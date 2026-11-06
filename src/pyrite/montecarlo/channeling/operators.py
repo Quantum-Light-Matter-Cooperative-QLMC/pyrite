@@ -604,7 +604,7 @@ def _tds_strength(element, cov, p, harmonic_g, q_y):
 
 
 def _tds_transform(element: str, a2: float, k) -> np.ndarray:
-    """Isotropic 2D TDS transform for the axial dissipator [eV² Å⁶].
+    """Isotropic 2D TDS transform for the axial dissipator [eV² Å⁴].
 
     This is the ``S = a² I`` limit of the planar covariance integral.  Axial
     scattering still uses its isotropic transverse-displacement approximation.

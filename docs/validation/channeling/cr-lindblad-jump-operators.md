@@ -235,7 +235,7 @@ The reference integrates in polar coordinates about one peak, with radial and
 angular panels graded to the other, so it shares no nodes with production. Relative
 errors, with Si $a^2=0.0057$ and W $a^2=0.0020$ Å$^2$:
 
-| Case | $G$ [Å⁻¹] | $D(G)$ reference [eV² Å⁶] | order 8 | order 16 |
+| Case | $G$ [Å⁻¹] | $D(G)$ reference [eV² Å⁴] | order 8 | order 16 |
 | --- | --- | --- | --- | --- |
 | Si | 26.2 | $+8.356\times10^{2}$ | $-4.0\times10^{-5}$ | $+2.0\times10^{-6}$ |
 | Si | 39.3 | $-9.092\times10^{2}$ | $-3.7\times10^{-4}$ | $+2.8\times10^{-8}$ |
@@ -243,8 +243,23 @@ errors, with Si $a^2=0.0057$ and W $a^2=0.0020$ Å$^2$:
 | W | 39.3 | $+4.582\times10^{4}$ | $+2.6\times10^{-4}$ | $+9.5\times10^{-6}$ |
 | W | 60 | $-1.194\times10^{4}$ | $-1.2\times10^{-3}$ | $-1.6\times10^{-7}$ |
 
-The stated tolerance is $2\times10^{-5}$ relative for $G\le130$ Å⁻¹; the reference
-changes by up to $6\times10^{-6}$ between orders 12 and 24. The large relative errors
-lie near the sign change of $D(G)$: the absolute order-8 error stays below
-$1.0\times10^{-5}\,D(0)$. Build cost is unchanged within timing noise (50
+The stated tolerance is absolute: the order-16 error is at most
+$2.2\times10^{-6}\,D(0)$ over the scanned cases, against up to
+$1.21\times10^{-5}\,D(0)$ for W at order 8 (small $G$) and $6.1\times10^{-6}\,D(0)$
+for Si. A relative bound cannot hold at the roots of $D(G)$. A $2\times10^{-5}$
+relative bound holds away from them, and not for W ($a^2=0.002$ Å$^2$) on 44–50 and
+63–76 Å⁻¹, where $|D|\ll D(0)$. The reference changes by up to $6\times10^{-6}$
+between orders 12 and 24. For anisotropic covariances `_tds_diagonal` reaches
+$1.1\times10^{-6}\,D(0)$ on eight synthetic cases (order 8: $3.0\times10^{-5}$), with
+relative errors up to $4.8\times10^{-4}$ where $|D|\ll D(0)$. The potential-table
+interpolation is a separate error of $2$–$9\times10^{-6}$ at the tabulated points,
+which this reference shares. Build cost is unchanged within timing noise (50
 transforms: 41 ms before, 40 ms after).
+
+**Fresh-context verification (2026-11-05): `rederived`.** Own confocal-elliptic and
+fine polar references reproduce the integrand, the Gaussian closed form and all
+tabulated $D(G)$. `_tds_diagonal` equals `_tds_transform` to $7\times10^{-15}$ for
+isotropic sites. The verifier's corrections to the units and tolerance are applied
+above. Independence caveat: the task required testing this section, so it and the
+production body were read before the derivation. Anisotropic covariances have no
+committed anchor.
