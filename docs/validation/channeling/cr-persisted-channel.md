@@ -58,9 +58,9 @@ incident electron on `E_grid`. It includes the diagnostic bound lines and
 tracked free-to-bound capture. `spec`, `spec_characteristic` and `brem` keep
 their existing meanings. Common component owners include CR once in totals;
 off omits it. `CHANNELING_MODEL` is
-`planar-density-matrix-emission-v4` after #536 registered the provisional
-MoS₂ directional valence loss (v3: #523 diamond electronic-kernel
-input change), and applies only to enabled channeling identities.
+`planar-density-matrix-emission-v5` after the #887 TDS radial quadrature
+correction (v4: #536 provisional MoS₂ directional valence loss; v3: #523
+diamond electronic-kernel input change), and applies only to enabled channeling identities.
 
 Assumptions: the P3 diagnostic source remains at constant mean energy, while
 transport includes continuous stopping. The profile, kernel, margin, mean

@@ -20,7 +20,7 @@ from typing import Any
 
 from .._channeling_admission import refuse_unverified_axial_run as refuse_unverified_axial_run
 
-AXIAL_MODEL_MARKER = "axial-entrance-experimental-config-v1"
+AXIAL_MODEL_MARKER = "axial-entrance-experimental-config-v2"
 AXIAL_SCHEMA_VERSION = 1
 _PENDING = {"version": 1, "kind": "pending-physical-validation"}
 _DEFAULT_LIMITS = {

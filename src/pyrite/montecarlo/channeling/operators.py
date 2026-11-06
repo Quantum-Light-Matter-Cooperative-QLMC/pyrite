@@ -93,7 +93,7 @@ _Q_SMALL_INV_ANG = 0.02
 # Upper |q| of every q integral. The TDS tail beyond it carries a relative
 # share ~ 1/(a Q)^2 < 1e-5; the electronic close tail ~ (q_typ / Q)^2.
 _Q_MAX_INV_ANG = 1.0e4
-_GL = {n: np.polynomial.legendre.leggauss(n) for n in (2, 3, 8, 24)}
+_GL = {n: np.polynomial.legendre.leggauss(n) for n in (2, 3, 8, 16, 24)}
 
 
 def _panels(edges, order: int = 8) -> tuple[np.ndarray, np.ndarray]:
@@ -604,13 +604,15 @@ def _tds_strength(element, cov, p, harmonic_g, q_y):
 
 
 def _tds_transform(element: str, a2: float, k) -> np.ndarray:
-    """Isotropic 2D TDS transform for the axial dissipator [eV² Å⁶].
+    """Isotropic 2D TDS transform for the axial dissipator [eV² Å⁴].
 
     This is the ``S = a² I`` limit of the planar covariance integral.  Axial
     scattering still uses its isotropic transverse-displacement approximation.
+    The Coulomb peaks at ``r = k / 2`` fall inside wide geometric radial panels,
+    so large ``k`` needs order 16 there; more angles do not help (#887).
     Validation: cr-lindblad-jump-operators
     """
-    radius, w_r = _panels(_geometric_edges(0.05, _Q_MAX_INV_ANG), 8)
+    radius, w_r = _panels(_geometric_edges(0.05, _Q_MAX_INV_ANG), 16)
     angle, w_a = _GL[24]
     angle, w_a = 0.5 * np.pi * (angle + 1.0), 0.5 * np.pi * w_a
     k = np.asarray(k, dtype=float)
@@ -637,7 +639,7 @@ def _tds_diagonal(profile, sites, covariances, hbar_v, max_harmonic):
     Validation: cr-lindblad-jump-operators
     """
     g = profile.g_inv_ang
-    radius, w_r = _panels(_geometric_edges(0.05, _Q_MAX_INV_ANG), 8)
+    radius, w_r = _panels(_geometric_edges(0.05, _Q_MAX_INV_ANG), 16)
     angle, w_a = _GL[24]
     angle, w_a = 0.5 * np.pi * (angle + 1.0), 0.5 * np.pi * w_a  # [0, pi], doubled below
     cos_t, sin_t = np.cos(angle), np.sin(angle)

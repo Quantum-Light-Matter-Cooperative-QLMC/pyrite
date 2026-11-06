@@ -11,10 +11,15 @@ from scipy.special import j0
 from pyrite.materials.channeling import longitudinal_kinematics, planar_profile
 from pyrite.materials.channeling.axial import axial_profile, axial_states
 from pyrite.materials.channeling.transverse import HBAR2_2M_EV_ANG2
-from pyrite.montecarlo.channeling import states
+from pyrite.montecarlo.channeling import operators, states
 from pyrite.montecarlo.channeling.axial_dissipator import axial_dissipator
 from pyrite.montecarlo.channeling.axial_mcwf import AxialMCWF
-from pyrite.montecarlo.channeling.operators import electronic_kernel, tds_kernel
+from pyrite.montecarlo.channeling.operators import (
+    _potential,
+    _tds_transform,
+    electronic_kernel,
+    tds_kernel,
+)
 from pyrite.montecarlo.channeling.realspace import RealSpaceGrid
 
 
@@ -431,3 +436,49 @@ def test_jump_hook_must_return_a_grid_state(tds_solver):
             step_ang=10.0,
             jump_hook=lambda e, phi, t: np.zeros(3),
         )
+
+
+def _peak_centred_transform(element, a2, g, order=24):
+    """``T(g)`` in polar coordinates about one Coulomb peak, graded to the other."""
+    x, w = np.polynomial.legendre.leggauss(order)
+
+    def composite(edges):
+        mid, half = 0.5 * (edges[1:] + edges[:-1]), 0.5 * (edges[1:] - edges[:-1])
+        return np.outer(half, x).ravel() + np.repeat(mid, order), np.outer(half, w).ravel()
+
+    scales = 0.05 * 2.0 ** np.arange(12)
+    near = np.concatenate([g - scales, g + scales])
+    q, w_q = composite(np.unique(np.r_[0.0, 0.05 * 2.0 ** np.arange(18), 1e4, g, near[near > 0.0]]))
+    tail = np.pi - 1e-4 * 2.0 ** np.arange(15)
+    t, w_t = composite(np.unique(np.r_[0.0, tail[tail > 0.0], np.pi]))
+    cos_t = np.cos(t)
+    total = 0.0
+    for start in range(0, q.size, 400):
+        qs, weights = q[start : start + 400], w_q[start : start + 400]
+        other = np.sqrt(np.maximum(qs[:, None] ** 2 + g**2 + 2.0 * qs[:, None] * g * cos_t, 0.0))
+        damp = np.exp(-a2 * (qs[:, None] ** 2 + qs[:, None] * g * cos_t + 0.5 * g**2))
+        angular = (_potential(element, other) * (np.exp(-0.5 * a2 * g**2) - damp)) @ w_t
+        total += 2.0 * np.sum(qs * weights * _potential(element, qs) * angular)
+    return total
+
+
+@pytest.mark.parametrize(
+    ("element", "a2", "g"),
+    [("Si", 0.0057, 13.0), ("Si", 0.0057, 26.2), ("Si", 0.0057, 39.3), ("W", 0.002, 60.0)],
+)
+def test_tds_transform_matches_peak_centred_reference_at_large_g(element, a2, g):
+    # Order 8 radial panels miss 39.3 and 60 by 3.7e-4 and 1.2e-3 (#887).
+    reference = _peak_centred_transform(element, a2, g)
+    assert _tds_transform(element, a2, np.array([g]))[0] == pytest.approx(reference, rel=2e-5)
+
+
+def test_tds_transform_matches_gaussian_closed_form(monkeypatch):
+    v0, b, a2 = 3.0, 0.08, 0.006
+    monkeypatch.setattr(operators, "_potential", lambda _element, q: v0 * np.exp(-b * q**2))
+    g = np.array([0.0, 5.0, 13.0, 26.2])
+    closed = (
+        v0**2
+        * np.exp(-b * g**2 / 2)
+        * (np.exp(-a2 * g**2 / 2) * np.pi / (2 * b) - np.exp(-a2 * g**2 / 4) * np.pi / (2 * b + a2))
+    )
+    np.testing.assert_allclose(operators._tds_transform("Si", a2, g), closed, rtol=1e-9)

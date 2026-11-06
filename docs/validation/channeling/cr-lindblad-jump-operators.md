@@ -222,3 +222,44 @@ The one failed check is numerical. `decoherence_rate` evaluates the TDS $\Gamma(
 ## Resolution (lead, after the verdict)
 
 Finding 1 is fixed. `decoherence_rate` now evaluates the $J_0$ term on panels at most half a period ($\pi/\Delta$) wide, up to $Q_1=2\pi\cdot400/\Delta$. It drops the oscillating tail beyond $Q_1$ behind a $\cos^2$ taper over $[0.75Q_1,Q_1]$, so no boundary term survives. The non-oscillating mean keeps the original grids. The electronic branch uses the same treatment. Against this write-up's converged reference, $\Gamma_{\rm TDS}$ agrees to $5.7\times10^{-6}$, $4.1\times10^{-6}$ and $2.8\times10^{-6}$ at $\Delta=1.92$, 3.0 and 5.0 Å. $\Gamma_{\rm el}(10^5\,{\rm \AA})$ now equals the electronic mean loss to $10^{-6}$. `test_tds_decoherence_rate_matches_converged_reference` pins those reference values, and `test_tds_decoherence_rate_matches_cell_kernel` pins agreement with the position-space cell kernel at $\Delta=d,2d$. Finding 3 is fixed: `kept_diagonal` accepts scalars. The fix was not re-verified in a fresh context.
+
+## Radial quadrature correction (#887)
+
+`_tds_transform` and `_tds_diagonal` evaluate the same polar integral about the
+midpoint $\mathbf G/2$. The integrand peaks at $\mathbf k=\pm\mathbf G/2$, so at
+large $G$ a peak sits inside a wide geometric radial panel. The earlier diagnosis
+of an angular error was wrong: with order-8 radial panels the result is unchanged
+from 24 to 384 angles, while order 16 at 24 angles converges.
+
+The reference integrates in polar coordinates about one peak, with radial and
+angular panels graded to the other, so it shares no nodes with production. Relative
+errors, with Si $a^2=0.0057$ and W $a^2=0.0020$ Å$^2$:
+
+| Case | $G$ [Å⁻¹] | $D(G)$ reference [eV² Å⁴] | order 8 | order 16 |
+| --- | --- | --- | --- | --- |
+| Si | 26.2 | $+8.356\times10^{2}$ | $-4.0\times10^{-5}$ | $+2.0\times10^{-6}$ |
+| Si | 39.3 | $-9.092\times10^{2}$ | $-3.7\times10^{-4}$ | $+2.8\times10^{-8}$ |
+| Si | 60 | $-2.144\times10^{1}$ | $-1.9\times10^{-4}$ | $-4.7\times10^{-6}$ |
+| W | 39.3 | $+4.582\times10^{4}$ | $+2.6\times10^{-4}$ | $+9.5\times10^{-6}$ |
+| W | 60 | $-1.194\times10^{4}$ | $-1.2\times10^{-3}$ | $-1.6\times10^{-7}$ |
+
+The stated tolerance is absolute: the order-16 error is at most
+$2.2\times10^{-6}\,D(0)$ over the scanned cases, against up to
+$1.21\times10^{-5}\,D(0)$ for W at order 8 (small $G$) and $6.1\times10^{-6}\,D(0)$
+for Si. A relative bound cannot hold at the roots of $D(G)$. A $2\times10^{-5}$
+relative bound holds away from them, and not for W ($a^2=0.002$ Å$^2$) on 44–50 and
+63–76 Å⁻¹, where $|D|\ll D(0)$. The reference changes by up to $6\times10^{-6}$
+between orders 12 and 24. For anisotropic covariances `_tds_diagonal` reaches
+$1.1\times10^{-6}\,D(0)$ on eight synthetic cases (order 8: $3.0\times10^{-5}$), with
+relative errors up to $4.8\times10^{-4}$ where $|D|\ll D(0)$. The potential-table
+interpolation is a separate error of $2$–$9\times10^{-6}$ at the tabulated points,
+which this reference shares. Build cost is unchanged within timing noise (50
+transforms: 41 ms before, 40 ms after).
+
+**Fresh-context verification (2026-11-05): `rederived`.** Own confocal-elliptic and
+fine polar references reproduce the integrand, the Gaussian closed form and all
+tabulated $D(G)$. `_tds_diagonal` equals `_tds_transform` to $7\times10^{-15}$ for
+isotropic sites. The verifier's corrections to the units and tolerance are applied
+above. Independence caveat: the task required testing this section, so it and the
+production body were read before the derivation. Anisotropic covariances have no
+committed anchor.
