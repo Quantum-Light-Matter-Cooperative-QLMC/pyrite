@@ -253,3 +253,36 @@ def radiative_layer_moments_scalar(
         element_rates[element_index] = number_per_ang * rate
         hard += element_rates[element_index]
     return soft, hard
+
+
+@njit(cache=True)
+def _sample_hard_photon(
+    target, u_k, L, n_elements, n_T, Z, incident, nominal, top, chi, E_eV, cutoff_eV, element_rates,
+    plasma,
+):  # fmt: skip
+    """Photon energy [eV] and emitting ``Z`` of a hard radiative event at ``E_eV``.
+
+    ``target`` lies in the sum of ``element_rates``, the layer's rates at ``E_eV``.
+
+    Validation: bremslib-radiative-partition
+    """
+    element_index = n_elements[L] - 1
+    cumulative = 0.0
+    for k_el in range(n_elements[L]):
+        cumulative += element_rates[k_el]
+        if cumulative > target:
+            element_index = k_el
+            break
+    nT = n_T[L, element_index]
+    photon_eV = sample_hard_photon_energy_scalar(
+        incident[L, element_index, :nT],
+        nominal[L, element_index],
+        top[L, element_index, :nT],
+        chi[L, element_index, :nT],
+        Z[L, element_index],
+        E_eV,
+        cutoff_eV,
+        u_k,
+        plasma[L],
+    )
+    return photon_eV, Z[L, element_index]

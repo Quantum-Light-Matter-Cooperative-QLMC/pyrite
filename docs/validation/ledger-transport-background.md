@@ -41,16 +41,16 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 
 ## `mixed-elastic-split`
 
-- **Claim:** `transport_mode="mixed"` splits each element's ELSEPA angular law at a quantile cutoff frozen per energy panel, with hard fraction `f_h = min(1, 2<mu>_k/C1)` from the panel's lower node; hard events run at `Sigma(E) f_h` and draw from the quantile interval `(1-f_h, 1)` of the detailed sampler, and `C1 = 0` is detailed transport bit for bit
-- **Code:** `_mixed_elastic_policy.py::validate_mixed_parameters`; `montecarlo/transport/mixed_elastic.py::{mixed_elastic_tables,_mixed_hard_rate_scalar,_mixed_hard_quantile_scalar}`; `montecarlo/transport/cores.py::make_cpu_transport_core`
-- **Source:** PENELOPE-2024, NEA/MBDAV/R(2024)1, Eqs. 4.9–4.10 and 4.33–4.37; [derivation](beam-transport/mixed-elastic-transport.md)
+- **Claim:** `transport_mode="mixed"` splits each element's ELSEPA angular law at a quantile cutoff frozen per energy panel, with hard fraction `f_h = min(1, 2<mu>_k/C1)` from the panel's lower node; hard events are proposed at an upper bound of `Sigma(E) f_h` over the step's energies, thinned to the true rate at the event's energy, and draw from the quantile interval `(1-f_h, 1)` of the detailed sampler; `C1 = 0` is detailed transport bit for bit
+- **Code:** `_mixed_elastic_policy.py::validate_mixed_parameters`; `montecarlo/transport/mixed_elastic.py::{mixed_elastic_tables,_mixed_hard_rate_scalar,_hard_rate_bound_scalar,_layer_hard_rate_bound,_mixed_hard_element,_mixed_hard_quantile_scalar}`; `montecarlo/transport/cores.py::make_cpu_transport_core`
+- **Source:** PENELOPE-2024, NEA/MBDAV/R(2024)1, Eqs. 4.9–4.10, 4.33–4.37 and 4.96–4.98; [derivation](beam-transport/mixed-elastic-transport.md)
 - **Equation:** `lambda_h = max(lambda_el, C1 lambda_1)`, `lambda_1 = lambda_el/(2<mu>)`, `xi_c = 1 - lambda_el/lambda_h`, `mu = P^-1(xi_c + (1-xi_c) u)`
 - **Assumptions:** per-element split of an additive compound rate; the frozen panel cutoff trades a jump in the hard rate at nodes for an exact partition between them; the C2 energy limit truncates the step and leaves the hard rate alone, unlike Eq. 4.85
 - **Limiting cases:** `C1 = 0` gives no soft part and reproduces detailed rows bit for bit; panels with `2<mu> >= C1` stay detailed; first-moment closure of soft plus hard on the detailed law between nodes
 - **Status:** discrepancy
-- **Checks:** hard fraction equals `2<mu>/C1` where active; rate and quantile share the panel fraction; out-of-range parameters refused
+- **Checks:** hard fraction equals `2<mu>/C1` where active; rate and quantile share the panel fraction; the hazard bound covers the rate across nodes; hard-event count against its exact integral across two nodes, which the earlier row-start hazard fails; out-of-range parameters refused
 - **Anchor:** `tests/montecarlo/collisions/test_mixed_elastic.py`
-- **Notes:** Issue #894. CPU per-electron core only so far. [Fresh-context verification](beam-transport/mixed-elastic-split.md) at 861642bbf: the table equations hold, but the core keeps the row-start hazard across an ELSEPA node, so a crossing row uses a stale hard rate and the mean deflection falls 1-2% below the Lewis integral at default parameters. Fix not applied. Target `rederived`, with the limit `anchored`.
+- **Notes:** Issue #894. CPU per-electron core only so far. [Fresh-context verification](beam-transport/mixed-elastic-split.md) at 861642bbf: the table equations hold, but the core keeps the row-start hazard across an ELSEPA node, so a crossing row uses a stale hard rate and the mean deflection falls 1-2% below the Lewis integral at default parameters. Thinning now replaces that hazard, and the status stays `discrepancy` until fresh-context verification of the fix. Target `rederived`, with the limit `anchored`.
 
 ## `mixed-elastic-soft-moments`
 
@@ -67,16 +67,16 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 
 ## `mixed-elastic-hinge`
 
-- **Claim:** the mixed per-electron core places one artificial deflection uniformly in each step, with PENELOPE's two-box law matching both soft Lewis moments at the hinge's energy; a step is the distance to the next hard event capped by `4 lambda_T^(h)`, `C2 E/S` and the layer limit; hinge and limit rows leave every hard optical depth running, and a boundary or hard event ends the step
-- **Code:** `montecarlo/transport/mixed_elastic.py::{_hinge_moments,_sample_hinge_mu,_hinge_direction,layer_step_limits_ang}`; `montecarlo/transport/cores.py::make_cpu_transport_core`; `montecarlo/transport/core_specializations.py::mixed_elastic_core`
-- **Source:** PENELOPE-2024 Eqs. 4.20–4.23, 4.28–4.32 and §§4.3.3, 4.4; [derivation](beam-transport/mixed-elastic-transport.md)
+- **Claim:** the mixed per-electron core places one artificial deflection uniformly in each step, with PENELOPE's two-box law matching both soft Lewis moments at the hinge's energy; a step is the distance to the next hard proposal at the step's rate bounds, capped by `4 lambda_T^(h)`, `C2 E/S` and the layer limit, so it realizes its planned length unless a surface or cutoff truncates it; hinge, limit and rejected-proposal rows leave every other hard optical depth running
+- **Code:** `montecarlo/transport/mixed_elastic.py::{_hinge_moments,_sample_hinge_mu,_hinge_direction,_grid_rate_bound,layer_step_limits_ang}`; `montecarlo/transport/cores.py::make_cpu_transport_core`; `montecarlo/transport/core_specializations.py::mixed_elastic_core`
+- **Source:** PENELOPE-2024 Eqs. 4.20–4.23, 4.28–4.32, 4.96–4.98 and §§4.3.3, 4.4; [derivation](beam-transport/mixed-elastic-transport.md)
 - **Equation:** `<mu> = (1 - exp(-s/lambda_s1))/2`, `<mu^2> = <mu> - (1 - exp(-s/lambda_s2))/6`, `mu_0 = (2<mu> - 3<mu^2>)/(1 - 2<mu>)`, `a = 1 - 2<mu> + mu_0`, `tau = xi s`
-- **Assumptions:** at least about ten hinges per track, the reason for the layer limit; moments at the hinge's energy capture their linear variation along a step; a hinge overtaken by a hard event is dropped, a second-order effect
+- **Assumptions:** at least about ten hinges per track, the reason for the layer limit; moments at the hinge's energy capture their linear variation along a step; a hinge pending at a surface is dropped (Eq. 4.23); a rate above its bound, from a straggling tail or a radiative rate peaking inside the window, is accepted with probability 1
 - **Limiting cases:** no soft part means no draws and no rows; the law reproduces both moments over small and large steps; position, energy and clock stay continuous across hinges, and direction changes only at hinges and hard events
 - **Status:** discrepancy
-- **Checks:** both moments by deviate quadrature; row continuity; step limit; reproducibility; exit fractions against detailed within 4 sigma; [pilot](beam-transport/mixed-elastic-transport.md#pilot-not-the-equivalence-study)
+- **Checks:** both moments by deviate quadrature; row continuity; step limit; reproducibility; exit fractions against detailed within 4 sigma; final `P1` and `P2` against the Lewis integrals across two nodes; inelastic and radiative event counts against detailed; [pilot](beam-transport/mixed-elastic-transport.md#pilot-not-the-equivalence-study)
 - **Anchor:** `tests/montecarlo/collisions/test_mixed_elastic.py`
-- **Notes:** Issue #894. CPU per-electron core only so far. [Fresh-context verification](beam-transport/mixed-elastic-hinge.md) at 861642bbf: the hinge law holds, but its moments use the planned step length when a hard event ends the step early, which overstates the soft first moment by about 1% at `C1 = 0.05` and 3% at `C1 = 0.2`. Shares its root cause with `mixed-elastic-split`. Fix not applied. Target `rederived`.
+- **Notes:** Issue #894. CPU per-electron core only so far. [Fresh-context verification](beam-transport/mixed-elastic-hinge.md) at 861642bbf: the hinge law holds, but its moments use the planned step length when a hard event ends the step early, which overstates the soft first moment by about 1% at `C1 = 0.05` and 3% at `C1 = 0.2`. Shares its root cause with `mixed-elastic-split`. Thinning now fixes the step's length when it starts, and the status stays `discrepancy` until fresh-context verification of the fix. Target `rederived`.
 
 ## `detector-cone-variance-reduction`
 

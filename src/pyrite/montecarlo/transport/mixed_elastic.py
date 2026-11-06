@@ -22,6 +22,7 @@ from ..._mixed_elastic_policy import (
     validate_mixed_parameters as validate_mixed_parameters,
 )
 from .core_geometry import _rotate_direction_scalar
+from .hard_inelastic import _log_grid_frac
 from .kinematics import _SM64_ONE, _stream_uniform_scalar
 from .scattering import _elsepa_bracket
 
@@ -30,6 +31,15 @@ MIXED_MAX_STEP_HARD_MFP = 4.0
 #: Default step limit as a fraction of the layer thickness, from PENELOPE's
 #: recipe of one tenth of the expected track length (Sec. 4.4.1).
 MIXED_MAX_STEP_LAYER_FRACTION = 0.1
+#: Energy window of a step's hazard bounds, as a multiple of ``C2``. A step loses
+#: ``C2 E`` at the start's stopping power; the stopping rises as the energy falls.
+#: With ``S ~ 1/E`` the loss is ``E (1 - sqrt(1 - 2 C2))``, 0.225 E at ``C2 = 0.2``.
+MIXED_STEP_LOSS_MARGIN = 1.5
+#: What a mixed step ends in: a limit, or a proposal from one hard process.
+STEP_END_LIMIT = 0
+STEP_END_ELASTIC = 1
+STEP_END_INELASTIC = 2
+STEP_END_RADIATIVE = 3
 _GAUSS_NODES, _GAUSS_WEIGHTS = np.polynomial.legendre.leggauss(6)
 
 
@@ -144,6 +154,106 @@ def _mixed_hard_rate_scalar(E_keV, logE_flat, log_rate_flat, hard_fraction, star
     row, f = _elsepa_bracket(np.log(E_keV * 1e3), logE_flat, start, length)
     rate = np.exp(log_rate_flat[row] + f * (log_rate_flat[row + 1] - log_rate_flat[row]))
     return rate * hard_fraction[row]
+
+
+@njit(cache=True)
+def _hard_rate_bound_scalar(E_low, E_high, logE_flat, log_rate_flat, hard_fraction, start, length):
+    """Upper bound [1/cm] of one element's hard rate on ``[E_low, E_high]``.
+
+    The rate is log-linear inside a panel, where the hard fraction is constant,
+    so its maximum lies at a window end or on either side of an interior node.
+
+    Validation: mixed-elastic-split
+    """
+    bound = max(
+        _mixed_hard_rate_scalar(E_low, logE_flat, log_rate_flat, hard_fraction, start, length),
+        _mixed_hard_rate_scalar(E_high, logE_flat, log_rate_flat, hard_fraction, start, length),
+    )
+    row_low, _ = _elsepa_bracket(np.log(E_low * 1e3), logE_flat, start, length)
+    row_high, _ = _elsepa_bracket(np.log(E_high * 1e3), logE_flat, start, length)
+    for node in range(row_low + 1, row_high + 1):
+        rate = np.exp(log_rate_flat[node]) * max(hard_fraction[node - 1], hard_fraction[node])
+        if rate > bound:
+            bound = rate
+    return bound
+
+
+@njit(cache=True)
+def _layer_hard_rate_bound(
+    E_low, E_high, L, n_el, logE_flat, log_rate_flat, hard_fraction, start, length
+):
+    """Upper bound [1/cm] of a layer's hard elastic rate; element bounds add.
+
+    Validation: mixed-elastic-split
+    """
+    bound = 0.0
+    for i_el in range(n_el):
+        bound += _hard_rate_bound_scalar(
+            E_low, E_high, logE_flat, log_rate_flat, hard_fraction,
+            start[L, i_el], length[L, i_el],
+        )  # fmt: skip
+    return bound
+
+
+@njit(cache=True)
+def _grid_rate_bound(rate, log_grid, n, log_low, log_high):
+    """Upper bound of a rate linear between the knots of ``log_grid``.
+
+    Validation: mixed-elastic-hinge
+    """
+    low, frac_low = _log_grid_frac(log_grid, n, log_low)
+    high, frac_high = _log_grid_frac(log_grid, n, log_high)
+    bound = max(
+        rate[low] + frac_low * (rate[low + 1] - rate[low]),
+        rate[high] + frac_high * (rate[high + 1] - rate[high]),
+    )
+    for knot in range(low + 1, high + 1):
+        if rate[knot] > bound:
+            bound = rate[knot]
+    return bound
+
+
+@njit(cache=True)
+def _mixed_hard_element(
+    target, E_keV, L, n_el, logE_flat, log_rate_flat, hard_fraction, start, length
+):
+    """Element whose true hard rate at ``E_keV`` holds ``target``; -1 rejects.
+
+    ``target`` is uniform on the step's elastic bound [1/cm], so an element is
+    chosen with probability ``rate_i / bound`` (PENELOPE Eqs. 4.96-4.98).
+
+    Validation: mixed-elastic-split
+    """
+    cumulative = 0.0
+    for i_el in range(n_el):
+        cumulative += _mixed_hard_rate_scalar(
+            E_keV, logE_flat, log_rate_flat, hard_fraction, start[L, i_el], length[L, i_el]
+        )
+        if target < cumulative:
+            return i_el
+    return -1
+
+
+@njit(cache=True)
+def _plan_mixed_step(elastic, inelastic, radiative, bounds, limit):
+    """Step length [Angstrom] and what ends it, from each clock's proposal distance.
+
+    ``bounds`` holds the elastic [1/cm], inelastic and radiative [1/Angstrom]
+    rate bounds; ``limit`` is the caller's layer and ``C2`` limit. A step is at
+    most ``4 lambda_T^(h)`` (Sec. 4.4), and a limit wins only when strictly shorter.
+
+    Validation: mixed-elastic-hinge
+    """
+    length, end = elastic, STEP_END_ELASTIC
+    if inelastic < length:
+        length, end = inelastic, STEP_END_INELASTIC
+    if radiative < length:
+        length, end = radiative, STEP_END_RADIATIVE
+    hard_total = bounds[0] + (bounds[1] + bounds[2]) * 1e8
+    cap = min(limit, MIXED_MAX_STEP_HARD_MFP * 1e8 / hard_total)
+    if cap < length:
+        return cap, STEP_END_LIMIT
+    return length, end
 
 
 @njit(cache=True)

@@ -1,5 +1,9 @@
 # `mixed-elastic-split`
 
+```{note}
+This page records verification of the row-start hazard at 861642bbf. The core has since moved to thinning, which has not had fresh-context verification.
+```
+
 ## Scope and independence
 
 Validation: `mixed-elastic-split`. Fresh-context verification on 2026-11-05, branch `issue-894-mixed-elastic-transport`, HEAD `19f59240e` plus the uncommitted move of `validate_mixed_parameters` to `_mixed_elastic_policy.py`, whose logic is unchanged. Source: PENELOPE-2024, NEA/MBDAV/R(2024)1, Eqs. 4.9–4.10, 4.33–4.37 and 4.95–4.98, read from the local PDF. The derivation below was recorded before the implementation or `mixed-elastic-transport.md` was read.

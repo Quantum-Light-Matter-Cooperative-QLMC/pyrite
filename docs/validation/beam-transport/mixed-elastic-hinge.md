@@ -1,5 +1,9 @@
 # `mixed-elastic-hinge`
 
+```{note}
+This page records verification of the row-start hazard at 861642bbf. The core has since moved to thinning, which has not had fresh-context verification.
+```
+
 ## Scope and independence
 
 Validation: `mixed-elastic-hinge`. Fresh-context verification on 2026-11-05, same state as [`mixed-elastic-split`](mixed-elastic-split.md). Source: PENELOPE-2024 Eqs. 4.20–4.23, 4.28–4.32, 4.85, 4.95–4.98, §§4.3.3, 4.4 and 4.4.1. Derived before reading the implementation.

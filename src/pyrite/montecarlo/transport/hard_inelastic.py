@@ -411,3 +411,43 @@ def _soft_loss_sample_keV(mean, variance, key, counter):
     if u < weight:
         return 0.0, counter
     return top * (u - weight) / (1.0 - weight), counter
+
+
+@njit(cache=True)
+def _sample_hard_collision(
+    target, E_eV, E_end_keV, E_cut_keV, u_w, u_q, u_phi, dx, dy, dz, channel_rate, n_channels,
+    lo, f, channel_U, channel_W, channel_branch, channel_code, cutoff_eV, secondaries,
+):  # fmt: skip
+    """One hard collision of a layer's channels at ``E_eV``.
+
+    ``target`` lies in the summed channel rate at grid position ``(lo, f)``.
+    Returns ``(W_keV, code, cos, phi, sec_x, sec_y, sec_z, absorbed)``; an
+    absorbed primary falls to its cutoff and keeps its direction.
+
+    Validation: shell-soft-hard-transport
+    """
+    ch = n_channels - 1
+    cumulative = 0.0
+    for k_ch in range(n_channels):
+        cumulative += channel_rate[k_ch, lo] + f * (
+            channel_rate[k_ch, lo + 1] - channel_rate[k_ch, lo]
+        )
+        if cumulative > target:
+            ch = k_ch
+            break
+    U, W, branch = channel_U[ch], channel_W[ch], channel_branch[ch]
+    W_eV = _sample_hard_transfer_eV(E_eV, U, W, branch, cutoff_eV, u_w)
+    if branch >= POSITRON_BRANCH_OFFSET:
+        # W_max = E at the row start can exceed the soft-debited
+        # row-end energy only for positrons; absorb, never overdraw.
+        W_eV = min(W_eV, E_end_keV * 1.0e3)
+    W_keV = W_eV * 1.0e-3
+    sec_x = sec_y = sec_z = 0.0
+    if secondaries:
+        sec_x, sec_y, sec_z = _hard_secondary_direction(
+            dx, dy, dz, E_eV, U, W, branch, W_eV, u_q, u_phi
+        )
+    if E_end_keV - W_keV <= E_cut_keV:
+        return W_keV, channel_code[ch], 1.0, 0.0, sec_x, sec_y, sec_z, True
+    cosine = _hard_primary_cosine(E_eV, U, W, branch, W_eV, u_q)
+    return W_keV, channel_code[ch], cosine, 2.0 * np.pi * u_phi, sec_x, sec_y, sec_z, False

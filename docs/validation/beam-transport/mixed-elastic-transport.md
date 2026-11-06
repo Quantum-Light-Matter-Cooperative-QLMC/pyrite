@@ -1,11 +1,12 @@
 # Mixed elastic transport with a random hinge
 
 ```{warning}
-Fresh-context verification found two open biases in the CPU core: a stale hard
-rate across ELSEPA nodes and an overstated hinge moment after an overtaking hard
+Fresh-context verification found two biases in the CPU core: a stale hard rate
+across ELSEPA nodes and an overstated hinge moment after an overtaking hard
 event. See [`mixed-elastic-split`](mixed-elastic-split.md) and
-[`mixed-elastic-hinge`](mixed-elastic-hinge.md). This note's statement that the
-node jump "changes speed, not physics" does not hold for the current core.
+[`mixed-elastic-hinge`](mixed-elastic-hinge.md). The core now thins its hard
+processes, as described under **Competing hazards** below. That fix has not had
+fresh-context verification, so both claims stay at `discrepancy` until it does.
 ```
 
 Design and derivation of the opt-in `transport_mode="mixed"` scheme (#894).
@@ -60,8 +61,7 @@ with $Q$ the quantile integrals over $(0,\xi_c)$ on the panel's two rows. Those
 are exact at every energy, not only at nodes, so soft plus hard reproduces the
 detailed law's moments everywhere. Interpolating node-level moments instead
 would lose that closure, on panels up to $\ln 1.33$ wide. The price is a
-jump in $\Sigma_h$ at a node. It changes speed, not physics, because the hard
-optical depth is consumed row by row.
+jump in $\Sigma_h$ at a node, which the core must resolve and does by thinning.
 
 **Energy control.** Three limits bound a step: $s\le 4\lambda_T^{(h)}$ (§4.4),
 $s\le C_2E/S$, and $s\le$ one tenth of the layer thickness or an explicit
@@ -72,11 +72,29 @@ limit on mean fractional loss. This is why the hard fraction has no stopping
 dependence. It also keeps the elastic table independent of the collision model.
 `max_dE_frac` substeps split rows without touching the step.
 
-**Competing hazards.** The step length is the distance to the next hard event
-of any kind at the step's start energy, then capped. Hinge and delta rows are
-fictitious for hard processes, so every optical depth survives them. A hard
-event that overtakes a pending hinge because rates rose along the step drops
-that hinge, an effect of the order of the energy change across a step.
+**Competing hazards.** Each hard process runs at an upper bound of its rate over
+the energies the step can reach, from the start energy down to
+$E(1-\tfrac32 C_2)$ or the cutoff (PENELOPE Eqs. 4.96–4.98). The step length is
+the distance to the first proposal, then capped, and it is fixed when the step
+starts. A proposal at the step's end is accepted with probability
+$\Sigma(E_{\rm end})/\Sigma_{\max}$. A rejected one is a delta row that restarts
+only that process's clock. One uniform makes the elastic decision and picks the
+element, so hazard, element and quantile all read the same energy.
+
+The realized step therefore equals the planned one unless a surface or cutoff
+truncates it, which is the case Eq. 4.23 covers. Hinge and delta rows are
+fictitious for hard processes, so every optical depth survives them.
+
+The elastic and inelastic bounds are exact suprema, because each rate is monotonic
+between table knots: log-linear with a constant hard fraction for elastic, linear
+for inelastic. The radiative bound takes the larger of the window's two ends.
+Energy loss beyond the window, from a straggling tail, or a radiative rate that
+peaks inside it, makes the true rate exceed the bound, and the proposal is then
+accepted with probability 1. The size of this clamp has not been measured.
+
+Thinning adds rows: about 15% on the table-free Si anchor (170 to 100 keV,
+$C_1=C_2=0.05$), where rejected proposals add 6.6 delta rows to the 95 rows per
+history of the earlier hazard scheme.
 
 **Interfaces.** A row stopped at a boundary discards the pending hinge and
 starts a new step (§4.4, (vi)). Eq. 4.23 shows this gives the correct mean
@@ -112,6 +130,9 @@ read it cannot use it.
 | Grooved geometry, cone splitting, LUT, Mott | Refused | No specialization |
 
 ## Pilot (not the equivalence study)
+
+This pilot predates thinning and did not expose either bias, so it is not
+evidence of equivalence.
 
 CPU per-electron core, ELSEPA, continuous stopping, $E_{\rm cut}=20$ keV,
 $C_1=C_2=0.05$, seeds 1000 onward with 300 electrons per seed, 2026-11-05.
