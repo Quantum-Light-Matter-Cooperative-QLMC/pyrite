@@ -116,7 +116,7 @@ def main():
     parser.add_argument("--thickness", type=float, default=1e7)
     parser.add_argument("--tilt", type=float, default=10.0)
     parser.add_argument("--azimuth", type=float, default=100.0)
-    parser.add_argument("--core", default="per-electron")
+    parser.add_argument("--core", default="cuda")
     args = parser.parse_args()
     subprocess.run(["git", "check-ignore", "-q", str(args.out)], check=True)
     args.out.mkdir(parents=True, exist_ok=True)

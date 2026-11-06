@@ -16,7 +16,7 @@ export PYRITE_USER_CATALOG="$PWD/scratch/roulette879/empty-user-catalog"
 export UV_CACHE_DIR=/tmp/pyrite-uv-cache
 export PYRITE_MC_BACKEND=cuda
 export PYRITE_TEST_BACKEND=cuda
-export PYRITE_FP64=1
+export PYRITE_FP64="${PYRITE_FP64:-0}"  # production float32 scoring; 1 forces float64
 export OPENBLAS_NUM_THREADS=1
 mkdir -p "$PYRITE_USER_CATALOG"
 git check-ignore scratch/roulette879/probe
