@@ -28,11 +28,10 @@ SCRATCH_BYTES_PER_ELECTRON = 8 * 1024**3 / 65_536
 SCRATCH_FRACTION = 0.125
 #: Share of the target the pool may reserve at most.
 POOL_FRACTION = 0.95
-#: Target kept outside the pool: the process held about 1 GiB beyond the pool
-#: (CUDA context plus driver allocations) at 16-64 GiB targets on the RTX PRO
-#: 6000 (#868). The context is not separable per process through CuPy, so this
-#: is a measured constant rather than a per-run reading.
-POOL_RESERVE_BYTES = 5 * 1024**3 // 4
+#: Target kept for allocations made outside the pool after the run starts: 0.10
+#: to 0.43 GiB on the RTX 5080 and RTX PRO 6000 (#868). Memory already in use
+#: outside the pool at the start (CUDA context, other processes) is read per run.
+POOL_HEADROOM_BYTES = 1024**3 // 2
 #: Smallest share of the target left to the pool, so small targets still run.
 #: Those targets are best effort: the reserve may not fit under them.
 MIN_POOL_FRACTION = 0.5
@@ -93,12 +92,16 @@ class MemoryBlockSizer:
     def pool_limit(self) -> Iterator[None]:
         """Cap the device pool under the target for this run, never above an existing cap."""
         previous = BACKEND.memory_limit_bytes()
-        if previous is None:  # no device pool
+        outside = BACKEND.device_bytes_outside_pool()
+        if previous is None or outside is None:  # no device pool
             yield
             return
         pool_bytes = int(
             max(
-                min(POOL_FRACTION * self.target_bytes, self.target_bytes - POOL_RESERVE_BYTES),
+                min(
+                    POOL_FRACTION * self.target_bytes,
+                    self.target_bytes - outside - POOL_HEADROOM_BYTES,
+                ),
                 MIN_POOL_FRACTION * self.target_bytes,
             )
         )

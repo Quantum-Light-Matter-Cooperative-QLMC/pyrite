@@ -56,14 +56,12 @@ rather than an electron count. It excludes `stream_block_electrons`:
 numerics = numerics.with_kernel_tuning(KernelTuning(stream_memory_mib=32_768))
 ```
 
-The target covers this process's whole device footprint. The run caps the CuPy
-memory pool below it, keeping at least 1.25 GiB and 5% of the target for the
-CUDA context and driver allocations, and restores the previous cap afterwards.
-Targets under about 2.5 GiB are best effort, because the pool keeps half of the
-target and that reserve may not fit. A first block of 1,024 electrons measures this scene's memory per
-electron, and later blocks are sized so retained rows take a quarter of the
-target, shrinking if a later block proves denser. Any `scratch_mib` and
-`electron_batch` you leave unset scale with the block.
+The target covers the whole card. At the start the run reads the device memory
+in use outside the CuPy pool, including this process's CUDA context and any
+other process, and caps the pool at the target minus that and a 0.5 GiB
+allowance, at most 95% of the target. It restores the previous cap afterwards.
+The pool always keeps half of the target, so targets too small for that overhead
+are best effort. Memory other processes take after the start is not covered.
 
 Transport counts are exact. CUDA scoring runs in float32 by default, and these
 blocks split the continuum population differently from a joined run, so
@@ -71,8 +69,7 @@ continuum bins can differ more than the lines: in W at 1 MeV, up to about 7e-5
 per bin against about 5e-7 for the lines, and about 7e-7 for the Si continuum.
 With `PYRITE_FP64=1` the difference falls to rounding. An
 allocation over the cap goes through the normal block recovery and can raise
-an out-of-memory error if the target is too small for the scene. Other
-processes on the card are not counted.
+an out-of-memory error if the target is too small for the scene.
 
 ## What it supports
 
