@@ -21,11 +21,15 @@ separate `DirectionalSpectrum` objects for the requested components:
 | `bremsstrahlung` | Continuum; BremsLib angular model when its tables resolve, otherwise isotropic EEDL |
 | `transition` | History-coherent planar-crossing TR; infinite slab required |
 
-One transport serves all directions and selected components. Use equal CXR and
-bremsstrahlung counts in `FixedSampling`: the directional calculation uses the
-line count for both populations. Characteristic and continuum scoring retain
-the live runner's lower-cutoff policy. Components stay separate; the result
-does not authorize summing arbitrary sources or adding a TR–line cross term.
+One transport serves all directions and selected components. It follows the
+larger of the two `FixedSampling` counts. PXR/CBS scores the first
+`cxr_electrons` histories; characteristic, continuum and TR score the first
+`brem_electrons` histories. As in the live runner, histories in both
+populations stop at the lower bremsstrahlung cutoff and line-only histories at
+the line cutoff. Each density is per incident electron of its own population,
+and unequal counts are honored as requested. Components stay separate; the
+result does not authorize summing arbitrary sources or adding a TR–line cross
+term.
 Cross-electron coherent and channeling radiation are excluded.
 
 TR requires explicit infinite planar geometry (`footprint=None`) and the

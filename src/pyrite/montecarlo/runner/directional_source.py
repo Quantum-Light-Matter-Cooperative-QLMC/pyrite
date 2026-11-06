@@ -11,7 +11,7 @@ from .transition_emission import block_transition_spectrum, case_layer_eps
 
 #: Detector-free directional components: (selection attribute, output slot).
 #: Each keeps the live runner's electron population: PXR/CBS uses the line
-#: population; characteristic and continuum use the lower-cutoff brem one.
+#: population; characteristic, continuum and TR use the lower-cutoff brem one.
 SOURCE_COMPONENTS = {
     "pxr-cbs": ("cxr", "spec"),
     "characteristic": ("characteristic", "spec_characteristic"),

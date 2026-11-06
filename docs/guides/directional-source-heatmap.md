@@ -3,16 +3,15 @@
 
 Use [Angular radiation distributions](../notebooks/designing/05-angular-radiation-distributions.ipynb)
 for the guided public-API example, complete source and captured map. Directional
-scoring is **experimental** and reuses one transported electron population for
-all directions.
+scoring is **experimental** and reuses one transport for all directions.
 
 ## Choose and compute the map
 
 1. Define the beam and target. Set the target footprint to the physical sample
    dimensions when side-face escape matters.
-2. Choose observation angles and an explicit photon-energy point grid. Set
-   equal CXR and bremsstrahlung counts in `FixedSampling` for the shared
-   directional population.
+2. Choose observation angles and an explicit photon-energy point grid. Set the
+   `FixedSampling` counts: `cxr_electrons` for PXR/CBS, `brem_electrons` for
+   characteristic, continuum and TR.
 3. Call `pyrite.radiation.directional_source` for PXR/CBS, or
    `directional_sources(..., components=...)` for separate supported components.
 4. Plot each returned density on its own angle and energy axes. Retain its
