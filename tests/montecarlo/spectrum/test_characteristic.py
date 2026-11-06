@@ -724,3 +724,56 @@ def test_segment_sum_matches_column_sum_to_float64_reordering():
     np.testing.assert_array_equal(
         characteristic._to_cpu(fused.segment_sum(weighted)), characteristic._to_cpu(summed)
     )
+
+
+@pytest.mark.parametrize(
+    ("element", "density", "layer", "z_range"),
+    [("W", 0.063, 0, (1.0, 99.0)), ("Si", 0.05, 1, (101.0, 999.0))],
+)
+def test_layered_w_si_spectrum_matches_a_per_line_reference(element, density, layer, z_range):
+    """Grouped, prepared and fused scoring equals the plain per-line sum (#1005)."""
+    from pyrite.montecarlo.spectrum.segment_escape import mean_transmission
+
+    rng = np.random.default_rng(13)
+    segments = _w_film_segments(21)
+    n = segments["L_ang"].size
+    segments["r_mid"][:, 2] = rng.uniform(*z_range, n)
+    segments["layer"] = np.full(n, layer)
+    energy = np.linspace(1.0e3, 1.2e4, 200)
+    composition = [(element, density)]
+    spectrum = characteristic.mc_characteristic_spectrum(
+        segments, energy, composition=composition, layers=_W_ON_SI, E_cut_keV=1.0, _table_cache={}
+    )
+
+    table = characteristic.load_characteristic_cross_sections(element)
+    clipped = characteristic._clip_segments_to_cutoff(segments, 1.0, composition, _W_ON_SI)
+    index = xp.flatnonzero(xp.asarray(clipped["elec_id"]) < 4)
+    n_hat = characteristic._observation_direction(np.deg2rad(119.0), None)
+    owner, fraction, start, end = characteristic.segment_escape_paths(
+        clipped, index, n_hat, layers=_W_ON_SI, xp=xp
+    )
+    seg_L = xp.asarray(clipped["L_ang"], dtype=REAL)[index][owner] * fraction
+    seg_E = xp.asarray(clipped["E_keV"], dtype=REAL)[index][owner]
+    sigma = characteristic._interpolate_shell_cross_sections(table, seg_E)
+    path_cm = density * 1.0e24 * (seg_L * 1.0e-8)
+    edges, widths = characteristic._energy_bin_edges_and_widths(energy)
+    _transfer, per_vacancy = characteristic._cascade_line_yields(table, table.recommended_cutoff_eV)
+    expected = np.zeros(energy.size)
+    for line, line_energy in enumerate(table.line_energy_eV):
+        if line_energy <= table.recommended_cutoff_eV:
+            continue
+        grid = xp.asarray([line_energy], dtype=REAL)
+        mu = xp.stack([characteristic._mu_total_inv_ang(c, grid)[0] for *_z, c in _W_ON_SI])
+        transmission = mean_transmission(start @ mu, end @ mu, xp=xp)
+        line_sigma = sigma @ xp.asarray(per_vacancy[:, line], dtype=REAL)
+        line_yield = float(characteristic._to_cpu(xp.sum(path_cm * line_sigma * transmission)))
+        weights = characteristic._lorentzian_bin_weights(
+            edges, line_energy, table.cxr_fwhm_eV[line]
+        )
+        expected += line_yield * weights / widths
+    expected /= 4.0 * np.pi * 4
+
+    assert np.any(expected > 0.0)
+    np.testing.assert_allclose(
+        spectrum, expected, rtol=scaled_rtol(1.0e-13, eps_multiple=energy.size), atol=0.0
+    )

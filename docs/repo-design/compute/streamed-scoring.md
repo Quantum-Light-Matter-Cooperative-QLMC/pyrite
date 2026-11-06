@@ -398,6 +398,51 @@ difference 0), so no tolerance change. The remaining W cost is the incoherent
 line reduction (`spec`, 36%), owned by #286; the BremsLib continuum is 8%, the
 host-to-device upload 3% and the per-block pool release about 2%.
 
+## Characteristic preparation and launches (#1005)
+
+`checks/characteristic_scoring_1005.py` adds synchronized timers and NVTX ranges
+inside `mc_characteristic_spectrum` to the harness above: 300 keV, 20,000
+electrons in 4,096-electron blocks, 400 line bins, seed 1, RTX 5080, two reps
+(job 4020 baseline; 4022 prepared context; 4025 fused kernels; 4028 column sum).
+Seconds; launches and copies from Nsight on a third rep:
+
+| Case and step | Characteristic | Setup | Accumulate | Interpolation | Launches | H2D copies |
+|---|---|---|---|---|---|---|
+| W, baseline | 3.96-3.98 | 0.24-0.25 | 3.45 | 0.91-0.92 | 79,470 | 14,904 |
+| W, prepared context | 3.43-3.45 | 0.08 | 3.07-3.09 | 0.53 | 76,143 | 454 |
+| W, fused kernels | 2.85-2.87 | 0.08 | 2.49-2.51 | 0.06-0.07 | 14,977 | 68 |
+| W, column sum | 1.53-1.55 | 0.08 | 1.18-1.19 | 0.06 | 17,320 | 68 |
+| Si, baseline | 0.137-0.139 | 0.04 | 0.08 | 0.014 | 2,880 | 407 |
+| Si, column sum | 0.100-0.202 | 0.02-0.13 | 0.058 | 0.003 | 1,646 | 38 |
+| 1 um W on 10 um Si, baseline | 0.94-0.95 | 0.52-0.53 | 0.36 | 0.07 | not traced | not traced |
+| 1 um W on 10 um Si, column sum | 0.35 | 0.10 | 0.19 | 0.006 | not traced | not traced |
+
+Setup is per call, so its one-time part shows only in the first block: W spends
+108 ms there and 38 ms in each later block before, 71 ms and 4 ms after. The
+0.13 s Si setup is an intermittent one-time host gap (115 ms) before the first
+CUDA call of the process, not a per-block cost.
+
+W wall drops from 16.7 s to 14.2 s and `add` from 8.4 s to 5.9-6.0 s. Most of
+the gain is not setup: interpolation and transmission were launch bound, and
+CuPy's `sum(axis=0)` over the `(chunk, line group)` float64 yields took 0.79 s
+of GPU time (1.38 s once the fused kernel fed it). A cuBLAS ones-vector product
+reads the same array in about 0.03 s.
+
+Every characteristic spectrum, streamed W, Si and layered W/Si and joined W at
+4,000 electrons, stayed bitwise identical to the baseline through all steps.
+The fused kernels are bit-for-bit by construction; the column sum reorders only
+a float64 sum that accumulates into float32 line yields, so a rounding-level
+difference is possible on other inputs. There is no model marker change.
+
+Spectral-window pruning is not implemented: on W at a 1e-6 in-window mass
+tolerance it would keep 79 of 95 lines, and only the about 1 s of per-line
+kernels scales with that count, about 1% of wall for an opt-in approximation.
+This is an estimate from line counts and the kernel split, not a timed arm.
+
+The remaining W cost is `pyrite_characteristic_line_yield` (0.59 s, float64
+`exp` and `expm1`, because the escape paths are float64) and the float64
+shell-response product (0.30 s).
+
 ## Transport/scoring overlap
 
 Overlapping CPU transport with GPU scoring is not implemented. Job 3010 timed
