@@ -2,17 +2,17 @@
   "schema": "pyrite.xsgen.elsepa-release.v1",
   "upstream": "ELSEPA 2020, Mendeley Data doi:10.17632/w4hm5vymym.1",
   "archive": {
-    "sha256": "cc0046c83660c8a6b4526725d9e875418f33a0ec52676d4ef27ce6b1eb261779",
-    "bytes": 49517253,
+    "sha256": "060c06cf31fbcf083ae5ca8a47c91ae958cf7b4465e3880e905acb7736b7ccbb",
+    "bytes": 49517306,
     "urls": [
-      "https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/releases/download/tables-elsepa-positron-4/elsepa-positron-tables.zip"
+      "https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/releases/download/tables-elsepa-positron-5/elsepa-positron-tables.zip"
     ]
   },
   "tables": [
     {
       "label": "Z=1",
-      "key": "b9b88de8199844dcb8230f99c36ffdbeb848e3d37c003e2a4738e14707eacc0d",
-      "manifest_sha256": "f2e560eb375edd703adad734635558f13b1e7173386666f43faed0d274b4f725"
+      "key": "44d2c40323cb8a3ee8cf0398a7e3432898f9c1024cb71ec2ad50d06084d2c8e4",
+      "manifest_sha256": "a59e03db99f9d77edbbfbda9f1bab70fc27d294e083aefe29119e34ae11ec993"
     },
     {
       "label": "Z=3",

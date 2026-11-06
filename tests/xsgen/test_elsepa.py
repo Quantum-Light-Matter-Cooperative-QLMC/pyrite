@@ -12,6 +12,7 @@ from pyrite.xsgen.elsepa import (
     parse_dcs,
     table_arrays,
 )
+from pyrite.xsgen.elsepa.parse import check_transport_scaling
 from pyrite.xsgen.toolchain import Toolchain
 
 #: ELSEPA's published test-run output, kept as a test fixture (ADR-0014).
@@ -151,3 +152,64 @@ def test_the_parser_accepts_output_written_without_an_absorption_potential():
 
     assert result.absorption_cm2 == 0.0
     assert result.total_elastic_cm2 == parse_dcs(reference).total_elastic_cm2
+
+
+def _screened_rutherford_sigma(energy_ev):
+    gamma = 1.0 + np.asarray(energy_ev) / 510998.95
+    return 1.0e-20 / ((gamma**2 - 1.0) * (1.0 - gamma**-2))
+
+
+def test_transport_scaling_guard_accepts_screened_rutherford_falloff():
+    energy = np.geomspace(2.0e6, 1.0e8, 20)
+    check_transport_scaling(energy, _screened_rutherford_sigma(energy), z=74)
+
+
+def test_transport_scaling_guard_rejects_a_transport_cross_section_that_stops_falling():
+    energy = np.geomspace(2.0e6, 1.0e8, 20)
+    sigma = _screened_rutherford_sigma(energy) + 1.0e-23
+    with pytest.raises(ValueError, match=r"stops falling.*Z=74"):
+        check_transport_scaling(energy, sigma, z=74)
+
+
+def test_transport_scaling_guard_ignores_panels_outside_the_factorized_range():
+    energy = np.asarray([1.0e3, 1.0e4, 1.0e5, 1.0e6, 2.0e8, 3.0e8])
+    check_transport_scaling(energy, np.full(energy.size, 1.0e-20), z=74)
+
+
+def test_generate_runs_each_energy_in_its_own_process(monkeypatch, tmp_path):
+    source = tmp_path / "elsepa"
+    (source / "database").mkdir(parents=True)
+    for name in ("elscata.f", "elsepa2020.f", "radial.f"):
+        (source / name).write_text(name, encoding="utf-8")
+    monkeypatch.setattr("pyrite.paths.user_data_path", lambda *a, **k: tmp_path / "data")
+    monkeypatch.setattr("pyrite.xsgen.store.data_dir", lambda: tmp_path / "packaged")
+    monkeypatch.setattr(
+        "pyrite.xsgen.elsepa.generate.find_toolchain",
+        lambda: Toolchain(Path("/fake/gfortran"), "GNU Fortran fake"),
+    )
+    monkeypatch.setattr("pyrite.xsgen.elsepa.generate.build", lambda *a, **k: Path("/fake/elscata"))
+    decks = []
+
+    def fake_run(*args, stdin_text, outputs, **kwargs):
+        decks.append(stdin_text)
+        assert len(outputs) == 1
+        energy = [line.split()[1] for line in stdin_text.splitlines() if line.startswith("EV")]
+        assert len(energy) == 1
+        text = _reference_output().decode("ascii")
+        text = text.replace("1.00000E+03 eV", f"{energy[0]} eV", 1)
+        return SimpleNamespace(outputs={outputs[0]: text})
+
+    monkeypatch.setattr("pyrite.xsgen.elsepa.generate.run_program", fake_run)
+
+    result = generate_element(80, [1_000.0, 2_000.0], source_path=source)
+
+    assert len(decks) == 2
+    assert result.table.arrays()["dcs_cm2_sr"].shape == (2, 606)
+
+
+def test_only_decks_that_inherit_state_record_process_per_energy():
+    flag = "process_per_energy"
+    assert ElsepaDeck.free_atom(1, [1.0e3]).model_record()[flag] is True
+    assert ElsepaDeck.free_atom(74, [1.0e3], nuclear_model=1).model_record()[flag] is True
+    assert flag not in ElsepaDeck.free_atom(2, [1.0e3]).model_record()
+    assert flag not in ElsepaDeck.free_atom(74, [1.0e3]).model_record()
