@@ -6,6 +6,7 @@ import pytest
 from scipy.constants import Avogadro
 
 from pyrite import _catalog_layout as layout
+from pyrite.config import FixedSampling
 from pyrite.materials import build_crystal, build_medium, load_material_catalog, save_material
 from tests.helpers.material_authoring import preserve_catalog_registry  # noqa: F401
 
@@ -304,8 +305,7 @@ def test_registered_medium_lowers_into_real_layered_case():
     case = api.build_case(
         scene,
         pr.Numerics(
-            cxr_trials=1,
-            brem_trials=1,
+            sampling=FixedSampling(cxr_histories=1, brem_histories=1),
             energy_bins=pr.detectors.EnergyBins(cxr=[1000, 1050], brem=[1000, 1050]),
         ),
     )

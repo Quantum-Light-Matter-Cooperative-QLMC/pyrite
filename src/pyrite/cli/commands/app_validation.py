@@ -27,6 +27,7 @@ import click
 from ..._acp import running_acp
 from ...console import output as _cli_core
 from ...paths import app_dir
+from .._deprecations import removed_option
 from .._extras import require_cli_extra
 
 NOTEBOOK = str(app_dir() / "validation_app.py")
@@ -143,9 +144,11 @@ def _cli(args):
     show_default=True,
     help="With --export, Fig. 1c line electrons per energy.",
 )
+@removed_option("--brem-trials", "--brem-histories")
+@removed_option("--brem-electrons", "--brem-histories")
+@removed_option("--ne-brem", "--brem-histories")
 @click.option(
-    "--brem-trials",
-    "--ne-brem",
+    "--brem-histories",
     "ne_brem",
     type=_cli_core.POSITIVE_INT,
     default=200,

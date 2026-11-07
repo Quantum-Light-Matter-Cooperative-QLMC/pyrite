@@ -44,7 +44,7 @@ def calculate():
         scene,
         observation=observation,
         numerics=Numerics(
-            sampling=FixedSampling(cxr_electrons=64, brem_electrons=64),
+            sampling=FixedSampling(cxr_histories=64, brem_histories=64),
             cxr_reflections=CxrReflections(n_families=2),
         ),
     )

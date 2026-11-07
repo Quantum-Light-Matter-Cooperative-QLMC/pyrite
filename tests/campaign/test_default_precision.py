@@ -9,6 +9,7 @@ from pyrite import materials
 from pyrite._precision import DEFAULT_PRECISION, Precision
 from pyrite.campaign.config import default_settings
 from pyrite.campaign.profiles import profile_precision_source, profile_run_settings
+from pyrite.config import AdaptiveSampling
 
 
 def _sweep(*, n_electrons=None, gdf=False, grooved=False):
@@ -32,9 +33,9 @@ def _with_standard(monkeypatch, field, value):
 def test_default_policy_matches_the_recorded_decision():
     assert DEFAULT_PRECISION == Precision(
         target_rse=0.05,
-        min_electrons=200,
-        max_electrons=20_000,
-        block_electrons=100,
+        min_histories=200,
+        max_histories=20_000,
+        block_histories=100,
         observables=("cxr", "brem"),
     )
 
@@ -46,7 +47,9 @@ def test_a_plain_profile_runs_the_default_policy():
 
 
 def test_an_explicit_table_wins(monkeypatch):
-    policy = Precision(target_rse=0.1, min_electrons=20, max_electrons=60, block_electrons=20)
+    policy = AdaptiveSampling(
+        target_rse=0.1, min_histories=20, max_histories=60, block_histories=20
+    )
     _with_standard(monkeypatch, "profile_precisions", policy.to_dict())
     precision, source = profile_precision_source(default_settings(), "standard")
     assert (precision, source) == (policy, "profile")
@@ -55,7 +58,7 @@ def test_an_explicit_table_wins(monkeypatch):
 @pytest.mark.parametrize(
     "sweep, reason",
     [
-        (_sweep(n_electrons=[450]), "fixed electron counts"),
+        (_sweep(n_electrons=[450]), "fixed history counts"),
         (_sweep(gdf=True), "GDF"),
         (_sweep(grooved=True), "grooved"),
     ],
@@ -69,7 +72,7 @@ def test_per_material_routes_keep_fixed_counts(sweep, reason):
 @pytest.mark.parametrize(
     "field, value, reason",
     [
-        ("profile_transport_numerics", {"n_electrons": (450,)}, "fixed electron counts"),
+        ("profile_transport_numerics", {"n_electrons": (450,)}, "fixed history counts"),
         ("profile_emissions", "coherent", "emission is 'coherent'"),
         ("profile_emissions", "both", "emission is 'both'"),
     ],

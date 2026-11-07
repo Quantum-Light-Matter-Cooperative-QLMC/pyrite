@@ -100,7 +100,7 @@ def test_removed_flat_arguments_fail():
         (
             {
                 "numerics": Numerics(
-                    sampling=AdaptiveSampling(target_rse=0.1, max_electrons=100, block_electrons=10)
+                    sampling=AdaptiveSampling(target_rse=0.1, max_histories=100, block_histories=10)
                 )
             },
             "fixed sampling",

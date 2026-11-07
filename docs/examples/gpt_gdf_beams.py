@@ -31,7 +31,7 @@ def calculate(path):
         Slab("hopg", thickness_ang=1_000.0, tilt_deg=30.0, footprint=Footprint(1.0, 1.0)),
         Detector(observation_angle_deg=135.0),
         numerics=Numerics(
-            sampling=FixedSampling(cxr_electrons=64, brem_electrons=64),
+            sampling=FixedSampling(cxr_histories=64, brem_histories=64),
             cxr_reflections=CxrReflections(n_families=2),
         ),
     )

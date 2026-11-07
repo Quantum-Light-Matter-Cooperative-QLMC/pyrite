@@ -10,10 +10,12 @@ import pytest
 import pyrite as pr
 from pyrite import api
 from pyrite._cxr_grid_policy import CxrYieldStatisticsWarning
+from pyrite._sampling import adaptive_sampling
 from pyrite.campaign.profiles import case_content_key, dataset_identity
 from pyrite.campaign.sweep import BeamSpec, build_cases
 from pyrite.campaign.sweep import Sweep as LegacySweep
 from pyrite.checkpoints import _checkpoint_io, _checkpoint_store
+from pyrite.config import FixedSampling
 from pyrite.montecarlo import Case, runner
 from pyrite.results import Settings, store_result
 
@@ -32,16 +34,19 @@ def scene():
 
 @pytest.fixture
 def precision():
-    return pr.config.Precision(0.1, 40, 60, 20, observables=("cxr", "brem"))
+    return pr.config.AdaptiveSampling(0.1, 40, 60, 20, observables=("cxr", "brem"))
 
 
 @pytest.fixture
 def numerics(precision):
-    return pr.Numerics(precision=precision, transport_core="per-electron")
+    return pr.Numerics(sampling=adaptive_sampling(precision), transport_core="per-electron")
 
 
 def test_precision_roundtrips_json_and_process_pickle(precision):
-    assert pr.config.Precision.from_dict(json.loads(json.dumps(precision.to_dict()))) == precision
+    assert (
+        pr.config.AdaptiveSampling.from_dict(json.loads(json.dumps(precision.to_dict())))
+        == precision
+    )
     assert pickle.loads(pickle.dumps(precision)) == precision
     assert "realized_electrons" not in precision.to_dict()
 
@@ -49,7 +54,7 @@ def test_precision_roundtrips_json_and_process_pickle(precision):
 def test_precision_freezes_caller_owned_sequences():
     observables = ["cxr"]
     band = [1000.0, 3000.0]
-    precision = pr.config.Precision(0.1, 40, 60, 20, observables=observables, band_eV=band)
+    precision = pr.config.AdaptiveSampling(0.1, 40, 60, 20, observables=observables, band_eV=band)
     observables.append("brem")
     band[1] = 5000.0
     assert precision.observables == ("cxr",)
@@ -57,10 +62,10 @@ def test_precision_freezes_caller_owned_sequences():
 
 
 def test_numerics_requires_typed_precision():
-    with pytest.raises(TypeError, match="precision must be a Precision"):
-        pr.Numerics(precision={"target_rse": 0.1})
+    with pytest.raises(TypeError, match="sampling must be"):
+        pr.Numerics(sampling={"target_rse": 0.1})
     with pytest.raises(ValueError, match="per-electron or CUDA"):
-        pr.Numerics(precision=pr.config.Precision(0.1, 40, 60, 20), transport_core="lockstep")
+        pr.Numerics(sampling=pr.config.AdaptiveSampling(0.1, 40, 60, 20), transport_core="lockstep")
 
 
 @pytest.mark.parametrize("invalid", [True, 1.5, "123"])
@@ -79,12 +84,10 @@ def test_seed_override_preserves_default_and_sweep_independence(scene):
     assert [case.seed for case in points] == [123, 124]
 
 
-def test_lowering_uses_policy_maximum_and_ignores_fixed_defaults(scene, numerics):
+def test_lowering_uses_policy_maximum(scene, numerics):
     first = api.build_case(scene, numerics)
-    other = api.build_case(scene, replace(numerics, cxr_trials=7, brem_trials=3))
-    assert first.Ne == first.Ne_brem == numerics.precision.max_electrons
-    assert first.adaptive_precision == numerics.precision.to_dict()
-    assert case_content_key(first) == case_content_key(other)
+    assert first.Ne == first.Ne_brem == numerics.sampling.max_histories
+    assert first.adaptive_precision == numerics.sampling.to_dict()
     assert pickle.loads(pickle.dumps(first)).to_dict().keys() == first.to_dict().keys()
     assert Case(**first.to_dict()).adaptive_precision == first.adaptive_precision
 
@@ -144,7 +147,7 @@ def test_adaptive_dataset_identity_hashes_policy_not_unused_fixed_counts(scene, 
 @pytest.fixture
 def adaptive_output(scene, numerics):
     case = api.build_case(scene, numerics)
-    with pytest.warns(CxrYieldStatisticsWarning, match="max_electrons=60"):
+    with pytest.warns(CxrYieldStatisticsWarning, match="max_histories=60"):
         output = runner.run_case(case, transport_core="per-electron")
     return case, output
 
@@ -168,22 +171,22 @@ def test_split_transport_spectrum_path_retains_provenance(scene, numerics):
         transport = runner._transport_case(case, transport_core="per-electron")
     output = runner._spectrum_case(case, transport)
     assert output["adaptive_sampling"]["realized_electrons"] == transport["Ne_lines"]
-    assert case.Ne == numerics.precision.max_electrons
+    assert case.Ne == numerics.sampling.max_histories
 
 
 @pytest.mark.parametrize("split", [False, True])
 def test_early_stop_preserves_requested_case_and_matches_realized_fixed_n(scene, split):
-    precision = pr.config.Precision(
+    precision = pr.config.AdaptiveSampling(
         1.0,
         40,
         200,
         20,
         observables=("cxr", "brem"),
-        max_electron_share=1.0,
-        min_effective_electrons=0.0,
+        max_history_share=1.0,
+        min_effective_histories=0.0,
         stability_blocks=0,
     )
-    case = api.build_case(scene, pr.Numerics(precision=precision))
+    case = api.build_case(scene, pr.Numerics(sampling=adaptive_sampling(precision)))
     key = case_content_key(case)
     if split:
         output = runner._spectrum_case(
@@ -203,7 +206,7 @@ def test_early_stop_preserves_requested_case_and_matches_realized_fixed_n(scene,
 
 def test_public_batch_means_survive_checkpoint_storage(scene, numerics, tmp_path):
     numerics = replace(
-        numerics, precision=replace(numerics.precision, batch_means_band_eV=(1000.0, 3000.0))
+        numerics, sampling=replace(numerics.sampling, batch_means_band_eV=(1000.0, 3000.0))
     )
     case = api.build_case(scene, numerics)
     with pytest.warns(CxrYieldStatisticsWarning):
@@ -229,7 +232,7 @@ def test_simulate_carries_requested_identity_and_realized_provenance(scene, nume
     assert result.provenance["identity_digest"] == case_content_key(
         result.case, xsgen_tables=result.provenance["xsgen_tables"]
     )
-    assert result.case.Ne == numerics.precision.max_electrons
+    assert result.case.Ne == numerics.sampling.max_histories
 
 
 @pytest.mark.slow
@@ -268,7 +271,7 @@ def test_adaptive_policy_survives_configured_case_lowering(scene, precision):
 def test_public_sweep_retains_policy_for_every_case(scene, numerics):
     sweep = pr.Sweep(scene, {"beam.energy_keV": [20.0, 30.0]})
     assert all(
-        case["adaptive_precision"] == numerics.precision.to_dict() for case in sweep.cases(numerics)
+        case["adaptive_precision"] == numerics.sampling.to_dict() for case in sweep.cases(numerics)
     )
 
 
@@ -289,12 +292,14 @@ def test_unsupported_routes_fail_before_transport(scene, numerics, monkeypatch):
 
 def test_adaptive_case_rejects_count_mismatch(scene, numerics):
     case = api.build_case(scene, numerics)
-    with pytest.raises(ValueError, match="precision.max_electrons"):
+    with pytest.raises(ValueError, match="precision.max_histories"):
         replace(case, Ne=40)
 
 
 def test_pre_precision_case_pickle_state_keeps_manual_controls(scene):
-    case = api.build_case(scene, pr.Numerics(cxr_trials=8, brem_trials=4))
+    case = api.build_case(
+        scene, pr.Numerics(sampling=FixedSampling(cxr_histories=8, brem_histories=4))
+    )
     case = replace(case, E_cut_lines_keV=7.0, E_cut_brem_keV=2.0, brem_step_eV=100.0)
     # Frozen/slotted dataclasses pickle a positional list of field values.
     # Precision was appended after all existing fields, so old state is a prefix.
@@ -335,11 +340,13 @@ def test_physical_detector_is_rejected_at_lowering(scene, numerics):
 @pytest.mark.slow
 def test_mixed_cpu_pool_preserves_fixed_case_and_adaptive_provenance(scene, monkeypatch):
     monkeypatch.delenv("PYRITE_MC_TRANSPORT_CORE", raising=False)
-    precision = pr.config.Precision(
-        1.0, 40, 200, 20, max_electron_share=1.0, min_effective_electrons=0.0, stability_blocks=0
+    precision = pr.config.AdaptiveSampling(
+        1.0, 40, 200, 20, max_history_share=1.0, min_effective_histories=0.0, stability_blocks=0
     )
-    adaptive = api.build_case(scene, pr.Numerics(precision=precision))
-    fixed = api.build_case(scene, pr.Numerics(cxr_trials=8, brem_trials=4))
+    adaptive = api.build_case(scene, pr.Numerics(sampling=adaptive_sampling(precision)))
+    fixed = api.build_case(
+        scene, pr.Numerics(sampling=FixedSampling(cxr_histories=8, brem_histories=4))
+    )
     expected_fixed = runner.run_cases([fixed], max_workers=1, progress=False, engine="cpu")[0]
     expected_adaptive = runner.run_case(adaptive, transport_core="per-electron")
     outputs = runner.run_cases([adaptive, fixed], max_workers=1, progress=False, engine="cpu")
@@ -382,11 +389,11 @@ def test_precision_cannot_cross_with_electron_count_sweep(scene, precision):
 
 def test_precision_accepts_a_bare_observable_name():
     """A single name is one observable, not its characters (``tuple("cxr")``)."""
-    precision = pr.config.Precision(
+    precision = pr.config.AdaptiveSampling(
         target_rse=0.1,
-        min_electrons=10,
-        max_electrons=20,
-        block_electrons=10,
+        min_histories=10,
+        max_histories=20,
+        block_histories=10,
         observables="brem",
     )
     assert precision.observables == ("brem",)
@@ -394,14 +401,14 @@ def test_precision_accepts_a_bare_observable_name():
 
 def test_precision_min_electrons_defaults_to_one_block():
     """Issue #443: an omitted minimum is one block, the smallest legal stop."""
-    precision = pr.config.Precision(target_rse=0.1, max_electrons=60, block_electrons=20)
-    assert precision.min_electrons == 20
-    assert pr.config.Precision.from_dict(precision.to_dict()) == precision
+    precision = pr.config.AdaptiveSampling(target_rse=0.1, max_histories=60, block_histories=20)
+    assert precision.min_histories == 20
+    assert pr.config.AdaptiveSampling.from_dict(precision.to_dict()) == precision
 
 
-@pytest.mark.parametrize("missing", ["max_electrons", "block_electrons"])
+@pytest.mark.parametrize("missing", ["max_histories", "block_histories"])
 def test_precision_still_requires_max_and_block_counts(missing):
-    values = {"target_rse": 0.1, "max_electrons": 60, "block_electrons": 20}
+    values = {"target_rse": 0.1, "max_histories": 60, "block_histories": 20}
     del values[missing]
     with pytest.raises(TypeError, match=f"requires {missing}"):
-        pr.config.Precision(**values)
+        pr.config.AdaptiveSampling(**values)

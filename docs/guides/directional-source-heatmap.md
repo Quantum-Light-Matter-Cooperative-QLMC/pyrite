@@ -10,7 +10,7 @@ scoring is **experimental** and reuses one transport for all directions.
 1. Define the beam and target. Set the target footprint to the physical sample
    dimensions when side-face escape matters.
 2. Choose observation angles and an explicit photon-energy point grid. Set the
-   `FixedSampling` counts: `cxr_electrons` for PXR/CBS, `brem_electrons` for
+   `FixedSampling` counts: `cxr_histories` for PXR/CBS, `brem_histories` for
    characteristic, continuum and TR.
 3. Call `pyrite.radiation.directional_source` for PXR/CBS, or
    `directional_sources(..., components=...)` for separate supported components.

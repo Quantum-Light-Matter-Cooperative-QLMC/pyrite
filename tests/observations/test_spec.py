@@ -8,7 +8,7 @@ import pytest
 
 from pyrite import Scene, Sweep, api
 from pyrite.beams import Beam, PointBunch, Spot
-from pyrite.config import Numerics, Physics
+from pyrite.config import FixedSampling, Numerics, Physics
 from pyrite.detectors import Detector, IdealPhotonCounter, PixelGrid, PlanarDetector, PlanarPose
 from pyrite.geometry import Footprint, Slab
 from pyrite.observations import Acquisition, Observation, ObservationStore, PixelScorer
@@ -16,7 +16,7 @@ from pyrite.runs.observe import produce_observation
 from tests.helpers.case_compare import assert_same_case
 
 ENERGY = np.linspace(500.0, 3000.0, 6)
-CONTROLS = Numerics(cxr_trials=1, brem_trials=1)
+CONTROLS = Numerics(sampling=FixedSampling(cxr_histories=1, brem_histories=1))
 
 
 @dataclass(frozen=True)
@@ -319,18 +319,27 @@ def test_sweep_binds_each_geometry_and_applies_run_overrides_before_axes(scene, 
                 PlanarPose.from_observation(100.0, 60.0),
                 PlanarPose.from_observation(100.0, 75.0),
             ),
-            "numerics.cxr_trials": (1, 2),
+            "numerics.sampling.cxr_histories": (1, 2),
         },
     )
     physics = replace(scene.physics, straggling=True)
-    cases = sweep.cases(replace(CONTROLS, cxr_trials=3), physics=physics, observation=observation)
+    cases = sweep.cases(
+        replace(CONTROLS, sampling=replace(CONTROLS.sampling, cxr_histories=3)),
+        physics=physics,
+        observation=observation,
+    )
     assert [case["seed"] for case in cases] == [1, 2, 3, 4]
     assert [case["Ne"] for case in cases] == [1, 2, 1, 2]
     for case, (_, point) in zip(cases, sweep.expand(), strict=True):
-        # The explicit per-point trial axis beats the supplied common numerics.
+        # The explicit per-point budget axis beats the supplied common numerics.
         expected = api.build_case(
             point,
-            replace(CONTROLS, cxr_trials=point.numerics.cxr_trials),
+            replace(
+                CONTROLS,
+                sampling=replace(
+                    CONTROLS.sampling, cxr_histories=point.numerics.sampling.cxr_histories
+                ),
+            ),
             physics=physics,
             observation=observation,
         )

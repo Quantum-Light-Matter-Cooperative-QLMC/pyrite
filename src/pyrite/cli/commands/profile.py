@@ -18,7 +18,7 @@ from pyrite.campaign import (
 )
 from pyrite.cli import _catalog_io
 from pyrite.cli import _completion as _cli_completion
-from pyrite.cli._deprecations import canonical_option
+from pyrite.cli._deprecations import canonical_option, removed_option
 from pyrite.cli._groups import LazyGroup
 from pyrite.cli.commands import (
     _profile_detectors,
@@ -69,10 +69,8 @@ _ATOMIC_ELECTRON_DEFLECTION_VALUES = ("kawrakow", "none")
 _SHELL_IONIZATION_MODEL_VALUES = ("eedl", "bote-salvat")
 _MOSAIC_ROUTE_VALUES = ("analytic", "mc")
 _NUMERICS_FIELD_NAMES = {
-    "cxr-trials": "n_electrons",
-    "brem-trials": "n_electrons_brem",
-    "line-electrons": "n_electrons",
-    "bremsstrahlung-electrons": "n_electrons_brem",
+    "cxr-histories": "n_electrons",
+    "brem-histories": "n_electrons_brem",
     "reflection-families": "n_families",
     "maximum-reflections": "max_reflections",
     "mosaic-nodes": "mosaic_nodes",
@@ -107,11 +105,11 @@ _RANGE_OPTIONS = (
     ("azimuth", "--azimuth", AZIMUTH_CSV_RANGE, "DEG,..."),
 )
 _PROFILE_UPDATE_LABELS = {
-    "ne_line": "line trials",
-    "ne_brem": "bremsstrahlung trials",
+    "ne_line": "cxr histories",
+    "ne_brem": "brem histories",
 }
 
-#: Electron-count profile settings (plan P2.4): single-value grids, sweepable.
+#: History-count profile settings (plan P2.4): single-value grids, sweepable.
 _ACTIVE_DETECTOR_FIELDS = profile_detectors.ACTIVE_DETECTOR_FIELDS
 
 
@@ -120,9 +118,13 @@ def _catalog_key(label):
 
 
 def _ne_cli_options(function):
+    for old in ("--cxr-trials", "--cxr-electrons"):
+        function = removed_option(old, "--cxr-histories")(function)
+    for old in ("--brem-trials", "--brem-electrons"):
+        function = removed_option(old, "--brem-histories")(function)
     function = canonical_option(
         "-b",
-        "--brem-trials",
+        "--brem-histories",
         "ne_brem",
         type=COUNT_CSV,
         metavar="N,...",
@@ -130,7 +132,7 @@ def _ne_cli_options(function):
     )(function)
     function = canonical_option(
         "-l",
-        "--cxr-trials",
+        "--cxr-histories",
         "ne_line",
         type=COUNT_CSV,
         metavar="N,...",
@@ -268,7 +270,7 @@ def command():
       pyrite profile show sub_100keV        (or: pyrite profile sub_100keV)
       pyrite profile create sub_100keV --energy 30:100:10
       pyrite profile set sub_100keV --detector eds
-      pyrite numerics set sub_100keV --cxr-trials 2000
+      pyrite numerics set sub_100keV --cxr-histories 2000
       pyrite numerics cxr-grid show sub_100keV
       pyrite profile add sub_100keV --energy 75
       pyrite profile set sub_100keV --material hopg,mose2
@@ -330,16 +332,20 @@ def numerics_show_command(name, json_output):
 
 @numerics_command.command("set")
 @click.argument("name", shell_complete=_cli_completion.complete_profile)
+@removed_option("--cxr-trials", "--cxr-histories")
+@removed_option("--cxr-electrons", "--cxr-histories")
+@removed_option("--brem-trials", "--brem-histories")
+@removed_option("--brem-electrons", "--brem-histories")
 @canonical_option(
-    "--cxr-trials",
-    "line_electrons",
+    "--cxr-histories",
+    "cxr_histories",
     type=click.IntRange(min=1),
     metavar="N",
     help="Monte Carlo electron histories used to estimate the CXR spectrum.",
 )
 @canonical_option(
-    "--brem-trials",
-    "bremsstrahlung_electrons",
+    "--brem-histories",
+    "brem_histories",
     type=click.IntRange(min=1),
     metavar="N",
     help="Monte Carlo electron histories used to estimate bremsstrahlung.",
@@ -653,11 +659,7 @@ def show_command(name, json_output):
     if json_output:
         emit_json_result(cli_json.JsonResult("cxr.profile.show", payload))
         return 0
-    names = {
-        value: key
-        for key, value in _NUMERICS_FIELD_NAMES.items()
-        if key not in {"line-electrons", "bremsstrahlung-electrons", "line-trials"}
-    }
+    names = {value: key for key, value in _NUMERICS_FIELD_NAMES.items()}
     _profile_show.emit_show(payload, target, resolution, names, grid_rows)
     return 0
 

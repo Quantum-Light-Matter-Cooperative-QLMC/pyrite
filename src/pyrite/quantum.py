@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, Self
 
 from ._numerics import Numerics, Physics, _miller, validate_channeling_numerics
+from ._sampling import AdaptiveSampling
 from ._spec_defaults import UNSET, _Unset
 from ._units import _positive_length_quantity, normalize_unit
 
@@ -343,7 +344,7 @@ class QuantumSetup:
             )
         if physics.channeling_model != "off" or physics.channeling_axial is not None:
             raise ValueError("Scene.quantum conflicts with legacy Physics.channeling_model")
-        if numerics.precision is not None:
+        if isinstance(numerics.sampling, AdaptiveSampling):
             raise ValueError("adaptive precision is unsupported by planar quantum channeling")
         values = dict(
             channeling_basis_size=self.numerics.basis_size,

@@ -20,6 +20,7 @@ from pyrite._config_policy import (
 )
 from pyrite.campaign.lowering import build_case
 from pyrite.campaign.profiles import case_content_key
+from pyrite.config import FixedSampling
 
 
 def _scene(numerics):
@@ -51,13 +52,14 @@ def test_kernel_tuning_alias_and_mirrored_case_identity():
     assert type(kernel).__name__ == "ExecutionConfig"
     assert pickle.loads(pickle.dumps(kernel)) == kernel
     old = cfg.Numerics(
-        cxr_trials=31,
-        brem_trials=17,
+        sampling=FixedSampling(cxr_histories=31, brem_histories=17),
         transport_core="per-electron",
         cxr_chunk=7,
         brem_chunk=3,
     )
-    new = cfg.Numerics(cxr_trials=31, brem_trials=17, execution=kernel)
+    new = cfg.Numerics(
+        sampling=FixedSampling(cxr_histories=31, brem_histories=17), execution=kernel
+    )
     assert new.kernel_tuning is kernel
     assert new.resolved_execution is kernel
     old_case, new_case = build_case(_scene(old)), build_case(_scene(new))
@@ -88,10 +90,6 @@ def test_mixed_group_conflicts_fail_instead_of_overriding():
         cfg.Numerics(transport_core="lockstep", execution=cfg.KernelTuning(transport_core="cuda"))
     with pytest.raises(ValueError, match="max_dE_frac"):
         cfg.Numerics(max_dE_frac=0.1, transport=cfg.TransportNumerics(max_dE_frac=0.2))
-    with pytest.raises(ValueError, match="cxr_trials"):
-        cfg.Numerics(cxr_trials=45, sampling=cfg.FixedSampling(46, 20))
-    with pytest.raises(ValueError, match="legacy precision"):
-        cfg.Numerics(precision=cfg.Precision(0.1, 40, 80, 20), sampling=cfg.FixedSampling())
 
 
 def test_canonical_module_does_not_initialize_schedulers_or_backends():

@@ -534,12 +534,12 @@ Usage: pyrite app validation export [OPTIONS]
   Write cached validation figures; never starts marimo.
 
 Options:
-  --outdir DIRECTORY     [default: (pyrite-output/figures)]
-  --ne INTEGER           [default: 20000]
-  --brem-trials INTEGER  Monte Carlo electron histories for Fig. 1c bremsstrahlung per
-                         energy.  [default: 200]
-  --ne-supp INTEGER      [default: 200]
-  -h, --help             Show this message and exit.
+  --outdir DIRECTORY        [default: (pyrite-output/figures)]
+  --ne INTEGER              [default: 20000]
+  --brem-histories INTEGER  Monte Carlo electron histories for Fig. 1c bremsstrahlung
+                            per energy.  [default: 200]
+  --ne-supp INTEGER         [default: 200]
+  -h, --help                Show this message and exit.
 ```
 
 ## `pyrite app validation launch`
@@ -565,19 +565,19 @@ Usage: pyrite app validation reproduce [OPTIONS]
   Populate the Zhai reproduction cache; runs here unless -R/--remote.
 
 Options:
-  --ne INTEGER RANGE           Fig. 1c line electrons per energy.  [default: 20000;
-                               x>=1]
-  --brem-trials INTEGER RANGE  Monte Carlo electron histories for Fig. 1c bremsstrahlung
-                               per energy.  [default: 200; x>=1]
-  --ne-supp INTEGER RANGE      Supplementary electrons per polar-tilt spectrum.
-                               [default: 200; x>=1]
-  --tmd-azimuth DEGREES        Exploratory TMD azimuth.  [default: 0.0; x<=None]
-  --refresh                    Recompute matching cache.
-  --no-sync                    With -R/--remote, skip code upload.
-  --dry-run                    With -R/--remote, print submission preview only.
-  --detach                     With -R/--remote, return after submission.
-  --target NAME                Use named remote compute target NAME.
-  -R, --remote [TARGET]        Run remotely; bare uses the configured target, =TARGET
-                               overrides it.
-  -h, --help                   Show this message and exit.
+  --ne INTEGER RANGE              Fig. 1c line electrons per energy.  [default: 20000;
+                                  x>=1]
+  --brem-histories INTEGER RANGE  Monte Carlo electron histories for Fig. 1c
+                                  bremsstrahlung per energy.  [default: 200; x>=1]
+  --ne-supp INTEGER RANGE         Supplementary electrons per polar-tilt spectrum.
+                                  [default: 200; x>=1]
+  --tmd-azimuth DEGREES           Exploratory TMD azimuth.  [default: 0.0; x<=None]
+  --refresh                       Recompute matching cache.
+  --no-sync                       With -R/--remote, skip code upload.
+  --dry-run                       With -R/--remote, print submission preview only.
+  --detach                        With -R/--remote, return after submission.
+  --target NAME                   Use named remote compute target NAME.
+  -R, --remote [TARGET]           Run remotely; bare uses the configured target, =TARGET
+                                  overrides it.
+  -h, --help                      Show this message and exit.
 ```

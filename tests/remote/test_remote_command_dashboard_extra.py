@@ -26,11 +26,11 @@ def test_progress_records_render_valid_electron_counts(done, total):
     records = presentation.parse_progress_records(json.dumps(snapshot))
     assert records["hopg"] == snapshot
     output = dashboard_render._format_case_progress(records, ["hopg"])
-    assert f"electrons {done:,}/{total:,} ({round(100 * done / total)}%)" in output
+    assert f"histories {done:,}/{total:,} ({round(100 * done / total)}%)" in output
     records["hopg"].update(activity="saving")
-    assert "electrons" not in dashboard_render._format_case_progress(records, ["hopg"])
+    assert "histories" not in dashboard_render._format_case_progress(records, ["hopg"])
     records["hopg"].update(activity="computing", state="done")
-    assert "electrons" not in dashboard_render._format_case_progress(records, ["hopg"])
+    assert "histories" not in dashboard_render._format_case_progress(records, ["hopg"])
 
 
 @pytest.mark.parametrize(
@@ -59,7 +59,7 @@ def test_progress_records_drop_invalid_electron_counts_and_keep_legacy_records(f
     }
     records = presentation.parse_progress_records(json.dumps({**legacy, **fields}))
     assert records == {"hopg": legacy}
-    assert "electrons" not in dashboard_render._format_case_progress(records, ["hopg"])
+    assert "histories" not in dashboard_render._format_case_progress(records, ["hopg"])
 
 
 def test_overall_progress_line_sums_cases_and_counts_done_materials():

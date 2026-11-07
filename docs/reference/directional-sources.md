@@ -23,8 +23,8 @@ separate `DirectionalSpectrum` objects for the requested components:
 
 One transport serves all directions and selected components. It follows the
 larger of the two `FixedSampling` counts. PXR/CBS scores the first
-`cxr_electrons` histories; characteristic, continuum and TR score the first
-`brem_electrons` histories. As in the live runner, histories in both
+`cxr_histories` histories; characteristic, continuum and TR score the first
+`brem_histories` histories. As in the live runner, histories in both
 populations stop at the lower bremsstrahlung cutoff and line-only histories at
 the line cutoff. Each density is per incident electron of its own population,
 and unequal counts are honored as requested. Components stay separate; the

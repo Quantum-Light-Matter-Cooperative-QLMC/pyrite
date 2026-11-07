@@ -9,6 +9,10 @@
 # Settings.allow_fallback and Case.allow_physics_fallback add explicit campaign
 # admission (#262); Case.physics_fallbacks carries preflight provenance to workers.
 # Existing bindings/statuses and strict/default identity payloads are preserved.
+# #1007: Numerics takes history budgets only as sampling=FixedSampling|AdaptiveSampling;
+# cxr_trials, brem_trials, precision and positional arguments were removed (hard break).
+# Budget fields are *_histories; pyrite.config.Precision was removed (use
+# AdaptiveSampling). Stored adaptive_precision payloads keep *_electrons keys.
 schema_version = 1
 canonical_facades = ["beams", "geometry", "config", "detectors", "observations", "transport", "radiation"]
 
@@ -333,7 +337,6 @@ AdaptiveSampling = { target = "pyrite._sampling:AdaptiveSampling", status = "adv
 CxrReflections = { target = "pyrite._numerics:CxrReflections", status = "advanced-stable" }
 FixedSampling = { target = "pyrite._sampling:FixedSampling", status = "advanced-stable" }
 PixelScorer = { target = "pyrite.instrument:PixelScorer", status = "advanced-stable" }
-Precision = { target = "pyrite._precision:Precision", status = "advanced-stable" }
 RadiationNumerics = { target = "pyrite._numerics_groups:RadiationNumerics", status = "advanced-stable" }
 TransportNumerics = { target = "pyrite._numerics_groups:TransportNumerics", status = "advanced-stable" }
 load_numerics = { target = "pyrite._config_presets:load_numerics", status = "advanced-stable" }

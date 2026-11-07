@@ -8,7 +8,7 @@ import pytest
 import pyrite.config as cfg
 from pyrite import Scene, api, simulate
 from pyrite.beams import Beam, PointBunch, Spot
-from pyrite.config import Numerics
+from pyrite.config import FixedSampling, Numerics
 from pyrite.detectors import Detector, PlanarDetector, PlanarPose
 from pyrite.geometry import Footprint, Slab
 from pyrite.montecarlo import runner
@@ -21,7 +21,7 @@ def scene():
         Beam(30.0, transverse=Spot(), longitudinal=PointBunch()),
         Slab("hopg", 1000.0, tilt_deg=30.0, footprint=Footprint(5.0, 5.0)),
         Detector(),
-        numerics=Numerics(cxr_trials=8, brem_trials=4, seed=3),
+        numerics=Numerics(sampling=FixedSampling(cxr_histories=8, brem_histories=4), seed=3),
     )
 
 

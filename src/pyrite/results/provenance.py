@@ -46,7 +46,7 @@ class Provenance(Mapping[str, Any]):
     scene: Scene | None = None
     """Resolved beam, target, detector, filters, emission, and acquisition."""
     numerics: Numerics | None = None
-    """Resolved sampling and execution controls, including any adaptive ``precision``."""
+    """Resolved sampling and execution controls, including the ``sampling`` policy."""
 
     # Identity
     identity_digest: str | None = None

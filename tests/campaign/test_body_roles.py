@@ -10,6 +10,7 @@ import pyrite as pr
 from pyrite import api
 from pyrite.campaign import geometry
 from pyrite.campaign.profiles import case_content_key
+from pyrite.config import FixedSampling
 from pyrite.instrument import model, observation_identity
 from pyrite.instrument.scene import scene_payload
 from pyrite.materials import CATALOG, MediumSpec
@@ -36,7 +37,7 @@ def _scene(target=None, *, filters=()):
         filters=filters,
         acquisition=pr.observations.Acquisition(1.0, (0.0, 1000.0, 2000.0)),
         physics=pr.Physics(brem_source="none"),
-        numerics=pr.Numerics(cxr_trials=1, brem_trials=1),
+        numerics=pr.Numerics(sampling=FixedSampling(cxr_histories=1, brem_histories=1)),
     )
 
 

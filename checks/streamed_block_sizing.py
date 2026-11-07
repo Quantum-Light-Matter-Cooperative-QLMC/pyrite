@@ -69,7 +69,7 @@ def scene_for(electrons, block, scratch, threads, batch):
         continuation_rows=rows,
     )
     numerics = Numerics(
-        sampling=FixedSampling(cxr_electrons=electrons, brem_electrons=max(1_024, electrons // 16)),
+        sampling=FixedSampling(cxr_histories=electrons, brem_histories=max(1_024, electrons // 16)),
         seed=7,
         energy_bins=EnergyBins().with_cxr_energies(np.linspace(750, 1_000, 251) * ureg.eV),
         cxr_reflections=CxrReflections(n_families=1),

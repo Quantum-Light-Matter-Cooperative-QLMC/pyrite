@@ -22,8 +22,8 @@ class IndependentStoppingMonitor:
             settings,
             observables=("cxr",),
             brem_target_rse=None,
-            brem_min_electrons=None,
-            brem_max_electrons=None,
+            brem_min_histories=None,
+            brem_max_histories=None,
         )
         self.cxr = StoppingMonitor(cxr, cxr_measure)
         self.brem = StoppingMonitor(settings.brem_policy(), brem_measure or cxr_measure)
@@ -72,8 +72,8 @@ class IndependentStoppingMonitor:
         for name, monitor in (("cxr", self.cxr), ("brem", self.brem)):
             record["statistics"][name].update(
                 target_rse=monitor.settings.target_rse,
-                min_electrons=monitor.settings.min_electrons,
-                max_electrons=monitor.settings.max_electrons,
+                min_electrons=monitor.settings.min_histories,
+                max_electrons=monitor.settings.max_histories,
                 stop_reason=monitor.stop_reason,
                 checks=monitor.checks,
                 pilot=monitor.pilot,
@@ -92,8 +92,8 @@ def case_stopping_monitor(case, settings):
         settings,
         observables=("cxr",),
         brem_target_rse=None,
-        brem_min_electrons=None,
-        brem_max_electrons=None,
+        brem_min_histories=None,
+        brem_max_histories=None,
     )
     return IndependentStoppingMonitor(
         settings, case_measure(case, cxr), case_measure(case, settings.brem_policy())

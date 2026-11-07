@@ -9,6 +9,7 @@ import pytest
 
 import pyrite
 from pyrite._catalog_layout import bundled_catalog, read_raw
+from pyrite._cxr_vocabulary import catalog_key
 from pyrite._precision import DEFAULT_PRECISION
 from pyrite.cli import command
 from pyrite.materials import MaterialConfigError, load_material_catalog
@@ -89,7 +90,7 @@ def test_unit_bearing_numerics_preset_rejects_wrong_dimensions(_isolate_user_cat
 
 def test_numerics_preset_resolves_into_profiles_with_provenance(_isolate_user_catalog):
     ok("profile", "create", "campaign", "--from", "quickstart")
-    ok("numerics", "preset", "create", "fast", "--cxr-trials", "200", "--mosaic-nodes", "7")
+    ok("numerics", "preset", "create", "fast", "--cxr-histories", "200", "--mosaic-nodes", "7")
     ok("profile", "set", "campaign", "--numerics", "fast")
 
     catalog = load_material_catalog(profile="campaign")
@@ -107,7 +108,7 @@ def test_numerics_preset_resolves_into_profiles_with_provenance(_isolate_user_ca
     numerics = pyrite.config.load_numerics("fast", catalog=load_material_catalog())
     expected = replace(
         pyrite.Numerics(),
-        cxr_trials=200,
+        sampling=pyrite.config.FixedSampling(cxr_histories=200),
         cxr_reflections=pyrite.config.CxrReflections(mosaic_nodes=7),
     )
     assert numerics == expected
@@ -119,24 +120,27 @@ def test_profile_sampling_policy_replaces_the_presets_whole_group(_isolate_user_
         _isolate_user_catalog,
         "numerics",
         "adaptive",
-        "mosaic_nodes = 7\n[precision]\n" + _precision_toml(),
+        "mosaic_nodes = 7\n[adaptive_sampling]\n" + _precision_toml(),
     )
     ok("profile", "create", "campaign", "--from", "quickstart")
     ok("profile", "set", "campaign", "--numerics", "adaptive")
     summary = payload("profile", "show", "campaign")
-    assert summary["precision"]["source"] == "preset adaptive"
+    assert summary["adaptive_sampling"]["source"] == "preset adaptive"
 
-    ok("numerics", "set", "campaign", "--cxr-trials", "300")
+    ok("numerics", "set", "campaign", "--cxr-histories", "300")
     catalog = load_material_catalog(profile="campaign")
     assert catalog.profile_precision("campaign") is None
     assert catalog.profile_numerics("campaign")["mosaic_nodes"] == 7
-    assert payload("profile", "show", "campaign")["precision"]["source"] != "preset adaptive"
+    assert payload("profile", "show", "campaign")["adaptive_sampling"]["source"] != (
+        "preset adaptive"
+    )
 
 
 def _precision_toml():
     values = DEFAULT_PRECISION.to_dict()
     lines = []
     for key, value in values.items():
+        key = catalog_key(key)
         if value is None:
             continue
         if isinstance(value, str):
@@ -188,15 +192,15 @@ def test_adopt_keeps_multi_value_trial_grids_on_the_profile(_isolate_user_catalo
     profile = _isolate_user_catalog / "profiles" / "campaign.toml"
     # Root keys must precede the profile's sub-tables.
     profile.write_text(
-        "n_electrons = {values = [100, 200]}\nmosaic_nodes = 7\n" + profile.read_text()
+        "cxr_histories = {values = [100, 200]}\nmosaic_nodes = 7\n" + profile.read_text()
     )
     ok("numerics", "preset", "adopt", "campaign", "mine")
-    # On disk, trial counts use the canonical ``cxr_trials`` spelling.
+    # On disk, electron counts use the canonical ``cxr_histories`` spelling.
     row = profile_row("campaign")
-    assert row["cxr_trials"] == {"values": [100, 200]}
+    assert row["cxr_histories"] == {"values": [100, 200]}
     assert "mosaic_nodes" not in row
     preset = read_raw(bundled_catalog())["numerics"]["mine"]
-    assert "cxr_trials" not in preset and preset["mosaic_nodes"] == 7
+    assert "cxr_histories" not in preset and preset["mosaic_nodes"] == 7
 
 
 def test_user_presets_ship_to_remote_jobs(_isolate_user_catalog):
@@ -212,3 +216,10 @@ def test_user_presets_ship_to_remote_jobs(_isolate_user_catalog):
 def test_loaded_physics_survives_worker_serialization():
     physics = pyrite.config.load_physics("electron-standard")
     assert pickle.loads(pickle.dumps(physics)) == physics
+
+
+@pytest.mark.parametrize("flag", ["--cxr-electrons", "--cxr-trials", "--brem-electrons"])
+def test_numerics_preset_removed_budget_flags_name_histories(_isolate_user_catalog, flag):
+    result = invoke(command, ["numerics", "preset", "create", "fast", flag, "200"])
+    assert result.exit_code == 2
+    assert f"{flag} was removed; use --{flag.split('-')[2]}-histories" in result.stderr

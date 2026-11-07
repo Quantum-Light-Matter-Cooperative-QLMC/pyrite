@@ -1,10 +1,13 @@
-"""Trial spellings preserve the existing bremsstrahlung CLI parameter contract."""
+"""History spellings preserve the existing bremsstrahlung CLI parameter contract (#1007)."""
 
+import click
 import pytest
 
 from pyrite.cli import command as root_command
 from pyrite.cli.commands import app, app_validation, recompute, remote, scan
 from tests.helpers.cli import assert_clean_result, invoke
+
+_NE_BREM_REMOVED = (app_validation.command, remote.rebrem_command, remote.check_command)
 
 
 @pytest.mark.parametrize(
@@ -19,42 +22,37 @@ from tests.helpers.cli import assert_clean_result, invoke
     ],
     ids=lambda command: command.name,
 )
-def test_brem_trial_alias_preserves_parameters_defaults_and_help(command):
-    parsed = []
-    for flag in (
-        ("--brem-trials", "--ne-brem")
-        if command in (app_validation.command, remote.rebrem_command, remote.check_command)
-        else ("--brem-trials",)
-    ):
-        with command.make_context(command.name, [flag, "17"]) as ctx:
-            assert ctx.params["ne_brem"] == 17
-            parsed.append(ctx.params)
-    assert all(params == parsed[0] for params in parsed)
+def test_brem_histories_flag_preserves_parameters_defaults_and_help(command):
+    with command.make_context(command.name, ["--brem-histories", "17"]) as ctx:
+        assert ctx.params["ne_brem"] == 17
     with command.make_context(command.name, []) as ctx:
         option = next(parameter for parameter in command.params if parameter.name == "ne_brem")
         assert ctx.params["ne_brem"] == option.default
+    removed = ("--brem-trials", "--brem-electrons") + (
+        ("--ne-brem",) if command in _NE_BREM_REMOVED else ()
+    )
+    for flag in removed:
+        with pytest.raises(click.UsageError, match=f"{flag} was removed; use --brem-histories"):
+            command.make_context(command.name, [flag, "17"])
 
     help_result = invoke(command, ["--help"])
     assert_clean_result(help_result)
-    if command not in (app_validation.command, remote.rebrem_command, remote.check_command):
-        assert "--brem-trials" in help_result.stdout
-        assert "--ne-brem" not in help_result.stdout
-    else:
-        assert help_result.stdout.index("--brem-trials") < help_result.stdout.index("--ne-brem")
+    assert "--brem-histories" in help_result.stdout
+    assert not any(flag in help_result.stdout for flag in removed)
     assert "Monte Carlo electron histories" in " ".join(help_result.stdout.split())
 
 
 @pytest.mark.parametrize("verb", ["create", "set", "add"])
-def test_profile_help_describes_trials(verb):
+def test_profile_help_describes_histories(verb):
     from pyrite.cli.commands import profile
 
     result = invoke(profile.command, [verb, "--help"])
 
     assert_clean_result(result)
-    assert "--cxr-trials" in result.stdout
-    assert "--brem-trials" in result.stdout
-    assert "--ne-line" not in result.stdout
-    assert "--ne-brem" not in result.stdout
+    assert "--cxr-histories" in result.stdout
+    assert "--brem-histories" in result.stdout
+    for stale in ("--cxr-electrons", "--brem-electrons", "--cxr-trials", "--ne-line", "--ne-brem"):
+        assert stale not in result.stdout
     assert "Monte Carlo electron histories" in " ".join(result.stdout.split())
 
 
@@ -66,15 +64,19 @@ def test_profile_help_describes_trials(verb):
             (["profile", verb, "example"], canonical, retired)
             for verb in ("create", "set", "add")
             for canonical, retired in (
-                ("--cxr-trials", "--ne-line"),
-                ("--brem-trials", "--ne-brem"),
+                ("--cxr-histories", "--ne-line"),
+                ("--brem-histories", "--ne-brem"),
             )
         ),
-        (["profile", "numerics", "set", "example"], "--cxr-trials", "--line-electrons"),
-        (["profile", "numerics", "set", "example"], "--brem-trials", "--bremsstrahlung-electrons"),
-        (["app", "validation", "reproduce"], "--brem-trials", "--ne-brem"),
-        (["app", "validation", "export"], "--brem-trials", "--ne-brem"),
-        (["checkpoint", "recompute", "brem", "hopg"], "--brem-trials", "--ne-brem"),
+        (["profile", "numerics", "set", "example"], "--cxr-histories", "--line-electrons"),
+        (
+            ["profile", "numerics", "set", "example"],
+            "--brem-histories",
+            "--bremsstrahlung-electrons",
+        ),
+        (["app", "validation", "reproduce"], "--brem-histories", "--ne-brem"),
+        (["app", "validation", "export"], "--brem-histories", "--ne-brem"),
+        (["checkpoint", "recompute", "brem", "hopg"], "--brem-histories", "--ne-brem"),
     ],
 )
 def test_removed_trial_spellings_are_refused_before_work(command_path, canonical, retired, reverse):
@@ -88,7 +90,7 @@ def test_removed_trial_spellings_are_refused_before_work(command_path, canonical
     assert result.stdout == ""
 
 
-@pytest.mark.parametrize("flag", ["--brem-trials", "--ne-brem"])
+@pytest.mark.parametrize("flag", ["--brem-histories", "--brem-trials", "--ne-brem"])
 def test_performance_command_excludes_preset_aliases(flag):
     result = invoke(scan.performance_command, [flag, "17"])
 

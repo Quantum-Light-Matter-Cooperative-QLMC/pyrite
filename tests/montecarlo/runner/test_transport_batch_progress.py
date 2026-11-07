@@ -140,7 +140,7 @@ def test_real_single_case_transport_advances_terminal_and_activity(monkeypatch, 
     assert all(b > a for a, b in zip(counts, counts[1:], strict=False))
     assert counts[-1] == case["Ne"]
     output = capsys.readouterr()
-    assert "electrons" in output.err
+    assert "histories" in output.err
     assert output.out == ""
 
 
@@ -169,7 +169,7 @@ def _run(monkeypatch, batches, **kwargs):
 def test_multi_batch_case_shows_a_nested_electron_bar(monkeypatch, capsys):
     monkeypatch.delenv("PYRITE_LOCAL_DASHBOARD", raising=False)
     _run(monkeypatch, [(2, 6), (4, 6), (6, 6)])
-    assert "electrons" in capsys.readouterr().err
+    assert "histories" in capsys.readouterr().err
 
 
 @pytest.mark.parametrize(

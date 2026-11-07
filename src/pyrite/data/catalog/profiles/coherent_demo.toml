@@ -1,7 +1,7 @@
 # Demo: coherent plus incoherent PXR emission with the line grid resolved
 # automatically inside per-line feature windows (#350). One thin (0.2 um) HOPG
 # case under an attosecond, 0.1 mm beam (beams/coherent_demo). Electron counts
-# are fixed (adaptive precision is incoherent-only) and demo-small; the
+# are fixed (adaptive sampling is incoherent-only) and demo-small; the
 # coherent cost grows steeply with them. Windowed coherent
 # grids warn that full-spectrum dispersion is not yet certified. ~15 s on CPU.
 #   pyrite run coherent_demo
@@ -11,8 +11,8 @@ energy_keV = {values = [30.0]}
 tilt_deg = {values = [45.0]}
 tilt_azim_deg = {values = [180.0]}
 materials = ["hopg"]
-cxr_trials = {values = [50]}
-brem_trials = {values = [50]}
+cxr_histories = {values = [50]}
+brem_histories = {values = [50]}
 detector = "reference"
 emission = "both"
 beam = "coherent_demo"

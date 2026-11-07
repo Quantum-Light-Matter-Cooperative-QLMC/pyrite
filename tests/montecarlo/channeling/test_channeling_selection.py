@@ -210,10 +210,11 @@ def test_transport_options_refuse_before_work(planar_case, monkeypatch, options,
 
 
 def test_adaptive_refuses_before_work(planar_case):
+    from pyrite._precision import Precision
     from pyrite.montecarlo.runner.adaptive import transport_case_adaptive
 
     with pytest.raises(ValueError, match="adaptive precision"):
-        transport_case_adaptive(planar_case, pr.config.Precision(0.1, 40, 60, 20))
+        transport_case_adaptive(planar_case, Precision(0.1, 40, 60, 20))
 
 
 # -- event contract ------------------------------------------------------------

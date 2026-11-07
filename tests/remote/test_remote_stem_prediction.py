@@ -12,7 +12,7 @@ import pytest
 
 from pyrite import materials
 from pyrite.campaign.profiles import canonical_profile_run, named_profile_stem
-from pyrite.config import Precision
+from pyrite.config import AdaptiveSampling
 from pyrite.remote import _queue_scripts as scripts
 from pyrite.runs import scan
 
@@ -72,8 +72,8 @@ def test_fixed_count_standard_profile_keeps_the_bare_canonical_stem(monkeypatch)
     [
         (
             "profile_precisions",
-            Precision(
-                target_rse=0.1, min_electrons=20, max_electrons=60, block_electrons=20
+            AdaptiveSampling(
+                target_rse=0.1, min_histories=20, max_histories=60, block_histories=20
             ).to_dict(),
         ),
         ("profile_emissions", "both"),

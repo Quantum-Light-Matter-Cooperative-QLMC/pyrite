@@ -15,6 +15,7 @@ from pyrite import api
 from pyrite.campaign.profiles import case_content_key
 from pyrite.campaign.sweep import Sweep as LegacySweep
 from pyrite.campaign.sweep import build_cases
+from pyrite.config import FixedSampling
 from pyrite.detectors import EnergyBins
 from pyrite.montecarlo.runner import case_table_markers
 from pyrite.runs import scan
@@ -27,8 +28,7 @@ def _inputs():
     )
     detector = pr.Detector()
     numerics = pr.Numerics(
-        cxr_trials=1,
-        brem_trials=1,
+        sampling=FixedSampling(cxr_histories=1, brem_histories=1),
         energy_bins=EnergyBins(cxr=np.array([1000.0, 1050.0]), brem=np.array([1000.0, 1050.0])),
     )
     return beam, target, detector, numerics

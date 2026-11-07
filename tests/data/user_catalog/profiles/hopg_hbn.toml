@@ -5,4 +5,4 @@ tilt_azim_deg = {values = [95.0, 105.0, 115.0, 125.0, 135.0, 145.0, 155.0, 165.0
 beam = "gaussian_200fs"
 materials = ["hopg", "hbn"]
 emission = "incoherent"
-n_electrons = {values = [10000]}
+cxr_histories = {values = [10000]}

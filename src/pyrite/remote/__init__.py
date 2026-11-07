@@ -17,10 +17,10 @@ Run, wait for SLURM, then pull:
     pyrite run sub_100keV --remote --detach
     pyrite remote pull mose2 wse2          # fetch existing checkpoints (grid-filtered)
     pyrite remote pull mose2 --full        # fetch the full, un-filtered checkpoint
-    pyrite remote rebrem mose2 --ne-brem 1000   # brem-only recompute of the box's
+    pyrite remote rebrem mose2 --brem-histories 1000   # brem-only recompute of the box's
                                              # checkpoints (GPU), follow, pull back
     pyrite remote sync                     # only push the current code
-    pyrite app validation reproduce --remote [--ne N] [--brem-trials N] [--ne-supp N]
+    pyrite app validation reproduce --remote [--ne N] [--brem-histories N] [--ne-supp N]
                                       # run the Zhai + supplementary MC
     pyrite remote pull --preset zhai      # pull an existing Zhai cache
 

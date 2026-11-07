@@ -57,7 +57,7 @@ def _(np, tables_ready):
     from pyrite.beams import Beam, LongitudinalDistribution, TransverseSpot
     from pyrite.config import CxrReflections, FixedSampling, Numerics, Physics
     from pyrite.detectors import Detector, EnergyBins
-    from pyrite.geometry import Footprint, Slab
+    from pyrite.geometry import Slab
     from pyrite.units import ureg
 
     beam_keV, observation_deg = 30.0, 150.0
@@ -65,7 +65,7 @@ def _(np, tables_ready):
     photon_grid_eV = np.arange(200.0, 600.5, 1.0)  # 1 eV resolves the thinnest fringes
     numerics = Numerics(
         sampling=FixedSampling(
-            cxr_electrons=64, brem_electrons=512
+            cxr_histories=64, brem_histories=512
         ),  # TR uses the continuum population
         cxr_reflections=CxrReflections(n_families=1),
         energy_model="midpoint",
@@ -93,7 +93,8 @@ def _(np, tables_ready):
                 "silicon",
                 thickness=thickness_nm * ureg.nm,
                 tilt=5 * ureg.degree,
-                footprint=Footprint(width=5 * ureg.mm, height=5 * ureg.mm),
+                width=5 * ureg.mm,
+                height=5 * ureg.mm,
             ),
             Detector(observation_angle=observation_deg * ureg.degree),
             physics=Physics(

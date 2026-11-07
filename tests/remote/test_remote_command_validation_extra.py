@@ -17,7 +17,7 @@ def test_zhai_queue_script_has_ne_flags_and_meta():
         refresh=True,
     )
     assert "python -m pyrite._entry.reproduce_zhai" in s
-    assert "--ne 11" in s and "--ne-brem 3" in s and "--ne-supp 5" in s and "--refresh" in s
+    assert "--ne 11" in s and "--brem-histories 3" in s and "--ne-supp 5" in s and "--refresh" in s
     assert "--tmd-azimuth 35.0" in s
     assert "20260101-000000" in s
     assert "materials: zhai" not in s and "quick: False" not in s

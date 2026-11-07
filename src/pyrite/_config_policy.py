@@ -38,15 +38,12 @@ PHYSICS_FIELD_OWNERS = MappingProxyType(
 
 NUMERICS_FIELD_OWNERS = MappingProxyType(
     {
-        "cxr_trials": SAMPLING_CONVERGENCE,
-        "brem_trials": SAMPLING_CONVERGENCE,
         "cxr_chunk": KERNEL_TUNING,
         "brem_chunk": KERNEL_TUNING,
         "transport_core": KERNEL_TUNING,
         "energy_model": NUMERICAL_APPROXIMATION,
         "max_dE_frac": NUMERICAL_APPROXIMATION,
         "cxr_reflections": SAMPLING_CONVERGENCE,
-        "precision": SAMPLING_CONVERGENCE,
         "sampling": SAMPLING_CONVERGENCE,
         "seed": SAMPLING_CONVERGENCE,
         "energy_bins": NUMERICAL_APPROXIMATION,

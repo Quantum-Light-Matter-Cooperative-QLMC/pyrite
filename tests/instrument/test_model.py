@@ -5,6 +5,7 @@ import pytest
 
 import pyrite as pr
 from pyrite import api
+from pyrite.config import FixedSampling
 from pyrite.materials import MediumSpec
 
 
@@ -158,7 +159,9 @@ def test_numerics_backend_is_removed() -> None:
 
 def test_physical_detector_projects_to_unchanged_case_schema() -> None:
     scene = _scene()
-    case = api.build_case(scene, pr.Numerics(cxr_trials=1, brem_trials=1))
+    case = api.build_case(
+        scene, pr.Numerics(sampling=FixedSampling(cxr_histories=1, brem_histories=1))
+    )
 
     assert case.theta_obs_rad == pytest.approx(0.0)
     assert "filters" not in case.to_dict()
@@ -188,7 +191,7 @@ def test_simulate_returns_partial_filter_spatial_result_and_observation_identity
     monkeypatch.setattr(api, "run_case_directions", fake_directional)
     kwargs = dict(
         filters=(plate,),
-        numerics=pr.Numerics(cxr_trials=1, brem_trials=1),
+        numerics=pr.Numerics(sampling=FixedSampling(cxr_histories=1, brem_histories=1)),
     )
     result = pr.simulate(
         pr.Scene(
@@ -279,7 +282,7 @@ def test_acquisition_enabled_simulation_exposes_layered_identity(monkeypatch) ->
         measured_edges_eV=(0.0, 500.0, 1_000.0),
     )
     kwargs = dict(
-        numerics=pr.Numerics(cxr_trials=1, brem_trials=1),
+        numerics=pr.Numerics(sampling=FixedSampling(cxr_histories=1, brem_histories=1)),
     )
     first = pr.simulate(
         pr.Scene(

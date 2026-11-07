@@ -46,7 +46,7 @@ def test_profile_coherent_window_opt_in_and_budget_reach_the_case(
     document = tomlkit.parse(catalog_path.read_text())
     policy = {"windows": enabled, "max_points": 5000000}
     document["profiles"]["hopg_short"]["line_grid_policy"] = policy
-    document["profiles"]["hopg_short"]["n_electrons"] = {"values": [200]}
+    document["profiles"]["hopg_short"]["cxr_histories"] = {"values": [200]}
     catalog_path.write_text(tomlkit.dumps(document))
     catalog = load_material_catalog(catalog_path)
     monkeypatch.setattr(

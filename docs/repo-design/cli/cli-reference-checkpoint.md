@@ -83,7 +83,7 @@ Options:
   -a, --all                  Recompute every checkpoint.
   --profile NAME             Catalog profile for legacy data; otherwise must match
                              checkpoint metadata.
-  --brem-trials N            Monte Carlo electron histories used to estimate
+  --brem-histories N         Monte Carlo electron histories used to estimate
                              bremsstrahlung; overrides profile default.
   --start EV                 Wide-bremsstrahlung lower bound in eV; overrides profile.
   --stop EV                  Wide-bremsstrahlung exclusive upper bound in eV; default
@@ -123,7 +123,8 @@ Options:
   -a, --all                  Recompute every checkpoint.
   --profile NAME             Catalog profile for legacy data; otherwise must match
                              checkpoint metadata.
-  --cxr-trials N             CXR trial count; overrides profile default.
+  --cxr-histories N          Monte Carlo electron histories for the CXR spectrum;
+                             overrides profile default.
   --start EV                 Line-grid lower bound in eV; overrides profile.
   --stop EV                  Line-grid exclusive upper bound in eV; overrides profile.
   --cxr-step EV              Uniform line-grid spacing in eV; overrides profile grid.

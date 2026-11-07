@@ -39,7 +39,7 @@ Usage: pyrite profile [OPTIONS] COMMAND [ARGS]...
     pyrite profile show sub_100keV        (or: pyrite profile sub_100keV)
     pyrite profile create sub_100keV --energy 30:100:10
     pyrite profile set sub_100keV --detector eds
-    pyrite numerics set sub_100keV --cxr-trials 2000
+    pyrite numerics set sub_100keV --cxr-histories 2000
     pyrite numerics cxr-grid show sub_100keV
     pyrite profile add sub_100keV --energy 75
     pyrite profile set sub_100keV --material hopg,mose2
@@ -92,9 +92,9 @@ Options:
                                   Azimuth tilts in degrees [0, 360]. Comma-separated,
                                   mixable with start:stop:step ranges; repeat to
                                   combine.
-  -l, --cxr-trials N,...          Monte Carlo electron histories used to estimate the
+  -l, --cxr-histories N,...       Monte Carlo electron histories used to estimate the
                                   CXR spectrum; positive integers.
-  -b, --brem-trials N,...         Monte Carlo electron histories used to estimate
+  -b, --brem-histories N,...      Monte Carlo electron histories used to estimate
                                   bremsstrahlung; positive integers.
   --material KEY,...              Add comma-separated material keys to explicit
                                   membership.
@@ -141,9 +141,9 @@ Options:
                                   Azimuth tilts in degrees [0, 360]. Comma-separated,
                                   mixable with start:stop:step ranges; repeat to
                                   combine.
-  -l, --cxr-trials N,...          Monte Carlo electron histories used to estimate the
+  -l, --cxr-histories N,...       Monte Carlo electron histories used to estimate the
                                   CXR spectrum; positive integers.
-  -b, --brem-trials N,...         Monte Carlo electron histories used to estimate
+  -b, --brem-histories N,...      Monte Carlo electron histories used to estimate
                                   bremsstrahlung; positive integers.
   --straggling / --no-straggling  Enable or disable collision energy-loss straggling
                                   (restricted soft loss in shell mode).
@@ -491,9 +491,9 @@ Commands:
 ## `pyrite profile numerics reset`
 
 ```text
-Usage: pyrite profile numerics reset [OPTIONS] NAME [cxr-trials|brem-trials|line-
-                                     electrons|bremsstrahlung-electrons|reflection-
-                                     families|maximum-reflections|mosaic-nodes|mosaic-
+Usage: pyrite profile numerics reset [OPTIONS] NAME [cxr-histories|brem-
+                                     histories|reflection-families|maximum-
+                                     reflections|mosaic-nodes|mosaic-
                                      route|straggling|energy-model|maximum-fractional-
                                      energy-loss|inelastic-model|inelastic-cutoff-
                                      ev|secondary-threshold-ev|elastic-
@@ -522,9 +522,9 @@ Usage: pyrite profile numerics set [OPTIONS] NAME
   Set one or more explicit result-affecting controls on PROFILE.
 
 Options:
-  --cxr-trials N                  Monte Carlo electron histories used to estimate the
+  --cxr-histories N               Monte Carlo electron histories used to estimate the
                                   CXR spectrum.  [x>=1]
-  --brem-trials N                 Monte Carlo electron histories used to estimate
+  --brem-histories N              Monte Carlo electron histories used to estimate
                                   bremsstrahlung.  [x>=1]
   --reflection-families N         Ranked reflection families to resolve.  [x>=1]
   --maximum-reflections N         Cap resolved reflections after family expansion.
@@ -755,9 +755,9 @@ Options:
                                   Azimuth tilts in degrees [0, 360]. Comma-separated,
                                   mixable with start:stop:step ranges; repeat to
                                   combine.
-  -l, --cxr-trials N,...          Monte Carlo electron histories used to estimate the
+  -l, --cxr-histories N,...       Monte Carlo electron histories used to estimate the
                                   CXR spectrum; positive integers.
-  -b, --brem-trials N,...         Monte Carlo electron histories used to estimate
+  -b, --brem-histories N,...      Monte Carlo electron histories used to estimate
                                   bremsstrahlung; positive integers.
   --straggling / --no-straggling  Enable or disable collision energy-loss straggling
                                   (restricted soft loss in shell mode).

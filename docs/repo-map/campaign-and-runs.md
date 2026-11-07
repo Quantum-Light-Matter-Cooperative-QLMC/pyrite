@@ -29,7 +29,7 @@ observation planning and trajectory consumers use those properties.
 
 Supported scalar scene API: `Scene`, path-addressed `Sweep`, `Physics`, `Numerics`, nested `CxrReflections`, and presentation-only `Analysis`. `Scene` rejects implicit multi-value fields; `Sweep` applies ordered dotted/indexed paths such as `target.layers[1].thickness_ang`, expands Cartesian products, and lowers them through `api.build_sweep_cases`. This `Sweep` is the preferred public object; `campaign.sweep.Sweep` below remains the profile/CLI-compatible campaign implementation.
 
-- Public: root-lazy `Scene`, `Sweep`, `Physics`, `Numerics`, `CxrReflections`, `Precision`, `Analysis`.
+- Public: root-lazy `Scene`, `Sweep`, `Physics`, `Numerics`, `CxrReflections`, `Analysis`; `pyrite.config` owns `FixedSampling`/`AdaptiveSampling`.
 - Deps: `campaign.geometry`, `campaign.sweep.BeamSpec`, `detectors`.
 
 `_numerics.py` owns frozen `Physics`, `Numerics`, and `CxrReflections`, plus

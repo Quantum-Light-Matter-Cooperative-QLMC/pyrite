@@ -19,6 +19,7 @@ from pyrite.apps.transition_radiation import (
     transport_figure,
     transported_demo,
 )
+from pyrite.config import FixedSampling
 
 
 @pytest.mark.parametrize("profile,mode", [("tr_demo", "history"), ("ctr_demo", "bunch")])
@@ -38,8 +39,9 @@ def test_reference_profiles_match_notebook_scene(profile, mode):
     direct = build_case(
         reference_scene(DemoConfig(), mode),
         pr.Numerics(
-            cxr_trials=DEFAULT_LINE_HISTORIES,
-            brem_trials=2 * DEFAULT_LINE_HISTORIES,
+            sampling=FixedSampling(
+                cxr_histories=DEFAULT_LINE_HISTORIES, brem_histories=2 * DEFAULT_LINE_HISTORIES
+            ),
             energy_bins=EnergyBins(cxr=photon_grid(), brem=np.arange(200.0, 30000.0, 100.0)),
         ),
         physics=reference_physics(mode),

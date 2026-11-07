@@ -59,7 +59,7 @@ def _(np, tables_ready):
     from pyrite.beams import Beam, PointBunch, TransverseSpot
     from pyrite.config import CxrReflections, FixedSampling, Numerics, Physics
     from pyrite.detectors import Detector
-    from pyrite.geometry import CrystalCut, Footprint, Slab
+    from pyrite.geometry import CrystalCut, Slab
     from pyrite.units import ureg
 
     detector = Detector(observation_angle=135 * ureg.degree)
@@ -76,7 +76,8 @@ def _(np, tables_ready):
             "hopg",
             thickness=thickness_nm * ureg.nm,
             tilt=tilt_deg * ureg.degree,
-            footprint=Footprint(width=2 * ureg.mm, height=2 * ureg.mm),
+            width=2 * ureg.mm,
+            height=2 * ureg.mm,
             cut=CrystalCut(beam_uvw=(0, 0, 2)),
         )
         result = simulate(
@@ -85,7 +86,7 @@ def _(np, tables_ready):
             detector,
             physics=Physics(brem_source="none"),  # isolate PXR/CBS
             numerics=Numerics(
-                sampling=FixedSampling(cxr_electrons=histories, brem_electrons=histories),
+                sampling=FixedSampling(cxr_histories=histories, brem_histories=histories),
                 cxr_reflections=CxrReflections(n_families=2),
             ),
         )

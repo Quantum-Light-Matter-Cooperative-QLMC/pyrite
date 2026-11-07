@@ -737,7 +737,7 @@ done
 
 
 def _zhai_flags(ne, ne_brem, ne_supp, tmd_azimuth, refresh):
-    flags = f" --ne {ne} --ne-brem {ne_brem} --ne-supp {ne_supp} --tmd-azimuth {tmd_azimuth}"
+    flags = f" --ne {ne} --brem-histories {ne_brem} --ne-supp {ne_supp} --tmd-azimuth {tmd_azimuth}"
     if refresh:
         flags += " --refresh"
     return flags
@@ -771,7 +771,7 @@ def _rebrem_flags(
 ):
     flags = ""
     if ne_brem is not None:
-        flags += f" --ne-brem {int(ne_brem)}"
+        flags += f" --brem-histories {int(ne_brem)}"
     if brem_step_eV is not None:
         flags += f" --step {float(brem_step_eV):g}"
     if brem_start_eV is not None:
@@ -952,7 +952,7 @@ def _recxr_flags(
 ):
     flags = ""
     if cxr_ne is not None:
-        flags += f" --cxr-trials {int(cxr_ne)}"
+        flags += f" --cxr-histories {int(cxr_ne)}"
     if line_step_eV is not None:
         flags += f" --cxr-step {float(line_step_eV):g}"
     if cxr_start_eV is not None:

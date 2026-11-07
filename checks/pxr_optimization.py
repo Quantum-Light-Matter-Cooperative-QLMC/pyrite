@@ -19,7 +19,7 @@ import numpy as np
 import pyrite as pr
 from pyrite.beams import PointBunch, PointSpot
 from pyrite.campaign.profiles import case_content_key
-from pyrite.config import CxrReflections
+from pyrite.config import CxrReflections, FixedSampling
 from pyrite.detectors import EnergyBins
 from pyrite.execution import LocalExecutor
 from pyrite.geometry import Footprint, Slab
@@ -77,8 +77,7 @@ def scene(histories: int = 32, step_eV: float = 2.0) -> pr.Scene:
             bremsstrahlung_model="eedl",
         ),
         numerics=pr.Numerics(
-            cxr_trials=histories,
-            brem_trials=histories,
+            sampling=FixedSampling(cxr_histories=histories, brem_histories=histories),
             transport_core="per-electron",
             energy_bins=EnergyBins(
                 cxr=np.linspace(750, 1000, round(250 / step_eV) + 1),

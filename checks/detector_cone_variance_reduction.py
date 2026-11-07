@@ -43,7 +43,7 @@ def _settings(ne):
     from pyrite._precision import Precision
 
     return Precision(
-        target_rse=0.1, min_electrons=ne, max_electrons=ne, block_electrons=ne,
+        target_rse=0.1, min_histories=ne, max_histories=ne, block_histories=ne,
         observables=("cxr", "brem"),
     )  # fmt: skip
 

@@ -295,7 +295,7 @@ def test_recompute_pair_uses_selected_producer_with_shared_segments(monkeypatch)
 
 
 def test_adaptive_observable_uses_selected_producer_and_refuses_unsupported(monkeypatch):
-    from pyrite._numerics import Precision
+    from pyrite._precision import Precision
     from pyrite.montecarlo.runner import adaptive
 
     batch = _batch()
@@ -306,8 +306,8 @@ def test_adaptive_observable_uses_selected_producer_and_refuses_unsupported(monk
     )
     settings = Precision(
         target_rse=0.1,
-        max_electrons=6,
-        block_electrons=3,
+        max_histories=6,
+        block_histories=3,
         observables=("cxr",),
         band_eV=(1000.0, 3000.0),
     )
