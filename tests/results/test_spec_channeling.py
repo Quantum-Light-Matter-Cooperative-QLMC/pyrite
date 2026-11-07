@@ -1,6 +1,7 @@
 """``spec_channeling`` as a persisted additive line-grid channel (#507, ADR-0018 P5)."""
 
 import numpy as np
+import polars as pl
 import pytest
 
 from pyrite._spectral_components import cxr_spectrum, incident_spectrum
@@ -123,8 +124,12 @@ def test_result_combines_channeling_and_lists_it_as_a_family():
         result.combined_cxr(include_channeling=False).density, [1.5, 2.25]
     )
     assert "channeling" in set(result.to_dataframe()["component"].to_list())
-    flux = result.spectral_flux(units="electron")
-    np.testing.assert_allclose(flux["total"].to_numpy(), [11.625, 26.25])
+    total = (
+        result.to_dataframe()
+        .group_by("photon_energy_eV", maintain_order=True)
+        .agg(pl.col("density").sum())
+    )
+    np.testing.assert_allclose(total["density"].to_numpy(), [11.625, 26.25])
 
 
 def test_result_refuses_channeling_on_another_grid():

@@ -17,7 +17,7 @@ from pyrite.units import Q_, ureg
 
 
 def _slab(**kwargs):
-    return Slab("hopg", 2000.0, footprint=None, **kwargs)
+    return Slab("hopg", 2000.0, width=None, height=None, **kwargs)
 
 
 def _stack(**kwargs):
@@ -161,7 +161,7 @@ def test_numeric_target_path_keeps_pint_lazy():
             sys.executable,
             "-c",
             "import sys; from pyrite.geometry import Slab, Stack, Layer; "
-            "assert Slab('hopg', 2000, 45, 180, footprint=None).tilt_deg == 45; "
+            "assert Slab('hopg', 2000, 45, 180, width=None, height=None).tilt_deg == 45; "
             "s = Stack((Layer('hopg', 2000), Layer('silicon', 3000)), 45, footprint=None); "
             "assert s.tilt_deg == 45; "
             "assert 'pint' not in sys.modules",

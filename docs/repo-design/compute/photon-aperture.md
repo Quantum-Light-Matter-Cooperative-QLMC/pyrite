@@ -55,8 +55,7 @@ normalization is applied. Out-of-bin detections remain separately available
 on the tally. Event tallies retain sub-cutoff source energy and characteristic
 relaxation budgets.
 
-The ordinary directional spectra, their per-sr units, and `spectral_flux()`
-remain separate. Their characteristic/continuum families are alternative
+The ordinary directional spectra, and their per-sr units remain separate. Their characteristic/continuum families are alternative
 views of contributions also represented by an aperture observation. No method
 sums those views. Primary transport runs once; both scoring routes reuse its
 rows. The aperture sampler and feedback use their own seeded streams without

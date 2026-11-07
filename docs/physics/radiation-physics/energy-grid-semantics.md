@@ -213,9 +213,9 @@ Acquisition reporting bins (`instrument/acquisition.py`) partition detected even
 
 (legacy-union-table)=
 
-### Legacy union table
+### Removed legacy union table
 
-`Result.spectral_flux` interpolates every family onto the union of all native nodes and fills zero outside each family's grid. Its values are unchanged and remain a display table, but they are not a yield representation:
+`Result.spectral_flux` (removed in 0.29.0) interpolated every family onto the union of all native nodes and filled zero outside each family's grid. It was a display table, not a yield representation, which is why it was retired in favour of native-grid views and `integrated_yield`:
 
 * Between a family's own nodes, union nodes preserve its piecewise-linear integral.
 * Beyond its support, the zero fill adds a bridging triangle from each nonzero endpoint to the next union node. For CXR $(100, 300)\,\mathrm{eV} \mapsto (2, 4)$, characteristic $(100, 300) \mapsto (0.5, 0.5)$ and brem, all declared as node samples, $(100, 200, 400) \mapsto (1, 1, 1)$, the native integrals are 600, 100 and 300 (1000 in total); the trapezoid of the union `total` column is 1225, including triangles of 200 and 25 between 300 and 400 eV. A producer-built characteristic is a bin mean on edges $(0, 200, 400)$ and represents 200, not 100.

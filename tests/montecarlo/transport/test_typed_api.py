@@ -32,7 +32,7 @@ def inputs(monkeypatch):
     )
     return (
         Beam(30.0, transverse=PointSpot(), longitudinal=PointBunch()),
-        Slab("silicon", 100.0, tilt_deg=30.0, footprint=None),
+        Slab("silicon", 100.0, tilt_deg=30.0, width=None, height=None),
         Physics(
             elastic_model="mott",
             inelastic_model="continuous",

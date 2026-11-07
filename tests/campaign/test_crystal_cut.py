@@ -23,7 +23,14 @@ CUT = pr.geometry.CrystalCut(
 
 def _slab(cut=None, tilt=84.5, azimuth=0.0, **kwargs):
     return pr.geometry.Slab(
-        "hopg", 500.0, tilt_deg=tilt, tilt_azim_deg=azimuth, footprint=None, cut=cut, **kwargs
+        "hopg",
+        500.0,
+        tilt_deg=tilt,
+        tilt_azim_deg=azimuth,
+        width=None,
+        height=None,
+        cut=cut,
+        **kwargs,
     )
 
 

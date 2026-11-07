@@ -506,7 +506,7 @@ def _coherent_offsets(
             "analytic coherent averaging of sampled "
             "bunch offsets needs a Gaussian bunch length to average them "
             "analytically: set Beam(longitudinal=LongitudinalDistribution('gaussian', ...)), "
-            "or use Slab(footprint=None) for a laterally infinite crystal"
+            "or use Slab(width=None, height=None) for a laterally infinite crystal"
         )
     sigma_z_ang = longitudinal_rms_fs * C_ANG_PER_FS
     # Decide support in host float64 so a borderline duration does not run on

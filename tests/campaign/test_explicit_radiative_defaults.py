@@ -186,7 +186,7 @@ def test_typed_trajectory_lowering_inherits_explicit_defaults():
 
     scene = Scene(
         Beam(30.0, transverse=PointSpot(), longitudinal=PointBunch()),
-        TypedSlab("silicon", 100.0, tilt_deg=30.0, footprint=None),
+        TypedSlab("silicon", 100.0, tilt_deg=30.0, width=None, height=None),
         detector=None,
     )
     numerics = Numerics(sampling=FixedSampling(3, 2), seed=19)

@@ -101,7 +101,6 @@ def test_simulate_returns_the_transition_component():
     without = result.combined_cxr(include_transition=False).density
     np.testing.assert_allclose(total - without, result.transition.density, rtol=1e-9, atol=0)
     assert "transition" in set(result.to_dataframe()["component"].to_list())
-    assert "transition" in result.spectral_flux().columns
 
 
 def test_checkpoint_round_trips_a_separate_transition_component(tr_run, tmp_path):

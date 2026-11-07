@@ -259,7 +259,8 @@ def test_unsupported_target_material_cut_pose_and_shapes_are_rejected():
         pr.Target(_body(), pose=pr.detectors.PlanarPose((0, 0, 50)))
     with pytest.raises(TypeError, match="RectangularBody"):
         pr.geometry.Filter(
-            pr.geometry.Slab("silicon", footprint=None), pr.detectors.PlanarPose((0, 0, 50))
+            pr.geometry.Slab("silicon", width=None, height=None),
+            pr.detectors.PlanarPose((0, 0, 50)),
         )
     with pytest.raises(TypeError, match="scalar real angle"):
         pr.Target(_body(), tilt_deg=[20, 30])

@@ -18,11 +18,11 @@ def test_slab_dimensions_match_footprint():
     assert slab.with_width(7 * ureg.mm).footprint == Footprint(7, 6)
 
 
-def test_infinite_slab_and_compatibility_warning():
+def test_infinite_slab_and_removed_footprint_none():
     slab = Slab("hopg", width=None, height=None)
     assert slab.width is None and slab.height is None
-    with pytest.warns(DeprecationWarning, match="width=None, height=None"):
-        assert Slab("hopg", footprint=None) == slab
+    with pytest.raises(TypeError, match=r"removed in 0\.29\.0.*width=None, height=None"):
+        Slab("hopg", footprint=None)
 
 
 def test_slab_dimension_conflicts():
@@ -32,13 +32,6 @@ def test_slab_dimension_conflicts():
         Slab("hopg", width=None, height=1 * ureg.mm)
     with pytest.raises(TypeError, match="mutually exclusive"):
         Slab("hopg", width=None, height=None, footprint=None)
-
-
-def test_footprint_quantity_deprecation():
-    with pytest.warns(DeprecationWarning, match="Footprint.width"):
-        footprint = Footprint(width=1 * ureg.mm, height_mm=2)
-    with pytest.warns(DeprecationWarning, match="Footprint.width"):
-        assert footprint.width.to("mm").magnitude == 1
 
 
 def test_slab_quantity_sweep_matches_footprint_sweep():

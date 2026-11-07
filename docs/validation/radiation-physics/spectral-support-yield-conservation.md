@@ -276,11 +276,12 @@ $((100,200),(300,400))$ and uncovered $((50,100),(200,300),(400,500))$. The
 first part's own uncovered set is $((50,100),(200,500))$.
 
 Fixture: with characteristic declared as nodes, the families give
-$600, 100, 300$ and total $1000$, and the legacy `spectral_flux` trapezoid
-gives $1225$. An independent `np.interp(left=0, right=0)` union sum gives
-$1225$ with column $(3.5, 4.5, 5.5, 1)$. With characteristic declared
-bin-mean on $(0, 200, 400)$, the total is $1100$ and the legacy table still
-gives $1225$.
+$600, 100, 300$ and total $1000$. The removed (0.29.0) legacy `spectral_flux`
+union table would have given a trapezoid of $1225$; an independent
+`np.interp(left=0, right=0)` union sum gives $1225$ with column
+$(3.5, 4.5, 5.5, 1)$, which shows why zero-filled union tables are not a yield
+representation. With characteristic declared bin-mean on $(0, 200, 400)$, the
+total is $1100$.
 
 Unit conversion: the node spectrum $(200, 400, 1000) \mapsto (1, 3, 2)$ gives
 $1900$ in eV and $1900$ after `to_energy("keV")` with a keV trapezoid. The bin-mean

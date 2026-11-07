@@ -56,7 +56,7 @@ from pyrite.units import ureg
 
 scene = Scene(
     Beam(kinetic_energy=40 * ureg.keV, transverse=Spot(), longitudinal=PointBunch()),
-    Slab("hopg", thickness=200 * ureg.nm, footprint=None),
+    Slab("hopg", thickness=200 * ureg.nm, width=None, height=None),
 )
 study = OptimizationStudy(
     scene,

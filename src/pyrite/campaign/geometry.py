@@ -32,7 +32,6 @@ from typing import TYPE_CHECKING, Any, Protocol, Self, cast
 
 import numpy as np
 
-from .._api_deprecations import warn_api
 from .._formatting import fmt_thickness
 from .._spec_defaults import UNSET as _UNSET
 from .._spec_defaults import _Unset
@@ -198,7 +197,7 @@ def crystal_params(material: str, n_families: int = 4) -> dict[str, Any]:
     )
 
 
-@dataclass(frozen=True, init=False)
+@dataclass(frozen=True)
 class Footprint:
     """Bounded rectangular crystal footprint: FULL width and height in mm.
 
@@ -209,55 +208,15 @@ class Footprint:
     Parameters
     ----------
     width_mm, height_mm
-        Legacy full transverse dimensions in mm, scalar or sweep sequence;
-        positional arguments remain supported and may contain compatible Pint
-        quantities. The numeric fields remain the serialized/lowered contract.
-    width, height
-        Deprecated keyword-only Pint lengths, scalar or one-dimensional sweep
-        arrays. Use Slab dimensions, or the numeric ``*_mm`` fields for Stack.
-        Read-back is deprecated; ``with_width`` / ``with_height`` remain available.
+        Full transverse dimensions in mm, scalar or sweep sequence; they may
+        contain compatible Pint quantities. The numeric fields remain the
+        serialized/lowered contract. Use Slab ``width``/``height`` for
+        quantity-valued slab dimensions; ``with_width`` / ``with_height``
+        replace a dimension with an explicit Pint length.
     """
 
     width_mm: ScalarOrSeq
     height_mm: ScalarOrSeq
-
-    def __init__(
-        self,
-        width_mm: ScalarOrSeq | _Unset = _UNSET,
-        height_mm: ScalarOrSeq | _Unset = _UNSET,
-        *,
-        width: object = _UNSET,
-        height: object = _UNSET,
-    ) -> None:
-        if width is not _UNSET:
-            warn_api("Footprint.width", stacklevel=3)
-            if width_mm is not _UNSET:
-                raise TypeError("Footprint.width_mm and width are mutually exclusive")
-            width_mm = _geometry_length(width, unit="mm", field="Footprint.width")
-        elif width_mm is _UNSET:
-            raise TypeError("Footprint requires width_mm or width")
-        if height is not _UNSET:
-            warn_api("Footprint.height", stacklevel=3)
-            if height_mm is not _UNSET:
-                raise TypeError("Footprint.height_mm and height are mutually exclusive")
-            height_mm = _geometry_length(height, unit="mm", field="Footprint.height")
-        elif height_mm is _UNSET:
-            raise TypeError("Footprint requires height_mm or height")
-        object.__setattr__(self, "width_mm", width_mm)
-        object.__setattr__(self, "height_mm", height_mm)
-        self.__post_init__()
-
-    @property
-    def width(self) -> Quantity:
-        """Fresh full x width in mm, retaining the original scalar/sweep shape."""
-        warn_api("Footprint.width", stacklevel=3)
-        return _quantity_geometry(self.width_mm, "mm")
-
-    @property
-    def height(self) -> Quantity:
-        """Fresh full y height in mm, retaining the original scalar/sweep shape."""
-        warn_api("Footprint.height", stacklevel=3)
-        return _quantity_geometry(self.height_mm, "mm")
 
     def with_width(self, width: object) -> Self:
         """Return a copy with an explicitly unit-bearing full x width."""
@@ -951,8 +910,9 @@ class Slab(SlabDimensions, _TargetGeometry):
     width, height
         Paired full transverse Pint lengths, or both ``None`` for an infinite slab.
     footprint
-        Compatibility alternative: a finite :class:`Footprint`. Passing ``None``
-        is deprecated; use ``width=None, height=None`` for an infinite slab.
+        Compatibility alternative: a finite :class:`Footprint`. ``None`` is
+        refused (removed in 0.29.0); use ``width=None, height=None`` for an
+        infinite slab.
     entrance_face
         Optional supported blazed-groove geometry.
     allow_normal_incidence

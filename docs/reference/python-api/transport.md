@@ -114,7 +114,7 @@ from pyrite.transport import simulate_trajectories
 
 segments = simulate_trajectories(
     Beam(30.0, transverse=PointSpot(), longitudinal=PointBunch()),
-    Slab("silicon", 1000.0, tilt_deg=30.0, footprint=None),
+    Slab("silicon", 1000.0, tilt_deg=30.0, width=None, height=None),
     physics=Physics(
         inelastic_model="continuous", radiative_model="uncoupled", bremsstrahlung_model="eedl"
     ),

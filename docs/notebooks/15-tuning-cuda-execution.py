@@ -3,7 +3,7 @@
 # dependencies = [
 #     "endf-parserpy==0.17.0",
 #     "marimo>=0.23.3",
-#     "pyrite-mc[nvidia,optimization]==0.28.0",
+#     "pyrite-mc[nvidia,optimization]==0.29.0",
 #     "matplotlib>=3.11",
 #     "numpy>=2",
 # ]
@@ -217,7 +217,7 @@ def _(electrons, np, workload):
             _material,
             thickness=_thickness,
             tilt=45 * ureg.degree,
-            footprint=Footprint(width=5 * ureg.mm, height=5 * ureg.mm),
+            footprint=Footprint(5 * ureg.mm, 5 * ureg.mm),
         ),
         Detector(observation_angle=90 * ureg.degree),
         numerics=Numerics(

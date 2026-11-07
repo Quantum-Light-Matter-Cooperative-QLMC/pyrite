@@ -36,7 +36,7 @@ from .temporal import TemporalIntensity
 
 FluxUnits = Literal["detector", "nA", "sr", "electron"]
 
-#: Units of each :meth:`Result.spectral_flux` ``units`` choice.
+#: Units of each flux ``units`` choice (``Result.spectral_flux`` was removed in 0.29.0).
 FLUX_UNITS: Mapping[str, str] = MappingProxyType(
     {
         "detector": "photons / (s eV)",
@@ -46,15 +46,6 @@ FLUX_UNITS: Mapping[str, str] = MappingProxyType(
     }
 )
 
-#: Pint-parsable unit and count basis of each :data:`FLUX_UNITS` choice.
-_FLUX_COLUMN_UNITS: Mapping[str, tuple[str, str]] = MappingProxyType(
-    {
-        "detector": ("1 / s / eV", "photons"),
-        "nA": ("1 / s / nA / eV", "photons"),
-        "sr": ("1 / s / eV / sr", "photons"),
-        "electron": ("1 / eV / sr", "photons_per_incident_electron"),
-    }
-)
 _ENERGY_COLUMN = {"unit": "eV", "basis": None}
 
 if TYPE_CHECKING:
@@ -246,8 +237,8 @@ class Result:
 
     Every :class:`SpectralDensity` holds photons / incident electron / eV / sr
     on its own grid; no family includes another. Derived views:
-    :meth:`to_dataframe` (long, native grids), :meth:`spectral_flux` (wide,
-    common grid, beam/acceptance-scaled, with a ``total`` column), and
+    :meth:`to_dataframe` (long, native grids), :meth:`accepted_spectra`
+    (explicit acceptance and current transforms), and
     :meth:`combined_cxr` (CXR plus characteristic, channeling and transition radiation). Displaying a result in a
     notebook renders this layout with grid sizes and ranges.
     """
@@ -344,7 +335,7 @@ class Result:
     ) -> pl.DataFrame:
         """Aperture histogram; per electron by default, or per second at ``current_nA``.
 
-        Densities/counts and their units remain separate from :meth:`spectral_flux`.
+        Densities/counts and their units remain separate from :meth:`accepted_spectra`.
         ``current=Q_(...)`` accepts an explicit mean current quantity instead
         of ``current_nA``; supplying both is an error. Uses exact histogram
         edges and widths; no acceptance factor is reapplied.
@@ -539,30 +530,6 @@ class Result:
             "density": {"unit": "1 / eV / sr", "basis": "photons_per_incident_electron"},
         }
 
-    def spectral_flux_units(
-        self, *, units: FluxUnits = "detector", mode: str = "incoherent"
-    ) -> dict[str, dict[str, str | None]]:
-        """Machine-readable units of :meth:`spectral_flux` columns for ``units``.
-
-        Entries follow :meth:`dataframe_units`; every family column and
-        ``total`` share the selected flux unit and count basis.
-
-        Deprecated since 0.27.0; removal in 0.29.0. Use native quantity
-        spectra and their ``dataframe_units()`` for new exports.
-        """
-        from .._api_deprecations import warn_api
-
-        warn_api("Result.spectral_flux_units")
-        if units not in FLUX_UNITS:
-            raise ValueError(f"units must be one of {', '.join(map(repr, FLUX_UNITS))}")
-        unit, basis = _FLUX_COLUMN_UNITS[units]
-        families = [name for name, _, _ in self._components(mode)]
-        return {
-            "photon_energy_eV": dict(_ENERGY_COLUMN),
-            "photon_energy_keV": {"unit": "keV", "basis": None},
-            **{name: {"unit": unit, "basis": basis} for name in (*families, "total")},
-        }
-
     def accepted_solid_angle_sr(self) -> float:
         """Solid angle in sr that turns this result's per-sr density into accepted flux.
 
@@ -581,92 +548,6 @@ class Result:
         if not isinstance(detector, PlanarDetector):
             raise ValueError("observation-average result needs its planar detector in scene")
         return float(np.sum(planar_detector_rays(detector).solid_angle_sr))
-
-    def spectral_flux(
-        self,
-        *,
-        units: FluxUnits = "detector",
-        mode: str = "incoherent",
-    ) -> pl.DataFrame:
-        """Return a wide spectrum table on a common grid, in physical units.
-
-        Deprecated since 0.27.0; removal in 0.29.0. For new exports use
-        :meth:`accepted_spectra` or component ``quantify()``, then explicit
-        current transforms and native ``to_dataframe()``/``dataframe_units()``.
-
-        Columns are ``photon_energy_eV``, ``photon_energy_keV``, one column per
-        family (``cxr`` in the selected ``mode``, ``characteristic``,
-        ``channeling`` and ``transition`` when present, ``brem``), and ``total``, their sum. The grid is the union of
-        every family's native nodes, so each family is exact at its own nodes
-        and linearly interpolated between them. Outside its own grid a family
-        is zero; the total therefore omits brem below the brem grid start.
-
-        This is a legacy display table, not a yield representation. Its zero
-        fill asserts no emission beyond a family's computational domain, so
-        integrating ``total`` over the union grid adds exterior bridging
-        triangles from nonzero endpoints, and bin-mean families (characteristic,
-        ``line_quadrature="bin-mean"`` PXR/CBS) are read as node samples. Use
-        :meth:`integrated_yield` for represented yields; values here are
-        unchanged.
-
-        Parameters
-        ----------
-        units
-            Key of :data:`FLUX_UNITS`:
-
-            - ``"detector"``: photons / s / eV into the accepted solid angle
-              (:meth:`accepted_solid_angle_sr`) at the mean beam current.
-            - ``"nA"``: photons / s / nA / eV into the accepted solid angle.
-            - ``"sr"``: photons / s / eV / sr at the mean beam current.
-            - ``"electron"``: the stored photons / electron / eV / sr.
-
-            Mean current is ``Q[pC] * f[kHz]`` nA from the beam's bunch charge
-            and repetition rate. Scalar-detector densities are evaluated at the
-            central observation direction, so ``"detector"`` and ``"nA"`` assume
-            the density is uniform over the acceptance.
-        mode
-            CXR mode for the ``cxr`` column: ``"incoherent"`` or ``"coherent"``.
-
-        Validation: pixel-acquisition-counting
-        """
-        import polars as pl
-        from scipy.constants import elementary_charge
-
-        from .._api_deprecations import warn_api
-        from .store import beam_current_na
-
-        warn_api("Result.spectral_flux")
-        if units not in FLUX_UNITS:
-            raise ValueError(f"units must be one of {', '.join(map(repr, FLUX_UNITS))}")
-        electrons_per_s_per_na = 1e-9 / elementary_charge
-        if units == "electron":
-            scale = 1.0
-        elif units == "sr":
-            scale = beam_current_na(self.case) * electrons_per_s_per_na
-        elif units == "nA":
-            scale = self.accepted_solid_angle_sr() * electrons_per_s_per_na
-        else:
-            scale = (
-                beam_current_na(self.case) * electrons_per_s_per_na * self.accepted_solid_angle_sr()
-            )
-
-        parts = self._components(mode)
-        energy_eV = np.unique(
-            np.concatenate([np.asarray(part.photon_energy_eV, float) for _, _, part in parts])
-        )
-        columns = {}
-        for name, _, part in parts:
-            order = np.argsort(part.photon_energy_eV)
-            columns[name] = scale * np.interp(
-                energy_eV,
-                np.asarray(part.photon_energy_eV, float)[order],
-                np.asarray(part.density, float)[order],
-                left=0.0,
-                right=0.0,
-            )
-        return pl.DataFrame(
-            {"photon_energy_eV": energy_eV, "photon_energy_keV": energy_eV / 1e3, **columns}
-        ).with_columns(total=pl.sum_horizontal(list(columns)))
 
     def integrated_yield(
         self,

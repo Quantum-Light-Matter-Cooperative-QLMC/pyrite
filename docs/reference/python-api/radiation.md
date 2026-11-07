@@ -34,7 +34,7 @@ the beam mean current; `.rate(current_na)` rescales stored arrays to ph/s/eV/sr.
 `pyrite.radiation.directional_sources(..., components=...)` returns one such result per
 component (`"pxr-cbs"`, `"characteristic"`, `"bremsstrahlung"`, `"transition"`)
 from one transport. The opt-in `"transition"` component uses the production
-history-coherent planar-crossing model; it requires `footprint=None` and the
+history-coherent planar-crossing model; it requires an infinite slab (`width=None, height=None`) and the
 supported X-ray dielectric band. Cherenkov remains an internal bulk diagnostic
 in the app, outside this escaped-source API.
 This surface is provisional; see [directional heatmaps](../../guides/directional-source-heatmap.md)
