@@ -355,7 +355,7 @@ def test_far_envelope_never_claims_the_core_of_a_sub_mev_width_line():
 
 def test_midpoint_series_matches_the_bin_integral_inside_its_window():
     """Validation: sinc-bin-midpoint-series -- the series mean of a narrow bin
-    agrees with the adaptive-quadrature bin integral to below 3e-9 of the
+    agrees with the adaptive-quadrature bin integral to below 2.5e-9 of the
     envelope 1/(2 pi^2 x^2) across the window, including bins on sinc^2 zeros."""
     rng = np.random.default_rng(1003)
     n = 120
@@ -373,4 +373,4 @@ def test_midpoint_series_matches_the_bin_integral_inside_its_window():
         envelope = 1.0 / (2.0 * np.pi**2 * xc[k] ** 2)
         tol = 1e-12 * envelope * dx[k]
         exact = quad(lambda x: np.sinc(x) ** 2, lo, hi, epsabs=tol, epsrel=1e-11)[0] / dx[k]
-        assert abs(series[k] - exact) <= 3e-9 * envelope
+        assert abs(series[k] - exact) <= 2.5e-9 * envelope

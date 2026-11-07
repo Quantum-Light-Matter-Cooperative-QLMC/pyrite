@@ -139,12 +139,12 @@ def _next_node(node, size):
 
 
 #: Measured cost constants for choosing between the tree and the all-pairs
-#: kernel (#286, jobs 3725/3732, RTX 5080, HOPG 1 mm, 300 keV and 29,999 keV
-#: flushes). The tree runs one thread per bin, so its wall time follows the
-#: busiest bin's near-line count (~4e-5 to 1.1e-4 s per line); the all-pairs
-#: kernel's follows the total near pairs (~9.2e-9 s each).
-_TREE_SECONDS_PER_BUSIEST_LINE = 7.0e-5
-_PAIRS_SECONDS_PER_NEAR_PAIR = 9.2e-9
+#: kernel with the midpoint series on (#1003, job 4036, RTX 5080, HOPG 300 keV
+#: and h-BN 5 MeV flushes). The tree runs one thread per bin, so its wall time
+#: follows the busiest bin's near-line count (2.4e-5 to 4.2e-5 s per line); the
+#: all-pairs kernel's follows the total near pairs (6.4e-9 to 7.7e-9 s each).
+_TREE_SECONDS_PER_BUSIEST_LINE = 3.5e-5
+_PAIRS_SECONDS_PER_NEAR_PAIR = 7.2e-9
 
 
 def near_line_counts(E_r, aw, edges, exact_widths):
@@ -221,6 +221,11 @@ def reduce_host(E_r, aw, w, edges, *, exact_widths=BIN_MEAN_EXACT_WIDTHS):
 
 _TREE_KERNEL = None
 _TREE_SOURCE = r"""
+#ifndef PYRITE_TREE_NEAR_ARGS
+#define PYRITE_TREE_NEAR_ARGS
+#define PYRITE_TREE_SKIP_NEAR(line, bin) 0
+#endif
+
 static __device__ int pyrite_next_node(int node, int size) {
     while (node > 1 && (node & 1)) node >>= 1;
     return node > 1 ? node + 1 : size;
@@ -233,6 +238,7 @@ extern "C" __global__ void pyrite_bin_tree_reduce(
     const int *first, const int *last,
     const double *center, const double *half, const double *radius,
     const double *moments, const double *edges, const double *inv_width,
+    PYRITE_TREE_NEAR_ARGS
     double *out, int n_bins, int n_nodes, int n_leaves, float far_widths
 ) {
     const int bin = blockIdx.x * blockDim.x + threadIdx.x;
@@ -270,6 +276,7 @@ extern "C" __global__ void pyrite_bin_tree_reduce(
             node *= 2;
         } else {
             for (int line = first[node]; line < last[node]; ++line) {
+                if (PYRITE_TREE_SKIP_NEAR(line, bin)) continue;
                 float mean;
                 const double value = pyrite_sincsq_far_mean(
                     a[line], e[line], 0.0f, lo_f, lo_c, hi_f, hi_c,
@@ -290,124 +297,26 @@ extern "C" __global__ void pyrite_bin_tree_reduce(
 """
 
 
-_WARP_TREE_KERNEL = None
-_WARP_TREE_SOURCE = r"""
-static __device__ int pyrite_next_node(int node, int size) {
-    while (node > 1 && (node & 1)) node >>= 1;
-    return node > 1 ? node + 1 : size;
-}
-
-static __device__ void pyrite_kahan_add(double value, double *sum, double *carry) {
-    const double y = value - *carry;
-    const double t = *sum + y;
-    *carry = (t - *sum) - y;
-    *sum = t;
-}
-
-/* One warp per bin. Every lane walks the same node sequence, so the opening
-   tests and multipole series are warp-uniform; a leaf's (at most 32) lines go
-   one per lane, so its FP64 sine integrals run in parallel instead of in
-   series. Each lane keeps a compensated sum; lane sums combine in a fixed
-   shuffle tree, so the result is deterministic. */
-extern "C" __global__ void pyrite_bin_tree_reduce_warp(
-    const float *e, const float *a, const float *w,
-    const int *first, const int *last,
-    const double *center, const double *half, const double *radius,
-    const double *moments, const double *edges, const double *inv_width,
-    double *out, int n_bins, int n_nodes, int n_leaves, float far_widths
-) {
-    const int lane = threadIdx.x & 31;
-    const int bin = (blockIdx.x * blockDim.x + threadIdx.x) >> 5;
-    if (bin >= n_bins) return;
-    const double lo = edges[bin], hi = edges[bin + 1], iw = inv_width[bin];
-    const float lo_f = (float)lo, hi_f = (float)hi;
-    const float lo_c = (float)(lo - (double)lo_f);
-    const float hi_c = (float)(hi - (double)hi_f);
-    double far_sum = 0.0, far_carry = 0.0, near_sum = 0.0, near_carry = 0.0;
-    int node = 1;
-    while (node < n_nodes) {
-        if (first[node] == last[node]) {
-            node = pyrite_next_node(node, n_nodes);
-            continue;
-        }
-        const double c = center[node], h = half[node];
-        const double nearest = fmin(fabs(lo - c), fabs(hi - c));
-        if (node < n_leaves && h <= 0.2 * nearest &&
-            (hi < c - h - radius[node] || lo > c + h + radius[node])) {
-            const double u = h / (lo - c), v = h / (hi - c);
-            const double base = 1.0 / ((lo - c) * (hi - c));
-            double term = base, vpow = 1.0;
-            double value = moments[node * 11] * term;
-            for (int k = 1; k <= 10; ++k) {
-                vpow *= v;
-                term = u * term + base * vpow;
-                value += moments[node * 11 + k] * term;
-            }
-            pyrite_kahan_add(value, &far_sum, &far_carry);
-            node = pyrite_next_node(node, n_nodes);
-        } else if (node < n_leaves) {
-            node *= 2;
-        } else {
-            const int line = first[node] + lane;
-            if (line < last[node]) {
-                float mean;
-                const double value = pyrite_sincsq_far_mean(
-                    a[line], e[line], 0.0f, lo_f, lo_c, hi_f, hi_c,
-                    far_widths, &mean
-                ) ? (double)w[line] * (double)mean :
-                    (double)w[line] * pyrite_sincsq_bin_mean(
-                        (double)a[line], (double)e[line], lo, hi, iw);
-                pyrite_kahan_add(value, &near_sum, &near_carry);
-            }
-            node = pyrite_next_node(node, n_nodes);
-        }
-    }
-    double total = near_sum - near_carry;
-    for (int offset = 16; offset > 0; offset >>= 1) {
-        total += __shfl_down_sync(0xffffffffu, total, offset);
-    }
-    if (lane == 0) {
-        out[bin] = total + (far_sum - far_carry);
-    }
-}
-"""
-
-
-def run_tree_reduction(
-    E_r, aw, w, edges, inv_width, *, out, exact_widths=BIN_MEAN_EXACT_WIDTHS, warp=False
-):
+def run_tree_reduction(E_r, aw, w, edges, inv_width, *, out, exact_widths=BIN_MEAN_EXACT_WIDTHS):
     """Add a scalable near/far bin-mean reduction to a CuPy spectrum.
-
-    ``warp=True`` selects the one-warp-per-bin traversal (#1003 candidate),
-    which evaluates a leaf's lines in parallel lanes.
 
     Validation: sinc-bin-near-far
     """
     import cupy
 
-    global _TREE_KERNEL, _WARP_TREE_KERNEL
+    global _TREE_KERNEL
     # This explicit CUDA entry point may run while the global backend is CPU.
     # Transfer through CuPy rather than the selected backend's array converter.
     tree = build_cxr_tree(
         cupy.asnumpy(E_r), cupy.asnumpy(aw), cupy.asnumpy(w), exact_widths=exact_widths
     )
     e, a, wt, first, last, center, half, radius, moments = tree
+    if _TREE_KERNEL is None:
+        _TREE_KERNEL = cupy.RawKernel(SINCSQ_BIN_PREAMBLE + _TREE_SOURCE, "pyrite_bin_tree_reduce")
     n_bins = int(inv_width.size)
-    if warp:
-        if _WARP_TREE_KERNEL is None:
-            _WARP_TREE_KERNEL = cupy.RawKernel(
-                SINCSQ_BIN_PREAMBLE + _WARP_TREE_SOURCE, "pyrite_bin_tree_reduce_warp"
-            )
-        kernel, grid = _WARP_TREE_KERNEL, ((n_bins * 32 + 127) // 128,)
-    else:
-        if _TREE_KERNEL is None:
-            _TREE_KERNEL = cupy.RawKernel(
-                SINCSQ_BIN_PREAMBLE + _TREE_SOURCE, "pyrite_bin_tree_reduce"
-            )
-        kernel, grid = _TREE_KERNEL, ((n_bins + 127) // 128,)
     per_bin = cupy.empty(n_bins, dtype=cupy.float64)
-    kernel(
-        grid,
+    _TREE_KERNEL(
+        ((n_bins + 127) // 128,),
         (128,),
         (
             cupy.asarray(e),

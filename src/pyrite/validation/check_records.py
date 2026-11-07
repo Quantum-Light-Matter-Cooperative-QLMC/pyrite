@@ -67,6 +67,9 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     "checks/photon_first_flight_cuda.py": (),
     # Live streamed scoring memory/wall benchmark (#611): engineering evidence.
     "checks/streamed_scoring_memory.py": (),
+    # Bin-mean reducer profile and A/B replay (#1003, #286): engineering evidence.
+    "checks/cxr_bin_mean_profile_1003.py": (),
+    "checks/line_sparse_near_286.py": (),
     # Characteristic vs continuum budget evaluation (#1006): engineering evidence.
     "checks/characteristic_budget_1006.py": (),
     # Streamed-block sizing sweep (#907): engineering evidence.

@@ -44,7 +44,7 @@ if command -v ncu >/dev/null; then
     --launch-count 12 \
     uv run --no-sync python "$script" replay "$out/hbn5mev-cuda-n128.npz" \
       --out "$out/replay-ncu.json" --slice-lines 50000 --max-flushes 1 --repeats 1 \
-      --arms auto,pairs,warp,sparse,warp+series,sparse+series \
+      --arms auto,pairs,tree,sparse,tree+series,sparse+series \
     > "$out/ncu.txt" 2>&1 || echo "FAILED ncu rc=$?"
 else
   echo "ncu not found"
