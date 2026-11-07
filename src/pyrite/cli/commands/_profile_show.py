@@ -166,6 +166,30 @@ def _emit_targets(payload):
         )
 
 
+_NUMERICS_GROUP_LABELS = {
+    "convergence": "reflections and mosaic",
+    "channeling": "channeling (quantum zone)",
+}
+
+
+def _numerics_group_rows(group, numerics_names, adaptive_active):
+    """Rows for one numerics group; channeling collapses to its model row when off."""
+    fields = group["fields"]
+    if group["name"] == "channeling" and any(
+        row["key"] == "channeling_model" and row["effective"] == "off" for row in fields
+    ):
+        fields = [row for row in fields if row["key"] == "channeling_model"]
+    rows = []
+    for row in fields:
+        if group["name"] == "sampling" and adaptive_active:
+            value = "adaptive (numerics adaptive-sampling)"
+        else:
+            source = "default" if row["source"] == "fidelity" else row["source"]
+            value = f"{_display(row['effective'])} ({source})"
+        rows.append((numerics_names[row["key"]], value))
+    return rows
+
+
 def emit_show(payload, target, resolution, numerics_names, grid_rows):
     emit_result(f"[{payload['name']}]")
     ranges = [
@@ -249,20 +273,10 @@ def emit_show(payload, target, resolution, numerics_names, grid_rows):
         or [("filters", "none")],
     )
 
+    adaptive_active = payload["adaptive_sampling"]["effective"] is not None
     for group in resolution.groups():
-        rows = []
-        for row in group["fields"]:
-            label = numerics_names[row["key"]]
-            if (
-                group["name"] == "sampling"
-                and payload["adaptive_sampling"]["effective"] is not None
-            ):
-                value = "adaptive (numerics adaptive-sampling)"
-            else:
-                source = "default" if row["source"] == "fidelity" else row["source"]
-                value = f"{_display(row['effective'])} ({source})"
-            rows.append((label, value))
-        label = "reflections and mosaic" if group["name"] == "convergence" else group["name"]
+        label = _NUMERICS_GROUP_LABELS.get(group["name"], group["name"])
+        rows = _numerics_group_rows(group, numerics_names, adaptive_active)
         _table(f"Numerics / {label} (profile numerics)", rows)
 
     adaptive = payload["adaptive_sampling"]

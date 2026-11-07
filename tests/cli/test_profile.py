@@ -1927,3 +1927,75 @@ def test_channeling_numerics_round_trip_and_reset(tmp_path, monkeypatch):
     )
     assert_clean_result(reset)
     assert "channeling_model" not in tomlkit.parse(catalog.read_text())["profiles"]["sub_100keV"]
+
+
+def _show_section(stdout, title):
+    return next(block for block in stdout.split("\n\n") if block.startswith(title))
+
+
+def test_show_channeling_section_collapses_when_off_and_lists_all_when_on(tmp_path, monkeypatch):
+    catalog = _catalog(tmp_path, monkeypatch)
+    off = invoke(profile.command, ["show", "sub_100keV"])
+    assert_clean_result(off)
+    off_section = _show_section(off.stdout, "Numerics / channeling (quantum zone)")
+    assert_table_row(off_section, "channeling-model", "off (built-in)")
+    assert "channeling-plane" not in off_section
+    transport = _show_section(off.stdout, "Numerics / transport")
+    assert "channeling-" not in transport
+
+    assert_clean_result(
+        invoke(
+            profile.command,
+            [
+                "numerics",
+                "set",
+                "sub_100keV",
+                "--channeling-model",
+                "planar",
+                "--channeling-plane",
+                "1",
+                "-1",
+                "0",
+                "--radiative-model",
+                "uncoupled",
+            ],
+        ),
+        stdout="updated numerics for profile sub_100keV\n",
+    )
+    on = invoke(profile.command, ["show", "sub_100keV"])
+    assert_clean_result(on)
+    on_section = _show_section(on.stdout, "Numerics / channeling (quantum zone)")
+    for label in (
+        "channeling-model",
+        "channeling-plane",
+        "channeling-axial",
+        "channeling-basis-size",
+        "channeling-bloch-cells",
+        "channeling-dz-ang",
+        "channeling-zone-max-ang",
+    ):
+        assert label in on_section
+    assert_table_row(on_section, "channeling-model", "planar (profile)")
+    assert "channeling-" not in _show_section(on.stdout, "Numerics / transport")
+    assert "channeling_model" in catalog.read_text()
+
+
+def test_numerics_json_has_channeling_group_with_all_seven_keys(tmp_path, monkeypatch):
+    _catalog(tmp_path, monkeypatch)
+    shown = invoke(profile.command, ["numerics", "show", "sub_100keV", "-o", "json"])
+    assert_clean_result(shown)
+    groups = {group["name"]: group for group in json.loads(shown.stdout)["payload"]["groups"]}
+    assert [row["key"] for row in groups["channeling"]["fields"]] == [
+        "channeling_model",
+        "channeling_plane",
+        "channeling_axial",
+        "channeling_basis_size",
+        "channeling_bloch_cells",
+        "channeling_dz_ang",
+        "channeling_zone_max_ang",
+    ]
+    for row in groups["channeling"]["fields"]:
+        assert {"explicit", "effective", "source"} <= row.keys()
+    assert not any(
+        key.startswith("channeling_") for key in (r["key"] for r in groups["transport"]["fields"])
+    )
