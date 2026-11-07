@@ -510,7 +510,9 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     spec = json.loads((HERE / "scenes.json").read_text())
-    scene = next(s for s in spec["scenes"] if s["id"] == args.scene)
+    # #1013 precision-only anchors are run here but are not Geant4 benchmark scenes.
+    scenes = spec["scenes"] + spec.get("precision_scenes", [])
+    scene = next(s for s in scenes if s["id"] == args.scene)
     mat = spec["materials"][scene["material"]]
     bounds = spec["bounds"]
     args.block_rows = args.block_rows or spec["block_rows"]

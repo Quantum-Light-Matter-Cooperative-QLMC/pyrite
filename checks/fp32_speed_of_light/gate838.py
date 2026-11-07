@@ -24,6 +24,11 @@ Bin intervals are Bonferroni-adjusted over a distribution's populated bins
 (the declared #510 multiple-comparison policy); headline observables each use
 the plain 95% interval.
 
+Every other paired observable (non-headline fractions such as backscatter at
+MeV, the #894 exit cosine and energy bins, work counts) is printed as an
+ungated diagnostic with its relative change and z, so rare large-angle
+outcomes are reported even where they cannot be gated (#1013).
+
     uv run python checks/fp32_speed_of_light/gate838.py evidence/gate838/<job> \\
         [--output summary.json]
 """
@@ -157,12 +162,12 @@ def main():
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     runs = load(args.dirs)
-    scenes = {s["id"]: s for s in SPEC["scenes"]}
+    scenes = {s["id"]: s for s in (*SPEC["scenes"], *SPEC.get("precision_scenes", ()))}
     floor = SPEC["precision"]["headline_floor"]["fraction_mean"]
     groups = defaultdict(list)
     for (est, scene, seed), pair in sorted(runs.items()):
         groups[(est, scene)].append((seed, pair))
-    rows, dists = [], []
+    rows, dists, diagnostics = [], [], []
     for (est, sid), pairs in sorted(groups.items()):
         scene = scenes[sid]
         fa = [observables(p["fp64"]) for _, p in pairs]
@@ -172,6 +177,12 @@ def main():
             a = np.concatenate([x[name] for x in fa])
             b = np.concatenate([y[name] for y in fb])
             if not headline(name, a.mean(), scene, est):
+                if a.mean() or b.mean():
+                    diagnostics.append(
+                        bound(a, b)
+                        | dict(estimator=est, scene=sid, observable=name, n=a.size)
+                        | dict(diff=float(b.mean() - a.mean()))
+                    )
                 continue
             r = bound(a, b) | dict(estimator=est, scene=sid, observable=name, n=int(a.size))
             r["pass"] = {str(eps): outcome(r, eps) for eps in TARGETS}
@@ -216,6 +227,16 @@ def main():
             f"| {d['scene']} | {d['name']} | {d['bins']} | {d['worst_bound']:.2e} | "
             f"{d['worst_abs_z']:.2f} | {d['p']:.3f} | {d['pass']['0.02']} | {d['pass']['0.01']} |"
         )
+    print()
+    print("Diagnostics (ungated)")
+    print("| est | scene | observable | n | fp64 mean | mixed - fp64 | rel | z |")
+    print("|---|---|---|---|---|---|---|---|")
+    for r in diagnostics:
+        print(
+            f"| {r['estimator']} | {r['scene']} | {r['observable']} | {r['n']} | "
+            f"{r['fp64_mean']:.4g} | {r['diff']:+.3e} | {r['rel']:+.2e} | "
+            f"{r['z']:+.2f} |"
+        )
     verdict = {
         str(eps): max(
             (x["pass"][str(eps)] for x in (*rows, *dists)),
@@ -227,7 +248,12 @@ def main():
     print(f"\nverdict: {verdict}")
     if args.output:
         args.output.write_text(
-            json.dumps(dict(observables=rows, distributions=dists, verdict=verdict), indent=1)
+            json.dumps(
+                dict(
+                    observables=rows, distributions=dists, diagnostics=diagnostics, verdict=verdict
+                ),
+                indent=1,
+            )
         )
 
 
