@@ -151,7 +151,7 @@ def _sync_time(fn):
     return time.perf_counter() - start
 
 
-_SERIES_ON = "#define PYRITE_BIN_MEAN_SERIES 1\n"
+_SERIES_DEFINE = "#define PYRITE_BIN_MEAN_SERIES {}\n"
 
 
 def _set_series(on):
@@ -159,8 +159,10 @@ def _set_series(on):
     from pyrite.montecarlo.spectrum.cxr import _bin_quadrature as quad
     from pyrite.montecarlo.spectrum.cxr import _bin_sparse, _bin_tree
 
-    base = quad.SINCSQ_BIN_PREAMBLE.removeprefix(_SERIES_ON)
-    preamble = (_SERIES_ON if on else "") + base
+    base = quad.SINCSQ_BIN_PREAMBLE
+    for flag in (0, 1):
+        base = base.removeprefix(_SERIES_DEFINE.format(flag))
+    preamble = _SERIES_DEFINE.format(int(on)) + base
     quad.SINCSQ_BIN_PREAMBLE = _bin_tree.SINCSQ_BIN_PREAMBLE = preamble
     _bin_sparse.SINCSQ_BIN_PREAMBLE = preamble
     _bin_sparse._NEAR_KERNEL = _bin_sparse._FAR_KERNEL = None

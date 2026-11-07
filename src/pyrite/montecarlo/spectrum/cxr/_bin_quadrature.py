@@ -82,7 +82,7 @@ _HOST_BLOCK_ELEMENTS = 1 << 22
 
 #: Midpoint-series window: bins narrower than this many lobe widths and centred
 #: at least ``_SERIES_MIN_X`` lobes from the resonance take the series mean
-#: when the kernels are built with ``PYRITE_BIN_MEAN_SERIES=1`` (off by default).
+#: (``PYRITE_BIN_MEAN_SERIES=0`` compiles it out for comparison).
 #: Validation: sinc-bin-midpoint-series
 _SERIES_MAX_DX = 0.1
 _SERIES_MIN_X = 2.0
@@ -195,7 +195,7 @@ static __device__ double pyrite_sincsq_tail(double x) {
 }
 
 #ifndef PYRITE_BIN_MEAN_SERIES
-#define PYRITE_BIN_MEAN_SERIES 0
+#define PYRITE_BIN_MEAN_SERIES 1
 #endif
 
 /* Mean of f = sinc^2 over a bin much narrower than a lobe, by its midpoint
@@ -366,7 +366,7 @@ def sincsq_midpoint_mean(xc: object, dx: object) -> np.ndarray:
     derivative) with ``f = (1 - cos 2 pi x)/(2 pi^2 x^2)``: the host mirror of
     the device ``pyrite_sincsq_midpoint_mean``. Valid only in the window
     ``dx <= _SERIES_MAX_DX``, ``|xc| >= _SERIES_MIN_X``, where the omitted
-    eighth-derivative term is below ``3e-9`` of the envelope ``1/(2 pi^2 xc^2)``.
+    eighth-derivative term is below ``2.5e-9`` of the envelope ``1/(2 pi^2 xc^2)``.
 
     Validation: sinc-bin-midpoint-series
     """
@@ -730,7 +730,7 @@ def sincsq_bin_lineshape(
     return xp.asarray(host, dtype=REAL)
 
 
-CXR_BIN_REDUCTION_MODEL = "near-count-auto-v2-gate1e9"
+CXR_BIN_REDUCTION_MODEL = "near-count-auto-v3-series"
 
 
 def _bin_reduction_markers(resolved):
