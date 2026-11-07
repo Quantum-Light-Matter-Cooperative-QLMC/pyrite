@@ -17,14 +17,9 @@
       "cc": 33
     },
     {
-      "path": "src/pyrite/_cxr_vocabulary.py",
-      "name": "translate_catalog_text",
-      "cc": 22
-    },
-    {
       "path": "src/pyrite/_numerics.py",
       "name": "Numerics.__post_init__",
-      "cc": 25,
+      "cc": 22,
       "exception": "#709: normalize the existing Physics/Numerics fields at construction while preserving their established units and validation order. Keep all config invariants at the boundary; unit conversion itself is delegated to _units.normalize_unit."
     },
     {
@@ -75,7 +70,7 @@
     {
       "path": "src/pyrite/campaign/single_scene.py",
       "name": "resolve_pixel_scene",
-      "cc": 31
+      "cc": 29
     },
     {
       "path": "src/pyrite/campaign/sweep.py",
@@ -436,7 +431,7 @@
     {
       "path": "src/pyrite/montecarlo/spectrum/characteristic.py",
       "name": "mc_characteristic_spectrum",
-      "cc": 27
+      "cc": 21
     },
     {
       "path": "src/pyrite/montecarlo/spectrum/coherent_band_audit.py",
@@ -571,7 +566,7 @@
     {
       "path": "src/pyrite/montecarlo/transport/_jit_kernel.py",
       "name": "_transport_kernel",
-      "cc": 195,
+      "cc": 193,
       "exception": "Numerical transport kernel: a split or rewrite needs RNG-stream, event-order, CPU/GPU parity and performance evidence (#567, #344); never refactor for the metric alone."
     },
     {

@@ -30,6 +30,7 @@ run through the collector.
 
 | Artifact | Purpose |
 |---|---|
+| `mixed_elastic/` | Paired equivalence, cost, and Geant4 comparison for mixed elastic transport (#894); see its README for the frozen protocol and run files. |
 | `cherenkov_geant4/` | Geant4 11.4.2 `G4Cerenkov` reference for bulk Cherenkov yield (#587): minimal Geant4 app, `compare.py`, sbatch and pinned `reference/` outputs. Needs a Geant4 build; independent reference, does not sign off the `frank-tamm-homogeneous-dielectric` claim. |
 | `equal_precision/` | Equal-precision PyRITE versus Geant4/PENRED comparator pilots, analyses and sbatch scripts (#510 and follow-ups); `manifest.json` freezes the scenes. Needs Geant4 and lab GPU; engineering evidence, no physics-validation claim. |
 | `geant4_performance/` | Matched-bounds Geant4 single-scattering versus PyRITE CUDA benchmark (#821 and follow-ups). Needs Geant4 and a GPU; performance evidence, no physics-validation claim. |
