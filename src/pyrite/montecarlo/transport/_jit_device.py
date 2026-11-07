@@ -536,15 +536,84 @@ def _elsepa_invert_row(cdf, pdf, mu, n_mu, guide, guide_cells, row, xi):
 
 
 @jit.rawkernel(device=True)
+def _elsepa_invert_tail(ccdf, pdf, mu, n_mu, guide, guide_cells, row, tail):
+    """:func:`_elsepa_invert_row` from the tail ``t = 1 - xi`` on ``ccdf = 1 - cdf``.
+
+    The same panel, guide window and stable root, with the comparison
+    ``cdf <= xi`` written ``ccdf >= t`` and the panel mass ``xi - cdf`` written
+    ``ccdf - t``; ``xi`` in guide cell ``j`` is ``t`` in
+    ``(1 - (j + 1) / cells, 1 - j / cells]``. In exact arithmetic it returns the
+    same ``mu``. Only the FP32 twin of :func:`_elsepa_quantile_mu` calls it
+    (#1013): a binary32 ``t`` and ``ccdf`` keep relative precision at the top of
+    the law, where ``xi`` and ``cdf`` near 1 resolve only ``2^-24``.
+
+    Validation: gpu-mixed-precision-tables
+    """
+    base = row * n_mu
+    guide_base = row * (guide_cells + I32_ONE)
+    scaled_tail = tail * np.float64(guide_cells)
+    guide_cell = guide_cells - I32_ONE
+    if scaled_tail >= np.float64(guide_cells):
+        guide_cell = I32_ZERO
+    elif scaled_tail > F64_ZERO:
+        guide_cell = guide_cells - I32_ONE - np.int32(scaled_tail)
+    lower_idx = guide[guide_base + guide_cell]
+    upper_idx = guide[guide_base + guide_cell + I32_ONE] + I32_ONE
+    while upper_idx - lower_idx > I32_ONE:
+        mid_idx = (lower_idx + upper_idx) // I32_TWO
+        if ccdf[base + mid_idx] >= tail:
+            lower_idx = mid_idx
+        else:
+            upper_idx = mid_idx
+    mu_width = mu[lower_idx + I32_ONE] - mu[lower_idx]
+    lower_pdf = pdf[base + lower_idx]
+    upper_pdf = pdf[base + lower_idx + I32_ONE]
+    interval_probability = ccdf[base + lower_idx] - tail
+    scaled_lower_pdf = mu_width * lower_pdf
+    discriminant = (
+        scaled_lower_pdf * scaled_lower_pdf
+        + F64_TWO * mu_width * (upper_pdf - lower_pdf) * interval_probability
+    )
+    if discriminant < F64_ZERO:
+        discriminant = F64_ZERO
+    inversion_denominator = scaled_lower_pdf + xp.sqrt(discriminant)
+    interval_fraction = F64_ZERO
+    if inversion_denominator > F64_ZERO:
+        interval_fraction = F64_TWO * interval_probability / inversion_denominator
+    if interval_fraction < F64_ZERO:
+        interval_fraction = F64_ZERO
+    if interval_fraction > F64_ONE:
+        interval_fraction = F64_ONE
+    return mu[lower_idx] + interval_fraction * mu_width
+
+
+#: ``I32_ONE`` in the FP32 twins (``_jit_precision.TWIN_CONSTANTS``), where
+#: :func:`_elsepa_quantile_mu` inverts from the tail; the FP64 build folds the
+#: branch away and emits its historical source.
+ELSEPA_TAIL_INVERSION = I32_ZERO
+
+
+@jit.rawkernel(device=True)
 def _elsepa_quantile_mu(cdf, pdf, mu, n_mu, guide, guide_cells, row, fraction, xi):
     """``ln E`` quantile mix of the inversions on rows ``row`` and ``row + 1``.
 
     The ``mu`` that :func:`pyrite.montecarlo.transport.scattering._sample_cos_theta_elsepa`
-    maps to ``cos(theta) = 1 - 2 mu``.
+    maps to ``cos(theta) = 1 - 2 mu``. ``xi`` is the FP64 deviate in both
+    builds. The FP32 twin forms its tail ``1 - xi`` in FP64, rounds that to
+    binary32, and inverts it on ``cdf``, which the mixed launch fills with the
+    complementary CDF ``1 - cdf`` (#1013).
+
+    Validation: gpu-mixed-precision-tables
     """
-    mu0 = _elsepa_invert_row(cdf, pdf, mu, n_mu, guide, guide_cells, row, xi)
-    mu1 = _elsepa_invert_row(cdf, pdf, mu, n_mu, guide, guide_cells, row + I32_ONE, xi)
-    return (F64_ONE - fraction) * mu0 + fraction * mu1
+    if ELSEPA_TAIL_INVERSION == I32_ONE:
+        tail = np.float64(F64_ONE - xi)
+        tail_mu0 = _elsepa_invert_tail(cdf, pdf, mu, n_mu, guide, guide_cells, row, tail)
+        tail_mu1 = _elsepa_invert_tail(cdf, pdf, mu, n_mu, guide, guide_cells, row + I32_ONE, tail)
+        return (F64_ONE - fraction) * tail_mu0 + fraction * tail_mu1
+    else:
+        mu0 = _elsepa_invert_row(cdf, pdf, mu, n_mu, guide, guide_cells, row, xi)
+        mu1 = _elsepa_invert_row(cdf, pdf, mu, n_mu, guide, guide_cells, row + I32_ONE, xi)
+        return (F64_ONE - fraction) * mu0 + fraction * mu1
 
 
 @jit.rawkernel(device=True)

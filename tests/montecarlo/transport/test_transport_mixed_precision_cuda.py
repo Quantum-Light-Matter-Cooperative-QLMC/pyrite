@@ -115,7 +115,13 @@ def test_mixed_helpers_compute_in_fp32_and_fp64_build_never_narrows(switches):
     assert called
     for name in called:
         signature, body = functions[name]
+        if name == "_elsepa_quantile_mu":
+            # The ELSEPA deviate arrives FP64; only its tail 1 - xi is narrowed (#1013).
+            assert signature.endswith("double xi) {"), signature
+            signature = signature.removesuffix("double xi) {")
         assert "double" not in signature + body, name
+    assert {"_elsepa_quantile_mu", "_elsepa_invert_tail"} <= called or switches[0] != 2
+    assert "_elsepa_invert_row" not in functions
     # Helpers outside the set keep FP64: no draw or stopping power is narrowed.
     assert functions["_stream_uniform"][0].startswith("__device__ double")
     body = mixed.split("__global__")[1]
@@ -243,3 +249,92 @@ def test_mixed_precision_needs_the_specialized_kernel(monkeypatch):
     monkeypatch.setattr(_jit_launch, "_SPECIALIZE_TRANSPORT_KERNEL", False)
     with pytest.raises(ValueError, match="specialized kernel"):
         _elsepa(REFERENCE, Ne=8, transport_precision="mixed")
+
+
+# Top stratum of the ELSEPA deviate probed below (#1013). A binary32 deviate
+# rounds its top 2^-25 to 1, the top node of the law, so 1/32 of this stratum
+# landed at mu ~ 1 before the tail inversion.
+_TAIL_STRATUM = 2.0**-20
+# The #821 Si number density, so the muffin-tin production table is resolved.
+_SI_NCM = 0.049942993373787194
+
+
+def _si_elsepa():
+    from pyrite.montecarlo.transport.scattering import elsepa_angular_pdf, elsepa_guide_table
+    from pyrite.xsgen._errors import TableNotFoundError
+    from pyrite.xsgen.elsepa.catalog import resolve_layer_tables
+
+    try:
+        (entry,) = resolve_layer_tables([("Si", _SI_NCM)])
+    except TableNotFoundError:
+        pytest.skip("released ELSEPA tables are not installed")
+    arrays = dict(entry.arrays)
+    mu = np.ascontiguousarray(arrays["mu"], dtype=np.float64)
+    pdf, cdf = elsepa_angular_pdf(mu, arrays["dcs_cm2_sr"])
+    return np.log(arrays["energy_eV"]), cdf, pdf, mu, elsepa_guide_table(cdf)
+
+
+def _mixed_quantiles(cdf, pdf, mu, guide, row, fraction, xi):
+    """The mixed build's ELSEPA quantile on its own float32 launch tables."""
+    from pyrite.montecarlo._cupy_jit import jit
+    from pyrite.montecarlo.transport._jit_launch import _float32_table
+    from pyrite.montecarlo.transport._jit_precision import fp32_twins
+
+    quantile = fp32_twins()["_elsepa_quantile_mu"]
+
+    @jit.rawkernel()
+    def probe(ccdf, pdf, mu, n_mu, guide, cells, row, fraction, xi, n, out):
+        i = np.int32(jit.blockIdx.x * jit.blockDim.x + jit.threadIdx.x)
+        if i < n:
+            out[i] = quantile(ccdf, pdf, mu, n_mu, guide, cells, row, fraction, xi[i])
+
+    n = xi.size
+    out = cupy.empty(n, dtype=cupy.float32)
+    probe(
+        ((n + 127) // 128,),
+        (128,),
+        (
+            _float32_table(cupy.asarray(cdf.reshape(-1)), True),
+            _float32_table(cupy.asarray(pdf.reshape(-1))),
+            _float32_table(cupy.asarray(mu)),
+            np.int32(mu.size),
+            cupy.asarray(guide.reshape(-1)),
+            np.int32(guide.shape[1] - 1),
+            np.int32(row),
+            np.float32(fraction),
+            cupy.asarray(xi),
+            np.int32(n),
+            out,
+        ),
+    )
+    return out.get().astype(np.float64)
+
+
+@pytest.mark.hardware
+@requires_cuda
+@pytest.mark.parametrize("energy_MeV", [10.0, 30.0])
+def test_mixed_elsepa_tail_matches_fp64_above_mu_099(energy_MeV):
+    """#1013: on the Si production table, the top 2^-20 of the deviate maps to
+    the true tail. FP64 is the host inversion of the same stratified draws;
+    before the fix the mixed quantile put 2048 of 65536 draws at mu ~ 1."""
+    from pyrite.montecarlo.transport.scattering import _elsepa_invert_row
+
+    log_e, cdf, pdf, mu, guide = _si_elsepa()
+    log_query = np.log(energy_MeV * 1e6)
+    row = int(np.searchsorted(log_e, log_query, side="right")) - 1
+    fraction = (log_query - log_e[row]) / (log_e[row + 1] - log_e[row])
+    n = 1 << 16
+    xi = 1.0 - _TAIL_STRATUM * (np.arange(n) + 0.5) / n
+    fp64 = np.array(
+        [
+            (1.0 - fraction) * _elsepa_invert_row(cdf, pdf, mu, guide, row, x)
+            + fraction * _elsepa_invert_row(cdf, pdf, mu, guide, row + 1, x)
+            for x in xi
+        ]
+    )
+    mixed = _mixed_quantiles(cdf, pdf, mu, guide, row, np.float32(fraction), xi)
+    above = int(np.count_nonzero(fp64 > 0.99))
+    assert abs(int(np.count_nonzero(mixed > 0.99)) - above) <= 2 + above // 100
+    # The stratum's first and second moments keep binary32 relative precision.
+    np.testing.assert_allclose(mixed.sum(), fp64.sum(), rtol=1e-4)
+    np.testing.assert_allclose(np.sum(mixed**2), np.sum(fp64**2), rtol=1e-4)

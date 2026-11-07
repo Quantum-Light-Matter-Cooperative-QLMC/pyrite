@@ -1164,10 +1164,10 @@ def _transport_kernel(
                                 R_ang = F64_ONE - mix_hf[el_row + elastic_lower_index] * (
                                     F64_ONE - R_ang
                                 )
+                            # R_ang stays FP64; the mixed twin narrows 1 - R_ang (#1013).
                             cos_theta = F64_ONE - F64_TWO * _elsepa_quantile_mu(
                                 el_cdf, el_pdf, el_mu, el_n_mu, el_guide, el_guide_cells,
-                                el_row + elastic_lower_index, elastic_fraction,
-                                table_real(R_ang),
+                                el_row + elastic_lower_index, elastic_fraction, R_ang,
                             )  # fmt: skip
                         else:
                             cos_theta = F64_ONE - F64_TWO * alpha * R_ang / (

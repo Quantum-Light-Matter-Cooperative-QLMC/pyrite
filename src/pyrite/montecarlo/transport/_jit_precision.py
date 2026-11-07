@@ -9,7 +9,10 @@ bounded sample:
 * the energy-grid lookups and interpolations (ELSEPA grid, SBETHE stopping,
   Mott screening, BremsLib moments and photon sampling) and ELSEPA polar-angle
   inversion, as the :data:`MIXED_HELPERS` device functions, and the tables
-  they read (:data:`MIXED_TABLES`, passed as float32 copies);
+  they read (:data:`MIXED_TABLES`, passed as float32 copies). The ELSEPA
+  inversion runs on the tail ``1 - xi`` of its FP64 deviate and the complement
+  ``1 - F`` of its CDF (:data:`MIXED_COMPLEMENT_TABLES`), so a deflection near
+  the top of the law keeps relative precision (#1013);
 * mixed elastic hard-rate lookups (#894); its soft moment tables stay FP64, see
   :mod:`._jit_mixed_device`;
 * the kernel body's query logarithms (``ln E``, ``log10 E``), the inline
@@ -62,7 +65,7 @@ MIXED_HELPERS = {
     _jit_device: (
         "_dEds_sbethe",
         "_interp_mott_log_alpha",
-        "_elsepa_invert_row",
+        "_elsepa_invert_tail",
         "_elsepa_quantile_mu",
     ),
     _jit_mixed_device: (
@@ -89,6 +92,7 @@ MIXED_HELPERS = {
 
 # Read-only kernel tables the mixed build reads as float32 copies: every
 # table the helpers above read, plus the ELSEPA log-rate the body interpolates.
+# The tables of MIXED_COMPLEMENT_TABLES are passed as float32(1 - table).
 MIXED_TABLES = (
     "el_logE",
     "el_log_rate",
@@ -108,6 +112,15 @@ MIXED_TABLES = (
     "rad_plasma",
     "mix_hf",
 )
+
+# The ELSEPA angular CDF reaches the FP32 twins as its complement 1 - F, formed
+# in FP64 before rounding, so the top of the law keeps relative precision
+# (#1013); see `_jit_device._elsepa_invert_tail`.
+MIXED_COMPLEMENT_TABLES = ("el_cdf",)
+
+# Module constants the FP32 twins rebind: the ELSEPA quantile inverts from
+# the tail of its deviate on the complement table.
+TWIN_CONSTANTS = {"ELSEPA_TAIL_INVERSION": np.int32(1)}
 
 
 class _Float32Numpy:
@@ -134,8 +147,10 @@ def fp32_twins() -> dict[str, Any]:
 
     Each twin shares its helper's code object. Its globals narrow every
     ``np.float64`` constant to ``np.float32``, resolve ``np.float64(...)`` to
-    ``np.float32(...)`` and bind the other listed helpers to their twins, so a
-    twin never calls an FP64 helper of the set.
+    ``np.float32(...)``, set :data:`TWIN_CONSTANTS` and bind the other listed
+    helpers to their twins, so a twin never calls an FP64 helper of the set.
+    The ELSEPA quantile twin is the one that reads an FP64 argument, its
+    deviate, and narrows only its tail ``1 - xi``.
 
     Validation: gpu-mixed-precision-tables
     """
@@ -149,6 +164,7 @@ def fp32_twins() -> dict[str, Any]:
             for key, value in func.__globals__.items()
         }
         namespace["np"] = _FLOAT32_NUMPY
+        namespace.update({key: value for key, value in TWIN_CONSTANTS.items() if key in namespace})
         namespaces.append(namespace)
         twin = types.FunctionType(
             func.__code__, namespace, func.__name__, func.__defaults__, func.__closure__
