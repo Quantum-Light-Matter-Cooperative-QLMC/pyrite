@@ -80,7 +80,6 @@ def test_bunch_transition_radiation_is_refused(monkeypatch, case):
         run_case_streamed({**case, "transition_radiation": {"coherence": "bunch"}}, 10)
 
 
-@pytest.mark.parametrize("block", [1, 3, 8, 100])
 @pytest.mark.parametrize(
     ("key", "value"),
     [
@@ -89,20 +88,12 @@ def test_bunch_transition_radiation_is_refused(monkeypatch, case):
         ("positron_transport", True),
     ],
 )
-def test_cascades_fail_before_transport_with_the_locality_reason(monkeypatch, block, key, value):
-    def no_transport(*args, **kwargs):
-        raise AssertionError("transport ran")
+def test_cascade_keys_are_live_streamable(key, value):
+    """Lineage-addressed cascade RNG makes primary blocks exact (#923).
 
-    monkeypatch.setattr(runner, "_transport_case", no_transport)
-    # Isolate each gate, including pair/positron options whose valid cases also
-    # set secondary_threshold_eV and therefore encounter its gate first.
-    case = {key: value}
-    reason = f"{key}: cascade RNG uses population-local parent track IDs"
-    assert streaming_refusal(case, live=True) == reason
-    # Saved complete histories can still be scored in whole-electron blocks.
-    assert streaming_refusal(case) is None
-    with pytest.raises(ValueError, match=reason):
-        run_case_streamed(case, block, transport_core="per-electron")
+    Joined-vs-streamed equality lives in ``test_streamed_cascades.py``.
+    """
+    assert streaming_refusal({key: value}, live=True) is None
 
 
 def test_lockstep_core_is_refused(case):

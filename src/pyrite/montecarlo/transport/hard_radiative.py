@@ -456,11 +456,15 @@ def _device_module(array):
     return cupy
 
 
-def complete_hard_radiative_events(segments, tables, seed: int) -> None:
+def complete_hard_radiative_events(segments, tables, seed: int, *, track_keys=None) -> None:
     """Attach photon directions and recoil momenta without changing RNG order.
 
     Draw (polar, azimuth) in canonical positive-photon row order, then group
-    by element. Each call owns its element stages; no global device cache.
+    by element. With ``track_keys`` (cascades, #923) the two uniforms of each
+    photon instead come from its lineage key: the emitting track's key
+    ``track_keys[electron_id]`` and the photon's ordinal among that track's
+    positive-photon rows in (flight, substep) order, so a photon's direction
+    is independent of row, block and generation order; ``seed`` is unused. Each call owns its element stages; no global device cache.
     Non-photon rows retain the two zero-vector result fields.
 
     Device-resident rows (#905) gather and download only the photon rows'
@@ -485,10 +489,15 @@ def complete_hard_radiative_events(segments, tables, seed: int) -> None:
 
     directions = _lazy_zeros(energies.size)
     momenta = _lazy_zeros(energies.size)
-    rng = np.random.default_rng(int(seed) ^ 0xD6023FEA38B57C29)
-    # Shape (N, 2) consumes exactly the same consecutive MT/PCG uniform words
-    # as the former two scalar random() calls per photon (even for N=0).
-    uniforms = rng.random((photon_rows.size, 2))
+    if track_keys is None:
+        rng = np.random.default_rng(int(seed) ^ 0xD6023FEA38B57C29)
+        # Shape (N, 2) consumes exactly the same consecutive MT/PCG uniform
+        # words as the former two scalar random() calls per photon (even N=0).
+        uniforms = rng.random((photon_rows.size, 2))
+    else:
+        uniforms = _lineage_photon_uniforms(
+            track_keys, gathered("electron_id"), gathered("flight_id"), gathered("substep_id")
+        )
     by_z = {table.atomic_number: table for table in tables.values()}
     element = gathered("hard_radiative_Z")
     incident = gathered("E_end_keV").astype(float, copy=False) * 1e3
@@ -515,6 +524,26 @@ def complete_hard_radiative_events(segments, tables, seed: int) -> None:
             momenta[rows] = target
     segments["hard_radiative_direction"] = directions
     segments["hard_radiative_target_momentum_eV_c"] = momenta
+
+
+def _lineage_photon_uniforms(track_keys, track, flight, substep):
+    """Direction uniforms ``(n, 2)`` of photon rows keyed by lineage and ordinal (#923)."""
+    from .lineage import (
+        PROCESS_HARD_PHOTON_DIRECTION,
+        daughter_keys,
+        keyed_uniforms,
+        parent_ordinals,
+    )
+
+    track = np.asarray(track, dtype=np.int64)
+    order, ordinal = parent_ordinals(track, np.asarray(substep), np.asarray(flight))
+    keys = np.empty(track.size, dtype=np.uint64)
+    keys[order] = daughter_keys(
+        np.asarray(track_keys, dtype=np.uint64)[track[order]],
+        PROCESS_HARD_PHOTON_DIRECTION,
+        ordinal,
+    )
+    return keyed_uniforms(keys, 2)
 
 
 # PENELOPE-2024 Eq. 3.154 polynomial coefficients of t, t^2, ..., t^7.
@@ -764,6 +793,7 @@ def add_radiative_result_fields(
     plasma_energy_eV_by_layer=None,
     *,
     complete=True,
+    track_keys=None,
 ) -> None:
     """Attach photon rows, their completed kinematics, and the mode's identity.
 
@@ -774,7 +804,7 @@ def add_radiative_result_fields(
     result["hard_radiative_k_eV"] = photon_k_eV
     result["hard_radiative_Z"] = photon_Z
     if complete:
-        complete_hard_radiative_events(result, tables, seed)
+        complete_hard_radiative_events(result, tables, seed, track_keys=track_keys)
     plasma = np.asarray(
         [] if plasma_energy_eV_by_layer is None else plasma_energy_eV_by_layer, dtype=float
     )

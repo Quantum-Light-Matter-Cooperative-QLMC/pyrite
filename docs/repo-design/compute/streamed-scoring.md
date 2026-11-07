@@ -52,7 +52,8 @@ spectra) remains the default and the reference.
   expected values on the tracks and never reads completed photon directions.
   Each block's own completion is skipped too (#864): blocks run with the
   internal `_complete_hard_photons=False`, which omits the direction and recoil
-  fields. Completion draws from its own generator, so transport rows and
+  fields. Pair cascades are the exception: conversion reads the directions, so
+  their blocks complete them, keyed by lineage (#923). Completion draws from its own generator, so transport rows and
   counts are unchanged bit for bit. If a future consumer needs them, the completion generator can be carried
   across ordered blocks, or `advance()`d by twice the earlier photon count;
   both reproduce the single-call draws exactly.
@@ -72,49 +73,44 @@ or CUDA core, with a fixed electron count and a final line grid.
 | `adaptive_precision` | The electron count, and hence the normalization, is decided during the run. |
 | `transition_radiation` | Electron-block transport refuses it; artifact replay still streams per-history TR. |
 | `channeling`, `gdf_source` | Refused by electron-block transport. |
-| `secondary_threshold_eV`, `pair_production_model`, `positron_transport` | Cascade RNG uses population-local parent track IDs; splitting the primary population changes descendant streams. |
 
 The lockstep core shares one generator across electrons and cannot run in
 blocks; pin `transport_core="per-electron"` or `"cuda"` (`"auto"` can resolve
 to lockstep at small electron counts).
 
-### Cascade locality
+### Cascades
 
-Cascade rows belong to their primary history, but their random streams are
-not invariant under electron-block transport. In `transport/secondaries.py`,
-`transport_secondary_cascade` numbers primaries from zero in each call and
-assigns subsequent track IDs after that call's primary and earlier-generation
-populations. `secondary_stream_keys` hashes the seed, parent track ID and hard
-event ordinal. A primary in a later block therefore receives a different
-parent address; even in the first block, a second-generation particle's parent
-ID depends on the number of primaries and earlier launches in that call.
-The explicit `LaunchState.stream_keys` feeds both the per-electron and CUDA
-cores through `host_pass`; changing the core does not fix these addresses.
-Pair conversion, pair electrons, positrons and annihilation also key their
-streams by parent track ID.
+Secondary, pair and positron cascades stream since #923. Their random streams
+are lineage-addressed (`transport/lineage.py`, case key
+`cascade_rng_model = "lineage-addressed-v1"`). A root's key is its global
+primary stream key. Every daughter, pair conversion, annihilation clock and
+emission, and hard-photon direction derives from the parent's lineage key,
+a process namespace and a parent-local event ordinal. The ordinal is counted
+before launch or energy filtering. Dense `track_id`s remain array indices
+only, so a primary block runs each history's whole cascade exactly as the
+joined run does. Every pass of a cascade builds its tables over one range:
+the block driver's population range, else the same range sampled from
+`(seed, e)`.
 
-There is a second dependency for coupled pair cascades:
-`complete_hard_radiative_events` samples photon directions from one sequential
-generator per generation/species call. Pair conversion reads those directions
-before launching charged particles. Live streaming skips completion, and
-`simulate_trajectories` rejects that combination. Completing each block
-independently would restart the generator and would not reproduce the joined
-population. The transport API also rejects cascades with a nonzero
-`_electron_start`.
+Contracts of the streamed cascade path:
 
-Normalization itself is compatible: `_join` maps every cascade row's
-`electron_id` to its primary, retains generation-zero `Ne` and exit counts,
-and keeps descendant counts in `secondaries`. The block driver's `_globalize`
-shifts row `electron_id`/`elec_id`, so the scorer's population masks and fixed
-`Ne`/`Ne_brem` denominators would include descendants without counting them as
-primaries. It does not globalize nested `secondary_tracks` or `pair_production`
-metadata, or track/parent IDs, and cannot repair RNG addresses after transport.
+- Rows are scored per block with global `electron_id` (the primary history);
+  `Ne`/`Ne_brem` denominators and the transport counts stay primary-only.
+- Nested `secondary_tracks` and `pair_production` metadata, `track_id` and
+  `parent_id` stay block-local. Scoring never reads them across blocks, and
+  the block is released after scoring. Compare histories across runs by
+  `secondary_tracks["lineage_key"]`, not by dense IDs.
+- The secondary-track budget is run-wide: `1000 N` descendants over the case.
+  A block may launch only what committed blocks left, so a run fails iff the
+  joined run would, whatever the block size; a replayed block never counts
+  twice.
+- Joined (non-streamed) block transport of cascades stays refused: merging
+  nested metadata, cross-references and generation order across blocks is not
+  implemented.
 
-All three cascade options remain refused before transport. Supporting them
-requires block-invariant lineage and photon-direction addressing first; this
-would change sampling and is outside the eligibility-only change. The refusal
-tests cover each option at multiple block sizes. No cascade streamed/joined
-spectral equivalence is claimed.
+Fixed-seed cascade realizations changed with #923. Cases recorded before it
+carry no `cascade_rng_model`; the runner refuses to transport them rather than
+replay them under the new scheme.
 
 ## Equivalence evidence
 
@@ -122,7 +118,13 @@ spectral equivalence is claimed.
 `tests/montecarlo/cascades/test_coupled_radiative_runner.py::test_streamed_scoring_matches_the_joined_coupled_run`
 compare streamed and joined spectra at `rtol=1e-12` over several block sizes,
 with unequal line and continuum populations and with coupled BremsLib straggled
-transport. Transport counts and segment totals agree exactly.
+transport. `tests/montecarlo/transport/test_streamed_cascades.py` does the same
+for shell cascades, uncoupled (to generation 2) and coupled, at block sizes 1,
+a nondivisor, `N` and above `N`, with `Ne` above and below `Ne_brem`.
+`tests/montecarlo/cascades/test_cascade_lineage.py` shows that blocked shell,
+pair and positron cascades reproduce every joined history's rows, launches,
+pair events and annihilation photons bit for bit on CPU, including with energy
+spread and per-electron cutoffs. Transport counts and segment totals agree exactly.
 
 ## Memory and wall time
 

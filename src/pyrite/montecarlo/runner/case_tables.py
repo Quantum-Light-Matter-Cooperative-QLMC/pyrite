@@ -64,6 +64,9 @@ def _case_inelastic_kwargs(case):
     key per transport layer (:func:`case_shell_materials`); an absorber layer
     without one raises.
     """
+    from ..._cascade_rng_policy import check_cascade_rng_model
+
+    check_cascade_rng_model(case)
     model = case.get("inelastic_model")
     if model is None:
         return {}

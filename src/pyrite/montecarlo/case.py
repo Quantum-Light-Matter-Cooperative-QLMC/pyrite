@@ -101,6 +101,7 @@ _CASE_KEY_ORDER = (
     "inelastic_model",
     "inelastic_cutoff_eV",
     "secondary_threshold_eV",
+    "cascade_rng_model",
     "elastic_model",
     "transport_mode",
     "mixed_c1",
@@ -334,6 +335,7 @@ class Case(Mapping[str, Any]):
     inelastic_model: Literal["shell-soft-hard"] | _Absent = _ABSENT
     inelastic_cutoff_eV: float | _Absent = _ABSENT
     secondary_threshold_eV: float | _Absent = _ABSENT
+    cascade_rng_model: str | _Absent = _ABSENT
     elastic_model: Literal["elsepa"] | _Absent = _ABSENT
     transport_mode: Literal["mixed"] | _Absent = _ABSENT
     mixed_c1: float | _Absent = _ABSENT
@@ -445,6 +447,7 @@ class Case(Mapping[str, Any]):
             if self.inelastic_model is _ABSENT:
                 raise ValueError("secondary_threshold_eV requires inelastic_model")
             _positive("secondary_threshold_eV", self.secondary_threshold_eV)
+        self._validate_cascade_rng_model()
         if self.elastic_model is not _ABSENT and self.elastic_model != "elsepa":
             raise ValueError("elastic_model must be absent or 'elsepa'")
         self._validate_transport_mode()
@@ -628,6 +631,20 @@ class Case(Mapping[str, Any]):
         for key, what in refused.items():
             if getattr(self, key) is not _ABSENT:
                 raise ValueError(f"transition_radiation does not support {what}")
+
+    def _validate_cascade_rng_model(self) -> None:
+        """A recorded cascade RNG marker must name this version's scheme (#923).
+
+        Absence is allowed here; the runner refuses an unmarked cascade.
+        """
+        if self.cascade_rng_model is _ABSENT:
+            return
+        from .._cascade_rng_policy import CASCADE_RNG_MODEL
+
+        if self.secondary_threshold_eV is _ABSENT:
+            raise ValueError("cascade_rng_model requires secondary_threshold_eV")
+        if self.cascade_rng_model != CASCADE_RNG_MODEL:
+            raise ValueError(f"cascade_rng_model must be {CASCADE_RNG_MODEL!r}")
 
     def _validate_radiative_moment_model(self) -> None:
         """Validate the versioned numerical approximation independently of physics."""

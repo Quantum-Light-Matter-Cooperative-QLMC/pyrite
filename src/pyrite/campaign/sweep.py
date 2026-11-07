@@ -38,6 +38,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 
+from .._cascade_rng_policy import CASCADE_RNG_MODEL
 from .._continuum_grid import automatic_continuum_grid
 from .._cxr_grid_policy import (
     AUTOMATIC_BANDWIDTH_POLICY,
@@ -975,6 +976,8 @@ def _model_case_keys(
     # Opt-in secondary transport (#94).
     if secondary_threshold_eV is not None:
         keys["secondary_threshold_eV"] = float(secondary_threshold_eV)
+        # Lineage-addressed cascade RNG (#923); joins only cascade cases.
+        keys["cascade_rng_model"] = CASCADE_RNG_MODEL
     # ELSEPA elastic model (the default): an explicit "mott" case keeps its
     # historical payload.
     if elastic_model == "elsepa":

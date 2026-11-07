@@ -75,14 +75,15 @@ an out-of-memory error if the target is too small for the scene.
 Streaming runs on the per-electron or CUDA transport core, in-process, through
 `pyrite.simulate` with a scalar `Detector`. It covers additive spectra: the
 incoherent CXR line spectrum, characteristic lines, and the EEDL or BremsLib
-continuum, including coupled BremsLib radiative transport.
+continuum, including coupled BremsLib radiative transport and secondary,
+pair or positron cascades (#923), whose histories run whole inside each block.
 
 These raise `ValueError` before any transport:
 
 - coherent emission, temporal profiles, photon transport and transition
   radiation;
 - channeling, adaptive precision, automatic line-grid resolution (no explicit
-  `energy_bins`), GDF beams, and secondary, pair or positron cascades;
+  `energy_bins`), and GDF beams;
 - the lockstep transport core;
 - a `PlanarDetector`, `pyrite.phases.simulate_transport`, directional source
   scans, and batch executors.

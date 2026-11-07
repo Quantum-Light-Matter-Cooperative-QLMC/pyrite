@@ -272,3 +272,14 @@ changed `BREMSSTRAHLUNG_BREMSLIB_MODEL` to `…/angle-f64-v1/fp32-cell-mb-v1`.
 Re-pinned: the `coupled` and `cascade` identity hashes in `resolved.json`.
 These fixtures are CPU/NumPy fp64, where the unit is exactly 1 cm², so every
 recorded output keeps its expectation.
+
+## Lineage-addressed cascade RNG (#923)
+
+Cascade streams moved from dense-track `(seed, parent track, ordinal)` keys
+to lineage keys (`cascade_rng_model = "lineage-addressed-v1"`), so every
+cascade case gains that key. Only the `cascade` entries were re-pinned
+(2026-11-07, CPU/NumPy fp64, Python 3.14): `resolved.json` adds the marker and
+its `case_content_key`/`parameter_sha256`; `outputs.json` keeps the first
+eight generation-0 rows, the converted photon energies and launch kinds, while
+the pair-electron energies, row count and total path re-realize. All other
+families and every tolerance are unchanged.

@@ -423,7 +423,8 @@ def _simulate_trajectories(
         omits ``hard_radiative_direction``/``hard_radiative_target_momentum_eV_c``
         for live streamed scoring, whose estimators never read them. Completion
         draws from its own generator, so transport rows are unchanged bit for
-        bit. Refused with secondary cascades, which consume the directions.
+        bit. Refused with pair conversion, which consumes the directions; a
+        shell-only cascade keys directions by lineage (#923) and may skip it.
 
     Returns
     -------
@@ -450,12 +451,8 @@ def _simulate_trajectories(
         (secondary_threshold_eV, pair_production_model, positron_transport, _secondary, groove),
         (gdf_source, bunch_length_fs, long_offsets_fs, longitudinal_distribution),
     )
-    if not _complete_hard_photons and (
-        secondary_threshold_eV,
-        pair_production_model,
-        positron_transport,
-    ) != (None, None, False):
-        raise ValueError("secondary cascades need completed hard-photon directions")
+    if not _complete_hard_photons and (pair_production_model, positron_transport) != (None, False):
+        raise ValueError("pair conversion needs completed hard-photon directions")
     # Every parameter, named once: the cascade re-enters this function with
     # exactly these inputs, never host-side locals.
     inputs = TransportInputs(

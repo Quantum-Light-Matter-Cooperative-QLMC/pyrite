@@ -14,6 +14,11 @@ path (:func:`.block_transport.finalize_population_fields`): bunch-centroid
 timing, because every eligible estimator is invariant to a per-electron time
 offset (it is a common phase inside one electron's flight groups), and the
 re-completion of hard-photon directions, which no eligible estimator reads.
+
+Secondary, pair and positron cascades stream too (#923): their RNG is
+lineage-addressed, so a primary block runs each history's whole cascade
+exactly as the joined run does. Pair cascades still complete hard-photon
+directions inside each block, since conversion consumes them.
 """
 
 from collections.abc import Mapping
@@ -29,12 +34,10 @@ from .fallbacks import measure_block_fallbacks
 #: Case keys whose spectra need every segment at once.
 STREAM_REFUSED_KEYS = ("coherent_emission", "temporal_profile", "photon_transport")
 
-_CASCADE_KEYS = ("secondary_threshold_eV", "pair_production_model", "positron_transport")
-
-#: Further case keys live streaming refuses in its first version (#611): a
-#: population-resolved line grid, adaptive electron counts, the channeling zone
-#: join, GDF beams, secondary/pair/positron cascades, and transition radiation
-#: (electron-block transport refuses it; artifact replay still streams it).
+#: Further case keys live streaming refuses (#611): a population-resolved line
+#: grid, adaptive electron counts, the channeling zone join, GDF beams, and
+#: transition radiation (electron-block transport refuses it; artifact replay
+#: still streams it). Cascades stream since #923.
 LIVE_STREAM_REFUSED_KEYS = (
     "transition_radiation",
     "line_grid_policy",
@@ -42,7 +45,6 @@ LIVE_STREAM_REFUSED_KEYS = (
     "adaptive_precision",
     "channeling",
     "gdf_source",
-    *_CASCADE_KEYS,
 )
 
 
@@ -57,8 +59,6 @@ def streaming_refusal(case: Mapping[str, Any], *, live: bool = False) -> str | N
     if live:
         for key in LIVE_STREAM_REFUSED_KEYS:
             if case.get(key) is not None:
-                if key in _CASCADE_KEYS:
-                    return f"{key}: cascade RNG uses population-local parent track IDs"
                 return f"{key} is not supported by live streamed scoring"
     return None
 

@@ -285,6 +285,29 @@ def transport_electron_blocks(
     )
 
 
+class _TrackBudget:
+    """Run-wide secondary-track budget over committed primary blocks (#923).
+
+    The joined cascade fails iff its total descendant count exceeds
+    ``DEFAULT_SECONDARY_TRACKS_PER_PRIMARY * N``. Each block may launch only
+    what earlier *committed* blocks left, so a block run fails iff the joined
+    run does, whatever the block size; a replayed block never counts twice.
+    """
+
+    def __init__(self, n_electrons):
+        from ..transport.secondaries import DEFAULT_SECONDARY_TRACKS_PER_PRIMARY
+
+        self.remaining = DEFAULT_SECONDARY_TRACKS_PER_PRIMARY * int(n_electrons)
+
+    def wrap(self, consume):
+        def consume_block(block):
+            launched = sum(block["secondaries"]["tracks_per_generation"][1:])
+            consume(block)
+            self.remaining -= int(launched)
+
+        return consume_block
+
+
 def transport_case_blocks(
     keep,
     *,
@@ -320,6 +343,12 @@ def transport_case_blocks(
     Validation: adaptive-sample-size-stopping
     """
     n_electrons = int(E_cut_by_electrons.size)
+    cascade = case.get("secondary_threshold_eV") is not None
+    if cascade and consume is None:
+        # A joined block cascade would need nested metadata, cross-references
+        # and generation ordering merged across blocks; only streaming exists.
+        raise ValueError("secondary cascades run in electron blocks only for live streamed scoring")
+    budget = _TrackBudget(n_electrons) if cascade else None
     no_bunch = {"bunch_length_fs": None, "long_shape": "gaussian"}
     no_bunch |= {"long_offsets_fs": None, "longitudinal_distribution": None}
     energies = initial_energies_keV(
@@ -334,9 +363,12 @@ def transport_case_blocks(
     def simulate_block(start, stop, keep=keep):
         block_kw: dict[str, Any] = {"_electron_start": start, "_energy_range_keV": energy_range}
         block_kw |= no_bunch
-        if consume is not None:
-            # Streamed estimators never read completed photon directions (#864).
+        if consume is not None and case.get("pair_production_model") is None:
+            # Streamed estimators never read completed photon directions (#864);
+            # pair conversion inside a cascade does.
             block_kw["_complete_hard_photons"] = False
+        if budget is not None:
+            block_kw["max_secondary_tracks"] = budget.remaining
         if progress is not None:
 
             def block_progress(done, _n, start=start):
@@ -353,6 +385,8 @@ def transport_case_blocks(
         bunch={k: beam_kw[k] for k in BUNCH_KWARGS},
         bremslib_tables=_case_radiative_kwargs(case).get("bremslib_tables"),
     )
+    if budget is not None:
+        consume = budget.wrap(consume)
     if monitor is None:
         return run(
             n_electrons,

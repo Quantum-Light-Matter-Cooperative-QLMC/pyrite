@@ -43,15 +43,6 @@ from collections.abc import Sequence
 
 import numpy as np
 
-from .kinematics import (
-    _SM64_GOLDEN,
-    _SM64_MIX1,
-    _SM64_MIX2,
-    _SM64_ONE,
-    _SM64_S27,
-    _SM64_S30,
-    _SM64_S31,
-)
 from .pair_production import _rotate
 
 __all__ = [
@@ -75,34 +66,28 @@ _CLASSICAL_RADIUS_ANG = 2.8179403262e-5
 _PI_RE2_ANG2 = np.pi * _CLASSICAL_RADIUS_ANG**2
 #: ``kind`` of an annihilation event.
 ANNIHILATION_AT_REST, ANNIHILATION_IN_FLIGHT = 0, 1
-_IN_FLIGHT_SALT = np.uint64(0x5851F42D4C957F2D)
-_EMISSION_SALT = np.uint64(0xA0761D6478BD642F)
 _MAX_REJECTIONS = 100_000
 _GL_X, _GL_W = np.polynomial.legendre.leggauss(8)
 _GL_X = 0.5 * (_GL_X + 1.0)
 _GL_W = 0.5 * _GL_W
 
 
-def _mix(x):
-    x = (x ^ (x >> _SM64_S30)) * _SM64_MIX1
-    x = (x ^ (x >> _SM64_S27)) * _SM64_MIX2
-    return x ^ (x >> _SM64_S31)
+def annihilation_stream_keys(parent_keys, photon_ordinal, *, in_flight):
+    """Per-positron stream keys from its pair event (parent lineage, photon ordinal).
 
-
-def annihilation_stream_keys(seed, parent_track, photon_ordinal, *, in_flight):
-    """Per-positron stream keys from its pair event (seed, parent track, photon ordinal).
-
-    ``in_flight`` selects the optical-depth budget stream; otherwise the
-    emission and photon-scoring stream.
+    ``parent_keys`` are the lineage keys of the tracks that emitted the
+    converting photons (#923). ``in_flight`` selects the optical-depth budget
+    namespace; otherwise the emission and photon-scoring namespace.
     Validation: heitler-annihilation, positron-annihilation-at-rest
     """
-    salt = _IN_FLIGHT_SALT if in_flight else _EMISSION_SALT
-    with np.errstate(over="ignore"):
-        x = np.uint64(seed) ^ salt
-        parent = np.asarray(parent_track, dtype=np.uint64)
-        ordinal = np.asarray(photon_ordinal, dtype=np.uint64)
-        x = _mix(x + _SM64_GOLDEN * (parent + _SM64_ONE))
-        return _mix(x + _SM64_GOLDEN * (ordinal + _SM64_ONE))
+    from .lineage import (
+        PROCESS_ANNIHILATION_EMISSION,
+        PROCESS_ANNIHILATION_IN_FLIGHT,
+        daughter_keys,
+    )
+
+    process = PROCESS_ANNIHILATION_IN_FLIGHT if in_flight else PROCESS_ANNIHILATION_EMISSION
+    return daughter_keys(parent_keys, process, photon_ordinal)
 
 
 def _rng(key) -> np.random.Generator:

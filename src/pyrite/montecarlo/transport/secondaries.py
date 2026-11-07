@@ -8,17 +8,21 @@ sampling, until a generation launches nothing. Rows of every generation are
 joined into one result with ``track_id``/``parent_id``/``generation`` fields.
 See ``docs/physics/beam-transport/shell-soft-hard-transport.md``.
 
-RNG. A secondary's stream key hashes (seed, parent track, parent hard ordinal)
-under its own salt, so it depends on neither batch size nor processing order.
-Its hard, soft-straggling and coupled-radiative streams derive from that key
-exactly as a primary's derive from its own.
+RNG (#923, ``lineage.CASCADE_RNG_MODEL``). A primary's lineage key is its
+transport stream key (global primary id, or an explicit launch's key). A
+secondary's key derives from its parent's lineage key, the process and the
+parent's hard ordinal, so it depends on neither batch size, block, processing
+order nor dense track ids. Its hard, soft-straggling and coupled-radiative
+streams derive from that key exactly as a primary's derive from its own.
+Hard-photon directions, pair conversion, both pair products and positron
+annihilation are keyed the same way from the emitting track's lineage.
 
 With ``pair_production_model`` each generation's coupled hard photons above
 ``2 m_e c^2`` also get one first-interaction step (``pair_production.py``); a
-pair's electron above ``T_s`` joins the next generation keyed on (seed, parent
-track, photon ordinal) under a salt of its own. Its positron is recorded and,
+pair's electron above ``T_s`` joins the next generation keyed on (parent
+lineage, photon ordinal) under a process namespace of its own. Its positron is recorded and,
 only with ``positron_transport``, launched above ``T_s`` like the electron
-under a third salt (#276). Each generation then runs its electrons and its
+under a third namespace (#276). Each generation then runs its electrons and its
 positrons as two transport calls, the positrons with their own SBETHE,
 ELSEPA, ``F_p``-scaled BremsLib and Bhabha shell tables, and joins them into
 one generation (electrons first). Each positron annihilates (#295,
@@ -49,6 +53,13 @@ from .kinematics import (
     _SM64_S30,
     _SM64_S31,
 )
+from .lineage import (
+    CASCADE_RNG_MODEL,
+    PROCESS_PAIR_ELECTRON,
+    PROCESS_PAIR_POSITRON,
+    PROCESS_SHELL,
+    daughter_keys,
+)
 
 __all__ = [
     "LaunchState",
@@ -58,13 +69,8 @@ __all__ = [
     "transport_secondary_cascade",
 ]
 
-# Distinct from the hard, Urban and radiative salts and the photon salt below.
+# Flat (seed, track, ordinal) keys; cascades use lineage keys (lineage.py).
 _SECONDARY_STREAM_SALT = np.uint64(0x7F4A7C159E3779B9)
-_PHOTON_SEED_SALT = np.uint64(0x2545F4914F6CDD1D)
-_PAIR_ELECTRON_STREAM_SALT = np.uint64(0x9B05688C2B3E6C1F)
-_PAIR_POSITRON_STREAM_SALT = np.uint64(0xD1B54A32D192ED03)
-# Separates a generation's positron photon-direction stream from its electrons'.
-_POSITRON_PHOTON_SALT = np.uint64(0x94D049BB133111EB)
 #: ``secondary_tracks["launch_kind"]`` values.
 LAUNCH_PRIMARY, LAUNCH_SHELL, LAUNCH_PAIR, LAUNCH_POSITRON = 0, 1, 2, 3
 #: ``pair_production["events"]["positron_fate"]`` values (with ``positron_transport``).
@@ -143,14 +149,17 @@ class SecondaryPass:
 
     ``launch`` is None for the primaries. ``table_range_keV`` makes every
     generation build identical shell tables; ``photon_seed`` keys the host
-    completion of coupled hard-photon directions per generation;
+    completion of coupled hard-photon directions of a non-lineage pass;
     ``projectile`` selects the electron or positron (Bhabha) shell tables.
+    ``lineage`` (cascades, #923) instead keys each hard photon's directions by
+    its track's lineage key and photon ordinal, so ``photon_seed`` is unused.
     """
 
     launch: LaunchState | None
     table_range_keV: tuple[float, float]
     photon_seed: int
     projectile: str = "electron"
+    lineage: bool = False
 
 
 def _mix(x):
@@ -160,7 +169,11 @@ def _mix(x):
 
 
 def secondary_stream_keys(seed, parent_track, parent_ordinal, *, salt=_SECONDARY_STREAM_SALT):
-    """Stream keys of secondaries from (seed, parent track, parent hard ordinal)."""
+    """Flat stream keys from (seed, parent track, parent ordinal) under ``salt``.
+
+    Cascade daughters use :func:`lineage.daughter_keys` instead (#923); this
+    remains for single-pass primary-indexed streams (relaxation photons).
+    """
     with np.errstate(over="ignore"):
         x = np.uint64(seed) ^ np.uint64(salt)
         parent = np.asarray(parent_track, dtype=np.uint64)
@@ -174,14 +187,6 @@ def _radiative_keys(keys):
 
     with np.errstate(over="ignore"):
         return _mix(np.asarray(keys, dtype=np.uint64) ^ np.uint64(_RADIATIVE_STREAM_SALT))
-
-
-def _photon_seed(seed, generation, *, positron=False):
-    if generation == 0 and not positron:
-        return seed
-    with np.errstate(over="ignore"):
-        x = np.uint64(seed) ^ (_POSITRON_PHOTON_SALT if positron else _PHOTON_SEED_SALT)
-        return int(_mix(x + _SM64_GOLDEN * np.uint64(generation)))
 
 
 def _is_device(a):
@@ -234,8 +239,9 @@ def _validate(kw):
         raise ValueError("max_secondary_generations must be a positive integer")
     if tracks is None:
         tracks = DEFAULT_SECONDARY_TRACKS_PER_PRIMARY * int(kw["Ne"])
-    if isinstance(tracks, bool) or int(tracks) != tracks or tracks < 1:
-        raise ValueError("max_secondary_tracks must be a positive integer")
+    # 0 is a run-wide budget already spent by earlier primary blocks (#923).
+    if isinstance(tracks, bool) or int(tracks) != tracks or tracks < 0:
+        raise ValueError("max_secondary_tracks must be a non-negative integer")
     threshold_keV = float(threshold_eV) * 1e-3
     _validate_coverage(kw, threshold_keV)
     _validate_pair_model(kw)
@@ -459,6 +465,53 @@ def _harvest(result, threshold_keV):
     }
 
 
+def _cascade_table_range(kw, launch: LaunchState | None, lo):
+    """One table range [keV] for every pass of the cascade, or None for GDF beams.
+
+    Fixed before transport from the population (#923): ``lo`` (the smaller of
+    the minimum cutoff and ``T_s``) and the largest of ``E0`` and every
+    primary's initial energy. A primary block supplies its population's range
+    as ``_energy_range_keV``; a single call samples the same energies here
+    (they are pure functions of ``(seed, e)``). Shell, radiative and LUT tables
+    are therefore identical in a block and in the joined run.
+    """
+    population = kw.get("_energy_range_keV")
+    if population is not None:
+        lo, hi = min(lo, float(population[0])), float(population[1])
+    elif launch is not None:
+        hi = float(np.max(launch.E_keV))
+    elif kw.get("gdf_source") is None:
+        from .beam_entry import initial_energies_keV
+
+        energies = initial_energies_keV(
+            kw["E0_keV"],
+            int(kw["Ne"]),
+            kw["seed"],
+            kw.get("energy_spread_frac"),
+            start=int(kw.get("_electron_start", 0)),
+        )
+        hi = float(np.max(energies))
+    else:
+        return None
+    return (lo, max(hi, float(kw["E0_keV"])))
+
+
+def _realized_table_range(fixed, lo, E0_keV, initial_E_keV):
+    """``fixed`` when set; a GDF beam widens to its sampled energies instead."""
+    if fixed is not None:
+        return fixed
+    return (lo, max(float(E0_keV), float(np.max(initial_E_keV))))
+
+
+def _root_keys(kw, launch: LaunchState | None):
+    """Lineage keys of the cascade roots: supplied launch keys, else global primary keys."""
+    if launch is not None:
+        return np.asarray(launch.stream_keys, dtype=np.uint64)
+    from .kinematics import stream_keys
+
+    return stream_keys(kw["seed"], int(kw["Ne"]), start=int(kw.get("_electron_start", 0)))
+
+
 def _with_launch(kw, launch: LaunchState | None):
     """Generation-0 arguments of an explicit launch: no beam, its count and energy.
 
@@ -507,12 +560,14 @@ def transport_secondary_cascade(simulate, kw, *, launch: LaunchState | None = No
     cut_min = float(kw["E_cut_keV"] if E_cut is None else np.min(E_cut))
     lo = min(cut_min, threshold_keV)
     Ne = int(kw["Ne"])
+    gen0_range = _cascade_table_range(kw, launch, lo)
+    # The shell tables take the union of this range and the call's range,
+    # which is ``gen0_range`` whenever that is fixed.
     gen0 = simulate(
-        **base,
-        _secondary=SecondaryPass(launch, (lo, float(kw["E0_keV"])), _photon_seed(seed, 0)),
+        **dict(base, _energy_range_keV=gen0_range),
+        _secondary=SecondaryPass(launch, (lo, float(kw["E0_keV"])), seed, lineage=True),
     )
-    # The transport widened gen 0's range to its sampled energies; match it.
-    table_range = (lo, max(float(kw["E0_keV"]), float(np.max(gen0["initial_E_keV"]))))
+    table_range = _realized_table_range(gen0_range, lo, kw["E0_keV"], gen0["initial_E_keV"])
     first_core = resolve_transport_core(kw["transport_core"], Ne, kw["groove"])
     later_core = "cuda" if first_core == "cuda" else "per-electron"
 
@@ -534,6 +589,9 @@ def transport_secondary_cascade(simulate, kw, *, launch: LaunchState | None = No
     counts = [_counts(gen0)]
     n_tracks = Ne
     electron_of = tracks["electron_id"][0]
+    # Lineage key of each local track of the current generation (#923).
+    key_of = _root_keys(kw, launch)
+    tracks["lineage_key"] = [key_of]
     t0_of = np.asarray(gen0["initial_t0_ang"], dtype=float)
     current = gen0
     row_offset = 0
@@ -541,14 +599,13 @@ def transport_secondary_cascade(simulate, kw, *, launch: LaunchState | None = No
         g = len(generations)
         harvest = _harvest(current, threshold_keV)
         harvest["kind"] = np.full(harvest["parent"].size, LAUNCH_SHELL, dtype=np.int8)
-        harvest["keys"] = secondary_stream_keys(
-            seed, track_offset[-1] + harvest["parent"], harvest["ordinal"]
+        harvest["keys"] = daughter_keys(
+            key_of[harvest["parent"]], PROCESS_SHELL, harvest["ordinal"]
         )
         if pair_model is not None:
             events, photon_counts = convert_hard_photons(
                 _pair_rows(current),
-                seed=seed,
-                parent_track_offset=track_offset[-1],
+                parent_keys=key_of,
                 layers=pair_layers,
                 width_ang=pair_width,
                 height_ang=pair_height,
@@ -558,12 +615,13 @@ def transport_secondary_cascade(simulate, kw, *, launch: LaunchState | None = No
             events["parent_track"] = track_offset[-1] + events["parent"]
             events["electron_id"] = electron_of[events["parent"]]
             events["electron_track"] = np.full(events["row"].size, -1, dtype=np.int64)
+            events["parent_key"] = key_of[events["parent"]]
             if positrons_on:
                 _init_positron_fates(events, threshold_keV)
             pair_events.append(events)
             pair_counts.append(photon_counts)
-            harvest = _merge_pair_launches(harvest, events, seed)
-        positron = _positron_launches(pair_events[-1], seed) if positrons_on else None
+            harvest = _merge_pair_launches(harvest, events)
+        positron = _positron_launches(pair_events[-1]) if positrons_on else None
         row_offset += _host(current["electron_id"]).size
         n_electron = int(harvest["parent"].size)
         n_positron = 0 if positron is None else int(positron["parent"].size)
@@ -592,7 +650,14 @@ def transport_secondary_cascade(simulate, kw, *, launch: LaunchState | None = No
         electrons = electron_of[harvest["parent"]]
         t0 = t0_of[harvest["parent"]]
         step = dict(base, **_BEAM_ARGS)
-        step.update(E_cut_keV=threshold_keV, transport_core=later_core)
+        # Descendants run from explicit launches keyed by lineage; a primary
+        # block's ``_electron_start`` addresses only beam sampling (#923).
+        step.update(
+            E_cut_keV=threshold_keV,
+            transport_core=later_core,
+            _electron_start=0,
+            _energy_range_keV=table_range,
+        )
         species = []
         for projectile, part in (
             ("electron", slice(0, n_electron)),
@@ -619,16 +684,11 @@ def transport_secondary_cascade(simulate, kw, *, launch: LaunchState | None = No
             call.update(E0_keV=float(np.max(harvest["E_keV"][part])), Ne=part.stop - part.start)
             species_result = simulate(
                 **call,
-                _secondary=SecondaryPass(
-                    launch,
-                    table_range,
-                    _photon_seed(seed, g, positron=positron_step),
-                    projectile,
-                ),
+                _secondary=SecondaryPass(launch, table_range, seed, projectile, lineage=True),
             )
             if positron_step:
                 species_result = _annihilate_positrons(
-                    species_result, pair_events[-1], seed, electron_density
+                    species_result, pair_events[-1], electron_density
                 )
             species.append(species_result)
         current = _merge_species(species[0], species[1], n_electron)
@@ -642,11 +702,12 @@ def transport_secondary_cascade(simulate, kw, *, launch: LaunchState | None = No
         tracks["launch_r_ang"].append(harvest["r_ang"])
         tracks["launch_v_hat"].append(harvest["v_hat"])
         tracks["launch_t_ang"].append(harvest["t_ang"])
+        tracks["lineage_key"].append(harvest["keys"])
         generations.append(current)
         track_offset.append(n_tracks)
         counts.append(_counts(current))
         n_tracks += n_new
-        electron_of, t0_of = electrons, t0
+        electron_of, t0_of, key_of = electrons, t0, harvest["keys"]
     track_table = {k: np.concatenate(v) for k, v in tracks.items()}
     out = _join(generations, track_offset, track_table, counts, threshold_keV)
     if pair_model is not None:
@@ -654,7 +715,6 @@ def transport_secondary_cascade(simulate, kw, *, launch: LaunchState | None = No
         if positrons_on:
             out["pair_production"]["annihilation_photons"] = _annihilation_photons(
                 out["pair_production"]["events"],
-                seed,
                 pair_layers,
                 pair_width,
                 pair_height,
@@ -681,7 +741,7 @@ def _init_positron_fates(events, threshold_keV):
     events["annihilation_v_hat"] = np.full((n, 3), np.nan)
 
 
-def _annihilate_positrons(result, events, seed, electron_density):
+def _annihilate_positrons(result, events, electron_density):
     """Cut one generation's positron tracks at their in-flight annihilation.
 
     Local track ``j`` is the ``j``-th launched pair positron of ``events``,
@@ -695,10 +755,7 @@ def _annihilate_positrons(result, events, seed, electron_density):
 
     launched = np.flatnonzero(events["positron_launched"])
     keys = annihilation_stream_keys(
-        seed,
-        events["parent_track"][launched],
-        events["photon_ordinal"][launched],
-        in_flight=True,
+        events["parent_key"][launched], events["photon_ordinal"][launched], in_flight=True
     )
     tau = np.array(
         [-np.log1p(-np.random.Generator(np.random.Philox(key=int(k))).random()) for k in keys]
@@ -756,7 +813,7 @@ def _track_ends(rows, n_tracks):
     }
 
 
-def _annihilation_photons(events, seed, layers, width_ang, height_ang, *, device=False):
+def _annihilation_photons(events, layers, width_ang, height_ang, *, device=False):
     """Both photons of every annihilating pair positron, scored in the stack.
 
     ``event`` indexes the joined pair events.
@@ -773,7 +830,7 @@ def _annihilation_photons(events, seed, layers, width_ang, height_ang, *, device
     index = np.flatnonzero(fate != FATE_ESCAPED)
     kinds = np.where(fate[index] == FATE_IN_FLIGHT, ANNIHILATION_IN_FLIGHT, ANNIHILATION_AT_REST)
     keys = annihilation_stream_keys(
-        seed, events["parent_track"][index], events["photon_ordinal"][index], in_flight=False
+        events["parent_key"][index], events["photon_ordinal"][index], in_flight=False
     )
     photons = score_annihilation_photons(
         kinds,
@@ -790,10 +847,10 @@ def _annihilation_photons(events, seed, layers, width_ang, height_ang, *, device
     return photons
 
 
-def _positron_launches(events, seed):
+def _positron_launches(events):
     """Launch fields of one generation's pair positrons above the threshold.
 
-    Keys hash (seed, parent track, photon ordinal) under the positron salt.
+    Keys derive from (parent lineage, photon ordinal) under the positron namespace.
     Validation: photon-pair-first-interaction, bhabha-close
     """
     launched = events["positron_launched"]
@@ -805,11 +862,10 @@ def _positron_launches(events, seed):
         "E_keV": events["positron_keV"][launched],
         "t_ang": events["t_ang"][launched],
         "kind": np.full(int(np.count_nonzero(launched)), LAUNCH_POSITRON, dtype=np.int8),
-        "keys": secondary_stream_keys(
-            seed,
-            events["parent_track"][launched],
+        "keys": daughter_keys(
+            events["parent_key"][launched],
+            PROCESS_PAIR_POSITRON,
             events["photon_ordinal"][launched],
-            salt=_PAIR_POSITRON_STREAM_SALT,
         ),
     }
 
@@ -824,7 +880,7 @@ def _append_launches(harvest, extra):
     return merged
 
 
-def _merge_pair_launches(harvest, events, seed):
+def _merge_pair_launches(harvest, events):
     """Append launched pair electrons after the shell launches, same fields.
 
     ``ordinal`` is the photon ordinal on the parent track; ``pair_index`` is
@@ -834,11 +890,8 @@ def _merge_pair_launches(harvest, events, seed):
     launched = events["electron_launched"]
     n_shell = harvest["parent"].size
     n_pair = int(np.count_nonzero(launched))
-    keys = secondary_stream_keys(
-        seed,
-        events["parent_track"][launched],
-        events["photon_ordinal"][launched],
-        salt=_PAIR_ELECTRON_STREAM_SALT,
+    keys = daughter_keys(
+        events["parent_key"][launched], PROCESS_PAIR_ELECTRON, events["photon_ordinal"][launched]
     )
     merged = dict(harvest)
     for name, extra in (
@@ -866,6 +919,7 @@ def _pair_summary(model, pair_events, pair_counts, positrons_on=False):
         "electron_launched",
         "global_row",
         "parent_track",
+        "parent_key",
         "electron_id",
         "electron_track",
     ]
@@ -938,6 +992,7 @@ def _join(generations, offsets, track_table, counts, threshold_keV):
     out["secondary_tracks"] = track_table
     out["secondaries"] = {
         "threshold_eV": threshold_keV * 1e3,
+        "rng_model": CASCADE_RNG_MODEL,
         "n_generations": len(generations),
         "tracks_per_generation": [
             int(np.sum(track_table["generation"] == g)) for g in range(len(generations))
