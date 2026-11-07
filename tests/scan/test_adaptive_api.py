@@ -102,7 +102,7 @@ def test_fixed_n_identity_matches_the_pre_precision_baseline():
     identity = dataset_identity("hopg", "full", Settings(), sweep, bremsstrahlung_model="eedl")
     assert (
         identity["parameter_sha256"]
-        == "f6fa825072e99150f63825cdd1888284e76b9dfca16909e77d01f76f463a1e2d"
+        == "7b26acb71fff26a0300e0ded75f63c9207ddcfac46c49c023580520f1e710350"
     )
     case = build_cases(
         sweep,
@@ -113,7 +113,7 @@ def test_fixed_n_identity_matches_the_pre_precision_baseline():
     )[0]
     assert "adaptive_precision" not in case
     assert (
-        case_content_key(case) == "dfc310848e992f446987bd6b20100712ce180828c856b5c6ca250053bda5a310"
+        case_content_key(case) == "e4e016702011d7efe8982fe9dc5d3ac75660a0a76a356f024bdcbd39dcfc4b07"
     )
 
 

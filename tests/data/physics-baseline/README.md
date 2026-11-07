@@ -240,6 +240,15 @@ content key. Only the generation-dependent identity hash in `resolved.json`
 was re-pinned. These fixtures are CPU/NumPy fp64, which always runs FP64, so
 every recorded output keeps its expectation.
 
+## Mixed-precision ELSEPA tail (#1013)
+
+The mixed kernel's ELSEPA inversion moved to the tail of its deviate, which
+changes default CUDA output above about 1 MeV, so `TRANSPORT_PRECISION_MODEL`
+became `cuda-exact-mixed-fp32-tables-v2`. The marker enters the dataset
+markers, so both `parameter_sha256` and `case_content_key` were re-pinned in
+`resolved.json` and `channeling.json`. These fixtures run FP64 on the CPU, so
+every recorded output keeps its expectation.
+
 ## Order-16 TDS radial panels (#887)
 
 `_tds_transform` and `_tds_diagonal` moved from order-8 to order-16 radial

@@ -77,6 +77,25 @@
       "max_steps": 100000
     }
   ],
+  "precision_scenes_note": "#1013 high-energy low-Z anchors for the FP32-FP64 refinement gate (gate838.py) only; not Geant4-matched benchmark scenes, so the benchmark and the frozen #894 protocol read `scenes` alone. rows_per_history is an estimate until measured",
+  "precision_scenes": [
+    {
+      "id": "si-10MeV-1mm",
+      "material": "Si",
+      "energy_keV": 10000,
+      "thickness_um": 1000,
+      "rows_per_history": 6000,
+      "max_steps": 100000
+    },
+    {
+      "id": "si-30MeV-1mm",
+      "material": "Si",
+      "energy_keV": 30000,
+      "thickness_um": 1000,
+      "rows_per_history": 6000,
+      "max_steps": 100000
+    }
+  ],
   "cone": {
     "center_deg": 90.0,
     "half_angle_deg": 10.0,

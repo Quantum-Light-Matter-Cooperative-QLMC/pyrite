@@ -26,7 +26,7 @@ from ._jit_kernel_variants import (
     transport_kernel_variant,
 )
 from ._jit_lut_kernel import _transport_lut_kernel
-from ._jit_precision import MIXED_TABLES
+from ._jit_precision import MIXED_COMPLEMENT_TABLES, MIXED_TABLES
 
 
 @dataclass(frozen=True)
@@ -48,19 +48,28 @@ _KERNEL_PARAMETERS = _transport_kernel.__code__.co_varnames[
     : _transport_kernel.__code__.co_argcount
 ]
 _MIXED_TABLE_INDICES = tuple(_KERNEL_PARAMETERS.index(name) for name in MIXED_TABLES)
+_MIXED_COMPLEMENT_INDICES = frozenset(
+    _KERNEL_PARAMETERS.index(name) for name in MIXED_COMPLEMENT_TABLES
+)
 # float32 copies of the mixed build's tables (#838), keyed by the source's
-# device pointer, size and dtype. Each entry holds its source, so a cached
-# pointer cannot be freed and reused by another array while it is a key.
+# device pointer, size, dtype and complement flag. Each entry holds its
+# source, so a cached pointer cannot be freed and reused by another array
+# while it is a key.
 _FLOAT32_TABLES: OrderedDict = OrderedDict()
 _FLOAT32_TABLE_SLOTS = 64
 
 
-def _float32_table(table):
-    """``table`` as a float32 device array, converted once while it is cached."""
-    key = (int(table.data.ptr), int(table.size), table.dtype.str)
+def _float32_table(table, complement=False):
+    """``table`` (``1 - table`` if ``complement``) as float32, converted once while cached.
+
+    The complement is formed in the table's FP64 before rounding (#1013).
+
+    Validation: gpu-mixed-precision-tables
+    """
+    key = (int(table.data.ptr), int(table.size), table.dtype.str, bool(complement))
     entry = _FLOAT32_TABLES.get(key)
     if entry is None:
-        entry = (table, table.astype(xp.float32))
+        entry = (table, ((1.0 - table) if complement else table).astype(xp.float32))
         _FLOAT32_TABLES[key] = entry
         if len(_FLOAT32_TABLES) > _FLOAT32_TABLE_SLOTS:
             _FLOAT32_TABLES.popitem(last=False)
@@ -75,7 +84,7 @@ def _precision_args(args, precision):
         return args
     args = list(args)
     for index in _MIXED_TABLE_INDICES:
-        args[index] = _float32_table(args[index])
+        args[index] = _float32_table(args[index], index in _MIXED_COMPLEMENT_INDICES)
     return tuple(args)
 
 

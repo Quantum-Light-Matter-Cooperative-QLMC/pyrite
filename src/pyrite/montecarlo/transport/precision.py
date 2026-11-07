@@ -23,7 +23,7 @@ from ..._numerics import TRANSPORT_PRECISIONS
 #: Precision ``auto`` selects on the exact CUDA core.
 DEFAULT_TRANSPORT_PRECISION = "mixed"
 #: Identity marker of the default precision policy.
-TRANSPORT_PRECISION_MODEL = "cuda-exact-mixed-fp32-tables-v1"
+TRANSPORT_PRECISION_MODEL = "cuda-exact-mixed-fp32-tables-v2"
 
 
 def validate_transport_precision(value: object) -> str:
