@@ -11,6 +11,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from pyrite._backend import BACKEND
 from pyrite.montecarlo.spectrum.brem_bremslib import (
     bremslib_segment_state,
     evaluate_bremslib,
@@ -25,7 +26,7 @@ from pyrite.montecarlo.transport.hard_radiative import (
     build_radiative_partition,
     sample_hard_radiative_photon,
 )
-from tests.helpers.bremslib import synthetic_bremslib_arrays
+from tests.helpers.bremslib import faint_tip_bremslib_arrays, synthetic_bremslib_arrays
 
 
 @pytest.fixture
@@ -145,6 +146,46 @@ def test_completion_stages_only_used_tables_once_and_preserves_draw_order(
         np.testing.assert_array_equal(
             segments["hard_radiative_target_momentum_eV_c"], expected_momenta
         )
+
+
+@pytest.mark.skipif(BACKEND.name != "cpu", reason="CPU FP32 emulation of accelerator staging")
+def test_fp32_photon_angles_keep_faint_tip_ddcs_normal(monkeypatch):
+    """#1019: FP32 angular CDFs form DDCS in millibarn, not subnormal cm².
+
+    A 1e-9 SDCS scale puts the whole 30 MeV tip row near 1e-39 cm²/eV/sr,
+    the released table's backward-tip range, so bulk draws sample it.
+    """
+    from pyrite.montecarlo.spectrum import brem_bremslib
+    from pyrite.montecarlo.transport import hard_radiative as module
+
+    table = prepare_bremslib_table(
+        faint_tip_bremslib_arrays(scale=1e-9), atomic_number=6, key="k", digest="d"
+    )
+    incident = np.full(3, 29999e3)
+    energy = np.array([29.9e6, 29.5e6, 29.96e6])
+    incoming = np.tile([0.0, 0.0, 1.0], (3, 1))
+    uniforms = np.array([[0.3, 0.3], [0.9, 0.6], [0.99, 0.1]])
+
+    def polar():
+        staged = stage_bremslib_table(table)
+        batch, _ = module._complete_hard_radiative_chunk(
+            staged, incident, energy, incoming, uniforms
+        )
+        scalar = [
+            module.hard_radiative_photon_at_energy(table, e, k, [0.0, 0.0, 1.0], *u).direction
+            for e, k, u in zip(incident, energy, uniforms, strict=True)
+        ]
+        np.testing.assert_array_equal(batch, scalar)
+        return np.arccos(batch[:, 2])
+
+    reference = polar()
+    # Accelerator FP32 table precision without accelerator hardware.
+    monkeypatch.setattr(brem_bremslib, "REAL", np.float32)
+    assert stage_bremslib_table(table).scaled_sdcs_mb.dtype == np.float32
+    np.testing.assert_allclose(polar(), reference, rtol=1e-6)
+    # Negative control: the same FP32 cells in cm² are subnormal.
+    monkeypatch.setattr(module, "_cell_unit_cm2", lambda _staged: 1.0)
+    assert np.max(abs(polar() / reference - 1.0)) > 1e-5
 
 
 def test_invalid_partition_and_empty_hard_range(table):

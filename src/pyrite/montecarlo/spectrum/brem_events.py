@@ -18,6 +18,7 @@ from ..transport.events import EVENT_CUTOFF, EVENT_HARD_RADIATIVE
 from .brem import mc_brem_spectrum
 from .brem_bremslib import (
     BremsLibBremsstrahlungTable,
+    _cell_unit_cm2,
     bremslib_segment_state,
     evaluate_bremslib_rows,
     stage_bremslib_table,
@@ -287,11 +288,16 @@ def mc_hard_brem_event_spectrum(
         staged = stage_bremslib_table(table)
         isotropic = bremslib_segment_state(staged, T_keV)
         directional = bremslib_segment_state(staged, T_keV, v[rows] @ direction)
+        # The ratio is unit-free: FP32 cells in millibarn keep backward tip
+        # angles out of the subnormal range (#1019); binary64 keeps cm².
+        unit = _cell_unit_cm2(staged)
         sdcs = np.asarray(
-            BACKEND.to_cpu(evaluate_bremslib_rows(staged, isotropic, k[rows])), dtype=float
+            BACKEND.to_cpu(evaluate_bremslib_rows(staged, isotropic, k[rows], unit_cm2=unit)),
+            dtype=float,
         )
         ddcs = np.asarray(
-            BACKEND.to_cpu(evaluate_bremslib_rows(staged, directional, k[rows])), dtype=float
+            BACKEND.to_cpu(evaluate_bremslib_rows(staged, directional, k[rows], unit_cm2=unit)),
+            dtype=float,
         )
         if np.any(~np.isfinite(sdcs) | (sdcs <= 0.0) | ~np.isfinite(ddcs) | (ddcs < 0.0)):
             raise ValueError("hard-radiative event has an invalid BremsLib conditional angle")

@@ -6,6 +6,7 @@ Validation: bremslib-radiative-event-spectrum
 import numpy as np
 import pytest
 
+from pyrite._backend import BACKEND
 from pyrite._grid_semantics import node_bin_edges_and_widths
 from pyrite.montecarlo.spectrum import brem_events
 from pyrite.montecarlo.spectrum.brem_bremslib import (
@@ -21,7 +22,7 @@ from pyrite.montecarlo.transport.events import (
     EVENT_HARD_RADIATIVE,
     check_segment_event_contract,
 )
-from tests.helpers.bremslib import synthetic_bremslib_arrays
+from tests.helpers.bremslib import faint_tip_bremslib_arrays, synthetic_bremslib_arrays
 
 
 @pytest.fixture
@@ -64,6 +65,60 @@ def test_hard_event_spectrum_uses_conditional_angle_without_reweighting_rate(mon
         0, 0
     ]
     np.testing.assert_allclose(got, [0.0, ddcs / sdcs / 10_000.0, 0.0])
+
+
+@pytest.mark.skipif(BACKEND.name != "cpu", reason="CPU FP32 emulation of accelerator staging")
+def test_fp32_backward_tip_event_weights_stay_normal(monkeypatch):
+    """#1019: FP32 DDCS/SDCS event weights use millibarn cells, not subnormal cm²."""
+    from pyrite.montecarlo.spectrum import brem_bremslib
+
+    monkeypatch.setattr(
+        brem_events, "_mu_total_inv_ang", lambda _comp, energy: np.zeros_like(energy)
+    )
+    table = prepare_bremslib_table(
+        faint_tip_bremslib_arrays(), atomic_number=6, key="k", digest="d"
+    )
+    k = np.array([29.9e6, 29.5e6, 29.15e6])
+    T_keV = np.array([29999.0, 29990.0, 29980.0])
+    # Backward electrons, forward observer: cos(theta) = -1, -0.8, -0.6.
+    v = np.array([[0.0, 0.0, -1.0], [0.6, 0.0, -0.8], [0.0, 0.8, -0.6]])
+    segments = {
+        "event_kind": np.full(3, EVENT_HARD_RADIATIVE),
+        "hard_radiative_k_eV": k,
+        "hard_radiative_Z": np.full(3, 6, dtype=np.int16),
+        "E_end_keV": T_keV,
+        "r_mid": np.array([[0.0, 0.0, 50.0]] * 3),
+        "v_hat": v,
+        "L_ang": np.full(3, 10.0),
+        "Ne": 3,
+        "thickness_ang": 100.0,
+    }
+    grid = np.sort(k)
+
+    def score():
+        return brem_events.mc_hard_brem_event_spectrum(
+            segments,
+            grid,
+            cutoff_eV=1000.0,
+            bremslib_tables={"C": table},
+            element="C",
+            n_atoms_per_ang3=0.1,
+            n_hat=[0.0, 0.0, 1.0],
+        )
+
+    staged = stage_bremslib_table(table, array_module=np)
+    sdcs = evaluate_bremslib_rows(staged, bremslib_segment_state(staged, T_keV), k)
+    ddcs = evaluate_bremslib_rows(staged, bremslib_segment_state(staged, T_keV, v[:, 2]), k)
+    tiny = np.finfo(np.float32).tiny
+    assert np.all(sdcs > 100 * tiny) and np.all(ddcs < tiny)
+    reference = score()
+    assert np.all(reference > 0.0)
+    # Accelerator FP32 table precision without accelerator hardware.
+    monkeypatch.setattr(brem_bremslib, "REAL", np.float32)
+    np.testing.assert_allclose(score(), reference, rtol=1e-4)
+    # Negative control: the same FP32 cells in cm² are subnormal.
+    monkeypatch.setattr(brem_events, "_cell_unit_cm2", lambda _staged: 1.0)
+    assert np.max(abs(score() / reference - 1.0)) > 1e-3
 
 
 def test_soft_track_and_hard_event_bins_do_not_overlap(monkeypatch, table):

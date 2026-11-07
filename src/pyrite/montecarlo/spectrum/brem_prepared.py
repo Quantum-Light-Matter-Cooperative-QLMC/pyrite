@@ -12,6 +12,7 @@ from ..._backend import BACKEND, REAL, _to_cpu, xp
 from ...materials.attenuation import _finite_mu_or_raise, _mu_total_inv_ang, _normalize_composition
 from .brem import _brem_incident_state
 from .brem_bremslib import (
+    _cell_unit_cm2,
     bremslib_segment_state,
     dielectric_scoring_factor,
     evaluate_bremslib,
@@ -206,10 +207,13 @@ class _PreparedBandTracks:
         for element, density in r.composition:
             staged = r.staged[element]
             state = bremslib_segment_state(staged, energy[rows], cosine[rows])
-            cells = evaluate_bremslib(staged, state, r.energy) * transmission
+            # FP32 cells in millibarn stay normal near the tip; the unit folds
+            # into the row weight (#1019). Binary64 keeps cm², bit-for-bit.
+            unit = _cell_unit_cm2(staged)
+            cells = evaluate_bremslib(staged, state, r.energy, unit_cm2=unit) * transmission
             if self.plasma_eV:
                 cells *= dielectric_scoring_factor(energy[rows], r.energy, self.plasma_eV)
-            scale = density * 1e16 * length[rows]
+            scale = density * 1e16 * unit * length[rows]
             for band in range(r.bands):
                 lo, hi = r.offsets_host[band : band + 2]
                 values = (cells[:, lo:hi] @ r.weights[lo:hi]) * scale

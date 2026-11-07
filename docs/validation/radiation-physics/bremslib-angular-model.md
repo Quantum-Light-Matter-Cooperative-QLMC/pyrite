@@ -73,7 +73,7 @@ The implementation's directional path temporarily multiplies the DDCS by $4\pi$ 
 
 ## Source-to-code comparison
 
-`prepare_bremslib_table` applies the exact piecewise-linear solid-angle integral, normalizes each shape, refines incident energy, and rebuilds DDCS from the interpolated SDCS and normalized shape. `bremslib_segment_state` uses $\arccos(\operatorname{clip}(\hat{\mathbf v}\cdot\hat{\mathbf n},-1,1))$ and linear angular interpolation. `evaluate_bremslib` applies the common $x$ and incident-energy interpolation, the $10^{-27}Z^2/k$ conversion, and the physical support $0<k\le T$. The FP32 portable reducer in `mc_brem_spectrum` requests the cells in millibarn (`unit_cm2`) and folds $10^{-27}$ into the row weight, because backward cells near a 30 MeV tip (about $10^{-42}$ cm²/eV/sr in carbon) lie below the FP32 normal range in cm² (#979); binary64 keeps cm² unchanged.
+`prepare_bremslib_table` applies the exact piecewise-linear solid-angle integral, normalizes each shape, refines incident energy, and rebuilds DDCS from the interpolated SDCS and normalized shape. `bremslib_segment_state` uses $\arccos(\operatorname{clip}(\hat{\mathbf v}\cdot\hat{\mathbf n},-1,1))$ and linear angular interpolation. `evaluate_bremslib` applies the common $x$ and incident-energy interpolation, the $10^{-27}Z^2/k$ conversion, and the physical support $0<k\le T$. The FP32 portable reducer in `mc_brem_spectrum` requests the cells in millibarn (`unit_cm2`) and folds $10^{-27}$ into the row weight, because backward cells near a 30 MeV tip (about $10^{-42}$ cm²/eV/sr in carbon) lie below the FP32 normal range in cm² (#979); binary64 keeps cm² unchanged. Every other FP32 caller uses the same millibarn cells (#1019). The prepared-band portable scorer folds $10^{-27}$ into its row weight. Hard-radiative photon angle sampling builds a scale-free angular CDF, and the hard-radiative event scorer forms the unit-free ratio DDCS/SDCS, so neither folds the unit back.
 
 The `angle-f64-v1` numerical policy retains binary64 direction components,
 their dot product and inverse cosine before converting the recovered angle
@@ -86,7 +86,9 @@ GPU. The exactly forward and backward limits remain zero and $\pi$;
 interpolation, solid-angle normalization and physical units are unchanged.
 The BremsLib model identity advances because directional scores can change.
 This is a numerical correction within the existing derivation, not new
-independent physics validation.
+independent physics validation. The later `fp32-cell-mb-v1` suffix (#1019)
+records the millibarn FP32 cells above. Default CUDA FP32 hard-photon angle
+sampling changes at the rounding level; binary64 output is unchanged.
 
 `mc_brem_spectrum` evaluates the angle per segment, preserves EEDL as the warned isotropic fallback for a missing element table or uncovered incident energy, applies attenuation, and divides by the incident-electron count. The portable path and the fused CUDA mirror use the same staged rows, interpolation fractions, tip rule, unit conversion, fallback state, and $4\pi$ cancellation. This derivation is a static source-to-code comparison. Separately, the hardware-gated CUDA comparison passed on an RTX 5080 on 2026-09-22; the full neighboring CUDA spectrum regression file passed (7 tests, SLURM job 1796).
 

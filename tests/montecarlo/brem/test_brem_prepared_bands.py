@@ -3,11 +3,11 @@
 import numpy as np
 import pytest
 
-from pyrite._backend import REAL
+from pyrite._backend import BACKEND, REAL
 from pyrite.montecarlo.spectrum.brem_bremslib import prepare_bremslib_table
 from pyrite.montecarlo.spectrum.brem_events import mc_coupled_brem_spectrum
 from pyrite.montecarlo.spectrum.brem_prepared import _PreparedBremsLibBands
-from tests.helpers.bremslib import synthetic_bremslib_arrays
+from tests.helpers.bremslib import faint_tip_bremslib_arrays, synthetic_bremslib_arrays
 from tests.montecarlo.brem.test_brem_photon_blocking import _LAYERS, _segments
 
 # Same FP32 cells and positive quadrature as the scalar CUDA band scorer;
@@ -108,3 +108,42 @@ def test_prepared_rejects_invalid_quadrature(bad_weights, inputs):
             bremslib_tables={"C": table},
             cutoff_eV=1000,
         )
+
+
+@pytest.mark.skipif(BACKEND.name != "cpu", reason="CPU FP32 emulation of the ROCm path")
+def test_fp32_portable_bands_keep_faint_tip_cells_normal(monkeypatch):
+    """#1019: ROCm FP32 ``_portable_rows`` scores backward tip cells in millibarn."""
+    from pyrite.montecarlo.spectrum import brem_bremslib, brem_prepared
+
+    table = prepare_bremslib_table(
+        faint_tip_bremslib_arrays(), atomic_number=6, key="k", digest="d"
+    )
+    segments = {
+        "r_mid": np.array([[0.0, 0.0, 20.0], [0.0, 0.0, 50.0], [0.0, 0.0, 80.0]]),
+        "v_hat": np.array([[0.0, 0.0, -1.0], [0.6, 0.0, -0.8], [0.0, 0.8, -0.6]]),
+        "L_ang": np.array([40.0, 110.0, 260.0]),
+        "E_keV": np.array([29999.0, 29990.0, 29980.0]),
+        "elec_id": np.arange(3),
+        "Ne": 3,
+        "thickness_ang": 100.0,
+    }
+    # Tip nodes of the HOPG 29,999 keV automatic grid band, as in #979.
+    grids = [np.linspace(29.15e6, 29.55e6, 6), np.linspace(29.6e6, 29.96e6, 6)]
+    weights = [np.gradient(g) for g in grids]
+    monkeypatch.setattr(brem_prepared, "_mu_total_inv_ang", lambda _c, e: np.zeros_like(e))
+
+    def score():
+        recipe = _PreparedBremsLibBands(
+            grids, weights, composition=[("C", 0.1)], bremslib_tables={"C": table}, cutoff_eV=1000
+        )
+        return recipe.bind(segments).integrate([[0.0, 0.0, 1.0]], [1.0])
+
+    reference = score()
+    assert np.all(reference > 0.0)
+    # Accelerator FP32 precision without accelerator hardware (CPU is binary64).
+    monkeypatch.setattr(brem_prepared, "REAL", np.float32)
+    monkeypatch.setattr(brem_bremslib, "REAL", np.float32)
+    np.testing.assert_allclose(score(), reference, rtol=1e-4)
+    # Negative control: the same FP32 cells formed in cm² lose the tip.
+    monkeypatch.setattr(brem_prepared, "_cell_unit_cm2", lambda _staged: 1.0)
+    assert np.max(abs(score() / reference - 1.0)) > 1e-3

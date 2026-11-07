@@ -122,6 +122,16 @@ def _table_namespace(staged):
     )
 
 
+def _cell_unit_cm2(staged: _StagedBremsLib) -> float:
+    """Cell unit for a staged table: millibarn in FP32, else cm² (bit-identical).
+
+    FP32 backward cells near a tens-of-MeV tip fall below the normal range in
+    cm² (#979, #1019); the CDF/row-weight callers fold the unit back in.
+    """
+    _, real = _table_namespace(staged)
+    return _FP32_CELL_UNIT_CM2 if np.dtype(real) == np.dtype(np.float32) else 1.0
+
+
 def _incident_bracket(staged: _StagedBremsLib, T_keV):
     xp, REAL = _table_namespace(staged)
     T = xp.asarray(T_keV, dtype=REAL)
@@ -245,16 +255,24 @@ def evaluate_bremslib(
     return _evaluate(staged, state, xp.asarray(photon_energy_eV, dtype=REAL)[None, :], unit_cm2)
 
 
-def evaluate_bremslib_rows(staged: _StagedBremsLib, state: _BremsLibSegmentState, photon_energy_eV):
+def evaluate_bremslib_rows(
+    staged: _StagedBremsLib,
+    state: _BremsLibSegmentState,
+    photon_energy_eV,
+    *,
+    unit_cm2: float = 1.0,
+):
     """:func:`evaluate_bremslib` with one photon energy per row; shape ``(Nsegment,)``.
 
     The diagonal of the ``(Nsegment, Nsegment)`` grid evaluation, without
-    forming it: row ``i`` is evaluated at ``photon_energy_eV[i]``.
+    forming it: row ``i`` is evaluated at ``photon_energy_eV[i]``. ``unit_cm2``
+    is as in :func:`evaluate_bremslib`.
 
     Validation: bremslib-angular-model
     """
     xp, REAL = _table_namespace(staged)
-    return _evaluate(staged, state, xp.asarray(photon_energy_eV, dtype=REAL)[:, None])[:, 0]
+    photon = xp.asarray(photon_energy_eV, dtype=REAL)[:, None]
+    return _evaluate(staged, state, photon, unit_cm2)[:, 0]
 
 
 #: Electron rest energy in eV, as in ``transport.dielectric_radiative``.
