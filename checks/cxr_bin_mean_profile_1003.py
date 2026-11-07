@@ -6,7 +6,10 @@ CPU it records the rows the dense lineshape would have reduced; on CUDA it
 records each ``_CxrBatch`` flush. ``stats`` reports the per-bin near-line
 counts that drive the reducer's pair/tree choice and its cost model.
 ``replay`` times every reducer route on the captured flushes on a CUDA device
-and compares them against the current production result.
+and compares them against the current production result. ``grid`` freezes the
+line grid a case's transport builds; ``wall`` times warm production runs on a
+frozen grid and saves their spectra, and ``compare`` diffs two ``wall``
+outputs, so the same script run in two checkouts gives a before/after pair.
 """
 
 import argparse
@@ -22,13 +25,9 @@ def _case(args, grid):
     from pyrite._energy_grid_encoding import encode_energy_grid
     from pyrite.energy_grid.bandwidth_check import build_case
 
-    config = dict(
-        thickness_ang=args.thickness,
-        tilt_deg=args.tilt,
-        tilt_azim_deg=args.azimuth,
-        n_electrons=args.electrons,
+    built = build_case(
+        args.material, args.energy, _config(args), seed=args.seed, resolution="local"
     )
-    built = build_case(args.material, args.energy, config, seed=args.seed, resolution="local")
     case = {key: value for key, value in built.items() if key != "line_grid_policy"}
     encoded = encode_energy_grid(grid)
     case.update(E_grid=encoded, E_grid_line=encoded, Ne=args.electrons, Ne_brem=16)
@@ -346,19 +345,120 @@ def replay(args):
     print(json.dumps(report["flushes"], indent=1))
 
 
+def grid(args):
+    """Save the line grid this case's transport builds at ``--electrons``."""
+    from pyrite._backend import _to_cpu
+    from pyrite.energy_grid.bandwidth_check import build_case
+    from pyrite.montecarlo import runner
+
+    built = build_case(
+        args.material, args.energy, _config(args), seed=args.seed, resolution="local"
+    )
+    transport = runner._transport_case(built, transport_core=args.core)
+    E_grid = np.asarray(_to_cpu(transport["E_grid"]), dtype=float)
+    np.save(args.out, E_grid)
+    print(json.dumps({"bins": int(E_grid.size), "sha256": _sha(args.out)}))
+
+
+def _config(args):
+    return dict(
+        thickness_ang=args.thickness,
+        tilt_deg=args.tilt,
+        tilt_azim_deg=args.azimuth,
+        n_electrons=args.electrons,
+    )
+
+
+def _sha(path):
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def _arrays(result, prefix=""):
+    """Numeric arrays of a run result, flattened one ``/`` level per dict."""
+    from pyrite._backend import _to_cpu
+
+    out = {}
+    for key, value in result.items():
+        if isinstance(value, dict):
+            out.update(_arrays(value, f"{prefix}{key}/"))
+            continue
+        try:
+            array = np.asarray(_to_cpu(value))
+        except Exception:
+            continue
+        if array.ndim and array.dtype.kind in "fc":
+            out[f"{prefix}{key}"] = array
+    return out
+
+
+def wall(args):
+    """Warm wall per primary of ``--repeats`` runs after one warmup run."""
+    from pyrite.montecarlo.runner import run_case
+
+    case = _case(args, np.load(args.grid))
+    run_case(dict(case, Ne=args.warmup, Ne_brem=args.warmup), transport_core=args.core)
+    times, result = [], None
+    for _ in range(args.repeats):
+        start = time.perf_counter()
+        result = run_case(case, transport_core=args.core, record_timing=True)
+        times.append(time.perf_counter() - start)
+    arrays = _arrays(result)
+    np.savez(args.out, **arrays)
+    meta = {
+        "material": args.material,
+        "energy_keV": args.energy,
+        "electrons": args.electrons,
+        "core": args.core,
+        "grid_sha256": _sha(args.grid),
+        "wall_s": times,
+        "wall_per_primary_s": float(np.median(times)) / args.electrons,
+        "scalars": {k: v for k, v in result.items() if np.isscalar(v)},
+        "arrays": {k: list(v.shape) for k, v in arrays.items()},
+    }
+    args.out.with_suffix(".json").write_text(json.dumps(meta, indent=2, default=str))
+    print(json.dumps({k: meta[k] for k in ("wall_s", "wall_per_primary_s")}))
+
+
+def compare(args):
+    """Per-array agreement of ``candidate`` with ``reference`` (``wall`` outputs)."""
+    ref, cand = np.load(args.reference), np.load(args.candidate)
+    widths = None
+    if args.grid is not None:
+        from pyrite._backend import _to_cpu
+        from pyrite.montecarlo.spectrum.cxr._bin_quadrature import bin_axis
+
+        widths = 1.0 / _to_cpu(bin_axis(np.load(args.grid))[1])
+    report = {}
+    for key in sorted(set(ref.files) & set(cand.files)):
+        r, c = ref[key].astype(float), cand[key].astype(float)
+        if r.shape != c.shape or r.ndim != 1:
+            continue
+        w = widths if widths is not None and widths.size == r.size else np.ones_like(r)
+        report[key] = {"bitwise_equal": bool(np.array_equal(r, c))}
+        if np.any(r):
+            report[key].update(_accuracy(c, r, w))
+    print(json.dumps(report, indent=1))
+    if args.out:
+        args.out.write_text(json.dumps(report, indent=2))
+
+
+def _case_args(p):
+    p.add_argument("--material", default="hbn")
+    p.add_argument("--energy", type=float, default=5000.0)
+    p.add_argument("--thickness", type=float, default=1e7)
+    p.add_argument("--tilt", type=float, default=10.0)
+    p.add_argument("--azimuth", type=float, default=100.0)
+    p.add_argument("--electrons", type=int, default=128)
+    p.add_argument("--seed", type=int, default=1)
+    p.add_argument("--core", default="auto")
+
+
 parser = argparse.ArgumentParser(description=__doc__)
 sub = parser.add_subparsers(dest="mode", required=True)
 cap = sub.add_parser("capture")
 cap.add_argument("--grid", type=Path, required=True)
 cap.add_argument("--out", type=Path, required=True)
-cap.add_argument("--material", default="hbn")
-cap.add_argument("--energy", type=float, default=5000.0)
-cap.add_argument("--thickness", type=float, default=1e7)
-cap.add_argument("--tilt", type=float, default=10.0)
-cap.add_argument("--azimuth", type=float, default=100.0)
-cap.add_argument("--electrons", type=int, default=128)
-cap.add_argument("--seed", type=int, default=1)
-cap.add_argument("--core", default="auto")
+_case_args(cap)
 st = sub.add_parser("stats")
 st.add_argument("fixture", type=Path)
 rep = sub.add_parser("replay")
@@ -372,5 +472,21 @@ rep.add_argument("--repeats", type=int, default=2)
 rep.add_argument("--tile-pairs", type=int, default=50_000_000)
 rep.add_argument("--slice-lines", type=int, default=0, help="first N lines per flush")
 rep.add_argument("--max-flushes", type=int, default=0)
+gr = sub.add_parser("grid")
+gr.add_argument("--out", type=Path, required=True)
+_case_args(gr)
+wl = sub.add_parser("wall")
+wl.add_argument("--grid", type=Path, required=True)
+wl.add_argument("--out", type=Path, required=True)
+wl.add_argument("--warmup", type=int, default=8)
+wl.add_argument("--repeats", type=int, default=2)
+_case_args(wl)
+cm = sub.add_parser("compare")
+cm.add_argument("reference", type=Path)
+cm.add_argument("candidate", type=Path)
+cm.add_argument("--grid", type=Path)
+cm.add_argument("--out", type=Path)
 args = parser.parse_args()
-{"capture": capture, "stats": stats, "replay": replay}[args.mode](args)
+modes = {"capture": capture, "stats": stats, "replay": replay, "grid": grid, "wall": wall}
+modes["compare"] = compare
+modes[args.mode](args)

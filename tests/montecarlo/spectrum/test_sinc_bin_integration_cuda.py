@@ -250,6 +250,11 @@ def test_fused_sparse_matches_the_tree_and_repeats_bitwise():
     routed = cp.zeros_like(tree)
     bq.run_bin_mean_reduction_kernel(*args, out=routed, method="sparse")
     np.testing.assert_array_equal(cp.asnumpy(routed), fused[0])
+    # #1003 acceptance: float32 rounding of the series-free host reference in
+    # every bin above 1e-6 of peak.
+    host = reduce_host(e, a, w, edges)
+    floor = np.maximum(np.abs(host), 1e-6 * np.abs(host).max())
+    assert np.max(np.abs(fused[0] - host) / floor) <= 2.0**-24
 
 
 def test_device_midpoint_series_matches_the_host_mirror():
