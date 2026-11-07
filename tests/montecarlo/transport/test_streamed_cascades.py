@@ -36,7 +36,9 @@ def _require_pdatconf():
         pytest.skip("pinned SBETHE reference data have not been fetched")
 
 
-def _cascade_case(*, coupled, Ne, Ne_brem, threshold=5000.0, energy_keV=150.0, seed=None):
+def _cascade_case(
+    *, coupled, Ne, Ne_brem, threshold=5000.0, energy_keV=150.0, seed=None, spread=None
+):
     """Silicon shell cascade inside the synthetic 5--200 keV BremsLib range."""
     radiative = (
         {"radiative_model": "bremslib-soft-hard", "radiative_cutoff_eV": 1000.0}
@@ -61,7 +63,10 @@ def _cascade_case(*, coupled, Ne, Ne_brem, threshold=5000.0, energy_keV=150.0, s
         "silicon", thickness_ang=2.0e5, tilt_deg=30.0, footprint=pr.geometry.Footprint(5.0, 5.0)
     )
     beam = pr.Beam(
-        energy_keV=energy_keV, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()
+        energy_keV=energy_keV,
+        transverse=pr.beams.Spot(),
+        longitudinal=pr.beams.PointBunch(),
+        energy_spread_frac=spread,
     )
     case = api.build_case(pr.Scene(beam, target, pr.Detector(), physics=physics), numerics)
     case = replace(case, E_cut_lines_keV=5.0, E_cut_brem_keV=5.0)
@@ -91,9 +96,15 @@ def test_shell_cascade_stream_smoke():
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize(("Ne", "Ne_brem"), [(9, 12), (12, 9)])
-def test_shell_cascade_streams_like_the_joined_run(Ne, Ne_brem):
-    case = _cascade_case(coupled=False, Ne=Ne, Ne_brem=Ne_brem, threshold=1000.0, seed=5)
+@pytest.mark.parametrize(
+    ("Ne", "Ne_brem", "seed", "spread"),
+    [(9, 12, 5, None), (12, 9, 5, None), (12, 9, 17, 0.08), (9, 12, 23, 0.08)],
+)
+def test_shell_cascade_streams_like_the_joined_run(Ne, Ne_brem, seed, spread):
+    """Seeds, ``Ne``/``Ne_brem`` both ways and energy spread to generation 2."""
+    case = _cascade_case(
+        coupled=False, Ne=Ne, Ne_brem=Ne_brem, threshold=1000.0, seed=seed, spread=spread
+    )
     assert streaming_refusal(case, live=True) is None
     reference = _joined(case, generations=3)
     n = max(Ne, Ne_brem)
@@ -102,13 +113,17 @@ def test_shell_cascade_streams_like_the_joined_run(Ne, Ne_brem):
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize("seed", [3, 8])
-def test_coupled_shell_cascade_streams_like_the_joined_run(seed):
+@pytest.mark.parametrize(
+    ("Ne", "Ne_brem", "seed", "spread"),
+    [(30, 22, 3, None), (30, 22, 8, None), (22, 30, 8, None), (22, 30, 13, 0.05)],
+)
+def test_coupled_shell_cascade_streams_like_the_joined_run(Ne, Ne_brem, seed, spread):
     """The synthetic table floor (5 keV) bounds T_s, so these reach generation 1."""
-    case = _cascade_case(coupled=True, Ne=30, Ne_brem=22, seed=seed)
+    case = _cascade_case(coupled=True, Ne=Ne, Ne_brem=Ne_brem, seed=seed, spread=spread)
     assert case["radiative_model"] == "bremslib-soft-hard"
     reference = _joined(case, generations=2)
-    for block in (1, 7, 30, 41):
+    n = max(Ne, Ne_brem)
+    for block in (1, 7, n, n + 11):
         _assert_streamed_matches(case, reference, block)
 
 
@@ -190,7 +205,8 @@ def _pair_case(monkeypatch, *, positrons, Ne, Ne_brem, seed=11):
 
 @pytest.mark.slow
 @pytest.mark.parametrize("positrons", [False, True])
-def test_pair_cascade_streams_like_the_joined_run(monkeypatch, positrons):
+@pytest.mark.parametrize(("Ne", "Ne_brem", "seed"), [(6, 5, 11), (5, 6, 29)])
+def test_pair_cascade_streams_like_the_joined_run(monkeypatch, positrons, Ne, Ne_brem, seed):
     """Pair conversion completes directions per block; streams match joined (#923)."""
     import warnings
 
@@ -198,7 +214,7 @@ def test_pair_cascade_streams_like_the_joined_run(monkeypatch, positrons):
         from tests.helpers.positron_tables import require_positron_tables
 
         require_positron_tables()
-    case = _pair_case(monkeypatch, positrons=positrons, Ne=6, Ne_brem=5)
+    case = _pair_case(monkeypatch, positrons=positrons, Ne=Ne, Ne_brem=Ne_brem, seed=seed)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", UserWarning)  # untransported positrons
         transport = runner._transport_case(case, transport_core="per-electron")
@@ -207,7 +223,7 @@ def test_pair_cascade_streams_like_the_joined_run(monkeypatch, positrons):
         if positrons:
             assert np.any(kinds == 3), "need launched positrons"
         reference = runner._spectrum_case(case, transport)
-        for block in (1, 4, 6, 9):
+        for block in (1, 4, 6, 9):  # 6 = max(Ne, Ne_brem)
             _assert_streamed_matches(case, reference, block)
 
 
@@ -230,3 +246,124 @@ def test_track_budget_fails_iff_the_joined_run_does(monkeypatch):
     monkeypatch.setattr(secondaries, "DEFAULT_SECONDARY_TRACKS_PER_PRIMARY", loose)
     for block in (1, 2, n):
         run_case_streamed(case, block, transport_core="per-electron")
+
+
+class _RecordedBudget:
+    """Spy on the run-wide track budget: committed launches per block."""
+
+    def __init__(self, monkeypatch):
+        from pyrite.montecarlo.runner import block_transport
+
+        self.instances = []
+        base = block_transport._TrackBudget
+        recorder = self
+
+        class Budget(base):
+            def __init__(self, n):
+                super().__init__(n)
+                self.initial = self.remaining
+                recorder.instances.append(self)
+
+        monkeypatch.setattr(block_transport, "_TrackBudget", Budget)
+
+    def committed(self):
+        (budget,) = self.instances
+        return budget.initial - budget.remaining
+
+
+@pytest.mark.parametrize("phase", ["transport", "brem_wide"])
+def test_cascade_block_oom_replays_without_double_counting(monkeypatch, phase):
+    """An injected allocator OOM replays only the failed cascade block (#923).
+
+    The reference is the same simulated-CUDA streamed run without the OOM:
+    the CUDA core disables the shell transport LUT, so it is its own
+    realization. Earlier blocks are not re-scored, and the track budget
+    counts the replayed block's descendants once.
+    """
+    from pyrite.montecarlo.runner import case_driver, pool
+    from pyrite.montecarlo.runner.emission_adapters import EmissionAdapter
+
+    case = _cascade_case(coupled=False, Ne=5, Ne_brem=4, threshold=1000.0, seed=5)
+    simulate, evaluate = case_driver.simulate_trajectories, EmissionAdapter.evaluate
+    calls, failed, armed = [], [], []
+
+    class AllocatorOOM(RuntimeError):
+        pass
+
+    def transport(*args, **kwargs):
+        start, resident = kwargs["_electron_start"], kwargs["keep_segments_on_device"]
+        calls.append((start, resident))
+        if armed and phase == "transport" and start == 2 and resident and not failed:
+            failed.append(True)
+            raise AllocatorOOM()
+        # Exercise the exact driver/recovery path without requiring hardware.
+        kwargs.update(transport_core="per-electron", keep_segments_on_device=False)
+        return simulate(*args, **kwargs)
+
+    def score(self, batch, slot, **kwargs):
+        rows = batch.segments["electron_id"]
+        if armed and slot == phase and rows.size and int(rows.min()) == 2 and not failed:
+            failed.append(True)
+            raise AllocatorOOM()
+        return evaluate(self, batch, slot, **kwargs)
+
+    budget = _RecordedBudget(monkeypatch)
+    monkeypatch.setattr(runner, "_case_transport_core", lambda *_: "cuda")
+    monkeypatch.setattr(case_driver, "simulate_trajectories", transport)
+    monkeypatch.setattr(runner, "_is_gpu_oom", lambda e: isinstance(e, AllocatorOOM))
+    monkeypatch.setattr(pool, "_admit_host_segments", lambda: None)
+    monkeypatch.setattr(EmissionAdapter, "evaluate", score)
+    reference = run_case_streamed(case, 2, transport_core="cuda")
+    calls.clear()
+    armed.append(True)
+    actual = run_case_streamed(case, 2, transport_core="cuda")
+    assert failed
+    assert calls == (
+        [(0, True), (2, True), (2, False), (4, True)]
+        if phase == "transport"
+        else [(0, True), (2, True), (4, True)]
+    )
+    if phase == "transport":
+        assert actual["_transport_gpu_oom_retries"] == 1
+    clean, replayed = budget.instances
+    assert clean.initial - clean.remaining > 0
+    assert replayed.initial - replayed.remaining == clean.initial - clean.remaining
+    for key in SPECTRA:
+        np.testing.assert_allclose(actual[key], reference[key], rtol=RTOL, atol=ATOL, err_msg=key)
+    for key in ("eta", "hit_frac", "n_segments"):
+        assert actual[key] == reference[key], key
+
+
+def test_cascade_step_budget_retry_reproduces_the_block(monkeypatch):
+    """A step-limit retry reruns the whole cascade block from its keys (#923)."""
+    from pyrite.montecarlo.runner import step_budget
+    from pyrite.montecarlo.transport import TransportStepLimitError
+
+    case = _cascade_case(coupled=False, Ne=5, Ne_brem=4, threshold=1000.0, seed=5)
+    transport_ref = runner._transport_case(case, transport_core="per-electron")
+    launched = sum(transport_ref["segs"]["secondaries"]["tracks_per_generation"][1:])
+    reference = runner._spectrum_case(case, transport_ref)
+    retry, limited = step_budget.retry_step_budget, []
+
+    def counting_retry(simulate, *args, **kwargs):
+        def attempt(*a, **kw):
+            try:
+                return simulate(*a, **kw)
+            except TransportStepLimitError:
+                limited.append(kw["max_steps"])
+                raise
+
+        return retry(attempt, *args, **kwargs)
+
+    from pyrite.montecarlo.runner import block_transport
+
+    budget = _RecordedBudget(monkeypatch)
+    monkeypatch.setenv("PYRITE_MC_TRANSPORT_INITIAL_MAX_STEPS", "4")
+    monkeypatch.setattr(block_transport, "retry_step_budget", counting_retry)
+    actual = run_case_streamed(case, 2, transport_core="per-electron")
+    assert limited, "the small initial budget must force a retry"
+    assert budget.committed() == launched
+    for key in SPECTRA:
+        np.testing.assert_allclose(actual[key], reference[key], rtol=RTOL, atol=ATOL, err_msg=key)
+    for key in ("eta", "hit_frac", "n_segments"):
+        assert actual[key] == reference[key], key
