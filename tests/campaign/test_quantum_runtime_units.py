@@ -5,8 +5,8 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from pyrite import states
-from pyrite.planar_source import (
+from pyrite import quantum as states
+from pyrite.quantum.planar_source import (
     PlanarStateProjection,
     propagate_planar_source,
     score_planar_source,
@@ -167,7 +167,7 @@ def _projection():
 
 
 def test_planar_propagation_normalizes_stopping_power_before_solver(monkeypatch):
-    import pyrite.planar_source as ps
+    import pyrite.quantum.planar_source as ps
 
     observed = {}
     solver = SimpleNamespace(
@@ -189,7 +189,7 @@ def test_planar_propagation_normalizes_stopping_power_before_solver(monkeypatch)
 
 
 def test_planar_scoring_normalizes_quantity_grids_and_angles(monkeypatch):
-    import pyrite.planar_source as ps
+    import pyrite.quantum.planar_source as ps
     from pyrite.montecarlo.channeling import emission
 
     monkeypatch.setattr(ps, "_solver_for", lambda _: object())

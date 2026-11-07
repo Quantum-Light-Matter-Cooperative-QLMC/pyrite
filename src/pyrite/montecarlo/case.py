@@ -8,10 +8,10 @@ from typing import Any, Literal, cast
 
 import numpy as np
 
-from .._channeling_admission import AxialAdmissionError as AxialAdmissionError
-from .._channeling_admission import refuse_axial_channeling as refuse_axial_channeling
-from .._channeling_admission import refuse_axial_channeling_cases as refuse_axial_channeling_cases
 from .._cxr_grid_policy import LOCAL_RESOLUTION_POLICY
+from ..quantum._admission import AxialAdmissionError as AxialAdmissionError
+from ..quantum._admission import refuse_axial_channeling as refuse_axial_channeling
+from ..quantum._admission import refuse_axial_channeling_cases as refuse_axial_channeling_cases
 
 type Composition = list[tuple[str, float]]
 type MillerIndex = tuple[int, int, int]

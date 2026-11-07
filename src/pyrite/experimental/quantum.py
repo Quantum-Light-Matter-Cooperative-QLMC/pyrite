@@ -25,10 +25,10 @@ if TYPE_CHECKING:
     from pyrite.montecarlo.channeling.mcwf import MCWFSolver as MCWFSolver
     from pyrite.montecarlo.channeling.realspace import RealSpaceGrid as RealSpaceGrid
     from pyrite.montecarlo.channeling.realspace import SplitStepPropagator as SplitStepPropagator
-    from pyrite.planar_source import PlanarStateProjection as PlanarStateProjection
-    from pyrite.planar_source import project_planar_source as project_planar_source
-    from pyrite.planar_source import propagate_planar_source as propagate_planar_source
-    from pyrite.planar_source import score_planar_source as score_planar_source
+    from pyrite.quantum.planar_source import PlanarStateProjection as PlanarStateProjection
+    from pyrite.quantum.planar_source import project_planar_source as project_planar_source
+    from pyrite.quantum.planar_source import propagate_planar_source as propagate_planar_source
+    from pyrite.quantum.planar_source import score_planar_source as score_planar_source
 
 _EXPORTS = {
     "DensityMatrixSolver": ("pyrite.montecarlo.channeling.density", "DensityMatrixSolver"),
@@ -46,10 +46,10 @@ _EXPORTS = {
         "AxialDiagnosticResult",
     ),
     "axial_diagnostic": ("pyrite.montecarlo.channeling.axial_diagnostic", "axial_diagnostic"),
-    "PlanarStateProjection": ("pyrite.planar_source", "PlanarStateProjection"),
-    "project_planar_source": ("pyrite.planar_source", "project_planar_source"),
-    "propagate_planar_source": ("pyrite.planar_source", "propagate_planar_source"),
-    "score_planar_source": ("pyrite.planar_source", "score_planar_source"),
+    "PlanarStateProjection": ("pyrite.quantum.planar_source", "PlanarStateProjection"),
+    "project_planar_source": ("pyrite.quantum.planar_source", "project_planar_source"),
+    "propagate_planar_source": ("pyrite.quantum.planar_source", "propagate_planar_source"),
+    "score_planar_source": ("pyrite.quantum.planar_source", "score_planar_source"),
     "RealSpaceGrid": ("pyrite.montecarlo.channeling.realspace", "RealSpaceGrid"),
     "SplitStepPropagator": ("pyrite.montecarlo.channeling.realspace", "SplitStepPropagator"),
 }

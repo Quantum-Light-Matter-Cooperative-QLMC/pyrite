@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 
 import pyrite as pr
-from pyrite import states
+from pyrite import quantum as states
 from pyrite.units import ureg
 
 

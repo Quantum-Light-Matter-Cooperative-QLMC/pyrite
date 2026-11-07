@@ -1,6 +1,5 @@
 """Root migration compatibility, discovery, warning filters, and object identity."""
 
-import importlib
 import re
 import subprocess
 import sys
@@ -82,13 +81,12 @@ def test_root_discovery_and_metadata_do_not_resolve_domain_exports():
     assert result.stdout == result.stderr == ""
 
 
-def test_star_import_and_states_module_remain_compatible():
+def test_star_import_exports_curated_root_names():
     namespace = {}
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", DeprecationWarning)
         exec("from pyrite import *", namespace)
     assert set(pyrite.__all__) <= namespace.keys()
-    assert namespace["states"] is importlib.import_module("pyrite.states")
     assert namespace["Beam"] is pyrite.Beam
 
 

@@ -15,10 +15,10 @@ from importlib import import_module
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, Self
 
-from ._numerics import Numerics, Physics, _miller, validate_channeling_numerics
-from ._sampling import AdaptiveSampling
-from ._spec_defaults import UNSET, _Unset
-from ._units import _positive_length_quantity, normalize_unit
+from .._numerics import Numerics, Physics, _miller, validate_channeling_numerics
+from .._sampling import AdaptiveSampling
+from .._spec_defaults import UNSET, _Unset
+from .._units import _positive_length_quantity, normalize_unit
 
 if TYPE_CHECKING:
     from pint import Quantity
@@ -119,26 +119,26 @@ if TYPE_CHECKING:
     from pyrite.montecarlo.channeling.states import (
         translate as translate,
     )
-    from pyrite.planar_source import (
+    from pyrite.quantum.planar_source import (
         PlanarStateProjection as PlanarStateProjection,
     )
-    from pyrite.planar_source import (
+    from pyrite.quantum.planar_source import (
         project_planar_source as project_planar_source,
     )
-    from pyrite.planar_source import (
+    from pyrite.quantum.planar_source import (
         propagate_planar_source as propagate_planar_source,
     )
-    from pyrite.planar_source import (
+    from pyrite.quantum.planar_source import (
         score_planar_source as score_planar_source,
     )
-    from pyrite.quantum_state import (
+    from pyrite.quantum.state import (
         TransverseStateSpec as TransverseStateSpec,
     )
 
 
 def _angstrom(value: float) -> Quantity:
     """Fresh registry-owned scalar angstrom read-back."""
-    from .units import Q_
+    from ..units import Q_
 
     return Q_(float(value), "angstrom")
 
@@ -329,7 +329,7 @@ class QuantumSetup:
     def lower(self, physics: Physics, numerics: Numerics) -> tuple[Physics, Numerics]:
         """Adapt supported planar configuration to unchanged versioned case fields."""
         if self.region.kind == "axial":
-            from .campaign.axial_spec import refuse_unverified_axial_run
+            from ._admission import refuse_unverified_axial_run
 
             refuse_unverified_axial_run()
         if (
@@ -412,7 +412,7 @@ _EXPORTS = {
     "MCWFResult": ("pyrite.montecarlo.channeling.mcwf", "MCWFResult"),
     "MCWFSolver": ("pyrite.montecarlo.channeling.mcwf", "MCWFSolver"),
     "MixedState": ("pyrite.montecarlo.channeling.states", "MixedState"),
-    "PlanarStateProjection": ("pyrite.planar_source", "PlanarStateProjection"),
+    "PlanarStateProjection": ("pyrite.quantum.planar_source", "PlanarStateProjection"),
     "RealSpaceGrid": ("pyrite.montecarlo.channeling.realspace", "RealSpaceGrid"),
     "SampledState": ("pyrite.montecarlo.channeling.states", "SampledState"),
     "ScatteringKernel": ("pyrite.montecarlo.channeling.operators", "ScatteringKernel"),
@@ -420,7 +420,7 @@ _EXPORTS = {
     "Superposition": ("pyrite.montecarlo.channeling.states", "Superposition"),
     "Translated": ("pyrite.montecarlo.channeling.states", "Translated"),
     "TransverseState": ("pyrite.montecarlo.channeling.states", "TransverseState"),
-    "TransverseStateSpec": ("pyrite.quantum_state", "TransverseStateSpec"),
+    "TransverseStateSpec": ("pyrite.quantum.state", "TransverseStateSpec"),
     "airy": ("pyrite.montecarlo.channeling.states", "airy"),
     "aperture_probe": ("pyrite.montecarlo.channeling.states", "aperture_probe"),
     "axial_diagnostic": ("pyrite.montecarlo.channeling.axial_diagnostic", "axial_diagnostic"),
@@ -433,9 +433,9 @@ _EXPORTS = {
     "hermite_gauss": ("pyrite.montecarlo.channeling.states", "hermite_gauss"),
     "laguerre_gauss": ("pyrite.montecarlo.channeling.states", "laguerre_gauss"),
     "mixture": ("pyrite.montecarlo.channeling.states", "mixture"),
-    "project_planar_source": ("pyrite.planar_source", "project_planar_source"),
-    "propagate_planar_source": ("pyrite.planar_source", "propagate_planar_source"),
-    "score_planar_source": ("pyrite.planar_source", "score_planar_source"),
+    "project_planar_source": ("pyrite.quantum.planar_source", "project_planar_source"),
+    "propagate_planar_source": ("pyrite.quantum.planar_source", "propagate_planar_source"),
+    "score_planar_source": ("pyrite.quantum.planar_source", "score_planar_source"),
     "superpose": ("pyrite.montecarlo.channeling.states", "superpose"),
     "tds_kernel": ("pyrite.montecarlo.channeling.operators", "tds_kernel"),
     "translate": ("pyrite.montecarlo.channeling.states", "translate"),

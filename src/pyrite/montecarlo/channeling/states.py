@@ -61,7 +61,7 @@ _TAIL = 1e-8
 
 def _physical(value, unit: str, name: str, expected: str, *, kind: str | None = None):
     """Normalize physical inputs before constructing runtime state objects."""
-    return normalize_unit(value, unit, field=f"pyrite.states.{name}", expected=expected, kind=kind)
+    return normalize_unit(value, unit, field=f"pyrite.quantum.{name}", expected=expected, kind=kind)
 
 
 def _length(value, name: str):

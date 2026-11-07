@@ -27,7 +27,7 @@ from .._spec_defaults import _Unset
 from .._units import _is_pint_quantity, _scalar_quantity, normalize_unit
 from ..montecarlo.bunch_front import BunchFrontTilt, validate_front_source
 from ..montecarlo.transverse import TransverseDistribution
-from ..quantum_state import TransverseStateSpec
+from ..quantum.state import TransverseStateSpec
 from .longitudinal import LongitudinalDistribution, _timing_quantity_fs
 from .sweep import BeamSpec
 

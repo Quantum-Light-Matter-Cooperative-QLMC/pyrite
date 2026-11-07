@@ -10,7 +10,7 @@ import pyrite as pr
 from pyrite.montecarlo.channeling import states
 from pyrite.montecarlo.channeling.density import DensityMatrixSolver
 from pyrite.montecarlo.channeling.handoff import zone_solver
-from pyrite.planar_source import project_planar_source, propagate_planar_source
+from pyrite.quantum.planar_source import project_planar_source, propagate_planar_source
 from pyrite.units import ureg
 
 ENERGY_EV = 17e6
@@ -171,7 +171,7 @@ def test_refusal_before_case_creation_or_propagation():
 
 def test_scoring_matches_existing_emitter_from_the_same_projected_state():
     from pyrite.montecarlo.channeling import channeling_spectrum
-    from pyrite.planar_source import _solver_for, score_planar_source
+    from pyrite.quantum.planar_source import _solver_for, score_planar_source
 
     low = pr.TransverseStateSpec.recipe("hermite_gauss", m=0, waist_ang=1.0)
     high = pr.TransverseStateSpec.recipe("hermite_gauss", m=1, waist_ang=1.0)
@@ -213,7 +213,7 @@ def test_scoring_matches_existing_emitter_from_the_same_projected_state():
 
 def test_preprojected_cr_input_validates_population_and_exclusivity():
     from pyrite.montecarlo.channeling import channeling_spectrum
-    from pyrite.planar_source import _solver_for, score_planar_source
+    from pyrite.quantum.planar_source import _solver_for, score_planar_source
 
     source = pr.TransverseStateSpec.recipe("gaussian", waist_ang=1.0, dimension=1)
     proj = _project(source)
@@ -264,7 +264,7 @@ def test_preprojected_cr_input_validates_population_and_exclusivity():
 
 
 def test_two_dimensional_source_requires_explicit_in_plane_angular_model():
-    from pyrite.planar_source import score_planar_source
+    from pyrite.quantum.planar_source import score_planar_source
 
     state = pr.TransverseStateSpec.recipe("laguerre_gauss", ell=1, waist_ang=2.0)
     proj = _project(state)

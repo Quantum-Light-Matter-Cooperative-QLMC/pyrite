@@ -16,7 +16,7 @@ def test_quantum_exports_are_experimental_and_documented():
         name
         for name, declaration in exports.items()
         if declaration["target"].startswith(
-            ("pyrite.quantum:", "pyrite.quantum_state:", "pyrite.montecarlo.channeling.states:")
+            ("pyrite.quantum:", "pyrite.quantum.state:", "pyrite.montecarlo.channeling.states:")
         )
     }
     content = QUANTUM_PAGE.read_text(encoding="utf-8")

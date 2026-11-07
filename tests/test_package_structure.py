@@ -34,7 +34,6 @@ def test_root_exports_stay_frozen() -> None:
     assert pyrite.__all__ == [
         "DATA_DIR",
         "__version__",
-        "states",
         "Analysis",
         "AcquisitionBatch",
         "Beam",

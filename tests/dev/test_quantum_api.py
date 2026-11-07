@@ -17,18 +17,10 @@ import pyrite
 from pyrite import quantum
 
 
-def test_legacy_state_and_projection_aliases_keep_identity():
-    from pyrite import planar_source, states
-
-    for name in states.__all__:
-        assert getattr(quantum, name) is getattr(states, name)
-    for name in (
-        "PlanarStateProjection",
-        "project_planar_source",
-        "propagate_planar_source",
-        "score_planar_source",
-    ):
-        assert getattr(quantum, name) is getattr(planar_source, name)
+def test_deleted_root_modules_are_gone_and_root_names_keep_identity():
+    for old in ("states", "quantum_state", "planar_source", "_channeling_admission"):
+        with pytest.raises(ModuleNotFoundError):
+            importlib.import_module(f"pyrite.{old}")
     for name in (
         "QuantumRegion",
         "QuantumDynamics",
@@ -40,7 +32,7 @@ def test_legacy_state_and_projection_aliases_keep_identity():
 
 
 def test_spec_and_configuration_keep_wire_identity():
-    from pyrite.quantum_state import SCHEMA, TransverseStateSpec
+    from pyrite.quantum.state import SCHEMA, TransverseStateSpec
 
     spec = TransverseStateSpec.recipe("gaussian", waist_ang=1.0, dimension=1)
     decoded = quantum.TransverseStateSpec.from_dict(json.loads(spec.canonical_json()))
@@ -56,7 +48,7 @@ def test_spec_and_configuration_keep_wire_identity():
     ]
     for value in values:
         cls = type(value)
-        expected_module = "pyrite.quantum_state" if value is spec else "pyrite.quantum"
+        expected_module = "pyrite.quantum.state" if value is spec else "pyrite.quantum"
         assert cls.__module__ == expected_module
         assert getattr(importlib.import_module(expected_module), cls.__name__) is cls
         assert pickle.loads(pickle.dumps(value)) == value
@@ -69,7 +61,7 @@ import sys
 
 class BlockEngines(importlib.abc.MetaPathFinder):
     def find_spec(self, fullname, path=None, target=None):
-        if fullname.startswith(("pyrite.montecarlo", "pyrite.planar_source",
+        if fullname.startswith(("pyrite.montecarlo", "pyrite.quantum.planar_source",
                                 "cupy", "numba", "matplotlib", "plotly",
                                 "distributed", "dask")):
             raise AssertionError("unexpected eager import: " + fullname)
@@ -90,19 +82,30 @@ QuantumSetup()
 
 
 @pytest.mark.parametrize(
-    "first", ["pyrite.quantum", "pyrite.quantum_state", "pyrite.planar_source", "pyrite.states"]
+    "first", ["pyrite.quantum", "pyrite.quantum.state", "pyrite.quantum.planar_source"]
 )
 def test_import_order_keeps_projection_and_state_bindings(first):
     script = f"""
 import importlib
 importlib.import_module({first!r})
-from pyrite import quantum, quantum_state, planar_source, states
-assert quantum.TransverseStateSpec is quantum_state.TransverseStateSpec
+from pyrite import quantum
+from pyrite.quantum import state, planar_source
+from pyrite.montecarlo.channeling import states
+assert quantum.TransverseStateSpec is state.TransverseStateSpec
 assert quantum.gaussian is states.gaussian
 assert quantum.PlanarStateProjection is planar_source.PlanarStateProjection
 assert quantum.QuantumSetup is planar_source.QuantumSetup
 """
     subprocess.run([sys.executable, "-c", script], check=True, capture_output=True, text=True)
+
+
+def test_experimental_quantum_exports_are_pinned_to_pyrite_quantum():
+    from pyrite.experimental import quantum as experimental
+
+    assert set(experimental.__all__) == set(experimental._EXPORTS)
+    for name, target in experimental._EXPORTS.items():
+        assert quantum._EXPORTS[name] == target, name
+        assert getattr(experimental, name) is getattr(quantum, name)
 
 
 def test_facade_rejects_unreviewed_engine_helpers():

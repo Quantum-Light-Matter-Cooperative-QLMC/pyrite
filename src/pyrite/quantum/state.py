@@ -16,10 +16,11 @@ import json
 import math
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
+from importlib import import_module
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Self
 
-from ._units import _is_pint_quantity, normalize_unit
+from .._units import _is_pint_quantity, normalize_unit
 
 if TYPE_CHECKING:
     from pint import Quantity
@@ -401,7 +402,7 @@ class TransverseStateSpec:
         Keys are semantic names; values carry the canonical units (Å, Å⁻¹, eV,
         rad). Unset optional values, selectors and child terms are omitted.
         """
-        from .units import Q_
+        from ..units import Q_
 
         result = {}
         for name, value in self.parameters:
@@ -577,7 +578,7 @@ class TransverseStateSpec:
         This is a state *construction* adapter, not a production Scene lowerer.
         The data file's content hash, shape and dtype must match its spec.
         """
-        from .montecarlo.channeling import states
+        states = import_module("pyrite.montecarlo.channeling.states")
 
         params = dict(self.parameters)
         if self.kind in _ANALYTIC:

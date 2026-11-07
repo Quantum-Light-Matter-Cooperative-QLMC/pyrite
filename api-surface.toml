@@ -44,7 +44,7 @@ SpectralDensity = { target = "pyrite.results.model:SpectralDensity", status = "a
 SpectralFactors = { target = "pyrite.results.model:SpectralFactors", status = "advanced-stable", domain = "results", root_role = "specialized" }
 Sweep = { target = "pyrite.campaign.model:Sweep", status = "stable", domain = "campaign", root_role = "core" }
 Target = { target = "pyrite.campaign.target:Target", status = "stable", domain = "geometry", root_role = "core" }
-TransverseStateSpec = { target = "pyrite.quantum_state:TransverseStateSpec", status = "experimental", domain = "quantum", root_role = "experimental" }
+TransverseStateSpec = { target = "pyrite.quantum.state:TransverseStateSpec", status = "experimental", domain = "quantum", root_role = "experimental" }
 fetch_tables = { target = "pyrite.xsgen.install:fetch_tables", status = "advanced-stable", domain = "datasets", root_role = "specialized" }
 photon_energies = { target = "pyrite.materials.emission:photon_energies", status = "advanced-stable", domain = "radiation", root_role = "specialized" }
 # simulate composes independent models, observations and executor= scheduling;
@@ -123,7 +123,7 @@ EntryState = { target = "pyrite.montecarlo.channeling.states:EntryState", status
 MCWFResult = { target = "pyrite.montecarlo.channeling.mcwf:MCWFResult", status = "experimental" }
 MCWFSolver = { target = "pyrite.montecarlo.channeling.mcwf:MCWFSolver", status = "experimental" }
 MixedState = { target = "pyrite.montecarlo.channeling.states:MixedState", status = "experimental" }
-PlanarStateProjection = { target = "pyrite.planar_source:PlanarStateProjection", status = "experimental" }
+PlanarStateProjection = { target = "pyrite.quantum.planar_source:PlanarStateProjection", status = "experimental" }
 RealSpaceGrid = { target = "pyrite.montecarlo.channeling.realspace:RealSpaceGrid", status = "experimental" }
 SampledState = { target = "pyrite.montecarlo.channeling.states:SampledState", status = "experimental" }
 ScatteringKernel = { target = "pyrite.montecarlo.channeling.operators:ScatteringKernel", status = "experimental" }
@@ -131,7 +131,7 @@ SplitStepPropagator = { target = "pyrite.montecarlo.channeling.realspace:SplitSt
 Superposition = { target = "pyrite.montecarlo.channeling.states:Superposition", status = "experimental" }
 Translated = { target = "pyrite.montecarlo.channeling.states:Translated", status = "experimental" }
 TransverseState = { target = "pyrite.montecarlo.channeling.states:TransverseState", status = "experimental" }
-TransverseStateSpec = { target = "pyrite.quantum_state:TransverseStateSpec", status = "experimental" }
+TransverseStateSpec = { target = "pyrite.quantum.state:TransverseStateSpec", status = "experimental" }
 airy = { target = "pyrite.montecarlo.channeling.states:airy", status = "experimental" }
 aperture_probe = { target = "pyrite.montecarlo.channeling.states:aperture_probe", status = "experimental" }
 axial_diagnostic = { target = "pyrite.montecarlo.channeling.axial_diagnostic:axial_diagnostic", status = "experimental" }
@@ -144,9 +144,9 @@ gaussian = { target = "pyrite.montecarlo.channeling.states:gaussian", status = "
 hermite_gauss = { target = "pyrite.montecarlo.channeling.states:hermite_gauss", status = "experimental" }
 laguerre_gauss = { target = "pyrite.montecarlo.channeling.states:laguerre_gauss", status = "experimental" }
 mixture = { target = "pyrite.montecarlo.channeling.states:mixture", status = "experimental" }
-project_planar_source = { target = "pyrite.planar_source:project_planar_source", status = "experimental" }
-propagate_planar_source = { target = "pyrite.planar_source:propagate_planar_source", status = "experimental" }
-score_planar_source = { target = "pyrite.planar_source:score_planar_source", status = "experimental" }
+project_planar_source = { target = "pyrite.quantum.planar_source:project_planar_source", status = "experimental" }
+propagate_planar_source = { target = "pyrite.quantum.planar_source:propagate_planar_source", status = "experimental" }
+score_planar_source = { target = "pyrite.quantum.planar_source:score_planar_source", status = "experimental" }
 superpose = { target = "pyrite.montecarlo.channeling.states:superpose", status = "experimental" }
 tds_kernel = { target = "pyrite.montecarlo.channeling.operators:tds_kernel", status = "experimental" }
 translate = { target = "pyrite.montecarlo.channeling.states:translate", status = "experimental" }
@@ -462,10 +462,10 @@ AxialMCWFResult = { target = "pyrite.montecarlo.channeling.axial_mcwf:AxialMCWFR
 AxialDiagnosticConfig = { target = "pyrite.montecarlo.channeling.axial_diagnostic:AxialDiagnosticConfig", status = "experimental" }
 AxialDiagnosticResult = { target = "pyrite.montecarlo.channeling.axial_diagnostic:AxialDiagnosticResult", status = "experimental" }
 axial_diagnostic = { target = "pyrite.montecarlo.channeling.axial_diagnostic:axial_diagnostic", status = "experimental" }
-PlanarStateProjection = { target = "pyrite.planar_source:PlanarStateProjection", status = "experimental" }
-project_planar_source = { target = "pyrite.planar_source:project_planar_source", status = "experimental" }
-propagate_planar_source = { target = "pyrite.planar_source:propagate_planar_source", status = "experimental" }
-score_planar_source = { target = "pyrite.planar_source:score_planar_source", status = "experimental" }
+PlanarStateProjection = { target = "pyrite.quantum.planar_source:PlanarStateProjection", status = "experimental" }
+project_planar_source = { target = "pyrite.quantum.planar_source:project_planar_source", status = "experimental" }
+propagate_planar_source = { target = "pyrite.quantum.planar_source:propagate_planar_source", status = "experimental" }
+score_planar_source = { target = "pyrite.quantum.planar_source:score_planar_source", status = "experimental" }
 RealSpaceGrid = { target = "pyrite.montecarlo.channeling.realspace:RealSpaceGrid", status = "experimental" }
 SplitStepPropagator = { target = "pyrite.montecarlo.channeling.realspace:SplitStepPropagator", status = "experimental" }
 
