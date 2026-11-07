@@ -21,6 +21,7 @@ from pyrite.montecarlo.spectrum.brem_bremslib import (
 from tests.helpers import scaled_rtol, to_host
 from tests.helpers.bremslib import (
     SYNTHETIC_T1_MEV,
+    faint_tip_bremslib_arrays,
     synthetic_bremslib_arrays,
     synthetic_scaled_sdcs,
     synthetic_shape,
@@ -88,6 +89,35 @@ def test_forward_angle_survives_float32_table_staging(monkeypatch, carbon_table)
     expected = left + np.float32(theta / staged.theta_rad[1]) * (right - left)
     np.testing.assert_allclose(state.lower_values[0], expected, rtol=2 * np.finfo(np.float32).eps)
     assert np.all(state.lower_values[0] > left)
+
+
+def test_float32_tip_cells_stay_normal_in_millibarn_units(monkeypatch):
+    """#979: backward cells near a 30 MeV tip underflow FP32 in cm², not in mb."""
+    from pyrite.montecarlo.spectrum import brem_bremslib as module
+
+    table = prepare_bremslib_table(
+        faint_tip_bremslib_arrays(), atomic_number=6, key="k", digest="d", electron_electron=False
+    )
+    photon_eV = np.linspace(29.15e6, 29.96e6, 12)
+    T_keV, cos_theta = [29999.0], [-1.0]
+    reference_table = module.stage_bremslib_table(table, array_module=np)
+    reference = module.evaluate_bremslib(
+        reference_table,
+        module.bremslib_segment_state(reference_table, T_keV, cos_theta),
+        photon_eV,
+    )
+    assert np.all(reference < np.finfo(np.float32).tiny)
+    # Exercise accelerator table precision without requiring accelerator hardware.
+    monkeypatch.setattr(module, "xp", np)
+    monkeypatch.setattr(module, "REAL", np.float32)
+    staged = module.stage_bremslib_table(table)
+    state = module.bremslib_segment_state(staged, np.float32(T_keV), cos_theta)
+    unit = module._FP32_CELL_UNIT_CM2
+    cells = module.evaluate_bremslib(staged, state, photon_eV, unit_cm2=unit)
+    assert cells.dtype == np.float32 and np.all(cells >= np.finfo(np.float32).tiny)
+    np.testing.assert_allclose(cells.astype(np.float64) * unit, reference, rtol=1.0e-5)
+    subnormal = module.evaluate_bremslib(staged, state, photon_eV)
+    assert np.max(abs(subnormal / reference - 1.0)) > 1.0e-3
 
 
 def test_forward_track_spectrum_retains_sub_milliradian_angle(monkeypatch, carbon_table):

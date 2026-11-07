@@ -60,6 +60,19 @@ def synthetic_bremslib_arrays(t1_MeV=SYNTHETIC_T1_MEV, theta_step_deg=1.0):
     }
 
 
+def faint_tip_bremslib_arrays(scale=1.0e-3):
+    """Synthetic table to 30 MeV with the SDCS scaled by ``scale`` (#979).
+
+    At 30 MeV the synthetic shape is forward-peaked enough that the backward
+    DDCS near the kinematic tip is about 1e-45 cm²/eV/sr in carbon: below the
+    FP32 normal range, as the released table's backward tip is at 30 MeV.
+    """
+    arrays = synthetic_bremslib_arrays(t1_MeV=np.array([1.0, 3.0, 10.0, 30.0]))
+    for field in ("sdcs_mb", "node_angular_integral_mb", "node_vendor_integral_mb"):
+        arrays[field] = arrays[field] * scale
+    return arrays
+
+
 def extend_synthetic_arrays(arrays, extension_t1_MeV, *, tip_columns=2):
     """Append extension rows as the library holds them above 30 MeV.
 

@@ -52,6 +52,8 @@ from ..._physics_fallback import (
 
 #: One millibarn in square centimetres.
 _MB_CM2 = 1.0e-27
+#: Cell unit for FP32 reducers: the table's own millibarn scale (#979).
+_FP32_CELL_UNIT_CM2 = _MB_CM2
 
 
 @dataclass(frozen=True, slots=True)
@@ -199,11 +201,12 @@ def _along_reduced_energy(staged, values, top, reduced):
     return v0 + fraction * (v1 - v0)
 
 
-def _evaluate(staged: _StagedBremsLib, state: _BremsLibSegmentState, photon_eV):
+def _evaluate(staged: _StagedBremsLib, state: _BremsLibSegmentState, photon_eV, unit_cm2=1.0):
     """Physical cross section at photon energies broadcast against the rows.
 
     ``photon_eV`` is ``(1, NE)`` for a shared grid or ``(Nsegment, 1)`` for
-    one photon energy per row; the result has the broadcast shape.
+    one photon energy per row; the result has the broadcast shape, expressed
+    in multiples of ``unit_cm2`` (the default ``1.0`` keeps cm² bit-for-bit).
     """
     xp, REAL = _table_namespace(staged)
     T_eV = state.incident_energy_keV * REAL(1.0e3)
@@ -216,21 +219,30 @@ def _evaluate(staged: _StagedBremsLib, state: _BremsLibSegmentState, photon_eV):
     physical = (photon_eV > REAL(0.0)) & (reduced <= REAL(1.0))
     return xp.where(
         physical,
-        scaled * REAL(_MB_CM2) * Z * Z / xp.maximum(photon_eV, REAL(1.0e-30)),
+        scaled * REAL(_MB_CM2 / unit_cm2) * Z * Z / xp.maximum(photon_eV, REAL(1.0e-30)),
         REAL(0.0),
     )
 
 
-def evaluate_bremslib(staged: _StagedBremsLib, state: _BremsLibSegmentState, photon_energy_eV):
+def evaluate_bremslib(
+    staged: _StagedBremsLib,
+    state: _BremsLibSegmentState,
+    photon_energy_eV,
+    *,
+    unit_cm2: float = 1.0,
+):
     """Return ``d sigma/dk`` [cm²/eV] or ``d2 sigma/(dk dOmega)`` [cm²/eV/sr].
 
     Which one depends on whether ``state`` was built with emission angles.
-    Shape ``(Nsegment, NE)``; zero outside ``0 < k <= T``.
+    Shape ``(Nsegment, NE)``; zero outside ``0 < k <= T``. ``unit_cm2``
+    expresses the result in that many cm² instead: FP32 callers pass
+    one millibarn so backward-angle cells near the kinematic tip
+    (about 1e-42 cm²/eV/sr at 30 MeV) stay above the FP32 normal range (#979).
 
     Validation: bremslib-angular-model
     """
     xp, REAL = _table_namespace(staged)
-    return _evaluate(staged, state, xp.asarray(photon_energy_eV, dtype=REAL)[None, :])
+    return _evaluate(staged, state, xp.asarray(photon_energy_eV, dtype=REAL)[None, :], unit_cm2)
 
 
 def evaluate_bremslib_rows(staged: _StagedBremsLib, state: _BremsLibSegmentState, photon_energy_eV):
