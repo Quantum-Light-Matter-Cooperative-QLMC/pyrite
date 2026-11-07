@@ -2,7 +2,7 @@
 
 The elastic model supplies two quantities to the transport loop: **how far** an electron flies before its next elastic collision, and **through what angle** it turns when that collision happens. Both are functions of the electron's kinetic energy and of the elements present in the current layer.
 
-PyRITE uses a single-scattering (CASINO-style) treatment: every elastic event is sampled explicitly, and only the inelastic energy loss between events is condensed into a continuous slowing-down law ([Stopping power](stopping-power.md)).
+PyRITE uses a single-scattering (CASINO-style) treatment: every elastic event is sampled explicitly, and only the inelastic energy loss between events is condensed into a continuous slowing-down law ([Stopping power](stopping-power.md)). `transport_mode="mixed"` opts into PENELOPE's class II scheme instead, which keeps strong deflections explicit and condenses the weak ones; see [Mixed elastic transport](mixed-elastic-transport.md).
 
 ## Selecting a model
 
