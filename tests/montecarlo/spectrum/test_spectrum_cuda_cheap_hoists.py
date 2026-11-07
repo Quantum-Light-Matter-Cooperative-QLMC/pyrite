@@ -120,6 +120,65 @@ def test_directional_bremslib_kernel_matches_chunked_cuda_fallback(monkeypatch):
 @pytest.mark.skipif(
     BACKEND.name not in CUPY_BACKENDS, reason="run with PYRITE_TEST_BACKEND=cuda or rocm"
 )
+def test_portable_bremslib_matches_fused_near_a_30_mev_tip(monkeypatch):
+    """#979: backward tip cells (~1e-45 cm²) must not underflow the FP32 fallback."""
+    from pyrite.montecarlo.spectrum import brem
+    from pyrite.montecarlo.spectrum.brem_bremslib import (
+        bremslib_segment_state,
+        evaluate_bremslib,
+        prepare_bremslib_table,
+        stage_bremslib_table,
+    )
+    from tests.helpers.bremslib import faint_tip_bremslib_arrays
+
+    backward = [[0.0, 0.0, -1.0], [0.6, 0.0, -0.8], [0.0, 0.8, -0.6]]
+    segments = {
+        "r_mid": np.array([[0.0, 0.0, 20.0], [0.0, 0.0, 50.0], [0.0, 0.0, 80.0]], np.float32),
+        "v_hat": np.array(backward, dtype=np.float32),
+        "L_ang": np.array([40.0, 110.0, 260.0], dtype=np.float32),
+        "E_keV": np.array([29999.0, 29990.0, 29980.0], dtype=np.float32),
+        "elec_id": np.arange(3),
+        "Ne": 3,
+        "thickness_ang": 100.0,
+    }
+    # The 12 tip nodes of the HOPG 29,999 keV automatic grid band.
+    energy_eV = np.linspace(29.15e6, 29.96e6, 12)
+    table = prepare_bremslib_table(
+        faint_tip_bremslib_arrays(), atomic_number=6, key="synthetic", digest="fixture"
+    )
+    monkeypatch.setattr(
+        brem, "_mu_total_inv_ang", lambda _composition, energy: brem.xp.zeros_like(energy)
+    )
+    kwargs = {
+        "composition": [("C", 0.1)],
+        "cross_section_model": "bremslib",
+        "bremslib_tables": {"C": table},
+        "n_hat": np.array([0.0, 0.0, 1.0]),
+        "chunk": 2,
+    }
+    spectra = {}
+    for fused in (True, False):
+        monkeypatch.setattr(brem, "_USE_JIT_BREM_REDUCTION", fused)
+        spectra[fused] = cp.asnumpy(
+            cp.asarray(brem.mc_brem_spectrum(segments, energy_eV, **kwargs))
+        ).astype(np.float64)
+
+    staged = stage_bremslib_table(table, array_module=np)
+    state = bremslib_segment_state(
+        staged, segments["E_keV"].astype(float), segments["v_hat"].astype(float)[:, 2]
+    )
+    ddcs = evaluate_bremslib(staged, state, energy_eV)
+    weights = 0.1e24 * segments["L_ang"].astype(float) * 1e-8 / segments["Ne"]
+    expected = weights @ ddcs
+    assert np.all(expected > 0.0)
+    np.testing.assert_allclose(spectra[True], expected, rtol=1e-4)
+    np.testing.assert_allclose(spectra[False], expected, rtol=1e-4)
+    np.testing.assert_allclose(spectra[False], spectra[True], rtol=1e-4)
+
+
+@pytest.mark.skipif(
+    BACKEND.name not in CUPY_BACKENDS, reason="run with PYRITE_TEST_BACKEND=cuda or rocm"
+)
 def test_dielectric_bremslib_kernel_matches_chunked_cuda_scorer(monkeypatch):
     """#439: the fused reducer applies the same Ter--Mikaelian factor as the portable path."""
     from pyrite.montecarlo.spectrum import brem

@@ -22,6 +22,7 @@ from ...materials.crystal import ALPHA_FS
 from ..eedl_ionization import eedl_path
 from ..transport import TRANSPORT_ELEMENTS
 from .brem_bremslib import (
+    _FP32_CELL_UNIT_CM2,
     BremsLibBremsstrahlungTable,
     _warn_bremslib_element_missing,
     _warn_bremslib_out_of_range,
@@ -801,6 +802,19 @@ def _bremsstrahlung_dsigma_dk(
     return xp.where(state.available[:, None], eedl, bethe_heitler)
 
 
+def _bremslib_cells(staged, T_keV, cos_theta, E_grid, plasma_eV, unit_cm2):
+    """Portable ``4 pi d2sigma/(dk dOmega)`` cells in ``unit_cm2`` per eV per sr.
+
+    The common ``1/(4 pi)`` of :func:`mc_brem_spectrum` then leaves the
+    direction-resolved density per steradian.
+    """
+    state = bremslib_segment_state(staged, T_keV, cos_theta)
+    dsig = REAL(4.0 * np.pi) * evaluate_bremslib(staged, state, E_grid, unit_cm2=unit_cm2)
+    if plasma_eV:
+        dsig = dsig * dielectric_scoring_factor(T_keV, E_grid, plasma_eV)
+    return state, dsig
+
+
 def mc_brem_spectrum(
     segments,
     E_grid_eV,
@@ -1126,6 +1140,10 @@ def mc_brem_spectrum(
         return _to_cpu(spec / (4.0 * xp.pi) / Ne)
 
     M = seg_E.size
+    # FP32 BremsLib cells near the tip at backward angles fall below the
+    # normal range in cm²; score them in millibarn and fold the unit into the
+    # row weight (#979). Binary64 keeps cm² so CPU output is bit-for-bit.
+    bremslib_unit = _FP32_CELL_UNIT_CM2 if np.dtype(REAL) == np.dtype(np.float32) else 1.0
     if cross_section_model == "bremslib":
         # The direction-resolved evaluation holds several (segment, energy)
         # temporaries at once; bound them to a few million cells per chunk.
@@ -1139,15 +1157,14 @@ def mc_brem_spectrum(
             context = eedl_contexts.get(el_i)
             staged = bremslib_staged.get(el_i)
             bremslib_state = None
+            unit = 1.0
             if staged is not None:
-                bremslib_state = bremslib_segment_state(staged, seg_E[sl], seg_cos_theta[sl])
-                # 4 pi d2sigma/(dk dOmega): the common 1/(4 pi) below then
-                # leaves the direction-resolved density per steradian.
-                dsig = REAL(4.0 * np.pi) * evaluate_bremslib(staged, bremslib_state, E_grid)
-                if plasma_eV:
-                    dsig = dsig * dielectric_scoring_factor(seg_E[sl], E_grid, plasma_eV)
+                unit = bremslib_unit
+                bremslib_state, dsig = _bremslib_cells(
+                    staged, seg_E[sl], seg_cos_theta[sl], E_grid, plasma_eV, unit
+                )
                 if bremslib_covers[el_i]:
-                    _accumulate(n_i * 1e24 * path_cm, dsig * T_abs, sl)
+                    _accumulate(n_i * 1e24 * unit * path_cm, dsig * T_abs, sl)
                     continue
                 directional = dsig
             if context is not None:
@@ -1167,8 +1184,8 @@ def mc_brem_spectrum(
                     E_grid,
                 )
             if bremslib_state is not None:
-                dsig = xp.where(bremslib_state.available[:, None], directional, dsig)
-            _accumulate(n_i * 1e24 * path_cm, dsig * T_abs, sl)
+                dsig = xp.where(bremslib_state.available[:, None], directional, dsig / REAL(unit))
+            _accumulate(n_i * 1e24 * unit * path_cm, dsig * T_abs, sl)
     if per_electron:
         return _to_cpu(electron_sum / (4.0 * np.pi))
     return _to_cpu(spec / (4.0 * xp.pi) / Ne)

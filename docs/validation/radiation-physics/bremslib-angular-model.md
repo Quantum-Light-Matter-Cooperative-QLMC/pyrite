@@ -73,7 +73,7 @@ The implementation's directional path temporarily multiplies the DDCS by $4\pi$ 
 
 ## Source-to-code comparison
 
-`prepare_bremslib_table` applies the exact piecewise-linear solid-angle integral, normalizes each shape, refines incident energy, and rebuilds DDCS from the interpolated SDCS and normalized shape. `bremslib_segment_state` uses $\arccos(\operatorname{clip}(\hat{\mathbf v}\cdot\hat{\mathbf n},-1,1))$ and linear angular interpolation. `evaluate_bremslib` applies the common $x$ and incident-energy interpolation, the $10^{-27}Z^2/k$ conversion, and the physical support $0<k\le T$.
+`prepare_bremslib_table` applies the exact piecewise-linear solid-angle integral, normalizes each shape, refines incident energy, and rebuilds DDCS from the interpolated SDCS and normalized shape. `bremslib_segment_state` uses $\arccos(\operatorname{clip}(\hat{\mathbf v}\cdot\hat{\mathbf n},-1,1))$ and linear angular interpolation. `evaluate_bremslib` applies the common $x$ and incident-energy interpolation, the $10^{-27}Z^2/k$ conversion, and the physical support $0<k\le T$. The FP32 portable reducer in `mc_brem_spectrum` requests the cells in millibarn (`unit_cm2`) and folds $10^{-27}$ into the row weight, because backward cells near a 30 MeV tip (about $10^{-42}$ cm²/eV/sr in carbon) lie below the FP32 normal range in cm² (#979); binary64 keeps cm² unchanged.
 
 The `angle-f64-v1` numerical policy retains binary64 direction components,
 their dot product and inverse cosine before converting the recovered angle
