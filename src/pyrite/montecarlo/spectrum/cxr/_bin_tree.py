@@ -138,13 +138,13 @@ def _next_node(node, size):
     return node + 1 if node > 1 else size
 
 
-#: Measured cost constants for choosing between the tree and the all-pairs
-#: kernel (#286, jobs 3725/3732, RTX 5080, HOPG 1 mm, 300 keV and 29,999 keV
-#: flushes). The tree runs one thread per bin, so its wall time follows the
-#: busiest bin's near-line count (~4e-5 to 1.1e-4 s per line); the all-pairs
-#: kernel's follows the total near pairs (~9.2e-9 s each).
-_TREE_SECONDS_PER_BUSIEST_LINE = 7.0e-5
-_PAIRS_SECONDS_PER_NEAR_PAIR = 9.2e-9
+#: Measured cost constants comparing the tree and all-pairs kernels for the
+#: ``checks/`` reports; ``auto`` no longer consults them (#1003). Series on (#1003, job 4036, RTX 5080, HOPG 300 keV
+#: and h-BN 5 MeV flushes). The tree runs one thread per bin, so its wall time
+#: follows the busiest bin's near-line count (2.4e-5 to 4.2e-5 s per line); the
+#: all-pairs kernel's follows the total near pairs (6.4e-9 to 7.7e-9 s each).
+_TREE_SECONDS_PER_BUSIEST_LINE = 3.5e-5
+_PAIRS_SECONDS_PER_NEAR_PAIR = 7.2e-9
 
 
 def near_line_counts(E_r, aw, edges, exact_widths):
@@ -171,7 +171,7 @@ def near_line_counts(E_r, aw, edges, exact_widths):
 def tree_is_faster(E_r, aw, edges, exact_widths):
     """True when the modelled tree time beats the all-pairs time for this flush.
 
-    Both kernels give the same bin means; only the cost differs. A line cluster
+    Used by ``checks/`` reports, not by ``auto``. Both kernels give the same bin means; only the cost differs. A line cluster
     much narrower than the near windows puts hundreds of thousands of near
     lines on a few bins, which the one-thread-per-bin tree walks serially.
 
@@ -221,6 +221,11 @@ def reduce_host(E_r, aw, w, edges, *, exact_widths=BIN_MEAN_EXACT_WIDTHS):
 
 _TREE_KERNEL = None
 _TREE_SOURCE = r"""
+#ifndef PYRITE_TREE_NEAR_ARGS
+#define PYRITE_TREE_NEAR_ARGS
+#define PYRITE_TREE_SKIP_NEAR(line, bin) 0
+#endif
+
 static __device__ int pyrite_next_node(int node, int size) {
     while (node > 1 && (node & 1)) node >>= 1;
     return node > 1 ? node + 1 : size;
@@ -233,6 +238,7 @@ extern "C" __global__ void pyrite_bin_tree_reduce(
     const int *first, const int *last,
     const double *center, const double *half, const double *radius,
     const double *moments, const double *edges, const double *inv_width,
+    PYRITE_TREE_NEAR_ARGS
     double *out, int n_bins, int n_nodes, int n_leaves, float far_widths
 ) {
     const int bin = blockIdx.x * blockDim.x + threadIdx.x;
@@ -270,6 +276,7 @@ extern "C" __global__ void pyrite_bin_tree_reduce(
             node *= 2;
         } else {
             for (int line = first[node]; line < last[node]; ++line) {
+                if (PYRITE_TREE_SKIP_NEAR(line, bin)) continue;
                 float mean;
                 const double value = pyrite_sincsq_far_mean(
                     a[line], e[line], 0.0f, lo_f, lo_c, hi_f, hi_c,
