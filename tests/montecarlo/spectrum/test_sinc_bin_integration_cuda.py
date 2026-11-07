@@ -77,7 +77,17 @@ def test_matrix_kernel_matches_the_host_evaluator_in_fp64():
     # which reaches ~6e3 for the broadest line on the 0.05 eV bins.
     scale = (np.pi / a_width)[:, None] * inv_width[None, :]
     difference = np.abs(cp.asnumpy(out) - host)
-    assert np.all(difference <= 1e-12 * np.abs(host) + 1e-14 * scale)
+    # The device takes the midpoint series in its window and the host does not, so
+    # those bins also carry the series remainder (Validation: sinc-bin-midpoint-series).
+    # The small slack keeps a bin an ulp from the window edge on the allowed side.
+    per_x = (a_width / np.pi)[:, None]
+    x_center = per_x * (0.5 * (edges[:-1] + edges[1:])[None, :] - E_res[:, None])
+    window = (per_x / inv_width[None, :] <= bq._SERIES_MAX_DX * (1 + 1e-12)) & (
+        np.abs(x_center) >= bq._SERIES_MIN_X * (1 - 1e-12)
+    )
+    envelope = 1.0 / (2.0 * np.pi**2 * np.maximum(np.abs(x_center), bq._SERIES_MIN_X) ** 2)
+    remainder = np.where(window, 2.5e-9 * envelope, 0.0)
+    assert np.all(difference <= 1e-12 * np.abs(host) + 1e-14 * scale + remainder)
 
 
 def test_matrix_kernel_float32_is_the_cast_fp64_mean():
