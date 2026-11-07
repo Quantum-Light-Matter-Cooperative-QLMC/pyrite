@@ -99,20 +99,26 @@ def test_tree_selector_picks_all_pairs_for_a_tight_cluster_and_tree_for_spread_l
     assert tree_is_faster(spread, a_narrow, edges, 64.0)
 
 
-@pytest.mark.parametrize("predicted", [True, False])
-def test_auto_consults_near_count_model_below_old_gate(monkeypatch, predicted):
+@pytest.mark.parametrize(
+    ("rows", "exact_widths", "route"),
+    [
+        (20_000, 64.0, "sparse"),
+        (16_666, 64.0, "pairs"),
+        (20_000, None, "pairs"),
+    ],
+)
+def test_auto_takes_the_sparse_route_from_the_pair_gate(monkeypatch, rows, exact_widths, route):
     import sys
     from types import SimpleNamespace
 
     from pyrite.montecarlo.spectrum.cxr import _bin_quadrature as reducer
-    from pyrite.montecarlo.spectrum.cxr import _bin_tree
+    from pyrite.montecarlo.spectrum.cxr import _bin_sparse
 
     calls = []
     monkeypatch.setitem(
         sys.modules,
         "cupy",
         SimpleNamespace(
-            asnumpy=lambda a: a,
             empty=lambda *a, **k: np.zeros(1),
             float32=np.float32,
             float64=np.float64,
@@ -120,23 +126,21 @@ def test_auto_consults_near_count_model_below_old_gate(monkeypatch, predicted):
         ),
     )
     monkeypatch.setattr(
-        _bin_tree, "tree_is_faster", lambda *args: calls.append("model") or predicted
-    )
-    monkeypatch.setattr(
-        _bin_tree, "run_tree_reduction", lambda *a, out, **k: calls.append("tree") or out
+        _bin_sparse, "run_sparse_reduction", lambda *a, out, **k: calls.append("sparse") or out
     )
     monkeypatch.setattr(
         reducer, "_bin_reduce_kernel", lambda: lambda *a, **k: calls.append("pairs")
     )
     reducer.run_bin_mean_reduction_kernel(
-        SimpleNamespace(size=20_000),
+        SimpleNamespace(size=rows),
         None,
         None,
         None,
         SimpleNamespace(shape=(60_000,)),
         out=np.zeros(1),
+        exact_widths=exact_widths,
     )
-    assert calls == ["model", "tree" if predicted else "pairs"]
+    assert calls == [route]
 
 
 def test_bin_mean_reduction_generation_is_conditional_in_physics_identity():

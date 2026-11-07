@@ -59,4 +59,4 @@ Production comparison reviewed, not rerun (SLURM 4036, CUDA, FP64 flush sums): `
 
 ## Status
 
-On by default since `CXR_BIN_REDUCTION_MODEL = "near-count-auto-v3-series"`. Device kernels only: the host evaluator stays two-tail. `PYRITE_BIN_MEAN_SERIES=0` compiles the series out for comparison.
+On by default since `CXR_BIN_REDUCTION_MODEL = "line-major-auto-v3-series"`. Device kernels only: the host evaluator stays two-tail. `PYRITE_BIN_MEAN_SERIES=0` compiles the series out for comparison.

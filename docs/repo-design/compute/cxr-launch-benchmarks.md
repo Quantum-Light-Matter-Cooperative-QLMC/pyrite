@@ -122,6 +122,42 @@ launch geometry cannot change MeV end-to-end time materially. Any MeV
 reduction work belongs to the bin-mean tree/pair kernels; this measurement
 does not justify a change to them either.
 
+## 2026-11-06 MeV reduction speedup
+
+[Issue #1003](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/1003).
+RTX 5080, SLURM 4021, 4036 and 4059, frozen grid (133,728 bins for h-BN). Median
+of 2 timed replays after one untimed warmup, synchronized wall, FP64 flush sums.
+Harness: `checks/cxr_bin_mean_profile_1003.py`. Clocks were not pinned. These
+are per-flush reduction times from captured lines, not per-primary wall time.
+
+| Flush (lines × bins) | Tree s | Tree + series | Fused | Fused + series |
+| --- | ---: | ---: | ---: | ---: |
+| HOPG 300 keV (47,698 × 17,100) | 0.751 | 0.615 | 0.165 | 0.122 |
+| HOPG 300 keV (220,352 × 34,200) | 3.258 | 2.172 | 1.288 | 0.817 |
+| HOPG 300 keV (220,352 × 126,224) | 5.325 | 2.644 | 3.962 | 1.974 |
+| h-BN 5 MeV (400,000 × 133,728) | 12.580 | 6.129 | 5.070 | 2.639 |
+| h-BN 5 MeV (379,028 × 133,728) | 11.087 | 5.623 | 4.770 | 2.481 |
+
+`auto` before #1003 took 12.63 and 11.14 s on the h-BN flushes, so fused plus
+series is **4.8× and 4.5×**. On the HOPG flushes it took 0.484, 4.63 and 5.36 s,
+so 4.0×, 5.7× and 2.7×. Every arm repeats bitwise. Against the series-free tree
+or all-pairs result, the worst per-bin relative deviation (floor 1e-6 of peak) is
+1.8e-8, which is also the existing gap between those two, and the worst integral
+deviation is 2.0e-12.
+
+Split of the h-BN flushes without the series (4.8–5.1 s): near 4.1–4.3 s, far
+0.58–0.62 s, host setup about 0.1 s. Near pairs are FP64 bound: on a 50,000-line
+slice `ncu` reports compute throughput 88%, FP64 the top pipeline, 27–28 of 32
+lanes active. The tree it replaces was imbalance bound at 50%, 27 lanes, 28.6 of
+50 occupancy. The two changes combine: the series cuts FP64 work per pair, and
+line-major warps keep lanes on one branch without a busiest-bin bound. Rejected:
+one warp per bin (3.7–4.1× slower than `auto`, job 4021) and bin-major sparse
+near (1.7–1.9× slower).
+
+Decision: `auto` takes the fused route from 1e9 pairs. Below the gate it keeps
+all pairs. The 8.2e8-pair flush above suggests a lower gate would win, but one
+flush does not establish where the crossover sits.
+
 ## Limits and reproduction
 
 The h-BN 300 keV, 1 mm, 8,000-electron capture (SLURM 1242) hit its ten-minute
