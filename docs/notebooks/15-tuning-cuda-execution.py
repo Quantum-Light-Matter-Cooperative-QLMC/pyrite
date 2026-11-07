@@ -222,7 +222,7 @@ def _(electrons, np, workload):
         Detector(observation_angle=90 * ureg.degree),
         numerics=Numerics(
             sampling=FixedSampling(
-                cxr_electrons=electrons.value, brem_electrons=max(1_024, electrons.value // 16)
+                cxr_histories=electrons.value, brem_histories=max(1_024, electrons.value // 16)
             ),
             seed=7,
             # A fixed 1 eV window (around the HOPG (002) line) keeps the

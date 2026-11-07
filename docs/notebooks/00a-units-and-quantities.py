@@ -402,7 +402,7 @@ def _(mo):
     Scaling the yield by a detector's energy response/QE requires a separate
     operation.
 
-    **Do not confuse:** a simulation with `FixedSampling(cxr_electrons=8192)`
+    **Do not confuse:** a simulation with `FixedSampling(cxr_histories=8192)`
     samples **8,192 numerical histories**, not 8,192 physical electrons per
     bunch.
     """)

@@ -85,7 +85,7 @@ def _(np, tables_ready):
             detector,
             physics=Physics(brem_source="none"),  # isolate PXR/CBS
             numerics=Numerics(
-                sampling=FixedSampling(cxr_electrons=histories, brem_electrons=histories),
+                sampling=FixedSampling(cxr_histories=histories, brem_histories=histories),
                 cxr_reflections=CxrReflections(n_families=2),
             ),
         )

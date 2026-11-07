@@ -72,7 +72,7 @@ def _(tables_ready):
     )
     detector = Detector(observation_angle=135 * ureg.degree)
     numerics = Numerics(
-        sampling=FixedSampling(cxr_electrons=8_192, brem_electrons=128),
+        sampling=FixedSampling(cxr_histories=8_192, brem_histories=128),
         cxr_reflections=CxrReflections(n_families=1),
     )
     assert tables_ready  # Reference tables must be ready before transport.

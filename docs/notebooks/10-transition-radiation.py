@@ -65,7 +65,7 @@ def _(np, tables_ready):
     photon_grid_eV = np.arange(200.0, 600.5, 1.0)  # 1 eV resolves the thinnest fringes
     numerics = Numerics(
         sampling=FixedSampling(
-            cxr_electrons=64, brem_electrons=512
+            cxr_histories=64, brem_histories=512
         ),  # TR uses the continuum population
         cxr_reflections=CxrReflections(n_families=1),
         energy_model="midpoint",

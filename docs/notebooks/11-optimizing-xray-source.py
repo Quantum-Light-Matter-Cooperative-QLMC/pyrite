@@ -100,7 +100,7 @@ def _(np):
     from pyrite.units import ureg
 
     search_numerics = Numerics(
-        sampling=FixedSampling(cxr_electrons=32, brem_electrons=32),
+        sampling=FixedSampling(cxr_histories=32, brem_histories=32),
         transport_core="per-electron",
         energy_bins=(
             EnergyBins()
@@ -290,7 +290,7 @@ def _(
     validation_numerics = Numerics(
         transport_core="per-electron",
         cxr_reflections=search_numerics.cxr_reflections,
-        sampling=FixedSampling(cxr_electrons=256, brem_electrons=256),
+        sampling=FixedSampling(cxr_histories=256, brem_histories=256),
         energy_bins=(
             EnergyBins()
             .with_cxr_energies(np.linspace(750, 1_000, 251) * ureg.eV)

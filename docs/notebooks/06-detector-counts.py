@@ -122,7 +122,7 @@ def _(observation, scene, simulate, tables_ready):
         scene,
         observation=observation,
         numerics=Numerics(
-            sampling=FixedSampling(cxr_electrons=512, brem_electrons=128),
+            sampling=FixedSampling(cxr_histories=512, brem_histories=128),
             cxr_reflections=CxrReflections(n_families=2),
         ),
     )

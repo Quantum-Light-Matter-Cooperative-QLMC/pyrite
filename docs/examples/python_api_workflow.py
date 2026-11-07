@@ -27,7 +27,7 @@ def compute():
         target,
         Detector(observation_angle_deg=135.0),
         numerics=pr.Numerics(
-            sampling=FixedSampling(cxr_electrons=2**15, brem_electrons=128),
+            sampling=FixedSampling(cxr_histories=2**15, brem_histories=128),
             cxr_reflections=CxrReflections(n_families=2),
         ),
     )

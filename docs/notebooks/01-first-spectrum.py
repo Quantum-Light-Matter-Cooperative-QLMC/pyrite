@@ -154,9 +154,9 @@ def _(mo, tables_ready):
 
     # Numerical settings for the simulation: how many trials to score for PXR/CBS spectra,
     # and how many for the brem spectrum. Note that these spectra reuse the same electron trajectories,
-    # so the total number of transported electrons is simply MAX(cxr_electrons, brem_electrons)
+    # so the total number of transported electrons is simply MAX(cxr_histories, brem_histories)
     numerics = Numerics(
-        sampling=FixedSampling(cxr_electrons=32_768, brem_electrons=128),
+        sampling=FixedSampling(cxr_histories=32_768, brem_histories=128),
         cxr_reflections=CxrReflections(
             n_families=2
         ),  # Here we only consider the first two Basal plane reflections

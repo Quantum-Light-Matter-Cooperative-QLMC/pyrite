@@ -140,7 +140,7 @@ def _(np, tables_ready):
 
     def make_numerics(energies_eV):
         return Numerics(
-            sampling=FixedSampling(cxr_electrons=2**15, brem_electrons=16),
+            sampling=FixedSampling(cxr_histories=2**15, brem_histories=16),
             cxr_reflections=CxrReflections(n_families=1),
             energy_bins=EnergyBins().with_cxr_energies(energies_eV * ureg.eV),
             seed=777,

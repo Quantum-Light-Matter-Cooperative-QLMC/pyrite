@@ -134,7 +134,7 @@ def _(beam_path, mean_energy_keV, tables_ready):
     )
     detector = Detector(observation_angle=135 * ureg.degree)
     numerics = Numerics(
-        sampling=FixedSampling(cxr_electrons=2_048, brem_electrons=2_048),
+        sampling=FixedSampling(cxr_histories=2_048, brem_histories=2_048),
         cxr_reflections=CxrReflections(n_families=2),
         seed=1,
     )

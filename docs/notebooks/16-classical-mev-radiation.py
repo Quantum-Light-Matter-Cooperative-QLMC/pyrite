@@ -81,7 +81,7 @@ def _(np):
         radiative_model="bremslib-soft-hard",
     )
     numerics = Numerics(
-        sampling=FixedSampling(cxr_electrons=256, brem_electrons=256),
+        sampling=FixedSampling(cxr_histories=256, brem_histories=256),
         cxr_reflections=CxrReflections(n_families=1),
         energy_model="midpoint",
         energy_bins=(
