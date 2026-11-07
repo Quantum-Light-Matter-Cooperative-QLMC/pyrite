@@ -8,8 +8,9 @@ offsets. Lanes add to per-bin 64-bit fixed-point accumulators with atomics.
 Integer addition commutes, so the sum is bitwise independent of launch order
 without sorting pairs. The scale is a power of two with ``sum(|w|) * scale <=
 2**61``. Bin means are at most one, so no accumulator overflows, and one pair's
-rounding error is at most ``2**-61 * sum(|w|)``. The far sum is the tree kernel
-with those near pairs left out.
+rounding error is at most ``2**-61 * sum(|w|)``. Pairs below half a unit round to
+zero, so the total runs slightly low (about 2e-12 of the integral on measured
+flushes). The far sum is the tree kernel with those near pairs left out.
 
 Validation: sinc-bin-near-far
 """

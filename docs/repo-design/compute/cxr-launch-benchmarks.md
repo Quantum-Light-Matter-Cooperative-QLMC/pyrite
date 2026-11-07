@@ -140,10 +140,11 @@ are per-flush reduction times from captured lines, not per-primary wall time.
 
 `auto` before #1003 took 12.63 and 11.14 s on the h-BN flushes, so fused plus
 series is **4.8× and 4.5×**. On the HOPG flushes it took 0.484, 4.63 and 5.36 s,
-so 4.0×, 5.7× and 2.7×. Every arm repeats bitwise. Against the series-free tree
-or all-pairs result, the worst per-bin relative deviation (floor 1e-6 of peak) is
-1.8e-8, which is also the existing gap between those two, and the worst integral
-deviation is 2.0e-12.
+so 4.0×, 5.7× and 2.7×. Every arm repeats bitwise. Against the series-free tree,
+the worst per-bin relative deviation is 3.0e-9 with a floor of 1e-6 of peak, and
+the worst integral deviation is 2.0e-12. Below that floor agreement is weaker:
+h-BN far-tail bins near 6e-11 of peak reach 2.3e-6 relative. See the
+[accumulator limits](../../validation/radiation-physics/sinc-bin-near-far.md).
 
 Split of the h-BN flushes without the series (4.8–5.1 s): near 4.1–4.3 s, far
 0.58–0.62 s, host setup about 0.1 s. Near pairs are FP64 bound: on a 50,000-line
