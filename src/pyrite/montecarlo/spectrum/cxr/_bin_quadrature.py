@@ -730,7 +730,7 @@ def sincsq_bin_lineshape(
     return xp.asarray(host, dtype=REAL)
 
 
-CXR_BIN_REDUCTION_MODEL = "near-count-auto-v3-series"
+CXR_BIN_REDUCTION_MODEL = "line-major-auto-v3-series"
 
 
 def _bin_reduction_markers(resolved):
@@ -769,22 +769,20 @@ def run_bin_mean_reduction_kernel(
     n_cxr_rows = int(E_r.size)
     if n_bins == 0 or n_cxr_rows == 0:
         return out
-    if method not in ("auto", "pairs", "tree"):
-        raise ValueError("method must be 'auto', 'pairs', or 'tree'")
-    # The host tree setup is O(lines) (~0.09 s for 400k synthetic lines on
-    # the development CPU). Jobs 3766/3767 show missed tree wins below 5e9.
-    # Consult the near-count model from 1e9 pairs; retain cheap small flushes. Above
-    # it, a host cost model picks the faster kernel from the per-bin near-line
-    # counts (#286): a tight line cluster makes the one-thread-per-bin tree
-    # 3-60x slower than all-pairs. An infinite exact window has no far nodes.
-    use_tree = method == "tree"
+    if method not in ("auto", "pairs", "tree", "sparse"):
+        raise ValueError("method must be 'auto', 'pairs', 'tree', or 'sparse'")
+    # Keep cheap small flushes on all pairs. From 1e9 pairs the fused line-major
+    # route beat the tree and all pairs on every measured flush (#1003, job 4059).
+    # An infinite exact window has no far nodes, so it stays on all pairs.
     if method == "auto" and exact_widths is not None and n_bins * n_cxr_rows >= 1_000_000_000:
-        from ._bin_tree import tree_is_faster
+        method = "sparse"
+    if method == "sparse" and exact_widths is not None:
+        from ._bin_sparse import run_sparse_reduction
 
-        use_tree = tree_is_faster(
-            cupy.asnumpy(E_r), cupy.asnumpy(aw), cupy.asnumpy(edges), exact_widths
+        return run_sparse_reduction(
+            E_r, aw, w, edges, inv_width, out=out, exact_widths=exact_widths
         )
-    if use_tree and exact_widths is not None:
+    if method == "tree" and exact_widths is not None:
         from ._bin_tree import run_tree_reduction
 
         return run_tree_reduction(E_r, aw, w, edges, inv_width, out=out, exact_widths=exact_widths)

@@ -138,8 +138,8 @@ def _next_node(node, size):
     return node + 1 if node > 1 else size
 
 
-#: Measured cost constants for choosing between the tree and the all-pairs
-#: kernel with the midpoint series on (#1003, job 4036, RTX 5080, HOPG 300 keV
+#: Measured cost constants comparing the tree and all-pairs kernels for the
+#: ``checks/`` reports; ``auto`` no longer consults them (#1003). Series on (#1003, job 4036, RTX 5080, HOPG 300 keV
 #: and h-BN 5 MeV flushes). The tree runs one thread per bin, so its wall time
 #: follows the busiest bin's near-line count (2.4e-5 to 4.2e-5 s per line); the
 #: all-pairs kernel's follows the total near pairs (6.4e-9 to 7.7e-9 s each).
@@ -171,7 +171,7 @@ def near_line_counts(E_r, aw, edges, exact_widths):
 def tree_is_faster(E_r, aw, edges, exact_widths):
     """True when the modelled tree time beats the all-pairs time for this flush.
 
-    Both kernels give the same bin means; only the cost differs. A line cluster
+    Used by ``checks/`` reports, not by ``auto``. Both kernels give the same bin means; only the cost differs. A line cluster
     much narrower than the near windows puts hundreds of thousands of near
     lines on a few bins, which the one-thread-per-bin tree walks serially.
 

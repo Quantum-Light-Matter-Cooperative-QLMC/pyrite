@@ -290,7 +290,7 @@ def replay(args):
     """Time every arm per flush; compare FP64 per-bin sums with the first arm.
 
     Arms rotate order each repeat after one untimed warmup (JIT). The first
-    arm is the reference and must be series-free production ``auto``.
+    arm is the reference: the series-free ``tree``, the route before #1003.
     """
     import cupy as cp
 

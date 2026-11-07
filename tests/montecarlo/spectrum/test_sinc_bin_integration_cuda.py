@@ -247,6 +247,9 @@ def test_fused_sparse_matches_the_tree_and_repeats_bitwise():
         fused.append(cp.asnumpy(out))
     np.testing.assert_array_equal(fused[0], fused[1])
     np.testing.assert_allclose(fused[0], cp.asnumpy(tree), rtol=2e-10, atol=0)
+    routed = cp.zeros_like(tree)
+    bq.run_bin_mean_reduction_kernel(*args, out=routed, method="sparse")
+    np.testing.assert_array_equal(cp.asnumpy(routed), fused[0])
 
 
 def test_device_midpoint_series_matches_the_host_mirror():
