@@ -253,3 +253,13 @@ the `channeling` output of `outputs.json` the `path_ang` sum (5.96e-12
 relative), `spec_characteristic` (2.2e-12) and `brem` (3.4e-12). Row counts,
 fates, the leading flight samples, the line spectrum and the resolved case
 payload are unchanged, and so are the tolerances.
+
+## FP32 BremsLib cell unit (#1019)
+
+GPU FP32 BremsLib cells in the prepared-band scorer, hard-photon angle
+sampling and the hard-radiative event scorer are now formed in millibarn so
+backward cells near a tens-of-MeV tip stay above the FP32 normal range. This
+changed `BREMSSTRAHLUNG_BREMSLIB_MODEL` to `…/angle-f64-v1/fp32-cell-mb-v1`.
+Re-pinned: the `coupled` and `cascade` identity hashes in `resolved.json`.
+These fixtures are CPU/NumPy fp64, where the unit is exactly 1 cm², so every
+recorded output keeps its expectation.

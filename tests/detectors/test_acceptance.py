@@ -203,9 +203,10 @@ def test_equal_acceptance_preserves_lowered_case_and_both_identities():
     # the #439 line-kinematics v5 marker, SBETHE corrected-stopping v2,
     # and #788's versioned default radiative-moment approximation.
     # #278: refined geometric grid and BremsLib angle-f64-v1 identity.
+    # #1019: BremsLib fp32-cell-mb-v1 identity.
     assert (
         case_content_key(cases[1])
-        == "8480e8c50a40af827befcd7259de682dbb3f54c1be9bfdd1788dc901ea96ce9a"
+        == "dd79f3d47b37379d74663031377ce309779851c640c773ef39ed3f5155013685"
     )
     sweeps = [
         LegacySweep(material="hopg", beam=beam.to_spec(), target=target, detector=d)
@@ -215,7 +216,7 @@ def test_equal_acceptance_preserves_lowered_case_and_both_identities():
     assert identities[0] == identities[1]
     assert (
         identities[1]["parameter_sha256"]
-        == "fbed7dcc9e2d42839cb4ce76fc9f17f054a11d91abd73ee41ccf39cf63d12f01"
+        == "68cfb31cf665078ae631e835574cdbf1c2cdc36160937de1aaecdd56a51103b0"
     )
     # Pin to the pre-object payload vocabulary; no acceptance metadata enters identity.
     assert "detector" not in identities[0]["resolved_parameters"]["sweep"]
