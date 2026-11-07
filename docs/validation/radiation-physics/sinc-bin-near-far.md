@@ -93,3 +93,18 @@ The verifier re-checked `bb5d80a8` from fresh context and returned
 positivity, single-line and all-near limits, and the guarded boundary. This
 is a source-to-code mathematics verdict. CUDA execution, production-case
 accuracy, and the speed criterion are separate pending measurements.
+
+## Fixed-point near accumulator
+
+The fused route (`_bin_sparse.py`, #1003) keeps the near/far partition above and changes how near pairs are summed. Each pair adds `llrint(scale * w * mean)` to a per-bin 64-bit integer, with `scale` a power of two and $2^{60} \le \text{scale}\sum|w_l| < 2^{61}$. Integer addition commutes, so the sum is bitwise independent of launch order. One pair's error is at most half a unit, so at most $2^{-61}\sum|w_l|$.
+
+The rounding is one-sided in practice. Weights span about 30 decades, and $\operatorname{sinc}^2$ means fall and have zeros across the near window, so 29-38% of pairs round to exactly zero and lose their whole value. That gives a systematic negative integral offset of $1.5\times10^{-13}$ to $2.0\times10^{-12}$ on the measured flushes, about 1% of the a-priori bound. A host replay with `np.rint` reproduces the measured offsets to about 0.2% (for example $-1.6194\times10^{-12}$ against $-1.6228\times10^{-12}$), and the agreement also indicates the device `llrint` rounds to nearest.
+
+Fresh-context check (2026-11-06, `0db76d387`): `rederived`, no code defect. The verifier read the implementation before deriving, so this is not code-blind, and device behaviour rests on job 4059 and the kernel source. Near-classified pairs that the float32 test sends to the envelope get the same value as the tree.
+
+Limits:
+
+- Against the tree, per-bin relative deviation is at most $3.0\times10^{-9}$ with a floor of $10^{-6}$ of peak. Without the floor, a sample of about 700 bins per flush reaches $6.5\times10^{-8}$ on HOPG (at $2.6\times10^{-8}$ of peak) and $2.3\times10^{-6}$ on h-BN (at $6$ to $7\times10^{-11}$ of peak, the far tail near 280 keV). So agreement to float32 rounding holds above the floor, not at every bin.
+- The launch grid reaches its $2^{31}-1$ block limit near $5.5\times10^{11}$ pairs, unguarded, and out of reach at the current batch target and grid.
+- A zero-width bin would make `llrint` undefined where the tree gives NaN. Fixture edges are strictly increasing; not every grid path was audited.
+
