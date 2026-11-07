@@ -15,6 +15,7 @@ from ..._physics_fallback import PhysicsFallbackWarning
 from ...materials._transport_data import TRANSPORT_ELEMENTS
 from ..spectrum.brem_bremslib import (
     BremsLibBremsstrahlungTable,
+    _cell_unit_cm2,
     _StagedBremsLib,
     bremslib_segment_state,
     evaluate_bremslib,
@@ -259,7 +260,10 @@ def hard_radiative_photon_at_energy(
     theta = np.asarray(table.theta_rad, dtype=float)
     staged = stage_bremslib_table(table) if _staged_table is None else _staged_table
     state = bremslib_segment_state(staged, np.full(theta.size, incident / 1e3), np.cos(theta))
-    ddcs = BACKEND.to_cpu(evaluate_bremslib(staged, state, [energy]))[:, 0]
+    # The CDF is scale-free: FP32 cells in millibarn keep backward tip angles
+    # out of the subnormal range (#1019); binary64 keeps cm², bit-for-bit.
+    unit = _cell_unit_cm2(staged)
+    ddcs = BACKEND.to_cpu(evaluate_bremslib(staged, state, [energy], unit_cm2=unit))[:, 0]
     # Exact integral of each linear-in-theta cell; the same rule normalizes DDCS.
     widths = np.diff(theta)
     a, b = theta[:-1], theta[1:]
@@ -352,7 +356,11 @@ def _complete_hard_radiative_chunk(staged, incident, energy, incoming, uniforms)
         np.tile(np.cos(theta), n),
     )
     ddcs = np.asarray(
-        BACKEND.to_cpu(evaluate_bremslib_rows(staged, state, np.repeat(energy, theta.size)))
+        BACKEND.to_cpu(
+            evaluate_bremslib_rows(
+                staged, state, np.repeat(energy, theta.size), unit_cm2=_cell_unit_cm2(staged)
+            )
+        )
     ).reshape(n, theta.size)
     widths = np.diff(theta)
     a, b = theta[:-1], theta[1:]
