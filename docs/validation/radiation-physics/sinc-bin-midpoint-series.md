@@ -1,6 +1,6 @@
 # sinc-bin-midpoint-series
 
-Ledger row: [`sinc-bin-midpoint-series`](../ledger-core-coherent-physics.md#sinc-bin-midpoint-series). Status: rederived. Validation: `sinc-bin-midpoint-series`.
+Ledger row: [`sinc-bin-midpoint-series`](../ledger-core-coherent-physics.md#sinc-bin-midpoint-series). Status: anchored. Validation: `sinc-bin-midpoint-series`.
 
 Implementation-context derivation of a cheaper evaluator for the exact [`sinc-bin-integration`](sinc-bin-integration.md) bin mean, for bins much narrower than a lobe of the line (#1003). It changes how the same mean is computed, not the quadrature.
 
@@ -56,6 +56,8 @@ Fresh-context verification (2026-11-06, commit `1631c4cb7`) returned `rederived`
 The verifier found two errors on this page, corrected above: the proof used $|A^{(k)}| \le 2(2\pi)^k$ for $k \ge 1$, which is loose by 2 and did not reach the claimed bound relative to $e(x_c)$; and it claimed the series beats two-tail on every window bin set.
 
 Production comparison reviewed, not rerun (SLURM 4036, CUDA, FP64 flush sums): `auto` with the series against `auto` without it, on HOPG 300 keV and h-BN 5 MeV, worst per-bin relative deviation $2.1\times10^{-10}$ (floor $10^{-6}$ of peak) and integral $4.2\times10^{-14}$, against a float32 half-ulp of $5.96\times10^{-8}$. Limits: deviation is compared on flush sums, not end-to-end spectra; the matrix route (`sincsq_bin_lineshape`) is not in the replay, though it calls the same function.
+
+End-to-end production comparison (SLURM 4072, RTX 5080, CUDA, fp64 transport, float32 scoring, N = 128, frozen grids): the full spectrum at `main` `9b861a89e`, without the series or the fused route, against `14c430d5b`, for h-BN 5 MeV 1 mm (133,728 bins) and silicon 5 MeV 1 mm (45,517 bins). In every bin above $10^{-6}$ of peak the two agree within 2 float32 ulps, at most $1.85\times10^{-7}$ relative. h-BN has 76 differing bins of 32,432 and silicon 145 of 40,159. The integral differs by $-1.2\times10^{-12}$. Bremsstrahlung and characteristic spectra are bitwise equal. The anchor is the host regression test against adaptive quadrature, which runs in CI.
 
 ## Status
 

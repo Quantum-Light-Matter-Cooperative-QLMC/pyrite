@@ -311,6 +311,7 @@ def replay(args):
         "node_coordinates": "grid" if has_grid else "bin centres",
         "flushes": [],
     }
+    saved = {}
     for index, sl in enumerate(_flushes(int(e.size), _JIT_CXR_BATCH_TARGET)):
         if args.max_flushes and index >= args.max_flushes:
             break
@@ -334,12 +335,15 @@ def replay(args):
                     entry["repeat_bitwise_equal"] &= bool(np.array_equal(outs[name], host))
                 outs[name] = host
                 print(index, repeat, name, f"{elapsed:.3f}s", flush=True)
+        saved.update({f"{index}/{name}": out for name, out in outs.items()})
         for name in arms[1:]:
             row["arms"][name].update(_accuracy(outs[name], outs[arms[0]], widths))
         for name in arms:
             row["arms"][name]["median_s"] = float(np.median(row["arms"][name]["s"]))
         report["flushes"].append(row)
         args.out.write_text(json.dumps(report, indent=2))
+    if args.save:
+        np.savez(args.save, **saved)
     report["complete"] = True
     args.out.write_text(json.dumps(report, indent=2))
     print(json.dumps(report["flushes"], indent=1))
@@ -472,6 +476,7 @@ rep.add_argument("--repeats", type=int, default=2)
 rep.add_argument("--tile-pairs", type=int, default=50_000_000)
 rep.add_argument("--slice-lines", type=int, default=0, help="first N lines per flush")
 rep.add_argument("--max-flushes", type=int, default=0)
+rep.add_argument("--save", type=Path, help="per-flush FP64 sums of every arm (.npz)")
 gr = sub.add_parser("grid")
 gr.add_argument("--out", type=Path, required=True)
 _case_args(gr)

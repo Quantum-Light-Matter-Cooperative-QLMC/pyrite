@@ -125,29 +125,37 @@ does not justify a change to them either.
 ## 2026-11-06 MeV reduction speedup
 
 [Issue #1003](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/1003).
-RTX 5080, SLURM 4021, 4036 and 4059, frozen grid (133,728 bins for h-BN). Median
+RTX 5080, SLURM 4021, 4036, 4059 and 4067, frozen grid (133,728 bins for h-BN). Median
 of 2 timed replays after one untimed warmup, synchronized wall, FP64 flush sums.
 Harness: `checks/cxr_bin_mean_profile_1003.py`. Clocks were not pinned. These
 are per-flush reduction times from captured lines, not per-primary wall time.
 
-| Flush (lines × bins) | Tree s | Tree + series | Fused | Fused + series |
-| --- | ---: | ---: | ---: | ---: |
-| HOPG 300 keV (47,698 × 17,100) | 0.751 | 0.615 | 0.165 | 0.122 |
-| HOPG 300 keV (220,352 × 34,200) | 3.258 | 2.172 | 1.288 | 0.817 |
-| HOPG 300 keV (220,352 × 126,224) | 5.325 | 2.644 | 3.962 | 1.974 |
-| h-BN 5 MeV (400,000 × 133,728) | 12.580 | 6.129 | 5.070 | 2.639 |
-| h-BN 5 MeV (379,028 × 133,728) | 11.087 | 5.623 | 4.770 | 2.481 |
+| Flush (lines × bins) | Tree s | Tree + series | Fused | Fused + series | + edge reuse |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| HOPG 300 keV (47,698 × 17,100) | 0.751 | 0.615 | 0.165 | 0.122 | 0.092 |
+| HOPG 300 keV (220,352 × 34,200) | 3.258 | 2.172 | 1.288 | 0.817 | 0.624 |
+| HOPG 300 keV (220,352 × 126,224) | 5.325 | 2.644 | 3.962 | 1.974 | 1.550 |
+| h-BN 5 MeV (400,000 × 133,728) | 12.580 | 6.129 | 5.070 | 2.639 | 2.033 |
+| h-BN 5 MeV (379,028 × 133,728) | 11.087 | 5.623 | 4.770 | 2.481 | 1.915 |
 
-`auto` before #1003 took 12.63 and 11.14 s on the h-BN flushes, so fused plus
-series is **4.8× and 4.5×**. On the HOPG flushes it took 0.484, 4.63 and 5.36 s,
-so 4.0×, 5.7× and 2.7×. Every arm repeats bitwise. Against the series-free tree,
+Edge reuse (job 4067, A/B against the previous kernel in the same job): each
+lane evaluates one bin edge's `Si` tail and passes it to the lane below, so an
+exact pair costs one tail, not two. Its sums are bitwise equal to the kernel
+without it on every flush. With the series on, about 80% of h-BN near pairs take
+the series and the remaining 20% are exact.
+
+`auto` before #1003 took 12.63 and 11.14 s on the h-BN flushes, so the fused
+route with series and edge reuse is **6.2× and 5.8×**. On the HOPG flushes it
+took 0.484, 4.63 and 5.36 s, so 5.3×, 7.4× and 3.5×. Every arm repeats bitwise. Against the series-free tree,
 the worst per-bin relative deviation is 3.0e-9 with a floor of 1e-6 of peak, and
 the worst integral deviation is 2.0e-12. Below that floor agreement is weaker:
 h-BN far-tail bins near 6e-11 of peak reach 2.3e-6 relative. See the
 [accumulator limits](../../validation/radiation-physics/sinc-bin-near-far.md).
 
 Split of the h-BN flushes without the series (4.8–5.1 s): near 4.1–4.3 s, far
-0.58–0.62 s, host setup about 0.1 s. Near pairs are FP64 bound: on a 50,000-line
+0.58–0.62 s, host setup about 0.1 s. With the series, near takes 1.80 s on the
+second flush; edge reuse brings it to 1.23 s, so the unchanged far tree (0.58 s)
+is now 30% of the flush. Near pairs are FP64 bound: on a 50,000-line
 slice `ncu` reports compute throughput 88%, FP64 the top pipeline, 27–28 of 32
 lanes active. The tree it replaces was imbalance bound at 50%, 27 lanes, 28.6 of
 50 occupancy. The two changes combine: the series cuts FP64 work per pair, and
@@ -159,13 +167,49 @@ Decision: `auto` takes the fused route from 1e9 pairs. Below the gate it keeps
 all pairs. The 8.2e8-pair flush above suggests a lower gate would win, but one
 flush does not establish where the crossover sits.
 
+### ROCm
+
+SLURM 4075 on qlmc-ace (Radeon 8060S, gfx1151, ROCm 7.1, CuPy 14.2 HIP, environment
+from `checks/rocm/env.sh`) at `a5ac6c2fd`. The bin-mean kernels compile through
+hiprtc with no source or flag changes, and the CUDA-gated bin-mean tests pass
+(39). These include fused against the host reference and the series dispatch.
+Replay of the h-BN flushes, one timed run after a warmup:
+
+| Flush | Tree s | Fused | Fused + series |
+| --- | ---: | ---: | ---: |
+| h-BN 5 MeV (400,000 × 133,728) | 15.87 | 6.43 | 4.24 |
+| h-BN 5 MeV (379,028 × 133,728) | 15.23 | 6.04 | 3.97 |
+
+Each arm repeats bitwise. Against the RTX 5080 sums of job 4067, per-bin
+relative deviation is at most 8.2e-12 for fused plus series and 4.9e-14 for
+the tree (floor 1e-6 of peak). Those are FP64 math-library differences, so the
+two GPUs do not agree bitwise.
+
+### Warm wall per primary
+
+SLURM 4072, RTX 5080, CUDA transport in fp64, float32 scoring, 128 primaries,
+seed 1, 1 mm at 10°/100°. The h-BN run uses the frozen seed-0 grid; the silicon
+grid was frozen in the same job. One untimed warmup run, then the median of 2
+runs, with each side's own checkout: `main` `9b861a89e` before #1003 against
+`14c430d5b`. Harness: `checks/cxr_bin_mean_wall_1003.sbatch`
+(`cxr_bin_mean_profile_1003.py grid|wall|compare`).
+
+| Case (bins) | Before s/primary | After s/primary | Speedup |
+| --- | ---: | ---: | ---: |
+| h-BN 5 MeV (133,728) | 0.196 | 0.036 | 5.4× |
+| silicon 5 MeV (45,517) | 0.478 | 0.092 | 5.2× |
+
+Spectra: bremsstrahlung and characteristic are bitwise equal. In every line
+bin above 1e-6 of peak the two agree within 2 float32 ulps (h-BN: 76 of 32,432
+bins differ; silicon: 145 of 40,159), and the integral within 1.2e-12.
+
 ## Limits and reproduction
 
 The h-BN 300 keV, 1 mm, 8,000-electron capture (SLURM 1242) hit its ten-minute
 limit before saving a batch. Its stage was not independently profiled; this
 is not a measured reduction time. The 2026-10-29 section supplies a
-300 keV production batch; no 5 MeV batch or catalog golden comparison has
-completed. Large derived bin arms were stopped and excluded from
+300 keV production batch; the 5 MeV batches are in the #1003 section. No
+catalog golden comparison has completed. Large derived bin arms were stopped and excluded from
 final evidence; use bounded forced-pair tests and point-only size stress.
 
 Nsight Compute (SLURM 1249) reported `ERR_NVGPUCTRPERM`. Occupancy, registers,

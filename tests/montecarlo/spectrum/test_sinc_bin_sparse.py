@@ -9,7 +9,7 @@ import pytest
 from pyrite.montecarlo.spectrum.cxr import _bin_quadrature as quad
 from pyrite.montecarlo.spectrum.cxr._bin_sparse import (
     _FIXED_POINT_BITS,
-    _WARP_LANES,
+    _JOB_BINS,
     fixed_point_scale,
     near_intervals,
     warp_job_offsets,
@@ -25,15 +25,16 @@ def _kernel_pairs(first, stop, offsets, job):
             line = middle
         else:
             past = middle
-    start = first[line] + (job - offsets[line]) * _WARP_LANES
-    return [(line, b) for b in range(start, start + _WARP_LANES) if b < stop[line]]
+    start = first[line] + (job - offsets[line]) * _JOB_BINS
+    return [(line, b) for b in range(start, start + _JOB_BINS) if b < stop[line]]
 
 
 @pytest.mark.parametrize(
     ("first", "stop"),
     [
         ([0, 4, 3, 2, 9], [3, 4, 5, 4, 9]),
-        ([5, 5, 0, 0], [5, 5, 32, 33]),
+        ([5, 5, 0, 0], [5, 5, 31, 32]),
+        ([0], [62]),
         ([0, 7, 7], [65, 7, 7]),
         ([3], [3]),
     ],

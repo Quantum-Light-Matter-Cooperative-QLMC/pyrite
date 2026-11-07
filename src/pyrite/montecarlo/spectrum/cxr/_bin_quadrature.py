@@ -228,20 +228,30 @@ static __device__ double pyrite_sincsq_midpoint_mean(double xc, double dx) {
     return series * (1.0 / (2.0 * PYRITE_PI * PYRITE_PI));
 }
 
+/* True, with the midpoint-series mean, when [e_lo, e_hi] is inside the series window. */
+static __device__ bool pyrite_sincsq_series_mean(
+    double a, double e_r, double e_lo, double e_hi, double *mean
+) {
+#if PYRITE_BIN_MEAN_SERIES
+    const double scale = a * (1.0 / PYRITE_PI);
+    const double dx = scale * (e_hi - e_lo);
+    const double xc = scale * ((0.5 * (e_lo + e_hi)) - e_r);
+    if (dx <= PYRITE_SERIES_MAX_DX && fabs(xc) >= PYRITE_SERIES_MIN_X) {
+        *mean = pyrite_sincsq_midpoint_mean(xc, dx);
+        return true;
+    }
+#endif
+    return false;
+}
+
 /* Mean of sinc^2(a (E - e_r) / pi) over [e_lo, e_hi]; inv_width = 1/(e_hi - e_lo). */
 static __device__ double pyrite_sincsq_bin_mean(
     double a, double e_r, double e_lo, double e_hi, double inv_width
 ) {
-#if PYRITE_BIN_MEAN_SERIES
-    {
-        const double scale = a * (1.0 / PYRITE_PI);
-        const double dx = scale * (e_hi - e_lo);
-        const double xc = scale * ((0.5 * (e_lo + e_hi)) - e_r);
-        if (dx <= PYRITE_SERIES_MAX_DX && fabs(xc) >= PYRITE_SERIES_MIN_X) {
-            return pyrite_sincsq_midpoint_mean(xc, dx);
-        }
+    double series;
+    if (pyrite_sincsq_series_mean(a, e_r, e_lo, e_hi, &series)) {
+        return series;
     }
-#endif
     const double x_lo = a * (e_lo - e_r) / PYRITE_PI;
     const double x_hi = a * (e_hi - e_r) / PYRITE_PI;
     double mass = pyrite_sincsq_tail(x_hi) - pyrite_sincsq_tail(x_lo);

@@ -2,7 +2,8 @@
 
 One warp evaluates one line across consecutive bins, so its lanes stay on the
 same ``Si`` branch, and no thread walks a whole bin, so a line cluster cannot
-bound the launch. Near pairs have no key array or tiles: a line's bins are cut
+bound the launch. Each lane evaluates one edge's ``Si`` tail and hands it to the
+lane below, so an exact pair costs one tail, not two. Near pairs have no key array or tiles: a line's bins are cut
 into warp-sized jobs, and each warp finds its line by bisecting per-line job
 offsets. Lanes add to per-bin 64-bit fixed-point accumulators with atomics.
 Integer addition commutes, so the sum is bitwise independent of launch order
@@ -25,6 +26,8 @@ from ._bin_quadrature import BIN_MEAN_EXACT_WIDTHS, SINCSQ_BIN_PREAMBLE
 from ._bin_tree import _TREE_SOURCE, build_cxr_tree
 
 _WARP_LANES = 32
+#: Bins per warp job: 32 lanes read 32 edges, which bound 31 bins.
+_JOB_BINS = _WARP_LANES - 1
 _NEAR_THREADS = 256
 _FAR_THREADS = 128
 _FIXED_POINT_BITS = 61
@@ -32,6 +35,13 @@ _FIXED_POINT_BITS = 61
 _NEAR_KERNEL = None
 _FAR_KERNEL = None
 _NEAR_SOURCE = r"""
+#if defined(__HIP_PLATFORM_AMD__)
+#define PYRITE_SHFL_UP(v) __shfl_up((v), 1, 32)
+#define PYRITE_SHFL_DOWN(v) __shfl_down((v), 1, 32)
+#else
+#define PYRITE_SHFL_UP(v) __shfl_up_sync(0xffffffffu, (v), 1, 32)
+#define PYRITE_SHFL_DOWN(v) __shfl_down_sync(0xffffffffu, (v), 1, 32)
+#endif
 extern "C" __global__ void pyrite_sparse_near_reduce(
     const float *e, const float *a, const float *w,
     const int *near_first, const int *near_stop, const long long *job_offsets,
@@ -47,17 +57,47 @@ extern "C" __global__ void pyrite_sparse_near_reduce(
         const int middle = line + (past - line) / 2;
         if (job_offsets[middle] <= job) line = middle; else past = middle;
     }
-    const int bin = near_first[line] + (int)(job - job_offsets[line]) * 32 + (threadIdx.x & 31);
-    if (bin >= near_stop[line]) return;
-    const double lo = edges[bin], hi = edges[bin + 1];
-    const float lo_f = (float)lo, hi_f = (float)hi;
-    float mean;
-    const double value = pyrite_sincsq_far_mean(
-        a[line], e[line], 0.0f, lo_f, (float)(lo - (double)lo_f), hi_f,
-        (float)(hi - (double)hi_f), far_widths, &mean
-    ) ? (double)mean : pyrite_sincsq_bin_mean(
-        (double)a[line], (double)e[line], lo, hi, inv_width[bin]);
-    atomicAdd(&fixed[bin], (unsigned long long)llrint(scale * ((double)w[line] * value)));
+    /* Lane k reads edge `bin` and owns the bin above it for k < PYRITE_JOB_BINS.
+       A bin's upper edge is the next bin's lower edge, so each exact pair's
+       upper Si tail is the next lane's lower one, passed down the warp: one
+       tail per edge instead of two per pair, the same doubles either way. */
+    const int lane = threadIdx.x & 31;
+    const int bin = near_first[line] + (int)(job - job_offsets[line]) * PYRITE_JOB_BINS + lane;
+    const int stop = near_stop[line];
+    const bool owns = lane < PYRITE_JOB_BINS && bin < stop;
+    const double a_line = (double)a[line], e_line = (double)e[line];
+    double value = 0.0;
+    int exact = 0;
+    if (owns) {
+        const double lo = edges[bin], hi = edges[bin + 1];
+        const float lo_f = (float)lo, hi_f = (float)hi;
+        float mean;
+        if (pyrite_sincsq_far_mean(
+                a[line], e[line], 0.0f, lo_f, (float)(lo - (double)lo_f), hi_f,
+                (float)(hi - (double)hi_f), far_widths, &mean)) {
+            value = (double)mean;
+        } else {
+            exact = !pyrite_sincsq_series_mean(a_line, e_line, lo, hi, &value);
+        }
+    }
+    const int below_exact = PYRITE_SHFL_UP(exact);
+    double x = 0.0, tail = 0.0;
+    if (bin <= stop && (exact || (lane > 0 && below_exact))) {
+        x = a_line * (edges[bin] - e_line) / PYRITE_PI;
+        tail = pyrite_sincsq_tail(x);
+    }
+    const double x_hi = PYRITE_SHFL_DOWN(x);
+    const double tail_hi = PYRITE_SHFL_DOWN(tail);
+    if (exact) {
+        double mass = tail_hi - tail;
+        if (x < 0.0 && x_hi >= 0.0) {
+            mass += 1.0;
+        }
+        value = mass * (PYRITE_PI / a_line) * inv_width[bin];
+    }
+    if (owns) {
+        atomicAdd(&fixed[bin], (unsigned long long)llrint(scale * ((double)w[line] * value)));
+    }
 }
 """
 _FAR_DEFINES = r"""
@@ -82,7 +122,7 @@ def near_intervals(e, aw, edges, exact_widths):
 
 def warp_job_offsets(first, stop):
     """Per-line offsets of warp-sized near jobs, and the total job count."""
-    jobs = (np.asarray(stop, dtype=np.int64) - first + _WARP_LANES - 1) // _WARP_LANES
+    jobs = (np.asarray(stop, dtype=np.int64) - first + _JOB_BINS - 1) // _JOB_BINS
     ends = np.cumsum(jobs)
     return np.concatenate(([0], ends[:-1])), int(ends[-1]) if ends.size else 0
 
@@ -112,7 +152,8 @@ def run_sparse_near(tree, first, stop, offsets, n_jobs, scale, edges, inv_width,
     global _NEAR_KERNEL
     if _NEAR_KERNEL is None:
         _NEAR_KERNEL = cupy.RawKernel(
-            SINCSQ_BIN_PREAMBLE + _NEAR_SOURCE, "pyrite_sparse_near_reduce"
+            SINCSQ_BIN_PREAMBLE + f"#define PYRITE_JOB_BINS {_JOB_BINS}\n" + _NEAR_SOURCE,
+            "pyrite_sparse_near_reduce",
         )
     fixed = cupy.zeros(int(inv_width.size), dtype=cupy.uint64)
     if n_jobs:
