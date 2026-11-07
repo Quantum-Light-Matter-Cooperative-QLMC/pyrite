@@ -102,6 +102,10 @@ _CASE_KEY_ORDER = (
     "inelastic_cutoff_eV",
     "secondary_threshold_eV",
     "elastic_model",
+    "transport_mode",
+    "mixed_c1",
+    "mixed_c2",
+    "mixed_max_step_um",
     "bremsstrahlung_model",
     "radiative_model",
     "radiative_moment_model",
@@ -215,6 +219,9 @@ class Case(Mapping[str, Any]):
         ``"elsepa"`` tabulated elastic scattering, which the default
         :class:`~pyrite.Numerics` lowers to explicitly; absent is the
         historical ``"mott"`` model, so pre-ELSEPA case keys stay valid.
+    transport_mode, mixed_c1, mixed_c2, mixed_max_step_um
+        Opt-in ``"mixed"`` elastic transport with a random hinge and its
+        parameters (#894); absent is detailed single scattering.
     bremsstrahlung_model
         Opt-in ``"bremslib"`` continuum source with its angular model; absent
         is the fetched EEDL continuum, so existing case keys stay valid.
@@ -328,6 +335,10 @@ class Case(Mapping[str, Any]):
     inelastic_cutoff_eV: float | _Absent = _ABSENT
     secondary_threshold_eV: float | _Absent = _ABSENT
     elastic_model: Literal["elsepa"] | _Absent = _ABSENT
+    transport_mode: Literal["mixed"] | _Absent = _ABSENT
+    mixed_c1: float | _Absent = _ABSENT
+    mixed_c2: float | _Absent = _ABSENT
+    mixed_max_step_um: float | _Absent = _ABSENT
     bremsstrahlung_model: Literal["bremslib"] | _Absent = _ABSENT
     radiative_model: Literal["bremslib-soft-hard"] | _Absent = _ABSENT
     radiative_cutoff_eV: float | _Absent = _ABSENT
@@ -436,6 +447,7 @@ class Case(Mapping[str, Any]):
             _positive("secondary_threshold_eV", self.secondary_threshold_eV)
         if self.elastic_model is not _ABSENT and self.elastic_model != "elsepa":
             raise ValueError("elastic_model must be absent or 'elsepa'")
+        self._validate_transport_mode()
         if self.bremsstrahlung_model is not _ABSENT and self.bremsstrahlung_model != "bremslib":
             raise ValueError("bremsstrahlung_model must be absent or 'bremslib'")
         self._validate_radiative_moment_model()
@@ -546,6 +558,42 @@ class Case(Mapping[str, Any]):
             raise ValueError("channeling supports a single-layer slab only")
         if self.mosaic_fwhm_rad or self.mosaic_mc_fwhm_rad:
             raise ValueError("channeling does not support mosaic crystals")
+
+    def _validate_transport_mode(self) -> None:
+        """Mixed transport replaces small-angle structure, so readers of it refuse."""
+        parameters = (self.mixed_c1, self.mixed_c2, self.mixed_max_step_um)
+        if self.transport_mode is _ABSENT:
+            if any(value is not _ABSENT for value in parameters):
+                raise ValueError("mixed_c1, mixed_c2 and mixed_max_step_um need transport_mode")
+            return
+        if self.transport_mode != "mixed":
+            raise ValueError("transport_mode must be absent or 'mixed'")
+        if self.mixed_c1 is _ABSENT or self.mixed_c2 is _ABSENT:
+            raise ValueError("transport_mode='mixed' needs mixed_c1 and mixed_c2")
+        from .._mixed_elastic_policy import MIXED_URBAN_REFUSAL, validate_mixed_parameters
+
+        validate_mixed_parameters(
+            self.mixed_c1,
+            self.mixed_c2,
+            None if self.mixed_max_step_um is _ABSENT else self.mixed_max_step_um,
+        )
+        if self.elastic_model is _ABSENT or self.energy_model is _ABSENT:
+            raise ValueError(
+                "transport_mode='mixed' requires elastic_model='elsepa' and energy_model='midpoint'"
+            )
+        if self.straggling is not _ABSENT and self.inelastic_model is _ABSENT:
+            raise ValueError(MIXED_URBAN_REFUSAL)
+        refused = {
+            "coherent_emission": "coherent emission",
+            "temporal_profile": "temporal profiles",
+            "transition_radiation": "transition radiation",
+            "channeling": "channeling",
+            "photon_transport": "photon transport",
+            "groove_spacing_ang": "a grooved entrance face",
+        }
+        for key, what in refused.items():
+            if getattr(self, key) is not _ABSENT:
+                raise ValueError(f"transport_mode='mixed' does not support {what}")
 
     def _validate_transition_radiation(self) -> None:
         record = self.transition_radiation

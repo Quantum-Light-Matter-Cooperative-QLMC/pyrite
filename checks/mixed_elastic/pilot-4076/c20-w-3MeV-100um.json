@@ -1,0 +1,590 @@
+{
+ "schema": "pyrite.geant4-performance.sample.v1",
+ "engine": "pyrite-cuda",
+ "estimator": "discrete",
+ "cone": {
+  "center_deg": 90.0,
+  "half_angle_deg": 10.0,
+  "stage": "source: photons at creation, unit transmission",
+  "bands_keV": [
+   [
+    10,
+    50
+   ],
+   [
+    50,
+    100
+   ],
+   [
+    100,
+    null
+   ]
+  ]
+ },
+ "cone_scoring": {
+  "mode": "sampled-photons",
+  "order": 8,
+  "rtol": 0.001,
+  "chunk": 20000,
+  "adaptive_orders": []
+ },
+ "audit": {
+  "forbidden": "pyrite.montecarlo.spectrum.{cxr,lines} computations",
+  "calls": [],
+  "skipped": true
+ },
+ "scene": {
+  "id": "w-3MeV-100um",
+  "material": "W",
+  "energy_keV": 3000,
+  "thickness_um": 100,
+  "rows_per_history": 8320,
+  "max_steps": 100000
+ },
+ "histories": 10000,
+ "warmup_histories": 7692,
+ "block": 7692,
+ "block_rows": 64000000,
+ "seed": 91001,
+ "controls": {
+  "max_dE_frac": 0.05,
+  "scratch_mib": 4096,
+  "seg_capacity": 16384,
+  "probe_electrons": 0,
+  "max_steps": 100000,
+  "schedule": "auto",
+  "rows_per_round": 1024,
+  "device_staging": true,
+  "radiative_moments": "table",
+  "pool_fraction": 0.85,
+  "score_rows": 20000000,
+  "kernel": "default",
+  "transport_precision": "mixed",
+  "mixed_c1": 0.2,
+  "mixed_c2": 0.2,
+  "mixed_max_step_um": null,
+  "inelastic_cutoff_eV": null,
+  "kernel_threads": 32,
+  "spectrum_step_eV": [],
+  "spectrum_geometric_nodes": []
+ },
+ "timings_s": {
+  "imports_and_tables": 0.945057358010672,
+  "cold_request": 0.8964577720034868,
+  "cold_transport": 0.6920831049792469,
+  "warm_request": 0.9666428969940171,
+  "warm_transport": 0.7135165859945118,
+  "process_total": 2.845123768900521
+ },
+ "work": {
+  "cold": {
+   "launched_rows": 2687152,
+   "launches": 4,
+   "assembly": [
+    {
+     "phase": "assembly",
+     "rows": 2687152,
+     "wall_s": 0.08137076394632459,
+     "staged": true,
+     "staging_budget_bytes": 12189309142,
+     "spilled_round": null,
+     "staged_peak_bytes": 400608696,
+     "pool_peak_bytes": 1459679744
+    }
+   ],
+   "retained_rows": 2687152,
+   "scoring_s": 0.20307205605786294,
+   "schedule": [
+    "transport schedule auto: continuation for 7692 histories"
+   ]
+  },
+  "warm": {
+   "launched_rows": 3465326,
+   "launches": 10,
+   "assembly": [
+    {
+     "phase": "assembly",
+     "rows": 1727184,
+     "wall_s": 0.03593972802627832,
+     "staged": true,
+     "staging_budget_bytes": 12498872739,
+     "spilled_round": null,
+     "staged_peak_bytes": 257494756,
+     "pool_peak_bytes": 947092480
+    },
+    {
+     "phase": "assembly",
+     "rows": 1738142,
+     "wall_s": 0.0330287670949474,
+     "staged": true,
+     "staging_budget_bytes": 12497965424,
+     "spilled_round": null,
+     "staged_peak_bytes": 259127554,
+     "pool_peak_bytes": 951132160
+    }
+   ],
+   "retained_rows": 3465326,
+   "scoring_s": 0.25104915304109454,
+   "schedule": [
+    "transport schedule auto: continuation for 5000 histories"
+   ]
+  }
+ },
+ "tables": {
+  "sbethe": "6a7b4dbfeffcbb8243196a6c1633d5a3373c763e1ab8187d14f8fdc78b040abe",
+  "sbethe_digest": "a7489a52cd0841e08c543f7137e894acf76715304f4532872bf0eeec65268116",
+  "bremslib": "dfccd9efa5bdcd0968b2cbbabd708106d123f6df654bc03d19b3e96cec0beec0",
+  "elsepa": [
+   "016589c75e4b80a0737fedab58d71817c45159b6f5b18c9216ab335b9a38dd63"
+  ]
+ },
+ "device": "NVIDIA GeForce RTX 5080",
+ "peak_rss_kib": 1286244,
+ "environment": {
+  "PYRITE_MC_BACKEND": "cuda",
+  "PYRITE_MC_TRANSPORT_SCHEDULE": null
+ },
+ "observables": {
+  "backscattered": {
+   "n": 10000,
+   "sum": 1224.0,
+   "sum_squares": 1224.0,
+   "mean": 0.1224,
+   "se": 0.0032776360825797885,
+   "nonzero": 1224,
+   "rse": 0.026778072570096314,
+   "precision_status": "estimable",
+   "nonzero_probability_upper95_if_zero": null
+  },
+  "transmitted": {
+   "n": 10000,
+   "sum": 8700.0,
+   "sum_squares": 8700.0,
+   "mean": 0.87,
+   "se": 0.0033632025084896853,
+   "nonzero": 8700,
+   "rse": 0.003865750009758259,
+   "precision_status": "estimable",
+   "nonzero_probability_upper95_if_zero": null
+  },
+  "side_exited": {
+   "n": 10000,
+   "sum": 0.0,
+   "sum_squares": 0.0,
+   "mean": 0.0,
+   "se": 0.0,
+   "nonzero": 0,
+   "rse": null,
+   "precision_status": "unresolved",
+   "nonzero_probability_upper95_if_zero": 0.000299528359776612
+  },
+  "stopped": {
+   "n": 10000,
+   "sum": 76.0,
+   "sum_squares": 76.0,
+   "mean": 0.0076,
+   "se": 0.0008685041335209604,
+   "nonzero": 76,
+   "rse": 0.11427685967381059,
+   "precision_status": "estimable",
+   "nonzero_probability_upper95_if_zero": null
+  },
+  "transmitted_energy_keV": {
+   "n": 10000,
+   "sum": 22891120.915057153,
+   "sum_squares": 61029785627.67685,
+   "mean": 2289.1120915057154,
+   "se": 9.28994455505441,
+   "nonzero": 8700,
+   "rse": 0.0040583178908219115,
+   "precision_status": "estimable",
+   "nonzero_probability_upper95_if_zero": null
+  },
+  "photons_1_10keV": {
+   "n": 10000,
+   "sum": 1540.0,
+   "sum_squares": 1826.0,
+   "mean": 0.154,
+   "se": 0.003986224905709648,
+   "nonzero": 1406,
+   "rse": 0.025884577309802908,
+   "precision_status": "estimable",
+   "nonzero_probability_upper95_if_zero": null
+  },
+  "photons_10_50keV": {
+   "n": 10000,
+   "sum": 1159.0,
+   "sum_squares": 1363.0,
+   "mean": 0.1159,
+   "se": 0.0035054169216770033,
+   "nonzero": 1064,
+   "rse": 0.030245184828964652,
+   "precision_status": "estimable",
+   "nonzero_probability_upper95_if_zero": null
+  },
+  "photons_50_100keV": {
+   "n": 10000,
+   "sum": 442.0,
+   "sum_squares": 468.0,
+   "mean": 0.0442,
+   "se": 0.002117801810474919,
+   "nonzero": 430,
+   "rse": 0.04791406811029228,
+   "precision_status": "estimable",
+   "nonzero_probability_upper95_if_zero": null
+  },
+  "photons_ge100keV": {
+   "n": 10000,
+   "sum": 1536.0,
+   "sum_squares": 1870.0,
+   "mean": 0.1536,
+   "se": 0.004042565798329494,
+   "nonzero": 1379,
+   "rse": 0.02631878774954098,
+   "precision_status": "estimable",
+   "nonzero_probability_upper95_if_zero": null
+  },
+  "photon_keV_ge10keV": {
+   "n": 10000,
+   "sum": 930012.4419199219,
+   "sum_squares": 1049777835.8157991,
+   "mean": 93.00124419199219,
+   "se": 3.103839331842408,
+   "nonzero": 2546,
+   "rse": 0.03337416997814382,
+   "precision_status": "estimable",
+   "nonzero_probability_upper95_if_zero": null
+  },
+  "path_um": {
+   "n": 10000,
+   "sum": 1632789.6279978883,
+   "sum_squares": 378670676.2525125,
+   "mean": 163.27896279978881,
+   "se": 1.0586863912014426,
+   "nonzero": 10000,
+   "rse": 0.006483911785375525,
+   "precision_status": "estimable",
+   "nonzero_probability_upper95_if_zero": null
+  },
+  "rows": {
+   "n": 10000,
+   "sum": 3465326.0,
+   "sum_squares": 1895275914.0,
+   "mean": 346.5326,
+   "se": 2.635330975543502,
+   "nonzero": 10000,
+   "rse": 0.00760485730792284,
+   "precision_status": "estimable",
+   "nonzero_probability_upper95_if_zero": null
+  },
+  "rows_elastic": {
+   "n": 10000,
+   "sum": 87345.0,
+   "sum_squares": 14189165.0,
+   "mean": 8.7345,
+   "se": 0.3664368002368987,
+   "nonzero": 9670,
+   "rse": 0.04195280785813712,
+   "precision_status": "estimable",
+   "nonzero_probability_upper95_if_zero": null
+  },
+  "rows_substep": {
+   "n": 10000,
+   "sum": 0.0,
+   "sum_squares": 0.0,
+   "mean": 0.0,
+   "se": 0.0,
+   "nonzero": 0,
+   "rse": null,
+   "precision_status": "unresolved",
+   "nonzero_probability_upper95_if_zero": 0.000299528359776612
+  },
+  "rows_hard_radiative": {
+   "n": 10000,
+   "sum": 4677.0,
+   "sum_squares": 7747.0,
+   "mean": 0.4677,
+   "se": 0.007456623305700263,
+   "nonzero": 3510,
+   "rse": 0.015943175765876123,
+   "precision_status": "estimable",
+   "nonzero_probability_upper95_if_zero": null
+  },
+  "rows_hard_inelastic": {
+   "n": 10000,
+   "sum": 0.0,
+   "sum_squares": 0.0,
+   "mean": 0.0,
+   "se": 0.0,
+   "nonzero": 0,
+   "rse": null,
+   "precision_status": "unresolved",
+   "nonzero_probability_upper95_if_zero": 0.000299528359776612
+  },
+  "rows_soft_hinge": {
+   "n": 10000,
+   "sum": 1730138.0,
+   "sum_squares": 472950492.0,
+   "mean": 173.0138,
+   "se": 1.3176877669088023,
+   "nonzero": 10000,
+   "rse": 0.007616084768433513,
+   "precision_status": "estimable",
+   "nonzero_probability_upper95_if_zero": null
+  },
+  "rows_delta": {
+   "n": 10000,
+   "sum": 1633166.0,
+   "sum_squares": 386089800.0,
+   "mean": 163.3166,
+   "se": 1.0926052329471547,
+   "nonzero": 10000,
+   "rse": 0.006690105188003882,
+   "precision_status": "estimable",
+   "nonzero_probability_upper95_if_zero": null
+  },
+  "transmitted_mu_bin_0": {
+   "n": 10000,
+   "sum": 1191.0,
+   "sum_squares": 1191.0,
+   "mean": 0.1191,
+   "se": 0.003239223403352366,
+   "nonzero": 1191,
+   "rse": 0.02719750968389896,
+   "precision_status": "estimable",
+   "nonzero_probability_upper95_if_zero": null
+  },
+  "transmitted_mu_bin_1": {
+   "n": 10000,
+   "sum": 4948.0,
+   "sum_squares": 4948.0,
+   "mean": 0.4948,
+   "se": 0.0049999795979181715,
+   "nonzero": 4948,
+   "rse": 0.010105051733868576,
+   "precision_status": "estimable",
+   "nonzero_probability_upper95_if_zero": null
+  },
+  "transmitted_mu_bin_2": {
+   "n": 10000,
+   "sum": 2253.0,
+   "sum_squares": 2253.0,
+   "mean": 0.2253,
+   "se": 0.0041780062917206534,
+   "nonzero": 2253,
+   "rse": 0.01854419126374014,
+   "precision_status": "estimable",
+   "nonzero_probability_upper95_if_zero": null
+  },
+  "transmitted_mu_bin_3": {
+   "n": 10000,
+   "sum": 308.0,
+   "sum_squares": 308.0,
+   "mean": 0.0308,
+   "se": 0.0017278410064164888,
+   "nonzero": 308,
+   "rse": 0.056098733974561325,
+   "precision_status": "estimable",
+   "nonzero_probability_upper95_if_zero": null
+  },
+  "transmitted_energy_bin_0": {
+   "n": 10000,
+   "sum": 34.0,
+   "sum_squares": 34.0,
+   "mean": 0.0034,
+   "se": 0.0005821321909916845,
+   "nonzero": 34,
+   "rse": 0.1712153502916719,
+   "precision_status": "estimable",
+   "nonzero_probability_upper95_if_zero": null
+  },
+  "transmitted_energy_bin_1": {
+   "n": 10000,
+   "sum": 127.0,
+   "sum_squares": 127.0,
+   "mean": 0.0127,
+   "se": 0.001119819806772484,
+   "nonzero": 127,
+   "rse": 0.08817478793484126,
+   "precision_status": "estimable",
+   "nonzero_probability_upper95_if_zero": null
+  },
+  "transmitted_energy_bin_2": {
+   "n": 10000,
+   "sum": 512.0,
+   "sum_squares": 512.0,
+   "mean": 0.0512,
+   "se": 0.0022041646567766706,
+   "nonzero": 512,
+   "rse": 0.043050090952669345,
+   "precision_status": "estimable",
+   "nonzero_probability_upper95_if_zero": null
+  },
+  "transmitted_energy_bin_3": {
+   "n": 10000,
+   "sum": 2237.0,
+   "sum_squares": 2237.0,
+   "mean": 0.2237,
+   "se": 0.004167441392122471,
+   "nonzero": 2237,
+   "rse": 0.018629599428352572,
+   "precision_status": "estimable",
+   "nonzero_probability_upper95_if_zero": null
+  },
+  "transmitted_energy_bin_4": {
+   "n": 10000,
+   "sum": 5790.0,
+   "sum_squares": 5790.0,
+   "mean": 0.579,
+   "se": 0.004937442438528614,
+   "nonzero": 5790,
+   "rse": 0.008527534436146138,
+   "precision_status": "estimable",
+   "nonzero_probability_upper95_if_zero": null
+  },
+  "backscattered_mu_bin_0": {
+   "n": 10000,
+   "sum": 290.0,
+   "sum_squares": 290.0,
+   "mean": 0.029,
+   "se": 0.0016781482706131232,
+   "nonzero": 290,
+   "rse": 0.05786718174528011,
+   "precision_status": "estimable",
+   "nonzero_probability_upper95_if_zero": null
+  },
+  "backscattered_mu_bin_1": {
+   "n": 10000,
+   "sum": 689.0,
+   "sum_squares": 689.0,
+   "mean": 0.0689,
+   "se": 0.002532966756998442,
+   "nonzero": 689,
+   "rse": 0.03676294277211091,
+   "precision_status": "estimable",
+   "nonzero_probability_upper95_if_zero": null
+  },
+  "backscattered_mu_bin_2": {
+   "n": 10000,
+   "sum": 213.0,
+   "sum_squares": 213.0,
+   "mean": 0.0213,
+   "se": 0.0014438973245866182,
+   "nonzero": 213,
+   "rse": 0.06778860678810414,
+   "precision_status": "estimable",
+   "nonzero_probability_upper95_if_zero": null
+  },
+  "backscattered_mu_bin_3": {
+   "n": 10000,
+   "sum": 32.0,
+   "sum_squares": 32.0,
+   "mean": 0.0032,
+   "se": 0.000564807844129381,
+   "nonzero": 32,
+   "rse": 0.17650245129043157,
+   "precision_status": "estimable",
+   "nonzero_probability_upper95_if_zero": null
+  },
+  "backscattered_energy_bin_0": {
+   "n": 10000,
+   "sum": 23.0,
+   "sum_squares": 23.0,
+   "mean": 0.0023,
+   "se": 0.00047905526757874143,
+   "nonzero": 23,
+   "rse": 0.2082848989472789,
+   "precision_status": "estimable",
+   "nonzero_probability_upper95_if_zero": null
+  },
+  "backscattered_energy_bin_1": {
+   "n": 10000,
+   "sum": 77.0,
+   "sum_squares": 77.0,
+   "mean": 0.0077,
+   "se": 0.0008741552578011954,
+   "nonzero": 77,
+   "rse": 0.1135266568572981,
+   "precision_status": "estimable",
+   "nonzero_probability_upper95_if_zero": null
+  },
+  "backscattered_energy_bin_2": {
+   "n": 10000,
+   "sum": 337.0,
+   "sum_squares": 337.0,
+   "mean": 0.0337,
+   "se": 0.0018046486294200229,
+   "nonzero": 337,
+   "rse": 0.05355040443382857,
+   "precision_status": "estimable",
+   "nonzero_probability_upper95_if_zero": null
+  },
+  "backscattered_energy_bin_3": {
+   "n": 10000,
+   "sum": 640.0,
+   "sum_squares": 640.0,
+   "mean": 0.064,
+   "se": 0.002447651752171863,
+   "nonzero": 640,
+   "rse": 0.03824455862768536,
+   "precision_status": "estimable",
+   "nonzero_probability_upper95_if_zero": null
+  },
+  "backscattered_energy_bin_4": {
+   "n": 10000,
+   "sum": 147.0,
+   "sum_squares": 147.0,
+   "mean": 0.0147,
+   "se": 0.0012035513506225475,
+   "nonzero": 147,
+   "rse": 0.0818742415389488,
+   "precision_status": "estimable",
+   "nonzero_probability_upper95_if_zero": null
+  },
+  "cone_source_photons_10_50kev": {
+   "n": 10000,
+   "sum": 10.0,
+   "sum_squares": 10.0,
+   "mean": 0.001,
+   "se": 0.0003160854172515713,
+   "nonzero": 10,
+   "rse": 0.3160854172515713,
+   "precision_status": "estimable",
+   "nonzero_probability_upper95_if_zero": null
+  },
+  "cone_source_photons_50_100kev": {
+   "n": 10000,
+   "sum": 2.0,
+   "sum_squares": 2.0,
+   "mean": 0.0002,
+   "se": 0.00014141428428549925,
+   "nonzero": 2,
+   "rse": 0.7070714214274962,
+   "precision_status": "estimable",
+   "nonzero_probability_upper95_if_zero": null
+  },
+  "cone_source_photons_ge100kev": {
+   "n": 10000,
+   "sum": 16.0,
+   "sum_squares": 16.0,
+   "mean": 0.0016,
+   "se": 0.0003996998573900168,
+   "nonzero": 16,
+   "rse": 0.24981241086876046,
+   "precision_status": "estimable",
+   "nonzero_probability_upper95_if_zero": null
+  },
+  "cone_source_photons_ge10kev": {
+   "n": 10000,
+   "sum": 28.0,
+   "sum_squares": 28.0,
+   "mean": 0.0028,
+   "se": 0.0005284353549796221,
+   "nonzero": 28,
+   "rse": 0.1887269124927222,
+   "precision_status": "estimable",
+   "nonzero_probability_upper95_if_zero": null
+  }
+ },
+ "raw_scores_sha256": "656306173ec997b96b86b448470237a255cb5276a3db1f8523ecee320c424f11"
+}

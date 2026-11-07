@@ -50,15 +50,16 @@ A policy is distinct from a simulation sweep profile. It governs execution resou
 
 ## Host transport step capacity
 
-CPU transport preallocates up to `n_electrons * max_steps` segment rows,
-even when actual trajectories are much shorter. The initial allocation
-uses a 20,000-step budget by default. Set
-`PYRITE_MC_TRANSPORT_INITIAL_MAX_STEPS` to a smaller positive integer
-(no greater than 160,000) to start with fewer rows. If a trajectory
-exceeds the allocated capacity, PyRITE deterministically replays the
-transport with a doubled budget, capped at the original ceiling. This
-is an allocation limit, **not** a physical stopping criterion or a
-truncation of trajectories; it may trade memory savings for more work.
+The default `max_steps` limit is 400,000 steps per electron. Lockstep and
+grooved CPU transport preallocate `n_electrons * budget` segment rows, even
+when actual trajectories are much shorter, so they start from a budget of
+20,000 steps. If a trajectory exceeds it, PyRITE deterministically replays
+the transport with a doubled budget, capped at `max_steps`. The other cores
+grow their output from emitted rows and start at the limit. Set
+`PYRITE_MC_TRANSPORT_INITIAL_MAX_STEPS` to a positive integer no greater than
+400,000 to start the runner with a smaller budget. A budget below `max_steps`
+is an allocation limit, **not** a physical stopping criterion or a truncation
+of trajectories; it may trade memory savings for more work.
 
 The disposable Sphinx/Marimo tutorial exports start at 128 steps to
 reduce peak allocations on Read the Docs without changing the history counts.

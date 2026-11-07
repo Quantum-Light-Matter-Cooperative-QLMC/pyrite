@@ -24,7 +24,7 @@ def _simulate_trajectories(
     n_atoms_per_ang3=None,
     E_cut_keV=5.0,
     seed=0,
-    max_steps=20000,
+    max_steps=400_000,
     elastic_model="elsepa",
     beam_dir=None,
     composition=None,
@@ -76,6 +76,7 @@ def _simulate_trajectories(
     bunch_front_tilt=None,
     _complete_hard_photons=True,
     _cone_split=None,
+    mixed_elastic=None,
 ):
     """
     Transport Ne electrons of energy E0_keV [keV] into a slab 0<=z<=thickness.
@@ -516,6 +517,7 @@ def _simulate_trajectories(
         bunch_front_tilt=bunch_front_tilt,
         _complete_hard_photons=_complete_hard_photons,
         _cone_split=_cone_split,
+        mixed_elastic=mixed_elastic,
     )
     from .cone_split import ConeSplit
 

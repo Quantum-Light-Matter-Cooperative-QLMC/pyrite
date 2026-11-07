@@ -37,15 +37,20 @@ RECORD = np.dtype(
         ("cone_photons", "<i4", (3,)),
     ]
 )
-EXPECTED_PROCESSES = {"Transportation", "eIoni", "eBrem", "CoulombScat"}
+BASE_PROCESSES = {"Transportation", "eIoni", "eBrem"}
+EXPECTED_PROCESSES = {
+    "ss": BASE_PROCESSES | {"CoulombScat"},
+    "wvi": BASE_PROCESSES | {"msc", "CoulombScat"},
+    "gs": BASE_PROCESSES | {"msc"},
+}
 CONE_BANDS = tuple(f"cone_source_photons_{b}" for b in ("10_50kev", "50_100kev", "ge100kev"))
 BANDS = ("photons_1_10keV", "photons_10_50keV", "photons_50_100keV", "photons_ge100keV")
 
 
-def audit_log(text, material):
+def audit_log(text, material, elastic="ss"):
     """Check matched bounds from the app's own dumps; return parsed facts."""
     processes = set(re.findall(r"^G4BENCH_PROCESS e- (\S+)$", text, re.M))
-    if processes != EXPECTED_PROCESSES:
+    if processes != EXPECTED_PROCESSES[elastic]:
         raise RuntimeError(f"unexpected electron processes {sorted(processes)}")
     block = text.split(f"Material : Bench{material}", 1)[1]
     thresholds = re.search(r"Energy thresholds :\s+gamma\s+(\S+ \S+)\s+e-\s+(\S+ \S+)", block)
@@ -81,6 +86,13 @@ def main():
     parser.add_argument("--executable", type=Path, required=True)
     parser.add_argument("--step-dr", type=float, default=0.0)
     parser.add_argument("--step-final-um", type=float, default=0.0)
+    parser.add_argument(
+        "--elastic",
+        choices=sorted(EXPECTED_PROCESSES),
+        default="ss",
+        help="ss: DPWA single scattering (#821); wvi: WentzelVI plus single Coulomb; "
+        "gs: Goudsmit-Saunderson (#894 mixed-scheme arms)",
+    )
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     spec = json.loads((HERE / "scenes.json").read_text())
@@ -110,6 +122,7 @@ def main():
         "--cone-half-deg",
         str(spec["cone"]["half_angle_deg"]),
     ]
+    cmd += ["--elastic", args.elastic]
     if args.step_dr > 0:
         cmd += ["--step-dr", str(args.step_dr), "--step-final-um", str(args.step_final_um)]
     start = time.perf_counter()
@@ -119,7 +132,7 @@ def main():
     text = (work / "raw.log").read_text()
     if done.returncode:
         raise RuntimeError(f"g4bench exit {done.returncode}; see {work / 'raw.log'}")
-    bounds, timing = audit_log(text, scene["material"])
+    bounds, timing = audit_log(text, scene["material"], args.elastic)
     rec = np.concatenate([np.fromfile(p, dtype=RECORD) for p in sorted(work.glob("rec.t*.bin"))])
     rec = rec[np.argsort(rec["event"], kind="stable")]
     if not np.array_equal(rec["event"], np.arange(args.histories)) or np.any(rec["terminal"] < 4):
@@ -158,6 +171,7 @@ def main():
         warmup_histories=args.warmup,
         seed=args.seed,
         threads=args.threads,
+        elastic=args.elastic,
         cone=spec["cone"],
         bounds=bounds,
         timings_s=dict(

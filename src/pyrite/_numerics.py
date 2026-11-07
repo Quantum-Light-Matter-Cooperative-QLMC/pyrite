@@ -9,6 +9,7 @@ import numpy as np
 
 from ._cxr_vocabulary import catalog_key
 from ._energy_bins import EnergyBins
+from ._mixed_elastic_policy import MIXED_URBAN_REFUSAL, validate_transport_mode
 from ._photon_config import PhotonTransport
 from ._sampling import AdaptiveSampling, FixedSampling, SamplingPolicy
 from ._spec_defaults import UNSET, _Unset
@@ -70,6 +71,10 @@ TRANSPORT_KEYS = (
     "inelastic_cutoff_eV",
     "secondary_threshold_eV",
     "elastic_model",
+    "transport_mode",
+    "mixed_c1",
+    "mixed_c2",
+    "mixed_max_step_um",
     "bremsstrahlung_model",
     "radiative_model",
     "radiative_cutoff_eV",
@@ -240,6 +245,17 @@ class Physics:
         sections from the released tables (``pyrite tables fetch elsepa``);
         ``"mott"`` keeps the historical screened-Rutherford angles calibrated
         to NIST Mott transport cross sections.
+    transport_mode, mixed_c1, mixed_c2, mixed_max_step_um
+        ``"single-scattering"`` (default) simulates every elastic event.
+        ``"mixed"`` aggregates small-angle events into a random hinge, which
+        requires ``elastic_model="elsepa"`` and ``energy_model="midpoint"`` and
+        is refused for coherent emission, temporal profiles, transition
+        radiation, channeling, photon transport, grooved targets and Urban
+        straggling (``straggling=True`` with continuous stopping). ``mixed_c1``
+        (default 0.05) bounds the mean soft deflection per hard step,
+        ``mixed_c2`` (default 0.05) the mean fractional soft loss per step, and
+        ``mixed_max_step_um`` adds an absolute step limit; the parameters apply
+        only under ``"mixed"``.
     bremsstrahlung_model
         ``"bremslib"`` (default) uses the released BremsLib tables with their
         angular model (``pyrite tables fetch bremslib``) and requires them for
@@ -340,6 +356,10 @@ class Physics:
     transition_lattice_origin_ang: tuple[float, float, float] | None = None
     shell_ionization_model: Literal["eedl", "bote-salvat"] = "eedl"
     photon_transport: PhotonTransport | None = None
+    transport_mode: Literal["single-scattering", "mixed"] = "single-scattering"
+    mixed_c1: float | None = None
+    mixed_c2: float | None = None
+    mixed_max_step_um: float | None = None
 
     def __init__(
         self,
@@ -363,6 +383,10 @@ class Physics:
         transition_lattice_origin_ang: tuple[float, float, float] | None | _Unset = UNSET,
         shell_ionization_model: Literal["eedl", "bote-salvat"] = "eedl",
         photon_transport: PhotonTransport | None = None,
+        transport_mode: Literal["single-scattering", "mixed"] = "single-scattering",
+        mixed_c1: float | None = None,
+        mixed_c2: float | None = None,
+        mixed_max_step_um: float | None = None,
         *,
         inelastic_cutoff: object = UNSET,
         secondary_threshold: object = UNSET,
@@ -505,6 +529,21 @@ class Physics:
             self.secondary_threshold_eV,
         )
         validate_elastic_model(self.elastic_model)
+        validate_transport_mode(
+            self.transport_mode, self.mixed_c1, self.mixed_c2, self.mixed_max_step_um
+        )
+        if self.transport_mode == "mixed" and (
+            self.elastic_model != "elsepa" or energy_model != "midpoint"
+        ):
+            raise ValueError(
+                "transport_mode='mixed' requires elastic_model='elsepa' and energy_model='midpoint'"
+            )
+        if (
+            self.transport_mode == "mixed"
+            and self.straggling
+            and self.inelastic_model == "continuous"
+        ):
+            raise ValueError(MIXED_URBAN_REFUSAL)
         validate_bremsstrahlung_model(self.bremsstrahlung_model)
         validate_radiative_numerics(
             self.radiative_model,

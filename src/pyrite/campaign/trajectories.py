@@ -35,7 +35,7 @@ def simulate_trajectories(
     numerics: Numerics | None = None,
     detector: Detector | None = None,
     E_cut_keV: float = 5.0,
-    max_steps: int = 20000,
+    max_steps: int = 400_000,
     keep_segments_on_device: bool = False,
     collect_diagnostics: bool = False,
     transport_progress: Callable[[int, int], None] | None = None,
@@ -65,7 +65,7 @@ def simulate_trajectories(
         Positive electron termination energy in keV, applied to all primaries
         (default 5). Independent of spectral scoring cutoffs.
     max_steps
-        Maximum steps per electron (default 20000); incomplete histories raise.
+        Maximum steps per electron (default 400,000); incomplete histories raise.
     keep_segments_on_device, collect_diagnostics, transport_progress
         Device-resident segment output, fixed-size post-transport diagnostics,
         and an optional ``callback(electrons_done, total)``. Default off.

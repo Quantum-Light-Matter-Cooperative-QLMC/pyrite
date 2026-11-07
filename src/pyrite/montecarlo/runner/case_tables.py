@@ -5,6 +5,7 @@ Validation: elsepa-elastic-sampling
 
 from types import MappingProxyType
 
+from ..._mixed_elastic_policy import MixedElasticParameters
 from ..._physics_contract import BUILTIN_DESCRIPTORS
 
 
@@ -142,6 +143,10 @@ def _case_elastic_kwargs(case):
     """
     atomic = case.get("atomic_electron_deflection")
     extra = {} if atomic is None else {"atomic_electron_deflection": atomic}
+    if case.get("transport_mode") == "mixed":
+        extra["mixed_elastic"] = MixedElasticParameters(
+            case["mixed_c1"], case["mixed_c2"], case.get("mixed_max_step_um")
+        )
     prepare = _ELASTIC_PREPARERS[_elastic_descriptor(case).id]
     return {**prepare(_case_elastic_entries(case)), **extra}
 

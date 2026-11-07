@@ -8,7 +8,7 @@ from numba import njit
 
 from pyrite.materials import CATALOG
 from pyrite.montecarlo.spectrum.brem_bremslib import prepare_bremslib_table
-from pyrite.montecarlo.transport import TransportLUTConfig, cores, host_pass
+from pyrite.montecarlo.transport import TransportLUTConfig, core_specializations, cores, host_pass
 from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 from pyrite.montecarlo.transport._jit_cutoff_bound import (
     add_soft_moment_bound,
@@ -190,7 +190,9 @@ def _reference_core(monkeypatch, per_electron, inelastic, radiative, lut):
     if lut:
         monkeypatch.setattr(host_pass, _LUT[(per_electron, inelastic)], reference)
     else:
-        monkeypatch.setattr(cores, _EXACT[(per_electron, inelastic, radiative)], reference)
+        monkeypatch.setattr(
+            core_specializations, _EXACT[(per_electron, inelastic, radiative)], reference
+        )
 
 
 def _assert_bitwise(actual, expected, path="result"):

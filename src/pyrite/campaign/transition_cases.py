@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+from .._mixed_elastic_policy import mixed_case_keys
 from .._numerics import Physics
 from ..montecarlo.case import Case, transition_case_record
 
@@ -22,6 +23,17 @@ def resolve_shell_ionization(cases: list[Case], physics: Physics) -> list[Case]:
     if physics.shell_ionization_model == "eedl":
         return cases
     return [replace(case, shell_ionization_model=physics.shell_ionization_model) for case in cases]
+
+
+def resolve_transport_mode(cases: list[Case], physics: Physics) -> list[Case]:
+    """Record opt-in mixed elastic transport (#894); the default adds no keys.
+
+    Validation: mixed-elastic-split
+    """
+    keys = mixed_case_keys(
+        physics.transport_mode, physics.mixed_c1, physics.mixed_c2, physics.mixed_max_step_um
+    )
+    return [replace(case, **keys) for case in cases] if keys else cases
 
 
 def resolve_transition_radiation(cases: list[Case], physics: Physics) -> list[Case]:

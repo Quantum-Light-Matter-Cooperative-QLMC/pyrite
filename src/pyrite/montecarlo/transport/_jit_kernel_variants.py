@@ -46,11 +46,12 @@ class TransportKernelSwitches(NamedTuple):
     inelastic_on: int
     rad_on: int
     cont_on: int
+    mixed_on: int = 0
 
     @classmethod
     def normalized(cls, **switches):
         """The switches as plain integers, e.g. from NumPy or bool values."""
-        return cls(**{name: int(switches[name]) for name in cls._fields})
+        return cls(**{name: int(switches.get(name, 0)) for name in cls._fields})
 
 
 # The runtime-switched kernel: one compile serves every configuration, and its

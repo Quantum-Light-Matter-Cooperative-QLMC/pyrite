@@ -187,6 +187,13 @@ def resolve_pixel_scene(
             ),
             secondary_threshold_eV=cast(float | None, transport.get("secondary_threshold_eV")),
             elastic_model=cast(Literal["mott", "elsepa"], transport.get("elastic_model", "elsepa")),
+            transport_mode=cast(
+                Literal["single-scattering", "mixed"],
+                transport.get("transport_mode", "single-scattering"),
+            ),
+            mixed_c1=cast(float | None, transport.get("mixed_c1")),
+            mixed_c2=cast(float | None, transport.get("mixed_c2")),
+            mixed_max_step_um=cast(float | None, transport.get("mixed_max_step_um")),
             bremsstrahlung_model=cast(
                 Literal["auto", "eedl", "bremslib"],
                 transport.get("bremsstrahlung_model", "bremslib"),

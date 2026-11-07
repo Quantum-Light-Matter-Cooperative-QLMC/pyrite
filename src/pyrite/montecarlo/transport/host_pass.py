@@ -9,7 +9,7 @@ Accelerator modules stay lazily imported.
 Validation: sbethe-corrected-stopping
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 import numpy as np
@@ -33,7 +33,7 @@ from .beam_entry import (
     table_energy_range,
 )
 from .continuation import effective_schedule, resolve_schedule
-from .cores import (
+from .core_specializations import (
     _transport_core_grooved,
     _transport_core_ungrooved_lut,
     _transport_core_ungrooved_lut_inelastic,
@@ -41,6 +41,7 @@ from .cores import (
     _transport_core_ungrooved_perelectron_lut_inelastic,
     cone_split_core,
     exact_ungrooved_core,
+    mixed_elastic_core,
 )
 from .events import TransportStepLimitError
 from .hard_inelastic import hard_keys_from_stream_keys, validate_inelastic_args
@@ -49,6 +50,7 @@ from .host_memory import GrowingHostRows, admit_host_allocation, reserve_or_rais
 from .kinematics import _sample_bunch_offsets, stream_keys
 from .layer_tables import build_layer_tables
 from .lut import build_transport_energy_lut
+from .mixed_elastic import MIXED_URBAN_REFUSAL, mixed_core_args, mixed_device_args
 from .precision import resolve_transport_precision, validate_transport_precision
 from .scattering import check_elsepa_coverage, check_mott_coverage
 from .stopping import (
@@ -191,6 +193,9 @@ _NO_VACUUM = (
     np.empty(0, dtype=float),
     np.empty(0, dtype=np.int64),
 )
+#: First fixed lockstep/grooved row budget per electron; see ``_replay_fixed_buffers``.
+FIXED_BUFFER_INITIAL_STEPS = 20_000
+
 # Segment buffer names in the lockstep ``segments`` tuple order.
 _ROW_FIELDS = (
     "seg_dir",
@@ -208,15 +213,38 @@ _ROW_FIELDS = (
 )
 
 
+def _replay_fixed_buffers(p, launch, electron_start, c):
+    """Grow lockstep's fixed row buffers by replay up to ``p.max_steps``.
+
+    Lockstep and grooved kernels need arrays of ``Ne * max_steps`` rows, so the
+    limit must not be the first reservation. Trajectories depend on the seed
+    alone, so a completed replay is exactly the run at the full limit.
+    """
+    budget = FIXED_BUFFER_INITIAL_STEPS
+    while budget < p.max_steps:
+        try:
+            return _run_validated_pass(replace(p, max_steps=budget), launch, electron_start, c)
+        except TransportStepLimitError:
+            budget *= 2
+    return _run_validated_pass(p, launch, electron_start, c)
+
+
 def run_transport_pass(p: TransportInputs):
     """Transport one population (primaries, a block, or one cascade generation)."""
     electron_start = int(p._electron_start)
-    # ``_secondary`` is the cascade's per-generation pass (secondaries.py).
     launch = None if p._secondary is None else p._secondary.launch
+    c = _validated_controls(p, launch, electron_start)
+    if c.transport_core == "lockstep" and p.max_steps > FIXED_BUFFER_INITIAL_STEPS:
+        return _replay_fixed_buffers(p, launch, electron_start, c)
+    return _run_validated_pass(p, launch, electron_start, c)
+
+
+def _run_validated_pass(p, launch, electron_start, c):
+    """One transport attempt at ``p.max_steps``, after input validation."""
+    # ``launch``: the cascade's per-generation pass (secondaries.py).
     block_keys = stream_keys(p.seed, p.Ne, start=electron_start)
     # Per-electron/CUDA keys: a block or cascade generation supplies its own.
     transport_keys = launch.stream_keys if launch is not None else block_keys
-    c = _validated_controls(p, launch, electron_start)
 
     _nsys_push("pyrite.transport.tables")
     stack = _layer_stack(p, c)
@@ -346,11 +374,36 @@ def _validated_controls(p, launch, electron_start):
     )
 
 
+def _refuse_ineligible_mixed(p, transport_core):
+    """Mixed elastic transport has one specialization (#894)."""
+    if p.mixed_elastic is not None and (
+        transport_core not in ("per-electron", "cuda")
+        or p.groove is not None
+        or p.elastic_model != "elsepa"
+        or p.energy_model != "midpoint"
+        or p._cone_split is not None
+    ):
+        raise ValueError(
+            "transport_mode='mixed' runs only on the ungrooved per-electron and CUDA cores with "
+            "elastic_model='elsepa', energy_model='midpoint' and no detector-cone splitting"
+        )
+    if p.mixed_elastic is not None and p.straggling and p.inelastic_model != "shell-soft-hard":
+        raise ValueError(MIXED_URBAN_REFUSAL)
+
+
+def _resolved_core(p):
+    """``transport_core`` for this pass; mixed elastic has no lockstep specialization."""
+    resolved = resolve_transport_core(p.transport_core, p.Ne, p.groove)
+    if p.mixed_elastic is not None and p.transport_core == "auto" and resolved != "cuda":
+        return "per-electron"
+    return resolved
+
+
 def _checked_core(p, launch, electron_start):
     """Resolved transport core, checked against groove, blocks and device rows."""
     transport_core = p.transport_core
     if launch is None:  # a launched generation names its per-electron core
-        transport_core = resolve_transport_core(transport_core, p.Ne, p.groove)
+        transport_core = _resolved_core(p)
     if transport_core != "lockstep" and p.groove is not None:
         raise ValueError("grooved transport is only implemented for the lockstep core")
     if p._cone_split is not None and (
@@ -360,6 +413,7 @@ def _checked_core(p, launch, electron_start):
             "detector-cone splitting runs only on the ungrooved per-electron CPU core "
             "with elastic_model='elsepa'"
         )
+    _refuse_ineligible_mixed(p, transport_core)
     if electron_start and transport_core == "lockstep":
         raise ValueError("electron blocks need counter-addressed streams, not the lockstep core")
     if effective_schedule(p.per_electron_config) == "continuation" and transport_core != "cuda":
@@ -688,6 +742,8 @@ def _per_electron_core(t, lut):
     )
     if t.inputs._cone_split is not None:
         return cone_split_core(inelastic=shell_mode, radiative=t.controls.radiative_mode), np
+    if t.inputs.mixed_elastic is not None and not cuda:
+        return mixed_elastic_core(inelastic=shell_mode, radiative=t.controls.radiative_mode), np
     if lut and cuda:
         if shell_mode:
             raise NotImplementedError(
@@ -768,9 +824,19 @@ def _run_per_electron(t, *, lut):
         packed_per_layer_tables += t.sbethe_group
         tables = (packed_per_layer_tables, s.L_top, s.L_bot, s.mott_group, e.E_keV)
         radiative = (t.radiative_args, b["seg_rad_k"], b["seg_rad_Z"])
+        # Cone splitting and mixed elastic transport exclude each other and
+        # share the core's third optional argument.
+        mixed_args = (
+            None
+            if p.mixed_elastic is None
+            else mixed_core_args(s.mott_group[5:], p.mixed_elastic, s.L_top, s.L_bot)
+        )
+        if mixed_args is not None and c.transport_core == "cuda":
+            mixed_args = mixed_device_args(mixed_args, core_xp, p.Ne)
         counts = _run_per_electron_transport(
             *common, *tables, *rows, t.straggle_on, t.stragg_dE, **options,
-            radiative=radiative if c.radiative_mode else None, split_args=split_args,
+            radiative=radiative if c.radiative_mode else None,
+            split_args=split_args if p.mixed_elastic is None else mixed_args,
         )  # fmt: skip
     seg_xp = core_xp if p.keep_segments_on_device else np
     split_record = (

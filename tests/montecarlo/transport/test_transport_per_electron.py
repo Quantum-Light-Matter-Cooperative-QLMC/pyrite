@@ -357,7 +357,8 @@ def test_launcher_signature_tracks_the_reference_core():
     launcher = [
         name
         for name, p in inspect.signature(run_transport_kernel).parameters.items()
-        if p.kind is not p.KEYWORD_ONLY and name != "config"
+        # Mixed elastic transport (#894) has its own CPU specialization.
+        if p.kind is not p.KEYWORD_ONLY and name not in ("config", "mixed_args")
     ]
     assert launcher == reference
 
@@ -389,8 +390,8 @@ def test_cuda_results_do_not_depend_on_launch_geometry(nthreads, use_lut, monkey
     launch = getattr(tjl, launch_name)
     launched = []
 
-    def configured_core():
-        return factory(config=tjl.TransportKernelConfig(nthreads=nthreads))
+    def configured_core(_config, *args):
+        return factory(tjl.TransportKernelConfig(nthreads=nthreads), *args)
 
     def record_launch(*args, **kwargs):
         launched.append(kwargs["config"].nthreads)
@@ -420,9 +421,10 @@ def test_cuda_first_step_agrees_with_the_cpu_reference():
     # Both cores draw the same numbers and take the same branches, so the first
     # recorded segment differs only by libm rounding (CUDA's log/pow are a few
     # ulp from the host's). Later segments are not compared: transport is
-    # chaotic and amplifies that difference.
+    # chaotic and amplifies that difference. FP64: "auto" means the FP32 tables
+    # of the mixed kernel (#838), whose rounding is far above libm's.
     cpu = _run(transport_core="per-electron")
-    gpu = _run(transport_core="cuda")
+    gpu = _run(transport_core="cuda", transport_precision="fp64")
 
     cpu_first = np.flatnonzero(np.diff(cpu["elec_id"], prepend=-1))
     gpu_first = np.flatnonzero(np.diff(gpu["elec_id"], prepend=-1))
@@ -462,14 +464,17 @@ def test_cuda_midpoint_first_flight_agrees_with_the_cpu_reference(use_lut):
     # Same argument as the frozen first-step test: only the opening segment of
     # each electron is comparable across libm implementations. Here it also
     # pins the flight identity and end-state fields the controlled propagator
-    # adds, so a mis-ordered kernel draw or a dropped substep shows up.
+    # adds, so a mis-ordered kernel draw or a dropped substep shows up. ELSEPA and
+    # coupled radiation bypass the LUT, so this case names a model that takes it.
     controlled = dict(
+        elastic_model="mott",
+        radiative_model="uncoupled",
         energy_model="midpoint",
         max_dE_frac=0.05,
         transport_lut_config=TransportLUTConfig(enabled=use_lut),
     )
     cpu = _run(transport_core="per-electron", **controlled)
-    gpu = _run(transport_core="cuda", **controlled)
+    gpu = _run(transport_core="cuda", transport_precision="fp64", **controlled)
 
     assert set(gpu) >= {"E_end_keV", "t_end_ang", "E_repr_keV", "flight_id", "substep_id"}
     first = np.flatnonzero(np.diff(cpu["elec_id"], prepend=-1))

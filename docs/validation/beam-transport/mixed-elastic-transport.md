@@ -1,0 +1,186 @@
+# Mixed elastic transport with a random hinge
+
+```{warning}
+`transport_mode="mixed"` refuses Urban straggling. The
+[re-verification at e25dede8b](mixed-elastic-reverification.md) found the hard
+count 0.07-0.32% low from the rate-bound clamp and the path 0.3-1.3% long, with
+the path growth's cause not isolated. Thinning is verified for continuous
+stopping and the shell soft sampler at $C_2\ge0.05$.
+```
+
+Design and derivation of the opt-in `transport_mode="mixed"` scheme (#894).
+Detailed single scattering stays the default and the reference. Claims:
+`mixed-elastic-split`, `mixed-elastic-soft-moments`, `mixed-elastic-hinge`.
+
+Source: [PENELOPE-2024, NEA/MBDAV/R(2024)1](https://www.oecd-nea.org/upload/docs/application/pdf/2025-07/nea_mbdav_r_2024_1_penelope-2024_2025-07-10_15-48-34_125.pdf),
+§§4.1 and 4.3–4.4; Fernández-Varea et al. (1993) and Baró et al. (1995) for the
+scheme's origin.
+
+## Scheme
+
+Elastic events with polar deviation below a cutoff are not simulated one by
+one. They are aggregated into one artificial deflection per step, at a hinge
+placed uniformly along the step. Events above the cutoff stay explicit.
+
+| Quantity | Definition | Source |
+|---|---|---|
+| Hard mean free path | $\lambda_h=\max(\lambda_{\rm el},\,C_1\lambda_1)$ per element | Eq. 4.10 |
+| Soft inverse transport paths | $\lambda_{s,1}^{-1}=2T_1/\lambda_{\rm el}$, $\lambda_{s,2}^{-1}=6(T_1-T_2)/\lambda_{\rm el}$ | Eq. 4.38 |
+| Hinge moments over step $s$ | $\langle\mu\rangle=\tfrac12(1-e^{-s/\lambda_{s,1}})$, $\langle\mu^2\rangle=\langle\mu\rangle-\tfrac16(1-e^{-s/\lambda_{s,2}})$ | Eqs. 4.28–4.29 |
+| Hinge law | $F_a=aU_{0,\mu_0}+(1-a)U_{\mu_0,1}$, $\mu_0=\dfrac{2\langle\mu\rangle-3\langle\mu^2\rangle}{1-2\langle\mu\rangle}$, $a=1-2\langle\mu\rangle+\mu_0$ | Eqs. 4.30–4.32 |
+| Hinge position | $\tau=\xi s$; moments evaluated at the energy reached at the hinge | §§4.1.2, 4.3.3 |
+
+With $\mu=(1-\cos\theta)/2$, $T_n=\int_0^{\mu_c}\mu^n p(\mu)\,d\mu$.
+
+## Decisions
+
+**Soft law.** PENELOPE's two-box distribution, not Goudsmit–Saunderson. It
+matches both moments, samples with one uniform, and needs no extra table. Its
+uniform tail reaches $\mu=1$ with small probability, which PENELOPE accepts once
+a track has about ten or more hinges.
+
+**Cutoff per element and per panel.** A layer's rate is a sum over elements, so
+each element gets its own rule, $\Sigma_{h,i}=\min(\Sigma_i,\Sigma_{1,i}/C_1)$.
+An element with a soft part has $\Sigma_{s,1,i}\le\Sigma_{1,i}=C_1\Sigma_{h,i}$
+and a detailed element has no soft part, so the soft deflection per hard step,
+$\Sigma_{s,1}/\Sigma_h$, stays at most $C_1$ in compounds too. The hard fraction depends only on the angular density,
+$f_{h,i}=\min(1,2\langle\mu\rangle_i/C_1)$, and carries atomic-electron rate
+scaling through $\Sigma_i$ unchanged.
+
+The quantile cutoff $\xi_c=1-f_h$ is frozen across each energy panel, from the
+lower node, whose $\langle\mu\rangle$ is the larger. The detailed sampler draws
+$\mu(\xi,E)=(1-f)\mu_k(\xi)+f\mu_{k+1}(\xi)$, so for a fixed $\xi_c$
+
+$$
+T_1(E)=(1-f)Q_k+fQ_{k+1},\qquad
+T_2(E)=(1-f)^2Q^{(2)}_k+2f(1-f)Q^{(\times)}_k+f^2Q^{(2)}_{k+1},
+$$
+
+with $Q$ the quantile integrals over $(0,\xi_c)$ on the panel's two rows. Those
+are exact at every energy, not only at nodes, so soft plus hard reproduces the
+detailed law's moments everywhere. Interpolating node-level moments instead
+would lose that closure, on panels up to $\ln 1.33$ wide. The price is a
+jump in $\Sigma_h$ at a node, which the core must resolve and does by thinning.
+
+**Energy control.** Three limits bound a step: $s\le 4\lambda_T^{(h)}$ (§4.4),
+$s\le C_2E/S$, and $s\le$ one hundredth of the layer thickness or an explicit
+`mixed_max_step_um`. §4.4.1 recommends a tenth for thin regions. With
+continuous stopping, a tenth shifted the transmitted cone and the backscatter
+energy tallies at 1-3 MeV, by up to 10% (Si 1 MeV, backscatter energy above
+0.9 $E_0$). A hundredth removed every shift on six scenes, Si and W at 300 keV,
+1 MeV and 3 MeV, at C = 0.05; a thirtieth removed about half. Under
+`shell-soft-hard` neither limit shifted a tally. At 1-3 MeV the hundredth costs
+nothing there, because hard inelastic events end steps sooner (#894, jobs
+4051-4070). PENELOPE's $C_2$ raises the hard elastic rate;
+here it truncates the step, with a delta row, and costs fewer rows for the same
+limit on mean fractional loss. This is why the hard fraction has no stopping
+dependence. It also keeps the elastic table independent of the collision model.
+`max_dE_frac` substeps split rows without touching the step.
+
+**Competing hazards.** Each hard process runs at an upper bound of its rate over
+the energies the step can reach, from the start energy down to
+$E(1-\tfrac32 C_2)$ or the cutoff (PENELOPE Eqs. 4.96–4.98). The step length is
+the distance to the first proposal, then capped, and it is fixed when the step
+starts. A proposal at the step's end is accepted with probability
+$\Sigma(E_{\rm end})/\Sigma_{\max}$. A rejected one is a delta row that restarts
+only that process's clock. One uniform makes the elastic decision and picks the
+element, so hazard, element and quantile all read the same energy.
+
+The realized step therefore equals the planned one unless a surface or cutoff
+truncates it, which is the case Eq. 4.23 covers. Hinge and delta rows are
+fictitious for hard processes, so every optical depth survives them.
+
+The elastic and inelastic bounds are exact suprema, because each rate is monotonic
+between table knots: log-linear with a constant hard fraction for elastic, linear
+for inelastic. The radiative bound takes the larger of the window's two ends.
+Energy loss beyond the window, from a straggling tail, or a radiative rate that
+peaks inside it, makes the true rate exceed the bound, and the proposal is then
+accepted with probability 1, and element or channel selection then truncates
+instead of rescaling. The radiative excess is negligible, at most 1.02%. Under
+Urban straggling 0.1-2.4% of steps leave the window, which lowers the hard count
+measurably, so that combination is refused; see the warning above.
+
+Thinning adds rows: about 15% on the table-free Si anchor (170 to 100 keV,
+$C_1=C_2=0.05$), where rejected proposals add 6.6 delta rows to the 95 rows per
+history of the earlier hazard scheme.
+
+**Interfaces.** A row stopped at a boundary discards the pending hinge and
+starts a new step (§4.4, (vi)). Eq. 4.23 shows this gives the correct mean
+deflection at the interface. Row positions are never adjusted, so the core's
+geometry code is unchanged.
+
+**Row contract.** A hinge row ends in `EVENT_SOFT_HINGE`; a capped step in
+`EVENT_DELTA`. Both start a new flight, so straggling keys stay unique.
+
+**CUDA kernel.** The exact kernel runs the scheme under its `mixed_on` switch,
+in the CPU core's draw order and row contract. `transport_core="auto"` takes the
+kernel when the case would otherwise run on it, and the per-electron core when
+it would otherwise run on lockstep. A step's fields live in a per-history device
+array, so a continuation yield stores nothing for them and a capacity replay
+resets them. In `transport_precision="mixed"`, hard-rate lookups and their layer
+sums are FP32 like `_rad_layer_moment`, and an elastic proposal's target narrows
+to FP32 before element selection. The soft moment tables and the hinge law stay
+FP64: the second moment is a difference of two exponentials that cancels to
+$s\,\Sigma\,T_2$, and FP32 rounding of $T_1$ would reach it when $T_2/T_1$ is
+small. The kernel tests the soft part through the hard fraction, which is one
+exactly where the soft moments vanish, and with no soft part at the row's energy
+it reads the detailed rates, which then equal the hard rates.
+
+## Limiting cases
+
+- $C_1=0$: nothing is soft, no hinge or delta draws happen, and transport is bit
+  for bit detailed. This is tested on the full row set.
+- Energies where $\lambda_{\rm el}\ge C_1\lambda_1$ are detailed in that panel.
+- Soft plus hard first moment closes on the detailed law between nodes.
+- $F_a$ reproduces both Lewis moments for every tested step, including tails
+  with probability near $10^{-6}$.
+- Row continuity: position, energy and clock are continuous across hinges;
+  direction changes only at hinges and hard events.
+
+## Eligibility
+
+The scheme replaces the small-angle trajectory structure, so observables that
+read it cannot use it.
+
+| Observable | Mixed | Reason |
+|---|---|---|
+| Terminal fractions, exit energy and angle, deposition | Eligible, pending the equivalence study | Moment-preserving by construction |
+| Standard bremsstrahlung | Consistency check in #990 | Depends on row energy and direction, weakly on small deviations |
+| Incoherent CXR lines | Under study in #990 | Reads each row's direction and duration |
+| Coherent emission, temporal profiles | Refused | Depend on flight-level phase and small-angle structure |
+| Channeling | Refused | Needs real transverse dynamics |
+| Grooved geometry, cone splitting, LUT, Mott | Refused | No specialization |
+| Any observable with Urban straggling | Refused | See the warning above |
+
+## Pilot (not the equivalence study)
+
+This pilot predates thinning and did not expose either bias, so it is not
+evidence of equivalence.
+
+CPU per-electron core, ELSEPA, continuous stopping, $E_{\rm cut}=20$ keV,
+$C_1=C_2=0.05$, seeds 1000 onward with 300 electrons per seed, 2026-11-05.
+Intervals are one standard error. The #821-anchored study with
+empirical-Bernstein intervals is still to be run.
+
+| Case | Mode | $N$ | Rows/history | Backscatter | Transmitted $\bar E$ (keV) | Transmitted $\langle\cos\rangle$ |
+|---|---|---|---|---|---|---|
+| W 1 MeV, 100 µm | detailed | 6,000 | 15,334 | 0.4558 ± 0.0064 | 570.84 ± 4.08 | 0.7228 ± 0.0056 |
+| | mixed | 24,000 | 1,222 | 0.4505 ± 0.0032 | 570.97 ± 1.99 | 0.7200 ± 0.0027 |
+| Si 1 MeV, 100 µm | detailed | 12,000 | 529 | 0.0026 ± 0.0005 | 962.60 ± 0.06 | 0.9344 ± 0.0008 |
+| | mixed | 48,000 | 24 | 0.0029 ± 0.0002 | 962.63 ± 0.03 | 0.9356 ± 0.0004 |
+| W 300 keV, 10 µm | detailed | 6,000 | 1,938 | 0.4283 ± 0.0064 | 244.91 ± 0.62 | 0.7220 ± 0.0037 |
+| | mixed | 24,000 | 243 | 0.4251 ± 0.0032 | 246.00 ± 0.30 | 0.7183 ± 0.0019 |
+
+All differences are within 1.6 standard errors. Row reductions are 12.6×, 22×
+and 8×.
+
+## Thin targets
+
+The layer step limit bounds every step by a hundredth of the layer thickness.
+A target thin against the hard mean free path therefore takes more rows under
+mixed transport than under detailed scattering. At the earlier tenth, Si at
+100 keV and 1 um took about 27 rows per history against 15 (40 histories,
+local, no job ID). Mixed transport pays off only when detailed scattering would
+take many more than the roughly two hundred rows that the limit forces per
+layer crossing. At 300 keV on 100 um the hundredth leaves `shell-soft-hard`
+2.0x (Si) and 2.3x (W) faster than detailed, against 2.6x at the tenth.
