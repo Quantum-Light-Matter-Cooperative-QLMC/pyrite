@@ -74,8 +74,8 @@ def mixed_transport_options(function):
         help=(
             "Elastic transport: single-scattering (default) simulates every event; mixed "
             "aggregates small-angle events into a random hinge (requires elsepa and midpoint; "
-            "refused for coherent emission, temporal profiles, transition radiation, channeling, "
-            "photon transport and grooved targets)."
+            "refused wherever CXR lines are scored, and for coherent emission, temporal profiles, "
+            "transition radiation, channeling, photon transport and grooved targets)."
         ),
     )(function)
     return function

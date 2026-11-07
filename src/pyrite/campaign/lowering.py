@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from .._energy_bins import EnergyBins
+from .._mixed_elastic_policy import refuse_mixed_cxr
 from .._numerics import Numerics, Physics
 from .._sampling import case_budget
 from ..instrument import PlanarDetector
@@ -145,6 +146,7 @@ def build_sweep_cases(
             observation=observation,
         )
         physics, resolved_numerics = request.physics, request.numerics
+        refuse_mixed_cxr({"transport_mode": physics.transport_mode})  # one physics, every case
         if physics.photon_transport is not None:
             raise ValueError(
                 "photon transport currently requires a scalar Scene; sweeps are unsupported"
@@ -233,6 +235,7 @@ def build_sweep_cases(
                 "photon transport currently requires a scalar Scene; sweeps are unsupported"
             )
         case = build_case(scene, observation=observation)
+        refuse_mixed_cxr(case)
         if label:
             case = replace(case, name=f"{case.name} {label}")
         cases.append(replace(case, seed=index + 1 if seed_start is None else seed_start + index))

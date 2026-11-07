@@ -21,6 +21,20 @@ MIXED_URBAN_REFUSAL = (
     "transport_mode='mixed' does not support Urban straggling yet; "
     "use inelastic_model='shell-soft-hard' or turn straggling off"
 )
+#: CXR scores each transport row with its own finite-time line shape, so the
+#: L/100 step cap sets the line width: #990 measured 96 eV against 1.9 eV
+#: detailed (HOPG 400 nm) and a 3x narrower peak (Si 1 mm).
+MIXED_CXR_REFUSAL = (
+    "transport_mode='mixed' does not support CXR line spectra: the mixed step cap "
+    "sets the finite-time line width (#990); use transport_mode='single-scattering', "
+    "or simulate_trajectories for transport-only mixed runs"
+)
+
+
+def refuse_mixed_cxr(case) -> None:
+    """Refuse CXR line scoring of a case lowered with ``transport_mode="mixed"``."""
+    if case.get("transport_mode") == "mixed":
+        raise ValueError(MIXED_CXR_REFUSAL)
 
 
 class MixedElasticParameters(NamedTuple):

@@ -145,12 +145,42 @@ read it cannot use it.
 | Observable | Mixed | Reason |
 |---|---|---|
 | Terminal fractions, exit energy and angle, deposition | Eligible, pending the equivalence study | Moment-preserving by construction |
-| Standard bremsstrahlung | Consistency check in #990 | Depends on row energy and direction, weakly on small deviations |
-| Incoherent CXR lines | Under study in #990 | Reads each row's direction and duration |
+| Incoherent CXR lines | Refused (#990) | The step cap sets each row's finite-time line width; see below |
+| Standard bremsstrahlung | Unreachable, not assessed | Spectrum runs always score CXR, which refuses |
 | Coherent emission, temporal profiles | Refused | Depend on flight-level phase and small-angle structure |
 | Channeling | Refused | Needs real transverse dynamics |
 | Grooved geometry, cone splitting, LUT, Mott | Refused | No specialization |
 | Any observable with Urban straggling | Refused | See the warning above |
+
+`pyrite.simulate`, sweeps and the CXR line scorer refuse mixed cases. Mixed
+transport is still available through `simulate_trajectories`.
+
+### CXR screening (#990)
+
+CXR gives each row a finite-time `sinc²` line of width about $\hbar/T_{\rm row}$.
+Mixed steps are capped at $L/100$, and `mixed_max_step_um` can only tighten
+that cap. So the cap, not the physics, sets the line width. Its sign depends on
+the cap relative to the elastic mean free path. These were single-seed screening
+runs on 2026-11-07 (exact CUDA core, pyrite 0.29.1, $C_1=C_2=0.05$) and are not
+interval-backed.
+
+HOPG, 400 nm, 30 keV, observed at 135°, 32,768 CXR histories. For the cap
+sweep, the step-fraction constant was patched in a diagnostic run:
+
+| Rows | 850 eV peak | Half-max span | 800–900 eV yield | Total CXR |
+|---|---|---|---|---|
+| Detailed | 2.10e-8 | 1.9 eV | 1.89e-7 | 3.19e-7 |
+| Mixed, cap 4 nm (default) | 1.47e-9 | 96 eV | 1.26e-7 | 3.15e-7 |
+| Mixed, cap 40 nm | 3.76e-9 | 42 eV | 1.81e-7 | 3.19e-7 |
+| Mixed, cap 120 nm | 8.81e-9 | 2.5 eV | 1.86e-7 | 3.18e-7 |
+| Mixed, cap 400 nm | 2.75e-8 | 1.6 eV | 1.85e-7 | 3.20e-7 |
+
+On Si at 1 MeV with 1 mm thickness (cap 10 µm, observed at 90°, 2,048
+histories), mixed gave a 1.6 eV line with a peak 3.3 times the detailed maximum,
+and total CXR 8.3 % above detailed. $C_1=0$ reproduces detailed transport bit
+for bit, while $C_1=C_2=0.01$ stays broad. The error therefore does not fade
+smoothly as $\theta_c\to 0$ while the cap binds. `transport_precision="fp64"`
+matches the mixed-precision result.
 
 ## Pilot (not the equivalence study)
 

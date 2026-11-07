@@ -596,9 +596,10 @@ Options:
                                   Elastic transport: single-scattering (default)
                                   simulates every event; mixed aggregates small-angle
                                   events into a random hinge (requires elsepa and
-                                  midpoint; refused for coherent emission, temporal
-                                  profiles, transition radiation, channeling, photon
-                                  transport and grooved targets).
+                                  midpoint; refused wherever CXR lines are scored, and
+                                  for coherent emission, temporal profiles, transition
+                                  radiation, channeling, photon transport and grooved
+                                  targets).
   --mixed-c1 FRACTION             Mean soft deflection per hard step under mixed
                                   transport (default 0.05).  [0.0<=x<=0.2]
   --mixed-c2 FRACTION             Mean fractional soft energy loss per step under mixed

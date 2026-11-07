@@ -14,6 +14,7 @@ import numpy as np
 
 from . import __version__
 from ._backend import BACKEND
+from ._mixed_elastic_policy import refuse_mixed_cxr
 from ._numerics import Physics
 from .campaign.kinematic_validity import case_kinematic_validity
 from .campaign.lowering import build_case, build_sweep_cases, lower_simulation
@@ -344,6 +345,7 @@ def simulate(
     )
     scene, resolved_numerics = request.scene, request.numerics
     case, xsgen_tables = _source_case(request)
+    refuse_mixed_cxr(case)  # before transport; the line scorer refuses it too
     if isinstance(scene.detector, PlanarDetector):
         if resolved_numerics.temporal_profile:
             raise ValueError("temporal_profile currently requires a scalar Detector")

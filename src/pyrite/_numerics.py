@@ -251,7 +251,10 @@ class Physics:
         requires ``elastic_model="elsepa"`` and ``energy_model="midpoint"`` and
         is refused for coherent emission, temporal profiles, transition
         radiation, channeling, photon transport, grooved targets and Urban
-        straggling (``straggling=True`` with continuous stopping). ``mixed_c1``
+        straggling (``straggling=True`` with continuous stopping). Its step cap
+        sets the CXR finite-time line width (#990), so every route that scores
+        CXR lines (``pyrite.simulate`` and sweeps) refuses it; mixed transport
+        is available through ``simulate_trajectories``. ``mixed_c1``
         (default 0.05) bounds the mean soft deflection per hard step,
         ``mixed_c2`` (default 0.05) the mean fractional soft loss per step, and
         ``mixed_max_step_um`` adds an absolute step limit; the parameters apply

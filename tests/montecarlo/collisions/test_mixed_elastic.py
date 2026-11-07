@@ -650,6 +650,42 @@ def test_public_mixed_physics_cuts_rows():
     assert rows[1] < rows[0]
 
 
+def test_simulate_refuses_mixed_before_transport(monkeypatch):
+    """#990: the step cap sets the CXR line width, so spectrum runs refuse mixed."""
+    import pyrite as pr
+    from pyrite import api
+
+    def no_transport(*args, **kwargs):
+        raise AssertionError("refusal must precede transport")
+
+    monkeypatch.setattr(api, "run_case", no_transport)
+    with pytest.raises(ValueError, match="does not support CXR line spectra"):
+        pr.simulate(_mixed_scene(), physics=_mixed_physics())
+
+
+def test_line_scorer_refuses_mixed_case():
+    from pyrite.montecarlo.runner import _cxr_for_segments
+
+    with pytest.raises(ValueError, match="does not support CXR line spectra"):
+        _cxr_for_segments(None, None, _lowered(_mixed_physics()), None, None, None)
+
+
+def test_sweep_lowering_refuses_mixed():
+    from dataclasses import replace
+
+    import pyrite as pr
+    from pyrite.api import build_configured_cases
+    from pyrite.campaign.config import default_settings, material_sweep
+    from pyrite.campaign.lowering import build_sweep_cases
+
+    with pytest.raises(ValueError, match="does not support CXR line spectra"):
+        build_sweep_cases(pr.Sweep(_mixed_scene()), physics=_mixed_physics())
+    with pytest.raises(ValueError, match="does not support CXR line spectra"):
+        build_configured_cases(
+            material_sweep("hopg"), replace(default_settings(), transport_mode="mixed")
+        )
+
+
 def test_mixed_case_records_model_marker_and_default_does_not():
     from pyrite._physics_provenance import resolved_physics_view
 
