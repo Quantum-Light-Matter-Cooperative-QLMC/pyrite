@@ -367,3 +367,69 @@ def test_cascade_step_budget_retry_reproduces_the_block(monkeypatch):
         np.testing.assert_allclose(actual[key], reference[key], rtol=RTOL, atol=ATOL, err_msg=key)
     for key in ("eta", "hit_frac", "n_segments"):
         assert actual[key] == reference[key], key
+
+
+def _cuda_available():
+    try:
+        import cupy
+
+        return cupy.cuda.runtime.getDeviceCount() > 0
+    except Exception:
+        return False
+
+
+#: CUDA scoring regroups whole-electron fp32 sums: the #611 16-epsilon allowance.
+CUDA_RTOL = 16 * np.finfo(np.float32).eps
+
+
+def _assert_cuda_streamed_matches(case, reference, block):
+    streamed = run_case_streamed(case, block, transport_core="cuda")
+    for key in SPECTRA:
+        np.testing.assert_allclose(
+            streamed[key], reference[key], rtol=CUDA_RTOL, atol=0, err_msg=key
+        )
+    for key in ("eta", "hit_frac", "n_segments"):
+        assert streamed[key] == reference[key], key
+
+
+@pytest.mark.slow
+@pytest.mark.hardware
+@pytest.mark.skipif(not _cuda_available(), reason="no CUDA device")
+@pytest.mark.parametrize(
+    ("coupled", "Ne", "Ne_brem", "spread"),
+    [(False, 12, 9, None), (False, 9, 12, 0.08), (True, 30, 22, None), (True, 22, 30, 0.05)],
+)
+def test_cuda_shell_cascade_streams_like_the_joined_run(coupled, Ne, Ne_brem, spread):
+    """CUDA joined vs streamed shell cascades share one lineage realization (#923)."""
+    kwargs = dict(threshold=1000.0) if not coupled else {}
+    case = _cascade_case(coupled=coupled, Ne=Ne, Ne_brem=Ne_brem, seed=5, spread=spread, **kwargs)
+    transport = runner._transport_case(case, transport_core="cuda")
+    assert all(transport["segs"]["secondaries"]["tracks_per_generation"][:2])
+    reference = runner._spectrum_case(case, transport)
+    n = max(Ne, Ne_brem)
+    for block in (1, 5, n, n + 7):
+        _assert_cuda_streamed_matches(case, reference, block)
+
+
+@pytest.mark.slow
+@pytest.mark.hardware
+@pytest.mark.skipif(not _cuda_available(), reason="no CUDA device")
+@pytest.mark.parametrize("positrons", [False, True])
+def test_cuda_pair_cascade_streams_like_the_joined_run(monkeypatch, positrons):
+    import warnings
+
+    if positrons:
+        from tests.helpers.positron_tables import require_positron_tables
+
+        require_positron_tables()
+    case = _pair_case(monkeypatch, positrons=positrons, Ne=6, Ne_brem=5)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", UserWarning)  # untransported positrons
+        transport = runner._transport_case(case, transport_core="cuda")
+        kinds = np.asarray(transport["segs"]["secondary_tracks"]["launch_kind"])
+        assert np.any(kinds == 2), "need launched pair electrons"
+        if positrons:
+            assert np.any(kinds == 3), "need launched positrons"
+        reference = runner._spectrum_case(case, transport)
+        for block in (1, 4, 6, 9):
+            _assert_cuda_streamed_matches(case, reference, block)
