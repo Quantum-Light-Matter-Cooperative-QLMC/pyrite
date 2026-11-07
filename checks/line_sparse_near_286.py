@@ -45,18 +45,14 @@ def pair_keys(first, offsets, start, stop, xp=np, *, sort=True):
 
 def far_source():
     """Keep production traversal/moments, skip only the compact leaf pairs."""
-    source = tree._TREE_SOURCE
-    replacements = {
-        "void pyrite_bin_tree_reduce(": "void pyrite_sparse_far_reduce(",
-        "double *out, int n_bins": "const long long *near_first, const long long *near_stop, double *out, int n_bins",
-        "for (int line = first[node]; line < last[node]; ++line) {": "for (int line = first[node]; line < last[node]; ++line) {\n"
-        "                if (bin >= near_first[line] && bin < near_stop[line]) continue;",
-    }
-    for old, new in replacements.items():
-        if source.count(old) != 1:
-            raise RuntimeError("production tree source changed; review sparse prototype")
-        source = source.replace(old, new)
-    return quad.SINCSQ_BIN_PREAMBLE + source
+    defines = """
+#define PYRITE_TREE_NEAR_ARGS const long long *near_first, const long long *near_stop,
+#define PYRITE_TREE_SKIP_NEAR(line, bin) ((bin) >= near_first[line] && (bin) < near_stop[line])
+"""
+    source = tree._TREE_SOURCE.replace(
+        "void pyrite_bin_tree_reduce(", "void pyrite_sparse_far_reduce("
+    )
+    return quad.SINCSQ_BIN_PREAMBLE + defines + source
 
 
 NEAR_SOURCE = r"""

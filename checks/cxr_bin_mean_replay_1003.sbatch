@@ -25,8 +25,9 @@ git status --short
 nvidia-smi --query-gpu=name,driver_version --format=csv
 uv sync -q --locked --no-default-groups --extra nvidia --group dev
 uv run --no-sync pyrite-dev test tests/montecarlo/spectrum/test_sinc_bin_integration_cuda.py \
-  tests/montecarlo/spectrum/test_sinc_bin_near_far.py || echo "FAILED cuda tests rc=$?"
-arms="${ARMS:-auto,node,pairs,tree,sparse,sparse-line,auto+series,pairs+series,tree+series,sparse-line+series}"
+  tests/montecarlo/spectrum/test_sinc_bin_near_far.py \
+  tests/montecarlo/spectrum/test_sinc_bin_sparse.py || echo "FAILED cuda tests rc=$?"
+arms="${ARMS:-auto,pairs,tree,sparse-line,fused,fused-stages,auto+series,pairs+series,tree+series,sparse-line+series,fused+series,fused-stages+series}"
 for fixture in "$@"; do
   name="$(basename "$fixture" .npz)"
   uv run --no-sync python checks/cxr_bin_mean_profile_1003.py replay "$fixture" \
@@ -35,10 +36,10 @@ done
 if [ -n "${NCU_FIXTURE:-}" ]; then
   ncu --section SpeedOfLight --section Occupancy --section ComputeWorkloadAnalysis \
     --section WarpStateStats --section LaunchStats \
-    --kernel-name regex:'pyrite_bin_tree_reduce|sparse_near' --launch-count 12 \
+    --kernel-name regex:'pyrite_bin_tree_reduce|pyrite_sparse_near_reduce|sparse_near' --launch-count 12 \
     uv run --no-sync python checks/cxr_bin_mean_profile_1003.py replay "$NCU_FIXTURE" \
       --out scratch/bin1003/replay2-ncu.json --slice-lines 50000 --max-flushes 1 --repeats 1 \
-      --arms auto,auto+series,sparse-line+series,sparse-line \
+      --arms auto,auto+series,sparse-line+series,fused+series,fused \
     > scratch/bin1003/ncu2.txt 2>&1 || echo "FAILED ncu rc=$?"
 fi
 echo DONE

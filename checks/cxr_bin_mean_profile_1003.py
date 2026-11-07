@@ -157,12 +157,15 @@ _SERIES_ON = "#define PYRITE_BIN_MEAN_SERIES 1\n"
 def _set_series(on):
     """Rebuild every bin-mean kernel with the midpoint series on or off."""
     from pyrite.montecarlo.spectrum.cxr import _bin_quadrature as quad
-    from pyrite.montecarlo.spectrum.cxr import _bin_tree
+    from pyrite.montecarlo.spectrum.cxr import _bin_sparse, _bin_tree
 
     base = quad.SINCSQ_BIN_PREAMBLE.removeprefix(_SERIES_ON)
-    quad.SINCSQ_BIN_PREAMBLE = _bin_tree.SINCSQ_BIN_PREAMBLE = (_SERIES_ON if on else "") + base
+    preamble = (_SERIES_ON if on else "") + base
+    quad.SINCSQ_BIN_PREAMBLE = _bin_tree.SINCSQ_BIN_PREAMBLE = preamble
+    _bin_sparse.SINCSQ_BIN_PREAMBLE = preamble
+    _bin_sparse._NEAR_KERNEL = _bin_sparse._FAR_KERNEL = None
     quad._BIN_REDUCE_KERNEL = quad._BIN_MEAN_KERNEL = None
-    _bin_tree._TREE_KERNEL = _bin_tree._WARP_TREE_KERNEL = None
+    _bin_tree._TREE_KERNEL = None
     _sparse_module().kernels.cache_clear()
 
 
@@ -179,6 +182,37 @@ def _sparse_module():
         sys.modules[name] = module
         spec.loader.exec_module(module)
     return sys.modules[name]
+
+
+def _fused_stages(inputs, out):
+    """The fused route with a synchronized clock between its stages."""
+    import cupy as cp
+
+    from pyrite.montecarlo.spectrum.cxr import _bin_sparse as fused
+    from pyrite.montecarlo.spectrum.cxr._bin_quadrature import BIN_MEAN_EXACT_WIDTHS as widths
+
+    e, a, w, edges, inv_width = inputs
+    stages = {}
+
+    def stage(name, work):
+        start = time.perf_counter()
+        result = work()
+        cp.cuda.Device().synchronize()
+        stages[name] = time.perf_counter() - start
+        return result
+
+    tree, first, stop, offsets, n_jobs, scale = stage(
+        "host_setup_s", lambda: fused.prepare_sparse_reduction(e, a, w, edges)
+    )
+    near = stage(
+        "near_s",
+        lambda: fused.run_sparse_near(
+            tree, first, stop, offsets, n_jobs, scale, edges, inv_width, widths
+        ),
+    )
+    far = stage("far_s", lambda: fused.run_sparse_far(tree, first, stop, edges, inv_width, widths))
+    out += near + far
+    print("fused-stages", json.dumps({**stages, "warp_jobs": n_jobs}), flush=True)
 
 
 def _arm(name, inputs, tile_pairs, nodes=None):
@@ -210,8 +244,14 @@ def _arm(name, inputs, tile_pairs, nodes=None):
         return run_node
     if kind in ("auto", "pairs"):
         return lambda out: run_bin_mean_reduction_kernel(*inputs, out=out, method=kind)
-    if kind in ("tree", "warp"):
-        return lambda out: run_tree_reduction(*inputs, out=out, warp=kind == "warp")
+    if kind == "tree":
+        return lambda out: run_tree_reduction(*inputs, out=out)
+    if kind == "fused":
+        from pyrite.montecarlo.spectrum.cxr._bin_sparse import run_sparse_reduction
+
+        return lambda out: run_sparse_reduction(*inputs, out=out)
+    if kind == "fused-stages":
+        return lambda out: _fused_stages(inputs, out)
     if kind in ("sparse", "sparse-line"):
         sparse = _sparse_module()
 
@@ -324,7 +364,7 @@ rep.add_argument("fixture", type=Path)
 rep.add_argument("--out", type=Path, required=True)
 rep.add_argument(
     "--arms",
-    default="auto,pairs,tree,warp,sparse,auto+series,pairs+series,warp+series,sparse+series",
+    default="auto,pairs,tree,sparse,auto+series,pairs+series,tree+series,sparse+series",
 )
 rep.add_argument("--repeats", type=int, default=2)
 rep.add_argument("--tile-pairs", type=int, default=50_000_000)
