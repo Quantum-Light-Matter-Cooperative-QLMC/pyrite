@@ -17,14 +17,16 @@ from pyrite.detectors import EnergyBins
 from pyrite.montecarlo import runner
 from pyrite.montecarlo import shell_configuration as config
 from pyrite.montecarlo.runner.streamed_scoring import run_case_streamed, streaming_refusal
+from tests.helpers.backend import scaled_rtol
 from tests.montecarlo.cascades.test_coupled_radiative_runner import (  # noqa: F401
     synthetic_si_tables,
 )
 
 SPECTRA = ("spec", "spec_characteristic", "brem_wide", "brem")
-# Summation order only; zeros stay exact up to an absolute floor far below any
-# populated bin of these small spectra.
-RTOL, ATOL = 1e-12, 1e-300
+# Summation order only (fp64); a device-precision session gets the #611
+# 16-epsilon whole-electron regrouping allowance. Zeros stay exact up to an
+# absolute floor far below any populated bin of these small spectra.
+RTOL, ATOL = scaled_rtol(1e-12, eps_multiple=16), 1e-300
 
 
 pytestmark = pytest.mark.usefixtures("synthetic_si_tables")
