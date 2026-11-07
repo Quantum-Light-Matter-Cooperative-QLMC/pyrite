@@ -13,6 +13,7 @@ from typing import Any
 import numpy as np
 
 from .._numerics import _emission_selection
+from .._sampling import FixedSampling, SamplingPolicy, adaptive_sampling
 from .geometry import Footprint, Slab, Stack
 from .model import Analysis, CxrReflections, Numerics, Physics, Scene, Sweep
 
@@ -127,16 +128,21 @@ def numerics_from_legacy(old_sweep: Any, settings: Any) -> Numerics:
     """Resolve the first legacy sampling-budget point and all fixed controls."""
     cxr = old_sweep.n_electrons
     brem = old_sweep.n_electrons_brem
+    precision = getattr(settings, "precision", None)
+    sampling: SamplingPolicy = (
+        FixedSampling(
+            int(getattr(settings, "n_electrons", 450) if cxr is None else _values(cxr)[0]),
+            int(getattr(settings, "n_electrons_brem", 100) if brem is None else _values(brem)[0]),
+        )
+        if precision is None
+        else adaptive_sampling(precision)
+    )
     return Numerics(
-        cxr_trials=int(getattr(settings, "n_electrons", 450) if cxr is None else _values(cxr)[0]),
-        brem_trials=int(
-            getattr(settings, "n_electrons_brem", 100) if brem is None else _values(brem)[0]
-        ),
+        sampling=sampling,
         channeling_basis_size=getattr(settings, "channeling_basis_size", 16),
         channeling_bloch_cells=getattr(settings, "channeling_bloch_cells", 16),
         channeling_dz_ang=getattr(settings, "channeling_dz_ang", 250.0),
         channeling_zone_max_ang=getattr(settings, "channeling_zone_max_ang", None),
-        precision=getattr(settings, "precision", None),
         energy_bins=old_sweep.energy_bins,
         cxr_chunk=old_sweep.spec_chunk,
         brem_chunk=old_sweep.brem_chunk,

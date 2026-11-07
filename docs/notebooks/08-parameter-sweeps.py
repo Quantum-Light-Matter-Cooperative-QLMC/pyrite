@@ -71,7 +71,7 @@ def _(np):
     )
     size = {"width": 5 * ureg.mm, "height": 5 * ureg.mm}
     numerics = Numerics(
-        sampling=FixedSampling(cxr_electrons=256, brem_electrons=256),
+        sampling=FixedSampling(cxr_histories=256, brem_histories=256),
         cxr_reflections=CxrReflections(n_families=1),
     )
     return (

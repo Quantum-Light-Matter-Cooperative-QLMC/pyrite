@@ -7,7 +7,7 @@ import pytest
 
 from pyrite import Scene, api
 from pyrite.beams import Beam, PointBunch, Spot
-from pyrite.config import Numerics, Physics
+from pyrite.config import FixedSampling, Numerics, Physics
 from pyrite.detectors import Detector, IdealPhotonCounter, PixelGrid, PlanarDetector, PlanarPose
 from pyrite.execution import LocalExecutor
 from pyrite.geometry import Footprint, Slab
@@ -37,7 +37,7 @@ def scene():
 
 @pytest.fixture
 def controls():
-    return Numerics(cxr_trials=1, brem_trials=1)
+    return Numerics(sampling=FixedSampling(cxr_histories=1, brem_histories=1))
 
 
 def scalar_output():

@@ -97,9 +97,6 @@ if TYPE_CHECKING:
         FixedSampling as FixedSampling,
     )
     from pyrite.config import (
-        Precision as Precision,
-    )
-    from pyrite.config import (
         RadiationNumerics as RadiationNumerics,
     )
     from pyrite.config import (

@@ -1,6 +1,6 @@
 {
   "schema": "pyrite.tutorial.v1",
-  "source_sha256": "342b844dcab500a53c2782d09cdbd45d74e8d511ab4919ddafc94c93e92cb2f7",
+  "source_sha256": "4360f142222bae801105b18002cebe60dae58e97556411339563b03adf57e8d5",
   "pyrite_version": "0.21.0",
   "python_version": "3.14.4",
   "git_revision": "ccb776ea02b274b97ad6e77627e42fe6b3ed6ac4",
@@ -7439,5 +7439,6 @@
       }
     },
     "warnings": []
-  }
+  },
+  "generated_source_sha256": "342b844dcab500a53c2782d09cdbd45d74e8d511ab4919ddafc94c93e92cb2f7"
 }

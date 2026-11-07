@@ -7,6 +7,7 @@ import pyrite as pr
 from pyrite import api
 from pyrite._spectral_components import cxr_spectrum
 from pyrite.checkpoints import _checkpoint_store, recompute
+from pyrite.config import FixedSampling
 from pyrite.detectors import EnergyBins
 from pyrite.montecarlo import runner
 from pyrite.montecarlo.runner.channeling_emission import rescore_channeling_spectrum
@@ -35,8 +36,7 @@ def channeling_run():
         ),
     )
     numerics = pr.Numerics(
-        cxr_trials=4,
-        brem_trials=6,
+        sampling=FixedSampling(cxr_histories=4, brem_histories=6),
         energy_bins=EnergyBins(
             cxr=np.linspace(1500.0, 3000.0, 31), brem=np.array([5000.0, 10000.0])
         ),

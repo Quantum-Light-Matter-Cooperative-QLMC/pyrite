@@ -8,6 +8,7 @@ import pytest
 import pyrite as pr
 from pyrite import api
 from pyrite.campaign.profiles import case_content_key
+from pyrite.config import FixedSampling
 from pyrite.montecarlo.channeling.planar_injection import (
     SOURCE_MODEL,
     conditional_handoffs,
@@ -49,8 +50,7 @@ def _gaussian(waist=10.0):
 
 def _numerics():
     return pr.Numerics(
-        cxr_trials=8,
-        brem_trials=12,
+        sampling=FixedSampling(cxr_histories=8, brem_histories=12),
         # Replay equality needs only a few photon nodes; the automatic grid
         # would score >300,000 nodes at every detector quadrature direction.
         energy_bins=pr.detectors.EnergyBins(

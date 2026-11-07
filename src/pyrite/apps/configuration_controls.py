@@ -10,6 +10,7 @@ from typing import Any, Literal, get_args, get_origin
 from pyrite._config_presets import EMISSION_VALUES, NUMERICS, PHYSICS
 from pyrite._cxr_vocabulary import CATALOG_FIELDS
 from pyrite._numerics import CxrReflections, Numerics, Physics
+from pyrite._sampling import FixedSampling
 from pyrite.campaign.configuration_editor import plain
 
 
@@ -58,8 +59,8 @@ def calculation_defaults(kind: str) -> dict[str, Any]:
     values = {**plain(Physics()), **plain(Numerics()), **plain(CxrReflections())}
     values["emission"] = Physics().emission_policy
     values.update(
-        n_electrons={"values": [Numerics().cxr_trials]},
-        n_electrons_brem={"values": [Numerics().brem_trials]},
+        n_electrons={"values": [FixedSampling().cxr_histories]},
+        n_electrons_brem={"values": [FixedSampling().brem_histories]},
     )
     values.update(
         inelastic_cutoff_eV=50.0,

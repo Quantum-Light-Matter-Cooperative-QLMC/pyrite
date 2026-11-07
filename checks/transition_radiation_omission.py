@@ -26,6 +26,7 @@ import numpy as np
 import pyrite as pr
 from pyrite._backend import xp
 from pyrite._photon_continuum_floor import continuum_medium_key, photon_continuum_floor_eV
+from pyrite.config import FixedSampling
 from pyrite.montecarlo.geometry import sample_to_lab_R
 from pyrite.montecarlo.spectrum.transition_radiation import (
     beta_from_kinetic_eV,
@@ -111,8 +112,7 @@ def _simulate(scene: Scene, grid: np.ndarray, trials: int):
         pr.Detector(scene.theta_obs_deg),
         physics=pr.Physics(),
         numerics=pr.Numerics(
-            cxr_trials=trials,
-            brem_trials=trials,
+            sampling=FixedSampling(cxr_histories=trials, brem_histories=trials),
             energy_bins=pr.detectors.EnergyBins(cxr=cxr, brem=grid),
         ),
     )

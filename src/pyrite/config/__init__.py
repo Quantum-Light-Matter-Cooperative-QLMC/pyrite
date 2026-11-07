@@ -38,7 +38,6 @@ if TYPE_CHECKING:
         TransportNumerics as TransportNumerics,
     )
     from pyrite._photon_config import PhotonTransport as PhotonTransport
-    from pyrite._precision import Precision as Precision
     from pyrite._sampling import (
         AdaptiveSampling as AdaptiveSampling,
     )
@@ -66,7 +65,6 @@ _EXPORTS = {
     "PhotonTransport": ("pyrite._photon_config", "PhotonTransport"),
     "PixelScorer": ("pyrite.instrument", "PixelScorer"),
     "Physics": ("pyrite._numerics", "Physics"),
-    "Precision": ("pyrite._precision", "Precision"),
     "RadiationNumerics": ("pyrite._numerics_groups", "RadiationNumerics"),
     "TransportKernelTuning": ("pyrite._numerics_groups", "TransportKernelTuning"),
     "TransportNumerics": ("pyrite._numerics_groups", "TransportNumerics"),
@@ -86,7 +84,6 @@ __all__ = [
     "PhotonTransport",
     "Physics",
     "PixelScorer",
-    "Precision",
     "RadiationNumerics",
     "TransportKernelTuning",
     "TransportNumerics",
@@ -96,8 +93,16 @@ __all__ = [
 ]
 
 
+#: Public names removed without an alias (#1007), and their replacement.
+_REMOVED = {"Precision": "AdaptiveSampling"}
+
+
 def __getattr__(name: str) -> Any:
     """Resolve a canonical API name without eagerly loading numerical engines."""
+    if name in _REMOVED:
+        # ImportError, not AttributeError: ``from pyrite.config import Precision``
+        # then reports the replacement instead of a bare "cannot import name".
+        raise ImportError(f"{__name__}.{name} was removed; use {__name__}.{_REMOVED[name]}")
     if name == "Timepix3ResponseNumerics":
         value = getattr(import_module("pyrite.config.response_numerics"), name)
         globals()[name] = value

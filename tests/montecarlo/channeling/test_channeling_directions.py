@@ -5,6 +5,7 @@ import pytest
 
 import pyrite as pr
 from pyrite import api
+from pyrite.config import FixedSampling
 from pyrite.detectors import EnergyBins
 from pyrite.montecarlo import runner
 
@@ -28,8 +29,7 @@ def case():
     return api.build_case(
         scene,
         pr.Numerics(
-            cxr_trials=4,
-            brem_trials=4,
+            sampling=FixedSampling(cxr_histories=4, brem_histories=4),
             channeling_basis_size=8,
             channeling_bloch_cells=4,
             channeling_dz_ang=500.0,

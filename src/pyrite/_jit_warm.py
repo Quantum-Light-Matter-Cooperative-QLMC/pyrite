@@ -99,7 +99,7 @@ def _run_case(case: WarmCase, cupy: bool) -> dict:
                 target,
                 pr.Detector(),
                 physics=pr.Physics(**case.physics),
-                numerics=pr.Numerics(cxr_trials=1, brem_trials=1),
+                numerics=pr.Numerics(sampling=pr.config.FixedSampling(1, 1)),
             )
     except Exception as exc:  # noqa: BLE001 - one unavailable case must not stop the rest
         record.update(status="failed", error=f"{type(exc).__name__}: {exc}")

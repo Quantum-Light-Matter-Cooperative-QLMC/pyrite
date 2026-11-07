@@ -9,6 +9,7 @@ import pyrite as pr
 from pyrite import api
 from pyrite._physics_provenance import resolved_physics_view
 from pyrite.checkpoints import _checkpoint_store
+from pyrite.config import FixedSampling
 from pyrite.montecarlo import runner
 from pyrite.montecarlo.spectrum.dtr_history import DTR_MODEL
 from pyrite.montecarlo.trajectories import read_trajectory_artifact, write_trajectory_artifact
@@ -28,8 +29,7 @@ def _scene(mode="two-beam"):
 
 def _numerics():
     return pr.Numerics(
-        cxr_trials=3,
-        brem_trials=3,
+        sampling=FixedSampling(cxr_histories=3, brem_histories=3),
         cxr_reflections=pr.config.CxrReflections(max_reflections=1),
         energy_bins=pr.detectors.EnergyBins(
             cxr=np.linspace(500.0, 1500.0, 9), brem=np.array([500.0, 5000.0])
@@ -194,7 +194,9 @@ def test_unsupported_configs_refuse_before_transport():
     with pytest.raises(ValueError, match="one reflection"):
         api.build_case(_scene(), replace(_numerics(), cxr_reflections=pr.config.CxrReflections()))
     with pytest.raises(ValueError, match="equal line and continuum"):
-        api.build_case(_scene(), replace(_numerics(), brem_trials=2))
+        api.build_case(
+            _scene(), replace(_numerics(), sampling=replace(_numerics().sampling, brem_histories=2))
+        )
     with pytest.raises(ValueError, match="three finite"):
         pr.Physics(
             transition_radiation="two-beam", transition_lattice_origin_ang=(float("nan"), 0.0, 0.0)

@@ -87,7 +87,7 @@ def _(np):
     from pyrite.beams import Beam, PointBunch, PointSpot
     from pyrite.config import CxrReflections, FixedSampling, Numerics, Physics
     from pyrite.detectors import Detector, EnergyBins
-    from pyrite.geometry import Footprint, Slab
+    from pyrite.geometry import Slab
     from pyrite.optimization import (
         FixedWindowYield,
         Integer,
@@ -100,7 +100,7 @@ def _(np):
     from pyrite.units import ureg
 
     search_numerics = Numerics(
-        sampling=FixedSampling(cxr_electrons=32, brem_electrons=32),
+        sampling=FixedSampling(cxr_histories=32, brem_histories=32),
         transport_core="per-electron",
         energy_bins=(
             EnergyBins()
@@ -116,7 +116,8 @@ def _(np):
             thickness=50 * ureg.nm,
             tilt=45 * ureg.degree,
             tilt_azimuth=180 * ureg.degree,
-            footprint=Footprint(width=5 * ureg.mm, height=5 * ureg.mm),
+            width=5 * ureg.mm,
+            height=5 * ureg.mm,
             mosaic=False,
         ),
         Detector(observation_angle=90 * ureg.degree),
@@ -290,7 +291,7 @@ def _(
     validation_numerics = Numerics(
         transport_core="per-electron",
         cxr_reflections=search_numerics.cxr_reflections,
-        sampling=FixedSampling(cxr_electrons=256, brem_electrons=256),
+        sampling=FixedSampling(cxr_histories=256, brem_histories=256),
         energy_bins=(
             EnergyBins()
             .with_cxr_energies(np.linspace(750, 1_000, 251) * ureg.eV)

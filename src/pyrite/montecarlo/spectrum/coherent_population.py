@@ -75,7 +75,7 @@ def pair_scale(physical_electrons, incident_samples):
     if incident_samples < 2:
         raise CoherentSamplingError(
             "physical coherent cross-electron power requires at least two incident samples; "
-            "increase --cxr-trials"
+            "increase cxr_histories"
         )
     return (population - 1.0) / (incident_samples - 1)
 
@@ -154,7 +154,7 @@ def require_resolved_power(
     if nonfinite_count:
         remedy = "check numerical inputs and arithmetic"
     else:
-        remedy = "increase --cxr-trials and check sampling convergence"
+        remedy = "increase cxr_histories and check sampling convergence"
         ratio = undersampling_ratio(physical_electrons, incident_samples)
         if ratio is not None:
             diagnostics["pair_weight"] = ratio
@@ -168,7 +168,7 @@ def require_resolved_power(
                     "remove sampled offsets (transverse=PointSpot(), "
                     "longitudinal=PointBunch()), lower bunch_charge_pc until N <= M, use a "
                     "finite Slab footprint with a Gaussian LongitudinalDistribution so offsets are averaged "
-                    "analytically, or raise --cxr-trials toward N"
+                    "analytically, or raise cxr_histories toward N"
                 )
     if not nonfinite_count:
         warnings.warn(

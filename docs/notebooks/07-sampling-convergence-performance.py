@@ -61,7 +61,7 @@ def _(np, tables_ready):
     from pyrite.beams import Beam, PointBunch, PointSpot
     from pyrite.config import AdaptiveSampling, CxrReflections, FixedSampling, Numerics, Physics
     from pyrite.detectors import Detector
-    from pyrite.geometry import Footprint, Slab
+    from pyrite.geometry import Slab
     from pyrite.units import ureg
 
     beam = Beam(kinetic_energy=30 * ureg.keV, transverse=PointSpot(), longitudinal=PointBunch())
@@ -69,7 +69,8 @@ def _(np, tables_ready):
         "hopg",
         thickness=100 * ureg.nm,
         tilt=30 * ureg.degree,
-        footprint=Footprint(width=5 * ureg.mm, height=5 * ureg.mm),
+        width=5 * ureg.mm,
+        height=5 * ureg.mm,
     )
     detector = Detector(observation_angle=135 * ureg.degree)
     physics = Physics(brem_source="none")
@@ -120,7 +121,7 @@ def _(
 ):
     assert tables_ready  # Wait for reference tables before executing transport.
     with mo.status.spinner(title="Compiling the sampling workload"):
-        _ = run(FixedSampling(cxr_electrons=16, brem_electrons=16), seed=1)  # untimed warmup
+        _ = run(FixedSampling(cxr_histories=16, brem_histories=16), seed=1)  # untimed warmup
     yields = np.zeros((len(budgets), replicates))
     seconds = np.zeros_like(yields)
     with mo.status.progress_bar(
@@ -132,7 +133,7 @@ def _(
             for _k in range(replicates):
                 # A distinct seed per (budget, replicate) makes every run independent.
                 _result, seconds[_i, _k] = run(
-                    FixedSampling(cxr_electrons=_n, brem_electrons=_n), seed=1_000 * _i + _k + 1
+                    FixedSampling(cxr_histories=_n, brem_histories=_n), seed=1_000 * _i + _k + 1
                 )
                 yields[_i, _k] = band_yield(_result)
                 _progress.update(subtitle=f"N={_n:,}, replicate {_k + 1}/{replicates}")
@@ -163,8 +164,8 @@ def _(AdaptiveSampling, band_eV, band_yield, mo, run, tables_ready):
     assert tables_ready
     policy = AdaptiveSampling(
         target_rse=5e-4,
-        max_electrons=32_768,
-        block_electrons=256,  # stopping is checked after each block
+        max_histories=32_768,
+        block_histories=256,  # stopping is checked after each block
         observables=("cxr",),
         band_eV=band_eV,
     )

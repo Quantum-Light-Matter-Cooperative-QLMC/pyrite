@@ -141,7 +141,7 @@ def _(np, ureg):
     )
     numerics = Numerics(
         seed=23,
-        sampling=FixedSampling(cxr_electrons=2048, brem_electrons=512),
+        sampling=FixedSampling(cxr_histories=2048, brem_histories=512),
         cxr_reflections=CxrReflections(n_families=6),
     )
     return acquisition, numerics, observation

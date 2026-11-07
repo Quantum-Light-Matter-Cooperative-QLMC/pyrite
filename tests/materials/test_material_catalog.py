@@ -2425,13 +2425,13 @@ def test_profile_temporal_profile_opt_in_parses_and_validates(tmp_path):
 
 
 def test_profile_precision_parses_and_rejects_incompatible_profiles(tmp_path):
-    """#361: ``profiles.NAME.precision`` is a validated adaptive policy."""
-    from pyrite.config import Precision
+    """#361: ``profiles.NAME.adaptive_sampling`` is a validated adaptive policy."""
+    from pyrite.config import AdaptiveSampling
     from pyrite.materials import MaterialConfigError, load_material_catalog
 
     policy = (
-        "precision = { target_rse = 0.1, min_electrons = 200, max_electrons = 2000, "
-        'block_electrons = 20, observables = ["line", "brem"], band_eV = [100.0, 900.0] }\n'
+        "adaptive_sampling = { target_rse = 0.1, min_histories = 200, max_histories = 2000, "
+        'block_histories = 20, observables = ["line", "brem"], band_eV = [100.0, 900.0] }\n'
     )
 
     def catalog(extra: str) -> str:
@@ -2442,23 +2442,25 @@ def test_profile_precision_parses_and_rejects_incompatible_profiles(tmp_path):
     fixed = load_material_catalog(_write_catalog(tmp_path, catalog("")))
     assert fixed.profile_precision("standard") is None
     adaptive = load_material_catalog(_write_catalog(tmp_path, catalog(policy)))
-    assert adaptive.profile_precision("standard") == Precision(
+    assert adaptive.profile_precision("standard") == AdaptiveSampling(
         target_rse=0.1,
-        min_electrons=200,
-        max_electrons=2000,
-        block_electrons=20,
+        min_histories=200,
+        max_histories=2000,
+        block_histories=20,
         observables=("cxr", "brem"),
         band_eV=(100.0, 900.0),
     )
     for extra, match in (
-        ("precision = { target_rse = 0.1 }\n", "requires min_electrons"),
-        (policy.replace("block_electrons = 20", "block_electrons = 30"), "multiples"),
+        ("adaptive_sampling = { target_rse = 0.1 }\n", "requires min_histories"),
+        (policy.replace("block_histories = 20", "block_histories = 30"), "multiples"),
+        (policy.replace("block_histories", "block_electrons"), "rename it to 'block_histories'"),
+        ("precision = { target_rse = 0.1 }\n", "rename it to 'adaptive_sampling'"),
         (policy.replace("target_rse = 0.1,", "target_rse = 0.1, spare = 1,"), "unknown"),
-        (policy + "n_electrons = { values = [450] }\n", "n_electrons"),
+        (policy + "cxr_histories = { values = [450] }\n", "cxr_histories"),
         (policy + 'emission = "both"\n', "coherent emission"),
         (
-            policy + "overrides = { hopg = { n_electrons_brem = { values = [90] } } }\n",
-            r"overrides\.hopg\.n_electrons_brem",
+            policy + "overrides = { hopg = { brem_histories = { values = [90] } } }\n",
+            r"overrides\.hopg\.brem_histories",
         ),
     ):
         with pytest.raises(MaterialConfigError, match=match):

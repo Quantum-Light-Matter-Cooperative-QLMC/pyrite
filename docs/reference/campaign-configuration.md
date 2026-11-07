@@ -31,10 +31,10 @@ pyrite physics show lab-scan
 Numerics uses `pyrite numerics preset` and `profile set PROFILE --numerics NAME`.
 Explicit profile physics fields override their preset. Any profile sampling
 value supersedes the preset's entire sampling policy; fixed counts and adaptive
-stopping are never mixed. Trial-count presets hold scalar values; a profile can
-sweep counts with `profile set|add --cxr-trials/--brem-trials`.
-One trial is one Monte Carlo history for that spectrum, distinct from physical
-bunch charge. Line and brem counts select shared transport histories and are
+stopping are never mixed. History-count presets hold scalar values; a profile can
+sweep counts with `profile set|add --cxr-histories/--brem-histories`.
+A history is one transported primary electron and everything it produces,
+distinct from physical bunch charge. Line and brem counts select shared transport histories and are
 not added to obtain a transport count.
 
 `preset adopt PROFILE NAME --dry-run` previews moving effective settings into
@@ -48,16 +48,16 @@ to obtain frozen configurations. See [named presets ADR](../adr/0021-named-physi
 
 ## Adaptive electron counts
 
-Eligible profiles without fixed counts or a `precision` table use adaptive
+Eligible profiles without fixed counts or an `adaptive_sampling` table use adaptive
 sampling: target relative standard error 0.05 on line and bremsstrahlung yields,
-200–20,000 electrons in blocks of 100, with heavy-tail guards. A case stops when
+200–20,000 histories in blocks of 100, with heavy-tail guards. A case stops when
 watched yields meet targets and guards pass, or at the maximum with a
 statistics-limited flag. Both components use one transported population.
-`pyrite numerics precision show PROFILE` reports the policy, fixed counts,
+`pyrite numerics adaptive-sampling show PROFILE` reports the policy, fixed counts,
 blockers and line-grid source.
 
 Fixed counts apply when a profile or material override sets
-`cxr_trials`/`brem_trials`, or for unsupported adaptive routes: coherent or
+`cxr_histories`/`brem_histories`, or for unsupported adaptive routes: coherent or
 `both` emission, particle cascades (secondaries, pairs, positrons), GDF beams,
 grooved entrances, physical pixel detectors, or channeling. An explicit policy
 on an unsupported route is refused. Trajectory capture also needs fixed counts.
@@ -65,10 +65,10 @@ Bundled `trajectory_demo`, `coherent_demo`, and detector demos provide bounded
 fixed-count examples; clone a demo before editing it.
 
 ```bash
-pyrite numerics precision enable lab-scan
-pyrite numerics precision set lab-scan --target-rse 0.02
-pyrite numerics precision show lab-scan
-pyrite numerics precision disable lab-scan --cxr-trials 500 --brem-trials 100
+pyrite numerics adaptive-sampling enable lab-scan
+pyrite numerics adaptive-sampling set lab-scan --target-rse 0.02
+pyrite numerics adaptive-sampling show lab-scan
+pyrite numerics adaptive-sampling disable lab-scan --cxr-histories 500 --brem-histories 100
 ```
 
 `enable` removes fixed profile counts, then stores supplied policy options;
@@ -104,8 +104,8 @@ stopping. Guards are shared; the pilot is clipped to brem bounds.
 The requested policy enters dataset/case identity. Realized counts and errors
 live separately in `adaptive_sampling`, so stopping does not change resume
 identity. Count grids cannot combine with adaptive sampling. The Python
-policy is `Numerics(precision=Precision(...))`; configured campaigns also accept
-`Settings(precision=policy)`. See [statistical methods](../computation/statistical-methods.md#adaptive-electron-counts)
+policy is `Numerics(sampling=AdaptiveSampling(...))`; configured campaigns also
+accept `Settings(precision=policy)`. See [statistical methods](../computation/statistical-methods.md#adaptive-electron-counts)
 for normalization, rare-electron limits and replay semantics.
 
 ## Photon grids

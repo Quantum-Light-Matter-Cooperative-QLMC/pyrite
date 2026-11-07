@@ -422,8 +422,8 @@ def test_profile_run_persists_imported_normalization(catalog, monkeypatch):
         "thickness_ang": [10],
         "tilt_deg": [10],
         "tilt_azim_deg": [0],
-        "n_electrons": [2],
-        "n_electrons_brem": [2],
+        "cxr_histories": [2],
+        "brem_histories": [2],
     }.items():
         row[key] = {"values": values}
     catalog.write_text(tomlkit.dumps(document))

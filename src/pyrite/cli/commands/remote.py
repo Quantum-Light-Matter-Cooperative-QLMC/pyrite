@@ -17,7 +17,7 @@ from ...console.output import (
 )
 from ...remote import config, lifecycle, transport
 from .. import _completion as _cli_completion
-from .._deprecations import DeprecatingGroup, canonical_option
+from .._deprecations import DeprecatingGroup, canonical_option, removed_option
 from .._groups import LazyGroup
 from ._remote_actions import (
     _cli_check,
@@ -153,9 +153,11 @@ def _recompute_options(function):
     help="Recompute brem-only remotely, follow, and pull completed checkpoints.",
 )
 @_recompute_options
+@removed_option("--brem-trials", "--brem-histories")
+@removed_option("--brem-electrons", "--brem-histories")
+@removed_option("--ne-brem", "--brem-histories")
 @click.option(
-    "--brem-trials",
-    "--ne-brem",
+    "--brem-histories",
     "ne_brem",
     type=POSITIVE_INT,
     default=None,
@@ -203,12 +205,14 @@ def rebrem_command(
     help="Recompute line-only remotely, follow, and pull completed checkpoints.",
 )
 @_recompute_options
+@removed_option("--cxr-trials", "--cxr-histories")
+@removed_option("--cxr-electrons", "--cxr-histories")
 @canonical_option(
-    "--cxr-trials",
+    "--cxr-histories",
     "cxr_ne",
     type=POSITIVE_INT,
     default=None,
-    help="New line electron count.",
+    help="New Monte Carlo electron history count for the CXR spectrum.",
 )
 @click.option("--start", type=NONNEGATIVE_FLOAT, default=None, help="Line lower bound in eV.")
 @click.option("--stop", type=POSITIVE_FLOAT, default=None, help="Line exclusive upper bound in eV.")
@@ -1054,9 +1058,11 @@ def sync_command(force, ssh_verbose):
     show_default=True,
     help="Fig. 1c line electrons per energy.",
 )
+@removed_option("--brem-trials", "--brem-histories")
+@removed_option("--brem-electrons", "--brem-histories")
+@removed_option("--ne-brem", "--brem-histories")
 @click.option(
-    "--brem-trials",
-    "--ne-brem",
+    "--brem-histories",
     "ne_brem",
     type=POSITIVE_INT,
     default=200,

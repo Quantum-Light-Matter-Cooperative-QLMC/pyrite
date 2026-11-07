@@ -774,7 +774,7 @@ def _electron_budget(
         raise TypeError("precision must be a Precision or None")
     if sweep.n_electrons is not None or sweep.n_electrons_brem is not None:
         raise ValueError("adaptive precision cannot be combined with electron-count sweep grids")
-    return precision.max_electrons, precision.max_electrons
+    return precision.max_histories, precision.max_histories
 
 
 def _case_energies(sweep: Sweep, gdf: GDFBeam | None) -> np.ndarray:
@@ -927,13 +927,13 @@ def _mosaic_case_keys(sweep: Sweep, cp: dict) -> tuple[float | None, float | Non
     return mosaic_fwhm_rad, None
 
 
-def _electron_counts(grid: Any, fallback: Any, label: str) -> list[int]:
+def _history_counts(grid: Any, fallback: Any, label: str) -> list[int]:
     if grid is None:
         return [int(fallback)]
     raw = _seq(grid)
     counts = [int(value) for value in raw]
     if any(count <= 0 or count != value for count, value in zip(counts, raw, strict=True)):
-        raise ValueError(f"{label} electron counts must be positive integers")
+        raise ValueError(f"{label} history counts must be positive integers")
     return counts
 
 
@@ -1126,8 +1126,8 @@ def build_cases(
     case_brem = _case_brem_resolver(sweep, brem_case_grid)
     ne_pairs = list(
         product(
-            _electron_counts(sweep.n_electrons, n_electrons, "n_electrons"),
-            _electron_counts(sweep.n_electrons_brem, n_electrons_brem, "n_electrons_brem"),
+            _history_counts(sweep.n_electrons, n_electrons, "cxr_histories"),
+            _history_counts(sweep.n_electrons_brem, n_electrons_brem, "brem_histories"),
         )
     )
     # Explicit grids suffix the persisted case name with ``ne=<line>/<brem>``.

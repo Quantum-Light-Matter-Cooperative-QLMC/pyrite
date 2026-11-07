@@ -18,12 +18,16 @@ from pyrite.cli._deprecations import (
 
 _EMPTY_COMMANDS = (
     "No command spelling is currently deprecated. Every spelling the CLI accepts "
-    "is canonical; anything else exits as an unknown command."
+    "is canonical; anything else exits as an unknown command, except hard-break "
+    "removals without a support window (`numerics precision`, #1007), which exit as "
+    "usage errors naming their replacement."
 )
 
 _EMPTY_OPTIONS = (
     "No option spelling is currently deprecated. Every option the CLI accepts is "
-    "canonical; anything else exits as a usage error."
+    "canonical; anything else exits as a usage error. Hard-break removals without a "
+    "support window (the `*-trials` and `*-electrons` Monte Carlo budget flags, "
+    "#1007) name their `*-histories` replacement."
 )
 
 _EMPTY_IMPLICIT = (

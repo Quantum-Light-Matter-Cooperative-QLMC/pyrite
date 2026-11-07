@@ -460,7 +460,7 @@ def _format_electron_progress(record):
     total = record.get("transport_electrons_total")
     if not isinstance(done, int) or not isinstance(total, int) or total <= 0:
         return ""
-    return f"electrons {done:,}/{total:,} ({round(100 * done / total)}%)"
+    return f"histories {done:,}/{total:,} ({round(100 * done / total)}%)"
 
 
 def _format_case_progress(records, materials=()):

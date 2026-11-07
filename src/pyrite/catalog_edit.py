@@ -16,8 +16,10 @@ def validate(path, text, *, profile="standard"):
     """Validate draft bytes with the selected catalog's relative asset paths.
 
     No validation file is written and no missing catalog directory is created.
+    ``text`` may be the canonical or the editable view of a parsed document.
     """
-    return _catalog_from_text(text, path=Path(path), profile=profile)
+    canonical = translate_catalog_text(text, canonical=True)
+    return _catalog_from_text(canonical, path=Path(path), profile=profile)
 
 
 @dataclass

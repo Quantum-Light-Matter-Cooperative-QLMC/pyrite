@@ -84,7 +84,7 @@ def test_rejects_invalid_path_or_accuracy_tuning_in_scientific_scene():
     with pytest.raises(ValueError, match="not a physical"):
         OptimizationStudy(
             scene(),
-            ParameterSpace({"numerics.cxr_trials": Integer(2, 100)}),
+            ParameterSpace({"numerics.sampling": Integer(2, 100)}),
             (Objective("f", "maximize", ""),),
         )
 

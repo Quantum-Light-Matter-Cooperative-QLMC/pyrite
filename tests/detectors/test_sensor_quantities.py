@@ -12,6 +12,7 @@ import pytest
 from pyrite import Beam, Numerics, Scene
 from pyrite.api import build_case, case_content_key
 from pyrite.beams import PointBunch, PointSpot
+from pyrite.config import FixedSampling
 from pyrite.detectors import Detector, SensorAcceptance
 from pyrite.geometry import Slab
 from pyrite.units import Q_, ureg
@@ -62,7 +63,7 @@ def test_equivalent_quantities_keep_detector_lowering_and_identity() -> None:
     )
     beam = Beam(energy_keV=30, transverse=PointSpot(), longitudinal=PointBunch())
     target = Slab("hopg", thickness_ang=1000, footprint=None)
-    numerics = Numerics(cxr_trials=1, brem_trials=1)
+    numerics = Numerics(sampling=FixedSampling(cxr_histories=1, brem_histories=1))
     detectors = [Detector(135, acceptance=sensor) for sensor in sensors]
     assert detectors[0].solid_angle_sr == detectors[1].solid_angle_sr
     assert detectors[0].polar_acceptance_deg == detectors[1].polar_acceptance_deg

@@ -574,18 +574,18 @@ def test_set_concatenates_repeated_range_options(tmp_path, monkeypatch):
 def test_set_reports_a_new_profile_parameter(tmp_path, monkeypatch):
     _catalog(tmp_path, monkeypatch)
 
-    result = invoke(profile.command, ["set", "sub_100keV", "--cxr-trials", "100,200"])
+    result = invoke(profile.command, ["set", "sub_100keV", "--cxr-histories", "100,200"])
 
     assert_clean_result(
         result,
-        stdout="updated profile sub_100keV: line trials set to 100, 200\n",
+        stdout="updated profile sub_100keV: cxr histories set to 100, 200\n",
     )
 
 
 @pytest.mark.parametrize("verb", ["create", "set", "add"])
 @pytest.mark.parametrize(
     ("line_flag", "brem_flag"),
-    [("--cxr-trials", "--brem-trials"), ("-l", "-b")],
+    [("--cxr-histories", "--brem-histories"), ("-l", "-b")],
 )
 def test_profile_trial_grids_keep_catalog_keys(tmp_path, monkeypatch, verb, line_flag, brem_flag):
     catalog = _catalog(tmp_path, monkeypatch)
@@ -595,13 +595,13 @@ def test_profile_trial_grids_keep_catalog_keys(tmp_path, monkeypatch, verb, line
 
     assert_clean_result(result)
     row = tomlkit.parse(catalog.read_text())["profiles"][name]
-    assert row["cxr_trials"]["values"] == [100, 200]
-    assert row["brem_trials"]["values"] == [50, 75]
+    assert row["cxr_histories"]["values"] == [100, 200]
+    assert row["brem_histories"]["values"] == [50, 75]
     assert "n_electrons" not in row
     assert "n_electrons_brem" not in row
 
 
-@pytest.mark.parametrize("flag", ["--cxr-trials", "--brem-trials"])
+@pytest.mark.parametrize("flag", ["--cxr-histories", "--brem-histories"])
 @pytest.mark.parametrize("value", ["0", "-1", "10,0"])
 def test_profile_trial_grids_reject_nonpositive_counts(tmp_path, monkeypatch, flag, value):
     catalog = _catalog(tmp_path, monkeypatch)
@@ -615,7 +615,7 @@ def test_profile_trial_grids_reject_nonpositive_counts(tmp_path, monkeypatch, fl
 
 @pytest.mark.parametrize(
     ("line_field", "brem_field"),
-    [("cxr-trials", "brem-trials")],
+    [("cxr-histories", "brem-histories")],
 )
 def test_numerics_trial_aliases_set_and_reset(tmp_path, monkeypatch, line_field, brem_field):
     catalog = _catalog(tmp_path, monkeypatch)
@@ -636,15 +636,15 @@ def test_numerics_trial_aliases_set_and_reset(tmp_path, monkeypatch, line_field,
 
     assert_clean_result(result)
     row = tomlkit.parse(catalog.read_text())["profiles"]["sub_100keV"]
-    assert row["cxr_trials"]["values"] == [100]
-    assert row["brem_trials"]["values"] == [50]
+    assert row["cxr_histories"]["values"] == [100]
+    assert row["brem_histories"]["values"] == [50]
 
     reset = invoke(profile.command, ["numerics", "reset", "sub_100keV", line_field, brem_field])
 
     assert_clean_result(reset)
     row = tomlkit.parse(catalog.read_text())["profiles"]["sub_100keV"]
-    assert "cxr_trials" not in row
-    assert "brem_trials" not in row
+    assert "cxr_histories" not in row
+    assert "brem_histories" not in row
 
 
 def test_set_unknown_material_in_membership_errors(tmp_path, monkeypatch):
@@ -725,10 +725,10 @@ def test_add_material_is_canonical_and_composes_with_ranges(tmp_path, monkeypatc
 def test_add_accepts_electron_count_grids(tmp_path, monkeypatch):
     catalog = _catalog(tmp_path, monkeypatch)
 
-    result = invoke(profile.command, ["add", "sub_100keV", "--cxr-trials", "100,200"])
+    result = invoke(profile.command, ["add", "sub_100keV", "--cxr-histories", "100,200"])
 
     assert_clean_result(result, stdout="updated profile sub_100keV\n")
-    assert "cxr_trials = {values = [100, 200]}" in catalog.read_text()
+    assert "cxr_histories = {values = [100, 200]}" in catalog.read_text()
 
 
 def test_remove_values_and_missing_value_error(tmp_path, monkeypatch):
@@ -870,7 +870,7 @@ def test_numerics_show_reports_effective_values_and_sources(tmp_path, monkeypatc
     assert_clean_result(shown)
     assert shown.stdout.startswith("[sub_100keV numerics]")
     assert "sampling:" in shown.stdout
-    assert "line electrons: 300 (default)" in shown.stdout
+    assert "cxr histories: 300 (default)" in shown.stdout
     assert "fidelity" not in shown.stdout
     assert "reflection families: 4 (built-in)" in shown.stdout
     assert "mosaic nodes: 5 (built-in)" in shown.stdout
@@ -887,7 +887,7 @@ def test_numerics_show_reports_effective_values_and_sources(tmp_path, monkeypatc
     fields = {row["key"]: row for group in envelope["payload"]["groups"] for row in group["fields"]}
     assert fields["n_electrons"] == {
         "key": "n_electrons",
-        "label": "line electrons",
+        "label": "cxr histories",
         "explicit": None,
         "effective": 300,
         "source": "fidelity",
@@ -906,8 +906,8 @@ def test_numerics_help_exposes_scientific_controls_not_execution_tuning():
     setting = invoke(profile.command, ["numerics", "set", "--help"])
     assert_clean_result(setting)
     for option in (
-        "--cxr-trials",
-        "--brem-trials",
+        "--cxr-histories",
+        "--brem-histories",
         "--reflection-families",
         "--maximum-reflections",
         "--mosaic-nodes",
@@ -928,7 +928,7 @@ def test_numerics_set_dry_run_write_validation_and_reset(tmp_path, monkeypatch):
             "numerics",
             "set",
             "sub_100keV",
-            "--cxr-trials",
+            "--cxr-histories",
             "12",
             "--reflection-families",
             "3",
@@ -940,7 +940,7 @@ def test_numerics_set_dry_run_write_validation_and_reset(tmp_path, monkeypatch):
         ],
     )
     assert_clean_result(dry_run)
-    assert "+cxr_trials = {values = [12]}" in dry_run.stdout
+    assert "+cxr_histories = {values = [12]}" in dry_run.stdout
     assert "+n_families = 3" in dry_run.stdout
     assert catalog.read_text() == _CATALOG
 
@@ -1686,8 +1686,8 @@ def test_show_groups_trial_grids_and_complete_numerics_in_aligned_columns(tmp_pa
     text = _CATALOG.replace(
         "[profiles.sub_100keV]",
         "[profiles.sub_100keV]\n"
-        "cxr_trials = { values = [100, 200] }\n"
-        "brem_trials = { values = [50, 150] }\n"
+        "cxr_histories = { values = [100, 200] }\n"
+        "brem_histories = { values = [50, 150] }\n"
         'n_families = 8\nmax_reflections = 6\nmosaic_nodes = 7\nmosaic_route = "mc"',
     )
     catalog = _catalog(tmp_path, monkeypatch, text)
@@ -1703,7 +1703,7 @@ def test_show_groups_trial_grids_and_complete_numerics_in_aligned_columns(tmp_pa
         "Numerics / sampling",
         "Numerics / reflections and mosaic",
         "Numerics / transport",
-        "Precision (",
+        "Adaptive sampling (",
         "CXR-grid policy (",
         "Energy grids (",
         "Material overrides (",
@@ -1715,8 +1715,8 @@ def test_show_groups_trial_grids_and_complete_numerics_in_aligned_columns(tmp_pa
         assert re.search(rf"^  {axis} {{2,}}\[", sweep, re.MULTILINE)
     assert "trials" not in sweep
     sampling = shown.stdout[offsets[4] : offsets[5]]
-    assert_table_row(sampling, "cxr-trials", "[100, 200] (profile)")
-    assert_table_row(sampling, "brem-trials", "[50, 150] (profile)")
+    assert_table_row(sampling, "cxr-histories", "[100, 200] (profile)")
+    assert_table_row(sampling, "brem-histories", "[50, 150] (profile)")
     convergence = shown.stdout[offsets[5] : offsets[6]]
     for label, value in (
         ("reflection-families", "8"),
@@ -1739,8 +1739,8 @@ def test_show_groups_trial_grids_and_complete_numerics_in_aligned_columns(tmp_pa
     envelope = json.loads(machine.stdout)
     assert envelope["schema"] == "cxr.profile.show"
     assert envelope["payload"]["ranges"][-2:] == [
-        {"name": "ne_line", "catalog_key": "n_electrons", "values": [100, 200]},
-        {"name": "ne_brem", "catalog_key": "n_electrons_brem", "values": [50, 150]},
+        {"name": "ne_line", "catalog_key": "cxr_histories", "values": [100, 200]},
+        {"name": "ne_brem", "catalog_key": "brem_histories", "values": [50, 150]},
     ]
 
 

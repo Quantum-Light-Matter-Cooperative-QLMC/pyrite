@@ -13,6 +13,8 @@ import resource
 import statistics
 import time
 
+from pyrite.config import FixedSampling
+
 
 def benchmark(repeats: int, electrons: int) -> dict:
     started = time.perf_counter()
@@ -40,8 +42,7 @@ def benchmark(repeats: int, electrons: int) -> dict:
             pr.Detector(),
         ),
         pr.Numerics(
-            cxr_trials=electrons,
-            brem_trials=electrons,
+            sampling=FixedSampling(cxr_histories=electrons, brem_histories=electrons),
             energy_bins=pr.detectors.EnergyBins(
                 cxr=np.linspace(1500.0, 4500.0, 31), brem=np.linspace(1000.0, 10000.0, 31)
             ),

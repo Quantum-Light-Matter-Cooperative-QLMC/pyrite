@@ -8,6 +8,7 @@ from functools import lru_cache
 import numpy as np
 
 from .._numerics import CxrReflections, Numerics
+from .._sampling import FixedSampling
 from ..campaign.beam import Beam, PointBunch, PointSpot
 from ..campaign.geometry import Footprint, Slab
 from ..directional import DIRECTIONAL_COMPONENTS, directional_sources, source_line_ceiling_eV
@@ -131,8 +132,7 @@ class MapConfig:
 
     def numerics(self) -> Numerics:
         return Numerics(
-            cxr_trials=self.electrons,
-            brem_trials=self.electrons,
+            sampling=FixedSampling(self.electrons, self.electrons),
             transport_core=self.transport_core,
             cxr_reflections=CxrReflections(max_reflections=self.max_reflections),
         )

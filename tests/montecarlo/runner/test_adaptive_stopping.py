@@ -44,7 +44,7 @@ from pyrite.montecarlo.spectrum.brem import mc_brem_spectrum
 from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 
 #: Guards disabled: the bare relative-standard-error rule.
-_RULE_ONLY = dict(max_electron_share=1.0, min_effective_electrons=0.0, stability_blocks=0)
+_RULE_ONLY = dict(max_history_share=1.0, min_effective_histories=0.0, stability_blocks=0)
 
 
 def _population_measure(population):
@@ -86,21 +86,21 @@ def test_degenerate_moments_report_no_error():
     "bad",
     [
         dict(target_rse=0.0),
-        dict(min_electrons=1),
-        dict(max_electrons=30),
-        dict(min_electrons=45),
-        dict(pilot_electrons=50),
+        dict(min_histories=1),
+        dict(max_histories=30),
+        dict(min_histories=45),
+        dict(pilot_histories=50),
         dict(observables=("spec",)),
-        dict(max_electron_share=0.0),
-        dict(block_electrons=20.5),
-        dict(block_electrons=True),
-        dict(min_electrons=40.5),
-        dict(max_electrons=200.5),
-        dict(pilot_electrons=20),
-        dict(pilot_electrons=220),
+        dict(max_history_share=0.0),
+        dict(block_histories=20.5),
+        dict(block_histories=True),
+        dict(min_histories=40.5),
+        dict(max_histories=200.5),
+        dict(pilot_histories=20),
+        dict(pilot_histories=220),
         dict(stability_blocks=1.5),
         dict(stability_fraction=float("nan")),
-        dict(min_effective_electrons=float("inf")),
+        dict(min_effective_histories=float("inf")),
         dict(observables=("cxr", "cxr")),
         dict(band_eV=(2000.0, 1000.0)),
         dict(band_eV=(0.0, 1000.0)),
@@ -108,7 +108,7 @@ def test_degenerate_moments_report_no_error():
     ],
 )
 def test_settings_are_validated(bad):
-    kw = dict(target_rse=0.1, min_electrons=40, max_electrons=200, block_electrons=20) | bad
+    kw = dict(target_rse=0.1, min_histories=40, max_histories=200, block_histories=20) | bad
     with pytest.raises(ValueError):
         AdaptiveSettings(**kw)
 
@@ -128,7 +128,7 @@ def test_gaussian_population_has_near_nominal_coverage(guards):
     """
     target = 0.05
     settings = AdaptiveSettings(
-        target_rse=target, min_electrons=50, max_electrons=100_000, block_electrons=10, **guards
+        target_rse=target, min_histories=50, max_histories=100_000, block_histories=10, **guards
     )
     errors, rses = [], []
     for seed in range(1000):
@@ -166,7 +166,7 @@ def light_line_masses():
     )
     base = dict(build_cases(sweep)[0])
     settings = AdaptiveSettings(
-        target_rse=1.0, min_electrons=_LIGHT_N, max_electrons=_LIGHT_N, block_electrons=_LIGHT_N
+        target_rse=1.0, min_histories=_LIGHT_N, max_histories=_LIGHT_N, block_histories=_LIGHT_N
     )
     populations = []
     for seed in _LIGHT_SEEDS:
@@ -189,7 +189,7 @@ def test_light_case_meets_its_target_over_20_seeds(light_line_masses):
     _, populations = light_line_masses
     target = 0.1
     settings = AdaptiveSettings(
-        target_rse=target, min_electrons=200, max_electrons=_LIGHT_N, block_electrons=20
+        target_rse=target, min_histories=200, max_histories=_LIGHT_N, block_histories=20
     )
     truth = np.concatenate(populations).mean()
     records = [run_stopping_rule(settings, _population_measure(p)) for p in populations]
@@ -208,7 +208,7 @@ def test_stop_inside_transport_equals_the_rule_on_the_population(light_line_mass
     """The monitor inside block transport reads the per-electron prefix exactly."""
     base, populations = light_line_masses
     settings = AdaptiveSettings(
-        target_rse=0.1, min_electrons=200, max_electrons=_LIGHT_N, block_electrons=20
+        target_rse=0.1, min_histories=200, max_histories=_LIGHT_N, block_histories=20
     )
     case = {**base, "seed": _LIGHT_SEEDS[0], "Ne": _LIGHT_N, "Ne_brem": _LIGHT_N}
     monitor = StoppingMonitor(settings, case_measure(case, settings))
@@ -223,10 +223,10 @@ def test_stop_inside_transport_equals_the_rule_on_the_population(light_line_mass
 
 def test_pilot_projection_skips_checks_until_the_projected_count():
     population = np.random.default_rng(3).normal(1.0, 0.5, 5000)
-    base = dict(target_rse=0.02, min_electrons=50, max_electrons=5000, block_electrons=10)
+    base = dict(target_rse=0.02, min_histories=50, max_histories=5000, block_histories=10)
     plain = run_stopping_rule(AdaptiveSettings(**base), _population_measure(population))
     piloted = run_stopping_rule(
-        AdaptiveSettings(**base, pilot_electrons=100), _population_measure(population)
+        AdaptiveSettings(**base, pilot_histories=100), _population_measure(population)
     )
     pilot = piloted["pilot"]
     rse = pilot["relative_se"]["cxr"]
@@ -258,7 +258,7 @@ def test_guards_turn_a_false_early_stop_into_statistics_limited():
     them, and the run ends statistics_limited at max_electrons.
     """
     population = _heavy_population(np.random.default_rng(0), 4000, every=500)
-    base = dict(target_rse=0.1, min_electrons=200, max_electrons=4000, block_electrons=100)
+    base = dict(target_rse=0.1, min_histories=200, max_histories=4000, block_histories=100)
     measure = _population_measure(population)
     rule = run_stopping_rule(AdaptiveSettings(**base, **_RULE_ONLY), measure)
     assert rule["stop_reason"] == "converged"
@@ -266,7 +266,7 @@ def test_guards_turn_a_false_early_stop_into_statistics_limited():
     line = rule["statistics"]["cxr"]
     assert abs(line["mean"] / 1.8 - 1.0) > 5 * line["relative_se"]
 
-    guarded = run_stopping_rule(AdaptiveSettings(**base, min_effective_electrons=1000.0), measure)
+    guarded = run_stopping_rule(AdaptiveSettings(**base, min_effective_histories=1000.0), measure)
     assert guarded["stop_reason"] == "max_electrons"
     assert guarded["statistics_limited"]
     assert guarded["realized_electrons"] == 4000
@@ -278,9 +278,9 @@ def test_guards_suppress_false_stops_across_seeds():
     """Rate 2e-3: rule-only stops falsely (error > 3 x reported) in most seeds;
     guarded runs do so in at most one of 40 (the tail is then unsampled even
     at the ESS floor: P(no heavy in 2000) = e^-4 ~ 2 %)."""
-    base = dict(target_rse=0.1, min_electrons=200, max_electrons=4000, block_electrons=100)
+    base = dict(target_rse=0.1, min_histories=200, max_histories=4000, block_histories=100)
     false_stops = {}
-    for label, guards in (("rule", _RULE_ONLY), ("guarded", {"min_effective_electrons": 1000.0})):
+    for label, guards in (("rule", _RULE_ONLY), ("guarded", {"min_effective_histories": 1000.0})):
         settings = AdaptiveSettings(**base, **guards)
         count = 0
         for seed in range(40):
@@ -288,7 +288,7 @@ def test_guards_suppress_false_stops_across_seeds():
             record = run_stopping_rule(settings, _population_measure(population))
             line = record["statistics"]["cxr"]
             if record["stop_reason"] == "converged":
-                assert line["max_electron_share"] <= settings.max_electron_share
+                assert line["max_electron_share"] <= settings.max_history_share
                 count += abs(line["mean"] / 1.8 - 1.0) > 3 * line["relative_se"]
         false_stops[label] = count
     assert false_stops["rule"] >= 20
@@ -304,11 +304,11 @@ def test_stability_guard_waits_out_a_late_heavy_electron():
     population[255] = 40.0  # block [240, 260)
     settings = AdaptiveSettings(
         target_rse=0.2,
-        min_electrons=260,
-        max_electrons=400,
-        block_electrons=20,
-        max_electron_share=1.0,
-        min_effective_electrons=0.0,
+        min_histories=260,
+        max_histories=400,
+        block_histories=20,
+        max_history_share=1.0,
+        min_effective_histories=0.0,
         stability_blocks=3,
         stability_fraction=0.5,
     )
@@ -393,9 +393,9 @@ def _fixed(case, n):
 
 _SETTINGS = AdaptiveSettings(
     target_rse=0.1,
-    min_electrons=40,
-    max_electrons=200,
-    block_electrons=20,
+    min_histories=40,
+    max_histories=200,
+    block_histories=20,
     observables=("cxr", "brem"),
 )
 
@@ -421,7 +421,7 @@ def test_same_seed_and_target_replay_the_same_count_and_output():
 def test_min_equal_max_is_the_fixed_n_run():
     case = _case()
     settings = AdaptiveSettings(
-        target_rse=0.1, min_electrons=60, max_electrons=60, block_electrons=20
+        target_rse=0.1, min_histories=60, max_histories=60, block_histories=20
     )
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", CxrYieldStatisticsWarning)  # ESS < 100 at 60
@@ -432,9 +432,9 @@ def test_min_equal_max_is_the_fixed_n_run():
 
 def test_unconverged_run_completes_statistics_limited():
     settings = AdaptiveSettings(
-        target_rse=1e-4, min_electrons=20, max_electrons=40, block_electrons=20
+        target_rse=1e-4, min_histories=20, max_histories=40, block_histories=20
     )
-    with pytest.warns(CxrYieldStatisticsWarning, match="max_electrons=40"):
+    with pytest.warns(CxrYieldStatisticsWarning, match="max_histories=40"):
         result, stats = run_case_adaptive(_case(), settings, transport_core="per-electron")
     assert stats["statistics_limited"] and stats["stop_reason"] == "max_electrons"
     assert stats["realized_electrons"] == 40
@@ -444,9 +444,9 @@ def test_unconverged_run_completes_statistics_limited():
 def test_batch_means_reconstruct_the_band_of_the_final_spectra():
     settings = AdaptiveSettings(
         target_rse=1.0,
-        min_electrons=60,
-        max_electrons=60,
-        block_electrons=20,
+        min_histories=60,
+        max_histories=60,
+        block_histories=20,
         batch_means_band_eV=(1000.0, 3000.0),
     )
     with warnings.catch_warnings():

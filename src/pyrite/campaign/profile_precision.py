@@ -1,11 +1,18 @@
-"""Profile adaptive precision policies and fixed-count transitions."""
+"""Profile adaptive-sampling policies and fixed-count transitions.
+
+Tables are staged in the internal stored vocabulary (``precision``,
+``min_electrons``, ...); catalog rendering writes ``adaptive_sampling`` and
+``*_histories`` (``pyrite._cxr_vocabulary``).
+"""
 
 import tomlkit
 
+from pyrite._cxr_vocabulary import catalog_key
 from pyrite._numerics import SAMPLING_KEYS, validate_profile_numerics
 from pyrite._precision import (
     DEFAULT_PRECISION,
     REQUIRED_FIELDS,
+    STORED_KEYS,
     Precision,
     default_precision_fallback,
 )
@@ -14,33 +21,47 @@ from pyrite.detectors.editing import _toml_value
 from ._profile_document import existing_profile, profile_overrides, values_item
 from .profile_numerics import profile_numerics_values
 
-SAMPLING_FLAGS = {"n_electrons": "cxr-trials", "n_electrons_brem": "brem-trials"}
+SAMPLING_FLAGS = {"n_electrons": "cxr-histories", "n_electrons_brem": "brem-histories"}
 
 
 _INITIAL_FIELDS = (*REQUIRED_FIELDS, "observables")
 
 
 def profile_precision_values(profile):
-    """Return the explicit ``precision`` table as plain values, or ``None``."""
+    """Return the explicit adaptive-sampling table as plain values, or ``None``."""
     table = profile.get("precision")
     if table is None:
         return None
     if not isinstance(table, dict):
-        raise ValueError("precision must be a table")
+        raise ValueError("adaptive_sampling must be a table")
     return dict(table.unwrap() if hasattr(table, "unwrap") else table)
 
 
+def policy_view(values):
+    """User-facing view of a stored-vocabulary policy: catalog field names, ``cxr``."""
+    if values is None:
+        return None
+    return {
+        catalog_key(key): (
+            ["cxr" if name == "line" else name for name in value] if key == "observables" else value
+        )
+        for key, value in values.items()
+    }
+
+
 def precision_resolution(profile):
-    """Resolve a profile row's electron-count mode for display.
+    """Resolve a profile row's history-count mode for display.
 
     Returns ``(explicit, effective, source, fixed_reason)``: ``source`` is
-    ``"profile"``, ``"default"`` or ``"fixed"``. Per-material count overrides,
+    ``"profile"``, ``"default"`` or ``"fixed"``. Policies use catalog field names
+    (:func:`policy_view`). Per-material count overrides,
     GDF beams and grooved faces also keep fixed counts; they are resolved per
     run, not here.
     """
     explicit = profile_precision_values(profile)
     if explicit is not None:
-        return explicit, Precision.from_dict(explicit).to_dict(), "profile", None
+        effective = Precision.from_dict(explicit).to_dict()
+        return policy_view(explicit), policy_view(effective), "profile", None
     reason = default_precision_fallback(
         fixed_counts=any(key in profile for key in SAMPLING_KEYS),
         emission=profile.get("emission"),
@@ -50,12 +71,12 @@ def precision_resolution(profile):
     )
     if reason is not None:
         return None, None, "fixed", reason
-    return None, DEFAULT_PRECISION.to_dict(), "default", None
+    return None, policy_view(DEFAULT_PRECISION.to_dict()), "default", None
 
 
 def _precision_table(values):
     table = tomlkit.table()
-    for key in Precision.__dataclass_fields__:
+    for key in (STORED_KEYS.get(name, name) for name in Precision.__dataclass_fields__):
         if key in values and values[key] is not None:
             value = values[key]
             if key == "observables":
@@ -70,7 +91,7 @@ def fixed_counts(profile):
 
 
 def describe_counts(counts):
-    """Render fixed counts with their CLI spellings: ``line-trials 500, brem-trials 100``."""
+    """Render fixed counts with their CLI spellings: ``cxr-histories 500, brem-histories 100``."""
     return ", ".join(
         f"{SAMPLING_FLAGS[key]} {','.join(str(value) for value in counts[key])}"
         for key in SAMPLING_KEYS
@@ -79,7 +100,7 @@ def describe_counts(counts):
 
 
 def precision_blockers(profile):
-    """Why adaptive precision cannot apply to this profile row, before any write.
+    """Why adaptive sampling cannot apply to this profile row, before any write.
 
     Covers the profile-level routes a run refuses: coherent emission, particle
     cascades, positron transport, physical-detector observation directions and
@@ -109,7 +130,7 @@ def precision_blockers(profile):
 def _check_adaptive(name, profile):
     blockers = precision_blockers(profile)
     if blockers:
-        raise ValueError(f"profile {name!r} cannot use adaptive precision: {'; '.join(blockers)}")
+        raise ValueError(f"profile {name!r} cannot use adaptive sampling: {'; '.join(blockers)}")
 
 
 def _initial_policy(current, updates):
@@ -123,7 +144,7 @@ def _initial_policy(current, updates):
 
 
 def set_precision(document, name, updates):
-    """Validate and stage an adaptive precision policy; return overwritten fields.
+    """Validate and stage an adaptive-sampling policy; return overwritten fields.
 
     A first policy starts from :data:`DEFAULT_PRECISION`'s budget and
     observables; an existing policy keeps every field ``updates`` leaves out.
@@ -135,8 +156,8 @@ def set_precision(document, name, updates):
     counts = fixed_counts(target)
     if counts:
         raise ValueError(
-            f"profile {name!r} sets fixed electron counts ({describe_counts(counts)}); "
-            f"replace them with: pyrite numerics precision enable {name} [OPTIONS]"
+            f"profile {name!r} sets fixed history counts ({describe_counts(counts)}); "
+            f"replace them with: pyrite numerics adaptive-sampling enable {name} [OPTIONS]"
         )
     _check_adaptive(name, target)
     target["precision"] = _precision_table(merged)
@@ -145,7 +166,7 @@ def set_precision(document, name, updates):
 
 
 def enable_precision(document, name, updates):
-    """Switch a profile to adaptive precision atomically.
+    """Switch a profile to adaptive sampling atomically.
 
     Removes fixed counts, then writes a policy only when ``updates`` are given
     or one already exists (unspecified fields as in :func:`set_precision`);
@@ -189,7 +210,7 @@ def disable_precision(document, name, counts):
 
 
 def reset_precision(document, name, fields=()):
-    """Remove selected optional precision fields, or the whole policy when empty."""
+    """Remove selected optional policy fields, or the whole policy when empty."""
     target = existing_profile(document, name)
     current = profile_precision_values(target)
     if current is None:
@@ -200,9 +221,9 @@ def reset_precision(document, name, fields=()):
     required = [field for field in fields if field in REQUIRED_FIELDS]
     if required:
         raise ValueError(
-            f"{', '.join(required)} is required by the policy; reset without fields to "
-            f"remove the policy, or 'pyrite numerics precision disable {name}' to select "
-            "fixed electron counts"
+            f"{', '.join(catalog_key(key) for key in required)} is required by the policy; "
+            "reset without fields to remove the policy, or "
+            f"'pyrite numerics adaptive-sampling disable {name}' to select fixed history counts"
         )
     removed = tuple(field for field in fields if field in current)
     remaining = {key: value for key, value in current.items() if key not in fields}

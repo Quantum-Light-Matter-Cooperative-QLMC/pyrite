@@ -21,7 +21,7 @@ def calculate():
         angle_deg=np.linspace(-180, 180, 48, endpoint=False),
         energy_eV=np.linspace(100, 2_000, 513),
         numerics=Numerics(
-            sampling=FixedSampling(cxr_electrons=2**12, brem_electrons=2**12),
+            sampling=FixedSampling(cxr_histories=2**12, brem_histories=2**12),
             cxr_reflections=CxrReflections(n_families=1),
         ),
         seed=1,

@@ -9,8 +9,8 @@ NUMERICS_GROUPS = (
     (
         "sampling",
         (
-            ("n_electrons", "line electrons"),
-            ("n_electrons_brem", "bremsstrahlung electrons"),
+            ("n_electrons", "cxr histories"),
+            ("n_electrons_brem", "brem histories"),
         ),
     ),
     (

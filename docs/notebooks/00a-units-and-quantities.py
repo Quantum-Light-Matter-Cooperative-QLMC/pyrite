@@ -143,11 +143,11 @@ def _(mo):
     | `Beam.kinetic_energy`        | `Beam.energy_keV`                | keV                    |
     | `Slab.thickness`             | `Slab.thickness_ang`             | Å                      |
     | `Slab.tilt`                  | `Slab.tilt_deg`                  | degree                 |
-    | `Footprint.width`            | `Footprint.width_mm`             | mm                     |
+    | `Slab.width`                 | `Slab.footprint.width_mm`        | mm                     |
     | `Detector.observation_angle` | `Detector.observation_angle_deg` | degree                 |
 
     `Slab.thickness` is a **physical thickness**, not an electron transport
-    step length. `Footprint.width` is the _full_ transverse width, not a half
+    step length. `Slab.width` is the _full_ transverse width, not a half
     width or standard deviation. Detector polar angle is measured from the
     beam axis; it is not a solid-angle acceptance.
     """)
@@ -158,7 +158,7 @@ def _(mo):
 def _(np, ureg):
     from pyrite.beams import Beam, PointBunch, PointSpot
     from pyrite.detectors import Detector
-    from pyrite.geometry import Footprint, Slab
+    from pyrite.geometry import Slab
 
     beam = Beam(
         kinetic_energy=0.03 * ureg.MeV,
@@ -169,7 +169,8 @@ def _(np, ureg):
         "hopg",
         thickness=0.1 * ureg.um,
         tilt=(np.pi / 6) * ureg.radian,
-        footprint=Footprint(width=0.5 * ureg.cm, height=5 * ureg.mm),
+        width=0.5 * ureg.cm,
+        height=5 * ureg.mm,
     )
     detector = Detector(observation_angle=0.75 * np.pi * ureg.radian)
 
@@ -402,7 +403,7 @@ def _(mo):
     Scaling the yield by a detector's energy response/QE requires a separate
     operation.
 
-    **Do not confuse:** a simulation with `FixedSampling(cxr_electrons=8192)`
+    **Do not confuse:** a simulation with `FixedSampling(cxr_histories=8192)`
     samples **8,192 numerical histories**, not 8,192 physical electrons per
     bunch.
     """)

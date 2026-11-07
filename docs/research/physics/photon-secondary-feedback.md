@@ -256,8 +256,8 @@ print(observation.score.total_per_primary_eV)
 
 The Scene must satisfy the existing CPU/ideal unpixelated physical-detector
 boundary, select coupled BremsLib and shell-soft-hard transport, and set
-`Physics.secondary_threshold_eV` equal to `electron_cutoff_eV`. Both trial
-counts must be equal and positive (`Numerics.cxr_trials == brem_trials`), so
+`Physics.secondary_threshold_eV` equal to `electron_cutoff_eV`. Both electron
+counts must be equal and positive (`FixedSampling.cxr_electrons == brem_electrons`), so
 all retained cascade rows have one unambiguous original-primary denominator.
 The input Scene and resolved Case are not modified. Original primary tracks
 retain the Scene seed; the separate event seed controls vacancy relaxation

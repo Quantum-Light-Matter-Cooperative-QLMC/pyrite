@@ -15,6 +15,7 @@ from pyrite.campaign.legacy import (
 from pyrite.campaign.model import Analysis, CxrReflections, Numerics, Physics, Scene, Sweep
 from pyrite.campaign.sweep import BeamSpec
 from pyrite.campaign.sweep import build_cases as build_legacy_cases
+from pyrite.config import FixedSampling
 from pyrite.detectors import (
     Detector,
     IdealPhotonCounter,
@@ -57,14 +58,14 @@ def test_scene_keeps_legacy_run_settings_outside_physical_value_and_round_trips_
         target=Slab("hopg", footprint=Footprint(5.0, 5.0)),
         detector=Detector(),
         physics=Physics(brem_source="none"),
-        numerics=Numerics(cxr_trials=7),
+        numerics=Numerics(sampling=FixedSampling(cxr_histories=7)),
     )
 
     assert {item.name for item in fields(scene)} == {"beam", "target", "detector", "filters"}
     assert set(scene.__dict__) == {"beam", "target", "detector", "filters"}
     assert set(asdict(scene)) == {"beam", "target", "detector", "filters"}
     assert scene.physics.brem_source == "none"
-    assert scene.numerics.cxr_trials == 7
+    assert scene.numerics.sampling.cxr_histories == 7
 
     restored = pickle.loads(pickle.dumps(scene))
     assert restored.physics == scene.physics
@@ -88,7 +89,7 @@ def test_scene_and_planar_detector_dataclass_values_contain_only_physical_inputs
         detector=detector,
         acquisition=Acquisition(1.0, (0.0, 1000.0)),
         physics=Physics(brem_source="none"),
-        numerics=Numerics(cxr_trials=7),
+        numerics=Numerics(sampling=FixedSampling(cxr_histories=7)),
     )
 
     assert set(asdict(detector)) == {"pose", "size_mm", "pixels"}
@@ -188,7 +189,7 @@ def test_object_defaults_are_separate_by_lifetime() -> None:
     numerics = Numerics(cxr_reflections=CxrReflections(max_reflections=4))
     analysis = Analysis()
 
-    assert numerics.cxr_trials == 450
+    assert numerics.sampling.cxr_histories == 450
     assert numerics.cxr_reflections.max_reflections == 4
     assert analysis.convolve_with_det is False
 
@@ -208,7 +209,7 @@ def test_legacy_pair_distributes_settings_and_swept_scene_fields() -> None:
 
     assert len(sweep.expand()) == 4
     assert sweep.base.physics.emission_policy == "both"
-    assert numerics_from_legacy(old, settings).cxr_trials == 12
+    assert numerics_from_legacy(old, settings).sampling.cxr_histories == 12
     assert analysis_from_legacy(settings).beam_current_na == settings.beam_current_na
 
 
@@ -245,7 +246,7 @@ def test_configured_sweep_accepts_independent_run_and_observation_overrides():
         tilt_deg=30.0,
     )
     converted = adapt_configured_sweep(old, Settings(n_electrons=12, n_electrons_brem=6))
-    numerics = Numerics(cxr_trials=9, brem_trials=4)
+    numerics = Numerics(sampling=FixedSampling(cxr_histories=9, brem_histories=4))
     observation = Observation(detector=Detector())
 
     cases = build_sweep_cases(

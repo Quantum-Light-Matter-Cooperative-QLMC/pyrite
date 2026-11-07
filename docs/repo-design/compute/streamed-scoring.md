@@ -186,7 +186,7 @@ gave identical wall times and bitwise-identical output on Si and W at
 measures how block size, scratch budget and `electron_batch` set the
 continuation population, and what that does to kernel time and memory. Scene: W
 1 MeV, 10 µm slab tilted 45°, scalar detector at 90°, 251-bin CXR window, one
-reflection family, seed 7, `brem_electrons = N // 16`, CUDA core, default
+reflection family, seed 7, `brem_histories = N // 16`, CUDA core, default
 mixed precision, `kernel_threads=32`, 256 continuation rows. W keeps 1,121.6
 rows per electron (294.0 M rows at 262,144 electrons). Kernel time is the sum
 of CUDA-event brackets around every continuation launch. Each block's

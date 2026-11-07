@@ -133,6 +133,7 @@ def _preflight_scene(scene, *, allow_cuda=False):
     """Reject unsupported *physical* and execution requests before transport."""
     from ._backend import BACKEND, CUPY_BACKENDS, xp
     from ._numerics import Numerics
+    from ._sampling import AdaptiveSampling
     from .campaign.model import Scene
     from .instrument import PlanarDetector
 
@@ -153,7 +154,7 @@ def _preflight_scene(scene, *, allow_cuda=False):
     numerics = scene.numerics
     if not isinstance(numerics, Numerics):
         raise TypeError("scene.numerics must be Numerics")
-    if numerics.precision is not None:
+    if isinstance(numerics.sampling, AdaptiveSampling):
         raise ValueError("photon reference does not support adaptive precision")
     cores = (
         ("auto", "lockstep", "per-electron", "cuda")

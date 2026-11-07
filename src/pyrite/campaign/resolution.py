@@ -11,6 +11,7 @@ from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Any
 
 from .._numerics import Numerics, Physics, resolve_physics
+from .._sampling import AdaptiveSampling
 from .._spec_defaults import UNSET, _Unset
 from ..instrument import Acquisition, Filter, FilterPlate, NativeAcquisition, PlanarDetector
 from ..observations.spec import Observation, bind_observation
@@ -72,7 +73,9 @@ def resolve_models(scene: Scene, numerics: Numerics) -> tuple[Physics, Numerics]
         if scene.beam.energy_spread_frac not in (None, 0.0):
             raise ValueError("Beam.state requires a monoenergetic source")
         source_record(scene.beam.state)
-    if numerics.precision is not None and isinstance(scene.detector, PlanarDetector):
+    if isinstance(numerics.sampling, AdaptiveSampling) and isinstance(
+        scene.detector, PlanarDetector
+    ):
         raise ValueError("adaptive precision does not support physical detectors; use fixed counts")
     return physics, numerics
 

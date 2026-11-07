@@ -5,7 +5,7 @@ from importlib import import_module
 
 import click
 
-from .._deprecations import canonical_option
+from .._deprecations import canonical_option, removed_option
 from .._groups import LazyGroup
 from .._options import remote_option
 
@@ -177,8 +177,10 @@ def _launch_validation(
     show_default="pyrite-output/figures",
 )
 @click.option("--ne", type=int, default=20_000, show_default=True)
+@removed_option("--brem-trials", "--brem-histories")
+@removed_option("--brem-electrons", "--brem-histories")
 @canonical_option(
-    "--brem-trials",
+    "--brem-histories",
     "ne_brem",
     type=int,
     default=200,
@@ -217,8 +219,10 @@ def validation_export_command(
     show_default=True,
     help="Fig. 1c line electrons per energy.",
 )
+@removed_option("--brem-trials", "--brem-histories")
+@removed_option("--brem-electrons", "--brem-histories")
 @canonical_option(
-    "--brem-trials",
+    "--brem-histories",
     "ne_brem",
     type=click.IntRange(min=1),
     default=200,

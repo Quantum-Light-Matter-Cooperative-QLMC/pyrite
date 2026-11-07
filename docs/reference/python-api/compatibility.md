@@ -88,6 +88,44 @@ Removal dates live in `pyrite._api_deprecations`.
 | --- | --- | --- |
 | `pyrite.beams.BunchLength(rms_fs=σ, shape=s)` (removed in 0.27.0) | `LongitudinalDistribution("gaussian", σ, shape=s)` | `shape="uniform"` is the flat top of the same RMS. `rms_duration=` keeps its meaning. Sampled offsets and case keys are unchanged; pickled `Beam` objects holding a `BunchLength` no longer load. |
 
+(electron-budget-migration)=
+## History-budget migration
+
+`Numerics` stores its Monte Carlo budget only as `sampling`, counted in
+histories: one history is one transported primary electron and everything it
+produces, not a physical beam electron. The legacy spellings were removed with
+no deprecation window (#1007, a deliberate exception to the API policy's
+deprecation schedule): using one raises an error naming its replacement. Change
+a budget with `dataclasses.replace(numerics, sampling=...)`. Equal budgets give
+identical case identities and results, and existing checkpoints and results
+still load. Persisted run records and identities keep their historical keys:
+`Ne`, `Ne_brem`, `adaptive_precision`, and the `*_electrons` keys of
+`AdaptiveSampling.to_dict()` (`min_electrons`, `max_electrons`, ...), which
+`AdaptiveSampling.from_dict()` reads.
+
+| Removed | Replacement |
+| --- | --- |
+| `Numerics(cxr_trials=N)`, `Numerics(brem_trials=M)` | `Numerics(sampling=FixedSampling(cxr_histories=N, brem_histories=M))` |
+| `Numerics(N, M, ...)` (positional) | `sampling=FixedSampling(N, M)`; every `Numerics` argument is keyword-only |
+| `Numerics(precision=Precision(...))` | `Numerics(sampling=AdaptiveSampling(...))` |
+| `pyrite.config.Precision` | `pyrite.config.AdaptiveSampling` |
+| `FixedSampling(cxr_electrons=, brem_electrons=)` | `FixedSampling(cxr_histories=, brem_histories=)` |
+| `AdaptiveSampling` fields `min_electrons`, `max_electrons`, `block_electrons`, `pilot_electrons`, `min_effective_electrons`, `max_electron_share`, `brem_min_electrons`, `brem_max_electrons` | `min_histories`, `max_histories`, `block_histories`, `pilot_histories`, `min_effective_histories`, `max_history_share`, `brem_min_histories`, `brem_max_histories` |
+| `numerics.cxr_trials`, `numerics.brem_trials`, `numerics.sampling.cxr_electrons`, `numerics.sampling.brem_electrons` | `numerics.sampling.cxr_histories`, `numerics.sampling.brem_histories` |
+| `numerics.precision` | `numerics.sampling`, when it is an `AdaptiveSampling` |
+| Sweep axes `numerics.cxr_trials`, `numerics.sampling.cxr_electrons` (and brem) | `numerics.sampling.cxr_histories`, `numerics.sampling.brem_histories` |
+| `Numerics.describe_sampling()` keys `cxr_electrons`, `brem_electrons`, `maximum_cxr_electrons`, `maximum_brem_electrons` | `cxr_histories`, `brem_histories`, `maximum_cxr_histories`, `maximum_brem_histories`; adaptive `requested` uses field names |
+| Catalog keys `cxr_trials`, `cxr_electrons`, `n_electrons` | `cxr_histories` |
+| Catalog keys `brem_trials`, `brem_electrons`, `n_electrons_brem` | `brem_histories` |
+| Catalog table `[profiles.NAME.precision]`, `[numerics.NAME.precision]` | `[profiles.NAME.adaptive_sampling]`, `[numerics.NAME.adaptive_sampling]` |
+| Adaptive table keys `min_electrons`, `max_electrons`, `block_electrons`, `pilot_electrons`, `min_effective_electrons`, `max_electron_share`, `brem_min_electrons`, `brem_max_electrons` | the `*_histories` / `max_history_share` field names |
+| `pyrite numerics precision ...` | `pyrite numerics adaptive-sampling ...` |
+| `--cxr-trials`, `--cxr-electrons`, `--brem-trials`, `--brem-electrons` on `pyrite profile create\|set\|add`, `pyrite numerics set`, `pyrite numerics preset create\|set` and `pyrite numerics adaptive-sampling disable` | `--cxr-histories`, `--brem-histories` |
+| `--cxr-trials` on `pyrite checkpoint recompute cxr` and `pyrite remote reline`; `--brem-trials` on `pyrite checkpoint recompute brem`, `pyrite app validation`, `pyrite app validation reproduce\|export`, `pyrite remote rebrem` and `pyrite remote check`; `--ne-brem` on `pyrite app validation`, `pyrite remote rebrem` and `pyrite remote check` | `--cxr-histories`, `--brem-histories` |
+| `--min-electrons`, `--max-electrons`, `--block-electrons`, `--pilot-electrons`, `--min-effective-electrons`, `--max-electron-share`, `--brem-min-electrons`, `--brem-max-electrons` (and the matching `reset` FIELD names) on `pyrite numerics adaptive-sampling` | `--min-histories`, `--max-histories`, `--block-histories`, `--pilot-histories`, `--min-effective-histories`, `--max-history-share`, `--brem-min-histories`, `--brem-max-histories` |
+| `fixed_counts.cxr_electrons`, `fixed_counts.brem_electrons` and `*_electrons` policy keys in `pyrite numerics adaptive-sampling show --output json` (schema `cxr.profile.precision.show`) | `fixed_counts.cxr_histories`, `fixed_counts.brem_histories`, `*_histories` policy keys (schema `cxr.profile.adaptive_sampling.show`) |
+| `precision` object in `pyrite profile show --output json` | `adaptive_sampling`, with catalog field names |
+
 ## Root import compatibility
 
 The forward-looking root API is `Beam`, `Target`, `Detector`, `Scene`,

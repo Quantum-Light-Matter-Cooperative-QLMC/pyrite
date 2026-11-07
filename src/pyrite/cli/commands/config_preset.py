@@ -29,7 +29,7 @@ _COMPLETE = {
     NUMERICS: _completion.complete_numerics_preset,
 }
 _TABLE_ONLY = {
-    NUMERICS: "precision and line_grid_policy tables are edited in the preset TOML or "
+    NUMERICS: "adaptive_sampling and cxr_grid_policy tables are edited in the preset TOML or "
     "captured by adopt"
 }
 
@@ -103,6 +103,8 @@ def build(kind):
             copy(param)
             for param in profile.numerics_set_command.params
             if fields.get((param.name or "").replace("_", "-")) is not None
+            # Removed budget flags (#1007) keep naming their replacement.
+            or (kind is NUMERICS and not param.expose_value)
         ]
         if kind is PHYSICS:
             params.append(

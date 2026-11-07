@@ -24,7 +24,7 @@ def test_rebrem_queue_script_flags_progress_and_markers():
         "20260101-000000", ["hopg", "hbn"], ne_brem=1000, brem_step_eV=25.0, redo_all=True
     )
     assert "pyrite checkpoint recompute brem" in s
-    assert "--ne-brem 1000" in s and "--step 25" in s and "--redo-all" in s
+    assert "--brem-histories 1000" in s and "--step 25" in s and "--redo-all" in s
     # per-material progress record feeds the shared plain/attached status dashboard
     assert '--progress-file "$JOBDIR/progress/$m.json"' in s
     # completion markers match the scan queue's so _completed_materials works
@@ -34,7 +34,7 @@ def test_rebrem_queue_script_flags_progress_and_markers():
 
 def test_rebrem_queue_script_omits_unset_flags():
     s = remote._rebrem_queue_script("j", ["hopg"], ne_brem=None, brem_step_eV=None, redo_all=False)
-    assert "--ne-brem" not in s and "--step" not in s and "--redo-all" not in s
+    assert "--brem-histories" not in s and "--step" not in s and "--redo-all" not in s
 
 
 def test_rebrem_metadata_keys_mode_line_and_live_job_plumbing():
@@ -79,7 +79,7 @@ def test_rebrem_cli_submits_attaches_and_pulls_completed(monkeypatch):
     monkeypatch.setattr(state, "_completed_materials", lambda jobid, mats: ["hopg"])
     monkeypatch.setattr(lifecycle, "pull", lambda stems, **kw: events.append(("pull", stems)))
 
-    _remote_main(["rebrem", "hopg", "hbn", "--ne-brem", "1000", "--step", "25"])
+    _remote_main(["rebrem", "hopg", "hbn", "--brem-histories", "1000", "--step", "25"])
 
     assert events[0][0] == "start" and events[0][1] == ["hopg", "hbn"]
     assert events[0][2]["ne_brem"] == 1000 and events[0][2]["brem_step_eV"] == 25.0
@@ -102,7 +102,7 @@ def test_rebrem_chunked_queue_script_self_resubmits():
         "J1", ["mos2", "w"], ne_brem=1000, brem_step_eV=None, redo_all=False, chunk_minutes=10.0
     )
     assert "pyrite checkpoint recompute brem" in s
-    assert "--ne-brem 1000" in s
+    assert "--brem-histories 1000" in s
     assert "--max-minutes" in s
     assert "--nice=10000" in s
     assert '--progress-file "$JOBDIR/progress/$m.json"' in s

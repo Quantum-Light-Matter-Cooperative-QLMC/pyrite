@@ -15,6 +15,7 @@ import pyrite as pr
 import pyrite.config as cfg
 from pyrite.campaign.lowering import build_case
 from pyrite.campaign.profiles import case_content_key
+from pyrite.config import FixedSampling
 from pyrite.montecarlo import runner
 from pyrite.montecarlo.runner.transport_options import transport_tuning
 
@@ -42,7 +43,9 @@ SCHEDULES = (
 
 def _numerics(transport):
     tuning = cfg.KernelTuning(transport_core="cuda", transport=transport)
-    return pr.Numerics(cxr_trials=256, brem_trials=128, seed=7, execution=tuning)
+    return pr.Numerics(
+        sampling=FixedSampling(cxr_histories=256, brem_histories=128), seed=7, execution=tuning
+    )
 
 
 def _scene(transport):

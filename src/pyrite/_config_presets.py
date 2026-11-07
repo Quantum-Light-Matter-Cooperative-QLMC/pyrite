@@ -2,8 +2,9 @@
 
 A ``[physics.NAME]`` object holds ``emission`` plus every profile key that is
 a :class:`~pyrite._numerics.Physics` field. A ``[numerics.NAME]`` object holds
-scalar trial counts, the remaining profile numerics keys, and optional
-``precision`` and ``line_grid_policy`` tables. Both may carry a display
+scalar history counts, the remaining profile numerics keys, and optional
+``adaptive_sampling`` and ``cxr_grid_policy`` tables (held internally as
+``precision`` and ``line_grid_policy``). Both may carry a display
 ``description``. A profile attaches them with ``physics = "NAME"`` and
 ``numerics = "NAME"``; its own keys stay explicit overrides. The catalog folds
 presets into each referencing profile row before any consumer reads it, so
@@ -16,6 +17,7 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any
 
+from ._cxr_vocabulary import catalog_key
 from ._numerics import (
     CONVERGENCE_KEYS,
     PHYSICS_FIELDS,
@@ -32,7 +34,7 @@ from ._units import normalize_unit_input
 EMISSION_VALUES = ("incoherent", "coherent", "both")
 METADATA_KEYS = ("description",)
 #: Keys of one sampling policy: a profile setting any of them takes none of
-#: them from its numerics preset, so fixed counts and adaptive precision never mix.
+#: them from its numerics preset, so fixed counts and adaptive sampling never mix.
 SAMPLING_POLICY_KEYS = (*SAMPLING_KEYS, "precision")
 
 
@@ -96,7 +98,11 @@ def preset_errors(kind: PresetKind, name: str, row: object) -> list[tuple[str, s
     if not isinstance(row, Mapping):
         return [(path, "must be a table")]
     errors = [
-        (f"{path}.{key}", f"unknown key; {kind.table} presets hold {', '.join(kind.keys)}")
+        (
+            f"{path}.{catalog_key(key)}",
+            f"unknown key; {kind.table} presets hold "
+            f"{', '.join(catalog_key(name) for name in kind.keys)}",
+        )
         for key in row
         if key not in kind.keys and key not in METADATA_KEYS
     ]
@@ -116,7 +122,7 @@ def validate_values(kind: PresetKind, values: Mapping[str, Any]) -> None:
     """Validate one preset's configuration values through the typed objects."""
     unknown = sorted(set(values) - set(kind.keys))
     if unknown:
-        raise ValueError(f"unknown {kind.table} preset field: {unknown[0]}")
+        raise ValueError(f"unknown {kind.table} preset field: {catalog_key(unknown[0])}")
     if kind is PHYSICS:
         emission = values.get("emission")
         if emission is not None and emission not in EMISSION_VALUES:
@@ -125,11 +131,14 @@ def validate_values(kind: PresetKind, values: Mapping[str, Any]) -> None:
         count = values.get(key)
         if count is not None and (type(count) is not int or count <= 0):
             raise ValueError(
-                f"{key} must be one positive integer; sweep counts belong in profile grids"
+                f"{catalog_key(key)} must be one positive integer; "
+                "sweep counts belong in profile grids"
             )
     if "precision" in values:
         if any(key in values for key in SAMPLING_KEYS):
-            raise ValueError("precision cannot be combined with fixed trial counts")
+            raise ValueError(
+                "adaptive_sampling cannot be combined with cxr_histories/brem_histories"
+            )
         from ._precision import Precision
 
         Precision.from_dict(values["precision"])
@@ -145,7 +154,7 @@ def preset_values(kind: PresetKind, row: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def _profile_value(key: str, value: Any) -> Any:
-    """Spell a preset value as its profile key: trial counts are value grids."""
+    """Spell a preset value as its profile key: electron counts are value grids."""
     return {"values": [value]} if key in SAMPLING_KEYS else value
 
 
@@ -204,21 +213,24 @@ def numerics_from_values(values: Mapping[str, Any]) -> Numerics:
     ``line_grid_policy`` is a catalog campaign policy with no field on
     :class:`Numerics`; it applies only through profiles.
     """
-    from ._precision import Precision
+    from ._sampling import AdaptiveSampling, FixedSampling, SamplingPolicy
 
     reflections = CxrReflections(**{key: values[key] for key in CONVERGENCE_KEYS if key in values})
-    renamed = {"n_electrons": "cxr_trials", "n_electrons_brem": "brem_trials"}
     fields = {
-        renamed.get(key, key): value
+        key: value
         for key, value in values.items()
-        if key in NUMERICS.scalar_keys and key not in CONVERGENCE_KEYS
+        if key in NUMERICS.scalar_keys and key not in (*CONVERGENCE_KEYS, *SAMPLING_KEYS)
     }
-    precision = values.get("precision")
-    return Numerics(
-        **fields,
-        cxr_reflections=reflections,
-        precision=None if precision is None else Precision.from_dict(precision),
-    )
+    sampling: SamplingPolicy
+    if "precision" in values:
+        sampling = AdaptiveSampling.from_dict(values["precision"])
+    else:
+        default = FixedSampling()
+        sampling = FixedSampling(
+            values.get("n_electrons", default.cxr_histories),
+            values.get("n_electrons_brem", default.brem_histories),
+        )
+    return Numerics(**fields, cxr_reflections=reflections, sampling=sampling)
 
 
 def _load(kind: PresetKind, name: str, catalog: Any) -> Mapping[str, Any]:
@@ -272,9 +284,10 @@ def load_numerics(name: str, *, catalog: Any = None) -> Numerics:
     Returns
     -------
     Numerics
-        Trial counts (``n_electrons`` -> ``cxr_trials``, ``n_electrons_brem``
-        -> ``brem_trials``), integration, reflection/mosaic and channeling-zone
-        numerics and any adaptive ``precision`` over the built-in defaults.
+        The preset's ``sampling`` policy (``cxr_histories``/``brem_histories``
+        counts or an ``adaptive_sampling`` table), integration,
+        reflection/mosaic and channeling-zone numerics over the built-in
+        defaults.
         Energy bins and execution-only fields keep their defaults; a
         ``line_grid_policy`` applies only to catalog profiles. Adjust the
         result with :func:`dataclasses.replace`.

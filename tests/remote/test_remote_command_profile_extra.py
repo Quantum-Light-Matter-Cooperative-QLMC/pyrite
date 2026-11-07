@@ -29,7 +29,7 @@ def test_reline_queue_script_and_metadata():
         "J1", ["mos2", "w"], cxr_ne=40000, line_step_eV=None, redo_all=True, chunk_minutes=10.0
     )
     assert "pyrite checkpoint recompute cxr" in s
-    assert "--cxr-trials 40000" in s
+    assert "--cxr-histories 40000" in s
     assert "--redo-all" in s
     assert "--max-minutes" in s
     assert "--nice=10000" in s
@@ -38,7 +38,7 @@ def test_reline_queue_script_and_metadata():
     mono = scripts._recxr_queue_script("J1", ["mos2", "w"], 40000, None, True)
     assert (
         "pyrite checkpoint recompute cxr" in mono
-        and "--cxr-trials 40000" in mono
+        and "--cxr-histories 40000" in mono
         and "--redo-all" in mono
     )
     assert "--progress-file" in mono

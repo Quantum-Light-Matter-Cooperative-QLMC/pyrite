@@ -121,7 +121,29 @@ _REMOVED_OPTIONS.update(
         ("profile set", "--line-trials"),
         ("profile add", "--line-trials"),
         ("profile numerics set", "--line-trials"),
-        ("numerics precision disable", "--line-trials"),
+        ("numerics adaptive-sampling disable", "--line-trials"),
+    )
+)
+
+
+# Issue #1007: Monte Carlo budgets are histories; the `*-trials` spellings
+# are hidden usage errors that name their `*-histories` replacement.
+_REMOVED_OPTIONS.update(
+    (tuple(path.split()), flag)
+    for path, flag in (
+        ("app validation export", "--brem-trials"),
+        ("checkpoint recompute brem", "--brem-trials"),
+        ("checkpoint recompute cxr", "--cxr-trials"),
+        *(
+            (path, flag)
+            for path in (
+                "profile add",
+                "profile create",
+                "profile set",
+                "profile numerics set",
+            )
+            for flag in ("--cxr-trials", "--brem-trials")
+        ),
     )
 )
 
@@ -269,7 +291,11 @@ def test_every_removed_frozen_option_is_now_refused(path, option):
     if _retired(path):
         assert "No such command" in completed.stderr
     else:
-        assert f"No such option '{option}'" in completed.stderr
+        # A #1007 hard-break removal names its replacement instead.
+        assert (
+            f"No such option '{option}'" in completed.stderr
+            or f"{option} was removed; use" in completed.stderr
+        )
 
 
 @pytest.mark.parametrize(

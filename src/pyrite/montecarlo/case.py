@@ -399,8 +399,8 @@ class Case(Mapping[str, Any]):
 
             precision = Precision.from_dict(self.adaptive_precision)
             precision.validate_case(self)
-            if self.Ne != precision.max_electrons or self.Ne_brem != precision.max_electrons:
-                raise ValueError("adaptive case Ne and Ne_brem must equal precision.max_electrons")
+            if self.Ne != precision.max_histories or self.Ne_brem != precision.max_histories:
+                raise ValueError("adaptive case Ne and Ne_brem must equal precision.max_histories")
         if isinstance(self.seed, bool) or not isinstance(self.seed, int):
             raise ValueError("seed must be an integer")
         for name in ("spec_chunk", "brem_chunk"):

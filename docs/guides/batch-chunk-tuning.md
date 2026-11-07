@@ -132,6 +132,7 @@ from pyrite import (
     SensorAcceptance,
     Slab,
 )
+from pyrite.config import FixedSampling
 
 
 def make_scene() -> Scene:
@@ -153,8 +154,7 @@ def make_scene() -> Scene:
         ),
         physics=Physics(emission="incoherent", brem_source="mc"),
         numerics=Numerics(
-            cxr_trials=8192,
-            brem_trials=2048,
+            sampling=FixedSampling(cxr_histories=8192, brem_histories=2048),
             cxr_reflections=CxrReflections(n_families=2),
             energy_bins=EnergyBins(cxr=np.linspace(250.0, 1250.0, 1001)),
             # Do not specify cxr_chunk: the tuner controls it with an env var.

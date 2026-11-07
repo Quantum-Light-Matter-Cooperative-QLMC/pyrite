@@ -15,6 +15,7 @@ import pyrite as pr
 import pyrite.config as cfg
 from pyrite import phases
 from pyrite.campaign.profiles import case_content_key
+from pyrite.config import FixedSampling
 from pyrite.detectors import EnergyBins
 from pyrite.execution import LocalExecutor
 from pyrite.montecarlo import runner
@@ -25,8 +26,7 @@ BINS = EnergyBins(cxr=np.linspace(250.0, 320.0, 15), brem=np.arange(1000.0, 3000
 
 def _numerics(block=None, core="per-electron", **kwargs):
     return pr.Numerics(
-        cxr_trials=12,
-        brem_trials=16,
+        sampling=FixedSampling(cxr_histories=12, brem_histories=16),
         energy_bins=BINS,
         execution=cfg.KernelTuning(transport_core=core, stream_block_electrons=block),
         **kwargs,
@@ -106,8 +106,7 @@ def test_other_entry_points_fail_before_transport(monkeypatch):
 
 def _memory_numerics(target):
     return pr.Numerics(
-        cxr_trials=12,
-        brem_trials=16,
+        sampling=FixedSampling(cxr_histories=12, brem_histories=16),
         energy_bins=BINS,
         execution=cfg.KernelTuning(transport_core="per-electron", stream_memory_mib=target),
     )
@@ -142,8 +141,7 @@ def test_memory_target_refused_outside_simulate():
         pr.simulate(
             _scene(),
             numerics=pr.Numerics(
-                cxr_trials=12,
-                brem_trials=16,
+                sampling=FixedSampling(cxr_histories=12, brem_histories=16),
                 energy_bins=BINS,
                 execution=cfg.KernelTuning(stream_memory_mib=64),
             ),
