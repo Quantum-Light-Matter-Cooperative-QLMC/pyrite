@@ -54,7 +54,7 @@ def mixed_transport_options(function):
         "mixed_max_step_um",
         type=click.FloatRange(min=0.0, min_open=True),
         metavar="UM",
-        help="Absolute step limit under mixed transport (default: a tenth of the layer thickness).",
+        help="Absolute step limit under mixed transport (default: a hundredth of the layer thickness).",
     )(function)
     function = click.option(
         "--mixed-c2",

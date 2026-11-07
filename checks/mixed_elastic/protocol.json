@@ -1,15 +1,15 @@
 {
  "schema": "pyrite.mixed-elastic.protocol.v1",
  "issue": 894,
- "sha": "248d684a66983745a124452c0f70bdfc3db74523",
+ "sha": "7690da3a93b84c18e0895ed026d4b99922421ae4",
  "epsilon": 0.02,
  "alpha": 0.05,
  "comparisons": 446,
  "seeds": [
-  92001,
-  92002,
-  92003,
-  92004
+  97001,
+  97002,
+  97003,
+  97004
  ],
  "families": {
   "matched": {
@@ -42,11 +42,11 @@
    "diagnostic_fraction": 0.25,
    "scenes": {
     "si-300keV-100um": {
-     "histories_per_seed": 2854101,
-     "predicted_hours": 0.5000000834034009,
+     "histories_per_seed": 1973280,
+     "predicted_hours": 0.5000001356483235,
      "pilot_rows_per_history": [
       1039.5559,
-      91.7095
+      372.7027
      ],
      "observables": {
       "backscattered": {
@@ -55,7 +55,7 @@
        "mean": 0.1051,
        "headline": true,
        "margin": 0.002102,
-       "required_histories": 1021715
+       "required_histories": 1021320
       },
       "transmitted": {
        "bound": 1.0,
@@ -63,7 +63,7 @@
        "mean": 0.8474,
        "headline": true,
        "margin": 0.016948,
-       "required_histories": 26226
+       "required_histories": 26042
       },
       "stopped": {
        "bound": 1.0,
@@ -71,7 +71,7 @@
        "mean": 0.0475,
        "headline": true,
        "margin": 0.00095,
-       "required_histories": 2358684
+       "required_histories": 2284468
       },
       "transmitted_mu_bin_0": {
        "bound": 1.0,
@@ -79,7 +79,7 @@
        "mean": 0.1156,
        "headline": true,
        "margin": 0.002312,
-       "required_histories": 901868
+       "required_histories": 887008
       },
       "transmitted_mu_bin_1": {
        "bound": 1.0,
@@ -87,7 +87,7 @@
        "mean": 0.4932,
        "headline": true,
        "margin": 0.009864000000000001,
-       "required_histories": 125162
+       "required_histories": 125193
       },
       "transmitted_mu_bin_2": {
        "bound": 1.0,
@@ -95,7 +95,7 @@
        "mean": 0.2116,
        "headline": true,
        "margin": 0.0042320000000000005,
-       "required_histories": 440660
+       "required_histories": 440299
       },
       "transmitted_mu_bin_3": {
        "bound": 1.0,
@@ -103,7 +103,7 @@
        "mean": 0.027,
        "headline": true,
        "margin": 0.00054,
-       "required_histories": 4312857
+       "required_histories": 4507651
       },
       "backscattered_mu_bin_0": {
        "bound": 1.0,
@@ -111,7 +111,7 @@
        "mean": 0.0206,
        "headline": true,
        "margin": 0.00041200000000000004,
-       "required_histories": 6017115
+       "required_histories": 5677647
       },
       "backscattered_mu_bin_1": {
        "bound": 1.0,
@@ -119,7 +119,7 @@
        "mean": 0.0619,
        "headline": true,
        "margin": 0.001238,
-       "required_histories": 1810225
+       "required_histories": 1853271
       },
       "backscattered_mu_bin_2": {
        "bound": 1.0,
@@ -127,7 +127,7 @@
        "mean": 0.0204,
        "headline": true,
        "margin": 0.00040800000000000005,
-       "required_histories": 5439021
+       "required_histories": 5348478
       },
       "backscattered_mu_bin_3": {
        "bound": 1.0,
@@ -149,7 +149,7 @@
        "mean": 0.0232,
        "headline": true,
        "margin": 0.000464,
-       "required_histories": 4878414
+       "required_histories": 4838731
       },
       "transmitted_energy_bin_2": {
        "bound": 1.0,
@@ -157,7 +157,7 @@
        "mean": 0.1141,
        "headline": true,
        "margin": 0.0022819999999999997,
-       "required_histories": 922163
+       "required_histories": 919858
       },
       "transmitted_energy_bin_3": {
        "bound": 1.0,
@@ -165,7 +165,7 @@
        "mean": 0.7047,
        "headline": true,
        "margin": 0.014094,
-       "required_histories": 54314
+       "required_histories": 54084
       },
       "transmitted_energy_bin_4": {
        "bound": 1.0,
@@ -187,7 +187,7 @@
        "mean": 0.027,
        "headline": true,
        "margin": 0.00054,
-       "required_histories": 4428427
+       "required_histories": 4146032
       },
       "backscattered_energy_bin_2": {
        "bound": 1.0,
@@ -195,7 +195,7 @@
        "mean": 0.0558,
        "headline": true,
        "margin": 0.001116,
-       "required_histories": 1956400
+       "required_histories": 2021758
       },
       "backscattered_energy_bin_3": {
        "bound": 1.0,
@@ -217,7 +217,7 @@
        "mean": 0.0052,
        "headline": true,
        "margin": 0.000104,
-       "required_histories": 46614435
+       "required_histories": 46385984
       },
       "photons_50_100keV": {
        "bound": 6.0,
@@ -232,7 +232,7 @@
        "mean": 0.0013,
        "headline": true,
        "margin": 2.6e-05,
-       "required_histories": 87586622
+       "required_histories": 80951259
       },
       "cone_source_photons_ge10kev": {
        "bound": 30.0,
@@ -240,7 +240,7 @@
        "mean": 0.0001,
        "headline": true,
        "margin": 2.0000000000000003e-06,
-       "required_histories": 1779430832
+       "required_histories": 3039438335
       },
       "transmitted_energy_keV": {
        "bound": 300.0003,
@@ -248,7 +248,7 @@
        "mean": 199.11275726229567,
        "headline": true,
        "margin": 3.9822551452459134,
-       "required_histories": 29924
+       "required_histories": 29730
       },
       "photon_keV_ge10keV": {
        "bound": 300.0003,
@@ -256,16 +256,16 @@
        "mean": 0.368371824609375,
        "headline": true,
        "margin": 0.007367436492187501,
-       "required_histories": 35981689
+       "required_histories": 29314946
       }
      }
     },
     "w-300keV-10um": {
-     "histories_per_seed": 1179188,
-     "predicted_hours": 0.5000001636381689,
+     "histories_per_seed": 945933,
+     "predicted_hours": 0.5000002625638547,
      "pilot_rows_per_history": [
       1985.8458,
-      305.2869
+      655.06
      ],
      "observables": {
       "backscattered": {
@@ -274,7 +274,7 @@
        "mean": 0.425,
        "headline": true,
        "margin": 0.0085,
-       "required_histories": 163373
+       "required_histories": 163712
       },
       "transmitted": {
        "bound": 1.0,
@@ -282,7 +282,7 @@
        "mean": 0.5438,
        "headline": true,
        "margin": 0.010875999999999999,
-       "required_histories": 103165
+       "required_histories": 103287
       },
       "stopped": {
        "bound": 1.0,
@@ -290,7 +290,7 @@
        "mean": 0.0312,
        "headline": true,
        "margin": 0.000624,
-       "required_histories": 3614164
+       "required_histories": 3646483
       },
       "transmitted_mu_bin_0": {
        "bound": 1.0,
@@ -298,7 +298,7 @@
        "mean": 0.0929,
        "headline": true,
        "margin": 0.001858,
-       "required_histories": 1145710
+       "required_histories": 1104148
       },
       "transmitted_mu_bin_1": {
        "bound": 1.0,
@@ -306,7 +306,7 @@
        "mean": 0.3199,
        "headline": true,
        "margin": 0.006398000000000001,
-       "required_histories": 253594
+       "required_histories": 253712
       },
       "transmitted_mu_bin_2": {
        "bound": 1.0,
@@ -314,7 +314,7 @@
        "mean": 0.1164,
        "headline": true,
        "margin": 0.002328,
-       "required_histories": 890131
+       "required_histories": 886317
       },
       "transmitted_mu_bin_3": {
        "bound": 1.0,
@@ -329,7 +329,7 @@
        "mean": 0.0874,
        "headline": true,
        "margin": 0.0017480000000000002,
-       "required_histories": 1227175
+       "required_histories": 1208388
       },
       "backscattered_mu_bin_1": {
        "bound": 1.0,
@@ -337,7 +337,7 @@
        "mean": 0.2506,
        "headline": true,
        "margin": 0.005012,
-       "required_histories": 357324
+       "required_histories": 358446
       },
       "backscattered_mu_bin_2": {
        "bound": 1.0,
@@ -345,7 +345,7 @@
        "mean": 0.078,
        "headline": true,
        "margin": 0.00156,
-       "required_histories": 1356797
+       "required_histories": 1424977
       },
       "backscattered_mu_bin_3": {
        "bound": 1.0,
@@ -374,7 +374,7 @@
        "mean": 0.0889,
        "headline": true,
        "margin": 0.001778,
-       "required_histories": 1218472
+       "required_histories": 1189978
       },
       "transmitted_energy_bin_3": {
        "bound": 1.0,
@@ -382,7 +382,7 @@
        "mean": 0.3395,
        "headline": true,
        "margin": 0.006790000000000001,
-       "required_histories": 232142
+       "required_histories": 231983
       },
       "transmitted_energy_bin_4": {
        "bound": 1.0,
@@ -390,7 +390,7 @@
        "mean": 0.0963,
        "headline": true,
        "margin": 0.001926,
-       "required_histories": 1099406
+       "required_histories": 1087669
       },
       "backscattered_energy_bin_0": {
        "bound": 1.0,
@@ -412,7 +412,7 @@
        "mean": 0.0927,
        "headline": true,
        "margin": 0.0018540000000000002,
-       "required_histories": 1130849
+       "required_histories": 1154246
       },
       "backscattered_energy_bin_3": {
        "bound": 1.0,
@@ -420,7 +420,7 @@
        "mean": 0.1921,
        "headline": true,
        "margin": 0.003842,
-       "required_histories": 496170
+       "required_histories": 500256
       },
       "backscattered_energy_bin_4": {
        "bound": 1.0,
@@ -428,7 +428,7 @@
        "mean": 0.1225,
        "headline": true,
        "margin": 0.00245,
-       "required_histories": 865740
+       "required_histories": 858561
       },
       "photons_10_50keV": {
        "bound": 30.0,
@@ -436,7 +436,7 @@
        "mean": 0.024,
        "headline": true,
        "margin": 0.00048,
-       "required_histories": 9943723
+       "required_histories": 9879331
       },
       "photons_50_100keV": {
        "bound": 6.0,
@@ -444,7 +444,7 @@
        "mean": 0.0081,
        "headline": true,
        "margin": 0.000162,
-       "required_histories": 19295936
+       "required_histories": 16922082
       },
       "photons_ge100keV": {
        "bound": 3.0,
@@ -452,7 +452,7 @@
        "mean": 0.0061,
        "headline": true,
        "margin": 0.00012200000000000001,
-       "required_histories": 23963228
+       "required_histories": 24999165
       },
       "cone_source_photons_ge10kev": {
        "bound": 30.0,
@@ -460,7 +460,7 @@
        "mean": 0.0004,
        "headline": true,
        "margin": 8.000000000000001e-06,
-       "required_histories": 568232720
+       "required_histories": 528225208
       },
       "transmitted_energy_keV": {
        "bound": 300.0003,
@@ -468,7 +468,7 @@
        "mean": 132.78220822268435,
        "headline": true,
        "margin": 2.655644164453687,
-       "required_histories": 109821
+       "required_histories": 110131
       },
       "photon_keV_ge10keV": {
        "bound": 300.0003,
@@ -476,16 +476,16 @@
        "mean": 2.2087116212890625,
        "headline": true,
        "margin": 0.04417423242578125,
-       "required_histories": 7057660
+       "required_histories": 6714987
       }
      }
     },
     "si-1MeV-1mm": {
-     "histories_per_seed": 438433,
-     "predicted_hours": 0.5000002204739838,
+     "histories_per_seed": 411249,
+     "predicted_hours": 0.500000402846128,
      "pilot_rows_per_history": [
       7807.8572,
-      370.1332
+      632.1919
      ],
      "observables": {
       "backscattered": {
@@ -494,7 +494,7 @@
        "mean": 0.0991,
        "headline": true,
        "margin": 0.001982,
-       "required_histories": 1069849
+       "required_histories": 1080308
       },
       "transmitted": {
        "bound": 1.0,
@@ -502,7 +502,7 @@
        "mean": 0.5344,
        "headline": true,
        "margin": 0.010688,
-       "required_histories": 106998
+       "required_histories": 107051
       },
       "stopped": {
        "bound": 1.0,
@@ -510,7 +510,7 @@
        "mean": 0.3665,
        "headline": true,
        "margin": 0.00733,
-       "required_histories": 207880
+       "required_histories": 208215
       },
       "transmitted_mu_bin_0": {
        "bound": 1.0,
@@ -518,7 +518,7 @@
        "mean": 0.0742,
        "headline": true,
        "margin": 0.001484,
-       "required_histories": 1445751
+       "required_histories": 1464823
       },
       "transmitted_mu_bin_1": {
        "bound": 1.0,
@@ -526,7 +526,7 @@
        "mean": 0.3213,
        "headline": true,
        "margin": 0.006425999999999999,
-       "required_histories": 251119
+       "required_histories": 249514
       },
       "transmitted_mu_bin_2": {
        "bound": 1.0,
@@ -534,7 +534,7 @@
        "mean": 0.1251,
        "headline": true,
        "margin": 0.002502,
-       "required_histories": 820126
+       "required_histories": 823077
       },
       "transmitted_mu_bin_3": {
        "bound": 1.0,
@@ -556,7 +556,7 @@
        "mean": 0.0598,
        "headline": true,
        "margin": 0.001196,
-       "required_histories": 1801974
+       "required_histories": 1866769
       },
       "backscattered_mu_bin_2": {
        "bound": 1.0,
@@ -578,7 +578,7 @@
        "mean": 0.031,
        "headline": true,
        "margin": 0.00062,
-       "required_histories": 3779673
+       "required_histories": 3670805
       },
       "transmitted_energy_bin_1": {
        "bound": 1.0,
@@ -586,7 +586,7 @@
        "mean": 0.1766,
        "headline": true,
        "margin": 0.0035320000000000004,
-       "required_histories": 543931
+       "required_histories": 550826
       },
       "transmitted_energy_bin_2": {
        "bound": 1.0,
@@ -594,7 +594,7 @@
        "mean": 0.3268,
        "headline": true,
        "margin": 0.006536,
-       "required_histories": 245257
+       "required_histories": 243469
       },
       "transmitted_energy_bin_3": {
        "bound": 1.0,
@@ -623,7 +623,7 @@
        "mean": 0.0426,
        "headline": true,
        "margin": 0.000852,
-       "required_histories": 2725526
+       "required_histories": 2689099
       },
       "backscattered_energy_bin_2": {
        "bound": 1.0,
@@ -631,7 +631,7 @@
        "mean": 0.0339,
        "headline": true,
        "margin": 0.000678,
-       "required_histories": 3237221
+       "required_histories": 3269096
       },
       "backscattered_energy_bin_3": {
        "bound": 1.0,
@@ -653,7 +653,7 @@
        "mean": 0.0415,
        "headline": true,
        "margin": 0.00083,
-       "required_histories": 11969518
+       "required_histories": 12025771
       },
       "photons_50_100keV": {
        "bound": 20.0,
@@ -661,7 +661,7 @@
        "mean": 0.0147,
        "headline": true,
        "margin": 0.000294,
-       "required_histories": 14100172
+       "required_histories": 13944407
       },
       "photons_ge100keV": {
        "bound": 10.0,
@@ -669,7 +669,7 @@
        "mean": 0.0177,
        "headline": true,
        "margin": 0.00035400000000000004,
-       "required_histories": 9614894
+       "required_histories": 9404484
       },
       "cone_source_photons_ge10kev": {
        "bound": 100.0,
@@ -677,7 +677,7 @@
        "mean": 0.0007,
        "headline": true,
        "margin": 1.4e-05,
-       "required_histories": 708810335
+       "required_histories": 660227700
       },
       "transmitted_energy_keV": {
        "bound": 1000.0009999999999,
@@ -685,7 +685,7 @@
        "mean": 263.9253166706704,
        "headline": true,
        "margin": 5.278506333413408,
-       "required_histories": 128332
+       "required_histories": 127892
       },
       "photon_keV_ge10keV": {
        "bound": 1000.0009999999999,
@@ -693,16 +693,16 @@
        "mean": 6.077743096289062,
        "headline": true,
        "margin": 0.12155486192578124,
-       "required_histories": 5389701
+       "required_histories": 5264137
       }
      }
     },
     "w-1MeV-100um": {
-     "histories_per_seed": 170001,
-     "predicted_hours": 0.5000005117952147,
+     "histories_per_seed": 157154,
+     "predicted_hours": 0.5000022904120105,
      "pilot_rows_per_history": [
       15407.7181,
-      1601.6287
+      1830.7531
      ],
      "observables": {
       "backscattered": {
@@ -711,7 +711,7 @@
        "mean": 0.4285,
        "headline": true,
        "margin": 0.00857,
-       "required_histories": 161378
+       "required_histories": 161453
       },
       "transmitted": {
        "bound": 1.0,
@@ -719,7 +719,7 @@
        "mean": 0.2329,
        "headline": true,
        "margin": 0.004658,
-       "required_histories": 390029
+       "required_histories": 385949
       },
       "stopped": {
        "bound": 1.0,
@@ -727,7 +727,7 @@
        "mean": 0.3386,
        "headline": true,
        "margin": 0.006772,
-       "required_histories": 232042
+       "required_histories": 232908
       },
       "transmitted_mu_bin_0": {
        "bound": 1.0,
@@ -735,7 +735,7 @@
        "mean": 0.0358,
        "headline": true,
        "margin": 0.000716,
-       "required_histories": 3295408
+       "required_histories": 3303445
       },
       "transmitted_mu_bin_1": {
        "bound": 1.0,
@@ -743,7 +743,7 @@
        "mean": 0.1409,
        "headline": true,
        "margin": 0.002818,
-       "required_histories": 712722
+       "required_histories": 702670
       },
       "transmitted_mu_bin_2": {
        "bound": 1.0,
@@ -751,7 +751,7 @@
        "mean": 0.0502,
        "headline": true,
        "margin": 0.0010040000000000001,
-       "required_histories": 2183327
+       "required_histories": 2153223
       },
       "transmitted_mu_bin_3": {
        "bound": 1.0,
@@ -766,7 +766,7 @@
        "mean": 0.0824,
        "headline": true,
        "margin": 0.0016480000000000002,
-       "required_histories": 1314015
+       "required_histories": 1293355
       },
       "backscattered_mu_bin_1": {
        "bound": 1.0,
@@ -774,7 +774,7 @@
        "mean": 0.2586,
        "headline": true,
        "margin": 0.005172,
-       "required_histories": 341264
+       "required_histories": 341464
       },
       "backscattered_mu_bin_2": {
        "bound": 1.0,
@@ -782,7 +782,7 @@
        "mean": 0.0792,
        "headline": true,
        "margin": 0.0015840000000000001,
-       "required_histories": 1399540
+       "required_histories": 1420241
       },
       "backscattered_mu_bin_3": {
        "bound": 1.0,
@@ -804,7 +804,7 @@
        "mean": 0.0581,
        "headline": true,
        "margin": 0.001162,
-       "required_histories": 1862448
+       "required_histories": 1885967
       },
       "transmitted_energy_bin_2": {
        "bound": 1.0,
@@ -812,7 +812,7 @@
        "mean": 0.1487,
        "headline": true,
        "margin": 0.002974,
-       "required_histories": 678016
+       "required_histories": 665704
       },
       "transmitted_energy_bin_3": {
        "bound": 1.0,
@@ -841,7 +841,7 @@
        "mean": 0.0564,
        "headline": true,
        "margin": 0.001128,
-       "required_histories": 1970632
+       "required_histories": 1945669
       },
       "backscattered_energy_bin_2": {
        "bound": 1.0,
@@ -849,7 +849,7 @@
        "mean": 0.1397,
        "headline": true,
        "margin": 0.002794,
-       "required_histories": 748694
+       "required_histories": 747695
       },
       "backscattered_energy_bin_3": {
        "bound": 1.0,
@@ -857,7 +857,7 @@
        "mean": 0.1613,
        "headline": true,
        "margin": 0.003226,
-       "required_histories": 603197
+       "required_histories": 609982
       },
       "backscattered_energy_bin_4": {
        "bound": 1.0,
@@ -865,7 +865,7 @@
        "mean": 0.06,
        "headline": true,
        "margin": 0.0012,
-       "required_histories": 1891317
+       "required_histories": 1892672
       },
       "photons_10_50keV": {
        "bound": 100.0,
@@ -873,7 +873,7 @@
        "mean": 0.1989,
        "headline": true,
        "margin": 0.003978,
-       "required_histories": 2534011
+       "required_histories": 2548662
       },
       "photons_50_100keV": {
        "bound": 20.0,
@@ -881,7 +881,7 @@
        "mean": 0.0689,
        "headline": true,
        "margin": 0.001378,
-       "required_histories": 3014531
+       "required_histories": 2914842
       },
       "photons_ge100keV": {
        "bound": 10.0,
@@ -889,7 +889,7 @@
        "mean": 0.1103,
        "headline": true,
        "margin": 0.002206,
-       "required_histories": 1436526
+       "required_histories": 1446331
       },
       "cone_source_photons_ge10kev": {
        "bound": 100.0,
@@ -897,7 +897,7 @@
        "mean": 0.0015,
        "headline": true,
        "margin": 3e-05,
-       "required_histories": 370105909
+       "required_histories": 357292491
       },
       "transmitted_energy_keV": {
        "bound": 1000.0009999999999,
@@ -905,7 +905,7 @@
        "mean": 132.29431799360208,
        "headline": true,
        "margin": 2.6458863598720415,
-       "required_histories": 445888
+       "required_histories": 434246
       },
       "photon_keV_ge10keV": {
        "bound": 1000.0009999999999,
@@ -913,16 +913,16 @@
        "mean": 37.17876040585937,
        "headline": true,
        "margin": 0.7435752081171875,
-       "required_histories": 959473
+       "required_histories": 962435
       }
      }
     },
     "si-3MeV-1mm": {
-     "histories_per_seed": 610048,
-     "predicted_hours": 0.5000005861012257,
+     "histories_per_seed": 554859,
+     "predicted_hours": 0.5000002511665697,
      "pilot_rows_per_history": [
       5484.3082,
-      28.3886
+      230.9364
      ],
      "observables": {
       "backscattered": {
@@ -938,7 +938,7 @@
        "mean": 0.9912,
        "headline": true,
        "margin": 0.019824,
-       "required_histories": 4857
+       "required_histories": 4936
       },
       "stopped": {
        "bound": 1.0,
@@ -953,7 +953,7 @@
        "mean": 0.0319,
        "headline": true,
        "margin": 0.000638,
-       "required_histories": 3398664
+       "required_histories": 3393486
       },
       "transmitted_mu_bin_1": {
        "bound": 1.0,
@@ -961,7 +961,7 @@
        "mean": 0.395,
        "headline": true,
        "margin": 0.0079,
-       "required_histories": 184250
+       "required_histories": 184670
       },
       "transmitted_mu_bin_2": {
        "bound": 1.0,
@@ -969,7 +969,7 @@
        "mean": 0.4808,
        "headline": true,
        "margin": 0.009616,
-       "required_histories": 131344
+       "required_histories": 131286
       },
       "transmitted_mu_bin_3": {
        "bound": 1.0,
@@ -977,7 +977,7 @@
        "mean": 0.0835,
        "headline": true,
        "margin": 0.00167,
-       "required_histories": 1274387
+       "required_histories": 1271700
       },
       "backscattered_mu_bin_0": {
        "bound": 1.0,
@@ -1084,7 +1084,7 @@
        "mean": 0.0274,
        "headline": true,
        "margin": 0.000548,
-       "required_histories": 42149529
+       "required_histories": 42550102
       },
       "photons_50_100keV": {
        "bound": 60.0,
@@ -1092,7 +1092,7 @@
        "mean": 0.0108,
        "headline": true,
        "margin": 0.00021600000000000002,
-       "required_histories": 33105376
+       "required_histories": 32931349
       },
       "photons_ge100keV": {
        "bound": 30.0,
@@ -1100,7 +1100,7 @@
        "mean": 0.0329,
        "headline": true,
        "margin": 0.000658,
-       "required_histories": 7521113
+       "required_histories": 7524856
       },
       "cone_source_photons_ge10kev": {
        "bound": 300.0,
@@ -1115,7 +1115,7 @@
        "mean": 2561.354474468474,
        "headline": true,
        "margin": 51.22708948936948,
-       "required_histories": 5965
+       "required_histories": 6072
       },
       "photon_keV_ge10keV": {
        "bound": 3000.0029999999997,
@@ -1123,16 +1123,16 @@
        "mean": 16.84226936816406,
        "headline": true,
        "margin": 0.33684538736328123,
-       "required_histories": 7104566
+       "required_histories": 7447895
       }
      }
     },
     "w-3MeV-100um": {
-     "histories_per_seed": 321378,
-     "predicted_hours": 0.5000006266578685,
+     "histories_per_seed": 295738,
+     "predicted_hours": 0.5000012598601785,
      "pilot_rows_per_history": [
       8084.2546,
-      91.439
+      384.1471
      ],
      "observables": {
       "backscattered": {
@@ -1141,7 +1141,7 @@
        "mean": 0.1191,
        "headline": true,
        "margin": 0.002382,
-       "required_histories": 888066
+       "required_histories": 898946
       },
       "transmitted": {
        "bound": 1.0,
@@ -1149,7 +1149,7 @@
        "mean": 0.8741,
        "headline": true,
        "margin": 0.017482,
-       "required_histories": 22019
+       "required_histories": 22269
       },
       "stopped": {
        "bound": 1.0,
@@ -1164,7 +1164,7 @@
        "mean": 0.1158,
        "headline": true,
        "margin": 0.002316,
-       "required_histories": 898512
+       "required_histories": 892734
       },
       "transmitted_mu_bin_1": {
        "bound": 1.0,
@@ -1172,7 +1172,7 @@
        "mean": 0.4967,
        "headline": true,
        "margin": 0.009934,
-       "required_histories": 123523
+       "required_histories": 123528
       },
       "transmitted_mu_bin_2": {
        "bound": 1.0,
@@ -1180,7 +1180,7 @@
        "mean": 0.231,
        "headline": true,
        "margin": 0.00462,
-       "required_histories": 392908
+       "required_histories": 385510
       },
       "transmitted_mu_bin_3": {
        "bound": 1.0,
@@ -1188,7 +1188,7 @@
        "mean": 0.0306,
        "headline": true,
        "margin": 0.000612,
-       "required_histories": 3613723
+       "required_histories": 3647459
       },
       "backscattered_mu_bin_0": {
        "bound": 1.0,
@@ -1196,7 +1196,7 @@
        "mean": 0.0266,
        "headline": true,
        "margin": 0.000532,
-       "required_histories": 4410745
+       "required_histories": 4470331
       },
       "backscattered_mu_bin_1": {
        "bound": 1.0,
@@ -1204,7 +1204,7 @@
        "mean": 0.0745,
        "headline": true,
        "margin": 0.00149,
-       "required_histories": 1454182
+       "required_histories": 1473012
       },
       "backscattered_mu_bin_2": {
        "bound": 1.0,
@@ -1240,7 +1240,7 @@
        "mean": 0.0487,
        "headline": true,
        "margin": 0.000974,
-       "required_histories": 2382233
+       "required_histories": 2428474
       },
       "transmitted_energy_bin_3": {
        "bound": 1.0,
@@ -1248,7 +1248,7 @@
        "mean": 0.2175,
        "headline": true,
        "margin": 0.00435,
-       "required_histories": 429183
+       "required_histories": 425207
       },
       "transmitted_energy_bin_4": {
        "bound": 1.0,
@@ -1256,7 +1256,7 @@
        "mean": 0.5929,
        "headline": true,
        "margin": 0.011858,
-       "required_histories": 85754
+       "required_histories": 85786
       },
       "backscattered_energy_bin_0": {
        "bound": 1.0,
@@ -1278,7 +1278,7 @@
        "mean": 0.032,
        "headline": true,
        "margin": 0.00064,
-       "required_histories": 3881981
+       "required_histories": 3932297
       },
       "backscattered_energy_bin_3": {
        "bound": 1.0,
@@ -1286,7 +1286,7 @@
        "mean": 0.0621,
        "headline": true,
        "margin": 0.001242,
-       "required_histories": 1750642
+       "required_histories": 1781146
       },
       "backscattered_energy_bin_4": {
        "bound": 1.0,
@@ -1301,7 +1301,7 @@
        "mean": 0.1123,
        "headline": true,
        "margin": 0.002246,
-       "required_histories": 10299758
+       "required_histories": 10290340
       },
       "photons_50_100keV": {
        "bound": 60.0,
@@ -1309,7 +1309,7 @@
        "mean": 0.0463,
        "headline": true,
        "margin": 0.0009260000000000001,
-       "required_histories": 7739163
+       "required_histories": 7806256
       },
       "photons_ge100keV": {
        "bound": 30.0,
@@ -1317,7 +1317,7 @@
        "mean": 0.1481,
        "headline": true,
        "margin": 0.0029620000000000002,
-       "required_histories": 1716694
+       "required_histories": 1708427
       },
       "cone_source_photons_ge10kev": {
        "bound": 300.0,
@@ -1333,7 +1333,7 @@
        "mean": 2307.030411724336,
        "headline": true,
        "margin": 46.14060823448672,
-       "required_histories": 24295
+       "required_histories": 24516
       },
       "photon_keV_ge10keV": {
        "bound": 3000.0029999999997,
@@ -1341,7 +1341,7 @@
        "mean": 85.24402961640625,
        "headline": true,
        "margin": 1.7048805923281252,
-       "required_histories": 1546124
+       "required_histories": 1540644
       }
      }
     }
@@ -1367,11 +1367,11 @@
    "diagnostic_fraction": 0.25,
    "scenes": {
     "si-300keV-100um": {
-     "histories_per_seed": 1040740,
-     "predicted_hours": 0.5000002160391025,
+     "histories_per_seed": 950099,
+     "predicted_hours": 0.49999991830520885,
      "pilot_rows_per_history": [
       1123.8902,
-      420.4302
+      582.1974
      ],
      "observables": {
       "backscattered": {
@@ -1380,7 +1380,7 @@
        "mean": 0.0952,
        "headline": true,
        "margin": 0.001904,
-       "required_histories": 1179394
+       "required_histories": 1125436
       },
       "transmitted": {
        "bound": 1.0,
@@ -1388,7 +1388,7 @@
        "mean": 0.8534,
        "headline": true,
        "margin": 0.017068,
-       "required_histories": 25631
+       "required_histories": 25201
       },
       "stopped": {
        "bound": 1.0,
@@ -1396,7 +1396,7 @@
        "mean": 0.0514,
        "headline": true,
        "margin": 0.001028,
-       "required_histories": 2163152
+       "required_histories": 2219931
       },
       "transmitted_mu_bin_0": {
        "bound": 1.0,
@@ -1404,7 +1404,7 @@
        "mean": 0.1102,
        "headline": true,
        "margin": 0.0022040000000000002,
-       "required_histories": 949271
+       "required_histories": 962847
       },
       "transmitted_mu_bin_1": {
        "bound": 1.0,
@@ -1412,7 +1412,7 @@
        "mean": 0.486,
        "headline": true,
        "margin": 0.00972,
-       "required_histories": 128722
+       "required_histories": 128770
       },
       "transmitted_mu_bin_2": {
        "bound": 1.0,
@@ -1420,7 +1420,7 @@
        "mean": 0.2278,
        "headline": true,
        "margin": 0.004556,
-       "required_histories": 394887
+       "required_histories": 392180
       },
       "transmitted_mu_bin_3": {
        "bound": 1.0,
@@ -1428,7 +1428,7 @@
        "mean": 0.0294,
        "headline": true,
        "margin": 0.000588,
-       "required_histories": 3780153
+       "required_histories": 3596350
       },
       "backscattered_mu_bin_0": {
        "bound": 1.0,
@@ -1436,7 +1436,7 @@
        "mean": 0.0208,
        "headline": true,
        "margin": 0.000416,
-       "required_histories": 5460442
+       "required_histories": 5435641
       },
       "backscattered_mu_bin_1": {
        "bound": 1.0,
@@ -1444,7 +1444,7 @@
        "mean": 0.0566,
        "headline": true,
        "margin": 0.001132,
-       "required_histories": 2064687
+       "required_histories": 1975780
       },
       "backscattered_mu_bin_2": {
        "bound": 1.0,
@@ -1473,7 +1473,7 @@
        "mean": 0.0288,
        "headline": true,
        "margin": 0.000576,
-       "required_histories": 3795515
+       "required_histories": 3973789
       },
       "transmitted_energy_bin_2": {
        "bound": 1.0,
@@ -1481,7 +1481,7 @@
        "mean": 0.149,
        "headline": true,
        "margin": 0.00298,
-       "required_histories": 657558
+       "required_histories": 664765
       },
       "transmitted_energy_bin_3": {
        "bound": 1.0,
@@ -1489,7 +1489,7 @@
        "mean": 0.6608,
        "headline": true,
        "margin": 0.013216000000000002,
-       "required_histories": 65064
+       "required_histories": 65088
       },
       "transmitted_energy_bin_4": {
        "bound": 1.0,
@@ -1511,7 +1511,7 @@
        "mean": 0.0278,
        "headline": true,
        "margin": 0.000556,
-       "required_histories": 4080769
+       "required_histories": 3598668
       },
       "backscattered_energy_bin_2": {
        "bound": 1.0,
@@ -1519,7 +1519,7 @@
        "mean": 0.043,
        "headline": true,
        "margin": 0.00086,
-       "required_histories": 2853885
+       "required_histories": 2723129
       },
       "backscattered_energy_bin_3": {
        "bound": 1.0,
@@ -1541,7 +1541,7 @@
        "mean": 0.007,
        "headline": true,
        "margin": 0.00014000000000000001,
-       "required_histories": 30502463
+       "required_histories": 28650947
       },
       "photons_50_100keV": {
        "bound": 6.0,
@@ -1556,7 +1556,7 @@
        "mean": 0.0016,
        "headline": true,
        "margin": 3.2000000000000005e-05,
-       "required_histories": 70480259
+       "required_histories": 79225849
       },
       "cone_source_photons_ge10kev": {
        "bound": 30.0,
@@ -1571,7 +1571,7 @@
        "mean": 202.31274707628498,
        "headline": true,
        "margin": 4.046254941525699,
-       "required_histories": 29939
+       "required_histories": 29605
       },
       "photon_keV_ge10keV": {
        "bound": 300.0003,
@@ -1579,16 +1579,16 @@
        "mean": 0.4478062171875001,
        "headline": true,
        "margin": 0.008956124343750002,
-       "required_histories": 28011368
+       "required_histories": 32655018
       }
      }
     },
     "w-300keV-10um": {
-     "histories_per_seed": 502216,
-     "predicted_hours": 0.5000002410724472,
+     "histories_per_seed": 463433,
+     "predicted_hours": 0.4999999455270281,
      "pilot_rows_per_history": [
       2179.2258,
-      833.8612
+      1003.042
      ],
      "observables": {
       "backscattered": {
@@ -1597,7 +1597,7 @@
        "mean": 0.4212,
        "headline": true,
        "margin": 0.008424000000000001,
-       "required_histories": 165993
+       "required_histories": 165610
       },
       "transmitted": {
        "bound": 1.0,
@@ -1605,7 +1605,7 @@
        "mean": 0.5386,
        "headline": true,
        "margin": 0.010772,
-       "required_histories": 105306
+       "required_histories": 105167
       },
       "stopped": {
        "bound": 1.0,
@@ -1613,7 +1613,7 @@
        "mean": 0.0402,
        "headline": true,
        "margin": 0.000804,
-       "required_histories": 2847804
+       "required_histories": 2784247
       },
       "transmitted_mu_bin_0": {
        "bound": 1.0,
@@ -1621,7 +1621,7 @@
        "mean": 0.0912,
        "headline": true,
        "margin": 0.001824,
-       "required_histories": 1178020
+       "required_histories": 1157105
       },
       "transmitted_mu_bin_1": {
        "bound": 1.0,
@@ -1629,7 +1629,7 @@
        "mean": 0.3158,
        "headline": true,
        "margin": 0.006316,
-       "required_histories": 255907
+       "required_histories": 259523
       },
       "transmitted_mu_bin_2": {
        "bound": 1.0,
@@ -1637,7 +1637,7 @@
        "mean": 0.1154,
        "headline": true,
        "margin": 0.002308,
-       "required_histories": 911750
+       "required_histories": 903393
       },
       "transmitted_mu_bin_3": {
        "bound": 1.0,
@@ -1652,7 +1652,7 @@
        "mean": 0.089,
        "headline": true,
        "margin": 0.00178,
-       "required_histories": 1155152
+       "required_histories": 1166957
       },
       "backscattered_mu_bin_1": {
        "bound": 1.0,
@@ -1660,7 +1660,7 @@
        "mean": 0.2442,
        "headline": true,
        "margin": 0.004884,
-       "required_histories": 369749
+       "required_histories": 370776
       },
       "backscattered_mu_bin_2": {
        "bound": 1.0,
@@ -1668,7 +1668,7 @@
        "mean": 0.078,
        "headline": true,
        "margin": 0.00156,
-       "required_histories": 1428944
+       "required_histories": 1359275
       },
       "backscattered_mu_bin_3": {
        "bound": 1.0,
@@ -1697,7 +1697,7 @@
        "mean": 0.0824,
        "headline": true,
        "margin": 0.0016480000000000002,
-       "required_histories": 1349601
+       "required_histories": 1311394
       },
       "transmitted_energy_bin_3": {
        "bound": 1.0,
@@ -1705,7 +1705,7 @@
        "mean": 0.2612,
        "headline": true,
        "margin": 0.0052239999999999995,
-       "required_histories": 328179
+       "required_histories": 333291
       },
       "transmitted_energy_bin_4": {
        "bound": 1.0,
@@ -1713,7 +1713,7 @@
        "mean": 0.1768,
        "headline": true,
        "margin": 0.0035360000000000005,
-       "required_histories": 548159
+       "required_histories": 560936
       },
       "backscattered_energy_bin_0": {
        "bound": 1.0,
@@ -1728,7 +1728,7 @@
        "mean": 0.0216,
        "headline": true,
        "margin": 0.00043200000000000004,
-       "required_histories": 5025880
+       "required_histories": 5370555
       },
       "backscattered_energy_bin_2": {
        "bound": 1.0,
@@ -1736,7 +1736,7 @@
        "mean": 0.0842,
        "headline": true,
        "margin": 0.001684,
-       "required_histories": 1291324
+       "required_histories": 1288713
       },
       "backscattered_energy_bin_3": {
        "bound": 1.0,
@@ -1744,7 +1744,7 @@
        "mean": 0.1656,
        "headline": true,
        "margin": 0.003312,
-       "required_histories": 595100
+       "required_histories": 593463
       },
       "backscattered_energy_bin_4": {
        "bound": 1.0,
@@ -1752,7 +1752,7 @@
        "mean": 0.1472,
        "headline": true,
        "margin": 0.002944,
-       "required_histories": 691591
+       "required_histories": 673379
       },
       "photons_10_50keV": {
        "bound": 30.0,
@@ -1760,7 +1760,7 @@
        "mean": 0.0212,
        "headline": true,
        "margin": 0.000424,
-       "required_histories": 11564402
+       "required_histories": 11590928
       },
       "photons_50_100keV": {
        "bound": 6.0,
@@ -1768,7 +1768,7 @@
        "mean": 0.009,
        "headline": true,
        "margin": 0.00017999999999999998,
-       "required_histories": 13105983
+       "required_histories": 15045807
       },
       "photons_ge100keV": {
        "bound": 3.0,
@@ -1776,7 +1776,7 @@
        "mean": 0.0074,
        "headline": true,
        "margin": 0.00014800000000000002,
-       "required_histories": 17243796
+       "required_histories": 18050115
       },
       "cone_source_photons_ge10kev": {
        "bound": 30.0,
@@ -1784,7 +1784,7 @@
        "mean": 0.0004,
        "headline": true,
        "margin": 8.000000000000001e-06,
-       "required_histories": 444823069
+       "required_histories": 528249489
       },
       "transmitted_energy_keV": {
        "bound": 300.0003,
@@ -1792,7 +1792,7 @@
        "mean": 133.36716880260872,
        "headline": true,
        "margin": 2.6673433760521745,
-       "required_histories": 111784
+       "required_histories": 112440
       },
       "photon_keV_ge10keV": {
        "bound": 300.0003,
@@ -1800,13 +1800,13 @@
        "mean": 2.3288742859375002,
        "headline": true,
        "margin": 0.046577485718750006,
-       "required_histories": 6101810
+       "required_histories": 6307448
       }
      }
     },
     "si-1MeV-1mm": {
-     "histories_per_seed": 180252,
-     "predicted_hours": 0.5000010998378824,
+     "histories_per_seed": 178150,
+     "predicted_hours": 0.4999994154638352,
      "pilot_rows_per_history": [
       8576.6948,
       3114.2182
@@ -2022,8 +2022,8 @@
      }
     },
     "w-1MeV-100um": {
-     "histories_per_seed": 70861,
-     "predicted_hours": 0.5000023220821102,
+     "histories_per_seed": 70180,
+     "predicted_hours": 0.5000025672295633,
      "pilot_rows_per_history": [
       16874.7016,
       5519.035
@@ -2243,8 +2243,8 @@
      }
     },
     "si-3MeV-1mm": {
-     "histories_per_seed": 201893,
-     "predicted_hours": 0.5000010489748293,
+     "histories_per_seed": 207511,
+     "predicted_hours": 0.4999997334554471,
      "pilot_rows_per_history": [
       5844.6198,
       1504.6188
@@ -2455,8 +2455,8 @@
      }
     },
     "w-3MeV-100um": {
-     "histories_per_seed": 115301,
-     "predicted_hours": 0.5000022786379986,
+     "histories_per_seed": 117581,
+     "predicted_hours": 0.5000018908139588,
      "pilot_rows_per_history": [
       9203.7654,
       2422.074

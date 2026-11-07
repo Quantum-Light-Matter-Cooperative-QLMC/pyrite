@@ -69,12 +69,12 @@
   "spectrum_geometric_nodes": []
  },
  "timings_s": {
-  "imports_and_tables": 0.9433612329885364,
-  "cold_request": 9.106619694968686,
-  "cold_transport": 3.460652143927291,
-  "warm_request": 19.191812378005125,
-  "warm_transport": 6.27610276802443,
-  "process_total": 29.271457407972775
+  "imports_and_tables": 0.9884593019960448,
+  "cold_request": 9.352900340920314,
+  "cold_transport": 3.587112203007564,
+  "warm_request": 20.56487758702133,
+  "warm_transport": 7.422569421003573,
+  "process_total": 30.935902542085387
  },
  "work": {
   "cold": {
@@ -84,7 +84,7 @@
     {
      "phase": "assembly",
      "rows": 65400958,
-     "wall_s": 1.4414524590829387,
+     "wall_s": 1.5404228860279545,
      "staged": true,
      "staging_budget_bytes": 12591109692,
      "spilled_round": null,
@@ -93,7 +93,7 @@
     }
    ],
    "retained_rows": 65400958,
-   "scoring_s": 5.628412341931835,
+   "scoring_s": 5.748580593033694,
    "schedule": [
     "transport schedule auto: continuation for 4210 histories"
    ]
@@ -105,36 +105,36 @@
     {
      "phase": "assembly",
      "rows": 51440709,
-     "wall_s": 0.6964317120146006,
+     "wall_s": 0.9247981109656394,
      "staged": true,
      "staging_budget_bytes": 12691149833,
      "spilled_round": null,
      "staged_peak_bytes": 7666121081,
-     "pool_peak_bytes": 9332082688
+     "pool_peak_bytes": 9332081664
     },
     {
      "phase": "assembly",
      "rows": 51883439,
-     "wall_s": 0.7209733380004764,
+     "wall_s": 1.1822413079207763,
      "staged": true,
      "staging_budget_bytes": 12691265033,
      "spilled_round": null,
      "staged_peak_bytes": 7732099443,
-     "pool_peak_bytes": 9408137216
+     "pool_peak_bytes": 9408134656
     },
     {
      "phase": "assembly",
      "rows": 50753033,
-     "wall_s": 0.6767423480050638,
+     "wall_s": 0.7952195330290124,
      "staged": true,
      "staging_budget_bytes": 12691265033,
      "spilled_round": null,
      "staged_peak_bytes": 7563638569,
-     "pool_peak_bytes": 9212861440
+     "pool_peak_bytes": 9212481536
     }
    ],
    "retained_rows": 154077181,
-   "scoring_s": 12.872966813854873,
+   "scoring_s": 13.098639364005066,
    "schedule": [
     "transport schedule auto: continuation for 3333 histories",
     "transport schedule auto: continuation for 3334 histories"
@@ -150,7 +150,7 @@
   ]
  },
  "device": "NVIDIA GeForce RTX 5080",
- "peak_rss_kib": 11611376,
+ "peak_rss_kib": 11611784,
  "environment": {
   "PYRITE_MC_BACKEND": "cuda",
   "PYRITE_MC_TRANSPORT_SCHEDULE": null

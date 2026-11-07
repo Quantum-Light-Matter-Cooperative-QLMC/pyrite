@@ -63,9 +63,15 @@ would lose that closure, on panels up to $\ln 1.33$ wide. The price is a
 jump in $\Sigma_h$ at a node, which the core must resolve and does by thinning.
 
 **Energy control.** Three limits bound a step: $s\le 4\lambda_T^{(h)}$ (§4.4),
-$s\le C_2E/S$, and $s\le$ one tenth of the layer thickness or an explicit
-`mixed_max_step_um`. The tenth follows §4.4.1's recipe for thin regions and
-keeps enough hinges per track. PENELOPE's $C_2$ raises the hard elastic rate;
+$s\le C_2E/S$, and $s\le$ one hundredth of the layer thickness or an explicit
+`mixed_max_step_um`. §4.4.1 recommends a tenth for thin regions. With
+continuous stopping, a tenth shifted the transmitted cone and the backscatter
+energy tallies at 1-3 MeV, by up to 10% (Si 1 MeV, backscatter energy above
+0.9 $E_0$). A hundredth removed every shift on six scenes, Si and W at 300 keV,
+1 MeV and 3 MeV, at C = 0.05; a thirtieth removed about half. Under
+`shell-soft-hard` neither limit shifted a tally. At 1-3 MeV the hundredth costs
+nothing there, because hard inelastic events end steps sooner (#894, jobs
+4051-4070). PENELOPE's $C_2$ raises the hard elastic rate;
 here it truncates the step, with a delta row, and costs fewer rows for the same
 limit on mean fractional loss. This is why the hard fraction has no stopping
 dependence. It also keeps the elastic table independent of the collision model.
@@ -170,9 +176,11 @@ and 8×.
 
 ## Thin targets
 
-The layer step limit bounds every step by a tenth of the layer thickness. A
-target thin against the hard mean free path therefore takes more rows under
-mixed transport than under detailed scattering: Si at 100 keV and 1 um took
-about 27 rows per history against 15 (40 histories, local, no job ID). Mixed
-transport pays off only when detailed scattering would take many more than the
-roughly twenty rows that the limit forces per layer.
+The layer step limit bounds every step by a hundredth of the layer thickness.
+A target thin against the hard mean free path therefore takes more rows under
+mixed transport than under detailed scattering. At the earlier tenth, Si at
+100 keV and 1 um took about 27 rows per history against 15 (40 histories,
+local, no job ID). Mixed transport pays off only when detailed scattering would
+take many more than the roughly two hundred rows that the limit forces per
+layer crossing. At 300 keV on 100 um the hundredth leaves `shell-soft-hard`
+2.0x (Si) and 2.3x (W) faster than detailed, against 2.6x at the tenth.

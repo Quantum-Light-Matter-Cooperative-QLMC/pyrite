@@ -31,9 +31,10 @@ from .scattering import _elsepa_bracket
 
 #: PENELOPE's limit on a step, in hard mean free paths (Sec. 4.4).
 MIXED_MAX_STEP_HARD_MFP = 4.0
-#: Default step limit as a fraction of the layer thickness, from PENELOPE's
-#: recipe of one tenth of the expected track length (Sec. 4.4.1).
-MIXED_MAX_STEP_LAYER_FRACTION = 0.1
+#: Default step limit as a fraction of the layer thickness. PENELOPE's tenth of
+#: the track length (Sec. 4.4.1) shifts 1-3 MeV angular and backscatter tallies
+#: by up to 10% under continuous stopping; a hundredth removes the shift (#894).
+MIXED_MAX_STEP_LAYER_FRACTION = 0.01
 #: Energy window of a step's hazard bounds, as a multiple of ``C2``. A step loses
 #: ``C2 E`` at the start's stopping power; the stopping rises as the energy falls.
 #: With ``S ~ 1/E`` the loss is ``E (1 - sqrt(1 - 2 C2))``, 0.225 E at ``C2 = 0.2``.

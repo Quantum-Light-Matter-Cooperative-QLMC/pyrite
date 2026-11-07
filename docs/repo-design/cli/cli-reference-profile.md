@@ -604,7 +604,7 @@ Options:
   --mixed-c2 FRACTION             Mean fractional soft energy loss per step under mixed
                                   transport (default 0.05).  [0.0<=x<=0.2]
   --mixed-maximum-step-um UM      Absolute step limit under mixed transport (default: a
-                                  tenth of the layer thickness).  [x>0.0]
+                                  hundredth of the layer thickness).  [x>0.0]
   --shell-ionization-model [eedl|bote-salvat]
                                   Characteristic-line primary vacancies: eedl (default)
                                   subshell cross sections, or the opt-in bote-salvat

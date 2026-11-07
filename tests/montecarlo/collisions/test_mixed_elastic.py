@@ -10,6 +10,7 @@ from functools import partial
 import numpy as np
 import pytest
 
+from pyrite.config import FixedSampling
 from pyrite.montecarlo.case import _ABSENT
 from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 from pyrite.montecarlo.transport import host_pass
@@ -208,8 +209,8 @@ def test_zero_c1_is_valid_without_c2():
 
 def test_step_limit_is_the_layer_fraction_or_the_explicit_limit():
     top, bottom = np.array([0.0, 1e4]), np.array([1e4, 1e6])
-    np.testing.assert_allclose(layer_step_limits_ang(top, bottom), [1e3, 9.9e4])
-    np.testing.assert_allclose(layer_step_limits_ang(top, bottom, 1.0), [1e3, 1e4])
+    np.testing.assert_allclose(layer_step_limits_ang(top, bottom), [1e2, 9.9e3])
+    np.testing.assert_allclose(layer_step_limits_ang(top, bottom, 0.5), [1e2, 5e3])
 
 
 def _transport(mixed, *, Ne=60, seed=11, thickness=2e4, E0=200.0, **kwargs):
@@ -270,7 +271,7 @@ def test_steps_respect_the_layer_limit():
 
 
 def test_mixed_transport_is_much_cheaper_and_reproducible():
-    thick = {"E0": 1000.0, "thickness": 1e6}
+    thick = {"E0": 1000.0, "thickness": 1e7}
     detailed = _transport(None, **thick)
     mixed = _transport(MixedElasticParameters(), **thick)
     again = _transport(MixedElasticParameters(), **thick)
@@ -589,7 +590,10 @@ def _lowered(physics=None):
     from pyrite.detectors import EnergyBins
 
     grid = np.array([1000.0, 1050.0])
-    numerics = pr.Numerics(cxr_trials=1, brem_trials=1, energy_bins=EnergyBins(cxr=grid, brem=grid))
+    numerics = pr.Numerics(
+        sampling=FixedSampling(cxr_histories=1, brem_histories=1),
+        energy_bins=EnergyBins(cxr=grid, brem=grid),
+    )
     return api.build_case(_mixed_scene(), numerics, physics=physics)
 
 
@@ -636,7 +640,7 @@ def test_public_mixed_physics_cuts_rows():
     from pyrite.campaign.trajectories import simulate_trajectories
 
     scene = _mixed_scene()
-    numerics = pr.Numerics(cxr_trials=40, brem_trials=40, seed=7)
+    numerics = pr.Numerics(sampling=FixedSampling(cxr_histories=40, brem_histories=40), seed=7)
     rows = [
         simulate_trajectories(scene.beam, scene.target, physics=physics, numerics=numerics)[
             "E_end_keV"
@@ -652,7 +656,7 @@ def test_mixed_case_records_model_marker_and_default_does_not():
     markers = dict(
         resolved_physics_view(_lowered(_mixed_physics()), table_markers={}).model_markers
     )
-    assert markers["mixed_elastic_model"] == "penelope-random-hinge.v1"
+    assert markers["mixed_elastic_model"] == "penelope-random-hinge.v2"
     assert "mixed_elastic_model" not in dict(
         resolved_physics_view(_lowered(), table_markers={}).model_markers
     )
