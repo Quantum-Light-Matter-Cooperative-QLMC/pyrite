@@ -220,7 +220,7 @@ def zero_solver():
 
 
 def test_actual_axial_adapter_free_grid_unitary_array_reconstruction_and_carrier(zero_solver):
-    from pyrite.materials.channeling.transverse import HBAR2_2M_EV_ANG2
+    from pyrite.materials.crystal import HBAR2_2M_EV_ANG2
     from pyrite.montecarlo.channeling.states import from_array
 
     solver = zero_solver

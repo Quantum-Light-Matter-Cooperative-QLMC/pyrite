@@ -32,8 +32,9 @@ import numpy as np
 import scipy.fft
 
 from ..._units import reject_quantity
-from ...materials.channeling.transverse import HBAR2_2M_EV_ANG2, longitudinal_kinematics
+from ...materials.crystal import HBAR2_2M_EV_ANG2
 from .axial_dissipator import AxialDissipator
+from .bloch import longitudinal_kinematics
 from .mcwf import _rng
 from .realspace import RealSpaceGrid
 from .states import EntryState, MixedState, momentum_inv_ang

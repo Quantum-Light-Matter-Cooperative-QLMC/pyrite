@@ -77,7 +77,7 @@ TEST_SUITE_PATTERNS = {
     ),
     # Genuine cross-directory exceptions to TEST_SUITE_DIRECTORIES.
     "transport": ("montecarlo/test_cone_split.py",),
-    "quantum": ("materials/test_channeling_profile.py",),
+    "quantum": ("montecarlo/channeling/test_channeling_bloch.py",),
     "channeling": ("materials/test_channeling_*.py",),
 }
 

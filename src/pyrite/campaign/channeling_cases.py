@@ -65,8 +65,8 @@ def _axis_proximity(case: Case) -> tuple[tuple[int, int, int], float, float] | N
     warning heuristic, not an emission or transport input.
     """
     from ..materials.atomic import Z_TABLE
-    from ..materials.channeling import longitudinal_kinematics
     from ..materials.crystal import CRYSTALS, E2_EV_ANG, M_E_EV, _direct_lattice_vectors
+    from ..montecarlo.channeling import longitudinal_kinematics
 
     info = CRYSTALS[case["crystal"]]
     beam = _beam_in_crystal(case)
@@ -106,8 +106,12 @@ def resolve_channeling(cases: list[Case], physics: Physics, numerics: Numerics) 
         from .axial_spec import refuse_unverified_axial_run
 
         refuse_unverified_axial_run()
-    from ..materials.channeling import longitudinal_kinematics, planar_profile, transverse_states
-    from ..montecarlo.channeling import DECHANNELING_MARGIN_EV
+    from ..materials.channeling import planar_profile
+    from ..montecarlo.channeling import (
+        DECHANNELING_MARGIN_EV,
+        longitudinal_kinematics,
+        transverse_states,
+    )
 
     if physics.channeling_model == "off":
         return cases

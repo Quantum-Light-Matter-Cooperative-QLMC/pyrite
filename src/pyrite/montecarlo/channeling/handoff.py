@@ -207,8 +207,8 @@ def _solve(
 
 def case_plane_incidence(case):
     """Resolve the case's planes in the same slab frame as native transport."""
-    from ...materials.channeling.entry import plane_incidence
     from ...materials.crystal import CRYSTALS, _orientation_R
+    from .entry import plane_incidence
 
     rotation = _orientation_R(
         CRYSTALS[case["crystal"]]["lattice"],

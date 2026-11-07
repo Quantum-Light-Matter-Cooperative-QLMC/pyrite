@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 from pyrite.materials.channeling.axial import axial_profile
-from pyrite.materials.channeling.transverse import HBAR2_2M_EV_ANG2
+from pyrite.materials.crystal import HBAR2_2M_EV_ANG2
 from pyrite.montecarlo.channeling.realspace import RealSpaceGrid
 
 

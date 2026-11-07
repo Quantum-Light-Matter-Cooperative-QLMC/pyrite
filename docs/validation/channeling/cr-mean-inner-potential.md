@@ -1,6 +1,6 @@
 # `cr-mean-inner-potential` re-derivation
 
-Claim: `materials/channeling/entry.py::mean_inner_potential_eV`. Source: Ibers, Acta Cryst. 11, 178 (1958); Spence & Zuo, *Electron Microdiffraction* (1992).
+Claim: `montecarlo/channeling/entry.py::mean_inner_potential_eV`. Source: Ibers, Acta Cryst. 11, 178 (1958); Spence & Zuo, *Electron Microdiffraction* (1992).
 
 ## Independent derivation (before reading the body)
 

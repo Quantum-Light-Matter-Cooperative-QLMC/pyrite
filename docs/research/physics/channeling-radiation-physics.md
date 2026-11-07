@@ -27,7 +27,7 @@ grows like $\sqrt{\gamma}$. Classical/quasiclassical treatments (Baier–Katkov,
 | 3 MeV | 6.87 | 3.44 MeV | 94.4 | 3.6 mrad | 2 | 0.5–1.9 keV |
 | 10 MeV | 20.6 | 10.5 MeV | 846 | 2.0 mrad | 3 | 4–17 keV |
 
-using Si(110): $d_p = 1.92$ Å, $U_0 \approx 21$ eV at 293 K, and the critical angle $\psi_c = \sqrt{2 U_0 / pv}$. The $n_b$ column is the bound-state count from the implemented eigensolve at $k=0$ (`materials.channeling`, ledger `cr-transverse-eigenproblem`); the WKB estimate above overcounts at these energies. It rises to 5 at 30 MeV, 6 at 40 MeV (matching Azadegan 2013) and 9 at 100 MeV.
+using Si(110): $d_p = 1.92$ Å, $U_0 \approx 21$ eV at 293 K, and the critical angle $\psi_c = \sqrt{2 U_0 / pv}$. The $n_b$ column is the bound-state count from the implemented eigensolve at $k=0$ (`montecarlo.channeling.bloch`, ledger `cr-transverse-eigenproblem`); the WKB estimate above overcounts at these energies. It rises to 5 at 30 MeV, 6 at 40 MeV (matching Azadegan 2013) and 9 at 100 MeV.
 
 Three consequences frame the whole implementation:
 
@@ -335,7 +335,7 @@ Inventory of effects checked for this walkthrough, with include/exclude decision
 
 ## 10. Proposed ledger rows
 
-One row per load-bearing equation. `file::symbol` anchors are filled at implementation. Static physics lives under `materials/channeling/`; evolution, emission and handoff live under `montecarlo/channeling/` (ADR-0018).
+One row per load-bearing equation. `file::symbol` anchors are filled at implementation. Crystal potential and thermal physics live under `materials/channeling/`; Bloch states, entry geometry, evolution, emission and handoff live under `montecarlo/channeling/` (ADR-0018, #1018).
 
 | id | claim | source | anchor idea |
 | --- | --- | --- | --- |

@@ -2,8 +2,9 @@
 
 import numpy as np
 
-from pyrite.materials.channeling import PlanarProfile, longitudinal_kinematics
+from pyrite.materials.channeling import PlanarProfile
 from pyrite.materials.crystal import M_E_EV
+from pyrite.montecarlo.channeling import longitudinal_kinematics
 
 
 def critical_angle_rad(profile: PlanarProfile, kinetic_energy_eV: float) -> float:

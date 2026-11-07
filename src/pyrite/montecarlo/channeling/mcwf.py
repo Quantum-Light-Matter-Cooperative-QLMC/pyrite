@@ -54,7 +54,6 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from ...materials.channeling.transverse import longitudinal_kinematics
 from ...materials.crystal import HBARC_EV_ANG
 from ..transport.kinematics import (
     _SM64_GOLDEN,
@@ -65,6 +64,7 @@ from ..transport.kinematics import (
     _SM64_S30,
     _SM64_S31,
 )
+from .bloch import longitudinal_kinematics
 from .density import DensityMatrixSolver
 
 _MCWF_STREAM_SALT = np.uint64(0x1F83D9AB5BE0CD19)

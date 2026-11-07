@@ -4,9 +4,9 @@ import numpy as np
 import pytest
 
 from pyrite.campaign.geometry import CrystalCut, resolve_crystal_cut
-from pyrite.materials.channeling import entry_populations, planar_profile
-from pyrite.materials.channeling.entry import mean_inner_potential_eV, plane_incidence
+from pyrite.materials.channeling import planar_profile
 from pyrite.materials.crystal import CRYSTALS, HBARC_EV_ANG, M_E_EV
+from pyrite.montecarlo.channeling import entry_populations, mean_inner_potential_eV, plane_incidence
 from pyrite.montecarlo.geometry import tilted_geometry
 
 SI_LATTICE = CRYSTALS["silicon"]["lattice"]

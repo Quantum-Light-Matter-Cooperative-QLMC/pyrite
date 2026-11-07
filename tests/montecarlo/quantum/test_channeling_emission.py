@@ -11,9 +11,9 @@ from scipy.signal import find_peaks
 from scipy.special import wofz
 
 from pyrite.materials.attenuation import linear_attenuation_inv_mm, plasma_energy_eV
-from pyrite.materials.channeling import planar_profile, transverse_states
+from pyrite.materials.channeling import planar_profile
 from pyrite.materials.channeling.potential import PlanarProfile
-from pyrite.materials.channeling.transverse import HBAR2_2M_EV_ANG2
+from pyrite.materials.crystal import HBAR2_2M_EV_ANG2
 from pyrite.montecarlo.channeling import (
     KIND_CAPTURE,
     KIND_LINE,
@@ -33,6 +33,7 @@ from pyrite.montecarlo.channeling import (
     transition_radiation,
     transition_radiation_bound,
     transition_radiation_per_eV,
+    transverse_states,
 )
 
 ENERGY_EV = 17e6

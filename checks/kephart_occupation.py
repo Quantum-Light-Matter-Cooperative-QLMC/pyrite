@@ -40,14 +40,16 @@ from pathlib import Path
 import numpy as np
 from scipy.optimize import curve_fit
 
-from pyrite.materials.channeling import longitudinal_kinematics, planar_profile, transverse_states
+from pyrite.materials.channeling import planar_profile
 from pyrite.materials.crystal import HBARC_EV_ANG, M_E_EV
 from pyrite.montecarlo.channeling import (
     DECHANNELING_MARGIN_EV,
     DensityMatrixSolver,
     decoherence_rate,
     electronic_kernel,
+    longitudinal_kinematics,
     tds_kernel,
+    transverse_states,
 )
 
 TEMPERATURE_K = 293.15

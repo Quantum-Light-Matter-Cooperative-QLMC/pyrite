@@ -13,9 +13,9 @@ from numbers import Integral
 
 import numpy as np
 
-from pyrite.materials.channeling.transverse import HBAR2_2M_EV_ANG2, longitudinal_kinematics
-from pyrite.materials.crystal import ALPHA_FS, HBARC_EV_ANG, M_E_EV
+from pyrite.materials.crystal import ALPHA_FS, HBAR2_2M_EV_ANG2, HBARC_EV_ANG, M_E_EV
 
+from .bloch import longitudinal_kinematics
 from .quantum_regression import RegressionCorrelation, spectral_quadratic_form
 from .realspace import RealSpaceGrid
 

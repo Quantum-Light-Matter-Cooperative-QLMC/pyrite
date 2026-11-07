@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 from scipy.integrate import solve_ivp
 
-from pyrite.materials.channeling.transverse import HBAR2_2M_EV_ANG2
+from pyrite.materials.crystal import HBAR2_2M_EV_ANG2
 from pyrite.montecarlo.channeling.axial_mcwf import AxialMCWF
 from pyrite.montecarlo.channeling.axial_projection import SpectralNoJump, run_spectral_mcwf
 from pyrite.montecarlo.channeling.realspace import RealSpaceGrid

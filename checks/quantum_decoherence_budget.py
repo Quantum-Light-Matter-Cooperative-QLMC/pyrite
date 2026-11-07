@@ -39,9 +39,12 @@ import sys
 import numpy as np
 
 from pyrite.materials.channeling import ChannelingDataError, planar_profile
-from pyrite.materials.channeling.transverse import longitudinal_kinematics, transverse_states
 from pyrite.materials.crystal import HBARC_EV_ANG
-from pyrite.montecarlo.channeling import decoherence_rate
+from pyrite.montecarlo.channeling import (
+    decoherence_rate,
+    longitudinal_kinematics,
+    transverse_states,
+)
 
 ENERGIES_EV = (3.0e4, 3.0e5, 3.0e6, 3.0e7)
 VDW_CELLS = (("hopg", (0, 0, 1)), ("hbn", (0, 0, 1)), ("mos2", (0, 0, 1)), ("wse2", (0, 0, 1)))

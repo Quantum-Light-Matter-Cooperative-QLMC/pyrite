@@ -52,14 +52,15 @@ from pathlib import Path
 
 import numpy as np
 
-from pyrite.materials.channeling import longitudinal_kinematics, planar_profile
-from pyrite.materials.channeling.transverse import _hamiltonian
+from pyrite.materials.channeling import planar_profile
 from pyrite.materials.crystal import (
     CRYSTALS,
     HBARC_EV_ANG,
     _direct_lattice_vectors,
     reciprocal_g_vector,
 )
+from pyrite.montecarlo.channeling import longitudinal_kinematics
+from pyrite.montecarlo.channeling.bloch import _hamiltonian
 
 
 def _config(args) -> dict:

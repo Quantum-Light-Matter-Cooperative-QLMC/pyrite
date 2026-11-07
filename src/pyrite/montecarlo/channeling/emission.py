@@ -52,8 +52,8 @@ from scipy.linalg import eig
 from scipy.special import voigt_profile, wofz
 
 from ...materials.attenuation import _resolve_composition, _stack_tau
-from ...materials.channeling.transverse import HBAR2_2M_EV_ANG2, _hamiltonian
-from ...materials.crystal import HBARC_EV_ANG, M_E_EV
+from ...materials.crystal import HBAR2_2M_EV_ANG2, HBARC_EV_ANG, M_E_EV
+from .bloch import _hamiltonian
 from .density import DensityMatrixSolver
 from .dipole import _beta, _denominator, boosted_dipole_pattern, dipole_rate_per_ang, dipole_stokes
 

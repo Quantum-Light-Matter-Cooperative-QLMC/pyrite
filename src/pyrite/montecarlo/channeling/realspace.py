@@ -37,8 +37,8 @@ from dataclasses import dataclass
 import numpy as np
 
 from ..._units import reject_quantity
-from ...materials.channeling.transverse import HBAR2_2M_EV_ANG2, longitudinal_kinematics
-from ...materials.crystal import HBARC_EV_ANG
+from ...materials.crystal import HBAR2_2M_EV_ANG2, HBARC_EV_ANG
+from .bloch import longitudinal_kinematics
 from .states import EntryState, MixedState, TransverseState, momentum_inv_ang
 
 

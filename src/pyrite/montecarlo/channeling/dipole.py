@@ -20,12 +20,8 @@ import numpy as np
 from scipy.constants import c as _C_M_PER_S
 
 from ...materials.channeling.potential import PlanarProfile
-from ...materials.channeling.transverse import (
-    TransverseStates,
-    doppler_denominator,
-    transverse_states,
-)
 from ...materials.crystal import ALPHA_FS, HBARC_EV_ANG, M_E_EV
+from .bloch import TransverseStates, doppler_denominator, transverse_states
 
 C_ANG_PER_S = _C_M_PER_S * 1e10
 

@@ -76,12 +76,12 @@ def test_cpu_wrapper_rejects_invalid_core_and_arm(monkeypatch):
         assert err.value.code == 2
 
 
-def test_cpu_kernel_call_inventory_is_exactly_three_plus_one():
+def test_cpu_kernel_call_inventory_is_exactly_four_plus_one():
     source = (Path(__file__).parents[2] / "src/pyrite/montecarlo/transport/cores.py").read_text()
     assert source.count("radiative_layer_moments_scalar(") == 1
-    # Each of the three sites: inline table lookup + out-of-line exact quadrature (#841).
-    assert source.count("_moments.table_moments(") == 3
-    assert source.count("_moments.exact_moments(") == 3
+    # Four sites have inline table lookup + out-of-line exact quadrature (#841).
+    assert source.count("_moments.table_moments(") == 4
+    assert source.count("_moments.exact_moments(") == 4
     transformed = source
     assert transformed.count("radiative_layer_moments_scalar(") == 1
     # The retained exact call is the physical row-end sampler prerequisite.

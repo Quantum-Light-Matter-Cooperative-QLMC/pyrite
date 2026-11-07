@@ -9,7 +9,8 @@ from __future__ import annotations
 import numpy as np
 from threadpoolctl import threadpool_limits
 
-from ...materials.channeling.transverse import HBAR2_2M_EV_ANG2, longitudinal_kinematics
+from ...materials.crystal import HBAR2_2M_EV_ANG2
+from .bloch import longitudinal_kinematics
 
 # Batching sectors amortizes per-round host Rayleigh--Ritz and launch costs on
 # large grids; beyond ~64 sectors small grids slow down again.

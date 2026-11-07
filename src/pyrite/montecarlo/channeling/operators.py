@@ -70,7 +70,6 @@ from scipy.special import ive, j0, jv
 from ...materials.atomic import Z_TABLE, cromer_mann_f0
 from ...materials.channeling.potential import F0_S_MAX_INV_ANG, PlanarProfile
 from ...materials.channeling.thermal import ChannelingDataError
-from ...materials.channeling.transverse import longitudinal_kinematics
 from ...materials.crystal import (
     CRYSTALS,
     E2_EV_ANG,
@@ -83,6 +82,7 @@ from ..transport.inelastic import _qmin_ev
 from ..transport.shell_gos import _PREF_EV_CM2, _triangle_moments, max_energy_loss_eV
 from ..transport.shell_oscillators import MaterialShellOscillators
 from ..transport.shell_rates import catalog_shell_oscillators
+from .bloch import longitudinal_kinematics
 
 DEFAULT_CELLS = 32
 DEFAULT_MAX_ORDER = 24

@@ -1,6 +1,6 @@
 # `cr-dipole-matrix-element` re-derivation
 
-Claim: `materials/channeling/transverse.py::TransverseStates.dipole_ang`. Source: the commutator identity, with Andersen et al. (1983).
+Claim: `montecarlo/channeling/bloch.py::TransverseStates.dipole_ang`. Source: the commutator identity, with Andersen et al. (1983).
 
 ## Independent derivation (before reading the body)
 

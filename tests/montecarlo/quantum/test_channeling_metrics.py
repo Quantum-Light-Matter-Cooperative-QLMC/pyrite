@@ -71,7 +71,8 @@ def test_axial_recording_preserves_trajectories():
 
 
 def test_complex_probe_actions_and_carrier_energy_match_dense_oracle():
-    from pyrite.materials.channeling.transverse import HBAR2_2M_EV_ANG2, longitudinal_kinematics
+    from pyrite.materials.crystal import HBAR2_2M_EV_ANG2
+    from pyrite.montecarlo.channeling import longitudinal_kinematics
 
     grid = RealSpaceGrid((3.0, 5.0), (3, 4))
     rng = np.random.default_rng(42)
