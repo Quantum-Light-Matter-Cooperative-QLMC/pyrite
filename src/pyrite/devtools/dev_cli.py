@@ -355,8 +355,44 @@ def _pytest_env(args: argparse.Namespace) -> dict[str, str]:
     return env
 
 
+#: Native thread pools capped per xdist worker (#1021). numpy and scipy each
+#: load their own OpenBLAS, so N workers x default pools oversubscribe cores.
+BLAS_THREAD_VARS = ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS")
+
+
+def _xdist_workers(pytest_args: tuple[str, ...]) -> int:
+    """Worker count requested by ``-n``/``--numprocesses`` (``auto`` = CPUs)."""
+    for i, arg in enumerate(pytest_args):
+        if arg in {"-n", "--numprocesses"} and i + 1 < len(pytest_args):
+            value = pytest_args[i + 1]
+        elif arg.startswith(("-n=", "--numprocesses=")):
+            value = arg.split("=", 1)[1]
+        elif arg.startswith("-n") and arg[2:].isdigit():
+            value = arg[2:]
+        else:
+            continue
+        if value in {"auto", "logical"}:
+            return os.cpu_count() or 1
+        return int(value) if value.isdigit() else 1
+    return 1
+
+
+def blas_thread_env(pytest_args: tuple[str, ...]) -> dict[str, str]:
+    """Single-threaded BLAS/OpenMP for parallel runs; caller-set values win."""
+    if _xdist_workers(pytest_args) < 2:
+        return {}
+    env = {name: "1" for name in BLAS_THREAD_VARS if name not in os.environ}
+    if env:
+        print(
+            "pyrite-dev: 1 BLAS/OpenMP thread per xdist worker "
+            "(set OPENBLAS_NUM_THREADS/OMP_NUM_THREADS to override)",
+            file=sys.stderr,
+        )
+    return env
+
+
 def _run_pytest(args: argparse.Namespace, *pytest_args: str) -> None:
-    env = _pytest_env(args)
+    env = {**blas_thread_env(pytest_args), **_pytest_env(args)}
     if env:
         run("-m", "pytest", *pytest_args, extra_env=env)
     else:

@@ -518,26 +518,79 @@ def test_test_suite_forwards_stable_paths_and_pytest_arguments(dev_module, monke
 def test_test_suite_uses_memory_bounded_workers(dev_module, monkeypatch, suite) -> None:
     calls = []
     monkeypatch.setenv("PYRITE_TEST_WORKERS", "3")
-    monkeypatch.setattr(dev_module, "run", lambda *args: calls.append(args))
+    for name in dev_module.BLAS_THREAD_VARS:
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr(dev_module, "run", lambda *args, **kwargs: calls.append((args, kwargs)))
 
     dev_module.cmd_test_suite(Namespace(suite=suite, pytest_args=[]))
 
     paths = [
         str(path.relative_to(dev_module.ROOT)) for path in dev_module.test_files_for_suite(suite)
     ]
-    assert calls == [("-m", "pytest", "-n", "3", "--dist", "worksteal", *paths)]
+    blas = dict.fromkeys(dev_module.BLAS_THREAD_VARS, "1")
+    assert calls == [
+        (("-m", "pytest", "-n", "3", "--dist", "worksteal", *paths), {"extra_env": blas})
+    ]
 
 
 @pytest.mark.parametrize("pytest_args", [["-n", "2"], ["-p", "no:xdist"]])
 def test_test_suite_respects_explicit_worker_choice(dev_module, monkeypatch, pytest_args) -> None:
     calls = []
     monkeypatch.setenv("PYRITE_TEST_WORKERS", "3")
-    monkeypatch.setattr(dev_module, "run", lambda *args: calls.append(args))
+    for name in dev_module.BLAS_THREAD_VARS:
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr(dev_module, "run", lambda *args, **kwargs: calls.append((args, kwargs)))
 
     dev_module.cmd_test_suite(Namespace(suite="integration", pytest_args=pytest_args))
 
     paths = [f"tests/{name}" for name in dev_module.INTEGRATION_TESTS]
-    assert calls == [("-m", "pytest", *pytest_args, *paths)]
+    # An explicit ``-n 2`` is still parallel and gets the cap; no xdist gets none.
+    kwargs = (
+        {"extra_env": dict.fromkeys(dev_module.BLAS_THREAD_VARS, "1")}
+        if "-n" in pytest_args
+        else {}
+    )
+    assert calls == [(("-m", "pytest", *pytest_args, *paths), kwargs)]
+
+
+@pytest.mark.parametrize(
+    ("pytest_args", "workers"),
+    [
+        ((), 1),
+        (("-n", "4"), 4),
+        (("-n4",), 4),
+        (("--numprocesses=3",), 3),
+        (("-n", "auto"), 16),
+        (("-p", "no:xdist"), 1),
+        (("tests/dev/test_dev_cli.py",), 1),
+    ],
+)
+def test_xdist_worker_count_from_pytest_args(dev_module, monkeypatch, pytest_args, workers):
+    monkeypatch.setattr(dev_module.os, "cpu_count", lambda: 16)
+
+    assert dev_module._xdist_workers(pytest_args) == workers
+
+
+def test_blas_thread_cap_only_for_parallel_runs(dev_module, monkeypatch) -> None:
+    for name in dev_module.BLAS_THREAD_VARS:
+        monkeypatch.delenv(name, raising=False)
+
+    assert dev_module.blas_thread_env(("-n", "1")) == {}
+    assert dev_module.blas_thread_env(("tests/dev/test_dev_cli.py",)) == {}
+    assert dev_module.blas_thread_env(("-n", "2")) == dict.fromkeys(
+        dev_module.BLAS_THREAD_VARS, "1"
+    )
+
+
+def test_blas_thread_cap_respects_caller_environment(dev_module, monkeypatch) -> None:
+    for name in dev_module.BLAS_THREAD_VARS:
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("OPENBLAS_NUM_THREADS", "4")
+
+    env = dev_module.blas_thread_env(("-n", "3"))
+
+    assert "OPENBLAS_NUM_THREADS" not in env
+    assert env == {"OMP_NUM_THREADS": "1", "MKL_NUM_THREADS": "1"}
 
 
 @pytest.mark.parametrize("argv", [["verify"], ["verify", "--skip-tests"]])

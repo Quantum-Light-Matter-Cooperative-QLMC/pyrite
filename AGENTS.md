@@ -166,9 +166,9 @@ Do not add separate tutorial provenance manifests or HTML/session exports.
 - Local tests: `pyrite-dev test` sizes workers by memory; never raise `-n`.
   That budget is a heuristic, not a memory limit. Full `--slow` audits and
   isolated multi-GiB tests belong on the remote box; see the measured
-  [slow-test audit](docs/repo-design/compute/slow-test-audit.md). For parallel
-  CPU audits, start with `OPENBLAS_NUM_THREADS=1` to avoid multiplying BLAS
-  threads by xdist workers; benchmark larger thread counts explicitly.
+  [slow-test audit](docs/repo-design/compute/slow-test-audit.md). Parallel
+  runs already default BLAS/OpenMP to 1 thread per worker (caller env wins);
+  benchmark larger thread counts explicitly.
   Cap heavy local probes with
   `systemd-run --user --scope -p MemoryMax=8G -p MemorySwapMax=0 ...`.
   After a squash/rebase with no content change, rerun only focused tests;
