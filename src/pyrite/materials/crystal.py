@@ -44,6 +44,7 @@ HC_EV_ANG = 12398.4198  # h c [eV*Angstrom]
 HBARC_EV_ANG = 1973.269804  # hbar c [eV*Angstrom]
 ALPHA_FS = 1.0 / 137.035999
 M_E_EV = 510998.95  # electron rest energy [eV]
+HBAR2_2M_EV_ANG2 = HBARC_EV_ANG**2 / (2.0 * M_E_EV)  # hbar^2 / (2 m_e) [eV*Angstrom^2]
 R_E_ANG = 2.8179403e-5  # classical electron radius [Angstrom]
 E2_EV_ANG = ALPHA_FS * HBARC_EV_ANG  # e^2 (Gaussian) = alpha hbar c = 14.3996 [eV*Angstrom]
 

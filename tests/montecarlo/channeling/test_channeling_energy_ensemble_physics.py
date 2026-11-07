@@ -7,11 +7,12 @@ import pytest
 
 pytest.importorskip("xraydb")  # Required by the existing material-scattering stack.
 
-from pyrite.materials.channeling import planar_profile, transverse_states  # noqa: E402
+from pyrite.materials.channeling import planar_profile
 from pyrite.montecarlo.channeling import (  # noqa: E402
     IncidentEnergyEnsemble,
     planar_energy_diagnostic,
     planar_solver_factory,
+    transverse_states,
 )
 
 

@@ -52,8 +52,8 @@ from scipy.special import airy as _airy
 from scipy.special import eval_genlaguerre, eval_hermite, ive, jv
 
 from ..._units import normalize_unit
-from ...materials.channeling.transverse import longitudinal_kinematics
 from ...materials.crystal import HBARC_EV_ANG, M_E_EV
+from .bloch import longitudinal_kinematics
 
 #: Envelope level treated as negligible when sizing momentum quadratures.
 _TAIL = 1e-8

@@ -6,11 +6,12 @@ import numpy as np
 import pytest
 from scipy.linalg import expm
 
-from pyrite.materials.channeling import entry_populations, planar_profile
+from pyrite.materials.channeling import planar_profile
 from pyrite.materials.crystal import HBARC_EV_ANG, M_E_EV
 from pyrite.montecarlo.channeling import (
     DensityMatrixSolver,
     electronic_kernel,
+    entry_populations,
     tds_kernel,
 )
 

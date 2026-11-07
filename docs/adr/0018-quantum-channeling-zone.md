@@ -126,6 +126,14 @@ PXR/CBS is recorded as an omission.
 
 - Static physics lives in `materials/channeling/`: potential, temperature
   dependence of thermal displacement $B(T)$, and the eigensolve.
+  *Outcome (#1018, maintainer decision 2026-11-07):* `materials/channeling/`
+  keeps only the beam-independent crystal properties (`thermal`, `potential`,
+  `axial`). The beam-dependent Bloch eigensolve, dipole elements, entry
+  populations, Doppler line energies and `longitudinal_kinematics` moved to
+  `montecarlo/channeling/bloch.py`, and the sample-tilt entry geometry to
+  `montecarlo/channeling/entry.py`, with the dynamics they feed. No alias
+  modules remain (experimental surface); `hbar^2/2m` is now
+  `materials.crystal.HBAR2_2M_EV_ANG2`.
 - Dynamics, emission and handoff live in `montecarlo/channeling/`.
 - The crystal catalog gains per-site thermal displacement, a reference
   temperature and a Debye temperature. Existing consumers keep reading the scalar

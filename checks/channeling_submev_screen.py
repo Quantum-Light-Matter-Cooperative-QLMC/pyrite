@@ -24,15 +24,14 @@ import sys
 import numpy as np
 
 from pyrite.materials.attenuation import plasma_energy_eV
-from pyrite.materials.channeling import (
+from pyrite.materials.channeling import planar_profile
+from pyrite.materials.crystal import HBAR2_2M_EV_ANG2, HBARC_EV_ANG, M_E_EV
+from pyrite.montecarlo.channeling import (
     entry_populations,
     line_energy_eV,
     longitudinal_kinematics,
-    planar_profile,
     transverse_states,
 )
-from pyrite.materials.channeling.transverse import HBAR2_2M_EV_ANG2
-from pyrite.materials.crystal import HBARC_EV_ANG, M_E_EV
 
 ENERGIES_KEV = (30, 50, 100, 200, 300, 500, 750, 1000)
 CASES = (

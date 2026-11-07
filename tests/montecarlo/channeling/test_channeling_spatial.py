@@ -5,8 +5,14 @@ from dataclasses import fields
 import numpy as np
 import pytest
 
-from pyrite.materials.channeling import longitudinal_kinematics, planar_profile, transverse_states
-from pyrite.montecarlo.channeling import DensityMatrixSolver, spatial_density, tds_kernel
+from pyrite.materials.channeling import planar_profile
+from pyrite.montecarlo.channeling import (
+    DensityMatrixSolver,
+    longitudinal_kinematics,
+    spatial_density,
+    tds_kernel,
+    transverse_states,
+)
 
 
 def test_pure_eigenstate_is_normalized_wavefunction_squared():

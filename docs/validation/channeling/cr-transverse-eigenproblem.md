@@ -1,6 +1,6 @@
 # `cr-transverse-eigenproblem` re-derivation
 
-Claim: `materials/channeling/transverse.py::{transverse_states,TransverseStates.wavefunction}`.
+Claim: `montecarlo/channeling/bloch.py::{transverse_states,TransverseStates.wavefunction}`.
 Source: Andersen, Bonderup, Lægsgaard and Sørensen, Phys. Scr. 28, 308 (1983); Azadegan, Comput. Phys. Commun. 184, 1064 (2013), Eqs. 2–6.
 
 ## Independent derivation (written before reading the implementation body)

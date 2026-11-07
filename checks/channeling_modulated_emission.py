@@ -45,9 +45,13 @@ import sys
 import numpy as np
 
 from pyrite.materials.channeling import planar_profile
-from pyrite.materials.channeling.transverse import longitudinal_kinematics
 from pyrite.materials.crystal import HBARC_EV_ANG, M_E_EV
-from pyrite.montecarlo.channeling import DensityMatrixSolver, electronic_kernel, tds_kernel
+from pyrite.montecarlo.channeling import (
+    DensityMatrixSolver,
+    electronic_kernel,
+    longitudinal_kinematics,
+    tds_kernel,
+)
 
 
 def _toeplitz(coefficients: np.ndarray, orders: np.ndarray) -> np.ndarray:

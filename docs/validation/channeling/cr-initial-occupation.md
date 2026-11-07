@@ -1,6 +1,6 @@
 # `cr-initial-occupation` re-derivation
 
-Claim: `materials/channeling/transverse.py::entry_populations`. Source: Andersen et al. (1983); Azadegan (2013), Eq. 17.
+Claim: `montecarlo/channeling/bloch.py::entry_populations`. Source: Andersen et al. (1983); Azadegan (2013), Eq. 17.
 
 ## Independent derivation (before reading the body)
 

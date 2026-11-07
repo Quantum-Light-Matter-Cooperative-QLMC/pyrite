@@ -204,7 +204,7 @@ def test_handoff_rows_continue_with_the_sampled_plane_angle(zone):
     ids = segs["electron_id"][dechannel]
     nxt = np.flatnonzero(~tagged & (segs["flight_id"] == 1))
     following = {int(e): j for e, j in zip(segs["electron_id"][nxt], nxt, strict=True)}
-    from pyrite.materials.channeling import plane_incidence
+    from pyrite.montecarlo.channeling import plane_incidence
 
     normal = plane_incidence(
         "silicon", (1, -1, 0), 5e6, tilt_deg=3.0, tilt_azim_deg=45.0, rotation=np.eye(3)

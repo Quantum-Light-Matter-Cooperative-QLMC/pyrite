@@ -13,14 +13,8 @@ import json
 import numpy as np
 
 from pyrite.materials.catalog import load_material_catalog
-from pyrite.materials.channeling import (
-    ChannelingDataError,
-    load_thermal_sites,
-    longitudinal_kinematics,
-    planar_profile,
-    transverse_states,
-)
-from pyrite.materials.channeling.entry import plane_incidence
+from pyrite.materials.channeling import ChannelingDataError, load_thermal_sites, planar_profile
+from pyrite.montecarlo.channeling import longitudinal_kinematics, plane_incidence, transverse_states
 from pyrite.montecarlo.transport.shell_rates import catalog_shell_oscillators
 
 

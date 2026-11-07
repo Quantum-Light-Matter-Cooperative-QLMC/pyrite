@@ -171,11 +171,11 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `cr-transverse-eigenproblem`
 
 - **Claim:** transverse states solve `[−(ħ²/2γm) d²/dx² + U(x)] ψ = E_⊥ ψ`, expanded in Bloch plane waves, with `H_{mm′} = (ħ²/2γm)(k + m g)² δ_{mm′} + U_{m−m′}`. A state is bound when it lies below `max U`.
-- **Code:** `materials/channeling/transverse.py::{transverse_states,TransverseStates.wavefunction}`, `apps/channeling.py::critical_angle_rad`
+- **Code:** `montecarlo/channeling/bloch.py::{transverse_states,TransverseStates.wavefunction}`, `apps/channeling.py::critical_angle_rad`
 - **Source:** Andersen et al., Phys. Scr. 28, 308 (1983); Azadegan (2013), Eqs. 2–6
 - **Status:** anchored
 - **Checks:** Free limit: the plane-wave spectrum, with no bound states; Cosine (Mathieu) limit: spacings `ħω − (a g²/4)(n+1)` to 2×10⁻⁴; Parity alternates at `k = 0`; Basis convergence between M = 16 and 48; Bound count grows as √γ: 6 → 12 → 24 at 40 → 160 → 640 MeV.
-- **Anchor:** `tests/materials/test_channeling_profile.py::{test_free_limit_has_no_bound_states,test_harmonic_limit_gives_equal_spacing,test_parity_alternates_and_selection_rule_emerges,test_bound_state_count_scales_as_sqrt_gamma,test_si110_40mev_matches_azadegan,test_diamond_lines_match_gouanere,test_diamond110_9mev_line_within_bloch_band,test_si_planar_lines_below_watson_detector_cutoff}`, `tests/notebooks/test_channeling_app.py::{test_si110_critical_angle_uses_the_well_depth,test_every_plotted_eigenfunction_has_unit_probability_per_period}`
+- **Anchor:** `tests/montecarlo/channeling/test_channeling_bloch.py::{test_free_limit_has_no_bound_states,test_harmonic_limit_gives_equal_spacing,test_parity_alternates_and_selection_rule_emerges,test_bound_state_count_scales_as_sqrt_gamma,test_si110_40mev_matches_azadegan,test_diamond_lines_match_gouanere,test_diamond110_9mev_line_within_bloch_band,test_si_planar_lines_below_watson_detector_cutoff}`, `tests/notebooks/test_channeling_app.py::{test_si110_critical_angle_uses_the_well_depth,test_every_plotted_eigenfunction_has_unit_probability_per_period}`
 
 The app's critical-angle diagnostic is the small-angle classical corollary of
 this Hamiltonian: at the well minimum, $p_x \simeq p\theta$ and
@@ -201,51 +201,51 @@ change the eigenproblem or introduce a new physical selection rule.
 ## `cr-dipole-matrix-element`
 
 - **Claim:** the transverse dipole matrix element between Bloch states at the same `k` is `x_fi = −i (ħ²/(γm)) Σ_m c_f*(k + m g) c_i / (E_f − E_i)`, from `[H, x] = −iħp/(γm)`. Parity selection emerges rather than being imposed.
-- **Code:** `materials/channeling/transverse.py::TransverseStates.dipole_ang`
+- **Code:** `montecarlo/channeling/bloch.py::TransverseStates.dipole_ang`
 - **Source:** standard commutator identity; Andersen et al. (1983)
 - **Status:** anchored
 - **Checks:** Units: Å; Same-parity elements are below 10⁻¹² at `k = 0`; Agrees with direct `⟨ψ_f|x|ψ_i⟩` quadrature over one centred period to 2×10⁻³ for deep states.
-- **Anchor:** `tests/materials/test_channeling_profile.py::{test_parity_alternates_and_selection_rule_emerges,test_dipole_matches_position_operator_for_deep_states}`
+- **Anchor:** `tests/montecarlo/channeling/test_channeling_bloch.py::{test_parity_alternates_and_selection_rule_emerges,test_dipole_matches_position_operator_for_deep_states}`
 - **Notes:** Consumed by the `cr-dipole-rate` emission row (#505).; **2026-10-15 fresh-context verdict `rederived`** ([write-up](channeling/cr-dipole-matrix-element.md)): `|x_fi|` agrees with an independent implementation to 6×10⁻¹⁷ Å; commutator vs direct quadrature 1e-8 for (1,0),(2,1),(3,0). The phase is eigenvector-gauge dependent; consumers use `|x_fi|²`. Human sign-off pending.
 
 ## `cr-initial-occupation`
 
 - **Claim:** an electron entering at angle `ψ` to the plane is the plane wave with `k_x = pψ/ħ`. Its populations are `P_n = |c_n(m₀)|²`, where `k + m₀ g = k_x`, which sums to 1. A Gaussian divergence is averaged by Gauss–Hermite quadrature. Surface refraction is not applied.
-- **Code:** `materials/channeling/transverse.py::entry_populations`
+- **Code:** `montecarlo/channeling/bloch.py::entry_populations`
 - **Source:** Andersen et al. (1983); Azadegan (2013), Eq. 17
 - **Status:** anchored
 - **Checks:** Unitarity to 10⁻¹²; Even states only at `ψ = 0`; `P(ψ) = P(−ψ)`; The divergence average stays normalized and mixes parities.
-- **Anchor:** `tests/materials/test_channeling_profile.py::{test_entry_populations_unitary_and_parity_selective,test_divergence_average_is_normalized_and_mixes_parity}`
+- **Anchor:** `tests/montecarlo/channeling/test_channeling_bloch.py::{test_entry_populations_unitary_and_parity_selective,test_divergence_average_is_normalized_and_mixes_parity}`
 - **Notes:** At 40 MeV Si(110), `P₀(0) = 0.24`, consistent with Azadegan 2013 Fig. 3; Surface refraction by the mean inner potential depends on the face/lattice geometry. It is deferred to the orientation coupling (#25), as is the laboratory-frame incidence angle; **2026-10-15 fresh-context verdict `rederived`** ([write-up](channeling/cr-initial-occupation.md)): independent version agrees to 1e-14 at 0 and 120 µrad tilt and with 100 µrad divergence, including the `k_x = g/2` fold edge; probabilists' Gauss–Hermite with normalized weights is equivalent. Orders beyond `M` contribute nothing (documented). Refraction and laboratory incidence are now supplied by `cr-plane-incidence`. Human sign-off pending.
 
 ## `cr-doppler-line-energy`
 
 - **Claim:** a transverse transition emits at `ħω = ΔE_⊥/(1 − β cos θ)`, evaluated as `1/(γ²(1+β)) + 2β sin²(θ/2)`, where `θ` is the photon angle to the electron velocity. Photon recoil `O(ħω/E)` is neglected.
-- **Code:** `materials/channeling/transverse.py::{doppler_denominator,line_energy_eV}`
+- **Code:** `montecarlo/channeling/bloch.py::{doppler_denominator,line_energy_eV}`
 - **Source:** relativistic kinematics; Andersen et al. (1983)
 - **Status:** anchored
 - **Checks:** Forward limit is `γ²(1+β)ΔE`; Agrees with the naive form at moderate angles; Cross-module: equals the PXR/CBS vacuum resonance denominator of `materials/emission.py::photon_energies` to 10⁻¹², at 5 MeV/3°, 5 MeV/20° and 30 keV/120°.
-- **Anchor:** `tests/materials/test_channeling_profile.py::{test_forward_line_energy_is_doppler_upshift,test_doppler_denominator_matches_pxr_resonance}`
+- **Anchor:** `tests/montecarlo/channeling/test_channeling_bloch.py::{test_forward_line_energy_is_doppler_upshift,test_doppler_denominator_matches_pxr_resonance}`
 - **Notes:** Shares the `line-energy-dispersion` convention: `θ` relative to `v`, positive frequency.; **2026-10-15 fresh-context verdict `rederived`** ([write-up](channeling/cr-doppler-line-energy.md)): the cancellation-free identity holds to ~1e-32 at 1 GeV/1e-4 rad in 50-digit arithmetic; the `photon_energies` equality rests on the existing anchor test. Human sign-off pending.
 
 ## `cr-mean-inner-potential`
 
 - **Claim:** the electron's mean potential energy in the crystal is the `g → 0` limit of the planar sum, `U_0 = −(4π e²/V) Σ_j Z_j⟨r²⟩_j/6`, using `f0(g) = Z − Z⟨r²⟩g²/6 + O(g⁴)`. It is the neutral independent-atom value and is negative, so electrons gain `−U_0` on entry.
-- **Code:** `materials/channeling/entry.py::mean_inner_potential_eV`
+- **Code:** `montecarlo/channeling/entry.py::mean_inner_potential_eV`
 - **Source:** Ibers, Acta Cryst. 11, 178 (1958); Spence & Zuo, *Electron Microdiffraction* (1992)
 - **Status:** anchored
 - **Checks:** Units are eV from e²/V. The sign is attractive. The two-node `g²` slope at `g = 0.05, 0.1 Å⁻¹` has `O(g²⟨r⁴⟩)` error of about 2e-3 relative (0.03 eV for Si). Si gives −13.80 eV, 0.8% from the independent-atom 13.91 V of Kruse et al. (2006) Table 2 (Doyle–Turner Hartree–Fock factors). Measured Si is 12.52 V (±0.71%, holography, same table), and DFT with bonding gives 12.57 V; the independent-atom value is 10% high, matching Kruse's attribution (7.5% bonding, 2.5% correlation). Diamond is deeper.
-- **Anchor:** `tests/materials/test_channeling_entry.py::test_mean_inner_potential_matches_independent_atom_and_measured_si`
+- **Anchor:** `tests/montecarlo/channeling/test_channeling_entry.py::test_mean_inner_potential_matches_independent_atom_and_measured_si`
 - **Notes:** Used only for entrance-face refraction (`cr-plane-incidence`). Transverse levels are referenced to `U_0 = 0` (`cr-planar-continuum-potential`). **2026-10-15 fresh-context verdict `rederived`** ([write-up](channeling/cr-mean-inner-potential.md)): the exact Waasmaier–Kirfel slope `Σ a_i b_i/16π²` gives Si −13.830 eV and diamond −20.816 eV, against the code's −13.799 and −20.790. The whole gap is the finite-difference error. Independence caveat: the verifier saw the function body after writing its formula. **Reference values** (Kruse, Schowalter, Lamoen, Rosenauer & Gerthsen, Ultramicroscopy 106, 105 (2006), Table 2, [doi:10.1016/j.ultramic.2005.06.057](https://doi.org/10.1016/j.ultramic.2005.06.057)): Si independent-atom 13.91 V, DFT 12.57 V, holography 12.52 V; Ge 15.58 / 14.67 / 14.3(2) V (Ge not in the catalog). Gajdardziska-Josifovska et al., Ultramicroscopy 50, 285 (1993), Table 2, report Si 9.26(8) V; Kruse et al. note it is far below their DFT and holography values and it is not used as the anchor. The ~1.3 eV bonding error shifts the refraction only, which is negligible at MeV energies (`cr-plane-incidence`). Human sign-off pending.
 
 ## `cr-plane-incidence`
 
 - **Claim:** the channeling plane normal in the sample frame is `n = R g_hkl/|g_hkl|`, with `R` the `CrystalCut` lattice rotation. The vacuum beam direction follows the `tilted_geometry` tilt convention. At the entrance face (`+z`) the tangential momentum is conserved and the normal component becomes `sqrt(p_in² − p_∥²)`, with `p_in` at kinetic energy `T − U_0`. The transverse wavevector is `k_x = p_in·n`, and the effective incidence passed to `entry_populations` is `k_x/p`.
-- **Code:** `materials/channeling/entry.py::plane_incidence`
+- **Code:** `montecarlo/channeling/entry.py::plane_incidence`
 - **Source:** reciprocal-lattice geometry (`surface-hkl-orientation`); electron refraction at a crystal surface by the mean inner potential (Spence & Zuo 1992)
 - **Status:** anchored
 - **Checks:** The beam direction equals `montecarlo.geometry.tilted_geometry` at four tilts; Tilting across perpendicular (110) planes gives `ψ = tilt`; tilting along them gives 0; For planes perpendicular to the face, refraction leaves `k_x` unchanged; Tangential momentum is conserved and `|p_in|` follows `T − U_0`; With the vacuum option, `ψ_eff = sin ψ`; A 1° `CrystalCut` miscut tilts (100) planes by exactly 1°; The catalog (440) face puts (110) planes at 90°; The beam must enter through the face; Lab-mapped populations equal plane-local populations.
-- **Anchor:** `tests/materials/test_channeling_entry.py::{test_beam_direction_matches_transport_tilt_convention,test_tilt_across_versus_along_a_perpendicular_plane,test_refraction_conserves_tangential_momentum_and_raises_normal_momentum,test_miscut_tilts_channeling_planes_off_the_face_normal,test_catalog_face_orientation_is_default,test_cut_crystal_entry_feeds_populations}`
+- **Anchor:** `tests/montecarlo/channeling/test_channeling_entry.py::{test_beam_direction_matches_transport_tilt_convention,test_tilt_across_versus_along_a_perpendicular_plane,test_refraction_conserves_tangential_momentum_and_raises_normal_momentum,test_miscut_tilts_channeling_planes_off_the_face_normal,test_catalog_face_orientation_is_default,test_cut_crystal_entry_feeds_populations}`
 - **Notes:** Issue #503, consuming #25's `CrystalCut`/`ResolvedCut.rotation`. At MeV energies refraction is negligible: `δk_x ≈ n_z(−U_0)/(ħcβ)`, about 6×10⁻⁹ rad at 40 MeV for planes nearly perpendicular to a 1°-miscut face, and 3.4×10⁻⁷ rad for (004) planes (`n_z = sin 1°`), against 2.4×10⁻⁴ rad at 30 keV. It matters at keV energies and for planes inclined to the face. The γ change inside the crystal (`U_0/E ~ 1e-5`) is neglected in the states. **2026-10-15 fresh-context verdict `rederived`** ([write-up](channeling/cr-plane-incidence.md)): an independent construction over planes (110), (004), (220), (111) and (1-10), 0° and 1° miscut, 40 MeV and 30 keV, and six tilt/azimuth pairs agrees to 4e-16. Human sign-off pending.
 
 ## `cr-lindblad-jump-operators`

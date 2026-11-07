@@ -4,8 +4,8 @@ import numpy as np
 import pytest
 from scipy.integrate import dblquad
 
-from pyrite.materials.channeling.transverse import longitudinal_kinematics
 from pyrite.materials.crystal import ALPHA_FS, HBARC_EV_ANG
+from pyrite.montecarlo.channeling import longitudinal_kinematics
 from pyrite.montecarlo.channeling.axial_qrt_source import (
     GlobalAxialSource,
     global_axial_source,

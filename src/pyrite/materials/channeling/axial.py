@@ -26,7 +26,7 @@ the planar profile of the zone plane normal to ``x``. Tests pin it.
 **Transverse states.** The paraxial transverse Hamiltonian
 ``-(hbar^2 / 2 gamma m) nabla_perp^2 + U(r)`` has Bloch solutions
 ``psi_k(r) = A^{-1/2} sum_G c_G exp(i (k + G) . r)``; :func:`axial_states`
-diagonalizes the plane-wave matrix as :func:`.transverse_states` does in 1D.
+diagonalizes the plane-wave matrix as :func:`pyrite.montecarlo.channeling.transverse_states` does in 1D.
 
 Lengths in angstroms, energies in eV.
 """
@@ -39,10 +39,15 @@ from dataclasses import dataclass
 import numpy as np
 
 from ..atomic import Z_TABLE, cromer_mann_f0
-from ..crystal import CRYSTALS, E2_EV_ANG, _direct_lattice_vectors, _reciprocal_basis
+from ..crystal import (
+    CRYSTALS,
+    E2_EV_ANG,
+    HBAR2_2M_EV_ANG2,
+    _direct_lattice_vectors,
+    _reciprocal_basis,
+)
 from .potential import _EXTINCTION_RTOL, F0_S_MAX_INV_ANG, _coprime
 from .thermal import thermal_b_factor
-from .transverse import HBAR2_2M_EV_ANG2
 
 #: Relative tolerance for matching projected lengths to the rectangular grid.
 _GRID_RTOL = 1e-7

@@ -92,20 +92,17 @@ def _():
     import numpy as np
 
     from pyrite.apps.channeling import critical_angle_rad
-    from pyrite.materials.channeling import (
-        entry_populations,
-        longitudinal_kinematics,
-        planar_profile,
-        transverse_states,
-    )
-    from pyrite.materials.channeling.transverse import HBAR2_2M_EV_ANG2
-    from pyrite.materials.crystal import M_E_EV
+    from pyrite.materials.channeling import planar_profile
+    from pyrite.materials.crystal import HBAR2_2M_EV_ANG2, M_E_EV
     from pyrite.montecarlo.channeling import (
         DECHANNELING_MARGIN_EV,
         DensityMatrixSolver,
         channeling_spectrum,
         electronic_kernel,
+        entry_populations,
+        longitudinal_kinematics,
         tds_kernel,
+        transverse_states,
     )
 
     return (

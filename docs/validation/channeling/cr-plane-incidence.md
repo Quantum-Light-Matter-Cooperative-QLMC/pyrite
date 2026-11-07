@@ -1,6 +1,6 @@
 # `cr-plane-incidence` re-derivation
 
-Claim: `materials/channeling/entry.py::plane_incidence`. Source: reciprocal-lattice geometry; electron refraction by the mean inner potential (Spence & Zuo 1992).
+Claim: `montecarlo/channeling/entry.py::plane_incidence`. Source: reciprocal-lattice geometry; electron refraction by the mean inner potential (Spence & Zuo 1992).
 
 ## Independent derivation (before reading the body)
 

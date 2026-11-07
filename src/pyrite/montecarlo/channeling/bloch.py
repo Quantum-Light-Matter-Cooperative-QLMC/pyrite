@@ -22,11 +22,9 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from ..crystal import HBARC_EV_ANG, M_E_EV
-from .potential import PlanarProfile
+from ...materials.channeling.potential import PlanarProfile
+from ...materials.crystal import HBAR2_2M_EV_ANG2, HBARC_EV_ANG, M_E_EV
 
-# hbar^2 / (2 m_e) [eV angstrom^2]
-HBAR2_2M_EV_ANG2 = HBARC_EV_ANG**2 / (2.0 * M_E_EV)
 DEFAULT_PLANE_WAVES = 32
 
 
@@ -199,7 +197,7 @@ def entry_populations(
     the transverse entry point is implicit in the Bloch normalization. A
     Gaussian beam divergence ``sigma`` is integrated by Gauss--Hermite
     quadrature over ``psi``. Surface refraction is not applied here: pass the
-    ``effective_rad`` of :func:`~pyrite.materials.channeling.entry.plane_incidence`,
+    ``effective_rad`` of :func:`~pyrite.montecarlo.channeling.entry.plane_incidence`,
     which carries the refracted transverse wavevector. Plane-wave orders beyond
     ``n_plane_waves`` contribute nothing, so ``sum_n P_n < 1`` when
     ``|k_x| > (M + 1/2) g``; raise ``n_plane_waves`` for large angles.

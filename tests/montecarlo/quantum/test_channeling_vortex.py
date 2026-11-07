@@ -5,9 +5,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from pyrite.materials.channeling import longitudinal_kinematics
 from pyrite.materials.channeling.axial import axial_profile, axial_states
-from pyrite.montecarlo.channeling import states
+from pyrite.montecarlo.channeling import longitudinal_kinematics, states
 from pyrite.montecarlo.channeling.realspace import RealSpaceGrid, SplitStepPropagator
 from pyrite.montecarlo.channeling.vortex import CylindricalProjection, angular_momentum
 

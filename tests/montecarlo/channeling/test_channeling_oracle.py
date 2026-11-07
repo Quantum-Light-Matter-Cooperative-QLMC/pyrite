@@ -6,13 +6,14 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from pyrite.materials.channeling import longitudinal_kinematics, planar_profile
-from pyrite.materials.channeling.transverse import _hamiltonian
+from pyrite.materials.channeling import planar_profile
+from pyrite.montecarlo.channeling import longitudinal_kinematics
+from pyrite.montecarlo.channeling.bloch import _hamiltonian
 
 
 @pytest.fixture(scope="module")
 def oracle():
-    path = Path(__file__).parents[2] / "checks" / "abtem_channeling_oracle.py"
+    path = Path(__file__).parents[3] / "checks" / "abtem_channeling_oracle.py"
     spec = importlib.util.spec_from_file_location("channeling_oracle", path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)

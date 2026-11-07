@@ -279,7 +279,7 @@ def projective_hook(
 
 def _setup(cells, shape, mechanisms, energy_eV, *, loss_coupling=False):
     from pyrite.materials.channeling.axial import axial_profile
-    from pyrite.materials.channeling.transverse import HBAR2_2M_EV_ANG2
+    from pyrite.materials.crystal import HBAR2_2M_EV_ANG2
     from pyrite.montecarlo.channeling.axial_dissipator import axial_dissipator
     from pyrite.montecarlo.channeling.axial_mcwf import AxialMCWF
 

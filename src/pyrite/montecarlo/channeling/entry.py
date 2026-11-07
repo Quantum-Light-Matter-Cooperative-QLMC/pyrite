@@ -2,7 +2,7 @@
 
 Maps a sample tilt and the lattice orientation of a cut crystal (issue #25)
 onto the plane-local incidence angle consumed by
-:func:`~pyrite.materials.channeling.transverse.entry_populations`, including
+:func:`~pyrite.montecarlo.channeling.bloch.entry_populations`, including
 refraction at the entrance face by the mean inner potential.
 
 Frames follow the transport convention: the sample ``+z`` axis is the
@@ -20,8 +20,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from ..atomic import Z_TABLE, cromer_mann_f0
-from ..crystal import (
+from ...materials.atomic import Z_TABLE, cromer_mann_f0
+from ...materials.crystal import (
     CRYSTALS,
     E2_EV_ANG,
     HBARC_EV_ANG,
@@ -151,7 +151,7 @@ def plane_incidence(
     Validation: cr-plane-incidence
     """
     if rotation is None:
-        from ..catalog import _get_default_catalog
+        from ...materials.catalog import _get_default_catalog
 
         spec = _get_default_catalog().crystals[crystal]
         rotation = _orientation_R(spec.lattice, spec.beam_uvw, 0.0, surface_hkl=spec.surface_hkl)

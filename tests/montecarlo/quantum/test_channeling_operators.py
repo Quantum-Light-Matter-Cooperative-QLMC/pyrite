@@ -8,16 +8,13 @@ import xraydb
 from scipy import integrate
 
 from pyrite.materials.atomic import Z_TABLE
-from pyrite.materials.channeling import (
-    ChannelingDataError,
-    longitudinal_kinematics,
-    planar_profile,
-)
+from pyrite.materials.channeling import ChannelingDataError, planar_profile
 from pyrite.materials.crystal import CRYSTALS, HBARC_EV_ANG, M_E_EV, _direct_lattice_vectors
 from pyrite.montecarlo.channeling import (
     decoherence_rate,
     electronic_channels,
     electronic_kernel,
+    longitudinal_kinematics,
     tds_kernel,
 )
 from pyrite.montecarlo.channeling.operators import (

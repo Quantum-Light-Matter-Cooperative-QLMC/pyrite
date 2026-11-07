@@ -10,7 +10,7 @@ here is supported, and no validation status changes. Claims stay with
 ## Method
 
 `checks/channeling_submev_screen.py` prints the full JSON record. It solves
-`materials.channeling.transverse_states` for Si and diamond (110), (111) and
+`montecarlo.channeling.transverse_states` for Si and diamond (110), (111) and
 (100) at 293.15 K, for 30, 50, 100, 200, 300, 500, 750 and 1000 keV. By time
 reversal, $E_n(k)=E_n(-k)$. The scan therefore covers $k\in[0,g/2]$ with
 trapezoid weights, including the zone centre and edge where 1D band extrema

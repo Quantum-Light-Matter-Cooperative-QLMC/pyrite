@@ -156,7 +156,7 @@ def test_gates_refuse_crystals_without_thermal_data():
 
 
 def test_gates_refuse_no_bound_state(monkeypatch):
-    from pyrite.materials import channeling as static
+    from pyrite.montecarlo import channeling as static
 
     real = static.transverse_states
 

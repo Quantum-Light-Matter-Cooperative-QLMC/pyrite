@@ -97,5 +97,5 @@ The original local dz/H checks left no saved results. Recovery job 1511
 on cluster-head's CPU partition recomputed H = 48 at dz = 25 and 12.5 Å and
 H = 64 at dz = 12.5 Å, recording every 500 Å. BLAS/OpenMP used one thread;
 each result was saved independently. Regression tests in
-`tests/materials/test_channeling_oracle.py` pin the n13 orthogonal cell and
+`tests/montecarlo/channeling/test_channeling_oracle.py` pin the n13 orthogonal cell and
 the grouped entrance populations across H = 48/64.

@@ -3,8 +3,8 @@
 import numpy as np
 import pytest
 
-from pyrite.materials.channeling.transverse import longitudinal_kinematics
 from pyrite.materials.crystal import ALPHA_FS, HBARC_EV_ANG, M_E_EV
+from pyrite.montecarlo.channeling import longitudinal_kinematics
 from pyrite.montecarlo.channeling.axial_qrt_source import (
     global_axial_source,
     on_axis_photon_spectrum,

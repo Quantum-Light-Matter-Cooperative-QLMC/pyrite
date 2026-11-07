@@ -8,7 +8,9 @@ from numbers import Integral
 
 import numpy as np
 
-from pyrite.materials.channeling.transverse import HBAR2_2M_EV_ANG2, longitudinal_kinematics
+from pyrite.materials.crystal import HBAR2_2M_EV_ANG2
+
+from .bloch import longitudinal_kinematics
 
 RECORDING_BUDGET_BYTES = 128 * 1024**2
 

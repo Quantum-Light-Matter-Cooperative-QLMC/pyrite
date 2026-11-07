@@ -7,8 +7,9 @@ import numpy as np
 import pytest
 
 from pyrite.apps.channeling import critical_angle_rad
-from pyrite.materials.channeling import longitudinal_kinematics, planar_profile, transverse_states
+from pyrite.materials.channeling import planar_profile
 from pyrite.materials.crystal import M_E_EV
+from pyrite.montecarlo.channeling import longitudinal_kinematics, transverse_states
 
 APP = Path(__file__).parents[2] / "src/pyrite/apps/channeling_app.py"
 
@@ -51,11 +52,11 @@ def test_planar_selection_routes_crystal_and_plane(label, crystal, hkl):
 
 
 def test_mos2_planar_scattering_and_diagnostics():
-    from pyrite.materials.channeling import entry_populations
     from pyrite.montecarlo.channeling import (
         DensityMatrixSolver,
         channeling_spectrum,
         electronic_kernel,
+        entry_populations,
         tds_kernel,
     )
 

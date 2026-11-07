@@ -17,10 +17,9 @@ from scipy.linalg import eigh
 from scipy.sparse.linalg import LinearOperator, eigsh, lobpcg
 from threadpoolctl import threadpool_limits
 
-from pyrite.materials.channeling.transverse import (
-    HBAR2_2M_EV_ANG2,
-    longitudinal_kinematics,
-)
+from pyrite.materials.crystal import HBAR2_2M_EV_ANG2
+
+from .bloch import longitudinal_kinematics
 
 MAX_DENSE_DIMENSION = 256
 MAX_SPECTRAL_STATES = 64

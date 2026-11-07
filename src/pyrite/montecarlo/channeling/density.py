@@ -47,8 +47,8 @@ import numpy as np
 from scipy.linalg import expm
 
 from ...materials.channeling.potential import PlanarProfile
-from ...materials.channeling.transverse import _hamiltonian, longitudinal_kinematics
 from ...materials.crystal import HBARC_EV_ANG, M_E_EV
+from .bloch import _hamiltonian, longitudinal_kinematics
 from .metrics import EnsembleMetrics, density_metrics
 from .operators import ScatteringKernel
 from .spatial import spatial_density
@@ -310,7 +310,7 @@ class DensityMatrixSolver:
         momenta by ``exp(-(k_x - p psi_0/hbar)^2 / 2 (p sigma/hbar)^2)``. With no
         divergence the beam is snapped to the nearest grid momentum. Pass the
         refracted ``effective_rad`` of
-        :func:`~pyrite.materials.channeling.entry.plane_incidence`.
+        :func:`~pyrite.montecarlo.channeling.entry.plane_incidence`.
 
         Returns ``(rho_S, free, outside)``: the subspace block, the diagonal
         weight on in-basis states above the cutoff, and the weight outside the

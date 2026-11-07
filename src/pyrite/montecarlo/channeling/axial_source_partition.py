@@ -23,10 +23,10 @@ from math import isfinite
 
 import numpy as np
 
-from pyrite.materials.channeling.transverse import longitudinal_kinematics
 from pyrite.materials.crystal import ALPHA_FS
 
 from .axial_qrt_source import GlobalAxialSource, on_axis_photon_spectrum
+from .bloch import longitudinal_kinematics
 from .quantum_regression import regression_correlation
 
 

@@ -1,6 +1,6 @@
 # `cr-doppler-line-energy` re-derivation
 
-Claim: `materials/channeling/transverse.py::{doppler_denominator,line_energy_eV}`. Source: relativistic kinematics; Andersen et al. (1983).
+Claim: `montecarlo/channeling/bloch.py::{doppler_denominator,line_energy_eV}`. Source: relativistic kinematics; Andersen et al. (1983).
 
 ## Independent derivation (before reading the body)
 

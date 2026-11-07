@@ -1,0 +1,225 @@
+"""Bloch states, dipole elements, entry populations and Doppler line energies."""
+
+import numpy as np
+import pytest
+
+from pyrite.materials.channeling import PlanarProfile, planar_profile
+from pyrite.materials.crystal import CRYSTALS, HBARC_EV_ANG, reciprocal_g_vector
+from pyrite.materials.emission import photon_energies
+from pyrite.montecarlo.channeling import (
+    doppler_denominator,
+    entry_populations,
+    line_energy_eV,
+    longitudinal_kinematics,
+    transverse_states,
+)
+
+SI_A = CRYSTALS["silicon"]["lattice"]["a"]
+
+
+@pytest.fixture(scope="module")
+def si110():
+    return planar_profile("silicon", (1, 1, 0), 293.15)
+
+
+def test_mos2_basal_bound_states_converge_and_scale_as_sqrt_gamma():
+    # The 66 eV, c/2-wide basal well binds ~33 states at 40 MeV, so the
+    # plane-wave basis must exceed the bound count: the default 32 orders
+    # undercount above ~40 MeV (51 instead of 65 at 160 MeV).
+    profile = planar_profile("mos2", (0, 0, 1), 295.0)
+    counts = []
+    for energy in (40e6, 160e6):
+        gamma, _ = longitudinal_kinematics(energy)
+        pair = [transverse_states(profile, gamma, n_plane_waves=m).n_bound for m in (64, 96)]
+        assert abs(pair[1] - pair[0]) <= 1
+        counts.append(pair[1])
+    assert counts == [33, 65]
+
+
+# ---- transverse states (cr-transverse-eigenproblem, cr-dipole-matrix-element) -
+
+
+def test_free_limit_has_no_bound_states():
+    free = PlanarProfile(
+        crystal="free",
+        hkl=(1, 0, 0),
+        period_ang=2.0,
+        potential_eV=np.zeros(4, dtype=complex),
+        nuclear_density=np.zeros(4, dtype=complex),
+        electron_density=np.zeros(4, dtype=complex),
+        temperature_K=0.0,
+        b_factors_ang2={},
+    )
+    states = transverse_states(free, gamma=10.0, k_inv_ang=0.3, n_plane_waves=8)
+    g = free.g_inv_ang
+    expected = np.sort(3.80998 / 10.0 * (0.3 + np.arange(-8, 9) * g) ** 2)
+    np.testing.assert_allclose(states.energies_eV, expected, rtol=1e-4)
+    assert states.n_bound == 0
+
+
+def test_harmonic_limit_gives_equal_spacing():
+    v0, period, gamma = 1000.0, 2.0, 100.0
+    cosine = PlanarProfile(
+        crystal="cosine",
+        hkl=(1, 0, 0),
+        period_ang=period,
+        potential_eV=np.array([0.0, -v0 / 2], dtype=complex),
+        nuclear_density=np.zeros(2, dtype=complex),
+        electron_density=np.zeros(2, dtype=complex),
+        temperature_K=0.0,
+        b_factors_ang2={},
+    )
+    states = transverse_states(cosine, gamma, n_plane_waves=48)
+    a = HBARC_EV_ANG**2 / (2 * 510998.95) / gamma
+    hbar_omega = np.sqrt(2.0 * a * v0 * cosine.g_inv_ang**2)
+    spacing = np.diff(states.energies_eV[:4])
+    # Mathieu expansion: E_n = -V0 + hw (n + 1/2) - (a g^2 / 16)(2n^2 + 2n + 1),
+    # so successive spacings fall by a g^2 / 4.
+    quartic = a * cosine.g_inv_ang**2 / 4.0
+    expected = hbar_omega - quartic * np.arange(1, 4)
+    np.testing.assert_allclose(spacing, expected, rtol=2e-4)
+    assert states.energies_eV[0] == pytest.approx(-v0 + hbar_omega / 2 - quartic / 4, rel=1e-5)
+
+
+def test_parity_alternates_and_selection_rule_emerges(si110):
+    gamma, _ = longitudinal_kinematics(40e6)
+    states = transverse_states(si110, gamma)
+    assert [states.parity(n) for n in range(6)] == [1, -1, 1, -1, 1, -1]
+    assert abs(states.dipole_ang(0, 1)) > 0.05
+    assert abs(states.dipole_ang(0, 2)) < 1e-12
+    assert abs(states.dipole_ang(1, 3)) < 1e-12
+
+
+def test_dipole_matches_position_operator_for_deep_states(si110):
+    gamma, _ = longitudinal_kinematics(40e6)
+    states = transverse_states(si110, gamma)
+    x = np.linspace(-si110.period_ang / 2, si110.period_ang / 2, 4001)
+    psi0, psi1 = states.wavefunction(x, 0), states.wavefunction(x, 1)
+    direct = np.trapezoid(np.conj(psi0) * x * psi1, x)
+    assert abs(states.dipole_ang(0, 1)) == pytest.approx(abs(direct), rel=2e-3)
+
+
+def test_bound_state_count_scales_as_sqrt_gamma(si110):
+    counts = [
+        transverse_states(si110, longitudinal_kinematics(t)[0], n_plane_waves=48).n_bound
+        for t in (40e6, 160e6, 640e6)
+    ]
+    assert counts[1] == pytest.approx(2 * counts[0], abs=1)
+    assert counts[2] == pytest.approx(2 * counts[1], abs=1)
+
+
+def test_si110_40mev_matches_azadegan(si110):
+    # Azadegan, Comput. Phys. Commun. 184, 1064 (2013), Sec. 4: six bound
+    # states and E0(1->0) = 2 gamma^2 (e1 - e0) = 76.2071 keV at k = 1.3089/A.
+    gamma, _ = longitudinal_kinematics(40e6)
+    states = transverse_states(si110, gamma, k_inv_ang=1.3089)
+    assert states.n_bound == 6
+    e10 = 2 * gamma**2 * (states.energies_eV[1] - states.energies_eV[0])
+    assert e10 == pytest.approx(76207.1, rel=0.02)
+
+
+@pytest.mark.parametrize(
+    ("plane", "energy_MeV", "transition", "measured_keV", "rel"),
+    [
+        ((1, 1, 0), 80.23, (1, 0), 313.4, 0.005),
+        ((1, 1, 0), 80.23, (2, 1), 213.9, 0.005),
+        ((1, 1, 0), 80.23, (3, 2), 164.6, 0.005),
+        ((1, 1, 0), 80.23, (4, 3), 130.1, 0.01),
+        ((1, 1, 0), 53.2, (1, 0), 160.0, 0.02),
+        ((1, 1, 0), 53.2, (2, 1), 103.6, 0.02),
+        ((1, 1, 0), 53.2, (3, 2), 78.0, 0.02),
+        ((1, 0, 0), 53.2, (1, 0), 119.8, 0.02),
+        ((1, 0, 0), 80.23, (1, 0), 239.0, 0.02),
+        ((1, 0, 0), 110.2, (1, 0), 405.0, 0.02),
+    ],
+)
+def test_diamond_lines_match_gouanere(plane, energy_MeV, transition, measured_keV, rel):
+    # Gouanere et al., Phys. Rev. B 38, 4352 (1988), Table II column 10:
+    # forward line energies (E^if)_0 at Psi = 0, corrected for multiple
+    # scattering; room temperature, 22 um (110) and 15 um (100) crystals.
+    profile = planar_profile("diamond", plane, 293.15)
+    gamma, _ = longitudinal_kinematics(energy_MeV * 1e6)
+    states = transverse_states(profile, gamma)
+    upper, lower = transition
+    line = line_energy_eV(states.energies_eV[upper] - states.energies_eV[lower], energy_MeV * 1e6)
+    assert line / 1e3 == pytest.approx(measured_keV, rel=rel)
+
+
+def test_diamond110_9mev_line_within_bloch_band():
+    # Genz et al., Phys. Rev. B 53, 8922 (1996), Table VII: (110) 1->0 at
+    # 9.0 MeV is 7.80-7.93 keV (+-0.08) over four crystals, detector at 0 deg.
+    # State 1 sits near the barrier, so the line spans a Bloch band.
+    profile = planar_profile("diamond", (1, 1, 0), 293.15)
+    gamma, _ = longitudinal_kinematics(9.0e6)
+    lines = []
+    for k in np.linspace(0.0, profile.g_inv_ang / 2, 9):
+        energies = transverse_states(profile, gamma, k_inv_ang=k).energies_eV
+        lines.append(line_energy_eV(energies[1] - energies[0], 9.0e6) / 1e3)
+    assert min(lines) < 7.80 and 7.93 < max(lines)
+    assert np.mean(lines) == pytest.approx(7.865, rel=0.02)
+
+
+@pytest.mark.parametrize("hkl", [(1, 1, 0), (1, 1, 1), (1, 0, 0)])
+def test_si_planar_lines_below_watson_detector_cutoff(hkl):
+    # Watson & Koehler, Phys. Rev. A 24, 861 (1981) and Phys. Rev. B 25, 3079
+    # (1982), Sec. IV B: no planar channeling radiation above the ~1 keV Si(Li)
+    # cutoff for any Si plane up to 3.0 MeV, detector 2.66 deg off the beam.
+    # Every strong (|x_fi| > 0.1 A) bound-bound line must therefore lie below it.
+    profile = planar_profile("silicon", hkl, 293.15)
+    gamma, _ = longitudinal_kinematics(3.0e6)
+    theta = np.deg2rad(2.66)
+    highest = 0.0
+    for k in np.linspace(0.0, profile.g_inv_ang / 2, 5):
+        states = transverse_states(profile, gamma, k_inv_ang=k)
+        energies = states.energies_eV
+        for i in range(1, states.n_bound):
+            for f in range(i):
+                if abs(states.dipole_ang(f, i)) > 0.1:
+                    line = line_energy_eV(energies[i] - energies[f], 3.0e6, theta)
+                    highest = max(highest, line)
+    assert highest < 1.05e3
+
+
+# ---- entry populations (cr-initial-occupation) -------------------------------
+
+
+def test_entry_populations_unitary_and_parity_selective(si110):
+    angles = np.array([0.0, 1e-4, 3e-4, -6e-4, 1.5e-3])
+    populations = entry_populations(si110, 40e6, angles)
+    np.testing.assert_allclose(populations.sum(axis=-1), 1.0, atol=1e-12)
+    at_zero = populations[0, :6]
+    assert np.all(at_zero[1::2] < 1e-20)  # only even states at normal incidence
+    assert at_zero[0] == pytest.approx(0.24, abs=0.03)  # Azadegan 2013 Fig. 3
+    np.testing.assert_allclose(
+        populations[2], entry_populations(si110, 40e6, -3e-4), rtol=1e-9, atol=1e-14
+    )
+
+
+def test_divergence_average_is_normalized_and_mixes_parity(si110):
+    sharp = entry_populations(si110, 40e6, 0.0)
+    smeared = entry_populations(si110, 40e6, 0.0, divergence_rad=2e-4)
+    assert smeared.sum() == pytest.approx(1.0, abs=1e-12)
+    assert sharp[1] < 1e-20 < 1e-3 < smeared[1]
+
+
+# ---- kinematics (cr-doppler-line-energy) -------------------------------------
+
+
+def test_forward_line_energy_is_doppler_upshift():
+    gamma, beta = longitudinal_kinematics(40e6)
+    assert line_energy_eV(1.0, 40e6) == pytest.approx(gamma**2 * (1 + beta), rel=1e-12)
+    naive = 1.0 - beta * np.cos(0.3)
+    assert doppler_denominator(40e6, 0.3) == pytest.approx(naive, rel=1e-12)
+
+
+@pytest.mark.parametrize(("energy", "theta_deg"), [(5e6, 3.0), (5e6, 20.0), (30e3, 120.0)])
+def test_doppler_denominator_matches_pxr_resonance(energy, theta_deg):
+    # With zero tilt and the catalog (440) surface reflection, photon_energies
+    # returns hbar c beta |g| / (1 - beta cos theta): same denominator.
+    _, magnitude = reciprocal_g_vector((4, 4, 0), CRYSTALS["silicon"]["lattice"])
+    photon = photon_energies("silicon", energy, theta_obs_deg=theta_deg, hkl=(4, 4, 0))[0]
+    _, beta = longitudinal_kinematics(energy)
+    pxr_denominator = HBARC_EV_ANG * beta * magnitude / photon
+    assert doppler_denominator(energy, np.deg2rad(theta_deg)) == pytest.approx(
+        pxr_denominator, rel=1e-12
+    )

@@ -10,7 +10,7 @@ import math
 
 import cupy as cp
 
-from ...materials.channeling.transverse import HBAR2_2M_EV_ANG2
+from ...materials.crystal import HBAR2_2M_EV_ANG2
 from ._axial_cuda_rng import ElectronRNG
 from .axial_mcwf import _PROPOSALS, MAX_REJECTION_TRIALS
 from .axial_mcwf import _SHELL_EDGES as _HOST_SHELL_EDGES

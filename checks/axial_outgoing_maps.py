@@ -180,7 +180,7 @@ def material_case(max_order: int, target_eV: float, window_eV: float = 2.0) -> d
     Validation: cr-axial-zone-handoff-accounting
     """
     from pyrite.materials.channeling.axial import axial_profile, axial_states
-    from pyrite.materials.channeling.transverse import longitudinal_kinematics
+    from pyrite.montecarlo.channeling import longitudinal_kinematics
     from pyrite.montecarlo.channeling.axial_dissipator import axial_dissipator
     from pyrite.montecarlo.channeling.operators import _potential
 
@@ -384,8 +384,8 @@ def material_fiber_channels(
     Validation: cr-axial-zone-handoff-accounting
     """
     from pyrite.materials.channeling.axial import axial_profile, axial_states
-    from pyrite.materials.channeling.transverse import longitudinal_kinematics
     from pyrite.materials.crystal import HBARC_EV_ANG, M_E_EV
+    from pyrite.montecarlo.channeling import longitudinal_kinematics
     from pyrite.montecarlo.channeling.axial_dissipator import axial_dissipator
     from pyrite.montecarlo.channeling.axial_fiber_unraveling import FiberChannels
     from pyrite.montecarlo.channeling.axial_tds_continuum import TdsString

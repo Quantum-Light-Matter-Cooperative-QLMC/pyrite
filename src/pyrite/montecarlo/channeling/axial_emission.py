@@ -51,12 +51,8 @@ from functools import lru_cache
 import numpy as np
 
 from ...materials.channeling.axial import AxialProfile, AxialStates, axial_states
-from ...materials.channeling.transverse import (
-    HBAR2_2M_EV_ANG2,
-    doppler_denominator,
-    longitudinal_kinematics,
-)
-from ...materials.crystal import M_E_EV
+from ...materials.crystal import HBAR2_2M_EV_ANG2, M_E_EV
+from .bloch import doppler_denominator, longitudinal_kinematics
 from .dipole import dipole_rate_per_ang
 from .realspace import RealSpaceGrid
 

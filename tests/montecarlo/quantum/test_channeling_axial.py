@@ -11,10 +11,10 @@ import pytest
 from scipy.special import airy as scipy_airy
 from scipy.special import eval_genlaguerre
 
-from pyrite.materials.channeling import longitudinal_kinematics, planar_profile
+from pyrite.materials.channeling import planar_profile
 from pyrite.materials.channeling.axial import axial_profile, axial_states
 from pyrite.materials.crystal import CRYSTALS
-from pyrite.montecarlo.channeling import states
+from pyrite.montecarlo.channeling import longitudinal_kinematics, states
 from pyrite.montecarlo.channeling.axial_emission import axial_line_catalog
 from pyrite.montecarlo.channeling.realspace import RealSpaceGrid, SplitStepPropagator
 

@@ -10,7 +10,8 @@ the photon transition primitives of :mod:`.dipole`; :mod:`.transition_radiation`
 bounds the excluded transition-radiation background. :mod:`.states` builds
 user-definable entry wavefunctions (Gaussian, Hermite/Laguerre-Gauss vortex,
 Bessel, Airy, aberrated aperture probes, sampled arrays, abTEM waves) and
-projects them onto the planar Bloch basis. :mod:`.realspace` is the
+projects them onto the planar Bloch basis. :mod:`.bloch` solves the planar Bloch
+eigenproblem at a beam energy and :mod:`.entry` maps sample tilt onto plane incidence. :mod:`.realspace` is the
 experimental axial tier's periodic split-step backend. CPU only.
 """
 
@@ -21,6 +22,14 @@ from .axial_energy_mcwf import (
     AxialEnergyMCWFResult,
     axial_energy_mcwf,
     sample_electron_energies,
+)
+from .bloch import (
+    TransverseStates,
+    doppler_denominator,
+    entry_populations,
+    line_energy_eV,
+    longitudinal_kinematics,
+    transverse_states,
 )
 from .density import (
     DECHANNELING_MARGIN_EV,
@@ -64,6 +73,7 @@ from .energy_ensemble import (
     planar_energy_spectrum,
     planar_solver_factory,
 )
+from .entry import PlaneIncidence, mean_inner_potential_eV, plane_incidence
 from .handoff import CHANNELING_MODEL
 from .mcwf import MCWFResult, MCWFSolver, mcwf_stream_key
 from .operators import (
@@ -111,6 +121,8 @@ __all__ = [
     "PlanarEnergyDiagnostic",
     "PlanarEnergySpectrum",
     "MCWFSolver",
+    "PlaneIncidence",
+    "TransverseStates",
     "ScatteringKernel",
     "TransitionRadiationBound",
     "axial_energy_mcwf",
@@ -124,20 +136,27 @@ __all__ = [
     "dipole_rate_per_ang",
     "dipole_far_field",
     "dipole_stokes",
+    "doppler_denominator",
     "electronic_channels",
     "electronic_kernel",
     "emission_lines",
+    "entry_populations",
     "first_order_transition",
+    "line_energy_eV",
     "line_shape",
+    "longitudinal_kinematics",
+    "mean_inner_potential_eV",
     "mcwf_stream_key",
     "planar_energy_diagnostic",
     "planar_energy_spectrum",
     "planar_solver_factory",
+    "plane_incidence",
     "rest_frame_dipole_rate_inv_s",
     "sample_electron_energies",
     "spatial_density",
     "tds_kernel",
     "transition_operator",
+    "transverse_states",
     "transition_radiation",
     "transition_radiation_bound",
     "transition_radiation_per_eV",
