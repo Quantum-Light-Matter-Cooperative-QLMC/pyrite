@@ -2,7 +2,10 @@
 # #838 FP32-FP64 refinement gate: fp64 and mixed transport_precision on the
 # #821 anchors, paired by seed; gate838.py evaluates the #510 one-third bound.
 # Usage (from the synced checkout root):
-#   sbatch checks/fp32_speed_of_light/gate838.sbatch "<scene:histories ...>" "<seeds>" "<estimators>"
+#   sbatch checks/fp32_speed_of_light/gate838.sbatch "<scene:histories ...>" "<seeds>" "<estimators>" \
+#       ["<extra pyrite_bench.py args>"]
+# e.g. "--warmup-histories -1 --block-rows 16000000" (#1013: one-block warmup, and a
+# smaller block for the 26 GB unified-memory ROCm node; neither changes the scores).
 # ROCm (#888): add -p gpu-amd -w qlmc-ace --gres=gpu:radeon8060s:1; checks/rocm/env.sh
 # picks the vendor, venv and CuPy-HIP build environment from the node.
 #SBATCH --job-name=gate838
@@ -17,6 +20,7 @@ cd "$SLURM_SUBMIT_DIR"
 . checks/rocm/env.sh
 export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 NUMBA_NUM_THREADS=1
 scenes=${1:?scene:histories list}; seeds=${2:-"201 202 203"}; estimators=${3:-discrete}
+read -r -a bench_extra <<< "${4:-}"
 pyrite_gpu_sync -q
 uv run --no-sync python checks/equal_precision/prepare_stopping.py > /dev/null
 out="evidence/gate838/$SLURM_JOB_ID"; mkdir -p "$out"
@@ -24,8 +28,8 @@ cp .pyrite-sync "$out/sync.json"; pyrite_gpu_info > "$out/gpu.txt" 2>&1
 for spec in $scenes; do
     s=${spec%%:*} h=${spec##*:}
     for est in $estimators; do
-        extra=()
-        [[ $est == continuous ]] && extra=(--estimator continuous --cone-mode point)
+        extra=("${bench_extra[@]}")
+        [[ $est == continuous ]] && extra+=(--estimator continuous --cone-mode point)
         for seed in $seeds; do
             # Alternate precision order per seed so drift cannot favour one arm.
             ps=(fp64 mixed); (( seed % 2 )) && ps=(mixed fp64)
