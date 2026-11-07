@@ -55,7 +55,7 @@ reuse its cache. CLI/profile/remote codepaths must converge on the same
 `Physics` and `scene_physics` admission gate.
 
 Raw compatibility mappings have an independent production guard in
-`_channeling_admission.refuse_axial_channeling`, also exposed through
+`quantum/_admission.refuse_axial_channeling`, also exposed through
 `montecarlo.case`. The data-only owner keeps configuration/table tools
 independent of Monte Carlo imports. It recognizes an axial
 `channeling.model` record as well as unlowered `channeling_model` /

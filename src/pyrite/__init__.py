@@ -196,7 +196,7 @@ if TYPE_CHECKING:
     from pyrite.quantum import (
         QuantumSetup as QuantumSetup,
     )
-    from pyrite.quantum_state import TransverseStateSpec as TransverseStateSpec
+    from pyrite.quantum.state import TransverseStateSpec as TransverseStateSpec
     from pyrite.results.directional import DirectionalSpectrum as DirectionalSpectrum
     from pyrite.results.model import (
         CxrSpectra as CxrSpectra,
@@ -255,7 +255,7 @@ _PUBLIC_OBJECTS = {
     "QuantumDynamics": ("pyrite.quantum", "QuantumDynamics"),
     "QuantumNumerics": ("pyrite.quantum", "QuantumNumerics"),
     "QuantumSetup": ("pyrite.quantum", "QuantumSetup"),
-    "TransverseStateSpec": ("pyrite.quantum_state", "TransverseStateSpec"),
+    "TransverseStateSpec": ("pyrite.quantum.state", "TransverseStateSpec"),
     "CxrSpectra": ("pyrite.results.model", "CxrSpectra"),
     "Detector": ("pyrite.detectors", "Detector"),
     "Numerics": ("pyrite.campaign.model", "Numerics"),
@@ -306,7 +306,7 @@ def __getattr__(name: str) -> Any:
     """Resolve curated root objects and approved submodules lazily."""
     from importlib import import_module
 
-    if name == "states" or name in _PUBLIC_MODULES:
+    if name in _PUBLIC_MODULES:
         module = import_module(f"{__name__}.{name}")
         globals()[name] = module
         return module
@@ -323,7 +323,7 @@ def __getattr__(name: str) -> Any:
 
 # __all__ stays unchanged: star imports retain the curated 0.22.0 root object
 # surface. Domain-module dot access does not reintroduce deprecated aliases.
-__all__ = ["DATA_DIR", "__version__", "states", *_PUBLIC_OBJECTS]
+__all__ = ["DATA_DIR", "__version__", *_PUBLIC_OBJECTS]
 
 
 # Forward-looking domain contract for the curated root object surface.

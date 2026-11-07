@@ -16,7 +16,7 @@ from typing import Any
 
 import numpy as np
 
-from ...quantum_state import TransverseStateSpec
+from ...quantum.state import TransverseStateSpec
 
 SOURCE_MODEL = "planar-gaussian-averaged-conditional-v1"
 MAX_MOMENTUM_BINS = 32

@@ -15,19 +15,20 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from importlib import import_module
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import numpy as np
 
-from ._units import normalize_unit
-from .quantum import QuantumSetup
-from .quantum_state import TransverseStateSpec
+from .._units import normalize_unit
+from . import QuantumSetup
+from .state import TransverseStateSpec
 
 if TYPE_CHECKING:
     from pint import Quantity
 
-    from .montecarlo.channeling.density import DensityMatrixResult
+    from ..montecarlo.channeling.density import DensityMatrixResult
 
 
 def _readonly(value: np.ndarray) -> np.ndarray:
@@ -50,10 +51,8 @@ def _setup_supported(setup: QuantumSetup) -> None:
         raise TypeError("setup must be a QuantumSetup")
     if setup.region.kind == "axial":
         # #624 central admission is shared with all production consumers.
-        # On main it is exported by axial_spec; on the #624 continuation it
-        # delegates to the common _channeling_admission contract. Do not
-        # construct planar kernels or allocate a quantum grid first.
-        from .campaign.axial_spec import refuse_unverified_axial_run
+        # Do not construct planar kernels or allocate a quantum grid first.
+        from ._admission import refuse_unverified_axial_run
 
         refuse_unverified_axial_run()
     if (
@@ -83,7 +82,7 @@ def _check_source_energy(spec: TransverseStateSpec, kinetic_energy_eV: float) ->
 
 
 def _quantity(value: float, unit: str) -> Quantity:
-    from .units import Q_
+    from ..units import Q_
 
     return Q_(float(value), unit)
 
@@ -157,8 +156,10 @@ class PlanarStateProjection:
 
 def _solver_for(projection: PlanarStateProjection):
     """Reuse expensive cached kernels, never mutate a cached production solver."""
-    from .montecarlo.channeling.density import DensityMatrixSolver
-    from .montecarlo.channeling.handoff import zone_solver
+    density = import_module("pyrite.montecarlo.channeling.density")
+    handoff = import_module("pyrite.montecarlo.channeling.handoff")
+    DensityMatrixSolver = density.DensityMatrixSolver
+    zone_solver = handoff.zone_solver
 
     profile, cached = zone_solver(
         projection.crystal,
@@ -227,7 +228,8 @@ def project_planar_source(
     )
     energy = _positive("kinetic_energy_eV", kinetic_energy_eV)
     temperature = _positive("temperature_K", temperature_K)
-    from .montecarlo.channeling.density import DECHANNELING_MARGIN_EV
+    density = import_module("pyrite.montecarlo.channeling.density")
+    DECHANNELING_MARGIN_EV = density.DECHANNELING_MARGIN_EV
 
     margin = (
         _positive(
@@ -252,7 +254,8 @@ def project_planar_source(
     if impact not in ("averaged", "fixed"):
         raise ValueError("impact must be 'fixed' or 'averaged'")
     _check_source_energy(state, energy)
-    from .montecarlo.channeling.states import planar_entry_density
+    states = import_module("pyrite.montecarlo.channeling.states")
+    planar_entry_density = states.planar_entry_density
 
     plane = setup.region.plane_hkl
     assert plane is not None
@@ -536,7 +539,8 @@ def score_planar_source(
         or np.any(np.diff(energy) <= 0.0)
     ):
         raise ValueError("photon_energy_eV must be a finite increasing positive 1-D grid")
-    from .montecarlo.channeling.emission import channeling_spectrum
+    emission = import_module("pyrite.montecarlo.channeling.emission")
+    channeling_spectrum = emission.channeling_spectrum
 
     solver = _solver_for(projection)
     return channeling_spectrum(

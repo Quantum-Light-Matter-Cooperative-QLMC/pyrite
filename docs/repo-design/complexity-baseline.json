@@ -667,12 +667,12 @@
       "cc": 27
     },
     {
-      "path": "src/pyrite/quantum_state.py",
+      "path": "src/pyrite/quantum/state.py",
       "name": "TransverseStateSpec.__post_init__",
       "cc": 30
     },
     {
-      "path": "src/pyrite/quantum_state.py",
+      "path": "src/pyrite/quantum/state.py",
       "name": "_params",
       "cc": 38
     },

@@ -17,7 +17,7 @@ def _project(tmp_path: Path) -> Path:
     (source / "__init__.py").write_text(
         f"_PUBLIC_OBJECTS = {mapping!r}\n"
         f"_ROOT_API = {tuple(sorted(mapping))!r}\n"
-        "__all__ = ['DATA_DIR', '__version__', 'states', *_PUBLIC_OBJECTS]\n"
+        "__all__ = ['DATA_DIR', '__version__', *_PUBLIC_OBJECTS]\n"
     )
     (source / "beam.py").write_text("# fixture leaf\n")
     exports = ["schema_version = 1", "[root_exports]"]

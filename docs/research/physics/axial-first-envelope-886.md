@@ -1,7 +1,7 @@
 # First axial run envelope: currently empty
 
 **No axial case is admitted.** `Physics(channeling_model="axial")` and every raw
-axial case refuse in `pyrite._channeling_admission` before work or writes. This page
+axial case refuse in `pyrite.quantum._admission` before work or writes. This page
 records what would have to be true to change that. It does not describe a supported
 capability.
 

@@ -38,10 +38,12 @@ runtime factories stay under `pyrite.quantum`. See the
 | Coherent real-space solving | `RealSpaceGrid`, `SplitStepPropagator` | Experimental periodic-grid diagnostics; finite grid loss is not physical dechanneling. |
 | Axial solving/results | `AxialMCWF`, `AxialMCWFResult`, `AxialDiagnosticConfig`, `AxialDiagnosticResult`, `axial_diagnostic` | Experimental direct diagnostics; production axial admission is unchanged. The high-level diagnostic collects grid, escape, phase-space and optional emission summaries. |
 
-Existing `pyrite` root aliases, `pyrite.quantum_state.TransverseStateSpec`,
-`pyrite.states` factories, `pyrite.planar_source` bridge functions, and the
-corresponding `pyrite.montecarlo.channeling` leaf imports remain the **same
-objects**. No classes move, and pickle paths, case payloads, model markers,
+Existing `pyrite` root aliases, `pyrite.quantum.state.TransverseStateSpec`,
+`pyrite.quantum.planar_source` bridge functions, and the
+corresponding `pyrite.montecarlo.channeling` leaf imports are the **same
+objects**. The former root modules `pyrite.quantum_state`, `pyrite.states`,
+`pyrite.planar_source` and `pyrite._channeling_admission` were deleted without
+aliases; import from `pyrite.quantum` instead. Pickle paths, case payloads, model markers,
 random streams, and numerical defaults are unchanged. Other channeling engine
 helpers are not implicitly part of this facade. The exact export/status list
 is governed by `api-surface.toml`.
@@ -54,7 +56,7 @@ limited to its existing admitted subset, detailed in the planar guide.
 ## Runtime quantity inputs
 
 Using the shared registry in `pyrite.units` (Pint is a core dependency), runtime factories through
-`pyrite.quantum` (and the identical `pyrite.states` aliases) normalize
+`pyrite.quantum` normalize
 `waist_ang`, `scale_ang`, `center_ang`, `spacing_ang`, `origin_ang` and
 `offset_ang` to Å; `k_radial_inv_ang` to Å⁻¹; and
 `kinetic_energy_eV` to eV. Aperture semiangles use radians; `Cnm`

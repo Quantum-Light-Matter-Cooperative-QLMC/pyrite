@@ -7,12 +7,12 @@ and depth evidence for the admitted case; do not loosen these parameters.
 
 import pytest
 
-from pyrite._channeling_admission import (
+from pyrite.montecarlo.case import refuse_axial_channeling as case_module_refusal
+from pyrite.quantum._admission import (
     AxialAdmissionError,
     refuse_axial_channeling,
     refuse_axial_channeling_cases,
 )
-from pyrite.montecarlo.case import refuse_axial_channeling as case_module_refusal
 
 _RECORD = {"model": "axial", "axis_uvw": [0, 0, 1], "zone_max_ang": 1000.0}
 
