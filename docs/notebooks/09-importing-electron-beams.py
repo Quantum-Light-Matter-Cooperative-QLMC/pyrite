@@ -107,7 +107,7 @@ def _(beam_path, mean_energy_keV, tables_ready):
     from pyrite.beams import Beam, PointBunch, PointSpot
     from pyrite.config import CxrReflections, FixedSampling, Numerics, Physics
     from pyrite.detectors import Detector
-    from pyrite.geometry import Footprint, Slab
+    from pyrite.geometry import Slab
     from pyrite.units import ureg
 
     # Select the 1 ns snapshot and project it relative to lab z = 0.1 m.
@@ -130,7 +130,8 @@ def _(beam_path, mean_energy_keV, tables_ready):
         "hopg",
         thickness=100 * ureg.nm,
         tilt=30 * ureg.degree,
-        footprint=Footprint(width=1 * ureg.mm, height=1 * ureg.mm),
+        width=1 * ureg.mm,
+        height=1 * ureg.mm,
     )
     detector = Detector(observation_angle=135 * ureg.degree)
     numerics = Numerics(

@@ -51,7 +51,7 @@ def _():
     from pyrite import Scene, simulate
     from pyrite.beams import Beam, PointBunch, PointSpot
     from pyrite.detectors import PixelGrid, PlanarDetector, PlanarPose
-    from pyrite.geometry import Footprint, Slab
+    from pyrite.geometry import Slab
     from pyrite.units import ureg
 
     beam = Beam(
@@ -71,7 +71,8 @@ def _():
             "hopg",
             thickness=100 * ureg.nm,
             tilt=30 * ureg.degree,
-            footprint=Footprint(width=5 * ureg.mm, height=5 * ureg.mm),
+            width=5 * ureg.mm,
+            height=5 * ureg.mm,
         ),
         panel,
     )

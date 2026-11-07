@@ -129,7 +129,7 @@ def _(mo, tables_ready):
     from pyrite.beams import Beam, PointBunch, PointSpot
     from pyrite.config import CxrReflections, FixedSampling, Numerics
     from pyrite.detectors import Detector
-    from pyrite.geometry import Footprint, Slab
+    from pyrite.geometry import Slab
     from pyrite.units import ureg
 
     # First, we define our electron beam:
@@ -146,7 +146,8 @@ def _(mo, tables_ready):
         "hopg",
         thickness=400 * ureg.nm,
         tilt=30 * ureg.degree,
-        footprint=Footprint(width=5 * ureg.mm, height=5 * ureg.mm),
+        width=5 * ureg.mm,
+        height=5 * ureg.mm,
     )
 
     # Our detector: in this case, an ideal point-like detector sampling per sterradian

@@ -61,7 +61,7 @@ def _(np, tables_ready):
     from pyrite.beams import Beam, PointBunch, PointSpot
     from pyrite.config import AdaptiveSampling, CxrReflections, FixedSampling, Numerics, Physics
     from pyrite.detectors import Detector
-    from pyrite.geometry import Footprint, Slab
+    from pyrite.geometry import Slab
     from pyrite.units import ureg
 
     beam = Beam(kinetic_energy=30 * ureg.keV, transverse=PointSpot(), longitudinal=PointBunch())
@@ -69,7 +69,8 @@ def _(np, tables_ready):
         "hopg",
         thickness=100 * ureg.nm,
         tilt=30 * ureg.degree,
-        footprint=Footprint(width=5 * ureg.mm, height=5 * ureg.mm),
+        width=5 * ureg.mm,
+        height=5 * ureg.mm,
     )
     detector = Detector(observation_angle=135 * ureg.degree)
     physics = Physics(brem_source="none")

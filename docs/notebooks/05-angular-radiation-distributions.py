@@ -52,7 +52,7 @@ def _(mo):
 def _():
     from pyrite.beams import Beam, PointBunch, PointSpot
     from pyrite.config import CxrReflections, FixedSampling, Numerics
-    from pyrite.geometry import Footprint, Slab
+    from pyrite.geometry import Slab
     from pyrite.radiation import directional_source
     from pyrite.units import ureg
 
@@ -67,7 +67,8 @@ def _():
         "silicon",
         thickness=100 * ureg.nm,
         tilt=30 * ureg.degree,
-        footprint=Footprint(width=5 * ureg.mm, height=5 * ureg.mm),
+        width=5 * ureg.mm,
+        height=5 * ureg.mm,
     )
     numerics = Numerics(
         sampling=FixedSampling(cxr_histories=512, brem_histories=512),

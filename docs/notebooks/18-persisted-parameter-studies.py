@@ -62,7 +62,7 @@ def _(np):
     from pyrite.config import CxrReflections, FixedSampling, Numerics, Physics
     from pyrite.detectors import Detector
     from pyrite.execution import run_sweep
-    from pyrite.geometry import Footprint, Slab
+    from pyrite.geometry import Slab
     from pyrite.results import Settings, records, select_results, summary_table, sweep_values
     from pyrite.storage import checkpoint_manifest, load_checkpoint
     from pyrite.units import ureg
@@ -79,7 +79,8 @@ def _(np):
             "hopg",
             thickness=50 * ureg.nm,
             tilt=30 * ureg.degree,
-            footprint=Footprint(width=5 * ureg.mm, height=5 * ureg.mm),
+            width=5 * ureg.mm,
+            height=5 * ureg.mm,
         ),
         Detector(observation_angle=135 * ureg.degree),
     )

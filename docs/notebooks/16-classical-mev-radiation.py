@@ -62,7 +62,7 @@ def _(np):
     from pyrite.beams import Beam, PointBunch, PointSpot
     from pyrite.config import CxrReflections, FixedSampling, Numerics, Physics
     from pyrite.detectors import Detector, EnergyBins
-    from pyrite.geometry import Footprint, Slab
+    from pyrite.geometry import Slab
     from pyrite.units import ureg
 
     energies_MeV = np.array([3.0, 10.0, 30.0])
@@ -73,7 +73,8 @@ def _(np):
         "silicon",
         thickness=100 * ureg.nm,
         tilt=5 * ureg.degree,
-        footprint=Footprint(width=5 * ureg.mm, height=5 * ureg.mm),
+        width=5 * ureg.mm,
+        height=5 * ureg.mm,
     )
     physics = Physics(
         transition_radiation="history",

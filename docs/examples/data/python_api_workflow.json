@@ -1,6 +1,6 @@
 {
   "schema": "pyrite.tutorial.v1",
-  "source_sha256": "589b12c2a8a3273105f9da01e8b422c7b3c3c5f3af71318694320c93606df8be",
+  "source_sha256": "5a19330f6869e876a72d39673fbd35e8cfa0bd9c620a8538817adcd98a063834",
   "pyrite_version": "0.22.0",
   "python_version": "3.14.4",
   "git_revision": "f555ba20cec75d55a19265f2af25a6be6847a40f",

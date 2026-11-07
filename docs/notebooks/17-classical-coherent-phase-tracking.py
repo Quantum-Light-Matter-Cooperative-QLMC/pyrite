@@ -153,7 +153,8 @@ def _(np, tables_ready):
         "hopg",
         thickness=20 * ureg.nm,
         tilt=tilt_deg * ureg.degree,
-        footprint=None,
+        width=None,
+        height=None,
     )
     detector = Detector(observation_angle=observation_deg * ureg.degree)
     charge_pc = 1e-5

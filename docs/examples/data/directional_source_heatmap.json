@@ -1,6 +1,6 @@
 {
   "schema": "pyrite.tutorial.v1",
-  "source_sha256": "2c2462a8481bd0cb7f613191532fb8b447d7f591069b137e9cfe2c219ce457cc",
+  "source_sha256": "5dd5a1896fbe7ba6ee2049e27490728e56d7edb45b3c3204e681b70cd7235ed3",
   "pyrite_version": "0.22.0",
   "python_version": "3.14.4",
   "git_revision": "d9c66359582689ddcdb235828d17ecb10dd761eb",
@@ -26245,5 +26245,6 @@
       "LineOpticalDataWarning: 944/153704 line escape-piece/reflection/mosaic pairs reach unavailable optical data (vacuum-seed screen or root lookup). High-energy PXR/CBS lines may be omitted, even on an automatically clipped photon grid. Counts are not lost photon yield. Inspect line_data_coverage; see issue #249.",
       "LineOpticalDataWarning: 98/153704 line escape-piece/reflection/mosaic pairs reach unavailable optical data (vacuum-seed screen or root lookup). High-energy PXR/CBS lines may be omitted, even on an automatically clipped photon grid. Counts are not lost photon yield. Inspect line_data_coverage; see issue #249."
     ]
-  }
+  },
+  "generated_source_sha256": "2c2462a8481bd0cb7f613191532fb8b447d7f591069b137e9cfe2c219ce457cc"
 }
