@@ -44,8 +44,11 @@ NUMERICS_GROUPS = (
             ("atomic_electron_deflection", "atomic-electron deflection"),
             ("transition_radiation", "transition radiation"),
             ("shell_ionization_model", "shell-ionization model"),
-            *((key, key.replace("_", " ")) for key in CHANNELING_KEYS),
         ),
+    ),
+    (
+        "channeling",
+        tuple((key, key.replace("_", " ")) for key in CHANNELING_KEYS),
     ),
 )
 
