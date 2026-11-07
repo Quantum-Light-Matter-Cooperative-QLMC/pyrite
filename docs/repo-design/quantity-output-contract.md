@@ -86,11 +86,10 @@ acceptance, so there is no second `sr` multiplier.
   source density. `"observation-average"` is filtered, solid-angle-weighted
   detector average **still per sr**. Multiplying by accepted solid angle is
   a physical operation using the case or pixel ray map, not an axis conversion.
-- `Result.spectral_flux(units="electron" | "sr" | "nA" | "detector")`
-  uses named beam-current/acceptance scalings. The `units` argument is **not**
-  a Pint energy-unit parameter. Its output currently has both eV and keV
-  coordinate columns, while density columns remain per **eV** in all modes.
-  Keep this legacy behavior unchanged; explicit current and acceptance replacements are described below.
+- `Result.spectral_flux(units=...)` (named beam-current/acceptance scalings,
+  eV and keV coordinate columns, density per **eV**) was deprecated in 0.27.0
+  and removed in 0.29.0; the explicit current and acceptance replacements are
+  described below.
 - `DirectionalSpectrum.rate()` uses electron rate from beam current (nA).
   A per-sr source is not an accepted-detector rate; do not assume an angular
   bin width or acceptance in this method.
@@ -306,7 +305,7 @@ in serialized records. Numeric metadata construction remains Pint-lazy.
 4. **Normalization refusals:** Pint energy conversion cannot turn per-primary
    into per-second, per-sr into aperture-integrated, or coherent conditional
    density into unconditional probability without explicit context.
-5. **Legacy and ownership:** `Result.to_dataframe`, `spectral_flux`,
+5. **Legacy and ownership:** `Result.to_dataframe`,
    `aperture_dataframe`, acquisition counts, old checkpoint/observation loads,
    hashes and manifests remain byte-/value-compatible; read-back mutations
    cannot alter their backing arrays.

@@ -14,7 +14,7 @@ from pyrite.campaign.profiles import case_content_key
 def scene(**kwargs):
     return pr.Scene(
         pr.Beam(30.0, transverse=pr.beams.PointSpot(), longitudinal=pr.beams.PointBunch()),
-        pr.geometry.Slab("hopg", thickness_ang=1000.0, tilt_deg=30.0, footprint=None),
+        pr.geometry.Slab("hopg", thickness_ang=1000.0, tilt_deg=30.0, width=None, height=None),
         **kwargs,
     )
 

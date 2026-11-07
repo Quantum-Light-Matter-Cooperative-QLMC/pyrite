@@ -143,7 +143,7 @@ def test_public_simulate_returns_separate_aperture_after_one_primary_pass(
         pr.Beam(
             energy_keV=40.0, transverse=pr.beams.PointSpot(), longitudinal=pr.beams.PointBunch()
         ),
-        pr.geometry.Slab("silicon", thickness_ang=100.0, tilt_deg=5.0, footprint=None),
+        pr.geometry.Slab("silicon", thickness_ang=100.0, tilt_deg=5.0, width=None, height=None),
         pr.detectors.PlanarDetector(pr.detectors.PlanarPose((0, 0, 10)), size_mm=(1.0, 1.0)),
         physics=pr.Physics(
             elastic_model="mott",

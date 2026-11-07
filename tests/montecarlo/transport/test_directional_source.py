@@ -108,7 +108,7 @@ def test_full_circle_basis_and_azimuth():
 def inputs():
     return (
         Beam(30.0, transverse=PointSpot(), longitudinal=PointBunch()),
-        Slab("silicon", 20.0, tilt_deg=30.0, tilt_azim_deg=45.0, footprint=None),
+        Slab("silicon", 20.0, tilt_deg=30.0, tilt_azim_deg=45.0, width=None, height=None),
     )
 
 
@@ -172,7 +172,7 @@ def test_tr_lowering_sets_history_model_and_preserves_oriented_frame(inputs, mon
     )["transition"]
     assert result.component == "transition-radiation-history"
     assert result.case["tilt_deg"] == 30 and result.case["tilt_azim_deg"] == 45
-    with pytest.raises(ValueError, match="footprint"):
+    with pytest.raises(ValueError, match="infinite planar slab"):
         owner.directional_sources(
             inputs[0],
             replace(inputs[1], footprint=Footprint(5, 5)),
@@ -512,7 +512,11 @@ def _escape_scan(footprint, keV, energy, angles):
             "silicon",
             2000.0,
             tilt_deg=45.0,
-            footprint=None if footprint is None else Footprint(footprint, footprint),
+            **(
+                {"width": None, "height": None}
+                if footprint is None
+                else {"footprint": Footprint(footprint, footprint)}
+            ),
         ),
         energy_eV=energy,
         angle_deg=angles,

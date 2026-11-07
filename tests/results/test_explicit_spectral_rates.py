@@ -288,21 +288,13 @@ def test_acquisition_counts_cannot_be_current_normalized():
     assert not hasattr(QuantifiedAcquisitionBatch, "rate_per_current")
 
 
-def test_legacy_selector_warning_window_preserves_numeric_tables():
+def test_legacy_flux_selectors_are_removed_and_native_tables_unchanged():
     from pyrite._api_deprecations import API_DEPRECATIONS
 
     result = scalar_result()
     for name in ("spectral_flux", "spectral_flux_units"):
-        entry = API_DEPRECATIONS[f"Result.{name}"]
-        assert (entry.deprecated_in, entry.remove_in) == ("0.27.0", "0.29.0")
-    with pytest.warns(DeprecationWarning, match="0.29.0"):
-        frame = result.spectral_flux(units="electron")
-    with pytest.warns(DeprecationWarning, match="0.29.0"):
-        metadata = result.spectral_flux_units(units="electron")
-    assert frame.columns == ["photon_energy_eV", "photon_energy_keV", "cxr", "brem", "total"]
-    assert list(metadata) == frame.columns
-    np.testing.assert_array_equal(frame["photon_energy_eV"], [100, 200, 300, 400, 800])
-    np.testing.assert_array_equal(frame["total"], [2, 5, 5, 3, 3])
+        assert not hasattr(result, name)
+        assert f"Result.{name}" not in API_DEPRECATIONS
     assert result.to_dataframe().columns == [
         "component",
         "mode",

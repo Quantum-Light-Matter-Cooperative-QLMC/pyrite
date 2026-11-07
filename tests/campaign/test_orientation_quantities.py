@@ -48,7 +48,7 @@ def test_semantic_cut_matches_numeric_fields_records_and_lowering():
         Q_(200, "degree"),
     )
     assert CrystalCut().roll == Q_(0, "degree")
-    slab = Slab("hopg", 500.0, tilt_deg=84.5, footprint=None, cut=cut)
+    slab = Slab("hopg", 500.0, tilt_deg=84.5, width=None, height=None, cut=cut)
     assert _lowered(slab) == _lowered(replace(slab, cut=NUMERIC_CUT))
 
 
@@ -139,7 +139,7 @@ def test_semantic_and_numeric_keywords_conflict_even_at_default(build, semantic,
 def test_sweep_and_optimization_reach_nested_cut_and_target_angles():
     scene = Scene(
         Beam(40, transverse=Spot(), longitudinal=PointBunch()),
-        Slab("hopg", 500.0, tilt_deg=84.5, footprint=None, cut=NUMERIC_CUT),
+        Slab("hopg", 500.0, tilt_deg=84.5, width=None, height=None, cut=NUMERIC_CUT),
     )
     path = "target.cut.miscut"
     scenes = Sweep(scene, {path: [1 * ureg.degree, 0.05 * ureg.radian]}).expand()

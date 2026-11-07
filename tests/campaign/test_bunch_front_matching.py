@@ -19,7 +19,7 @@ def _scene(tilt=84.5, azimuth=0.0):
             longitudinal=pr.beams.LongitudinalDistribution("gaussian", 0.001),
         ),
         target=pr.geometry.Slab(
-            "hopg", 500.0, tilt_deg=tilt, tilt_azim_deg=azimuth, footprint=None
+            "hopg", 500.0, tilt_deg=tilt, tilt_azim_deg=azimuth, width=None, height=None
         ),
         detector=pr.Detector(observation_angle_deg=145.0),
     )

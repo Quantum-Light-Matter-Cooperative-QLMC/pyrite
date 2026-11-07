@@ -49,7 +49,7 @@ def test_mutating_returned_pint_quantities_cannot_break_spectrum_invariant() -> 
     np.testing.assert_array_equal(component.density, original["density"])
 
 
-def test_cxr_and_brem_keep_their_native_grids_and_legacy_flux_is_unchanged() -> None:
+def test_cxr_and_brem_keep_their_native_grids() -> None:
     cxr = SpectralDensity([100.0, 300.0], [2.0, 4.0])
     brem = SpectralDensity([100.0, 200.0, 400.0], [1.0, 1.0, 1.0])
     result = Result(
@@ -58,15 +58,13 @@ def test_cxr_and_brem_keep_their_native_grids_and_legacy_flux_is_unchanged() -> 
         case={"domega_sr": 0.01, "bunch_charge_pc": 2.0, "rep_rate_hz": 1.0e4},
         provenance={},
     )
-    before = result.spectral_flux(units="electron")
     c = cxr.quantify().to_energy("keV")
     b = brem.quantify().to_energy("keV")
     assert c.photon_energy.magnitude.shape == (2,)
     assert b.photon_energy.magnitude.shape == (3,)
     assert _integrated(c) == pytest.approx(np.trapezoid(cxr.density, cxr.photon_energy_eV))
     assert _integrated(b) == pytest.approx(np.trapezoid(brem.density, brem.photon_energy_eV))
-    assert before.equals(result.spectral_flux(units="electron"))
-    assert "photon_energy_keV" in before.columns  # Density remains per eV.
+    assert not hasattr(result, "spectral_flux")  # Density remains per eV.
 
 
 def test_observation_average_and_nan_support_are_preserved() -> None:

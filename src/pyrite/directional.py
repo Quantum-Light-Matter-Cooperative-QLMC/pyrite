@@ -66,7 +66,9 @@ def _lowered_source(beam, target, grid, numerics, seed, *, transition=False):
     if getattr(slab, "entrance_face", None) is not None:
         raise ValueError("directional_source supports flat slabs/stacks; grooves are unsupported")
     if transition and slab.footprint is not None:
-        raise ValueError("directional TR requires an infinite planar slab (footprint=None)")
+        raise ValueError(
+            "directional TR requires an infinite planar slab (width=None, height=None)"
+        )
     if getattr(beam.longitudinal, "kind", "gaussian") not in {"point", "gaussian"}:
         raise ValueError(
             "directional_source does not support direction-targeted longitudinal modes"

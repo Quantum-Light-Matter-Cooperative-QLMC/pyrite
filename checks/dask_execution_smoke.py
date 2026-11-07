@@ -27,7 +27,7 @@ def smoke_cases():
         beam=pr.Beam(
             energy_keV=30, transverse=pr.beams.PointSpot(), longitudinal=pr.beams.PointBunch()
         ),
-        target=pr.geometry.Slab("hopg", thickness_ang=100, tilt_deg=30, footprint=None),
+        target=pr.geometry.Slab("hopg", thickness_ang=100, tilt_deg=30, width=None, height=None),
         numerics=pr.Numerics(
             sampling=pr.config.FixedSampling(4, 2),
             energy_bins=pr.detectors.EnergyBins(

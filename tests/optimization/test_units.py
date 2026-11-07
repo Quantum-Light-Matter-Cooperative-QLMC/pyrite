@@ -214,16 +214,13 @@ def test_external_quantity_bounds_are_detached_and_nested_paths_bind():
     external = pint.UnitRegistry()
     low = external.Quantity(np.array(4.0), "mm")
     high = external.Quantity(0.6, "cm")
-    space = ParameterSpace({"target.footprint.width": Continuous(low, high)})
+    space = ParameterSpace({"target.width": Continuous(low, high)})
     low.magnitude[...] = 20.0
     bound = space.bind(_base())
-    assert bound.parameters["target.footprint.width"] == Continuous(4, 6)
+    assert bound.parameters["target.width"] == Continuous(4, 6)
     study = OptimizationStudy(_base(), bound, (Objective("f", "maximize", ""),))
     assert (
-        study.scene(
-            {"target.footprint.width": external.Quantity(0.5, "cm")}
-        ).target.footprint.width_mm
-        == 5.0
+        study.scene({"target.width": external.Quantity(0.5, "cm")}).target.footprint.width_mm == 5.0
     )
 
 

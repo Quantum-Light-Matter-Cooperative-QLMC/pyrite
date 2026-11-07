@@ -19,7 +19,7 @@ from pyrite.results.store import store_result
 def _scene(mode="two-beam"):
     return pr.Scene(
         pr.Beam(energy_keV=30.0, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()),
-        pr.geometry.Slab("hopg", thickness_ang=100.0, tilt_deg=30.0, footprint=None),
+        pr.geometry.Slab("hopg", thickness_ang=100.0, tilt_deg=30.0, width=None, height=None),
         pr.Detector(),
         physics=pr.Physics(
             transition_radiation=mode, radiative_model="uncoupled", bremsstrahlung_model="eedl"

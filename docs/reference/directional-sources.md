@@ -32,7 +32,7 @@ result does not authorize summing arbitrary sources or adding a TR–line cross
 term.
 Cross-electron coherent and channeling radiation are excluded.
 
-TR requires explicit infinite planar geometry (`footprint=None`) and the
+TR requires explicit infinite planar geometry (`width=None, height=None`) and the
 existing per-layer X-ray dielectric band. Finite lateral interfaces and optical
 response are not inferred. See [transition radiation](../physics/radiation-physics/transition-radiation.md)
 for the physical assumptions and current limits.

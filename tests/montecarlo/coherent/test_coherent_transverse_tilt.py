@@ -242,7 +242,7 @@ def test_finite_footprint_without_bunch_length_names_user_facing_fixes():
             coherent=True,
             physical_electrons=50.0,
         )
-    assert "footprint=None" in str(caught.value)
+    assert "width=None, height=None" in str(caught.value)
     assert "longitudinal_rms_fs" not in str(caught.value)
 
 

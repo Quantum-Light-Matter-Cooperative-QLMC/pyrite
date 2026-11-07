@@ -56,12 +56,6 @@ def test_native_component_sum_is_1000_and_legacy_union_table_stays_1225():
     assert yields["total"].inside == pytest.approx(1000.0, rel=1e-15)
     assert yields["total"].support_eV == ((100.0, 400.0),)
     assert yields["total"].complete
-    # The legacy union table zero-fills beyond each family's support; the extra
-    # 225 are the exterior triangles 100 * 4 / 2 (cxr) and 100 * 0.5 / 2.
-    table = result.spectral_flux(units="electron")
-    legacy = np.trapezoid(table["total"].to_numpy(), table["photon_energy_eV"].to_numpy())
-    assert legacy == pytest.approx(1225.0, rel=1e-15)
-    np.testing.assert_allclose(table["total"], [3.5, 4.5, 5.5, 1.0])
 
 
 def test_nonzero_endpoints_and_clipped_window_split_mass_exactly():

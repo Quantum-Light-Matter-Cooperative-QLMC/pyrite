@@ -40,7 +40,9 @@ def source_outputs(
         raise ValueError(f"components must be a nonempty subset of {sorted(SOURCE_COMPONENTS)}")
     if "transition" in components:
         if case.get("crystal_width_mm") is not None:
-            raise ValueError("directional TR requires an infinite planar slab (footprint=None)")
+            raise ValueError(
+                "directional TR requires an infinite planar slab (width=None, height=None)"
+            )
         if (case.get("transition_radiation") or {}).get("coherence") != "history":
             raise ValueError("directional TR requires history coherence")
         case_layer_eps(case, decode_energy_grid(case["E_grid"]))

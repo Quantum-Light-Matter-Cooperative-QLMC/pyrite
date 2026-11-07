@@ -36,7 +36,12 @@ def _sweep():
         material="silicon",
         beam=BeamSpec(energy_keV=[5000.0]),
         target=Slab(
-            "silicon", footprint=None, thickness_ang=20000.0, tilt_deg=3.0, tilt_azim_deg=45.0
+            "silicon",
+            width=None,
+            height=None,
+            thickness_ang=20000.0,
+            tilt_deg=3.0,
+            tilt_azim_deg=45.0,
         ),
     )
 

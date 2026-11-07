@@ -27,23 +27,6 @@ def _api_entry(spelling: str, replacement: str, *, since: str) -> ApiDeprecation
 ROOT_API_REPLACEMENTS = {}
 
 API_DEPRECATIONS: dict[str, ApiDeprecation] = {}
-# #955: first announced in 0.27.0; never remove before replacements ship.
-for _spelling in ("Result.spectral_flux", "Result.spectral_flux_units"):
-    API_DEPRECATIONS[_spelling] = _api_entry(
-        _spelling,
-        "Result.accepted_spectra(assume_uniform=True) for scalar sources, "
-        "or SpectralDensity.quantify(), followed by explicit rate(current=...), "
-        "to_energy(), to_dataframe()/dataframe_units(); integrated_yield() for totals",
-        since="0.27.0",
-    )
-
-
-for _spelling, _replacement in (
-    ("Footprint.width", "Slab.width for slabs or Footprint.width_mm for stacks"),
-    ("Footprint.height", "Slab.height for slabs or Footprint.height_mm for stacks"),
-    ("Slab(footprint=None)", "Slab(width=None, height=None)"),
-):
-    API_DEPRECATIONS[_spelling] = _api_entry(_spelling, _replacement, since="0.27.0")
 
 
 def warn_api(spelling: str, *, stacklevel: int = 3) -> None:

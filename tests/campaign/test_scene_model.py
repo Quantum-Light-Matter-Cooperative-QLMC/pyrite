@@ -135,7 +135,6 @@ def test_quantity_paths_delegate_to_owners_and_preserve_numeric_cases() -> None:
         axes={
             "beam.kinetic_energy": [0.03 * ureg.MeV, 45 * ureg.keV],
             "target.layers[1].thickness": [285 * ureg.nm, 0.5 * ureg.um],
-            "target.footprint.width": [0.5 * ureg.cm, 6 * ureg.mm],
         },
     )
     numeric = Sweep(
@@ -143,7 +142,6 @@ def test_quantity_paths_delegate_to_owners_and_preserve_numeric_cases() -> None:
         axes={
             "beam.energy_keV": [30.0, 45.0],
             "target.layers[1].thickness_ang": [2850.0, 5000.0],
-            "target.footprint.width_mm": [5.0, 6.0],
         },
     )
     for (_, actual), (_, expected) in zip(quantity.expand(), numeric.expand(), strict=True):

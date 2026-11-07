@@ -217,7 +217,7 @@ def _(electrons, np, workload):
             _material,
             thickness=_thickness,
             tilt=45 * ureg.degree,
-            footprint=Footprint(width=5 * ureg.mm, height=5 * ureg.mm),
+            footprint=Footprint(5 * ureg.mm, 5 * ureg.mm),
         ),
         Detector(observation_angle=90 * ureg.degree),
         numerics=Numerics(

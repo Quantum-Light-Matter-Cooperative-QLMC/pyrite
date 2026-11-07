@@ -121,9 +121,10 @@ spellings raises `TypeError`; `dataclasses.replace` uses `spacing_ang`.
 
 Slab transverse dimensions are full widths, supplied as paired Pint lengths:
 `Slab("hopg", width=5 * ureg.mm, height=5 * ureg.mm)`. Set both to
-`None` for an infinite slab. The `Slab(footprint=None)` spelling is deprecated,
-as are the quantity-valued `Footprint.width` and `Footprint.height` keywords
-and properties; numeric `Footprint` dimensions remain available for `Stack`.
+`None` for an infinite slab. The `Slab(footprint=None)` spelling and the
+quantity-valued `Footprint.width` and `Footprint.height` keywords and
+properties were removed in 0.29.0; `Footprint` dimensions remain available for
+`Stack` through `width_mm`/`height_mm`.
 
 ## Named target definitions
 

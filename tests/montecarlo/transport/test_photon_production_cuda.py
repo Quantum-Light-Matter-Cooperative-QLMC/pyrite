@@ -63,7 +63,7 @@ def _scene(component="brem", feedback=False):
     )
     return pr.Scene(
         pr.Beam(energy_keV=40, transverse=beams.PointSpot(), longitudinal=beams.PointBunch()),
-        geometry.Slab("silicon", thickness_ang=1000, tilt_deg=5, footprint=None),
+        geometry.Slab("silicon", thickness_ang=1000, tilt_deg=5, width=None, height=None),
         detectors.PlanarDetector(detectors.PlanarPose((0, 0, 1)), size_mm=(2, 2)),
         physics=physics,
         numerics=pr.Numerics(
@@ -204,7 +204,8 @@ def test_cuda_pair_electron_positron_feedback_closes_rest_reservoir(cuda, monkey
 
     scene = _scene(feedback=True)
     scene = replace(
-        scene, target=geometry.Slab("silicon", thickness_ang=1e5, tilt_deg=5, footprint=None)
+        scene,
+        target=geometry.Slab("silicon", thickness_ang=1e5, tilt_deg=5, width=None, height=None),
     )
     context = prepare_photon_case(api.build_case(scene))
     assert context["stage"].base.transport["transport_core"] == "cuda"

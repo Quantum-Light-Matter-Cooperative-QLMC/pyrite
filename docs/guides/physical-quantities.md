@@ -242,11 +242,10 @@ with open("cxr-rate.units.json", "w") as stream:
 ```
 
 Numeric `result.to_dataframe()` and `result.dataframe_units()` remain supported.
-`spectral_flux(units=...)` and `spectral_flux_units(units=...)`, including
-selector-based CSV/Parquet recipes, are deprecated since 0.27.0, with removal
-scheduled for 0.29.0. During that window their values, column schemas and legacy
-union-grid display behavior remain unchanged. Their `total` is not a native
-yield representation; use native integration for physical totals.
+`spectral_flux(units=...)` and `spectral_flux_units(units=...)` were deprecated
+in 0.27.0 and removed in 0.29.0. Use `accepted_spectra()` or `quantify()`, then
+explicit current transforms and native `to_dataframe()`/`dataframe_units()`;
+use `integrated_yield()` for physical totals.
 
 Each entry holds a Pint-parsable `unit` and a separate `basis`. The basis
 records counts that Pint cannot express, such as photons per incident
@@ -291,5 +290,5 @@ release and supported for two minor versions before removal.
 For slabs, specify full transverse dimensions directly with `Slab(width=5 *
 ureg.mm, height=5 * ureg.mm)`. Use `width=None, height=None` for a
 laterally infinite slab. `Slab(footprint=None)` and the quantity-valued
-`Footprint.width` and `Footprint.height` spellings are deprecated. For a
-`Stack`, `Footprint(width_mm=5, height_mm=5)` remains supported.
+`Footprint.width` and `Footprint.height` spellings were removed in 0.29.0.
+For a `Stack`, `Footprint(width_mm=5, height_mm=5)` remains supported.

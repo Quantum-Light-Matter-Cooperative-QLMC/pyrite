@@ -87,7 +87,12 @@ def _(mo, tables_ready):
         transport_result = simulate_trajectories(
             Beam(kinetic_energy=30 * ureg.keV, transverse=PointSpot(), longitudinal=PointBunch()),
             Slab(
-                "hopg", thickness_nm * 10, tilt_deg=0.0, footprint=None, allow_normal_incidence=True
+                "hopg",
+                thickness_nm * 10,
+                tilt_deg=0.0,
+                width=None,
+                height=None,
+                allow_normal_incidence=True,
             ),
             physics=Physics(
                 inelastic_model="continuous",

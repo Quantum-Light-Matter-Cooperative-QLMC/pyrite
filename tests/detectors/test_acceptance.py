@@ -192,7 +192,7 @@ def test_equal_acceptance_preserves_lowered_case_and_both_identities():
     beam = pr.Beam(
         energy_keV=30, transverse=pr.beams.PointSpot(), longitudinal=pr.beams.PointBunch()
     )
-    target = pr.geometry.Slab("hopg", thickness_ang=1000, footprint=None)
+    target = pr.geometry.Slab("hopg", thickness_ang=1000, width=None, height=None)
     numerics = pr.Numerics(sampling=FixedSampling(cxr_histories=1, brem_histories=1))
     cases = [
         build_case(pr.Scene(beam, target, detector), numerics) for detector in (legacy, modern)
@@ -230,7 +230,7 @@ def test_sensor_and_equal_flat_acceptance_lower_identically():
     beam = pr.Beam(
         energy_keV=30, transverse=pr.beams.PointSpot(), longitudinal=pr.beams.PointBunch()
     )
-    target = pr.geometry.Slab("hopg", thickness_ang=1000, footprint=None)
+    target = pr.geometry.Slab("hopg", thickness_ang=1000, width=None, height=None)
     cases = [build_case(pr.Scene(beam, target, detector)) for detector in (legacy, modern)]
     assert cases[0] == cases[1]
     assert case_content_key(cases[0]) == case_content_key(cases[1])

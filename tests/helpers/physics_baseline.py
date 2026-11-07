@@ -5,7 +5,7 @@ from dataclasses import replace
 import numpy as np
 
 from pyrite.campaign.config import default_settings
-from pyrite.campaign.geometry import Footprint, Stack
+from pyrite.campaign.geometry import Footprint, Slab, Stack
 from pyrite.campaign.profiles import case_content_key, dataset_identity
 from pyrite.campaign.sweep import BeamSpec, Sweep, build_cases
 from pyrite.config import FixedSampling
@@ -76,7 +76,13 @@ def resolved_baseline(kind):
                 transverse_fwhm_x_mm=None,
                 transverse_fwhm_y_mm=None,
             ),
-            target=replace(sweep.target, footprint=None),
+            target=Slab(
+                sweep.target.material,
+                thickness_ang=sweep.target.thickness_ang,
+                tilt_deg=sweep.target.tilt_deg,
+                width=None,
+                height=None,
+            ),
         )
     elif kind == "eedl-fallback":
         selections["bremsstrahlung_model"] = "auto"

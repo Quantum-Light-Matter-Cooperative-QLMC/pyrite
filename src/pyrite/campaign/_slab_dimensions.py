@@ -5,7 +5,6 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import TYPE_CHECKING, Any, Self, cast
 
-from .._api_deprecations import warn_api
 from .._spec_defaults import UNSET as _UNSET
 from .._spec_defaults import _Unset
 from .._units import _positive_length_quantity as _geometry_length
@@ -42,7 +41,10 @@ def slab_footprint(
     if footprint is _UNSET:
         raise TypeError("Slab requires width and height or footprint")
     if footprint is None and not infinite_via_dimensions:
-        warn_api("Slab(footprint=None)", stacklevel=4)
+        raise TypeError(
+            "Slab(footprint=None) was removed in 0.29.0; "
+            "use Slab(width=None, height=None) for an infinite slab"
+        )
     return footprint, infinite_via_dimensions and footprint is None
 
 

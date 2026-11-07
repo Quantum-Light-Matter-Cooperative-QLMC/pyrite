@@ -213,7 +213,7 @@ def _sweep(**kwargs):
         ),
         (
             {"crystal_width_mm": None, "crystal_height_mm": None},
-            Slab(MATERIAL, footprint=None),
+            Slab(MATERIAL, width=None, height=None),
         ),
         (
             {
@@ -405,4 +405,4 @@ def test_footprint_is_required_and_none_keeps_infinite_extent():
     with pytest.raises(TypeError, match="footprint"):
         Stack(layers=stack.layers)
     assert stack.footprint is None
-    assert Slab(MATERIAL, footprint=None).footprint is None
+    assert Slab(MATERIAL, width=None, height=None).footprint is None

@@ -62,7 +62,7 @@ def test_equivalent_quantities_keep_detector_lowering_and_identity() -> None:
         SensorAcceptance(distance=Q_(40, "cm"), width=Q_(14000, "um"), height=Q_(7, "mm")),
     )
     beam = Beam(energy_keV=30, transverse=PointSpot(), longitudinal=PointBunch())
-    target = Slab("hopg", thickness_ang=1000, footprint=None)
+    target = Slab("hopg", thickness_ang=1000, width=None, height=None)
     numerics = Numerics(sampling=FixedSampling(cxr_histories=1, brem_histories=1))
     detectors = [Detector(135, acceptance=sensor) for sensor in sensors]
     assert detectors[0].solid_angle_sr == detectors[1].solid_angle_sr
