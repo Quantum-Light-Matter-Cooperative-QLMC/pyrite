@@ -29,9 +29,10 @@ Annihilation photons get the first-interaction step of #275
 the stack or interacts at a point sampled from EPDL2025 ``mu_total``, where its
 history ends. They never re-enter pair conversion.
 
-RNG. A positron is identified by its pair event, so its streams hash (seed,
-parent track, photon ordinal) like the positron's launch key, under one salt
-for the in-flight budget and another for emission and photon scoring.
+RNG. A positron is identified by its pair event, so its streams derive from
+the converting photon's (parent lineage key, photon ordinal) like the
+positron's launch key (#923), under one namespace for the in-flight budget and
+another for emission and photon scoring.
 Host emission retains Philox; CUDA emission uses the counter-based
 SplitMix64 stream in :mod:`._jit_annihilation`, with device-resident inputs
 and outputs until this module's EPDL photon-scoring boundary.
