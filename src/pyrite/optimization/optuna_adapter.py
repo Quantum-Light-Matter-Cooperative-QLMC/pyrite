@@ -6,6 +6,7 @@ metadata; no parallel JSON ledger that can diverge from it is maintained.
 
 from __future__ import annotations
 
+import warnings
 from typing import Any, Literal
 
 from .space import Categorical, Continuous, Integer, ParameterSpace
@@ -15,6 +16,43 @@ _CONSTRAINT_KEY = "pyrite_constraint_violations"
 _TRIAL_KEY = "pyrite_optimization_trial_v1"
 _DEFINITION_KEY = "pyrite_optimization_definition_sha256_v1"
 _SAMPLER_KEY = "pyrite_optimization_sampler_v1"
+
+
+def _make_optuna_sampler(
+    optuna: Any,
+    *,
+    sampler: Literal["tpe", "multivariate-tpe", "random"],
+    seed: int | None,
+    constraints: tuple[Constraint, ...],
+    native_constraints: bool,
+) -> Any:
+    """Build a sampler with stable TPE defaults and Optuna 4/5 constraint handling."""
+    if sampler == "random":
+        return optuna.samplers.RandomSampler(seed=seed)
+
+    # Optuna 5 changed TPE's default to multivariate=True. Keep the
+    # independent and multivariate modes explicit across major versions.
+    sampler_options: dict[str, Any] = {
+        "seed": seed,
+        "multivariate": sampler == "multivariate-tpe",
+        "constant_liar": False,  # a single serial study coordinator
+    }
+    if constraints and not native_constraints:
+        sampler_options["constraints_func"] = lambda trial: trial.user_attrs.get(
+            _CONSTRAINT_KEY, (float("inf"),) * len(constraints)
+        )
+    # Filter only the two Optuna 4 experimental-argument notices. Other
+    # warnings, including deprecations and Optuna 5 warnings, remain visible.
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            message=(
+                r"Argument ``(constraints_func|multivariate)`` "
+                r"is an experimental feature"
+            ),
+            category=optuna.exceptions.ExperimentalWarning,
+        )
+        return optuna.samplers.TPESampler(**sampler_options)
 
 
 class OptunaOptimizer:
@@ -67,17 +105,16 @@ class OptunaOptimizer:
         self.constraints = tuple(constraints)
         self.persistent = storage is not None
         self.sampler_name = sampler
-        if sampler == "random":
-            optuna_sampler = optuna.samplers.RandomSampler(seed=seed)
-        else:
-            sampler_options: dict[str, Any] = {"seed": seed}
-            if sampler == "multivariate-tpe":
-                sampler_options["multivariate"] = True
-            if constraints:
-                sampler_options["constraints_func"] = lambda trial: trial.user_attrs.get(
-                    _CONSTRAINT_KEY, (float("inf"),) * len(constraints)
-                )
-            optuna_sampler = optuna.samplers.TPESampler(**sampler_options)
+        # Optuna 5 stores named constraints on Trial; older releases require
+        # TPESampler(constraints_func=...) and trial user attributes instead.
+        self._native_constraints = callable(getattr(optuna.trial.Trial, "set_constraint", None))
+        optuna_sampler = _make_optuna_sampler(
+            optuna,
+            sampler=sampler,
+            seed=seed,
+            constraints=self.constraints,
+            native_constraints=self._native_constraints,
+        )
         self.study = optuna.create_study(
             directions=[obj.direction for obj in objectives],
             sampler=optuna_sampler,
@@ -118,6 +155,17 @@ class OptunaOptimizer:
                 self.study.set_user_attr(_DEFINITION_KEY, definition_digest)
             elif old != definition_digest:
                 raise ValueError("optimization study definition mismatch on resume")
+            if self._native_constraints and self.constraints:
+                for frozen in prior:
+                    if (
+                        frozen.state == self._optuna.trial.TrialState.COMPLETE
+                        and _CONSTRAINT_KEY in frozen.user_attrs
+                        and not getattr(frozen, "constraints", None)
+                    ):
+                        raise ValueError(
+                            "Optuna 5 cannot safely resume a constrained Optuna 4 study: "
+                            "prior trials lack native constraint metadata; use a new study_name"
+                        )
 
         for frozen in prior:
             if frozen.state == self._optuna.trial.TrialState.RUNNING:
@@ -179,6 +227,13 @@ class OptunaOptimizer:
                 raise TypeError(f"unsupported optimization parameter {path!r}")
         return Proposal(values, trial)
 
+    def _write_constraints(self, token: Any, violations: tuple[float, ...]) -> None:
+        """Write both the durable PyRITE record and the version-appropriate Optuna record."""
+        token.set_user_attr(_CONSTRAINT_KEY, violations)
+        if self._native_constraints:
+            for definition, violation in zip(self.constraints, violations, strict=True):
+                token.set_constraint(definition.name, float(violation))
+
     def record_trial(self, proposal: Proposal, result: OptimizationTrial) -> None:
         """Durably write observations BEFORE the Optuna trial transition.
 
@@ -194,7 +249,7 @@ class OptunaOptimizer:
                 constraint.violation(result.constraints[constraint.name])
                 for constraint in self.constraints
             )
-            proposal.token.set_user_attr(_CONSTRAINT_KEY, violations)
+            self._write_constraints(proposal.token, violations)
         proposal.token.set_user_attr(
             _TRIAL_KEY,
             {
@@ -222,5 +277,5 @@ class OptunaOptimizer:
         if len(constraint_violations) != len(self.constraints):
             raise ValueError("optimizer feedback must match constraint count")
         if self.constraints:
-            proposal.token.set_user_attr(_CONSTRAINT_KEY, constraint_violations)
+            self._write_constraints(proposal.token, constraint_violations)
         self.study.tell(proposal.token, values if len(values) > 1 else values[0])

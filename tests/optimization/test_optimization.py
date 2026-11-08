@@ -124,8 +124,8 @@ def test_optuna_sampler_selection(method, expected):
         sampler=method,
     )
     assert type(optimizer.study.sampler).__name__ == expected
-    if method == "multivariate-tpe":
-        assert optimizer.study.sampler._multivariate
+    if method in ("tpe", "multivariate-tpe"):
+        assert bool(optimizer.study.sampler._multivariate) is (method == "multivariate-tpe")
     result = definition.run(
         lambda candidate, _: {
             "flux": candidate.beam.energy_keV,
@@ -136,6 +136,62 @@ def test_optuna_sampler_selection(method, expected):
     )
     assert len(result.trials) == 3
     assert all(trial.state is TrialState.COMPLETED for trial in result.trials)
+
+
+def test_constraint_storage_uses_optuna5_native_api_when_available():
+    """The new API uses named violations, not deprecated sampler callbacks."""
+    optuna = pytest.importorskip("optuna")
+    if not callable(getattr(optuna.trial.Trial, "set_constraint", None)):
+        pytest.skip("requires Optuna >=5")
+    definition = study()
+    optimizer = OptunaOptimizer(
+        definition.parameters, definition.objectives, constraints=definition.constraints, seed=3
+    )
+    assert optimizer._native_constraints
+    assert optimizer.study.sampler._constraints_func is None
+    definition.run(
+        lambda candidate, _: {
+            "flux": candidate.beam.energy_keV,
+            "line_fwhm_eV": 2.0 if candidate.beam.energy_keV > 60 else 0.5,
+        },
+        optimizer,
+        max_trials=8,
+    )
+    for trial in optimizer.study.trials:
+        expected = 1.0 if trial.params["beam.energy_keV"] > 60 else -0.5
+        assert trial.constraints["line_fwhm_eV"] == expected
+        assert tuple(trial.user_attrs["pyrite_constraint_violations"]) == (expected,)
+
+
+@pytest.mark.parametrize("native", [False, True])
+def test_constraint_storage_api_dispatch(native):
+    """Smoke-test both the old and named Optuna constraint APIs."""
+    pytest.importorskip("optuna")
+    definition = study()
+    optimizer = OptunaOptimizer(
+        definition.parameters,
+        definition.objectives,
+        constraints=definition.constraints,
+        seed=3,
+        sampler="random",
+    )
+
+    class Token:
+        def __init__(self):
+            self.user_attrs = {}
+            self.constraints = {}
+
+        def set_user_attr(self, key, value):
+            self.user_attrs[key] = value
+
+        def set_constraint(self, key, value):
+            self.constraints[key] = value
+
+    token = Token()
+    optimizer._native_constraints = native
+    optimizer._write_constraints(token, (0.5,))
+    assert token.user_attrs["pyrite_constraint_violations"] == (0.5,)
+    assert token.constraints == ({"line_fwhm_eV": 0.5} if native else {})
 
 
 def test_optuna_sampler_identity_on_persistent_resume(tmp_path):

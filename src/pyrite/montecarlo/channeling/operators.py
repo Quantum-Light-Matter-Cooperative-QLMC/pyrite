@@ -948,6 +948,8 @@ def electronic_kernel(
     for index, (nodes, node_w) in enumerate(zip(p, p_w, strict=True)):
         if bins[index] == 0:
             nodes, node_w = centre_p, centre_pw
+        # NumPy iteration stubs can type a row as a scalar; keep weights 1-D.
+        node_w = np.asarray(node_w, dtype=float)
         px = np.broadcast_to(nodes[:, None], (nodes.size, q_y.size)).ravel()
         qy = np.broadcast_to(q_y[None, :], (nodes.size, q_y.size)).ravel()
         q = np.hypot(px, qy)

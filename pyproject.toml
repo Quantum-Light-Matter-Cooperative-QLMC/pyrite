@@ -61,7 +61,7 @@ dask = [
     "dask-jobqueue>=0.9",
 ]
 optimization = [
-    "optuna>=4.5,<5",
+    "optuna>=5.0,<6",
 ]
 external-db = [
     "mp-api>=0.46",
@@ -185,6 +185,9 @@ notebooks = [
 # heavy MC physics validation lives in checks/, not here; heavy tests that do
 # live here carry the opt-in `slow` marker (tests/helpers/slow_marker.py).
 testpaths = ["tests"]
+# Allow importlib-mode tests to import top-level checks/ helpers without
+# relying on `python -m pytest` to put the checkout root on sys.path.
+pythonpath = [".", "src"]
 addopts = [
     "-q",
     "--import-mode=importlib"

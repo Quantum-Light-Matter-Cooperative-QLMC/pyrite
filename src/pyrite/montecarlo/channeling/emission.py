@@ -564,12 +564,14 @@ class _History:
         if limits.ndim != 1 or not limits.size or np.any(~np.isfinite(limits)):
             raise ValueError("path_limits_ang must be a nonempty finite one-dimensional array")
         limits = np.sort(np.clip(limits, 0.0, self.z_ang[-1]))
-        z = np.unique(np.concatenate((self.z_ang, limits)))
-        rates = np.empty((z.size, self.rates.shape[1]))
+        z = np.asarray(np.unique(np.concatenate((self.z_ang, limits))), dtype=np.float64)
+        xp = np.asarray(self.z_ang, dtype=np.float64)
+        rates = np.empty((z.size, self.rates.shape[1]), dtype=np.float64)
         for i in range(self.rates.shape[1]):
-            rates[:, i] = np.interp(z, self.z_ang, self.rates[:, i])
+            rates[:, i] = np.interp(z, xp, np.asarray(self.rates[:, i], dtype=np.float64))
         weight = (limits.size - np.searchsorted(limits, z[1:], side="left")) / limits.size
-        return _History(z, rates, np.interp(z, self.z_ang, self.bound), weight)
+        bound = np.interp(z, xp, np.asarray(self.bound, dtype=np.float64))
+        return _History(z, rates, bound, weight)
 
 
 def _validated_entry_initial(solver: DensityMatrixSolver, initial) -> tuple[np.ndarray, float]:

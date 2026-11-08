@@ -9,7 +9,7 @@ rate seen, so a denser stretch of the population shrinks them. Electron streams
 are counter-addressed, so block sizes do not change transport.
 """
 
-from collections.abc import Iterator, Mapping
+from collections.abc import Generator, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import replace
 from typing import Any
@@ -77,7 +77,7 @@ class MemoryBlockSizer:
         self.bytes_per_electron = max(self.bytes_per_electron, size / max(stop - start, 1))
 
     @contextmanager
-    def block_tuning(self, electrons: int) -> Iterator[None]:
+    def block_tuning(self, electrons: int) -> Generator[None]:
         """Run one block as one population, keeping any explicit user control."""
         scratch = min(SCRATCH_BYTES_PER_ELECTRON * electrons, SCRATCH_FRACTION * self.target_bytes)
         tuning = replace(
@@ -89,7 +89,7 @@ class MemoryBlockSizer:
             yield
 
     @contextmanager
-    def pool_limit(self) -> Iterator[None]:
+    def pool_limit(self) -> Generator[None]:
         """Cap the device pool under the target for this run, never above an existing cap."""
         previous = BACKEND.memory_limit_bytes()
         outside = BACKEND.device_bytes_outside_pool()

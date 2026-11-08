@@ -17,12 +17,6 @@
       "cc": 33
     },
     {
-      "path": "src/pyrite/_numerics.py",
-      "name": "Numerics.__post_init__",
-      "cc": 22,
-      "exception": "#709: normalize the existing Physics/Numerics fields at construction while preserving their established units and validation order. Keep all config invariants at the boundary; unit conversion itself is delegated to _units.normalize_unit."
-    },
-    {
       "path": "src/pyrite/_precision.py",
       "name": "Precision.__post_init__",
       "cc": 39
@@ -61,11 +55,6 @@
       "path": "src/pyrite/campaign/front_matching.py",
       "name": "phase_matched_front_for_scene",
       "cc": 24
-    },
-    {
-      "path": "src/pyrite/campaign/lowering.py",
-      "name": "build_sweep_cases",
-      "cc": 21
     },
     {
       "path": "src/pyrite/campaign/single_scene.py",
@@ -125,7 +114,7 @@
     {
       "path": "src/pyrite/cli/commands/_profile_show.py",
       "name": "emit_show",
-      "cc": 33
+      "cc": 28
     },
     {
       "path": "src/pyrite/cli/commands/_remote_actions.py",
@@ -521,7 +510,7 @@
     {
       "path": "src/pyrite/montecarlo/spectrum/cxr/_per_hkl.py",
       "name": "_accumulate_reflection",
-      "cc": 26
+      "cc": 25
     },
     {
       "path": "src/pyrite/montecarlo/spectrum/cxr/_per_hkl.py",

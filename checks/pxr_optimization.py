@@ -140,12 +140,12 @@ class ComparisonOptimizer(OptunaOptimizer):
         elif self.method == "random":
             sampler = optuna.samplers.RandomSampler(seed=self.seed + number)
         else:
-            sampler = optuna.samplers.TPESampler(
-                seed=self.seed + number,
-                constraints_func=lambda trial: trial.user_attrs.get(
+            options = {"seed": self.seed + number, "multivariate": False, "constant_liar": False}
+            if not self._native_constraints:
+                options["constraints_func"] = lambda trial: trial.user_attrs.get(
                     "pyrite_constraint_violations", (float("inf"),)
-                ),
-            )
+                )
+            sampler = optuna.samplers.TPESampler(**options)
         self.study.sampler = sampler
         proposal = super().ask()
         self.current = proposal.token

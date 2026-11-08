@@ -92,10 +92,16 @@ numeric study digests remain unchanged.
 
 ## Selecting an Optuna sampler
 
-`OptunaOptimizer` defaults to independent TPE, but accepts `sampler="random"`
+The `optimization` extra requires Optuna 5.0 or newer (within major version 5).
+Run `uv lock --upgrade-package optuna` and `uv sync --extra optimization`
+after updating your checkout. The lockfile is regenerated locally, rather
+than included in the source patch.
+
+`OptunaOptimizer` defaults to **independent** TPE, with `sampler="random"`
 for a baseline or `sampler="multivariate-tpe"` to consider parameter
-interactions. The latter can be useful for coupled geometry variables, but
-has no guaranteed advantage at small trial budgets:
+interactions. PyRITE explicitly selects `multivariate` because Optuna 5 changed
+its default. The multivariate algorithm has no guaranteed advantage at small
+trial budgets:
 
 ```python
 optimizer = OptunaOptimizer(
@@ -110,10 +116,18 @@ optimizer = OptunaOptimizer(
 Constrained TPE uses the declared constraint violations when proposing new
 points; random search samples without considering those constraints, though
 infeasible trials remain excluded from `.best_trial` and `.pareto_front`.
-A persistent study records its sampler choice and rejects a change on resume.
-Existing studies without that tag can resume only with the original `"tpe"`
-default. Evaluate algorithms with equal compute budgets and independently
-validated finalist results rather than comparing noisy search maxima.
+Optuna 5 stores named trial constraints through `Trial.set_constraint` rather
+than the deprecated sampler-level `constraints_func`; PyRITE also retains its
+own ordered violation record for recovery and diagnostics. A persistent study
+records its sampler choice and rejects a change on resume. Existing studies
+without that tag can resume only with the original `"tpe"` default.
+
+**Migration:** A constrained study produced with Optuna 4 cannot safely resume
+under Optuna 5 because its completed trials lack native constraint metadata.
+Start a new study with a new `study_name` or preserve the Optuna 4 environment
+for that old study. Unconstrained studies do not have that specific limitation.
+Evaluate algorithms with equal compute budgets and independently validated
+finalist results rather than comparing noisy search maxima.
 
 ## Persisting and resuming a study
 

@@ -307,7 +307,7 @@ def _decimate_frame(df, max_points):
             component: grp.sort_values("energy_eV")
             for component, grp in trace.groupby("component", sort=False, dropna=False)
         }
-        basis = components.get("total", next(iter(components.values())))
+        basis = components["total"] if "total" in components else next(iter(components.values()))
         basis_energy = basis["energy_eV"].to_numpy()
         for component in components.values():
             component_energy = component["energy_eV"].to_numpy()
