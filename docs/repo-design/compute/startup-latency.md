@@ -157,7 +157,10 @@ with the specialization flags plus SHA-256 digests of the sources of `body`'s
 module and of every module defining a dispatcher `body` calls
 (`pyrite._jit_cache.stabilize_closure_cache`). Bytecode, signature, target CPU
 and Numba's own source stamp stay in the key. A warm first `simulate` now
-compiles nothing.
+compiles nothing. The digest also follows `module.attr` calls on PyRITE
+modules (`_cutoff.lut_cutoff_bound`, `_moments.table_moments`) and
+dispatchers captured in closure cells: Numba does not re-check a cached
+callee when its caller loads, so each such module must invalidate the entry.
 
 The separately profiled warm process (instrumented, overlapping cumulative
 times) spends 0.45 s loading 11 cached overloads, 0.27 s importing Numba and
