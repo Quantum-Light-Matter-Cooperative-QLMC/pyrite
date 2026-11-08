@@ -112,6 +112,7 @@ _RESOLUTION_INPUT_KEYS = (
     "inelastic_model",
     "inelastic_cutoff_eV",
     "secondary_threshold_eV",
+    "cascade_rng_model",
     "radiative_model",
     "radiative_moment_model",
     "radiative_cutoff_eV",

@@ -10,6 +10,7 @@ import pytest
 from scipy import integrate, stats
 
 from pyrite.materials.photon_cross_sections import photon_cross_sections_ang2
+from pyrite.montecarlo.transport.kinematics import stream_keys
 from pyrite.montecarlo.transport.pair_production import (
     PAIR_THRESHOLD_EV,
     convert_hard_photons,
@@ -375,7 +376,7 @@ def test_photon_streams_are_keyed_and_order_independent():
     rows = _photon_rows(n, k)
     # A dense heavy layer so most photons convert inside 10 Angstrom.
     layers = [(0.0, 10.0, [("Pb", 1.0e10)])]
-    events, counts = convert_hard_photons(rows, seed=4, parent_track_offset=7, layers=layers)
+    events, counts = convert_hard_photons(rows, parent_keys=stream_keys(4, n), layers=layers)
     assert counts["photons"] == int(np.count_nonzero(k > PAIR_THRESHOLD_EV))
     assert counts["pair"] == events["row"].size > 0
     assert counts["pair"] + counts["other"] + counts["escaped"] == counts["photons"]
@@ -387,28 +388,36 @@ def test_photon_streams_are_keyed_and_order_independent():
     assert np.all(events["t_ang"] >= rows["t_end_ang"][events["row"]])
     permutation = np.random.default_rng(1).permutation(n)
     shuffled = {name: value[permutation] for name, value in rows.items()}
-    again, _ = convert_hard_photons(shuffled, seed=4, parent_track_offset=7, layers=layers)
+    again, _ = convert_hard_photons(shuffled, parent_keys=stream_keys(4, n), layers=layers)
     original = np.lexsort((events["photon_ordinal"], events["parent"]))
     moved = np.lexsort((again["photon_ordinal"], again["parent"]))
     for name in ("parent", "photon_ordinal", "electron_keV", "positron_keV", "r_ang"):
         np.testing.assert_array_equal(events[name][original], again[name][moved])
     np.testing.assert_array_equal(permutation[again["row"][moved]], events["row"][original])
-    other, _ = convert_hard_photons(rows, seed=5, parent_track_offset=7, layers=layers)
+    other, _ = convert_hard_photons(rows, parent_keys=stream_keys(5, n), layers=layers)
     assert not np.array_equal(other["electron_keV"], events["electron_keV"])
-    assert pair_photon_stream_key(4, 7, 0) != pair_photon_stream_key(4, 8, 0)
+    assert pair_photon_stream_key(7, 0) != pair_photon_stream_key(8, 0)
+    assert pair_photon_stream_key(7, 0) != pair_photon_stream_key(7, 1)
 
 
 def test_no_photon_above_threshold_converts_nothing():
     rows = _photon_rows(10, np.full(10, 9.0e5))
     events, counts = convert_hard_photons(
-        rows, seed=0, parent_track_offset=0, layers=[(0.0, 10.0, [("Pb", 1.0e10)])]
+        rows, parent_keys=stream_keys(0, 10), layers=[(0.0, 10.0, [("Pb", 1.0e10)])]
     )
     assert counts == {"photons": 0, "pair": 0, "other": 0, "escaped": 0}
     assert events["row"].size == 0 and events["r_ang"].shape == (0, 3)
 
 
 def _cascade(
-    monkeypatch, *, pair_scale, model="penelope-2024", seed=11, thickness_ang=1.0e5, **extra
+    monkeypatch,
+    *,
+    pair_scale,
+    model="penelope-2024",
+    seed=11,
+    thickness_ang=1.0e5,
+    Ne=6,
+    **extra,
 ):
     """Thin silicon, 3 MeV, synthetic BremsLib boosted to emit many MeV photons.
 
@@ -444,7 +453,7 @@ def _cascade(
     )
     return simulate_trajectories(
         3000.0,
-        6,
+        Ne,
         thickness_ang,
         composition=CATALOG.crystal("silicon").composition,
         E_cut_keV=100.0,

@@ -69,7 +69,7 @@ def test_device_photons_and_scoring_draws_replay_on_host():
     kinds = np.ones(64, dtype=np.int8)
     kinds[::4] = ann.ANNIHILATION_AT_REST
     direction = rng.normal(size=(64, 3))  # sampler normalizes the in-flight direction
-    keys = ann.annihilation_stream_keys(295, np.arange(64), np.zeros(64), in_flight=False)
+    keys = ann.annihilation_stream_keys(np.arange(295, 359), np.zeros(64), in_flight=False)
     result = _sample(kinds, kinetic, direction, keys)
     assert all(isinstance(v, cp.ndarray) for v in result.values())
     assert result["valid"].get().all()
@@ -105,7 +105,7 @@ def test_device_photons_and_scoring_draws_replay_on_host():
 @pytest.mark.parametrize("kinetic_keV", (10.0, 1_000.0, 10_000.0))
 def test_device_zeta_matches_independent_heitler_cdf(kinetic_keV):
     n = 20_000
-    keys = ann.annihilation_stream_keys(295, np.arange(n), np.zeros(n), in_flight=False)
+    keys = ann.annihilation_stream_keys(295 + np.arange(n), np.zeros(n), in_flight=False)
     result = _sample(
         np.ones(n, dtype=np.int8), np.full(n, kinetic_keV), np.tile([0.0, 0.0, 1.0], (n, 1)), keys
     )
@@ -128,7 +128,7 @@ def test_device_zeta_matches_independent_heitler_cdf(kinetic_keV):
 
 def test_device_at_rest_is_isotropic_and_exactly_antiparallel():
     n = 20_000
-    keys = ann.annihilation_stream_keys(296, np.arange(n), np.zeros(n), in_flight=False)
+    keys = ann.annihilation_stream_keys(296 + np.arange(n), np.zeros(n), in_flight=False)
     # No incoming axis or energy is needed for an at-rest event.
     result = _sample(np.zeros(n, dtype=np.int8), np.full(n, np.nan), np.full((n, 3), np.nan), keys)
     energy, direction = result["k_keV"].get(), result["direction"].get()
@@ -146,7 +146,7 @@ def test_device_sampler_is_independent_of_batch_order_and_chunking():
     kinds = np.arange(n) % 2
     kinetic = np.geomspace(1.0, 1e5, n)
     directions = np.tile([0.3, -0.4, 0.866], (n, 1))
-    keys = ann.annihilation_stream_keys(297, np.arange(n), np.zeros(n), in_flight=False)
+    keys = ann.annihilation_stream_keys(297 + np.arange(n), np.zeros(n), in_flight=False)
     whole = _sample(kinds, kinetic, directions, keys)
     reverse = _sample(kinds[::-1], kinetic[::-1], directions[::-1], keys[::-1])
     chunks = [

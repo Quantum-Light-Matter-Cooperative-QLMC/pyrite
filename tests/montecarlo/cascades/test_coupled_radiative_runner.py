@@ -393,9 +393,9 @@ def test_streamed_blocks_skip_completion_bitwise(synthetic_si_tables, monkeypatc
     calls = []
     complete = hard_radiative.complete_hard_radiative_events
 
-    def counted(*args):
+    def counted(*args, **kwargs):
         calls.append(1)
-        return complete(*args)
+        return complete(*args, **kwargs)
 
     monkeypatch.setattr(hard_radiative, "complete_hard_radiative_events", counted)
     skipped = run_case_streamed(case, 5, transport_core="per-electron")
@@ -437,12 +437,15 @@ def test_skipped_completion_leaves_transport_rows_bitwise(synthetic_si_tables):
     for key, value in bare.items():
         if isinstance(value, np.ndarray):
             np.testing.assert_array_equal(value, full[key], err_msg=key)
-    with pytest.raises(ValueError, match="secondary cascades need completed"):
+    # Pair conversion reads the directions; a shell-only cascade keys them by
+    # lineage and may skip them (#923).
+    with pytest.raises(ValueError, match="pair conversion needs completed"):
         simulate_trajectories(
             case["E0_keV"],
             2,
             case["thickness_ang"],
             secondary_threshold_eV=50.0,
+            pair_production_model="penelope-2024",
             _complete_hard_photons=False,
             **kwargs,
         )

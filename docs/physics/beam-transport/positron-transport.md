@@ -60,7 +60,7 @@ with the coefficients of Eq. 3.154, a fit to Kim et al.'s positron/electron radi
 
 ## Cascade and energy accounting
 
-A pair positron with $E_+>T_s$ is launched in the next generation with `launch_kind = 3`, from the interaction point and with its sampled direction; its stream key hashes (seed, parent track, photon ordinal) under a salt of its own. Each generation runs its electrons and its positrons as two transport calls and joins them, electrons first, into one generation. Hard collisions of a positron launch electron secondaries; its hard photons may convert again. Positron rows carry the usual fields; `secondary_tracks["launch_kind"]` identifies them.
+A pair positron with $E_+>T_s$ is launched in the next generation with `launch_kind = 3`, from the interaction point and with its sampled direction; its lineage key derives from the parent track's lineage key and the photon ordinal under a process namespace of its own (#923). Each generation runs its electrons and its positrons as two transport calls and joins them, electrons first, into one generation. Hard collisions of a positron launch electron secondaries; its hard photons may convert again. Positron rows carry the usual fields; `secondary_tracks["launch_kind"]` identifies them.
 
 A positron below $T_s$ deposits its kinetic energy locally (`positron_subthreshold`, part of `deposited`) and annihilates at rest where it was born. A transported one escapes, annihilates in flight, or reaches the tracking cutoff, deposits its residual energy and annihilates at rest (next section). `secondary_energy_balance` replaces `pair_rest_mass` by where that energy goes: the annihilation photons that escape (`annihilation_escaped`) or interact in the stack (`annihilation_absorbed`), whose energies add to $2m_ec^2$ plus any in-flight kinetic energy, or `positron_escaped_rest` ($2m_ec^2$) for a positron that leaves the stack. Hence
 
@@ -104,7 +104,7 @@ with azimuths $\phi$ uniform and $\phi+\pi$.
 
 **Photons.** PyRITE does not transport photons. Each annihilation photon gets the first-interaction step of [pair conversion](../radiation-physics/hard-bremsstrahlung-events.md#pair-conversion-of-hard-photons): from the annihilation point along its direction, its first interaction is sampled from the EPDL2025 narrow-beam $\mu_{\rm total}$ of the stack and footprint. It either escapes or is absorbed there; no Compton or photoelectric daughters are followed, and no annihilation photon converts to a pair.
 
-**Streams.** Each positron is identified by its pair event, so its streams hash (seed, parent track, photon ordinal), as its launch key does, under one salt for the budget $\tau$ and another for the photon emission and scoring.
+**Streams.** Each positron is identified by its pair event, so its streams derive from (parent lineage key, photon ordinal), as its launch key does, under one namespace for the budget $\tau$ and another for the photon emission and scoring.
 
 CPU emission retains its Philox generator. CUDA transport uses the batched
 `transport._jit_annihilation` emitter: two SplitMix64 counter draws per

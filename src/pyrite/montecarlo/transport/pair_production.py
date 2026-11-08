@@ -22,9 +22,10 @@ below 10 % of the pair cross section for every catalog element up to 5 MeV.
 Positrons are recorded and energy-accounted, and transported and annihilated
 only with ``positron_transport`` (#276, #295).
 
-RNG. Every photon owns a Philox stream keyed on (seed, parent track, photon
-ordinal on that track) under its own salt, so a photon's interaction does not
-depend on batch size, generation order, or the transport core.
+RNG. Every photon owns a Philox stream keyed on (parent lineage key, photon
+ordinal on that track) under its own process namespace (``lineage.py``,
+#923), so a photon's interaction does not depend on batch size, block,
+generation order, dense track ids, or the transport core.
 
 Validation: photon-pair-first-interaction, pair-production-sampling
 """
@@ -36,15 +37,7 @@ import numpy as np
 
 from ...materials.photon_cross_sections import photon_cross_sections_ang2
 from ..geometry import first_prism_exit
-from .kinematics import (
-    _SM64_GOLDEN,
-    _SM64_MIX1,
-    _SM64_MIX2,
-    _SM64_ONE,
-    _SM64_S27,
-    _SM64_S30,
-    _SM64_S31,
-)
+from .lineage import _mix  # noqa: F401  (photon_coupling/photon_histories import it here)
 
 __all__ = [
     "PAIR_PRODUCTION_MODELS",
@@ -64,7 +57,6 @@ PAIR_PRODUCTION_MODELS = ("penelope-2024",)
 _ELECTRON_REST_EV = 510998.95
 PAIR_THRESHOLD_EV = 2.0 * _ELECTRON_REST_EV
 _ALPHA = 1.0 / 137.035999084
-_PAIR_PHOTON_SALT = np.uint64(0x3C6EF372FE94F82B)
 _MAX_REJECTIONS = 100_000
 
 #: Reduced screening radius ``R m_e c / hbar`` for Z = 1..99, PENELOPE-2024
@@ -252,26 +244,16 @@ def sample_pair(
     )
 
 
-def _mix(x):
-    x = (x ^ (x >> _SM64_S30)) * _SM64_MIX1
-    x = (x ^ (x >> _SM64_S27)) * _SM64_MIX2
-    return x ^ (x >> _SM64_S31)
+def pair_photon_stream_key(parent_keys, photon_ordinal):
+    """Per-photon stream keys from (parent lineage key, photon ordinal) (#923).
 
-
-def pair_photon_stream_key(seed, parent_track, photon_ordinal):
-    """Per-photon stream keys from (seed, parent track, photon ordinal).
-
-    ``parent_track`` is the cascade's global track id, so keys of photons from
-    generation-1 and later parents depend on ``Ne`` and on earlier launches,
-    as secondary keys do; never on batch size or processing order.
+    ``parent_keys`` are the emitting tracks' lineage keys, so keys never
+    depend on ``Ne``, the block, earlier launches or processing order.
     Validation: photon-pair-first-interaction
     """
-    with np.errstate(over="ignore"):
-        x = np.uint64(seed) ^ _PAIR_PHOTON_SALT
-        parent = np.asarray(parent_track, dtype=np.uint64)
-        ordinal = np.asarray(photon_ordinal, dtype=np.uint64)
-        x = _mix(x + _SM64_GOLDEN * (parent + _SM64_ONE))
-        return _mix(x + _SM64_GOLDEN * (ordinal + _SM64_ONE))
+    from .lineage import PROCESS_PAIR_PHOTON, daughter_keys
+
+    return daughter_keys(parent_keys, PROCESS_PAIR_PHOTON, photon_ordinal)
 
 
 def _photon_rng(key) -> np.random.Generator:
@@ -420,9 +402,7 @@ def _empty_events():
     }
 
 
-def convert_hard_photons(
-    rows, *, seed, parent_track_offset, layers, width_ang=None, height_ang=None
-):
+def convert_hard_photons(rows, *, parent_keys, layers, width_ang=None, height_ang=None):
     """Pair events of one generation's coupled hard photons, host arrays.
 
     ``rows`` maps the generation's per-row fields (host NumPy): ``electron_id``
@@ -430,6 +410,7 @@ def convert_hard_photons(
     ``L_ang``, ``t_end_ang`` and the ``hard_radiative_*`` photon fields. A
     photon leaves the row endpoint ``r_mid + L v_hat / 2`` at clock
     ``t_end_ang``; its ordinal counts the parent's photon rows in flight order.
+    ``parent_keys[i]`` is the lineage key of local track ``i``.
     Returns the pair events (local ``row``/``parent``) and the per-outcome
     photon counts over photons above threshold.
     Validation: photon-pair-first-interaction, pair-production-sampling
@@ -458,7 +439,7 @@ def convert_hard_photons(
     if photon_rows.size == 0:
         return _empty_events(), counts
 
-    keys = pair_photon_stream_key(seed, parent_track_offset + parent, ordinal)
+    keys = pair_photon_stream_key(np.asarray(parent_keys, dtype=np.uint64)[parent], ordinal)
     rngs = [_photon_rng(key) for key in keys]
     uniforms = np.array([rng.random(2) for rng in rngs])
     r_mid = np.asarray(rows["r_mid"], dtype=float)[photon_rows]

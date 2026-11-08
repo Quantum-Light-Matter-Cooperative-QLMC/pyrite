@@ -1126,6 +1126,9 @@ def _add_optional_fields(t, o, rows, result):
             p.seed if p._secondary is None else p._secondary.photon_seed,
             t.radiative_args[-1][: len(c.layers)],
             complete=p._complete_hard_photons,
+            track_keys=(
+                t.transport_keys if p._secondary is not None and p._secondary.lineage else None
+            ),
         )
         from .radiative_moment_transport import add_moment_identity
 

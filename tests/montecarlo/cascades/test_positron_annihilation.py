@@ -192,17 +192,18 @@ def test_truncation_cuts_the_crossing_row_and_drops_the_rest():
 
 
 def test_stream_keys_separate_budget_and_emission():
-    a = ann.annihilation_stream_keys(7, [3, 3, 4], [0, 1, 0], in_flight=True)
-    b = ann.annihilation_stream_keys(7, [3, 3, 4], [0, 1, 0], in_flight=False)
+    parents = np.asarray([3, 3, 4], dtype=np.uint64)
+    a = ann.annihilation_stream_keys(parents, [0, 1, 0], in_flight=True)
+    b = ann.annihilation_stream_keys(parents, [0, 1, 0], in_flight=False)
     assert len(set(a.tolist()) | set(b.tolist())) == 6
     np.testing.assert_array_equal(
-        a, ann.annihilation_stream_keys(7, [3, 3, 4], [0, 1, 0], in_flight=True)
+        a, ann.annihilation_stream_keys(parents, [0, 1, 0], in_flight=True)
     )
 
 
 def test_scored_photons_escape_or_interact():
     layers = [(0.0, 1.0e8, [("Si", 0.05)])]
-    keys = ann.annihilation_stream_keys(1, np.arange(400), np.zeros(400), in_flight=False)
+    keys = ann.annihilation_stream_keys(np.arange(400), np.zeros(400), in_flight=False)
     kinds = np.tile([ann.ANNIHILATION_AT_REST, ann.ANNIHILATION_IN_FLIGHT], 200)
     origins = np.tile([0.0, 0.0, 5.0e7], (400, 1))
     v = np.tile([0.0, 0.0, 1.0], (400, 1))
@@ -249,7 +250,8 @@ def test_cascade_annihilates_every_stopped_positron_and_closes_energy(monkeypatc
         secondary_energy_balance,
     )
 
-    result = _thick(monkeypatch, sigma_scale=300.0)
+    # Seed chosen (lineage RNG, #923) so in-flight and at-rest fates both occur.
+    result = _thick(monkeypatch, sigma_scale=300.0, seed=17)
     pair = result["pair_production"]
     events, photons = pair["events"], pair["annihilation_photons"]
     fate = events["positron_fate"]

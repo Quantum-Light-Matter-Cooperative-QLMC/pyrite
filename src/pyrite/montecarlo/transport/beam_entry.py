@@ -258,17 +258,21 @@ def initial_energies_keV(E0_keV, Ne, seed, energy_spread_frac, *, start=0):
 def check_electron_block(start, cascade_or_geometry, beam_inputs):
     """Reject inputs an electron block (``start > 0``) cannot reproduce (#361).
 
-    Secondary cascades, grooves and GDF beams are not block-addressed, and
-    bunch offsets are centred on the realized population, so the block driver
-    samples them once after the join.
+    Grooves and GDF beams are not block-addressed, and bunch offsets are
+    centred on the realized population, so the block driver samples them once
+    after the join. Secondary cascades are block-addressed through lineage
+    keys (#923): their roots take global primary keys and every descendant
+    stream derives from its parent's lineage. An explicit-launch pass is never
+    a primary block; only a cascade's beam-sampled root generation is.
     """
     if int(start) < 0:
         raise ValueError("_electron_start must be non-negative")
-    threshold, pair_model, positrons, secondary, groove = cascade_or_geometry
-    blocked = (threshold, pair_model, secondary, groove, *beam_inputs)
-    if int(start) and (positrons or any(value is not None for value in blocked)):
+    _threshold, _pair_model, _positrons, secondary, groove = cascade_or_geometry
+    explicit = secondary is not None and (secondary.launch is not None or not secondary.lineage)
+    blocked = (groove, *beam_inputs)
+    if int(start) and (explicit or any(value is not None for value in blocked)):
         raise ValueError(
-            "electron blocks support neither secondary cascades, grooves, GDF beams, "
+            "electron blocks support neither explicit launches, grooves, GDF beams, "
             "nor in-block bunch sampling"
         )
 

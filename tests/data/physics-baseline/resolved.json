@@ -2453,6 +2453,7 @@
       "inelastic_model": "shell-soft-hard",
       "inelastic_cutoff_eV": 50.0,
       "secondary_threshold_eV": 1000.0,
+      "cascade_rng_model": "lineage-addressed-v1",
       "bremsstrahlung_model": "bremslib",
       "radiative_model": "bremslib-soft-hard",
       "radiative_moment_model": "radiative-moments-v1/positive-linear-log-energy-v1/rtol2e-4",
@@ -2479,7 +2480,7 @@
       "dtheta_obs_rad": 0.0351963661580141,
       "domega_sr": 0.0012390399999999998
     },
-    "case_content_key": "e3c71a8290a39333eb1378ea17cf4cbaaee53947b255a0a38290527203fa48ae",
-    "parameter_sha256": "c18cc640e4b398a56ebc031280cbde735ebabb341559c4cf44625756054944e7"
+    "case_content_key": "22a8c2928d76acd31968748eb083ae6e9be22c6bde29236395d9a9ce56c35e56",
+    "parameter_sha256": "72f3bd1bd50d7e67143132f601fad9a3159f27f3545b65f2787fe084feba3c54"
   }
 }

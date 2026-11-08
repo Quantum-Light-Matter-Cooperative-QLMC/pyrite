@@ -317,3 +317,24 @@ replay exactly through the host step. It also closes the energy balance per
 history, and its pair counts agree with the per-electron core. Mode-off
 outputs are bitwise equal to `main` at `0810f2ce`, apart from the additive
 `launch_kind` column.
+
+## Lineage-addressed streams (#923, 2026-11-07)
+
+Fresh-context re-validation at `b35bd8494`. Streams are lineage-addressed:
+$k_{\rm d}=\mathrm{mix}(\mathrm{mix}(k_{\rm p}\oplus s_L\oplus s_{\rm proc})+G(n+1))$,
+with $k_{\rm p}$ the parent lineage key (a root's global stream key or its
+explicit launch key), $n$ the parent-local event ordinal counted before
+filtering, and $G$ odd (`montecarlo/transport/lineage.py`). Domain separation
+from the derived hard, Urban and radiative streams holds because every
+$s_L\oplus s_{\rm proc}$ differs from every flat salt in the repository
+(minimum Hamming distance 23). Samplers and the number and role of uniforms
+are unchanged, so fixed-seed realizations change while distributions do not.
+Numeric checks: 50.08 M keys (200 k parents × 7 processes × 32 ordinals, two
+grandchild levels, 4 M primary keys under two seeds) are unique; an ordinal
+step flips 32.00 of 64 bits on average; `keyed_uniforms` gives KS $p=0.72,
+0.67$, joint 32×32 $\chi^2$ $p=0.064$, and sibling, parent–daughter and
+conversion–direction correlations within $1\sigma$ of zero. A runtime mutation
+making `daughter_keys` population-dependent fails the block-invariance anchor
+(`tests/montecarlo/cascades/test_cascade_lineage.py`), so it is not vacuous.
+
+The photon ordinal counts every positive-energy hard photon of the parent in (flight, substep) order before the $k>2m_ec^2$ filter; the hard-photon direction ordinal uses the same order under its own namespace. Conversion, pair electron, pair positron, annihilation budget and emission each have a namespace on the same (parent, ordinal). Channeling and cone-split launches keep their photon-seed identity (`lineage=False`) and are refused in electron blocks. Supersedes the dense-track stream description above. Status stays `anchored`.

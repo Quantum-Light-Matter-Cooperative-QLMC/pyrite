@@ -22,6 +22,7 @@ from pyrite.montecarlo import shell_configuration as config
 from pyrite.montecarlo.spectrum.brem_bremslib import prepare_bremslib_table
 from pyrite.montecarlo.transport import TransportLUTConfig, pair_production
 from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
+from pyrite.montecarlo.transport.kinematics import stream_keys
 from pyrite.montecarlo.transport.secondaries import secondary_energy_balance
 from pyrite.xsgen.sbethe.catalog import resolve_catalog_table
 from tests.helpers.bremslib import synthetic_bremslib_arrays
@@ -124,7 +125,9 @@ def test_cuda_generation_zero_pairs_replay_on_the_host():
         )
     }
     replay, _ = pair_production.convert_hard_photons(
-        rows, seed=11, parent_track_offset=0, layers=[(0.0, THICKNESS_ANG, SILICON)]
+        rows,
+        parent_keys=stream_keys(11, int(np.max(rows["electron_id"])) + 1),
+        layers=[(0.0, THICKNESS_ANG, SILICON)],
     )
     first = events["row"] < n0  # global rows; generation 0 comes first
     assert first.any()

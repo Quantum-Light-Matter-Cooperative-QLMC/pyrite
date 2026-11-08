@@ -139,7 +139,9 @@ def _thick_annihilating(monkeypatch):
 def test_cuda_annihilation_is_deterministic_and_closes_energy():
     from pyrite.montecarlo.transport.secondaries import FATE_IN_FLIGHT
 
-    a, b = _positrons(**CUDA), _positrons(**CUDA)
+    # The default population annihilates no positron in flight under the
+    # lineage-addressed streams (#923); the fates test's population does.
+    a, b = _positrons(Ne=32, seed=5, **CUDA), _positrons(Ne=32, seed=5, **CUDA)
     fate = a["pair_production"]["events"]["positron_fate"]
     assert np.any(fate == FATE_IN_FLIGHT)
     np.testing.assert_array_equal(fate, b["pair_production"]["events"]["positron_fate"])

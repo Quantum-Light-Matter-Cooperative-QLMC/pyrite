@@ -175,6 +175,8 @@ def _launch_cascade(stage, rows, seed, *, positron=False):
         r_ang=launch.r_ang,
         t_ang=launch.t_ang,
         parent_track=np.asarray(rows["key"], dtype=np.uint64),
+        # The photon-history key is this positron's lineage root (#923).
+        parent_key=np.asarray(rows["key"], dtype=np.uint64),
         photon_ordinal=np.zeros(n, dtype=np.int64),
     )
     _init_positron_fates(events, -1.0)  # every row in this batch is transported
@@ -189,7 +191,7 @@ def _launch_cascade(stage, rows, seed, *, positron=False):
         call.update(_positron_overrides(kw, layers))
         call["_secondary"] = replace(call["_secondary"], projectile="positron")
         result = simulate_trajectories(**call)
-        return _annihilate_positrons(result, events, seed, electron_density_per_ang3(layers))
+        return _annihilate_positrons(result, events, electron_density_per_ang3(layers))
 
     return transport_secondary_cascade(simulate, kw, launch=launch), events
 
