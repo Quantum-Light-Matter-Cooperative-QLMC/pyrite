@@ -30,6 +30,7 @@ import hashlib
 import os
 import sys
 import time
+import types
 from collections.abc import Iterator, MutableMapping
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -343,6 +344,45 @@ def _module_source_digest(module_name: str) -> str:
     return f"{module_name}:{hashlib.sha256(Path(path).read_bytes()).hexdigest()}"
 
 
+def _dispatch_modules(dispatcher) -> set[str]:
+    """Modules whose source a dispatcher's generated code depends on.
+
+    Follows the dispatcher's own module, every dispatcher it names as a global
+    or as ``module.attr`` on a PyRITE module global, and, recursively, every
+    dispatcher captured in its closure cells (with that closure's own globals).
+    Disk-cached callees are not re-checked by Numba when a caller loads, so
+    each module reached here must invalidate the caller's entry.
+    """
+    from numba.core.dispatcher import Dispatcher
+
+    modules: set[str] = set()
+    seen: set[int] = set()
+
+    def visit(func) -> None:
+        if id(func) in seen:
+            return
+        seen.add(id(func))
+        modules.add(func.__module__)
+        names = func.__code__.co_names
+        for name in names:
+            value = func.__globals__.get(name)
+            if isinstance(value, Dispatcher):
+                modules.add(value.py_func.__module__)
+            elif isinstance(value, types.ModuleType) and value.__name__.startswith("pyrite."):
+                if any(isinstance(getattr(value, attr, None), Dispatcher) for attr in names):
+                    modules.add(value.__name__)
+        for cell in func.__closure__ or ():
+            try:
+                value = cell.cell_contents
+            except ValueError:  # empty cell
+                continue
+            if isinstance(value, Dispatcher):
+                visit(value.py_func)
+
+    visit(dispatcher.py_func)
+    return modules
+
+
 def stabilize_closure_cache(closure, captured, key: str) -> None:
     """Key a ``cache=True`` closure's disk cache on ``key`` instead of its cells.
 
@@ -350,24 +390,18 @@ def stabilize_closure_cache(closure, captured, key: str) -> None:
     dispatcher pickles by value with lazily drawn random UUIDs (its own and
     those of every dispatcher its globals reach), so the closure would get a new
     key, and recompile, in every process. This replaces the cells' pickle in the
-    index key with ``key`` plus SHA-256 digests of the source of ``captured``'s
-    module and of every module defining a dispatcher ``captured`` calls, so an
-    edit to any of them still invalidates the entry. The closure's own bytecode,
-    signature, target and CPU stay in the key as usual.
+    index key with ``key`` plus SHA-256 digests of the source of every module
+    :func:`_dispatch_modules` reaches from ``captured``, so an edit to any of
+    them still invalidates the entry. The closure's own bytecode, signature,
+    target and CPU stay in the key as usual.
 
     ``key`` must name everything else that specializes ``captured`` (for a
     factory, its arguments): equal keys must mean equal generated code. Call
     before the closure first compiles.
     """
     from numba.core.caching import FunctionCache
-    from numba.core.dispatcher import Dispatcher
 
-    func = captured.py_func
-    modules = {func.__module__}
-    for name in func.__code__.co_names:
-        value = func.__globals__.get(name)
-        if isinstance(value, Dispatcher):
-            modules.add(value.py_func.__module__)
+    modules = _dispatch_modules(captured)
     digest = hashlib.sha256(
         "\n".join([key, *(_module_source_digest(m) for m in sorted(modules))]).encode()
     ).hexdigest()

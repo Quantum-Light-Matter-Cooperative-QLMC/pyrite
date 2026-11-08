@@ -213,6 +213,30 @@ def test_transport_core_cache_key_is_stable_across_processes():
     assert first != key("radiative")
 
 
+def test_transport_core_digest_reaches_module_attribute_callees():
+    """Regression (#991): ``_cutoff.*``/``_moments.*`` edits invalidate the core.
+
+    Numba does not re-check a disk-cached callee when its caller loads, so the
+    stable key must digest modules ``body`` reaches through ``module.attr``
+    calls (``_cutoff.lut_cutoff_bound``), not only through direct globals.
+    """
+    from numba.core.dispatcher import Dispatcher
+
+    from pyrite.montecarlo.transport.cores import make_cpu_transport_core
+
+    core = make_cpu_transport_core(radiative=True)
+    (body,) = [
+        cell.cell_contents
+        for cell in core.py_func.__closure__
+        if isinstance(cell.cell_contents, Dispatcher)
+    ]
+    modules = _jit_cache._dispatch_modules(body)
+    prefix = "pyrite.montecarlo.transport."
+    for leaf in ("cores", "stopping", "lut", "_jit_cutoff_bound", "_jit_moment_lookup"):
+        assert prefix + leaf in modules
+    assert all(m.startswith("pyrite.") for m in modules)
+
+
 _IMPORT_PROBE = textwrap.dedent(
     """
     import json, os, sys
