@@ -1,0 +1,638 @@
+{
+ "allocation": {
+  "OMP_NUM_THREADS": 8,
+  "OPENBLAS_NUM_THREADS": 8,
+  "cpus": 8,
+  "gpus": 1,
+  "mem": "24G"
+ },
+ "benchmark": {
+  "command": "python checks/axial_energy_mcwf_cuda.py",
+  "log_sha256": "7e3942ec887b92434ebbec1689f8d075a73783b95b02e8bb8bd2c88b87caa149",
+  "output": {
+   "cpu": "x86_64",
+   "cuda_runtime": 13020,
+   "cupy": "14.2.0",
+   "device": "NVIDIA GeForce RTX 5080",
+   "peak_host_rss_kib": 1714724,
+   "repeats": 2,
+   "timestamp_utc": "2026-11-08T00:58:46.616298+00:00",
+   "warmup": 1,
+   "workloads": [
+    {
+     "depth_ang": 1000.0,
+     "energy_eV": 1000000.0,
+     "energy_nodes": 1,
+     "energy_spread_frac": 0.0,
+     "max_cached_solvers": 1,
+     "precision": "complex128",
+     "rows": [
+      {
+       "backend": "cpu",
+       "chunk_size": 64,
+       "cold_s": 0.5877225400181487,
+       "electron_steps_per_s": 11801.97836294776,
+       "electrons": 64,
+       "results": {
+        "bin_counts": [
+         64
+        ],
+        "jumps": {
+         "absorbed": 0,
+         "electronic": 40,
+         "sink": 3,
+         "tds": 33
+        },
+        "surviving_by_bin_final": [
+         0.953125
+        ],
+        "surviving_final": 0.953125
+       },
+       "warm_median_s": 0.5422819635132328,
+       "warm_s": [
+        0.5478502960177138,
+        0.5367136310087517
+       ]
+      },
+      {
+       "backend": "cuda",
+       "chunk_size": 16,
+       "cold_s": 1.647024414036423,
+       "electron_steps_per_s": 25859.41531955225,
+       "electrons": 256,
+       "pool_reserved_bytes": 80125440,
+       "results": {
+        "bin_counts": [
+         256
+        ],
+        "jumps": {
+         "absorbed": 0,
+         "electronic": 152,
+         "sink": 8,
+         "tds": 118
+        },
+        "surviving_by_bin_final": [
+         0.96875
+        ],
+        "surviving_final": 0.96875
+       },
+       "throughput_speedup_vs_cpu": 2.191108517936088,
+       "warm_median_s": 0.9899682449758984,
+       "warm_s": [
+        0.9786641369573772,
+        1.0012723529944196
+       ]
+      },
+      {
+       "backend": "cuda",
+       "chunk_size": 64,
+       "cold_s": 0.7651800781022757,
+       "electron_steps_per_s": 34447.785117089195,
+       "electrons": 256,
+       "pool_reserved_bytes": 77545984,
+       "results": {
+        "bin_counts": [
+         256
+        ],
+        "jumps": {
+         "absorbed": 0,
+         "electronic": 152,
+         "sink": 8,
+         "tds": 118
+        },
+        "surviving_by_bin_final": [
+         0.96875
+        ],
+        "surviving_final": 0.96875
+       },
+       "throughput_speedup_vs_cpu": 2.9188144612464133,
+       "warm_median_s": 0.7431537299999036,
+       "warm_s": [
+        0.7444800969678909,
+        0.7418273630319163
+       ]
+      },
+      {
+       "backend": "cuda",
+       "chunk_size": 256,
+       "cold_s": 10.412367710960098,
+       "electron_steps_per_s": 35617.80013497792,
+       "electrons": 256,
+       "pool_reserved_bytes": 78974976,
+       "results": {
+        "bin_counts": [
+         256
+        ],
+        "jumps": {
+         "absorbed": 0,
+         "electronic": 152,
+         "sink": 8,
+         "tds": 118
+        },
+        "surviving_by_bin_final": [
+         0.96875
+        ],
+        "surviving_final": 0.96875
+       },
+       "throughput_speedup_vs_cpu": 3.017951655190268,
+       "warm_median_s": 0.7187417499953881,
+       "warm_s": [
+        0.7339370819972828,
+        0.7035464179934934
+       ]
+      },
+      {
+       "backend": "cuda",
+       "chunk_size": 256,
+       "cold_s": 0.6923594289692119,
+       "electron_steps_per_s": 35801.19075567185,
+       "electrons": 256,
+       "pool_reserved_bytes": 38566400,
+       "results": {
+        "bin_counts": [
+         256
+        ],
+        "jumps": {
+         "absorbed": 0,
+         "electronic": 152,
+         "sink": 8,
+         "tds": 118
+        },
+        "surviving_by_bin_final": [
+         0.96875
+        ],
+        "surviving_final": 0.96875
+       },
+       "throughput_speedup_vs_cpu": 3.033490627983989,
+       "warm_median_s": 0.7150600150343962,
+       "warm_s": [
+        0.7287388161057606,
+        0.7013812139630318
+       ]
+      }
+     ],
+     "seed": 17,
+     "shape": [
+      32,
+      32
+     ],
+     "step_ang": 10.0
+    },
+    {
+     "depth_ang": 1000.0,
+     "energy_eV": 1000000.0,
+     "energy_nodes": 3,
+     "energy_spread_frac": 0.01,
+     "max_cached_solvers": 3,
+     "precision": "complex128",
+     "rows": [
+      {
+       "backend": "cpu",
+       "chunk_size": 64,
+       "cold_s": 0.5672697629779577,
+       "electron_steps_per_s": 11161.500616773992,
+       "electrons": 64,
+       "results": {
+        "bin_counts": [
+         0,
+         64,
+         0
+        ],
+        "jumps": {
+         "absorbed": 0,
+         "electronic": 40,
+         "sink": 3,
+         "tds": 33
+        },
+        "surviving_by_bin_final": [
+         0.0,
+         0.953125,
+         0.0
+        ],
+        "surviving_final": 0.953125
+       },
+       "warm_median_s": 0.5733996009803377,
+       "warm_s": [
+        0.580235657049343,
+        0.5665635449113324
+       ]
+      },
+      {
+       "backend": "cuda",
+       "chunk_size": 16,
+       "cold_s": 1.1506225590128452,
+       "electron_steps_per_s": 22223.548121123353,
+       "electrons": 256,
+       "pool_reserved_bytes": 48892416,
+       "results": {
+        "bin_counts": [
+         0,
+         255,
+         1
+        ],
+        "jumps": {
+         "absorbed": 0,
+         "electronic": 153,
+         "sink": 7,
+         "tds": 119
+        },
+        "surviving_by_bin_final": [
+         0.0,
+         0.9725490196078431,
+         1.0
+        ],
+        "surviving_final": 0.97265625
+       },
+       "throughput_speedup_vs_cpu": 1.9910896289092912,
+       "warm_median_s": 1.1519312695018016,
+       "warm_s": [
+        1.1630295380018651,
+        1.140833001001738
+       ]
+      },
+      {
+       "backend": "cuda",
+       "chunk_size": 64,
+       "cold_s": 0.9222037780564278,
+       "electron_steps_per_s": 25064.024633561054,
+       "electrons": 256,
+       "pool_reserved_bytes": 44510720,
+       "results": {
+        "bin_counts": [
+         0,
+         255,
+         1
+        ],
+        "jumps": {
+         "absorbed": 0,
+         "electronic": 153,
+         "sink": 7,
+         "tds": 119
+        },
+        "surviving_by_bin_final": [
+         0.0,
+         0.9725490196078431,
+         1.0
+        ],
+        "surviving_final": 0.97265625
+       },
+       "throughput_speedup_vs_cpu": 2.2455783943508223,
+       "warm_median_s": 1.021384249906987,
+       "warm_s": [
+        0.9646673589013517,
+        1.0781011409126222
+       ]
+      },
+      {
+       "backend": "cuda",
+       "chunk_size": 256,
+       "cold_s": 0.9059057499980554,
+       "electron_steps_per_s": 29392.21231747919,
+       "electrons": 256,
+       "pool_reserved_bytes": 58068480,
+       "results": {
+        "bin_counts": [
+         0,
+         255,
+         1
+        ],
+        "jumps": {
+         "absorbed": 0,
+         "electronic": 153,
+         "sink": 7,
+         "tds": 119
+        },
+        "surviving_by_bin_final": [
+         0.0,
+         0.9725490196078431,
+         1.0
+        ],
+        "surviving_final": 0.97265625
+       },
+       "throughput_speedup_vs_cpu": 2.6333566898081147,
+       "warm_median_s": 0.8709790104767308,
+       "warm_s": [
+        0.8736508389702067,
+        0.8683071819832548
+       ]
+      },
+      {
+       "backend": "cuda",
+       "chunk_size": 256,
+       "cold_s": 0.8753007861087099,
+       "electron_steps_per_s": 29937.104326267883,
+       "electrons": 256,
+       "pool_reserved_bytes": 46782976,
+       "results": {
+        "bin_counts": [
+         0,
+         255,
+         1
+        ],
+        "jumps": {
+         "absorbed": 0,
+         "electronic": 153,
+         "sink": 7,
+         "tds": 119
+        },
+        "surviving_by_bin_final": [
+         0.0,
+         0.9725490196078431,
+         1.0
+        ],
+        "surviving_final": 0.97265625
+       },
+       "throughput_speedup_vs_cpu": 2.6821755742482414,
+       "warm_median_s": 0.8551261244574562,
+       "warm_s": [
+        0.8669055049540475,
+        0.8433467439608648
+       ]
+      }
+     ],
+     "seed": 17,
+     "shape": [
+      32,
+      32
+     ],
+     "step_ang": 10.0
+    },
+    {
+     "depth_ang": 1000.0,
+     "energy_eV": 1000000.0,
+     "energy_nodes": 7,
+     "energy_spread_frac": 0.01,
+     "max_cached_solvers": 7,
+     "precision": "complex128",
+     "rows": [
+      {
+       "backend": "cpu",
+       "chunk_size": 64,
+       "cold_s": 0.8793011660454795,
+       "electron_steps_per_s": 7332.478889700422,
+       "electrons": 64,
+       "results": {
+        "bin_counts": [
+         0,
+         0,
+         12,
+         43,
+         9,
+         0,
+         0
+        ],
+        "jumps": {
+         "absorbed": 0,
+         "electronic": 40,
+         "sink": 3,
+         "tds": 32
+        },
+        "surviving_by_bin_final": [
+         0.0,
+         0.0,
+         1.0,
+         0.9302325581395349,
+         1.0,
+         0.0,
+         0.0
+        ],
+        "surviving_final": 0.953125
+       },
+       "warm_median_s": 0.8728289704304188,
+       "warm_s": [
+        0.8712327049579471,
+        0.8744252359028906
+       ]
+      },
+      {
+       "backend": "cuda",
+       "chunk_size": 16,
+       "cold_s": 5.694372577010654,
+       "electron_steps_per_s": 18173.453622188208,
+       "electrons": 1024,
+       "pool_reserved_bytes": 85242368,
+       "results": {
+        "bin_counts": [
+         0,
+         4,
+         186,
+         670,
+         161,
+         3,
+         0
+        ],
+        "jumps": {
+         "absorbed": 0,
+         "electronic": 576,
+         "sink": 24,
+         "tds": 497
+        },
+        "surviving_by_bin_final": [
+         0.0,
+         1.0,
+         0.946236559139785,
+         0.9850746268656716,
+         0.9751552795031055,
+         1.0,
+         0.0
+        ],
+        "surviving_final": 0.9765625
+       },
+       "throughput_speedup_vs_cpu": 2.478487002221797,
+       "warm_median_s": 5.634592198533937,
+       "warm_s": [
+        5.632384694064967,
+        5.636799703002907
+       ]
+      },
+      {
+       "backend": "cuda",
+       "chunk_size": 64,
+       "cold_s": 3.697001256980002,
+       "electron_steps_per_s": 27711.78894853357,
+       "electrons": 1024,
+       "pool_reserved_bytes": 110496768,
+       "results": {
+        "bin_counts": [
+         0,
+         4,
+         186,
+         670,
+         161,
+         3,
+         0
+        ],
+        "jumps": {
+         "absorbed": 0,
+         "electronic": 576,
+         "sink": 24,
+         "tds": 497
+        },
+        "surviving_by_bin_final": [
+         0.0,
+         1.0,
+         0.946236559139785,
+         0.9850746268656716,
+         0.9751552795031055,
+         1.0,
+         0.0
+        ],
+        "surviving_final": 0.9765625
+       },
+       "throughput_speedup_vs_cpu": 3.779320658864627,
+       "warm_median_s": 3.6951782575342804,
+       "warm_s": [
+        3.6722931150579825,
+        3.7180634000105783
+       ]
+      },
+      {
+       "backend": "cuda",
+       "chunk_size": 256,
+       "cold_s": 3.1134244279237464,
+       "electron_steps_per_s": 33115.30030432912,
+       "electrons": 1024,
+       "pool_reserved_bytes": 139341824,
+       "results": {
+        "bin_counts": [
+         0,
+         4,
+         186,
+         670,
+         161,
+         3,
+         0
+        ],
+        "jumps": {
+         "absorbed": 0,
+         "electronic": 576,
+         "sink": 24,
+         "tds": 497
+        },
+        "surviving_by_bin_final": [
+         0.0,
+         1.0,
+         0.946236559139785,
+         0.9850746268656716,
+         0.9751552795031055,
+         1.0,
+         0.0
+        ],
+        "surviving_final": 0.9765625
+       },
+       "throughput_speedup_vs_cpu": 4.516248979706519,
+       "warm_median_s": 3.0922262234962545,
+       "warm_s": [
+        3.096741857007146,
+        3.087710589985363
+       ]
+      },
+      {
+       "backend": "cuda",
+       "chunk_size": 1024,
+       "cold_s": 11.832110009039752,
+       "electron_steps_per_s": 36149.67545322316,
+       "electrons": 1024,
+       "pool_reserved_bytes": 144113664,
+       "results": {
+        "bin_counts": [
+         0,
+         4,
+         186,
+         670,
+         161,
+         3,
+         0
+        ],
+        "jumps": {
+         "absorbed": 0,
+         "electronic": 576,
+         "sink": 24,
+         "tds": 497
+        },
+        "surviving_by_bin_final": [
+         0.0,
+         1.0,
+         0.946236559139785,
+         0.9850746268656716,
+         0.9751552795031055,
+         1.0,
+         0.0
+        ],
+        "surviving_final": 0.9765625
+       },
+       "throughput_speedup_vs_cpu": 4.930075626129774,
+       "warm_median_s": 2.8326672014663927,
+       "warm_s": [
+        2.808696547988802,
+        2.8566378549439833
+       ]
+      }
+     ],
+     "seed": 17,
+     "shape": [
+      32,
+      32
+     ],
+     "step_ang": 10.0
+    }
+   ]
+  }
+ },
+ "code_identity": "revision b68995200cf4583386a869c21dbea4a07b40e07a clean-tree rsync 2026-11-08T00:56:33Z",
+ "comparability": "Same crystal (Si <001>, 293.15 K), grid, depths, step, seed and incident-energy assignments on both backends, complex128. Energy and entrance draws are shared host NumPy Philox streams (bin counts identical for equal electron counts); trajectory streams are NumPy Philox (CPU) versus Philox4x32-10 (CUDA), so CPU/CUDA results are independent ensembles compared statistically. CPU reference capped at 64 electrons; throughput compared per electron-step. Warm = median of 2 repeats after 1 warmup.",
+ "environment": [
+  "3.14.6 (main, Jun 11 2026, 04:03:53) [Clang 22.1.3 ]",
+  "numpy 2.5.4",
+  "scipy 1.18.1",
+  "cupy 14.2.0 13020"
+ ],
+ "gpu": "NVIDIA GeForce RTX 5080, 16303 MiB, 610.47, 12.0",
+ "host": "qlmc DESKTOP-QNIHO3D, partition gpu",
+ "issue": 627,
+ "memory_scope": "CuPy default-pool reserved bytes after each row, excluding allocations made directly by CUDA libraries; host RSS is process peak. Not a whole-device peak-memory guarantee.",
+ "revision": "b68995200cf4583386a869c21dbea4a07b40e07a",
+ "schema": 1,
+ "slurm_job": 4112,
+ "source_sha256": {
+  "checks/axial_energy_mcwf_cuda.py": "54fa09b4593a20d8d9fcc185f0b8fb075faba1912c91712b5678915c63bfbbeb",
+  "src/pyrite/montecarlo/channeling/_axial_cuda.py": "c0af4f8912c41047bedf08225f7eeec67055f371572346024f4d630a8e4d0452",
+  "src/pyrite/montecarlo/channeling/_axial_cuda_dissipator.py": "ece0849cd18fa3d001699bf8eb7429684df0af1133a36db3b2829c063dfddb9d",
+  "src/pyrite/montecarlo/channeling/_axial_cuda_jumps.py": "73adb39d9bed83e35181e876a43aad8fad4fea722e2d90923dc96d87b9a485e9",
+  "src/pyrite/montecarlo/channeling/_axial_cuda_rng.py": "c6e85d7a1a014d02f30dd96b283aa5cad91820e84ee58ba09f95d7cdb8f27414",
+  "src/pyrite/montecarlo/channeling/_axial_energy_cuda.py": "de1c9d75045bbf3c85b25548bf7cd5a876529ce50569c446f673abf0ba85c658",
+  "src/pyrite/montecarlo/channeling/axial_energy_mcwf.py": "33c2d6bada3a2e3d1bfa1fdd25ced727f279cc0eac1b715408e2c2183204596e",
+  "src/pyrite/montecarlo/channeling/axial_mcwf.py": "d51cae422f7788bce4ac98388c7bec8ec3b1e2920088981213da09eac1162a88",
+  "tests/montecarlo/quantum/test_channeling_axial_cuda.py": "aad6dd4391512bc2d89029121e11421dfb4ffd73c241f69bf97e22901f8b80ea",
+  "tests/montecarlo/quantum/test_channeling_axial_energy_mcwf.py": "0b197348eebadc085c23b77be0f72849c9741cd843e0eea392ed5973cf1aced3",
+  "tests/montecarlo/quantum/test_channeling_axial_energy_mcwf_cuda.py": "ee2a82aa14563f9beddcba02476299447c955d0c979770ebd9e5b6816db73c37",
+  "tests/montecarlo/quantum/test_channeling_axial_energy_mcwf_physics.py": "3d9124df283f026867c69eea58c92585b619b56785cf3eec4141d1310c2d9999"
+ },
+ "tests": {
+  "call_seconds": {
+   "tests/montecarlo/quantum/test_channeling_axial_cuda.py::test_backend_and_callback_refusals": 0.2,
+   "tests/montecarlo/quantum/test_channeling_axial_cuda.py::test_cpu_jump_history_preserves_batch_and_recording_contract": 0.28,
+   "tests/montecarlo/quantum/test_channeling_axial_cuda.py::test_cuda_admission_reserves_recording_finalization_and_mixtures": 0.2,
+   "tests/montecarlo/quantum/test_channeling_axial_cuda.py::test_cuda_deterministic_propagation_and_device_callbacks": 0.23,
+   "tests/montecarlo/quantum/test_channeling_axial_cuda.py::test_cuda_jump_equations_match_cpu": 0.28,
+   "tests/montecarlo/quantum/test_channeling_axial_cuda.py::test_cuda_rejection_acceptance_handles_strided_real_weights": 0.04,
+   "tests/montecarlo/quantum/test_channeling_axial_cuda.py::test_cuda_replicated_jump_population_and_survival_statistics": 2.08,
+   "tests/montecarlo/quantum/test_channeling_axial_cuda.py::test_cuda_stream_batch_recording_and_stochastic_parity": 1.36,
+   "tests/montecarlo/quantum/test_channeling_axial_cuda.py::test_cuda_threshold_blocks_preserve_exact_seeded_trajectories": 0.39,
+   "tests/montecarlo/quantum/test_channeling_axial_energy_mcwf.py::test_chunk_invariance_conservation_and_correlated_entrance": 0.01,
+   "tests/montecarlo/quantum/test_channeling_axial_energy_mcwf.py::test_energy_shifted_radiation_histogram_is_incoherent": 0.01,
+   "tests/montecarlo/quantum/test_channeling_axial_energy_mcwf.py::test_energy_stream_mono_discrete_gaussian": 0.39,
+   "tests/montecarlo/quantum/test_channeling_axial_energy_mcwf_cuda.py::test_admission_reserves_other_resident_energies": 0.29,
+   "tests/montecarlo/quantum/test_channeling_axial_energy_mcwf_cuda.py::test_chunk_ends_follow_global_ids_and_checkpoints": 0.01,
+   "tests/montecarlo/quantum/test_channeling_axial_energy_mcwf_cuda.py::test_cuda_batches_chunks_and_restart_preserve_histories": 2.61,
+   "tests/montecarlo/quantum/test_channeling_axial_energy_mcwf_cuda.py::test_cuda_energy_conditioned_statistics_match_cpu": 10.84,
+   "tests/montecarlo/quantum/test_channeling_axial_energy_mcwf_cuda.py::test_cuda_mono_energy_uses_global_ids_of_direct_cuda_solver": 6.96,
+   "tests/montecarlo/quantum/test_channeling_axial_energy_mcwf_cuda.py::test_cuda_no_jump_reductions_match_cpu_reference": 1.1,
+   "tests/montecarlo/quantum/test_channeling_axial_energy_mcwf_physics.py::test_each_mono_reference_has_energy_dependent_dissipator_and_matching_stream": 0.71
+  },
+  "command": "PYRITE_TEST_WORKERS=1 pyrite-dev test --slow tests/montecarlo/quantum/test_channeling_axial_energy_mcwf_cuda.py tests/montecarlo/quantum/test_channeling_axial_energy_mcwf.py tests/montecarlo/quantum/test_channeling_axial_energy_mcwf_physics.py tests/montecarlo/quantum/test_channeling_axial_cuda.py -rs -v --durations=0",
+  "log_sha256": "126328d92f9723a08334acb57579d33953b2e2ff8b31d7be3ecf96ad06fa75ca",
+  "note": "No skips reported; durations list shows calls >= 0.005 s. The first CUDA test in a process pays kernel/graph compilation.",
+  "summary": "25 passed in 32.31s"
+ }
+}

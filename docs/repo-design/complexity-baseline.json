@@ -329,7 +329,7 @@
     {
       "path": "src/pyrite/montecarlo/channeling/axial_energy_mcwf.py",
       "name": "axial_energy_mcwf",
-      "cc": 82
+      "cc": 69
     },
     {
       "path": "src/pyrite/montecarlo/channeling/axial_source_assembly.py",

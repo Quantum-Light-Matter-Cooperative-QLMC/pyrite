@@ -102,7 +102,37 @@ def _observe(cp, observable, lagged, half, live, tilts, area, total):
     return total
 
 
-def _admit(solver, backend, batch_size, budget, depths, observable, component_count):
+def device_static_bytes(solver) -> int:
+    """Resident device bytes of one solver's uploaded dissipator and jump scratch.
+
+    Energy-dependent: TDS source count, phase spectra and grid tables differ by
+    kinetic energy, so callers caching several energies reserve each one.
+    """
+    cells = int(np.prod(solver.grid.shape))
+    d = solver.dissipator
+    static = sum(v.nbytes for v in vars(d).values() if isinstance(v, np.ndarray))
+    static += sum(v.nbytes for v in d.phase_spectra.values())
+    # Fixed device spectra/scratch: fine-grid TDS coefficients, rejection GEMMs,
+    # source spectra and potential.
+    static += cells * 16 * 48 + 131 * 131 * 8 * 4
+    static += len(d.tds_sources) * (
+        cells * 16 * 12 + 15 * 131**2 + 131 * sum(solver.grid.shape) * 32
+    )
+    return static
+
+
+def _admit(
+    solver,
+    backend,
+    batch_size,
+    budget,
+    depths,
+    observable,
+    component_count,
+    *,
+    reserved_bytes=0,
+):
+    """Admitted batch size; ``reserved_bytes`` holds other resident device solvers."""
     cp = backend.xp
     policy = resolve_resource_policy(backend)
     available = int(cp.cuda.runtime.memGetInfo()[0])
@@ -112,17 +142,11 @@ def _admit(solver, backend, batch_size, budget, depths, observable, component_co
             raise ValueError("memory_budget_bytes must be a positive integer")
         limit = min(limit, budget)
     cells = int(np.prod(solver.grid.shape))
-    d = solver.dissipator
-    static = sum(v.nbytes for v in vars(d).values() if isinstance(v, np.ndarray))
-    static += sum(v.nbytes for v in d.phase_spectra.values())
-    # Fixed device spectra/scratch: fine-grid TDS coefficients, rejection GEMMs,
-    # source spectra, potential and recorded density. FFT workspace receives a
+    # Recorded density and sampled entry components; FFT workspace receives a
     # factor of two over the live complex128 arrays. Admission fails before upload.
     # Sums, divided values and final stack coexist during finalization.
-    fixed = static + cells * (16 * (48 + component_count) + 24 * depths) + 131 * 131 * 8 * 4
-    fixed += len(d.tds_sources) * (
-        cells * 16 * 12 + 15 * 131**2 + 131 * sum(solver.grid.shape) * 32
-    )
+    fixed = device_static_bytes(solver) + int(reserved_bytes)
+    fixed += cells * (16 * component_count + 24 * depths)
     fixed += 3 * int(getattr(observable, "recording_bytes", 0))
     fixed += int(getattr(observable, "scratch_bytes", 0))
     if limit <= fixed:
@@ -168,15 +192,12 @@ def run_cuda(
         observable,
         len(components),
     )
-    from ._axial_cuda_dissipator import DeviceDissipator
-    from ._axial_cuda_jumps import DeviceJumps
+    from ._axial_cuda_jumps import electron_rng
 
-    device = DeviceJumps(solver, DeviceDissipator(solver.dissipator))
+    device = device_jumps(solver)
     weights = cp.asarray([float(w) for w, _ in components])
     sampled = cp.asarray(np.stack([s for _, s in components]))
-    phase = cp.exp(-1j * step_ang * cp.asarray(solver._complex_potential) / solver.hbar_v)
-    # The step's inverse FFT is unscaled; apply its 1/n here once, not per step.
-    phase /= phase.size
+    phase = potential_phase(cp, solver, step_ang)
     base_tilt = (solver.momentum * tilt_rad[0], solver.momentum * tilt_rad[1])
     sums = [None] * len(steps)
     alive = np.zeros(len(steps))
@@ -185,32 +206,21 @@ def run_cuda(
     history = {kind: np.zeros(steps.size, dtype=np.int64) for kind in jumps}
     absorbed = 0
     for start in range(0, n_electrons, size_limit):
+        ids = range(start, min(start + size_limit, n_electrons))
+        rngs = [electron_rng(seed, e) for e in ids]
         batch = _Batch(
             device,
-            sampled,
-            weights,
-            start,
-            min(size_limit, n_electrons - start),
-            seed,
+            initial_states(sampled, weights, rngs),
+            rngs,
+            ids,
             step_ang,
-            base_tilt,
+            [base_tilt] * len(rngs),
             jump_hook,
         )
         absorbed += batch.absorbed
-        for index, target in enumerate(steps):
-            batch.advance(target, step_ang, phase, jumps, sinks)
-            _record_jumps(history, index, batch.jumps)
-            sums[index] = _observe(
-                cp,
-                observable,
-                batch.lagged,
-                batch.half,
-                batch.live,
-                batch.device_tilts,
-                solver.grid.cell_area_ang2,
-                sums[index],
-            )
-            alive[index] += int(batch.live.sum())
+        record_batch(
+            cp, batch, steps, step_ang, phase, observable, sums, alive, history, jumps, sinks
+        )
         absorbed += batch.absorbed_after_entry
     if jump_hook is not None:
         jumps["absorbed"] = absorbed
@@ -233,6 +243,54 @@ def run_cuda(
         int(n_electrons),
         history,
     )
+
+
+def device_jumps(solver):
+    """Upload one solver's immutable dissipator and rates to the device."""
+    from ._axial_cuda_dissipator import DeviceDissipator
+    from ._axial_cuda_jumps import DeviceJumps
+
+    return DeviceJumps(solver, DeviceDissipator(solver.dissipator))
+
+
+def potential_phase(cp, solver, step_ang):
+    """Device potential factor of one split step, prescaled by the unscaled IFFT."""
+    phase = cp.exp(-1j * step_ang * cp.asarray(solver._complex_potential) / solver.hbar_v)
+    # The step's inverse FFT is unscaled; apply its 1/n here once, not per step.
+    phase /= phase.size
+    return phase
+
+
+def initial_states(sampled, weights, rngs):
+    """Entry component of each electron, drawn at its stream's first address."""
+    from ._axial_cuda_jumps import _choose
+
+    cp = __import__("cupy")
+    if sampled.shape[0] == 1:
+        # A one-component categorical draw is always index zero; reserve
+        # its scalar address exactly as the general sampler does.
+        for rng in rngs:
+            rng.counter = 1
+        return cp.broadcast_to(sampled[0], (len(rngs), *sampled.shape[1:])).copy()
+    return cp.stack([sampled[_choose(rng, weights)] for rng in rngs])
+
+
+def record_batch(cp, batch, steps, step_ang, phase, observable, sums, alive, history, jumps, sinks):
+    """Advance one admitted batch through every depth, adding raw sums in place."""
+    for index, target in enumerate(steps):
+        batch.advance(target, step_ang, phase, jumps, sinks)
+        _record_jumps(history, index, batch.jumps)
+        sums[index] = _observe(
+            cp,
+            observable,
+            batch.lagged,
+            batch.half,
+            batch.live,
+            batch.device_tilts,
+            batch.area,
+            sums[index],
+        )
+        alive[index] += int(batch.live.sum())
 
 
 class _StepGraphs:
@@ -287,36 +345,36 @@ class _StepGraphs:
 
 
 class _Batch:
-    def __init__(self, device, sampled, weights, start, size, seed, step, tilt, hook):
-        from ._axial_cuda_jumps import _choose, electron_rng
+    """Admitted electrons advanced together; ``ids`` are their global IDs.
 
+    ``rngs[b]`` is electron ``ids[b]``'s own stream and ``tilts[b]`` its carrier
+    tilt [1/angstrom]; batch membership never changes a stream's addresses.
+    """
+
+    def __init__(self, device, phi, rngs, ids, step, tilts, hook):
         self.device = device
         self.cp = cp = __import__("cupy")
-        self.start, self.step, self.hook = start, 0, hook
+        self.ids, self.step, self.hook = list(ids), 0, hook
         self.jumps = {"tds": 0, "sink": 0, "electronic": 0}
-        self.rngs = [electron_rng(seed, e) for e in range(start, start + size)]
-        if sampled.shape[0] == 1:
-            phi = cp.broadcast_to(sampled[0], (size, *sampled.shape[1:])).copy()
-            # A one-component categorical draw is always index zero; reserve
-            # its scalar address exactly as the general sampler does.
-            for rng in self.rngs:
-                rng.counter = 1
-        else:
-            phi = cp.stack([sampled[_choose(rng, weights)] for rng in self.rngs])
+        self.rngs = rngs
+        size = len(rngs)
         self.area = device.grid.cell_area_ang2
         phi /= cp.sqrt(cp.sum(cp.abs(phi) ** 2, axis=(1, 2)) * self.area)[:, None, None]
-        self.tilts = [tilt] * size
-        self.device_tilts = cp.broadcast_to(cp.asarray(tilt), (size, 2)).copy()
+        self.tilts = list(tilts)
+        self.device_tilts = cp.asarray(np.asarray(self.tilts, dtype=float).reshape(size, 2))
         self.live = cp.ones(size, dtype=bool)
         if hook is not None:
             for b in range(size):
-                kept = _hook(cp, hook, start + b, phi[b], tilt, self.area)
+                kept = _hook(cp, hook, self.ids[b], phi[b], self.tilts[b], self.area)
                 self.live[b] = kept is not None
                 phi[b] = 0 if kept is None else kept
         self.live_count = int(self.live.sum())
         self.absorbed = size - self.live_count
         self.absorbed_after_entry = 0
-        self.half = cp.broadcast_to(device._half_kinetic(tilt, step), phi.shape).copy()
+        if len(set(self.tilts)) == 1:
+            self.half = cp.broadcast_to(device._half_kinetic(self.tilts[0], step), phi.shape).copy()
+        else:
+            self.half = cp.stack([device._half_kinetic(t, step) for t in self.tilts])
         self.full = self.half**2
         self.thresholds = cp.stack([rng.random() for rng in self.rngs])
         self.lagged = cp.fft.fft2(phi, axes=(-2, -1)) * self.half.conj()
@@ -387,7 +445,7 @@ class _Batch:
             self.device_tilts[b] = cp.stack([cp.asarray(v) for v in self.tilts[b]])
             self.half[b] = self.device._half_kinetic(self.tilts[b], step_ang)
             self.full[b] = self.half[b] ** 2
-        kept = _hook(cp, self.hook, self.start + b, state, self.tilts[b], self.area)
+        kept = _hook(cp, self.hook, self.ids[b], state, self.tilts[b], self.area)
         self.absorbed_after_entry += int(kept is None) - int(kind == "sink")
         if kept is None:
             self.live[b] = False
