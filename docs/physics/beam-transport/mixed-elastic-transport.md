@@ -12,13 +12,19 @@ detailed transport remains the reference.
 
 ```python
 import pyrite as pr
+from pyrite.transport import simulate_trajectories
 
 physics = pr.Physics(transport_mode="mixed")  # C1 = C2 = 0.05
 physics = pr.Physics(transport_mode="mixed", mixed_c1=0.1, mixed_c2=0.05, mixed_max_step_um=5.0)
+tracks = simulate_trajectories(beam, target, physics=physics)
 ```
 
-Profiles and the CLI take the same settings as `--transport-mode`,
-`--mixed-c1`, `--mixed-c2` and `--mixed-maximum-step-um`.
+Mixed transport serves trajectory-level tallies: terminal fractions, exit
+energy and angle, and deposition. `pyrite.simulate`, sweeps and the CXR line
+scorer refuse mixed cases (#990), so spectrum runs stay on detailed transport.
+Profiles and the CLI accept the same settings as `--transport-mode`,
+`--mixed-c1`, `--mixed-c2` and `--mixed-maximum-step-um`, and the spectrum
+commands then refuse the case.
 
 ## Model
 
@@ -89,9 +95,11 @@ energy tallies by up to 10%. A hundredth removed the shift. An explicit
 - Coherent emission (PXR, CBS, coherent bremsstrahlung), transition radiation,
   temporal profiles, channeling, photon transport, grooved geometry and
   detector-cone splitting are refused. The emission models read the small-angle
-  structure of the flight; the others have no mixed specialization. Incoherent CXR lines and standard
-  bremsstrahlung are allowed, and their accuracy under the scheme is studied in
-  #990.
+  structure of the flight; the others have no mixed specialization.
+- Incoherent CXR lines are refused. Each row radiates a finite-time line of
+  width about $\hbar/T_{\rm row}$, so the step limit, not the physics, sets the
+  line width. Standard bremsstrahlung is not reachable, because spectrum runs
+  always score CXR (#990).
 - `transport_mode` and its parameters are part of a case's identity, recorded
   under the model marker `penelope-random-hinge.v2`. A default case carries no
   mixed keys.
