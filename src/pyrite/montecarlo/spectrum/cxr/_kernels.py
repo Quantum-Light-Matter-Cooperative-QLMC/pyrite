@@ -970,20 +970,27 @@ def _stage_row(a):
 # on x86: round-to-nearest-even with subnormals kept (CuPy's own ``astype``
 # flushes float32 subnormals to zero), and a NaN becomes a quiet NaN keeping the
 # sign and the top 22 payload bits, as cvtsd2ss does. CuPy compiles every
-# kernel with ``-ftz=true`` (``cupy/cuda/compiler.py``), which turns
-# ``__double2float_rn`` into the flushing ``cvt.rn.ftz.f32.f64``; the inline PTX
-# names the non-flushing ``cvt.rn.f32.f64`` explicitly. That instruction would
-# canonicalise a NaN payload, hence the separate NaN branch.
+# kernel with float32 flush-to-zero (``-ftz=true`` on NVRTC,
+# ``-fcuda-flush-denormals-to-zero`` on HIPRTC; ``cupy/cuda/compiler.py``), so
+# ``__double2float_rn`` flushes subnormal results on both vendors. Below
+# FLT_MIN = 2^-126 the result bits are therefore built exactly in float64:
+# a float32 subnormal is m * 2^-149 with bit pattern ``m``, and
+# ``m = rint(|x| * 2^149)`` (exact scaling, ties to even) is that pattern; m =
+# 2^23 is FLT_MIN itself. At or above FLT_MIN the result is normal or infinite,
+# which the intrinsic rounds exactly. No vendor inline assembly (#1032).
 _CAST_F32_SRC = """
 long long b = __double_as_longlong(x);
+unsigned int sign = (unsigned int)((unsigned long long)b >> 63) << 31;
 if (x != x) {
-    unsigned int sign = (unsigned int)((unsigned long long)b >> 63) << 31;
     unsigned int pay = (unsigned int)(((unsigned long long)b >> 29) & 0x3FFFFFu);
     y = __uint_as_float(sign | 0x7FC00000u | pay);
 } else {
-    float r;
-    asm("cvt.rn.f32.f64 %0, %1;" : "=f"(r) : "d"(x));
-    y = r;
+    double ax = fabs(x);
+    if (ax < 0x1p-126) {
+        y = __uint_as_float(sign | (unsigned int)rint(ldexp(ax, 149)));
+    } else {
+        y = __double2float_rn(x);
+    }
 }
 """
 _cast_kernel = None

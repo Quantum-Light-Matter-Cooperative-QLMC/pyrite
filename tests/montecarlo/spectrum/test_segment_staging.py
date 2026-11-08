@@ -318,6 +318,11 @@ def _adversarial_f64():
             1e300,
             -1e300,
             5e-324,
+            # Subnormal ties round to even; the last one rounds up to FLT_MIN.
+            1.5 * 2.0**-149,
+            -2.5 * 2.0**-149,
+            (2**23 - 0.5) * 2.0**-149,
+            (2**22 + 0.5) * 2.0**-149,
         ]
     )
     nans = np.array(
