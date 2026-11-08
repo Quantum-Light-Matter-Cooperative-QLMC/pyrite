@@ -6,13 +6,15 @@ Evolve a 2D Gaussian in Si[001] at 5 MeV, then inspect its density and overlap
 with the initial state. This coherent CPU diagnostic needs no transport tables
 or GPU.
 
-For a standalone public-API walkthrough, open [Axial channeling and wavefunction evolution](../notebooks/quantum/14-axial-channeling-evolution.ipynb).
+For a standalone public-API walkthrough, open [Axial channeling: crystal strings, vortices, and quantum jumps](../notebooks/quantum/14-axial-channeling-evolution.ipynb).
 
 :::{warning}
 **Experimental — not rigorously validated.** These are finite-grid model
 outputs, not experimental data or measured dechanneling. No convergence or
-predictive-accuracy claim is made. Production transport refuses
-`Physics(channeling_model="axial")`.
+predictive-accuracy claim is made. Standard runs with
+`Physics(channeling_model="axial")` admit only the two calibrated cases of the
+[first axial envelope](../research/physics/axial-first-envelope-886.md) and
+refuse every other case.
 :::
 
 (run-an-axial-diagnostic)=
