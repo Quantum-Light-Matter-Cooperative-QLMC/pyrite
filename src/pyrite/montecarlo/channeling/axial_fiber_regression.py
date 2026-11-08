@@ -384,3 +384,81 @@ def fiber_on_axis_source(
         sems,
         events,
     )
+
+
+def fiber_thickness_spectra(
+    channels: FiberChannels,
+    entry_orders: np.ndarray,
+    *,
+    kinetic_energy_eV: float,
+    hbar_v_eV_ang: float,
+    depths_ang,
+    thickness_indices,
+    photon_energy_eV,
+    incident_ids,
+    seed: int = 0,
+    carrier_inv_ang: tuple[float, float] = (0.0, 0.0),
+    boundary_eV: float | None = None,
+    absorption_inv_ang=None,
+    window=None,
+    search_step_ang: float = 100.0,
+    depth_tolerance_ang: float = 1e-6,
+    max_working_bytes: int = 256 * 1024**2,
+) -> tuple[np.ndarray, list[FiberEvent]]:
+    r"""Per-primary on-axis spectra for slabs ending at several recorded depths.
+
+    For each primary history of :func:`fiber_on_axis_source` and each index
+    $k$ in ``thickness_indices``, the estimate restricted to depths
+    $z_0..z_k$ is the estimator of a slab of thickness $z_k$ on that depth
+    grid: records up to $z_k$ never depend on later depths, and the
+    trapezoid weights and exit path $z_k-z$ (attenuation ``absorption_inv_ang``
+    per photon energy) are those of the truncated grid. Thicknesses are
+    therefore paired exactly within each primary. Returns an array
+    ``(primary, thickness, energy)`` in photons/(eV sr incident electron) and
+    the primaries' terminal events (as :func:`fiber_on_axis_source`).
+
+    Validation: cr-axial-fiber-regression
+    """
+    z, energies = _admit(
+        depths_ang, photon_energy_eV, kinetic_energy_eV, hbar_v_eV_ang, max_working_bytes
+    )
+    stops = [int(k) for k in thickness_indices]
+    if not stops or any(not 1 <= k < z.size for k in stops):
+        raise ValueError("thickness_indices must select recorded depths after the first")
+    amplitudes = [
+        None
+        if absorption_inv_ang is None
+        else _amplitude(absorption_inv_ang, z[k] - z[: k + 1], energies, z[: k + 1])
+        for k in stops
+    ]
+    gamma, _ = longitudinal_kinematics(kinetic_energy_eV)
+    primaries = _primaries(
+        channels,
+        entry_orders,
+        hbar_v_eV_ang,
+        gamma,
+        z,
+        incident_ids,
+        seed,
+        carrier_inv_ang,
+        boundary_eV,
+        window,
+        search_step_ang,
+        depth_tolerance_ang,
+    )
+    out, events = [], []
+    for event, estimate, _ in primaries:
+        events.append(event)
+        out.append(
+            [
+                signed_on_axis_spectrum(
+                    estimate[: k + 1, : k + 1],
+                    z[: k + 1],
+                    energies,
+                    kinetic_energy_eV,
+                    amplitude=amplitude,
+                )
+                for k, amplitude in zip(stops, amplitudes, strict=True)
+            ]
+        )
+    return np.asarray(out).reshape(len(out), len(stops), energies.size), events

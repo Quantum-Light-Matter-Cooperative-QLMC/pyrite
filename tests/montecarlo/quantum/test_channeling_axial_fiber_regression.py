@@ -10,6 +10,7 @@ from pyrite.materials.crystal import HBARC_EV_ANG, M_E_EV
 from pyrite.montecarlo.channeling.axial_fiber_regression import (
     fiber_lowering_currents,
     fiber_on_axis_source,
+    fiber_thickness_spectra,
     signed_on_axis_spectrum,
 )
 from pyrite.montecarlo.channeling.axial_fiber_unraveling import (
@@ -213,6 +214,38 @@ def test_signed_spectrum_reproduces_the_qrt_photon_law():
     signed = signed_on_axis_spectrum(values, DEPTHS, energies, KINETIC)
     np.testing.assert_allclose(signed, expected, rtol=1e-10, atol=1e-12 * expected.max())
     assert expected.max() > 0
+
+
+def test_thickness_prefixes_are_truncated_slabs_of_the_same_histories():
+    channels, entry, *_ = _dense(0.004, 0.006)
+    energies = np.linspace(0.05, 1.2, 18)
+    mu = np.linspace(1e-4, 5e-4, energies.size)
+    common = dict(
+        kinetic_energy_eV=KINETIC,
+        hbar_v_eV_ang=HBAR_V,
+        photon_energy_eV=energies,
+        incident_ids=range(40),
+        seed=11,
+        search_step_ang=500.0,
+        absorption_inv_ang=mu,
+    )
+    spectra, events = fiber_thickness_spectra(
+        channels, entry, depths_ang=DEPTHS, thickness_indices=[6, 12], **common
+    )
+    assert spectra.shape == (40, 2, energies.size)
+    assert [e.incident_id for e in events] == list(range(40))
+    for k, column in ((12, 1), (6, 0)):
+        depths = DEPTHS[: k + 1]
+        alone = fiber_on_axis_source(
+            channels, entry, depths_ang=depths, exit_path_ang=depths[-1] - depths, **common
+        )
+        np.testing.assert_allclose(
+            spectra[:, column].mean(axis=0), alone.spectrum, rtol=1e-10, atol=1e-14
+        )
+        if k == 12:
+            assert events == alone.events
+    with pytest.raises(ValueError, match="thickness_indices"):
+        fiber_thickness_spectra(channels, entry, depths_ang=DEPTHS, thickness_indices=[0], **common)
 
 
 @pytest.mark.parametrize(

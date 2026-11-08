@@ -20,8 +20,19 @@ entrance plane wave sits at order n with carrier k_perp - n g folded into
 (< 0.3 deg) the beam-direction offset is far inside 1/gamma. ``reference``
 (bool) replaces the cut by +inf, retaining the whole order window (P = R), as
 the return-flux reference of ``checks/axial_outgoing_convergence.py``.
-``harmonic_max`` and ``grid_points`` set the electronic-kick harmonic cutoff
+``cut_multiple`` (default 1) sets the cut target ``U_max + m (U_max - U_min)``
+when ``target_eV`` is None. ``harmonic_max`` and ``grid_points`` set the electronic-kick harmonic cutoff
 and the density grid of ``material_fiber_channels``.
+
+Depth calibration (#993): ``checkpoints_ang`` (list of slab thicknesses on the
+depth grid) switches the chunk to
+:func:`~pyrite.montecarlo.channeling.axial_fiber_regression.fiber_thickness_spectra`.
+Every recorded thickness in ``[c - drift_span_ang, c]`` of each checkpoint
+``c`` is scored from the same histories (exactly paired), and the chunk keeps
+per-thickness spectrum sums (``thickness_ang``, ``thickness_spectrum_sum``).
+The full-slab spectrum is the last thickness; the correlation trace is not
+recorded in this mode, and ``events`` keeps ``(id, kind, depth, weight)`` per
+primary (unit-weight fates when the entry weight is one, as with ``reference``).
 
 Closure (``paired ARM.json CONTROL.json [LO HI]``): arms run on the same seed
 and incident chunks are paired per chunk; the relative change of the yield
@@ -64,6 +75,9 @@ DEFAULTS = {
     "reference": False,
     "harmonic_max": 4,
     "grid_points": 32,
+    "cut_multiple": 1.0,
+    "checkpoints_ang": None,
+    "drift_span_ang": 15.0,
 }
 
 
@@ -79,7 +93,7 @@ def build(options: dict):
     extrema = axial_profile("silicon", tuple(o["axis"])).extrema()
     target = o["target_eV"]
     if target is None:  # provisional numerical cut rule of the escape note
-        target = extrema[1] + (extrema[1] - extrema[0])
+        target = extrema[1] + float(o["cut_multiple"]) * (extrema[1] - extrema[0])
     channels, entry, hbar_v, info = _MAPS["material_fiber_channels"](
         _extents(o["max_order"]),
         float(target),
@@ -144,6 +158,8 @@ def chunk(options: dict, start: int, count: int) -> dict:
             absorption_inv_ang=linear_attenuation_inv_mm("silicon", energies) * 1e-7,
             exit_path_ang=depths[-1] - depths,
         )
+    if o["checkpoints_ang"]:
+        return _thickness_chunk(o, channels, entry, hbar_v, info, depths, energies, start, count)
     clock = time.perf_counter()
     source = fiber_on_axis_source(
         channels,
@@ -183,6 +199,66 @@ def chunk(options: dict, start: int, count: int) -> dict:
     }
 
 
+def _thickness_indices(depths, checkpoints, span: float) -> list[int]:
+    """Grid indices of every recorded thickness in [c - span, c] for each checkpoint c."""
+    keep = set()
+    for c in checkpoints:
+        hit = np.flatnonzero(np.isclose(depths, float(c), rtol=0, atol=1e-6))
+        if hit.size != 1 or hit[0] == 0:
+            raise ValueError(f"checkpoint {c} A is not a recorded depth of the grid")
+        near = (depths >= float(c) - span - 1e-6) & (depths <= float(c) + 1e-6) & (depths > 0)
+        keep.update(int(i) for i in np.flatnonzero(near))
+    keep.add(depths.size - 1)
+    return sorted(keep)
+
+
+def _thickness_chunk(o, channels, entry, hbar_v, info, depths, energies, start, count) -> dict:
+    """Chunk of per-thickness spectrum sums from the same primary histories."""
+    from pyrite.materials.attenuation import linear_attenuation_inv_mm
+    from pyrite.montecarlo.channeling.axial_fiber_regression import fiber_thickness_spectra
+
+    indices = _thickness_indices(depths, o["checkpoints_ang"], float(o["drift_span_ang"]))
+    extra = {}
+    if o["max_working_bytes"] is not None:
+        extra["max_working_bytes"] = int(o["max_working_bytes"])
+    if o["absorption"]:
+        extra["absorption_inv_ang"] = linear_attenuation_inv_mm("silicon", energies) * 1e-7
+    clock = time.perf_counter()
+    spectra, events = fiber_thickness_spectra(
+        channels,
+        entry,
+        kinetic_energy_eV=float(o["energy_eV"]),
+        hbar_v_eV_ang=hbar_v,
+        depths_ang=depths,
+        thickness_indices=indices,
+        photon_energy_eV=energies,
+        incident_ids=range(start, start + count),
+        seed=int(o["seed"]),
+        boundary_eV=o["boundary_eV"],
+        carrier_inv_ang=tuple(o["carrier_inv_ang"]),
+        search_step_ang=200.0,
+        **extra,
+    )
+    full = spectra[:, -1]
+    return {
+        "status": "research-only; fibred absorbing model, on-axis, retained subspace only",
+        "settings": {k: v for k, v in o.items()},
+        "info": {k: v for k, v in info.items() if k != "events"},
+        "start": start,
+        "count": int(spectra.shape[0]),
+        "seconds": time.perf_counter() - clock,
+        "photon_energy_eV": energies.tolist(),
+        "depths_ang": [float(depths[0]), float(depths[-1]), int(depths.size)],
+        "spectrum_sum": full.sum(axis=0).tolist(),
+        "spectrum_sum_sq": (full**2).sum(axis=0).tolist(),
+        "thickness_ang": [float(depths[i]) for i in indices],
+        "thickness_spectrum_sum": spectra.sum(axis=0).tolist(),
+        "events": [
+            [int(e.incident_id), e.kind, float(e.depth_ang), float(e.weight)] for e in events
+        ],
+    }
+
+
 def merge(parts: list[dict]) -> dict:
     """Combine chunks exactly; mean, SEM and peak summary per eV of photon energy."""
     first = parts[0]
@@ -201,7 +277,7 @@ def merge(parts: list[dict]) -> dict:
     energies = np.asarray(first["photon_energy_eV"])
     kinds: dict[str, float] = {}
     for p in parts:
-        for kind, weight in p["terminal_weight_sum"].items():
+        for kind, weight in p.get("terminal_weight_sum", {}).items():
             kinds[kind] = kinds.get(kind, 0.0) + weight
     return {
         "status": first["status"],
@@ -214,13 +290,24 @@ def merge(parts: list[dict]) -> dict:
         "sem_per_eV_sr": sem.tolist(),
         "integrated_per_sr": float(np.trapezoid(mean, energies)),
         "integrated_sem_per_sr": _batch_sem(parts, energies),
-        "retained_weight": (np.sum([p["trace_sum"] for p in parts], axis=0) / n).tolist()[-1],
+        "retained_weight": (
+            (np.sum([p["trace_sum"] for p in parts], axis=0) / n).tolist()[-1]
+            if all("trace_sum" in p for p in parts)
+            else None
+        ),
         "terminal_fraction": {k: v / n for k, v in kinds.items()},
-        "mean_kick_jumps": sum(p["kick_jumps_sum"] for p in parts) / n,
-        "mean_tds_jumps": sum(p["tds_jumps_sum"] for p in parts) / n,
+        "mean_kick_jumps": sum(p.get("kick_jumps_sum", 0) for p in parts) / n,
+        "mean_tds_jumps": sum(p.get("tds_jumps_sum", 0) for p in parts) / n,
         "peaks": peaks(energies, mean, sem),
         "chunks": [
-            {"start": p["start"], "count": p["count"], "spectrum_sum": p["spectrum_sum"]}
+            {
+                "start": p["start"],
+                "count": p["count"],
+                "spectrum_sum": p["spectrum_sum"],
+                **{
+                    k: p[k] for k in ("thickness_ang", "thickness_spectrum_sum", "events") if k in p
+                },
+            }
             for p in sorted(parts, key=lambda p: p["start"])
         ],
     }
