@@ -148,11 +148,6 @@ def make_cpu_transport_core(
     """
     validate_core_axes(grooved, per_electron, lut, inelastic, radiative, cone_split, mixed)
 
-    # Collision stopping is dispatched inline (LUT / SBETHE / packed / compound)
-    # at four sites that must stay in sync: the mixed-step bound, row start,
-    # cutoff midpoint, and predictor midpoint. A shared helper was measured in
-    # #991: Numba increfs every array argument at each call, which made exact
-    # rows 1.5-3x slower, so each site passes its leaf only the arrays it reads.
     @njit(cache=True)
     def body(
         run,
