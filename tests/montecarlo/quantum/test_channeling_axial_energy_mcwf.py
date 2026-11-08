@@ -218,11 +218,37 @@ def test_fixed_energy_reference_and_oam_population(lib):
     assert out.energies_eV.tolist() == [100.0] * 9
 
 
-def test_bounds_and_unsupported_cuda(lib):
-    base, mod, config, _ = lib
+def test_bounds_and_cuda_envelope_refusals(lib):
+    base, mod, config, state = lib
     dist = base.IncidentEnergyEnsemble(100.0)
-    with pytest.raises(NotImplementedError, match="CUDA"):
-        mod.axial_energy_mcwf(dist, config, options=mod.AxialEnergyMCWFOptions(backend="cuda"))
+    cuda = mod.AxialEnergyMCWFOptions(n_electrons=2, backend="cuda")
+    with pytest.raises(ValueError, match="backend"):
+        mod.axial_energy_mcwf(dist, config, options=mod.AxialEnergyMCWFOptions(backend="sycl"))
+    with pytest.raises(ValueError, match="memory_budget_bytes"):
+        mod.axial_energy_mcwf(
+            dist, config, options=mod.AxialEnergyMCWFOptions(memory_budget_bytes=2**20)
+        )
+    with pytest.raises(ValueError, match="memory_budget_bytes"):
+        mod.axial_energy_mcwf(
+            dist,
+            config,
+            options=mod.AxialEnergyMCWFOptions(backend="cuda", memory_budget_bytes=0),
+        )
+    with pytest.raises(NotImplementedError, match="solver"):
+        mod.axial_energy_mcwf(dist, config, options=cuda, solver_factory=lambda e, g, p: None)
+    with pytest.raises(ValueError, match="cuda_compatible"):
+        mod.axial_energy_mcwf(
+            dist,
+            config,
+            options=cuda,
+            observable_factory=lambda e: lambda phi, tilt: np.array([1.0]),
+        )
+    config.oam_string = 0
+    with pytest.raises(NotImplementedError, match="OAM"):
+        mod.axial_energy_mcwf(dist, config, options=cuda)
+    config.oam_string = None
+    # Every refusal precedes solver construction.
+    assert state.solvers == []
     with pytest.raises(ValueError, match="work_limit"):
         mod.axial_energy_mcwf(
             dist, config, options=mod.AxialEnergyMCWFOptions(n_electrons=10, work_limit=10)

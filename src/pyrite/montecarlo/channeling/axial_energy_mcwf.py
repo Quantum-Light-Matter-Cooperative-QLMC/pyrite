@@ -3,8 +3,9 @@
 An electron gets a fixed entrance kinetic energy; the energy-specific
 Hamiltonian, dissipator, carrier tilt and (optional) line catalog are rebuilt
 at that energy. No energy loss at jumps, amplitude averaging or energy-time
-phase model is implied. This is a bounded, sequential CPU reference backend;
-it deliberately does not claim CUDA parity before a CUDA MCWF backend exists.
+phase model is implied. The CPU backend is a bounded, sequential reference;
+``backend="cuda"`` batches each admission chunk's electrons by energy on the
+axial CUDA solver (:mod:`._axial_energy_cuda`) with statistical CPU parity.
 
 Counter-addressed Philox streams ensure the same electron has the same
 energy, entrance random stream and MCWF history regardless of chunk admission.
@@ -17,7 +18,7 @@ from __future__ import annotations
 
 from collections import OrderedDict
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from hashlib import sha256
 from math import prod
 from typing import Any, Literal, NamedTuple
@@ -86,7 +87,9 @@ class AxialEnergyMCWFOptions:
     ``work_limit`` bounds ``n_electrons * pixels * split_steps``; the
     ``storage_limit_bytes`` bounds returned arrays and per-electron energies,
     not temporary solver allocations (which depend on the dissipator tables).
-    ``max_cached_solvers`` limits resident energy-dependent dissipators.
+    ``max_cached_solvers`` limits resident energy-dependent dissipators (on
+    CUDA also their device copies, which are reserved before admitting a
+    batch). ``memory_budget_bytes`` optionally caps CUDA device admission.
     """
 
     n_electrons: int = 64
@@ -100,14 +103,19 @@ class AxialEnergyMCWFOptions:
     work_limit: int = 100_000_000
     storage_limit_bytes: int = 128 * 1024 * 1024
     backend: Literal["cpu", "cuda"] = "cpu"
+    memory_budget_bytes: int | None = None
+
+
+def _check_backend(options: AxialEnergyMCWFOptions) -> None:
+    if options.backend not in ("cpu", "cuda"):
+        raise ValueError("backend must be 'cpu' or 'cuda'")
+    budget = options.memory_budget_bytes
+    if budget is not None and (options.backend != "cuda" or _bad_positive_int(budget)):
+        raise ValueError("memory_budget_bytes must be a positive integer and requires CUDA")
 
 
 def _check_options(options: AxialEnergyMCWFOptions, config: Any) -> None:
-    if options.backend != "cpu":
-        raise NotImplementedError(
-            "energy-resolved CUDA MCWF requires a production CUDA axial solver; "
-            "CPU-only reference implementation does not claim CPU/CUDA parity"
-        )
+    _check_backend(options)
     for name, lo, hi in (
         ("n_electrons", 1, 100_000),
         ("seed", 0, 2**63 - 1),
@@ -142,6 +150,28 @@ def _check_options(options: AxialEnergyMCWFOptions, config: Any) -> None:
     work = options.n_electrons * prod(config.shape) * int(np.max(np.rint(ratio)))
     if work > options.work_limit:
         raise ValueError(f"work estimate {work} exceeds work_limit {options.work_limit}")
+
+
+def _bad_positive_int(value: Any) -> bool:
+    return isinstance(value, bool) or not isinstance(value, int) or value < 1
+
+
+def require_cuda_callback(callback: Any, name: str) -> None:
+    """Refuse a host-only callback before any device trajectory work."""
+    if callback is not None and not getattr(callback, "cuda_compatible", False):
+        raise ValueError(f"CUDA energy-resolved MCWF {name} must declare cuda_compatible=True")
+
+
+def _check_cuda_envelope(config: Any, *, solver_factory: Any, first_custom: Any) -> None:
+    """Refuse cases outside the documented CUDA envelope before any solver work."""
+    if config.oam_string is not None:
+        raise NotImplementedError("CUDA energy-resolved MCWF has no device OAM projection")
+    if solver_factory is not None:
+        raise NotImplementedError("CUDA energy-resolved MCWF uses the built-in AxialMCWF solver")
+    require_cuda_callback(first_custom, "observable_factory output")
+    from ..._backend import select_cupy_backend
+
+    select_cupy_backend()
 
 
 def _energy_bins(
@@ -396,6 +426,8 @@ def _restart_signature(
         np.asarray(pairs, dtype=int).reshape(-1, 2),
         np.asarray([] if photon_edges is None else photon_edges),
         np.asarray([options.sampling, config.mode, config.crystal, *config.mechanisms]),
+        # CPU checkpoints keep their historical digest; CUDA streams differ.
+        *([np.asarray(["cuda"])] if options.backend == "cuda" else []),
     ):
         array = np.asarray(values)
         signature.update(str(array.shape).encode())
@@ -595,6 +627,12 @@ def axial_energy_mcwf(
         energies.setflags(write=False)
         discrete = True
     distinct_energies = np.unique(energies).size
+    if options.backend == "cuda":
+        _check_cuda_envelope(
+            config,
+            solver_factory=solver_factory,
+            first_custom=None if observable_factory is None else observable_factory(energies[0]),
+        )
     if distinct_energies > options.max_distinct_energies:
         raise ValueError("distinct electron energies exceed max_distinct_energies")
     ids, bounds, centers = _energy_bins(
@@ -718,30 +756,119 @@ def axial_energy_mcwf(
         radiation=photon_edges is not None,
     )
 
-    for start in range(next_id, options.n_electrons, options.chunk_size):
+    layout = _ObservableLayout(
+        npix, 0 if projection is None else len(projection.ells), len(pairs), 0
+    )
+
+    def entry_for(eid: int, energy: float) -> tuple[Any, Sequence[float]]:
+        rng = _rng(options.seed, eid, _ENTRY_TAG)
+        if entry_factory is None:
+            current_entry, tilt_rad = sampled_entry, config.tilt_rad
+        else:
+            current_entry, tilt_rad = entry_factory(energy, eid, rng)
+        if len(tilt_rad) != 2 or not np.all(np.isfinite(tilt_rad)):
+            raise ValueError("entry tilt must be two finite radians")
+        return current_entry, tilt_rad
+
+    def custom_for(energy: float, level_size: int) -> Callable | None:
+        custom = None if observable_factory is None else observable_factory(energy)
+        if custom is not None:
+            # Bound the full single-electron history before requesting it.
+            probe = np.ones(grid.shape, complex) / np.sqrt(grid.area_ang2)
+            custom_size = np.asarray(custom(probe, (0.0, 0.0))).size
+            single_history_bytes = nd * (npix + len(pairs) + custom_size + level_size + 17) * 16
+            if single_history_bytes > options.storage_limit_bytes:
+                raise ValueError("custom observable history exceeds storage_limit_bytes")
+        return custom
+
+    def accumulate(bin_id, data, surviving, jumps, custom, levels, sampled_depths):
+        """Add one electron's (CPU) or one energy group's (CUDA) raw sums.
+
+        ``levels`` is ``(level observer or None, level history size)``.
+        """
+        nonlocal additional_bins, nbytes
+        level_observer, level_size = levels
+        if data.ndim != 2 or data.shape[0] != nd or not np.all(np.isfinite(data)):
+            raise ValueError("solver returned nonfinite or malformed observables")
+        parts = replace(layout, level_size=level_size).split(data, has_custom=custom is not None)
+        density_bins[bin_id] += parts.density.real.reshape(nd, *config.shape)
+        if oam_bins is not None:
+            oam_bins[bin_id] += parts.oam.real
+        if pairs:
+            assert coh_bins is not None
+            coh_bins[bin_id] += parts.coherence
+        if custom is not None:
+            extra = parts.custom
+            if additional_bins is None:
+                extra_bytes = (nb + 1) * extra.size * 16
+                if (nbytes + extra_bytes) * capacity_factor > options.storage_limit_bytes:
+                    raise ValueError("custom observable would exceed storage_limit_bytes")
+                additional_bins = np.zeros((nb, *extra.shape), complex)
+                nbytes += extra_bytes
+            if extra.shape != additional_bins.shape[1:]:
+                raise ValueError("observable_factory outputs must have a fixed common shape")
+            additional_bins[bin_id] += extra
+        if photon_edges is not None and level_observer is not None:
+            assert photons_bins is not None
+            photons_bins[bin_id] += _radiation_bins(
+                parts.level,
+                level_observer.levels,
+                level_observer.levels.catalog,
+                sampled_depths,
+                photon_edges,
+                detector_sigma_eV,
+            )
+        survival_bins[bin_id] += surviving
+        for kind, count in jumps.items():
+            jumps_bins[bin_id][kind] = jumps_bins[bin_id].get(kind, 0) + int(count)
+
+    def checkpoint_due(processed: int) -> bool:
+        return bool(
+            options.checkpoint_every
+            and processed % options.checkpoint_every == 0
+            and processed < options.n_electrons
+        )
+
+    if options.backend == "cuda":
+        from ._axial_energy_cuda import cuda_energy_groups
+
+        for processed, groups in cuda_energy_groups(
+            energies=energies,
+            start_id=next_id,
+            options=options,
+            solvers=solvers,
+            entry_for=entry_for,
+            custom_for=custom_for,
+            pairs=pairs,
+            dx=dx,
+            dy=dy,
+            npix=npix,
+            depths_ang=config.depths_ang,
+            step_ang=config.step_ang,
+            trajectory_seed=options.seed ^ _TRAJECTORY_TAG,
+        ):
+            for group in groups:
+                bin_id = int(ids[group.electron_ids[0]])
+                accumulate(
+                    bin_id,
+                    group.data,
+                    group.surviving,
+                    group.jumps,
+                    group.custom,
+                    (group.level_observer, group.level_size),
+                    group.depths_ang,
+                )
+            if checkpoint_due(processed):
+                emit_checkpoint(processed)
+    cpu_starts = (
+        () if options.backend == "cuda" else range(next_id, options.n_electrons, options.chunk_size)
+    )
+    for start in cpu_starts:
         for eid in range(start, min(options.n_electrons, start + options.chunk_size)):
             energy = float(energies[eid])
-            bin_id = int(ids[eid])
             solver, level_observer, level_size = solvers.get(energy)
-            rng = _rng(options.seed, eid, _ENTRY_TAG)
-            if entry_factory is None:
-                current_entry, tilt_rad = sampled_entry, config.tilt_rad
-            else:
-                current_entry, tilt_rad = entry_factory(energy, eid, rng)
-            if len(tilt_rad) != 2 or not np.all(np.isfinite(tilt_rad)):
-                raise ValueError("entry tilt must be two finite radians")
-            custom = None if observable_factory is None else observable_factory(energy)
-            if custom is not None:
-                # Bound the full single-electron history before requesting it.
-                probe = np.ones(grid.shape, complex) / np.sqrt(grid.area_ang2)
-                custom_size = np.asarray(custom(probe, (0.0, 0.0))).size
-                single_history_bytes = nd * (npix + len(pairs) + custom_size + level_size + 17) * 16
-                if single_history_bytes > options.storage_limit_bytes:
-                    raise ValueError("custom observable history exceeds storage_limit_bytes")
-
-            layout = _ObservableLayout(
-                npix, 0 if projection is None else len(projection.ells), len(pairs), level_size
-            )
+            current_entry, tilt_rad = entry_for(eid, energy)
+            custom = custom_for(energy, level_size)
 
             def observe(phi, tilt, *, custom=custom, level_observer=level_observer):
                 coherence = None
@@ -769,45 +896,16 @@ def axial_energy_mcwf(
                 tilt_rad=tuple(tilt_rad),
                 observable=observe,
             )
-            data = np.asarray(electron.observables)
-            if data.ndim != 2 or data.shape[0] != nd or not np.all(np.isfinite(data)):
-                raise ValueError("solver returned nonfinite or malformed observables")
-            parts = layout.split(data, has_custom=custom is not None)
-            density_bins[bin_id] += parts.density.real.reshape(nd, *config.shape)
-            if oam_bins is not None:
-                oam_bins[bin_id] += parts.oam.real
-            if pairs:
-                assert coh_bins is not None
-                coh_bins[bin_id] += parts.coherence
-            if custom is not None:
-                extra = parts.custom
-                if additional_bins is None:
-                    extra_bytes = (nb + 1) * extra.size * 16
-                    if (nbytes + extra_bytes) * capacity_factor > options.storage_limit_bytes:
-                        raise ValueError("custom observable would exceed storage_limit_bytes")
-                    additional_bins = np.zeros((nb, *extra.shape), complex)
-                    nbytes += extra_bytes
-                if extra.shape != additional_bins.shape[1:]:
-                    raise ValueError("observable_factory outputs must have a fixed common shape")
-                additional_bins[bin_id] += extra
-            if photon_edges is not None and level_observer is not None:
-                assert photons_bins is not None
-                photons_bins[bin_id] += _radiation_bins(
-                    parts.level,
-                    level_observer.levels,
-                    level_observer.levels.catalog,
-                    np.asarray(electron.depths_ang),
-                    photon_edges,
-                    detector_sigma_eV,
-                )
-            survival_bins[bin_id] += electron.surviving
-            for kind, count in electron.jumps.items():
-                jumps_bins[bin_id][kind] = jumps_bins[bin_id].get(kind, 0) + int(count)
-            if (
-                options.checkpoint_every
-                and (eid + 1) % options.checkpoint_every == 0
-                and eid + 1 < options.n_electrons
-            ):
+            accumulate(
+                int(ids[eid]),
+                np.asarray(electron.observables),
+                electron.surviving,
+                electron.jumps,
+                custom,
+                (level_observer, level_size),
+                np.asarray(electron.depths_ang),
+            )
+            if checkpoint_due(eid + 1):
                 emit_checkpoint(eid + 1)
 
     # Convert per-bin sums to per-assigned-incident-electron means. Empty bins
@@ -829,9 +927,19 @@ def axial_energy_mcwf(
         for name in {key for item in jumps_bins for key in item}
     }
     provenance = dict(
-        backend="cpu",
-        rng="counter-addressed Philox with separate tags",
-        reduction_order="global electron ID ascending",
+        backend=options.backend,
+        rng=(
+            "counter-addressed Philox with separate tags"
+            if options.backend == "cpu"
+            else "host NumPy Philox energy/entry streams; CUDA Philox4x32-10 trajectory "
+            "streams keyed by global electron ID"
+        ),
+        reduction_order=(
+            "global electron ID ascending"
+            if options.backend == "cpu"
+            else "global-ID admission chunks; energy groups in first-ID order; device batch sums"
+        ),
+        memory_budget_bytes=options.memory_budget_bytes,
         n_electrons=options.n_electrons,
         seed=options.seed,
         sampling=options.sampling,
