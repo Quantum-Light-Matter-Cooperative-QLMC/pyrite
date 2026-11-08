@@ -1,6 +1,6 @@
 # Energy-resolved axial MCWF trajectories (issue #627)
 
-**Experimental, CPU reference API** building on [incident-energy ensembles (#626)](channeling-energy-ensemble.md). The energy of each electron is sampled **once at entrance** and remains fixed through every jump. Dynamic energy loss, energy-time correlations and a validated CUDA per-electron backend are *not* implemented. This is distinct from running one averaged axial solve independently at each quadrature node.
+**Experimental API** (sequential CPU reference plus a batched CUDA backend) building on [incident-energy ensembles (#626)](channeling-energy-ensemble.md). The energy of each electron is sampled **once at entrance** and remains fixed through every jump. Dynamic energy loss and energy-time correlations are *not* implemented. This is distinct from running one averaged axial solve independently at each quadrature node.
 
 ## Contract
 
@@ -69,8 +69,43 @@ r2 = axial_energy_mcwf(
 
 Limits are explicit: at most 100,000 electrons; at most 256 energy bins and 128 pixel coherence pairs; at most 4,096 photon-energy bins; at most 2,048 distinct solver energies by default (`max_distinct_energies`); maximum 8 concurrently cached energy solvers; `work_limit` bounds `electrons * pixels * split steps`; `storage_limit_bytes` preflights returned reductions and per-electron level-observable histories. **Solver-internal dissipator cache and FFT scratch allocations are not hard-capped by this number** and may consume additional RAM. If continuous sampling needs more distinct energies, increase that cap and plan for repeated solver construction. It is much more expensive than reusing a small quadrature grid.
 
-## Validation status and CUDA
+## Validation status
 
 The isolated deterministic tests cover zero spread, explicit weights, Gaussian inverse-CDF statistics, exact chunk-size independence, restart equivalence, correlated entrance tilts, energy-conditioned probability accounting, energy-shifted photon binning, helicity and resource validation. A separate integration test with actual PyRITE TDS solver is supplied and is skipped if the `xraydb` dependency is unavailable.
 
-**CUDA is intentionally rejected** (`backend="cuda"` raises `NotImplementedError`): current `main` contains only the CPU axial MCWF solver. The active `issue-620-quantum-cuda` branch includes an experimental CUDA runner with batch admission and CUDA-compatible callback requirements, but this wrapper's CPU `numpy` observer is *not* CUDA-compatible. Proper GPU support must implement global per-electron energy/RNG addressing, matching GPU observable reductions and an energy-aware memory admission policy, followed by CPU/CUDA parity and batching benchmarks. No parity or GPU speedup is asserted by this patch.
+## CUDA backend and envelope
+
+`AxialEnergyMCWFOptions(backend="cuda")` runs the trajectories on the complex128 axial CUDA MCWF solver (NVIDIA GPU with the `nvidia` extra). Electrons are admitted in global-ID chunks of `chunk_size`, split at every `checkpoint_every` boundary. Inside a chunk they are grouped by their fixed entrance energy, and each group runs as device batches on its energy-specific Hamiltonian and dissipator.
+
+**RNG addressing.** Entrance energy and entrance phase space use the same host NumPy Philox streams as the CPU reference, so `energies_eV`, bin assignments, `bin_counts` and `entry_factory` calls (in electron-ID order) are identical across backends. Each trajectory uses the axial CUDA Philox4x32-10 stream keyed by `mcwf_stream_key(seed ^ 0x6272, electron_id)`, with the global electron ID as the key. Batch membership, energy grouping, admission and deaths do not move any electron's draws. CPU trajectories use NumPy Philox, so CPU and CUDA ensembles are **independent samples**. Their agreement is statistical, not paired.
+
+**Reductions.** Density, fixed-pixel coherence (with each electron's own carrier phase), custom observables and the level history are summed on the device per energy group, in the CPU packed layout. Radiation is integrated from the group's summed level history. This equals the CPU per-electron sum because the depth trapezoid, line polarization and dipole yield (proportional to line strength) are linear. Group sums are added to their energy bin in chunk order and in first-electron-ID order within a chunk. Float rounding therefore differs from the CPU per-electron order and can differ between admission layouts (observed within `rtol=1e-10`). Jump counts, survival and bin counts did not change with batching or chunk size in any test or benchmark row.
+
+**Memory admission.** Each batch is admitted by the axial CUDA rule (device budget: half of free memory, the resource policy cap, and the optional `memory_budget_bytes`). The admission first reserves the device dissipators of the other cached energies (`max_cached_solvers`, least-recently-used eviction). If those reserved bytes crowd out the current energy, they are released and admission is retried. Admission fails before upload if one electron cannot fit.
+
+**Supported envelope.** Covered: binned, continuous or explicit energies; `entry_factory`; `coherence_pairs`; `observable_factory` outputs declaring `cuda_compatible = True`; radiation histograms through the built-in level observer; checkpoint/restart within the CUDA backend.
+
+**Refused before solver construction:** `oam_string` (the OAM projection is host-only), `solver_factory`, `observable_factory` outputs without `cuda_compatible`, a missing CUDA device, and `memory_budget_bytes` on CPU.
+
+CUDA checkpoints carry a backend tag in their signature, so they cannot resume a CPU run or the reverse. CPU checkpoint digests are unchanged.
+
+AMD/ROCm GPUs (the lab `gpu-amd` partition) and complex64 are **outside** the envelope: neither has been run for this API, and production axial MCWF stays complex128. Dynamic energy loss is still not modelled.
+
+### Evidence
+
+Revision `b68995200`, SLURM job 4112, NVIDIA RTX 5080, CuPy 14.2.0, CUDA runtime 13020. Raw record: `docs/validation/check-records/axial-energy-mcwf-cuda.json`. All 25 selected tests passed, including the slow tests, with no skips:
+
+- **Global-ID addressing.** A monoenergetic run reproduces a direct `AxialMCWF(backend="cuda")` run with `seed ^ 0x6272`. Jump counts and survival match exactly; density matches within `rtol=1e-10`.
+- **Admission invariance.** For two energies with energy-correlated random tilts, chunk sizes 40 and 3 and a restart from a CUDA checkpoint give identical jumps, survival and bin counts. Density and coherence match within `rtol=1e-10`.
+- **Deterministic reductions.** With no dissipation, two 10 MeV energies and per-electron tilts, CUDA matches the CPU reference within `rtol=1e-9` for density, coherence, a custom observable, energy-conditioned photon density and helicities.
+- **Statistical parity.** For energy-conditioned survival, quadrant populations and per-electron jump counts, CPU and CUDA means agree within four combined standard errors plus a two-electron floor, over 8 seeds × 64 electrons with two energies.
+
+Batching benchmark (`checks/axial_energy_mcwf_cuda.py`): Si ⟨001⟩ at 1 MeV, 32² grid, 100 steps of 10 Å. The CPU reference is capped at 64 electrons. Throughput is in electron-steps per second, from the warm median.
+
+| Beam | CUDA electrons | CPU | CUDA, `chunk_size` 16 | 64 | 256 | 1024 |
+|---|---|---|---|---|---|---|
+| monoenergetic | 256 | 11 800 | 25 900 | 34 400 | 35 800 | — |
+| 3 nodes | 256 | 11 200 | 22 200 | 25 100 | 29 900 | — |
+| 7 nodes | 1024 | 7 330 | 18 200 | 27 700 | 33 100 | 36 200 |
+
+Over that scan, CUDA runs 2.0–4.9 times faster than the CPU reference. The gain grows with `chunk_size`, because larger energy groups give larger device batches. With several energies it also needs `max_cached_solvers` at least the number of distinct energies; otherwise each chunk rebuilds dissipators. The first call at a new batch shape pays CUDA graph and FFT-plan setup: cold runs of 10–12 s appeared at chunk sizes 256 and 1024. CuPy pool reserve was 39–144 MB. These figures cover this device and workload only. They do not establish acceleration for small grids or few electrons, where the CPU can be faster.
