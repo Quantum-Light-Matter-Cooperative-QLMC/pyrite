@@ -13,7 +13,11 @@ Usage::
 Kwargs: axis, energy_eV, thickness_ang, step_ang, max_order, outgoing_order_max,
 target_eV, electronic, boundary ("max", "none" or a float in eV), photon grid
 (e_min_eV, e_max_eV, n_energy), absorption (bool), seed, max_working_bytes
-(None keeps the library budget).
+(None keeps the library budget), tilt_deg and tilt_azimuth_deg (incidence angle
+to the axis and its azimuth from the profile's first reciprocal axis; the
+entrance plane wave sits at order n with carrier k_perp - n g folded into
+[-g/2, g/2)). Photons are scored along the crystal axis; at these tilts
+(< 0.3 deg) the beam-direction offset is far inside 1/gamma.
 
 Validation: cr-axial-fiber-regression
 """
@@ -46,6 +50,8 @@ DEFAULTS = {
     "absorption": True,
     "seed": 0,
     "max_working_bytes": None,
+    "tilt_deg": 0.0,
+    "tilt_azimuth_deg": 0.0,
 }
 
 
@@ -71,13 +77,37 @@ def build(options: dict):
         axis=tuple(o["axis"]),
         energy_eV=float(o["energy_eV"]),
     )
+    carrier, entry = _tilted_entry(o, info, channels, entry)
     boundary = o["boundary"]
     if boundary == "max":
         boundary = info["potential_extrema_eV"][1]
     elif boundary == "none":
         boundary = None
-    o.update(target_eV=float(target), boundary_eV=boundary)
+    o.update(target_eV=float(target), boundary_eV=boundary, carrier_inv_ang=list(carrier))
     return channels, entry, hbar_v, info, o
+
+
+def _tilted_entry(o: dict, info: dict, channels, entry):
+    """Carrier and entrance order vector of a plane wave tilted by ``tilt_deg``."""
+    theta = np.deg2rad(float(o["tilt_deg"]))
+    if theta == 0.0:
+        return (0.0, 0.0), entry
+    from pyrite.materials.channeling.axial import axial_profile, axial_states
+    from pyrite.montecarlo.channeling import longitudinal_kinematics
+
+    phi = np.deg2rad(float(o["tilt_azimuth_deg"]))
+    k_perp = info["k_inv_ang"] * np.sin(theta) * np.array([np.cos(phi), np.sin(phi)])
+    g = np.asarray(channels.reciprocal_inv_ang, dtype=float)
+    order = np.floor(k_perp / g + 0.5).astype(int)
+    carrier = k_perp - order * g
+    profile = axial_profile("silicon", tuple(o["axis"]))
+    gamma, _ = longitudinal_kinematics(float(o["energy_eV"]))
+    window = _extents(o["max_order"])
+    orders = axial_states(profile, gamma, (0.0, 0.0), window).orders
+    tilted = np.all(orders == order, axis=1).astype(complex)
+    if tilted.sum() != 1:
+        raise ValueError("tilted entrance order lies outside the order window")
+    return (float(carrier[0]), float(carrier[1])), tilted
 
 
 def chunk(options: dict, start: int, count: int) -> dict:
@@ -109,6 +139,7 @@ def chunk(options: dict, start: int, count: int) -> dict:
         incident_ids=range(start, start + count),
         seed=int(o["seed"]),
         boundary_eV=o["boundary_eV"],
+        carrier_inv_ang=tuple(o["carrier_inv_ang"]),
         search_step_ang=200.0,
         **extra,
     )

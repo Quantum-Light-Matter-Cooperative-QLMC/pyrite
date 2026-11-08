@@ -1,0 +1,80 @@
+{
+  "source": {
+    "citation": "J. U. Andersen, E. Bonderup, E. Laegsgaard, B. B. Marsh and A. H. Sorensen, Nucl. Instrum. Methods 194, 209-224 (1982)",
+    "doi": "10.1016/0029-554X(82)90517-1",
+    "zotero_item": "I99KB2XX",
+    "zotero_attachment": "3DAD8MLD",
+    "verified": "2026-11-08",
+    "method": "Table 2 transcribed; Figs. 8 and 11 digitized from a 400 dpi render of PDF pages 12-13 (axis ticks located by pixel search, markers by density/cross detection plus visual reading)"
+  },
+  "material": "silicon",
+  "temperature": "room temperature",
+  "detector": {
+    "geometry": "photons detected in the beam direction",
+    "resolution_fwhm_eV": [280, 300],
+    "solid_angle_sr_fig11": 8.0425e-6,
+    "solid_angle_note": "0.64e-6 x 4 pi sr (Fig. 11 caption; Fig. 12 caption prints 0.64e-5 x 4 pi, taken as a misprint since Sec. 7 gives ~1e-6 x 4 pi)"
+  },
+  "beam": {
+    "divergence_fwhm_deg": 0.02,
+    "divergence_note": "Collimated to 0.02 deg FWHM; magnetic deflection 'may have contributed a similar amount during long runs'.",
+    "energy_note": "Measured energy about 1% below nominal; kinetic energies below are nominal."
+  },
+  "notes": [
+    "Rest-frame energy is E_R = E_lab / (2 gamma) for forward emission (Eq. 6). Fig. 8 abscissa gamma/d uses d(100) = 5.431, d(110) = 3.840, d(111) = 4.703 angstrom: these reproduce the nominal energies minus ~1% at every marker.",
+    "Fig. 8 markers digitized to about +-4 eV in E_R and +-0.01 in gamma/d. <100> markers at gamma/d 1.07 and 1.25 below the 2p-1s curve and 1.61 above it are 2p-1s/3p-1s as placed by the authors' curves.",
+    "Table 2 widths are Lorentzian half widths in the paper's notation Gamma (Eq. 27: Gamma = 2 gamma^2 hbar c (K_i + K_f)), i.e. FWHM of the lifetime Lorentzian; uncertainty 'at least 10%'.",
+    "Fig. 11 counts are fitted 2p-1s line areas for 1 uC per point into 0.64e-6 x 4 pi sr. Conversion: 1 count = 1 / (6.2415e12 e x 8.0425e-6 sr) = 1.992e-8 photons/sr/e. Crystal absorption was applied inside the line fit, so areas are absorption-corrected; detector efficiency is not stated. Digitization +-150 counts, +-0.003 deg. The data are slightly asymmetric about zero (peaks at -0.095 and +0.082 deg).",
+    "At exact alignment the 2p population vanishes (only s states are populated, Sec. 3); the measured ~4400 counts at 0.005 deg reflect beam divergence and scattering."
+  ],
+  "line_energies_fig8": {
+    "units": {"gamma_over_d": "1/angstrom", "rest_frame_eV": "eV"},
+    "d_angstrom": {"100": 5.431, "110": 3.840, "111": 4.703},
+    "points": [
+      {"axis": "111", "kinetic_energy_MeV": 4.0, "gamma_over_d": 1.87, "transition": "3p-1s", "rest_frame_eV": 424},
+      {"axis": "111", "kinetic_energy_MeV": 4.0, "gamma_over_d": 1.87, "transition": "2p-1s", "rest_frame_eV": 279},
+      {"axis": "111", "kinetic_energy_MeV": 4.0, "gamma_over_d": 1.87, "transition": "3d-2p", "rest_frame_eV": 133},
+      {"axis": "111", "kinetic_energy_MeV": 4.0, "gamma_over_d": 1.87, "transition": "2s-2p", "rest_frame_eV": 80},
+      {"axis": "110", "kinetic_energy_MeV": 2.25, "gamma_over_d": 1.41, "transition": "3p-1s", "rest_frame_eV": 301},
+      {"axis": "110", "kinetic_energy_MeV": 2.25, "gamma_over_d": 1.41, "transition": "2p-1s", "rest_frame_eV": 212},
+      {"axis": "110", "kinetic_energy_MeV": 4.0, "gamma_over_d": 2.30, "transition": "3p-1s", "rest_frame_eV": 545},
+      {"axis": "110", "kinetic_energy_MeV": 4.0, "gamma_over_d": 2.30, "transition": "2p-1s", "rest_frame_eV": 336},
+      {"axis": "110", "kinetic_energy_MeV": 4.0, "gamma_over_d": 2.30, "transition": "3d-2p", "rest_frame_eV": 175},
+      {"axis": "110", "kinetic_energy_MeV": 4.0, "gamma_over_d": 2.30, "transition": "2s-2p", "rest_frame_eV": 88},
+      {"axis": "100", "kinetic_energy_MeV": 2.5, "gamma_over_d": 1.09, "transition": "3p-1s", "rest_frame_eV": 219},
+      {"axis": "100", "kinetic_energy_MeV": 2.5, "gamma_over_d": 1.09, "transition": "2p-1s", "rest_frame_eV": 157},
+      {"axis": "100", "kinetic_energy_MeV": 3.0, "gamma_over_d": 1.27, "transition": "3p-1s", "rest_frame_eV": 251},
+      {"axis": "100", "kinetic_energy_MeV": 3.0, "gamma_over_d": 1.27, "transition": "2p-1s", "rest_frame_eV": 184},
+      {"axis": "100", "kinetic_energy_MeV": 3.5, "gamma_over_d": 1.45, "transition": "3p-1s", "rest_frame_eV": 291},
+      {"axis": "100", "kinetic_energy_MeV": 3.5, "gamma_over_d": 1.45, "transition": "2p-1s", "rest_frame_eV": 212},
+      {"axis": "100", "kinetic_energy_MeV": 4.0, "gamma_over_d": 1.63, "transition": "3p-1s", "rest_frame_eV": 336},
+      {"axis": "100", "kinetic_energy_MeV": 4.0, "gamma_over_d": 1.63, "transition": "2p-1s", "rest_frame_eV": 234}
+    ]
+  },
+  "line_widths_table2": {
+    "transition": "2p-1s",
+    "kinetic_energy_MeV": 4.0,
+    "units": "eV",
+    "relative_uncertainty_min": 0.10,
+    "rows": [
+      {"axis": "100", "thickness_um": 2.0, "gamma_exp_eV": 688, "gamma_theory_total_eV": 588, "gamma_thermal_simple_eV": 701, "gamma_thermal_eq28_eV": 466, "correlation_C": 1.25, "gamma_electronic_eV": 40},
+      {"axis": "111", "thickness_um": 0.5, "gamma_exp_eV": 950, "gamma_theory_total_eV": 807, "gamma_thermal_simple_eV": 869, "gamma_thermal_eq28_eV": 595, "correlation_C": 1.40, "gamma_electronic_eV": 45}
+    ]
+  },
+  "line_yield_fig11": {
+    "axis": "100",
+    "kinetic_energy_MeV": 3.5,
+    "thickness_um": 0.3,
+    "transition": "2p-1s",
+    "counts_per_photon_per_sr_per_electron": 5.0196e7,
+    "theory_peak_counts": 15200,
+    "theory_note": "Many-beam and single-string curves include exponential 2p depopulation with decay length 0.44 um; both vanish at 0 deg.",
+    "points_deg_counts": [
+      [-0.294, 2010], [-0.270, 2260], [-0.245, 2700], [-0.220, 2960], [-0.195, 4330],
+      [-0.169, 5840], [-0.145, 8280], [-0.121, 11220], [-0.095, 13810], [-0.071, 13020],
+      [-0.046, 10000], [-0.021, 5450], [0.005, 4370], [0.032, 7840], [0.056, 11800],
+      [0.082, 13640], [0.105, 12790], [0.133, 10370], [0.157, 7100], [0.180, 4620],
+      [0.205, 3500], [0.230, 3140], [0.255, 2550]
+    ]
+  }
+}

@@ -54,23 +54,94 @@ Findings:
   depth grid changes the yield by $+0.4(25)\%$. Both are within statistics at
   this sample size. One-cell supercell and the Bloch-sector set were not
   varied: the fibre engine is one-cell only.
-- **Line energies against measurement.** Every resolved model peak sits 10–19%
-  below the Watson & Koehler forward-equivalent energy, with the same sign at
-  all three energies and both axes. Andersen, Bonderup & Pantell judge Watson's
-  energies 10–20% high from the detector angle. The model is therefore
-  consistent with the measurement within that stated systematic. This test is
-  weak: it cannot distinguish a model error of order 10% from the detector
-  systematic, and the 4–5 keV maxima are 2–4 keV wide humps, not resolved lines.
-- **Line widths.** The 3 keV peak has a smeared FWHM of 0.45–0.64 keV against
-  0.2 keV resolution. No numerical measured axial width is available (see
-  below), so widths are not compared.
-- **Absolute yield.** The output is finite and incident-normalized, but no
-  absolute measured axial yield is available to compare.
+- **Line energies against Watson & Koehler.** Every resolved model peak sits
+  10–19% below the Watson & Koehler forward-equivalent energy, with the same
+  sign at all three energies and both axes. The Andersen et al. (1982)
+  comparison below resolves this: the model matches Andersen's forward-detector
+  energies, so the offset is Watson's detector-angle systematic.
 - **Physics sensitivity.** Electronic kicks double the retained source relative
   to TDS alone (1.79 → 3.73), and the K-edge-region 1.63 keV line is resolved
   only without kicks. Retained weight at exit is 0.42–0.48; the rest leaves as
   outgoing (40–53%) or unresolved (5–12%) records, whose later emission is
   native-owned or unrepresented.
+
+## Andersen et al. (1982): energies, widths and absolute yield
+
+Andersen, Bonderup, Laegsgaard, Marsh & Sørensen, Nucl. Instrum. Methods 194,
+209 (1982) (Zotero `I99KB2XX`) measured Si with a forward detector
+(~1e-6 × 4π sr, 280–300 eV resolution). Data in
+`tests/data/channeling/andersen-1982-si-axial.json`: Table 2 transcribed;
+Figs. 8 and 11 digitized from a 400 dpi render. Remote arms at `41796d0d0` (rebased onto main as `fc4ae9d97`; the incoming main changes touch no channeling, axial or materials code)
+(jobs 4945–4962, 2000–4000 primaries) are in the
+[record](../../validation/check-records/axial-source/fiber-source-992-remote.json)
+under `andersen_1982`; `checks/axial_fiber_andersen.py` does the comparison.
+All arms use `absorption=false`, because Andersen's line energies and areas
+are absorption-corrected fits. Tilted incidence puts the entrance plane wave
+at order $\mathbf n$, with carrier $\mathbf k_\perp-\mathbf n\mathbf g$
+folded into the first zone.
+
+**Line energies (Fig. 8; rest frame $E_R=E/2\gamma$, peaks of the 300 eV-smeared
+model).**
+
+| Axis, energy, tilt | 2p→1s meas → model (eV) | 3p→1s | 3d→2p | 2s→2p |
+|---|---|---|---|---|
+| ⟨111⟩ 4 MeV, 0° | 279 → 279.0 (0.0%) | 424 → 422.6 (−0.3%) | not resolved | 80 → 82.5 (+3%) |
+| ⟨111⟩ 4 MeV, 0.06° | 279 → 280.6 (+0.6%) | 424 → 413.2 (−2.6%) | 133 → 129.6 (−2.6%) | 80 → 82.7 (+3%) |
+| ⟨110⟩ 2.25 MeV, 0.07° | 212 → 203.7 (−3.9%) | 301 → 293.0 (−2.7%) | | |
+| ⟨110⟩ 4 MeV, 0.07° | 336 → 323.4 (−3.8%) | 545 → 519.1 (−4.7%) | 175 → 178.3 (+1.9%) | 88 → 87.3 (−0.8%) |
+| ⟨100⟩ 2.5 / 3.0 / 3.5 / 4.0 MeV | 157/184/212/234 → −0.4/+1.6/+2.5/+4.2% | 219/251/291/336 → −7.4/−2.3/+0.6/+5.5% | | |
+
+All lines agree within 5%, except ⟨100⟩ 3p→1s at 2.5 MeV (−7%). On ⟨100⟩
+the 3p state is barely bound, and Andersen's own curve misses those markers
+by a similar amount. The static line catalog (one-string flat levels) gives
+⟨111⟩/⟨110⟩ 2p→1s within 1% and ⟨100⟩ within +2–4%, pinned by
+`test_silicon_axial_2p1s_matches_andersen_fig8`. The model's ⟨111⟩ 2.99 MeV
+2p→1s (2.95 keV) is 12% below Watson's 3.36 keV but within 1–2% of
+Andersen's curve at that $\gamma/d$. Watson's energies are high, as
+Andersen, Bonderup & Pantell state.
+
+**2p→1s widths (Table 2).** The unsmeared model spectrum is fitted around
+2p→1s with Eq. (35): a finite-thickness Lorentzian of lifetime FWHM $\Gamma$
+at slab length $l$, plus a linear background.
+
+| Case | $\Gamma_\mathrm{exp}$ | Andersen theory (uncorrelated / total) | Model $\Gamma$ |
+|---|---|---|---|
+| ⟨111⟩ 4 MeV 0.5 µm, 0° | 950 | 595 / 807 | 813(14) (−14%) |
+| ⟨111⟩ 4 MeV 0.5 µm, 0.06° | 950 | 595 / 807 | 724(5) (−24%) |
+| ⟨100⟩ 4 MeV 2 µm, 0.1° | 688 | 466 / 588 | 524(5) (−24%) |
+
+The model sits 14–24% below measurement, which carries an uncertainty of
+"at least 10%". It lies between Andersen's uncorrelated thermal estimate and
+their total. That total includes correlated displacements of neighbouring
+string atoms, a factor $1+0.7(C-1)=1.18$–$1.28$ on the thermal part. The
+model's independent-string TDS omits these correlations, so a deficit of this
+size is expected. Measured widths are therefore reproduced to the stated
+physics scope, not beyond it. Correlated TDS would be a model extension.
+Fits at other energies have $\chi^2/\nu$ up to 20, because neighbouring
+lines fall inside the window, so those widths are not used.
+
+**Absolute 2p→1s line yield (Fig. 11; ⟨100⟩ 3.5 MeV, 0.3 µm).** Model line
+areas (photons/sr/e⁻) are converted to Andersen's counts for 1 µC into
+$0.64\times10^{-6}\times4\pi$ sr (1 count = 1.992e-8 sr⁻¹ e⁻¹). The
+measured value is the mean of ±θ.
+
+| Tilt (°) | 0 | 0.02 | 0.04 | 0.06 | 0.075 | 0.088 | 0.10 | 0.12 |
+|---|---|---|---|---|---|---|---|---|
+| Model (counts) | 4050(220) | 6580(160) | 9650(110) | 12470(110) | 14850(100) | 15510(90) | 14250(80) | 11780(80) |
+| Measured | 4580 | 5850 | 9030 | 11890 | 13150 | 13500 | 13140 | 11410 |
+| Ratio | 0.88 | 1.12 | 1.07 | 1.05 | 1.13 | 1.15 | 1.08 | 1.03 |
+
+On the main lobe the model is 3–15% above the data; Andersen's own
+many-beam curve peaks at 15,200, 12% above. Beam divergence (0.02° FWHM
+collimation plus a similar magnet term) lowers the model peak by about 5%,
+which leaves model/data ≈ 1.08 at the maximum. Data asymmetry about 0°
+(peaks at −0.095° and +0.082°) and the unstated detector efficiency are
+systematics of the same order. At exact alignment the model gives a nonzero
+2p→1s yield (0.88 × measured, before divergence) from scattering into 2p
+alone, because only s states are populated at entry. A 45° tilt azimuth
+changes the 0.088° area by −2%. At 0.15° the free→2p line crosses the window
+(Andersen fixed its ratio for this reason), and the single-line fit fails
+(χ²/ν = 30). That point is not compared.
 
 ## Measured data used
 
@@ -86,9 +157,9 @@ Findings:
   15%" with single-scattering calculations. That review judges Watson's line
   energies 10–20% high, from the detector angle.
 
-No absolute measured axial yield or numerical axial line width was found in
-the library. The original Andersen et al. measurement (the review's ref. 28,
-Nucl. Instrum. Methods 194 (1982)) is not in the library.
+- Andersen, Bonderup, Laegsgaard, Marsh & Sørensen, Nucl. Instrum. Methods
+  194, 209 (1982) (Zotero `I99KB2XX`; the review's ref. 28): line energies,
+  widths and absolute line yields, compared in the section above.
 
 ## Photon refraction in the Doppler phase
 

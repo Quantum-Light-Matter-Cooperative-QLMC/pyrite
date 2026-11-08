@@ -567,7 +567,7 @@ change the eigenproblem or introduce a new physical selection rule.
 - **Verification:** 2026-11-07 fresh-context re-derivation `matches` at `a3c144c34`: verdict `rederived` ([write-up](channeling/cr-axial-fiber-regression.md#fresh-context-verification-2026-11-07)); independent pathwise, dense and absolute-continuity oracles agree. The verifier's B > M finding is pinned by the `box-larger-than-window` anchor case. Owner advanced to `anchored` 2026-11-08.
 - **Checks:** jump-free exactness (1e-14); photon-law identity (1e-10); two-carrier commensurate dense block-GKSL oracle with kicks, and with kicks plus a lattice Kraus column (correlation z RMS < 1.3, max < 5; spectrum |z| < 4.5); primary events bitwise equal to `unravel_fiber_outgoing`; a pure-damping model is rejected at > 10 SE; batched kick/lattice/string maps equal the drawn outputs.
 - **Anchor:** `tests/montecarlo/quantum/test_channeling_axial_fiber_regression.py`
-- **Notes:** #992 research CPU reference; advances the source-estimator part of `cr-axial-persisted-channel` only. Si ⟨111⟩/⟨110⟩ remote evidence: [research note](../research/physics/axial-material-source-992.md). Human sign-off remains in #277.
+- **Notes:** #992 research CPU reference; advances the source-estimator part of `cr-axial-persisted-channel` only. Si ⟨111⟩/⟨110⟩/⟨100⟩ remote evidence, including comparison with Andersen et al., NIM 194, 209 (1982) line energies, widths and absolute 2p→1s yield: [research note](../research/physics/axial-material-source-992.md#andersen-et-al-1982-energies-widths-and-absolute-yield). Measured agreement is research evidence and outside this claim. Human sign-off remains in #277.
 
 ## `cr-mcwf-regression-estimator`
 
