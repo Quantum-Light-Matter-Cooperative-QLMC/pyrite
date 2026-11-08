@@ -55,6 +55,8 @@ cr-axial-fiber-return-deficit
 cr-quantum-regression-correlation
 cr-axial-qrt-source-normalization
 cr-axial-source-partition
+cr-axial-fiber-regression
+cr-axial-fiber-angular
 cr-axial-cuda-backend
 cr-axial-realspace-propagation
 cr-axial-realspace-dissipator

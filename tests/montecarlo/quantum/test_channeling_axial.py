@@ -275,7 +275,7 @@ _WATSON = json.loads(
 
 
 @cache
-def _main_line_keV(uvw, kinetic_energy_MeV):
+def _main_line_keV(uvw, kinetic_energy_MeV, max_bandwidth_eV=0.5):
     """Forward energy of the strongest dipole line onto the deepest Si string level.
 
     Upper-level states are equally populated (``rho`` = identity). The 0.5 eV
@@ -284,7 +284,10 @@ def _main_line_keV(uvw, kinetic_energy_MeV):
     ``max_order`` 16 is converged to 0.4% (<110>) and 0.03% (<111>) against 24.
     """
     catalog = axial_line_catalog(
-        axial_profile("silicon", uvw), kinetic_energy_MeV * 1e6, max_order=16, max_bandwidth_eV=0.5
+        axial_profile("silicon", uvw),
+        kinetic_energy_MeV * 1e6,
+        max_order=16,
+        max_bandwidth_eV=max_bandwidth_eV,
     )
     deepest = catalog.levels[0].energy_eV
     candidates = [
@@ -342,3 +345,36 @@ def test_silicon_axial_main_lines_order_like_watson_koehler():
     for energy in sorted(set(rows["111"]) & set(rows["110"])):
         assert rows["110"][energy][0] > rows["111"][energy][1]
         assert _main_line_keV((1, 1, 0), energy) > _main_line_keV((1, 1, 1), energy)
+
+
+_ANDERSEN = json.loads(
+    (Path(__file__).parents[2] / "data/channeling/andersen-1982-si-axial.json").read_text()
+)["line_energies_fig8"]
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize(
+    ("axis", "uvw", "bandwidth"),
+    [
+        ("111", (1, 1, 1), 0.5),
+        ("110", (1, 1, 0), 0.5),
+        ("100", (0, 0, 1), 3.0),
+    ],
+)
+def test_silicon_axial_2p1s_matches_andersen_fig8(axis, uvw, bandwidth):
+    # Andersen et al., NIM 194, 209 (1982), Fig. 8: measured rest-frame
+    # 2p->1s energies E_R = E/(2 gamma), forward detector, 2.25-4 MeV. Model
+    # within 1% on <111>/<110> and +2-4% on <100>, where the authors' own
+    # single-string curve also runs above several markers. Watson & Koehler's
+    # +12-17% offset on the same <111> line is a Watson systematic (0.046 rad
+    # detector). <100> levels exceed the 0.5 eV flat-band gate (dense strings).
+    d = _ANDERSEN["d_angstrom"][axis]
+    for point in _ANDERSEN["points"]:
+        if point["axis"] != axis or point["transition"] != "2p-1s":
+            continue
+        gamma = point["gamma_over_d"] * d
+        kinetic_MeV = (gamma - 1.0) * 0.51099895
+        rest = _main_line_keV(uvw, kinetic_MeV, bandwidth) * 1e3 / (2 * gamma)
+        assert rest == pytest.approx(point["rest_frame_eV"], rel=0.05), point
+        if axis != "100":
+            assert rest == pytest.approx(point["rest_frame_eV"], rel=0.015), point

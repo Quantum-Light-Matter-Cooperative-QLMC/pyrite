@@ -235,7 +235,7 @@ class TailRecord:
     displacement_ang: tuple[float, float]
 
 
-def string_jump(channel: StringChannel, chi, kappa, order_max, box, rng, fold):
+def string_jump(channel: StringChannel, chi, kappa, order_max, box, rng, fold, operators=None):
     """One continuum TDS jump from window state ``chi`` at carrier ``kappa``.
 
     ``order_max`` = (M_x, M_y) and ``box`` = (B_x, B_y) are per-axis extents
@@ -245,8 +245,11 @@ def string_jump(channel: StringChannel, chi, kappa, order_max, box, rng, fold):
     C order. ``fold(moved)`` returns the integer shift into the zone. Given
     ``(Q, u)``, ``P(Q in box) = ||B J chi||^2 / ||J chi||^2``, so deciding by
     where ``Q`` lands is exact; the tail record makes no further draw.
+    ``operators``, if a list, receives the drawn ``J_{Q,u}`` as a batched
+    map from window-order columns (K, n) to box columns (Kb, n).
     Validation: cr-axial-continuum-tds-jumps
     Validation: cr-axial-tds-tail
+    Validation: cr-axial-fiber-regression
     """
     m = np.array(order_extents(order_max, "order_max"))
     b = np.array(order_extents(box, "box"))
@@ -264,4 +267,17 @@ def string_jump(channel: StringChannel, chi, kappa, order_max, box, rng, fold):
     # Output order o sits at index o + M + half per axis; the box is |o_i| <= B_i.
     lo = m + half - b
     out = full[lo[0] : lo[0] + 2 * b[0] + 1, lo[1] : lo[1] + 2 * b[1] + 1]
+    if operators is not None:
+        kernel = np.fft.fft2(column, s=size)
+
+        def apply(x):
+            batch = np.fft.fft2(np.asarray(x).T.reshape(-1, *width), s=size)
+            moved = np.fft.ifft2(batch * kernel)
+            return (
+                moved[:, lo[0] : lo[0] + 2 * b[0] + 1, lo[1] : lo[1] + 2 * b[1] + 1]
+                .reshape(len(moved), -1)
+                .T
+            )
+
+        operators.append(apply)
     return (float(new_kappa[0]), float(new_kappa[1])), out.ravel()
