@@ -31,6 +31,7 @@ physics/axial-escape-instrument
 physics/axial-entrance-zone-contract-623
 physics/axial-preintegration-624
 physics/axial-first-envelope-886
+physics/axial-material-source-992
 physics/channeling-materials
 physics/dechanneling-boundary
 physics/mos2-directional-loss-sources

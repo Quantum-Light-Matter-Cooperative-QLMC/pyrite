@@ -362,8 +362,9 @@ def material_fiber_channels(
     tds: str = "lattice",
     axis: tuple[int, int, int] = (0, 0, 1),
     tail_theta_max_rad: float | None = None,
+    energy_eV: float = 5e6,
 ):
-    """Si, 5 MeV, one-cell fiber channels: TDS + electronic kicks.
+    """Si one-cell fiber channels (default 5 MeV): TDS + electronic kicks.
 
     ``max_order`` = M or (M_x, M_y) is the retained order window and
     ``outgoing_order_max`` = B or (B_x, B_y) (default ``max_order``) the
@@ -393,7 +394,7 @@ def material_fiber_channels(
 
     if tds not in ("lattice", "strings"):
         raise ValueError("tds must be 'lattice' or 'strings'")
-    energy = 5e6
+    energy = float(energy_eV)
     profile = axial_profile("silicon", axis)
     gamma, beta = longitudinal_kinematics(energy)
     k_inv_ang = gamma * beta * M_E_EV / HBARC_EV_ANG  # p / hbar
@@ -484,6 +485,8 @@ def material_fiber_channels(
         "strings": len(dissipator.tds_sources),
         "k_inv_ang": k_inv_ang,
         "tail_q_max_inv_ang": channels.tail_q_max_inv_ang,
+        "energy_eV": energy,
+        "potential_extrema_eV": [float(x) for x in profile.extrema()],
     }
     return channels, entry, hbar_v, info
 

@@ -348,6 +348,41 @@ class _Engine:
                 out[axis_index] = full[source[0], source[1]]
         return out.ravel()
 
+    def _batch(self, x: np.ndarray, size) -> np.ndarray:
+        """FFT of window-order columns ``x`` (K, n) laid out as (n, 2M_x+1, 2M_y+1)."""
+        return np.fft.fft2(np.asarray(x).T.reshape(-1, *self.shape), s=size)
+
+    def lattice_column_outputs(self, j: int, x: np.ndarray) -> np.ndarray:
+        """``B L_j x`` (Kb, n) for window-order columns ``x``; batched :meth:`lattice_outputs`.
+
+        Validation: cr-axial-fiber-regression
+        """
+        full = np.fft.ifft2(self.lattice_fft[j] * self._batch(x, self.lattice_size))
+        (source_x, target_x), (source_y, target_y) = self.lattice_crop
+        out = np.zeros((len(full), *self.box_shape), dtype=complex)
+        out[:, target_x, target_y.T] = full[:, source_x, source_y.T]
+        return out.reshape(len(full), -1).T
+
+    def kick_outputs(self, i: int, x: np.ndarray, shift: np.ndarray) -> np.ndarray:
+        """Batched :meth:`kick_output` (Kb, n) for window-order columns ``x``.
+
+        Validation: cr-axial-fiber-regression
+        """
+        full = np.fft.ifft2(self.kick_fft[i] * self._batch(x, self.kick_size))
+        out = np.zeros((len(full), *self.box_shape), dtype=complex)
+        source = [
+            np.arange(n) - b - s + m + h
+            for n, b, s, m, h in zip(
+                self.box_shape, self.box, shift, self.m, self.kick_half, strict=True
+            )
+        ]
+        live = [(a >= 0) & (a < size) for a, size in zip(source, self.kick_size, strict=True)]
+        rows, cols = np.flatnonzero(live[0]), np.flatnonzero(live[1])
+        out[:, rows[:, None], cols[None, :]] = full[
+            :, source[0][rows][:, None], source[1][cols][None, :]
+        ]
+        return out.reshape(len(full), -1).T
+
 
 def _measure(engine, phi_orders, window, seed, incident):
     shape = engine.box_shape
@@ -375,12 +410,14 @@ def _split(fiber: _Fiber, out: np.ndarray, outside: float, rng, window_in_box: n
     return choice, c, f
 
 
-def _lattice_channel(engine, chi, lattice_total, rng):
+def _lattice_channel(engine, chi, lattice_total, rng, operators=None):
     """Draw a Kraus column given a lattice jump; ``None`` is the out-of-box remainder.
 
     Conditional weights ``||B L_j chi||^2 / <chi|Gamma_lat|chi>`` and the
     remainder; with the group draw this is the one-stage channel law.
+    ``operators``, if a list, receives the drawn column's batched box map.
     Validation: cr-axial-fiber-unraveling
+    Validation: cr-axial-fiber-regression
     """
     outs = engine.lattice_outputs(chi)
     represented = np.sum(np.abs(outs) ** 2, axis=1)
@@ -389,18 +426,26 @@ def _lattice_channel(engine, chi, lattice_total, rng):
         raise ValueError("lattice_loss is smaller than its represented Kraus outputs")
     weights = np.append(represented, max(unresolved, 0.0))
     j = int(rng.choice(weights.size, p=weights / weights.sum()))
-    return None if j == len(represented) else outs[j]
+    if j == len(represented):
+        return None
+    if operators is not None:
+        operators.append(lambda x: engine.lattice_column_outputs(j, x))
+    return outs[j]
 
 
-def _jump(engine, fiber, chi, kappa, rng):
+def _jump(engine, fiber, chi, kappa, rng, operators=None):
     """Draw one jump from ``chi``: group, channel, fold and split.
 
     Groups: lattice columns ``<chi|Gamma_lat|chi>``, each continuum string
     ``<chi|Gamma_s|chi>``, each kick node ``||S_i chi||^2``. Returns
     ``(kind, kappa, fiber, choice, c_new, f)``; ``choice`` None is unresolved,
     ``_TAIL`` a classified string tail with ``(record, string)`` in ``c_new``.
+    ``operators``, if a list, receives the drawn jump's batched window-to-box
+    map (window-order columns (K, n) to (Kb, n)) for companion vectors; it
+    draws nothing.
     Validation: cr-axial-fiber-unraveling
     Validation: cr-axial-tds-tail
+    Validation: cr-axial-fiber-regression
     """
     lattice_total = float(np.vdot(chi, engine.ch.lattice_loss @ chi).real)
     strings = [channel.rate(chi) for channel in engine.strings]
@@ -411,7 +456,7 @@ def _jump(engine, fiber, chi, kappa, rng):
         raise FloatingPointError("jump at a state with no finite jump rate")
     group = int(rng.choice(rates.size, p=rates / total))
     if group == 0:
-        out = _lattice_channel(engine, chi, lattice_total, rng)
+        out = _lattice_channel(engine, chi, lattice_total, rng, operators)
         if out is None:
             return "tds", kappa, fiber, None, None, None
         return ("tds", kappa, fiber, *_split(fiber, out, 0.0, rng, engine.window_in_box))
@@ -424,6 +469,7 @@ def _jump(engine, fiber, chi, kappa, rng):
             tuple(engine.box),
             rng,
             lambda moved: _fold(moved, engine.g),
+            operators,
         )
         if isinstance(result, TailRecord):
             cap = engine.ch.tail_q_max_inv_ang
@@ -446,6 +492,8 @@ def _jump(engine, fiber, chi, kappa, rng):
     kappa = tuple(float(x) for x in moved - shift * engine.g)
     fiber = engine.fiber(kappa)
     out = engine.kick_output(i, chi, shift).ravel()
+    if operators is not None:
+        operators.append(lambda x: engine.kick_outputs(i, x, shift))
     outside = float(kick[i]) - float(np.vdot(out, out).real)
     return ("kick", kappa, fiber, *_split(fiber, out, outside, rng, engine.window_in_box))
 
@@ -497,11 +545,18 @@ def _trajectory(
     tolerance,
     observe=None,
     checkpoints=(),
+    carry=None,
 ):
     """One terminal-event history; law in :func:`unravel_fiber_outgoing`.
 
+    ``carry``, if given, follows the history without drawing: after each
+    no-jump segment ``carry.segment(fiber, c, kappa, start, stop, final)`` and
+    at each retained jump ``carry.jump(fiber, norm, operator, new_fiber, c_new)``
+    with the pre-jump state norm and the drawn batched box map.
+
     Validation: cr-axial-fiber-unraveling
     Validation: cr-axial-tds-tail
+    Validation: cr-axial-fiber-regression
     """
     rng = fiber_stream(seed, incident)
     fiber = engine.fiber(kappa)
@@ -529,10 +584,14 @@ def _trajectory(
             _observe_segment(
                 observe, incident, fiber, c, kappa, start, stop, checkpoints, depth is None
             )
+        if carry is not None:
+            final = depth is None
+            carry.segment(fiber, c, kappa, start, max_depth if final else depth, final)
         if depth is None:
             return event("retained", max_depth)
         chi = fiber.vectors @ (state / np.linalg.norm(state))
-        kind, kappa, fiber, choice, c_new, f = _jump(engine, fiber, chi, kappa, rng)
+        operators, before = ([] if carry is not None else None), fiber
+        kind, kappa, fiber, choice, c_new, f = _jump(engine, fiber, chi, kappa, rng, operators)
         counts[kind] += 1
         if choice is None:
             return event("unresolved", depth)
@@ -546,6 +605,8 @@ def _trajectory(
                 tail_string=string,
             )
         if choice == 0:
+            if carry is not None and operators:
+                carry.jump(before, np.linalg.norm(state), operators[0], fiber, c_new)
             c = c_new / np.linalg.norm(c_new)
         elif choice == 1:
             return outgoing(f, depth)
