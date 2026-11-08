@@ -197,6 +197,8 @@ class _Session:
                 transport=spectral.transport,
                 cxr_chunk=tuning.cxr_chunk,
                 brem_chunk=tuning.brem_chunk,
+                cxr_threads=tuning.cxr_threads,
+                cxr_energies_per_block=tuning.cxr_energies_per_block,
             )
 
             def run(progress):

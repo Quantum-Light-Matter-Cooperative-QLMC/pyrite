@@ -109,6 +109,68 @@ def test_optuna_optimization_and_constraints():
     assert result.best_trial.constraints["line_fwhm_eV"] <= 1.0
 
 
+@pytest.mark.parametrize(
+    ("method", "expected"),
+    [("tpe", "TPESampler"), ("multivariate-tpe", "TPESampler"), ("random", "RandomSampler")],
+)
+def test_optuna_sampler_selection(method, expected):
+    pytest.importorskip("optuna")
+    definition = study()
+    optimizer = OptunaOptimizer(
+        definition.parameters,
+        definition.objectives,
+        constraints=definition.constraints,
+        seed=3,
+        sampler=method,
+    )
+    assert type(optimizer.study.sampler).__name__ == expected
+    if method == "multivariate-tpe":
+        assert optimizer.study.sampler._multivariate
+    result = definition.run(
+        lambda candidate, _: {
+            "flux": candidate.beam.energy_keV,
+            "line_fwhm_eV": 0.5,
+        },
+        optimizer,
+        max_trials=3,
+    )
+    assert len(result.trials) == 3
+    assert all(trial.state is TrialState.COMPLETED for trial in result.trials)
+
+
+def test_optuna_sampler_identity_on_persistent_resume(tmp_path):
+    pytest.importorskip("optuna")
+    definition = study()
+    storage = f"sqlite:///{tmp_path / 'sampling.db'}"
+    kwargs = dict(
+        parameters=definition.parameters,
+        objectives=definition.objectives,
+        constraints=definition.constraints,
+        storage=storage,
+        study_name="physical-study",
+        seed=3,
+    )
+    first = OptunaOptimizer(**kwargs, sampler="random")
+    definition.run(
+        lambda _candidate, _: {"flux": 1.0, "line_fwhm_eV": 0.5},
+        first,
+        max_trials=2,
+        evaluation_id="sampler-test-v1",
+    )
+    resumed = OptunaOptimizer(**kwargs, sampler="random")
+    result = definition.run(
+        lambda _candidate, _: {"flux": 1.0, "line_fwhm_eV": 0.5},
+        resumed,
+        max_trials=3,
+        evaluation_id="sampler-test-v1",
+    )
+    assert len(result.trials) == 3
+    with pytest.raises(ValueError, match="different sampler"):
+        OptunaOptimizer(**kwargs, sampler="tpe")
+    with pytest.raises(ValueError, match="sampler must be"):
+        OptunaOptimizer(**kwargs, sampler="invalid")
+
+
 def test_failure_never_gets_rewarded_and_missing_observable_fails():
     pytest.importorskip("optuna")
     s = study()

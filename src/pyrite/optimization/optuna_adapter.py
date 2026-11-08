@@ -6,7 +6,7 @@ metadata; no parallel JSON ledger that can diverge from it is maintained.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from .space import Categorical, Continuous, Integer, ParameterSpace
 from .study import Constraint, Objective, OptimizationTrial, Proposal, TrialState
@@ -14,6 +14,7 @@ from .study import Constraint, Objective, OptimizationTrial, Proposal, TrialStat
 _CONSTRAINT_KEY = "pyrite_constraint_violations"
 _TRIAL_KEY = "pyrite_optimization_trial_v1"
 _DEFINITION_KEY = "pyrite_optimization_definition_sha256_v1"
+_SAMPLER_KEY = "pyrite_optimization_sampler_v1"
 
 
 class OptunaOptimizer:
@@ -23,6 +24,12 @@ class OptunaOptimizer:
     Persisted studies MUST have a stable ``study_name``. Only one active
     coordinator may operate on a persisted study at a time. Starting a second
     writer concurrently or manually editing Optuna's tables is unsupported.
+
+    ``sampler`` selects independent TPE (default), multivariate TPE or random
+    sampling. TPE incorporates declared feasibility constraints in proposals;
+    random sampling does not, although infeasible results are still excluded
+    from PyRITE's best-trial and Pareto selection. A persistent study cannot
+    resume under a different sampler.
 
     The study definition and evaluator identity are bound on the first call to
     ``OptimizationStudy.run``, before asking any trial. Completed trial scores,
@@ -38,6 +45,7 @@ class OptunaOptimizer:
         seed: int | None = None,
         storage: str | None = None,
         study_name: str | None = None,
+        sampler: Literal["tpe", "multivariate-tpe", "random"] = "tpe",
     ) -> None:
         try:
             import optuna
@@ -51,19 +59,28 @@ class OptunaOptimizer:
             raise ValueError("study_name requires storage")
         if storage is not None and (not isinstance(study_name, str) or not study_name):
             raise ValueError("persistent Optuna optimizer requires a nonempty study_name")
+        if sampler not in ("tpe", "multivariate-tpe", "random"):
+            raise ValueError("sampler must be 'tpe', 'multivariate-tpe', or 'random'")
         self._optuna = optuna
         self.parameters = parameters
         self.objectives = tuple(objectives)
         self.constraints = tuple(constraints)
         self.persistent = storage is not None
-        sampler_options: dict[str, Any] = {"seed": seed}
-        if constraints:
-            sampler_options["constraints_func"] = lambda trial: trial.user_attrs.get(
-                _CONSTRAINT_KEY, (float("inf"),) * len(constraints)
-            )
+        self.sampler_name = sampler
+        if sampler == "random":
+            optuna_sampler = optuna.samplers.RandomSampler(seed=seed)
+        else:
+            sampler_options: dict[str, Any] = {"seed": seed}
+            if sampler == "multivariate-tpe":
+                sampler_options["multivariate"] = True
+            if constraints:
+                sampler_options["constraints_func"] = lambda trial: trial.user_attrs.get(
+                    _CONSTRAINT_KEY, (float("inf"),) * len(constraints)
+                )
+            optuna_sampler = optuna.samplers.TPESampler(**sampler_options)
         self.study = optuna.create_study(
             directions=[obj.direction for obj in objectives],
-            sampler=optuna.samplers.TPESampler(**sampler_options),
+            sampler=optuna_sampler,
             storage=storage,
             study_name=study_name,
             load_if_exists=self.persistent,
@@ -72,6 +89,15 @@ class OptunaOptimizer:
             obj.direction for obj in objectives
         ]:
             raise ValueError("existing Optuna study has different objective directions")
+        if self.persistent:
+            previous = self.study.user_attrs.get(_SAMPLER_KEY)
+            # Older persistent studies have no sampler tag; their built-in
+            # default was TPE, so only that spelling can resume them safely.
+            if previous is None and self.study.trials and sampler != "tpe":
+                raise ValueError("legacy Optuna study has no sampler identity; resume with 'tpe'")
+            if previous is not None and previous != sampler:
+                raise ValueError("existing Optuna study uses a different sampler")
+            self.study.set_user_attr(_SAMPLER_KEY, sampler)
 
     def prepare_resume(self, definition_digest: str | None) -> tuple[OptimizationTrial, ...]:
         """Validate the definition and recover interrupted Optuna trial transitions.

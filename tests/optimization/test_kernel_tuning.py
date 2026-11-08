@@ -12,6 +12,7 @@ import pytest
 import pyrite as pr
 import pyrite.config as cfg
 from pyrite.optimization import KernelSearchSpace, KernelTuningResult, TuningProgress, tune_kernels
+from pyrite.optimization import _kernel_worker as kw
 from pyrite.optimization import kernel_tuning as kt
 from pyrite.phases import SimulationProgress
 
@@ -111,6 +112,43 @@ def test_candidate_changes_only_search_space_dimensions():
     assert cxr.dimensions("spectrum") == ("cxr_threads", "cxr_energies_per_block")
     got = cxr.candidate(base, {"cxr_threads": 256, "cxr_energies_per_block": 4})
     assert (got.cxr_threads, got.cxr_energies_per_block, got.brem_chunk) == (256, 4, 8)
+
+
+def test_spectrum_worker_applies_all_proposed_launch_controls(monkeypatch, tmp_path):
+    """A phase-only trial must time its proposed launch, not the default one."""
+    base = cfg.KernelTuning(transport_core="cuda", cxr_threads=512, cxr_energies_per_block=2)
+    candidate = cfg.KernelTuning(
+        transport_core="cuda",
+        cxr_chunk=8192,
+        brem_chunk=1024,
+        cxr_threads=128,
+        cxr_energies_per_block=4,
+    )
+    session = object.__new__(kw._Session)
+    session.base = base
+    session.scene = SimpleNamespace(
+        numerics=SimpleNamespace(with_kernel_tuning=lambda value: value)
+    )
+    session.backend = SimpleNamespace(release_memory=Mock(), synchronize=Mock())
+    session.workdir = tmp_path
+    session._transport = SimpleNamespace(numerics=SimpleNamespace(kernel_tuning=base))
+    session._warmed = set()
+    session._forward = lambda *_args: lambda _event: None
+    observed = []
+
+    def fake_score(_transport, *, kernel_tuning, progress):
+        assert callable(progress)
+        observed.append(kernel_tuning)
+        return SimpleNamespace(provenance={})
+
+    monkeypatch.setattr("pyrite.phases.score_spectra", fake_score)
+    monkeypatch.setattr(kw, "save_spectra", lambda _result, path: path.touch())
+    samples, check = session.measure("spectrum", candidate, "spectrum-test", warmups=0, repeats=1)
+    # One initial phase warmup and one timed score are both configured identically.
+    assert len(observed) == 2
+    assert all(setting == candidate for setting in observed)
+    assert len(samples) == 1
+    assert Path(check["spectra"]).exists()
 
 
 def test_equivalence_requires_exact_grids_and_close_densities(tmp_path):

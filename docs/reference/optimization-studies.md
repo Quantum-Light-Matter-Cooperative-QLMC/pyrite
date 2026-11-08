@@ -90,6 +90,31 @@ registry-bound quantity is stored. Equivalent converted bounds produce the
 same definition when their stored numbers are exactly equal; existing legacy
 numeric study digests remain unchanged.
 
+## Selecting an Optuna sampler
+
+`OptunaOptimizer` defaults to independent TPE, but accepts `sampler="random"`
+for a baseline or `sampler="multivariate-tpe"` to consider parameter
+interactions. The latter can be useful for coupled geometry variables, but
+has no guaranteed advantage at small trial budgets:
+
+```python
+optimizer = OptunaOptimizer(
+    study.parameters,
+    study.objectives,
+    constraints=study.constraints,
+    seed=21,
+    sampler="multivariate-tpe",
+)
+```
+
+Constrained TPE uses the declared constraint violations when proposing new
+points; random search samples without considering those constraints, though
+infeasible trials remain excluded from `.best_trial` and `.pareto_front`.
+A persistent study records its sampler choice and rejects a change on resume.
+Existing studies without that tag can resume only with the original `"tpe"`
+default. Evaluate algorithms with equal compute budgets and independently
+validated finalist results rather than comparing noisy search maxima.
+
 ## Persisting and resuming a study
 
 The complete {download}`comparison script <../../checks/pxr_optimization.py>` constructs a
