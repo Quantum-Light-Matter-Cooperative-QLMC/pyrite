@@ -52,8 +52,10 @@ Findings:
 - **Numerical convergence of the retained source.** A larger window and box
   changes the yield by $+3(3)\%$ (1.2σ) and the peaks by one grid bin. A finer
   depth grid changes the yield by $+0.4(25)\%$. Both are within statistics at
-  this sample size. One-cell supercell and the Bloch-sector set were not
-  varied: the fibre engine is one-cell only.
+  this sample size. Supercell and Bloch sectors have no finite set to vary in
+  the fibre model; window, cut and kick-harmonic convergence and the
+  emitting-subspace closure are in the
+  [next section](#emitting-subspace-closure-and-numerical-convergence).
 - **Line energies against Watson & Koehler.** Every resolved model peak sits
   10–19% below the Watson & Koehler forward-equivalent energy, with the same
   sign at all three energies and both axes. The Andersen et al. (1982)
@@ -64,6 +66,78 @@ Findings:
   only without kicks. Retained weight at exit is 0.42–0.48; the rest leaves as
   outgoing (40–53%) or unresolved (5–12%) records, whose later emission is
   native-owned or unrepresented.
+
+## Emitting-subspace closure and numerical convergence
+
+**Bloch sectors and supercell.** The finite-grid reference of #885 samples
+carriers on a $c\times c$ grid, $\kappa_r=r\mathbf g/c$, so it has a
+supercell and a Bloch-sector set to converge. The fibre model has neither. Its
+carrier is a continuous classical label. TDS string jumps shift it by a
+continuous $\Delta$ over the zone, and the $c\times c$ supercell is the
+restriction of $\Delta$ to a grid
+([`cr-axial-continuum-tds-jumps`](../../validation/channeling/cr-axial-continuum-tds-jumps.md),
+supercell-equivalence check). Electronic kicks shift it by $q$ at uniform
+azimuth. One cell with independent strings is therefore the
+infinite-supercell limit, not a truncation. What remains numerical is the
+order window $M$, the outgoing box $B$, the retained cut, the depth step and
+the kick harmonic cutoff.
+
+**Closure.** `emitting_subspace_closure` needs one finite-grid
+`GlobalAxialSource` and a single-sector density. It cannot take the fibre
+model, whose jumps change carrier: the same reason the dense
+`regression_correlation` was replaced. Its question is still answerable
+directly. The `reference` arm retains the whole order window ($P=R$, no cut),
+so states above the cut keep emitting and can return below it. Arm minus
+control is then the source the absorbing cut omits at that window, coherent
+cross-cut terms included. This is the photon-yield analogue of the #882
+return deficit.
+
+All arms below share seed and 50- or 100-primary chunks, so differences are
+paired per chunk ([record](../../validation/check-records/axial-source/closure-992-remote.json);
+`checks/axial_fiber_source.py paired`). Jobs 5465–5469 and 5521
+(⟨100⟩) and 5865–5871 (⟨111⟩), 2000 primaries per arm. Each value is the arm/control yield
+ratio minus one, mean ± SEM, over the whole grid and over the main-line band
+(⟨100⟩ 2.8–4.0 keV, the 2p→1s line; ⟨111⟩ 2.5–3.5 keV).
+
+| Change | ⟨100⟩ 3.5 MeV, 0.3 µm, tilt 0.088° | band | ⟨111⟩ 2.99 MeV, 1.1 µm, 0° | band |
+|---|---|---|---|---|
+| Cut $U_\max+2\Delta U$ (vs $+\Delta U$) | −0.03(19)% | −0.15(27)% | +2.8(11)% | +4.0(18)% |
+| $P=R$, $M=9$ (closure) | +0.10(31)% | +0.02(43)% | +1.8(12)% | +2.3(18)% |
+| Window $M=11$ | +0.00(5)% | −0.02(6)% | +2.5(10)% | +1.2(15)% |
+| $P=R$ at $M=11$ vs $M=11$ (closure) | +0.24(34)% | +0.24(47)% | +0.7(11)% | +0.6(15)% |
+| $P=R$, $M=11$ vs control (all changes) | +0.24(33)% | +0.22(46)% | +3.2(12)% | +1.8(16)% |
+| Kick harmonics $\lvert n\rvert\le6$ | +0.04(3)% | +0.05(4)% | −0.6(9)% | −1.0(12)% |
+| Kick harmonics $\lvert n\rvert\le8$, 48² grid | | | −0.4(8)% | −0.6(12)% |
+
+Retained weight at exit rises with the cut, by construction (⟨111⟩: 0.42
+control, 0.52 doubled cut, 0.58 $P=R$, 0.65 $P=R$ at $M=11$). The yield
+barely moves, because states above the cut feed the bound block weakly before
+they leave. Dropped kick weight $\int\rho_q$ is $1.3\times10^{-3}$ and
+$1.8\times10^{-2}$ at the default $\lvert n\rvert\le4$, against
+$1.1\times10^{-4}$/$3.7\times10^{-3}$ at 6 and $9\times10^{-4}$ at 8 (48²).
+
+Findings:
+
+- **0.3 µm (Andersen Fig. 11 peak).** Every change is below 0.3% of the yield
+  and the 2p→1s area. The absorbing cut omits no measurable source, and the
+  Fig. 11 model/data ratio (1.15, ≈1.08 after divergence) is not a
+  truncation effect.
+- **1.1 µm (Watson main).** The closure, cut and window each move the yield by
+  2–3%, at 1.5–2.5σ. All changes together give +3.2(12)%, so the
+  absorbing $M=9$ control underestimates the converged source by about 2–5%
+  (95%). The arms are not additive within errors (doubled cut exceeds $P=R$
+  by 1.0(9)%), as expected from sign-indefinite cross-cut terms. This matches
+  the #882 trend: return and window effects grow with depth, staying near 1%
+  to about 1 µm and then rising.
+- **Kick harmonics** are converged in both cases (≤1%, within 1σ).
+- **Material completeness** is outside this table. Emission after a record
+  leaves the retained subspace (outgoing, 2–51% of incidents here) or is unresolved (1–8%) is native-owned
+  or unrepresented, as stated above.
+
+These bounds are numerical closure at the stated cases, not a depth budget for
+admission. For #994, the selected scope should stay at thicknesses of about
+1 µm or less, or carry a ≈5% one-sided numerical allowance, until deeper
+cases are run at $M\ge11$ with $P=R$.
 
 ## Andersen et al. (1982): energies, widths and absolute yield
 

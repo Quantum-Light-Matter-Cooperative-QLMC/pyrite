@@ -17,13 +17,22 @@ target_eV, electronic, boundary ("max", "none" or a float in eV), photon grid
 to the axis and its azimuth from the profile's first reciprocal axis; the
 entrance plane wave sits at order n with carrier k_perp - n g folded into
 [-g/2, g/2)). Photons are scored along the crystal axis; at these tilts
-(< 0.3 deg) the beam-direction offset is far inside 1/gamma.
+(< 0.3 deg) the beam-direction offset is far inside 1/gamma. ``reference``
+(bool) replaces the cut by +inf, retaining the whole order window (P = R), as
+the return-flux reference of ``checks/axial_outgoing_convergence.py``.
+``harmonic_max`` and ``grid_points`` set the electronic-kick harmonic cutoff
+and the density grid of ``material_fiber_channels``.
+
+Closure (``paired ARM.json CONTROL.json [LO HI]``): arms run on the same seed
+and incident chunks are paired per chunk; the relative change of the yield
+(whole grid, or ``LO``-``HI`` eV) and its batch-paired SEM are printed.
 
 Validation: cr-axial-fiber-regression
 """
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import runpy
 import sys
@@ -52,6 +61,9 @@ DEFAULTS = {
     "max_working_bytes": None,
     "tilt_deg": 0.0,
     "tilt_azimuth_deg": 0.0,
+    "reference": False,
+    "harmonic_max": 4,
+    "grid_points": 32,
 }
 
 
@@ -76,7 +88,11 @@ def build(options: dict):
         tds="strings",
         axis=tuple(o["axis"]),
         energy_eV=float(o["energy_eV"]),
+        harmonic_max=int(o["harmonic_max"]),
+        grid_points=int(o["grid_points"]),
     )
+    if o["reference"]:  # P = R: the whole order window is retained (no cut)
+        channels = dataclasses.replace(channels, cut=lambda energies: np.inf)
     carrier, entry = _tilted_entry(o, info, channels, entry)
     boundary = o["boundary"]
     if boundary == "max":
@@ -203,6 +219,10 @@ def merge(parts: list[dict]) -> dict:
         "mean_kick_jumps": sum(p["kick_jumps_sum"] for p in parts) / n,
         "mean_tds_jumps": sum(p["tds_jumps_sum"] for p in parts) / n,
         "peaks": peaks(energies, mean, sem),
+        "chunks": [
+            {"start": p["start"], "count": p["count"], "spectrum_sum": p["spectrum_sum"]}
+            for p in sorted(parts, key=lambda p: p["start"])
+        ],
     }
 
 
@@ -313,6 +333,49 @@ def compare(merged: dict, *, resolution_fwhm_eV: float = 200.0, draws: int = 400
     }
 
 
+def _chunk_yields(merged: dict, lo: float, hi: float) -> dict[int, tuple[int, float]]:
+    e = np.asarray(merged["photon_energy_eV"])
+    band = (e >= lo) & (e <= hi)
+    return {
+        c["start"]: (c["count"], float(np.trapezoid(np.asarray(c["spectrum_sum"])[band], e[band])))
+        for c in merged["chunks"]
+    }
+
+
+def paired(arm: dict, control: dict, lo: float = 0.0, hi: float = np.inf) -> dict:
+    """Relative yield change of merged ``arm`` against merged ``control``, chunk-paired.
+
+    Both arms must share seed and chunk boundaries, so each chunk holds the same
+    incident IDs and draws up to the arm's change. The ratio of means and its SEM
+    come from per-chunk linearized residuals (delta method on paired totals).
+    """
+    if arm["settings"]["seed"] != control["settings"]["seed"]:
+        raise ValueError("arms differ in seed; they are not paired")
+    if arm["photon_energy_eV"] != control["photon_energy_eV"]:
+        raise ValueError("arms use different photon grids")
+    a, c = _chunk_yields(arm, lo, hi), _chunk_yields(control, lo, hi)
+    if a.keys() != c.keys() or any(a[k][0] != c[k][0] for k in a):
+        raise ValueError("arms do not share chunk boundaries")
+    keys = sorted(a)
+    counts = np.array([a[k][0] for k in keys], dtype=float)
+    ya = np.array([a[k][1] for k in keys]) / counts
+    yc = np.array([c[k][1] for k in keys]) / counts
+    n = counts.sum()
+    ma, mc = np.sum(counts * ya) / n, np.sum(counts * yc) / n
+    ratio = ma / mc
+    resid = ya - ratio * yc
+    var = np.sum(counts * (resid - np.sum(counts * resid) / n) ** 2) / (len(keys) - 1) / n
+    return {
+        "band_eV": [lo, hi if np.isfinite(hi) else None],
+        "incidents": int(n),
+        "chunks": len(keys),
+        "arm_per_sr": float(ma),
+        "control_per_sr": float(mc),
+        "relative_change": float(ratio - 1),
+        "relative_sem": float(np.sqrt(var) / mc),
+    }
+
+
 def main(argv: list[str]) -> None:
     if argv[0] == "chunk":
         options, start, count, out = json.loads(argv[1]), int(argv[2]), int(argv[3]), argv[4]
@@ -322,6 +385,10 @@ def main(argv: list[str]) -> None:
         merged = merge(parts)
         merged["comparison"] = compare(merged)
         Path(argv[1]).write_text(json.dumps(merged, indent=1))
+    elif argv[0] == "paired":
+        arm, control = (json.loads(Path(path).read_text()) for path in argv[1:3])
+        band = [float(v) for v in argv[3:5]] if len(argv) >= 5 else [0.0, np.inf]
+        print(json.dumps(paired(arm, control, *band), indent=1))
     else:
         raise SystemExit(__doc__)
 
