@@ -73,6 +73,15 @@ from .energy_ensemble import (
     planar_energy_spectrum,
     planar_solver_factory,
 )
+from .energy_time import (
+    EnergyNodes,
+    IncidentPhaseSpace,
+    LinearEnergyChirp,
+    TimeSlices,
+    quantize_energies,
+    sample_incident_phase_space,
+    time_slices,
+)
 from .entry import PlaneIncidence, mean_inner_potential_eV, plane_incidence
 from .handoff import CHANNELING_MODEL
 from .mcwf import MCWFResult, MCWFSolver, mcwf_stream_key
@@ -86,6 +95,18 @@ from .operators import (
     tds_kernel,
 )
 from .spatial import spatial_density
+from .temporal_radiation import (
+    AxialPhaseSpaceMCWFResult,
+    TemporalSliceDiagnostic,
+    TimeResolvedSpectrum,
+    axial_phase_space_mcwf,
+    axial_temporal_slices,
+    axial_time_resolved_spectrum,
+    planar_temporal_slices,
+    planar_time_resolved_spectrum,
+    projected_arrival_fs,
+    retarded_delay_fs,
+)
 from .transition_radiation import (
     TransitionRadiationBound,
     transition_radiation,
@@ -157,6 +178,23 @@ __all__ = [
     "tds_kernel",
     "transition_operator",
     "transverse_states",
+    "AxialPhaseSpaceMCWFResult",
+    "EnergyNodes",
+    "IncidentPhaseSpace",
+    "LinearEnergyChirp",
+    "TemporalSliceDiagnostic",
+    "TimeResolvedSpectrum",
+    "TimeSlices",
+    "axial_phase_space_mcwf",
+    "axial_temporal_slices",
+    "axial_time_resolved_spectrum",
+    "planar_temporal_slices",
+    "planar_time_resolved_spectrum",
+    "projected_arrival_fs",
+    "quantize_energies",
+    "retarded_delay_fs",
+    "sample_incident_phase_space",
+    "time_slices",
     "transition_radiation",
     "transition_radiation_bound",
     "transition_radiation_per_eV",
