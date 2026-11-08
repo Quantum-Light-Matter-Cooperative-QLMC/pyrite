@@ -52,6 +52,7 @@ NUMERICS_FIELD_OWNERS = MappingProxyType(
         "seed": SAMPLING_CONVERGENCE,
         "energy_bins": NUMERICAL_APPROXIMATION,
         "temporal_profile": NUMERICAL_APPROXIMATION,
+        "line_roulette": SAMPLING_CONVERGENCE,
         "transport": NUMERICAL_APPROXIMATION,
         "radiation": NUMERICAL_APPROXIMATION,
         "execution": KERNEL_TUNING,

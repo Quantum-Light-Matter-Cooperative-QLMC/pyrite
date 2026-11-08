@@ -699,6 +699,7 @@ def _cxr_for_case(case, E_grid, *, coherent=None):
     (``pyrite reline``) reuses the EXACT live-sweep line path rather than
     re-deriving it by hand."""
     from .emission_adapters import EmissionBatch, select_emission
+    from .line_roulette import line_screen_for
 
     emission = select_emission(case)
     segs, _E_brem, n_hat, abs_layers, groove = _transport_cxr_for_case(case, E_grid)
@@ -714,6 +715,7 @@ def _cxr_for_case(case, E_grid, *, coherent=None):
             groove,
             coherent=coherent,
             electron_limit=case["Ne"],
+            line_screen=line_screen_for(case, case["Ne"]),
         ),
         "spec_coherent" if coherent else "spec",
     ).values
@@ -734,6 +736,7 @@ def _cxr_pair_for_case(
     from dataclasses import replace
 
     from .emission_adapters import EmissionBatch, select_emission
+    from .line_roulette import line_screen_for
 
     emission = select_emission(case)
     segs, _E_brem, n_hat, abs_layers, groove = _transport_cxr_for_case(case, E_grid)
@@ -752,6 +755,7 @@ def _cxr_pair_for_case(
         groove,
         electron_limit=Ne_lines,
         table_cache=table_cache,
+        line_screen=line_screen_for(case, Ne_lines),
     )
     spec = emission.cxr.evaluate(batch, "spec").values
     spec_coherent = (
@@ -889,6 +893,7 @@ def _spectrum_case_impl(case, tp, record_timing=False):
     from dataclasses import replace as batch_replace
 
     from .emission_adapters import EmissionBatch, select_emission
+    from .line_roulette import line_screen_for
 
     timed = _pkg._TIMING or record_timing
     t0 = perf_counter() if timed else 0.0
@@ -931,6 +936,12 @@ def _spectrum_case_impl(case, tp, record_timing=False):
     # Opt-in temporal profile (#292): one accumulator per emission policy.
     temporal, temporal_coherent = case_temporal_profiles(case, tp, want_coherent)
     truncation_audit = cxr_truncation_audit(case, E_grid, n_electrons=Ne_lines)
+    # An allocation retry keeps phases that already finished (#278): repeating a
+    # 600k-node line sum cost about ten minutes per characteristic retry.
+    phase_cache = case.get("_spectrum_phase_cache")
+    line_screen = line_screen_for(case, Ne_lines)
+    if phase_cache is not None and line_screen is not None:
+        line_screen = phase_cache.setdefault("line_screen", line_screen)
     batch = EmissionBatch(
         segs_dev,
         E_grid,
@@ -942,10 +953,8 @@ def _spectrum_case_impl(case, tp, record_timing=False):
         table_cache=cxr_table_cache,
         truncation_audit=truncation_audit,
         temporal=temporal,
+        line_screen=line_screen,
     )
-    # An allocation retry keeps phases that already finished (#278): repeating a
-    # 600k-node line sum cost about ten minutes per characteristic retry.
-    phase_cache = case.get("_spectrum_phase_cache")
     (
         spec,
         spec_coherent,
@@ -1053,6 +1062,8 @@ def _spectrum_case_impl(case, tp, record_timing=False):
                 }
     if spec_coherent is not None:
         out["spec_coherent"] = spec_coherent
+    if line_screen is not None:
+        out["line_roulette"] = line_screen.record()
     out.update(optional_line_components(case, tp))
     if coherent_yield_record is not None:
         out["line_grid_coherent_yield_audit"] = coherent_yield_record

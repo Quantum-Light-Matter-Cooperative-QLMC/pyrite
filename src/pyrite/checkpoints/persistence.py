@@ -108,6 +108,7 @@ _CAS_OPTIONAL_PAYLOAD_KEYS = frozenset(
         "line_grid_resolved",
         "line_data_coverage",
         "physics_fallbacks",
+        "line_roulette",
     }
 )
 

@@ -14,6 +14,7 @@ The entries below use generated docstrings, signatures, and source links. API su
    pyrite.config.CxrReflections
    pyrite.config.AdaptiveSampling
    pyrite.config.FixedSampling
+   pyrite.config.LineRoulette
    pyrite.config.RadiationNumerics
    pyrite.config.TransportNumerics
    pyrite.config.Timepix3ResponseNumerics

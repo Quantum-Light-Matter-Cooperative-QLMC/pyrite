@@ -82,6 +82,14 @@ if hasattr(xp, "fuse"):  # CuPy exposes fuse(); NumPy/dpnp do not -> eager fallb
     _sincsq_lineshape = xp.fuse()(_sincsq_lineshape)
 
 
+def _audit_skips_reduction(audit):
+    """Whether this pass only fills ``audit``: collected lines or line masses.
+
+    Validation: line-scoring-roulette
+    """
+    return audit is not None and ("collect" in audit or audit.get("mass_only", False))
+
+
 def _accumulate_edge_truncation(audit, E_r, a_width, weight, electron=None):
     """Add these lines' whole and out-of-axis ``sinc**2`` mass to ``audit``.
 
@@ -90,7 +98,8 @@ def _accumulate_edge_truncation(audit, E_r, a_width, weight, electron=None):
     ``min(1, 1 / (pi a_w D))`` of it, all of it when the resonance lies past
     that edge (``cxr_seeds.sincsq_upper_tail_bound``). Sums stay on the device
     until the runner reads them. ``collect`` instead retains the production
-    resonance, width and coefficient for measured grid construction.
+    resonance, width and coefficient for measured grid construction; with
+    either ``collect`` or ``mass_only`` the caller skips the grid reduction.
 
     With ``n_electrons`` in the audit, ``electron`` (each line's emitting
     electron id) also sums the line mass per electron into ``electron_mass``,
