@@ -1,6 +1,6 @@
 # Energy-resolved axial MCWF trajectories (issue #627)
 
-**Experimental API** (sequential CPU reference plus a batched CUDA backend) building on [incident-energy ensembles (#626)](channeling-energy-ensemble.md). The energy of each electron is sampled **once at entrance** and remains fixed through every jump. Dynamic energy loss and energy-time correlations are *not* implemented. This is distinct from running one averaged axial solve independently at each quadrature node.
+**Experimental API** (sequential CPU reference plus a batched CUDA backend) building on [incident-energy ensembles (#626)](channeling-energy-ensemble.md). The energy of each electron is sampled **once at entrance** and remains fixed through every jump. Dynamic energy loss is *not* implemented; correlated energy–time records and arrival-time slices enter through [`axial_phase_space_mcwf` (#628)](channeling-energy-time-phase-space.md#correlated-axial-mcwf). This is distinct from running one averaged axial solve independently at each quadrature node.
 
 ## Contract
 

@@ -1,6 +1,6 @@
 # Incoherent incident-energy ensembles for quantum channeling
 
-**Experimental Python API** — [issue #626](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/626). Per-electron energy-resolved MCWF is provided by the separate [issue #627](channeling-energy-resolved-mcwf.md) CPU reference API. Correlated energy/time phase space remains outside scope (#628). These ensemble wrappers do not change PyRITE's production electron transport.
+**Experimental Python API** — [issue #626](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/626). Per-electron energy-resolved MCWF is provided by the separate [issue #627](channeling-energy-resolved-mcwf.md) CPU reference API. Correlated energy/time phase space, temporal slices and retarded photon arrival are documented in [correlated energy–time phase space (#628)](channeling-energy-time-phase-space.md). These ensemble wrappers do not change PyRITE's production electron transport.
 
 The optional diagnostic API lives at `pyrite.montecarlo.channeling.energy_ensemble`, and its symbols are also exported by `pyrite.montecarlo.channeling`. A kinetic energy is always in **eV**. `energy_spread_frac` follows the established `BeamSpec` convention: a fractional **RMS** spread in the kinetic energy, not in total energy or in Lorentz factor.
 

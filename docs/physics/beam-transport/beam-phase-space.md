@@ -95,7 +95,7 @@ delta_i ~ N(0, energy_spread_frac)
 E_i     = E0_keV * (1 + delta_i)
 ```
 
-drawn **independently and uncorrelated** with the longitudinal offsets, for every `long_shape` including `compressed`, so {math}`\langle t\,\delta\rangle = 0` holds by construction and `beam_metrics` reports a longitudinal emittance of exactly `sigma_t * sigma_delta`. A chirp model would enter as an additive correlation parameter defaulting to zero; see [Longitudinal bunch structure](longitudinal-structure.md).
+drawn **independently and uncorrelated** with the longitudinal offsets, for every `long_shape` including `compressed`, so {math}`\langle t\,\delta\rangle = 0` holds by construction and `beam_metrics` reports a longitudinal emittance of exactly `sigma_t * sigma_delta`. A chirp model would enter as an additive correlation parameter defaulting to zero; see [Longitudinal bunch structure](longitudinal-structure.md). The experimental channeling diagnostics apply exactly such an additive chirp to sampled primaries, without changing transport ([correlated energy–time phase space](../radiation-physics/channeling-energy-time-phase-space.md)).
 
 ### RNG placement
 

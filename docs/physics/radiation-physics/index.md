@@ -18,6 +18,7 @@ diffracted-transition-radiation
 
 channeling-energy-ensemble
 channeling-energy-resolved-mcwf
+channeling-energy-time-phase-space
 ```
 
 ```{toctree}

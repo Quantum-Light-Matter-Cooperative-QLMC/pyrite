@@ -64,4 +64,7 @@ cr-dipole-far-field-amplitude
 cr-quantum-ensemble-metrics
 cr-mcwf-regression-estimator
 cr-valence-directional-loss
+cr-energy-time-phase-space
+cr-temporal-slice-ensemble
+cr-retarded-photon-arrival
 ```
