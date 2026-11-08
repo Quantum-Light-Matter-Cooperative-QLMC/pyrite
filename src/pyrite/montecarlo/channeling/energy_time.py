@@ -316,9 +316,10 @@ class IncidentPhaseSpace:
         Uses ``GDFBeam.sample`` (whole-record resampling by ``nmacro`` weight,
         field-free ray-plane projection and screen crossing times), so every
         imported energy--time--position--direction correlation is preserved
-        record by record. ``beam`` is a ``GDFBeam`` from ``load_gdf_beam``.
+        record by record. ``beam`` is a ``GDFBeam`` from ``load_gdf_beam``;
+        the projection itself is the ledgered ``gpt-gdf-injection`` claim.
 
-        Validation: gpt-gdf-injection
+        Validation: cr-energy-time-phase-space
         """
         position, direction, energy_keV, time_ang = beam.sample(
             int(count), int(seed), float(z_origin_m), float(tilt), float(azimuth)
