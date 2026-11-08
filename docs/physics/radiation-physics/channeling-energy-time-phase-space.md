@@ -128,6 +128,7 @@ spectrum.bunch_envelope_rms_fs, spectrum.mean_wavetrain_rms_fs
 
 ## Limitations and decisions
 
+- The timing assumes the entrance face is $z = 0$ and the mean velocity is along $z$: a tilted planar `surface_normal` is refused, and analytic records sampled with `beam_dir` or face tilts are outside the timing model (the axial MCWF path, which subtracts the centroid slope, is not affected). The axial path times its $4\pi$ line yields with the forward delay, exact for a forward detector only.
 - Static crystal and constant electron energy inside the crystal: no energy loss and no energy-changing jumps. Emission inside a depth window is taken as uniform in depth. The deterministic paths use the nominal transverse entry, and one scalar detector direction per time-resolved spectrum (the aperture average is not retarded per sub-direction).
 - Records are a sampled representation of the bunch. Energy-node quantization trades resolution (`quantization_rms_eV`) for solver cost; raise `max_energy_nodes` to check convergence.
 - The chirp lives on the channeling-diagnostic phase space only. Adding it to `pyrite.Beam`/`BeamSpec` for production transport would change campaign configuration and case identity, and is left as a separate decision.

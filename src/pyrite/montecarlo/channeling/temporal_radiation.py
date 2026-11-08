@@ -287,11 +287,54 @@ def _check_prefix_depths(edges: np.ndarray, dz_ang: float, sample_ang: float) ->
     """Window spectra are differences of nested histories: edges must share the sample grid."""
     inner = max(1, int(round(sample_ang / dz_ang)))
     ratio = edges[1:] / (inner * dz_ang)
-    if not np.allclose(ratio, np.rint(ratio), rtol=0.0, atol=1e-9):
+    # Mirror ``emission._depth_history``: it uses ceil(L / (inner dz)) segments.
+    if not np.allclose(ratio, np.rint(ratio), rtol=0.0, atol=1e-9) or np.any(
+        np.ceil(ratio) != np.rint(ratio)
+    ):
         raise ValueError(
             "depth_edges_ang must be multiples of the estimator segment "
             f"{inner * dz_ang} angstrom (sample_ang rounded to dz_ang multiples)"
         )
+
+
+def _planar_window_depths(
+    thickness_ang: float,
+    depth_edges_ang: Sequence[float] | None,
+    dz_ang: float,
+    sample_ang: float,
+    theta_rad: float,
+    phi_rad: float,
+    surface_normal: Any,
+    spectrum_kwargs: dict[str, Any],
+) -> np.ndarray:
+    """Validate the planar timing geometry and return the cumulative window depths.
+
+    Pops (and refuses nonzero) analytic energy spread and path censoring from
+    ``spectrum_kwargs``: both would conflict with the explicit records.
+    """
+    if surface_normal is not None and not np.allclose(
+        np.asarray(surface_normal, float) / np.linalg.norm(surface_normal), (0.0, 0.0, 1.0)
+    ):
+        raise ValueError("retarded timing assumes the entrance face z = 0 normal to the beam")
+    for name in ("energy_spread_eV", "path_limits_ang"):
+        value = spectrum_kwargs.pop(name, None)
+        if value is not None and np.any(np.asarray(value) != 0):
+            raise ValueError(f"{name} is incompatible with phase-space time resolution")
+    if np.ndim(theta_rad) or np.ndim(phi_rad):
+        raise ValueError("time-resolved spectra take one scalar detector direction")
+    if not np.isfinite(thickness_ang) or thickness_ang <= 0:
+        raise ValueError("thickness_ang must be finite and positive")
+    depth = _edges(
+        "depth_edges_ang",
+        (0.0, thickness_ang) if depth_edges_ang is None else depth_edges_ang,
+        2,
+        65,
+    )
+    if depth[0] != 0.0 or not np.isclose(depth[-1], thickness_ang, rtol=1e-12, atol=0.0):
+        raise ValueError("depth_edges_ang must start at 0 and end at thickness_ang")
+    if depth.size > 2:
+        _check_prefix_depths(depth, dz_ang, sample_ang)
+    return depth
 
 
 def planar_time_resolved_spectrum(
@@ -327,31 +370,21 @@ def planar_time_resolved_spectrum(
     from .emission import _resolve_composition, channeling_spectrum
     from .energy_ensemble import _planar_solver
 
-    for name in ("energy_spread_eV", "path_limits_ang"):
-        value = spectrum_kwargs.pop(name, None)
-        if value is not None and np.any(np.asarray(value) != 0):
-            raise ValueError(f"{name} is incompatible with phase-space time resolution")
-    if np.ndim(theta_rad) or np.ndim(phi_rad):
-        raise ValueError("time-resolved spectra take one scalar detector direction")
-    if not np.isfinite(thickness_ang) or thickness_ang <= 0:
-        raise ValueError("thickness_ang must be finite and positive")
-    depth = _edges(
-        "depth_edges_ang",
-        (0.0, thickness_ang) if depth_edges_ang is None else depth_edges_ang,
-        2,
-        65,
+    depth = _planar_window_depths(
+        thickness_ang,
+        depth_edges_ang,
+        dz_ang,
+        sample_ang,
+        theta_rad,
+        phi_rad,
+        surface_normal,
+        spectrum_kwargs,
     )
-    if depth[0] != 0.0 or not np.isclose(depth[-1], thickness_ang, rtol=1e-12, atol=0.0):
-        raise ValueError("depth_edges_ang must start at 0 and end at thickness_ang")
-    if depth.size > 2:
-        _check_prefix_depths(depth, dz_ang, sample_ang)
     time_edges = _edges("time_edges_fs", time_edges_fs)
     energies = np.asarray(photon_energy_eV, dtype=float)
     if energies.ndim != 1 or not energies.size or not np.all(np.isfinite(energies)):
         raise ValueError("photon_energy_eV must be a finite one-dimensional grid")
     nodes = quantize_energies(space, max_nodes=max_energy_nodes)
-    normal = np.asarray((0.0, 0.0, 1.0) if surface_normal is None else surface_normal, float)
-    normal = normal / np.linalg.norm(normal)
     window = np.zeros((nodes.size, depth.size - 1, 4, energies.size))
     for k, energy in enumerate(nodes.energies_eV):
         solver = _planar_solver(solver_factory, float(energy))
@@ -360,7 +393,7 @@ def planar_time_resolved_spectrum(
             slab = [
                 (
                     0.0,
-                    float(thickness_ang) * normal[2],
+                    float(thickness_ang),
                     _resolve_composition(solver.profile.crystal),
                 )
             ]
@@ -449,8 +482,10 @@ def axial_time_resolved_spectrum(
     catalog; the stored depths of ``config`` are the emission windows (the
     accumulated per-line yields are differenced between stored depths).
     Helicity channels use each window's accumulated ``T_++`` and ``T_--``.
-    Photon energies are the forward (``theta = 0``) line energies, so the
-    transverse projection term vanishes.
+    Photon energies *and* retardation are forward (``theta = 0``), so the
+    transverse projection term vanishes; the 4 pi line yields are timed with
+    the forward delay, which is exact only for a forward detector (photons at
+    ``theta ~ 1/gamma`` arrive up to about twice as late within the crystal).
 
     Validation: cr-retarded-photon-arrival, cr-temporal-slice-ensemble
     """
@@ -565,7 +600,14 @@ def planar_temporal_slices(
     n_bands = min(np.asarray(r.band_populations).shape[-1] for r in runs)
     observables = {
         name: _slice_mix(slices, [getattr(r, name) for r in runs])
-        for name in ("trace", "bound_population", "free_flux", "overflow_flux")
+        for name in (
+            "trace",
+            "bound_population",
+            "free_flux",
+            "overflow_flux",
+            "reprojection_flux",
+            "entry_flux",
+        )
     }
     observables["band_populations"] = _slice_mix(
         slices, [np.asarray(r.band_populations)[..., :n_bands] for r in runs]

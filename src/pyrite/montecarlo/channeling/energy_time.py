@@ -218,7 +218,9 @@ class IncidentPhaseSpace:
         """Return records with ``T_i + h (t_i - t_ref)``; other coordinates kept.
 
         Raises if a chirped energy is not positive; a chirp is a bounded
-        correlation, never a reason to clip the distribution silently.
+        correlation, never a reason to clip the distribution silently. Only
+        an explicit earlier chirp (its provenance) is refused; a correlation
+        already present in imported records is not detected and simply adds.
 
         Validation: cr-energy-time-phase-space
         """
@@ -405,7 +407,9 @@ def sample_incident_phase_space(
     ``transverse_distribution``, ``beam_fwhm_mm``, ``energy_spread_frac``,
     ``beam_dir``, tilts...). The arrival times, the uncorrelated energy
     spread and the transverse draws are therefore *exactly* the transport
-    primaries of the same seed; only the chirp is added here.
+    primaries of the same seed; only the chirp is added here. The temporal
+    diagnostics take the slab ``z`` as the mean beam axis, so omit
+    ``beam_dir`` and face tilts when the records feed retarded timing.
     """
     from ..transport.beam_entry import sample_primary_entry
 
@@ -491,6 +495,7 @@ def quantize_energies(space: IncidentPhaseSpace, *, max_nodes: int = 17) -> Ener
         remap = np.cumsum(keep) - 1
         index = remap[inverse]
         out_energy, out_weight, edges, method = distinct[keep], nodes[keep], None, "exact"
+        dropped = ~keep[inverse]
     else:
         edges = np.linspace(distinct[0], distinct[-1], max_nodes + 1)
         raw = np.clip(np.searchsorted(edges, energy, side="right") - 1, 0, max_nodes - 1)
@@ -502,6 +507,17 @@ def quantize_energies(space: IncidentPhaseSpace, *, max_nodes: int = 17) -> Ener
         out_weight = mass[keep]
         out_energy = first[keep] / out_weight
         method = "binned"
+        dropped = ~keep[raw]
+    if np.any(dropped):
+        # Zero-weight records whose bin carries no mass: nearest retained node.
+        upper = np.clip(np.searchsorted(out_energy, energy[dropped]), 1, out_energy.size - 1)
+        lower = np.maximum(upper - 1, 0)
+        upper = np.minimum(upper, out_energy.size - 1)
+        nearer = np.abs(energy[dropped] - out_energy[lower]) <= np.abs(
+            energy[dropped] - out_energy[upper]
+        )
+        index = np.array(index)
+        index[dropped] = np.where(nearer, lower, upper)
     out_weight = out_weight / out_weight.sum()
     rms = float(np.sqrt(weight @ (energy - out_energy[index]) ** 2))
     arrays = [np.array(a, copy=True) for a in (out_energy, out_weight, index.astype(np.int64))]

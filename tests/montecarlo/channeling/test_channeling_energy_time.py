@@ -217,3 +217,20 @@ def test_time_slices_condition_node_weights_on_arrival():
     assert slices.outside_probability == pytest.approx(1 / 6)
     np.testing.assert_allclose(slices.node_weights, [[1, 0], [1 / 3, 2 / 3]])
     np.testing.assert_allclose(slices.mean_energy_eV, [1e6, 5e6 / 3])
+
+
+def test_zero_weight_records_map_to_a_retained_node():
+    space = _space(
+        6,
+        kinetic_energy_eV=[1e6, 2e6, 2e6, 3e6, 3e6, 3e6],
+        weights=[0, 1, 1, 1, 1, 1],
+    )
+    nodes = quantize_energies(space, max_nodes=4)
+    np.testing.assert_array_equal(nodes.energies_eV, [2e6, 3e6])
+    np.testing.assert_array_equal(nodes.node_index, [0, 0, 0, 1, 1, 1])
+    rng = np.random.default_rng(9)
+    energy = 5e6 + rng.normal(0, 1e3, 50)
+    weights = np.ones(50)
+    weights[np.argmin(energy)] = 0.0  # its sparse low bin may carry no mass
+    binned = quantize_energies(_space(50, kinetic_energy_eV=energy, weights=weights), max_nodes=40)
+    assert np.all((binned.node_index >= 0) & (binned.node_index < binned.size))

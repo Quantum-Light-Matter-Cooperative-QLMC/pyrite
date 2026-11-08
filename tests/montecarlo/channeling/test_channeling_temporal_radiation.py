@@ -176,6 +176,22 @@ def test_depth_windows_are_cumulative_differences_through_the_full_slab(stub_pla
         tr.planar_time_resolved_spectrum(
             _space([0.0], 1e6), factory, 1000.0, [1e3], [-1, 1], depth_edges_ang=(0, 300, 1000)
         )
+    with pytest.raises(ValueError, match="multiples"):
+        # 0.3 Å float edge: within 1e-9 of a multiple but ceil() gives an extra segment.
+        tr.planar_time_resolved_spectrum(
+            _space([0.0], 1e6),
+            factory,
+            0.9000000000000001,
+            [1e3],
+            [-1, 1],
+            depth_edges_ang=(0.0, 0.6, 0.9000000000000001),
+            dz_ang=0.3,
+            sample_ang=0.3,
+        )
+    with pytest.raises(ValueError, match="entrance face"):
+        tr.planar_time_resolved_spectrum(
+            _space([0.0], 1e6), factory, 1000.0, [1e3], [-1, 1], surface_normal=(0.1, 0.0, 1.0)
+        )
     with pytest.raises(ValueError, match="incompatible"):
         tr.planar_time_resolved_spectrum(
             _space([0.0], 1e6), factory, 1000.0, [1e3], [-1, 1], energy_spread_eV=10.0
@@ -270,6 +286,17 @@ def test_planar_slices_are_invariant_to_arrival_time_spread():
     )
     for row in mono.observables["trace"]:
         np.testing.assert_array_equal(row, direct[17e6].trace)
+    # Per-slice probability balance closes like the direct solve's.
+    obs = mono.observables
+    balance = (
+        obs["trace"]
+        + obs["entry_flux"][:, None]
+        + obs["free_flux"]
+        + obs["overflow_flux"]
+        + obs["reprojection_flux"]
+    )
+    expected_balance = np.broadcast_to(direct[17e6].balance_defect + 1.0, balance.shape)
+    np.testing.assert_allclose(balance, expected_balance, atol=1e-12)
     # A chirp makes slices differ: head at 17 MeV, tail at 20 MeV.
     chirped = tr.planar_temporal_slices(
         _space(times, np.where(times < 0, 17e6, 20e6)), factory, 200.0, 100.0, [-400, 0, 400], **kw
@@ -304,3 +331,27 @@ def test_planar_chirp_line_shift_against_direct_solves():
     exponent = np.polyfit(np.log(gamma), np.log(result.mean_photon_energy_eV), 1)[0]
     # E_gamma ~ 2 gamma^2 Delta E_perp(gamma): between harmonic 1.5 and rigid 2.
     assert 1.4 < exponent < 2.1
+
+
+@requires_xraydb
+def test_real_planar_windows_telescope_to_the_full_slab():
+    from pyrite.materials.channeling import planar_profile
+    from pyrite.montecarlo.channeling import channeling_spectrum, planar_solver_factory
+
+    factory = planar_solver_factory(
+        planar_profile("silicon", (1, 1, 0), 293.15), n_cells=2, max_order=5
+    )
+    grid = np.linspace(1e3, 200e3, 300)
+    kw = dict(dz_ang=100.0, sample_ang=500.0)
+    result = tr.planar_time_resolved_spectrum(
+        _space([0.0], 18.5e6),
+        factory,
+        1500.0,
+        grid,
+        [-1.0, 1.0],
+        depth_edges_ang=(0.0, 500.0, 1000.0, 1500.0),
+        **kw,
+    )
+    full = channeling_spectrum(factory(18.5e6), 1500.0, grid, 0.0, **kw)
+    np.testing.assert_allclose(result.time_integrated[0], full.spectrum, rtol=1e-10, atol=1e-300)
+    assert result.wavetrain_rms_fs[0] > 0
