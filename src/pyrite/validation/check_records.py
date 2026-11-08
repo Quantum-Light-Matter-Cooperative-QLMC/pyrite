@@ -69,6 +69,7 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     "checks/axial_escape_accounting.py": (),
     "checks/axial_matching_study.py": (),
     "checks/axial_fiber_andersen.py": ("cr-axial-fiber-regression",),
+    "checks/axial_fiber_angular_map.py": ("cr-axial-fiber-angular",),
     "checks/axial_fiber_source.py": ("cr-axial-fiber-regression",),
     "checks/axial_outgoing_convergence.py": ("cr-axial-fiber-return-deficit",),
     "checks/axial_outgoing_maps.py": ("cr-axial-zone-handoff-accounting",),

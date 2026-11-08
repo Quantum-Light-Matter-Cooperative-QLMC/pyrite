@@ -143,6 +143,54 @@ changes the 0.088° area by −2%. At 0.15° the free→2p line crosses the wind
 (Andersen fixed its ratio for this reason), and the single-line fit fails
 (χ²/ν = 30). That point is not compared.
 
+## Off-axis observation and polarization
+
+`fiber_angular_source` (claim `cr-axial-fiber-angular`) scores the same
+two-time source toward a direction $(\theta,\phi)$, with polarization basis
+$(\hat\theta,\hat\phi)$. It uses the Liénard–Wiechert angular factor
+evaluated at each line's resonance,
+$A_\theta=\hat n_\perp\cdot\mathbf J(\cos\theta-\beta)/(1-\beta\cos\theta)$
+and $A_\phi=\hat\phi\cdot\mathbf J$, together with the Doppler phase
+$E(1-\beta\cos\theta)z/\hbar v$.
+
+An earlier velocity/recoil form evaluated the photon-recoil term at the photon
+energy. It kept the crystal-face boundary terms, which produced a continuum
+growing in proportion to $E$, and it made the estimator heavy-tailed. It is
+rejected; the [derivation](../../validation/channeling/cr-axial-fiber-angular.md)
+records the reasons.
+
+Three Si⟨100⟩ arms were run with a depth step of 7.5 Å, $\theta\gamma\le2$ and
+16 azimuths (jobs 5405–5407, commit 819567a16; [check record](../../validation/check-records/axial-source/fiber-angular-992-remote.json)).
+Intensities are integrated over the photon grid only.
+
+| Arm | θγ | Line peak (eV) | $I/I(0)$ | cos 2φ contrast | Linear degree | $V/I$ |
+|---|---|---|---|---|---|---|
+| 3.5 MeV, 0.3 µm, tilt 0.088° | 0 | 3400 | 1 | 0 | 0.64 | −0.0006 |
+| | 0.5 | 2720 | 0.43 | −0.30 | 0.70 | −0.0008 |
+| | 1 | 1720 | 0.10 | −0.74 | 1.000 | 0.0000 |
+| | 1.5 | 1080 | 0.042 | −0.59 | 0.87 | 0.0001 |
+| 3.5 MeV, 0.3 µm, tilt 0 | 1 | 1720 | 0.092 | −0.0017 | 1.000 | 0.0000 |
+| | 2 | — | 0.0099 | +0.0010 | 0.47 | 0.0010 |
+| 10 MeV, 0.2 µm, tilt 0.046° (≈ψc/5) | 0 | 6600 | 1 | 0 | 0.36 | −0.0033 |
+| | 1 | 3400 | 0.13 | −0.36 | 1.000 | 0.0000 |
+| | 2 | — | 0.020 | −0.17 | 0.53 | 0.0035 |
+
+How to read these numbers:
+
+- **Doppler shift.** The 3.5 MeV 2p→1s peak follows $E(0)/(1+\gamma^2\theta^2)$: 3.40, 2.72, 1.70 and 1.05 keV are predicted, 3.40, 2.72, 1.72 and 1.08 keV are found.
+- **Intensity at θ = 1/γ.** A transverse dipole line, averaged over azimuth, gives 0.125 of its forward value there. The grid integral is lower because off-axis lines move below the 0.8 keV grid edge.
+- **Symmetry.** At exact alignment the map is azimuthally uniform within 0.3%, as $C_4$ symmetry requires.
+- **Tilted beam.** Tilting the beam along $x$ aligns the 2p population along the tilt. That produces the expected null at $\phi=0$ when $\theta'=90°$, i.e. at $\theta\gamma=1$.
+- **Polarization.** It is fully linear at $\theta\gamma=1$, where $\cos\theta'=0$ and only the $\hat\phi$ component survives. Circular polarization stays below 0.4% everywhere.
+
+**Comparison with Korotchenko, Kunashenko & Dabagov (2022).** They give
+theoretical predictions for Si⟨100⟩ at 10 MeV and $\vartheta_c/5$, with no
+measured data (Eur. Phys. J. C 82, 196, Zotero `NH9SX2CA`).
+
+- **Linear-only polarization:** reproduced.
+- **Four-fold azimuthal peaks:** cannot be tested here. They come from a $\langle xy\rangle_{if}$ term, first order in the photon's transverse momentum times a quadrupole moment. At the transverse dipole order implemented here, a $C_4$ ensemble is azimuthally uniform, and the tilt adds only $\cos2\phi$. Testing their four-fold peaks needs the next order in $\mathbf q\cdot\mathbf r$, or exact recoil (a companion in fibre $\kappa-\mathbf q$).
+- **10 MeV spectrum shape:** ours is a broad continuum to about 24 keV, peaking at 6.6 keV, with a 20–22 keV shoulder. That shoulder is consistent with extrapolating Andersen's Fig. 8 2p→1s trend to $\gamma/d\approx3.8$. Theirs is smooth to 33 keV with its maximum at 26.8 keV. Different potentials and matrix elements make that a qualitative comparison only.
+
 ## Measured data used
 
 - Watson & Koehler, Phys. Rev. B 25, 3079 (1982), Table II

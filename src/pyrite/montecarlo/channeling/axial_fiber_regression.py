@@ -87,7 +87,7 @@ class _Companions:
     norm as the primary. ``values[i, j, a, b]`` accumulates
     ``<w_jb(z_i)|J_a|u(z_i)>`` for ``i >= j``.
 
-    Validation: cr-axial-fiber-regression
+    Validation: cr-axial-fiber-regression, cr-axial-fiber-angular
     """
 
     def __init__(self, engine, depths, gamma, boundary_eV):
@@ -246,6 +246,52 @@ def _admit(depths_ang, photon_energy_eV, kinetic_energy_eV, hbar_v_eV_ang, max_w
     return z, e
 
 
+def _primaries(
+    channels,
+    entry_orders,
+    hbar_v_eV_ang,
+    gamma,
+    z,
+    incident_ids,
+    seed,
+    carrier_inv_ang,
+    boundary_eV,
+    window,
+    search_step_ang,
+    depth_tolerance_ang,
+):
+    """Yield ``(event, W * values, W * alive)`` for each primary history.
+
+    Validation: cr-axial-fiber-regression, cr-axial-fiber-angular
+    """
+    engine = _Engine(channels, hbar_v_eV_ang)
+    entry = np.asarray(entry_orders, dtype=complex)
+    if entry.shape != (engine.k,) or not np.all(np.isfinite(entry)):
+        raise ValueError("entry_orders must be finite on the order window")
+    if window is None:
+        window = np.zeros(engine.box_shape, dtype=complex)
+        window[0, 0] = 1.0
+    window = np.asarray(window, dtype=complex)
+    if window.shape != engine.box_shape or not np.isclose(np.vdot(window, window).real, 1.0):
+        raise ValueError("window must be a unit-norm array on the outgoing box shape")
+    kappa = (float(carrier_inv_ang[0]), float(carrier_inv_ang[1]))
+    for incident in incident_ids:
+        carry = _Companions(engine, z, gamma, boundary_eV)
+        event = _trajectory(
+            engine,
+            entry,
+            kappa,
+            window,
+            float(z[-1]),
+            seed,
+            int(incident),
+            search_step_ang,
+            depth_tolerance_ang,
+            carry=carry,
+        )
+        yield event, event.weight * carry.values, event.weight * carry.alive
+
+
 def fiber_on_axis_source(
     channels: FiberChannels,
     entry_orders: np.ndarray,
@@ -290,40 +336,29 @@ def fiber_on_axis_source(
         depths_ang, photon_energy_eV, kinetic_energy_eV, hbar_v_eV_ang, max_working_bytes
     )
     amplitude = _amplitude(absorption_inv_ang, exit_path_ang, energies, z)
-    engine = _Engine(channels, hbar_v_eV_ang)
-    entry = np.asarray(entry_orders, dtype=complex)
-    if entry.shape != (engine.k,) or not np.all(np.isfinite(entry)):
-        raise ValueError("entry_orders must be finite on the order window")
-    if window is None:
-        window = np.zeros(engine.box_shape, dtype=complex)
-        window[0, 0] = 1.0
-    window = np.asarray(window, dtype=complex)
-    if window.shape != engine.box_shape or not np.isclose(np.vdot(window, window).real, 1.0):
-        raise ValueError("window must be a unit-norm array on the outgoing box shape")
     gamma, _ = longitudinal_kinematics(kinetic_energy_eV)
-    kappa = (float(carrier_inv_ang[0]), float(carrier_inv_ang[1]))
+    primaries = _primaries(
+        channels,
+        entry_orders,
+        hbar_v_eV_ang,
+        gamma,
+        z,
+        incident_ids,
+        seed,
+        carrier_inv_ang,
+        boundary_eV,
+        window,
+        search_step_ang,
+        depth_tolerance_ang,
+    )
     shape = (z.size, z.size, 2, 2)
     totals = [np.zeros(shape, dtype=complex), np.zeros(shape), np.zeros(shape)]
     spectra, alive, events = [], np.zeros(z.size), []
-    for incident in incident_ids:
-        carry = _Companions(engine, z, gamma, boundary_eV)
-        event = _trajectory(
-            engine,
-            entry,
-            kappa,
-            window,
-            float(z[-1]),
-            seed,
-            int(incident),
-            search_step_ang,
-            depth_tolerance_ang,
-            carry=carry,
-        )
-        estimate = event.weight * carry.values
+    for event, estimate, live in primaries:
         totals[0] += estimate
         totals[1] += estimate.real**2
         totals[2] += estimate.imag**2
-        alive += event.weight * carry.alive
+        alive += live
         spectra.append(
             signed_on_axis_spectrum(estimate, z, energies, kinetic_energy_eV, amplitude=amplitude)
         )
