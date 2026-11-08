@@ -144,7 +144,7 @@ read it cannot use it.
 
 | Observable | Mixed | Reason |
 |---|---|---|
-| Terminal fractions, exit energy and angle, deposition | Eligible, pending the equivalence study | Moment-preserving by construction |
+| Terminal fractions, exit energy and angle, deposition | Eligible: 195 of 446 comparisons pass at ε = 2%, none fail, the rest are unresolved ([study](mixed-elastic-equivalence.md)) | Moment-preserving by construction |
 | Incoherent CXR lines | Refused (#990) | The step cap sets each row's finite-time line width; see below |
 | Standard bremsstrahlung | Unreachable, not assessed | Spectrum runs always score CXR, which refuses |
 | Coherent emission, temporal profiles | Refused | Depend on flight-level phase and small-angle structure |
@@ -190,7 +190,7 @@ evidence of equivalence.
 CPU per-electron core, ELSEPA, continuous stopping, $E_{\rm cut}=20$ keV,
 $C_1=C_2=0.05$, seeds 1000 onward with 300 electrons per seed, 2026-11-05.
 Intervals are one standard error. The #821-anchored study with
-empirical-Bernstein intervals is still to be run.
+empirical-Bernstein intervals is [Mixed elastic equivalence and cost](mixed-elastic-equivalence.md).
 
 | Case | Mode | $N$ | Rows/history | Backscatter | Transmitted $\bar E$ (keV) | Transmitted $\langle\cos\rangle$ |
 |---|---|---|---|---|---|---|

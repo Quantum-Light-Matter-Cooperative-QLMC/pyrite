@@ -56,6 +56,7 @@ mixed-elastic-soft-moments
 mixed-elastic-hinge
 mixed-elastic-reverification
 mixed-elastic-cuda-verification
+mixed-elastic-equivalence
 sbethe-atomic-shell-inputs
 sbethe-atomic-shell-inputs-verification
 gos-core-edge

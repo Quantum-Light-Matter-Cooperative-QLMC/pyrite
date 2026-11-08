@@ -13,5 +13,6 @@ atomic-electron-deflection
 stopping-power
 inelastic-scattering-events
 shell-soft-hard-transport
+mixed-elastic-transport
 positron-transport
 ```
