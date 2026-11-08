@@ -6,6 +6,45 @@ and source-photon scoring. Numerical convergence and cross-code equivalence
 have not been established, so it supports **no speedup or qualified time to
 precision claim**. It adds no physics-validation claim or sign-off.
 
+## Status at closure, 2026-11-07
+
+[#510](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/510)
+and its matched Geant4 single-scattering follow-up
+[#821](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/821)
+closed with their tooling landed and their measurement gates open. The tooling is
+the harness, Geant4/PyRITE/PenRed adapters, the frozen 44-case matrix and the
+comparison schema (PRs #579, #641, #645, #648, #824 and #893). **No
+equal-accuracy cross-engine speedup is qualified.** The issues recorded these
+outcomes:
+
+- Seeds 101 and 102 of the six-scene 90°/10° cone study (Si/W at 0.3/1/3 MeV).
+  The PyRITE CUDA continuous cone estimator reached several precision targets
+  far faster than Geant4 single scattering on 32 threads. These are statistical
+  timing ratios only. Unresolved mean differences remain, e.g. Si 300 keV
+  continuous/Geant4 = 1.087 (combined z = 3.19).
+- Frozen W study (19.3 g/cm³, 100 µm, 3/30/100 MeV, 1° cones at 0° and 15°;
+  job 3823, source `6481a07c8`). PyRITE/Geant4 SS uncollided yield is
+  1.36–1.70 at 30 MeV/15° and 2.00–2.94 at 100 MeV/15°, with smaller on-axis
+  differences that are still beyond sampling error.
+
+The raw outputs of those runs, the archived Geant4 reductions and the later
+uniform-2% jobs 3742/3744 were removed in remote cleanup before they were
+promoted. The figures above are transcribed from the issue records and cannot be
+reproduced from retained artifacts. Successor work regenerates its own evidence:
+
+- [#1039](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/1039):
+  W bremsstrahlung source with prescribed electron states.
+- [#1040](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/1040):
+  W electron-transport tails without photon scoring.
+- [#1041](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/1041):
+  accuracy-qualified `T(ε)` campaign against Geant4 SS/MSC and PenRed.
+- [#1042](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/1042):
+  reproduction of a measured high-Z bremsstrahlung spectrum.
+
+Standalone PENELOPE-2024 is deferred by the project owner. EGSnrc is deferred
+until the two-engine contract passes. The rest of this page is the dated pilot
+record.
+
 ## Frozen pilot scope
 
 The executable [manifest](../../../checks/equal_precision/manifest.json) fixes
