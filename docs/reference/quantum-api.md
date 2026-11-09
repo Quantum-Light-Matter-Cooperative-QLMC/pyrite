@@ -49,7 +49,7 @@ helpers are not implicitly part of this facade. The exact export/status list
 is governed by `api-surface.toml`.
 
 Portable recipes describe sources; runtime factories produce evaluated state
-objects. Use `TransverseStateSpec.recipe(...)` and `.to_runtime()` when a
+objects. Use `TransverseStateSpec.recipe(...)` and `.build()` when a
 durable source description is needed. Production source injection remains
 limited to its existing admitted subset, detailed in the planar guide.
 

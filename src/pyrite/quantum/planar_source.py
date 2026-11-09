@@ -276,7 +276,7 @@ def project_planar_source(
         source_dimension=state.dimension,
     )
     solver = _solver_for(metadata)
-    runtime = state.to_runtime(base_dir=base_dir)
+    runtime = state.build(base_dir=base_dir)
     wave_density, outside = planar_entry_density(
         solver, runtime, incidence_rad=float(incidence_rad), impact=impact
     )

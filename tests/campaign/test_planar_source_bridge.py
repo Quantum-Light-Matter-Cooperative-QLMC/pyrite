@@ -43,7 +43,7 @@ def test_projected_entry_is_identical_to_existing_solver_reference():
     )
     solver = DensityMatrixSolver(profile, ENERGY_EV, cached.kernel, margin_eV=projected.margin_eV)
     plane, outside = states.planar_entry_density(
-        solver, spec.to_runtime(), incidence_rad=0.0, impact="fixed"
+        solver, spec.build(), incidence_rad=0.0, impact="fixed"
     )
     rho, free, outside = solver.entry_from_plane(plane, outside)
     np.testing.assert_array_equal(projected.plane_density, plane)
@@ -196,7 +196,7 @@ def test_scoring_matches_existing_emitter_from_the_same_projected_state():
             grid,
             0.0,
             incidence_rad=proj.incidence_rad,
-            entry_state=state.to_runtime(),
+            entry_state=state.build(),
             entry_impact=impact,
             dz_ang=proj.setup.numerics.step_ang,
             sample_ang=40.0,
@@ -227,7 +227,7 @@ def test_preprojected_cr_input_validates_population_and_exclusivity():
             grid,
             0.0,
             entry_initial=proj.initial,
-            entry_state=source.to_runtime(),
+            entry_state=source.build(),
             **kwargs,
         )
     with pytest.raises(ValueError, match="entry_initial conflicts"):

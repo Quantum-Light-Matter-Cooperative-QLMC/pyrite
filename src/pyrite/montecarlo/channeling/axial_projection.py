@@ -16,11 +16,13 @@ from collections import OrderedDict
 from collections.abc import Sequence
 from dataclasses import dataclass
 from numbers import Integral
+from pathlib import Path
 from typing import Protocol
 
 import numpy as np
 from scipy.linalg import expm
 
+from ...quantum.state import TransverseStateSpec
 from .axial_mcwf import (
     AxialMCWF,
     AxialMCWFResult,
@@ -33,7 +35,7 @@ from .axial_mcwf import (
     density_observable,
 )
 from .mcwf import _rng
-from .states import EntryState, MixedState
+from .states import EntryState
 
 Index = tuple[np.ndarray, np.ndarray]
 Spectrum = Sequence[tuple[Index, np.ndarray, np.ndarray]]
@@ -243,7 +245,7 @@ def _trajectory(
 def run_spectral_mcwf(
     solver: AxialMCWF,
     projector: SpectralProjector,
-    entry: EntryState | MixedState,
+    entry: EntryState | TransverseStateSpec,
     depths_ang: Sequence[float],
     n_electrons: int,
     *,
@@ -254,6 +256,7 @@ def run_spectral_mcwf(
     tilt_rad: tuple[float, float] = (0.0, 0.0),
     observable: Observable = density_observable,
     jump_hook: JumpHook | None = None,
+    base_dir: str | Path | None = None,
 ) -> AxialMCWFResult:
     """Research CPU MCWF with exact finite-grid no-jump matrix propagation.
 
@@ -272,6 +275,8 @@ def run_spectral_mcwf(
     """
     if solver.backend != "cpu":
         raise ValueError("spectral MCWF research reference supports only CPU")
+    if isinstance(entry, TransverseStateSpec):
+        entry = entry.build(base_dir=base_dir)
     steps = _depth_steps(depths_ang, n_electrons, step_ang)
     stepper = SpectralNoJump(
         projector,

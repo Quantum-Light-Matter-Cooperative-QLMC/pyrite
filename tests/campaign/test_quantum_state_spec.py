@@ -74,7 +74,7 @@ def test_analytic_state_json_and_runtime(kind, kwargs, dimension):
     assert pr.TransverseStateSpec.from_dict(payload) == spec
     assert pickle.loads(pickle.dumps(spec)) == spec
     assert len(spec.digest) == 64
-    runtime = spec.to_runtime()
+    runtime = spec.build()
     assert runtime.dimension == dimension
 
 
@@ -88,7 +88,7 @@ def test_superposition_preserves_phase_and_mixture_is_not_superposition():
     assert pr.TransverseStateSpec.from_dict(serialized) == coherent
     assert tuple(w for w, _ in incoherent.terms) == (0.75, 0.25)
     assert incoherent.digest != coherent.digest
-    assert incoherent.to_runtime().dimension == 2
+    assert incoherent.build().dimension == 2
     assert pr.TransverseStateSpec.from_dict(incoherent.to_dict()) == incoherent
 
 
@@ -101,7 +101,7 @@ def test_translation_is_frozen_and_independent_of_caller_mutations():
     offset[0] = 99
     assert dict(original.parameters)["center_ang"] == (2, 3)
     assert dict(shifted.parameters)["offset_ang"] == (0.5, -1)
-    assert shifted.to_runtime().centre == (2.5, 2.0)
+    assert shifted.build().centre == (2.5, 2.0)
     with pytest.raises(FrozenInstanceError):
         shifted.kind = "gaussian"
 
@@ -116,7 +116,7 @@ def test_sampled_content_checks_and_location_independent_identity(tmp_path):
     b = pr.TransverseStateSpec.from_npy(second, spacing_ang=(0.1, 0.2))
     assert a.digest == b.digest
     assert a.to_dict()["parameters"]["path"] != b.to_dict()["parameters"]["path"]
-    result = a.to_runtime()
+    result = a.build()
     assert result.dimension == 2
     assert pr.TransverseStateSpec.from_dict(json.loads(json.dumps(a.to_dict()))) == a
 
@@ -124,11 +124,11 @@ def test_sampled_content_checks_and_location_independent_identity(tmp_path):
         a, parameters=tuple((k, "a.npy" if k == "path" else v) for k, v in a.parameters)
     )
     with pytest.raises(ValueError, match="base_dir"):
-        relative.to_runtime()
-    assert relative.to_runtime(base_dir=tmp_path).dimension == 2
+        relative.build()
+    assert relative.build(base_dir=tmp_path).dimension == 2
     np.save(first, array * 2)
     with pytest.raises(ValueError, match="content differs"):
-        a.to_runtime()
+        a.build()
 
 
 def test_configuration_refuses_invalid_inputs(tmp_path):

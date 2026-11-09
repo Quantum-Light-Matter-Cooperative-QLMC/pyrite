@@ -5,18 +5,20 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from numbers import Integral
+from pathlib import Path
 from typing import Literal
 
 import numpy as np
 
 from pyrite._units import reject_quantity
 from pyrite.materials.channeling.axial import AxialProfile, axial_profile
+from pyrite.quantum.state import TransverseStateSpec
 
 from .axial_dissipator import axial_dissipator
 from .axial_mcwf import AxialMCWF
 from .metrics import RECORDING_BUDGET_BYTES, AxialMetricsObservable, EnsembleMetrics
 from .realspace import RealSpaceGrid, SplitStepPropagator
-from .states import EntryState, MixedState, gaussian, momentum_inv_ang
+from .states import EntryState, MixedState, TransverseState, gaussian, momentum_inv_ang
 from .vortex import CylindricalProjection
 
 
@@ -347,9 +349,10 @@ def _validate_backend(config):
 def axial_diagnostic(
     config: AxialDiagnosticConfig = AxialDiagnosticConfig(),
     *,
-    entry: EntryState | None = None,
+    entry: EntryState | TransverseStateSpec | None = None,
     observable: Callable[[np.ndarray, tuple[float, float]], np.ndarray] | None = None,
     record_metrics: bool = False,
+    base_dir: str | Path | None = None,
 ) -> AxialDiagnosticResult:
     """Assemble the experimental axial diagnostic with optional stored ensemble metrics.
 
@@ -373,6 +376,10 @@ def axial_diagnostic(
     _validate(config)
     _validate_backend(config)
     entry = gaussian(waist_ang=0.5) if entry is None else entry
+    if isinstance(entry, TransverseStateSpec):
+        entry = entry.build(base_dir=base_dir)
+    if not isinstance(entry, (TransverseState, MixedState)):
+        raise TypeError('entry must be a runtime state or TransverseStateSpec')
     if entry.dimension != 2:
         raise ValueError("entry must be a 2D state")
     profile = axial_profile(config.crystal, config.axis, config.temperature_K)

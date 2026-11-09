@@ -27,17 +27,19 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
 import scipy.fft
 
 from ..._units import reject_quantity
 from ...materials.crystal import HBAR2_2M_EV_ANG2
+from ...quantum.state import TransverseStateSpec
 from .axial_dissipator import AxialDissipator
 from .bloch import longitudinal_kinematics
 from .mcwf import _rng
 from .realspace import RealSpaceGrid
-from .states import EntryState, MixedState, momentum_inv_ang
+from .states import EntryState, MixedState, TransverseState, momentum_inv_ang
 
 #: Rejection trials allowed per TDS displacement draw.
 MAX_REJECTION_TRIALS = 100_000
@@ -213,7 +215,7 @@ class AxialMCWF:
 
     def run(
         self,
-        entry: EntryState,
+        entry: EntryState | TransverseStateSpec,
         depths_ang: Sequence[float],
         n_electrons: int,
         *,
@@ -224,6 +226,7 @@ class AxialMCWF:
         jump_hook: JumpHook | None = None,
         batch_size: int | None = None,
         memory_budget_bytes: int | None = None,
+        base_dir: str | Path | None = None,
     ) -> AxialMCWFResult:
         """Run ``n_electrons`` trajectories from ``entry`` and average ``observable``.
 
@@ -243,6 +246,12 @@ class AxialMCWF:
         reductions before device allocation. Results contain host arrays.
         Depths, step and tilt are numeric-only; Pint quantities raise ``TypeError``.
         """
+        if isinstance(entry, TransverseStateSpec):
+            entry = entry.build(base_dir=base_dir)
+        if not isinstance(entry, (TransverseState, MixedState)):
+            raise TypeError('entry must be a runtime state or TransverseStateSpec')
+        if entry.dimension != 2:
+            raise ValueError('entry must be a 2D state')
         reject_quantity(depths_ang, field="AxialMCWF.run.depths_ang", unit="angstrom")
         reject_quantity(step_ang, field="AxialMCWF.run.step_ang", unit="angstrom")
         reject_quantity(tilt_rad, field="AxialMCWF.run.tilt_rad", unit="rad")

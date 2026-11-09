@@ -451,7 +451,7 @@ class TransverseStateSpec:
         """Reference a saved .npy array by its exact contents (no embedding).
 
         Relative artifact paths require ``base_dir`` when later calling
-        :meth:`to_runtime`. The SHA covers contiguous array data; dtype and
+        :meth:`build`. The SHA covers contiguous array data; dtype and
         shape are tracked separately. Only 1D/2D finite floating arrays with
         nonzero amplitude are accepted. Files remain external to JSON.
         ``spacing``, ``origin`` and ``kinetic_energy`` are Pint quantity
@@ -572,7 +572,7 @@ class TransverseStateSpec:
         """SHA256 of the canonical source descriptor, independent of runtime arrays."""
         return hashlib.sha256(self.canonical_json().encode("utf-8")).hexdigest()
 
-    def to_runtime(self, *, base_dir: str | Path | None = None):
+    def build(self, *, base_dir: str | Path | None = None):
         """Build an existing channeling EntryState from this portable spec.
 
         This is a state *construction* adapter, not a production Scene lowerer.
@@ -608,7 +608,7 @@ class TransverseStateSpec:
                 origin_ang=params["origin_ang"],
                 kinetic_energy_eV=params["kinetic_energy_eV"],
             )
-        children = [(w, s.to_runtime(base_dir=base_dir)) for w, s in self.terms]
+        children = [(w, s.build(base_dir=base_dir)) for w, s in self.terms]
         if self.kind == "translated":
             return states.translate(children[0][1], params["offset_ang"])
         if self.kind == "mixture":

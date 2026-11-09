@@ -253,4 +253,4 @@ def test_runtime_units_preserve_portable_spec_identity_and_json():
     assert bare.digest == unitful.digest
     assert bare.to_dict() == unitful.to_dict()
     assert isinstance(json.loads(unitful.canonical_json()), dict)
-    assert unitful.to_runtime().centre == pytest.approx(bare.to_runtime().centre)
+    assert unitful.build().centre == pytest.approx(bare.build().centre)
