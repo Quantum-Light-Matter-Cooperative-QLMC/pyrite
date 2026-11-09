@@ -45,6 +45,7 @@ from __future__ import annotations
 import math
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -422,6 +423,22 @@ class MixedState:
 
 
 EntryState = TransverseState | MixedState
+
+
+def axial_entry(entry: object, base_dir: str | Path | None = None) -> EntryState:
+    """Runtime 2D entry state from a runtime state or a ``TransverseStateSpec``.
+
+    Specs are built with ``base_dir`` resolving relative artifact paths.
+    """
+    from ...quantum.state import TransverseStateSpec
+
+    if isinstance(entry, TransverseStateSpec):
+        entry = entry.build(base_dir=base_dir)
+    if not isinstance(entry, (TransverseState, MixedState)):
+        raise TypeError("entry must be a runtime state or TransverseStateSpec")
+    if entry.dimension != 2:
+        raise ValueError("entry must be a 2D state")
+    return entry
 
 
 # ---------------------------------------------------------------------------

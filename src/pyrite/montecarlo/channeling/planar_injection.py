@@ -92,7 +92,7 @@ def source_entry_initial(case, solver, incidence_rad: float):
 
     spec = source_spec(case["channeling_source"])
     plane, outside = planar_entry_density(
-        solver, spec.to_runtime(), incidence_rad=incidence_rad, impact="averaged"
+        solver, spec.build(), incidence_rad=incidence_rad, impact="averaged"
     )
     rho, free, out = solver.entry_from_plane(plane, outside)
     return rho, float(np.sum(free) + out)
