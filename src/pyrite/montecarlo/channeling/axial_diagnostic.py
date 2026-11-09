@@ -18,7 +18,7 @@ from .axial_dissipator import axial_dissipator
 from .axial_mcwf import AxialMCWF
 from .metrics import RECORDING_BUDGET_BYTES, AxialMetricsObservable, EnsembleMetrics
 from .realspace import RealSpaceGrid, SplitStepPropagator
-from .states import EntryState, MixedState, TransverseState, gaussian, momentum_inv_ang
+from .states import EntryState, MixedState, axial_entry, gaussian, momentum_inv_ang
 from .vortex import CylindricalProjection
 
 
@@ -376,12 +376,7 @@ def axial_diagnostic(
     _validate(config)
     _validate_backend(config)
     entry = gaussian(waist_ang=0.5) if entry is None else entry
-    if isinstance(entry, TransverseStateSpec):
-        entry = entry.build(base_dir=base_dir)
-    if not isinstance(entry, (TransverseState, MixedState)):
-        raise TypeError('entry must be a runtime state or TransverseStateSpec')
-    if entry.dimension != 2:
-        raise ValueError("entry must be a 2D state")
+    entry = axial_entry(entry, base_dir)
     profile = axial_profile(config.crystal, config.axis, config.temperature_K)
     grid = RealSpaceGrid(
         (profile.period_ang[0] * config.cells[0], profile.period_ang[1] * config.cells[1]),

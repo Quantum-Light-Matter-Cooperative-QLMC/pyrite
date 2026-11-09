@@ -35,7 +35,7 @@ from .axial_mcwf import (
     density_observable,
 )
 from .mcwf import _rng
-from .states import EntryState
+from .states import EntryState, axial_entry
 
 Index = tuple[np.ndarray, np.ndarray]
 Spectrum = Sequence[tuple[Index, np.ndarray, np.ndarray]]
@@ -275,8 +275,7 @@ def run_spectral_mcwf(
     """
     if solver.backend != "cpu":
         raise ValueError("spectral MCWF research reference supports only CPU")
-    if isinstance(entry, TransverseStateSpec):
-        entry = entry.build(base_dir=base_dir)
+    entry = axial_entry(entry, base_dir)
     steps = _depth_steps(depths_ang, n_electrons, step_ang)
     stepper = SpectralNoJump(
         projector,
