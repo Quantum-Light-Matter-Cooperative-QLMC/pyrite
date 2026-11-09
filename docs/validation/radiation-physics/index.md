@@ -49,6 +49,8 @@ photon-full-track-thick-brem
 coherent-formation-absorption
 coherent-inter-electron-decoherence
 quantum-pair-population-normalization
+longitudinal-energy-diagonal-emission
+longitudinal-quantum-bunching
 coherent-physical-bunch-population
 coherent-line-spectrum
 coherent-segment-midpoint-time

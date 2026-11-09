@@ -23,6 +23,7 @@ physics/relativistic-electron-transport
 physics/relativistic-pxr-cbs
 physics/superradiant-pxr
 physics/quantum-coherent-emission
+physics/longitudinal-coherence-recoil
 physics/phase-retention
 physics/channeling-radiation-physics
 physics/channeling-submev-envelope

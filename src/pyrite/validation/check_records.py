@@ -116,6 +116,10 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     "checks/feranchuk_vs_zhai_check.py": ("closed-form-flux", "coherent-line-spectrum"),
     "checks/kinematic_validity_check.py": ("coherent-line-spectrum", "line-energy-dispersion"),
     "checks/line_window_backend_agreement.py": ("line-window-seeding",),
+    "checks/longitudinal_coherence_regimes.py": (
+        "longitudinal-quantum-bunching",
+        "cr-recoil-line-energy",
+    ),
     "checks/mosaic_mc_check.py": ("mosaic-analytic", "mosaic-mc"),
     "checks/multilayer_check.py": ("multilayer-stack", "self-absorption"),
     "checks/multilayer_slice3_check.py": ("multilayer-stack", "self-absorption"),
