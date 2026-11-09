@@ -45,6 +45,7 @@ physics/optical-ir-emission
 physics/production-cherenkov
 physics/photon-transport
 physics/cxr-boundary-photon-source
+physics/cxr-carbon-first-interaction-411
 physics/photon-continuous-sources
 physics/photon-continuous-scoring
 physics/photon-scene-handoff
