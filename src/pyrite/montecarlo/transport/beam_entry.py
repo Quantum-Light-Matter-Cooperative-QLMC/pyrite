@@ -17,7 +17,7 @@ from ..geometry import (
 )
 from ..groove import entry_points
 from ..transverse import resolved_from_mapping, sample_transverse
-from .kinematics import beta_from_keV, child_stream_root, counter_normals
+from .kinematics import beta_from_keV, child_stream_root, counter_normals, counter_uniforms
 
 
 def initial_beam_positions(
@@ -31,6 +31,7 @@ def initial_beam_positions(
     tilt_azim_rad,
     groove,
     start=0,
+    counter_groove_phase=False,
     E0_keV=None,
     energy_spread_frac=None,
     bunch_front_tilt=None,
@@ -39,8 +40,11 @@ def initial_beam_positions(
 
     Spot and Twiss draws are counter-addressed per electron inside their child
     namespaces, so a block ``[start, stop)`` equals that slice of one larger
-    draw. The groove phase stays on its sequential child generator; grooved
-    transport is lockstep-only and never runs in electron blocks.
+    draw. The historical lockstep groove phase stays on its sequential child
+    generator. ``counter_groove_phase=True`` opts into the counter-addressed
+    phase for the forthcoming per-electron grooved core (#972), without changing
+    the existing lockstep results. It is a private staging option; the outer
+    transport driver still refuses grooved electron blocks.
 
     ``transverse_slopes`` is ``(x', y')`` from a Twiss ``transverse_distribution``,
     else ``None``. ``beam_entry`` is :func:`beam_entry_record` for nominal
@@ -85,14 +89,21 @@ def initial_beam_positions(
         # bit-for-bit, so the untilted beam draw is unchanged.
         pos[:, :2] = project_beam_entry(offsets, tilt_polar_rad, tilt_azim_rad)
     elif groove is not None:
-        if start:
-            raise ValueError("grooved beam entry does not support electron blocks")
-        # Groove effects depend on x mod spacing; a point source samples one
-        # phase only. Draw the lateral phase uniformly over one period from an
-        # independent child stream (same spawn pattern as beam_rng, so the
-        # main free-path/scattering draws are untouched).
-        phase_rng = np.random.default_rng(np.random.SeedSequence(seed).spawn(3)[2])
-        pos[:, 0] = phase_rng.uniform(0.0, groove.spacing_ang, size=Ne)
+        # A point source at the flat face must sample the groove period instead
+        # of concentrating every electron at the same facet. Both modes use the
+        # historical spawn(3)[2] child, isolated from the transport stream.
+        if counter_groove_phase:
+            # Draw 0 of global electron e, independent of Ne and the block.
+            # The same mechanism already addresses the spot/Twiss streams.
+            phase = counter_uniforms(child_stream_root(seed, 3, 2), Ne, 1, start=start)
+            pos[:, 0] = phase[:, 0] * groove.spacing_ang
+        else:
+            # Preserve the released lockstep phase sequence bit-for-bit until
+            # the per-electron grooved routing and model marker are migrated.
+            if start:
+                raise ValueError("grooved beam entry does not support electron blocks")
+            phase_rng = np.random.default_rng(np.random.SeedSequence(seed).spawn(3)[2])
+            pos[:, 0] = phase_rng.uniform(0.0, groove.spacing_ang, size=Ne)
     if groove is not None:
         # Slide each ray along the beam to its relief-facet entry point.
         # Later flights use exact groove exit/re-entry events below.

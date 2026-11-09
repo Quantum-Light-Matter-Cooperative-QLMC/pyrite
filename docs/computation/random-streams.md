@@ -31,7 +31,7 @@ They compose: the child tree partitions host-side input sampling by physical inp
 
 Each optional beam or bunch distribution draws from its own child of the run seed, obtained by spawning a fixed number of children and taking the last. The index assignment is fixed and documented in the code, because it is part of the reproducibility contract rather than an implementation detail.
 
-Inside a beam or bunch child, draws are counter-addressed per electron (`child_stream_root`, `counter_normals` in `montecarlo/transport/kinematics.py`). The child's first 64-bit state word roots the stream, and draw $c$ of electron $e$ is the counter construction {eq}`eq-streams-counter-address` with a 52-bit mantissa, $u = (\lfloor z/2^{12} \rfloor + \tfrac12)\,2^{-52} \in (0, 1)$. Gaussian draws are $\Phi^{-1}(u)$, one uniform per normal; the representable range truncates the tails at $|z| \approx 8.2$. A per-electron draw therefore depends on $(\text{seed}, e, c)$ only, never on the electron count. The groove phase, which only the lockstep core consumes, stays on a sequential generator.
+Inside a beam or bunch child, draws are counter-addressed per electron (`child_stream_root`, `counter_normals` in `montecarlo/transport/kinematics.py`). The child's first 64-bit state word roots the stream, and draw $c$ of electron $e$ is the counter construction {eq}`eq-streams-counter-address` with a 52-bit mantissa, $u = (\lfloor z/2^{12} \rfloor + \tfrac12)\,2^{-52} \in (0, 1)$. Gaussian draws are $\Phi^{-1}(u)$, one uniform per normal; the representable range truncates the tails at $|z| \approx 8.2$. A per-electron draw therefore depends on $(\text{seed}, e, c)$ only, never on the electron count. For #972, the new per-electron groove-phase mode uses counter draw 0 inside the existing `spawn(3)[2]` child. Until its exact core is routed, lockstep still uses the historical sequential generator so current grooved results are unchanged.
 
 ```{list-table} Child-stream assignment by physical input.
 :name: tbl-streams-children
@@ -45,7 +45,8 @@ Inside a beam or bunch child, draws are counter-addressed per electron (`child_s
   - Gaussian entry offsets: counter draws 0 (x) and 1 (y)
 * - `spawn(3)[2]`
   - Groove lateral phase
-  - Uniform phase over one groove period (sequential; lockstep only)
+  - Uniform phase over one groove period (legacy sequential for lockstep;
+    counter draw 0 of each electron for the staged per-electron mode)
 * - `spawn(4)[3]`
   - Longitudinal bunch
   - Arrival-time offsets: counter draws 0 (Gaussian or train centre),

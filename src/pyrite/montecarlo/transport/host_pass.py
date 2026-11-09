@@ -478,6 +478,9 @@ def _sample_entry(p, c, stack, launch, electron_start):
         tilt_azim_rad=p.tilt_azim_rad,
         groove=p.groove,
         start=electron_start,
+        # This is dormant while #972 keeps grooved runs on lockstep. Once the
+        # exact per-electron grooved core is routed, its phase is block-stable.
+        counter_groove_phase=c.transport_core == "per-electron",
         E0_keV=p.E0_keV,
         energy_spread_frac=p.energy_spread_frac,
         bunch_front_tilt=bunch_front_tilt,
