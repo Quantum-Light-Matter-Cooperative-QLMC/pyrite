@@ -323,6 +323,89 @@ def _overall_progress_line(records, materials=(), *, use_cost=False, state_overr
     return f"{accent}  {percent:>3}%  {completed}/{job_total} cases"
 
 
+def _time_work_units(record, *, use_cost):
+    """Normalize either case counts or compute costs to matching work units."""
+    if use_cost:
+        done, total = _cost_progress(record)
+        cost_key = "sample_new_cost" if "sample_compute_seconds" in record else "measured_new_cost"
+        measured = record.get(cost_key)
+        if measured is None and "done_cost" not in record:
+            measured = record.get(
+                "sample_new_cases" if "sample_compute_seconds" in record else "measured_new_cases"
+            )
+    else:
+        done = float(record["cached_cases"] + record["completed_new_cases"])
+        total = float(record["total_cases"])
+        measured = record.get(
+            "sample_new_cases" if "sample_compute_seconds" in record else "measured_new_cases"
+        )
+    return done, total, measured
+
+
+def _time_work_sample(record, *, use_cost):
+    """Return remaining fraction, sampled rate, active seconds, and sample totals.
+
+    Only completed positive-duration intervals contribute to the pooled rate;
+    cached work and unfinished intervals still count toward progress, not speed.
+    """
+    done, total, measured = _time_work_units(record, use_cost=use_cost)
+    done_fraction = 1.0 if total == 0 else min(1.0, done / total)
+    remaining_fraction = 0.0 if record["state"] == "done" else 1.0 - done_fraction
+    active = record.get("active_compute_seconds")
+    active_seconds = (
+        float(active) if isinstance(active, (int, float)) and not isinstance(active, bool) else None
+    )
+    duration = record.get("sample_compute_seconds", active)
+    if (
+        isinstance(measured, (int, float))
+        and not isinstance(measured, bool)
+        and isinstance(duration, (int, float))
+        and not isinstance(duration, bool)
+        and total > 0
+        and measured > 0
+        and duration > 0
+    ):
+        fraction = min(done_fraction, float(measured) / total)
+        if fraction > 0:
+            return remaining_fraction, fraction / duration, active_seconds, fraction, duration
+    return remaining_fraction, None, active_seconds, 0.0, 0.0
+
+
+def _schedule_remaining_work(work, *, parallel, pooled_rate):
+    """Greedily assign started work first, then unstarted work, to free slots."""
+    slots = [0.0] * min(parallel, len(work))
+    for started in (True, False):
+        for fraction, rate, is_started in work:
+            if fraction <= 0 or is_started != started:
+                continue
+            duration = fraction / (rate or pooled_rate)
+            slot = min(range(len(slots)), key=slots.__getitem__)
+            slots[slot] += duration
+    return max(slots)
+
+
+def _time_work_profile(records, ordered, *, use_cost):
+    """Collect sampled work and CPU-active durations for each roster entry."""
+    seconds = []
+    work = []
+    sample_seconds = 0.0
+    sample_fraction = 0.0
+    failed = False
+    for material in ordered:
+        record = records.get(material)
+        if record is None:
+            work.append((1.0, None, False))
+            continue
+        failed = failed or record["state"] == "failed"
+        remaining, rate, active, fraction, duration = _time_work_sample(record, use_cost=use_cost)
+        if active is not None:
+            seconds.append(active)
+        sample_fraction += fraction
+        sample_seconds += duration
+        work.append((remaining, rate, True))
+    return work, seconds, failed, sample_fraction, sample_seconds
+
+
 def _compute_time_estimate(records, materials=(), *, use_cost=False, parallel_materials=1):
     """Estimate per-material remaining work, then schedule it across job slots.
 
@@ -339,57 +422,9 @@ def _compute_time_estimate(records, materials=(), *, use_cost=False, parallel_ma
         parallel = max(1, int(parallel_materials))
     except (TypeError, ValueError):
         parallel = 1
-    seconds = []
-    work = []
-    sample_seconds = 0.0
-    sample_fraction = 0.0
-    failed = False
-    for material in ordered:
-        record = records.get(material)
-        if record is None:
-            work.append((1.0, None, False))
-            continue
-        failed = failed or record["state"] == "failed"
-        if use_cost:
-            done, total = _cost_progress(record)
-            cost_key = (
-                "sample_new_cost" if "sample_compute_seconds" in record else "measured_new_cost"
-            )
-            measured = record.get(cost_key)
-            if measured is None and "done_cost" not in record:
-                measured = record.get(
-                    "sample_new_cases"
-                    if "sample_compute_seconds" in record
-                    else "measured_new_cases"
-                )
-        else:
-            done = float(record["cached_cases"] + record["completed_new_cases"])
-            total = float(record["total_cases"])
-            measured = record.get(
-                "sample_new_cases" if "sample_compute_seconds" in record else "measured_new_cases"
-            )
-        done_fraction = 1.0 if total == 0 else min(1.0, done / total)
-        remaining_fraction = 0.0 if record["state"] == "done" else 1.0 - done_fraction
-        active = record.get("active_compute_seconds")
-        if isinstance(active, (int, float)) and not isinstance(active, bool):
-            seconds.append(float(active))
-        duration = record.get("sample_compute_seconds", active)
-        rate = None
-        if (
-            isinstance(measured, (int, float))
-            and not isinstance(measured, bool)
-            and isinstance(duration, (int, float))
-            and not isinstance(duration, bool)
-            and total > 0
-            and measured > 0
-            and duration > 0
-        ):
-            fraction = min(done_fraction, float(measured) / total)
-            if fraction > 0:
-                rate = fraction / duration
-                sample_fraction += fraction
-                sample_seconds += duration
-        work.append((remaining_fraction, rate, True))
+    work, seconds, failed, sample_fraction, sample_seconds = _time_work_profile(
+        records, ordered, use_cost=use_cost
+    )
     elapsed = max(max(seconds), sum(seconds) / parallel) if seconds else None
     if elapsed is None:
         return unavailable
@@ -398,17 +433,7 @@ def _compute_time_estimate(records, materials=(), *, use_cost=False, parallel_ma
     if failed or sample_fraction <= 0 or sample_seconds <= 0:
         return {"elapsed": elapsed, "remaining": None, "total": None}
     pooled_rate = sample_fraction / sample_seconds
-    # Started materials occupy slots before the queued roster. Greedy assignment
-    # includes the serial tail rather than dividing all remaining work by N.
-    slots = [0.0] * min(parallel, len(ordered))
-    for started in (True, False):
-        for fraction, rate, is_started in work:
-            if fraction <= 0 or is_started != started:
-                continue
-            duration = fraction / (rate or pooled_rate)
-            slot = min(range(len(slots)), key=slots.__getitem__)
-            slots[slot] += duration
-    remaining = max(slots)
+    remaining = _schedule_remaining_work(work, parallel=parallel, pooled_rate=pooled_rate)
     if not math.isfinite(remaining) or remaining < 0:
         return {"elapsed": elapsed, "remaining": None, "total": None}
     return {"elapsed": elapsed, "remaining": remaining, "total": elapsed + remaining}
@@ -674,15 +699,31 @@ def _pending_queue_context(payload, target_job_id):
     return _state._pending_queue_context(payload, target_job_id)
 
 
-def format_job_status(sections, detail):
+def _status_phase_records(records, *, cpu_phase):
+    """Select the active phase for the headline without hiding other rows."""
+    if cpu_phase:
+        selected = {
+            record["material"]: record
+            for record in records.values()
+            if record.get("phase") == "cpu"
+        }
+    else:
+        selected = {
+            record["material"]: record
+            for record in records.values()
+            if record.get("phase") != "cpu"
+        }
+    return selected or records
+
+
+def _status_context(sections):
+    """Normalize shared local/remote status fields before building display rows."""
     metadata = sections.get("META", "")
     fields = metadata_fields(metadata)
     scheduler = scheduler_fields(sections.get("SQUEUE", ""))
-    jobid = sanitize_terminal(sections.get("JOB") or fields.get("job", "?"))
     state_text = sanitize_terminal(sections.get("STATE") or "(no state yet)", multiline=True)
     kind = fields.get("kind", "material-sweep")
     diagnostic = kind == "line-grid-bounds"
-    materials = fields.get("materials", "-").split()
     scheduler_id = scheduler.get("job_id") or fields.get("slurm_job_id", "-")
     scheduler_state = scheduler.get("state", "NOT_QUEUED")
     queued = scheduler_state.upper() == "PENDING" or state_text.lower().startswith("queued")
@@ -691,166 +732,187 @@ def format_job_status(sections, detail):
         if scheduler_state not in ("", "NOT_QUEUED")
         else ("PENDING" if queued else state_text)
     )
-    progress_state = "paused" if queued else None
-    # Progress is fetched at every verbosity now, so the overall bar and the
-    # per-material CASE PROGRESS block render at levels 0/1/2 alike; the log is
-    # still only pulled (and legacy-parsed) at -vv.
+    # Progress is fetched at all verbosity levels, but legacy log parsing
+    # remains restricted to -vv. Diagnostic jobs do not consume progress.
     records = {} if diagnostic else parse_progress_records(sections.get("PROGRESS", ""))
     cpu_phase = fields.get("cpu_only") == "True" or state_text.startswith(
         ("profiling CPU", "completed CPU", "CPU profile failed", "done CPU", "FAILED CPU")
     )
-    phase_records = records
-    if cpu_phase:
-        cpu_records = {
-            record["material"]: record
-            for record in records.values()
-            if record.get("phase") == "cpu"
-        }
-        if cpu_records:
-            phase_records = cpu_records
-    else:
-        primary_records = {
-            record["material"]: record
-            for record in records.values()
-            if record.get("phase") != "cpu"
-        }
-        if primary_records:
-            phase_records = primary_records
-    rows = [
-        ("State", display_state),
+    return {
+        "metadata": metadata,
+        "fields": fields,
+        "scheduler": scheduler,
+        "jobid": sanitize_terminal(sections.get("JOB") or fields.get("job", "?")),
+        "state_text": state_text,
+        "kind": kind,
+        "diagnostic": diagnostic,
+        "materials": fields.get("materials", "-").split(),
+        "scheduler_id": scheduler_id,
+        "queued": queued,
+        "display_state": display_state,
+        "progress_state": "paused" if queued else None,
+        "records": records,
+        "cpu_phase": cpu_phase,
+        "phase_records": _status_phase_records(records, cpu_phase=cpu_phase),
+    }
+
+
+def _status_queue_rows(sections, context):
+    """Pending-queue position and priority caveat, when a snapshot exists."""
+    queue_context = (
+        _pending_queue_context(sections.get("QUEUE", ""), context["scheduler_id"])
+        if context["queued"]
+        else None
+    )
+    if queue_context is None:
+        return []
+    top = queue_context["top"]
+    return [
+        (
+            "Queue position",
+            f"{queue_context['rank']}/{queue_context['count']} pending in "
+            f"{queue_context['partition']}",
+        ),
+        (
+            "Queue leader",
+            f"{top['job_id']} · {top['user']}/{top['name']} · {top['reason']}",
+        ),
+        (
+            "Queue note",
+            "Priority snapshot; priority can change and backfill may run lower-ranked jobs first.",
+        ),
     ]
+
+
+def _status_diagnostic_rows(context):
+    fields = context["fields"]
+    slice_text = fields.get("slice_minutes", "-")
+    try:
+        hard_minutes = max(1, math.ceil(float(slice_text) * 3))
+    except ValueError:
+        hard_minutes = "-"
+    return [
+        ("Kind", context["kind"]),
+        ("Energies", f"{fields.get('energies', '-')} keV"),
+        ("Slice", f"{slice_text} min soft / {hard_minutes} min hard"),
+        ("Output", fields.get("json_out", "-")),
+    ]
+
+
+def _status_summary_rows(context):
+    """Material and mode rows common to scan and material-based remote jobs."""
+    records = context["phase_records"]
+    materials = context["materials"]
+    done_materials = sum(1 for record in records.values() if record["state"] == "done")
+    material_count = len([material for material in materials if material != "-"])
+    roster = _format_material_roster(materials, include_count=False)
+    material_summary = f"{done_materials}/{material_count} complete"
+    if roster != "-":
+        material_summary += f"\n{roster}"
+    rows = [
+        ("Materials", material_summary),
+        ("Mode", mode_summary(context["metadata"])),
+    ]
+    profile = _profile_summary(context["fields"])
+    if profile is not None:
+        rows.append(("Profile", profile))
+    return rows
+
+
+def _status_progress_rows(context, detail):
+    """Compute-weighted base bar and optional case-count comparison at -v."""
+    records = context["phase_records"]
+    materials = context["materials"]
+    progress_state = context["progress_state"]
+    parallel = context["fields"].get("parallel_materials", 1)
+    if _has_cost_data(records):
+        timing = _compute_time_estimate(
+            records, materials, use_cost=True, parallel_materials=parallel
+        )
+        overall_compute = _overall_progress_line(
+            records, materials, use_cost=True, state_override=progress_state
+        )
+        overall_cases = _overall_progress_line(
+            records, materials, use_cost=False, state_override=progress_state
+        )
+        rows = []
+        if detail >= 1:
+            if overall_compute is not None:
+                rows.append(
+                    ("Progress (compute)", f"{overall_compute}  ·  {_compute_time_suffix(timing)}")
+                )
+            if overall_cases is not None:
+                rows.append(("Progress (cases)", overall_cases))
+        elif overall_compute is not None:
+            rows.append(("Progress", f"{overall_compute}  ·  {_compute_time_suffix(timing)}"))
+        return rows
+    timing = _compute_time_estimate(records, materials, parallel_materials=parallel)
+    overall = _overall_progress_line(records, materials, state_override=progress_state)
+    if overall is not None:
+        return [("Progress", f"{overall}  ·  {_compute_time_suffix(timing)}")]
+    return []
+
+
+def _status_header_rows(sections, context, detail):
+    rows = [("State", context["display_state"])]
     capture_sizes = sanitize_terminal(sections.get("TRAJECTORIES", ""), multiline=True).strip()
     if capture_sizes:
         rows.append(("Trajectory bytes / stem", capture_sizes))
     timeout_event = sanitize_terminal(sections.get("TIMEOUT", "")).strip()
     if timeout_event:
         rows.append(("Last timeout", timeout_event))
-    if cpu_phase and state_text != display_state:
-        rows.append(("Phase", state_text))
-    queue_context = (
-        _pending_queue_context(sections.get("QUEUE", ""), scheduler_id) if queued else None
-    )
-    if queue_context is not None:
-        top = queue_context["top"]
-        rows.extend(
-            [
-                (
-                    "Queue position",
-                    f"{queue_context['rank']}/{queue_context['count']} pending in "
-                    f"{queue_context['partition']}",
-                ),
-                (
-                    "Queue leader",
-                    f"{top['job_id']} · {top['user']}/{top['name']} · {top['reason']}",
-                ),
-                (
-                    "Queue note",
-                    "Priority snapshot; priority can change and backfill may run "
-                    "lower-ranked jobs first.",
-                ),
-            ]
-        )
-    if diagnostic:
-        slice_text = fields.get("slice_minutes", "-")
-        try:
-            hard_minutes = max(1, math.ceil(float(slice_text) * 3))
-        except ValueError:
-            hard_minutes = "-"
-        rows.extend(
-            [
-                ("Kind", kind),
-                ("Energies", f"{fields.get('energies', '-')} keV"),
-                ("Slice", f"{slice_text} min soft / {hard_minutes} min hard"),
-                ("Output", fields.get("json_out", "-")),
-            ]
-        )
+    if context["cpu_phase"] and context["state_text"] != context["display_state"]:
+        rows.append(("Phase", context["state_text"]))
+    rows.extend(_status_queue_rows(sections, context))
+    if context["diagnostic"]:
+        rows.extend(_status_diagnostic_rows(context))
     else:
-        done_materials = sum(1 for record in phase_records.values() if record["state"] == "done")
-        material_count = len([material for material in materials if material != "-"])
-        roster = _format_material_roster(materials, include_count=False)
-        material_summary = f"{done_materials}/{material_count} complete"
-        if roster != "-":
-            material_summary += f"\n{roster}"
-        rows.extend(
-            [
-                ("Materials", material_summary),
-                ("Mode", mode_summary(metadata)),
-            ]
-        )
-        profile = _profile_summary(fields)
-        if profile is not None:
-            rows.append(("Profile", profile))
-        # Plain or attached `status` (detail 0) shows one bar -- compute-weighted
-        # when the job's progress records carry cost data, else the legacy
-        # case-count bar (unchanged for rebrem/reline/older jobs). -v/-vv show
-        # both so a heavy-vs-cheap-case skew is visible alongside raw counts.
-        if _has_cost_data(phase_records):
-            timing = _compute_time_estimate(
-                phase_records,
-                materials,
-                use_cost=True,
-                parallel_materials=fields.get("parallel_materials", 1),
-            )
-            overall_compute = _overall_progress_line(
-                phase_records, materials, use_cost=True, state_override=progress_state
-            )
-            overall_cases = _overall_progress_line(
-                phase_records, materials, use_cost=False, state_override=progress_state
-            )
-            if detail >= 1:
-                if overall_compute is not None:
-                    rows.append(
-                        (
-                            "Progress (compute)",
-                            f"{overall_compute}  ·  {_compute_time_suffix(timing)}",
-                        )
-                    )
-                if overall_cases is not None:
-                    rows.append(("Progress (cases)", overall_cases))
-            elif overall_compute is not None:
-                rows.append(("Progress", f"{overall_compute}  ·  {_compute_time_suffix(timing)}"))
-        else:
-            timing = _compute_time_estimate(
-                phase_records,
-                materials,
-                parallel_materials=fields.get("parallel_materials", 1),
-            )
-            overall = _overall_progress_line(
-                phase_records, materials, state_override=progress_state
-            )
-            if overall is not None:
-                rows.append(("Progress", f"{overall}  ·  {_compute_time_suffix(timing)}"))
-    output = [f"JOB {jobid}", format_fields(rows)]
-    if not diagnostic:
-        progress = _format_case_progress(records, materials)
+        rows.extend(_status_summary_rows(context))
+        rows.extend(_status_progress_rows(context, detail))
+    return rows
+
+
+def _status_allocation_rows(context):
+    scheduler = context["scheduler"]
+    return [
+        ("SLURM job", context["scheduler_id"]),
+        ("Partition", scheduler.get("partition", "-")),
+        ("Elapsed", scheduler.get("elapsed", "-")),
+        ("Remaining", scheduler.get("left", "-")),
+        ("Nodes", scheduler.get("nodes", "-")),
+        ("Reason", scheduler.get("reason", "-")),
+        ("Workers", context["fields"].get("workers", "-")),
+    ]
+
+
+def _status_detail_sections(sections, context, detail):
+    """Assemble optional sections in the original CLI ordering and verbosity."""
+    output = []
+    if not context["diagnostic"]:
+        records = context["records"]
+        progress = _format_case_progress(records, context["materials"])
         if not records and detail >= 2:
-            progress = _legacy_progress(sections.get("LOG", ""), state_text) or progress
+            progress = _legacy_progress(sections.get("LOG", ""), context["state_text"]) or progress
         output.extend(["", "CASE PROGRESS", progress])
         performance = _format_performance_profiles(sections.get("PERFORMANCE", ""))
         if performance is not None:
             output.extend(["", "PERFORMANCE PROFILE", performance])
     if detail >= 1:
-        allocation = [
-            ("SLURM job", scheduler_id),
-            ("Partition", scheduler.get("partition", "-")),
-            ("Elapsed", scheduler.get("elapsed", "-")),
-            ("Remaining", scheduler.get("left", "-")),
-            ("Nodes", scheduler.get("nodes", "-")),
-            ("Reason", scheduler.get("reason", "-")),
-            ("Workers", fields.get("workers", "-")),
-        ]
-        output.extend(["", "ALLOCATION", format_fields(allocation)])
+        output.extend(["", "ALLOCATION", format_fields(_status_allocation_rows(context))])
     if detail >= 2:
-        output.extend(
-            [
-                "",
-                "COMPUTE USAGE",
-                _format_compute_usage(sections.get("RESOURCES", "")),
-            ]
-        )
+        output.extend(["", "COMPUTE USAGE", _format_compute_usage(sections.get("RESOURCES", ""))])
         output.extend(
             ["", "RECENT LOG (diagnostics only)", _clean_recent_log(sections.get("LOG", ""))]
         )
+    return output
+
+
+def format_job_status(sections, detail):
+    """Render local and remote job status using shared presentation sections."""
+    context = _status_context(sections)
+    rows = _status_header_rows(sections, context, detail)
+    output = [f"JOB {context['jobid']}", format_fields(rows)]
+    output.extend(_status_detail_sections(sections, context, detail))
     return "\n".join(output)
 
 
