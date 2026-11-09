@@ -159,7 +159,7 @@ def interval_measurement(
     counts = arms["control"].counts
     shifts = _common_shift(list(arms.values()), checkpoint_ang, span_ang)
     bands = arms["control"].yields.shape[-1]
-    # 2 one-sided reference bounds per shift-and-checkpoint, two-sided paired
+    # 1 one-sided reference bound per checkpoint and per shift, two-sided paired
     # bounds for 5 probes + interaction at c and at each shift.
     n_bounds = bands * (1 + len(shifts) + 2 * 6 * (1 + len(shifts)))
     tq = _t(alpha / n_bounds, batches)  # two-sided bounds were counted twice above
