@@ -112,8 +112,9 @@ print(reading.absorbed_joule_per_pulse, reading.expected_voltage_v)
   handoff. Real materials, general finite surfaces and exact edge currents
   are not. Measured passive Jones elements and a pitch/window convergence
   diagnostic exist (sections below). Published numerical benchmark,
-  measured element data, spectral convergence and automatic production
-  integration remain open; bounded source/field CUDA parity is recorded below.
+  measured element data, finite-aperture spectral convergence and automatic
+  production integration remain open (hemisphere energy/angle convergence is
+  below); bounded source/field CUDA parity is recorded below.
 - **#617:** supply a real measured and provenance-pinned detector calibration,
   temporal/electronic response and broader uncertainty propagation. The bounded
   field handoff, ideal polarized interferogram and conditional Gaussian fit
@@ -949,6 +950,47 @@ separately, and reports both relative changes plus `hemisphere_fft_bias`, the
 FFT-vs-quadrature hemisphere ratio of the base source. `converged` requires all
 three below `rtol`. It is a numerical diagnostic for one geometry and energy,
 not physics validation.
+
+`finite_screen_spectral_convergence` covers the energy and angle axes for a
+band. It integrates the hemisphere photon count $\int(dU/dE)/(Ee)\,dE$ with
+nested composite Simpson rules, halving the node spacing at each refinement
+and reusing the earlier nodes. Separately it doubles both Gauss–Legendre
+$\cos\theta$ and uniform $\varphi$ orders of `hemisphere_energy_per_eV` at
+every base node. It reports the band changes and the largest pointwise
+$dN/dE$ change. The quadrature has no window error, so the source pitch is
+the only grid axis left, and the pitch diagnostic refines it. For
+$\beta=0.95$ over 1–2 eV:
+
+- A 3 µm disc reaches the planar Ginzburg–Frank photons/eV to within
+  $2\times10^{-3}$ at every node. Its band count matches the planar
+  $\propto\ln 2$ result to $10^{-4}$.
+- A 1 µm disc rings around the planar yield by about ±7 % (edge
+  interference). It needs about nine base nodes for a $10^{-4}$ energy
+  change; three nodes give $2\times10^{-3}$.
+- A 0.2 µm disc ($\ll\gamma\beta\lambda/2\pi$) is suppressed below the planar
+  yield and recovers with $E$.
+
+Angular orders 16×32 are converged to $10^{-5}$ for these sources.
+Finite-aperture collection (`collect_screen_green`) is not yet part of this
+spectral study.
+
+**Published finite-disc reference (Schmidt et al., arXiv:1803.00608, Sect. 2.3).**
+For $\gamma=100$ and $\lambda=0.3$ mm, the solver (with `observe_screen_green`)
+reproduces the absolute yields of the published closed forms:
+
+- **Fig. 7(a) disc** ($a=3$ mm, $D=4$ m): the far-field yield
+  $\mathrm{GF}\cdot(1-T)^2$ of Eq. (14) and the near-field Hankel integral
+  of Eq. (15), both to $3\times10^{-3}$. The lobe moves from $\gamma\theta=1$
+  to 4.6.
+- **Fig. 7(b) disc** ($a=30$ mm, $D=0.2$ m): Eq. (15) to 1 % for
+  $\gamma\theta\ge0.5$. The near-field peak sits at $\gamma\theta\approx3.2$,
+  with a secondary maximum near 6.5. Near the on-axis minimum the vector
+  $|\mathbf E|^2$ exceeds the scalar Eq. (15) by up to 5.7 %, because of the
+  longitudinal near field $E_z\approx(a/D)E_\rho$. The transverse field alone
+  follows Eq. (15) to $2\times10^{-3}$.
+
+The periodic FFT propagation of case (b) is not window-converged at a 205 mm
+window, so use the direct Green path for such large near-field sources.
 
 `collect_screen_green` removes the window error from finite-aperture
 collection. It sums the detector-plane fields directly from the compact source

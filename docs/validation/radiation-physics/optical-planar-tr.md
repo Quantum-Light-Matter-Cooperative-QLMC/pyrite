@@ -98,3 +98,111 @@ What is not anchored:
 - Vacuum runs are taken as infinite (straight upstream beam optics and free exit).
 - Energy loss along a run does not end it; negligible over optical $L$.
 - No finite radiator, near field, optics or detector response.
+
+## Fresh-context review of `coherent_formation_error_bound` (2026-11-08)
+
+The propagation of the per-history formation bound through the self, pair and total estimators was re-derived and compared at `b0860fbfa`. The verdict is **rederived**: the algebra matches term by term, a 20 000-trial randomized perturbation test shows no violation, and the self bound is tight. The write-up is in [`optical-ctr-population`](optical-ctr-population.md#fresh-context-review-of-the-615-follow-up-2026-11-08). The factor-2 premise for $b_h$ remains a documented heuristic.
+
+## Owner follow-up: APL version (2026-11-08)
+
+The published APL letter (99, 143103) was read. It states that Fig. 3 is the TR probability "for the entire upper hemisphere" calculated with García de Abajo, RMP 82, 209 and Johnson–Christy constants, and that Fig. 4c is the measured pattern at 400 and 900 nm (40 nm band-pass) "integrated over azimuthal angle", excluding φ = 150–210° and θ > 85°. The flux was first converted to photons per solid angle.
+
+- **Angular pattern.** Digitized Fig. 4c measured curves (`test_coenen_measured_angular_pattern_is_the_azimuth_integrated_flux`) agree with the band-averaged $\sin\theta\,dN/d\Omega$ shape to RMS 0.023 (400 nm) and 0.05 (900 nm) over 24–84°. Peaks: measured 61° and 66–68°, model 59.5° and 68.5°. The per-sr shape (peaks 55°, 66°) is excluded at RMS 0.14. The plotted quantity is therefore $dN/d\theta$ (azimuth integral over $d\Omega$). The 900 nm residual is largest at 72–80° (measured low; mirror edge) and below 0.3 where the curves overlap in the raster.
+- **Absolute factor 0.696.** Not a mirror-acceptance factor (the text says full hemisphere). Not an effective beam energy: the published/ours ratio spread over 375–900 nm is 5.5 % at 30 keV and grows to 6.7–9.5 % at 25–15 keV. The paper's absolute check (8×10⁶ s⁻¹ generated at 12 nA, ~4×10⁶ s⁻¹ expected after acceptance/reflection/QE, 3.9×10⁶ s⁻¹ measured) assumes an unitemized ~50 % efficiency; our scale would need ~34 %. The measurement cannot discriminate. Remaining step: compare with García de Abajo RMP 82, 209 Eq. for TR probability directly.
+
+## Fresh-context review of the APL Fig. 4c and RMP-scale anchors (2026-11-09)
+
+Scope: `test_coenen_measured_angular_pattern_is_the_azimuth_integrated_flux` and `test_cited_theory_reproduces_our_absolute_scale_not_the_published_curve` at `6e12e4de0`. Sources read: Coenen, Vesseur and Polman, APL 99, 143103 (2011), pp. 3–4; García de Abajo, arXiv:0903.1669 (preprint of RMP 82, 209), Sec. IV.B–C, pp. 30–32. The model below was written from these sources with the Johnson–Christy n,k read directly from the pinned `Au-Johnson.yml` record. No PyRITE solver function was used. Both tests pass (6 passed with the Schmidt module).
+
+### Claim A: measured Fig. 4c angular pattern
+
+**What the text says.** The CCD image is converted "to photon flux per unit of solid angle" (Fig. 2(c) map). The data are "interpolated to yield points that are equally spaced in $\theta$ and $\varphi$". For Fig. 4c, "the emission patterns were integrated over azimuthal angle $\varphi$", with $\varphi=150$–$210^\circ$ dropped. The caption reads "Emission pattern integrated over $\varphi$". The text does not say whether the $\varphi$ integral carries the solid-angle Jacobian. Read literally, a uniform-grid sum over $\varphi$ of a per-sr quantity is $\propto dN/d\Omega$. The measured curves exclude that reading (below). Read as an integral over $d\Omega=\sin\theta\,d\theta\,d\varphi$ at fixed $\theta$, it gives
+
+$$
+\frac{dN}{d\theta}=\int d\varphi\,\sin\theta\,\frac{dN}{d\Omega}\propto\sin\theta\,\frac{dN}{d\Omega},
+$$
+
+and the data match this. The operator is therefore inferred from the measurement, not stated by the paper. Two hypotheses with no free parameters are compared, and the margin is a factor of about 6 in RMS, so the inference is decisive. It should still be recorded as an inference.
+
+**Independent re-digitization.** Raster: `pdfimages -f 4 -l 4 -png`, image 1 (752×1485 px). The polar centre is the baseline midpoint, $(376, 1470.5)$ px in the full image ($y$ offset 1000 gives the owner's $(376,470)$). The unit circle is the solid outer arc. A radial histogram of dark pixels peaks at $330\pm1$ px. The dotted grid circles sit at 66, 131, 197 and 264 px on the baseline, i.e. 0.2–0.8. Colour masks: red $r>170,\,g,b<100$; green $g-r>40$. Each value is the median radius in a $\pm1^\circ$ bin on each side. Left and right lobes agree to about 0.02 above $40^\circ$. The bins at $36$–$40^\circ$ (400 nm) and $56^\circ$ (900 nm) on the right are contaminated by the curve labels, and only the left side is used there.
+
+| $\theta$ [deg] | 24 | 32 | 40 | 48 | 56 | 60 | 64 | 68 | 72 | 76 | 80 | 84 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 400 nm, this review (L/R mean) | 0.148 | 0.362 | 0.642 | 0.843 | 0.965 | 0.986 | 0.942 | 0.898 | 0.764 | 0.583 | 0.344 | 0.209 |
+| 400 nm, owner | 0.163 | 0.351 | 0.662 | 0.831 | 0.961 | 0.984 | 0.942 | 0.904 | 0.773 | 0.584 | 0.354 | 0.204 |
+| 900 nm, this review | 0.070 | 0.152 | 0.444 | 0.674 | 0.867 | 0.941 | 0.972 | 0.972 | 0.931 | 0.800 | 0.624 | 0.369 |
+| 900 nm, owner | 0.093 | 0.156 | 0.446 | 0.672 | 0.848 | 0.941 | 0.967 | 0.970 | 0.934 | 0.800 | 0.630 | 0.411 |
+
+Agreement is within 0.02 above $30^\circ$, except at 900 nm and $84^\circ$. There, 1° bins give 0.366/0.372 against the owner's 0.411. The curve falls by about 0.065 per degree there, so the difference is an angle offset of about $0.6^\circ$. Below $30^\circ$ the red, green and dashed curves overlap near the origin, and values differ by up to 0.05.
+
+**Independent model.** Backward Ginzburg–Frank emission of a charge entering gold ($\beta=0.328376$ at 30 keV), photons per eV per sr:
+
+$$
+\frac{d^2N}{dE\,d\Omega}=\frac{\alpha\beta^2\sin^2\theta\cos^2\theta}{\pi^2E}
+\left|\frac{(\varepsilon-1)\bigl(1-\beta^2+\beta\sqrt{\varepsilon-\sin^2\theta}\bigr)}
+{(1-\beta^2\cos^2\theta)\bigl(1+\beta\sqrt{\varepsilon-\sin^2\theta}\bigr)\bigl(\varepsilon\cos\theta+\sqrt{\varepsilon-\sin^2\theta}\bigr)}\right|^2 ,
+$$
+
+converted to per nm by $E/\lambda$ and averaged over a flat 40 nm band (41 points). Against this review's digitization over 24–84°:
+
+| Model shape | 400 nm peak / RMS | 900 nm peak / RMS |
+|---|---|---|
+| $\sin\theta\,dN/d\Omega$, band-averaged | 59.8° / 0.025 | 68.8° / 0.051 |
+| $\sin\theta\,dN/d\Omega$, monochromatic | 59.8° / 0.025 | 68.8° / 0.051 |
+| $dN/d\Omega$ (per sr) | 54.8° / 0.146 | 65.8° / 0.143 |
+| $\sin^2\theta\,dN/d\Omega$ | 62.8° / 0.101 | 70.5° / 0.101 |
+| exiting-charge sign ($\mp\beta\sqrt{\cdot}$) | 59.8° / 0.025 | 68.8° / 0.051 |
+| perfect conductor, $\sin\theta\,dN/d\Omega$ | 89.8° / 0.36 | 89.8° / 0.23 |
+
+The owner's numbers (0.023/0.05; per sr 0.14) reproduce. The 900 nm residual is structured: the model is high by 0.05–0.10 at 24–36° and by 0.05–0.09 at 72–80°. The measured lobe is narrower than the model. This is consistent with, but not proven to be, mirror acceptance. The open paraboloid removes part of the $\varphi$ range at large $\theta$ (Fig. 4a), and the text does not say this was compensated. That loss would suppress the large-$\theta$ tail. It would move a per-sr pattern further from the data, so it does not weaken the exclusion of the per-sr reading.
+
+**What the anchor constrains.**
+
+- The normalized polar shape at 400 and 900 nm, 30 keV, normal incidence. This shape tests the finite-ε gold response: a perfect conductor is excluded at RMS 0.23–0.36.
+- The collection operator ($dN/d\theta$), inferred from the data as described above.
+
+**What it does not constrain.**
+
+- Absolute yield, and therefore the 0.696 question.
+- The band-pass model: monochromatic and 40 nm averages agree to $<10^{-3}$.
+- Entering versus exiting sign: the two give identical shapes to three decimals for gold at $\beta=0.33$.
+- $\varphi$ dependence (azimuthal symmetry is assumed), polarization, angles below about $30^\circ$ where the curves overlap, and other energies or materials.
+
+The paper's own dashed theory curve also follows the data, so this is a measured anchor in normalized shape only. It is legitimate at that scope. The 0.035/0.065 RMS limits pass with margin 0.010/0.014 on this independent digitization.
+
+### Claim C: RMP Sec. IV.C absolute scale
+
+**Transcription.** The preprint uses medium 1 = vacuum above ($z>0$) and medium 2 = metal ($z<0$).
+
+$$
+\mu_1=\frac{-(\omega/v)\epsilon_2+q_{z2}\epsilon_1}{q^2-k^2\epsilon_1}-\frac{-(\omega/v)\epsilon_1+q_{z2}\epsilon_1}{q^2-k^2\epsilon_2},\qquad
+D=\frac{2ie\,q_\parallel/c}{q_{z1}\epsilon_2+q_{z2}\epsilon_1},
+$$
+
+$q^2=q_\parallel^2+(\omega/v)^2$, $q_{zj}=\sqrt{k^2\epsilon_j-q_\parallel^2}$, $\mathbf f_H=ik\cos\theta\,D\,\mu_1\hat\varphi$ at $q_\parallel=k\sin\theta$, and $\Gamma_{\rm CL}=|\mathbf f|^2/(4\pi^2\hbar k)$ per sr per unit $\omega$. The test's `mu1`, `d` and `per_sr` match term by term with $\epsilon_1=1$, $\epsilon_2=\varepsilon$, $e=\sqrt\alpha$ ($\hbar=c=1$, eV), $\omega/v=+k/\beta$, and $\epsilon_1$ multiplying $q_{z2}$ in both numerators. In the test $|\mathbf f|=|\mathbf f_H|$ because the far field is transverse in vacuum. With $\hbar=1$ and energies in eV, per unit $\omega$ is per eV.
+
+**Sign of $v$.** Using $q^2-k^2\epsilon_2=w^2-q_{z2}^2$ with $w=\omega/v$, Eq. (52) reduces exactly to
+
+$$
+\mu_1=\frac{(\varepsilon-1)\,(k^2-w^2-w\,q_{z2})}{(w^2-q_{z1}^2)\,(w+q_{z2})}.
+$$
+
+For $w=+k/\beta$, the factor $(1-\beta^2+\beta\sqrt{\varepsilon-\sin^2\theta})/(1+\beta\sqrt{\varepsilon-\sin^2\theta})$ appears. This is the pole-free form for backward emission by a charge entering the metal, the Coenen geometry. For $w=-k/\beta$, the Cherenkov denominator $1-\beta\sqrt{\cdot}$ appears, i.e. the exiting/forward form. The preprint's $e^{i\omega z/v}$ with the metal at $z<0$ does not fix the sign of $v$ for an impinging electron unambiguously. The owner's choice is the physically correct one. Numerically the hemisphere yields of the two signs differ by only $-3.3\%$ to $+0.3\%$ over 375–900 nm, so the choice cannot explain 0.696.
+
+**Agreement.** With $w=+k/\beta$, $\Gamma_{\rm CL}$ equals the closed form above to $10^{-6}$ at every wavelength (the algebra makes them identical). The test's $10^{-3}$ is therefore a quadrature tolerance. This "cited-theory" check is the same Ginzburg–Frank physics, written in another formalism. It is an independent transcription, not independent physics.
+
+**$\sin\theta$ in Eq. (56).** The preprint prints $\Gamma_{\rm TR}=(2\pi\hbar k)^{-1}\int_0^{\pi/2}d\theta\,|\mathbf f|^2$. Integrating the per-sr $\Gamma_{\rm CL}$ over $d\Omega=2\pi\sin\theta\,d\theta$ gives $(2\pi\hbar k)^{-1}\int\sin\theta\,d\theta\,|\mathbf f|^2$, so the printed form lacks $\sin\theta$. This is confirmed for the arXiv preprint only; the journal version was not checked. Without $\sin\theta$ the hemisphere value is 1.264–1.363 times ours over 375–900 nm. That is the wrong direction for 0.696: published/no-$\sin\theta$ is 0.49–0.55.
+
+**Published/ours** (this review, owner's Fig. 3 values; the APL raster image 0 was compared visually and agrees): 0.677 (375), 0.679 (400), 0.660 (485), 0.692 (550), 0.697 (600–900 nm, constant to 0.2 %).
+
+**Conclusion check.** The statement that a faithful implementation of the cited RMP formalism reproduces our hemisphere integral, not the published curve, is supported. The tested variants were: sign of $v$ (≤3 %), the omitted $\sin\theta$ (×1.3, wrong direction), monochromatic versus band (none) and $n,k$ interpolation (insensitive). None of them produces a constant 0.70. "Discrepancy of the published curve with its cited theory" is a fair label if it means unexplained by that theory. It is not evidence of an error in the paper. The paper may have used inputs or a code (e.g. BEM) other than Eq. (56), and its cause is unknown. The record should keep "cause unknown" and cite the preprint (not the journal) for the Eq. (56) $\sin\theta$ observation.
+
+### Verdict
+
+- Claim A: **anchored scope confirmed** for the normalized measured shape. Record that the $\sin\theta$ operator is inferred from the data (text ambiguous), and that the band-pass and entering/exiting sign are not constrained.
+- Claim C: **rederived** (transcription, sign choice and $\sin\theta$ statement verified). No divergent factor in the implementation.
+- Ledger status of `optical-planar-tr`: keep `anchored`.
+
+### Owner disposition (2026-11-09)
+
+`anchored` kept. The ledger notes now record that the Fig. 4c comparison was reviewed, that the sinθ reading is inferred from the data, and what the comparison leaves unconstrained. They also record that the RMP check is a transcription of the same physics, that Eq. (56) omits sinθ in the arXiv preprint, and that the cause of 0.696 is unknown. The 900 nm value at 84° (owner 0.411, reviewer 0.369) is left as digitized; the test tolerance (RMS < 0.065) covers it.

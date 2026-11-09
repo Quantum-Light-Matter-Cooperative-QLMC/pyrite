@@ -53,7 +53,7 @@ def _response(eps, medium="matched"):
 
 @pytest.fixture(scope="module")
 def transported():
-    # Plumbing only: HOPG transport tables (no Au transport tables) with Au optics.
+    # Plumbing only: HOPG transport with Au optics (consistent gold scene: gold_transported).
     fields = dict(
         name="optical wiring", crystal="hopg", composition=_HOPG.composition,
         hkl_list=[(0, 0, 2)], B_ang2=0.8, E0_keV=30.0, thickness_ang=5e4,
@@ -429,6 +429,71 @@ def test_straight_runs_and_formation_bound_on_transported_histories(transported)
         )  # fmt: skip
 
 
+def test_coherent_formation_bound_propagates_to_pair_and_total(transported):
+    case, tp = transported
+    from pyrite.montecarlo.spectrum.optical_transition_validity import (
+        coherent_formation_error_bound,
+        formation_error_bound,
+    )
+
+    crossings, m = _crossings(case, tp), int(tp["Ne_brem"])
+    eps = case_layer_eps(case, _ENERGY, layer_responses=(_AU,))
+    one = OpticalBunchSource.sampled(_PC1, "one")
+    single = coherent_formation_error_bound(
+        crossings, _ENERGY, _BACK, eps, source=one, n_histories=m
+    )
+    # N = 1: no pair weight; total is the self bound of formation_error_bound.
+    np.testing.assert_allclose(
+        single["self"], formation_error_bound(crossings, _ENERGY, _BACK, eps)
+    )
+    np.testing.assert_allclose(single["total"], single["self"])
+    point = OpticalBunchSource.gaussian(100.0, "point", rms_t_fs=1e-4)
+    bunch = coherent_formation_error_bound(
+        crossings, _ENERGY, _BACK, eps, source=point, n_histories=m
+    )
+    assert np.all(bunch["pair"] >= 0) and np.all(np.isfinite(bunch["total"]))
+    # Pair-dominated total follows the pair bound, not the self bound.
+    np.testing.assert_allclose(bunch["total"], bunch["pair"], rtol=1e-3)
+    # Unit importance weights are the unweighted estimator.
+    unit = OpticalBunchSource.gaussian(100.0, "w", rms_t_fs=1e-4, weights=np.full(m, 3.0))
+    weighted = coherent_formation_error_bound(
+        crossings, _ENERGY, _BACK, eps, source=unit, n_histories=m
+    )
+    for key in ("self", "pair", "total"):
+        np.testing.assert_allclose(weighted[key], bunch[key], rtol=1e-12)
+    straight = dataclasses.replace(
+        crossings,
+        straight_before_ang=np.full(len(crossings), np.inf),
+        straight_after_ang=np.full(len(crossings), np.inf),
+    )
+    zero = coherent_formation_error_bound(
+        straight, _ENERGY, _BACK, eps, source=point, n_histories=m
+    )
+    assert all(np.all(v == 0.0) for v in zero.values())
+
+
+def test_validity_records_out_of_band_envelope_by_law(transported):
+    case, tp = transported
+    gauss = OpticalBunchSource.gaussian(1.0, "catalog gaussian_200fs", rms_t_fs=200.0)
+    result = case_optical_transition(
+        case, tp, layer_responses=(_AU,), source=gauss, formation_tolerance=None
+    )
+    validity = result.metadata["validity"]
+    assert 1e-5 < validity["out_of_band_energy_eV"] / 30e3 < 1e-3
+    assert validity["energy_fraction"] > validity["out_of_band_energy_eV"] / 30e3
+    with pytest.raises(ValueError, match="kinetic energy"):
+        case_optical_transition(
+            case, tp, layer_responses=(_AU,), formation_tolerance=None, energy_budget=1e-5,
+            source=OpticalBunchSource.gaussian(100.0, "100 pC", rms_t_fs=200.0),
+        )  # fmt: skip
+    sampled = case_optical_transition(
+        case, tp, layer_responses=(_AU,), formation_tolerance=None,
+        source=OpticalBunchSource.sampled(_PC1 * (1 + 1e-6), "just above one electron"),
+    )  # fmt: skip
+    assert sampled.metadata["validity"]["out_of_band_energy_eV"] is None
+    assert "sampled" in sampled.metadata["validity"]["out_of_band_unbounded"]
+
+
 @pytest.mark.filterwarnings(
     "ignore::pyrite.montecarlo.spectrum.coherent_population.CoherentSamplingWarning"
 )
@@ -451,3 +516,52 @@ def test_energy_budget_records_and_refuses_unbounded_coherence(transported):
             case, tp, layer_responses=(_AU,), source=one, formation_tolerance=None,
             energy_budget=1e-12,
         )  # fmt: skip
+
+
+# --- Consistent gold transport + gold optics scene (Coenen-like, #615) ---------------
+
+
+@pytest.fixture(scope="module")
+def gold_transported():
+    au = CATALOG.crystal("au")
+    fields = dict(
+        name="optical gold", crystal="au", composition=au.composition,
+        hkl_list=[(2, 0, 0)], B_ang2=0.62, E0_keV=30.0, thickness_ang=5e4,
+        crystal_width_mm=None, crystal_height_mm=None, beam_fwhm_mm=None, surface_hkl=None,
+        E_grid=_GRID, E_grid_line=_GRID, E_grid_brem=(0.0, 500.0, 50.0),
+        theta_obs_rad=0.3, dtheta_obs_rad=np.deg2rad(2.0), tilt_deg=0.0, tilt_azim_deg=0.0,
+        domega_sr=1e-4, beam_uvw=(0, 0, 1), mosaic_fwhm_rad=None, mosaic_mc_fwhm_rad=None,
+        mosaic_mc_nodes=1, abs_layers=None, layer_radiators=None, brem_file=None, Ne=12,
+        Ne_brem=8, seed=11, spec_chunk=None, brem_chunk=None, energy_model="midpoint",
+        elastic_model="elsepa",
+        transition_radiation={"model": "planar-stack", "coherence": "history"},
+    )  # fmt: skip
+    case = Case(**fields)
+    tp = runner._transport_case(case)
+    return case, dict(tp, E_grid=_ENERGY, n_hat=_BACK)
+
+
+def test_gold_transport_with_gold_optics_scene(gold_transported):
+    from pyrite.materials.optical import gold_johnson_christy_response
+    from pyrite.montecarlo.spectrum.transition_radiation import planar_transition_radiation
+
+    case, tp = gold_transported
+    response = gold_johnson_christy_response()
+    crossings = _crossings(case, tp)
+    entries = (crossings.layer_before == -1) & (crossings.interface == 0)
+    assert int(np.sum(entries)) == tp["Ne_brem"]
+    assert np.any(crossings.layer_after == -1)  # gold backscatters through the entrance face
+    one = OpticalBunchSource.sampled(_PC1, "one electron")
+    result = case_optical_transition(
+        case, tp, layer_responses=(response,), source=one, formation_tolerance=None
+    )
+    beta = beta_from_kinetic_eV(30e3)
+    entry_only = planar_transition_radiation(
+        _ENERGY, _BACK * np.array([1, 1, -1]), np.array([0.0, 0.0, -beta]), [],
+        substrate_eps=response.epsilon(_ENERGY),
+    )  # fmt: skip
+    ratio = result.yield_per_electron / entry_only
+    assert np.all((ratio > 0.5) & (ratio < 2.0))  # entry plus interfering backscatter exits
+    # At 30 keV gold deflects within the optical skin depth: fixed trajectories refused.
+    with pytest.raises(ValueError, match="formation-zone bound"):
+        case_optical_transition(case, tp, layer_responses=(response,), source=one)

@@ -333,3 +333,144 @@ published-anchor requirements remain outside this backend audit.
 Suggested ledger change: retain `rederived`; optionally record this fresh
 source-first backend-scope verification in Checks, without claiming an anchor
 or human sign-off.
+
+## Fresh-context review of `finite_screen_spectral_convergence` (2026-11-08)
+
+Scope: `optical_finite_convergence.py::finite_screen_spectral_convergence` at `b0860fbfa`. It is a numerical diagnostic, not a physics claim.
+
+- **Simpson rule.** The rule is $\frac h3[f_0+f_n+4\sum f_{\rm odd}+2\sum f_{\rm even}]$ on odd node counts. Refinement uses $2(n-1)+1$ nodes. `np.linspace` nests exactly (checked for three bands), so the float-keyed cache reuses the earlier nodes.
+- **Units.** Photons per eV are $(dU/dE)/(E\,e)$, with $dU/dE$ in J eV$^{-1}$ and $E\,e$ in J. This is correct.
+- **Reference.** The large-disc reference integrates `ginzburg_frank_photons_per_eV_sr` over the hemisphere as $\pi\sum_iw_if(\theta_i)$, with $u=(t+1)/2$, $d\Omega=2\pi\,du$. In SI, $e^2/(4\pi^3\varepsilon_0c)=\alpha\hbar/\pi^2$, so it is the conductor Ginzburg–Frank form derived independently in `optical-ctr-population` above. That form is an independent closed form, not the finite-screen solver. The reference is valid for $R\gg\gamma\beta\lambda/2\pi$: at $\beta=0.95$ and 1 eV, $\gamma\beta\lambda/2\pi\approx0.6\,\mu$m, against $R=3\,\mu$m. The 1/E planar law makes the band count $f(1\,{\rm eV})\ln2$ exact. The $2\times10^{-3}$ pointwise tolerance is consistent with the residual edge term at $R/(\gamma\beta\lambda/2\pi)\approx5$.
+- **Verdict.** **rederived** as a numerical diagnostic. No divergent factor or unit was found. Finite-aperture collection is not covered, as the page states.
+
+## Fresh-context review of the Schmidt et al. finite-disc anchor (2026-11-09)
+
+Scope: `tests/montecarlo/spectrum/test_optical_finite_schmidt.py` at `6e12e4de0`. Source read: Schmidt et al., arXiv:1803.00608, Sect. 2.3, pp. 6–8 (Eqs. (8)–(20), Figs. 5–7). The checks below use scipy and a scratch 2D quadrature. They do not use the PyRITE solver, except where the probe is labelled.
+
+**Eq. (12) transcription.** The printed form is
+
+$$
+T(\theta,k)=\frac{ka}{\beta\gamma}J_0(ka\sin\theta)K_1\!\Bigl(\frac{ka}{\beta\gamma}\Bigr)+\frac{ka}{\beta^2\gamma^2\sin\theta}J_1(ka\sin\theta)K_0\!\Bigl(\frac{ka}{\beta\gamma}\Bigr),
+$$
+
+as in `_t_correction`. Its small-angle, $\beta=1$ form with $ka/\gamma=2\pi\xi$ and $\theta_s=\gamma\theta$ is Eq. (18), so the two printed equations are mutually consistent.
+
+**Eq. (13) prefactor and the Eq. (12)–(13) identity.** The prefactor is $e^2k^4/(4\pi^3\varepsilon_0c\beta^4\gamma^2)$. Using $\int_0^\infty\rho J_1(b\rho)K_1(c\rho)\,d\rho=b/[c(b^2+c^2)]$ with $b=k\sin\theta$ and $c=k/\beta\gamma$, together with $1+\beta^2\gamma^2\sin^2\theta=\gamma^2(1-\beta^2\cos^2\theta)$, the $a\to\infty$ limit is
+
+$$
+\frac{d^2U}{d\omega\,d\Omega}=\frac{e^2\beta^2\sin^2\theta}{4\pi^3\varepsilon_0c\,(1-\beta^2\cos^2\theta)^2},
+$$
+
+the SI Ginzburg–Frank conductor form for $\omega>0$. The prefactor is therefore correct independently of the paper's $(2\pi)^{-3/2}$ Fourier convention in Eq. (9). Numerically, GF$\cdot(1-T)^2$ equals the prefactor times $|\int_0^a|^2$ to $5\times10^{-12}$ ($a=3$ and 30 mm, five angles).
+
+**Unit conversion.** With $\tilde{\mathbf E}(\omega)=\int\mathbf E\,e^{i\omega t}dt$, Parseval gives $\int|\mathbf E|^2dt=\pi^{-1}\int_0^\infty|\tilde{\mathbf E}|^2d\omega$. Then $d^2U/d\omega\,d\Omega=R^2|\tilde{\mathbf E}|^2/(\pi Z_0)$, and photons per eV per sr follow by dividing by $\hbar_{\rm eV\,s}$ ($d\omega/dE$) and by $E\,e$ (photon energy in J). This matches `_solver_photons` and `_hankel_photons`.
+
+**Fig. 6.** From Eq. (12): at $\xi=1$, $(1-T)^2=0.952,\,0.998,\,0.999$ at $\theta_s=0.01,\,1.4,\,2.4$; at $\xi=0.5$, $0.559,\,1.102,\,0.934$. For $\xi=0.5$ the maximum is 1.103 at $\theta_s=1.37$ and the minimum is 0.933 at 2.34. These agree with the plotted curves and with the test's values within 0.02.
+
+**Fig. 7 lobes.** Read from the plot: (a) finite-disc peak at $\gamma\theta\approx4.6$, GF at 1. (b) near-field peak at about 3.2, secondary bump at about 6.5, far field at 1. All agree with the tested values. The published curves are individually normalized ("arbitrary units"). The absolute agreement is therefore with the paper's printed Eqs. (14)–(15), not with published numbers.
+
+**Independence.** The reference is a 1D scalar paraxial Hankel quadrature. The solver is a 2D Cartesian magnetic-equivalent-current source with the exact retarded vector Green function. They share only the physical-optics source: the radial $K_1$ incident field on the disc and zero off it. Schmidt et al. assume the same (Eqs. (8)–(9)). The anchor checks absolute normalization, discretization and the Green operator against a published theoretical calculation. It does not test physical optics itself (edge fields, finite conductivity).
+
+**Near-axis deviation in Fig. 7(b): the attribution is wrong.** The dropped phase terms of Eq. (10) were quantified with a scratch scalar Kirchhoff integral over $(\rho,\varphi)$. It uses the $x$-projection $E_\rho\cos\varphi$ and the exact $R'$. At the rim, $k\rho^4/8R^3=0.27$ rad as stated, but the source has decayed there ($K_1(6.3)$). Including the quartic term alone changes $|E|^2$ by $+7\times10^{-4}$ at $\gamma\theta=0.2$. All third- and fourth-order terms together change it by at most $4\times10^{-3}$ at $\gamma\theta\le9$. These terms cannot produce the 6 % deviation.
+
+The solver's deviation is instead reproduced by the Smythe vector field. With $h=(ik-1/R')e^{ikR'}/R'$, the field components are $E_x\propto\int E_\rho\cos\varphi\,(D/R')\,h$ and $E_z\propto-\int E_\rho\,(x\cos\varphi-\rho)/R'\,h$.
+
+| $\gamma\theta$ | 0.2 | 0.4 | 0.6 | 0.8 | 1.2 | 3.2 | 6.2 | 9.0 |
+|---|---|---|---|---|---|---|---|---|
+| solver / Eq. (15) − 1 (probe, $dx=0.1$ and 0.05 mm identical) | +0.0569 | +0.0141 | +0.0062 | +0.0033 | +0.0014 | +0.0001 | +0.0025 | −0.0040 |
+| $(\lvert E_x\rvert^2+\lvert E_z\rvert^2)$ / Eq. (15) − 1, scratch Smythe | +0.0569 | +0.0142 | +0.0062 | +0.0033 | +0.0014 | +0.0001 | +0.0025 | −0.0040 |
+| $\lvert E_x\rvert^2$ / Eq. (15) − 1, scratch Smythe | +0.0001 | +0.0001 | 0.0000 | −0.0002 | −0.0002 | −0.0004 | −0.0010 | −0.0117 |
+
+The near-axis excess is the longitudinal field. $E_z$ is of order $(\rho/R)E_\rho$ with $a/D=0.15$, and it is finite on axis while the transverse field vanishes as $\theta$. That gives the $\theta^{-2}$ excess in $|\mathbf E|^2$. Eq. (15) is a transverse scalar quantity and drops $E_z$. The solver counts $|\mathbf E|^2$, including $E_z$, as the flux $R^2|\mathbf E|^2/Z_0$. For Fig. 7(a) ($a/D<10^{-3}$) the effect is absent. The probe there gives $-9\times10^{-4}$ at $dx=0.05$ mm (the test's step) and $\le3\times10^{-4}$ at 0.025 mm, i.e. discretization only.
+
+The test comment and ledger note ("quartic Fresnel phase … differs by up to 6 %") have the right magnitude but the wrong cause. The 1 % comparison at $\gamma\theta\ge0.5$ is valid: the $E_z$ term is $\le0.62$ % at the test grid angles there (first node $\gamma\theta=0.6$; about 0.9 % would apply at exactly 0.5). Near the axis, which quantity is meant as "energy per sr" in the near zone ($|\mathbf E|^2$, $\mathbf S\cdot\hat{\mathbf r}$ or $\mathbf S\cdot\hat{\mathbf z}$) is a definition choice that the comparison does not settle.
+
+**Verdict: anchored scope supported; no divergent factor.**
+
+- Eq. (12)–(14) transcription, prefactor and unit conversion pass.
+- Fig. 6 values and Fig. 7 lobes are reproduced.
+- The Fig. 7(a) absolute agreement is $\le10^{-3}$, and the Fig. 7(b) agreement at $\gamma\theta\ge0.5$ is $\le0.62$ %.
+- The near-axis cause is misattributed. This is a documentation finding, not a defect in the code.
+
+Scope: published theoretical finite-disc calculation (physical-optics PEC, normal incidence, $\gamma=100$, $\lambda=0.3$ mm); no measurement. The tests pass (3 in 3 s).
+
+### Owner disposition (2026-11-09)
+
+Applied `anchored`, scoped to the published theoretical finite-disc calculation. The near-axis attribution was corrected from the quartic phase to the longitudinal $E_z$ in the ledger, the physics page and the test. The test now also pins transverse-only agreement with Eq. (15) to $2\times10^{-3}$ for $\gamma\theta\le3$.
+
+## Measured slit diffraction radiation screen (2026-11-09)
+
+Source: M. Castellano et al., *Phys. Rev. E* **63**, 056501 (2001), Sect. III–IV and Figs. 5–8.
+
+Setup in the paper:
+
+- Beam: 225 MeV, 1 nC.
+- Screen: a 45° aluminized Si screen made of two 44 × 20 mm² halves, with a horizontal slit of width $a = 0$–10 mm.
+- Collection: a 200 mm focal-length parabolic mirror with the screen at its front focus, followed by a Martin–Puplett interferometer that keeps only the vertical polarization.
+- Measurement: total coherent power, normalized to the closed slit (Fig. 8 points: 1, 0.93, 0.755, 0.64, 0.535, 0.44 at $a = 0,2,\dots,10$ mm).
+
+The paper's model (Eq. (3)) is the Fresnel image of the screen source at detector distance $b$. Neither $b$ nor the detector aperture is stated; both are deferred to its ref. [13].
+
+`checks/castellano_slit_dr.py` covers the following:
+
+- Source: the PEC source from `circular_pec_transition_field`, restricted to the projected slit screen (31.1 mm wide, halves 20 mm tall).
+- Detection: the y-polarized image, with phase $\exp[ik\rho^2(1-b/f)/2f]$, integrated over a detector disc of angular radius $\theta_d$.
+- Weighting: the digitized universal coherent curve of Fig. 7.
+
+| | $\theta_d=0.02$ | 0.05 | 0.1 |
+|---|---|---|---|
+| $b=f$ (far field of the finite screen) | 0.459 | 0.322 | 0.208 |
+| best $b/f\in\{2,3,5,7,10\}$ | 0.042 ($b/f=10$) | 0.037 ($b/f=5$) | 0.042 ($b/f=3$) |
+
+(rms deviation from Fig. 8)
+
+Reading:
+
+- **Focal-plane detection is excluded.** The far field of a finite screen falls too slowly with slit width: 0.74–1.13 at 10 mm, against 0.44 measured. This agrees with the paper's conclusion that the actual collection geometry is needed.
+- **Plausible near-field geometries match** to the digitization level, but only after fitting the two unpublished parameters. That makes this a consistency screen, not an anchor. The claim's status is unchanged.
+- **Simplifications in the check:** a point electron (the 5 mm × 0.5 mm rms beam is ignored, as in the paper's model), projected normal incidence, and a scalar lens.
+- **Ref. [13] checked (2026-11-09).** Castellano et al., NIM A 435, 297 (1999) is generic Kirchhoff theory for three schemes (diaphragm, focal-plane lens, image plane). It gives no TTF detector distance or aperture.
+- **Model difference from ref. [13].** Its Eq. (15) truncates the pseudophoton spectrum at $\kappa\le k$ before restricting the field to the finite target. That truncation produces PRE Eq. (3)'s $J_0(k\rho)/\rho$ term. Our source keeps the full incident field.
+- **Effect of that difference.** Rerunning the scan with their truncated source changes the ratios by less than 1 % for $b/f\le7$, at every aperture. It does not explain the focal-plane miss.
+- **Interferometer topology (Leissner et al., PAC 1999, p. 2172; PRE ref. [15]).** No distances are given, but the optics are:
+  - a parabola collimates the radiator light;
+  - the Martin–Puplett splits and recombines it;
+  - a second parabola focuses it onto horn-antenna pyroelectric detectors.
+
+  With the radiator at the first focus and the detectors at the second, this is an imaging relay (NIM A 435, scheme (c)), not PRE Eq. (3)'s single lens with a free $b$.
+- **Image-plane model.** The check filters the y image by the pupil half-angle $\theta_a$ and integrates it over a screen-referred detector disc $\rho_d$ (horn radius / magnification). PRE's "200 mrad" acceptance is ambiguous between full and half angle, so both readings are run:
+
+  | $\rho_d$ [mm] | 5 | 7 | 10 | 12.5 | 15 | 20 | ∞ |
+  |---|---|---|---|---|---|---|---|
+  | rms, $\theta_a=0.1$ | 0.272 | 0.177 | **0.036** | 0.048 | 0.088 | 0.160 | 0.209 |
+  | rms, $\theta_a=0.2$ | 0.303 | 0.209 | 0.111 | 0.054 | **0.017** | 0.052 | 0.085 |
+
+  The $\rho_d\to\infty$ column equals focal-plane detection over the same pupil (Parseval, asserted to < 0.01; agreement 3e-3).
+- **Reading of the image-plane result.** One free parameter fits Fig. 8 to the digitization level at 10–15 mm, which is a plausible horn footprint at near-unit magnification. Because that radius is unpublished, this is still a screen, not an anchor.
+- **Relay geometry (Leissner, diploma thesis, PITHA 99/4, 1998, Ch. 4 and Sect. 7.1).**
+
+  | Element | Value |
+  |---|---|
+  | Parabolas | both f = 200 mm, 85–90 mm apertures, 953 mm apart |
+  | Radiator → first mirror | 220 mm (footnote 3: the focal distance could not be reached) |
+  | Exit window | Ø ≈ 60 mm at 130 mm |
+  | Horns | 55.9 mm mouth → 6.2 mm throat, 83 mm long |
+  | Pyro crystals | Ø 5 mm |
+
+  - Two equal focal lengths image the radiator at unit magnification for any mirror spacing. The 20 mm offset leaves a residual defocus of $B\approx-20$ mm, which changes the ratios by about 0.001.
+  - The first mirror fixes the pupil half-angle at 0.20–0.22 rad, which is PRE's "200 mrad".
+- **Horn acceptance.** Brightness conservation fixes the horn throughput, $\pi^2 r_t^2$, but not its shape in phase space. Three readings with equal étendue and no fitted parameter:
+
+  | Horn reading | Fig. 8 rms |
+  |---|---|
+  | Disc of radius $r_t/\sin\theta_a$ under the full pupil | 0.015 (throat, 0.20), 0.035 (throat, 0.22), 0.053 (crystal, 0.20), 0.086 (crystal, 0.22) |
+  | Whole mouth at the image, angles $\le\arcsin(r_t/r_{\rm mouth}) = 0.111$ rad | 0.191 |
+  | Throat at the image plane | 0.435–0.438 |
+
+- **Reading:**
+  - With the published geometry, the solver reproduces the measured slit dependence to within the digitization level, with no fitted parameter, under the disc horn reading.
+  - The other readings of the same étendue do not reproduce it, so the agreement is conditional on the horn's phase-space acceptance.
+  - It is also conditional on the 1998 TR-station distances applying to the 2000 DR run, which used the same interferometer (PRE ref. [15]).
+  - This is a model-conditional consistency, not an anchor. The claim's status is unchanged.
+  - The check's screening criterion is *separation*: every disc variant is below 0.10 and every other reading is above 0.15. Thresholds were set after seeing these results.
+- **Path to an anchor:** a horn acceptance model (multimode conical-horn pattern at 0.05–0.4 THz) or a measured horn/detector angular response. With it, pin the predicted curve.

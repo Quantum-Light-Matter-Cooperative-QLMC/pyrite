@@ -94,3 +94,64 @@ def test_direct_green_collection_matches_large_window_fft_without_window_error()
             aperture=_APERTURE,
             pitch_m=0.1e-6,
         )
+
+
+# --- Spectral (energy-node) and angular convergence of a band (#616) --------------
+
+
+def _band(radius_m, n=48, **kw):
+    from pyrite.montecarlo.spectrum.optical_finite_convergence import (
+        finite_screen_spectral_convergence,
+    )
+
+    screen = PECCircularScreen(outer_radius_m=radius_m, beta_z=-0.95)
+    return finite_screen_spectral_convergence(
+        (1.0, 2.0), screen, nx=n, ny=n, dx_m=0.1e-6, dy_m=0.1e-6, n_u=16, n_phi=32, **kw
+    )
+
+
+def _gf_hemisphere_photons_per_eV(energy_eV):
+    from pyrite.montecarlo.spectrum.optical_finite_screen import ginzburg_frank_photons_per_eV_sr
+
+    t, w = np.polynomial.legendre.leggauss(400)
+    theta = np.arccos((t + 1) / 2)
+    return np.pi * np.array(
+        [
+            np.sum(w * ginzburg_frank_photons_per_eV_sr(e, theta, 0.95))
+            for e in np.atleast_1d(energy_eV)
+        ]
+    )
+
+
+def test_band_converges_in_energy_and_angle_to_the_planar_far_field():
+    result = _band(3e-6, n=64, n_energy=3, refinements=1)
+    assert [row[0] for row in result.energy_rows] == [3, 5]
+    assert [row[0] for row in result.angular_rows] == [(16, 32), (32, 64)]
+    assert result.energy_relative_change < 3e-3  # Simpson 3 -> 5 nodes on ~1/E
+    assert result.angular_relative_change < 1e-5 and result.angular_pointwise_change < 1e-5
+    assert result.converged
+    assert not _band(3e-6, n=64, n_energy=3, refinements=1, rtol=1e-6).converged
+    # Large disc -> planar Ginzburg--Frank far field: photons/eV ~ 1/E, band ln 2.
+    gf = _gf_hemisphere_photons_per_eV(result.energy_eV)
+    np.testing.assert_allclose(result.photons_per_eV, gf, rtol=2e-3)
+    assert result.band_photons == pytest.approx(gf[0] * np.log(2.0), rel=2e-4)
+
+
+def test_finite_disc_changes_the_spectrum_and_needs_resolved_energy_nodes():
+    # Radius ~ lambda: edge interference rings around the planar yield by several %.
+    ring = _band(1e-6, n_energy=9, refinements=1)
+    ratio = ring.photons_per_eV / _gf_hemisphere_photons_per_eV(ring.energy_eV)
+    assert np.ptp(ratio) > 0.08 and ring.energy_relative_change < 1e-4
+    coarse = _band(1e-6, n_energy=3, refinements=1)
+    assert coarse.energy_relative_change > 10 * ring.energy_relative_change
+    # Radius << gamma beta lambda / 2 pi: below the planar yield, recovering with E.
+    small = _band(0.2e-6, n_energy=3, refinements=1)
+    ratio = small.photons_per_eV / _gf_hemisphere_photons_per_eV(small.energy_eV)
+    assert np.all(ratio < 0.95) and np.all(np.diff(ratio) > 0)
+    assert small.band_photons < ring.band_photons
+
+
+def test_spectral_convergence_refuses_bad_controls():
+    for kw in ({"n_energy": 4}, {"n_energy": 1}, {"refinements": 0}, {"rtol": 1.0}):
+        with pytest.raises(ValueError):
+            _band(1e-6, **kw)

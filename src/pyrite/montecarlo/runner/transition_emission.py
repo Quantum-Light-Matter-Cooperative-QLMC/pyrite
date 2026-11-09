@@ -182,11 +182,13 @@ def case_optical_transition(
     never calls this.
 
     Unbounded use is refused (``optical_transition_validity``): the
-    formation-zone bound of the self power must not exceed
-    ``formation_tolerance``, and the radiated energy per physical electron
+    formation-zone bound of the total predicted yield (self plus weighted pair,
+    ``coherent_formation_error_bound``) must not exceed ``formation_tolerance``, and the radiated energy per physical electron
     over both hemispheres and the band must stay below ``energy_budget`` of
-    the kinetic energy with negligible pair emission at the band edges.
-    ``None`` skips a check and records it as not evaluated.
+    the kinetic energy with negligible pair emission at the band edges. For
+    Gaussian laws the energy includes the analytic out-of-band coherent
+    envelope (``out_of_band_energy_eV``); other laws with ``N > 1`` record
+    ``out_of_band_unbounded`` instead. ``None`` skips a check and records it as not evaluated.
 
     Validation: optical-planar-tr, optical-ctr-population, optical-material-response
     """
@@ -247,14 +249,23 @@ def _optical_validity(crossings, energy, n_hat, eps, source, count, formation, b
     """Formation and energy-budget refusals of :func:`case_optical_transition`."""
     from ..spectrum.optical_transition import optical_transition_radiation
     from ..spectrum.optical_transition_validity import (
-        formation_error_bound,
+        coherent_formation_error_bound,
         kinetic_energy_eV,
+        out_of_band_coherent_energy_eV,
         radiated_energy_fraction,
     )
 
-    out: dict[str, object] = {"formation_bound": None, "energy_fraction": None}
+    out: dict[str, object] = {
+        "formation_bound": None,
+        "energy_fraction": None,
+        "out_of_band_energy_eV": None,
+    }
     if formation is not None:
-        bound = float(np.max(formation_error_bound(crossings, energy, n_hat, eps)))
+        bounds = coherent_formation_error_bound(
+            crossings, energy, n_hat, eps, source=source, n_histories=count
+        )
+        bound = float(np.max(bounds["total"]))
+        out["formation_self_bound"] = float(np.max(bounds["self"]))
         if not bound <= formation:
             raise ValueError(
                 f"optical TR formation-zone bound {bound:.3g} exceeds {formation:g}: "
@@ -271,7 +282,14 @@ def _optical_validity(crossings, energy, n_hat, eps, source, count, formation, b
             )
             return r.yield_per_electron, r.self_yield, excess * r.form_factor * r.pair_yield
 
+        try:
+            outside = out_of_band_coherent_energy_eV(crossings, energy, source, count, eps)
+        except ValueError as exc:  # law without an envelope: recorded as unbounded
+            outside, out["out_of_band_unbounded"] = 0.0, str(exc)
+        else:
+            out["out_of_band_energy_eV"] = outside
         out["energy_fraction"] = radiated_energy_fraction(
-            score, energy, kinetic_energy_eV(crossings), max_fraction=budget
-        )
+            score, energy, kinetic_energy_eV(crossings), max_fraction=budget,
+            out_of_band_eV=outside,
+        )  # fmt: skip
     return out
