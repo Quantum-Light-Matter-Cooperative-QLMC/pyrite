@@ -15,8 +15,13 @@ by a tolerance (maintainer decision, 2026-11-09).
 
 ``free_free`` names the owner of the in-cut free→free block that the fibre
 source with ``boundary="max"`` does not score (#992): ``"native"`` when native
-CBS scores it on tilted zone rows, ``"bound"`` when it is omitted and carried as
-the declared one-sided ``free_free_upper`` (relative to the band yield).
+CBS scores it on tilted zone rows (coherent emission is then required), or
+``"bound"`` when it is omitted and carried as the declared one-sided
+``free_free_upper`` (relative to the band yield; measured mean + 3 SE).
+``free_free_in_cut`` is the measured block (``boundary="none"`` minus ``"max"``,
+chunk-paired with the calibration control) for either owner; for ``"native"``
+it is the reference native CBS must reproduce. Free→free above the retained
+cut is outside both estimators at exact alignment and is not bounded here.
 
 Validation: cr-axial-depth-calibration
 """
@@ -72,8 +77,11 @@ class AdmittedAxialCase:
     joint_confidence: float
     free_free: Literal["native", "bound"]
     free_free_upper: float | None
+    free_free_in_cut: float
+    free_free_in_cut_sem: float
     evidence_id: str
     evidence_record: str
+    free_free_record: str
     observable: str = "on-axis"
     particle: str = "electron"
 
@@ -101,8 +109,32 @@ ADMITTED_AXIAL_CASES: Mapping[str, AdmittedAxialCase] = MappingProxyType(
             joint_confidence=0.95,
             free_free="native",
             free_free_upper=None,
+            free_free_in_cut=0.07832616270160697,
+            free_free_in_cut_sem=0.0007510980036569821,
             evidence_id="993/A@07c0f5f3e",
             evidence_record=f"{_RECORDS}/depth-calibration-993-A.json",
+            free_free_record=f"{_RECORDS}/free-free-994.json",
+        ),
+        "si-fibre/B": AdmittedAxialCase(
+            key="si-fibre/B",
+            crystal="silicon",
+            axis_uvw=(0, 0, 1),
+            kinetic_energy_eV=3.5e6,
+            thickness_ang=3000.0,
+            tilt_deg=0.0,
+            tilt_azimuth_deg=0.0,
+            temperature_K=293.15,
+            numerics=AxialFibreNumerics(),
+            band_eV=(800.0, 10000.0),
+            depth_budget=0.09705397354242776,
+            joint_confidence=0.95,
+            free_free="bound",
+            free_free_upper=0.18874404816708856,
+            free_free_in_cut=0.18193684747509553,
+            free_free_in_cut_sem=0.0022690668973310135,
+            evidence_id="993/B@07c0f5f3e",
+            evidence_record=f"{_RECORDS}/depth-calibration-993-B.json",
+            free_free_record=f"{_RECORDS}/free-free-994.json",
         ),
     }
 )

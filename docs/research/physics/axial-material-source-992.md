@@ -341,3 +341,17 @@ incidence it must keep `boundary="max"`, or the block is counted twice.
 Free→free above the retained cut is outside both estimators on the exact axis;
 its size is not bounded here. This is input to #994 admission, not a
 production rule.
+
+**Si ⟨100⟩ 3.5 MeV, 0.3 µm (#994).** The in-cut block was measured for the
+two #993 cases with a `boundary="none"` arm, chunk-paired with each #993
+control (qlmc cpu at 07c0f5f3e, jobs 10497 and 10498, 20,000 primaries
+each). Record: `docs/validation/check-records/axial-source/free-free-994.json`.
+
+| Case | 800 eV–10 keV | 2.8–4 keV (2p→1s) |
+|---|---|---|
+| A, tilt 0.088° | +7.83(8)% | +3.63(4)% |
+| B, 0° | +18.19(23)% | +10.95(16)% |
+
+The maintainer's 2026-11-09 decisions on #994: A takes the block from native
+CBS on its tilted zone rows. B omits it and carries a declared one-sided
+bound of 18.9% (mean + 3 SE). Above-cut free→free stays unbounded for B.

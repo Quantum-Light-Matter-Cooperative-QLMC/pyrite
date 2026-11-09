@@ -65,6 +65,25 @@ def test_entry_equals_its_retained_calibration_record(key):
 
 
 @pytest.mark.parametrize("key", sorted(ADMITTED_AXIAL_CASES))
+def test_free_free_values_equal_their_paired_record(key):
+    case = ADMITTED_AXIAL_CASES[key]
+    record = json.loads((ROOT / case.free_free_record).read_text())["cases"][key]
+    calibration = json.loads((ROOT / case.evidence_record).read_text())
+    whole = record["paired"]["whole"]
+    assert record["control_evidence_id"] == case.evidence_id
+    assert whole["relative_change"] == case.free_free_in_cut
+    assert whole["relative_sem"] == case.free_free_in_cut_sem
+    arm, control = record["settings"], calibration["settings"]["control"]
+    assert arm["boundary"] == "none"
+    assert {k: v for k, v in arm.items() if k not in ("boundary", "boundary_eV")} == {
+        k: v for k, v in control.items() if k not in ("boundary", "boundary_eV")
+    }
+    if case.free_free == "bound":
+        upper = whole["relative_change"] + 3 * whole["relative_sem"]
+        assert case.free_free_upper == upper
+
+
+@pytest.mark.parametrize("key", sorted(ADMITTED_AXIAL_CASES))
 def test_exact_case_matches_and_unit_roundoff_is_tolerated(key):
     case = ADMITTED_AXIAL_CASES[key]
     assert match_axial_case(_query(case)) is case
@@ -79,7 +98,7 @@ CHANGES = {
     "energy": {"kinetic_energy_eV": 3.6e6},
     "thickness-thinner": {"thickness_ang": 1500.0},
     "thickness-thicker": {"thickness_ang": 3015.0},
-    "tilt": {"tilt_deg": 0.0},
+    "tilt": {"tilt_deg": 0.05},
     "tilt-azimuth": {"tilt_azimuth_deg": 90.0},
     "temperature": {"temperature_K": 100.0},
     "positron": {"particle": "positron"},
@@ -95,6 +114,13 @@ def test_any_other_case_refuses_and_names_the_mismatch(change):
     assert "#994" in str(info.value)
 
 
+def test_exact_alignment_selects_the_aligned_entry_for_any_azimuth():
+    tilted = ADMITTED_AXIAL_CASES["si-fibre/A"]
+    for azimuth in (0.0, 37.0):
+        query = _query(tilted, tilt_deg=0.0, tilt_azimuth_deg=azimuth)
+        assert match_axial_case(query) is ADMITTED_AXIAL_CASES["si-fibre/B"]
+
+
 def test_no_symmetry_reduction_of_the_tilt_azimuth():
     case = ADMITTED_AXIAL_CASES["si-fibre/A"]
     for azimuth in (90.0, 180.0, -0.088):
@@ -108,7 +134,7 @@ def test_lookup_takes_no_caller_evidence():
     with pytest.raises(TypeError):
         AxialCaseQuery(**{**vars(_query(ADMITTED_AXIAL_CASES["si-fibre/A"])), "depth_budget": 0})
     with pytest.raises(TypeError):
-        ADMITTED_AXIAL_CASES["si-fibre/B"] = ADMITTED_AXIAL_CASES["si-fibre/A"]  # type: ignore[index]
+        ADMITTED_AXIAL_CASES["si-fibre/C"] = ADMITTED_AXIAL_CASES["si-fibre/A"]  # type: ignore[index]
 
 
 def test_line_grid_must_stay_inside_the_calibrated_band():
@@ -122,6 +148,8 @@ def test_line_grid_must_stay_inside_the_calibrated_band():
 def test_free_free_bound_is_declared_exactly_when_the_block_is_omitted():
     case = ADMITTED_AXIAL_CASES["si-fibre/A"]
     assert case.free_free == "native" and case.free_free_upper is None
+    aligned = ADMITTED_AXIAL_CASES["si-fibre/B"]
+    assert aligned.tilt_deg == 0.0 and aligned.free_free == "bound"
     with pytest.raises(ValueError):
         dataclasses.replace(case, free_free="bound")
     with pytest.raises(ValueError):
