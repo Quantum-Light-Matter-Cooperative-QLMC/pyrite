@@ -211,6 +211,31 @@ at $k=0$. These are static overlaps, not occupations.
   within W N- and M-shell absorption. Escape needs the dielectric/attenuation
   bound; vacuum line energy is not a detected spectrum.
 
+### Focused W ⟨001⟩ entrance-population audit
+
+`checks/channeling_submev_w001_entry.py` is a bounded follow-up to the broad
+axial screen: it resolves the static *incident* probability into the 1s
+band (index 0), the combined 2p doublet (indices 1–2), other bound states,
+unbound states and incident orders outside the truncated plane-wave basis.
+The sum is unity before any conditional renormalization; in particular, a
+large total bound overlap does not establish population of the 2p emitter.
+At exact axial alignment the 2p projector has zero overlap by symmetry.
+The doublet is grouped to avoid arbitrary eigenvector rotations in its
+degenerate subspace. Rank labels may cease to identify orbitals at crossings.
+
+Run from the repository root with
+`PYRITE_MC_BACKEND=cpu OMP_NUM_THREADS=4 uv run python checks/channeling_submev_w001_entry.py`
+(optionally `--energies-kev 30 50 100 200 300 500 750 1000`). The JSON record
+compares 4×4 and 6×6 Gauss–Hermite angular quadratures at each divergence,
+and a 2→3 well-momentum basis cutoff for selected widths. Check both
+`quadrature_abs_delta` and `cutoff_abs_delta_at_coarse_quadrature` before
+interpreting 2p occupation. The `outside_basis` contribution is **numerical
+truncation**, not physical dechanneling, and must never be silently dropped.
+These entrance overlaps do not include the surface, scattering, capture,
+occupation evolution, emission, absorption or detector response. No numerical
+result or support classification is asserted until the diagnostic is run and
+its convergence reviewed.
+
 ## Not established
 
 These items are open under #585 and none is settled by this screen:

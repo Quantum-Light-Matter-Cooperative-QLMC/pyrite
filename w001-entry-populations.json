@@ -1,0 +1,412 @@
+{
+  "meta": {
+    "issue": 585,
+    "material": "tungsten",
+    "axis_uvw": [
+      0,
+      0,
+      1
+    ],
+    "temperature_K": 293.15,
+    "assumption": "incoherent mixture of incident plane-wave angles; no evolution or escape",
+    "band_labels": "ranks 0 and 1:2 only; no band-crossing tracking",
+    "cutoffs_over_well_momentum": [
+      2.0,
+      3.0
+    ],
+    "gauss_hermite_nodes_per_axis": [
+      4,
+      6
+    ],
+    "all_probabilities_are_unconditional": true
+  },
+  "cases": [
+    {
+      "kinetic_keV": 30.0,
+      "orders": [
+        11,
+        11
+      ],
+      "refined_orders": [
+        17,
+        17
+      ],
+      "k0_2p_to_1s_gaps_eV": [
+        226.52365739111858,
+        226.52365739111994
+      ],
+      "critical_angle_mrad": 167.66434050118102,
+      "entry": [
+        {
+          "divergence_over_critical": 0.0,
+          "sigma_mrad": 0.0,
+          "probabilities": {
+            "ground_1s": 0.08423118066982863,
+            "upper_2p": 2.810956759558842e-28,
+            "other_bound": 0.8952924478936708,
+            "unbound": 0.020476371436500416,
+            "outside_basis": 0.0
+          },
+          "quadrature_abs_delta": {
+            "ground_1s": 0.0,
+            "upper_2p": 0.0,
+            "other_bound": 0.0,
+            "unbound": 0.0,
+            "outside_basis": 0.0
+          },
+          "cutoff_abs_delta_at_coarse_quadrature": {
+            "ground_1s": 6.92886941497245e-05,
+            "upper_2p": 6.674555460024284e-27,
+            "other_bound": 9.373462549921996e-06,
+            "unbound": 5.991523159979209e-05,
+            "outside_basis": 0.0
+          }
+        },
+        {
+          "divergence_over_critical": 0.05,
+          "sigma_mrad": 8.38321702505905,
+          "probabilities": {
+            "ground_1s": 0.08022981245696174,
+            "upper_2p": 0.1755040376667806,
+            "other_bound": 0.601512698383499,
+            "unbound": 0.1427534514927585,
+            "outside_basis": 0.0
+          },
+          "quadrature_abs_delta": {
+            "ground_1s": 2.901672124522303e-07,
+            "upper_2p": 0.011876226526633171,
+            "other_bound": 0.002867297431540239,
+            "unbound": 0.014743814125385002,
+            "outside_basis": 0.0
+          }
+        },
+        {
+          "divergence_over_critical": 0.1,
+          "sigma_mrad": 16.7664340501181,
+          "probabilities": {
+            "ground_1s": 0.0705632202099248,
+            "upper_2p": 0.23514941026190925,
+            "other_bound": 0.3684980693592622,
+            "unbound": 0.3257893001689034,
+            "outside_basis": 0.0
+          },
+          "quadrature_abs_delta": {
+            "ground_1s": 2.1966145409446636e-05,
+            "upper_2p": 0.005110924866128519,
+            "other_bound": 0.3605569604181296,
+            "unbound": 0.35546800169741133,
+            "outside_basis": 0.0
+          },
+          "cutoff_abs_delta_at_coarse_quadrature": {
+            "ground_1s": 5.591100115705239e-05,
+            "upper_2p": 1.935713516215687e-05,
+            "other_bound": 1.4576519043428549e-05,
+            "unbound": 8.984465536243658e-05,
+            "outside_basis": 0.0
+          }
+        },
+        {
+          "divergence_over_critical": 0.25,
+          "sigma_mrad": 41.916085125295254,
+          "probabilities": {
+            "ground_1s": 0.03948799231124448,
+            "upper_2p": 0.12039429177100047,
+            "other_bound": 0.004737151375083993,
+            "unbound": 0.8353805645426706,
+            "outside_basis": 0.0
+          },
+          "quadrature_abs_delta": {
+            "ground_1s": 0.0018262245813593786,
+            "upper_2p": 0.015105466333591236,
+            "other_bound": 0.0004200224961842013,
+            "unbound": 0.016511668418766945,
+            "outside_basis": 0.0
+          }
+        },
+        {
+          "divergence_over_critical": 0.5,
+          "sigma_mrad": 83.83217025059051,
+          "probabilities": {
+            "ground_1s": 0.011930326415038758,
+            "upper_2p": 0.013236027726979243,
+            "other_bound": 1.913147582137201e-05,
+            "unbound": 0.9748145143821605,
+            "outside_basis": 0.0
+          },
+          "quadrature_abs_delta": {
+            "ground_1s": 0.003474817961625248,
+            "upper_2p": 0.005920113592008803,
+            "other_bound": 0.0012311620760921758,
+            "unbound": 0.008163769477542271,
+            "outside_basis": 0.0
+          },
+          "cutoff_abs_delta_at_coarse_quadrature": {
+            "ground_1s": 3.385520821103105e-06,
+            "upper_2p": 4.62290807849014e-06,
+            "other_bound": 9.987324740368207e-07,
+            "unbound": 9.007161373308925e-06,
+            "outside_basis": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "kinetic_keV": 100.0,
+      "orders": [
+        12,
+        12
+      ],
+      "refined_orders": [
+        18,
+        18
+      ],
+      "k0_2p_to_1s_gaps_eV": [
+        234.87981536414546,
+        234.87981536414688
+      ],
+      "critical_angle_mrad": 94.50064388743887,
+      "entry": [
+        {
+          "divergence_over_critical": 0.0,
+          "sigma_mrad": 0.0,
+          "probabilities": {
+            "ground_1s": 0.07254080747109497,
+            "upper_2p": 6.479524366180975e-28,
+            "other_bound": 0.8751825305590383,
+            "unbound": 0.05227666196986738,
+            "outside_basis": 0.0
+          },
+          "quadrature_abs_delta": {
+            "ground_1s": 0.0,
+            "upper_2p": 0.0,
+            "other_bound": 0.0,
+            "unbound": 0.0,
+            "outside_basis": 0.0
+          },
+          "cutoff_abs_delta_at_coarse_quadrature": {
+            "ground_1s": 3.775312938525399e-05,
+            "upper_2p": 5.829361391368352e-28,
+            "other_bound": 4.631470738036825e-05,
+            "unbound": 8.406783676407487e-05,
+            "outside_basis": 0.0
+          }
+        },
+        {
+          "divergence_over_critical": 0.05,
+          "sigma_mrad": 4.725032194371943,
+          "probabilities": {
+            "ground_1s": 0.06922045258692051,
+            "upper_2p": 0.09852952825010472,
+            "other_bound": 0.6175487281342468,
+            "unbound": 0.214701291028728,
+            "outside_basis": 0.0
+          },
+          "quadrature_abs_delta": {
+            "ground_1s": 1.9267195201788656e-07,
+            "upper_2p": 0.004160383041105761,
+            "other_bound": 0.016374743237015377,
+            "unbound": 0.02053531895007249,
+            "outside_basis": 0.0
+          }
+        },
+        {
+          "divergence_over_critical": 0.1,
+          "sigma_mrad": 9.450064388743886,
+          "probabilities": {
+            "ground_1s": 0.061130498655980456,
+            "upper_2p": 0.1572958594555148,
+            "other_bound": 0.35588950041956846,
+            "unbound": 0.42568414146893624,
+            "outside_basis": 0.0
+          },
+          "quadrature_abs_delta": {
+            "ground_1s": 1.6559045358049973e-05,
+            "upper_2p": 0.00937259208753738,
+            "other_bound": 0.05362287755183781,
+            "unbound": 0.04426684450965929,
+            "outside_basis": 0.0
+          },
+          "cutoff_abs_delta_at_coarse_quadrature": {
+            "ground_1s": 3.124730944462778e-05,
+            "upper_2p": 1.0348580389674122e-05,
+            "other_bound": 0.00016148052388637035,
+            "unbound": 0.0002030764137203045,
+            "outside_basis": 0.0
+          }
+        },
+        {
+          "divergence_over_critical": 0.25,
+          "sigma_mrad": 23.625160971859717,
+          "probabilities": {
+            "ground_1s": 0.034648613702261244,
+            "upper_2p": 0.10729414415043964,
+            "other_bound": 0.00035591763386439156,
+            "unbound": 0.8577013245134342,
+            "outside_basis": 0.0
+          },
+          "quadrature_abs_delta": {
+            "ground_1s": 0.0014893205317413477,
+            "upper_2p": 0.014438144569117156,
+            "other_bound": 0.0071631656237293884,
+            "unbound": 0.0087642994771302,
+            "outside_basis": 0.0
+          }
+        },
+        {
+          "divergence_over_critical": 0.5,
+          "sigma_mrad": 47.250321943719435,
+          "probabilities": {
+            "ground_1s": 0.01070447556702594,
+            "upper_2p": 0.01496287298325239,
+            "other_bound": 0.000851574674803519,
+            "unbound": 0.973481076774918,
+            "outside_basis": 0.0
+          },
+          "quadrature_abs_delta": {
+            "ground_1s": 0.0030679193490591675,
+            "upper_2p": 0.007402194808785763,
+            "other_bound": 0.0017107609026901479,
+            "unbound": 0.008759353255154867,
+            "outside_basis": 0.0
+          },
+          "cutoff_abs_delta_at_coarse_quadrature": {
+            "ground_1s": 1.4641297670517708e-06,
+            "upper_2p": 3.155951831467288e-06,
+            "other_bound": 7.934746343012805e-07,
+            "unbound": 5.413556232625183e-06,
+            "outside_basis": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "kinetic_keV": 300.0,
+      "orders": [
+        14,
+        14
+      ],
+      "refined_orders": [
+        20,
+        20
+      ],
+      "k0_2p_to_1s_gaps_eV": [
+        250.20638748651794,
+        250.2063874865195
+      ],
+      "critical_angle_mrad": 57.90881709356595,
+      "entry": [
+        {
+          "divergence_over_critical": 0.0,
+          "sigma_mrad": 0.0,
+          "probabilities": {
+            "ground_1s": 0.0521993482293215,
+            "upper_2p": 3.247252372399915e-29,
+            "other_bound": 0.6911030191952025,
+            "unbound": 0.25669763257547557,
+            "outside_basis": 0.0
+          },
+          "quadrature_abs_delta": {
+            "ground_1s": 0.0,
+            "upper_2p": 0.0,
+            "other_bound": 0.0,
+            "unbound": 0.0,
+            "outside_basis": 0.0
+          },
+          "cutoff_abs_delta_at_coarse_quadrature": {
+            "ground_1s": 1.2666131617128373e-05,
+            "upper_2p": 1.1290351857932512e-27,
+            "other_bound": 0.00011266196262027517,
+            "unbound": 0.00012532809423709823,
+            "outside_basis": 0.0
+          }
+        },
+        {
+          "divergence_over_critical": 0.05,
+          "sigma_mrad": 2.8954408546782973,
+          "probabilities": {
+            "ground_1s": 0.04996737971285631,
+            "upper_2p": 0.036372965953106136,
+            "other_bound": 0.46170818623300747,
+            "unbound": 0.4519514681010295,
+            "outside_basis": 0.0
+          },
+          "quadrature_abs_delta": {
+            "ground_1s": 9.596534374101129e-08,
+            "upper_2p": 0.00023960178696730283,
+            "other_bound": 0.008749415779075842,
+            "unbound": 0.008989113531386095,
+            "outside_basis": 0.0
+          }
+        },
+        {
+          "divergence_over_critical": 0.1,
+          "sigma_mrad": 5.7908817093565945,
+          "probabilities": {
+            "ground_1s": 0.0444449468613645,
+            "upper_2p": 0.07207323796434775,
+            "other_bound": 0.21741443141641512,
+            "unbound": 0.666067383757872,
+            "outside_basis": 0.0
+          },
+          "quadrature_abs_delta": {
+            "ground_1s": 9.356022690254484e-06,
+            "upper_2p": 0.004375156863626106,
+            "other_bound": 0.044694506172565235,
+            "unbound": 0.04032870533163002,
+            "outside_basis": 0.0
+          },
+          "cutoff_abs_delta_at_coarse_quadrature": {
+            "ground_1s": 1.0790322178079459e-05,
+            "upper_2p": 2.3038503956240852e-06,
+            "other_bound": 3.952651542490915e-05,
+            "unbound": 5.262068799927189e-05,
+            "outside_basis": 0.0
+          }
+        },
+        {
+          "divergence_over_critical": 0.25,
+          "sigma_mrad": 14.477204273391488,
+          "probabilities": {
+            "ground_1s": 0.02575099772015727,
+            "upper_2p": 0.07072415528718834,
+            "other_bound": 0.0009809274055244618,
+            "unbound": 0.9025439195871298,
+            "outside_basis": 0.0
+          },
+          "quadrature_abs_delta": {
+            "ground_1s": 0.0009623559899453633,
+            "upper_2p": 0.0015560438105764463,
+            "other_bound": 0.0020502718058674225,
+            "unbound": 0.00046812799465489885,
+            "outside_basis": 0.0
+          }
+        },
+        {
+          "divergence_over_critical": 0.5,
+          "sigma_mrad": 28.954408546782975,
+          "probabilities": {
+            "ground_1s": 0.00825814685263968,
+            "upper_2p": 0.015680896084233748,
+            "other_bound": 0.0030355555954726774,
+            "unbound": 0.9730254014676536,
+            "outside_basis": 0.0
+          },
+          "quadrature_abs_delta": {
+            "ground_1s": 0.0023076146958305073,
+            "upper_2p": 0.00678302222411797,
+            "other_bound": 0.00030065985715348447,
+            "unbound": 0.009391296777102931,
+            "outside_basis": 0.0
+          },
+          "cutoff_abs_delta_at_coarse_quadrature": {
+            "ground_1s": 4.738636254306844e-08,
+            "upper_2p": 1.337613969761009e-06,
+            "other_bound": 3.699586412263603e-07,
+            "unbound": 1.7549589735876836e-06,
+            "outside_basis": 0.0
+          }
+        }
+      ]
+    }
+  ]
+}
