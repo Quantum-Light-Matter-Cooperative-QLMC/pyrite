@@ -241,7 +241,7 @@ def _(
 
 @app.cell
 def _(energies_keV, np, plt, records, saved_store, thicknesses_nm):
-    # Integrate the *saved* incoherent PXR/CBS source spectrum on its native grid.
+    # Integrate the saved incoherent PXR/CBS source spectrum on its native grid.
     band_yield = np.full((len(thicknesses_nm), len(energies_keV)), np.nan)
     for _record in records(saved_store):
         _case = _record["case"]

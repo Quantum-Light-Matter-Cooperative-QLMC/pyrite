@@ -64,10 +64,10 @@ def _(mo):
     ## Crystals and Reciprocal Lattice Vectors
 
     In general, crystals are defined by planes of symmetry known as lattice planes.
-    Lattice planes are generally defined by their [miller indices](https://en.wikipedia.org/wiki/Miller_index) $(hkl)$,
-    which describe their orientation in the unit cell. Taking the spatial Fourier Transform of the lattice leads
+    Lattice planes are generally defined by their [Miller indices](https://en.wikipedia.org/wiki/Miller_index) $(hkl)$,
+    which describe their orientation in the unit cell. Taking the spatial Fourier transform of the lattice leads
     to the concept of a 'reciprocal lattice vector' $\mathbf{g}_{hkl}$, which is orthogonal in real space to its
-    associated $(hkl)$ lattice plane and has magnitude
+    associated $(hkl)$ lattice plane. Its magnitude is related to the plane spacing by
 
     $$
     d = \frac{2 \pi}{|\mathbf{g}_{hkl}|}
@@ -86,7 +86,7 @@ def _(mo):
     $$
 
     A lattice which can exchange momentum $\mathbf{g}_{hkl}$ is also capable of exchanging $n\mathbf{g}_{hkl}$,
-    meaning that photons can also be emitted at $nE_p$ for integer $n$
+    meaning that photons can also be emitted at $nE_p$ for integer $n$.
 
     While an ideal crystal has an infinite number of reciprocal lattice vectors, not all contribute
     equally to X-ray emission. The strength of each contribution depends in part on the crystal's
@@ -141,7 +141,7 @@ def _(mo, tables_ready):
         bunch_charge=1.0 * ureg.pC,
     )
 
-    # Next, our crystalline target: a 400 nm thick slab of Highly-Ordered Pyrolytic Graphite
+    # Next, our crystalline target: a 400 nm thick slab of Highly Oriented Pyrolytic Graphite
     target = Slab(
         "hopg",
         thickness=400 * ureg.nm,
@@ -150,7 +150,7 @@ def _(mo, tables_ready):
         height=5 * ureg.mm,
     )
 
-    # Our detector: in this case, an ideal point-like detector sampling per sterradian
+    # Our detector: in this case, an ideal point-like detector sampling per steradian
     detector = Detector(observation_angle=135 * ureg.degree)
 
     # Numerical settings for the simulation: how many trials to score for PXR/CBS spectra,
@@ -160,7 +160,7 @@ def _(mo, tables_ready):
         sampling=FixedSampling(cxr_histories=32_768, brem_histories=128),
         cxr_reflections=CxrReflections(
             n_families=2
-        ),  # Here we only consider the first two Basal plane reflections
+        ),  # Here we only consider the first two basal-plane reflections
     )
 
     with mo.status.spinner(title="Simulating electron transport and X-ray spectrum"):
@@ -212,13 +212,13 @@ def _(mo):
 
     In blue, we see our desired result! The pair of spectral lines corresponding to $(002)$ and $(004)$, with the second line looking to be ~2x the photon energy of the first.
 
-    In green, we see the *extremely* dominant characteristic radiation line from the Carbon atoms in the HOPG, at ~277 eV. Luckily, these
-    characteristic xrays are absorbed by a slight breeze (literally), so it shouldn't be too hard to filter out and leave our
-    soft-xray lines of interest.
+    In green, we see the *extremely* dominant characteristic radiation line from the carbon atoms in the HOPG, at ~277 eV. Luckily, these
+    characteristic X-rays are absorbed by a slight breeze (literally), so they shouldn't be too hard to filter out, leaving our
+    soft-X-ray lines of interest.
 
     Lastly, in orange, we see our incoherent bremsstrahlung background, and, interestingly, we notice that it has a sharp drop right at the same energy
-    as the characteristic line. This is because the absorption $K$-edge of Carbon (i.e. the photon energy required to strip an inner-shell electron
-    from the atom) is directly tied to the characteristic xray emission line, as this line is caused by excited conduction-band electrons decaying down
+    as the characteristic line. This is because the absorption $K$-edge of carbon (i.e. the photon energy required to strip an inner-shell electron
+    from the atom) is directly tied to the characteristic X-ray emission line, as this line is caused by excited conduction-band electrons decaying down
     into empty inner-shell states and emitting photons of very similar energy.
     """)
     return
