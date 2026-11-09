@@ -73,6 +73,10 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     "checks/axial_fiber_source.py": ("cr-axial-fiber-regression",),
     "checks/axial_outgoing_convergence.py": ("cr-axial-fiber-return-deficit",),
     "checks/axial_outgoing_maps.py": ("cr-axial-zone-handoff-accounting",),
+    "checks/axial_depth_calibration.py": ("cr-axial-depth-calibration",),
+    "checks/axial_fiber_fates.py": ("cr-axial-zone-handoff-physical",),
+    # #585 static screen: a screening record, not a support verdict.
+    "checks/channeling_submev_axial_screen.py": (),
     # Hardware performance evidence accompanies the CUDA backend validation;
     # it does not add a separate pass/fail ledger claim.
     "checks/axial_mcwf_cuda.py": (),
