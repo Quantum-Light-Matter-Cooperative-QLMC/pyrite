@@ -155,3 +155,61 @@ def test_spectral_convergence_refuses_bad_controls():
     for kw in ({"n_energy": 4}, {"n_energy": 1}, {"refinements": 0}, {"rtol": 1.0}):
         with pytest.raises(ValueError):
             _band(1e-6, **kw)
+
+
+# --- Finite-aperture band convergence (direct Green, no window axis) (#616) -------
+
+
+def _aperture_band(**kw):
+    from pyrite.montecarlo.spectrum.optical_finite_convergence import (
+        finite_aperture_spectral_convergence,
+    )
+
+    screen = PECCircularScreen(outer_radius_m=1e-6, beta_z=-0.95)
+    return finite_aperture_spectral_convergence(
+        (1.0, 2.0),
+        screen,
+        nx=32,
+        ny=32,
+        dx_m=0.1e-6,
+        dy_m=0.1e-6,
+        plane_z_m=0.5e-6,
+        aperture=_APERTURE,
+        detector_pitch_m=0.1e-6,
+        **{"n_energy": 3, **kw},
+    )
+
+
+def test_aperture_band_converges_and_is_a_lambda_dependent_hemisphere_fraction():
+    result = _aperture_band()
+    assert [row[0] for row in result.energy_rows] == [3, 5]
+    assert [row[0] for row in result.detector_rows] == pytest.approx([1e-7, 5e-8])
+    assert [row[0] for row in result.source_rows] == pytest.approx([1e-7, 5e-8])
+    assert result.detector_pointwise_change < 2e-3 and result.source_pointwise_change < 1e-3
+    assert result.energy_relative_change < 1e-2 and result.converged
+    assert not _aperture_band(rtol=1e-4).converged
+    # Each node is the window-free direct Green collection of that energy.
+    screen = PECCircularScreen(outer_radius_m=1e-6, beta_z=-0.95)
+    node = circular_pec_transition_field(1.5, screen, nx=32, ny=32, dx_m=0.1e-6, dy_m=0.1e-6)
+    direct = collect_screen_green(node, plane_z_m=0.5e-6, aperture=_APERTURE, pitch_m=0.1e-6)
+    assert result.photons_per_eV[2] == pytest.approx(direct.photons_per_eV, rel=1e-12)
+    # A finite aperture collects a wavelength-dependent part of the hemisphere.
+    from pyrite.montecarlo.spectrum.optical_finite_convergence import (
+        finite_screen_spectral_convergence,
+    )
+
+    hemi = finite_screen_spectral_convergence(
+        (1.0, 2.0), screen, nx=32, ny=32, dx_m=0.1e-6, dy_m=0.1e-6, n_energy=3, n_u=16, n_phi=32
+    )
+    fraction = result.photons_per_eV / hemi.photons_per_eV
+    assert np.all((fraction > 0.5) & (fraction < 1.0)) and np.ptp(fraction) > 0.01
+
+
+def test_aperture_band_refuses_bad_controls():
+    for kw in ({"n_energy": 4}, {"refinements": 0}, {"rtol": 0.0}):
+        with pytest.raises(ValueError):
+            _aperture_band(**kw)
+    with pytest.raises(TypeError):
+        _aperture_band(aperture=None)
+    with pytest.raises(ValueError, match="remote"):
+        _aperture_band(refinements=8)

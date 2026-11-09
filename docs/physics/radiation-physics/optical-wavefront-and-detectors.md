@@ -971,8 +971,18 @@ $\beta=0.95$ over 1–2 eV:
   yield and recovers with $E$.
 
 Angular orders 16×32 are converged to $10^{-5}$ for these sources.
-Finite-aperture collection (`collect_screen_green`) is not yet part of this
-spectral study.
+
+`finite_aperture_spectral_convergence` does the same for a band collected
+through a finite detector-plane aperture with the direct Green sum
+(`collect_screen_green`), so there is no window axis. It refines three axes
+independently: Simpson energy nodes, the detector pitch (halved) and the
+source pitch (halved at a fixed physical window, evaluated on the base energy
+nodes). It reports the band change in energy and the largest pointwise
+$dN/dE$ change for each pitch. For a 1 µm disc, $eta=0.95$, 1–2 eV, and a
+2 µm square aperture 0.5 µm downstream, both pitch changes are below
+$2	imes10^{-3}$ at 0.1 µm. The aperture collects 0.5–1 of the hemisphere
+photons/eV, and that fraction varies with wavelength. The cost is
+O(source pixels × aperture points) per energy node.
 
 **Published finite-disc reference (Schmidt et al., arXiv:1803.00608, Sect. 2.3).**
 For $\gamma=100$ and $\lambda=0.3$ mm, the solver (with `observe_screen_green`)
