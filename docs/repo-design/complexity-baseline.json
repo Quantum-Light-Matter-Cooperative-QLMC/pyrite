@@ -158,16 +158,6 @@
     },
     {
       "path": "src/pyrite/console/dashboard/render.py",
-      "name": "_compute_time_estimate",
-      "cc": 42
-    },
-    {
-      "path": "src/pyrite/console/dashboard/render.py",
-      "name": "format_job_status",
-      "cc": 44
-    },
-    {
-      "path": "src/pyrite/console/dashboard/render.py",
       "name": "mode_summary",
       "cc": 29
     },
@@ -308,7 +298,7 @@
     {
       "path": "src/pyrite/montecarlo/channeling/axial_diagnostic.py",
       "name": "axial_diagnostic",
-      "cc": 34
+      "cc": 33
     },
     {
       "path": "src/pyrite/montecarlo/channeling/axial_dissipator.py",
