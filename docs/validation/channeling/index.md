@@ -16,6 +16,7 @@ cr-transverse-eigenproblem
 cr-dipole-matrix-element
 cr-initial-occupation
 cr-doppler-line-energy
+cr-recoil-line-energy
 cr-mean-inner-potential
 cr-plane-incidence
 cr-lindblad-jump-operators
