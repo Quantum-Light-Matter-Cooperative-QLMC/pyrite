@@ -11,6 +11,9 @@ from .cores import make_cpu_transport_core
 _transport_core_ungrooved = make_cpu_transport_core()
 _transport_core_ungrooved_lut = make_cpu_transport_core(lut=True)
 _transport_core_grooved = make_cpu_transport_core(grooved=True)
+# Compiled on first direct call. Host routing stays pinned to lockstep until
+# grooved vacuum rows are capacity-replayed and joined into the final output.
+_transport_core_grooved_perelectron = make_cpu_transport_core(grooved=True, per_electron=True)
 _transport_core_ungrooved_perelectron = make_cpu_transport_core(per_electron=True)
 _transport_core_ungrooved_perelectron_lut = make_cpu_transport_core(per_electron=True, lut=True)
 # Opt-in shell soft/hard inelastic specializations (never selected by default).

@@ -291,7 +291,10 @@ def make_cpu_transport_core(
             ) = split_args
         if per_electron:
             (e_start, e_count, cap, stream_key) = run
-            (seg_count, exit_code) = pe_out
+            if grooved:
+                (seg_count, exit_code, vac_count) = pe_out
+            else:
+                (seg_count, exit_code) = pe_out
             (straggle_on, stragg_dE) = straggling
             Ne = alive.size
         else:
@@ -368,6 +371,8 @@ def make_cpu_transport_core(
                     sp_killed[e] = False
                 if straggle_on:
                     stragg_dE[e] = 0.0
+                if grooved:
+                    vac_count[i] = 0
                 if alive[e]:
                     exit_code[i] = EXIT_STEP_LIMITED
 
@@ -973,17 +978,31 @@ def make_cpu_transport_core(
                             exit_side_j, entry_distance = True, np.inf
                     reentered = np.isfinite(entry_distance)
                     if reentered:
-                        if nvac >= max_vac:
-                            raise RuntimeError("vacuum segment buffer exhausted")
+                        if per_electron:
+                            # Capacity replay reads the full required count,
+                            # even when this pass cannot retain all the rows.
+                            i = e - e_start
+                            vac_slot = i * max_vac + vac_count[i]
+                            write_vac = vac_count[i] < max_vac
+                            vac_count[i] += 1
+                        else:
+                            if nvac >= max_vac:
+                                raise RuntimeError("vacuum segment buffer exhausted")
+                            vac_slot, write_vac = nvac, True
+                            nvac += 1
                         ex, ey, ez = (
                             sx + entry_distance * dx,
                             sy + entry_distance * dy,
                             sz + entry_distance * dz,
                         )
-                        vac_start[nvac, 0], vac_start[nvac, 1], vac_start[nvac, 2] = sx, sy, sz
-                        vac_end[nvac, 0], vac_end[nvac, 1], vac_end[nvac, 2] = ex, ey, ez
-                        vac_E[nvac], vac_t0[nvac], vac_id[nvac] = E_keV[e], clock[e], e
-                        nvac += 1
+                        if write_vac:
+                            vac_start[vac_slot, 0], vac_start[vac_slot, 1] = sx, sy
+                            vac_start[vac_slot, 2] = sz
+                            vac_end[vac_slot, 0], vac_end[vac_slot, 1] = ex, ey
+                            vac_end[vac_slot, 2] = ez
+                            vac_E[vac_slot], vac_t0[vac_slot], vac_id[vac_slot] = (
+                                E_keV[e], clock[e], e
+                            )
                         clock[e] += entry_distance / beta_from_keV_scalar(E_keV[e])
                         pos[e, 0], pos[e, 1], pos[e, 2] = (
                             ex + surface_eps * dx,
@@ -999,13 +1018,27 @@ def make_cpu_transport_core(
                     if zero_surface_events[e] >= 2:
                         raise RuntimeError("repeated zero-length grooved surface events")
                 died_j = exit_top_j or exit_bot_j or exit_side_j or cutoff_j
-                n_back += int(exit_top_j)
-                n_trans += int(exit_bot_j)
-                n_side += int(exit_side_j)
-                n_cutoff += int(cutoff_j)
                 if died_j:
-                    alive[e] = False
-                    n_eligible -= 1
+                    if per_electron:
+                        i = e - e_start
+                        exit_code[i] = (
+                            EXIT_BACKSCATTERED
+                            if exit_top_j
+                            else EXIT_TRANSMITTED
+                            if exit_bot_j
+                            else EXIT_SIDE
+                            if exit_side_j
+                            else EXIT_CUTOFF_STOPPED
+                        )
+                        seg_count[i] = local_nseg[e]
+                        cursor += 1
+                    else:
+                        n_back += int(exit_top_j)
+                        n_trans += int(exit_bot_j)
+                        n_side += int(exit_side_j)
+                        n_cutoff += int(cutoff_j)
+                        alive[e] = False
+                        n_eligible -= 1
                     continue
                 if cross_up_j or cross_dn_j:
                     pos[e, 2] += (1.0 if dirs[e, 2] > 0.0 else -1.0) * EPS

@@ -9,8 +9,8 @@ from numba import njit
 
 def validate_core_axes(grooved, per_electron, lut, inelastic, radiative, cone_split, mixed):
     """Refuse axis combinations that have no CPU core specialization."""
-    if grooved and (per_electron or lut):
-        raise ValueError("grooved transport has only an exact lockstep specialization")
+    if grooved and lut:
+        raise ValueError("grooved transport has no LUT specialization")
     if grooved and inelastic:
         raise ValueError("shell soft/hard inelastic transport has no grooved specialization")
     if radiative and (grooved or lut):
@@ -121,6 +121,41 @@ def adapt_cpu_transport_core(body, *, per_electron, lut, grooved, cone_split, mi
                 inelastic_args,
                 radiative_args,
                 split_args,
+            )
+    elif per_electron and grooved:
+
+        @njit(cache=True)
+        def core(
+            run,
+            control,
+            geometry,
+            groove,
+            materials,
+            mott,
+            state,
+            segments,
+            pe_out,
+            straggling,
+        ):
+            """Exact grooved history with per-electron rows and vacuum slots.
+
+            ``pe_out`` adds a per-batch vacuum-count array. Overflow is
+            reported through the count for capacity replay.
+            """
+            return body(
+                run,
+                0,
+                control,
+                geometry,
+                groove,
+                materials,
+                mott,
+                (),
+                state,
+                segments,
+                pe_out,
+                straggling,
+                (),
             )
     elif per_electron:
 

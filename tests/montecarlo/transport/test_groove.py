@@ -380,6 +380,8 @@ def _run_grooved(
     seed=9,
     width_ang=None,
     height_ang=None,
+    per_electron=False,
+    vacuum_capacity=None,
 ):
     """Drive the compiled grooved core (:func:`_transport_core_grooved`) directly
     from a hand-placed single electron, using real groove geometry rather than a
@@ -473,6 +475,107 @@ def _run_grooved(
     straggle_on = False
     stream_keys_arr = np.zeros(Ne, dtype=np.uint64)
     stragg_dE = np.zeros(Ne)
+
+    if per_electron:
+        from pyrite.montecarlo.transport.batching import pack_layer_tables
+        from pyrite.montecarlo.transport.core_specializations import (
+            _transport_core_grooved_perelectron,
+        )
+        from pyrite.montecarlo.transport.kinematics import stream_keys
+
+        # The same real geometry fixture, this time through the *compiled*
+        # counter-addressed core; the host dispatcher remains lockstep-only.
+        max_vac = max_segments if vacuum_capacity is None else vacuum_capacity
+        vac_start = np.empty((max_vac, 3))
+        vac_end = np.empty((max_vac, 3))
+        vac_E = np.empty(max_vac)
+        vac_t0 = np.empty(max_vac)
+        vac_id = np.empty(max_vac, dtype=np.int64)
+        vac_count = np.zeros(1, dtype=np.int64)
+        seg_count = np.zeros(1, dtype=np.int64)
+        exit_code = np.zeros(1, dtype=np.int8)
+        packed = pack_layer_tables(
+            L_Js,
+            L_Zs,
+            L_ks,
+            L_coeffs,
+            L_E_cross,
+            L_ncm3,
+            L_sr_rate_numer,
+            L_mott_numer,
+            L_mott_denom1,
+            L_mott_denom2,
+            L_sr_joy_numer,
+        )
+        tp = float(spec.tilt_polar_rad)
+        _transport_core_grooved_perelectron(
+            (0, 1, max_segments, stream_keys(seed, Ne)),
+            (max_steps, max_segments, 0, 0, 0.0),
+            (
+                n_layers,
+                internal_bounds,
+                z_total,
+                finite_footprint,
+                0.0 if width_ang is None else float(width_ang),
+                0.0 if height_ang is None else float(height_ang),
+                packed[-1],
+                L_top,
+                L_bot,
+            ),
+            (
+                float(spec.spacing_ang),
+                float(spec.depth_ang),
+                float(np.sin(tp)),
+                float(np.cos(tp)),
+                max_vac,
+                vac_start,
+                vac_end,
+                vac_E,
+                vac_t0,
+                vac_id,
+            ),
+            packed[:-1]
+            + (
+                False,
+                np.zeros(n_layers, dtype=np.int32),
+                np.zeros((n_layers, 1)),
+                np.zeros((n_layers, 1)),
+            ),
+            (mott_has_table, mott_start, mott_len, mott_logE_flat, mott_logA_flat)
+            + pack_elsepa_tables(None, None),
+            (alive, clock, pos, dirs, E_keV, E_cut_by_electrons),
+            (
+                seg_dir, seg_mid, seg_len, seg_E, seg_t0, seg_id, seg_lay,
+                seg_E_end, seg_t_end, seg_flight, seg_substep, seg_event,
+            ),
+            (seg_count, exit_code, vac_count),
+            (straggle_on, stragg_dE),
+        )
+        from pyrite.montecarlo.transport.cores import (
+            EXIT_BACKSCATTERED,
+            EXIT_CUTOFF_STOPPED,
+            EXIT_SIDE,
+            EXIT_STEP_LIMITED,
+            EXIT_TRANSMITTED,
+        )
+
+        nseg = int(seg_count[0])
+        nvac = min(int(vac_count[0]), max_vac)
+        return dict(
+            n_backscattered=int(exit_code[0] == EXIT_BACKSCATTERED),
+            n_transmitted=int(exit_code[0] == EXIT_TRANSMITTED),
+            n_side_exited=int(exit_code[0] == EXIT_SIDE),
+            n_stopped=int(exit_code[0] == EXIT_CUTOFF_STOPPED),
+            n_step_limited=int(exit_code[0] == EXIT_STEP_LIMITED),
+            vacuum_count=int(vac_count[0]),
+            vacuum_start_ang=vac_start[:nvac],
+            vacuum_end_ang=vac_end[:nvac],
+            vacuum_E_keV=vac_E[:nvac],
+            E_keV=seg_E[:nseg],
+            v_hat=seg_dir[:nseg],
+            layer=seg_lay[:nseg],
+            L_ang=seg_len[:nseg],
+        )
 
     tp = float(spec.tilt_polar_rad)
     nseg, nvac, n_back, n_trans, n_side, n_cutoff, n_step_limited = (
@@ -622,6 +725,49 @@ def test_surface_reentry_does_not_consume_material_step_budget():
     assert out["vacuum_start_ang"].shape == (1, 3)
     assert out["n_transmitted"] == 1
     assert out["n_backscattered"] == out["n_side_exited"] == out["n_stopped"] == 0
+
+
+def test_exact_per_electron_groove_reentry_and_budget():
+    """Re-entry may precede the only charged material step; the exit is typed."""
+    d = np.array([1.0, 0.0, 0.1])
+    d /= np.linalg.norm(d)
+    p0 = np.array([3000.0, 0.0, 8000.0])
+    kw = dict(thickness_ang=50000.0, max_steps=1)
+
+    exact = _run_grooved(p0, d, SPEC, per_electron=True, **kw)
+    legacy = _run_grooved(p0, d, SPEC, **kw)
+    assert exact["n_transmitted"] == legacy["n_transmitted"] == 1
+    assert exact["n_step_limited"] == 0
+    assert exact["vacuum_count"] == 1
+    np.testing.assert_allclose(exact["vacuum_start_ang"], legacy["vacuum_start_ang"])
+    np.testing.assert_allclose(exact["vacuum_end_ang"], legacy["vacuum_end_ang"])
+    np.testing.assert_allclose(exact["L_ang"], legacy["L_ang"])
+
+
+def test_exact_per_electron_groove_vacuum_capacity_reports_required_rows():
+    """A full vacuum buffer must not corrupt memory or lose replay counts."""
+    d = np.array([1.0, 0.0, 0.1])
+    d /= np.linalg.norm(d)
+    p0 = np.array([3000.0, 0.0, 8000.0])
+    kw = dict(thickness_ang=50000.0, max_steps=1, per_electron=True)
+    tiny = _run_grooved(p0, d, SPEC, vacuum_capacity=0, **kw)
+    full = _run_grooved(p0, d, SPEC, vacuum_capacity=1, **kw)
+    assert tiny["vacuum_count"] == full["vacuum_count"] == 1
+    assert tiny["vacuum_start_ang"].shape == (0, 3)
+    assert full["vacuum_start_ang"].shape == (1, 3)
+    assert tiny["n_transmitted"] == full["n_transmitted"] == 1
+    np.testing.assert_array_equal(tiny["L_ang"], full["L_ang"])
+
+
+def test_exact_per_electron_groove_backscatter_exit_code():
+    d = np.array([np.cos(TP), 0.0, -np.sin(TP)])
+    p0 = np.array([3000.0, 0.0, 0.8 * SPEC.depth_ang])
+    out = _run_grooved(
+        p0, d, SPEC, thickness_ang=1.0e7, max_steps=4, per_electron=True
+    )
+    assert out["n_backscattered"] == 1
+    assert out["n_step_limited"] == out["n_transmitted"] == 0
+    assert out["vacuum_count"] == 0
 
 
 def test_surface_event_exhaustion_raises_instead_of_classifying_survivor_stopped():
