@@ -1,13 +1,13 @@
 {
   "schema": "pyrite.tutorial.v1",
   "source_sha256": "ec56162b8e1b72e48a4046d3f178799698fc3da160d804e6345a1f3cfa81a1da",
-  "pyrite_version": "0.21.0",
-  "python_version": "3.14.6",
-  "git_revision": "eb41ac67e1f3942ef68cb4ff7fd91f1dacc6bb01",
+  "pyrite_version": "0.30.0",
+  "python_version": "3.14.4",
+  "git_revision": "3c759da334a409b0a9ea4e491a928a3789f9f12a",
   "output": {
     "repository_input_sha256": {
       "docs/validation/check-records/pxr-optimization.json": "e77d7cb86376bdc06d2f8aee25d5b73a7aaf16d43a0689daef19d4b698ee4aba",
-      "checks/pxr_optimization.py": "cc2b647e8d10b1d9d086bec92bf1f10f6fd1431060f80708e628040a8003b7e5"
+      "checks/pxr_optimization.py": "eac1dd88f8a0a692739086dd8ec6b1d28b6961fc66821d94312cc1e44f91a5d7"
     },
     "simulation_source": {
       "code_digest": "4d751daec85b740d866b3261eefa443bafd691edfb06c85d78774e9618937eaf",
