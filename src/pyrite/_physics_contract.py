@@ -258,6 +258,32 @@ BUILTIN_DESCRIPTORS = DescriptorCatalog(
             required_datasets=("channeling_thermal", "shell-configuration"),
         ),
         ModelDescriptor(
+            "transport.channeling",
+            "axial",
+            "montecarlo.runner.axial",
+            (
+                "repository-calibrated fibre case (exact crystal, axis, energy, depth, tilt)",
+                "plane-wave electron beam, single unbounded slab cut normal to the axis",
+                "midpoint integration, uncoupled radiative scoring, no secondaries",
+            ),
+            implementations=("cpu.per-electron",),
+            required_datasets=("channeling_thermal", "sbethe"),
+        ),
+        ModelDescriptor(
+            "emission.channeling",
+            "axial",
+            "montecarlo.runner.axial",
+            (
+                "repository-calibrated fibre case",
+                "on-axis, zero-aperture source on a line grid inside the calibrated band",
+                "bound-to-bound and capture only; no replay, directions, streaming or "
+                "adaptive precision",
+            ),
+            implementations=("cpu",),
+            output_slots=("spec_channeling",),
+            required_datasets=("channeling_thermal",),
+        ),
+        ModelDescriptor(
             "emission.transition",
             "planar-stack",
             "montecarlo.runner.transition_emission",

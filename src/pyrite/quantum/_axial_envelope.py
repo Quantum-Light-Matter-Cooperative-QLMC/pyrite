@@ -15,7 +15,7 @@ by a tolerance (maintainer decision, 2026-11-09).
 
 ``free_free`` names the owner of the in-cut free→free block that the fibre
 source with ``boundary="max"`` does not score (#992): ``"native"`` when native
-CBS scores it on tilted zone rows (coherent emission is then required), or
+CBS scores it on tilted zone rows (per flight, in incoherent emission), or
 ``"bound"`` when it is omitted and carried as the declared one-sided
 ``free_free_upper`` (relative to the band yield; measured mean + 3 SE).
 ``free_free_in_cut`` is the measured block (``boundary="none"`` minus ``"max"``,

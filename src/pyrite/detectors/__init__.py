@@ -18,6 +18,7 @@ from .spec import (
     LegacyEDS,
     NativeBinnedResponse,
     NativeSpectrum,
+    PointDetector,
     Timepix3,
 )
 
@@ -54,6 +55,7 @@ __all__ = [
     "PixelGrid",
     "PlanarDetector",
     "PlanarPose",
+    "PointDetector",
     "Timepix3",
     "Timepix3Response",
     "convolve_detector",

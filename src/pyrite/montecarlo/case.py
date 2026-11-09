@@ -596,10 +596,10 @@ class Case(Mapping[str, Any]):
                 f"domega_sr={self.domega_sr:g})"
             )
         check_axial_line_band(admitted, decode_energy_grid(self.E_grid_line))
-        if admitted.free_free == "native" and self.coherent_emission is _ABSENT:
-            raise AxialAdmissionError("axial native free->free owner requires coherent CBS")
-        if admitted.free_free == "bound" and self.coherent_emission is not _ABSENT:
-            raise AxialAdmissionError("axial bound free->free owner forbids coherent CBS")
+        if self.coherent_emission is not _ABSENT:
+            # Native CBS is scored per flight with or without this flag; the
+            # flag adds only bunch-phased scoring, which has no axial contract.
+            raise AxialAdmissionError("axial fibre does not support coherent emission")
         for field, label in (
             ("abs_layers", "layer stacks"),
             ("groove_spacing_ang", "grooves"),

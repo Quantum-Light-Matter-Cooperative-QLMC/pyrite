@@ -10,11 +10,10 @@ import numpy as np
 import pytest
 
 import pyrite as pr
-from pyrite.campaign.channeling_cases import resolve_channeling
 from pyrite.campaign.lowering import build_case
 from pyrite.checkpoints import _checkpoint_store
 from pyrite.config import FixedSampling
-from pyrite.detectors import EnergyBins
+from pyrite.detectors import EnergyBins, PointDetector
 from pyrite.montecarlo import runner
 from pyrite.montecarlo.case import (
     AxialAdmissionError,
@@ -32,9 +31,8 @@ GRID = np.linspace(800.0, 10000.0, 47)
 
 
 def fibre_case(key="B", *, lines=LINES, brem=BREM):
-    """An admitted case lowered from public objects, scored on axis with no aperture."""
+    """A calibrated case lowered from public objects alone."""
     tilt = dict(tilt_deg=0.088, tilt_azim_deg=225.0) if key == "A" else dict(tilt_deg=0.0)
-    emission = ("incoherent", "coherent") if key == "A" else "incoherent"
     beam = pr.Beam(
         energy_keV=3500.0, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()
     )
@@ -51,18 +49,13 @@ def fibre_case(key="B", *, lines=LINES, brem=BREM):
         sampling=FixedSampling(cxr_histories=lines, brem_histories=brem),
         energy_bins=EnergyBins(cxr=GRID, brem=GRID),
     )
-    scene = pr.Scene(beam, target, pr.Detector(observation_angle_deg=0.0))
-    plain = build_case(
-        scene, numerics, physics=pr.Physics(emission=emission, radiative_model="uncoupled")
-    )
     physics = pr.Physics(
         channeling_model="axial",
         channeling_axial={"version": 2, "axis_uvw": [0, 0, 1]},
-        emission=emission,
+        emission="incoherent",
         radiative_model="uncoupled",
     )
-    on_axis = replace(plain, dtheta_obs_rad=0.0, domega_sr=0.0)
-    return resolve_channeling([on_axis], physics, numerics)[0]
+    return build_case(pr.Scene(beam, target, PointDetector()), numerics, physics=physics)
 
 
 @pytest.fixture(scope="module")
@@ -137,13 +130,43 @@ def test_other_consumers_and_backends_refuse_before_work(case_b, runnable_b):
         (dict(E0_keV=3000.0), "kinetic_energy_eV"),
         (dict(thickness_ang=6000.0), "thickness_ang"),
         (dict(tilt_deg=0.05), "tilt_deg"),
-        (dict(coherent_emission=True), "forbids coherent"),
+        (dict(coherent_emission=True), "coherent emission"),
         (dict(energy_model="exact"), "midpoint"),
     ],
 )
 def test_cases_outside_the_envelope_refuse_at_construction(case_b, change, message):
     with pytest.raises(ValueError, match=message):
         replace(case_b, **change)
+
+
+def test_a_finite_aperture_detector_refuses_at_lowering():
+    beam = pr.Beam(
+        energy_keV=3500.0, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()
+    )
+    target = pr.geometry.Slab(
+        "silicon",
+        thickness_ang=3000.0,
+        tilt_deg=0.0,
+        width=None,
+        height=None,
+        cut=pr.geometry.CrystalCut(surface_hkl=(0, 0, 1)),
+        allow_normal_incidence=True,
+    )
+    physics = pr.Physics(
+        channeling_model="axial",
+        channeling_axial={"version": 2, "axis_uvw": [0, 0, 1]},
+        radiative_model="uncoupled",
+    )
+    numerics = pr.Numerics(
+        sampling=FixedSampling(cxr_histories=2, brem_histories=2),
+        energy_bins=EnergyBins(cxr=GRID, brem=GRID),
+    )
+    for detector, message in (
+        (pr.Detector(observation_angle_deg=0.0), "zero-aperture"),
+        (PointDetector(observation_angle_deg=1.0), "zero-aperture"),
+    ):
+        with pytest.raises(AxialAdmissionError, match=message):
+            build_case(pr.Scene(beam, target, detector), numerics, physics=physics)
 
 
 def test_axis_must_be_the_slab_normal(case_b):
@@ -233,3 +256,37 @@ def test_source_and_budgets_round_trip_through_results_and_checkpoints(case_b, p
     assert stored["free_free"] == "bound"
     assert stored["free_free_upper"] == entry.free_free_upper
     assert stored["evidence_record"] == entry.evidence_record
+
+
+@pytest.mark.slow
+def test_public_simulate_runs_a_runnable_case_from_public_inputs(runnable_b, produced):
+    _, out = produced
+    beam = pr.Beam(
+        energy_keV=3500.0, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()
+    )
+    target = pr.geometry.Slab(
+        "silicon",
+        thickness_ang=3000.0,
+        tilt_deg=0.0,
+        width=None,
+        height=None,
+        cut=pr.geometry.CrystalCut(surface_hkl=(0, 0, 1)),
+        allow_normal_incidence=True,
+    )
+    result = pr.simulate(
+        beam,
+        target,
+        PointDetector(),
+        physics=pr.Physics(
+            channeling_model="axial",
+            channeling_axial={"version": 2, "axis_uvw": [0, 0, 1]},
+            radiative_model="uncoupled",
+        ),
+        numerics=pr.Numerics(
+            sampling=FixedSampling(cxr_histories=LINES, brem_histories=BREM),
+            energy_bins=EnergyBins(cxr=GRID, brem=GRID),
+        ),
+    )
+    np.testing.assert_array_equal(result.channeling.photon_energy_eV, GRID)
+    np.testing.assert_array_equal(result.channeling.density, out["spec_channeling"])
+    assert result.case["channeling"]["case_key"] == "si-fibre/B"

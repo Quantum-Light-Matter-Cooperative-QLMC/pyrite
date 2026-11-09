@@ -948,13 +948,8 @@ def validate_channeling_physics(physics: "Physics", energy_model: str) -> None:
             raise ValueError("axial channeling requires radiative_model='uncoupled'")
         if physics.secondary_threshold_eV is not None:
             raise ValueError("axial channeling cannot transport secondaries")
-        if "coherent" in cast(tuple[str, ...], physics.emission) and (
-            physics.channeling_axial is None or physics.channeling_axial.get("version") != 2
-        ):
-            raise ValueError("axial v1 channeling currently requires incoherent emission")
-        # For v2, per-case lookup determines the owner of free->free: A requires
-        # native coherent CBS, B must omit it. This cannot be decided at the
-        # Physics-only validation stage.
+        if "coherent" in cast(tuple[str, ...], physics.emission):
+            raise ValueError("axial channeling currently requires incoherent emission")
         return
     if physics.channeling_axial is not None:
         raise ValueError("channeling_axial requires channeling_model='axial'")

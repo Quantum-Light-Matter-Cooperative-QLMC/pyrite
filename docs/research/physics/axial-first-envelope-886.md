@@ -10,7 +10,7 @@ does not describe a supported capability.
 ## Calibrated cases
 
 Selected with `Physics(channeling_model="axial", channeling_axial={"version": 2,
-"axis_uvw": [0, 0, 1]})`. Every numeric comes from the lookup; the version 1 recipe of
+"axis_uvw": [0, 0, 1]})` and observed with `pyrite.detectors.PointDetector()`. Every numeric comes from the lookup; the version 1 recipe of
 #624 stays parseable and refuses at run.
 
 | Key | Case | Depth budget ε (95%) | In-cut free→free block | Evidence |
@@ -26,7 +26,8 @@ and checkpoints.
 
 A calibrated case must also be: an electron beam with no angular or energy spread, a
 single laterally unbounded slab cut normal to the axis, midpoint transport on the CPU
-core, and on-axis scoring with zero aperture on a line grid inside the band.
+core, incoherent emission, and on-axis scoring with zero aperture on a line grid inside
+the band.
 Everything else refuses.
 
 ## What still blocks a run
@@ -37,8 +38,7 @@ Everything else refuses.
 | Fibre photon source | `cr-axial-fiber-regression`, `anchored` | Done, #992 |
 | Measured depth budget per case | `cr-axial-depth-calibration`, `anchored` for A and B | Done, #993 |
 | Native launch, scoring and persistence adapter | Implemented (`montecarlo/runner/axial.py`); `cr-axial-persisted-channel` is `unverified` | [#994](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/994) |
-| A: native CBS reproduces the measured in-cut block | Open | #994 |
-| Public input for on-axis, zero-aperture scoring | Open: no public `Detector` expresses it | #994 |
+| A: owner of the in-cut free→free block | Open: native CBS on A's zone rows gives 2.33e-4 /sr in band against the measured 4.17e-5 /sr, with a different spectral shape | #994 |
 
 Check the [ledger](../../validation/ledger-channeling.md) for current claim status.
 

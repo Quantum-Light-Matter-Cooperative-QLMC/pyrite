@@ -21,7 +21,7 @@ def spec(axis=(0, 0, 1)):
     return {"version": 2, "axis_uvw": list(axis)}
 
 
-def physics(*, coherent=True):
+def physics(*, coherent=False):
     return Physics(
         channeling_model="axial",
         channeling_axial=spec(),
@@ -30,7 +30,7 @@ def physics(*, coherent=True):
     )
 
 
-def case(*, tilt=0.088, azimuth=225.0, coherent=True):
+def case(*, tilt=0.088, azimuth=225.0, coherent=False):
     return Case(
         name="si-axial",
         crystal="silicon",
@@ -115,20 +115,27 @@ def test_repository_record_is_detached_and_includes_provenance():
     assert axial_channeling_record(entry)["fibre_numerics"]["max_order"] == 9
 
 
-def test_case_a_is_resolved_and_native_coherent_owner_is_required():
+def test_case_a_resolves_with_its_native_free_free_owner():
     out = resolve_channeling([case()], physics(), Numerics())
     assert out[0]["channeling"] == axial_channeling_record(ADMITTED_AXIAL_CASES["si-fibre/A"])
-    with pytest.raises(AxialAdmissionError, match="requires coherent CBS"):
-        resolve_channeling([case(coherent=False)], physics(coherent=False), Numerics())
+    assert out[0]["channeling"]["free_free"] == "native"
 
 
-def test_case_b_resolves_with_bound_but_refuses_coherent_emission():
+def test_case_b_resolves_with_its_declared_bound():
     entry = ADMITTED_AXIAL_CASES["si-fibre/B"]
-    out = resolve_channeling([case(tilt=0.0, coherent=False)], physics(coherent=False), Numerics())
+    out = resolve_channeling([case(tilt=0.0)], physics(), Numerics())
     assert out[0]["channeling"]["case_key"] == entry.key
     assert out[0]["channeling"]["free_free_upper"] == entry.free_free_upper
-    with pytest.raises(AxialAdmissionError, match="forbids coherent CBS"):
-        resolve_channeling([case(tilt=0.0)], physics(), Numerics())
+
+
+@pytest.mark.parametrize("tilt", [0.088, 0.0])
+def test_coherent_emission_is_refused_for_every_axial_case(tilt):
+    # Native CBS is scored per flight regardless of the flag; it adds only
+    # bunch-phased scoring, which has no axial contract (#994).
+    with pytest.raises(ValueError, match="incoherent emission"):
+        physics(coherent=True)
+    with pytest.raises(AxialAdmissionError, match="does not support coherent emission"):
+        resolve_channeling([case(tilt=tilt, coherent=True)], physics(), Numerics())
 
 
 def test_v2_refuses_other_energies_observables_and_tampered_records():
