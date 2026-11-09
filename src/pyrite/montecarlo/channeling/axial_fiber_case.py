@@ -22,6 +22,10 @@ from .axial_fiber_unraveling import FiberChannels
 
 _GAP_WINDOW_EV = 2.0  # provisional cut-search half-width of the research driver
 _SEARCH_STEP_ANG = 200.0
+#: Declared half-width [eV] of the physical-handoff matching window around the
+#: target cut. The #993 fates were measured with it; the gap-midpoint cut sits
+#: up to 5.4 eV from the target (docs/research/physics/axial-depth-calibration-993.md).
+MATCHING_WINDOW_EV = 10.0
 
 
 @dataclass(frozen=True)
@@ -31,7 +35,8 @@ class AxialFiberInputs:
     ``entry_orders`` is the tilted plane wave on the retained order window,
     ``carrier_inv_ang`` its folded transverse carrier, ``boundary_eV`` the
     ``boundary="max"`` final-state cap (potential maximum) and ``depths_ang``
-    the uniform depth grid ending at the slab thickness.
+    the uniform depth grid ending at the slab thickness. ``potential_min_eV``
+    and ``target_eV`` declare the matching cut of the physical handoff.
     """
 
     channels: FiberChannels
@@ -39,6 +44,7 @@ class AxialFiberInputs:
     hbar_v_eV_ang: float
     carrier_inv_ang: tuple[float, float]
     boundary_eV: float
+    potential_min_eV: float
     target_eV: float
     depths_ang: np.ndarray
     k_inv_ang: float
@@ -146,6 +152,7 @@ def axial_fiber_inputs(case: AdmittedAxialCase) -> AxialFiberInputs:
         hbar_v_eV_ang=hbar_v,
         carrier_inv_ang=carrier,
         boundary_eV=u_max,
+        potential_min_eV=u_min,
         target_eV=target,
         depths_ang=np.linspace(0.0, case.thickness_ang, steps + 1),
         k_inv_ang=k_inv_ang,

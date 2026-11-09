@@ -20,11 +20,11 @@ from numbers import Integral, Real
 from typing import Any
 
 from ..quantum._admission import refuse_unverified_axial_run as refuse_unverified_axial_run
+from ..quantum._axial_envelope import AXIAL_FIBRE_MODEL_MARKER as AXIAL_FIBRE_MODEL_MARKER
 
 # Do not re-key the v1 research configuration; this is a distinct *production*
 # model generation and must not collide with planar or the v1 recipe.
 AXIAL_MODEL_MARKER = "axial-entrance-experimental-config-v2"
-AXIAL_FIBRE_MODEL_MARKER = "axial-fibre-v1"
 AXIAL_SCHEMA_VERSION = 1
 _PENDING = {"version": 1, "kind": "pending-physical-validation"}
 _DEFAULT_LIMITS = {
@@ -189,6 +189,14 @@ def _pending(raw: object, name: str) -> dict[str, Any]:
     return dict(_PENDING)
 
 
+def _fibre_selector(raw: Mapping[str, object]) -> dict[str, Any]:
+    """Version 2: the axis only; everything else comes from the repository lookup."""
+    inp = _fields(raw, "channeling_axial", {"version", "axis_uvw"}, {"model"})
+    if inp.get("model", "axial") != "axial":
+        raise ValueError("channeling_axial.model must be 'axial'")
+    return {"version": 2, "model": "axial", "axis_uvw": _axis(inp["axis_uvw"])}
+
+
 def resolve_axial_spec(raw: Mapping[str, object]) -> dict[str, Any]:
     """Normalize v1 research recipes or v2 calibrated-fibre selectors.
 
@@ -200,12 +208,14 @@ def resolve_axial_spec(raw: Mapping[str, object]) -> dict[str, Any]:
         raise ValueError("channeling_axial must be an object with string keys")
     version = _integer(raw.get("version", 1), "channeling_axial.version")
     if version == 2:
-        inp = _fields(raw, "channeling_axial", {"version", "axis_uvw"}, {"model"})
-        if inp.get("model", "axial") != "axial":
-            raise ValueError("channeling_axial.model must be 'axial'")
-        return {"version": 2, "model": "axial", "axis_uvw": _axis(inp["axis_uvw"])}
+        return _fibre_selector(raw)
     if version != 1:
         raise ValueError("unsupported axial configuration version")
+    return _research_recipe(raw)
+
+
+def _research_recipe(raw: Mapping[str, object]) -> dict[str, Any]:
+    """Version 1: the parseable, non-executable research recipe of #624."""
     inp = _fields(
         raw,
         "channeling_axial",

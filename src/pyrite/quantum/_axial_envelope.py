@@ -37,6 +37,9 @@ from typing import Literal
 from ._admission import AxialAdmissionError
 
 _REL_TOL = 1e-9
+#: Model generation of the calibrated fibre source; distinct from planar and
+#: from the non-executable v1 axial recipe.
+AXIAL_FIBRE_MODEL_MARKER = "axial-fibre-v1"
 
 
 @dataclass(frozen=True)
@@ -138,6 +141,25 @@ ADMITTED_AXIAL_CASES: Mapping[str, AdmittedAxialCase] = MappingProxyType(
         ),
     }
 )
+
+
+#: Keys of the lookup entries the standard runner may execute. An entry is
+#: calibrated when it is in :data:`ADMITTED_AXIAL_CASES`; it becomes runnable
+#: only when every claim its run uses is ``anchored``. Empty today:
+#: ``cr-axial-persisted-channel`` (launch, scoring and persistence adapter) is
+#: not yet verified, and si-fibre/A additionally waits on reconciling native
+#: coherent bremsstrahlung on its zone rows with the measured in-cut free->free
+#: block (#994). Repository-owned; callers cannot extend it.
+RUNNABLE_AXIAL_CASES: frozenset[str] = frozenset()
+
+
+def require_runnable_axial_case(key: object) -> None:
+    """Refuse a calibrated case whose production claims are not yet anchored."""
+    if key not in RUNNABLE_AXIAL_CASES:
+        raise AxialAdmissionError(
+            f"axial case {key} is calibrated but not yet runnable: the production "
+            "adapter claim cr-axial-persisted-channel is not anchored for it (#994)"
+        )
 
 
 @dataclass(frozen=True)

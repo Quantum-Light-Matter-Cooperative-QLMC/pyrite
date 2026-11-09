@@ -340,9 +340,9 @@ def store_result(results, case, out):
 
         aperture_from_record({"case": case, "photon_aperture": out.get("photon_aperture")})
 
-    from ..montecarlo.case import refuse_axial_channeling
+    from ..montecarlo.case import admit_axial_channeling
 
-    refuse_axial_channeling(case)
+    admit_axial_channeling(case)
     name, E0 = case["name"], case["E0_keV"]
     E_grid = out["E_grid"]
     E_pk = E_grid[np.argmax(cxr_spectrum(out))]

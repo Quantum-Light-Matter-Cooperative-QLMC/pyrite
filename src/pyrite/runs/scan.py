@@ -670,7 +670,7 @@ def _resolved_run(args, material):
     detector_id = getattr(args, "detector_id", None)
 
     from ..campaign.profiles import profile_run_settings
-    from ..montecarlo.case import refuse_axial_channeling
+    from ..quantum._admission import refuse_unverified_axial_settings
 
     settings = profile_run_settings(settings, catalog_profile, fidelity, CATALOG)
     settings = replace(
@@ -679,7 +679,7 @@ def _resolved_run(args, material):
             (settings.allow_fallback, getattr(args, "allow_physics_fallback", False))
         ),
     )
-    refuse_axial_channeling(vars(settings))
+    refuse_unverified_axial_settings(settings.channeling_model, settings.channeling_axial)
     overrides = {}
     if getattr(args, "quick", False):
         # Resolve quick beam energies from the effective profile/material line

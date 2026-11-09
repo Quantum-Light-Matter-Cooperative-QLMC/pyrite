@@ -67,7 +67,7 @@ from ..checkpoints.recompute import (  # noqa: F401 -- compatibility exports
     repair_cxr_spec,
 )
 from ..montecarlo import run_cases, runner
-from ..montecarlo.case import refuse_axial_channeling_cases
+from ..montecarlo.case import admit_axial_channeling_cases
 from ..results import store_result
 from ._sweep_execution import (
     SweepBudget,
@@ -443,7 +443,7 @@ def run_sweep(
         incomplete return, including partial configs. An exception skips that
         final save; configs published before it remain resumable.
     """
-    refuse_axial_channeling_cases(cases)
+    admit_axial_channeling_cases(cases)
     if artifact_store is not None and content_key_fn is None:
         raise ValueError("artifact_store requires content_key_fn for physics identity validation")
     if group_key is None:

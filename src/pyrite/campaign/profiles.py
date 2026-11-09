@@ -575,6 +575,11 @@ def _model_generation_markers(emission: str) -> dict[str, Any]:
     return markers
 
 
+def _axial_marker(spec: Mapping[str, object]) -> str:
+    """Model marker of a resolved axial spec: calibrated fibre (v2) or the v1 recipe."""
+    return AXIAL_FIBRE_MODEL_MARKER if spec["version"] == 2 else AXIAL_MODEL_MARKER
+
+
 def _identity_v1(
     material: str,
     fidelity: str,
@@ -624,11 +629,7 @@ def _identity_v1(
         if channeling["channeling_model"] == "axial":
             # Expand defaults before hashing; do not alias planar or v1.
             channeling["channeling_axial"] = resolve_axial_spec(channeling["channeling_axial"])
-            model_marker = (
-                AXIAL_FIBRE_MODEL_MARKER
-                if channeling["channeling_axial"]["version"] == 2
-                else AXIAL_MODEL_MARKER
-            )
+            model_marker = _axial_marker(channeling["channeling_axial"])
         else:
             channeling.pop("channeling_axial", None)  # planar identity remains bit-for-bit
             model_marker = CHANNELING_MODEL

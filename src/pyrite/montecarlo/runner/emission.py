@@ -349,7 +349,10 @@ def optional_line_components(case, tp) -> dict[str, Any]:
     """Opt-in line-grid components scored from the same transport, by key."""
     out = {}
     if case.get("channeling") is not None:
-        from .channeling_emission import case_channeling_spectrum
+        if case["channeling"].get("model") == "axial":
+            from .axial import case_axial_spectrum as case_channeling_spectrum
+        else:
+            from .channeling_emission import case_channeling_spectrum
 
         out["spec_channeling"] = case_channeling_spectrum(case, tp)
     if case.get("transition_radiation") is not None:

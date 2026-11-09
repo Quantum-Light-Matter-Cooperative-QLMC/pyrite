@@ -114,7 +114,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `cr-axial-persisted-channel`
 
 - **Claim:** proposed standard-run axial source: incident-normalized photons/eV/sr from a complete declared emitting subspace, physical finite-path/scattering correlations, consistent frames and depth attenuation, and exactly-once optional result/checkpoint persistence. All strings, represented capture and unresolved spectral weight require explicit coverage or bounds.
-- **Code:** research proposal only; no production axial source or persistence adapter.
+- **Code:** `src/pyrite/montecarlo/runner/axial.py` (`transport_axial_case`, `fibre_source_and_fates`, `case_axial_spectrum`), `src/pyrite/montecarlo/runner/axial_native.py`, `src/pyrite/montecarlo/channeling/axial_fiber_case.py`. Not runnable: the repository's runnable set (`RUNNABLE_AXIAL_CASES` of the axial envelope module) is empty until this claim is anchored.
 - **Source:** [standard-run source contract](../research/physics/axial-run-integration.md#expected-value-spectral-source); `cr-axial-helicity-emission` for the existing local-level polarization scope; `cr-quantum-regression-correlation` for the finite Markov reference algebra. None establishes the complete material source.
 - **Status:** unverified
 - **Checks:** planned: complete emitting-subspace/capture convergence, correct photon units and angular frames, finite-path/scattering line shapes, amplitude attenuation, mixed-state linearity, exactly-once combination, cache separation, persisted round-trip and early unsupported-consumer refusal.

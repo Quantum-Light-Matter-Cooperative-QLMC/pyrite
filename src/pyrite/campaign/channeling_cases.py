@@ -43,18 +43,9 @@ AXIS_WARN_CRITICAL_ANGLES = 3.0
 
 def _beam_in_crystal(case: Case) -> np.ndarray:
     """Unit beam direction in crystal (construction) coordinates."""
-    from ..materials.crystal import CRYSTALS, _orientation_R
-    from ..montecarlo.geometry import tilted_geometry
+    from ..montecarlo.channeling.axial_case import beam_in_crystal
 
-    beam, _ = tilted_geometry(0.0, np.deg2rad(case["tilt_deg"]), np.deg2rad(case["tilt_azim_deg"]))
-    rotation = _orientation_R(
-        CRYSTALS[case["crystal"]]["lattice"],
-        case["beam_uvw"],
-        case.get("azimuth_rad", 0.0),
-        case.get("recip_miscut_rad"),
-        surface_hkl=case["surface_hkl"],
-    )
-    return beam if rotation is None else np.asarray(rotation).T @ beam
+    return beam_in_crystal(case)
 
 
 def _axis_proximity(case: Case) -> tuple[tuple[int, int, int], float, float] | None:

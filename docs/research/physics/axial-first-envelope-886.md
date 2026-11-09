@@ -1,24 +1,44 @@
-# First axial run envelope: currently empty
+# First axial run envelope: two calibrated cases, none runnable yet
 
-**No axial case is admitted.** `Physics(channeling_model="axial")` and every raw
-axial case refuse in `pyrite.quantum._admission` before work or writes. This page
-records what would have to be true to change that. It does not describe a supported
-capability.
+**No axial case runs yet.** Two silicon cases are calibrated and held in the
+repository lookup (`pyrite.quantum._axial_envelope.ADMITTED_AXIAL_CASES`). The standard
+runner can launch, score and persist them, but
+`RUNNABLE_AXIAL_CASES` is empty, so every axial case still refuses before work or
+writes. A case becomes runnable when every claim its run uses is `anchored`. This page
+does not describe a supported capability.
 
-## Why the envelope is empty
+## Calibrated cases
 
-[#886](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/886)
-requires every claim an envelope uses to be `anchored`, and requires a measured depth
-budget for each admitted case. Neither exists for a material case:
+Selected with `Physics(channeling_model="axial", channeling_axial={"version": 2,
+"axis_uvw": [0, 0, 1]})`. Every numeric comes from the lookup; the version 1 recipe of
+#624 stays parseable and refuses at run.
+
+| Key | Case | Depth budget ε (95%) | In-cut free→free block | Evidence |
+| --- | --- | --- | --- | --- |
+| `si-fibre/A` | Si ⟨100⟩, 3.5 MeV, 0.3 µm, tilt 0.088° | 3.97% | +7.83(8)%, owner: native CBS on zone rows | `depth-calibration-993-A.json`, `free-free-994.json` |
+| `si-fibre/B` | Si ⟨100⟩, 3.5 MeV, 0.3 µm, 0° | 9.71% | +18.19(23)%, omitted; declared one-sided bound 18.9% | `depth-calibration-993-B.json`, `free-free-994.json` |
+
+Records are under `docs/validation/check-records/axial-source/`. ε bounds the on-axis
+yield integrated over 800 eV–10 keV, not individual bins. Free→free above the
+retained cut is not bounded for B. ε, the free→free owner and bound, and the evidence
+IDs are stored in the resolved `Case.channeling` record and so persist with results
+and checkpoints.
+
+A calibrated case must also be: an electron beam with no angular or energy spread, a
+single laterally unbounded slab cut normal to the axis, midpoint transport on the CPU
+core, and on-axis scoring with zero aperture on a line grid inside the band.
+Everything else refuses.
+
+## What still blocks a run
 
 | Requirement | Current state | Owner |
 | --- | --- | --- |
-| Physical outgoing instrument | `cr-axial-zone-handoff-physical`, for the instrument only | Done, #883 |
-| Budget arithmetic and refusal guard | `cr-axial-depth-budget`, with no measured input | #884 |
-| Finite-grid source partition and on-axis mapping | `cr-axial-source-partition`, a finite reference only | #885 |
-| Validated material photon source | `cr-axial-persisted-channel` is `unverified` | [#992](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/992) |
-| Measured depth budget per (material, axis, energy) | None | [#993](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/993) |
-| Native launch, scoring and persistence adapters | None | [#994](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/994) |
+| Physical outgoing instrument | `cr-axial-zone-handoff-physical` | Done, #883 |
+| Fibre photon source | `cr-axial-fiber-regression`, `anchored` | Done, #992 |
+| Measured depth budget per case | `cr-axial-depth-calibration`, `anchored` for A and B | Done, #993 |
+| Native launch, scoring and persistence adapter | Implemented (`montecarlo/runner/axial.py`); `cr-axial-persisted-channel` is `unverified` | [#994](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/994) |
+| A: native CBS reproduces the measured in-cut block | Open | #994 |
+| Public input for on-axis, zero-aperture scoring | Open: no public `Detector` expresses it | #994 |
 
 Check the [ledger](../../validation/ledger-channeling.md) for current claim status.
 
@@ -55,8 +75,9 @@ exists.
 | Remote submission | The same admission as local runs, before sync or staging |
 | W and other diagnostic-only anchors | Their own depth budget and source evidence |
 
-The refusal is unconditional today, so these consumers are covered by the existing
-sentinel tests in `tests/remote/test_axial_admission.py`, `tests/checkpoint/` and
+These consumers refuse a calibrated case by name. Sentinel tests:
+`tests/montecarlo/channeling/test_axial_fibre_runner.py`,
+`tests/remote/test_axial_admission.py`, `tests/checkpoint/` and
 `tests/montecarlo/quantum/test_channeling_axial_preintegration_gates.py`, along with
 `tests/montecarlo/quantum/test_channeling_axial_envelope.py`.
 

@@ -28,7 +28,7 @@ import numpy as np
 
 from ..._backend import BACKEND
 from ..._physics_fallback import collect_physics_fallbacks
-from ..case import Case, refuse_axial_channeling
+from ..case import AxialAdmissionError, Case, admit_axial_channeling, refuse_axial_channeling
 from ..spectrum import _segments_in_layer, _segments_on_device, mc_cxr_spectrum
 from ..spectrum.coherent_population import physical_bunch_electrons
 from ..spectrum.cxr import _setup as _cxr_setup
@@ -127,6 +127,8 @@ def run_case(
         count, resolved crystal, incident energy, and optional timing metrics.
     """
     _adaptive.validate_directions(case, observation_directions)
+    if observation_directions is not None:
+        refuse_axial_channeling(case, "directional scoring")
     transport = _pkg._transport_case(
         case,
         record_timing,
@@ -171,6 +173,27 @@ def run_case_directions(
         keep_segments_on_device=True,
     )
     return _directional_outputs(case, transport, directions)
+
+
+def _zone_transport(case, core):
+    """Transport core and entrance-zone driver of a channeling case (None when off).
+
+    Zone launches need counter-addressed streams, so a planar case runs on the
+    per-electron CPU core unless CUDA was selected; an axial fibre case is CPU
+    only (#994) and refuses CUDA before any work.
+    """
+    record = case.get("channeling")
+    if record is None:
+        return core, None
+    if record.get("model") == "axial":
+        if core == "cuda":
+            raise AxialAdmissionError("axial fibre cases run on the CPU transport core only (#994)")
+        from .axial import transport_axial_case
+
+        return "per-electron", transport_axial_case
+    from .channeling import transport_channeling_case
+
+    return (core if core == "cuda" else "per-electron"), transport_channeling_case
 
 
 def _resident_transport(case, core, channeling):
@@ -285,9 +308,8 @@ def _transport_case(
     E_cut_by_electrons[combined_transport_mask] = min(E_cut_lines, E_cut_brem)
 
     core = _pkg._case_transport_core(case, transport_core)
-    channeling = case.get("channeling") is not None
-    if channeling and core != "cuda":  # launches need counter-addressed streams
-        core = "per-electron"
+    core, zone_transport = _zone_transport(case, core)
+    channeling = zone_transport is not None
     resident = keep_segments_on_device and _resident_transport(case, core, channeling)
     straggling = bool(case.get("straggling", False))
     # The CUDA LUT kernel has no shell soft/hard mode, so production shell runs
@@ -364,10 +386,8 @@ def _transport_case(
 
     transport = _transport
     if channeling:
-        from .channeling import transport_channeling_case
-
         transport = partial(
-            transport_channeling_case,
+            zone_transport,
             case,
             simulate=_simulate,
             E_cut_by_electrons=E_cut_by_electrons,
@@ -782,7 +802,7 @@ def _spectrum_case(case, tp, record_timing=False):
     """GPU phase of run_case: CXR spectrum + brem from the already-transported
     segments ``tp`` (from _transport_case). Runs in the main process, so only one
     CUDA context ever touches the device."""
-    refuse_axial_channeling(case)
+    admit_axial_channeling(case)
     case = _adaptive.realized_case(case, tp)
     timed = _pkg._TIMING or record_timing
     if timed:

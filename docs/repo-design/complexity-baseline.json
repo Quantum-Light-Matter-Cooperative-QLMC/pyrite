@@ -369,12 +369,12 @@
     {
       "path": "src/pyrite/montecarlo/runner/case_driver.py",
       "name": "_transport_case",
-      "cc": 24
+      "cc": 22
     },
     {
       "path": "src/pyrite/montecarlo/runner/channeling.py",
       "name": "transport_channeling_case",
-      "cc": 29,
+      "cc": 22,
       "exception": "#680: accept 26 -> 29 for optional source momentum sampling, optional beam-entry provenance and conditional-versus-legacy handoff selection. Source sampling and bin propagation already have separate owners in planar_injection. The remaining branches belong to the ordered entrance -> zone -> handoff -> native continuation orchestration, preserving electron IDs and RNG streams; extracting them solely for CC would obscure that data flow."
     },
     {

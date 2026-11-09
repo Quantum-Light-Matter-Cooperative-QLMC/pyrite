@@ -8,8 +8,11 @@ Retained electrons cross the rear face without native transport. Unresolved
 weight is neither called transmitted nor silently sent into amorphous
 transport; its incident IDs remain explicit for bounded provenance.
 
-This is a preparation seam, not production admission. The axial admission gate
-remains closed until the runner, scorer and persisted-channel claim are joined.
+This is a preparation seam, not production admission: :mod:`.axial` joins it
+to the runner and scorer, and no case is runnable until the persisted-channel
+claim is anchored.
+
+Validation: cr-axial-persisted-channel
 """
 
 from __future__ import annotations
@@ -23,7 +26,7 @@ from ...quantum._admission import AxialAdmissionError
 from ..transport.secondaries import LaunchState
 
 if TYPE_CHECKING:
-    from ..channeling.axial_outgoing_launch import AxialHandoffRecord, AxialIncident
+    from ..channeling.axial_outgoing_launch import AxialHandoffRecord, AxialIncident, AxialLaunch
 
 
 @dataclass(frozen=True)
@@ -82,6 +85,28 @@ def _validated_launch(record: AxialHandoffRecord, incident: AxialIncident, depth
     return pos, vec
 
 
+def _classify(record: AxialHandoffRecord, incident: AxialIncident, thickness_ang: float):
+    """Group of one terminal fate and, for a native continuation, its checked launch."""
+    if not np.isfinite(record.depth_ang) or not 0 <= record.depth_ang <= thickness_ang:
+        raise AxialAdmissionError("axial terminal depth lies outside the slab")
+    if record.fate == "physical_outgoing":
+        pos, vec = _validated_launch(record, incident, thickness_ang)
+        if record.depth_ang == thickness_ang or record.launch is None:
+            return "exit", None
+        return "launch", (record.launch, pos, vec)
+    if record.fate == "retained":
+        if record.launch is not None or not np.isclose(
+            record.depth_ang, thickness_ang, atol=1e-8, rtol=0
+        ):
+            raise AxialAdmissionError("retained axial primary must exit at the back face")
+        return "exit", None
+    if record.fate == "unresolved":
+        if record.launch is not None:
+            raise AxialAdmissionError("unresolved axial weight cannot launch native")
+        return "unresolved", None
+    raise AxialAdmissionError(f"unknown axial terminal fate {record.fate!r}")
+
+
 def axial_native_plan(
     records: list[AxialHandoffRecord],
     incidents: list[AxialIncident],
@@ -109,31 +134,14 @@ def axial_native_plan(
     expected = set(range(n))
     if len(by_id) != n or len(fates) != n or set(by_id) != expected or set(fates) != expected:
         raise AxialAdmissionError("axial fates must cover each zero-based primary exactly once")
-    launches = []
-    launch_ids, exit_ids, unresolved_ids = [], [], []
+    launches: list[tuple[AxialLaunch, np.ndarray, np.ndarray]] = []
+    groups: dict[str, list[int]] = {"launch": [], "exit": [], "unresolved": []}
     for identity in range(n):
-        incident, record = by_id[identity], fates[identity]
-        if not np.isfinite(record.depth_ang) or not 0 <= record.depth_ang <= thickness_ang:
-            raise AxialAdmissionError("axial terminal depth lies outside the slab")
-        if record.fate == "physical_outgoing":
-            pos, vec = _validated_launch(record, incident, thickness_ang)
-            if record.depth_ang == thickness_ang:
-                exit_ids.append(identity)
-                continue
-            launch_ids.append(identity)
-            launches.append((record.launch, pos, vec))
-        elif record.fate == "retained":
-            if record.launch is not None or not np.isclose(
-                record.depth_ang, thickness_ang, atol=1e-8, rtol=0
-            ):
-                raise AxialAdmissionError("retained axial primary must exit at the back face")
-            exit_ids.append(identity)
-        elif record.fate == "unresolved":
-            if record.launch is not None:
-                raise AxialAdmissionError("unresolved axial weight cannot launch native")
-            unresolved_ids.append(identity)
-        else:
-            raise AxialAdmissionError(f"unknown axial terminal fate {record.fate!r}")
+        group, launch = _classify(fates[identity], by_id[identity], thickness_ang)
+        groups[group].append(identity)
+        if launch is not None:
+            launches.append(launch)
+    launch_ids, exit_ids, unresolved_ids = groups["launch"], groups["exit"], groups["unresolved"]
     native = None
     if launches:
         # Use the exact sampled lab/slab position, direction, clock and seed
