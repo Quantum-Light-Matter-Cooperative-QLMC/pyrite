@@ -167,6 +167,7 @@ def case_optical_transition(
     direction=None,
     formation_tolerance: float | None = 0.05,
     energy_budget: float | None = 1e-3,
+    formation_kink_phase: float | None = None,
     xp=None,
 ):
     """Opt-in optical TR/CTR of a case's transported histories (#615).
@@ -189,6 +190,11 @@ def case_optical_transition(
     Gaussian laws the energy includes the analytic out-of-band coherent
     envelope (``out_of_band_energy_eV``); other laws with ``N > 1`` record
     ``out_of_band_unbounded`` instead. ``None`` skips a check and records it as not evaluated.
+    ``formation_kink_phase`` [rad] opts into the phase formation policy
+    (``kink_phase_tol`` of ``optical_transition_validity``): a transported
+    direction change only shortens a straight run where the path departs from
+    it by more than that phase inside the formation length. The policy and
+    value are then recorded as ``formation_kink_phase``.
 
     Validation: optical-planar-tr, optical-ctr-population, optical-material-response
     """
@@ -227,8 +233,9 @@ def case_optical_transition(
     ]
     backend = (np if cp is None else cp) if xp is None else xp
     validity = _optical_validity(
-        crossings, energy, n_hat, eps, source, count, formation_tolerance, energy_budget, backend
-    )
+        crossings, energy, n_hat, eps, source, count,
+        (formation_tolerance, formation_kink_phase), energy_budget, backend,
+    )  # fmt: skip
     return optical_transition_radiation(
         crossings,
         energy,
@@ -260,10 +267,14 @@ def _optical_validity(crossings, energy, n_hat, eps, source, count, formation, b
         "energy_fraction": None,
         "out_of_band_energy_eV": None,
     }
+    formation, kink_phase = formation
+    if kink_phase is not None:
+        out["formation_kink_phase"] = float(kink_phase)
     if formation is not None:
         bounds = coherent_formation_error_bound(
-            crossings, energy, n_hat, eps, source=source, n_histories=count
-        )
+            crossings, energy, n_hat, eps, source=source, n_histories=count,
+            kink_phase_tol=kink_phase,
+        )  # fmt: skip
         bound = float(np.max(bounds["total"]))
         out["formation_self_bound"] = float(np.max(bounds["self"]))
         if not bound <= formation:

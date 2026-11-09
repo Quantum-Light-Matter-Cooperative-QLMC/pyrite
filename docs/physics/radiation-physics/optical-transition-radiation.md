@@ -174,6 +174,22 @@ predicates are lattice phases and are not reused here.
   default tolerance refuses fixed trajectories there; the scene runs only
   with the check disabled. García de Abajo (RMP 82, 209, footnote 17) places
   straight passage over a skin depth only above about 50 keV.
+- **Phase formation policy (opt-in).** `formation_kink_phase` (rad) replaces
+  "any direction change ends a run" with a phase test. Crossing records also
+  carry the direction changes along the path on each side
+  (`kinks_before_ang`, `kinks_after_ang`: distance and $|\Delta\hat{\mathbf v}|$,
+  16 slots, the last marking where the usable path ends). For a
+  piecewise-straight path,
+  $|\mathbf r(s)-\mathbf r_0(s)|\le D(L)=\sum_{d_i<L}(L-d_i)|\Delta\hat{\mathbf v}_i|$
+  for all $s\le L$, which is exact geometry. A side is short only if the path
+  ends inside $L$ or $\|\mathbf K\|D(L)$ exceeds the tolerance, with
+  $\mathbf K=(\mathbf k_\parallel,\lambda)$ the side medium's wave vector.
+  Treating a smaller phase as straight is the heuristic step; a tolerance of
+  0 reproduces the default exactly. With 0.1 rad, the HOPG-transport/Au-optics
+  test scene goes from 0.171 to 0: its condensed-history kinks are below the
+  phase tolerance within $L$. The gold scene drops from 1.47 to 0.57 and is
+  still refused, consistent with real deflection inside the skin depth. The
+  value is recorded as `formation_kink_phase` in the validity metadata.
 - **Energy budget.** The radiated energy per physical electron, including the
   pair term, integrated over both hemispheres (Gauss–Legendre in
   $\cos\theta$ × uniform $\varphi$) and the band, plus the out-of-band

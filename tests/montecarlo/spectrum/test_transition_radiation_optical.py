@@ -429,6 +429,75 @@ def test_straight_runs_and_formation_bound_on_transported_histories(transported)
         )  # fmt: skip
 
 
+def test_kink_lists_follow_the_transported_path():
+    from pyrite.montecarlo.spectrum.transition_radiation_crossings import (
+        KINK_SLOTS,
+        _kink_lists,
+    )
+
+    turn = [np.array([np.sin(a), 0.0, np.cos(a)]) for a in (0.0, 0.1, 0.3)]
+    track, v, length = np.zeros(3, int), np.array(turn), np.array([10.0, 20.0, 30.0])
+    ahead = _kink_lists(track, v, length, [0], forward=True)[0]
+    jumps = [2 * np.sin(0.05), 2 * np.sin(0.1)]
+    np.testing.assert_allclose(ahead[:3], [[10, jumps[0]], [30, jumps[1]], [60, np.inf]])
+    assert np.all(ahead[3:] == (np.inf, 0.0))
+    behind = _kink_lists(track, v, length, [2], forward=False)[0]
+    np.testing.assert_allclose(behind[:3], [[30, jumps[1]], [50, jumps[0]], [60, np.inf]])
+    # A second track neither contributes kinks nor extends the path.
+    two = _kink_lists(np.r_[track, 1], np.r_[v, v[:1]], np.r_[length, 5.0], [0], forward=True)
+    np.testing.assert_allclose(two[0, :3], ahead[:3])
+    # More kinks than slots end the usable path at the last slot's kink.
+    many = np.array([[np.sin(0.01 * i), 0.0, np.cos(0.01 * i)] for i in range(40)])
+    full = _kink_lists(np.zeros(40, int), many, np.ones(40), [0], forward=True)[0]
+    assert np.isinf(full[-1, 1]) and full[-1, 0] == KINK_SLOTS
+    assert np.all(np.isfinite(full[:-1, 1]))
+
+
+def test_phase_formation_policy_relaxes_only_sub_phase_kinks(transported, gold_transported):
+    from pyrite.materials.optical import gold_johnson_christy_response
+    from pyrite.montecarlo.spectrum.optical_transition_validity import formation_error_bound
+
+    for scene, response in (
+        (transported, _AU),
+        (gold_transported, gold_johnson_christy_response()),
+    ):
+        case, tp = scene
+        crossings = _crossings(case, tp)
+        for kinks, run in (
+            (crossings.kinks_before_ang, crossings.straight_before_ang),
+            (crossings.kinks_after_ang, crossings.straight_after_ang),
+        ):  # the first kink or path end is the straight run
+            first = np.min(np.where(kinks[..., 1] != 0, kinks[..., 0], np.inf), axis=-1)
+            np.testing.assert_allclose(first, run, rtol=1e-12)
+        eps = case_layer_eps(case, _ENERGY, layer_responses=(response,))
+        default = formation_error_bound(crossings, _ENERGY, _BACK, eps)
+        bounds = [
+            formation_error_bound(crossings, _ENERGY, _BACK, eps, kink_phase_tol=tol)
+            for tol in (0.0, 0.1, 0.3, 1.0)
+        ]
+        np.testing.assert_array_equal(bounds[0], default)  # tol = 0 is the default policy
+        assert all(np.all(a >= b) for a, b in zip(bounds, bounds[1:], strict=False))
+    # HOPG condensed-history kinks are sub-phase over the Au-optics formation
+    # length; gold at 30 keV still deflects too far inside its skin depth.
+    assert np.max(default) > 1.0 and np.max(bounds[1]) > 0.05
+    case, tp = transported
+    one = OpticalBunchSource.sampled(_PC1, "one")
+    with pytest.raises(ValueError, match="formation-zone bound"):
+        case_optical_transition(case, tp, layer_responses=(_AU,), source=one, energy_budget=None)
+    result = case_optical_transition(
+        case, tp, layer_responses=(_AU,), source=one, energy_budget=None,
+        formation_kink_phase=0.1,
+    )  # fmt: skip
+    validity = result.metadata["validity"]
+    assert validity["formation_kink_phase"] == 0.1 and validity["formation_bound"] <= 0.05
+    for bad in (-0.1, np.nan):
+        with pytest.raises(ValueError, match="kink_phase_tol"):
+            formation_error_bound(_crossings(case, tp), _ENERGY, _BACK, eps, kink_phase_tol=bad)
+    bare = dataclasses.replace(_crossings(case, tp), kinks_after_ang=None)
+    with pytest.raises(ValueError, match="kinks"):
+        formation_error_bound(bare, _ENERGY, _BACK, eps, kink_phase_tol=0.1)
+
+
 def test_coherent_formation_bound_propagates_to_pair_and_total(transported):
     case, tp = transported
     from pyrite.montecarlo.spectrum.optical_transition_validity import (

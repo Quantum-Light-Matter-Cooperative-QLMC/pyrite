@@ -49,6 +49,22 @@ use outside it:
   (``t``–``x`` correlated), sampled, empirical and realization laws are not
   bounded: the caller reports them as unbounded.
 
+**Phase policy (opt-in ``kink_phase_tol``).** By default every transported
+direction change ends a straight run. With ``kink_phase_tol`` a side is
+instead short only where its usable path ends inside ``L`` (track end) or
+where the path within ``L`` departs from the straight extrapolation by more
+than that phase. For piecewise-straight unit-speed paths
+``r(s) - r_0(s) = sum_i (s - d_i)_+ dv_i`` (kink ``i`` at path distance
+``d_i``), so ``|r(s) - r_0(s)| <= D(L) = sum_{d_i < L} (L - d_i) |dv_i|`` on
+``s <= L``; the side is short where ``||K|| D(L) > kink_phase_tol`` with the
+side medium's wave vector ``K = (k_par, lambda)`` and
+``||K||^2 = |k_par|^2 + |lambda|^2``. Arc length fixes the time, so this
+bounds the change of ``K . r`` in the own-field phase. The geometry bound is
+exact; treating a sub-tolerance phase as straight is the heuristic, and the
+factor-2 term then applies only to sides judged short. ``kink_phase_tol = 0``
+reproduces the default policy exactly. Kinks beyond ``KINK_SLOTS`` end the
+path (conservative).
+
 ``formation_error_bound`` concerns the self (single-history) power;
 ``coherent_formation_error_bound`` propagates the same per-history bound
 through the pair estimator and the total predicted yield, which is the
@@ -97,16 +113,24 @@ def _side_runs(crossings, side_layer):
 
 
 def formation_error_bound(
-    crossings: BoundaryCrossings, photon_energy_eV, direction, layer_eps
+    crossings: BoundaryCrossings,
+    photon_energy_eV,
+    direction,
+    layer_eps,
+    *,
+    kink_phase_tol: float | None = None,
 ) -> np.ndarray:
     """Relative self-power error bound per energy/direction (module docstring).
 
-    Needs transport-derived crossings (``straight_*_ang``). Host NumPy; a
-    validity preflight for bounded scenes, not a production reduction.
+    Needs transport-derived crossings (``straight_*_ang``, or ``kinks_*_ang``
+    with ``kink_phase_tol`` [rad]). Host NumPy; a validity preflight for
+    bounded scenes, not a production reduction.
 
     Validation: optical-planar-tr
     """
-    shape, total, error = _crossing_parts(crossings, photon_energy_eV, direction, layer_eps)
+    shape, total, error = _crossing_parts(
+        crossings, photon_energy_eV, direction, layer_eps, kink_phase_tol
+    )
     return _history_relative_error(crossings.electron_id, total, error).reshape(shape)
 
 
@@ -118,6 +142,7 @@ def coherent_formation_error_bound(
     *,
     source,
     n_histories: int,
+    kink_phase_tol: float | None = None,
 ) -> dict[str, np.ndarray]:
     """Relative formation sensitivity of the self, pair and total predicted yield.
 
@@ -131,11 +156,13 @@ def coherent_formation_error_bound(
     takes the sum of the absolute bounds. Returns arrays ``self``, ``pair`` and
     ``total`` (``inf`` where the estimate vanishes but its bound does not). The
     same factor-2 heuristic as the self bound: a sensitivity measure, not a
-    proven bound.
+    proven bound. ``kink_phase_tol`` selects the phase policy (module docstring).
 
     Validation: optical-planar-tr, optical-ctr-population
     """
-    shape, total, error = _crossing_parts(crossings, photon_energy_eV, direction, layer_eps)
+    shape, total, error = _crossing_parts(
+        crossings, photon_energy_eV, direction, layer_eps, kink_phase_tol
+    )
     count = int(n_histories)
     field, bound = _history_sums(crossings.electron_id, total, error, count)
     w = np.ones(count) if source.history_weights is None else source.history_weights
@@ -170,10 +197,16 @@ def _ratio(error, value):
         return np.where(value > 0, error / value, np.where(error > 0, np.inf, 0.0))
 
 
-def _crossing_parts(crossings, photon_energy_eV, direction, layer_eps):
+def _crossing_parts(crossings, photon_energy_eV, direction, layer_eps, kink_phase_tol=None):
     """``(shape, A (B, K, 3), b (B, K))``: crossing amplitudes and formation bounds."""
-    if crossings.straight_before_ang is None or crossings.straight_after_ang is None:
-        raise ValueError("formation bound needs transport-derived straight runs")
+    if kink_phase_tol is None:
+        if crossings.straight_before_ang is None or crossings.straight_after_ang is None:
+            raise ValueError("formation bound needs transport-derived straight runs")
+    else:
+        if not np.isfinite(kink_phase_tol) or kink_phase_tol < 0:
+            raise ValueError("kink_phase_tol must be finite and non-negative [rad]")
+        if crossings.kinks_before_ang is None or crossings.kinks_after_ang is None:
+            raise ValueError("the phase formation policy needs transport-derived kinks")
     energy = np.asarray(photon_energy_eV, dtype=float)
     n = np.asarray(direction, dtype=float)
     shape = np.broadcast_shapes(energy.shape, n.shape[:-1])
@@ -199,23 +232,49 @@ def _crossing_parts(crossings, photon_energy_eV, direction, layer_eps):
         own[:, column] = 1.0
         part = interface_transition_radiation_amplitude(*args, own_field_sides=own)
         magnitude = np.linalg.norm((part * scale).reshape(omega.size, len(crossings), 3), axis=-1)
-        length = _formation_length(side, eps_slab, omega, k_par, q)
-        short = _side_runs(crossings, side)[None, :] < length
+        length, wavenumber = _formation_length(side, eps_slab, omega, k_par, q)
+        if kink_phase_tol is None:
+            short = _side_runs(crossings, side)[None, :] < length
+        else:
+            short = _phase_short(crossings, side, length, wavenumber, kink_phase_tol)
         error += 2.0 * np.where(short, magnitude, 0.0)
     total = interface_transition_radiation_amplitude(*args) * scale
     return shape, total.reshape(omega.size, len(crossings), 3), error
 
 
 def _formation_length(side, eps_slab, omega, k_par, q):
-    """``max(1/|q - lambda|, 1/|q + lambda|)`` [Å] of each crossing's medium; 0 in vacuum."""
+    """Formation length ``max(1/|q - lambda|, 1/|q + lambda|)`` and ``||K||`` [1/Å].
+
+    Both ``(B, K)`` for each crossing's side medium; zero in vacuum.
+    """
     length = np.zeros(q.shape)
+    wavenumber = np.zeros(q.shape)
     k2 = np.sum(k_par**2, axis=-1)[:, None]
     for layer in np.unique(side[side != VACUUM]):
         mask = side == layer
         lam = _outgoing_root(eps_slab[layer][:, None] * omega[:, None] ** 2 - k2)
         qm = q[:, mask]
         length[:, mask] = HBARC_EV_ANG / np.minimum(np.abs(qm - lam), np.abs(qm + lam))
-    return length
+        wavenumber[:, mask] = np.sqrt(k2 + np.abs(lam) ** 2) / HBARC_EV_ANG
+    return length, wavenumber
+
+
+def _phase_short(crossings, side_layer, length, wavenumber, tol):
+    """``(B, K)`` sides whose path ends, or bends by phase ``> tol``, inside ``L``."""
+    kinks = np.where(
+        (side_layer == crossings.layer_before)[:, None, None],
+        crossings.kinks_before_ang,
+        crossings.kinks_after_ang,
+    )
+    distance, size = kinks[..., 0], kinks[..., 1]
+    ends = np.isinf(size)
+    path = np.min(np.where(ends, distance, np.inf), axis=-1)  # (K,)
+    bend = np.where(ends, 0.0, size)[None]
+    reach = np.clip(length[..., None] - distance[None], 0.0, None)  # (B, K, S)
+    with np.errstate(invalid="ignore"):
+        displacement = np.sum(np.where(bend > 0, reach * bend, 0.0), axis=-1)
+    short = (path[None, :] < length) | (wavenumber * displacement > tol)
+    return short & (side_layer != VACUUM)[None, :]
 
 
 def _history_sums(electron_id, amplitude, error, n_histories):
