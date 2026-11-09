@@ -117,6 +117,7 @@ run through the collector.
 | `feranchuk_check_script.py` | Legacy Feranchuk–Spence LiF absolute-flux anchor. |
 | `feranchuk_vs_zhai_check.py` | Analytic-versus-transport comparison through the maintained Zhai anchor pipeline. |
 | `kinematic_validity_check.py` | Kinematic-approximation audit; its validity parameters are supporting diagnostics, not separate ledger claims. |
+| `longitudinal_coherence_regimes.py` | Regime tables for the #629 research note: PINEM Talbot lengths, quantum versus classical harmonic-bunching caps, the ordinary-beam pair factor, and recoil-exact Si/diamond(110) CR lines. Exits 0 when the internal limits hold; under a second on CPU. |
 | `line_window_backend_agreement.py` | CUDA versus CPU line-route agreement on a production window plan, float32 and FP64, on one pickled transport (#101). |
 | `mosaic_mc_check.py` | Perfect-crystal limit, quadrature convergence, broadening, and yield checks. |
 | `multilayer_check.py` | First-slice stack transport and front/back escape checks. |
