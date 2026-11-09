@@ -99,6 +99,15 @@ class BoundaryCrossings:
         the track ends; ``inf`` on a vacuum side (no transport scatters there).
         ``None`` for records not derived from transport rows. They bound the
         locally straight formation assumption (``optical_transition``).
+    kinks_before_ang, kinks_after_ang
+        Direction changes along the transported path away from the crossing on
+        the incoming and outgoing side, ``(n, KINK_SLOTS, 2)``: path distance
+        [Å] from the crossing and ``|v_hat_new - v_hat_old|``, nearest first,
+        padded with ``(inf, 0)``. An ``inf`` second entry marks where the
+        usable path ends (track end, or more kinks than slots). They feed the
+        opt-in phase formation policy (``optical_transition_validity``).
+        ``None`` for records not derived from transport rows; padding only on
+        a vacuum side.
     """
 
     electron_id: np.ndarray
@@ -117,6 +126,8 @@ class BoundaryCrossings:
     n_side_exits: int
     straight_before_ang: np.ndarray | None = None
     straight_after_ang: np.ndarray | None = None
+    kinks_before_ang: np.ndarray | None = None
+    kinks_after_ang: np.ndarray | None = None
 
     def __len__(self) -> int:
         return int(self.interface.size)
@@ -257,6 +268,16 @@ def boundary_crossings(
         is_entry, run_forward[index], np.where(beyond == VACUUM, np.inf, inner_after)
     )
 
+    # Same sides as the straight runs: backward from the row end before a
+    # face; forward from the entry row start or the next row start after it.
+    kinks_before = _kink_lists(track, v_hat, length, index, forward=False)
+    kinks_before[is_entry] = (np.inf, 0.0)
+    kinks_after = _kink_lists(
+        track, v_hat, length, np.where(is_entry, index, following), forward=True
+    )
+    kinks_after[~is_entry & ((beyond == VACUUM) | ~continues)] = (np.inf, 0.0)
+    kinks_after[~is_entry & (beyond != VACUUM) & ~continues, 0] = (0.0, np.inf)
+
     ranked = np.lexsort((age, track[index]))
     index, position, interface = index[ranked], position[ranked], interface[ranked]
     count = index.size
@@ -277,7 +298,59 @@ def boundary_crossings(
         n_side_exits=int(np.count_nonzero(kind == EVENT_EXIT_SIDE)),
         straight_before_ang=straight_before[ranked],
         straight_after_ang=straight_after[ranked],
+        kinks_before_ang=kinks_before[ranked],
+        kinks_after_ang=kinks_after[ranked],
     )
+
+
+#: Kink slots per crossing side; later kinks end the usable path conservatively.
+KINK_SLOTS = 16
+
+
+def _kink_lists(track, v_hat, length, rows, *, forward):
+    """``(len(rows), KINK_SLOTS, 2)`` direction changes away from a row point.
+
+    ``forward`` walks along the track from the start of each row in ``rows``;
+    otherwise it walks back toward the track's first row from the row end.
+    Each entry is ``(path distance, |dv|)``; the path end is
+    ``(distance, inf)``. Rows of one track are contiguous and time-ordered; a
+    kink sits at the start of the row whose direction differs from the last.
+    """
+    count = track.size
+    end = np.cumsum(length)
+    begin = end - length
+    first = np.ones(count, dtype=bool)
+    first[1:] = track[1:] != track[:-1]
+    jump = np.zeros(count)
+    jump[1:] = np.linalg.norm(v_hat[1:] - v_hat[:-1], axis=-1)
+    turned = np.zeros(count, dtype=bool)
+    turned[1:] = np.any(np.abs(v_hat[1:] - v_hat[:-1]) > 1e-12, axis=-1)
+    kinks = np.flatnonzero(turned & ~first)  # same test as _straight_runs
+    last = np.r_[first[1:], True]
+    track_first = np.maximum.accumulate(np.where(first, np.arange(count), 0))
+    track_last = np.minimum.accumulate(np.where(last, np.arange(count), count)[::-1])[::-1]
+    out = np.empty((np.size(rows), KINK_SLOTS, 2))
+    out[:] = (np.inf, 0.0)
+    for i, row in enumerate(np.asarray(rows, dtype=np.intp)):
+        if forward:
+            lo = np.searchsorted(kinks, row, side="right")
+            hi = np.searchsorted(kinks, track_last[row], side="right")
+            ahead = kinks[lo : min(hi, lo + KINK_SLOTS)]
+            dist = begin[ahead] - begin[row]
+            stop = end[track_last[row]] - begin[row]
+        else:
+            lo = np.searchsorted(kinks, track_first[row], side="right")
+            hi = np.searchsorted(kinks, row, side="right")
+            ahead = kinks[max(lo, hi - KINK_SLOTS) : hi][::-1]
+            dist = end[row] - begin[ahead]
+            stop = end[row] - begin[track_first[row]]
+        size = jump[ahead]
+        if dist.size >= KINK_SLOTS:
+            stop = dist[KINK_SLOTS - 1]
+            dist, size = dist[: KINK_SLOTS - 1], size[: KINK_SLOTS - 1]
+        out[i, : dist.size, 0], out[i, : dist.size, 1] = dist, size
+        out[i, dist.size] = (stop, np.inf)
+    return out
 
 
 def _straight_runs(track, v_hat, length):
@@ -584,8 +657,10 @@ def _take(crossings: BoundaryCrossings, index) -> BoundaryCrossings:
     }  # fmt: skip
     runs = {
         name: None if getattr(crossings, name) is None else getattr(crossings, name)[index]
-        for name in ("straight_before_ang", "straight_after_ang")
-    }
+        for name in (
+            "straight_before_ang", "straight_after_ang", "kinks_before_ang", "kinks_after_ang"
+        )
+    }  # fmt: skip
     return BoundaryCrossings(
         **fields,
         **runs,

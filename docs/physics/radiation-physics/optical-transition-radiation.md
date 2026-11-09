@@ -155,23 +155,79 @@ predicates are lattice phases and are not reused here.
   the transported straight run on each side (`straight_before_ang`,
   `straight_after_ang`; any direction change ends a run). When a run is
   shorter than $L$, that side's linear share of the amplitude $\mathbf A_s$ is
-  allowed to change by $2|\mathbf A_s|$; the resulting bound on the self power,
-  $\sum_e(2|\delta\mathbf S_e||\mathbf S_e|+|\delta\mathbf S_e|^2)/\sum_e|\mathbf S_e|^2$,
-  must not exceed `formation_tolerance` (default 0.05). This is a sensitivity
-  bound, not a model of radiation from the deflection (bremsstrahlung). It is
-  conservative: condensed-history direction changes end runs.
+  allowed to change by $2|\mathbf A_s|$, so each history's field changes by
+  at most $b_e=\sum_c 2\sum_s d_s|\mathbf A_s|$. Propagated through the
+  estimators (weights $w_e$, $D=\sum_e w_e b_e$):
+  $|\delta\sum w|\mathbf S|^2|\le\sum_e w_e(2b_e|\mathbf S_e|+b_e^2)$ for the
+  self term and
+  $2D|\sum_e w_e\mathbf S_e|+D^2+\sum_e w_e^2(2b_e|\mathbf S_e|+b_e^2)$ for the
+  distinct-pair numerator. The relative bound of the total predicted yield
+  (self plus $(N-1)|F|^2$ pair; `coherent_formation_error_bound`) must not
+  exceed `formation_tolerance` (default 0.05); the self-only bound is
+  recorded as `formation_self_bound`. This is a sensitivity measure, not a
+  model of radiation from the deflection (bremsstrahlung), and the premise
+  that a deflected term is no larger than the straight one is heuristic. It
+  is conservative: condensed-history direction changes end runs.
+  In a consistent gold scene (catalog `au` transport tables with
+  Johnson–Christy gold optics, 30 keV), the bound is about 1.5. ELSEPA
+  scattering deflects the electrons within the optical skin depth, so the
+  default tolerance refuses fixed trajectories there; the scene runs only
+  with the check disabled. García de Abajo (RMP 82, 209, footnote 17) places
+  straight passage over a skin depth only above about 50 keV.
+- **Phase formation policy (opt-in).** `formation_kink_phase` (rad) replaces
+  "any direction change ends a run" with a phase test. Crossing records also
+  carry the direction changes along the path on each side
+  (`kinks_before_ang`, `kinks_after_ang`: distance and $|\Delta\hat{\mathbf v}|$,
+  16 slots, the last marking where the usable path ends). For a
+  piecewise-straight path,
+  $|\mathbf r(s)-\mathbf r_0(s)|\le D(L)=\sum_{d_i<L}(L-d_i)|\Delta\hat{\mathbf v}_i|$
+  for all $s\le L$, which is exact geometry. A side is short only if the path
+  ends inside $L$ or $\|\mathbf K\|D(L)$ exceeds the tolerance, with
+  $\mathbf K=(\mathbf k_\parallel,\lambda)$ the side medium's wave vector.
+  Treating a smaller phase as straight is the heuristic step; a tolerance of
+  0 reproduces the default exactly. With 0.1 rad, the HOPG-transport/Au-optics
+  test scene goes from 0.171 to 0: its condensed-history kinks are below the
+  phase tolerance within $L$. The gold scene drops from 1.47 to 0.57 and is
+  still refused, consistent with real deflection inside the skin depth. The
+  value is recorded as `formation_kink_phase` in the validity metadata.
 - **Energy budget.** The radiated energy per physical electron, including the
   pair term, integrated over both hemispheres (Gauss–Legendre in
-  $\cos\theta$ × uniform $\varphi$) and the band, must stay below
-  `energy_budget` (default $10^{-3}$) of the entrance kinetic energy, and the
-  pair-to-self ratio at both band edges must be below $10^{-3}$; otherwise the
-  coherent energy just outside the band is unbounded and the case is refused.
-  The budget is in-band only: it cannot detect coherent energy below a band
-  whose lower edge lies above the coherent window $E_w$, where $|F|^2$ rises
-  back toward one (for 30 keV electrons on gold, a 200 fs bunch radiates
-  roughly $2	imes10^{-4}$ of the kinetic energy there at 1 pC and
-  $2	imes10^{-3}$ at 10 pC). Check $E_w$ against the band before relying on
-  fixed trajectories for a high-charge short bunch.
+  $\cos\theta$ × uniform $\varphi$) and the band, plus the out-of-band
+  coherent envelope below, must stay below `energy_budget` (default
+  $10^{-3}$) of the entrance kinetic energy, and the pair-to-self ratio at
+  both band edges must be below $10^{-3}$.
+- **Out-of-band coherent energy.** Outside the band no optics are supplied, so
+  the pair yield is bounded instead of scored: $|\langle\mathbf S\rangle|^2\le
+  \langle|\mathbf S|^2\rangle$, $|\mathbf S_e|^2\le n_e\sum_c|\mathbf A_c|^2$
+  ($n_e$ crossings), and each crossing by its perfect-conductor image-charge
+  energy,
+
+  $$
+  \frac{dU_c}{dE\,d\Omega}=\frac{\alpha}{4\pi^2}
+  \left|\mathbf n\times\Bigl(\frac{\boldsymbol\beta}{1-\mathbf n\cdot\boldsymbol\beta}
+  -\frac{\boldsymbol\beta'}{1-\mathbf n\cdot\boldsymbol\beta'}\Bigr)\right|^2,
+  $$
+
+  with $\boldsymbol\beta'$ mirrored in the face (normal incidence: the
+  Ginzburg–Frank conductor form), integrated over the vacuum hemisphere (the
+  larger of both for an inner face). This energy per eV is flat in $E$, and a
+  Gaussian law without time–transverse correlation has
+  $|F|^2\le e^{-(E\sigma_t/\hbar)^2}$, so the tails integrate to
+  $(N-1)B\,(\hbar/\sigma_t)(\sqrt\pi/2)[\operatorname{erf}x_{\rm lo}+\operatorname{erfc}x_{\rm hi}]$,
+  $x=E\sigma_t/\hbar$, $B$ the weighted sample mean of $n_e\sum_c U'_c$ (a
+  consistent estimate, not a strict bound). The conductor envelope fails
+  where a traversed medium can emit Cherenkov light into vacuum
+  ($\beta^2\operatorname{Re}\varepsilon\ge1$, exceeded by up to orders of
+  magnitude) and for grazing crossings on low-$|\varepsilon|$ media near
+  their plasma edge (up to about 1.6×). Gold below its plasma edge stays at
+  0.86–0.99 of it. A layer whose in-band permittivity reaches
+  $\beta^2\operatorname{Re}\varepsilon\ge1$ (a proxy for the unscored
+  out-of-band values), $\gamma>5$ (where the fixed quadrature is unresolved),
+  and sampled, empirical, realization and tilted Gaussian laws are recorded
+  as `out_of_band_unbounded`, not refused. The larger-hemisphere rule for
+  inner faces is a heuristic. For 30 keV electrons on gold at 200 fs and
+  1 pC the envelope is about $1.8\times10^{-4}$ of the kinetic energy below a
+  1.4–3.3 eV band.
 
 Both checks bound the self (single-history) power; the pair term's relative
 error is not bounded by the formation check, and the factor 2 is a heuristic

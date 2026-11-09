@@ -128,6 +128,8 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     "checks/optical_response_cuda.py": ("optical-material-response",),
     "checks/optical_stack_cuda.py": ("optical-stack-fast-solver",),
     "checks/optical_transition_cuda.py": ("optical-planar-tr", "optical-ctr-population"),
+    # #616 measured slit-DR screen: detector geometry is fitted, so no claim.
+    "checks/castellano_slit_dr.py": (),
     # Decision evidence for the pixel angular-reconstruction policy (#23); v1
     # makes no ledgered reconstruction-accuracy claim, so it emits no records.
     "checks/pixel_reconstruction_oracle.py": (),

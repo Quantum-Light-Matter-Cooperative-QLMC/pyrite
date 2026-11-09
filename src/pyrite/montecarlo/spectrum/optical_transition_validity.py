@@ -22,13 +22,54 @@ use outside it:
   hemispheres, must be a small fraction of the kinetic energy; and the pair
   term must be negligible at both band edges, otherwise coherent energy
   just outside the band is unbounded by this calculation. The budget is
-  in-band only: it cannot see coherent emission below a band whose lower edge
-  lies above the coherent window (``gaussian_coherent_band_eV``), where
-  ``|F|^2`` rises again toward one; such sub-band energy needs supported optics
-  there and is reported, not bounded, by the caller.
+  scored in-band; coherent emission outside the band (below a band whose
+  lower edge lies above the coherent window ``gaussian_coherent_band_eV``,
+  where ``|F|^2`` rises again toward one, and above it) is added from an
+  analytic envelope, ``out_of_band_coherent_energy_eV``, for Gaussian laws.
+- **out-of-band envelope** — outside the band the per-electron pair yield
+  ``|<S>|^2 <= <|S|^2>`` (Cauchy–Schwarz). Each history's field obeys
+  ``|S|^2 <= n_h sum_c |A_c|^2`` (``n_h`` crossings), and each crossing is
+  bounded by its perfect-conductor image-charge yield,
+  ``dU/(dE dOmega) = alpha/(4 pi^2) |n x (b/(1 - n.b) - b'/(1 - n.b'))|^2``
+  (``b'`` mirrored in the face; normal incidence gives Ginzburg–Frank),
+  integrated over the vacuum hemisphere (both for an inner face). This energy
+  per eV is flat in ``E``, so with ``|F|^2 <= exp[-(E sigma_t/hbar)^2]`` the
+  tails are ``(N - 1) B (hbar/sigma_t) (sqrt(pi)/2) [erf(x_lo) + erfc(x_hi)]``,
+  ``x = E sigma_t/hbar``, with ``B`` the weighted sample mean of
+  ``n_h sum_c U'_c`` (a consistent estimate, not a strict bound). The PEC
+  envelope is not an upper bound where a traversed medium can emit Cherenkov
+  light into vacuum (``beta^2 Re eps >= 1``: refracted Cherenkov exceeds it by
+  up to orders of magnitude) or for grazing crossings on low-``|eps|`` media
+  near their plasma edge (up to ~1.6x); metals below their plasma edge stay at
+  0.86–0.99 of it. Supplying ``layer_eps`` refuses ``beta^2 Re eps >= 1`` on
+  the in-band permittivity, a proxy for the unscored out-of-band values. The
+  larger-hemisphere rule for inner faces is a heuristic (no thin-film
+  transmission or multilayer enhancement). The fixed angular quadrature is
+  refused above ``gamma = 5`` (1 % at 1.2 rad tilt there). Tilted
+  (``t``–``x`` correlated), sampled, empirical and realization laws are not
+  bounded: the caller reports them as unbounded.
 
-Both bounds concern the self (single-history) power: the pair term's
-relative error is not bounded by the formation check. The factor 2 assumes
+**Phase policy (opt-in ``kink_phase_tol``).** By default every transported
+direction change ends a straight run. With ``kink_phase_tol`` a side is
+instead short only where its usable path ends inside ``L`` (track end) or
+where the path within ``L`` departs from the straight extrapolation by more
+than that phase. For piecewise-straight unit-speed paths
+``r(s) - r_0(s) = sum_i (s - d_i)_+ dv_i`` (kink ``i`` at path distance
+``d_i``), so ``|r(s) - r_0(s)| <= D(L) = sum_{d_i < L} (L - d_i) |dv_i|`` on
+``s <= L``; the side is short where ``||K|| D(L) > kink_phase_tol`` with the
+side medium's wave vector ``K = (k_par, lambda)`` and
+``||K||^2 = |k_par|^2 + |lambda|^2``. Arc length fixes the time, so this
+bounds the change of ``K . r`` in the own-field phase. The geometry bound is
+exact; treating a sub-tolerance phase as straight is the heuristic, and the
+factor-2 term then applies only to sides judged short. ``kink_phase_tol = 0``
+reproduces the default policy exactly. Kinks beyond ``KINK_SLOTS`` end the
+path (conservative).
+
+``formation_error_bound`` concerns the self (single-history) power;
+``coherent_formation_error_bound`` propagates the same per-history bound
+through the pair estimator and the total predicted yield, which is the
+quantity :func:`~pyrite.montecarlo.runner.transition_emission.case_optical_transition`
+refuses on. The factor 2 assumes
 the true term of a short run is no larger than the straight-run term; it is a
 heuristic sensitivity measure, not a proven bound.
 
@@ -38,17 +79,21 @@ Validation: optical-planar-tr, optical-ctr-population
 from __future__ import annotations
 
 from collections.abc import Callable
+from math import erf, erfc
 
 import numpy as np
 
-from ...materials.crystal import HBARC_EV_ANG
+from ...materials.crystal import ALPHA_FS, HBARC_EV_ANG, M_E_EV
 from .transition_radiation import _outgoing_root, interface_transition_radiation_amplitude
 from .transition_radiation_crossings import VACUUM, BoundaryCrossings, _emission_frame
 
 __all__ = [
+    "coherent_formation_error_bound",
     "formation_error_bound",
     "hemisphere_directions",
     "kinetic_energy_eV",
+    "out_of_band_coherent_energy_eV",
+    "pec_crossing_energy_per_eV",
     "radiated_energy_fraction",
 ]
 
@@ -68,17 +113,100 @@ def _side_runs(crossings, side_layer):
 
 
 def formation_error_bound(
-    crossings: BoundaryCrossings, photon_energy_eV, direction, layer_eps
+    crossings: BoundaryCrossings,
+    photon_energy_eV,
+    direction,
+    layer_eps,
+    *,
+    kink_phase_tol: float | None = None,
 ) -> np.ndarray:
     """Relative self-power error bound per energy/direction (module docstring).
 
-    Needs transport-derived crossings (``straight_*_ang``). Host NumPy; a
-    validity preflight for bounded scenes, not a production reduction.
+    Needs transport-derived crossings (``straight_*_ang``, or ``kinks_*_ang``
+    with ``kink_phase_tol`` [rad]). Host NumPy; a validity preflight for
+    bounded scenes, not a production reduction.
 
     Validation: optical-planar-tr
     """
-    if crossings.straight_before_ang is None or crossings.straight_after_ang is None:
-        raise ValueError("formation bound needs transport-derived straight runs")
+    shape, total, error = _crossing_parts(
+        crossings, photon_energy_eV, direction, layer_eps, kink_phase_tol
+    )
+    return _history_relative_error(crossings.electron_id, total, error).reshape(shape)
+
+
+def coherent_formation_error_bound(
+    crossings: BoundaryCrossings,
+    photon_energy_eV,
+    direction,
+    layer_eps,
+    *,
+    source,
+    n_histories: int,
+    kink_phase_tol: float | None = None,
+) -> dict[str, np.ndarray]:
+    """Relative formation sensitivity of the self, pair and total predicted yield.
+
+    Propagates the per-history bound ``|dS_h| <= b_h`` of
+    :func:`formation_error_bound` through the estimators of
+    ``optical_transition_radiation`` with weights ``w_h`` (``W = Sum w``,
+    ``W_2 = Sum w^2``, ``D = Sum w b``):
+    ``|d Sum w|S|^2| <= Sum w (2 b|S| + b^2)``;
+    ``|d(|Sum w S|^2 - Sum w^2|S|^2)| <= 2 D |Sum w S| + D^2 + Sum w^2 (2 b|S| + b^2)``;
+    the total ``self + (N - 1)|F|^2 pair`` (a realization: ``|Sum S|^2/M``)
+    takes the sum of the absolute bounds. Returns arrays ``self``, ``pair`` and
+    ``total`` (``inf`` where the estimate vanishes but its bound does not). The
+    same factor-2 heuristic as the self bound: a sensitivity measure, not a
+    proven bound. ``kink_phase_tol`` selects the phase policy (module docstring).
+
+    Validation: optical-planar-tr, optical-ctr-population
+    """
+    shape, total, error = _crossing_parts(
+        crossings, photon_energy_eV, direction, layer_eps, kink_phase_tol
+    )
+    count = int(n_histories)
+    field, bound = _history_sums(crossings.electron_id, total, error, count)
+    w = np.ones(count) if source.history_weights is None else source.history_weights
+    norm = np.linalg.norm(field, axis=-1)  # (B, H)
+    w_sum, w2_sum = float(w.sum()), float(np.sum(w**2))
+    power_err = 2.0 * bound * norm + bound**2
+    g, dg = norm**2 @ w, power_err @ w
+    h, dh = norm**2 @ w**2, power_err @ w**2
+    coherent = np.linalg.norm(np.einsum("h,bhk->bk", w, field), axis=-1)
+    d_sum = bound @ w
+    d_coherent = 2.0 * d_sum * coherent + d_sum**2
+    pair_den = w_sum**2 - w2_sum
+    pair, d_pair = (coherent**2 - h, d_coherent + dh) if pair_den > 0 else (0.0 * g, 0.0 * g)
+    if source.law == "realization":
+        value, d_value = coherent**2 / w_sum, d_coherent / w_sum
+    else:
+        energy = np.asarray(photon_energy_eV, dtype=float)
+        n = np.asarray(direction, dtype=float)
+        factor = np.broadcast_to(source.form_factor_squared(energy, n), shape).reshape(-1)
+        weight = max(source.physical_electrons - 1.0, 0.0) * factor / max(pair_den, 1e-300)
+        value = g / w_sum + weight * pair
+        d_value = dg / w_sum + weight * d_pair
+    return {
+        "self": _ratio(dg, g).reshape(shape),
+        "pair": _ratio(d_pair, np.abs(pair)).reshape(shape),
+        "total": _ratio(d_value, np.abs(value)).reshape(shape),
+    }
+
+
+def _ratio(error, value):
+    with np.errstate(divide="ignore", invalid="ignore"):
+        return np.where(value > 0, error / value, np.where(error > 0, np.inf, 0.0))
+
+
+def _crossing_parts(crossings, photon_energy_eV, direction, layer_eps, kink_phase_tol=None):
+    """``(shape, A (B, K, 3), b (B, K))``: crossing amplitudes and formation bounds."""
+    if kink_phase_tol is None:
+        if crossings.straight_before_ang is None or crossings.straight_after_ang is None:
+            raise ValueError("formation bound needs transport-derived straight runs")
+    else:
+        if not np.isfinite(kink_phase_tol) or kink_phase_tol < 0:
+            raise ValueError("kink_phase_tol must be finite and non-negative [rad]")
+        if crossings.kinks_before_ang is None or crossings.kinks_after_ang is None:
+            raise ValueError("the phase formation policy needs transport-derived kinks")
     energy = np.asarray(photon_energy_eV, dtype=float)
     n = np.asarray(direction, dtype=float)
     shape = np.broadcast_shapes(energy.shape, n.shape[:-1])
@@ -104,38 +232,68 @@ def formation_error_bound(
         own[:, column] = 1.0
         part = interface_transition_radiation_amplitude(*args, own_field_sides=own)
         magnitude = np.linalg.norm((part * scale).reshape(omega.size, len(crossings), 3), axis=-1)
-        length = _formation_length(side, eps_slab, omega, k_par, q)
-        short = _side_runs(crossings, side)[None, :] < length
+        length, wavenumber = _formation_length(side, eps_slab, omega, k_par, q)
+        if kink_phase_tol is None:
+            short = _side_runs(crossings, side)[None, :] < length
+        else:
+            short = _phase_short(crossings, side, length, wavenumber, kink_phase_tol)
         error += 2.0 * np.where(short, magnitude, 0.0)
     total = interface_transition_radiation_amplitude(*args) * scale
-    total = total.reshape(omega.size, len(crossings), 3)
-    return _history_relative_error(crossings.electron_id, total, error).reshape(shape)
+    return shape, total.reshape(omega.size, len(crossings), 3), error
 
 
 def _formation_length(side, eps_slab, omega, k_par, q):
-    """``max(1/|q - lambda|, 1/|q + lambda|)`` [Å] of each crossing's medium; 0 in vacuum."""
+    """Formation length ``max(1/|q - lambda|, 1/|q + lambda|)`` and ``||K||`` [1/Å].
+
+    Both ``(B, K)`` for each crossing's side medium; zero in vacuum.
+    """
     length = np.zeros(q.shape)
+    wavenumber = np.zeros(q.shape)
     k2 = np.sum(k_par**2, axis=-1)[:, None]
     for layer in np.unique(side[side != VACUUM]):
         mask = side == layer
         lam = _outgoing_root(eps_slab[layer][:, None] * omega[:, None] ** 2 - k2)
         qm = q[:, mask]
         length[:, mask] = HBARC_EV_ANG / np.minimum(np.abs(qm - lam), np.abs(qm + lam))
-    return length
+        wavenumber[:, mask] = np.sqrt(k2 + np.abs(lam) ** 2) / HBARC_EV_ANG
+    return length, wavenumber
+
+
+def _phase_short(crossings, side_layer, length, wavenumber, tol):
+    """``(B, K)`` sides whose path ends, or bends by phase ``> tol``, inside ``L``."""
+    kinks = np.where(
+        (side_layer == crossings.layer_before)[:, None, None],
+        crossings.kinks_before_ang,
+        crossings.kinks_after_ang,
+    )
+    distance, size = kinks[..., 0], kinks[..., 1]
+    ends = np.isinf(size)
+    path = np.min(np.where(ends, distance, np.inf), axis=-1)  # (K,)
+    bend = np.where(ends, 0.0, size)[None]
+    reach = np.clip(length[..., None] - distance[None], 0.0, None)  # (B, K, S)
+    with np.errstate(invalid="ignore"):
+        displacement = np.sum(np.where(bend > 0, reach * bend, 0.0), axis=-1)
+    short = (path[None, :] < length) | (wavenumber * displacement > tol)
+    return short & (side_layer != VACUUM)[None, :]
+
+
+def _history_sums(electron_id, amplitude, error, n_histories):
+    """Per-history field sums ``(B, H, 3)`` and summed bounds ``(B, H)``."""
+    ids = np.asarray(electron_id, dtype=np.intp)
+    summed = np.zeros((amplitude.shape[0], n_histories, 3), dtype=complex)
+    bound = np.zeros((amplitude.shape[0], n_histories))
+    np.add.at(summed.transpose(1, 0, 2), ids, amplitude.transpose(1, 0, 2))  # views
+    np.add.at(bound.T, ids, error.T)
+    return summed, bound
 
 
 def _history_relative_error(electron_id, amplitude, error):
     histories, inverse = np.unique(electron_id, return_inverse=True)
-    summed = np.zeros((amplitude.shape[0], histories.size, 3), dtype=complex)
-    bound = np.zeros((amplitude.shape[0], histories.size))
-    for column, history in enumerate(inverse):  # amplitude (B, K, 3), error (B, K)
-        summed[:, history] += amplitude[:, column]
-        bound[:, history] += error[:, column]
+    summed, bound = _history_sums(inverse, amplitude, error, histories.size)
     norm = np.linalg.norm(summed, axis=-1)
     power = np.sum(norm**2, axis=-1)
     excess = np.sum(2.0 * bound * norm + bound**2, axis=-1)
-    with np.errstate(divide="ignore", invalid="ignore"):
-        return np.where(power > 0, excess / power, np.where(excess > 0, np.inf, 0.0))
+    return _ratio(excess, power)
 
 
 def hemisphere_directions(n_cos: int = 12, n_phi: int = 12, *, forward: bool):
@@ -166,6 +324,7 @@ def radiated_energy_fraction(
     edge_tolerance: float = 1e-3,
     n_cos: int = 12,
     n_phi: int = 12,
+    out_of_band_eV: float = 0.0,
 ) -> float:
     """Radiated energy per physical electron over kinetic energy; refuses unbounded use.
 
@@ -174,11 +333,14 @@ def radiated_energy_fraction(
     ``max(N - 1, 0) F pair_yield``. Integrates ``E * yield`` over both
     hemispheres (Gauss–Legendre/uniform) and the band (trapezoid). Raises
     when the fraction exceeds ``max_fraction`` or the pair-to-self ratio at a
-    band edge exceeds ``edge_tolerance``.
+    band edge exceeds ``edge_tolerance``. ``out_of_band_eV`` [eV per physical
+    electron] adds energy outside the band (``out_of_band_coherent_energy_eV``).
 
     Validation: optical-ctr-population
     """
     energy = np.asarray(photon_energy_eV, dtype=float)
+    if not np.isfinite(out_of_band_eV) or out_of_band_eV < 0.0:
+        raise ValueError("out_of_band_eV must be finite and nonnegative")
     if energy.ndim != 1 or energy.size < 2 or kinetic_energy_eV <= 0:
         raise ValueError("energy budget needs a 1-D band and positive kinetic energy")
     radiated = 0.0
@@ -193,7 +355,7 @@ def radiated_energy_fraction(
                 "scored band is unbounded: extend the band with supported optics"
             )
         radiated += float(np.trapezoid(energy * (total @ weight), energy))
-    fraction = radiated / float(kinetic_energy_eV)
+    fraction = (radiated + float(out_of_band_eV)) / float(kinetic_energy_eV)
     if not np.isfinite(fraction) or fraction > max_fraction:
         raise ValueError(
             f"radiated energy is {fraction:.3g} of the kinetic energy (limit {max_fraction:g}): "
@@ -208,3 +370,88 @@ def kinetic_energy_eV(crossings: BoundaryCrossings) -> float:
     if not np.any(entry):
         raise ValueError("no entrance crossings")
     return float(np.min(crossings.kinetic_energy_keV[entry])) * 1e3
+
+
+#: Largest Lorentz factor the fixed envelope quadrature resolves to ~1 %.
+_MAX_ENVELOPE_GAMMA = 5.0
+
+
+def pec_crossing_energy_per_eV(crossings: BoundaryCrossings, n_cos: int = 24, n_phi: int = 24):
+    """Perfect-conductor image-charge TR energy per eV of each crossing [eV/eV].
+
+    ``alpha/(4 pi^2) int |n x (b/(1 - n.b) - b'/(1 - n.b'))|^2 dOmega`` over the
+    vacuum hemisphere of the face (entrance face ``z < 0``, last face
+    ``z > 0``; the larger of both for an inner face). Independent of ``E``.
+
+    Validation: optical-ctr-population
+    """
+    gamma = 1.0 + np.asarray(crossings.kinetic_energy_keV, dtype=float) * 1e3 / M_E_EV
+    if gamma.size and float(np.max(gamma)) > _MAX_ENVELOPE_GAMMA:
+        raise ValueError(
+            f"PEC envelope quadrature is unresolved above gamma = {_MAX_ENVELOPE_GAMMA:g}"
+        )
+    beta = np.sqrt(1.0 - 1.0 / gamma**2)[:, None] * np.asarray(crossings.direction, dtype=float)
+    image = beta * np.array([1.0, 1.0, -1.0])
+    hemispheres = []
+    for forward in (False, True):
+        n, weight = hemisphere_directions(n_cos, n_phi, forward=forward)
+        terms = [  # (C, D, 3): n x b / (1 - n.b)
+            np.cross(n[None], b[:, None]) / (1.0 - np.einsum("dk,ck->cd", n, b))[..., None]
+            for b in (beta, image)
+        ]
+        power = np.sum(np.abs(terms[0] - terms[1]) ** 2, axis=-1)
+        hemispheres.append(ALPHA_FS / (4.0 * np.pi**2) * (power @ weight))
+    back, front = hemispheres
+    last = len(crossings.z_interfaces_ang) - 1
+    interface = np.asarray(crossings.interface)
+    return np.where(
+        interface == 0, back, np.where(interface == last, front, np.maximum(back, front))
+    )
+
+
+def out_of_band_coherent_energy_eV(
+    crossings: BoundaryCrossings, band_eV, source, n_histories: int, layer_eps=None
+) -> float:
+    """Envelope of coherent pair energy outside ``band_eV`` per physical electron [eV].
+
+    Module docstring (out-of-band envelope). ``source`` is an
+    ``OpticalBunchSource``; zero for ``N <= 1``. Raises ``ValueError`` for laws
+    whose tail this envelope does not cover (only Gaussian laws without
+    time–transverse correlation are supported), above ``gamma = 5``, and, with
+    ``layer_eps`` (per-layer in-band permittivities), when any layer reaches
+    the Cherenkov condition ``beta^2 Re eps >= 1``.
+
+    Validation: optical-ctr-population
+    """
+    excess = max(source.physical_electrons - 1.0, 0.0)
+    if excess == 0.0:
+        return 0.0
+    if source.law != "gaussian":
+        raise ValueError(f"no out-of-band envelope for source law {source.law!r}")
+    cov = np.asarray(source.covariance_ang2, dtype=float)
+    if np.any(cov[0, 1:] != 0.0):
+        raise ValueError("no out-of-band envelope for a time-transverse correlated law")
+    if layer_eps is not None and np.size(crossings.kinetic_energy_keV):
+        kinetic = float(np.max(crossings.kinetic_energy_keV)) * 1e3
+        beta2 = 1.0 - 1.0 / (1.0 + kinetic / M_E_EV) ** 2
+        worst = max((float(np.max(np.real(e))) for e in layer_eps), default=0.0)
+        if beta2 * worst >= 1.0:
+            raise ValueError(
+                f"a layer can emit Cherenkov light (beta^2 Re eps = {beta2 * worst:.3g}): "
+                "the PEC envelope does not bound it"
+            )
+    sigma = float(np.sqrt(cov[0, 0]))
+    band = np.asarray(band_eV, dtype=float)
+    lo, hi = float(np.min(band)), float(np.max(band))
+    if sigma == 0.0:
+        return np.inf
+    count = int(n_histories)
+    weights = np.ones(count) if source.history_weights is None else source.history_weights
+    per_crossing = pec_crossing_energy_per_eV(crossings)
+    ids = np.asarray(crossings.electron_id)
+    n_cross = np.bincount(ids, minlength=count)
+    summed = np.bincount(ids, weights=per_crossing, minlength=count)
+    envelope = float(np.sum(weights * n_cross * summed) / np.sum(weights))
+    scale = HBARC_EV_ANG / sigma
+    tails = 0.5 * np.sqrt(np.pi) * scale * (erf(lo / scale) + erfc(hi / scale))
+    return excess * envelope * float(tails)
