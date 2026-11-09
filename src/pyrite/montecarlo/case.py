@@ -532,6 +532,9 @@ class Case(Mapping[str, Any]):
 
     def _validate_channeling(self) -> None:
         record = self.channeling
+        if isinstance(record, Mapping) and record.get("model") == "axial":
+            self._validate_axial_channeling(record)
+            return
         if not isinstance(record, Mapping) or set(record) != set(CHANNELING_RECORD_KEYS):
             raise ValueError(
                 "channeling must be a record with keys " + ", ".join(CHANNELING_RECORD_KEYS)
@@ -569,6 +572,58 @@ class Case(Mapping[str, Any]):
             raise ValueError("channeling supports a single-layer slab only")
         if self.mosaic_fwhm_rad or self.mosaic_mc_fwhm_rad:
             raise ValueError("channeling does not support mosaic crystals")
+
+    def _validate_axial_channeling(self, record: Mapping[str, object]) -> None:
+        """Reject uncalibrated, tampered or unsupported v2 fibre records.
+
+        A record's case key or claimed budget alone cannot grant admission:
+        re-resolve the physical case and compare the *entire* repository-owned
+        payload. Runner admission remains separately closed until #994 lands.
+        """
+        from .._energy_grid_encoding import decode_energy_grid
+        from ..campaign.axial_cases import axial_case_query, axial_channeling_record
+        from ..quantum._admission import AxialAdmissionError
+        from ..quantum._axial_envelope import (
+            ADMITTED_AXIAL_CASES,
+            check_axial_line_band,
+            match_axial_case,
+        )
+
+        key = record.get("case_key")
+        if not isinstance(key, str) or key not in ADMITTED_AXIAL_CASES:
+            raise AxialAdmissionError("axial record has no repository-owned admission (#994)")
+        template = ADMITTED_AXIAL_CASES[key]
+        admitted = match_axial_case(
+            axial_case_query(self, template.axis_uvw, template.temperature_K)
+        )
+        if dict(record) != axial_channeling_record(admitted):
+            raise AxialAdmissionError("axial resolved record differs from repository lookup (#994)")
+        if self.energy_model != "midpoint":
+            raise AxialAdmissionError("axial fibre requires midpoint transport")
+        if self.theta_obs_rad != 0 or self.dtheta_obs_rad != 0 or self.domega_sr != 0:
+            raise AxialAdmissionError("axial fibre supports on-axis, zero-aperture scoring only")
+        check_axial_line_band(admitted, decode_energy_grid(self.E_grid_line))
+        if admitted.free_free == "native" and self.coherent_emission is _ABSENT:
+            raise AxialAdmissionError("axial native free->free owner requires coherent CBS")
+        if admitted.free_free == "bound" and self.coherent_emission is not _ABSENT:
+            raise AxialAdmissionError("axial bound free->free owner forbids coherent CBS")
+        for field, label in (
+            ("abs_layers", "layer stacks"),
+            ("groove_spacing_ang", "grooves"),
+            ("gdf_source", "GDF input"),
+            ("secondary_threshold_eV", "secondaries"),
+            ("adaptive_precision", "adaptive precision"),
+            ("temporal_profile", "temporal profiles"),
+            ("radiative_model", "coupled radiative transport"),
+            ("transition_radiation", "transition radiation"),
+            ("photon_transport", "photon transport"),
+            ("transport_mode", "mixed transport"),
+        ):
+            value = getattr(self, field)
+            if value is not _ABSENT and value is not None:
+                raise AxialAdmissionError(f"axial fibre does not support {label}")
+        if self.mosaic_fwhm_rad or self.mosaic_mc_fwhm_rad:
+            raise AxialAdmissionError("axial fibre does not support mosaic crystals")
 
     def _validate_transport_mode(self) -> None:
         """Mixed transport replaces small-angle structure, so readers of it refuse."""

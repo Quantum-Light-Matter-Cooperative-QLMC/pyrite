@@ -57,7 +57,7 @@ from ..montecarlo.transport import STOPPING_MODEL
 from ..montecarlo.transport.precision import TRANSPORT_PRECISION_MODEL
 from ..results import EmissionMode, Settings
 from ..xsgen.bremslib.tables import resolve_bremsstrahlung_model
-from .axial_spec import AXIAL_MODEL_MARKER, resolve_axial_spec
+from .axial_spec import AXIAL_FIBRE_MODEL_MARKER, AXIAL_MODEL_MARKER, resolve_axial_spec
 from .identity_options import (
     _CONTENT_KEY_DENYLIST,
     pop_identity_options,
@@ -622,9 +622,13 @@ def _identity_v1(
     channeling = {key: settings_payload.pop(key, None) for key in CHANNELING_KEYS}
     if channeling["channeling_model"] not in (None, "off"):
         if channeling["channeling_model"] == "axial":
-            # Expand defaults before hashing; do not alias the planar marker.
+            # Expand defaults before hashing; do not alias planar or v1.
             channeling["channeling_axial"] = resolve_axial_spec(channeling["channeling_axial"])
-            model_marker = AXIAL_MODEL_MARKER
+            model_marker = (
+                AXIAL_FIBRE_MODEL_MARKER
+                if channeling["channeling_axial"]["version"] == 2
+                else AXIAL_MODEL_MARKER
+            )
         else:
             channeling.pop("channeling_axial", None)  # planar identity remains bit-for-bit
             model_marker = CHANNELING_MODEL
@@ -832,7 +836,7 @@ def case_content_key(
     # are unchanged. The record itself (plane, margin, numerics) is in "case".
     if case.get("channeling") is not None:
         if case["channeling"].get("model") == "axial":
-            payload["channeling_model"] = AXIAL_MODEL_MARKER
+            payload["channeling_model"] = case["channeling"].get("model_marker", AXIAL_MODEL_MARKER)
         else:
             payload["channeling_model"] = CHANNELING_MODEL
     if case.get("transition_radiation") is not None:
