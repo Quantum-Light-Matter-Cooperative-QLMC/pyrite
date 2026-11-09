@@ -81,7 +81,7 @@ def test_constant_sdcs_cell_integral(variant):
         np.float32(1), np.float32(2), np.float32(1.25), np.float32(1.25)
     )
     assert actual.dtype == np.dtype("float32")
-    assert actual == pytest.approx(1.25 * np.log(2), rel=2 * np.finfo(np.float32).eps)
+    assert actual == pytest.approx(1.25 * np.log(2), rel=2 * float(np.finfo(np.float32).eps))
 
 
 @pytest.mark.parametrize("variant", ["rad-cell64-24", "rad-stable32-24"])
@@ -98,7 +98,9 @@ def test_mixed_cell_resolves_close_photon_nodes(variant):
     actual = namespace["_rad_cell_rate"](
         np.float32(1e6), np.float32(1e6 + 0.25), np.float32(1.25), np.float32(1.25)
     )
-    assert actual == pytest.approx(1.25 * np.log1p(0.25 / 1e6), rel=2 * np.finfo(np.float32).eps)
+    assert actual == pytest.approx(
+        1.25 * np.log1p(0.25 / 1e6), rel=2 * float(np.finfo(np.float32).eps)
+    )
 
 
 def _toy_trajectory():

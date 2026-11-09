@@ -135,11 +135,11 @@ def test_model_routes_resolved_case_geometry_through_all_components(monkeypatch)
 
     model = af.model_spectra(anchor, ne=1, ne_brem=1)
 
-    assert geometry_calls == pytest.approx(
-        [
-            (np.deg2rad(101.0), 0.0, 0.0),
-            (np.deg2rad(101.0), 0.0, 0.0),
-        ]
+    # pytest >= 9.2 approx rejects nested sequences; compare as an array.
+    np.testing.assert_allclose(
+        np.asarray(geometry_calls, dtype=float),
+        [(np.deg2rad(101.0), 0.0, 0.0), (np.deg2rad(101.0), 0.0, 0.0)],
+        rtol=1e-6,
     )
     assert aperture_calls[0][2:] == pytest.approx((np.deg2rad(101.0), np.deg2rad(12.0)))
     expected_flux = np.trapezoid(np.ones(anchor.E_grid.size), anchor.E_grid) * 0.02
