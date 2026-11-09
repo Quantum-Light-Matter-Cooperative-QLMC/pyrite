@@ -305,14 +305,15 @@ def _silent_worker(tmp_path, stderr="worker said this"):
 
 
 def test_worker_timeout_reports_stderr(tmp_path):
-    with pytest.raises(kt._WorkerError, match="no worker reply.*worker said this"):
-        _silent_worker(tmp_path)._next()
+    worker = _silent_worker(tmp_path)
+    with worker._stderr, pytest.raises(kt._WorkerError, match="no worker reply.*worker said this"):
+        worker._next()
 
 
 def test_worker_interrupt_keeps_stderr_as_a_note(tmp_path):
     worker = _silent_worker(tmp_path)
     worker._lines = SimpleNamespace(get=Mock(side_effect=KeyboardInterrupt))
-    with pytest.raises(KeyboardInterrupt) as caught:
+    with worker._stderr, pytest.raises(KeyboardInterrupt) as caught:
         worker._next()
     assert any("worker said this" in note for note in caught.value.__notes__)
 
@@ -329,4 +330,5 @@ def test_caller_pool_is_released_and_live_memory_warned(monkeypatch, reserved, w
         warnings.simplefilter("always")
         kt._release_caller_device_memory()
     backend.release_memory.assert_called_once_with()
-    assert bool(caught) is warns
+    # Ignore GC-time ResourceWarnings from unrelated objects collected meanwhile.
+    assert any(not issubclass(w.category, ResourceWarning) for w in caught) is warns
