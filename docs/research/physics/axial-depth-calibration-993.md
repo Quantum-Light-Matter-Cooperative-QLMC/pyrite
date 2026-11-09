@@ -18,9 +18,9 @@ crystal thickness.
 
 | Case | Axis | Energy | Thickness | Tilt | Checkpoints (Å) |
 |---|---|---|---|---|---|
-| A | ⟨100⟩ | 3.5 MeV | 0.3 µm | 0.088° | 1000, 2000, 3000 |
-| B | ⟨100⟩ | 3.5 MeV | 0.3 µm | 0° | 1000, 2000, 3000 |
-| C | ⟨111⟩ | 2.99 MeV | 1.1 µm | 0° | 3000, 6000, 11000 |
+| A | ⟨100⟩ | 3.5 MeV | 0.3 µm | 0.088° | 750, 1500, 3000 |
+| B | ⟨100⟩ | 3.5 MeV | 0.3 µm | 0° | 750, 1500, 3000 |
+| C | ⟨111⟩ | 2.99 MeV | 1.0995 µm (733 × 15 Å) | 0° | 3000, 6000, 10995 |
 
 ## Arms
 
@@ -42,4 +42,26 @@ All-on fates come from the all-on arm's unit-weight events.
 
 ## Results
 
-Pending remote runs.
+Remote runs on qlmc at 07c0f5f3e (job arrays 6147–6162; drivers
+`checks/axial_depth_calibration_993{.sbatch,.sh}`; every arm's settings are in the record). Band 800 eV to
+$E_\max$ (10 keV for A and B). Joint confidence 0.95. Records:
+`docs/validation/check-records/axial-source/depth-calibration-993-{A,B}.json`.
+
+Bound $\varepsilon$ on the relative photon-source error, per interval
+$(c-15\,\text{Å}, c]$. Components (photons/sr per incident) are at 3000 Å.
+
+| Case | ε at 750 Å | ε at 1500 Å | ε at 3000 Å | Return | Unresolved | Grid | Source model | Reference LCB |
+|---|---|---|---|---|---|---|---|---|
+| A | 5.35% | 4.50% | 3.97% | 4.9e-6 | 1.15e-5 | 2.2e-6 | 2.2e-6 | 5.24e-4 |
+| B | 12.2% | 10.8% | 9.71% | 4.8e-6 | 4.6e-6 | 2.1e-6 | 2.8e-6 | 1.47e-4 |
+
+Every paired probe difference is within 1.6 SE of zero; the all-on interaction
+bound is about 2e-6 in both cases. The budget is therefore resolution-limited:
+it is set by $t$ = 3.42 times the paired SEs and by the fate terms, not by any
+resolved model change. Unresolved is the largest term in A, at
+$C_u F_u$ with $C_u = 6.6\times10^{-4}$ and $F_u^\text{ctl} = 0.87\%$.
+B carries about the same absolute bounds on a yield 3.5 times smaller.
+Doubling ratios are 0.92–1.03. More primaries would shrink every
+term except the fate cap terms.
+
+Case C is still running (as of 2026-11-08, 18:54 local).
