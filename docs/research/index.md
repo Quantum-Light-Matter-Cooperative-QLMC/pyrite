@@ -44,6 +44,7 @@ physics/transition-radiation-recommendations
 physics/optical-ir-emission
 physics/production-cherenkov
 physics/photon-transport
+physics/cxr-boundary-photon-source
 physics/photon-continuous-sources
 physics/photon-continuous-scoring
 physics/photon-scene-handoff
