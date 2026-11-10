@@ -17,6 +17,7 @@ detector-line-broadening
 detector-timepix
 grazing-reflectivity
 optical-instrument-observable
+optical-phase-retrieval
 pixel-angular-interpolation
 positioned-filter-attenuation
 ```

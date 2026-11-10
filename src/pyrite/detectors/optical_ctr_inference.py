@@ -31,6 +31,7 @@ from pathlib import Path
 import numpy as np
 from scipy.optimize import brentq, minimize_scalar
 
+from .optical_ctr_jitter import ChargeJitterModel, jitter_profile_at_sigma
 from .optical_energy import CalibratedPulseEnergyDetector
 from .optical_interferometer import (
     IdealMartinPuplett,
@@ -40,6 +41,7 @@ from .optical_interferometer import (
 )
 
 __all__ = [
+    "ChargeJitterModel",
     "GaussianCTRTemplates",
     "OpticalVoltageScan",
     "GaussianCTRFit",
@@ -51,6 +53,10 @@ __all__ = [
 _HBAR_EV_FS = 0.6582119569509067
 _ELECTRON_VOLT_J = 1.602176634e-19
 _DELTA_CHI2_95 = 3.841458820694124
+_STATISTICS = (
+    "Independent normal voltage errors, known variances; delta chi2 = 3.841 for one parameter; no systematic covariance",
+    "Normal readout errors plus port-correlated, parameter-dependent charge-jitter covariance; delta(-2 ln L) = 3.841 for one parameter; no other systematic covariance",
+)
 
 
 def _positive_increasing(e):
@@ -512,6 +518,7 @@ def fit_gaussian_ctr(
     scale_prior_rms_fraction: float | None = None,
     profile_points: int = 101,
     max_spectral_elements: int = 4_000_000,
+    charge_jitter: ChargeJitterModel | None = None,
 ) -> GaussianCTRFit:
     """Fit Gaussian RMS time and conditionally profile its 95% interval.
 
@@ -521,6 +528,13 @@ def fit_gaussian_ctr(
     Correlated/systematic errors and unknown spectral source shape are not
     absorbed into the statistical CI. The fit must not be reported as a unique
     bunch-profile reconstruction.
+
+    ``charge_jitter`` declares shot-to-shot population jitter of an averaged
+    scan (``optical_ctr_jitter``): the expected value takes the matching pair
+    factor, the two ports share a parameter-dependent jitter covariance, and
+    the profile is ``-2 ln L`` instead of chi-square (the reported
+    ``chi_square`` is then its quadratic form). Pass templates of the mean
+    bunch, not ones already processed by ``with_charge_jitter``.
 
     Validation: optical-instrument-observable
     """
@@ -542,8 +556,15 @@ def fit_gaussian_ctr(
     if data_count <= nuisance_count + 1:
         raise ValueError("insufficient scan points for Gaussian CTR fit")
 
+    if charge_jitter is not None:
+        if not isinstance(charge_jitter, ChargeJitterModel):
+            raise TypeError("charge_jitter must be a ChargeJitterModel")
+        if "shot-averaged charge jitter" in templates.provenance:
+            raise ValueError("templates already carry a charge-jitter pair factor")
+        incoherent_v = kernel @ templates.incoherent_photons_per_eV_per_pulse
+
     def profile(sigma):
-        return _profile_at_sigma(
+        plain = _profile_at_sigma(
             float(sigma),
             templates,
             kernel,
@@ -552,12 +573,26 @@ def fit_gaussian_ctr(
             fit_offsets=fit_offsets,
             scale_prior_rms_fraction=scale_prior_rms_fraction,
         )
+        if charge_jitter is None:
+            return (*plain, plain[0])
+        temporal = np.exp(-np.square(templates.energy_eV * float(sigma) / _HBAR_EV_FS))
+        coherent_v = kernel @ (templates.coherent_envelope_photons_per_eV_per_pulse * temporal)
+        return jitter_profile_at_sigma(
+            incoherent_v,
+            coherent_v,
+            scan,
+            charge_jitter,
+            fit_scale=fit_scale,
+            fit_offsets=fit_offsets,
+            scale_prior_rms_fraction=scale_prior_rms_fraction,
+            scale_guess=plain[1],
+        )
 
     grid, values = _refined_profile(profile, lower, upper, profile_points)
     idx = int(np.argmin(values))
     sigma = float(grid[idx])
-    chi2, scale, offsets, predicted = profile(sigma)
-    threshold = chi2 + _DELTA_CHI2_95
+    objective, scale, offsets, predicted, chi2 = profile(sigma)
+    threshold = objective + _DELTA_CHI2_95
     low_ci, high_ci, multimodal = _profile_interval(profile, grid, values, threshold)
     for p, detector in enumerate(detectors):
         if detector.saturation_v is not None and np.any(predicted[:, p] >= detector.saturation_v):
@@ -584,7 +619,12 @@ def fit_gaussian_ctr(
         "fit_offsets": fit_offsets,
         "scale_prior_rms_fraction": scale_prior_rms_fraction,
         "profile_points": profile_points,
-        "conditional_statistics": "Independent normal voltage errors, known variances; delta chi2 = 3.841 for one parameter; no systematic covariance",
+        "charge_jitter": None if charge_jitter is None else charge_jitter.describe(),
+        "profile_objective": "chi-square"
+        if charge_jitter is None
+        else "-2 ln L with parameter-dependent two-port jitter covariance",
+        "profile_objective_minimum": objective,
+        "conditional_statistics": _STATISTICS[charge_jitter is not None],
         "missing_band": "No data or source spectrum outside the supplied band; missing-band continuation and phase remain unspecified",
         "physical_normalization": "Templates already per physical bunch; no additional N or N(N-1) multiplier",
     }
@@ -606,7 +646,7 @@ def fit_gaussian_ctr(
             "Gaussian independent temporal offsets; sigma is RMS, not FWHM",
             "templates contain physical bunch population, transverse acceptance and polarization",
             "no missing-band extrapolation or unique-profile/phase reconstruction",
-            "conditional independent Gaussian voltage errors; no systematic covariance",
+            _STATISTICS[charge_jitter is not None],
             "ideal Jones Martin-Puplett transfer, calibration held fixed",
         ),
         metadata=json.loads(json.dumps(metadata, sort_keys=True)),

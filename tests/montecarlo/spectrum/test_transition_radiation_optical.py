@@ -634,3 +634,56 @@ def test_gold_transport_with_gold_optics_scene(gold_transported):
     # At 30 keV gold deflects within the optical skin depth: fixed trajectories refused.
     with pytest.raises(ValueError, match="formation-zone bound"):
         case_optical_transition(case, tp, layer_responses=(response,), source=one)
+
+
+def test_formation_length_is_a_path_length_for_oblique_crossings():
+    # Independent form: the own-field mismatch phase per unit path is
+    # |omega/beta - K . u| / (hbar c), K = (k_par, +-lambda).
+    from pyrite.montecarlo.spectrum.optical_transition_validity import (
+        HBARC_EV_ANG,
+        _formation_length,
+    )
+
+    omega = np.array([1.5, 2.5])
+    eps = [np.full(2, -2.55 + 3.6j)]
+    theta, beta = 0.9, 0.3284
+    k_par = omega[:, None] * np.array([[np.sin(theta), 0.0]])
+    tilt = np.array([0.0, 1.0, 1.4])
+    u = np.stack([np.sin(tilt) * 0.6, np.sin(tilt) * 0.8, np.cos(tilt)], axis=-1)
+    v = beta * u
+    q = (omega[:, None] - k_par @ v[:, :2].T) / v[:, 2]
+    side = np.zeros(3, dtype=int)
+    length, wavenumber = _formation_length(side, eps, omega, k_par, q, v)
+    lam = np.sqrt(eps[0][:, None] * omega[:, None] ** 2 - np.sum(k_par**2, axis=-1)[:, None])
+    along = omega[:, None] / beta - k_par @ u[:, :2].T
+    rate = np.minimum(np.abs(along - lam * u[:, 2]), np.abs(along + lam * u[:, 2]))
+    np.testing.assert_allclose(length, HBARC_EV_ANG / rate, rtol=1e-12)
+    np.testing.assert_allclose(length[:, 2] / length[:, 0] > 1.0, True)
+    np.testing.assert_allclose(
+        wavenumber[:, 0] * HBARC_EV_ANG,
+        omega * np.sqrt(np.sin(theta) ** 2 + np.abs(eps[0] - np.sin(theta) ** 2)),
+        rtol=1e-12,
+    )
+
+
+def test_phase_policy_also_bounds_the_current_direction_change():
+    # Slow charge, ||K|| L < 1: a kink at L/2 passes the phase test alone
+    # (||K|| D = 0.02) but turns the current by D / L = 0.2.
+    from types import SimpleNamespace
+
+    from pyrite.montecarlo.spectrum.optical_transition_validity import _phase_short
+
+    def crossing(bend):
+        kinks = np.zeros((1, 16, 2))
+        kinks[0, 0] = (50.0, bend)
+        kinks[0, 1] = (1e6, np.inf)  # usable path ends far outside L
+        return SimpleNamespace(
+            layer_before=np.array([0]), kinks_before_ang=kinks, kinks_after_ang=kinks
+        )
+
+    side = np.array([0])
+    length, wavenumber = np.array([[100.0]]), np.array([[1e-3]])
+    assert _phase_short(crossing(0.4), side, length, wavenumber, 0.1)[0, 0]
+    assert not _phase_short(crossing(0.1), side, length, wavenumber, 0.1)[0, 0]
+    # Fast charge, ||K|| L >> 1: the phase term decides.
+    assert _phase_short(crossing(0.1), side, length, np.array([[0.05]]), 0.1)[0, 0]

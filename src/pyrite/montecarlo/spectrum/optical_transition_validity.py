@@ -53,17 +53,24 @@ use outside it:
 direction change ends a straight run. With ``kink_phase_tol`` a side is
 instead short only where its usable path ends inside ``L`` (track end) or
 where the path within ``L`` departs from the straight extrapolation by more
-than that phase. For piecewise-straight unit-speed paths
+than that tolerance (in phase or in relative current direction). For piecewise-straight unit-speed paths
 ``r(s) - r_0(s) = sum_i (s - d_i)_+ dv_i`` (kink ``i`` at path distance
 ``d_i``), so ``|r(s) - r_0(s)| <= D(L) = sum_{d_i < L} (L - d_i) |dv_i|`` on
-``s <= L``; the side is short where ``||K|| D(L) > kink_phase_tol`` with the
-side medium's wave vector ``K = (k_par, lambda)`` and
-``||K||^2 = |k_par|^2 + |lambda|^2``. Arc length fixes the time, so this
-bounds the change of ``K . r`` in the own-field phase. The geometry bound is
-exact; treating a sub-tolerance phase as straight is the heuristic, and the
-factor-2 term then applies only to sides judged short. ``kink_phase_tol = 0``
-reproduces the default policy exactly. Kinks beyond ``KINK_SLOTS`` end the
-path (conservative).
+``s <= L``; the side is short where
+``max(||K||, 1/L) D(L) > kink_phase_tol`` with the side medium's wave vector
+``K = (k_par, lambda)`` and ``||K||^2 = |k_par|^2 + |lambda|^2``. At constant
+speed arc length fixes the time, so ``||K|| D`` bounds the change of
+``K . r`` in the own-field phase; ``D / L`` is the scale of the relative
+change of the current direction over the zone, which dominates for
+``||K|| L < 1`` (slow charges). The displacement bound is exact; treating a
+sub-tolerance side as straight is the heuristic, and the factor-2 term then
+applies only to sides judged short. ``kink_phase_tol = 0`` reproduces the
+default policy (up to rounding of the two path distances). Kinks beyond
+``KINK_SLOTS`` end the path (conservative).
+
+``L`` is a path length in both policies: the formation depth
+``1 / min|q -+ lambda|`` along the normal divided by ``|u_z|`` of the
+crossing direction. Energy loss inside ``L`` is not modeled.
 
 ``formation_error_bound`` concerns the self (single-history) power;
 ``coherent_formation_error_bound`` propagates the same per-history bound
@@ -232,7 +239,7 @@ def _crossing_parts(crossings, photon_energy_eV, direction, layer_eps, kink_phas
         own[:, column] = 1.0
         part = interface_transition_radiation_amplitude(*args, own_field_sides=own)
         magnitude = np.linalg.norm((part * scale).reshape(omega.size, len(crossings), 3), axis=-1)
-        length, wavenumber = _formation_length(side, eps_slab, omega, k_par, q)
+        length, wavenumber = _formation_length(side, eps_slab, omega, k_par, q, v)
         if kink_phase_tol is None:
             short = _side_runs(crossings, side)[None, :] < length
         else:
@@ -242,10 +249,13 @@ def _crossing_parts(crossings, photon_energy_eV, direction, layer_eps, kink_phas
     return shape, total.reshape(omega.size, len(crossings), 3), error
 
 
-def _formation_length(side, eps_slab, omega, k_par, q):
-    """Formation length ``max(1/|q - lambda|, 1/|q + lambda|)`` and ``||K||`` [1/Å].
+def _formation_length(side, eps_slab, omega, k_par, q, velocity):
+    """Formation *path* length ``L`` [Å] and ``||K||`` [1/Å], both ``(B, K)``.
 
-    Both ``(B, K)`` for each crossing's side medium; zero in vacuum.
+    ``max(1/|q - lambda|, 1/|q + lambda|)`` is a depth along the normal
+    (``q`` and ``lambda`` are z wave numbers); the mismatch phase accumulates
+    over the path length ``depth / |u_z|``, the quantity comparable with the
+    transported straight runs and kink distances. Zero in vacuum.
     """
     length = np.zeros(q.shape)
     wavenumber = np.zeros(q.shape)
@@ -256,7 +266,8 @@ def _formation_length(side, eps_slab, omega, k_par, q):
         qm = q[:, mask]
         length[:, mask] = HBARC_EV_ANG / np.minimum(np.abs(qm - lam), np.abs(qm + lam))
         wavenumber[:, mask] = np.sqrt(k2 + np.abs(lam) ** 2) / HBARC_EV_ANG
-    return length, wavenumber
+    cos_normal = np.abs(velocity[:, 2]) / np.linalg.norm(velocity, axis=-1)
+    return length / cos_normal[None, :], wavenumber
 
 
 def _phase_short(crossings, side_layer, length, wavenumber, tol):
@@ -273,7 +284,10 @@ def _phase_short(crossings, side_layer, length, wavenumber, tol):
     reach = np.clip(length[..., None] - distance[None], 0.0, None)  # (B, K, S)
     with np.errstate(invalid="ignore"):
         displacement = np.sum(np.where(bend > 0, reach * bend, 0.0), axis=-1)
-    short = (path[None, :] < length) | (wavenumber * displacement > tol)
+    # Phase change ||K|| D and direction change D / L of the source current.
+    with np.errstate(divide="ignore"):
+        rate = np.maximum(wavenumber, np.where(length > 0, 1.0 / length, 0.0))
+    short = (path[None, :] < length) | (rate * displacement > tol)
     return short & (side_layer != VACUUM)[None, :]
 
 

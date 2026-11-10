@@ -19,7 +19,7 @@ electron to ``d^2W/(domega dOmega)`` in Gaussian units: ``x pi^2 hbar E /
 
 Data: ``tests/data/optical/schroeder-2004-fig3.json`` (digitized by the
 repository owner). The divergent (solid) curve departs below 0.08 rad by up to
-18 %; an independent quadrature of the paper's own Eqs. (17)/(18) departs from
+about 20 %; an independent quadrature of the paper's own Eqs. (17)/(18) departs from
 it identically, so that part is a figure/equation discrepancy of the source and
 is excluded.
 

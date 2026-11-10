@@ -180,18 +180,19 @@ def _aperture_band(**kw):
     )
 
 
-def test_aperture_band_converges_and_is_a_lambda_dependent_hemisphere_fraction():
-    result = _aperture_band()
+def test_single_refinement_is_a_lambda_dependent_hemisphere_fraction_not_convergence():
+    result = _aperture_band(refinements=1)
     assert [row[0] for row in result.energy_rows] == [3, 5]
     assert [row[0] for row in result.detector_rows] == pytest.approx([1e-7, 5e-8])
     assert [row[0] for row in result.source_rows] == pytest.approx([1e-7, 5e-8])
-    assert result.detector_pointwise_change < 2e-3 and result.source_pointwise_change < 1e-3
-    assert result.energy_relative_change < 1e-2 and result.converged
-    assert not _aperture_band(rtol=1e-4).converged
+    assert result.detector_pointwise_change < 2e-3 and result.source_pointwise_change < 3e-4
+    # One step of a non-monotone axis cannot certify convergence (see the slow test).
+    assert not result.converged
     # Each node is the window-free direct Green collection of that energy.
     screen = PECCircularScreen(outer_radius_m=1e-6, beta_z=-0.95)
     node = circular_pec_transition_field(1.5, screen, nx=32, ny=32, dx_m=0.1e-6, dy_m=0.1e-6)
     direct = collect_screen_green(node, plane_z_m=0.5e-6, aperture=_APERTURE, pitch_m=0.1e-6)
+    assert result.energy_eV[2] == 1.5
     assert result.photons_per_eV[2] == pytest.approx(direct.photons_per_eV, rel=1e-12)
     # A finite aperture collects a wavelength-dependent part of the hemisphere.
     from pyrite.montecarlo.spectrum.optical_finite_convergence import (
@@ -203,6 +204,19 @@ def test_aperture_band_converges_and_is_a_lambda_dependent_hemisphere_fraction()
     )
     fraction = result.photons_per_eV / hemi.photons_per_eV
     assert np.all((fraction > 0.5) & (fraction < 1.0)) and np.ptp(fraction) > 0.01
+
+
+@pytest.mark.slow
+def test_aperture_band_converges_over_two_refinements_of_each_axis():
+    result = _aperture_band()
+    assert [row[0] for row in result.energy_rows] == [3, 5, 9]
+    assert [row[0] for row in result.source_rows] == pytest.approx([1e-7, 5e-8, 2.5e-8])
+    assert result.energy_relative_change < 1e-3 and result.converged
+    # The source staircase is not monotone: the first halving (1.6e-4) understates the
+    # second (1.3e-3), and the reported change is the larger one.
+    assert 1e-3 < result.source_pointwise_change < 2e-3
+    assert result.detector_pointwise_change < 2e-3
+    assert not _aperture_band(rtol=1e-4).converged
 
 
 def test_aperture_band_refuses_bad_controls():

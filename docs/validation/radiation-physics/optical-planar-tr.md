@@ -206,3 +206,149 @@ For $w=+k/\beta$, the factor $(1-\beta^2+\beta\sqrt{\varepsilon-\sin^2\theta})/(
 ### Owner disposition (2026-11-09)
 
 `anchored` kept. The ledger notes now record that the Fig. 4c comparison was reviewed, that the sinθ reading is inferred from the data, and what the comparison leaves unconstrained. They also record that the RMP check is a transcription of the same physics, that Eq. (56) omits sinθ in the arXiv preprint, and that the cause of 0.696 is unknown. The 900 nm value at 84° (owner 0.411, reviewer 0.369) is left as digitized; the test tolerance (RMS < 0.065) covers it.
+
+## Phase formation policy (fresh-context review, 2026-11-09)
+
+Scope: the opt-in `kink_phase_tol` / `formation_kink_phase` policy of `formation_error_bound` and `coherent_formation_error_bound`, reviewed at `d882faf32`. The derivation below was written before the implementation was opened.
+
+### Independent derivation
+
+**Geometry.** Let $s$ be the path length from the crossing and $\hat{\mathbf u}(s)$ the piecewise-constant unit direction, $\hat{\mathbf u}_0$ at the crossing, with kinks $\Delta\hat{\mathbf u}_i=\hat{\mathbf u}_i-\hat{\mathbf u}_{i-1}$ at $s=d_i$. Then
+
+$$
+\mathbf d(s)\equiv\mathbf r(s)-\hat{\mathbf u}_0 s=\int_0^s\bigl(\hat{\mathbf u}(s')-\hat{\mathbf u}_0\bigr)\,ds'=\sum_i (s-d_i)_+\,\Delta\hat{\mathbf u}_i ,
+$$
+
+and the triangle inequality gives, for every $s\le L$,
+
+$$
+|\mathbf d(s)|\le\sum_i(s-d_i)_+|\Delta\hat{\mathbf u}_i|\le D(L)\equiv\sum_{d_i<L}(L-d_i)\,|\Delta\hat{\mathbf u}_i| ,\qquad |\Delta\hat{\mathbf u}_i|=2\sin(\theta_i/2).
+$$
+
+$D$ is non-decreasing in $L$. It is an upper bound, not the displacement: it is attained for a single kink and for coplanar same-sense kinks, and it stays positive when later kinks restore the original direction or position. The chord $2\sin(\theta_i/2)$ is the correct weight; $\sin\theta_i$ would not bound the displacement.
+
+**Phase.** The own-field source phase is $\omega t-\mathbf K\cdot\mathbf r$. At constant speed $t=s/v$ on the bent and on the straight path alike, so the $\omega/v$ term cancels at equal $s$ and the phase difference is $-\mathbf K\cdot\mathbf d(s)$. The wave vector is that of the free wave in the side medium, $\mathbf K=(\mathbf k_\parallel,\pm\lambda)$, with real $\mathbf k_\parallel$ and complex $\lambda=\sqrt{\varepsilon\omega^2-k_\parallel^2}$. For real $\mathbf d$, Cauchy–Schwarz gives
+
+$$
+|\mathbf K\cdot\mathbf d|\le\|\mathbf K\|\,|\mathbf d|,\qquad \|\mathbf K\|^2=k_\parallel^2+|\lambda|^2=\omega^2\bigl(\sin^2\theta+|\varepsilon-\sin^2\theta|\bigr)\ge|\varepsilon|\omega^2 .
+$$
+
+This Hermitian norm is the one that makes the bound rigorous in an absorbing medium; it bounds the modulus of the complex phase change (real phase and attenuation together), with $|e^{-i\mathbf K\cdot\mathbf d}-1|\le e^{\|\mathbf K\|D}-1$. $|n|\omega$ or $\operatorname{Re}n\,\omega$ would be too small. Energy loss inside $L$ (a change of $v$) is not covered.
+
+**Path length of the formation zone.** The mismatch phase is $(q\mp\lambda)z=(\omega-\mathbf K\cdot\mathbf v)\,s/\beta$, so $L=\hbar c/|q\mp\lambda|$ is a depth along the normal. The path length over which the same phase accumulates is
+
+$$
+\boxed{L_s=\frac{L}{|\hat u_{0z}|}} .
+$$
+
+Distances $d_i$ are path lengths, so the displacement bound that covers the formation zone is $D(L_s)$, not $D(L)$.
+
+**Tolerance 0.** With $|\Delta\hat{\mathbf u}_i|>0$ for every listed kink and $\|\mathbf K\|>0$, $\|\mathbf K\|D(L)>0$ holds exactly when some kink has $d_i<L$, so "path ends inside $L$ or $\|\mathbf K\|D(L)>0$" equals "straight run $<L$". A kink at $d_i=L$ gives zero in both. A zero-angle kink would break the equality only if it ended a default run.
+
+**What the phase test does not bound.** The source is the current $\hat{\mathbf u}(s)e^{i(\omega s/\beta-\mathbf K\cdot\mathbf r)}$. A kink also changes the vector factor, by a relative amount of order $D(L)/L$ over the zone. This exceeds $\|\mathbf K\|D(L)$ whenever $\|\mathbf K\|L<1$.
+
+### Comparison with the implementation
+
+| Term | Independent | Code | Result |
+|---|---|---|---|
+| Kink weight | $2\sin(\theta_i/2)$ | `jump = norm(v_hat[1:] - v_hat[:-1])` in `_kink_lists` | match |
+| Displacement | $\sum_{d_i<L}(L-d_i)|\Delta\hat{\mathbf u}_i|$, upper bound | `sum(clip(length - distance, 0) * bend)` in `_phase_short` | match |
+| Wave-vector norm | $\sqrt{k_\parallel^2+|\lambda|^2}$ | `sqrt(k2 + abs(lam)**2) / HBARC_EV_ANG` | match |
+| Units | Å, 1/Å, rad | `length` [Å], `wavenumber` [1/Å], `kink_phase_tol` [rad] | match |
+| Time lag | cancels at equal $s$ (constant speed) | not present; docstring "Arc length fixes the time" | match |
+| Path end, slot overflow | short if the usable path ends inside $L$ | `path < length`; 16th kink becomes the path end | match, conservative |
+| Zero-angle kinks | must not be listed | same `> 1e-12` component test as `_straight_runs` | match |
+| Formation distance along the path | $L/|\hat u_{0z}|$ | `length` (depth) compared with path distances | **differs by $1/|\hat u_{0z}|$** |
+| Current direction term $D/L$ | not bounded by the phase test | not tested | undocumented limit of the heuristic |
+
+### Numerical evidence
+
+Scripts: `scratch/phase_policy_review.py`, `scratch/phase_policy_scene.py` (not committed).
+
+- 20 000 random three-dimensional polylines (1–11 kinks, turn scale $10^{-3}$ to isotropic, random $L$): $\max_{s\le L}|\mathbf d(s)|/D(L)\le1.000000$, no violation. With random complex $\varepsilon$ ($\operatorname{Re}\in[-30,10]$, $\operatorname{Im}\in[0,30]$) and both signs of $\lambda$ (40 000 cases): $\max|\mathbf K\cdot\mathbf d|/(\|\mathbf K\|D)=0.9966$, no violation. Replacing the norm by $|n|\omega$ gives 130 violations, worst ratio 2.04.
+- `_kink_lists` and `_phase_short` against an independent row walk and against `_straight_runs`, on 300 random multi-track scenes: 0 mismatches in 245 221 comparisons (tolerances 0, 0.01, 0.1, 1; tolerance 0 against the default). The short set shrinks monotonically with the tolerance.
+- The first-kink distance and the default run are computed by different floating-point expressions and differ by up to $1.2\times10^{-10}$ relative in these scenes. With $L$ placed within one ulp of the run, tolerance 0 and the default disagree in 34 610 of 144 000 cases. The equality is therefore exact mathematically and up to rounding of the two distances; it is not bit-exact for $L$ inside that window.
+- `_formation_length` for gold-like $\varepsilon=-2.55+3.6i$ at 2.5 eV, $\theta=0.9$ rad, $\beta=0.3284$: path formation length over the coded `length` is 1.000, 2.000 and 5.759 at 0°, 60° and 80° from the normal, equal to $1/|\hat u_{0z}|$. $\|\mathbf K\|L$ is 0.79, 0.54 and 0.19.
+- Test scenes, self bound at the four test energies, as coded and with `length` divided by $|\hat u_{0z}|$:
+
+| Scene | Policy | As coded | With $L/|\hat u_{0z}|$ |
+|---|---|---|---|
+| HOPG transport, Au optics | default / tolerance 0 | 0.018, 0.056, 0.171, 0.138 | unchanged |
+| HOPG transport, Au optics | 0.1 rad | 0 | 0 |
+| Gold | default / tolerance 0 | 0.178, 0.460, 1.467, 1.117 | 0.246, 0.617, 1.835, 1.364 |
+| Gold | 0.1 rad | 0.057, 0.111, 0.567, 0.227 | 0.216, 0.483, 1.507, 1.173 |
+
+  The documented 0.171, 1.47 and 0.57 reproduce. The gold scene has crossings down to $|\hat u_{0z}|=0.13$ (obliquely exiting backscatter).
+- One kink at $L/2$, real $n=1.5$, relative change of $\int_0^L\hat{\mathbf u}\,e^{i(\omega s/\beta-\mathbf K\cdot\mathbf r)}ds$: at $\beta=0.33$, turn 0.1 rad, $\|\mathbf K\|D=0.049$ and the change is 0.052; at $\beta=0.05$, turn 2 rad, $\|\mathbf K\|D=0.068$ and the change is 0.87; at $\beta=0.02$, full reversal, $\|\mathbf K\|D=0.031$ and the change is 1.03. The change follows $D/L$, not $\|\mathbf K\|D$.
+
+The focused tests (`-k "kink or formation"`) pass: 4 passed.
+
+### Findings
+
+1. **Medium, discrepancy.** `optical_transition_validity.py:257` returns the depth $L=\hbar c/|q\mp\lambda|$; `:237` (default) and `:273`–`:276` (phase policy) compare it with path lengths. The first divergent factor is $1/|\hat u_{0z}|$. Both policies are anti-conservative for oblique crossings, and the phase policy more so because $D$ grows with the reach. Gold scene at 0.1 rad and 2.5 eV: 0.567 as coded, 1.507 with the path formation length. The default policy inherits the same factor (1.467 against 1.835); the earlier reviews did not check it. Normal-incidence entry crossings are unaffected, so the HOPG numbers stand.
+2. **Low to medium, wording and scope of the heuristic.** The phase test does not bound the change of the current direction, of relative size $D(L)/L$. For $\|\mathbf K\|L<1$ this term is the larger one, and for slow charges ($\|\mathbf K\|L\approx\beta|n|$) even a reversal inside $L$ passes a 0.1 rad tolerance. The module docstring (`:52`–`:66`) and the physics page (`optical-transition-radiation.md:177`–`:192`) name only "sub-tolerance phase is straight" as the heuristic. A test on $\max(\|\mathbf K\|,1/L)\,D(L)$ would cover both terms.
+3. **Informational.** "Tolerance 0 reproduces the default exactly" is true mathematically and in every randomized comparison, but the two distances come from different floating-point expressions (`transition_radiation_crossings.py:339`–`:346` against `:372`–`:373`), so it is not bit-exact when $L$ falls within rounding of a run. The `assert_array_equal` in the test is safe in practice.
+4. **Informational.** Constant speed inside $L$ is assumed and not stated as an assumption; the bound uses the crossing's kinetic energy.
+
+### Wording
+
+"Exact displacement bound, heuristic acceptance" is accurate for the inequality $|\mathbf r(s)-\mathbf r_0(s)|\le D(L)$ on $s\le L$ and for $\|\mathbf K\|$. It is not accurate as a statement about the formation zone until $L$ is converted to a path length (finding 1), and "exact geometry" should not be read as covering the current direction (finding 2).
+
+### Verdict
+
+**discrepancy** for the phase-policy sub-claim: the factor $1/|\hat u_{0z}|$ between the coded formation depth and the path distances it is compared with. The displacement bound, the wave-vector norm, the units, the tolerance-0 reduction, the `None` default and the monotonicity are rederived and match. Suggested ledger note: record the phase policy as reviewed with this discrepancy open; the status change belongs to the task owner.
+
+### Owner disposition (2026-11-09)
+
+- Finding 1 fixed: `_formation_length` returns the path length $L/|\hat u_{0z}|$, used by both policies. Pinned by `test_formation_length_is_a_path_length_for_oblique_crossings` against the independent per-path mismatch rate $|\omega/\beta-\mathbf K\cdot\hat{\mathbf u}|$. The scene values equal the reviewer's right-hand column: HOPG 0.171 unchanged; gold default 1.835.
+- Finding 2 adopted: the phase policy tests $\max(\|\mathbf K\|,1/L)\,D(L)$. Gold at 0.1 rad is 0.216, 0.509, 1.507, 1.173; HOPG stays 0. The acceptance step remains a heuristic.
+- Findings 3 and 4 recorded in the module docstring and the physics page (rounding of the two distances; constant speed inside $L$).
+- The corrected code was re-reviewed below (2026-11-09 re-review). Scored spectra are unaffected; only the validity bound and refusals change. Ledger status unchanged.
+
+
+## Formation path length (re-review, 2026-11-09)
+
+Scope: commit `79cdd48e7`, which changes `_formation_length`, `_crossing_parts`, `_phase_short`, the module docstring, and adds `test_formation_length_is_a_path_length_for_oblique_crossings`. The derivation was written before the diff was opened.
+
+### Independent derivation
+
+A charge moves with speed $\beta c$ along the unit direction $\hat{\mathbf u}$, so $\mathbf r=s\hat{\mathbf u}$ and $t=s/(\beta c)$ at path length $s$. Its field at frequency $\omega$ is compared with a free wave $\mathbf K=(\mathbf k_\parallel,\pm\lambda)$ of the side medium, with $\lambda=\sqrt{\varepsilon\omega^2-k_\parallel^2}$ complex (units $\hbar=c=1$, as in the code). The mismatch phase along the path is
+
+$$
+\omega t-\mathbf K\cdot\mathbf r=s\Bigl(\frac{\omega}{\beta}-\mathbf k_\parallel\cdot\hat{\mathbf u}_\parallel\mp\lambda\hat u_z\Bigr),
+\qquad
+L_s^{\pm}=\frac{1}{\bigl|\omega/\beta-\mathbf k_\parallel\cdot\hat{\mathbf u}_\parallel\mp\lambda\hat u_z\bigr|}.
+$$
+
+The modulus includes attenuation, as in the earlier reviews. The interface wave number of the particle field is $q=(\omega-\mathbf k_\parallel\cdot\mathbf v_\parallel)/v_z$ with $\mathbf v=\beta\hat{\mathbf u}$. Multiplying gives
+
+$$
+\hat u_z(q\mp\lambda)=\frac{\omega}{\beta}-\mathbf k_\parallel\cdot\hat{\mathbf u}_\parallel\mp\lambda\hat u_z
+\quad\Rightarrow\quad
+L_s^{\pm}=\frac{1}{|\hat u_z|\,|q\mp\lambda|}=\frac{L_z^{\pm}}{|\hat u_z|}.
+$$
+
+This holds identically for either sign of $\hat u_z$ and for either branch of $\lambda$, because the set $\{q-\lambda,\ q+\lambda\}$ is invariant under $\lambda\to-\lambda$. Taking $\max_\pm L_s^\pm$ commutes with the division. Any frame map that is a rotation or reflection preserving the $z$ axis up to sign (such as $\pi$ about $x$) leaves $|\hat u_z|=|v_z|/|\mathbf v|$, $\mathbf k_\parallel\cdot\mathbf v_\parallel$ and $q\,v_z$ unchanged when $\mathbf n$, $\mathbf v$ and $q$ are transformed together. Both sides of the interface share the crossing velocity, so the conversion is the same for the before and after sides.
+
+### Comparison
+
+- `_formation_length` returns `HBARC_EV_ANG / min(|q - lam|, |q + lam|) / (|v_z| / |v|)`, which equals $\max_\pm L_s^\pm$. `velocity` is `frame.velocity` $=\beta\hat{\mathbf u}\cdot$`_FLIP` (diag $(1,-1,-1)$ for backward emission), and `q` is built from the same flipped `v` and `k_par`, so $|v_z|/|\mathbf v|=|\hat u_z|$ in both hemispheres. **Match.**
+- `_crossing_parts`: the default policy compares the path length with `_side_runs` (path lengths), and the phase policy feeds it to `_phase_short`. Both now use the path length. **Match.**
+- `_phase_short`: `reach = clip(L - d_i)` uses path distances on both sides, consistent with $D(L_s)$. `rate = max(||K||, 1/L)` covers the phase term $\|\mathbf K\|D$ and the direction term $D/L$, in 1/Å matching `wavenumber`. At tolerance 0, every listed kink with $d_i<L$ still gives a positive product, so the default is reproduced. **Match** (the acceptance step remains a heuristic).
+- Docstring (lines 52–73): consistent with the code. Line 53 ("departs … by more than that phase") predates the $D/L$ term, but the following sentences state it.
+
+### Numerical evidence
+
+Script `scratch/v2_formation_path.py` (not committed). It draws 2000 random cases of 6 crossings and 3 energies, with $\beta\in[0.02,0.999]$, isotropic $\hat{\mathbf u}$ (both signs of $\hat u_z$), complex $\varepsilon$ with $\operatorname{Re}\in[-30,10]$ and $\operatorname{Im}\in[0,30]$, and emission into both hemispheres. Each is evaluated in three frames: identity, $\operatorname{diag}(1,1,-1)$, and $\operatorname{diag}(-1,1,-1)$. The code's length times my per-path rate equals $\hbar c$ to a worst relative error of $3.5\times10^{-14}$. The focused tests (`-k "kink or formation"`) pass: 5 passed.
+
+### Test independence
+
+The reference $|\omega/\beta-\mathbf k_\parallel\cdot\hat{\mathbf u}_\parallel\mp\lambda\hat u_z|$ is a different expression from the code's $|q\mp\lambda|/|\hat u_z|$, so it pins the $1/|\hat u_z|$ factor. It is not fully independent: the test builds `q` with the same convention it feeds to the function, and it covers only $\hat u_z>0$, one side and the forward frame. The algebra above shows that the other cases are equivalent. Nothing pins the new $D/L$ term in `_phase_short`: no test is in the regime $1/L>\|\mathbf K\|$ with a sub-$L$ kink. Exact $v_z=0$ would give $0/0$, but a crossing cannot have $v_z=0$ (informational).
+
+### Verdict
+
+- **Claim**: `optical-planar-tr` — `optical_transition_validity.py::{_formation_length, _crossing_parts, _phase_short}` — own-field formation path length.
+- **Filters**: units pass (Å, 1/Å, rad); limits pass (normal incidence unchanged; tolerance 0 equals the default); signs/conventions pass (both $\hat u_z$ signs, both $\lambda$ branches, both hemispheres).
+- **Re-derivation**: `matches`. The earlier discrepancy (factor $1/|\hat u_{0z}|$) is resolved in both policies.
+- **Verdict**: `rederived` for the corrected formation-validity code.
+- **Suggested ledger change**: replace "The corrected validity code is not yet re-reviewed" with "re-reviewed `rederived` at `405d97a44` (path length $L_z/|\hat u_z|$ in both policies, both hemispheres; $D/L$ term not separately pinned)". Keep the status `anchored`. Optionally, add a slow-charge test of the $D/L$ term.
