@@ -131,6 +131,9 @@ _PIXEL_SCORER_KEYS = frozenset({"reconstruction", "angular_shape"})
 _OBSERVATION_RESPONSE_KEYS = frozenset(
     {"kind", "thickness_um", "bias_v", "dE_mc", "dE_out", "n_mc", "seed", "numerics"}
 )
+_ALEXS_RESPONSE_KEYS = frozenset(
+    {"kind", "sensor_format", "sensor_code", "readout_rate_hz", "gain_mode", "qe_curve"}
+)
 _ACQUISITION_KEYS = frozenset(
     {
         "reporting_bins",
@@ -716,10 +719,12 @@ def _parse_observation_response(
     row = _table(raw, path, errors)
     if row is None:
         return None
-    errors.keys(row, path, set(_OBSERVATION_RESPONSE_KEYS))
     kind = row.get("kind")
+    if kind == "alexs":
+        return _parse_alexs_response(row, path, errors)
+    errors.keys(row, path, set(_OBSERVATION_RESPONSE_KEYS))
     if kind not in {"ideal", "timepix3"}:
-        errors.add(f"{path}.kind", "must be 'ideal' or 'timepix3'")
+        errors.add(f"{path}.kind", "must be 'ideal', 'timepix3' or 'alexs'")
         return None
     extra = set(row) - {"kind"}
     if kind == "ideal" and extra:
@@ -754,6 +759,43 @@ def _parse_observation_response(
     nested = _parse_nested_timepix_numerics(row, path, errors)
     if nested is not None:
         cleaned["numerics"] = nested
+    return MappingProxyType(cleaned)
+
+
+def _parse_alexs_response(
+    row: Mapping[str, object], path: str, errors: _Errors
+) -> Mapping[str, object] | None:
+    """Validate an ALEX-s CCD response declaration (parser half, issue #1080).
+
+    ``qe_curve`` stays a curve name here; the catalog loader resolves it
+    against the owning catalog's ``curves/`` directory.
+    """
+    errors.keys(row, path, set(_ALEXS_RESPONSE_KEYS))
+    for key in ("sensor_format", "sensor_code", "readout_rate_hz", "gain_mode"):
+        if key not in row:
+            errors.add(f"{path}.{key}", "missing required key")
+    cleaned: dict[str, object] = {"kind": "alexs"}
+    if "sensor_format" in row:
+        sensor_format = _pair(row["sensor_format"], f"{path}.sensor_format", errors, integer=True)
+        if sensor_format is not None:
+            cleaned["sensor_format"] = sensor_format
+    for key in ("sensor_code", "gain_mode", "qe_curve"):
+        if key not in row:
+            continue
+        value = row[key]
+        if not isinstance(value, str) or not value.strip():
+            errors.add(f"{path}.{key}", "must be a nonempty string")
+        else:
+            cleaned[key] = value.strip()
+    if "readout_rate_hz" in row:
+        rate = _unit_number(
+            row["readout_rate_hz"], f"{path}.readout_rate_hz", errors, "Hz", expected="frequency"
+        )
+        if rate is None or rate <= 0:
+            if not errors.has(f"{path}.readout_rate_hz"):
+                errors.add(f"{path}.readout_rate_hz", "must be a finite positive number in Hz")
+        else:
+            cleaned["readout_rate_hz"] = rate
     return MappingProxyType(cleaned)
 
 

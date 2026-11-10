@@ -28,7 +28,10 @@ catalog/
   numerics/<name>.toml    # named numerics presets (ADR-0021)
   filters/<name>.toml     # named finite downstream plates or sequences (issue #665)
   targets/<name>.toml     # named scalar slab/stack targets (issue #665)
+  gratings/<name>.toml    # named diffraction gratings and mounts (issue #1080)
   profiles/<name>.toml    # profile fields plus its [overrides.MATERIAL] tables
+  cifs/                   # catalog-owned CIF structures
+  curves/<name>.csv       # tabulated instrument curves, or curves/<name>.toml
   energy-grid-artifacts/  # immutable line-grid artifacts, not catalog source
 ```
 
@@ -48,12 +51,13 @@ schema_version = 1
 [numerics.NAME]      # reusable sampling, integration and grid policy
 [filters.NAME]       # reusable downstream finite plate or plate sequence
 [targets.NAME]       # reusable scalar slab or stack target
+[gratings.NAME]      # diffraction grating and spectrometer mount record
 [crystals.NAME]      # CIF-backed crystalline phase
 [media.NAME]         # amorphous composition
 [materials.NAME]     # runnable film or stack
 ```
 
-`profiles`, `crystals`, `media`, and `materials` are required. `beams`, `detectors`, `physics`, and `numerics` are optional. `energy_grids` is accepted only as a legacy compatibility input; new grids are immutable artifacts referenced from profiles.
+`profiles`, `crystals`, `media`, and `materials` are required. `beams`, `detectors`, `physics`, `numerics`, `filters`, `targets`, and `gratings` are optional. `energy_grids` is accepted only as a legacy compatibility input; new grids are immutable artifacts referenced from profiles.
 
 Bundled profiles contain neither artifact references nor legacy line rows, so every bundled material uses automatic case-local line grids. For an opt-in fixed grid, line rows resolve from the selected profile's artifact reference for that material, then its own `[energy_grids.MATERIAL]` legacy table. There is no cross-material fallback: profile-named tables, including `[energy_grids.standard]`, do not supply or seed another material's rows. Explicit fixed line grids remain supported. Without a fixed grid, all energies use the existing automatic `sinc-nyquist` resolution and `kinematic-ceiling` bandwidth policy from the case's own material and trajectories. Derivation is not a prerequisite.
 
@@ -194,3 +198,101 @@ override plate fields; a sequence reference accepts only `ref` and expands in
 place, keeping each member's absolute pose. Only expanded plate values enter
 observation identity. `pyrite.geometry.load_filter` returns one plate and
 rejects a sequence; `load_filters` returns an ordered tuple for either form.
+
+## Instrument curves and gratings
+
+These records let a laboratory keep instrument data, including confidential
+datasheet curves, in a private catalog layer (see
+[private instrument catalogs](../reference/catalogs-and-workspaces.md#private-instrument-catalogs)).
+They are validated declarative data; the ALEX-s CCD response and grating
+physics that consume them are tracked in issue #1081.
+
+### Tabulated curves
+
+A curve is a dimensionless response (`quantity` is `efficiency`,
+`quantum_efficiency`, `transmission` or `reflectance`) sampled on an energy or
+wavelength abscissa. Objects reference it by name; `NAME` resolves to exactly
+one of `curves/NAME.csv` or `curves/NAME.toml` under the catalog root that owns
+the referencing object file (the user layer for user objects). Curve files and
+the `curves/` directory may not be symlinks, and the resolved path must stay
+inside `curves/`.
+
+CSV form: `#` comment lines carrying TOML `key = value` provenance, one header
+row `<energy|wavelength> [<unit>], value [<unit>]` (the value unit is optional
+and defaults to dimensionless), then two numbers per row:
+
+```text
+# source = "Detector datasheet, document ID"
+# revision = "B"
+# digitization = "WebPlotDigitizer, 1 nm steps"
+# confidential = true
+# quantity = "quantum_efficiency"
+wavelength [nm], value [percent]
+10.0, 20.0
+20.0, 50.0
+```
+
+TOML form: the same provenance keys at top level, plus `abscissa`
+(`"energy"` or `"wavelength"`), `abscissa_unit`, optional `value_unit`, and
+equal-length `x` and `y` arrays.
+
+| Key | Required | Meaning |
+|---|---|---|
+| `source` | yes | Source document (title or identifier) |
+| `revision` | no | Source document revision |
+| `digitization` | yes | How the numbers were obtained |
+| `confidential` | yes | `true` when the source must not be published |
+| `quantity` | yes | One of the four dimensionless quantities above |
+| `label` | no | Display text |
+
+Units convert through the shared Pint registry: energies to eV, wavelengths to
+energy by `E = hc/λ`, and values to a fraction (`percent` is accepted). The
+abscissa must be finite and strictly increasing in file order, at least two
+rows are required, and converted values must lie in `[0, 1]`. The loaded
+`MaterialCatalog.curves` maps each referenced curve name to a record whose
+`energy_eV` ascends, with values reordered to match.
+
+### Gratings
+
+```toml
+[gratings.example-ff]
+label = "Example flat-field grating"
+groove_density_per_mm = 1200   # positive, 1/mm
+order = -1                     # nonzero integer
+order_convention = "sum"       # m λ = d (sin α + sin β); "difference": d (sin α − sin β)
+coating = "Au"                 # optional display text
+blank_mm = [30.0, 50.0]        # optional width and height
+efficiency_curve = "example-ff-efficiency"   # optional curve name
+
+[gratings.example-ff.mount]
+r_mm = 350.0                   # entrance arm, required
+alpha_deg = 85.0               # incidence angle from the grating normal, required
+band_nm = [5.0, 20.0]          # band ends, required by r_prime_mm / beta_deg
+r_prime_mm = [470.0, 460.0]    # exit arm at the two band ends
+beta_deg = [-80.0, -75.0]      # diffraction angle at the two band ends
+beta_H_deg = -78.0             # optional
+r_H_prime_mm = 465.0           # optional
+focal_plane_length_mm = 25.0   # optional
+```
+
+Angles are measured from the grating normal and must lie strictly between
+−90° and 90°; lengths are positive. Physical fields accept compatible quantity
+strings (`"2.5 cm"`). The record is display and inventory data only; nothing
+here enters a simulation identity.
+
+### ALEX-s detector response
+
+A pixel detector `[response]` table may use `kind = "alexs"`:
+
+```toml
+[detectors.lab-ccd.response]
+kind = "alexs"
+sensor_format = [2048, 512]    # columns, rows (positive integers)
+sensor_code = "EXAMPLE-BI"     # vendor sensor designation
+readout_rate_hz = "1 MHz"      # positive frequency
+gain_mode = "high"             # vendor gain mode name
+qe_curve = "lab-ccd-qe"        # optional curve name
+```
+
+The first four keys are required. Observations that lower such a detector fail
+with a "not yet supported" error until issue #1081 lands.

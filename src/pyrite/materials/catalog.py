@@ -18,6 +18,8 @@ from .._catalog_layout import read_sources as _read_sources
 from .._cxr_vocabulary import translate_catalog_fields
 from ._beam_detector_parse import _parse_beams, _parse_detectors
 from ._catalog_decode import CxrGridByEnergy, _Errors, _grid
+from ._curves import resolve_object_curves
+from ._gratings import parse_gratings
 from ._named_filters import resolve_named_filters
 from ._named_targets import resolve_named_targets
 from ._parse import (
@@ -132,6 +134,7 @@ def _load_material_catalog_cached(
             "detectors",
             "filters",
             "targets",
+            "gratings",
             *_config_presets.TABLES,
         },
     )
@@ -148,6 +151,7 @@ def _load_material_catalog_cached(
     profiles = _parse_profiles(profile_rows, errors)
     beams = _parse_beams(raw.get("beams", {}), errors)
     detectors, detector_labels = _parse_detectors(raw.get("detectors", {}), errors)
+    gratings = parse_gratings(raw.get("gratings", {}), errors)
     profile_artifacts, profile_energy_grid_refs = _load_profile_artifacts(
         source, profiles, profile, errors
     )
@@ -282,6 +286,7 @@ def _load_material_catalog_cached(
             if not resolved:
                 resolved["default"] = MappingProxyType({})
         profile_detector_sets[name] = MappingProxyType(resolved)
+    curves = resolve_object_curves(source, detectors, profile_detector_sets, gratings, errors)
     if errors.items:
         raise MaterialConfigError(errors.items, profile=profile)
     return MaterialCatalog(
@@ -315,6 +320,8 @@ def _load_material_catalog_cached(
         detector_keys=tuple(detectors),
         preset_tables=preset_tables,
         profile_preset_refs=profile_preset_refs,
+        gratings=MappingProxyType(gratings),
+        curves=MappingProxyType(curves),
     )
 
 

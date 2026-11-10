@@ -6,6 +6,7 @@ directory::
     catalog.toml            # root keys only (``schema_version``)
     <table>/<name>.toml     # body of ``[<table>.<name>]``, without the header
     cifs/                  # catalog-owned crystal structures
+    curves/                # tabulated instrument curves (CSV or TOML)
     energy-grid-artifacts/ # immutable grid artifacts (not catalog source)
 
 The object name is the file stem, so a name and its file cannot disagree and a
@@ -34,6 +35,9 @@ from .paths import data_dir
 
 MANIFEST = "catalog.toml"
 ARTIFACT_DIR = "energy-grid-artifacts"
+CURVE_DIR = "curves"
+#: Catalog-owned asset directories: referenced by objects, never parsed as tables.
+ASSET_DIRS = ("cifs", CURVE_DIR)
 OBJECT_TABLES = (
     "detectors",
     "profiles",
@@ -46,8 +50,14 @@ OBJECT_TABLES = (
     "numerics",
     "filters",
     "targets",
+    "gratings",
 )
 LAYERED_TABLES = OBJECT_TABLES
+_EXPECTED_ENTRIES = (
+    ", ".join((MANIFEST, *(f"{name}/" for name in (*ASSET_DIRS, ARTIFACT_DIR)), "or one of"))
+    + " "
+    + ", ".join(f"{table}/" for table in OBJECT_TABLES)
+)
 _STEM_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 
 Sources = tuple[tuple[str, bytes], ...]
@@ -162,13 +172,10 @@ def source_files(path: Path | str) -> tuple[tuple[str, Path], ...]:
     for entry in _visible(path.iterdir()):
         if entry.name == MANIFEST:
             continue
-        if entry.name in (ARTIFACT_DIR, "cifs") and entry.is_dir():
+        if entry.name in (ARTIFACT_DIR, *ASSET_DIRS) and entry.is_dir():
             continue
         if entry.name not in OBJECT_TABLES or not entry.is_dir():
-            errors.append(
-                f"{entry}: unexpected catalog entry; expected {MANIFEST}, "
-                f"cifs/, {ARTIFACT_DIR}/, or one of {', '.join(f'{t}/' for t in OBJECT_TABLES)}"
-            )
+            errors.append(f"{entry}: unexpected catalog entry; expected {_EXPECTED_ENTRIES}")
     if manifest.is_file():
         files.append((MANIFEST, manifest))
     for table in OBJECT_TABLES:
@@ -471,6 +478,8 @@ def object_keys(path: Path | str, table: str) -> tuple[str, ...]:
 
 __all__ = [
     "ARTIFACT_DIR",
+    "ASSET_DIRS",
+    "CURVE_DIR",
     "LAYERED_TABLES",
     "object_sources",
     "MANIFEST",

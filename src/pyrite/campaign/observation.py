@@ -35,6 +35,11 @@ def _response_from_config(row: Mapping[str, object] | None):
         return None
     if row.get("kind") == "ideal":
         return IdealPhotonCounter()
+    if row.get("kind") == "alexs":
+        raise NotImplementedError(
+            "observation response kind 'alexs' is declared in the catalog but its CCD "
+            "response is not yet supported (issue #1081); use 'ideal' or 'timepix3'"
+        )
     if row.get("kind") != "timepix3":
         raise ValueError("observation response kind must be 'ideal' or 'timepix3'")
     values = {key: value for key, value in row.items() if key != "kind"}
