@@ -9,6 +9,7 @@ import numpy as np
 from numba import njit
 
 from ..geometry import X_MAX, X_MIN, Y_MAX, Y_MIN, Z_MAX, Z_MIN
+from ..groove import _first_surface_event_scalar_numba
 
 
 @njit(cache=True)
@@ -84,3 +85,23 @@ def _searchsorted_right_scalar(bounds, x, n):
         else:
             hi = mid
     return lo
+
+
+@njit(cache=True)
+def _groove_reentry_scalar(sx, sy, sz, dx, dy, dz, groove_geometry, footprint):
+    """Vacuum leg from a material->vacuum facet event (blazed grooves).
+
+    ``groove_geometry`` is ``(spacing, depth, sin_tilt, cos_tilt)`` [Ang] and
+    ``footprint`` is ``(z_total, finite, width, height)`` [Ang]. Returns the
+    distance to the next relief/working-facet re-entry, ``inf`` when the ray
+    leaves for good, and whether a finite footprint's side face comes first
+    (then the distance is ``inf``). Validation: blazed-groove-geometry
+    """
+    spacing, depth, st, ct = groove_geometry
+    entry = _first_surface_event_scalar_numba(sx, sz, dx, dz, spacing, depth, st, ct, 2)
+    z_total, finite, width, height = footprint
+    if finite:
+        side, face = _first_prism_exit_scalar(sx, sy, sz, dx, dy, dz, 0.0, z_total, width, height)
+        if face < Z_MIN and side < entry:
+            return np.inf, True
+    return entry, False

@@ -40,11 +40,10 @@ def initial_beam_positions(
 
     Spot and Twiss draws are counter-addressed per electron inside their child
     namespaces, so a block ``[start, stop)`` equals that slice of one larger
-    draw. The historical lockstep groove phase stays on its sequential child
-    generator. ``counter_groove_phase=True`` opts into the counter-addressed
-    phase for the forthcoming per-electron grooved core (#972), without changing
-    the existing lockstep results. It is a private staging option; the outer
-    transport driver still refuses grooved electron blocks.
+    draw. The lockstep groove phase stays on its sequential child generator, so
+    lockstep grooved results are unchanged and never run in blocks.
+    ``counter_groove_phase=True`` is the per-electron grooved core's
+    counter-addressed phase (#972), block-invariant like the spot draws.
 
     ``transverse_slopes`` is ``(x', y')`` from a Twiss ``transverse_distribution``,
     else ``None``. ``beam_entry`` is :func:`beam_entry_record` for nominal
@@ -269,21 +268,23 @@ def initial_energies_keV(E0_keV, Ne, seed, energy_spread_frac, *, start=0):
 def check_electron_block(start, cascade_or_geometry, beam_inputs):
     """Reject inputs an electron block (``start > 0``) cannot reproduce (#361).
 
-    Grooves and GDF beams are not block-addressed, and bunch offsets are
+    GDF beams are not block-addressed, and bunch offsets are
     centred on the realized population, so the block driver samples them once
     after the join. Secondary cascades are block-addressed through lineage
     keys (#923): their roots take global primary keys and every descendant
     stream derives from its parent's lineage. An explicit-launch pass is never
     a primary block; only a cascade's beam-sampled root generation is.
+    Grooves are block-addressed on the per-electron core (#972); the lockstep
+    core refuses every block itself.
     """
     if int(start) < 0:
         raise ValueError("_electron_start must be non-negative")
     _threshold, _pair_model, _positrons, secondary, groove = cascade_or_geometry
     explicit = secondary is not None and (secondary.launch is not None or not secondary.lineage)
-    blocked = (groove, *beam_inputs)
-    if int(start) and (explicit or any(value is not None for value in blocked)):
+    del groove  # block-addressed by the per-electron core's counter phase
+    if int(start) and (explicit or any(value is not None for value in beam_inputs)):
         raise ValueError(
-            "electron blocks support neither explicit launches, grooves, GDF beams, "
+            "electron blocks support neither explicit launches, GDF beams, "
             "nor in-block bunch sampling"
         )
 

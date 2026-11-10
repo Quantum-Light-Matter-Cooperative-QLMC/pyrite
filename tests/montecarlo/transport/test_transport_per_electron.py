@@ -318,12 +318,13 @@ def test_compound_target_selects_between_elements():
     assert np.all(np.isfinite(out["E_keV"]))
 
 
-def test_grooved_transport_rejects_the_per_electron_core():
+def test_grooved_transport_rejects_the_cuda_core():
+    """Grooves run on both CPU cores (#972); CUDA has no grooved kernel (#973)."""
     from pyrite.montecarlo.groove import GrooveSpec
 
-    with pytest.raises(ValueError, match="grooved transport"):
+    with pytest.raises(ValueError, match="no grooved specialization"):
         _run(
-            transport_core="per-electron",
+            transport_core="cuda",
             groove=GrooveSpec(spacing_ang=1.0e4, depth_ang=1.0e3, tilt_polar_rad=0.2),
         )
 

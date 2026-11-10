@@ -35,6 +35,7 @@ from .beam_entry import (
 from .continuation import effective_schedule, resolve_schedule
 from .core_specializations import (
     _transport_core_grooved,
+    _transport_core_grooved_perelectron,
     _transport_core_ungrooved_lut,
     _transport_core_ungrooved_lut_inelastic,
     _transport_core_ungrooved_perelectron_lut,
@@ -44,6 +45,7 @@ from .core_specializations import (
     mixed_elastic_core,
 )
 from .events import TransportStepLimitError
+from .grooved_batches import GroovedVacuumCore
 from .hard_inelastic import hard_keys_from_stream_keys, validate_inelastic_args
 from .hard_radiative import validate_radiative_args
 from .host_memory import GrowingHostRows, admit_host_allocation, reserve_or_raise
@@ -404,8 +406,11 @@ def _checked_core(p, launch, electron_start):
     transport_core = p.transport_core
     if launch is None:  # a launched generation names its per-electron core
         transport_core = _resolved_core(p)
-    if transport_core != "lockstep" and p.groove is not None:
-        raise ValueError("grooved transport is only implemented for the lockstep core")
+    if transport_core == "cuda" and p.groove is not None:
+        raise ValueError(
+            "grooved transport runs on the lockstep or per-electron CPU core; "
+            "the CUDA core has no grooved specialization"
+        )
     if p._cone_split is not None and (
         transport_core != "per-electron" or p.groove is not None or p.elastic_model != "elsepa"
     ):
@@ -478,8 +483,8 @@ def _sample_entry(p, c, stack, launch, electron_start):
         tilt_azim_rad=p.tilt_azim_rad,
         groove=p.groove,
         start=electron_start,
-        # This is dormant while #972 keeps grooved runs on lockstep. Once the
-        # exact per-electron grooved core is routed, its phase is block-stable.
+        # Lockstep keeps its sequential phase; the per-electron core takes the
+        # counter-addressed one, so its blocks equal slices of one population.
         counter_groove_phase=c.transport_core == "per-electron",
         E0_keV=p.E0_keV,
         energy_spread_frac=p.energy_spread_frac,
@@ -695,7 +700,7 @@ def _row_buffers(p, c, sec_on):
         "seg_rad_k": (n_rad_rows, (), float),
         "seg_rad_Z": (n_rad_rows, (), np.int16),
     }
-    if c.transport_core != "lockstep" and p.groove is None and not p.keep_segments_on_device:
+    if c.transport_core != "lockstep" and not p.keep_segments_on_device:
         grow = GrowingHostRows(
             {name: (tail, dtype) for name, (n, tail, dtype) in schema.items() if n}
         )
@@ -720,7 +725,7 @@ def _dispatch_core(t):
         return _run_per_electron(t, lut=True)
     if groove is None and t.transport_lut is not None:
         return _run_lockstep_lut(t)
-    if groove is None and not lockstep:
+    if not lockstep:
         # Per-electron streams and run-to-completion ordering. Not bit-for-bit
         # with the lockstep core -- see `_transport_core_ungrooved_perelectron`.
         return _run_per_electron(t, lut=False)
@@ -743,6 +748,8 @@ def _per_electron_core(t, lut):
     precision = resolve_transport_precision(
         t.inputs.transport_precision, exact_cuda=cuda and not lut
     )
+    if t.inputs.groove is not None:
+        return _grooved_core(t), np
     if t.inputs._cone_split is not None:
         return cone_split_core(inelastic=shell_mode, radiative=t.controls.radiative_mode), np
     if t.inputs.mixed_elastic is not None and not cuda:
@@ -768,6 +775,21 @@ def _per_electron_core(t, lut):
         per_electron=True, inelastic=shell_mode, radiative=t.controls.radiative_mode
     )
     return core, np
+
+
+def _grooved_core(t):
+    """Exact grooved per-electron CPU core behind the generic batch driver."""
+    groove = t.inputs.groove
+    tp = float(groove.tilt_polar_rad)
+    geometry = (
+        float(groove.spacing_ang),
+        float(groove.depth_ang),
+        float(np.sin(tp)),
+        float(np.cos(tp)),
+    )
+    # Only the capacity headroom is read; the CPU core never continues.
+    config = t.inputs.per_electron_config
+    return GroovedVacuumCore(_transport_core_grooved_perelectron, geometry, config)
 
 
 def _run_per_electron(t, *, lut):
@@ -845,7 +867,8 @@ def _run_per_electron(t, *, lut):
     split_record = (
         None if split_args is None else p._cone_split.collect(split_args, t.transport_keys, p.Ne)
     )
-    return _CoreOutcome(*counts, seg_xp, _NO_VACUUM, split_record)
+    vacuum = core.vacuum() if isinstance(core, GroovedVacuumCore) else _NO_VACUUM
+    return _CoreOutcome(*counts, seg_xp, vacuum, split_record)
 
 
 def _energy_model_code(p):

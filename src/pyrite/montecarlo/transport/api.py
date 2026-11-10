@@ -257,7 +257,7 @@ def _simulate_trajectories(
       ``positron_transport=True`` with it also transports the positrons.
       Validation: shell-secondary-transport, photon-pair-first-interaction, bhabha-close
 
-    transport_core: which ungrooved core runs the electrons. "auto" (default) --
+    transport_core: which core runs the electrons. "auto" (default) --
     the CUDA core when this process has a CUDA device, the run is ungrooved,
     and Ne > CUDA_TRANSPORT_MIN_ELECTRONS; the lockstep core otherwise (see
     `resolve_transport_core`; pin with `PYRITE_MC_TRANSPORT_CORE`). "lockstep"
@@ -268,7 +268,9 @@ def _simulate_trajectories(
     differently-ordered (and, for CUDA, differently-rounded) random streams,
     so each realizes a different sample of the SAME distribution --
     identical models, draw semantics, and aggregate agreement across seeds.
-    Grooved transport always stays on the lockstep core. See
+    Grooved transport runs on "lockstep" ("auto" keeps it there) or
+    "per-electron", which also runs grooved electron blocks; "cuda" refuses
+    grooves. See
     docs/physics/beam-transport/electron-transport.md.
     Validation: gpu-transport-core
 

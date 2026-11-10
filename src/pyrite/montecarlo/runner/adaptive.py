@@ -567,7 +567,7 @@ def case_transport_core(case, requested="auto"):
 
     Mirrors what ``simulate_trajectories`` will decide for this case: transport
     covers both electron populations, so the count that matters is
-    ``max(Ne, Ne_brem)``, and a grooved entrance face stays on the lockstep core.
+    ``max(Ne, Ne_brem)``, and ``auto`` keeps a grooved entrance face on the lockstep core.
     """
 
     from ..transport import resolve_transport_core

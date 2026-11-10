@@ -20,6 +20,7 @@ from .cone_split import EXIT_CONE_SPLIT, _event_key, cone_split_event
 from .core_adapters import adapt_cpu_transport_core, validate_core_axes
 from .core_geometry import (
     _first_prism_exit_scalar,
+    _groove_reentry_scalar,
     _rotate_direction_scalar,
     _searchsorted_right_scalar,
 )
@@ -291,10 +292,9 @@ def make_cpu_transport_core(
             ) = split_args
         if per_electron:
             (e_start, e_count, cap, stream_key) = run
+            seg_count, exit_code = pe_out[0], pe_out[1]
             if grooved:
-                (seg_count, exit_code, vac_count) = pe_out
-            else:
-                (seg_count, exit_code) = pe_out
+                vac_count = pe_out[2]
             (straggle_on, stragg_dE) = straggling
             Ne = alive.size
         else:
@@ -967,42 +967,29 @@ def make_cpu_transport_core(
                     zero_surface_events[e] = 0
                 else:
                     sx, sy, sz = pos[e, 0], pos[e, 1], pos[e, 2]
-                    entry_distance = _first_surface_event_scalar_numba(
-                        sx, sz, dx, dz, groove_spacing, groove_depth, groove_st, groove_ct, 2
+                    entry_distance, exit_side_j = _groove_reentry_scalar(
+                        sx, sy, sz, dx, dy, dz, groove[:4], geometry[2:6]
                     )
-                    if finite_footprint:
-                        side_distance, side_face = _first_prism_exit_scalar(
-                            sx, sy, sz, dx, dy, dz, 0.0, z_total, width_ang, height_ang
-                        )
-                        if side_face < Z_MIN and side_distance < entry_distance:
-                            exit_side_j, entry_distance = True, np.inf
                     reentered = np.isfinite(entry_distance)
                     if reentered:
+                        # Count every leg, write those that fit (per-electron
+                        # replay reads the count). Lockstep overflows only past
+                        # max_steps legs of one history, which raises below.
                         if per_electron:
-                            # Capacity replay reads the full required count,
-                            # even when this pass cannot retain all the rows.
                             i = e - e_start
-                            vac_slot = i * max_vac + vac_count[i]
-                            write_vac = vac_count[i] < max_vac
+                            vac_slot, write_vac = i * max_vac + vac_count[i], vac_count[i] < max_vac
                             vac_count[i] += 1
                         else:
-                            if nvac >= max_vac:
-                                raise RuntimeError("vacuum segment buffer exhausted")
-                            vac_slot, write_vac = nvac, True
+                            vac_slot, write_vac = nvac, nvac < max_vac
                             nvac += 1
-                        ex, ey, ez = (
-                            sx + entry_distance * dx,
-                            sy + entry_distance * dy,
-                            sz + entry_distance * dz,
-                        )
+                        ex, ey = sx + entry_distance * dx, sy + entry_distance * dy
+                        ez = sz + entry_distance * dz
                         if write_vac:
                             vac_start[vac_slot, 0], vac_start[vac_slot, 1] = sx, sy
-                            vac_start[vac_slot, 2] = sz
                             vac_end[vac_slot, 0], vac_end[vac_slot, 1] = ex, ey
-                            vac_end[vac_slot, 2] = ez
-                            vac_E[vac_slot], vac_t0[vac_slot], vac_id[vac_slot] = (
-                                E_keV[e], clock[e], e
-                            )
+                            vac_start[vac_slot, 2], vac_end[vac_slot, 2] = sz, ez
+                            vac_E[vac_slot], vac_t0[vac_slot] = E_keV[e], clock[e]
+                            vac_id[vac_slot] = e
                         clock[e] += entry_distance / beta_from_keV_scalar(E_keV[e])
                         pos[e, 0], pos[e, 1], pos[e, 2] = (
                             ex + surface_eps * dx,
@@ -1017,61 +1004,41 @@ def make_cpu_transport_core(
                     zero_surface_events[e] = zero_surface_events[e] + 1 if step_j <= EPS else 0
                     if zero_surface_events[e] >= 2:
                         raise RuntimeError("repeated zero-length grooved surface events")
-                died_j = exit_top_j or exit_bot_j or exit_side_j or cutoff_j
-                if died_j:
-                    if per_electron:
-                        i = e - e_start
-                        exit_code[i] = (
-                            EXIT_BACKSCATTERED
-                            if exit_top_j
-                            else EXIT_TRANSMITTED
-                            if exit_bot_j
-                            else EXIT_SIDE
-                            if exit_side_j
-                            else EXIT_CUTOFF_STOPPED
-                        )
-                        seg_count[i] = local_nseg[e]
-                        cursor += 1
-                    else:
-                        n_back += int(exit_top_j)
-                        n_trans += int(exit_bot_j)
-                        n_side += int(exit_side_j)
-                        n_cutoff += int(cutoff_j)
-                        alive[e] = False
-                        n_eligible -= 1
-                    continue
+            elif limited_j:
+                # A grooved substep falls through and charges its step below.
+                substep_id[e] += 1
+                if per_electron:
+                    material_steps[e] += 1
+                continue
+            if exit_top_j or exit_bot_j or exit_side_j or cutoff_j:
+                if per_electron:
+                    i = e - e_start
+                    exit_code[i] = (
+                        EXIT_BACKSCATTERED
+                        if exit_top_j
+                        else EXIT_TRANSMITTED
+                        if exit_bot_j
+                        else EXIT_SIDE
+                        if exit_side_j
+                        else EXIT_CUTOFF_STOPPED
+                    )
+                    seg_count[i] = local_nseg[e]
+                    cursor += 1
+                else:
+                    n_back += int(exit_top_j)
+                    n_trans += int(exit_bot_j)
+                    n_side += int(exit_side_j)
+                    n_cutoff += int(cutoff_j)
+                    alive[e] = False
+                    # Flat lockstep loops on n_alive, grooved on n_eligible.
+                    n_alive -= 1
+                    n_eligible -= 1
+                continue
+            if grooved:
                 if cross_up_j or cross_dn_j:
                     pos[e, 2] += (1.0 if dirs[e, 2] > 0.0 else -1.0) * EPS
                 full_j = not (cross_up_j or cross_dn_j or exit_side_j or surface_first or limited_j)
             else:
-                if limited_j:
-                    substep_id[e] += 1
-                    if per_electron:
-                        material_steps[e] += 1
-                    continue
-                died_j = exit_top_j or exit_bot_j or exit_side_j or cutoff_j
-                if died_j:
-                    if per_electron:
-                        i = e - e_start
-                        exit_code[i] = (
-                            EXIT_BACKSCATTERED
-                            if exit_top_j
-                            else EXIT_TRANSMITTED
-                            if exit_bot_j
-                            else EXIT_SIDE
-                            if exit_side_j
-                            else EXIT_CUTOFF_STOPPED
-                        )
-                        seg_count[i] = local_nseg[e]
-                        cursor += 1
-                    else:
-                        n_back += int(exit_top_j)
-                        n_trans += int(exit_bot_j)
-                        n_side += int(exit_side_j)
-                        n_cutoff += int(cutoff_j)
-                        alive[e] = False
-                        n_alive -= 1
-                    continue
                 if mixed:
                     if event_j == EVENT_SOFT_HINGE or event_j == EVENT_DELTA:
                         # Fictitious for the hard processes: their optical
