@@ -29,6 +29,7 @@ from pyrite.console.output import (
     emit_result,
     output_option,
 )
+from pyrite.console.tables import emit_named_list, emit_object
 
 _NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 
@@ -107,26 +108,20 @@ def _beam_payload(document, name):
     return {"name": name, **payload}
 
 
-def _emit_show(payload):
-    emit_result(f"[{payload['name']}]")
-    if payload.get("label"):
-        emit_result(f"  label: {payload['label']}")
-    emit_result(f"  source: {payload.get('source', 'analytic')}")
-    for key, value in payload.items():
-        if key.startswith("gdf_"):
-            emit_result(f"  {key}: {value}")
-    for key in _DISPLAY_SCALARS:
-        if key in payload:
-            emit_result(f"  {key}: {payload[key]:g}")
+def _emit_show(payload, origin=None):
+    rows = [("label", payload["label"])] if payload.get("label") else []
+    rows.append(("source", payload.get("source", "analytic")))
+    rows += [(key, value) for key, value in payload.items() if key.startswith("gdf_")]
+    rows += [(key, float(payload[key])) for key in _DISPLAY_SCALARS if key in payload]
     transverse = payload.get("transverse")
     if isinstance(transverse, dict):
-        for key in sorted(transverse):
-            emit_result(f"  transverse.{key}: {transverse[key]:g}")
+        rows += [(f"transverse.{key}", float(transverse[key])) for key in sorted(transverse)]
     longitudinal = payload.get("longitudinal")
     if isinstance(longitudinal, dict):
-        emit_result(f"  longitudinal.kind: {longitudinal['kind']}")
+        rows.append(("longitudinal.kind", longitudinal["kind"]))
         if "envelope_rms_fs" in longitudinal:
-            emit_result(f"  longitudinal.envelope_rms_fs: {longitudinal['envelope_rms_fs']:g}")
+            rows.append(("longitudinal.envelope_rms_fs", float(longitudinal["envelope_rms_fs"])))
+    emit_object(payload["name"], rows, origin=origin)
 
 
 @click.group(name="beam", cls=DeprecatingGroup, deprecation_prefix="beam", no_args_is_help=True)
@@ -179,11 +174,14 @@ def list_command(json_output):
     if json_output:
         emit_json_result(cli_json.JsonResult("cxr.beam.list", {"beams": rows}))
         return 0
-    for row in rows:
-        label = f" ({row['label']})" if row["label"] else ""
-        emit_result(
-            f"{row['name']}{label}: {len(row['referenced_by'] or [])} profiles [{row['source']}]"
-        )
+    emit_named_list(
+        (
+            (row["name"], row["source"], len(row["referenced_by"] or []), row["label"])
+            for row in rows
+        ),
+        noun="beam",
+        create_hint="pyrite beam create NAME",
+    )
     return 0
 
 
@@ -203,7 +201,8 @@ def show_command(name, json_output):
     if json_output:
         emit_json_result(cli_json.JsonResult("cxr.beam.show", payload))
         return 0
-    _emit_show(payload)
+    origin = object_sources(_catalog_io.active_catalog_path(), "beams").get(name, "catalog")
+    _emit_show(payload, origin)
     return 0
 
 

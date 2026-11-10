@@ -54,6 +54,7 @@ from pyrite.console.output import (
     flatten_option_values,
     output_option,
 )
+from pyrite.console.tables import emit_table, object_origin
 
 _NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 #: Mirrors ``materials.catalog._EMISSION_VALUES`` (kept local, not imported,
@@ -313,18 +314,20 @@ def list_command(json_output):
     if json_output:
         emit_json_result(cli_json.JsonResult("cxr.profile.list", {"profiles": rows}))
         return 0
-    for row in rows:
-        membership = (
-            "all materials (implicit)"
-            if row["materials"] is None
-            else f"{len(row['materials'])} materials"
-        )
-        override_count = len(row["overrides"] or [])
-        source = {"bundled": " (bundled)", "user": " (yours)"}.get(row["source"], "")
-        emit_result(
-            f"{row['name']}: {membership}, {override_count} material overrides, "
-            f"{len(row['energy_grid_refs'] or {})} energy-grid refs{source}"
-        )
+    emit_table(
+        ("name", "origin", "materials", "overrides", "grid refs"),
+        [
+            (
+                row["name"],
+                object_origin(row["source"]),
+                "all (implicit)" if row["materials"] is None else len(row["materials"]),
+                len(row["overrides"] or []),
+                len(row["energy_grid_refs"] or {}),
+            )
+            for row in rows
+        ],
+        empty="no profiles; create one with: pyrite profile create NAME",
+    )
     return 0
 
 

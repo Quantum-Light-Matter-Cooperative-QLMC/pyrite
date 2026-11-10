@@ -13,6 +13,7 @@ import click
 from ...console import output as _cli_core
 from ...console.output import emit_diagnostic, emit_json, emit_result, output_option
 from ...console.outputs import output_default, output_dir, output_label
+from ...console.tables import emit_table
 from .. import _completion as _cli_completion
 from .._groups import LazyGroup
 
@@ -84,11 +85,7 @@ def _cell(value) -> str:
 
 
 def _emit_table(header: list[str], rows: list[list[str]]) -> None:
-    widths = [max(len(row[i]) for row in [header, *rows]) for i in range(len(header))]
-    for row in [header, *rows]:
-        emit_result(
-            "  ".join(cell.ljust(width) for cell, width in zip(row, widths, strict=True)).rstrip()
-        )
+    emit_table(header, rows)
 
 
 _LS_COLUMNS = (

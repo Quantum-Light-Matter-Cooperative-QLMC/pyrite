@@ -7,6 +7,7 @@ with no prose mixed in.
 """
 
 import json
+import re
 
 import numpy as np
 import pytest
@@ -14,7 +15,7 @@ import pytest
 from pyrite.cli.commands import tables as tables_command
 from pyrite.console import config as _config
 from pyrite.xsgen.store import ElementTarget, TableRequest, store, user_table_dir
-from tests.helpers.cli import assert_clean_result, invoke
+from tests.helpers.cli import assert_clean_result, assert_row, invoke
 
 
 @pytest.fixture
@@ -77,7 +78,7 @@ def test_path_json_reports_both_tiers(isolated):
 
 def test_list_of_an_empty_store_is_a_header_and_nothing_else(isolated):
     result = invoke(tables_command.command, ["list"])
-    assert_clean_result(result, stdout="KEY\tCODE\tQUANTITY\tTARGET\tTIER\n")
+    assert_clean_result(result, stdout="no stored tables\n")
 
 
 def test_list_reports_a_stored_table(isolated):
@@ -86,8 +87,8 @@ def test_list_reports_a_stored_table(isolated):
 
     assert result.exit_code == 0
     rows = result.stdout.splitlines()
-    assert rows[0].split("\t") == ["KEY", "CODE", "QUANTITY", "TARGET", "TIER"]
-    assert rows[1].split("\t") == [request.key, "elsepa", "elastic_dcs", "Z=29", "user"]
+    assert rows[0].split() == ["KEY", "CODE", "QUANTITY", "TARGET", "TIER"]
+    assert rows[1].split() == [request.key, "elsepa", "elastic_dcs", "Z=29", "user"]
 
 
 def test_list_json_carries_one_envelope(isolated):
@@ -108,16 +109,17 @@ def test_show_prints_the_provenance_manifest(isolated):
     result = invoke(tables_command.command, ["show", request.key])
 
     assert result.exit_code == 0
-    manifest = json.loads(result.stdout)
-    assert manifest["key"] == request.key
-    assert manifest["deck_hash"] == request.deck_hash
-    assert manifest["modifications"], "CC BY requires the adaptation note"
+    assert_row(result.stdout, "key", request.key)
+    assert_row(result.stdout, "deck_hash", request.deck_hash)
+    assert re.search(r"^  modifications {2,}\S", result.stdout, re.MULTILINE), (
+        "CC BY requires the adaptation note"
+    )
 
 
 def test_show_accepts_an_unambiguous_key_prefix(isolated):
     request = _store_one()
     result = invoke(tables_command.command, ["show", request.key[:8]])
-    assert json.loads(result.stdout)["key"] == request.key
+    assert_row(result.stdout, "key", request.key)
 
 
 def test_show_refuses_an_ambiguous_prefix_rather_than_guessing(isolated):
@@ -824,7 +826,7 @@ def test_sources_list_distinguishes_missing_tree_from_missing_database(
     result = invoke(tables_command.command, ["sources", "list"])
 
     assert result.exit_code == 0, "a missing tree is a reported status, not a failure"
-    rows = {line.split("\t")[0]: line for line in result.stdout.splitlines()[1:] if "\t" in line}
+    rows = {line.split()[0]: line for line in result.stdout.splitlines()[1:] if line.strip()}
     assert set(rows) >= {"elsepa", "sbethe", "bremslib"}
     assert "ready" in rows["elsepa"]
     assert "incomplete" in rows["sbethe"]

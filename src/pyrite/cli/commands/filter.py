@@ -11,6 +11,7 @@ from tomlkit.exceptions import ParseError
 from pyrite.cli import _catalog_io
 from pyrite.cli.commands._profile_shared import write
 from pyrite.console.output import CLIError, confirm_destructive, emit_result
+from pyrite.console.tables import emit_named_list, emit_object, flatten
 
 _NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*\Z")
 
@@ -84,10 +85,18 @@ def list_command():
         from pyrite._catalog_layout import object_sources
 
         sources = object_sources(_catalog_io.active_catalog_path(), "filters")
-        for name, row in _rows(doc).items():
-            emit_result(f"{name} ({sources.get(name, 'catalog')}): {row.get('description', '')}")
+        rows = [
+            (
+                name,
+                sources.get(name, "catalog"),
+                len({profile for profile, _index, _row in _reference_sites(doc, name)}),
+                row.get("description"),
+            )
+            for name, row in _rows(doc).items()
+        ]
     except (OSError, ValueError, ParseError) as exc:
         raise CLIError(str(exc)) from None
+    emit_named_list(rows, noun="filter preset", create_hint="pyrite filter create NAME")
 
 
 @command.command("show")
@@ -97,13 +106,15 @@ def show_command(name):
     try:
         _original, doc = _catalog_io.catalog_text()
         row = _existing(doc, name)
-        emit_result(f"filter preset {name}:")
-        for key, value in row.items():
-            emit_result(f"  {key}: {value}")
         sites = _reference_sites(doc, name)
-        emit_result("used by: " + (", ".join(f"{p}[{i}]" for p, i, _ in sites) or "none"))
+        from pyrite._catalog_layout import object_sources
+
+        origin = object_sources(_catalog_io.active_catalog_path(), "filters").get(name, "catalog")
     except (OSError, ValueError, ParseError) as exc:
         raise CLIError(str(exc)) from None
+    plain = row.unwrap() if hasattr(row, "unwrap") else dict(row)
+    used_by = ", ".join(f"{p}[{i}]" for p, i, _ in sites) or "none"
+    emit_object(f"filter {name}", [*flatten(plain), ("used by", used_by)], origin=origin)
 
 
 @command.command("create")

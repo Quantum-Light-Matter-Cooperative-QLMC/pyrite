@@ -7,9 +7,12 @@ and origin spellings are a machine contract and keep their raw values.
 
 Two vocabularies are normalized for humans (docs/repo-design/cli/cli-output.md):
 
-* value source -- where an effective setting came from: ``profile`` (set on
-  the profile), ``preset:<name>`` (from an attached named preset), ``run``
-  (a run-time override) or ``default`` (built in);
+* value source -- where an effective setting came from: ``material`` (a
+  per-material override inside the profile), ``profile`` (set on the
+  profile), ``preset:<name>`` (from an attached named preset), ``run`` (a
+  run-time override) or ``default`` (built in); ``pyrite config`` adds
+  ``option`` (given on the command line), ``env:<VAR>`` and ``config``
+  (the persistent config store);
 * object origin -- where a named object is stored: ``bundled`` (read-only
   bundled catalog), ``user`` (your ``catalog.user`` layer) or ``catalog`` (a
   single explicitly selected catalog).
@@ -22,13 +25,15 @@ from collections.abc import Iterable, Mapping, Sequence
 import click
 
 #: Human value-source labels; ``preset`` is rendered ``preset:<name>``.
-VALUE_SOURCES = frozenset({"profile", "preset", "run", "default"})
+VALUE_SOURCES = frozenset(
+    {"material", "profile", "preset", "run", "option", "env", "config", "default"}
+)
 #: Human object-origin labels.
 OBJECT_ORIGINS = frozenset({"bundled", "user", "catalog"})
 
 # Raw provenance spellings produced by resolvers (and kept in JSON) that all
 # mean "nothing selected it; the built-in value applies".
-_DEFAULT_SOURCES = frozenset({"default", "built-in", "fidelity", "stored"})
+_DEFAULT_SOURCES = frozenset({"default", "built-in", "built-in default", "fidelity", "stored"})
 
 
 def value_source(raw: object) -> str:
@@ -36,10 +41,19 @@ def value_source(raw: object) -> str:
     text = str(raw).strip()
     if text in _DEFAULT_SOURCES:
         return "default"
-    if text in ("profile", "explicit"):
+    if text in ("profile", "explicit", "inherited"):
         return "profile"
+    if text in ("material", "overridden"):
+        return "material"
     if text == "run":
         return "run"
+    # `pyrite config` precedence (console.config.resolve).
+    if text == "command line":
+        return "option"
+    if text == "config store":
+        return "config"
+    if text.startswith("PYRITE_"):
+        return f"env:{text}"
     for prefix in ("preset ", "preset:"):
         if text.startswith(prefix):
             return f"preset:{text.removeprefix(prefix).strip()}"
@@ -155,4 +169,45 @@ def emit_settings(
         empty="(no settings)",
         indent=2 if title else 0,
         wrap=1,
+    )
+
+
+def flatten(values: Mapping[str, object], prefix: str = "") -> list[tuple[str, str]]:
+    """Dotted ``(setting, value)`` rows for nested tables; never prints a Python dict."""
+    rows: list[tuple[str, str]] = []
+    for key, value in values.items():
+        label = f"{prefix}{key}"
+        if isinstance(value, Mapping):
+            rows.extend(flatten(value, f"{label}."))
+        else:
+            rows.append((label, display(value)))
+    return rows
+
+
+def emit_object(
+    heading: str, rows: Iterable[tuple[str, object]], *, origin: object | None = None
+) -> None:
+    """Emit ``[heading]  origin: ...`` then one SETTING / VALUE table."""
+    click.echo(f"[{heading}]" + ("" if origin is None else f"  origin: {object_origin(origin)}"))
+    emit_table(("setting", "value"), rows, empty="  (no settings)", indent=2)
+
+
+def emit_named_list(
+    rows: Iterable[tuple[object, ...]],
+    *,
+    noun: str,
+    extra: Sequence[str] = (),
+    create_hint: str | None = None,
+) -> None:
+    """List named objects: NAME, ORIGIN, extra columns, PROFILES, DESCRIPTION.
+
+    Each row is ``(name, raw origin, *extra, profile count, description)``.
+    """
+    emit_table(
+        ("name", "origin", *extra, "profiles", "description"),
+        [
+            (name, object_origin(origin), *middle, count, description or "")
+            for name, origin, *middle, count, description in rows
+        ],
+        empty=f"no {noun}s" + (f"; create one with: {create_hint}" if create_hint else ""),
     )

@@ -11,6 +11,7 @@ from pyrite.cli import command
 from pyrite.console import config
 from pyrite.materials._schema import MaterialConfigError
 from pyrite.materials.catalog import load_material_catalog
+from tests.helpers.cli import assert_row
 from tests.helpers.user_catalog import copy_full_catalog
 
 
@@ -44,7 +45,7 @@ def test_catalog_option_routes_detector_edit_outside_package(tmp_path, monkeypat
     )
 
     assert listed.exit_code == 0, listed.output
-    assert "local_only:" in listed.output
+    assert_row(listed.output, "local_only", "catalog")
     assert result.exit_code == 0, result.output
     assert (catalog / "detectors" / "lab.toml").is_file()
     assert not (bundled_catalog() / "detectors" / "lab.toml").exists()

@@ -31,6 +31,7 @@ from pyrite.console.output import (
     emit_result,
     output_option,
 )
+from pyrite.console.tables import emit_object, emit_table, flatten
 
 
 def complete_id(ctx, param, incomplete):
@@ -88,13 +89,17 @@ def _inspect(profile_name, identifier, json_output):
     if json_output:
         emit_json_result(cli_json.JsonResult(kind, payload))
         return 0
-    for key, entry in (
-        entries.items() if identifier is None else [(identifier, entries[identifier])]
-    ):
-        emit_result(f"{key}: {entry['kind']} ({entry['reference'] or 'inline'})")
-        if identifier is not None:
-            for field, value in entry.items():
-                emit_result(f"  {field}: {value}")
+    if identifier is None:
+        emit_table(
+            ("id", "kind", "reference"),
+            [
+                (key, entry["kind"], entry["reference"] or "inline")
+                for key, entry in entries.items()
+            ],
+            empty=f"{profile_name}: no detectors",
+        )
+    else:
+        emit_object(f"{profile_name} detector {identifier}", flatten(entries[identifier]))
     return 0
 
 

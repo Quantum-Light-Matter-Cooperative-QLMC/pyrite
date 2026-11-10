@@ -2,7 +2,7 @@ import json
 
 from pyrite.cli import _catalog_io
 from pyrite.cli.commands import beam
-from tests.helpers.cli import assert_clean_result, invoke
+from tests.helpers.cli import assert_clean_result, assert_row, invoke
 
 _CATALOG = """[profiles.standard]
 thickness_ang = { values = [1000.0] }
@@ -42,7 +42,7 @@ def test_list_text_and_json(tmp_path, monkeypatch):
 
     text = invoke(beam.command, ["list"])
     assert_clean_result(text)
-    assert "rf_gun_200fs (RF gun, 200 fs): 1 profiles" in text.stdout
+    assert_row(text.stdout, "rf_gun_200fs", "catalog", "1", "RF gun, 200 fs")
 
     machine = invoke(beam.command, ["list", "-o", "json"])
     assert_clean_result(machine)
@@ -60,9 +60,9 @@ def test_show_text_and_json(tmp_path, monkeypatch):
     shown = invoke(beam.command, ["show", "rf_gun_200fs"])
     assert_clean_result(shown)
     assert "[rf_gun_200fs]" in shown.stdout
-    assert "label: RF gun, 200 fs" in shown.stdout
-    assert "rep_rate_hz: 1000" in shown.stdout
-    assert "bunch_charge_pc: 2.5" in shown.stdout
+    assert_row(shown.stdout, "label", "RF gun, 200 fs")
+    assert_row(shown.stdout, "rep_rate_hz", "1000")
+    assert_row(shown.stdout, "bunch_charge_pc", "2.5")
 
     machine = invoke(beam.command, ["show", "rf_gun_200fs", "-o", "json"])
     assert_clean_result(machine)

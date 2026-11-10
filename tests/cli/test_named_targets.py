@@ -12,7 +12,7 @@ from pyrite.cli.commands import profile as profile_cli
 from pyrite.cli.commands import target as target_cli
 from pyrite.geometry import Slab, Stack, load_filters, load_target
 from pyrite.materials.catalog import load_material_catalog
-from tests.helpers.cli import invoke
+from tests.helpers.cli import assert_row, invoke
 from tests.helpers.user_catalog import copy_full_catalog
 
 SLAB_ARGS = ["--material", "silicon", "--thickness-ang", "20000", "--tilt-deg", "30"]
@@ -115,7 +115,12 @@ def test_sequence_lifecycle_detach_preserves_resolved_values(path):
     ]["filters"]
     assert rows[1]["ref"] == "pair"
     assert [plate["expanded_index"] for plate in rows[1]["plates"]] == [2, 3]
-    assert "sequence pair" in ok(profile_cli.command, "filter", "list", "standard").output
+    assert_row(
+        ok(profile_cli.command, "filter", "list", "standard").output,
+        "2",
+        "pair",
+        "sequence (expanded plates 2, 3)",
+    )
     assert "preset pair" in ok(profile_cli.command, "show", "standard").output
 
     override = invoke(profile_cli.command, ["filter", "set", "standard", "2", "--name", "x"])

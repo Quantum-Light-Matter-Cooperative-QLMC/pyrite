@@ -8,7 +8,7 @@ from pyrite.cli import _catalog_io
 from pyrite.cli import command as root_command
 from pyrite.cli.commands import profile
 from pyrite.console import output as _core
-from tests.helpers.cli import assert_clean_result, assert_table_row, invoke
+from tests.helpers.cli import assert_clean_result, assert_row, assert_table_row, invoke
 
 _CATALOG = """[profiles.standard]
 thickness_ang = { values = [1000.0] }
@@ -139,8 +139,8 @@ def test_list_text_and_json(tmp_path, monkeypatch):
 
     text = invoke(profile.command, ["list"])
     assert_clean_result(text)
-    assert "standard: all materials (implicit), 1 material overrides" in text.stdout
-    assert "sub_100keV: 1 materials, 0 material overrides" in text.stdout
+    assert_row(text.stdout, "standard", "catalog", "all (implicit)", "1", "0")
+    assert_row(text.stdout, "sub_100keV", "catalog", "1", "0", "0")
 
     machine = invoke(profile.command, ["list", "-o", "json"])
     assert_clean_result(machine)
@@ -159,10 +159,8 @@ def test_list_and_show_expose_energy_grid_refs(tmp_path, monkeypatch):
 
     listed = invoke(profile.command, ["list"])
     assert_clean_result(listed)
-    assert "standard: all materials (implicit), 1 material overrides, 0 energy-grid refs" in (
-        listed.stdout
-    )
-    assert "sub_100keV: 1 materials, 0 material overrides, 1 energy-grid refs" in listed.stdout
+    assert_row(listed.stdout, "standard", "catalog", "all (implicit)", "1", "0")
+    assert_row(listed.stdout, "sub_100keV", "catalog", "1", "0", "1")
 
     shown = invoke(profile.command, ["show", "sub_100keV"])
     assert_clean_result(shown)
@@ -171,7 +169,7 @@ def test_list_and_show_expose_energy_grid_refs(tmp_path, monkeypatch):
     # A profile with no refs reports inline defaults separately from overrides.
     legacy = invoke(profile.command, ["show", "standard"])
     assert_clean_result(legacy)
-    assert_table_row(legacy.stdout, "line default", "automatic for uncovered energies (built-in)")
+    assert_table_row(legacy.stdout, "line default", "automatic for uncovered energies (default)")
     assert "uniform 10 eV" in legacy.stdout
     assert "storage" not in legacy.stdout
 
@@ -1769,7 +1767,7 @@ def test_show_wraps_values_and_wide_keeps_them_on_one_line(tmp_path, monkeypatch
 @pytest.mark.parametrize(
     ("descriptor", "expected"),
     [
-        (None, "uniform 25 eV; start = material floor; stop = case beam energy + step (built-in)"),
+        (None, "uniform 25 eV; start = material floor; stop = case beam energy + step (default)"),
         (
             "{ arange = { start = 500.0, stop = 1000.0, step = 10.0 } }",
             "uniform 10 eV; start = max(500 eV, material floor); stop = case beam energy + step (profile)",
@@ -1787,7 +1785,7 @@ def test_show_brem_default_and_effective_bounds(tmp_path, monkeypatch, descripto
     shown = invoke(profile.command, ["show", "sub_100keV", "-o", "wide"])
     assert_clean_result(shown)
     assert_table_row(shown.stdout, "brem default", expected)
-    assert_table_row(shown.stdout, "line default", "automatic for uncovered energies (built-in)")
+    assert_table_row(shown.stdout, "line default", "automatic for uncovered energies (default)")
     assert_table_row(shown.stdout, "overrides", "none")
     assert "E_grid_brem.arange" not in shown.stdout
     assert "material overrides)" not in shown.stdout

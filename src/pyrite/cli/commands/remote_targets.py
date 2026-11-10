@@ -6,6 +6,7 @@ from dataclasses import asdict
 import click
 
 from ...console.output import confirm_destructive, emit_diagnostic, emit_result, output_option
+from ...console.tables import emit_object, emit_table, flatten
 from ...remote import targets
 
 
@@ -22,7 +23,18 @@ def _show(value, json_output):
 @output_option
 def list_command(json_output):
     """List configured targets."""
-    _show({name: asdict(value) for name, value in targets.named_targets().items()}, json_output)
+    named = targets.named_targets()
+    if json_output:
+        _show({name: asdict(value) for name, value in named.items()}, json_output)
+        return
+    emit_table(
+        ("name", "host", "gpu", "partition", "description"),
+        [
+            (name, value.host, value.gpu_vendor, value.partition, value.description or "")
+            for name, value in named.items()
+        ],
+        empty="no remote targets; add one with: pyrite remote target add NAME",
+    )
 
 
 @command.command("show")
@@ -30,7 +42,11 @@ def list_command(json_output):
 @output_option
 def show_command(name, json_output):
     """Show one resolved named target."""
-    _show(asdict(targets.resolve_target(name)), json_output)
+    value = asdict(targets.resolve_target(name))
+    if json_output:
+        _show(value, json_output)
+        return
+    emit_object(name, flatten({key: item for key, item in value.items() if key != "name"}))
 
 
 def _fields(function):

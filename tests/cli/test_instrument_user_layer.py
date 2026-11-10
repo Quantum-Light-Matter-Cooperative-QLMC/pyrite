@@ -1,6 +1,7 @@
 """Named beams/detectors live outside installed package data (#417)."""
 
 import json
+import re
 import shutil
 
 import pytest
@@ -56,7 +57,7 @@ def test_user_instrument_lifecycle_preserves_package(
     origins = {row["name"]: row["source"] for row in json.loads(listed.stdout)["payload"][table]}
     assert origins["renamed"] == "user"
     assert origins[source] == "bundled"
-    assert "[user]" in invoke(command, ["list"]).stdout
+    assert re.search(r"^renamed +user ", invoke(command, ["list"]).stdout, re.MULTILINE)
     assert_clean_result(invoke(command, ["delete", "renamed", "--yes"]))
     assert not (_isolate_user_catalog / table / "renamed.toml").exists()
     assert snapshot(bundled) == before
