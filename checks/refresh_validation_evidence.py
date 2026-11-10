@@ -13,6 +13,7 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -33,6 +34,23 @@ DEFAULT_CPU_CHECKS = (
     "checks/transition_radiation_omission.py",
     "checks/longitudinal_coherence_regimes.py",
 )
+
+
+# Entry-point review establishes exit-code gates for these exact invocations.
+# A canonical claim association alone is not publication eligibility. Keep
+# argument-bearing capture/reduction modes and report-only diagnostics out.
+CPU_RECIPES: dict[str, tuple[str, ...]] = {
+    **dict.fromkeys(DEFAULT_CPU_CHECKS, ()),
+    "checks/brem_source_comparison.py": ("--download",),
+    "checks/shell_ionization_comparison.py": ("--download",),
+}
+
+
+def validate_recipes(checks: list[str]) -> None:
+    """Fail before execution/publication unless each invocation has a gate."""
+    for check in checks:
+        if check not in CPU_RECIPES or not CHECK_LEDGER_IDS.get(check):
+            raise ValueError(f"no reviewed CPU recipe for {check}; see checks/README.md")
 
 
 def selected_checks(requested: list[str], *, all_mapped: bool) -> list[str]:
@@ -78,6 +96,7 @@ def refresh(
     checks: list[str], output_dir: Path, *, publish: bool = False, repo: Path = ROOT
 ) -> int:
     """Execute all selected producers, preserving failures and a status snapshot."""
+    validate_recipes(checks)
     output_dir.mkdir(parents=True, exist_ok=False)
     records_dir = output_dir / "records"
     records_dir.mkdir()
@@ -94,10 +113,12 @@ def refresh(
             str(records_dir.resolve()),
             "--",
             check,
+            *CPU_RECIPES[check],
         ]
         env = {**os.environ, "PYRITE_MC_BACKEND": "cpu"}
         env.pop("PYRITE_TEST_BACKEND", None)
         log_file = output_dir / f"{Path(check).stem}.log"
+        started = time.monotonic()
         with log_file.open("w", encoding="utf-8") as stream:
             completed = subprocess.run(
                 command,
@@ -110,7 +131,15 @@ def refresh(
         print(f"  exit {completed.returncode} (log: {log_file})", flush=True)
         if completed.returncode not in (0, 2, 75):
             print(log_file.read_text(encoding="utf-8")[-4000:], file=sys.stderr)
-        commands.append({"check": check, "exit_code": completed.returncode, "log": log_file.name})
+        commands.append(
+            {
+                "check": check,
+                "args": list(CPU_RECIPES[check]),
+                "exit_code": completed.returncode,
+                "elapsed_seconds": time.monotonic() - started,
+                "log": log_file.name,
+            }
+        )
         if completed.returncode not in (0, 2, 75):
             status = 1
     try:
@@ -154,11 +183,13 @@ def refresh(
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", type=Path, required=True)
-    parser.add_argument("--check", action="append", default=[], help="extra mapped check path")
+    parser.add_argument(
+        "--check", action="append", default=[], help="extra reviewed CPU recipe path"
+    )
     parser.add_argument(
         "--all-mapped",
         action="store_true",
-        help="run every mapped producer (possibly very expensive)",
+        help="request all mapped producers (refused until every recipe is reviewed)",
     )
     parser.add_argument(
         "--publish",

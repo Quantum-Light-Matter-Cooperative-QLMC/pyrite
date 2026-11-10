@@ -12,7 +12,9 @@ collects isolated JSONL records, and writes a preview summary + manifest for rev
 The `scheduled_cuda_parity.py` probe compares line, bremsstrahlung, characteristic,
 and coherent spectra on three identical seeded segment records, across CPU FP64,
 CUDA FP64 and CUDA FP32. Run it via `scheduled_cuda_parity.sbatch` on the lab box.
-These two orchestration probes have no independent ledger-claim mapping.
+The `schedule_cuda_parity.sh` cron entry point guards recurring lab-host
+submissions and records their job IDs. The orchestration and parity probes have
+no independent ledger-claim mapping.
 Use the collector to preserve normal output and write dated JSONL evidence:
 
 ```bash
@@ -224,9 +226,19 @@ Candidates for a later bounded CPU manifest are the source/shell table
 comparisons and optional crystallography/cascade oracles;
 measure them with pinned prerequisites and inspect their output first. CUDA
 parity has its separate lab cron. Remaining ensembles require explicit remote
-recipes. **Do not use `--all-mapped --publish` to refresh the ledger:** the
-collector's exit-code interpretation cannot distinguish a diagnostic from a
-scientific gate. Full evidence coverage requires threshold adapters or reviewed
+recipes. The refresh driver accepts only exact invocations in its `CPU_RECIPES`
+registry, and validates every path before creating artifacts or starting any
+producer, including direct `refresh()` calls and explicit `--check` selections.
+Currently the three defaults use no arguments; the source and shell comparisons
+use `--download` to obtain their pinned references. These latter two are
+reviewed gate recipes available for explicit profiling, not default scheduled
+work. Manifest command rows record exact arguments and elapsed wall seconds.
+`--all-mapped` is refused while any mapped entry lacks a reviewed recipe;
+run diagnostic tools directly when investigating them. The raw
+`pyrite-dev validation-records` collector still interprets process exit codes;
+its callers must review the exact mode rather than treating mapping as proof
+of a scientific gate. Full evidence coverage requires threshold adapters or
+reviewed
 verdicts for the diagnostic rows, not merely rerunning their entry points.
 
 | Producer (`checks/`) | Runtime / route | Prerequisites | Verdict contract |

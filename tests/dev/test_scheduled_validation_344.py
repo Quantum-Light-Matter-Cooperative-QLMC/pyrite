@@ -88,3 +88,43 @@ def test_exhaustive_diagnostics_cannot_be_published(tmp_path, capsys):
     assert error.value.code == 2
     assert "without scientific failure gates" in capsys.readouterr().err
     assert not output.exists()
+
+
+@pytest.mark.parametrize("publish", [False, True])
+def test_refresh_refuses_diagnostic_recipe_before_execution(tmp_path, monkeypatch, publish):
+    refresh = _script("refresh_validation_evidence.py")
+
+    def unexpected_run(*args, **kwargs):
+        pytest.fail("diagnostic producer was executed")
+
+    monkeypatch.setattr(refresh.subprocess, "run", unexpected_run)
+    output = tmp_path / "evidence"
+    with pytest.raises(ValueError, match="no reviewed CPU recipe"):
+        refresh.refresh(["checks/kinematic_validity_check.py"], output, publish=publish)
+    assert not output.exists()
+
+
+def test_refresh_records_exact_reviewed_invocation(tmp_path, monkeypatch):
+    import json
+    from types import SimpleNamespace
+
+    from pyrite.validation.check_records import records_for_exit, write_records
+
+    refresh = _script("refresh_validation_evidence.py")
+    check = "checks/brem_source_comparison.py"
+
+    def collect(command, **kwargs):
+        # Emulate a missing reference, preserving the collector's real JSONL contract.
+        assert command[-2:] == [check, "--download"]
+        output = Path(command[command.index("--output-dir") + 1])
+        write_records(output / "brem_source_comparison.jsonl", records_for_exit(check, 2, "abc"))
+        return SimpleNamespace(returncode=2)
+
+    monkeypatch.setattr(refresh.subprocess, "run", collect)
+    monkeypatch.setattr(refresh, "current_revision", lambda: "abc")
+    output = tmp_path / "evidence"
+    assert refresh.refresh([check], output) == 0
+    manifest = json.loads((output / "manifest.json").read_text())
+    assert manifest["checks"][0]["verdict"] == "skip"
+    assert manifest["commands"][0]["args"] == ["--download"]
+    assert manifest["commands"][0]["elapsed_seconds"] >= 0

@@ -35,14 +35,18 @@ In a repository checkout, run or extend the manifest explicitly:
 
 ```bash
 uv run python checks/refresh_validation_evidence.py \
-  --output-dir /tmp/pyrite-evidence-344 --check checks/cross_reflection_coherence.py
+  --output-dir /tmp/pyrite-evidence-344 --check checks/brem_source_comparison.py
 ```
 
 Some `checks/` producers require external oracles, reviewed golden artifacts,
-or expensive GPU jobs. `--all-mapped` is an operator-only exhaustive attempt;
-it is not appropriate for the GitHub CPU runner. It includes diagnostic-only
-producers whose successful exit is not a scientific pass; combining it with
-`--publish` is rejected. See the producer inventory in `checks/README.md` for
+or expensive GPU jobs. The refresh driver accepts only reviewed CPU recipes
+with explicit failure gates. Its exact recipe arguments, including pinned
+reference downloads for the source/shell comparisons, are declared in
+`CPU_RECIPES`; each manifest records arguments and elapsed wall seconds.
+Mapped diagnostic-only producers are refused before execution, including
+explicit `--check` and direct `refresh()` publication calls. `--all-mapped`
+is refused until every selected producer has a reviewed recipe. See the producer
+inventory in `checks/README.md` for
 execution routes and verdict-review prerequisites. A skipped check is never
 recorded as a pass. Neither artifacts nor automated records grant human
 sign-off, and **the checked-in status summary is not modified by cron**.
