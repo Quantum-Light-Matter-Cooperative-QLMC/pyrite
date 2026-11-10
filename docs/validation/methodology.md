@@ -27,6 +27,8 @@ tracer coverage: this job supplements, rather than replaces, compiled tests.
 GitHub-hosted runners never run CUDA. The independent Monday 07:17 UTC
 `validation-evidence.yml` workflow collects a bounded CPU-only evidence set,
 including its manifest and a regenerated *preview* of the ledger status summary.
+The default producers check bremsstrahlung angular shape, transition-radiation
+omission, and analytic longitudinal-coherence/recoil limits.
 The run uploads the records and output for 90 days; failures turn the job red.
 
 In a repository checkout, run or extend the manifest explicitly:
@@ -38,7 +40,10 @@ uv run python checks/refresh_validation_evidence.py \
 
 Some `checks/` producers require external oracles, reviewed golden artifacts,
 or expensive GPU jobs. `--all-mapped` is an operator-only exhaustive attempt;
-it is not appropriate for the GitHub CPU runner. A skipped check is never
+it is not appropriate for the GitHub CPU runner. It includes diagnostic-only
+producers whose successful exit is not a scientific pass; combining it with
+`--publish` is rejected. See the producer inventory in `checks/README.md` for
+execution routes and verdict-review prerequisites. A skipped check is never
 recorded as a pass. Neither artifacts nor automated records grant human
 sign-off, and **the checked-in status summary is not modified by cron**.
 After reviewing recorded provenance, a maintainer may run the collector with

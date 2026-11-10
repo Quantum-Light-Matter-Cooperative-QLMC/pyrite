@@ -78,3 +78,13 @@ def test_cuda_scheduler_submission_and_fail_closed(tmp_path, state):
     if state == "idle":
         assert submissions.read_text().endswith("\t456\n")
         assert "--dependency=singleton" in (root / "submitted.args").read_text()
+
+
+def test_exhaustive_diagnostics_cannot_be_published(tmp_path, capsys):
+    refresh = _script("refresh_validation_evidence.py")
+    output = tmp_path / "evidence"
+    with pytest.raises(SystemExit) as error:
+        refresh.main(["--output-dir", str(output), "--all-mapped", "--publish"])
+    assert error.value.code == 2
+    assert "without scientific failure gates" in capsys.readouterr().err
+    assert not output.exists()

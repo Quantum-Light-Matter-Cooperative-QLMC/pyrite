@@ -27,10 +27,11 @@ ROOT = Path(__file__).resolve().parents[1]
 # Deliberately small and non-interactive. Other checks may require a compiler,
 # independent oracle, heavyweight transport, stored golden, or GPU hardware.
 DEFAULT_CPU_CHECKS = (
-    # Both producers return nonzero on a failed scientific comparison. Do not
+    # These producers return nonzero on a failed scientific comparison. Do not
     # include report-only diagnostics: exit 0 there does not establish a pass.
     "checks/brem_angular_comparison.py",
     "checks/transition_radiation_omission.py",
+    "checks/longitudinal_coherence_regimes.py",
 )
 
 
@@ -165,6 +166,11 @@ def main(argv: list[str] | None = None) -> int:
         help="maintainer-only: copy evidence into tracked ledger and regenerate",
     )
     args = parser.parse_args(argv)
+    if args.all_mapped and args.publish:
+        parser.error(
+            "--all-mapped includes diagnostic producers without scientific failure gates; "
+            "review verdicts before publishing evidence"
+        )
     try:
         selected = selected_checks(args.check, all_mapped=args.all_mapped)
         return refresh(selected, args.output_dir, publish=args.publish)
