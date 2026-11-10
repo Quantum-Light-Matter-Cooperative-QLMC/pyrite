@@ -24,6 +24,9 @@ The main CI workflow runs on PRs, pushes to `main`, and weekly on Sundays at
 Pushes to `main` and the weekly run also execute `pyrite-dev test --numba --slow`
 with `PYRITE_ONLINE_TESTS=1`. **`--numba` sets `NUMBA_DISABLE_JIT=1`** for
 tracer coverage: this job supplements, rather than replaces, compiled tests.
+PRs skip it; run it on a branch with `gh workflow run CI --ref <branch>`.
+Live COD lattice checks retry throttled fetches and skip, naming the cause,
+when COD stays unreachable.
 GitHub-hosted runners never run CUDA. The independent Monday 07:17 UTC
 `validation-evidence.yml` workflow collects a bounded CPU-only evidence set,
 including its manifest and a regenerated *preview* of the ledger status summary.
