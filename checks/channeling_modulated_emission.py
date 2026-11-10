@@ -32,7 +32,9 @@ density) has ``F(0) = 1`` up to ``2 (n_max / n_bar) sqrt(w)``, where ``w`` is th
 entry weight above the subspace cutoff whose interference the collapse rule
 drops; and the comb's ``F(0)`` from the converter equals a direct
 position-space quadrature of ``|psi|^2 n / n_bar`` (to 1e-6) when nothing is
-lost at entry. About 2 minutes on CPU (multithreaded BLAS).
+lost at entry. Nonfinite overlap, entry flux, or yield results fail. If no
+prescribed energy exercises the lossless-comb gate, exit 2 records incomplete
+coverage rather than a pass. About 2 minutes on CPU (multithreaded BLAS).
 
 Validation: channeling-modulated-incoherent-emission
 """
@@ -69,7 +71,10 @@ def overlap_factor(solver: DensityMatrixSolver, rho: np.ndarray, coefficients: n
     toeplitz = _toeplitz(coefficients, solver.orders)
     weighted = float(np.einsum("hk,rkh->", toeplitz, plane).real)
     trace = float(np.einsum("rnn->", rho).real)
-    return weighted / (float(coefficients[0].real) * trace), trace
+    factor = weighted / (float(coefficients[0].real) * trace)
+    if not np.isfinite(factor) or not np.isfinite(trace):
+        raise ValueError("nonfinite channeling overlap or retained trace")
+    return factor, trace
 
 
 def comb_state(solver: DensityMatrixSolver, centre_ang: float, sigma_ang: float):
@@ -116,7 +121,10 @@ def depth_profile(solver, initial, coefficients, thickness_ang, chunk_ang, dz_an
 def yield_factor(depths, factors, traces) -> float:
     """``Y(L)``: retained population at ``F``, dechanneled population at 1."""
     integrand = traces * factors + (1.0 - traces)
-    return float(np.trapezoid(integrand, depths) / depths[-1])
+    value = float(np.trapezoid(integrand, depths) / depths[-1])
+    if not np.isfinite(value):
+        raise ValueError("nonfinite channeling yield factor")
+    return value
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -139,6 +147,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"{args.crystal}(110): d = {profile.period_ang:.4f} A, plane at x = {plane_x:.3f} A")
     print(f"perfect-focus planar bound: n_max / n_bar = {peak:.2f} (nuclear, thermal smear)")
     failures: list[str] = []
+    comb_checks = 0
     thickness = args.thickness_um * 1e4
 
     for energy in args.energies_eV:
@@ -157,6 +166,8 @@ def main(argv: list[str] | None = None) -> int:
         rho, free, outside = solver.entry_state(0.0, 0.0)
         f_plane, _ = overlap_factor(solver, rho, nuclear)
         plane_entry = float(free.sum()) + outside
+        if not np.isfinite(plane_entry):
+            raise ValueError("nonfinite plane-wave entry flux")
         print(f"aligned plane wave: F(0) = {f_plane:.6f}, entry flux {plane_entry:.2e}")
         # Dropping the entry's above-cutoff part removes its interference with the
         # retained part, an O(sqrt(entry)) change of the density (collapse rule).
@@ -182,8 +193,12 @@ def main(argv: list[str] | None = None) -> int:
         )
         f_comb, _ = overlap_factor(solver, full_rho, nuclear)
         print(f"  converter F(0) {f_comb:.6f}, direct quadrature {direct:.6f}")
+        if not np.isfinite(entry):
+            raise ValueError("nonfinite comb entry flux")
         if entry < 1e-12:
-            if abs(f_comb / direct - 1.0) > 1e-6:
+            comb_checks += 1
+            error = abs(f_comb / direct - 1.0)
+            if not np.isfinite(error) or error > 1e-6:
                 failures.append(f"{tag}: comb F(0) {f_comb:.6f} != quadrature {direct:.6f}")
 
         print("  state            F_nuc(0)  F_el(0)  Y_nuc(0.1um) Y_nuc(1um) Y_nuc(L)  tr rho(L)")
@@ -220,8 +235,14 @@ def main(argv: list[str] | None = None) -> int:
 
     for failure in failures:
         print(f"FAIL: {failure}")
-    print("PASS" if not failures else f"{len(failures)} failure(s)")
-    return 0 if not failures else 1
+    if failures:
+        print(f"{len(failures)} failure(s)")
+        return 1
+    if not comb_checks:
+        print("SKIP: no prescribed energy exercised the lossless comb/quadrature gate")
+        return 2
+    print(f"PASS (comb/quadrature gate exercised at {comb_checks} energies)")
+    return 0
 
 
 if __name__ == "__main__":

@@ -4,6 +4,11 @@ on:
   pull_request:
     # Stacked issue PRs need the same CI as PRs targeting main.
     branches: [main, "issue-*"]
+  push:
+    branches: [main]
+  schedule:
+    # Weekly full CPU test matrix; the CUDA parity run is lab-only.
+    - cron: '53 6 * * 0'
   # Bot commits made with GITHUB_TOKEN need an explicit CI dispatch.
   workflow_dispatch:
 
@@ -158,7 +163,7 @@ jobs:
   quantum:
     needs: changes
     if: >-
-      github.event_name == 'workflow_dispatch' ||
+      github.event_name != 'pull_request' ||
       needs.changes.outputs.quantum == 'true'
     strategy:
       fail-fast: false
@@ -210,3 +215,33 @@ jobs:
         run: uv run pyrite-dev check-skills
       - name: Check generated repository map
         run: uv run pyrite-dev repo-map --check
+
+  # Keep the existing JIT-compiled suite above. Here --numba intentionally
+  # disables JIT to exercise Python-level Numba bodies; it does NOT test
+  # compiled kernels. Online tests run separately on push/main and weekly.
+  numba-online:
+    if: github.event_name == 'push' || github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      PYRITE_MC_BACKEND: cpu
+      PYRITE_ONLINE_TESTS: '1'
+      PYRITE_SLOW_TESTS: '1'
+      PYRITE_TEST_WORKERS: '2'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          python-version: '3.14'
+      - run: uv sync --all-groups --locked
+      - name: Cache pinned physics tables
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.local/share/pyrite/datasets
+            ~/.local/share/pyrite/xsgen/tables
+            ~/.local/share/pyrite/xsgen/reference-data
+          key: pyrite-data-${{ hashFiles('src/pyrite/datasets.py', 'src/pyrite/xsgen/fetch.py', 'src/pyrite/data/xsgen/*-tables.json') }}
+      - run: uv run pyrite tables fetch
+      - name: Full test suite with JIT disabled and online checks enabled
+        run: uv run pyrite-dev test --numba --slow --durations=30

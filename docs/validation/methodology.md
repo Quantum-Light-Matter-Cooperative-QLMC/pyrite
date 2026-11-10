@@ -17,6 +17,89 @@ Agreement with Zhai/Feranchuk is necessary but not sufficient — it can hide **
 - **Re-derivation write-ups** — `docs/validation/<domain>/<id>.md` holds each independent derivation, its diff against the implementation, and the adjudication. Domain directories mirror the physics hierarchy where practical; the ledger is the location authority. Write and format the math per the [LaTeX/MyST style rules](formatting-style.md).
 - **Anchors** — regression tests (mostly under `checks/`) that pin a claim to a reference value with a tolerance.
 
+### Scheduled validation evidence and CPU/CUDA parity (#344)
+
+The main CI workflow runs on PRs, pushes to `main`, and weekly on Sundays at
+06:53 UTC. CPU tests with compiled JIT remain enabled in the regular matrix.
+Pushes to `main` and the weekly run also execute `pyrite-dev test --numba --slow`
+with `PYRITE_ONLINE_TESTS=1`. **`--numba` sets `NUMBA_DISABLE_JIT=1`** for
+tracer coverage: this job supplements, rather than replaces, compiled tests.
+GitHub-hosted runners never run CUDA. The independent Monday 07:17 UTC
+`validation-evidence.yml` workflow collects a bounded CPU-only evidence set,
+including its manifest and a regenerated *preview* of the ledger status summary.
+The default producers check bremsstrahlung angular shape, transition-radiation
+omission, analytic longitudinal-coherence/recoil limits, and EEDL shell
+ionization against pinned Bote–Salvat references. It also runs the bounded
+Dans-Diffraction crystallography and xraylib cascade gates. The workflow's
+locked `oracle` dependency group provisions both; an unavailable optional
+oracle records a skip rather than a pass. The bounded full-default
+channeling-modulated emission gate also runs; it records a skip if none of its
+prescribed energies exercises the conditional lossless-comb comparison.
+The run uploads the records and output for 90 days; failures turn the job red.
+
+In a repository checkout, run or extend the manifest explicitly:
+
+```bash
+uv run python checks/refresh_validation_evidence.py \
+  --output-dir /tmp/pyrite-evidence-344 --check checks/brem_source_comparison.py
+```
+
+Some `checks/` producers require external oracles, reviewed golden artifacts,
+or expensive GPU jobs. The refresh driver accepts only reviewed CPU recipes
+with explicit failure gates. Its exact recipe arguments, including pinned
+reference downloads for the source/shell comparisons, are declared in
+`CPU_RECIPES`; each manifest records arguments and elapsed wall seconds.
+Mapped diagnostic-only producers are refused before execution, including
+explicit `--check` and direct `refresh()` publication calls. `--all-mapped`
+is refused until every selected producer has a reviewed recipe. See the producer
+inventory in `checks/README.md` for
+execution routes and verdict-review prerequisites. A skipped check is never
+recorded as a pass. Neither artifacts nor automated records grant human
+sign-off, and **the checked-in status summary is not modified by cron**.
+After reviewing recorded provenance, a maintainer may run the collector with
+`--publish`, which copies its records into `docs/validation/check-records/`
+and regenerates `status-summary.md` locally; that change requires ordinary
+code review before reaching `main`.
+
+For GPU parity, first run `pyrite remote sync` from a clean checkout. On the lab
+host, submit `sbatch -p gpu --gres=gpu:1 checks/scheduled_cuda_parity.sbatch`.
+`pyrite remote sync` ships `checks/` but not `tests/`. Each SLURM allocation
+writes `evidence/validation-344/<job-id>/report.json`, the per-case spectrum
+snapshots and subprocess logs; copy these records back and review the results
+before closing the issue. This is a **hardware-gated**, same-trajectory parity
+check (line, brem, characteristic, coherent; three seeds and energy settings),
+not an independent statistical or cross-code validation. The provisional FP32
+peak/yield tolerance is 3% to allow the discrepancy reported in #298 to be
+measured, while FP64 is initially guarded at `1e-5`; these must be calibrated
+against real hardware evidence, rather than asserted as established accuracy.
+For recurring runs, sync a **dedicated** checkout with
+`PYRITE_REMOTE_DIR=~/pyrite-validation uv run pyrite remote sync` (ensure any
+selected named target uses that directory too). On the lab host, install this
+entry in the operator's crontab, preserving existing entries:
+
+```text
+17 8 * * 1 /bin/bash "$HOME/pyrite-validation/checks/schedule_cuda_parity.sh" >> "$HOME/pyrite-validation/validation-cron.log" 2>&1
+```
+
+This runs Mondays at 08:17 in the lab host's timezone. The host and cron service
+must be running. It tests the last explicitly synced revision; it does not fetch
+or deploy new code. Update that dedicated checkout only while no parity job is
+queued or running. The wrapper serializes submissions, skips an existing
+`validation-344` job, and records UTC submission times and job IDs in
+`evidence/validation-344/submissions.tsv`. SLURM singleton dependencies also
+serialize jobs with the same name and user. Submission failures go to
+`validation-cron.log`; execution failures appear in SLURM accounting and
+`validation-344-<job-id>.log`, with scientific results in `report.json` when the
+probe completes. Inspect these outputs after each run; no automated alert or
+GitHub upload is configured. Remove the crontab entry to disable recurring runs.
+
+The first lab run (2026-11-10, RTX 5080, revision `f95c0c65`) passed every
+channel and case. The largest CUDA FP64 deviation was `8e-16`, and the largest
+FP32 deviations were `8.3e-4` peak-relative (coherent) and `1.0e-4`
+integrated. FP32 scoring on identical trajectories therefore does not
+reproduce the 1.9 % difference in #298. That difference must come from
+somewhere upstream of spectrum scoring, such as transport or sampling.
+
 ### Optional external crystallography oracle
 
 Run the pinned, validation-only `Dans_Diffraction` backend with:

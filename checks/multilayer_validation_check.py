@@ -28,18 +28,15 @@ plan"): two self-contained, quantitative checks that need NO measured data.
      centroid -- carries the scaling: K-O estimates the *range*, and the dose-
      profile shape (hence the centroid fraction) is Z-dependent.]
 
-Run CPU-forced (the viz laptop has the cupy wheel but no CUDA toolkit):
-    uv run python -c "import sys;sys.modules['cupy']=None;sys.path.insert(0,'checks');import runpy;runpy.run_path('checks/multilayer_validation_check.py',run_name='__main__')"
+Run with the project environment and CPU backend:
+    PYRITE_MC_BACKEND=cpu uv run python checks/multilayer_validation_check.py
 """
 
-import os
 import sys
 
 import numpy as np
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
-
-from pyrite.campaign.sweep import crystal_params, substrate_composition  # noqa: E402
+from pyrite.campaign.sweep import crystal_params, substrate_composition
 from pyrite.montecarlo import (
     TRANSPORT_ELEMENTS,
     _mu_total_inv_ang,
@@ -47,7 +44,7 @@ from pyrite.montecarlo import (
     tilted_geometry,
 )
 from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
-from pyrite.montecarlo.transport import spliced_stopping_keV_per_ang  # noqa: E402
+from pyrite.montecarlo.transport import spliced_stopping_keV_per_ang
 
 _N_A = 6.02214076e23  # rho[g/cm^3] = n[1/Ang^3] * A[g/mol] * 1e24 / N_A
 

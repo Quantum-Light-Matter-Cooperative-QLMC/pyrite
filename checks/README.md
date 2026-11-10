@@ -6,6 +6,15 @@ ledger remains authoritative; a successful check is evidence, not human
 sign-off.
 
 The canonical check-to-ledger mapping is `pyrite.validation.check_records.CHECK_LEDGER_IDS`.
+The `refresh_validation_evidence.py` driver runs a small scheduled CPU manifest
+of explicit pass/fail checks (not report-only diagnostics),
+collects isolated JSONL records, and writes a preview summary + manifest for review.
+The `scheduled_cuda_parity.py` probe compares line, bremsstrahlung, characteristic,
+and coherent spectra on three identical seeded segment records, across CPU FP64,
+CUDA FP64 and CUDA FP32. Run it via `scheduled_cuda_parity.sbatch` on the lab box.
+The `schedule_cuda_parity.sh` cron entry point guards recurring lab-host
+submissions and records their job IDs. The orchestration and parity probes have
+no independent ledger-claim mapping.
 Use the collector to preserve normal output and write dated JSONL evidence:
 
 ```bash
@@ -192,3 +201,187 @@ independent physics-validation verdicts.
 | `continuum_geant4_isolated.sbatch`, `continuum_geant4_queen.sbatch`, `continuum_geant4_spectra.sbatch` | Submit Geant4 benchmark workloads. |
 | `continuum_precision.sbatch`, `continuum_pyrite_isolated.sbatch` | Submit precision workloads. |
 | `escaped278` | Escaped-photon comparison and prepared-scorer benchmark harnesses; follow-up ownership in #821/#825. |
+
+## Scheduled evidence coverage inventory
+
+Static review of the 52 mapped producers (54 distinct claims), 2026-11-10.
+The mapping in `pyrite.validation.check_records` identifies claim associations;
+it does **not** certify a producer's exit code as a pass/fail gate. Unmeasured
+runtime labels below are routing decisions; measured rows refer to the
+admission samples documented below. Unmeasured transport,
+solver and ensemble jobs must be profiled on the lab host before admission to
+a bounded scheduled manifest. Never launch the entire inventory locally.
+
+`Diagnostic` means the entry point prints/reduces results without establishing
+a complete threshold verdict; exit 0 must not be promoted to scientific pass.
+`Review` means internal guards exist but full claim gating needs inspection.
+`Gate` means the producer has an explicit failure exit/exception; its required
+mode, inputs and claim coverage still need review before scheduling. In
+particular, multi-mode scripts must run their comparison/check mode, not just
+capture or reduction. No row here promotes a physics claim.
+
+The default CPU schedule includes `brem_angular_comparison.py` and
+`transition_radiation_omission.py` (blocked by #1064 and #1065), plus
+`longitudinal_coherence_regimes.py` (local smoke passed, covering two claims),
+`shell_ionization_comparison.py` (remote gate passed in 51.69 s), and the
+optional `dans_diffraction_oracle.py` / `xraylib_cascade_oracle.py` gates
+(remote passes in 3.20 / 1.46 s). The full-default
+`channeling_modulated_emission.py` gate also passed remotely in 21.58 s.
+The source table comparison has a reviewed
+recipe but fails its existing gate (#1068); it remains explicit-only. CUDA
+parity has its separate lab cron. Remaining ensembles require explicit remote
+recipes. The refresh driver accepts only exact invocations in its `CPU_RECIPES`
+registry, and validates every path before creating artifacts or starting any
+producer, including direct `refresh()` calls and explicit `--check` selections.
+The original three defaults, both oracle gates and channeling-emission gate
+use no arguments; the shell
+comparison and explicit-only source comparison use `--download` to obtain their
+pinned references. Manifest command rows record exact arguments and elapsed
+wall seconds.
+The ledger index and all listed parts must be present before producers run;
+remote sync omits documentation, so stage those tracked inputs and historical
+`docs/validation/check-records/` separately in a dedicated profiling checkout.
+Missing index/parts are rejected before execution rather than losing timing
+metadata after an expensive probe.
+`--all-mapped` is refused while any mapped entry lacks a reviewed recipe;
+run diagnostic tools directly when investigating them. The raw
+`pyrite-dev validation-records` collector still interprets process exit codes;
+its callers must review the exact mode rather than treating mapping as proof
+of a scientific gate. Full evidence coverage requires threshold adapters or
+reviewed verdicts for the diagnostic rows, not merely rerunning their entry points.
+
+| Producer (`checks/`) | Runtime / route | Prerequisites | Verdict contract |
+| --- | --- | --- | --- |
+| `abtem_channeling_oracle.py` | Optional CPU oracle; unmeasured | abTEM environment; explicit run and compare modes and captured artifacts | Gate (explicit mode where applicable) |
+| `axial_depth_calibration.py` | Remote CPU ensemble; unmeasured | Explicit run/merge/compare recipe and retained arm/fate inputs; Andersen comparison needs paper fixture | Diagnostic |
+| `axial_fiber_andersen.py` | Remote CPU ensemble; unmeasured | Explicit run/merge/compare recipe and retained arm/fate inputs; Andersen comparison needs paper fixture | Diagnostic |
+| `axial_fiber_angular_map.py` | Remote CPU ensemble; unmeasured | Explicit run/merge/compare recipe and retained arm/fate inputs; Andersen comparison needs paper fixture | Diagnostic |
+| `axial_fiber_fates.py` | Remote CPU ensemble; unmeasured | Explicit run/merge/compare recipe and retained arm/fate inputs; Andersen comparison needs paper fixture | Diagnostic |
+| `axial_fiber_source.py` | Remote CPU ensemble; unmeasured | Explicit run/merge/compare recipe and retained arm/fate inputs; Andersen comparison needs paper fixture | Diagnostic |
+| `axial_outgoing_convergence.py` | Remote CPU ensemble; unmeasured | Explicit run/merge/compare recipe and retained arm/fate inputs; Andersen comparison needs paper fixture | Diagnostic |
+| `axial_outgoing_maps.py` | Remote CPU ensemble; unmeasured | Explicit run/merge/compare recipe and retained arm/fate inputs; Andersen comparison needs paper fixture | Diagnostic |
+| `brem_angular_comparison.py` | CPU analytic/table; unmeasured | Packaged physics/catalog data; source and shell comparisons additionally need pinned reference/released tables | Gate (explicit mode where applicable) |
+| `brem_source_comparison.py` | Remote CPU table; 16.08 s (one warm sample) | Packaged physics/catalog data; source and shell comparisons additionally need pinned reference/released tables | Gate (explicit mode where applicable) |
+| `channeling_handoff.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Gate (explicit mode where applicable) |
+| `channeling_modulated_emission.py` | Remote CPU; 21.58 s (one sample) | Packaged physics/catalog data; source and shell comparisons additionally need pinned reference/released tables | Gate (explicit mode where applicable) |
+| `channeling_overflow.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Gate (explicit mode where applicable) |
+| `coherent_flat_omission.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Review |
+| `coherent_physical_population_remote.py` | CUDA allocation; input/ladder-dependent | NVIDIA environment; some probes need captured trajectories or explicit CLI modes | Review |
+| `coherent_transverse_coherence.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Diagnostic |
+| `coherent_window_excluded_dispersion.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Review |
+| `collision_statistics_refinement.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Diagnostic |
+| `cross_reflection_coherence.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Diagnostic |
+| `dans_diffraction_oracle.py` | Remote CPU oracle; 3.20 s (one sample) | Optional Dans_Diffraction installation; packaged crystal definitions | Gate (explicit mode where applicable) |
+| `detector_solid_angle_check.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Gate (explicit mode where applicable) |
+| `elsepa_line_sensitivity.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Diagnostic |
+| `energy_loss_straggling_observables.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Diagnostic |
+| `energy_step_convergence_matrix.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Diagnostic |
+| `feranchuk_check_script.py` | CPU analytic/table; unmeasured | Packaged physics/catalog data; source and shell comparisons additionally need pinned reference/released tables | Diagnostic |
+| `feranchuk_vs_zhai_check.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Diagnostic |
+| `kephart_occupation.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Gate (explicit mode where applicable) |
+| `kinematic_validity_check.py` | CPU analytic/table; unmeasured | Packaged physics/catalog data; source and shell comparisons additionally need pinned reference/released tables | Diagnostic |
+| `line_setup_support_286.py` | CUDA allocation; input/ladder-dependent | NVIDIA environment; some probes need captured trajectories or explicit CLI modes | Diagnostic |
+| `line_window_backend_agreement.py` | CUDA allocation; input/ladder-dependent | NVIDIA environment; some probes need captured trajectories or explicit CLI modes | Gate (explicit mode where applicable) |
+| `longitudinal_coherence_regimes.py` | CPU analytic/table; unmeasured | Packaged physics/catalog data; source and shell comparisons additionally need pinned reference/released tables | Gate (explicit mode where applicable) |
+| `mosaic_mc_check.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Gate (explicit mode where applicable) |
+| `multilayer_check.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Diagnostic |
+| `multilayer_slice3_check.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Gate (explicit mode where applicable) |
+| `multilayer_validation_check.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Gate (explicit mode where applicable) |
+| `optical_response_cuda.py` | CUDA allocation; input/ladder-dependent | NVIDIA environment; some probes need captured trajectories or explicit CLI modes | Gate (explicit mode where applicable) |
+| `optical_stack_cuda.py` | CUDA allocation; input/ladder-dependent | NVIDIA environment; some probes need captured trajectories or explicit CLI modes | Gate (explicit mode where applicable) |
+| `optical_transition_cuda.py` | CUDA allocation; input/ladder-dependent | NVIDIA environment; some probes need captured trajectories or explicit CLI modes | Gate (explicit mode where applicable) |
+| `quantum_decoherence_budget.py` | Remote CPU; 1.51 s (one sample) | Packaged physics/catalog data; source and shell comparisons additionally need pinned reference/released tables | Gate (explicit mode where applicable) |
+| `radiation_error_estimator_calibration.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Diagnostic |
+| `sb85_eta_small_kappa_fit.py` | CPU analytic/table; unmeasured | Packaged physics/catalog data; source and shell comparisons additionally need pinned reference/released tables | Diagnostic |
+| `segment_escape_split_ladder.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Diagnostic |
+| `shell_ionization_comparison.py` | Remote CPU table; 51.69 s (one warm sample) | Packaged physics/catalog data; source and shell comparisons additionally need pinned reference/released tables | Gate (explicit mode where applicable) |
+| `shell_secondary_transport_observables.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Gate (explicit mode where applicable) |
+| `shell_soft_hard_transport_observables.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Diagnostic |
+| `sinc_bin_integration.py` | CUDA allocation; input/ladder-dependent | NVIDIA environment; some probes need captured trajectories or explicit CLI modes | Gate (explicit mode where applicable) |
+| `soft_deflection_line_sensitivity.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Diagnostic |
+| `soft_inelastic_deflection.py` | CPU analytic/table; unmeasured | Packaged physics/catalog data; source and shell comparisons additionally need pinned reference/released tables | Diagnostic |
+| `substep_invariance.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Diagnostic |
+| `transition_radiation_omission.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Gate (explicit mode where applicable) |
+| `transport_core_goldens.py` | Remote CPU capture/check; unmeasured | Existing reviewed golden directory; capture is not a validation verdict | Gate (explicit mode where applicable) |
+| `xraylib_cascade_oracle.py` | Remote CPU oracle; 1.46 s (one sample) | Optional xraylib installation; packaged EADL cascade data | Gate (explicit mode where applicable) |
+
+### First bounded table-recipe measurements
+
+Job 10901, revision `80218ed8a`, 2026-11-10: one warm-reference sample per
+recipe after job 10900 downloaded prerequisites. CPU backend, AMD Ryzen 9
+9950X3D, two allocated CPUs, BLAS/OpenMP set to one thread, 8 GiB memory limit.
+The two-recipe harness took 68.14 s wall and peaked at 1,739,092 KiB RSS;
+per-recipe peak memory was not measured. These are admission measurements,
+not an optimization comparison or timing guarantee. Both commands include
+process startup and pinned-reference lookup/download handling.
+
+| Exact producer invocation | Wall seconds | Exit / mapped claim verdict | Scheduling decision |
+| --- | ---: | --- | --- |
+| `checks/brem_source_comparison.py --download` | 16.08 | 1 / `brem-source-comparison`: fail | Explicit-only; 61 existing gate violations (46 H, 15 Li), no tolerance change. |
+| `checks/shell_ionization_comparison.py --download` | 51.69 | 0 / `eedl-shell-ionization-comparison`: pass | Admit to bounded CPU defaults. |
+
+Source prerequisites are pinned Seltzer–Berger reference data and released
+BremsLib tables; shell prerequisites are pinned Bote–Salvat parameters and
+packaged EEDL data. The remote manifest, exact arguments, logs, records and
+ledger preview remain under `evidence/validation-344-profile/10901/` in the
+dedicated profiling checkout; they were not promoted into tracked claim
+records. Job 10900 evaluated both gates but could not render its preview
+because remote sync omits ledger documentation. Stage the tracked ledger
+inputs before remote refresh; the driver now checks that prerequisite before
+starting a producer.
+
+### Optional oracle recipe measurements
+
+Job 10902, revision `6f8833d69`, 2026-11-10: one default-mode sample per
+oracle, without an explicit warm-up, after `uv sync --all-groups --locked`.
+That provisioning matches the existing scheduled workflow; no dependency or
+workflow change was required. Python 3.14.6, Dans-Diffraction 3.4.0, xraylib
+4.3.0, NumPy 2.5.4 and SciPy 1.18.1 ran on the same CPU/backend/resource limits
+as the table sample above. The harness took 4.78 s wall and peaked at
+251,964 KiB RSS; per-oracle peak memory and timing spread were not measured.
+These single samples establish bounded admission, not performance guarantees.
+
+| Exact producer invocation | Wall seconds | Exit / mapped claim verdict | Scheduling decision |
+| --- | ---: | --- | --- |
+| `checks/dans_diffraction_oracle.py` | 3.20 | 0 / `dans-diffraction-oracle`: pass | Admit; locked `oracle` group provisions Dans-Diffraction. |
+| `checks/xraylib_cascade_oracle.py` | 1.46 | 0 / `characteristic-radiation`: pass | Admit; locked `oracle` group provisions xraylib. |
+
+Both optional dependencies return exit 2 when unavailable; the refresh records
+`skip`, never `pass`. Local use can provision them with `uv run --group oracle`.
+The crystallography recipe evaluates its fixed material/reflection/energy set
+with existing finite/tolerance gates. The cascade recipe preserves the existing
+10% vacancy and 5% line bounds and fails if any prescribed case produces no
+gated reference comparisons, closing the former empty-reference false pass.
+No physical threshold or model was changed. Results, versions, logs, records,
+manifest and preview remain under `evidence/validation-344-profile/10902/`
+in the dedicated profiling checkout; claim records were not promoted.
+
+### Quantum and channeling-emission gate measurements
+
+Job 10903, revision `cb496c867`, 2026-11-10, ran each exact default invocation
+once, without an explicit warm-up. Same CPU/backend/resource limits as above;
+Python 3.14.6, NumPy 2.5.4 and SciPy 1.18.1 were provisioned with the existing
+locked groups. Separate manifests and time reports preserve each result.
+
+| Exact producer invocation | Producer wall seconds | Harness peak RSS [KiB] | Verdict / scheduling decision |
+| --- | ---: | ---: | --- |
+| `checks/quantum_decoherence_budget.py` | 1.51 | 280,368 | Fail / explicit-only: its old not-computable table rejects newly available MoS2 channeling data; material coverage needs review. |
+| `checks/channeling_modulated_emission.py` | 21.58 | 266,128 | Pass / admit to CPU defaults; the conditional lossless-comb gate was exercised at 17 MeV. |
+
+The quantum sample retained Si(110)/diamond(110) at all four prescribed
+energies and audited all four HOPG/vdW entries. No rate bound was relaxed or
+material assertion removed. Nonfinite rates and limit statistics now fail
+rather than evade comparisons. Diagnostic channeling-radiation formation
+lengths can remain unavailable when fewer than two bound states exist.
+
+The emission sample retained all defaults: Si(110), 0.3/3/17 MeV, 16 cells,
+maximum order 16, 2 micrometres, and all prescribed entry states/tilts. No
+quick mode was substituted. The lossless-comb comparison ran at 17 MeV;
+0.3 and 3 MeV had entry losses above its existing applicability condition.
+Its existing entry/quadrature bounds are unchanged;
+nonfinite overlaps, entry fluxes and yields now fail. If no prescribed energy
+exercises the conditional comb gate, exit 2 records incomplete coverage rather
+than a pass. The single admission measurements do not establish timing spread
+or performance guarantees. Evidence remains under
+`evidence/validation-344-profile/10903/`, with separate producer subdirectories
+and peak-memory reports; no claim records were promoted.

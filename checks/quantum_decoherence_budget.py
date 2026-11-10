@@ -18,15 +18,17 @@ must keep a transverse superposition alive:
 Cells: Si(110) at 30 keV, 300 keV, 3 MeV and 30 MeV (TDS and electronic);
 diamond(110) at the same energies, using its sourced 34 eV valence oscillator
 in the production electronic kernel; and the HOPG/vdW
-catalog crystals at 30 keV, which have no channeling thermal data and are
-reported as not computable.
+catalog crystals at 30 keV, audited against the original not-computable
+table. Newly available channeling data fail the gate until that table's
+coverage is reviewed.
 
     PYRITE_MC_BACKEND=cpu uv run python checks/quantum_decoherence_budget.py
 
 Exit 0 when the limits hold: ``Gamma(0) = 0``; ``Gamma_TDS(Delta -> inf)``
 saturates (relative change below 1e-3 from 100 to 1000 angstrom); and
 ``beta^2 Gamma_TDS`` is energy independent (``C`` scales as ``1 / v^2``) to
-1e-6. A few seconds.
+1e-6. Nonfinite rates or limit statistics fail. Diagnostic formation lengths
+remain unavailable when fewer than two bound states exist. A few seconds.
 
 Validation: quantum-decoherence-budget
 """
@@ -129,16 +131,24 @@ def main(argv: list[str] | None = None) -> int:
             failures.append(f"{crystal} unexpectedly has channeling data; add it to the table")
 
     for row in rows:
+        if not (
+            np.all(np.isfinite(row["tds"]))
+            and np.all(np.isfinite(row["electronic"]))
+            and np.isfinite(row["beta"])
+        ):
+            failures.append(f"{row['label']} {row['energy_eV']:g}: nonfinite decoherence rates")
+            continue
         scale = max(float(row["tds"][-1] + row["electronic"][-1]), 1e-300)
         if abs(row["tds"][0]) + abs(row["electronic"][0]) > 1e-12 * scale:
             failures.append(f"{row['label']} {row['energy_eV']:g}: Gamma(0) != 0")
-        if abs(row["tds"][-1] / row["tds"][-2] - 1.0) > 1e-3:
+        saturation = abs(row["tds"][-1] / row["tds"][-2] - 1.0)
+        if not np.isfinite(saturation) or saturation > 1e-3:
             failures.append(f"{row['label']} {row['energy_eV']:g}: TDS rate does not saturate")
     for label in ("Si(110)", "diamond(110)"):
         scaled = [r["tds"][1:] * r["beta"] ** 2 for r in rows if r["label"] == label]
         spread = max(float(np.max(np.abs(s / scaled[0] - 1.0))) for s in scaled)
         print(f"\n{label}: max relative spread of beta^2 Gamma_TDS over energy {spread:.2e}")
-        if spread > 1e-6:
+        if not np.isfinite(spread) or spread > 1e-6:
             failures.append(f"{label}: beta^2 Gamma_TDS is energy dependent ({spread:.2e})")
 
     for failure in failures:
