@@ -106,7 +106,9 @@ GitHub's contributor list: agent commits carry `Co-Authored-By: Claude …`
 trailers, which GitHub counts as contributors, and Zenodo would otherwise
 credit them as authors. Only humans are listed. Add a new human author to
 `.zenodo.json` in a normal PR; never add an AI agent or `[bot]` account.
-`tests/dev/test_release.py` enforces this. After a release, check the new
+`tests/dev/test_release.py` enforces this. The licence is `other-nc`, Zenodo's
+nearest vocabulary entry for the UCLA Academic Software License in
+`LICENSE.txt`, which the archived source carries. After a release, check the new
 Zenodo version's creator list; correct a stray creator by editing that record.
 
 Releases for data and table archives (`tables-*`, `mirror-*`) share the

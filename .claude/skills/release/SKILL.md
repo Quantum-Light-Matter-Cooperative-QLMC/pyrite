@@ -39,4 +39,5 @@ Zenodo authors come only from `.zenodo.json` (humans only; never add an AI
 agent or bot, even though commits carry `Co-Authored-By: Claude` trailers).
 After the tag publishes, confirm the new Zenodo version's creator list.
 
-Never tag or push without explicit human authorization. No PyPI publishing.
+Never tag or push without explicit human authorization. Never publish to PyPI
+directly; the tag-triggered `release.yml` publishes it.
