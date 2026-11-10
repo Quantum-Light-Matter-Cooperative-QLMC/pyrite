@@ -219,15 +219,16 @@ jobs:
   # Keep the existing JIT-compiled suite above. Here --numba intentionally
   # disables JIT to exercise Python-level Numba bodies; it does NOT test
   # compiled kernels. Online tests run separately on push/main and weekly.
+  # Main pushes skip the slow tier (51% of JIT-disabled cost; PRs run it
+  # compiled); the weekly run keeps it. Workers follow the memory heuristic
+  # (4 on public 4-vCPU runners). Profile: #344, lab job 10909.
   numba-online:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 60
     env:
       PYRITE_MC_BACKEND: cpu
       PYRITE_ONLINE_TESTS: '1'
-      PYRITE_SLOW_TESTS: '1'
-      PYRITE_TEST_WORKERS: '2'
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
@@ -243,5 +244,16 @@ jobs:
             ~/.local/share/pyrite/xsgen/reference-data
           key: pyrite-data-${{ hashFiles('src/pyrite/datasets.py', 'src/pyrite/xsgen/fetch.py', 'src/pyrite/data/xsgen/*-tables.json') }}
       - run: uv run pyrite tables fetch
-      - name: Full test suite with JIT disabled and online checks enabled
-        run: uv run pyrite-dev test --numba --slow --durations=30
+      - name: Test suite with JIT disabled and online checks enabled
+        run: >-
+          uv run pyrite-dev test --numba
+          ${{ github.event_name == 'schedule' && '--slow' || '' }}
+          --durations=30 --junitxml=numba-junit.xml
+      - name: Upload per-test durations
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: numba-junit-${{ github.run_id }}
+          path: numba-junit.xml
+          if-no-files-found: ignore
+          retention-days: 30

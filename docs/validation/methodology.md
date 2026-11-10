@@ -21,8 +21,10 @@ Agreement with Zhai/Feranchuk is necessary but not sufficient — it can hide **
 
 The main CI workflow runs on PRs, pushes to `main`, and weekly on Sundays at
 06:53 UTC. CPU tests with compiled JIT remain enabled in the regular matrix.
-Pushes to `main` and the weekly run also execute `pyrite-dev test --numba --slow`
-with `PYRITE_ONLINE_TESTS=1`. **`--numba` sets `NUMBA_DISABLE_JIT=1`** for
+Pushes to `main` also execute `pyrite-dev test --numba` with
+`PYRITE_ONLINE_TESTS=1`; the weekly run adds `--slow`. The slow tier is about
+half the JIT-disabled cost and already runs compiled on every PR. The job
+uploads `numba-junit.xml` for per-test durations. **`--numba` sets `NUMBA_DISABLE_JIT=1`** for
 tracer coverage: this job supplements, rather than replaces, compiled tests.
 PRs skip it; run it on a branch with `gh workflow run CI --ref <branch>`.
 Live COD lattice checks retry throttled fetches and skip, naming the cause,
