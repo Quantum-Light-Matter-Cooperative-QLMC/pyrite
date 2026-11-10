@@ -372,8 +372,9 @@ momentum changes the Bloch $k$), and $k\neq0$.
 
 These items are open under #585 and none is settled by this screen:
 
-- literature recovery for sub-MeV channeling-radiation photons, as distinct
-  from electron diffraction, EELS and cathodoluminescence;
+- full-text literature recovery for sub-MeV channeling-radiation photons, as
+  distinct from electron diffraction, EELS and cathodoluminescence; the
+  cursory search below found no sub-MeV anchor;
 - longitudinal lattice harmonics, or full Bloch or multislice propagation, as
   against plane averaging;
 - TDS and electronic scattering validity at these energies, along with
@@ -391,3 +392,42 @@ These items are open under #585 and none is settled by this screen:
 axial lines at 1–3 MeV. They saw no planar lines above about 1 keV. That
 result is consistent with the eV-scale planar candidates above. It does not
 show that sub-MeV planar radiation is absent, and it gives no anchor for it.
+
+## Literature: cursory search (2026-11-10)
+
+A short web search looked for photon spectra from electrons below 1 MeV in
+crystals. It found no report of a measured transverse bound→bound line below
+1 MeV. That is not proof of absence. Every item below was read only as an
+abstract or bibliographic record; none is full text, and none is a validation
+anchor.
+
+- **Coherent bremsstrahlung (CB) at microscope energies.** Spence, Reese,
+  Yamamoto and Kurizki reported broad zone-axis peaks in TEM X-ray
+  microanalysis spectra, identified by their orientation and beam-energy
+  dependence (Phil. Mag. B **48**, L39 (1983),
+  [record](https://scilit.com/publications/982ef0699fb3e1908c457a69709f02d5)).
+  Reese, Spence and Yamamoto followed with "Coherent bremsstrahlung from
+  kilovolt electrons in zone axis orientations", Phil. Mag. A **49**, 697
+  (1984), [doi:10.1080/01418618408233297](https://doi.org/10.1080/01418618408233297).
+  A secondary source treats CB and channeling radiation as two aspects of one
+  process; the paper itself was not read. Later TEM work measured CB in Si
+  ⟨110⟩ and ⟨100⟩ at 80–200 keV (Pantel et al., record only). Duval and
+  Delacour found the elementary CB formula insufficient to identify such
+  peaks ([MMM 1996](https://mmm.edpsciences.org/10.1051/mmm:1996103)). These
+  peaks come from the lattice period along the beam, at keV photon energies.
+  They are not transverse bound→bound lines. They are a sub-MeV background to
+  separate, and evidence that zone-axis photon spectra are measurable in this
+  geometry. The 1984 paper is the first full-text target.
+- **Transverse bound states without emission.** An on-column 2p state with
+  topological charge ±1 has been discussed for vortex-beam STEM
+  ([arXiv:1204.0021](https://arxiv.org/abs/1204.0021)), the same 1s/2p
+  structure as the W ⟨001⟩ emitter here. Paulauskas and Klie model kV-scale
+  bound states as decaying roughly exponentially with depth
+  ([arXiv:1811.09138](https://arxiv.org/abs/1811.09138)). That bears on
+  occupation lengths, not on emission. STEM s-state (1s) models and
+  channelling/ALCHEMI reviews treat propagation only.
+- **Lowest-energy CR experiments found.** The Fermilab/ASTA design targets a
+  line near 1.2 keV from about 4 MeV electrons
+  ([arXiv:1407.6053](https://arxiv.org/abs/1407.6053); Blomberg et al.,
+  FEL2013 MOPSO07). No measured spectrum was found. Watson and Koehler (above)
+  remain the lowest-energy measured axial lines known here, at 1–3 MeV.
