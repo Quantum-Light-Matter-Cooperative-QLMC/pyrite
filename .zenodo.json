@@ -1,0 +1,9 @@
+{
+  "upload_type": "software",
+  "license": "cc-by-4.0",
+  "creators": [
+    {"name": "Amador, Alex", "affiliation": "UCLA"},
+    {"name": "Farhadian, Nicholas"},
+    {"name": "Rozells, Jackson"}
+  ]
+}

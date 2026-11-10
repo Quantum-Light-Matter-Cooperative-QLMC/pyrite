@@ -98,6 +98,17 @@ the separate publish workflow, replace the `publish-pypi.yml` publisher with
 the GitHub `pypi` environment still gate publication; omit that requirement
 if publication should proceed without manual approval.
 
+### Zenodo authorship
+
+Zenodo archives each published GitHub Release under the concept DOI in
+`README.md`. Its creators come from the committed `.zenodo.json`, never from
+GitHub's contributor list: agent commits carry `Co-Authored-By: Claude …`
+trailers, which GitHub counts as contributors, and Zenodo would otherwise
+credit them as authors. Only humans are listed. Add a new human author to
+`.zenodo.json` in a normal PR; never add an AI agent or `[bot]` account.
+`tests/dev/test_release.py` enforces this. After a release, check the new
+Zenodo version's creator list; correct a stray creator by editing that record.
+
 Releases for data and table archives (`tables-*`, `mirror-*`) share the
 repository's Releases page. Create them with `--latest=false` (see
 [data distribution](data-distribution-and-repository-size.md)) so the Latest

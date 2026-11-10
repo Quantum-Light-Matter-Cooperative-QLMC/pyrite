@@ -1,5 +1,6 @@
 """`pyrite-dev release`: version bump, due-removal gate, release notes."""
 
+import json
 import subprocess
 from pathlib import Path
 
@@ -195,3 +196,14 @@ def test_release_command_fails_before_editing_when_removals_are_due(monkeypatch,
 
     with pytest.raises(SystemExit, match="module pyrite.old"):
         dev_cli.main(["release", "99.0.0", "--check"])
+
+
+def test_zenodo_creators_are_explicit_humans() -> None:
+    """Zenodo credits `.zenodo.json` creators, not GitHub co-author trailers."""
+    path = Path(__file__).resolve().parents[2] / ".zenodo.json"
+    creators = json.loads(path.read_text())["creators"]
+
+    assert creators
+    for creator in creators:
+        name = creator["name"].lower()
+        assert not any(tag in name for tag in ("claude", "anthropic", "[bot]", "copilot"))
