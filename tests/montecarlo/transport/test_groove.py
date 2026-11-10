@@ -761,6 +761,43 @@ def test_exact_per_electron_groove_reentry_and_budget():
     np.testing.assert_allclose(exact["L_ang"], legacy["L_ang"])
 
 
+def test_per_electron_host_keeps_uncharged_reentry_segments(monkeypatch):
+    """A single charged step can follow a material/vacuum/material crossing."""
+    from pyrite.montecarlo.transport import host_pass
+
+    sample = host_pass.initial_beam_positions
+
+    def placed_entry(*args, **kwargs):
+        pos, slopes, record = sample(*args, **kwargs)
+        pos[:] = (3000.0, 0.0, 8000.0)
+        return pos, slopes, record
+
+    monkeypatch.setattr(host_pass, "initial_beam_positions", placed_entry)
+    direction = np.array([1.0, 0.0, 0.1])
+    direction /= np.linalg.norm(direction)
+    out = simulate_trajectories(
+        E0_keV=60.0,
+        thickness_ang=50000.0,
+        Ne=1,
+        element="C",
+        n_atoms_per_ang3=1e-12,
+        seed=9,
+        elastic_model="sr",
+        radiative_model="uncoupled",
+        beam_dir=direction,
+        tilt_polar_rad=TP,
+        tilt_azim_rad=np.pi,
+        groove=SPEC,
+        transport_core="per-electron",
+        max_steps=1,
+    )
+    assert out["n_transmitted"] == 1
+    assert out["L_ang"].size == 2
+    assert out["vacuum_start_ang"].shape == (1, 3)
+    np.testing.assert_array_equal(out["elec_id"], [0, 0])
+    assert np.all(in_material(out["r_mid"], 50000.0, SPEC))
+
+
 def test_exact_per_electron_groove_vacuum_capacity_reports_required_rows():
     """A full vacuum buffer must not corrupt memory or lose replay counts."""
     d = np.array([1.0, 0.0, 0.1])

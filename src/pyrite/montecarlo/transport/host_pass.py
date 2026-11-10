@@ -797,13 +797,16 @@ def _run_per_electron(t, *, lut):
     p, c, s, e, b = t.inputs, t.controls, t.stack, t.entry, t.buffers
     core, core_xp = _per_electron_core(t, lut)
     split_args = None if p._cone_split is None else p._cone_split.core_args(t.transport_keys, p.Ne)
+    # Each re-entry adds an uncharged material fragment. Surface events and
+    # charged steps each have a per-history max_steps bound.
+    max_segments = p.Ne * p.max_steps * (2 if p.groove is not None else 1)
     common = (
         core,
         core_xp,
         p.Ne,
         p.seed,
         p.max_steps,
-        p.Ne * p.max_steps,
+        max_segments,
         s.n_layers,
         s.internal_bounds,
         _ELASTIC_CODES[p.elastic_model],
