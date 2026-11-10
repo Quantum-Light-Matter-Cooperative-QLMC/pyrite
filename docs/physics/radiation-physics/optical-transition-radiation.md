@@ -121,6 +121,34 @@ sampled Gaussian offsets reproduce the analytic law within the pair-estimate
 error; importance-weighted samples from a wider law reproduce the target law;
 a resolved microbunched profile has its harmonic at $E=2\pi\hbar c/\lambda_m$.
 
+**Published comparisons.** Two published calculations are reproduced through
+the production scorer from their stated parameters.
+
+- Casalbuoni, Schmidt and Schmüser, TESLA Report 2005-15, Eq. (37) and
+  Fig. 14 (`tests/montecarlo/spectrum/test_optical_ctr_casalbuoni_anchor.py`):
+  the far-field energy of a 1 nC, $\gamma=1000$, zero-length bunch with a
+  uniform-disc transverse density of radius 50–1000 µm, from an infinitely
+  large conducting screen, inside 100 and 10 mrad acceptance cones, in µJ per
+  GHz over 0.6–28 THz. The disc enters once as an `empirical` profile and once
+  as `sampled` crossing positions; both agree with the published curves within
+  1 %. The curves lie about 0.5 % (0.2–0.7 %) above Eq. (37) evaluated with
+  CODATA constants. The 1000 µm, 100 mrad curve below 1.2 THz is up to 1.9 %
+  under its own equation and is excluded; a smaller shortfall of the same kind
+  shows at 350 µm. The `gaussian` law reproduces the
+  $\sigma=50$ fs form factor of Fig. 15 within 0.003. The finite-screen and
+  near-field curves of the same figures need a finite radiator and are not
+  compared.
+- Schroeder et al., Phys. Rev. E 69, 016501 (2004), Fig. 3
+  (`tests/montecarlo/spectrum/test_optical_ctr_schroeder_anchor.py`): fully
+  coherent conductor-exit CTR of a Boltzmann momentum distribution with and
+  without divergence, which tests the pair estimator over energy and direction
+  spread at $F=1$.
+
+Both are calculations, not measurements, for a perfect conductor. The absolute
+$N^2$ scale and the transverse and Gaussian form factors come from the first,
+the momentum-spread pair average from the second. Neither tests phase signs
+(the laws are even), a measured optical response or an instrument.
+
 ## RMS duration convention and coherent window
 
 Catalog `envelope_rms_fs` values are RMS (standard
@@ -169,7 +197,7 @@ predicates are lattice phases and are not reused here.
   that a deflected term is no larger than the straight one is heuristic. It
   is conservative: condensed-history direction changes end runs.
   In a consistent gold scene (catalog `au` transport tables with
-  Johnson–Christy gold optics, 30 keV), the bound is about 1.5. ELSEPA
+  Johnson–Christy gold optics, 30 keV), the bound is about 1.8. ELSEPA
   scattering deflects the electrons within the optical skin depth, so the
   default tolerance refuses fixed trajectories there; the scene runs only
   with the check disabled. García de Abajo (RMP 82, 209, footnote 17) places
@@ -182,14 +210,23 @@ predicates are lattice phases and are not reused here.
   piecewise-straight path,
   $|\mathbf r(s)-\mathbf r_0(s)|\le D(L)=\sum_{d_i<L}(L-d_i)|\Delta\hat{\mathbf v}_i|$
   for all $s\le L$, which is exact geometry. A side is short only if the path
-  ends inside $L$ or $\|\mathbf K\|D(L)$ exceeds the tolerance, with
-  $\mathbf K=(\mathbf k_\parallel,\lambda)$ the side medium's wave vector.
-  Treating a smaller phase as straight is the heuristic step; a tolerance of
-  0 reproduces the default exactly. With 0.1 rad, the HOPG-transport/Au-optics
-  test scene goes from 0.171 to 0: its condensed-history kinks are below the
-  phase tolerance within $L$. The gold scene drops from 1.47 to 0.57 and is
-  still refused, consistent with real deflection inside the skin depth. The
-  value is recorded as `formation_kink_phase` in the validity metadata.
+  ends inside $L$ or $\max(\|\mathbf K\|,1/L)\,D(L)$ exceeds the tolerance,
+  with $\mathbf K=(\mathbf k_\parallel,\lambda)$ the side medium's wave
+  vector. $\|\mathbf K\|D$ bounds the phase change at constant speed;
+  $D/L$ is the scale of the change of the current direction over the zone,
+  the larger term for slow charges ($\|\mathbf K\|L<1$). Treating a
+  sub-tolerance side as straight is the heuristic step; a tolerance of 0
+  reproduces the default. With 0.1 rad, the HOPG-transport/Au-optics test
+  scene goes from 0.171 to 0: its condensed-history kinks are below the
+  tolerance within $L$. The gold scene goes from 1.84 to 1.51 and is still
+  refused, consistent with real deflection inside the skin depth. The value
+  is recorded as `formation_kink_phase` in the validity metadata.
+- **Path formation length.** In both policies $L$ is a path length: the
+  formation depth $\hbar c/\min|q\mp\lambda|$ along the normal divided by
+  $|\hat u_z|$ of the crossing direction, so that it is comparable with
+  transported run lengths. Obliquely exiting backscatter (down to
+  $|\hat u_z|=0.13$ in the gold scene) has a correspondingly longer zone.
+  Energy loss inside $L$ is not modeled.
 - **Energy budget.** The radiated energy per physical electron, including the
   pair term, integrated over both hemispheres (Gauss–Legendre in
   $\cos\theta$ × uniform $\varphi$) and the band, plus the out-of-band
