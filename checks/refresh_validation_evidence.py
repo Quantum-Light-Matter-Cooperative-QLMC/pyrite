@@ -34,6 +34,8 @@ DEFAULT_CPU_CHECKS = (
     "checks/transition_radiation_omission.py",
     "checks/longitudinal_coherence_regimes.py",
     "checks/shell_ionization_comparison.py",
+    "checks/dans_diffraction_oracle.py",
+    "checks/xraylib_cascade_oracle.py",
 )
 
 

@@ -207,8 +207,8 @@ independent physics-validation verdicts.
 Static review of the 52 mapped producers (54 distinct claims), 2026-11-10.
 The mapping in `pyrite.validation.check_records` identifies claim associations;
 it does **not** certify a producer's exit code as a pass/fail gate. Unmeasured
-runtime labels below are routing decisions; measured rows refer to the single
-warm-reference sample documented below. Unmeasured transport,
+runtime labels below are routing decisions; measured rows refer to the
+admission samples documented below. Unmeasured transport,
 solver and ensemble jobs must be profiled on the lab host before admission to
 a bounded scheduled manifest. Never launch the entire inventory locally.
 
@@ -223,18 +223,18 @@ capture or reduction. No row here promotes a physics claim.
 The default CPU schedule includes `brem_angular_comparison.py` and
 `transition_radiation_omission.py` (blocked by #1064 and #1065), plus
 `longitudinal_coherence_regimes.py` (local smoke passed, covering two claims),
-and `shell_ionization_comparison.py` (remote gate passed in 51.69 s).
-The optional crystallography/cascade oracles remain candidates: measure them
-with pinned prerequisites and inspect their output first. The source table
-comparison has a reviewed recipe but fails its existing gate; it remains
-explicit-only. CUDA
+`shell_ionization_comparison.py` (remote gate passed in 51.69 s), and the
+optional `dans_diffraction_oracle.py` / `xraylib_cascade_oracle.py` gates
+(remote passes in 3.20 / 1.46 s). The source table comparison has a reviewed
+recipe but fails its existing gate (#1068); it remains explicit-only. CUDA
 parity has its separate lab cron. Remaining ensembles require explicit remote
 recipes. The refresh driver accepts only exact invocations in its `CPU_RECIPES`
 registry, and validates every path before creating artifacts or starting any
 producer, including direct `refresh()` calls and explicit `--check` selections.
-The original three defaults use no arguments; the admitted shell comparison
-and explicit-only source comparison use `--download` to obtain their pinned
-references. Manifest command rows record exact arguments and elapsed wall seconds.
+The original three defaults and both oracle gates use no arguments; the shell
+comparison and explicit-only source comparison use `--download` to obtain their
+pinned references. Manifest command rows record exact arguments and elapsed
+wall seconds.
 The ledger index and all listed parts must be present before producers run;
 remote sync omits documentation, so stage those tracked inputs and historical
 `docs/validation/check-records/` separately in a dedicated profiling checkout.
@@ -245,8 +245,7 @@ run diagnostic tools directly when investigating them. The raw
 `pyrite-dev validation-records` collector still interprets process exit codes;
 its callers must review the exact mode rather than treating mapping as proof
 of a scientific gate. Full evidence coverage requires threshold adapters or
-reviewed
-verdicts for the diagnostic rows, not merely rerunning their entry points.
+reviewed verdicts for the diagnostic rows, not merely rerunning their entry points.
 
 | Producer (`checks/`) | Runtime / route | Prerequisites | Verdict contract |
 | --- | --- | --- | --- |
@@ -269,7 +268,7 @@ verdicts for the diagnostic rows, not merely rerunning their entry points.
 | `coherent_window_excluded_dispersion.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Review |
 | `collision_statistics_refinement.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Diagnostic |
 | `cross_reflection_coherence.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Diagnostic |
-| `dans_diffraction_oracle.py` | Optional CPU oracle; unmeasured | Optional Dans_Diffraction installation; packaged crystal definitions | Gate (explicit mode where applicable) |
+| `dans_diffraction_oracle.py` | Remote CPU oracle; 3.20 s (one sample) | Optional Dans_Diffraction installation; packaged crystal definitions | Gate (explicit mode where applicable) |
 | `detector_solid_angle_check.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Gate (explicit mode where applicable) |
 | `elsepa_line_sensitivity.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Diagnostic |
 | `energy_loss_straggling_observables.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Diagnostic |
@@ -301,7 +300,7 @@ verdicts for the diagnostic rows, not merely rerunning their entry points.
 | `substep_invariance.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Diagnostic |
 | `transition_radiation_omission.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Gate (explicit mode where applicable) |
 | `transport_core_goldens.py` | Remote CPU capture/check; unmeasured | Existing reviewed golden directory; capture is not a validation verdict | Gate (explicit mode where applicable) |
-| `xraylib_cascade_oracle.py` | Optional CPU oracle; unmeasured | Optional xraylib installation; packaged EADL cascade data | Gate (explicit mode where applicable) |
+| `xraylib_cascade_oracle.py` | Remote CPU oracle; 1.46 s (one sample) | Optional xraylib installation; packaged EADL cascade data | Gate (explicit mode where applicable) |
 
 ### First bounded table-recipe measurements
 
@@ -327,3 +326,29 @@ records. Job 10900 evaluated both gates but could not render its preview
 because remote sync omits ledger documentation. Stage the tracked ledger
 inputs before remote refresh; the driver now checks that prerequisite before
 starting a producer.
+
+### Optional oracle recipe measurements
+
+Job 10902, revision `6f8833d69`, 2026-11-10: one default-mode sample per
+oracle, without an explicit warm-up, after `uv sync --all-groups --locked`.
+That provisioning matches the existing scheduled workflow; no dependency or
+workflow change was required. Python 3.14.6, Dans-Diffraction 3.4.0, xraylib
+4.3.0, NumPy 2.5.4 and SciPy 1.18.1 ran on the same CPU/backend/resource limits
+as the table sample above. The harness took 4.78 s wall and peaked at
+251,964 KiB RSS; per-oracle peak memory and timing spread were not measured.
+These single samples establish bounded admission, not performance guarantees.
+
+| Exact producer invocation | Wall seconds | Exit / mapped claim verdict | Scheduling decision |
+| --- | ---: | --- | --- |
+| `checks/dans_diffraction_oracle.py` | 3.20 | 0 / `dans-diffraction-oracle`: pass | Admit; locked `oracle` group provisions Dans-Diffraction. |
+| `checks/xraylib_cascade_oracle.py` | 1.46 | 0 / `characteristic-radiation`: pass | Admit; locked `oracle` group provisions xraylib. |
+
+Both optional dependencies return exit 2 when unavailable; the refresh records
+`skip`, never `pass`. Local use can provision them with `uv run --group oracle`.
+The crystallography recipe evaluates its fixed material/reflection/energy set
+with existing finite/tolerance gates. The cascade recipe preserves the existing
+10% vacancy and 5% line bounds and fails if any prescribed case produces no
+gated reference comparisons, closing the former empty-reference false pass.
+No physical threshold or model was changed. Results, versions, logs, records,
+manifest and preview remain under `evidence/validation-344-profile/10902/`
+in the dedicated profiling checkout; claim records were not promoted.

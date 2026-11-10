@@ -29,7 +29,10 @@ GitHub-hosted runners never run CUDA. The independent Monday 07:17 UTC
 including its manifest and a regenerated *preview* of the ledger status summary.
 The default producers check bremsstrahlung angular shape, transition-radiation
 omission, analytic longitudinal-coherence/recoil limits, and EEDL shell
-ionization against pinned Bote–Salvat references.
+ionization against pinned Bote–Salvat references. It also runs the bounded
+Dans-Diffraction crystallography and xraylib cascade gates. The workflow's
+locked `oracle` dependency group provisions both; an unavailable optional
+oracle records a skip rather than a pass.
 The run uploads the records and output for 90 days; failures turn the job red.
 
 In a repository checkout, run or extend the manifest explicitly:
