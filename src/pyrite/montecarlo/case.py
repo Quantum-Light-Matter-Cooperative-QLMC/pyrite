@@ -532,6 +532,9 @@ class Case(Mapping[str, Any]):
 
     def _validate_channeling(self) -> None:
         record = self.channeling
+        if isinstance(record, Mapping) and record.get("model") == "axial":
+            self._validate_axial_channeling(record)
+            return
         if not isinstance(record, Mapping) or set(record) != set(CHANNELING_RECORD_KEYS):
             raise ValueError(
                 "channeling must be a record with keys " + ", ".join(CHANNELING_RECORD_KEYS)
@@ -569,6 +572,57 @@ class Case(Mapping[str, Any]):
             raise ValueError("channeling supports a single-layer slab only")
         if self.mosaic_fwhm_rad or self.mosaic_mc_fwhm_rad:
             raise ValueError("channeling does not support mosaic crystals")
+
+    def _validate_axial_channeling(self, record: Mapping[str, object]) -> None:
+        """Reject uncalibrated, tampered or unsupported v2 fibre records.
+
+        A record's case key or claimed budget alone cannot grant admission:
+        re-resolve the physical case and compare the *entire* repository-owned
+        payload. :func:`admit_axial_channeling` applies the same check at
+        the runner's entry points.
+        """
+        from .._energy_grid_encoding import decode_energy_grid
+        from ..quantum._admission import AxialAdmissionError
+        from ..quantum._axial_envelope import check_axial_line_band
+        from .channeling.axial_case import admitted_axial_case
+
+        admitted = admitted_axial_case(self)
+        if self.energy_model != "midpoint":
+            raise AxialAdmissionError("axial fibre requires midpoint transport")
+        if self.theta_obs_rad != 0 or self.dtheta_obs_rad != 0 or self.domega_sr != 0:
+            raise AxialAdmissionError(
+                "axial fibre supports on-axis, zero-aperture scoring only (got "
+                f"theta_obs_rad={self.theta_obs_rad:g}, dtheta_obs_rad={self.dtheta_obs_rad:g}, "
+                f"domega_sr={self.domega_sr:g})"
+            )
+        check_axial_line_band(admitted, decode_energy_grid(self.E_grid_line))
+        if self.coherent_emission is not _ABSENT:
+            # Native CBS is scored per flight with or without this flag; the
+            # flag adds only bunch-phased scoring, which has no axial contract.
+            raise AxialAdmissionError("axial fibre does not support coherent emission")
+        for field, label in (
+            ("abs_layers", "layer stacks"),
+            ("groove_spacing_ang", "grooves"),
+            ("gdf_source", "GDF input"),
+            ("secondary_threshold_eV", "secondaries"),
+            ("adaptive_precision", "adaptive precision"),
+            ("temporal_profile", "temporal profiles"),
+            ("radiative_model", "coupled radiative transport"),
+            ("transition_radiation", "transition radiation"),
+            ("photon_transport", "photon transport"),
+            ("transport_mode", "mixed transport"),
+            ("transverse_distribution", "transverse beam distributions"),
+            ("line_grid_policy", "automatic line grids"),
+        ):
+            value = getattr(self, field)
+            if value is not _ABSENT and value is not None:
+                raise AxialAdmissionError(f"axial fibre does not support {label}")
+        if self.mosaic_fwhm_rad or self.mosaic_mc_fwhm_rad:
+            raise AxialAdmissionError("axial fibre does not support mosaic crystals")
+        if self.crystal_width_mm is not None or self.crystal_height_mm is not None:
+            raise AxialAdmissionError("axial fibre requires a laterally unbounded slab")
+        if self.energy_spread_frac is not _ABSENT and self.energy_spread_frac:
+            raise AxialAdmissionError("axial fibre does not support beam energy spread")
 
     def _validate_transport_mode(self) -> None:
         """Mixed transport replaces small-angle structure, so readers of it refuse."""
@@ -760,13 +814,55 @@ def refuse_transition_radiation(case: Mapping[str, Any], consumer: str) -> None:
         raise ValueError(f"{consumer} does not support transition_radiation cases yet (#103)")
 
 
+def admit_axial_channeling(case: Mapping[str, Any]) -> None:
+    """Admit an axial case to the standard runner, or refuse before any work.
+
+    Non-axial cases pass. An axial case passes only as a resolved fibre record
+    that equals the repository lookup for its own physical fields and meets
+    every envelope condition of :meth:`Case._validate_axial_channeling`
+    (observable, line band, free→free owner, unsupported options), and only
+    when the repository marks that entry runnable. A raw mapping is validated
+    as a :class:`Case`, so no record, key or budget a caller writes can grant
+    admission.
+    """
+    from ..quantum._admission import is_axial_channeling, refuse_unverified_axial_run
+
+    if not is_axial_channeling(case):
+        return
+    record = case.get("channeling")
+    if (
+        not isinstance(record, Mapping)
+        or record.get("model") != "axial"
+        or record.get("case_key") is None
+    ):
+        refuse_unverified_axial_run()
+    if isinstance(case, Case):
+        case._validate_axial_channeling(record)
+    else:
+        try:
+            Case(**dict(case))
+        except TypeError as error:
+            raise AxialAdmissionError(
+                f"axial case is not a complete case record: {error}"
+            ) from error
+    from ..quantum import _axial_envelope
+
+    _axial_envelope.require_runnable_axial_case(record.get("case_key"))
+
+
+def admit_axial_channeling_cases(cases) -> None:
+    """Admit a whole batch before any case can read caches, write, or execute."""
+    for case in cases:
+        admit_axial_channeling(case)
+
+
 def refuse_channeling(case: Mapping[str, Any], consumer: str) -> None:
     """Raise before any work when ``consumer`` cannot run a channeling case.
 
     ADR-0017 tier-3 rule: every consumer path either supports the planar
     channeling zone (#506) or refuses it before transport or output writes.
     """
-    refuse_axial_channeling(case)
+    refuse_axial_channeling(case, consumer)
     if case.get("channeling") is not None:
         raise ValueError(f"{consumer} does not support channeling cases (#506)")
 

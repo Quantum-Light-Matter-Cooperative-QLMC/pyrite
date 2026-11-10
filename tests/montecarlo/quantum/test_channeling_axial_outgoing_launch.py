@@ -309,14 +309,10 @@ def test_records_depend_on_incident_identity_not_order(checks):
     [
         (dict(matching=AxialMatchingDeclaration(9.0, 1.0, 0.0)), "matching window"),
         (dict(incidents=_incidents(2) + _incidents(1)), "unique"),
-        (
-            dict(incidents=[AxialIncident(0, (0.0, 0.0), 0.0, 1.0, 3)]),
-            "predates",
-        ),
         (dict(incidents=[AxialIncident(0, (0.0, 0.0), 1.0, 0.0, -1)]), "stream_key"),
         (dict(zone=replace(_zone(), frame_lab=np.diag([1.0, 1.0, -1.0]))), "right-handed"),
     ],
-    ids=["cut-off-target", "duplicate-id", "clock", "stream-key", "left-handed"],
+    ids=["cut-off-target", "duplicate-id", "stream-key", "left-handed"],
 )
 def test_inconsistent_inputs_refuse(checks, change, message):
     with pytest.raises(ValueError, match=message):
@@ -398,3 +394,46 @@ def test_reported_bounds_are_the_exact_box_reach_geometry(checks):
         # Any represented |k_perp| moves no farther, nor later, than the bound.
         k = np.hypot(*la.k_perp_inv_ang)
         assert k < reach
+
+
+def test_native_arrival_offset_may_exceed_the_entrance_clock(checks):
+    # Native t_ang starts at the entrance face; t0_ang is an independent bunch
+    # arrival offset of either sign (#994), so neither bounds the other.
+    *_, records = _box_case(checks, 2, incidents=[AxialIncident(0, (0.0, 0.0), 0.0, 5.0, 3)])
+    assert [r.incident_id for r in records] == [0]
+    launch = records[0].launch
+    assert launch is None or (launch.t0_ang == 5.0 and launch.t_ang >= 0.0)
+
+
+def test_pre_drawn_events_reproduce_the_sampled_handoff(checks):
+    # #994: the runner draws each fibre history once (photon source) and maps
+    # the same terminal events to fates; the records must equal a fresh sample.
+    from pyrite.montecarlo.channeling.axial_fiber_unraveling import unravel_fiber_outgoing
+    from pyrite.montecarlo.channeling.axial_outgoing_launch import matching_checked_channels
+
+    _, entry, channels, sampled = _box_case(checks, 12)
+    events = unravel_fiber_outgoing(
+        matching_checked_channels(channels, MATCH),
+        entry,
+        hbar_v_eV_ang=HBAR_V,
+        window=BOX_WINDOW,
+        max_depth_ang=12.0,
+        incident_ids=range(12),
+        seed=11,
+        search_step_ang=2.0,
+    )
+    *_, reused = _box_case(checks, 12, events=events)
+    assert [(r.incident_id, r.fate, r.depth_ang) for r in reused] == [
+        (r.incident_id, r.fate, r.depth_ang) for r in sampled
+    ]
+    for a, b in zip(reused, sampled, strict=True):
+        assert (a.launch is None) == (b.launch is None)
+        if a.launch is not None:
+            np.testing.assert_array_equal(a.launch.r_ang, b.launch.r_ang)
+            np.testing.assert_array_equal(a.launch.v_hat, b.launch.v_hat)
+            assert a.launch.stream_key == b.launch.stream_key
+    assert {r.fate for r in sampled} >= {"physical_outgoing"}
+    with pytest.raises(ValueError, match="every incident"):
+        _box_case(checks, 12, events=events[:5])
+    with pytest.raises(ValueError, match="incident order"):
+        _box_case(checks, 12, events=events[::-1])

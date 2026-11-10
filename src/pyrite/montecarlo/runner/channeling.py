@@ -123,6 +123,29 @@ def _row_arrays(result) -> dict[str, np.ndarray]:
     }
 
 
+def join_zone_rows(native, native_rows, zone) -> dict[str, Any]:
+    """Zone rows in front of the native rows, in the primary-run result schema."""
+    count = int(zone["L_ang"].size)
+    joined = {key: np.concatenate([zone[key], native_rows[key]]) for key in native_rows}
+    joined["channeling_zone"] = np.concatenate(
+        [np.ones(count, dtype=bool), np.zeros(native_rows["L_ang"].size, dtype=bool)]
+    )
+    order = np.lexsort((joined["substep_id"], joined["flight_id"], joined["electron_id"]))
+    joined = {key: value[order] for key, value in joined.items()}
+    # A launched pass also records shell secondary directions; channeling runs
+    # transport no secondaries, so the result keeps the primary-run schema.
+    out = {
+        key: value
+        for key, value in native.items()
+        if key not in native_rows and key not in _LAUNCH_ONLY
+    }
+    out.update(joined)
+    for alias, canonical in _ALIASES.items():
+        if alias in native:
+            out[alias] = out[canonical]
+    return out
+
+
 def transport_channeling_case(
     case,
     keep,
@@ -249,23 +272,7 @@ def transport_channeling_case(
         template, z_ids, r0[z_ids], v0[z_ids], E_keV[z_ids], clock[z_ids], t0[z_ids],
         length[z_ids], kind[z_ids],
     )  # fmt: skip
-    joined = {key: np.concatenate([zone[key], native_rows[key]]) for key in native_rows}
-    joined["channeling_zone"] = np.concatenate(
-        [np.ones(z_ids.size, dtype=bool), np.zeros(native_rows["L_ang"].size, dtype=bool)]
-    )
-    order = np.lexsort((joined["substep_id"], joined["flight_id"], joined["electron_id"]))
-    joined = {key: value[order] for key, value in joined.items()}
-    # A launched pass also records shell secondary directions; channeling runs
-    # transport no secondaries, so the result keeps the primary-run schema.
-    out = {
-        key: value
-        for key, value in native.items()
-        if key not in native_rows and key not in _LAUNCH_ONLY
-    }
-    out.update(joined)
-    for alias, canonical in _ALIASES.items():
-        if alias in native:
-            out[alias] = out[canonical]
+    out = join_zone_rows(native, native_rows, zone)
     out.update(initial_r_ang=r0, initial_v_hat=v0, initial_E_keV=E_keV, initial_t0_ang=t0, Ne=Ne)
     if record is not None:
         out["beam_entry"] = record

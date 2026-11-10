@@ -5,7 +5,7 @@ from contextvars import ContextVar
 from dataclasses import replace
 from typing import Any
 
-from ..case import refuse_axial_channeling, refuse_channeling, refuse_transition_radiation
+from ..case import admit_axial_channeling, refuse_channeling, refuse_transition_radiation
 
 # Public KernelTuning.transport override (#776): a ``PerElectronTransportConfig``
 # set by in-process callers around ``run_case`` and read by ``_transport_case``.
@@ -201,7 +201,7 @@ def _check_opt_in_transport(
             raise ValueError("photon transport does not support block/adaptive transport")
         prepare_photon_case(case, transport_core)
 
-    refuse_axial_channeling(case)
+    admit_axial_channeling(case)
     if trajectory_capture is not None:
         refuse_channeling(case, "trajectory capture")
     if block_electrons is not None:

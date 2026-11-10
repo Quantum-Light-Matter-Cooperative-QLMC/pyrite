@@ -20,7 +20,7 @@ The entries below use generated docstrings, signatures, and source links. API su
 
 ## Angular acceptance and energy selection
 
-`Detector` is the established scalar angular observation interface; see the [semantic aliases](#semantic-response-aliases). `EnergyBins` is detector-facing energy selection, not passive geometry.
+`Detector` is the established scalar angular observation interface, and the experimental `PointDetector` is the same observation along one direction with zero acceptance (source densities per sr, no counting scale); see the [semantic aliases](#semantic-response-aliases). `EnergyBins` is detector-facing energy selection, not passive geometry.
 
 ```{eval-rst}
 .. autosummary::
@@ -28,6 +28,7 @@ The entries below use generated docstrings, signatures, and source links. API su
    :nosignatures:
 
    pyrite.detectors.Detector
+   pyrite.detectors.PointDetector
    pyrite.detectors.AngularAcceptance
    pyrite.detectors.SensorAcceptance
    pyrite.detectors.EnergyBins
