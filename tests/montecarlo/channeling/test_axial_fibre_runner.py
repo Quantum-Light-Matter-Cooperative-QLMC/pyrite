@@ -275,6 +275,15 @@ def test_source_and_budgets_round_trip_through_results_and_checkpoints(case_b, p
     assert stored["free_free"] == "bound"
     assert stored["free_free_upper"] == entry.free_free_upper
     assert stored["evidence_record"] == entry.evidence_record
+    info = produced[0]["segs"]["channeling"]
+    diagnostics = record["channeling_diagnostics"]
+    assert diagnostics["n_fibre_primaries"] == LINES == info["n_fibre_primaries"]
+    assert diagnostics["n_fibre_unresolved"] == info["n_fibre_unresolved"]
+    assert diagnostics["fate_fractions"] == info["fate_fractions"]
+    assert sum(diagnostics["fate_fractions"].values()) == pytest.approx(1.0)
+    assert diagnostics["entrance_weight"] == info["entrance_weight"]
+    np.testing.assert_array_equal(diagnostics["spec_channeling_sem"], info["source"]["sem"])
+    assert diagnostics["spec_channeling_sem"].shape == record["spec_channeling"].shape
 
 
 @pytest.mark.slow

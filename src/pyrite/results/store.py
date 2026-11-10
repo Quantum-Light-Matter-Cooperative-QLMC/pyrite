@@ -380,6 +380,9 @@ def store_result(results, case, out):
     for key in LINE_COMPONENT_KEYS:
         if out.get(key) is not None:
             results[name][E0][key] = out[key]
+    # Axial fibre run diagnostics: fate counts and source SEM (#994).
+    if out.get("channeling_diagnostics") is not None:
+        results[name][E0]["channeling_diagnostics"] = out["channeling_diagnostics"]
     # Opt-in line temporal intensity profile (#292); absent unless requested.
     if out.get("photon_aperture") is not None:
         results[name][E0]["photon_aperture"] = out["photon_aperture"]

@@ -331,6 +331,36 @@ def transport_axial_case(
     return out
 
 
+#: Run diagnostics persisted with every admitted axial record (#994).
+_DIAGNOSTIC_COUNTS = (
+    "n_fibre_primaries",
+    "n_fibre_outgoing_native",
+    "n_fibre_retained_exit",
+    "n_fibre_unresolved",
+)
+
+
+def case_axial_diagnostics(case, transport) -> dict[str, Any]:
+    """Fate counts and source error of one axial run, stored as ``channeling_diagnostics``.
+
+    ``spec_channeling_sem`` is the standard error of ``spec_channeling`` over
+    the line electrons [photons/(eV sr incident electron)]; ``fate_fractions``
+    are the per-line-electron fractions of each fibre fate, so a stored record
+    shows its own unresolved fraction. Values are copied from the transport
+    that scored ``spec_channeling``.
+
+    Validation: cr-axial-persisted-channel
+    """
+    case_axial_spectrum(case, transport)  # same source checks
+    info = transport["segs"]["channeling"]
+    return {
+        **{key: int(info[key]) for key in _DIAGNOSTIC_COUNTS},
+        "fate_fractions": {fate: float(value) for fate, value in info["fate_fractions"].items()},
+        "entrance_weight": float(info["entrance_weight"]),
+        "spec_channeling_sem": np.asarray(info["source"]["sem"], dtype=float).copy(),
+    }
+
+
 def case_axial_spectrum(case, transport) -> np.ndarray:
     """Persisted fibre source [photons/(eV sr incident electron)] on the line grid.
 
