@@ -48,6 +48,8 @@ CPU_RECIPES: dict[str, tuple[str, ...]] = {
     "checks/shell_ionization_comparison.py": ("--download",),
     "checks/dans_diffraction_oracle.py": (),
     "checks/xraylib_cascade_oracle.py": (),
+    "checks/quantum_decoherence_budget.py": (),
+    "checks/channeling_modulated_emission.py": (),
 }
 
 

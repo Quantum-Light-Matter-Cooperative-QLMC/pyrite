@@ -129,16 +129,24 @@ def main(argv: list[str] | None = None) -> int:
             failures.append(f"{crystal} unexpectedly has channeling data; add it to the table")
 
     for row in rows:
+        if not (
+            np.all(np.isfinite(row["tds"]))
+            and np.all(np.isfinite(row["electronic"]))
+            and np.isfinite(row["beta"])
+        ):
+            failures.append(f"{row['label']} {row['energy_eV']:g}: nonfinite decoherence rates")
+            continue
         scale = max(float(row["tds"][-1] + row["electronic"][-1]), 1e-300)
         if abs(row["tds"][0]) + abs(row["electronic"][0]) > 1e-12 * scale:
             failures.append(f"{row['label']} {row['energy_eV']:g}: Gamma(0) != 0")
-        if abs(row["tds"][-1] / row["tds"][-2] - 1.0) > 1e-3:
+        saturation = abs(row["tds"][-1] / row["tds"][-2] - 1.0)
+        if not np.isfinite(saturation) or saturation > 1e-3:
             failures.append(f"{row['label']} {row['energy_eV']:g}: TDS rate does not saturate")
     for label in ("Si(110)", "diamond(110)"):
         scaled = [r["tds"][1:] * r["beta"] ** 2 for r in rows if r["label"] == label]
         spread = max(float(np.max(np.abs(s / scaled[0] - 1.0))) for s in scaled)
         print(f"\n{label}: max relative spread of beta^2 Gamma_TDS over energy {spread:.2e}")
-        if spread > 1e-6:
+        if not np.isfinite(spread) or spread > 1e-6:
             failures.append(f"{label}: beta^2 Gamma_TDS is energy dependent ({spread:.2e})")
 
     for failure in failures:

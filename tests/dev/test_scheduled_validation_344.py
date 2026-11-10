@@ -185,3 +185,68 @@ def test_cascade_oracle_cannot_pass_without_gated_reference_rows(monkeypatch):
     monkeypatch.setitem(sys.modules, "xraylib", oracle)
     monkeypatch.setattr(cascade, "_pyrite_cascade", lambda *args: ({}, {}))
     assert cascade.main() == 1
+
+
+def test_quantum_budget_rejects_nonfinite_rates(monkeypatch):
+    budget = _script("quantum_decoherence_budget.py")
+    monkeypatch.setattr(budget, "planar_profile", lambda *args: object())
+    monkeypatch.setattr(budget, "VDW_CELLS", ())
+    monkeypatch.setattr(budget, "_print_row", lambda *args: None)
+    monkeypatch.setattr(
+        budget,
+        "_row",
+        lambda label, profile, energy: {
+            "label": label,
+            "energy_eV": energy,
+            "tds": np.full(11, np.nan),
+            "electronic": np.zeros(11),
+            "beta": 1.0,
+        },
+    )
+    assert budget.main([]) == 1
+
+
+def test_channeling_overlap_rejects_nonfinite_density():
+    from types import SimpleNamespace
+
+    emission = _script("channeling_modulated_emission.py")
+    solver = SimpleNamespace(
+        basis=SimpleNamespace(vectors=np.ones((1, 1, 1))),
+        orders=np.array([0]),
+    )
+    with pytest.raises(ValueError, match="nonfinite"):
+        emission.overlap_factor(solver, np.full((1, 1, 1), np.nan), np.ones(1))
+
+
+def test_channeling_limits_skip_when_comb_gate_is_never_exercised(monkeypatch):
+    from types import SimpleNamespace
+
+    emission = _script("channeling_modulated_emission.py")
+    # Exercise verdict control flow without running the expensive density solver.
+    profile = SimpleNamespace(
+        period_ang=1.0,
+        nuclear_density=np.ones(1),
+        electron_density=np.ones(1),
+        potential=lambda x: np.cos(2 * np.pi * x),
+        nuclear=np.ones_like,
+        extrema=lambda: (0.0, 1.0),
+    )
+    solver = SimpleNamespace(entry_state=lambda *args: (np.ones((1, 1, 1)), np.zeros(1), 0.0))
+    monkeypatch.setattr(emission, "planar_profile", lambda *args: profile)
+    monkeypatch.setattr(emission, "tds_kernel", lambda *args, **kwargs: 0)
+    monkeypatch.setattr(emission, "electronic_kernel", lambda *args, **kwargs: 0)
+    monkeypatch.setattr(emission, "DensityMatrixSolver", lambda *args: solver)
+    monkeypatch.setattr(emission, "comb_state", lambda *args: (np.full((1, 1, 1), 0.9), 0.1))
+    monkeypatch.setattr(emission, "overlap_factor", lambda *args: (1.0, 1.0))
+    monkeypatch.setattr(
+        emission,
+        "depth_profile",
+        lambda *args: (np.array([0.0, 1000.0, 2000.0]), np.ones(3), np.ones(3)),
+    )
+    assert emission.main(["--energies-eV", "300000"]) == 2
+
+
+def test_channeling_yield_rejects_nonfinite_profile():
+    emission = _script("channeling_modulated_emission.py")
+    with pytest.raises(ValueError, match="nonfinite"):
+        emission.yield_factor(np.array([0.0, 1.0]), np.array([1.0, np.nan]), np.ones(2))
