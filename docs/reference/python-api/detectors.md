@@ -210,8 +210,10 @@ and saved records retain their existing numeric representation.
 Model a grating-spectrometer entrance slit with a scalar detector by giving
 `SlitAcceptance` the source-to-slit distance, the narrow `width`, the long
 `length`, and a `roll` measured from the length axis to the local azimuthal
-tangent. With `roll=0` the narrow width lies along the polar direction, so
-dispersion runs across the polar (energy) gradient:
+tangent. The default `roll=90°` puts the long axis along the polar direction
+and the narrow width along the azimuthal tangent. With `roll=0` the narrow
+width lies along the polar direction instead, so the slit cuts across the
+polar (energy) gradient:
 
 ```python
 from pyrite.detectors import Detector, SlitAcceptance

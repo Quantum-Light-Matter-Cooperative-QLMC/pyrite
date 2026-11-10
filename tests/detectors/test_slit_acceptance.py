@@ -28,7 +28,7 @@ def _scene(detector):
 
 @pytest.mark.parametrize(("distance", "width", "length"), GEOMETRIES)
 def test_roll_zero_equals_sensor_with_width_polar(distance, width, length):
-    slit = SlitAcceptance(distance, width, length)
+    slit = SlitAcceptance(distance, width, length, roll_deg=0)
     sensor = SensorAcceptance(distance, length, width)  # width_mm=azimuthal, height_mm=polar
     assert slit.roll_deg == 0
     assert slit.resolve() == sensor.resolve()
@@ -46,7 +46,14 @@ def test_roll_ninety_swaps_to_sensor_height_length(distance, width, length):
     slit = SlitAcceptance(distance, width, length, roll_deg=90)
     sensor = SensorAcceptance(distance, width, length)  # azimuthal=w, polar=length
     assert slit.resolve() == pytest.approx(sensor.resolve(), rel=1e-15)
-    assert slit.resolve()[2] == SlitAcceptance(distance, width, length).resolve()[2]
+    assert slit.resolve()[2] == SlitAcceptance(distance, width, length, roll_deg=0).resolve()[2]
+
+
+def test_default_roll_puts_long_axis_polar():
+    slit = SlitAcceptance(400, 0.05, 14)
+    assert slit.roll_deg == 90
+    assert slit == SlitAcceptance(400, 0.05, 14, roll_deg=90)
+    assert slit.resolve() == SlitAcceptance(400, 0.05, 14, roll_deg=90).resolve()
 
 
 @pytest.mark.parametrize("roll", [0.0, 1e-7, 17.0, 45.0, 63.3, 89.999, 90.0])
@@ -101,7 +108,7 @@ def test_small_slit_limits(roll):
 
 
 def test_width_may_exceed_length_and_roll_is_from_length_axis():
-    wide = SlitAcceptance(100, 8, 2)
+    wide = SlitAcceptance(100, 8, 2, 0)
     assert wide.resolve() == SensorAcceptance(100, 2, 8).resolve()
     assert SlitAcceptance(100, 8, 2, 90).resolve() == pytest.approx(
         SensorAcceptance(100, 8, 2).resolve(), rel=1e-15

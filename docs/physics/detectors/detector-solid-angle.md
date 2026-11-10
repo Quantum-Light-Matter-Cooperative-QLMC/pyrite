@@ -93,7 +93,7 @@ $\Delta\theta=2\arctan[h/(2L)]$ and $\Delta\phi_{\rm local}=2\arctan[b/(2L)]$,
 the same local meridional convention as `SensorAcceptance`. Hence $\psi=0$
 equals `SensorAcceptance(height=w, width=\ell)`, $\psi=90^\circ$ equals
 `SensorAcceptance(height=\ell, width=w)`, and $\psi$ and $180^\circ-\psi$
-resolve identically. The input roll is folded into $[0^\circ,180^\circ)$. For
+resolve identically. The input roll is folded into $[0^\circ,180^\circ)$; the default is $\psi=90^\circ$ (long axis polar). For
 a small slit, $\Omega\simeq w\ell/L^2$, $\Delta\theta\simeq h/L$ and
 $\Delta\phi_{\rm local}\simeq b/L$.
 

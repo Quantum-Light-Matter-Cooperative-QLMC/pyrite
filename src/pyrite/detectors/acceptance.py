@@ -450,7 +450,8 @@ class SlitAcceptance:
     width larger than the length is allowed). ``roll_deg`` is the angle from
     the ``length`` axis to the local azimuthal tangent, so ``roll_deg=0`` puts
     the narrow width along the polar direction and ``90`` along the azimuthal
-    tangent. It is stored folded into [0, 180) degrees; ψ and 180° - ψ are
+    tangent. The default ``roll_deg=90`` puts the long axis along the polar
+    direction. It is stored folded into [0, 180) degrees; ψ and 180° - ψ are
     mirror-image slits with equal resolved spans. No line curvature, source size, diffraction, pose, or
     response is implied.
 
@@ -466,7 +467,7 @@ class SlitAcceptance:
     distance_mm: float
     width_mm: float
     length_mm: float
-    roll_deg: float = 0.0
+    roll_deg: float = 90.0
 
     def __init__(
         self,
@@ -501,7 +502,7 @@ class SlitAcceptance:
                 raise TypeError("SlitAcceptance received both roll_deg and roll")
             roll_deg = _roll_quantity(roll, field="SlitAcceptance.roll")
         elif roll_deg is _UNSET:
-            roll_deg = 0.0
+            roll_deg = 90.0
         object.__setattr__(self, "roll_deg", roll_deg)
         self.__post_init__()
 
