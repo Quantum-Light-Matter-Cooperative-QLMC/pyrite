@@ -204,9 +204,9 @@ at $k=0$. These are static overlaps, not occupations.
   $1.4\times10^{-2}$ (⟨001⟩) and $1.6\times10^{-2}$ (⟨111⟩) at 30 keV, and
   photon recoil over total energy reaches $5.4\times10^{-3}$. In Si and
   diamond they stay at or below $2.3\times10^{-3}$ and $5.1\times10^{-4}$. A
-  percent-level longitudinal correction is comparable to the 2p dispersion
-  at 30 keV, so the W line energies below about 100 keV need the
-  finite-$\beta$ audit.
+  percent-level longitudinal correction would be comparable to the 2p
+  dispersion at 30 keV. The finite-β audit
+  ({ref}`sec-submev-w001-finite-beta`) below finds the actual corrections an order of magnitude smaller.
 - The W lines at 0.33–4.4 keV lie well above $\hbar\omega_p=80.2$ eV, but
   within W N- and M-shell absorption. Escape needs the dielectric/attenuation
   bound; vacuum line energy is not a detected spectrum.
@@ -295,6 +295,79 @@ These overlaps omit surface refraction and the entrance potential step,
 incoherent scattering, capture, occupation evolution, emission, absorption
 and detector response. They give no support classification.
 
+(sec-submev-w001-finite-beta)=
+### Finite-β audit of the W ⟨001⟩ line
+
+`checks/channeling_submev_w001_kinematics.py` tests the two approximations
+between the transverse eigenvalues and the forward photon energy.
+
+*Transverse Hamiltonian.* For a potential $V$ independent of the axial
+coordinate $z$, the spin-free Klein–Gordon equation
+$[(E-V)^2-c^2p^2-m^2c^4]\psi=0$ separates exactly. With
+$\psi=e^{ip_zz/\hbar}\phi$ and $c^2p_z^2=E^2-m^2c^4-2E\varepsilon$,
+
+$$
+\Bigl[\frac{c^2p_\perp^2}{2E}+V-\frac{V^2}{2E}\Bigr]\phi=\varepsilon\phi .
+$$
+
+The transverse mass $E/c^2=\gamma m$ is therefore exact, not a paraxial
+approximation; low $\beta$ does not by itself invalidate it. The production
+Hamiltonian drops $-V^2/2E$. With $V=\bar V+U$, $\bar V$ the mean inner
+potential and $U_{00}=0$, the dropped term is a constant plus
+$-U\bar V/E-U^2/2E$. The check adds both, using
+$\bar V=-35.75$ eV from `mean_inner_potential_eV`
+(`cr-mean-inner-potential`) and the exact convolution of the stored $U$
+coefficients for $U^2$.
+
+*Line energy.* The production line
+$\hbar\omega=\Delta\varepsilon/(1-\beta)$ (forward) is first order in
+$\hbar\omega/E$ (`cr-doppler-line-energy`). The check solves the exact forward
+conservation of total energy and $p_z$, with $\varepsilon$ re-solved at the
+final energy:
+$cp_z(E,\varepsilon_{2p}(E))-cp_z(E-\hbar\omega,\varepsilon_{1s}(E-\hbar\omega))=\hbar\omega$.
+The photon is on the axis, so the Bloch $k$ is unchanged. A unit test checks
+the secant root against an independent bracketed solve.
+
+Both are evaluated at $k=0$ with cutoffs 2 and 3 well momenta. The run took
+11 min on 4 CPU threads, with a peak of 1.3 GiB. Relative changes agree
+between the cutoffs to $2\times10^{-6}$.
+
+| T | Gap (eV) | KG gap change | First-order line (eV) | Exact kinematics | Both | $\hbar\omega/E$ |
+| --- | --- | --- | --- | --- | --- | --- |
+| 30 keV | 226.52 | $+7.5\times10^{-4}$ | 337.28 | $-1.09\times10^{-3}$ | $-3.4\times10^{-4}$ | $6.2\times10^{-4}$ |
+| 50 keV | 229.08 | $+7.2\times10^{-4}$ | 390.04 | $-1.18\times10^{-3}$ | $-4.5\times10^{-4}$ | $7.0\times10^{-4}$ |
+| 100 keV | 234.88 | $+6.7\times10^{-4}$ | 519.90 | $-1.39\times10^{-3}$ | $-7.2\times10^{-4}$ | $8.5\times10^{-4}$ |
+| 200 keV | 243.89 | $+5.8\times10^{-4}$ | 800.45 | $-1.79\times10^{-3}$ | $-1.21\times10^{-3}$ | $1.1\times10^{-3}$ |
+| 300 keV | 250.21 | $+5.2\times10^{-4}$ | 1119.62 | $-2.17\times10^{-3}$ | $-1.65\times10^{-3}$ | $1.4\times10^{-3}$ |
+| 500 keV | 257.39 | $+4.2\times10^{-4}$ | 1876.87 | $-2.87\times10^{-3}$ | $-2.45\times10^{-3}$ | $1.9\times10^{-3}$ |
+| 750 keV | 260.41 | $+3.4\times10^{-4}$ | 3035.60 | $-3.68\times10^{-3}$ | $-3.35\times10^{-3}$ | $2.4\times10^{-3}$ |
+| 1 MeV | 259.99 | $+2.8\times10^{-4}$ | 4412.57 | $-4.44\times10^{-3}$ | $-4.16\times10^{-3}$ | $2.9\times10^{-3}$ |
+
+Relative changes are against the production gap or line at cutoff 2. "Both"
+is the exact root with the KG terms.
+
+- The KG term lowers 1s by 0.11–0.18 eV and 2p by 0.01–0.04 eV, because $U$
+  is deepest at the string core. The gap widens by at most $7.5\times10^{-4}$.
+  $\bar V$ contributes $-\bar V/E\approx6.6\times10^{-5}$ of that at 30 keV.
+  The scale $U_0/pv$ overstates the effect: only the difference of
+  $\langle U^2\rangle$ between the two levels enters the gap.
+- The exact kinematic root lies below the first-order line by about
+  $1.5\,\hbar\omega/E$. The correction grows with energy, since
+  $\hbar\omega/E\approx2\gamma\Delta\varepsilon/mc^2$. It is not a
+  low-energy breakdown.
+- At 30–100 keV the combined shift is 0.11–0.38 eV. That is comparable to
+  the basis-cutoff change in the line (0.18–0.24 eV) and well below the 2p
+  dispersion. The 2.8 eV dispersion at 30 keV spreads the forward line by
+  about 4 eV. At 300 keV–1 MeV the shift is 1.8–18 eV, larger than both. A
+  promoted line at these energies would need the exact root, or an explicit
+  $O(\hbar\omega/E)$ tolerance.
+
+This audit omits spin. The squared Dirac equation adds a term
+$i\hbar c\,\boldsymbol\alpha\cdot\nabla V$ that the Klein–Gordon form
+lacks; it is not bounded here. Also omitted are longitudinal lattice
+harmonics, the dielectric response, off-axis emission (whose transverse photon
+momentum changes the Bloch $k$), and $k\neq0$.
+
 ## Not established
 
 These items are open under #585 and none is settled by this screen:
@@ -312,6 +385,7 @@ These items are open under #585 and none is settled by this screen:
   focused W ⟨001⟩ audit only static per-band entry overlaps;
 - a converged k grid and an inter-string versus on-string classification of
   multi-string axial pairs, and the flat-band catalog's admission of such pairs.
+- spin terms of the squared Dirac equation, which the finite-β audit omits.
 
 [Watson & Koehler (1982)](https://doi.org/10.1103/PhysRevB.25.3079) observed
 axial lines at 1–3 MeV. They saw no planar lines above about 1 keV. That

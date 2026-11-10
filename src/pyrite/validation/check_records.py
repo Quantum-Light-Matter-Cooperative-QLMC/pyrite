@@ -78,6 +78,7 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     # #585 static screen: a screening record, not a support verdict.
     "checks/channeling_submev_axial_screen.py": (),
     "checks/channeling_submev_w001_entry.py": (),
+    "checks/channeling_submev_w001_kinematics.py": (),
     # Hardware performance evidence accompanies the CUDA backend validation;
     # it does not add a separate pass/fail ledger claim.
     "checks/axial_mcwf_cuda.py": (),
