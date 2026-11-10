@@ -168,10 +168,10 @@ def test_released_bremslib_tracks_seltzer_berger(Z):
     )
     gated = (np.array(_KAPPA) >= 0.05) & (np.array(_KAPPA) <= 0.95)
     # Both sides include electron-electron bremsstrahlung (BremsLib through
-    # the Seltzer-Berger 1985 eta). The bounds follow that paper's quoted
-    # uncertainty (~10 % for the nuclear term below 2 MeV, 3-10 % from 2 to
-    # 50 MeV, 5-10 % theory in the total); the catalogue sweep reaches 1.12
-    # for B and C at k/T <= 0.05 and 0.4-1 MeV (checks/brem_source_comparison.py).
+    # the Seltzer-Berger 1985 eta). C and W stay inside 6 % in moment here,
+    # tighter than the catalogue gate's 10 % (Seltzer-Berger 1986, p. 346);
+    # the sweep reaches 1.12 pointwise for B and C at k/T = 0.05, 0.4-1 MeV
+    # (checks/brem_source_comparison.py).
     for result in results:
         ratio = result.chi_ratio[gated]
         assert np.all(np.abs(ratio - 1.0) <= 0.13), (result.incident_energy_MeV, ratio)
@@ -199,3 +199,65 @@ def test_extended_bremslib_first_moment_tracks_seltzer_berger_at_100_mev(Z):
         _excerpt_table(), [(element, Z)], (100.0,), models=("bremslib",), bremslib_tables=tables
     )
     assert abs(result.first_moment_ratio - 1.0) <= 0.06
+
+
+def _comparison(element, Z, energy, *, chi=1.0, moment=1.0, model="bremslib"):
+    from pyrite.validation.brem_sources import SourceComparison
+
+    kappa = np.array(_KAPPA)
+    return SourceComparison(
+        model=model,
+        element=element,
+        atomic_number=Z,
+        incident_energy_MeV=energy,
+        kappa=kappa,
+        chi_ratio=np.where((kappa >= 0.05) & (kappa <= 0.95), chi, 1.0),
+        hard_cross_section_ratio=1.0,
+        first_moment_ratio=moment,
+    )
+
+
+def test_gate_domain_ungated_elements_are_h_and_the_li_policy_choice():
+    from checks import brem_source_comparison as check
+
+    assert set(check.UNGATED_ELEMENTS) == {1, 3}
+    hydrogen, lithium = check.UNGATED_ELEMENTS[1], check.UNGATED_ELEMENTS[3]
+    assert "pp. 347-348" in hydrogen and "p. 35" in hydrogen
+    assert "policy choice" in lithium and "#1073" in lithium
+
+
+def test_gate_moment_bands_follow_seltzer_berger_and_the_extension_decision():
+    from checks import brem_source_comparison as check
+
+    assert [band[:3] for band in check.MOMENT_TOLERANCE_BANDS] == [
+        (0.01, 30.0, 0.10),
+        (30.0, 100.0, 0.06),
+    ]
+    assert "p. 346" in check.MOMENT_TOLERANCE_BANDS[0][3]
+    assert "#439" in check.MOMENT_TOLERANCE_BANDS[1][3]
+    assert check.moment_tolerance(0.008) is None
+    assert check.moment_tolerance(0.01) == check.moment_tolerance(30.0) == 0.10
+    assert check.moment_tolerance(50.0) == 0.06
+    assert check.POINTWISE_TOLERANCE == 0.13
+
+
+def test_gate_violations_skip_ungated_and_apply_the_bands():
+    from checks import brem_source_comparison as check
+
+    kappa = np.array(_KAPPA)
+    passing = [
+        _comparison("H", 1, 1.0, chi=1.27, moment=1.13),
+        _comparison("Li", 3, 1.0, chi=1.14, moment=1.07),
+        _comparison("C", 6, 1.0, chi=1.12, moment=1.09),
+        _comparison("C", 6, 50.0, chi=1.3, moment=1.05),
+        _comparison("C", 6, 0.005, chi=1.3, moment=1.3),
+        _comparison("C", 6, 1.0, chi=2.0, moment=2.0, model="eedl"),
+    ]
+    assert check.gate_violations(passing, kappa) == []
+    failing = [
+        _comparison("C", 6, 1.0, moment=1.11),
+        _comparison("C", 6, 1.0, chi=1.14),
+        _comparison("C", 6, 50.0, moment=1.07),
+    ]
+    kinds = [(f[0], f[1], f[2]) for f in check.gate_violations(failing, kappa)]
+    assert kinds == [("C", 1.0, "moment"), ("C", 1.0, "chi"), ("C", 50.0, "moment")]
