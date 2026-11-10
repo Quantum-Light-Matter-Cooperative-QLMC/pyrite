@@ -57,6 +57,12 @@ not an independent statistical or cross-code validation. The provisional FP32
 peak/yield tolerance is 3% to allow the discrepancy reported in #298 to be
 measured, while FP64 is initially guarded at `1e-5`; these must be calibrated
 against real hardware evidence, rather than asserted as established accuracy.
+The first lab run (2026-11-10, RTX 5080, revision `f95c0c65`) passed every
+channel and case. The largest CUDA FP64 deviation was `8e-16`, and the largest
+FP32 deviations were `8.3e-4` peak-relative (coherent) and `1.0e-4`
+integrated. FP32 scoring on identical trajectories therefore does not
+reproduce the 1.9 % difference in #298. That difference must come from
+somewhere upstream of spectrum scoring, such as transport or sampling.
 
 ### Optional external crystallography oracle
 
