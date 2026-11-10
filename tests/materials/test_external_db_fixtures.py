@@ -140,3 +140,68 @@ def test_refresh_retains_cached_entry_after_configured_mp_failure(monkeypatch) -
 
     assert module.main() == 1
     assert written == [cached]
+
+
+class _CifResponse:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_args) -> None:
+        return None
+
+    def read(self) -> bytes:
+        return b"data_x\n"
+
+
+def _scripted_urlopen(monkeypatch, outcomes: list) -> list[str]:
+    import urllib.request
+
+    calls: list[str] = []
+
+    def urlopen(url, timeout):
+        calls.append(url)
+        outcome = outcomes.pop(0)
+        if isinstance(outcome, Exception):
+            raise outcome
+        return _CifResponse()
+
+    monkeypatch.setattr(urllib.request, "urlopen", urlopen)
+    return calls
+
+
+def test_cod_fetch_retries_transient_failures(monkeypatch) -> None:
+    from urllib.error import HTTPError, URLError
+
+    from tests.helpers import external_db_fixtures as module
+
+    calls = _scripted_urlopen(
+        monkeypatch,
+        [URLError(ConnectionResetError(104, "reset")), HTTPError("u", 503, "busy", {}, None), "ok"],
+    )
+    delays: list[float] = []
+    assert module._fetch_cod_cif(1, sleep=delays.append) == "data_x\n"
+    assert len(calls) == 3
+    assert delays == [module.COD_BACKOFF_S, 2 * module.COD_BACKOFF_S]
+
+
+def test_cod_fetch_reports_persistent_unavailability(monkeypatch) -> None:
+    from urllib.error import URLError
+
+    from tests.helpers import external_db_fixtures as module
+
+    outcomes = [URLError(ConnectionRefusedError(111, "refused"))] * module.COD_ATTEMPTS
+    calls = _scripted_urlopen(monkeypatch, list(outcomes))
+    with pytest.raises(module.ExternalDBUnavailableError, match="unreachable"):
+        module._fetch_cod_cif(1, sleep=lambda _s: None)
+    assert len(calls) == module.COD_ATTEMPTS
+
+
+def test_cod_fetch_does_not_retry_missing_entry(monkeypatch) -> None:
+    from urllib.error import HTTPError
+
+    from tests.helpers import external_db_fixtures as module
+
+    calls = _scripted_urlopen(monkeypatch, [HTTPError("u", 404, "missing", {}, None)])
+    with pytest.raises(HTTPError):
+        module._fetch_cod_cif(1, sleep=lambda _s: None)
+    assert len(calls) == 1
