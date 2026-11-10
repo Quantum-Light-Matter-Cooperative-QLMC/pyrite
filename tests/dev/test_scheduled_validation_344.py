@@ -41,3 +41,40 @@ def test_validation_refresh_rejects_unregistered_checks():
     checks = refresh.selected_checks(["checks/brem_angular_comparison.py"], all_mapped=False)
     assert checks == list(refresh.DEFAULT_CPU_CHECKS)
     assert "checks/kinematic_validity_check.py" not in checks
+
+
+@pytest.mark.parametrize("state", ["idle", "busy", "unavailable"])
+def test_cuda_scheduler_submission_and_fail_closed(tmp_path, state):
+    import os
+    import shutil
+    import subprocess
+
+    root = tmp_path / "checkout"
+    (root / "checks").mkdir(parents=True)
+    script = root / "checks" / "schedule_cuda_parity.sh"
+    shutil.copy2(Path(__file__).parents[2] / "checks" / script.name, script)
+    commands = tmp_path / "bin"
+    commands.mkdir()
+    queue = commands / "squeue"
+    queue.write_text(
+        "#!/bin/bash\n"
+        + {"idle": "exit 0\n", "busy": "echo 123\n", "unavailable": "exit 1\n"}[state]
+    )
+    submit = commands / "sbatch"
+    submit.write_text('#!/bin/bash\nprintf "%s\\n" "$@" > submitted.args\necho 456\n')
+    queue.chmod(0o755)
+    submit.chmod(0o755)
+    result = subprocess.run(
+        ["bash", str(script)],
+        env={**os.environ, "PATH": f"{commands}:{os.environ['PATH']}"},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    submissions = root / "evidence" / "validation-344" / "submissions.tsv"
+    assert result.returncode == (1 if state == "unavailable" else 0)
+    assert submissions.exists() == (state == "idle")
+    assert (root / "submitted.args").exists() == (state == "idle")
+    if state == "idle":
+        assert submissions.read_text().endswith("\t456\n")
+        assert "--dependency=singleton" in (root / "submitted.args").read_text()

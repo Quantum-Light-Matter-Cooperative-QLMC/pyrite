@@ -57,6 +57,27 @@ not an independent statistical or cross-code validation. The provisional FP32
 peak/yield tolerance is 3% to allow the discrepancy reported in #298 to be
 measured, while FP64 is initially guarded at `1e-5`; these must be calibrated
 against real hardware evidence, rather than asserted as established accuracy.
+For recurring runs, sync a **dedicated** checkout with
+`PYRITE_REMOTE_DIR=~/pyrite-validation uv run pyrite remote sync` (ensure any
+selected named target uses that directory too). On the lab host, install this
+entry in the operator's crontab, preserving existing entries:
+
+```text
+17 8 * * 1 /bin/bash "$HOME/pyrite-validation/checks/schedule_cuda_parity.sh" >> "$HOME/pyrite-validation/validation-cron.log" 2>&1
+```
+
+This runs Mondays at 08:17 in the lab host's timezone. The host and cron service
+must be running. It tests the last explicitly synced revision; it does not fetch
+or deploy new code. Update that dedicated checkout only while no parity job is
+queued or running. The wrapper serializes submissions, skips an existing
+`validation-344` job, and records UTC submission times and job IDs in
+`evidence/validation-344/submissions.tsv`. SLURM singleton dependencies also
+serialize jobs with the same name and user. Submission failures go to
+`validation-cron.log`; execution failures appear in SLURM accounting and
+`validation-344-<job-id>.log`, with scientific results in `report.json` when the
+probe completes. Inspect these outputs after each run; no automated alert or
+GitHub upload is configured. Remove the crontab entry to disable recurring runs.
+
 The first lab run (2026-11-10, RTX 5080, revision `f95c0c65`) passed every
 channel and case. The largest CUDA FP64 deviation was `8e-16`, and the largest
 FP32 deviations were `8.3e-4` peak-relative (coherent) and `1.0e-4`
