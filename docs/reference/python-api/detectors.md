@@ -31,6 +31,7 @@ The entries below use generated docstrings, signatures, and source links. API su
    pyrite.detectors.PointDetector
    pyrite.detectors.AngularAcceptance
    pyrite.detectors.SensorAcceptance
+   pyrite.detectors.SlitAcceptance
    pyrite.detectors.EnergyBins
 ```
 
@@ -203,6 +204,37 @@ Legacy positional and `*_mm` arguments remain numeric-compatible;
 `dataclasses.replace` uses those numeric fields. The exact numeric
 `resolve()` tuple retains degree spans and steradians, and detector lowering
 and saved records retain their existing numeric representation.
+
+## Spectrometer entrance slit
+
+Model a grating-spectrometer entrance slit with a scalar detector by giving
+`SlitAcceptance` the source-to-slit distance, the narrow `width`, the long
+`length`, and a `roll` measured from the length axis to the local azimuthal
+tangent. With `roll=0` the narrow width lies along the polar direction, so
+dispersion runs across the polar (energy) gradient:
+
+```python
+from pyrite.detectors import Detector, SlitAcceptance
+from pyrite.units import Q_
+
+slit = SlitAcceptance(
+    distance=Q_(500, "mm"), width=Q_(50, "um"), length=Q_(10, "mm"), roll=Q_(0, "degree")
+)
+detector = Detector(observation_angle=Q_(135, "degree"), acceptance=slit)
+narrower = detector.acceptance.with_width(Q_(25, "um"))  # sweep slit width, distance or roll
+```
+
+`resolve()` returns the polar span, azimuthal span and exact solid angle, which
+lower onto the same scalar case fields as `SensorAcceptance`; `roll=0` is
+identical to `SensorAcceptance(distance, height=width, width=length)`. The
+derivation is in [Detector solid-angle integration](../../physics/detectors/detector-solid-angle.md#slit-acceptance).
+
+This is the idealized fast path for sweeps and optimization. It models a point
+source on the slit normal and omits line curvature along the slit, source
+size, diffraction and grating coupling. Scoring multiplies the central
+direction by $\Omega$, and the Gaussian polar-span broadening treats the polar
+span as uniform, which is exact only at $\psi=0^\circ$ and $90^\circ$ (the true
+distribution is trapezoidal in between).
 
 ## Response contracts
 

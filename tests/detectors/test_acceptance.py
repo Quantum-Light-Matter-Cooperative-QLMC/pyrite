@@ -180,7 +180,7 @@ def test_flat_acceptance_keywords_and_positionals_are_removed():
             pr.Detector(**{keyword: 2})
     with pytest.raises(TypeError):
         pr.Detector(135, 2, 0.001)
-    with pytest.raises(TypeError, match="AngularAcceptance or SensorAcceptance"):
+    with pytest.raises(TypeError, match="AngularAcceptance, SensorAcceptance or SlitAcceptance"):
         pr.Detector(acceptance=object())
     assert pr.Detector().polar_acceptance_deg is None
 

@@ -7,7 +7,7 @@ live in ``pyrite.instrument`` during the compatibility transition.
 from importlib import import_module
 from typing import TYPE_CHECKING, Any
 
-from .acceptance import AngularAcceptance, SensorAcceptance
+from .acceptance import AngularAcceptance, SensorAcceptance, SlitAcceptance
 from .spec import (
     Detector,
     DetectorResponse,
@@ -41,6 +41,7 @@ __all__ = [
     "AngularAcceptance",
     "AngularDetector",
     "SensorAcceptance",
+    "SlitAcceptance",
     "Detector",
     "DetectorResponse",
     "NativeBinnedResponse",
@@ -76,6 +77,7 @@ _EXPORTS = {
     "PlanarDetector": ("pyrite.instrument", "PlanarDetector"),
     "PlanarPose": ("pyrite.instrument", "PlanarPose"),
     "SensorAcceptance": ("pyrite.detectors", "SensorAcceptance"),
+    "SlitAcceptance": ("pyrite.detectors", "SlitAcceptance"),
 }
 
 # Semantic spellings preserve existing classes, pickle paths and identities.

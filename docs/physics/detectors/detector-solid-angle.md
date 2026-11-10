@@ -4,8 +4,8 @@ The line energy `E_res = ħc·(v·g)/(1 − v·n̂)` depends on the observation 
 
 ## Scalar acceptance geometry
 
-`Detector.acceptance` accepts an immutable `AngularAcceptance` or
-`SensorAcceptance`. Both resolve to the existing polar-span and solid-angle
+`Detector.acceptance` accepts an immutable `AngularAcceptance`,
+`SensorAcceptance` or `SlitAcceptance`. All resolve to the existing polar-span and solid-angle
 case fields; no acceptance-description metadata enters checkpoint identity.
 
 ### Centred spherical patch
@@ -63,6 +63,47 @@ These are local meridional openings, not the longitude bounds of the angular
 patch. In the small-sensor limit, $\Omega\simeq wh/d^2$,
 $\Delta\theta\simeq h/d$, and $\Delta\phi_{\rm local}\simeq w/d$.
 Validation: `detector-sensor-acceptance`; [independent derivation](../../validation/detectors/detector-sensor-acceptance.md).
+
+### Slit acceptance
+
+`SlitAcceptance(distance_mm, width_mm, length_mm, roll_deg)` is a
+source-facing rectangle with a narrow opening $w$ and a long axis $\ell$
+($w>\ell$ is allowed), at radial distance $L$. The roll $\psi$ is measured
+from the length axis to the local azimuthal tangent, so $\psi=0$ puts the
+narrow width along the polar direction (dispersion across the polar gradient)
+and $\psi=90^\circ$ along the azimuthal tangent. Rolling the slit about the line
+of sight preserves every distance from the source, so the projected-area
+integral of the previous section is unchanged:
+
+$$
+\Omega=4\arctan\frac{w\ell}{2L\sqrt{4L^2+w^2+\ell^2}},
+$$
+
+independent of $\psi$. With polar tangent $y$ and azimuthal tangent $x$, the
+corners of the rolled rectangle are $\pm\tfrac{\ell}{2}(\cos\psi,\sin\psi)
+\pm\tfrac{w}{2}(-\sin\psi,\cos\psi)$, whose full projected extents are
+
+$$
+h=w|\cos\psi|+\ell|\sin\psi|\ \text{(polar)},\qquad
+b=\ell|\cos\psi|+w|\sin\psi|\ \text{(azimuthal)}.
+$$
+
+The resolved spans are the opening angles of those extents,
+$\Delta\theta=2\arctan[h/(2L)]$ and $\Delta\phi_{\rm local}=2\arctan[b/(2L)]$,
+the same local meridional convention as `SensorAcceptance`. Hence $\psi=0$
+equals `SensorAcceptance(height=w, width=\ell)`, $\psi=90^\circ$ equals
+`SensorAcceptance(height=\ell, width=w)`, and $\psi$ and $180^\circ-\psi$
+resolve identically. The input roll is folded into $[0^\circ,180^\circ)$. For
+a small slit, $\Omega\simeq w\ell/L^2$, $\Delta\theta\simeq h/L$ and
+$\Delta\phi_{\rm local}\simeq b/L$.
+
+Omissions: a point source on the slit normal, a flat slit (no line curvature),
+and no source size, diffraction or grating coupling. Scoring still uses the
+central direction times $\Omega$. For $0<\psi<90^\circ$ the polar
+distribution across the slit is trapezoidal, but the aperture broadening of
+`aperture_fwhm_eV` treats the polar span as uniform, so it is exact only at
+$\psi=0^\circ$ and $90^\circ$.
+Validation: `detector-slit-acceptance`.
 
 The legacy `PlanarDetector.scalar_detector()` projection keeps its corner-based
 polar span and $wh|\hat{n}\cdot\hat{r}|/d^2$ solid-angle approximation. Its
