@@ -22,7 +22,7 @@ from __future__ import annotations
 import itertools
 import warnings
 from dataclasses import replace
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
 
@@ -43,18 +43,9 @@ AXIS_WARN_CRITICAL_ANGLES = 3.0
 
 def _beam_in_crystal(case: Case) -> np.ndarray:
     """Unit beam direction in crystal (construction) coordinates."""
-    from ..materials.crystal import CRYSTALS, _orientation_R
-    from ..montecarlo.geometry import tilted_geometry
+    from ..montecarlo.channeling.axial_case import beam_in_crystal
 
-    beam, _ = tilted_geometry(0.0, np.deg2rad(case["tilt_deg"]), np.deg2rad(case["tilt_azim_deg"]))
-    rotation = _orientation_R(
-        CRYSTALS[case["crystal"]]["lattice"],
-        case["beam_uvw"],
-        case.get("azimuth_rad", 0.0),
-        case.get("recip_miscut_rad"),
-        surface_hkl=case["surface_hkl"],
-    )
-    return beam if rotation is None else np.asarray(rotation).T @ beam
+    return beam_in_crystal(case)
 
 
 def _axis_proximity(case: Case) -> tuple[tuple[int, int, int], float, float] | None:
@@ -101,11 +92,21 @@ def resolve_channeling(cases: list[Case], physics: Physics, numerics: Numerics) 
         bound state at the beam energy, or an unsupported case combination.
     """
     if physics.channeling_model == "axial":
-        # Defense in depth for direct/legacy callers that bypass Scene lowering:
-        # never fall through to the planar resolver and its model marker.
+        from ..quantum._axial_envelope import match_axial_case
+        from .axial_cases import axial_case_query, axial_channeling_record
         from .axial_spec import refuse_unverified_axial_run
 
-        refuse_unverified_axial_run()
+        if physics.channeling_axial is None or physics.channeling_axial["version"] != 2:
+            refuse_unverified_axial_run()  # v1 remains parseable, never executable
+        u, v, w = cast(list[int], physics.channeling_axial["axis_uvw"])
+        axis = (u, v, w)
+        out = []
+        for case in cases:
+            # Match only resolved physical cases; do not infer or extrapolate
+            # calibration settings from an API/profile recipe.
+            admitted = match_axial_case(axial_case_query(case, axis, CHANNELING_TEMPERATURE_K))
+            out.append(replace(case, channeling=axial_channeling_record(admitted)))
+        return out
     from ..materials.channeling import planar_profile
     from ..montecarlo.channeling import (
         DECHANNELING_MARGIN_EV,

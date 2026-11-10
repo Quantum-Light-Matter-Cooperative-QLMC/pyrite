@@ -366,6 +366,8 @@ NativeSpectrum = { target = "pyrite.detectors.spec:NativeSpectrum", status = "ad
 Timepix3 = { target = "pyrite.detectors.spec:Timepix3", status = "advanced-stable" }
 EagleXO = { target = "pyrite.detectors.spec:EagleXO", status = "advanced-stable" }
 LegacyEDS = { target = "pyrite.detectors.spec:LegacyEDS", status = "advanced-stable" }
+# Zero-acceptance observer along one direction (#994); required by direction-specific models.
+PointDetector = { target = "pyrite.detectors.spec:PointDetector", status = "experimental" }
 
 [package_exports."pyrite.detectors.eaglexo_response"]
 EagleResponse = { target = "pyrite.detectors.eaglexo_response:EagleResponse", status = "advanced-stable" }

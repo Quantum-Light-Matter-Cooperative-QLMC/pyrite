@@ -45,7 +45,9 @@ class AxialIncident:
     ``impact_ang`` is the crystal-frame transverse impact point relative to
     the entrance origin, which must be a lattice point of the cell coordinates
     used by the spectrum and strings. Clocks are native ``t_ang``/``t0_ang``
-    (Å, c=1); ``stream_key`` is the unchanged native primary key.
+    (Å, c=1): the flight clock at the entrance face and the bunch arrival
+    offset are independent, so neither bounds the other. ``stream_key`` is
+    the unchanged native primary key.
     """
 
     incident_id: int
@@ -263,6 +265,28 @@ def _checked_cut(channels: FiberChannels, matching: AxialMatchingDeclaration):
     return cut
 
 
+def matching_checked_channels(
+    channels: FiberChannels, matching: AxialMatchingDeclaration
+) -> FiberChannels:
+    """``channels`` whose every selected cut must lie in the declared window.
+
+    Validation: cr-axial-zone-handoff-physical
+    """
+    return replace(channels, cut=_checked_cut(channels, matching))
+
+
+def _supplied_events(events, incidents, entered, kappa) -> list[FiberEvent]:
+    """Pre-drawn terminal events of the entered incidents, identity checked."""
+    if len(events) != len(incidents):
+        raise ValueError("supplied events must cover every incident once")
+    by_id = {}
+    for incident, event in zip(incidents, events, strict=True):
+        if event.incident_id != incident.incident_id:
+            raise ValueError("supplied events are not in incident order")
+        by_id[incident.incident_id] = event
+    return [by_id[i.incident_id] for i in entered]
+
+
 def _check_tail_reach(channels, engine, zone, matching) -> None:
     """Every classified tail must be above every admitted cut: floor + U_min >= target + window.
 
@@ -285,8 +309,6 @@ def _validate_incidents(incidents: Sequence[AxialIncident]) -> None:
         values = (*i.impact_ang, i.clock_at_surface_ang, i.t0_ang)
         if len(i.impact_ang) != 2 or not np.all(np.isfinite(values)):
             raise ValueError("incident impact and clocks must be finite")
-        if i.clock_at_surface_ang < i.t0_ang:
-            raise ValueError("surface clock predates incident clock")
         key = i.stream_key
         if isinstance(key, bool) or not isinstance(key, Integral) or not 0 <= key < 2**64:
             raise ValueError("stream_key must be a 64-bit nonnegative integer")
@@ -306,6 +328,7 @@ def sample_physical_handoff(
     seed: int = 0,
     search_step_ang: float = 100.0,
     depth_tolerance_ang: float = 1e-6,
+    events: Sequence[FiberEvent] | None = None,
 ) -> list[AxialHandoffRecord]:
     r"""Sample the correlated physical outgoing instrument, one record per incident.
 
@@ -324,11 +347,18 @@ def sample_physical_handoff(
     marginal is resampled. The unit-weight fates sum to the incident count
     at every depth.
 
+    ``events``, if given, are the terminal events of every incident (in
+    ``incidents`` order) already drawn by :func:`.fiber_on_axis_source` with
+    :func:`matching_checked_channels` and the same entry, carrier, window,
+    depth, seed and step settings. They equal the events drawn here, so the
+    fibre histories are not run a second time; an incident the entry split
+    sends out at the surface ignores its event.
+
     Validation: cr-axial-zone-handoff-physical
     """
     frame = _check_zone(zone, max_depth_ang)
     _validate_incidents(incidents)
-    checked = replace(channels, cut=_checked_cut(channels, matching))
+    checked = matching_checked_channels(channels, matching)
     engine = _Engine(checked, hbar_v_eV_ang)
     _check_tail_reach(checked, engine, zone, matching)
     entry = np.asarray(entry_orders, dtype=complex)
@@ -367,19 +397,22 @@ def sample_physical_handoff(
             incident.incident_id, "physical_outgoing", 0.0, launch
         )
     if entered:
-        events = unravel_fiber_outgoing(
-            checked,
-            entry,
-            carrier_inv_ang=kappa,
-            hbar_v_eV_ang=hbar_v_eV_ang,
-            window=g,
-            max_depth_ang=max_depth_ang,
-            incident_ids=[i.incident_id for i in entered],
-            seed=seed,
-            search_step_ang=search_step_ang,
-            depth_tolerance_ang=depth_tolerance_ang,
-        )
-        for incident, event in zip(entered, events, strict=True):
+        if events is None:
+            drawn = unravel_fiber_outgoing(
+                checked,
+                entry,
+                carrier_inv_ang=kappa,
+                hbar_v_eV_ang=hbar_v_eV_ang,
+                window=g,
+                max_depth_ang=max_depth_ang,
+                incident_ids=[i.incident_id for i in entered],
+                seed=seed,
+                search_step_ang=search_step_ang,
+                depth_tolerance_ang=depth_tolerance_ang,
+            )
+        else:
+            drawn = _supplied_events(events, incidents, entered, kappa)
+        for incident, event in zip(entered, drawn, strict=True):
             fate = {"outgoing": "physical_outgoing", "tail": "physical_outgoing"}.get(
                 event.kind, event.kind
             )

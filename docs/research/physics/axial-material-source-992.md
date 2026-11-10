@@ -330,7 +330,7 @@ $0.92(11)\times10^{-4}$ /sr, about 20% of the retained-subspace source.
 | Population | Native CBS | Fibred source (`boundary="max"`) | Free→free block |
 |---|---|---|---|
 | Zone row, exact axis (this run) | zero-order $\mathbf g$ has $\mathbf v\cdot\mathbf g=0$: no line | not scored | **omitted by both** |
-| Zone row, tilted incidence | line above the native resonance-root threshold | not scored | supplied natively |
+| Zone row, tilted incidence | line above the native resonance-root threshold; off for admitted fibre cases (#994) | not scored | supplied natively before #994; omitted and bounded for admitted fibre cases |
 | Handed-off electron (left $P(\kappa)$) | tilted `on_shell_direction` row: line scored | emission after a record leaves the retained subspace is not represented | supplied natively, no overlap |
 | Nonzero axial-order $\mathbf g$, incoherent brems | native | not scored | n/a (stays native, ADR-0018) |
 
@@ -341,3 +341,21 @@ incidence it must keep `boundary="max"`, or the block is counted twice.
 Free→free above the retained cut is outside both estimators on the exact axis;
 its size is not bounded here. This is input to #994 admission, not a
 production rule.
+
+**Si ⟨100⟩ 3.5 MeV, 0.3 µm (#994).** The in-cut block was measured for the
+two #993 cases with a `boundary="none"` arm, chunk-paired with each #993
+control (qlmc cpu at 07c0f5f3e, jobs 10497 and 10498, 20,000 primaries
+each). Record: `docs/validation/check-records/axial-source/free-free-994.json`.
+
+| Case | 800 eV–10 keV | 2.8–4 keV (2p→1s) |
+|---|---|---|
+| A, tilt 0.088° | +7.83(8)% | +3.63(4)% |
+| B, 0° | +18.19(23)% | +10.95(16)% |
+
+The maintainer's 2026-11-09 decisions on #994 treat A and B alike. Native
+PXR/CBS line scoring is off on axial zone rows (`cr-axial-zone-row-native-lines`),
+and each case omits the in-cut block and carries it as a declared one-sided
+bound: 8.06% for A and 18.9% for B (mean + 3 SE). Above-cut free→free stays
+unbounded for both. An earlier decision had A take the block from native CBS on
+its tilted zone rows; the comparison below showed that native CBS does not
+reproduce it, and that decision was superseded.

@@ -10,7 +10,8 @@ from typing import Any
 from ..._backend import BACKEND, BackendResourceError, BackendUnavailableError
 from ..._energy_grid_encoding import decode_energy_grid
 from ..._env import env_value
-from ..case import refuse_axial_channeling_cases
+from ...quantum._admission import is_axial_channeling as _is_axial
+from ..case import AxialAdmissionError, admit_axial_channeling_cases
 from . import (
     _EEDL_BREM_DENSE_INTERMEDIATES,
     _RESOURCE_POLICY,
@@ -373,8 +374,12 @@ def run_cases(
     """
     if engine not in ("auto", "gpu", "cpu"):
         raise ValueError(f"engine must be one of 'auto', 'gpu', 'cpu'; got {engine!r}")
-    refuse_axial_channeling_cases(cases)
+    admit_axial_channeling_cases(cases)
     use_gpu = _RESOURCE_POLICY.gpu if engine == "auto" else engine == "gpu"
+    if any(_is_axial(case) for case in cases):  # admitted envelope is CPU only (#994)
+        if engine == "gpu":
+            raise AxialAdmissionError("axial fibre cases run on CPU only (#994)")
+        use_gpu = False
     if engine == "gpu" and not _RESOURCE_POLICY.gpu:
         raise BackendUnavailableError(
             "run_cases(engine='gpu') requested but no supported accelerator is available; "

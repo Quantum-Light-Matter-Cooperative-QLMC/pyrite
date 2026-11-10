@@ -570,6 +570,59 @@ class Detector:
 delattr(Detector, "response")
 
 
+def _restore_point_detector(observation_angle_deg, response):
+    return PointDetector(observation_angle_deg, response=response)
+
+
+class PointDetector(Detector):
+    """Ideal point observer: one direction, no angular acceptance.
+
+    Source arrays are scored along the single observation direction, in
+    photons per incident electron per eV per sr, with no averaging over an
+    aperture. ``polar_acceptance_deg``, ``azimuthal_acceptance_deg`` and
+    ``solid_angle_sr`` are zero, so there is no counting scale: use it for
+    source densities, not detected counts. Models that are validated for one
+    direction only (the axial fibre source, on axis) require it.
+
+    Parameters
+    ----------
+    observation_angle_deg
+        Polar observation angle from the beam axis in degrees (default 0, on
+        the beam axis).
+    observation_angle
+        Keyword-only Pint angular quantity; conflicts with an explicit
+        ``observation_angle_deg``.
+    response
+        Optional object implementing read-time ``score``.
+    """
+
+    def __init__(
+        self,
+        observation_angle_deg: float | _Unset = _UNSET,
+        *,
+        observation_angle: object = _UNSET,
+        acceptance: None = None,
+        response: DetectorResponse | None = None,
+        _legacy_acceptance: tuple[float | None, float | None] = (None, None),
+    ) -> None:
+        if acceptance is not None or tuple(_legacy_acceptance) not in ((None, None), (0.0, 0.0)):
+            raise TypeError("PointDetector has no angular acceptance; use Detector for one")
+        if observation_angle_deg is _UNSET and observation_angle is _UNSET:
+            observation_angle_deg = 0.0
+        super().__init__(
+            observation_angle_deg, observation_angle=observation_angle, response=response
+        )
+        for name in ("polar_acceptance_deg", "azimuthal_acceptance_deg", "solid_angle_sr"):
+            object.__setattr__(self, name, 0.0)
+
+    def with_observation_angle(self, observation_angle: object) -> "PointDetector":
+        """Return a point detector at another polar angle, retaining the response."""
+        return PointDetector(observation_angle=observation_angle, response=self.response)
+
+    def __reduce__(self):
+        return (_restore_point_detector, (self.observation_angle_deg, self.response))
+
+
 class DetectorSpec(Detector):
     """Deprecated compatibility spelling for :class:`Detector`."""
 

@@ -58,10 +58,14 @@ def resolve_models(scene: Scene, numerics: Numerics) -> tuple[Physics, Numerics]
     if scene.quantum is not None:
         physics, numerics = scene.quantum.lower(physics, numerics)
     physics.validate_transport(numerics.energy_model)
-    if physics.channeling_model == "axial":
+    if physics.channeling_model == "axial" and (
+        physics.channeling_axial is None or physics.channeling_axial.get("version") != 2
+    ):
         from .axial_spec import refuse_unverified_axial_run
 
         refuse_unverified_axial_run()
+    # Version 2 can be lowered to a strictly validated Case record. The runner
+    # still refuses every axial case until the #994 production adapter lands.
     if scene.beam.state is not None:
         from ..montecarlo.channeling.planar_injection import source_record
         from ..montecarlo.transverse import TransverseDistribution

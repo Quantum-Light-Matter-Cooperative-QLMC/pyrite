@@ -59,7 +59,7 @@ conversion for tilted incidence. Entrance phase, transverse drift and the
 physical exit plane must use the same transform. A first tier can refuse
 non-normal incidence; it cannot silently call solver depth a lab path length.
 
-Proposed first eligibility envelope ([currently empty](axial-first-envelope-886.md)): electrons in a single, flat, nonmosaic
+Proposed first eligibility envelope ([two admitted silicon cases](axial-first-envelope-886.md)): electrons in a single, flat, nonmosaic
 silicon or diamond slab, isotropic sourced displacement data, rectangular
 projected cells, 1–30 MeV, fixed counts and CPU execution. This is an engineering
 restriction, not a validated axial energy range. Require a nonempty usable
@@ -249,20 +249,20 @@ The following is an implementation inventory, not a claim that guards already
 exist for an axial case. Today the model selector rejects axial globally.
 Once a selector is admitted, every downstream path needs variant dispatch.
 
-| Surface and owner | Current planar behavior | Proposed first axial policy |
-| --- | --- | --- |
-| Scene/profile lowering: `_numerics`, `campaign.channeling_cases`, `single_scene` | Planar-only record and resolution | One shared axial resolver after physical contracts pass |
-| Fixed CPU run: `runner.channeling`, `channeling.handoff` | Planar solve, sampled handoff, native launch | Dedicated axial solve/launch adapter; never call planar `zone_solver` |
-| Source: `runner.channeling_emission`, `emission_adapters` | Planar expected-value scorer | Dedicated axial source, registered in the existing single channel slot |
-| Scalar API/result: `api`, `results.model` | Exposes stored channel separately | Same units/shape and exactly-once combination |
-| Directions/physical detectors: `runner.directions`, `observations` | Supported via planar source rescoring | Early axial refusal until azimuth/frame/absorption scoring is validated |
-| Replay: `runner.artifacts` | Reconstructs planar source from the case | Early axial refusal before artifact iteration or writes |
-| Recompute: `checkpoints.recompute` | Line repair rescores planar CR; brem repair preserves it | Refuse axial line repair; permit brem repair only after byte-preservation coverage |
-| CUDA continuation: `runner.channeling` | CPU quantum zone followed by native CUDA | Early axial refusal until the joint launch contract is covered on both backends |
-| Adaptive precision: `runner.adaptive` | Refused | Refused until an independent per-electron CR variance contract exists |
-| Capture/blocks: `runner._check_channeling_transport` | Refused | Keep refusal; a block-local MCWF solve changes the source ensemble |
-| Checkpoint/dataset/provenance: `checkpoints.persistence`, `campaign.profiles`, `_physics_provenance` | Optional channel storage and planar marker | Tagged axial identity, atomic compatible persistence, no reuse of a planar cache |
-| Remote submission: `remote`, CLI validation | Forwards planar resolved settings | Refuse unsupported settings locally before sync/submission |
+| Surface and owner | Current planar behavior | Proposed first axial policy | First envelope (#994) |
+| --- | --- | --- | --- |
+| Scene/profile lowering: `_numerics`, `campaign.channeling_cases`, `single_scene` | Planar-only record and resolution | One shared axial resolver after physical contracts pass | `Physics` v2 selector; `montecarlo.channeling.axial_case` resolves the lowered case against the repository lookup. Profiles cannot yet express a zero-aperture detector |
+| Fixed CPU run: `runner.channeling`, `channeling.handoff` | Planar solve, sampled handoff, native launch | Dedicated axial solve/launch adapter; never call planar `zone_solver` | `runner.axial` and `runner.axial_native`: one fibre history per line electron, native launch of outgoing electrons |
+| Source: `runner.channeling_emission`, `emission_adapters` | Planar expected-value scorer | Dedicated axial source, registered in the existing single channel slot | Fibre on-axis source stored once as `spec_channeling`; zone rows score no native lines |
+| Scalar API/result: `api`, `results.model` | Exposes stored channel separately | Same units/shape and exactly-once combination | Same units and shape; round trip through results tested |
+| Directions/physical detectors: `runner.directions`, `observations` | Supported via planar source rescoring | Early axial refusal until azimuth/frame/absorption scoring is validated | Refused; only `PointDetector` (on axis, zero aperture) is admitted |
+| Replay: `runner.artifacts` | Reconstructs planar source from the case | Early axial refusal before artifact iteration or writes | Refused |
+| Recompute: `checkpoints.recompute` | Line repair rescores planar CR; brem repair preserves it | Refuse axial line repair; permit brem repair only after byte-preservation coverage | Both repairs refuse axial records |
+| CUDA continuation: `runner.channeling` | CPU quantum zone followed by native CUDA | Early axial refusal until the joint launch contract is covered on both backends | Refused (CPU only) |
+| Adaptive precision: `runner.adaptive` | Refused | Refused until an independent per-electron CR variance contract exists | Refused |
+| Capture/blocks: `runner._check_channeling_transport` | Refused | Keep refusal; a block-local MCWF solve changes the source ensemble | Refused |
+| Checkpoint/dataset/provenance: `checkpoints.persistence`, `campaign.profiles`, `_physics_provenance` | Optional channel storage and planar marker | Tagged axial identity, atomic compatible persistence, no reuse of a planar cache | `axial-fibre-v2` marker in the resolved record; planar and off identities unchanged |
+| Remote submission: `remote`, CLI validation | Forwards planar resolved settings | Refuse unsupported settings locally before sync/submission | Refused before sync or staging; a profile cannot yet express an admitted case (no zero-aperture detector) |
 
 Refusals must run before table preparation, quantum solves, native transport,
 checkpoint reservations or writes. Validate raw `Case` callers as well as the

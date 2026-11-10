@@ -1,11 +1,12 @@
-"""Versioned, JSON-safe experimental axial run configuration (#624).
+"""Versioned, JSON-safe axial run configurations (#624, #994).
 
-Pure configuration resolver shared by the public ``Physics`` facade and profile
-lowering. This module intentionally does *not* admit a production axial run:
-the physical handoff/depth budget and photon source in #623 remain unverified.
+Version 1 remains a parseable, non-executable research recipe. Version 2 is a
+minimal selector for the repository-calibrated fibre source: only the axis is
+caller-selected. Energy, depth, emission owner and numerical settings come from
+the resolved case and the repository-owned admission table, never from input.
 
-No discrete FFT sink, periodic wrap or above-barrier population is interpreted
-as physical escape here. Scientific identity excludes execution-only ceilings.
+Version 2 is *not* an authorization to run: production consumers continue to
+refuse axial cases until the runner and persistence adapter are validated.
 """
 
 from __future__ import annotations
@@ -19,7 +20,10 @@ from numbers import Integral, Real
 from typing import Any
 
 from ..quantum._admission import refuse_unverified_axial_run as refuse_unverified_axial_run
+from ..quantum._axial_envelope import AXIAL_FIBRE_MODEL_MARKER as AXIAL_FIBRE_MODEL_MARKER
 
+# Do not re-key the v1 research configuration; this is a distinct *production*
+# model generation and must not collide with planar or the v1 recipe.
 AXIAL_MODEL_MARKER = "axial-entrance-experimental-config-v2"
 AXIAL_SCHEMA_VERSION = 1
 _PENDING = {"version": 1, "kind": "pending-physical-validation"}
@@ -185,14 +189,33 @@ def _pending(raw: object, name: str) -> dict[str, Any]:
     return dict(_PENDING)
 
 
-def resolve_axial_spec(raw: Mapping[str, object]) -> dict[str, Any]:
-    """Normalize one proposed axial recipe, without making it run-eligible.
+def _fibre_selector(raw: Mapping[str, object]) -> dict[str, Any]:
+    """Version 2: the axis only; everything else comes from the repository lookup."""
+    inp = _fields(raw, "channeling_axial", {"version", "axis_uvw"}, {"model"})
+    if inp.get("model", "axial") != "axial":
+        raise ValueError("channeling_axial.model must be 'axial'")
+    return {"version": 2, "model": "axial", "axis_uvw": _axis(inp["axis_uvw"])}
 
-    Inputs are JSON/TOML-compatible primitive collections; no arrays, opaque
-    state callables or implicit physical boundary/source model are admitted.
-    The returned mapping is detached, canonical and JSON-safe, appropriate
-    for a future case identity. Execution limits are checked but not physics.
+
+def resolve_axial_spec(raw: Mapping[str, object]) -> dict[str, Any]:
+    """Normalize v1 research recipes or v2 calibrated-fibre selectors.
+
+    A v2 selector cannot prescribe numerical, boundary, source, entry or depth
+    values. They are resolved per case from the repository's #993/#994 lookup.
+    Normalizing a selector does not authorize production execution.
     """
+    if not isinstance(raw, Mapping):
+        raise ValueError("channeling_axial must be an object with string keys")
+    version = _integer(raw.get("version", 1), "channeling_axial.version")
+    if version == 2:
+        return _fibre_selector(raw)
+    if version != 1:
+        raise ValueError("unsupported axial configuration version")
+    return _research_recipe(raw)
+
+
+def _research_recipe(raw: Mapping[str, object]) -> dict[str, Any]:
+    """Version 1: the parseable, non-executable research recipe of #624."""
     inp = _fields(
         raw,
         "channeling_axial",
@@ -283,8 +306,9 @@ def axial_spec_identity(spec: Mapping[str, object]) -> str:
         raise ValueError("expected an axial resolved specification")
     normalized = resolve_axial_spec(raw)
     payload = {k: v for k, v in normalized.items() if k != "limits"}
+    marker = AXIAL_FIBRE_MODEL_MARKER if normalized["version"] == 2 else AXIAL_MODEL_MARKER
     encoded = json.dumps(
-        {"marker": AXIAL_MODEL_MARKER, "spec": payload},
+        {"marker": marker, "spec": payload},
         sort_keys=True,
         separators=(",", ":"),
         allow_nan=False,
