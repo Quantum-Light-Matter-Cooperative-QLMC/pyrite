@@ -141,3 +141,47 @@ def test_refresh_requires_ledger_inputs_before_running_producers(tmp_path, monke
     with pytest.raises(ValueError, match="ledger input is required"):
         refresh.refresh(["checks/brem_source_comparison.py"], output, repo=tmp_path)
     assert not output.exists()
+
+
+def test_optional_oracles_report_skip_when_dependencies_are_missing(monkeypatch):
+    import builtins
+
+    dans = _script("dans_diffraction_oracle.py")
+
+    def unavailable(*args, **kwargs):
+        raise dans.DansDiffractionUnavailableError("optional dependency missing")
+
+    monkeypatch.setattr(dans, "validate_dans_crystal", unavailable)
+    assert dans.main() == 2
+
+    cascade = _script("xraylib_cascade_oracle.py")
+    original_import = builtins.__import__
+
+    def missing_xraylib(name, *args, **kwargs):
+        if name == "xraylib":
+            raise ImportError("optional dependency missing")
+        return original_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", missing_xraylib)
+    assert cascade.main() == 2
+
+
+def test_cascade_oracle_cannot_pass_without_gated_reference_rows(monkeypatch):
+    import sys
+    from types import SimpleNamespace
+
+    cascade = _script("xraylib_cascade_oracle.py")
+
+    def undefined(*args):
+        raise ValueError("reference is undefined")
+
+    oracle = SimpleNamespace(
+        SymbolToAtomicNumber=lambda _: 14,
+        CS_Photo_Partial=undefined,
+        CS_FluorLine_Kissel_Cascade=undefined,
+        **{f"{name}_SHELL": i for i, name in enumerate(cascade.SHELLS)},
+        **{f"{name}_LINE": i for i, name in enumerate(cascade.LINES)},
+    )
+    monkeypatch.setitem(sys.modules, "xraylib", oracle)
+    monkeypatch.setattr(cascade, "_pyrite_cascade", lambda *args: ({}, {}))
+    assert cascade.main() == 1

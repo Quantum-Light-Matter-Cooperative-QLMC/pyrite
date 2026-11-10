@@ -17,14 +17,9 @@ physics sign-off.
 Validation: dans-diffraction-oracle
 """
 
-import os
-import sys
-
 from tabulate import tabulate
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
-
-from pyrite.validation.validation_oracles import (  # noqa: E402
+from pyrite.validation.validation_oracles import (
     DEFAULT_DANS_TOLERANCES,
     DansDiffractionUnavailableError,
     validate_dans_crystal,

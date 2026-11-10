@@ -44,6 +44,8 @@ CPU_RECIPES: dict[str, tuple[str, ...]] = {
     **dict.fromkeys(DEFAULT_CPU_CHECKS, ()),
     "checks/brem_source_comparison.py": ("--download",),
     "checks/shell_ionization_comparison.py": ("--download",),
+    "checks/dans_diffraction_oracle.py": (),
+    "checks/xraylib_cascade_oracle.py": (),
 }
 
 

@@ -124,6 +124,7 @@ def main() -> int:
             failures.append(f"{' '.join(case)} {quantity}: EADL/xraylib {eadl / reference:.4f}")
 
     for element, energy_keV, tag in CASES:
+        first_row = len(rows)
         Z = xrl.SymbolToAtomicNumber(element)
         case = (element, f"{energy_keV:g}", tag)
         primaries = {}
@@ -174,6 +175,9 @@ def main() -> int:
                 line in GATED_LINES[element],
                 LINE_LIMIT,
             )
+
+        if not any(row[-1] in {"PASS", "FAIL"} for row in rows[first_row:]):
+            failures.append(f"{' '.join(case)}: no gated reference comparisons")
 
     print(
         tabulate(
