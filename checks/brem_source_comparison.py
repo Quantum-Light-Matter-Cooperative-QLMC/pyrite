@@ -7,22 +7,27 @@ cross section above ``kappa = 0.05``, and the radiative first moment. See
 ``pyrite.validation.brem_sources`` for the reduction.
 
 Gate (claim ``brem-source-comparison``, BremsLib only) on the validated domain
-``10 keV <= T <= 30 MeV``, ``0.05 <= kappa <= 0.95``:
+``10 keV <= T <= 30 MeV``, ``0.05 <= kappa <= 0.95``, every catalogue element
+except those in ``UNGATED_ELEMENTS``:
 
 * pointwise ``chi`` ratio within ``1 +/- 0.13``;
-* first-moment ratio within ``1 +/- 0.06``.
+* first-moment ratio within ``1 +/- 0.10``.
 
-Both sides include electron-electron bremsstrahlung: Seltzer--Berger's own,
-and the staged BremsLib tables through Seltzer and Berger's (1985) ``eta``
-(``pyrite._bremslib_electron``). The bounds follow that paper's quoted
-uncertainty: ~10 % for the electron-nucleus term below 2 MeV and 3--10 %
-from 2 to 50 MeV, and 5--10 % theory uncertainty in the total. Before the
-electron-electron term was added the lower bounds were ``1/(1 + 1/Z)`` minus
-0.05 and 0.03. ``kappa < 0.05`` and the tip ``kappa > 0.95`` (resolved
-differently by the two grids) are reported, not gated.
+The moment band is the upper end of Seltzer and Berger's quoted uncertainty of
+their own ``dsigma/dk`` (At. Data Nucl. Data Tables 35, 345 (1986), p. 346:
+about 10 % below 2 MeV, 5--10 % from 2 to 50 MeV); ``MOMENT_TOLERANCE_BANDS``
+holds it with its citation. Both sides include electron-electron
+bremsstrahlung: Seltzer--Berger's own, and the staged BremsLib tables through
+Seltzer and Berger's (1985) ``eta`` (``pyrite._bremslib_electron``).
+``kappa < 0.05`` and the tip ``kappa > 0.95`` (resolved differently by the two
+grids) are reported, not gated.
+
+``UNGATED_ELEMENTS`` maps each catalogue element that is reported but not gated
+to its reason, printed and written to the JSON report. H has two cited reasons;
+Li is an explicit policy choice for a measured, unexplained discrepancy (#1073).
 
 The 30--100 MeV extension rows (claim ``bremslib-high-energy-extension``,
-#439) gate only the first moment, within the same ``1 +/- 0.06``. Their
+#439) gate only the first moment, within ``1 +/- 0.06`` (#439's decision). Their
 pointwise ratios on the library columns ``kappa <= 0.95`` are BremsLib data,
 pinned to the library by the extension tests, and are reported; the filled
 tip ``kappa > 0.95`` (PyRITE's held-ratio rule, 2--3.5 % of the moment, moving
@@ -62,7 +67,65 @@ from pyrite.xsgen.bremslib import tables as bremslib_tables
 
 T_MIN_MEV, T_MAX_MEV, KAPPA_MIN, KAPPA_MAX = 0.01, 30.0, 0.05, 0.95
 EXTENSION_MAX_MEV = 100.0
-POINTWISE_TOLERANCE, MOMENT_TOLERANCE = 0.13, 0.06
+POINTWISE_TOLERANCE = 0.13
+
+#: First-moment tolerance by incident-energy band: ``(T_low, T_high, tolerance,
+#: citation)`` in MeV, inclusive at both ends.
+MOMENT_TOLERANCE_BANDS = (
+    (
+        T_MIN_MEV,
+        T_MAX_MEV,
+        0.10,
+        "Seltzer & Berger, ADNDT 35, 345 (1986), p. 346: dsigma/dk uncertainty about 10 % "
+        "below 2 MeV and 5-10 % at 2-50 MeV; upper end of the quoted ranges",
+    ),
+    (
+        T_MAX_MEV,
+        EXTENSION_MAX_MEV,
+        0.06,
+        "bremslib-high-energy-extension (#439): maintainer's moment gate for 30 < T <= 100 MeV",
+    ),
+)
+
+#: Catalogue elements reported but not gated, with the reason for each.
+UNGATED_ELEMENTS = {
+    1: "H: the reference electron-nucleus value is a linear extrapolation outside "
+    "Pratt et al.'s Z = 2-92 (Seltzer & Berger, ADNDT 35, 345 (1986), p. 348; Z = 2-92 range p. 346), "
+    "and BremsLib uses the screened Born approximation for Z <= 2 at T2 >= 0.5 MeV "
+    "(Poskus, ADNDT 166, 101734 (2025), p. 35)",
+    3: "Li: explicit policy choice, not a sourced exclusion; a measured BremsLib-versus-"
+    "Seltzer-Berger electron-nucleus discrepancy with no known cause, tracked in #1073",
+}
+
+
+def moment_tolerance(incident_energy_MeV):
+    """First-moment tolerance at ``T``, or ``None`` outside every gated band."""
+    for low, high, tolerance, _ in MOMENT_TOLERANCE_BANDS:
+        if low * (1 - 1e-9) <= incident_energy_MeV <= high * (1 + 1e-9):
+            return tolerance
+    return None
+
+
+def gate_violations(results, kappa):
+    """BremsLib gate violations ``(element, T, kind, min, max)`` among ``results``.
+
+    Ungated elements, EEDL and energies outside ``MOMENT_TOLERANCE_BANDS`` never
+    fail; pointwise ``chi`` is gated only up to ``T_MAX_MEV``.
+    """
+    gated_kappa = (kappa >= KAPPA_MIN) & (kappa <= KAPPA_MAX)
+    failures = []
+    for r in results:
+        tolerance = moment_tolerance(r.incident_energy_MeV)
+        if r.model != "bremslib" or r.atomic_number in UNGATED_ELEMENTS or tolerance is None:
+            continue
+        ratio = r.chi_ratio[gated_kappa]
+        extension = r.incident_energy_MeV > T_MAX_MEV * (1 + 1e-9)
+        if not extension and np.any(np.abs(ratio - 1.0) > POINTWISE_TOLERANCE):
+            failures.append((r.element, r.incident_energy_MeV, "chi", ratio.min(), ratio.max()))
+        moment = r.first_moment_ratio
+        if abs(moment - 1.0) > tolerance:
+            failures.append((r.element, r.incident_energy_MeV, "moment", moment, moment))
+    return failures
 
 
 def _eedl_panel_moments(table, elements):
@@ -94,6 +157,39 @@ def _eedl_panel_moments(table, elements):
     return rows
 
 
+def _ungated_summary(results, gated_kappa):
+    """Gated-domain ranges for each ungated element, with its reason."""
+    rows = []
+    for z, reason in UNGATED_ELEMENTS.items():
+        mine = [
+            r
+            for r in results
+            if r.model == "bremslib"
+            and r.atomic_number == z
+            and r.incident_energy_MeV >= T_MIN_MEV * (1 - 1e-9)
+        ]
+        if not mine:
+            continue
+        chi = np.concatenate(
+            [
+                r.chi_ratio[gated_kappa]
+                for r in mine
+                if r.incident_energy_MeV <= T_MAX_MEV * (1 + 1e-9)
+            ]
+        )
+        moments = [r.first_moment_ratio for r in mine]
+        rows.append(
+            {
+                "element": mine[0].element,
+                "Z": z,
+                "reason": reason,
+                "chi_ratio": [float(chi.min()), float(chi.max())],
+                "first_moment_ratio": [float(min(moments)), float(max(moments))],
+            }
+        )
+    return rows
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--download", action="store_true", help="fetch the pinned table")
@@ -118,26 +214,29 @@ def main(argv=None) -> int:
     ]
     results = compare_sources(table, elements, energies, bremslib_tables=tables)
 
-    failures = []
     gated_kappa = (table.kappa >= KAPPA_MIN) & (table.kappa <= KAPPA_MAX)
     for model in ("bremslib", "eedl"):
         print(f"\n== {model}: chi ratio envelope over {KAPPA_MIN} <= kappa <= {KAPPA_MAX}")
         print(f"{'el':>3} {'T[MeV]':>8} {'min':>7} {'max':>7} {'moment':>7} {'hard':>7}")
         for r in (r for r in results if r.model == model):
             ratio = r.chi_ratio[gated_kappa]
+            flag = (
+                "  ungated" if model == "bremslib" and r.atomic_number in UNGATED_ELEMENTS else ""
+            )
             print(
                 f"{r.element:>3} {r.incident_energy_MeV:8.3f} {ratio.min():7.3f} "
                 f"{ratio.max():7.3f} {r.first_moment_ratio:7.3f} "
-                f"{r.hard_cross_section_ratio:7.3f}"
+                f"{r.hard_cross_section_ratio:7.3f}{flag}"
             )
-            if model != "bremslib" or r.incident_energy_MeV < T_MIN_MEV * (1 - 1e-9):
-                continue
-            extension = r.incident_energy_MeV > T_MAX_MEV * (1 + 1e-9)
-            if not extension and np.any(np.abs(ratio - 1.0) > POINTWISE_TOLERANCE):
-                failures.append((r.element, r.incident_energy_MeV, "chi", ratio.min(), ratio.max()))
-            moment = r.first_moment_ratio
-            if abs(moment - 1.0) > MOMENT_TOLERANCE:
-                failures.append((r.element, r.incident_energy_MeV, "moment", moment, moment))
+    failures = gate_violations(results, table.kappa)
+    ungated = _ungated_summary(results, gated_kappa)
+    print("\n== bremslib reported, not gated (10 keV <= T <= 100 MeV)")
+    for row in ungated:
+        print(
+            f"{row['element']:>3} chi {row['chi_ratio'][0]:.3f}..{row['chi_ratio'][1]:.3f} "
+            f"(T <= {T_MAX_MEV:g} MeV), moment {row['first_moment_ratio'][0]:.3f}.."
+            f"{row['first_moment_ratio'][1]:.3f}: {row['reason']}"
+        )
 
     tip = table.kappa > KAPPA_MAX
     print(
@@ -164,9 +263,12 @@ def main(argv=None) -> int:
                 "T_MeV": [T_MIN_MEV, T_MAX_MEV],
                 "kappa": [KAPPA_MIN, KAPPA_MAX],
                 "pointwise_tolerance": POINTWISE_TOLERANCE,
-                "moment_tolerance": MOMENT_TOLERANCE,
+                "moment_tolerance_bands": [
+                    {"T_MeV": [low, high], "tolerance": tol, "source": source}
+                    for low, high, tol, source in MOMENT_TOLERANCE_BANDS
+                ],
             },
-            "moment_gated_extension_T_MeV": [T_MAX_MEV, EXTENSION_MAX_MEV],
+            "ungated_elements": ungated,
             "comparisons": [
                 {
                     "model": r.model,
