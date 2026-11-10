@@ -198,6 +198,12 @@ _CORE_KEY = textwrap.dedent(
 )
 
 
+_REQUIRES_JIT = pytest.mark.skipif(
+    os.environ.get("NUMBA_DISABLE_JIT") == "1",
+    reason="exercises the Numba disk cache, absent under NUMBA_DISABLE_JIT",
+)
+
+
 def test_transport_core_cache_key_is_stable_across_processes():
     """Regression (#910): ``core`` captured ``body`` and missed in every process."""
 
@@ -227,9 +233,7 @@ def test_transport_import_survives_disabled_jit():
     assert done.returncode == 0, done.stderr
 
 
-@pytest.mark.skipif(
-    os.environ.get("NUMBA_DISABLE_JIT") == "1", reason="needs compiled Numba dispatchers"
-)
+@_REQUIRES_JIT
 def test_transport_core_digest_reaches_module_attribute_callees():
     """Regression (#991): ``_cutoff.*``/``_moments.*`` edits invalidate the core.
 
