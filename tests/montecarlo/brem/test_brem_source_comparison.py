@@ -222,7 +222,7 @@ def test_gate_domain_ungated_elements_are_h_and_the_li_policy_choice():
 
     assert set(check.UNGATED_ELEMENTS) == {1, 3}
     hydrogen, lithium = check.UNGATED_ELEMENTS[1], check.UNGATED_ELEMENTS[3]
-    assert "pp. 347-348" in hydrogen and "p. 35" in hydrogen
+    assert "p. 348" in hydrogen and "p. 35" in hydrogen
     assert "policy choice" in lithium and "#1073" in lithium
 
 

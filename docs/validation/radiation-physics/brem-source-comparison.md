@@ -145,9 +145,9 @@ The catalogue (`xsgen/bremslib/release.py::catalogue_elements()`, every transpor
 
 ### Sources
 
-- **SB86** — S. M. Seltzer and M. J. Berger, *At. Data Nucl. Data Tables* **35**, 345 (1986). p. 346: estimated `dσ/dk` uncertainty "3% to 5% in the high-energy region, T1 ≥ 50 MeV; 5% to 10% in the intermediate-energy region, 2 ≤ T1 ≤ 50 MeV; and about 10% … in the low-energy region, T1 < 2 MeV". pp. 347–348: below 2 MeV the electron–nucleus values are Pratt et al.'s tables for Z = 2–92, and "linear extrapolation was used to extend their results to the cases Z = 1 and Z = 93–100"; 2–50 MeV is interpolated between those and the high-energy theory. Table II (p. 385 on) tabulates `η` and `η̄` for every Z = 1–100.
-- **SB85** — *Nucl. Instrum. Methods B* **12**, 95 (1985). p. 97: the same linear extrapolation of Pratt et al. to Z = 1; Pratt et al. "conservatively estimate the overall uncertainty to be 10%". Table 4 gives `η` for Z = 6, 13, 29, 47, 74, 92 only; it is the source of PyRITE's staged factor.
-- **Poškus 2025** — A. Poškus, *At. Data Nucl. Data Tables* **166**, 101734 (2025), the BremsLib v2.0 paper. p. 35: for Z = 1 and 2 with `T2 ≥ 0.5 MeV` and `k ≠ 0` the library uses the screened Born approximation (error about Z %). Elsewhere it quotes only computational uncertainties (≤ 0.2 % for Li at 0.4–1 MeV; Secs. 2.3–2.4) and contains no comparison with Seltzer–Berger. Electron–electron bremsstrahlung is not in the library (Sec. 1).
+- **SB86** — S. M. Seltzer and M. J. Berger, *At. Data Nucl. Data Tables* **35**, 345 (1986). p. 346: estimated `dσ/dk` uncertainty "3% to 5% in the high-energy region, T1 ≥ 50 MeV; 5% to 10% in the intermediate-energy region, 2 ≤ T1 ≤ 50 MeV; and about 10% … in the low-energy region, T1 < 2 MeV". p. 346: Pratt et al.'s tables cover Z between 2 and 92; p. 348: below 2 MeV the electron–nucleus values are those tables, and "linear extrapolation was used to extend their results to the cases Z = 1 and Z = 93–100"; 2–50 MeV is interpolated between those and the high-energy theory. Table II (p. 385 on) tabulates `η` and `η̄` for every Z = 1–100.
+- **SB85** — *Nucl. Instrum. Methods B* **12**, 95 (1985). p. 96: the same linear extrapolation of Pratt et al. to Z = 1; Pratt et al. "conservatively estimate the overall uncertainty to be 10%". Table 4 gives `η` for Z = 6, 13, 29, 47, 74, 92 only; it is the source of PyRITE's staged factor.
+- **Poškus 2025** — A. Poškus, *At. Data Nucl. Data Tables* **166**, 101734 (2025), the BremsLib v2.0 paper. p. 35: for Z = 1 and 2 with `T2 ≥ 0.5 MeV` and `k ≠ 0` the library uses the screened Born approximation (error about Z %). Elsewhere it quotes only computational uncertainties (Secs. 2.3–2.4) and contains no comparison with Seltzer–Berger; the library's own `RelErr` columns for Li are ≤ 0.2 % at 0.4–1 MeV, about 1.4 % at 2–5 MeV and 3–6 % at 10–30 MeV. Electron–electron bremsstrahlung is not in the library (Sec. 1).
 
 ### Root cause
 
@@ -159,22 +159,22 @@ Both sides include electron–electron bremsstrahlung with nearly the same `η`.
 | SB86 Z = 3 | 0.445 | 1.060 |
 | SB85 Z = 6 (held) | 0.435 | 1.056 |
 
-Substituting SB86's rows moves H's total by +1.1 % at 0.5 MeV and −1.3 % at 30 MeV, and Li's by at most 0.3 %. The low-Z excess is therefore in the electron–nucleus term: BremsLib exceeds SB86's by about 5 % for B–O (already recorded in the update above), more for Li, and most for H, largest at `k/T = 0.05`. Reference identity (pinned SHA), table coverage (no fallback warnings; H and Li digests `660fe488…`, `1f148244…`) and interpolation in `T` were ruled out.
+Substituting SB86's rows moves H's total by +1.1 % at 0.5 MeV and −1.3 % at 30 MeV (at most 1.3 % up to 30 MeV, 1.6 % at 80–100 MeV), and Li's by at most 0.3 %. The low-Z excess is therefore in the electron–nucleus term: BremsLib exceeds SB86's by about 5 % for B–O (already recorded in the update above), more for Li, and most for H, largest at `k/T = 0.05`. Reference identity (pinned SHA), table coverage (no fallback warnings; H and Li digests `660fe488…`, `1f148244…`) and interpolation in `T` were ruled out.
 
 ### Gate
 
 `checks/brem_source_comparison.py` now holds:
 
-- `MOMENT_TOLERANCE_BANDS`: first moment within `1 ± 0.10` for 10 keV–30 MeV, the upper end of SB86 p. 346's quoted ranges below 50 MeV, and the existing `1 ± 0.06` for the 30–100 MeV extension rows (`bremslib-high-energy-extension`, #439). Pointwise stays `1 ± 0.13`.
+- `MOMENT_TOLERANCE_BANDS`: first moment within `1 ± 0.10` for 10 keV–30 MeV, the upper end of SB86 p. 346's quoted ranges below 50 MeV, and the existing `1 ± 0.06` for the extension rows, 30 < T ≤ 100 MeV (`bremslib-high-energy-extension`, #439). Pointwise stays `1 ± 0.13`.
 - `UNGATED_ELEMENTS`, printed and written to the JSON report with a reason each:
-  - **H (Z = 1):** the reference electron–nucleus value is extrapolated outside Pratt et al.'s Z = 2–92 (SB86 pp. 347–348; SB85 p. 97), and BremsLib uses the screened Born approximation for Z ≤ 2 (Poškus 2025 p. 35).
+  - **H (Z = 1):** the reference electron–nucleus value is extrapolated outside Pratt et al.'s Z = 2–92 (SB86 p. 348, Z = 2–92 range p. 346; SB85 p. 96), and BremsLib uses the screened Born approximation for Z ≤ 2 (Poškus 2025 p. 35).
   - **Li (Z = 3):** an explicit policy choice, not a sourced exclusion — a measured BremsLib-versus-SB86 electron–nucleus discrepancy with no known cause, tracked in #1073.
 
 ### Results (2026-11-10)
 
 Exact recipe, `PYRITE_MC_BACKEND=cpu`, exit 0, `PASS`. BremsLib, `0.05 ≤ k/T ≤ 0.95`:
 
-| Z | pointwise, 10 keV–30 MeV | moment, 10 keV–30 MeV | moment, 30–100 MeV |
+| Z | pointwise, 10 keV–30 MeV | moment, 10 keV–30 MeV | moment, 30 < T ≤ 100 MeV |
 |---|---|---|---|
 | 5–20 | 0.957–1.121 | 0.981–1.057 | 1.026–1.058 |
 | 22–42 | 0.955–1.057 | 0.986–1.033 | 1.022–1.031 |
@@ -183,4 +183,14 @@ Exact recipe, `PYRITE_MC_BACKEND=cpu`, exit 0, `PASS`. BremsLib, `0.05 ≤ k/T �
 | Li (reported) | 0.959–1.139 | 0.989–1.063 | 1.059–1.072 |
 
 Below 10 keV (reported): 0.78–1.27 pointwise, 0.95–1.08 in moment. EEDL at its own panels: 0.979–0.991 in moment over 185 panels.
+
+### Fresh-context verification (2026-11-10)
+
+An independent verifier read SB86, SB85 and Poškus 2025 directly (rendering SB86 Table II and SB85 p. 96), recomputed the `η̄` substitution, inspected `MOMENT_TOLERANCE_BANDS`, `UNGATED_ELEMENTS`, `moment_tolerance` and `gate_violations`, and reran the recipe (exit 0, `PASS`, 42 elements) and the module tests (17 passed).
+
+- **Filters:** units pass (dimensionless ratios); limits pass (the electron–electron factor tends to 1 at high Z); signs and conventions pass (`1 + η/Z`; BremsLib over Seltzer–Berger).
+- **Re-derivation:** `matches`. SB86 p. 346 uncertainties, the p. 348 Z = 1 extrapolation (Z = 2–92 range on p. 346), Table II `η̄` for Z = 1 and 3, SB85 Table 4 `η̄` for Z = 6 and Poškus p. 35 all read as stated. Substituting SB86's `η̄` moves H by at most 1.3 % up to 30 MeV (1.6 % at 80–100 MeV) and Li by at most 0.29 %, so the excess is electron–nucleus.
+- **Boundaries:** 10 keV gated at 0.10 and lower energies never gated; 30 MeV takes the 0.10 band and keeps the pointwise gate; `30 < T ≤ 100 MeV` gates only the moment at 0.06; EEDL and ungated elements never fail and are reported with reasons.
+- **Corrections applied:** SB85's Z = 1 extrapolation and Pratt et al.'s 10 % are on p. 96, not p. 97; the SB86 citation is p. 348 with the Z = 2–92 range on p. 346; the Li computational uncertainty comes from the library's `RelErr` columns, not the paper; the `η̄` shift is scoped to energy.
+- **Verdict:** `rederived`; with the gate-domain tests in `tests/montecarlo/brem/test_brem_source_comparison.py` the row is `anchored`. Li's exclusion remains a policy choice (#1073). Only a human may mark this signed off.
 

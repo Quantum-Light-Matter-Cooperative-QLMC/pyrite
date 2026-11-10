@@ -83,14 +83,14 @@ MOMENT_TOLERANCE_BANDS = (
         T_MAX_MEV,
         EXTENSION_MAX_MEV,
         0.06,
-        "bremslib-high-energy-extension (#439): maintainer's 30-100 MeV moment gate",
+        "bremslib-high-energy-extension (#439): maintainer's moment gate for 30 < T <= 100 MeV",
     ),
 )
 
 #: Catalogue elements reported but not gated, with the reason for each.
 UNGATED_ELEMENTS = {
     1: "H: the reference electron-nucleus value is a linear extrapolation outside "
-    "Pratt et al.'s Z = 2-92 (Seltzer & Berger, ADNDT 35, 345 (1986), pp. 347-348), "
+    "Pratt et al.'s Z = 2-92 (Seltzer & Berger, ADNDT 35, 345 (1986), p. 348; Z = 2-92 range p. 346), "
     "and BremsLib uses the screened Born approximation for Z <= 2 at T2 >= 0.5 MeV "
     "(Poskus, ADNDT 166, 101734 (2025), p. 35)",
     3: "Li: explicit policy choice, not a sourced exclusion; a measured BremsLib-versus-"
