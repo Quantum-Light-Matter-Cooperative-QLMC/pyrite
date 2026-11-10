@@ -281,4 +281,4 @@ the transported arrays; spectrum candidates rescore one kept transport with
 re-timing against the baseline (`min_speedup`). Tests:
 `tests/optimization/test_kernel_tuning.py` (fake worker),
 `tests/montecarlo/transport/test_transport_kernel_tuning_cuda.py` (device). Guide:
-`docs/guides/batch-chunk-tuning.md`; tutorial 15.
+`docs/guides/batch-chunk-tuning.md`; tutorial 19.

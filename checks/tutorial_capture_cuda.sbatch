@@ -3,7 +3,7 @@
 #
 # From a clean checkout of the branch on the box (a git clone or `git archive`
 # of the commit under test):
-#   sbatch checks/tutorial_capture_cuda.sbatch 15-tuning-cuda-execution
+#   sbatch checks/tutorial_capture_cuda.sbatch 19-tuning-cuda-execution
 # then copy docs/notebooks/*/<name>.ipynb back and commit it with its source.
 # Sphinx only warns when a CUDA capture is stale, so this runs whenever a GPU
 # is free rather than gating documentation builds.
