@@ -250,3 +250,27 @@ def test_channeling_yield_rejects_nonfinite_profile():
     emission = _script("channeling_modulated_emission.py")
     with pytest.raises(ValueError, match="nonfinite"):
         emission.yield_factor(np.array([0.0, 1.0]), np.array([1.0, np.nan]), np.ones(2))
+
+
+@pytest.mark.parametrize("absorption,depth", [(False, True), (True, False), (True, True)])
+def test_multilayer_analytic_requires_both_gates(monkeypatch, absorption, depth):
+    analytic = _script("multilayer_validation_check.py")
+    evaluated = []
+
+    def absorption_gate():
+        evaluated.append("absorption")
+        return absorption
+
+    def depth_gate():
+        evaluated.append("depth")
+        return depth
+
+    monkeypatch.setattr(analytic, "check_absorption_closed_form", absorption_gate)
+    monkeypatch.setattr(analytic, "check_depth_dose_kanaya_okayama", depth_gate)
+    if absorption and depth:
+        analytic.main()
+    else:
+        with pytest.raises(SystemExit) as error:
+            analytic.main()
+        assert error.value.code == 1
+    assert evaluated == ["absorption", "depth"]
