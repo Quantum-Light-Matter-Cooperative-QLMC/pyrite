@@ -84,7 +84,9 @@ def snapshot(case_id: int, output: Path, backend: str) -> None:
             raise RuntimeError(f"real CUDA backend required, got {BACKEND.name}")
     seed, energy, transverse, scale = CASES[case_id]
     rows = segments(seed, energy, transverse, scale)
-    grid = np.linspace(70.0, 1650.0, 397)
+    # HOPG (002) at ~90 deg sits near hc*beta/d: ~1.2 keV at 30 keV and
+    # ~2.0 keV at 100 keV, so the grid must reach past 2 keV (4 eV spacing).
+    grid = np.linspace(70.0, 2510.0, 611)
     n_hat = np.array([1.0, 0.0, 0.01])
     n_hat /= np.linalg.norm(n_hat)
     line_kwargs = {
@@ -116,6 +118,8 @@ def snapshot(case_id: int, output: Path, backend: str) -> None:
     for name, values in spectra.items():
         if values.shape != grid.shape or not np.all(np.isfinite(values)) or np.any(values < -1e-30):
             raise RuntimeError(f"invalid {name} output on {backend}")
+        if not np.any(values > 0):
+            raise RuntimeError(f"{name} spectrum is identically zero on {backend}; widen the grid")
     output.parent.mkdir(parents=True, exist_ok=True)
     np.savez_compressed(output, grid=grid, **spectra)
 
