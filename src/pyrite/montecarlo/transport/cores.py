@@ -140,7 +140,7 @@ def make_cpu_transport_core(
     steps run at thinned hard-rate bounds and hold one random hinge. With
     ``C1 = 0`` it consumes no extra draws and is bit-for-bit the detailed core.
 
-    Validation: gpu-transport-core
+    Validation: gpu-transport-core, blazed-groove-geometry
     Validation: mixed-elastic-split
     Validation: mixed-elastic-hinge
     Validation: shell-secondary-transport

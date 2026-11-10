@@ -48,6 +48,8 @@ class GroovedVacuumCore:
     ``groove_geometry`` is ``(spacing_ang, depth_ang, sin_tilt, cos_tilt)``.
     Call :meth:`vacuum` after the driver finishes to get the joined
     ``(start, end, E_keV, t_ang, electron_id)`` arrays.
+
+    Validation: blazed-groove-geometry
     """
 
     def __init__(self, core, groove_geometry, config, capacity=None):

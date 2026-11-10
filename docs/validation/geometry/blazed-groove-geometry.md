@@ -216,3 +216,32 @@ The two former discrepancies are corrected: closed facet-band endpoints use a ge
 **Verdict: `rederived`.**
 
 Suggested ledger edit (human applies): change status from `unverified` to `rederived`; link this write-up and the endpoint/edge re-review evidence. Do not mark `signed-off`.
+
+## 6. Re-verification: exact per-electron grooved core (#972), 2026-11-10
+
+- **Scope**: `src/pyrite/montecarlo/transport/cores.py::make_cpu_transport_core` with `grooved=True, per_electron=True`; `transport/core_geometry.py::_groove_reentry_scalar`; `transport/core_adapters.py`; `transport/grooved_batches.py::GroovedVacuumCore`; routing in `transport/host_pass.py`; groove phase in `transport/beam_entry.py::initial_beam_positions`.
+- **Verifier**: independent fresh context (did not write the #972 implementation). §6.1 was written from §§3.1--3.5 and the task statement before the per-electron implementation bodies were read.
+
+### 6.1 Independent requirements for a per-electron core
+
+The geometry of §§3.1--3.5 is unchanged. A per-electron (one history at a time, counter-addressed random draws) core must additionally satisfy the following.
+
+**(R1) Vacuum leg.** From §3.5, a vacuum leg of length $L_{\rm vac}$ from a material-to-vacuum facet point $\mathbf{q}$ to the next vacuum-to-material event leaves $E$ and $\hat{\mathbf d}$ unchanged and advances the stored clock (units Å) by
+
+$$
+\Delta(ct) = \frac{L_{\rm vac}}{\beta(E)} .
+$$
+
+No interaction draw may occur on the leg, so the counter-addressed stream position is the same as it would be had the leg been absent.
+
+**(R2) Step budget.** A material step budget $N_{\max}$ counts material steps only. Re-entry is a geometric event, not a step. A per-history surface-event bound $N_{\rm surf}\le N_{\max}$ (raise beyond it) and a repeated zero-length-event guard keep a degenerate history from looping. Both counters must reset at the start of each history, otherwise outcomes depend on which history ran previously, violating partition invariance.
+
+**(R3) Exit classification.** The groove changes only how the entrance-face exit is detected. With the surface event at $s_{\rm surf}$ and side distance $s_{\rm side}$: if no re-entry exists along $\hat{\mathbf d}$ ($s_{\rm entry}=\infty$), the history is a permanent top exit (backscatter). If a finite footprint has $s_{\rm side}<s_{\rm entry}$, the history is a side exit. Otherwise it is a re-entry, not an exit. The remaining exits keep the flat core's precedence: top, then bottom, then side, then cutoff.
+
+**(R4) Groove phase.** The grooves are periodic in $x$, so the beam spot is translation-invariant only modulo $\Lambda$. An unbiased lateral phase is $x_0 \leftarrow x_0 + u\Lambda$, $u\sim U[0,1)$; then (§3.2) $s_1/(\Lambda\sin t_p)$ is uniform on $[0,1)$ and $z_{\rm entry}$ is uniform on $[0,h)$. For a per-electron core to give results independent of $N_e$ and block partition, $u_e$ must be a pure function of $({\rm seed}, e)$, e.g. a fixed counter of electron $e$ in a dedicated child stream that no other consumer advances. The entry point then follows from `entry_points` (§3.2).
+
+**(R5) Buffers and replay.** With a fixed per-electron vacuum capacity $C$, every leg must be counted, and a leg is written only when its slot index is $< C$. A history whose count exceeds $C$ must be rerun with larger capacity from its *initial* state (position, direction, energy, clock). Because draws are counter-addressed by $(e,\text{counter})$, the rerun is bit-identical, and the replay is invisible. Output order is electron-major: legs of electron $e$ in event order, then electron $e+1$.
+
+**(R6) Flat limit.** With $h\to 0$, $z_{\rm entry}\to 0$ (§3.2) and no facet band exists, so no surface events or vacuum legs occur. The per-electron grooved core must then reduce to the flat per-electron core: same exit codes and same segment set, up to the phase draw, which lives on a separate stream and so does not perturb transport draws.
+
+**(R7) Lockstep buffer pigeonhole.** Each vacuum leg is preceded by exactly one material-to-vacuum surface event in the same history. If a history raises once $N_{\rm surf}>N_{\max}$, then it has at most $N_{\max}$ legs, and the lockstep total satisfies $N_{\rm vac}\le N_e N_{\max}$. A buffer of size $N_eN_{\max}$ therefore never overflows before the per-history raise fires.
