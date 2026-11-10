@@ -43,12 +43,25 @@ def test_outside_basis_is_not_renormalized(monkeypatch):
     assert called[0][0] == pytest.approx((0.1, 0.0))
 
 
-def test_gaussian_at_zero_has_unit_normalization(monkeypatch):
+def test_zone_average_is_normalized_and_resolves_order(monkeypatch):
     profile = SimpleNamespace(g_inv_ang=(2.0, 3.0))
     monkeypatch.setattr(entry, "axial_states", lambda *args, **kwargs: _states(np.eye(4)))
-    result = entry._gaussian_entry(profile, 1.2, 0.5, 2.0, 0.0, (1, 1), 0.0, 4)
-    assert result["ground_1s"] == pytest.approx(1.0)
-    assert sum(result.values()) == pytest.approx(1.0)
+    narrow, wide = 0.15, 2.0
+    (tight, broad), diag = entry._zone_entry(profile, 1.2, 0.0, (1, 1), (narrow, wide), 32)
+    # A narrow beam stays on the incident order (0, 0), which maps to band 0.
+    assert tight["normalization"] == pytest.approx(1.0, abs=1e-12)
+    assert tight["ground_1s"] == pytest.approx(1.0, abs=1e-6)
+    # A broad beam spills onto orders the 4-wave basis lacks; that weight is
+    # reported, not renormalized away.
+    assert broad["outside_basis"] > 0.1
+    assert sum(broad[key] for key in entry.COMPONENTS) == pytest.approx(broad["normalization"])
+    assert diag["n_zone"] == 32
+
+
+def test_zone_average_rejects_nonpositive_width():
+    profile = SimpleNamespace(g_inv_ang=(2.0, 3.0))
+    with pytest.raises(ValueError, match="positive"):
+        entry._zone_entry(profile, 1.2, 0.0, (1, 1), (0.0,), 4)
 
 
 def test_screen_refuses_missing_radiating_doublet(monkeypatch):

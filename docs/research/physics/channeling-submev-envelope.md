@@ -225,16 +225,75 @@ degenerate subspace. Rank labels may cease to identify orbitals at crossings.
 
 Run from the repository root with
 `PYRITE_MC_BACKEND=cpu OMP_NUM_THREADS=4 uv run python checks/channeling_submev_w001_entry.py`
-(optionally `--energies-kev 30 50 100 200 300 500 750 1000`). The JSON record
-compares 4×4 and 6×6 Gauss–Hermite angular quadratures at each divergence,
-and a 2→3 well-momentum basis cutoff for selected widths. Check both
-`quadrature_abs_delta` and `cutoff_abs_delta_at_coarse_quadrature` before
-interpreting 2p occupation. The `outside_basis` contribution is **numerical
-truncation**, not physical dechanneling, and must never be silently dropped.
-These entrance overlaps do not include the surface, scattering, capture,
-occupation evolution, emission, absorption or detector response. No numerical
-result or support classification is asserted until the diagnostic is run and
-its convergence reviewed.
+(optionally `--energies-kev ...`). Divergence is an isotropic 2D Gaussian in
+the incident tilt, of width $\sigma = f\,\psi_c$. The overlaps vary on the
+angular scale $g/p$ of one reciprocal vector, which is 0.19, 0.18 and 0.15
+$\psi_c$ at 30, 100 and 300 keV. A tensor Gauss–Hermite grid of a few nodes
+cannot resolve that: an earlier 4×4 versus 6×6 run disagreed by up to 0.36 in
+the 2p weight and was off by up to a factor of three. The check therefore
+writes the incident wavevector as $K = k + G$ with $k$ in the first zone. One
+solve at $k$ gives the overlap of every basis order $G$, and the Gaussian
+average becomes a midpoint sum over $k$ of $w(k+G)$ times the band projector
+of row $G$. The sum over all $G$ is periodic in $k$, so the midpoint rule
+converges exponentially once $\sigma$ exceeds the node spacing. The record
+compares 16² and 24² zone grids and a 2→3 well-momentum cutoff. It sums the
+Gaussian over an untruncated $G$ window as a normalization check. The
+`outside_basis` weight is **numerical truncation**, not dechanneling.
+
+The run at 30, 100 and 300 keV took 21 min on 4 CPU threads, with a peak of
+0.65 GiB. Zone-grid deltas are at most $1.4\times10^{-3}$ and cutoff deltas at
+most $1.3\times10^{-4}$. Every normalization is one to $10^{-6}$, and no weight
+falls outside the basis. The 1s band and the 2p doublet are bound across the
+whole zone at all three energies. The 2p doublet stays at least 9.3, 16.7 and
+35.2 eV below band 3, so the rank labels cross nothing. The 2p dispersion is
+2.8, 1.1 and 0.07 eV.
+
+Incident probability at 24² zone nodes, cutoff 2:
+
+| T | $\psi_c$ (mrad) | $f=\sigma/\psi_c$ | 1s | 2p doublet | other bound | unbound |
+| --- | --- | --- | --- | --- | --- | --- |
+| 30 keV | 167.7 | 0 | 0.084 | 0 | 0.895 | 0.021 |
+| | | 0.01 | 0.084 | 0.022 | 0.872 | 0.022 |
+| | | 0.02 | 0.084 | 0.064 | 0.824 | 0.028 |
+| | | 0.05 | 0.080 | 0.166 | 0.604 | 0.150 |
+| | | 0.1 | 0.071 | 0.209 | 0.276 | 0.445 |
+| | | 0.25 | 0.040 | 0.109 | 0.061 | 0.790 |
+| | | 0.5 | 0.017 | 0.038 | 0.017 | 0.928 |
+| 100 keV | 94.5 | 0 | 0.073 | 0 | 0.875 | 0.052 |
+| | | 0.01 | 0.072 | 0.008 | 0.864 | 0.055 |
+| | | 0.02 | 0.072 | 0.028 | 0.834 | 0.067 |
+| | | 0.05 | 0.069 | 0.097 | 0.628 | 0.206 |
+| | | 0.1 | 0.061 | 0.147 | 0.296 | 0.496 |
+| | | 0.25 | 0.035 | 0.089 | 0.065 | 0.811 |
+| | | 0.5 | 0.015 | 0.033 | 0.018 | 0.935 |
+| 300 keV | 57.9 | 0 | 0.052 | 0 | 0.691 | 0.257 |
+| | | 0.01 | 0.052 | 0.002 | 0.681 | 0.265 |
+| | | 0.02 | 0.052 | 0.008 | 0.649 | 0.291 |
+| | | 0.05 | 0.050 | 0.036 | 0.472 | 0.442 |
+| | | 0.1 | 0.044 | 0.071 | 0.220 | 0.664 |
+| | | 0.25 | 0.026 | 0.057 | 0.048 | 0.869 |
+| | | 0.5 | 0.011 | 0.023 | 0.014 | 0.952 |
+
+What the table shows, within this static plane-wave model:
+
+- The emitter is thinly populated at entry. The 1s band takes 5–8 % of an
+  aligned beam. The 2p doublet takes none at exact alignment, by symmetry.
+  Its weight grows roughly as $\sigma^2$ for small $f$, peaks near
+  $f\approx0.1$ (0.21, 0.15 and 0.07 at 30, 100 and 300 keV), and falls off as
+  the beam leaves the well.
+- Most of the aligned bound weight sits in "other bound" bands, near the
+  barrier and spread over the cell. The broad screen found their line to 1s
+  nearly forbidden. This weight is not 2p→1s emitter population.
+- At a fixed fraction of $\psi_c$, the 2p entry weight falls with energy.
+  Since $\psi_c$ itself shrinks as $1/\sqrt{pv}$, a fixed angular divergence in
+  mrad is a larger fraction of $\psi_c$ at higher energy.
+- The 2p→1s line needs 2p population. These entry weights give no
+  occupation evolution, coherence, linewidth or yield. They set only the
+  scale of the initial 2p population at an ideal surface.
+
+These overlaps omit surface refraction and the entrance potential step,
+incoherent scattering, capture, occupation evolution, emission, absorption
+and detector response. They give no support classification.
 
 ## Not established
 
@@ -248,9 +307,9 @@ These items are open under #585 and none is settled by this screen:
   occupation lengths and linewidths;
 - dielectric modification of the emission and of escape through a finite
   slab;
-- axial occupation per band, radiating weight and capture; the
-  [axial screen](#axial-screen) records zone-wide availability and a crude
-  entry overlap only;
+- axial occupation evolution, radiating weight and capture; the
+  [axial screen](#axial-screen) records zone-wide availability, and the
+  focused W ⟨001⟩ audit only static per-band entry overlaps;
 - a converged k grid and an inter-string versus on-string classification of
   multi-string axial pairs, and the flat-band catalog's admission of such pairs.
 
