@@ -28,7 +28,8 @@ GitHub-hosted runners never run CUDA. The independent Monday 07:17 UTC
 `validation-evidence.yml` workflow collects a bounded CPU-only evidence set,
 including its manifest and a regenerated *preview* of the ledger status summary.
 The default producers check bremsstrahlung angular shape, transition-radiation
-omission, and analytic longitudinal-coherence/recoil limits.
+omission, analytic longitudinal-coherence/recoil limits, and EEDL shell
+ionization against pinned Bote–Salvat references.
 The run uploads the records and output for 90 days; failures turn the job red.
 
 In a repository checkout, run or extend the manifest explicitly:

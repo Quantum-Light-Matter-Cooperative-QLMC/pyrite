@@ -33,6 +33,7 @@ DEFAULT_CPU_CHECKS = (
     "checks/brem_angular_comparison.py",
     "checks/transition_radiation_omission.py",
     "checks/longitudinal_coherence_regimes.py",
+    "checks/shell_ionization_comparison.py",
 )
 
 
@@ -97,6 +98,10 @@ def refresh(
 ) -> int:
     """Execute all selected producers, preserving failures and a status snapshot."""
     validate_recipes(checks)
+    ledger = repo / "docs" / "validation" / "physics-validation-ledger.md"
+    if not ledger.is_file():
+        raise ValueError(f"ledger input is required before refresh: {ledger}")
+    entries = parse_ledger_parts(ledger)
     output_dir.mkdir(parents=True, exist_ok=False)
     records_dir = output_dir / "records"
     records_dir.mkdir()
@@ -151,11 +156,10 @@ def refresh(
         rows = [{"check": check, "verdict": "fail", "error": str(exc)} for check in checks]
     if any(row["verdict"] == "fail" for row in rows):
         status = 1
-    ledger = repo / "docs" / "validation" / "physics-validation-ledger.md"
     historical = read_records(ledger.with_name("check-records"))
     current = read_records(records_dir)
     (output_dir / "status-summary.md").write_text(
-        render_status_summary(parse_ledger_parts(ledger), (*historical, *current)),
+        render_status_summary(entries, (*historical, *current)),
         encoding="utf-8",
     )
     report = {

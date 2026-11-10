@@ -128,3 +128,16 @@ def test_refresh_records_exact_reviewed_invocation(tmp_path, monkeypatch):
     assert manifest["checks"][0]["verdict"] == "skip"
     assert manifest["commands"][0]["args"] == ["--download"]
     assert manifest["commands"][0]["elapsed_seconds"] >= 0
+
+
+def test_refresh_requires_ledger_inputs_before_running_producers(tmp_path, monkeypatch):
+    refresh = _script("refresh_validation_evidence.py")
+
+    def unexpected_run(*args, **kwargs):
+        pytest.fail("producer ran before ledger preflight")
+
+    monkeypatch.setattr(refresh.subprocess, "run", unexpected_run)
+    output = tmp_path / "evidence"
+    with pytest.raises(ValueError, match="ledger input is required"):
+        refresh.refresh(["checks/brem_source_comparison.py"], output, repo=tmp_path)
+    assert not output.exists()

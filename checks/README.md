@@ -206,8 +206,9 @@ independent physics-validation verdicts.
 
 Static review of the 52 mapped producers (54 distinct claims), 2026-11-10.
 The mapping in `pyrite.validation.check_records` identifies claim associations;
-it does **not** certify a producer's exit code as a pass/fail gate. Runtime
-labels below are routing decisions, not measured timings. Unmeasured transport,
+it does **not** certify a producer's exit code as a pass/fail gate. Unmeasured
+runtime labels below are routing decisions; measured rows refer to the single
+warm-reference sample documented below. Unmeasured transport,
 solver and ensemble jobs must be profiled on the lab host before admission to
 a bounded scheduled manifest. Never launch the entire inventory locally.
 
@@ -221,18 +222,24 @@ capture or reduction. No row here promotes a physics claim.
 
 The default CPU schedule includes `brem_angular_comparison.py` and
 `transition_radiation_omission.py` (blocked by #1064 and #1065), plus
-`longitudinal_coherence_regimes.py` (local smoke passed, covering two claims).
-Candidates for a later bounded CPU manifest are the source/shell table
-comparisons and optional crystallography/cascade oracles;
-measure them with pinned prerequisites and inspect their output first. CUDA
+`longitudinal_coherence_regimes.py` (local smoke passed, covering two claims),
+and `shell_ionization_comparison.py` (remote gate passed in 51.69 s).
+The optional crystallography/cascade oracles remain candidates: measure them
+with pinned prerequisites and inspect their output first. The source table
+comparison has a reviewed recipe but fails its existing gate; it remains
+explicit-only. CUDA
 parity has its separate lab cron. Remaining ensembles require explicit remote
 recipes. The refresh driver accepts only exact invocations in its `CPU_RECIPES`
 registry, and validates every path before creating artifacts or starting any
 producer, including direct `refresh()` calls and explicit `--check` selections.
-Currently the three defaults use no arguments; the source and shell comparisons
-use `--download` to obtain their pinned references. These latter two are
-reviewed gate recipes available for explicit profiling, not default scheduled
-work. Manifest command rows record exact arguments and elapsed wall seconds.
+The original three defaults use no arguments; the admitted shell comparison
+and explicit-only source comparison use `--download` to obtain their pinned
+references. Manifest command rows record exact arguments and elapsed wall seconds.
+The ledger index and all listed parts must be present before producers run;
+remote sync omits documentation, so stage those tracked inputs and historical
+`docs/validation/check-records/` separately in a dedicated profiling checkout.
+Missing index/parts are rejected before execution rather than losing timing
+metadata after an expensive probe.
 `--all-mapped` is refused while any mapped entry lacks a reviewed recipe;
 run diagnostic tools directly when investigating them. The raw
 `pyrite-dev validation-records` collector still interprets process exit codes;
@@ -252,7 +259,7 @@ verdicts for the diagnostic rows, not merely rerunning their entry points.
 | `axial_outgoing_convergence.py` | Remote CPU ensemble; unmeasured | Explicit run/merge/compare recipe and retained arm/fate inputs; Andersen comparison needs paper fixture | Diagnostic |
 | `axial_outgoing_maps.py` | Remote CPU ensemble; unmeasured | Explicit run/merge/compare recipe and retained arm/fate inputs; Andersen comparison needs paper fixture | Diagnostic |
 | `brem_angular_comparison.py` | CPU analytic/table; unmeasured | Packaged physics/catalog data; source and shell comparisons additionally need pinned reference/released tables | Gate (explicit mode where applicable) |
-| `brem_source_comparison.py` | CPU analytic/table; unmeasured | Packaged physics/catalog data; source and shell comparisons additionally need pinned reference/released tables | Gate (explicit mode where applicable) |
+| `brem_source_comparison.py` | Remote CPU table; 16.08 s (one warm sample) | Packaged physics/catalog data; source and shell comparisons additionally need pinned reference/released tables | Gate (explicit mode where applicable) |
 | `channeling_handoff.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Gate (explicit mode where applicable) |
 | `channeling_modulated_emission.py` | CPU analytic/table; unmeasured | Packaged physics/catalog data; source and shell comparisons additionally need pinned reference/released tables | Gate (explicit mode where applicable) |
 | `channeling_overflow.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Gate (explicit mode where applicable) |
@@ -285,7 +292,7 @@ verdicts for the diagnostic rows, not merely rerunning their entry points.
 | `radiation_error_estimator_calibration.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Diagnostic |
 | `sb85_eta_small_kappa_fit.py` | CPU analytic/table; unmeasured | Packaged physics/catalog data; source and shell comparisons additionally need pinned reference/released tables | Diagnostic |
 | `segment_escape_split_ladder.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Diagnostic |
-| `shell_ionization_comparison.py` | CPU analytic/table; unmeasured | Packaged physics/catalog data; source and shell comparisons additionally need pinned reference/released tables | Gate (explicit mode where applicable) |
+| `shell_ionization_comparison.py` | Remote CPU table; 51.69 s (one warm sample) | Packaged physics/catalog data; source and shell comparisons additionally need pinned reference/released tables | Gate (explicit mode where applicable) |
 | `shell_secondary_transport_observables.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Gate (explicit mode where applicable) |
 | `shell_soft_hard_transport_observables.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Diagnostic |
 | `sinc_bin_integration.py` | CUDA allocation; input/ladder-dependent | NVIDIA environment; some probes need captured trajectories or explicit CLI modes | Gate (explicit mode where applicable) |
@@ -295,3 +302,28 @@ verdicts for the diagnostic rows, not merely rerunning their entry points.
 | `transition_radiation_omission.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Gate (explicit mode where applicable) |
 | `transport_core_goldens.py` | Remote CPU capture/check; unmeasured | Existing reviewed golden directory; capture is not a validation verdict | Gate (explicit mode where applicable) |
 | `xraylib_cascade_oracle.py` | Optional CPU oracle; unmeasured | Optional xraylib installation; packaged EADL cascade data | Gate (explicit mode where applicable) |
+
+### First bounded table-recipe measurements
+
+Job 10901, revision `80218ed8a`, 2026-11-10: one warm-reference sample per
+recipe after job 10900 downloaded prerequisites. CPU backend, AMD Ryzen 9
+9950X3D, two allocated CPUs, BLAS/OpenMP set to one thread, 8 GiB memory limit.
+The two-recipe harness took 68.14 s wall and peaked at 1,739,092 KiB RSS;
+per-recipe peak memory was not measured. These are admission measurements,
+not an optimization comparison or timing guarantee. Both commands include
+process startup and pinned-reference lookup/download handling.
+
+| Exact producer invocation | Wall seconds | Exit / mapped claim verdict | Scheduling decision |
+| --- | ---: | --- | --- |
+| `checks/brem_source_comparison.py --download` | 16.08 | 1 / `brem-source-comparison`: fail | Explicit-only; 61 existing gate violations (46 H, 15 Li), no tolerance change. |
+| `checks/shell_ionization_comparison.py --download` | 51.69 | 0 / `eedl-shell-ionization-comparison`: pass | Admit to bounded CPU defaults. |
+
+Source prerequisites are pinned Seltzer–Berger reference data and released
+BremsLib tables; shell prerequisites are pinned Bote–Salvat parameters and
+packaged EEDL data. The remote manifest, exact arguments, logs, records and
+ledger preview remain under `evidence/validation-344-profile/10901/` in the
+dedicated profiling checkout; they were not promoted into tracked claim
+records. Job 10900 evaluated both gates but could not render its preview
+because remote sync omits ledger documentation. Stage the tracked ledger
+inputs before remote refresh; the driver now checks that prerequisite before
+starting a producer.
