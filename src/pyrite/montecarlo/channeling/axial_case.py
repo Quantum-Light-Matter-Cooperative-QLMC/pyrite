@@ -6,6 +6,8 @@ expressed in the axial profile frame (``AxialProfile.axes`` rows): the tilt is
 the angle between beam and axis, and its azimuth is measured from the
 profile's first transverse axis toward its second. Admission compares these
 resolved values with the repository lookup; no other frame is accepted.
+
+Validation: cr-axial-persisted-channel
 """
 
 from __future__ import annotations
