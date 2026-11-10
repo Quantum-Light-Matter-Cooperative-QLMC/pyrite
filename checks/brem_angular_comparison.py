@@ -6,12 +6,15 @@ the enclosed-flux angles ``theta_50`` and ``theta_90`` of the stored
 double-differential cross section with Schiff's small-angle formula. See
 ``pyrite.validation.brem_angular``.
 
-The gate is ``|ratio - 1| <= 0.06`` for Z < 46 and 0.15 for Z >= 46, where the
-Born-approximation Schiff formula omits the Coulomb distortion that the
-partial-wave library includes. It is set from the measured envelope; it is a shape-agreement gate on a
-Born-approximation reference, not a claim of experimental accuracy. Above
-``kappa = 0.8`` the tip is reported, not gated. Exit 0 pass, 1 fail, 2 skip
-(BremsLib tables not installed).
+The gate is ``|ratio - 1| <= 0.06`` for 3 <= Z < 46 and 0.15 for Z >= 46, where
+the Born-approximation Schiff formula omits the Coulomb distortion that the
+partial-wave library includes. It is set from the measured envelope; it is a
+shape-agreement gate on a Born-approximation reference, not a claim of
+experimental accuracy. Z < 3 (hydrogen) is compared and reported, not gated:
+Schiff's Thomas-Fermi screening is 4-5 % off for Z = 1, 2 (see
+``pyrite.validation.brem_angular.gate_tolerance``). Above ``kappa = 0.8`` the
+tip is reported, not gated. Every element's range is printed. Exit 0 pass,
+1 fail, 2 skip (BremsLib tables not installed).
 
 Validation: bremslib-angular-schiff
 
@@ -27,14 +30,49 @@ from pathlib import Path
 import numpy as np
 
 from pyrite.materials._transport_data import TRANSPORT_ELEMENTS
-from pyrite.validation.brem_angular import QUANTILES, compare_angular_shape
+from pyrite.validation.brem_angular import (
+    HIGH_Z_MIN,
+    KAPPA_MAX,
+    KAPPA_MIN,
+    QUANTILES,
+    SCHIFF_MIN_Z,
+    TOLERANCE_HIGH_Z,
+    TOLERANCE_LOW_Z,
+    compare_angular_shape,
+    gate_tolerance,
+)
 from pyrite.xsgen._errors import TableNotFoundError
 from pyrite.xsgen.bremslib import release
 from pyrite.xsgen.bremslib import tables as bremslib_tables
 
 T_MIN_KEV, T_MAX_KEV = 5000.0, 30000.0
-KAPPA_MIN, KAPPA_MAX = 0.1, 0.8
-TOLERANCE_LOW_Z, TOLERANCE_HIGH_Z, HIGH_Z_MIN = 0.06, 0.15, 46
+
+
+def element_ranges(rows: list[dict]) -> dict[str, dict]:
+    """Per-element enclosed-angle ratio ranges, gated and reported separately."""
+    ranges = {}
+    for element in dict.fromkeys(r["element"] for r in rows):
+        mine = [r for r in rows if r["element"] == element]
+        entry = {"Z": mine[0]["Z"]}
+        for group, label in ((True, "gated"), (False, "reported")):
+            v = [x for r in mine if r["gated"] == group for x in r["ratio"].values()]
+            if v:
+                entry[label] = {"min": min(v), "max": max(v), "nodes": len(v) // len(QUANTILES)}
+        ranges[element] = entry
+    return ranges
+
+
+def print_ranges(ranges: dict[str, dict]) -> None:
+    """Print every element's ranges, the ungated low-Z block first."""
+    ungated = [e for e, r in ranges.items() if r["Z"] < SCHIFF_MIN_Z]
+    print(f"ungated (Z < {SCHIFF_MIN_Z}, reported only): {', '.join(ungated) or 'none'}")
+    for element, entry in ranges.items():
+        parts = [
+            f"{label} {entry[label]['min']:.3f}..{entry[label]['max']:.3f} over {entry[label]['nodes']}"
+            for label in ("gated", "reported")
+            if label in entry
+        ]
+        print(f"{element:>3} Z={entry['Z']:<3} " + "; ".join(parts))
 
 
 def main(argv=None) -> int:
@@ -51,10 +89,6 @@ def main(argv=None) -> int:
         return 2
 
     rows, failures = [], []
-    print(
-        f"{'el':>3} {'T[MeV]':>7} {'kappa':>5} "
-        + " ".join(f"th{int(100 * p):>2}" for p in QUANTILES)
-    )
     for element, Z in elements:
         table = tables.get(element)
         if table is None:
@@ -66,7 +100,8 @@ def main(argv=None) -> int:
                 if not 0.1 <= kappa <= 0.9:
                     continue
                 ratios = compare_angular_shape(table, i, j)
-                gated = bool(KAPPA_MIN <= kappa <= KAPPA_MAX)
+                tolerance = gate_tolerance(Z, float(kappa))
+                gated = tolerance is not None
                 rows.append(
                     {
                         "element": element,
@@ -77,10 +112,11 @@ def main(argv=None) -> int:
                         "ratio": {str(p): float(r) for p, r in ratios.items()},
                     }
                 )
-                tolerance = TOLERANCE_HIGH_Z if Z >= HIGH_Z_MIN else TOLERANCE_LOW_Z
                 if gated and any(abs(r - 1.0) > tolerance for r in ratios.values()):
                     failures.append((element, float(energy), float(kappa), ratios))
-    for group, label in ((True, "gated"), (False, "reported (kappa > 0.8)")):
+    ranges = element_ranges(rows)
+    print_ranges(ranges)
+    for group, label in ((True, "gated"), (False, f"reported (Z < {SCHIFF_MIN_Z} or kappa > 0.8)")):
         for p in QUANTILES:
             v = np.array([r["ratio"][str(p)] for r in rows if r["gated"] == group])
             if v.size:
@@ -96,7 +132,10 @@ def main(argv=None) -> int:
                         "tolerance_low_z": TOLERANCE_LOW_Z,
                         "tolerance_high_z": TOLERANCE_HIGH_Z,
                         "high_z_min": HIGH_Z_MIN,
+                        "min_z": SCHIFF_MIN_Z,
                     },
+                    "ungated_elements": {e: r for e, r in ranges.items() if r["Z"] < SCHIFF_MIN_Z},
+                    "element_ranges": ranges,
                     "comparisons": rows,
                     "failures": [[f[0], f[1], f[2]] for f in failures],
                 },

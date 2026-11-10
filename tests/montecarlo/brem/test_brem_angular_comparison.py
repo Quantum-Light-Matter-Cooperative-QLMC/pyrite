@@ -8,9 +8,11 @@ import pytest
 
 from pyrite.validation.brem_angular import (
     ELECTRON_REST_ENERGY_MEV,
+    SCHIFF_MIN_Z,
     angular_window_rad,
     compare_angular_shape,
     enclosed_angle,
+    gate_tolerance,
     schiff_density,
 )
 from pyrite.xsgen._errors import TableNotFoundError
@@ -25,6 +27,11 @@ def test_enclosed_angle_of_isotropic_density_is_the_cap_angle():
         assert enclosed_angle(theta, np.ones_like(theta), fraction) == pytest.approx(
             expected, rel=1e-6
         )
+    # A per-node scalar (the staged 1 + eta/Z electron-electron factor) cancels.
+    density = np.cos(theta / 2.0) ** 2
+    assert enclosed_angle(theta, 3.7 * density, 0.5) == pytest.approx(
+        enclosed_angle(theta, density, 0.5), rel=1e-12
+    )
 
 
 def test_schiff_density_is_positive_and_peaks_near_one_over_gamma():
@@ -61,3 +68,15 @@ def test_installed_bremslib_shape_matches_schiff_at_low_z(element, Z, T_keV):
     for j in (2, 4, 6):
         for ratio in compare_angular_shape(table, i, j).values():
             assert ratio == pytest.approx(1.0, abs=0.06)
+
+
+def test_gate_domain_reports_hydrogen_and_the_tip_without_gating_them():
+    # Thomas-Fermi screening in Schiff's M is 4-5 % off for Z = 1, 2 (Seltzer
+    # and Berger 1985, Fig. 1), so those elements are reported, not gated.
+    assert gate_tolerance(1, 0.1) is None
+    assert gate_tolerance(SCHIFF_MIN_Z - 1, 0.5) is None
+    assert gate_tolerance(SCHIFF_MIN_Z, 0.1) == 0.06
+    assert gate_tolerance(45, 0.8) == 0.06
+    assert gate_tolerance(46, 0.5) == 0.15
+    assert gate_tolerance(29, 0.9) is None
+    assert gate_tolerance(29, 0.05) is None

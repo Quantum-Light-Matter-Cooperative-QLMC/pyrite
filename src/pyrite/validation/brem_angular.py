@@ -24,6 +24,18 @@ electron-electron term, ``theta << 1``. The window is therefore cut at
 Limiting case: ``Z -> 0`` in ``M`` gives the unscreened Formula 2BN(a); the
 peak angle scales as ``1/E0``.
 
+Gate domain: the screening term of ``M`` comes from the Thomas-Fermi-scaled
+Yukawa potential ``(Ze/r) exp(-r/a)``, ``a = 111 Z^(-1/3)`` in ``hbar/mc``
+(Koch and Motz, Sec. II-E(3), p. 940). Thomas-Fermi screening functions differ from
+Hartree-Fock ones by 1-2 % for ``Z >= 3`` but by 4-5 % for ``Z = 1, 2`` (Seltzer
+and Berger, Nucl. Instrum. Methods B 12, 95 (1985), Sec. 2.2.2, Fig. 1), so
+the reference is gated only for ``Z >= SCHIFF_MIN_Z``. Lighter elements are
+compared and reported, not gated. In the Born approximation, which BremsLib
+itself uses for ``Z <= 2`` above 0.5 MeV, screening is the only ``Z``
+dependence of either shape. The electron-electron term is not a gate reason:
+staging multiplies each BremsLib node by the scalar ``1 + eta/Z``, which
+cancels in the normalized shape, so neither side carries an e-e shape.
+
 Validation: bremslib-angular-schiff
 """
 
@@ -33,6 +45,23 @@ from pyrite._bremslib_extension import ELECTRON_REST_ENERGY_MEV, schiff_density
 from pyrite.montecarlo.spectrum.brem_bremslib import BremsLibBremsstrahlungTable
 
 QUANTILES = (0.5, 0.9)
+KAPPA_MIN, KAPPA_MAX = 0.1, 0.8
+TOLERANCE_LOW_Z, TOLERANCE_HIGH_Z, HIGH_Z_MIN = 0.06, 0.15, 46
+SCHIFF_MIN_Z = 3
+
+
+def gate_tolerance(atomic_number: int, kappa: float) -> float | None:
+    """Gate ``|ratio - 1|`` bound at one node, or ``None`` if only reported.
+
+    Gated for ``Z >= SCHIFF_MIN_Z`` and ``KAPPA_MIN <= kappa <= KAPPA_MAX``;
+    the bound is set from the measured envelope, wider from ``HIGH_Z_MIN`` where
+    the Born formula omits Coulomb distortion.
+
+    Validation: bremslib-angular-schiff
+    """
+    if atomic_number < SCHIFF_MIN_Z or not KAPPA_MIN <= kappa <= KAPPA_MAX:
+        return None
+    return TOLERANCE_HIGH_Z if atomic_number >= HIGH_Z_MIN else TOLERANCE_LOW_Z
 
 
 def enclosed_angle(theta_rad: np.ndarray, density: np.ndarray, fraction: float) -> float:
