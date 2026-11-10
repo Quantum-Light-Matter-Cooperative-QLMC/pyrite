@@ -14,16 +14,17 @@ not individual spectral bins, and is declared with results rather than gated
 by a tolerance (maintainer decision, 2026-11-09).
 
 ``free_free`` names the owner of the in-cut free→free block that the fibre
-source with ``boundary="max"`` does not score (#992): ``"native"`` when native
-CBS scores it on tilted zone rows (per flight, in incoherent emission), or
-``"bound"`` when it is omitted and carried as the declared one-sided
-``free_free_upper`` (relative to the band yield; measured mean + 3 SE).
-``free_free_in_cut`` is the measured block (``boundary="none"`` minus ``"max"``,
-chunk-paired with the calibration control) for either owner; for ``"native"``
-it is the reference native CBS must reproduce. Free→free above the retained
-cut is outside both estimators at exact alignment and is not bounded here.
+source with ``boundary="max"`` does not score (#992). It is always ``"bound"``:
+native PXR/CBS line scoring is off on axial zone rows
+(``cr-axial-zone-row-native-lines``), so the block is omitted and carried as
+the declared one-sided ``free_free_upper`` (relative to the band yield;
+measured mean + 3 SE). ``free_free_in_cut`` is the measured block
+(``boundary="none"`` minus ``"max"``, chunk-paired with the calibration
+control). Free→free above the retained cut is scored by neither estimator on
+zone rows and is not bounded here.
 
 Validation: cr-axial-depth-calibration
+Validation: cr-axial-zone-row-native-lines
 """
 
 from __future__ import annotations
@@ -39,7 +40,7 @@ from ._admission import AxialAdmissionError
 _REL_TOL = 1e-9
 #: Model generation of the calibrated fibre source; distinct from planar and
 #: from the non-executable v1 axial recipe.
-AXIAL_FIBRE_MODEL_MARKER = "axial-fibre-v1"
+AXIAL_FIBRE_MODEL_MARKER = "axial-fibre-v2"
 
 
 @dataclass(frozen=True)
@@ -78,8 +79,8 @@ class AdmittedAxialCase:
     band_eV: tuple[float, float]
     depth_budget: float
     joint_confidence: float
-    free_free: Literal["native", "bound"]
-    free_free_upper: float | None
+    free_free: Literal["bound"]
+    free_free_upper: float
     free_free_in_cut: float
     free_free_in_cut_sem: float
     evidence_id: str
@@ -89,8 +90,8 @@ class AdmittedAxialCase:
     particle: str = "electron"
 
     def __post_init__(self) -> None:
-        if (self.free_free == "bound") != (self.free_free_upper is not None):
-            raise ValueError("free_free_upper is required exactly when free_free='bound'")
+        if self.free_free != "bound" or not self.free_free_upper >= self.free_free_in_cut:
+            raise ValueError("free_free must be 'bound' with an upper bound covering the block")
 
 
 _RECORDS = "docs/validation/check-records/axial-source"
@@ -110,8 +111,8 @@ ADMITTED_AXIAL_CASES: Mapping[str, AdmittedAxialCase] = MappingProxyType(
             band_eV=(800.0, 10000.0),
             depth_budget=0.039720652973856484,
             joint_confidence=0.95,
-            free_free="native",
-            free_free_upper=None,
+            free_free="bound",
+            free_free_upper=0.08057945671257792,
             free_free_in_cut=0.07832616270160697,
             free_free_in_cut_sem=0.0007510980036569821,
             evidence_id="993/A@07c0f5f3e",
@@ -147,9 +148,7 @@ ADMITTED_AXIAL_CASES: Mapping[str, AdmittedAxialCase] = MappingProxyType(
 #: calibrated when it is in :data:`ADMITTED_AXIAL_CASES`; it becomes runnable
 #: only when every claim its run uses is ``anchored``. Empty today:
 #: ``cr-axial-persisted-channel`` (launch, scoring and persistence adapter) is
-#: not yet verified, and si-fibre/A additionally waits on reconciling native
-#: coherent bremsstrahlung on its zone rows with the measured in-cut free->free
-#: block (#994). Repository-owned; callers cannot extend it.
+#: not yet anchored (#994). Repository-owned; callers cannot extend it.
 RUNNABLE_AXIAL_CASES: frozenset[str] = frozenset()
 
 

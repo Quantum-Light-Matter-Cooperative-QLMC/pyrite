@@ -493,11 +493,18 @@ def _cxr_for_segments(
     count up to ``MAX_ELECTRON_BLOCKS``, then re-raises to the spectrum phase's
     chunk-halving retry. A case that fits runs as one unchanged call; coherent
     sums, which may couple electrons, are never split. Mixed-transport cases
-    refuse here, the one entry every CXR route shares (#990).
+    refuse here, the one entry every CXR route shares (#990), and an axial
+    fibre case drops its zone rows here (#994).
+
+    Validation: cr-axial-zone-row-native-lines
     """
     from ..._mixed_elastic_policy import refuse_mixed_cxr
 
     refuse_mixed_cxr(case)
+    if case.get("channeling") is not None:  # axial zone rows score no native lines (#994)
+        from .axial import native_line_rows
+
+        segs = native_line_rows(case, segs)
     if (case.get("transition_radiation") or {}).get("model") == "two-beam":
         from .dtr_emission import case_dtr_spectrum
 

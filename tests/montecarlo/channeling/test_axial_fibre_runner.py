@@ -101,7 +101,7 @@ def test_runner_admits_a_runnable_case_and_no_caller_record(case_b, runnable_b):
 
 def test_marking_one_case_runnable_admits_no_other(runnable_b):
     case = fibre_case("A")
-    assert case["channeling"]["free_free"] == "native"
+    assert case["channeling"]["free_free"] == "bound"
     with pytest.raises(AxialAdmissionError, match="not yet runnable"):
         admit_axial_channeling(case)
 
@@ -251,7 +251,7 @@ def test_source_and_budgets_round_trip_through_results_and_checkpoints(case_b, p
     np.testing.assert_array_equal(record["spec_channeling"], out["spec_channeling"])
     stored = record["case"]["channeling"]
     entry = ADMITTED_AXIAL_CASES["si-fibre/B"]
-    assert stored["model_marker"] == "axial-fibre-v1"
+    assert stored["model_marker"] == "axial-fibre-v2"
     assert stored["depth_budget"] == entry.depth_budget
     assert stored["free_free"] == "bound"
     assert stored["free_free_upper"] == entry.free_free_upper
@@ -290,3 +290,78 @@ def test_public_simulate_runs_a_runnable_case_from_public_inputs(runnable_b, pro
     np.testing.assert_array_equal(result.channeling.photon_energy_eV, GRID)
     np.testing.assert_array_equal(result.channeling.density, out["spec_channeling"])
     assert result.case["channeling"]["case_key"] == "si-fibre/B"
+
+
+def test_native_line_rows_keeps_other_cases_and_refuses_an_untagged_axial_transport(case_b):
+    from pyrite.montecarlo.runner.axial import native_line_rows
+
+    rows = {
+        "L_ang": np.array([1.0, 2.0, 3.0]),
+        "v_hat": np.eye(3),
+        "electron_id": np.array([0, 0, 1]),
+        "channeling_zone": np.array([True, False, True]),
+        "initial_E_keV": np.array([1.0, 2.0, 3.0]),
+        "Ne": 3,
+    }
+    for other in ({}, {"channeling": None}, {"channeling": {"model": "planar"}}):
+        assert native_line_rows(other, rows) is rows
+    kept = native_line_rows(case_b, rows)
+    np.testing.assert_array_equal(kept["L_ang"], [2.0])
+    np.testing.assert_array_equal(kept["v_hat"], [[0.0, 1.0, 0.0]])
+    np.testing.assert_array_equal(kept["channeling_zone"], [False])
+    np.testing.assert_array_equal(kept["initial_E_keV"], rows["initial_E_keV"])  # per electron
+    assert kept["Ne"] == 3 and rows["L_ang"].size == 3
+    untagged = {key: value for key, value in rows.items() if key != "channeling_zone"}
+    with pytest.raises(AxialAdmissionError, match="zone-row tag"):
+        native_line_rows(case_b, untagged)
+
+
+@pytest.fixture(scope="module")
+def produced_a():
+    """Tilted si-fibre/A: its zone rows are off axis, so native lines would score."""
+    case = fibre_case("A")
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(_axial_envelope, "RUNNABLE_AXIAL_CASES", frozenset({"si-fibre/A"}))
+        transport = runner._transport_case(case)
+        yield case, transport, runner._spectrum_case(case, transport)
+
+
+@pytest.mark.slow
+def test_axial_zone_rows_score_no_native_lines(produced_a):
+    """No double count: lines come from native rows, the zone from the fibre source."""
+    from pyrite.montecarlo.runner.axial import native_line_rows
+
+    case, transport, out = produced_a
+    segs, grid, n_hat = transport["segs"], transport["E_grid"], transport["n_hat"]
+    zone = np.asarray(segs["channeling_zone"])
+    assert zone.sum() == LINES
+    native = native_line_rows(case, segs)
+    assert native["L_ang"].size == zone.size - LINES and native["Ne"] == segs["Ne"]
+    plain = {key: value for key, value in case.to_dict().items() if key != "channeling"}
+    score = lambda rows: runner._cxr_for_segments(  # noqa: E731
+        rows, grid, plain, n_hat, None, None, coherent=False, Ne=LINES
+    )
+    np.testing.assert_array_equal(out["spec"], score(native))
+    with_zone = score(segs)  # what a free plane-wave reading of the zone rows would add
+    removed = np.trapezoid(with_zone - out["spec"], grid)  # 1.56e-4 /sr at these 4 histories
+    assert removed > 1e-4 > np.trapezoid(out["spec"], grid) > 0.0
+
+
+@pytest.mark.slow
+def test_admitted_cases_persist_the_fibre_source_and_their_free_free_bound(produced_a, tmp_path):
+    case, transport, out = produced_a
+    entry = ADMITTED_AXIAL_CASES["si-fibre/A"]
+    info = transport["segs"]["channeling"]
+    np.testing.assert_array_equal(out["spec_channeling"], info["source"]["spectrum"])
+    assert info["free_free"] == "bound"
+    assert info["free_free_upper"] == entry.free_free_upper == pytest.approx(0.0806, abs=5e-5)
+    records = {}
+    store_result(records, case, dict(out))
+    _checkpoint_store.save("silicon", tmp_path, records)
+    loaded = _checkpoint_store.load("silicon", tmp_path)
+    stored = next(iter(next(iter(loaded.values())).values()))["case"]["channeling"]
+    assert stored["free_free"] == "bound"
+    assert stored["free_free_upper"] == entry.free_free_upper
+    assert stored["free_free_in_cut"] == entry.free_free_in_cut
+    assert stored["free_free_record"] == entry.free_free_record
+    assert stored["fibre_numerics"]["boundary"] == "max"

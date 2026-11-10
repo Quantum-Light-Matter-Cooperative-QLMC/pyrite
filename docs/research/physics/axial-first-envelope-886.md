@@ -15,12 +15,13 @@ Selected with `Physics(channeling_model="axial", channeling_axial={"version": 2,
 
 | Key | Case | Depth budget ε (95%) | In-cut free→free block | Evidence |
 | --- | --- | --- | --- | --- |
-| `si-fibre/A` | Si ⟨100⟩, 3.5 MeV, 0.3 µm, tilt 0.088° | 3.97% | +7.83(8)%, owner: native CBS on zone rows | `depth-calibration-993-A.json`, `free-free-994.json` |
+| `si-fibre/A` | Si ⟨100⟩, 3.5 MeV, 0.3 µm, tilt 0.088° | 3.97% | +7.83(8)%, omitted; declared one-sided bound 8.06% | `depth-calibration-993-A.json`, `free-free-994.json` |
 | `si-fibre/B` | Si ⟨100⟩, 3.5 MeV, 0.3 µm, 0° | 9.71% | +18.19(23)%, omitted; declared one-sided bound 18.9% | `depth-calibration-993-B.json`, `free-free-994.json` |
 
 Records are under `docs/validation/check-records/axial-source/`. ε bounds the on-axis
 yield integrated over 800 eV–10 keV, not individual bins. Free→free above the
-retained cut is not bounded for B. ε, the free→free owner and bound, and the evidence
+retained cut is not bounded for either case. Zone rows score no native PXR/CBS lines
+(`cr-axial-zone-row-native-lines`), so the block is never counted twice. ε, the free→free owner and bound, and the evidence
 IDs are stored in the resolved `Case.channeling` record and so persist with results
 and checkpoints.
 
@@ -38,7 +39,7 @@ Everything else refuses.
 | Fibre photon source | `cr-axial-fiber-regression`, `anchored` | Done, #992 |
 | Measured depth budget per case | `cr-axial-depth-calibration`, `anchored` for A and B | Done, #993 |
 | Native launch, scoring and persistence adapter | Implemented (`montecarlo/runner/axial.py`); `cr-axial-persisted-channel` is `unverified` | [#994](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/994) |
-| A: owner of the in-cut free→free block | Open: native CBS on A's zone rows gives 2.33e-4 /sr in band against the measured 4.17e-5 /sr, with a different spectral shape | #994 |
+| Zone rows score no native lines; A and B carry the in-cut free→free block as a declared bound | Implemented; `cr-axial-zone-row-native-lines` is `unverified` | #994 |
 
 Check the [ledger](../../validation/ledger-channeling.md) for current claim status.
 

@@ -78,9 +78,8 @@ def test_free_free_values_equal_their_paired_record(key):
     assert {k: v for k, v in arm.items() if k not in ("boundary", "boundary_eV")} == {
         k: v for k, v in control.items() if k not in ("boundary", "boundary_eV")
     }
-    if case.free_free == "bound":
-        upper = whole["relative_change"] + 3 * whole["relative_sem"]
-        assert case.free_free_upper == upper
+    assert case.free_free == "bound"
+    assert case.free_free_upper == whole["relative_change"] + 3 * whole["relative_sem"]
 
 
 @pytest.mark.parametrize("key", sorted(ADMITTED_AXIAL_CASES))
@@ -145,12 +144,13 @@ def test_line_grid_must_stay_inside_the_calibrated_band():
             check_axial_line_band(case, grid)
 
 
-def test_free_free_bound_is_declared_exactly_when_the_block_is_omitted():
+def test_every_entry_carries_the_omitted_block_as_a_declared_bound():
+    for case in ADMITTED_AXIAL_CASES.values():
+        assert case.free_free == "bound"
+        assert case.free_free_upper > case.free_free_in_cut > 0.0
     case = ADMITTED_AXIAL_CASES["si-fibre/A"]
-    assert case.free_free == "native" and case.free_free_upper is None
-    aligned = ADMITTED_AXIAL_CASES["si-fibre/B"]
-    assert aligned.tilt_deg == 0.0 and aligned.free_free == "bound"
+    assert case.free_free_upper == pytest.approx(0.0806, abs=5e-5)
     with pytest.raises(ValueError):
-        dataclasses.replace(case, free_free="bound")
+        dataclasses.replace(case, free_free="native")
     with pytest.raises(ValueError):
-        dataclasses.replace(case, free_free_upper=0.1)
+        dataclasses.replace(case, free_free_upper=0.5 * case.free_free_in_cut)

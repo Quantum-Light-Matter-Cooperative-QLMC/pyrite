@@ -16,9 +16,11 @@ its on-axis photon estimate and its terminal fate; nothing is drawn twice.
   transported no further and are counted in the diagnostics.
 * Zone rows: each line electron's straight segment along the beam from the
   entrance face to its terminal depth, with the constant-stopping energy and
-  clock of :func:`.zone_energy_and_clock`. Native scoring treats them as
-  ordinary rows; for a ``free_free="native"`` case coherent bremsstrahlung on
-  them owns the in-cut free→free block the fibre source omits.
+  clock of :func:`.zone_energy_and_clock`. They score no native PXR/CBS lines
+  (:func:`native_line_rows`): the fibre source owns the line-band emission of
+  the zone, and the in-cut free→free block it omits is carried as the entry's
+  declared one-sided bound. Characteristic and incoherent bremsstrahlung
+  scoring on zone rows is unchanged.
 * Bremsstrahlung-only electrons (IDs from ``Ne`` on) run native amorphous
   transport from the entrance face, as in planar channeling.
 
@@ -32,6 +34,7 @@ Validation: cr-axial-persisted-channel
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any
 
 import numpy as np
@@ -158,6 +161,43 @@ def _axial_zone_rows(template, records, zone, r0, v0, E_keV, clock, t0):
     rows["E_repr_keV"] = 0.5 * (rows["E_start_keV"] + rows["E_end_keV"])
     rows["t_end_ang"] = clock[ids] + np.asarray([t for _, t in state], dtype=float).reshape(-1)
     return rows, ids
+
+
+def native_line_rows(case, segs):
+    """Rows of ``segs`` that native PXR/CBS line scoring may read.
+
+    For an axial fibre case the zone rows are removed, so the line spectrum
+    ``spec`` is the sum over native rows only:
+    ``spec = (1/Ne) sum_{rows not in zone} dN/(dE dOmega)``. The scalars
+    (``Ne``, thickness) are kept, so the per-incident-electron normalization
+    is unchanged. Every other case returns ``segs`` itself. An axial transport
+    without the ``channeling_zone`` tag refuses.
+
+    The native line kernel treats a row as a free plane-wave electron on a
+    straight path. Inside the zone the electron is in the fibre model's
+    retained transverse states, whose bound→bound and capture emission is
+    already in ``spec_channeling``; scoring the same path natively counts that
+    population twice (measured for si-fibre/A: 2.33e-4 /sr in band against the
+    4.17e-5 /sr in-cut free→free block, #994). The omitted in-cut free→free
+    block is declared as ``free_free_upper``; above-cut free→free on zone rows
+    is unbounded and declared with results.
+
+    Validation: cr-axial-zone-row-native-lines
+    """
+    record = case.get("channeling")
+    if not isinstance(record, Mapping) or record.get("model") != "axial":
+        return segs
+    from ..spectrum.cxr._kernels import _SEG_ARRAYS
+
+    zone = segs.get("channeling_zone")
+    if zone is None:
+        raise AxialAdmissionError("axial transport carries no zone-row tag (#994)")
+    keep = ~np.asarray(zone, dtype=bool)
+    out = dict(segs)
+    for key in (*_SEG_ARRAYS, "channeling_zone"):
+        if out.get(key) is not None:
+            out[key] = out[key][keep]
+    return out
 
 
 def transport_axial_case(

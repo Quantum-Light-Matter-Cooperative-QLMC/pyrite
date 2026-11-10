@@ -82,7 +82,7 @@ def test_public_v2_is_minimal_roundtripping_and_distinct_from_v1():
         }
     )
     assert axial_spec_identity(normalized) != axial_spec_identity(v1)
-    assert AXIAL_FIBRE_MODEL_MARKER == "axial-fibre-v1"
+    assert AXIAL_FIBRE_MODEL_MARKER == "axial-fibre-v2"
 
 
 @pytest.mark.parametrize(
@@ -106,8 +106,9 @@ def test_public_v2_never_accepts_caller_physics(additional):
 def test_repository_record_is_detached_and_includes_provenance():
     entry = ADMITTED_AXIAL_CASES["si-fibre/A"]
     rec = axial_channeling_record(entry)
-    assert rec["model_marker"] == "axial-fibre-v1"
-    assert rec["free_free"] == "native"
+    assert rec["model_marker"] == "axial-fibre-v2"
+    assert rec["free_free"] == "bound"
+    assert rec["free_free_upper"] == entry.free_free_upper
     assert rec["fibre_numerics"]["boundary"] == "max"
     assert rec["depth_budget"] == entry.depth_budget
     assert rec["evidence_id"] == entry.evidence_id
@@ -115,10 +116,10 @@ def test_repository_record_is_detached_and_includes_provenance():
     assert axial_channeling_record(entry)["fibre_numerics"]["max_order"] == 9
 
 
-def test_case_a_resolves_with_its_native_free_free_owner():
+def test_case_a_resolves_with_its_declared_bound():
     out = resolve_channeling([case()], physics(), Numerics())
     assert out[0]["channeling"] == axial_channeling_record(ADMITTED_AXIAL_CASES["si-fibre/A"])
-    assert out[0]["channeling"]["free_free"] == "native"
+    assert out[0]["channeling"]["free_free"] == "bound"
 
 
 def test_case_b_resolves_with_its_declared_bound():
