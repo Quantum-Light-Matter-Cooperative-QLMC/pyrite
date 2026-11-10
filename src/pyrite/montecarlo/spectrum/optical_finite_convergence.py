@@ -295,9 +295,17 @@ class ApertureSpectralConvergence:
 
     ``energy_rows`` are ``(nodes, photons)`` at the base pitches;
     ``detector_rows`` are ``(detector_pitch_m, photons)`` and ``source_rows``
-    ``(source_pitch_m, photons)`` on the base energy nodes. The ``*_pointwise``
-    changes are the largest relative ``dN/dE`` change over those nodes.
-    ``energy_eV``/``photons_per_eV`` hold the finest energy grid.
+    ``(source_pitch_m, photons)`` on the base energy nodes. Each ``*_pointwise``
+    change is the largest ``dN/dE`` change between *any* two consecutive levels
+    of that axis, over the base nodes, relative to the largest ``|dN/dE|`` of
+    the finer level. ``energy_eV``/``photons_per_eV`` and ``band_photons`` hold
+    the finest energy grid at the *base* detector and source pitches; no
+    combined error estimate is formed.
+
+    ``converged`` needs at least two refinements: the pitch axes are not
+    monotone (aperture-edge weights at detector pixel centres; pixel-centre
+    staircase disc edge on non-nested source grids), so a single small step
+    can understate the error several-fold.
     """
 
     band_eV: tuple[float, float]
@@ -319,7 +327,7 @@ class ApertureSpectralConvergence:
 
     @property
     def converged(self) -> bool:
-        return (
+        return len(self.source_rows) >= 3 and (
             max(
                 self.energy_relative_change,
                 self.detector_pointwise_change,
@@ -330,7 +338,12 @@ class ApertureSpectralConvergence:
 
 
 def _pointwise(spectra):
-    return float(np.max(np.abs(spectra[-1] - spectra[-2]) / np.abs(spectra[-1])))
+    """Largest change over every consecutive level pair, scaled by the finer spectrum."""
+    changes = []
+    for coarse, fine in zip(spectra[:-1], spectra[1:], strict=True):
+        scale = float(np.max(np.abs(fine)))
+        changes.append(np.inf if scale == 0 else float(np.max(np.abs(fine - coarse))) / scale)
+    return max(changes)
 
 
 def finite_aperture_spectral_convergence(
@@ -345,7 +358,7 @@ def finite_aperture_spectral_convergence(
     aperture: PlaneAcceptance,
     detector_pitch_m: float,
     n_energy: int = 5,
-    refinements: int = 1,
+    refinements: int = 2,
     rtol: float = 0.01,
 ) -> ApertureSpectralConvergence:
     """Converge a finite-aperture band photon count in energy and both pitches.
@@ -354,8 +367,16 @@ def finite_aperture_spectral_convergence(
     odd >= 3). Detector refinement halves ``detector_pitch_m``; source
     refinement halves ``dx_m, dy_m`` and doubles ``nx, ny`` (fixed physical
     window, which must keep the screen compact). Both pitch axes are evaluated
-    on the base energy nodes. The direct Green sum has no window axis. Cost is
-    O(source pixels x aperture points) per node; refinements multiply it by 4.
+    on the base energy nodes. The direct Green sum has no window axis.
+
+    The source axis refines the *sampled* disc: metal is the set of pixel
+    centres with ``rho <= a`` on centred grids that are not nested, so the edge
+    staircase changes irregularly with pitch and its error is not monotone
+    (fresh-context review, 2026-11-10: the last of two steps was ~4x the first
+    on the committed test case). Hence the largest change over all levels is
+    reported and ``converged`` requires ``refinements >= 2``. Cost is
+    O(source pixels x aperture points) per node; each refinement multiplies it
+    by 4, and the default two refinements by 16 at the finest level.
 
     Validation: optical-wavefront-propagation
     """

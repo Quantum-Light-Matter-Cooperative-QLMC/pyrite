@@ -355,9 +355,13 @@ def collect_screen_green(
     so there is no periodic window and no light-circle k-sampling error; it
     is exact to source-pixel and detector-``pitch_m`` quadrature. The aperture
     is sampled on a ``pitch_m`` grid with the same partial-pixel weights as the
-    FFT path. Both pitches must resolve min(wavelength, plane distance); the
-    source must be compact (zero on the window border). Cost is O(source
-    pixels x aperture points); no Jones analyzer is applied.
+    FFT path. Both pitches must resolve min(wavelength, plane distance); this
+    is the caller's responsibility and is not checked. The aperture-edge
+    weights are applied at detector pixel centres, so the edge term is O(pitch)
+    and not monotone in pitch: converge it over more than one refinement
+    (:func:`finite_aperture_spectral_convergence`). The source must be compact
+    (zero on the window border). Cost is O(source pixels x aperture points);
+    no Jones analyzer is applied.
 
     Validation: optical-wavefront-propagation
     """

@@ -125,10 +125,11 @@ print(reading.absorbed_joule_per_pulse, reading.expected_voltage_v)
 
 Tests exercise analytically known plane waves, power and phase limits, evanescent
 decay, linear pulse-energy integration, saturation, calibration hashing and
-strict refusal of unsupported inputs. They are **not** experimental anchors:
-`optical-wavefront-propagation` and `optical-instrument-observable` remain
-`rederived`, with published observable regressions still required for
-`anchored`. Device parity alone does not establish a physical anchor.
+strict refusal of unsupported inputs. They are **not** experimental anchors.
+`optical-wavefront-propagation` is `anchored` on published *theoretical*
+near-field TR calculations (Casalbuoni et al., TESLA Report 2005-15, Figs. 8
+and 15; see its [ledger row](../../validation/ledger-core-coherent-physics.md#optical-wavefront-propagation)
+for the scope). Device parity alone does not establish a physical anchor.
 
 ## Circular PEC source (#616, bounded reference)
 
@@ -514,8 +515,9 @@ The synthetic channel is not a measured calibration, and the common numerical
 mesh does not establish source or acceptance convergence. **Unresolved gates:**
 independent finite-boundary publication benchmark, formation-zone energy budget,
 production source/transport integration and experiment. Bounded field-operator
-CUDA parity is recorded below. `optical-finite-boundary-field` remains
-`rederived`; published evidence is still required for `anchored`.
+CUDA parity is recorded below. `optical-finite-boundary-field` is `anchored` on
+the published theoretical finite-disc calculation of Schmidt et al. (below),
+not on a measurement.
 
 ## Finite-distance, polarization-resolved collection (#616 next slice)
 
@@ -977,12 +979,21 @@ through a finite detector-plane aperture with the direct Green sum
 (`collect_screen_green`), so there is no window axis. It refines three axes
 independently: Simpson energy nodes, the detector pitch (halved) and the
 source pitch (halved at a fixed physical window, evaluated on the base energy
-nodes). It reports the band change in energy and the largest pointwise
-$dN/dE$ change for each pitch. For a 1 µm disc, $eta=0.95$, 1–2 eV, and a
-2 µm square aperture 0.5 µm downstream, both pitch changes are below
-$2	imes10^{-3}$ at 0.1 µm. The aperture collects 0.5–1 of the hemisphere
-photons/eV, and that fraction varies with wavelength. The cost is
-O(source pixels × aperture points) per energy node.
+nodes). It reports the band change in energy and, for each pitch, the
+largest pointwise $dN/dE$ change over every pair of consecutive levels. Both
+pitch axes are non-monotone: the aperture edge is weighted at detector pixel
+centres, and the disc edge is a pixel-centre staircase on grids that are not
+nested. One halving can therefore understate the error several-fold, so
+`converged` requires at least two refinements (the default). For a 1 µm disc,
+$\beta=0.95$, 1–2 eV, and a 2 µm square aperture 0.5 µm downstream, the
+source-pitch changes are $1.6\times10^{-4}$ then $1.3\times10^{-3}$ from
+0.1 µm to 25 nm, and the detector-pitch change is below $10^{-3}$. The source
+axis converges the *sampled* disc; its departure from a continuous disc was
+$4\times10^{-3}$ at a 0.1 µm pitch in the fresh-context review. The reported
+band uses the finest energy grid at the base pitches. The aperture collects
+0.5–1 of the hemisphere photons/eV, and that fraction varies with wavelength.
+The cost is O(source pixels × aperture points) per energy node and grows 16×
+over two refinements.
 
 **Published finite-disc reference (Schmidt et al., arXiv:1803.00608, Sect. 2.3).**
 For $\gamma=100$ and $\lambda=0.3$ mm, the solver (with `observe_screen_green`)
