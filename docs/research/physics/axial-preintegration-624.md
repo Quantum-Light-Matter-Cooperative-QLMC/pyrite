@@ -1,6 +1,7 @@
 # #624 preliminary axial integration: canonical recipe and refusal seams
 
-This is a configuration-only change. **No standard axial run is enabled.**
+This is a configuration-only change. **It enables no standard axial run**; the
+[first envelope](axial-first-envelope-886.md) (#994) admits two silicon cases.
 Issue [#623](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/623)
 still lacks an anchored physical matching surface, incident-normalized material
 photon source, and calibrated per-case return-flux/depth bound. Periodic FFT

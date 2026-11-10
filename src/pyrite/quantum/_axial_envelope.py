@@ -146,10 +146,19 @@ ADMITTED_AXIAL_CASES: Mapping[str, AdmittedAxialCase] = MappingProxyType(
 
 #: Keys of the lookup entries the standard runner may execute. An entry is
 #: calibrated when it is in :data:`ADMITTED_AXIAL_CASES`; it becomes runnable
-#: only when every claim its run uses is ``anchored``. Empty today:
-#: ``cr-axial-persisted-channel`` (launch, scoring and persistence adapter) is
-#: not yet anchored (#994). Repository-owned; callers cannot extend it.
-RUNNABLE_AXIAL_CASES: frozenset[str] = frozenset()
+#: only when every claim its run uses (:data:`AXIAL_RUN_CLAIMS`) is
+#: ``anchored``. Repository-owned; callers cannot extend it.
+RUNNABLE_AXIAL_CASES: frozenset[str] = frozenset({"si-fibre/A", "si-fibre/B"})
+
+#: Ledger claims every admitted fibre run relies on (#994).
+AXIAL_RUN_CLAIMS: tuple[str, ...] = (
+    "cr-axial-fiber-regression",
+    "cr-axial-depth-calibration",
+    "cr-axial-zone-handoff-physical",
+    "cr-axial-source-partition",
+    "cr-axial-zone-row-native-lines",
+    "cr-axial-persisted-channel",
+)
 
 
 def require_runnable_axial_case(key: object) -> None:

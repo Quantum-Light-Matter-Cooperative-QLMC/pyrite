@@ -71,8 +71,21 @@ def runnable_b():
         yield
 
 
-def test_no_calibrated_case_is_runnable_in_the_repository(case_b):
-    assert _axial_envelope.RUNNABLE_AXIAL_CASES == frozenset()
+def test_repository_runs_exactly_the_admitted_cases_once_their_claims_are_anchored():
+    from pathlib import Path
+
+    from pyrite.devtools.validation_ledger import parse_ledger_parts
+
+    assert _axial_envelope.RUNNABLE_AXIAL_CASES == frozenset(ADMITTED_AXIAL_CASES)
+    root = Path(__file__).parents[3]
+    entries = parse_ledger_parts(root / "docs/validation/physics-validation-ledger.md")
+    status = {entry.validation_id: entry.status for entry in entries}
+    for claim in _axial_envelope.AXIAL_RUN_CLAIMS:
+        assert status[claim] in ("anchored", "signed-off"), claim
+
+
+def test_a_calibrated_case_not_marked_runnable_refuses(case_b, monkeypatch):
+    monkeypatch.setattr(_axial_envelope, "RUNNABLE_AXIAL_CASES", frozenset())
     for case in (case_b, case_b.to_dict(), fibre_case("A")):
         with pytest.raises(AxialAdmissionError, match="not yet runnable"):
             admit_axial_channeling(case)
@@ -182,16 +195,15 @@ def produced(case_b, runnable_b):
     return transport, runner._spectrum_case(case_b, transport)
 
 
-@pytest.mark.slow
-def test_one_fibre_history_gives_the_source_and_the_fates(case_b, produced):
+def _direct_source(case, key):
+    """The admitted entry's fibre estimator called directly, outside the runner."""
     from pyrite.materials.attenuation import linear_attenuation_inv_mm
     from pyrite.montecarlo.channeling.axial_fiber_case import axial_fiber_inputs
     from pyrite.montecarlo.channeling.axial_fiber_regression import fiber_on_axis_source
 
-    transport, out = produced
-    entry = ADMITTED_AXIAL_CASES["si-fibre/B"]
+    entry = ADMITTED_AXIAL_CASES[key]
     inputs = axial_fiber_inputs(entry)
-    direct = fiber_on_axis_source(
+    return fiber_on_axis_source(
         inputs.channels,
         inputs.entry_orders,
         kinetic_energy_eV=entry.kinetic_energy_eV,
@@ -199,13 +211,20 @@ def test_one_fibre_history_gives_the_source_and_the_fates(case_b, produced):
         depths_ang=inputs.depths_ang,
         photon_energy_eV=GRID,
         incident_ids=range(LINES),
-        seed=int(case_b["seed"]),
+        seed=int(case["seed"]),
         carrier_inv_ang=inputs.carrier_inv_ang,
         boundary_eV=inputs.boundary_eV,  # boundary="max": no free->free scored
         absorption_inv_ang=linear_attenuation_inv_mm("silicon", GRID) * 1e-7,
         exit_path_ang=inputs.depths_ang[-1] - inputs.depths_ang,
         search_step_ang=inputs.search_step_ang,
     )
+
+
+@pytest.mark.slow
+def test_one_fibre_history_gives_the_source_and_the_fates(case_b, produced):
+    transport, out = produced
+    entry = ADMITTED_AXIAL_CASES["si-fibre/B"]
+    direct = _direct_source(case_b, "si-fibre/B")
     np.testing.assert_array_equal(out["E_grid"], GRID)
     np.testing.assert_array_equal(out["spec_channeling"], direct.spectrum)
     assert np.isfinite(out["spec_channeling"]).all()
@@ -345,6 +364,29 @@ def test_axial_zone_rows_score_no_native_lines(produced_a):
     with_zone = score(segs)  # what a free plane-wave reading of the zone rows would add
     removed = np.trapezoid(with_zone - out["spec"], grid)  # 1.56e-4 /sr at these 4 histories
     assert removed > 1e-4 > np.trapezoid(out["spec"], grid) > 0.0
+
+
+@pytest.mark.slow
+def test_exact_axis_zone_rows_score_no_native_lines(case_b, produced):
+    """si-fibre/B at 0°: v·g = 0 for every in-band reflection, so dropping zone rows changes nothing."""
+    from pyrite.montecarlo.runner.axial import native_line_rows
+
+    transport, out = produced
+    segs, grid, n_hat = transport["segs"], transport["E_grid"], transport["n_hat"]
+    plain = {key: value for key, value in case_b.to_dict().items() if key != "channeling"}
+    score = lambda rows: runner._cxr_for_segments(  # noqa: E731
+        rows, grid, plain, n_hat, None, None, coherent=False, Ne=LINES
+    )
+    np.testing.assert_array_equal(out["spec"], score(native_line_rows(case_b, segs)))
+    np.testing.assert_array_equal(score(segs), out["spec"])
+
+
+@pytest.mark.slow
+def test_tilted_case_source_equals_the_direct_estimator(produced_a):
+    case, _, out = produced_a
+    np.testing.assert_array_equal(
+        out["spec_channeling"], _direct_source(case, "si-fibre/A").spectrum
+    )
 
 
 @pytest.mark.slow

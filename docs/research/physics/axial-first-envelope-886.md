@@ -1,13 +1,12 @@
-# First axial run envelope: two calibrated cases, none runnable yet
+# First axial run envelope: two admitted silicon cases
 
-**No axial case runs yet.** Two silicon cases are calibrated and held in the
-repository lookup (`pyrite.quantum._axial_envelope.ADMITTED_AXIAL_CASES`). The standard
-runner can launch, score and persist them, but
-`RUNNABLE_AXIAL_CASES` is empty, so every axial case still refuses before work or
-writes. A case becomes runnable when every claim its run uses is `anchored`. This page
-does not describe a supported capability.
+Two silicon cases run on the standard CPU runner. They are calibrated and held in the
+repository lookup (`pyrite.quantum._axial_envelope.ADMITTED_AXIAL_CASES`) and marked
+runnable (`RUNNABLE_AXIAL_CASES`) because every claim their run uses is `anchored`.
+Every other axial case refuses before work or writes. The selector and
+`PointDetector` are experimental.
 
-## Calibrated cases
+## Admitted cases
 
 Selected with `Physics(channeling_model="axial", channeling_axial={"version": 2,
 "axis_uvw": [0, 0, 1]})` and observed with `pyrite.detectors.PointDetector()`. Every numeric comes from the lookup; the version 1 recipe of
@@ -25,21 +24,22 @@ retained cut is not bounded for either case. Zone rows score no native PXR/CBS l
 IDs are stored in the resolved `Case.channeling` record and so persist with results
 and checkpoints.
 
-A calibrated case must also be: an electron beam with no angular or energy spread, a
+An admitted case must also be: an electron beam with no angular or energy spread, a
 single laterally unbounded slab cut normal to the axis, midpoint transport on the CPU
 core, incoherent emission, and on-axis scoring with zero aperture on a line grid inside
 the band.
-Everything else refuses.
+Everything else refuses. A profile cannot yet express a zero-aperture
+detector, so these cases run only from the Python API.
 
-## What still blocks a run
+## Claims an admitted run uses
 
-| Requirement | Current state | Owner |
+| Requirement | Claim and status | Owner |
 | --- | --- | --- |
 | Physical outgoing instrument | `cr-axial-zone-handoff-physical` | Done, #883 |
 | Fibre photon source | `cr-axial-fiber-regression`, `anchored` | Done, #992 |
 | Measured depth budget per case | `cr-axial-depth-calibration`, `anchored` for A and B | Done, #993 |
-| Native launch, scoring and persistence adapter | Implemented (`montecarlo/runner/axial.py`); `cr-axial-persisted-channel` is `unverified` | [#994](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/994) |
-| Zone rows score no native lines; A and B carry the in-cut free→free block as a declared bound | Implemented; `cr-axial-zone-row-native-lines` is `unverified` | #994 |
+| Native launch, scoring and persistence adapter | `cr-axial-persisted-channel`, `anchored` for A and B | Done, [#994](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/994) |
+| Zone rows score no native lines; A and B carry the in-cut free→free block as a declared bound | `cr-axial-zone-row-native-lines`, `anchored` | Done, #994 |
 
 Check the [ledger](../../validation/ledger-channeling.md) for current claim status.
 
@@ -76,7 +76,7 @@ exists.
 | Remote submission | The same admission as local runs, before sync or staging |
 | W and other diagnostic-only anchors | Their own depth budget and source evidence |
 
-These consumers refuse a calibrated case by name. Sentinel tests:
+These consumers refuse an admitted case by name. Sentinel tests:
 `tests/montecarlo/channeling/test_axial_fibre_runner.py`,
 `tests/remote/test_axial_admission.py`, `tests/checkpoint/` and
 `tests/montecarlo/quantum/test_channeling_axial_preintegration_gates.py`, along with
