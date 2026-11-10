@@ -26,6 +26,7 @@ import numpy as np
 import pyrite as pr
 from pyrite._backend import xp
 from pyrite._photon_continuum_floor import continuum_medium_key, photon_continuum_floor_eV
+from pyrite.campaign.inelastic_cases import covered_shell_materials
 from pyrite.config import FixedSampling
 from pyrite.montecarlo.geometry import sample_to_lab_R
 from pyrite.montecarlo.spectrum.transition_radiation import (
@@ -103,14 +104,20 @@ def _simulate(scene: Scene, grid: np.ndarray, trials: int):
             tilt_deg=scene.tilt_deg,
             footprint=footprint,
         )
-    # The study reads only the continuum; above 10 MeV the automatic line grid
+    # The study reads only the continuum; from 3 MeV the automatic line grid
     # exceeds its point budget, so give the lines a fixed coarse grid there.
-    cxr = np.linspace(1e3, 20e3, 2000) if scene.kinetic_keV > 1e4 else None
+    cxr = np.linspace(1e3, 20e3, 2000) if scene.kinetic_keV >= 3e3 else None
+    # Reproduce the pre-971df7c69 "auto" default the evidence was taken with:
+    # shell soft/hard where every layer has conduction-band shell data,
+    # continuous stopping otherwise (sapphire has none) (#1065).
+    covered = covered_shell_materials()
+    shell = all(material in covered for material, _ in scene.layers)
+    inelastic = "shell-soft-hard" if shell else "continuous"
     result = pr.simulate(
         beam,
         target,
         pr.Detector(scene.theta_obs_deg),
-        physics=pr.Physics(),
+        physics=pr.Physics(inelastic_model=inelastic),
         numerics=pr.Numerics(
             sampling=FixedSampling(cxr_histories=trials, brem_histories=trials),
             energy_bins=pr.detectors.EnergyBins(cxr=cxr, brem=grid),
