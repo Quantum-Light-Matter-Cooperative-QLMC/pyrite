@@ -53,7 +53,7 @@ use outside it:
 direction change ends a straight run. With ``kink_phase_tol`` a side is
 instead short only where its usable path ends inside ``L`` (track end) or
 where the path within ``L`` departs from the straight extrapolation by more
-than that phase. For piecewise-straight unit-speed paths
+than that tolerance (in phase or in relative current direction). For piecewise-straight unit-speed paths
 ``r(s) - r_0(s) = sum_i (s - d_i)_+ dv_i`` (kink ``i`` at path distance
 ``d_i``), so ``|r(s) - r_0(s)| <= D(L) = sum_{d_i < L} (L - d_i) |dv_i|`` on
 ``s <= L``; the side is short where

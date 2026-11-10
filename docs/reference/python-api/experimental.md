@@ -177,6 +177,15 @@ and bounded; these provisional operators supply no measured response by default.
 `polarized_interferogram` preserve that backend through the forward reductions.
 See [device operators and transfer boundaries](../../physics/radiation-physics/optical-wavefront-and-detectors.md#device-resident-field-operators-and-cuda-parity).
 
+`pyrite.detectors.optical_ctr_inference.fit_gaussian_ctr(charge_jitter=...)`
+takes a `ChargeJitterModel` (mean electrons, relative charge RMS, shots per
+scan point, `"none"` or `"per-shot-charge"` normalization) for shot-averaged
+scans. `pyrite.detectors.optical_interferogram_convergence.interferogram_convergence`
+reports energy-node, mirror-step and mirror-range refinement changes of a
+symmetric two-port scan (mirror travel in m, energies in eV). Both are
+host-NumPy analysis helpers; see
+[the physics page](../../physics/radiation-physics/optical-wavefront-and-detectors.md).
+
 Finite PEC source entry points in `pyrite.montecarlo.spectrum.optical_finite_screen`
 and `optical_finite_bunch`, `optical_finite_collection.finite_screen_bunch_plane_band`,
 and the three `runner.finite_screen_emission.case_finite_screen_*` adapters

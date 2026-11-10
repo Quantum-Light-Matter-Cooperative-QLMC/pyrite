@@ -363,3 +363,168 @@ photon-density difference $4.66\times10^{-10}$).
 - **Suggested ledger change**: retain `rederived`; append this scoped comparison
   to Checks. Actual CUDA execution, published anchors and measured calibration
   are not established by this review.
+
+## Charge-jitter likelihood, published Martin–Puplett observable and scan convergence (fresh-context review, 2026-11-09)
+
+Scope: commit `405d97a44` — `optical_ctr_jitter.py` (`ChargeJitterModel`, `_evaluate`, `jitter_profile_at_sigma`), its use in `fit_gaussian_ctr(charge_jitter=)`, `optical_interferogram_convergence.py`, and `tests/detectors/test_optical_interferometer_leissner.py`. Each derivation below was written before the corresponding implementation body was opened. Scripts: `scratch/v2_jitter_moments.py`, `scratch/v2_jitter_coverage.py`, `scratch/v2_jitter_coverage_gauss.py`, `scratch/v2_leissner_features.py`, `scratch/v2_convergence_checks.py` (not committed; run with `python -P`, because an existing `scratch/coverage.py` shadows the `coverage` package otherwise).
+
+### A. Shot-averaged charge jitter
+
+**Shot model.** With $N=q\bar N$, $\langle q\rangle=1$, $\operatorname{Var}q=r^2$, the pair factor of one shot is
+
+$$
+g(q)=\frac{N(N-1)}{\bar N(\bar N-1)}=\frac{\bar N q^2-q}{\bar N-1},
+\qquad
+V_p=a_p q+c_p g(q)=\alpha_p q+\beta_p q^2,
+$$
+
+$$
+\alpha_p=a_p-\frac{c_p}{\bar N-1},\qquad \beta_p=\frac{\bar N c_p}{\bar N-1}.
+$$
+
+No large-$\bar N$ step is used, so everything below is exact at finite $\bar N$.
+
+**Raw average.** Write $m_k=\langle q^k\rangle$. The scan value is the mean of $n$ independent shots, so
+
+$$
+\langle\bar V_p\rangle=a_p+c_p\frac{\bar N m_2-1}{\bar N-1}=a_p+c_p\Bigl(1+\frac{\bar N r^2}{\bar N-1}\Bigr),
+$$
+
+which needs only $m_1,m_2$ and holds for any charge law. The port covariance is
+
+$$
+n\,\operatorname{Cov}(\bar V_p,\bar V_{p'})=\alpha_p\alpha_{p'}r^2+(\alpha_p\beta_{p'}+\beta_p\alpha_{p'})(m_3-m_2)+\beta_p\beta_{p'}(m_4-m_2^2),
+$$
+
+which needs $m_3$ and $m_4$. In central moments $\mu_k$: $m_3-m_2=2r^2+\mu_3$ and $m_4-m_2^2=4r^2+4\mu_3+\mu_4-r^4$. The Gaussian assumption enters only here: $\mu_3=0$, $\mu_4=3r^4$ gives $2r^2$ and $4r^2+2r^4$.
+
+**Per-shot normalization.** $V_p/q=\alpha_p+\beta_p q$ exactly, so $\langle\cdot\rangle=a_p+c_p$ and $n\operatorname{Cov}=\beta_p\beta_{p'}r^2$ for any law with $q>0$. This assumes $q$ is measured without error and that baselines are subtracted before the division. Readout noise added after the division is a separate per-port term.
+
+**Likelihood.** For independent delays with $2\times2$ covariance $C_i(\theta)=R_i+J_i(\theta)$,
+
+$$
+-2\ln L=\sum_i\Bigl[\mathbf d_i^{\mathsf T}C_i^{-1}\mathbf d_i+\ln\det C_i\Bigr]+\text{const}.
+$$
+
+The log-determinant cannot be dropped because $J_i$ depends on $\sigma$ and on the scale. Constant port offsets $\mathbf o$ enter only the mean. If they are additive baselines (not proportional to $q$), they leave $C_i$ unchanged and are profiled exactly by GLS: $\mathbf o=(\sum_iW_i)^{-1}\sum_iW_i\mathbf d_i$. If a common scale $s$ multiplies the mean-bunch voltages, it multiplies $a$ and $c$, so $J\propto s^2$. The profile over $(s,\mathbf o)$ with $\Delta(-2\ln L)=3.841$ is the Wilks interval. It is asymptotic (in delay count and in signal-to-noise), not exact. It is justified for the full Gaussian likelihood, including the log-determinant term, and is not justified for the quadratic form alone.
+
+**Comparison.**
+
+| Term | Independent | Code | Result |
+|---|---|---|---|
+| Pair mean factor, raw | $1+\bar Nr^2/(\bar N-1)$ | `pair_mean_factor` | match |
+| Pair mean factor, normalized | $1$ | `pair_mean_factor` | match |
+| $\alpha,\beta$ | as above | `port_covariance` lines 98–99 | match |
+| Raw covariance | $r^2,\ 2r^2,\ 4r^2+2r^4$ (Gaussian $\mu_3,\mu_4$) | lines 107–111 | match; Gaussian moments stated |
+| Normalized covariance | $\beta\beta' r^2/n$ | line 105 | match; exact for any law |
+| Scale | multiplies $a,c$ in mean and covariance | `_evaluate` lines 132–133 | match |
+| Offsets | GLS, outside $C$ | line 141 | match |
+| $\ln\det$ | $\sum\ln\det C_i$ up to a constant | line 144 (minus readout-only constant) | match |
+| Scale prior | adds $((s-1)/\sigma_s)^2$ | line 174 | match |
+| Threshold | $\Delta=3.841$ on the profiled objective | `fit_gaussian_ctr` threshold | match |
+
+**Moments by direct shot simulation.** These use independent code: $2\times10^5$ trials of 8 shots, $\bar N\in\{3,40,6\times10^6\}$, $r\in\{0.08,0.3\}$, and Gaussian and gamma charge laws. My closed forms agree with the code to $2\times10^{-16}$ for the mean and to rounding for the covariance whenever the moments are Gaussian. The simulated means are within $2.1$ standard errors in every case. Simulated covariance agrees with the code within 1 % (Gaussian law, both modes) and within 0.5 % (gamma law, normalized mode). Under a gamma law in raw mode, the code's Gaussian-moment covariance is off by 3.4 % at $r=0.08$ and 43 % at $r=0.3$. My moment form with the gamma $m_3,m_4$ agrees within 0.4 %. The stated restriction ($r\ll1$, Gaussian moments) is therefore necessary, and the error is linear in skewness times $r$.
+
+**Interval coverage.** Each case uses 41 delays, 120 energy nodes, $\sigma=200$ fs, $\bar N=6\times10^6$, $r=0.1$ and 8 shots. Jitter RMS is 21 (normalized) to 380 (raw) times the readout RMS. The true scale is 1.3 when fitted; with fitted offsets the true offsets are $(2,-1)\times10^{-5}$ V. Scans come from independent shot draws.
+
+| Mode | fit_scale | offsets | trials | coverage | median CI width [fs] |
+|---|---|---|---|---|---|
+| raw | False | False | 400 | 0.935 ± 0.012 | 1.10 |
+| raw | False | True | 400 | 0.938 ± 0.012 | 1.13 |
+| raw | True | False | 400 | 0.948 ± 0.011 | 0.94 |
+| raw | True | True | 400 | 0.927 ± 0.013 | 0.94 |
+| normalized | False | False | 400 | 0.935 ± 0.012 | 1.06 |
+| normalized | False | True | 400 | 0.927 ± 0.013 | 1.11 |
+| normalized | True | False | 400 | 0.930 ± 0.013 | 0.89 |
+| normalized | True | True | 400 | 0.940 ± 0.012 | 0.89 |
+| raw, shots | False | False | 1000 | 0.949 ± 0.007 | — |
+| raw, exact Gaussian data | False | False | 1000 | 0.947 ± 0.007 | — |
+| normalized, shots | False | False | 1000 | 0.952 ± 0.007 | — |
+| normalized, exact Gaussian data | False | False | 1000 | 0.935 ± 0.008 | — |
+
+The pooled coverage is $0.941\pm0.003$ over 7200 fits. Every bias is below 0.02 fs against an SD of 0.24–0.30 fs, and no interval is open. In each of the 4000 fits of the last four rows, the code's interval contained the truth exactly when my independent $-2\ln L$ (own mean and covariance formulas) gave $\Delta<3.841$, and the mean $\Delta$ was 0.995–1.074. The roughly 1 % undercoverage also occurs for exactly Gaussian data, so it is finite-sample Wilks behaviour, not a model error.
+
+**Findings (Part A).**
+
+1. Low, stale metadata. `optical_ctr_inference.py:623` (`conditional_statistics`: "Independent normal voltage errors, known variances; delta chi2") and `:645` (`model_assumptions`: "conditional independent Gaussian voltage errors") are still written into a jitter fit. There, errors are port-correlated, and their covariance depends on the parameters.
+2. Informational. In raw mode the covariance error is linear in the skewness of the charge law (gamma law: 3.4 % at $r=0.08$, 43 % at $r=0.3$). The docstring states the Gaussian-moment assumption correctly; a skewed measured charge law needs $\mu_3,\mu_4$.
+3. Informational. The scale search is bounded to $e^{\pm3}$ around the chi-square scale. A clamped chi-square scale of 0 re-centres it at 1. No case failed here.
+4. Informational. `with_charge_jitter` accepts $r\ge1$, but `ChargeJitterModel` refuses it (`optical_ctr_inference.py:148`).
+
+Part A verdict: **rederived**.
+
+### B. Published forward observable: Leissner et al., PAC 1999, p. 2172
+
+**Eq. (5) from Eq. (4).** Expanding,
+
+$$
+\tilde S(\omega)=e^{-\sigma^2\omega^2}-2e^{-(\sigma^2+\xi^2)\omega^2}+e^{-(\sigma^2+2\xi^2)\omega^2},
+$$
+
+and with $\int_0^\infty e^{-a\omega^2}\cos\omega t\,d\omega=\tfrac12\sqrt{\pi/a}\,e^{-t^2/4a}$, multiplying by $2\sigma/\sqrt\pi$:
+
+$$
+S(t)=e^{-t^2/4\sigma^2}-\frac{2\sigma}{\sqrt{\sigma^2+\xi^2}}e^{-t^2/4(\sigma^2+\xi^2)}+\frac{\sigma}{\sqrt{\sigma^2+2\xi^2}}e^{-t^2/4(\sigma^2+2\xi^2)} .
+$$
+
+This is Eq. (5) as printed, confirmed numerically against quadrature to $10^{-15}$. $\int S\,dt\propto\tilde S(0)=0$.
+
+**Ideal Martin–Puplett with energy-integrating detectors.** With spectral energy density $u(\omega)$ and $\tau=\mathrm{OPD}/c=2x/c$, $U_{1,2}=\tfrac12\int u(\omega)[1\pm\cos\omega\tau]\,d\omega$, so
+
+$$
+\frac{U_1-U_2}{U_1+U_2}=\frac{\int u(\omega)\cos\omega\tau\,d\omega}{\int u(\omega)\,d\omega}=\frac{S(\tau)}{S(0)}
+$$
+
+when $u\propto\tilde S$. A photon-density input must be $u/E\propto\tilde S/E$ for a flat absorptance and gain, because the detector weights photons by $E$. The test's `power / energy` mapping is correct.
+
+**Spectral peak.** $d\ln\tilde S/d(\omega^2)=0$ gives $e^{-\xi^2\omega_p^2}=\sigma^2/(\sigma^2+2\xi^2)$, matching the test's `_xi_from_spectral_peak`, with $\omega=2\pi f$.
+
+**My figure readings** (400 dpi render, axis ticks located in pixels):
+
+| Feature | Reading | Uncertainty |
+|---|---|---|
+| Fig. 4 solid-curve maximum | 0.1056 THz | ±0.005 THz (polyline vertex) |
+| Fig. 4 data maximum | ≈0.115 THz | — |
+| Fig. 3 solid-curve central maximum | 0.895 | ±0.01 (absolute; not 1) |
+| Fig. 3 first zero | ±2.24 ps | ±0.10 ps |
+| Fig. 3 side minima, position | ±4.1 ps | ±0.2 ps |
+| Fig. 3 side minima, value | −0.547 absolute | ±0.01 |
+| Fig. 3 side minima / central maximum | −0.611 | ±0.015 |
+| Fig. 3 secondary maxima | ≈ +0.09 at ±8.5 ps | — |
+| $\sigma$ | 2 ps (Sec. 3.1, 20–30 % systematic) | — |
+
+**Consistency.** $\sigma=2$ ps with $f_p=0.1056$ THz gives $\xi=0.753$ ps. The predicted first zero is 2.23 ps, the minimum is at 4.08 ps with depth/peak −0.616, and the side maximum is at 8.62 ps (0.103 on the figure's scale). All match my readings within uncertainty. With $f_p=0.100$ THz the test's $\xi=1.074$ ps gives 2.35 ps, 4.29 ps and −0.612. The figures are therefore consistent with $\omega=2\pi f$ and with Fig. 3 delay $=\mathrm{OPD}/c$. A mirror-travel delay would double every time feature. The depth ratio hardly constrains $\xi$: it changes by 0.006 over 0.10–0.11 THz.
+
+**Test review.**
+
+- `test_two_port_difference_equals_published_closed_form`: the forward model (Jones transfer at 45°, OPD $=2x$, $\int\eta E\,n\,dE$) reproduces Eq. (5)/$S(0)$ to $10^{-10}$ for four $\xi$. Correct.
+- `test_published_fit_features_of_figures_3_and_4`: these pinned readings are biased. The test uses 0.10 THz, a 2.5 ps zero, 4.5 ps minima and "−0.55 of the central maximum". Mine are $0.1056\pm0.005$ THz, $2.24\pm0.1$ ps, $4.1\pm0.2$ ps and $-0.611\pm0.015$ of the central maximum. −0.55 is the absolute plotted value; the curve peaks at 0.895, not 1. The tolerances (0.5 ps, 0.1) are 2.5–7 times the reading uncertainty. The model passes either way, so this is not a physics error. Still, the comment misstates what is pinned, and the depth check at ±0.1 is weak.
+- Not exercised: absolute modulation depth (Fig. 3 peaks at about 0.9, so the real instrument is not ideal), measured data points, calibration, non-45° or lossy optics, inference (`fit_gaussian_ctr`, jitter), and Fig. 5.
+
+**Anchor scope.** Yes, `anchored` is supported for "published closed-form forward observable of an ideal Martin–Puplett with an energy-integrating detector; fit features of Figs. 3–4; no measured calibration, no digitized data". This holds provided the figure readings and the depth wording are corrected, for example to 0.105 ± 0.01 THz, 2.24 ± 0.2 ps, 4.1 ± 0.3 ps and −0.61 ± 0.03 relative to the central maximum (these tolerances are about twice the reading uncertainty). Two more scope items should be added: "normalized to the central maximum", and that inference and charge jitter are not covered. The anchor exercises the Jones transfer (ideal 45° only), the double-pass OPD and the energy-weighted detector integral. It does not exercise calibration, inference, absolute response or non-ideal optics.
+
+Part B verdict: **rederived** for the forward observable. Eq. (5) is confirmed as printed; the pinned figure readings are imprecise (low severity).
+
+### C. `interferogram_convergence`
+
+**Constant removal.** Any two-beam port spectrum has the form $V_p(\phi)=A_p+\operatorname{Re}[B_pe^{i\phi}]$ after a linear detector. With $\phi\to\phi+\pi$, $B_p\to-B_p$, so $[V_p(\phi)-V_p(\phi+\pi)]/2=\operatorname{Re}[B_pe^{i\phi}]$ exactly. `_port_spectra` is $(\mathrm{dc}+\mathrm{fringe}\cdot q\cos\phi)\cdot\rho\cdot\eta_p$, linear in $\cos\phi$ (the $\max(\cdot,0)$ clamp acts only on roundoff), and the detector integral is linear below saturation, which is refused. Numerically, for lossy arms (0.8, 0.6), grids at 0.7 and 0.9 rad, ports (0.9, 0.7), OPD jitter and sloped, unequal detectors, $[V(0)+V(\pi)]/2$ is constant over 801 positions to $6\times10^{-16}$ relative.
+
+**Inversion.** For $D(l)=\int_0^\infty W(E)\cos(2\pi El/hc)\,dE$ on $l\in(-\infty,\infty)$,
+
+$$
+\int_{-\infty}^{\infty}D(l)\cos(2\pi E'l/hc)\,dl=\frac{hc}{2}W(E') \quad\Rightarrow\quad W=\frac{2}{hc}\int_{-\infty}^{\infty}D\cos\,dl .
+$$
+
+The constant is $2/hc$ for a two-sided integral in OPD, which the code uses (it would be $4/hc$ for a one-sided OPD integral, and also $4/hc$ for a two-sided integral over mirror travel $x$, since $dl=2\,dx$). `np.gradient` on a uniform grid with halved ends gives trapezoid weights. For ideal 45° grids, the recovered $W$ matches $\eta g e\,u(E)$ to $5\times10^{-6}$ of the maximum.
+
+**Nyquist and resolution.** Sampling $\cos(2\pi l/\lambda)$ needs $\Delta l<\lambda_{\min}/2$, with $\Delta l=2\Delta x$ and $\lambda_{\min}=hc/E_{\max}$, so the ratio is $2\Delta x/(hc/2E_{\max})$, as in line 137. The symmetric span $2l_{\max}$ gives $\Delta E=hc/(2l_{\max})$ with $l_{\max}=$ `opd[-1]`. Both agree with my values to $10^{-8}$ relative. A ratio of 1.2 produces a delay-step change of 0.064.
+
+Part C verdict: **rederived**. One informational note: the Nyquist test uses the band edge, not the signal support, which is conservative.
+
+### Verifier output
+
+- **Claim**: `optical-instrument-observable` — `optical_ctr_jitter.py::{ChargeJitterModel, jitter_profile_at_sigma}`, `optical_ctr_inference.py::fit_gaussian_ctr`, `optical_interferogram_convergence.py::interferogram_convergence` — shot moments, Gaussian $-2\ln L$; Leissner et al. PAC 1999 Eqs. (4)–(5), Figs. 3–4.
+- **Filters**: units pass; limits pass ($r=0$ reduces to chi-square; $\bar N$ finite is exact); signs/conventions pass.
+- **Re-derivation**: `matches`. Divergences are wording/readings only: stale metadata `optical_ctr_inference.py:623,645`; Leissner test readings (0.10 THz, 2.5 ps, 4.5 ps, −0.55 "relative") against 0.1056 THz, 2.24 ps, 4.1 ps, −0.611.
+- **Verdict**: `rederived` (A, B, C).
+- **Suggested ledger change**: `anchored` with the proposed scope once the Leissner readings and depth wording are corrected. Add "normalized to the central maximum; ideal 45° optics; not inference, jitter, calibration or absolute modulation depth". Record jitter coverage 0.941 ± 0.003 over 7200 fits. Never `signed-off`.

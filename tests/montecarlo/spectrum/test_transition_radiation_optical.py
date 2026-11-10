@@ -664,3 +664,26 @@ def test_formation_length_is_a_path_length_for_oblique_crossings():
         omega * np.sqrt(np.sin(theta) ** 2 + np.abs(eps[0] - np.sin(theta) ** 2)),
         rtol=1e-12,
     )
+
+
+def test_phase_policy_also_bounds_the_current_direction_change():
+    # Slow charge, ||K|| L < 1: a kink at L/2 passes the phase test alone
+    # (||K|| D = 0.02) but turns the current by D / L = 0.2.
+    from types import SimpleNamespace
+
+    from pyrite.montecarlo.spectrum.optical_transition_validity import _phase_short
+
+    def crossing(bend):
+        kinks = np.zeros((1, 16, 2))
+        kinks[0, 0] = (50.0, bend)
+        kinks[0, 1] = (1e6, np.inf)  # usable path ends far outside L
+        return SimpleNamespace(
+            layer_before=np.array([0]), kinks_before_ang=kinks, kinks_after_ang=kinks
+        )
+
+    side = np.array([0])
+    length, wavenumber = np.array([[100.0]]), np.array([[1e-3]])
+    assert _phase_short(crossing(0.4), side, length, wavenumber, 0.1)[0, 0]
+    assert not _phase_short(crossing(0.1), side, length, wavenumber, 0.1)[0, 0]
+    # Fast charge, ||K|| L >> 1: the phase term decides.
+    assert _phase_short(crossing(0.1), side, length, np.array([[0.05]]), 0.1)[0, 0]

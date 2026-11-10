@@ -111,14 +111,16 @@ print(reading.absorbed_joule_per_pulse, reading.expected_voltage_v)
   bounded reference, with oblique straight-charge incidence and transport
   handoff. Real materials, general finite surfaces and exact edge currents
   are not. Measured passive Jones elements and a pitch/window convergence
-  diagnostic exist (sections below). Published numerical benchmark,
-  measured element data, finite-aperture spectral convergence and automatic
-  production integration remain open (hemisphere energy/angle convergence is
-  below); bounded source/field CUDA parity is recorded below.
+  diagnostic exist (sections below). Measured element data, a measured DR
+  anchor and automatic production integration remain open (hemisphere and
+  finite-aperture spectral convergence and the published finite-disc
+  benchmark are below); bounded source/field CUDA parity is recorded below.
 - **#617:** supply a real measured and provenance-pinned detector calibration,
   temporal/electronic response and broader uncertainty propagation. The bounded
-  field handoff, ideal polarized interferogram and conditional Gaussian fit
-  are implemented below. Published data reproduction remains open.
+  field handoff, ideal polarized interferogram, conditional Gaussian fit,
+  charge-jitter likelihood and scan convergence diagnostic are implemented
+  below. A published closed-form interferogram is reproduced; measured-data
+  reproduction with a real calibration remains open.
 - **DTR:** the existing atomic Bragg DTR solver (#581) is a separate X-ray
   coherent-boundary model, **not** optical diffraction from a wavelength-scale
   grating or optical aperture DR.
@@ -1056,8 +1058,163 @@ coherent envelope scales by $1+\bar N r^2/(\bar N-1)\to1+r^2$.
 applies exactly this, assuming charge is uncorrelated with bunch shape and the
 scan voltages are linear shot averages. Ignoring it biases the fitted duration
 (regression in `tests/detectors/test_optical_ctr_inference.py`). Common
-arrival-time jitter cancels in the interferogram; per-shot charge
-normalization and the extra voltage variance from jitter are not modeled.
+arrival-time jitter cancels in the interferogram.
+
+### Charge jitter in the scan likelihood
+
+`with_charge_jitter` corrects the mean only. A scan value averaged over
+$n$ shots also fluctuates with the charge, identically in both ports.
+`ChargeJitterModel(mean_electrons, charge_rms_fraction, shots_per_point,
+normalization)` passed as `fit_gaussian_ctr(charge_jitter=...)` models this.
+With $q=N/\bar N$ and mean-bunch incoherent and pair voltages $a_p$, $c_p$,
+
+$$
+V_p=\alpha_p q+\beta_p q^2,\qquad
+\alpha_p=a_p-\frac{c_p}{\bar N-1},\quad \beta_p=\frac{c_p\bar N}{\bar N-1}.
+$$
+
+| `normalization` | Expected value | Port covariance $\times\,n$ | Moments used |
+|---|---|---|---|
+| `"none"` (raw average) | $a_p+c_p\,[1+\bar N r^2/(\bar N-1)]$ | $\alpha_p\alpha_{p'}r^2+(\alpha_p\beta_{p'}+\beta_p\alpha_{p'})\,2r^2+\beta_p\beta_{p'}(4r^2+2r^4)$ | Gaussian third and fourth central moments of $q$ |
+| `"per-shot-charge"` ($V_p/q$ per shot) | $a_p+c_p$ | $\beta_p\beta_{p'}r^2$ | mean and variance only |
+
+The covariance depends on the fitted duration and scale, so the profile is
+$-2\ln L=\sum_i[\mathbf d_i^{\mathsf T}C_i^{-1}\mathbf d_i+\ln(\det C_i/\det C_{i0})]$
+with $C_i$ the readout diagonal plus the jitter covariance and $C_{i0}$ the
+readout part alone; it reduces to $\chi^2$ at $r=0$. The reported
+`chi_square` is then the quadratic form. Pass mean-bunch templates, not ones
+already processed by `with_charge_jitter` (refused).
+
+Assumptions: charge uncorrelated with duration, transverse shape and arrival
+time; exact charge measurement; baselines subtracted before normalization;
+the same number of shots at every mirror position. On 200 synthetic scans
+per configuration (10 % jitter, 8 shots, 200 fs) the 95 % interval covers the
+true duration in 0.90–0.96 of scans; a fit that ignores the jitter covers it
+in 0.02–0.55. The fresh-context review pooled 7200 independent fits at
+$0.941\pm0.003$, the same with exactly Gaussian data. A skewed charge law
+breaks the raw-mode covariance (3 % at $r=0.08$, 43 % at $r=0.3$ for a gamma
+law); the normalized mode is unaffected. Calibration and transverse-source uncertainties are still not
+propagated.
+
+## Scan convergence of the two-port interferogram (#617)
+
+`detectors.optical_interferogram_convergence.interferogram_convergence`
+refines three numerical axes of a symmetric mirror scan independently. The
+fringe part of each port, $F_p=[V_p(\varphi)-V_p(\varphi+\pi)]/2$, removes
+the constant level exactly; the difference $D=F_0-F_1$ is the cosine
+transform of the response-weighted fringe spectrum $W(E)$ [V/eV], recovered
+as $W_\mathrm{rec}(E)=(2/hc)\sum_j w_jD(\ell_j)\cos(2\pi E\ell_j/hc)$.
+
+| Axis | Refinement | Failure it exposes |
+|---|---|---|
+| Energy nodes | $n\to2n-1$, scan voltages | fringe unresolved in energy at the largest delay |
+| Mirror step | halved, $W_\mathrm{rec}$ | aliasing; `nyquist_ratio` (OPD step over $\lambda_\min/2$) must be below 1 |
+| Mirror range | doubled, $W_\mathrm{rec}$ | truncation leakage; resolution $hc/(2\ell_\max)$ |
+
+`converged` requires all three relative changes within `rtol` and a Nyquist
+ratio below 1. For the filtered-Gaussian spectrum of the next section (2 ps,
+band to 0.58 THz), a 0.25 ps step over ±40 ps changes by less than
+$10^{-3}$ on every axis and recovers $W$ to $2\times10^{-3}$ of its peak; a
+2 ps step, a ±5 ps range or 9 energy nodes are each flagged alone. These are
+refinement differences, not source, optics or calibration accuracy.
+
+## Published Martin–Puplett interferogram (#617)
+
+Leissner et al. (PAC 1999, p. 2172) describe the TTF Martin–Puplett scan of
+a Gaussian bunch behind an empirical high-pass
+$g(\omega)=1-e^{-\xi^2\omega^2}$: detected spectrum
+$S(\omega)=e^{-\sigma^2\omega^2}(1-e^{-\xi^2\omega^2})^2$ (their Eq. 4) and
+its closed-form autocorrelation (Eq. 5), the normalized difference
+interferogram $(U_1-U_2)/(U_1+U_2)$ up to $S(t{=}0)$.
+`tests/detectors/test_optical_interferometer_leissner.py` feeds
+photons/eV $=S/E$ through `polarized_interferogram` with a flat absorber and
+reproduces Eq. (5) to $10^{-10}$ for $\xi$ from 0.5 to 3 ps. With the
+published $\sigma=2$ ps and $\xi=0.75$ ps fixed by the 0.106 THz maximum
+of the fitted spectrum in Fig. 4, the curve has its first zero at 2.23 ps and
+side minima of $-0.616$ of the central maximum at 4.08 ps. The solid curve of
+Fig. 3 reads $2.24\pm0.1$ ps, $-0.611\pm0.015$ and $4.1\pm0.2$ ps (the
+plotted maximum is 0.895, which the ideal model does not describe). This exercises the Jones transfer, double-pass delay
+and energy integral against a published formula. It uses no measured
+calibration and no digitized data, and it does not test the inference.
+
+## Minimal-phase bunch-profile reconstruction (#617)
+
+`detectors.optical_phase_retrieval.reconstruct_minimal_phase_profile` turns a
+measured longitudinal form-factor magnitude $|f(E)|^2$ into the
+*minimal-phase* profile. The input is already divided by the single-electron
+spectrum, $N(N-1)$, the transverse form factor and the instrument response.
+With $f(\omega)=\int\rho(t)e^{i\omega t}\,dt$ (Leissner et al., PAC 1999,
+Eq. 2) and $E=\hbar\omega$, the phase is their Eq. (6), from Lai and Sievers:
+
+$$
+\psi(\omega)=-\frac{2\omega}{\pi}\,\mathrm{PV}\!\int_0^\infty
+\frac{\ln\bigl(|f(u)|/|f(\omega)|\bigr)}{u^2-\omega^2}\,du ,\qquad
+\rho(t)=\frac1\pi\int_0^\infty|f(\omega)|\cos\bigl(\psi(\omega)-\omega t\bigr)\,d\omega .
+$$
+
+The printed Eq. (7) has $+\omega z/c$, which is $\rho(-t)$ in the Eq. (2)
+convention. A magnitude cannot tell the two apart.
+
+**The result is not a unique profile.** The same $|f|$ also belongs to
+$\rho(-t)$ (`time_reversed()`) and to any arrival-time shift. Every zero of $f$
+that could lie in the other half plane gives another profile. A trailing
+bunch larger than the leading one, for example, comes back with the two
+swapped. Deep in-band minima of $|f|$ mark such zeros near the real axis
+(`spectral_minima_eV`, a heuristic relative to the adjacent peaks). The spectrum outside the band comes from the declared
+continuation, not from data. Each result has `is_unique = False` and
+lists these ambiguities.
+
+**Missing band.** `MissingBandModel(low=..., high_power_exponent=p)` sets the
+continuation and the result records it:
+
+| Model | Below $E_\mathrm{lo}$ | Effect |
+|---|---|---|
+| `"gaussian-to-unity"` | $\ln\lvert f\rvert=\ln\lvert f(E_\mathrm{lo})\rvert\,(E/E_\mathrm{lo})^2$, $\lvert f(0)\rvert=1$ | area 1; needs $\lvert f(E_\mathrm{lo})\rvert\le1$ |
+| `"constant"` | $\lvert f(E_\mathrm{lo})\rvert$ held to 0 | no normalization; long signed tails |
+| above $E_\mathrm{hi}$ | $\lvert f\rvert\propto E^{-p}$ | analytic in Eq. (6); synthesis truncated at $8E_\mathrm{hi}$ |
+
+The result changes with the continuation. For a 200 fs Gaussian whose band
+starts at $|f|^2=0.70$, the two low models differ in RMS by more than 10 %.
+Changing $p$ from 3 to 6 moves the in-band phase by more than 0.05 rad.
+`extrapolated_power_fraction` is the share of $\int|f|^2$ that comes from the
+continuation. `truncated_magnitude_fraction` is the share of $\int|f|$ cut
+from the synthesis. Leissner et al. report shifts of up to 1 ps FWHM from
+their low-frequency polynomial alone.
+
+**Numerics.** $\ln|f|$ is piecewise linear between nodes. Eq. (6) is integrated
+exactly per segment. The tail above the last node $X$ has the closed form
+$(1/\omega)[g(X)\,\mathrm{artanh}(\omega/X)-p\,\chi_2(\omega/X)]$, with
+$g=\ln|f|-\ln|f(\omega)|$ and $\chi_2$ the Legendre chi function. The
+inverse transform integrates piecewise-linear $|f|$ and $\psi$ exactly, so
+the node spacing need not resolve $\omega t$. RMS and FWHM are those of
+the signed profile on the requested window. Both are NaN when its area or
+variance there is not positive. `negative_lobe_fraction` above a few percent
+means the data or the continuation do not match a nonnegative
+minimal-phase profile.
+
+**Uncertainty.** `propagate_reconstruction_uncertainty` samples a
+`FormFactorUncertainty` through the same map and continuation. Each draw is
+seeded, and the result gives the profile mean, standard deviation and 95 %
+band, the per-draw RMS and its 95 % interval. The inputs are:
+
+- independent absolute noise per node;
+- bunch-charge RMS, with $|f|^2\propto N^{-2}$ on all nodes together;
+- transverse form-factor and response relative RMS, scalar or per node.
+
+Charge, transverse and response errors are each *fully correlated* across
+frequency: one draw scales the whole array. This keeps smooth shape errors
+intact. A common scale leaves $\psi$ unchanged, so charge uncertainty only
+reaches the profile shape through the $|f(0)|=1$ normalization of
+`"gaussian-to-unity"`. Draws are floored at a small positive value and
+capped at $|f|=1$; both are counted. The band covers the declared inputs
+only, not the ambiguities above. The Gaussian fit takes charge uncertainty
+only through `scale_prior_rms_fraction`. Transverse and response
+uncertainties are not propagated into it.
+
+Validation: [`optical-phase-retrieval`](../../validation/ledger-core-coherent-physics.md#optical-phase-retrieval)
+(`rederived`; analytic and quadrature regressions, no published anchor). Leissner Fig. 6
+cannot be reproduced: the measured interferogram and the extrapolation
+polynomial are not published.
 
 
 ## Device-resident field operators and CUDA parity

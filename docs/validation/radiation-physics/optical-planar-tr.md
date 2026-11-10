@@ -303,5 +303,52 @@ The focused tests (`-k "kink or formation"`) pass: 4 passed.
 - Finding 1 fixed: `_formation_length` returns the path length $L/|\hat u_{0z}|$, used by both policies. Pinned by `test_formation_length_is_a_path_length_for_oblique_crossings` against the independent per-path mismatch rate $|\omega/\beta-\mathbf K\cdot\hat{\mathbf u}|$. The scene values equal the reviewer's right-hand column: HOPG 0.171 unchanged; gold default 1.835.
 - Finding 2 adopted: the phase policy tests $\max(\|\mathbf K\|,1/L)\,D(L)$. Gold at 0.1 rad is 0.216, 0.509, 1.507, 1.173; HOPG stays 0. The acceptance step remains a heuristic.
 - Findings 3 and 4 recorded in the module docstring and the physics page (rounding of the two distances; constant speed inside $L$).
-- The corrected code postdates this review and has not itself been fresh-context reviewed. Scored spectra are unaffected; only the validity bound and refusals change. Ledger status unchanged.
+- The corrected code was re-reviewed below (2026-11-09 re-review). Scored spectra are unaffected; only the validity bound and refusals change. Ledger status unchanged.
 
+
+## Formation path length (re-review, 2026-11-09)
+
+Scope: commit `79cdd48e7`, which changes `_formation_length`, `_crossing_parts`, `_phase_short`, the module docstring, and adds `test_formation_length_is_a_path_length_for_oblique_crossings`. The derivation was written before the diff was opened.
+
+### Independent derivation
+
+A charge moves with speed $\beta c$ along the unit direction $\hat{\mathbf u}$, so $\mathbf r=s\hat{\mathbf u}$ and $t=s/(\beta c)$ at path length $s$. Its field at frequency $\omega$ is compared with a free wave $\mathbf K=(\mathbf k_\parallel,\pm\lambda)$ of the side medium, with $\lambda=\sqrt{\varepsilon\omega^2-k_\parallel^2}$ complex (units $\hbar=c=1$, as in the code). The mismatch phase along the path is
+
+$$
+\omega t-\mathbf K\cdot\mathbf r=s\Bigl(\frac{\omega}{\beta}-\mathbf k_\parallel\cdot\hat{\mathbf u}_\parallel\mp\lambda\hat u_z\Bigr),
+\qquad
+L_s^{\pm}=\frac{1}{\bigl|\omega/\beta-\mathbf k_\parallel\cdot\hat{\mathbf u}_\parallel\mp\lambda\hat u_z\bigr|}.
+$$
+
+The modulus includes attenuation, as in the earlier reviews. The interface wave number of the particle field is $q=(\omega-\mathbf k_\parallel\cdot\mathbf v_\parallel)/v_z$ with $\mathbf v=\beta\hat{\mathbf u}$. Multiplying gives
+
+$$
+\hat u_z(q\mp\lambda)=\frac{\omega}{\beta}-\mathbf k_\parallel\cdot\hat{\mathbf u}_\parallel\mp\lambda\hat u_z
+\quad\Rightarrow\quad
+L_s^{\pm}=\frac{1}{|\hat u_z|\,|q\mp\lambda|}=\frac{L_z^{\pm}}{|\hat u_z|}.
+$$
+
+This holds identically for either sign of $\hat u_z$ and for either branch of $\lambda$, because the set $\{q-\lambda,\ q+\lambda\}$ is invariant under $\lambda\to-\lambda$. Taking $\max_\pm L_s^\pm$ commutes with the division. Any frame map that is a rotation or reflection preserving the $z$ axis up to sign (such as $\pi$ about $x$) leaves $|\hat u_z|=|v_z|/|\mathbf v|$, $\mathbf k_\parallel\cdot\mathbf v_\parallel$ and $q\,v_z$ unchanged when $\mathbf n$, $\mathbf v$ and $q$ are transformed together. Both sides of the interface share the crossing velocity, so the conversion is the same for the before and after sides.
+
+### Comparison
+
+- `_formation_length` returns `HBARC_EV_ANG / min(|q - lam|, |q + lam|) / (|v_z| / |v|)`, which equals $\max_\pm L_s^\pm$. `velocity` is `frame.velocity` $=\beta\hat{\mathbf u}\cdot$`_FLIP` (diag $(1,-1,-1)$ for backward emission), and `q` is built from the same flipped `v` and `k_par`, so $|v_z|/|\mathbf v|=|\hat u_z|$ in both hemispheres. **Match.**
+- `_crossing_parts`: the default policy compares the path length with `_side_runs` (path lengths), and the phase policy feeds it to `_phase_short`. Both now use the path length. **Match.**
+- `_phase_short`: `reach = clip(L - d_i)` uses path distances on both sides, consistent with $D(L_s)$. `rate = max(||K||, 1/L)` covers the phase term $\|\mathbf K\|D$ and the direction term $D/L$, in 1/Å matching `wavenumber`. At tolerance 0, every listed kink with $d_i<L$ still gives a positive product, so the default is reproduced. **Match** (the acceptance step remains a heuristic).
+- Docstring (lines 52–73): consistent with the code. Line 53 ("departs … by more than that phase") predates the $D/L$ term, but the following sentences state it.
+
+### Numerical evidence
+
+Script `scratch/v2_formation_path.py` (not committed). It draws 2000 random cases of 6 crossings and 3 energies, with $\beta\in[0.02,0.999]$, isotropic $\hat{\mathbf u}$ (both signs of $\hat u_z$), complex $\varepsilon$ with $\operatorname{Re}\in[-30,10]$ and $\operatorname{Im}\in[0,30]$, and emission into both hemispheres. Each is evaluated in three frames: identity, $\operatorname{diag}(1,1,-1)$, and $\operatorname{diag}(-1,1,-1)$. The code's length times my per-path rate equals $\hbar c$ to a worst relative error of $3.5\times10^{-14}$. The focused tests (`-k "kink or formation"`) pass: 5 passed.
+
+### Test independence
+
+The reference $|\omega/\beta-\mathbf k_\parallel\cdot\hat{\mathbf u}_\parallel\mp\lambda\hat u_z|$ is a different expression from the code's $|q\mp\lambda|/|\hat u_z|$, so it pins the $1/|\hat u_z|$ factor. It is not fully independent: the test builds `q` with the same convention it feeds to the function, and it covers only $\hat u_z>0$, one side and the forward frame. The algebra above shows that the other cases are equivalent. Nothing pins the new $D/L$ term in `_phase_short`: no test is in the regime $1/L>\|\mathbf K\|$ with a sub-$L$ kink. Exact $v_z=0$ would give $0/0$, but a crossing cannot have $v_z=0$ (informational).
+
+### Verdict
+
+- **Claim**: `optical-planar-tr` — `optical_transition_validity.py::{_formation_length, _crossing_parts, _phase_short}` — own-field formation path length.
+- **Filters**: units pass (Å, 1/Å, rad); limits pass (normal incidence unchanged; tolerance 0 equals the default); signs/conventions pass (both $\hat u_z$ signs, both $\lambda$ branches, both hemispheres).
+- **Re-derivation**: `matches`. The earlier discrepancy (factor $1/|\hat u_{0z}|$) is resolved in both policies.
+- **Verdict**: `rederived` for the corrected formation-validity code.
+- **Suggested ledger change**: replace "The corrected validity code is not yet re-reviewed" with "re-reviewed `rederived` at `405d97a44` (path length $L_z/|\hat u_z|$ in both policies, both hemispheres; $D/L$ term not separately pinned)". Keep the status `anchored`. Optionally, add a slow-charge test of the $D/L$ term.
