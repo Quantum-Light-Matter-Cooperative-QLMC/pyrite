@@ -18,6 +18,7 @@ import pytest
 
 from pyrite.campaign.sweep import BeamSpec, Sweep, build_cases
 from pyrite.montecarlo import runner
+from pyrite.montecarlo.groove import blazed_groove_spec, entry_points
 from pyrite.montecarlo.runner.block_transport import (
     electron_blocks,
     transport_electron_blocks,
@@ -27,7 +28,11 @@ from pyrite.montecarlo.transport import _simulate_trajectories as simulate_traje
 from pyrite.montecarlo.transport._jit_radiative import radiative_stream_keys
 from pyrite.montecarlo.transport.beam_entry import initial_beam_positions, initial_energies_keV
 from pyrite.montecarlo.transport.hard_inelastic import hard_stream_keys
-from pyrite.montecarlo.transport.kinematics import counter_normals, counter_uniforms
+from pyrite.montecarlo.transport.kinematics import (
+    child_stream_root,
+    counter_normals,
+    counter_uniforms,
+)
 from pyrite.montecarlo.transverse import (
     TransverseDistribution,
     resolve_transverse_distribution,
@@ -113,6 +118,53 @@ def test_transverse_entry_blocks_equal_the_slice(beam):
     if slopes is not None:
         for whole, part in zip(slopes, blk_slopes, strict=True):
             np.testing.assert_array_equal(part, whole[17:37])
+
+
+def _grooved_point_source():
+    return dict(
+        transverse_distribution=None,
+        beam_fwhm_mm=None,
+        beam_fwhm_y_mm=None,
+        tilt_polar_rad=np.pi / 4,
+        tilt_azim_rad=np.pi,
+        groove=blazed_groove_spec(2.0e4, np.pi / 2, np.pi / 4, np.pi),
+    )
+
+
+@pytest.mark.parametrize(("start", "count"), [(0, 50), (1, 13), (17, 20), (49, 1), (50, 0)])
+def test_counter_groove_phase_matches_population_slice(start, count):
+    """The future grooved per-electron stream cannot depend on block size."""
+    kwargs = _grooved_point_source() | {"counter_groove_phase": True}
+    full, _, _ = initial_beam_positions(43, 50, **kwargs)
+    block, _, _ = initial_beam_positions(43, count, start=start, **kwargs)
+    np.testing.assert_array_equal(block, full[start : start + count])
+
+
+def test_counter_groove_phase_uses_dedicated_child_draw_zero():
+    kwargs = _grooved_point_source() | {"counter_groove_phase": True}
+    seed, n = 101, 61
+    positions, _, _ = initial_beam_positions(seed, n, **kwargs)
+    phases = (
+        counter_uniforms(child_stream_root(seed, 3, 2), n, 1)[:, 0] * kwargs["groove"].spacing_ang
+    )
+    ex, ez = entry_points(phases, kwargs["groove"])
+    np.testing.assert_array_equal(positions[:, 0], ex)
+    np.testing.assert_array_equal(positions[:, 2], ez)
+    assert np.all(positions[:, 1] == 0.0)
+
+
+def test_legacy_groove_phase_still_matches_lockstep_generator():
+    """Do not silently re-pin existing grooved numerical results in this slice."""
+    kwargs = _grooved_point_source()
+    seed, n = 101, 61
+    positions, _, _ = initial_beam_positions(seed, n, **kwargs)
+    rng = np.random.default_rng(np.random.SeedSequence(seed).spawn(3)[2])
+    phases = rng.uniform(0.0, kwargs["groove"].spacing_ang, size=n)
+    ex, ez = entry_points(phases, kwargs["groove"])
+    np.testing.assert_array_equal(positions[:, 0], ex)
+    np.testing.assert_array_equal(positions[:, 2], ez)
+    with pytest.raises(ValueError, match="does not support electron blocks"):
+        initial_beam_positions(seed, 3, start=7, **kwargs)
 
 
 def test_twiss_draw_of_an_electron_ignores_the_electron_count():
@@ -239,3 +291,58 @@ def test_electron_blocks_cover_the_range_once():
     assert electron_blocks(0, 3) == []
     with pytest.raises(ValueError):
         electron_blocks(5, 0)
+
+
+def _grooved_kw():
+    from pyrite.montecarlo.geometry import tilted_geometry
+
+    beam, _ = tilted_geometry(np.pi / 2, np.pi / 4, np.pi)
+    return dict(
+        E0_keV=30.0,
+        thickness_ang=5.0e4,
+        element="Si",
+        n_atoms_per_ang3=0.04996,
+        seed=19,
+        transport_core="per-electron",
+        energy_model="midpoint",
+        elastic_model="elsepa",
+        beam_dir=beam,
+        tilt_polar_rad=np.pi / 4,
+        tilt_azim_rad=np.pi,
+        groove=blazed_groove_spec(2.0e3, np.pi / 2, np.pi / 4, np.pi),
+    )
+
+
+def test_grooved_per_electron_blocks_equal_one_fixed_n_call():
+    """Counter phase + electron-major vacuum rows: blocks are exact slices (#972)."""
+    n, kw = 40, _grooved_kw()
+    ref = simulate_trajectories(Ne=n, **kw)
+    assert ref["vacuum_elec_id"].size > 0  # re-entry legs are exercised
+    energy_range = (5.0, float(kw["E0_keV"]))
+    for block in (7, 16, 40):
+
+        def simulate_block(start, stop):
+            return simulate_trajectories(
+                Ne=stop - start, _electron_start=start, _energy_range_keV=energy_range, **kw
+            )
+
+        got = transport_electron_blocks(simulate_block, n, block, seed=kw["seed"], bunch={})
+        _assert_identical(got, ref)
+
+
+def test_grooved_per_electron_batches_and_capacity_replays_are_invisible(monkeypatch):
+    from pyrite.montecarlo.transport import PerElectronTransportConfig, grooved_batches
+
+    n, kw = 40, _grooved_kw()
+    ref = simulate_trajectories(Ne=n, **kw)
+    assert np.bincount(ref["vacuum_elec_id"]).max() > 1  # one slot must overflow
+    monkeypatch.setattr(grooved_batches, "INITIAL_VACUUM_CAPACITY", 1)
+    tiny = PerElectronTransportConfig(max_batch=3, seg_capacity=1, probe_electrons=0)
+    got = simulate_trajectories(Ne=n, per_electron_config=tiny, **kw)
+    _assert_identical(got, ref)
+
+
+def test_grooved_lockstep_still_refuses_blocks():
+    kw = _grooved_kw() | {"transport_core": "lockstep"}
+    with pytest.raises(ValueError, match="counter-addressed streams"):
+        simulate_trajectories(Ne=4, _electron_start=4, **kw)

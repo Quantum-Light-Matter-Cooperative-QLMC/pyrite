@@ -292,8 +292,12 @@ def test_groove_none_is_bitwise_identical():
     np.testing.assert_array_equal(a["r_mid"], b["r_mid"])
 
 
-def test_groove_entries_start_on_relief_facet():
-    segs = simulate_trajectories(**_SIM_KW, **_tilt_kw(), groove=SPEC)
+_CORES = pytest.mark.parametrize("core", ["lockstep", "per-electron"])
+
+
+@_CORES
+def test_groove_entries_start_on_relief_facet(core):
+    segs = simulate_trajectories(**_SIM_KW, **_tilt_kw(), groove=SPEC, transport_core=core)
     # first segment of each electron starts at its entry point; entry depths
     # span [0, h) and multiple phases are sampled (uniform-phase fallback).
     # elec_id is NOT globally sorted (each event-driven iteration only appends
@@ -306,14 +310,16 @@ def test_groove_entries_start_on_relief_facet():
     assert np.unique(np.round(r0[:, 0], 3)).size > 10
 
 
-def test_groove_entry_depth_reproducible_with_seed():
-    a = simulate_trajectories(**_SIM_KW, **_tilt_kw(), groove=SPEC)
-    b = simulate_trajectories(**_SIM_KW, **_tilt_kw(), groove=SPEC)
+@_CORES
+def test_groove_entry_depth_reproducible_with_seed(core):
+    a = simulate_trajectories(**_SIM_KW, **_tilt_kw(), groove=SPEC, transport_core=core)
+    b = simulate_trajectories(**_SIM_KW, **_tilt_kw(), groove=SPEC, transport_core=core)
     np.testing.assert_array_equal(a["r_mid"], b["r_mid"])
 
 
-def test_groove_transport_records_only_material_segments_and_vacuum_invariants():
-    out = simulate_trajectories(**_SIM_KW, **_tilt_kw(), groove=SPEC)
+@_CORES
+def test_groove_transport_records_only_material_segments_and_vacuum_invariants(core):
+    out = simulate_trajectories(**_SIM_KW, **_tilt_kw(), groove=SPEC, transport_core=core)
 
     assert {
         "vacuum_start_ang",
@@ -331,8 +337,9 @@ def test_groove_transport_records_only_material_segments_and_vacuum_invariants()
     assert np.all(out["vacuum_elec_id"] < _SIM_KW["Ne"])
 
 
-def test_vacuum_leg_preserves_energy_direction_and_advances_clock():
-    out = simulate_trajectories(**_SIM_KW, **_tilt_kw(), groove=SPEC)
+@_CORES
+def test_vacuum_leg_preserves_energy_direction_and_advances_clock(core):
+    out = simulate_trajectories(**_SIM_KW, **_tilt_kw(), groove=SPEC, transport_core=core)
 
     for vac_i, electron in enumerate(out["vacuum_elec_id"]):
         later = np.flatnonzero(
@@ -380,6 +387,8 @@ def _run_grooved(
     seed=9,
     width_ang=None,
     height_ang=None,
+    per_electron=False,
+    vacuum_capacity=None,
 ):
     """Drive the compiled grooved core (:func:`_transport_core_grooved`) directly
     from a hand-placed single electron, using real groove geometry rather than a
@@ -473,6 +482,117 @@ def _run_grooved(
     straggle_on = False
     stream_keys_arr = np.zeros(Ne, dtype=np.uint64)
     stragg_dE = np.zeros(Ne)
+
+    if per_electron:
+        from pyrite.montecarlo.transport.batching import pack_layer_tables
+        from pyrite.montecarlo.transport.core_specializations import (
+            _transport_core_grooved_perelectron,
+        )
+        from pyrite.montecarlo.transport.kinematics import stream_keys
+
+        # The same real geometry fixture, this time through the *compiled*
+        # counter-addressed core; the host dispatcher remains lockstep-only.
+        max_vac = max_segments if vacuum_capacity is None else vacuum_capacity
+        vac_start = np.empty((max_vac, 3))
+        vac_end = np.empty((max_vac, 3))
+        vac_E = np.empty(max_vac)
+        vac_t0 = np.empty(max_vac)
+        vac_id = np.empty(max_vac, dtype=np.int64)
+        vac_count = np.zeros(1, dtype=np.int64)
+        seg_count = np.zeros(1, dtype=np.int64)
+        exit_code = np.zeros(1, dtype=np.int8)
+        packed = pack_layer_tables(
+            L_Js,
+            L_Zs,
+            L_ks,
+            L_coeffs,
+            L_E_cross,
+            L_ncm3,
+            L_sr_rate_numer,
+            L_mott_numer,
+            L_mott_denom1,
+            L_mott_denom2,
+            L_sr_joy_numer,
+        )
+        tp = float(spec.tilt_polar_rad)
+        _transport_core_grooved_perelectron(
+            (0, 1, max_segments, stream_keys(seed, Ne)),
+            (max_steps, max_segments, 0, 0, 0.0),
+            (
+                n_layers,
+                internal_bounds,
+                z_total,
+                finite_footprint,
+                0.0 if width_ang is None else float(width_ang),
+                0.0 if height_ang is None else float(height_ang),
+                packed[-1],
+                L_top,
+                L_bot,
+            ),
+            (
+                float(spec.spacing_ang),
+                float(spec.depth_ang),
+                float(np.sin(tp)),
+                float(np.cos(tp)),
+                max_vac,
+                vac_start,
+                vac_end,
+                vac_E,
+                vac_t0,
+                vac_id,
+            ),
+            packed[:-1]
+            + (
+                False,
+                np.zeros(n_layers, dtype=np.int32),
+                np.zeros((n_layers, 1)),
+                np.zeros((n_layers, 1)),
+            ),
+            (mott_has_table, mott_start, mott_len, mott_logE_flat, mott_logA_flat)
+            + pack_elsepa_tables(None, None),
+            (alive, clock, pos, dirs, E_keV, E_cut_by_electrons),
+            (
+                seg_dir,
+                seg_mid,
+                seg_len,
+                seg_E,
+                seg_t0,
+                seg_id,
+                seg_lay,
+                seg_E_end,
+                seg_t_end,
+                seg_flight,
+                seg_substep,
+                seg_event,
+            ),
+            (seg_count, exit_code, vac_count),
+            (straggle_on, stragg_dE),
+        )
+        from pyrite.montecarlo.transport.cores import (
+            EXIT_BACKSCATTERED,
+            EXIT_CUTOFF_STOPPED,
+            EXIT_SIDE,
+            EXIT_STEP_LIMITED,
+            EXIT_TRANSMITTED,
+        )
+
+        nseg = int(seg_count[0])
+        nvac = min(int(vac_count[0]), max_vac)
+        return dict(
+            n_backscattered=int(exit_code[0] == EXIT_BACKSCATTERED),
+            n_transmitted=int(exit_code[0] == EXIT_TRANSMITTED),
+            n_side_exited=int(exit_code[0] == EXIT_SIDE),
+            n_stopped=int(exit_code[0] == EXIT_CUTOFF_STOPPED),
+            n_step_limited=int(exit_code[0] == EXIT_STEP_LIMITED),
+            vacuum_count=int(vac_count[0]),
+            vacuum_start_ang=vac_start[:nvac],
+            vacuum_end_ang=vac_end[:nvac],
+            vacuum_E_keV=vac_E[:nvac],
+            E_keV=seg_E[:nseg],
+            v_hat=seg_dir[:nseg],
+            layer=seg_lay[:nseg],
+            L_ang=seg_len[:nseg],
+        )
 
     tp = float(spec.tilt_polar_rad)
     nseg, nvac, n_back, n_trans, n_side, n_cutoff, n_step_limited = (
@@ -622,6 +742,84 @@ def test_surface_reentry_does_not_consume_material_step_budget():
     assert out["vacuum_start_ang"].shape == (1, 3)
     assert out["n_transmitted"] == 1
     assert out["n_backscattered"] == out["n_side_exited"] == out["n_stopped"] == 0
+
+
+def test_exact_per_electron_groove_reentry_and_budget():
+    """Re-entry may precede the only charged material step; the exit is typed."""
+    d = np.array([1.0, 0.0, 0.1])
+    d /= np.linalg.norm(d)
+    p0 = np.array([3000.0, 0.0, 8000.0])
+    kw = dict(thickness_ang=50000.0, max_steps=1)
+
+    exact = _run_grooved(p0, d, SPEC, per_electron=True, **kw)
+    legacy = _run_grooved(p0, d, SPEC, **kw)
+    assert exact["n_transmitted"] == legacy["n_transmitted"] == 1
+    assert exact["n_step_limited"] == 0
+    assert exact["vacuum_count"] == 1
+    np.testing.assert_allclose(exact["vacuum_start_ang"], legacy["vacuum_start_ang"])
+    np.testing.assert_allclose(exact["vacuum_end_ang"], legacy["vacuum_end_ang"])
+    np.testing.assert_allclose(exact["L_ang"], legacy["L_ang"])
+
+
+def test_per_electron_host_keeps_uncharged_reentry_segments(monkeypatch):
+    """A single charged step can follow a material/vacuum/material crossing."""
+    from pyrite.montecarlo.transport import host_pass
+
+    sample = host_pass.initial_beam_positions
+
+    def placed_entry(*args, **kwargs):
+        pos, slopes, record = sample(*args, **kwargs)
+        pos[:] = (3000.0, 0.0, 8000.0)
+        return pos, slopes, record
+
+    monkeypatch.setattr(host_pass, "initial_beam_positions", placed_entry)
+    direction = np.array([1.0, 0.0, 0.1])
+    direction /= np.linalg.norm(direction)
+    out = simulate_trajectories(
+        E0_keV=60.0,
+        thickness_ang=50000.0,
+        Ne=1,
+        element="C",
+        n_atoms_per_ang3=1e-12,
+        seed=9,
+        elastic_model="sr",
+        radiative_model="uncoupled",
+        beam_dir=direction,
+        tilt_polar_rad=TP,
+        tilt_azim_rad=np.pi,
+        groove=SPEC,
+        transport_core="per-electron",
+        max_steps=1,
+    )
+    assert out["n_transmitted"] == 1
+    assert out["L_ang"].size == 2
+    assert out["vacuum_start_ang"].shape == (1, 3)
+    np.testing.assert_array_equal(out["elec_id"], [0, 0])
+    assert np.all(in_material(out["r_mid"], 50000.0, SPEC))
+
+
+def test_exact_per_electron_groove_vacuum_capacity_reports_required_rows():
+    """A full vacuum buffer must not corrupt memory or lose replay counts."""
+    d = np.array([1.0, 0.0, 0.1])
+    d /= np.linalg.norm(d)
+    p0 = np.array([3000.0, 0.0, 8000.0])
+    kw = dict(thickness_ang=50000.0, max_steps=1, per_electron=True)
+    tiny = _run_grooved(p0, d, SPEC, vacuum_capacity=0, **kw)
+    full = _run_grooved(p0, d, SPEC, vacuum_capacity=1, **kw)
+    assert tiny["vacuum_count"] == full["vacuum_count"] == 1
+    assert tiny["vacuum_start_ang"].shape == (0, 3)
+    assert full["vacuum_start_ang"].shape == (1, 3)
+    assert tiny["n_transmitted"] == full["n_transmitted"] == 1
+    np.testing.assert_array_equal(tiny["L_ang"], full["L_ang"])
+
+
+def test_exact_per_electron_groove_backscatter_exit_code():
+    d = np.array([np.cos(TP), 0.0, -np.sin(TP)])
+    p0 = np.array([3000.0, 0.0, 0.8 * SPEC.depth_ang])
+    out = _run_grooved(p0, d, SPEC, thickness_ang=1.0e7, max_steps=4, per_electron=True)
+    assert out["n_backscattered"] == 1
+    assert out["n_step_limited"] == out["n_transmitted"] == 0
+    assert out["vacuum_count"] == 0
 
 
 def test_surface_event_exhaustion_raises_instead_of_classifying_survivor_stopped():
@@ -953,3 +1151,107 @@ def test_groove_substeps_resume_the_open_flight():
     np.testing.assert_allclose(
         fine["t_start_ang"][order][1:][same], fine["t_end_ang"][order][:-1][same], rtol=1e-12
     )
+
+
+# --- Exact per-electron grooved core (#972) ---------------------------------
+
+
+def _si_case(spacing_ang, tilt_deg, core, Ne=1500, seed=5):
+    from pyrite.montecarlo.geometry import tilted_geometry
+
+    tp = np.deg2rad(tilt_deg)
+    beam, _ = tilted_geometry(np.pi / 2, tp, np.pi)
+    groove = None if spacing_ang is None else blazed_groove_spec(spacing_ang, np.pi / 2, tp, np.pi)
+    return simulate_trajectories(
+        E0_keV=30.0,
+        Ne=Ne,
+        thickness_ang=3.0e4,
+        element="Si",
+        n_atoms_per_ang3=0.04996,
+        seed=seed,
+        elastic_model="sr",
+        energy_model="midpoint",
+        beam_dir=beam,
+        tilt_polar_rad=tp,
+        tilt_azim_rad=np.pi,
+        groove=groove,
+        transport_core=core,
+        radiative_model="uncoupled",
+    )
+
+
+def _two_proportion_z(k1, k2, n):
+    p = (k1 + k2) / (2 * n)
+    return abs(k1 - k2) / (n * np.sqrt(2 * p * (1 - p) / n))
+
+
+@pytest.mark.parametrize(("spacing", "tilt"), [(2.0e3, 45.0), (5.0e3, 30.0), (1.0e4, 60.0)])
+def test_per_electron_grooved_agrees_statistically_with_lockstep(spacing, tilt):
+    """Independent samples of the same model: exits, depth and energy agree."""
+    lock = _si_case(spacing, tilt, "lockstep")
+    exact = _si_case(spacing, tilt, "per-electron")
+    n = lock["Ne"]
+    for key in ("n_backscattered", "n_transmitted"):
+        assert _two_proportion_z(lock[key], exact[key], n) < 4.0, key
+    for out in (lock, exact):
+        out["zbar"] = np.average(out["r_mid"][:, 2], weights=out["L_ang"])
+        out["Ebar"] = np.average(out["E_keV"], weights=out["L_ang"])
+        out["Lbar"] = out["L_ang"].sum() / n
+        out["vbar"] = out["vacuum_elec_id"].size / n
+    assert exact["zbar"] == pytest.approx(lock["zbar"], rel=0.04)
+    assert exact["Ebar"] == pytest.approx(lock["Ebar"], rel=0.01)
+    assert exact["Lbar"] == pytest.approx(lock["Lbar"], rel=0.03)
+    assert exact["vbar"] == pytest.approx(lock["vbar"], abs=0.04)
+
+
+def test_per_electron_groove_flat_face_limit():
+    """h -> 0: the same streams give the ungrooved per-electron outcome."""
+    flat = _si_case(None, 45.0, "per-electron", Ne=600)
+    tiny = _si_case(1.0e-2, 45.0, "per-electron", Ne=600)
+    for key in ("n_backscattered", "n_transmitted", "n_side_exited", "n_cutoff_stopped"):
+        assert tiny[key] == flat[key], key
+    assert tiny["L_ang"].sum() == pytest.approx(flat["L_ang"].sum(), rel=1e-5)
+    np.testing.assert_allclose(
+        np.bincount(tiny["elec_id"], weights=tiny["L_ang"], minlength=600),
+        np.bincount(flat["elec_id"], weights=flat["L_ang"], minlength=600),
+        rtol=1e-3,
+    )
+
+
+def test_grooved_auto_stays_lockstep_and_cuda_is_refused():
+    from pyrite.montecarlo.transport import resolve_transport_core
+
+    assert resolve_transport_core("auto", 10**6, groove=SPEC) == "lockstep"
+    with pytest.raises(ValueError, match="no grooved specialization"):
+        simulate_trajectories(**_SIM_KW, **_tilt_kw(), groove=SPEC, transport_core="cuda")
+
+
+def _hopg_yields(core, spacing, seed):
+    from pyrite.montecarlo.geometry import tilted_geometry
+    from pyrite.montecarlo.spectrum.brem import mc_brem_spectrum
+
+    beam, n_hat = tilted_geometry(np.pi / 2, TP, np.pi)
+    groove = blazed_groove_spec(spacing, np.pi / 2, TP, np.pi)
+    segs = simulate_trajectories(
+        E0_keV=60.0, Ne=600, thickness_ang=2.0e5, element="C", n_atoms_per_ang3=0.1136,
+        seed=seed, elastic_model="sr", beam_dir=beam, tilt_polar_rad=TP, tilt_azim_rad=np.pi,
+        groove=groove, transport_core=core, radiative_model="uncoupled",
+    )  # fmt: skip
+    cxr = mc_cxr_spectrum(
+        segs, np.linspace(500.0, 3000.0, 200), crystal="hopg", hkl_list=[(0, 0, 2)],
+        n_hat=n_hat, B_ang2=0.0, composition=[("C", 0.1136)], groove=groove,
+    )  # fmt: skip
+    brem = mc_brem_spectrum(
+        segs, np.linspace(5e3, 50e3, 40), composition=[("C", 0.1136)], n_hat=n_hat, groove=groove
+    )
+    return cxr.sum(), brem.sum()
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("spacing", [1.0e4, 3.0e3])
+def test_per_electron_grooved_line_and_brem_yields_match_lockstep(spacing):
+    """Seed scatter at Ne=600 is ~3 % (line) and ~1.5 % (brem)."""
+    lock_cxr, lock_brem = _hopg_yields("lockstep", spacing, 1)
+    exact_cxr, exact_brem = _hopg_yields("per-electron", spacing, 1)
+    assert exact_cxr == pytest.approx(lock_cxr, rel=0.1)
+    assert exact_brem == pytest.approx(lock_brem, rel=0.05)

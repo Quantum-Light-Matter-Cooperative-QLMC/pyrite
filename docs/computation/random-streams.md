@@ -31,7 +31,7 @@ They compose: the child tree partitions host-side input sampling by physical inp
 
 Each optional beam or bunch distribution draws from its own child of the run seed, obtained by spawning a fixed number of children and taking the last. The index assignment is fixed and documented in the code, because it is part of the reproducibility contract rather than an implementation detail.
 
-Inside a beam or bunch child, draws are counter-addressed per electron (`child_stream_root`, `counter_normals` in `montecarlo/transport/kinematics.py`). The child's first 64-bit state word roots the stream, and draw $c$ of electron $e$ is the counter construction {eq}`eq-streams-counter-address` with a 52-bit mantissa, $u = (\lfloor z/2^{12} \rfloor + \tfrac12)\,2^{-52} \in (0, 1)$. Gaussian draws are $\Phi^{-1}(u)$, one uniform per normal; the representable range truncates the tails at $|z| \approx 8.2$. A per-electron draw therefore depends on $(\text{seed}, e, c)$ only, never on the electron count. The groove phase, which only the lockstep core consumes, stays on a sequential generator.
+Inside a beam or bunch child, draws are counter-addressed per electron (`child_stream_root`, `counter_normals` in `montecarlo/transport/kinematics.py`). The child's first 64-bit state word roots the stream, and draw $c$ of electron $e$ is the counter construction {eq}`eq-streams-counter-address` with a 52-bit mantissa, $u = (\lfloor z/2^{12} \rfloor + \tfrac12)\,2^{-52} \in (0, 1)$. Gaussian draws are $\Phi^{-1}(u)$, one uniform per normal; the representable range truncates the tails at $|z| \approx 8.2$. A per-electron draw therefore depends on $(\text{seed}, e, c)$ only, never on the electron count. The per-electron grooved core takes its lateral groove phase from counter draw 0 inside the `spawn(3)[2]` child (#972). Lockstep keeps the historical sequential generator in that child, so lockstep grooved results are unchanged.
 
 ```{list-table} Child-stream assignment by physical input.
 :name: tbl-streams-children
@@ -45,7 +45,8 @@ Inside a beam or bunch child, draws are counter-addressed per electron (`child_s
   - Gaussian entry offsets: counter draws 0 (x) and 1 (y)
 * - `spawn(3)[2]`
   - Groove lateral phase
-  - Uniform phase over one groove period (sequential; lockstep only)
+  - Uniform phase over one groove period (sequential for lockstep;
+    counter draw 0 of each electron for the per-electron core)
 * - `spawn(4)[3]`
   - Longitudinal bunch
   - Arrival-time offsets: counter draws 0 (Gaussian or train centre),
@@ -119,13 +120,13 @@ Exact replay supports the [capacity policy](execution-and-acceleration.md#output
 Adaptive electron counts (#361) extend a run block by block, so a run over $[0, N)$ must equal the same run assembled from blocks $[kB, (k+1)B)$. Every input the per-electron and CUDA cores consume is prefix-stable:
 
 * transport, hard-collision, radiative, and straggling keys take the block's start offset;
-* spot, Twiss, and energy-spread draws are counter-addressed inside their children;
-* the cores emit rows electron-major, so concatenating blocks reproduces the single call's row order;
+* spot, Twiss, energy-spread, and per-electron groove-phase draws are counter-addressed inside their children;
+* the cores emit rows, and grooved vacuum legs, electron-major, so concatenating blocks reproduces the single call's row order;
 * every block builds its shell, radiative, and lookup tables over the population's energy range (`_energy_range_keV`), not its own, so interpolation is identical.
 
 Two population-wide steps are redone once after the join (`montecarlo/runner/block_transport.py`). Bunch offsets are centred on the realized population's centroid, which no block knows; each raw offset is still a pure function of $(\text{seed}, e)$. Hard-photon directions come from one sequential generator over photon rows.
 
-The lockstep core shares one generator across electrons and is not supported. Grooves, GDF beams, and secondary cascades are rejected in blocks.
+The lockstep core shares one generator across electrons and is not supported. GDF beams and explicit-launch passes are rejected in blocks.
 
 ### The straggling namespace
 

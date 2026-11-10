@@ -1,7 +1,7 @@
 # blazed-groove-geometry
 
 - **Claim id**: `blazed-groove-geometry`
-- **Anchors**: `src/pyrite/montecarlo/groove.py::{blazed_groove_spec,surface_depth_ang,in_material,first_surface_event,escape_distance_ang,entry_points}`; `src/pyrite/montecarlo/transport.py::simulate_trajectories`; `src/pyrite/montecarlo/spectrum/lines.py::mc_cxr_spectrum`; `src/pyrite/montecarlo/spectrum/brem.py::mc_brem_spectrum`
+- **Anchors**: `src/pyrite/montecarlo/groove.py::{blazed_groove_spec,surface_depth_ang,in_material,first_surface_event,escape_distance_ang,entry_points}`; `src/pyrite/montecarlo/transport/api.py::_simulate_trajectories`; `src/pyrite/montecarlo/transport/cores.py::make_cpu_transport_core`; `src/pyrite/montecarlo/transport/core_geometry.py::_groove_reentry_scalar`; `src/pyrite/montecarlo/transport/grooved_batches.py::GroovedVacuumCore`; `src/pyrite/montecarlo/spectrum/cxr/_spectrum.py::mc_cxr_spectrum`; `src/pyrite/montecarlo/spectrum/brem.py::mc_brem_spectrum`
 - **Source**: elementary periodic ray–plane intersection (no literature equation)
 - **Verifier**: independent fresh context (did not write the implementation), 2026-07-24. Sections 1--3 were derived **before** reading implementation bodies (only the ledger row, module/function derivation docstrings, and signatures were read first, per the [validation methodology](../methodology.md)).
 
@@ -215,4 +215,221 @@ The two former discrepancies are corrected: closed facet-band endpoints use a ge
 
 **Verdict: `rederived`.**
 
-Suggested ledger edit (human applies): change status from `unverified` to `rederived`; link this write-up and the endpoint/edge re-review evidence. Do not mark `signed-off`.
+Suggested ledger edit (task owner applies): change status from `unverified` to `rederived`; link this write-up and the endpoint/edge re-review evidence. Do not mark `signed-off`.
+
+## 6. Re-verification: exact per-electron grooved core (#972), 2026-11-10
+
+**Scope:** `transport/cores.py::make_cpu_transport_core` with `grooved=True,
+per_electron=True`, `core_geometry.py::_groove_reentry_scalar`, the signature
+adapter, `grooved_batches.py::GroovedVacuumCore`, `beam_entry.py::initial_beam_positions`,
+and `host_pass.py` routing. Paths are under `src/pyrite/montecarlo/`.
+Sections 1–5 retain the historical review. This section supersedes the unfinished
+#972 requirements with a separate fresh-context verification.
+
+### 6.1 Independent derivation
+
+This addendum begins from the ledger's elementary periodic ray–plane source
+and the public geometry/core docstrings. It covers the exact CPU specialization
+with `grooved=True, per_electron=True`; it does not re-certify photon scoring,
+lockstep physics, or GPU parity. The verifier did not implement this change.
+
+Put $s_t=\sin\theta$, $c_t=\cos\theta$, period $\Lambda>0$, and
+$h=\Lambda s_t c_t$. Let $q=x\bmod\Lambda$. Intersecting the two facet families
+with $z$ gives the independent surface expression
+
+$$
+f(x)=\begin{cases}
+q c_t/s_t,&0\le q\le\Lambda s_t^2,\\
+(\Lambda-q)s_t/c_t,&\Lambda s_t^2<q<\Lambda.
+\end{cases}
+$$
+
+The two branches meet at $h$ and vanish at periodic apexes. Material is
+$f(x)\le z\le T$ within any finite lateral footprint. For a unit direction
+$\mathbf d$ and current position $\mathbf p$, the working and relief candidates
+are respectively
+
+$$
+\ell_{w,k}=\frac{k\Lambda c_t-(c_t p_x-s_t p_z)}{c_t d_x-s_t d_z},
+\qquad
+\ell_{r,k}=\frac{k\Lambda s_t-(s_t p_x+c_t p_z)}{s_t d_x+c_t d_z}.
+$$
+
+Discard zero denominators, nonpositive distances, candidates outside the facet
+depth band $[0,h]$, and candidates lacking the requested two-sided material
+transition. The earliest remaining candidate is the physical surface event.
+Prism back/side exits compete by the same positive ray distance. In vacuum,
+any permanent prism exit must beat a later material entry; with no future
+entry the history ends, whereas a later entry continues the same history.
+
+These expressions have length units: unit-vector dot products and trigonometric
+factors are dimensionless. Forward distances are positive for either direction
+of lateral motion; integer plane indices range over both signs. A tangent has
+no crossing unless another facet changes the material predicate. Boundary ties
+need a declared numerical convention, rather than a sign reversal.
+
+For a vacuum leg of length $\ell$, independent mechanics requires
+
+$$
+\mathbf p_{\rm next}=\mathbf p+\ell\mathbf d,\qquad
+E_{\rm next}=E,\qquad \mathbf d_{\rm next}=\mathbf d,\qquad
+(ct)_{\rm next}=ct+\ell/\beta(E),
+\quad \beta(E)=\sqrt{1-(1+E/(mc^2))^{-2}}.
+$$
+
+The stored clock is a length (Angstrom, $c=1$), kinetic energy is keV,
+and vacuum generates no stopping, scattering, or radiating material row.
+A groove exit followed by entry is not a permanent electron exit. Its geometry
+event count must persist for that history across every continuation; the
+material-step count advances only for material rows. Independent bounded
+counters prevent either physical-row truncation or an infinite geometric loop.
+
+A continuation is a partition of a history, not a new history. All state that
+can affect subsequent output must survive it: position, direction, energy,
+clock, optical depth, RNG/event indices, material and groove-event counters.
+If temporary output capacity is exhausted, replay must restore the complete
+pre-attempt state and replace, rather than accumulate, provisional rows and
+vacuum legs. Shrinking electron batches or increasing row capacity must leave
+physical output and per-history exit counts unchanged.
+
+For groove phase sampling, each electron needs a uniform lateral phase
+$U_e\Lambda$ keyed by the root seed and global electron index $e$ in a dedicated
+namespace. A block starting at $e_0$ must receive the identical sequence slice
+$\{U_e:e_0\le e<e_0+N\}$; neither local row number nor output reservation can
+enter the key. For a flat-face starting coordinate $x_0$, relief entry follows
+$\ell_0=(-x_0s_t)\bmod(\Lambda s_t)$ and
+$(x,z)=(x_0+\ell_0s_t,\ell_0c_t)$. As $\Lambda\to0$ at fixed nondegenerate
+$\theta$, $h\to0$, entry depth and groove modulation vanish and the physical
+geometry tends to a flat entrance face. Endpoint tilt angles remain excluded.
+
+
+### 6.2 Comparison, correction and numeric evidence
+
+The plane distances and working/relief signs agree with the compiled scalar
+facet search. `_groove_reentry_scalar` compares the next entry against a finite
+side exit; back-face exit cannot precede a later entry in the groove band
+because the slab back face is below that band. A permanent no-entry history is
+backscattered; a side that wins is classified as side exit. An entry creates a
+vacuum diagnostic, rather than a radiating material row or a permanent exit.
+
+`cores.py` initializes `surface_events` and `zero_surface_events` as
+per-electron arrays (lines 359–360), resets each batch's vacuum count (375),
+and charges no material step for a successful re-entry (1227). The separate
+surface bound raises above `max_steps` (999–1001); the repeated zero-length
+bound raises at two consecutive events (1004–1006). A shallow hand-placed
+per-electron ray with direction proportional to $(1,0,0.02)$ independently
+confirmed the surface-limit exception. Counters belong to each history, so a
+preceding electron cannot spend a following electron's budget.
+
+Here “material steps” means charged non-re-entry steps; a material fragment
+ending in successful re-entry is uncharged. It is still retained as a material
+row and contributes stopping and radiation. This refines the row/budget
+wording in §6.1: a material-row count is not the termination counter.
+
+At re-entry, `cores.py` records the post-material energy, preserves direction,
+and adds precisely the vacuum length divided by its constant-energy beta
+(lines 983–998). It suppresses elastic scattering at the facet. The next
+material flight resamples its locally exponential free path, as in the
+historical core (§4.2); it need not retain a previously sampled optical depth
+across this boundary. There is no random draw during the vacuum leg itself.
+Energy-limited material substeps retain their open-flight state. CPU grooved
+continuation is refused by host routing; batch replays restart the complete
+history, so the hypothetical continuation requirements in §6.1 do not assert
+an implemented CPU continuation feature.
+
+An independent elementary geometry point uses $\Lambda=20000$ Å,
+$\theta=45^\circ$, $\mathbf p=(3000,0,8000)$ Å and
+$\mathbf d=(1,0,0.1)/\sqrt{1.01}$. The working exit satisfies $x=z$:
+
+$$
+\ell_w=\frac{5000\sqrt{1.01}}{0.9}=5583.26423395605\ {\rm \mathring A},
+\qquad x_w=z_w=8555.555555555555\ {\rm \mathring A}.
+$$
+
+The next relief plane is $x+z=20000$ Å, giving
+$\ell_{\rm vac}=2639.3612742337705$ Å and entry
+$(11181.818181818182,0,8818.181818181818)$ Å. The compiled per-electron core
+returned these endpoints at displayed precision, one vacuum leg, and two
+material rows terminating in transmission through the $T=50000$ Å back face,
+with `max_steps=1`. The post-entry displacement adds only the declared
+period-scaled nudge.
+
+**Discrepancy found and corrected by the task owner.** The original host call
+passed `max_segments = Ne * max_steps` into the batch driver's global retained
+row guard (`batching.py`, near line 556). This confused the charged material
+step budget with the larger material-row count. The direct core test supplied
+extra row slots and therefore missed the host error. An ephemeral probe using
+the numeric state above, dilute carbon $n=10^{-12}$ Å$^{-3}$, 60 keV,
+`elastic_model='sr'`, seed 9, cutoff $10^{-6}$ keV and `max_steps=1` reached
+`RuntimeError: segment buffer exhausted` in public host routing. Only the
+entrance position/direction samplers were patched to inject the hand-placed
+state; the geometry, transport core and batch driver were real.
+
+The owner's correction in `host_pass.py::_run_per_electron` (near line 802)
+uses `2 * Ne * max_steps` for grooved runs. Independently, at most
+`max_steps` successful re-entries produce uncharged fragments, and at most
+`max_steps` other rows, including the terminal row, are possible before the
+charged-step limit. Therefore this bound admits every non-raising history.
+The identical probe after correction returned two material rows, one vacuum
+leg, and one transmitted electron. The new
+`test_per_electron_host_keeps_uncharged_reentry_segments` also passed in the
+verifier's own run. No implementation was edited by this verifier.
+
+`GroovedVacuumCore` snapshots position, direction, energy and clock, grows
+vacuum capacity using the required count, and restores the snapshot before
+retry (lines 65–90). The core reconstructs its RNG, material/surface counters
+and straggling accumulator for every full-history attempt. The adapter replaces
+its entry for the same batch start (93), so a segment-capacity replay cannot
+leave duplicate vacuum legs; final joining sorts batch starts (99). The generic
+batch driver likewise restores its entry snapshot before segment replay and
+adds exit counts only after acceptance. This matches the independently derived
+replay contract, including batches that shrink after capacity growth.
+
+`initial_beam_positions` uses draw zero of global electron $e$ in
+`child_stream_root(seed, 3, 2)` when `counter_groove_phase=True` (line 97);
+`host_pass.py` selects that mode for the per-electron route (488). Finite spot
+and Twiss entrances retain their separately addressed distributions. The
+signature adapter forwards groove geometry and the extra vacuum counter without
+altering numerical values. Exact grooved CPU routing is selected explicitly;
+`auto` retains lockstep and CUDA grooves remain refused. The small-period flat
+limit has the same exit counts and convergent per-electron material lengths;
+it is a numerical limit, not an assertion of bitwise equality at finite period.
+
+### 6.3 Filters and verification limits
+
+| Filter | Result and evidence |
+| --- | --- |
+| Dimensions and boundary units | **Pass.** Source geometry, entry sampler, kernel and retained positions/lengths use Å; kinetic energies use keV; clock uses Å with $c=1$; beta and directions are dimensionless. The mixed geometry tuple's trigonometric entries and finite-footprint flag are dimensionless, despite its shorthand `[Ang]` docstring annotation. No source table or unit-converting loader is involved. |
+| Limits | **Pass.** Period vanishes at fixed nondegenerate tilt; entry relief depth vanishes and flat geometry is recovered. Endpoint tilts remain explicitly excluded. No-entry rays escape permanently; finite sides compete with later entry. |
+| Signs and conventions | **Pass.** Positive ray distance, working outward normal, relief inward normal, depth-positive sample frame, permanent top/side classification, and vacuum clock direction agree. |
+| Notation and normalization | **Pass.** Ledger, geometry docstrings, this derivation and kernel identify the same period/depth and material-only rows. No per-volume, solid-angle or population normalization factor enters this geometry claim. Vacuum diagnostics are a separate population of legs, not extra radiating histories. |
+| Reference values and citations | **Pass / not applicable to tables.** Source is elementary geometry, with no paper figure, page or transcribed material datum to certify. The numeric facet point above is derived directly from the plane equations, independent of geometry helpers. Carbon data only supply negligible interaction rates in the bookkeeping probe. |
+| Tolerances | **Pass within the stated floating-point model.** Geometry's depth-band allowance is $32\epsilon_{\rm machine}\max(\Lambda,h)$; the post-entry nudge is $\max(64\epsilon_{\rm machine}\Lambda,2\times10^{-12}\Lambda)$. These resolve boundary roundoff and have length units, rather than source uncertainty. Clock/direction anchors use relative $2\times10^{-13}$ roundoff tolerances; the flat-limit anchor allows aggregate $10^{-5}$ and per-electron $10^{-3}$ relative path differences at finite $\Lambda=0.01$ Å. These are finite-period convergence checks, not a source-error estimate. |
+| Artifact validity and evidence scope | **Pass for current local evidence.** Review started at existing commit `833b4829f`; the owner committed the host row-bound correction and regression as `9b1977ff4`. The post-correction probe and regression result below certify that correction. The commands below and ephemeral probes were executed against that tree. No new external-code, CPU/GPU or FP32/FP64 comparison is claimed; historical remote counts in §4.5 are not used as evidence for #972. |
+
+Verifier-executed focused checks, with `UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run
+pyrite-dev test`:
+
+- `tests/montecarlo/transport/test_groove.py -k 'exact_per_electron or material_segments_and_vacuum_invariants or flat_face_limit or first_surface_event'`: **6 passed**, 42 deselected.
+- Same module with `-k 'vacuum_leg_preserves or surface_event_exhaustion'`: **3 passed**, 45 deselected.
+- Same module after the host correction, `-k 'host_keeps_uncharged'`: **1 passed**, 48 deselected.
+- Ephemeral `uv run python` probes reproduced the analytic endpoints, the
+  per-electron surface-event guard, and the host failure/correction above.
+
+The first two focused runs reported the existing missing-BremsLib fallback
+warning; they validate transport geometry and vacuum bookkeeping, not coupled
+radiative physics. The task owner additionally reports 116 passed and 28 skipped
+for the groove, per-electron and block-transport modules after the correction.
+Block/phase/capacity evidence comes from the existing exact-array equality
+anchors in `test_block_transport.py`; this verifier inspected their assertions.
+The task owner owns the final docs build, rendered-math QA and documentation
+checks; those checks must complete before publication of this write-up.
+
+### 6.4 Adjudication
+
+- **Claim**: `blazed-groove-geometry` — `src/pyrite/montecarlo/transport/cores.py::make_cpu_transport_core` (exact grooved per-electron CPU), with the geometry, adapter, phase and host owners above — elementary periodic ray–plane intersection.
+- **Filters**: units **pass**; limits **pass**; signs/conventions **pass**; normalization **pass**; boundary units **pass**; reference transcription **not applicable**; tolerances **pass**; evidence validity **pass** within §6.3's local scope.
+- **Re-derivation**: **matches after correction** — the divergent retained-row ceiling was $N_eN_{\max}$; the corrected groove ceiling $2N_eN_{\max}$ follows from separate charged-step and re-entry-event bounds. No geometric factor, sign or vacuum-clock discrepancy remains in the reviewed path.
+- **Verdict**: **`rederived`** for the corrected exact per-electron path.
+- **Write-up**: `docs/validation/geometry/blazed-groove-geometry.md`.
+- **Suggested ledger change**: task owner may record this corrected #972 verification and set the claim to `rederived`, or `anchored` after its listed regressions pass the required project checks. Add the host uncharged-fragment regression to the anchor list. Never apply `signed-off` from this agent review.
