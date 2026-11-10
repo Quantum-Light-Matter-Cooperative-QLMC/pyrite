@@ -26,7 +26,7 @@ peak angle scales as ``1/E0``.
 
 Gate domain: the screening term of ``M`` comes from the Thomas-Fermi-scaled
 Yukawa potential ``(Ze/r) exp(-r/a)``, ``a = 111 Z^(-1/3)`` in ``hbar/mc``
-(Koch and Motz, Sec. II-E(3), p. 940). Thomas-Fermi screening functions differ from
+(Koch and Motz, Sec. II-E(3), p. 941). Thomas-Fermi screening functions differ from
 Hartree-Fock ones by 1-2 % for ``Z >= 3`` but by 4-5 % for ``Z = 1, 2`` (Seltzer
 and Berger, Nucl. Instrum. Methods B 12, 95 (1985), Sec. 2.2.2, Fig. 1), so
 the reference is gated only for ``Z >= SCHIFF_MIN_Z``. Lighter elements are

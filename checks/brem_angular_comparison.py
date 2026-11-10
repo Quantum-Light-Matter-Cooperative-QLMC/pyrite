@@ -49,13 +49,18 @@ T_MIN_KEV, T_MAX_KEV = 5000.0, 30000.0
 
 
 def element_ranges(rows: list[dict]) -> dict[str, dict]:
-    """Per-element enclosed-angle ratio ranges, gated and reported separately."""
+    """Per-element ratio ranges: gated, reported below the Z floor, and the tip."""
     ranges = {}
     for element in dict.fromkeys(r["element"] for r in rows):
         mine = [r for r in rows if r["element"] == element]
         entry = {"Z": mine[0]["Z"]}
-        for group, label in ((True, "gated"), (False, "reported")):
-            v = [x for r in mine if r["gated"] == group for x in r["ratio"].values()]
+        groups = (
+            ("gated", lambda r: r["gated"]),
+            ("reported", lambda r: not r["gated"] and r["kappa"] <= KAPPA_MAX),
+            ("tip", lambda r: r["kappa"] > KAPPA_MAX),
+        )
+        for label, keep in groups:
+            v = [x for r in mine if keep(r) for x in r["ratio"].values()]
             if v:
                 entry[label] = {"min": min(v), "max": max(v), "nodes": len(v) // len(QUANTILES)}
         ranges[element] = entry
@@ -69,7 +74,7 @@ def print_ranges(ranges: dict[str, dict]) -> None:
     for element, entry in ranges.items():
         parts = [
             f"{label} {entry[label]['min']:.3f}..{entry[label]['max']:.3f} over {entry[label]['nodes']}"
-            for label in ("gated", "reported")
+            for label in ("gated", "reported", "tip")
             if label in entry
         ]
         print(f"{element:>3} Z={entry['Z']:<3} " + "; ".join(parts))
@@ -94,7 +99,8 @@ def main(argv=None) -> int:
         if table is None:
             continue
         for i, energy in enumerate(table.incident_energy_keV):
-            if not T_MIN_KEV <= energy <= T_MAX_KEV:
+            # Staged energies carry round-off (4999.999..., 30000.00...4 keV).
+            if not T_MIN_KEV * (1 - 1e-9) <= energy <= T_MAX_KEV * (1 + 1e-9):
                 continue
             for j, kappa in enumerate(table.nominal_reduced_energy):
                 if not 0.1 <= kappa <= 0.9:
