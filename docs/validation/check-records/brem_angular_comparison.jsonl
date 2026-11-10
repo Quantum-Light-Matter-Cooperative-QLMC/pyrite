@@ -1,0 +1,1 @@
+{"check": "checks/brem_angular_comparison.py", "ledger_id": "bremslib-angular-schiff", "measured_value": null, "recorded_at": "2026-11-10T20:21:58.758751+00:00", "reference_value": null, "revision": "ad8f0577af803357fd41c657713d6210d5fac1f3", "schema_revision": 1, "tolerance": null, "verdict": "pass"}

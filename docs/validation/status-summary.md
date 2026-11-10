@@ -12,10 +12,10 @@ Formal sign-off requires human review of each claim. Independent derivations, au
 
 | Verdict | Claims |
 |---|---:|
-| `pass` | 27 |
+| `pass` | 28 |
 | `fail` | 0 |
 | `skip` | 0 |
-| `missing` | 300 |
+| `missing` | 299 |
 
 Oldest current automated evidence: `2026-09-15T15:45:04.640409+00:00` (UTC timestamp; use it to assess evidence age).
 
@@ -23,8 +23,8 @@ Oldest current automated evidence: `2026-09-15T15:45:04.640409+00:00` (UTC times
 |---|---:|
 | `signed-off` | 0 |
 | `anchored` | 109 |
-| `rederived` | 111 |
-| `filtered` | 14 |
+| `rederived` | 112 |
+| `filtered` | 13 |
 | `unverified` | 89 |
 | `discrepancy` | 4 |
 | **Total** | **327** |
