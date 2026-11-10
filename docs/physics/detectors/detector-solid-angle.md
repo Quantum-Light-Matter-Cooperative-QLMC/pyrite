@@ -103,7 +103,7 @@ central direction times $\Omega$. For $0<\psi<90^\circ$ the polar
 distribution across the slit is trapezoidal, but the aperture broadening of
 `aperture_fwhm_eV` treats the polar span as uniform, so it is exact only at
 $\psi=0^\circ$ and $90^\circ$.
-Validation: `detector-slit-acceptance`.
+Validation: `detector-slit-acceptance`; [independent derivation](../../validation/detectors/detector-slit-acceptance.md).
 
 The legacy `PlanarDetector.scalar_detector()` projection keeps its corner-based
 polar span and $wh|\hat{n}\cdot\hat{r}|/d^2$ solid-angle approximation. Its
