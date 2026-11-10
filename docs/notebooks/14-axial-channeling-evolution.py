@@ -113,8 +113,9 @@ def _(AxialDiagnosticConfig, gaussian, laguerre_gauss, ureg):
         kinetic_energy_eV=kinetic_energy.to("eV").magnitude,
         cells=(2, 2),
         shape=(48, 48),
-        depths_ang=tuple((value * ureg.nm).to("angstrom").magnitude
-                         for value in (0, 10, 20, 35, 50)),
+        depths_ang=tuple(
+            (value * ureg.nm).to("angstrom").magnitude for value in (0, 10, 20, 35, 50)
+        ),
         step_ang=(5 * ureg.angstrom).magnitude,
         mode="unitary",
         backend="cpu",
@@ -144,10 +145,12 @@ def _(np, plt, vortex):
     _grid = vortex.grid
     _shift = (_grid.shape[0] // 2, _grid.shape[1] // 2)
     _dx, _dy = (_grid.extent_ang[i] / _grid.shape[i] for i in range(2))
-    _extent = (-_grid.extent_ang[0] / 2 - _dx / 2,
-               _grid.extent_ang[0] / 2 - _dx / 2,
-               -_grid.extent_ang[1] / 2 - _dy / 2,
-               _grid.extent_ang[1] / 2 - _dy / 2)
+    _extent = (
+        -_grid.extent_ang[0] / 2 - _dx / 2,
+        _grid.extent_ang[0] / 2 - _dx / 2,
+        -_grid.extent_ang[1] / 2 - _dy / 2,
+        _grid.extent_ang[1] / 2 - _dy / 2,
+    )
 
     def _center(values):
         return np.roll(values, _shift, axis=(0, 1)).T
@@ -162,16 +165,28 @@ def _(np, plt, vortex):
     for _ax, _image, _title, _cmap, _label in (
         (_axes[0, 0], vortex.potential_eV, "Axial string potential", "viridis", "U (eV)"),
         (_axes[0, 1], _density_0, "Vortex entry density", "magma", "Å⁻²"),
-        (_axes[1, 0], _density_end, f"Density after {vortex.depths_ang[-1] / 10:g} nm", "magma", "Å⁻²"),
+        (
+            _axes[1, 0],
+            _density_end,
+            f"Density after {vortex.depths_ang[-1] / 10:g} nm",
+            "magma",
+            "Å⁻²",
+        ),
         (_axes[1, 1], _phase_end, "Final envelope phase (masked)", "twilight", "rad"),
     ):
-        _image_artist = _ax.imshow(_center(_image), origin="lower", extent=_extent,
-                                   cmap=_cmap, aspect="equal",
-                                   **({"vmin": -np.pi, "vmax": np.pi} if _label == "rad" else {}))
+        _image_artist = _ax.imshow(
+            _center(_image),
+            origin="lower",
+            extent=_extent,
+            cmap=_cmap,
+            aspect="equal",
+            **({"vmin": -np.pi, "vmax": np.pi} if _label == "rad" else {}),
+        )
         _ax.set(title=_title, xlabel="x from string (Å)", ylabel="y from string (Å)")
         fig_geometry.colorbar(_image_artist, ax=_ax, label=_label, shrink=0.8)
-    _axes[0, 1].add_patch(plt.Circle((0, 0), vortex.config.oam_radius_ang,
-                                    fill=False, ls="--", color="white", lw=1))
+    _axes[0, 1].add_patch(
+        plt.Circle((0, 0), vortex.config.oam_radius_ang, fill=False, ls="--", color="white", lw=1)
+    )
     fig_geometry  # noqa: B018 - displayed by marimo
     return
 
@@ -208,8 +223,10 @@ def _(gaussian_result, np, plt, vortex):
 
     def _fidelity(_result):
         _waves = _result.wavefunctions_per_ang
-        return (np.abs(np.sum(_waves[0].conj() * _waves, axis=(1, 2))
-                       * _result.grid.cell_area_ang2) ** 2)
+        return (
+            np.abs(np.sum(_waves[0].conj() * _waves, axis=(1, 2)) * _result.grid.cell_area_ang2)
+            ** 2
+        )
 
     fig_diagnostics, (ax_overlap, ax_oam) = plt.subplots(
         1, 2, figsize=(11, 3.7), layout="constrained"
@@ -222,9 +239,10 @@ def _(gaussian_result, np, plt, vortex):
 
     for _ell in (-1, 0, 1):
         _index = int(np.flatnonzero(vortex.oam_ells == _ell)[0])
-        ax_oam.plot(depth_nm, vortex.oam_populations[:, _index], "o-", label=fr"$P_{{{_ell:+d}}}$")
-    ax_oam.plot(depth_nm, vortex.oam_populations.sum(axis=1), "k--",
-                label="Disk weight (reported modes)")
+        ax_oam.plot(depth_nm, vortex.oam_populations[:, _index], "o-", label=rf"$P_{{{_ell:+d}}}$")
+    ax_oam.plot(
+        depth_nm, vortex.oam_populations.sum(axis=1), "k--", label="Disk weight (reported modes)"
+    )
     ax_oam.set(xlabel="Depth (nm)", ylabel="OAM weight per incident electron", ylim=(0, None))
     ax_oam.legend(fontsize=8)
     fig_diagnostics  # noqa: B018 - displayed by marimo
@@ -244,14 +262,31 @@ def _(np, plt, vortex):
     _y = (np.arange(_grid.shape[1]) - _shift[1]) * _grid.extent_ang[1] / _grid.shape[1]
     fig_flow, ax = plt.subplots(figsize=(6, 4.5), layout="constrained")
     _magnitude = np.hypot(_jx_center, _jy_center)
-    _image = ax.imshow(_magnitude, origin="lower", aspect="equal",
-                       extent=(_x[0] - (_x[1]-_x[0])/2, _x[-1] + (_x[1]-_x[0])/2,
-                               _y[0] - (_y[1]-_y[0])/2, _y[-1] + (_y[1]-_y[0])/2))
+    _image = ax.imshow(
+        _magnitude,
+        origin="lower",
+        aspect="equal",
+        extent=(
+            _x[0] - (_x[1] - _x[0]) / 2,
+            _x[-1] + (_x[1] - _x[0]) / 2,
+            _y[0] - (_y[1] - _y[0]) / 2,
+            _y[-1] + (_y[1] - _y[0]) / 2,
+        ),
+    )
     _stride = 4
-    ax.quiver(_x[::_stride], _y[::_stride], _jx_center[::_stride, ::_stride],
-              _jy_center[::_stride, ::_stride], color="white", pivot="mid")
-    ax.set(xlabel="x from string (Å)", ylabel="y from string (Å)",
-           title=f"Vortex transverse current at {vortex.depths_ang[-1] / 10:g} nm")
+    ax.quiver(
+        _x[::_stride],
+        _y[::_stride],
+        _jx_center[::_stride, ::_stride],
+        _jy_center[::_stride, ::_stride],
+        color="white",
+        pivot="mid",
+    )
+    ax.set(
+        xlabel="x from string (Å)",
+        ylabel="y from string (Å)",
+        title=f"Vortex transverse current at {vortex.depths_ang[-1] / 10:g} nm",
+    )
     fig_flow.colorbar(_image, ax=ax, label="|j⊥| (Å⁻²)")
     fig_flow  # noqa: B018 - displayed by marimo
     return
@@ -310,12 +345,14 @@ def _(np, plt, scattered):
     ax_surv.set(xlabel="Depth (nm)", ylabel="Fraction / purity estimate", ylim=(0, None))
     ax_surv.legend(fontsize=8)
     for _index in np.argsort(scattered.spectral_populations[-1])[-3:][::-1]:
-        ax_spectrum.plot(z, scattered.spectral_populations[:, _index], "o-",
-                         label=str(scattered.spectral_labels[_index]))
-    ax_spectrum.plot(z, scattered.spectral_omitted, "s--",
-                     label="Outside computed subspace")
-    ax_spectrum.plot(z, scattered.spectral_represented, "k:",
-                     label="All represented bins")
+        ax_spectrum.plot(
+            z,
+            scattered.spectral_populations[:, _index],
+            "o-",
+            label=str(scattered.spectral_labels[_index]),
+        )
+    ax_spectrum.plot(z, scattered.spectral_omitted, "s--", label="Outside computed subspace")
+    ax_spectrum.plot(z, scattered.spectral_represented, "k:", label="All represented bins")
     ax_spectrum.set(xlabel="Depth (nm)", ylabel="Weight per incident electron", ylim=(0, None))
     ax_spectrum.legend(fontsize=8)
     fig_scattering  # noqa: B018 - displayed by marimo
@@ -379,7 +416,7 @@ def _(EnergyBins, FixedSampling, PointDetector, np, pr):
         return pr.simulate(
             pr.Beam(
                 energy_keV=energy_keV,
-                transverse=pr.beams.Spot(),          # pencil beam, no divergence
+                transverse=pr.beams.Spot(),  # pencil beam, no divergence
                 longitudinal=pr.beams.PointBunch(),  # no energy spread
             ),
             pr.geometry.Slab(
@@ -417,13 +454,17 @@ def _(EnergyBins, FixedSampling, PointDetector, np, pr):
 @app.cell
 def _(fibre, plt):
     fig_fibre, ax_fibre = plt.subplots(figsize=(8, 3.8), layout="constrained")
-    for _component, _label in ((fibre.channeling, "Axial channeling source"),
-                               (fibre.brem, "Bremsstrahlung")):
+    for _component, _label in (
+        (fibre.channeling, "Axial channeling source"),
+        (fibre.brem, "Bremsstrahlung"),
+    ):
         ax_fibre.plot(_component.photon_energy_eV / 1e3, _component.density, label=_label)
-    ax_fibre.set(xlabel="Photon energy (keV)",
-                 ylabel="photons / electron / eV / sr",
-                 yscale="log",
-                 title="si-fibre/B on axis, 32 histories (statistically noisy)")
+    ax_fibre.set(
+        xlabel="Photon energy (keV)",
+        ylabel="photons / electron / eV / sr",
+        yscale="log",
+        title="si-fibre/B on axis, 32 histories (statistically noisy)",
+    )
     ax_fibre.legend(fontsize=8)
     fig_fibre  # noqa: B018 - displayed by marimo
     return

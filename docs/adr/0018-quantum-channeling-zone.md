@@ -1,6 +1,6 @@
 # 0018 — Model electron channeling as a quantum entrance zone
 
-- **Status:** Proposed
+- **Status:** Accepted — 2026-11-10 (planar implemented and persisted in #503–#507 and #521; first axial cases admitted in #994)
 - **Date:** 2026-10-14
 - **Issue:** [#502](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/502) (parent [#56](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/56))
 - **Design:** [Channeling radiation physics walkthrough](../research/physics/channeling-radiation-physics.md)
@@ -173,6 +173,41 @@ The following consumers refuse channeling before transport or writes:
 - Trajectory capture and electron-block transport: the zone source and initial
   entrance population are not represented by the current block/capture
   contract. Use fixed-count execution without capture.
+
+## Axial outcomes (#883–#886, #992–#994)
+
+Axial channeling reached standard runs through a narrower route than the
+planar tier. Each outcome below is recorded with its ledger claim; see the
+[channeling ledger](../validation/ledger-channeling.md) for current status.
+
+- **Zone model (#883).** The axial zone is a carrier-fibred, absorbing MCWF
+  model with TDS and electronic jumps, rather than the periodic real-space
+  grid and numerical sink of the diagnostic API. Its terminal fates (retained, outgoing, unresolved) form a physical
+  outgoing instrument; outgoing electrons launch native transport with their
+  own stream keys (`cr-axial-zone-handoff-physical`).
+- **Depth budget (#884, #993).** A case runs only with a measured,
+  repository-held bound ε on its on-axis band yield (`cr-axial-depth-budget`,
+  `cr-axial-depth-calibration`). The first calibrations give ε = 3.97% for
+  `si-fibre/A` and 9.71% for `si-fibre/B` (95%, 800 eV–10 keV band).
+- **Source and partition (#885, #992).** The photon source is an
+  expected-value two-time correlation estimator over fibre histories
+  (`cr-axial-fiber-regression`). Bound→bound and capture belong to channeling,
+  free→free to CBS (`cr-axial-source-partition`). The Si evidence is compared
+  with Andersen et al., NIM 194, 209 (1982); see the
+  [#992 note](../research/physics/axial-material-source-992.md).
+- **Zone-row ownership (#994).** Unlike the planar tier, native PXR/CBS scores
+  no lines on axial zone rows, so the fibre source alone owns the zone's line
+  band. The in-cut free→free block that CBS would have carried is omitted and
+  stored as a declared one-sided bound: 8.06% for A, 18.9% for B
+  (`cr-axial-zone-row-native-lines`).
+- **Admission (#886, #994).** Standard runs admit only cases in the
+  repository lookup whose run claims are all `anchored`
+  (`cr-axial-persisted-channel`): Si ⟨100⟩, 3.5 MeV, 0.3 µm, CPU, incoherent
+  emission, on-axis zero-aperture `PointDetector`. Every other axial case,
+  and replay, recompute, CUDA, block, adaptive, coherent and remote
+  consumers, refuse before work. The
+  [first envelope](../research/physics/axial-first-envelope-886.md) lists the
+  evidence needed to widen it.
 
 ## Consequences
 

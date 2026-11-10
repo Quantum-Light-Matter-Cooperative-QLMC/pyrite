@@ -75,7 +75,7 @@ In other words:
 | [0015](0015-xraydb-atomic-scattering-data.md)       | xraydb as the atomic scattering data source | Accepted                         |
 | [0016](0016-target-filter-body-components.md)      | Share descriptions across target and filter roles | Accepted                    |
 | [0017](0017-in-tree-physics-extension-contract.md) | In-tree physics preparation and batch scoring contracts | Proposed |
-| [0018](0018-quantum-channeling-zone.md)            | Model electron channeling as a quantum entrance zone | Proposed |
+| [0018](0018-quantum-channeling-zone.md)            | Model electron channeling as a quantum entrance zone | Accepted |
 | [0019](0019-cli-configuration-ownership.md) | CLI configuration ownership | Accepted |
 | [0020](0020-photon-transport-source-and-scoring.md) | Photon transport source and scoring | Accepted |
 | [0021](0021-named-physics-numerics-presets.md) | Named Physics and Numerics presets | Accepted |

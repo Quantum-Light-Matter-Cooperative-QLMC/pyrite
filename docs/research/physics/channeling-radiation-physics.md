@@ -1,6 +1,6 @@
 # Channeling radiation: physics implementation walkthrough
 
-**Status:** Proposed physics design; not implemented as a production model. The architecture is recorded in [ADR-0018](../../adr/0018-quantum-channeling-zone.md) (Proposed); delivery is tracked in [#56](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/56) and its sub-issues.
+**Status:** Design walkthrough. Planar channeling is implemented and persisted (#503–#507, #521); standard axial runs admit two calibrated Si ⟨100⟩ cases (#994, [first envelope](axial-first-envelope-886.md)). The architecture is recorded in [ADR-0018](../../adr/0018-quantum-channeling-zone.md) (Accepted), and claim status lives in the [channeling ledger](../../validation/ledger-channeling.md). Where the implementation departs from this walkthrough, ADR-0018's outcome notes govern.
 
 [ADR-0018](../../adr/0018-quantum-channeling-zone.md) fixes the architecture: a quantum entrance zone with one-way handoff to native transport. The earlier Geant4 route in [relativistic electron transport](relativistic-electron-transport.md) is superseded for channeling. This document works through the physics step by step, in the order an implementation would build it: continuum potential → transverse quantum states → initial occupation → depth evolution → photon emission → axial extension. It closes with physics easily missed, and with the ownership map between the channeling zone and native transport.
 
@@ -295,7 +295,9 @@ The same six steps with dimension bumped to 2:
 - **Evolution/emission:** the same operator layer, but the MCWF backend runs on a real-space grid (~$64^2$ points). At that size the density matrix ($\sim10^7$ entries) and eigenbasis jump tables become too large. Doughnut scattering (azimuthal randomization of quasi-free electrons around the axis) is represented only if the continuum sampling is fine enough. That is the main numerical risk, and a good reason the axial tier stays `experimental` with qualitative peak-order checks only.
 - **Vortex (OAM) beams:** a vortex centered on a string projects onto states with $\ell'\equiv\ell \pmod m$, where $m$ is the string lattice's rotational order. An atom-sized $\ell=\pm1$ probe couples to on-column 2p states and keeps its helical phase for >50 nm ([Xin & Zheng 2012](https://arxiv.org/abs/1204.0021)). Off-center or wide vortices spread over many $\ell$, and $\langle L_z\rangle$ changes with impact parameter and depth ([Lubk et al.](https://arxiv.org/abs/1111.6050)). Uncontrolled impact-parameter averaging washes the effect out. A surviving $\ell$ imbalance biases $\ell\to\ell\mp1$ decays, giving net circular polarization and photon OAM in specific lines ([Korotchenko & Kunashenko 2024](https://arxiv.org/abs/2403.01930)). Planar potentials do not conserve $L_z$, so planar channeling carries no OAM mode.
 
-Anchor: Watson's 1–3 MeV silicon axial lines (peak energies and ordering).
+**Implemented route (#883–#886, #992–#994).** Standard runs replace the real-space grid with a carrier-fibred absorbing MCWF model whose terminal fates hand outgoing electrons to native transport. Each admitted case carries a measured depth budget, and its zone rows score no native PXR/CBS lines; see the axial outcomes of [ADR-0018](../../adr/0018-quantum-channeling-zone.md) and the [first envelope](axial-first-envelope-886.md). The real-space grid remains the diagnostic API.
+
+**Anchors.** Line energies, widths and the absolute 2p→1s yield are compared with Andersen et al., NIM 194, 209 (1982) ([#992 note](axial-material-source-992.md#andersen-et-al-1982-energies-widths-and-absolute-yield)). Watson & Koehler's 1–3 MeV lines anchor only main-line identification and cross-axis ordering (`cr-axial-2d-eigenproblem`): their energies are judged 10–20% high from the detector angle, and the model sits 10–19% below them.
 
 ## 8. Ownership map: channeling zone and native transport
 
@@ -311,6 +313,7 @@ Anchor: Watson's 1–3 MeV silicon axial lines (peak energies and ordering).
 | PXR/CBS during the channeled zone | existing PXR/CBS kernel on tagged straight mean segments | Channeled-state modulation is an omission (§9, item 10). |
 | Characteristic emission | existing scorer | Channeling-modulated (ALCHEMI-type) yields are a research diagnostic (#501). |
 | $\gamma(z)$ drift feeding back into line energies | channeling zone, optional | Negligible over µm occupation lengths. |
+| On-axis line band of axial zone rows | axial fibre source | Native PXR/CBS scores no lines on these rows; the omitted in-cut free→free block is a declared one-sided bound (#994, `cr-axial-zone-row-native-lines`). |
 | ≥200 MeV channeling | quasiclassical (Geant4 `G4ChannelingFastSimModel`/`G4BaierKatkov`) | External validation reference only, never a backend. |
 
 The handoff is one-directional in v1. Once dechanneled, an electron does not re-enter the channeling zone. Rechanneling of near-aligned quasi-free electrons is real but second-order at these dechanneling lengths, and is recorded as a known omission in profile metadata.
@@ -333,29 +336,9 @@ Inventory of effects checked for this walkthrough, with include/exclude decision
 9. **Spin and quantum-recoil corrections**: spin-flip rates suppressed by $(\hbar\omega/E)^2 \lesssim 10^{-5}$; recoil handled at first order — both documented as dropped with bounds, satisfying the derivation-docstring assumption rule.
 10. **PXR/CBS from *channeled* electrons.** Channeled states sample the unit cell non-uniformly, which in principle modulates their PXR emission. v1 scores channeled-zone segments as straight mean segments in the existing PXR/CBS kernel, and records the modulation as an omission. The channeled fraction of the path is µm-scale. Recording the omission keeps the coherent and channeling modules from silently claiming inconsistent electron ensembles.
 
-## 10. Proposed ledger rows
+## 10. Ledger rows
 
-One row per load-bearing equation. `file::symbol` anchors are filled at implementation. Crystal potential and thermal physics live under `materials/channeling/`; Bloch states, entry geometry, evolution, emission and handoff live under `montecarlo/channeling/` (ADR-0018, #1018).
-
-| id | claim | source | anchor idea |
-| --- | --- | --- | --- |
-| `cr-mott-bethe-factor` | $f^e(s) = (Z - f_x)/(8\pi^2 a_0 s^2)$, neutral-atom, analytic $s\to0$ | Mott–Bethe; ICRU/IT-C conventions | cross-check vs Doyle–Turner tabulation |
-| `cr-planar-continuum-potential` | plane-projected $U(x)$ from $V_\mathbf{g}$ with DW smearing | ABP 1983 | Si(110) depth ≈ 22 eV @ 293 K |
-| `cr-debye-b-of-t` | Debye-model $B(T)$ anchored to catalog RT values | standard Debye–Waller theory | published Si $B(T)$ points |
-| `cr-transverse-eigenproblem` | $[-\hbar^2/2\gamma m\, \partial_x^2 + U]u = E_\perp u$, Bloch BCs | ABP 1983; Dirac reduction | free limit; parity; $\sqrt{\gamma}$ level count |
-| `cr-initial-occupation` | plane-wave → Bloch decomposition, divergence convolution | ABP 1983 | unitarity; selective vs flooded population regimes |
-| `cr-lindblad-jump-operators` | Einstein-model TDS and local-density electronic jump operators | ABP 1983; Uggerhøj 2005; QEP/frozen-phonon limit | imaginary part reproduces the absorptive potential; state-ordering of lifetimes |
-| `cr-density-matrix-split-operator` | coherent eigenbasis step + position-space dissipator | §5.3 derivation | zero-scattering unitarity; trace + flux = 1; frozen-phonon (abTEM) oracle |
-| `cr-mcwf-unravelling` | $H_{\rm eff}$ evolution and jump probabilities | Dalibard–Castin–Mølmer | ensemble mean equals the density-matrix solver |
-| `cr-dechanneling-collapse` | bound/free projection, flux, launch-state sampling | §5.4 | Kephart 17/54 MeV occupation lengths; margin sensitivity; calibration declared |
-| `cr-zone-handoff-accounting` | energy, population and time continuity across the handoff | §5.5 | closure tests |
-| `cr-doppler-line-energy` | $\hbar\omega = \Delta E_\perp / (1-\beta\cos\theta)$ + recoil bound | kinematics | consistency test vs `line-energy-dispersion` denominator |
-| `cr-dipole-rate` | $A' = e^2\omega'^3|x_{if}|^2 / 3\pi\epsilon_0\hbar c^3$, $\omega' = \gamma\Delta E_\perp/\hbar$ | standard QED dipole | emergent parity selection rule |
-| `cr-boosted-dipole-angular` | aberration-mapped $\sin^2\Theta'$ pattern + polarization | relativistic aberration | solid-angle integral returns $A'/\gamma$; $\gamma\to1$ limit |
-| `cr-line-shape` | occupation Lorentzian ⊗ geometric ⊗ $2\delta\gamma/\gamma$ | §6.3 derivation | measured planar widths (Gouanère 1988; Azadegan 2006); not Watson's axial lines |
-| `cr-yield-assembly` | depth-integrated exit yield, photons/eV/sr/e⁻ | §6.4 | Gouanère 1988 diamond(110) peak energies; Watson's lines are axial |
-| `cr-axial-2d-eigenproblem` | 2D sparse eigensolve, approximate $(n,\ell)$ labels | ABP 1983; Watson axial data | peak ordering only (experimental tier) |
-| `cr-transition-radiation-bound` | TR yield bound at boundaries vs CR yield | Ginzburg–Frank | decision record: include or bounded-exclude |
+The load-bearing equations above are now ledger claims, with sources, anchors, verification and `file::symbol` locations in the [channeling ledger](../../validation/ledger-channeling.md). The ledger is the only status record; this walkthrough does not track it. Crystal potential and thermal physics live under `materials/channeling/`; Bloch states, entry geometry, evolution, emission and handoff live under `montecarlo/channeling/` (ADR-0018, #1018).
 
 ## 11. End-to-end pipeline
 
@@ -369,7 +352,7 @@ per case (beam E, divergence, tilt):
   4. initial state rho_0 (divergence-averaged; or psi_0 / product state)
   5. evolve rho(z) [planar] or MCWF trajectories [axial/keV] -> dechanneling flux
   6. sample per-electron handoffs -> native transport cores (EVENT_DECHANNEL)
-  7. assemble line spectrum -> diagnostic API, later spec_channeling
+  7. assemble line spectrum -> persisted spec_channeling
   8. tagged zone segments + native segments -> existing PXR/CBS, brem, characteristic
      (free-free excluded from 7)
 ```
