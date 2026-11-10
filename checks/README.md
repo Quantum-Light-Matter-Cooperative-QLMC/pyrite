@@ -225,13 +225,16 @@ The default CPU schedule includes `brem_angular_comparison.py` and
 `longitudinal_coherence_regimes.py` (local smoke passed, covering two claims),
 `shell_ionization_comparison.py` (remote gate passed in 51.69 s), and the
 optional `dans_diffraction_oracle.py` / `xraylib_cascade_oracle.py` gates
-(remote passes in 3.20 / 1.46 s). The source table comparison has a reviewed
+(remote passes in 3.20 / 1.46 s). The full-default
+`channeling_modulated_emission.py` gate also passed remotely in 21.58 s.
+The source table comparison has a reviewed
 recipe but fails its existing gate (#1068); it remains explicit-only. CUDA
 parity has its separate lab cron. Remaining ensembles require explicit remote
 recipes. The refresh driver accepts only exact invocations in its `CPU_RECIPES`
 registry, and validates every path before creating artifacts or starting any
 producer, including direct `refresh()` calls and explicit `--check` selections.
-The original three defaults and both oracle gates use no arguments; the shell
+The original three defaults, both oracle gates and channeling-emission gate
+use no arguments; the shell
 comparison and explicit-only source comparison use `--download` to obtain their
 pinned references. Manifest command rows record exact arguments and elapsed
 wall seconds.
@@ -260,7 +263,7 @@ reviewed verdicts for the diagnostic rows, not merely rerunning their entry poin
 | `brem_angular_comparison.py` | CPU analytic/table; unmeasured | Packaged physics/catalog data; source and shell comparisons additionally need pinned reference/released tables | Gate (explicit mode where applicable) |
 | `brem_source_comparison.py` | Remote CPU table; 16.08 s (one warm sample) | Packaged physics/catalog data; source and shell comparisons additionally need pinned reference/released tables | Gate (explicit mode where applicable) |
 | `channeling_handoff.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Gate (explicit mode where applicable) |
-| `channeling_modulated_emission.py` | CPU analytic/table; unmeasured | Packaged physics/catalog data; source and shell comparisons additionally need pinned reference/released tables | Gate (explicit mode where applicable) |
+| `channeling_modulated_emission.py` | Remote CPU; 21.58 s (one sample) | Packaged physics/catalog data; source and shell comparisons additionally need pinned reference/released tables | Gate (explicit mode where applicable) |
 | `channeling_overflow.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Gate (explicit mode where applicable) |
 | `coherent_flat_omission.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Review |
 | `coherent_physical_population_remote.py` | CUDA allocation; input/ladder-dependent | NVIDIA environment; some probes need captured trajectories or explicit CLI modes | Review |
@@ -287,7 +290,7 @@ reviewed verdicts for the diagnostic rows, not merely rerunning their entry poin
 | `optical_response_cuda.py` | CUDA allocation; input/ladder-dependent | NVIDIA environment; some probes need captured trajectories or explicit CLI modes | Gate (explicit mode where applicable) |
 | `optical_stack_cuda.py` | CUDA allocation; input/ladder-dependent | NVIDIA environment; some probes need captured trajectories or explicit CLI modes | Gate (explicit mode where applicable) |
 | `optical_transition_cuda.py` | CUDA allocation; input/ladder-dependent | NVIDIA environment; some probes need captured trajectories or explicit CLI modes | Gate (explicit mode where applicable) |
-| `quantum_decoherence_budget.py` | CPU analytic/table; unmeasured | Packaged physics/catalog data; source and shell comparisons additionally need pinned reference/released tables | Gate (explicit mode where applicable) |
+| `quantum_decoherence_budget.py` | Remote CPU; 1.51 s (one sample) | Packaged physics/catalog data; source and shell comparisons additionally need pinned reference/released tables | Gate (explicit mode where applicable) |
 | `radiation_error_estimator_calibration.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Diagnostic |
 | `sb85_eta_small_kappa_fit.py` | CPU analytic/table; unmeasured | Packaged physics/catalog data; source and shell comparisons additionally need pinned reference/released tables | Diagnostic |
 | `segment_escape_split_ladder.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Diagnostic |
@@ -352,3 +355,33 @@ gated reference comparisons, closing the former empty-reference false pass.
 No physical threshold or model was changed. Results, versions, logs, records,
 manifest and preview remain under `evidence/validation-344-profile/10902/`
 in the dedicated profiling checkout; claim records were not promoted.
+
+### Quantum and channeling-emission gate measurements
+
+Job 10903, revision `cb496c867`, 2026-11-10, ran each exact default invocation
+once, without an explicit warm-up. Same CPU/backend/resource limits as above;
+Python 3.14.6, NumPy 2.5.4 and SciPy 1.18.1 were provisioned with the existing
+locked groups. Separate manifests and time reports preserve each result.
+
+| Exact producer invocation | Producer wall seconds | Harness peak RSS [KiB] | Verdict / scheduling decision |
+| --- | ---: | ---: | --- |
+| `checks/quantum_decoherence_budget.py` | 1.51 | 280,368 | Fail / explicit-only: its old not-computable table rejects newly available MoS2 channeling data; material coverage needs review. |
+| `checks/channeling_modulated_emission.py` | 21.58 | 266,128 | Pass / admit to CPU defaults; the conditional lossless-comb gate was exercised at 17 MeV. |
+
+The quantum sample retained Si(110)/diamond(110) at all four prescribed
+energies and audited all four HOPG/vdW entries. No rate bound was relaxed or
+material assertion removed. Nonfinite rates and limit statistics now fail
+rather than evade comparisons. Diagnostic channeling-radiation formation
+lengths can remain unavailable when fewer than two bound states exist.
+
+The emission sample retained all defaults: Si(110), 0.3/3/17 MeV, 16 cells,
+maximum order 16, 2 micrometres, and all prescribed entry states/tilts. No
+quick mode was substituted. The lossless-comb comparison ran at 17 MeV;
+0.3 and 3 MeV had entry losses above its existing applicability condition.
+Its existing entry/quadrature bounds are unchanged;
+nonfinite overlaps, entry fluxes and yields now fail. If no prescribed energy
+exercises the conditional comb gate, exit 2 records incomplete coverage rather
+than a pass. The single admission measurements do not establish timing spread
+or performance guarantees. Evidence remains under
+`evidence/validation-344-profile/10903/`, with separate producer subdirectories
+and peak-memory reports; no claim records were promoted.

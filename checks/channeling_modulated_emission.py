@@ -32,7 +32,9 @@ density) has ``F(0) = 1`` up to ``2 (n_max / n_bar) sqrt(w)``, where ``w`` is th
 entry weight above the subspace cutoff whose interference the collapse rule
 drops; and the comb's ``F(0)`` from the converter equals a direct
 position-space quadrature of ``|psi|^2 n / n_bar`` (to 1e-6) when nothing is
-lost at entry. About 2 minutes on CPU (multithreaded BLAS).
+lost at entry. Nonfinite overlap, entry flux, or yield results fail. If no
+prescribed energy exercises the lossless-comb gate, exit 2 records incomplete
+coverage rather than a pass. About 2 minutes on CPU (multithreaded BLAS).
 
 Validation: channeling-modulated-incoherent-emission
 """

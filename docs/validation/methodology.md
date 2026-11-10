@@ -32,7 +32,9 @@ omission, analytic longitudinal-coherence/recoil limits, and EEDL shell
 ionization against pinned Bote–Salvat references. It also runs the bounded
 Dans-Diffraction crystallography and xraylib cascade gates. The workflow's
 locked `oracle` dependency group provisions both; an unavailable optional
-oracle records a skip rather than a pass.
+oracle records a skip rather than a pass. The bounded full-default
+channeling-modulated emission gate also runs; it records a skip if none of its
+prescribed energies exercises the conditional lossless-comb comparison.
 The run uploads the records and output for 90 days; failures turn the job red.
 
 In a repository checkout, run or extend the manifest explicitly:

@@ -18,15 +18,17 @@ must keep a transverse superposition alive:
 Cells: Si(110) at 30 keV, 300 keV, 3 MeV and 30 MeV (TDS and electronic);
 diamond(110) at the same energies, using its sourced 34 eV valence oscillator
 in the production electronic kernel; and the HOPG/vdW
-catalog crystals at 30 keV, which have no channeling thermal data and are
-reported as not computable.
+catalog crystals at 30 keV, audited against the original not-computable
+table. Newly available channeling data fail the gate until that table's
+coverage is reviewed.
 
     PYRITE_MC_BACKEND=cpu uv run python checks/quantum_decoherence_budget.py
 
 Exit 0 when the limits hold: ``Gamma(0) = 0``; ``Gamma_TDS(Delta -> inf)``
 saturates (relative change below 1e-3 from 100 to 1000 angstrom); and
 ``beta^2 Gamma_TDS`` is energy independent (``C`` scales as ``1 / v^2``) to
-1e-6. A few seconds.
+1e-6. Nonfinite rates or limit statistics fail. Diagnostic formation lengths
+remain unavailable when fewer than two bound states exist. A few seconds.
 
 Validation: quantum-decoherence-budget
 """
