@@ -198,9 +198,9 @@ def test_show_and_bare_name_alias(tmp_path, monkeypatch):
     assert_table_row(shown.stdout, "kind", "scalar")
     assert "pixel" not in shown.stdout
     assert_table_row(shown.stdout, "emission", "incoherent (default)")
-    assert_table_row(shown.stdout, "straggling", "off (built-in)")
-    assert_table_row(shown.stdout, "energy-model", "midpoint (built-in)")
-    assert_table_row(shown.stdout, "maximum-fractional-energy-loss", "0 (built-in)")
+    assert_table_row(shown.stdout, "straggling", "false default")
+    assert_table_row(shown.stdout, "energy-model", "midpoint default")
+    assert_table_row(shown.stdout, "maximum-fractional-energy-loss", "0 default")
 
     aliased = invoke(profile.command, ["sub_100keV"])
     assert_clean_result(aliased)
@@ -858,9 +858,9 @@ def test_set_transport_numerics_round_trips_and_validates_coupling(tmp_path, mon
     assert "max_dE_frac = 0.02" in text
 
     shown = invoke(profile.command, ["show", "sub_100keV"])
-    assert_table_row(shown.stdout, "straggling", "on (profile)")
-    assert_table_row(shown.stdout, "energy-model", "midpoint (profile)")
-    assert_table_row(shown.stdout, "maximum-fractional-energy-loss", "0.02 (profile)")
+    assert_table_row(shown.stdout, "straggling", "true profile")
+    assert_table_row(shown.stdout, "energy-model", "midpoint profile")
+    assert_table_row(shown.stdout, "maximum-fractional-energy-loss", "0.02 profile")
 
 
 def test_numerics_show_reports_effective_values_and_sources(tmp_path, monkeypatch):
@@ -869,12 +869,14 @@ def test_numerics_show_reports_effective_values_and_sources(tmp_path, monkeypatc
     shown = invoke(root_command, ["profile", "numerics", "show", "sub_100keV"])
     assert_clean_result(shown)
     assert shown.stdout.startswith("[sub_100keV numerics]")
-    assert "sampling:" in shown.stdout
-    assert "cxr histories: 300 (default)" in shown.stdout
+    assert "\nSampling\n" in shown.stdout
+    assert_table_row(shown.stdout, "mode", "adaptive (default policy) default")
+    assert_table_row(shown.stdout, "cxr histories", "unused (adaptive) default")
     assert "fidelity" not in shown.stdout
-    assert "reflection families: 4 (built-in)" in shown.stdout
-    assert "mosaic nodes: 5 (built-in)" in shown.stdout
-    assert "energy model: midpoint (built-in)" in shown.stdout
+    assert_table_row(shown.stdout, "reflection families", "4 default")
+    assert_table_row(shown.stdout, "mosaic nodes", "5 default")
+    assert_table_row(shown.stdout, "energy model", "midpoint default")
+    assert "straggling" not in shown.stdout
 
     machine = invoke(
         root_command,
@@ -980,7 +982,7 @@ def test_numerics_set_dry_run_write_validation_and_reset(tmp_path, monkeypatch):
 
     shown = invoke(profile.command, ["numerics", "show", "sub_100keV"])
     assert_clean_result(shown)
-    assert "maximum reflections: 6 (profile); explicit: 6" in shown.stdout
+    assert_table_row(shown.stdout, "maximum reflections", "6 profile")
 
     reset = invoke(
         profile.command,
@@ -1577,106 +1579,83 @@ def test_numerics_set_shell_inelastic_mode_validates_and_resets(tmp_path, monkey
 
     missing_cutoff = invoke(
         profile.command,
-        [
-            "numerics",
-            "set",
-            "sub_100keV",
-            "--energy-model",
-            "midpoint",
-            "--inelastic-model",
-            "shell-soft-hard",
-        ],
+        ["physics", "set", "sub_100keV", "--inelastic-model", "shell-soft-hard"],
     )
-    assert_clean_result(missing_cutoff, stdout="updated numerics for profile sub_100keV\n")
+    assert_clean_result(missing_cutoff, stdout="updated physics for profile sub_100keV\n")
 
-    frozen = invoke(
-        profile.command,
-        [
-            "numerics",
-            "set",
-            "sub_100keV",
-            "--inelastic-model",
-            "shell-soft-hard",
-            "--energy-model",
-            "frozen",
-            "--inelastic-cutoff-ev",
-            "50",
-        ],
-    )
+    frozen = invoke(profile.command, ["numerics", "set", "sub_100keV", "--energy-model", "frozen"])
     assert frozen.exit_code == 1
     assert "requires energy_model='midpoint'" in frozen.stderr
 
     written = invoke(
         profile.command,
         [
-            "numerics",
+            "physics",
             "set",
             "sub_100keV",
-            "--energy-model",
-            "midpoint",
             "--inelastic-model",
             "shell-soft-hard",
             "--inelastic-cutoff-ev",
             "50",
         ],
     )
-    assert_clean_result(written, stdout="updated numerics for profile sub_100keV\n")
+    assert_clean_result(written, stdout="updated physics for profile sub_100keV\n")
     assert 'inelastic_model = "shell-soft-hard"' in catalog.read_text()
     assert "inelastic_cutoff_eV = 50.0" in catalog.read_text()
     shown = invoke(profile.command, ["show", "sub_100keV"])
-    assert_table_row(shown.stdout, "inelastic-model", "shell-soft-hard (profile)")
-    assert_table_row(shown.stdout, "inelastic-cutoff-ev", "50 (profile)")
+    assert_table_row(shown.stdout, "inelastic-model", "shell-soft-hard profile")
+    assert_table_row(shown.stdout, "inelastic-cutoff-ev", "50 profile")
 
-    zero = invoke(profile.command, ["numerics", "set", "sub_100keV", "--inelastic-cutoff-ev", "0"])
+    zero = invoke(profile.command, ["physics", "set", "sub_100keV", "--inelastic-cutoff-ev", "0"])
     assert zero.exit_code == 2
 
     secondary = invoke(
-        profile.command, ["numerics", "set", "sub_100keV", "--secondary-threshold-ev", "1000"]
+        profile.command, ["physics", "set", "sub_100keV", "--secondary-threshold-ev", "1000"]
     )
-    assert_clean_result(secondary, stdout="updated numerics for profile sub_100keV\n")
+    assert_clean_result(secondary, stdout="updated physics for profile sub_100keV\n")
     assert "secondary_threshold_eV = 1000.0" in catalog.read_text()
     shown = invoke(profile.command, ["show", "sub_100keV"])
-    assert_table_row(shown.stdout, "secondary-threshold-ev", "1000 (profile)")
+    assert_table_row(shown.stdout, "secondary-threshold-ev", "1000 profile")
     pair = invoke(
         profile.command,
-        ["numerics", "set", "sub_100keV", "--pair-production-model", "penelope-2024"],
+        ["physics", "set", "sub_100keV", "--pair-production-model", "penelope-2024"],
     )
-    assert_clean_result(pair, stdout="updated numerics for profile sub_100keV\n")
+    assert_clean_result(pair, stdout="updated physics for profile sub_100keV\n")
     assert 'pair_production_model = "penelope-2024"' in catalog.read_text()
     shown = invoke(profile.command, ["show", "sub_100keV"])
-    assert_table_row(shown.stdout, "pair-production-model", "penelope-2024 (profile)")
-    positron = invoke(profile.command, ["numerics", "set", "sub_100keV", "--positron-transport"])
-    assert_clean_result(positron, stdout="updated numerics for profile sub_100keV\n")
+    assert_table_row(shown.stdout, "pair-production-model", "penelope-2024 profile")
+    positron = invoke(profile.command, ["physics", "set", "sub_100keV", "--positron-transport"])
+    assert_clean_result(positron, stdout="updated physics for profile sub_100keV\n")
     assert "positron_transport = true" in catalog.read_text()
     shown = invoke(profile.command, ["show", "sub_100keV"])
-    assert_table_row(shown.stdout, "positron-transport", "on (profile)")
+    assert_table_row(shown.stdout, "positron-transport", "true profile")
     unpositron = invoke(
-        profile.command, ["numerics", "reset", "sub_100keV", "positron-transport", "--yes"]
+        profile.command, ["physics", "reset", "sub_100keV", "positron-transport", "--yes"]
     )
     assert unpositron.exit_code == 0
     assert "positron_transport" not in catalog.read_text()
     bad_pair = invoke(
-        profile.command, ["numerics", "set", "sub_100keV", "--pair-production-model", "bh"]
+        profile.command, ["physics", "set", "sub_100keV", "--pair-production-model", "bh"]
     )
     assert bad_pair.exit_code == 2
     unpaired = invoke(
         profile.command,
-        ["numerics", "reset", "sub_100keV", "pair-production-model", "--yes"],
+        ["physics", "reset", "sub_100keV", "pair-production-model", "--yes"],
     )
     assert unpaired.exit_code == 0
     assert "pair_production_model" not in catalog.read_text()
     cleared = invoke(
         profile.command,
-        ["numerics", "reset", "sub_100keV", "secondary-threshold-ev", "--yes"],
+        ["physics", "reset", "sub_100keV", "secondary-threshold-ev", "--yes"],
     )
     assert cleared.exit_code == 0
     assert "secondary_threshold_eV" not in catalog.read_text()
 
     reset = invoke(
         profile.command,
-        ["numerics", "reset", "sub_100keV", "inelastic-model", "inelastic-cutoff-ev"],
+        ["physics", "reset", "sub_100keV", "inelastic-model", "inelastic-cutoff-ev"],
     )
-    assert_clean_result(reset, stdout="reset numerics for profile sub_100keV\n")
+    assert_clean_result(reset, stdout="reset physics for profile sub_100keV\n")
     assert "inelastic_model" not in catalog.read_text()
 
 
@@ -1703,6 +1682,7 @@ def test_show_groups_trial_grids_and_complete_numerics_in_aligned_columns(tmp_pa
         "Numerics / sampling",
         "Numerics / reflections and mosaic",
         "Numerics / transport",
+        "Physics / transport",
         "Adaptive sampling (",
         "CXR-grid policy (",
         "Energy grids (",
@@ -1715,8 +1695,8 @@ def test_show_groups_trial_grids_and_complete_numerics_in_aligned_columns(tmp_pa
         assert re.search(rf"^  {axis} {{2,}}\[", sweep, re.MULTILINE)
     assert "trials" not in sweep
     sampling = shown.stdout[offsets[4] : offsets[5]]
-    assert_table_row(sampling, "cxr-histories", "[100, 200] (profile)")
-    assert_table_row(sampling, "brem-histories", "[50, 150] (profile)")
+    assert_table_row(sampling, "cxr-histories", "[100, 200] profile")
+    assert_table_row(sampling, "brem-histories", "[50, 150] profile")
     convergence = shown.stdout[offsets[5] : offsets[6]]
     for label, value in (
         ("reflection-families", "8"),
@@ -1724,13 +1704,13 @@ def test_show_groups_trial_grids_and_complete_numerics_in_aligned_columns(tmp_pa
         ("mosaic-nodes", "7"),
         ("mosaic-route", "mc"),
     ):
-        assert_table_row(convergence, label, value + " (profile)")
+        assert_table_row(convergence, label, value + " profile")
     assert "ne-line" not in shown.stdout and "ne-brem" not in shown.stdout
     assert "fidelity" not in shown.stdout
     for section in shown.stdout.split("\n\n")[1:]:
         lines = section.splitlines()
-        value_column = lines[1].index("Value")
-        for line in lines[3:]:
+        value_column = lines[1].index("VALUE")
+        for line in lines[2:]:
             if line.strip():
                 assert line[value_column] != " "
                 assert line[value_column - 2 : value_column] == "  "
@@ -1764,7 +1744,7 @@ def test_show_flattens_inline_beam_and_preserves_filter_order(tmp_path, monkeypa
 def test_show_wraps_values_and_wide_keeps_them_on_one_line(tmp_path, monkeypatch):
     import os
 
-    from pyrite.cli.commands import _profile_show
+    from pyrite.console import tables
 
     members = ", ".join(f"material_{index}" for index in range(12))
     text = _CATALOG.replace(
@@ -1773,7 +1753,7 @@ def test_show_wraps_values_and_wide_keeps_them_on_one_line(tmp_path, monkeypatch
     )
     _catalog(tmp_path, monkeypatch, text)
     monkeypatch.setattr(
-        _profile_show.shutil, "get_terminal_size", lambda *_a, **_k: os.terminal_size((80, 24))
+        tables.shutil, "get_terminal_size", lambda *_a, **_k: os.terminal_size((80, 24))
     )
     monkeypatch.setenv("NO_COLOR", "1")
     shown = invoke(profile.command, ["show", "sub_100keV"])
@@ -1883,8 +1863,8 @@ def test_show_line_environment_preserves_explicit_grid_precedence(tmp_path, monk
 
 def test_channeling_numerics_round_trip_and_reset(tmp_path, monkeypatch):
     catalog = _catalog(tmp_path, monkeypatch)
-    arguments = [
-        "numerics",
+    physics = [
+        "physics",
         "set",
         "sub_100keV",
         "--channeling-model",
@@ -1895,6 +1875,13 @@ def test_channeling_numerics_round_trip_and_reset(tmp_path, monkeypatch):
         "0",
         "--radiative-model",
         "uncoupled",
+    ]
+    result = invoke(profile.command, physics)
+    assert_clean_result(result, stdout="updated physics for profile sub_100keV\n")
+    arguments = [
+        "numerics",
+        "set",
+        "sub_100keV",
         "--channeling-basis-size",
         "12",
         "--channeling-bloch-cells",
@@ -1909,21 +1896,17 @@ def test_channeling_numerics_round_trip_and_reset(tmp_path, monkeypatch):
     values = tomlkit.parse(catalog.read_text())["profiles"]["sub_100keV"]
     assert values["channeling_plane"] == [1, -1, 0]
     assert values["channeling_basis_size"] == 12
-    shown = invoke(profile.command, ["numerics", "show", "sub_100keV", "-o", "json"])
+    shown = invoke(profile.command, ["physics", "show", "sub_100keV", "-o", "json"])
     assert_clean_result(shown)
-    fields = {
-        row["key"]: row
-        for group in json.loads(shown.stdout)["payload"]["groups"]
-        for row in group["fields"]
-    }
+    fields = {row["key"]: row for row in json.loads(shown.stdout)["payload"]["fields"]}
     assert fields["channeling_model"]["effective"] == "planar"
     invalid = invoke(
-        profile.command, ["numerics", "set", "sub_100keV", "--channeling-plane", "0", "0", "0"]
+        profile.command, ["physics", "set", "sub_100keV", "--channeling-plane", "0", "0", "0"]
     )
     assert invalid.exit_code != 0
     assert "nonzero" in invalid.stderr
     reset = invoke(
-        profile.command, ["numerics", "reset", "sub_100keV", "channeling-model", "channeling-plane"]
+        profile.command, ["physics", "reset", "sub_100keV", "channeling-model", "channeling-plane"]
     )
     assert_clean_result(reset)
     assert "channeling_model" not in tomlkit.parse(catalog.read_text())["profiles"]["sub_100keV"]
@@ -1937,17 +1920,18 @@ def test_show_channeling_section_collapses_when_off_and_lists_all_when_on(tmp_pa
     catalog = _catalog(tmp_path, monkeypatch)
     off = invoke(profile.command, ["show", "sub_100keV"])
     assert_clean_result(off)
-    off_section = _show_section(off.stdout, "Numerics / channeling (quantum zone)")
-    assert_table_row(off_section, "channeling-model", "off (built-in)")
+    off_section = _show_section(off.stdout, "Physics / channeling (quantum zone)")
+    assert_table_row(off_section, "channeling-model", "off default")
     assert "channeling-plane" not in off_section
-    transport = _show_section(off.stdout, "Numerics / transport")
+    assert "Numerics / channeling" not in off.stdout
+    transport = _show_section(off.stdout, "Physics / transport")
     assert "channeling-" not in transport
 
     assert_clean_result(
         invoke(
             profile.command,
             [
-                "numerics",
+                "physics",
                 "set",
                 "sub_100keV",
                 "--channeling-model",
@@ -1960,11 +1944,13 @@ def test_show_channeling_section_collapses_when_off_and_lists_all_when_on(tmp_pa
                 "uncoupled",
             ],
         ),
-        stdout="updated numerics for profile sub_100keV\n",
+        stdout="updated physics for profile sub_100keV\n",
     )
     on = invoke(profile.command, ["show", "sub_100keV"])
     assert_clean_result(on)
-    on_section = _show_section(on.stdout, "Numerics / channeling (quantum zone)")
+    on_section = _show_section(on.stdout, "Physics / channeling (quantum zone)") + _show_section(
+        on.stdout, "Numerics / channeling (quantum zone)"
+    )
     for label in (
         "channeling-model",
         "channeling-plane",
@@ -1975,20 +1961,24 @@ def test_show_channeling_section_collapses_when_off_and_lists_all_when_on(tmp_pa
         "channeling-zone-max-ang",
     ):
         assert label in on_section
-    assert_table_row(on_section, "channeling-model", "planar (profile)")
-    assert "channeling-" not in _show_section(on.stdout, "Numerics / transport")
+    assert_table_row(on_section, "channeling-model", "planar profile")
+    assert "channeling-" not in _show_section(on.stdout, "Physics / transport")
     assert "channeling_model" in catalog.read_text()
 
 
-def test_numerics_json_has_channeling_group_with_all_seven_keys(tmp_path, monkeypatch):
+def test_numerics_and_physics_json_split_the_seven_channeling_keys(tmp_path, monkeypatch):
     _catalog(tmp_path, monkeypatch)
+    physics = invoke(profile.command, ["physics", "show", "sub_100keV", "-o", "json"])
+    assert_clean_result(physics)
+    assert [
+        row["key"]
+        for row in json.loads(physics.stdout)["payload"]["fields"]
+        if row["key"].startswith("channeling_")
+    ] == ["channeling_model", "channeling_plane", "channeling_axial"]
     shown = invoke(profile.command, ["numerics", "show", "sub_100keV", "-o", "json"])
     assert_clean_result(shown)
     groups = {group["name"]: group for group in json.loads(shown.stdout)["payload"]["groups"]}
     assert [row["key"] for row in groups["channeling"]["fields"]] == [
-        "channeling_model",
-        "channeling_plane",
-        "channeling_axial",
         "channeling_basis_size",
         "channeling_bloch_cells",
         "channeling_dz_ang",

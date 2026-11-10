@@ -11,150 +11,33 @@ Version: `0.31.0`
 ```text
 Usage: pyrite numerics [OPTIONS] COMMAND [ARGS]...
 
-  Inspect and edit PROFILE's sampling, integration and photon grids.
+  Manage named numerics presets: sampling, reflections/mosaic, integration.
 
-  show/set/reset/validate edit the selected profile's own fields, which override any
-  attached named preset; manage reusable presets with 'pyrite numerics preset'. Physical
-  models and cutoffs live under pyrite physics.
-
-Options:
-  -h, --help  Show this message and exit.
-
-Commands:
-  list               List the campaigns whose configuration can...
-  reset              Reset selected fields, or all fields owned...
-  set                Set PROFILE fields; validate and...
-  show               Show explicit/effective settings and their...
-  validate           Validate the selected campaign without...
-  preset             Manage named numerics presets that profiles attach by name.
-  adaptive-sampling  Configure adaptive sampling or fixed history counts on PROFILE.
-  cxr-grid           Configure PROFILE's automatic CXR photon-grid policy.
-  energy-grid        Derive and inspect specialist photon-grid artifacts.
-```
-
-## `pyrite numerics list`
-
-```text
-Usage: pyrite numerics list [OPTIONS]
-
-  List the campaigns whose configuration can be inspected or edited.
-
-Options:
-  -o, --output [table|json]  Output format; only json is a stable automation contract.
-                             [default: table]
-  -h, --help                 Show this message and exit.
-```
-
-## `pyrite numerics reset`
-
-```text
-Usage: pyrite numerics reset [OPTIONS] PROFILE [cxr-histories|brem-histories|reflection-
-                             families|maximum-reflections|mosaic-nodes|mosaic-
-                             route|energy-model|maximum-fractional-energy-
-                             loss|channeling-basis-size|channeling-bloch-
-                             cells|channeling-dz-ang|channeling-zone-max-ang]...
-
-  Reset selected fields, or all fields owned by this command.
-
-Options:
-  -y, --yes   Skip the standard-profile confirmation.
-  --dry-run   Validate and preview without saving.
-  -h, --help  Show this message and exit.
-```
-
-## `pyrite numerics set`
-
-```text
-Usage: pyrite numerics set [OPTIONS] NAME
-
-  Set PROFILE fields; validate and atomically save, or preview with --dry-run.
-
-Options:
-  --cxr-histories N               Monte Carlo electron histories used to estimate the
-                                  CXR spectrum.  [x>=1]
-  --brem-histories N              Monte Carlo electron histories used to estimate
-                                  bremsstrahlung.  [x>=1]
-  --reflection-families N         Ranked reflection families to resolve.  [x>=1]
-  --maximum-reflections N         Cap resolved reflections after family expansion.
-                                  [x>=1]
-  --mosaic-nodes N                Gauss-Hermite nodes per mosaic tilt axis.  [x>=1]
-  --mosaic-route [analytic|mc]    Mosaic broadening route.
-  --energy-model [frozen|midpoint]
-                                  Transport clock model.
-  --maximum-fractional-energy-loss FRACTION
-                                  Cap one row's fractional mean energy loss; positive
-                                  values require midpoint.  [x>=0.0]
-  --channeling-basis-size INTEGER RANGE
-                                  Transverse plane-wave band |h| <= H (default 16).
-                                  [x>=1]
-  --channeling-bloch-cells INTEGER RANGE
-                                  Bloch-grid supercell size (default 16).  [x>=1]
-  --channeling-dz-ang FLOAT RANGE
-                                  Zone depth step in angstrom (default 250).  [x>0]
-  --channeling-zone-max-ang FLOAT RANGE
-                                  Zone length cap in angstrom (default first layer
-                                  thickness).  [x>0]
-  -y, --yes                       Skip the 'standard' confirmation prompt.
-  --dry-run                       Print proposed TOML diff; write nothing.
-  -h, --help                      Show this message and exit.
-```
-
-## `pyrite numerics show`
-
-```text
-Usage: pyrite numerics show [OPTIONS] PROFILE
-
-  Show explicit/effective settings and their source for PROFILE.
-
-Options:
-  -o, --output [table|json]  Output format; only json is a stable automation contract.
-                             [default: table]
-  -h, --help                 Show this message and exit.
-```
-
-## `pyrite numerics validate`
-
-```text
-Usage: pyrite numerics validate [OPTIONS] PROFILE
-
-  Validate the selected campaign without running simulation or writing files.
-
-Options:
-  -h, --help  Show this message and exit.
-```
-
-## `pyrite numerics preset`
-
-```text
-Usage: pyrite numerics preset [OPTIONS] COMMAND [ARGS]...
-
-  Manage named numerics presets that profiles attach by name.
-
-  Bundled reference presets are read-only; clone one with create NAME --from SOURCE.
-  Attach with 'pyrite profile set PROFILE --numerics NAME'. Profile fields override the
-  preset; a preset never changes a result's identity unless its effective values change.
-  Adaptive_sampling and cxr_grid_policy tables are edited in the preset toml or captured
-  by adopt.
+  A profile attaches a preset with 'pyrite profile set PROFILE --numerics NAME'; the
+  profile's own fields, adaptive-sampling policy and CXR-grid policy (pyrite profile
+  numerics) override it. Bundled presets are read-only; clone one with 'create NAME
+  --from SOURCE'. Physical models live under pyrite physics.
 
 Options:
   -h, --help  Show this message and exit.
 
 Commands:
-  adopt     Move PROFILE's own fields into new preset NAME and attach it.
-  create    Create user preset NAME, empty (built-in defaults) or cloned with...
-  delete    Delete an unreferenced user preset; irreversible.
-  list      List presets, their origin, and referencing profiles.
-  rename    Rename user preset NAME and update every referencing profile atomically.
-  reset     Return selected fields, or all fields, of NAME to built-in defaults.
-  set       Set fields of user preset NAME; affects every referencing profile.
-  show      Show NAME's stored and effective fields with their source.
-  validate  Validate NAME and every profile that references it; write nothing.
+  adopt        Move PROFILE's own fields into new preset...
+  create       Create user preset NAME, empty (built-in...
+  delete       Delete an unreferenced user preset;...
+  list         List presets, their origin, and...
+  rename       Rename user preset NAME and update every...
+  reset        Return selected fields, or all fields, of...
+  set          Set fields of user preset NAME; affects...
+  show         Show NAME's stored and effective fields...
+  validate     Validate NAME and every profile that...
+  energy-grid  Derive and inspect specialist photon-grid artifacts.
 ```
 
-## `pyrite numerics preset adopt`
+## `pyrite numerics adopt`
 
 ```text
-Usage: pyrite numerics preset adopt [OPTIONS] PROFILE NAME
+Usage: pyrite numerics adopt [OPTIONS] PROFILE NAME
 
   Move PROFILE's own fields into new preset NAME and attach it.
 
@@ -169,20 +52,26 @@ Options:
   -h, --help          Show this message and exit.
 ```
 
-## `pyrite numerics preset create`
+## `pyrite numerics create`
 
 ```text
-Usage: pyrite numerics preset create [OPTIONS] NAME
+Usage: pyrite numerics create [OPTIONS] NAME
 
   Create user preset NAME, empty (built-in defaults) or cloned with --from; validate and
   atomically save, or preview with --dry-run.
 
 Options:
   --from SOURCE                   Clone SOURCE's fields; options then override them.
-  --cxr-histories N               Monte Carlo electron histories used to estimate the
-                                  CXR spectrum.  [x>=1]
-  --brem-histories N              Monte Carlo electron histories used to estimate
-                                  bremsstrahlung.  [x>=1]
+  --cxr-histories N               Fixed Monte Carlo electron histories used to estimate
+                                  the CXR spectrum; setting it selects fixed counts.
+                                  Adaptive sampling (the default) is restored by 'pyrite
+                                  profile numerics adaptive-sampling enable PROFILE'.
+                                  [x>=1]
+  --brem-histories N              Fixed Monte Carlo electron histories used to estimate
+                                  bremsstrahlung; setting it selects fixed counts.
+                                  Adaptive sampling (the default) is restored by 'pyrite
+                                  profile numerics adaptive-sampling enable PROFILE'.
+                                  [x>=1]
   --reflection-families N         Ranked reflection families to resolve.  [x>=1]
   --maximum-reflections N         Cap resolved reflections after family expansion.
                                   [x>=1]
@@ -208,10 +97,10 @@ Options:
   -h, --help                      Show this message and exit.
 ```
 
-## `pyrite numerics preset delete`
+## `pyrite numerics delete`
 
 ```text
-Usage: pyrite numerics preset delete [OPTIONS] NAME
+Usage: pyrite numerics delete [OPTIONS] NAME
 
   Delete an unreferenced user preset; irreversible.
 
@@ -221,10 +110,10 @@ Options:
   -h, --help  Show this message and exit.
 ```
 
-## `pyrite numerics preset list`
+## `pyrite numerics list`
 
 ```text
-Usage: pyrite numerics preset list [OPTIONS]
+Usage: pyrite numerics list [OPTIONS]
 
   List presets, their origin, and referencing profiles.
 
@@ -234,10 +123,10 @@ Options:
   -h, --help                 Show this message and exit.
 ```
 
-## `pyrite numerics preset rename`
+## `pyrite numerics rename`
 
 ```text
-Usage: pyrite numerics preset rename [OPTIONS] NAME NEW_NAME
+Usage: pyrite numerics rename [OPTIONS] NAME NEW_NAME
 
   Rename user preset NAME and update every referencing profile atomically.
 
@@ -246,31 +135,38 @@ Options:
   -h, --help  Show this message and exit.
 ```
 
-## `pyrite numerics preset reset`
+## `pyrite numerics reset`
 
 ```text
-Usage: pyrite numerics preset reset [OPTIONS] NAME [FIELDS]...
+Usage: pyrite numerics reset [OPTIONS] NAME [FIELDS]...
 
   Return selected fields, or all fields, of NAME to built-in defaults.
 
 Options:
   --dry-run   Print proposed TOML diff; write nothing.
+  -y, --yes   Skip the standard-profile confirmation.
   -h, --help  Show this message and exit.
 ```
 
-## `pyrite numerics preset set`
+## `pyrite numerics set`
 
 ```text
-Usage: pyrite numerics preset set [OPTIONS] NAME
+Usage: pyrite numerics set [OPTIONS] NAME
 
   Set fields of user preset NAME; affects every referencing profile. Validates all
   referencing profiles before saving.
 
 Options:
-  --cxr-histories N               Monte Carlo electron histories used to estimate the
-                                  CXR spectrum.  [x>=1]
-  --brem-histories N              Monte Carlo electron histories used to estimate
-                                  bremsstrahlung.  [x>=1]
+  --cxr-histories N               Fixed Monte Carlo electron histories used to estimate
+                                  the CXR spectrum; setting it selects fixed counts.
+                                  Adaptive sampling (the default) is restored by 'pyrite
+                                  profile numerics adaptive-sampling enable PROFILE'.
+                                  [x>=1]
+  --brem-histories N              Fixed Monte Carlo electron histories used to estimate
+                                  bremsstrahlung; setting it selects fixed counts.
+                                  Adaptive sampling (the default) is restored by 'pyrite
+                                  profile numerics adaptive-sampling enable PROFILE'.
+                                  [x>=1]
   --reflection-families N         Ranked reflection families to resolve.  [x>=1]
   --maximum-reflections N         Cap resolved reflections after family expansion.
                                   [x>=1]
@@ -293,13 +189,14 @@ Options:
                                   thickness).  [x>0]
   --description TEXT              Replace the display description.
   --dry-run                       Print proposed TOML diff; write nothing.
+  -y, --yes                       Skip the standard-profile confirmation.
   -h, --help                      Show this message and exit.
 ```
 
-## `pyrite numerics preset show`
+## `pyrite numerics show`
 
 ```text
-Usage: pyrite numerics preset show [OPTIONS] NAME
+Usage: pyrite numerics show [OPTIONS] NAME
 
   Show NAME's stored and effective fields with their source.
 
@@ -309,308 +206,15 @@ Options:
   -h, --help                 Show this message and exit.
 ```
 
-## `pyrite numerics preset validate`
+## `pyrite numerics validate`
 
 ```text
-Usage: pyrite numerics preset validate [OPTIONS] NAME
+Usage: pyrite numerics validate [OPTIONS] NAME
 
   Validate NAME and every profile that references it; write nothing.
 
 Options:
   -h, --help  Show this message and exit.
-```
-
-## `pyrite numerics adaptive-sampling`
-
-```text
-Usage: pyrite numerics adaptive-sampling [OPTIONS] COMMAND [ARGS]...
-
-  Inspect and edit PROFILE's history-count mode: adaptive policy or fixed counts.
-
-  Profiles without fixed history counts or a policy run adaptive by default (target RSE
-  0.05, 200-20000 histories, blocks of 100, line and bremsstrahlung). Each incoherent
-  case stops when the relative standard error of its line (and optionally
-  bremsstrahlung) yield meets the target and its heavy-tail guards pass, or at the
-  maximum count flagged statistics-limited. By default one count serves both
-  populations. --brem-target-rse enables independent brem-prefix stopping; line
-  transport continues until brem finishes. Coherent emission, cascades, physical
-  detectors, GDF beams, grooves and fixed history counts keep fixed counts. A history is
-  one transported primary electron.
-
-    enable   switch to adaptive: drop fixed counts, optionally customize
-    set      customize fields of an adaptive policy
-    reset    drop customized fields, or the whole table (back to the default)
-    disable  opt out: drop any policy and select fixed counts
-
-  History sampling is independent of the line grid; see 'pyrite numerics cxr-grid'.
-
-Options:
-  -h, --help  Show this message and exit.
-
-Commands:
-  disable  Opt PROFILE out of adaptive sampling: remove any policy, set fixed counts.
-  enable   Switch PROFILE to adaptive history counts in one atomic edit.
-  reset    Reset optional FIELDs to defaults, or remove the policy when none are...
-  set      Create or update PROFILE's adaptive policy.
-  show     Show PROFILE's history-count mode, its source, blockers and next steps.
-```
-
-## `pyrite numerics adaptive-sampling disable`
-
-```text
-Usage: pyrite numerics adaptive-sampling disable [OPTIONS] NAME
-
-  Opt PROFILE out of adaptive sampling: remove any policy, set fixed counts.
-
-  --cxr-histories/--brem-histories replace that count. A count the profile already sets
-  is otherwise kept, including a sweep grid. A count it lacks is prompted for on a
-  terminal; without a terminal, or with --yes or --dry-run, it takes the full-fidelity
-  default (300 line, 150 brem).
-
-Options:
-  --cxr-histories N   Fixed Monte Carlo electron histories for the CXR spectrum.  [x>=1]
-  --brem-histories N  Fixed Monte Carlo electron histories for bremsstrahlung.  [x>=1]
-  -y, --yes           Use defaults for missing counts; skip confirmations.
-  --dry-run           Print proposed TOML diff; write nothing.
-  -h, --help          Show this message and exit.
-```
-
-## `pyrite numerics adaptive-sampling enable`
-
-```text
-Usage: pyrite numerics adaptive-sampling enable [OPTIONS] NAME
-
-  Switch PROFILE to adaptive history counts in one atomic edit.
-
-  Removes the profile's fixed cxr-histories/brem-histories. Without options the default
-  policy applies (no table is written); options write a policy whose unspecified fields
-  come from the existing policy, else the default. Refuses, writing nothing, when the
-  profile cannot run adaptive (coherent emission, cascades, positrons, a physical
-  detector, or per-material count overrides). Emission, cascades, beam, geometry and
-  line-grid selectors are never changed.
-
-Options:
-  --brem-target-rse FRACTION      Stop brem independently at this RSE; requires both cxr
-                                  and brem observables.  [x>0.0]
-  --brem-min-histories N          Brem minimum; defaults to --min-histories. Requires
-                                  --brem-target-rse.  [x>=2]
-  --brem-max-histories N          Brem maximum, at most --max-histories; defaults to it.
-                                  Requires --brem-target-rse.  [x>=2]
-  --target-rse FRACTION           Target relative standard error of each watched yield
-                                  (0.05 = 5%).  [x>0.0]
-  --min-histories N               Smallest count at which the run may stop; a multiple
-                                  of --block-histories.  [x>=2]
-  --max-histories N               Count at which the run stops regardless, flagged
-                                  statistics-limited.  [x>=2]
-  --block-histories N             Histories per transport block; the rule is checked at
-                                  block ends.  [x>=1]
-  --observable [cxr|brem|line]    Yield that must converge; repeat for both. Replaces
-                                  the watched set (a new policy watches line and brem).
-  --max-history-share FRACTION    Guard: largest share of a yield one history may hold
-                                  (default 0.05).  [0.0<x<=1.0]
-  --min-effective-histories N     Guard: effective sample size floor (sum m)^2 / sum m^2
-                                  (default 100).  [x>=0.0]
-  --stability-blocks K            Guard: block ends whose running mean must agree; 0
-                                  disables (default 3).  [x>=0]
-  --stability-fraction FRACTION   Guard: allowed relative mean drift as a fraction of
-                                  the target (default 0.5).  [x>=0.0]
-  --pilot-histories N             Pilot count that projects the stopping count and skips
-                                  checks until it.  [x>=1]
-  --band-ev START,STOP            Monitor band in eV (default: the case's line band).
-  --batch-means-band-ev START,STOP
-                                  Band in eV for reported per-bin batch-means errors;
-                                  costs one extra reduction.
-  -y, --yes                       Skip the 'standard' confirmation prompt.
-  --dry-run                       Print proposed TOML diff; write nothing.
-  -h, --help                      Show this message and exit.
-```
-
-## `pyrite numerics adaptive-sampling reset`
-
-```text
-Usage: pyrite numerics adaptive-sampling reset [OPTIONS] NAME [target-rse|brem-target-
-                                               rse|brem-min-histories|brem-max-
-                                               histories|min-histories|max-
-                                               histories|block-histories|observable|max-
-                                               history-share|min-effective-
-                                               histories|stability-blocks|stability-
-                                               fraction|pilot-histories|band-ev|batch-
-                                               means-band-ev]...
-
-  Reset optional FIELDs to defaults, or remove the policy when none are named.
-
-  Removing the policy returns PROFILE to the default adaptive policy unless it cannot
-  run adaptive. Fixed counts are untouched; select them with 'pyrite numerics adaptive-
-  sampling disable'.
-
-Options:
-  -y, --yes   Skip the 'standard' confirmation prompt.
-  --dry-run   Print proposed TOML diff; write nothing.
-  -h, --help  Show this message and exit.
-```
-
-## `pyrite numerics adaptive-sampling set`
-
-```text
-Usage: pyrite numerics adaptive-sampling set [OPTIONS] NAME
-
-  Create or update PROFILE's adaptive policy.
-
-  Fields left unspecified keep the existing policy's values; a new policy takes them
-  from the default (target RSE 0.05, 200-20000 histories, blocks of 100, line and brem).
-  A profile with fixed counts is refused; switch it with 'pyrite numerics adaptive-
-  sampling enable'.
-
-Options:
-  --brem-target-rse FRACTION      Stop brem independently at this RSE; requires both cxr
-                                  and brem observables.  [x>0.0]
-  --brem-min-histories N          Brem minimum; defaults to --min-histories. Requires
-                                  --brem-target-rse.  [x>=2]
-  --brem-max-histories N          Brem maximum, at most --max-histories; defaults to it.
-                                  Requires --brem-target-rse.  [x>=2]
-  --target-rse FRACTION           Target relative standard error of each watched yield
-                                  (0.05 = 5%).  [x>0.0]
-  --min-histories N               Smallest count at which the run may stop; a multiple
-                                  of --block-histories.  [x>=2]
-  --max-histories N               Count at which the run stops regardless, flagged
-                                  statistics-limited.  [x>=2]
-  --block-histories N             Histories per transport block; the rule is checked at
-                                  block ends.  [x>=1]
-  --observable [cxr|brem|line]    Yield that must converge; repeat for both. Replaces
-                                  the watched set (a new policy watches line and brem).
-  --max-history-share FRACTION    Guard: largest share of a yield one history may hold
-                                  (default 0.05).  [0.0<x<=1.0]
-  --min-effective-histories N     Guard: effective sample size floor (sum m)^2 / sum m^2
-                                  (default 100).  [x>=0.0]
-  --stability-blocks K            Guard: block ends whose running mean must agree; 0
-                                  disables (default 3).  [x>=0]
-  --stability-fraction FRACTION   Guard: allowed relative mean drift as a fraction of
-                                  the target (default 0.5).  [x>=0.0]
-  --pilot-histories N             Pilot count that projects the stopping count and skips
-                                  checks until it.  [x>=1]
-  --band-ev START,STOP            Monitor band in eV (default: the case's line band).
-  --batch-means-band-ev START,STOP
-                                  Band in eV for reported per-bin batch-means errors;
-                                  costs one extra reduction.
-  -y, --yes                       Skip the 'standard' confirmation prompt.
-  --dry-run                       Print proposed TOML diff; write nothing.
-  -h, --help                      Show this message and exit.
-```
-
-## `pyrite numerics adaptive-sampling show`
-
-```text
-Usage: pyrite numerics adaptive-sampling show [OPTIONS] NAME
-
-  Show PROFILE's history-count mode, its source, blockers and next steps.
-
-Options:
-  -o, --output [table|json]  Output format; only json is a stable automation contract.
-                             [default: table]
-  -h, --help                 Show this message and exit.
-```
-
-## `pyrite numerics cxr-grid`
-
-```text
-Usage: pyrite numerics cxr-grid [OPTIONS] COMMAND [ARGS]...
-
-  Inspect and edit PROFILE's cxr-grid policy (``[profiles.NAME.cxr_grid_policy]``).
-
-  Three selectors, each defaulting to the first value listed:
-
-    bandwidth   kinematic-ceiling | resonance-population
-                closed-form kinematic bound (no simulation), or the case's
-                measured resonance population capped by that bound
-    resolution  sinc-nyquist | resonance-local
-                uniform measured sinc spacing, or spacing refined locally
-                around measured resonances (3 eV backbone)
-    quadrature  node | bin-mean
-                point samples of the sinc^2 line profile, or bin means that
-                keep integrated line yield exact but smooth peak height/width
-
-  resonance-local requires bandwidth resonance-population and quadrature bin-mean. Any
-  stored selector, even one equal to its default, makes every case of the profile
-  resolve its line grid automatically from its own trajectories, ahead of explicit
-  E_grid_line and stored energy-grid rows; automatic resolution does not support
-  coherent emission (#117), and bin-mean does not support a positive max_dE_frac. The
-  table joins the case and dataset identity: editing it gives new checkpoints, and
-  earlier results stay under their old identity.
-
-  Tolerances, maximum spacing (3 eV), the point budget (600000) and backend ULPs are not
-  profile keys: set them per call (API) or with PYRITE_ENERGY_GRID_* environment
-  variables.
-
-  Examples:
-    pyrite numerics cxr-grid show high_energy
-    pyrite numerics cxr-grid set my_profile --quadrature bin-mean
-    pyrite numerics cxr-grid set my_profile --bandwidth resonance-population \
-        --resolution resonance-local --quadrature bin-mean
-    pyrite numerics cxr-grid reset my_profile resolution
-    pyrite numerics cxr-grid reset my_profile
-
-Options:
-  -h, --help  Show this message and exit.
-
-Commands:
-  reset  Remove selected FIELDs, or the whole policy when none are named.
-  set    Set one or more cxr-grid selectors on PROFILE.
-  show   Show explicit and effective PROFILE cxr-grid selectors and the grid source.
-```
-
-## `pyrite numerics cxr-grid reset`
-
-```text
-Usage: pyrite numerics cxr-grid reset [OPTIONS] NAME
-                                      [bandwidth|resolution|quadrature]...
-
-  Remove selected FIELDs, or the whole policy when none are named.
-
-  Removing the whole policy returns PROFILE to explicit, stored or built-in line grids.
-  A partial reset that leaves an impossible combination is a usage error.
-
-Options:
-  -y, --yes   Skip the 'standard' confirmation prompt.
-  --dry-run   Print proposed TOML diff; write nothing.
-  -h, --help  Show this message and exit.
-```
-
-## `pyrite numerics cxr-grid set`
-
-```text
-Usage: pyrite numerics cxr-grid set [OPTIONS] NAME
-
-  Set one or more cxr-grid selectors on PROFILE.
-
-  The merged policy is validated before anything is written; an impossible combination
-  is a usage error.
-
-Options:
-  --bandwidth [kinematic-ceiling|resonance-population]
-                                  Line-axis upper edge policy. Default kinematic-
-                                  ceiling.
-  --resolution [sinc-nyquist|resonance-local]
-                                  Line-axis spacing policy; resonance-local needs
-                                  resonance-population and bin-mean. Default sinc-
-                                  nyquist.
-  --quadrature [node|bin-mean]    sinc^2 line-profile evaluation on the axis. Default
-                                  node.
-  -y, --yes                       Skip the 'standard' confirmation prompt.
-  --dry-run                       Print proposed TOML diff; write nothing.
-  -h, --help                      Show this message and exit.
-```
-
-## `pyrite numerics cxr-grid show`
-
-```text
-Usage: pyrite numerics cxr-grid show [OPTIONS] NAME
-
-  Show explicit and effective PROFILE cxr-grid selectors and the grid source.
-
-Options:
-  -o, --output [table|json]  Output format; only json is a stable automation contract.
-                             [default: table]
-  -h, --help                 Show this message and exit.
 ```
 
 ## `pyrite numerics energy-grid`

@@ -157,7 +157,7 @@ def set_precision(document, name, updates):
     if counts:
         raise ValueError(
             f"profile {name!r} sets fixed history counts ({describe_counts(counts)}); "
-            f"replace them with: pyrite numerics adaptive-sampling enable {name} [OPTIONS]"
+            f"replace them with: pyrite profile numerics adaptive-sampling enable {name} [OPTIONS]"
         )
     _check_adaptive(name, target)
     target["precision"] = _precision_table(merged)
@@ -223,7 +223,7 @@ def reset_precision(document, name, fields=()):
         raise ValueError(
             f"{', '.join(catalog_key(key) for key in required)} is required by the policy; "
             "reset without fields to remove the policy, or "
-            f"'pyrite numerics adaptive-sampling disable {name}' to select fixed history counts"
+            f"'pyrite profile numerics adaptive-sampling disable {name}' to select fixed history counts"
         )
     removed = tuple(field for field in fields if field in current)
     remaining = {key: value for key, value in current.items() if key not in fields}

@@ -1,7 +1,7 @@
 # Demo: 1 MeV beam with the measured line-grid policy (resonance-population
 # bandwidth, resonance-local spacing, bin-mean quadrature). The line grid is
 # resolved automatically, independently of electron sampling, which uses the
-# default adaptive policy (pyrite numerics adaptive-sampling show high_energy_demo).
+# default adaptive policy (pyrite profile numerics adaptive-sampling show high_energy_demo).
 # ~1 min on CPU.
 #   pyrite run high_energy_demo
 

@@ -1,6 +1,6 @@
 """Read-only profile summary assembly for catalog consumers."""
 
-from pyrite._config_presets import KINDS
+from pyrite._config_presets import KINDS, NUMERICS
 from pyrite._cxr_vocabulary import catalog_key
 from pyrite._numerics import TRANSPORT_KEYS
 
@@ -91,6 +91,24 @@ def detector_payloads(document, profile):
     }
 
 
+def adaptive_resolution(document, profile):
+    """History-count mode of ``profile`` over its presets.
+
+    Returns ``{explicit, effective, source, fixed_reason}``; ``source`` is
+    ``profile``, ``preset <name>``, ``default`` or ``fixed``.
+    """
+    adaptive = dict(
+        zip(
+            ("explicit", "effective", "source", "fixed_reason"),
+            precision_resolution(effective_profile(document, profile)),
+            strict=True,
+        )
+    )
+    if adaptive["source"] == "profile" and "precision" not in profile:
+        adaptive["source"] = f"preset {profile.get(NUMERICS.reference_key)}"
+    return adaptive
+
+
 def profile_payload(document, name):
     profile = existing_profile(document, name)
     overrides = profile_overrides(profile)
@@ -106,15 +124,7 @@ def profile_payload(document, name):
     physical = physical_detector_row(profile)
     presets = {kind.table: profile.get(kind.reference_key) for kind in KINDS}
     effective = effective_profile(document, profile)
-    adaptive = dict(
-        zip(
-            ("explicit", "effective", "source", "fixed_reason"),
-            precision_resolution(effective),
-            strict=True,
-        )
-    )
-    if adaptive["source"] == "profile" and "precision" not in profile:
-        adaptive["source"] = f"preset {presets['numerics']}"
+    adaptive = adaptive_resolution(document, profile)
     targets = profile.get("targets")
     return {
         **({"targets": dict(targets)} if targets else {}),

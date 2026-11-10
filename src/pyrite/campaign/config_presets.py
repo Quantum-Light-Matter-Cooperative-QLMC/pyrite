@@ -40,7 +40,7 @@ def existing_preset(document, kind, name):
         known = ", ".join(rows) or "none"
         raise ValueError(
             f"unknown {kind.table} preset {name!r} (known: {known}); "
-            f"create it with: pyrite {kind.table} preset create {name}"
+            f"create it with: pyrite {kind.table} create {name}"
         )
     return rows[name]
 

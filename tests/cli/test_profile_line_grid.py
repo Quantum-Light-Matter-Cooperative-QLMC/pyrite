@@ -1,4 +1,4 @@
-"""``pyrite numerics cxr-grid`` against an isolated copy of the bundled catalog."""
+"""``pyrite profile numerics cxr-grid`` against an isolated copy of the bundled catalog."""
 
 import json
 
@@ -35,11 +35,11 @@ def _stored(catalog, name):
 
 
 def _line_grid(*args):
-    return invoke(root_command, ["numerics", "cxr-grid", *args])
+    return invoke(root_command, ["profile", "numerics", "cxr-grid", *args])
 
 
 def test_help_lists_selectors_defaults_combinations_and_identity():
-    group = invoke(root_command, ["numerics", "cxr-grid", "--help"])
+    group = invoke(root_command, ["profile", "numerics", "cxr-grid", "--help"])
     assert_clean_result(group)
     for text in (
         "kinematic-ceiling | resonance-population",
@@ -50,7 +50,7 @@ def test_help_lists_selectors_defaults_combinations_and_identity():
     ):
         assert text in " ".join(group.stdout.split())
 
-    setting = invoke(root_command, ["numerics", "cxr-grid", "set", "--help"])
+    setting = invoke(root_command, ["profile", "numerics", "cxr-grid", "set", "--help"])
     assert_clean_result(setting)
     flat = " ".join(setting.stdout.split())
     for default in ("kinematic-ceiling", "sinc-nyquist", "node"):
@@ -87,7 +87,7 @@ def test_show_reports_explicit_effective_and_grid_source(catalog):
     assert_clean_result(profile_json)
     assert json.loads(profile_json.stdout)["payload"]["line_grid_policy"] == _FULL_POLICY
     profile_text = invoke(root_command, ["profile", "show", "sub_100keV"])
-    assert "CXR-grid policy (numerics cxr-grid)" in profile_text.stdout
+    assert "CXR-grid policy (profile numerics cxr-grid)" in profile_text.stdout
     assert_table_row(profile_text.stdout, "policy", "none (explicit, stored or built-in grids)")
 
 
@@ -197,7 +197,7 @@ def test_reset_partial_conflict_named_and_whole(catalog):
 def test_standard_edit_prompts_and_clone_carries_policy(catalog):
     declined = invoke(
         root_command,
-        ["numerics", "cxr-grid", "set", "standard", "--quadrature", "bin-mean"],
+        ["profile", "numerics", "cxr-grid", "set", "standard", "--quadrature", "bin-mean"],
         input="n\n",
     )
     assert declined.exit_code == 1

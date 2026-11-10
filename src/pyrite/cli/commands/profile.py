@@ -1,7 +1,6 @@
 """Manage catalog profiles (``[profiles.*]`` named campaigns)."""
 
 import re
-from typing import Any, cast
 
 import click
 import tomlkit
@@ -21,10 +20,10 @@ from pyrite.cli import _completion as _cli_completion
 from pyrite.cli._deprecations import canonical_option, removed_option
 from pyrite.cli._groups import LazyGroup
 from pyrite.cli.commands import (
+    _calculation_options,
     _profile_detectors,
     _profile_filters,
     _profile_presets,
-    _profile_shared,
     _profile_show,
 )
 from pyrite.cli.commands._profile_members import (
@@ -60,49 +59,6 @@ _NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 #: Mirrors ``materials.catalog._EMISSION_VALUES`` (kept local, not imported,
 #: to avoid coupling this CLI module to that private catalog constant).
 _EMISSION_VALUES = ("incoherent", "coherent", "both")
-_ENERGY_MODEL_VALUES = ("frozen", "midpoint")
-_INELASTIC_MODEL_VALUES = ("auto", "continuous", "shell-soft-hard")
-_ELASTIC_MODEL_VALUES = ("mott", "elsepa")
-_BREMSSTRAHLUNG_MODEL_VALUES = ("auto", "eedl", "bremslib")
-_RADIATIVE_MODEL_VALUES = ("auto", "uncoupled", "bremslib-soft-hard")
-_PAIR_PRODUCTION_MODEL_VALUES = ("penelope-2024",)
-_ATOMIC_ELECTRON_DEFLECTION_VALUES = ("kawrakow", "none")
-_SHELL_IONIZATION_MODEL_VALUES = ("eedl", "bote-salvat")
-_MOSAIC_ROUTE_VALUES = ("analytic", "mc")
-_NUMERICS_FIELD_NAMES = {
-    "cxr-histories": "n_electrons",
-    "brem-histories": "n_electrons_brem",
-    "reflection-families": "n_families",
-    "maximum-reflections": "max_reflections",
-    "mosaic-nodes": "mosaic_nodes",
-    "mosaic-route": "mosaic_route",
-    "straggling": "straggling",
-    "energy-model": "energy_model",
-    "maximum-fractional-energy-loss": "max_dE_frac",
-    "inelastic-model": "inelastic_model",
-    "inelastic-cutoff-ev": "inelastic_cutoff_eV",
-    "secondary-threshold-ev": "secondary_threshold_eV",
-    "elastic-model": "elastic_model",
-    "transport-mode": "transport_mode",
-    "mixed-c1": "mixed_c1",
-    "mixed-c2": "mixed_c2",
-    "mixed-maximum-step-um": "mixed_max_step_um",
-    "bremsstrahlung-model": "bremsstrahlung_model",
-    "radiative-model": "radiative_model",
-    "radiative-cutoff-ev": "radiative_cutoff_eV",
-    "pair-production-model": "pair_production_model",
-    "positron-transport": "positron_transport",
-    "atomic-electron-deflection": "atomic_electron_deflection",
-    "channeling-model": "channeling_model",
-    "channeling-axial": "channeling_axial",
-    "transition-radiation": "transition_radiation",
-    "shell-ionization-model": "shell_ionization_model",
-    "channeling-plane": "channeling_plane",
-    "channeling-basis-size": "channeling_basis_size",
-    "channeling-bloch-cells": "channeling_bloch_cells",
-    "channeling-dz-ang": "channeling_dz_ang",
-    "channeling-zone-max-ang": "channeling_zone_max_ang",
-}
 _RANGE_OPTIONS = (
     ("thickness", "--thickness", THICKNESS_CSV_RANGE, "ANGSTROM,..."),
     ("energy", "--energy", ENERGY_CSV_RANGE, "KEV,..."),
@@ -155,7 +111,7 @@ def _transport_cli_options(function):
     )(function)
     function = click.option(
         "--energy-model",
-        type=click.Choice(_ENERGY_MODEL_VALUES),
+        type=click.Choice(_calculation_options._ENERGY_MODEL_VALUES),
         help="Transport clock model (frozen or midpoint).",
     )(function)
     function = click.option(
@@ -240,6 +196,14 @@ class _ProfileGroup(LazyGroup):
     name="profile",
     cls=_ProfileGroup,
     deprecation_prefix="profile",
+    lazy_commands={
+        "numerics": "pyrite.cli.commands.calculation.profile_numerics_command",
+        "physics": "pyrite.cli.commands.calculation.profile_physics_command",
+    },
+    lazy_help={
+        "numerics": "Show/edit PROFILE's sampling, mosaic, integration and grid fields.",
+        "physics": "Show/edit PROFILE's physical models, cutoffs and emission.",
+    },
     no_args_is_help=True,
     context_settings={"help_option_names": ["-h", "--help"]},
 )
@@ -261,9 +225,13 @@ def command():
     docs/repo-design/physical-units.md for supported fields and examples.
 
     Where settings live: ranges, membership, beam/detector references and
-    emission use ``set|add|remove``; sampling/integration use ``pyrite numerics``;
-    physical models/cutoffs use ``pyrite physics``; line-grid and precision
-    policies live under ``pyrite numerics``. Filters and the pixel detector use ``filter``
+    emission use ``set|add|remove``. PROFILE's own sampling, mosaic,
+    integration and CXR-grid fields use ``profile numerics``, including
+    adaptive sampling (``profile numerics adaptive-sampling``, the default
+    unless fixed history counts are set); its physical models and cutoffs use
+    ``profile physics``. Named presets those override are managed with
+    ``pyrite numerics`` and ``pyrite physics`` and attached with ``set
+    --numerics|--physics NAME``. Filters and the pixel detector use ``filter``
     and ``detector``; reusable beams and detectors are named objects
     edited with ``pyrite beam`` and ``pyrite detector``. The full map is
     docs/repo-design/profile-settings.md. Bundled demos are read-only (copy
@@ -275,294 +243,16 @@ def command():
       pyrite profile show sub_100keV        (or: pyrite profile sub_100keV)
       pyrite profile create sub_100keV --energy 30:100:10
       pyrite profile set sub_100keV --detector eds
-      pyrite numerics set sub_100keV --cxr-histories 2000
-      pyrite numerics cxr-grid show sub_100keV
+      pyrite profile numerics show sub_100keV
+      pyrite profile numerics adaptive-sampling set sub_100keV --target-rse 0.02
+      pyrite profile numerics set sub_100keV --cxr-histories 2000   (fixed counts)
+      pyrite profile physics set sub_100keV --elastic-model mott
+      pyrite profile numerics cxr-grid show sub_100keV
       pyrite profile add sub_100keV --energy 75
       pyrite profile set sub_100keV --material hopg,mose2
       pyrite profile rename sub_100keV sub100
       pyrite profile delete sub_100keV -y
     """
-
-
-@command.group("numerics")
-def numerics_command():
-    """Inspect and edit result-affecting calculation controls."""
-
-
-@numerics_command.command("show")
-@click.argument("name", shell_complete=_cli_completion.complete_profile)
-@output_option
-def numerics_show_command(name, json_output):
-    """Show explicit and effective PROFILE numerics with value sources."""
-    fidelity = "full"
-    try:
-        _text, document = _catalog_io.catalog_text()
-        target = _profile_document.existing_profile(document, name)
-        resolution = profile_numerics.profile_resolution(document, target, fidelity=fidelity)
-        groups = resolution.groups()
-        payload = {"profile": name, "fidelity": fidelity, "groups": groups}
-    except (OSError, ValueError, ParseError) as exc:
-        if json_output:
-            emit_json_result(cli_json.failure("cxr.profile.numerics.show", {}, str(exc)))
-            return 1
-        raise CLIError(str(exc)) from None
-    if json_output:
-        emit_json_result(cli_json.JsonResult("cxr.profile.numerics.show", payload))
-        return 0
-    emit_result(f"[{name} numerics]")
-    for group in groups:
-        label = "reflections and mosaic" if group["name"] == "convergence" else group["name"]
-        emit_result(f"{label}:")
-        fields = group["fields"]
-        if not isinstance(fields, list):  # pragma: no cover - internal payload invariant
-            raise AssertionError("numerics fields must be a list")
-        for row in fields:
-            if not isinstance(row, dict):  # pragma: no cover - internal payload invariant
-                raise AssertionError("numerics field must be a mapping")
-            row = cast(dict[str, Any], row)
-            value = row["effective"]
-            display = (
-                "none"
-                if value is None
-                else str(value).lower()
-                if isinstance(value, bool)
-                else value
-            )
-            explicit = row["explicit"]
-            explicit_display = "unset" if explicit is None else explicit
-            source = "default" if row["source"] == "fidelity" else row["source"]
-            emit_result(f"  {row['label']}: {display} ({source}); explicit: {explicit_display}")
-    return 0
-
-
-@numerics_command.command("set")
-@click.argument("name", shell_complete=_cli_completion.complete_profile)
-@removed_option("--cxr-trials", "--cxr-histories")
-@removed_option("--cxr-electrons", "--cxr-histories")
-@removed_option("--brem-trials", "--brem-histories")
-@removed_option("--brem-electrons", "--brem-histories")
-@canonical_option(
-    "--cxr-histories",
-    "cxr_histories",
-    type=click.IntRange(min=1),
-    metavar="N",
-    help="Monte Carlo electron histories used to estimate the CXR spectrum.",
-)
-@canonical_option(
-    "--brem-histories",
-    "brem_histories",
-    type=click.IntRange(min=1),
-    metavar="N",
-    help="Monte Carlo electron histories used to estimate bremsstrahlung.",
-)
-@click.option(
-    "--reflection-families",
-    type=click.IntRange(min=1),
-    metavar="N",
-    help="Ranked reflection families to resolve.",
-)
-@click.option(
-    "--maximum-reflections",
-    type=click.IntRange(min=1),
-    metavar="N",
-    help="Cap resolved reflections after family expansion.",
-)
-@click.option(
-    "--mosaic-nodes",
-    type=click.IntRange(min=1),
-    metavar="N",
-    help="Gauss-Hermite nodes per mosaic tilt axis.",
-)
-@click.option(
-    "--mosaic-route",
-    type=click.Choice(_MOSAIC_ROUTE_VALUES),
-    help="Mosaic broadening route.",
-)
-@click.option(
-    "--straggling/--no-straggling",
-    default=None,
-    help="Enable or disable collision energy-loss straggling (restricted soft loss in shell mode).",
-)
-@click.option(
-    "--energy-model", type=click.Choice(_ENERGY_MODEL_VALUES), help="Transport clock model."
-)
-@click.option(
-    "--maximum-fractional-energy-loss",
-    type=click.FloatRange(min=0.0),
-    metavar="FRACTION",
-    help="Cap one row's fractional mean energy loss; positive values require midpoint.",
-)
-@click.option(
-    "--inelastic-model",
-    type=click.Choice(_INELASTIC_MODEL_VALUES),
-    help=(
-        "Collision energy-loss scheme: shell-soft-hard (default; midpoint, ungrooved, "
-        "shell data for every layer), continuous stopping (explicit approximation), or auto "
-        "(legacy conditional shell selection with warned continuous fallback)."
-    ),
-)
-@click.option(
-    "--inelastic-cutoff-ev",
-    type=click.FloatRange(min=0.0, min_open=True),
-    metavar="EV",
-    help=(
-        "Soft/hard energy-loss cutoff W_c in eV (default 50 for shell-soft-hard or auto); must exceed each "
-        "material's conduction-band resonance (Si 16.7, SiO2 22, MoS2 23 eV)."
-    ),
-)
-@click.option(
-    "--secondary-threshold-ev",
-    type=click.FloatRange(min=0.0, min_open=True),
-    metavar="EV",
-    help=(
-        "Transport hard-collision secondaries above this energy in eV (production cut and "
-        "tracking cutoff; requires shell-soft-hard and SBETHE coverage, >= 1000 eV)."
-    ),
-)
-@click.option(
-    "--elastic-model",
-    type=click.Choice(_ELASTIC_MODEL_VALUES),
-    help=(
-        "Elastic scattering: elsepa (default) full differential cross sections (needs "
-        "'pyrite tables fetch elsepa'; bypasses the transport LUT), or the historical "
-        "mott screened-Rutherford angles."
-    ),
-)
-@click.option(
-    "--bremsstrahlung-model",
-    type=click.Choice(_BREMSSTRAHLUNG_MODEL_VALUES),
-    help=(
-        "Continuum bremsstrahlung: bremslib (default) requires the released BremsLib tables "
-        "('pyrite tables fetch bremslib') and uses their angular model; eedl is the fetched "
-        "EEDL continuum with an isotropic photon angle (pair with --radiative-model "
-        "uncoupled); auto is the legacy table-checked BremsLib selection."
-    ),
-)
-@click.option(
-    "--radiative-model",
-    type=click.Choice(_RADIATIVE_MODEL_VALUES),
-    help=(
-        "Radiative energy loss: bremslib-soft-hard (default) uses soft loss plus sampled "
-        "hard photons and requires midpoint energy, BremsLib and an ungrooved target; "
-        "uncoupled (explicit approximation) scores after collision-only transport; auto "
-        "(legacy) couples where supported. Unsupported scenes must pass uncoupled."
-    ),
-)
-@click.option(
-    "--radiative-cutoff-ev",
-    type=click.FloatRange(min=0.0, min_open=True),
-    metavar="EV",
-    help=(
-        "Hard-photon cutoff k_c in eV for bremslib-soft-hard or auto (default 1000); must not "
-        "exceed the continuum electron cutoff (1000 eV by default)."
-    ),
-)
-@click.option(
-    "--pair-production-model",
-    type=click.Choice(_PAIR_PRODUCTION_MODEL_VALUES),
-    help=(
-        "Convert coupled hard photons above 1.022 MeV to e-/e+ pairs (opt-in). Requires "
-        "--secondary-threshold-ev and coupled BremsLib transport; pair electrons are "
-        "transported as secondaries, positrons are recorded unless --positron-transport."
-    ),
-)
-@click.option(
-    "--positron-transport/--no-positron-transport",
-    default=None,
-    help=(
-        "Transport pair positrons above the secondary threshold (opt-in; requires "
-        "--pair-production-model). Positrons annihilate in flight and at rest; each "
-        "annihilation photon escapes or is absorbed at its first interaction."
-    ),
-)
-@click.option(
-    "--atomic-electron-deflection",
-    type=click.Choice(_ATOMIC_ELECTRON_DEFLECTION_VALUES),
-    help=(
-        "Angular deflection by atomic electrons: kawrakow (default) scales each element's "
-        "elastic rate by 1 + xi/Z (xi = 1 under continuous stopping; the Moller share "
-        "above W_c is removed under shell-soft-hard, which needs elsepa); none keeps "
-        "elastic-only deflection."
-    ),
-)
-@_profile_shared.mixed_transport_options
-@click.option(
-    "--shell-ionization-model",
-    type=click.Choice(_SHELL_IONIZATION_MODEL_VALUES),
-    help=(
-        "Characteristic-line primary vacancies: eedl (default) subshell cross sections, or "
-        "the opt-in bote-salvat K/L/M fit (needs 'pyrite tables fetch bote-salvat'; EEDL "
-        "for higher shells)."
-    ),
-)
-@click.option(
-    "--channeling-model",
-    type=click.Choice(("off", "planar")),
-    help="Planar quantum entrance zone (default off); requires plane, midpoint, uncoupled "
-    "radiation and incoherent emission. Disable with numerics reset PROFILE "
-    "channeling-model channeling-plane.",
-)
-@click.option(
-    "--channeling-plane",
-    type=(int, int, int),
-    metavar="H K L",
-    help="Nonzero Miller indices of the planar channeling family; requires planar.",
-)
-@click.option(
-    "--channeling-basis-size",
-    type=click.IntRange(min=1),
-    help="Transverse plane-wave band |h| <= H (default 16).",
-)
-@click.option(
-    "--channeling-bloch-cells",
-    type=click.IntRange(min=1),
-    help="Bloch-grid supercell size (default 16).",
-)
-@click.option(
-    "--channeling-dz-ang",
-    type=click.FloatRange(min=0, min_open=True),
-    help="Zone depth step in angstrom (default 250).",
-)
-@click.option(
-    "--channeling-zone-max-ang",
-    type=click.FloatRange(min=0, min_open=True),
-    help="Zone length cap in angstrom (default first layer thickness).",
-)
-@click.option("-y", "--yes", is_flag=True, help="Skip the 'standard' confirmation prompt.")
-@click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing.")
-def numerics_set_command(name, yes, dry_run, **values):
-    """Set one or more explicit result-affecting controls on PROFILE."""
-    updates = {
-        _NUMERICS_FIELD_NAMES[key.replace("_", "-")]: value
-        for key, value in values.items()
-        if value is not None
-    }
-    if not updates:
-        raise click.UsageError("provide at least one numerics option")
-    try:
-        original, document = _catalog_io.catalog_text()
-        profile_numerics.set_numerics(document, name, updates)
-    except (OSError, ValueError, ParseError) as exc:
-        raise CLIError(str(exc)) from None
-    _confirm_standard(name, "set calculation numerics on", yes, dry_run)
-    return _write(document, original, dry_run, f"updated numerics for profile {name}")
-
-
-@numerics_command.command("reset")
-@click.argument("name", shell_complete=_cli_completion.complete_profile)
-@click.argument("fields", nargs=-1, type=click.Choice(tuple(_NUMERICS_FIELD_NAMES)))
-@click.option("-y", "--yes", is_flag=True, help="Skip the 'standard' confirmation prompt.")
-@click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing.")
-def numerics_reset_command(name, fields, yes, dry_run):
-    """Reset selected FIELDs, or every explicit numeric when none are named."""
-    keys = tuple(_NUMERICS_FIELD_NAMES[field] for field in fields)
-    try:
-        original, document = _catalog_io.catalog_text()
-        profile_numerics.reset_numerics(document, name, keys)
-    except (OSError, ValueError, ParseError) as exc:
-        raise CLIError(str(exc)) from None
-    _confirm_standard(name, "reset calculation numerics on", yes, dry_run)
-    return _write(document, original, dry_run, f"reset numerics for profile {name}")
 
 
 @command.group("ranges")
@@ -665,7 +355,7 @@ def show_command(name, json_output):
     if json_output:
         emit_json_result(cli_json.JsonResult("cxr.profile.show", payload))
         return 0
-    names = {value: key for key, value in _NUMERICS_FIELD_NAMES.items()}
+    names = {value: key for key, value in _calculation_options.FIELD_NAMES.items()}
     _profile_show.emit_show(payload, target, resolution, names, grid_rows)
     return 0
 

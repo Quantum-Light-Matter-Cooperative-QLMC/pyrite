@@ -388,14 +388,11 @@ def emit_result(message: str) -> None:
     click.echo(message)
 
 
-def emit_table(headers, rows) -> None:
-    """Emit an aligned, color-independent human table without tab stops."""
-    cells = [tuple(str(value) for value in row) for row in (headers, *rows)]
-    widths = [max(len(click.unstyle(row[i])) for row in cells) for i in range(len(headers))]
-    for row in cells:
-        emit_result(
-            "  ".join(value.ljust(width) for value, width in zip(row, widths, strict=True)).rstrip()
-        )
+def emit_table(headers, rows, **options) -> None:
+    """Emit an aligned human table; see :func:`pyrite.console.tables.emit_table`."""
+    from .tables import emit_table as render
+
+    render(headers, rows, **options)
 
 
 def emit_diagnostic(message: str) -> None:

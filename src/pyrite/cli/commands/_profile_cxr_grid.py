@@ -1,4 +1,4 @@
-"""``pyrite numerics cxr-grid``: a profile's stored cxr-grid policy selectors."""
+"""``pyrite profile numerics cxr-grid``: a profile's stored cxr-grid policy selectors."""
 
 import click
 from tomlkit.exceptions import ParseError
@@ -85,12 +85,12 @@ def command():
 
     \b
     Examples:
-      pyrite numerics cxr-grid show high_energy
-      pyrite numerics cxr-grid set my_profile --quadrature bin-mean
-      pyrite numerics cxr-grid set my_profile --bandwidth resonance-population \\
+      pyrite profile numerics cxr-grid show high_energy
+      pyrite profile numerics cxr-grid set my_profile --quadrature bin-mean
+      pyrite profile numerics cxr-grid set my_profile --bandwidth resonance-population \\
           --resolution resonance-local --quadrature bin-mean
-      pyrite numerics cxr-grid reset my_profile resolution
-      pyrite numerics cxr-grid reset my_profile
+      pyrite profile numerics cxr-grid reset my_profile resolution
+      pyrite profile numerics cxr-grid reset my_profile
     """
 
 

@@ -235,9 +235,10 @@ def test_click_tree_preserves_frozen_command_and_option_names():
         hidden_deprecated = {
             flag
             for param in current.params
-            if isinstance(param, DeprecatedOption) and param.hidden
-            for flag in param.opts
-            if (" ".join(path), flag) in DEPRECATED_FLAGS
+            if isinstance(param, DeprecatedOption)
+            and param.hidden
+            and (" ".join(path), param.deprecated_flag) in DEPRECATED_FLAGS
+            for flag in (*param.opts, *param.secondary_opts)
         }
         for option in _node_options(node):
             if (path, option) in _REMOVED_OPTIONS:

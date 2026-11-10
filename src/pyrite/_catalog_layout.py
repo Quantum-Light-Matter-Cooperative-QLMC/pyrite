@@ -366,7 +366,7 @@ def _bundled_object_message(table: str, name: str) -> str:
     if table in ("physics", "numerics"):
         return (
             f"{table} preset {name!r} is a bundled reference and is read-only; copy it with "
-            f"'pyrite {table} preset create NAME --from {name}'"
+            f"'pyrite {table} create NAME --from {name}'"
         )
     relative = MANIFEST if table == MANIFEST else f"{table}/{name}.toml"
     return (

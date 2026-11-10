@@ -1,28 +1,19 @@
 """Human profile summary, grouped by the CLI's settings owners."""
 
-import shutil
-import textwrap
-
-import click
-
 from pyrite._energy_grid_encoding import encode_energy_grid
+from pyrite._numerics import PHYSICS_FIELDS
 from pyrite.campaign import _profile_document, profile_cxr_grid, profile_detectors
 from pyrite.cli import _catalog_io
 from pyrite.console.output import emit_result
+from pyrite.console.tables import display, emit_settings, emit_table
 from pyrite.materials._catalog_decode import resolve_grid_descriptor
 from pyrite.materials._schema import DEFAULT_BREM_GRID
 
 
 def _display(value):
-    if value is None:
-        return "none"
-    if isinstance(value, bool):
-        return "on" if value else "off"
-    if isinstance(value, (int, float)):
+    if isinstance(value, int) and not isinstance(value, bool):
         return f"{value:g}"
-    if isinstance(value, (list, tuple)):
-        return "[" + ", ".join(_display(item) for item in value) + "]"
-    return str(value)
+    return display(value)
 
 
 def _rows(values, prefix=""):
@@ -36,28 +27,8 @@ def _rows(values, prefix=""):
 
 
 def _table(title, rows):
-    rows = list(rows) or [("settings", "none")]
-    width = max([len("Setting"), *(len(label) for label, _value in rows)])
-    emit_result(f"\n{title}")
-    emit_result(f"  {'Setting':<{width}}  Value")
-    emit_result(f"  {'-' * width}  {'-' * 5}")
-    context = click.get_current_context(silent=True)
-    wide = context is not None and context.meta.get("pyrite.output_format") == "wide"
-    columns = max(60, shutil.get_terminal_size().columns)
-    for label, value in rows:
-        lines = (
-            [value]
-            if wide
-            else textwrap.wrap(
-                value,
-                width=max(16, columns - width - 4),
-                break_long_words=False,
-                break_on_hyphens=False,
-            )
-            or [""]
-        )
-        for index, line in enumerate(lines):
-            emit_result(f"  {label if index == 0 else '':<{width}}  {line}")
+    emit_result("")
+    emit_table(("setting", "value"), list(rows) or [("settings", "none")], title=title, indent=2)
 
 
 def _grid_summary(value, *, brem=False):
@@ -173,21 +144,35 @@ _NUMERICS_GROUP_LABELS = {
 
 
 def _numerics_group_rows(group, numerics_names, adaptive_active):
-    """Rows for one numerics group; channeling collapses to its model row when off."""
+    """SETTING/VALUE/SOURCE rows for one group; channeling collapses to its model when off."""
     fields = group["fields"]
     if group["name"] == "channeling" and any(
         row["key"] == "channeling_model" and row["effective"] == "off" for row in fields
     ):
         fields = [row for row in fields if row["key"] == "channeling_model"]
-    rows = []
-    for row in fields:
-        if group["name"] == "sampling" and adaptive_active:
-            value = "adaptive (numerics adaptive-sampling)"
-        else:
-            source = "default" if row["source"] == "fidelity" else row["source"]
-            value = f"{_display(row['effective'])} ({source})"
-        rows.append((numerics_names[row["key"]], value))
-    return rows
+    return [
+        (
+            numerics_names[row["key"]],
+            "unused (adaptive)"
+            if group["name"] == "sampling" and adaptive_active
+            else _display(row["effective"]),
+            row["source"],
+            row["key"] in PHYSICS_FIELDS,
+        )
+        for row in fields
+    ]
+
+
+def _emit_calculation_groups(resolution, numerics_names, adaptive_active):
+    """Numerics and Physics groups, each titled with the command that owns it."""
+    for group in resolution.groups():
+        label = _NUMERICS_GROUP_LABELS.get(group["name"], group["name"])
+        rows = _numerics_group_rows(group, numerics_names, adaptive_active)
+        for physics, owner in ((False, "Numerics"), (True, "Physics")):
+            selected = [row[:3] for row in rows if row[3] is physics]
+            if selected:
+                emit_result("")
+                emit_settings(f"{owner} / {label} (profile {owner.lower()})", selected)
 
 
 def emit_show(payload, target, resolution, numerics_names, grid_rows):
@@ -226,7 +211,7 @@ def emit_show(payload, target, resolution, numerics_names, grid_rows):
     _emit_targets(payload)
 
     _table(
-        "Named presets (profile set --physics/--numerics; pyrite physics|numerics preset)",
+        "Named presets (profile set --physics/--numerics; pyrite physics|numerics)",
         _preset_rows(payload),
     )
 
@@ -274,10 +259,7 @@ def emit_show(payload, target, resolution, numerics_names, grid_rows):
     )
 
     adaptive_active = payload["adaptive_sampling"]["effective"] is not None
-    for group in resolution.groups():
-        label = _NUMERICS_GROUP_LABELS.get(group["name"], group["name"])
-        rows = _numerics_group_rows(group, numerics_names, adaptive_active)
-        _table(f"Numerics / {label} (profile numerics)", rows)
+    _emit_calculation_groups(resolution, numerics_names, adaptive_active)
 
     adaptive = payload["adaptive_sampling"]
     if adaptive["effective"] is None:
@@ -287,11 +269,11 @@ def emit_show(payload, target, resolution, numerics_names, grid_rows):
             ("mode", f"adaptive ({adaptive['source']} policy)"),
             *list(_rows(adaptive["effective"])),
         ]
-    _table("Adaptive sampling (numerics adaptive-sampling)", adaptive_rows)
+    _table("Adaptive sampling (profile numerics adaptive-sampling)", adaptive_rows)
 
     policy = payload["line_grid_policy"]
     _table(
-        "CXR-grid policy (numerics cxr-grid)",
+        "CXR-grid policy (profile numerics cxr-grid)",
         [("source", "automatic for every case"), *list(_rows(policy))]
         if policy
         else [("policy", "none (explicit, stored or built-in grids)")],

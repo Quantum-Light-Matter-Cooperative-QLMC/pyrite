@@ -8,11 +8,34 @@ Per [ADR-0002](../../adr/0002-cli-surface-redesign.md), every renamed or retired
 
 ## Commands
 
-No command spelling is currently deprecated. Every spelling the CLI accepts is canonical; anything else exits as an unknown command, except hard-break removals without a support window (`numerics precision`, #1007), which exit as usage errors naming their replacement.
+| Deprecated spelling | Replacement | Deprecated in | Remove in | Note |
+| --- | --- | --- | --- | --- |
+| `pyrite numerics adaptive-sampling` | `pyrite profile numerics adaptive-sampling` | 0.32.0 | 0.34.0 |  |
+| `pyrite numerics cxr-grid` | `pyrite profile numerics cxr-grid` | 0.32.0 | 0.34.0 |  |
+| `pyrite numerics preset` | `pyrite numerics` | 0.32.0 | 0.34.0 | `pyrite numerics list` now lists presets; profiles are listed by `pyrite profile list`. |
+| `pyrite physics preset` | `pyrite physics` | 0.32.0 | 0.34.0 | `pyrite physics list` now lists presets; profiles are listed by `pyrite profile list`. |
 
 ## Options
 
-No option spelling is currently deprecated. Every option the CLI accepts is canonical; anything else exits as a usage error. Hard-break removals without a support window (the `*-trials` and `*-electrons` Monte Carlo budget flags, #1007) name their `*-histories` replacement.
+| Command | Deprecated option | Replacement | Deprecated in | Remove in | Note |
+| --- | --- | --- | --- | --- | --- |
+| `pyrite profile numerics set` | `--atomic-electron-deflection` | use 'pyrite profile physics set' | 0.32.0 | 0.34.0 | Physics field; saved unchanged during the support window. |
+| `pyrite profile numerics set` | `--bremsstrahlung-model` | use 'pyrite profile physics set' | 0.32.0 | 0.34.0 | Physics field; saved unchanged during the support window. |
+| `pyrite profile numerics set` | `--channeling-model` | use 'pyrite profile physics set' | 0.32.0 | 0.34.0 | Physics field; saved unchanged during the support window. |
+| `pyrite profile numerics set` | `--channeling-plane` | use 'pyrite profile physics set' | 0.32.0 | 0.34.0 | Physics field; saved unchanged during the support window. |
+| `pyrite profile numerics set` | `--elastic-model` | use 'pyrite profile physics set' | 0.32.0 | 0.34.0 | Physics field; saved unchanged during the support window. |
+| `pyrite profile numerics set` | `--inelastic-cutoff-ev` | use 'pyrite profile physics set' | 0.32.0 | 0.34.0 | Physics field; saved unchanged during the support window. |
+| `pyrite profile numerics set` | `--inelastic-model` | use 'pyrite profile physics set' | 0.32.0 | 0.34.0 | Physics field; saved unchanged during the support window. |
+| `pyrite profile numerics set` | `--mixed-c1` | use 'pyrite profile physics set' | 0.32.0 | 0.34.0 | Physics field; saved unchanged during the support window. |
+| `pyrite profile numerics set` | `--mixed-c2` | use 'pyrite profile physics set' | 0.32.0 | 0.34.0 | Physics field; saved unchanged during the support window. |
+| `pyrite profile numerics set` | `--pair-production-model` | use 'pyrite profile physics set' | 0.32.0 | 0.34.0 | Physics field; saved unchanged during the support window. |
+| `pyrite profile numerics set` | `--positron-transport` | use 'pyrite profile physics set' | 0.32.0 | 0.34.0 | Physics field; saved unchanged during the support window. |
+| `pyrite profile numerics set` | `--radiative-cutoff-ev` | use 'pyrite profile physics set' | 0.32.0 | 0.34.0 | Physics field; saved unchanged during the support window. |
+| `pyrite profile numerics set` | `--radiative-model` | use 'pyrite profile physics set' | 0.32.0 | 0.34.0 | Physics field; saved unchanged during the support window. |
+| `pyrite profile numerics set` | `--secondary-threshold-ev` | use 'pyrite profile physics set' | 0.32.0 | 0.34.0 | Physics field; saved unchanged during the support window. |
+| `pyrite profile numerics set` | `--shell-ionization-model` | use 'pyrite profile physics set' | 0.32.0 | 0.34.0 | Physics field; saved unchanged during the support window. |
+| `pyrite profile numerics set` | `--straggling` | use 'pyrite profile physics set' | 0.32.0 | 0.34.0 | Physics field; saved unchanged during the support window. |
+| `pyrite profile numerics set` | `--transport-mode` | use 'pyrite profile physics set' | 0.32.0 | 0.34.0 | Physics field; saved unchanged during the support window. |
 
 ## Implicit defaults
 

@@ -11,208 +11,32 @@ Version: `0.31.0`
 ```text
 Usage: pyrite physics [OPTIONS] COMMAND [ARGS]...
 
-  Inspect and edit PROFILE's physical models and cutoffs (API Physics).
+  Manage named physics presets: models, cutoffs, straggling and emission.
 
-  show/set/reset/validate edit the selected profile's own fields, which override any
-  attached named preset; manage reusable presets with 'pyrite physics preset'.
-  brem_source is currently an API-only setting; CLI campaigns keep their existing
-  sources.
-
-Options:
-  -h, --help  Show this message and exit.
-
-Commands:
-  list      List the campaigns whose configuration can...
-  reset     Reset selected fields, or all fields owned...
-  set       Set PROFILE fields; validate and...
-  show      Show explicit/effective settings and their...
-  validate  Validate the selected campaign without...
-  preset    Manage named physics presets that profiles attach by name.
-```
-
-## `pyrite physics list`
-
-```text
-Usage: pyrite physics list [OPTIONS]
-
-  List the campaigns whose configuration can be inspected or edited.
-
-Options:
-  -o, --output [table|json]  Output format; only json is a stable automation contract.
-                             [default: table]
-  -h, --help                 Show this message and exit.
-```
-
-## `pyrite physics reset`
-
-```text
-Usage: pyrite physics reset [OPTIONS] PROFILE [straggling|inelastic-model|inelastic-
-                            cutoff-ev|secondary-threshold-ev|elastic-model|transport-
-                            mode|mixed-c1|mixed-c2|mixed-maximum-step-um|bremsstrahlung-
-                            model|radiative-model|radiative-cutoff-ev|pair-production-
-                            model|positron-transport|atomic-electron-
-                            deflection|channeling-model|channeling-axial|transition-
-                            radiation|shell-ionization-model|channeling-
-                            plane|emission]...
-
-  Reset selected fields, or all fields owned by this command.
-
-Options:
-  -y, --yes   Skip the standard-profile confirmation.
-  --dry-run   Validate and preview without saving.
-  -h, --help  Show this message and exit.
-```
-
-## `pyrite physics set`
-
-```text
-Usage: pyrite physics set [OPTIONS] NAME
-
-  Set PROFILE fields; validate and atomically save, or preview with --dry-run.
-
-Options:
-  --straggling / --no-straggling  Enable or disable collision energy-loss straggling
-                                  (restricted soft loss in shell mode).
-  --inelastic-model [auto|continuous|shell-soft-hard]
-                                  Collision energy-loss scheme: shell-soft-hard
-                                  (default; midpoint, ungrooved, shell data for every
-                                  layer), continuous stopping (explicit approximation),
-                                  or auto (legacy conditional shell selection with
-                                  warned continuous fallback).
-  --inelastic-cutoff-ev EV        Soft/hard energy-loss cutoff W_c in eV (default 50 for
-                                  shell-soft-hard or auto); must exceed each material's
-                                  conduction-band resonance (Si 16.7, SiO2 22, MoS2 23
-                                  eV).  [x>0.0]
-  --secondary-threshold-ev EV     Transport hard-collision secondaries above this energy
-                                  in eV (production cut and tracking cutoff; requires
-                                  shell-soft-hard and SBETHE coverage, >= 1000 eV).
-                                  [x>0.0]
-  --elastic-model [mott|elsepa]   Elastic scattering: elsepa (default) full differential
-                                  cross sections (needs 'pyrite tables fetch elsepa';
-                                  bypasses the transport LUT), or the historical mott
-                                  screened-Rutherford angles.
-  --bremsstrahlung-model [auto|eedl|bremslib]
-                                  Continuum bremsstrahlung: bremslib (default) requires
-                                  the released BremsLib tables ('pyrite tables fetch
-                                  bremslib') and uses their angular model; eedl is the
-                                  fetched EEDL continuum with an isotropic photon angle
-                                  (pair with --radiative-model uncoupled); auto is the
-                                  legacy table-checked BremsLib selection.
-  --radiative-model [auto|uncoupled|bremslib-soft-hard]
-                                  Radiative energy loss: bremslib-soft-hard (default)
-                                  uses soft loss plus sampled hard photons and requires
-                                  midpoint energy, BremsLib and an ungrooved target;
-                                  uncoupled (explicit approximation) scores after
-                                  collision-only transport; auto (legacy) couples where
-                                  supported. Unsupported scenes must pass uncoupled.
-  --radiative-cutoff-ev EV        Hard-photon cutoff k_c in eV for bremslib-soft-hard or
-                                  auto (default 1000); must not exceed the continuum
-                                  electron cutoff (1000 eV by default).  [x>0.0]
-  --pair-production-model [penelope-2024]
-                                  Convert coupled hard photons above 1.022 MeV to e-/e+
-                                  pairs (opt-in). Requires --secondary-threshold-ev and
-                                  coupled BremsLib transport; pair electrons are
-                                  transported as secondaries, positrons are recorded
-                                  unless --positron-transport.
-  --positron-transport / --no-positron-transport
-                                  Transport pair positrons above the secondary threshold
-                                  (opt-in; requires --pair-production-model). Positrons
-                                  annihilate in flight and at rest; each annihilation
-                                  photon escapes or is absorbed at its first
-                                  interaction.
-  --atomic-electron-deflection [kawrakow|none]
-                                  Angular deflection by atomic electrons: kawrakow
-                                  (default) scales each element's elastic rate by 1 +
-                                  xi/Z (xi = 1 under continuous stopping; the Moller
-                                  share above W_c is removed under shell-soft-hard,
-                                  which needs elsepa); none keeps elastic-only
-                                  deflection.
-  --transport-mode [single-scattering|mixed]
-                                  Elastic transport: single-scattering (default)
-                                  simulates every event; mixed aggregates small-angle
-                                  events into a random hinge (requires elsepa and
-                                  midpoint; refused wherever CXR lines are scored, and
-                                  for coherent emission, temporal profiles, transition
-                                  radiation, channeling, photon transport and grooved
-                                  targets).
-  --mixed-c1 FRACTION             Mean soft deflection per hard step under mixed
-                                  transport (default 0.05).  [0.0<=x<=0.2]
-  --mixed-c2 FRACTION             Mean fractional soft energy loss per step under mixed
-                                  transport (default 0.05).  [0.0<=x<=0.2]
-  --shell-ionization-model [eedl|bote-salvat]
-                                  Characteristic-line primary vacancies: eedl (default)
-                                  subshell cross sections, or the opt-in bote-salvat
-                                  K/L/M fit (needs 'pyrite tables fetch bote-salvat';
-                                  EEDL for higher shells).
-  --channeling-model [off|planar]
-                                  Planar quantum entrance zone (default off); requires
-                                  plane, midpoint, uncoupled radiation and incoherent
-                                  emission. Disable with numerics reset PROFILE
-                                  channeling-model channeling-plane.
-  --channeling-plane H K L        Nonzero Miller indices of the planar channeling
-                                  family; requires planar.
-  -y, --yes                       Skip the 'standard' confirmation prompt.
-  --dry-run                       Print proposed TOML diff; write nothing.
-  --emission [incoherent|coherent|both]
-                                  CXR modes; cross-model constraints are validated
-                                  before saving.
-  -h, --help                      Show this message and exit.
-```
-
-## `pyrite physics show`
-
-```text
-Usage: pyrite physics show [OPTIONS] PROFILE
-
-  Show explicit/effective settings and their source for PROFILE.
-
-Options:
-  -o, --output [table|json]  Output format; only json is a stable automation contract.
-                             [default: table]
-  -h, --help                 Show this message and exit.
-```
-
-## `pyrite physics validate`
-
-```text
-Usage: pyrite physics validate [OPTIONS] PROFILE
-
-  Validate the selected campaign without running simulation or writing files.
-
-Options:
-  -h, --help  Show this message and exit.
-```
-
-## `pyrite physics preset`
-
-```text
-Usage: pyrite physics preset [OPTIONS] COMMAND [ARGS]...
-
-  Manage named physics presets that profiles attach by name.
-
-  Bundled reference presets are read-only; clone one with create NAME --from SOURCE.
-  Attach with 'pyrite profile set PROFILE --physics NAME'. Profile fields override the
-  preset; a preset never changes a result's identity unless its effective values change.
+  A profile attaches a preset with 'pyrite profile set PROFILE --physics NAME'; the
+  profile's own fields (pyrite profile physics) override it. Bundled presets are read-
+  only; clone one with 'create NAME --from SOURCE'. brem_source is currently an API-only
+  setting.
 
 Options:
   -h, --help  Show this message and exit.
 
 Commands:
-  adopt     Move PROFILE's own fields into new preset NAME and attach it.
-  create    Create user preset NAME, empty (built-in defaults) or cloned with...
-  delete    Delete an unreferenced user preset; irreversible.
-  list      List presets, their origin, and referencing profiles.
-  rename    Rename user preset NAME and update every referencing profile atomically.
-  reset     Return selected fields, or all fields, of NAME to built-in defaults.
-  set       Set fields of user preset NAME; affects every referencing profile.
-  show      Show NAME's stored and effective fields with their source.
-  validate  Validate NAME and every profile that references it; write nothing.
+  adopt     Move PROFILE's own fields into new preset...
+  create    Create user preset NAME, empty (built-in...
+  delete    Delete an unreferenced user preset;...
+  list      List presets, their origin, and...
+  rename    Rename user preset NAME and update every...
+  reset     Return selected fields, or all fields, of...
+  set       Set fields of user preset NAME; affects...
+  show      Show NAME's stored and effective fields...
+  validate  Validate NAME and every profile that...
 ```
 
-## `pyrite physics preset adopt`
+## `pyrite physics adopt`
 
 ```text
-Usage: pyrite physics preset adopt [OPTIONS] PROFILE NAME
+Usage: pyrite physics adopt [OPTIONS] PROFILE NAME
 
   Move PROFILE's own fields into new preset NAME and attach it.
 
@@ -227,10 +51,10 @@ Options:
   -h, --help          Show this message and exit.
 ```
 
-## `pyrite physics preset create`
+## `pyrite physics create`
 
 ```text
-Usage: pyrite physics preset create [OPTIONS] NAME
+Usage: pyrite physics create [OPTIONS] NAME
 
   Create user preset NAME, empty (built-in defaults) or cloned with --from; validate and
   atomically save, or preview with --dry-run.
@@ -313,7 +137,7 @@ Options:
   --channeling-model [off|planar]
                                   Planar quantum entrance zone (default off); requires
                                   plane, midpoint, uncoupled radiation and incoherent
-                                  emission. Disable with numerics reset PROFILE
+                                  emission. Disable with profile physics reset PROFILE
                                   channeling-model channeling-plane.
   --channeling-plane H K L        Nonzero Miller indices of the planar channeling
                                   family; requires planar.
@@ -325,10 +149,10 @@ Options:
   -h, --help                      Show this message and exit.
 ```
 
-## `pyrite physics preset delete`
+## `pyrite physics delete`
 
 ```text
-Usage: pyrite physics preset delete [OPTIONS] NAME
+Usage: pyrite physics delete [OPTIONS] NAME
 
   Delete an unreferenced user preset; irreversible.
 
@@ -338,10 +162,10 @@ Options:
   -h, --help  Show this message and exit.
 ```
 
-## `pyrite physics preset list`
+## `pyrite physics list`
 
 ```text
-Usage: pyrite physics preset list [OPTIONS]
+Usage: pyrite physics list [OPTIONS]
 
   List presets, their origin, and referencing profiles.
 
@@ -351,10 +175,10 @@ Options:
   -h, --help                 Show this message and exit.
 ```
 
-## `pyrite physics preset rename`
+## `pyrite physics rename`
 
 ```text
-Usage: pyrite physics preset rename [OPTIONS] NAME NEW_NAME
+Usage: pyrite physics rename [OPTIONS] NAME NEW_NAME
 
   Rename user preset NAME and update every referencing profile atomically.
 
@@ -363,22 +187,23 @@ Options:
   -h, --help  Show this message and exit.
 ```
 
-## `pyrite physics preset reset`
+## `pyrite physics reset`
 
 ```text
-Usage: pyrite physics preset reset [OPTIONS] NAME [FIELDS]...
+Usage: pyrite physics reset [OPTIONS] NAME [FIELDS]...
 
   Return selected fields, or all fields, of NAME to built-in defaults.
 
 Options:
   --dry-run   Print proposed TOML diff; write nothing.
+  -y, --yes   Skip the standard-profile confirmation.
   -h, --help  Show this message and exit.
 ```
 
-## `pyrite physics preset set`
+## `pyrite physics set`
 
 ```text
-Usage: pyrite physics preset set [OPTIONS] NAME
+Usage: pyrite physics set [OPTIONS] NAME
 
   Set fields of user preset NAME; affects every referencing profile. Validates all
   referencing profiles before saving.
@@ -460,7 +285,7 @@ Options:
   --channeling-model [off|planar]
                                   Planar quantum entrance zone (default off); requires
                                   plane, midpoint, uncoupled radiation and incoherent
-                                  emission. Disable with numerics reset PROFILE
+                                  emission. Disable with profile physics reset PROFILE
                                   channeling-model channeling-plane.
   --channeling-plane H K L        Nonzero Miller indices of the planar channeling
                                   family; requires planar.
@@ -469,13 +294,14 @@ Options:
                                   before saving.
   --description TEXT              Replace the display description.
   --dry-run                       Print proposed TOML diff; write nothing.
+  -y, --yes                       Skip the standard-profile confirmation.
   -h, --help                      Show this message and exit.
 ```
 
-## `pyrite physics preset show`
+## `pyrite physics show`
 
 ```text
-Usage: pyrite physics preset show [OPTIONS] NAME
+Usage: pyrite physics show [OPTIONS] NAME
 
   Show NAME's stored and effective fields with their source.
 
@@ -485,10 +311,10 @@ Options:
   -h, --help                 Show this message and exit.
 ```
 
-## `pyrite physics preset validate`
+## `pyrite physics validate`
 
 ```text
-Usage: pyrite physics preset validate [OPTIONS] NAME
+Usage: pyrite physics validate [OPTIONS] NAME
 
   Validate NAME and every profile that references it; write nothing.
 

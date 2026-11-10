@@ -1,4 +1,4 @@
-"""``pyrite numerics adaptive-sampling``: a profile's adaptive history-count policy."""
+"""``pyrite profile numerics adaptive-sampling``: a profile's adaptive history-count policy."""
 
 import click
 from tomlkit.exceptions import ParseError
@@ -242,7 +242,7 @@ def command():
       disable  opt out: drop any policy and select fixed counts
 
     History sampling is independent of the line grid; see
-    'pyrite numerics cxr-grid'.
+    'pyrite profile numerics cxr-grid'.
     """
 
 
@@ -302,12 +302,12 @@ def precision_show_command(name, json_output):
             if automatic_grid
             else "explicit or stored grids first, automatic for the rest"
         )
-        + f"; independent of history sampling, see 'pyrite numerics cxr-grid show {name}'"
+        + f"; independent of history sampling, see 'pyrite profile numerics cxr-grid show {name}'"
     )
     if effective is not None:
-        emit_result(f"  to select fixed counts: pyrite numerics adaptive-sampling disable {name}")
+        emit_result(f"  to select fixed counts: pyrite profile numerics adaptive-sampling disable {name}")
     elif counts and not blockers:
-        emit_result(f"  to switch to adaptive: pyrite numerics adaptive-sampling enable {name}")
+        emit_result(f"  to switch to adaptive: pyrite profile numerics adaptive-sampling enable {name}")
     return 0
 
 
@@ -355,13 +355,13 @@ def precision_set_command(name, yes, dry_run, **values):
     Fields left unspecified keep the existing policy's values; a new policy takes
     them from the default (target RSE 0.05, 200-20000 histories, blocks of 100,
     line and brem). A profile with fixed counts is refused; switch it with
-    'pyrite numerics adaptive-sampling enable'.
+    'pyrite profile numerics adaptive-sampling enable'.
     """
     updates = _updates(values)
     if not updates:
         raise click.UsageError(
             "provide at least one policy option; "
-            f"'pyrite numerics adaptive-sampling enable {name}' selects the default policy"
+            f"'pyrite profile numerics adaptive-sampling enable {name}' selects the default policy"
         )
     try:
         original, document = _catalog_io.catalog_text()
@@ -382,7 +382,7 @@ def precision_reset_command(name, fields, yes, dry_run):
 
     Removing the policy returns PROFILE to the default adaptive policy unless it
     cannot run adaptive. Fixed counts are untouched; select them with
-    'pyrite numerics adaptive-sampling disable'.
+    'pyrite profile numerics adaptive-sampling disable'.
     """
     keys = tuple(_stored(_PRECISION_FIELD_NAMES[field]) for field in fields)
     try:

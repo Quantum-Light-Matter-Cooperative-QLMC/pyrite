@@ -66,8 +66,8 @@ Choose a family for its complete help, options, defaults, and examples.
 - [`pyrite config`](cli-reference-config.md) — Set and inspect environment-scoped CLI defaults.
 - [`pyrite remote`](cli-reference-remote.md) — [dev] Push code and run or manage MC sweeps on a remote GPU box over SSH.
 - [`pyrite profile`](cli-reference-profile.md) — Manage catalog scan profiles (named campaign defaults).
-- [`pyrite physics`](cli-reference-physics.md) — Inspect and edit PROFILE's physical models and cutoffs (API Physics).
-- [`pyrite numerics`](cli-reference-numerics.md) — Inspect and edit PROFILE's sampling, integration and photon grids.
+- [`pyrite physics`](cli-reference-physics.md) — Manage named physics presets: models, cutoffs, straggling and emission.
+- [`pyrite numerics`](cli-reference-numerics.md) — Manage named numerics presets: sampling, reflections/mosaic, integration.
 - [`pyrite material`](cli-reference-material.md) — Add, inspect, validate, and blaze individual materials.
 - [`pyrite beam`](cli-reference-beam.md) — Manage named beams (``[beams.*]``), attachable to profiles by name.
 - [`pyrite detector`](cli-reference-detector.md) — Manage named detector geometries, attachable to profiles by name.
@@ -136,8 +136,8 @@ Commands:
   config        Set profile, catalog, workspace, and remote defaults.
   remote        Run and manage MC sweeps on a remote GPU host.
   profile       Manage named catalog campaigns and material membership.
-  physics       Inspect and edit a campaign's physical models and cutoffs.
-  numerics      Configure sampling, integration, precision and photon grids.
+  physics       Manage named physics presets: models, cutoffs and emission.
+  numerics      Manage named numerics presets: sampling, mosaic and integration.
   material      Inspect, validate, edit, and blaze individual materials.
   beam          Manage named beams, attachable to profiles by name.
   detector      Manage named detector geometries.
@@ -263,58 +263,52 @@ Existing command fragments remain available below; each link opens the full fami
 - <span id="pyrite-profile-filter-set"></span>[`pyrite profile filter set`](cli-reference-profile.md#pyrite-profile-filter-set)
 - <span id="pyrite-profile-filter-show"></span>[`pyrite profile filter show`](cli-reference-profile.md#pyrite-profile-filter-show)
 - <span id="pyrite-profile-list"></span>[`pyrite profile list`](cli-reference-profile.md#pyrite-profile-list)
-- <span id="pyrite-profile-numerics"></span>[`pyrite profile numerics`](cli-reference-profile.md#pyrite-profile-numerics)
-- <span id="pyrite-profile-numerics-reset"></span>[`pyrite profile numerics reset`](cli-reference-profile.md#pyrite-profile-numerics-reset)
-- <span id="pyrite-profile-numerics-set"></span>[`pyrite profile numerics set`](cli-reference-profile.md#pyrite-profile-numerics-set)
-- <span id="pyrite-profile-numerics-show"></span>[`pyrite profile numerics show`](cli-reference-profile.md#pyrite-profile-numerics-show)
 - <span id="pyrite-profile-ranges"></span>[`pyrite profile ranges`](cli-reference-profile.md#pyrite-profile-ranges)
 - <span id="pyrite-profile-ranges-show"></span>[`pyrite profile ranges show`](cli-reference-profile.md#pyrite-profile-ranges-show)
 - <span id="pyrite-profile-remove"></span>[`pyrite profile remove`](cli-reference-profile.md#pyrite-profile-remove)
 - <span id="pyrite-profile-rename"></span>[`pyrite profile rename`](cli-reference-profile.md#pyrite-profile-rename)
 - <span id="pyrite-profile-set"></span>[`pyrite profile set`](cli-reference-profile.md#pyrite-profile-set)
 - <span id="pyrite-profile-show"></span>[`pyrite profile show`](cli-reference-profile.md#pyrite-profile-show)
+- <span id="pyrite-profile-numerics"></span>[`pyrite profile numerics`](cli-reference-profile.md#pyrite-profile-numerics)
+- <span id="pyrite-profile-numerics-reset"></span>[`pyrite profile numerics reset`](cli-reference-profile.md#pyrite-profile-numerics-reset)
+- <span id="pyrite-profile-numerics-set"></span>[`pyrite profile numerics set`](cli-reference-profile.md#pyrite-profile-numerics-set)
+- <span id="pyrite-profile-numerics-show"></span>[`pyrite profile numerics show`](cli-reference-profile.md#pyrite-profile-numerics-show)
+- <span id="pyrite-profile-numerics-validate"></span>[`pyrite profile numerics validate`](cli-reference-profile.md#pyrite-profile-numerics-validate)
+- <span id="pyrite-profile-numerics-adaptive-sampling"></span>[`pyrite profile numerics adaptive-sampling`](cli-reference-profile.md#pyrite-profile-numerics-adaptive-sampling)
+- <span id="pyrite-profile-numerics-adaptive-sampling-disable"></span>[`pyrite profile numerics adaptive-sampling disable`](cli-reference-profile.md#pyrite-profile-numerics-adaptive-sampling-disable)
+- <span id="pyrite-profile-numerics-adaptive-sampling-enable"></span>[`pyrite profile numerics adaptive-sampling enable`](cli-reference-profile.md#pyrite-profile-numerics-adaptive-sampling-enable)
+- <span id="pyrite-profile-numerics-adaptive-sampling-reset"></span>[`pyrite profile numerics adaptive-sampling reset`](cli-reference-profile.md#pyrite-profile-numerics-adaptive-sampling-reset)
+- <span id="pyrite-profile-numerics-adaptive-sampling-set"></span>[`pyrite profile numerics adaptive-sampling set`](cli-reference-profile.md#pyrite-profile-numerics-adaptive-sampling-set)
+- <span id="pyrite-profile-numerics-adaptive-sampling-show"></span>[`pyrite profile numerics adaptive-sampling show`](cli-reference-profile.md#pyrite-profile-numerics-adaptive-sampling-show)
+- <span id="pyrite-profile-numerics-cxr-grid"></span>[`pyrite profile numerics cxr-grid`](cli-reference-profile.md#pyrite-profile-numerics-cxr-grid)
+- <span id="pyrite-profile-numerics-cxr-grid-reset"></span>[`pyrite profile numerics cxr-grid reset`](cli-reference-profile.md#pyrite-profile-numerics-cxr-grid-reset)
+- <span id="pyrite-profile-numerics-cxr-grid-set"></span>[`pyrite profile numerics cxr-grid set`](cli-reference-profile.md#pyrite-profile-numerics-cxr-grid-set)
+- <span id="pyrite-profile-numerics-cxr-grid-show"></span>[`pyrite profile numerics cxr-grid show`](cli-reference-profile.md#pyrite-profile-numerics-cxr-grid-show)
+- <span id="pyrite-profile-physics"></span>[`pyrite profile physics`](cli-reference-profile.md#pyrite-profile-physics)
+- <span id="pyrite-profile-physics-reset"></span>[`pyrite profile physics reset`](cli-reference-profile.md#pyrite-profile-physics-reset)
+- <span id="pyrite-profile-physics-set"></span>[`pyrite profile physics set`](cli-reference-profile.md#pyrite-profile-physics-set)
+- <span id="pyrite-profile-physics-show"></span>[`pyrite profile physics show`](cli-reference-profile.md#pyrite-profile-physics-show)
+- <span id="pyrite-profile-physics-validate"></span>[`pyrite profile physics validate`](cli-reference-profile.md#pyrite-profile-physics-validate)
 - <span id="pyrite-physics"></span>[`pyrite physics`](cli-reference-physics.md#pyrite-physics)
+- <span id="pyrite-physics-adopt"></span>[`pyrite physics adopt`](cli-reference-physics.md#pyrite-physics-adopt)
+- <span id="pyrite-physics-create"></span>[`pyrite physics create`](cli-reference-physics.md#pyrite-physics-create)
+- <span id="pyrite-physics-delete"></span>[`pyrite physics delete`](cli-reference-physics.md#pyrite-physics-delete)
 - <span id="pyrite-physics-list"></span>[`pyrite physics list`](cli-reference-physics.md#pyrite-physics-list)
+- <span id="pyrite-physics-rename"></span>[`pyrite physics rename`](cli-reference-physics.md#pyrite-physics-rename)
 - <span id="pyrite-physics-reset"></span>[`pyrite physics reset`](cli-reference-physics.md#pyrite-physics-reset)
 - <span id="pyrite-physics-set"></span>[`pyrite physics set`](cli-reference-physics.md#pyrite-physics-set)
 - <span id="pyrite-physics-show"></span>[`pyrite physics show`](cli-reference-physics.md#pyrite-physics-show)
 - <span id="pyrite-physics-validate"></span>[`pyrite physics validate`](cli-reference-physics.md#pyrite-physics-validate)
-- <span id="pyrite-physics-preset"></span>[`pyrite physics preset`](cli-reference-physics.md#pyrite-physics-preset)
-- <span id="pyrite-physics-preset-adopt"></span>[`pyrite physics preset adopt`](cli-reference-physics.md#pyrite-physics-preset-adopt)
-- <span id="pyrite-physics-preset-create"></span>[`pyrite physics preset create`](cli-reference-physics.md#pyrite-physics-preset-create)
-- <span id="pyrite-physics-preset-delete"></span>[`pyrite physics preset delete`](cli-reference-physics.md#pyrite-physics-preset-delete)
-- <span id="pyrite-physics-preset-list"></span>[`pyrite physics preset list`](cli-reference-physics.md#pyrite-physics-preset-list)
-- <span id="pyrite-physics-preset-rename"></span>[`pyrite physics preset rename`](cli-reference-physics.md#pyrite-physics-preset-rename)
-- <span id="pyrite-physics-preset-reset"></span>[`pyrite physics preset reset`](cli-reference-physics.md#pyrite-physics-preset-reset)
-- <span id="pyrite-physics-preset-set"></span>[`pyrite physics preset set`](cli-reference-physics.md#pyrite-physics-preset-set)
-- <span id="pyrite-physics-preset-show"></span>[`pyrite physics preset show`](cli-reference-physics.md#pyrite-physics-preset-show)
-- <span id="pyrite-physics-preset-validate"></span>[`pyrite physics preset validate`](cli-reference-physics.md#pyrite-physics-preset-validate)
 - <span id="pyrite-numerics"></span>[`pyrite numerics`](cli-reference-numerics.md#pyrite-numerics)
+- <span id="pyrite-numerics-adopt"></span>[`pyrite numerics adopt`](cli-reference-numerics.md#pyrite-numerics-adopt)
+- <span id="pyrite-numerics-create"></span>[`pyrite numerics create`](cli-reference-numerics.md#pyrite-numerics-create)
+- <span id="pyrite-numerics-delete"></span>[`pyrite numerics delete`](cli-reference-numerics.md#pyrite-numerics-delete)
 - <span id="pyrite-numerics-list"></span>[`pyrite numerics list`](cli-reference-numerics.md#pyrite-numerics-list)
+- <span id="pyrite-numerics-rename"></span>[`pyrite numerics rename`](cli-reference-numerics.md#pyrite-numerics-rename)
 - <span id="pyrite-numerics-reset"></span>[`pyrite numerics reset`](cli-reference-numerics.md#pyrite-numerics-reset)
 - <span id="pyrite-numerics-set"></span>[`pyrite numerics set`](cli-reference-numerics.md#pyrite-numerics-set)
 - <span id="pyrite-numerics-show"></span>[`pyrite numerics show`](cli-reference-numerics.md#pyrite-numerics-show)
 - <span id="pyrite-numerics-validate"></span>[`pyrite numerics validate`](cli-reference-numerics.md#pyrite-numerics-validate)
-- <span id="pyrite-numerics-preset"></span>[`pyrite numerics preset`](cli-reference-numerics.md#pyrite-numerics-preset)
-- <span id="pyrite-numerics-preset-adopt"></span>[`pyrite numerics preset adopt`](cli-reference-numerics.md#pyrite-numerics-preset-adopt)
-- <span id="pyrite-numerics-preset-create"></span>[`pyrite numerics preset create`](cli-reference-numerics.md#pyrite-numerics-preset-create)
-- <span id="pyrite-numerics-preset-delete"></span>[`pyrite numerics preset delete`](cli-reference-numerics.md#pyrite-numerics-preset-delete)
-- <span id="pyrite-numerics-preset-list"></span>[`pyrite numerics preset list`](cli-reference-numerics.md#pyrite-numerics-preset-list)
-- <span id="pyrite-numerics-preset-rename"></span>[`pyrite numerics preset rename`](cli-reference-numerics.md#pyrite-numerics-preset-rename)
-- <span id="pyrite-numerics-preset-reset"></span>[`pyrite numerics preset reset`](cli-reference-numerics.md#pyrite-numerics-preset-reset)
-- <span id="pyrite-numerics-preset-set"></span>[`pyrite numerics preset set`](cli-reference-numerics.md#pyrite-numerics-preset-set)
-- <span id="pyrite-numerics-preset-show"></span>[`pyrite numerics preset show`](cli-reference-numerics.md#pyrite-numerics-preset-show)
-- <span id="pyrite-numerics-preset-validate"></span>[`pyrite numerics preset validate`](cli-reference-numerics.md#pyrite-numerics-preset-validate)
-- <span id="pyrite-numerics-adaptive-sampling"></span>[`pyrite numerics adaptive-sampling`](cli-reference-numerics.md#pyrite-numerics-adaptive-sampling)
-- <span id="pyrite-numerics-adaptive-sampling-disable"></span>[`pyrite numerics adaptive-sampling disable`](cli-reference-numerics.md#pyrite-numerics-adaptive-sampling-disable)
-- <span id="pyrite-numerics-adaptive-sampling-enable"></span>[`pyrite numerics adaptive-sampling enable`](cli-reference-numerics.md#pyrite-numerics-adaptive-sampling-enable)
-- <span id="pyrite-numerics-adaptive-sampling-reset"></span>[`pyrite numerics adaptive-sampling reset`](cli-reference-numerics.md#pyrite-numerics-adaptive-sampling-reset)
-- <span id="pyrite-numerics-adaptive-sampling-set"></span>[`pyrite numerics adaptive-sampling set`](cli-reference-numerics.md#pyrite-numerics-adaptive-sampling-set)
-- <span id="pyrite-numerics-adaptive-sampling-show"></span>[`pyrite numerics adaptive-sampling show`](cli-reference-numerics.md#pyrite-numerics-adaptive-sampling-show)
-- <span id="pyrite-numerics-cxr-grid"></span>[`pyrite numerics cxr-grid`](cli-reference-numerics.md#pyrite-numerics-cxr-grid)
-- <span id="pyrite-numerics-cxr-grid-reset"></span>[`pyrite numerics cxr-grid reset`](cli-reference-numerics.md#pyrite-numerics-cxr-grid-reset)
-- <span id="pyrite-numerics-cxr-grid-set"></span>[`pyrite numerics cxr-grid set`](cli-reference-numerics.md#pyrite-numerics-cxr-grid-set)
-- <span id="pyrite-numerics-cxr-grid-show"></span>[`pyrite numerics cxr-grid show`](cli-reference-numerics.md#pyrite-numerics-cxr-grid-show)
 - <span id="pyrite-numerics-energy-grid"></span>[`pyrite numerics energy-grid`](cli-reference-numerics.md#pyrite-numerics-energy-grid)
 - <span id="pyrite-numerics-energy-grid-derive"></span>[`pyrite numerics energy-grid derive`](cli-reference-numerics.md#pyrite-numerics-energy-grid-derive)
 - <span id="pyrite-numerics-energy-grid-show"></span>[`pyrite numerics energy-grid show`](cli-reference-numerics.md#pyrite-numerics-energy-grid-show)

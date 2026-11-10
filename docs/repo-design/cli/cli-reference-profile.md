@@ -26,12 +26,15 @@ Usage: pyrite profile [OPTIONS] COMMAND [ARGS]...
   units.md for supported fields and examples.
 
   Where settings live: ranges, membership, beam/detector references and emission use
-  ``set|add|remove``; sampling/integration use ``pyrite numerics``; physical
-  models/cutoffs use ``pyrite physics``; line-grid and precision policies live under
-  ``pyrite numerics``. Filters and the pixel detector use ``filter`` and ``detector``;
-  reusable beams and detectors are named objects edited with ``pyrite beam`` and
-  ``pyrite detector``. The full map is docs/repo-design/profile-settings.md. Bundled
-  demos are read-only (copy with ``create NAME --from DEMO``); yours live in
+  ``set|add|remove``. PROFILE's own sampling, mosaic, integration and CXR-grid fields
+  use ``profile numerics``, including adaptive sampling (``profile numerics adaptive-
+  sampling``, the default unless fixed history counts are set); its physical models and
+  cutoffs use ``profile physics``. Named presets those override are managed with
+  ``pyrite numerics`` and ``pyrite physics`` and attached with ``set
+  --numerics|--physics NAME``. Filters and the pixel detector use ``filter`` and
+  ``detector``; reusable beams and detectors are named objects edited with ``pyrite
+  beam`` and ``pyrite detector``. The full map is docs/repo-design/profile-settings.md.
+  Bundled demos are read-only (copy with ``create NAME --from DEMO``); yours live in
   ``catalog.user``.
 
   Examples:
@@ -39,8 +42,11 @@ Usage: pyrite profile [OPTIONS] COMMAND [ARGS]...
     pyrite profile show sub_100keV        (or: pyrite profile sub_100keV)
     pyrite profile create sub_100keV --energy 30:100:10
     pyrite profile set sub_100keV --detector eds
-    pyrite numerics set sub_100keV --cxr-histories 2000
-    pyrite numerics cxr-grid show sub_100keV
+    pyrite profile numerics show sub_100keV
+    pyrite profile numerics adaptive-sampling set sub_100keV --target-rse 0.02
+    pyrite profile numerics set sub_100keV --cxr-histories 2000   (fixed counts)
+    pyrite profile physics set sub_100keV --elastic-model mott
+    pyrite profile numerics cxr-grid show sub_100keV
     pyrite profile add sub_100keV --energy 75
     pyrite profile set sub_100keV --material hopg,mose2
     pyrite profile rename sub_100keV sub100
@@ -56,12 +62,13 @@ Commands:
   detector  Manage profile detector IDs, references...
   filter    Manage finite FilterPlate objects on a...
   list      List profiles: source, membership,...
-  numerics  Inspect and edit result-affecting...
   ranges    Inspect campaign sweep ranges, including...
   remove    Remove values from an existing profile's...
   rename    Rename profile NAME to NEW_NAME.
   set       Replace range grids,...
   show      Show PROFILE in tables grouped by CLI...
+  numerics  Show/edit PROFILE's sampling, mosaic, integration and grid fields.
+  physics   Show/edit PROFILE's physical models, cutoffs and emission.
 ```
 
 ## `pyrite profile add`
@@ -472,180 +479,6 @@ Options:
   -h, --help                 Show this message and exit.
 ```
 
-## `pyrite profile numerics`
-
-```text
-Usage: pyrite profile numerics [OPTIONS] COMMAND [ARGS]...
-
-  Inspect and edit result-affecting calculation controls.
-
-Options:
-  -h, --help  Show this message and exit.
-
-Commands:
-  reset  Reset selected FIELDs, or every explicit numeric when none are named.
-  set    Set one or more explicit result-affecting controls on PROFILE.
-  show   Show explicit and effective PROFILE numerics with value sources.
-```
-
-## `pyrite profile numerics reset`
-
-```text
-Usage: pyrite profile numerics reset [OPTIONS] NAME [cxr-histories|brem-
-                                     histories|reflection-families|maximum-
-                                     reflections|mosaic-nodes|mosaic-
-                                     route|straggling|energy-model|maximum-fractional-
-                                     energy-loss|inelastic-model|inelastic-cutoff-
-                                     ev|secondary-threshold-ev|elastic-model|transport-
-                                     mode|mixed-c1|mixed-c2|mixed-maximum-step-
-                                     um|bremsstrahlung-model|radiative-model|radiative-
-                                     cutoff-ev|pair-production-model|positron-
-                                     transport|atomic-electron-deflection|channeling-
-                                     model|channeling-axial|transition-radiation|shell-
-                                     ionization-model|channeling-plane|channeling-basis-
-                                     size|channeling-bloch-cells|channeling-dz-
-                                     ang|channeling-zone-max-ang]...
-
-  Reset selected FIELDs, or every explicit numeric when none are named.
-
-Options:
-  -y, --yes   Skip the 'standard' confirmation prompt.
-  --dry-run   Print proposed TOML diff; write nothing.
-  -h, --help  Show this message and exit.
-```
-
-## `pyrite profile numerics set`
-
-```text
-Usage: pyrite profile numerics set [OPTIONS] NAME
-
-  Set one or more explicit result-affecting controls on PROFILE.
-
-Options:
-  --cxr-histories N               Monte Carlo electron histories used to estimate the
-                                  CXR spectrum.  [x>=1]
-  --brem-histories N              Monte Carlo electron histories used to estimate
-                                  bremsstrahlung.  [x>=1]
-  --reflection-families N         Ranked reflection families to resolve.  [x>=1]
-  --maximum-reflections N         Cap resolved reflections after family expansion.
-                                  [x>=1]
-  --mosaic-nodes N                Gauss-Hermite nodes per mosaic tilt axis.  [x>=1]
-  --mosaic-route [analytic|mc]    Mosaic broadening route.
-  --straggling / --no-straggling  Enable or disable collision energy-loss straggling
-                                  (restricted soft loss in shell mode).
-  --energy-model [frozen|midpoint]
-                                  Transport clock model.
-  --maximum-fractional-energy-loss FRACTION
-                                  Cap one row's fractional mean energy loss; positive
-                                  values require midpoint.  [x>=0.0]
-  --inelastic-model [auto|continuous|shell-soft-hard]
-                                  Collision energy-loss scheme: shell-soft-hard
-                                  (default; midpoint, ungrooved, shell data for every
-                                  layer), continuous stopping (explicit approximation),
-                                  or auto (legacy conditional shell selection with
-                                  warned continuous fallback).
-  --inelastic-cutoff-ev EV        Soft/hard energy-loss cutoff W_c in eV (default 50 for
-                                  shell-soft-hard or auto); must exceed each material's
-                                  conduction-band resonance (Si 16.7, SiO2 22, MoS2 23
-                                  eV).  [x>0.0]
-  --secondary-threshold-ev EV     Transport hard-collision secondaries above this energy
-                                  in eV (production cut and tracking cutoff; requires
-                                  shell-soft-hard and SBETHE coverage, >= 1000 eV).
-                                  [x>0.0]
-  --elastic-model [mott|elsepa]   Elastic scattering: elsepa (default) full differential
-                                  cross sections (needs 'pyrite tables fetch elsepa';
-                                  bypasses the transport LUT), or the historical mott
-                                  screened-Rutherford angles.
-  --bremsstrahlung-model [auto|eedl|bremslib]
-                                  Continuum bremsstrahlung: bremslib (default) requires
-                                  the released BremsLib tables ('pyrite tables fetch
-                                  bremslib') and uses their angular model; eedl is the
-                                  fetched EEDL continuum with an isotropic photon angle
-                                  (pair with --radiative-model uncoupled); auto is the
-                                  legacy table-checked BremsLib selection.
-  --radiative-model [auto|uncoupled|bremslib-soft-hard]
-                                  Radiative energy loss: bremslib-soft-hard (default)
-                                  uses soft loss plus sampled hard photons and requires
-                                  midpoint energy, BremsLib and an ungrooved target;
-                                  uncoupled (explicit approximation) scores after
-                                  collision-only transport; auto (legacy) couples where
-                                  supported. Unsupported scenes must pass uncoupled.
-  --radiative-cutoff-ev EV        Hard-photon cutoff k_c in eV for bremslib-soft-hard or
-                                  auto (default 1000); must not exceed the continuum
-                                  electron cutoff (1000 eV by default).  [x>0.0]
-  --pair-production-model [penelope-2024]
-                                  Convert coupled hard photons above 1.022 MeV to e-/e+
-                                  pairs (opt-in). Requires --secondary-threshold-ev and
-                                  coupled BremsLib transport; pair electrons are
-                                  transported as secondaries, positrons are recorded
-                                  unless --positron-transport.
-  --positron-transport / --no-positron-transport
-                                  Transport pair positrons above the secondary threshold
-                                  (opt-in; requires --pair-production-model). Positrons
-                                  annihilate in flight and at rest; each annihilation
-                                  photon escapes or is absorbed at its first
-                                  interaction.
-  --atomic-electron-deflection [kawrakow|none]
-                                  Angular deflection by atomic electrons: kawrakow
-                                  (default) scales each element's elastic rate by 1 +
-                                  xi/Z (xi = 1 under continuous stopping; the Moller
-                                  share above W_c is removed under shell-soft-hard,
-                                  which needs elsepa); none keeps elastic-only
-                                  deflection.
-  --transport-mode [single-scattering|mixed]
-                                  Elastic transport: single-scattering (default)
-                                  simulates every event; mixed aggregates small-angle
-                                  events into a random hinge (requires elsepa and
-                                  midpoint; refused wherever CXR lines are scored, and
-                                  for coherent emission, temporal profiles, transition
-                                  radiation, channeling, photon transport and grooved
-                                  targets).
-  --mixed-c1 FRACTION             Mean soft deflection per hard step under mixed
-                                  transport (default 0.05).  [0.0<=x<=0.2]
-  --mixed-c2 FRACTION             Mean fractional soft energy loss per step under mixed
-                                  transport (default 0.05).  [0.0<=x<=0.2]
-  --mixed-maximum-step-um UM      Absolute step limit under mixed transport (default: a
-                                  hundredth of the layer thickness).  [x>0.0]
-  --shell-ionization-model [eedl|bote-salvat]
-                                  Characteristic-line primary vacancies: eedl (default)
-                                  subshell cross sections, or the opt-in bote-salvat
-                                  K/L/M fit (needs 'pyrite tables fetch bote-salvat';
-                                  EEDL for higher shells).
-  --channeling-model [off|planar]
-                                  Planar quantum entrance zone (default off); requires
-                                  plane, midpoint, uncoupled radiation and incoherent
-                                  emission. Disable with numerics reset PROFILE
-                                  channeling-model channeling-plane.
-  --channeling-plane H K L        Nonzero Miller indices of the planar channeling
-                                  family; requires planar.
-  --channeling-basis-size INTEGER RANGE
-                                  Transverse plane-wave band |h| <= H (default 16).
-                                  [x>=1]
-  --channeling-bloch-cells INTEGER RANGE
-                                  Bloch-grid supercell size (default 16).  [x>=1]
-  --channeling-dz-ang FLOAT RANGE
-                                  Zone depth step in angstrom (default 250).  [x>0]
-  --channeling-zone-max-ang FLOAT RANGE
-                                  Zone length cap in angstrom (default first layer
-                                  thickness).  [x>0]
-  -y, --yes                       Skip the 'standard' confirmation prompt.
-  --dry-run                       Print proposed TOML diff; write nothing.
-  -h, --help                      Show this message and exit.
-```
-
-## `pyrite profile numerics show`
-
-```text
-Usage: pyrite profile numerics show [OPTIONS] NAME
-
-  Show explicit and effective PROFILE numerics with value sources.
-
-Options:
-  -o, --output [table|json]  Output format; only json is a stable automation contract.
-                             [default: table]
-  -h, --help                 Show this message and exit.
-```
-
 ## `pyrite profile ranges`
 
 ```text
@@ -823,4 +656,568 @@ Options:
   -o, --output [table|json|wide]  Output format; only json is a stable automation
                                   contract.  [default: table]
   -h, --help                      Show this message and exit.
+```
+
+## `pyrite profile numerics`
+
+```text
+Usage: pyrite profile numerics [OPTIONS] COMMAND [ARGS]...
+
+  Show and edit PROFILE's own numerics fields: history sampling (adaptive or fixed),
+  reflections/mosaic, integration, the channeling grid, and the CXR-grid policy.
+
+  Profile fields override the attached named preset (pyrite numerics; attach with
+  'pyrite profile set PROFILE --numerics NAME'). Physics fields live under 'pyrite
+  profile physics'.
+
+Options:
+  -h, --help  Show this message and exit.
+
+Commands:
+  reset              Reset selected fields, or every field this...
+  set                Set PROFILE numerics fields; validate and...
+  show               Show PROFILE's effective fields as SETTING...
+  validate           Validate PROFILE without running a...
+  adaptive-sampling  Adaptive sampling policy or fixed history counts on PROFILE.
+  cxr-grid           PROFILE's automatic CXR photon-grid policy.
+```
+
+## `pyrite profile numerics reset`
+
+```text
+Usage: pyrite profile numerics reset [OPTIONS] PROFILE [FIELDS]...
+
+  Reset selected fields, or every field this command owns, to the preset/default.
+
+Options:
+  -y, --yes   Skip the standard-profile confirmation.
+  --dry-run   Validate and preview without saving.
+  -h, --help  Show this message and exit.
+```
+
+## `pyrite profile numerics set`
+
+```text
+Usage: pyrite profile numerics set [OPTIONS] PROFILE
+
+  Set PROFILE numerics fields; validate and atomically save, or preview with --dry-run.
+
+  Setting --cxr-histories or --brem-histories selects fixed history counts; return to
+  adaptive sampling with 'pyrite profile numerics adaptive-sampling enable PROFILE'.
+
+Options:
+  --cxr-histories N               Fixed Monte Carlo electron histories used to estimate
+                                  the CXR spectrum; setting it selects fixed counts.
+                                  Adaptive sampling (the default) is restored by 'pyrite
+                                  profile numerics adaptive-sampling enable PROFILE'.
+                                  [x>=1]
+  --brem-histories N              Fixed Monte Carlo electron histories used to estimate
+                                  bremsstrahlung; setting it selects fixed counts.
+                                  Adaptive sampling (the default) is restored by 'pyrite
+                                  profile numerics adaptive-sampling enable PROFILE'.
+                                  [x>=1]
+  --reflection-families N         Ranked reflection families to resolve.  [x>=1]
+  --maximum-reflections N         Cap resolved reflections after family expansion.
+                                  [x>=1]
+  --mosaic-nodes N                Gauss-Hermite nodes per mosaic tilt axis.  [x>=1]
+  --mosaic-route [analytic|mc]    Mosaic broadening route.
+  --energy-model [frozen|midpoint]
+                                  Transport clock model.
+  --maximum-fractional-energy-loss FRACTION
+                                  Cap one row's fractional mean energy loss; positive
+                                  values require midpoint.  [x>=0.0]
+  --channeling-basis-size INTEGER RANGE
+                                  Transverse plane-wave band |h| <= H (default 16).
+                                  [x>=1]
+  --channeling-bloch-cells INTEGER RANGE
+                                  Bloch-grid supercell size (default 16).  [x>=1]
+  --channeling-dz-ang FLOAT RANGE
+                                  Zone depth step in angstrom (default 250).  [x>0]
+  --channeling-zone-max-ang FLOAT RANGE
+                                  Zone length cap in angstrom (default first layer
+                                  thickness).  [x>0]
+  -y, --yes                       Skip the standard-profile confirmation.
+  --dry-run                       Validate and preview without saving.
+  -h, --help                      Show this message and exit.
+```
+
+## `pyrite profile numerics show`
+
+```text
+Usage: pyrite profile numerics show [OPTIONS] PROFILE
+
+  Show PROFILE's effective fields as SETTING / VALUE / SOURCE groups.
+
+  SOURCE is profile (set on PROFILE), preset:NAME (from the attached preset) or default
+  (built in).
+
+Options:
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
+  -h, --help                      Show this message and exit.
+```
+
+## `pyrite profile numerics validate`
+
+```text
+Usage: pyrite profile numerics validate [OPTIONS] PROFILE
+
+  Validate PROFILE without running a simulation or writing files.
+
+Options:
+  -h, --help  Show this message and exit.
+```
+
+## `pyrite profile numerics adaptive-sampling`
+
+```text
+Usage: pyrite profile numerics adaptive-sampling [OPTIONS] COMMAND [ARGS]...
+
+  Inspect and edit PROFILE's history-count mode: adaptive policy or fixed counts.
+
+  Profiles without fixed history counts or a policy run adaptive by default (target RSE
+  0.05, 200-20000 histories, blocks of 100, line and bremsstrahlung). Each incoherent
+  case stops when the relative standard error of its line (and optionally
+  bremsstrahlung) yield meets the target and its heavy-tail guards pass, or at the
+  maximum count flagged statistics-limited. By default one count serves both
+  populations. --brem-target-rse enables independent brem-prefix stopping; line
+  transport continues until brem finishes. Coherent emission, cascades, physical
+  detectors, GDF beams, grooves and fixed history counts keep fixed counts. A history is
+  one transported primary electron.
+
+    enable   switch to adaptive: drop fixed counts, optionally customize
+    set      customize fields of an adaptive policy
+    reset    drop customized fields, or the whole table (back to the default)
+    disable  opt out: drop any policy and select fixed counts
+
+  History sampling is independent of the line grid; see 'pyrite profile numerics cxr-
+  grid'.
+
+Options:
+  -h, --help  Show this message and exit.
+
+Commands:
+  disable  Opt PROFILE out of adaptive sampling: remove any policy, set fixed counts.
+  enable   Switch PROFILE to adaptive history counts in one atomic edit.
+  reset    Reset optional FIELDs to defaults, or remove the policy when none are...
+  set      Create or update PROFILE's adaptive policy.
+  show     Show PROFILE's history-count mode, its source, blockers and next steps.
+```
+
+## `pyrite profile numerics adaptive-sampling disable`
+
+```text
+Usage: pyrite profile numerics adaptive-sampling disable [OPTIONS] NAME
+
+  Opt PROFILE out of adaptive sampling: remove any policy, set fixed counts.
+
+  --cxr-histories/--brem-histories replace that count. A count the profile already sets
+  is otherwise kept, including a sweep grid. A count it lacks is prompted for on a
+  terminal; without a terminal, or with --yes or --dry-run, it takes the full-fidelity
+  default (300 line, 150 brem).
+
+Options:
+  --cxr-histories N   Fixed Monte Carlo electron histories for the CXR spectrum.  [x>=1]
+  --brem-histories N  Fixed Monte Carlo electron histories for bremsstrahlung.  [x>=1]
+  -y, --yes           Use defaults for missing counts; skip confirmations.
+  --dry-run           Print proposed TOML diff; write nothing.
+  -h, --help          Show this message and exit.
+```
+
+## `pyrite profile numerics adaptive-sampling enable`
+
+```text
+Usage: pyrite profile numerics adaptive-sampling enable [OPTIONS] NAME
+
+  Switch PROFILE to adaptive history counts in one atomic edit.
+
+  Removes the profile's fixed cxr-histories/brem-histories. Without options the default
+  policy applies (no table is written); options write a policy whose unspecified fields
+  come from the existing policy, else the default. Refuses, writing nothing, when the
+  profile cannot run adaptive (coherent emission, cascades, positrons, a physical
+  detector, or per-material count overrides). Emission, cascades, beam, geometry and
+  line-grid selectors are never changed.
+
+Options:
+  --brem-target-rse FRACTION      Stop brem independently at this RSE; requires both cxr
+                                  and brem observables.  [x>0.0]
+  --brem-min-histories N          Brem minimum; defaults to --min-histories. Requires
+                                  --brem-target-rse.  [x>=2]
+  --brem-max-histories N          Brem maximum, at most --max-histories; defaults to it.
+                                  Requires --brem-target-rse.  [x>=2]
+  --target-rse FRACTION           Target relative standard error of each watched yield
+                                  (0.05 = 5%).  [x>0.0]
+  --min-histories N               Smallest count at which the run may stop; a multiple
+                                  of --block-histories.  [x>=2]
+  --max-histories N               Count at which the run stops regardless, flagged
+                                  statistics-limited.  [x>=2]
+  --block-histories N             Histories per transport block; the rule is checked at
+                                  block ends.  [x>=1]
+  --observable [cxr|brem|line]    Yield that must converge; repeat for both. Replaces
+                                  the watched set (a new policy watches line and brem).
+  --max-history-share FRACTION    Guard: largest share of a yield one history may hold
+                                  (default 0.05).  [0.0<x<=1.0]
+  --min-effective-histories N     Guard: effective sample size floor (sum m)^2 / sum m^2
+                                  (default 100).  [x>=0.0]
+  --stability-blocks K            Guard: block ends whose running mean must agree; 0
+                                  disables (default 3).  [x>=0]
+  --stability-fraction FRACTION   Guard: allowed relative mean drift as a fraction of
+                                  the target (default 0.5).  [x>=0.0]
+  --pilot-histories N             Pilot count that projects the stopping count and skips
+                                  checks until it.  [x>=1]
+  --band-ev START,STOP            Monitor band in eV (default: the case's line band).
+  --batch-means-band-ev START,STOP
+                                  Band in eV for reported per-bin batch-means errors;
+                                  costs one extra reduction.
+  -y, --yes                       Skip the 'standard' confirmation prompt.
+  --dry-run                       Print proposed TOML diff; write nothing.
+  -h, --help                      Show this message and exit.
+```
+
+## `pyrite profile numerics adaptive-sampling reset`
+
+```text
+Usage: pyrite profile numerics adaptive-sampling reset [OPTIONS] NAME [target-rse|brem-
+                                                       target-rse|brem-min-
+                                                       histories|brem-max-histories|min-
+                                                       histories|max-histories|block-
+                                                       histories|observable|max-history-
+                                                       share|min-effective-
+                                                       histories|stability-
+                                                       blocks|stability-fraction|pilot-
+                                                       histories|band-ev|batch-means-
+                                                       band-ev]...
+
+  Reset optional FIELDs to defaults, or remove the policy when none are named.
+
+  Removing the policy returns PROFILE to the default adaptive policy unless it cannot
+  run adaptive. Fixed counts are untouched; select them with 'pyrite profile numerics
+  adaptive-sampling disable'.
+
+Options:
+  -y, --yes   Skip the 'standard' confirmation prompt.
+  --dry-run   Print proposed TOML diff; write nothing.
+  -h, --help  Show this message and exit.
+```
+
+## `pyrite profile numerics adaptive-sampling set`
+
+```text
+Usage: pyrite profile numerics adaptive-sampling set [OPTIONS] NAME
+
+  Create or update PROFILE's adaptive policy.
+
+  Fields left unspecified keep the existing policy's values; a new policy takes them
+  from the default (target RSE 0.05, 200-20000 histories, blocks of 100, line and brem).
+  A profile with fixed counts is refused; switch it with 'pyrite profile numerics
+  adaptive-sampling enable'.
+
+Options:
+  --brem-target-rse FRACTION      Stop brem independently at this RSE; requires both cxr
+                                  and brem observables.  [x>0.0]
+  --brem-min-histories N          Brem minimum; defaults to --min-histories. Requires
+                                  --brem-target-rse.  [x>=2]
+  --brem-max-histories N          Brem maximum, at most --max-histories; defaults to it.
+                                  Requires --brem-target-rse.  [x>=2]
+  --target-rse FRACTION           Target relative standard error of each watched yield
+                                  (0.05 = 5%).  [x>0.0]
+  --min-histories N               Smallest count at which the run may stop; a multiple
+                                  of --block-histories.  [x>=2]
+  --max-histories N               Count at which the run stops regardless, flagged
+                                  statistics-limited.  [x>=2]
+  --block-histories N             Histories per transport block; the rule is checked at
+                                  block ends.  [x>=1]
+  --observable [cxr|brem|line]    Yield that must converge; repeat for both. Replaces
+                                  the watched set (a new policy watches line and brem).
+  --max-history-share FRACTION    Guard: largest share of a yield one history may hold
+                                  (default 0.05).  [0.0<x<=1.0]
+  --min-effective-histories N     Guard: effective sample size floor (sum m)^2 / sum m^2
+                                  (default 100).  [x>=0.0]
+  --stability-blocks K            Guard: block ends whose running mean must agree; 0
+                                  disables (default 3).  [x>=0]
+  --stability-fraction FRACTION   Guard: allowed relative mean drift as a fraction of
+                                  the target (default 0.5).  [x>=0.0]
+  --pilot-histories N             Pilot count that projects the stopping count and skips
+                                  checks until it.  [x>=1]
+  --band-ev START,STOP            Monitor band in eV (default: the case's line band).
+  --batch-means-band-ev START,STOP
+                                  Band in eV for reported per-bin batch-means errors;
+                                  costs one extra reduction.
+  -y, --yes                       Skip the 'standard' confirmation prompt.
+  --dry-run                       Print proposed TOML diff; write nothing.
+  -h, --help                      Show this message and exit.
+```
+
+## `pyrite profile numerics adaptive-sampling show`
+
+```text
+Usage: pyrite profile numerics adaptive-sampling show [OPTIONS] NAME
+
+  Show PROFILE's history-count mode, its source, blockers and next steps.
+
+Options:
+  -o, --output [table|json]  Output format; only json is a stable automation contract.
+                             [default: table]
+  -h, --help                 Show this message and exit.
+```
+
+## `pyrite profile numerics cxr-grid`
+
+```text
+Usage: pyrite profile numerics cxr-grid [OPTIONS] COMMAND [ARGS]...
+
+  Inspect and edit PROFILE's cxr-grid policy (``[profiles.NAME.cxr_grid_policy]``).
+
+  Three selectors, each defaulting to the first value listed:
+
+    bandwidth   kinematic-ceiling | resonance-population
+                closed-form kinematic bound (no simulation), or the case's
+                measured resonance population capped by that bound
+    resolution  sinc-nyquist | resonance-local
+                uniform measured sinc spacing, or spacing refined locally
+                around measured resonances (3 eV backbone)
+    quadrature  node | bin-mean
+                point samples of the sinc^2 line profile, or bin means that
+                keep integrated line yield exact but smooth peak height/width
+
+  resonance-local requires bandwidth resonance-population and quadrature bin-mean. Any
+  stored selector, even one equal to its default, makes every case of the profile
+  resolve its line grid automatically from its own trajectories, ahead of explicit
+  E_grid_line and stored energy-grid rows; automatic resolution does not support
+  coherent emission (#117), and bin-mean does not support a positive max_dE_frac. The
+  table joins the case and dataset identity: editing it gives new checkpoints, and
+  earlier results stay under their old identity.
+
+  Tolerances, maximum spacing (3 eV), the point budget (600000) and backend ULPs are not
+  profile keys: set them per call (API) or with PYRITE_ENERGY_GRID_* environment
+  variables.
+
+  Examples:
+    pyrite profile numerics cxr-grid show high_energy
+    pyrite profile numerics cxr-grid set my_profile --quadrature bin-mean
+    pyrite profile numerics cxr-grid set my_profile --bandwidth resonance-population \
+        --resolution resonance-local --quadrature bin-mean
+    pyrite profile numerics cxr-grid reset my_profile resolution
+    pyrite profile numerics cxr-grid reset my_profile
+
+Options:
+  -h, --help  Show this message and exit.
+
+Commands:
+  reset  Remove selected FIELDs, or the whole policy when none are named.
+  set    Set one or more cxr-grid selectors on PROFILE.
+  show   Show explicit and effective PROFILE cxr-grid selectors and the grid source.
+```
+
+## `pyrite profile numerics cxr-grid reset`
+
+```text
+Usage: pyrite profile numerics cxr-grid reset [OPTIONS] NAME
+                                              [bandwidth|resolution|quadrature]...
+
+  Remove selected FIELDs, or the whole policy when none are named.
+
+  Removing the whole policy returns PROFILE to explicit, stored or built-in line grids.
+  A partial reset that leaves an impossible combination is a usage error.
+
+Options:
+  -y, --yes   Skip the 'standard' confirmation prompt.
+  --dry-run   Print proposed TOML diff; write nothing.
+  -h, --help  Show this message and exit.
+```
+
+## `pyrite profile numerics cxr-grid set`
+
+```text
+Usage: pyrite profile numerics cxr-grid set [OPTIONS] NAME
+
+  Set one or more cxr-grid selectors on PROFILE.
+
+  The merged policy is validated before anything is written; an impossible combination
+  is a usage error.
+
+Options:
+  --bandwidth [kinematic-ceiling|resonance-population]
+                                  Line-axis upper edge policy. Default kinematic-
+                                  ceiling.
+  --resolution [sinc-nyquist|resonance-local]
+                                  Line-axis spacing policy; resonance-local needs
+                                  resonance-population and bin-mean. Default sinc-
+                                  nyquist.
+  --quadrature [node|bin-mean]    sinc^2 line-profile evaluation on the axis. Default
+                                  node.
+  -y, --yes                       Skip the 'standard' confirmation prompt.
+  --dry-run                       Print proposed TOML diff; write nothing.
+  -h, --help                      Show this message and exit.
+```
+
+## `pyrite profile numerics cxr-grid show`
+
+```text
+Usage: pyrite profile numerics cxr-grid show [OPTIONS] NAME
+
+  Show explicit and effective PROFILE cxr-grid selectors and the grid source.
+
+Options:
+  -o, --output [table|json]  Output format; only json is a stable automation contract.
+                             [default: table]
+  -h, --help                 Show this message and exit.
+```
+
+## `pyrite profile physics`
+
+```text
+Usage: pyrite profile physics [OPTIONS] COMMAND [ARGS]...
+
+  Show and edit PROFILE's own physics fields: physical models, cutoffs, straggling,
+  emission and the channeling model.
+
+  Profile fields override the attached named preset (pyrite physics; attach with 'pyrite
+  profile set PROFILE --physics NAME'). Numerics fields live under 'pyrite profile
+  numerics'.
+
+Options:
+  -h, --help  Show this message and exit.
+
+Commands:
+  reset     Reset selected fields, or every field this...
+  set       Set PROFILE physics fields; validate and...
+  show      Show PROFILE's effective fields as SETTING...
+  validate  Validate PROFILE without running a...
+```
+
+## `pyrite profile physics reset`
+
+```text
+Usage: pyrite profile physics reset [OPTIONS] PROFILE [FIELDS]...
+
+  Reset selected fields, or every field this command owns, to the preset/default.
+
+Options:
+  -y, --yes   Skip the standard-profile confirmation.
+  --dry-run   Validate and preview without saving.
+  -h, --help  Show this message and exit.
+```
+
+## `pyrite profile physics set`
+
+```text
+Usage: pyrite profile physics set [OPTIONS] PROFILE
+
+  Set PROFILE physics fields; validate and atomically save, or preview with --dry-run.
+
+Options:
+  --straggling / --no-straggling  Enable or disable collision energy-loss straggling
+                                  (restricted soft loss in shell mode).
+  --inelastic-model [auto|continuous|shell-soft-hard]
+                                  Collision energy-loss scheme: shell-soft-hard
+                                  (default; midpoint, ungrooved, shell data for every
+                                  layer), continuous stopping (explicit approximation),
+                                  or auto (legacy conditional shell selection with
+                                  warned continuous fallback).
+  --inelastic-cutoff-ev EV        Soft/hard energy-loss cutoff W_c in eV (default 50 for
+                                  shell-soft-hard or auto); must exceed each material's
+                                  conduction-band resonance (Si 16.7, SiO2 22, MoS2 23
+                                  eV).  [x>0.0]
+  --secondary-threshold-ev EV     Transport hard-collision secondaries above this energy
+                                  in eV (production cut and tracking cutoff; requires
+                                  shell-soft-hard and SBETHE coverage, >= 1000 eV).
+                                  [x>0.0]
+  --elastic-model [mott|elsepa]   Elastic scattering: elsepa (default) full differential
+                                  cross sections (needs 'pyrite tables fetch elsepa';
+                                  bypasses the transport LUT), or the historical mott
+                                  screened-Rutherford angles.
+  --bremsstrahlung-model [auto|eedl|bremslib]
+                                  Continuum bremsstrahlung: bremslib (default) requires
+                                  the released BremsLib tables ('pyrite tables fetch
+                                  bremslib') and uses their angular model; eedl is the
+                                  fetched EEDL continuum with an isotropic photon angle
+                                  (pair with --radiative-model uncoupled); auto is the
+                                  legacy table-checked BremsLib selection.
+  --radiative-model [auto|uncoupled|bremslib-soft-hard]
+                                  Radiative energy loss: bremslib-soft-hard (default)
+                                  uses soft loss plus sampled hard photons and requires
+                                  midpoint energy, BremsLib and an ungrooved target;
+                                  uncoupled (explicit approximation) scores after
+                                  collision-only transport; auto (legacy) couples where
+                                  supported. Unsupported scenes must pass uncoupled.
+  --radiative-cutoff-ev EV        Hard-photon cutoff k_c in eV for bremslib-soft-hard or
+                                  auto (default 1000); must not exceed the continuum
+                                  electron cutoff (1000 eV by default).  [x>0.0]
+  --pair-production-model [penelope-2024]
+                                  Convert coupled hard photons above 1.022 MeV to e-/e+
+                                  pairs (opt-in). Requires --secondary-threshold-ev and
+                                  coupled BremsLib transport; pair electrons are
+                                  transported as secondaries, positrons are recorded
+                                  unless --positron-transport.
+  --positron-transport / --no-positron-transport
+                                  Transport pair positrons above the secondary threshold
+                                  (opt-in; requires --pair-production-model). Positrons
+                                  annihilate in flight and at rest; each annihilation
+                                  photon escapes or is absorbed at its first
+                                  interaction.
+  --atomic-electron-deflection [kawrakow|none]
+                                  Angular deflection by atomic electrons: kawrakow
+                                  (default) scales each element's elastic rate by 1 +
+                                  xi/Z (xi = 1 under continuous stopping; the Moller
+                                  share above W_c is removed under shell-soft-hard,
+                                  which needs elsepa); none keeps elastic-only
+                                  deflection.
+  --transport-mode [single-scattering|mixed]
+                                  Elastic transport: single-scattering (default)
+                                  simulates every event; mixed aggregates small-angle
+                                  events into a random hinge (requires elsepa and
+                                  midpoint; refused wherever CXR lines are scored, and
+                                  for coherent emission, temporal profiles, transition
+                                  radiation, channeling, photon transport and grooved
+                                  targets).
+  --mixed-c1 FRACTION             Mean soft deflection per hard step under mixed
+                                  transport (default 0.05).  [0.0<=x<=0.2]
+  --mixed-c2 FRACTION             Mean fractional soft energy loss per step under mixed
+                                  transport (default 0.05).  [0.0<=x<=0.2]
+  --shell-ionization-model [eedl|bote-salvat]
+                                  Characteristic-line primary vacancies: eedl (default)
+                                  subshell cross sections, or the opt-in bote-salvat
+                                  K/L/M fit (needs 'pyrite tables fetch bote-salvat';
+                                  EEDL for higher shells).
+  --channeling-model [off|planar]
+                                  Planar quantum entrance zone (default off); requires
+                                  plane, midpoint, uncoupled radiation and incoherent
+                                  emission. Disable with profile physics reset PROFILE
+                                  channeling-model channeling-plane.
+  --channeling-plane H K L        Nonzero Miller indices of the planar channeling
+                                  family; requires planar.
+  --emission [incoherent|coherent|both]
+                                  CXR modes; cross-model constraints are validated
+                                  before saving.
+  -y, --yes                       Skip the standard-profile confirmation.
+  --dry-run                       Validate and preview without saving.
+  -h, --help                      Show this message and exit.
+```
+
+## `pyrite profile physics show`
+
+```text
+Usage: pyrite profile physics show [OPTIONS] PROFILE
+
+  Show PROFILE's effective fields as SETTING / VALUE / SOURCE groups.
+
+  SOURCE is profile (set on PROFILE), preset:NAME (from the attached preset) or default
+  (built in).
+
+Options:
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
+  -h, --help                      Show this message and exit.
+```
+
+## `pyrite profile physics validate`
+
+```text
+Usage: pyrite profile physics validate [OPTIONS] PROFILE
+
+  Validate PROFILE without running a simulation or writing files.
+
+Options:
+  -h, --help  Show this message and exit.
 ```

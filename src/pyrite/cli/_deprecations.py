@@ -59,7 +59,26 @@ def _entry(
 #: The 0.1.0 cohort of 68 command spellings was removed at 0.3.0 (issue #68),
 #: and `material set` (deprecated 0.4.0, issue #359) at 0.6.0 (issue #387).
 #: `material simulate` was removed at 0.8.0; use `run --ephemeral`.
-DEPRECATIONS: dict[str, Deprecation] = {}
+DEPRECATIONS: dict[str, Deprecation] = {
+    # Issue #1078: `pyrite numerics|physics` manage named presets directly.
+    **{
+        f"{noun} preset": _entry(
+            f"{noun} preset",
+            f"pyrite {noun}",
+            since="0.32.0",
+            note=f"`pyrite {noun} list` now lists presets; profiles are listed by "
+            "`pyrite profile list`.",
+        )
+        for noun in ("numerics", "physics")
+    },
+    # Issue #1078: profile-scoped sampling and grid policies live under the profile.
+    **{
+        f"numerics {name}": _entry(
+            f"numerics {name}", f"pyrite profile numerics {name}", since="0.32.0"
+        )
+        for name in ("adaptive-sampling", "cxr-grid")
+    },
+}
 
 
 #: Paths whose canonical replacement depends on the arguments given, so the
@@ -67,6 +86,45 @@ DEPRECATIONS: dict[str, Deprecation] = {}
 #: callback. `DeprecatingGroup` leaves these alone rather than pre-empting them
 #: with the registry's generic replacement.
 SELF_WARNING: frozenset[str] = frozenset()
+
+
+#: Argument-shape deprecations (issue #1078): a live command keeps an old
+#: meaning that its arguments select, e.g. ``numerics show PROFILE`` where
+#: ``numerics show NAME`` now shows a preset. Keyed by the documented form; the
+#: command calls `warn_form` when it takes the old route. `tests/cli/
+#: test_deprecations.py` invokes every form and checks the warning.
+DEPRECATED_FORMS: dict[str, Deprecation] = {
+    **{
+        f"{noun} {verb} PROFILE": _entry(
+            f"{noun} {verb} PROFILE",
+            f"pyrite profile {noun} {verb} PROFILE",
+            since="0.32.0",
+            note="Taken when the name is a profile and not a preset.",
+        )
+        for noun in ("numerics", "physics")
+        for verb in ("show", "set", "reset", "validate")
+    },
+    "profile numerics reset PHYSICS-FIELD": _entry(
+        "profile numerics reset PHYSICS-FIELD",
+        "pyrite profile physics reset",
+        since="0.32.0",
+        note="Physical models, cutoffs and straggling are Physics fields.",
+    ),
+}
+
+
+def warn_form(form: str, replacement: str) -> None:
+    """Warn once per invocation that *form* is deprecated in favour of *replacement*."""
+    entry = DEPRECATED_FORMS[form]
+    meta = click.get_current_context().meta
+    if meta.get(WARNED_META_KEY):
+        return
+    meta[WARNED_META_KEY] = True
+    click.echo(
+        f"warning: 'pyrite {entry.path}' is deprecated and will be removed in "
+        f"{entry.remove_in}; use '{replacement}'",
+        err=True,
+    )
 
 
 def message(path: str, *, replacement: str | None = None) -> str:
@@ -223,7 +281,35 @@ def _flag(
 #: `--fidelity` cohort (deprecated in 0.4.0, issue #215) at 0.6.0 (issue #387).
 #: `RetiredOption` and `canonical_option` (renamed spellings) and
 #: `DeprecatedOption` (whole options) stay as the substrate ADR-0002 requires.
-DEPRECATED_FLAGS: dict[tuple[str, str], DeprecatedFlag] = {}
+DEPRECATED_FLAGS: dict[tuple[str, str], DeprecatedFlag] = {
+    # Issue #1078: Physics flags on `profile numerics set` move to `profile physics set`.
+    ("profile numerics set", flag): _flag(
+        "profile numerics set",
+        flag,
+        "use 'pyrite profile physics set'",
+        since="0.32.0",
+        note="Physics field; saved unchanged during the support window.",
+    )
+    for flag in (
+        "--straggling",
+        "--inelastic-model",
+        "--inelastic-cutoff-ev",
+        "--secondary-threshold-ev",
+        "--elastic-model",
+        "--bremsstrahlung-model",
+        "--radiative-model",
+        "--radiative-cutoff-ev",
+        "--pair-production-model",
+        "--positron-transport",
+        "--atomic-electron-deflection",
+        "--transport-mode",
+        "--mixed-c1",
+        "--mixed-c2",
+        "--shell-ionization-model",
+        "--channeling-model",
+        "--channeling-plane",
+    )
+}
 
 
 def flag_message(command: str, flag: str, replacement: str) -> str:

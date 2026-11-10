@@ -93,39 +93,51 @@ def test_draft_failure_readonly_and_concurrent_edit_never_save(_isolate_user_cat
 
 def test_calculation_groups_have_api_field_ownership_and_scoped_resets(_isolate_user_catalog):
     assert_clean_result(invoke(command, ["profile", "create", "campaign", "--from", "quickstart"]))
-    assert_clean_result(invoke(command, ["physics", "set", "campaign", "--straggling"]))
-    assert_clean_result(invoke(command, ["numerics", "set", "campaign", "--mosaic-nodes", "5"]))
+    assert_clean_result(invoke(command, ["profile", "physics", "set", "campaign", "--straggling"]))
+    assert_clean_result(
+        invoke(command, ["profile", "numerics", "set", "campaign", "--mosaic-nodes", "5"])
+    )
     for noun in ("physics", "numerics"):
-        shown = invoke(command, [noun, "show", "campaign", "-o", "json"])
+        shown = invoke(command, ["profile", noun, "show", "campaign", "-o", "json"])
         assert_clean_result(shown)
-        fields = json.loads(shown.stdout)["payload"]["fields"]
+        payload = json.loads(shown.stdout)["payload"]
+        fields = payload.get("fields") or [
+            row for group in payload["groups"] for row in group["fields"]
+        ]
         assert fields
         assert all((field["key"] in PHYSICS_FIELDS) == (noun == "physics") for field in fields)
     before = snapshot(_isolate_user_catalog)
-    frozen = invoke(command, ["numerics", "set", "campaign", "--mosaic-nodes", "7", "--dry-run"])
+    frozen = invoke(
+        command, ["profile", "numerics", "set", "campaign", "--mosaic-nodes", "7", "--dry-run"]
+    )
     assert_clean_result(frozen)
     assert snapshot(_isolate_user_catalog) == before
-    assert_clean_result(invoke(command, ["physics", "reset", "campaign"]))
+    assert_clean_result(invoke(command, ["profile", "physics", "reset", "campaign"]))
     saved = read_raw(bundled_catalog())["profiles"]["campaign"]
     assert "straggling" not in saved
     assert saved["mosaic_nodes"] == 5
-    bad = invoke(command, ["numerics", "set", "campaign", "--straggling"])
+    bad = invoke(command, ["numerics", "set", "default", "--straggling"])
     assert bad.exit_code == 2
     assert "No such option" in bad.stderr
+    moved = invoke(command, ["profile", "numerics", "set", "campaign", "--straggling"])
+    assert moved.exit_code == 0
+    assert "use 'pyrite profile physics set'" in moved.stderr
+    assert read_raw(bundled_catalog())["profiles"]["campaign"]["straggling"] is True
 
 
 def test_calculation_cross_model_errors_and_dry_run_do_not_write(_isolate_user_catalog):
     assert_clean_result(invoke(command, ["profile", "create", "campaign", "--from", "quickstart"]))
     assert_clean_result(
-        invoke(command, ["physics", "set", "campaign", "--radiative-model", "uncoupled"])
+        invoke(command, ["profile", "physics", "set", "campaign", "--radiative-model", "uncoupled"])
     )
     assert_clean_result(
-        invoke(command, ["numerics", "set", "campaign", "--energy-model", "frozen"])
+        invoke(command, ["profile", "numerics", "set", "campaign", "--energy-model", "frozen"])
     )
     before = snapshot(_isolate_user_catalog)
     rejected = invoke(
         command,
         [
+            "profile",
             "physics",
             "set",
             "campaign",
@@ -187,8 +199,8 @@ def test_exported_catalog_reproduces_cli_configuration(tmp_path):
     exported = selected.parent / "exported.toml"
     exported.write_text(draft.serialize())
     for path in (
-        ["physics", "show", "quickstart"],
-        ["numerics", "show", "quickstart"],
+        ["profile", "physics", "show", "quickstart"],
+        ["profile", "numerics", "show", "quickstart"],
         ["profile", "ranges", "show", "quickstart", "hopg"],
     ):
         original = invoke(command, ["--catalog", str(selected), *path, "-o", "json"])

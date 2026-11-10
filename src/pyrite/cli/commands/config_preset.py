@@ -1,6 +1,5 @@
 """Manage named physics/numerics presets that profiles reference (ADR-0021)."""
 
-from copy import copy
 from typing import Any, cast
 
 import click
@@ -20,8 +19,9 @@ from pyrite.console.output import (
     emit_result,
     output_option,
 )
+from pyrite.console.tables import emit_table, object_origin
 
-from . import calculation, profile
+from . import _calculation_options, _calculation_view
 from ._profile_shared import confirm_standard, write
 
 _COMPLETE = {
@@ -84,7 +84,7 @@ def _fail(schema, json_output, exc):
 
 def build(kind):
     """Return the ``pyrite <kind> preset`` command group."""
-    fields = calculation._field_names(kind is PHYSICS)
+    fields = _calculation_options.field_names(physics=kind is PHYSICS)
     complete = _COMPLETE[kind]
     noun = f"{kind.table} preset"
 
@@ -99,13 +99,8 @@ def build(kind):
         return result
 
     def setting_params():
-        params = [
-            copy(param)
-            for param in profile.numerics_set_command.params
-            if fields.get((param.name or "").replace("_", "-")) is not None
-            # Removed budget flags (#1007) keep naming their replacement.
-            or (kind is NUMERICS and not param.expose_value)
-        ]
+        # Removed budget flags (#1007) keep naming their replacement.
+        params = _calculation_options.field_params(physics=kind is PHYSICS)
         if kind is PHYSICS:
             params.append(
                 click.Option(
@@ -156,14 +151,19 @@ def build(kind):
         if json_output:
             emit_json_result(cli_json.JsonResult(schema, {"presets": rows}))
             return 0
-        if not rows:
-            emit_result(f"no {kind.table} presets; create one with: pyrite {noun} create NAME")
-        for row in rows:
-            emit_result(
-                f"{row['name']}  [{row['source']}]  profiles: {', '.join(row['profiles']) or '-'}"
-            )
-            if row["description"]:
-                emit_result(f"  {row['description']}")
+        emit_table(
+            ("name", "origin", "profiles", "description"),
+            [
+                (
+                    row["name"],
+                    object_origin(row["source"]),
+                    ", ".join(row["profiles"]) or "-",
+                    row["description"] or "",
+                )
+                for row in rows
+            ],
+            empty=f"no {kind.table} presets; create one with: pyrite {kind.table} create NAME",
+        )
         return 0
 
     @group.command("show")
@@ -187,12 +187,14 @@ def build(kind):
         if json_output:
             emit_json_result(cli_json.JsonResult(schema, payload))
             return 0
-        emit_result(f"[{noun} {name}] ({payload['source']})")
+        emit_result(f"[{noun} {name}]  origin: {object_origin(payload['source'])}")
         if payload["description"]:
             emit_result(f"  {payload['description']}")
         emit_result(f"  profiles: {', '.join(payload['profiles']) or '-'}")
-        for field in payload["fields"]:
-            emit_result(f"  {field['label']}: {field['effective']} ({field['source']})")
+        if kind is PHYSICS:
+            _calculation_view.emit_physics(payload["fields"])
+        else:
+            _calculation_view.emit_numerics(payload["fields"])
         return 0
 
     def create(name, source, dry_run, emission=None, description=None, **values):

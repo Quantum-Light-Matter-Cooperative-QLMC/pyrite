@@ -87,7 +87,8 @@ def test_precision_show_reports_the_default_policy_without_a_table(tmp_path, mon
     assert "  target-rse: 0.05 (default)\n" in shown.stdout
     assert "  max-histories: 20000 (default)\n" in shown.stdout
     machine = invoke(
-        root_command, ["numerics", "adaptive-sampling", "show", "sub_100keV", "-o", "json"]
+        root_command,
+        ["profile", "numerics", "adaptive-sampling", "show", "sub_100keV", "-o", "json"],
     )
     assert_clean_result(machine)
     envelope = json.loads(machine.stdout)
@@ -228,7 +229,7 @@ def test_precision_set_validates_at_the_boundary(tmp_path, monkeypatch):
 
     nothing = invoke(numerics_command, ["adaptive-sampling", "set", "sub_100keV"])
     assert nothing.exit_code == 2
-    assert "pyrite numerics adaptive-sampling enable sub_100keV" in nothing.stderr
+    assert "pyrite profile numerics adaptive-sampling enable sub_100keV" in nothing.stderr
     assert catalog.read_text() == _CATALOG
 
 
@@ -240,7 +241,7 @@ def test_precision_set_refuses_fixed_counts_and_coherent_profiles(tmp_path, monk
     refused = invoke(numerics_command, ["adaptive-sampling", "set", "sub_100keV", *_POLICY])
     assert refused.exit_code == 1
     assert "cxr-histories 450" in refused.stderr
-    assert "pyrite numerics adaptive-sampling enable sub_100keV" in refused.stderr
+    assert "pyrite profile numerics adaptive-sampling enable sub_100keV" in refused.stderr
     assert "line-electrons" not in refused.stderr
 
     coherent = _CATALOG.replace(
@@ -395,7 +396,8 @@ def test_disable_selects_fixed_counts_with_defaults_or_flags(tmp_path, monkeypat
     shown = invoke(numerics_command, ["adaptive-sampling", "show", "sub_100keV"])
     assert "  counts: cxr-histories 300, brem-histories 150\n" in shown.stdout
     assert (
-        "to switch to adaptive: pyrite numerics adaptive-sampling enable sub_100keV" in shown.stdout
+        "to switch to adaptive: pyrite profile numerics adaptive-sampling enable sub_100keV"
+        in shown.stdout
     )
 
     changed = invoke(
@@ -452,7 +454,7 @@ def test_numerics_counts_on_an_adaptive_profile_point_at_disable(tmp_path, monke
 
     refused = invoke(profile.command, ["numerics", "set", "sub_100keV", "--cxr-histories", "500"])
     assert refused.exit_code == 1
-    assert "pyrite numerics adaptive-sampling disable sub_100keV" in refused.stderr
+    assert "pyrite profile numerics adaptive-sampling disable sub_100keV" in refused.stderr
     assert catalog.read_text() == before
 
 
@@ -461,7 +463,7 @@ def test_show_reports_line_grid_independently_and_next_steps(tmp_path, monkeypat
     shown = invoke(numerics_command, ["adaptive-sampling", "show", "sub_100keV"])
     assert "CXR grid: explicit or stored grids first" in shown.stdout
     assert (
-        "to select fixed counts: pyrite numerics adaptive-sampling disable sub_100keV"
+        "to select fixed counts: pyrite profile numerics adaptive-sampling disable sub_100keV"
         in shown.stdout
     )
     machine = json.loads(
@@ -497,8 +499,8 @@ def test_show_reports_line_grid_independently_and_next_steps(tmp_path, monkeypat
         *(
             (argv, f"--{kind}-{suffix}", f"--{kind}-histories")
             for argv in (
-                ["numerics", "adaptive-sampling", "disable", "p"],
-                ["numerics", "set", "p"],
+                ["profile", "numerics", "adaptive-sampling", "disable", "p"],
+                ["profile", "numerics", "set", "p"],
                 ["profile", "set", "p"],
                 ["profile", "add", "p"],
                 ["profile", "create", "p"],
@@ -507,7 +509,7 @@ def test_show_reports_line_grid_independently_and_next_steps(tmp_path, monkeypat
             for suffix in ("trials", "electrons")
         ),
         *(
-            (["numerics", "adaptive-sampling", verb, "p"], f"--{old}", f"--{new}")
+            (["profile", "numerics", "adaptive-sampling", verb, "p"], f"--{old}", f"--{new}")
             for verb in ("set", "enable")
             for old, new in (
                 ("min-electrons", "min-histories"),

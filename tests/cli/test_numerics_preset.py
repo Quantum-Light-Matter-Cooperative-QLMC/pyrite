@@ -58,9 +58,9 @@ def write_preset(layer, table, name, text):
 
 def test_bundled_numerics_reference_restates_built_ins():
     assert pyrite.config.load_numerics("default") == pyrite.Numerics()
-    refused = invoke(command, ["numerics", "preset", "set", "default", "--mosaic-nodes", "7"])
+    refused = invoke(command, ["numerics", "set", "default", "--mosaic-nodes", "7"])
     assert refused.exit_code == 1
-    assert "pyrite numerics preset create NAME --from default" in refused.stderr
+    assert "pyrite numerics create NAME --from default" in refused.stderr
 
 
 def test_unit_bearing_numerics_preset_resolves_to_canonical_values(_isolate_user_catalog):
@@ -90,14 +90,14 @@ def test_unit_bearing_numerics_preset_rejects_wrong_dimensions(_isolate_user_cat
 
 def test_numerics_preset_resolves_into_profiles_with_provenance(_isolate_user_catalog):
     ok("profile", "create", "campaign", "--from", "quickstart")
-    ok("numerics", "preset", "create", "fast", "--cxr-histories", "200", "--mosaic-nodes", "7")
+    ok("numerics", "create", "fast", "--cxr-histories", "200", "--mosaic-nodes", "7")
     ok("profile", "set", "campaign", "--numerics", "fast")
 
     catalog = load_material_catalog(profile="campaign")
     material = member("campaign")
     assert catalog.material(material).scan.n_electrons == (200,)
-    shown = payload("numerics", "show", "campaign")
-    sources = {row["key"]: row["source"] for row in shown["fields"]}
+    shown = payload("profile", "numerics", "show", "campaign")
+    sources = {row["key"]: row["source"] for group in shown["groups"] for row in group["fields"]}
     assert shown["preset"] == "fast"
     assert sources["n_electrons"] == "preset fast"
     assert sources["mosaic_nodes"] == "preset fast"
@@ -127,7 +127,7 @@ def test_profile_sampling_policy_replaces_the_presets_whole_group(_isolate_user_
     summary = payload("profile", "show", "campaign")
     assert summary["adaptive_sampling"]["source"] == "preset adaptive"
 
-    ok("numerics", "set", "campaign", "--cxr-histories", "300")
+    ok("profile", "numerics", "set", "campaign", "--cxr-histories", "300")
     catalog = load_material_catalog(profile="campaign")
     assert catalog.profile_precision("campaign") is None
     assert catalog.profile_numerics("campaign")["mosaic_nodes"] == 7
@@ -156,13 +156,13 @@ def _precision_toml():
 
 def test_adoption_keeps_identity_and_records_preset_provenance(_isolate_user_catalog):
     ok("profile", "create", "campaign", "--from", "quickstart")
-    ok("physics", "set", "campaign", "--straggling")
-    ok("numerics", "set", "campaign", "--mosaic-nodes", "7")
+    ok("profile", "physics", "set", "campaign", "--straggling")
+    ok("profile", "numerics", "set", "campaign", "--mosaic-nodes", "7")
     before = resolved("campaign")
     assert "presets" not in before
 
-    ok("physics", "preset", "adopt", "campaign", "my-physics")
-    ok("numerics", "preset", "adopt", "campaign", "my-numerics")
+    ok("physics", "adopt", "campaign", "my-physics")
+    ok("numerics", "adopt", "campaign", "my-numerics")
     row = profile_row("campaign")
     assert row["physics"] == "my-physics" and row["numerics"] == "my-numerics"
     assert "straggling" not in row and "mosaic_nodes" not in row
@@ -173,7 +173,7 @@ def test_adoption_keeps_identity_and_records_preset_provenance(_isolate_user_cat
     assert labels["physics"]["name"] == "my-physics"
     assert labels["numerics"]["name"] == "my-numerics"
 
-    ok("numerics", "preset", "rename", "my-numerics", "shared")
+    ok("numerics", "rename", "my-numerics", "shared")
     renamed = resolved("campaign")
     assert renamed["parameter_sha256"] == before["parameter_sha256"]
     assert renamed["presets"]["numerics"] == {
@@ -181,7 +181,7 @@ def test_adoption_keeps_identity_and_records_preset_provenance(_isolate_user_cat
         "sha256": labels["numerics"]["sha256"],
     }
 
-    ok("numerics", "preset", "set", "shared", "--mosaic-nodes", "9")
+    ok("numerics", "set", "shared", "--mosaic-nodes", "9")
     edited = resolved("campaign")
     assert edited["parameter_sha256"] != before["parameter_sha256"]
     assert edited["presets"]["numerics"]["sha256"] != labels["numerics"]["sha256"]
@@ -194,7 +194,7 @@ def test_adopt_keeps_multi_value_trial_grids_on_the_profile(_isolate_user_catalo
     profile.write_text(
         "cxr_histories = {values = [100, 200]}\nmosaic_nodes = 7\n" + profile.read_text()
     )
-    ok("numerics", "preset", "adopt", "campaign", "mine")
+    ok("numerics", "adopt", "campaign", "mine")
     # On disk, electron counts use the canonical ``cxr_histories`` spelling.
     row = profile_row("campaign")
     assert row["cxr_histories"] == {"values": [100, 200]}
@@ -220,6 +220,6 @@ def test_loaded_physics_survives_worker_serialization():
 
 @pytest.mark.parametrize("flag", ["--cxr-electrons", "--cxr-trials", "--brem-electrons"])
 def test_numerics_preset_removed_budget_flags_name_histories(_isolate_user_catalog, flag):
-    result = invoke(command, ["numerics", "preset", "create", "fast", flag, "200"])
+    result = invoke(command, ["numerics", "create", "fast", flag, "200"])
     assert result.exit_code == 2
     assert f"{flag} was removed; use --{flag.split('-')[2]}-histories" in result.stderr

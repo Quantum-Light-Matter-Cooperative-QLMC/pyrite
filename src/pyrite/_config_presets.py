@@ -249,7 +249,7 @@ def load_physics(name: str, *, catalog: Any = None) -> Physics:
     ----------
     name
         A bundled or user ``[physics.NAME]`` catalog preset, e.g.
-        ``"electron-standard"``. List them with ``pyrite physics preset list``.
+        ``"electron-standard"``. List them with ``pyrite physics list``.
     catalog
         A loaded :class:`~pyrite.materials.MaterialCatalog`; defaults to the
         selected catalog with its user layer.
@@ -276,7 +276,7 @@ def load_numerics(name: str, *, catalog: Any = None) -> Numerics:
     ----------
     name
         A bundled or user ``[numerics.NAME]`` catalog preset. List them with
-        ``pyrite numerics preset list``.
+        ``pyrite numerics list``.
     catalog
         A loaded :class:`~pyrite.materials.MaterialCatalog`; defaults to the
         selected catalog with its user layer.
