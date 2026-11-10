@@ -330,7 +330,7 @@ $0.92(11)\times10^{-4}$ /sr, about 20% of the retained-subspace source.
 | Population | Native CBS | Fibred source (`boundary="max"`) | Free→free block |
 |---|---|---|---|
 | Zone row, exact axis (this run) | zero-order $\mathbf g$ has $\mathbf v\cdot\mathbf g=0$: no line | not scored | **omitted by both** |
-| Zone row, tilted incidence | line above the native resonance-root threshold | not scored | supplied natively |
+| Zone row, tilted incidence | line above the native resonance-root threshold; off for admitted fibre cases (#994) | not scored | supplied natively before #994; omitted and bounded for admitted fibre cases |
 | Handed-off electron (left $P(\kappa)$) | tilted `on_shell_direction` row: line scored | emission after a record leaves the retained subspace is not represented | supplied natively, no overlap |
 | Nonzero axial-order $\mathbf g$, incoherent brems | native | not scored | n/a (stays native, ADR-0018) |
 
@@ -352,6 +352,10 @@ each). Record: `docs/validation/check-records/axial-source/free-free-994.json`.
 | A, tilt 0.088° | +7.83(8)% | +3.63(4)% |
 | B, 0° | +18.19(23)% | +10.95(16)% |
 
-The maintainer's 2026-11-09 decisions on #994: A takes the block from native
-CBS on its tilted zone rows. B omits it and carries a declared one-sided
-bound of 18.9% (mean + 3 SE). Above-cut free→free stays unbounded for B.
+The maintainer's 2026-11-09 decisions on #994 treat A and B alike. Native
+PXR/CBS line scoring is off on axial zone rows (`cr-axial-zone-row-native-lines`),
+and each case omits the in-cut block and carries it as a declared one-sided
+bound: 8.06% for A and 18.9% for B (mean + 3 SE). Above-cut free→free stays
+unbounded for both. An earlier decision had A take the block from native CBS on
+its tilted zone rows; the comparison below showed that native CBS does not
+reproduce it, and that decision was superseded.

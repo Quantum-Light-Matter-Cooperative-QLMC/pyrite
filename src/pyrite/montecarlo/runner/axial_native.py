@@ -6,7 +6,8 @@ turns its already sampled outgoing records into the same :class:`LaunchState`
 used by native secondary passes, preserving primary IDs and RNG stream keys.
 Retained electrons cross the rear face without native transport. Unresolved
 weight is neither called transmitted nor silently sent into amorphous
-transport; its incident IDs remain explicit for bounded provenance.
+transport; its incident IDs remain explicit, and the counts are reported in
+the run diagnostics (not persisted).
 
 This is a preparation seam, not production admission: :mod:`.axial` joins it
 to the runner and scorer, and no case is runnable until the persisted-channel
@@ -47,7 +48,7 @@ class AxialNativePlan:
     n_primaries: int
 
     def provenance(self) -> dict[str, int]:
-        """Counts to persist with the *calibrated* depth/free-free budgets."""
+        """Fate counts for the run diagnostics (not persisted with results)."""
         return {
             "n_fibre_primaries": self.n_primaries,
             "n_fibre_outgoing_native": int(self.launch_ids.size),
