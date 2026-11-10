@@ -12,13 +12,14 @@ new checkpoint stems and earlier results stay under their old identity.
 
 ## Ranges and membership
 
-`pyrite profile show NAME` presents Setting / Value tables grouped by editing
-command: sweep/membership/emission, beam, detectors, filters, numerics
-(sampling/reflection-and-mosaic/transport), adaptive sampling, line-grid, energy grids and material
-overrides. Energy grids name the profile or built-in defaults, grid overrides
-and stored artifacts together; the last section lists non-grid material
-overrides. Numerics name their value source; adaptive
-sampling delegates `cxr-histories` and `brem-histories` to the adaptive-sampling policy.
+`pyrite profile show NAME` presents SETTING / VALUE tables grouped by editing
+command: sweep/membership/emission, named presets, beam, detectors, filters,
+numerics (`profile numerics`: sampling, reflections and mosaic, integration,
+channeling grid), physics (`profile physics`: models and cutoffs, emission,
+channeling), adaptive sampling, cxr-grid, energy grids and material overrides.
+Numerics and physics rows add a SOURCE column (see
+[CLI output vocabulary](cli/cli-output.md)). While adaptive sampling is
+active, `cxr-histories` and `brem-histories` read `unused (adaptive)`.
 Long values wrap in the default table output; `--output wide` keeps each value
 on one line. `--output json` retains the stable machine payload.
 
@@ -43,21 +44,45 @@ one field is an error. The removed budget keys `cxr_trials`, `brem_trials`,
 Resolved run metadata retains its identity vocabulary (`Ne`, `Ne_brem`), so
 existing checkpoints and results still load.
 
-## Calculation numerics
+## Calculation numerics and physics
 
-`pyrite numerics show|set|reset NAME` owns sampling, integration and reflection/mosaic controls.
-`pyrite physics show|set|reset NAME` owns physical models, straggling and cutoffs.
-Both edit the existing profile; the legacy combined `profile numerics` view remains
-compatible. `show` reports
-explicit value, effective value and source (`profile`, `default`, `built-in`)
-in human output. The JSON payload retains its existing source spellings.
+Profile-scoped settings have two disjoint owners:
+
+- `pyrite profile numerics show|set|reset|validate PROFILE` owns sampling,
+  reflection/mosaic, integration and channeling-grid controls, plus the
+  `adaptive-sampling` and `cxr-grid` subgroups.
+- `pyrite profile physics show|set|reset|validate PROFILE` owns physical
+  models, straggling, cutoffs, emission and channeling physics.
+
+`pyrite numerics` and `pyrite physics` manage reusable named presets
+(`list|show|create|set|reset|validate|rename|delete|adopt`) that a profile references with
+`profile set --numerics|--physics`. `show` prints SETTING / VALUE / SOURCE,
+where SOURCE is `default`, `preset:NAME`, `profile` or `run`. The sampling
+group leads with `mode: fixed (...)` or `mode: adaptive (...)`. The JSON
+payload keeps its existing source spellings; `cxr.profile.numerics.show` now
+carries numerics rows only and adds a `preset` key (physics rows moved to
+`pyrite.profile.physics.show`).
+
+The 0.31 spellings still work for two minor releases, warn on stderr and keep
+their exit codes: `pyrite numerics|physics show|set|reset|validate PROFILE`,
+`pyrite numerics|physics preset ...`, `pyrite numerics adaptive-sampling|cxr-grid`,
+and physics flags on `profile numerics set|reset`. See
+[CLI deprecations](cli/cli-deprecations.md).
+
+Numerics (`profile numerics set`):
 
 | TOML key | Setter flag | Notes |
 |---|---|---|
-| `cxr_histories`, `brem_histories` | `--cxr-histories`, `--brem-histories` | single-value grids; `profile set\|add -l/-b` edit them as sweepable grids |
+| `cxr_histories`, `brem_histories` | `--cxr-histories`, `--brem-histories` | fixed counts; ignored while adaptive sampling is active. `profile set\|add -l/-b` edit them as sweepable grids |
 | `n_families`, `max_reflections` | `--reflection-families`, `--maximum-reflections` | |
 | `mosaic_nodes`, `mosaic_route` | `--mosaic-nodes`, `--mosaic-route` | |
-| `straggling`, `energy_model`, `max_dE_frac` | `--straggling`, `--energy-model`, `--maximum-fractional-energy-loss` | also accepted by `profile create\|set` for compatibility |
+| `energy_model`, `max_dE_frac` | `--energy-model`, `--maximum-fractional-energy-loss` | also accepted by `profile create\|set` for compatibility |
+
+Physics (`profile physics set`):
+
+| TOML key | Setter flag | Notes |
+|---|---|---|
+| `straggling` | `--straggling` | also accepted by `profile create\|set` for compatibility |
 | `inelastic_model`, `inelastic_cutoff_eV`, `secondary_threshold_eV` | `--inelastic-model`, `--inelastic-cutoff-ev`, `--secondary-threshold-ev` | |
 | `elastic_model`, `bremsstrahlung_model` | `--elastic-model`, `--bremsstrahlung-model` | |
 | `radiative_model`, `radiative_cutoff_eV` | `--radiative-model`, `--radiative-cutoff-ev` | |
@@ -76,7 +101,7 @@ legacy `radiative_model="auto"`. Without the flag every coupled request is
 strict.
 
 To choose uncoupled transport deliberately, set `radiative_model="uncoupled"`
-in the numerical preset (`--radiative-model uncoupled`); it takes no
+in the profile or a physics preset (`--radiative-model uncoupled`); it takes no
 `radiative_cutoff_eV`. Pair `bremsstrahlung_model="eedl"` with it. This scores radiation after transport without
 debiting radiative energy loss from the electron trajectory; it is a model
 choice, not a substitute with a guaranteed accuracy bound. Assess its limits
@@ -86,7 +111,7 @@ resolving a new run does not reinterpret stored `auto` or absent fields.
 
 ## Line-grid policy
 
-`pyrite numerics cxr-grid show|set|reset NAME` owns `[profiles.NAME.cxr_grid_policy]`.
+`pyrite profile numerics cxr-grid show|set|reset NAME` owns `[profiles.NAME.cxr_grid_policy]`.
 
 | TOML key | Values (default first) | Flag |
 |---|---|---|

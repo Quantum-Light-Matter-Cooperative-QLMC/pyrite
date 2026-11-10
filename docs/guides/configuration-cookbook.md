@@ -36,8 +36,9 @@ Actual captured command output:
 
 The scan keeps the demo's explicit `example`-derived beam, `reference` scalar
 detector and adaptive sampling policy. It now selects 30 and 60 keV, with a
-5 µm target (`50000` Å). `inherited` means a range comes from the profile;
-`overridden` would identify a material-specific replacement. Inspect effective
+5 µm target (`50000` Å). SOURCE `profile` means a range comes from the profile;
+`material` would identify a material-specific replacement (see the
+[CLI output vocabulary](../repo-design/cli/cli-output.md)). Inspect effective
 ranges after edits: those resolved inputs determine checkpoint identity.
 
 ## Keep a laboratory setup

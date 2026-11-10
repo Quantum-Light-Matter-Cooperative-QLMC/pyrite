@@ -9,6 +9,7 @@ Detail page of the [repository map](../repo_map.md). Start from the front page; 
 
 ## `cli/_deprecations.py`
 RFC D7 deprecation harness: frozen `Deprecation` registry keyed by command path, `DeprecatingGroup(click.Group)` that warns once per invocation in `resolve_command` (before callbacks and `--help`), and `scripts/generate_cli_deprecations.py` regenerates [CLI deprecations](../repo-design/cli/cli-deprecations.md) from the registry.
+- `DEPRECATED_FORMS` + `warn_form` cover deprecated argument shapes of live commands (profile names routed through preset nouns); the generator renders them under "Argument forms" and `pyrite-dev release` schedules their removal.
 - Public: `DEPRECATIONS`, `Deprecation`, `DeprecatingGroup`, `message`, `warn`, `invocation_path`, `SUPPORT_WINDOW_MINORS`.
 - Wired into `cli/_groups.py` (`LazyGroup(DeprecatingGroup)`), `cli/commands/profile.py`, `cli/commands/sweep.py`, `cli/commands/energy_grid.py`, `cli/commands/remote.py`.
 
@@ -18,6 +19,7 @@ One module per `pyrite` subcommand group, holding only the Click layer. `scan`/`
 ## `console/`
 Terminal presentation primitives shared by the CLI and the domain packages, and the layer everything else may depend on without depending on `cli/`. It imports `paths`, `_env` and `_catalog_keys` and nothing else first-party.
 - `output.py` — colour, Click parameter types, destructive-action confirmation, result/diagnostic emission, JSON envelopes, and `run()`, which preserves the pyrite exit contract around Click.
+- `tables.py` — the one human renderer for `list`/`show` (`emit_table`, `emit_settings`, `emit_object`, `emit_named_list`) and the value-source/object-origin vocabulary ([CLI output vocabulary](../repo-design/cli/cli-output.md)); JSON never passes through it.
 - `json.py` — stable JSON payload adapters for automation.
 - `config.py` — the persistent context store (`profile.current`, `remote.*` target and SLURM profile, `workspace.root`, `catalog.path`, `xsgen.*`), its per-call > `PYRITE_*` > store > built-in precedence resolver, and workspace/catalog path helpers.
 - `outputs.py` — lazy workspace output paths, ancestor discovery, CLI-only legacy migration (rename or verified cross-filesystem copy), and shared output-kind defaults; `config.py` exposes resolver wrappers.
@@ -71,9 +73,12 @@ downloads. Launch: `pyrite app configuration launch` (port 2726). Guide:
 validation, diffs, stale-edit checks and atomic selected-layer saving.
 `detectors.editing` owns detector create/clone/patch and response/acquisition
 merges, shared with profile edits and the typed detector CLI. Neither imports
-Click command modules. `cli.commands.calculation` exposes API-owned
-`physics`/`numerics` views and edits of existing profiles; it creates no preset
-store. See [ADR-0019](../adr/0019-cli-configuration-ownership.md).
+Click command modules. `cli.commands.calculation` builds the `pyrite
+numerics|physics` named-preset nouns (preset verbs from `config_preset`) and
+the disjoint `profile numerics|physics` groups, partitioned by
+`pyrite._numerics.PHYSICS_FIELDS`; `_calculation_options` holds the shared
+field flags and `_calculation_view` the grouped SETTING/VALUE/SOURCE views and
+sampling-mode rows. See [ADR-0019](../adr/0019-cli-configuration-ownership.md).
 
 ## `cli/commands/job.py`
 Canonical `pyrite remote job list|status|logs|attach|stop` Click layer. Reuses the remote viewer, JSON envelope, completion, exit, confirmation, and lifecycle owners; normalizes persisted submitter names into the four public job kinds. The former root `job` alias was removed in 0.17.0.

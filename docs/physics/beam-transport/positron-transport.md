@@ -1,6 +1,6 @@
 # Positron transport
 
-With `pair_production_model` the secondary cascade converts coupled hard photons into electron–positron pairs ([pair conversion](../radiation-physics/hard-bremsstrahlung-events.md#pair-conversion-of-hard-photons)). `positron_transport=True` (issue #276; `pyrite profile numerics set --positron-transport`) transports those positrons instead of only recording them. The default `False` leaves every run bit for bit unchanged, and the key joins run identity only when it is on.
+With `pair_production_model` the secondary cascade converts coupled hard photons into electron–positron pairs ([pair conversion](../radiation-physics/hard-bremsstrahlung-events.md#pair-conversion-of-hard-photons)). `positron_transport=True` (issue #276; `pyrite profile physics set --positron-transport`) transports those positrons instead of only recording them. The default `False` leaves every run bit for bit unchanged, and the key joins run identity only when it is on.
 
 A positron interacts like an electron except for its charge and its distinguishability from target electrons. PyRITE therefore keeps the electron algorithm and replaces only the tables and the close-collision law:
 

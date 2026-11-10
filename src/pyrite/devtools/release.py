@@ -80,13 +80,19 @@ def removal_targets() -> dict[str, str]:
     """Every scheduled removal as ``label -> remove_in`` across all shim families."""
     from pyrite._api_deprecations import API_DEPRECATIONS
     from pyrite._module_deprecations import MODULE_DEPRECATIONS, PUBLIC_EXPORT_DEPRECATIONS
-    from pyrite.cli._deprecations import DEPRECATED_FLAGS, DEPRECATIONS, IMPLICIT_DEFAULTS
+    from pyrite.cli._deprecations import (
+        DEPRECATED_FLAGS,
+        DEPRECATED_FORMS,
+        DEPRECATIONS,
+        IMPLICIT_DEFAULTS,
+    )
 
     targets = {f"command {path}": entry.remove_in for path, entry in DEPRECATIONS.items()}
     targets.update(
         {f"option {cmd} {flag}": entry.remove_in for (cmd, flag), entry in DEPRECATED_FLAGS.items()}
     )
     targets.update({f"default {key}": entry.remove_in for key, entry in IMPLICIT_DEFAULTS.items()})
+    targets.update({f"form {form}": entry.remove_in for form, entry in DEPRECATED_FORMS.items()})
     targets.update({f"module {name}": e.remove_in for name, e in MODULE_DEPRECATIONS.items()})
     targets.update(
         {

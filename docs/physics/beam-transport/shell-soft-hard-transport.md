@@ -109,7 +109,7 @@ Missing installable reference data also raises: absent `pdatconf.p14` names
 
 For uncovered materials, amorphous layers, grooves or frozen integration,
 choose `Physics(inelastic_model="continuous")` explicitly, or set
-`pyrite profile numerics set PROFILE --inelastic-model continuous`.
+`pyrite profile physics set PROFILE --inelastic-model continuous`.
 Continuous stopping omits hard inelastic events; this is an explicit physical
 approximation without a general accuracy bound. It takes no inelastic cutoff.
 When replacing an existing shell configuration, clear its inherited cutoff too:

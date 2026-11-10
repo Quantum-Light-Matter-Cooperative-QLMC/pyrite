@@ -19,7 +19,12 @@ import pytest
 from pyrite import __version__
 from pyrite._api_deprecations import API_DEPRECATIONS, _window
 from pyrite._module_deprecations import MODULE_DEPRECATIONS, PUBLIC_EXPORT_DEPRECATIONS
-from pyrite.cli._deprecations import DEPRECATED_FLAGS, DEPRECATIONS, IMPLICIT_DEFAULTS
+from pyrite.cli._deprecations import (
+    DEPRECATED_FLAGS,
+    DEPRECATED_FORMS,
+    DEPRECATIONS,
+    IMPLICIT_DEFAULTS,
+)
 
 
 def _minor(version: str) -> tuple[int, int]:
@@ -60,6 +65,15 @@ def test_no_deprecated_option_spelling_is_past_its_removal_target() -> None:
 
     assert not overdue, (
         f"pyrite-mc {__version__} still ships {len(overdue)} option spelling(s) "
+        f"at or past their removal target: {sorted(overdue)}."
+    )
+
+
+def test_no_deprecated_argument_form_is_past_its_removal_target() -> None:
+    overdue = _overdue({form: entry.remove_in for form, entry in DEPRECATED_FORMS.items()})
+
+    assert not overdue, (
+        f"pyrite-mc {__version__} still accepts {len(overdue)} argument form(s) "
         f"at or past their removal target: {sorted(overdue)}."
     )
 
