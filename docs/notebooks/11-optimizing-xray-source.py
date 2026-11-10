@@ -205,7 +205,7 @@ def _(
 
 @app.cell
 def _(finalist, np, plt, score, search_result):
-    # Every point is an *evaluated* geometry; no contour interpolation of sparse data.
+    # Every point is an evaluated geometry; no contour interpolation of sparse data.
     _trials = sorted(search_result.trials, key=lambda trial: trial.number)
     _numbers = np.array([trial.number + 1 for trial in _trials])
     _yields = np.array([trial.objectives[score.name] for trial in _trials])

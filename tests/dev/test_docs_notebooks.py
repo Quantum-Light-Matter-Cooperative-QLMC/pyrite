@@ -156,7 +156,30 @@ def test_missing_title_rejected_by_native_export(notebooks, tmp_path):
     source.write_text("# source\n")
     nb = nbformat.v4.new_notebook(cells=[nbformat.v4.new_markdown_cell("No heading")])
     with pytest.raises(ValueError, match="lost the tutorial figures"):
-        notebooks.captured_notebook(source, nb, "Example", "Next")
+        notebooks.captured_notebook(source, nb, "Next")
+
+
+def test_page_found_by_number_and_title_follows_source(notebooks, tmp_path, monkeypatch):
+    import nbformat
+
+    pages = tmp_path / "designing"
+    pages.mkdir()
+    (pages / "14-old-slug.ipynb").write_text("{}")
+    source = tmp_path / "14-new-slug.py"
+    source.write_text("# source\n")
+    monkeypatch.setattr(notebooks, "NOTEBOOKS", tmp_path)
+    assert notebooks.page_location(source) == pages / "14-old-slug.ipynb"
+
+    figure = {"output_type": "display_data", "data": {"image/png": "x"}, "metadata": {}}
+    nb = nbformat.v4.new_notebook(
+        cells=[
+            nbformat.v4.new_markdown_cell("# New title\n\nProse"),
+            nbformat.v4.new_code_cell("1", outputs=[figure]),
+        ]
+    )
+    result = notebooks.captured_notebook(source, nb, "Next")
+    assert result.metadata["pyrite_docs"]["title"] == "New title"
+    assert result.cells[0].source.startswith("# New title\n\n[![Open in Molab]")
 
 
 def test_line_energy_notebook_cpu_smoke(monkeypatch):

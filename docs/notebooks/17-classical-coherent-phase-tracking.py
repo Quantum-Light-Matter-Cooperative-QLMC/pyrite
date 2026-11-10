@@ -45,7 +45,7 @@ def _(mo):
 
     ## What is "coherent emission"?
 
-    By default, PyRITE scores parametric X-rays radiation and coherent bremsstrahlung
+    By default, PyRITE scores parametric X-ray radiation and coherent bremsstrahlung
     (together, CXR) in **incoherent** mode. Fields interfere coherently, that is,
     are summed before squaring, only _within_ each straight segment of each
     electron's flight. That intra-segment interference produces the Bragg

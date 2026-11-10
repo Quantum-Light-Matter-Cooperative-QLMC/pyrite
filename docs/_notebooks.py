@@ -247,29 +247,34 @@ def regenerate_command(sources):
 
 
 def page_location(source):
-    """Find either the legacy wrapper or its generated notebook successor."""
+    """Find the tutorial page: legacy wrapper or notebook, else the notebook with the same number.
+
+    Numbers (``14`` in ``14-axial-channeling.py``) identify tutorials, so retitling or
+    renaming a source still finds its existing page.
+    """
     candidates = [
         *NOTEBOOKS.glob(f"*/{source.stem}.md"),
         *NOTEBOOKS.glob(f"*/{source.stem}.ipynb"),
     ]
+    number = re.match(r"(\d+[a-z]?)-", source.stem)
+    if not candidates and number:
+        candidates = list(NOTEBOOKS.glob(f"*/{number.group(1)}-*.ipynb"))
     if len(candidates) != 1:
         raise ValueError(f"{source.name}: expected exactly one tutorial page, got {candidates}")
     return candidates[0]
 
 
-def page_context(page):
+def page_footer(page):
     """Preserve authored cross-links while migrating the old iframe wrapper."""
     if page.suffix == ".ipynb":
-        metadata = json.loads(page.read_text())["metadata"]["pyrite_docs"]
-        return metadata["title"], metadata["footer"]
+        return json.loads(page.read_text())["metadata"]["pyrite_docs"]["footer"]
     content = page.read_text()
-    title = content.splitlines()[0].removeprefix("# ")
     if "## Continue learning" not in content or "## Canonical source" not in content:
         raise ValueError(f"{page}: expected Continue learning and Canonical source sections")
     footer = content.split("## Continue learning", 1)[1].split("## Canonical source", 1)[0].strip()
     # Only notebook-to-notebook URLs change suffix; links to guides and references stay .md.
     footer = re.sub(r"(\d\d-[a-z0-9-]+)\.md(?=[)#])", r"\1.ipynb", footer)
-    return title, footer
+    return footer
 
 
 def output_contains_figure(notebook):
@@ -308,8 +313,11 @@ def suppress_model_warnings(notebook):
         cell["outputs"] = outputs
 
 
-def captured_notebook(source, notebook, title, footer):
-    """Add site-only material without changing the editable marimo source."""
+def captured_notebook(source, notebook, footer):
+    """Add site-only material without changing the editable marimo source.
+
+    The page title always follows the marimo source heading.
+    """
     import nbformat
 
     if not output_contains_figure(notebook):
@@ -329,8 +337,7 @@ def captured_notebook(source, notebook, title, footer):
         match = re.search(r"^# (.+)$", markdown, re.MULTILINE)
         if not match:
             continue
-        if match.group(1).strip() != title:
-            raise ValueError(f"{source.name}: Marimo and documentation titles disagree")
+        title = match.group(1).strip()
         heading = f"# {title}\n\n{badge}"
         cell["source"] = markdown[: match.start()] + heading + markdown[match.end() :]
         break
@@ -458,7 +465,7 @@ def regenerate(names):
         completed = []
         for source in sources:
             page = page_location(source)
-            title, footer = page_context(page)
+            footer = page_footer(page)
             staged_source = directory / source.name
             shutil.copyfile(source, staged_source)
             exported = directory / f"{source.stem}.ipynb"
@@ -481,9 +488,7 @@ def regenerate(names):
                 env=envs[source],
                 cwd=DOCS.parent,
             )
-            notebook = captured_notebook(
-                source, nbformat.read(exported, as_version=4), title, footer
-            )
+            notebook = captured_notebook(source, nbformat.read(exported, as_version=4), footer)
             nbformat.validate(notebook)
             nbformat.write(notebook, exported)
             format_capture(exported)
@@ -557,7 +562,7 @@ def refreshed_notebook(source, exported, captured):
     for old, new in zip(old_cells, new_cells, strict=True):
         new.outputs = old.outputs
         new.execution_count = old.execution_count
-    return captured_notebook(source, exported, metadata["title"], metadata["footer"])
+    return captured_notebook(source, exported, metadata["footer"])
 
 
 def refresh_page(name):

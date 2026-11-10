@@ -41,19 +41,19 @@ def _(mo):
     # Electron trajectories: where X-rays come from
 
     Before calculating a spectrum, PyRITE follows sampled electron histories
-    through the target. Each straight electron's straight flight _segments_
+    through the target. Each electron's straight flight _segment_
     between scattering events has a defined position, direction, path length
     and changing kinetic energy. Elastic scattering changes the next flight's
     direction, while the material's _stopping power_ reduces the energy as
     the electron moves.
 
     Depending on the simulation mode, this stopping
-    power is either treated as purely `continuous` (the "Continuously
+    power is either treated as purely `continuous` (the "Continuous
     Slowing Down Approximation", or CSDA), or, if `shell-soft-hard` is enabled,
-    the inelastic collisions are split between continuous low-energy stopping,
-    while above some cutoff, discrete inelastic events are sampled directly
+    inelastic energy losses are split between continuous low-energy stopping
+    and discrete inelastic events above a cutoff, sampled directly
     via inelastic scattering cross sections from _BremsLib_. In this case,
-    discrete inelastic events case electrons to both lose energy and change
+    discrete inelastic events cause electrons to both lose energy and change
     direction.
 
     Here **65,536 sampled 30 keV electrons** enter a **4 µm HOPG slab** at
@@ -118,8 +118,8 @@ def _(mo):
     ## Follow the electrons
 
     `simulate_trajectories()` returns NumPy arrays, **one entry per material
-    segment**—not one entry per electron. Instead, each entry has an `electron_id`
-    field which tags the electron it is assoicated with. The entry `r_mid` is
+    segment**, not one entry per electron. Instead, each entry has an `electron_id`
+    field which tags the electron it is associated with. The entry `r_mid` is
     the midpoint in **Å**, `v_hat` the direction unit vector, and `L_ang` the
     segment length in **Å**. Thus the two endpoints are
 
@@ -157,7 +157,7 @@ def _(histories, np, transport_result):
     displayed_rows = electron_ids < 32
 
     # Midpoint is a continuous-energy scoring point, not the position of an
-    # elastic event: event_kind identifies the event at the *far endpoint*.
+    # elastic event: event_kind identifies the event at the far endpoint.
     return (
         displayed_rows,
         electron_ids,

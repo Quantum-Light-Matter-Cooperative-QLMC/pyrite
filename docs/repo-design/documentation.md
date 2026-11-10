@@ -583,7 +583,7 @@ uv run marimo edit docs/notebooks/01-first-spectrum.py
 
 CUDA tutorials (`backend = "cuda"`) are regenerated on the lab GPU whenever it
 is free. From a clean checkout of the commit on the box, submit
-`sbatch checks/tutorial_capture_cuda.sbatch 15-tuning-cuda-execution`, then copy
+`sbatch checks/tutorial_capture_cuda.sbatch 19-tuning-cuda-execution`, then copy
 the `.ipynb` back and commit it with its source. Local regeneration stops
 before exporting when CuPy finds no device.
 
