@@ -11,7 +11,8 @@ bounds the excluded transition-radiation background. :mod:`.states` builds
 user-definable entry wavefunctions (Gaussian, Hermite/Laguerre-Gauss vortex,
 Bessel, Airy, aberrated aperture probes, sampled arrays, abTEM waves) and
 projects them onto the planar Bloch basis. :mod:`.bloch` solves the planar Bloch
-eigenproblem at a beam energy and :mod:`.entry` maps sample tilt onto plane incidence. :mod:`.realspace` is the
+eigenproblem at a beam energy and :mod:`.entry` maps sample tilt onto plane incidence. :mod:`.exit_angular` gives the
+angular distribution of electrons leaving the crystal. :mod:`.realspace` is the
 experimental axial tier's periodic split-step backend. CPU only.
 """
 
@@ -83,6 +84,13 @@ from .energy_time import (
     time_slices,
 )
 from .entry import PlaneIncidence, mean_inner_potential_eV, plane_incidence
+from .exit_angular import (
+    ExitAngularDistribution,
+    classical_exit_angles,
+    coherent_exit_distribution,
+    density_exit_distribution,
+    open_exit_distribution,
+)
 from .handoff import CHANNELING_MODEL
 from .mcwf import MCWFResult, MCWFSolver, mcwf_stream_key
 from .operators import (
@@ -133,6 +141,7 @@ __all__ = [
     "DensityMatrixResult",
     "DensityMatrixSolver",
     "ElectronicChannels",
+    "ExitAngularDistribution",
     "EmissionLines",
     "EnergyQuadrature",
     "IncidentEnergyEnsemble",
@@ -153,7 +162,10 @@ __all__ = [
     "capture_bound",
     "check_quadrature_convergence",
     "channeling_spectrum",
+    "classical_exit_angles",
+    "coherent_exit_distribution",
     "decoherence_rate",
+    "density_exit_distribution",
     "dipole_rate_per_ang",
     "dipole_far_field",
     "dipole_stokes",
@@ -168,6 +180,7 @@ __all__ = [
     "longitudinal_kinematics",
     "mean_inner_potential_eV",
     "mcwf_stream_key",
+    "open_exit_distribution",
     "planar_energy_diagnostic",
     "planar_energy_spectrum",
     "planar_solver_factory",
