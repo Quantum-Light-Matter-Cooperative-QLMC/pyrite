@@ -1,0 +1,44 @@
+{
+  "source": {
+    "doi": "10.1038/s41566-022-01132-6",
+    "citation": "Huang et al., Quantum recoil in free-electron interactions with atomic lattices, Nat. Photon. 17, 224-230 (2023), Supplementary Information",
+    "zotero_item": "YUFBZEBM",
+    "zotero_attachment": "GA2V2SJW",
+    "table": "S4",
+    "verified": "2026-11-11",
+    "method": "Text extraction (pdftotext -layout) of SI Table S4, visually checked against PDF page 17 (SI page 16). Observation angles from main-text Methods ('X-ray measurements'); interlayer c spacings from main-text Fig. 2 labels."
+  },
+  "conventions": {
+    "beam": "+z (lab), electrons travel roughly along the crystal [001] axis",
+    "tilt": "theta_til/phi_til: polar/azimuth of the [001] axis in the lab frame (paper Eq. 5)",
+    "observation": "theta_obs polar from +z, phi_obs = 0 (detector in the x-z plane)",
+    "reflection": "paper label (0 0 -m) with g = -m 2 pi / c [001]; PyRITE's recoil sign is the negation, g = +m 2 pi / c [001]",
+    "tilts_are_fitted": "Table S4 tilts were fitted to the measured lines with the paper's quantum model; only 2*E2 - E4 is fit-independent (classical value 0 for any tilt)"
+  },
+  "detector": {
+    "type": "silicon drift EDS",
+    "calibration_uncertainty_eV": 0.5,
+    "fwhm_eV": {"JXA-8530F": {"650": 52, "1300": 72}, "JSM-7800F Prime": {"650": 50, "1300": 65}}
+  },
+  "sets": {
+    "fig1d": {"material": "graphite", "thickness_nm": 85, "c_ang": 6.71, "theta_obs_deg": 130.0, "instrument": "JXA-8530F"},
+    "figS5a": {"material": "graphite", "thickness_nm": 55, "c_ang": 6.71, "theta_obs_deg": 119.0, "instrument": "JSM-7800F Prime"},
+    "figS5b": {"material": "hBN", "thickness_nm": 95, "c_ang": 6.62, "theta_obs_deg": 119.0, "instrument": "JSM-7800F Prime"}
+  },
+  "columns": ["set", "kinetic_keV", "E2_eV", "E4_eV", "theta_til_deg", "phi_til_deg"],
+  "rows": [
+    ["fig1d", 10.7, 630.54, 1240.28, 13.00, 2.9],
+    ["fig1d", 11.0, 637.47, 1256.12, 13.03, 2.2],
+    ["fig1d", 11.3, 645.30, 1271.54, 12.96, 0.3],
+    ["fig1d", 11.7, 655.88, 1294.23, 12.45, 0.4],
+    ["fig1d", 12.0, 667.45, 1316.53, 10.78, 3.7],
+    ["fig1d", 12.5, 678.82, 1341.31, 10.79, 55.1],
+    ["fig1d", 13.0, 685.79, 1355.14, 12.87, 50.8],
+    ["figS5a", 13.5, 734.49, 1449.33, 6.38, 112.6],
+    ["figS5a", 14.0, 738.26, 1459.61, 10.29, 134.2],
+    ["figS5a", 14.5, 751.37, 1483.90, 10.02, 146.3],
+    ["figS5b", 13.5, 745.73, 1476.54, 0.38, 2.6],
+    ["figS5b", 14.0, 744.15, 1469.04, 12.15, 78.8],
+    ["figS5b", 14.5, 767.43, 1515.29, 6.08, 14.1]
+  ]
+}
