@@ -72,6 +72,7 @@ line-absorption-tabulation
 line-tabulation-root-support
 kinematic-validity-envelope
 line-energy-dispersion
+line-reflection-coupling-tables
 line-recoil-formation
 line-recoil-resonance
 line-recoil-validity-screen
@@ -84,6 +85,7 @@ sinc-bin-integration
 sinc-bin-midpoint-series
 sinc-bin-near-far
 spectral-support-yield-conservation
+spxr-physical-population
 transverse-bunch-form-factor
 xray-chi-zero
 xray-in-medium-propagation-phase

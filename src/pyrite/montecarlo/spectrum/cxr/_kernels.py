@@ -398,9 +398,10 @@ def _cxr_table_nan_onsets(crystal_info, composition, use_henke):
     tables return NaN for ``E >= Emax`` of each element, and the EPDL2025
     attenuation for ``E > EPDL_E_MAX_EV``. Per table,
 
-    - ``chi_g``/``U_g``: NaN from ``min_d Emax_d`` over the anomalous basis
+    - ``chi_g``: NaN from ``min_d Emax_d`` over the anomalous basis
       elements (all of them with ``use_henke``, else the edge-prone ones), since
-      a NaN term poisons the element sum; finite without any;
+      a NaN term poisons the element sum; finite without any. The static
+      ``U_g`` uses the static form factor and stays finite past this onset;
     - ``Re n``: NaN from ``min_basis Emax`` with ``use_henke``, else finite;
     - each absorber's ``log(mu_i)``: NaN above ``EPDL_E_MAX_EV`` (100 GeV).
 
@@ -457,9 +458,12 @@ def _cxr_emission_ceiling(crystal_info, composition, use_henke=True):
     """Energy at and above which no line can emit, in eV.
 
     The minimum of :func:`_cxr_table_nan_onsets`: a resonance there reads a NaN
-    coupling, refractive index or attenuation and is dropped by the line
-    kernels' finite mask, so no line centre lies at or above it. Always finite,
-    because every absorber's attenuation ends.
+    susceptibility, refractive index or attenuation, and the line kernels'
+    finite masks drop it (incoherent weight; coherent amplitude, formation and
+    complex coefficients). A data-domain cut, not a physical emission end. The
+    coherent route also evaluates refraction on the output axis, so automatic
+    stops round this ceiling down. Always finite, because every absorber's
+    attenuation ends.
 
     Validation: line-grid-emission-ceiling
     """

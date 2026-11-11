@@ -129,3 +129,135 @@ No divergent term, sign, exponent, or convention found between the independent d
 ## Counter-addressed energy draws (#361 re-verification, 2026-10-07)
 
 `beam_entry.py::initial_energies_keV` sets $E_e=E_0(1+f\,Z_{e,0})$, with $Z_{e,0}=\Phi^{-1}(u_{e,0})$ in the `spawn(6)[5]` child. The construction is derived in [beam-phase-space-injection §6](beam-phase-space-injection.md). Independent checks at $E_0=100$ keV, $f=0.01$ and $N=10^6$ gave mean $\delta=6.5\times10^{-6}$ and $\sigma_\delta/f=0.99987$. Row $e=5$ equals the reference exactly, the block `start=500` equals the slice, and $f\in\{0,\texttt{None}\}$ gives exactly $E_0$. $\rho(\delta, t_{\rm bunch})=5.6\times10^{-4}$, consistent with zero, from disjoint children. The non-positive-energy guard is unchanged. No discrepancy.
+
+## Independent verification of the 6σ clamp (fresh context, 2026-11-11)
+
+This is a fresh-context check at commit `491208cde`. I read the ledger row, the
+signatures and the docstrings first. I derived the law below before reading the
+body of `initial_energies_keV` or `upper_beam_energy_keV`.
+
+### Cheap filters
+
+- **Units:** $\delta$ and $z$ are dimensionless, and $E_i=E_0(1+\delta_i)$ is in keV. Pass.
+- **Limits:**
+  - $\sigma_\delta\to0$ gives $E_i=E_0$.
+  - $k\to\infty$ recovers the unclamped Gaussian.
+  - $\sigma_\delta<1/k=1/6$ guarantees $E_i>0$.
+  - Pass.
+- **Symmetry:** the clamp is symmetric, so the law stays even in $z$. Pass.
+
+### Clamped Gaussian law
+
+The draw is $z\sim\mathcal N(0,1)$. It is clipped, not truncated and
+renormalized: $\tilde z=\max(-k,\min(k,z))$ with $k=6$. All tail mass is moved
+onto the endpoints $\pm k$.
+
+- **Clipped mass:** $P(\lvert z\rvert>k)=2\Phi(-k)=1.9732\times10^{-9}$.
+- **Mean:** $\tilde z$ is an odd function of a symmetric law, so $\langle\tilde z\rangle=0$ exactly.
+- **Variance:**
+
+  $$
+  \langle\tilde z^2\rangle
+  =\bigl[2\Phi(k)-1-2k\varphi(k)\bigr]+k^2\,2\Phi(-k)
+  =1-2\bigl[k\varphi(k)-(k^2-1)\Phi(-k)\bigr],
+  $$
+
+  so $1-\langle\tilde z^2\rangle=3.849\times10^{-9}$ at $k=6$ (`mpmath`, 40 digits). The
+  RMS spread is therefore $\sigma_\delta(1-1.9\times10^{-9})$. That difference is
+  negligible, but the ledger statement "RMS $\sigma_\delta E_0$" is exact only to
+  this order.
+- **Strict upper energy:** $E_i\le E_0(1+k\lvert\sigma_\delta\rvert)=E_{\rm up}$
+  holds with equality only at the clip. In IEEE arithmetic
+  `E0 * (1.0 + f * 6.0)` and `E0 * (1.0 + 6.0 * abs(f))` are bit-identical,
+  including for $f<0$ at $z=-6$. So $E_{\rm up}$ is strict without a rounding
+  margin. I checked 200 000 random $(E_0,f)$ pairs at $z=\pm6$ and found 0
+  violations.
+- **Line shift:** the fractional line shift
+  $S=(\gamma-1)/[\gamma^3\beta^2(1-\beta\cos\theta_{\rm obs})]$ is a pointwise
+  first-order derivative of the resonance in $\delta$. It does not depend on the
+  law of $\delta$, so the clamp leaves its validity unchanged. Re-derived:
+  $2\beta\,\mathrm d\beta=2\,\mathrm d\gamma/\gamma^3$ and
+  $\mathrm d\gamma=(\gamma-1)\delta$ give
+  $\mathrm d\beta/\beta=(\gamma-1)\delta/(\gamma^3\beta^2)$.
+
+### Comparison with the implementation
+
+`initial_energies_keV` matches the derived law:
+
+- It computes `z = np.clip(counter_normals(...)[:, 0], -6.0, 6.0)`.
+- The energy is then `E = E0 * (1.0 + f * z)`.
+- The whole branch runs only `if energy_spread_frac:`, so `None` and `0` keep
+  `np.full(Ne, E0)` exactly.
+- A nonfinite or non-positive energy still raises.
+
+`upper_beam_energy_keV` returns `E0 * (1.0 + 6.0 * abs(f or 0.0))`, which also
+matches. Before the clamp, `counter_normals` already bounded
+$\lvert z\rvert\le8.2095$ (the `ndtri` limit of the smallest uniform). The clamp
+therefore changes only draws in $6<\lvert z\rvert\le8.2095$.
+
+### Numerics
+
+All draws come from `initial_energies_keV`, with seed 12345 and
+$4\times10^6$ electrons at $E_0=300$ keV:
+
+| $f$ | max $E$ (keV) | $E_{\rm up}$ (keV) | mean $z$ | RMS $z$ | $z$ range |
+|---|---|---|---|---|---|
+| 0.01 | 314.954 | 318.0 | $5.0\times10^{-4}$ | 1.00026 | $[-5.20, 4.98]$ |
+| 0.1 | 449.544 | 480.0 | $5.0\times10^{-4}$ | 1.00026 | $[-5.20, 4.98]$ |
+
+The mean and RMS sit within $1\sigma$ of their sampling errors
+($5\times10^{-4}$ and $3.5\times10^{-4}$). In both rows the maximum is at most
+$E_{\rm up}$.
+
+- **Monoenergetic limit:** $f\in\{0,\texttt{None}\}$ gives the same bytes as
+  `np.full(1000, 300.0)`, and `upper_beam_energy_keV` returns exactly $E_0$.
+- **Block addressing:** block `start=1000` equals the slice of the joined call.
+- **Clamp branch:** the anchor
+  `test_energy_spread_draw_is_clamped_at_the_declared_upper_energy` monkeypatches
+  draws $\{-9,-6,0,2.5,6,8.2\}$ and gets $\{94,94,100,102.5,106,106\}$ keV. A
+  natural draw with $\lvert z\rvert>6$ needs about $5\times10^8$ electrons, so the
+  monkeypatch is the right test.
+- **Test run:** the anchors in `test_transverse.py`, `test_bounds.py` and
+  `test_beam_energy_spread_grid.py` pass (81 passed alongside the
+  line-grid-policy module, 1 slow test skipped).
+
+### Consumers
+
+Every analytic spread consumer goes through `initial_energies_keV`:
+
+- `sample_primary_entry`
+- `host_pass`
+- `block_transport`
+- the `secondaries` table range
+- the channeling `sample_incident_phase_space`, which calls the primary sampler
+
+Every consumer that builds an automatic line grid or line ceiling evaluates
+$E_{\rm up}$ from the same `energy_spread_frac` the case carries:
+
+- `campaign/sweep.py::_automatic_cxr_grid_policy`
+- `directional.py::line_window_ceiling_eV`
+
+GDF sources refuse a spread. The channeling `IncidentEnergyEnsemble`
+(`cutoff_sigma`) is a separate diagnostic quadrature that is not wired to line
+grids.
+
+### Documentation drift (non-blocking; not edited)
+
+- The `transport/api.py::_simulate_trajectories` docstring still says
+  `u ~ Normal(0, 1)` with no clamp.
+- `docs/physics/beam-transport/beam-phase-space.md` still writes
+  `delta_i ~ N(0, energy_spread_frac)` with no clamp.
+- The `energy_grid/bounds.py::line_shift_fraction` docstring cites
+  `montecarlo/spectrum/lines.py::_cxr_kin_core`, and the ledger `Source` cites
+  `spectrum.py::_cxr_kin_core`. Neither file exists; the kernel is
+  `montecarlo/spectrum/cxr/_kernels.py::_cxr_kin_core`.
+- The `initial_energies_keV` docstring calls the clip a "truncation". It is a
+  clamp onto the endpoints, not a renormalized truncation. The mean is
+  unchanged either way.
+
+### Verdict
+
+`rederived`. The clamped law (zero mean, variance deficit $3.85\times10^{-9}$,
+clipped mass $2\Phi(-6)$), the bitwise-strict $E_{\rm up}$, the bit-for-bit
+$f=0$ limit and the unchanged $S$ all match the implementation. No human
+sign-off is implied.

@@ -283,6 +283,22 @@ def test_energy_spread_zero_is_bit_for_bit_monoenergetic():
             assert actual == expected, key
 
 
+def test_energy_spread_draw_is_clamped_at_the_declared_upper_energy(monkeypatch):
+    """Validation: beam-energy-spread-injection
+
+    ``|z| <= 6`` makes ``E0 (1 + 6 f)`` a strict upper incident energy, which
+    the line-grid kinematic bound evaluates beta at.
+    """
+    import pyrite.montecarlo.transport.beam_entry as beam_entry
+
+    draws = np.array([[-9.0], [-6.0], [0.0], [2.5], [6.0], [8.2]])
+    monkeypatch.setattr(beam_entry, "counter_normals", lambda *a, **k: draws)
+    energies = beam_entry.initial_energies_keV(100.0, draws.shape[0], 7, 0.01)
+    np.testing.assert_allclose(energies, [94.0, 94.0, 100.0, 102.5, 106.0, 106.0], rtol=1e-15)
+    assert energies.max() == pytest.approx(beam_entry.upper_beam_energy_keV(100.0, 0.01))
+    assert beam_entry.upper_beam_energy_keV(100.0, None) == 100.0
+
+
 def test_energy_spread_refuses_to_transport_a_non_positive_energy():
     with pytest.raises(ValueError, match="non-positive electron energy"):
         _transport(energy_spread_frac=5.0)
