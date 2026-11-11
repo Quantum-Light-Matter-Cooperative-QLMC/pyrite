@@ -118,7 +118,6 @@ def _write_variant(
     material,
     catalog_profile="standard",
     variant=None,
-    fidelity="full",
     digest="abcdef0123456789",
 ):
     stem_dir = checkpoint_dir / stem
@@ -129,7 +128,7 @@ def _write_variant(
             {
                 "dataset_identity": {
                     "material": material,
-                    "fidelity": fidelity,
+                    "fidelity": "full",
                     "variant": variant,
                     "catalog_profile": catalog_profile,
                     "parameter_sha256": digest,
@@ -206,7 +205,7 @@ def test_profile_menu_orders_newest_variant_first_when_no_standard(tmp_path):
 
 
 def test_profile_menu_labels_quick_variant_by_variant_not_catalog_profile(tmp_path):
-    _write_variant(tmp_path, "hbn_quick", material="hbn", variant="quick", fidelity="full")
+    _write_variant(tmp_path, "hbn_quick", material="hbn", variant="quick")
 
     menu = analyze.profile_menu("hbn", tmp_path)
 

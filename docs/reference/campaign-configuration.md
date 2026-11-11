@@ -195,7 +195,7 @@ accuracy target. It installs immutable grid artifacts and repoints the profile.
 With `--remote`, detached submission returns before installation: attach
 or rerun without `--detach` to resume, pull and install. Verify with
 `pyrite-dev energy-grid verify`. Do not paste survey-cropped bounds into
-the catalog; subsequent fidelity reduction is a separate decision.
+the catalog; any later grid reduction is a separate decision.
 
 ## Named beams and explicit instruments
 

@@ -212,7 +212,7 @@ def profile_menu(material: str, checkpoint_dir: Path | str) -> tuple[MaterialMen
     the same material -- named ``catalog_profile`` runs, ``--quick``, etc.
 
     Each non-canonical row is labeled by its resolved ``catalog_profile`` (or
-    ``variant``/``fidelity`` when there is no named profile), suffixed with a
+    ``variant``/frozen identity tier when there is no named profile), suffixed with a
     short digest so two runs under the same profile stay distinguishable.
     Rows are canonical-first, then newest-first, so an unmodified
     :func:`select_initial_material` default keeps existing single-checkpoint

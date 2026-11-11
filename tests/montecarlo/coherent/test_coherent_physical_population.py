@@ -301,7 +301,7 @@ def test_population_model_revision_invalidates_coherent_dataset_identity(monkeyp
     coherent = replace(plain, emission="both")
 
     def identity(settings):
-        return profiles.dataset_identity("hopg", "full", settings, sweep)
+        return profiles.dataset_identity("hopg", settings, sweep)
 
     old_plain = identity(plain)
     old_coherent = identity(coherent)

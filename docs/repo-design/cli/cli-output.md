@@ -46,9 +46,11 @@ chooses them; fixed counts then read `unused (adaptive)`. Switch with
 ## JSON compatibility
 
 JSON source and origin spellings are a machine contract and are not
-normalized (for example `built-in`, `fidelity`, `yours`). One payload changed
-in 0.32: `cxr.profile.numerics.show` carries numerics rows only and adds a
-`preset` key; physics rows moved to `pyrite.profile.physics.show`. Deprecated
+normalized (for example `built-in`, `yours`). One payload changed
+in 0.32: `cxr.profile.numerics.show` carries numerics rows only, adds a
+`preset` key and drops the `fidelity` key; built-in history counts report
+source `default` instead of the retired `fidelity` (#1079); physics rows moved
+to `pyrite.profile.physics.show`. Deprecated
 `pyrite numerics|physics show PROFILE` keeps the legacy combined schema.
 
 `remote job list|status` and `remote performance list` keep the dashboard

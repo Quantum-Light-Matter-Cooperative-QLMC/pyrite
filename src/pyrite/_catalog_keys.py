@@ -17,7 +17,7 @@ from functools import lru_cache
 from ._catalog_layout import bundled_catalog, object_keys, selected_catalog
 
 # ``@`` is allowed so ``<material>@<label>-<digest>`` checkpoint @-stems surface
-# in local checkpoint-stem completion alongside legacy ``--<fidelity>-`` stems.
+# in local checkpoint-stem completion alongside legacy ``--<tier>-`` stems.
 SAFE_TOKEN_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._@-]*")
 
 

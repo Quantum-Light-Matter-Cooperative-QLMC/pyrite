@@ -57,7 +57,6 @@ NUMERICS_GROUPS = (
 class NumericsResolution:
     """Explicit and effective result-affecting numerics with provenance."""
 
-    fidelity: str
     explicit: Mapping[str, object]
     effective: Mapping[str, object]
     sources: Mapping[str, str]

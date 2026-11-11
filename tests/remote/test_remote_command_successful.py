@@ -44,8 +44,8 @@ def test_successful_profile_run_resolves_remote_stem_before_real_pull(monkeypatc
     monkeypatch.setattr(state, "_completed_materials", lambda _jobid, _materials: ["hopg"])
     monkeypatch.setattr(state, "_materials_needing_pull", lambda _jobid, mats: list(mats))
 
-    def resolve(material, profile, *, fidelity, **_kwargs):
-        resolved.append((material, profile, fidelity))
+    def resolve(material, profile, **_kwargs):
+        resolved.append((material, profile))
         return remote_stem
 
     monkeypatch.setattr(lifecycle_pull, "resolve_profile_stem", resolve)
@@ -74,7 +74,7 @@ def test_successful_profile_run_resolves_remote_stem_before_real_pull(monkeypatc
 
     _remote_main(["run", "sub_100keV", "--no-sync"])
 
-    assert resolved == [("hopg", "sub_100keV", "full")]
+    assert resolved == [("hopg", "sub_100keV")]
     assert len(transfers) == 1
     assert _checkpoint_store.checkpoint_exists(
         remote_stem, tmp_path / "pyrite-output" / "checkpoints"
@@ -87,7 +87,7 @@ def test_successful_multi_detector_run_pulls_every_stem_of_completed_material(
     """Regression (#289): a multi-detector profile yields one stem per detector
     per material; the post-wait pull keeps every detector stem of a completed
     material instead of zipping stems against materials."""
-    pairs = scripts._material_stems(["hopg", "hbn"], False, "full", catalog_profile="standard")
+    pairs = scripts._material_stems(["hopg", "hbn"], False, catalog_profile="standard")
     assert [material for material, _ in pairs] == ["hopg", "hopg", "hbn", "hbn"]
     pulled = []
 

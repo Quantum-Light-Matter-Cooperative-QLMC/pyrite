@@ -35,9 +35,9 @@ def test_identity_unchanged_by_catalog_location(isolated_config, monkeypatch):
     copy_full_catalog(copy)
     shutil.copytree(bundled_catalog().parent / "cifs", copy / "cifs")
 
-    bundled = named_profile_identity("hopg", "survey", catalog_profile="coh_test")
+    bundled = named_profile_identity("hopg", catalog_profile="coh_test")
     monkeypatch.setenv("PYRITE_CATALOG", str(copy))
-    moved = named_profile_identity("hopg", "survey", catalog_profile="coh_test")
+    moved = named_profile_identity("hopg", catalog_profile="coh_test")
 
     assert moved == bundled
     assert str(copy) not in repr(moved)

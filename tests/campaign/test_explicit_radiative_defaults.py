@@ -61,8 +61,8 @@ def test_covered_scene_cases_and_identities_match_legacy_auto(sweep_factory):
     current = default_settings()
     old = replace(current, **LEGACY)
     assert (
-        dataset_identity("hopg", "full", current, sweep)["parameter_sha256"]
-        == dataset_identity("hopg", "full", old, sweep)["parameter_sha256"]
+        dataset_identity("hopg", current, sweep)["parameter_sha256"]
+        == dataset_identity("hopg", old, sweep)["parameter_sha256"]
     )
     elements = ["C", "Si"]
     resolved, events = resolve_run_models(current, elements, grooved=False)
@@ -70,8 +70,8 @@ def test_covered_scene_cases_and_identities_match_legacy_auto(sweep_factory):
     assert events == old_events == []
     assert _selectors(resolved)[:2] == _selectors(resolved_old)[:2]
     assert (
-        dataset_identity("hopg", "full", resolved, sweep)["parameter_sha256"]
-        == dataset_identity("hopg", "full", resolved_old, sweep)["parameter_sha256"]
+        dataset_identity("hopg", resolved, sweep)["parameter_sha256"]
+        == dataset_identity("hopg", resolved_old, sweep)["parameter_sha256"]
     )
     assert canonical_settings(resolved) and canonical_settings(resolved_old)
 
@@ -128,7 +128,7 @@ def test_missing_tables_raise_in_run_preflight_with_guidance(monkeypatch):
 
     monkeypatch.setattr(tables, "resolve_element_table", missing)
     with pytest.raises(TableNotFoundError, match="radiative_model='uncoupled'"):
-        scan._resolved_run(Namespace(fidelity="full", catalog_profile="standard"), "hopg")
+        scan._resolved_run(Namespace(catalog_profile="standard"), "hopg")
 
 
 @pytest.mark.parametrize("grooved", [False, True])
@@ -155,7 +155,7 @@ def test_allow_fallback_degrades_default_and_records_it(monkeypatch, grooved):
 def test_explicit_uncoupled_records_no_coupled_identity():
     sweep = material_sweep("silicon")
     settings = replace(default_settings(), radiative_model="uncoupled", radiative_cutoff_eV=None)
-    numerics = dataset_identity("silicon", "full", settings, sweep)["resolved_parameters"][
+    numerics = dataset_identity("silicon", settings, sweep)["resolved_parameters"][
         "transport_numerics"
     ]
     assert "radiative_model" not in numerics

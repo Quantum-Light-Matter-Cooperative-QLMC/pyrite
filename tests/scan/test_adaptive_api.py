@@ -99,7 +99,7 @@ def test_fixed_n_identity_matches_the_pre_precision_baseline():
     # Re-pinned for the deliberate CBS v4 (#513) and line-kinematics v5 (#439)
     # identity generations, then the corrected-stopping v2 marker (1f22f89c), then
     # #278's automatic continuum grid (``continuum_grid_model`` joins the identity).
-    identity = dataset_identity("hopg", "full", Settings(), sweep, bremsstrahlung_model="eedl")
+    identity = dataset_identity("hopg", Settings(), sweep, bremsstrahlung_model="eedl")
     assert (
         identity["parameter_sha256"]
         == "95e2b6742b437f6206dddf69980139331b2b8dbd538c2dbe1d709f27ae7d4d11"
@@ -122,17 +122,15 @@ def test_adaptive_dataset_identity_hashes_policy_not_unused_fixed_counts(scene, 
         material="hopg", beam=scene.beam, target=scene.target, detector=scene.detector
     )
     settings = Settings(precision=precision)
-    first = dataset_identity("hopg", "full", settings, sweep, bremsstrahlung_model="eedl")
+    first = dataset_identity("hopg", settings, sweep, bremsstrahlung_model="eedl")
     other = dataset_identity(
         "hopg",
-        "full",
         replace(settings, n_electrons=7, n_electrons_brem=3),
         sweep,
         bremsstrahlung_model="eedl",
     )
     changed = dataset_identity(
         "hopg",
-        "full",
         replace(settings, precision=replace(precision, target_rse=0.2)),
         sweep,
         bremsstrahlung_model="eedl",

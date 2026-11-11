@@ -256,7 +256,7 @@ Usage: pyrite checkpoint gc [OPTIONS]
 Options:
   --all           Prune current checkpoints for standard and every named catalog
                   profile.
-  --profile NAME  Prune current full and survey checkpoints for catalog profile NAME.
+  --profile NAME  Prune current checkpoints for catalog profile NAME.
   -y, --yes       Delete exact previewed stale records.
   -h, --help      Show this message and exit.
 ```

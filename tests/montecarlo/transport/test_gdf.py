@@ -318,9 +318,9 @@ def test_absolute_weight_scale_and_identity(tmp_path):
     beam = load_gdf_beam(path)
     sweep = gdf_sweep(path, gdf_normalization="gdf_charge", rep_rate_hz=1e6)
     before = build_cases(sweep)[0]
-    identity_before = dataset_identity("hopg", "full", default_settings(), sweep)
+    identity_before = dataset_identity("hopg", default_settings(), sweep)
     shape = replace(sweep, beam=replace(sweep.beam, gdf_shape_only=True))
-    identity_shape = dataset_identity("hopg", "full", default_settings(), shape)
+    identity_shape = dataset_identity("hopg", default_settings(), shape)
     assert identity_before["parameter_sha256"] != identity_shape["parameter_sha256"]
     assert case_content_key(before) != case_content_key(build_cases(shape)[0])
     arrays = fields()
@@ -330,7 +330,7 @@ def test_absolute_weight_scale_and_identity(tmp_path):
     np.testing.assert_array_equal(beam.probabilities, scaled.probabilities)
     assert scaled.absolute_charge_c == pytest.approx(100 * beam.absolute_charge_c)
     after = build_cases(sweep)[0]
-    identity_after = dataset_identity("hopg", "full", default_settings(), sweep)
+    identity_after = dataset_identity("hopg", default_settings(), sweep)
     assert beam_current_na(after) == pytest.approx(100 * beam_current_na(before))
     assert case_content_key(before) != case_content_key(after)
     assert identity_before["parameter_sha256"] != identity_after["parameter_sha256"]
@@ -475,8 +475,7 @@ def test_shared_rate_saved_normalization_and_phase_space(tmp_path, normalization
     # Per-electron source arrays can be reused, but normalized dataset identity changes.
     assert case_content_key(cases[0]) == case_content_key(cases[1])
     identities = [
-        dataset_identity("hopg", "full", default_settings(), candidate)
-        for candidate in (sweep, faster)
+        dataset_identity("hopg", default_settings(), candidate) for candidate in (sweep, faster)
     ]
     assert identities[0]["parameter_sha256"] != identities[1]["parameter_sha256"]
     charge = 10 * elementary_charge if normalization == "gdf_charge" else 1e-12
@@ -509,6 +508,6 @@ def test_gdf_charge_ignores_configured_charge_in_identity(tmp_path):
     other = replace(sweep, beam=replace(sweep.beam, bunch_charge_pc=100))
     assert build_cases(sweep)[0] == build_cases(other)[0]
     assert (
-        dataset_identity("hopg", "full", default_settings(), sweep)["parameter_sha256"]
-        == dataset_identity("hopg", "full", default_settings(), other)["parameter_sha256"]
+        dataset_identity("hopg", default_settings(), sweep)["parameter_sha256"]
+        == dataset_identity("hopg", default_settings(), other)["parameter_sha256"]
     )

@@ -93,8 +93,8 @@ def test_user_instruments_resolve_after_remote_transfer(
 
     bundle = layout.bundled_catalog()
     layer = _isolate_user_catalog
-    bundled = named_profile_identity("hopg", "survey", catalog_profile="quickstart")
-    existing_user = named_profile_identity("hopg", "survey", catalog_profile="coh_test")
+    bundled = named_profile_identity("hopg", catalog_profile="quickstart")
+    existing_user = named_profile_identity("hopg", catalog_profile="coh_test")
     for table, source in (("beams", "example"), ("detectors", "reference")):
         (layer / table).mkdir()
         (layer / table / "mine.toml").write_bytes((bundle / table / f"{source}.toml").read_bytes())
@@ -106,9 +106,9 @@ def test_user_instruments_resolve_after_remote_transfer(
         )
     )
     monkeypatch.setattr(config, "SYNC_PATHS", [])
-    local = named_profile_identity("hopg", "survey", catalog_profile="mine")
-    assert named_profile_identity("hopg", "survey", catalog_profile="quickstart") == bundled
-    assert named_profile_identity("hopg", "survey", catalog_profile="coh_test") == existing_user
+    local = named_profile_identity("hopg", catalog_profile="mine")
+    assert named_profile_identity("hopg", catalog_profile="quickstart") == bundled
+    assert named_profile_identity("hopg", catalog_profile="coh_test") == existing_user
     entries = transport._sync_entries()
     assert {
         "user-catalog/beams/mine.toml",
@@ -121,8 +121,8 @@ def test_user_instruments_resolve_after_remote_transfer(
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(file.read_bytes())
     monkeypatch.setenv("PYRITE_USER_CATALOG", str(remote))
-    assert named_profile_identity("hopg", "survey", catalog_profile="mine") == local
-    assert named_profile_identity("hopg", "survey", catalog_profile="quickstart") == bundled
+    assert named_profile_identity("hopg", catalog_profile="mine") == local
+    assert named_profile_identity("hopg", catalog_profile="quickstart") == bundled
 
 
 def test_user_materials_cifs_round_trip_with_same_identity(

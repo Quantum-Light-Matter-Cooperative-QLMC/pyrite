@@ -74,9 +74,9 @@ def test_physics_selector_and_lowering():
 def test_identity_and_provenance_diverge_only_when_on():
     sweep = material_sweep("hopg")
     base = default_settings()
-    off = dataset_identity("hopg", "full", base, sweep)
-    on = dataset_identity("hopg", "full", replace(base, transition_radiation="history"), sweep)
-    bunch = dataset_identity("hopg", "full", replace(base, transition_radiation="bunch"), sweep)
+    off = dataset_identity("hopg", base, sweep)
+    on = dataset_identity("hopg", replace(base, transition_radiation="history"), sweep)
+    bunch = dataset_identity("hopg", replace(base, transition_radiation="bunch"), sweep)
     assert "transition_model" not in off["resolved_parameters"]
     assert on["resolved_parameters"]["transition_model"] == TRANSITION_MODEL
     assert len({off["parameter_sha256"], on["parameter_sha256"], bunch["parameter_sha256"]}) == 3

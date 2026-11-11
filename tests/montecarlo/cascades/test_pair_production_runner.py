@@ -83,8 +83,8 @@ def test_identity_forks_only_when_pairs_can_run(monkeypatch, resolved):
     )
     sweep = material_sweep("silicon")
     settings = replace(default_settings(), **SHELL, **COUPLED)
-    base = dataset_identity("silicon", "full", settings, sweep)
-    paired = dataset_identity("silicon", "full", replace(settings, **PAIR), sweep)
+    base = dataset_identity("silicon", settings, sweep)
+    paired = dataset_identity("silicon", replace(settings, **PAIR), sweep)
     numerics = paired["resolved_parameters"]["transport_numerics"]
     assert "pair_production_model" not in base["resolved_parameters"]["transport_numerics"]
     if resolved == "bremslib":

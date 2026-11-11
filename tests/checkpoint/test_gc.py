@@ -25,7 +25,6 @@ def _target():
     return cleanup._Target(
         stem="hopg",
         material="hopg",
-        fidelity="full",
         catalog_profile="standard",
         identity={"parameter_sha256": "current"},
     )

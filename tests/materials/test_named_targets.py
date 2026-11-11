@@ -154,23 +154,23 @@ def test_named_inline_and_renamed_have_same_identity(document, tmp_path, monkeyp
     row["tilt_azim_deg"] = 0.0
     inline = load(document, tmp_path)
     monkeypatch.setattr(config, "CATALOG", inline)
-    before = named_profile_identity("silicon", "survey")
+    before = named_profile_identity("silicon")
     document["targets"] = {"film": {**SLAB, "description": "label only"}}
     row["targets"] = {"silicon": "film"}
     named = load(document, tmp_path)
     monkeypatch.setattr(config, "CATALOG", named)
-    after = named_profile_identity("silicon", "survey")
+    after = named_profile_identity("silicon")
     assert before == after
     assert config.material_sweep("silicon").target == load_target("film", catalog=named)
     document["targets"]["other"] = document["targets"].pop("film")
     row["targets"]["silicon"] = "other"
     renamed = load(document, tmp_path)
     monkeypatch.setattr(config, "CATALOG", renamed)
-    assert named_profile_identity("silicon", "survey") == before
+    assert named_profile_identity("silicon") == before
     document["targets"]["other"]["thickness_ang"] = 30000
     changed = load(document, tmp_path)
     monkeypatch.setattr(config, "CATALOG", changed)
-    assert named_profile_identity("silicon", "survey") != before
+    assert named_profile_identity("silicon") != before
 
 
 def test_reference_lifecycle_and_invalid_delete_rollback(document, tmp_path):
@@ -240,7 +240,7 @@ def test_stack_named_and_inline_identity_match(document, tmp_path, monkeypatch):
     row.update({"thickness_ang": 20000.0, "tilt_deg": 30.0, "tilt_azim_deg": 0.0})
     document["materials"]["silicon"]["stack"] = layers
     monkeypatch.setattr(config, "CATALOG", load(document, tmp_path))
-    inline = named_profile_identity("silicon", "survey")
+    inline = named_profile_identity("silicon")
     inline_target = config.material_sweep("silicon").target
     document["materials"]["silicon"].pop("stack")
     document["targets"] = {
@@ -251,7 +251,7 @@ def test_stack_named_and_inline_identity_match(document, tmp_path, monkeypatch):
     }
     row["targets"] = {"silicon": "supported"}
     monkeypatch.setattr(config, "CATALOG", load(document, tmp_path))
-    assert named_profile_identity("silicon", "survey") == inline
+    assert named_profile_identity("silicon") == inline
     assert config.material_sweep("silicon").target == inline_target
 
 
@@ -260,7 +260,7 @@ def test_unused_presets_do_not_change_identity(document, tmp_path, monkeypatch):
     from pyrite.campaign.profiles import named_profile_identity
 
     monkeypatch.setattr(config, "CATALOG", load(document, tmp_path))
-    before = named_profile_identity("silicon", "survey")
+    before = named_profile_identity("silicon")
     document["targets"] = {"film": SLAB}
     document["filters"] = {
         "window": {
@@ -271,7 +271,7 @@ def test_unused_presets_do_not_change_identity(document, tmp_path, monkeypatch):
         }
     }
     monkeypatch.setattr(config, "CATALOG", load(document, tmp_path))
-    assert named_profile_identity("silicon", "survey") == before
+    assert named_profile_identity("silicon") == before
 
 
 def test_remote_catalog_layer_transfer_covers_preset_tables():

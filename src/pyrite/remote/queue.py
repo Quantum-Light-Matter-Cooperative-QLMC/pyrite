@@ -208,7 +208,6 @@ def start_queue(
     dry_run=False,
     parallel_materials=None,
     chunk_minutes=10.0,
-    fidelity="full",
     high_energy_min_kev=None,
     catalog_profile="standard",
     performance_profile=None,
@@ -285,7 +284,6 @@ def start_queue(
         "expected_physics": expected_inventory(
             materials,
             quick,
-            fidelity,
             catalog_profile,
             high_energy_min_kev,
             allow_physics_fallback=allow_physics_fallback,
@@ -298,7 +296,12 @@ def start_queue(
     stems = (
         []
         if cpu_only
-        else scripts._stems(materials, quick, fidelity, high_energy_min_kev, catalog_profile)
+        else scripts._stems(
+            materials,
+            quick,
+            high_energy_min_kev=high_energy_min_kev,
+            catalog_profile=catalog_profile,
+        )
     )
     if chunked:
         parallel_materials = None
@@ -308,7 +311,6 @@ def start_queue(
             quick,
             workers,
             chunk_minutes,
-            fidelity,
             high_energy_min_kev,
             catalog_profile,
             performance_profile,
@@ -332,7 +334,6 @@ def start_queue(
             quick,
             workers,
             parallel_materials,
-            fidelity,
             high_energy_min_kev,
             catalog_profile,
             performance_profile,
@@ -368,7 +369,6 @@ def start_queue(
         workers,
         parallel_materials,
         chunk_minutes,
-        fidelity,
         high_energy_min_kev,
         catalog_profile,
         performance_profile,

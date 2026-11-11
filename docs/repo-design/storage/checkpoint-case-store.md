@@ -4,7 +4,7 @@ Named profiles retain separate checkpoint identities while sharing numerically i
 
 ## Identity and layout
 
-`profiles.case_content_key()` hashes schema `cxr.case-content-key.v1` plus the fully resolved case dictionary. Profile labels, fidelity/variant labels, execution chunk sizes, analytic mosaic post-processing, and reporting-only flux/current fields are excluded. Physics inputs, Monte Carlo mosaic width, and RNG seed remain keyed.
+`profiles.case_content_key()` hashes schema `cxr.case-content-key.v1` plus the fully resolved case dictionary. Profile labels, variant labels, execution chunk sizes, analytic mosaic post-processing, and reporting-only flux/current fields are excluded. Physics inputs, Monte Carlo mosaic width, and RNG seed remain keyed.
 
 Each raw transport output is stored once at:
 

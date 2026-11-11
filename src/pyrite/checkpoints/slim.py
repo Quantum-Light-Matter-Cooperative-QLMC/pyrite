@@ -49,7 +49,7 @@ def _material_from_stem(in_path):
 
 
 def _grid_from_stem(in_path):
-    """Return ``(material, fidelity, catalog_profile)`` for a canonical or
+    """Return ``(material, catalog_profile)`` for a canonical or
     named-profile stem (a canonical stem yields the bare material key)."""
     stem = os.path.splitext(os.path.basename(os.path.normpath(in_path)))[0]
     # ``@`` (current @-stems) or ``--`` (legacy stems) marks a resolved variant
@@ -57,7 +57,7 @@ def _grid_from_stem(in_path):
     # canonical (or ``_quick``) material key.
     if "--" not in stem and "@" not in stem:
         return _material_from_stem(in_path)
-    from ..campaign.profiles import identity_from_stem
+    from ..campaign.profiles import RETIRED_SURVEY_TIER, identity_from_stem, legacy_tier
 
     # Pass the checkpoint's parent dir so identity_from_stem can read the stem's
     # meta.json sidecar (authoritative dataset_identity recorded at run time)
@@ -68,7 +68,12 @@ def _grid_from_stem(in_path):
         raise SystemExit(
             f"--grid: cannot resolve named-profile identity from checkpoint stem {stem!r}"
         )
-    return identity["material"], identity["fidelity"], identity.get("catalog_profile", "standard")
+    if legacy_tier(identity) == RETIRED_SURVEY_TIER:
+        raise SystemExit(
+            f"--grid: checkpoint {stem!r} was produced by the retired survey tier, whose "
+            "reduced grid no longer exists; slim it without --grid"
+        )
+    return identity["material"], identity.get("catalog_profile", "standard")
 
 
 def _pct_smaller(before, after):

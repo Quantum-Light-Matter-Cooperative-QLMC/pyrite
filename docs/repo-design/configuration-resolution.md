@@ -168,7 +168,7 @@ owning tools or execution environment.
 
 `pyrite run [PROFILE]` uses the positional profile when present; otherwise it uses `profile.current`. The selected `[profiles.NAME]` row supplies shared scan values. `[profiles.NAME.overrides.MATERIAL]` replaces values for one material. An explicit membership list limits the campaign; an absent list means every configured material. `-m/--material` narrows that resolved membership and does not create another profile.
 
-Named beam references resolve to beam values before hashing. Each detector in the selected profile resolves independently. Runs require explicit scalar acceptance fields or pixel geometry, which determines its own scalar acceptance. A profile with no detector declaration must attach one before running. Referenced object names and labels are display metadata, while detector IDs identify separate output datasets. The built-in detector has no spectral response; scoring preserves the source spectrum apart from acceptance scaling. An explicit emission policy overrides the fidelity preset's default. The photon dispersion model is not configurable: the in-medium relation always applies. Energy-grid references are verified and resolved for the selected profile before a material sweep is built.
+Named beam references resolve to beam values before hashing. Each detector in the selected profile resolves independently. Runs require explicit scalar acceptance fields or pixel geometry, which determines its own scalar acceptance. A profile with no detector declaration must attach one before running. Referenced object names and labels are display metadata, while detector IDs identify separate output datasets. The built-in detector has no spectral response; scoring preserves the source spectrum apart from acceptance scaling. An explicit emission policy overrides the default incoherent emission. The photon dispersion model is not configurable: the in-medium relation always applies. Energy-grid references are verified and resolved for the selected profile before a material sweep is built.
 
 ## Run resolution order
 
@@ -176,7 +176,7 @@ For each material, the run path performs the following conceptual sequence:
 
 ```text
 CLI context -> catalog profile -> material override -> named beam/detector
-            -> resolved detector energy bins -> fidelity preset
+            -> resolved detector energy bins -> built-in defaults
             -> explicit run overrides -> cases and identity
 ```
 

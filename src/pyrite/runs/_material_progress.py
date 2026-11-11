@@ -320,7 +320,6 @@ def start_performance_logger(args, material, *, identity, stem, cases, sweep, co
         profile=performance_profile,
         material=material,
         static={
-            "fidelity": identity["fidelity"],
             "catalog_profile": identity.get("catalog_profile", "standard"),
             "parameter_sha256": identity["parameter_sha256"],
             "checkpoint_stem": stem,

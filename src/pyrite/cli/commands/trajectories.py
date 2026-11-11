@@ -211,7 +211,7 @@ def _skipped_row(path: Path, status: str, reason: str) -> dict:
     "info",
     help=(
         "Describe one trajectory artifact without loading its segment arrays.\n\n"
-        "Prints the case, seed, provenance (checkpoint stem, profile, fidelity), "
+        "Prints the case, seed, provenance (checkpoint stem, profile), "
         "whether a scene was recorded, schema and row order, then every "
         "/transport field with its role, dtype, shape, and units. Per-segment "
         "field names are the valid cell arrays of `pyrite trajectories export` "
@@ -257,7 +257,6 @@ def _print_info(info: dict) -> None:
         ("seed", info["seed"]),
         ("stem", provenance.get("checkpoint_stem")),
         ("profile", provenance.get("profile")),
-        ("fidelity", provenance.get("fidelity")),
         ("scene", "recorded" if info["scene"] else "not recorded"),
         ("spectrum inputs", "recorded" if info["spectrum_inputs"] else "not recorded"),
         ("schema", info["schema_version"]),

@@ -576,14 +576,14 @@ def test_repair_brem_wide_persists_profile_and_explicit_bounds(monkeypatch):
         brem_start_eV=100.0,
         brem_stop_eV=500.0,
         brem_step_eV=100.0,
-        fidelity="survey",
+        profile_defaults=True,
     )
 
     assert n == 1
     np.testing.assert_array_equal(record["E_grid_brem"], [100.0, 200.0, 300.0, 400.0])
     assert record["case"]["E_grid_brem"] == (100.0, 500.0, 100.0)
     assert record["case"]["Ne_brem"] == 30
-    assert record["case"]["brem_profile"] == "survey"
+    assert record["case"]["brem_profile"] == "full"
 
 
 def test_repair_brem_wide_retune_skips_record_already_at_target():
@@ -629,12 +629,14 @@ def test_rebrem_profile_defaults_match_for_explicit_materials_and_all(monkeypatc
         lambda path, **kwargs: calls.append((Path(path).name, kwargs)) or {},
     )
 
-    rebrem.rebrem_checkpoints(materials=["hopg", "hbn"], checkpoint_dir=tmp_path, fidelity="survey")
+    rebrem.rebrem_checkpoints(
+        materials=["hopg", "hbn"], checkpoint_dir=tmp_path, require_identity=True
+    )
     explicit = calls.copy()
     calls.clear()
-    rebrem.rebrem_checkpoints(checkpoint_dir=tmp_path, fidelity="survey")
+    rebrem.rebrem_checkpoints(checkpoint_dir=tmp_path, require_identity=True)
 
-    # Compared key by key: a graded profile continuum (hopg/survey is refined,
+    # Compared key by key: a graded profile continuum (hopg is refined,
     # so its grid carries two step sizes) resolves to a ``brem_nodes`` array,
     # and a dict holding one cannot be compared with ``==``.
     by_name = {name: kwargs for name, kwargs in calls}
@@ -648,8 +650,8 @@ def test_rebrem_profile_defaults_match_for_explicit_materials_and_all(monkeypatc
                 assert np.array_equal(np.asarray(got[key]), np.asarray(want[key])), (name, key)
             else:
                 assert got[key] == want[key], (name, key)
-    assert {kwargs["ne_brem"] for _, kwargs in calls} == {30}
-    assert {kwargs["fidelity"] for _, kwargs in calls} == {"survey"}
+    assert {kwargs["ne_brem"] for _, kwargs in calls} == {150}
+    assert {kwargs["profile_defaults"] for _, kwargs in calls} == {True}
 
 
 def test_rebrem_cli_requires_materials_xor_all(monkeypatch):
@@ -911,14 +913,14 @@ def test_repair_line_spec_persists_profile_and_explicit_bounds(monkeypatch):
         cxr_start_eV=500.0,
         line_stop_eV=1100.0,
         line_step_eV=200.0,
-        fidelity="survey",
+        profile_defaults=True,
         from_config=False,
     )
 
     assert n == 1
     np.testing.assert_array_equal(record["E_grid"], [500.0, 700.0, 900.0])
     assert record["case"]["Ne"] == 60
-    assert record["case"]["line_profile"] == "survey"
+    assert record["case"]["line_profile"] == "full"
 
 
 def test_repair_line_spec_skips_at_target(monkeypatch):
@@ -1079,17 +1081,19 @@ def test_reline_profile_defaults_match_for_explicit_materials_and_all(monkeypatc
         lambda path, material, **kwargs: calls.append((material, kwargs)) or {},
     )
 
-    reline.recxr_checkpoints(materials=["hopg", "hbn"], checkpoint_dir=tmp_path, fidelity="survey")
+    reline.recxr_checkpoints(
+        materials=["hopg", "hbn"], checkpoint_dir=tmp_path, require_identity=True
+    )
     explicit = calls.copy()
     calls.clear()
-    reline.recxr_checkpoints(checkpoint_dir=tmp_path, fidelity="survey")
+    reline.recxr_checkpoints(checkpoint_dir=tmp_path, require_identity=True)
 
     assert {name: kwargs for name, kwargs in calls} == {name: kwargs for name, kwargs in explicit}
-    assert {kwargs["cxr_ne"] for _, kwargs in calls} == {60}
-    assert {kwargs["fidelity"] for _, kwargs in calls} == {"survey"}
+    assert {kwargs["cxr_ne"] for _, kwargs in calls} == {300}
+    assert {kwargs["profile_defaults"] for _, kwargs in calls} == {True}
 
 
-def test_reline_resolves_variant_material_profile_and_fidelity_from_metadata(monkeypatch, tmp_path):
+def test_reline_resolves_variant_material_and_profile_from_metadata(monkeypatch, tmp_path):
     import json
 
     from pyrite.checkpoints import recompute as reline
@@ -1103,7 +1107,7 @@ def test_reline_resolves_variant_material_profile_and_fidelity_from_metadata(mon
             {
                 "dataset_identity": {
                     "material": "hopg",
-                    "fidelity": "survey",
+                    "fidelity": "full",
                     "catalog_profile": "sub_100keV",
                 }
             }
@@ -1123,8 +1127,29 @@ def test_reline_resolves_variant_material_profile_and_fidelity_from_metadata(mon
     )
 
     assert calls[0][1] == "hopg"
-    assert calls[0][2]["fidelity"] == "survey"
+    assert calls[0][2]["profile_defaults"] is True
     assert calls[0][2]["catalog_profile"] == "sub_100keV"
+
+
+@pytest.mark.parametrize("command", ["rebrem_checkpoints", "recxr_checkpoints"])
+def test_recompute_refuses_retired_survey_checkpoint(monkeypatch, tmp_path, command):
+    """#1079: a survey-tier checkpoint's reduced grid no longer exists, so a
+    profile-aware recompute must refuse it instead of retargeting the full grid."""
+    import json
+
+    from pyrite.checkpoints import recompute
+
+    stem = "hopg@survey-0123456789ab"
+    directory = tmp_path / stem
+    directory.mkdir()
+    (directory / "meta.json").write_text(
+        json.dumps({"dataset_identity": {"material": "hopg", "fidelity": "survey"}})
+    )
+    monkeypatch.setattr(recompute, "repair_checkpoint", lambda *a, **k: pytest.fail("ran"))
+    monkeypatch.setattr(recompute, "recxr_checkpoint", lambda *a, **k: pytest.fail("ran"))
+
+    with pytest.raises(ValueError, match="retired survey tier"):
+        getattr(recompute, command)(materials=[stem], checkpoint_dir=tmp_path)
 
 
 def test_recompute_legacy_ambiguous_stem_requires_explicit_profile(tmp_path):
@@ -1145,15 +1170,15 @@ def test_recompute_rejects_profile_mismatch(tmp_path):
 
     from pyrite.checkpoints.recompute_defaults import dataset_context
 
-    path = tmp_path / "hopg@survey"
+    path = tmp_path / "hopg@other"
     path.mkdir()
     (path / "meta.json").write_text(
         json.dumps(
             {
                 "dataset_identity": {
                     "material": "hopg",
-                    "fidelity": "survey",
-                    "catalog_profile": "survey",
+                    "fidelity": "full",
+                    "catalog_profile": "other",
                 }
             }
         )
@@ -1315,7 +1340,7 @@ def test_rebrem_retunes_onto_a_graded_profile_grid(monkeypatch, tmp_path):
         lambda path, **kwargs: calls.append(kwargs) or {},
     )
 
-    rebrem.rebrem_checkpoints(materials=["hopg"], checkpoint_dir=tmp_path, fidelity="survey")
+    rebrem.rebrem_checkpoints(materials=["hopg"], checkpoint_dir=tmp_path, require_identity=True)
 
     assert len(calls) == 1
     assert np.array_equal(calls[0]["brem_nodes"], nodes)
@@ -1346,7 +1371,7 @@ def test_rebrem_keeps_the_uniform_triple_for_a_uniform_profile_grid(monkeypatch,
         lambda path, **kwargs: calls.append(kwargs) or {},
     )
 
-    rebrem.rebrem_checkpoints(materials=["hopg"], checkpoint_dir=tmp_path, fidelity="survey")
+    rebrem.rebrem_checkpoints(materials=["hopg"], checkpoint_dir=tmp_path, require_identity=True)
 
     assert calls[0]["brem_nodes"] is None
     assert calls[0]["brem_start_eV"] == 50.0

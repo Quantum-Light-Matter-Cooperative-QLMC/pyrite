@@ -175,11 +175,10 @@ def test_dataset_identity_tracks_model_and_termination():
 
     base = default_settings()
     sweep = material_sweep("hopg")
-    off = dataset_identity("hopg", "full", base, sweep)
-    on = dataset_identity("hopg", "full", replace(base, transition_radiation="two-beam"), sweep)
+    off = dataset_identity("hopg", base, sweep)
+    on = dataset_identity("hopg", replace(base, transition_radiation="two-beam"), sweep)
     shifted = dataset_identity(
         "hopg",
-        "full",
         replace(
             base, transition_radiation="two-beam", transition_lattice_origin_ang=(0.0, 0.0, 1.0)
         ),

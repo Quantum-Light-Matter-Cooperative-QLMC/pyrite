@@ -159,6 +159,8 @@ def test_info_human_lists_fields_with_units(root):
     assert result.exit_code == 0, result.output
     assert "scene" in result.stdout and "recorded" in result.stdout
     assert "Per-segment fields:" in result.stdout
+    # Pre-#1079 captures still record the retired tier; it is never shown.
+    assert "fidelity" not in result.stdout
     assert any(
         line.split()[:1] == ["E_start_keV"] and line.split()[-1] == "keV"
         for line in result.stdout.splitlines()

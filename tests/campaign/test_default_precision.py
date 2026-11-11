@@ -41,7 +41,7 @@ def test_default_policy_matches_the_recorded_decision():
 
 
 def test_a_plain_profile_runs_the_default_policy():
-    settings = profile_run_settings(default_settings(), "standard", "full", sweep=_sweep())
+    settings = profile_run_settings(default_settings(), "standard", sweep=_sweep())
     assert settings.precision == DEFAULT_PRECISION
     assert profile_precision_source(settings, "standard", sweep=_sweep())[1] == "default"
 
@@ -79,7 +79,7 @@ def test_per_material_routes_keep_fixed_counts(sweep, reason):
 )
 def test_profile_settings_keep_fixed_counts(monkeypatch, field, value, reason):
     _with_standard(monkeypatch, field, value)
-    settings = profile_run_settings(default_settings(), "standard", "full", sweep=_sweep())
+    settings = profile_run_settings(default_settings(), "standard", sweep=_sweep())
     assert settings.precision is None
     assert reason in profile_precision_source(settings, "standard", sweep=_sweep())[1]
 

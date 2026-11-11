@@ -49,7 +49,7 @@ def test_scan_records_both_source_and_radiative_fallbacks(monkeypatch):
     from pyrite.xsgen.bremslib import tables
 
     monkeypatch.setattr(tables, "resolve_bremsstrahlung_model", lambda *_a, **_k: "eedl")
-    args = Namespace(fidelity="full", catalog_profile="standard", allow_physics_fallback=True)
+    args = Namespace(catalog_profile="standard", allow_physics_fallback=True)
     with pytest.warns(PhysicsFallbackWarning):
         settings, _, identity, _ = scan._resolved_run(args, "hopg")
     assert settings.radiative_model == "uncoupled"
@@ -65,7 +65,7 @@ def test_scan_refuses_before_minting_an_uncoupled_identity(monkeypatch):
 
     monkeypatch.setattr(tables, "resolve_bremsstrahlung_model", lambda *_a, **_k: "eedl")
     with pytest.raises(ValueError, match="--allow-physics-fallback"):
-        scan._resolved_run(Namespace(fidelity="full", catalog_profile="standard"), "hopg")
+        scan._resolved_run(Namespace(catalog_profile="standard"), "hopg")
 
 
 def test_run_settings_opt_in_overrides_ambient_warning_errors(monkeypatch):
@@ -86,7 +86,7 @@ def test_run_settings_opt_in_overrides_ambient_warning_errors(monkeypatch):
         warnings.simplefilter("error", PhysicsFallbackWarning)
         with pytest.warns(PhysicsFallbackWarning):
             settings, _, identity, _ = scan._resolved_run(
-                Namespace(fidelity="full", catalog_profile="standard"), "hopg"
+                Namespace(catalog_profile="standard"), "hopg"
             )
     assert settings.allow_fallback
     assert identity["resolved_parameters"]["transport_numerics"]["allow_physics_fallback"] is True
@@ -100,7 +100,7 @@ def test_opt_in_and_strict_have_distinct_dataset_cache_admission():
 
     sweep = material_sweep("hopg")
     settings = default_settings()
-    strict = dataset_identity("hopg", "full", settings, sweep)
-    allowed = dataset_identity("hopg", "full", replace(settings, allow_fallback=True), sweep)
+    strict = dataset_identity("hopg", settings, sweep)
+    allowed = dataset_identity("hopg", replace(settings, allow_fallback=True), sweep)
     assert strict["parameter_sha256"] != allowed["parameter_sha256"]
     assert "allow_physics_fallback" not in strict["resolved_parameters"]["transport_numerics"]

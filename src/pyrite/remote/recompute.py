@@ -16,7 +16,6 @@ def start_rebrem_queue(
     no_sync=False,
     dry_run=False,
     chunk_minutes=10.0,
-    fidelity="full",
     brem_start_eV=None,
     brem_stop_eV=None,
 ):
@@ -45,7 +44,6 @@ def start_rebrem_queue(
             brem_step_eV,
             redo_all,
             chunk_minutes,
-            fidelity,
             brem_start_eV,
             brem_stop_eV,
         )
@@ -57,7 +55,6 @@ def start_rebrem_queue(
             ne_brem,
             brem_step_eV,
             redo_all,
-            fidelity,
             brem_start_eV,
             brem_stop_eV,
         )
@@ -78,7 +75,6 @@ def start_rebrem_queue(
             ne_brem,
             brem_step_eV,
             redo_all,
-            fidelity,
             brem_start_eV,
             brem_stop_eV,
         ),
@@ -116,7 +112,6 @@ def start_rebrem_queue(
                             ne_brem,
                             brem_step_eV,
                             redo_all,
-                            fidelity,
                             brem_start_eV,
                             brem_stop_eV,
                         )
@@ -140,7 +135,6 @@ def start_recxr_queue(
     no_sync=False,
     dry_run=False,
     chunk_minutes=10.0,
-    fidelity="full",
     cxr_start_eV=None,
     line_stop_eV=None,
 ):
@@ -168,7 +162,6 @@ def start_recxr_queue(
             line_step_eV,
             redo_all,
             chunk_minutes,
-            fidelity,
             cxr_start_eV,
             line_stop_eV,
         )
@@ -180,7 +173,6 @@ def start_recxr_queue(
             cxr_ne,
             line_step_eV,
             redo_all,
-            fidelity,
             cxr_start_eV,
             line_stop_eV,
         )
@@ -201,7 +193,6 @@ def start_recxr_queue(
             cxr_ne,
             line_step_eV,
             redo_all,
-            fidelity,
             cxr_start_eV,
             line_stop_eV,
         ),
@@ -239,7 +230,6 @@ def start_recxr_queue(
                             cxr_ne,
                             line_step_eV,
                             redo_all,
-                            fidelity,
                             cxr_start_eV,
                             line_stop_eV,
                         )

@@ -19,7 +19,6 @@ def resolve_inventory(request: dict) -> dict:
             args = Namespace(
                 allow_physics_fallback=request.get("allow_physics_fallback", False),
                 quick=request["quick"],
-                fidelity=request["fidelity"],
                 catalog_profile=request["catalog_profile"],
                 detector_id=detector_id,
                 high_energy_floor_map=request.get("high_energy_floor_map", {}),
@@ -39,7 +38,6 @@ def resolve_inventory(request: dict) -> dict:
 def expected_inventory(
     materials,
     quick,
-    fidelity,
     catalog_profile,
     high_energy_min_kev=None,
     *,
@@ -52,7 +50,6 @@ def expected_inventory(
         "allow_physics_fallback": allow_physics_fallback,
         "materials": list(materials),
         "quick": bool(quick),
-        "fidelity": fidelity,
         "catalog_profile": catalog_profile,
         "high_energy_floor_map": {
             material: high_energy_min_kev

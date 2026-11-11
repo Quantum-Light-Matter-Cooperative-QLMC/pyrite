@@ -854,8 +854,8 @@ crystal = "mos2"
     monkeypatch.setattr(config, "_catalog", lambda catalog_profile="standard": inline_catalog)
     inline_sweep = config.material_sweep("mos2")
     assert (
-        dataset_identity("mos2", "full", default_settings(), ref_sweep)["parameter_sha256"]
-        == dataset_identity("mos2", "full", default_settings(), inline_sweep)["parameter_sha256"]
+        dataset_identity("mos2", default_settings(), ref_sweep)["parameter_sha256"]
+        == dataset_identity("mos2", default_settings(), inline_sweep)["parameter_sha256"]
     )
 
 

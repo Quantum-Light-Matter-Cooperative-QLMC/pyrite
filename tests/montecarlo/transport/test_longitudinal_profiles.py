@@ -177,8 +177,8 @@ def test_longitudinal_policy_changes_identity_but_not_macro_particle_definition(
     )
     settings = Settings(n_electrons=20, n_electrons_brem=10)
 
-    identity = dataset_identity("hopg", "full", settings, base)
-    changed_identity = dataset_identity("hopg", "full", settings, changed)
+    identity = dataset_identity("hopg", settings, base)
+    changed_identity = dataset_identity("hopg", settings, changed)
 
     assert identity["parameter_sha256"] != changed_identity["parameter_sha256"]
     assert "longitudinal_resolutions" in identity["resolved_parameters"]

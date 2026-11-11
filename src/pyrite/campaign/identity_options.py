@@ -39,7 +39,8 @@ if TYPE_CHECKING:
 #   - ``spec_chunk`` / ``brem_chunk``: GPU batch sizes. Chunk-invariant per the
 #     goldens, and only ever set on ``-p/--perf`` runs -- which bypass the cache
 #     entirely (perf implies ``--no-cache``) -- so the cache never mixes chunks.
-# ``catalog_profile`` / ``variant`` / ``fidelity`` are NOT case-dict fields today
+# ``catalog_profile`` / ``variant`` / ``fidelity`` (the frozen identity tier,
+# #1079) are NOT case-dict fields today
 # -- the profile name never reaches a case, which is exactly what lets two
 # differently-named profiles' shared case hash equal and reuse one blob. They are
 # listed anyway as belt-and-suspenders: should any future path stamp a label onto

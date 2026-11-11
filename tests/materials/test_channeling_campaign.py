@@ -64,14 +64,12 @@ def test_channeling_identity_changes_only_for_enabled_zone(monkeypatch):
     )
     sweep = _sweep()
     off = Settings(radiative_model="uncoupled")
-    identity = dataset_identity("silicon", "full", off, sweep)
-    assert identity == dataset_identity(
-        "silicon", "full", replace(off, channeling_basis_size=32), sweep
-    )
+    identity = dataset_identity("silicon", off, sweep)
+    assert identity == dataset_identity("silicon", replace(off, channeling_basis_size=32), sweep)
     assert "channeling" not in identity["resolved_parameters"]
     on = Settings(**PLANAR)
-    enabled = dataset_identity("silicon", "full", on, sweep)
-    changed = dataset_identity("silicon", "full", replace(on, channeling_dz_ang=250.0), sweep)
+    enabled = dataset_identity("silicon", on, sweep)
+    changed = dataset_identity("silicon", replace(on, channeling_dz_ang=250.0), sweep)
     assert len({variant_stem(item) for item in (identity, enabled, changed)}) == 3
 
 
@@ -104,7 +102,7 @@ def test_catalog_retains_channeling_profile_fields(tmp_path):
     for key, value in PLANAR.items():
         if key != "channeling_plane":
             assert values[key] == value
-    settings = profile_run_settings(Settings(), "hopg_short", "full", catalog)
+    settings = profile_run_settings(Settings(), "hopg_short", catalog)
     assert settings.channeling_plane == (1, -1, 0)
     assert settings.channeling_basis_size == 12
     assert settings.precision is None

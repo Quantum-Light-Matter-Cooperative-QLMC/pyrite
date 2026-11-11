@@ -40,7 +40,7 @@ def test_inventory_uses_dataset_union_without_lowering_cases_or_execution(monkey
         "build_configured_cases",
         lambda *args: pytest.fail("preflight must not lower a complete sweep"),
     )
-    expected = parity.expected_inventory(["hopg"], True, "full", "profile")
+    expected = parity.expected_inventory(["hopg"], True, "profile")
     assert set(expected["inventory"]) == {"hopg/a", "hopg/b"}
     assert all(
         row["table_markers"] == {"union": "digest"} for row in expected["inventory"].values()
@@ -112,7 +112,7 @@ def test_submission_embeds_expected_inventory_in_staged_script(monkeypatch):
 def test_staged_table_digest_change_is_detected_by_real_scan_resolution(monkeypatch):
     from pyrite.xsgen import store
 
-    expected = parity.expected_inventory(["hopg"], True, "full", "standard")
+    expected = parity.expected_inventory(["hopg"], True, "standard")
     parity.verify_inventory(expected)
     identity_markers = store.identity_markers
 

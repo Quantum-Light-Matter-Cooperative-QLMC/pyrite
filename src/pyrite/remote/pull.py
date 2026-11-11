@@ -23,7 +23,7 @@ def _resolve_survey_stems(stems):
     already fullmatches that regex) and ``_quick`` stems pass through
     unexpanded: a stem that already names an exact variant, or a quick smoke
     checkpoint, never has a survey sibling worth auto-discovering."""
-    from ..campaign.profiles import _VARIANT_STEM_RE
+    from ..campaign.profiles import _VARIANT_STEM_RE, RETIRED_SURVEY_TIER
 
     bare = {
         stem
@@ -36,10 +36,10 @@ def _resolve_survey_stems(stems):
     resolved = list(stems)
     for name in sorted(names):
         match = _VARIANT_STEM_RE.fullmatch(name)
-        # A survey variant reads as ``--survey-`` (legacy ``fidelity`` group) or
-        # ``@survey-`` (@-stem ``label`` group for a standard-profile survey run).
-        survey_token = None if match is None else (match["fidelity"] or match["label"])
-        if match is None or survey_token != "survey" or match["material"] not in bare:
+        # A retired survey-tier checkpoint reads as ``--survey-`` (legacy ``tier``
+        # group) or ``@survey-`` (@-stem ``label`` group).
+        survey_token = None if match is None else (match["tier"] or match["label"])
+        if match is None or survey_token != RETIRED_SURVEY_TIER or match["material"] not in bare:
             continue
         if name in resolved:
             continue
@@ -93,7 +93,8 @@ def _remote_meta_json(stem):
 
 def _profile_pull_candidates(material):
     """Every on-disk stem for MATERIAL: the bare canonical directory (if
-    present) plus every identity-qualified ``<material>--<fidelity>-<hash>``
+    present) plus every identity-qualified ``<material>@<label>-<hash>`` or
+    legacy ``<material>--<tier>-<hash>``
     variant -- the stem name alone never carries the catalog profile, so this
     only narrows by material; :func:`resolve_profile_stem` reads each
     candidate's meta.json to filter by profile."""
@@ -110,9 +111,7 @@ def _profile_pull_candidates(material):
     return candidates
 
 
-def resolve_profile_stem(
-    material, catalog_profile, *, fidelity=None, hash_prefix=None, detector_id=None
-):
+def resolve_profile_stem(material, catalog_profile, *, hash_prefix=None, detector_id=None):
     """Resolve a ``MATERIAL@PROFILE`` pull selector to one exact on-disk
     checkpoint stem.
 
@@ -122,7 +121,11 @@ def resolve_profile_stem(
     round trip per candidate; materials rarely carry more than a handful of
     variants). The newest match wins unless ``hash_prefix`` (``--hash``) pins
     one; ties print every alternative hash so a caller can pin explicitly.
+    Retired survey-tier checkpoints never match a profile selector; pull them
+    by exact stem.
     """
+    from ..campaign.profiles import LEGACY_IDENTITY_TIER, legacy_tier
+
     candidates = _profile_pull_candidates(material)
     found = []
     for stem in candidates:
@@ -137,7 +140,7 @@ def resolve_profile_stem(
             (
                 stem,
                 profile,
-                str(identity.get("fidelity", "full")),
+                legacy_tier(identity),
                 digest,
                 mtime,
                 identity.get("detector_id"),
@@ -147,17 +150,14 @@ def resolve_profile_stem(
         item
         for item in found
         if item[1] == catalog_profile
-        and (fidelity is None or item[2] == fidelity)
+        and item[2] == LEGACY_IDENTITY_TIER
         and (detector_id is None or item[5] == detector_id)
     ]
     if hash_prefix is not None:
         matches = [item for item in matches if item[3].startswith(hash_prefix)]
     if not matches:
         available = sorted(
-            {
-                f"{profile}/{found_fidelity}:{digest[:12]}"
-                for _, profile, found_fidelity, digest, _, _ in found
-            }
+            {f"{profile}/{tier}:{digest[:12]}" for _, profile, tier, digest, _, _ in found}
         )
         detail = f"; found on the box: {', '.join(available)}" if available else "; none found"
         selector = f"{material}@{catalog_profile}"
@@ -177,7 +177,7 @@ def resolve_profile_stem(
     return matches[0][0]
 
 
-def resolve_profile_stems(material, catalog_profile, *, fidelity=None):
+def resolve_profile_stems(material, catalog_profile):
     """Resolve every detector stem MATERIAL holds under CATALOG_PROFILE: one
     :func:`resolve_profile_stem` per detector of the profile's detector set
     (a single stem when the catalog cannot enumerate the profile's detectors)."""
@@ -192,12 +192,11 @@ def resolve_profile_stems(material, catalog_profile, *, fidelity=None):
         )
         detector_ids = tuple(catalog.profile_detector_set(catalog_profile))
     except (KeyError, ValueError):
-        return [resolve_profile_stem(material, catalog_profile, fidelity=fidelity)]
+        return [resolve_profile_stem(material, catalog_profile)]
     return [
         resolve_profile_stem(
             material,
             catalog_profile,
-            fidelity=fidelity,
             detector_id=(
                 detector_id if detector_variant(catalog_profile, detector_id) is not None else None
             ),

@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 
 
-def scan_trajectory_capture(args, identity, stem, material, fidelity):
+def scan_trajectory_capture(args, identity, stem, material):
     """``TrajectoryCapture`` under ``args.trajectories/<stem>`` with scene and provenance.
 
     The scene snapshots the profile's physical filters/detector (#205),
@@ -30,7 +30,6 @@ def scan_trajectory_capture(args, identity, stem, material, fidelity):
             "material": material,
             "checkpoint_stem": stem,
             "catalog_profile": profile,
-            "fidelity": fidelity,
             "parameter_sha256": identity["parameter_sha256"],
             "dataset_identity": identity,
         },

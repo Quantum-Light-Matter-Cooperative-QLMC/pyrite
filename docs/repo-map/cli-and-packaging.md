@@ -100,7 +100,7 @@ Opt-in cross-engine benchmark helpers (#510, driven from `checks/equal_precision
 Canonical local performance-artifact lifecycle: inventory, analysis, and preview-by-default profile deletion (`rm`; the retired `prune` spelling stays a hidden alias). `profile analyze` remains a hidden warning alias. Revalidates selected file signatures before deletion.
 
 ## `checkpoints/recompute.py`
-Checkpoint repair and recompute owner for both component datasets. Per-record `repair_brem_wide` / `repair_cxr_spec`, checkpoint-level `repair_checkpoint` / `recxr_checkpoint`, and batch `rebrem_checkpoints` / `recxr_checkpoints` share one progress callback. Enumerates checkpoint stems and resolves per-material identity and fidelity defaults. Folded from the retired `rebrem.py`/`reline.py`.
+Checkpoint repair and recompute owner for both component datasets. Per-record `repair_brem_wide` / `repair_cxr_spec`, checkpoint-level `repair_checkpoint` / `recxr_checkpoint`, and batch `rebrem_checkpoints` / `recxr_checkpoints` share one progress callback. Enumerates checkpoint stems and resolves per-material identity and profile defaults; retired survey-tier checkpoints are refused. Folded from the retired `rebrem.py`/`reline.py`.
 Pure eligibility, target-grid validation and case-parameter planning live in `_repair_planning.py`; `_repair_progress.py` owns the shared deadline, callback and save cadence. Component execution stays in `recompute.py`, using the live runner scorers. Repair contracts live in `tests/checkpoint/test_recompute.py`.
 - Deps: `checkpoints.persistence`, `checkpoints._checkpoint_store`, `checkpoints.recompute_defaults`, `_progress`, `energy_grid.encoding`, `montecarlo`; imports no run driver package.
 
@@ -108,7 +108,7 @@ Pure eligibility, target-grid validation and case-parameter planning live in `_r
 Click layer for `pyrite checkpoint recompute {brem,cxr}` (`brem_command`, `cxr_command`), including `--json` envelopes and the exclusive materials-or-`--all` selection contract.
 
 ## `checkpoints/recompute_defaults.py`
-Fidelity-aware line/bremsstrahlung recompute defaults shared by local, grouped, and remote command paths. Resolves preset settings and material photon grids; keeps a compatibility fallback for older branches.
+Profile-aware line/bremsstrahlung recompute defaults shared by local, grouped, and remote command paths. Resolves material/profile from sidecars, built-in settings and material photon grids; refuses retired survey-tier identities.
 
 ## `apps/analyze.py`
 Notebook support for `src/pyrite/apps/analysis_app.py`: checkpoint loading, menu building, emission selection, and the initial-material precedence rule. Free of CLI imports so the notebook can load it on its own; the launcher lives in `cli/commands/app_analysis.py` and the persisted default both sides read lives in `_app_defaults.py`.

@@ -1,13 +1,12 @@
 """Profile-aware defaults shared by line and bremsstrahlung recomputes."""
 
 import json
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, cast
 
 import numpy as np
 
-from ..campaign.profiles import FIDELITY_NAMES
+from ..campaign.profiles import RETIRED_SURVEY_TIER, legacy_tier
 
 
 @dataclass(frozen=True)
@@ -15,7 +14,6 @@ class DatasetContext:
     """Resolved identity needed by component recompute."""
 
     material: str
-    fidelity: str
     catalog_profile: str
     identified: bool
 
@@ -43,10 +41,14 @@ def dataset_context(
     checkpoint_path,
     *,
     catalog_profile: str | None = None,
-    fidelity: str | None = None,
     require_identity: bool = False,
 ) -> DatasetContext:
-    """Resolve material/profile/fidelity from sidecars, with safe legacy fallback."""
+    """Resolve material/profile from sidecars, with safe legacy fallback.
+
+    A checkpoint whose identity records the retired ``survey`` tier is refused:
+    its reduced grid and history counts no longer exist, so a profile-aware
+    recompute would silently retarget it onto the full grid.
+    """
     meta_path, cases_path = _identity_files(checkpoint_path)
     meta = _json_object(meta_path)
     cases = _json_object(cases_path)
@@ -65,7 +67,12 @@ def dataset_context(
             raise ValueError(f"invalid checkpoint metadata {meta_path}: identity versions disagree")
 
     material = identity.get("material") if identity else None
-    stored_fidelity = identity.get("fidelity") if identity else None
+    if identity and legacy_tier(identity) == RETIRED_SURVEY_TIER:
+        raise ValueError(
+            f"checkpoint {Path(checkpoint_path).name!r} was produced by the retired survey "
+            "tier; it still loads, lists, pulls and slims, but cannot be recomputed. "
+            "Re-run the material under its profile instead"
+        )
     stored_profile = identity.get("catalog_profile") if identity else None
     if cases is not None:
         if cases.get("schema") != "cxr.case-manifest.v1":
@@ -122,77 +129,25 @@ def dataset_context(
         raise ValueError(
             f"checkpoint for {material!r} has no catalog-profile identity; pass --profile NAME"
         )
-    resolved_fidelity = fidelity or stored_fidelity or "full"
-    _validate_fidelity(resolved_fidelity)
     return DatasetContext(
         str(material),
-        resolved_fidelity,
         str(resolved_profile),
         identified,
     )
 
 
-def _validate_fidelity(fidelity: str) -> str:
-    if fidelity not in FIDELITY_NAMES:
-        raise ValueError(f"fidelity must be one of {', '.join(FIDELITY_NAMES)}")
-    return fidelity
-
-
-def settings(fidelity: str):
-    """Return settings for ``fidelity``, including compatibility before presets land."""
+def settings():
+    """Return the built-in run settings profile-aware recomputes start from."""
     from ..campaign.config import default_settings
 
-    fidelity = _validate_fidelity(fidelity)
-    try:
-        return cast(Any, default_settings)(fidelity=fidelity)
-    except TypeError:
-        current = default_settings()
-        if fidelity == "full":
-            return current
-        return replace(current, n_electrons=60, n_electrons_brem=30)
+    return default_settings()
 
 
-def sweep(material: str, fidelity: str, *, catalog_profile: str = "standard"):
-    """Return material sweep for ``fidelity``, with a standalone survey fallback."""
+def sweep(material: str, *, catalog_profile: str = "standard"):
+    """Return the current catalog sweep for ``material`` under ``catalog_profile``."""
     from ..campaign.config import material_sweep
 
-    fidelity = _validate_fidelity(fidelity)
-    try:
-        return cast(Any, material_sweep)(
-            material,
-            fidelity=fidelity,
-            catalog_profile=catalog_profile,
-        )
-    except TypeError:
-        current = material_sweep(material)
-        if fidelity == "full":
-            return current
-
-        def reduced(values, limit):
-            array = np.atleast_1d(np.asarray(values, dtype=float))
-            if array.size <= limit:
-                return array
-            indices = np.linspace(0, array.size - 1, limit, dtype=int)
-            return array[indices]
-
-        bins = current.energy_bins
-        cxr_by_energy = bins.cxr_by_energy
-        if cxr_by_energy is not None:
-            cxr_by_energy = {
-                energy: np.asarray(grid, dtype=float)[::5] for energy, grid in cxr_by_energy.items()
-            }
-        brem = bins.brem
-        if brem is not None:
-            brem = np.asarray(brem, dtype=float)[::5]
-        return replace(
-            current,
-            energy_keV=reduced(current.energy_keV, 2),
-            thickness_ang=reduced(current.thickness_ang, 3),
-            tilt_deg=reduced(current.tilt_deg, 5),
-            tilt_azim_deg=reduced(current.tilt_azim_deg, 2),
-            energy_bins=replace(bins, cxr_by_energy=cxr_by_energy, brem=brem),
-            n_families=2,
-        )
+    return material_sweep(material, catalog_profile=catalog_profile)
 
 
 def uniform_bounds(grid) -> tuple[float, float, float]:

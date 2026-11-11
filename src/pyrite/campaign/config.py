@@ -36,7 +36,7 @@ from ..montecarlo.transverse import TransverseDistribution
 from ..results import Settings
 from .longitudinal import LongitudinalDistribution
 from .observation import resolve_profile_observation
-from .profiles import get_fidelity_preset, resolve_numerics
+from .profiles import DEFAULT_N_ELECTRONS, DEFAULT_N_ELECTRONS_BREM, resolve_numerics
 from .sweep import BeamSpec, Sweep, beam_replace, target_from_flat, target_replace
 
 # Override keys that address the beam (BeamSpec) rather than the Sweep itself,
@@ -77,22 +77,29 @@ COLLAPSE_AZIMUTH = True
 PENETRATION_TILT_DEG = (0.0, 15.0, 45.0, 75.0)
 
 
-def default_settings(fidelity: str = "full"):
+def default_settings():
     """The analysis / detector / unit knobs shared by the runner and the plots.
     The runner uses n_electrons*; every notebook that plots must use the SAME
     detector flags (apply_detector_qe / brem_source) so the displayed spectra
-    match what was simulated."""
-    settings = Settings(
+    match what was simulated.
+
+    Emission defaults to ``"incoherent"``; a catalog profile's ``emission``
+    (``"coherent"``/``"both"``) enables the phased kernel through
+    :func:`pyrite.campaign.profiles.profile_run_settings`.
+
+    Validation: coherent-emission
+    """
+    return Settings(
         beam_current_na=5.0,
-        n_electrons=300,  # transport electrons per line spectrum
-        n_electrons_brem=150,  # transport electrons per background
+        n_electrons=DEFAULT_N_ELECTRONS,  # transport electrons per line spectrum
+        n_electrons_brem=DEFAULT_N_ELECTRONS_BREM,  # transport electrons per background
         # OFF: source spectra stay response-free (no legacy SDD polymer-window
         # QE). The Timepix3 / Eagle XO views apply their own QE downstream.
         apply_detector_qe=False,
         convolve_with_det=False,
         brem_source="mc",  # "mc" | "external" | "none"
+        emission="incoherent",
     )
-    return get_fidelity_preset(fidelity).apply_settings(settings)
 
 
 #: Default scalar observation geometry. Source spectra stay response-free until
@@ -192,7 +199,6 @@ def material_grid(material: str) -> dict[str, object]:
 def material_sweep(
     material: str,
     *,
-    fidelity="full",
     theta_obs_deg: Any = None,
     detector: Any = None,
     detector_id: Any = None,
@@ -206,8 +212,7 @@ def material_sweep(
     key the Sweep's material is the film crystal; the catalog material key stays the
     CLI/checkpoint name.
 
-    ``profile`` is a campaign alias for ``catalog_profile`` (fidelity now has its
-    own ``fidelity=`` keyword; it no longer squats on ``profile=``).
+    ``profile`` is a campaign alias for ``catalog_profile``.
 
     A profile whose physical detector declares an acquisition (a counting
     observation) derives the scalar observation angle, polar acceptance, and
@@ -342,10 +347,7 @@ def material_sweep(
         n_electrons_brem=scan.n_electrons_brem,
         cxr_grid_policy=_profile_cxr_grid_policy(catalog_profile),
     )
-    sweep = get_fidelity_preset(fidelity).apply_sweep(sweep)
-    numerics = resolve_numerics(
-        _catalog(catalog_profile).profile_numerics(catalog_profile), fidelity=fidelity
-    )
+    numerics = resolve_numerics(_catalog(catalog_profile).profile_numerics(catalog_profile))
     sweep = replace(
         sweep,
         **{key: numerics.effective[key] for key in CONVERGENCE_KEYS},
