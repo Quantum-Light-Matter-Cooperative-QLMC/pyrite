@@ -160,3 +160,167 @@ first-order Snell order of the root itself.
 | Coherent single segment on the incoherent root within $2\times10^{-6}$; split invariance | `tests/montecarlo/spectrum/test_xray_dispersion.py::test_single_segment_coherent_line_sits_on_the_escape_path_root`; `tests/montecarlo/coherent/test_coherent_formation_absorption.py::test_coherent_spectrum_is_invariant_under_segment_splitting` |
 | CUDA prologue against the CPU formation line | `tests/montecarlo/coherent/test_coherent_formation_absorption_cuda.py::test_prologue_exact_recoil_matches_the_cpu_formation_line` (GPU-gated) |
 | Complete symmetry orbits in pinned families | `tests/materials/test_crystallography.py::test_pinned_families_are_complete_symmetry_orbits` |
+
+## Independent verification (fresh context, 2026-11-11)
+
+Verifier: fresh context that did not write the implementation. The derivation
+below was written from Shi et al. (2024) Eq. (6) and the first-order Snell
+photon momentum before the implementation or the author derivation above was
+read.
+
+### Independent derivation
+
+Units $c=1$ for energies and momenta (eV), $E=\gamma M$, $\mathbf P=E\boldsymbol\beta$,
+$\mathbf G=\hbar c\,\mathbf g$. The sign of the momentum given to the lattice
+was fixed by requiring the classical limit
+$\omega(1-\mathbf v\cdot\hat{\mathbf n})=\mathbf v\cdot\mathbf g$ with
+$\mathbf v\cdot\mathbf g>0$. This gives
+$\mathbf P_f=\mathbf P-\mathbf k-\mathbf G$ and $E_f=E-\epsilon$; the lattice
+takes $+\hbar\mathbf g$ in the PyRITE label. With
+$\mathbf k=\epsilon(\hat{\mathbf n}+\delta\mathbf h)$, $\hat{\mathbf n}\cdot\mathbf h=-1$,
+we have $k^2=\epsilon^2(1-2\delta+\delta^2h^2)$ and
+$\mathbf k\cdot\mathbf G=\epsilon(\hat{\mathbf n}\cdot\mathbf G+\delta\,\mathbf h\cdot\mathbf G)$.
+The mass shell $E_f^2-P_f^2=E^2-P^2$, divided by $-2E$, is exactly
+
+$$
+\epsilon\Bigl[1-\boldsymbol\beta\cdot\hat{\mathbf n}+\frac{\hat{\mathbf n}\cdot\mathbf G}{E}
+-\delta\,\boldsymbol\beta\cdot\mathbf h
++\frac{\delta(\mathbf h\cdot\mathbf G-\epsilon)}{E}+\frac{\delta^2h^2\epsilon}{2E}\Bigr]
+=\boldsymbol\beta\cdot\mathbf G-\frac{G^2}{2E}.
+$$
+
+**(a) Root.** Keeping the terms through first order in $\delta$ at
+zero recoil, and all orders in recoil at $\delta=0$, gives, after dividing by
+$\hbar c$:
+
+$$
+\omega=\frac{\mathbf v\cdot\mathbf g-\hbar c\,g^2/(2E)}
+{1-\mathbf v\cdot\hat{\mathbf n}+\hbar c\,\hat{\mathbf n}\cdot\mathbf g/E-\delta(\omega)\,\mathbf v\cdot\mathbf h}.
+$$
+
+The only dropped terms are the mixed $\delta(\mathbf Q\cdot\mathbf h-\hbar\omega)/E$
+and $\delta^2h^2\hbar\omega/(2E)$. The relative root error is exactly
+$t/D$, where $t$ is their sum. For $\mathbf Q\cdot\mathbf h<0$,
+$\lvert\mathbf Q\cdot\mathbf h-\epsilon\rvert=\lvert\mathbf Q\cdot\mathbf h\rvert+\epsilon$,
+so the ledger bound $[\lvert\delta\rvert(\lvert\mathbf Q\cdot\mathbf h\rvert+\epsilon)+\delta^2h^2\epsilon]/(ED)$
+is saturated to first order.
+
+**(b) Limits.** At $\delta=0$, $\epsilon^2-k^2=0$ identically. The mass shell
+is then exactly linear in $\epsilon$, and the root is the exact vacuum root of
+`line-recoil-resonance`. As $\hbar\to0$ at fixed $\omega$ and $\mathbf g$,
+$r_{\rm num}$, $r_{\rm den}$ and both dropped terms vanish. What remains is
+the classical first-order Snell root
+$\omega=\mathbf v\cdot\mathbf g/(1-\mathbf v\cdot\hat{\mathbf n}-\delta\,\mathbf v\cdot\mathbf h)$.
+
+**(c) Slope.** The energy mismatch along fixed $\hat{\mathbf n}$ is
+$\Delta(\epsilon)=\epsilon+E_f(\mathbf P_f)-E$, so
+$d\Delta/d\epsilon=1-\boldsymbol\beta_f\cdot d\mathbf k/d\epsilon$. In vacuum,
+$E_f-\mathbf P_f\cdot\hat{\mathbf n}=E(1-\boldsymbol\beta\cdot\hat{\mathbf n})+\mathbf G\cdot\hat{\mathbf n}$.
+This gives
+$1-\boldsymbol\beta_f\cdot\hat{\mathbf n}=\kappa D_{\rm ex}$ exactly, with
+$\kappa=E/(E-\epsilon)$. The slope in wavenumber is
+$\kappa D_{\rm ex}/\hbar c$ per unit $\epsilon$. On the Snell vector,
+$1-\boldsymbol\beta_f\cdot(\hat{\mathbf n}+\delta\mathbf h)=\kappa[D_{\rm Snell}+\delta(\mathbf Q\cdot\mathbf h-2\epsilon)/E+O(\delta^2)]$.
+So the production $\kappa D_{\rm Snell}$ is correct to the same mixed order as
+the root. The dispersive $\delta'(\epsilon)$ part of $d\mathbf k/d\epsilon$
+belongs to `xray-in-medium-resonance` and is outside this claim.
+
+**(d) Positive mass shell.** On the exact shell,
+$E_f^2=M^2+P_f^2\ge M^2$, so either $E_f\ge M$ or $E_f\le-M$. Since
+$\lvert\boldsymbol\beta_f\rvert<1$, $\kappa D=1-\boldsymbol\beta_f\cdot\hat{\mathbf n}>0$.
+Therefore $D>0\Leftrightarrow\kappa>0\Leftrightarrow E_f>0\Leftrightarrow\epsilon\le T$.
+Together with $N>0$ this selects the physical branch. At $\delta\ne0$ the
+root is off shell by $O(x\delta)$, so the explicit $\epsilon\le T$ test is a
+useful guard and not redundant there.
+
+**Age phase.** At fixed $\epsilon$, the linearized exact phase rate is
+$\kappa(D_{\rm ex}\omega-N)$, and the classical rate is
+$D_{\rm vac}\omega-\mathbf v\cdot\mathbf g$. Their difference, using
+$\kappa-1=\kappa x$, is
+
+$$
+\kappa(xD_{\rm vac}+r_{\rm den})\,\omega-\kappa(x\,\mathbf v\cdot\mathbf g-r_{\rm num}),
+$$
+
+which is exactly the claimed $(d_{\rm shift},g_{\rm shift})$ per unit age.
+The escape phase is kept geometric, so the coherent self-term satisfies
+$\kappa(D_{\rm ex}\omega-N)-\delta\omega\,\mathbf v\cdot\mathbf h=0$. That
+gives $\omega_c=N/(D_{\rm ex}-\delta\,\mathbf v\cdot\mathbf h/\kappa)$. The
+offset from the incoherent root is $x\delta\,\mathbf v\cdot\mathbf h/D$
+relative. This is the same order as the dropped mass-shell terms, so the
+incoherent root itself is no more accurate than that offset. Keeping the
+escape phase geometric is therefore a consistent choice within the claim's
+accuracy, and it preserves additivity of $L_{\rm esc}$ under splitting.
+
+### Comparison with the implementation
+
+| Item | Code | Result |
+|---|---|---|
+| $r_{\rm num}=\tfrac12 g^2\hbar c/E$ [1/Å], $r_{\rm den}=\hat{\mathbf n}\cdot\mathbf g\,\hbar c/E$, $\hbar c/E$ [Å] | `_kernels.py:697-720` | matches; vacuum $\hat{\mathbf n}\cdot\mathbf g$ (Snell-corrected $\hat{\mathbf n}\cdot\mathbf g$ only in the detuning, `_batched.py:479`, `_per_hkl.py:956`) |
+| $\kappa=1/(1-\omega\hbar c/E)$ | `_kernels.py:723-732` | matches |
+| $D>0$, $\omega\hbar c/E\le1-1/\gamma$ | `_kernels.py:735-741` | matches (d) |
+| Vacuum centre, $a=\kappa D t_L/(2\hbar c)$, $d_{\rm shift}$, $g_{\rm shift}$ | `_kernels.py:744-773` | matches the age-phase identity; $x$ and $\kappa$ are evaluated at the vacuum root |
+| Snell fixed point on $D_{\rm vac}+r_{\rm den}$, $\mathbf v\cdot\mathbf g-r_{\rm num}$ | `_kernels.py:776-839`; callers `_per_hkl.py:899-920`, `_batched.py:468-492`, `_coverage.py:179-202`, `reflection_rows.py:153-167` | matches (a); every route applies the guard and $\kappa D$ |
+| $\mathbf k\cdot\mathbf v=\omega(1-D+r_{\rm den})=\omega(\mathbf v\cdot\hat{\mathbf n}+\delta\,\mathbf v\cdot\mathbf h)$ | `_kernels.py:640`, `_per_hkl.py:955` | matches the physical Snell vector |
+| Incoherent width/Jacobian $\kappa D_{\rm Snell}$ | `_per_hkl.py:1118`, `_batched.py:490`, `reflection_rows.py:167` | matches (c) |
+| Formation phase on $d$ and $\mathbf g\cdot\mathbf r$; age $=$ `seg_t_mid` (Å, the same clock as `d_all_geom` $=ct-\hat{\mathbf n}\cdot\mathbf r$) | `_per_hkl.py:108-110, 676-677, 1048-1049`; `_batched.py:615-646` | matches |
+| CUDA prologue | `coherent_stream_jit_kernel.py:216-276, 383-404` | same algebra, guard, $\kappa$ placement and age phase as the CPU twin; not executed (no GPU) |
+
+Units: $\omega$, $\mathbf v\cdot\mathbf g$, $r_{\rm num}$ in 1/Å; $D$, $r_{\rm den}$,
+$x$, $\kappa$ dimensionless; age and $t_L$ in Å ($c\,t$); $\hbar c$ in eV·Å.
+All are consistent.
+
+### Numeric check
+
+The independent check is
+`scratch/v1099_check.py` (not committed). It uses 60-digit mpmath, its own mass shell and
+its own algebra, and imports only the functions under test. It covers 159
+random oblique, backward and reverse geometries with $T=10$ keV–100 MeV,
+$\lvert\mathbf g\rvert=0.5$–8 Å$^{-1}$ and $\delta=10^{-7}$–$3\times10^{-5}$.
+
+- At $\delta=0$, the production root matches the exact vacuum root to
+  $5.0\times10^{-15}$ relative.
+- $\kappa D$ matches $1-\boldsymbol\beta_f\cdot\hat{\mathbf n}$ to
+  $4.9\times10^{-15}$.
+- $d_{\rm shift}\omega-g_{\rm shift}$ matches
+  $\kappa(D_{\rm ex}\omega-N)-(D_{\rm vac}\omega-\mathbf v\cdot\mathbf g)$ at
+  $0.9\epsilon_c$ and $1.1\epsilon_c$ to $1.9\times10^{-14}$.
+- The production in-medium root, compared with the exact first-order-Snell mass-shell
+  root, stays within the mixed-order bound. One case reached $1+6.4\times10^{-6}$
+  times the bound ($x=0.22$, $D=0.04$). This is second order: the bound is
+  evaluated at the linear root rather than at the true root. The anchor's
+  $1.5\times$ slack covers it.
+
+### Anchors run
+
+`pyrite-dev test` on `tests/montecarlo/spectrum/test_line_recoil_exact.py`,
+`tests/montecarlo/spectrum/test_xray_dispersion.py`,
+`tests/materials/test_recoil.py` and
+`tests/montecarlo/coherent/test_coherent_formation_absorption.py`: 110 passed.
+The CUDA-gated anchor was not run locally.
+
+### Observations (not discrepancies)
+
+1. The age phase is (rate of the current piece)$\times$(electron's own age),
+   not $\int$rate$\,dt$ along the history. It is exact for one
+   constant-momentum flight and invariant under splitting that flight. For an
+   electron whose flights have different momenta, the cross-flight relative
+   recoil phase is $\text{rate}_j t_j-\text{rate}_i t_i$. This is outside the
+   certified scope, which `line-recoil-formation` already excludes ("joining
+   flights with different momenta"). Cross-flight terms matter only where two
+   flights' lines overlap in energy.
+2. The formation centre uses $\kappa$ at the vacuum root, while the incoherent
+   width uses $\kappa$ at the in-medium root. The difference is $O(x\delta)$,
+   within the claim's order.
+3. `HBARC_EV_ANG = 1973.269804` truncates CODATA's
+   $1973.26980459\ldots$ by $3\times10^{-10}$ relative. This is immaterial.
+
+### Verdict
+
+- **Claim**: `line-recoil-in-medium-root` — `montecarlo/spectrum/cxr/_kernels.py::{_line_recoil_terms,_recoil_slope_factor,_recoil_line_allowed,_recoil_formation_line,_in_medium_kinematics}` + CUDA `_coherent_prologue_kernel` — Shi et al. (2024) Eq. (6) with first-order Snell $\mathbf k$.
+- **Filters**: units pass; limits ($\delta=0$, $\hbar\to0$, normal exit) pass; signs/conventions pass.
+- **Re-derivation**: `matches`. The root, dropped terms, $\kappa D$ slope, mass-shell guard and age-phase decomposition all agree term by term.
+- **Verdict**: `rederived`.
+- **Suggested ledger change**: the owner may set Status `rederived`, or
+  `anchored` after confirming the named anchors in CI, and note the
+  fresh-context verification. Never `signed-off`.
