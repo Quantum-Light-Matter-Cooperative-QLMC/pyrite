@@ -595,6 +595,79 @@ window, not a physical rechanneling fraction
 cut omits at these windows: the omission is not negligible beyond about one
 occupation length.
 
+### Paired-arm source budgets (#993 method)
+
+`checks/planar_fiber_budget.py` applies the
+[#993 calibration](axial-depth-calibration-993.md) unchanged
+(`calibrate_axial_depth`, `cr-axial-depth-calibration`) to seven
+chunk-paired fibre arms per case:
+
+| Probe | Change from control |
+|---|---|
+| control | 300 eV cut, window $M$, box $B=M$, kick harmonics $B+M$, search step 200 Å |
+| return flux | `P = R` |
+| unresolved | $B=M+dM$ |
+| matching surface | 600 eV cut |
+| grid | $M+dM$, search step 100 Å |
+| source model | kick harmonics $1.5(B+M)$ |
+| all-on | all of the above |
+
+Here $dM=\max(4,\lfloor M/4\rfloor)$. The observable is the forward-detector line source
+at crystal thickness $c$: per upper band $u$ of the configuration's lines,
+$w_u\int_0^c|c_u|^2(1+\gamma^2\theta_y^2)^{-2}\,dz$ per incident with the
+dipole weight $w_u$ of `line_weights`. In the secular line model at fixed
+energy this is proportional to the on-axis line yield; the constant cancels
+in ε. Joint confidence 0.95; outgoing and tail terminations are
+`physical_outgoing` fates, box overflow is `unresolved`. Evidence:
+[check record](../../validation/check-records/planar_fiber_runs/README.md),
+remote array 11088 (4000 incidents per arm) and a local `channeling_demo` run
+(20000).
+
+| Case | $c$ [µm] | ε | Return / unresolved / grid / source (÷ reference LCB) | `P = R` shift | 600 eV shift |
+|---|---:|---:|---|---:|---:|
+| `channeling_demo`, Si(1-10) 17 MeV | 2 | **4.9%** | 2.5 / 1.4 / 0.5 / 0.5% | −0.0% (0.2σ) | +0.1% (0.8σ) |
+| Si(110), 17 MeV | 5 / 20 / 60 | 516 / 242 / 268% | at 60 µm: 102 / 109 / 29 / 28% | +0.6 / +3.1 / **+24.2%** (20σ) | +0.5 / +2.5 / +14.8% |
+| Si(100), 17 MeV | 5 / 20 / 60 | 572 / 258 / 277% | at 60 µm: 104 / 120 / 26 / 27% | +1.0 / +6.0 / **+28.4%** (17σ) | +0.7 / +3.6 / +16.4% |
+| Si(100), 54.5 MeV | 12.5 / 50 / 100 | 191 / 113 / 146% | at 100 µm: 64 / 33 / 23 / 26% | +0.0 / +4.8 / **+15.5%** (14σ) | −0.3 / +3.2 / +11.2% |
+| Si(110), 54.5 MeV | 12.5 / 50 / 100 | 195 / 119 / 151% | at 100 µm: 65 / 33 / 25 / 27% | +0.5 / +2.6 / **+12.3%** (13σ) | +1.2 / +3.3 / +11.1% |
+
+Shifts are paired differences of the summed line source relative to the
+control; σ combines the bins' batch SEs in quadrature (bins are correlated,
+so it is indicative).
+
+**Demo.** The 2 µm budget is resolution-limited, like #993 cases A and B.
+No probe is resolved beyond 2.4σ, and the bound is the batch-$t$ and
+Hoeffding allowances. Sub-µm thicknesses are refused at this sample size:
+the returned outgoing fraction (control minus all-on, 0.008 at 0.5 µm) is
+below the Hoeffding allowance, so $C_o$ is undefined.
+
+**Kephart configurations: negative for a usable budget at these sizes.**
+Two effects set ε.
+
+- *Fate caps.* The unresolved term is $C_u(F_u+h)$, with $C_u$ the
+  maximum over checkpoints of the control yield over the lower-bounded
+  retained fraction. At the deepest checkpoint the control retains only
+  6–15%, so $C_u$ is large. The Hoeffding allowance $h\approx0.03$ at 4000
+  incidents dwarfs the measured unresolved fraction (≤ 0.5%). This term is
+  resolution, not physics.
+- *Resolved model change.* The `P = R` arm raises the line source by
+  12–28% at the deepest checkpoint (13–20σ), and the 600 eV cut by 11–16%.
+  That is the return deficit above in the source observable: an absorbing
+  cut at 300 eV omits a resolved fraction of the emission beyond about one
+  occupation length. More primaries would shrink the caps but not this
+  term.
+
+Window, box, search-step and kick-harmonic probes are within 2.4σ of zero
+everywhere. Above the cut the window orders never matter, so the grid probe
+reproduces the unresolved probe's box change. At 54.5 MeV the checkpoint
+spacing (2.08 µm) makes the reference drift allowance large at 12.5 µm (LCB
+0.67× the mean).
+
+Thicknesses beyond about three occupation lengths cannot be budgeted by
+this method. At 120 µm (17 MeV) the control retains ≈ 0.5%, below the
+Hoeffding allowance, and the unresolved cap is undefined. Kephart's slabs
+reach 120 and 500 µm. The budgets therefore stop at 60 and 100 µm.
+
 ## Reproduction
 
 Run on the lab through an isolated `pyrite remote sync` checkout and SLURM;

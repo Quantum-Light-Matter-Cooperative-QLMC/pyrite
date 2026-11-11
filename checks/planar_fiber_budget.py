@@ -85,12 +85,16 @@ LINES = {
     "si110_54": ((1, 0), (2, 1), (3, 2)),
 }
 #: Budget checkpoints c [µm]: crystal thicknesses within each configuration's slab.
+#: The fate caps need a positive lower bound on the control's retained fraction
+#: (``C_u``) and on the returned outgoing fraction (``C_o``) at every checkpoint,
+#: so thicknesses beyond about three occupation lengths (control retains < 1%)
+#: and the demo's sub-µm depths are refused at these sample sizes.
 BUDGET_UM = {
     "demo_17": (2.0,),
-    "si110_17": (20.0, 60.0, 120.0),
-    "si100_17": (20.0, 60.0, 120.0),
-    "si100_54": (50.0, 200.0, 500.0),
-    "si110_54": (50.0, 200.0, 500.0),
+    "si110_17": (5.0, 20.0, 60.0),
+    "si100_17": (5.0, 20.0, 60.0),
+    "si100_54": (12.5, 50.0, 100.0),
+    "si110_54": (12.5, 50.0, 100.0),
 }
 CHUNK = 100
 

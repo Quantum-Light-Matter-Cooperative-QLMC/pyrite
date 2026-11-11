@@ -34,3 +34,30 @@ paired with the same absorbing arm. Source `df2d79a14`.
 at H = 32/24, 16 cells, dz 62.5 Å (balance defects −0.019/−0.017), run
 locally at `986fc3849` for a like-for-like comparison with the fibre's
 absorbing arm at the same margin.
+
+## Paired-arm source budgets (`budget/`)
+
+Driver `checks/planar_fiber_budget.py` (arms, observable and statistics in
+its docstring); calibration by
+`montecarlo/channeling/axial_depth_calibration.py::calibrate_axial_depth`,
+unchanged.
+
+- Kephart configurations: remote array 11088 (qlmc, 2026-11-11), isolated
+  copy `~/pyrite-1056-budget` from `git archive` of `80393f474`
+  (`PYRITE_SOURCE_REVISION` in `submit.sh`). 160 tasks (case `id // 40`,
+  incidents `(id % 40) * 100 .. +100`, all seven arms per task), one CPU,
+  3 GiB, all `Exit status: 0`, peak RSS 0.29 GiB. `outputs-11088.sha256`
+  hashes the 1120 chunks, which remain at
+  `qlmc:~/pyrite-1056-budget/scratch/budget/`.
+- `channeling_demo` (`demo_17`): local, 200 chunks of 100 incidents.
+  Chunks 0–3900 ran from the working tree of `831b7db38` plus the
+  then-uncommitted driver, byte-identical to `80393f474`'s run path; chunks
+  4000–19900 ran at `80393f474` with only the analysis code edited. Both
+  revisions are listed in the report's `source_shas`.
+  `outputs-demo_17.sha256` hashes the 1400 chunks (kept in the
+  worktree's ignored `scratch/budget-demo/`).
+- `report-<case>.json`: `analyze <case>` at `518a92e00` plus the
+  checkpoint change committed with this record (`BUDGET_UM`). Each report holds
+  every arm's settings, CPU time, the per-interval bounds and audit
+  (paired differences, SEs, `t` quantile, drift shifts), and the fate caps
+  with their fractions.
