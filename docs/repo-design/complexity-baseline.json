@@ -470,7 +470,7 @@
     {
       "path": "src/pyrite/montecarlo/spectrum/coherent_stream_jit_kernel.py",
       "name": "_coherent_prologue_kernel",
-      "cc": 23
+      "cc": 24
     },
     {
       "path": "src/pyrite/montecarlo/spectrum/coherent_stream_jit_kernel.py",
@@ -480,7 +480,7 @@
     {
       "path": "src/pyrite/montecarlo/spectrum/coherent_stream_jit_kernel.py",
       "name": "run_coherent_prologue_kernel",
-      "cc": 34
+      "cc": 30
     },
     {
       "path": "src/pyrite/montecarlo/spectrum/coherent_windows.py",

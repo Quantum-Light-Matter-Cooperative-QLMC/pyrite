@@ -860,6 +860,19 @@ def _formation_args(half_dL, apb, bma, q, *, use_medium, n_seg, n_pairs):
     return True, half_dL, apb, bma, q
 
 
+def _recoil_args(inverse_energy, age, n_segments):
+    """Per-segment float32 ``hbar c/E`` and age; an omitted one is zero."""
+    out = []
+    for name, values in (("inverse_energy", inverse_energy), ("age", age)):
+        if values is None:
+            values = xp.zeros(n_segments, dtype=xp.float32)
+        values = xp.ascontiguousarray(values, dtype=xp.float32)
+        if int(values.size) != n_segments:
+            raise ValueError(f"{name} must have one entry per segment")
+        out.append(values)
+    return tuple(out)
+
+
 def allocate_coherent_fields(n_g, n_E):
     """Return four flattened ``(n_g, n_E)`` float32 persistent field planes."""
     size = int(n_g) * int(n_E)
@@ -1042,15 +1055,7 @@ def run_coherent_prologue_kernel(
 
     if not use_medium:
         delta_tab = _dummy()
-    zeros = None
-    if inverse_energy is None or age is None:
-        zeros = xp.zeros(n_segments, dtype=xp.float32)
-    inverse_energy = zeros if inverse_energy is None else inverse_energy
-    age = zeros if age is None else age
-    inverse_energy = xp.ascontiguousarray(inverse_energy, dtype=xp.float32)
-    age = xp.ascontiguousarray(age, dtype=xp.float32)
-    if int(inverse_energy.size) != n_segments or int(age.size) != n_segments:
-        raise ValueError("inverse_energy and age must have one entry per segment")
+    inverse_energy, age = _recoil_args(inverse_energy, age, n_segments)
     if use_formation:
         apb_out, bma_out, q_out = formation
     else:
