@@ -167,6 +167,23 @@ def test_batch_integrator_matches_density_solver(si110):
     assert weights[1, 1].sum() < weights[1, 0].sum()
 
 
+@pytest.mark.parametrize("margin", [5.0, 300.0, 1e5, -1e3])
+def test_batch_projection_matches_full_solver_for_each_subspace(si110, margin):
+    kernel = tds_kernel(si110, ENERGY, **GRID)
+    solver = DensityMatrixSolver(si110, ENERGY, kernel, margin_eV=margin)
+    rho, _, _ = solver.entry_state(0.0, 3e-4)
+    weights = propagate_batch(solver, solver._cell_kernel0[None], rho, [200.0, 400.0], 20.0)
+    assert weights.shape == (2, 1, GRID["n_cells"], 2 * GRID["max_order"] + 1)
+    if margin == 5.0:
+        assert 0 < solver.basis.subspace.any(axis=0).sum() < solver.orders.size
+    if margin == -1e3:
+        assert not solver.basis.subspace.any()
+        np.testing.assert_array_equal(weights, 0.0)
+    for i, depth in enumerate((200.0, 400.0)):
+        reference = open_exit_distribution(solver, depth, 20.0, divergence_rad=3e-4)
+        np.testing.assert_allclose(weights[i, 0].ravel(), reference.weights, atol=1e-12)
+
+
 def test_zero_kernel_cut_is_the_gaussian_peak(si110):
     kernel = tds_kernel(si110, ENERGY, **GRID)
     zero = replace(

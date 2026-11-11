@@ -148,6 +148,9 @@ def propagate_batch(
     ``(n_depths, B, n_cells, N)`` as NumPy, ordered like
     :func:`~.exit_angular.density_exit_distribution`.
 
+    Evolution omits eigenstate slots outside the retained subspace in every
+    residue; the output still covers the full plane-wave band.
+
     Validation: cr-planar-exit-out-of-plane, cr-density-matrix-split-operator
     """
     depths = np.atleast_1d(np.asarray(thickness_ang, dtype=float))
@@ -159,37 +162,48 @@ def propagate_batch(
     if solver.basis.gamma != solver.gamma0 or solver._scale != 1.0:
         raise ValueError("solver must be at its entry energy")
     dz = float(dz_ang)
-    half = xp.asarray(solver._propagators(dz, solver.hbar_v0))
-    vectors = xp.asarray(solver.basis.vectors)
+    # After the first half-step, states and jump outputs lie in the solver's
+    # retained subspace. Omit eigenstate slots inactive in every residue;
+    # keep the per-residue mask for slots retained in only some residues.
+    active = np.flatnonzero(solver.basis.subspace.any(axis=0))
+    half = xp.ascontiguousarray(
+        xp.asarray(solver._propagators(dz, solver.hbar_v0)[:, active][:, :, active])
+    )
+    vectors = xp.ascontiguousarray(xp.asarray(solver.basis.vectors[:, :, active]))
     waves = xp.asarray(solver._waves)
-    keep = xp.asarray(solver.basis.subspace)
+    keep = xp.asarray(solver.basis.subspace[:, active])
     mask = keep[:, :, None] & keep[:, None, :]
     kernels = xp.asarray(cell_kernels)
     if kernels.ndim != 4 or kernels.shape[1:] != (solver.n_cells, solver.n_grid, solver.n_grid):
         raise ValueError("cell_kernels must have shape (B, n_cells, n_grid, n_grid)")
+    if not active.size:
+        return np.zeros((depths.size, kernels.shape[0], solver.n_cells, solver.orders.size))
     to_grid = waves @ vectors  # (r, a, n)
-    from_grid = xp.conj(xp.swapaxes(to_grid, -1, -2))
+    from_grid = xp.ascontiguousarray(xp.conj(xp.swapaxes(to_grid, -1, -2)))
+    half_adjoint = xp.ascontiguousarray(xp.conj(xp.swapaxes(half, -1, -2)))
+    vectors_adjoint = xp.ascontiguousarray(xp.conj(xp.swapaxes(vectors, -1, -2)))
     norm = float(solver.n_grid) ** 2
 
-    def sandwich(outer, inner):
-        return outer @ inner @ xp.conj(xp.swapaxes(outer, -1, -2))
+    def sandwich(outer, inner, adjoint):
+        return outer @ inner @ adjoint
 
     def jump(state):
-        grid = sandwich(to_grid, state)
+        grid = sandwich(to_grid, state, from_grid)
         back = xp.fft.ifft(xp.fft.fft(grid, axis=1) * kernels, axis=1)
         eigen = from_grid @ back @ to_grid / norm
         return eigen * mask
 
-    state = xp.broadcast_to(xp.asarray(rho), (kernels.shape[0],) + rho.shape).copy()
+    retained = xp.asarray(rho)[:, active][:, :, active]
+    state = xp.broadcast_to(retained, (kernels.shape[0],) + retained.shape).copy()
     out = []
     for step in range(1, int(marks[-1]) + 1):
-        state = sandwich(half, state)
+        state = sandwich(half, state, half_adjoint)
         first = jump(state)
         state = state + dz * first + 0.5 * dz**2 * jump(first)
-        state = sandwich(half, state)
+        state = sandwich(half, state, half_adjoint)
         state = 0.5 * (state + xp.conj(xp.swapaxes(state, -1, -2)))
         if step in marks:
-            plane = sandwich(vectors, state)
+            plane = sandwich(vectors, state, vectors_adjoint)
             weights = xp.real(xp.diagonal(plane, axis1=-2, axis2=-1))
             out.append(weights.get() if hasattr(weights, "get") else np.asarray(weights))
     return np.stack(out)
