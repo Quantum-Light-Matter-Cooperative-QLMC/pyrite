@@ -198,15 +198,6 @@ L30 = 300.0
 HKL = reflections()
 N110, POL110 = photon_frame(110.0)
 GRID = np.linspace(1850.0, 2100.0, 1001)
-
-
-# --- parts -------------------------------------------------------------------------
-
-T30 = 30e3
-L30 = 300.0
-HKL = reflections()
-N110, POL110 = photon_frame(110.0)
-GRID = np.linspace(1850.0, 2100.0, 1001)
 PHASES = np.radians(np.arange(0, 360, 30))
 
 
