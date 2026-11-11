@@ -20,7 +20,7 @@ def test_profile_edit_between_slices_fails_before_scan_and_preserves_job_identit
 ):
     bash = _bash_or_skip(tmp_path)
     profile = "sub_100keV"
-    expected = expected_inventory(["hopg"], False, "full", profile)
+    expected = expected_inventory(["hopg"], False, profile)
     stem = expected["inventory"]["hopg/default"]["stem"]
     inventory = tmp_path / "inventory.json"
     inventory.write_text(json.dumps(expected["inventory"]))
@@ -69,7 +69,7 @@ def test_profile_edit_between_slices_fails_before_scan_and_preserves_job_identit
     original = definition.read_text()
     assert "30.0, 40.0" in original
     definition.write_text(original.replace("30.0, 40.0", "31.0, 40.0"))
-    current = expected_inventory(["hopg"], False, "full", profile)["inventory"]
+    current = expected_inventory(["hopg"], False, profile)["inventory"]
     assert current["hopg/default"]["stem"] != stem
     inventory.write_text(json.dumps(current))
     second = subprocess.run([bash, "-c", script], capture_output=True, text=True, env=env)
