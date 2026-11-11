@@ -190,12 +190,12 @@ def test_cascade_oracle_cannot_pass_without_gated_reference_rows(monkeypatch):
 def test_quantum_budget_rejects_nonfinite_rates(monkeypatch):
     budget = _script("quantum_decoherence_budget.py")
     monkeypatch.setattr(budget, "planar_profile", lambda *args: object())
-    monkeypatch.setattr(budget, "VDW_CELLS", ())
+    monkeypatch.setattr(budget, "UNAVAILABLE_CELLS", ())
     monkeypatch.setattr(budget, "_print_row", lambda *args: None)
     monkeypatch.setattr(
         budget,
         "_row",
-        lambda label, profile, energy: {
+        lambda label, profile, energy, electronic: {
             "label": label,
             "energy_eV": energy,
             "tds": np.full(11, np.nan),
@@ -204,6 +204,100 @@ def test_quantum_budget_rejects_nonfinite_rates(monkeypatch):
         },
     )
     assert budget.main([]) == 1
+
+
+def test_quantum_budget_material_table_matches_catalog():
+    from pyrite.materials.channeling import ChannelingDataError, planar_profile
+
+    budget = _script("quantum_decoherence_budget.py")
+    # MoS2 is computed for TDS only; its electronic rate stays unsupported (#541).
+    assert [(c[1], c[3]) for c in budget.CELLS] == [
+        ("silicon", True),
+        ("diamond", True),
+        ("mos2", False),
+    ]
+    for _, crystal, hkl, _ in budget.CELLS:
+        planar_profile(crystal, hkl, 293.15)
+    for crystal, hkl in budget.UNAVAILABLE_CELLS:
+        with pytest.raises(ChannelingDataError):
+            planar_profile(crystal, hkl, 293.15)
+
+
+def _cheap_budget(monkeypatch, budget, profile):
+    monkeypatch.setattr(budget, "planar_profile", profile)
+    monkeypatch.setattr(budget, "_print_row", lambda *args: None)
+    rate = np.array([0.0, 1.0, 1.0])
+    monkeypatch.setattr(
+        budget,
+        "_row",
+        lambda label, profile, energy, electronic: {
+            "label": label,
+            "energy_eV": energy,
+            "tds": rate,
+            "electronic": rate if electronic else None,
+            "beta": 1.0,
+        },
+    )
+
+
+def test_quantum_budget_flags_material_coverage_changes(monkeypatch, capsys):
+    from pyrite.materials.channeling import ChannelingDataError
+
+    budget = _script("quantum_decoherence_budget.py")
+    _cheap_budget(monkeypatch, budget, lambda *args: object())
+    assert budget.main([]) == 1
+    assert "hopg unexpectedly has channeling data" in capsys.readouterr().out
+
+    def lose_mos2(crystal, *args):
+        if crystal in {"mos2", "hopg", "hbn", "wse2"}:
+            raise ChannelingDataError(crystal)
+        return object()
+
+    _cheap_budget(monkeypatch, budget, lose_mos2)
+    assert budget.main([]) == 1
+    assert "MoS2(001) lost its channeling data" in capsys.readouterr().out
+
+
+def test_quantum_budget_reports_mos2_outside_its_thermal_window(monkeypatch, capsys):
+    from pyrite.materials.channeling import ChannelingDataError
+
+    budget = _script("quantum_decoherence_budget.py")
+    assert budget._outside_thermal_window("mos2", 293.15) == ""
+    assert budget._outside_thermal_window("silicon", 77.0) == ""
+
+    def computable(crystal, *args):
+        if crystal in {"hopg", "hbn", "wse2"}:
+            raise ChannelingDataError(crystal)
+        return object()
+
+    _cheap_budget(monkeypatch, budget, computable)
+    assert budget.main(["--temperature-K", "77"]) == 0
+    assert "MoS2(001): not computable at 77 K (Mo thermal row holds only at 295 +- 10 K)" in (
+        capsys.readouterr().out
+    )
+
+
+def test_quantum_budget_prints_tds_only_rows_as_bounds(capsys):
+    budget = _script("quantum_decoherence_budget.py")
+    nan = float("nan")
+    row = {
+        "label": "MoS2(001)",
+        "energy_eV": 3.0e4,
+        "deltas": np.zeros(2),
+        "tds": np.zeros(2),
+        "electronic": None,
+        "n_bound": 3,
+        "l_cr_ang": nan,
+        "l_pxr_ang": 1.0,
+        "ell_half_ang": 2.0,
+        "ell_one_ang": 3.0,
+        "diffusion_inv_ang3": 4.0,
+        "gamma_l_cr": nan,
+    }
+    budget._print_row(row)
+    out = capsys.readouterr().out
+    assert "G_el[1/A]  unsupported" in out
+    assert "1/G(d/2) <= 2 A" in out and "2G/D^2 >= 4 1/A^3" in out
 
 
 def test_channeling_overlap_rejects_nonfinite_density():
