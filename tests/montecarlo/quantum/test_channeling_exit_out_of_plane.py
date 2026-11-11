@@ -246,7 +246,8 @@ def test_eta_nodes_cover_the_gaussian():
         eta_nodes(0.0, 1.36e6)
 
 
-def test_cupy_batch_matches_numpy(si110):
+@pytest.mark.parametrize("margin", [5.0, 300.0, -1e3])
+def test_cupy_batch_matches_numpy(si110, margin):
     cp = pytest.importorskip("cupy")
     try:
         if cp.cuda.runtime.getDeviceCount() < 1:
@@ -254,7 +255,7 @@ def test_cupy_batch_matches_numpy(si110):
     except Exception as exc:  # pragma: no cover - driver dependent
         pytest.skip(f"CUDA unavailable: {exc}")
     kernel = tds_kernel(si110, ENERGY, **GRID) + electronic_kernel(si110, ENERGY, **GRID)
-    solver = DensityMatrixSolver(si110, ENERGY, kernel)
+    solver = DensityMatrixSolver(si110, ENERGY, kernel, margin_eV=margin)
     rho, _, _ = solver.entry_state(0.0, 3e-4)
     cells = np.stack(
         [
