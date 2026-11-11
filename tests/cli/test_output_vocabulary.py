@@ -19,7 +19,6 @@ _RAW_SOURCES = {
     "run": "run",
     "built-in": "default",
     "built-in default": "default",
-    "fidelity": "default",
     "stored": "default",
     "default": "default",
     "command line": "option",

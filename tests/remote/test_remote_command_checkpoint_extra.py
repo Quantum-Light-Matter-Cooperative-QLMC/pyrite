@@ -135,7 +135,7 @@ def test_split_profile_selector_treats_full_at_stem_as_literal():
     try to re-resolve ``<label>-<digest>`` as a catalog profile."""
     from pyrite.campaign.profiles import named_profile_stem
 
-    at_stem = named_profile_stem("hopg", "full", catalog_profile="sub_100keV")
+    at_stem = named_profile_stem("hopg", catalog_profile="sub_100keV")
     assert "@" in at_stem and at_stem != "hopg@sub_100keV"  # full stem, has digest tail
     assert lifecycle._split_profile_selector(at_stem) is None
     # a bare selector (no digest tail) still resolves as a profile query
@@ -316,16 +316,16 @@ def test_stems_predicts_qualified_stem_for_non_standard_catalog_profile(monkeypa
 
     calls = []
 
-    def fake_named_profile_stem(
-        material, fidelity, *, catalog_profile="standard", detector_id=None
-    ):
-        calls.append((material, fidelity, catalog_profile, detector_id))
-        return f"{material}--{fidelity}-qualified"
+    def fake_named_profile_stem(material, *, catalog_profile="standard", detector_id=None):
+        calls.append((material, catalog_profile, detector_id))
+        return f"{material}@{catalog_profile}-qualified"
 
     monkeypatch.setattr(profiles_module, "named_profile_stem", fake_named_profile_stem)
 
-    assert scripts._stems(["mos2"], False, catalog_profile="sub_100keV") == ["mos2--full-qualified"]
-    assert calls == [("mos2", "full", "sub_100keV", "default")]
+    assert scripts._stems(["mos2"], False, catalog_profile="sub_100keV") == [
+        "mos2@sub_100keV-qualified"
+    ]
+    assert calls == [("mos2", "sub_100keV", "default")]
 
 
 def test_stems_quick_suffix():
@@ -333,12 +333,6 @@ def test_stems_quick_suffix():
     from pyrite.campaign.profiles import named_profile_stem
 
     assert remote._stems(["mose2"], False) == [named_profile_stem("mose2")]
-
-
-def test_stem_resolves_survey_profile():
-    from pyrite.campaign.profiles import named_profile_stem
-
-    assert remote._stems(["mos2"], False, "survey") == [named_profile_stem("mos2", "survey")]
 
 
 def test_submit_failure_releases_its_checkpoint_reservations():

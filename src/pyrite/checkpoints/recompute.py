@@ -69,7 +69,6 @@ def rebrem_checkpoints(
     brem_start_eV=None,
     brem_stop_eV=None,
     brem_step_eV=None,
-    fidelity=None,
     catalog_profile=None,
     require_identity=False,
     redo_all=False,
@@ -116,29 +115,22 @@ def rebrem_checkpoints(
         from .recompute_defaults import dataset_context
 
         context = dataset_context(
-            path,
-            catalog_profile=catalog_profile,
-            fidelity=fidelity,
-            require_identity=require_identity,
+            path, catalog_profile=catalog_profile, require_identity=require_identity
         )
+        use_profile_defaults = context.identified or require_identity
         resolved_ne = ne_brem
         resolved_start = brem_start_eV
         resolved_step = brem_step_eV
         resolved_nodes = None
-        if context.identified or fidelity is not None or require_identity:
+        if use_profile_defaults:
             import numpy as np
 
             from .recompute_defaults import settings, sweep, uniform_bounds
 
-            profile_settings = settings(context.fidelity)
             if resolved_ne is None:
-                resolved_ne = profile_settings.n_electrons_brem
+                resolved_ne = settings().n_electrons_brem
             try:
-                profile_sweep = sweep(
-                    context.material,
-                    context.fidelity,
-                    catalog_profile=context.catalog_profile,
-                )
+                profile_sweep = sweep(context.material, catalog_profile=context.catalog_profile)
             except (KeyError, TypeError, ValueError):
                 # Derived stems (for example ``*_blazed``) have no catalog row.
                 # Keep their stored grid while still applying profile Ne/provenance.
@@ -187,9 +179,7 @@ def rebrem_checkpoints(
             )
         max_seconds = None if deadline is None else max(0.0, deadline - time.monotonic())
         status = {}
-        repair_options = {}
-        if context.identified or fidelity is not None or require_identity:
-            repair_options["fidelity"] = context.fidelity
+        repair_options = {"profile_defaults": True} if use_profile_defaults else {}
         try:
             if progress_file is not None:
                 progress_timer.start()
@@ -244,7 +234,6 @@ def recxr_checkpoints(
     cxr_start_eV=None,
     line_stop_eV=None,
     line_step_eV=None,
-    fidelity=None,
     catalog_profile=None,
     require_identity=False,
     from_config=True,
@@ -287,17 +276,14 @@ def recxr_checkpoints(
         from .recompute_defaults import dataset_context
 
         context = dataset_context(
-            path,
-            catalog_profile=catalog_profile,
-            fidelity=fidelity,
-            require_identity=require_identity,
+            path, catalog_profile=catalog_profile, require_identity=require_identity
         )
         resolved_ne = cxr_ne
-        use_profile_defaults = context.identified or fidelity is not None or require_identity
+        use_profile_defaults = context.identified or require_identity
         if use_profile_defaults and resolved_ne is None:
             from .recompute_defaults import settings
 
-            resolved_ne = settings(context.fidelity).n_electrons
+            resolved_ne = settings().n_electrons
         kw = {}
         if progress_file is not None:
             latest = {"total_cases": 0, "cached_cases": 0, "completed_new_cases": 0}
@@ -326,7 +312,7 @@ def recxr_checkpoints(
         if line_stop_eV is not None:
             recompute_options["line_stop_eV"] = line_stop_eV
         if use_profile_defaults:
-            recompute_options["fidelity"] = context.fidelity
+            recompute_options["profile_defaults"] = True
             recompute_options["catalog_profile"] = context.catalog_profile
         try:
             if progress_file is not None:
@@ -382,7 +368,7 @@ def repair_brem_wide(
     brem_stop_eV=None,
     brem_step_eV=None,
     brem_nodes=None,
-    fidelity=None,
+    profile_defaults=False,
     on_progress=None,
     max_seconds=None,
     status=None,
@@ -458,7 +444,7 @@ def repair_brem_wide(
         brem_stop_eV,
         brem_step_eV,
         target_nodes,
-        fidelity,
+        profile_defaults,
     )
     todo, n_skipped = _plan_brem(results, request, only_nonfinite)
     cadence = _RepairProgress(
@@ -546,7 +532,7 @@ def repair_cxr_spec(
     cxr_start_eV=None,
     line_stop_eV=None,
     line_step_eV=None,
-    fidelity=None,
+    profile_defaults=False,
     catalog_profile="standard",
     from_config=True,
     redo_all=False,
@@ -589,18 +575,14 @@ def repair_cxr_spec(
     sweep = None
     if from_config:
         try:
-            if fidelity is None:
+            if profile_defaults:
+                from ..checkpoints.recompute_defaults import sweep as profile_sweep
+
+                sweep = profile_sweep(material, catalog_profile=catalog_profile)
+            else:
                 from ..campaign.config import material_sweep
 
                 sweep = material_sweep(material, catalog_profile=catalog_profile)
-            else:
-                from ..checkpoints.recompute_defaults import sweep as fidelity_sweep
-
-                sweep = fidelity_sweep(
-                    material,
-                    fidelity,
-                    catalog_profile=catalog_profile,
-                )
         except Exception:
             sweep = None  # unknown/derived stem -> fall back to each record's grid
 
@@ -610,7 +592,7 @@ def repair_cxr_spec(
         only_stale,
         redo_all,
         cxr_ne,
-        fidelity,
+        profile_defaults,
         line_step_eV,
         from_config,
         cxr_start_eV,

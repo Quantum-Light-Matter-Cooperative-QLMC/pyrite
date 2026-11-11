@@ -120,9 +120,7 @@ def test_named_beam_workflow(catalog, monkeypatch, normalization):
     path.write_bytes(b"broken")
     with pytest.raises(MaterialConfigError, match="cannot read"):
         scan._resolved_run(
-            Namespace(
-                catalog_profile="standard", performance_profile=None, fidelity="full", quick=False
-            ),
+            Namespace(catalog_profile="standard", performance_profile=None, quick=False),
             "hopg",
         )
 
@@ -321,15 +319,11 @@ def test_named_beam_rename_and_label_preserve_identity(catalog, monkeypatch):
         == 0
     )
     monkeypatch.setattr(config, "CATALOG", load_material_catalog(catalog))
-    before = dataset_identity(
-        "hopg", "full", config.default_settings(), config.material_sweep("hopg")
-    )
+    before = dataset_identity("hopg", config.default_settings(), config.material_sweep("hopg"))
     assert invoke("set", "imported", "--label", "My lab beam", "-y").exit_code == 0
     assert invoke("rename", "imported", "renamed").exit_code == 0
     monkeypatch.setattr(config, "CATALOG", load_material_catalog(catalog))
-    after = dataset_identity(
-        "hopg", "full", config.default_settings(), config.material_sweep("hopg")
-    )
+    after = dataset_identity("hopg", config.default_settings(), config.material_sweep("hopg"))
     assert before["parameter_sha256"] == after["parameter_sha256"]
 
 

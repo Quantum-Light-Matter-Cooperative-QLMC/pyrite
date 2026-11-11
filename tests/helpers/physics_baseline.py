@@ -96,7 +96,6 @@ def resolved_baseline(kind):
     case = build_cases(sweep, 4, 4, **selections)[0]
     identity = dataset_identity(
         "silicon",
-        "full",
         settings,
         sweep,
         xsgen_tables=markers,

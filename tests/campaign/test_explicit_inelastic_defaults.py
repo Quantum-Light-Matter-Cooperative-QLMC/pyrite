@@ -35,8 +35,8 @@ def test_resolved_legacy_cases_and_dataset_identities_are_reusable():
     current = default_settings()
     legacy = replace(current, inelastic_model="auto", inelastic_cutoff_eV=None)
     assert (
-        dataset_identity("silicon", "full", current, sweep)["parameter_sha256"]
-        == (dataset_identity("silicon", "full", legacy, sweep)["parameter_sha256"])
+        dataset_identity("silicon", current, sweep)["parameter_sha256"]
+        == (dataset_identity("silicon", legacy, sweep)["parameter_sha256"])
     )
     cases = build_cases(sweep, 4, 4)
     old = build_cases(sweep, 4, 4, inelastic_model="auto")

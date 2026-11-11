@@ -44,7 +44,6 @@ def resolved(profile):
     material = member(profile)
     args = Namespace(
         quick=False,
-        fidelity="full",
         catalog_profile=profile,
         detector_id=None,
         high_energy_floor_map={},
@@ -102,7 +101,7 @@ def test_numerics_preset_resolves_into_profiles_with_provenance(_isolate_user_ca
     assert shown["preset"] == "fast"
     assert sources["n_electrons"] == "preset fast"
     assert sources["mosaic_nodes"] == "preset fast"
-    assert sources["n_electrons_brem"] == "fidelity"
+    assert sources["n_electrons_brem"] == "default"
     summary = payload("profile", "show", "campaign")
     assert summary["presets"] == {"physics": None, "numerics": "fast"}
 

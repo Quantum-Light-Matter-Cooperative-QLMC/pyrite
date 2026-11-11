@@ -246,7 +246,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `coherent-emission`
 
 - **Claim:** opt-in phased segment sum `dN/dE dΩ ∝ \|Σ_j A_j·exp{i[ω(t_abs,j−n̂·r_j)−g·r_j]}\|²`; intra-electron plus inter-electron/superradiant cross terms and Gaussian inter-electron form factor `exp[−(ωσ_z)²]`
-- **Code:** `montecarlo/spectrum/cxr/_spectrum.py::mc_cxr_spectrum` (`coherent=True`); profile policy `campaign/profiles.py::FidelityPreset.emission` (`"coherent"`/`"both"`, surfaced by `pyrite profile set --emission` and `pyrite profile add/remove --coherent`)
+- **Code:** `montecarlo/spectrum/cxr/_spectrum.py::mc_cxr_spectrum` (`coherent=True`); profile policy `campaign/config.py::default_settings` (incoherent default) and `campaign/profiles.py::profile_run_settings` (`"coherent"`/`"both"`, surfaced by `pyrite profile set --emission` and `pyrite profile add/remove --coherent`)
 - **Source:** Feranchuk–Spence 2000; Zhai 2025; far-field phased-array sum; Gaussian characteristic function
 - **Status:** rederived
 - **Checks:** units/sign; repository `S(+g)` ↔ `χ_g exp(−ig·r)` mapping; straight-trajectory phase stationarity at `ω=v·g/(1−v·n̂)`; full/cutoff sinc paths; mosaic placement; self/coincident/qualified decoherent limits

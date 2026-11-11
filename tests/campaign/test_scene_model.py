@@ -260,11 +260,11 @@ def test_configured_sweep_accepts_independent_run_and_observation_overrides():
 
 
 def test_every_catalog_profile_round_trips_a_resolved_case_list() -> None:
-    settings = default_settings("survey")
+    settings = default_settings()
     for profile in CATALOG.profile_names:
         members = CATALOG.profile_materials(profile)
         material = members[0] if members else "hopg"
-        old = material_sweep(material, fidelity="survey", catalog_profile=profile)
+        old = material_sweep(material, catalog_profile=profile)
         converted = adapt_configured_sweep(old, settings)
         expected = build_legacy_cases(
             old,

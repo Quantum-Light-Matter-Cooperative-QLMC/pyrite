@@ -136,8 +136,8 @@ def test_clear_profile_targets_only_profile_stems(monkeypatch, capsys):
     monkeypatch.setattr(
         scripts,
         "_stems",
-        lambda materials, quick, fidelity, **kwargs: [
-            f"{material}--{fidelity}-profile-{kwargs['catalog_profile']}" for material in materials
+        lambda materials, quick, **kwargs: [
+            f"{material}--full-profile-{kwargs['catalog_profile']}" for material in materials
         ],
     )
 
@@ -148,9 +148,7 @@ def test_clear_profile_targets_only_profile_stems(monkeypatch, capsys):
 
     listing = commands[-1]
     assert "hopg--full-profile-sub_100keV" in listing
-    assert "hopg--survey-profile-sub_100keV" in listing
     assert "hbn--full-profile-sub_100keV" in listing
-    assert "hbn--survey-profile-sub_100keV" in listing
     assert "hopg_quick" not in listing
     assert "would delete" in capsys.readouterr().out
 

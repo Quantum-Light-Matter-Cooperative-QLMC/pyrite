@@ -21,13 +21,13 @@ from tests.remote._remote_test_helpers import (
 def test_resolve_profile_stems_resolves_one_stem_per_detector(monkeypatch, multi_detector_standard):
     seen = []
 
-    def resolve(material, profile, *, fidelity=None, detector_id=None, **_kwargs):
+    def resolve(material, profile, *, detector_id=None, **_kwargs):
         seen.append(detector_id)
         return f"{material}-{detector_id}"
 
     monkeypatch.setattr(lifecycle_pull, "resolve_profile_stem", resolve)
 
-    stems = lifecycle.resolve_profile_stems("hopg", "standard", fidelity="full")
+    stems = lifecycle.resolve_profile_stems("hopg", "standard")
 
     assert len(stems) == 2
     assert len(set(stems)) == 2
@@ -35,9 +35,8 @@ def test_resolve_profile_stems_resolves_one_stem_per_detector(monkeypatch, multi
 
 
 def test_resolve_survey_stems_discovers_matching_survey_dir(monkeypatch, capsys):
-    from pyrite.campaign.profiles import named_profile_stem
 
-    survey_stem = named_profile_stem("hopg", "survey")
+    survey_stem = f"hopg@survey-{'d' * 12}"
     monkeypatch.setattr(
         transport,
         "_ssh_capture",
@@ -63,9 +62,8 @@ def test_resolve_survey_stems_ignores_other_materials_and_profiles(monkeypatch):
 
 
 def test_resolve_survey_stems_does_not_duplicate_an_explicitly_requested_stem(monkeypatch):
-    from pyrite.campaign.profiles import named_profile_stem
 
-    survey_stem = named_profile_stem("hopg", "survey")
+    survey_stem = f"hopg@survey-{'d' * 12}"
     monkeypatch.setattr(transport, "_ssh_capture", lambda _command: f"{survey_stem}\n")
 
     assert lifecycle._resolve_survey_stems(["hopg", survey_stem]) == ["hopg", survey_stem]
@@ -126,7 +124,7 @@ def test_resolve_profile_stem_hash_prefix_pins_one(monkeypatch):
     assert lifecycle.resolve_profile_stem("hopg", "sub_100keV", hash_prefix="a" * 12) == a
 
 
-def test_resolve_profile_stem_filters_requested_fidelity(monkeypatch):
+def test_resolve_profile_stem_skips_retired_survey_tier(monkeypatch):
     full = f"hopg--full-{'a' * 12}"
     survey = f"hopg--survey-{'b' * 12}"
     meta = {
@@ -157,7 +155,7 @@ def test_resolve_profile_stem_filters_requested_fidelity(monkeypatch):
         _fake_remote_catalog(f"{full}\n{survey}\n", meta),
     )
 
-    assert lifecycle.resolve_profile_stem("hopg", "sub_100keV", fidelity="full") == full
+    assert lifecycle.resolve_profile_stem("hopg", "sub_100keV") == full
 
 
 def test_resolve_profile_stem_raises_with_no_match(monkeypatch):

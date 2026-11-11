@@ -66,8 +66,8 @@ def test_identity_forks_only_when_positrons_can_run(monkeypatch, resolved):
     )
     sweep = material_sweep("silicon")
     settings = replace(default_settings(), **SHELL, **COUPLED, **PAIR)
-    base = dataset_identity("silicon", "full", settings, sweep)
-    positron = dataset_identity("silicon", "full", replace(settings, **POSITRON), sweep)
+    base = dataset_identity("silicon", settings, sweep)
+    positron = dataset_identity("silicon", replace(settings, **POSITRON), sweep)
     numerics = positron["resolved_parameters"]["transport_numerics"]
     assert "positron_transport" not in base["resolved_parameters"]["transport_numerics"]
     if resolved == "bremslib":

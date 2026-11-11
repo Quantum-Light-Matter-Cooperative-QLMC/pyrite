@@ -19,19 +19,17 @@ from pyrite._photon_continuum_floor import continuum_medium_key
 from pyrite.campaign import profile_lifecycle, profile_summary, profiles
 from pyrite.campaign.config import default_settings, material_sweep
 from pyrite.campaign.profiles import (
-    FIDELITY_NAMES,
     IDENTITY_MIGRATIONS,
+    LEGACY_IDENTITY_TIER,
     STOPPING_MODEL,
-    FidelityPreset,
     case_content_key,
     dataset_identity,
-    get_fidelity_preset,
     identity_from_stem,
     named_profile_identity,
     named_profile_stem,
     variant_stem,
 )
-from pyrite.campaign.sweep import BeamSpec, build_cases, target_flat_fields
+from pyrite.campaign.sweep import BeamSpec, build_cases, target_replace
 from pyrite.checkpoints import _checkpoint_store
 from pyrite.detectors import AngularAcceptance, Detector, Timepix3
 from pyrite.materials import CATALOG
@@ -139,7 +137,7 @@ def test_typed_case_content_key_matches_pre_case_golden():
 
 def test_dataset_identity_dispatches_through_recorded_v1():
     sweep = material_sweep("hopg")
-    identity = dataset_identity("hopg", "full", default_settings(), sweep)
+    identity = dataset_identity("hopg", default_settings(), sweep)
 
     assert set(IDENTITY_MIGRATIONS) == {1}
     assert identity["identity_version"] == 1
@@ -147,7 +145,7 @@ def test_dataset_identity_dispatches_through_recorded_v1():
         "ad7db32d0fdb300e72ac65cafb06f56d632f3752ef22a968ba7828c643b5f2dd"
     )
     with pytest.raises(ValueError, match="unsupported dataset identity version"):
-        dataset_identity("hopg", "full", default_settings(), sweep, identity_version=2)
+        dataset_identity("hopg", default_settings(), sweep, identity_version=2)
 
 
 def test_explicit_uniform_brem_grid_does_not_share_catalog_band_identity():
@@ -156,14 +154,14 @@ def test_explicit_uniform_brem_grid_does_not_share_catalog_band_identity():
     uniform = replace(automatic.energy_bins, brem=np.arange(0.0, 30000.0, 25.0))
     band = replace(automatic, energy_bins=uniform, brem_band=True)
     explicit = replace(band, brem_band=False)
-    band_identity = dataset_identity("hopg", "full", default_settings(), band)
-    explicit_identity = dataset_identity("hopg", "full", default_settings(), explicit)
+    band_identity = dataset_identity("hopg", default_settings(), band)
+    explicit_identity = dataset_identity("hopg", default_settings(), explicit)
 
     assert "brem_grid_exact" not in band_identity["resolved_parameters"]["sweep"]
     assert explicit_identity["resolved_parameters"]["sweep"]["brem_grid_exact"] is True
     assert explicit_identity["parameter_sha256"] != band_identity["parameter_sha256"]
     # The automatic continuum grid (#278) forks from both declared spellings.
-    automatic_identity = dataset_identity("hopg", "full", default_settings(), automatic)
+    automatic_identity = dataset_identity("hopg", default_settings(), automatic)
     assert automatic_identity["resolved_parameters"]["sweep"]["continuum_grid_model"] == (
         CONTINUUM_GRID_MODEL
     )
@@ -246,9 +244,7 @@ def test_example_beam_is_the_implicit_beam_spec():
 def test_trajectory_demo_is_one_fixed_count_case_with_micron_beam():
     assert CATALOG.profile_materials("trajectory_demo") == ("hopg",)
     sweep = material_sweep("hopg", catalog_profile="trajectory_demo")
-    settings = profiles.profile_run_settings(
-        default_settings(), "trajectory_demo", "full", sweep=sweep
-    )
+    settings = profiles.profile_run_settings(default_settings(), "trajectory_demo", sweep=sweep)
     cases = build_cases(sweep)
 
     assert len(cases) == 1
@@ -265,9 +261,7 @@ def test_trajectory_demo_is_one_fixed_count_case_with_micron_beam():
 
 def _channeling_demo():
     sweep = material_sweep("silicon", catalog_profile="channeling_demo")
-    settings = profiles.profile_run_settings(
-        default_settings(), "channeling_demo", "full", sweep=sweep
-    )
+    settings = profiles.profile_run_settings(default_settings(), "channeling_demo", sweep=sweep)
     return sweep, settings
 
 
@@ -332,33 +326,29 @@ def test_case_content_key_excludes_label_perf_and_flux_scale_fields():
 
 def test_full_profile_preserves_production_defaults_exactly():
     implicit_settings = default_settings()
-    explicit_settings = default_settings("full")
+    explicit_settings = default_settings()
     implicit_sweep = material_sweep("mose2")
-    explicit_sweep = material_sweep("mose2", fidelity="full")
+    explicit_sweep = material_sweep("mose2")
 
-    assert FIDELITY_NAMES == ("full", "survey")
     assert implicit_settings == explicit_settings
     assert implicit_settings.n_electrons == 300
     assert implicit_settings.n_electrons_brem == 150
-    implicit_identity = dataset_identity("mose2", "full", implicit_settings, implicit_sweep)
-    explicit_identity = dataset_identity("mose2", "full", explicit_settings, explicit_sweep)
+    implicit_identity = dataset_identity("mose2", implicit_settings, implicit_sweep)
+    explicit_identity = dataset_identity("mose2", explicit_settings, explicit_sweep)
     assert implicit_identity == explicit_identity
-    assert get_fidelity_preset("full").provisional is False
 
 
 def test_transport_numerics_fork_dataset_identity_only_when_nondefault():
     settings = default_settings()
     sweep = material_sweep("hopg")
-    base = dataset_identity("hopg", "full", settings, sweep)
+    base = dataset_identity("hopg", settings, sweep)
     explicit_defaults = dataset_identity(
         "hopg",
-        "full",
         replace(settings, straggling=False, energy_model="midpoint", max_dE_frac=0.0),
         sweep,
     )
     active = dataset_identity(
         "hopg",
-        "full",
         replace(settings, straggling=True, energy_model="midpoint", max_dE_frac=0.02),
         sweep,
     )
@@ -389,37 +379,13 @@ def test_transport_numerics_fork_dataset_identity_only_when_nondefault():
     }
 
 
-def test_survey_profile_reduces_configured_expensive_sweep_dimensions():
-    full = material_sweep("mose2")
-    survey = material_sweep("mose2", fidelity="survey")
-    settings = default_settings("survey")
-
-    assert settings.n_electrons == 60
-    assert settings.n_electrons_brem == 30
-    assert len(np.atleast_1d(survey.beam.energy_keV)) <= 2
-    survey_geometry = target_flat_fields(survey.target)
-    assert len(np.atleast_1d(survey_geometry["thickness_ang"])) <= 3
-    assert len(np.atleast_1d(survey_geometry["tilt_deg"])) <= 5
-    assert len(np.atleast_1d(survey_geometry["tilt_azim_deg"])) <= 2
-    assert survey.n_families == 2
-    # Both fidelities resolve the automatic continuum grid per case (#278); it is
-    # already O(10^3) nodes, so survey does not coarsen it.
-    assert survey.energy_bins.brem is None and full.energy_bins.brem is None
-    assert not survey.energy_bins.cxr_by_energy
-    assert not full.energy_bins.cxr_by_energy
-    cases = build_cases(survey, settings.n_electrons, settings.n_electrons_brem)
-    assert cases
-    assert all(len(case["hkl_list"]) <= 4 for case in cases)
-    assert all(case.get("line_grid_policy") is not None for case in cases)
-
-
-def test_profile_convergence_overrides_fidelity_and_forks_identity(monkeypatch):
+def test_profile_convergence_overrides_defaults_and_forks_identity(monkeypatch):
     from types import MappingProxyType
 
     from pyrite.campaign import config
     from pyrite.materials import CATALOG
 
-    baseline = material_sweep("hopg", fidelity="survey")
+    baseline = material_sweep("hopg")
     custom = replace(
         CATALOG,
         profile_transport_numerics=MappingProxyType(
@@ -438,51 +404,49 @@ def test_profile_convergence_overrides_fidelity_and_forks_identity(monkeypatch):
     )
     monkeypatch.setattr(config, "CATALOG", custom)
 
-    resolved = config.material_sweep("hopg", fidelity="survey")
+    resolved = config.material_sweep("hopg")
     assert resolved.n_families == 3
     assert resolved.max_reflections == 6
     assert resolved.mosaic_nodes == 7
     assert resolved.mosaic_route == "mc"
-    overridden = config.material_sweep("hopg", fidelity="survey", n_families=8)
+    overridden = config.material_sweep("hopg", n_families=8)
     assert overridden.n_families == 8
     assert (
-        dataset_identity("hopg", "survey", default_settings("survey"), resolved)["parameter_sha256"]
-        != dataset_identity("hopg", "survey", default_settings("survey"), baseline)[
-            "parameter_sha256"
-        ]
+        dataset_identity("hopg", default_settings(), resolved)["parameter_sha256"]
+        != dataset_identity("hopg", default_settings(), baseline)["parameter_sha256"]
     )
 
 
 def test_dataset_identity_is_deterministic_and_resolved_parameter_sensitive():
-    settings = default_settings("survey")
-    sweep = material_sweep("mose2", fidelity="survey")
-    first = dataset_identity("mose2", "survey", settings, sweep)
-    same = dataset_identity("mose2", "survey", settings, sweep)
+    settings = default_settings()
+    sweep = material_sweep("mose2")
+    first = dataset_identity("mose2", settings, sweep)
+    same = dataset_identity("mose2", settings, sweep)
     changed = dataset_identity(
         "mose2",
-        "survey",
         settings,
         replace(sweep, n_families=sweep.n_families + 1),
     )
 
     assert first == same
     assert first["parameter_sha256"] != changed["parameter_sha256"]
-    assert first["resolved_parameters"]["settings"]["n_electrons"] == 60
-    assert first["resolved_parameters"]["sweep"]["n_families"] == 2
+    assert first["resolved_parameters"]["settings"]["n_electrons"] == 300
+    # Frozen legacy identity vocabulary (#1079): hashed and recorded verbatim.
+    assert first["fidelity"] == first["resolved_parameters"]["fidelity"] == LEGACY_IDENTITY_TIER
+    assert LEGACY_IDENTITY_TIER == "full"
 
 
 def test_variant_stem_preserves_canonical_full_and_isolates_variants():
     full_settings = default_settings()
     full_sweep = material_sweep("hopg")
-    full = dataset_identity("hopg", "full", full_settings, full_sweep)
-    survey = dataset_identity(
-        "hopg",
-        "survey",
-        default_settings("survey"),
-        material_sweep("hopg", fidelity="survey"),
-    )
+    full = dataset_identity("hopg", full_settings, full_sweep)
+    quick = {**full, "variant": "quick"}
+    # A retired survey-tier identity read back from its sidecar keeps its label.
+    survey = {**full, "fidelity": "survey"}
 
     assert variant_stem(full, canonical_full=True) == "hopg"
+    assert variant_stem(full).startswith("hopg@full-")
+    assert variant_stem(quick, canonical_full=True) == "hopg_quick"
     assert variant_stem(survey).startswith("hopg@survey-")
     assert variant_stem(full) != variant_stem(survey)
 
@@ -493,8 +457,8 @@ def test_catalog_profile_leaves_standard_hash_bit_for_bit():
     identity keeps its historical parameter_sha256 (and checkpoint stem)."""
     settings = default_settings()
     sweep = material_sweep("hopg")
-    implicit = dataset_identity("hopg", "full", settings, sweep)
-    explicit = dataset_identity("hopg", "full", settings, sweep, catalog_profile="standard")
+    implicit = dataset_identity("hopg", settings, sweep)
+    explicit = dataset_identity("hopg", settings, sweep, catalog_profile="standard")
 
     assert implicit["parameter_sha256"] == explicit["parameter_sha256"]
     assert implicit["catalog_profile"] == "standard"
@@ -507,7 +471,7 @@ def test_line_kinematics_marker_is_a_constant_that_orphans_vacuum_era_digests():
     mandatory described the retired vacuum kinematics. The payload therefore
     carries a CONSTANT generation marker, hashed on every run, so those
     checkpoints cannot be resumed into (rev-and-re-run)."""
-    identity = dataset_identity("hopg", "full", default_settings(), material_sweep("hopg"))
+    identity = dataset_identity("hopg", default_settings(), material_sweep("hopg"))
 
     assert identity["resolved_parameters"]["line_kinematics"] == "in-medium"
     assert "xray_dispersion" not in identity["resolved_parameters"]
@@ -516,7 +480,7 @@ def test_line_kinematics_marker_is_a_constant_that_orphans_vacuum_era_digests():
 
 def test_stopping_model_marker_is_a_constant_that_orphans_splice_era_digests():
     """SBETHE is unconditional production physics and moves every old digest."""
-    identity = dataset_identity("hopg", "full", default_settings(), material_sweep("hopg"))
+    identity = dataset_identity("hopg", default_settings(), material_sweep("hopg"))
 
     assert identity["resolved_parameters"]["stopping_model"] == STOPPING_MODEL
     assert STOPPING_MODEL == "sbethe-corrected-v2"
@@ -536,7 +500,7 @@ def test_case_content_key_separates_stopping_models():
 
 def test_characteristic_model_marker_orphans_previous_line_models():
     """Unconditional characteristic physics, data, and line shape are hashed."""
-    identity = dataset_identity("hopg", "full", default_settings(), material_sweep("hopg"))
+    identity = dataset_identity("hopg", default_settings(), material_sweep("hopg"))
 
     assert identity["resolved_parameters"]["characteristic_model"] == CHARACTERISTIC_MODEL
     assert "eedl" in CHARACTERISTIC_MODEL
@@ -561,16 +525,16 @@ def test_bremsstrahlung_model_marker_orphans_bethe_heitler_era_digests():
         radiative_model="uncoupled",
         radiative_cutoff_eV=None,
     )
-    identity = dataset_identity("hopg", "full", settings, material_sweep("hopg"))
+    identity = dataset_identity("hopg", settings, material_sweep("hopg"))
 
     assert identity["resolved_parameters"]["bremsstrahlung_model"] == BREMSSTRAHLUNG_MODEL
     assert "mf23-527-mf26-527" in BREMSSTRAHLUNG_MODEL
 
 
 def test_default_continuum_is_bremslib_when_installed_and_eedl_otherwise(monkeypatch):
-    installed = dataset_identity("hopg", "full", default_settings(), material_sweep("hopg"))
+    installed = dataset_identity("hopg", default_settings(), material_sweep("hopg"))
     monkeypatch.setattr(profiles, "resolve_bremsstrahlung_model", lambda model, _e: "eedl")
-    fallback = dataset_identity("hopg", "full", default_settings(), material_sweep("hopg"))
+    fallback = dataset_identity("hopg", default_settings(), material_sweep("hopg"))
 
     assert installed["resolved_parameters"]["bremsstrahlung_model"] == BREMSSTRAHLUNG_BREMSLIB_MODEL
     assert fallback["resolved_parameters"]["bremsstrahlung_model"] == BREMSSTRAHLUNG_MODEL
@@ -593,7 +557,7 @@ def test_case_content_key_separates_bremsstrahlung_models():
 
 
 def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
-    identity = dataset_identity("hopg", "full", default_settings(), material_sweep("hopg"))
+    identity = dataset_identity("hopg", default_settings(), material_sweep("hopg"))
     sweep_payload = identity["resolved_parameters"]["sweep"]
 
     assert identity["parameter_sha256"] == (
@@ -720,8 +684,8 @@ def test_nondefault_detector_round_trips_cases_identity_and_stem():
         acceptance=AngularAcceptance(polar_deg=16.6, solid_angle_sr=0.066),
     )
     custom_sweep = material_sweep("hopg", detector=detector)
-    standard = dataset_identity("hopg", "full", settings, standard_sweep)
-    custom = dataset_identity("hopg", "full", settings, custom_sweep)
+    standard = dataset_identity("hopg", settings, standard_sweep)
+    custom = dataset_identity("hopg", settings, custom_sweep)
     case = build_cases(custom_sweep)[0]
     payload = custom["resolved_parameters"]["sweep"]
 
@@ -748,8 +712,8 @@ def test_nondefault_detector_round_trips_cases_identity_and_stem():
 def test_every_nondefault_detector_acceptance_field_changes_identity(detector):
     settings = default_settings()
     standard_sweep = material_sweep("hopg")
-    standard = dataset_identity("hopg", "full", settings, standard_sweep)
-    changed = dataset_identity("hopg", "full", settings, replace(standard_sweep, detector=detector))
+    standard = dataset_identity("hopg", settings, standard_sweep)
+    changed = dataset_identity("hopg", settings, replace(standard_sweep, detector=detector))
 
     assert changed["parameter_sha256"] != standard["parameter_sha256"]
 
@@ -766,16 +730,16 @@ def test_read_time_response_does_not_change_transport_identity():
     )
 
     assert (
-        dataset_identity("hopg", "full", settings, rescored)["parameter_sha256"]
-        == dataset_identity("hopg", "full", settings, standard_sweep)["parameter_sha256"]
+        dataset_identity("hopg", settings, rescored)["parameter_sha256"]
+        == dataset_identity("hopg", settings, standard_sweep)["parameter_sha256"]
     )
 
 
 def test_catalog_profile_changes_hash_and_stem_when_not_standard():
     settings = default_settings()
     sweep = material_sweep("hopg")
-    standard = dataset_identity("hopg", "full", settings, sweep, catalog_profile="standard")
-    other = dataset_identity("hopg", "full", settings, sweep, catalog_profile="sub_100keV")
+    standard = dataset_identity("hopg", settings, sweep, catalog_profile="standard")
+    other = dataset_identity("hopg", settings, sweep, catalog_profile="sub_100keV")
 
     assert other["catalog_profile"] == "sub_100keV"
     assert other["resolved_parameters"]["catalog_profile"] == "sub_100keV"
@@ -792,24 +756,16 @@ def test_catalog_profile_changes_hash_and_stem_when_not_standard():
 
 def test_named_profile_stem_default_catalog_profile_is_adaptive_and_hashed():
     """standard runs adaptive counts by default (#361): its stem is a variant."""
-    assert named_profile_stem("hopg", "full").startswith("hopg@full-")
-    assert named_profile_stem("hopg", "full", catalog_profile="standard") == named_profile_stem(
-        "hopg", "full"
-    )
+    assert named_profile_stem("hopg").startswith("hopg@full-")
+    assert named_profile_stem("hopg", catalog_profile="standard") == named_profile_stem("hopg")
 
 
-def test_named_profiles_default_to_incoherent_emission():
-    """Back-compat: the tri-state emission rename leaves both presets on the
-    incoherent (default) policy, with the derived coherent_emission property
-    off, so existing runs keep the bit-for-bit incoherent path."""
-    for name in FIDELITY_NAMES:
-        preset = get_fidelity_preset(name)
-        assert preset.emission == "incoherent"
-        assert preset.coherent_emission is False
-    # Settings resolved for those profiles carry the same incoherent default.
-    settings = default_settings("full").__class__()
-    assert settings.emission == "incoherent"
-    assert settings.coherent_emission is False
+def test_default_settings_use_incoherent_emission():
+    """Back-compat: the built-in run settings stay on the incoherent policy,
+    so existing runs keep the bit-for-bit incoherent path."""
+    for settings in (default_settings(), default_settings().__class__()):
+        assert settings.emission == "incoherent"
+        assert settings.coherent_emission is False
 
 
 @pytest.mark.parametrize(
@@ -817,12 +773,14 @@ def test_named_profiles_default_to_incoherent_emission():
     [("incoherent", False), ("coherent", True), ("both", True)],
 )
 def test_emission_mode_resolves_through_profile_to_settings(emission, coherent):
-    """Each emission mode rides FidelityPreset.apply_settings onto Settings, and
-    the derived coherent_emission property agrees on both sides."""
-    preset = FidelityPreset("probe", n_electrons=10, n_electrons_brem=5, emission=emission)
-    assert preset.coherent_emission is coherent
-
-    resolved = preset.apply_settings(default_settings())
+    """A profile emission rides profile_run_settings onto Settings, and the
+    derived coherent_emission property agrees."""
+    catalog = mock.Mock()
+    catalog.profile_emission.return_value = emission
+    catalog.profile_temporal_profile.return_value = False
+    catalog.profile_numerics.return_value = None
+    catalog.profile_precision.return_value = None
+    resolved = profiles.profile_run_settings(default_settings(), "probe", catalog)
     assert resolved.emission == emission
     assert resolved.coherent_emission is coherent
 
@@ -832,9 +790,9 @@ def test_emission_modes_yield_three_distinct_digests_incoherent_unchanged():
     incoherent path still adds no key of its own to the hashed payload."""
     sweep = material_sweep("hopg")
     base = default_settings()
-    incoherent = dataset_identity("hopg", "full", replace(base, emission="incoherent"), sweep)
-    coherent = dataset_identity("hopg", "full", replace(base, emission="coherent"), sweep)
-    both = dataset_identity("hopg", "full", replace(base, emission="both"), sweep)
+    incoherent = dataset_identity("hopg", replace(base, emission="incoherent"), sweep)
+    coherent = dataset_identity("hopg", replace(base, emission="coherent"), sweep)
+    both = dataset_identity("hopg", replace(base, emission="both"), sweep)
 
     digests = {
         incoherent["parameter_sha256"],
@@ -863,31 +821,14 @@ def test_emission_modes_yield_three_distinct_digests_incoherent_unchanged():
     assert incoherent["parameter_sha256"] == (
         "ad7db32d0fdb300e72ac65cafb06f56d632f3752ef22a968ba7828c643b5f2dd"
     )
-    survey_incoherent = dataset_identity(
-        "mose2", "survey", default_settings("survey"), material_sweep("mose2", fidelity="survey")
-    )
-    # Re-minted for issue #100: mose2 carries its own E_grid_brem override, and
-    # that row's `start` now records the medium's derived photon-continuum floor
-    # instead of 0 eV, so the declared sweep payload this digest hashes moved.
-    # Artifact-backed materials (hopg, hbn) did not: their stored 0.0 is a
-    # bandwidth request the resolver raises, so it was left alone. Re-minted
-    # again for issue #89's default ELSEPA elastic model, and for issue #181's
-    # line-escape marker. Re-minted again for issue #256: the per-material
-    # uniform override was dropped, so the hashed sweep grid is the profile
-    # default (the resolved case grids are unchanged). Re-minted again for
-    # issue #218: mose2 gained conduction-band data, so the default "auto"
-    # inelastic model now resolves to shell-soft-hard (50 eV cutoff).
-    assert survey_incoherent["parameter_sha256"] == (
-        "d286c1a08073b40996ccd535bc4cce7b8833c489703c809cb6ae402f1ff5cd67"
-    )
 
 
 def test_identity_from_stem_resolves_non_standard_catalog_profile():
     """Regression: ``pyrite remote pull --profile`` died here -- a variant stem
-    names only material/fidelity/digest, and identity_from_stem used to
+    names only material/label/digest, and identity_from_stem used to
     recompute the digest under "standard" only, so a sub_100keV checkpoint
     could never match (remote `pyrite slim --grid` SystemExit, 21/21 failed)."""
-    stem = named_profile_stem("hopg", "full", catalog_profile="sub_100keV")
+    stem = named_profile_stem("hopg", catalog_profile="sub_100keV")
     identity = identity_from_stem(stem)
 
     assert identity is not None
@@ -895,28 +836,57 @@ def test_identity_from_stem_resolves_non_standard_catalog_profile():
     assert identity["fidelity"] == "full"
     assert identity["catalog_profile"] == "sub_100keV"
     # standard-profile variant stems keep resolving as before
-    survey = named_profile_stem("hopg", "survey")
-    assert identity_from_stem(survey)["catalog_profile"] == "standard"
+    standard = named_profile_stem("hopg")
+    assert identity_from_stem(standard)["catalog_profile"] == "standard"
 
 
 def test_identity_from_stem_dual_reads_legacy_hyphen_stem():
     """Dual-read: checkpoints written under the pre-2026-07-29
-    ``<material>--<fidelity>-<digest>`` scheme still resolve after the @-stem
+    ``<material>--<tier>-<digest>`` scheme still resolve after the @-stem
     migration, so existing on-disk checkpoints are never orphaned. The @-stem
     and its legacy twin share a digest -- only the stem text differs."""
-    identity = named_profile_identity("hopg", "survey")
+    identity = named_profile_identity("hopg")
     digest = identity["parameter_sha256"][:12]
-    legacy_stem = f"hopg--survey-{digest}"
-    at_stem = named_profile_stem("hopg", "survey")
+    legacy_stem = f"hopg--full-{digest}"
+    at_stem = named_profile_stem("hopg")
 
-    assert at_stem == f"hopg@survey-{digest}"  # new scheme is what gets written
+    assert at_stem == f"hopg@full-{digest}"  # new scheme is what gets written
     resolved = identity_from_stem(legacy_stem)  # old scheme still reads back
     assert resolved is not None
     assert (resolved["material"], resolved["fidelity"], resolved["catalog_profile"]) == (
         "hopg",
-        "survey",
+        "full",
         "standard",
     )
+
+
+@pytest.mark.parametrize("stem", ["hopg--survey-0123456789ab", "hopg@survey-0123456789ab"])
+def test_retired_survey_stems_resolve_only_from_their_sidecar(tmp_path, stem):
+    """#1079: the survey tier's reduced grid is gone, so a sidecar-less survey
+    stem cannot be recomputed -- but its recorded identity still reads back."""
+    assert identity_from_stem(stem) is None
+    recorded = {
+        **named_profile_identity("hopg"),
+        "fidelity": "survey",
+        "parameter_sha256": "0123456789ab" + "0" * 52,
+    }
+    manifest = _checkpoint_store.manifest_path(stem, tmp_path)
+    manifest.parent.mkdir(parents=True, exist_ok=True)
+    manifest.write_text(json.dumps({"dataset_identity": recorded}))
+    assert identity_from_stem(stem, tmp_path)["fidelity"] == "survey"
+
+
+# Golden pins (#1079): retiring the fidelity machinery must leave every named
+# stem byte-identical. Re-pin together with the digests above on a *_MODEL bump.
+@pytest.mark.parametrize(
+    ("profile", "material", "stem"),
+    [
+        ("standard", "hopg", "hopg@full-aae0806563e9"),
+        ("standard", "mose2", "mose2@full-b6b6f140da54"),
+    ],
+)
+def test_named_profile_stems_are_pinned(profile, material, stem):
+    assert named_profile_stem(material, catalog_profile=profile) == stem
 
 
 def test_identity_from_stem_reads_sidecar_when_profile_edited_after_run(tmp_path):
@@ -932,7 +902,7 @@ def test_identity_from_stem_reads_sidecar_when_profile_edited_after_run(tmp_path
     # backing profile was later edited": the stem commits to this run-time
     # digest, which no recompute against the current catalog can reproduce.
     run_time_identity = {
-        **named_profile_identity("hopg", "full", catalog_profile="sub_100keV"),
+        **named_profile_identity("hopg", catalog_profile="sub_100keV"),
         "parameter_sha256": "dead" * 16,  # 64 hex chars, un-recomputable today
     }
     stem = variant_stem(run_time_identity)
@@ -965,14 +935,12 @@ def test_shell_inelastic_mode_forks_identity_and_case_payload_only_when_on():
     default = replace(default_settings(), energy_model="midpoint")
     settings = replace(default, inelastic_model="continuous", inelastic_cutoff_eV=None)
     sweep = material_sweep("silicon")
-    base = dataset_identity("silicon", "full", settings, sweep)
+    base = dataset_identity("silicon", settings, sweep)
     shell = replace(settings, inelastic_model="shell-soft-hard", inelastic_cutoff_eV=50.0)
-    active = dataset_identity("silicon", "full", shell, sweep)
+    active = dataset_identity("silicon", shell, sweep)
     # The "auto" default (#281) resolves silicon to the shell mode at 50 eV.
-    explicit_default = dataset_identity("silicon", "full", default, sweep)
-    other_cutoff = dataset_identity(
-        "silicon", "full", replace(shell, inelastic_cutoff_eV=100.0), sweep
-    )
+    explicit_default = dataset_identity("silicon", default, sweep)
+    other_cutoff = dataset_identity("silicon", replace(shell, inelastic_cutoff_eV=100.0), sweep)
 
     assert explicit_default["parameter_sha256"] == active["parameter_sha256"]
     assert "inelastic_model" not in base["resolved_parameters"]["transport_numerics"]
@@ -1017,13 +985,9 @@ def test_secondary_threshold_forks_identity_and_case_payload_only_when_set():
         inelastic_cutoff_eV=50.0,
     )
     sweep = material_sweep("silicon")
-    base = dataset_identity("silicon", "full", settings, sweep)
-    on = dataset_identity(
-        "silicon", "full", replace(settings, secondary_threshold_eV=1000.0), sweep
-    )
-    other = dataset_identity(
-        "silicon", "full", replace(settings, secondary_threshold_eV=2000.0), sweep
-    )
+    base = dataset_identity("silicon", settings, sweep)
+    on = dataset_identity("silicon", replace(settings, secondary_threshold_eV=1000.0), sweep)
+    other = dataset_identity("silicon", replace(settings, secondary_threshold_eV=2000.0), sweep)
     assert "secondary_threshold_eV" not in base["resolved_parameters"]["transport_numerics"]
     assert on["resolved_parameters"]["transport_numerics"]["secondary_threshold_eV"] == 1000.0
     assert len({base["parameter_sha256"], on["parameter_sha256"], other["parameter_sha256"]}) == 3
@@ -1051,11 +1015,9 @@ def test_default_elsepa_model_forks_identity_and_case_payload_from_mott():
     """ELSEPA is the default; the historical Mott model keeps its old payload."""
     settings = default_settings()
     sweep = material_sweep("silicon")
-    base = dataset_identity("silicon", "full", settings, sweep)
-    explicit_default = dataset_identity(
-        "silicon", "full", replace(settings, elastic_model="elsepa"), sweep
-    )
-    mott = dataset_identity("silicon", "full", replace(settings, elastic_model="mott"), sweep)
+    base = dataset_identity("silicon", settings, sweep)
+    explicit_default = dataset_identity("silicon", replace(settings, elastic_model="elsepa"), sweep)
+    mott = dataset_identity("silicon", replace(settings, elastic_model="mott"), sweep)
 
     assert settings.elastic_model == "elsepa"
     assert explicit_default["parameter_sha256"] == base["parameter_sha256"]
@@ -1086,7 +1048,7 @@ def test_mixed_transport_forks_identity_by_parameter():
     settings = default_settings()
     sweep = material_sweep("hopg")
     digests = {
-        dataset_identity("hopg", "full", variant, sweep)["parameter_sha256"]
+        dataset_identity("hopg", variant, sweep)["parameter_sha256"]
         for variant in (
             settings,
             replace(settings, transport_mode="mixed"),
@@ -1106,7 +1068,7 @@ def test_atomic_electron_deflection_forks_identity_and_none_restores_it():
     assert settings.atomic_electron_deflection == "kawrakow"
     # The pre-#317 pins of test_dataset_identity_dispatches_through_recorded_v1
     # and test_typed_case_content_key_matches_pre_case_golden.
-    assert dataset_identity("hopg", "full", off, sweep)["parameter_sha256"] == (
+    assert dataset_identity("hopg", off, sweep)["parameter_sha256"] == (
         "5b437e81de3b9d21399bdcf60423b8b2351dfd7595bcde80554202eaaaf65935"
     )
     case = build_cases(
@@ -1128,9 +1090,7 @@ def test_mott_shell_cases_keep_elastic_only_deflection_with_a_warning():
     assert shell["inelastic_model"] == "shell-soft-hard"
     assert "atomic_electron_deflection" not in shell
     assert continuous["atomic_electron_deflection"] == "kawrakow"
-    mott = dataset_identity(
-        "silicon", "full", replace(default_settings(), elastic_model="mott"), sweep
-    )
+    mott = dataset_identity("silicon", replace(default_settings(), elastic_model="mott"), sweep)
     assert "atomic_electron_deflection" not in mott["resolved_parameters"]["transport_numerics"]
 
 
@@ -1225,14 +1185,14 @@ def test_reference_detector_migration_preserves_dataset_and_case_identity(name):
         ),
         energy_bins=sweep.energy_bins,
     )
-    settings = profiles.profile_run_settings(default_settings(), name, "full")
-    assert dataset_identity(
-        "hopg", "full", settings, sweep, catalog_profile=name
-    ) == dataset_identity("hopg", "full", settings, legacy, catalog_profile=name)
+    settings = profiles.profile_run_settings(default_settings(), name)
+    assert dataset_identity("hopg", settings, sweep, catalog_profile=name) == dataset_identity(
+        "hopg", settings, legacy, catalog_profile=name
+    )
     # Reduce the product without transport; cases must retain the same CAS keys.
     changes = {
         "beam": replace(sweep.beam, energy_keV=np.array([30.0])),
-        "target": profiles.target_replace(
+        "target": target_replace(
             sweep.target,
             thickness_ang=np.array([2000.0]),
             tilt_deg=np.array([45.0]),
@@ -1263,8 +1223,8 @@ def test_explicit_brem_grid_keeps_its_nodes_and_forks_from_automatic(material):
         sweep, energy_bins=replace(sweep.energy_bins, brem=np.arange(0.0, 30000.0, 25.0))
     )
     settings = default_settings()
-    implicit_identity = dataset_identity(material, "full", settings, sweep)
-    explicit_identity = dataset_identity(material, "full", settings, explicit)
+    implicit_identity = dataset_identity(material, settings, sweep)
+    explicit_identity = dataset_identity(material, settings, explicit)
     assert implicit_identity["parameter_sha256"] != explicit_identity["parameter_sha256"]
     assert "continuum_grid_model" not in explicit_identity["resolved_parameters"]["sweep"]
     implicit_cases = build_cases(sweep, n_electrons=1, n_electrons_brem=1, inelastic_model="auto")
@@ -1304,7 +1264,7 @@ def test_brem_band_reduction_generation_forks_only_adaptive_bremslib(monkeypatch
         (adaptive, "eedl"),
     ]
     identities = [
-        dataset_identity("hopg", "full", settings, sweep, bremsstrahlung_model=model)
+        dataset_identity("hopg", settings, sweep, bremsstrahlung_model=model)
         for settings, model in configurations
     ]
     case = {
@@ -1320,7 +1280,7 @@ def test_brem_band_reduction_generation_forks_only_adaptive_bremslib(monkeypatch
     )
     monkeypatch.setattr(_precision, "_BREM_BAND_REDUCTION_MODEL", "test-next-generation")
     updated = [
-        dataset_identity("hopg", "full", settings, sweep, bremsstrahlung_model=model)
+        dataset_identity("hopg", settings, sweep, bremsstrahlung_model=model)
         for settings, model in configurations
     ]
     assert [
@@ -1339,13 +1299,13 @@ def test_brem_band_reduction_generation_forks_only_adaptive_bremslib(monkeypatch
 def test_bin_mean_reduction_generation_moves_dataset_and_case_keys_only_for_bins():
     sweep = replace(material_sweep("hopg"), cxr_grid_policy={"quadrature": "bin-mean"})
     settings = default_settings()
-    current = dataset_identity("hopg", "full", settings, sweep)
+    current = dataset_identity("hopg", settings, sweep)
     case = {"line_quadrature": "bin-mean", "seed": 1}
     current_case = case_content_key(case)
     node_case = {"seed": 1}
     node_before = case_content_key(node_case)
     with mock.patch.object(profiles, "_bin_reduction_markers", return_value={}):
-        previous = dataset_identity("hopg", "full", settings, sweep)
+        previous = dataset_identity("hopg", settings, sweep)
         previous_case = case_content_key(case)
         assert case_content_key(node_case) == node_before
     assert current["parameter_sha256"] != previous["parameter_sha256"]

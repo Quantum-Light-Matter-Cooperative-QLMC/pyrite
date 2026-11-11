@@ -190,10 +190,9 @@ def test_pull_resolves_profile_selector_to_the_predicted_stem(monkeypatch, tmp_p
 def test_pull_bare_material_also_pulls_matching_survey_checkpoint(monkeypatch, tmp_path, capsys):
     import numpy as np
 
-    from pyrite.campaign.profiles import named_profile_stem
     from pyrite.checkpoints import _checkpoint_io, _checkpoint_store
 
-    survey_stem = named_profile_stem("hopg", "survey")
+    survey_stem = f"hopg@survey-{'d' * 12}"
     payload = {
         "cfg": {
             30.0: {

@@ -89,17 +89,17 @@
     {
       "path": "src/pyrite/checkpoints/recompute.py",
       "name": "rebrem_checkpoints",
-      "cc": 41
+      "cc": 38
     },
     {
       "path": "src/pyrite/checkpoints/recompute.py",
       "name": "recxr_checkpoints",
-      "cc": 29
+      "cc": 28
     },
     {
       "path": "src/pyrite/checkpoints/recompute_defaults.py",
       "name": "dataset_context",
-      "cc": 34
+      "cc": 33
     },
     {
       "path": "src/pyrite/cli/commands/_beam_shared.py",
@@ -668,7 +668,7 @@
     {
       "path": "src/pyrite/remote/cleanup.py",
       "name": "clear_remote",
-      "cc": 27
+      "cc": 23
     },
     {
       "path": "src/pyrite/remote/jobs.py",
@@ -688,7 +688,7 @@
     {
       "path": "src/pyrite/remote/pull.py",
       "name": "resolve_profile_stem",
-      "cc": 22
+      "cc": 21
     },
     {
       "path": "src/pyrite/remote/transport.py",
@@ -728,7 +728,7 @@
     {
       "path": "src/pyrite/runs/scan.py",
       "name": "_resolved_run",
-      "cc": 32
+      "cc": 30
     },
     {
       "path": "src/pyrite/runs/scan.py",

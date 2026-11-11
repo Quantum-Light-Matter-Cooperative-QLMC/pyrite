@@ -41,7 +41,7 @@ def axial_profile(monkeypatch):
 
 def test_scan_refuses_axial_before_material_resolution(axial_profile):
     with pytest.raises(ValueError, match="#623"):
-        scan._resolved_run(Namespace(fidelity="full", catalog_profile="standard"), "hopg")
+        scan._resolved_run(Namespace(catalog_profile="standard"), "hopg")
 
 
 @pytest.mark.parametrize("dry_run", [False, True])

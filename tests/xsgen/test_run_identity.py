@@ -28,7 +28,7 @@ pytestmark = pytest.mark.usefixtures("isolated_dirs")
 def _identity(**kwargs):
     sweep = material_sweep("hopg")
     kwargs.setdefault("bremsstrahlung_model", "eedl")
-    return dataset_identity("hopg", "full", default_settings(), sweep, **kwargs)
+    return dataset_identity("hopg", default_settings(), sweep, **kwargs)
 
 
 def _case() -> dict[str, object]:

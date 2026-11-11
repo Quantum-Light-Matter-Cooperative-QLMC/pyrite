@@ -7,6 +7,11 @@ import numpy as np
 from .._energy_grid_encoding import decode_energy_grid, encode_energy_grid
 from ..montecarlo.case import refuse_axial_channeling
 
+#: Value of the ``line_profile``/``brem_profile`` case stamps a profile-aware
+#: recompute writes. Frozen legacy vocabulary (the retired tier name), kept so
+#: records repaired before #1079 still read as at-target.
+PROFILE_DEFAULTS_STAMP = "full"
+
 
 def _validate_grid(grid, name, minimum=1):
     """Reject unusable coordinates before any selected record is changed."""
@@ -47,18 +52,21 @@ class _BremRequest:
     brem_stop_eV: float | None
     brem_step_eV: float | None
     target_nodes: np.ndarray | None
-    fidelity: str | None
+    profile_defaults: bool
 
     @property
     def retune(self):
-        return self.target_nodes is not None or any(
-            value is not None
-            for value in (
-                self.ne_brem,
-                self.brem_start_eV,
-                self.brem_stop_eV,
-                self.brem_step_eV,
-                self.fidelity,
+        return (
+            self.target_nodes is not None
+            or self.profile_defaults
+            or any(
+                value is not None
+                for value in (
+                    self.ne_brem,
+                    self.brem_start_eV,
+                    self.brem_stop_eV,
+                    self.brem_step_eV,
+                )
             )
         )
 
@@ -72,7 +80,7 @@ def _brem_at_target(r, request):
     c = r["case"]
     if request.ne_brem is not None and int(c.get("Ne_brem", -1)) != int(request.ne_brem):
         return False
-    if request.fidelity is not None and c.get("brem_profile") != request.fidelity:
+    if request.profile_defaults and c.get("brem_profile") != PROFILE_DEFAULTS_STAMP:
         return False
     return _brem_grid_matches(r, request)
 
@@ -127,8 +135,8 @@ def _brem_target(r, request):
     updates = {}
     if request.ne_brem is not None:
         updates["Ne_brem"] = int(request.ne_brem)
-    if request.fidelity is not None:
-        updates["brem_profile"] = request.fidelity
+    if request.profile_defaults:
+        updates["brem_profile"] = PROFILE_DEFAULTS_STAMP
     if request.target_nodes is not None:
         # A graded target is already final: build_cases likewise passes a
         # nonuniform grid through for every beam energy instead of extending
@@ -199,7 +207,7 @@ def _target_cxr_grid(
     return base
 
 
-def _cxr_at_target(r, target, cxr_ne, fidelity):
+def _cxr_at_target(r, target, cxr_ne, profile_defaults):
     eg = np.asarray(r["E_grid"], float)
     spec = r.get("spec")
     finite = spec is not None and np.isfinite(np.asarray(spec)).all()
@@ -215,8 +223,8 @@ def _cxr_at_target(r, target, cxr_ne, fidelity):
         finite = finite and bool(np.isfinite(np.asarray(transition, dtype=float)).all())
     grid_ok = eg.shape == target.shape and np.allclose(eg, target)
     ne_ok = cxr_ne is None or int(r["case"].get("Ne", -1)) == int(cxr_ne)
-    fidelity_ok = fidelity is None or r["case"].get("line_profile") == fidelity
-    at_target = finite and grid_ok and ne_ok and fidelity_ok
+    stamp_ok = not profile_defaults or r["case"].get("line_profile") == PROFILE_DEFAULTS_STAMP
+    at_target = finite and grid_ok and ne_ok and stamp_ok
     return at_target
 
 
@@ -226,7 +234,7 @@ def _plan_cxr(
     only_stale,
     redo_all,
     cxr_ne,
-    fidelity,
+    profile_defaults,
     line_step_eV,
     from_config,
     cxr_start_eV,
@@ -248,7 +256,11 @@ def _plan_cxr(
                 ),
                 "line grid",
             )
-            if only_stale and not redo_all and _cxr_at_target(record, target, cxr_ne, fidelity):
+            if (
+                only_stale
+                and not redo_all
+                and _cxr_at_target(record, target, cxr_ne, profile_defaults)
+            ):
                 skipped += 1
                 continue
             if (
@@ -268,7 +280,7 @@ def _plan_cxr(
             updates = {}
             if cxr_ne is not None:
                 updates["Ne"] = int(cxr_ne)
-            if fidelity is not None:
-                updates["line_profile"] = fidelity
+            if profile_defaults:
+                updates["line_profile"] = PROFILE_DEFAULTS_STAMP
             todo.append((record, target, updates))
     return todo, skipped

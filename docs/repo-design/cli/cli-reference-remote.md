@@ -50,8 +50,7 @@ Usage: pyrite remote gc [OPTIONS]
 Options:
   --all                     Reclaim records for standard and every named catalog
                             profile.
-  --profile NAME            Reclaim current full and survey records for catalog profile
-                            NAME.
+  --profile NAME            Reclaim current records for catalog profile NAME.
   --min-age-minutes NUMBER  Only release reservations at least this old.  [default: 5.0]
   -y, --yes                 Reclaim exactly what was previewed.
   -v, --verbose             Print raw ssh/scp/rsync commands instead of a status line.

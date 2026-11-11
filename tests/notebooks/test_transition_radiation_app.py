@@ -31,7 +31,7 @@ def test_reference_profiles_match_notebook_scene(profile, mode):
     from pyrite.detectors import EnergyBins
     from pyrite.materials import CATALOG
 
-    settings = profile_run_settings(default_settings(), profile, "full", CATALOG)
+    settings = profile_run_settings(default_settings(), profile, CATALOG)
     sweep = material_sweep("silicon", catalog_profile=profile)
     cases = build_configured_cases(sweep, settings)
     assert len(cases) == 1

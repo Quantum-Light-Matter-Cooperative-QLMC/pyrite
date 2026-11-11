@@ -30,7 +30,7 @@ from .. import _completion as _cli_completion
     "catalog_profile",
     metavar="NAME",
     shell_complete=_cli_completion.complete_profile,
-    help="Prune current full and survey checkpoints for catalog profile NAME.",
+    help="Prune current checkpoints for catalog profile NAME.",
 )
 @click.option("-y", "--yes", is_flag=True, help="Delete exact previewed stale records.")
 def gc_command(all_profiles: bool, catalog_profile: str | None, yes: bool) -> None:

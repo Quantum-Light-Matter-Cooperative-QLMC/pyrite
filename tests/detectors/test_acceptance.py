@@ -212,7 +212,7 @@ def test_equal_acceptance_preserves_lowered_case_and_both_identities():
         LegacySweep(material="hopg", beam=beam.to_spec(), target=target, detector=d)
         for d in (legacy, modern)
     ]
-    identities = [dataset_identity("hopg", "full", Settings(), s) for s in sweeps]
+    identities = [dataset_identity("hopg", Settings(), s) for s in sweeps]
     assert identities[0] == identities[1]
     assert (
         identities[1]["parameter_sha256"]

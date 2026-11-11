@@ -972,7 +972,7 @@ def rm_command(materials, all_checkpoints, catalog_profile, yes, ssh_verbose):
     default=None,
     metavar="NAME",
     shell_complete=_cli_completion.complete_profile,
-    help="Reclaim current full and survey records for catalog profile NAME.",
+    help="Reclaim current records for catalog profile NAME.",
 )
 @click.option(
     "--min-age-minutes",

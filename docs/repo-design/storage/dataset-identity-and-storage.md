@@ -4,9 +4,11 @@ PyRITE separates a **dataset identity** (the complete resolved run) from a **cas
 
 ## Dataset identity
 
-`cxr.dataset-identity.v1` contains the material, fidelity, optional variant, resolved settings, sweep, crystallography, and any non-default catalog-profile name. Canonical JSON serialization is hashed with SHA-256. The full payload and `parameter_sha256` are written to the component manifest as `dataset_identity`; the directory stem carries a 12-character digest for human navigation, not as the sole provenance record.
+`cxr.dataset-identity.v1` contains the material, the frozen legacy tier key `"fidelity": "full"`, optional variant, resolved settings, sweep, crystallography, and any non-default catalog-profile name. Canonical JSON serialization is hashed with SHA-256. The full payload and `parameter_sha256` are written to the component manifest as `dataset_identity`; the directory stem carries a 12-character digest for human navigation, not as the sole provenance record.
 
-The standard, unmodified `full` run keeps the compatibility stem `<material>`. Other fidelities, catalog profiles, or explicit overrides use an identity-qualified stem `<material>@<label>-<12-char-digest>`, where the label is the explicit variant, non-standard catalog profile, or fidelity. Older `<material>--<fidelity>-<digest>` stems remain readable. The historical quick-run stem is retained but still records identity metadata.
+The standard, unmodified run keeps the compatibility stem `<material>`. Catalog profiles, adaptive or non-default settings, or explicit overrides use an identity-qualified stem `<material>@<label>-<12-char-digest>`, where the label is the explicit variant, the non-standard catalog profile, or the frozen tier `full`. Older `<material>--<tier>-<digest>` stems remain readable. The historical quick-run stem is retained but still records identity metadata.
+
+The reduced-grid `survey` tier was retired (#215, #1079). Its `@survey-`/`--survey-` checkpoints still load, list, slim and pull (a bare-material `pyrite remote pull` also fetches survey siblings), but they resolve only from their sidecar identity: `checkpoint recompute` refuses them, `slim --grid` refuses them, and `pyrite checkpoint gc`, `pyrite remote gc`, `pyrite remote rm` and `MATERIAL@PROFILE` pull selectors no longer target them. Delete one with `pyrite checkpoint rm`. The `"fidelity": "full"` key stays in every new identity so existing digests and stems are unchanged.
 
 ## Case content keys and CAS
 

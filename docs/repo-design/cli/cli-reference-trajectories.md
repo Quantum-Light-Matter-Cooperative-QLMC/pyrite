@@ -64,9 +64,9 @@ Usage: pyrite trajectories info [OPTIONS] ARTIFACT
 
   Describe one trajectory artifact without loading its segment arrays.
 
-  Prints the case, seed, provenance (checkpoint stem, profile, fidelity), whether a
-  scene was recorded, schema and row order, then every /transport field with its role,
-  dtype, shape, and units. Per-segment field names are the valid cell arrays of `pyrite
+  Prints the case, seed, provenance (checkpoint stem, profile), whether a scene was
+  recorded, schema and row order, then every /transport field with its role, dtype,
+  shape, and units. Per-segment field names are the valid cell arrays of `pyrite
   trajectories export` and colouring names of the ParaView preset. History ID range,
   number of histories with segments, track count, and segments per secondary generation
   come from bounded scans of the integer ID columns.

@@ -8,7 +8,7 @@ from pyrite._precision import OBSERVABLES
 from pyrite.campaign import profile_precision as _profile_edit
 from pyrite.campaign._profile_document import existing_profile
 from pyrite.campaign.profile_cxr_grid import cxr_grid_sources
-from pyrite.campaign.profiles import get_fidelity_preset
+from pyrite.campaign.profiles import DEFAULT_N_ELECTRONS, DEFAULT_N_ELECTRONS_BREM
 from pyrite.cli import _catalog_io
 from pyrite.cli import _completion as _cli_completion
 from pyrite.cli.commands._profile_shared import confirm_standard, write
@@ -455,15 +455,14 @@ def precision_disable_command(name, cxr_histories, brem_histories, yes, dry_run)
     --cxr-histories/--brem-histories replace that count. A count the profile already
     sets is otherwise kept, including a sweep grid. A count it lacks is prompted
     for on a terminal; without a terminal, or with --yes or --dry-run, it takes
-    the full-fidelity default (300 line, 150 brem).
+    the built-in default (300 line, 150 brem).
     """
     try:
         original, document = _catalog_io.catalog_text()
         current = _profile_edit.fixed_counts(existing_profile(document, name))
     except (OSError, TypeError, ValueError, ParseError) as exc:
         raise CLIError(str(exc)) from None
-    preset = get_fidelity_preset("full")
-    defaults = {"n_electrons": preset.n_electrons, "n_electrons_brem": preset.n_electrons_brem}
+    defaults = {"n_electrons": DEFAULT_N_ELECTRONS, "n_electrons_brem": DEFAULT_N_ELECTRONS_BREM}
     prompt = _interactive() and not (yes or dry_run)
     counts = {}
     for key, value in (("n_electrons", cxr_histories), ("n_electrons_brem", brem_histories)):

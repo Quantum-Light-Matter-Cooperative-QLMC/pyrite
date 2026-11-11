@@ -54,12 +54,12 @@ def test_case_records_only_the_opt_in_model(case):
 
 def test_identity_is_unchanged_for_eedl_and_forks_for_bote_salvat(case):
     sweep = material_sweep("hopg")
-    default = dataset_identity("hopg", "full", default_settings(), sweep)
+    default = dataset_identity("hopg", default_settings(), sweep)
     explicit = dataset_identity(
-        "hopg", "full", replace(default_settings(), shell_ionization_model="eedl"), sweep
+        "hopg", replace(default_settings(), shell_ionization_model="eedl"), sweep
     )
     bote = dataset_identity(
-        "hopg", "full", replace(default_settings(), shell_ionization_model="bote-salvat"), sweep
+        "hopg", replace(default_settings(), shell_ionization_model="bote-salvat"), sweep
     )
 
     assert explicit["parameter_sha256"] == default["parameter_sha256"]

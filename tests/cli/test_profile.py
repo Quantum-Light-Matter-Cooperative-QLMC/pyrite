@@ -890,7 +890,7 @@ def test_numerics_show_reports_effective_values_and_sources(tmp_path, monkeypatc
         "label": "cxr histories",
         "explicit": None,
         "effective": 300,
-        "source": "fidelity",
+        "source": "default",
     }
     assert fields["max_reflections"]["effective"] is None
     assert fields["max_reflections"]["source"] == "built-in"

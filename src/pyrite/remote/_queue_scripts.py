@@ -76,7 +76,7 @@ def _forwarded_env_exports():
 
 
 # ---- detached job queue -------------------------------------------------------
-def _stems(materials, quick, fidelity="full", high_energy_min_kev=None, catalog_profile="standard"):
+def _stems(materials, quick, *, high_energy_min_kev=None, catalog_profile="standard"):
     """Checkpoint stems a queue produces (the scan runner writes
     <material>_quick/ for --quick runs). ``high_energy_min_kev`` predicts the
     non-canonical stem for materials classified by legacy job records (a no-op
@@ -84,14 +84,15 @@ def _stems(materials, quick, fidelity="full", high_energy_min_kev=None, catalog_
     return [
         stem
         for _, stem in _material_stems(
-            materials, quick, fidelity, high_energy_min_kev, catalog_profile
+            materials,
+            quick,
+            high_energy_min_kev=high_energy_min_kev,
+            catalog_profile=catalog_profile,
         )
     ]
 
 
-def _material_stems(
-    materials, quick, fidelity="full", high_energy_min_kev=None, catalog_profile="standard"
-):
+def _material_stems(materials, quick, *, high_energy_min_kev=None, catalog_profile="standard"):
     """``(material, stem)`` pairs behind :func:`_stems`; a multi-detector
     profile yields one pair per detector for each material."""
     from ..materials import CATALOG, load_material_catalog
@@ -115,7 +116,7 @@ def _material_stems(
 
     # Bare <material> only when the runner would write it: a standard profile
     # with precision, coherent emission or non-default numerics is hashed.
-    canonical = not multiple and canonical_profile_run(catalog_profile, fidelity)
+    canonical = not multiple and canonical_profile_run(catalog_profile)
     if high_energy_min_kev is None:
         if canonical:
             return [(material, material) for material in materials]
@@ -128,7 +129,7 @@ def _material_stems(
                 material
                 if material not in catalog.materials
                 else named_profile_stem(
-                    material, fidelity, catalog_profile=catalog_profile, detector_id=detector_id
+                    material, catalog_profile=catalog_profile, detector_id=detector_id
                 ),
             )
             for material in materials
@@ -143,7 +144,6 @@ def _material_stems(
                 stem = high_energy_floor_stem(
                     material,
                     high_energy_min_kev,
-                    fidelity,
                     catalog_profile=catalog_profile,
                     detector_id=detector_id,
                 )
@@ -151,7 +151,7 @@ def _material_stems(
                 stem = material
             else:
                 stem = named_profile_stem(
-                    material, fidelity, catalog_profile=catalog_profile, detector_id=detector_id
+                    material, catalog_profile=catalog_profile, detector_id=detector_id
                 )
             stems.append((material, stem))
     return stems
@@ -301,7 +301,6 @@ def _queue_script(
     quick,
     workers,
     parallel_materials=config.DEFAULT_PARALLEL_MATERIALS,
-    fidelity="full",
     high_energy_min_kev=None,
     catalog_profile="standard",
     performance_profile=None,
@@ -356,8 +355,8 @@ def _queue_script(
     # --performance-profile so its sampler JSON never clobbers the GPU tick file.
     #
     # It always uses the tiny --quick smoke grid regardless of the parent job's
-    # fidelity: cProfile only needs a representative call distribution (which
-    # functions dominate tottime), not full statistics. A full-fidelity serial
+    # grid: cProfile only needs a representative call distribution (which
+    # functions dominate tottime), not full statistics. A full-grid serial
     # NumPy pass ran >1h and had to be killed; --quick finishes in minutes while
     # firing the same spectrum functions. --max-minutes is a hard backstop.
     cpu_flags = " --quick"
@@ -627,7 +626,6 @@ def _chunked_queue_script(
     quick,
     workers,
     chunk_minutes,
-    fidelity="full",
     high_energy_min_kev=None,
     catalog_profile="standard",
     performance_profile=None,
@@ -789,7 +787,6 @@ def _rebrem_queue_script(
     ne_brem,
     brem_step_eV,
     redo_all,
-    fidelity="full",
     brem_start_eV=None,
     brem_stop_eV=None,
 ):
@@ -845,7 +842,6 @@ def _rebrem_chunked_queue_script(
     brem_step_eV,
     redo_all,
     chunk_minutes,
-    fidelity="full",
     brem_start_eV=None,
     brem_stop_eV=None,
 ):
@@ -918,7 +914,6 @@ def _rebrem_queue_metadata(
     ne_brem,
     brem_step_eV,
     redo_all,
-    fidelity="full",
     brem_start_eV=None,
     brem_stop_eV=None,
 ):
@@ -931,7 +926,6 @@ def _rebrem_queue_metadata(
             f"materials: {' '.join(materials)}",
             "quick: False",
             "kind: rebrem",
-            f"fidelity: {fidelity}",
             f"ne_brem: {ne_brem}",
             f"brem_start_eV: {brem_start_eV}",
             f"brem_stop_eV: {brem_stop_eV}",
@@ -970,7 +964,6 @@ def _recxr_queue_script(
     cxr_ne,
     line_step_eV,
     redo_all,
-    fidelity="full",
     cxr_start_eV=None,
     line_stop_eV=None,
 ):
@@ -1023,7 +1016,6 @@ def _recxr_chunked_queue_script(
     line_step_eV,
     redo_all,
     chunk_minutes,
-    fidelity="full",
     cxr_start_eV=None,
     line_stop_eV=None,
 ):
@@ -1098,7 +1090,6 @@ def _recxr_queue_metadata(
     cxr_ne,
     line_step_eV,
     redo_all,
-    fidelity="full",
     cxr_start_eV=None,
     line_stop_eV=None,
 ):
@@ -1109,7 +1100,6 @@ def _recxr_queue_metadata(
             f"materials: {' '.join(materials)}",
             "quick: False",
             "kind: reline",
-            f"fidelity: {fidelity}",
             f"line_ne: {cxr_ne}",
             f"line_start_eV: {cxr_start_eV}",
             f"line_stop_eV: {line_stop_eV}",
@@ -1128,7 +1118,6 @@ def _queue_metadata(
     workers,
     parallel_materials: int | None = config.DEFAULT_PARALLEL_MATERIALS,
     chunk_minutes: float = 0,
-    fidelity: str = "full",
     high_energy_min_kev: float | None = None,
     catalog_profile: str = "standard",
     performance_profile: str | None = None,
@@ -1152,7 +1141,6 @@ def _queue_metadata(
             f"job: {jobid}",
             f"materials: {' '.join(materials)}",
             f"quick: {bool(quick)}",
-            f"fidelity: {fidelity}",
             f"catalog_profile: {catalog_profile}",
             f"workers: {workers}",
             f"parallel_materials: {parallel_materials}",

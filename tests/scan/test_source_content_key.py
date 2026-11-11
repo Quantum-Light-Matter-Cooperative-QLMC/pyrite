@@ -100,7 +100,6 @@ def test_dataset_identity_keeps_the_full_dataset_markers():
     args = Namespace(
         catalog_profile="standard",
         performance_profile=None,
-        fidelity="full",
         quick=False,
     )
     _, _, identity, _ = scan._resolved_run(args, "hopg")

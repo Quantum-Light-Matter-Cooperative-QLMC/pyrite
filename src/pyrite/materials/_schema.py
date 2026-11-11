@@ -379,7 +379,7 @@ class ScanSpec:
     thickness_layers
         Optional film-thickness grid in crystal layers.
     n_electrons, n_electrons_brem
-        Optional macro-electron count grids overriding fidelity defaults.
+        Optional macro-electron count grids overriding the built-in defaults.
     """
 
     thickness_ang: np.ndarray
@@ -391,7 +391,7 @@ class ScanSpec:
     E_grid_brem: np.ndarray
     thickness_layers: np.ndarray | None = None
     #: Optional electron-count grids (profile settings): None -> the runner's
-    #: settings-level counts (fidelity policy) apply. Single values typical;
+    #: settings-level counts apply. Single values typical;
     #: multiple values sweep transport statistics (see ``Sweep.n_electrons``).
     n_electrons: np.ndarray | None = None
     n_electrons_brem: np.ndarray | None = None
@@ -578,7 +578,7 @@ class MaterialCatalog:
     profile_detectors: Mapping[str, Mapping[str, object]] = MappingProxyType({})
     #: Explicit ``profiles.NAME.emission`` overrides ("incoherent"/"coherent"/
     #: "both"), keyed by profile; profiles with no emission key are absent (the
-    #: active fidelity preset's emission stands unmodified).
+    #: default incoherent emission stands unmodified).
     profile_emissions: Mapping[str, str] = MappingProxyType({})
     #: ``profiles.NAME.temporal_profile = true`` opt-ins (#292); absent is off.
     profile_temporal_profiles: Mapping[str, bool] = MappingProxyType({})
@@ -660,7 +660,7 @@ class MaterialCatalog:
     def profile_emission(self, name: str) -> str | None:
         """Explicit ``profiles.NAME.emission`` override, or ``None`` when the
         profile carries no emission key. Consumed by :func:`scan._resolved_run`
-        to override the active fidelity preset's emission."""
+        to override the default incoherent emission."""
         return self.profile_emissions.get(name)
 
     def profile_temporal_profile(self, name: str) -> bool:

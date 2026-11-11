@@ -346,8 +346,7 @@ def add_command(json_path, materials, pull, force, catalog_profile, regen_golden
     Legacy grid tables, scan ranges, and material overrides remain unchanged.
 
     Manual line and bremsstrahlung overrides remain unchanged unless
-    ``--force`` is passed. This command does not run a scan and does not select
-    ``full`` or ``survey`` fidelity.
+    ``--force`` is passed. This command does not run a scan.
 
     \b
     Example:

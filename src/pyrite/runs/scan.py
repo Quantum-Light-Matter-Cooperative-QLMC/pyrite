@@ -654,14 +654,12 @@ def _resolved_run(args, material):
     assert default_settings is not None
     assert material_sweep is not None
 
-    fidelity = getattr(args, "fidelity", "full")
     catalog_profile = _effective_catalog_profile(args)
-    settings = default_settings() if fidelity == "full" else default_settings(fidelity)
+    settings = default_settings()
     # Emission (incoherent/coherent/both) is PROFILE-owned -- there is no CLI
     # override flag. A catalog_profile emission key (set via `pyrite profile
     # set/add/remove --emission/--coherent/--incoherent`) overrides the
-    # fidelity preset's emission; absent means the fidelity's own emission
-    # stands. settings.emission drives the dataset_identity divergence key and
+    # default incoherent emission. settings.emission drives the dataset_identity divergence key and
     # the canonical_full collision guard below, so a coherent/both run never
     # shares the plain incoherent <material> stem.
     from .._config_presets import identity_labels
@@ -672,7 +670,7 @@ def _resolved_run(args, material):
     from ..campaign.profiles import profile_run_settings
     from ..quantum._admission import refuse_unverified_axial_settings
 
-    settings = profile_run_settings(settings, catalog_profile, fidelity, CATALOG)
+    settings = profile_run_settings(settings, catalog_profile, CATALOG)
     settings = replace(
         settings,
         allow_fallback=any(
@@ -686,12 +684,10 @@ def _resolved_run(args, material):
         # grids instead of forcing a fixed [30, 50]: a named profile may own an
         # E_grid_line_by_energy mapping without 50 keV, and build_cases rejects a
         # beam energy with no configured line grid before compute. The probe
-        # sweep (same catalog_profile/fidelity, no beam/tilt overrides) exposes
+        # sweep (same catalog_profile, no beam/tilt overrides) exposes
         # the valid line-grid energies; _select_quick_energies keeps the standard
         # profile's [30, 50] bit-for-bit where both are valid.
-        probe = material_sweep(
-            material, fidelity=fidelity, catalog_profile=catalog_profile, detector_id=detector_id
-        )
+        probe = material_sweep(material, catalog_profile=catalog_profile, detector_id=detector_id)
         overrides.update(
             # Start at 5 deg, not 0: tilt=0 is a banned emission geometry
             # (issue_notes.md #1), and build_cases rejects it.
@@ -709,7 +705,6 @@ def _resolved_run(args, material):
     # Beam source and distribution settings are profile-owned.
     sweep = material_sweep(
         material,
-        fidelity=fidelity,
         catalog_profile=catalog_profile,
         detector_id=detector_id,
         **overrides,
@@ -794,7 +789,6 @@ def _resolved_run(args, material):
     named_variant = variant is not None and variant != "quick"
     identity = dataset_identity(
         material,
-        fidelity,
         settings,
         sweep,
         variant=variant,
@@ -811,8 +805,7 @@ def _resolved_run(args, material):
         )
     )
     canonical_full = (
-        fidelity == "full"
-        and not overrides
+        not overrides
         and not getattr(args, "quick", False)
         and not named_variant
         and catalog_profile == "standard"
@@ -870,7 +863,6 @@ def _run_material(args, material, max_seconds=None):
     assert build_cases is not None
 
     settings, sweep, identity, stem = _resolved_run(args, material)
-    fidelity = identity["fidelity"]
 
     cases = fallback_cases(
         build_cases(sweep, settings),
@@ -920,9 +912,7 @@ def _run_material(args, material, max_seconds=None):
     if getattr(args, "trajectories", None) is not None:
         from ._trajectory_capture import scan_trajectory_capture
 
-        capture_kw["trajectory_capture"] = scan_trajectory_capture(
-            args, identity, stem, material, fidelity
-        )
+        capture_kw["trajectory_capture"] = scan_trajectory_capture(args, identity, stem, material)
     from ..api import source_content_key_fn
 
     content_key_fn = source_content_key_fn()
@@ -1012,7 +1002,8 @@ def _print_sweep_header(args, material, cases, settings, identity):
     print(
         f"{material} [{getattr(args, 'detector_id', 'default')}]: {len(cases)} cases across "
         f"{len({c['name'] for c in cases})} configs "
-        f"[profile={identity['fidelity']}, parameters={identity['parameter_sha256'][:12]}]"
+        f"[profile={identity.get('catalog_profile', 'standard')}, "
+        f"parameters={identity['parameter_sha256'][:12]}]"
         + (" (quick grid)" if args.quick else "")
         + ("" if settings.emission == "incoherent" else f" ({settings.emission})")
     )

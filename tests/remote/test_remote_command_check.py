@@ -44,7 +44,7 @@ def test_check_shell_tokens_accepts_at_stems():
     was previously rejected by ``_SHELL_TOKEN_RE``)."""
     from pyrite.campaign.profiles import named_profile_stem
 
-    at_stem = named_profile_stem("hopg", "full", catalog_profile="sub_100keV")
+    at_stem = named_profile_stem("hopg", catalog_profile="sub_100keV")
     remote._check_shell_tokens([at_stem])  # must not raise
 
 

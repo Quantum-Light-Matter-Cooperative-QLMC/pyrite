@@ -42,7 +42,7 @@ covers installation, remote execution and grid identity.
 
 ## A run does not resume the checkpoint I expected
 
-Compare each active stem's component metadata beneath the effective `pyrite-output/checkpoints/` root. Fidelity, profile-resolved values, overrides, beam/detector values, emission mode, and crystallography can change the digest and stem. This is intentional isolation, not a cache miss bug. `pyrite checkpoint list` shows active datasets; `pyrite checkpoint archive list` shows the archive shelf. Legacy checkpoints without identity are provenance-incomplete.
+Compare each active stem's component metadata beneath the effective `pyrite-output/checkpoints/` root. Profile-resolved values, overrides, beam/detector values, emission mode, and crystallography can change the digest and stem. This is intentional isolation, not a cache miss bug. `pyrite checkpoint list` shows active datasets; `pyrite checkpoint archive list` shows the archive shelf. Legacy checkpoints without identity are provenance-incomplete.
 
 ## Analysis cannot find output
 
@@ -99,4 +99,4 @@ Verify `pyrite config get remote.target`, then inspect `pyrite remote job list` 
 
 ## Results look plausible but differ unexpectedly
 
-Compare full identities, selected coordinates, fidelity, emission mode, detector response, solid-angle scaling, and catalog revision. View source components before detector convolution. Then consult the [validation ledger](../validation/physics-validation-ledger.md); execution success is not physics validation.
+Compare full identities, selected coordinates, emission mode, detector response, solid-angle scaling, and catalog revision. View source components before detector convolution. Then consult the [validation ledger](../validation/physics-validation-ledger.md); execution success is not physics validation.

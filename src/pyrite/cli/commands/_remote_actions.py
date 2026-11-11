@@ -18,7 +18,7 @@ from ...console.outputs import output_dir
 from ...remote import lifecycle, scripts, state, transport, viewer
 
 
-def remote_scan(material, quick=False, workers=None, fidelity="full"):
+def remote_scan(material, quick=False, workers=None):
     """Submit one material through SLURM and follow it to completion.
 
     This compatibility helper deliberately does not pull: callers that need a
@@ -30,7 +30,6 @@ def remote_scan(material, quick=False, workers=None, fidelity="full"):
         quick=quick,
         workers=workers,
         chunk_minutes=0,
-        fidelity=fidelity,
     )
     viewer.attach(jobid)
     return jobid
@@ -427,7 +426,6 @@ def _cli_start(
         material_stems = scripts._material_stems(
             completed,
             quick,
-            "full",
             high_energy_min_kev=high_energy_min_kev,
             catalog_profile=catalog_profile,
         )
@@ -438,7 +436,7 @@ def _cli_start(
         material_stems = [
             (material, stem)
             for material in completed
-            for stem in lifecycle.resolve_profile_stems(material, catalog_profile, fidelity="full")
+            for stem in lifecycle.resolve_profile_stems(material, catalog_profile)
         ]
     from ...checkpoints import _checkpoint_store
 

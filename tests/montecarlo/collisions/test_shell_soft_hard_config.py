@@ -156,7 +156,7 @@ def test_auto_identity_records_the_resolved_model(material, shell):
     from pyrite.campaign.profiles import dataset_identity
 
     settings = replace(default_settings(), inelastic_model="auto", inelastic_cutoff_eV=None)
-    identity = dataset_identity(material, "full", settings, material_sweep(material))
+    identity = dataset_identity(material, settings, material_sweep(material))
     numerics = identity["resolved_parameters"]["transport_numerics"]
     if shell:
         assert numerics["inelastic_model"] == "shell-soft-hard"
@@ -165,7 +165,6 @@ def test_auto_identity_records_the_resolved_model(material, shell):
         assert "inelastic_model" not in numerics
         continuous = dataset_identity(
             material,
-            "full",
             replace(settings, inelastic_model="continuous"),
             material_sweep(material),
         )

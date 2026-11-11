@@ -33,7 +33,7 @@ OBJECT_ORIGINS = frozenset({"bundled", "user", "catalog"})
 
 # Raw provenance spellings produced by resolvers (and kept in JSON) that all
 # mean "nothing selected it; the built-in value applies".
-_DEFAULT_SOURCES = frozenset({"default", "built-in", "built-in default", "fidelity", "stored"})
+_DEFAULT_SOURCES = frozenset({"default", "built-in", "built-in default", "stored"})
 
 
 def value_source(raw: object) -> str:

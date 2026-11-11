@@ -23,14 +23,11 @@ from ..console.outputs import output_dir
 from ..materials import CATALOG
 from . import _checkpoint_store
 
-_FIDELITIES = ("full", "survey")
-
 
 @dataclass(frozen=True)
 class _Target:
     stem: str
     material: str
-    fidelity: str
     catalog_profile: str
     identity: dict[str, Any]
 
@@ -57,21 +54,9 @@ def _targets(all_profiles: bool, catalog_profile: str | None) -> list[_Target]:
     targets: dict[str, _Target] = {}
     for profile in _selected_profiles(all_profiles, catalog_profile):
         for material in _profile_materials(profile):
-            for fidelity in _FIDELITIES:
-                identity = named_profile_identity(
-                    material,
-                    fidelity,
-                    catalog_profile=profile,
-                )
-                stem = named_profile_stem(
-                    material,
-                    fidelity,
-                    catalog_profile=profile,
-                )
-                targets.setdefault(
-                    stem,
-                    _Target(stem, material, fidelity, profile, identity),
-                )
+            identity = named_profile_identity(material, catalog_profile=profile)
+            stem = named_profile_stem(material, catalog_profile=profile)
+            targets.setdefault(stem, _Target(stem, material, profile, identity))
     return list(targets.values())
 
 
@@ -92,14 +77,8 @@ def _current_case_keys(target: _Target) -> dict[tuple[str, float], str]:
     from ..campaign.config import default_settings, material_sweep
     from ..campaign.profiles import profile_run_settings
 
-    sweep = material_sweep(
-        target.material,
-        fidelity=target.fidelity,
-        catalog_profile=target.catalog_profile,
-    )
-    settings = profile_run_settings(
-        default_settings(target.fidelity), target.catalog_profile, target.fidelity, sweep=sweep
-    )
+    sweep = material_sweep(target.material, catalog_profile=target.catalog_profile)
+    settings = profile_run_settings(default_settings(), target.catalog_profile, sweep=sweep)
     return {
         (case["name"], float(case["E0_keV"])): _case_key(case)
         for case in build_configured_cases(sweep, settings)

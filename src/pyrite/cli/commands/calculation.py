@@ -114,7 +114,6 @@ def _show(name, json_output, *, physics, legacy=False):
             payload = {
                 "profile": name,
                 "preset": preset,
-                "fidelity": resolution.fidelity,
                 "groups": [group for group in groups if group["fields"]],
             }
     except (OSError, ValueError, ParseError) as exc:

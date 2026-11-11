@@ -27,7 +27,7 @@ def test_two_detector_demo_resolves_raw_spectra_at_distinct_angles():
         np.testing.assert_array_equal(detector.score(energy, spectra), spectra)
         assert resolve_profile_observation(CATALOG, profile, detector_id=detector_id) is None
         sweep = material_sweep("hopg", catalog_profile=profile, detector_id=detector_id)
-        settings = profile_run_settings(default_settings(), profile, "full", sweep=sweep)
+        settings = profile_run_settings(default_settings(), profile, sweep=sweep)
         assert settings.precision is None
         cases = build_cases(sweep, 4, 4)
         assert len(cases) == 1
@@ -58,7 +58,7 @@ def test_pixelated_detector_demo_resolves_native_grid_and_ideal_expected_counts(
     assert observation.acquisition.measured_edges_eV[-1] == 30000.0
     assert observation.filters == ()
     sweep = material_sweep("hopg", catalog_profile=profile, detector_id="camera")
-    settings = profile_run_settings(default_settings(), profile, "full", sweep=sweep)
+    settings = profile_run_settings(default_settings(), profile, sweep=sweep)
     assert settings.precision is None
 
 

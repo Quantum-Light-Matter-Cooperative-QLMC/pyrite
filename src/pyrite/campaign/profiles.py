@@ -1,10 +1,8 @@
-"""Fidelity presets and reproducible dataset identities.
+"""Built-in run numerics and reproducible dataset identities.
 
-Profiles are policies applied after catalog material lookup.  ``full`` is an
-exact compatibility policy: it leaves catalog grids unchanged and retains the
-production electron counts.  ``survey`` is provisional and intentionally
-smaller.  Every resolved run can be serialized into a deterministic identity,
-so differently resolved variants never silently resume into one dataset.
+Profiles are policies applied after catalog material lookup.  Every resolved
+run can be serialized into a deterministic identity, so differently resolved
+variants never silently resume into one dataset.
 
 Validation: inelastic-angular-deflection
 """
@@ -15,7 +13,7 @@ import json
 import os
 import re
 from collections.abc import Mapping
-from dataclasses import dataclass, replace
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, Literal
 
@@ -40,7 +38,6 @@ from .._numerics import (
     validate_profile_numerics,
 )
 from .._precision import Precision, _brem_band_reduction_markers
-from ..detectors import EnergyBins
 from ..materials.photon_cross_sections import ATTENUATION_MODEL
 from ..montecarlo.case import Case
 from ..montecarlo.channeling.handoff import CHANNELING_MODEL
@@ -55,7 +52,7 @@ from ..montecarlo.spectrum.cxr._bin_quadrature import _bin_reduction_markers
 from ..montecarlo.spectrum.transition_radiation_crossings import TRANSITION_MODEL
 from ..montecarlo.transport import STOPPING_MODEL
 from ..montecarlo.transport.precision import TRANSPORT_PRECISION_MODEL
-from ..results import EmissionMode, Settings
+from ..results import Settings
 from ..xsgen.bremslib.tables import resolve_bremsstrahlung_model
 from .axial_spec import AXIAL_FIBRE_MODEL_MARKER, AXIAL_MODEL_MARKER, resolve_axial_spec
 from .identity_options import (
@@ -75,183 +72,52 @@ from .sweep import (
     build_cases,
     crystal_params,
     target_flat_fields,
-    target_replace,
 )
 
-FIDELITY_NAMES = ("full", "survey")
 DATASET_IDENTITY_SCHEMA = "cxr.dataset-identity.v1"
 CASE_CONTENT_KEY_SCHEMA = "cxr.case-content-key.v1"
 CURRENT_IDENTITY_VERSION = 1
 
+#: Built-in fixed history counts (line spectrum, bremsstrahlung) when no
+#: profile, preset or run override sets them.
+DEFAULT_N_ELECTRONS = 300
+DEFAULT_N_ELECTRONS_BREM = 150
 
-def _centered_sample(values: Any, limit: int | None) -> Any:
-    """Keep at most ``limit`` values from a centered, narrower input span."""
-    if limit is None:
-        return values
-    array = np.atleast_1d(np.asarray(values))
-    if array.size <= limit:
-        return values
-    indices = np.linspace(0.2 * (array.size - 1), 0.8 * (array.size - 1), limit)
-    indices = np.unique(np.rint(indices).astype(int))
-    return array[indices]
-
-
-def _coarsen_grid(values: Any, factor: int, span_fraction: float) -> np.ndarray:
-    """Crop a uniform/nonuniform grid around its center, then decimate it."""
-    array = np.atleast_1d(np.asarray(values, dtype=float))
-    if array.size <= 2:
-        return array.copy()
-    keep = max(2, int(np.ceil(array.size * span_fraction)))
-    start = (array.size - keep) // 2
-    cropped = array[start : start + keep]
-    coarse = cropped[::factor]
-    if coarse[-1] != cropped[-1]:
-        coarse = np.append(coarse, cropped[-1])
-    return coarse
+#: Frozen legacy identity vocabulary. Dataset identities written before the
+#: retired ``survey`` tier (#215, #1079) carry ``"fidelity": "full"`` in both
+#: the hashed payload and the identity record; every current identity keeps
+#: that exact key/value so parameter digests and checkpoint stems stay
+#: byte-identical. It is not a setting and nothing branches on it.
+LEGACY_IDENTITY_TIER = "full"
+#: Tier name of checkpoints produced by the retired reduced-grid tier. They
+#: still load, list, pull and slim; their identity cannot be recomputed.
+RETIRED_SURVEY_TIER = "survey"
 
 
-@dataclass(frozen=True)
-class FidelityPreset:
-    """Independent settings and grid-reduction policy for one fidelity preset.
-
-    Validation: coherent-emission
-    """
-
-    name: str
-    n_electrons: int
-    n_electrons_brem: int
-    max_energies: int | None = None
-    max_thicknesses: int | None = None
-    max_tilts: int | None = None
-    max_azimuths: int | None = None
-    n_families: int | None = None
-    max_reflections: int | None = None
-    photon_grid_stride: int = 1
-    photon_grid_span_fraction: float = 1.0
-    provisional: bool = False
-    # Emission policy (tri-state). A policy, not a grid reduction, so it rides
-    # the profile like n_electrons. "incoherent" (default) is the incoherent
-    # path; "coherent"/"both" enable the phased kernel.
-    emission: EmissionMode = "incoherent"
-
-    @property
-    def coherent_emission(self) -> bool:
-        """Derived: whether this preset's emission policy runs the coherent
-        kernel. Kept so ``build_cases(coherent_emission=)`` and other
-        transport-side readers are untouched by the tri-state rename."""
-        return self.emission in {"coherent", "both"}
-
-    def apply_settings(self, settings: Settings) -> Settings:
-        """Return settings with this preset's transport counts resolved."""
-        return replace(
-            settings,
-            n_electrons=self.n_electrons,
-            n_electrons_brem=self.n_electrons_brem,
-            emission=self.emission,
-        )
-
-    def apply_sweep(self, sweep: Sweep) -> Sweep:
-        """Return catalog sweep reduced according to this preset."""
-        if self.name == "full":
-            return sweep
-        energies = _centered_sample(sweep.beam.energy_keV, self.max_energies)
-        energy_values = {float(value) for value in np.atleast_1d(energies)}
-        assert sweep.detector is not None
-        bins = sweep.energy_bins
-        by_energy = bins.cxr_by_energy
-        if by_energy is not None:
-            by_energy = {
-                float(energy): _coarsen_grid(
-                    grid, self.photon_grid_stride, self.photon_grid_span_fraction
-                )
-                for energy, grid in by_energy.items()
-                if float(energy) in energy_values
-            }
-        cxr_grid = (
-            None
-            if bins.cxr is None
-            else _coarsen_grid(
-                bins.cxr,
-                self.photon_grid_stride,
-                self.photon_grid_span_fraction,
-            )
-        )
-        brem_grid = (
-            None
-            if bins.brem is None
-            else _coarsen_grid(
-                bins.brem,
-                self.photon_grid_stride,
-                self.photon_grid_span_fraction,
-            )
-        )
-        assert sweep.target is not None
-        geometry = target_flat_fields(sweep.target)
-        return replace(
-            sweep,
-            beam=beam_replace(sweep.beam, energy_keV=energies),
-            target=target_replace(
-                sweep.target,
-                thickness_ang=_centered_sample(geometry["thickness_ang"], self.max_thicknesses),
-                tilt_deg=_centered_sample(geometry["tilt_deg"], self.max_tilts),
-                tilt_azim_deg=_centered_sample(geometry["tilt_azim_deg"], self.max_azimuths),
-            ),
-            n_families=self.n_families or sweep.n_families,
-            max_reflections=self.max_reflections,
-            energy_bins=EnergyBins(cxr=cxr_grid, cxr_by_energy=by_energy, brem=brem_grid),
-        )
-
-
-_FIDELITY_PRESETS = {
-    "full": FidelityPreset("full", n_electrons=300, n_electrons_brem=150),
-    "survey": FidelityPreset(
-        "survey",
-        n_electrons=60,
-        n_electrons_brem=30,
-        max_energies=2,
-        max_thicknesses=3,
-        max_tilts=5,
-        max_azimuths=2,
-        n_families=2,
-        max_reflections=4,
-        photon_grid_stride=4,
-        photon_grid_span_fraction=0.7,
-        provisional=True,
-    ),
-}
-
-
-def get_fidelity_preset(name: str = "full") -> FidelityPreset:
-    """Return named fidelity preset or raise a boundary-friendly ``ValueError``."""
-    try:
-        return _FIDELITY_PRESETS[name]
-    except KeyError:
-        raise ValueError(
-            f"unknown fidelity preset {name!r} (choose from {FIDELITY_NAMES})"
-        ) from None
+def legacy_tier(identity: Mapping[str, Any]) -> str:
+    """The frozen tier recorded in a dataset identity (absent reads as current)."""
+    return str(identity.get("fidelity", LEGACY_IDENTITY_TIER))
 
 
 def resolve_numerics(
     explicit: Mapping[str, object] | None = None,
     *,
-    fidelity: str = "full",
     overrides: Mapping[str, object] | None = None,
     named: Mapping[str, object] | None = None,
     named_sources: Mapping[str, str] | None = None,
 ) -> NumericsResolution:
-    """Resolve run overrides over profile, presets, fidelity, then built-in numerics.
+    """Resolve run overrides over profile, presets, then built-in numerics.
 
     ``named`` and ``named_sources`` carry preset values/provenance beneath profile/run overrides.
     """
-    preset = get_fidelity_preset(fidelity)
     convergence = CxrReflections()
     numerics = Numerics(cxr_reflections=convergence)
     physics = Physics()
     effective: dict[str, object] = {
-        "n_electrons": preset.n_electrons,
-        "n_electrons_brem": preset.n_electrons_brem,
-        "n_families": (convergence.n_families if preset.n_families is None else preset.n_families),
-        "max_reflections": preset.max_reflections,
+        "n_electrons": DEFAULT_N_ELECTRONS,
+        "n_electrons_brem": DEFAULT_N_ELECTRONS_BREM,
+        "n_families": convergence.n_families,
+        "max_reflections": None,
         "mosaic_nodes": convergence.mosaic_nodes,
         "mosaic_route": convergence.mosaic_route,
         "straggling": physics.straggling,
@@ -282,14 +148,7 @@ def resolve_numerics(
         }
     )
     sources = {
-        key: (
-            "fidelity"
-            if key in SAMPLING_KEYS
-            or (key == "n_families" and preset.n_families is not None)
-            or (key == "max_reflections" and preset.max_reflections is not None)
-            else "built-in"
-        )
-        for key in PROFILE_NUMERICS_KEYS
+        key: "default" if key in SAMPLING_KEYS else "built-in" for key in PROFILE_NUMERICS_KEYS
     }
     effective.update(named or {})
     sources.update(named_sources or {})
@@ -316,7 +175,6 @@ def resolve_numerics(
     }.get(sources["radiative_cutoff_eV"], effective["radiative_cutoff_eV"])
     validate_profile_numerics({**effective, **run_overrides})
     return NumericsResolution(
-        fidelity=fidelity,
         explicit=normalized,
         effective=effective,
         sources=sources,
@@ -582,7 +440,6 @@ def _axial_marker(spec: Mapping[str, object]) -> str:
 
 def _identity_v1(
     material: str,
-    fidelity: str,
     settings: Settings,
     sweep: Sweep,
     *,
@@ -599,7 +456,7 @@ def _identity_v1(
     crystallography = crystal_params(sweep.target.material, sweep.n_families)
     resolved = {
         "material": material,
-        "fidelity": fidelity,
+        "fidelity": LEGACY_IDENTITY_TIER,
         "variant": variant,
         "settings": _jsonable(settings),
         "sweep": _jsonable(sweep),
@@ -704,7 +561,7 @@ def _identity_v1(
         "schema": DATASET_IDENTITY_SCHEMA,
         "identity_version": 1,
         "material": material,
-        "fidelity": fidelity,
+        "fidelity": LEGACY_IDENTITY_TIER,
         "variant": variant,
         "catalog_profile": catalog_profile,
         "parameter_sha256": hashlib.sha256(encoded).hexdigest(),
@@ -719,7 +576,6 @@ IDENTITY_MIGRATIONS = {1: _identity_v1}
 
 def dataset_identity(
     material: str,
-    fidelity: str,
     settings: Settings,
     sweep: Sweep,
     *,
@@ -745,7 +601,6 @@ def dataset_identity(
         raise ValueError(f"unsupported dataset identity version: {identity_version!r}") from None
     return migration(
         material,
-        fidelity,
         settings,
         sweep,
         variant=variant,
@@ -855,21 +710,22 @@ def case_content_key(
 def variant_stem(identity: Mapping[str, Any], *, canonical_full: bool = False) -> str:
     """Map identity to active checkpoint stem.
 
-    Canonical ``full`` retains historical ``<material>`` storage and ``--quick``
+    A canonical run retains historical ``<material>`` storage and ``--quick``
     keeps the ``<material>_quick`` stem. Every other resolved variant uses a
     readable ``<material>@<label>-<digest>`` stem (the "@-stem" scheme,
     2026-07-29): the label names the run's ``catalog_profile`` when non-standard
     (so a named-profile checkpoint finally carries its profile name), else the
-    fidelity. The 12-hex ``parameter_sha256`` prefix keeps two runs that share a
+    frozen identity tier (``full``; ``survey`` on retired-tier checkpoints).
+    The 12-hex ``parameter_sha256`` prefix keeps two runs that share a
     label but differ in parameters -- a coherent vs incoherent run, a re-run
     after the backing profile was edited -- from ever colliding on disk.
 
-    Older ``<material>--<fidelity>-<digest>`` stems written before this scheme
+    Older ``<material>--<tier>-<digest>`` stems written before this scheme
     are still resolved on read (dual-read; see :data:`_VARIANT_STEM_RE` and
     :func:`identity_from_stem`); only newly written stems use ``@``.
     """
     material = str(identity["material"])
-    if canonical_full and identity["fidelity"] == "full" and identity.get("variant") is None:
+    if canonical_full and identity.get("variant") is None:
         return material
     if identity.get("variant") == "quick":
         return f"{material}_quick"
@@ -878,14 +734,14 @@ def variant_stem(identity: Mapping[str, Any], *, canonical_full: bool = False) -
 
 def _stem_label(identity: Mapping[str, Any]) -> str:
     """Readable @-stem label: an explicit ``variant``, else a non-standard
-    ``catalog_profile`` name, else the fidelity."""
+    ``catalog_profile`` name, else the frozen identity tier."""
     variant = identity.get("variant")
     if variant:
         return str(variant)
     catalog_profile = identity.get("catalog_profile", "standard")
     if catalog_profile and catalog_profile != "standard":
         return str(catalog_profile)
-    return str(identity["fidelity"])
+    return legacy_tier(identity)
 
 
 def detector_variant(
@@ -913,12 +769,11 @@ def detector_variant(
 def profile_run_settings(
     settings: Settings,
     catalog_profile: str,
-    fidelity: str,
     catalog: Any = None,
     *,
     sweep: Sweep | None = None,
 ) -> Settings:
-    """Apply a catalog profile's run-owned settings to fidelity ``settings``.
+    """Apply a catalog profile's run-owned settings to default ``settings``.
 
     The emission policy, ``I(t)`` opt-in, transport numerics and electron-count
     policy belong to the profile. ``pyrite run`` and every stem predictor
@@ -928,6 +783,8 @@ def profile_run_settings(
     :data:`~pyrite._precision.DEFAULT_PRECISION` applies unless
     :func:`profile_precision_source` names a reason to keep fixed counts.
     ``sweep`` adds the per-material checks (count overrides, GDF beam, grooves).
+
+    Validation: coherent-emission
     """
     if catalog is None:
         from ..materials import CATALOG as catalog
@@ -936,7 +793,7 @@ def profile_run_settings(
         settings = replace(settings, emission=emission)
     if catalog.profile_temporal_profile(catalog_profile):  # opt-in; absent keeps the preset
         settings = replace(settings, temporal_profile=True)
-    numerics = resolve_numerics(catalog.profile_numerics(catalog_profile), fidelity=fidelity)
+    numerics = resolve_numerics(catalog.profile_numerics(catalog_profile))
     settings = replace(settings, **{key: numerics.effective[key] for key in TRANSPORT_KEYS})
     precision, _source = profile_precision_source(settings, catalog_profile, catalog, sweep=sweep)
     return replace(settings, precision=precision)
@@ -1003,43 +860,34 @@ def canonical_settings(settings: Settings, *, resolved_bremsstrahlung: bool = Tr
     )
 
 
-def canonical_profile_run(
-    catalog_profile: str, fidelity: str, detector_id: str | None = None
-) -> bool:
+def canonical_profile_run(catalog_profile: str, detector_id: str | None = None) -> bool:
     """Whether an unmodified profile run writes the bare ``<material>`` stem."""
-    if fidelity != "full" or catalog_profile != "standard":
+    if catalog_profile != "standard":
         return False
     if detector_variant(catalog_profile, detector_id) is not None:
         return False
     from .config import default_settings
 
     return canonical_settings(
-        profile_run_settings(default_settings(fidelity), catalog_profile, fidelity),
+        profile_run_settings(default_settings(), catalog_profile),
         resolved_bremsstrahlung=False,
     )
 
 
 def named_profile_identity(
     material: str,
-    fidelity: str = "full",
     *,
     catalog_profile: str = "standard",
     detector_id: str | None = None,
 ) -> dict[str, Any]:
-    """Resolve identity for an unmodified named material/fidelity pair."""
+    """Resolve identity for an unmodified named material/profile pair."""
     # Local import avoids config -> profiles -> config import cycle.
     from .config import default_settings, material_sweep
 
-    sweep = material_sweep(
-        material,
-        fidelity=fidelity,
-        catalog_profile=catalog_profile,
-        detector_id=detector_id,
-    )
+    sweep = material_sweep(material, catalog_profile=catalog_profile, detector_id=detector_id)
     return dataset_identity(
         material,
-        fidelity,
-        profile_run_settings(default_settings(fidelity), catalog_profile, fidelity, sweep=sweep),
+        profile_run_settings(default_settings(), catalog_profile, sweep=sweep),
         sweep,
         catalog_profile=catalog_profile,
         variant=detector_variant(catalog_profile, detector_id),
@@ -1048,24 +896,20 @@ def named_profile_identity(
 
 def named_profile_stem(
     material: str,
-    fidelity: str = "full",
     *,
     catalog_profile: str = "standard",
     detector_id: str | None = None,
 ) -> str:
     """Checkpoint stem for an unmodified named material/profile pair."""
     return variant_stem(
-        named_profile_identity(
-            material, fidelity, catalog_profile=catalog_profile, detector_id=detector_id
-        ),
-        canonical_full=canonical_profile_run(catalog_profile, fidelity, detector_id),
+        named_profile_identity(material, catalog_profile=catalog_profile, detector_id=detector_id),
+        canonical_full=canonical_profile_run(catalog_profile, detector_id),
     )
 
 
 def high_energy_floor_identity(
     material: str,
     floor_kev: float,
-    fidelity: str = "full",
     *,
     catalog_profile: str = "standard",
     detector_id: str | None = None,
@@ -1077,9 +921,7 @@ def high_energy_floor_identity(
     # Local import avoids config -> profiles -> config import cycle.
     from .config import default_settings, material_sweep
 
-    sweep = material_sweep(
-        material, fidelity=fidelity, catalog_profile=catalog_profile, detector_id=detector_id
-    )
+    sweep = material_sweep(material, catalog_profile=catalog_profile, detector_id=detector_id)
     energies = np.asarray(sweep.beam.energy_keV, dtype=float)
     kept = energies[energies >= floor_kev]
     if kept.size == 0:
@@ -1090,8 +932,7 @@ def high_energy_floor_identity(
     sweep = replace(sweep, beam=beam_replace(sweep.beam, energy_keV=kept))
     return dataset_identity(
         material,
-        fidelity,
-        profile_run_settings(default_settings(fidelity), catalog_profile, fidelity, sweep=sweep),
+        profile_run_settings(default_settings(), catalog_profile, sweep=sweep),
         sweep,
         catalog_profile=catalog_profile,
         variant=detector_variant(catalog_profile, detector_id),
@@ -1101,7 +942,6 @@ def high_energy_floor_identity(
 def high_energy_floor_stem(
     material: str,
     floor_kev: float,
-    fidelity: str = "full",
     *,
     catalog_profile: str = "standard",
     detector_id: str | None = None,
@@ -1111,7 +951,6 @@ def high_energy_floor_stem(
         high_energy_floor_identity(
             material,
             floor_kev,
-            fidelity,
             catalog_profile=catalog_profile,
             detector_id=detector_id,
         ),
@@ -1120,13 +959,13 @@ def high_energy_floor_stem(
 
 
 # Matches both stem schemes so old and new checkpoints resolve side by side
-# (dual-read): the legacy ``<material>--<fidelity>-<digest>`` form (``fidelity``
+# (dual-read): the legacy ``<material>--<tier>-<digest>`` form (``tier``
 # group set) and the current ``<material>@<label>-<digest>`` @-stem form
 # (``label`` group set). ``material`` and ``label`` are lazy so the trailing
 # ``-<12 hex>`` digest anchors the split unambiguously.
 _VARIANT_STEM_RE = re.compile(
     r"^(?P<material>.+?)"
-    r"(?:--(?P<fidelity>full|survey)|@(?P<label>[^@]+?))"
+    r"(?:--(?P<tier>full|survey)|@(?P<label>[^@]+?))"
     r"-(?P<digest>[0-9a-f]{12})$"
 )
 
@@ -1144,24 +983,23 @@ def _catalog_profile_candidates() -> tuple[str, ...]:
 def _recompute_candidates(
     groups: Mapping[str, str | None],
 ) -> Any:
-    """``(fidelity, catalog_profile)`` pairs to try when recomputing a
-    sidecar-less variant stem's identity. The digest -- not the stem text --
-    decides the match, so this only narrows the search using whatever the stem
-    names: a legacy ``--<fidelity>-`` stem fixes the fidelity (profile unknown,
-    try every candidate); an ``@<label>-`` stem's label is either a fidelity
-    name (a standard-profile run) or a ``catalog_profile`` name (fidelity
-    unknown, try each)."""
-    fidelity = groups.get("fidelity")
-    if fidelity is not None:
-        for catalog_profile in _catalog_profile_candidates():
-            yield fidelity, catalog_profile
-        return
+    """Catalog profiles to try when recomputing a sidecar-less variant stem's
+    identity. The digest -- not the stem text -- decides the match, so this
+    only narrows the search using whatever the stem names: a legacy
+    ``--full-`` stem leaves the profile unknown (try every candidate); an
+    ``@full-`` stem is a standard-profile run; any other ``@<label>-`` names a
+    ``catalog_profile``. Retired ``survey`` stems yield nothing: that tier's
+    reduced grid no longer exists, so only their sidecar identifies them."""
+    tier = groups.get("tier")
     label = groups.get("label")
-    if label in FIDELITY_NAMES:
-        yield label, "standard"
+    if RETIRED_SURVEY_TIER in (tier, label):
         return
-    for fidelity_name in FIDELITY_NAMES:
-        yield fidelity_name, label
+    if tier is not None:
+        yield from _catalog_profile_candidates()
+    elif label == LEGACY_IDENTITY_TIER:
+        yield "standard"
+    else:
+        yield label
 
 
 def _sidecar_identity(stem: str, root: str | os.PathLike[str]) -> dict[str, Any] | None:
@@ -1199,7 +1037,7 @@ def identity_from_stem(
     Only stems with no such sidecar fall back to recomputing: the stem's digest
     commits to a resolved parameter set but the stem text names it only
     partially, so the identity is recomputed under each plausible
-    ``(fidelity, catalog_profile)`` pair (see :func:`_recompute_candidates`)
+    ``catalog_profile`` (see :func:`_recompute_candidates`)
     until the digests agree. A material that is not a member of a candidate
     profile raises inside ``material_sweep`` -- that candidate is simply
     skipped. A run whose digest depends on state not reconstructable from the
@@ -1212,10 +1050,10 @@ def identity_from_stem(
     match = _VARIANT_STEM_RE.fullmatch(stem)
     if match is not None:
         groups = match.groupdict()
-        for fidelity, catalog_profile in _recompute_candidates(groups):
+        for catalog_profile in _recompute_candidates(groups):
             try:
                 identity = named_profile_identity(
-                    groups["material"], fidelity, catalog_profile=catalog_profile
+                    groups["material"], catalog_profile=catalog_profile
                 )
             except (KeyError, ValueError):
                 continue
@@ -1223,7 +1061,7 @@ def identity_from_stem(
                 return identity
         return None
     try:
-        identity = named_profile_identity(stem, "full")
+        identity = named_profile_identity(stem)
     except ValueError:
         return None
-    return identity if named_profile_stem(stem, "full") == stem else None
+    return identity if named_profile_stem(stem) == stem else None

@@ -813,7 +813,7 @@ Usage: pyrite profile numerics adaptive-sampling disable [OPTIONS] NAME
 
   --cxr-histories/--brem-histories replace that count. A count the profile already sets
   is otherwise kept, including a sweep grid. A count it lacks is prompted for on a
-  terminal; without a terminal, or with --yes or --dry-run, it takes the full-fidelity
+  terminal; without a terminal, or with --yes or --dry-run, it takes the built-in
   default (300 line, 150 brem).
 
 Options:

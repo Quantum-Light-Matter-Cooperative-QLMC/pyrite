@@ -180,7 +180,7 @@ def test_queue_script_cpu_flag_adds_cprofile_after_primary():
     assert "-m pyrite._entry.profile_module " in script
     assert "env -u PYRITE_MC_NSYS PYRITE_MC_BACKEND=cpu" in script
     # Always the tiny --quick grid (representative call distribution in minutes,
-    # not a >1h full-fidelity serial pass) with a hard --max-minutes backstop.
+    # not a >1h full-grid serial pass) with a hard --max-minutes backstop.
     assert '_entry.scan "sub_100keV" -m "$m" --quick --workers 0' in script
     assert "--max-minutes 10" in script
     # Fresh checkpoint dir (a cache hit would profile zero compute) and no

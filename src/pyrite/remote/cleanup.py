@@ -33,7 +33,7 @@ def _refuse_if_busy(materials, quick):
 def clear_remote(materials, yes=False, catalog_profile="standard"):
     """Delete one or more materials' accumulated checkpoints on the box: the
     legacy ``pyrite-output/checkpoints/<material>/`` and ``.../<material>_quick/``
-    plus the current full/survey stems for each standard-profile material, or
+    plus the current stems for each standard-profile material, or
     every manifest-confirmed identity
     generation owned by ``catalog_profile``. Accepts a single crystal key or a list.
 
@@ -46,16 +46,7 @@ def clear_remote(materials, yes=False, catalog_profile="standard"):
     transport._check_materials(materials)  # interpolated into a remote shell command
     label = f"profile={catalog_profile}" if catalog_profile != "standard" else ", ".join(materials)
     if catalog_profile != "standard":
-        current_stems = [
-            stem
-            for fidelity in ("full", "survey")
-            for stem in scripts._stems(
-                materials,
-                False,
-                fidelity,
-                catalog_profile=catalog_profile,
-            )
-        ]
+        current_stems = scripts._stems(materials, False, catalog_profile=catalog_profile)
         stems = _profile_checkpoint_stems(catalog_profile, current_stems=current_stems)
     else:
         # Legacy bare stems plus the stems current standard runs write, which
@@ -64,11 +55,7 @@ def clear_remote(materials, yes=False, catalog_profile="standard"):
             dict.fromkeys(
                 [
                     *(stem for m in materials for stem in (m, f"{m}_quick")),
-                    *(
-                        stem
-                        for fidelity in ("full", "survey")
-                        for stem in scripts._stems(materials, False, fidelity)
-                    ),
+                    *scripts._stems(materials, False),
                 ]
             )
         )

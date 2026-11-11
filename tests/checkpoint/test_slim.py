@@ -170,12 +170,12 @@ def test_slim_checkpoint_max_compresslevel_is_lossless_and_no_larger(tmp_path):
 
 
 # ---- grid filtering (checkpoint lifecycle: grid-filtered pull) ----------------
-def _grid_config_names(material="hopg", profile="full", catalog_profile="standard"):
+def _grid_config_names(material="hopg", catalog_profile="standard"):
     """The real current-grid config names for a material, straight from the same
     build_cases path slim_results(grid=) rebuilds."""
-    s = default_settings(profile)
+    s = default_settings()
     cases = build_cases(
-        material_sweep(material, fidelity=profile, catalog_profile=catalog_profile),
+        material_sweep(material, catalog_profile=catalog_profile),
         s.n_electrons,
         s.n_electrons_brem,
     )
@@ -199,22 +199,26 @@ def test_grid_keeps_only_current_grid_names():
     assert set(res) == keep | {"stale_old_config_a", "stale_old_config_b"}  # input untouched
 
 
-def test_grid_accepts_survey_profile_selector_and_variant_stem():
-    from pyrite.campaign.profiles import named_profile_stem
-    from pyrite.checkpoints.slim import _grid_from_stem
+def test_grid_refuses_retired_survey_stem_but_plain_slim_works(tmp_path):
+    """#1079: a survey checkpoint still slims; only --grid (whose reduced grid
+    no longer exists) is refused, before the checkpoint is loaded."""
+    import json
 
-    keep = set(_grid_config_names("hopg", "survey")[:2])
-    res = {name: {30.0: _record(0.0, 30.0)} for name in keep}
-    res["stale_old_config"] = {30.0: _record(0.0, 30.0)}
+    from pyrite.campaign.profiles import named_profile_identity
 
-    slim = slim_results(res, case_names=keep)
+    stem = "hopg@survey-0123456789ab"
+    identity = {**named_profile_identity("hopg"), "fidelity": "survey"}
+    (tmp_path / stem).mkdir()
+    (tmp_path / stem / "meta.json").write_text(json.dumps({"dataset_identity": identity}))
+    src = tmp_path / f"{stem}.pkl"
+    res = {"cfg": {30.0: _record(0.0, 30.0)}}
+    with open(src, "wb") as f:
+        pickle.dump(res, f)
 
-    assert set(slim) == keep
-    assert _grid_from_stem(named_profile_stem("hopg", "survey")) == (
-        "hopg",
-        "survey",
-        "standard",
-    )
+    with pytest.raises(SystemExit, match="retired survey tier"):
+        slim_checkpoint(str(src), str(tmp_path / "out.pkl"), grid=True)
+    slim_checkpoint(str(src), str(tmp_path / "out.pkl"), drop_wide_brem=True)
+    assert set(_checkpoint_io.load(str(tmp_path / "out.pkl"))) == {"cfg"}
 
 
 def test_grid_from_stem_resolves_catalog_profile_variant():
@@ -228,9 +232,9 @@ def test_grid_from_stem_resolves_catalog_profile_variant():
     from pyrite.campaign.profiles import named_profile_stem
     from pyrite.checkpoints.slim import _grid_from_stem
 
-    stem = named_profile_stem("hopg", "full", catalog_profile="sub_100keV")
+    stem = named_profile_stem("hopg", catalog_profile="sub_100keV")
     selector = _grid_from_stem(f"checkpoints/{stem}")
-    assert selector == ("hopg", "full", "sub_100keV")
+    assert selector == ("hopg", "sub_100keV")
 
     keep = set(_grid_config_names("hopg", catalog_profile="sub_100keV")[:2])
     res = {name: {30.0: _record(0.0, 30.0)} for name in keep}

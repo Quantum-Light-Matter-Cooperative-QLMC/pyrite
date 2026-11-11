@@ -108,10 +108,10 @@ def test_identity_records_coupling_only_when_bremslib_runs(monkeypatch, resolved
     )
     sweep = material_sweep("silicon")
     settings = replace(default_settings(), radiative_model="uncoupled", radiative_cutoff_eV=None)
-    base = dataset_identity("silicon", "full", settings, sweep)
-    coupled = dataset_identity("silicon", "full", replace(settings, **COUPLED), sweep)
+    base = dataset_identity("silicon", settings, sweep)
+    coupled = dataset_identity("silicon", replace(settings, **COUPLED), sweep)
     other = dataset_identity(
-        "silicon", "full", replace(settings, **{**COUPLED, "radiative_cutoff_eV": 500.0}), sweep
+        "silicon", replace(settings, **{**COUPLED, "radiative_cutoff_eV": 500.0}), sweep
     )
     numerics = coupled["resolved_parameters"]["transport_numerics"]
     assert "radiative_model" not in base["resolved_parameters"]["transport_numerics"]
@@ -135,7 +135,7 @@ def test_legacy_auto_radiative_mode_resolves_with_the_continuum_source(monkeypat
     legacy = {"bremsstrahlung_model": "auto", "radiative_model": "auto"}
     case = build_cases(sweep, 4, 4, **legacy)[0]
     settings = replace(default_settings(), **legacy, radiative_cutoff_eV=None)
-    identity = dataset_identity("silicon", "full", settings, sweep)
+    identity = dataset_identity("silicon", settings, sweep)
     assert case["energy_model"] == "midpoint"
     assert ("radiative_model" in case) is (resolved == "bremslib")
     numerics = identity["resolved_parameters"]["transport_numerics"]
@@ -178,8 +178,8 @@ def test_grooves_fall_back_to_uncoupled_without_a_coupling_identity(
     settings = replace(
         default_settings(), energy_model="midpoint", bremsstrahlung_model=bremsstrahlung_model
     )
-    base = dataset_identity("hopg", "full", settings, sweep)
-    coupled = dataset_identity("hopg", "full", replace(settings, **COUPLED), sweep)
+    base = dataset_identity("hopg", settings, sweep)
+    coupled = dataset_identity("hopg", replace(settings, **COUPLED), sweep)
     assert coupled["parameter_sha256"] == base["parameter_sha256"]
     assert "radiative_model" not in coupled["resolved_parameters"]["transport_numerics"]
 
