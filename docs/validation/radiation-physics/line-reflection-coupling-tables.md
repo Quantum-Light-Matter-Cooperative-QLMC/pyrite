@@ -1,6 +1,8 @@
 # Reflection coupling tables
 
-Claim: `line-reflection-coupling-tables`. Independent verification, 2026-11-11.
+Claim: `line-reflection-coupling-tables`. Current status: **rederived** after
+[re-verification of the corrected contract](#re-verification-of-corrected-contract-2026-11-11-1101),
+2026-11-11. The initial finding below records the superseded ledger wording.
 This is an evaluation-order and storage claim; it introduces no new material
 model. The reader need is an explanation of the equation and its verification.
 
@@ -83,7 +85,7 @@ factor. Therefore all orientation rows for reflection $j$ can read table $j$.
 The row map must duplicate the reflection index in the same order as geometry
 rows, without duplicating orientation weights or changing interpolation indices.
 
-## Implementation comparison and exact ledger discrepancy
+## Initial implementation comparison and exact ledger discrepancy
 
 The bodies were inspected only after the independent expressions above were
 written. Reviewed revision: `032ec80ccf762443e4fdc814085204ea817a5e41`;
@@ -198,7 +200,7 @@ nested-loop reference exactly. The coherent prologue and fused CUDA gather
 were inspected but not executed. No GPU runtime parity, performance result,
 or old remote artifact is claimed as evidence for this revision.
 
-## Filter results and adjudication
+## Initial filter results and adjudication
 
 | Filter | Result |
 | --- | --- |
@@ -227,3 +229,188 @@ Only this validation document was changed by the verifier. Scratch scripts
 and outputs were kept under `/tmp`. Docs tests, Sphinx build and positive
 render inspection are delegated to the integrating owner by explicit task
 instruction; they were not run concurrently here.
+
+## Re-verification of corrected contract (2026-11-11, #1101)
+
+### Independent derivation recorded before implementation inspection
+
+This fresh verifier received the owner-corrected ledger row, source records,
+and AST-extracted signatures/docstrings only. The preceding report and
+implementation bodies were not read before this section was recorded. The
+reader's need is independent evidence; this existing validation page owns it.
+The emission Fourier convention is an input contract from
+`line-energy-dispersion`, not a physical claim revalidated here.
+
+Source: {cite:t}`feranchuk2000`, p. 4227, Eqs. (3) and (4), checked directly
+against the source PDF. Eq. (3) supplies the positive basis phase and the
+negative susceptibility prefactor. Eq. (4) describes the static screened
+potential; its atomic factor is the static electron-density form factor.
+The source's far-from-resonance approximation does not itself provide the
+anomalous corrections: their supplied contract is the additive atomic factor
+$f_j=f_{0,j}+f'_j+i f''_j$ for susceptibility only.
+
+Let fractional positions be $\mathbf R_j$, Miller vector $\mathbf h$,
+$\phi_j=2\pi\mathbf h\cdot\mathbf R_j$, and
+$D=\exp[-B\lvert\mathbf g\rvert^2/(16\pi^2)]$. All atoms share the stated
+isotropic $B$. Grouping by element $a$ gives
+
+$$
+\begin{aligned}
+P_a&=\sum_{j\in a}e^{i\phi_j},&
+C&=\sum_a P_a f_{0,a},&
+A&=\sum_a P_a(Z_a-f_{0,a}),\\
+S_+(E)&=D\sum_j e^{i\phi_j}(f_{0,j}+f'_j+i f''_j)
+=D\left[C+\sum_a P_a(f'_a+i f''_a)\right],\\
+\chi_{\mathbf g}(E)&=-\frac{r_e\lambda(E)^2}{\pi V}S_+(E),&
+\frac{U_{\mathbf g}}{m_ec^2}&=
+\frac{4\pi e^2}{V m_ec^2}\frac{D}{\lvert\mathbf g\rvert^2}A.
+\end{aligned}
+$$
+
+The potential expression includes the source's extra electron charge and
+inverse cell volume when converting its Fourier potential into an electron
+coupling. The repository shorthand `U_g/m_e` means division of `U_g` in eV
+by the electron rest energy in eV. With lengths in angstroms, $e^2$ has units
+eV angstrom, $D A/\lvert\mathbf g\rvert^2$ has units angstrom squared, and
+the volume cancels these three powers of length. Both table outputs are
+dimensionless. $r_e\lambda^2/V$ is dimensionless as well. Debye--Waller
+suppression appears exactly once in each amplitude, never squared.
+
+At negative Miller indices the phases conjugate, while real $f_0,f',f''$,
+$D$, $\lvert\mathbf g\rvert$ and the prefactors stay unchanged. Therefore the
+supplied emission mapping yields
+
+$$
+\begin{aligned}
+\chi_{\mathrm{line},\mathbf g}(E)
+&=\chi_{-\mathbf g}(E)^*
+=-\frac{r_e\lambda^2}{\pi V}
+ D\sum_j e^{i\phi_j}(f_{0,j}+f'_j-i f''_j),\\
+\left(\frac{U_{-\mathbf g}}{m_ec^2}\right)^*
+&=\frac{U_{\mathbf g}}{m_ec^2},\\
+\chi_{\mathrm{line},\mathbf g}-\chi_{\mathbf g}
+&=\frac{2i r_e\lambda^2D}{\pi V}\sum_j e^{i\phi_j}f''_j.
+\end{aligned}
+$$
+
+Thus reverse-and-conjugate is essential; conjugating the positive-index
+coefficient alone would reverse the basis phase incorrectly. With
+$f''=0$, emission and direct susceptibility coincide. Static potential never
+contains $f'$ or $f''$ and is energy independent even when its output is
+broadcast across the energy axis. Large $B$ suppresses both; an extinct
+weighted structure factor suppresses the corresponding amplitude. The
+nonzero-reflection condition avoids the static forward singularity.
+
+Storage changes no equation. If orientation row $r$ has reflection index
+$t(r)$, every interpolation bracket $k$ must read row $t(r)$ at both
+endpoints:
+
+$$
+T_r(E)=(1-w)T_{t(r),k}+wT_{t(r),k+1}.
+$$
+
+Duplicated orientation rows may have different resonant energies and hence
+weights, while sharing the same reflection table. Identity indexing must
+recover the unindexed path. Float64 grouping may change rounding order;
+casting to the spectrum's real dtype must follow the convention mapping.
+
+Cheap filters before code inspection: units pass; zero-anomalous,
+static-energy-independence and Debye--Waller limits pass;
+positive-phase/reverse-and-conjugate signs pass for the corrected contract.
+
+### Comparison, fresh checks and current verdict
+
+Implementation bodies and the preceding report were read only after the
+independent derivation above was appended. Reviewed source revision:
+`4cdcb6ac6635d448e77c98d4844214ff540b5223`, with the owner's uncommitted
+ledger correction. No source changes were required or made.
+
+`reflection_coupling_tables` matches the direct expression term by term.
+Its complex multiply expands into real/imaginary float64 arrays with
+$+i f''$. `emission_coupling_tables` negates all Miller indices, calls the
+direct helper, then negates both imaginary output arrays. This matches
+$\chi_{-\mathbf g}^*$ and $U_{\mathbf g}/(m_ec^2)$ exactly.
+`_reflection_tables` performs this mapping before casting to `REAL`.
+There is no remaining anomalous-sign mismatch with the corrected ledger
+Claim/Source. The static potential contains neither anomalous term.
+
+`_batched_reflection_tables` appends `i_hkl` to `ROW_TABLE` in the same
+orientation loop as geometry and weights. CPU interpolation uses this row
+for both endpoints and endpoint clamps. The coherent device prologue reads
+`table_row[reflection]` before interpolating all four coupling components.
+This last statement is source inspection, not executed CUDA parity.
+
+Fresh focused anchors passed, **10 parametrized cases in 2.93 s**:
+
+```text
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test \
+  tests/materials/test_crystallography.py::test_emission_coupling_tables_are_the_conjugate_friedel_mate \
+  tests/materials/test_crystallography.py::test_emission_coupling_tables_reduce_to_crystallographic_without_fpp \
+  tests/materials/test_crystallography.py::test_reflection_coupling_tables_match_per_atom_couplings \
+  tests/materials/test_crystallography.py::test_reflection_coupling_tables_u_matches_static_U_g
+```
+
+A new scratch oracle independently reconstructed the hexagonal direct-cell
+matrix and volume, solved $A^T\mathbf g=2\pi\mathbf h$, and summed the basis
+atom by atom using raw xraydb Waasmaier--Kirfel factors, Chantler corrections
+and atomic numbers. It did not call the production metric, thermal-factor,
+structure-factor, per-atom coupling or atomic-factor wrappers. It shared the
+atomic database and catalog positions; this is an independent algebra and
+normalization check, not independent experimental validation of those data.
+
+For noncentrosymmetric 4H-SiC, $B=0.5\,\mathrm{\AA}^2$, reflections
+$(102),(103),(\overline{1}0\overline{2}),(110)$, and energies
+100, 1838, 1840, 2000, 8000, 12657, 12659, 30000 and 900000 eV, both
+conventions and the static coupling matched the independent expressions.
+Largest absolute complex error divided by the peak reference modulus of
+each reflection was $5.37\times10^{-16}$ across all three quantities.
+The threshold $2\times10^{-13}$ was fixed before running the oracle as a
+float64 arithmetic allowance, without tuning to observed results. It is
+not a source-data uncertainty estimate.
+
+The independent 4H-SiC (102), 8000 eV point illustrates the distinction:
+
+$$
+\begin{aligned}
+\chi_{\mathbf g}&=2.8121062901210447\times10^{-6}
+-5.062328688317329\times10^{-6}i,\\
+\chi_{\mathrm{line},\mathbf g}&=2.452092711894810\times10^{-6}
+-5.408386459640571\times10^{-6}i,\\
+\frac{U_{\mathbf g}}{m_ec^2}&=-1.0753862067864168\times10^{-6}
++5.673967431566597\times10^{-6}i.
+\end{aligned}
+$$
+
+Across the sampled energies the largest fractional modulus difference of
+the two susceptibilities for (102) was 2.77; an oracle accidentally using
+the direct convention would therefore fail decisively. h-BN with anomalous
+terms disabled gave exactly equal direct and emission tables for the same
+four reflections, all four components and $B=0.4\,\mathrm{\AA}^2$.
+A separate CPU gather probe used repeated/reordered map `[1, 0, 1, 0]`,
+two segment rows, different fractions and both endpoint clamps: all four
+components equalled an explicit scalar-loop reference exactly.
+
+| Filter | Current result |
+| --- | --- |
+| Normalization and units across corrected row, docstrings and code | Pass; both outputs dimensionless, static division uses rest energy |
+| Limits and Debye--Waller factor | Pass; one amplitude factor, static energy independence, zero-imaginary-anomalous equality |
+| Signs and Fourier convention mapping | Pass; direct $+i f''$, emission $-i f''$ at positive basis phase |
+| Source transcription and reference data | Eqs. (3)/(4), p. 4227 checked directly; atomic-data accuracy remains outside this claim |
+| Tolerance | Pass; preregistered float64 arithmetic budget, no fitted physical tolerance |
+| CPU indexing and storage | Pass; source tracing and fresh exact scalar-loop comparison |
+| Historical external/CUDA/performance evidence | Not used to certify this revision; CUDA execution remains pending |
+
+**Current verdict: rederived for the owner-corrected contract.** This
+supersedes the preceding discrepancy verdict only for the corrected
+Claim/Source distinction. No divergent factor, sign, exponent, unit or row
+index remains in this evaluation/mapping/storage claim. The emission
+Fourier convention itself remains owned by `line-energy-dispersion`.
+Suggested owner ledger edit: set this row to `rederived`, replace the
+pending re-verification note with this result, retain the pending CUDA
+parity limitation, and name the conjugate-Friedel/no-anomalous anchors
+alongside the existing direct-table anchor. No human sign-off is claimed.
+
+The verifier modified only this document. Scratch oracle and logs remain
+outside tracked files. Per explicit task handoff, the integrating owner runs
+`tests/dev/test_docs.py`, the Sphinx build, ledger checks and positive rendered
+math inspection centrally; those checks are not represented as completed here.
