@@ -375,6 +375,15 @@ class PixelGrid:
         """One 256 by 256 Timepix3 ASIC with 55 micrometre pitch."""
         return cls(shape=(256, 256), pitch_mm=(0.055, 0.055))
 
+    @classmethod
+    def alexs_2k512(cls) -> PixelGrid:
+        """One greateyes ALEX-s 2k512: 515 rows by 2048 columns, 13.5 um pitch.
+
+        Usable format from the public DS-ALEXs Rev05 datasheet; the long
+        (column) axis is local x, the dispersion axis behind a grating.
+        """
+        return cls(shape=(515, 2048), pitch_mm=(0.0135, 0.0135))
+
 
 def _readonly_float_array(value: object) -> np.ndarray:
     array = np.asarray(value, dtype=float)

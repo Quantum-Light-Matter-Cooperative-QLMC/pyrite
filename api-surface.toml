@@ -370,6 +370,15 @@ EagleXO = { target = "pyrite.detectors.spec:EagleXO", status = "advanced-stable"
 LegacyEDS = { target = "pyrite.detectors.spec:LegacyEDS", status = "advanced-stable" }
 # Zero-acceptance observer along one direction (#994); required by direction-specific models.
 PointDetector = { target = "pyrite.detectors.spec:PointDetector", status = "experimental" }
+# #1081: charge-integrating ALEX-s response; experimental until the catalog QE path settles.
+AlexS = { target = "pyrite.detectors.spec:AlexS", status = "experimental" }
+TabulatedEfficiency = { target = "pyrite.detectors._tabulated:TabulatedEfficiency", status = "experimental" }
+
+[package_exports."pyrite.detectors.alexs_response"]
+AlexsFormat = { target = "pyrite.detectors.alexs_response:AlexsFormat", status = "experimental" }
+alexs_frame = { target = "pyrite.detectors.alexs_response:alexs_frame", status = "experimental" }
+quantum_efficiency = { target = "pyrite.detectors.alexs_response:quantum_efficiency", status = "experimental" }
+signal_electrons = { target = "pyrite.detectors.alexs_response:signal_electrons", status = "experimental" }
 
 [package_exports."pyrite.detectors.eaglexo_response"]
 EagleResponse = { target = "pyrite.detectors.eaglexo_response:EagleResponse", status = "advanced-stable" }
@@ -384,6 +393,17 @@ Grating = { target = "pyrite.detectors.grating:Grating", status = "advanced-stab
 SimpleCCD = { target = "pyrite.detectors.grating:SimpleCCD", status = "advanced-stable" }
 disperse_spectrum = { target = "pyrite.detectors.grating:disperse_spectrum", status = "advanced-stable" }
 detected_image = { target = "pyrite.detectors.grating:detected_image", status = "advanced-stable" }
+# #1081 flat-field mount; Grating gains optional efficiency_curve/mount fields and from_catalog.
+FlatFieldMount = { target = "pyrite.detectors.grating:FlatFieldMount", status = "experimental" }
+
+[package_exports."pyrite.detectors.grating_image"]
+SlitImage = { target = "pyrite.detectors.grating_image:SlitImage", status = "experimental" }
+AlongSlitSpread = { target = "pyrite.detectors.grating_image:AlongSlitSpread", status = "experimental" }
+SpectrometerImage = { target = "pyrite.detectors.grating_image:SpectrometerImage", status = "experimental" }
+slit_image_width_mm = { target = "pyrite.detectors.grating_image:slit_image_width_mm", status = "experimental" }
+slit_image_pixels = { target = "pyrite.detectors.grating_image:slit_image_pixels", status = "experimental" }
+detected_image_2d = { target = "pyrite.detectors.grating_image:detected_image_2d", status = "experimental" }
+alexs_spectrometer_image = { target = "pyrite.detectors.grating_image:alexs_spectrometer_image", status = "experimental" }
 
 [package_exports."pyrite.results.radiation"]
 radiation_band_metrics = { target = "pyrite.results.radiation:radiation_band_metrics", status = "advanced-stable" }

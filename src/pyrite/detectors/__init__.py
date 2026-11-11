@@ -7,8 +7,10 @@ live in ``pyrite.instrument`` during the compatibility transition.
 from importlib import import_module
 from typing import TYPE_CHECKING, Any
 
+from ._tabulated import TabulatedEfficiency
 from .acceptance import AngularAcceptance, SensorAcceptance, SlitAcceptance
 from .spec import (
+    AlexS,
     Detector,
     DetectorResponse,
     DetectorSpec,
@@ -38,6 +40,7 @@ if TYPE_CHECKING:
 
 
 __all__ = [
+    "AlexS",
     "AngularAcceptance",
     "AngularDetector",
     "SensorAcceptance",
@@ -59,10 +62,13 @@ __all__ = [
     "PointDetector",
     "Timepix3",
     "Timepix3Response",
+    "TabulatedEfficiency",
+    "alexs_response",
     "convolve_detector",
     "detector_efficiency",
     "eaglexo_response",
     "grating",
+    "grating_image",
     "timepix_response",
 ]
 
@@ -87,7 +93,9 @@ EagleXOResponse = EagleXO
 
 # Supported historical detector-adjacent import, now owned by geometry.
 _LEGACY_EXPORTS = {"FilterPlate": ("pyrite.instrument", "FilterPlate")}
-_MODULE_EXPORTS = frozenset({"eaglexo_response", "grating", "timepix_response"})
+_MODULE_EXPORTS = frozenset(
+    {"alexs_response", "eaglexo_response", "grating", "grating_image", "timepix_response"}
+)
 
 
 def __getattr__(name: str) -> Any:

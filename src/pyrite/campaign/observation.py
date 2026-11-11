@@ -7,7 +7,15 @@ from typing import Any, cast
 
 from ..config import AngularSampling as PixelScorer
 from ..config import Timepix3ResponseNumerics
-from ..detectors import IdealPhotonCounter, PixelGrid, PlanarDetector, PlanarPose, Timepix3
+from ..detectors import (
+    AlexS,
+    IdealPhotonCounter,
+    PixelGrid,
+    PlanarDetector,
+    PlanarPose,
+    TabulatedEfficiency,
+    Timepix3,
+)
 from ..geometry import FilterPlate
 from ..instrument import Acquisition, ResolvedObservation
 from ..materials import MaterialCatalog
@@ -30,18 +38,38 @@ def filter_from_config(row: Mapping[str, object]) -> FilterPlate:
     )
 
 
-def _response_from_config(row: Mapping[str, object] | None):
+def _alexs_from_config(row: Mapping[str, object], curves: Mapping[str, Any] | None) -> AlexS:
+    """Lower an ALEX-s response, folding the resolved QE curve values in."""
+    qe = None
+    name = cast(str | None, row.get("qe_curve"))
+    if name is not None:
+        if curves is None or name not in curves:
+            raise ValueError(
+                f"ALEX-s qe_curve {name!r} needs the owning catalog's curves; "
+                "lower it through resolve_profile_observation or pass curves="
+            )
+        curve = curves[name]
+        qe = TabulatedEfficiency(curve.energy_eV, curve.value, name=name)
+    return AlexS(
+        sensor_format=cast(tuple[int, int], row["sensor_format"]),
+        readout_rate_hz=cast(float, row["readout_rate_hz"]),
+        gain_mode=cast(str, row["gain_mode"]),
+        sensor_code=cast(str, row["sensor_code"]),
+        qe=qe,
+    )
+
+
+def _response_from_config(
+    row: Mapping[str, object] | None, curves: Mapping[str, Any] | None = None
+):
     if row is None:
         return None
     if row.get("kind") == "ideal":
         return IdealPhotonCounter()
     if row.get("kind") == "alexs":
-        raise NotImplementedError(
-            "observation response kind 'alexs' is declared in the catalog but its CCD "
-            "response is not yet supported (issue #1081); use 'ideal' or 'timepix3'"
-        )
+        return _alexs_from_config(row, curves)
     if row.get("kind") != "timepix3":
-        raise ValueError("observation response kind must be 'ideal' or 'timepix3'")
+        raise ValueError("observation response kind must be 'ideal', 'timepix3' or 'alexs'")
     values = {key: value for key, value in row.items() if key != "kind"}
     if "numerics" in values:
         settings = cast(Mapping[str, object], values["numerics"])
@@ -51,8 +79,14 @@ def _response_from_config(row: Mapping[str, object] | None):
 
 def physical_detector_from_config(
     row: Mapping[str, object],
+    *,
+    curves: Mapping[str, Any] | None = None,
 ) -> PlanarDetector:
-    """Lower validated physical geometry and its explicit response."""
+    """Lower validated physical geometry and its explicit response.
+
+    ``curves`` is the owning catalog's ``MaterialCatalog.curves``; an ALEX-s
+    response that names a ``qe_curve`` needs it.
+    """
     pose = PlanarPose.from_observation(
         cast(float, row["distance_mm"]),
         cast(float, row.get("polar_deg", 90.0)),
@@ -67,7 +101,7 @@ def physical_detector_from_config(
             shape=cast(tuple[int, int], row.get("shape", (256, 256))),
             pitch_mm=cast(tuple[float, float], row.get("pitch_mm", (0.055, 0.055))),
         ),
-        response=_response_from_config(response),
+        response=_response_from_config(response, curves),
     )
 
 
@@ -95,7 +129,13 @@ def resolve_profile_observation(
         ) from None
     if row is None or "acquisition" not in row:
         return None
-    detector = physical_detector_from_config(row)
+    detector = physical_detector_from_config(row, curves=catalog.curves)
+    if isinstance(detector.response, AlexS):
+        raise ValueError(
+            f"detector {detector_id!r} uses the charge-integrating ALEX-s response, which "
+            "has no photon-counting acquisition; remove its [acquisition] table and read "
+            "ADU through pyrite.detectors.alexs_response / grating_image"
+        )
     if detector.response is None:
         detector = PlanarDetector(
             pose=detector.pose,
@@ -136,7 +176,9 @@ def profile_trajectory_scene(profile_name: str, detector_id: str | None = None) 
     catalog = CATALOG if profile_name == "standard" else load_material_catalog(profile=profile_name)
     detectors = catalog.profile_detector_set(profile_name)
     row = detectors[detector_id or next(iter(detectors))]
-    detector = physical_detector_from_config(row) if "distance_mm" in row else None
+    detector = (
+        physical_detector_from_config(row, curves=catalog.curves) if "distance_mm" in row else None
+    )
     filters = tuple(filter_from_config(f) for f in catalog.profile_filters.get(profile_name, ()))
     return scene_payload(filters, detector)
 
