@@ -34,6 +34,8 @@ cr-line-shape
 cr-yield-assembly
 cr-capture-bound
 cr-capture-yield
+cr-planar-free-free-block
+cr-planar-zone-row-ownership
 cr-transition-radiation-bound
 cr-zone-handoff-accounting
 cr-planar-conditional-source
