@@ -14,6 +14,11 @@ Usage::
 ``mechanisms``, ``n_cells``, ``max_order``, ``dz_ang``, ``eta_steps_ang``,
 ``energy_scale``, ``divergences_rad``, ``thicknesses_um``, ``backend``
 (``numpy``/``cupy``), ``workers``. Report-only diagnostic: no pass/fail exit.
+
+``capture_curves`` writes an NPZ beside OUT.json (one curve per JSON row).
+``uniform_electronic_density`` replaces only the electronic-density harmonics
+by their cell average, in both gain and loss, as an LDA sensitivity control;
+the crystal potential and ionic TDS densities remain unchanged.
 """
 
 from __future__ import annotations
@@ -41,6 +46,8 @@ DEFAULTS = {
     "thicknesses_um": [1.8, 2.0, 2.2],
     "backend": "cupy",
     "workers": 6,
+    "capture_curves": False,
+    "uniform_electronic_density": False,
 }
 ORDERS = range(-4, 5)
 
@@ -51,6 +58,10 @@ def _setup(arm):
 
     case = json.loads(DATA.read_text())["cases"][arm["case"]]
     profile = planar_profile("silicon", tuple(case["plane_hkl"]), 293.15)
+    if arm["uniform_electronic_density"]:
+        from dataclasses import replace
+
+        profile = replace(profile, electron_density=profile.electron_density[:1].copy())
     kinetic = case["total_energy_MeV"] * 1e6 * arm["energy_scale"] - M_E_EV
     return case, profile, kinetic
 
@@ -106,6 +117,8 @@ def run(arm_path: str, out_path: str) -> None:
         max_order=arm["max_order"],
     )
     solver = DensityMatrixSolver(profile, kinetic, base)
+    # Validate all incident widths before building the expensive eta batch.
+    entries = [(sigma, solver.entry_state(0.0, sigma)[0]) for sigma in arm["divergences_rad"]]
     eta, eta_w = eta_nodes(min(arm["divergences_rad"]), kinetic, tuple(arm["eta_steps_ang"]))
     jobs = [(arm, float(value), solver.n_grid) for value in eta[1:]]
     with ProcessPoolExecutor(arm["workers"]) as pool:
@@ -113,12 +126,15 @@ def run(arm_path: str, out_path: str) -> None:
     built = time.time()
     depths = [1e4 * value for value in arm["thicknesses_um"]]
     rows = []
-    for sigma in arm["divergences_rad"]:
-        rho, _, _ = solver.entry_state(0.0, sigma)
+    cuts, marginals = [], []
+    for sigma, rho in entries:
         weights = propagate_batch(solver, kernels, rho, depths, arm["dz_ang"], xp=xp)
         for depth, block in zip(depths, weights, strict=True):
             cut = exit_cut(solver, block, eta, eta_w, sigma)
             marginal = cut.marginal
+            if arm["capture_curves"]:
+                cuts.append(cut.density_per_rad)
+                marginals.append(marginal.weights)
             rows.append(
                 {
                     "divergence_rad": sigma,
@@ -148,6 +164,16 @@ def run(arm_path: str, out_path: str) -> None:
         "seconds": {"kernels": built - started, "propagate": time.time() - built},
         "rows": rows,
     }
+    if arm["capture_curves"]:
+        curve_path = Path(out_path).with_suffix(".npz")
+        np.savez_compressed(
+            curve_path,
+            angles_rad=cut.angles_rad,
+            cut_density_per_rad=np.stack(cuts),
+            marginal_weights=np.stack(marginals),
+            order_spacing_rad=cut.order_spacing_rad,
+        )
+        out["curves_file"] = curve_path.name
     Path(out_path).write_text(json.dumps(out, indent=1))
     print(f"wrote {out_path}: {len(rows)} rows, {out['seconds']}")
 
