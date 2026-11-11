@@ -10,12 +10,12 @@ from .coherent_jit_kernel import (
     CoherentKernelConfig,
     run_coherent_reduction_kernel,
 )
+from .coherent_prologue_jit_kernel import run_coherent_prologue_kernel
 from .coherent_stream_jit_kernel import (
     DEFAULT_COHERENT_STREAM_KERNEL_CONFIG,
     CoherentStreamKernelConfig,
     finalize_coherent_fields,
     run_coherent_field_accumulation_kernel,
-    run_coherent_prologue_kernel,
 )
 
 __all__ = [

@@ -10,7 +10,7 @@ and the residual Jacobian are pinned below.
 import numpy as np
 import pytest
 
-from pyrite.materials.crystal import CRYSTALS, reciprocal_g_vector, refractive_index
+from pyrite.materials.crystal import CRYSTALS, M_E_EV, reciprocal_g_vector, refractive_index
 from pyrite.montecarlo.spectrum import mc_cxr_spectrum
 from pyrite.montecarlo.spectrum.cxr import _observation_direction
 from pyrite.montecarlo.transport import beta_from_keV
@@ -26,7 +26,21 @@ HBARC_EV_ANG = 1973.269804
 # Long segment -> narrow sinc envelope, so the spectral peak resolves a shift of
 # order delta * E_res (~6e-2 eV here) instead of drowning in a ~100 eV wide line.
 SEG_LENGTH_ANG = 8000.0
-E_GRID = np.linspace(1599.0, 1601.5, 100_001)
+N_HAT = _observation_direction(np.deg2rad(119.0), None)
+N_Z = float(N_HAT[2])  # detector looks upstream, out the entrance face
+G_VEC = reciprocal_g_vector(HKL, CRYSTALS[CRYSTAL]["lattice"])[0]
+G_Z = float(G_VEC[2])
+BETA = float(beta_from_keV(np.array([E_KEV]))[0])
+V_DOT_G = BETA * G_Z
+V_DOT_N = BETA * N_Z
+# Exact recoil (line-recoil-in-medium-root): numerator v.g - hbar c g^2/2E and
+# denominator shift hbar c n.g/E, with E the total electron energy.
+_HBARC_OVER_E = HBARC_EV_ANG / (1.0e3 * E_KEV + M_E_EV)
+NUMERATOR = V_DOT_G - 0.5 * _HBARC_OVER_E * float(G_VEC @ G_VEC)
+R_DEN = _HBARC_OVER_E * float(N_HAT @ G_VEC)
+# Grid centred on the line (~1593.6 eV with recoil; 1600.2 eV classical).
+_E_CENTRE = round(HBARC_EV_ANG * NUMERATOR / (1.0 - V_DOT_N + R_DEN), 1)
+E_GRID = np.linspace(_E_CENTRE - 1.0, _E_CENTRE + 1.5, 100_001)
 # A grid step of 2.5e-5 eV at 1600 eV is a fifth of float32's ulp there, and the
 # interference measurements below read an absolute phase of ~3650 rad off a
 # single bin -- a claim float32 cannot state at any grid spacing, since eps
@@ -38,14 +52,7 @@ _needs_fp64_grid = requires_resolvable_grid(
 )
 # Equality between two code paths does not need that resolution, so the checks
 # that only compare paths use a grid every backend can represent.
-_COARSE_GRID = np.arange(1599.0, 1601.5, 1.0e-3)
-
-N_HAT = _observation_direction(np.deg2rad(119.0), None)
-N_Z = float(N_HAT[2])  # detector looks upstream, out the entrance face
-G_Z = float(reciprocal_g_vector(HKL, CRYSTALS[CRYSTAL]["lattice"])[0][2])
-BETA = float(beta_from_keV(np.array([E_KEV]))[0])
-V_DOT_G = BETA * G_Z
-V_DOT_N = BETA * N_Z
+_COARSE_GRID = np.arange(_E_CENTRE - 1.0, _E_CENTRE + 1.5, 1.0e-3)
 
 
 def _segments():
@@ -80,8 +87,8 @@ def _spectrum(**kwargs):
 
 
 def _vacuum_resonance_eV():
-    """``omega_res = v.g / (1 - v.n_hat)``, the retired k = omega root."""
-    return HBARC_EV_ANG * V_DOT_G / (1.0 - V_DOT_N)
+    """Exact vacuum recoil root, the retired k = omega (``Re n = 1``) root."""
+    return HBARC_EV_ANG * NUMERATOR / (1.0 - V_DOT_N + R_DEN)
 
 
 def _in_medium_resonance_eV(passes=6):
@@ -94,7 +101,7 @@ def _in_medium_resonance_eV(passes=6):
     E = _vacuum_resonance_eV()
     for _ in range(passes):
         n_re = float(refractive_index(CRYSTAL, np.array([E])).real[0])
-        E = HBARC_EV_ANG * V_DOT_G / (1.0 - V_DOT_N + (1.0 - n_re) * BETA / N_Z)
+        E = HBARC_EV_ANG * NUMERATOR / (1.0 - V_DOT_N + R_DEN + (1.0 - n_re) * BETA / N_Z)
     return E
 
 
@@ -123,7 +130,7 @@ def test_line_sits_on_the_in_medium_resonance_not_the_vacuum_one(layers):
     delta = 1.0 - float(refractive_index(CRYSTAL, np.array([E_med])).real[0])
     np.testing.assert_allclose(
         (measured - E_vac) / E_vac,
-        -delta * BETA / N_Z / (1.0 - V_DOT_N),
+        -delta * BETA / N_Z / (1.0 - V_DOT_N + R_DEN),
         rtol=2e-3,
     )
 
@@ -249,7 +256,7 @@ def test_micron_scale_depth_separation_inverts_the_interference():
     np.testing.assert_allclose(measured, -np.cos(vacuum_part), atol=0.05)
 
 
-def _escape_path_resonance_eV(passes=6):
+def _escape_path_resonance_eV(passes=6, kappa=1.0):
     """Root of ``v = 0`` for the coherent formation factor, by iteration.
 
     Along the +z flight ``L_esc = z / (-n_z)``, so the in-medium escape leg
@@ -257,11 +264,15 @@ def _escape_path_resonance_eV(passes=6):
     ``omega (1 - v.n_hat - beta delta / (-n_z)) = v.g``. This is the
     Snell-refracted normal wavevector ``k_z = omega (-n_z - delta / (-n_z))``
     of a flat exit face, not the unrefracted bulk ``1 - Re n (v.n_hat)``.
+
+    ``kappa`` divides the escape term: the coherent formation phase carries the
+    exact-recoil slope ``kappa D`` on the vacuum part only, the photon escape
+    phase staying geometric (``line-recoil-in-medium-root``).
     """
     E = _vacuum_resonance_eV()
     for _ in range(passes):
         delta = 1.0 - float(refractive_index(CRYSTAL, np.array([E])).real[0])
-        E = HBARC_EV_ANG * V_DOT_G / (1.0 - V_DOT_N - BETA * delta / (-N_Z))
+        E = HBARC_EV_ANG * NUMERATOR / (1.0 - V_DOT_N + R_DEN - BETA * delta / (-N_Z) / kappa)
     return E
 
 
@@ -282,10 +293,15 @@ def test_single_segment_coherent_line_sits_on_the_escape_path_root():
     measured = float(E_GRID[coh.argmax()])
     step = float(E_GRID[1] - E_GRID[0])
 
-    E_esc = _escape_path_resonance_eV()
+    # The coherent stationary point puts kappa on the vacuum slope only; the
+    # incoherent root differs from it at O(x delta), here ~7e-4 eV.
+    kappa = 1.0 / (1.0 - _vacuum_resonance_eV() / (1.0e3 * E_KEV + M_E_EV))
+    E_esc = _escape_path_resonance_eV(kappa=kappa)
     np.testing.assert_allclose(measured, E_esc, atol=2.0 * step)
     incoh = mc_cxr_spectrum(_one_segment(9_000.0), E_GRID, CRYSTAL, [HKL], B_ang2=B_ANG2)
-    np.testing.assert_allclose(E_GRID[incoh.argmax()], measured, rtol=0.0, atol=step)
+    E_incoh = _escape_path_resonance_eV()
+    np.testing.assert_allclose(E_GRID[incoh.argmax()], E_incoh, rtol=0.0, atol=2.0 * step)
+    assert abs(E_incoh - E_esc) < 2.0e-6 * E_esc
 
 
 # --- case-dict plumbing ----------------------------------------------------

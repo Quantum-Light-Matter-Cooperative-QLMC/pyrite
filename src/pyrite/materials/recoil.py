@@ -170,21 +170,6 @@ def recoil_shift_fraction(
     return np.asarray(_shift_fraction(np, *state))
 
 
-def _recoil_shift_fraction_unchecked(xp, kinetic_eV, electron_direction, g_ang_inv, normal):
-    """:func:`recoil_shift_fraction` with array module ``xp`` and no input checks.
-
-    The caller guarantees float64, finite, strictly positive ``kinetic_eV`` and
-    finite, nonzero direction rows; the directions are normalized here exactly
-    as the checked reference normalizes them, so NumPy inputs give bitwise
-    the reference result. Used by the device line-recoil screen.
-
-    Validation: line-recoil-validity-screen
-    """
-    direction = electron_direction / xp.linalg.norm(electron_direction, axis=-1)[..., None]
-    normal = normal / xp.linalg.norm(normal, axis=-1)[..., None]
-    return _shift_fraction(xp, *_kinematics(xp, kinetic_eV, direction, g_ang_inv, normal))
-
-
 def _shift_fraction(xp, kinetic, total, beta, direction, transfer, normal):
     exact = _exact_root(xp, kinetic, total, beta, direction, transfer, normal)
     numerator = beta * (direction * transfer).sum(axis=-1)

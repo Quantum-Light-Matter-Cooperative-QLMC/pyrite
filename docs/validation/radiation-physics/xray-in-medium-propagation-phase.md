@@ -124,7 +124,7 @@ pyrite-dev test \
 
 The ledger row's notes column states: *"...the streaming route still falls back to the exact array path because its prologue kernel derives the resonance from the vacuum denominator on device and has no in-medium root."*
 
-This is now **stale**. Commit `4d40255` ("solve the in-medium resonance in the CUDA stream prologue", same day as this verification) ports the fixed point into `coherent_stream_jit_kernel.py::run_coherent_prologue_kernel`, which now accepts `v_dot_n`/`n_re_tab` and iterates the same `omega = v.g / (1 - Re n(omega) v.n_hat)` root used by the CPU/NumPy path (`_in_medium_kinematics`). In `mc_cxr_spectrum`, the gate
+This is now **stale**. Commit `4d40255` ("solve the in-medium resonance in the CUDA stream prologue", same day as this verification) ports the fixed point into `coherent_prologue_jit_kernel.py::run_coherent_prologue_kernel`, which now accepts `v_dot_n`/`n_re_tab` and iterates the same `omega = v.g / (1 - Re n(omega) v.n_hat)` root used by the CPU/NumPy path (`_in_medium_kinematics`). In `mc_cxr_spectrum`, the gate
 
 ```python
 _use_jit_coherent_stream = (

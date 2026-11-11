@@ -35,6 +35,20 @@ from v4 to v5. Only the generation-dependent `case_content_key` and
 re-pinned. On CPU/NumPy fp64 the line spectra move at rounding level only, so
 every recorded output keeps its expectation and tolerance.
 
+## Exact-recoil line kinematics v6 generation (#1099)
+
+Placing, widening and phasing every line on the exact recoil root changed
+`CXR_ESCAPE_MODEL` from v5 to v6 (`segment-mean-v6-exact-recoil`). Only the
+generation-dependent `case_content_key` and `parameter_sha256` hashes in
+`resolved.json` and `channeling.json` were re-pinned. The recorded output
+families in `outputs.json` were subsequently checked against CI: the legacy,
+EEDL-fallback, multilayer and coherent CXR spectra do move outside their
+recorded tolerance. Their `spec` and (where present) `spec_coherent` arrays
+were re-pinned on CPU/NumPy fp64, Python 3.14. Transport signatures,
+characteristic spectra, bremsstrahlung spectra and comparison tolerances
+remain unchanged. The mode-off diagnostic still checks bitwise equality
+before and after photon-transport diagnostics.
+
 ## Always-on Ter–Mikaelian coupling (#439)
 
 Applying the dielectric factor `k²/(k² + (γħω_p)²)` to every coupled BremsLib

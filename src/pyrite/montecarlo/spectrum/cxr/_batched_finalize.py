@@ -9,14 +9,13 @@ import numpy as np
 from ...._backend import REAL, _to_cpu, xp
 from ....materials.crystal import HBARC_EV_ANG
 from . import _policy
-from ._formation import formation_profile
+from ._formation import _FormationLines, formation_profile
 from ._per_hkl import (
     _coherent_electron_grouped_row,
     _coherent_jit_grouped_row,
     _decoherence_blend,
     _flat_energy_keep,
     _flat_view,
-    _FormationLines,
     _row_decoherence_factor,
 )
 

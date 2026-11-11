@@ -9,6 +9,7 @@ from numpy.typing import ArrayLike, NDArray
 
 from .catalog import CrystalSpec, MaterialCatalog, load_material_catalog
 from .crystal import HBARC_EV_ANG, M_E_EV, _orientation_R, beta_from_Ee, reciprocal_g_vector
+from .recoil import recoil_resonance_eV
 
 __all__ = ["photon_energies"]
 
@@ -84,6 +85,7 @@ def photon_energies(
     hkl: Sequence[int] | Mapping[str, Sequence[int]] | None = None,
     mode: Literal["broadcast", "grid"] = "broadcast",
     catalog: MaterialCatalog | str | Path | None = None,
+    recoil: bool = True,
 ) -> NDArray[np.float64]:
     """Return vacuum CXR photon energies across materials and beam geometry.
 
@@ -101,8 +103,9 @@ def photon_energies(
         in-plane roll. These angles tilt the whole sample, not just the crystal.
     theta_obs_deg, phi_obs_deg
         Lab detector polar angle from beam +z and azimuth from +x, in degrees.
-        Detector azimuth does not change this straight-beam vacuum resonance,
-        but participates in broadcasting and grid shape. Default polar: 90 deg.
+        Under the exact recoil root, detector azimuth enters through the
+        ``Q.n/E`` term; classically (``recoil=False``) it does not change this
+        straight-beam vacuum resonance. Default polar: 90 deg.
     hkl
         Optional Miller triple shared by all materials, or a mapping of material
         keys to triples. Missing mapping entries use the default. Defaults choose
@@ -122,6 +125,10 @@ def photon_energies(
     catalog
         Loaded catalogue, path to a complete catalogue, or ``None`` for current
         configured/environment-selected catalogue resolution.
+    recoil
+        ``True`` (default) returns the exact recoil root, as the Monte Carlo
+        line routes place lines; ``False`` returns the classical
+        (``hbar g -> 0``) root for comparison.
 
     Returns
     -------
@@ -139,18 +146,23 @@ def photon_energies(
 
     Notes
     -----
-    Source: Zhai 2025 main-text Eq. (1), Feranchuk--Spence 2000: in vacuum,
+    Source: Shi et al. (2024) Eq. (6) for the exact vacuum root
+    (:func:`~pyrite.materials.recoil.recoil_resonance_eV`):
+    ``E_gamma = (beta*u.Q - Q^2/2E) / (1 - beta*u.n + Q.n/E)`` with
+    ``Q = hbar*c*g`` and ``E`` the total electron energy. Its classical limit
+    (``recoil=False``; Zhai 2025 main-text Eq. (1), Feranchuk--Spence 2000) is
     ``E_gamma = hbar*c*beta*abs(v_hat.g)/(1 - beta*v_hat.n_hat)``;
     ``|g| = 2*pi/d_hkl``. The numerator selects the radiating Friedel mate
     under the production positive-g convention. Units are eV and angstroms.
+    The recoil shift is percent-level for 10--100 keV lines.
     Assumes a straight electron at the supplied entrance energy, vacuum photon
     propagation, and a single ideal orientation. In-medium dispersion, transport
     broadening, mosaic averaging, intensity, and detector response are excluded.
     A basal reflection aligned with the slab normal reduces to
-    ``hbar*c*beta*|g|*abs(cos(tilt))/(1-beta*cos(theta_obs))`` and is independent
-    of tilt azimuth. Production in-medium line centres can differ.
+    ``hbar*c*beta*|g|*abs(cos(tilt))/(1-beta*cos(theta_obs))`` classically and
+    is independent of tilt azimuth. Production in-medium line centres can differ.
 
-    Validation: line-energy-dispersion, surface-hkl-orientation
+    Validation: line-energy-dispersion, surface-hkl-orientation, line-recoil-resonance
     """
     if mode not in ("broadcast", "grid"):
         raise ValueError("mode must be 'broadcast' or 'grid'")
@@ -179,7 +191,7 @@ def photon_energies(
             for axis, value in enumerate(values)
         ]
     try:
-        energy, tilt, azimuth, observation, _ = np.broadcast_arrays(*values)
+        energy, tilt, azimuth, observation, obs_azimuth = np.broadcast_arrays(*values)
     except ValueError as exc:
         raise ValueError("numerical inputs have incompatible broadcast shapes") from exc
 
@@ -199,7 +211,9 @@ def photon_energies(
 
     # Sparse grid inputs expand only as views; numerical work is vectorized
     # over geometry, with one small orientation calculation per material.
-    tilt, azimuth, observation = (np.deg2rad(angle) for angle in (tilt, azimuth, observation))
+    tilt, azimuth, observation, obs_azimuth = (
+        np.deg2rad(angle) for angle in (tilt, azimuth, observation, obs_azimuth)
+    )
     with np.errstate(over="ignore", under="ignore"):
         beta = beta_from_Ee(energy)
         inverse_gamma = M_E_EV / (M_E_EV + energy)
@@ -209,25 +223,74 @@ def photon_energies(
     ca, sa = np.cos(azimuth), np.sin(azimuth)
     result = np.full((len(keys), *energy.shape), np.nan, dtype=float)
     for index, key in enumerate(keys):
-        if key not in resolved.materials:
-            raise ValueError(f"unknown catalogue material {key!r}")
-        crystal_key = resolved.materials[key].crystal_key
-        if crystal_key not in resolved.crystals:
-            raise ValueError(f"material {key!r} is noncrystalline")
-        crystal = resolved.crystals[crystal_key]
-        indices = overrides.get(key, shared_hkl)
-        if indices is None:
-            indices = _primary_hkl(crystal)
-        g, magnitude = reciprocal_g_vector(indices, crystal.lattice)
-        orientation = _orientation_R(
-            crystal.lattice, crystal.beam_uvw, 0.0, surface_hkl=crystal.surface_hkl
-        )
-        if orientation is not None:
-            g = orientation @ g
+        g, magnitude = _sample_g(resolved, key, overrides.get(key, shared_hkl))
         # R_sample_to_lab's final row is (-sin(t)*cos(a), -sin(t)*sin(a), cos(t)).
-        projection = np.abs(-st * (ca * g[0] + sa * g[1]) + ct * g[2])
-        with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
-            photon = HBARC_EV_ANG * beta * projection / denominator
+        signed = -st * (ca * g[0] + sa * g[1]) + ct * g[2]
+        projection = np.abs(signed)
+        if recoil:
+            photon = _exact_photon(energy, g, signed, (st, ct, ca, sa), observation, obs_azimuth)
+        else:
+            photon = _classical_photon(beta, projection, denominator)
         keep = (projection > 1e-12 * magnitude) & (photon > 0) & (photon <= energy)
         result[index] = np.where(keep, photon, np.nan)
     return result
+
+
+def _sample_g(catalog, key, indices):
+    """Sample-frame reciprocal vector and ``|g|`` of a material's reflection.
+
+    ``indices=None`` selects :func:`_primary_hkl`.
+    """
+    if key not in catalog.materials:
+        raise ValueError(f"unknown catalogue material {key!r}")
+    crystal_key = catalog.materials[key].crystal_key
+    if crystal_key not in catalog.crystals:
+        raise ValueError(f"material {key!r} is noncrystalline")
+    crystal = catalog.crystals[crystal_key]
+    if indices is None:
+        indices = _primary_hkl(crystal)
+    g, magnitude = reciprocal_g_vector(indices, crystal.lattice)
+    orientation = _orientation_R(
+        crystal.lattice, crystal.beam_uvw, 0.0, surface_hkl=crystal.surface_hkl
+    )
+    if orientation is not None:
+        g = orientation @ g
+    return g, magnitude
+
+
+def _classical_photon(beta, projection, denominator):
+    """Classical vacuum root ``hbar c beta |u.g| / (1 - beta u.n)``."""
+    with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
+        return HBARC_EV_ANG * beta * projection / denominator
+
+
+def _exact_photon(energy, g, signed, tilt_trig, observation, obs_azimuth):
+    """Exact recoil root in the sample frame for the radiating Friedel mate.
+
+    ``R`` rotates sample ``+z`` onto the lab slab normal about
+    ``k = (-sin a, cos a, 0)``; ``R.T v = cos(t) v - sin(t) k x v +
+    (1 - cos t) k (k.v)`` gives the sample-frame beam and detector. The
+    mate with positive beam projection ``u.g`` radiates.
+
+    Validation: line-recoil-resonance
+    """
+    st, ct, ca, sa = tilt_trig
+    k = np.stack([-sa, ca, np.zeros_like(sa)], axis=-1)
+    n_lab = np.stack(
+        [
+            np.sin(observation) * np.cos(obs_azimuth),
+            np.sin(observation) * np.sin(obs_azimuth),
+            np.cos(observation),
+        ],
+        axis=-1,
+    )
+    normal = (
+        ct[..., None] * n_lab
+        - st[..., None] * np.cross(k, n_lab)
+        + (1.0 - ct)[..., None] * k * np.sum(k * n_lab, axis=-1, keepdims=True)
+    )
+    beam = np.stack([-st * ca, -st * sa, ct], axis=-1)
+    mate = np.where(signed < 0, -1.0, 1.0)[..., None] * g
+    if energy.size == 0:
+        return np.empty(energy.shape)
+    return recoil_resonance_eV(energy, beam, mate, normal)

@@ -612,7 +612,7 @@ def _interp_gather_cxr_tables(
     )
 
 
-def _cxr_kin_core(vx, vy, vz, gx, gy, gz, denom, g2, n_dot_g):
+def _cxr_kin_core(vx, vy, vz, gx, gy, gz, denom, g2, n_dot_g, r_num=0.0, r_den=0.0):
     """Resonance frequency + photon kinematics with g-only algebra hoisted.
 
     For unit detector direction ``n``, ``|(omega*n)+g|^2-omega^2`` is exactly
@@ -626,10 +626,16 @@ def _cxr_kin_core(vx, vy, vz, gx, gy, gz, denom, g2, n_dot_g):
     carrying the Snell correction ``delta grad L.g``), both per (segment, g) rather than hoisted.
     Every identity above survives that substitution unchanged -- see
     ``_in_medium_kinematics``.
+
+    Under exact recoil ``denom`` is the exact denominator and ``r_num``/``r_den``
+    the terms of ``_line_recoil_terms``: the root is ``(v.g - r_num)/denom``
+    while ``k.v = omega (1 - denom + r_den)`` keeps the physical refracted
+    photon direction, so the couplings change only through the root.
+    Validation: line-recoil-in-medium-root
     """
     v_dot_g = vx * gx + vy * gy + vz * gz
-    omega_res = v_dot_g / denom
-    k_dot_v = omega_res * (1.0 - denom)
+    omega_res = (v_dot_g - r_num) / denom
+    k_dot_v = omega_res * ((1.0 - denom) + r_den)
     k_dot_g = omega_res * n_dot_g
     v_dot_kg = v_dot_g + k_dot_v
     detuning = g2 + 2.0 * k_dot_g
@@ -705,7 +711,14 @@ def _in_medium_kinematics(denom_vac, v_dot_g, delta_tab, E_tab, v_dot_grad=None,
     direct callers; production spectrum routes always supply the gradient.
     Returns ``(denom, delta)`` at the root.
 
-    Validation: xray-in-medium-resonance, line-kinematics-precision
+    Exact recoil (``line-recoil-in-medium-root``): callers pass
+    ``denom_vac + r_den`` and ``v.g - r_num`` (:func:`_line_recoil_terms`);
+    the same passes then return the exact first-order Snell denominator
+    ``1 - v.n + Q.n/E - delta v.grad L`` and sample ``delta`` at the
+    exact root.
+
+    Validation: xray-in-medium-resonance, line-kinematics-precision,
+    line-recoil-in-medium-root
     """
     _xp = array_namespace(denom_vac, v_dot_g, delta_tab, E_tab)
     if v_dot_grad is None:

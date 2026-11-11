@@ -198,11 +198,16 @@ def test_line_energy_notebook_cpu_smoke(monkeypatch):
     energies = definitions["lines_eV"]
     assert energies.shape == (6, 171)
     assert np.isfinite(energies).all() and np.all(energies > 0)
-    # Same basal Friedel pair: doubling Miller order doubles the vacuum resonance.
+    # Same basal Friedel pair: doubling Miller order doubles the classical
+    # resonance; the default exact recoil root falls short of it (Huang 2023).
     line = definitions["photon_energies"]
     kwargs = {"tilt_deg": 30.0, "theta_obs_deg": 135.0, "catalog": definitions["catalog"]}
     first_order = line("hopg", 30_000.0, hkl=(0, 0, 2), **kwargs)[0]
-    assert line("hopg", 30_000.0, hkl=(0, 0, 4), **kwargs)[0] == pytest.approx(2 * first_order)
+    classical = [
+        line("hopg", 30_000.0, hkl=h, recoil=False, **kwargs)[0] for h in [(0, 0, 2), (0, 0, 4)]
+    ]
+    assert classical[1] == pytest.approx(2 * classical[0])
+    assert line("hopg", 30_000.0, hkl=(0, 0, 4), **kwargs)[0] < 2 * first_order
     assert definitions["selected_eV"] == pytest.approx(first_order)
     import matplotlib.pyplot as plt
 

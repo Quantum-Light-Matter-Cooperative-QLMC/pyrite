@@ -47,6 +47,13 @@ from ._per_hkl import (
     _flat_view,
     _row_decoherence_factor,
 )
+from ._recoil import (
+    _line_recoil_terms,
+    _recoil_formation_line,
+    _recoil_inverse_energy,
+    _recoil_line_allowed,
+    _recoil_slope_factor,
+)
 
 
 @dataclass
@@ -98,6 +105,8 @@ class _BatchedBlock:
     vy: Any
     vz: Any
     denom: Any
+    # Exact sinc slope ``kappa * denom`` (line-recoil-in-medium-root).
+    slope: Any
     gamma: Any
     t_L: Any
     L_esc: Any
@@ -455,9 +464,13 @@ def _batched_block(st, bt, sb):
     # |grad L|^2 per row; the same reduction feeds the Snell guard and |k|.
     grad2 = (st.escape_gradient[sb] ** 2).sum(axis=1)[:, None]
     # Refraction makes the denominator and k.g piece/reflection dependent.
+    # Exact recoil shifts v.g and the denominator per (row, g).
+    # Validation: line-recoil-in-medium-root
+    gamma = gamma_full[sb]
+    r_num, r_den, inv_E = _line_recoil_terms(gamma, g2, n_dot_g)
     denom, delta = _in_medium_kinematics(
-        st.denom_all[sb][:, None],
-        vx * gx + vy * gy + vz * gz,
+        st.denom_all[sb][:, None] + r_den,
+        (vx * gx + vy * gy + vz * gz) - r_num,
         delta_tab_g,
         E_tab_g,
         (v_all[sb] * st.escape_gradient[sb]).sum(axis=1)[:, None],
@@ -466,7 +479,6 @@ def _batched_block(st, bt, sb):
     grad = st.escape_gradient[sb]
     grad_dot_g = grad[:, 0, None] * gx + grad[:, 1, None] * gy + grad[:, 2, None] * gz
     n_dot_g_blk = n_dot_g + delta * grad_dot_g
-    gamma = gamma_full[sb]
     t_L = t_L_full[sb]
     L_esc = L_esc_full[sb]
 
@@ -474,9 +486,10 @@ def _batched_block(st, bt, sb):
     # steps 1 and 4 are reduced algebraically inside one fused launch;
     # g-only invariants are hoisted outside the segment-block loop.
     omega_res, v_dot_g, detuning, k_dot_g, v_dot_kg, k_dot_v = _cxr_kin_core(
-        vx, vy, vz, gx, gy, gz, denom, g2, n_dot_g_blk
+        vx, vy, vz, gx, gy, gz, denom, g2, n_dot_g_blk, r_num, r_den
     )
     vdg = v_dot_g
+    slope = denom * _recoil_slope_factor(omega_res, inv_E)
     # -- 3. couplings at each resonance energy (shared interp index) -----
     # chi/U real+imag all sample the SAME E_res on the SAME E_tab_g grid,
     # so bracket ONCE (_interp_index) and gather per table -- kills the
@@ -484,6 +497,7 @@ def _batched_block(st, bt, sb):
     k_mag, E_res, keep, _ix, _fr, _log_fr, _blw, _abv = _line_bracket(
         omega_res, delta, grad2, cxr_electron[sb][:, None], E_tab_g, lo_keep, hi_keep
     )
+    keep = keep & _recoil_line_allowed(denom, omega_res, inv_E, gamma)
     chi_re, chi_im, u_re, u_im, mu = _interp_gather_cxr_tables(
         _ix,
         _fr,
@@ -503,6 +517,7 @@ def _batched_block(st, bt, sb):
         vy=vy,
         vz=vz,
         denom=denom,
+        slope=slope,
         gamma=gamma,
         t_L=t_L,
         L_esc=L_esc,
@@ -597,9 +612,11 @@ def _batched_coherent_block(st, bt, blk, coh_blocks, coh_counts):
     L_end = st.escape_ends[1][sb][:, None]
     apb, bma, q = formation_coefficients(L_start * mu, L_end * mu, xp=xp)
     half_dL = 0.5 * (L_end - L_start)
-    denom_vac = bt.denom_full[sb]
-    E_vac = HBARC_EV_ANG * vdg / denom_vac
-    a_vac = denom_vac * t_L / (2.0 * HBARC_EV_ANG)
+    # Exact vacuum centre/width and the recoil phase over the electron's age.
+    # Validation: line-recoil-in-medium-root
+    E_vac, a_vac, d_shift, g_shift = _recoil_formation_line(
+        vdg, bt.denom_full[sb], t_L, gamma, bt.g2, bt.n_dot_g, st.seg_t_mid[sb][:, None]
+    )
     amp = xp.sqrt(ALPHA_FS * omega_res / _PREF_C1)
     good = (
         keep
@@ -627,8 +644,8 @@ def _batched_coherent_block(st, bt, blk, coh_blocks, coh_counts):
     per_cxr = (
         E_vac,
         a_vac,
-        (d_all_geom[sb] / HBARC_EV_ANG)[:, None],  # phase slope vs E
-        gxr * gx + gyr * gy + gzr * gz,  # g.r_j
+        (d_all_geom[sb][:, None] + d_shift) / HBARC_EV_ANG,  # phase slope vs E
+        gxr * gx + gyr * gy + gzr * gz + g_shift,  # g.r_j
         c_s.real,
         c_s.imag,
         c_p.real,
@@ -676,7 +693,7 @@ def _escape_weights(st, blk, A2, WM):
     if T_abs is None:
         T_abs = piece_mean_transmission(frac, path_start, path_end, blk.mu[..., None], xp=xp)
         T_abs *= piece_fraction
-    denom, t_L, keep = blk.denom, blk.t_L, blk.keep
+    denom, t_L, keep = blk.slope, blk.t_L, blk.keep
     pref = _cxr_weight_core(blk.omega_res, t_L, T_abs, ALPHA_FS, _PREF_C1)
     fused = _fused.line_weights(denom, t_L, pref, A2, WM, keep, two_hbarc=2.0 * HBARC_EV_ANG)
     if fused is not None:
@@ -979,11 +996,11 @@ def _accumulate_batched(st):
     )
     if _use_jit_coherent_stream:
         from ..coherent_grouped_jit_kernel import run_coherent_grouped_intensity_kernel
+        from ..coherent_prologue_jit_kernel import run_coherent_prologue_kernel
         from ..coherent_stream_jit_kernel import (
             DEFAULT_COHERENT_STREAM_KERNEL_CONFIG,
             allocate_coherent_fields,
             run_coherent_field_accumulation_kernel,
-            run_coherent_prologue_kernel,
         )
 
         _coh_g = G.reshape(-1)
@@ -1005,6 +1022,7 @@ def _accumulate_batched(st):
         # decoherence-relevant offset is configured, so this is a no-op swap
         # in that (default) case. See the
         # coherent-inter-electron-decoherence block above.
+        _coh_centre = xp.ascontiguousarray(d_all_geom, dtype=REAL)
         _coh_phase_slope = xp.ascontiguousarray(d_all_geom / HBARC_EV_ANG, dtype=REAL)
         # Piece-end escape distances for the formation factor: the prologue
         # turns them into per-(segment, g) attenuation constants, and half
@@ -1013,6 +1031,13 @@ def _accumulate_batched(st):
         _coh_L_start = xp.ascontiguousarray(st.escape_ends[0], dtype=REAL)
         _coh_L_end = xp.ascontiguousarray(st.escape_ends[1], dtype=REAL)
         _coh_half_dL = xp.ascontiguousarray(0.5 * (_coh_L_end - _coh_L_start), dtype=REAL)
+        # Exact recoil: hbar c/E and the electron's own midpoint age per
+        # segment (CPU twin ``_recoil_formation_line``).
+        # Validation: line-recoil-in-medium-root
+        _coh_inverse_energy = xp.ascontiguousarray(
+            _recoil_inverse_energy(gamma_full.reshape(-1)), dtype=REAL
+        )
+        _coh_age = xp.ascontiguousarray(st.seg_t_mid, dtype=REAL)
         # The planes share one energy axis across rows, so the all-electron
         # term streams on the union of the rows' kept energies; a row's
         # energy kept only for another row gets its exact full blend.
@@ -1069,6 +1094,9 @@ def _accumulate_batched(st):
                 L_start=_coh_L_start[sel],
                 L_end=_coh_L_end[sel],
                 table_row=bt.ROW_TABLE,
+                inverse_energy=_coh_inverse_energy[sel],
+                age=_coh_age[sel],
+                centre_ang=_coh_centre[sel],
                 config=DEFAULT_COHERENT_STREAM_KERNEL_CONFIG,
             )
             # Formation mode appends the pair-layout attenuation constants

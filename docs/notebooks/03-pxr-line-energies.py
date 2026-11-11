@@ -42,7 +42,10 @@ def _(mo):
     Predict ideal HOPG resonance energies before simulating transport.
     `photon_energies()` takes beam energy in **eV**, angles in **degrees**,
     and returns a leading material axis even for one material. It is
-    analytic, so the controls below recompute instantly.
+    analytic, so the controls below recompute instantly. Lines use the exact
+    recoil root, which sits about a percent below the classical Doppler line
+    at these energies and makes `(004)` fall a few eV short of twice `(002)`;
+    pass `recoil=False` for the classical root.
     """)
     return
 

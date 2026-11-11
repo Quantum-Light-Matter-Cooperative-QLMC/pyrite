@@ -1,51 +1,16 @@
 """Exact vacuum recoil compared with the unsquared electron mass shell."""
 
-from decimal import Decimal, localcontext
-
 import numpy as np
 import pytest
 
 from pyrite.materials.crystal import HBARC_EV_ANG, M_E_EV
 from pyrite.materials.recoil import (
-    _recoil_shift_fraction_unchecked,
     recoil_mismatch_inv_ang,
     recoil_mismatch_slope,
     recoil_resonance_eV,
     recoil_shift_fraction,
 )
-
-
-def _mass_shell_root(kinetic, g, direction, *, photon=None):
-    """65-digit bisection of source Eq (6), without squaring or a root formula."""
-    with localcontext() as ctx:
-        ctx.prec = 65
-
-        def dec(value):
-            return Decimal(str(value))
-
-        mass, hc, kinetic = dec(M_E_EV), dec(HBARC_EV_ANG), dec(kinetic)
-        total = kinetic + mass
-        momentum = (kinetic * (kinetic + 2 * mass)).sqrt()
-        transfer = [hc * dec(value) for value in g]
-        normal = [dec(value) for value in direction]
-
-        def residual(photon):
-            final = [-transfer[i] - photon * normal[i] for i in range(3)]
-            final[2] += momentum
-            return (mass * mass + sum(value * value for value in final)).sqrt() + photon - total
-
-        if photon is not None:
-            return float(residual(dec(photon)) / hc)
-        if residual(Decimal(0)) >= 0:
-            return np.nan
-        lo, hi = Decimal(0), kinetic
-        for _ in range(190):
-            midpoint = (lo + hi) / 2
-            if residual(midpoint) > 0:
-                hi = midpoint
-            else:
-                lo = midpoint
-        return float((lo + hi) / 2)
+from tests.helpers.recoil import mass_shell_root as _mass_shell_root
 
 
 @pytest.mark.parametrize("kinetic", [30e3, 1e6, 5e6, 50e6, 1e9])
@@ -246,20 +211,6 @@ def test_shift_fraction_branches_and_broadcasting():
     assert np.all(np.diff(np.abs(actual)) > 0)
     # Finite where beta itself rounds to one in float64.
     assert np.isfinite(recoil_shift_fraction(1e15, [0, 0, 1], [0, 0, 2e-8], [0, 0, 1]))
-
-
-def test_unchecked_shift_fraction_is_bitwise_the_reference():
-    """The screen's namespace-generic path reproduces the checked reference (#286)."""
-    rng = np.random.default_rng(286)
-    kinetic = 10.0 ** rng.uniform(3, 10, 4096)
-    direction = rng.normal(size=(4096, 3)).astype(np.float32).astype(np.float64)
-    direction /= np.linalg.norm(direction, axis=1)[:, None]
-    g = np.array([0.0, 0.3, 1.9])
-    normal = np.array([0.6, 0.0, 0.8])
-    expected = recoil_shift_fraction(kinetic, direction, g, normal)
-    actual = _recoil_shift_fraction_unchecked(np, kinetic, direction, g, normal)
-    np.testing.assert_array_equal(actual, expected)
-    assert np.isnan(expected).any() and np.isfinite(expected).any()
 
 
 def test_huang_2023_harmonic_defect_matches_in_crystal_lines():

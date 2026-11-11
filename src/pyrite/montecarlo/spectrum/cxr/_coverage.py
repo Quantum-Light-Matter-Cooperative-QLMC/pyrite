@@ -16,21 +16,16 @@ from ...._env import env_value
 from ....materials.atomic import _chantler_bounds
 from ....materials.crystal import _EDGE_PRONE, HBARC_EV_ANG, reciprocal_g_vector
 from ....materials.photon_cross_sections import EPDL_E_MIN_EV
-from ....materials.recoil import _recoil_shift_fraction_unchecked
 from ..reflection_rows import MIN_RESONANCE_EV
-from ._kernels import _cxr_emission_ceiling, _in_medium_kinematics
+from ._kernels import (
+    _cxr_emission_ceiling,
+    _in_medium_kinematics,
+)
+from ._recoil import _line_recoil_terms, _recoil_line_allowed
 
 
 class LineOpticalDataWarning(UserWarning):
     """Transported line pairs reach unavailable optical data."""
-
-
-# Screening policy, not a physical constant: a 1 % vacuum line shift is
-# comparable to typical spectrometer resolution at the affected energies.
-# Record-only: ordinary 10-100 keV HOPG lines exceed it through the
-# longitudinal lattice-recoil term, so a warning would fire on routine cases
-# before the in-crystal applicability is settled (issues #249, #527).
-RECOIL_SHIFT_LIMIT = 0.01
 
 
 #: Opt-in switch for the screen: any nonempty value other than ``0`` enables it.
@@ -38,7 +33,7 @@ LINE_DATA_COVERAGE_ENV = "PYRITE_LINE_DATA_COVERAGE"
 
 
 def line_data_coverage_enabled():
-    """Whether this process runs the opt-in line optical-data/recoil screen.
+    """Whether this process runs the opt-in line optical-data screen.
 
     Off by default: the screen is diagnostic only (counts, never yield) and
     cost up to 95 % of the line phase before #286 vectorized it.
@@ -102,7 +97,8 @@ def publish_line_data_coverage(record):
 def line_data_coverage(st):
     """Screen all eligible pairs before the output-grid/finite-value masks.
 
-    Reuses the production vacuum seed and Snell solver, with the same optical
+    Reuses the production exact-recoil vacuum seed and Snell solver
+    (``line-recoil-in-medium-root``), with the same optical
     table and backend precision. A seed outside the *physical data domain* is
     reported separately: it is not a solved in-medium resonance. Roots outside
     the output tabulation can use the production endpoint clamp and are flagged
@@ -124,7 +120,7 @@ def line_data_coverage(st):
     if rows.shape[0]:
         domain = (lower, upper, *np.asarray(_to_cpu(st.E_grid))[[0, -1]])
         normal = np.asarray(_to_cpu(st.n_hat), dtype=np.float64)
-        rows_dev = (xp.asarray(rows, dtype=REAL), xp.asarray(rows, dtype=xp.float64))
+        rows_dev = xp.asarray(rows, dtype=REAL)
         normal = xp.asarray(normal / np.linalg.norm(normal))
         # Bound diagnostic temporaries by (segment, row) pairs, independently
         # of the photon-axis size and the reflection count.
@@ -133,13 +129,12 @@ def line_data_coverage(st):
             block = slice(start, start + chunk)
             counts += _block_counts(st, block, rows_dev, normal, domain)
     return {
-        "schema": "line-data-coverage.v2",
+        "schema": "line-data-coverage.v3",
         "population": "unweighted-eligible-escape-piece/reflection/mosaic-pairs",
         "crystal": str(req.crystal),
         "coherent": bool(req.coherent),
         "direction": [float(v) for v in st.n_hat],
         "optical_domain_eV": [float(lower), float(upper)],
-        "recoil_shift_limit": RECOIL_SHIFT_LIMIT,
         "counts": dict(zip(_COUNT_KEYS, (int(v) for v in _to_cpu(counts)), strict=True)),
     }
 
@@ -156,7 +151,6 @@ _COUNT_KEYS = (
     "finite_root",
     "finite_root_outside_grid",
     "vacuum_seed_outside_tabulation",
-    "recoil_shift_exceeds_limit",
 )
 # Segment-row pairs per screening pass: a few hundred MiB of temporaries.
 _PAIR_BUDGET = 1 << 19
@@ -178,10 +172,16 @@ def _reflection_rows(st):
 def _block_counts(st, block, rows_dev, normal, domain):
     """Outcome counts of one segment block against every reflection row."""
     lower, upper, grid_lo, grid_hi = domain
-    rows, rows64 = rows_dev
+    rows = rows_dev
     velocity = st.v_all[block]
-    denom_vac = st.denom_all[block][:, None]
-    vg = xp.sum(velocity[:, None, :] * rows[None, :, :], axis=2)
+    gamma = st.gamma_all[block][:, None]
+    r_num, r_den, inv_E = _line_recoil_terms(
+        gamma,
+        xp.sum(rows * rows, axis=1)[None, :],
+        (rows @ xp.asarray(normal, dtype=REAL))[None, :],
+    )
+    denom_vac = st.denom_all[block][:, None] + r_den
+    vg = xp.sum(velocity[:, None, :] * rows[None, :, :], axis=2) - r_num
     gradient = st.escape_gradient[block]
     vg_escape = xp.sum(velocity * gradient, axis=1)[:, None]
     grad2 = xp.sum(gradient * gradient, axis=1)[:, None]
@@ -194,6 +194,11 @@ def _block_counts(st, block, rows_dev, normal, domain):
             denom_vac, vg, st.delta_tab_g, st.E_tab_g, vg_escape, grad2
         )
         root = HBARC_EV_ANG * vg / denom
+        # A forbidden exact vacuum root (negative-energy branch) is no
+        # positive seed; a forbidden in-medium root is a rejected root.
+        allowed = _recoil_line_allowed(denom_vac, vg / denom_vac, inv_E, gamma)
+        seed = xp.where(allowed | ~xp.isfinite(seed), seed, 0.0)
+        root = xp.where(_recoil_line_allowed(denom, vg / denom, inv_E, gamma), root, xp.nan)
     positive = eligible & xp.isfinite(seed) & (seed > 0)
     seed_miss = positive & ((seed <= lower) | (seed >= upper))
     pending = positive & ~seed_miss
@@ -217,37 +222,4 @@ def _block_counts(st, block, rows_dev, normal, domain):
         finite & ((root < grid_lo) | (root > grid_hi)),
         positive & ((seed < st.E_tab_g[0]) | (seed > st.E_tab_g[-1])),
     )
-    return xp.stack(
-        [xp.count_nonzero(mask) for mask in masks]
-        + [_recoil_count(st, block, positive, rows64, normal)]
-    )
-
-
-def _recoil_count(st, block, positive, rows, normal):
-    """Positive vacuum seeds whose exact vacuum recoil shift exceeds the limit.
-
-    Float64 evaluation of the exact/classical vacuum roots for each positive
-    seed, from the transported kinetic energy and direction rather than the
-    float32 speed, which rounds to one near 1.5 GeV. The energy field is the
-    one the line kernels use. A segment whose classical root is not positive in
-    float64 is not counted. Optical data are not needed, so seeds outside the
-    optical domain are screened too. Rows are evaluated in place on the array
-    backend (no host copy or row compaction, which made this screen dominate
-    the line phase, #286); unselected rows get placeholder inputs and are
-    masked out of the count.
-
-    Validation: line-recoil-validity-screen
-    """
-    segments = st.segments
-    field = "E_repr_keV" if segments.get("E_repr_keV") is not None else "E_keV"
-    kinetic = 1.0e3 * xp.asarray(segments[field])[block].astype(xp.float64)
-    direction = xp.asarray(segments["v_hat"])[block].astype(xp.float64)
-    norm = xp.linalg.norm(direction, axis=1)
-    # The reference raises on degenerate input; such rows are not screened.
-    usable = xp.isfinite(kinetic) & (kinetic > 0) & xp.isfinite(norm) & (norm > 0)
-    with np.errstate(divide="ignore", invalid="ignore"):
-        kinetic = xp.where(usable, kinetic, 1.0)[:, None]
-        direction = xp.where(usable[:, None], direction / norm[:, None], normal)[:, None, :]
-        fraction = _recoil_shift_fraction_unchecked(xp, kinetic, direction, rows, normal)
-    exceeds = positive & usable[:, None] & (xp.abs(fraction) > RECOIL_SHIFT_LIMIT)
-    return xp.asarray(xp.count_nonzero(exceeds), dtype=xp.int64)
+    return xp.stack([xp.count_nonzero(mask) for mask in masks])

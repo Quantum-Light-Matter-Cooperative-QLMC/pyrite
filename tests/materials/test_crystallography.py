@@ -858,3 +858,33 @@ def test_reflection_coupling_tables_u_matches_static_U_g(use_henke):
         ref = U_g("silicon", hkl, grid, 0.48, use_henke) / 510998.95
         np.testing.assert_allclose(u_re[row], ref.real, rtol=1e-12, atol=0)
         np.testing.assert_allclose(u_im[row], ref.imag, rtol=1e-12, atol=1e-18)
+
+
+def test_pinned_families_are_complete_symmetry_orbits():
+    """Each pinned family's symmetry members are exactly its Friedel pair.
+
+    The exact recoil root splits symmetry members that share ``u.g``
+    (Shi 2024 transverse recoil), so every member must be scored as its own
+    row. ``CrystalSpec.hkl_list`` scores ``(g, -g)`` per pinned family; that
+    is the complete orbit only while no other member exists.
+    Validation: line-recoil-in-medium-root
+    """
+    from pyrite.materials import load_material_catalog
+    from pyrite.materials.crystal import _reflection_families, reciprocal_g_vector
+
+    catalog = load_material_catalog()
+    pinned = {key: spec for key, spec in catalog.crystals.items() if spec.hkl_families}
+    assert pinned
+    for key, spec in pinned.items():
+        for family in spec.hkl_families:
+            _, magnitude = reciprocal_g_vector(family, spec.lattice)
+            groups = _reflection_families(key, 1000.0, spec.B_ang2, False, magnitude * 1.000001)
+            negative = tuple(-h for h in family)
+            # Rounding may split a noncentrosymmetric Friedel pair; take both groups.
+            members = {
+                hkl
+                for group in groups.values()
+                if tuple(family) in group or negative in group
+                for hkl in group
+            }
+            assert members == {tuple(family), negative}, (key, family, sorted(members))

@@ -562,10 +562,10 @@ def test_coherent_field_reducer_uses_segment_only_aw_and_phase():
     np.testing.assert_allclose(cp.asnumpy(pair_out), got_segment, rtol=2e-6, atol=2e-6)
 
 
-def test_coherent_prologue_returns_only_pair_dependent_planes():
+def test_coherent_prologue_returns_pair_layout_planes():
+    from pyrite.montecarlo.spectrum.coherent_prologue_jit_kernel import run_coherent_prologue_kernel
     from pyrite.montecarlo.spectrum.coherent_stream_jit_kernel import (
         CoherentStreamKernelConfig,
-        run_coherent_prologue_kernel,
     )
 
     hbarc = 1973.269804
@@ -636,9 +636,9 @@ def test_coherent_prologue_returns_only_pair_dependent_planes():
 
     assert len(result) == 8
     assert result[0].size == n_g * n_seg
-    assert result[1].size == n_seg  # aw is no longer duplicated across g
-    assert result[2].size == n_seg  # phase_slope is no longer duplicated across g
-    assert all(arr.size == n_g * n_seg for arr in result[3:])
+    # Exact recoil makes the half-width and phase slope per (segment, g)
+    # (line-recoil-in-medium-root); omitted recoil inputs are the classical root.
+    assert all(arr.size == n_g * n_seg for arr in result)
     E_r = cp.asnumpy(result[0]).reshape(n_g, n_seg)
     expected = hbarc * (v @ G.T).T / denom[None, :]
     np.testing.assert_allclose(E_r, expected, rtol=2e-5, atol=2e-4)

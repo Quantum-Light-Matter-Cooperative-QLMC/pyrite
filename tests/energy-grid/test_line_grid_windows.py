@@ -252,6 +252,8 @@ def _case_and_segments(**policy):
 
 def test_runner_resolves_a_windowed_grid_and_reuses_it_from_the_cache():
     case, segments, n_hat = _case_and_segments(windows=True)
+    # Keep this cache test away from the grazing-exit critical-angle refusal.
+    n_hat = np.array([np.sin(np.pi / 3), 0.0, np.cos(np.pi / 3)])
     placeholder = decode_energy_grid(case["E_grid_line"])
     grid, record = resolve_cxr_grid(case, segments, n_hat, 2, placeholder)
     policy = case["line_grid_policy"]

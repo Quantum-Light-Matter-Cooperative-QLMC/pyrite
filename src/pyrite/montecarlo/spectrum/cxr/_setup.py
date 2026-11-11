@@ -45,7 +45,9 @@ from ._temporal import segment_arrival_times
 # anomalous f' of edge-prone elements. v5 (#439): gamma and the Doppler
 # factor 1 - v.n_hat are formed cancellation-free and the in-medium root reads
 # a float64-formed decrement table, which moves float32 device lines at MeV.
-CXR_ESCAPE_MODEL = "segment-mean-v5-precise-kinematics"
+# v6 (#1099): every line route places, widens and phases lines on the exact
+# recoil root (line-recoil-in-medium-root), a percent-level shift at 10-100 keV.
+CXR_ESCAPE_MODEL = "segment-mean-v6-exact-recoil"
 
 
 #: Size of the most recent line setups' tabulation, for performance telemetry.
@@ -171,6 +173,10 @@ class _SpectrumSetup:
     escape_ends: Any = None
     escape_gradient: Any = None
     piece_fraction: Any = None
+    # Phased-field routes only: the electron's own midpoint age [Angstrom, c=1]
+    # (no bunch ``t0``), over which the exact-recoil phase accumulates.
+    # Validation: line-recoil-in-medium-root
+    seg_t_mid: Any = None
     # Bin-mean quadrature only: FP64 bin edges and inverse widths on the
     # accumulation routes' device (``_bin_quadrature.bin_axis``).
     bin_edges: Any = None
@@ -184,6 +190,8 @@ class _SpectrumSetup:
     # Read-only coefficient observers receive the current row's midpoint
     # susceptibility phase, aligned with idx/coefs (not all segment rows).
     capture_phase_rad: Any = None
+    # Matching reducer-geometry ``d`` with the exact-recoil shift.
+    capture_centre_ang: Any = None
     # Production intensity weight for the captured (reflection, orientation).
     capture_mosaic_weight: float = 1.0
     # Nonincreasing transverse bound sup F_perp for the row, or None.
@@ -581,7 +589,7 @@ def _prepare_spectrum(request):
     # went unbound on the paths that never read them; as dataclass fields they
     # need an explicit absent value. Nothing below reads one where the original
     # would have raised UnboundLocalError.
-    cdtype = omega_grid = delta_omega_grid = d_all = None
+    cdtype = omega_grid = delta_omega_grid = d_all = seg_t_mid = None
 
     info = CRYSTALS[crystal]
     n_atoms = len(info["basis"]) / info["V_cell"]
@@ -915,6 +923,7 @@ def _prepare_spectrum(request):
         escape_ends=escape_ends,
         escape_gradient=escape_gradient,
         piece_fraction=piece_fraction,
+        seg_t_mid=seg_t_mid,
         temporal_buf=temporal_buf,
         temporal_tau=temporal_tau,
         temporal_tau_geo=temporal_tau_geo,
