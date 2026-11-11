@@ -24,6 +24,7 @@ def member(profile):
 
 def ok(*args):
     result = invoke(command, list(args))
+    assert result.exit_code == 0, result.stderr
     assert_clean_result(result)
     return result
 
@@ -134,6 +135,59 @@ def test_profile_sampling_policy_replaces_the_presets_whole_group(_isolate_user_
     assert payload("profile", "show", "campaign")["adaptive_sampling"]["source"] != (
         "preset adaptive"
     )
+
+
+def test_numerics_cli_switches_sampling_in_both_directions(_isolate_user_catalog):
+    ok(
+        "numerics",
+        "create",
+        "budget",
+        "--cxr-histories",
+        "200",
+        "--brem-histories",
+        "60",
+        "--mosaic-nodes",
+        "7",
+    )
+    ok("profile", "create", "campaign", "--from", "quickstart")
+    ok("profile", "set", "campaign", "--numerics", "budget")
+    path = _isolate_user_catalog / "numerics" / "budget.toml"
+    before = path.read_text()
+
+    preview = ok("numerics", "set", "budget", "--sampling", "adaptive", "--dry-run")
+    assert "adaptive_sampling" in preview.stdout
+    assert path.read_text() == before
+    conflict = invoke(
+        command, ["numerics", "set", "budget", "--target-rse", "0.1", "--cxr-histories", "500"]
+    )
+    assert conflict.exit_code == 2
+    assert path.read_text() == before
+
+    ok("numerics", "set", "budget", "--sampling", "adaptive", "--target-rse", "0.03")
+    row = read_raw(bundled_catalog())["numerics"]["budget"]
+    assert "cxr_histories" not in row and "brem_histories" not in row
+    assert row["adaptive_sampling"]["target_rse"] == 0.03
+    assert row["mosaic_nodes"] == 7
+    shown = ok("numerics", "show", "budget").stdout
+    assert "adaptive" in shown and "target_rse" in shown
+    fields = payload("numerics", "show", "budget")["fields"]
+    assert {"n_electrons", "n_electrons_brem"}.isdisjoint(row["key"] for row in fields)
+    assert payload("profile", "show", "campaign")["adaptive_sampling"]["source"] == "preset budget"
+
+    ok("numerics", "set", "budget", "--observable", "cxr")
+    sampling = pyrite.config.load_numerics("budget", catalog=load_material_catalog()).sampling
+    assert isinstance(sampling, pyrite.config.AdaptiveSampling)
+    assert sampling.target_rse == 0.03 and sampling.observables == ("cxr",)
+
+    ok("numerics", "create", "fixed-copy", "--from", "budget", "--brem-histories", "80")
+    sampling = pyrite.config.load_numerics("fixed-copy", catalog=load_material_catalog()).sampling
+    assert sampling == pyrite.config.FixedSampling(brem_histories=80)
+    ok("numerics", "set", "budget", "--sampling", "fixed")
+    row = read_raw(bundled_catalog())["numerics"]["budget"]
+    assert "adaptive_sampling" not in row
+    assert row["cxr_histories"] == 450 and row["brem_histories"] == 100
+    assert row["mosaic_nodes"] == 7
+    assert payload("profile", "show", "campaign")["adaptive_sampling"]["effective"] is None
 
 
 def _precision_toml():

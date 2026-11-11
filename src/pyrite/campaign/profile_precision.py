@@ -74,7 +74,8 @@ def precision_resolution(profile):
     return None, policy_view(DEFAULT_PRECISION.to_dict()), "default", None
 
 
-def _precision_table(values):
+def precision_table(values):
+    """Build a TOML table from stored-vocabulary policy values."""
     table = tomlkit.table()
     for key in (STORED_KEYS.get(name, name) for name in Precision.__dataclass_fields__):
         if key in values and values[key] is not None:
@@ -133,7 +134,7 @@ def _check_adaptive(name, profile):
         raise ValueError(f"profile {name!r} cannot use adaptive sampling: {'; '.join(blockers)}")
 
 
-def _initial_policy(current, updates):
+def merge_policy(current, updates):
     """Merge ``updates`` over ``current``, or over the default budget for a first policy."""
     if current is None:
         current = {key: DEFAULT_PRECISION.to_dict()[key] for key in _INITIAL_FIELDS}
@@ -152,7 +153,7 @@ def set_precision(document, name, updates):
     """
     target = existing_profile(document, name)
     current = profile_precision_values(target)
-    merged = _initial_policy(current, updates)
+    merged = merge_policy(current, updates)
     counts = fixed_counts(target)
     if counts:
         raise ValueError(
@@ -160,7 +161,7 @@ def set_precision(document, name, updates):
             f"replace them with: pyrite profile numerics adaptive-sampling enable {name} [OPTIONS]"
         )
     _check_adaptive(name, target)
-    target["precision"] = _precision_table(merged)
+    target["precision"] = precision_table(merged)
     current = current or {}
     return tuple(key for key in updates if key in current and current[key] != updates[key])
 
@@ -178,12 +179,12 @@ def enable_precision(document, name, updates):
     current = profile_precision_values(target)
     policy = None
     if updates or current is not None:
-        policy = _initial_policy(current, updates)
+        policy = merge_policy(current, updates)
     counts = fixed_counts(target)
     for key in counts:
         target.pop(key)
     if policy is not None:
-        target["precision"] = _precision_table(policy)
+        target["precision"] = precision_table(policy)
     return counts
 
 
@@ -228,5 +229,5 @@ def reset_precision(document, name, fields=()):
     removed = tuple(field for field in fields if field in current)
     remaining = {key: value for key, value in current.items() if key not in fields}
     Precision.from_dict(remaining)
-    target["precision"] = _precision_table(remaining)
+    target["precision"] = precision_table(remaining)
     return removed

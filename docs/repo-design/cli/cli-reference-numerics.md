@@ -13,10 +13,12 @@ Usage: pyrite numerics [OPTIONS] COMMAND [ARGS]...
 
   Manage named numerics presets: sampling, reflections/mosaic, integration.
 
-  A profile attaches a preset with 'pyrite profile set PROFILE --numerics NAME'; the
-  profile's own fields, adaptive-sampling policy and CXR-grid policy (pyrite profile
-  numerics) override it. Bundled presets are read-only; clone one with 'create NAME
-  --from SOURCE'. Physical models live under pyrite physics.
+  Switch sampling with 'pyrite numerics set NAME --sampling adaptive' or '--sampling
+  fixed'.
+
+  Attach a preset with 'pyrite profile set PROFILE --numerics NAME'. Profile settings
+  (pyrite profile numerics) override the preset. Bundled presets are read-only; clone
+  one with 'create NAME --from SOURCE'. Physical models live under pyrite physics.
 
 Options:
   -h, --help  Show this message and exit.
@@ -62,16 +64,10 @@ Usage: pyrite numerics create [OPTIONS] NAME
 
 Options:
   --from SOURCE                   Clone SOURCE's fields; options then override them.
-  --cxr-histories N               Fixed Monte Carlo electron histories used to estimate
-                                  the CXR spectrum; setting it selects fixed counts.
-                                  Adaptive sampling (the default) is restored by 'pyrite
-                                  profile numerics adaptive-sampling enable PROFILE'.
-                                  [x>=1]
-  --brem-histories N              Fixed Monte Carlo electron histories used to estimate
-                                  bremsstrahlung; setting it selects fixed counts.
-                                  Adaptive sampling (the default) is restored by 'pyrite
-                                  profile numerics adaptive-sampling enable PROFILE'.
-                                  [x>=1]
+  --cxr-histories N               Select fixed sampling and set this estimator's history
+                                  count.  [x>=1]
+  --brem-histories N              Select fixed sampling and set this estimator's history
+                                  count.  [x>=1]
   --reflection-families N         Ranked reflection families to resolve.  [x>=1]
   --maximum-reflections N         Cap resolved reflections after family expansion.
                                   [x>=1]
@@ -92,6 +88,41 @@ Options:
   --channeling-zone-max-ang FLOAT RANGE
                                   Zone length cap in angstrom (default first layer
                                   thickness).  [x>0]
+  --sampling [fixed|adaptive]     Select adaptive or fixed sampling. Adaptive options
+                                  select adaptive; --cxr-histories or --brem-histories
+                                  select fixed. Switching replaces the previous sampling
+                                  settings. With no counts, switching to fixed uses 450
+                                  CXR and 100 brem histories.
+  --brem-target-rse FRACTION      Stop brem independently at this RSE; requires both cxr
+                                  and brem observables.  [x>0.0]
+  --brem-min-histories N          Brem minimum; defaults to --min-histories. Requires
+                                  --brem-target-rse.  [x>=2]
+  --brem-max-histories N          Brem maximum, at most --max-histories; defaults to it.
+                                  Requires --brem-target-rse.  [x>=2]
+  --target-rse FRACTION           Target relative standard error of each watched yield
+                                  (0.05 = 5%).  [x>0.0]
+  --min-histories N               Smallest count at which the run may stop; a multiple
+                                  of --block-histories.  [x>=2]
+  --max-histories N               Count at which the run stops regardless, flagged
+                                  statistics-limited.  [x>=2]
+  --block-histories N             Histories per transport block; the rule is checked at
+                                  block ends.  [x>=1]
+  --observable [cxr|brem|line]    Yield that must converge; repeat for both. Replaces
+                                  the watched set (a new policy watches line and brem).
+  --max-history-share FRACTION    Guard: largest share of a yield one history may hold
+                                  (default 0.05).  [0.0<x<=1.0]
+  --min-effective-histories N     Guard: effective sample size floor (sum m)^2 / sum m^2
+                                  (default 100).  [x>=0.0]
+  --stability-blocks K            Guard: block ends whose running mean must agree; 0
+                                  disables (default 3).  [x>=0]
+  --stability-fraction FRACTION   Guard: allowed relative mean drift as a fraction of
+                                  the target (default 0.5).  [x>=0.0]
+  --pilot-histories N             Pilot count that projects the stopping count and skips
+                                  checks until it.  [x>=1]
+  --band-ev START,STOP            Monitor band in eV (default: the case's line band).
+  --batch-means-band-ev START,STOP
+                                  Band in eV for reported per-bin batch-means errors;
+                                  costs one extra reduction.
   --description TEXT              Replace the display description.
   --dry-run                       Print proposed TOML diff; write nothing.
   -h, --help                      Show this message and exit.
@@ -157,16 +188,10 @@ Usage: pyrite numerics set [OPTIONS] NAME
   referencing profiles before saving.
 
 Options:
-  --cxr-histories N               Fixed Monte Carlo electron histories used to estimate
-                                  the CXR spectrum; setting it selects fixed counts.
-                                  Adaptive sampling (the default) is restored by 'pyrite
-                                  profile numerics adaptive-sampling enable PROFILE'.
-                                  [x>=1]
-  --brem-histories N              Fixed Monte Carlo electron histories used to estimate
-                                  bremsstrahlung; setting it selects fixed counts.
-                                  Adaptive sampling (the default) is restored by 'pyrite
-                                  profile numerics adaptive-sampling enable PROFILE'.
-                                  [x>=1]
+  --cxr-histories N               Select fixed sampling and set this estimator's history
+                                  count.  [x>=1]
+  --brem-histories N              Select fixed sampling and set this estimator's history
+                                  count.  [x>=1]
   --reflection-families N         Ranked reflection families to resolve.  [x>=1]
   --maximum-reflections N         Cap resolved reflections after family expansion.
                                   [x>=1]
@@ -187,6 +212,41 @@ Options:
   --channeling-zone-max-ang FLOAT RANGE
                                   Zone length cap in angstrom (default first layer
                                   thickness).  [x>0]
+  --sampling [fixed|adaptive]     Select adaptive or fixed sampling. Adaptive options
+                                  select adaptive; --cxr-histories or --brem-histories
+                                  select fixed. Switching replaces the previous sampling
+                                  settings. With no counts, switching to fixed uses 450
+                                  CXR and 100 brem histories.
+  --brem-target-rse FRACTION      Stop brem independently at this RSE; requires both cxr
+                                  and brem observables.  [x>0.0]
+  --brem-min-histories N          Brem minimum; defaults to --min-histories. Requires
+                                  --brem-target-rse.  [x>=2]
+  --brem-max-histories N          Brem maximum, at most --max-histories; defaults to it.
+                                  Requires --brem-target-rse.  [x>=2]
+  --target-rse FRACTION           Target relative standard error of each watched yield
+                                  (0.05 = 5%).  [x>0.0]
+  --min-histories N               Smallest count at which the run may stop; a multiple
+                                  of --block-histories.  [x>=2]
+  --max-histories N               Count at which the run stops regardless, flagged
+                                  statistics-limited.  [x>=2]
+  --block-histories N             Histories per transport block; the rule is checked at
+                                  block ends.  [x>=1]
+  --observable [cxr|brem|line]    Yield that must converge; repeat for both. Replaces
+                                  the watched set (a new policy watches line and brem).
+  --max-history-share FRACTION    Guard: largest share of a yield one history may hold
+                                  (default 0.05).  [0.0<x<=1.0]
+  --min-effective-histories N     Guard: effective sample size floor (sum m)^2 / sum m^2
+                                  (default 100).  [x>=0.0]
+  --stability-blocks K            Guard: block ends whose running mean must agree; 0
+                                  disables (default 3).  [x>=0]
+  --stability-fraction FRACTION   Guard: allowed relative mean drift as a fraction of
+                                  the target (default 0.5).  [x>=0.0]
+  --pilot-histories N             Pilot count that projects the stopping count and skips
+                                  checks until it.  [x>=1]
+  --band-ev START,STOP            Monitor band in eV (default: the case's line band).
+  --batch-means-band-ev START,STOP
+                                  Band in eV for reported per-bin batch-means errors;
+                                  costs one extra reduction.
   --description TEXT              Replace the display description.
   --dry-run                       Print proposed TOML diff; write nothing.
   -y, --yes                       Skip the standard-profile confirmation.

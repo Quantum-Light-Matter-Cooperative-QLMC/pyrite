@@ -11,12 +11,14 @@ from collections.abc import Iterable, Mapping
 from typing import Any
 
 from pyrite._numerics import CHANNELING_KEYS, CONVERGENCE_KEYS, PHYSICS_FIELDS, SAMPLING_KEYS
+from pyrite._precision import Precision
+from pyrite.campaign.profile_precision import policy_view
 from pyrite.console.tables import emit_settings, value_source
 
 Row = Mapping[str, Any]
 
 _NUMERICS_GROUPS = (
-    ("Sampling", (*SAMPLING_KEYS, "adaptive_sampling")),
+    ("Sampling", (*SAMPLING_KEYS, "precision")),
     ("Reflections and mosaic", CONVERGENCE_KEYS),
     ("CXR grid", ("cxr_grid_policy",)),
     ("Channeling grid", tuple(key for key in CHANNELING_KEYS if key not in PHYSICS_FIELDS)),
@@ -54,7 +56,18 @@ def _plain(rows: Iterable[Row]) -> list[tuple[str, object, object]]:
 def sampling_rows(rows: list[Row], adaptive: Mapping[str, Any] | None):
     """Sampling rows led by the history-count mode; fixed counts unused when adaptive."""
     if adaptive is None:
-        return _plain(rows)
+        policy = next((row for row in rows if row["key"] == "precision"), None)
+        if policy is None:
+            source = next(
+                (row["source"] for row in rows if row["explicit"] is not None), "built-in"
+            )
+            return [("mode", "fixed", source), *_plain(rows)]
+        source = policy["source"]
+        effective = policy_view(Precision.from_dict(policy["effective"]).to_dict())
+        return [
+            ("mode", "adaptive", source),
+            *((key, value, source) for key, value in effective.items() if value is not None),
+        ]
     effective, source = adaptive["effective"], adaptive["source"]
     if effective is None:
         # Fixed mode follows from the profile's own settings (counts, emission, ...).
