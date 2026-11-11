@@ -180,7 +180,11 @@ def test_match_series_tolerant():
     assert af._match_series(ref, 99.0) is None
 
 
-def test_single_segment_lineshape_converges_to_closed_form(anchor):
+def test_single_segment_lineshape_converges_to_closed_form(anchor, monkeypatch):
+    # Feranchuk–Spence is a classical closed form; compare its classical limit.
+    from pyrite.montecarlo.spectrum.cxr import _recoil
+
+    monkeypatch.setattr(_recoil, "_RECOIL_HBARC_EV_ANG", 0.0)
     short_ratio = af.single_segment_anchor(anchor, 25.0, L_seg_ang=100.0)[2]
     long_ratio = af.single_segment_anchor(anchor, 25.0, L_seg_ang=3000.0)[2]
 

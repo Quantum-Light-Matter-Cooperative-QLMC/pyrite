@@ -8,9 +8,9 @@ import pytest
 from pyrite.campaign.sweep import BeamSpec, Sweep, build_cases, layer_radiator
 from pyrite.detectors import EnergyBins
 from pyrite.materials import LayerSpec, load_material_catalog
-from pyrite.materials.crystal import HBARC_EV_ANG
-from pyrite.montecarlo import beta_from_keV, mc_cxr_spectrum
+from pyrite.montecarlo import mc_cxr_spectrum
 from pyrite.montecarlo.geometry import _orientation_R
+from tests.helpers.recoil import mass_shell_root
 
 GENERAL_LATTICE = {
     "system": "general",
@@ -329,8 +329,7 @@ crystal = "mos2"
     assert float(np.max(surface_spec)) > 0.0
     a_ang = float(catalog.crystal("mos2").lattice["a"])
     g_100 = 4.0 * np.pi / (np.sqrt(3.0) * a_ang)
-    beta_30 = beta_from_keV(30.0)
     n_unit = n_hat / np.linalg.norm(n_hat)
-    expected_resonance_eV = HBARC_EV_ANG * beta_30 * g_100 / (1.0 - beta_30 * n_unit[2])
+    expected_resonance_eV = mass_shell_root(30000.0, [0.0, 0.0, g_100], n_unit)
     assert grid[int(np.argmax(surface_spec))] == pytest.approx(expected_resonance_eV, abs=5.0)
     assert not np.allclose(surface_spec, direct_spec, rtol=1e-6, atol=0.0)

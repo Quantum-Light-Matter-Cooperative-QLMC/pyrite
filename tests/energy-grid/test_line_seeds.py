@@ -33,6 +33,7 @@ from pyrite.montecarlo.spectrum.cxr_seeds import (
     register_seed_provider,
 )
 from pyrite.montecarlo.transport import beta_from_keV
+from tests.helpers.recoil import mass_shell_root
 
 _CRYSTAL = next(key for key, info in CRYSTALS.items() if {e for e, _ in info["basis"]} == {"C"})
 _N_HAT = np.array([np.sin(np.deg2rad(60.0)), 0.0, np.cos(np.deg2rad(60.0))])
@@ -51,32 +52,36 @@ def _flights(energies_keV, lengths_ang, directions):
 
 def _resonance_eV(energy_keV, direction, hkl):
     g_vector, _ = reciprocal_g_vector(hkl, CRYSTALS[_CRYSTAL]["lattice"])
-    beta = float(beta_from_keV(energy_keV))
-    v = beta * np.asarray(direction, dtype=float) / np.linalg.norm(direction)
-    return HBARC_EV_ANG * float(v @ g_vector) / (1.0 - float(v @ _N_HAT))
+    incident = np.asarray(direction, dtype=float) / np.linalg.norm(direction)
+    return mass_shell_root(energy_keV * 1000.0, g_vector, _N_HAT, incident=incident)
 
 
 def _in_medium_denominator(energy_keV, direction, hkl):
-    """``1 - Re n(E) v.n`` at the root of ``E = hbar c v.g / (1 - Re n(E) v.n)``.
-
-    Solved with pointwise ``refractive_index`` rather than the kernels' table.
-    """
+    """Mass-shell root and local slope using pointwise refractive index."""
     g_vector, _ = reciprocal_g_vector(hkl, CRYSTALS[_CRYSTAL]["lattice"])
-    beta = float(beta_from_keV(energy_keV))
-    v = beta * np.asarray(direction, dtype=float) / np.linalg.norm(direction)
-    v_dot_g, v_dot_n = float(v @ g_vector), float(v @ _N_HAT)
+    incident = np.asarray(direction, dtype=float) / np.linalg.norm(direction)
 
     def n_re(energy_eV):
         return float(np.real(refractive_index(_CRYSTAL, np.array([energy_eV]))[0]))
 
-    vacuum = HBARC_EV_ANG * v_dot_g / (1.0 - v_dot_n)
+    vacuum = _resonance_eV(energy_keV, direction, hkl)
+
+    def mismatch(e, delta):
+        h = np.array([0.0, 0.0, -1.0 / _N_HAT[2]])
+        return mass_shell_root(
+            energy_keV * 1000.0, g_vector, _N_HAT + delta * h, photon=e, incident=incident
+        )
+
     root = brentq(
-        lambda e: e * (1.0 - v_dot_n + (1.0 - n_re(e)) * v[2] / _N_HAT[2]) - HBARC_EV_ANG * v_dot_g,
+        lambda e: mismatch(e, 1.0 - n_re(e)),
         0.9 * vacuum,
         1.1 * vacuum,
         xtol=1e-9,
     )
-    return root, 1.0 - v_dot_n + (1.0 - n_re(root)) * v[2] / _N_HAT[2]
+    delta = 1.0 - n_re(root)
+    step = 0.01
+    slope = (mismatch(root + step, delta) - mismatch(root - step, delta)) / (2 * step)
+    return root, slope * HBARC_EV_ANG
 
 
 def test_band_seeds_centre_on_the_in_medium_root_the_kernels_use():
@@ -300,5 +305,9 @@ def test_kinematic_summary_reports_the_narrowest_feature_not_only_the_quantile()
     _root, denominator = _in_medium_denominator(30.0, g_vector, (0, 0, 2))
     expected = 2.0 * np.pi * HBARC_EV_ANG / (denominator * t_L)
 
-    assert kinematic["narrowest_feature_width_eV"] == pytest.approx(expected, rel=1e-6)
-    assert kinematic["samples_at_narrowest"] == pytest.approx(expected / kinematic["spacing_eV"])
+    # The production Snell approximation drops mixed recoil/dispersion terms;
+    # the oracle retains them and evaluates the optical index pointwise.
+    assert kinematic["narrowest_feature_width_eV"] == pytest.approx(expected, rel=1e-5)
+    assert kinematic["samples_at_narrowest"] == pytest.approx(
+        kinematic["narrowest_feature_width_eV"] / kinematic["spacing_eV"]
+    )
