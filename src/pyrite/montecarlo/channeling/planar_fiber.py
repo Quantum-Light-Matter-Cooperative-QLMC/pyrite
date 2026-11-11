@@ -32,7 +32,10 @@ energy (no stopping) and the absorbing cut ``E_perp < barrier + margin``
 of :class:`.density.DensityMatrixSolver`. Isotropic sites only; directional
 valence is refused.
 
-Validation: cr-planar-fiber-unraveling
+:func:`planar_on_axis_source` is the on-axis two-time photon source of this
+model (the companion estimator of ``cr-axial-fiber-regression``).
+
+Validation: cr-planar-fiber-unraveling, cr-planar-fiber-regression
 """
 
 from __future__ import annotations
@@ -43,6 +46,7 @@ import numpy as np
 
 from ...materials.channeling.potential import PlanarProfile
 from ...materials.crystal import CRYSTALS, HBARC_EV_ANG, M_E_EV, reciprocal_g_vector
+from .axial_fiber_regression import FiberOnAxisSource, fiber_on_axis_source
 from .axial_fiber_unraveling import FiberChannels
 from .axial_tds_continuum import TdsString
 from .bloch import _hamiltonian, longitudinal_kinematics
@@ -78,7 +82,8 @@ class PlanarFiberInputs:
     ``orders`` are the window orders ``-M..M``; ``entry_orders`` the
     entrance plane wave on them at ``carrier_inv_ang``; ``k_inv_ang`` the
     longitudinal wavenumber ``p / hbar``; ``barrier_eV`` and ``cutoff_eV``
-    the planar barrier and the absorbing cut.
+    the planar barrier and the absorbing cut; ``kinetic_energy_eV`` the
+    fixed electron kinetic energy.
     """
 
     channels: FiberChannels
@@ -91,6 +96,7 @@ class PlanarFiberInputs:
     barrier_eV: float
     cutoff_eV: float
     sites: tuple[PlaneSite, ...]
+    kinetic_energy_eV: float
 
 
 def plane_sites(profile: PlanarProfile) -> tuple[PlaneSite, ...]:
@@ -258,4 +264,62 @@ def planar_fiber_inputs(
         barrier_eV=float(barrier),
         cutoff_eV=cutoff,
         sites=sites,
+        kinetic_energy_eV=float(kinetic_energy_eV),
+    )
+
+
+def planar_on_axis_source(
+    inputs: PlanarFiberInputs,
+    *,
+    depths_ang,
+    photon_energy_eV,
+    incident_ids,
+    seed: int = 0,
+    absorption_inv_ang=None,
+    exit_path_ang=None,
+    search_step_ang: float = 100.0,
+    max_working_bytes: int = 256 * 1024**2,
+) -> FiberOnAxisSource:
+    r"""On-axis two-time photon source of the planar fibre model.
+
+    :func:`.axial_fiber_regression.fiber_on_axis_source` on the channels of
+    ``inputs``, with lowering currents ending on bound states
+    (``boundary_eV`` = the planar barrier): bound -> bound lines plus
+    capture from retained above-barrier states, the partition of
+    :func:`.emission.channeling_spectrum`. No secular approximation, line
+    shape or capture clustering is assumed: line positions, widths, overlaps,
+    cross terms between transitions and capture all follow from
+    $G(z_i,z_j)=\mathrm{Tr}[J_x\Lambda_{z_i-z_j}(\rho(z_j)J_x^\dagger)]$.
+
+    Planar currents: the window orders are ``(n, 0)`` and the carrier's
+    ``y`` component is the accumulated out-of-plane momentum, so
+    $J_y=\hbar\kappa_y/(\gamma mc)\,\mathbb 1$ in every fibre and its
+    positive-frequency part vanishes; only $J_x=\hbar(\kappa_x+ng)/(\gamma mc)$
+    radiates, with $\langle f|J_x|i\rangle=i(E_f-E_i)x_{fi}/\hbar c$
+    (``cr-dipole-matrix-element``). The fibre-global
+    $\hbar^2\kappa_y^2/2\gamma m$ dropped from $H(\kappa)$ cancels in every
+    record (companion and primary share the fibre). Observation is along the
+    beam axis; the electron's own out-of-plane angle does not shift the
+    Doppler factor (as :func:`.emission.channeling_spectrum` at
+    ``theta = 0`` with no divergence).
+
+    Units: eV, Å; photons/(eV sr incident electron).
+
+    Validation: cr-planar-fiber-regression
+    """
+    return fiber_on_axis_source(
+        inputs.channels,
+        inputs.entry_orders,
+        kinetic_energy_eV=inputs.kinetic_energy_eV,
+        hbar_v_eV_ang=inputs.hbar_v_eV_ang,
+        depths_ang=depths_ang,
+        photon_energy_eV=photon_energy_eV,
+        incident_ids=incident_ids,
+        seed=seed,
+        carrier_inv_ang=inputs.carrier_inv_ang,
+        boundary_eV=inputs.barrier_eV,
+        absorption_inv_ang=absorption_inv_ang,
+        exit_path_ang=exit_path_ang,
+        search_step_ang=search_step_ang,
+        max_working_bytes=max_working_bytes,
     )
