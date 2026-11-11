@@ -80,6 +80,9 @@ class StudyCase:
 # reaches ~1.3 keV, 54.5 MeV: M = 48 reaches ~0.9 keV for Si(110)).
 CASES = {
     "si110_5": StudyCase("si110_5", (1, 1, 0), 5.0e6, 0.0, 20.0, 16),
+    # channeling_demo: 17 MeV, 2 µm, (1-10) planes (equivalent to (110)), zero
+    # incidence and divergence (its beam has none).
+    "demo_17": StudyCase("demo_17", (1, 1, 0), 17.0e6, 0.0, 2.0, 32),
     "si110_17": StudyCase("si110_17", (1, 1, 0), 16.92e6, 2.2e-3, 120.0, 32),
     "si100_17": StudyCase("si100_17", (1, 0, 0), 16.92e6, 2.2e-3, 120.0, 24),
     "si100_54": StudyCase("si100_54", (1, 0, 0), 54.5e6, 1.0e-3, 500.0, 36),
@@ -99,13 +102,25 @@ def checkpoints(case: StudyCase, count: int = 241) -> np.ndarray:
     return np.linspace(0.0, case.thickness_um * 1e4, count)
 
 
-def _inputs(case: StudyCase, arm: str, margin_eV: float, order_max: int | None):
+def _inputs(
+    case: StudyCase,
+    arm: str,
+    margin_eV: float,
+    order_max: int | None,
+    outgoing_order_max: int | None = None,
+    kick_half: int | None = None,
+):
     from pyrite.materials.channeling import planar_profile
     from pyrite.montecarlo.channeling.planar_fiber import planar_fiber_inputs
 
     profile = planar_profile("silicon", case.hkl, TEMPERATURE_K)
     inputs = planar_fiber_inputs(
-        profile, case.kinetic_energy_eV, order_max=order_max or case.order_max, margin_eV=margin_eV
+        profile,
+        case.kinetic_energy_eV,
+        order_max=order_max or case.order_max,
+        outgoing_order_max=outgoing_order_max,
+        margin_eV=margin_eV,
+        kick_half=kick_half,
     )
     channels = inputs.channels
     if arm == "reference":
@@ -125,12 +140,33 @@ def entrance_angles(seed: int, incident: int, sigma: float) -> tuple[float, floa
     return tuple(float(x) for x in sigma * rng.standard_normal(2))
 
 
-def run_arm(key, arm, start, count, *, seed=0, margin_eV=300.0, order_max=None, n_checkpoints=241):
-    """Run ``count`` incidents from ``start``; per-incident arrays (see module doc)."""
+def run_arm(
+    key,
+    arm,
+    start,
+    count,
+    *,
+    seed=0,
+    margin_eV=300.0,
+    order_max=None,
+    n_checkpoints=241,
+    outgoing_order_max=None,
+    kick_half=None,
+    search_step_ang=200.0,
+    probe=None,
+):
+    """Run ``count`` incidents from ``start``; per-incident arrays (see module doc).
+
+    ``outgoing_order_max``, ``kick_half`` and ``search_step_ang`` are the
+    budget probes' knobs (``checks/planar_fiber_budget.py``); ``probe`` labels
+    the arm in ``info``.
+    """
     from pyrite.montecarlo.channeling.axial_fiber_unraveling import _Engine, _trajectory
 
     case = CASES[key]
-    profile, inputs, channels = _inputs(case, arm, margin_eV, order_max)
+    profile, inputs, channels = _inputs(
+        case, arm, margin_eV, order_max, outgoing_order_max, kick_half
+    )
     engine = _Engine(channels, inputs.hbar_v_eV_ang)
     m = int(engine.m[0])
     box = int(engine.box[0])
@@ -176,7 +212,7 @@ def run_arm(key, arm, start, count, *, seed=0, margin_eV=300.0, order_max=None, 
             float(cps[-1]),
             seed,
             incident,
-            200.0,
+            float(search_step_ang),
             1e-6,
             observe,
             tuple(float(z) for z in cps),
@@ -205,6 +241,9 @@ def run_arm(key, arm, start, count, *, seed=0, margin_eV=300.0, order_max=None, 
         "margin_eV": margin_eV,
         "order_max": m,
         "outgoing_order_max": box,
+        "kick_half": kick_half,
+        "search_step_ang": float(search_step_ang),
+        "probe": probe,
         "cutoff_eV": None if arm == "reference" else inputs.cutoff_eV,
         "barrier_eV": u_max,
         "well_bottom_eV": u_min,
@@ -243,7 +282,19 @@ def load(paths) -> dict:
     """Concatenate chunks of one arm (same case, arm, seed and grid), sorted by incident."""
     chunks = [dict(np.load(p, allow_pickle=False)) for p in paths]
     infos = [json.loads(str(c["info"])) for c in chunks]
-    keys = {(i["case"]["key"], i["arm"], i["seed"], i["margin_eV"], i["order_max"]) for i in infos}
+    keys = {
+        (
+            i["case"]["key"],
+            i["arm"],
+            i["seed"],
+            i["margin_eV"],
+            i["order_max"],
+            i["outgoing_order_max"],
+            i.get("kick_half"),
+            i.get("search_step_ang", 200.0),
+        )
+        for i in infos
+    }
     if len(keys) != 1:
         raise ValueError(f"chunks mix configurations: {sorted(keys)}")
     order = np.argsort([i["start"] for i in infos])
