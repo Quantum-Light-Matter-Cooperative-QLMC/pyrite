@@ -334,7 +334,7 @@
     {
       "path": "src/pyrite/montecarlo/channeling/emission.py",
       "name": "emission_lines",
-      "cc": 45
+      "cc": 42
     },
     {
       "path": "src/pyrite/montecarlo/channeling/energy_ensemble.py",

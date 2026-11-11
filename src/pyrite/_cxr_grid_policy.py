@@ -297,7 +297,7 @@ def kinematic_cxr_stop_eV(
 
     Source equation: the resonance the line kernels solve,
     ``E_res = hbar c (v . g) / (1 - n_hat . v)``
-    (``montecarlo/spectrum/lines/_kernels.py::_cxr_kin_core``; ledger rows
+    (``montecarlo/spectrum/cxr/_kernels.py::_cxr_kin_core``; ledger rows
     ``line-energy-dispersion`` and ``finite-time-lineshape``). Writing
     ``v = beta c v_hat`` and maximizing numerator and denominator independently
     over direction gives ``|v . g| <= beta |g|`` and ``1 - n_hat . v >= 1 - beta``,
@@ -311,8 +311,13 @@ def kinematic_cxr_stop_eV(
     ``energy_grid.derive`` sits well above the fixed-geometry value
     ``1 - beta cos(theta_obs)`` would give. The reflection set is the case's own
     ``hkl_list``; reflections outside it radiate nothing in this model.
-    ``beta`` is the incident speed, the largest the electron ever has, so
-    slowing down only moves lines down.
+    ``beta`` is taken at ``energy_keV``; slowing down only moves lines down,
+    so the bound is strict for a monoenergetic beam. It is *not* strict when
+    the beam has an energy spread (``energy_spread_frac`` samples an unbounded
+    Gaussian, so some electrons start above ``energy_keV``) -- see the ledger
+    row's ``discrepancy`` status. The vacuum denominator also assumes
+    ``Re n <= 1``; soft-x-ray windows with ``Re n > 1`` can exceed the
+    unrounded bound slightly.
 
     Limiting cases: ``beta -> 0`` gives ``E_res -> 0`` (a stopped electron
     radiates no line); at fixed ``beta`` the bound is linear in ``|g|_max``,

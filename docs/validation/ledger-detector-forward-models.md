@@ -67,10 +67,10 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Claim:** accepted event mass per incident electron scales to expected counts with $N_e=t_{exp}f_{rep}Q_{bunch}10^{-12}/e$; reporting bins plus disjoint underflow, overflow, and below-cut channels conservatively partition native measured event mass
 - **Code:** `instrument/acquisition.py::electron_count`; `instrument/acquisition.py::score_acquisition`
 - **Source:** SI definitions of coulomb, picocoulomb, hertz, and the exact elementary charge; `scipy.constants.elementary_charge`
-- **Status:** unverified
-- **Checks:** units; analytic one-electron-per-bunch normalization; exact zero-charge limit; hand-computed fractional-overlap partition; component-additive totals; fixed-seed selection/chunk invariance
+- **Status:** rederived
+- **Checks:** units; analytic one-electron-per-bunch normalization; exact zero-charge limit; hand-computed fractional-overlap partition; component-additive totals; fixed-seed selection/chunk invariance; 2026-11-11 fresh-context re-derivation matches: N_e equals exact-rational references (relative difference 0); 2000 random layouts agree with an independent loop reference to 8.9e-16 and conserve mass to 4e-16; [write-up](detectors/pixel-acquisition-counting.md)
 - **Anchor:** `tests/instrument/test_acquisition_core.py`; `tests/results/test_spatial_model.py`
-- **Notes:** implementation-context review only. Uniform density within each native measured bin is the conservative-rebin assumption. `Result.spectral_flux` (removed in 0.29.0) was the former carrier of the per-electron-to-rate scaling; explicit current and acceptance scaling now lives in `Result.accepted_spectra` and spectral `.rate(current=...)`, validated under `spectral-explicit-rate-normalization`. Fresh-context validation remains pending; no hardware calibration claim is made.
+- **Notes:** Uniform density within each native measured bin is the conservative-rebin assumption. Side-channel convention is range-first: underflow $[0,e_0)$ and overflow $[e_M,\infty)$ lie outside the reporting window and take precedence over below-cut; below-cut is in-window sub-threshold mass $[e_0,\min(E_{th},e_M))$ (now stated in the `score_acquisition` docstring; reporting bins and totals are convention-independent). Detector native response (`native_score`) is out of scope. `Result.spectral_flux` (removed in 0.29.0) was the former carrier of the per-electron-to-rate scaling; explicit current and acceptance scaling now lives in `Result.accepted_spectra` and spectral `.rate(current=...)`, validated under `spectral-explicit-rate-normalization`. No hardware calibration claim is made. Only a human may mark this row `signed-off`.
 
 ## `pixel-angular-interpolation`
 

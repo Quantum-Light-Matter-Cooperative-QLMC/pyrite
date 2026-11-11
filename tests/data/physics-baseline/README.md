@@ -283,3 +283,14 @@ its `case_content_key`/`parameter_sha256`; `outputs.json` keeps the first
 eight generation-0 rows, the converted photon energies and launch kinds, while
 the pair-electron energies, row count and total path re-realize. All other
 families and every tolerance are unchanged.
+
+## Planar zone-row ownership (#1055)
+
+Native PXR/CBS scoring of a planar channeling case now drops the plane's own
+reciprocal row on zone rows, and `spec_channeling` adds the in-cut free→free
+block (`final_states="tracked"`). This changed `CHANNELING_MODEL` to
+`planar-density-matrix-emission-v6`. Re-pinned: only the `case_content_key` in
+`channeling.json`. The channeling fixture's beam lies in the Si (1-10) planes,
+so `v·g = 0` for the own row and its native zone-row line was already zero:
+`spec`, `spec_characteristic`, `brem`, the rows and the fates keep their
+expectations. `spec_channeling` is not pinned here.

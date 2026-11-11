@@ -248,10 +248,10 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Equation:** $\lambda^{-1}_{i,s}(E)=n_i\sigma_{i,s}(E)10^{16}\,{\rm \AA}^{-1}$ for $n_i$ in atoms/Å$^3$ and $\sigma_{i,s}$ in cm$^2$; total rate is the sum over elements and subshells
 - **Assumptions:** independent-atom mixture in a homogeneous medium; linear-linear interpolation as declared by the accepted ENDF sections; rates only, with no inferred transfer or recoil distribution
 - **Limiting cases:** a closed shell contributes zero; below every binding energy the material rate is zero; an accessible shell outside its tabulated projectile-energy range is rejected
-- **Status:** unverified
-- **Checks:** source parser validates monotone grids, nonnegative values, and ENDF interpolation law; independent material-rate and Bote–Salvat comparisons remain pending
-- **Anchor:** [implementation derivation](beam-transport/eedl-material-shell-rates.md)
-- **Notes:** Host-side input preparation only. No production event scheduler consumes these rates; differential spectrum, stopping closure, and fresh-context verification remain open. Only a human may mark this row `signed-off`.
+- **Status:** rederived
+- **Checks:** source parser validates monotone grids, nonnegative values, and ENDF interpolation law; independent material-rate and Bote–Salvat comparisons remain pending; 2026-11-11 fresh-context re-derivation matches ([independent verification](beam-transport/eedl-material-shell-rates.md#independent-verification)): independent fixed-column ENDF parse agrees within 1 ulp for Si K and ZrTe5 Zr K / Te L3 at 30 keV, at a node and at threshold; whole-tape scan (1612 sections) all INT=2, strictly increasing, nonnegative; subshell sum equals MT=522 to 5e-9
+- **Anchor:** `tests/montecarlo/collisions/test_shell_ionization_rates.py` (Si K at 30 keV against the independent ENDF reference, 1e-9); [implementation derivation](beam-transport/eedl-material-shell-rates.md)
+- **Notes:** Host-side rate preparation consumed by `transport/shell_rates.py::eedl_inner_cross_sections` (`penelope-shell-rate-closure`). Ni M4/M5 and Ag N5 tables start ~0.5–0.7 eV above their 10 eV binding energy, so Ni/Ag compositions raise for ~10–10.7 eV (below the 1 keV cutoff). The unit constant was renamed `_ANG2_PER_CM2` after review (value unchanged). Differential spectrum and stopping closure remain open. Only a human may mark this row `signed-off`.
 
 ## `sbethe-atomic-shell-inputs`
 
@@ -339,10 +339,10 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Equation:** $g(Q)\propto[Q(1+Q/(2m_ec^2))]^{-1}$ on $(Q_-,Q'_k)$, $L(Q)=\ln[Q/(Q+2m_ec^2)]$; longitudinal $\cos\theta=[p(E)^2+p(E-W'_k)^2-p(Q)^2]/[2p(E)p(E-W'_k)]$ with $p(T)^2=T(T+2m_ec^2)$; close $Q=W$, $\cos^2\theta=(E-W)(E+2m_ec^2)/[E(E-W+2m_ec^2)]$; $\phi=2\pi\xi$
 - **Assumptions:** bound-shell angular distribution uses $W'_k$ even when its sampled loss differs; the incoming flight is the polar axis; transverse deflection is neglected; the returned azimuth needs caller rotation to world coordinates
 - **Limiting cases:** longitudinal $Q=Q_-$ gives $\cos\theta=1$; transverse $\cos\theta=1$; close $W/E\to0$ gives $\cos\theta\to1$
-- **Status:** unverified
-- **Checks:** every nonzero fixture branch at 10 keV; four longitudinal recoil quantiles versus direct $Q$ quadrature ($10^{-9}$); close and longitudinal polar angles versus source equations; transverse and invalid-uniform limits; every active catalog branch for Si/SiO₂/MoS₂ at 1, 10 and 100 keV
+- **Status:** rederived
+- **Checks:** every nonzero fixture branch at 10 keV; four longitudinal recoil quantiles versus direct $Q$ quadrature ($10^{-9}$); close and longitudinal polar angles versus source equations; transverse and invalid-uniform limits; every active catalog branch for Si/SiO₂/MoS₂ at 1, 10 and 100 keV; 2026-11-11 code-blind fresh-context re-derivation from the PENELOPE-2024 PDF matches term by term ([independent verification](beam-transport/penelope-shell-hard-recoil.md#independent-verification)): 40-digit mpmath reference over every active Si/SiO₂/MoS₂ channel at 1, 10, 100 keV, including the modified-resonance branch $E\le3W_k-2U_k$ (SiO₂ Si-L1 1 keV, Si-K 10 keV; MoS₂ M1–M3 1 keV): sampled $Q$ ≤ 8.2e-13 relative, longitudinal and close $\cos\theta$ ≤ 3.6e-14
 - **Anchor:** `tests/montecarlo/collisions/test_shell_partition.py`; [implementation derivation](beam-transport/penelope-shell-hard-recoil.md)
-- **Notes:** Host-side primary recoil; segment scheduling, independent measured recoil comparison, and CPU/GPU reproducibility remain open. Secondary direction has its own ledger row. Only a human may mark this row `signed-off`.
+- **Notes:** Host-side primary recoil; segment scheduling, independent measured recoil comparison, and CPU/GPU reproducibility remain open. Secondary direction has its own ledger row. Only a human may mark this row `signed-off`. An earlier batch-3 verifier reached the same verdict (Q ≤ 2.7e-15) but saw the implementation before deriving, so the code-blind re-run is the evidence of record. The 10 keV Si fixture in the anchor never reaches the $W'_k\ne W_k$ branch; the catalog test reaches it with bounds-only checks.
 
 ## `penelope-shell-secondary-direction`
 
