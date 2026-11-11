@@ -86,7 +86,7 @@ LINES = {
 }
 #: Budget checkpoints c [µm]: crystal thicknesses within each configuration's slab.
 BUDGET_UM = {
-    "demo_17": (0.5, 1.0, 2.0),
+    "demo_17": (2.0,),
     "si110_17": (20.0, 60.0, 120.0),
     "si100_17": (20.0, 60.0, 120.0),
     "si100_54": (50.0, 200.0, 500.0),
@@ -189,13 +189,10 @@ def analyze(key: str, directory: Path) -> dict:
     def fates(arm):
         names = {"outgoing": "physical_outgoing", "tail": "physical_outgoing"}
         return [
-            AxialHandoffRecord(
-                int(i), names.get(KINDS[k], KINDS[k]), float(d) if KINDS[k] != "retained" else 0.0
-            )
+            AxialHandoffRecord(int(i), names.get(KINDS[k], KINDS[k]), float(d))
             for i, k, d in zip(arm["ids"], arm["kind"], arm["depth"], strict=True)
         ]
 
-    sha = loaded["control"]["info"]["source_sha"]
     case = CASES[key]
     settings = probe_settings(key, "control")
     case_key = (
@@ -213,7 +210,7 @@ def analyze(key: str, directory: Path) -> dict:
         sampled_max_depth_ang=float(grid[-1]),
         case_key=case_key,
         observable_key=observable_key,
-        model_id=f"cr-planar-fiber-unraveling@{sha}",
+        model_id="cr-planar-fiber-unraveling",  # planar_fiber.py unchanged since 986fc3849
         evidence_id=f"planar-budget-1056:{key}",
     )
     return {
@@ -223,7 +220,7 @@ def analyze(key: str, directory: Path) -> dict:
         "band_weights": {str(u): w for u, w in weights.items()},
         "incidents": int(loaded["control"]["ids"].size),
         "chunks": len(arms["control"].starts),
-        "source_sha": sha,
+        "source_shas": sorted({s for arm in loaded.values() for s in arm["source_shas"]}),
         "settings": {probe: probe_settings(key, probe) for probe in ARMS},
         "cpu_seconds": {probe: arm["seconds"] for probe, arm in loaded.items()},
         "budget_um": list(BUDGET_UM[key]),

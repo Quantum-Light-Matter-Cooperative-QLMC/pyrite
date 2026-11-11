@@ -309,6 +309,7 @@ def load(paths) -> dict:
     merged["checkpoints"] = chunks[0]["checkpoints"]
     merged["info"] = infos[order[0]]
     merged["seconds"] = float(sum(i["seconds"] for i in infos))
+    merged["source_shas"] = sorted({i["source_sha"] for i in infos})
     return merged
 
 
