@@ -455,11 +455,20 @@ def test_flat_field_position_is_the_plane_intersection():
     assert s[1] == pytest.approx(0.0)  # beta = beta_H lands at the foot
 
 
-def test_flat_field_reduces_to_cot_beta_for_a_plane_normal_to_the_grating():
-    beta_h = np.deg2rad(89.999999)
-    mount = FlatFieldMount(300.0, 280.0, beta_h)
-    beta = np.deg2rad(np.array([80.0, 84.0]))
+@pytest.mark.parametrize("sign", [1.0, -1.0])
+def test_flat_field_reduces_to_cot_beta_for_a_plane_normal_to_the_grating(sign):
+    # tan has period pi, so beta_H -> +90 and -90 deg both give -r_H' cot(beta).
+    # Rays reach the plane on the same side as its normal.
+    mount = FlatFieldMount(300.0, 280.0, sign * np.deg2rad(89.999999))
+    beta = sign * np.deg2rad(np.array([80.0, 84.0]))
     assert mount.position_mm(beta) == pytest.approx(-280.0 / np.tan(beta), rel=1e-5, abs=1e-4)
+
+
+def test_flat_field_rays_that_miss_the_plane_are_nan():
+    mount = FlatFieldMount(300.0, 280.0, 0.2)
+    assert np.isnan(mount.position_mm(0.2 + np.pi / 2 + 0.1))
+    assert np.isnan(mount.exit_arm_mm(0.2 - np.pi / 2 - 0.1))
+    assert np.isfinite(mount.position_mm(0.5))
 
 
 # Synthetic mount (arbitrary values): 1000/mm, m = +1, alpha = 86 deg, band 6-24 nm. Its tabulated
@@ -524,6 +533,7 @@ def test_from_catalog_builds_a_flat_field_grating(_isolate_user_catalog, convent
     residuals = g.mount_residuals()
     assert max(abs(e) for e in residuals["beta_error_deg"]) < 0.05
     assert abs(residuals["focal_plane_length_rel_error"]) < 0.01
+    assert max(abs(e) for e in residuals["exit_arm_rel_error"]) < 0.01
 
 
 def test_from_catalog_without_focal_plane_has_no_mount(_isolate_user_catalog):

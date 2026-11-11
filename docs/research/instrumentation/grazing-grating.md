@@ -29,7 +29,7 @@ A measurement modality promoted to TODO P1 (was P3 #2): instead of reading the P
 | `energy_fwhm_eV(E, n_pix=4, read_noise_e=READ_NOISE_E)` | Fano + read-noise single-photon energy resolution (photon-counting mode; not applied by default) |
 | `detected_image_physical(E_grid_eV, spec, grating, ccd, distance_mm, ...)` | like `detected_image`, but weights by `qe_absorption` before binning and applies the `charge_cloud_sigma_um` Gaussian blur (at the detected spectrum's flux-weighted mean energy) after binning |
 | `Grating(..., efficiency_curve=TabulatedEfficiency)` | absolute vendor efficiency `η(E)`; `throughput = η(E)` alone (no Fresnel factor), zero outside the tabulated band |
-| `FlatFieldMount(r, r_H', β_H)` / `Grating(..., mount=...)` | flat focal plane at perpendicular distance `r_H'`, normal at `β_H`: `s(β) = r_H' tan(β − β_H)` (`≈ ∓r_H' cot β` for `β_H → ±90°`); used when `distance_mm` is `None` |
+| `FlatFieldMount(r, r_H', β_H)` / `Grating(..., mount=...)` | flat focal plane at perpendicular distance `r_H'`, normal at `β_H`: `s(β) = r_H' tan(β − β_H)` (`→ −r_H' cot β` for `β_H → ±90°`); used when `distance_mm` is `None` |
 | `Grating.from_catalog(name)` / `Grating.mount_residuals()` | build grating, mount and curve from a private catalog `[gratings.NAME]`; compare the grating equation with the mount's tabulated band-end angles and focal-plane length |
 | `grating_image.slit_image_width_mm` / `SlitImage` | slit image width on the focal plane, `w (cos α/cos β)(r'/r)/cos(β − β_H)` |
 | `grating_image.slit_image_pixels` | point-slit image convolved per column with rect(slit image) ⊗ optional Gaussian aberration (vendor resolving power); flux-conserving |

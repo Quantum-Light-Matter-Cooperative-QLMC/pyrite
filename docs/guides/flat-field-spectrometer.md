@@ -87,8 +87,8 @@ frame = alexs_spectrometer_image(
     shot_noise=True,
     read_noise=True,
 )
-frame.adu            # (515, 2048) ADU
-frame.row_summed()   # 1D dispersion-axis view
+frame.adu  # (515, 2048) ADU
+frame.row_summed()  # 1D dispersion-axis view
 ```
 
 Take the astigmatic height `H(λ)` from the vendor's spot diagrams, or pass
