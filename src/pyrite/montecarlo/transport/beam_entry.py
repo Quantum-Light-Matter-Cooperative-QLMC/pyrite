@@ -242,21 +242,44 @@ def resolve_bunch_times(t0_ang, clock, record, pos, E_keV, *, gdf_t0=None, launc
     )
 
 
+#: Clamp on the standardized energy-spread draw, ``|z| <= k``. It makes
+#: ``E0 (1 + k f)`` a declared, strict upper incident energy that line-grid
+#: bandwidth bounds can use; the clipped mass is ``2 Phi(-6) ~ 2e-9``.
+ENERGY_SPREAD_CLAMP_SIGMA = 6.0
+
+
+def upper_beam_energy_keV(E0_keV, energy_spread_frac=None):
+    """Largest incident kinetic energy :func:`initial_energies_keV` can draw, keV.
+
+    ``E0 (1 + k |f|)`` with ``k = ENERGY_SPREAD_CLAMP_SIGMA``; ``E0`` for a
+    monoenergetic beam (``f`` unset or 0). Per-electron energies imported from
+    external phase-space files (GPT/GDF) are not covered.
+
+    Validation: beam-energy-spread-injection
+    """
+    frac = abs(float(energy_spread_frac or 0.0))
+    return float(E0_keV) * (1.0 + ENERGY_SPREAD_CLAMP_SIGMA * frac)
+
+
 def initial_energies_keV(E0_keV, Ne, seed, energy_spread_frac, *, start=0):
     """Incident kinetic energies [keV] of electrons ``[start, start + Ne)``.
 
     ``E_e = E0 (1 + f z_e)`` with ``z_e`` draw 0 of electron ``e``'s counter
     stream in the ``spawn(6)[5]`` child namespace -- RMS *relative* deviation,
     uncorrelated with arrival time (decision 3: no chirp model), and a pure
-    function of ``(seed, e)``. ``f`` unset or 0 gives the monoenergetic beam
-    bit for bit. Raises rather than returning a non-positive energy.
+    function of ``(seed, e)``. ``z_e`` is clamped to
+    ``|z| <= ENERGY_SPREAD_CLAMP_SIGMA`` (a symmetric 6-sigma truncation, mean
+    unchanged), so :func:`upper_beam_energy_keV` is a strict bound. ``f`` unset
+    or 0 gives the monoenergetic beam bit for bit. Raises rather than returning
+    a non-positive energy.
 
     Validation: beam-energy-spread-injection
     """
     E_keV = np.full(Ne, float(E0_keV))
     if energy_spread_frac:
         spread = counter_normals(child_stream_root(seed, 6, 5), Ne, 1, start=start)
-        E_keV = E_keV * (1.0 + float(energy_spread_frac) * spread[:, 0])
+        z = np.clip(spread[:, 0], -ENERGY_SPREAD_CLAMP_SIGMA, ENERGY_SPREAD_CLAMP_SIGMA)
+        E_keV = E_keV * (1.0 + float(energy_spread_frac) * z)
         if not np.all(np.isfinite(E_keV)) or not np.all(E_keV > 0.0):
             raise ValueError(
                 f"energy_spread_frac={energy_spread_frac} drew a non-finite or non-positive "

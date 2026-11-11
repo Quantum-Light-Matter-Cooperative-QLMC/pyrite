@@ -311,11 +311,12 @@ def kinematic_cxr_stop_eV(
     ``energy_grid.derive`` sits well above the fixed-geometry value
     ``1 - beta cos(theta_obs)`` would give. The reflection set is the case's own
     ``hkl_list``; reflections outside it radiate nothing in this model.
-    ``beta`` is taken at ``energy_keV``; slowing down only moves lines down,
-    so the bound is strict for a monoenergetic beam. It is *not* strict when
-    the beam has an energy spread (``energy_spread_frac`` samples an unbounded
-    Gaussian, so some electrons start above ``energy_keV``) -- see the ledger
-    row's ``discrepancy`` status. The vacuum denominator also assumes
+    ``beta`` is taken at ``energy_keV``, which callers must pass as the
+    largest incident energy: slowing down only moves lines down, so the bound
+    is strict for every electron that starts at or below it. For a spread beam
+    that is ``upper_beam_energy_keV`` = ``E0 (1 + 6 f)``, where the sampler
+    clamps its Gaussian draw. Externally imported per-electron energies
+    (GPT/GDF) are not covered. The vacuum denominator also assumes
     ``Re n <= 1``; soft-x-ray windows with ``Re n > 1`` can exceed the
     unrounded bound slightly.
 

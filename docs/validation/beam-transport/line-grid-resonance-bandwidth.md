@@ -356,3 +356,173 @@ CXR sizing with `max_dE_frac > 0` therefore fail loudly instead of reporting
 zero mass. The automatic bandwidth policy, which takes no audit, is
 unaffected. No flight-field tail certificate was derived. Anchor:
 `tests/montecarlo/spectrum/test_spectrum_phases.py::test_truncation_audit_refuses_flight_grouped_substeps`.
+
+## Independent re-verification (fresh context, 2026-11-11, post-remediation)
+
+This is a fresh-context verifier at commit `e45ebefbd`. Before reading any
+implementation body or the sections above, it read the ledger row's Claim,
+Code, Source, Checks and Anchor, and the signatures and docstrings of
+`sincsq_upper_tail_bound`, `resonance_population_stop_eV`,
+`characteristic_stop_eV`, `case_cxr_stop_eV`, `_accumulate_edge_truncation`,
+`check_cxr_truncation` and `_mc_spectrum`. It wrote the derivation below
+first. Only the remediation commit's diff and this page's discrepancy section
+were read afterwards. The dependence on `line-grid-kinematic-bandwidth` is
+disclosed here but not adjudicated.
+
+### Source-first derivation
+
+**Line tail.** A finite-time line of energy-independent weight $W$ is
+$W\,\operatorname{sinc}^2$ with $f(x)=\sin^2(ax)/(ax)^2$ and
+$x=E-E_{\rm res}$. Its whole mass is $W\int_{-\infty}^{\infty}f\,dx=W\pi/a$.
+The first zero lies at $w=\pi/a$, so the mass is $Ww$. Because
+$\sin^2\le 1$, for $D>0$
+
+$$
+\int_D^\infty \frac{\sin^2(ax)}{(ax)^2}\,dx\le\int_D^\infty\frac{dx}{a^2x^2}
+=\frac{1}{a^2D},
+\qquad
+\phi(D)\le\min\!\left(1,\frac{1/(a^2D)}{\pi/a}\right)
+=\min\!\left(1,\frac{w}{\pi^2D}\right),
+$$
+
+with $\phi=1$ for $D\le 0$. The exact tail
+$\left[\sin^2U/U+\pi/2-\operatorname{Si}(2U)\right]/\pi$, where $U=aD$,
+tends to $1/(2\pi U)$. The bound is therefore asymptotically twice the true
+tail and never below it.
+
+**Lorentzian tail.** For a line
+$L(x)=(\Gamma/2\pi)/(x^2+\Gamma^2/4)$, the tail is
+$\int_D^\infty L\,dx=\tfrac12-\tfrac1\pi\arctan(2D/\Gamma)
+=\tfrac1\pi\arctan(\Gamma/2D)\le\Gamma/(2\pi D)$, because $\arctan y\le y$
+for $y\ge0$. Each line therefore keeps all but $\varepsilon$ of its mass
+when $S\ge E_c+\Gamma/(2\pi\varepsilon)$. A per-line bound also holds for
+any mixture of lines.
+
+**Selector.** For lines $i$ with mass $m_i=W_iw_i$, the bounded lost
+fraction is
+$\Lambda(S)=\sum_i m_i\phi_i(S-E_i)/\sum_i m_i$, which does not increase
+with $S$. The smallest admissible stop has $\Lambda(S)\le\varepsilon/2$.
+Rounding it up only lowers $\Lambda$. Capping it at the ceiling
+$S_{\max}$ takes $\min(S,S_{\max})$. The characteristic edge is
+$\max_c\,[E_c+\Gamma_c/(2\pi\varepsilon)]$, and the larger edge wins. For one
+line the stop is $E_{\rm res}+w/(\pi^2\varepsilon/2)$ before rounding.
+
+**Coverage requirement.** The collector and every audit must see exactly
+the terms the spectrum deposits, with the same $W_i$, $E_i$ and $w_i$. A
+physical flight split into numerical substeps $k$ is reduced as one field:
+
+$$
+I(E)=\Bigl|\sum_k A_k(E)\Bigr|^2=\sum_k|A_k|^2
++2\operatorname{Re}\sum_{k<l}A_kA_l^{*}.
+$$
+
+Neither its total mass nor its tail is the independent mixture
+$\sum_k|A_k|^2$. A valid certificate would need a bound on the summed field
+itself. For example, $|A_k(E)|\le C_k/|E-E_k|$ gives
+$I\le(\sum_kC_k)^2/(E-\max_kE_k)^2$, normalized by the flight's own
+Parseval mass. Without such a certificate, every route that reduces grouped
+substeps must refuse every audit. Otherwise a radiating population reads as
+zero mass, and `check_cxr_truncation` maps zero mass to a zero fraction.
+
+### Implementation comparison
+
+| Item | Derivation | Implementation | Result |
+|---|---|---|---|
+| sinc tail | $\min(1,w/(\pi^2D))$, $1$ for $D\le0$ | `sincsq_upper_tail_bound`: the same; `_accumulate_edge_truncation`: $\min(1,1/(\pi a_wD))$, the same because $w=\pi/a_w$ | match |
+| line mass | $W\pi/a$ | `weight * pi / a_width` (edge audit); `weight * width` (selector, with `width = pi / a_width` collected) | match |
+| Lorentzian | $\Gamma/(2\pi D)$ per line | `centre + fwhm / (2 pi limit)`, maximized over emitted lines above the relaxation cutoff | match |
+| selector | smallest $S$ with $\Lambda\le\varepsilon/2$, round up, cap | bisection on $\Lambda$ from the lowest resonance to the ceiling, `ceil` to 100 eV, `min(ceiling, ...)`, and $\varepsilon/$`proxy_safety` with `BANDWIDTH_PROXY_SAFETY` = 2 | match |
+| combined edge | max of both edges, at least start + 100 eV, capped | `case_cxr_stop_eV` | match |
+| production weights, batched | the audited triple equals the deposited triple | `_batched_incoherent_block` passes the same `E_r_f`, `aw_f` and `w_f` to the audit and to `accumulate_sincsq`/`_CxrBatch`; `_queue_unit_lines` does the same per CUDA unit | match |
+| production weights, per-hkl | the same | section 7: the same `E_r[good]`, `a_width[good]` and `weight[good]` reach the audit and `_reduce_lineshapes` | match |
+| grouped flights | refuse or certify | `_mc_spectrum`: `st.grouped and request.truncation_audit is not None` raises `ValueError` before any accumulation; a device backend refuses grouped rows earlier in `_refuse_grouped_reduction` | refuse, now complete |
+
+#### Audit callers
+
+Every caller that builds a truncation audit reaches `_mc_spectrum` through
+`_cxr_for_segments` and `mc_cxr_spectrum`. `_mc_spectrum` has no other
+caller in `src/`.
+
+- `runner/cxr_grid.py::_direction_populations` (`collect`).
+- `runner/case_driver.py::_spectrum_case_impl` and `_line_phase` (edge audit,
+  then `check_cxr_truncation`).
+- `runner/streamed_scoring.py` (edge audit through `EmissionBatch`).
+- `runner/line_roulette.py::LineScreen._screen` (`mass_only`).
+- `runner/adaptive.py::case_measure` (per-electron masses).
+- `energy_grid/bandwidth_check.py` production and attribute (edge and
+  `collect`).
+
+The refusal is per call. A call that mixes grouped and single-row flights
+also has `st.grouped` true and is refused. The coherent evaluation receives
+no audit (`emission_adapters._cxr`). Two-beam transition radiation bypasses
+`mc_cxr_spectrum` but refuses `line_grid_policy` in `validate_dtr_case`, so
+it cannot produce an empty audit under this policy either.
+
+One residual silent-zero path is benign. `check_cxr_truncation` still
+returns fraction 0 when `line_mass` is 0, and `case_measure` still returns
+zeros when `electron_mass` is absent. Each is now reached only when no line
+is deposited either: no row resonates inside the keep window, or no row has
+finite positive weight. In both cases the spectrum is also zero.
+
+### Numerical evidence
+
+The verifier wrote its own scratch probe; it does not reuse the previous
+verifier's script. The run used the CPU backend under
+`systemd-run MemoryMax=8G`. The setup was two 25 keV electrons in HOPG,
+4000 Å, seed 11, lockstep midpoint transport, then `subdivide_flights`. The
+spectrum used (002), $B=0.8\ \mathrm{Å}^2$, a take-off angle of 119° and an
+axis from 880 to 1068 eV in 2 eV steps.
+
+| Population | Unaudited spectrum sum | `collect` | edge | `mass_only` | adaptive (`n_electrons`) | runner `_direction_populations` |
+|---|---|---|---|---|---|---|
+| `max_dE_frac=0` (26 rows = 26 flights) | $1.668584\times10^{-7}$ | admitted, 1 chunk | admitted, line mass $6.753977\times10^{-7}$ | admitted, the same mass | admitted, the same mass | 26 lines |
+| `max_dE_frac=2e-4` (391 rows, 26 flights) | $1.667479\times10^{-7}$ | **refused** | **refused** | **refused** | **refused** | **refused** |
+| mixed (electron 0 substepped, 197 rows; electron 1 single rows, 15 rows) | $1.667567\times10^{-7}$ | **refused** | **refused** | n/a | n/a | n/a |
+
+The probe also compared production weights against the deposited
+spectrum. On the ungrouped population over 600–1399.95 eV at 0.05 eV, the
+trapezoid integral of the per-electron spectrum was
+$3.590788\times10^{-7}$. The audit line mass was $7.200206\times10^{-7}$
+over 2 electrons. The resulting $\int S\,dE\cdot N_e/m=0.997412$. The
+missing $2.59\times10^{-3}$ equals half the audited bound
+$(2.215+2.964)\times10^{-3}/2$, as the factor-two asymptote predicts. On
+that narrow axis `check_cxr_truncation` correctly refused, with a
+$2.2\times10^{-3}$ upper fraction against the $10^{-4}$ share.
+
+The elementary bounds were checked independently with SciPy's `sici`. Over
+$aD\in\{0.01,\dots,10^4\}$, the largest exact-to-bound ratio was
+$0.6735$, at $aD=1$. It tends to $0.5000$. The Lorentzian bound held at
+$D/\Gamma\in\{0.01,\dots,10^3\}$ and was tight to $10^{-10}$ at $10^3$. A
+single 12000 eV line with $w=7.3$ eV and limit $5\times10^{-5}$ gave a stop
+of 26800 eV. The closed form gives 26792.89 eV, which rounds up to the same
+value.
+
+`UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test
+tests/montecarlo/spectrum/test_spectrum_phases.py
+tests/energy-grid/test_line_grid_bandwidth.py`: **62 passed**, 26 existing
+thick-target/kinematic warnings.
+
+### Filter table
+
+| Filter | Result |
+|---|---|
+| Units: tail fractions dimensionless ($w$, $D$, $\Gamma$ in eV); mass $W\cdot$eV in both audit and selector | pass |
+| Limits: one line gives $E_{\rm res}+w/(\pi^2\varepsilon/2)$; $\Gamma\to0$ puts the stop at the highest centre; $D\le0$ counts the whole line | pass |
+| Bound direction: sinc bound $\ge$ exact (ratio $\le0.674$); $\arctan y\le y$ | pass |
+| Notation: $\varepsilon/2$ in the ledger matches `truncation_limit / proxy_safety` in the docstring; $1/(\pi a_wD)=w/(\pi^2D)$ | pass |
+| Production-weight coverage, independent rows (batched, per-hkl, CUDA unit queue) | pass |
+| Grouped substeps: every audit kind refused, host and device, including mixed calls | pass (refusal, no certificate) |
+| Ceiling cap preserves `line-grid-kinematic-bandwidth` (`stop` $\le$ ceiling; warn-not-refuse only at the ceiling) | pass mechanically. Correctness of the ceiling value itself is the separate `line-grid-kinematic-bandwidth` discrepancy, which affects energy-spread beams, and is not adjudicated here |
+
+### Verdict
+
+**`rederived`**, within the stated scope. The tail bounds, the selector and
+production-weight coverage of independent-row populations match the
+independent derivation. The flight-grouped discrepancy is resolved by
+refusal: no truncation audit can now report zero mass for a grouped,
+radiating population. No flight-field tail certificate exists, so measured
+bandwidth, line roulette and adaptive CXR sizing are unavailable for
+substepped transport. That is a scope limit and should be stated in the
+ledger Claim. The result is conditional on the ceiling input from
+`line-grid-kinematic-bandwidth`, which has its own open discrepancy.
+Not `signed-off`.

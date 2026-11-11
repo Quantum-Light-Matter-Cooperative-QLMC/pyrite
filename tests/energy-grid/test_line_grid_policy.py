@@ -244,13 +244,14 @@ def test_high_energy_hbn_rejects_impossible_budget_before_transport(monkeypatch)
     assert "No transport was started" in message
 
 
-def _automatic_policy(material, energy_keV, per_call=None):
+def _automatic_policy(material, energy_keV, per_call=None, energy_spread_frac=None):
     from types import SimpleNamespace
 
     from pyrite.campaign.geometry import crystal_params
     from pyrite.campaign.sweep import _automatic_cxr_grid_policy
 
-    sweep = SimpleNamespace(cxr_grid_policy=per_call)
+    beam = SimpleNamespace(energy_spread_frac=energy_spread_frac)
+    sweep = SimpleNamespace(cxr_grid_policy=per_call, beam=beam)
     return _automatic_cxr_grid_policy(sweep, crystal_params(material), energy_keV)
 
 
@@ -455,3 +456,39 @@ def test_cache_key_depends_on_policy_and_on_resolution_inputs():
     assert key == coordinate_cache_key(payload, dict(inputs))
     assert key != coordinate_cache_key(payload, {**inputs, "seed": 2})
     assert key != coordinate_cache_key(_payload(max_points=99), inputs)
+
+
+def test_spread_beam_bounds_use_the_declared_upper_incident_energy():
+    """Validation: line-grid-kinematic-bandwidth
+
+    A spread beam's electrons start up to ``E0 (1 + 6 f)`` (the sampler's
+    clamp), so beta and the energy-conservation cap are taken there.
+    HOPG-like (004) at 300 keV, f = 0.01: the +3 sigma resonance the
+    nominal-energy bound missed (26534 eV) is now inside the stop.
+    """
+    nominal = _automatic_policy("hopg", 300.0)
+    spread = _automatic_policy("hopg", 300.0, energy_spread_frac=0.01)
+    assert spread.stop_eV == _kinematic_stop("hopg", 300.0 * 1.06)
+    assert spread.stop_eV > 26534.0 > nominal.stop_eV
+    capped = _automatic_policy("hopg", 3000.0, energy_spread_frac=0.0)
+    assert capped.stop_eV == _automatic_policy("hopg", 3000.0).stop_eV
+
+
+@pytest.mark.parametrize("energy_keV", [966.21, 966.25])
+def test_kinetic_cap_just_below_the_data_onset_stays_below_it(monkeypatch, energy_keV):
+    """Validation: line-grid-emission-ceiling
+
+    Each limit is rounded by its own rule before the minimum: a beam energy
+    inside (966200, 966266.74) eV must not round up past the HOPG data onset.
+    The resonance bound is lifted so the kinetic limit binds.
+    """
+    import pyrite.campaign.sweep as sweep_module
+    from pyrite.campaign.geometry import crystal_params
+    from pyrite.montecarlo.spectrum.cxr import _cxr_emission_ceiling
+
+    monkeypatch.setattr(sweep_module, "kinematic_cxr_stop_eV", lambda *a, **k: 2.0e6)
+    cp = crystal_params("hopg")
+    ceiling = _cxr_emission_ceiling(CRYSTALS[cp["crystal"]], cp["composition"])
+    assert 966200.0 < energy_keV * 1e3 < ceiling
+    policy = _automatic_policy("hopg", energy_keV)
+    assert policy.stop_eV == 966200.0 < ceiling
