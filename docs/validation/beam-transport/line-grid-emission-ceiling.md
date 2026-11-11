@@ -298,3 +298,21 @@ obsolete CUDA guard assertion. Preserve the separate bandwidth discrepancy;
 any energy-distribution bound or recoil model needs its own verification.
 No implementation, test or ledger repair was made here. Agent status is never
 human sign-off.
+
+## Post-verification remediation (implementation context)
+
+Applied after this verdict by the #1101 task owner; not part of the
+independent derivation above and not yet re-verified in fresh context.
+
+- A binding atomic-data ceiling now rounds **down** to the largest 100 eV node
+  strictly below the onset; kinetic and resonance limits still round up.
+  HOPG at 5, 10 and 50 MeV now stops at 966200 eV, so output-axis refraction
+  stays inside its support. Those automatic cases change identity.
+- Coherent per-hkl (`_formation_good`) and batched
+  (`_batched_coherent_block`) predicates now also require finite complex
+  polarization coefficients, covering the final-root crossing.
+- The ledger claim and `_cxr_table_nan_onsets` docstring no longer group
+  static `U_g` with anomalous support or cite the absent CUDA guard.
+
+The nominal-energy scope inherited from `line-grid-kinematic-bandwidth` is
+unchanged.

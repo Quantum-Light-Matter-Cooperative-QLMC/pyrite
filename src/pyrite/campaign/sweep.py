@@ -678,9 +678,12 @@ def _automatic_cxr_grid_policy(sweep: Sweep, cp: dict, energy_keV: float) -> Cxr
         # axis already stops where the case's own lines do.
         return policy
     # The classical resonance bound has no electron recoil and can exceed the
-    # beam's kinetic energy, which no photon can; and no line emits at or above
-    # the atomic data's end, where its couplings or attenuation are NaN and the
-    # line kernels drop it. The axis stops at the lowest of the three.
+    # beam's kinetic energy, which no photon can; and no line is scored at or
+    # above the atomic data's end, where its couplings or attenuation are NaN
+    # and the line kernels drop it. The axis stops at the lowest of the three.
+    # The data limit rounds DOWN, strictly below its NaN onset: the coherent
+    # route evaluates refraction on the output axis itself, so an upward-
+    # rounded node past the onset would read NaN. Energy conservation rounds up.
     # Validation: line-grid-emission-ceiling
     from ..materials.crystal import CRYSTALS
     from ..montecarlo.spectrum.cxr import _cxr_emission_ceiling
@@ -690,7 +693,10 @@ def _automatic_cxr_grid_policy(sweep: Sweep, cp: dict, energy_keV: float) -> Cxr
         "atomic data ceiling": _cxr_emission_ceiling(CRYSTALS[cp["crystal"]], cp["composition"]),
     }
     label, cap = min(limits.items(), key=lambda item: item[1])
-    cap = math.ceil(cap / STOP_ROUND_TO_EV) * STOP_ROUND_TO_EV
+    steps = math.ceil(cap / STOP_ROUND_TO_EV)
+    if label == "atomic data ceiling":
+        steps -= 1  # largest node strictly below the onset
+    cap = steps * STOP_ROUND_TO_EV
     if not start < cap < policy.stop_eV:
         return policy
     sources = {**dict(policy.sources), "stop_eV": label}

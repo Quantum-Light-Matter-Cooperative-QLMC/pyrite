@@ -452,3 +452,47 @@ def test_the_phases_compose_into_the_documented_pipeline():
     assert out.shape == (E_GRID.size,)
     assert np.all(np.isfinite(out))
     assert out.max() > 0.0
+
+
+@_grouped_is_host_only
+@pytest.mark.parametrize(
+    "audit",
+    [
+        {"start_eV": 700.0, "stop_eV": 1500.0, "collect": []},
+        {"start_eV": 700.0, "stop_eV": 1500.0},
+        {"start_eV": 700.0, "stop_eV": 1500.0, "mass_only": True},
+    ],
+    ids=["collect", "edge", "mass-only"],
+)
+def test_truncation_audit_refuses_flight_grouped_substeps(audit):
+    """Validation: line-grid-resonance-bandwidth
+
+    The grouped reduction sums each flight's substep fields and fills no row
+    audit, so measured collection, edge fractions and line masses would read
+    empty while the spectrum is not. Refuse rather than certify zero.
+    """
+    with pytest.raises(ValueError, match="flight-grouped substeps"):
+        mc_cxr_spectrum(
+            _segments(flights=True),
+            E_GRID,
+            CRYSTAL,
+            [HKL],
+            n_hat=N_HAT,
+            B_ang2=B_ANG2,
+            truncation_audit=audit,
+        )
+    assert not audit.get("collect"), "nothing may be collected before the refusal"
+
+
+def test_coherent_formation_mask_drops_nonfinite_coefficients():
+    """Validation: line-grid-emission-ceiling
+
+    A final root update can cross the atomic-data end after finite lookups:
+    the coupling is NaN while the scalar amplitude stays finite. The line
+    must be dropped, not multiplied into the field sum.
+    """
+    one = xp.ones(3, dtype=REAL)
+    rows = (one, one, one, one, xp.zeros(3, dtype=REAL), one)
+    coef = xp.asarray([1.0 + 1.0j, complex(np.nan, 0.0), complex(0.0, np.nan)])
+    good = per_hkl_module._formation_good(one, one, rows, [coef, xp.ones(3, dtype=coef.dtype)])
+    np.testing.assert_array_equal(to_host(good), [True, False, False])

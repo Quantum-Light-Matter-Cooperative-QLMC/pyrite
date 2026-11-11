@@ -345,3 +345,14 @@ mathematical subclaim and the separate ceiling qualification. Only the task
 owner edits the ledger; human sign-off remains separate. Documentation tests,
 HTML build and positive math-render inspection are run centrally by the task
 owner after integrating this write-up.
+
+### Post-verification remediation (implementation context)
+
+Applied after this verdict by the #1101 task owner; not yet re-verified in
+fresh context. `_mc_spectrum` now refuses **every** truncation audit on
+flight-grouped rows (`collect`, edge, `mass_only`, adaptive per-electron
+masses), not only `mass_only`. Measured bandwidth, line roulette and adaptive
+CXR sizing with `max_dE_frac > 0` therefore fail loudly instead of reporting
+zero mass. The automatic bandwidth policy, which takes no audit, is
+unaffected. No flight-field tail certificate was derived. Anchor:
+`tests/montecarlo/spectrum/test_spectrum_phases.py::test_truncation_audit_refuses_flight_grouped_substeps`.

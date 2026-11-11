@@ -609,11 +609,14 @@ def _batched_coherent_block(st, bt, blk, coh_blocks, coh_counts):
         & (apb > 0)
         & xp.isfinite(bma)
     )
+    c_s, c_p = ((amp * t_L) * A_e for A_e in pol_A)
+    # A coupling read past the atomic data's end is NaN while ``amp`` stays
+    # finite; drop the line. Validation: line-grid-emission-ceiling
+    good &= xp.isfinite(c_s) & xp.isfinite(c_p)
     shape = omega_res.shape
     # Flatten g-major for contiguous per-reflection records; keep counts on
     # device until the final reduction.
     gm = xp.ascontiguousarray(good.T).reshape(-1)
-    c_s, c_p = ((amp * t_L) * A_e for A_e in pol_A)
     # Offset-free midpoint phase for the inter-electron blend.
     gxr, gyr, gzr = (
         seg_r_geom[sb, 0][:, None],

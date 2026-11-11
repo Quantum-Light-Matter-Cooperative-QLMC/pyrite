@@ -273,7 +273,8 @@ def test_automatic_stop_is_capped_at_the_atomic_data_emission_ceiling():
     ceiling = _cxr_emission_ceiling(CRYSTALS[cp["crystal"]], cp["composition"])
     policy = _automatic_policy("hopg", 5000.0)
     assert _kinematic_stop("hopg", 5000.0) > ceiling
-    assert ceiling <= policy.stop_eV < ceiling + 100.0
+    assert ceiling - 100.0 <= policy.stop_eV < ceiling
+    assert policy.stop_eV % 100.0 == 0.0
     assert dict(policy.sources)["stop_eV"] == "atomic data ceiling"
 
 
