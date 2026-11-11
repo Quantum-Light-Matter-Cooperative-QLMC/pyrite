@@ -679,9 +679,7 @@ def _accumulate_reflection_coherent(
     good = _formation_good(amp, t_L, cxr_rows, coefs)
     E_vac, a_vac, half_dL, apb, bma, q = cxr_rows
     if st.temporal_buf is not None:
-        _temporal_coherent_row(
-            st, g_vec_d, wm, idx, coefs, good, cxr_rows, L_esc, recoil_phase
-        )
+        _temporal_coherent_row(st, g_vec_d, wm, idx, coefs, good, cxr_rows, L_esc, recoil_phase)
     if req.coefficient_capture is not None:
         # Read-only: coherent window seeding reads the row's own couplings.
         # Validation: coherent-line-grid-windowed-resolution
@@ -1021,9 +1019,7 @@ def _accumulate_reflection(
         # pieces (``_setup``), and each carries its exact complex formation
         # integral under absorption and the escape-path refractive slope.
         # Both routes refuse layers, so one mu. Validation: coherent-formation-absorption
-        L_esc, cxr_rows, recoil_phase = _formation_cxr(
-            st, idx, t_L, vdg, mu_layers[0], g2, n_dot_g
-        )
+        L_esc, cxr_rows, recoil_phase = _formation_cxr(st, idx, t_L, vdg, mu_layers[0], g2, n_dot_g)
     else:
         # Incoherent route: the segment mean of exp(-tau) over the same escape
         # geometry, split into linear pieces (issue #181, as #176 for
