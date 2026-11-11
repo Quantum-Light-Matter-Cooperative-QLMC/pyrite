@@ -40,6 +40,8 @@ cr-transition-radiation-bound
 cr-zone-handoff-accounting
 cr-planar-conditional-source
 cr-planar-overflow-spectrum
+cr-planar-fiber-unraveling
+cr-planar-fiber-regression
 cr-planar-exit-angular
 cr-persisted-channel
 quantum-decoherence-budget

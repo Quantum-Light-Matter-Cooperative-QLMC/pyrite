@@ -506,6 +506,234 @@ stamp; testing a later production revision is a separate comparison.
 The differential overflow instrument uses the separate revision and owner
 hashes recorded in its array-1614 `submit.sh`, not the boundary-sweep stamp.
 
+## Carrier-fibred planar reference (#1056)
+
+`cr-planar-fiber-unraveling` maps the same planar Lindblad model onto the
+axial fibre engine. The Bloch carrier is continuous and TDS transfers are
+exact and continuous. String outputs outside the window are recorded as
+tails with their exact $(k_x,q_y)$, and the out-of-plane angle of every
+trajectory is carried exactly. Two arms share seeds and incident IDs:
+absorbing at the declared 300 eV margin, and `P = R`, which retains the
+whole order window. Evidence:
+[check record](../../validation/check-records/planar_fiber_runs/README.md),
+remote array 10928 (2000 incidents per arm) and local 5 MeV runs (4000).
+These are fixed-energy model diagnostics, not a replacement boundary.
+
+### Handoff angles
+
+Absorbing arm, terminal angles in units of $\psi_c=\sqrt{2D/pv}$:
+
+| Case | Outgoing mean (median) | Cut angle | Tail share | Tail median (90%) | Band edge of window |
+|---|---:|---:|---:|---:|---:|
+| Si(110), 5 MeV, 20 µm | 4.71 (4.48) | 3.91 | 0.128 | 9.42 (20.3) | 7.00 |
+| Si(110), 17 MeV | 4.61 (4.33) | 3.91 | 0.078 | 10.3 (23.3) | 7.75 |
+| Si(100), 17 MeV | 6.20 (5.77) | 5.17 | 0.074 | 14.4 (32.8) | 11.1 |
+| Si(100), 54.5 MeV | 5.86 (5.51) | 5.17 | 0.084 | 12.8 (23.7) | 9.31 |
+| Si(110), 54.5 MeV | 4.40 (4.19) | 3.91 | 0.088 | 8.47 (15.9) | 6.51 |
+
+The SEMs of the outgoing means are 0.015–0.03. Exact momentum sampling
+reproduces the #522 clustering (4.7 ψc at 5 MeV Si(110)): it is set by the
+300 eV cut, not by the solver's Bloch grid. About 8–13% of incidents leave
+the window by TDS. Their median angle is 1.3–1.4 times the band-edge angle
+of the window they leave, with a heavy upper tail. The band-edge
+assignment therefore understates these angles; it is not a lower bound for
+the angle distribution either, since the 10% quantile is about 1.1 times the
+edge. The angles depend on the window (the 5 MeV tail median is 9.4 ψc at
+M = 16 and 11.9 ψc in the `P = R` arm at M = 24).
+
+### Occupation lengths at 300 eV
+
+Fitted lengths [µm] from the radiation-weighted band signal and their
+ratios to Kephart Table I. "Detector" applies the forward-detector factor
+$(1+\gamma^2\theta_y^2)^{-2}$ per trajectory, using the exact carried
+$\theta_y$. The harness's `detector_ratio.bound` instead averages that
+factor over a modelled $\theta_y$ distribution with bound-weighted rates.
+Batch-means SEM on 10 batches.
+
+| Case | Fibre L (SEM) | Ratio | Fibre detector ratio | DM L, H32/24, 16 cells, dz 62.5 Å | DM `detector_ratio.bound` |
+|---|---:|---:|---:|---:|---:|
+| Si(110), 17 MeV, n=1 | 20.10 (0.47) | 1.005 | 0.945 | 18.71 | 0.809 |
+| Si(110), 17 MeV, n=2 | 19.82 (0.39) | 1.166 | 1.097 | 18.57 | 0.945 |
+| Si(110), 17 MeV, n=3 | 18.80 (0.45) | 1.106 | 1.042 | 18.48 | 0.941 |
+| Si(100), 17 MeV | 17.88 (0.63) | 1.118 | 1.049 | 18.63 | 1.005 |
+| Si(100), 54.5 MeV | 42.7 (1.2) | 1.779 | **1.538** | — | 1.233 (H32, dz 125 Å screening) |
+| Si(110), 54.5 MeV | 44.4 (1.2) | 1.232 | 1.071 | — | 0.796 (same) |
+
+At 17 MeV, the continuous model and the density-matrix solver agree within
+7% (at most 3σ, with the solver's dz 62.5 Å balance defect near −0.02). The
+detector correction is weaker with the exact carried angle (about −6%) than
+with the modelled bound-weighted spreading (about −14%). At 54.5 MeV the
+fibre removes the finite-window overflow that dominated the screening runs.
+Both planes then give nearly equal lengths (36.9 and 38.6 µm on the detector
+observable, against measured 24 and 36 µm). Si(100) moves further outside
+tolerance. The 300 eV margin was calibrated through the solver's window
+and observable. In the continuous model it does not reproduce the plane
+dependence at 54.5 MeV. A refit would again be calibration; the measured
+statement is negative for 300 eV.
+
+### Return deficit (`P = R` minus absorbing)
+
+The below-barrier population $N_B$ per incident is paired by incident:
+
+| Case | z [µm] | $N_B$ absorbing | Deficit (SEM) |
+|---|---:|---:|---:|
+| Si(110), 5 MeV | 5 / 20 | 0.121 / 0.0224 | 0.0055 (21) / 0.0190 (15) |
+| Si(110), 17 MeV | 20 / 100 | 0.0732 / 0.0010 | 0.0124 (35) / 0.0214 (15) |
+| Si(100), 17 MeV | 20 / 100 | 0.0476 / 0.0006 | 0.0167 (26) / 0.0145 (10) |
+| Si(100), 54.5 MeV | 20.8 / 100 | 0.108 / 0.0209 | 0.0048 (40) / 0.0244 (26) |
+| Si(110), 54.5 MeV | 20.8 / 100 | 0.135 / 0.0255 | 0.0022 (47) / 0.0259 (30) |
+
+Return is small over the first occupation length and dominant beyond a few.
+At 100 µm the retained-window arm holds about twice the absorbing arm's
+below-barrier weight at 54.5 MeV and more than 20 times as much at 17 MeV. The `P = R` arm's fitted
+lengths are 1.7–2.8 times Kephart's on the detector observable, close to the
+earlier no-cutoff solver results. At 5 MeV the deficit grows from M = 16 to
+M = 24 (0.019 → 0.026 at 20 µm). The `P = R` reference is therefore not
+window-converged, and the deficit is numerical accounting at a fixed
+window, not a physical rechanneling fraction
+(`cr-axial-fiber-return-deficit` semantics). It does bound what an absorbing
+cut omits at these windows: the omission is not negligible beyond about one
+occupation length.
+
+### Paired-arm source budgets (#993 method)
+
+`checks/planar_fiber_budget.py` applies the
+[#993 calibration](axial-depth-calibration-993.md) unchanged
+(`calibrate_axial_depth`, `cr-axial-depth-calibration`) to seven
+chunk-paired fibre arms per case:
+
+| Probe | Change from control |
+|---|---|
+| control | 300 eV cut, window $M$, box $B=M$, kick harmonics $B+M$, search step 200 Å |
+| return flux | `P = R` |
+| unresolved | $B=M+dM$ |
+| matching surface | 600 eV cut |
+| grid | $M+dM$, search step 100 Å |
+| source model | kick harmonics $1.5(B+M)$ |
+| all-on | all of the above |
+
+Here $dM=\max(4,\lfloor M/4\rfloor)$. The observable is the forward-detector line source
+at crystal thickness $c$: per upper band $u$ of the configuration's lines,
+$w_u\int_0^c|c_u|^2(1+\gamma^2\theta_y^2)^{-2}\,dz$ per incident with the
+dipole weight $w_u$ of `line_weights`. In the secular line model at fixed
+energy this is proportional to the on-axis line yield; the constant cancels
+in ε. Joint confidence 0.95; outgoing and tail terminations are
+`physical_outgoing` fates, box overflow is `unresolved`. Evidence:
+[check record](../../validation/check-records/planar_fiber_runs/README.md),
+remote array 11088 (4000 incidents per arm) and a local `channeling_demo` run
+(20000).
+
+| Case | $c$ [µm] | ε | Return / unresolved / grid / source (÷ reference LCB) | `P = R` shift | 600 eV shift |
+|---|---:|---:|---|---:|---:|
+| `channeling_demo`, Si(1-10) 17 MeV | 2 | **4.9%** | 2.5 / 1.4 / 0.5 / 0.5% | −0.0% (0.2σ) | +0.1% (0.8σ) |
+| Si(110), 17 MeV | 5 / 20 / 60 | 516 / 242 / 268% | at 60 µm: 102 / 109 / 29 / 28% | +0.6 / +3.1 / **+24.2%** (20σ) | +0.5 / +2.5 / +14.8% |
+| Si(100), 17 MeV | 5 / 20 / 60 | 572 / 258 / 277% | at 60 µm: 104 / 120 / 26 / 27% | +1.0 / +6.0 / **+28.4%** (17σ) | +0.7 / +3.6 / +16.4% |
+| Si(100), 54.5 MeV | 12.5 / 50 / 100 | 191 / 113 / 146% | at 100 µm: 64 / 33 / 23 / 26% | +0.0 / +4.8 / **+15.5%** (14σ) | −0.3 / +3.2 / +11.2% |
+| Si(110), 54.5 MeV | 12.5 / 50 / 100 | 195 / 119 / 151% | at 100 µm: 65 / 33 / 25 / 27% | +0.5 / +2.6 / **+12.3%** (13σ) | +1.2 / +3.3 / +11.1% |
+
+Shifts are paired differences of the summed line source relative to the
+control; σ combines the bins' batch SEs in quadrature (bins are correlated,
+so it is indicative).
+
+**Demo.** The 2 µm budget is resolution-limited, like #993 cases A and B.
+No probe is resolved beyond 2.4σ, and the bound is the batch-$t$ and
+Hoeffding allowances. Sub-µm thicknesses are refused at this sample size:
+the returned outgoing fraction (control minus all-on, 0.008 at 0.5 µm) is
+below the Hoeffding allowance, so $C_o$ is undefined.
+
+**Kephart configurations: negative for a usable budget at these sizes.**
+Two effects set ε.
+
+- *Fate caps.* The unresolved term is $C_u(F_u+h)$, with $C_u$ the
+  maximum over checkpoints of the control yield over the lower-bounded
+  retained fraction. At the deepest checkpoint the control retains only
+  6–15%, so $C_u$ is large. The Hoeffding allowance $h\approx0.03$ at 4000
+  incidents dwarfs the measured unresolved fraction (≤ 0.5%). This term is
+  resolution, not physics.
+- *Resolved model change.* The `P = R` arm raises the line source by
+  12–28% at the deepest checkpoint (13–20σ), and the 600 eV cut by 11–16%.
+  That is the return deficit above in the source observable: an absorbing
+  cut at 300 eV omits a resolved fraction of the emission beyond about one
+  occupation length. More primaries would shrink the caps but not this
+  term.
+
+Window, box, search-step and kick-harmonic probes are within 2.4σ of zero
+everywhere. Above the cut the window orders never matter, so the grid probe
+reproduces the unresolved probe's box change. At 54.5 MeV the checkpoint
+spacing (2.08 µm) makes the reference drift allowance large at 12.5 µm (LCB
+0.67× the mean).
+
+Thicknesses beyond about three occupation lengths cannot be budgeted by
+this method. At 120 µm (17 MeV) the control retains ≈ 0.5%, below the
+Hoeffding allowance, and the unresolved cap is undefined. Kephart's slabs
+reach 120 and 500 µm. The budgets therefore stop at 60 and 100 µm.
+
+### Two-time source vs the secular line model
+
+`cr-planar-fiber-regression` gives the on-axis spectrum of the same
+fixed-energy model directly from the two-time correlation
+$G(z_i,z_j)$, with no secular approximation, mode profile or capture
+clustering. `checks/planar_fiber_spectrum.py` compares it with production
+`channeling_spectrum`: same profile, kernels and 300 eV margin, θ = 0, zero
+aperture and divergence, plane-wave entry at zero incidence, photon
+absorption off. Both sides use the same partition: bound→bound plus capture
+into bound states. The production Bloch grid is converged (16 and 32
+cells agree to 0.1%). Halving the depth step changes fibre totals by
+≤ 2e-4. Evidence:
+[check record](../../validation/check-records/planar_fiber_runs/README.md),
+remote array 11248, 4000 primaries per case.
+
+Total on-axis yield, fibre ÷ production (SEM about 0.005):
+
+| Case | 0.5 µm | 1 µm | 2 µm | Production capture share (0.5 / 1 / 2 µm) |
+|---|---:|---:|---:|---:|
+| `channeling_demo`, Si(110) 17 MeV | 1.024 | 1.010 | 1.018 | 0.16 / 0.16 / 0.16 |
+| Si(100), 16.92 MeV | 1.041 | 1.029 | 1.025 | 0.76 / 0.66 / 0.57 |
+| Si(110), 5 MeV | 1.022 | 1.023 | 1.024 | 0.07 / 0.09 / 0.12 |
+
+Per line window (bounded by midpoints between Doppler-shifted Bohr energies
+at κ = 0), `channeling_demo`:
+
+| Window | 0.5 µm yield ratio / RMS width ratio / centroid shift | 2 µm |
+|---|---|---|
+| 1→0 (14.4–26 keV) | 1.30 / 1.39 / +99 eV | 1.04 / 1.11 / −7 eV |
+| 2→1 (8.6–14.4 keV) | 0.88 / 1.57 / +757 eV | 1.03 / 1.14 / +146 eV |
+| 3→2 (4.7–8.6 keV) | 1.76 / 1.03 / +179 eV | 0.98 / 1.06 / +124 eV |
+| < 4.7 keV (82–88% capture in production) | 0.72 / 1.15 / +449 eV | 0.88 / 0.92 / +202 eV |
+
+Batch SEMs are ≤ 0.024 on ratios and ≤ 14 eV on shifts.
+
+- **Totals agree within 1–4%.** The secular model's line yields carry the
+  right integrated emission at these depths, capture included.
+- **Thin slabs: line shape, not yield.** At 0.5 µm the two-time lines are
+  much broader, as the finite-thickness transit profile requires: an
+  isolated scattering-free line has the sinc² profile of width
+  $\sim2\pi\hbar v/L$. The production mode profile is stationary and omits
+  this. The broad 2→1 line spills into the neighbouring windows. That is why
+  3→2 reads 1.76 and 2→1 reads 0.88 although the total agrees. The
+  differences shrink with thickness: 2→1 width ratio 1.57 → 1.30 → 1.14 at
+  0.5/1/2 µm.
+- **At 2 µm** (the demo thickness), strong-line yields agree within ±4%.
+  Two-time widths remain 6–14% larger, with centroid shifts up to +150 eV
+  on 2→1 and 3→2. The capture-dominated low-energy window is 12% lower in
+  the two-time source. That is where production's capture clustering and
+  the dropped cross terms between near-degenerate free→bound transitions
+  enter.
+- **Si(100)** has nearly coincident 1→0 and 3→2 Bohr energies (13.8 and
+  13.6 keV), so its per-window split is not meaningful. Their combined
+  window reads 1.29 / 1.10 / 1.05 at 0.5/1/2 µm, with the same
+  thin-slab broadening pattern. Its low-energy window is almost all capture
+  (97–99%) and agrees within 7%.
+- **Si(110) at 5 MeV** shows the same pattern with narrower departures.
+  1→0 reads 1.12 / 1.04 / 1.03 in yield, with width ratio 1.25 / 1.12 / 1.06
+  at 0.5/1/2 µm. 2→1 reads 0.97 / 1.01 / 1.02, width 1.37 / 1.12 / 1.02.
+  Centroids sit 26–86 eV higher. The depth step error is ≤ 1e-4.
+
+Scope: the comparison isolates the emission model at fixed energy, on
+axis, without absorption or divergence. It does not test the secular
+model's divergence or aperture quadrature, stopping, or post-handoff
+emission (absent from both).
+
 ## Reproduction
 
 Run on the lab through an isolated `pyrite remote sync` checkout and SLURM;

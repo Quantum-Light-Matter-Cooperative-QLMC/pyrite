@@ -1,0 +1,452 @@
+{
+  "case": {
+    "key": "demo_17",
+    "hkl": [
+      1,
+      1,
+      0
+    ],
+    "kinetic_energy_eV": 17000000.0,
+    "thicknesses_um": [
+      0.5,
+      1.0,
+      2.0
+    ],
+    "order_max": 32,
+    "dz_ang": 50.0,
+    "photon_eV": [
+      500.0,
+      26000.0,
+      1021
+    ],
+    "lines": [
+      [
+        1,
+        0
+      ],
+      [
+        2,
+        1
+      ],
+      [
+        3,
+        2
+      ],
+      [
+        4,
+        3
+      ]
+    ]
+  },
+  "incidents": 4000,
+  "source_shas": [
+    "8179040b0947be97ad57aa998f8d6e38d57a2e2a"
+  ],
+  "cpu_seconds": 2793.6158525794744,
+  "fates": {
+    "outgoing": 138,
+    "retained": 3827,
+    "unresolved": 35
+  },
+  "comparison": {
+    "windows": [
+      {
+        "line": [
+          4,
+          3
+        ],
+        "centre_eV": 2343.767276160576,
+        "window_eV": [
+          500.0,
+          4678.140990073786
+        ]
+      },
+      {
+        "line": [
+          3,
+          2
+        ],
+        "centre_eV": 7012.514703986996,
+        "window_eV": [
+          4678.140990073786,
+          8613.307232867324
+        ]
+      },
+      {
+        "line": [
+          2,
+          1
+        ],
+        "centre_eV": 10214.099761747651,
+        "window_eV": [
+          8613.307232867324,
+          14362.72535117108
+        ]
+      },
+      {
+        "line": [
+          1,
+          0
+        ],
+        "centre_eV": 18511.35094059451,
+        "window_eV": [
+          14362.72535117108,
+          26000.0
+        ]
+      }
+    ],
+    "thicknesses": [
+      {
+        "thickness_um": 0.5,
+        "total": {
+          "fibre": 0.009033706659296419,
+          "fibre_sem": 3.894554813362606e-05,
+          "production": 0.00882612631859028,
+          "production_capture": 0.001407157893710074
+        },
+        "lines": [
+          {
+            "line": [
+              4,
+              3
+            ],
+            "centre_eV": 2343.767276160576,
+            "window_eV": [
+              500.0,
+              4678.140990073786
+            ],
+            "fibre_yield": 0.0006020766847834649,
+            "fibre_yield_sem": 4.555301271872837e-07,
+            "production_yield": 0.0008371924159694654,
+            "production_capture_yield": 0.0007348226049969149,
+            "yield_ratio": 0.7191616566261682,
+            "yield_ratio_sem": 0.005401851746195614,
+            "fibre_centroid_eV": 3113.2516331151073,
+            "production_centroid_eV": 2664.1584646038987,
+            "centroid_shift_eV": 449.09316851120866,
+            "centroid_shift_sem_eV": 1.6483391967340857,
+            "fibre_rms_width_eV": 1033.2969359938845,
+            "production_rms_width_eV": 900.8822149493599,
+            "width_ratio": 1.1469833890016,
+            "width_ratio_sem": 0.0002525830695761284
+          },
+          {
+            "line": [
+              3,
+              2
+            ],
+            "centre_eV": 7012.514703986996,
+            "window_eV": [
+              4678.140990073786,
+              8613.307232867324
+            ],
+            "fibre_yield": 0.0013854543714852674,
+            "fibre_yield_sem": 7.058290663161658e-07,
+            "production_yield": 0.0007865150262670831,
+            "production_capture_yield": 8.526813410475422e-05,
+            "yield_ratio": 1.7615103656198905,
+            "yield_ratio_sem": 0.008775982305533218,
+            "fibre_centroid_eV": 7099.693819074222,
+            "production_centroid_eV": 6920.395255219518,
+            "centroid_shift_eV": 179.2985638547043,
+            "centroid_shift_sem_eV": 1.9832013505646118,
+            "fibre_rms_width_eV": 1117.8197708252044,
+            "production_rms_width_eV": 1086.0253169390505,
+            "width_ratio": 1.0292759785524763,
+            "width_ratio_sem": 0.0004912382527627686
+          },
+          {
+            "line": [
+              2,
+              1
+            ],
+            "centre_eV": 10214.099761747651,
+            "window_eV": [
+              8613.307232867324,
+              14362.72535117108
+            ],
+            "fibre_yield": 0.004781998934102006,
+            "fibre_yield_sem": 2.260251834482973e-06,
+            "production_yield": 0.005454447920397669,
+            "production_capture_yield": 0.00010624181294122867,
+            "yield_ratio": 0.8767154813632106,
+            "yield_ratio_sem": 0.0037327924292002526,
+            "fibre_centroid_eV": 11190.336918899997,
+            "production_centroid_eV": 10433.715780151637,
+            "centroid_shift_eV": 756.62113874836,
+            "centroid_shift_sem_eV": 3.4750679443833743,
+            "fibre_rms_width_eV": 1480.5763090677656,
+            "production_rms_width_eV": 942.2654159602462,
+            "width_ratio": 1.5712943338357974,
+            "width_ratio_sem": 0.00149483011042255
+          },
+          {
+            "line": [
+              1,
+              0
+            ],
+            "centre_eV": 18511.35094059451,
+            "window_eV": [
+              14362.72535117108,
+              26000.0
+            ],
+            "fibre_yield": 0.0022628058428494358,
+            "fibre_yield_sem": 1.6510748745846068e-06,
+            "production_yield": 0.0017475374955522721,
+            "production_capture_yield": 0.00048064193366669563,
+            "yield_ratio": 1.294853957988652,
+            "yield_ratio_sem": 0.023863732085761154,
+            "fibre_centroid_eV": 18996.31966974738,
+            "production_centroid_eV": 18897.74053464568,
+            "centroid_shift_eV": 98.57913510169965,
+            "centroid_shift_sem_eV": 13.842710436138542,
+            "fibre_rms_width_eV": 2808.1458210767137,
+            "production_rms_width_eV": 2013.2229197865556,
+            "width_ratio": 1.3948509096918273,
+            "width_ratio_sem": 0.0037978722344698883
+          }
+        ]
+      },
+      {
+        "thickness_um": 1.0,
+        "total": {
+          "fibre": 0.017466430759541123,
+          "fibre_sem": 8.907246947817345e-05,
+          "production": 0.017288525165744507,
+          "production_capture": 0.002701044678049256
+        },
+        "lines": [
+          {
+            "line": [
+              4,
+              3
+            ],
+            "centre_eV": 2343.767276160576,
+            "window_eV": [
+              500.0,
+              4678.140990073786
+            ],
+            "fibre_yield": 0.0012697842338356077,
+            "fibre_yield_sem": 1.5551586180900802e-06,
+            "production_yield": 0.0014338579794423122,
+            "production_capture_yield": 0.0012256204146517064,
+            "yield_ratio": 0.8855718293170711,
+            "yield_ratio_sem": 0.009623573602953803,
+            "fibre_centroid_eV": 3054.7529030736723,
+            "production_centroid_eV": 2740.0148201989077,
+            "centroid_shift_eV": 314.7380828747646,
+            "centroid_shift_sem_eV": 3.1890267696487853,
+            "fibre_rms_width_eV": 951.7542268317151,
+            "production_rms_width_eV": 928.6799161149892,
+            "width_ratio": 1.0248463548272415,
+            "width_ratio_sem": 0.001257499036264764
+          },
+          {
+            "line": [
+              3,
+              2
+            ],
+            "centre_eV": 7012.514703986996,
+            "window_eV": [
+              4678.140990073786,
+              8613.307232867324
+            ],
+            "fibre_yield": 0.0019681185296029843,
+            "fibre_yield_sem": 1.7522568571787238e-06,
+            "production_yield": 0.0018182213478816394,
+            "production_capture_yield": 0.00022552806010266762,
+            "yield_ratio": 1.082441657555053,
+            "yield_ratio_sem": 0.007829855140330013,
+            "fibre_centroid_eV": 7045.190502324199,
+            "production_centroid_eV": 6790.016605924731,
+            "centroid_shift_eV": 255.1738963994676,
+            "centroid_shift_sem_eV": 5.543431389698126,
+            "fibre_rms_width_eV": 1149.1718196278487,
+            "production_rms_width_eV": 1045.6601407014214,
+            "width_ratio": 1.0989917038025303,
+            "width_ratio_sem": 0.0015515866270459512
+          },
+          {
+            "line": [
+              2,
+              1
+            ],
+            "centre_eV": 10214.099761747651,
+            "window_eV": [
+              8613.307232867324,
+              14362.72535117108
+            ],
+            "fibre_yield": 0.009421704628721692,
+            "fibre_yield_sem": 6.815468102829411e-06,
+            "production_yield": 0.009577112802766102,
+            "production_capture_yield": 0.00031175537500286024,
+            "yield_ratio": 0.9837729619307058,
+            "yield_ratio_sem": 0.006850882748899044,
+            "fibre_centroid_eV": 10742.449044326833,
+            "production_centroid_eV": 10458.796925369736,
+            "centroid_shift_eV": 283.6521189570976,
+            "centroid_shift_sem_eV": 4.527870844309886,
+            "fibre_rms_width_eV": 1261.8470763386506,
+            "production_rms_width_eV": 973.0076014013999,
+            "width_ratio": 1.2968522286169624,
+            "width_ratio_sem": 0.0033489683443646556
+          },
+          {
+            "line": [
+              1,
+              0
+            ],
+            "centre_eV": 18511.35094059451,
+            "window_eV": [
+              14362.72535117108,
+              26000.0
+            ],
+            "fibre_yield": 0.00480477645750843,
+            "fibre_yield_sem": 4.5865119696732935e-06,
+            "production_yield": 0.004458165456884805,
+            "production_capture_yield": 0.0009375889540027015,
+            "yield_ratio": 1.077747451048132,
+            "yield_ratio_sem": 0.018740983317599772,
+            "fibre_centroid_eV": 18766.488431186455,
+            "production_centroid_eV": 18875.0404683655,
+            "centroid_shift_eV": -108.55203717904442,
+            "centroid_shift_sem_eV": 7.573764684050539,
+            "fibre_rms_width_eV": 2482.2419630839163,
+            "production_rms_width_eV": 1991.2252260572398,
+            "width_ratio": 1.246590255387093,
+            "width_ratio_sem": 0.005179903804609139
+          }
+        ]
+      },
+      {
+        "thickness_um": 2.0,
+        "total": {
+          "fibre": 0.032132808482507734,
+          "fibre_sem": 0.00018703181927637338,
+          "production": 0.03156701316780386,
+          "production_capture": 0.005005625338367058
+        },
+        "lines": [
+          {
+            "line": [
+              4,
+              3
+            ],
+            "centre_eV": 2343.767276160576,
+            "window_eV": [
+              500.0,
+              4678.140990073786
+            ],
+            "fibre_yield": 0.001991501934715385,
+            "fibre_yield_sem": 3.6794244815888476e-06,
+            "production_yield": 0.0022568872521837712,
+            "production_capture_yield": 0.0018557659791152206,
+            "yield_ratio": 0.8824109103316533,
+            "yield_ratio_sem": 0.011834139458589337,
+            "fibre_centroid_eV": 3036.6741505637206,
+            "production_centroid_eV": 2834.2049283728966,
+            "centroid_shift_eV": 202.46922219082398,
+            "centroid_shift_sem_eV": 6.603823462907188,
+            "fibre_rms_width_eV": 879.9749724084979,
+            "production_rms_width_eV": 958.1986899073638,
+            "width_ratio": 0.9183637816219219,
+            "width_ratio_sem": 0.0035296076586914488
+          },
+          {
+            "line": [
+              3,
+              2
+            ],
+            "centre_eV": 7012.514703986996,
+            "window_eV": [
+              4678.140990073786,
+              8613.307232867324
+            ],
+            "fibre_yield": 0.0038924859354986397,
+            "fibre_yield_sem": 4.739353309568641e-06,
+            "production_yield": 0.003992265151894963,
+            "production_capture_yield": 0.0005443253202533205,
+            "yield_ratio": 0.9750068663778602,
+            "yield_ratio_sem": 0.00938167366400176,
+            "fibre_centroid_eV": 6808.190300650735,
+            "production_centroid_eV": 6683.7936334713495,
+            "centroid_shift_eV": 124.39666717938508,
+            "centroid_shift_sem_eV": 6.737208998174532,
+            "fibre_rms_width_eV": 1058.0247242084176,
+            "production_rms_width_eV": 995.5616179272324,
+            "width_ratio": 1.0627415773734166,
+            "width_ratio_sem": 0.002399131862547823
+          },
+          {
+            "line": [
+              2,
+              1
+            ],
+            "centre_eV": 10214.099761747651,
+            "window_eV": [
+              8613.307232867324,
+              14362.72535117108
+            ],
+            "fibre_yield": 0.015866592330337607,
+            "fibre_yield_sem": 1.5906009379678952e-05,
+            "production_yield": 0.01535475422426224,
+            "production_capture_yield": 0.0008142866193188164,
+            "yield_ratio": 1.0333341777145872,
+            "yield_ratio_sem": 0.008866871031733461,
+            "fibre_centroid_eV": 10639.915214927836,
+            "production_centroid_eV": 10493.429416320434,
+            "centroid_shift_eV": 146.4857986074021,
+            "centroid_shift_sem_eV": 4.11415061821853,
+            "fibre_rms_width_eV": 1153.5736926923469,
+            "production_rms_width_eV": 1015.1671290899941,
+            "width_ratio": 1.1363386969852165,
+            "width_ratio_sem": 0.0038041392691523903
+          },
+          {
+            "line": [
+              1,
+              0
+            ],
+            "centre_eV": 18511.35094059451,
+            "window_eV": [
+              14362.72535117108,
+              26000.0
+            ],
+            "fibre_yield": 0.010378627309368466,
+            "fibre_yield_sem": 9.971830110222978e-06,
+            "production_yield": 0.009960222632049615,
+            "production_capture_yield": 0.0017897004080765573,
+            "yield_ratio": 1.0420075627599452,
+            "yield_ratio_sem": 0.012134055239785618,
+            "fibre_centroid_eV": 18866.12604442224,
+            "production_centroid_eV": 18873.377739147527,
+            "centroid_shift_eV": -7.251694725287962,
+            "centroid_shift_sem_eV": 6.746329481364324,
+            "fibre_rms_width_eV": 2216.426143530385,
+            "production_rms_width_eV": 2002.4669405694408,
+            "width_ratio": 1.1068478078844592,
+            "width_ratio_sem": 0.0035503434755006806
+          }
+        ]
+      }
+    ]
+  },
+  "quadrature": {
+    "incidents": 1000,
+    "relative_difference": [
+      -0.00014540240691341273,
+      -5.6390368885914775e-05,
+      -9.49261074534835e-06
+    ],
+    "relative_sem": [
+      4.639242762069988e-05,
+      3.064434502608842e-05,
+      2.311934606398145e-05
+    ],
+    "max_abs_bin_difference_over_peak": [
+      0.00011913229155836668,
+      6.28599940122987e-05,
+      4.3205119348541104e-05
+    ]
+  }
+}
