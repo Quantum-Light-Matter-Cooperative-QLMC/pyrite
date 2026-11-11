@@ -1,4 +1,8 @@
-"""Vacuum line-centre API anchors and plotting-array contracts."""
+"""Vacuum line-centre API anchors and plotting-array contracts.
+
+Closed-form anchors use the classical root (``recoil=False``); the default
+exact recoil root is pinned against ``recoil_resonance_eV`` below.
+"""
 
 import subprocess
 import sys
@@ -20,7 +24,9 @@ def catalog():
 
 def test_root_export_and_hopg_vacuum_anchor(catalog):
     assert pr.photon_energies is photon_energies
-    energies = pr.photon_energies("hopg", [30_000, 100_000], theta_obs_deg=60, catalog=catalog)
+    energies = pr.photon_energies(
+        "hopg", [30_000, 100_000], theta_obs_deg=60, catalog=catalog, recoil=False
+    )
     # Independent scalar relation E=hc/d * beta/(1-beta*cos(theta)); d002=c/2.
     beta = np.sqrt(1 - (510_998.95 / (510_998.95 + np.array([30_000, 100_000]))) ** 2)
     expected = HC_EV_ANG / (catalog.crystals["hopg"].lattice["c"] / 2) * beta / (1 - beta / 2)
@@ -150,8 +156,9 @@ def test_basal_azimuth_invariance_and_tilt_cosine(catalog):
         tilt_azim_deg=[0, 60, 180, 360],
         phi_obs_deg=[0, 90, 180, 270],
         catalog=catalog,
+        recoil=False,
     )
-    untilted = photon_energies("hopg", 30_000, catalog=catalog)[0]
+    untilted = photon_energies("hopg", 30_000, catalog=catalog, recoil=False)[0]
     np.testing.assert_allclose(result, untilted * np.sqrt(3) / 2)
 
 
@@ -168,6 +175,7 @@ def test_oblique_reflection_full_orientation_and_friedel_pair(catalog):
         tilt_azim_deg=azimuths,
         hkl=(1, 1, 1),
         catalog=custom,
+        recoil=False,
     )
     beta = np.sqrt(1 - (510_998.95 / 610_998.95) ** 2)
     projection = np.abs(
@@ -185,6 +193,7 @@ def test_oblique_reflection_full_orientation_and_friedel_pair(catalog):
             tilt_azim_deg=azimuths,
             hkl=(-1, -1, -1),
             catalog=custom,
+            recoil=False,
         ),
     )
 
@@ -192,8 +201,10 @@ def test_oblique_reflection_full_orientation_and_friedel_pair(catalog):
 def test_nonorthogonal_default_is_reciprocal_normal(catalog):
     gep = catalog.crystals["gep"]
     assert gep.lattice["beta"] != 90
-    untilted = photon_energies("gep", 30_000, catalog=catalog)[0]
-    tilted = photon_energies("gep", 30_000, tilt_deg=60, tilt_azim_deg=[0, 90], catalog=catalog)
+    untilted = photon_energies("gep", 30_000, catalog=catalog, recoil=False)[0]
+    tilted = photon_energies(
+        "gep", 30_000, tilt_deg=60, tilt_azim_deg=[0, 90], catalog=catalog, recoil=False
+    )
     np.testing.assert_allclose(tilted, untilted / 2)
 
 
@@ -206,6 +217,7 @@ def test_matches_existing_validation_anchor(catalog):
         [30_000, 100_000],
         theta_obs_deg=np.rad2deg(anchor.theta_obs_rad),
         catalog=catalog,
+        recoil=False,
     )
     np.testing.assert_allclose(
         energies[0],
@@ -272,8 +284,9 @@ def test_mapping_overrides_and_ambiguous_default(catalog):
         30_000,
         hkl={"hopg": (0, 0, 4)},
         catalog=catalog,
+        recoil=False,
     )
-    default = photon_energies(["hopg", "mos2"], 30_000, catalog=catalog)
+    default = photon_energies(["hopg", "mos2"], 30_000, catalog=catalog, recoil=False)
     np.testing.assert_allclose(overridden, default * [2, 1])
     custom = replace(
         catalog,
@@ -287,9 +300,9 @@ def test_mapping_overrides_and_ambiguous_default(catalog):
         },
     )
     with pytest.raises(ValueError, match="provide hkl explicitly"):
-        photon_energies("hopg", 30_000, catalog=custom)
+        photon_energies("hopg", 30_000, catalog=custom, recoil=False)
     np.testing.assert_allclose(
-        photon_energies("hopg", 30_000, hkl=(0, 0, 2), catalog=custom),
+        photon_energies("hopg", 30_000, hkl=(0, 0, 2), catalog=custom, recoil=False),
         default[:1],
     )
 
@@ -306,10 +319,12 @@ def test_external_catalog_path_and_environment(tmp_path, monkeypatch, catalog):
             "[[0, 0, 4]]",
         )
     )
-    expected = photon_energies("hopg", 30_000, catalog=catalog) * 2
-    np.testing.assert_allclose(photon_energies("hopg", 30_000, catalog=path), expected)
+    expected = photon_energies("hopg", 30_000, catalog=catalog, recoil=False) * 2
+    np.testing.assert_allclose(
+        photon_energies("hopg", 30_000, catalog=path, recoil=False), expected
+    )
     monkeypatch.setenv("PYRITE_CATALOG", str(path))
-    np.testing.assert_allclose(photon_energies("hopg", 30_000), expected)
+    np.testing.assert_allclose(photon_energies("hopg", 30_000, recoil=False), expected)
 
 
 def test_call_does_not_initialize_execution_or_plotting():
@@ -325,3 +340,45 @@ assert {'numba', 'pyrite._backend', 'pyrite.api', 'pyrite.montecarlo',
         [sys.executable, "-c", script], capture_output=True, text=True, check=False
     )
     assert result.returncode == 0, result.stderr
+
+
+def test_default_is_the_exact_recoil_root(catalog):
+    """Default lines are ``recoil_resonance_eV`` for the radiating mate.
+
+    Validation: line-recoil-resonance
+    """
+    from pyrite.materials.crystal import reciprocal_g_vector
+    from pyrite.materials.recoil import recoil_resonance_eV
+
+    theta = np.deg2rad(60.0)
+    exact = photon_energies("hopg", [30_000, 100_000], theta_obs_deg=60, catalog=catalog)
+    classical = photon_energies(
+        "hopg", [30_000, 100_000], theta_obs_deg=60, catalog=catalog, recoil=False
+    )
+    g, _ = reciprocal_g_vector((0, 0, 2), catalog.crystals["hopg"].lattice)
+    normal = [np.sin(theta), 0.0, np.cos(theta)]
+    expected = recoil_resonance_eV([30_000, 100_000], [0, 0, 1], g, normal)
+    np.testing.assert_allclose(exact[0], expected, rtol=1e-12)
+    # Percent-level, toward lower energy, in the 10-100 keV band.
+    shift = exact[0] / classical[0] - 1.0
+    assert np.all((shift < -1e-3) & (shift > -5e-2))
+
+
+def test_exact_root_breaks_harmonic_linearity_and_azimuth_invariance(catalog):
+    """Classically E(004) = 2 E(002) and detector azimuth is inert; the
+    exact root has a positive harmonic defect 2E2 - E4 (Huang 2023) and
+    sees azimuth through ``Q.n/E`` once ``g`` leaves the beam axis."""
+    e2, e4 = (
+        photon_energies("hopg", 30_000, hkl=hkl, theta_obs_deg=90, catalog=catalog)[0]
+        for hkl in [(0, 0, 2), (0, 0, 4)]
+    )
+    assert 2.0 * e2 - e4 > 1.0
+    azimuths = photon_energies(
+        "hopg", 30_000, tilt_deg=30, phi_obs_deg=[0, 90, 180], catalog=catalog
+    )[0]
+    assert np.ptp(azimuths) > 1e-3 * azimuths.mean()
+    # Rotating the whole geometry about the beam leaves the root unchanged.
+    rotated = photon_energies(
+        "hopg", 30_000, tilt_deg=30, tilt_azim_deg=90, phi_obs_deg=90, catalog=catalog
+    )[0]
+    assert rotated == pytest.approx(azimuths[0], rel=1e-12)

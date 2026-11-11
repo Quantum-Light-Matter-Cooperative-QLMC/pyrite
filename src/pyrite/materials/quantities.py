@@ -195,8 +195,13 @@ def photon_energies_q(
     hkl=None,
     mode="broadcast",
     catalog=None,
+    recoil=True,
 ):
-    """Vacuum resonant CXR photon energies, preserving broadcast/grid semantics."""
+    """Vacuum resonant CXR photon energies, preserving broadcast/grid semantics.
+
+    ``recoil`` selects the exact (default) or classical root, as in
+    :func:`~pyrite.materials.emission.photon_energies`.
+    """
     from .emission import photon_energies
 
     result = photon_energies(
@@ -209,6 +214,7 @@ def photon_energies_q(
         hkl=hkl,
         mode=mode,
         catalog=catalog,
+        recoil=recoil,
     )
     return _output(result, "eV")
 

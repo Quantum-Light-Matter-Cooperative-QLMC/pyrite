@@ -214,10 +214,12 @@ def test_forward_line_energy_is_doppler_upshift():
 
 @pytest.mark.parametrize(("energy", "theta_deg"), [(5e6, 3.0), (5e6, 20.0), (30e3, 120.0)])
 def test_doppler_denominator_matches_pxr_resonance(energy, theta_deg):
-    # With zero tilt and the catalog (440) surface reflection, photon_energies
-    # returns hbar c beta |g| / (1 - beta cos theta): same denominator.
+    # With zero tilt and the catalog (440) surface reflection, the classical
+    # photon_energies root is hbar c beta |g| / (1 - beta cos theta): same denominator.
     _, magnitude = reciprocal_g_vector((4, 4, 0), CRYSTALS["silicon"]["lattice"])
-    photon = photon_energies("silicon", energy, theta_obs_deg=theta_deg, hkl=(4, 4, 0))[0]
+    photon = photon_energies(
+        "silicon", energy, theta_obs_deg=theta_deg, hkl=(4, 4, 0), recoil=False
+    )[0]
     _, beta = longitudinal_kinematics(energy)
     pxr_denominator = HBARC_EV_ANG * beta * magnitude / photon
     assert doppler_denominator(energy, np.deg2rad(theta_deg)) == pytest.approx(
