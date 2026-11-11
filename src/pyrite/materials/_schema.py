@@ -260,7 +260,12 @@ class CrystalSpec:
 
     @property
     def hkl_list(self) -> tuple[tuple[int, int, int], ...]:
-        """Pinned representatives expanded to both reciprocal directions."""
+        """Pinned representatives expanded to both reciprocal directions.
+
+        Every pinned family is a complete symmetry orbit ``{g, -g}``, so this
+        scores each member as its own row, which the exact recoil root needs
+        (members sharing ``u.g`` split); a test guards future pins.
+        """
         return tuple(hkl for family in self.hkl_families for hkl in (family, _negative(family)))
 
     @property

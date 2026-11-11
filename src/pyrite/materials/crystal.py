@@ -750,6 +750,44 @@ def _orientation_R(
 
 
 # ---- reflection ranking -----------------------------------------------------
+def _reflection_families(crystal, E_ref_eV, B_ang2, use_henke, g_max_invang):
+    """Reflections with ``|g| <= g_max`` grouped as symmetry families.
+
+    Members share ``(|g|, |S(g)| exp(-W) / g^2)`` to rounding, the
+    space-group-free grouping of :func:`dominant_reflections`. Returns
+    ``{(|g|, metric): [(h, k, l), ...]}``.
+    """
+    info = CRYSTALS[crystal]
+    B = _reciprocal_basis(info["lattice"])
+    a_vecs = _direct_lattice_vectors(info["lattice"])
+
+    # exact per-axis index bounds: |h_i| <= g_max |a_i| / 2 pi
+    nmax = [int(np.floor(g_max_invang * np.linalg.norm(a) / (2.0 * np.pi))) for a in a_vecs]
+    grids = np.meshgrid(*(np.arange(-n, n + 1) for n in nmax), indexing="ij")
+    hkl = np.column_stack([G.ravel() for G in grids]).astype(float)
+    g_vec = hkl @ B
+    g_mag = np.linalg.norm(g_vec, axis=1)
+    keep = (g_mag > 1e-9) & (g_mag <= g_max_invang)
+    hkl, g_mag = hkl[keep], g_mag[keep]
+
+    # |S(g)| with the per-element form-factor policy, vectorized over hkl
+    dwf = debye_waller(g_mag, B_ang2)
+    F_el = {}
+    for el in {el for el, _ in info["basis"]}:
+        F_el[el] = _atom_F(el, g_mag, E_ref_eV, use_henke)
+    S = np.zeros(g_mag.shape, dtype=complex)
+    for el, R_frac in info["basis"]:
+        S += F_el[el] * np.exp(2j * np.pi * (hkl @ R_frac)) * dwf
+    metric = np.abs(S) / g_mag**2
+
+    # group symmetry mates: identical (|g|, metric) to rounding
+    fams = {}
+    for i in range(hkl.shape[0]):
+        key = (round(float(g_mag[i]), 6), round(float(metric[i]), 9))
+        fams.setdefault(key, []).append(tuple(int(x) for x in hkl[i]))
+    return fams
+
+
 def dominant_reflections(
     crystal,
     n_families=4,
@@ -800,34 +838,7 @@ def dominant_reflections(
     list of tuple
         Miller-index triples ordered by decreasing family strength.
     """
-    info = CRYSTALS[crystal]
-    B = _reciprocal_basis(info["lattice"])
-    a_vecs = _direct_lattice_vectors(info["lattice"])
-
-    # exact per-axis index bounds: |h_i| <= g_max |a_i| / 2 pi
-    nmax = [int(np.floor(g_max_invang * np.linalg.norm(a) / (2.0 * np.pi))) for a in a_vecs]
-    grids = np.meshgrid(*(np.arange(-n, n + 1) for n in nmax), indexing="ij")
-    hkl = np.column_stack([G.ravel() for G in grids]).astype(float)
-    g_vec = hkl @ B
-    g_mag = np.linalg.norm(g_vec, axis=1)
-    keep = (g_mag > 1e-9) & (g_mag <= g_max_invang)
-    hkl, g_mag = hkl[keep], g_mag[keep]
-
-    # |S(g)| with the per-element form-factor policy, vectorized over hkl
-    dwf = debye_waller(g_mag, B_ang2)
-    F_el = {}
-    for el in {el for el, _ in info["basis"]}:
-        F_el[el] = _atom_F(el, g_mag, E_ref_eV, use_henke)
-    S = np.zeros(g_mag.shape, dtype=complex)
-    for el, R_frac in info["basis"]:
-        S += F_el[el] * np.exp(2j * np.pi * (hkl @ R_frac)) * dwf
-    metric = np.abs(S) / g_mag**2
-
-    # group symmetry mates: identical (|g|, metric) to rounding
-    fams = {}
-    for i in range(hkl.shape[0]):
-        key = (round(float(g_mag[i]), 6), round(float(metric[i]), 9))
-        fams.setdefault(key, []).append(tuple(int(x) for x in hkl[i]))
+    fams = _reflection_families(crystal, E_ref_eV, B_ang2, use_henke, g_max_invang)
     ranked = sorted(fams.items(), key=lambda kv: -kv[0][1])
 
     out = []
