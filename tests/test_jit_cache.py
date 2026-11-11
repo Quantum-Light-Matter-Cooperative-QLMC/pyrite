@@ -198,6 +198,12 @@ _CORE_KEY = textwrap.dedent(
 )
 
 
+_REQUIRES_JIT = pytest.mark.skipif(
+    os.environ.get("NUMBA_DISABLE_JIT") == "1",
+    reason="exercises the Numba disk cache, absent under NUMBA_DISABLE_JIT",
+)
+
+
 def test_transport_core_cache_key_is_stable_across_processes():
     """Regression (#910): ``core`` captured ``body`` and missed in every process."""
 
@@ -215,9 +221,19 @@ def test_transport_core_cache_key_is_stable_across_processes():
     assert first != key("radiative")
 
 
-@pytest.mark.skipif(
-    os.environ.get("NUMBA_DISABLE_JIT") == "1", reason="needs compiled Numba dispatchers"
-)
+def test_transport_import_survives_disabled_jit():
+    """Regression (#344): ``NUMBA_DISABLE_JIT`` closures are plain functions."""
+    env = {**os.environ, "NUMBA_DISABLE_JIT": "1"}
+    done = subprocess.run(
+        [sys.executable, "-c", "import pyrite.montecarlo.transport.core_specializations"],
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    assert done.returncode == 0, done.stderr
+
+
+@_REQUIRES_JIT
 def test_transport_core_digest_reaches_module_attribute_callees():
     """Regression (#991): ``_cutoff.*``/``_moments.*`` edits invalidate the core.
 

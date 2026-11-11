@@ -25,6 +25,7 @@ from tests.helpers.external_db_fixtures import (
     TOL_ANGLE_DEG,
     TOL_COD_ANG,
     TOL_MP_REL,
+    ExternalDBUnavailableError,
     Lattice,
     cached_lattice_tuple,
     fetch_external,
@@ -122,7 +123,10 @@ def test_local_lattice_matches_live_external(
     """
     local = local_lattice_tuple(key)
     if cod_id is not None:
-        crystal = fetch_external(cod_id, None)
+        try:
+            crystal = fetch_external(cod_id, None)
+        except ExternalDBUnavailableError as exc:
+            pytest.skip(f"{key}: {exc}")
         assert crystal is not None
         _assert_geometry_agrees(local, lattice_tuple(crystal), source=f"cod:{cod_id}")
         return

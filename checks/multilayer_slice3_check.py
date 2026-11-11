@@ -1,36 +1,25 @@
-"""Multilayer slice-3 validation: per-layer COHERENT radiation
+"""Multilayer slice-3 validation: per-layer PXR/CBS and characteristic emission
 (docs/physics/materials/multilayer-materials.md (2)).
 
-mc_cxr_spectrum already radiates one crystal; slice 3 makes _spectrum_case radiate
-EVERY crystalline layer of a film-on-substrate stack and sum them incoherently,
-each self-absorbing through the whole stack. `_spectrum_case`'s returned
-``spec`` is the per-layer COHERENT (PXR/CBS) sum PLUS the incoherent
-characteristic (EEDL/xraydb relaxation) component that every layer -- crystalline
-or not -- contributes from its own composition; ``spec_characteristic`` carries
-that second term separately so it can be subtracted back out. On real
-transport segments:
+`_spectrum_case` scores each crystalline layer of a film-on-substrate stack
+with self-absorption through the whole stack. It returns the
+incoherently summed PXR/CBS density in ``spec`` and the characteristic
+(EEDL/xraydb relaxation) density in ``spec_characteristic``. Both are checked
+against independent per-layer sums on the same transport segments:
 
   1. A CRYSTALLINE substrate (silicon) gets its own electron segments and
      radiates NONZERO PXR/CBS lines of its own.
-  2. The pipeline spectrum equals the incoherent sum of the per-layer
-     contributions (film layer 0 + substrate layer 1, each COHERENT +
-     characteristic) -- i.e. _spectrum_case really does sum the layers, with
-     no cross-layer coherence.
+  2. Each pipeline component equals the sum of that component from the film
+     and substrate.
   3. An AMORPHOUS substrate (sio2) radiates NO COHERENT lines of its own (its
      layer radiator is None, so only its characteristic emission contributes);
      the same per-layer sum invariant as (2) still holds for this stack too.
-  4. Sanity: a crystalline substrate raises the total coherent line flux above
+  4. Sanity: a crystalline substrate raises the PXR/CBS line flux above
      the same film on an amorphous substrate.
 
-Assertions 2/3 diff the pipeline spectrum against a manual per-layer
-reproduction at a 1e-9 relative tolerance -- exact under CPU/NumPy's
-associative fp64 reduction, but CUDA's non-associative reduction order
-introduces ~1e-8 relative noise (amplified here by a small denominator) that
-is physically negligible yet trips that tolerance. Pin the CPU backend below
-the same way tests/conftest.py does: stubbing cupy alone does not force CPU on
-a box whose environment pins PYRITE_MC_BACKEND to an accelerator (e.g. this
-repo's .envrc PYRITE_MC_BACKEND=cuda) -- _backend.select_backend honors that
-explicit request instead of falling back, so the stubbed import raises.
+Assertions 2 and 3 compare each component at a 1e-9 relative tolerance.
+The check pins CPU scoring because CUDA reduction-order differences can exceed
+that tolerance.
 """
 
 import os
@@ -41,10 +30,9 @@ import sys  # noqa: E402
 
 import numpy as np  # noqa: E402
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
-
-from pyrite.campaign.sweep import BeamSpec, Sweep, build_cases, substrate_radiator  # noqa: E402
-from pyrite.detectors import Detector, EnergyBins  # noqa: E402
+from pyrite.campaign.geometry import DEFAULT_FOOTPRINT  # noqa: E402
+from pyrite.campaign.sweep import BeamSpec, Stack, Sweep, build_cases  # noqa: E402
+from pyrite.detectors import EnergyBins  # noqa: E402
 from pyrite.montecarlo import (  # noqa: E402
     _segments_in_layer,
     _spectrum_case,
@@ -64,18 +52,25 @@ E_BREM = np.arange(100.0, 30000.0, 100.0)
 def _case(substrate):
     sw = Sweep(
         material="mose2",
-        tilt_deg=TILT,
         beam=BeamSpec(energy_keV=E0),
-        thickness_ang=T_FILM,
-        substrate=substrate,
-        substrate_thickness_ang=T_SUB,
-        detector=Detector(energy_bins=EnergyBins(cxr=E_LINE, brem=E_BREM)),
+        target=Stack.on_substrate(
+            "mose2", T_FILM, substrate, T_SUB, tilt_deg=TILT, footprint=DEFAULT_FOOTPRINT
+        ),
+        energy_bins=EnergyBins(cxr=E_LINE, brem=E_BREM),
     )
-    return build_cases(sw, n_electrons=600, n_electrons_brem=120)[0]
+    # Use the same stopping model in both stacks. The amorphous substrate
+    # has no catalog crystal for shell-resolved stopping.
+    return build_cases(
+        sw,
+        n_electrons=600,
+        n_electrons_brem=120,
+        inelastic_model="continuous",
+        radiative_model="uncoupled",
+    )[0]
 
 
 def _radiate_layer(segs, E_grid, n_hat, case, tp, L):
-    """One layer's COHERENT + characteristic spectrum, exactly as
+    """One layer's separate PXR/CBS and characteristic spectra, as
     _spectrum_case computes it (same per-radiator kwargs as
     runner._cxr_for_segments / _characteristic_from_segments): the film and
     substrate radiators carry different surface_hkl/beam_uvw, so reproducing
@@ -85,10 +80,10 @@ def _radiate_layer(segs, E_grid, n_hat, case, tp, L):
     rad = case["layer_radiators"][L]
     sL = _segments_in_layer(segs, L)
     if sL["L_ang"].size == 0:
-        return np.zeros(E_grid.shape)
-    coherent = np.zeros(E_grid.shape)
+        return np.zeros(E_grid.shape), np.zeros(E_grid.shape)
+    cxr = np.zeros(E_grid.shape)
     if rad is not None:
-        coherent = mc_cxr_spectrum(
+        cxr = mc_cxr_spectrum(
             sL,
             E_grid,
             crystal=rad["crystal"],
@@ -102,7 +97,7 @@ def _radiate_layer(segs, E_grid, n_hat, case, tp, L):
             recip_miscut_rad=rad.get("recip_miscut_rad", case.get("recip_miscut_rad")),
             sinc_cutoff=case.get("sinc_cutoff"),
             layers=abs_layers,
-            coherent=bool(case.get("coherent_emission", False)),
+            coherent=False,
             electron_limit=tp["Ne_lines"],
             E_cut_keV=case.get("E_cut_lines_keV", 5.0),
         )
@@ -115,7 +110,19 @@ def _radiate_layer(segs, E_grid, n_hat, case, tp, L):
         electron_limit=tp["Ne_brem"],
         E_cut_keV=case.get("E_cut_brem_keV", 1.0),
     )
-    return coherent + characteristic
+    return cxr, characteristic
+
+
+def _component_errors(output, film, substrate):
+    """Maximum error relative to each manual component's peak."""
+    errors = []
+    for key, film_part, substrate_part in zip(
+        ("spec", "spec_characteristic"), film, substrate, strict=True
+    ):
+        expected = film_part + substrate_part
+        peak = max(float(np.max(np.abs(expected))), 1e-300)
+        errors.append(float(np.max(np.abs(output[key] - expected)) / peak))
+    return errors
 
 
 def main():
@@ -137,19 +144,7 @@ def main():
     spec_sub = _radiate_layer(segs, E_grid, n_hat, case, tp, 1)
 
     # 1. the crystalline substrate radiates its own lines -----------------------
-    sub_coherent = mc_cxr_spectrum(
-        _segments_in_layer(segs, 1),
-        E_grid,
-        crystal=case["layer_radiators"][1]["crystal"],
-        hkl_list=case["layer_radiators"][1]["hkl_list"],
-        n_hat=n_hat,
-        B_ang2=case["layer_radiators"][1]["B_ang2"],
-        composition=case["abs_layers"][1][2],
-        beam_uvw=case["layer_radiators"][1].get("beam_uvw"),
-        surface_hkl=case["layer_radiators"][1].get("surface_hkl"),
-        layers=case["abs_layers"],
-    )
-    sub_int = float(np.trapezoid(sub_coherent, E_grid))
+    sub_int = float(np.trapezoid(spec_sub[0], E_grid))
     radiates = n_sub > 0 and sub_int > 0.0
     ok &= radiates
     print(
@@ -158,20 +153,17 @@ def main():
     )
 
     # 2. pipeline spectrum == incoherent sum of the per-layer parts -------------
-    manual = spec_film + spec_sub
-    denom = max(float(np.max(np.abs(manual))), 1e-300)
-    rel = float(np.max(np.abs(out["spec"] - manual)) / denom)
-    summed = rel < 1e-9
+    rel_cxr, rel_characteristic = _component_errors(out, spec_film, spec_sub)
+    summed = rel_cxr < 1e-9 and rel_characteristic < 1e-9
     ok &= summed
     print(
         f"2. pipeline == film(0) + substrate(1), incoherent sum:  "
-        f"{'PASS' if summed else 'FAIL'}  (max rel {rel:.1e})"
+        f"{'PASS' if summed else 'FAIL'}  (PXR/CBS {rel_cxr:.1e}, "
+        f"characteristic {rel_characteristic:.1e})"
     )
 
     # 3. amorphous substrate: no COHERENT lines of its own, but the same
-    #    per-layer sum invariant as (2) still holds (its characteristic term
-    #    is nonzero, so this is no longer a bit-for-bit film-only match). ---
-    assert substrate_radiator("sio2") is None
+    #    per-layer sum invariant as (2) still holds. ---------------------------
     case_a = _case("sio2")
     tp_a = _transport_case(case_a)
     out_a = _spectrum_case(case_a, tp_a)
@@ -179,14 +171,13 @@ def main():
     assert case_a["layer_radiators"][1] is None  # amorphous: no coherent radiator
     film_a = _radiate_layer(segs_a, E_grid_a, n_hat_a, case_a, tp_a, 0)
     sub_a = _radiate_layer(segs_a, E_grid_a, n_hat_a, case_a, tp_a, 1)
-    manual_a = film_a + sub_a
-    denom_a = max(float(np.max(np.abs(manual_a))), 1e-300)
-    rel_a = float(np.max(np.abs(out_a["spec"] - manual_a)) / denom_a)
-    summed_a = rel_a < 1e-9
+    rel_cxr_a, rel_characteristic_a = _component_errors(out_a, film_a, sub_a)
+    summed_a = rel_cxr_a < 1e-9 and rel_characteristic_a < 1e-9
     ok &= summed_a
     print(
         f"3. amorphous substrate: no coherent lines, sum invariant holds:  "
-        f"{'PASS' if summed_a else 'FAIL'}  (max rel {rel_a:.1e})"
+        f"{'PASS' if summed_a else 'FAIL'}  (PXR/CBS {rel_cxr_a:.1e}, "
+        f"characteristic {rel_characteristic_a:.1e})"
     )
 
     # 4. sanity: crystalline substrate raises total coherent line flux ---------
@@ -195,7 +186,7 @@ def main():
     boosted = f_si > f_sio2
     ok &= boosted
     print(
-        f"4. crystalline substrate boosts coherent flux:          "
+        f"4. crystalline substrate boosts PXR/CBS flux:           "
         f"{'PASS' if boosted else 'FAIL'}  (Si {f_si:.3e} > SiO2 {f_sio2:.3e})"
     )
 

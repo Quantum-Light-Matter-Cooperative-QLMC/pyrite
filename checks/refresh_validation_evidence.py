@@ -52,6 +52,7 @@ CPU_RECIPES: dict[str, tuple[str, ...]] = {
     "checks/quantum_decoherence_budget.py": (),
     "checks/channeling_modulated_emission.py": (),
     "checks/multilayer_validation_check.py": (),
+    "checks/multilayer_slice3_check.py": (),
 }
 
 

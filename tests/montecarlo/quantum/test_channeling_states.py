@@ -1,5 +1,6 @@
 """User-definable channeling entry states (cr-entry-state-projection, #508)."""
 
+import os
 from types import SimpleNamespace
 
 import numpy as np
@@ -205,6 +206,10 @@ def test_entry_state_refuses_an_extra_divergence(solver):
         )
 
 
+@pytest.mark.skipif(
+    os.environ.get("NUMBA_DISABLE_JIT") == "1",
+    reason="abtem imports Numba dispatcher internals absent under NUMBA_DISABLE_JIT",
+)
 def test_aperture_probe_matches_abtem_conventions():
     abtem = pytest.importorskip("abtem")
     abtem.config.set({"device": "cpu"})

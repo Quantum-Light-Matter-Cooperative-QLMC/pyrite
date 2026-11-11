@@ -203,6 +203,46 @@ def local_lattice_tuple(key: str) -> Lattice:
     return (a, b, c, alpha, beta, gamma)
 
 
+class ExternalDBUnavailableError(RuntimeError):
+    """The external database stayed unreachable after bounded retries."""
+
+
+#: COD fetch attempts and first backoff (s); delays double per retry.
+COD_ATTEMPTS = 4
+COD_BACKOFF_S = 2.0
+
+
+def _fetch_cod_cif(cod_id: int, *, sleep: Callable[[float], None] | None = None) -> str:
+    """Return COD entry ``cod_id`` as CIF text, retrying transport failures.
+
+    Connection resets/refusals, timeouts and HTTP 429/5xx are retried with
+    exponential backoff (COD throttles shared CI egress), then raise
+    :class:`ExternalDBUnavailableError`. Other HTTP errors (e.g. 404) raise at once.
+    """
+    import time
+    from urllib.error import HTTPError, URLError
+    from urllib.request import urlopen
+
+    pause = time.sleep if sleep is None else sleep
+    url = f"https://www.crystallography.net/cod/{cod_id}.cif"
+    last: Exception | None = None
+    for attempt in range(COD_ATTEMPTS):
+        if attempt:
+            pause(COD_BACKOFF_S * 2 ** (attempt - 1))
+        try:
+            with urlopen(url, timeout=30) as response:
+                return response.read().decode("utf-8")
+        except HTTPError as exc:
+            if exc.code != 429 and exc.code < 500:
+                raise
+            last = exc
+        except (URLError, OSError) as exc:
+            last = exc
+    raise ExternalDBUnavailableError(
+        f"COD {cod_id} unreachable after {COD_ATTEMPTS} attempts: {last}"
+    ) from last
+
+
 def fetch_external(cod_id: int | None, mp_id: str | None) -> SmallStructure | Lattice | None:
     """Live-fetch lattice data from COD (preferred) or Materials Project.
 
@@ -211,12 +251,9 @@ def fetch_external(cod_id: int | None, mp_id: str | None) -> SmallStructure | La
     :class:`MPQueryError` rather than silently skipping. Requires network access.
     """
     if cod_id is not None:
-        from urllib.request import urlopen
-
         import gemmi
 
-        with urlopen(f"https://www.crystallography.net/cod/{cod_id}.cif", timeout=30) as response:
-            document = gemmi.cif.read_string(response.read().decode("utf-8"))
+        document = gemmi.cif.read_string(_fetch_cod_cif(cod_id))
         return gemmi.make_small_structure_from_block(document.sole_block())
     if mp_id is not None:
         api_key = resolve_mp_api_key()
