@@ -19,7 +19,9 @@ from .._config_presets import (
     validate_values,
 )
 from .._numerics import SAMPLING_KEYS
+from .._sampling import FixedSampling
 from ._profile_document import existing_profile, profile_rows
+from .profile_precision import merge_policy, precision_table
 
 _NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 
@@ -72,12 +74,35 @@ def _write_values(row, values):
         row[key] = value
 
 
-def create_preset(document, kind, name, *, source=None, values=None, description=None):
+def _preset_changes(kind, row, values, sampling):
+    base = preset_values(kind, row)
+    updates = dict(values or {})
+    removed = ()
+    if sampling == "adaptive":
+        removed = SAMPLING_KEYS
+        updates["precision"] = precision_table(
+            merge_policy(base.get("precision"), updates.get("precision", {}))
+        ).unwrap()
+    elif sampling == "fixed":
+        removed = ("precision",)
+        if not any(key in base or key in updates for key in SAMPLING_KEYS):
+            defaults = FixedSampling()
+            updates.update(
+                n_electrons=defaults.cxr_histories, n_electrons_brem=defaults.brem_histories
+            )
+    merged = {key: value for key, value in base.items() if key not in removed}
+    merged.update(updates)
+    validate_values(kind, merged)
+    return merged, updates, removed
+
+
+def create_preset(
+    document, kind, name, *, source=None, values=None, description=None, sampling=None
+):
     """Add preset ``name``, cloned from ``source`` when given, then apply ``values``."""
     require_new(document, kind, name)
     origin = existing_preset(document, kind, source) if source is not None else {}
-    merged = {**preset_values(kind, origin), **(values or {})}
-    validate_values(kind, merged)
+    merged, _, _ = _preset_changes(kind, origin, values, sampling)
     row = tomlkit.table()
     description = description if description is not None else origin.get("description")
     if description is not None:
@@ -87,11 +112,12 @@ def create_preset(document, kind, name, *, source=None, values=None, description
     return row
 
 
-def set_preset(document, kind, name, *, values=None, description=None):
+def set_preset(document, kind, name, *, values=None, description=None, sampling=None):
     """Validate and apply field updates to preset ``name``."""
     row = existing_preset(document, kind, name)
-    updates = dict(values or {})
-    validate_values(kind, {**preset_values(kind, row), **updates})
+    _, updates, removed = _preset_changes(kind, row, values, sampling)
+    for key in removed:
+        row.pop(key, None)
     _write_values(row, updates)
     if description is not None:
         row["description"] = description

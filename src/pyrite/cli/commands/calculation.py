@@ -376,6 +376,19 @@ def _dispatching(kind, verb, preset_command, profile_command):
             )
         if values.get("description") is not None:
             raise click.UsageError(f"--description applies to {noun} presets, not profiles")
+        if (
+            kind is NUMERICS
+            and verb == "set"
+            and any(
+                ctx.get_parameter_source(key) is click.core.ParameterSource.COMMANDLINE
+                for key in preset_names - profile_names
+            )
+        ):
+            raise click.UsageError(
+                "Sampling options here apply to named presets. To switch this profile, use "
+                f"'pyrite profile numerics adaptive-sampling enable {name}' or "
+                f"'pyrite profile numerics adaptive-sampling disable {name}'."
+            )
         warn_form(f"{noun} {verb} PROFILE", f"pyrite profile {noun} {verb} {name}")
         if verb == "show":  # the deprecated route keeps its JSON payload
             return _show(name, values["json_output"], physics=kind is PHYSICS, legacy=True)
@@ -443,11 +456,13 @@ numerics_command = _build_noun(
     NUMERICS,
     """Manage named numerics presets: sampling, reflections/mosaic, integration.
 
-    A profile attaches a preset with 'pyrite profile set PROFILE --numerics NAME';
-    the profile's own fields, adaptive-sampling policy and CXR-grid policy
-    (pyrite profile numerics) override it. Bundled presets are read-only;
-    clone one with 'create NAME --from SOURCE'. Physical models live under
-    pyrite physics.
+    Switch sampling with 'pyrite numerics set NAME --sampling adaptive' or
+    '--sampling fixed'.
+
+    Attach a preset with 'pyrite profile set PROFILE --numerics NAME'.
+    Profile settings (pyrite profile numerics) override the preset. Bundled
+    presets are read-only; clone one with 'create NAME --from SOURCE'.
+    Physical models live under pyrite physics.
     """,
     {
         "adaptive-sampling": "pyrite.cli.commands._profile_precision.command",

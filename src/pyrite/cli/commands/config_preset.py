@@ -7,7 +7,7 @@ from tomlkit.exceptions import ParseError
 
 from pyrite._catalog_layout import object_sources
 from pyrite._config_presets import NUMERICS, PHYSICS, preset_values
-from pyrite._numerics import PHYSICS_FIELDS, PROFILE_NUMERICS_KEYS
+from pyrite._numerics import PHYSICS_FIELDS, PROFILE_NUMERICS_KEYS, SAMPLING_KEYS
 from pyrite.campaign import config_presets
 from pyrite.campaign.profiles import resolve_numerics
 from pyrite.cli import _catalog_io, _completion
@@ -21,17 +21,19 @@ from pyrite.console.output import (
 )
 from pyrite.console.tables import emit_table, object_origin
 
-from . import _calculation_options, _calculation_view
+from . import _calculation_options, _calculation_view, _profile_precision
 from ._profile_shared import confirm_standard, write
 
 _COMPLETE = {
     PHYSICS: _completion.complete_physics_preset,
     NUMERICS: _completion.complete_numerics_preset,
 }
-_TABLE_ONLY = {
-    NUMERICS: "adaptive_sampling and cxr_grid_policy tables are edited in the preset TOML or "
-    "captured by adopt"
-}
+_TABLE_ONLY = {NUMERICS: "CXR grid policies are edited in the preset TOML or captured by adopt"}
+_SAMPLING_HELP = (
+    "Select adaptive or fixed sampling. Adaptive options select adaptive; "
+    "--cxr-histories or --brem-histories select fixed. Switching replaces the previous "
+    "sampling settings. With no counts, switching to fixed uses 450 CXR and 100 brem histories."
+)
 
 
 def _source(kind, name):
@@ -50,6 +52,8 @@ def _field_rows(kind, preset, values):
         for row in cast(list[dict[str, Any]], group["fields"])
         if (row["key"] in PHYSICS_FIELDS) == physics
     ]
+    if "precision" in values:
+        rows = [row for row in rows if row["key"] not in SAMPLING_KEYS]
     if kind is PHYSICS:
         rows.insert(
             0,
@@ -82,17 +86,28 @@ def _fail(schema, json_output, exc):
     raise CLIError(str(exc)) from None
 
 
+def _sampling_changes(mode, options, updates):
+    policy = _profile_precision.policy_updates(options)
+    fixed = any(key in updates for key in SAMPLING_KEYS)
+    if (mode == "adaptive" and fixed) or (policy and (fixed or mode == "fixed")):
+        raise click.UsageError("choose either adaptive policy options or fixed history counts")
+    if policy:
+        updates["precision"] = policy
+        return "adaptive"
+    return "fixed" if fixed else mode
+
+
 def build(kind):
     """Return the ``pyrite <kind> preset`` command group."""
     fields = _calculation_options.field_names(physics=kind is PHYSICS)
     complete = _COMPLETE[kind]
     noun = f"{kind.table} preset"
 
-    def updates(values, emission=None):
+    def updates(values, emission):
         result = {
             fields[key.replace("_", "-")]: value
             for key, value in values.items()
-            if value is not None
+            if value is not None and key.replace("_", "-") in fields
         }
         if emission is not None:
             result["emission"] = emission
@@ -107,6 +122,23 @@ def build(kind):
                     ("--emission",),
                     type=click.Choice(("incoherent", "coherent", "both")),
                     help="CXR modes; cross-model constraints are validated before saving.",
+                )
+            )
+        else:
+            for param in params:
+                if isinstance(param, click.Option) and param.name in (
+                    "cxr_histories",
+                    "brem_histories",
+                ):
+                    param.help = "Select fixed sampling and set this estimator's history count."
+            params.extend(
+                (
+                    click.Option(
+                        ("--sampling",),
+                        type=click.Choice(("fixed", "adaptive")),
+                        help=_SAMPLING_HELP,
+                    ),
+                    *_profile_precision.policy_params(),
                 )
             )
         params.append(click.Option(("--description",), help="Replace the display description."))
@@ -197,7 +229,9 @@ def build(kind):
             _calculation_view.emit_numerics(payload["fields"])
         return 0
 
-    def create(name, source, dry_run, emission=None, description=None, **values):
+    def create(name, source, dry_run, emission=None, description=None, sampling=None, **values):
+        changes = updates(values, emission)
+        sampling = _sampling_changes(sampling, values, changes) if kind is NUMERICS else None
         try:
             original, document = _catalog_io.catalog_text()
             config_presets.create_preset(
@@ -205,22 +239,26 @@ def build(kind):
                 kind,
                 name,
                 source=source,
-                values=updates(values, emission),
+                values=changes,
                 description=description,
+                sampling=sampling,
             )
         except (OSError, ValueError, ParseError) as exc:
             raise CLIError(str(exc)) from None
         origin = f" from {source}" if source else ""
         return write(document, original, dry_run, f"created {noun} {name}{origin}")
 
-    def set_(name, dry_run, emission=None, description=None, **values):
+    def set_(name, dry_run, emission=None, description=None, sampling=None, **values):
         changes = updates(values, emission)
-        if not changes and description is None:
+        sampling = _sampling_changes(sampling, values, changes) if kind is NUMERICS else None
+        if not changes and description is None and sampling is None:
             raise click.UsageError("provide at least one setting option")
         try:
             _catalog_io.require_writable_object(kind.table, name)
             original, document = _catalog_io.catalog_text()
-            config_presets.set_preset(document, kind, name, values=changes, description=description)
+            config_presets.set_preset(
+                document, kind, name, values=changes, description=description, sampling=sampling
+            )
         except (OSError, ValueError, ParseError) as exc:
             raise CLIError(str(exc)) from None
         return write(document, original, dry_run, f"updated {noun} {name}")

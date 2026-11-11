@@ -176,11 +176,21 @@ def _policy_options(function):
     return function
 
 
-def _updates(values):
+def policy_params():
+    """Build fresh Click parameters for the adaptive policy fields."""
+
+    def holder():
+        pass
+
+    return list(reversed(getattr(_policy_options(holder), "__click_params__", [])))
+
+
+def policy_updates(values):
+    """Map supplied adaptive options to stored-vocabulary policy fields."""
     updates = {
-        _stored(_PRECISION_FIELD_NAMES[key.replace("_", "-")]): value
-        for key, value in values.items()
-        if value is not None and value != ()
+        _stored(field): value
+        for option, field in _PRECISION_FIELD_NAMES.items()
+        if (value := values.get(option.replace("-", "_"))) is not None and value != ()
     }
     if "observables" in updates:
         updates["observables"] = list(dict.fromkeys(updates["observables"]))
@@ -345,7 +355,7 @@ def precision_enable_command(name, yes, dry_run, **values):
     """
     try:
         original, document = _catalog_io.catalog_text()
-        removed = _profile_edit.enable_precision(document, name, _updates(values))
+        removed = _profile_edit.enable_precision(document, name, policy_updates(values))
     except (OSError, TypeError, ValueError, ParseError) as exc:
         raise CLIError(str(exc)) from None
     if _catalog_io.is_unchanged(document, original):
@@ -373,7 +383,7 @@ def precision_set_command(name, yes, dry_run, **values):
     line and brem). A profile with fixed counts is refused; switch it with
     'pyrite profile numerics adaptive-sampling enable'.
     """
-    updates = _updates(values)
+    updates = policy_updates(values)
     if not updates:
         raise click.UsageError(
             "provide at least one policy option; "
