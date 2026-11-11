@@ -36,9 +36,13 @@ from ._kernels import (
     _interp_elemental_mu,
     _interp_gather1d,
     _interp_index,
+    _line_recoil_terms,
     _log_interp_fraction,
     _matvec3,
     _polarization_pair,
+    _recoil_formation_line,
+    _recoil_line_allowed,
+    _recoil_slope_factor,
     _reflection_tables,
     _rowdot3,
     _sincsq_lineshape,
@@ -81,7 +85,7 @@ class _FormationLines(tuple):
         return _FormationLines(a[sel] for a in self)
 
 
-def _formation_cxr(st, idx, t_L, v_dot_g, mu):
+def _formation_cxr(st, idx, t_L, v_dot_g, mu, g2, n_dot_g):
     """Formation-factor lines and midpoint escape for the kept piece rows ``idx``.
 
     The escape distance is affine on each piece row (``_setup`` split the
@@ -90,22 +94,31 @@ def _formation_cxr(st, idx, t_L, v_dot_g, mu):
     attenuation ``tau = mu L`` at both ends. The sinc centre and width are the
     VACUUM ones: the in-medium part of the intra-piece phase slope is the
     escape-path term, which ``half_dL`` carries.
-    Returns ``(L_esc_mid, lines)``. Validation: coherent-formation-absorption
+
+    Under exact recoil the centre and width are the exact vacuum root and
+    slope, and ``recoil_phase = (d_shift, g_shift)`` carries the exact
+    mismatch's extra phase over the electron's own age; every phased
+    consumer adds it to ``d`` and ``g.r``.
+    Returns ``(L_esc_mid, lines, recoil_phase)``.
+    Validation: coherent-formation-absorption, line-recoil-in-medium-root
     """
     L_start, L_end = (a[idx] for a in st.escape_ends)
     denom_vac = st.denom_all[idx]
     apb, bma, q = formation_coefficients(mu * L_start, mu * L_end, xp=xp)
+    E_c, a_c, d_shift, g_shift = _recoil_formation_line(
+        v_dot_g, denom_vac, t_L, st.gamma_all[idx], g2, n_dot_g, st.seg_t_mid[idx]
+    )
     cxr_rows = _FormationLines(
         (
-            HBARC_EV_ANG * v_dot_g / denom_vac,
-            denom_vac * t_L / (2.0 * HBARC_EV_ANG),
+            E_c,
+            a_c,
             0.5 * (L_end - L_start),
             apb,
             bma,
             q,
         )
     )
-    return 0.5 * (L_start + L_end), cxr_rows
+    return 0.5 * (L_start + L_end), cxr_rows, (d_shift, g_shift)
 
 
 def _formation_good(amp, t_L, cxr_rows, coefs):
@@ -588,7 +601,7 @@ def _coherent_jit_grouped_row(st, elec_id_sel, per_cxr_sel, L_esc_sel, formation
     return out
 
 
-def _temporal_coherent_row(st, g_vec_d, wm, idx, coefs, good, cxr_rows, L_esc):
+def _temporal_coherent_row(st, g_vec_d, wm, idx, coefs, good, cxr_rows, L_esc, recoil_phase):
     """Add this row's coherent ``I(t)`` to the temporal buffer.
 
     Realized phases use the float64 arrival ``temporal_tau`` and ``seg_r``;
@@ -601,12 +614,14 @@ def _temporal_coherent_row(st, g_vec_d, wm, idx, coefs, good, cxr_rows, L_esc):
         return
     rows = idx[sel]
     g64 = xp.asarray(g_vec_d, dtype=np.float64)
+    # Exact-recoil phase over the electron's own age (line-recoil-in-medium-root).
+    d_shift, g_shift = (xp.asarray(a[sel], dtype=np.float64) for a in recoil_phase)
     row = CoherentRow(
         coefs=[c[sel] for c in coefs],
-        d=st.temporal_tau[rows],
-        g_phase=xp.asarray(st.seg_r[rows], dtype=np.float64) @ g64,
-        d_geo=st.temporal_tau_geo[rows],
-        g_phase_geo=xp.asarray(st.seg_r_geom[rows], dtype=np.float64) @ g64,
+        d=st.temporal_tau[rows] + d_shift,
+        g_phase=xp.asarray(st.seg_r[rows], dtype=np.float64) @ g64 + g_shift,
+        d_geo=st.temporal_tau_geo[rows] + d_shift,
+        g_phase_geo=xp.asarray(st.seg_r_geom[rows], dtype=np.float64) @ g64 + g_shift,
         cxr_rows=tuple(a[sel] for a in cxr_rows),
         L_esc=L_esc[sel],
         electron=st.seg_elec_id[rows],
@@ -624,7 +639,9 @@ def _temporal_coherent_row(st, g_vec_d, wm, idx, coefs, good, cxr_rows, L_esc):
     )
 
 
-def _accumulate_reflection_coherent(st, g_vec_d, wm, idx, om, t_L, L_esc, cxr_rows, pol_A):
+def _accumulate_reflection_coherent(
+    st, g_vec_d, wm, idx, om, t_L, L_esc, cxr_rows, pol_A, recoil_phase
+):
     """Step 7c: coherent (phased) accumulation for one reflection and
     crystallite orientation.
 
@@ -636,7 +653,8 @@ def _accumulate_reflection_coherent(st, g_vec_d, wm, idx, om, t_L, L_esc, cxr_ro
     under absorption a damped sinc whose modulus-square integrates to the
     segment-mean transmission), and the emission-time/retardation phase
     ``exp[i omega(E) d_j]`` with ``d_j = t_abs,j - n_hat.r_j``, plus the
-    midpoint in-medium term. Validation: coherent-formation-absorption
+    midpoint in-medium term, and the exact-recoil phase ``recoil_phase``.
+    Validation: coherent-formation-absorption, line-recoil-in-medium-root
     """
     req = st.request
     chunk = req.chunk
@@ -655,17 +673,20 @@ def _accumulate_reflection_coherent(st, g_vec_d, wm, idx, om, t_L, L_esc, cxr_ro
     # when no decoherence-relevant offset is configured, so this is
     # a no-op swap in that (default) case. See the
     # coherent-inter-electron-decoherence block above.
-    d = d_all_geom[idx]
-    g_phase = _matvec3(seg_r_geom[idx], g_vec_d)
+    d = d_all_geom[idx] + recoil_phase[0]
+    g_phase = _matvec3(seg_r_geom[idx], g_vec_d) + recoil_phase[1]
     coefs = [(amp * t_L) * A_e for A_e in pol_A]  # complex per polarization
     good = _formation_good(amp, t_L, cxr_rows, coefs)
     E_vac, a_vac, half_dL, apb, bma, q = cxr_rows
     if st.temporal_buf is not None:
-        _temporal_coherent_row(st, g_vec_d, wm, idx, coefs, good, cxr_rows, L_esc)
+        _temporal_coherent_row(
+            st, g_vec_d, wm, idx, coefs, good, cxr_rows, L_esc, recoil_phase
+        )
     if req.coefficient_capture is not None:
         # Read-only: coherent window seeding reads the row's own couplings.
         # Validation: coherent-line-grid-windowed-resolution
         st.capture_phase_rad = g_phase
+        st.capture_centre_ang = d
         st.capture_mosaic_weight = float(wm)
         st.capture_transverse_envelope = (
             None if st.transverse is None else transverse_envelope(st.transverse, st.n_hat, g_vec_d)
@@ -872,17 +893,20 @@ def _accumulate_reflection(
 
     # -- 1. per-piece Snell resonance (Zhai SI Eqs. 7-9) ---------------------
     #   omega_res = v.g / (1 - v.n - delta v.grad L)   [1/Ang]   (>0 radiates)
+    #   exact recoil: v.g -> v.g - r_num, denominator + r_den
+    #   (Validation: line-recoil-in-medium-root)
     v_dot_g = _matvec3(v_all, g_vec_d)
+    r_num, r_den, inv_E = _line_recoil_terms(gamma_all, g2, n_dot_g)
     grad = st.escape_gradient
     denom, delta_seg = _in_medium_kinematics(
-        st.denom_all,
-        v_dot_g,
+        st.denom_all + r_den,
+        v_dot_g - r_num,
         delta_tab_g,
         E_tab_g,
         (v_all * grad).sum(axis=1),
         (grad**2).sum(axis=1),
     )
-    omega_res = v_dot_g / denom
+    omega_res = (v_dot_g - r_num) / denom
     E_res = HBARC_EV_ANG * omega_res  # -> eV
 
     # -- 2. drop segments whose line misses the spectral window -------------
@@ -893,6 +917,7 @@ def _accumulate_reflection(
         & (E_res > float(E_grid[0] - pad))
         & (E_res > 10.0)
         & (E_res < E_grid[-1] + pad)
+        & _recoil_line_allowed(denom, omega_res, inv_E, gamma_all)
     )
     if not keep.any():
         return
@@ -904,6 +929,8 @@ def _accumulate_reflection(
     t_L = t_L_all[idx]  # interaction time [Ang] (c=1)
     dnm = denom[idx]
     vdg = v_dot_g[idx]
+    r_den_i = r_den[idx]
+    kappa = _recoil_slope_factor(om, inv_E[idx])
 
     # -- 3. couplings AT each segment's resonance energy --------------------
     # All five tabulations share E_r and E_tab_g, so bracket once. U_g tables
@@ -925,7 +952,7 @@ def _accumulate_reflection(
     delta = delta_seg[idx]
     grad2 = (grad[idx] ** 2).sum(axis=1)
     k_mag = om * xp.sqrt(xp.where(grad2 == 0.0, 1.0, 1.0 - 2.0 * delta + delta**2 * grad2))
-    k_dot_v = om * (1.0 - dnm)
+    k_dot_v = om * ((1.0 - dnm) + r_den_i)
     k_dot_g = om * (n_dot_g + delta * _matvec3(grad[idx], g_vec_d))
     v_dot_kg = vdg + k_dot_v
     detuning = g2 + 2.0 * k_dot_g
@@ -994,7 +1021,9 @@ def _accumulate_reflection(
         # pieces (``_setup``), and each carries its exact complex formation
         # integral under absorption and the escape-path refractive slope.
         # Both routes refuse layers, so one mu. Validation: coherent-formation-absorption
-        L_esc, cxr_rows = _formation_cxr(st, idx, t_L, vdg, mu_layers[0])
+        L_esc, cxr_rows, recoil_phase = _formation_cxr(
+            st, idx, t_L, vdg, mu_layers[0], g2, n_dot_g
+        )
     else:
         # Incoherent route: the segment mean of exp(-tau) over the same escape
         # geometry, split into linear pieces (issue #181, as #176 for
@@ -1016,8 +1045,8 @@ def _accumulate_reflection(
     # the point -- and not the number of independent emitters.
     if gid_all is not None:  # i.e. ``grouped``, narrowed for the gather below
         amp = xp.sqrt(ALPHA_FS * om / (4.0 * xp.pi**2 * HBARC_EV_ANG))
-        d = d_all[idx]
-        g_phase = _matvec3(seg_r[idx], g_vec_d)
+        d = d_all[idx] + recoil_phase[0]
+        g_phase = _matvec3(seg_r[idx], g_vec_d) + recoil_phase[1]
         coefs = [(amp * t_L) * A_e for A_e in pol_A]
         good = _formation_good(amp, t_L, cxr_rows, coefs)
         sel = np.flatnonzero(good)
@@ -1068,7 +1097,9 @@ def _accumulate_reflection(
     # emission-time/retardation phase is exp[i omega(E) d_j] with
     # d_j = t_abs,j - n_hat.r_j.
     if coherent:
-        _accumulate_reflection_coherent(st, g_vec_d, wm, idx, om, t_L, L_esc, cxr_rows, pol_A)
+        _accumulate_reflection_coherent(
+            st, g_vec_d, wm, idx, om, t_L, L_esc, cxr_rows, pol_A, recoil_phase
+        )
         return
 
     # -- 7. accumulate the finite-segment lineshape ---------------------------
@@ -1082,7 +1113,9 @@ def _accumulate_reflection(
     targets = [(weight, spec)]
     if components:
         targets += [(pref * A2_pxr * wm, spec_pxr), (pref * A2_cbs * wm, spec_cbs)]
-    a_width = dnm * t_L / (2.0 * HBARC_EV_ANG)
+    # Exact slope kappa D at the root: the sinc width and its energy Jacobian.
+    # Validation: line-recoil-in-medium-root
+    a_width = (dnm * kappa) * t_L / (2.0 * HBARC_EV_ANG)
     good = xp.isfinite(weight) & (weight > 0)
     _accumulate_edge_truncation(
         st.request.truncation_audit,

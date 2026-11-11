@@ -220,7 +220,7 @@ class CoherentRowCollector:
                 energy_eV=E_vac,
                 amplitude=amplitude,
                 duration_ang=duration,
-                centre_ang=np.asarray(_host(st.d_all_geom), dtype=float)[rows],
+                centre_ang=_captured_centre(st, rows, sel),
                 electron=np.asarray(_host(st.seg_elec_id))[rows],
                 start_transmission=start,
                 end_transmission=end,
@@ -235,6 +235,17 @@ class CoherentRowCollector:
                 centre_scale_ang=_centre_scale(st, rows),
             )
         )
+
+
+def _captured_centre(st, rows, sel):
+    """The row's reducer-geometry ``d``, including the exact-recoil shift.
+
+    Validation: line-recoil-in-medium-root
+    """
+    centre = getattr(st, "capture_centre_ang", None)
+    if centre is None:
+        return np.asarray(_host(st.d_all_geom), dtype=float)[rows]
+    return np.asarray(_host(centre), dtype=float)[sel]
 
 
 def _centre_scale(st, rows):

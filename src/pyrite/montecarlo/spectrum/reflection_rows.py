@@ -72,7 +72,12 @@ def reflection_rows(
 
     Validation: line-window-seeding, line-kinematics-precision
     """
-    from .cxr._kernels import _vacuum_doppler
+    from .cxr._kernels import (
+        _line_recoil_terms,
+        _recoil_line_allowed,
+        _recoil_slope_factor,
+        _vacuum_doppler,
+    )
     from .segment_escape import segment_escape_gradient
 
     # Seeding is host work even when transport returned device arrays.
@@ -95,7 +100,7 @@ def reflection_rows(
         gradient, index = gradient[line], index[line]
     beta = beta_from_keV(energy)
     velocity = beta[:, None] * direction
-    _, vacuum = _vacuum_doppler(energy, beta, direction, n_hat, xp=np)
+    gamma, vacuum = _vacuum_doppler(energy, beta, direction, n_hat, xp=np)
     parent_length = np.asarray(segments.get("line_parent_L_ang", segments["L_ang"]), dtype=float)
     fraction = np.asarray(
         segments.get("line_piece_fraction", np.ones_like(parent_length)), dtype=float
@@ -105,6 +110,8 @@ def reflection_rows(
     weight = (parent_length / beta) ** 2 * fraction
     usable = np.isfinite(weight) & (weight > 0.0) & np.isfinite(vacuum) & (vacuum > 0.0)
     velocity, vacuum, weight = velocity[usable], vacuum[usable], weight[usable]
+    gamma = gamma[usable]
+    n_vector = np.asarray(n_hat, dtype=float)
     gradient, index = gradient[usable], index[usable]
     v_dot_grad = np.sum(velocity * gradient, axis=1)
     grad2 = np.sum(gradient**2, axis=1)
@@ -141,16 +148,24 @@ def reflection_rows(
         rows = []
         for mosaic_rotation, mosaic_weight in orientations:
             g_row = g_vector if mosaic_rotation is None else mosaic_rotation @ g_vector
-            v_dot_g = velocity @ g_row
+            # Exact recoil root and slope, as the kernels place each line.
+            # Validation: line-recoil-in-medium-root
+            r_num, r_den, inv_E = _line_recoil_terms(
+                gamma, float(g_row @ g_row), float(n_vector @ g_row)
+            )
+            numerator = velocity @ g_row - r_num
             with np.errstate(divide="ignore", invalid="ignore"):
                 if refractive is None:
-                    denominator = vacuum
+                    denominator = vacuum + r_den
                 else:
                     denominator, _ = _in_medium_kinematics(
-                        vacuum, v_dot_g, *refractive, v_dot_grad, grad2
+                        vacuum + r_den, numerator, *refractive, v_dot_grad, grad2
                     )
-                resonance = HBARC_EV_ANG * v_dot_g / denominator
-            radiating = np.isfinite(resonance) & (resonance > MIN_RESONANCE_EV)
+                omega = numerator / denominator
+                resonance = HBARC_EV_ANG * omega
+                allowed = _recoil_line_allowed(denominator, omega, inv_E, gamma)
+                denominator = denominator * _recoil_slope_factor(omega, inv_E)
+            radiating = np.isfinite(resonance) & (resonance > MIN_RESONANCE_EV) & allowed
             rows.append((float(mosaic_weight), radiating, resonance, denominator))
         label = label_prefix + "(" + " ".join(str(int(h)) for h in hkl) + ")"
         reflections.append((label, rows))

@@ -612,7 +612,7 @@ def _interp_gather_cxr_tables(
     )
 
 
-def _cxr_kin_core(vx, vy, vz, gx, gy, gz, denom, g2, n_dot_g):
+def _cxr_kin_core(vx, vy, vz, gx, gy, gz, denom, g2, n_dot_g, r_num=0.0, r_den=0.0):
     """Resonance frequency + photon kinematics with g-only algebra hoisted.
 
     For unit detector direction ``n``, ``|(omega*n)+g|^2-omega^2`` is exactly
@@ -626,10 +626,16 @@ def _cxr_kin_core(vx, vy, vz, gx, gy, gz, denom, g2, n_dot_g):
     carrying the Snell correction ``delta grad L.g``), both per (segment, g) rather than hoisted.
     Every identity above survives that substitution unchanged -- see
     ``_in_medium_kinematics``.
+
+    Under exact recoil ``denom`` is the exact denominator and ``r_num``/``r_den``
+    the terms of ``_line_recoil_terms``: the root is ``(v.g - r_num)/denom``
+    while ``k.v = omega (1 - denom + r_den)`` keeps the physical refracted
+    photon direction, so the couplings change only through the root.
+    Validation: line-recoil-in-medium-root
     """
     v_dot_g = vx * gx + vy * gy + vz * gz
-    omega_res = v_dot_g / denom
-    k_dot_v = omega_res * (1.0 - denom)
+    omega_res = (v_dot_g - r_num) / denom
+    k_dot_v = omega_res * ((1.0 - denom) + r_den)
     k_dot_g = omega_res * n_dot_g
     v_dot_kg = v_dot_g + k_dot_v
     detuning = g2 + 2.0 * k_dot_g
@@ -682,6 +688,77 @@ def _vacuum_doppler(E_keV, beta, v_hat, n_hat, *, xp=xp):
     return gamma, one_minus_beta + beta * one_minus_cos
 
 
+# hbar*c in the line-recoil terms only. Production never changes it; zero is
+# the hbar -> 0 hook under which every route reproduces the classical root,
+# width and phase bit for bit (``x + 0``, ``x - 0`` and ``x * 1`` are exact).
+_RECOIL_HBARC_EV_ANG = HBARC_EV_ANG
+
+
+def _line_recoil_terms(gamma, g2, n_dot_g):
+    """``(r_num, r_den, hbarc/E)`` of the exact recoil root, per row.
+
+    With ``Q = hbar c g`` and total energy ``E = gamma m c^2``, the exact
+    vacuum root (``materials.recoil``) is
+    ``hbar omega = (beta u.Q - Q^2/2E) / (1 - beta u.n + Q.n/E)``.
+    In the route's ``1/Angstrom`` units, ``omega = (v.g - r_num) / (D + r_den)``
+    with ``r_num = hbar c g^2 / (2E)`` [1/Angstrom] and
+    ``r_den = hbar c n.g / E``. ``D`` is the classical (vacuum or
+    first-order Snell) denominator. ``hbarc/E`` [Angstrom] also forms
+    the slope factor of :func:`_recoil_slope_factor`.
+
+    Validation: line-recoil-in-medium-root
+    """
+    inv_E = _RECOIL_HBARC_EV_ANG / (gamma * M_E_EV)
+    return 0.5 * g2 * inv_E, n_dot_g * inv_E, inv_E
+
+
+def _recoil_slope_factor(omega, inv_E):
+    """``kappa = E / (E - hbar omega)``, the exact-slope factor at the root.
+
+    The mismatch slope at the exact root is ``(1 - beta_f.n)/hbar c =
+    kappa D_exact / hbar c`` (``line-recoil-formation``), so the sinc
+    half-width, and with it the energy Jacobian, carries ``kappa``.
+
+    Validation: line-recoil-in-medium-root
+    """
+    return 1.0 / (1.0 - omega * inv_E)
+
+
+def _recoil_line_allowed(denom, omega, inv_E, gamma):
+    """Positive-mass-shell guard: ``D_exact > 0`` and ``hbar omega <= T``.
+
+    ``hbar omega <= T`` is ``omega hbarc/E <= 1 - 1/gamma``; it is vacuous
+    at ``inv_E = 0``. Validation: line-recoil-in-medium-root
+    """
+    return (denom > 0) & (omega * inv_E <= 1.0 - 1.0 / gamma)
+
+
+def _recoil_formation_line(vdg, denom_vac, t_L, gamma, g2, n_dot_g, age):
+    """Exact vacuum sinc centre/width and the recoil phase of a formation piece.
+
+    Returns ``(E_c, a, d_shift, g_shift)``. The piece's phase is
+    ``E d/hbar c - g.r``; its exact mismatch, linear about the root,
+    ``kappa (D E/hbar c - N)`` with ``N = v.g - r_num``, ``D = D_vac + r_den``,
+    exceeds the classical ``D_vac E/hbar c - v.g`` by
+    ``(kappa D - D_vac) E/hbar c - (kappa N - v.g)``. Its accumulated phase
+    over the electron's own age ``t`` [Angstrom] is carried by
+    ``d -> d + d_shift`` and ``g.r -> g.r + g_shift``. ``kappa - 1 =
+    kappa x`` with ``x = hbar omega/E`` keeps both shifts cancellation free.
+
+    Validation: line-recoil-in-medium-root
+    """
+    r_num, r_den, inv_E = _line_recoil_terms(gamma, g2, n_dot_g)
+    numerator = vdg - r_num
+    denom = denom_vac + r_den
+    E_c = HBARC_EV_ANG * numerator / denom
+    x = numerator / denom * inv_E
+    kappa = 1.0 / (1.0 - x)
+    a = kappa * denom * t_L / (2.0 * HBARC_EV_ANG)
+    d_shift = kappa * (x * denom_vac + r_den) * age
+    g_shift = kappa * (x * vdg - r_num) * age
+    return E_c, a, d_shift, g_shift
+
+
 def _in_medium_kinematics(denom_vac, v_dot_g, delta_tab, E_tab, v_dot_grad=None, grad2=None):
     """First-order Snell resonance on one linear photon-escape piece.
 
@@ -705,7 +782,14 @@ def _in_medium_kinematics(denom_vac, v_dot_g, delta_tab, E_tab, v_dot_grad=None,
     direct callers; production spectrum routes always supply the gradient.
     Returns ``(denom, delta)`` at the root.
 
-    Validation: xray-in-medium-resonance, line-kinematics-precision
+    Exact recoil (``line-recoil-in-medium-root``): callers pass
+    ``denom_vac + r_den`` and ``v.g - r_num`` (:func:`_line_recoil_terms`);
+    the same passes then return the exact first-order Snell denominator
+    ``1 - v.n + Q.n/E - delta v.grad L`` and sample ``delta`` at the
+    exact root.
+
+    Validation: xray-in-medium-resonance, line-kinematics-precision,
+    line-recoil-in-medium-root
     """
     _xp = array_namespace(denom_vac, v_dot_g, delta_tab, E_tab)
     if v_dot_grad is None:

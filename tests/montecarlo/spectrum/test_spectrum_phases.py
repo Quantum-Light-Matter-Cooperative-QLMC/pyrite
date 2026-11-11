@@ -16,6 +16,7 @@ from pyrite._backend import REAL, xp
 from pyrite.materials.crystal import (
     CRYSTALS,
     HBARC_EV_ANG,
+    M_E_EV,
     reciprocal_g_vector,
     refractive_index,
 )
@@ -106,15 +107,18 @@ def _resonance_eV():
 
     The near-transverse exit amplifies the correction enough to resolve it on
     this grid; dedicated dispersion anchors use a finer absolute-root grid.
+    Exact recoil adds ``-hbar c g^2/2E`` to the numerator and ``hbar c n.g/E``
+    to the denominator (Validation: line-recoil-in-medium-root).
     """
     g_vec, _ = reciprocal_g_vector(HKL, CRYSTALS[CRYSTAL]["lattice"])
     v = beta_from_keV(E_KEV) * np.array([0.0, 0.0, 1.0])
-    v_dot_g = float(v @ g_vec)
-    v_dot_n = float(v @ N_HAT)
-    E = HBARC_EV_ANG * v_dot_g / (1.0 - v_dot_n)  # vacuum seed
+    hbarc_over_E = HBARC_EV_ANG / (1.0e3 * E_KEV + M_E_EV)
+    numerator = float(v @ g_vec) - 0.5 * hbarc_over_E * float(g_vec @ g_vec)
+    vacuum = 1.0 - float(v @ N_HAT) + hbarc_over_E * float(N_HAT @ g_vec)
+    E = HBARC_EV_ANG * numerator / vacuum  # vacuum seed
     for _ in range(64):
         n_re = float(np.asarray(refractive_index(CRYSTAL, np.array([E]), True).real)[0])
-        E = HBARC_EV_ANG * v_dot_g / (1.0 - v_dot_n + (1.0 - n_re) * v[2] / N_HAT[2])
+        E = HBARC_EV_ANG * numerator / (vacuum + (1.0 - n_re) * v[2] / N_HAT[2])
     return E
 
 
