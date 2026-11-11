@@ -14,7 +14,8 @@ from .eedl_ionization import (
     load_eedl_shell_ionization,
 )
 
-_CM2_PER_ANG2 = 1.0e16
+#: Å² per cm² (1 cm = 1e8 Å).
+_ANG2_PER_CM2 = 1.0e16
 EEDL_SHELL_RATE_SOURCE = f"EPICS2025-EEDL-MF23-{EEDL_SHA256}"
 
 
@@ -90,7 +91,7 @@ def material_shell_ionization_rates(
                     projectile_min_ev=float(shell.projectile_energy_eV[0]),
                     projectile_max_ev=float(shell.projectile_energy_eV[-1]),
                     cross_section_cm2=sigma,
-                    rate_per_ang=float(density * sigma * _CM2_PER_ANG2),
+                    rate_per_ang=float(density * sigma * _ANG2_PER_CM2),
                 )
             )
 

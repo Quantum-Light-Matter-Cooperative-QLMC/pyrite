@@ -105,6 +105,17 @@ def electron_count(
 ) -> float:
     """Return physical incident electrons during an acquisition exposure.
 
+    Source: SI definitions of the coulomb, picocoulomb and hertz with the exact
+    elementary charge (``scipy.constants.elementary_charge``):
+    ``N_e = t_exp f_rep Q_bunch[pC] 1e-12 / e``.
+
+    Assumption: every bunch carries the same charge ``bunch_charge_pc`` and the
+    exposure spans ``exposure_s * rep_rate_hz`` bunches (fractional bunches
+    are kept as an expectation).
+
+    Limiting cases: one electron per bunch (``Q = e``) gives ``t_exp f_rep``;
+    zero charge or zero rate gives exactly zero.
+
     Validation: pixel-acquisition-counting
     """
     if not isinstance(acquisition, Acquisition):
@@ -296,6 +307,21 @@ def score_acquisition(
     component: str,
 ) -> AcquisitionBatch:
     """Score a selected pixel batch into expected or coordinate-stable counts.
+
+    Source: expected counts are ``N_e m_k`` with ``N_e`` from
+    :func:`electron_count` and ``m_k`` the detector's accepted event mass per
+    incident electron in native measured bin ``k``.
+
+    Assumption: event mass is uniform within each native bin, so it is shared
+    among reporting bins by overlap length (conservative rebinning).
+    Side channels are range-first: underflow ``[0, e_0)`` and overflow
+    ``[e_M, inf)`` lie outside the reporting window and take precedence;
+    below-cut is in-window sub-threshold mass ``[e_0, min(E_th, e_M))``;
+    reporting bin ``j`` registers ``[max(e_j, E_th), e_{j+1})``. These
+    intervals are disjoint and cover ``[0, inf)``.
+
+    Limiting cases: reporting bins plus the three side channels sum exactly to
+    the native event mass; zero charge gives zero in every channel.
 
     Validation: pixel-acquisition-counting
     """
