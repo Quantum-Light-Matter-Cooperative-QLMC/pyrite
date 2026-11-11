@@ -66,6 +66,14 @@ DEFAULT_CAPTURE_THRESHOLD = 0.03
 
 KIND_LINE = 0
 KIND_CAPTURE = 1
+#: Free -> free between tracked above-barrier states; only in the
+#: ``final_states="tracked"`` diagnostic catalog (#1055), never in production.
+KIND_FREE_FREE = 2
+_FINAL_STATES = ("bound", "tracked")
+#: Free -> free transitions whose forward lab photon energy is below this are
+#: dropped [eV]: intra-doublet pairs radiate at sub-eV energies, below the
+#: photon attenuation tables, and outside any line band.
+FREE_FREE_FLOOR_EV = 1000.0
 
 
 def _block_dipoles(solver: DensityMatrixSolver, block: int, states: np.ndarray) -> np.ndarray:
@@ -159,8 +167,9 @@ class EmissionLines:
     """Dipole lines ending on bound states, from a density-matrix solver's basis.
 
     One entry per cluster of transitions in one Bloch block. ``kind`` is
-    :data:`KIND_LINE` (bound -> bound) or :data:`KIND_CAPTURE` (tracked free
-    -> bound). Members are the ``(lower, upper, amplitude)`` triples of the
+    :data:`KIND_LINE` (bound -> bound), :data:`KIND_CAPTURE` (tracked free
+    -> bound) or, in the ``final_states="tracked"`` diagnostic catalog only,
+    :data:`KIND_FREE_FREE` (tracked free -> tracked free). Members are the ``(lower, upper, amplitude)`` triples of the
     cluster; ``|amplitude|^2`` is the dipole path rate [1/angstrom] and its
     phase follows the eigenvector gauge of the solver's basis (rates use
     ``rho`` in the same gauge).
@@ -253,10 +262,27 @@ class EmissionLines:
 
         Validation: cr-line-shape, cr-yield-assembly
         """
+        line, capture, _ = self.kind_spectra(photon_energy_eV, yields, theta_e_rad, sigma_gamma_rel)
+        return line, capture
+
+    def kind_spectra(
+        self,
+        photon_energy_eV,
+        yields: np.ndarray,
+        theta_e_rad: float,
+        sigma_gamma_rel: float = 0.0,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Line, capture and free -> free spectra; see :meth:`spectrum`.
+
+        The free -> free part is zero unless the catalog was built with
+        ``final_states="tracked"``.
+
+        Validation: cr-line-shape, cr-yield-assembly, cr-planar-free-free-block
+        """
         energies = np.asarray(photon_energy_eV, dtype=float)
         denom = float(_denominator(self.gamma, theta_e_rad))
         kinematic = np.cos(theta_e_rad) / (self.gamma**2 * self.beta * denom)
-        out = [np.zeros(energies.shape), np.zeros(energies.shape)]
+        out = [np.zeros(energies.shape) for _ in range(3)]
         for group in self.groups:
             members = group.lines
             centre, hwhm, weight = group.modes(np.asarray(yields)[members])
@@ -270,11 +296,66 @@ class EmissionLines:
                 )
             profile = _complex_profile(energies[..., None] - centre, hwhm, sigma)
             out[int(self.kind[members[0]])] += (np.conj(weight) * profile).real.sum(axis=-1)
-        return out[KIND_LINE], out[KIND_CAPTURE]
+        return out[KIND_LINE], out[KIND_CAPTURE], out[KIND_FREE_FREE]
 
 
 def _gauge(amplitude: Any) -> complex:
     return complex(amplitude) if amplitude != 0 else 1.0 + 0j
+
+
+def _block_transitions(solver, block, initial_ok, final_ok, bound, shifted, gamma_step):
+    """Lowering transitions of one Bloch block with their rates and kinds.
+
+    ``initial_ok``/``final_ok``/``bound`` are the block's state masks and
+    ``shifted`` the block energies at ``gamma (1 +/- gamma_step)``; see
+    :func:`emission_lines`.
+
+    Validation: cr-dipole-rate, cr-capture-yield, cr-planar-free-free-block
+    """
+    gamma = float(solver.basis.gamma)
+    states = np.flatnonzero(initial_ok)
+    dipoles = _block_dipoles(solver, block, states)
+    energies = solver.basis.energies[block][states]
+    log_step = np.log1p(gamma_step) - np.log1p(-gamma_step)
+    found = []
+    for a, upper in enumerate(states):
+        for b, lower in enumerate(states):
+            if not final_ok[lower] or energies[a] <= energies[b] + 1e-12:
+                continue
+            x = dipoles[b, a]
+            delta = float(energies[a] - energies[b])
+            free_final = not bound[lower]
+            if abs(x) == 0.0 or (
+                free_final and delta / _denominator(gamma, 0.0) < FREE_FREE_FLOOR_EV
+            ):
+                continue
+            rate = float(dipole_rate_per_ang(delta, abs(x), gamma))
+            up = shifted[0][block, upper] - shifted[0][block, lower]
+            down = shifted[1][block, upper] - shifted[1][block, lower]
+            if free_final:
+                kind = KIND_FREE_FREE
+            else:
+                kind = KIND_LINE if bound[upper] else KIND_CAPTURE
+            found.append(
+                {
+                    "block": block,
+                    "kind": kind,
+                    "upper": int(upper),
+                    "lower": int(lower),
+                    "delta": delta,
+                    "amp": np.sqrt(rate) * x / abs(x),
+                    "rate": rate,
+                    # A near-degenerate free pair can change order under the
+                    # gamma shift; its line sits near 0 eV and keeps only the
+                    # kinematic Doppler spread.
+                    "exponent": (
+                        float((np.log(up) - np.log(down)) / log_step)
+                        if up > 0.0 and down > 0.0
+                        else 0.0
+                    ),
+                }
+            )
+    return found
 
 
 def emission_lines(
@@ -282,6 +363,7 @@ def emission_lines(
     *,
     include_capture: bool = True,
     cluster_tol_eV: float | None = None,
+    final_states: str = "bound",
     gamma_step: float = 1e-4,
     relative_cut: float = 1e-12,
 ) -> EmissionLines:
@@ -295,7 +377,19 @@ def emission_lines(
     margin``: radiative capture). ``x_fi`` comes from the commutator in the
     solver's eigenbasis, so parity selection emerges; transitions below
     ``relative_cut`` of the block's strongest of the same kind are dropped.
-    Free -> free (coherent bremsstrahlung) is never scored.
+    Free -> free (coherent bremsstrahlung) is never scored by default.
+
+    ``final_states="tracked"`` is a diagnostic catalog (#1055): final states
+    are every tracked state (``E < barrier + margin``), so it adds
+    :data:`KIND_FREE_FREE` transitions between tracked above-barrier states,
+    with the same operator, path rate and cuts per kind. Final subspaces of the
+    kinds are disjoint and clusters share a final state, so the bound -> bound
+    and capture rows are unchanged and the added rows are exactly the in-cut
+    free -> free block (the planar analogue of the axial fibre's
+    ``boundary="none"`` minus ``"max"``). Tracked free initial states are
+    included whatever ``include_capture`` says. Free -> free transitions
+    with a forward lab energy below :data:`FREE_FREE_FLOOR_EV` are dropped,
+    so the catalog is for observation directions near the beam.
 
     **Widths.** For each transition ``(upper, lower)`` the coherences of all
     blocks form a :class:`LineGroup` with generator ``K`` (scattering
@@ -315,15 +409,19 @@ def emission_lines(
 
     Zero bound states give an empty catalog, hence exactly zero emission.
 
-    Validation: cr-dipole-rate, cr-line-shape, cr-capture-yield
+    Validation: cr-dipole-rate, cr-line-shape, cr-capture-yield, cr-planar-free-free-block
     """
+    if final_states not in _FINAL_STATES:
+        raise ValueError(f"final_states must be one of {_FINAL_STATES}, got {final_states!r}")
+    tracked = final_states == "tracked"
     basis = solver.basis
     gamma = float(basis.gamma)
     beta = float(_beta(gamma))
     hbar_v = HBARC_EV_ANG * beta
     size = solver.orders.size
     bound = basis.energies < solver.barrier_eV
-    initial_ok = bound | (basis.subspace & ~bound) if include_capture else bound
+    initial_ok = bound | (basis.subspace & ~bound) if include_capture or tracked else bound
+    final_ok = bound | basis.subspace if tracked else bound
     shifted = [
         np.array(
             [
@@ -347,40 +445,12 @@ def emission_lines(
     # 1. transitions per block
     pairs: list[dict] = []
     for block in range(solver.n_cells):
-        finals = np.flatnonzero(bound[block])
-        states = np.flatnonzero(initial_ok[block])
-        if finals.size == 0 or states.size < 2:
+        if not final_ok[block].any() or np.count_nonzero(initial_ok[block]) < 2:
             continue
-        dipoles = _block_dipoles(solver, block, states)
-        energies = basis.energies[block][states]
-        found = []
-        for a, upper in enumerate(states):
-            for b, lower in enumerate(states):
-                if not bound[block, lower] or energies[a] <= energies[b] + 1e-12:
-                    continue
-                x = dipoles[b, a]
-                if abs(x) == 0.0:
-                    continue
-                delta = float(energies[a] - energies[b])
-                rate = float(dipole_rate_per_ang(delta, abs(x), gamma))
-                up = shifted[0][block, upper] - shifted[0][block, lower]
-                down = shifted[1][block, upper] - shifted[1][block, lower]
-                found.append(
-                    {
-                        "block": block,
-                        "kind": KIND_LINE if bound[block, upper] else KIND_CAPTURE,
-                        "upper": int(upper),
-                        "lower": int(lower),
-                        "delta": delta,
-                        "amp": np.sqrt(rate) * x / abs(x),
-                        "rate": rate,
-                        "exponent": float(
-                            (np.log(up) - np.log(down))
-                            / (np.log1p(gamma_step) - np.log1p(-gamma_step))
-                        ),
-                    }
-                )
-        for kind in (KIND_LINE, KIND_CAPTURE):
+        found = _block_transitions(
+            solver, block, initial_ok[block], final_ok[block], bound[block], shifted, gamma_step
+        )
+        for kind in (KIND_LINE, KIND_CAPTURE, KIND_FREE_FREE):
             subset = [item for item in found if item["kind"] == kind]
             if subset:
                 floor = relative_cut * max(item["rate"] for item in subset)
@@ -669,6 +739,9 @@ class ChannelingSpectrum:
         lines plus capture, shape ``S + (n_E,)``.
     capture_spectrum
         The free -> bound capture component of ``spectrum``.
+    free_free_spectrum
+        The in-cut free -> free component of ``spectrum``; zero unless
+        ``final_states="tracked"`` (diagnostic, #1055).
     stokes
         Intensity-weighted normalized Stokes ``(Q, U)`` of ``spectrum``,
         shape ``S + (n_E, 2)``; NaN where the spectrum is zero.
@@ -695,6 +768,7 @@ class ChannelingSpectrum:
     line_rates: np.ndarray
     bound_population: np.ndarray
     line_yield: np.ndarray
+    free_free_spectrum: np.ndarray | None = None
 
     @property
     def total_line_yield(self) -> float:
@@ -752,6 +826,7 @@ def channeling_spectrum(
     entry_state=None,
     entry_impact: str = "averaged",
     entry_initial: tuple[np.ndarray, float] | None = None,
+    final_states: str = "bound",
 ) -> ChannelingSpectrum:
     """Return the channeling-radiation spectrum per electron.
 
@@ -834,6 +909,10 @@ def channeling_spectrum(
         propagation without projecting twice. Mutually exclusive with
         ``entry_state``, nonzero ``incidence_rad``/``divergence_rad`` and
         nondefault ``entry_impact``; these are already encoded in ``rho_S``.
+    final_states
+        ``"bound"`` (production) or ``"tracked"``: the diagnostic catalog of
+        :func:`emission_lines` that adds the in-cut free -> free block,
+        reported as ``free_free_spectrum`` and included in ``spectrum`` (#1055).
 
     Returns
     -------
@@ -849,7 +928,8 @@ def channeling_spectrum(
     tracked free states give zero capture; with ``absorption=False`` the
     energy and solid-angle integral of a point detector equals the yields.
 
-    Validation: cr-yield-assembly, cr-line-shape, cr-capture-yield, cr-persisted-channel
+    Validation: cr-yield-assembly, cr-line-shape, cr-capture-yield, cr-persisted-channel,
+    cr-planar-free-free-block
     """
     if entry_initial is not None and (
         entry_state is not None
@@ -869,7 +949,12 @@ def channeling_spectrum(
     normal = normal / np.linalg.norm(normal)
     if normal[2] <= 0:
         raise ValueError("surface_normal must point into the slab along the mean beam")
-    lines = emission_lines(solver, include_capture=include_capture, cluster_tol_eV=cluster_tol_eV)
+    lines = emission_lines(
+        solver,
+        include_capture=include_capture,
+        cluster_tol_eV=cluster_tol_eV,
+        final_states=final_states,
+    )
     history = _depth_history(
         solver,
         lines,
@@ -887,6 +972,7 @@ def channeling_spectrum(
     line_yield = history.integrate(history.rates)
     spectrum = np.zeros(shape + (energies.size,))
     capture = np.zeros_like(spectrum)
+    free_free = np.zeros_like(spectrum)
     q_sum = np.zeros_like(spectrum)
     u_sum = np.zeros_like(spectrum)
     if lines.size and np.any(line_yield > 0.0):
@@ -907,7 +993,7 @@ def channeling_spectrum(
             psi_weight = psi_weight / psi_weight.sum()
         else:
             psi, psi_weight = np.zeros(1), np.ones(1)
-        flat = [a.reshape(-1, energies.size) for a in (spectrum, capture, q_sum, u_sum)]
+        flat = [a.reshape(-1, energies.size) for a in (spectrum, capture, q_sum, u_sum, free_free)]
         for d, (t0, p0) in enumerate(zip(theta.ravel(), phi.ravel(), strict=True)):
             n0 = np.array([np.sin(t0) * np.cos(p0), np.sin(t0) * np.sin(p0), np.cos(t0)])
             t1 = np.array([np.cos(t0) * np.cos(p0), np.cos(t0) * np.sin(p0), -np.sin(t0)])
@@ -933,15 +1019,16 @@ def channeling_spectrum(
                     else:
                         yields = line_yield
                     weight = wa * wp * float(boosted_dipole_pattern(theta_e, phi_e, gamma))
-                    bound_part, capture_part = lines.spectrum(
+                    bound_part, capture_part, free_part = lines.kind_spectra(
                         energies, yields, theta_e, sigma_gamma_rel
                     )
-                    total = weight * (bound_part + capture_part)
+                    total = weight * (bound_part + capture_part + free_part)
                     stokes = dipole_stokes(theta_e, phi_e, gamma)
                     flat[0][d] += total
                     flat[1][d] += weight * capture_part
                     flat[2][d] += total * stokes[0]
                     flat[3][d] += total * stokes[1]
+                    flat[4][d] += weight * free_part
     with np.errstate(divide="ignore", invalid="ignore"):
         stokes_out = np.stack([q_sum / spectrum, u_sum / spectrum], axis=-1)
     return ChannelingSpectrum(
@@ -956,6 +1043,7 @@ def channeling_spectrum(
         line_rates=history.rates,
         bound_population=history.bound,
         line_yield=line_yield,
+        free_free_spectrum=free_free,
     )
 
 
