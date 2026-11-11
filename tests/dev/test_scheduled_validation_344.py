@@ -274,3 +274,48 @@ def test_multilayer_analytic_requires_both_gates(monkeypatch, absorption, depth)
             analytic.main()
         assert error.value.code == 1
     assert evaluated == ["absorption", "depth"]
+
+
+@pytest.mark.parametrize(
+    "failing", [None, "substrate", "crystalline_sum", "amorphous_sum", "boost"]
+)
+def test_multilayer_slice3_fails_on_any_assertion(monkeypatch, failing):
+    slice3 = _script("multilayer_slice3_check.py")
+    grid = np.array([0.0, 1.0])
+    segments = {"L_ang": np.ones(2)}
+
+    def case(substrate):
+        return {
+            "substrate": substrate,
+            "layer_radiators": [{}, None if substrate == "sio2" else {}],
+        }
+
+    def spectrum(case, tp):
+        boosted = case["substrate"] == "silicon" and failing != "boost"
+        flux = 2.0 if boosted else 1.0
+        return {"spec": np.full(2, flux), "spec_characteristic": np.ones(2)}
+
+    def radiate(segs, E_grid, n_hat, case, tp, L):
+        silent = failing == "substrate" and case["substrate"] == "silicon" and L == 1
+        return np.zeros(2) if silent else np.ones(2), np.ones(2)
+
+    errors = iter(
+        [
+            [1.0 if failing == "crystalline_sum" else 0.0, 0.0],
+            [0.0, 1.0 if failing == "amorphous_sum" else 0.0],
+        ]
+    )
+    monkeypatch.setattr(slice3, "_case", case)
+    monkeypatch.setattr(
+        slice3, "_transport_case", lambda case: {"segs": segments, "n_hat": None, "E_grid": grid}
+    )
+    monkeypatch.setattr(slice3, "_spectrum_case", spectrum)
+    monkeypatch.setattr(slice3, "_segments_in_layer", lambda segs, L: segs)
+    monkeypatch.setattr(slice3, "_radiate_layer", radiate)
+    monkeypatch.setattr(slice3, "_component_errors", lambda *args: next(errors))
+    if failing is None:
+        slice3.main()
+        return
+    with pytest.raises(SystemExit) as error:
+        slice3.main()
+    assert error.value.code == 1

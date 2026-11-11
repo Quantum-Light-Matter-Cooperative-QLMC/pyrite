@@ -226,7 +226,8 @@ The default CPU schedule includes `brem_angular_comparison.py` and
 `shell_ionization_comparison.py` (remote gate passed in 51.69 s), and the
 optional `dans_diffraction_oracle.py` / `xraylib_cascade_oracle.py` gates
 (remote passes in 3.20 / 1.46 s). The full-default
-`channeling_modulated_emission.py` gate also passed remotely in 21.58 s.
+`channeling_modulated_emission.py` gate also passed remotely in 21.58 s, and the
+explicit-only multilayer analytic and slice-3 gates in 10.21 / 36.71 s.
 The source table comparison has a reviewed
 recipe but fails its existing gate (#1068); it remains explicit-only. CUDA
 parity has its separate lab cron. Remaining ensembles require explicit remote
@@ -285,8 +286,8 @@ reviewed verdicts for the diagnostic rows, not merely rerunning their entry poin
 | `longitudinal_coherence_regimes.py` | CPU analytic/table; unmeasured | Packaged physics/catalog data; source and shell comparisons additionally need pinned reference/released tables | Gate (explicit mode where applicable) |
 | `mosaic_mc_check.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Gate (explicit mode where applicable) |
 | `multilayer_check.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Diagnostic |
-| `multilayer_slice3_check.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Gate (explicit mode where applicable) |
-| `multilayer_validation_check.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Gate (explicit mode where applicable) |
+| `multilayer_slice3_check.py` | Remote CPU transport; 36.71 s (one sample) | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Gate (explicit mode where applicable) |
+| `multilayer_validation_check.py` | Remote CPU transport; 10.21 s (one sample) | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Gate (explicit mode where applicable) |
 | `optical_response_cuda.py` | CUDA allocation; input/ladder-dependent | NVIDIA environment; some probes need captured trajectories or explicit CLI modes | Gate (explicit mode where applicable) |
 | `optical_stack_cuda.py` | CUDA allocation; input/ladder-dependent | NVIDIA environment; some probes need captured trajectories or explicit CLI modes | Gate (explicit mode where applicable) |
 | `optical_transition_cuda.py` | CUDA allocation; input/ladder-dependent | NVIDIA environment; some probes need captured trajectories or explicit CLI modes | Gate (explicit mode where applicable) |
