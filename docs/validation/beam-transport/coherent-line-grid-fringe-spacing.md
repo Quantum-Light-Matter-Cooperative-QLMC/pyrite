@@ -107,3 +107,206 @@ coherent_fringe_spacing(incoherent.segments, incoherent.transport["n_hat"])
 ```
 
 Heavier ladders (larger $N_e$, 100/300 keV, tilt 85°) belong on `pyrite remote`; the numbers above are the CPU-affordable subset and are sufficient to separate the two routes by six orders of magnitude at the policy spacing.
+
+## Independent verification
+
+Fresh-context verifier, 2026-11-11, issue #4 batch 3. The derivation below was
+drafted from the ledger row and the signatures and docstrings of
+`coherent_fringe_spacing`, `coherent_retardation` and
+`_refuse_coherent_resolution` before this page or any implementation body was
+read. The implementation was compared afterwards.
+
+### Independent derivation
+
+Units: $c=1$, times and lengths in Å, photon energy $E$ in eV,
+$\omega = E/\hbar c$ in Å$^{-1}$, $\hbar c = 1973.27$ eV Å.
+
+Take one straight segment $j$ at constant velocity $\beta\hat{\mathbf v}_j$,
+duration $t_L$ (a time, so $t_L = L/\beta$ for path length $L$), midpoint time
+$t_{\mathrm{mid},j}$ and midpoint position $\mathbf r_j$. Write
+$t = t_{\mathrm{mid},j} + t'$ with $\lvert t'\rvert \le t_L/2$, so
+$\mathbf r(t) = \mathbf r_j + \beta\hat{\mathbf v}_j t'$. The diffracted
+far-field amplitude is
+
+$$
+A_j(E) = \int_{-t_L/2}^{t_L/2}
+\exp\!\left\{ i\left[\omega\,\bigl(t - \hat{\mathbf n}\cdot\mathbf r(t)\bigr)
+ - \mathbf g\cdot\mathbf r(t)\right]\right\} \mathrm dt'
+= e^{i(\omega d_j - \mathbf g\cdot\mathbf r_j)}\,
+  t_L\,\frac{\sin(\Delta_j t_L/2)}{\Delta_j t_L/2},
+$$
+
+with $d_j = t_{\mathrm{mid},j} - \hat{\mathbf n}\cdot\mathbf r_j$ and
+$\Delta_j = \omega(1-\beta\hat{\mathbf v}_j\cdot\hat{\mathbf n}) - \beta\,\mathbf g\cdot\hat{\mathbf v}_j$.
+The midpoint factorization leaves
+a **real** envelope, so the whole energy-dependent phase of segment $j$ is
+
+$$
+\phi_j(E) = \frac{d_j}{\hbar c}E - \mathbf g\cdot\mathbf r_j
+ - L_{\mathrm{esc},j}\,\delta\omega(E),
+$$
+
+where the last term is the in-medium propagation phase the ledger names. Then
+
+$$
+\lvert A\rvert^2 = \sum_j \lvert A_j\rvert^2
+ + \sum_{j\ne k} \lvert A_j\rvert\lvert A_k\rvert
+   \cos\bigl(\phi_j(E)-\phi_k(E)\bigr),
+$$
+
+and each cross term oscillates in $E$ at
+$\mathrm d(\phi_j-\phi_k)/\mathrm dE = (d_j-d_k)/\hbar c$, the difference of
+per-segment slopes. $-\mathbf g\cdot\mathbf r_j$ carries no $E$ and contributes
+only a constant offset to each cross phase.
+
+**In-medium term.** With $\delta\omega = (1-n_{\rm re})\omega$ and
+$1-n_{\rm re} = \delta \propto \omega^{-2}$ away from edges,
+$\mathrm d(\delta\,\omega)/\mathrm dE = -\delta/\hbar c$. The term therefore
+shifts the cross-term rate by
+$\delta\,(L_{\mathrm{esc},j}-L_{\mathrm{esc},k})/\hbar c$. It is negligible when
+$\delta\,\Delta L_{\rm esc} \ll D$. With $\delta \lesssim 10^{-4}$ and the
+smallest quoted span $D \sim 4\times10^{5}$ Å, this needs
+$\Delta L_{\rm esc} \ll 4\times10^{9}$ Å, i.e. 0.4 m, which holds for every
+crystal. The ledger's "smaller by $1-n_{\rm re}$" is correct once read as
+$\delta\,\Delta L_{\rm esc}$ against $D$, not $\delta$ against 1.
+
+**Per-segment increment.** From $d(t) = t - \hat{\mathbf n}\cdot\mathbf r(t)$,
+$\mathrm dd/\mathrm dt = 1-\beta\hat{\mathbf v}\cdot\hat{\mathbf n}$ is constant
+on a straight segment, so
+
+$$
+\Delta d_j = (1-\beta\hat{\mathbf v}_j\cdot\hat{\mathbf n})\,t_L
+$$
+
+exactly, provided $t_L$ is the flight *time* $L/\beta$. Since
+$\beta<1$, $d$ is strictly increasing along a trajectory. For one contiguous
+electron the span is therefore a sum of increments:
+$\max d - \min d = \sum_j \Delta d_j - (\Delta d_{\rm first}+\Delta d_{\rm last})/2$,
+which grows as $N_{\rm seg}\,\overline{\Delta d}$. The sinc first zero
+$\Delta E = 2\pi\hbar c/\Delta d_j$ follows one increment, so the ratio between
+the two scales grows with the segment count. A fixed safety factor cannot
+connect them.
+
+**Band limit.** In the conjugate variable $\tau$ (Å) of $E/\hbar c$, $A_j$ is the
+Fourier transform of a box of width $\Delta d_j$ centred on $d_j$. The support
+of $\lvert A\rvert^2$ is the difference set of the union of those boxes:
+$\lvert\tau\rvert \le D_{\rm end} = \max_j(d_j+\Delta d_j/2)-\min_k(d_k-\Delta d_k/2)$.
+This gives two sampling rules, a factor of 2 apart:
+
+- the spectral-shape (Nyquist) step $h \le \pi\hbar c/D_{\rm end}$;
+- exact uniform-trapezoid integrated yield (Poisson summation: aliases sit at
+  $\tau = 2\pi\hbar c\,m/h$) for $h < 2\pi\hbar c/D_{\rm end}$.
+
+When $D \gg \Delta d$,
+$D_{\rm end} = D + O(\Delta d)$, giving $h_{\rm coh} = \pi\hbar c/D$ with
+$D = \max_j d_j - \min_j d_j$. This is the shape-Nyquist step, which is
+conservative by about 2 for integrated yield. Taken literally with midpoints,
+it is larger than the strict $\pi\hbar c/D_{\rm end}$ by the factor
+$D_{\rm end}/D = 1 + O(1/N_{\rm seg})$.
+
+**Limits.** For a single segment, $D=0$, the midpoint estimator gives
+$h\to\infty$, and the only band limit is the envelope's own
+$D_{\rm end} = \Delta d$. The spectrum then reduces to the incoherent
+$t_L^2\,\mathrm{sinc}^2$, whose shape-Nyquist step is $\pi\hbar c/\Delta d$:
+half the first-zero distance $2\pi\hbar c/\Delta d$. As $D\to\infty$, $h\to 0$.
+Units: $[\hbar c/D] = $ eV Å / Å $=$ eV.
+
+**Refusal.** `sinc-nyquist` derives its step from $2\pi\hbar c/\Delta d_j$, one
+increment, while the coherent cross terms need $\pi\hbar c/D$ with
+$D \approx N_{\rm seg}\overline{\Delta d}$ per electron (more across electrons).
+Without windows, the automatic step therefore aliases the coherent route by a
+factor of about $2N_{\rm seg}$. Refusing is the correct consequence, and
+refusing unconditionally, rather than comparing two steps, is also sound.
+
+### Comparison with the implementation
+
+| item | independent | implementation | result |
+|---|---|---|---|
+| phase slope | $d_j/\hbar c$ | `d_all_geom / HBARC_EV_ANG` (`_batched.py`), `arg = d*omega - g_phase - L_esc*dom` (`_per_hkl.py`) | match |
+| $d_j$ | $t_{\rm start}+t_L/2-\hat{\mathbf n}\cdot\mathbf r_{\rm mid}$, $t_L=L/\beta$ | `(start_time + 0.5*t_L) - r_mid @ n_vec`, `t_L = length/beta` | match |
+| step | $\pi\hbar c/D$ | `np.pi * HBARC_EV_ANG / span` | match (midpoint convention, see above) |
+| grouped | widest single-electron span | max over `elec_id` groups of `part.max()-part.min()` | match |
+| single segment | estimator $\infty$; envelope governs | returns `(inf, 0.0, 1)` | match; the estimator does **not** itself return the incoherent width |
+| infinite slab, active decoherence | reducer subtracts $(x_{0,e},y_{0,e})$ from $\mathbf r$, so $d \mathrel{+}= \hat{\mathbf n}_\perp\cdot\mathbf r_{0\perp,e}$ | `d + xy0_pop[owner] @ n_vec[:2]` | match (sign checked) |
+| **finite footprint, active decoherence** | reducer phases with offset-free geometry | `coherent_retardation` keeps sampled positions | **differs** |
+| refusal | refuse every non-windowed coherent case | raises unconditionally when `coherent_emission` and `windows is None`; steps only feed the message | match |
+
+**Divergence, finite footprint.** Since `917ec678a` (2026-10-08, #370),
+`cxr/_setup.py::_coherent_offsets` applies `_offset_free_geometry` on the
+analytic finite-footprint branch as well. The reducer therefore phases finite
+footprints with $\mathbf r - (x_{0,e},y_{0,e},0)$ too.
+`diagnostics.coherent_retardation` still applies the add-back only
+`if not finite_footprint`, and its docstring says "A finite footprint ... keeps
+the sampled positions". The first divergent term is the missing
+$+\hat{\mathbf n}_\perp\cdot\mathbf r_{0\perp,e}$ on finite footprints. This
+breaks the claim's "in the reducer's geometry": the reported all-electron span
+includes the beam footprint projected on $\hat{\mathbf n}$, which the reducer's
+flat term no longer carries. The ledger statement "Finite-footprint cases,
+including every measurement above, are unchanged" predates `917ec678a` by three
+days and is stale for the current reducer. The error is conservative: the step
+comes out too fine.
+
+A second, smaller mismatch is on the `physical_electrons` route without
+analytic offsets. There, `_setup.py` swaps in the realized `d_all`, which
+includes `t0_ang` and the sampled positions. The estimator removes both, so it
+under-reports $D$, the non-conservative direction.
+
+Neither mismatch changes the refusal decision, because the refusal is
+unconditional. Only the steps and spans quoted in the error message are
+affected, and `coherent_fringe_spacing` has no other production consumer.
+
+### Numeric checks
+
+The independent script, outside the repository, builds 40 contiguous synthetic
+30 keV segments for one electron. It evaluates the exact straight-segment
+amplitude sum $\lvert\sum_j A_j\rvert^2$ in closed form. It does not use
+implementation helpers.
+
+- Increment identity:
+  $\max\lvert\Delta d - (1-\beta\hat{\mathbf v}\cdot\hat{\mathbf n})t_L\rvert = 1.2\times10^{-11}$ Å
+  (roundoff).
+- Spans: $D = 104374$ Å and $D_{\rm end} = \sum\Delta d = 106724$ Å
+  ($+2.25\%$). The FFT of the densely sampled spectrum holds less than
+  $10^{-9}$ of its power beyond $\tau = 106712$ Å, confirming that the support
+  ends at $D_{\rm end}$.
+- Trapezoid yield error against an $h_{\rm coh}/64$ reference:
+  $7.6\times10^{-10}$ at $h_{\rm coh}/2$, $1.8\times10^{-9}$ at $h_{\rm coh}$,
+  $2.4\times10^{-3}$ at $2h_{\rm coh}$ (just past $2\pi\hbar c/D_{\rm end}$),
+  $2.4\times10^{-2}$ at $4h_{\rm coh}$, and $5.9\times10^{-2}$ at
+  $8h_{\rm coh}$. Linear-interpolation $L_1$ shape error is $13\%$ at
+  $h_{\rm coh}$: the Nyquist step is a band limit, not an accuracy target.
+- At the sinc step (3.776 eV), the incoherent yield error is
+  $1.2\times10^{-5}$ while the coherent yield error is $0.198$, reproducing
+  the separation in principle.
+- `coherent_fringe_spacing` on the same segments returns step 0.05939418285 eV
+  and span 104374.0249 Å, equal to the independent values (relative
+  difference 0). With `grouped=True` on one electron it gives the same result.
+  A single segment returns `(inf, 0.0, 1)`. `sinc_feature_spacing` at
+  `aliased_weight_limit=0` returns 3.7763023 eV, the independent minimum
+  first zero.
+- Two electrons with a $5\times10^{5}$ Å transverse offset on an infinite
+  slab give span 104374 Å, offset removed as intended. With
+  `crystal_width_ang`/`crystal_height_ang` set, the span is 570394 Å, the
+  sampled geometry, against the reducer's current offset-free 104374 Å. This is
+  the divergence above.
+- Ledger arithmetic: $\pi\hbar c/2.5298\times10^{7}$ Å $= 2.450\times10^{-4}$ eV,
+  giving $1.506\times10^{7}$ points over 3690 eV. For the grouped span,
+  $\pi\hbar c/4.1553\times10^{5}$ Å $= 1.492\times10^{-2}$ eV. Both are
+  consistent with the tables, but the spans themselves were not reproduced:
+  that needs hopg transport, which was not run locally.
+- Anchor file `tests/energy-grid/test_coherent_line_grid.py`: 7 passed.
+
+### Verdict
+
+**`discrepancy`, narrowly scoped.** The band-limit physics is rederived and
+matches: the cross-term rate as a difference of slopes,
+$-\mathbf g\cdot\mathbf r_j$ dropping out, the in-medium slope being
+negligible, the exact increment identity, $h_{\rm coh}=\pi\hbar c/D$ up to the
+$O(1/N_{\rm seg})$ midpoint-versus-endpoint convention, and the refusal logic.
+The divergence is the claim's "in the reducer's geometry" clause. For finite
+footprints with active decoherence, `coherent_retardation` omits the
+offset removal that the reducer has applied since `917ec678a`. On the
+`physical_electrons` route it removes offsets that the reducer keeps. The
+ledger's single-segment check should read "the estimator returns $\infty$ and
+the per-segment envelope, at $\pi\hbar c/\Delta d$, governs", not "returns the
+incoherent width". Sign-off remains a human decision.
