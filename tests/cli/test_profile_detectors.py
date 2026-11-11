@@ -132,10 +132,36 @@ def test_migrate_implicit_default_keeps_resolved_values(catalog):
     assert row(catalog)["detectors"]["default"]["observation_angle_deg"] == 90
 
 
+@pytest.mark.parametrize("source", [None, "quickstart"])
+def test_add_converts_new_or_copied_profile_with_preview(catalog, source):
+    args = ["create", "multi", "--detector", "reference"]
+    if source is not None:
+        args.extend(["--from", source])
+    assert_clean_result(invoke(profile.command, args))
+    original = catalog.read_text()
+    before = profile_summary.profile_payload(tomlkit.parse(original), "multi")["detectors"]
+    for options in (["--dry-run"], []):
+        preview = call("add", "multi", "side", "--detector", "reference", *options)
+        assert "legacy stem -> detector-default" in preview.stdout
+        assert "parameter digest and checkpoint stem" in preview.stdout
+        assert catalog.read_text() == original
+    call("add", "multi", "side", "--detector", "reference", "-y")
+    document = tomlkit.parse(catalog.read_text())
+    assert document["profiles"]["multi"]["detectors"] == {
+        "default": "reference",
+        "side": "reference",
+    }
+    assert (
+        profile_summary.profile_payload(document, "multi")["detectors"]["default"]
+        == before["default"]
+    )
+
+
 @pytest.mark.parametrize(
     "args, message",
     [
-        (["add", "standard", "new", "--detector", "reference"], "migrate"),
+        (["add", "standard", "default", "--detector", "reference"], "duplicate"),
+        (["add", "standard", "new", "--detector", "missing"], "unknown detector"),
         (["set", "standard", "missing", "--detector", "reference"], "unknown detector ID"),
         (["set", "standard", "default", "--roll-deg", "2"], "shared detector"),
         (["set", "standard", "physical", "--shape", "4", "4"], "unknown detector ID"),
