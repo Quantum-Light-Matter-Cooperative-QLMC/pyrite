@@ -1,6 +1,7 @@
 """Friedel-pair discrimination for the line resonance / coupling pairing.
 
-A line at ``omega = v.g(hkl) / (1 - n_hat.v)`` emits ``k = k0 - g(hkl)``, so
+A line at the exact recoil root (``recoil_resonance_eV``; classically
+``omega = v.g(hkl) / (1 - n_hat.v)``) emits ``k = k0 - g(hkl)``, so
 its momentum transfer is ``-g(hkl)`` and, in the repository's ``exp(+i omega
 t)`` / ``f' + i f''`` convention, its PXR coupling is ``chi(-hkl)``. Only a
 noncentrosymmetric crystal with ``f'' != 0`` separates that from ``chi(+hkl)``.
@@ -10,7 +11,7 @@ The test point-reflects one straight segment (``v -> -v``, ``n_hat -> -n_hat``,
 energy, the escape path and ``U_g`` coupling are unchanged, so the PXR yield
 ratio isolates the ``|chi|^2`` pairing.
 
-Validation: line-energy-dispersion
+Validation: line-energy-dispersion, line-recoil-in-medium-root
 """
 
 import numpy as np
@@ -18,11 +19,10 @@ import pytest
 
 from pyrite.materials.crystal import (
     CRYSTALS,
-    HBARC_EV_ANG,
-    beta_from_Ee,
     chi_g,
     reciprocal_g_vector,
 )
+from pyrite.materials.recoil import recoil_resonance_eV
 from pyrite.montecarlo import mc_cxr_spectrum
 
 CRYSTAL = "4h_sic"  # P6_3mc: noncentrosymmetric, Si K-edge f'' near 3 keV
@@ -73,9 +73,8 @@ def test_line_couples_to_the_friedel_mate_of_its_resonant_harmonic(tilt_deg, mon
         lambda crystal, energy, *args: np.ones_like(energy, dtype=complex),
     )
     g_mag, g_hat, v_hat, n_hat = _geometry(tilt_deg)
-    beta = float(beta_from_Ee(E_KEV * 1e3))
-    # Independent closed form for the line centre (vacuum, straight flight).
-    E_cxr = HBARC_EV_ANG * beta * g_mag * (g_hat @ v_hat) / (1.0 - beta * (n_hat @ v_hat))
+    # Independent line centre: the exact vacuum recoil root (straight flight).
+    E_cxr = float(recoil_resonance_eV(E_KEV * 1e3, v_hat, g_mag * g_hat, n_hat))
     grid = np.linspace(0.9 * E_cxr, 1.1 * E_cxr, 4001)
     step = grid[1] - grid[0]
 
@@ -127,8 +126,7 @@ def test_total_yield_matches_the_unconjugated_native_pairing(monkeypatch):
         lambda crystal, energy, *args: np.ones_like(energy, dtype=complex),
     )
     g_mag, g_hat, v_hat, n_hat = _geometry(-12.0)
-    beta = float(beta_from_Ee(E_KEV * 1e3))
-    E_cxr = HBARC_EV_ANG * beta * g_mag * (g_hat @ v_hat) / (1.0 - beta * (n_hat @ v_hat))
+    E_cxr = float(recoil_resonance_eV(E_KEV * 1e3, v_hat, g_mag * g_hat, n_hat))
     grid = np.linspace(0.9 * E_cxr, 1.1 * E_cxr, 2001)
     kwargs = {
         "crystal": CRYSTAL,

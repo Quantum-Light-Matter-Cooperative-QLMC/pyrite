@@ -551,13 +551,19 @@ def test_straight_flight_is_invariant_to_two_half_segments(sinc_cutoff):
 
 @pytest.mark.parametrize("sinc_cutoff", [None, 4.0])
 def test_straight_trajectory_segments_are_in_phase_at_resonance(sinc_cutoff):
-    """The reciprocal-harmonic phase cancels propagation phase on resonance."""
+    """The reciprocal-harmonic phase cancels propagation phase on resonance.
+
+    On the exact recoil root the linearized exact mismatch, and with it the
+    phase difference between consecutive pieces, vanishes.
+    Validation: line-recoil-in-medium-root
+    """
+    from pyrite.materials.recoil import recoil_resonance_eV
+
     n_hat = np.asarray(KWARGS["n_hat"], dtype=float)
     n_hat /= np.linalg.norm(n_hat)
-    _, g_norm = reciprocal_g_vector((0, 0, 2), CRYSTALS["hopg"]["lattice"])
+    g_vec, g_norm = reciprocal_g_vector((0, 0, 2), CRYSTALS["hopg"]["lattice"])
     beta = float(beta_from_Ee(30e3))
-    k_gamma = beta * g_norm / (1.0 - beta * n_hat[2])
-    target_energy = HBARC_EV_ANG * k_gamma
+    target_energy = float(recoil_resonance_eV(30e3, [0.0, 0.0, 1.0], g_vec, n_hat))
     dz = np.pi / g_norm
     segments = _segments(2)
     segments.update(

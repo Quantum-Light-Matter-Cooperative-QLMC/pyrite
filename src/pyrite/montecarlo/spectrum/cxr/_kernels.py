@@ -744,6 +744,12 @@ def _recoil_formation_line(vdg, denom_vac, t_L, gamma, g2, n_dot_g, age):
     over the electron's own age ``t`` [Angstrom] is carried by
     ``d -> d + d_shift`` and ``g.r -> g.r + g_shift``. ``kappa - 1 =
     kappa x`` with ``x = hbar omega/E`` keeps both shifts cancellation free.
+    The photon escape phase ``delta omega L_esc`` stays geometric (no
+    ``kappa``), inside the piece (``half_dL``) and between pieces alike, which
+    keeps the coherent sum invariant under segment splitting. A coherent
+    self-term therefore peaks where ``kappa D (E - E_c) = delta E v.grad L``,
+    an ``O(x delta)`` relative offset from the incoherent in-medium root,
+    below the first-order Snell order of that root.
 
     Validation: line-recoil-in-medium-root
     """

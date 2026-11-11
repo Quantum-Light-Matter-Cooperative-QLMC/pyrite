@@ -177,7 +177,9 @@ def _block_counts(st, block, rows_dev, normal, domain):
     velocity = st.v_all[block]
     gamma = st.gamma_all[block][:, None]
     r_num, r_den, inv_E = _line_recoil_terms(
-        gamma, xp.sum(rows * rows, axis=1)[None, :], (rows @ xp.asarray(normal, dtype=REAL))[None, :]
+        gamma,
+        xp.sum(rows * rows, axis=1)[None, :],
+        (rows @ xp.asarray(normal, dtype=REAL))[None, :],
     )
     denom_vac = st.denom_all[block][:, None] + r_den
     vg = xp.sum(velocity[:, None, :] * rows[None, :, :], axis=2) - r_num
@@ -193,8 +195,10 @@ def _block_counts(st, block, rows_dev, normal, domain):
             denom_vac, vg, st.delta_tab_g, st.E_tab_g, vg_escape, grad2
         )
         root = HBARC_EV_ANG * vg / denom
-        # Forbidden exact roots (negative-energy branch) are no seed/root.
-        seed = xp.where(_recoil_line_allowed(denom_vac, vg / denom_vac, inv_E, gamma), seed, xp.nan)
+        # A forbidden exact vacuum root (negative-energy branch) is no
+        # positive seed; a forbidden in-medium root is a rejected root.
+        allowed = _recoil_line_allowed(denom_vac, vg / denom_vac, inv_E, gamma)
+        seed = xp.where(allowed | ~xp.isfinite(seed), seed, 0.0)
         root = xp.where(_recoil_line_allowed(denom, vg / denom, inv_E, gamma), root, xp.nan)
     positive = eligible & xp.isfinite(seed) & (seed > 0)
     seed_miss = positive & ((seed <= lower) | (seed >= upper))
@@ -220,4 +224,3 @@ def _block_counts(st, block, rows_dev, normal, domain):
         positive & ((seed < st.E_tab_g[0]) | (seed > st.E_tab_g[-1])),
     )
     return xp.stack([xp.count_nonzero(mask) for mask in masks])
-
