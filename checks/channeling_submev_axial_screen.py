@@ -186,6 +186,26 @@ def _band_scan(profile, gamma, depth, barrier, perc, cutoff, n_k) -> dict:
     }
 
 
+def _entry_populations(profile, gamma, k_inv_ang, barrier, perc, orders):
+    """Bound/localized weight of the incident plane wave ``exp(i k.r)``.
+
+    ``axial_states`` centres its basis on the given ``k`` without folding, so a
+    tilt beyond the zone would starve the basis of the low-momentum waves that
+    build bound states. Fold ``k = k_red + n0 . g`` into the first zone; the
+    incident wave is then basis order ``n0``. An incident order outside the
+    basis lies beyond the cutoff (several well momenta) and is counted as
+    unbound; its weight is returned as ``outside``.
+    """
+    g = np.asarray(profile.g_inv_ang)
+    n0 = np.round(np.asarray(k_inv_ang) / g).astype(int)
+    if np.any(np.abs(n0) > np.asarray(orders)):
+        return 0.0, 0.0, 1.0
+    s = axial_states(profile, gamma, tuple(np.asarray(k_inv_ang) - n0 * g), max_order=orders)
+    row = np.flatnonzero((s.orders[:, 0] == n0[0]) & (s.orders[:, 1] == n0[1]))[0]
+    pop = np.abs(s.coefficients[row]) ** 2
+    return float(pop[s.energies_eV < barrier].sum()), float(pop[s.energies_eV < perc].sum()), 0.0
+
+
 def _entry(profile, gamma, beta, depth, barrier, perc, orders) -> list:
     """Bound/localized populations of an aligned plane wave with 2D Gaussian divergence."""
     p_inv_ang = gamma * beta * M_E_EV / HBARC_EV_ANG
@@ -204,19 +224,21 @@ def _entry(profile, gamma, beta, depth, barrier, perc, orders) -> list:
                 for ay, wy in zip(nodes * sigma, weights, strict=True)
             ]
         )
-        bound = local = 0.0
+        bound = local = outside = 0.0
         for ax, ay, w in grid:
-            s = axial_states(profile, gamma, (p_inv_ang * ax, p_inv_ang * ay), max_order=orders)
-            zero = np.flatnonzero((s.orders[:, 0] == 0) & (s.orders[:, 1] == 0))[0]
-            pop = np.abs(s.coefficients[zero]) ** 2
-            bound += w * pop[s.energies_eV < barrier].sum()
-            local += w * pop[s.energies_eV < perc].sum()
+            b, loc, out = _entry_populations(
+                profile, gamma, (p_inv_ang * ax, p_inv_ang * ay), barrier, perc, orders
+            )
+            bound += w * b
+            local += w * loc
+            outside += w * out
         rows.append(
             {
                 "divergence_over_critical": fraction,
                 "critical_mrad": float(1e3 * critical),
                 "bound": float(bound),
                 "localized": float(local),
+                "incident_outside_basis": float(outside),
             }
         )
     return rows
