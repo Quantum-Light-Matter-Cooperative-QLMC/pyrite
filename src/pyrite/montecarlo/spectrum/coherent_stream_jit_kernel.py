@@ -16,10 +16,10 @@ before squaring.  This module therefore splits the GPU work into three stages:
    mosaic-weighted reflection/orientation rows into the spectrum.  Different
    g rows therefore remain incoherent by construction.
 
-Peak pair scratch is O(6 * segment_block * N_g) plus two O(segment_block)
-segment-only geometry arrays. ``aw`` and ``phase_slope`` are no longer duplicated
-for every g row. No device->host line-count transfer is needed between the
-prologue and reduction stages.
+Peak pair scratch is O(8 * segment_block * N_g), plus three formation rows.
+Exact recoil makes ``aw`` and ``phase_slope`` per (segment, g)
+(``line-recoil-in-medium-root``). No device->host line-count transfer is
+needed between the prologue and reduction stages.
 """
 
 from dataclasses import dataclass
@@ -154,8 +154,12 @@ def _coherent_prologue_kernel(
     log_mu_tab,
     table_row,
     delta_tab,
+    inverse_energy,
+    age,
+    phase_slope_seg,
     E_r_out,
     aw_out,
+    phase_slope_out,
     g_phase_out,
     cs_re_out,
     cs_im_out,
@@ -180,7 +184,8 @@ def _coherent_prologue_kernel(
 ):
     # g-major fixed order: pair_index = reflection*n_segments + segment.  The reduction kernel then
     # reads each g row contiguously while its threads stride over segments.
-    """Validation: xray-in-medium-resonance, line-kinematics-precision"""
+    """Validation: xray-in-medium-resonance, line-kinematics-precision,
+    line-recoil-in-medium-root"""
     pair_index = jit.blockIdx.x * jit.blockDim.x + jit.threadIdx.x
     if pair_index >= pair_count:
         return
@@ -208,9 +213,16 @@ def _coherent_prologue_kernel(
     gy = g_flat[reflection_offset + U32_ONE]
     gz = g_flat[reflection_offset + U32_TWO]
 
-    resonance_denom = denom[segment]
+    # Exact recoil (CPU twin ``_line_recoil_terms``): v.g -> v.g - r_num and
+    # D -> D + r_den, with inverse_energy = hbar c / E [Angstrom]; zero is the
+    # classical hbar -> 0 limit. Validation: line-recoil-in-medium-root
+    inv_energy = inverse_energy[segment]
+    recoil_num = F32_HALF * g2[reflection] * inv_energy
+    recoil_den = n_dot_g[reflection] * inv_energy
+    resonance_denom = denom[segment] + recoil_den
     vacuum_denom = resonance_denom
     v_dot_g = vx * gx + vy * gy + vz * gz
+    numerator = v_dot_g - recoil_num
 
     # First-order Snell fixed point: D = (1-v.n) - delta v.grad L on the
     # cancellation-free vacuum factor and decrement table (see the CPU twin).
@@ -226,7 +238,7 @@ def _coherent_prologue_kernel(
     if use_medium:
         previous_denominator = resonance_denom
         for _it in range(3):
-            trial_energy_eV = hbarc * (v_dot_g / resonance_denom)
+            trial_energy_eV = hbarc * (numerator / resonance_denom)
             trial_below = trial_energy_eV <= E_tab[U32_ZERO]
             trial_above = trial_energy_eV >= E_tab[n_samples - U32_ONE]
             trial_upper = _bracket_index(E_tab, trial_energy_eV, n_samples)
@@ -248,9 +260,14 @@ def _coherent_prologue_kernel(
         ):
             return
 
-    omega = v_dot_g / resonance_denom
+    omega = numerator / resonance_denom
     resonance_eV = hbarc * omega
     if resonance_eV <= lo_keep or resonance_eV <= F32_TEN or resonance_eV >= hi_keep:
+        return
+    # Positive-mass-shell guard (``_recoil_line_allowed``): D > 0 and hbar
+    # omega <= T, i.e. omega hbar c/E <= 1 - 1/gamma.
+    recoil_fraction = omega * inv_energy
+    if not (resonance_denom > F32_ZERO and recoil_fraction <= F32_ONE - F32_ONE / gamma[segment]):
         return
 
     below = resonance_eV <= E_tab[U32_ZERO]
@@ -277,7 +294,7 @@ def _coherent_prologue_kernel(
     if use_medium:
         if gradient_norm_sq != F32_ZERO:
             k_mag = omega * xp.sqrt(F32_ONE - F32_TWO * delta + delta * delta * gradient_norm_sq)
-    k_dot_v = omega * (F32_ONE - resonance_denom)
+    k_dot_v = omega * ((F32_ONE - resonance_denom) + recoil_den)
     k_dot_g = omega * (n_dot_g[reflection] + delta * (grad_x * gx + grad_y * gy + grad_z * gz))
     v_dot_kg = v_dot_g + k_dot_v
     detuning = g2[reflection] + F32_TWO * k_dot_g
@@ -363,22 +380,33 @@ def _coherent_prologue_kernel(
     # The sinc half-width rides on the resonance denominator, so under the
     # refractive model it stops being a per-segment hoist and is emitted here in
     # the pair layout the field reducer already understands.
-    if use_medium:
-        aw_out[pair_index] = resonance_denom * duration / (F32_TWO * hbarc)
+    # The exact slope kappa D (``_recoil_slope_factor``) carries the width,
+    # so it is per (segment, g) even in vacuum.
+    aw_out[pair_index] = (resonance_denom * (F32_ONE / (F32_ONE - recoil_fraction)) * duration) / (
+        F32_TWO * hbarc
+    )
     # Formation mode centres the line on the VACUUM sinc centre and width; the
     # field kernels add the escape-path refractive slope (``_formation``).
+    # CPU twin of the exact centre, width and age phase: ``_recoil_formation_line``.
+    vacuum_omega = numerator / vacuum_denom
+    vacuum_fraction = vacuum_omega * inv_energy
+    vacuum_kappa = F32_ONE / (F32_ONE - vacuum_fraction)
     if use_formation:
-        E_r_out[pair_index] = hbarc * (v_dot_g / vacuum_denom)
-        aw_out[pair_index] = vacuum_denom * duration / (F32_TWO * hbarc)
+        E_r_out[pair_index] = hbarc * vacuum_omega
+        aw_out[pair_index] = (vacuum_kappa * vacuum_denom) * duration / (F32_TWO * hbarc)
         apb_out[pair_index] = end_sum
         bma_out[pair_index] = end_diff
         q_out[pair_index] = absorb_q
+    segment_age = age[segment]
+    d_shift = vacuum_kappa * (vacuum_fraction * denom[segment] + recoil_den) * segment_age
+    g_shift = vacuum_kappa * (vacuum_fraction * v_dot_g - recoil_num) * segment_age
+    phase_slope_out[pair_index] = phase_slope_seg[segment] + d_shift / hbarc
     position_offset = segment * U32_THREE
     g_phase_out[pair_index] = (
         r_flat[position_offset] * gx
         + r_flat[position_offset + U32_ONE] * gy
         + r_flat[position_offset + U32_TWO] * gz
-    )
+    ) + g_shift
     cs_re_out[pair_index] = sigma_re
     cs_im_out[pair_index] = sigma_im
     cp_re_out[pair_index] = pi_re
@@ -877,19 +905,20 @@ def run_coherent_prologue_kernel(
     L_start=None,
     L_end=None,
     table_row=None,
+    inverse_energy=None,
+    age=None,
     config=DEFAULT_COHERENT_STREAM_KERNEL_CONFIG,
 ):
     """Build g-major coherent line data for one contiguous segment block.
 
     The public/internal call shape is retained for compatibility. The returned
-    tuple also retains its historical eight entries, but ``aw`` and
-    ``phase_slope`` are now segment-sized rather than duplicated across g rows.
-    The field reducer accepts both layouts, so callers that construct pair-sized
-    geometry directly remain valid.
+    tuple also retains its historical eight entries; ``aw`` and ``phase_slope``
+    are in the pair layout. The field reducer accepts both layouts, so callers
+    that construct segment-sized geometry directly remain valid.
 
-    ``g2``/``n_dot_g``/``g_dot_e*`` and ``aw_seg`` are optional precomputed
-    hoists. When omitted they are constructed once here, preserving older direct
-    callers while the main line path avoids rebuilding them per segment block.
+    ``g2``/``n_dot_g``/``g_dot_e*`` are optional precomputed hoists. When
+    omitted they are constructed once here. ``aw_seg`` is accepted for call
+    compatibility but ignored: the exact-recoil half-width is per pair.
 
     Under the in-medium dispersion the caller supplies ``delta_tab``, the
     decrement ``1 - Re n`` on the ``E_tab`` grid. The kernel then solves the
@@ -916,6 +945,13 @@ def run_coherent_prologue_kernel(
     orientations share their reflection's tables; omitted, row ``g`` reads
     table row ``g``.
     Validation: line-reflection-coupling-tables
+
+    Exact recoil takes the per-segment ``inverse_energy = hbar c / E``
+    [Angstrom] and the electron's own midpoint ``age`` [Angstrom]; omitted,
+    both are zero (the classical root). The root, width, and the recoil
+    phase over the age then follow ``cxr._kernels._recoil_formation_line``,
+    so ``phase_slope`` is returned in the pair layout.
+    Validation: line-recoil-in-medium-root
     """
     n_threads = int(config.prologue_nthreads)
     _validate_threads(n_threads, "prologue_nthreads")
@@ -963,8 +999,6 @@ def run_coherent_prologue_kernel(
         g_dot_es = G[:, 0] * ES[:, 0] + G[:, 1] * ES[:, 1] + G[:, 2] * ES[:, 2]
     if g_dot_ep is None:
         g_dot_ep = G[:, 0] * EP[:, 0] + G[:, 1] * EP[:, 1] + G[:, 2] * EP[:, 2]
-    if aw_seg is None and not use_medium:
-        aw_seg = denom * t_L / np.float32(2.0 * float(hbarc))
 
     # Backward-compatible direct callers may still supply raw U_g tables. The
     # optimized main path supplies pre-scaled U_g/m_e tables and sets mass=1.
@@ -978,23 +1012,24 @@ def run_coherent_prologue_kernel(
 
     # Only g-dependent quantities live in pair scratch; under the refractive
     # model the half-width joins them.
-    n_slots = (7 if use_medium else 6) + (3 if use_formation else 0)
+    n_slots = 8 + (3 if use_formation else 0)
     storage = xp.empty(n_slots * n_pairs, dtype=xp.float32)
+    phase_slope_pair = storage[(n_slots - 1) * n_pairs : n_slots * n_pairs]
     resonances_eV = storage[0 * n_pairs : 1 * n_pairs]
     g_phase = storage[1 * n_pairs : 2 * n_pairs]
     sigma_coeffs_re = storage[2 * n_pairs : 3 * n_pairs]
     sigma_coeffs_im = storage[3 * n_pairs : 4 * n_pairs]
     pi_coeffs_re = storage[4 * n_pairs : 5 * n_pairs]
     pi_coeffs_im = storage[5 * n_pairs : 6 * n_pairs]
-    if use_medium:
-        aw_seg = storage[6 * n_pairs : 7 * n_pairs]
+    # Exact recoil puts kappa on the half-width, so it is never hoisted.
+    aw_seg = storage[6 * n_pairs : 7 * n_pairs]
     formation = ()
     if use_formation:
         formation = tuple(storage[i * n_pairs : (i + 1) * n_pairs] for i in (7, 8, 9))
     line_data = (
         resonances_eV,
         aw_seg,
-        phase_slope_seg,
+        phase_slope_pair,
         g_phase,
         sigma_coeffs_re,
         sigma_coeffs_im,
@@ -1007,6 +1042,15 @@ def run_coherent_prologue_kernel(
 
     if not use_medium:
         delta_tab = _dummy()
+    zeros = None
+    if inverse_energy is None or age is None:
+        zeros = xp.zeros(n_segments, dtype=xp.float32)
+    inverse_energy = zeros if inverse_energy is None else inverse_energy
+    age = zeros if age is None else age
+    inverse_energy = xp.ascontiguousarray(inverse_energy, dtype=xp.float32)
+    age = xp.ascontiguousarray(age, dtype=xp.float32)
+    if int(inverse_energy.size) != n_segments or int(age.size) != n_segments:
+        raise ValueError("inverse_energy and age must have one entry per segment")
     if use_formation:
         apb_out, bma_out, q_out = formation
     else:
@@ -1048,8 +1092,12 @@ def run_coherent_prologue_kernel(
             log_mu_kernel,
             table_row,
             delta_tab,
+            inverse_energy,
+            age,
+            xp.ascontiguousarray(phase_slope_seg, dtype=xp.float32),
             resonances_eV,
             aw_seg,
+            phase_slope_pair,
             g_phase,
             sigma_coeffs_re,
             sigma_coeffs_im,

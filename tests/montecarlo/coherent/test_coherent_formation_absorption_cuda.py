@@ -241,7 +241,7 @@ def test_stream_grouped_kernel_formation_mode_matches_the_reference(epb):
     )
 
 
-def _run_prologue(d, *, L_esc, L_start=None, L_end=None):
+def _run_prologue(d, *, L_esc, L_start=None, L_end=None, **recoil):
     from pyrite.montecarlo.spectrum.coherent_stream_jit_kernel import (
         CoherentStreamKernelConfig,
         run_coherent_prologue_kernel,
@@ -279,9 +279,58 @@ def _run_prologue(d, *, L_esc, L_start=None, L_end=None):
         L_start=None if L_start is None else cp.asarray(np.asarray(L_start, dtype=np.float32)),
         L_end=None if L_end is None else cp.asarray(np.asarray(L_end, dtype=np.float32)),
         config=CoherentStreamKernelConfig(32, 32, 2, 32),
+        **{key: cp.asarray(np.asarray(val, dtype=np.float32)) for key, val in recoil.items()},
     )
     cp.cuda.Stream.null.synchronize()
     return [cp.asnumpy(a) for a in out]
+
+
+def test_prologue_exact_recoil_matches_the_cpu_formation_line():
+    """CUDA twin of ``_recoil_formation_line``: centre, width and age phase.
+
+    ``hbar c / E`` is exaggerated (~1e-3 of ``1/g``) so the recoil terms sit
+    far above float32 resolution. Validation: line-recoil-in-medium-root
+    """
+    from pyrite.materials.crystal import HBARC_EV_ANG, M_E_EV
+    from pyrite.montecarlo.spectrum.cxr._kernels import _recoil_formation_line
+    from tests.montecarlo.spectrum.test_xray_dispersion_cuda import _prologue_inputs
+
+    d = _prologue_inputs()
+    L_start = np.array([2000.0, 8000.0], dtype=np.float32)
+    L_end = np.array([6000.0, 3000.0], dtype=np.float32)
+    inverse_energy = np.array([2.0e-3, 1.0e-3], dtype=np.float32)
+    age = np.array([300.0, 1200.0], dtype=np.float32)
+    kwargs = dict(L_esc=0.5 * (L_start + L_end), L_start=L_start, L_end=L_end)
+    classical = _run_prologue(d, **kwargs)
+    formed = _run_prologue(d, **kwargs, inverse_energy=inverse_energy, age=age)
+
+    n_seg = d["n_seg"]
+    seg = np.tile(np.arange(n_seg), d["n_g"])
+    G = d["G"].astype(float)
+    g_row = np.repeat(np.arange(d["n_g"]), n_seg)
+    v_dot_g = np.sum(d["v"].astype(float)[seg] * G[g_row], axis=1)
+    g2 = np.sum(G * G, axis=1)[g_row]
+    n_dot_g = (G @ d["n_hat"].astype(float))[g_row]
+    # Feed the CPU helper the same hbar c/E through gamma: E = hbar c / inv_E.
+    gamma = HBARC_EV_ANG / (inverse_energy.astype(float)[seg] * M_E_EV)
+    E_c, a, d_shift, g_shift = _recoil_formation_line(
+        v_dot_g,
+        d["denom"].astype(float)[seg],
+        d["t_L"].astype(float)[seg],
+        gamma,
+        g2,
+        n_dot_g,
+        age.astype(float)[seg],
+    )
+    live = formed[4] != 0.0
+    assert live.any()
+    np.testing.assert_allclose(formed[0][live], E_c[live], rtol=3e-6)
+    np.testing.assert_allclose(formed[1][live], a[live], rtol=3e-6)
+    phase_slope = classical[2] + d_shift / d["hbarc"]
+    np.testing.assert_allclose(formed[2][live], phase_slope[live], rtol=3e-6, atol=1e-7)
+    np.testing.assert_allclose(formed[3][live], (classical[3] + g_shift)[live], rtol=3e-6)
+    # The recoil moved every live centre (the classical limit is not reproduced).
+    assert np.all(np.abs(formed[0][live] - classical[0][live]) > 1e-4 * classical[0][live])
 
 
 def test_prologue_formation_mode_moves_the_attenuation_into_the_piece_constants():

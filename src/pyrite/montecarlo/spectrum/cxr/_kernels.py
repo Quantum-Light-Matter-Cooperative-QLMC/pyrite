@@ -694,6 +694,14 @@ def _vacuum_doppler(E_keV, beta, v_hat, n_hat, *, xp=xp):
 _RECOIL_HBARC_EV_ANG = HBARC_EV_ANG
 
 
+def _recoil_inverse_energy(gamma):
+    """``hbar c / E`` [Angstrom] with ``E = gamma m c^2``; zero under the hook.
+
+    Validation: line-recoil-in-medium-root
+    """
+    return _RECOIL_HBARC_EV_ANG / (gamma * M_E_EV)
+
+
 def _line_recoil_terms(gamma, g2, n_dot_g):
     """``(r_num, r_den, hbarc/E)`` of the exact recoil root, per row.
 
@@ -708,7 +716,7 @@ def _line_recoil_terms(gamma, g2, n_dot_g):
 
     Validation: line-recoil-in-medium-root
     """
-    inv_E = _RECOIL_HBARC_EV_ANG / (gamma * M_E_EV)
+    inv_E = _recoil_inverse_energy(gamma)
     return 0.5 * g2 * inv_E, n_dot_g * inv_E, inv_E
 
 

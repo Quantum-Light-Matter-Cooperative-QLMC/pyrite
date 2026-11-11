@@ -39,6 +39,7 @@ from ._kernels import (
     _matvec3,
     _polarization_pair,
     _recoil_formation_line,
+    _recoil_inverse_energy,
     _recoil_line_allowed,
     _recoil_slope_factor,
     _reflection_tables,
@@ -1027,6 +1028,13 @@ def _accumulate_batched(st):
         _coh_L_start = xp.ascontiguousarray(st.escape_ends[0], dtype=REAL)
         _coh_L_end = xp.ascontiguousarray(st.escape_ends[1], dtype=REAL)
         _coh_half_dL = xp.ascontiguousarray(0.5 * (_coh_L_end - _coh_L_start), dtype=REAL)
+        # Exact recoil: hbar c/E and the electron's own midpoint age per
+        # segment (CPU twin ``_recoil_formation_line``).
+        # Validation: line-recoil-in-medium-root
+        _coh_inverse_energy = xp.ascontiguousarray(
+            _recoil_inverse_energy(gamma_full.reshape(-1)), dtype=REAL
+        )
+        _coh_age = xp.ascontiguousarray(st.seg_t_mid, dtype=REAL)
         # The planes share one energy axis across rows, so the all-electron
         # term streams on the union of the rows' kept energies; a row's
         # energy kept only for another row gets its exact full blend.
@@ -1083,6 +1091,8 @@ def _accumulate_batched(st):
                 L_start=_coh_L_start[sel],
                 L_end=_coh_L_end[sel],
                 table_row=bt.ROW_TABLE,
+                inverse_energy=_coh_inverse_energy[sel],
+                age=_coh_age[sel],
                 config=DEFAULT_COHERENT_STREAM_KERNEL_CONFIG,
             )
             # Formation mode appends the pair-layout attenuation constants
