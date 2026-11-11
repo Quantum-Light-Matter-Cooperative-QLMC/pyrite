@@ -11,6 +11,11 @@ on:
     - cron: '53 6 * * 0'
   # Bot commits made with GITHUB_TOKEN need an explicit CI dispatch.
   workflow_dispatch:
+    inputs:
+      slow:
+        description: Add the weekly slow tier to the JIT-disabled job
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -220,7 +225,7 @@ jobs:
   # disables JIT to exercise Python-level Numba bodies; it does NOT test
   # compiled kernels. Online tests run separately on push/main and weekly.
   # Main pushes skip the slow tier (51% of JIT-disabled cost; PRs run it
-  # compiled); the weekly run keeps it. Runners act as ~2 cores (4 workers
+  # compiled); the weekly run and a dispatch with slow=true keep it. Runners act as ~2 cores (4 workers
   # cost 1.6-2.5x per test), so 2 workers per shard; shards balance measured
   # non-slow JIT-disabled cost (#344, lab job 10909, CI run 42924996024).
   numba-online:
@@ -245,7 +250,7 @@ jobs:
       PYRITE_ONLINE_TESTS: '1'
       PYRITE_TEST_WORKERS: '2'
       SUITES: ${{ matrix.suites }}
-      SLOW: ${{ github.event_name == 'schedule' && '--slow' || '' }}
+      SLOW: ${{ (github.event_name == 'schedule' || inputs.slow) && '--slow' || '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1

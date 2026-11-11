@@ -23,10 +23,11 @@ The main CI workflow runs on PRs, pushes to `main`, and weekly on Sundays at
 06:53 UTC. CPU tests with compiled JIT remain enabled in the regular matrix.
 Pushes to `main` and manual dispatches run every primary test suite across
 three shards with `NUMBA_DISABLE_JIT=1` and `PYRITE_ONLINE_TESTS=1`. The
-weekly run adds `--slow`. The same JIT-disabled mode can be selected locally
+weekly run adds `--slow`; a manual dispatch adds it with `-f slow=true`. The same JIT-disabled mode can be selected locally
 with `pyrite-dev test --numba`. Each shard uploads a
 `numba-junit-<shard>-<run-id>` artifact containing one timing XML file per
-suite. Run the job on a branch with `gh workflow run CI --ref <branch>`.
+suite. Run the job on a branch with `gh workflow run CI --ref <branch>`
+(append `-f slow=true` to rehearse the weekly tier).
 Live COD lattice checks retry throttled fetches and skip, naming the cause,
 when COD stays unreachable.
 GitHub-hosted runners never run CUDA. The independent Monday 07:17 UTC
