@@ -22,6 +22,7 @@ grating-slit-image-width
 grazing-reflectivity
 optical-instrument-observable
 optical-phase-retrieval
+pixel-acquisition-counting
 pixel-angular-interpolation
 positioned-filter-attenuation
 ```

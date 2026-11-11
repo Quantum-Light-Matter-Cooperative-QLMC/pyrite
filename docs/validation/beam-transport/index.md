@@ -77,6 +77,7 @@ gos-moller-close
 gos-optical-quadrature
 gos-soft-hard-partition
 line-grid-sinc-convergence
+line-grid-kinematic-bandwidth
 line-grid-resonance-bandwidth
 line-grid-resonance-local-spacing
 line-spectrum-error-budget

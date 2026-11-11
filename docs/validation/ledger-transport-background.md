@@ -248,10 +248,10 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Equation:** $\lambda^{-1}_{i,s}(E)=n_i\sigma_{i,s}(E)10^{16}\,{\rm \AA}^{-1}$ for $n_i$ in atoms/Å$^3$ and $\sigma_{i,s}$ in cm$^2$; total rate is the sum over elements and subshells
 - **Assumptions:** independent-atom mixture in a homogeneous medium; linear-linear interpolation as declared by the accepted ENDF sections; rates only, with no inferred transfer or recoil distribution
 - **Limiting cases:** a closed shell contributes zero; below every binding energy the material rate is zero; an accessible shell outside its tabulated projectile-energy range is rejected
-- **Status:** unverified
-- **Checks:** source parser validates monotone grids, nonnegative values, and ENDF interpolation law; independent material-rate and Bote–Salvat comparisons remain pending
+- **Status:** rederived
+- **Checks:** source parser validates monotone grids, nonnegative values, and ENDF interpolation law; independent material-rate and Bote–Salvat comparisons remain pending; 2026-11-11 fresh-context re-derivation matches ([independent verification](beam-transport/eedl-material-shell-rates.md#independent-verification)): independent fixed-column ENDF parse agrees within 1 ulp for Si K and ZrTe5 Zr K / Te L3 at 30 keV, at a node and at threshold; whole-tape scan (1612 sections) all INT=2, strictly increasing, nonnegative; subshell sum equals MT=522 to 5e-9
 - **Anchor:** [implementation derivation](beam-transport/eedl-material-shell-rates.md)
-- **Notes:** Host-side input preparation only. No production event scheduler consumes these rates; differential spectrum, stopping closure, and fresh-context verification remain open. Only a human may mark this row `signed-off`.
+- **Notes:** Host-side rate preparation consumed by `transport/shell_rates.py::eedl_inner_cross_sections` (`penelope-shell-rate-closure`). No direct regression test calls `material_shell_ionization_rates`; coverage is indirect via `tests/montecarlo/collisions/test_shell_rates.py`. Ni M4/M5 and Ag N5 tables start ~0.5–0.7 eV above their 10 eV binding energy, so Ni/Ag compositions raise for ~10–10.7 eV (below the 1 keV cutoff). `_CM2_PER_ANG2` is misnamed (Å²/cm²); value correct. Differential spectrum and stopping closure remain open. Only a human may mark this row `signed-off`.
 
 ## `sbethe-atomic-shell-inputs`
 
