@@ -38,6 +38,7 @@ cr-transition-radiation-bound
 cr-zone-handoff-accounting
 cr-planar-conditional-source
 cr-planar-overflow-spectrum
+cr-planar-fiber-unraveling
 cr-persisted-channel
 quantum-decoherence-budget
 channeling-modulated-incoherent-emission

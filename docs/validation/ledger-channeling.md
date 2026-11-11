@@ -149,6 +149,18 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Anchor:** `tests/montecarlo/channeling/test_channeling_overflow.py`; `tests/montecarlo/quantum/test_channeling_density.py::test_jump_source_observer_reproduces_overflow_without_changing_solve`
 - **Notes:** #522 research prototype, no production caller, no channeling-model marker change. Algebraic verification does not certify convergence of a material tail or the physical boundary. The instrument reports a signed closure defect and never assigns omitted probability to a band-edge angle.
 
+## `cr-planar-fiber-unraveling`
+
+- **Claim:** the planar Lindblad model of `cr-lindblad-jump-operators` (isotropic Einstein TDS per plane site and scalar local-density electronic kicks, `q_y` integrated) is the axial carrier-fibred absorbing model on a rectangular cell `(d, L_y)` with a `y` continuum: each plane site `x_s` (volume density `n_s`) is a row of independent strings of linear density `λ_s = n_s d L_y`, and kicks carry columns `√c_i (√ρ_{q_i})_n` at the electronic quadrature nodes. With `g_y/2` above every transfer and `|κ_y|`, nothing folds in `y`; `κ_y` is the accumulated out-of-plane momentum, a non-interfering label, and `H(κ) = H_x(κ_x)`. The fibre loss equals the full-transfer planar `C(x, x)` Toeplitz, jump outputs follow the planar kernel's coherent gain, and the unraveling's retained, in-window free and overflow tallies converge to the planar density-matrix solver's as the window grows (the fibre window is symmetric about zero momentum; the solver's covers `[-Mg, (M+1)g)`). Research reference, not a physical escape or production model.
+- **Code:** `montecarlo/channeling/planar_fiber.py::{planar_fiber_inputs,plane_sites,root_density_harmonics,_strings,_kicks}`; sampling engine of `cr-axial-fiber-unraveling`, unchanged.
+- **Source:** `cr-lindblad-jump-operators` (Hall & Hirsch 1965; Bird & King 1990; PENELOPE-2024 GOS, local-density localization); `cr-axial-continuum-tds-jumps` (image sum into continuous carrier-moving Kraus jumps); Castin, Dalibard & Mølmer, arXiv:0805.4002, Eqs. (4), (8). [Derivation](channeling/cr-planar-fiber-unraveling.md).
+- **Assumptions:** first Born; isotropic Gaussian displacements (anisotropic sites refused); scalar electronic response (directional valence unsupported); fixed energy; transfer cut 10⁴ Å⁻¹ as the planar kernels; the planar solver's absorbing cut `barrier + margin`; caller owns matching, rechanneling and admission.
+- **Limiting cases:** zero mechanisms retain every incident; coincident planes merge (Si(110), Si(100): real Toeplitz loss); only `λ_s/A = n_s` enters, independent of `L_y`; window convention vanishes as `M → ∞`.
+- **Status:** unverified
+- **Checks:** plane-site densities vs `_site_densities` (Si(110), Si(100), diamond(111)); loss vs solver Toeplitz (TDS 2e-7 relative, electronic 1e-15); single-jump TDS momentum law vs `overflow_spectrum` (χ²); kick law vs electronic kernel gain (total 1e-6, TV < 0.02); ensemble trace/free/overflow vs `DensityMatrixSolver.propagate` at M = 16 (4.5σ); tails keep `(k_x, q_y)`; injected plane-shift and kick-smoothing faults detected.
+- **Anchor:** `tests/montecarlo/quantum/test_channeling_planar_fiber.py`
+- **Notes:** #1056 research CPU reference; feeds #522, does not close it. No production caller; `CHANNELING_MODEL` unchanged. Awaiting fresh-context verification.
+
 ## `diamond-valence-oscillator`
 
 - **Claim:** the existing PENELOPE effective-oscillator model for undoped diamond assigns four valence electrons per C formula unit to the approximately 34 eV bulk plasmon, retaining two K-core electrons; this is not a free-carrier or boron-doped intervalence oscillator.
