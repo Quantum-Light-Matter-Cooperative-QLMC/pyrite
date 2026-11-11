@@ -363,6 +363,26 @@ class PlanarDetector:
             scorer=scorer,
         )
 
+    @classmethod
+    def alexs_2k512(
+        cls,
+        pose: PlanarPose,
+        *,
+        response: DetectorResponse | None = None,
+        scorer: PixelScorer | None = None,
+    ) -> PlanarDetector:
+        """Construct one greateyes ALEX-s 2k512 sensor (515 x 2048, 13.5 um).
+
+        Pass ``response=pyrite.detectors.AlexS()`` for its charge-integrating
+        response; geometry alone implies none.
+        """
+        return cls(
+            pose=pose,
+            pixels=PixelGrid.alexs_2k512(),
+            response=response,
+            scorer=scorer,
+        )
+
     def score(
         self,
         energy_eV: np.ndarray,

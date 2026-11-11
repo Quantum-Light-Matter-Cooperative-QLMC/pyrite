@@ -62,7 +62,7 @@ kind = "alexs"
 sensor_format = [2048, 512]
 sensor_code = "SYNTH-BI"
 readout_rate_hz = "1 MHz"
-gain_mode = "high"
+gain_mode = "high-capacity"
 qe_curve = "qe"
 """
 
@@ -208,7 +208,7 @@ def test_bad_gratings_fail_with_clear_errors(layer, old, new, message):
 
 def test_alexs_response_requires_its_fields(layer):
     (layer / "detectors" / "lab-ccd.toml").write_text(
-        _DETECTOR.replace('gain_mode = "high"\n', "bias_v = 100\n")
+        _DETECTOR.replace('gain_mode = "high-capacity"\n', "bias_v = 100\n")
     )
 
     errors = _errors()
@@ -217,13 +217,41 @@ def test_alexs_response_requires_its_fields(layer):
     assert "detectors.lab-ccd.response.bias_v: unknown key" in errors
 
 
-def test_alexs_lowering_is_not_yet_supported(layer):
+def test_alexs_lowering_folds_resolved_qe_values(layer):
     from pyrite.campaign.observation import physical_detector_from_config
+    from pyrite.detectors import AlexS
+    from pyrite.instrument.observation import response_payload
 
-    detector = load_material_catalog().detectors["lab-ccd"]
+    catalog = load_material_catalog()
+    detector = catalog.detectors["lab-ccd"]
 
-    with pytest.raises(NotImplementedError, match="not yet supported"):
+    lowered = physical_detector_from_config(detector, curves=catalog.curves)
+
+    response = lowered.response
+    assert isinstance(response, AlexS)
+    assert response.gain_mode == "high-capacity" and response.readout_rate_hz == 1.0e6
+    assert response.qe is not None and response.qe.name == "qe"
+    assert response.qe.value == pytest.approx((0.8, 0.5, 0.2))
+    assert response_payload(response)["config"]["qe"]["value"] == pytest.approx([0.8, 0.5, 0.2])
+    with pytest.raises(ValueError, match="needs the owning catalog's curves"):
         physical_detector_from_config(detector)
+
+
+def test_alexs_curve_edit_changes_response_identity(layer):
+    from pyrite.campaign.observation import physical_detector_from_config
+    from pyrite.instrument.observation import payload_digest, response_payload
+
+    def digest():
+        load_material_catalog.cache_clear()
+        catalog = load_material_catalog()
+        detector = physical_detector_from_config(
+            catalog.detectors["lab-ccd"], curves=catalog.curves
+        )
+        return payload_digest(response_payload(detector.response))
+
+    before = digest()
+    (layer / "curves" / "qe.csv").write_text(_CSV.replace("20.0, 50.0", "20.0, 55.0"))
+    assert digest() != before
 
 
 def test_bundled_catalog_declares_no_gratings_or_curves():

@@ -123,7 +123,9 @@ def resolve_pixel_scene(
 
     observation = resolve_profile_observation(catalog, profile_name, detector_id=detector_id)
     detector = (
-        physical_detector_from_config(physical) if observation is None else observation.detector
+        physical_detector_from_config(physical, curves=catalog.curves)
+        if observation is None
+        else observation.detector
     )
     scorer_row = cast("dict[str, Any] | None", physical.get("scorer"))
     scorer = (

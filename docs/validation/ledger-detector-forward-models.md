@@ -81,3 +81,14 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Checks:** units (eV); limiting case FWHM→0 as Δθobs→0 or β→0; prefactor pinned against an independent `2*sqrt(2*log(2))/3` computation; fresh-context re-derivation: Eq. (14) azimuthal reduction for v∥z confirmed term-for-term (rtol 1e-14 spot check), Zhai's 0.785 prefactor reproduced exactly by the span=3σ Gaussian-equivalence reading
 - **Anchor:** `tests/detectors/test_response.py`
 - **Notes:** **2026-07-11 fix**: prefactor was `2·sqrt(2ln2/3)` (√3× too large, misplaced parenthesis) prior to this fix; corrected to `2·sqrt(2ln2)/3` per Eq. (14); the 0.785 factor is Zhai's own convention (~15% wider than a uniform-span variance match, ≈0.68) — we follow the paper; write-up `detectors/detector-line-broadening.md`
+
+## `alexs-adu-conversion`
+
+- **Claim:** charge-integrating CCD conversion $\mathrm{ADU}=g\,\min\!\big(\sum N\,\mathrm{QE}(E)\,E/W+I_\mathrm{dark}t,\;\mathrm{FW}\big)$ plus zero-mean Gaussian read noise of variance $(g\sigma_\mathrm{read})^2$ ADU²; optional Poisson draw of absorbed photons (fixed mean charge per photon) and dark electrons
+- **Code:** `detectors/alexs_response.py::{signal_electrons, alexs_frame}`; `detectors/spec.py::AlexS`
+- **Source:** greateyes DS-ALEXs datasheet Rev05 (May 2025), 2k512 BI UV1: $W=3.66$ eV/e⁻, FW $=100$ ke⁻, $g=1$ (standard) or $0.34$ (high capacity) ADU/e⁻, $\sigma_\mathrm{read}=3.5/6.8/10.7$ e⁻ at 50 kHz/1 MHz/3 MHz, $I_\mathrm{dark}=0.00025$ e⁻/px/s at −100 °C; photon-to-charge conversion at the mean pair-creation energy (Janesick, *Scientific Charge-Coupled Devices*, SPIE 2001)
+- **Status:** unverified
+- **Checks:** monochromatic line integrates to $N\,\mathrm{QE}\,E/3.66\cdot g$ in both gain modes; full-well clipping before gain; read-noise variance in ADU; dark charge $=I_\mathrm{dark}t$ (mean and Poisson variance); photon shot-noise variance $N(E/W)^2$; unit-photon and zero-QE limits
+- **Anchor:** `tests/detectors/test_alexs_response.py::test_monochromatic_adu_is_n_qe_e_over_w_times_gain`, `::test_full_well_clipping`, `::test_read_noise_variance`, `::test_dark_charge_is_rate_times_exposure`, `::test_photon_shot_noise_keeps_mean_charge_per_photon`, `::test_signal_electrons_unit_photon_and_zero_qe_limits`
+- **Notes:** QE is the catalog `qe_curve` (zero outside its band) or, until the user digitizes it, the `alexs-qe-absorption` Beer-Lambert fallback with the datasheet 15 µm epitaxial layer. Fano fluctuations, ADC saturation and register-well (binning) limits are not modelled; the dark rate is the −100 °C datasheet value. Not part of any default simulation output.
+

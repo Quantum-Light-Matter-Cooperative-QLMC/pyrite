@@ -60,6 +60,7 @@ experimental-planar-channeling
 experimental-axial-channeling
 transition-radiation-demo
 radiation-diagnostics
+flat-field-spectrometer
 ```
 
 Quantum/channeling examples are **experimental and not rigorously validated**.

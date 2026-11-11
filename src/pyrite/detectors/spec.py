@@ -14,6 +14,7 @@ from .._spec_defaults import UNSET as _UNSET
 from .._spec_defaults import _Unset
 from .._units import normalize_unit, reject_quantity
 from ..config.response_numerics import Timepix3ResponseNumerics
+from ._tabulated import TabulatedEfficiency
 from .acceptance import AngularAcceptance, SensorAcceptance, _explicit_angular_quantity
 
 if TYPE_CHECKING:
@@ -303,6 +304,72 @@ class EagleXO:
             resolve_energy=self.resolve_energy,
             n_pix=self.n_pix,
         ).apply(incident)
+
+
+@dataclass(frozen=True)
+class AlexS:
+    """Configure the greateyes ALEX-s charge-integrating CCD response.
+
+    :meth:`score` returns the expected ADU density per eV,
+    ``density * scale * QE(E) * E / 3.66 eV * gain``: integrated over energy it
+    is the noise-free signal in ADU before dark charge, full-well clipping and
+    read noise, which act on a whole frame through
+    :func:`pyrite.detectors.alexs_response.alexs_frame`. The response is
+    charge-integrating, so it has no native measured-energy bins and cannot
+    drive a photon-counting acquisition.
+
+    Parameters
+    ----------
+    sensor_format
+        ``(columns, rows)`` usable pixels; the 2k512 has ``(2048, 515)``.
+    readout_rate_hz
+        Datasheet readout rate (50 kHz, 1 MHz or 3 MHz); selects read noise.
+    gain_mode
+        ``"standard"`` (1 ADU/e-) or ``"high-capacity"`` (0.34 ADU/e-).
+    sensor_code
+        Vendor sensor designation, display and identity only.
+    qe
+        Tabulated quantum efficiency (the catalog ``qe_curve``). ``None`` uses
+        the Beer-Lambert fallback with the datasheet 15 um epitaxial layer.
+        The curve values are dataclass fields, so they enter response identity.
+
+    Validation: alexs-adu-conversion
+    """
+
+    sensor_format: tuple[int, int] = (2048, 515)
+    readout_rate_hz: float = 1.0e6
+    gain_mode: str = "standard"
+    sensor_code: str = "BI UV1"
+    qe: TabulatedEfficiency | None = None
+
+    def __post_init__(self) -> None:
+        from .alexs_response import gain_adu_per_e, read_noise_e
+
+        columns, rows = (int(item) for item in self.sensor_format)
+        if columns <= 0 or rows <= 0:
+            raise ValueError("AlexS.sensor_format must be two positive integers")
+        object.__setattr__(self, "sensor_format", (columns, rows))
+        object.__setattr__(self, "readout_rate_hz", float(self.readout_rate_hz))
+        read_noise_e(self.readout_rate_hz)
+        gain_adu_per_e(self.gain_mode)
+        if self.qe is not None and not isinstance(self.qe, TabulatedEfficiency):
+            raise TypeError("AlexS.qe must be a TabulatedEfficiency or None")
+
+    @property
+    def gain_adu_per_e(self) -> float:
+        """ADC gain [ADU per electron] of the selected gain mode."""
+        from .alexs_response import gain_adu_per_e
+
+        return gain_adu_per_e(self.gain_mode)
+
+    def score(self, energy_eV, intrinsic_density, *, fwhm_eV, scale):
+        from .alexs_response import quantum_efficiency, signal_electrons
+
+        del fwhm_eV
+        E = np.asarray(energy_eV, dtype=float)
+        photons = np.asarray(intrinsic_density) * scale
+        electrons = signal_electrons(E, photons, quantum_efficiency(E, self.qe))
+        return electrons * self.gain_adu_per_e
 
 
 @dataclass(frozen=True)

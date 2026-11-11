@@ -1187,6 +1187,44 @@ seed = 19
     assert observation.detector.response.seed == 7
 
 
+def test_profile_observation_rejects_counting_acquisition_for_alexs(tmp_path):
+    from pyrite.campaign.observation import resolve_profile_observation
+    from pyrite.materials import load_material_catalog
+
+    text = (
+        _minimal_catalog(
+            material_rows="""
+[materials.mos2]
+display_name = "mos2"
+crystal = "mos2"
+"""
+        )
+        + """
+[profiles.standard.physical_detector]
+distance_mm = 400.0
+shape = [515, 2048]
+pitch_mm = [0.0135, 0.0135]
+
+[profiles.standard.physical_detector.response]
+kind = "alexs"
+sensor_format = [2048, 515]
+sensor_code = "SYNTH-BI"
+readout_rate_hz = "50 kHz"
+gain_mode = "standard"
+
+[profiles.standard.physical_detector.acquisition]
+exposure_s = 2.0
+measured_min_eV = 0.0
+measured_max_eV = 2000.0
+measured_bin_width_eV = 400.0
+"""
+    )
+    catalog = load_material_catalog(_write_catalog(tmp_path, text))
+
+    with pytest.raises(ValueError, match="charge-integrating ALEX-s"):
+        resolve_profile_observation(catalog, "standard")
+
+
 def _acquisition_catalog_text(fields, *, named=False):
     path = "detectors.camera" if named else "profiles.standard.physical_detector"
     base = _minimal_catalog(

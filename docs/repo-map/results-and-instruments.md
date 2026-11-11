@@ -64,5 +64,15 @@ Eagle XO detector forward model (geometry/solid angle, QE table, energy resoluti
 
 #### `grating.py`
 **Exploratory** grazing-incidence soft-X-ray grating spectrometer forward model (dispersion geometry, coating reflectivity, simple CCD pixel grid; not wired into pipeline). See [grazing-grating model](../research/instrumentation/grazing-grating.md).
-- Public: `Grating`, `wavelength_angstrom`, `groove_spacing_angstrom`, `coating_number_density_per_ang3`, `detector_position_mm`, `disperse_spectrum`, `resolving_power`, `ALEXS_SENSORS`, `SimpleCCD`, `bin_to_pixels`.
-- Deps: `materials.crystal` (`HC_EV_ANG`, `optical_constants`).
+- Public: `Grating` (optional `efficiency_curve`, `mount`, `from_catalog`), `FlatFieldMount`, `wavelength_angstrom`, `groove_spacing_angstrom`, `coating_number_density_per_ang3`, `detector_position_mm`, `disperse_spectrum`, `resolving_power`, `ALEXS_SENSORS` (re-export), `SimpleCCD`, `bin_to_pixels`.
+- Deps: `materials.crystal` (`HC_EV_ANG`, `optical_constants`), `alexs_response`, `_tabulated`; `materials` catalog lazily in `from_catalog`.
+
+#### `grating_image.py`
+Flat-field spectrometer image (#1081): analytic slit-image kernel, along-slit astigmatic spread, 2D `(rows, columns)` image and the spectrum → slit → grating → ALEX-s ADU frame.
+- Public: `SlitImage`, `AlongSlitSpread`, `SpectrometerImage`, `slit_image_width_mm`, `slit_image_pixels`, `detected_image_2d`, `alexs_spectrometer_image`.
+- Deps: `grating`, `alexs_response`.
+
+#### `alexs_response.py`
+greateyes ALEX-s 2k512 BI UV1 charge-integrating response: datasheet constants, QE (catalog curve or Beer-Lambert fallback), signal electrons, frame realization (dark, full well, Poisson/read noise, gain). `spec.AlexS` is its response config; `_tabulated.TabulatedEfficiency` holds tabulated QE/efficiency curves.
+- Public: `ALEXS_SENSORS`, `AlexsFormat`, `quantum_efficiency`, `signal_electrons`, `alexs_frame`, datasheet constants.
+- Deps: `grating.qe_absorption` (lazy).

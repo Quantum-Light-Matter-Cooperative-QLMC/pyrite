@@ -120,7 +120,8 @@ def catalog_detector(catalog_profile: str = "standard", detector_id: str | None 
     if "distance_mm" in spec:
         from .observation import physical_detector_from_config
 
-        projection = physical_detector_from_config(spec).scalar_detector()
+        curves = _catalog(catalog_profile).curves
+        projection = physical_detector_from_config(spec, curves=curves).scalar_detector()
         return replace(
             DEFAULT_CATALOG_DETECTOR,
             observation_angle_deg=projection.observation_angle_deg,
