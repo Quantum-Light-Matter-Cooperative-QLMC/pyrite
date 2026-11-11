@@ -73,11 +73,9 @@ def reflection_rows(
     Validation: line-window-seeding, line-kinematics-precision
     """
     from .cxr._kernels import (
-        _line_recoil_terms,
-        _recoil_line_allowed,
-        _recoil_slope_factor,
         _vacuum_doppler,
     )
+    from .cxr._recoil import _line_recoil_terms, _recoil_line_allowed, _recoil_slope_factor
     from .segment_escape import segment_escape_gradient
 
     # Seeding is host work even when transport returned device arrays.

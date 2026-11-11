@@ -34,14 +34,9 @@ from ._kernels import (
     _in_medium_kinematics,
     _interp_gather_cxr_tables,
     _interp_index,
-    _line_recoil_terms,
     _log_interp_fraction,
     _matvec3,
     _polarization_pair,
-    _recoil_formation_line,
-    _recoil_inverse_energy,
-    _recoil_line_allowed,
-    _recoil_slope_factor,
     _reflection_tables,
     _rowdot3,
     _segment_escape_distance,
@@ -51,6 +46,13 @@ from ._per_hkl import (
     _flat_energy_keep,
     _flat_view,
     _row_decoherence_factor,
+)
+from ._recoil import (
+    _line_recoil_terms,
+    _recoil_formation_line,
+    _recoil_inverse_energy,
+    _recoil_line_allowed,
+    _recoil_slope_factor,
 )
 
 
@@ -994,11 +996,11 @@ def _accumulate_batched(st):
     )
     if _use_jit_coherent_stream:
         from ..coherent_grouped_jit_kernel import run_coherent_grouped_intensity_kernel
+        from ..coherent_prologue_jit_kernel import run_coherent_prologue_kernel
         from ..coherent_stream_jit_kernel import (
             DEFAULT_COHERENT_STREAM_KERNEL_CONFIG,
             allocate_coherent_fields,
             run_coherent_field_accumulation_kernel,
-            run_coherent_prologue_kernel,
         )
 
         _coh_g = G.reshape(-1)

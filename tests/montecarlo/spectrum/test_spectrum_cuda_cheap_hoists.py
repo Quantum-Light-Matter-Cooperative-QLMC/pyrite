@@ -563,9 +563,9 @@ def test_coherent_field_reducer_uses_segment_only_aw_and_phase():
 
 
 def test_coherent_prologue_returns_pair_layout_planes():
+    from pyrite.montecarlo.spectrum.coherent_prologue_jit_kernel import run_coherent_prologue_kernel
     from pyrite.montecarlo.spectrum.coherent_stream_jit_kernel import (
         CoherentStreamKernelConfig,
-        run_coherent_prologue_kernel,
     )
 
     hbarc = 1973.269804

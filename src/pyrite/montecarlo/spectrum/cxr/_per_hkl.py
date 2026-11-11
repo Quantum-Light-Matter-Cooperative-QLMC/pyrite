@@ -22,7 +22,7 @@ from . import _policy
 from ._bin_quadrature import sincsq_bin_lineshape
 from ._cpu_reduce import accumulate_sincsq, numpy_backend
 from ._formation import (
-    formation_coefficients,
+    _formation_cxr,
     formation_profile,
     formation_window_half_width,
 )
@@ -36,17 +36,14 @@ from ._kernels import (
     _interp_elemental_mu,
     _interp_gather1d,
     _interp_index,
-    _line_recoil_terms,
     _log_interp_fraction,
     _matvec3,
     _polarization_pair,
-    _recoil_formation_line,
-    _recoil_line_allowed,
-    _recoil_slope_factor,
     _reflection_tables,
     _rowdot3,
     _sincsq_lineshape,
 )
+from ._recoil import _line_recoil_terms, _recoil_line_allowed, _recoil_slope_factor
 from ._temporal import (
     CoherentRow,
     add_boxes,
@@ -67,58 +64,6 @@ def _sinc_window_bounds(E_grid, lo, hi):
     i0 = max(int(_to_cpu(xp.searchsorted(E_grid, lo, side="right"))) - 1, 0)
     i1 = min(int(_to_cpu(xp.searchsorted(E_grid, hi, side="right"))) + 1, E_grid.size)
     return i0, i1
-
-
-class _FormationLines(tuple):
-    """Per-line data of the complex formation factor, one entry per line.
-
-    ``(E_vac, a_vac, half_dL, apb, bma, q)``: the vacuum sinc centre and
-    width, half the escape-distance change along the piece, and the
-    attenuation constants of ``_formation.formation_coefficients``. A plain
-    tuple subclass so the rows gather with one comprehension.
-    Validation: coherent-formation-absorption
-    """
-
-    __slots__ = ()
-
-    def take(self, sel):
-        return _FormationLines(a[sel] for a in self)
-
-
-def _formation_cxr(st, idx, t_L, v_dot_g, mu, g2, n_dot_g):
-    """Formation-factor lines and midpoint escape for the kept piece rows ``idx``.
-
-    The escape distance is affine on each piece row (``_setup`` split the
-    segments), so its end values give the midpoint phase distance
-    ``(L_start + L_end)/2``, the refractive slope ``half_dL``, and the
-    attenuation ``tau = mu L`` at both ends. The sinc centre and width are the
-    VACUUM ones: the in-medium part of the intra-piece phase slope is the
-    escape-path term, which ``half_dL`` carries.
-
-    Under exact recoil the centre and width are the exact vacuum root and
-    slope, and ``recoil_phase = (d_shift, g_shift)`` carries the exact
-    mismatch's extra phase over the electron's own age; every phased
-    consumer adds it to ``d`` and ``g.r``.
-    Returns ``(L_esc_mid, lines, recoil_phase)``.
-    Validation: coherent-formation-absorption, line-recoil-in-medium-root
-    """
-    L_start, L_end = (a[idx] for a in st.escape_ends)
-    denom_vac = st.denom_all[idx]
-    apb, bma, q = formation_coefficients(mu * L_start, mu * L_end, xp=xp)
-    E_c, a_c, d_shift, g_shift = _recoil_formation_line(
-        v_dot_g, denom_vac, t_L, st.gamma_all[idx], g2, n_dot_g, st.seg_t_mid[idx]
-    )
-    cxr_rows = _FormationLines(
-        (
-            E_c,
-            a_c,
-            0.5 * (L_end - L_start),
-            apb,
-            bma,
-            q,
-        )
-    )
-    return 0.5 * (L_start + L_end), cxr_rows, (d_shift, g_shift)
 
 
 def _formation_good(amp, t_L, cxr_rows, coefs):

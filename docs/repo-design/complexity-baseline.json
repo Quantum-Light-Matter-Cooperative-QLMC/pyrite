@@ -448,6 +448,16 @@
       "cc": 30
     },
     {
+      "path": "src/pyrite/montecarlo/spectrum/coherent_prologue_jit_kernel.py",
+      "name": "_coherent_prologue_kernel",
+      "cc": 24
+    },
+    {
+      "path": "src/pyrite/montecarlo/spectrum/coherent_prologue_jit_kernel.py",
+      "name": "run_coherent_prologue_kernel",
+      "cc": 30
+    },
+    {
       "path": "src/pyrite/montecarlo/spectrum/coherent_sample_certificates.py",
       "name": "row_derivative_bounds",
       "cc": 55
@@ -469,18 +479,8 @@
     },
     {
       "path": "src/pyrite/montecarlo/spectrum/coherent_stream_jit_kernel.py",
-      "name": "_coherent_prologue_kernel",
-      "cc": 24
-    },
-    {
-      "path": "src/pyrite/montecarlo/spectrum/coherent_stream_jit_kernel.py",
       "name": "_field_kernel_2e",
       "cc": 29
-    },
-    {
-      "path": "src/pyrite/montecarlo/spectrum/coherent_stream_jit_kernel.py",
-      "name": "run_coherent_prologue_kernel",
-      "cc": 30
     },
     {
       "path": "src/pyrite/montecarlo/spectrum/coherent_windows.py",

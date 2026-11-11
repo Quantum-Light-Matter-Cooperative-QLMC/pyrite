@@ -220,7 +220,7 @@ Effects of the exact root:
   is therefore scored as its complete symmetry orbit.
 - At MeV energies the shift falls to about $\hbar\omega/E$ for forward lines.
 
-`_kernels._RECOIL_HBARC_EV_ANG = 0` is the $\hbar\mathbf g\to0$ classical
+`cxr._recoil._RECOIL_HBARC_EV_ANG = 0` is the $\hbar\mathbf g\to0$ classical
 limit, a test hook only. `pyrite.materials.recoil` exposes the vacuum
 reference (`recoil_resonance_eV`, `recoil_mismatch_inv_ang`,
 `recoil_mismatch_slope`, `recoil_shift_fraction`).

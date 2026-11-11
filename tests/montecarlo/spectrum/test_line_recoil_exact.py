@@ -21,12 +21,9 @@ from pyrite.materials.recoil import (
     recoil_shift_fraction,
 )
 from pyrite.montecarlo import mc_cxr_spectrum
-from pyrite.montecarlo.spectrum.cxr import _kernels, _setup
-from pyrite.montecarlo.spectrum.cxr._kernels import (
-    _in_medium_kinematics,
-    _line_recoil_terms,
-    _recoil_slope_factor,
-)
+from pyrite.montecarlo.spectrum.cxr import _recoil, _setup
+from pyrite.montecarlo.spectrum.cxr._kernels import _in_medium_kinematics
+from pyrite.montecarlo.spectrum.cxr._recoil import _line_recoil_terms, _recoil_slope_factor
 from pyrite.montecarlo.transport import beta_from_keV
 from tests.helpers.recoil import mass_shell_root
 
@@ -100,7 +97,7 @@ def test_snell_root_differs_from_the_in_medium_mass_shell_only_at_mixed_order(ki
 
 def test_zero_hbar_hook_is_the_classical_snell_root(monkeypatch):
     """``hbar g -> 0``: recoil terms vanish and the classical root is bitwise kept."""
-    monkeypatch.setattr(_kernels, "_RECOIL_HBARC_EV_ANG", 0.0)
+    monkeypatch.setattr(_recoil, "_RECOIL_HBARC_EV_ANG", 0.0)
     for n_hat in DIRECTIONS:
         energy, slope, h, _, denom = _kernel_root(1e6, n_hat, 1e-5)
         v = np.sqrt(1.0 - 1.0 / (1.0 + 1e6 / M_E_EV) ** 2) * BEAM
@@ -203,7 +200,7 @@ def test_huang_2023_harmonic_defect_through_production_lines(monkeypatch):
     assert np.all(simulated > 15.0)
     assert abs(residual.mean()) <= 2.0 * sigma
 
-    monkeypatch.setattr(_kernels, "_RECOIL_HBARC_EV_ANG", 0.0)
+    monkeypatch.setattr(_recoil, "_RECOIL_HBARC_EV_ANG", 0.0)
     _, classical, _ = _huang_defects(classical=True)
     assert np.all(np.abs(classical) < 1.0)  # refraction only
     assert (measured - classical).mean() > 10.0 * sigma
@@ -226,7 +223,7 @@ SHI_FORWARD = [(1, 1, 1), (-1, 1, 1), (1, -1, 1), (-1, -1, 1)]
 def _si_lines(T_keV, length, theta_deg, rows, monkeypatch, *, classical=False):
     _vacuum(monkeypatch)
     if classical:
-        monkeypatch.setattr(_kernels, "_RECOIL_HBARC_EV_ANG", 0.0)
+        monkeypatch.setattr(_recoil, "_RECOIL_HBARC_EV_ANG", 0.0)
     th = np.radians(theta_deg)
     n_hat = np.array([np.sin(th), 0.0, np.cos(th)])
     lattice = CRYSTALS["silicon"]["lattice"]

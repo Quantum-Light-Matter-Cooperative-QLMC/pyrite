@@ -242,9 +242,9 @@ def test_stream_grouped_kernel_formation_mode_matches_the_reference(epb):
 
 
 def _run_prologue(d, *, L_esc, L_start=None, L_end=None, **recoil):
+    from pyrite.montecarlo.spectrum.coherent_prologue_jit_kernel import run_coherent_prologue_kernel
     from pyrite.montecarlo.spectrum.coherent_stream_jit_kernel import (
         CoherentStreamKernelConfig,
-        run_coherent_prologue_kernel,
     )
 
     G, ES, EP = d["G"], d["ES"], d["EP"]
@@ -292,7 +292,7 @@ def test_prologue_exact_recoil_matches_the_cpu_formation_line():
     far above float32 resolution. Validation: line-recoil-in-medium-root
     """
     from pyrite.materials.crystal import HBARC_EV_ANG, M_E_EV
-    from pyrite.montecarlo.spectrum.cxr._kernels import _recoil_formation_line
+    from pyrite.montecarlo.spectrum.cxr._recoil import _recoil_formation_line
     from tests.montecarlo.spectrum.test_xray_dispersion_cuda import _prologue_inputs
 
     d = _prologue_inputs()

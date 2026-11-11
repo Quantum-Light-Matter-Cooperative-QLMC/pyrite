@@ -103,13 +103,13 @@ def _direct(segments, population, **kwargs):
 
 def test_distinct_pair_power_matches_two_delayed_fields(monkeypatch):
     from pyrite.materials.crystal import HBARC_EV_ANG
-    from pyrite.montecarlo.spectrum.cxr import _kernels
+    from pyrite.montecarlo.spectrum.cxr import _recoil
 
     # The delay is put on the electron's own age at a fixed position, which
     # is a time translation only classically: the exact-recoil phase
     # accumulates over that age (line-recoil-in-medium-root). The N**2
     # population algebra under test is recoil independent, so take hbar -> 0.
-    monkeypatch.setattr(_kernels, "_RECOIL_HBARC_EV_ANG", 0.0)
+    monkeypatch.setattr(_recoil, "_RECOIL_HBARC_EV_ANG", 0.0)
     segments = _straight_bunch(2)
     delay = 1.0
     segments["t_ang"][1] = delay

@@ -3,6 +3,11 @@
 Validation: `line-recoil-in-medium-root`.
 Ledger row: [`line-recoil-in-medium-root`](../ledger-core-coherent-physics.md#line-recoil-in-medium-root).
 
+After the verification below (at `85c4ce537`), the recoil helpers moved unchanged
+from `cxr/_kernels.py` to `cxr/_recoil.py`, and the CUDA prologue from
+`coherent_stream_jit_kernel.py` to `coherent_prologue_jit_kernel.py`, to meet
+source line budgets. File:line citations in that section refer to that commit.
+
 Issue #1099 (option A of #527) moves every production PXR/CBS line onto the
 exact recoil root. This page derives the root used by the production routes and
 its lineshape slope. It also records which terms are dropped and how the
@@ -117,7 +122,7 @@ accumulated over the age is carried by two cancellation-free terms:
 - $\mathbf g\cdot\mathbf r\to\mathbf g\cdot\mathbf r+\kappa(x\,\mathbf v\cdot\mathbf g-r_{\rm num})t$.
 
 They use $\kappa-1=\kappa x$ (`_recoil_formation_line`; CUDA twin
-`coherent_stream_jit_kernel.py::_coherent_prologue_kernel`). The age is the
+`coherent_prologue_jit_kernel.py::_coherent_prologue_kernel`). The age is the
 electron's own segment-midpoint age. The bunch arrival time enters separately
 through the inter-electron phase.
 

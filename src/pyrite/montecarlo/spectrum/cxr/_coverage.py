@@ -20,9 +20,8 @@ from ..reflection_rows import MIN_RESONANCE_EV
 from ._kernels import (
     _cxr_emission_ceiling,
     _in_medium_kinematics,
-    _line_recoil_terms,
-    _recoil_line_allowed,
 )
+from ._recoil import _line_recoil_terms, _recoil_line_allowed
 
 
 class LineOpticalDataWarning(UserWarning):

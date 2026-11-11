@@ -396,9 +396,9 @@ def _prologue_inputs():
 
 
 def _run_prologue(d, *, delta_tab=None):
+    from pyrite.montecarlo.spectrum.coherent_prologue_jit_kernel import run_coherent_prologue_kernel
     from pyrite.montecarlo.spectrum.coherent_stream_jit_kernel import (
         CoherentStreamKernelConfig,
-        run_coherent_prologue_kernel,
     )
 
     medium = delta_tab is not None
@@ -506,9 +506,7 @@ def test_prologue_rejects_a_hoisted_half_width_under_the_medium():
 
 
 def _run_prologue_raw(d, *, delta_tab, aw_seg):
-    from pyrite.montecarlo.spectrum.coherent_stream_jit_kernel import (
-        run_coherent_prologue_kernel,
-    )
+    from pyrite.montecarlo.spectrum.coherent_prologue_jit_kernel import run_coherent_prologue_kernel
 
     return run_coherent_prologue_kernel(
         cp.asarray(d["v"]).reshape(-1),
