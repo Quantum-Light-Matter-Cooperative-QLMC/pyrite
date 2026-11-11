@@ -103,13 +103,14 @@ Crystal-only quantum-channeling properties (ADR-0018, #503; Bloch/entry moved to
 - Public: `planar_profile`, `PlanarProfile`, `thermal_b_factor`, `debye_b_factor`, `debye_integral`, `fit_debye_temperature`, `load_thermal_sites`, `ThermalSite`, `ChannelingDataError`. Deps: `materials.atomic`, `materials.crystal`, `DATA_DIR`, NumPy, SciPy; no Monte Carlo imports.
 
 ## `materials/recoil.py`
-Provisional exact vacuum line-recoil reference: physical positive-mass-shell
-photon roots, fixed-momentum energy mismatch and its stable derivative Jacobian.
-Paired NumPy broadcasting. Read only by the record-only line coverage screen
-(`spectrum/cxr/_coverage.py`); no production scorer or `photon_energies`
-selection, medium/interface model, quantum amplitude or arbitrary-trajectory
-coherence.
-Ledger: `line-recoil-resonance`, `line-recoil-formation`, `line-recoil-validity-screen`.
+Exact vacuum line-recoil reference: physical positive-mass-shell photon roots,
+fixed-momentum energy mismatch and its stable derivative Jacobian. Paired NumPy
+broadcasting. `materials.emission.photon_energies` uses its root by default
+(`recoil=False` is classical). The production line kernels carry their own
+array form of the same root in `spectrum/cxr/_kernels.py` (`_line_recoil_terms`
+and siblings, first-order Snell, `line-recoil-in-medium-root`, #1099). No
+quantum amplitude or arbitrary-trajectory coherence.
+Ledger: `line-recoil-resonance`, `line-recoil-formation`, `line-recoil-validity-screen`, `line-recoil-in-medium-root`.
 - Entry points: `recoil_resonance_eV`, `recoil_shift_fraction`, `recoil_mismatch_inv_ang`, `recoil_mismatch_slope`.
 - Deps: `materials.crystal` (shared constants), NumPy.
 
