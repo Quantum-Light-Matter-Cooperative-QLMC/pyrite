@@ -674,6 +674,7 @@ def tds_kernel(
     n_cells: int = DEFAULT_CELLS,
     max_order: int = DEFAULT_MAX_ORDER,
     beam_uvw=None,
+    out_of_plane_ang: float = 0.0,
 ) -> ScatteringKernel:
     """Return the Einstein-model thermal diffuse scattering kernel.
 
@@ -694,7 +695,13 @@ def tds_kernel(
     Limits: ``T -> 0`` keeps only zero-point TDS; ``a -> 0`` gives ``C = 0``;
     ``C ∝ 1/v^2``, so ``W ∝ 1/v`` with no ``gamma``.
 
-    Validation: cr-lindblad-jump-operators
+    ``out_of_plane_ang = eta > 0`` returns the out-of-plane transform used by
+    :mod:`.exit_out_of_plane`: the jump (gain) part carries ``cos(q_y eta)``,
+    the Fourier factor of the out-of-plane momentum ``q_y`` each jump adds,
+    while the diagonal (loss) is unchanged. That kernel is not positive
+    semidefinite and is not a Lindblad generator on its own.
+
+    Validation: cr-lindblad-jump-operators, cr-planar-exit-out-of-plane
     """
     _check_grid(n_cells, max_order)
     hbar_v = _kinematics(kinetic_energy_eV)
@@ -709,7 +716,7 @@ def tds_kernel(
     bins = _transfer_bins(n_cells, max_order)
     sub, sub_w = _GL[2]
     p = (bins[:, None] * width + 0.5 * width * sub[None, :]).ravel()
-    q_y = _panels(_geometric_edges(0.05, _Q_MAX_INV_ANG), 8)
+    q_y = _out_of_plane_panels(_geometric_edges(0.05, _Q_MAX_INV_ANG), out_of_plane_ang)
     size = 2 * max_order + 1
     kernel = np.zeros((n_cells, size, size), dtype=complex)
     residue = bins % n_cells
@@ -809,6 +816,21 @@ def _oscillatory_panels(edges: np.ndarray, delta: float):
     return q, w
 
 
+def _out_of_plane_panels(edges: np.ndarray, eta_ang: float, order: int = 8):
+    """``q_y`` nodes and weights for ``int dq_y f(q_y) cos(q_y eta)`` over ``edges``.
+
+    ``eta = 0`` returns the plain composite rule. Otherwise the panels and tail
+    taper of :func:`_oscillatory_panels` resolve the cosine, and the weights
+    carry ``cos(q_y eta)``.
+    """
+    if eta_ang < 0.0 or not np.isfinite(eta_ang):
+        raise ValueError("out_of_plane_ang must be finite and non-negative")
+    if eta_ang == 0.0:
+        return _panels(edges, order)
+    q, w = _oscillatory_panels(np.asarray(edges, dtype=float), eta_ang)
+    return q, w * np.cos(q * eta_ang)
+
+
 def _close_loss_nodes(channels: ElectronicChannels):
     """Loss nodes and weights over every close range, split at each shell's edges."""
     lower = float(np.min(channels.close_lower_eV))
@@ -889,6 +911,7 @@ def electronic_kernel(
     oscillators: MaterialShellOscillators | None = None,
     valence=None,
     c_axis: str | None = None,
+    out_of_plane_ang: float = 0.0,
 ) -> ScatteringKernel:
     """Return the local-density electronic-excitation kernel.
 
@@ -914,7 +937,11 @@ def electronic_kernel(
     diffusion ``int w(q) (1 - cos q_x Delta)``; ``q -> 0`` jumps do not
     decohere.
 
-    Validation: cr-lindblad-jump-operators, cr-valence-directional-loss
+    ``out_of_plane_ang`` weights the jump part by ``cos(q_y eta)`` and keeps
+    the full loss diagonal, as in :func:`tds_kernel`.
+
+    Validation: cr-lindblad-jump-operators, cr-valence-directional-loss,
+    cr-planar-exit-out-of-plane
     """
     _check_grid(n_cells, max_order)
     hbar_v = _kinematics(kinetic_energy_eV)
@@ -942,7 +969,9 @@ def electronic_kernel(
     centre_x, centre_w = _panels(_geometric_edges(q_floor, 0.5 * width, 1.5), 8)
     centre_p = np.concatenate([-centre_x, centre_x])
     centre_pw = np.concatenate([centre_w, centre_w])
-    q_y, q_yw = _panels(_geometric_edges(q_floor, _Q_MAX_INV_ANG, 1.5), 8)
+    q_y, q_yw = _out_of_plane_panels(
+        _geometric_edges(q_floor, _Q_MAX_INV_ANG, 1.5), out_of_plane_ang
+    )
     # Abel-type weights onto the log-q table: A[l, t] = int_bin dp int dq_y w(q) hat_t(q).
     abel = np.zeros((bins.size, root.log_q.size))
     for index, (nodes, node_w) in enumerate(zip(p, p_w, strict=True)):

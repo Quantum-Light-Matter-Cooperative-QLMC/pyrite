@@ -1,0 +1,179 @@
+"""Out-of-plane-resolved planar exit distribution (cr-planar-exit-out-of-plane)."""
+
+from dataclasses import replace
+
+import numpy as np
+import pytest
+from scipy import integrate
+
+from pyrite.materials.channeling import planar_profile
+from pyrite.montecarlo.channeling import DensityMatrixSolver, electronic_kernel, tds_kernel
+from pyrite.montecarlo.channeling import operators as op
+from pyrite.montecarlo.channeling.exit_angular import open_exit_distribution
+from pyrite.montecarlo.channeling.exit_out_of_plane import (
+    eta_nodes,
+    exit_cut,
+    local_contrast,
+    out_of_plane_exit_cut,
+    out_of_plane_kernel,
+    propagate_batch,
+)
+
+ENERGY = 4e6
+GRID = {"n_cells": 8, "max_order": 4}
+
+
+@pytest.fixture(scope="module")
+def si110():
+    return planar_profile("silicon", (1, 1, 0), 293.15)
+
+
+def _in_band_trace(kernel):
+    return float(np.einsum("rii->", kernel.momentum_kernel).real)
+
+
+def _p_range(profile, n_cells, max_order):
+    width = profile.g_inv_ang / n_cells
+    return (-max_order * n_cells - 0.5) * width, ((max_order + 1) * n_cells - 0.5) * width
+
+
+def test_zero_eta_is_the_default_kernel_and_eta_keeps_the_loss(si110):
+    for build in (tds_kernel, electronic_kernel):
+        default = build(si110, ENERGY, **GRID)
+        zero = build(si110, ENERGY, **GRID, out_of_plane_ang=0.0)
+        np.testing.assert_array_equal(zero.momentum_kernel, default.momentum_kernel)
+        shifted = build(si110, ENERGY, **GRID, out_of_plane_ang=2.0)
+        np.testing.assert_array_equal(shifted.diagonal_coefficients, default.diagonal_coefficients)
+        # |cos(q_y eta)| <= 1 lowers the in-band gain (it may change sign).
+        assert abs(_in_band_trace(shifted)) < _in_band_trace(default)
+    with pytest.raises(ValueError, match="out_of_plane_ang"):
+        tds_kernel(si110, ENERGY, **GRID, out_of_plane_ang=-1.0)
+
+
+@pytest.mark.parametrize("eta", [0.0, 0.7, 3.0])
+def test_tds_transform_trace_matches_fourier_cosine_quadrature(si110, eta):
+    # Independent: the in-band G = 0 gain is
+    # n_0/(2 pi hbar v)^2 int dp int dq_y v(q)^2 (1 - e^{-a^2 q^2}) cos(q_y eta),
+    # with the q_y half-line done by QUADPACK's Fourier-cosine rule (QAWF).
+    grid = {"n_cells": 8, "max_order": 1}
+    kernel = tds_kernel(si110, ENERGY, **grid, out_of_plane_ang=eta)
+    a2 = op._transverse_covariances(si110)["Si"][0]
+    n0 = float(op._site_densities(si110, 0)["Si"][0].real)
+    hbar_v = op._kinematics(ENERGY)
+
+    def inner(p):
+        def f(q_y):
+            q = np.hypot(p, q_y)
+            return op._potential("Si", q) ** 2 * -np.expm1(-a2 * q**2)
+
+        if eta == 0.0:
+            return integrate.quad(f, 0.0, np.inf, limit=400)[0]
+        return integrate.quad(f, 0.0, np.inf, weight="cos", wvar=eta, limlst=200)[0]
+
+    lo, hi = _p_range(si110, **grid)
+    edges = np.linspace(lo, hi, 2 * (2 * grid["max_order"] + 1) * grid["n_cells"] + 1)
+    nodes, weights = np.polynomial.legendre.leggauss(6)
+    total = 0.0
+    for a, b in zip(edges[:-1], edges[1:], strict=True):
+        p = 0.5 * (a + b) + 0.5 * (b - a) * nodes
+        total += 0.5 * (b - a) * weights @ np.array([inner(x) for x in p])
+    expected = n0 * 2.0 * total / (2.0 * np.pi * hbar_v) ** 2
+    assert _in_band_trace(kernel) == pytest.approx(expected, rel=2e-3)
+
+
+def test_batch_integrator_matches_density_solver(si110):
+    kernel = tds_kernel(si110, ENERGY, **GRID) + electronic_kernel(si110, ENERGY, **GRID)
+    solver = DensityMatrixSolver(si110, ENERGY, kernel)
+    rho, _, _ = solver.entry_state(0.0, 3e-4)
+    shifted = out_of_plane_kernel(si110, ENERGY, 1.5, **GRID)
+    cells = np.stack([solver._cell_kernel0, shifted.cell_kernel(solver.n_grid)])
+    weights = propagate_batch(solver, cells, rho, [200.0, 400.0], 20.0)
+    assert weights.shape == (2, 2, GRID["n_cells"], 2 * GRID["max_order"] + 1)
+    for index, depth in enumerate((200.0, 400.0)):
+        reference = open_exit_distribution(solver, depth, 20.0, divergence_rad=3e-4)
+        np.testing.assert_allclose(weights[index, 0].ravel(), reference.weights, atol=1e-12)
+    # The eta transform redistributes in kappa_y only: never above the marginal.
+    assert weights[1, 1].sum() < weights[1, 0].sum()
+
+
+def test_zero_kernel_cut_is_the_gaussian_peak(si110):
+    kernel = tds_kernel(si110, ENERGY, **GRID)
+    zero = replace(
+        kernel,
+        momentum_kernel=0.0 * kernel.momentum_kernel,
+        diagonal_coefficients=0.0 * kernel.diagonal_coefficients,
+    )
+    solver = DensityMatrixSolver(si110, ENERGY, zero)
+    sigma = 3e-4
+    eta, eta_w = eta_nodes(sigma, ENERGY)
+    rho, _, _ = solver.entry_state(0.0, sigma)
+    one = propagate_batch(solver, solver._cell_kernel0[None], rho, 400.0, 20.0)[0]
+    weights = np.broadcast_to(one, (eta.size,) + one.shape[1:])
+    for theta_y in (0.0, sigma):
+        cut = exit_cut(solver, weights, eta, eta_w, sigma, theta_y)
+        peak = np.exp(-0.5 * (theta_y / sigma) ** 2) / (np.sqrt(2.0 * np.pi) * sigma)
+        np.testing.assert_allclose(cut.density_per_rad, peak * one.ravel(), rtol=1e-6, atol=1e-9)
+    assert cut.marginal.total + cut.marginal.unresolved == pytest.approx(1.0)
+
+
+def test_cut_marginal_is_the_open_exit_distribution(si110):
+    cut = out_of_plane_exit_cut(
+        si110,
+        ENERGY,
+        400.0,
+        20.0,
+        divergence_rad=6e-4,
+        mechanisms=("tds",),
+        eta_steps_ang=(0.25, 1.0, 4.0),
+        **GRID,
+    )
+    solver = DensityMatrixSolver(si110, ENERGY, tds_kernel(si110, ENERGY, **GRID))
+    reference = open_exit_distribution(solver, 400.0, 20.0, divergence_rad=6e-4)
+    np.testing.assert_allclose(cut.marginal.weights, reference.weights, atol=1e-12)
+    np.testing.assert_allclose(cut.angles_rad, reference.angles_rad, rtol=1e-12)
+    assert np.all(cut.density_per_rad > -1e-9)
+
+
+def test_local_contrast_on_a_comb():
+    spacing = 1e-3
+    angles = np.arange(-64, 65) * spacing / 16
+    weights = np.ones_like(angles)
+    weights[np.isclose(angles, spacing)] = 3.0
+    assert local_contrast(angles, weights, spacing, 1) == pytest.approx(3.0)
+    assert local_contrast(angles, weights, spacing, 0) == pytest.approx(1.0)
+    with pytest.raises(ValueError, match="inner"):
+        local_contrast(angles, weights, spacing, 0, inner=0.4, outer=0.3)
+
+
+def test_eta_nodes_cover_the_gaussian():
+    eta, weights = eta_nodes(1.75e-4, 1.36e6)
+    assert eta[0] == 0.0 and weights[0] == 0.0 and np.all(np.diff(eta) > 0.0)
+    # Panels end at eta_max = 5 / (p sigma); the Gaussian factor integrates exactly.
+    p = np.sqrt(1.36e6 * (1.36e6 + 2 * 510998.95)) / 1973.2698
+    width = 1.0 / (p * 1.75e-4)
+    assert weights @ np.exp(-0.5 * (eta / width) ** 2) == pytest.approx(
+        np.sqrt(np.pi / 2) * width, rel=1e-5
+    )
+    with pytest.raises(ValueError):
+        eta_nodes(0.0, 1.36e6)
+
+
+def test_cupy_batch_matches_numpy(si110):
+    cp = pytest.importorskip("cupy")
+    try:
+        if cp.cuda.runtime.getDeviceCount() < 1:
+            pytest.skip("no CUDA device")
+    except Exception as exc:  # pragma: no cover - driver dependent
+        pytest.skip(f"CUDA unavailable: {exc}")
+    kernel = tds_kernel(si110, ENERGY, **GRID) + electronic_kernel(si110, ENERGY, **GRID)
+    solver = DensityMatrixSolver(si110, ENERGY, kernel)
+    rho, _, _ = solver.entry_state(0.0, 3e-4)
+    cells = np.stack(
+        [
+            solver._cell_kernel0,
+            out_of_plane_kernel(si110, ENERGY, 2.0, **GRID).cell_kernel(solver.n_grid),
+        ]
+    )
+    cpu = propagate_batch(solver, cells, rho, 400.0, 20.0)
+    gpu = propagate_batch(solver, cells, rho, 400.0, 20.0, xp=cp)
+    np.testing.assert_allclose(gpu, cpu, atol=1e-12)
