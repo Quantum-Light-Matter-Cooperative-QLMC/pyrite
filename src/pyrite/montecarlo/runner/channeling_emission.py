@@ -47,8 +47,11 @@ def case_channeling_spectrum(case, transport) -> np.ndarray:
     misses and the line-scoring energy cutoff censor the expected source.
     They censor electron paths only; photon absorption assumes an infinite
     lateral slab, so side-escaping photon geometries are outside this model.
+    The source scores bound→bound, capture and the in-cut free→free block
+    (``final_states="tracked"``); native line scoring drops the plane's own
+    reciprocal row on zone rows, so the two never overlap (#1055).
 
-    Validation: cr-persisted-channel
+    Validation: cr-persisted-channel, cr-planar-zone-row-ownership
     """
     refuse_axial_channeling(case)
     if "channeling" not in transport["segs"] or "channeling_beam_dir" not in transport:
@@ -117,6 +120,9 @@ def case_channeling_spectrum(case, transport) -> np.ndarray:
         layers=[(0.0, float(case["thickness_ang"]), case["composition"])],
         surface_normal=frame[2],
         path_limits_ang=limits,
+        # The zone source owns the plane's own-row emission on zone rows,
+        # including the in-cut free->free block (#1055).
+        final_states="tracked",
     )
     return result.spectrum
 

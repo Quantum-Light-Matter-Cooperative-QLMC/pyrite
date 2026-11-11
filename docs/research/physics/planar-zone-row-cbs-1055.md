@@ -6,8 +6,10 @@ orphan: true
 
 **Status:** research evidence for #1055 and
 [`cr-planar-free-free-block`](../../validation/ledger-channeling.md#cr-planar-free-free-block).
-This note records a measurement. It changes no production rule; the ownership
-decision belongs to the maintainer (#1055 Plan item 4).
+This note records the measurement behind the ownership rule. The maintainer
+chose option 3 below; it is implemented as
+[`cr-planar-zone-row-ownership`](../../validation/ledger-channeling.md#cr-planar-zone-row-ownership)
+(`CHANNELING_MODEL` v6).
 
 ## Question
 

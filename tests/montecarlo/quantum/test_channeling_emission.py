@@ -670,3 +670,34 @@ def test_nearly_free_line_sits_at_the_quantum_cbs_energy(wide_solver, si110):
     )
     peak = grid[np.argmax(result.free_free_spectrum)]
     assert peak == pytest.approx(expected, rel=0.03)
+
+
+def test_tracked_partition_is_exact_when_a_final_band_straddles_the_barrier(si110):
+    # At 12.5 MeV a final band is bound in some Bloch blocks and free in
+    # others, so capture and free -> free rows share (upper, lower). Grouping
+    # them together (before the fix) changed the capture widths and modes.
+    from pyrite.montecarlo.channeling.emission import KIND_FREE_FREE
+
+    energy = 12.5e6
+    kernel = tds_kernel(si110, energy, **GRID) + electronic_kernel(si110, energy, **GRID)
+    solver = DensityMatrixSolver(si110, energy, kernel, margin_eV=300.0)
+    bound = solver.basis.energies < solver.barrier_eV
+    assert np.any(bound.any(axis=0) & ~bound.all(axis=0))  # a straddling band
+    base = emission_lines(solver)
+    tracked = emission_lines(solver, final_states="tracked")
+    old = tracked.kind != KIND_FREE_FREE
+    for name in ("block", "kind", "upper", "lower", "delta_eV", "hwhm_eV", "strength_per_ang"):
+        np.testing.assert_array_equal(getattr(tracked, name)[old], getattr(base, name))
+    assert all(
+        len({int(tracked.kind[line] == KIND_FREE_FREE) for line in group.lines}) == 1
+        for group in tracked.groups
+    )
+    energies = np.linspace(3e3, 40e3, 149)
+    for incidence in (0.0, 1e-3):
+        options = dict(incidence_rad=incidence, dz_ang=1000.0, sample_ang=2000.0)
+        a = channeling_spectrum(solver, 4000.0, energies, 0.0, **options)
+        b = channeling_spectrum(solver, 4000.0, energies, 0.0, final_states="tracked", **options)
+        np.testing.assert_array_equal(b.capture_spectrum, a.capture_spectrum)
+        np.testing.assert_allclose(
+            b.spectrum - b.free_free_spectrum, a.spectrum, rtol=0.0, atol=1e-12 * b.spectrum.max()
+        )

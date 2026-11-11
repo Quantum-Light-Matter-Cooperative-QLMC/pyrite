@@ -1,7 +1,7 @@
 """#994 milestone 4: calibrated axial fibre cases through the standard runner.
 
-No lookup entry is runnable in the repository yet (the adapter claim is not
-anchored), so the runner tests mark si-fibre/B runnable for themselves.
+Both calibrated entries are runnable. Admission-policy tests temporarily
+restrict the runnable set; source fixtures use the repository admission state.
 """
 
 from dataclasses import replace
@@ -63,9 +63,9 @@ def case_b():
     return fibre_case("B")
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def runnable_b():
-    """Module-wide stand-in for the repository marking si-fibre/B runnable."""
+    """Restrict admission to si-fibre/B for one policy test."""
     with pytest.MonkeyPatch.context() as patch:
         patch.setattr(_axial_envelope, "RUNNABLE_AXIAL_CASES", frozenset({"si-fibre/B"}))
         yield
@@ -190,7 +190,7 @@ def test_axis_must_be_the_slab_normal(case_b):
 
 
 @pytest.fixture(scope="module")
-def produced(case_b, runnable_b):
+def produced(case_b):
     transport = runner._transport_case(case_b)
     return transport, runner._spectrum_case(case_b, transport)
 
@@ -348,10 +348,8 @@ def test_native_line_rows_keeps_other_cases_and_refuses_an_untagged_axial_transp
 def produced_a():
     """Tilted si-fibre/A: its zone rows are off axis, so native lines would score."""
     case = fibre_case("A")
-    with pytest.MonkeyPatch.context() as patch:
-        patch.setattr(_axial_envelope, "RUNNABLE_AXIAL_CASES", frozenset({"si-fibre/A"}))
-        transport = runner._transport_case(case)
-        yield case, transport, runner._spectrum_case(case, transport)
+    transport = runner._transport_case(case)
+    return case, transport, runner._spectrum_case(case, transport)
 
 
 @pytest.mark.slow

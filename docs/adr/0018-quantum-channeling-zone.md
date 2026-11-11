@@ -111,6 +111,15 @@ whose long-wavelength bound→bound limit is the dipole rate.
   separate spectral component (`cr-capture-yield`).
 - Free→free transitions are coherent bremsstrahlung (CBS), which the PXR/CBS
   kernel already produces, so they are never scored here.
+  *Outcome (#1055, maintainer decision 2026-11-10):* superseded for the zone.
+  The native kernel scored zone rows as free plane waves at the beam angle and
+  counted the zone twice: 5.4× the in-cut free→free block for Si(110) at
+  0.8 mrad, 17 MeV, more than the whole CR yield. Native PXR/CBS now drops the
+  plane's own reciprocal row on zone rows; other rows stay native. The
+  persisted source scores the in-cut free→free block between tracked
+  above-barrier states (`cr-planar-free-free-block`,
+  `cr-planar-zone-row-ownership`); above-cut free→free stays unscored.
+  Handed-off electrons keep native CBS.
 - Squaring per-trajectory field amplitudes across MCWF trajectories is not a
   valid estimator.
 
@@ -195,8 +204,9 @@ planar tier. Each outcome below is recorded with its ledger claim; see the
   free→free to CBS (`cr-axial-source-partition`). The Si evidence is compared
   with Andersen et al., NIM 194, 209 (1982); see the
   [#992 note](../research/physics/axial-material-source-992.md).
-- **Zone-row ownership (#994).** Unlike the planar tier, native PXR/CBS scores
-  no lines on axial zone rows, so the fibre source alone owns the zone's line
+- **Zone-row ownership (#994).** Native PXR/CBS scores
+  no lines on axial zone rows (the planar tier drops only the own reciprocal
+  row, #1055), so the fibre source alone owns the zone's line
   band. The in-cut free→free block that CBS would have carried is omitted and
   stored as a declared one-sided bound: 8.06% for A, 18.9% for B
   (`cr-axial-zone-row-native-lines`).

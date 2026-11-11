@@ -63,6 +63,7 @@ from .electron_blocks import (
 from .emission import optional_line_components
 from .fallbacks import spectrum_fallbacks
 from .oom import _maybe_free_pool, _SpectrumPhaseOOM
+from .planar_zone_lines import planar_zone_line_parts
 from .recovery import _spectrum_with_recovery, transport_with_recovery
 from .stage_chunks import _stage_counters
 from .step_budget import retry_step_budget
@@ -493,10 +494,12 @@ def _cxr_for_segments(
     count up to ``MAX_ELECTRON_BLOCKS``, then re-raises to the spectrum phase's
     chunk-halving retry. A case that fits runs as one unchanged call; coherent
     sums, which may couple electrons, are never split. Mixed-transport cases
-    refuse here, the one entry every CXR route shares (#990), and an axial
-    fibre case drops its zone rows here (#994).
+    refuse here, the one entry every CXR route shares (#990), an axial
+    fibre case drops its zone rows here (#994), and a planar channeling case
+    scores its own reciprocal row only on rows outside the zone (#1055,
+    :func:`.planar_zone_lines.planar_zone_line_parts`).
 
-    Validation: cr-axial-zone-row-native-lines
+    Validation: cr-axial-zone-row-native-lines, cr-planar-zone-row-ownership
     """
     from ..._mixed_elastic_policy import refuse_mixed_cxr
 
@@ -519,6 +522,21 @@ def _cxr_for_segments(
             n_hat,
             coherent=bool(case.get("coherent_emission", False)) if coherent is None else coherent,
             count=Ne,
+        )
+    parts = planar_zone_line_parts(case, segs)
+    if parts is not None:  # planar zone rows: own-row lines belong to spec_channeling (#1055)
+        return _score_line_parts(
+            parts,
+            E_grid,
+            n_hat,
+            abs_layers,
+            groove,
+            coherent=coherent,
+            Ne=Ne,
+            table_cache=table_cache,
+            truncation_audit=truncation_audit,
+            temporal=temporal,
+            coefficient_capture=coefficient_capture,
         )
     once = partial(
         _cxr_for_segments_once,
@@ -566,6 +584,21 @@ def _cxr_for_segments(
             restore_audit(truncation_audit, saved)
             BACKEND.release_memory()
             n_blocks = min(MAX_ELECTRON_BLOCKS, 2 * n_blocks)
+
+
+def _score_line_parts(parts, E_grid, n_hat, abs_layers, groove, **options):
+    """Sum :func:`_cxr_for_segments` over incoherent ``(case, rows)`` parts.
+
+    Reflections never interfere, so splitting them between row sets adds.
+    Audits, temporal profiles and coefficient collectors accumulate.
+
+    Validation: cr-planar-zone-row-ownership
+    """
+    spec = None
+    for part_case, part_segs in parts:
+        part = _cxr_for_segments(part_segs, E_grid, part_case, n_hat, abs_layers, groove, **options)
+        spec = part if spec is None else spec + part
+    return spec
 
 
 def _cxr_for_segments_once(

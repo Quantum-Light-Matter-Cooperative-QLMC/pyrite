@@ -24,8 +24,10 @@ final state and are degenerate within their widths, ``d_c = sum a_fi
 ``rho`` is block-diagonal in Bloch ``k``. Scored transitions end on bound
 states: bound -> bound lines and free -> bound radiative capture from the
 above-barrier states the solver tracks (maintainer decision 2026-10-15,
-reversing v1's bound -> bound-only rule for capture). Free -> free is
-coherent bremsstrahlung (PXR/CBS kernel) and is never scored. Per-trajectory
+reversing v1's bound -> bound-only rule for capture). Free -> free between
+tracked states is scored only by the ``final_states="tracked"`` catalog, which
+the persisted planar source uses because native PXR/CBS drops the plane's own
+row on zone rows (#1055). Per-trajectory
 MCWF field amplitudes are never squared.
 
 **Line shape.** The radiating coherences ``<f_k|rho|i_k>`` of one transition
@@ -303,6 +305,11 @@ def _gauge(amplitude: Any) -> complex:
     return complex(amplitude) if amplitude != 0 else 1.0 + 0j
 
 
+def _group_key(item) -> tuple[int, int, bool]:
+    """Line-group key: band pair and whether the row is free -> free."""
+    return (item["upper"], item["lower"], item["kind"] == KIND_FREE_FREE)
+
+
 def _block_transitions(solver, block, initial_ok, final_ok, bound, shifted, gamma_step):
     """Lowering transitions of one Bloch block with their rates and kinds.
 
@@ -457,12 +464,16 @@ def emission_lines(
                 pairs.extend(item for item in subset if item["rate"] >= floor)
 
     # 2. coherence-transfer generator per (upper, lower) across blocks
-    by_pair: dict[tuple[int, int], list[int]] = {}
+    # Free -> free rows form their own groups: where a final band straddles
+    # the barrier across blocks, its capture and free -> free rows share
+    # (upper, lower) but must not share coherence-transfer modes, so the
+    # bound and capture groups stay those of the default catalog (#1055).
+    by_pair: dict[tuple[int, int, bool], list[int]] = {}
     for index, item in enumerate(pairs):
-        by_pair.setdefault((item["upper"], item["lower"]), []).append(index)
-    generators: dict[tuple[int, int], np.ndarray] = {}
+        by_pair.setdefault(_group_key(item), []).append(index)
+    generators: dict[tuple[int, int, bool], np.ndarray] = {}
     for key, indices in by_pair.items():
-        upper, lower = key
+        upper, lower, _ = key
         matrix = np.zeros((len(indices), len(indices)), dtype=complex)
         blocks = [pairs[j]["block"] for j in indices]
         for col, j in enumerate(indices):
@@ -531,9 +542,9 @@ def emission_lines(
     # 4. line groups from the representatives
     groups: list[LineGroup] = []
     group_of = np.zeros(len(rows), dtype=int)
-    by_rep: dict[tuple[int, int], list[int]] = {}
+    by_rep: dict[tuple[int, int, bool], list[int]] = {}
     for line, row in enumerate(rows):
-        by_rep.setdefault((row["upper"], row["lower"]), []).append(line)
+        by_rep.setdefault(_group_key(row), []).append(line)
     for key, lines in by_rep.items():
         pair_blocks = [pairs[j]["block"] for j in by_pair[key]]
         position = [pair_blocks.index(rows[line]["block"]) for line in lines]
