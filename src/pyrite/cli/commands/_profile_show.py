@@ -58,14 +58,14 @@ def energy_grid_rows(document, target):
     elif sources["environment"]:
         line = "automatic (environment policy)"
     else:
-        line = "automatic for uncovered energies (built-in)"
+        line = "automatic for uncovered energies (default)"
     rows = [("line default", line)]
     if "E_grid_brem" in target:
         brem = _grid_summary(target["E_grid_brem"], brem=True) + " (profile)"
     else:
         start, stop, step = DEFAULT_BREM_GRID
         brem = _grid_summary({"arange": {"start": start, "stop": stop, "step": step}}, brem=True)
-        brem += " (built-in)"
+        brem += " (default)"
     rows.append(("brem default", brem))
     if policy and "E_grid_line" in target:
         rows.append(

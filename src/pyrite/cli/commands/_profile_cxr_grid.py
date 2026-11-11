@@ -15,6 +15,7 @@ from pyrite.cli import _completion as _cli_completion
 from pyrite.cli.commands._profile_shared import confirm_standard, write
 from pyrite.console import json as cli_json
 from pyrite.console.output import CLIError, emit_json_result, emit_result, output_option
+from pyrite.console.tables import emit_settings
 
 _SCHEMA = "cxr.profile.line-grid.show"
 
@@ -118,11 +119,9 @@ def cxr_grid_show_command(name, json_output):
         emit_json_result(cli_json.JsonResult(_SCHEMA, payload))
         return 0
     emit_result(f"[{name} cxr-grid policy]")
-    for row in payload["fields"]:
-        explicit_display = "unset" if row["explicit"] is None else row["explicit"]
-        emit_result(
-            f"  {row['key']}: {row['effective']} ({row['source']}); explicit: {explicit_display}"
-        )
+    emit_settings(
+        None, [(row["key"], row["effective"], row["source"]) for row in payload["fields"]]
+    )
     emit_result("cxr-grid source:")
     for line in _source_lines(payload["grid_source"]):
         emit_result(f"  {line}")

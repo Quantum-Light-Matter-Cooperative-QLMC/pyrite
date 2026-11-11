@@ -10,9 +10,10 @@ from pyrite.console import json as cli_json
 from pyrite.console.output import (
     CLIError,
     emit_json_result,
-    emit_result,
     output_option,
 )
+
+from ...console.tables import emit_object, emit_settings
 
 _COMMANDS = {
     "create": "pyrite.cli.commands.material_create.command",
@@ -151,26 +152,44 @@ def _show(material, profile_name, json_output, *, schema="cxr.material.show"):
     if json_output:
         emit_json_result(cli_json.JsonResult(schema, payload))
         return 0
-    emit_result(f"{material}: profile {profile_name}")
     identity = payload["identity"]
+    rows = []
     if identity is not None:
-        emit_result(f"  label: {identity['label']}")
-        emit_result(f"  formula: {identity['formula']}")
+        rows += [("label", identity["label"]), ("formula", identity["formula"])]
         if identity["phase"] is not None:
-            emit_result(f"  phase: {identity['phase']}")
+            rows.append(("phase", identity["phase"]))
         if identity["full_name"] is not None:
-            emit_result(f"  name: {identity['full_name']}")
+            rows.append(("name", identity["full_name"]))
         cut = _format_cut(identity)
         if cut is not None:
-            emit_result(f"  cut: {cut}")
+            rows.append(("cut", cut))
     definition = payload.get("definition")
-    if definition is not None:
-        emit_result(f"  source: {definition['source']}")
-        emit_result(f"  density: {definition['density_g_cm3']:g} g/cm³")
-        emit_result(f"  composition (atoms/angstrom³): {definition['composition']}")
-    for row in payload["ranges"]:
-        emit_result(f"  {row['name']}: [{_catalog_io.display(row['values'])}] ({row['source']})")
+    emit_object(
+        f"{material} in profile {profile_name}",
+        [*rows, *_definition_rows(definition)],
+        origin=None if definition is None else definition["source"],
+    )
+    emit_settings(
+        "Ranges",
+        [
+            (row["name"], f"[{_catalog_io.display(row['values'])}]", row["source"])
+            for row in payload["ranges"]
+        ],
+    )
     return 0
+
+
+def _definition_rows(definition):
+    if definition is None:
+        return []
+    return [
+        ("kind", definition["kind"]),
+        ("density", f"{definition['density_g_cm3']:g} g/cm³"),
+        *(
+            (f"composition.{element}", f"{value:g} atoms/angstrom³")
+            for element, value in definition["composition"].items()
+        ),
+    ]
 
 
 @click.group(
@@ -227,13 +246,16 @@ def show_command(material, json_output):
     if json_output:
         emit_json_result(cli_json.JsonResult(schema, payload))
     else:
-        emit_result(material)
-        if identity:
-            for key in ("label", "formula", "phase", "full_name"):
-                if identity.get(key) is not None:
-                    emit_result(f"  {key}: {identity[key]}")
-        if definition:
-            emit_result(f"  kind: {definition['kind']}\n  source: {definition['source']}")
-            emit_result(f"  density: {definition['density_g_cm3']:g} g/cm³")
-            emit_result(f"  composition (atoms/angstrom³): {definition['composition']}")
+        emit_object(
+            material,
+            [
+                *(
+                    (key, identity[key])
+                    for key in ("label", "formula", "phase", "full_name")
+                    if identity and identity.get(key) is not None
+                ),
+                *_definition_rows(definition),
+            ],
+            origin=None if not definition else definition["source"],
+        )
     return 0

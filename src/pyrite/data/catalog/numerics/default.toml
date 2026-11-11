@@ -4,7 +4,7 @@
 # adaptive sampling are deliberately absent so the selected fidelity and the
 # default adaptive policy keep applying. Clone it to start a custom preset:
 #   pyrite numerics create my-numerics --from default
-description = "Built-in defaults: midpoint integration without substeps, analytic 5-node mosaic quadrature; fidelity owns trial counts"
+description = "Built-in defaults: midpoint integration without substeps, analytic 5-node mosaic quadrature; history counts come from adaptive sampling unless a profile fixes them"
 energy_model = "midpoint"
 max_dE_frac = 0.0
 mosaic_nodes = 5

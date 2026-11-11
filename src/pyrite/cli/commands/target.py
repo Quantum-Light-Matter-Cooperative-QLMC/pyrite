@@ -19,6 +19,7 @@ from pyrite.console.output import (
     emit_result,
     output_option,
 )
+from pyrite.console.tables import emit_named_list, emit_object, flatten
 
 _ERRORS = (OSError, ValueError, ParseError)
 
@@ -144,11 +145,22 @@ def list_command(json_output):
     if json_output:
         emit_json_result(cli_json.JsonResult("cxr.target.list", {"targets": rows}))
         return 0
-    for row in rows:
-        emit_result(
-            f"{row['name']} ({row['kind']}, {row['material']}): "
-            f"{len(row['referenced_by'])} references [{row['source']}]"
-        )
+    emit_named_list(
+        (
+            (
+                row["name"],
+                row["source"],
+                row["kind"],
+                row["material"],
+                len({site.split(".", 1)[0] for site in row["referenced_by"]}),
+                row["description"],
+            )
+            for row in rows
+        ),
+        noun="target preset",
+        extra=("kind", "material"),
+        create_hint="pyrite target create NAME",
+    )
     return 0
 
 
@@ -175,13 +187,9 @@ def show_command(name, json_output):
     if json_output:
         emit_json_result(cli_json.JsonResult("cxr.target.show", payload))
         return 0
-    emit_result(f"target preset {name}:")
-    for key, value in payload["definition"].items():
-        emit_result(f"  {key}: {value}")
     sites = payload["referenced_by"]
-    emit_result(
-        "used by: " + (", ".join(f"{s['profile']}.{s['material']}" for s in sites) or "none")
-    )
+    used_by = ", ".join(f"{s['profile']}.{s['material']}" for s in sites) or "none"
+    emit_object(f"target {name}", [*flatten(payload["definition"]), ("used by", used_by)])
     if sites:
         emit_result("inherited profile geometry is unused for these materials")
     return 0

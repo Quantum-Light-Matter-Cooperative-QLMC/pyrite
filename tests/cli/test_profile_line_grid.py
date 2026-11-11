@@ -8,7 +8,7 @@ from pyrite.campaign.config import material_sweep
 from pyrite.cli import _catalog_io
 from pyrite.cli import command as root_command
 from pyrite.materials.catalog import load_material_catalog
-from tests.helpers.cli import assert_clean_result, assert_table_row, invoke
+from tests.helpers.cli import assert_clean_result, assert_row, assert_table_row, invoke
 from tests.helpers.user_catalog import copy_full_catalog
 
 _FULL_POLICY = {
@@ -65,9 +65,7 @@ def test_help_lists_selectors_defaults_combinations_and_identity():
 def test_show_reports_explicit_effective_and_grid_source(catalog):
     shown = _line_grid("show", "high_energy")
     assert_clean_result(shown)
-    assert "bandwidth: resonance-population (profile); explicit: resonance-population" in (
-        shown.stdout
-    )
+    assert_row(shown.stdout, "bandwidth", "resonance-population", "profile")
     assert "automatic resolution for every case" in shown.stdout
 
     default = _line_grid("show", "sub_100keV", "-o", "json")

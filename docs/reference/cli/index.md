@@ -8,5 +8,6 @@ consult the deprecation inventory when updating existing commands.
 :maxdepth: 1
 
 Command reference <../../repo-design/cli/cli-reference>
+Output vocabulary <../../repo-design/cli/cli-output>
 Deprecated commands <../../repo-design/cli/cli-deprecations>
 ```

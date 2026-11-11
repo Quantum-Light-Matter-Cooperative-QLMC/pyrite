@@ -9,8 +9,8 @@ precedence. This page covers the behavior of those settings together.
 
 ## Calculation numerics and presets
 
-`pyrite numerics show PROFILE` reports sampling, reflection/mosaic sampling and
-transport integration; `pyrite physics show PROFILE` reports interaction models
+`pyrite profile numerics show PROFILE` reports sampling, reflection/mosaic sampling and
+transport integration; `pyrite profile physics show PROFILE` reports interaction models
 and cutoffs. Each reports explicit and effective values and their sources.
 `set` writes profile fields; `reset` removes explicit fields; `--dry-run`
 previews without writing. Per-run overrides win over explicit profile values,
@@ -18,17 +18,17 @@ then named presets, then built-in workload/model defaults.
 
 Named physics presets hold emission, model selectors and physical cutoffs.
 Numerics presets hold scalar trial counts, integration, reflection/mosaic
-quadrature and optional precision and line-grid policies. Bundled presets are
+quadrature and optional adaptive-sampling and cxr-grid policies. Bundled presets are
 read-only. Clone one and attach it to an editable profile:
 
 ```bash
-pyrite physics preset create low-angle --from electron-standard
-pyrite physics preset set low-angle --elastic-model mott --straggling
+pyrite physics create low-angle --from electron-standard
+pyrite physics set low-angle --elastic-model mott --straggling
 pyrite profile set lab-scan --physics low-angle
-pyrite physics show lab-scan
+pyrite profile physics show lab-scan
 ```
 
-Numerics uses `pyrite numerics preset` and `profile set PROFILE --numerics NAME`.
+Numerics uses `pyrite numerics` and `profile set PROFILE --numerics NAME`.
 Explicit profile physics fields override their preset. Any profile sampling
 value supersedes the preset's entire sampling policy; fixed counts and adaptive
 stopping are never mixed. History-count presets hold scalar values; a profile can
@@ -53,7 +53,7 @@ sampling: target relative standard error 0.05 on line and bremsstrahlung yields,
 200–20,000 histories in blocks of 100, with heavy-tail guards. A case stops when
 watched yields meet targets and guards pass, or at the maximum with a
 statistics-limited flag. Both components use one transported population.
-`pyrite numerics adaptive-sampling show PROFILE` reports the policy, fixed counts,
+`pyrite profile numerics adaptive-sampling show PROFILE` reports the policy, fixed counts,
 blockers and line-grid source.
 
 Fixed counts apply when a profile or material override sets
@@ -65,10 +65,10 @@ Bundled `trajectory_demo`, `coherent_demo`, and detector demos provide bounded
 fixed-count examples; clone a demo before editing it.
 
 ```bash
-pyrite numerics adaptive-sampling enable lab-scan
-pyrite numerics adaptive-sampling set lab-scan --target-rse 0.02
-pyrite numerics adaptive-sampling show lab-scan
-pyrite numerics adaptive-sampling disable lab-scan --cxr-histories 500 --brem-histories 100
+pyrite profile numerics adaptive-sampling enable lab-scan
+pyrite profile numerics adaptive-sampling set lab-scan --target-rse 0.02
+pyrite profile numerics adaptive-sampling show lab-scan
+pyrite profile numerics adaptive-sampling disable lab-scan --cxr-histories 500 --brem-histories 100
 ```
 
 `enable` removes fixed profile counts, then stores supplied policy options;
@@ -84,8 +84,8 @@ profile to implicit adaptive sampling. It does not add fixed counts.
 existing ones; unspecified existing counts, including sweep grids, remain.
 Missing counts prompt on a terminal; non-interactive, `--yes` and `--dry-run`
 use the workload defaults (300 line, 150 brem). Setting counts with
-`numerics set` while a policy exists is refused; use `precision disable`.
-All precision commands support `--dry-run`.
+`profile numerics set` while a policy exists is refused; use
+`adaptive-sampling disable`. All adaptive-sampling commands support `--dry-run`.
 
 The minimum, maximum and optional pilot count must be block-size multiples.
 Default guards are maximum electron share 0.05, minimum effective electrons
@@ -127,7 +127,7 @@ Per-case line-grid precedence, highest first:
 4. Default automatic resolution when no stored row covers the energy.
 
 A policy changes line coordinates only; stored brem grids still apply.
-`pyrite numerics cxr-grid show PROFILE` displays sources; `set` changes
+`pyrite profile numerics cxr-grid show PROFILE` displays sources; `set` changes
 selectors and `reset` removes them. Cloning copies the policy; fresh creation
 does not set one. Policy edits enter dataset identity.
 

@@ -15,6 +15,7 @@ from pyrite.cli.commands._profile_shared import confirm_standard, write
 from pyrite.console import json as cli_json
 from pyrite.console import output as _output
 from pyrite.console.output import CLIError, emit_json_result, emit_result, output_option
+from pyrite.console.tables import emit_settings, value_source
 
 from .._deprecations import canonical_option, removed_option
 
@@ -282,21 +283,32 @@ def precision_show_command(name, json_output):
         emit_json_result(cli_json.JsonResult("cxr.profile.adaptive_sampling.show", payload))
         return 0
     if effective is None:
-        emit_result(f"[{name} adaptive-sampling] fixed history counts: {fixed_reason}")
-        if counts:
-            emit_result(f"  counts: {_profile_edit.describe_counts(counts)}")
+        emit_result(f"[{name} adaptive-sampling]  mode: fixed ({fixed_reason})")
+        rows = [
+            (flag, ",".join(str(value) for value in counts[key]), "profile")
+            for key, flag in _profile_edit.SAMPLING_FLAGS.items()
+            if key in counts
+        ]
     else:
-        emit_result(f"[{name} adaptive-sampling] adaptive ({source} policy)")
-        for flag, key in _PRECISION_FIELD_NAMES.items():
-            marker = "" if explicit is not None and key in explicit else " (default)"
-            emit_result(f"  {flag}: {_display(effective.get(key))}{marker}")
+        emit_result(f"[{name} adaptive-sampling]  mode: adaptive ({value_source(source)} policy)")
+        policy_source = "default" if explicit is None else source
+        rows = [
+            (
+                flag,
+                _display(effective.get(key)),
+                policy_source if explicit is not None and key in explicit else "default",
+            )
+            for flag, key in _PRECISION_FIELD_NAMES.items()
+        ]
+    emit_settings(None, rows)
+    if effective is not None:
         emit_result(
-            "  per material, fixed counts, GDF beams and grooved faces keep fixed history counts"
+            "per material, fixed counts, GDF beams and grooved faces keep fixed history counts"
         )
     for blocker in blockers:
-        emit_result(f"  adaptive unsupported: {blocker}")
+        emit_result(f"adaptive unsupported: {blocker}")
     emit_result(
-        "  CXR grid: "
+        "CXR grid: "
         + (
             "automatic for every case (cxr-grid policy)"
             if automatic_grid
@@ -305,9 +317,13 @@ def precision_show_command(name, json_output):
         + f"; independent of history sampling, see 'pyrite profile numerics cxr-grid show {name}'"
     )
     if effective is not None:
-        emit_result(f"  to select fixed counts: pyrite profile numerics adaptive-sampling disable {name}")
+        emit_result(
+            f"to select fixed counts: pyrite profile numerics adaptive-sampling disable {name}"
+        )
     elif counts and not blockers:
-        emit_result(f"  to switch to adaptive: pyrite profile numerics adaptive-sampling enable {name}")
+        emit_result(
+            f"to switch to adaptive: pyrite profile numerics adaptive-sampling enable {name}"
+        )
     return 0
 
 

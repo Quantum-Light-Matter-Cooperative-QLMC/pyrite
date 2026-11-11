@@ -14,7 +14,7 @@ If a run produces an unexpectedly broad or dense line grid, inspect its
 resolved policy before changing physical settings:
 
 ```bash
-pyrite numerics cxr-grid show PROFILE
+pyrite profile numerics cxr-grid show PROFILE
 ```
 
 Automatic grids bound the case's kinematic bandwidth and resolve the spacing

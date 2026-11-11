@@ -1002,11 +1002,13 @@ def resolved_show_inputs(
     return raw, energy_grids, brem_by_material, refs
 
 
-def show(material=None, band=None, *, profile: str = "standard", catalog_path=None) -> str:
-    """Render configured energy grids, every block headed by its band.
+def show_rows(
+    material=None, band=None, *, profile: str = "standard", catalog_path=None
+) -> list[tuple[str, list[tuple[str, str, str]]]]:
+    """Configured energy grids as ``(material, [(setting, value, provenance)])``.
 
-    ``band`` filters the output: ``"line"`` shows only line grids, ``"brem"``
-    only bremsstrahlung, ``None`` (default) shows both side by side.
+    ``band`` filters the rows: ``"line"`` only line grids, ``"brem"`` only
+    bremsstrahlung, ``None`` (default) both.
     """
     raw, energy_grids, brem_by_material, refs = resolved_show_inputs(
         profile=profile, catalog_path=catalog_path
@@ -1015,30 +1017,40 @@ def show(material=None, band=None, *, profile: str = "standard", catalog_path=No
     if material is not None and material not in mats:
         raise ValueError(f"unknown material: {material}")
     keys = [material] if material else list(mats)
-    show_cxr = band in (None, "line")
-    show_brem = band in (None, "brem")
-    out = []
+    blocks = []
     for key in keys:
-        out.append(f"=== {key} ===")
+        rows = []
         if key in refs:
-            out.append(f"  artifact: sha256:{refs[key]}  [profile {profile}]")
-        if show_cxr:
+            rows.append(("artifact", f"sha256:{refs[key]}", f"profile {profile}"))
+        if band in (None, "line"):
             block = energy_grids.get(key, {})
             if not block.get("cxr_by_energy"):
-                out.append("  line grid: no stored per-energy rows")
+                rows.append(("line grid", "no stored per-energy rows", "-"))
             for item in block.get("cxr_by_energy", []):
                 e = float(item["energy_keV"])
                 source = item.get("source", "derived")
                 note_rec = _provenance.get_cxr(key, e, profile=profile)
                 note = note_rec.get("note") if note_rec else None
                 tag = f"manual: {note}" if source == "manual" and note else source
-                out.append(
-                    f"  line grid @ {e:g} keV: {_grid_summary(item['grid'], 'line grid')}  [{tag}]"
+                rows.append(
+                    (f"line grid @ {e:g} keV", _grid_summary(item["grid"], "line grid"), tag)
                 )
-        if show_brem:
+        if band in (None, "brem"):
             brem = brem_by_material.get(key)
             if brem:
                 rec = _provenance.get_brem(key, profile=profile)
-                tag = rec["source"] if rec else "derived"
-                out.append(f"  brem grid: {_band_summary(brem)}  [{tag}]")
+                rows.append(("brem grid", _band_summary(brem), rec["source"] if rec else "derived"))
+        blocks.append((key, rows))
+    return blocks
+
+
+def show(material=None, band=None, *, profile: str = "standard", catalog_path=None) -> str:
+    """Render :func:`show_rows` as plain text, every block headed by its material."""
+    out = []
+    for key, rows in show_rows(material, band, profile=profile, catalog_path=catalog_path):
+        out.append(f"=== {key} ===")
+        out.extend(
+            f"  {label}: {value}" + ("" if tag == "-" else f"  [{tag}]")
+            for label, value, tag in rows
+        )
     return "\n".join(out)

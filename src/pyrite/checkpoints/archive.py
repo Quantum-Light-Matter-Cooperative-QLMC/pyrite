@@ -176,21 +176,20 @@ def _dataset_identity(path, is_directory):
 def _list_shelf(directory, root, empty, *, archived):
     """Print each checkpoint under ``directory`` with size (MB), record count and
     profile, sorted by label. Returns the list of labels."""
-    if not os.path.isdir(directory):
-        print(empty)
-        return []
-    directory = Path(directory)
-    labels = sorted(
-        {
-            entry.name
-            for entry in directory.iterdir()
-            if entry.is_dir() and _checkpoint_store.checkpoint_exists(entry.name, directory)
-        }
-        | {entry.stem for entry in directory.glob("*.pkl")}
-    )
-    if not labels:
-        print(empty)
-        return []
+    from ..console.tables import emit_table
+
+    labels = []
+    if os.path.isdir(directory):
+        directory = Path(directory)
+        labels = sorted(
+            {
+                entry.name
+                for entry in directory.iterdir()
+                if entry.is_dir() and _checkpoint_store.checkpoint_exists(entry.name, directory)
+            }
+            | {entry.stem for entry in directory.glob("*.pkl")}
+        )
+    rows = []
     for label in labels:
         path, is_directory = (_archive_paths if archived else _active_paths)(label, root)
         mb = (
@@ -199,11 +198,10 @@ def _list_shelf(directory, root, empty, *, archived):
             else path.stat().st_size / 1e6
         )
         n = _record_count(path)
-        n_str = "?" if n is None else str(n)
         identity = _dataset_identity(path, is_directory)
         name = None if identity is None else identity.get("catalog_profile")
-        profile = "" if name is None else f"  {name}"
-        print(f"  {label:<32}  {mb:7.1f} MB  {n_str:>6} records{profile}")
+        rows.append((label, f"{mb:.1f} MB", "?" if n is None else str(n), name or "-"))
+    emit_table(("checkpoint", "size", "records", "profile"), rows, empty=empty)
     return labels
 
 

@@ -34,3 +34,15 @@ def assert_table_row(stdout: str, label: str, value: str) -> None:
         + r"(?:\n|$)"
     )
     assert re.search(pattern, stdout, re.MULTILINE), stdout
+
+
+def assert_row(stdout: str, *cells: str) -> None:
+    """Assert one row of a shared-renderer table (any indent, 2+ spaces between cells)."""
+    import re
+
+    pattern = (
+        r"^\s*"
+        + r" {2,}".join(r"\s+".join(re.escape(word) for word in cell.split()) for cell in cells)
+        + r"(?: {2,}|\s*$)"
+    )
+    assert re.search(pattern, stdout, re.MULTILINE), stdout

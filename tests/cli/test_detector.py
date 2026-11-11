@@ -1,8 +1,9 @@
 import json
+import re
 
 from pyrite.cli import _catalog_io
 from pyrite.cli.commands import detector
-from tests.helpers.cli import assert_clean_result, invoke
+from tests.helpers.cli import assert_clean_result, assert_row, invoke
 
 _CATALOG = """[profiles.standard]
 detector = "standard_90"
@@ -47,12 +48,12 @@ def test_list_and_show_text_and_json(tmp_path, monkeypatch):
     machine = invoke(detector.command, ["show", "eds", "-o", "json"])
 
     assert_clean_result(listed)
-    assert "standard_90 (Standard geometry): 1 profiles" in listed.stdout
-    assert "eds: 1 profiles" in listed.stdout
+    assert re.search(r"^standard_90 +\w+ +1 +Standard geometry$", listed.stdout, re.MULTILINE)
+    assert re.search(r"^eds +\w+ +1$", listed.stdout, re.MULTILINE)
     assert_clean_result(shown)
-    assert "observation angle: 119 deg" in shown.stdout
-    assert "polar acceptance (full span): 16.6 deg" in shown.stdout
-    assert "solid angle: 0.066 sr" in shown.stdout
+    assert_row(shown.stdout, "observation angle", "119 deg")
+    assert_row(shown.stdout, "polar acceptance (full span)", "16.6 deg")
+    assert_row(shown.stdout, "solid angle", "0.066 sr")
     assert_clean_result(machine)
     assert json.loads(machine.stdout)["payload"] == {
         "name": "eds",

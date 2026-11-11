@@ -11,7 +11,8 @@ from pyrite.cli import _completion as _cli_completion
 from pyrite.cli.commands._filter_shared import filter_cli_options, filter_from_row, filter_row
 from pyrite.cli.commands._profile_shared import write as _write
 from pyrite.console import json as cli_json
-from pyrite.console.output import CLIError, emit_json_result, emit_result, output_option
+from pyrite.console.output import CLIError, emit_json_result, output_option
+from pyrite.console.tables import emit_object, emit_table, flatten
 
 
 @click.group("filter")
@@ -117,15 +118,15 @@ def filter_list_command(profile_name, json_output):
     if json_output:
         emit_json_result(cli_json.JsonResult("cxr.profile.filter.list", payload))
         return 0
-    if not payload["filters"]:
-        emit_result(f"{profile_name}: no filters")
+    rows = []
     for row in payload["filters"]:
         if row.get("kind") == "sequence":
             members = ", ".join(str(plate["expanded_index"]) for plate in row["plates"])
-            emit_result(f"{row['index']}: sequence {row['ref']} (expanded plates {members})")
-            continue
-        label = row.get("name") or f"#{row['index']}"
-        emit_result(f"{row['index']}: {label} ({row['material']}, {row['thickness_mm']:g} mm)")
+            rows.append((row["index"], row["ref"], f"sequence (expanded plates {members})"))
+        else:
+            label = row.get("name") or f"#{row['index']}"
+            rows.append((row["index"], label, f"{row['material']}, {row['thickness_mm']:g} mm"))
+    emit_table(("index", "name", "filter"), rows, empty=f"{profile_name}: no filters")
     return 0
 
 
@@ -156,10 +157,10 @@ def filter_show_command(profile_name, identifier, json_output):
     if json_output:
         emit_json_result(cli_json.JsonResult("cxr.profile.filter.show", row))
         return 0
-    emit_result(f"{profile_name} filter {row.get('name') or '#' + str(row['index'])}:")
-    for key, value in row.items():
-        if key != "index":
-            emit_result(f"  {key}: {value}")
+    emit_object(
+        f"{profile_name} filter {row.get('name') or '#' + str(row['index'])}",
+        flatten({key: value for key, value in row.items() if key != "index"}),
+    )
     return 0
 
 

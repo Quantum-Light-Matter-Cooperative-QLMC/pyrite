@@ -26,6 +26,7 @@ from pyrite.console.output import (
     emit_result,
     output_option,
 )
+from pyrite.console.tables import emit_named_list, emit_object, flatten
 from pyrite.detectors.editing import create_detector
 
 _NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
@@ -103,13 +104,11 @@ def _detector_payload(document, name):
     return {"name": name, **payload}
 
 
-def _emit_show(payload):
-    emit_result(f"[{payload['name']}]")
-    if payload.get("label"):
-        emit_result(f"  label: {payload['label']}")
+def _emit_show(payload, origin=None):
+    rows: list[tuple[str, object]] = [("label", payload["label"])] if payload.get("label") else []
     for key, label, unit in _DISPLAY_FIELDS:
         if key in payload:
-            emit_result(f"  {label}: {payload[key]:g} {unit}")
+            rows.append((label, f"{payload[key]:g} {unit}"))
     if "distance_mm" in payload:
         for key in (
             "distance_mm",
@@ -124,7 +123,9 @@ def _emit_show(payload):
             "acquisition",
         ):
             if key in payload:
-                emit_result(f"  {key}: {payload[key]}")
+                value = payload[key]
+                rows += flatten(value, f"{key}.") if isinstance(value, dict) else [(key, value)]
+    emit_object(payload["name"], rows, origin=origin)
 
 
 @click.group(
@@ -182,11 +183,14 @@ def list_command(json_output):
     if json_output:
         emit_json_result(cli_json.JsonResult("cxr.detector.list", {"detectors": rows}))
         return 0
-    for row in rows:
-        label = f" ({row['label']})" if row["label"] else ""
-        emit_result(
-            f"{row['name']}{label}: {len(row['referenced_by'] or [])} profiles [{row['source']}]"
-        )
+    emit_named_list(
+        (
+            (row["name"], row["source"], len(row["referenced_by"] or []), row["label"])
+            for row in rows
+        ),
+        noun="detector",
+        create_hint="pyrite detector create NAME",
+    )
     return 0
 
 
@@ -206,7 +210,8 @@ def show_command(name, json_output):
     if json_output:
         emit_json_result(cli_json.JsonResult("cxr.detector.show", payload))
         return 0
-    _emit_show(payload)
+    origin = object_sources(_catalog_io.active_catalog_path(), "detectors").get(name, "catalog")
+    _emit_show(payload, origin)
     return 0
 
 

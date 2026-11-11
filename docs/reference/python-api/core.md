@@ -41,7 +41,7 @@ Beam transverse and
 longitudinal descriptions and target footprints are explicit inputs.
 {py:func}`pyrite.config.load_physics` and {py:func}`pyrite.config.load_numerics` return
 named catalog presets (for example the bundled `electron-standard` and
-`default`, or ones made with `pyrite physics|numerics preset create`) as
+`default`, or ones made with `pyrite physics|numerics create`) as
 frozen `Physics` and `Numerics`; adjust them with `dataclasses.replace`
 instead of restating every setting.
 

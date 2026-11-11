@@ -8,6 +8,7 @@ import pickle
 import pytest
 
 from pyrite.checkpoints import _checkpoint_io, _checkpoint_store, archive
+from tests.helpers.cli import assert_row
 
 
 def _write(path, payload):
@@ -126,7 +127,8 @@ def test_archives_lists_labels_and_counts(tmp_path, capsys):
     labels = archive.list_archives(root=str(tmp_path))
     assert labels == ["a", "b"]
     out = capsys.readouterr().out
-    assert "a" in out and "4 records" in out and "1 records" in out
+    assert_row(out, "a", "0.0 MB", "4", "-")
+    assert_row(out, "b", "0.0 MB", "1", "-")
 
 
 def test_archives_empty_shelf(tmp_path, capsys):
@@ -298,7 +300,7 @@ def test_list_checkpoints_lists_active_slots_not_shelf(tmp_path, capsys):
     _write(tmp_path / "archive" / "old.pkl", _store())
 
     assert archive.list_checkpoints(root=str(tmp_path)) == ["hopg"]
-    assert "4 records" in capsys.readouterr().out
+    assert_row(capsys.readouterr().out, "hopg", "0.0 MB", "4", "-")
 
 
 def test_list_checkpoints_empty(tmp_path, capsys):

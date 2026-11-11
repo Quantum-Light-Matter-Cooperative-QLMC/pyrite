@@ -11,6 +11,7 @@ from pathlib import Path
 from pyrite import __version__
 from pyrite.cli._deprecations import (
     DEPRECATED_FLAGS,
+    DEPRECATED_FORMS,
     DEPRECATIONS,
     IMPLICIT_DEFAULTS,
     SUPPORT_WINDOW_MINORS,
@@ -35,6 +36,31 @@ _EMPTY_IMPLICIT = (
     "unnamed, or a user-catalog profile that names no beam or detector, exits as a "
     "usage error."
 )
+
+
+def _form_lines() -> list[str]:
+    """Argument shapes of a live command that still work but warn."""
+    if not DEPRECATED_FORMS:
+        return []
+    lines = [
+        "",
+        "## Argument forms",
+        "",
+        (
+            "These spellings reach a current command with a deprecated argument shape; "
+            "they still run, warn on stderr and keep their exit codes."
+        ),
+        "",
+        "| Deprecated form | Replacement | Deprecated in | Remove in | Note |",
+        "| --- | --- | --- | --- | --- |",
+    ]
+    for form in sorted(DEPRECATED_FORMS):
+        entry = DEPRECATED_FORMS[form]
+        lines.append(
+            f"| `pyrite {entry.path}` | `{entry.replacement}` | {entry.deprecated_in} "
+            f"| {entry.remove_in} | {entry.note} |"
+        )
+    return lines
 
 
 def build_deprecations() -> str:
@@ -72,6 +98,7 @@ def build_deprecations() -> str:
             )
     else:
         lines.append(_EMPTY_COMMANDS)
+    lines.extend(_form_lines())
     lines.extend(("", "## Options", ""))
     if DEPRECATED_FLAGS:
         lines.extend(

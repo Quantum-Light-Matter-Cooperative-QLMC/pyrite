@@ -35,6 +35,7 @@ from pyrite.console.output import (
     output_option,
 )
 from pyrite.console.outputs import output_default, output_label
+from pyrite.console.tables import emit_table
 from pyrite.energy_grid import apply, job
 from pyrite.energy_grid import gc as artifact_gc
 
@@ -692,10 +693,17 @@ def _show(json_output, material, catalog_profile, *, band=None):
         emit_json_result(result)
         return 0
     try:
-        result = apply.show(material, band=band, profile=resolved_profile)
+        blocks = apply.show_rows(material, band=band, profile=resolved_profile)
     except (OSError, RuntimeError, ValueError) as exc:
         raise CLIError(str(exc)) from None
-    emit_result(result)
+    for index, (key, rows) in enumerate(blocks):
+        emit_table(
+            ("setting", "value", "provenance"),
+            rows,
+            title=("" if index == 0 else "\n") + f"[{key}]",
+            indent=2,
+            wrap=1,
+        )
     return 0
 
 

@@ -86,6 +86,7 @@ def test_removal_targets_reads_every_registry_family(monkeypatch) -> None:
     monkeypatch.setattr(cli, "DEPRECATIONS", {"a b": row})
     monkeypatch.setattr(cli, "DEPRECATED_FLAGS", {("run", "--x"): row})
     monkeypatch.setattr(cli, "IMPLICIT_DEFAULTS", {"profile": row})
+    monkeypatch.setattr(cli, "DEPRECATED_FORMS", {"x show PROFILE": row})
     monkeypatch.setattr(api_rows, "API_DEPRECATIONS", {"Beam() without x=": row})
 
     labels = release.removal_targets()
@@ -96,6 +97,7 @@ def test_removal_targets_reads_every_registry_family(monkeypatch) -> None:
         "command a b",
         "option run --x",
         "default profile",
+        "form x show PROFILE",
         "api Beam() without x=",
     }
     assert set(labels.values()) == {"0.9.0"}

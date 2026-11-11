@@ -6,6 +6,7 @@ import click
 
 from ...console import config as _config
 from ...console.output import CLIError, emit_diagnostic, emit_result, emit_table
+from ...console.tables import value_source
 from ...remote.config import validate_remote_target, validate_slurm_setting
 from .._groups import LazyGroup
 
@@ -155,10 +156,10 @@ def list_command(prefix: str) -> None:
         rows = []
         for key in keys:
             resolved = _config.resolve(key)
-            rows.append((key, resolved.value, resolved.source))
+            rows.append((key, resolved.value, value_source(resolved.source)))
     except _config.ConfigError as exc:
         raise CLIError(str(exc)) from exc
-    emit_table(("KEY", "VALUE", "SOURCE"), rows)
+    emit_table(("KEY", "VALUE", "SOURCE"), rows, wrap=1)
 
 
 def _matching_keys(prefix):

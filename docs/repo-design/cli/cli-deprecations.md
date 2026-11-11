@@ -15,6 +15,22 @@ Per [ADR-0002](../../adr/0002-cli-surface-redesign.md), every renamed or retired
 | `pyrite numerics preset` | `pyrite numerics` | 0.32.0 | 0.34.0 | `pyrite numerics list` now lists presets; profiles are listed by `pyrite profile list`. |
 | `pyrite physics preset` | `pyrite physics` | 0.32.0 | 0.34.0 | `pyrite physics list` now lists presets; profiles are listed by `pyrite profile list`. |
 
+## Argument forms
+
+These spellings reach a current command with a deprecated argument shape; they still run, warn on stderr and keep their exit codes.
+
+| Deprecated form | Replacement | Deprecated in | Remove in | Note |
+| --- | --- | --- | --- | --- |
+| `pyrite numerics reset PROFILE` | `pyrite profile numerics reset PROFILE` | 0.32.0 | 0.34.0 | Taken when the name is a profile and not a preset. |
+| `pyrite numerics set PROFILE` | `pyrite profile numerics set PROFILE` | 0.32.0 | 0.34.0 | Taken when the name is a profile and not a preset. |
+| `pyrite numerics show PROFILE` | `pyrite profile numerics show PROFILE` | 0.32.0 | 0.34.0 | Taken when the name is a profile and not a preset. |
+| `pyrite numerics validate PROFILE` | `pyrite profile numerics validate PROFILE` | 0.32.0 | 0.34.0 | Taken when the name is a profile and not a preset. |
+| `pyrite physics reset PROFILE` | `pyrite profile physics reset PROFILE` | 0.32.0 | 0.34.0 | Taken when the name is a profile and not a preset. |
+| `pyrite physics set PROFILE` | `pyrite profile physics set PROFILE` | 0.32.0 | 0.34.0 | Taken when the name is a profile and not a preset. |
+| `pyrite physics show PROFILE` | `pyrite profile physics show PROFILE` | 0.32.0 | 0.34.0 | Taken when the name is a profile and not a preset. |
+| `pyrite physics validate PROFILE` | `pyrite profile physics validate PROFILE` | 0.32.0 | 0.34.0 | Taken when the name is a profile and not a preset. |
+| `pyrite profile numerics reset PHYSICS-FIELD` | `pyrite profile physics reset` | 0.32.0 | 0.34.0 | Physical models, cutoffs and straggling are Physics fields. |
+
 ## Options
 
 | Command | Deprecated option | Replacement | Deprecated in | Remove in | Note |

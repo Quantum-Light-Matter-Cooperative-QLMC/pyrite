@@ -11,7 +11,7 @@ from pyrite._catalog_layout import read_text
 from pyrite.cli import _catalog_io
 from pyrite.cli.commands import _simulation, material, profile
 from pyrite.config import FixedSampling
-from tests.helpers.cli import assert_clean_result, invoke
+from tests.helpers.cli import assert_clean_result, assert_row, invoke
 
 _CATALOG = """[profiles.standard]
 thickness_ang = { values = [1000.0] }
@@ -53,9 +53,9 @@ def test_show_default_profile_reports_effective_sources(tmp_path, monkeypatch):
     result = invoke(profile.command, ["ranges", "show", "standard", "hopg"])
 
     assert_clean_result(result)
-    assert "hopg: profile standard" in result.stdout
-    assert "thickness: [2000] (overridden)" in result.stdout
-    assert "energy: [30] (inherited)" in result.stdout
+    assert "[hopg in profile standard]" in result.stdout
+    assert_row(result.stdout, "thickness", "[2000]", "material")
+    assert_row(result.stdout, "energy", "[30]", "profile")
     assert "profiles this material belongs to" not in result.stdout
 
 

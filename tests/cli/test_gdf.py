@@ -15,6 +15,7 @@ from pyrite.cli.commands import beam, profile
 from pyrite.cli.commands import scan as scan_cli
 from pyrite.materials import MaterialConfigError, load_material_catalog
 from pyrite.runs import scan
+from tests.helpers.cli import assert_row
 from tests.materials.test_material_catalog import _minimal_catalog
 from tests.montecarlo.transport.test_gdf import fields, write_gdf
 
@@ -86,8 +87,8 @@ def test_named_beam_workflow(catalog, monkeypatch, normalization):
     assert row["rep_rate_hz"] == 1000
     shown = invoke("show", "imported")
     assert shown.exit_code == 0, shown.output
-    assert "source: gpt_gdf" in shown.output
-    assert f"gdf_path: {path}" in shown.output
+    assert_row(shown.output, "source", "gpt_gdf")
+    assert_row(shown.output, "gdf_path", str(path))
     machine = invoke("show", "imported", "-o", "json")
     assert json.loads(machine.output)["payload"]["gdf_normalization"] == normalization
     attached = CliRunner().invoke(profile.command, ["set", "standard", "--beam", "imported", "-y"])

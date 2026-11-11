@@ -13,7 +13,6 @@ EEDL, EADL and derived EPDL files every run reads, plus the derived EPDL
 photon-transport table; without a code it installs all of them.
 """
 
-import json
 from dataclasses import dataclass
 
 import click
@@ -25,6 +24,7 @@ from ...console.output import (
     emit_result,
     output_option,
 )
+from ...console.tables import emit_object, emit_table, flatten
 from ...xsgen.install import (
     BARE_FETCH_STEPS,
     DATASET_FETCH_CODES,
@@ -265,11 +265,12 @@ def list_command(json_output: bool) -> None:
     if json_output:
         emit_json("pyrite.tables.list.v1", {"tables": rows})
         return
-    emit_result("KEY\tCODE\tQUANTITY\tTARGET\tTIER")
-    for row in rows:
-        emit_result(
-            f"{row['key']}\t{row['code']}\t{row['quantity']}\t{row['target']}\t{row['tier']}"
-        )
+    emit_table(
+        ("key", "code", "quantity", "target", "tier"),
+        [(row["key"], row["code"], row["quantity"], row["target"], row["tier"]) for row in rows],
+        empty="no stored tables",
+        wrap=3,
+    )
 
 
 @command.command("show")
@@ -295,7 +296,10 @@ def show_command(key: str, json_output: bool) -> None:
     if json_output:
         emit_json("pyrite.tables.show.v1", {"tier": table.tier, "manifest": manifest})
         return
-    emit_result(json.dumps(manifest, indent=2, sort_keys=True))
+    emit_object(
+        f"table {table.key[:12]}",
+        [("tier", table.tier), *flatten(dict(sorted(manifest.items())))],
+    )
 
 
 @command.command("generate")
@@ -884,12 +888,23 @@ def sources_list_command(json_output: bool) -> None:
     if json_output:
         emit_json("pyrite.tables.sources.v1", {"sources": [row.payload() for row in rows]})
         return
-    emit_result("CODE\tSTATUS\tORIGIN\tROOT")
-    for row in rows:
-        emit_result(f"{row.code}\t{row.status}\t{row.origin or '-'}\t{row.root or '-'}")
-        if row.missing_data_dirs:
-            missing = ", ".join(row.missing_data_dirs)
-            emit_result(f"\t\tmissing data directories: {missing}")
+    emit_table(
+        ("code", "status", "origin", "root"),
+        [
+            (
+                row.code,
+                row.status
+                + (
+                    f" (missing data directories: {', '.join(row.missing_data_dirs)})"
+                    if row.missing_data_dirs
+                    else ""
+                ),
+                row.origin or "-",
+                row.root or "-",
+            )
+            for row in rows
+        ],
+    )
 
 
 @sources_command.command("set")

@@ -7,7 +7,7 @@ from pyrite.cli import command as root_command
 from pyrite.cli.commands import profile
 from pyrite.cli.commands.calculation import numerics_command
 from tests.cli.test_profile import _CATALOG, _catalog
-from tests.helpers.cli import assert_clean_result, assert_table_row, invoke
+from tests.helpers.cli import assert_clean_result, assert_row, assert_table_row, invoke
 
 _POLICY = [
     "--target-rse",
@@ -83,9 +83,11 @@ def test_precision_show_reports_the_default_policy_without_a_table(tmp_path, mon
 
     shown = invoke(numerics_command, ["adaptive-sampling", "show", "sub_100keV"])
     assert_clean_result(shown)
-    assert shown.stdout.startswith("[sub_100keV adaptive-sampling] adaptive (default policy)\n")
-    assert "  target-rse: 0.05 (default)\n" in shown.stdout
-    assert "  max-histories: 20000 (default)\n" in shown.stdout
+    assert shown.stdout.startswith(
+        "[sub_100keV adaptive-sampling]  mode: adaptive (default policy)\n"
+    )
+    assert_row(shown.stdout, "target-rse", "0.05", "default")
+    assert_row(shown.stdout, "max-histories", "20000", "default")
     machine = invoke(
         root_command,
         ["profile", "numerics", "adaptive-sampling", "show", "sub_100keV", "-o", "json"],
@@ -116,7 +118,7 @@ def test_precision_show_names_why_a_profile_keeps_fixed_counts(tmp_path, monkeyp
         _catalog(tmp_path, monkeypatch, text)
         shown = invoke(numerics_command, ["adaptive-sampling", "show", "sub_100keV"])
         assert_clean_result(shown)
-        assert shown.stdout.startswith("[sub_100keV adaptive-sampling] fixed history counts: ")
+        assert shown.stdout.startswith("[sub_100keV adaptive-sampling]  mode: fixed (")
         assert reason in shown.stdout
         machine = json.loads(
             invoke(
@@ -168,12 +170,14 @@ def test_precision_set_show_and_reset_round_trip(tmp_path, monkeypatch):
     assert_clean_result(updated)
     shown = invoke(numerics_command, ["adaptive-sampling", "show", "sub_100keV"])
     assert_clean_result(shown)
-    assert shown.stdout.startswith("[sub_100keV adaptive-sampling] adaptive (profile policy)\n")
-    assert "  target-rse: 0.1\n" in shown.stdout
-    assert "  observable: cxr,brem\n" in shown.stdout
-    assert "  max-history-share: 0.02\n" in shown.stdout
-    assert "  min-effective-histories: 100 (default)\n" in shown.stdout
-    assert "  pilot-histories: none (default)\n" in shown.stdout
+    assert shown.stdout.startswith(
+        "[sub_100keV adaptive-sampling]  mode: adaptive (profile policy)\n"
+    )
+    assert_row(shown.stdout, "target-rse", "0.1", "profile")
+    assert_row(shown.stdout, "observable", "cxr,brem", "profile")
+    assert_row(shown.stdout, "max-history-share", "0.02", "profile")
+    assert_row(shown.stdout, "min-effective-histories", "100", "default")
+    assert_row(shown.stdout, "pilot-histories", "none", "default")
     machine = json.loads(
         invoke(numerics_command, ["adaptive-sampling", "show", "sub_100keV", "-o", "json"]).stdout
     )
@@ -394,7 +398,8 @@ def test_disable_selects_fixed_counts_with_defaults_or_flags(tmp_path, monkeypat
     assert "adaptive_sampling" not in row
     assert (row["cxr_histories"]["values"], row["brem_histories"]["values"]) == ([300], [150])
     shown = invoke(numerics_command, ["adaptive-sampling", "show", "sub_100keV"])
-    assert "  counts: cxr-histories 300, brem-histories 150\n" in shown.stdout
+    assert_row(shown.stdout, "cxr-histories", "300", "profile")
+    assert_row(shown.stdout, "brem-histories", "150", "profile")
     assert (
         "to switch to adaptive: pyrite profile numerics adaptive-sampling enable sub_100keV"
         in shown.stdout

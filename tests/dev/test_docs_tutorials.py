@@ -301,9 +301,9 @@ def test_configuration_exercise_isolated_and_reproducible(tutorials, monkeypatch
     data = example.compute()
     assert data == tutorials.checked_output("configuration_cookbook")
     assert data["exit_code"] == 0
-    assert "thickness: [50000] (inherited)" in data["display_text"]
-    assert "energy: [30, 60] (inherited)" in data["display_text"]
-    assert "profile.current  lab-scan  config store" in data["display_text"]
+    assert "thickness  [50000]   profile" in data["display_text"]
+    assert "energy     [30, 60]  profile" in data["display_text"]
+    assert "profile.current  lab-scan  config\n" in data["display_text"]
     assert sorted(p.relative_to(tmp_path).as_posix() for p in tmp_path.rglob("*")) == sorted(
         item
         for key in ("XDG_CONFIG_HOME", "PYRITE_USER_CATALOG", "PYRITE_HOME", "PYRITE_CATALOG")

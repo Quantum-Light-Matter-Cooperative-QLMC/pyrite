@@ -14,6 +14,7 @@ from pyrite.apps.configuration_exports import available_components, export_recor
 from pyrite.campaign.configuration_editor import ConfigurationEditor, run_command
 from pyrite.catalog_edit import CatalogDraft
 from pyrite.units import ureg
+from tests.helpers.cli import assert_row
 
 
 @pytest.fixture
@@ -266,7 +267,7 @@ def test_save_catalog_button_persists_staged_objects(editor, monkeypatch, _isola
 
     listed = CliRunner().invoke(command, ["profile", "list"])
     assert listed.exit_code == 0, listed.output
-    assert "notebook:" in listed.output
+    assert_row(listed.output, "notebook", "user")
 
 
 @pytest.mark.parametrize("kind", ["geometry", "physics", "numerics"])
@@ -349,7 +350,7 @@ def test_create_then_save_remains_interactive_after_cell_cleanup(
     assert (_isolate_user_catalog / "profiles" / "test_ui.toml").is_file()
     listed = CliRunner().invoke(command, ["profile", "list"])
     assert listed.exit_code == 0, listed.output
-    assert "test_ui:" in listed.output
+    assert_row(listed.output, "test_ui", "user")
 
 
 def test_stale_edits_cannot_overwrite_newer_profile(editor):
