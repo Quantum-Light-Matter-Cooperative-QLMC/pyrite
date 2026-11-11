@@ -75,6 +75,7 @@ line-energy-dispersion
 line-recoil-in-crystal
 line-reflection-coupling-tables
 line-recoil-formation
+line-recoil-in-medium-root
 line-recoil-resonance
 line-recoil-validity-screen
 narrow-beam-total-attenuation

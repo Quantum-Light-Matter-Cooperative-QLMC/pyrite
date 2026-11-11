@@ -2,6 +2,10 @@
 
 Validation: `line-recoil-validity-screen`.
 
+Issue #1099 retired the `recoil_shift_exceeds_limit` screen count: production
+lines sit on the exact root ([`line-recoil-in-medium-root`](line-recoil-in-medium-root.md)).
+Screen-count evidence below is historical; the shift fraction remains.
+
 ## Independent derivation
 
 Fresh-context verification at `f617230c`. This section was written before
