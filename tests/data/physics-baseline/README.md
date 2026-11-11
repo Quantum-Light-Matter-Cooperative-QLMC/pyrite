@@ -35,6 +35,15 @@ from v4 to v5. Only the generation-dependent `case_content_key` and
 re-pinned. On CPU/NumPy fp64 the line spectra move at rounding level only, so
 every recorded output keeps its expectation and tolerance.
 
+## Exact-recoil line kinematics v6 generation (#1099)
+
+Placing, widening and phasing every line on the exact recoil root changed
+`CXR_ESCAPE_MODEL` from v5 to v6 (`segment-mean-v6-exact-recoil`). Only the
+generation-dependent `case_content_key` and `parameter_sha256` hashes in
+`resolved.json` and `channeling.json` were re-pinned. The recorded output
+families (`outputs.json`) keep their expectations and tolerances: their
+fixtures carry no line spectra that move outside the recorded tolerance.
+
 ## Always-on Ter–Mikaelian coupling (#439)
 
 Applying the dielectric factor `k²/(k² + (γħω_p)²)` to every coupled BremsLib
