@@ -8,6 +8,7 @@ for sources, criteria and limitations, follow each record or the
 ```{toctree}
 :maxdepth: 1
 
+alexs-adu-conversion
 alexs-charge-diffusion
 alexs-qe-absorption
 detector-angular-acceptance
@@ -16,6 +17,8 @@ detector-slit-acceptance
 detector-eaglexo
 detector-line-broadening
 detector-timepix
+flat-field-focal-plane
+grating-slit-image-width
 grazing-reflectivity
 optical-instrument-observable
 optical-phase-retrieval

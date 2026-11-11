@@ -139,6 +139,8 @@ class FlatFieldMount:
     band_beta_rad
         Optional tabulated diffraction angles at the band ends [rad], in this
         module's convention.
+    band_exit_arm_mm
+        Optional tabulated exit arms ``r'`` at the band ends [mm].
     """
 
     entrance_arm_mm: float
@@ -147,6 +149,7 @@ class FlatFieldMount:
     focal_plane_length_mm: float | None = None
     band_nm: tuple[float, float] | None = None
     band_beta_rad: tuple[float, float] | None = None
+    band_exit_arm_mm: tuple[float, float] | None = None
 
     def __post_init__(self) -> None:
         for name in ("entrance_arm_mm", "focal_distance_mm"):
@@ -168,8 +171,10 @@ class FlatFieldMount:
             s(beta) = r_H' tan(beta - beta_H).
 
         For a plane perpendicular to the grating surface (``beta_H -> +-90``
-        deg) this is ``s = -+r_H' cot(beta)`` measured from the grating plane,
-        the usual flat-field statement. It is the existing
+        deg) this is ``s = -r_H' cot(beta)`` for either sign (``tan`` has period
+        ``pi``), measured from the grating plane: the usual flat-field
+        statement. Rays that cannot reach the plane (``|beta - beta_H| >= 90``
+        deg) return NaN. It is the existing
         :func:`detector_position_mm` map with ``L = r_H'`` and
         ``beta_ref = beta_H``. Limiting case: ``beta = beta_H`` lands at the
         foot, ``s = 0``. Source: plane-line intersection; flat-field mount
@@ -177,14 +182,19 @@ class FlatFieldMount:
 
         Validation: flat-field-focal-plane
         """
-        return detector_position_mm(beta_rad, self.focal_normal_rad, self.focal_distance_mm)
+        beta = np.asarray(beta_rad, float)
+        position = detector_position_mm(beta, self.focal_normal_rad, self.focal_distance_mm)
+        return np.where(np.cos(beta - self.focal_normal_rad) > 0.0, position, np.nan)
 
     def exit_arm_mm(self, beta_rad):
         """Grating-to-focal-plane path ``r'(beta) = r_H'/cos(beta - beta_H)`` [mm].
 
         Validation: flat-field-focal-plane
         """
-        return self.focal_distance_mm / np.cos(np.asarray(beta_rad, float) - self.focal_normal_rad)
+        cosine = np.cos(np.asarray(beta_rad, float) - self.focal_normal_rad)
+        return np.where(
+            cosine > 0.0, self.focal_distance_mm / np.where(cosine > 0.0, cosine, 1.0), np.nan
+        )
 
 
 @dataclass(frozen=True)
@@ -293,8 +303,9 @@ class Grating:
         Returns ``beta_error_deg`` (computed minus tabulated diffraction angle
         at each band end, degrees) and ``focal_plane_length_rel_error``
         (``|s(beta_long) - s(beta_short)|`` from the computed angles relative
-        to the tabulated focal-plane length); entries are ``None`` when the
-        mount lacks the tabulated values.
+        to the tabulated focal-plane length) and ``exit_arm_rel_error``
+        (``r'(beta)/r'_table - 1`` at each band end); entries are ``None`` when
+        the mount lacks the tabulated values.
 
         Validation: flat-field-focal-plane
         """
@@ -310,7 +321,15 @@ class Grating:
         if mount.focal_plane_length_mm is not None:
             span = abs(float(np.diff(mount.position_mm(beta))[0]))
             length_error = span / mount.focal_plane_length_mm - 1.0
-        return {"beta_error_deg": beta_error, "focal_plane_length_rel_error": length_error}
+        arm_error = None
+        if mount.band_exit_arm_mm is not None:
+            ratio = mount.exit_arm_mm(beta) / np.asarray(mount.band_exit_arm_mm, float)
+            arm_error = tuple((ratio - 1.0).tolist())
+        return {
+            "beta_error_deg": beta_error,
+            "focal_plane_length_rel_error": length_error,
+            "exit_arm_rel_error": arm_error,
+        }
 
     @property
     def d_angstrom(self) -> float:
@@ -399,6 +418,7 @@ def _catalog_mount(mount, sign: float) -> FlatFieldMount | None:
         focal_plane_length_mm=mount.get("focal_plane_length_mm"),
         band_nm=mount.get("band_nm"),
         band_beta_rad=None if beta is None else tuple(sign * np.deg2rad(beta)),
+        band_exit_arm_mm=mount.get("r_prime_mm"),
     )
 
 

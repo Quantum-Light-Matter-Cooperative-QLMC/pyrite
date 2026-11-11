@@ -169,7 +169,11 @@ def alexs_frame(
     Notes
     -----
     Read-noise variance in ADU is ``(gain * sigma_read)**2``; dark charge is
-    linear in exposure. The dark rate is the datasheet value at -100 C.
+    linear in exposure. The dark rate is the datasheet value at -100 C. ADU are
+    bias-subtracted (no offset or ADC floor), so read noise can make a pixel
+    negative. The shot-noise draw gives every photon in a pixel the pixel's
+    mean charge: exact for one photon energy per pixel, and it underestimates
+    the variance by ``mean(q)**2 / mean(q**2)`` when a pixel mixes energies.
 
     Validation: alexs-adu-conversion
     """
@@ -187,6 +191,8 @@ def alexs_frame(
         expected = np.clip(np.asarray(photons, dtype=float), 0.0, None)
         if expected.shape != charge.shape:
             raise ValueError("photons must match signal_e in shape")
+        if np.any((expected <= 0.0) & (charge > 0.0)):
+            raise ValueError("shot_noise needs photons > 0 wherever signal_e > 0")
         per_photon = np.divide(charge, expected, out=np.zeros_like(charge), where=expected > 0)
         charge = rng.poisson(expected) * per_photon
     dark_e = DARK_CURRENT_E_PER_PX_S * float(exposure_s) if dark else 0.0

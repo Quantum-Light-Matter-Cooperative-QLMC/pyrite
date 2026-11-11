@@ -107,6 +107,14 @@ def test_photon_shot_noise_keeps_mean_charge_per_photon():
 def test_noise_requires_explicit_generator():
     with pytest.raises(ValueError, match="explicit numpy Generator"):
         ax.alexs_frame(np.zeros(2), exposure_s=1.0, read_noise=True)
+    with pytest.raises(ValueError, match="photons > 0"):
+        ax.alexs_frame(
+            np.ones(2),
+            exposure_s=0.0,
+            photons=np.zeros(2),
+            shot_noise=True,
+            rng=np.random.default_rng(),
+        )
     with pytest.raises(ValueError, match="photon image"):
         ax.alexs_frame(np.zeros(2), exposure_s=1.0, shot_noise=True, rng=np.random.default_rng())
 

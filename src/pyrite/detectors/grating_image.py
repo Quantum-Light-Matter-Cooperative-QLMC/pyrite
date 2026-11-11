@@ -203,7 +203,8 @@ def _kernel_cdf(u, width, pitch, sigma):
     ``w -> 0`` reduces to ``[A(u+p/2) - A(u-p/2)] / p``, which with
     ``sigma -> 0`` is the source pixel itself.
     """
-    rect = width > _ZERO_WIDTH_MM
+    # Below ~1e-6 pixel the wide form loses ~eps*p/w to cancellation.
+    rect = width > 1.0e-6 * pitch
     w = np.where(rect, width, 1.0)
 
     def B(v):
@@ -366,8 +367,8 @@ def detected_image_2d(
         :class:`SlitImage`.
     along_slit
         Optional :class:`AlongSlitSpread`.
-
-    Other parameters are as in :func:`slit_image_pixels`.
+    distance_mm, beta_ref_rad, center_mm, weight_by_throughput
+        As in :func:`slit_image_pixels`.
 
     Returns
     -------
