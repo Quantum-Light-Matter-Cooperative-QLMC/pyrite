@@ -12,6 +12,7 @@ alexs-charge-diffusion
 alexs-qe-absorption
 detector-angular-acceptance
 detector-sensor-acceptance
+detector-slit-acceptance
 detector-eaglexo
 detector-line-broadening
 detector-timepix

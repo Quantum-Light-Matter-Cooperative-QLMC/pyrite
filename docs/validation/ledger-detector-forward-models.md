@@ -22,6 +22,16 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Anchor:** `tests/detectors/test_acceptance.py::test_sensor_acceptance_exact_rectangle`; `tests/detectors/test_acceptance.py::test_sensor_acceptance_small_sensor_and_scale_invariance`
 - **Notes:** height is polar, width is along the local azimuthal tangent; local opening angles are not global longitude intervals. Scalar central-direction scoring remains an approximation for nonuniform intensity. The legacy `PlanarDetector.scalar_detector()` approximation is unchanged. Fresh-context source-to-code derivation matches, with independent quadrature and limiting-case regression anchors; [derivation](detectors/detector-sensor-acceptance.md).
 
+## `detector-slit-acceptance`
+
+- **Claim:** a centred source-facing slit of narrow width $w$ and length $\ell$ at distance $L$, rolled by $\psi$ from its length axis to the local azimuthal tangent, has roll-invariant $\Omega=4\arctan[w\ell/(2L\sqrt{4L^2+w^2+\ell^2})]$ and local polar/azimuthal full spans $2\arctan[h/(2L)]$, $2\arctan[b/(2L)]$ with projected extents $h=w|\cos\psi|+\ell|\sin\psi|$, $b=\ell|\cos\psi|+w|\sin\psi|$
+- **Code:** `detectors/acceptance.py::SlitAcceptance.resolve`
+- **Source:** the centred-rectangle projected-area integral of `detector-sensor-acceptance` ([PNNL-19616](https://digital.library.unt.edu/ark:/67531/metadc829646/m2/1/high_res_d/1023130.pdf), §2.3.2a, p. 9), invariant under rotation about the line of sight; extents of a rotated rectangle's projection onto the tangent axes
+- **Status:** anchored
+- **Checks:** units, roll-invariant $\Omega$, $\psi\to180^\circ-\psi$ symmetry, $\psi=0$ and $90^\circ$ equal `SensorAcceptance`, small-slit limits $\Omega\to w\ell/L^2$ and $\Delta\theta\to h/L$, independent quadrature over the rolled rectangle
+- **Anchor:** `tests/detectors/test_slit_acceptance.py::test_roll_zero_equals_sensor_with_width_polar`; `tests/detectors/test_slit_acceptance.py::test_roll_ninety_swaps_to_sensor_height_length`; `tests/detectors/test_slit_acceptance.py::test_projected_extents_use_opening_angles`; `tests/detectors/test_slit_acceptance.py::test_small_slit_limits`
+- **Notes:** idealized point source on the slit normal; no line curvature, source size, diffraction or grating coupling. Scoring still uses the central direction times $\Omega$ with the Gaussian polar-span broadening, which treats the polar span as uniform; the true polar distribution is trapezoidal for $0<\psi<90^\circ$, so the broadening is exact only at $\psi=0^\circ$ and $90^\circ$. At intermediate roll the uniform-span model overestimates the aperture rms by $(a+c)/\sqrt{a^2+c^2}\in[1,\sqrt2]$ with $a=w|\cos\psi|$, $c=\ell|\sin\psi|$. Fresh-context source-to-code derivation matches (2026-11-10), with independent quadrature and limiting-case regression anchors; [derivation](detectors/detector-slit-acceptance.md); physics note: [slit section](../physics/detectors/detector-solid-angle.md#slit-acceptance).
+
 ## `positioned-filter-attenuation`
 
 - **Claim:** primary photons reaching pixel centre `p` through finite plates have factor `T_p(E) = exp[-Σ_j μ_j(E)ℓ_pj]`, where each `ℓ_pj` is the exact source-to-pixel ray length inside plate `j`; pixel flux is `F_p(E) = I_q(p)(E) ΔΩ_p T_p(E)`

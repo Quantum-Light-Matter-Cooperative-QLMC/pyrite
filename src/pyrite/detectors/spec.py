@@ -14,7 +14,12 @@ from .._spec_defaults import UNSET as _UNSET
 from .._spec_defaults import _Unset
 from .._units import normalize_unit, reject_quantity
 from ..config.response_numerics import Timepix3ResponseNumerics
-from .acceptance import AngularAcceptance, SensorAcceptance, _explicit_angular_quantity
+from .acceptance import (
+    AngularAcceptance,
+    SensorAcceptance,
+    SlitAcceptance,
+    _explicit_angular_quantity,
+)
 
 if TYPE_CHECKING:
     from pint import Quantity
@@ -352,7 +357,7 @@ class Detector:
         ``observation_angle_deg`` (including a positional angle). Read-back
         uses a fresh degree quantity and ``with_observation_angle`` replaces it.
     acceptance
-        AngularAcceptance or SensorAcceptance. Resolved full spans in degrees
+        AngularAcceptance, SensorAcceptance or SlitAcceptance. Resolved full spans in degrees
         and solid angle in sr are available as read-only attributes. None
         retains the profile/material defaults.
     response
@@ -363,7 +368,7 @@ class Detector:
     polar_acceptance_deg: float | None = field(default=None, init=False)
     solid_angle_sr: float | None = field(default=None, init=False)
     azimuthal_acceptance_deg: float | None = field(default=None, init=False, compare=False)
-    acceptance: AngularAcceptance | SensorAcceptance | None = field(
+    acceptance: AngularAcceptance | SensorAcceptance | SlitAcceptance | None = field(
         default=None, kw_only=True, compare=False
     )
     _legacy_acceptance: tuple[float | None, float | None] = field(
@@ -376,7 +381,7 @@ class Detector:
         observation_angle_deg: float | _Unset = _UNSET,
         *,
         observation_angle: object = _UNSET,
-        acceptance: AngularAcceptance | SensorAcceptance | None = None,
+        acceptance: AngularAcceptance | SensorAcceptance | SlitAcceptance | None = None,
         response: DetectorResponse | None = None,
         _legacy_acceptance: tuple[float | None, float | None] = (None, None),
     ) -> None:
@@ -396,9 +401,11 @@ class Detector:
         elif observation_angle_deg is _UNSET:
             observation_angle_deg = 90.0
         if acceptance is not None and not isinstance(
-            acceptance, (AngularAcceptance, SensorAcceptance)
+            acceptance, (AngularAcceptance, SensorAcceptance, SlitAcceptance)
         ):
-            raise TypeError("acceptance must be AngularAcceptance or SensorAcceptance")
+            raise TypeError(
+                "acceptance must be AngularAcceptance, SensorAcceptance or SlitAcceptance"
+            )
         polar, omega = _legacy_acceptance
         object.__setattr__(self, "observation_angle_deg", observation_angle_deg)
         object.__setattr__(self, "polar_acceptance_deg", polar)
@@ -435,7 +442,9 @@ class Detector:
             _legacy_acceptance=self._legacy_acceptance,
         )
 
-    def _resolve_acceptance(self, acceptance: AngularAcceptance | SensorAcceptance) -> None:
+    def _resolve_acceptance(
+        self, acceptance: AngularAcceptance | SensorAcceptance | SlitAcceptance
+    ) -> None:
         polar, azimuthal, omega = (
             acceptance.resolve(self.observation_angle_deg)
             if isinstance(acceptance, AngularAcceptance)

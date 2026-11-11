@@ -356,6 +356,8 @@ PlanarDetector = { target = "pyrite.instrument:PlanarDetector", status = "advanc
 PlanarPose = { target = "pyrite.instrument:PlanarPose", status = "advanced-stable" }
 # Semantic distance/width/height retain numeric mm fields and exact acceptance resolution.
 SensorAcceptance = { target = "pyrite.detectors:SensorAcceptance", status = "advanced-stable" }
+# Slit-native distance/width/length/roll resolve onto the same scalar acceptance fields.
+SlitAcceptance = { target = "pyrite.detectors:SlitAcceptance", status = "advanced-stable" }
 FilterPlate = { target = "pyrite.instrument:FilterPlate", status = "advanced-stable" }
 AngularDetector = { target = "pyrite.detectors:AngularDetector", status = "advanced-stable" }
 NativeBinnedResponse = { target = "pyrite.detectors.spec:NativeBinnedResponse", status = "advanced-stable" }
