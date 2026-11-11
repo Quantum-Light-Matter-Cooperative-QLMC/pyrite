@@ -80,6 +80,7 @@ line-recoil-validity-screen
 narrow-beam-total-attenuation
 pxr-amplitude
 quantum-recoil-observability
+quantum-shaped-cxr-interference
 self-absorption
 segment-escape-average
 sinc-bin-far-envelope
