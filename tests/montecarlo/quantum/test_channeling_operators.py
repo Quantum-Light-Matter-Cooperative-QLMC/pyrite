@@ -366,6 +366,19 @@ def test_anisotropic_decoherence_rate_matches_polar_quadrature(mos2_tilted, delt
     assert got.tds[0] == pytest.approx(reference, rel=2e-5)
 
 
+@pytest.mark.parametrize(
+    ("delta", "reference"), [(0.1, 9.765012e-4), (1.0, 2.0144784e-3), (3.0735, 1.9825127e-3)]
+)
+def test_basal_decoherence_budget_matches_polar_quadrature(delta, reference):
+    # quantum-decoherence-budget MoS2(001) cell at 30 keV (#1071): the phi = 0
+    # Bessel-series branch (S = diag(u_c, u_b), no beam). Reference: direct 2D
+    # polar quadrature of (1/(2 pi hbar v)^2) sum_s n_s int d^2q v^2
+    # (1 - e^{-q.S.q})(1 - cos(q_x Delta)) with xraydb Mott--Bethe potentials
+    # (4096 angles, 40-node Gauss panels on 240 log-q intervals, 1e-4..1e4 / A).
+    basal = planar_profile("mos2", (0, 0, 1), 295.0)
+    assert decoherence_rate(basal, 3.0e4, [delta]).tds[0] == pytest.approx(reference, rel=2e-5)
+
+
 def test_anisotropic_mean_loss_depends_only_on_eigenvalues(mos2_tilted):
     # G = 0: C(x, x) averages v(|q|)^2 (1 - e^{-q.S.q}) over the plane, which is
     # invariant under rotating S; the G != 0 harmonics are not.

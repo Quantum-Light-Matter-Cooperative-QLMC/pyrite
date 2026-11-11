@@ -204,3 +204,45 @@ graphite surrogate; its equations are unchanged. Refreshed numerical results
 and source scope are in the [material survey](../../research/physics/channeling-materials.md)
 and [diamond verification](diamond-valence-oscillator.md). The original
 surrogate numbers in this historical verification are not current predictions.
+
+## MoS₂(001) TDS extension (#1071)
+
+Fresh-context verification, 2026-11-11, of the MoS₂(001) cell added after #535
+admitted 2H-MoS₂ uniaxial thermal rows. Item 7's "MoS₂ not computable" above is
+historical. Scope: the TDS term only; the electronic term stays unsupported
+because `decoherence_rate` has only the scalar radial response and the
+directional MoS₂ valence model is provisional (#541).
+
+- **Formula.** For an anisotropic site with transverse covariance $S$,
+  $\Gamma_{\rm TDS}=\sum_s n_s/(2\pi\hbar v)^2\int d^2q\,v_s^2(1-e^{-q\cdot S\cdot q})(1-\cos q_x\Delta)$.
+  The basal plane normal is $c$, so $S=\mathrm{diag}(u_c,u_b)$ for every
+  in-plane $y$ and the rate is beam independent. Jacobi–Anger gives
+  $e^{-\bar s q^2}\sum_n\varepsilon_n I_n(\rho q^2)\cos(n\varphi)J_{2n}(q\Delta)$
+  with $\varphi=0$, $\rho=(u_c-u_b)/2$; the code's
+  $e^{-\lambda_{\min}q^2}\,\mathrm{ive}(n,\rho q^2)$ is the same term.
+- **Inputs at run time.** Mo $(0.0077, 0, 0.0048)$ and S $(0.0049, 0, 0.0038)$ Å²;
+  2 Mo + 4 S in $V=106.316$ Å³; period $c/2=6.147$ Å.
+- **Independent quadrature (30 keV).** Own spline of xraydb $f_0$ and direct
+  polar quadrature, no Bessel series:
+
+  | Δ [Å] | verifier [Å⁻¹] | code [Å⁻¹] | relative |
+  |---|---|---|---|
+  | 0.1 | 9.765011e-4 | 9.765099e-4 | +9.0e-6 |
+  | 1.0 | 2.0144782e-3 | 2.0144872e-3 | +4.5e-6 |
+  | 3.0735 | 1.9825125e-3 | 1.9825216e-3 | +4.6e-6 |
+
+  The pinned references of `test_basal_decoherence_budget_matches_polar_quadrature`
+  agree with the verifier to 1e-7. Model sensitivity (not error): an additive
+  instead of multiplicative $f_0$ normalization shifts the rate by −1.2e-3; a
+  $q$ cutoff at 1e3 instead of 1e4 Å⁻¹ by −1.3e-4.
+- **Limits.** $\Gamma(0)=0$ exactly ($J_{2n}(0)=\delta_{n0}$); $\Gamma(100)=\Gamma(1000\,\text{Å})$;
+  $\beta^2\Gamma(1\,\text{Å})=2.17224\times10^{-4}$ Å⁻¹ at all four energies
+  (check spread 2.1e-15).
+- **Support.** Each channel adds $\tfrac12\langle|L_k(x)-L_k(x+\Delta)|^2\rangle\ge0$,
+  so TDS-only $1/\Gamma$ values are upper bounds and $\Gamma L_{\rm CR}$,
+  $2\Gamma/\Delta^2$ lower bounds. They hold relative to the modelled Einstein,
+  first-Born TDS with uncorrected ADPs; at 30 keV $Z\alpha/\beta\approx0.93$ for Mo
+  (≤ 0.40 from 0.3 MeV). $L_{\rm CR}$ comes from the anchored basal profile and is
+  diagnostic; $L_f=1/g=0.978$ Å is geometry.
+
+**Verdict:** `rederived` for the MoS₂(001) TDS extension.

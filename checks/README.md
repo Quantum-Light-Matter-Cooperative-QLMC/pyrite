@@ -120,7 +120,7 @@ run through the collector.
 | `dans_diffraction_oracle.py` | Pinned external lattice, reciprocal-geometry, and structure-factor comparison. |
 | `kephart_occupation.py` | Kephart et al. (1989) Si occupation lengths from the density solver, through the forward-detector observable with bound-weighted y-spreading. Sweeps cutoff, band, Bloch grid and depth step (remote). `--critical-angle-multiples` and `--gap-fractions` add exploratory boundaries with explicit spectral metadata; see [boundary investigation](../docs/research/physics/dechanneling-boundary.md) (#522). `--refit` re-fits the stored runs in `docs/validation/check-records/kephart_occupation_runs/` at the declared 300 eV cutoff and gates on `--tolerance` and `--outlier` (#504). |
 | `channeling_handoff.py` | Planar channeling handoff (#506) at the production grid (Si(110), 5 MeV, `H = 16`, 16 cells, 20 um): total-variation distance of the `E_perp` free-flux marginal per 5 um chunk from the whole-depth marginal (the separable-sampling assumption, gated on `--tolerance`), overflow share and mean free handoff angle in units of `psi_c`. About 10 s on CPU. |
-| `quantum_decoherence_budget.py` | Research (#501): cell-averaged transverse decoherence rate `Γ(Δx)` of the #504 jump operators for Si(110) and diamond(110) at 30 keV–30 MeV (diamond electronic through a graphite-oscillator surrogate), against CR and PXR/CBS formation lengths; reports HOPG/vdW cells as not computable. Gates `Γ(0) = 0`, TDS saturation and `1/v²` scaling. Under a second. |
+| `quantum_decoherence_budget.py` | Research (#501): cell-averaged transverse decoherence rate `Γ(Δx)` of the #504 jump operators for Si(110), diamond(110) and MoS₂(001) at 30 keV–30 MeV (MoS₂ TDS only, printed as bounds; its electronic rate is unsupported, #541), against CR and PXR/CBS formation lengths; reports HOPG, hBN and WSe₂ (001) as not computable and fails if a cell's data appear or vanish. Gates `Γ(0) = 0`, TDS saturation and `1/v²` scaling. About 20 s. |
 | `channeling_modulated_emission.py` | Research prototype (#501): channeling-modulated local incoherent emission factor `F(z)` and depth-averaged yield `Y(L)` for aligned/tilted plane waves and d-periodic shaped combs in Si(110) at 0.3/3/17 MeV, from the density solver. Gates the plane-wave and converter limits. About 1.5 min on CPU. |
 | `detector_solid_angle_check.py` | Solid-angle integration and analytic aperture-width comparison; the integrated-spectrum route is not separately ledgered. |
 | `zhai_hbn_energy_trend.py` | Remote-only S5b h-BN sensitivity diagnostic: Friedel pairing, escape, basal reflections, Debye–Waller factors, bin quadrature, and detector response stages. Reports model factors; approximate paper peaks are not regression targets. |
@@ -376,6 +376,8 @@ energies and audited all four HOPG/vdW entries. No rate bound was relaxed or
 material assertion removed. Nonfinite rates and limit statistics now fail
 rather than evade comparisons. Diagnostic channeling-radiation formation
 lengths can remain unavailable when fewer than two bound states exist.
+After the #1071 coverage review (MoS₂(001) TDS-only), lab job 10922 at
+`8d5f02f7c` ran the same no-argument invocation: pass, 20.13 s, 372,656 KiB.
 
 The emission sample retained all defaults: Si(110), 0.3/3/17 MeV, 16 cells,
 maximum order 16, 2 micrometres, and all prescribed entry states/tilts. No
