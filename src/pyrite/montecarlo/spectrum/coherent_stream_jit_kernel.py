@@ -222,7 +222,7 @@ def _coherent_prologue_kernel(
     resonance_denom = denom[segment] + recoil_den
     vacuum_denom = resonance_denom
     v_dot_g = vx * gx + vy * gy + vz * gz
-    numerator = v_dot_g - recoil_num
+    line_numerator = v_dot_g - recoil_num
 
     # First-order Snell fixed point: D = (1-v.n) - delta v.grad L on the
     # cancellation-free vacuum factor and decrement table (see the CPU twin).
@@ -238,7 +238,7 @@ def _coherent_prologue_kernel(
     if use_medium:
         previous_denominator = resonance_denom
         for _it in range(3):
-            trial_energy_eV = hbarc * (numerator / resonance_denom)
+            trial_energy_eV = hbarc * (line_numerator / resonance_denom)
             trial_below = trial_energy_eV <= E_tab[U32_ZERO]
             trial_above = trial_energy_eV >= E_tab[n_samples - U32_ONE]
             trial_upper = _bracket_index(E_tab, trial_energy_eV, n_samples)
@@ -260,7 +260,7 @@ def _coherent_prologue_kernel(
         ):
             return
 
-    omega = numerator / resonance_denom
+    omega = line_numerator / resonance_denom
     resonance_eV = hbarc * omega
     if resonance_eV <= lo_keep or resonance_eV <= F32_TEN or resonance_eV >= hi_keep:
         return
@@ -388,7 +388,7 @@ def _coherent_prologue_kernel(
     # Formation mode centres the line on the VACUUM sinc centre and width; the
     # field kernels add the escape-path refractive slope (``_formation``).
     # CPU twin of the exact centre, width and age phase: ``_recoil_formation_line``.
-    vacuum_omega = numerator / vacuum_denom
+    vacuum_omega = line_numerator / vacuum_denom
     vacuum_fraction = vacuum_omega * inv_energy
     vacuum_kappa = F32_ONE / (F32_ONE - vacuum_fraction)
     if use_formation:

@@ -494,8 +494,8 @@ def test_prologue_unit_index_reproduces_the_vacuum_kinematics():
     med = _run_prologue(d, delta_tab=np.zeros_like(d["delta_tab"]))
 
     np.testing.assert_array_equal(med[0], vac[0])  # E_r
-    np.testing.assert_array_equal(med[1], np.tile(vac[1], d["n_g"]))  # aw, pair layout
-    for got, want in zip(med[2:], vac[2:], strict=True):
+    # aw and phase_slope are pair layout in both (line-recoil-in-medium-root).
+    for got, want in zip(med[1:], vac[1:], strict=True):
         np.testing.assert_array_equal(got, want)
 
 
