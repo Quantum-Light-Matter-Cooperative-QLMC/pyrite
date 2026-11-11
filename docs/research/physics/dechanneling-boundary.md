@@ -668,6 +668,67 @@ this method. At 120 µm (17 MeV) the control retains ≈ 0.5%, below the
 Hoeffding allowance, and the unresolved cap is undefined. Kephart's slabs
 reach 120 and 500 µm. The budgets therefore stop at 60 and 100 µm.
 
+### Two-time source vs the secular line model
+
+`cr-planar-fiber-regression` gives the on-axis spectrum of the same
+fixed-energy model directly from the two-time correlation
+$G(z_i,z_j)$, with no secular approximation, mode profile or capture
+clustering. `checks/planar_fiber_spectrum.py` compares it with production
+`channeling_spectrum`: same profile, kernels and 300 eV margin, θ = 0, zero
+aperture and divergence, plane-wave entry at zero incidence, photon
+absorption off. Both sides use the same partition: bound→bound plus capture
+into bound states. The production Bloch grid is converged (16 and 32
+cells agree to 0.1%). Halving the depth step changes fibre totals by
+≤ 2e-4. Evidence:
+[check record](../../validation/check-records/planar_fiber_runs/README.md),
+remote array 11248, 4000 primaries per case.
+
+Total on-axis yield, fibre ÷ production (SEM about 0.005):
+
+| Case | 0.5 µm | 1 µm | 2 µm | Production capture share (0.5 / 1 / 2 µm) |
+|---|---:|---:|---:|---:|
+| `channeling_demo`, Si(110) 17 MeV | 1.024 | 1.010 | 1.018 | 0.16 / 0.16 / 0.16 |
+| Si(100), 16.92 MeV | 1.041 | 1.029 | 1.025 | 0.76 / 0.66 / 0.57 |
+
+Per line window (bounded by midpoints between Doppler-shifted Bohr energies
+at κ = 0), `channeling_demo`:
+
+| Window | 0.5 µm yield ratio / RMS width ratio / centroid shift | 2 µm |
+|---|---|---|
+| 1→0 (14.4–26 keV) | 1.30 / 1.39 / +99 eV | 1.04 / 1.11 / −7 eV |
+| 2→1 (8.6–14.4 keV) | 0.88 / 1.57 / +757 eV | 1.03 / 1.14 / +146 eV |
+| 3→2 (4.7–8.6 keV) | 1.76 / 1.03 / +179 eV | 0.98 / 1.06 / +124 eV |
+| < 4.7 keV (82–88% capture in production) | 0.72 / 1.15 / +449 eV | 0.88 / 0.92 / +202 eV |
+
+Batch SEMs are ≤ 0.024 on ratios and ≤ 14 eV on shifts.
+
+- **Totals agree within 1–4%.** The secular model's line yields carry the
+  right integrated emission at these depths, capture included.
+- **Thin slabs: line shape, not yield.** At 0.5 µm the two-time lines are
+  much broader, as the finite-thickness transit profile requires: an
+  isolated scattering-free line has the sinc² profile of width
+  $\sim2\pi\hbar v/L$. The production mode profile is stationary and omits
+  this. The broad 2→1 line spills into the neighbouring windows. That is why
+  3→2 reads 1.76 and 2→1 reads 0.88 although the total agrees. The
+  differences shrink with thickness: 2→1 width ratio 1.57 → 1.30 → 1.14 at
+  0.5/1/2 µm.
+- **At 2 µm** (the demo thickness), strong-line yields agree within ±4%.
+  Two-time widths remain 6–14% larger, with centroid shifts up to +150 eV
+  on 2→1 and 3→2. The capture-dominated low-energy window is 12% lower in
+  the two-time source. That is where production's capture clustering and
+  the dropped cross terms between near-degenerate free→bound transitions
+  enter.
+- **Si(100)** has nearly coincident 1→0 and 3→2 Bohr energies (13.8 and
+  13.6 keV), so its per-window split is not meaningful. Their combined
+  window reads 1.29 / 1.10 / 1.05 at 0.5/1/2 µm, with the same
+  thin-slab broadening pattern. Its low-energy window is almost all capture
+  (97–99%) and agrees within 7%.
+
+Scope: the comparison isolates the emission model at fixed energy, on
+axis, without absorption or divergence. It does not test the secular
+model's divergence or aperture quadrature, stopping, or post-handoff
+emission (absent from both).
+
 ## Reproduction
 
 Run on the lab through an isolated `pyrite remote sync` checkout and SLURM;

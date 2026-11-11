@@ -61,3 +61,18 @@ unchanged.
   every arm's settings, CPU time, the per-interval bounds and audit
   (paired differences, SEs, `t` quantile, drift shifts), and the fate caps
   with their fractions.
+
+## Two-time source vs secular line model (`spectrum/`)
+
+Harness `checks/planar_fiber_spectrum.py`; model `cr-planar-fiber-regression`.
+Remote array 11248 (qlmc, 2026-11-11), isolated copy `~/pyrite-1056-spectrum`
+from `git archive` of `8179040b0` (`PYRITE_SOURCE_REVISION` in `submit.sh`).
+Task `id`: case `id // 50` in `(demo_17, si100_17, si110_5)`; slots 0–39 are
+`control` chunks of 100 primaries (incidents `slot * 100 ..`), slots 40–49
+the paired half-step `fine` chunks (incidents 0–999). `report-<case>.json`
+is `analyze <case> <control chunks> --fine <fine chunks>` run on the remote
+copy, so the production reference uses the same revision.
+`outputs-11248-*.sha256` hash the chunks, which remain at
+`qlmc:~/pyrite-1056-spectrum/scratch/spectrum/`. The demo and Si(100) arms
+have completed and are recorded here. Si(110) 5 MeV is still running and will
+be added when it completes.
