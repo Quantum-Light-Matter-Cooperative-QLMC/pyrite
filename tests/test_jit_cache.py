@@ -201,9 +201,11 @@ _CORE_KEY = textwrap.dedent(
 def test_transport_core_cache_key_is_stable_across_processes():
     """Regression (#910): ``core`` captured ``body`` and missed in every process."""
 
+    env = {k: v for k, v in os.environ.items() if k != "NUMBA_DISABLE_JIT"}
+
     def key(variant: str) -> str:
         done = subprocess.run(
-            [sys.executable, "-c", _CORE_KEY, variant], capture_output=True, text=True
+            [sys.executable, "-c", _CORE_KEY, variant], env=env, capture_output=True, text=True
         )
         assert done.returncode == 0, done.stderr
         return done.stdout.strip()
@@ -213,6 +215,9 @@ def test_transport_core_cache_key_is_stable_across_processes():
     assert first != key("radiative")
 
 
+@pytest.mark.skipif(
+    os.environ.get("NUMBA_DISABLE_JIT") == "1", reason="needs compiled Numba dispatchers"
+)
 def test_transport_core_digest_reaches_module_attribute_callees():
     """Regression (#991): ``_cutoff.*``/``_moments.*`` edits invalidate the core.
 
