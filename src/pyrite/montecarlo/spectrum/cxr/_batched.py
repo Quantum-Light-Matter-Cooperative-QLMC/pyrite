@@ -1020,6 +1020,7 @@ def _accumulate_batched(st):
         # decoherence-relevant offset is configured, so this is a no-op swap
         # in that (default) case. See the
         # coherent-inter-electron-decoherence block above.
+        _coh_centre = xp.ascontiguousarray(d_all_geom, dtype=REAL)
         _coh_phase_slope = xp.ascontiguousarray(d_all_geom / HBARC_EV_ANG, dtype=REAL)
         # Piece-end escape distances for the formation factor: the prologue
         # turns them into per-(segment, g) attenuation constants, and half
@@ -1093,6 +1094,7 @@ def _accumulate_batched(st):
                 table_row=bt.ROW_TABLE,
                 inverse_energy=_coh_inverse_energy[sel],
                 age=_coh_age[sel],
+                centre_ang=_coh_centre[sel],
                 config=DEFAULT_COHERENT_STREAM_KERNEL_CONFIG,
             )
             # Formation mode appends the pair-layout attenuation constants

@@ -282,7 +282,7 @@
     {
       "path": "src/pyrite/materials/emission.py",
       "name": "photon_energies",
-      "cc": 26
+      "cc": 23
     },
     {
       "path": "src/pyrite/montecarlo/case.py",

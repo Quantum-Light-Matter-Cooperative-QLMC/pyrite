@@ -223,32 +223,45 @@ def photon_energies(
     ca, sa = np.cos(azimuth), np.sin(azimuth)
     result = np.full((len(keys), *energy.shape), np.nan, dtype=float)
     for index, key in enumerate(keys):
-        if key not in resolved.materials:
-            raise ValueError(f"unknown catalogue material {key!r}")
-        crystal_key = resolved.materials[key].crystal_key
-        if crystal_key not in resolved.crystals:
-            raise ValueError(f"material {key!r} is noncrystalline")
-        crystal = resolved.crystals[crystal_key]
-        indices = overrides.get(key, shared_hkl)
-        if indices is None:
-            indices = _primary_hkl(crystal)
-        g, magnitude = reciprocal_g_vector(indices, crystal.lattice)
-        orientation = _orientation_R(
-            crystal.lattice, crystal.beam_uvw, 0.0, surface_hkl=crystal.surface_hkl
-        )
-        if orientation is not None:
-            g = orientation @ g
+        g, magnitude = _sample_g(resolved, key, overrides.get(key, shared_hkl))
         # R_sample_to_lab's final row is (-sin(t)*cos(a), -sin(t)*sin(a), cos(t)).
         signed = -st * (ca * g[0] + sa * g[1]) + ct * g[2]
         projection = np.abs(signed)
         if recoil:
             photon = _exact_photon(energy, g, signed, (st, ct, ca, sa), observation, obs_azimuth)
         else:
-            with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
-                photon = HBARC_EV_ANG * beta * projection / denominator
+            photon = _classical_photon(beta, projection, denominator)
         keep = (projection > 1e-12 * magnitude) & (photon > 0) & (photon <= energy)
         result[index] = np.where(keep, photon, np.nan)
     return result
+
+
+def _sample_g(catalog, key, indices):
+    """Sample-frame reciprocal vector and ``|g|`` of a material's reflection.
+
+    ``indices=None`` selects :func:`_primary_hkl`.
+    """
+    if key not in catalog.materials:
+        raise ValueError(f"unknown catalogue material {key!r}")
+    crystal_key = catalog.materials[key].crystal_key
+    if crystal_key not in catalog.crystals:
+        raise ValueError(f"material {key!r} is noncrystalline")
+    crystal = catalog.crystals[crystal_key]
+    if indices is None:
+        indices = _primary_hkl(crystal)
+    g, magnitude = reciprocal_g_vector(indices, crystal.lattice)
+    orientation = _orientation_R(
+        crystal.lattice, crystal.beam_uvw, 0.0, surface_hkl=crystal.surface_hkl
+    )
+    if orientation is not None:
+        g = orientation @ g
+    return g, magnitude
+
+
+def _classical_photon(beta, projection, denominator):
+    """Classical vacuum root ``hbar c beta |u.g| / (1 - beta u.n)``."""
+    with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
+        return HBARC_EV_ANG * beta * projection / denominator
 
 
 def _exact_photon(energy, g, signed, tilt_trig, observation, obs_azimuth):

@@ -156,7 +156,7 @@ def _coherent_prologue_kernel(
     delta_tab,
     inverse_energy,
     age,
-    phase_slope_seg,
+    centre_ang,
     E_r_out,
     aw_out,
     phase_slope_out,
@@ -392,7 +392,8 @@ def _coherent_prologue_kernel(
     vacuum_fraction = vacuum_omega * inv_energy
     vacuum_kappa = F32_ONE / (F32_ONE - vacuum_fraction)
     if use_formation:
-        E_r_out[pair_index] = hbarc * vacuum_omega
+        # Same rounding order as the CPU twin: (hbar c N) / D.
+        E_r_out[pair_index] = (hbarc * line_numerator) / vacuum_denom
         aw_out[pair_index] = (vacuum_kappa * vacuum_denom) * duration / (F32_TWO * hbarc)
         apb_out[pair_index] = end_sum
         bma_out[pair_index] = end_diff
@@ -400,7 +401,8 @@ def _coherent_prologue_kernel(
     segment_age = age[segment]
     d_shift = vacuum_kappa * (vacuum_fraction * denom[segment] + recoil_den) * segment_age
     g_shift = vacuum_kappa * (vacuum_fraction * v_dot_g - recoil_num) * segment_age
-    phase_slope_out[pair_index] = phase_slope_seg[segment] + d_shift / hbarc
+    # (d + d_shift) / hbar c, the CPU twin's rounding order.
+    phase_slope_out[pair_index] = (centre_ang[segment] + d_shift) / hbarc
     position_offset = segment * U32_THREE
     g_phase_out[pair_index] = (
         r_flat[position_offset] * gx
@@ -860,10 +862,17 @@ def _formation_args(half_dL, apb, bma, q, *, use_medium, n_seg, n_pairs):
     return True, half_dL, apb, bma, q
 
 
-def _recoil_args(inverse_energy, age, n_segments):
-    """Per-segment float32 ``hbar c/E`` and age; an omitted one is zero."""
+def _recoil_args(inverse_energy, age, centre_ang, default_centre, n_segments):
+    """Per-segment float32 ``hbar c/E``, age and centre ``d``.
+
+    An omitted ``hbar c/E`` or age is zero; an omitted centre is
+    ``default_centre``.
+    """
+    if centre_ang is None:
+        centre_ang = default_centre
     out = []
-    for name, values in (("inverse_energy", inverse_energy), ("age", age)):
+    named = (("inverse_energy", inverse_energy), ("age", age), ("centre_ang", centre_ang))
+    for name, values in named:
         if values is None:
             values = xp.zeros(n_segments, dtype=xp.float32)
         values = xp.ascontiguousarray(values, dtype=xp.float32)
@@ -920,6 +929,7 @@ def run_coherent_prologue_kernel(
     table_row=None,
     inverse_energy=None,
     age=None,
+    centre_ang=None,
     config=DEFAULT_COHERENT_STREAM_KERNEL_CONFIG,
 ):
     """Build g-major coherent line data for one contiguous segment block.
@@ -963,7 +973,9 @@ def run_coherent_prologue_kernel(
     [Angstrom] and the electron's own midpoint ``age`` [Angstrom]; omitted,
     both are zero (the classical root). The root, width, and the recoil
     phase over the age then follow ``cxr._kernels._recoil_formation_line``,
-    so ``phase_slope`` is returned in the pair layout.
+    so ``phase_slope`` is returned in the pair layout as ``(d + d_shift) /
+    hbar c``. ``centre_ang`` is the per-segment ``d`` [Angstrom]; omitted, it
+    is ``phase_slope_seg * hbarc``.
     Validation: line-recoil-in-medium-root
     """
     n_threads = int(config.prologue_nthreads)
@@ -1055,7 +1067,9 @@ def run_coherent_prologue_kernel(
 
     if not use_medium:
         delta_tab = _dummy()
-    inverse_energy, age = _recoil_args(inverse_energy, age, n_segments)
+    inverse_energy, age, centre_ang = _recoil_args(
+        inverse_energy, age, centre_ang, phase_slope_seg * np.float32(hbarc), n_segments
+    )
     if use_formation:
         apb_out, bma_out, q_out = formation
     else:
@@ -1099,7 +1113,7 @@ def run_coherent_prologue_kernel(
             delta_tab,
             inverse_energy,
             age,
-            xp.ascontiguousarray(phase_slope_seg, dtype=xp.float32),
+            centre_ang,
             resonances_eV,
             aw_seg,
             phase_slope_pair,
