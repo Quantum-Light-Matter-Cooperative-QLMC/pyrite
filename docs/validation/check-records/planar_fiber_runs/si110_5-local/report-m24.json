@@ -1,0 +1,111 @@
+{
+  "info": {
+    "case": {
+      "key": "si110_5",
+      "hkl": [
+        1,
+        1,
+        0
+      ],
+      "kinetic_energy_eV": 5000000.0,
+      "divergence_rad": 0.0,
+      "thickness_um": 20.0,
+      "order_max": 16
+    },
+    "arm": "absorbing",
+    "seed": 0,
+    "start": 0,
+    "count": 1000,
+    "margin_eV": 300.0,
+    "order_max": 16,
+    "outgoing_order_max": 16,
+    "cutoff_eV": 306.6243444390868,
+    "barrier_eV": 6.624344439086843,
+    "well_bottom_eV": -14.415722663269918,
+    "k_inv_ang": 2780.794090824429,
+    "gamma": 10.784755917795916,
+    "g_inv_ang": 3.2722995732997227,
+    "seconds": 74.93276643799618,
+    "source_sha": "7cd7d29e7eab15101149735959ad30c56d76c5ac"
+  },
+  "cpu_seconds": 349.04547762000584,
+  "handoff": {
+    "psi_c_rad": 0.0027752264130277145,
+    "incidents": 4000,
+    "retained_fraction": 0.16100000000000006,
+    "outgoing_fraction": 0.7005000000000001,
+    "outgoing_abs_psi_over_psi_c": {
+      "mean": 4.709660646361824,
+      "sem": 0.014946769314537986,
+      "quantiles_10_50_90": [
+        3.8874380669696804,
+        4.4828731863631575,
+        5.901947555589344
+      ]
+    },
+    "unresolved_fraction": 0.010500000000000004,
+    "tail_fraction": 0.128,
+    "tail_abs_psi_over_psi_c": {
+      "mean": 12.475737218044817,
+      "sem": 0.4038909437399714,
+      "quantiles_10_50_90": [
+        7.399410171578225,
+        9.417508498112582,
+        20.256852707209895
+      ]
+    },
+    "cut_angle_over_psi_c": 3.9062142361580943,
+    "band_edge_over_psi_c": 6.996321331460844,
+    "depth_um_terminal_mean": 7.814654327346219
+  },
+  "occupation": {},
+  "reference_handoff": {
+    "psi_c_rad": 0.0027752264130277145,
+    "incidents": 4000,
+    "retained_fraction": 0.72525,
+    "outgoing_fraction": 0.0,
+    "unresolved_fraction": 0.042499999999999996,
+    "tail_fraction": 0.23224999999999998,
+    "tail_abs_psi_over_psi_c": {
+      "mean": 15.125539023202938,
+      "sem": 0.3209859752306396,
+      "quantiles_10_50_90": [
+        10.564773356100574,
+        11.936553036948645,
+        22.67245078870321
+      ]
+    },
+    "band_edge_over_psi_c": 10.388477128532768,
+    "depth_um_terminal_mean": 11.199827498412407
+  },
+  "reference_occupation": {},
+  "return_deficit": {
+    "incidents": 4000,
+    "depth_um": [
+      1.0,
+      5.0,
+      20.0,
+      20.0
+    ],
+    "bound": {
+      "absorbing": [
+        0.32907587448904574,
+        0.12090541104407565,
+        0.02240859819316673,
+        0.02240859819316673
+      ],
+      "deficit": [
+        0.001267905933316493,
+        0.006920976530896819,
+        0.025862364863513242,
+        0.025862364863513242
+      ],
+      "deficit_sem": [
+        0.0012982294676753521,
+        0.002108810859658744,
+        0.0015423192651356815,
+        0.0015423192651356815
+      ]
+    }
+  }
+}

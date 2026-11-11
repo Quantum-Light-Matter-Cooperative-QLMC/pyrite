@@ -506,6 +506,95 @@ stamp; testing a later production revision is a separate comparison.
 The differential overflow instrument uses the separate revision and owner
 hashes recorded in its array-1614 `submit.sh`, not the boundary-sweep stamp.
 
+## Carrier-fibred planar reference (#1056)
+
+`cr-planar-fiber-unraveling` maps the same planar Lindblad model onto the
+axial fibre engine. The Bloch carrier is continuous and TDS transfers are
+exact and continuous. String outputs outside the window are recorded as
+tails with their exact $(k_x,q_y)$, and the out-of-plane angle of every
+trajectory is carried exactly. Two arms share seeds and incident IDs:
+absorbing at the declared 300 eV margin, and `P = R`, which retains the
+whole order window. Evidence:
+[check record](../../validation/check-records/planar_fiber_runs/README.md),
+remote array 10928 (2000 incidents per arm) and local 5 MeV runs (4000).
+These are fixed-energy model diagnostics, not a replacement boundary.
+
+### Handoff angles
+
+Absorbing arm, terminal angles in units of $\psi_c=\sqrt{2D/pv}$:
+
+| Case | Outgoing mean (median) | Cut angle | Tail share | Tail median (90%) | Band edge of window |
+|---|---:|---:|---:|---:|---:|
+| Si(110), 5 MeV, 20 µm | 4.71 (4.48) | 3.91 | 0.128 | 9.42 (20.3) | 7.00 |
+| Si(110), 17 MeV | 4.61 (4.33) | 3.91 | 0.078 | 10.3 (23.3) | 7.75 |
+| Si(100), 17 MeV | 6.20 (5.77) | 5.17 | 0.074 | 14.4 (32.8) | 11.1 |
+| Si(100), 54.5 MeV | 5.86 (5.51) | 5.17 | 0.084 | 12.8 (23.7) | 9.31 |
+| Si(110), 54.5 MeV | 4.40 (4.19) | 3.91 | 0.088 | 8.47 (15.9) | 6.51 |
+
+The SEMs of the outgoing means are 0.015–0.03. Exact momentum sampling
+reproduces the #522 clustering (4.7 ψc at 5 MeV Si(110)): it is set by the
+300 eV cut, not by the solver's Bloch grid. About 8–13% of incidents leave
+the window by TDS. Their median angle is 1.3–1.4 times the band-edge angle
+of the window they leave, with a heavy upper tail. The band-edge
+assignment therefore understates these angles; it is not a lower bound for
+the angle distribution either, since the 10% quantile is about 1.1 times the
+edge. The angles depend on the window (the 5 MeV tail median is 9.4 ψc at
+M = 16 and 11.9 ψc in the `P = R` arm at M = 24).
+
+### Occupation lengths at 300 eV
+
+Fitted lengths [µm] from the radiation-weighted band signal and their
+ratios to Kephart Table I. "Detector" applies the forward-detector factor
+$(1+\gamma^2\theta_y^2)^{-2}$ per trajectory, using the exact carried
+$\theta_y$. The harness's `detector_ratio.bound` instead averages that
+factor over a modelled $\theta_y$ distribution with bound-weighted rates.
+Batch-means SEM on 10 batches.
+
+| Case | Fibre L (SEM) | Ratio | Fibre detector ratio | DM L, H32/24, 16 cells, dz 62.5 Å | DM `detector_ratio.bound` |
+|---|---:|---:|---:|---:|---:|
+| Si(110), 17 MeV, n=1 | 20.10 (0.47) | 1.005 | 0.945 | 18.71 | 0.809 |
+| Si(110), 17 MeV, n=2 | 19.82 (0.39) | 1.166 | 1.097 | 18.57 | 0.945 |
+| Si(110), 17 MeV, n=3 | 18.80 (0.45) | 1.106 | 1.042 | 18.48 | 0.941 |
+| Si(100), 17 MeV | 17.88 (0.63) | 1.118 | 1.049 | 18.63 | 1.005 |
+| Si(100), 54.5 MeV | 42.7 (1.2) | 1.779 | **1.538** | — | 1.233 (H32, dz 125 Å screening) |
+| Si(110), 54.5 MeV | 44.4 (1.2) | 1.232 | 1.071 | — | 0.796 (same) |
+
+At 17 MeV, the continuous model and the density-matrix solver agree within
+7% (at most 3σ, with the solver's dz 62.5 Å balance defect near −0.02). The
+detector correction is weaker with the exact carried angle (about −6%) than
+with the modelled bound-weighted spreading (about −14%). At 54.5 MeV the
+fibre removes the finite-window overflow that dominated the screening runs.
+Both planes then give nearly equal lengths (36.9 and 38.6 µm on the detector
+observable, against measured 24 and 36 µm). Si(100) moves further outside
+tolerance. The 300 eV margin was calibrated through the solver's window
+and observable. In the continuous model it does not reproduce the plane
+dependence at 54.5 MeV. A refit would again be calibration; the measured
+statement is negative for 300 eV.
+
+### Return deficit (`P = R` minus absorbing)
+
+The below-barrier population $N_B$ per incident is paired by incident:
+
+| Case | z [µm] | $N_B$ absorbing | Deficit (SEM) |
+|---|---:|---:|---:|
+| Si(110), 5 MeV | 5 / 20 | 0.121 / 0.0224 | 0.0055 (21) / 0.0190 (15) |
+| Si(110), 17 MeV | 20 / 100 | 0.0732 / 0.0010 | 0.0124 (35) / 0.0214 (15) |
+| Si(100), 17 MeV | 20 / 100 | 0.0476 / 0.0006 | 0.0167 (26) / 0.0145 (10) |
+| Si(100), 54.5 MeV | 20.8 / 100 | 0.108 / 0.0209 | 0.0048 (40) / 0.0244 (26) |
+| Si(110), 54.5 MeV | 20.8 / 100 | 0.135 / 0.0255 | 0.0022 (47) / 0.0259 (30) |
+
+Return is small over the first occupation length and dominant beyond a few.
+At 100 µm the retained-window arm holds about twice the absorbing arm's
+below-barrier weight at 54.5 MeV and more than 20 times as much at 17 MeV. The `P = R` arm's fitted
+lengths are 1.7–2.8 times Kephart's on the detector observable, close to the
+earlier no-cutoff solver results. At 5 MeV the deficit grows from M = 16 to
+M = 24 (0.019 → 0.026 at 20 µm). The `P = R` reference is therefore not
+window-converged, and the deficit is numerical accounting at a fixed
+window, not a physical rechanneling fraction
+(`cr-axial-fiber-return-deficit` semantics). It does bound what an absorbing
+cut omits at these windows: the omission is not negligible beyond about one
+occupation length.
+
 ## Reproduction
 
 Run on the lab through an isolated `pyrite remote sync` checkout and SLURM;
