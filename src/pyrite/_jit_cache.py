@@ -397,9 +397,15 @@ def stabilize_closure_cache(closure, captured, key: str) -> None:
 
     ``key`` must name everything else that specializes ``captured`` (for a
     factory, its arguments): equal keys must mean equal generated code. Call
-    before the closure first compiles.
+    before the closure first compiles. A no-op when ``closure`` is not a Numba
+    dispatcher (``NUMBA_DISABLE_JIT=1`` makes ``njit`` return the plain
+    function, which has no disk cache).
     """
     from numba.core.caching import FunctionCache
+    from numba.core.dispatcher import Dispatcher
+
+    if not isinstance(closure, Dispatcher):
+        return
 
     modules = _dispatch_modules(captured)
     digest = hashlib.sha256(
