@@ -234,6 +234,42 @@ def test_electronic_channels_integrate_to_penelope_moments():
     assert close == pytest.approx(window.close[:, 0].sum() * per_electron, rel=1e-6)
 
 
+@pytest.mark.parametrize("shape", ["scalar", "matrix", "empty"])
+def test_electronic_support_masks_preserve_shell_edges(shape):
+    channels = electronic_channels(catalog_shell_oscillators("silicon"), ENERGY_EV)
+    ridge = np.sqrt(channels.distant_qmax_inv_ang**2 - channels.distant_qmin_inv_ang**2)
+    edges = np.concatenate(
+        [
+            ridge,
+            channels.close_transfer(channels.close_lower_eV),
+            [channels.close_transfer(ENERGY_EV / 2)],
+        ]
+    )
+    q = np.concatenate(
+        [np.geomspace(1e-4, 1e5, 30), edges, np.nextafter(edges, 0.0), np.nextafter(edges, np.inf)]
+    )
+    if shape == "scalar":
+        q = np.asarray(0.2)
+    elif shape == "matrix":
+        q = np.stack([q, -q])
+    else:
+        q = np.empty((2, 0))
+    # Original all-point formulas, including points just outside every
+    # shell/kinematic boundary, must agree exactly with support filtering.
+    q2 = q[..., None] ** 2 + channels.distant_qmin_inv_ang**2
+    recoil = np.sqrt(HBARC_EV_ANG**2 * q2 + M_E_EV**2) - M_E_EV
+    distant = channels.distant_ang2 / (np.pi * q2 * (1.0 + recoil / M_E_EV))
+    distant = np.where(q2 <= channels.distant_qmax_inv_ang**2, distant, 0.0).sum(axis=-1)
+    x = 2.0 * (HBARC_EV_ANG * q) ** 2 / (M_E_EV * ENERGY_EV)
+    valid = x < 1.0
+    root = np.sqrt(np.where(valid, 1.0 - x, 1.0))
+    loss = (HBARC_EV_ANG * q) ** 2 / (M_E_EV * (1.0 + root))
+    jacobian = HBARC_EV_ANG**2 / (2.0 * M_E_EV * root)
+    close = np.where(valid, channels.close_loss(loss) * jacobian / np.pi, 0.0)
+    np.testing.assert_array_equal(channels.distant(q), distant)
+    np.testing.assert_array_equal(channels.close(q), close)
+
+
 def test_uniform_density_gives_pure_momentum_diffusion(si110):
     flat = replace(si110, electron_density=si110.electron_density[:1].copy())
     kernel = electronic_kernel(flat, ENERGY_EV, **SMALL)

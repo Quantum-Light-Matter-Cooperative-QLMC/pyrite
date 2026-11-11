@@ -120,6 +120,38 @@ def test_electronic_transform_matches_single_oscillator_hankel_integral(si110, m
     assert _in_band_trace(kernel) == pytest.approx(expected, rel=2e-3)
 
 
+@pytest.mark.parametrize("eta", [0.0, 1.5])
+@pytest.mark.parametrize("cross", [0.0, 0.001])
+def test_tds_lattice_reuse_matches_direct_covariance(si110, monkeypatch, eta, cross):
+    # Reference the original, unseparated covariance integral on each
+    # retained bin; do not use the optimized lattice slices/contractions.
+    grid = {"n_cells": 3, "max_order": 2}
+    cov = (0.005, cross, 0.007)
+    monkeypatch.setattr(op, "_transverse_covariances", lambda *_: {"Si": cov})
+    fast = tds_kernel(si110, ENERGY, **grid, out_of_plane_ang=eta)
+
+    def direct(element, covariance, p, g, n_cells, harmonics, q_y):
+        bins = np.arange(-grid["max_order"] * n_cells, (grid["max_order"] + 1) * n_cells)
+        orders = (bins - bins % n_cells) // n_cells
+        return {
+            n: op._tds_strength(
+                element,
+                covariance,
+                p[np.repeat(np.abs(orders + n) <= grid["max_order"], 2)],
+                np.array([n * g]),
+                q_y,
+            )[:, 0]
+            for n in harmonics
+        }
+
+    monkeypatch.setattr(op, "_tds_order_strengths", direct)
+    reference = tds_kernel(si110, ENERGY, **grid, out_of_plane_ang=eta)
+    np.testing.assert_allclose(
+        fast.momentum_kernel, reference.momentum_kernel, rtol=1e-11, atol=1e-18
+    )
+    np.testing.assert_array_equal(fast.diagonal_coefficients, reference.diagonal_coefficients)
+
+
 def test_batch_integrator_matches_density_solver(si110):
     kernel = tds_kernel(si110, ENERGY, **GRID) + electronic_kernel(si110, ENERGY, **GRID)
     solver = DensityMatrixSolver(si110, ENERGY, kernel)

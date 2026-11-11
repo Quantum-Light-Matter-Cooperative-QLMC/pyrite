@@ -276,11 +276,17 @@ class ElectronicChannels:
 
         Validation: cr-lindblad-jump-operators
         """
-        q_perp = np.asarray(q_perp, dtype=float)[..., None]
-        q2 = q_perp**2 + self.distant_qmin_inv_ang**2
+        q_perp = np.asarray(q_perp, dtype=float)
+        # Conservative support test; retain the per-shell boundary arithmetic below.
+        active = q_perp**2 + np.min(self.distant_qmin_inv_ang**2) <= np.max(
+            self.distant_qmax_inv_ang**2
+        )
+        result = np.zeros_like(q_perp)
+        q2 = q_perp[active, None] ** 2 + self.distant_qmin_inv_ang**2
         recoil = np.sqrt(HBARC_EV_ANG**2 * q2 + M_E_EV**2) - M_E_EV
         value = self.distant_ang2 / (np.pi * q2 * (1.0 + recoil / M_E_EV))
-        return np.where(q2 <= self.distant_qmax_inv_ang**2, value, 0.0).sum(axis=-1)
+        result[active] = np.where(q2 <= self.distant_qmax_inv_ang**2, value, 0.0).sum(axis=-1)
+        return result[()]
 
     def close_loss(self, loss_eV):
         """Close Møller ``dsigma/dW`` per electron [angstrom^2 / eV], summed over shells.
@@ -312,10 +318,12 @@ class ElectronicChannels:
         q = np.asarray(q_perp, dtype=float)
         x = 2.0 * (HBARC_EV_ANG * q) ** 2 / (M_E_EV * self.energy_eV)
         valid = x < 1.0
-        root = np.sqrt(np.where(valid, 1.0 - x, 1.0))
-        loss = (HBARC_EV_ANG * q) ** 2 / (M_E_EV * (1.0 + root))
+        root = np.sqrt(1.0 - x[valid])
+        loss = (HBARC_EV_ANG * q[valid]) ** 2 / (M_E_EV * (1.0 + root))
         jacobian = HBARC_EV_ANG**2 / (2.0 * M_E_EV * root)  # dW / dq_perp^2
-        return np.where(valid, self.close_loss(loss) * jacobian / np.pi, 0.0)
+        result = np.zeros_like(q)
+        result[valid] = self.close_loss(loss) * jacobian / np.pi
+        return result
 
     def weight(self, q_perp):
         """Total ``dsigma/d^2q_perp`` per electron [angstrom^4]."""
@@ -667,6 +675,40 @@ def _tds_diagonal(profile, sites, covariances, hbar_v, max_harmonic):
     return coefficients / (2.0 * np.pi * hbar_v) ** 2
 
 
+def _tds_order_strengths(element, cov, p, g, n_cells, harmonics, q_y):
+    """Reuse lattice-shifted potential samples across TDS harmonics.
+
+    ``p`` has the same two quadrature offsets in every momentum bin. A shift
+    by ``n g`` is therefore a slice offset of ``2 n n_cells``. For ``S_xy = 0``
+    the Gaussian also separates into a momentum factor and a q_y factor, so
+    two contractions replace the full covariance arrays for each harmonic.
+    The original covariance expression handles nonzero ``S_xy``.
+
+    Validation: cr-lindblad-jump-operators, cr-planar-exit-out-of-plane
+    """
+    sxx, sxy, syy = cov
+    nodes, weights = q_y
+    values = None if sxy != 0.0 else _potential(element, np.hypot(p[:, None], nodes))
+    damped_weights = weights * np.exp(-syy * nodes**2)
+    strengths = {}
+    for n in harmonics:
+        shift = 2 * n * n_cells
+        start, stop = max(0, -shift), min(p.size, p.size - shift)
+        bra, ket = slice(start, stop), slice(start + shift, stop + shift)
+        if values is None:
+            strengths[n] = _tds_strength(element, cov, p[bra], np.array([n * g]), q_y)[:, 0]
+            continue
+        plain = np.einsum("pi,pi,i->p", values[ket], values[bra], weights)
+        damped = np.einsum("pi,pi,i->p", values[ket], values[bra], damped_weights)
+        damping = np.exp(-0.5 * sxx * (p[ket] ** 2 + p[bra] ** 2))
+        strengths[n] = (
+            2.0
+            * (np.exp(-0.5 * sxx * (n * g) ** 2) * plain - damping * damped)
+            / (2.0 * np.pi) ** 2
+        )
+    return strengths
+
+
 def tds_kernel(
     profile: PlanarProfile,
     kinetic_energy_eV: float,
@@ -721,17 +763,19 @@ def tds_kernel(
     kernel = np.zeros((n_cells, size, size), dtype=complex)
     residue = bins % n_cells
     bra_order = (bins - residue) // n_cells
-    for n in range(-min(max_harmonic, 2 * max_order), min(max_harmonic, 2 * max_order) + 1):
+    harmonics = range(-min(max_harmonic, 2 * max_order), min(max_harmonic, 2 * max_order) + 1)
+    strengths = {
+        element: _tds_order_strengths(element, covariances[element], p, g, n_cells, harmonics, q_y)
+        for element in sites
+    }
+    for n in harmonics:
         ket_order = bra_order + n
         keep = np.abs(ket_order) <= max_order
         if not keep.any():
             continue
-        p_keep = p.reshape(bins.size, sub.size)[keep].ravel()
         entry = np.zeros(int(keep.sum()), dtype=complex)
         for element, density in sites.items():
-            strength = _tds_strength(element, covariances[element], p_keep, np.array([n * g]), q_y)[
-                :, 0
-            ]
+            strength = strengths[element][n]
             binned = strength.reshape(-1, sub.size) @ (0.5 * width * sub_w)
             entry += density[max_harmonic + n] * binned
         kernel[residue[keep], ket_order[keep] + max_order, bra_order[keep] + max_order] += entry
