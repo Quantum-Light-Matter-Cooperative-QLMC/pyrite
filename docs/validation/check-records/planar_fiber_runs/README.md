@@ -73,6 +73,5 @@ the paired half-step `fine` chunks (incidents 0–999). `report-<case>.json`
 is `analyze <case> <control chunks> --fine <fine chunks>` run on the remote
 copy, so the production reference uses the same revision.
 `outputs-11248-*.sha256` hash the chunks, which remain at
-`qlmc:~/pyrite-1056-spectrum/scratch/spectrum/`. The demo and Si(100) arms
-have completed and are recorded here. Si(110) 5 MeV is still running and will
-be added when it completes.
+`qlmc:~/pyrite-1056-spectrum/scratch/spectrum/`. All 150 tasks have completed with
+`Exit status: 0`; peak RSS was 0.75 GiB.

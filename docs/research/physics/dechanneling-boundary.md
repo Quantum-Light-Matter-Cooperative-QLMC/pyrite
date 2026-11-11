@@ -689,6 +689,7 @@ Total on-axis yield, fibre ÷ production (SEM about 0.005):
 |---|---:|---:|---:|---:|
 | `channeling_demo`, Si(110) 17 MeV | 1.024 | 1.010 | 1.018 | 0.16 / 0.16 / 0.16 |
 | Si(100), 16.92 MeV | 1.041 | 1.029 | 1.025 | 0.76 / 0.66 / 0.57 |
+| Si(110), 5 MeV | 1.022 | 1.023 | 1.024 | 0.07 / 0.09 / 0.12 |
 
 Per line window (bounded by midpoints between Doppler-shifted Bohr energies
 at κ = 0), `channeling_demo`:
@@ -723,6 +724,10 @@ Batch SEMs are ≤ 0.024 on ratios and ≤ 14 eV on shifts.
   window reads 1.29 / 1.10 / 1.05 at 0.5/1/2 µm, with the same
   thin-slab broadening pattern. Its low-energy window is almost all capture
   (97–99%) and agrees within 7%.
+- **Si(110) at 5 MeV** shows the same pattern with narrower departures.
+  1→0 reads 1.12 / 1.04 / 1.03 in yield, with width ratio 1.25 / 1.12 / 1.06
+  at 0.5/1/2 µm. 2→1 reads 0.97 / 1.01 / 1.02, width 1.37 / 1.12 / 1.02.
+  Centroids sit 26–86 eV higher. The depth step error is ≤ 1e-4.
 
 Scope: the comparison isolates the emission model at fixed energy, on
 axis, without absorption or divergence. It does not test the secular
