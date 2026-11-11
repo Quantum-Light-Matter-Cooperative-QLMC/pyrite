@@ -107,14 +107,17 @@ def plane_sites(profile: PlanarProfile) -> tuple[PlaneSite, ...]:
     _, g_coprime = reciprocal_g_vector(profile.hkl, info["lattice"])
     covariances = _transverse_covariances(profile)
     d = profile.period_ang
+    step = profile.g_inv_ang / g_coprime
+    if not np.isclose(step, round(step), rtol=0, atol=1e-9):
+        raise ValueError("profile period is not an integer fraction of the coprime spacing")
     merged: dict[tuple[str, float], float] = {}
     for element, position in info["basis"]:
         sxx, sxy, syy = covariances[element]
         if sxy != 0.0 or not np.isclose(sxx, syy, rtol=1e-12):
             raise ValueError("planar fibre strings need isotropic transverse displacements")
-        # x_s / d = (hkl . r_s) g / g_coprime; snap the fraction so coincident
+        # x_s / d = (hkl . r_s) g / g_coprime (integer, as _site_densities); snap the fraction so coincident
         # planes (and x_s ~ d) merge exactly.
-        fraction = float(np.dot(profile.hkl, position)) * profile.g_inv_ang / g_coprime
+        fraction = float(np.dot(profile.hkl, position)) * round(step)
         x = (round(fraction % 1.0, 12) % 1.0) * d
         merged[(element, x)] = merged.get((element, x), 0.0) + 1.0 / float(info["V_cell"])
     return tuple(

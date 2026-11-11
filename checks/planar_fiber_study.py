@@ -373,7 +373,7 @@ def analyze(absorbing_paths, reference_paths=(), depths_um=(1.0, 5.0, 20.0, 100.
         report["reference_occupation"] = occupation(reference)
         top = absorbing["checkpoints"][-1] / 1e4
         report["return_deficit"] = return_deficit(
-            absorbing, reference, [d for d in depths_um if d <= top] + [top]
+            absorbing, reference, [d for d in depths_um if d < top] + [top]
         )
     return report
 
