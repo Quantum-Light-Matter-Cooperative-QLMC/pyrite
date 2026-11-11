@@ -351,11 +351,11 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Source:** PENELOPE-2024 §3.2.5.4, NEA/MBDAV/R(2024)1, Eqs. 3.137–3.138; Geant4 `G4PenelopeIonisationModel::SampleFinalStateElectron` distant-transverse convention
 - **Equation:** longitudinal $\cos\theta_s=[p(E)^2+p(Q)^2-p(E-W'_k)^2]/[2p(E)p(Q)]$, $p(T)^2=T(T+2m_ec^2)$; close $\cos\theta_s=\sqrt{W(E+2m_ec^2)/[E(W+2m_ec^2)]}$; $\phi_s=(\phi+\pi)\bmod 2\pi$; world direction $\mathbf d'=\cos\theta\,\mathbf d+\sin\theta(\cos\phi\,\mathbf u+\sin\phi\,\mathbf v)$ with a common orthonormal frame $(\mathbf u,\mathbf v,\mathbf d)$
 - **Assumptions:** target electron initially at rest for the angular approximation; bound-shell longitudinal angle uses modified resonance even when sampled loss differs; transverse cosine 0.5 is an explicit implementation convention; both returned directions use the incoming flight frame
-- **Limiting cases:** longitudinal $Q=Q_-$ gives forward emission; close $W/E\to0$ gives transverse emission; forward primary retains the incoming unit direction; subthreshold energy has no direction
-- **Status:** unverified
+- **Limiting cases:** longitudinal $Q=Q_-$ gives forward emission; close $W\to0$ at fixed $E$ gives transverse emission; forward primary retains the incoming unit direction; subthreshold energy has no direction
+- **Status:** rederived
 - **Checks:** every nonzero fixture branch at three recoil quantiles; momentum-triangle and close formulas; opposite azimuth and transverse convention; on-axis and tilted shared-frame rotation, unit norms and polar cosines; suppressed secondary direction absent; invalid incoming directions rejected
 - **Anchor:** `tests/montecarlo/collisions/test_shell_partition.py`; [implementation derivation](beam-transport/penelope-shell-secondary-direction.md)
-- **Notes:** Host-side only; independent angular validation, track scheduling, and CPU/GPU comparison remain open. Uses the hard-loss sampler's adjudicated $p_{\rm dis}(W)/W$ distant law (not Eq. 3.125). Only a human may mark this row `signed-off`.
+- **Notes:** Host-side claim. Fresh-context verification (2026-11-11, #1101) independently rederived PENELOPE Eqs. 3.137–3.138, the Geant4 transverse convention, opposite azimuth and shared-frame rotation; 100 focused tests pass. Independent 60-digit conditional-angle comparisons cover 1140 cases per projectile; high-energy cancellation remains within the documented FP64 conditioning bound. Track scheduling and CPU/GPU comparison are outside this verification. Uses the hard-loss sampler's adjudicated $p_{\rm dis}(W)/W$ distant law (not Eq. 3.125). Only a human may mark this row `signed-off`.
 
 ## `shell-soft-hard-transport`
 

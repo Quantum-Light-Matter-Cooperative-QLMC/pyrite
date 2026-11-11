@@ -72,6 +72,7 @@ line-absorption-tabulation
 line-tabulation-root-support
 kinematic-validity-envelope
 line-energy-dispersion
+line-reflection-coupling-tables
 line-recoil-formation
 line-recoil-resonance
 line-recoil-validity-screen
