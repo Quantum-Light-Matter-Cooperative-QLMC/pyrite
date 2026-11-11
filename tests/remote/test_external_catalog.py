@@ -165,3 +165,23 @@ def test_user_materials_cifs_round_trip_with_same_identity(
     (remote / "cifs" / "unsafe.cif").symlink_to(outside)
     with pytest.raises(SystemExit, match="unsafe symlink"):
         transport._sync_entries()
+
+
+def test_user_layer_curves_and_gratings_ship_as_user_catalog(
+    tmp_path, monkeypatch, empty_user_catalog
+):
+    layer = empty_user_catalog
+    (layer / "curves").mkdir()
+    (layer / "curves" / "qe.csv").write_text("wavelength [nm], value\n1, 0.1\n2, 0.2\n")
+    (layer / "gratings").mkdir()
+    (layer / "gratings" / "ff.toml").write_text("order = 1\n")
+    monkeypatch.setattr(config, "SYNC_PATHS", [])
+
+    arcs = {arc for arc, _ in transport._sync_entries()}
+
+    assert arcs == {"user-catalog/curves/qe.csv", "user-catalog/gratings/ff.toml"}
+    outside = tmp_path / "outside.csv"
+    outside.write_text("secret\n")
+    (layer / "curves" / "leak.csv").symlink_to(outside)
+    with pytest.raises(SystemExit, match="unsafe symlink"):
+        transport._sync_entries()

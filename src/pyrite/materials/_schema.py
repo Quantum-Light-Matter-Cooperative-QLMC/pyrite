@@ -13,6 +13,7 @@ from .._precision import Precision
 from .._sampling import AdaptiveSampling
 from .._units import reject_quantity
 from ._catalog_decode import CxrGridByEnergy, _number
+from ._curves import TabulatedCurve
 from ._identity import CutFrame, MaterialIdentity, hexagonal_setting, reduce_indices
 
 _SCAN_KEYS = (
@@ -634,6 +635,13 @@ class MaterialCatalog:
     #: ``profiles.NAME.physics``/``numerics`` references keyed by table then
     #: profile, as display provenance only.
     profile_preset_refs: Mapping[str, Mapping[str, str]] = MappingProxyType({})
+    #: Named ``[gratings.*]`` instrument records (groove density, order and
+    #: convention, coating, mount geometry, blank, optional efficiency curve
+    #: name), validated as declarative data only.
+    gratings: Mapping[str, Mapping[str, object]] = MappingProxyType({})
+    #: Tabulated curves (``curves/NAME.csv|toml``) referenced by detector
+    #: ``response.qe_curve`` or grating ``efficiency_curve``, keyed by curve name.
+    curves: Mapping[str, TabulatedCurve] = MappingProxyType({})
 
     def profile_beam(self, name: str) -> Mapping[str, object] | None:
         """Decoded ``[profiles.NAME.beam]`` distribution overrides, or ``None``

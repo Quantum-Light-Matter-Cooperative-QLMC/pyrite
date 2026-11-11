@@ -564,7 +564,7 @@ def _sync_entries() -> list[tuple[str, Path]]:
                     entries.append(((Path(p) / relative).as_posix(), f))
         else:
             entries.append((Path(p).as_posix(), local))
-    from .._catalog_layout import read_sources, selected_catalog
+    from .._catalog_layout import ARTIFACT_DIR, ASSET_DIRS, read_sources, selected_catalog
 
     catalog = selected_catalog()
     if config.external_catalog_selected():
@@ -573,7 +573,7 @@ def _sync_entries() -> list[tuple[str, Path]]:
         if catalog.is_dir():
             sources = [catalog / relative for relative, _ in read_sources(catalog)]
             assets = []
-            for name in ("cifs", "energy-grid-artifacts"):
+            for name in (*ASSET_DIRS, ARTIFACT_DIR):
                 root = catalog / name
                 if root.is_dir():
                     assets.extend(
@@ -599,16 +599,16 @@ def _sync_entries() -> list[tuple[str, Path]]:
 
 
 def _user_catalog_entries() -> list[tuple[str, Path]]:
-    """Ship user objects, managed CIFs, and energy-grid artifacts as ``user-catalog/``."""
-    from .._catalog_layout import ARTIFACT_DIR, LAYERED_TABLES, user_layer
+    """Ship user objects, CIFs, curves, and energy-grid artifacts as ``user-catalog/``."""
+    from .._catalog_layout import ARTIFACT_DIR, ASSET_DIRS, LAYERED_TABLES, user_layer
 
     layer = user_layer()
-    for name in (*LAYERED_TABLES, "cifs", ARTIFACT_DIR):
+    for name in (*LAYERED_TABLES, *ASSET_DIRS, ARTIFACT_DIR):
         if (layer / name).is_symlink():
             raise SystemExit(f"user catalog contains unsafe symlink: {layer / name}")
     files = [
         file
-        for name in (*LAYERED_TABLES, "cifs", ARTIFACT_DIR)
+        for name in (*LAYERED_TABLES, *ASSET_DIRS, ARTIFACT_DIR)
         if (layer / name).is_dir()
         for file in (layer / name).rglob("*")
         if not any(part.startswith(".") for part in file.relative_to(layer).parts)

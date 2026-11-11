@@ -11,7 +11,7 @@ With no complete external catalog selected, user additions from `catalog.user`
 (or `PYRITE_USER_CATALOG`, defaulting to the platform configuration directory)
 are read over the bundled catalog. The layer holds profiles, beams, detectors,
 crystals, media, materials, energy grids, physics/numerics presets, reusable
-filter plates and targets. Bundled names are read-only and cannot be reused, including case-only differences.
+filter plates, targets, gratings and tabulated `curves/`. Bundled names are read-only and cannot be reused, including case-only differences.
 Create editable copies, for example:
 
 ```bash
@@ -30,6 +30,37 @@ A selected external catalog is **complete**: it replaces the bundle and disables
 the user overlay. All object edits write that catalog in place. Keep laboratory
 profiles, instrument objects, filters, samples and their CIFs under separate
 version control. Remote submissions stage the selected catalog and run its copy.
+
+## Private instrument catalogs
+
+Instrument data that must stay private, such as digitized datasheet curves or
+mount geometry under a nondisclosure agreement, lives in the user layer, kept
+as a checkout of a private laboratory repository. Nothing in it is copied into
+PyRITE.
+
+```bash
+git clone git@example.org:lab/instrument-catalog.git ~/lab/instrument-catalog
+pyrite config set catalog.user ~/lab/instrument-catalog   # or PYRITE_USER_CATALOG
+```
+
+The checkout uses the user-layer layout:
+
+```text
+instrument-catalog/
+  curves/lab-ccd-qe.csv        # tabulated curve with provenance header
+  curves/lab-ff-efficiency.toml
+  gratings/lab-ff.toml         # efficiency_curve = "lab-ff-efficiency"
+  detectors/lab-ccd.toml       # response.kind = "alexs", qe_curve = "lab-ccd-qe"
+```
+
+Mark curves from restricted sources with `confidential = true`. Use object
+names that differ from bundled ones. `pyrite detector list` reports these
+objects as `user`, and `pyrite material validate` rejects bad curve units,
+non-increasing abscissae, out-of-range values and paths that leave `curves/`.
+`pyrite remote` ships the layer, including `curves/`, as `user-catalog/`, so
+keep the remote box's access to that data in mind. A complete external catalog
+(`--catalog`) can hold the same `curves/` and `gratings/` entries instead. The
+file formats are in the [schema reference](../repo-design/materials-catalog-schema.md#instrument-curves-and-gratings).
 
 ## Copy a complete catalog
 
@@ -57,8 +88,8 @@ Use `--catalog PATH` for one command, `PYRITE_CATALOG` for a shell session, or
 of precedence. An invalid selected path fails instead of falling back. The
 selection covers profile, material, beam, detector, filter, grid and run commands.
 
-A directory catalog has `catalog.toml`, `<table>/<name>.toml`, optional `cifs/`,
-and `energy-grid-artifacts/`. Custom crystal CIF paths use `cifs/FILE.cif` and
+A directory catalog has `catalog.toml`, `<table>/<name>.toml`, optional `cifs/`
+and `curves/`, and `energy-grid-artifacts/`. Custom crystal CIF paths use `cifs/FILE.cif` and
 must stay inside that directory, including after symlink resolution. Existing
 packaged CIF references still work if no local file of that name exists.
 Immutable energy-grid artifacts belong to the selected catalog root. See the
