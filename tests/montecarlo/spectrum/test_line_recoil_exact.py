@@ -15,14 +15,105 @@ import numpy as np
 import pytest
 
 from pyrite.materials.crystal import CRYSTALS, HBARC_EV_ANG, M_E_EV, reciprocal_g_vector
-from pyrite.materials.recoil import recoil_resonance_eV, recoil_shift_fraction
+from pyrite.materials.recoil import (
+    recoil_mismatch_slope,
+    recoil_resonance_eV,
+    recoil_shift_fraction,
+)
 from pyrite.montecarlo import mc_cxr_spectrum
 from pyrite.montecarlo.spectrum.cxr import _kernels, _setup
+from pyrite.montecarlo.spectrum.cxr._kernels import (
+    _in_medium_kinematics,
+    _line_recoil_terms,
+    _recoil_slope_factor,
+)
 from pyrite.montecarlo.transport import beta_from_keV
+from tests.helpers.recoil import mass_shell_root
 
 BEAM = np.array([0.0, 0.0, 1.0])
 HUANG = Path(__file__).parents[2] / "data/recoil/huang-2023-table-s4.json"
 HUANG_CRYSTAL = {"graphite": "hopg", "hBN": "hbn"}
+
+
+G_GENERIC = np.array([0.4, 0.2, 1.8])
+EXIT_FACE = np.array([0.3, 0.1, 1.0]) / np.linalg.norm([0.3, 0.1, 1.0])
+DIRECTIONS = [
+    np.array([0.6, 0.0, 0.8]),
+    np.array([np.sin(2.0), 0.0, np.cos(2.0)]),
+    np.array([0.0, 0.0, -1.0]),
+]
+
+
+def _kernel_root(kinetic_eV, n_hat, delta, g=G_GENERIC):
+    """Production root on one piece with a constant decrement ``delta``.
+
+    Returns ``(E_res [eV], kappa D_exact, h, E_total [eV], D_exact)``; the
+    exit face points along the photon so ``h = -e/(e.n)`` is outgoing.
+    """
+    gamma = 1.0 + kinetic_eV / M_E_EV
+    v = np.sqrt(1.0 - 1.0 / gamma**2) * BEAM
+    face = EXIT_FACE if n_hat[2] > 0 else -EXIT_FACE
+    h = -face / (face @ n_hat)
+    r_num, r_den, inv_E = _line_recoil_terms(np.array([gamma]), g @ g, n_hat @ g)
+    numerator = v @ g - r_num
+    denom, _ = _in_medium_kinematics(
+        1.0 - v @ n_hat + r_den,
+        numerator,
+        np.full(2, delta),
+        np.array([1.0, 1e9]),
+        np.array([v @ h]),
+        np.array([h @ h]),
+    )
+    omega = numerator / denom
+    slope = denom * _recoil_slope_factor(omega, inv_E)
+    return float(HBARC_EV_ANG * omega[0]), float(slope[0]), h, gamma * M_E_EV, float(denom[0])
+
+
+@pytest.mark.parametrize("kinetic", [30e3, 1e6, 50e6])
+@pytest.mark.parametrize("n_hat", DIRECTIONS, ids=["oblique", "backward", "reverse"])
+def test_kernel_root_and_slope_match_the_65_digit_mass_shell_at_zero_decrement(kinetic, n_hat):
+    """``delta = 0``: the production root solves the unsquared mass shell."""
+    energy, slope, *_ = _kernel_root(kinetic, n_hat, 0.0)
+    np.testing.assert_allclose(energy, mass_shell_root(kinetic, G_GENERIC, n_hat), rtol=1e-14)
+    exact = recoil_mismatch_slope(energy, kinetic, BEAM, G_GENERIC, n_hat) * HBARC_EV_ANG
+    np.testing.assert_allclose(slope, exact, rtol=1e-13)
+
+
+@pytest.mark.parametrize("kinetic", [30e3, 1e6, 50e6])
+@pytest.mark.parametrize("n_hat", DIRECTIONS, ids=["oblique", "backward", "reverse"])
+def test_snell_root_differs_from_the_in_medium_mass_shell_only_at_mixed_order(kinetic, n_hat):
+    """``k_eff = (E/hbar c)(n + delta h)``: dropped terms are ``O(delta hbar)``.
+
+    The production denominator keeps ``1 - v.n + Q.n/E - delta v.h`` and
+    omits ``delta (Q.h - E_res)/E + O(delta^2 h^2 E_res/E)``.
+    """
+    delta = 1e-5
+    energy, _, h, total, denom = _kernel_root(kinetic, n_hat, delta)
+    reference = mass_shell_root(kinetic, G_GENERIC, n_hat + delta * h)
+    q_dot_h = HBARC_EV_ANG * abs(G_GENERIC @ h)
+    bound = (delta * (q_dot_h + energy) + delta**2 * (h @ h) * energy) / (total * denom)
+    assert abs(energy / reference - 1.0) <= 1.5 * bound
+    # The decrement itself moves the root far more than the omitted terms.
+    vacuum, *_ = _kernel_root(kinetic, n_hat, 0.0)
+    assert abs(energy / vacuum - 1.0) > 10.0 * bound
+
+
+def test_zero_hbar_hook_is_the_classical_snell_root(monkeypatch):
+    """``hbar g -> 0``: recoil terms vanish and the classical root is bitwise kept."""
+    monkeypatch.setattr(_kernels, "_RECOIL_HBARC_EV_ANG", 0.0)
+    for n_hat in DIRECTIONS:
+        energy, slope, h, _, denom = _kernel_root(1e6, n_hat, 1e-5)
+        v = np.sqrt(1.0 - 1.0 / (1.0 + 1e6 / M_E_EV) ** 2) * BEAM
+        classical, _ = _in_medium_kinematics(
+            np.array([1.0 - v @ n_hat]),
+            np.array([v @ G_GENERIC]),
+            np.full(2, 1e-5),
+            np.array([1.0, 1e9]),
+            np.array([v @ h]),
+            np.array([h @ h]),
+        )
+        assert denom == classical[0] and slope == classical[0]
+        assert energy == HBARC_EV_ANG * (v @ G_GENERIC / classical[0])
 
 
 def _segment(v_hat, T_keV, thickness_ang):

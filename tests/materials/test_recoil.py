@@ -1,7 +1,5 @@
 """Exact vacuum recoil compared with the unsquared electron mass shell."""
 
-from decimal import Decimal, localcontext
-
 import numpy as np
 import pytest
 
@@ -12,39 +10,7 @@ from pyrite.materials.recoil import (
     recoil_resonance_eV,
     recoil_shift_fraction,
 )
-
-
-def _mass_shell_root(kinetic, g, direction, *, photon=None):
-    """65-digit bisection of source Eq (6), without squaring or a root formula."""
-    with localcontext() as ctx:
-        ctx.prec = 65
-
-        def dec(value):
-            return Decimal(str(value))
-
-        mass, hc, kinetic = dec(M_E_EV), dec(HBARC_EV_ANG), dec(kinetic)
-        total = kinetic + mass
-        momentum = (kinetic * (kinetic + 2 * mass)).sqrt()
-        transfer = [hc * dec(value) for value in g]
-        normal = [dec(value) for value in direction]
-
-        def residual(photon):
-            final = [-transfer[i] - photon * normal[i] for i in range(3)]
-            final[2] += momentum
-            return (mass * mass + sum(value * value for value in final)).sqrt() + photon - total
-
-        if photon is not None:
-            return float(residual(dec(photon)) / hc)
-        if residual(Decimal(0)) >= 0:
-            return np.nan
-        lo, hi = Decimal(0), kinetic
-        for _ in range(190):
-            midpoint = (lo + hi) / 2
-            if residual(midpoint) > 0:
-                hi = midpoint
-            else:
-                lo = midpoint
-        return float((lo + hi) / 2)
+from tests.helpers.recoil import mass_shell_root as _mass_shell_root
 
 
 @pytest.mark.parametrize("kinetic", [30e3, 1e6, 5e6, 50e6, 1e9])
