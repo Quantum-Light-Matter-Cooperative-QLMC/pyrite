@@ -19,7 +19,6 @@ import argparse
 import hashlib
 import json
 import os
-import subprocess
 from pathlib import Path
 
 import numpy as np
@@ -28,6 +27,7 @@ from pyrite.materials.channeling import planar_profile
 from pyrite.materials.crystal import HBARC_EV_ANG, M_E_EV
 from pyrite.montecarlo.channeling import DensityMatrixSolver, electronic_kernel, tds_kernel
 from pyrite.montecarlo.channeling.overflow import overflow_spectrum
+from pyrite.validation.check_records import current_revision
 
 
 def _kernel(profile, energy, order, cells):
@@ -130,8 +130,7 @@ def main(argv=None):
     output = {
         "check": "channeling_overflow",
         "schema_revision": 2,
-        "revision": os.environ.get("PYRITE_SOURCE_REVISION")
-        or subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
+        "revision": os.environ.get("PYRITE_SOURCE_REVISION") or current_revision(),
         "source_sha256": {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in owners},
         "parameters": {k: str(v) if isinstance(v, Path) else v for k, v in vars(args).items()},
         "solver_overflow_flux": float(result.overflow_flux[-1]),

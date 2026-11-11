@@ -1,0 +1,1 @@
+{"check": "checks/quantum_decoherence_budget.py", "ledger_id": "quantum-decoherence-budget", "measured_value": null, "recorded_at": "2026-11-11T05:52:57.703795+00:00", "reference_value": null, "revision": "d659e91339cbe3cbd14cc865d0bbbaeff6d504f8", "schema_revision": 1, "tolerance": null, "verdict": "pass"}
