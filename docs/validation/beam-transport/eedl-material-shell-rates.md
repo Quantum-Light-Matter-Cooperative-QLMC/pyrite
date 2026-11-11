@@ -186,3 +186,5 @@ All agree to within one unit in the last place. The catalog `silicon` density,
 `rederived`: the independent expression, interpolation semantics,
 designator mapping, limits and numeric values match the implementation.
 Human sign-off remains pending.
+
+Follow-up (2026-11-11): finding 5 resolved by renaming the constant to `_ANG2_PER_CM2` (value unchanged); finding 1 resolved by `tests/montecarlo/collisions/test_shell_ionization_rates.py`.

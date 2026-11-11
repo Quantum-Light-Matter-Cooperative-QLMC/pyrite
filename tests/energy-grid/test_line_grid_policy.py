@@ -111,6 +111,31 @@ def test_kinematic_stop_bounds_the_resonance_over_random_directions():
             assert resonance <= stop * (1.0 + 1e-12)
 
 
+def test_kinematic_stop_is_attained_and_matches_reference_values():
+    """Validation: line-grid-kinematic-bandwidth.
+
+    The bound is the exact supremum: v_hat = n_hat = g_hat reaches it. Reference
+    values use CODATA hbar c and m_e c^2 independently of the module constants,
+    with |g| = 2 pi / 1.677 Å (2026-11-11 fresh-context verification).
+    """
+    hbarc_ev_ang = 1973.269804
+    rest_ev = 510998.95
+    g_mag = 2.0 * np.pi / 1.677
+    for energy_keV, unrounded, rounded in (
+        (30.0, 3614.755, 3700.0),
+        (300.0, 25689.817, 25700.0),
+        (1000.0, 118083.994, 118100.0),
+    ):
+        gamma = 1.0 + energy_keV * 1.0e3 / rest_ev
+        beta = np.sqrt(1.0 - 1.0 / gamma**2)
+        aligned = hbarc_ev_ang * beta * g_mag / (1.0 - beta)
+        assert aligned == pytest.approx(unrounded, abs=1e-3)
+        assert kinematic_cxr_stop_eV([g_mag], energy_keV, round_to_eV=1e-9) == pytest.approx(
+            aligned, rel=1e-12
+        )
+        assert kinematic_cxr_stop_eV([g_mag], energy_keV) == rounded
+
+
 def test_kinematic_stop_scales_linearly_with_g_and_vanishes_with_beta():
     single = kinematic_cxr_stop_eV([1.0], 100.0, round_to_eV=1e-9)
     doubled = kinematic_cxr_stop_eV([2.0], 100.0, round_to_eV=1e-9)
