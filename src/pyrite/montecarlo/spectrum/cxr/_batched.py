@@ -534,6 +534,7 @@ def _batched_coherent_block(st, bt, blk, coh_blocks, coh_counts):
     introduces no reduction of its own.
 
     Validation: coherent-formation-absorption
+    Validation: line-grid-emission-ceiling
     """
     seg_elec_id = st.seg_elec_id
     seg_r_geom = st.seg_r_geom

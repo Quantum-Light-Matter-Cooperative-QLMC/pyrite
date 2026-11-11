@@ -268,8 +268,8 @@ def initial_energies_keV(E0_keV, Ne, seed, energy_spread_frac, *, start=0):
     stream in the ``spawn(6)[5]`` child namespace -- RMS *relative* deviation,
     uncorrelated with arrival time (decision 3: no chirp model), and a pure
     function of ``(seed, e)``. ``z_e`` is clamped to
-    ``|z| <= ENERGY_SPREAD_CLAMP_SIGMA`` (a symmetric 6-sigma truncation, mean
-    unchanged), so :func:`upper_beam_energy_keV` is a strict bound. ``f`` unset
+    ``|z| <= ENERGY_SPREAD_CLAMP_SIGMA`` (a symmetric clamp onto the 6-sigma
+    endpoints, not a renormalized truncation; mean unchanged), so :func:`upper_beam_energy_keV` is a strict bound. ``f`` unset
     or 0 gives the monoenergetic beam bit for bit. Raises rather than returning
     a non-positive energy.
 

@@ -545,3 +545,257 @@ $(966200, 966266.74)\ \mathrm{eV}$ now stops at 966200 eV. Anchor:
 `tests/energy-grid/test_line_grid_policy.py::test_kinetic_cap_just_below_the_data_onset_stays_below_it`.
 The kinetic limit is now the declared upper incident energy
 $E_0(1+6f)$ (see `line-grid-kinematic-bandwidth`).
+
+## Independent re-verification 2 (fresh context, 2026-11-11, per-limit rounding)
+
+Fresh-context verifier for #1101 at commit `491208cde`, worktree
+`issue-1101-ceiling-reverify2`. This context did not write the
+implementation or the earlier sections of this page.
+
+### Independence and order
+
+I read the ledger Claim, Code, Source, Checks and Anchor fields and the
+signatures and docstrings of `_automatic_cxr_grid_policy`,
+`_cxr_emission_ceiling`, `_cxr_table_nan_onsets`, `_formation_good` and
+`upper_beam_energy_keV`. I also read the source-domain predicates in
+`materials/atomic.py::henke_dispersion` (strict interior
+$E_{\min}<E<E_{\max}$) and `materials/photon_cross_sections.py` (closed band
+$[E^{\rm EPDL}_{\min},E^{\rm EPDL}_{\max}]$). I wrote the derivation below in a
+scratch note before reading the rounding statements. One disclosure: the
+first 40 lines of `_automatic_cxr_grid_policy` were in view while I read its
+docstring. Their comments restate the claim, "data limit rounds DOWN,
+strictly below its NaN onset". I read none of this page's earlier sections
+until after the comparison. The resonance bound $E_{\rm res,max}$
+(`line-grid-kinematic-bandwidth`) is taken as given; it is verified
+separately and not adjudicated here.
+
+### Independent derivation
+
+Let $\Delta=100\ \mathrm{eV}$ be the stop lattice; nodes are $n\Delta$ with
+$n\in\mathbb Z$. The automatic axis is
+$\{E_j\}=\operatorname{linspace}(E_{\rm start},S,N)$, so its largest node is
+$S$. The automatic stop has three limits.
+
+1. **Energy conservation.** No photon can exceed the kinetic energy of the
+   electron that emits it. Slowing down only lowers that energy, so the bound
+   is the largest incident kinetic energy. For a spread beam that is the
+   sampler clamp:
+
+   $$
+   E_{\rm kin}=10^{3}\,E_0\,(1+6\lvert f\rvert)\ \mathrm{eV}.
+   $$
+
+   This is a closed bound: $\hbar\omega=E_{\rm kin}$ is allowed and emission
+   above it is zero. Rounding up only adds empty nodes, so
+   $R_{\rm kin}=\Delta\lceil E_{\rm kin}/\Delta\rceil\ge E_{\rm kin}$.
+2. **Resonance bound.** $E_{\rm res,max}$ already comes rounded up:
+   $R_{\rm res}=\Delta\lceil E_{\rm res,max}/\Delta\rceil$.
+3. **Data support.** The coherent route evaluates $\operatorname{Re}n(E_j)$
+   directly on the output axis.
+   - Chantler $f',f''$ are finite only on the open interval
+     $(E_{\min},E_{\max})$.
+   - EPDL attenuation is finite on the closed band
+     $E\le E^{\rm EPDL}_{\max}=10^{11}\ \mathrm{eV}$.
+
+   Write $E_{\rm data}$ for the smallest energy at or above which some line
+   table is NaN. For Chantler that energy is $E_{\max}$ itself; for EPDL it is
+   the first float above $10^{11}$. Every node must satisfy
+   $E_j<E_{\rm data}$. The largest such lattice node is
+
+   $$
+   R_{\rm data}=\max\{n\Delta:\ n\Delta<E_{\rm data}\}
+   =\Delta\left(\left\lceil E_{\rm data}/\Delta\right\rceil-1\right),
+   \qquad R_{\rm data}=\infty\ \text{if}\ E_{\rm data}=\infty .
+   $$
+
+   This holds whether or not $E_{\rm data}$ lies on the lattice: if
+   $E_{\rm data}=m\Delta$ then $R_{\rm data}=(m-1)\Delta$.
+
+Each limit has its own rounding rule. The stop is the minimum of the
+rounded values:
+
+$$
+\boxed{S=\min\left(R_{\rm kin},\,R_{\rm res},\,R_{\rm data}\right)}.
+$$
+
+Then $S\le R_{\rm data}<E_{\rm data}$ for every ordering of the three raw
+limits, including ties and limits within $\Delta$ of each other. Taking the
+minimum of raw limits first and rounding the winner up is not equivalent. If
+$E_{\rm kin}\in(R_{\rm data},E_{\rm data})$, that order gives
+$R_{\rm kin}=R_{\rm data}+\Delta>E_{\rm data}$.
+
+**Floating point.** For finite $E\ge0$, let $q=\mathrm{fl}(E/\Delta)$.
+Correctly rounded division is monotone and integers are representable, so
+$E/\Delta\le m$ implies $q\le m$. Hence $\lceil q\rceil\le\lceil E/\Delta\rceil$
+and $\Delta(\lceil q\rceil-1)\le R_{\rm data}<E$; the product is exact for
+$n<2^{53}/100$. Floating-point error can only lose one node; it never crosses
+the onset. For the EPDL onset the strict rule may drop the valid closed
+endpoint $10^{11}\ \mathrm{eV}$, which is harmless.
+
+**Line rejection.** A line is dropped exactly when any factor that enters
+its contribution is nonfinite. For the coherent routes these factors are the
+complex polarization coefficients $c_{s,p}=(a\,t_L)A_{s,p}$, not only their
+moduli or scalar parts.
+
+### Implementation comparison
+
+The policy code (excerpt, `campaign/sweep.py`):
+
+```text
+limits = {
+    "energy conservation": math.ceil(upper_keV * 1.0e3 / STOP_ROUND_TO_EV) * STOP_ROUND_TO_EV,
+    "atomic data ceiling": (
+        (math.ceil(data_eV / STOP_ROUND_TO_EV) - 1) * STOP_ROUND_TO_EV
+        if math.isfinite(data_eV) else math.inf),
+}
+label, cap = min(limits.items(), key=lambda item: item[1])
+if not start < cap < policy.stop_eV:
+    return policy
+```
+
+Here `policy.stop_eV` is $R_{\rm res}$; `kinematic_cxr_stop_eV` rounds up with
+`STOP_ROUND_TO_EV = 100`. The `upper_keV` argument is
+`upper_beam_energy_keV(E0, f)` $=E_0(1+6\lvert f\rvert)$.
+
+| Term | Derivation | Code | Agreement |
+|---|---|---|---|
+| $R_{\rm kin}$ | $\Delta\lceil E_{\rm kin}/\Delta\rceil$, $E_{\rm kin}=E_0(1+6\lvert f\rvert)$ | identical | matches |
+| $R_{\rm res}$ | rounded up, taken as given | `policy.stop_eV` | matches (conditional) |
+| $R_{\rm data}$ | $\Delta(\lceil E_{\rm data}/\Delta\rceil-1)$, $\infty$ if infinite | identical, `math.isfinite` guard | matches |
+| Order | round each limit, then take the minimum | rounds inside `limits`, then `min` | matches |
+| Tie or $R_{\rm res}$ lowest | $S=R_{\rm res}\le R_{\rm data}$ | returns `policy` unchanged | matches |
+| $E_{\rm data}$ (Chantler) | open onset $E_{\max}$ | `_chantler_bounds(el)[1]`, `min` over anomalous basis and over the full basis (`Re n`) | matches |
+| $E_{\rm data}$ (EPDL) | first float above $10^{11}$ | `np.nextafter(EPDL_E_MAX_EV, inf)` | matches |
+| Axis end | last node equals $S$ | `np.linspace(start, stop, num)` | matches |
+
+The guard `cap <= start` would return $R_{\rm res}$ unclamped. It cannot fire:
+$R_{\rm kin}\ge100\ \mathrm{eV}>E_{\rm start}\in\{10,50\}\ \mathrm{eV}$, and
+every Chantler $E_{\max}$ is about $966\ \mathrm{keV}$. The policy calls
+`_cxr_emission_ceiling` with `use_henke=True`, while the campaign path uses
+the kernel default `use_henke=True`. With `use_henke=False` the ceiling would
+only be lower, which is conservative.
+
+**Line rejection.**
+
+- `_formation_good` (per-hkl, both the ungrouped and the grouped calls)
+  includes `isfinite(c)` for each complex coefficient.
+- `_batched_coherent_block` includes
+  `good &= xp.isfinite(c_s) & xp.isfinite(c_p)`.
+- For complex input, `isfinite` is true only when both the real and imaginary
+  parts are finite.
+- Both coherent routes select rows with a boolean index (`[gm]`,
+  `flatnonzero(good)`); they do not multiply by the mask. A NaN therefore
+  never reaches the field sum or the CUDA kernels, which consume the batched
+  `per_cxr` arrays after selection.
+- The incoherent routes mask `isfinite(weight) & (weight > 0)` in the
+  per-hkl path, the batched path and the fused kernel.
+
+The claim's description of these masks is accurate. The output-axis
+refraction (`_setup.py`, `refractive_index(crystal, E_grid_eV, use_henke)`)
+is a direct Chantler evaluation, not a table interpolation. The open
+interval at $E_{\max}$ is therefore the support that matters there.
+
+### Numerical evidence (CPU, project environment, no transport)
+
+Scripts are in the session scratchpad; none are committed.
+
+1. **Data onsets: independent oracle.** I read
+   `xraydb.chantler_energies` directly for $Z=1$ to $92$. $E_{\max}$ ranges
+   over $966266.74$ to $966279.33\ \mathrm{eV}$. An exact-rational oracle for
+   $R_{\rm data}$ agrees with the code formula for all 92 elements. The
+   smallest margin is $E_{\max}-R_{\rm data}=66.74\ \mathrm{eV}$ (HOPG/C
+   $\to966200\ \mathrm{eV}$).
+2. **Ordering sweep of the real policy.** I ran 9234 cases. In each case
+   `kinematic_cxr_stop_eV` and `_cxr_emission_ceiling` were monkeypatched,
+   and $E_0$ was chosen so that $E_0(1+6\lvert f\rvert)$ equals a target
+   $E_{\rm kin}$.
+   - $E_{\rm data}$ took the values $966266.74$, the lattice-exact $966200$,
+     $966200\pm1$ ulp, $966299.99999$, $966300$, $10^6$, $\infty$, and
+     `nextafter(1e11)`.
+   - $E_{\rm kin}$ and $E_{\rm res}$ were offset from $E_{\rm data}$ by
+     $\{-250,-150,-100.5,-100,-99.999,-66.74,-50,-10^{-6},0,10^{-6},0.5,33.26,50,99.999,100,100.001,150,250\}\ \mathrm{eV}$.
+     $E_{\rm res}$ also took a value $10^9\ \mathrm{eV}$ above.
+   - $f\in\{\text{unset},0,0.01\}$.
+
+   Results: no case gave $S\ge E_{\rm data}$, no stop fell off the lattice,
+   and the code agreed with the exact-rational oracle
+   $\min(R_{\rm kin},R_{\rm res},R_{\rm data})$ in all 9234 cases. The binding
+   labels were resonance 2662, energy conservation 2228 and atomic data
+   ceiling 4344.
+3. **Real policy over the catalog.** I evaluated the unpatched policy for all
+   51 catalog materials, at
+   $E_0\in\{300,966.2,966.21,966.25,966.2667,966.3,1000,5000,50000\}\ \mathrm{keV}$
+   with $f\in\{\text{unset},0.01\}$.
+   - There were 0 failures: every stop satisfies $S<E_{\rm data}$, and
+     $\operatorname{Re}n$ is finite at the last nodes and at $S$.
+   - At each material's $E_{\rm data}$, $\operatorname{Re}n$ is NaN at
+     $E_{\rm data}$ and finite one ulp and $1\ \mathrm{eV}$ below. This
+     confirms the open onset.
+   - At 5 MeV, the data-bound materials stop at $966200\ \mathrm{eV}$. The
+     others are resonance-bound.
+4. **End-to-end coherent scoring (`mc_cxr_spectrum`, CPU).** The probe used
+   HOPG with its catalog reflections plus $(00\bar2)$ and $(00\bar4)$, and
+   3000 synthetic 10 MeV segments within $0.06\ \mathrm{rad}$ of $\hat{\mathbf n}$.
+   Of the vacuum resonances, 9712 lie above $966266.74\ \mathrm{eV}$ and 498
+   lie in $[0.9,1.0]\ \mathrm{MeV}$.
+
+   | Axis end | incoherent | coherent batched | coherent per-hkl (`sinc_cutoff=200`) |
+   |---|---|---|---|
+   | $966200\ \mathrm{eV}$ (policy) | 0 nonfinite | 0 nonfinite | 0 nonfinite |
+   | $966300\ \mathrm{eV}$ (control) | 0 nonfinite | NaN at 966300 | NaN at 966300 (sum NaN) |
+
+   The control shows that the probe detects a node past the support. The
+   policy stop is finite on all three routes, and lines past the data end
+   are dropped rather than propagated.
+5. **Anchors.** `tests/energy-grid/test_line_grid_policy.py` (36 tests,
+   including both
+   `test_kinetic_cap_just_below_the_data_onset_stays_below_it` cases) and
+   `tests/montecarlo/spectrum/test_spectrum_phases.py::test_coherent_formation_mask_drops_nonfinite_coefficients`
+   passed: 37 tests in total. `tests/dev/test_validation_ledger.py` passed
+   (18 tests).
+
+### Filters
+
+| Filter | Result |
+|---|---|
+| Units | pass: keV $\to$ eV ($\times10^3$) applied once; all limits are in eV |
+| Limits | pass: $f=0$ reduces to $E_0$; $E_{\rm data}=\infty$ gives $\min(R_{\rm kin},R_{\rm res})$ (50 MeV caps at $5\times10^7$); a resonance-bound case keeps $R_{\rm res}$; measured bandwidth keeps its cap |
+| Rounding direction and convention | pass: closed limits round up, the open onset rounds strictly down, and the lattice-exact onset falls back one node |
+| Domains | pass: Chantler is open at $E_{\max}$; EPDL is closed at $10^{11}$ and represented by its first NaN float |
+| Notation and docstrings | pass: the ledger, the `_cxr_emission_ceiling` and `_cxr_table_nan_onsets` docstrings, and the code agree |
+| Checks field values | pass by hand: $2\gamma^2\hbar c\lvert\mathbf g_{004}\rvert$ gives 1.72, 6.25 and 144 MeV at 5, 10 and 50 MeV, and crosses $E_{\rm kin}$ near 16.6 MeV ("near 17 MeV") |
+
+### Minor findings (non-blocking)
+
+- **Claim wording.** "The binding limit is recorded as `sources["stop_eV"]`"
+  holds only when energy conservation or the data ceiling binds. When the
+  resonance bound binds or ties, the key is absent, which is the anchored
+  behaviour.
+- **Anchor coverage.** No anchor pins the batched coefficient mask
+  (`_batched_coherent_block`); it is verified here by inspection and by
+  probe 4.
+- **Code field.** The ledger `Code` field omits marker-bearing owners:
+  `_per_hkl.py::_formation_good`, `_batched.py::_batched_coherent_block`,
+  and `directional.py::line_window_ceiling_eV`. The last is an upper-only
+  warning helper that omits the data cap by design. The ledger tests pass.
+
+### Verdict
+
+**Rederived**, conditional on $E_{\rm res,max}$ from
+`line-grid-kinematic-bandwidth`, which is not adjudicated here. Rounding each
+limit by its own rule before taking the minimum keeps the automatic stop
+strictly inside every table support evaluated on the output axis. This holds
+for all orderings of the three limits, for limits within 100 eV of each
+other, for lattice-exact onsets and for an infinite data ceiling. All line
+routes drop nonfinite factors, including complex coefficients. The
+divergence found by the previous re-verification is closed.
+
+Suggested ledger edit: change `discrepancy` to `rederived` for
+`line-grid-emission-ceiling`, keeping the dependence on
+`line-grid-kinematic-bandwidth` noted. Optionally:
+
+- qualify the `sources["stop_eV"]` sentence;
+- add the three marker owners to `Code`;
+- add a batched-mask anchor.
+
+The task owner applies any change. This is not human sign-off.

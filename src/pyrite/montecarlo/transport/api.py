@@ -159,7 +159,8 @@ def _simulate_trajectories(
     Validation: beam-phase-space-injection
 
     energy_spread_frac: RMS relative spread; starts at E0_keV * (1 + f * u),
-    u ~ Normal(0, 1), independent of arrival time. None/0 preserves the
+    u ~ Normal(0, 1) clamped to |u| <= 6 (so E0 (1 + 6 f) is a strict upper
+    energy), independent of arrival time. None/0 preserves the
     monoenergetic beam; non-positive drawn energies raise. See
     docs/physics/beam-transport/beam-phase-space.md.
     Validation: beam-energy-spread-injection
