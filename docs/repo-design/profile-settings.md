@@ -167,8 +167,12 @@ copies every SOURCE key except `overrides`, including numerics and
 Detector collections are edited with `profile detector list|show|add|set|reset|rm`.
 Named scalar/pixel objects belong to `pyrite detector`; profile-local edits of a
 reference require `set NAME ID --inline-copy`. Legacy `default` and `physical`
-IDs retain their storage until explicit `profile detector migrate NAME`
-(preview/confirmation, including checkpoint variant consequences). The single
+IDs retain their storage until `profile detector add NAME ID --detector REF`
+converts it into a collection, or explicit `profile detector migrate NAME` is
+requested. Conversion previews the TOML and checkpoint variant consequences
+before confirmation; `--yes` applies it in scripts and `--dry-run` previews it.
+Each profile run scores every attached ID into its own dataset, with counting
+observations stored alongside the corresponding detector's results. The single
 `profile set --detector` shortcut updates one collection entry and rejects
 ambiguous collections. See [detector contracts](../reference/campaign-configuration.md#detector-collections-filters-and-counting-observations) for
 membership, optional-section resets, migration, and inspection JSON.

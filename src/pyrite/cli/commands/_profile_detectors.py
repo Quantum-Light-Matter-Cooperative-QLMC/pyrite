@@ -53,8 +53,19 @@ def command():
 
     Named objects belong to 'pyrite detector'; local edits require an inline
     entry or --inline-copy. Legacy default/physical IDs edit existing storage.
-    Use migrate PROFILE --dry-run before adding IDs to a legacy profile.
-    Filters remain shared under 'profile filter'.
+    Every run scores each ID individually in a separate dataset. Add converts
+    legacy storage after previewing checkpoint changes; --yes confirms the
+    conversion. Filters remain shared under 'profile filter'.
+
+    \b
+    Examples:
+      pyrite profile create lab-scan --from quickstart
+      pyrite detector create clone side-view --from reference
+      pyrite detector set side-view --observation-angle 100 --yes
+      pyrite profile detector add lab-scan side --detector side-view --dry-run
+      pyrite profile detector add lab-scan side --detector side-view --yes
+      pyrite profile detector list lab-scan
+      pyrite run lab-scan
     """
 
 
@@ -144,10 +155,19 @@ def _validate(document):
     shell_complete=completion.complete_detector,
     help="Named scalar or pixel detector to attach.",
 )
-@click.option("-y", "--yes", is_flag=True, help="Skip the standard-profile confirmation.")
-@click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing.")
+@click.option(
+    "-y", "--yes", is_flag=True, help="Confirm storage conversion and standard-profile edits."
+)
+@click.option(
+    "--dry-run", is_flag=True, help="Print proposed TOML and checkpoint changes; write nothing."
+)
 def add_command(profile_name, identifier, reference, yes, dry_run):
-    """Attach a named detector under a new ID; migrate legacy profiles explicitly."""
+    """Attach a named detector under a new ID, preserving existing detectors.
+
+    Legacy storage converts to a collection with a checkpoint-change preview
+    and confirmation. Use --dry-run to inspect it or --yes to apply it.
+    Runs score every attached ID individually.
+    """
     if re.fullmatch(r"[a-z][a-z0-9_-]*", identifier) is None:
         raise click.UsageError(
             "ID must start with a lowercase letter; use lowercase letters, digits, '_' or '-'"
@@ -155,18 +175,24 @@ def add_command(profile_name, identifier, reference, yes, dry_run):
     try:
         original, document = _catalog_io.catalog_text()
         profile = existing_profile(document, profile_name)
-        if "detectors" not in profile:
-            raise ValueError(
-                f"legacy profile; preview conversion with: pyrite profile detector migrate {profile_name} --dry-run"
-            )
+        _reference(document, reference)
+        identifiers = _migrate(document, profile_name) if "detectors" not in profile else []
         if identifier in profile["detectors"]:
             raise ValueError(f"duplicate detector ID {identifier!r}; use profile detector set")
-        _reference(document, reference)
         profile["detectors"][identifier] = reference
     except (OSError, ValueError, ParseError) as exc:
         raise click.UsageError(str(exc)) from None
     _validate(document)
-    confirm_standard(profile_name, "add a detector to", yes, dry_run)
+    if identifiers:
+        _migration_preview(identifiers)
+        write(document, original, True, "")
+        if dry_run or not confirm_destructive(
+            yes,
+            f"Add detector {identifier} and convert profile {profile_name} with these checkpoint changes?",
+        ):
+            return 0
+    else:
+        confirm_standard(profile_name, "add a detector to", yes, dry_run)
     return write(
         document, original, dry_run, f"added detector {identifier} to profile {profile_name}"
     )
@@ -316,14 +342,29 @@ def migrate_command(profile_name, yes, dry_run):
     """
     try:
         original, document = _catalog_io.catalog_text()
-        before = detector_payloads(document, existing_profile(document, profile_name))
-        identifiers = edit.migrate_profile_detectors(document, profile_name)
-        after = detector_payloads(document, existing_profile(document, profile_name))
-        if before != after:
-            raise ValueError("migration would change resolved detector values")
+        identifiers = _migrate(document, profile_name)
     except (OSError, ValueError, ParseError) as exc:
         raise click.UsageError(str(exc)) from None
     _validate(document)
+    _migration_preview(identifiers)
+    write(document, original, True, "")
+    if dry_run or not confirm_destructive(
+        yes, f"Migrate profile {profile_name} with these checkpoint consequences?"
+    ):
+        return 0
+    return write(document, original, False, f"migrated detectors on profile {profile_name}")
+
+
+def _migrate(document, profile_name):
+    before = detector_payloads(document, existing_profile(document, profile_name))
+    identifiers = edit.migrate_profile_detectors(document, profile_name)
+    after = detector_payloads(document, existing_profile(document, profile_name))
+    if before != after:
+        raise ValueError("migration would change resolved detector values")
+    return identifiers
+
+
+def _migration_preview(identifiers):
     emit_result(
         "Checkpoint variants: "
         + ", ".join(
@@ -336,9 +377,3 @@ def migrate_command(profile_name, yes, dry_run):
         "A changed variant changes the parameter digest and checkpoint stem; "
         "new variants use their own identity-qualified datasets."
     )
-    write(document, original, True, "")
-    if dry_run or not confirm_destructive(
-        yes, f"Migrate profile {profile_name} with these checkpoint consequences?"
-    ):
-        return 0
-    return write(document, original, False, f"migrated detectors on profile {profile_name}")

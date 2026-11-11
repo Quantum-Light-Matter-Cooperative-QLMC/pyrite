@@ -31,17 +31,21 @@ Usage: pyrite profile [OPTIONS] COMMAND [ARGS]...
   sampling``, the default unless fixed history counts are set); its physical models and
   cutoffs use ``profile physics``. Named presets those override are managed with
   ``pyrite numerics`` and ``pyrite physics`` and attached with ``set
-  --numerics|--physics NAME``. Filters and the pixel detector use ``filter`` and
-  ``detector``; reusable beams and detectors are named objects edited with ``pyrite
-  beam`` and ``pyrite detector``. The full map is docs/repo-design/profile-settings.md.
-  Bundled demos are read-only (copy with ``create NAME --from DEMO``); yours live in
-  ``catalog.user``.
+  --numerics|--physics NAME``. Filters and detector membership use ``filter`` and
+  ``detector``. Each run scores every attached detector ID individually. Reusable beams
+  and detectors are named objects edited with ``pyrite beam`` and ``pyrite detector``.
+  The full map is docs/repo-design/profile-settings.md. Bundled demos are read-only
+  (copy with ``create NAME --from DEMO``); yours live in ``catalog.user``.
 
   Examples:
     pyrite profile list
     pyrite profile show sub_100keV        (or: pyrite profile sub_100keV)
     pyrite profile create sub_100keV --energy 30:100:10
     pyrite profile set sub_100keV --detector eds
+    pyrite profile detector add sub_100keV side --detector reference --dry-run
+    pyrite profile detector add sub_100keV side --detector reference --yes
+    pyrite profile detector list sub_100keV
+    pyrite run sub_100keV
     pyrite profile numerics show sub_100keV
     pyrite profile numerics adaptive-sampling set sub_100keV --target-rse 0.02
     pyrite profile numerics set sub_100keV --cxr-histories 2000   (fixed counts)
@@ -160,11 +164,12 @@ Options:
                                   requires midpoint.  [x>=0.0]
   --beam NAME                     Attach a named [beams.NAME] reference; create it with
                                   'pyrite beam create'.
-  --detector NAME                 Attach a named detector (one-ID collections update
-                                  that ID; multiple IDs require profile detector set
-                                  PROFILE ID); reference uses the Timepix3 aperture with
-                                  ideal response and raw spectra. Create others with
-                                  'pyrite detector create'.
+  --detector NAME                 Attach or replace the sole detector. Add further
+                                  detectors with 'profile detector add PROFILE ID
+                                  --detector NAME'; edit a specific ID with 'profile
+                                  detector set PROFILE ID'. The reference detector uses
+                                  the Timepix3 aperture with ideal response and raw
+                                  spectra. Create objects with 'pyrite detector create'.
   --material KEY,...              Set explicit initial membership (comma-separated
                                   material keys).
   --dry-run                       Print proposed TOML diff; write nothing.
@@ -197,15 +202,25 @@ Usage: pyrite profile detector [OPTIONS] COMMAND [ARGS]...
   Manage profile detector IDs, references and inline configuration.
 
   Named objects belong to 'pyrite detector'; local edits require an inline entry or
-  --inline-copy. Legacy default/physical IDs edit existing storage. Use migrate PROFILE
-  --dry-run before adding IDs to a legacy profile. Filters remain shared under 'profile
-  filter'.
+  --inline-copy. Legacy default/physical IDs edit existing storage. Every run scores
+  each ID individually in a separate dataset. Add converts legacy storage after
+  previewing checkpoint changes; --yes confirms the conversion. Filters remain shared
+  under 'profile filter'.
+
+  Examples:
+    pyrite profile create lab-scan --from quickstart
+    pyrite detector create clone side-view --from reference
+    pyrite detector set side-view --observation-angle 100 --yes
+    pyrite profile detector add lab-scan side --detector side-view --dry-run
+    pyrite profile detector add lab-scan side --detector side-view --yes
+    pyrite profile detector list lab-scan
+    pyrite run lab-scan
 
 Options:
   -h, --help  Show this message and exit.
 
 Commands:
-  add      Attach a named detector under a new ID; migrate legacy profiles explicitly.
+  add      Attach a named detector under a new ID, preserving existing detectors.
   list     List PROFILE_NAME's resolved detector IDs and references.
   migrate  Explicitly convert legacy storage to an ID collection, preserving values.
   reset    Clear ID's optional sections.
@@ -219,12 +234,16 @@ Commands:
 ```text
 Usage: pyrite profile detector add [OPTIONS] PROFILE_NAME IDENTIFIER
 
-  Attach a named detector under a new ID; migrate legacy profiles explicitly.
+  Attach a named detector under a new ID, preserving existing detectors.
+
+  Legacy storage converts to a collection with a checkpoint-change preview and
+  confirmation. Use --dry-run to inspect it or --yes to apply it. Runs score every
+  attached ID individually.
 
 Options:
   --detector TEXT  Named scalar or pixel detector to attach.  [required]
-  -y, --yes        Skip the standard-profile confirmation.
-  --dry-run        Print proposed TOML diff; write nothing.
+  -y, --yes        Confirm storage conversion and standard-profile edits.
+  --dry-run        Print proposed TOML and checkpoint changes; write nothing.
   -h, --help       Show this message and exit.
 ```
 
@@ -614,11 +633,12 @@ Options:
                                   requires midpoint.  [x>=0.0]
   --beam NAME                     Attach a named [beams.NAME] reference; create it with
                                   'pyrite beam create'.
-  --detector NAME                 Attach a named detector (one-ID collections update
-                                  that ID; multiple IDs require profile detector set
-                                  PROFILE ID); reference uses the Timepix3 aperture with
-                                  ideal response and raw spectra. Create others with
-                                  'pyrite detector create'.
+  --detector NAME                 Attach or replace the sole detector. Add further
+                                  detectors with 'profile detector add PROFILE ID
+                                  --detector NAME'; edit a specific ID with 'profile
+                                  detector set PROFILE ID'. The reference detector uses
+                                  the Timepix3 aperture with ideal response and raw
+                                  spectra. Create objects with 'pyrite detector create'.
   --physics NAME                  Attach a named physics preset; the profile's own
                                   fields stay overrides.
   --numerics NAME                 Attach a named numerics preset; the profile's own

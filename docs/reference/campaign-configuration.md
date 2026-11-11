@@ -236,19 +236,24 @@ profile filters are shared and ordered. Pixel acceptance derives from geometry,
 including without acquisition. `profile show` prints the projection.
 
 ```bash
+pyrite profile create lab-scan --from quickstart
 pyrite detector create planar sensor --distance-mm 400 --shape 256 256 \
   --angular-shape 2 2 --response ideal --exposure-s 1 --reporting-bins native
-pyrite profile detector migrate lab-scan --dry-run
-pyrite profile detector migrate lab-scan --yes
-pyrite profile detector add lab-scan camera --detector sensor
+pyrite profile detector add lab-scan camera --detector sensor --dry-run
+pyrite profile detector add lab-scan camera --detector sensor --yes
+pyrite profile detector list lab-scan
 pyrite profile detector show lab-scan camera -o json
 pyrite profile detector set lab-scan camera --inline-copy --roll-deg 5
+pyrite run lab-scan
 ```
 
 Named detector creation uses `scalar`, `planar`, or `clone --from SOURCE`;
 `set` edits reusable objects. `profile detector list|show` inspects ID-resolved
-geometry/references. `add` attaches an ID; `set --detector REF` replaces a
-reference. Profile-local field edits of a named reference require
+geometry/references. `add PROFILE ID --detector REF` attaches another detector
+while preserving existing IDs. It converts legacy storage as needed, previews the TOML and
+checkpoint changes, and asks for confirmation. In scripts, use `--yes` to
+apply the conversion; `--dry-run` previews it. `set --detector REF` replaces
+one ID's reference. Profile-local field edits of a named reference require
 `--inline-copy`, preserving all settings before the local edit.
 `detector reset REF scorer|response|acquisition` clears optional sections;
 `profile detector reset PROFILE ID SECTION...` clears inline sections.
@@ -257,7 +262,9 @@ confirmation (`--yes` for scripts); `--dry-run` previews without writing.
 
 Legacy `detector` and `physical_detector` are exposed as IDs `default` and
 `physical`; they cannot coexist with a collection. Targeting those IDs preserves
-storage until explicit `migrate`. Migration preserves detector settings/order,
+storage until `add` converts it or explicit `migrate` is requested.
+`profile detector migrate PROFILE --dry-run` previews conversion alone.
+Migration preserves detector settings/order,
 previews exact TOML and checkpoint variants, and confirms before writing.
 Converting one legacy detector into a collection adds `detector-ID` to the
 variant and changes identity. Multiple legacy detectors already use these

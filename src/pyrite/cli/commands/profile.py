@@ -232,8 +232,9 @@ def command():
     unless fixed history counts are set); its physical models and cutoffs use
     ``profile physics``. Named presets those override are managed with
     ``pyrite numerics`` and ``pyrite physics`` and attached with ``set
-    --numerics|--physics NAME``. Filters and the pixel detector use ``filter``
-    and ``detector``; reusable beams and detectors are named objects
+    --numerics|--physics NAME``. Filters and detector membership use ``filter``
+    and ``detector``. Each run scores every attached detector ID individually.
+    Reusable beams and detectors are named objects
     edited with ``pyrite beam`` and ``pyrite detector``. The full map is
     docs/repo-design/profile-settings.md. Bundled demos are read-only (copy
     with ``create NAME --from DEMO``); yours live in ``catalog.user``.
@@ -244,6 +245,10 @@ def command():
       pyrite profile show sub_100keV        (or: pyrite profile sub_100keV)
       pyrite profile create sub_100keV --energy 30:100:10
       pyrite profile set sub_100keV --detector eds
+      pyrite profile detector add sub_100keV side --detector reference --dry-run
+      pyrite profile detector add sub_100keV side --detector reference --yes
+      pyrite profile detector list sub_100keV
+      pyrite run sub_100keV
       pyrite profile numerics show sub_100keV
       pyrite profile numerics adaptive-sampling set sub_100keV --target-rse 0.02
       pyrite profile numerics set sub_100keV --cxr-histories 2000   (fixed counts)
@@ -391,8 +396,9 @@ def show_command(name, json_output):
     metavar="NAME",
     shell_complete=_cli_completion.complete_detector,
     help=(
-        "Attach a named detector (one-ID collections update that ID; multiple IDs require profile detector set PROFILE ID); reference uses the Timepix3 aperture with ideal response "
-        "and raw spectra. Create others with 'pyrite detector create'."
+        "Attach or replace the sole detector. Add further detectors with 'profile detector add PROFILE ID --detector NAME'; "
+        "edit a specific ID with 'profile detector set PROFILE ID'. The reference detector uses the Timepix3 "
+        "aperture with ideal response and raw spectra. Create objects with 'pyrite detector create'."
     ),
 )
 @canonical_option(
@@ -505,8 +511,9 @@ def create_command(
     metavar="NAME",
     shell_complete=_cli_completion.complete_detector,
     help=(
-        "Attach a named detector (one-ID collections update that ID; multiple IDs require profile detector set PROFILE ID); reference uses the Timepix3 aperture with ideal response "
-        "and raw spectra. Create others with 'pyrite detector create'."
+        "Attach or replace the sole detector. Add further detectors with 'profile detector add PROFILE ID --detector NAME'; "
+        "edit a specific ID with 'profile detector set PROFILE ID'. The reference detector uses the Timepix3 "
+        "aperture with ideal response and raw spectra. Create objects with 'pyrite detector create'."
     ),
 )
 @_profile_presets.attach_options
