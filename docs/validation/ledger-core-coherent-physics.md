@@ -647,13 +647,13 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 
 ## `spxr-physical-population`
 
-- **Claim:** for a fixed physical population of independent, identically distributed electron fields, the ensemble spectral yield separates into `N <|E|²> + N(N-1) |<E>|²`, with physical `N = Q/|e|` independent of numerical sample count
+- **Claim:** for a fixed nonnegative integer physical population of independent, identically distributed electron channel amplitudes with finite second moment, the ensemble spectral yield separates into `N <|E|²> + N(N-1) |<E>|²`, with physical `N = Q/|e|` for nonnegative bunch-charge magnitude `Q` (equivalently `|Q_signed|/|e|` for an electron-only bunch), independent of numerical sample count
 - **Code:** proposed only; no production estimator
-- **Source:** expansion of the squared field sum under independence; spontaneous/coherent bunch contributions in Feranchuk, San and Skoromnik (2022), DOI 10.1103/PhysRevAccelBeams.25.120702; [research derivation and assumptions](../research/physics/superradiant-pxr.md)
-- **Status:** unverified
-- **Checks:** implementation-context algebra only; dimensionless population multiplies single-channel spectral-yield units; zero mean field leaves the linear self term, identical deterministic fields give the quadratic population limit, and one electron has no pair term
+- **Source:** expansion of the squared field sum under independence; spontaneous/coherent bunch contributions in Feranchuk, San and Skoromnik (2022), DOI 10.1103/PhysRevAccelBeams.25.120702, Eq. (36), p. 120702-7 (exact double sum); Eqs. (49)–(50), p. 120702-8 use continuum `N²`, distinct from exact pair count; [research derivation and assumptions](../research/physics/superradiant-pxr.md)
+- **Status:** rederived
+- **Checks:** fresh-context source-first derivation and 21 exact-rational finite-ensemble enumerations (zero residual); dimensionless population multiplies single-channel spectral-yield units; zero mean field leaves the linear self term, identical deterministic fields give the quadratic population limit, and one electron has no pair term
 - **Anchor:** —
-- **Notes:** research-only normalization requirement, not validation of current coherent output. Finite-sample pair-estimator bias, correlated bunches and physical-charge convergence remain to be independently derived and tested. No existing coherence claim is advanced; human sign-off remains required.
+- **Notes:** research-only normalization requirement, not validation of current coherent output. Finite-sample pair-estimator bias, correlated bunches and physical-charge convergence remain to be independently derived and tested. Fresh-context verification (2026-11-11, #1101) rederived the fixed-count self/pair decomposition before reading the research note; explicit charge-magnitude and finite-moment qualifications match that model. No production estimator, correlated-bunch model or absolute yield is certified; no existing coherence claim is advanced. [Independent verification](radiation-physics/spxr-physical-population.md). Human sign-off remains separate.
 
 ## `quantum-pair-population-normalization`
 
