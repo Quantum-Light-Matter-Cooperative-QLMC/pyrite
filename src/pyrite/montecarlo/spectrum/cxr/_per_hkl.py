@@ -108,13 +108,22 @@ def _formation_cxr(st, idx, t_L, v_dot_g, mu):
     return 0.5 * (L_start + L_end), cxr_rows
 
 
-def _formation_good(amp, t_L, cxr_rows):
-    """Live lines: finite positive amplitude and a finite, non-vanishing
-    attenuation profile (``apb = 0`` only where both ends are opaque)."""
+def _formation_good(amp, t_L, cxr_rows, coefs):
+    """Live lines: finite positive amplitude, finite complex polarization
+    coefficients, and a finite, non-vanishing attenuation profile (``apb = 0``
+    only where both ends are opaque).
+
+    A line whose coupling reads past the atomic data's end has a NaN
+    coefficient while its scalar amplitude stays finite; it is dropped here
+    rather than poisoning the field sum. Validation: line-grid-emission-ceiling
+    """
     _, _, _, apb, bma, _ = cxr_rows
-    return (
+    good = (
         xp.isfinite(amp) & (amp > 0) & (t_L > 0) & xp.isfinite(apb) & (apb > 0) & xp.isfinite(bma)
     )
+    for c in coefs:
+        good &= xp.isfinite(c)
+    return good
 
 
 def _formation_SP(st, cxr_rows, e_sl=slice(None), sinc_cutoff=None):
@@ -649,7 +658,7 @@ def _accumulate_reflection_coherent(st, g_vec_d, wm, idx, om, t_L, L_esc, cxr_ro
     d = d_all_geom[idx]
     g_phase = _matvec3(seg_r_geom[idx], g_vec_d)
     coefs = [(amp * t_L) * A_e for A_e in pol_A]  # complex per polarization
-    good = _formation_good(amp, t_L, cxr_rows)
+    good = _formation_good(amp, t_L, cxr_rows, coefs)
     E_vac, a_vac, half_dL, apb, bma, q = cxr_rows
     if st.temporal_buf is not None:
         _temporal_coherent_row(st, g_vec_d, wm, idx, coefs, good, cxr_rows, L_esc)
@@ -1010,7 +1019,7 @@ def _accumulate_reflection(
         d = d_all[idx]
         g_phase = _matvec3(seg_r[idx], g_vec_d)
         coefs = [(amp * t_L) * A_e for A_e in pol_A]
-        good = _formation_good(amp, t_L, cxr_rows)
+        good = _formation_good(amp, t_L, cxr_rows, coefs)
         sel = np.flatnonzero(good)
         if sel.size == 0:
             return

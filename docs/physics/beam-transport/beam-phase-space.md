@@ -91,9 +91,12 @@ Slopes become directions by tilting the nominal `beam_dir` about the two transve
 ### Energy spread
 
 ```text
-delta_i ~ N(0, energy_spread_frac)
+z_i     ~ N(0, 1), clamped to |z_i| <= 6
+delta_i = energy_spread_frac * z_i
 E_i     = E0_keV * (1 + delta_i)
 ```
+
+The clamp moves only draws beyond 6σ (mass {math}`2\Phi(-6)\approx2\times10^{-9}`) onto the endpoints, leaving the mean unchanged, and makes `E0_keV * (1 + 6 * energy_spread_frac)` a strict upper incident energy; automatic line grids bound their bandwidth there.
 
 drawn **independently and uncorrelated** with the longitudinal offsets, for every `long_shape` including `compressed`, so {math}`\langle t\,\delta\rangle = 0` holds by construction and `beam_metrics` reports a longitudinal emittance of exactly `sigma_t * sigma_delta`. A chirp model would enter as an additive correlation parameter defaulting to zero; see [Longitudinal bunch structure](longitudinal-structure.md). The experimental channeling diagnostics apply exactly such an additive chirp to sampled primaries, without changing transport ([correlated energy–time phase space](../radiation-physics/channeling-energy-time-phase-space.md)).
 

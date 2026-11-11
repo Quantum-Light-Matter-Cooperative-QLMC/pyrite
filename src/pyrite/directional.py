@@ -93,7 +93,8 @@ def line_window_ceiling_eV(case) -> float:
 
     The case's closed-form kinematic bound
     ``hbar c beta |g|_max / (1 - beta)`` over every radiating layer's
-    reflections, capped by the incident kinetic energy. The atomic-data cap
+    reflections at the declared upper incident energy (``E0 (1 + 6 f)`` for a
+    spread beam), capped by that kinetic energy. The atomic-data cap
     is omitted, so the value can only be high. It is direction independent, because
     scattered electrons may point anywhere. Relativistic beams Doppler-shift
     near-forward lines far above their side-on energies, so an explicit grid
@@ -110,7 +111,9 @@ def line_window_ceiling_eV(case) -> float:
         if radiator is not None
         for hkl in radiator["hkl_list"]
     ]
-    energy_keV = float(case["E0_keV"])
+    from .montecarlo.transport.beam_entry import upper_beam_energy_keV
+
+    energy_keV = upper_beam_energy_keV(case["E0_keV"], case.get("energy_spread_frac"))
     return min(kinematic_cxr_stop_eV(magnitudes, energy_keV), energy_keV * 1e3)
 
 

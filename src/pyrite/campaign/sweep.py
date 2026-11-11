@@ -663,10 +663,15 @@ def _automatic_cxr_grid_policy(sweep: Sweep, cp: dict, energy_keV: float) -> Cxr
     Validation: line-grid-emission-ceiling
     Validation: line-grid-kinematic-bandwidth
     """
+    from ..montecarlo.transport.beam_entry import upper_beam_energy_keV
+
     spec = CATALOG.crystal(cp["crystal"])
     magnitudes = [reciprocal_g_vector(hkl, spec.lattice)[1] for hkl in cp["hkl_list"]]
     start = cxr_start_eV(energy_keV)
-    stop = kinematic_cxr_stop_eV(magnitudes, energy_keV)
+    # Bounds use the declared upper incident energy, E0 (1 + 6 f) for a spread
+    # beam: the sampler clamps there, so no electron starts above it.
+    upper_keV = upper_beam_energy_keV(energy_keV, sweep.beam.energy_spread_frac)
+    stop = kinematic_cxr_stop_eV(magnitudes, upper_keV)
     policy = resolve_cxr_grid_policy(
         start_eV=start,
         stop_eV=stop,
@@ -678,19 +683,29 @@ def _automatic_cxr_grid_policy(sweep: Sweep, cp: dict, energy_keV: float) -> Cxr
         # axis already stops where the case's own lines do.
         return policy
     # The classical resonance bound has no electron recoil and can exceed the
-    # beam's kinetic energy, which no photon can; and no line emits at or above
-    # the atomic data's end, where its couplings or attenuation are NaN and the
-    # line kernels drop it. The axis stops at the lowest of the three.
+    # beam's kinetic energy, which no photon can; and no line is scored at or
+    # above the atomic data's end, where its couplings or attenuation are NaN
+    # and the line kernels drop it. The axis stops at the lowest of the three.
+    # The data limit rounds DOWN, strictly below its NaN onset: the coherent
+    # route evaluates refraction on the output axis itself, so an upward-
+    # rounded node past the onset would read NaN. Energy conservation rounds up.
     # Validation: line-grid-emission-ceiling
     from ..materials.crystal import CRYSTALS
     from ..montecarlo.spectrum.cxr import _cxr_emission_ceiling
 
+    # Round each limit by its own rule BEFORE taking the minimum: a kinetic
+    # limit just below the data onset would otherwise round up across it.
+    data_eV = _cxr_emission_ceiling(CRYSTALS[cp["crystal"]], cp["composition"])
     limits = {
-        "energy conservation": energy_keV * 1.0e3,
-        "atomic data ceiling": _cxr_emission_ceiling(CRYSTALS[cp["crystal"]], cp["composition"]),
+        "energy conservation": math.ceil(upper_keV * 1.0e3 / STOP_ROUND_TO_EV) * STOP_ROUND_TO_EV,
+        # largest node strictly below the onset
+        "atomic data ceiling": (
+            (math.ceil(data_eV / STOP_ROUND_TO_EV) - 1) * STOP_ROUND_TO_EV
+            if math.isfinite(data_eV)
+            else math.inf
+        ),
     }
     label, cap = min(limits.items(), key=lambda item: item[1])
-    cap = math.ceil(cap / STOP_ROUND_TO_EV) * STOP_ROUND_TO_EV
     if not start < cap < policy.stop_eV:
         return policy
     sources = {**dict(policy.sources), "stop_eV": label}

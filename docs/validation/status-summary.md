@@ -12,21 +12,21 @@ Formal sign-off requires human review of each claim. Independent derivations, au
 
 | Verdict | Claims |
 |---|---:|
-| `pass` | 28 |
+| `pass` | 35 |
 | `fail` | 0 |
 | `skip` | 0 |
-| `missing` | 307 |
+| `missing` | 300 |
 
-Oldest current automated evidence: `2026-09-15T15:45:04.640409+00:00` (UTC timestamp; use it to assess evidence age).
+Oldest current automated evidence: `2026-09-15T15:45:30.982686+00:00` (UTC timestamp; use it to assess evidence age).
 
 | Status | Claims |
 |---|---:|
 | `signed-off` | 0 |
 | `anchored` | 117 |
-| `rederived` | 114 |
+| `rederived` | 120 |
 | `filtered` | 13 |
-| `unverified` | 85 |
-| `discrepancy` | 6 |
+| `unverified` | 80 |
+| `discrepancy` | 5 |
 | **Total** | **335** |
 
 Status meanings and promotion rules are defined in the [validation methodology](methodology.md).

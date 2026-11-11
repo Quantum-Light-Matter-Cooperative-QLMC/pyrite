@@ -326,9 +326,17 @@ def _mc_spectrum(request):
     Validation: line-scoring-roulette
     """
     st = _prepare_spectrum(request)
-    if st.grouped and (request.truncation_audit or {}).get("mass_only"):
-        # The grouped reduction fills no row audit, so masses would read as zero.
-        raise ValueError("a line-mass pass does not support flight-grouped substeps")
+    if st.grouped and request.truncation_audit is not None:
+        # The grouped reduction sums substep fields per flight and fills no
+        # row audit: collected lines, line masses and edge fractions would all
+        # read as empty. Treating substeps as independent sinc lines would drop
+        # their interference cross terms. Validation: line-grid-resonance-bandwidth
+        raise ValueError(
+            "a truncation audit (measured bandwidth, line-mass or adaptive pass) "
+            "does not support flight-grouped substeps: their summed fields carry "
+            "no audited sinc-line mass. Use the automatic bandwidth policy, or "
+            "transport without max_dE_frac."
+        )
     coverage = line_data_coverage(st) if line_data_coverage_enabled() else None
     if _needs_per_hkl_route(st):
         _accumulate_per_hkl(st)
