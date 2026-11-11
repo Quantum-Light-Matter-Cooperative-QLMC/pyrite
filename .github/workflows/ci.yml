@@ -220,15 +220,32 @@ jobs:
   # disables JIT to exercise Python-level Numba bodies; it does NOT test
   # compiled kernels. Online tests run separately on push/main and weekly.
   # Main pushes skip the slow tier (51% of JIT-disabled cost; PRs run it
-  # compiled); the weekly run keeps it. Workers follow the memory heuristic
-  # (4 on public 4-vCPU runners). Profile: #344, lab job 10909.
+  # compiled); the weekly run keeps it. Runners act as ~2 cores (4 workers
+  # cost 1.6-2.5x per test), so 2 workers per shard; shards balance measured
+  # non-slow JIT-disabled cost (#344, lab job 10909, CI run 42924996024).
   numba-online:
     if: github.event_name != 'pull_request'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard: collisions
+            suites: transport-collisions
+          - shard: transport-spectrum
+            suites: >-
+              transport transport-runner transport-cascades spectrum
+              spectrum-coherent spectrum-brem channeling quantum
+          - shard: core-data
+            suites: core packaging apps cli energy-grid materials xsgen
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
+      NUMBA_DISABLE_JIT: '1'
       PYRITE_MC_BACKEND: cpu
       PYRITE_ONLINE_TESTS: '1'
+      PYRITE_TEST_WORKERS: '2'
+      SUITES: ${{ matrix.suites }}
+      SLOW: ${{ github.event_name == 'schedule' && '--slow' || '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
@@ -244,16 +261,23 @@ jobs:
             ~/.local/share/pyrite/xsgen/reference-data
           key: pyrite-data-${{ hashFiles('src/pyrite/datasets.py', 'src/pyrite/xsgen/fetch.py', 'src/pyrite/data/xsgen/*-tables.json') }}
       - run: uv run pyrite tables fetch
-      - name: Test suite with JIT disabled and online checks enabled
-        run: >-
-          uv run pyrite-dev test --numba
-          ${{ github.event_name == 'schedule' && '--slow' || '' }}
-          --durations=30 --junitxml=numba-junit.xml
+      - name: Suites with JIT disabled and online checks enabled
+        shell: bash
+        run: |
+          read -ra suites <<< "$SUITES"
+          rc=0
+          for suite in "${suites[@]}"; do
+            echo "::group::$suite"
+            uv run pyrite-dev test-suite "$suite" $SLOW --durations=10 \
+              --junitxml="numba-junit-$suite.xml" || rc=1
+            echo "::endgroup::"
+          done
+          exit "$rc"
       - name: Upload per-test durations
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: numba-junit-${{ github.run_id }}
-          path: numba-junit.xml
+          name: numba-junit-${{ matrix.shard }}-${{ github.run_id }}
+          path: numba-junit-*.xml
           if-no-files-found: ignore
           retention-days: 30

@@ -334,6 +334,17 @@ def test_ci_runs_every_primary_suite_once(dev_module) -> None:
     assert quantum["python"] == matrix["python"]
 
 
+def test_numba_online_shards_run_every_primary_suite_once(dev_module) -> None:
+    import yaml
+
+    workflow = yaml.safe_load((dev_module.ROOT / ".github/workflows/ci.yml").read_text())
+    job = workflow["jobs"]["numba-online"]
+    suites = [s for row in job["strategy"]["matrix"]["include"] for s in row["suites"].split()]
+
+    assert sorted(suites) == sorted(dev_module.PRIMARY_TEST_SUITE_NAMES)
+    assert job["env"]["NUMBA_DISABLE_JIT"] == "1"
+
+
 @pytest.mark.parametrize(
     ("base", "expected"),
     [("main", True), ("issue-680", True), ("issue-681-execution", True), ("release", False)],
