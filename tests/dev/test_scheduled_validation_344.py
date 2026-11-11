@@ -413,3 +413,44 @@ def test_multilayer_slice3_fails_on_any_assertion(monkeypatch, failing):
     with pytest.raises(SystemExit) as error:
         slice3.main()
     assert error.value.code == 1
+
+
+@pytest.mark.parametrize(("tail", "code"), [(1.0, 0), (0.0, 1), (np.nan, 1)])
+def test_channeling_handoff_gates_chunk_distance(monkeypatch, tail, code):
+    """Separable chunks pass; a shifted (TV 1/6) or nonfinite marginal fails."""
+    handoff = _script("channeling_handoff.py")
+    second = np.ones(64)
+    second[32:] = tail
+    marginals = iter([np.ones(64), second])
+
+    class Profile:
+        def extrema(self):
+            return 0.0, 20.0
+
+    class Solver:
+        cutoff_eV, gamma0, beta0 = 0.0, 10.0, 1.0
+        basis = type("Basis", (), {"energies": np.array([1.0, 30.0])})
+
+        def __init__(self, *args):
+            pass
+
+        def propagate(self, *args, **kwargs):
+            flux = np.zeros(1)
+            return type(
+                "Result",
+                (),
+                {
+                    "final_density": np.ones((1, 1, 1)),
+                    "entry_flux": 0.0,
+                    "free_flux_by_energy": next(marginals),
+                    "free_flux": flux,
+                    "reprojection_flux": flux,
+                    "overflow_flux": flux,
+                },
+            )
+
+    monkeypatch.setattr(handoff, "planar_profile", lambda *args: Profile())
+    monkeypatch.setattr(handoff, "tds_kernel", lambda *args, **kwargs: 0.0)
+    monkeypatch.setattr(handoff, "electronic_kernel", lambda *args, **kwargs: 0.0)
+    monkeypatch.setattr(handoff, "DensityMatrixSolver", Solver)
+    assert handoff.main(["--chunks", "2"]) == code

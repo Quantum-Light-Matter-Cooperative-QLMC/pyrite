@@ -53,6 +53,10 @@ CPU_RECIPES: dict[str, tuple[str, ...]] = {
     "checks/channeling_modulated_emission.py": (),
     "checks/multilayer_validation_check.py": (),
     "checks/multilayer_slice3_check.py": (),
+    "checks/channeling_handoff.py": (),
+    "checks/mosaic_mc_check.py": (),
+    # Full ensemble only: --quick cannot meet the 1% convergence gate.
+    "checks/shell_secondary_transport_observables.py": (),
 }
 
 
