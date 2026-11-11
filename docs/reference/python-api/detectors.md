@@ -97,6 +97,39 @@ These advanced-stable numeric functions and grid-dependent operators implement r
    pyrite.detectors.grating.detected_image
 ```
 
+## Experimental flat-field spectrometer and ALEX-s API
+
+These experimental objects forward-model a scored spectrum through an entrance
+slit, a flat-field grating and a greateyes ALEX-s 2k512 CCD (issue #1081).
+`AlexS` is the charge-integrating response (expected ADU density per eV);
+`alexs_response` holds its datasheet constants and frame realization.
+`Grating.from_catalog` builds a grating, its `FlatFieldMount` and its absolute
+`efficiency_curve` from a private catalog's `[gratings.NAME]` record. The
+slit-image kernel and the 2D image live in `grating_image`. See
+[model a private flat-field spectrometer](../../guides/flat-field-spectrometer.md)
+and the [grazing-incidence grating note](../../research/instrumentation/grazing-grating.md).
+
+```{eval-rst}
+.. autosummary::
+   :toctree: ../../_autosummary
+   :nosignatures:
+
+   pyrite.detectors.AlexS
+   pyrite.detectors.TabulatedEfficiency
+   pyrite.detectors.alexs_response.AlexsFormat
+   pyrite.detectors.alexs_response.alexs_frame
+   pyrite.detectors.alexs_response.quantum_efficiency
+   pyrite.detectors.alexs_response.signal_electrons
+   pyrite.detectors.grating.FlatFieldMount
+   pyrite.detectors.grating_image.SlitImage
+   pyrite.detectors.grating_image.AlongSlitSpread
+   pyrite.detectors.grating_image.SpectrometerImage
+   pyrite.detectors.grating_image.slit_image_width_mm
+   pyrite.detectors.grating_image.slit_image_pixels
+   pyrite.detectors.grating_image.detected_image_2d
+   pyrite.detectors.grating_image.alexs_spectrometer_image
+```
+
 ## Advanced opt-in quantity helpers
 
 These supported wrappers accept explicit quantities around the numeric scientific interfaces. They do not replace numeric records, defaults or persisted arrays. See [units](units.md).

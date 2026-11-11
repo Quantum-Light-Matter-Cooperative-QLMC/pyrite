@@ -1,11 +1,15 @@
 """Tests for the grazing-incidence grating forward model (P3 #8). Pure numpy."""
 
+import os
+
 import numpy as np
 import pytest
 
+from pyrite.detectors import TabulatedEfficiency
 from pyrite.detectors._si_sensor import SI_N_PER_ANG3
 from pyrite.detectors.grating import (
     ALEXS_SENSORS,
+    FlatFieldMount,
     Grating,
     SimpleCCD,
     bin_to_pixels,
@@ -21,6 +25,7 @@ from pyrite.detectors.grating import (
     resolving_power,
     wavelength_angstrom,
 )
+from pyrite.materials import load_material_catalog
 from pyrite.materials.crystal import HC_EV_ANG, absorption_length_ang, optical_constants
 
 
@@ -400,3 +405,163 @@ def test_detected_image_physical_blur_redistributes_flux_across_pixels():
     # before blurring now carry some counts near the peak
     zero_before = counts_unblurred == 0.0
     assert np.any(counts[zero_before] > 0.0)
+
+
+# ---- flat-field grating: efficiency curve, focal plane, catalog (#1081) -------
+# Every grating, mount and curve below is synthetic. Real vendor data stays in
+# the user's private catalog and is checked only by the skipped test at the end.
+_EFFICIENCY = TabulatedEfficiency((100.0, 200.0, 300.0), (0.10, 0.20, 0.05), name="synthetic")
+
+
+def test_throughput_unchanged_without_efficiency_curve():
+    E = np.array([300.0, 600.0, 900.0])
+    g = Grating(groove_density_per_mm=1200.0, alpha_rad=np.deg2rad(88.0), groove_efficiency=0.3)
+    assert g.throughput(E) == pytest.approx(g.reflectivity(E) * 0.3)
+
+
+def test_efficiency_curve_is_applied_once_without_fresnel():
+    g = Grating(1200.0, np.deg2rad(88.0), efficiency_curve=_EFFICIENCY)
+    E = np.array([100.0, 150.0, 300.0])
+    assert g.throughput(E) == pytest.approx([0.10, 0.15, 0.05])
+    # Detected flux scales by eta exactly once: no reflectivity factor.
+    E_grid = np.linspace(120.0, 280.0, 801)
+    spec = np.ones_like(E_grid)
+    x, inten = disperse_spectrum(E_grid, spec, g, 500.0, weight_by_throughput=True)
+    assert abs(np.trapezoid(inten, x)) == pytest.approx(
+        np.trapezoid(_EFFICIENCY(E_grid), E_grid), rel=1e-9
+    )
+
+
+def test_efficiency_curve_is_zero_outside_its_band():
+    g = Grating(1200.0, np.deg2rad(88.0), efficiency_curve=_EFFICIENCY)
+    assert g.throughput(np.array([50.0, 99.9, 300.1, 1000.0])) == pytest.approx(np.zeros(4))
+    assert not _EFFICIENCY.covers(50.0) and _EFFICIENCY.covers(200.0)
+
+
+def test_efficiency_curve_refuses_a_second_groove_efficiency():
+    with pytest.raises(ValueError, match="already includes"):
+        Grating(1200.0, 1.5, groove_efficiency=0.5, efficiency_curve=_EFFICIENCY)
+
+
+def test_flat_field_position_is_the_plane_intersection():
+    mount = FlatFieldMount(entrance_arm_mm=300.0, focal_distance_mm=280.0, focal_normal_rad=0.3)
+    beta = np.array([0.1, 0.3, 0.5])
+    s = mount.position_mm(beta)
+    rays = mount.exit_arm_mm(beta)[:, None] * np.column_stack([np.sin(beta), np.cos(beta)])
+    normal = np.array([np.sin(0.3), np.cos(0.3)])
+    tangent = np.array([np.cos(0.3), -np.sin(0.3)])
+    assert rays @ normal == pytest.approx(np.full(3, 280.0))  # on the plane
+    assert rays @ tangent == pytest.approx(s)  # offset from the foot
+    assert s[1] == pytest.approx(0.0)  # beta = beta_H lands at the foot
+
+
+@pytest.mark.parametrize("sign", [1.0, -1.0])
+def test_flat_field_reduces_to_cot_beta_for_a_plane_normal_to_the_grating(sign):
+    # tan has period pi, so beta_H -> +90 and -90 deg both give -r_H' cot(beta).
+    # Rays reach the plane on the same side as its normal.
+    mount = FlatFieldMount(300.0, 280.0, sign * np.deg2rad(89.999999))
+    beta = sign * np.deg2rad(np.array([80.0, 84.0]))
+    assert mount.position_mm(beta) == pytest.approx(-280.0 / np.tan(beta), rel=1e-5, abs=1e-4)
+
+
+def test_flat_field_rays_that_miss_the_plane_are_nan():
+    mount = FlatFieldMount(300.0, 280.0, 0.2)
+    assert np.isnan(mount.position_mm(0.2 + np.pi / 2 + 0.1))
+    assert np.isnan(mount.exit_arm_mm(0.2 - np.pi / 2 - 0.1))
+    assert np.isfinite(mount.position_mm(0.5))
+
+
+# Synthetic mount (arbitrary values): 1000/mm, m = +1, alpha = 86 deg, band 6-24 nm. Its tabulated
+# betas and focal-plane length are this module's equations rounded to the
+# precision a vendor table prints, so the check is a consistency check.
+_SYNTH_GRATING = """\
+label = "Synthetic flat-field grating"
+groove_density_per_mm = 1000
+order = 1
+order_convention = "{convention}"
+coating = "Au"
+efficiency_curve = "synthetic-eta"
+
+[mount]
+r_mm = 300.0
+alpha_deg = 86.0
+band_nm = [6.0, 24.0]
+r_prime_mm = [280.67, 284.06]
+beta_deg = [{b1}, {b2}]
+beta_H_deg = {bh}
+r_H_prime_mm = 280.0
+focal_plane_length_mm = 28.56
+"""
+_SYNTH_ETA = """\
+source = "synthetic absolute efficiency"
+digitization = "analytic toy"
+confidential = false
+quantity = "efficiency"
+abscissa = "wavelength"
+abscissa_unit = "nm"
+x = [4.0, 12.0, 21.0]
+y = [0.05, 0.12, 0.08]
+"""
+
+
+def _write_synthetic_grating(root, convention):
+    sign = 1.0 if convention == "sum" else -1.0
+    (root / "gratings").mkdir(exist_ok=True)
+    (root / "curves").mkdir(exist_ok=True)
+    (root / "curves" / "synthetic-eta.toml").write_text(_SYNTH_ETA)
+    text = _SYNTH_GRATING.format(
+        convention=convention, b1=sign * -82.5525, b2=sign * -76.7963, bh=sign * -86.5
+    )
+    (root / "gratings" / "synthetic-ff.toml").write_text(text)
+    load_material_catalog.cache_clear()
+
+
+@pytest.mark.parametrize("convention", ["sum", "difference"])
+def test_from_catalog_builds_a_flat_field_grating(_isolate_user_catalog, convention):
+    _write_synthetic_grating(_isolate_user_catalog, convention)
+    try:
+        g = Grating.from_catalog("synthetic-ff")
+    finally:
+        load_material_catalog.cache_clear()
+    assert g.order == 1 and g.alpha_rad == pytest.approx(np.deg2rad(86.0))
+    assert g.mount is not None
+    assert g.mount.focal_normal_rad == pytest.approx(np.deg2rad(-86.5))
+    assert g.mount.entrance_arm_mm == 300.0
+    assert g.efficiency_curve is not None and g.efficiency_curve.name == "synthetic-eta"
+    # 12 nm -> its curve value, no reflectivity factor.
+    assert g.throughput(HC_EV_ANG / 120.0) == pytest.approx(0.12)
+    residuals = g.mount_residuals()
+    assert max(abs(e) for e in residuals["beta_error_deg"]) < 0.05
+    assert abs(residuals["focal_plane_length_rel_error"]) < 0.01
+    assert max(abs(e) for e in residuals["exit_arm_rel_error"]) < 0.01
+
+
+def test_from_catalog_without_focal_plane_has_no_mount(_isolate_user_catalog):
+    _write_synthetic_grating(_isolate_user_catalog, "sum")
+    path = _isolate_user_catalog / "gratings" / "synthetic-ff.toml"
+    path.write_text(path.read_text().replace("beta_H_deg = -86.5\n", ""))
+    load_material_catalog.cache_clear()
+    try:
+        assert Grating.from_catalog("synthetic-ff").mount is None
+    finally:
+        load_material_catalog.cache_clear()
+
+
+@pytest.mark.skipif(
+    not (
+        os.environ.get("PYRITE_INTERNAL_USER_CATALOG") and os.environ.get("PYRITE_INTERNAL_GRATING")
+    ),
+    reason="needs the private instrument catalog (PYRITE_INTERNAL_USER_CATALOG, "
+    "PYRITE_INTERNAL_GRATING)",
+)
+def test_internal_grating_mount_matches_its_vendor_table(monkeypatch):
+    """Same consistency check against the real grating; numbers never enter the repo."""
+    monkeypatch.setenv("PYRITE_USER_CATALOG", os.environ["PYRITE_INTERNAL_USER_CATALOG"])
+    load_material_catalog.cache_clear()
+    try:
+        g = Grating.from_catalog(os.environ["PYRITE_INTERNAL_GRATING"])
+    finally:
+        load_material_catalog.cache_clear()
+    residuals = g.mount_residuals()
+    assert max(abs(e) for e in residuals["beta_error_deg"]) < 0.05
+    assert abs(residuals["focal_plane_length_rel_error"]) < 0.01

@@ -37,14 +37,23 @@ detected image (counts vs pixel), chaining `disperse_spectrum` and
 `SimpleCCD`/`bin_to_pixels` with closed-form detector physics -- Beer-Lambert
 absorption QE, Einstein-relation drift-diffusion charge sharing, Fano +
 read-noise energy resolution -- the same ladder `eaglexo_response.py` climbed
-for the Eagle XO. No public greateyes ALEX-s datasheet QE/noise curve exists
-(unlike the Eagle XO's digitized `eaglexo_qe.csv`), so these are physics
-formulas with device-specific constants (active thickness, depletion voltage,
-temperature, read noise) flagged '### FILL IN' pending a real datasheet.
+for the Eagle XO. Their ALEX-s device constants come from the public greateyes
+DS-ALEXs Rev05 datasheet (15 um epitaxial Si, -100 C, 3.5 e- read noise at
+50 kHz); the depletion bias and entrance-window QE peak are not in that
+datasheet and stay flagged '### FILL IN'. The charge-integrating ALEX-s
+response itself lives in `alexs_response.py`.
+
+Flat-field spectrometer (issue #1081): `Grating.efficiency_curve` replaces the
+Fresnel x placeholder throughput by a tabulated absolute efficiency,
+`FlatFieldMount` maps diffraction angle onto a flat focal plane at distance
+r_H' with normal beta_H, and `Grating.from_catalog` builds both from a catalog
+`[gratings.NAME]` record. The slit-image kernel and the 2D ALEX-s image live in
+`grating_image.py`. No ray tracing.
 """
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import TypedDict
+from typing import Any, cast
 
 import numpy as np
 
@@ -54,6 +63,16 @@ from ..materials.crystal import (
     optical_constants,
 )  # h*c [eV*Angstrom]
 from ._si_sensor import FANO_SI, SI_N_PER_ANG3, W_EHP_EV
+from ._tabulated import TabulatedEfficiency
+from .alexs_response import (
+    ALEXS_SENSORS,
+    DARK_CURRENT_TEMP_C,
+    EPI_THICKNESS_UM,
+    READ_NOISE_E_BY_RATE_HZ,
+)
+from .alexs_response import (
+    AlexsSensor as AlexsSensor,
+)
 
 # ---- coating optical constants (grazing-incidence reflectivity) --------------
 # Atomic number density n = rho/A * N_A, converted cm^-3 -> Ang^-3 (the unit
@@ -96,6 +115,89 @@ def groove_spacing_angstrom(groove_density_per_mm):
 
 
 @dataclass(frozen=True)
+class FlatFieldMount:
+    """Flat-field spectrometer mount: entrance arm and flat focal plane.
+
+    Angles follow this module's convention (from the grating normal, with
+    ``sin beta = m lambda/d - sin alpha``). The focal plane's normal leaves the
+    grating centre at ``focal_normal_rad`` (the vendor's ``beta_H``) and meets
+    the plane at ``focal_distance_mm`` (``r_H'``).
+
+    Parameters
+    ----------
+    entrance_arm_mm
+        Entrance-slit-to-grating distance ``r`` [mm].
+    focal_distance_mm
+        Perpendicular distance ``r_H'`` from the grating centre to the focal
+        plane [mm].
+    focal_normal_rad
+        Direction ``beta_H`` of that perpendicular from the grating normal [rad].
+    focal_plane_length_mm
+        Optional tabulated distance between the band-end foci [mm].
+    band_nm
+        Optional ``(short, long)`` design band [nm].
+    band_beta_rad
+        Optional tabulated diffraction angles at the band ends [rad], in this
+        module's convention.
+    band_exit_arm_mm
+        Optional tabulated exit arms ``r'`` at the band ends [mm].
+    """
+
+    entrance_arm_mm: float
+    focal_distance_mm: float
+    focal_normal_rad: float
+    focal_plane_length_mm: float | None = None
+    band_nm: tuple[float, float] | None = None
+    band_beta_rad: tuple[float, float] | None = None
+    band_exit_arm_mm: tuple[float, float] | None = None
+
+    def __post_init__(self) -> None:
+        for name in ("entrance_arm_mm", "focal_distance_mm"):
+            value = float(getattr(self, name))
+            if not np.isfinite(value) or value <= 0.0:
+                raise ValueError(f"FlatFieldMount.{name} must be finite and positive")
+            object.__setattr__(self, name, value)
+        if not abs(float(self.focal_normal_rad)) < 0.5 * np.pi:
+            raise ValueError("FlatFieldMount.focal_normal_rad must lie inside (-pi/2, pi/2)")
+
+    def position_mm(self, beta_rad):
+        """Dispersion-axis position on the flat focal plane [mm].
+
+        A ray leaving the grating centre at ``beta`` meets the plane
+        ``{p : p . n_H = r_H'}`` (unit normal ``n_H`` at ``beta_H``) after the
+        path ``r'(beta) = r_H' / cos(beta - beta_H)``; its offset along the
+        plane from the foot of the perpendicular is
+
+            s(beta) = r_H' tan(beta - beta_H).
+
+        For a plane perpendicular to the grating surface (``beta_H -> +-90``
+        deg) this is ``s = -r_H' cot(beta)`` for either sign (``tan`` has period
+        ``pi``), measured from the grating plane: the usual flat-field
+        statement. Rays that cannot reach the plane (``|beta - beta_H| >= 90``
+        deg) return NaN. It is the existing
+        :func:`detector_position_mm` map with ``L = r_H'`` and
+        ``beta_ref = beta_H``. Limiting case: ``beta = beta_H`` lands at the
+        foot, ``s = 0``. Source: plane-line intersection; flat-field mount
+        geometry of Kita et al., Appl. Opt. 22, 512 (1983).
+
+        Validation: flat-field-focal-plane
+        """
+        beta = np.asarray(beta_rad, float)
+        position = detector_position_mm(beta, self.focal_normal_rad, self.focal_distance_mm)
+        return np.where(np.cos(beta - self.focal_normal_rad) > 0.0, position, np.nan)
+
+    def exit_arm_mm(self, beta_rad):
+        """Grating-to-focal-plane path ``r'(beta) = r_H'/cos(beta - beta_H)`` [mm].
+
+        Validation: flat-field-focal-plane
+        """
+        cosine = np.cos(np.asarray(beta_rad, float) - self.focal_normal_rad)
+        return np.where(
+            cosine > 0.0, self.focal_distance_mm / np.where(cosine > 0.0, cosine, 1.0), np.nan
+        )
+
+
+@dataclass(frozen=True)
 class Grating:
     """A reflection grating in a fixed mount.
 
@@ -114,6 +216,13 @@ class Grating:
     groove_efficiency
         Placeholder scalar diffraction efficiency in ``[0, 1]``. This is not a
         groove-profile or rigorous coupled-wave model.
+    efficiency_curve
+        Optional tabulated absolute efficiency ``eta(E)`` (vendor curve). When
+        set, :meth:`throughput` is ``eta(E)`` alone and is zero outside the
+        curve's band; ``groove_efficiency`` must stay at one.
+    mount
+        Optional :class:`FlatFieldMount` used for the focal-plane map when no
+        explicit detector distance is given.
 
     Notes
     -----
@@ -126,6 +235,101 @@ class Grating:
     order: int = 1
     coating: str = "Au"
     groove_efficiency: float = 1.0
+    efficiency_curve: TabulatedEfficiency | None = None
+    mount: FlatFieldMount | None = None
+
+    def __post_init__(self) -> None:
+        if self.efficiency_curve is not None:
+            if not isinstance(self.efficiency_curve, TabulatedEfficiency):
+                raise TypeError("Grating.efficiency_curve must be a TabulatedEfficiency")
+            if self.groove_efficiency != 1.0:
+                raise ValueError(
+                    "an absolute efficiency_curve already includes the groove efficiency; "
+                    "leave groove_efficiency at 1"
+                )
+        if self.mount is not None and not isinstance(self.mount, FlatFieldMount):
+            raise TypeError("Grating.mount must be a FlatFieldMount or None")
+
+    @classmethod
+    def from_catalog(cls, name: str, catalog=None) -> "Grating":
+        """Build a grating and its flat-field mount from a ``[gratings.NAME]`` record.
+
+        Parameters
+        ----------
+        name
+            Grating record name.
+        catalog
+            Loaded :class:`~pyrite.materials.MaterialCatalog`; ``None`` loads the
+            selected catalog with its user layer (where private gratings live).
+
+        Notes
+        -----
+        A ``"difference"`` record (``m lambda = d (sin alpha - sin beta)``)
+        keeps its order and maps its diffraction angles to this module's
+        ``"sum"`` convention by ``beta -> -beta``, since
+        ``sin(-beta) = m lambda/d - sin alpha``. The flat-field mount needs
+        ``r_H_prime_mm`` and ``beta_H_deg``; without them ``mount`` is
+        ``None``. ``efficiency_curve`` resolves against the catalog's curves.
+
+        Validation: flat-field-focal-plane
+        """
+        if catalog is None:
+            from ..materials import load_material_catalog
+
+            catalog = load_material_catalog()
+        try:
+            record = catalog.gratings[name]
+        except KeyError:
+            raise KeyError(
+                f"no catalog grating {name!r}; have {sorted(catalog.gratings)}"
+            ) from None
+        curve_name = cast(str | None, record.get("efficiency_curve"))
+        curve = (
+            None if curve_name is None else TabulatedEfficiency.from_catalog(curve_name, catalog)
+        )
+        mount = cast(Mapping[str, Any], record["mount"])
+        return cls(
+            groove_density_per_mm=cast(float, record["groove_density_per_mm"]),
+            alpha_rad=float(np.deg2rad(mount["alpha_deg"])),
+            order=cast(int, record["order"]),
+            coating=cast(str, record.get("coating", "Au")),
+            efficiency_curve=curve,
+            mount=_catalog_mount(mount, 1.0 if record["order_convention"] == "sum" else -1.0),
+        )
+
+    def mount_residuals(self) -> dict[str, object]:
+        """Compare the grating equation with the mount's tabulated band ends.
+
+        Returns ``beta_error_deg`` (computed minus tabulated diffraction angle
+        at each band end, degrees) and ``focal_plane_length_rel_error``
+        (``|s(beta_long) - s(beta_short)|`` from the computed angles relative
+        to the tabulated focal-plane length) and ``exit_arm_rel_error``
+        (``r'(beta)/r'_table - 1`` at each band end); entries are ``None`` when
+        the mount lacks the tabulated values.
+
+        Validation: flat-field-focal-plane
+        """
+        mount = self.mount
+        if mount is None or mount.band_nm is None:
+            raise ValueError("mount_residuals needs a mount with band_nm")
+        energy = HC_EV_ANG / (10.0 * np.asarray(mount.band_nm, float))
+        beta = self.diffraction_angle_rad(energy)
+        beta_error = None
+        if mount.band_beta_rad is not None:
+            beta_error = tuple(np.rad2deg(beta - np.asarray(mount.band_beta_rad)).tolist())
+        length_error = None
+        if mount.focal_plane_length_mm is not None:
+            span = abs(float(np.diff(mount.position_mm(beta))[0]))
+            length_error = span / mount.focal_plane_length_mm - 1.0
+        arm_error = None
+        if mount.band_exit_arm_mm is not None:
+            ratio = mount.exit_arm_mm(beta) / np.asarray(mount.band_exit_arm_mm, float)
+            arm_error = tuple((ratio - 1.0).tolist())
+        return {
+            "beta_error_deg": beta_error,
+            "focal_plane_length_rel_error": length_error,
+            "exit_arm_rel_error": arm_error,
+        }
 
     @property
     def d_angstrom(self) -> float:
@@ -188,10 +392,34 @@ class Grating:
         return np.abs(r) ** 2
 
     def throughput(self, E_eV):
-        """Combined grating throughput: Fresnel `reflectivity(E)` times the
-        placeholder `groove_efficiency` scalar (NOT a real groove-profile
-        efficiency model -- see that field's docstring)."""
+        """Grating throughput into the working order.
+
+        With ``efficiency_curve`` set, this is the tabulated absolute
+        efficiency ``eta(E)`` only: a vendor absolute efficiency already
+        includes the coating reflectivity, so ``reflectivity(E)`` is not
+        applied again. Energies outside the curve's band return zero (never
+        extrapolated). Without a curve, the unchanged product of Fresnel
+        `reflectivity(E)` and the placeholder `groove_efficiency` scalar.
+        """
+        if self.efficiency_curve is not None:
+            return self.efficiency_curve(E_eV)
         return self.reflectivity(E_eV) * self.groove_efficiency
+
+
+def _catalog_mount(mount, sign: float) -> FlatFieldMount | None:
+    """Lower a validated catalog mount table; ``sign`` maps beta to "sum"."""
+    if "r_H_prime_mm" not in mount or "beta_H_deg" not in mount:
+        return None
+    beta = mount.get("beta_deg")
+    return FlatFieldMount(
+        entrance_arm_mm=float(mount["r_mm"]),
+        focal_distance_mm=float(mount["r_H_prime_mm"]),
+        focal_normal_rad=sign * float(np.deg2rad(mount["beta_H_deg"])),
+        focal_plane_length_mm=mount.get("focal_plane_length_mm"),
+        band_nm=mount.get("band_nm"),
+        band_beta_rad=None if beta is None else tuple(sign * np.deg2rad(beta)),
+        band_exit_arm_mm=mount.get("r_prime_mm"),
+    )
 
 
 def detector_position_mm(beta_rad, beta_ref_rad, distance_mm):
@@ -201,8 +429,28 @@ def detector_position_mm(beta_rad, beta_ref_rad, distance_mm):
     return distance_mm * np.tan(np.asarray(beta_rad, float) - beta_ref_rad)
 
 
+def _focal_plane(grating, beta, distance_mm, beta_ref_rad):
+    """Resolve the focal-plane map: ``(position_mm, dposition_dbeta_mm)``.
+
+    An explicit ``distance_mm`` keeps the existing flat-detector map
+    ``L tan(beta - beta_ref)`` (``beta_ref`` defaulting to the mean angle);
+    ``distance_mm=None`` uses the grating's :class:`FlatFieldMount`.
+    """
+    beta = np.asarray(beta, float)
+    if distance_mm is None:
+        if grating.mount is None:
+            raise ValueError("distance_mm is required for a grating without a FlatFieldMount")
+        mount = grating.mount
+        slope = mount.focal_distance_mm / np.cos(beta - mount.focal_normal_rad) ** 2
+        return mount.position_mm(beta), slope
+    distance = float(distance_mm)
+    reference = float(np.nanmean(beta)) if beta_ref_rad is None else beta_ref_rad
+    position = detector_position_mm(beta, reference, distance)
+    return position, distance / np.cos(beta - reference) ** 2
+
+
 def disperse_spectrum(
-    E_grid_eV, spec, grating, distance_mm, *, beta_ref_rad=None, weight_by_throughput=False
+    E_grid_eV, spec, grating, distance_mm=None, *, beta_ref_rad=None, weight_by_throughput=False
 ):
     """Map an energy spectrum onto detector positions through ``grating``.
 
@@ -229,10 +477,11 @@ def disperse_spectrum(
     grating
         Reflection-grating geometry and throughput model.
     distance_mm
-        Grating-to-detector distance in mm.
+        Grating-to-detector distance in mm. ``None`` uses the grating's
+        flat-field mount (:meth:`FlatFieldMount.position_mm`).
     beta_ref_rad
         Detector-normal diffraction direction in radians. ``None`` centres the
-        propagating band on its mean angle.
+        propagating band on its mean angle. Ignored for the flat-field mount.
     weight_by_throughput
         Multiply by grating reflectivity and groove efficiency before remapping.
 
@@ -247,9 +496,7 @@ def disperse_spectrum(
     if weight_by_throughput:
         spec = spec * grating.throughput(E)
     beta = grating.diffraction_angle_rad(E)
-    if beta_ref_rad is None:
-        beta_ref_rad = float(np.nanmean(beta))
-    x = detector_position_mm(beta, beta_ref_rad, distance_mm)
+    x, _ = _focal_plane(grating, beta, distance_mm, beta_ref_rad)
     ok = np.isfinite(x)
     E, spec, x = E[ok], spec[ok], x[ok]
     if E.size < 2:
@@ -261,27 +508,9 @@ def disperse_spectrum(
 
 
 # ---- simple CCD: pixel binning of the dispersed profile (phased-plan step 3) --
-# greateyes ALEX-s, two interchangeable formats (docs/research/instrumentation/grazing-grating.md
-# "Hardware targets"). n_pix / pixel_um are along the DISPERSION axis (the
-# sensor's long axis); active_mm is (dispersion, cross-dispersion) extent,
-# included for reference only (this simple model is 1-D, along dispersion).
-class AlexsSensor(TypedDict):
-    """One greateyes ALEX-s sensor format. Typing the registry with this (rather
-    than ``dict[str, Any]``) lets pyright keep ``n_pix`` an ``int`` and
-    ``pixel_um`` a ``float`` through the ``SimpleCCD.from_alexs`` spread, the
-    same way the catalog types material scan grids."""
-
-    n_pix: int
-    pixel_um: float
-    active_mm: tuple[float, float]
-
-
-ALEXS_SENSORS: dict[str, AlexsSensor] = {
-    "1k256": AlexsSensor(n_pix=1024, pixel_um=26.0, active_mm=(26.6, 6.7)),
-    "2k512": AlexsSensor(n_pix=2048, pixel_um=13.5, active_mm=(27.6, 6.9)),
-}
-
-
+# greateyes ALEX-s formats now live with the ALEX-s response
+# (`alexs_response.ALEXS_SENSORS`, with the row dimension); re-exported here for
+# existing imports. n_pix / pixel_um run along the DISPERSION axis.
 @dataclass(frozen=True)
 class SimpleCCD:
     """A geometry-only CCD pixel grid along the grating's dispersion axis.
@@ -364,7 +593,7 @@ def detected_image(
     spec,
     grating,
     ccd,
-    distance_mm,
+    distance_mm=None,
     *,
     weight_by_throughput=True,
     beta_ref_rad=None,
@@ -404,7 +633,7 @@ def detected_image(
     ccd
         One-dimensional detector pixel grid.
     distance_mm
-        Grating-to-detector distance in mm.
+        Grating-to-detector distance in mm; ``None`` uses the flat-field mount.
     weight_by_throughput
         Apply grating throughput before spatial remapping.
     beta_ref_rad
@@ -445,30 +674,19 @@ def resolving_power(E_eV, grating, distance_mm, pixel_mm, beta_ref_rad=None):
 # ---- physical CCD: QE, charge sharing, energy resolution (phased-plan step 5) --
 # Upgrades SimpleCCD's geometry-only pixel binning with real detector physics,
 # the same "geometry -> QE(E) -> charge diffusion" ladder eaglexo_response.py
-# climbed for the Eagle XO. No digitized greateyes ALEX-s datasheet QE/noise
-# curve is publicly available (unlike the Eagle XO's eaglexo_qe.csv), so QE and
-# charge diffusion below are both closed-form physics models (Beer-Lambert
-# absorption efficiency; Einstein-relation drift-diffusion) with the
-# DEVICE-SPECIFIC numeric constants (active thickness, depletion voltage,
-# temperature, read noise) flagged '### FILL IN' pending a real greateyes
-# datasheet/measurement -- same pattern as eaglexo_response.py's
-# DEFAULT_DISTANCE_M / ACTIVE_SI_UM.
-ACTIVE_SI_UM = 30.0  ### FILL IN -- active (depleted) Si thickness [um] of the
-#   greateyes ALEX-s sensor; no public datasheet value found. Deep-depletion
-#   back-illuminated CCDs built for SXR/EUV typically run ~30-50 um; this is a
-#   mid-range placeholder, NOT a measured/confirmed ALEX-s number.
-DEPLETION_VOLTAGE_V = 40.0  ### FILL IN -- full-depletion bias [V]; a typical
-#   deep-depletion scientific-CCD range (~20-50 V), not ALEX-s-confirmed.
-OPERATING_TEMP_C = -60.0  ### FILL IN -- greateyes markets ALEX-s as
-#   "deep-cooled"; -60 C is a representative TE-cooled operating point for
-#   that product family, not a confirmed ALEX-s spec.
-READ_NOISE_E = 3.0  ### FILL IN -- read noise [e- RMS] at slow readout; no
-#   public ALEX-s figure found, set close to the Eagle XO's 2.3 e-
-#   (eaglexo_response.READ_NOISE_E) as a representative deep-cooled-CCD value.
-ENTRANCE_QE_PEAK = 0.9  ### FILL IN -- entrance-surface / dead-layer loss
-#   factor capping the Beer-Lambert QE below 1; representative back-
-#   illuminated-CCD value (cf. eaglexo_response.qe_absorption_model's
-#   peak=0.93 default), not measured for ALEX-s.
+# climbed for the Eagle XO. QE and charge diffusion below are closed-form
+# physics models (Beer-Lambert absorption efficiency; Einstein-relation
+# drift-diffusion). Device constants come from the public greateyes DS-ALEXs
+# Rev05 (May 2025) datasheet where it states them; the rest stay '### FILL IN'.
+ACTIVE_SI_UM = EPI_THICKNESS_UM  # greateyes DS-ALEXs Rev05: 15 um epitaxial Si
+#   (standard sensor; 40 um is the deep-depletion variant only).
+DEPLETION_VOLTAGE_V = 40.0  ### FILL IN -- full-depletion bias [V]; not in the
+#   ALEX-s datasheet; a typical deep-depletion scientific-CCD value.
+OPERATING_TEMP_C = DARK_CURRENT_TEMP_C  # -100 C, the datasheet dark-current point
+READ_NOISE_E = READ_NOISE_E_BY_RATE_HZ[50.0e3]  # 3.5 e- RMS at 50 kHz (datasheet)
+ENTRANCE_QE_PEAK = 0.9  ### FILL IN -- entrance-surface / dead-layer loss factor
+#   capping the Beer-Lambert QE below 1; not a datasheet number. Replaced by the
+#   digitized catalog QE curve (`AlexS.qe`) once the user supplies it.
 
 _K_B_EV_PER_K = 8.617333262e-5  # Boltzmann constant [eV/K] (== [V/K], 1 eV/e- = 1 V)
 

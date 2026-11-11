@@ -245,6 +245,7 @@ def test_run_scene_snapshots_physical_geometry_without_acquisition(monkeypatch):
                 )
             ]
         },
+        curves={},
     )
     monkeypatch.setattr(materials, "CATALOG", fake)
     scene = profile_trajectory_scene("standard", "camera")
