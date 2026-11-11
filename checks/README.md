@@ -114,6 +114,7 @@ run through the collector.
 | `coherent_window_excluded_dispersion.py` | Per-row window-excluded production power against the dispersive window certificate on one transport; `--case anchor` on CPU, `--case thick` (1 mm) on `pyrite remote`. |
 | `coherent_transverse_coherence.py` | Tests whether a single coherent transverse-direction draw is representative of the observable spectrum. |
 | `transition_radiation_omission.py` | Exact planar-stack transition radiation of every boundary crossing, bounded over the detector acceptance, against the production bremsstrahlung density for tens-of-keV and MeV scenes; per-band omission bias against `target_rse / 3` (#102). Small CPU runs. |
+| `transverse_recoil_527.py` | Transverse-recoil PXR prototype and detector-resolution observability table against Shi 2024 Fig. 2 (#527). |
 | `collision_statistics_refinement.py` | Measures collision-statistics changes under transport substep refinement. |
 | `cross_reflection_coherence.py` | Bounds the coherent-spectrum effect of omitted cross-reflection terms. |
 | `abtem_channeling_oracle.py` | abTEM frozen-phonon multislice of oriented Si (beam `[1 −1 n]` in the (110) planes; Einstein displacements), projected on PyRITE Bloch states. Compares `P_n(z)` with the TDS-only density solver and gates on `--tolerance`. Runs on CPU or GPU (`--device gpu`, CuPy) (#504; `oracle` group). |
@@ -145,6 +146,7 @@ run through the collector.
 | `pair_conversion_yield.py` | Expected pair conversions per primary for Si and MoS2 slabs at 3–5 MeV under coupled BremsLib transport: hard photons above 2mₑc², their expected first-interaction pair probability, and pairs per primary (#275); sizing evidence only, emits no records. |
 | `positron_table_inventory.py` | Real ELSEPA positron free-atom Si/W and muffin-tin Si outputs, and SBETHE positron Si/W outputs, against the native parsers and stopping loader (#276). Generator-format inventory only; no Monte Carlo or transport-validation claim. `--out` retains decks, native outputs, source hashes, and compiler provenance. |
 | `pixel_reconstruction_oracle.py` | Nearest-tile pixel angular reconstruction against direct per-pixel evaluation from one transport, across angular shapes and representative pixels (#23); decision evidence only, no ledger claim, emits no records. |
+| `recoil_in_crystal_527.py` | In-crystal survival of the exact vacuum line-recoil shift against Huang 2023 SI Table S4 harmonic defects, with mean-inner-potential and refraction corrections sized (#527). Exits 0 when the gate holds. |
 | `radiation_error_estimator_calibration.py` | Calibrates warning thresholds for the radiation error estimator. |
 | `inner_shell_experiment_comparison.py` | EEDL and tabulated Bote–Salvat against cited thin-film K and Pb/Th L-subshell measurements; descriptive overvoltage-band report, no agreement gate (`bote-salvat-ionization-backend`). |
 | `shell_ionization_comparison.py` | Pinned Bote–Salvat `xion.f` transcription, local EEDL shell interpolation, and characteristic-production ratios for the 24 catalogue elements. |
@@ -308,6 +310,7 @@ reviewed verdicts for the diagnostic rows, not merely rerunning their entry poin
 | `optical_transition_cuda.py` | CUDA allocation; input/ladder-dependent | NVIDIA environment; some probes need captured trajectories or explicit CLI modes | Gate (explicit mode where applicable) |
 | `quantum_decoherence_budget.py` | Remote CPU; 1.51 s (one sample) | Packaged physics/catalog data; source and shell comparisons additionally need pinned reference/released tables | Gate (explicit mode where applicable) |
 | `radiation_error_estimator_calibration.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Diagnostic |
+| `recoil_in_crystal_527.py` | CPU analytic/table; unmeasured | Packaged physics/catalog data; source and shell comparisons additionally need pinned reference/released tables | Gate |
 | `sb85_eta_small_kappa_fit.py` | CPU analytic/table; unmeasured | Packaged physics/catalog data; source and shell comparisons additionally need pinned reference/released tables | Diagnostic |
 | `segment_escape_split_ladder.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Diagnostic |
 | `shell_ionization_comparison.py` | Remote CPU table; 51.69 s (one warm sample) | Packaged physics/catalog data; source and shell comparisons additionally need pinned reference/released tables | Gate (explicit mode where applicable) |
@@ -319,6 +322,7 @@ reviewed verdicts for the diagnostic rows, not merely rerunning their entry poin
 | `substep_invariance.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Diagnostic |
 | `transition_radiation_omission.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Gate (explicit mode where applicable) |
 | `transport_core_goldens.py` | Remote CPU capture/check; unmeasured | Existing reviewed golden directory; capture is not a validation verdict | Gate (explicit mode where applicable) |
+| `transverse_recoil_527.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Diagnostic |
 | `xraylib_cascade_oracle.py` | Remote CPU oracle; 1.46 s (one sample) | Optional xraylib installation; packaged EADL cascade data | Gate (explicit mode where applicable) |
 
 ### First bounded table-recipe measurements

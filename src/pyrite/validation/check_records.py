@@ -112,6 +112,8 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     "checks/axial_split_step_precision_cuda.py": (),
     "checks/axial_mcwf_return_flux.py": (),
     "checks/quantum_decoherence_budget.py": ("quantum-decoherence-budget",),
+    "checks/recoil_in_crystal_527.py": ("line-recoil-in-crystal",),
+    "checks/transverse_recoil_527.py": ("quantum-recoil-observability",),
     "checks/channeling_material_survey.py": (),
     "checks/channeling_submev_screen.py": (),
     "checks/srd164_inner_shell_comparison.py": (),
