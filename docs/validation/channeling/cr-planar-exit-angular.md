@@ -103,3 +103,32 @@ No single (energy, $L$) reproduces both panels with this potential. The classica
 ## Verdict
 
 `rederived`. The coherent amplitude, the divergence average, the open-system plane-wave diagonal with its sink bookkeeping, and the classical Verlet deflection all match an independent derivation and independent numerics to round-off or truncation level. The energy-convention claim (total energy) and the recorded 4 MeV quantum-panel discrepancy, which lies in the source rather than the code, are both confirmed.
+
+## Electronic spot investigation (#1109, diagnostic milestone)
+
+These are implementation-context diagnostics, separate from the independent
+verdict above. The [numeric record](../check-records/planar-exit-1109.json)
+uses Si(110), total energy 1.87 MeV (kinetic 1.35900105 MeV), thickness
+2 µm, divergence 0.175 mrad, 32 Bloch cells and 20 Å depth steps.
+
+The electronic rate is 4.4215/µm, but the retained rate into nearest orders
+$|\Delta h|\geq1$ is 0.4164/µm: 0.04865 from valence distant,
+0.07393 from core distant and 0.29386 from close collisions. Nearest order
+means $\Delta h=\lfloor\Delta k_x/g+1/2\rfloor$. The retained electronic
+second angular moment is $1.416\times10^{-5}$ rad²/µm, against
+$7.273\times10^{-5}$ rad²/µm for TDS. These omit overflow and are not full
+diffusion coefficients or a comparison with the published electronic/nuclear
+ratio. Loss minus retained gain includes quadrature error: the core-distant
+residual is −0.000124/µm and must not be read as a negative physical sink.
+
+With both mechanisms, increasing the retained order limit from 8 to 12 changes
+unresolved weight from 0.332906 to 0.331810. The marginal remains smooth.
+However, the out-of-plane-resolved cut at $\theta_y=0$ has local contrast
+1.88/1.91/0.99 at orders 0/1/2, versus 1.03/1.09/0.99 in the marginal.
+Contrast is the order-center value divided by the mean over
+$0.15<|\theta_x/s-m|<0.35$, where $s=\lambda/d$. Thus marginal smoothing
+alone does not establish the absence of film spots. This single, unrefined
+Fourier inversion does not yet establish the measured three-spot count:
+the other three settings, inversion/grid convergence and experimental
+systematics remain open. The 2D observable stays `filtered`; fresh-context
+review is pending. No default kernel or model marker changed.

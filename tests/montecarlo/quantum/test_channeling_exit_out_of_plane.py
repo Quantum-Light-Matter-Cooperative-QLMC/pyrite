@@ -5,8 +5,10 @@ from dataclasses import replace
 import numpy as np
 import pytest
 from scipy import integrate
+from scipy.special import j0
 
 from pyrite.materials.channeling import planar_profile
+from pyrite.materials.crystal import HBARC_EV_ANG, M_E_EV
 from pyrite.montecarlo.channeling import DensityMatrixSolver, electronic_kernel, tds_kernel
 from pyrite.montecarlo.channeling import operators as op
 from pyrite.montecarlo.channeling.exit_angular import open_exit_distribution
@@ -78,6 +80,43 @@ def test_tds_transform_trace_matches_fourier_cosine_quadrature(si110, eta):
         p = 0.5 * (a + b) + 0.5 * (b - a) * nodes
         total += 0.5 * (b - a) * weights @ np.array([inner(x) for x in p])
     expected = n0 * 2.0 * total / (2.0 * np.pi * hbar_v) ** 2
+    assert _in_band_trace(kernel) == pytest.approx(expected, rel=2e-3)
+
+
+@pytest.mark.parametrize("eta", [0.0, 0.7, 3.0])
+def test_electronic_transform_matches_single_oscillator_hankel_integral(si110, monkeypatch, eta):
+    # Uniform density removes the LDA harmonics. With a Bethe disk contained
+    # inside the retained x band, the Cartesian gain trace must equal
+    # n_e int 2 pi q dq (dsigma/d^2q) J0(q eta). This independent 1-D
+    # integral tests the electronic cosine weighting and its factor of two.
+    energy = 1.87e6 - M_E_EV
+    flat = replace(si110, electron_density=si110.electron_density[:1].copy())
+    channels = op.electronic_channels(op._profile_oscillators(flat, None), energy)
+    strength, qmin, qmax = 0.1, 0.02, 1.0  # angstrom^2, 1/angstrom, 1/angstrom
+    channels = replace(
+        channels,
+        distant_ang2=np.array([strength]),
+        distant_qmin_inv_ang=np.array([qmin]),
+        distant_qmax_inv_ang=np.array([qmax]),
+        close_ang2_eV=np.zeros_like(channels.close_ang2_eV),
+    )
+    monkeypatch.setattr(op, "electronic_channels", lambda *_: channels)
+    grid = {"n_cells": 8, "max_order": 1}
+    lo, hi = _p_range(flat, **grid)
+    ridge = np.sqrt(qmax**2 - qmin**2)
+    assert lo < -ridge < ridge < hi
+
+    def radial(q):
+        q2 = q**2 + qmin**2
+        # PENELOPE Eq. 3.104 after changing Q to q_perp; the 2 pi
+        # azimuth integral cancels the differential cross section's pi.
+        recoil_factor = np.sqrt(1.0 + (HBARC_EV_ANG / M_E_EV) ** 2 * q2)
+        return 2.0 * strength * q * j0(q * eta) / (q2 * recoil_factor)
+
+    expected = flat.electron_density[0].real * integrate.quad(radial, 0.0, ridge, epsabs=1e-12)[0]
+    kernel = electronic_kernel(flat, energy, **grid, out_of_plane_ang=eta)
+    # Same 0.2% quadrature budget as the TDS oracle; the Bethe ridge is a
+    # discontinuous boundary in the Cartesian rule, smooth in this oracle.
     assert _in_band_trace(kernel) == pytest.approx(expected, rel=2e-3)
 
 

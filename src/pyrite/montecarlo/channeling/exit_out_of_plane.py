@@ -21,9 +21,9 @@ the ``out_of_plane_ang`` option of :func:`~.operators.tds_kernel` and
 ``dP/dtheta_y (theta_x, theta_y) = (p / pi) int_0^inf d eta
 cos(p theta_y eta) exp(-(p sigma_y eta)^2 / 2) P~(theta_x, eta)``.
 
-``eta = 0`` is the marginal. The ``eta`` integral uses piecewise-uniform
-trapezoid nodes, fine near 0, where ``P~`` falls on the scale of the largest
-frequent kicks.
+``eta = 0`` is the marginal. The ``eta`` integral uses composite
+Gauss--Legendre panels, fine near 0, where ``P~`` falls on the scale of the
+largest frequent kicks.
 
 **Batched integrator.** :func:`propagate_batch` advances one entry state
 under many cell kernels with the Strang step of
@@ -50,7 +50,7 @@ from .operators import DEFAULT_CELLS, ScatteringKernel, electronic_kernel, tds_k
 
 #: Plane-wave orders kept by default: the Gridnev patterns need |m| <= 3.
 DEFAULT_EXIT_ORDERS = 8
-#: Piecewise trapezoid steps [angstrom] on [0, 1), [1, 4) and [4, eta_max].
+#: Panel-width scales [angstrom] on [0, 1), [1, 4) and [4, eta_max].
 DEFAULT_ETA_STEPS = (0.05, 0.2, 1.0)
 #: ``eta_max = ETA_SPAN / (p sigma_y)``: the Gaussian factor is e^-12.5 there.
 ETA_SPAN = 5.0
