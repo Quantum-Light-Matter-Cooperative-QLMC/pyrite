@@ -24,6 +24,8 @@ physics/relativistic-pxr-cbs
 physics/superradiant-pxr
 physics/quantum-coherent-emission
 physics/longitudinal-coherence-recoil
+physics/quantum-recoil-in-crystal-527
+physics/transverse-recoil-527
 physics/phase-retention
 physics/channeling-radiation-physics
 physics/channeling-submev-envelope

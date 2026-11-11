@@ -72,12 +72,14 @@ line-absorption-tabulation
 line-tabulation-root-support
 kinematic-validity-envelope
 line-energy-dispersion
+line-recoil-in-crystal
 line-reflection-coupling-tables
 line-recoil-formation
 line-recoil-resonance
 line-recoil-validity-screen
 narrow-beam-total-attenuation
 pxr-amplitude
+quantum-recoil-observability
 self-absorption
 segment-escape-average
 sinc-bin-far-envelope

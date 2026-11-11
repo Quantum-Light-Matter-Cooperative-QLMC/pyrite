@@ -260,3 +260,36 @@ def test_unchecked_shift_fraction_is_bitwise_the_reference():
     actual = _recoil_shift_fraction_unchecked(np, kinetic, direction, g, normal)
     np.testing.assert_array_equal(actual, expected)
     assert np.isnan(expected).any() and np.isfinite(expected).any()
+
+
+def test_huang_2023_harmonic_defect_matches_in_crystal_lines():
+    """Measured graphite/hBN 2E2 - E4 (Huang 2023 SI Table S4) is the exact recoil root's.
+
+    The classical root is linear in g, so its harmonic defect is zero for any tilt and
+    any linear EDS gain; a calibration offset enters additively (0.5 eV, SI S5).
+    """
+    import json
+    from pathlib import Path
+
+    data = json.loads(
+        (Path(__file__).parents[1] / "data/recoil/huang-2023-table-s4.json").read_text()
+    )
+    beam = np.array([0.0, 0.0, 1.0])
+    measured, predicted = [], []
+    for name, kinetic_keV, e2, e4, theta_til, phi_til in data["rows"]:
+        info = data["sets"][name]
+        t, p, o = np.radians([theta_til, phi_til, info["theta_obs_deg"]])
+        axis = np.array([np.sin(t) * np.cos(p), np.sin(t) * np.sin(p), np.cos(t)])
+        normal = np.array([np.sin(o), 0.0, np.cos(o)])
+        g = 2.0 * np.pi / info["c_ang"] * np.array([[2.0], [4.0]]) * axis
+        line2, line4 = recoil_resonance_eV(kinetic_keV * 1e3, beam, g, normal)
+        measured.append(2.0 * e2 - e4)
+        predicted.append(2.0 * line2 - line4)
+    residual = np.array(measured) - np.array(predicted)
+    sigma = np.hypot(
+        residual.std(ddof=1) / np.sqrt(residual.size),
+        data["detector"]["calibration_uncertainty_eV"],
+    )
+    assert np.all(np.array(predicted) > 15.0)
+    assert abs(residual.mean()) <= 2.0 * sigma
+    assert np.mean(measured) > 10.0 * sigma  # the classical defect, 0, is excluded
