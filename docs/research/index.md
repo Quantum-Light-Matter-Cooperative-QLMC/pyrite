@@ -26,6 +26,7 @@ physics/quantum-coherent-emission
 physics/longitudinal-coherence-recoil
 physics/quantum-recoil-in-crystal-527
 physics/transverse-recoil-527
+physics/shi-2024-intensity-1103
 physics/shaped-electron-cxr-1102
 physics/phase-retention
 physics/channeling-radiation-physics

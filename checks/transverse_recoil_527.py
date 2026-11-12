@@ -18,19 +18,31 @@ flights keep their classical line position from ``mc_cxr_spectrum``; only
 the recoil correction is nominal. Backgrounds (brem, characteristic, forward
 CBS) are not included.
 
+Production lines sit on the exact root since #1099, so the classical
+spectra here are taken under the ``hbar -> 0`` hook
+(``_recoil._RECOIL_HBARC_EV_ANG = 0``) that keeps the classical root, width
+and phase bit for bit. Shi heights come from the vector-digitized Fig. 2
+(``tests/data/recoil/shi-2024-fig2.json``, #1103). Shi's CL curve is the
+PXR-only classical rate, so Part 1 also reports PyRITE's classical PXR
+component (``checks/shi_2024_matrix_elements_1103.py``).
+
 Run:  uv run python checks/transverse_recoil_527.py [electrons]
 
 Validation: quantum-recoil-observability
 """
 
+import contextlib
+import json
 import sys
 import time
+from pathlib import Path
 
 import numpy as np
 
 from pyrite.materials.crystal import CRYSTALS, reciprocal_g_vector
 from pyrite.materials.recoil import recoil_resonance_eV, recoil_shift_fraction
 from pyrite.montecarlo.spectrum import mc_cxr_spectrum
+from pyrite.montecarlo.spectrum.cxr import _recoil
 from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 
 BEAM = np.array([0.0, 0.0, 1.0])
@@ -40,9 +52,26 @@ B_SI = 0.4632  # Si Debye-Waller B at room temperature [Ang^2]
 B_HOPG = 0.8
 DETECTORS_EV = (0.0, 5.0, 70.0)
 
-# Shi Fig. 2b/d/f classical (CL) peak heights read off the published figure,
-# photons/(eV sr electron): (n_z=-2, n_z=-3). Visual reads, about +-10 %.
-SHI_CL = {30.0: (1.15e-9, 1.2e-9), 300.0: (5.8e-11, 0.55e-10), 5000.0: (4.4e-11, 3.8e-11)}
+# Shi Fig. 2b/d/f classical (CL) peak heights, photons/(eV sr electron):
+# (n_z=-2, n_z=-3), from the vector-digitized figure (#1103).
+_FIG2 = json.loads(
+    (Path(__file__).resolve().parents[1] / "tests/data/recoil/shi-2024-fig2.json").read_text()
+)["curves"]
+SHI_CL = {
+    T: tuple(_FIG2[f"{T:g} keV CL nz=-{nz}"]["peak"] for nz in (2, 3))
+    for T in (30.0, 300.0, 5000.0)
+}
+
+
+@contextlib.contextmanager
+def _classical_lines():
+    """Classical production lines: the ``hbar -> 0`` recoil hook (#1099)."""
+    saved = _recoil._RECOIL_HBARC_EV_ANG
+    _recoil._RECOIL_HBARC_EV_ANG = 0.0
+    try:
+        yield
+    finally:
+        _recoil._RECOIL_HBARC_EV_ANG = saved
 
 
 def _si_allowed(h, k, nz):
@@ -91,11 +120,12 @@ def _cl_qm(segments, grid, crystal, rows, B, n_hat, exact, classical, ok):
     for row, e_x, e_c, keep in zip(rows, exact, classical, ok, strict=True):
         if not keep:
             continue
-        s = np.asarray(
-            mc_cxr_spectrum(
-                segments, grid, crystal, [row], n_hat=n_hat, beam_uvw=(0, 0, 1), B_ang2=B
+        with _classical_lines():
+            s = np.asarray(
+                mc_cxr_spectrum(
+                    segments, grid, crystal, [row], n_hat=n_hat, beam_uvw=(0, 0, 1), B_ang2=B
+                )
             )
-        )
         cl += s
         qm += np.interp(grid - (e_x - e_c), grid, s, left=0.0, right=0.0)
         per_row.append((float(s.max()), row, float(e_x)))
@@ -129,10 +159,23 @@ def part1_shi_fig2():
             )
             peak = grid[cl.argmax()]
             heights.append(cl.max())
+            with _classical_lines():
+                _, pxr, _ = mc_cxr_spectrum(
+                    _straight(T, 300.0),
+                    grid,
+                    "silicon",
+                    [r for r, k in zip(rows, ok, strict=True) if k],
+                    n_hat=n_hat,
+                    beam_uvw=(0, 0, 1),
+                    B_ang2=B_SI,
+                    components=True,
+                )
+            pxr_ratio = float(np.max(pxr)) / SHI_CL[T][nz - 2]
             share = per_row[0][0] / cl.max()
             print(
                 f"  T={T:6.0f} keV n_z=-{nz}: classical root {c:7.1f} eV, CL peak {peak:7.1f} eV "
-                f"{cl.max():.3g} (Shi {SHI_CL[T][nz - 2]:.2g}, ratio {cl.max() / SHI_CL[T][nz - 2]:.2f}); "
+                f"{cl.max():.3g} (Shi {SHI_CL[T][nz - 2]:.3g}, ratio {cl.max() / SHI_CL[T][nz - 2]:.2f}, "
+                f"PXR-only {pxr_ratio:.2f}); "
                 f"QM peak {grid[qm.argmax()]:7.1f} eV, QM/CL {qm.max() / cl.max():.2f}; "
                 f"largest row {per_row[0][1]} at {per_row[0][2]:.1f} eV holds {share:.2f} of CL peak"
             )
