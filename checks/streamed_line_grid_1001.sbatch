@@ -2,12 +2,12 @@
 #SBATCH -p gpu
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=8
-#SBATCH --mem=48G
+#SBATCH --mem=38G
 #SBATCH -t 03:00:00
 #SBATCH -o grid1001-%j.log
 # #1001 streamed line_grid_policy: grid-pass memory/wall against N, and joined
 # vs two-pass streamed on the same case (grid bitwise, spectra, peaks, wall).
-# usage (from a clean, synced checkout root): sbatch -J grid1001-<sha> checks/streamed_line_grid_1001.sbatch si|hbn [OUT]
+# usage (from an isolated rsync of the worktree, e.g. ~/pyrite-1001, with CODE_SHA): sbatch -J grid1001-<sha> checks/streamed_line_grid_1001.sbatch si|hbn [OUT]
 #   si:  silicon 300 keV, 10 um, tilt 30, automatic policy (sinc-nyquist)
 #   hbn: h-BN 5 MeV, 1 mm, tilt 10 / azim 100 (#879), measured resonance-local policy
 set -uo pipefail
@@ -15,7 +15,8 @@ CASE=$1
 ROOT=${2:-grid1001_out}
 export PATH="$HOME/.local/bin:$PATH"
 cd "$SLURM_SUBMIT_DIR"
-export PYRITE_HOME="$PWD"
+export PYRITE_HOME="$HOME/pyrite"  # shared tables; code runs from this isolated copy
+export XDG_CONFIG_HOME="$(mktemp -d)"
 export PYRITE_CATALOG="$PWD/src/pyrite/data/catalog"
 export PYRITE_USER_CATALOG="$(mktemp -d)/catalog"
 export PYRITE_MC_BACKEND=cuda
