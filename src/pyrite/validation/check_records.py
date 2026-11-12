@@ -66,6 +66,8 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     "checks/planar_fiber_study.py": ("cr-planar-fiber-unraveling", "cr-axial-fiber-return-deficit"),
     "checks/planar_fiber_budget.py": ("cr-planar-fiber-unraveling", "cr-axial-depth-calibration"),
     "checks/planar_fiber_spectrum.py": ("cr-planar-fiber-regression", "cr-line-shape"),
+    # #1057 measured planar yields/widths: comparison record, no pass/fail gate.
+    "checks/planar_line_anchors.py": ("cr-line-shape", "cr-yield-assembly"),
     "checks/channeling_handoff.py": ("cr-zone-handoff-accounting",),
     "checks/channeling_overflow.py": ("cr-planar-overflow-spectrum",),
     # #1055 ownership measurement: records ratios, without a pass/fail gate.

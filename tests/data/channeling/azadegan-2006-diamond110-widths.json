@@ -1,0 +1,35 @@
+{
+  "source": {
+    "citation": "B. Azadegan, W. Wagner and J. Pawelke, Phys. Rev. B 74, 045209 (2006)",
+    "doi": "10.1103/PhysRevB.74.045209",
+    "zotero_item": "PQZAK23U",
+    "zotero_attachment": "KLWUGPNH",
+    "verified": "2026-11-11",
+    "method": "Tables II-V transcribed from the PDF text layer (pp. 045209-7 to -9); same values as the 2026-10-15 audit in docs/validation/channeling/cr-line-shape.md"
+  },
+  "material": "diamond",
+  "plane_hkl": [1, 1, 0],
+  "transition": [1, 0],
+  "temperature": "room temperature (potential figures use 300 K)",
+  "beam": {
+    "divergence_mrad": 0.1,
+    "relative_energy_spread": 0.0013,
+    "note": "Initial divergence about 0.1 mrad; energy spread RMS/FWHM not stated; electron energy convention (kinetic vs total) not stated, see cr-line-shape."
+  },
+  "detector": {
+    "type": "CdTe, on axis, 3.3 m, 1 mm aperture",
+    "solid_angle_sr": 7.2e-8,
+    "calibration_fwhm_eV_at_13p93_keV": 470
+  },
+  "width_definition": "Gamma_exp is the FWHM of the fitted asymmetric profile (Eq. 23) and includes detector resolution, Bloch dispersion and in-plane multiple scattering; Gamma_T is its Lorentzian parameter. No uncertainties given.",
+  "rows_42p5um": [
+    {"kinetic_energy_MeV": 14.6, "gamma_exp_keV": 1.51, "gamma_T_keV": 1.09, "detector_fwhm_keV": 0.47, "theta_ms_ch_mrad": 6.03, "theta_ratio_to_eq18": 0.55, "E_exp_keV": 16.58, "E0_keV": 16.76},
+    {"kinetic_energy_MeV": 17.0, "gamma_exp_keV": 2.00, "gamma_T_keV": 1.45, "detector_fwhm_keV": 0.49, "theta_ms_ch_mrad": 5.32, "theta_ratio_to_eq18": 0.56, "E_exp_keV": 21.72, "E0_keV": 21.96},
+    {"kinetic_energy_MeV": 30.0, "gamma_exp_keV": 5.88, "gamma_T_keV": 4.25, "detector_fwhm_keV": 0.60, "theta_ms_ch_mrad": 2.87, "theta_ratio_to_eq18": 0.54, "E_exp_keV": 56.19, "E0_keV": 56.87},
+    {"kinetic_energy_MeV": 34.0, "gamma_exp_keV": 7.84, "gamma_T_keV": 6.00, "detector_fwhm_keV": 0.63, "theta_ms_ch_mrad": 2.60, "theta_ratio_to_eq18": 0.56, "E_exp_keV": 70.02, "E0_keV": 70.96}
+  ],
+  "notes": [
+    "theta_ms_ch is the effective RMS in-plane multiple-scattering angle from the line-shape asymmetry fit (Table II), about 0.55 of the amorphous Eq. (18) value at 42.5 um and growing roughly as L^0.37 in alpha^2.",
+    "Table VI coherence lengths are internally inconsistent with Table V by about a factor of two (cr-line-shape audit); they are not transcribed."
+  ]
+}

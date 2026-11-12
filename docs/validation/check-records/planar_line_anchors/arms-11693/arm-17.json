@@ -1,0 +1,613 @@
+{
+ "check": "planar_line_anchors",
+ "revision": "unknown",
+ "host": "DESKTOP-QNIHO3D",
+ "backend": "cpu",
+ "temperature_K": 293.15,
+ "settings": {
+  "datasets": [
+   "kephart"
+  ],
+  "cases": [
+   "kephart_100"
+  ],
+  "cells": 8,
+  "orders": 16,
+  "dz": 100.0,
+  "bins": 6,
+  "models": [
+   "kernel",
+   "none",
+   "amorphous"
+  ],
+  "grid": 2400,
+  "n_divergence": 15,
+  "divergence_scale": 1.0,
+  "no_history_reuse": false,
+  "out": "scratch/anchors/arm-17.json"
+ },
+ "cases": [
+  {
+   "case": "kephart_100_16.92",
+   "dataset": "kephart",
+   "material": "silicon",
+   "hkl": [
+    1,
+    0,
+    0
+   ],
+   "kinetic_energy_MeV": 16.92,
+   "barrier_eV": 3.974255662268579,
+   "y_rate_weights": [
+    1.8881821614058227,
+    1.0310652198871735
+   ],
+   "edges_um": [
+    0.0,
+    1.0,
+    2.8,
+    3.35,
+    5.0,
+    7.8,
+    10.0,
+    13.35,
+    19.0,
+    30.0,
+    40.0,
+    53.35,
+    80.0,
+    83.35,
+    120.0
+   ],
+   "models": {
+    "kernel": {
+     "sigma_y_mrad": [
+      2.285944322671901,
+      3.0414504792379375,
+      3.6854010178932146,
+      4.250474710701573,
+      5.288859927354762,
+      6.326307157319158,
+      7.3624771524897135,
+      8.861100013953173,
+      11.247427684296447,
+      13.81382454928415,
+      16.304902969620155,
+      20.01243055809396,
+      22.478840511647515,
+      25.473325887805082
+     ],
+     "thicknesses": [
+      {
+       "thickness_um": 1.0,
+       "lines": {
+        "1-0": {
+         "yield_per_sr": 0.002181871665557524,
+         "centroid_eV": 13334.97844765894,
+         "peak_eV": 13306.836025627816,
+         "fwhm_eV": 1389.2340103943152,
+         "fwhm_clipped": false,
+         "with_capture_yield_per_sr": 0.0025050576946937077,
+         "window_eV": [
+          9758.459579055912,
+          17262.72345290485
+         ],
+         "contamination": 0.1182150035538179
+        }
+       }
+      },
+      {
+       "thickness_um": 2.8,
+       "lines": {
+        "1-0": {
+         "yield_per_sr": 0.005584458339582843,
+         "centroid_eV": 13304.3759655052,
+         "peak_eV": 13284.898962414612,
+         "fwhm_eV": 1421.213451786307,
+         "fwhm_clipped": false,
+         "with_capture_yield_per_sr": 0.006422799040040882,
+         "window_eV": [
+          9758.459579055912,
+          17262.72345290485
+         ],
+         "contamination": 0.1182150035538179
+        }
+       }
+      },
+      {
+       "thickness_um": 5.0,
+       "lines": {
+        "1-0": {
+         "yield_per_sr": 0.0090177424120695,
+         "centroid_eV": 13263.909043882073,
+         "peak_eV": 13262.961899201408,
+         "fwhm_eV": 1466.1439677928029,
+         "fwhm_clipped": false,
+         "with_capture_yield_per_sr": 0.010388817435567844,
+         "window_eV": [
+          9758.459579055912,
+          17262.72345290485
+         ],
+         "contamination": 0.1182150035538179
+        }
+       }
+      },
+      {
+       "thickness_um": 7.8,
+       "lines": {
+        "1-0": {
+         "yield_per_sr": 0.0125691760283865,
+         "centroid_eV": 13214.199265433832,
+         "peak_eV": 13241.024835988204,
+         "fwhm_eV": 1517.5452319666529,
+         "fwhm_clipped": false,
+         "with_capture_yield_per_sr": 0.0145034525957262,
+         "window_eV": [
+          9758.459579055912,
+          17262.72345290485
+         ],
+         "contamination": 0.1182150035538179
+        }
+       }
+      },
+      {
+       "thickness_um": 10.0,
+       "lines": {
+        "1-0": {
+         "yield_per_sr": 0.014885044786503198,
+         "centroid_eV": 13179.210228621234,
+         "peak_eV": 13226.4001271794,
+         "fwhm_eV": 1542.2927109794382,
+         "fwhm_clipped": false,
+         "with_capture_yield_per_sr": 0.01719378353942775,
+         "window_eV": [
+          9758.459579055912,
+          17262.72345290485
+         ],
+         "contamination": 0.1182150035538179
+        }
+       }
+      },
+      {
+       "thickness_um": 19.0,
+       "lines": {
+        "1-0": {
+         "yield_per_sr": 0.021481648276544297,
+         "centroid_eV": 13074.241919986984,
+         "peak_eV": 13189.838355157395,
+         "fwhm_eV": 1655.5868560465333,
+         "fwhm_clipped": false,
+         "with_capture_yield_per_sr": 0.02490688348919397,
+         "window_eV": [
+          9758.459579055912,
+          17262.72345290485
+         ],
+         "contamination": 0.1182150035538179
+        }
+       }
+      },
+      {
+       "thickness_um": 40.0,
+       "lines": {
+        "1-0": {
+         "yield_per_sr": 0.027808624779753023,
+         "centroid_eV": 12982.756696780152,
+         "peak_eV": 13197.150709561796,
+         "fwhm_eV": 1892.0636702001975,
+         "fwhm_clipped": false,
+         "with_capture_yield_per_sr": 0.03244452817744025,
+         "window_eV": [
+          9758.459579055912,
+          17262.72345290485
+         ],
+         "contamination": 0.1182150035538179
+        }
+       }
+      },
+      {
+       "thickness_um": 80.0,
+       "lines": {
+        "1-0": {
+         "yield_per_sr": 0.030305719852567255,
+         "centroid_eV": 12932.659529431432,
+         "peak_eV": 13211.775418370598,
+         "fwhm_eV": 1889.0970326869574,
+         "fwhm_clipped": false,
+         "with_capture_yield_per_sr": 0.035463981056904,
+         "window_eV": [
+          9758.459579055912,
+          17262.72345290485
+         ],
+         "contamination": 0.1182150035538179
+        }
+       }
+      },
+      {
+       "thickness_um": 120.0,
+       "lines": {
+        "1-0": {
+         "yield_per_sr": 0.030526491641180518,
+         "centroid_eV": 12933.48692310069,
+         "peak_eV": 13211.775418370598,
+         "fwhm_eV": 1884.7011862388445,
+         "fwhm_clipped": false,
+         "with_capture_yield_per_sr": 0.035749015862647976,
+         "window_eV": [
+          9758.459579055912,
+          17262.72345290485
+         ],
+         "contamination": 0.1182150035538179
+        }
+       }
+      }
+     ]
+    },
+    "none": {
+     "sigma_y_mrad": [
+      2.2,
+      2.2,
+      2.2,
+      2.2,
+      2.2,
+      2.2,
+      2.2,
+      2.2,
+      2.2,
+      2.2,
+      2.2,
+      2.2,
+      2.2,
+      2.2
+     ],
+     "thicknesses": [
+      {
+       "thickness_um": 1.0,
+       "lines": {
+        "1-0": {
+         "yield_per_sr": 0.0021837139922272803,
+         "centroid_eV": 13339.944834366326,
+         "peak_eV": 13306.836025627816,
+         "fwhm_eV": 1384.8753114719166,
+         "fwhm_clipped": false,
+         "with_capture_yield_per_sr": 0.0025070209411432254,
+         "window_eV": [
+          9758.459579055912,
+          17262.72345290485
+         ],
+         "contamination": 0.1182150035538179
+        }
+       }
+      },
+      {
+       "thickness_um": 2.8,
+       "lines": {
+        "1-0": {
+         "yield_per_sr": 0.005619097165852729,
+         "centroid_eV": 13339.92717538385,
+         "peak_eV": 13306.836025627816,
+         "fwhm_eV": 1384.8725270994873,
+         "fwhm_clipped": false,
+         "with_capture_yield_per_sr": 0.00645958616840225,
+         "window_eV": [
+          9758.459579055912,
+          17262.72345290485
+         ],
+         "contamination": 0.1182150035538179
+        }
+       }
+      },
+      {
+       "thickness_um": 5.0,
+       "lines": {
+        "1-0": {
+         "yield_per_sr": 0.009142336521073702,
+         "centroid_eV": 13339.988494312875,
+         "peak_eV": 13306.836025627816,
+         "fwhm_eV": 1384.8835235949955,
+         "fwhm_clipped": false,
+         "with_capture_yield_per_sr": 0.010520786577520765,
+         "window_eV": [
+          9758.459579055912,
+          17262.72345290485
+         ],
+         "contamination": 0.1182150035538179
+        }
+       }
+      },
+      {
+       "thickness_um": 7.8,
+       "lines": {
+        "1-0": {
+         "yield_per_sr": 0.012873818276587613,
+         "centroid_eV": 13340.070609092216,
+         "peak_eV": 13306.836025627816,
+         "fwhm_eV": 1384.898540951579,
+         "fwhm_clipped": false,
+         "with_capture_yield_per_sr": 0.014825505084673698,
+         "window_eV": [
+          9758.459579055912,
+          17262.72345290485
+         ],
+         "contamination": 0.1182150035538179
+        }
+       }
+      },
+      {
+       "thickness_um": 10.0,
+       "lines": {
+        "1-0": {
+         "yield_per_sr": 0.015370273240787196,
+         "centroid_eV": 13340.12111956162,
+         "peak_eV": 13306.836025627816,
+         "fwhm_eV": 1384.9078857248787,
+         "fwhm_clipped": false,
+         "with_capture_yield_per_sr": 0.01770636587524639,
+         "window_eV": [
+          9758.459579055912,
+          17262.72345290485
+         ],
+         "contamination": 0.1182150035538179
+        }
+       }
+      },
+      {
+       "thickness_um": 19.0,
+       "lines": {
+        "1-0": {
+         "yield_per_sr": 0.02293129854162841,
+         "centroid_eV": 13340.239139526473,
+         "peak_eV": 13306.836025627816,
+         "fwhm_eV": 1384.929899563076,
+         "fwhm_clipped": false,
+         "with_capture_yield_per_sr": 0.02643364643327843,
+         "window_eV": [
+          9758.459579055912,
+          17262.72345290485
+         ],
+         "contamination": 0.1182150035538179
+        }
+       }
+      },
+      {
+       "thickness_um": 40.0,
+       "lines": {
+        "1-0": {
+         "yield_per_sr": 0.03155814071037427,
+         "centroid_eV": 13340.31993230701,
+         "peak_eV": 13306.836025627816,
+         "fwhm_eV": 1384.9450276507578,
+         "fwhm_clipped": false,
+         "with_capture_yield_per_sr": 0.03639239579423678,
+         "window_eV": [
+          9758.459579055912,
+          17262.72345290485
+         ],
+         "contamination": 0.1182150035538179
+        }
+       }
+      },
+      {
+       "thickness_um": 80.0,
+       "lines": {
+        "1-0": {
+         "yield_per_sr": 0.03570220315241762,
+         "centroid_eV": 13340.345539976335,
+         "peak_eV": 13306.836025627816,
+         "fwhm_eV": 1384.9498225691677,
+         "fwhm_clipped": false,
+         "with_capture_yield_per_sr": 0.04117632715306742,
+         "window_eV": [
+          9758.459579055912,
+          17262.72345290485
+         ],
+         "contamination": 0.1182150035538179
+        }
+       }
+      },
+      {
+       "thickness_um": 120.0,
+       "lines": {
+        "1-0": {
+         "yield_per_sr": 0.03629269000345944,
+         "centroid_eV": 13340.348713735584,
+         "peak_eV": 13306.836025627816,
+         "fwhm_eV": 1384.950416753447,
+         "fwhm_clipped": false,
+         "with_capture_yield_per_sr": 0.04185798891990161,
+         "window_eV": [
+          9758.459579055912,
+          17262.72345290485
+         ],
+         "contamination": 0.1182150035538179
+        }
+       }
+      }
+     ]
+    },
+    "amorphous": {
+     "sigma_y_mrad": [
+      2.4050123628283977,
+      3.022432471795141,
+      3.4970751910023115,
+      3.9064493064315307,
+      4.654255644022104,
+      5.400445723408626,
+      6.145968592448542,
+      7.224946944566094,
+      8.943693998839866,
+      10.792470551037994,
+      12.585911123075906,
+      15.252825992047498,
+      17.025578270299697,
+      19.177549357861892
+     ],
+     "thicknesses": [
+      {
+       "thickness_um": 1.0,
+       "lines": {
+        "1-0": {
+         "yield_per_sr": 0.0021792095020151,
+         "centroid_eV": 13327.83354881311,
+         "peak_eV": 13299.523671223415,
+         "fwhm_eV": 1395.823529622514,
+         "fwhm_clipped": false,
+         "with_capture_yield_per_sr": 0.002502224466654028,
+         "window_eV": [
+          9758.459579055912,
+          17262.72345290485
+         ],
+         "contamination": 0.1182150035538179
+        }
+       }
+      },
+      {
+       "thickness_um": 2.8,
+       "lines": {
+        "1-0": {
+         "yield_per_sr": 0.005582643893955368,
+         "centroid_eV": 13302.421274898845,
+         "peak_eV": 13277.58660801021,
+         "fwhm_eV": 1422.607337128764,
+         "fwhm_clipped": false,
+         "with_capture_yield_per_sr": 0.006420862738970929,
+         "window_eV": [
+          9758.459579055912,
+          17262.72345290485
+         ],
+         "contamination": 0.1182150035538179
+        }
+       }
+      },
+      {
+       "thickness_um": 5.0,
+       "lines": {
+        "1-0": {
+         "yield_per_sr": 0.009033591548322489,
+         "centroid_eV": 13272.65236470785,
+         "peak_eV": 13262.961899201408,
+         "fwhm_eV": 1455.4414837229724,
+         "fwhm_clipped": false,
+         "with_capture_yield_per_sr": 0.010405506860663487,
+         "window_eV": [
+          9758.459579055912,
+          17262.72345290485
+         ],
+         "contamination": 0.1182150035538179
+        }
+       }
+      },
+      {
+       "thickness_um": 7.8,
+       "lines": {
+        "1-0": {
+         "yield_per_sr": 0.01263307038814452,
+         "centroid_eV": 13237.097271456967,
+         "peak_eV": 13248.337190392605,
+         "fwhm_eV": 1496.0286468497652,
+         "fwhm_clipped": false,
+         "with_capture_yield_per_sr": 0.014570649566016135,
+         "window_eV": [
+          9758.459579055912,
+          17262.72345290485
+         ],
+         "contamination": 0.1182150035538179
+        }
+       }
+      },
+      {
+       "thickness_um": 10.0,
+       "lines": {
+        "1-0": {
+         "yield_per_sr": 0.01500296580129002,
+         "centroid_eV": 13211.894544403214,
+         "peak_eV": 13233.712481583803,
+         "fwhm_eV": 1521.3368056846884,
+         "fwhm_clipped": false,
+         "with_capture_yield_per_sr": 0.01731792924918559,
+         "window_eV": [
+          9758.459579055912,
+          17262.72345290485
+         ],
+         "contamination": 0.1182150035538179
+        }
+       }
+      },
+      {
+       "thickness_um": 19.0,
+       "lines": {
+        "1-0": {
+         "yield_per_sr": 0.021920149121464484,
+         "centroid_eV": 13130.759589792575,
+         "peak_eV": 13204.463063966197,
+         "fwhm_eV": 1579.7700664035583,
+         "fwhm_clipped": false,
+         "with_capture_yield_per_sr": 0.02536668925989643,
+         "window_eV": [
+          9758.459579055912,
+          17262.72345290485
+         ],
+         "contamination": 0.1182150035538179
+        }
+       }
+      },
+      {
+       "thickness_um": 40.0,
+       "lines": {
+        "1-0": {
+         "yield_per_sr": 0.029059543039973955,
+         "centroid_eV": 13036.69255088988,
+         "peak_eV": 13182.526000752992,
+         "fwhm_eV": 1736.457269681614,
+         "fwhm_clipped": false,
+         "with_capture_yield_per_sr": 0.0337607696770329,
+         "window_eV": [
+          9758.459579055912,
+          17262.72345290485
+         ],
+         "contamination": 0.1182150035538179
+        }
+       }
+      },
+      {
+       "thickness_um": 80.0,
+       "lines": {
+        "1-0": {
+         "yield_per_sr": 0.03190690623352514,
+         "centroid_eV": 12998.762096541484,
+         "peak_eV": 13189.838355157395,
+         "fwhm_eV": 1801.7934546349225,
+         "fwhm_clipped": false,
+         "with_capture_yield_per_sr": 0.03717594135545792,
+         "window_eV": [
+          9758.459579055912,
+          17262.72345290485
+         ],
+         "contamination": 0.1182150035538179
+        }
+       }
+      },
+      {
+       "thickness_um": 120.0,
+       "lines": {
+        "1-0": {
+         "yield_per_sr": 0.03225392810488159,
+         "centroid_eV": 12991.352400740387,
+         "peak_eV": 13197.150709561796,
+         "fwhm_eV": 1800.5669814726261,
+         "fwhm_clipped": false,
+         "with_capture_yield_per_sr": 0.03759575699045895,
+         "window_eV": [
+          9758.459579055912,
+          17262.72345290485
+         ],
+         "contamination": 0.1182150035538179
+        }
+       }
+      }
+     ]
+    }
+   },
+   "seconds": 132.54878372699022
+  }
+ ]
+}

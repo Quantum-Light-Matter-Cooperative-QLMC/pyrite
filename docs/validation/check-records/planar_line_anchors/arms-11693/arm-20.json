@@ -1,0 +1,149 @@
+{
+ "check": "planar_line_anchors",
+ "revision": "unknown",
+ "host": "qlmc-queen",
+ "backend": "cpu",
+ "temperature_K": 293.15,
+ "settings": {
+  "datasets": [
+   "azadegan"
+  ],
+  "cases": [
+   "azadegan_110_30"
+  ],
+  "cells": 8,
+  "orders": 16,
+  "dz": 100.0,
+  "bins": 6,
+  "models": [
+   "kernel",
+   "none",
+   "amorphous"
+  ],
+  "grid": 2400,
+  "n_divergence": 15,
+  "divergence_scale": 1.0,
+  "no_history_reuse": false,
+  "out": "scratch/anchors/arm-20.json"
+ },
+ "cases": [
+  {
+   "case": "azadegan_110_30_42.5",
+   "dataset": "azadegan",
+   "material": "diamond",
+   "hkl": [
+    1,
+    1,
+    0
+   ],
+   "kinetic_energy_MeV": 30.0,
+   "barrier_eV": 8.199770031776064,
+   "y_rate_weights": [
+    1.078626628871848,
+    1.0095856170578799
+   ],
+   "edges_um": [
+    0.0,
+    1.2,
+    4.7,
+    10.6,
+    18.9,
+    29.5,
+    42.5
+   ],
+   "models": {
+    "kernel": {
+     "sigma_y_mrad": [
+      0.19832865531678665,
+      0.8115470252283529,
+      1.6690739893148334,
+      2.6000820231779365,
+      3.5721180349357953,
+      4.575096918052227
+     ],
+     "thicknesses": [
+      {
+       "thickness_um": 42.5,
+       "lines": {
+        "1-0": {
+         "yield_per_sr": 0.6337120914003522,
+         "centroid_eV": 59551.80975581877,
+         "peak_eV": 60299.138581305735,
+         "fwhm_eV": 3077.4156759521065,
+         "fwhm_clipped": false,
+         "with_capture_yield_per_sr": 0.7258251359807774,
+         "window_eV": [
+          48213.01516657761,
+          75683.10741528186
+         ],
+         "contamination": 0.13487738519207212
+        }
+       }
+      }
+     ]
+    },
+    "none": {
+     "sigma_y_mrad": [
+      0.1,
+      0.1,
+      0.1,
+      0.1,
+      0.1,
+      0.1
+     ],
+     "thicknesses": [
+      {
+       "thickness_um": 42.5,
+       "lines": {
+        "1-0": {
+         "yield_per_sr": 0.6687521138700315,
+         "centroid_eV": 60551.31103452358,
+         "peak_eV": 60537.01656427727,
+         "fwhm_eV": 2253.1807855163424,
+         "fwhm_clipped": false,
+         "with_capture_yield_per_sr": 0.7649518816162477,
+         "window_eV": [
+          48213.01516657761,
+          75683.10741528186
+         ],
+         "contamination": 0.13487738519207212
+        }
+       }
+      }
+     ]
+    },
+    "amorphous": {
+     "sigma_y_mrad": [
+      0.5401138933258351,
+      1.313692023269359,
+      2.2397052629767407,
+      3.2309780464943683,
+      4.256106486291638,
+      5.306399972677021
+     ],
+     "thicknesses": [
+      {
+       "thickness_um": 42.5,
+       "lines": {
+        "1-0": {
+         "yield_per_sr": 0.6155944895031542,
+         "centroid_eV": 59270.28855409666,
+         "peak_eV": 60219.84592031522,
+         "fwhm_eV": 3499.1905843239147,
+         "fwhm_clipped": false,
+         "with_capture_yield_per_sr": 0.706030025000542,
+         "window_eV": [
+          48213.01516657761,
+          75683.10741528186
+         ],
+         "contamination": 0.13487738519207212
+        }
+       }
+      }
+     ]
+    }
+   },
+   "seconds": 84.75001416821033
+  }
+ ]
+}

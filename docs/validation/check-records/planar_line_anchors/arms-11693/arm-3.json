@@ -1,0 +1,149 @@
+{
+ "check": "planar_line_anchors",
+ "revision": "unknown",
+ "host": "DESKTOP-QNIHO3D",
+ "backend": "cpu",
+ "temperature_K": 293.15,
+ "settings": {
+  "datasets": [
+   "genz"
+  ],
+  "cases": [
+   "genz_110_5.2_55"
+  ],
+  "cells": 8,
+  "orders": 16,
+  "dz": 100.0,
+  "bins": 6,
+  "models": [
+   "kernel",
+   "none",
+   "amorphous"
+  ],
+  "grid": 2400,
+  "n_divergence": 15,
+  "divergence_scale": 1.0,
+  "no_history_reuse": false,
+  "out": "scratch/anchors/arm-3.json"
+ },
+ "cases": [
+  {
+   "case": "genz_110_5.2_55",
+   "dataset": "genz",
+   "material": "diamond",
+   "hkl": [
+    1,
+    1,
+    0
+   ],
+   "kinetic_energy_MeV": 5.2,
+   "barrier_eV": 8.199770031776064,
+   "y_rate_weights": [
+    2.0521935206623816,
+    1.0229948331118186
+   ],
+   "edges_um": [
+    0.0,
+    1.55,
+    6.1,
+    13.75,
+    24.45,
+    38.2,
+    55.0
+   ],
+   "models": {
+    "kernel": {
+     "sigma_y_mrad": [
+      1.7189561444071346,
+      7.825536089323361,
+      15.198309304975348,
+      23.124739204134897,
+      31.394492154525075,
+      39.92042378878653
+     ],
+     "thicknesses": [
+      {
+       "thickness_um": 55.0,
+       "lines": {
+        "1-0": {
+         "yield_per_sr": 0.001652455645282647,
+         "centroid_eV": 2987.734054445402,
+         "peak_eV": 2837.92338031672,
+         "fwhm_eV": 675.1156878043848,
+         "fwhm_clipped": false,
+         "with_capture_yield_per_sr": 0.0024559464022257792,
+         "window_eV": [
+          2065.452808346626,
+          4107.729796566811
+         ],
+         "contamination": 0.2414545609655282
+        }
+       }
+      }
+     ]
+    },
+    "none": {
+     "sigma_y_mrad": [
+      0.3,
+      0.3,
+      0.3,
+      0.3,
+      0.3,
+      0.3
+     ],
+     "thicknesses": [
+      {
+       "thickness_um": 55.0,
+       "lines": {
+        "1-0": {
+         "yield_per_sr": 0.0020109670909131076,
+         "centroid_eV": 3053.383970407718,
+         "peak_eV": 2845.083057119349,
+         "fwhm_eV": 656.7888286324032,
+         "fwhm_clipped": false,
+         "with_capture_yield_per_sr": 0.0028288247734773787,
+         "window_eV": [
+          2065.452808346626,
+          4107.729796566811
+         ],
+         "contamination": 0.2414545609655282
+        }
+       }
+      }
+     ]
+    },
+    "amorphous": {
+     "sigma_y_mrad": [
+      3.320423954193384,
+      8.169094932749953,
+      13.939507640320578,
+      20.083929321193544,
+      26.443866867982315,
+      32.96203222882834
+     ],
+     "thicknesses": [
+      {
+       "thickness_um": 55.0,
+       "lines": {
+        "1-0": {
+         "yield_per_sr": 0.0017128678359745598,
+         "centroid_eV": 2991.577980960215,
+         "peak_eV": 2836.1334611160623,
+         "fwhm_eV": 678.1529945486955,
+         "fwhm_clipped": false,
+         "with_capture_yield_per_sr": 0.002523328885972143,
+         "window_eV": [
+          2065.452808346626,
+          4107.729796566811
+         ],
+         "contamination": 0.2414545609655282
+        }
+       }
+      }
+     ]
+    }
+   },
+   "seconds": 848.5287587220082
+  }
+ ]
+}
