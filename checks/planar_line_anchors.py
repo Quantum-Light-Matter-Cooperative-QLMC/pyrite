@@ -421,12 +421,114 @@ def run_case(case, *, cells, orders, dz_ang, n_bins, models, n_grid, n_divergenc
 
 
 def _revision():
+    if os.environ.get("PYRITE_SOURCE_REVISION"):
+        return os.environ["PYRITE_SOURCE_REVISION"]
     try:
         return subprocess.run(
             ["git", "rev-parse", "HEAD"], capture_output=True, text=True, cwd=ROOT, check=True
         ).stdout.strip()
     except (OSError, subprocess.CalledProcessError):
         return "unknown"
+
+
+def _measured(rows, hkl, transition, mev):
+    for row in rows:
+        if tuple(row["plane"]) == tuple(hkl) and row["transition"] == list(transition):
+            if np.isclose(row["kinetic_energy_MeV"], mev):
+                return row
+    return None
+
+
+def report(paths, out):
+    """Model/measurement tables from stored run JSONs (default grid, unscaled arms)."""
+    genz = json.loads((DATA / "genz-1996-diamond-planar.json").read_text())
+    kephart = json.loads((DATA / "kephart-1989-si-planar-yields.json").read_text())
+    azadegan = json.loads((DATA / "azadegan-2006-diamond110-widths.json").read_text())
+    thick = genz["crystals"]["thickness_um"]
+    rows = []
+    for path in paths:
+        record = json.loads(Path(path).read_text())
+        settings = record["settings"]
+        arm = {
+            k: settings.get(k)
+            for k in ("cells", "orders", "dz", "bins", "divergence_scale", "tds_scale")
+        }
+        for case in record["cases"]:
+            mev = case["kinetic_energy_MeV"]
+            for model, result in case["models"].items():
+                for t in result["thicknesses"]:
+                    for name, m in t["lines"].items():
+                        if m is None:
+                            continue
+                        transition = [int(v) for v in name.split("-")]
+                        base = {
+                            "source": Path(path).name,
+                            "arm": arm,
+                            "case": case["case"],
+                            "model": model,
+                            "line": name,
+                            "thickness_um": t["thickness_um"],
+                            "model_yield": m["yield_per_sr"],
+                            "model_yield_with_capture": m["with_capture_yield_per_sr"],
+                            "model_fwhm_keV": m["fwhm_eV"] / 1e3,
+                            "model_centroid_keV": m["centroid_eV"] / 1e3,
+                            "contamination": m["contamination"],
+                            "fwhm_clipped": m["fwhm_clipped"],
+                        }
+                        if case["dataset"] == "genz":
+                            i = thick.index(int(round(t["thickness_um"])))
+                            for key, table in (
+                                ("yield", "yields_table1"),
+                                ("fwhm", "widths_table4"),
+                                ("centroid", "energies_table7"),
+                            ):
+                                meas = _measured(genz[table]["rows"], case["hkl"], transition, mev)
+                                if meas is None:
+                                    continue
+                                scale = 1e-3 if key == "yield" else 1.0
+                                base[f"measured_{key}"] = meas["measured"][i] * scale
+                                base[f"measured_{key}_err"] = meas["uncertainty"][i] * scale
+                                if meas.get("theory"):
+                                    base[f"genz_theory_{key}"] = meas["theory"][i] * scale
+                        elif case["dataset"] == "kephart":
+                            for fit in kephart["integrated_exponential_fits"]["rows"]:
+                                if fit["plane"] == case["hkl"] and fit["transition"] == transition:
+                                    z = t["thickness_um"]
+                                    base["measured_yield"] = fit["amplitude"] * (
+                                        1 - np.exp(-z / fit["length_um"])
+                                    )
+                                    base["measured_slope"] = fit["slope_text"]
+                                    base["model_slope_estimate"] = m["yield_per_sr"] / z
+                        else:
+                            for az in azadegan["rows_42p5um"]:
+                                if np.isclose(az["kinetic_energy_MeV"], mev):
+                                    base["measured_fwhm"] = az["gamma_exp_keV"]
+                                    base["measured_centroid"] = az["E_exp_keV"]
+                                    base["azadegan_theta_ms_ch_mrad"] = az["theta_ms_ch_mrad"]
+                                    base["model_sigma_y_exit_mrad"] = result["sigma_y_mrad"][-1]
+                        for key in ("yield", "fwhm", "centroid"):
+                            model_key = {
+                                "yield": "model_yield",
+                                "fwhm": "model_fwhm_keV",
+                                "centroid": "model_centroid_keV",
+                            }[key]
+                            if base.get(f"measured_{key}"):
+                                base[f"ratio_{key}"] = base[model_key] / base[f"measured_{key}"]
+                        rows.append(base)
+    for row in rows:
+        ratios = " ".join(
+            f"{k[6:]}={row[k]:.3f}"
+            for k in ("ratio_yield", "ratio_fwhm", "ratio_centroid")
+            if k in row
+        )
+        print(
+            f"{row['case']:22s} {row['model']:9s} {row['line']:4s} {row['thickness_um']:6.1f}um "
+            f"Y={row['model_yield']:.3g} W={row['model_fwhm_keV']:.3f} E={row['model_centroid_keV']:.3f} "
+            f"{ratios} {row['arm']}"
+        )
+    Path(out).write_text(
+        json.dumps({"check": "planar_line_anchors report", "rows": rows}, indent=1)
+    )
 
 
 def main(argv=None):
@@ -447,8 +549,12 @@ def main(argv=None):
         "--tds-scale", type=float, default=1.0, help="sensitivity: multiply the TDS kernel"
     )
     parser.add_argument("--no-history-reuse", action="store_true")
+    parser.add_argument("--report", nargs="+", help="tabulate stored run JSONs instead of running")
     parser.add_argument("--out", required=True)
     args = parser.parse_args(argv)
+    if args.report:
+        report(args.report, args.out)
+        return
     global REUSE_HISTORY
     REUSE_HISTORY = not args.no_history_reuse
     cases = [c for name in args.datasets for c in DATASETS[name]()]
