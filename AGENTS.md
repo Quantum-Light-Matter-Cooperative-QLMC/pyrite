@@ -135,6 +135,11 @@ Do not add separate tutorial provenance manifests or HTML/session exports.
   relevant `*_MODEL` marker or `tables-*-N` tag in that PR.
 - Heavy sweeps/GPU work use `pyrite remote`; never run locally.
 - Add imports with first use. Verify with smallest useful command.
+- A new or renamed `checks/*.py` must, in the same commit, get a
+  `CHECK_LEDGER_IDS` entry in `src/pyrite/validation/check_records.py` (its
+  ledger ids, or `()`) and rows in both `checks/README.md` tables (catalog
+  and cost). Any new `scripts/` entry needs a row in `scripts/README.md`.
+  Then run `tests/dev/test_validation_check_records.py`; CI `core` fails otherwise.
 - Public API changes follow [the API checklist](docs/development/api-policy.md#before-approving-a-public-feature):
   owner/status, canonical imports and aliases, compatibility, units/defaults,
   dependencies, docs/tests, and serialization/scientific identity. Update
