@@ -213,11 +213,13 @@ def test_bunch_front_gradient_keeps_the_offset_free_geometry_with_physical_elect
     """An analytic offset average outranks the realized-field pairing."""
     segs = _offset_segments()
     segs["beam_entry"] = {"bunch_front_gradient": [0.0, 0.0]}
-    free = coherent_fringe_spacing(segs, _N_HAT_OBLIQUE, electron_limit=3)[1]
-    physical = coherent_fringe_spacing(
+    d = _reducer_d(segs, longitudinal_rms_fs=100.0, physical_electrons=1.0e7)
+    _, span, _ = coherent_fringe_spacing(
         segs, _N_HAT_OBLIQUE, electron_limit=3, physical_electrons=1.0e7
-    )[1]
-    assert physical == pytest.approx(free)
+    )
+    free = coherent_fringe_spacing(segs, _N_HAT_OBLIQUE, electron_limit=3)[1]
+    assert span == pytest.approx(d.max() - d.min(), rel=1e-6)
+    assert span == pytest.approx(free)
 
 
 def test_single_segment_has_no_fringe_and_returns_infinity():

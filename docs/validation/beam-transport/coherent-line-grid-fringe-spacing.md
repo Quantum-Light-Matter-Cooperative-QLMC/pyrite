@@ -59,12 +59,12 @@ which is exactly the combination whose reciprocal sets the incoherent first zero
 
 ## Decoherence selects which span applies
 
-`decoherence_active` (`montecarlo/spectrum/cxr/_setup.py`) is true whenever the case carries nonzero bunch offsets or a finite footprint — including the standard `beam_fwhm_mm = 1.0` cases. The spectrum is then the blend $(1-F)\sum_e |S_e|^2 + F |\sum_e S_e|^2$ on the offset-free geometric phase:
+`decoherence_active` (`montecarlo/spectrum/cxr/_setup.py`) is true whenever the line population carries nonzero bunch offsets — including the standard `beam_fwhm_mm = 1.0` cases. The spectrum is then the blend $(1-F)\sum_e |S_e|^2 + F |\sum_e S_e|^2$, on the offset-free geometric phase where offsets are averaged (finite footprint, bunch-front gradient, or no `physical_electrons`); on the production infinite-slab route (`physical_electrons` set, no analytic average) the reducer instead pairs the realized fields through `pair_scale`, sampled offsets and $t_0$ included:
 
 - the $\sum_e |S_e|^2$ floor is band-limited by the widest **single-electron** span (`coherent_fringe_spacing(..., grouped=True)`);
 - the $|\sum_e S_e|^2$ term is band-limited by the **all-electron** span.
 
-The all-electron span is set by the transverse beam extent projected on $\hat n$, so it is ~2.5 mm in every case measured below, essentially independent of material and beam energy. Those inter-electron fringes are one realization of the sampled offsets — speckle, which `montecarlo/spectrum/cxr/_setup.py` already notes "does not shrink with electron count". Whether they are an observable at all is a modelling question outside this row; it is tracked separately as issue #155.
+The all-electron span is set by the transverse beam extent projected on $\hat n$, so it was ~2.5 mm in every case measured below, essentially independent of material and beam energy. Those finite-footprint measurements predate `917ec678a` (#370); the current finite-footprint reducer phases offset-free, so this footprint-set span is historical there, while the production infinite-slab span carries the projected footprint and the $t_0$ spread. Those inter-electron fringes are one realization of the sampled offsets — speckle, which `montecarlo/spectrum/cxr/_setup.py` already notes "does not shrink with electron count". Whether they are an observable at all is a modelling question outside this row; it is tracked separately as issue #155.
 
 ## Measurements
 
@@ -315,7 +315,7 @@ incoherent width". Sign-off remains a human decision.
 
 `coherent_retardation` now selects $d_j$ by the same predicate as the reducer:
 no offsets keeps the sampled geometry; offsets with `physical_electrons` and no
-analytic average (`finite footprint or bunch_front_gradient`) add the realized
+analytic offset average (the analytic average is taken on a finite footprint or with a `bunch_front_gradient`) add the realized
 `t0_ang` on sampled positions; every other offset case adds back
 $\hat{\mathbf n}_\perp\cdot\mathbf r_{0\perp,e}$ (offset-free).
 `_refuse_coherent_resolution` passes `physical_bunch_electrons(case)`, the same
@@ -324,5 +324,112 @@ removed; the refusal decision is unchanged and only its quoted steps/spans
 move. Regression: `tests/energy-grid/test_coherent_line_grid.py` compares the
 estimator against the reducer's own `_prepare_spectrum(...).d_all_geom` on the
 infinite-slab offset-free, finite-footprint and `physical_electrons` routes
-(the latter two fail on the pre-fix estimator), and pins the bunch-front
-precedence and the single-segment `(inf, 0.0, 1)` limit.
+(the latter two fail on the pre-fix estimator) and the bunch-front-gradient
+route with `physical_electrons` (offset-free precedence), and pins the
+single-segment `(inf, 0.0, 1)` limit.
+
+### Independent re-verification (2026-11-12, #1098)
+
+Fresh-context verifier, commit `7b6074640`. The scope is the "in the reducer's
+geometry" clause only; the band-limit physics above stands as rederived. The
+reference was rebuilt from `cxr/_setup.py` (`_coherent_offsets`,
+`_offset_free_geometry`, the `physical_electrons` override in
+`_prepare_spectrum`) before the new `coherent_retardation` body was read.
+
+**Reference.** Write $d^{\rm s}_j = t_{{\rm mid},j} - \hat{\mathbf n}\cdot\mathbf r_j$
+on sampled positions, with $t_{{\rm mid},j} = t_j + t_{L,j}/2$ and $t_j = 0$ when
+`t_ang` is absent. Decoherence is active when any of the first $N_e$ entries of
+`initial_t0_ang` or `initial_r_ang[:, :2]` is nonzero, where $N_e$ is
+`electron_limit`, or `segments["Ne"]` if that is absent. "Analytic" means a
+finite footprint or a truthy `beam_entry["bunch_front_gradient"]`. The reducer's
+coherent phase centre `d_all_geom` is then:
+
+| route | reducer `d_all_geom` |
+|---|---|
+| decoherence inactive, no `physical_electrons` | $d^{\rm s}_j$ |
+| decoherence inactive, `physical_electrons` set | $d^{\rm s}_j + t_{0,j}$ (override; `analytic_offsets` defaults to false) |
+| active, not analytic, no `physical_electrons` | $d^{\rm s}_j + \hat{\mathbf n}_\perp\cdot\mathbf r_{0\perp,e(j)}$ |
+| active, not analytic, `physical_electrons` set | $d^{\rm s}_j + t_{0,j}$ |
+| active, analytic (any `physical_electrons`) | $d^{\rm s}_j + \hat{\mathbf n}_\perp\cdot\mathbf r_{0\perp,e(j)}$ |
+
+Here $e(j)$ is `elec_id` clipped to $[0, N_e-1]$. Transport writes
+`t0_ang = initial_t0_ang[elec_id]` (`transport/host_pass.py`,
+`runner/block_transport.py`). The inactive route with `physical_electrons`
+therefore has $t_{0,j} = 0$ on every line row ($e < N_e$), and the estimator's
+plain $d^{\rm s}_j$ is exact there. `physical_electrons = 0.0` counts as set in
+both functions (`is not None`).
+
+**Comparison.** `coherent_retardation` implements every row of the table
+with the same predicates, including the precedence of the analytic average
+over `physical_electrons` and the `[:electron_limit]` population cut.
+`_refuse_coherent_resolution` passes `physical_bunch_electrons(case)`. The
+case driver passes the same value on every coherent `mc_cxr_spectrum` call,
+on both the single- and the multi-radiator path, with the same `Ne`.
+`physical_bunch_electrons` never returns `None`, so production coherent
+infinite-slab cases always take the realized route. `coherent_windows.py` uses
+only `_offset_population`, which this commit leaves unchanged. No scored
+spectrum path calls `coherent_retardation`.
+
+**Numeric check.** An independent script (outside the repository, FP64) built five
+electrons with six oblique segments each, random face offsets
+($\sigma = 3\times10^3$ Å) and bunch times, and $\hat{\mathbf n} = (0.48, 0.36, 0.8)$.
+It compared `_prepare_spectrum(...).d_all_geom`, `coherent_retardation` and
+the hand formula row by row on 15 configurations:
+
+- no offsets, with and without `physical_electrons`, and with `t0_ang` absent;
+- infinite slab with both offsets, $t_0$ only, or $\mathbf r_{0\perp}$ only,
+  with and without `physical_electrons` (including `0.0`);
+- finite footprint, with and without `physical_electrons`;
+- bunch-front gradient, with and without `physical_electrons`;
+- `t_ang` absent;
+- `electron_limit` below the population, with offsets only on the excluded
+  electrons (reducer `decoherence_active` false).
+
+Every route agrees to $\le 1.4\times10^{-15}$ relative. Spans agree to
+$\le 1.1\times10^{-15}$, and the limit case to $2\times10^{-13}$ Å absolute.
+`tests/energy-grid/test_coherent_line_grid.py`: 12 passed.
+
+**Residual scope (non-blocking).**
+
+- The estimator reads unexpanded transport rows. The reducer phases the
+  escape-piece rows after `_clip_segments_to_cutoff`, and, on multi-radiator
+  cases, per layer. Piece midpoints lie inside their parent's $d$ interval, so
+  the reducer's span is at most the estimator's span plus
+  $\max_j \Delta d_j$, which is inside the midpoint convention adjudicated
+  above. Clipping and per-layer reduction only shrink the reducer's span, so
+  in those cases the estimator is conservative.
+- On a segment record that carries a nonzero per-row `t0_ang` but no
+  `initial_t0_ang`/`initial_r_ang` population, the reducer with
+  `physical_electrons` adds $t_0$ while the estimator does not. The scratch
+  check gives span 6740 Å from the estimator against 7101 Å from the reducer.
+  Transport never emits such a record, and the docstring's "assumes the
+  population ... stored on `segments`" covers the case.
+
+**Wording.**
+
+1. The ledger Notes entry for 2026-10-05 (#350) says that on an infinite slab
+   with active decoherence the offset is removed, "so the all-electron span
+   there no longer counts the beam footprint". That holds only without
+   `physical_electrons`. Every production coherent case passes it, so
+   production infinite-slab spans include the projected footprint and the
+   $t_0$ spread. The same entry still names `lines/_setup.py`; the current
+   owner is `cxr/_setup.py`.
+2. In "Decoherence selects which span applies", two statements are stale.
+   "The blend ... on the offset-free geometric phase" does not describe the
+   production infinite-slab route, which pairs realized fields through
+   `pair_scale`. The ~2.5 mm footprint-set all-electron span describes the
+   historical finite-footprint measurements, not the current offset-free
+   finite-footprint reducer. Mark both as historical or route-qualified.
+3. In "Remediation (#1098)", the parenthetical in "no analytic average
+   (`finite footprint or bunch_front_gradient`)" reads as if it defined the
+   route. It defines the analytic average, and should read "no analytic
+   average, where the analytic average is a finite footprint or a bunch-front
+   gradient".
+4. The same section says the regression tests pin "the bunch-front
+   precedence". That test compares the estimator with itself, not with the
+   reducer's `d_all_geom`. The reducer comparison above (bunch front at
+   $100$ fs) closes that gap, but the committed test does not.
+
+**Verdict: `rederived`.** The first-divergent term of the 2026-11-11 review is
+removed. On every production route, the estimator's $d_j$ equals the reducer's
+`d_all_geom` on the line rows. Sign-off remains a human decision.
