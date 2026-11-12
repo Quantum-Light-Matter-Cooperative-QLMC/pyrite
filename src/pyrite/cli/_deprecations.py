@@ -308,6 +308,7 @@ DEPRECATED_FLAGS: dict[tuple[str, str], DeprecatedFlag] = {
         "--shell-ionization-model",
         "--channeling-model",
         "--channeling-plane",
+        "--channeling-admission",
     )
 }
 

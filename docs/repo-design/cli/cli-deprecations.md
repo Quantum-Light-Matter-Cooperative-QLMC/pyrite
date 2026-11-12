@@ -37,6 +37,7 @@ These spellings reach a current command with a deprecated argument shape; they s
 | --- | --- | --- | --- | --- | --- |
 | `pyrite profile numerics set` | `--atomic-electron-deflection` | use 'pyrite profile physics set' | 0.32.0 | 0.34.0 | Physics field; saved unchanged during the support window. |
 | `pyrite profile numerics set` | `--bremsstrahlung-model` | use 'pyrite profile physics set' | 0.32.0 | 0.34.0 | Physics field; saved unchanged during the support window. |
+| `pyrite profile numerics set` | `--channeling-admission` | use 'pyrite profile physics set' | 0.32.0 | 0.34.0 | Physics field; saved unchanged during the support window. |
 | `pyrite profile numerics set` | `--channeling-model` | use 'pyrite profile physics set' | 0.32.0 | 0.34.0 | Physics field; saved unchanged during the support window. |
 | `pyrite profile numerics set` | `--channeling-plane` | use 'pyrite profile physics set' | 0.32.0 | 0.34.0 | Physics field; saved unchanged during the support window. |
 | `pyrite profile numerics set` | `--elastic-model` | use 'pyrite profile physics set' | 0.32.0 | 0.34.0 | Physics field; saved unchanged during the support window. |
