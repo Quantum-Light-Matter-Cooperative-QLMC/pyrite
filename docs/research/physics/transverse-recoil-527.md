@@ -86,13 +86,13 @@ SI §S6 (Supplementary Fig. 4) finds the plane-wave result unchanged for a trans
 
 ## 5. Prototype and observability table
 
-`checks/transverse_recoil_527.py` computes PyRITE's classical PXR one reflection at a time (`mc_cxr_spectrum`, Si B = 0.4632 Å², HOPG B = 0.8 Å²). It then shifts each reflection's spectrum rigidly from its classical to its exact root.
+`checks/transverse_recoil_527.py` computes PyRITE's classical PXR one reflection at a time (`mc_cxr_spectrum` under the ħ → 0 recoil hook, since production lines sit on the exact root after #1099; Si B = 0.4632 Å², HOPG B = 0.8 Å²). It then shifts each reflection's spectrum rigidly from its classical to its exact root.
 - The "QM" curve is a prototype. It keeps PyRITE's classical per-reflection weight and line shape; it does not use Shi's quantum matrix element or the recoil Jacobian.
 - Rows cover $\lvert h\rvert,\lvert k\rvert\le 8$ for each $n_z$ (7 for the forward case).
 
 ### 5.1 Against Shi Fig. 2 (straight 30 nm Si, θ = 100°)
 
-Shi heights are visual reads of Fig. 2b/d/f (about ±10 %).
+Shi heights below are the original visual reads of Fig. 2b/d/f (about ±10 %). The vector-digitized values (`tests/data/recoil/shi-2024-fig2.json`, #1103) agree within 3 %; the check now reads them.
 
 | $T$ | $n_z$ | PyRITE CL peak (photons/eV/sr/e) | Shi CL | ratio | prototype QM/CL height |
 |---|---|---|---|---|---|
@@ -108,12 +108,7 @@ Shi heights are visual reads of Fig. 2b/d/f (about ±10 %).
   - PyRITE's tallest prototype peak is 0.36–0.41× CL, but its absolute height is close to Shi's tallest QM peak: 7.6e-10 against ≈1.05e-9 at 30 keV, and 6.1e-11 against ≈5.3e-11 at 300 keV.
   - Shi's QM area in Fig. 2f visibly exceeds its CL area, whereas the prototype conserves area by construction.
 
-The candidate causes are not separated:
-- Shi's per-pathway quantum matrix element and Jacobian;
-- the transverse-position average in Shi's classical Eq. (1);
-- the potentials: Salvat Yukawa in Shi (SI §S1) against Waasmaier–Kirfel/Chantler with Debye–Waller in PyRITE. B = 0 raises PyRITE's peak by 24 %, the wrong direction.
-
-Settling the cause needs digitized Fig. 2 data or Shi's code. Until then, sub-MeV per-reflection intensities and the peak-shift magnitudes that depend on them are unvalidated. Line positions are not affected.
+**Resolved in #1103** ([attribution note](shi-2024-intensity-1103.md)). Shi's CL curve is the classical PXR-only rate, while Shi's QM curve and PyRITE's classical line both carry CBS and the PXR×CBS interference. That accounts for the 1.9–2.6× gap and for Shi's QM area exceeding its CL area. The PXR-only remainder is the crystal potential: Si K-edge f′ and Debye–Waller in PyRITE, Yukawa without either in Shi. Line positions are not affected.
 
 ### 5.2 Transported observability table
 

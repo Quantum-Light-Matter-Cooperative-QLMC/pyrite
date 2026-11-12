@@ -84,6 +84,7 @@ quantum-recoil-observability
 quantum-shaped-cxr-interference
 self-absorption
 segment-escape-average
+shi-2024-fig2-intensity-attribution
 sinc-bin-far-envelope
 sinc-bin-integration
 sinc-bin-midpoint-series

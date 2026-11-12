@@ -115,6 +115,8 @@ run through the collector.
 | `coherent_transverse_coherence.py` | Tests whether a single coherent transverse-direction draw is representative of the observable spectrum. |
 | `transition_radiation_omission.py` | Exact planar-stack transition radiation of every boundary crossing, bounded over the detector acceptance, against the production bremsstrahlung density for tens-of-keV and MeV scenes; per-band omission bias against `target_rse / 3` (#102). Small CPU runs. |
 | `transverse_recoil_527.py` | Transverse-recoil PXR prototype and detector-resolution observability table against Shi 2024 Fig. 2 (#527). |
+| `shi_2024_matrix_elements_1103.py` | Independent per-reflection Shi 2024 PXR/CB matrix elements (SI Eqs. S12–S17) against production `A_PXR`/`A_CBS`: classical-limit calibration, Shi Fig. 2 predicted from Shi's inputs, and the CL-is-PXR-only attribution (#1103). |
+| `digitize_shi_2024_fig2_1103.py` | Regenerates `tests/data/recoil/shi-2024-fig2.json` from the publisher PDF's Fig. 2 vector paths (rasterize + skeletonize); needs the PDF and `uv run --with pymupdf --with scikit-image` (#1103). |
 | `shaped_electron_1102.py` | Shaped-electron (two-component momentum superposition) CXR interference against its mixture: final-state trace, phase, offset and registration scans, two-beam Bloch check of Shi 2024 Fig. 5 (#1102); research reference, no gate. |
 | `planar_exit_out_of_plane.py` | Gridnev (1987) Si planar spot visibility: local contrast of the out-of-plane-resolved `θ_y = 0` exit cut and of the `θ_y`-integrated marginal for configured E/L/σ, grid, `η` and dz arms, with optional NPZ curves, a uniform-electronic-density (LDA) control (#1109), and a coherent zero-kernel control, incidence tilt, Gaussian beam mixtures and `θ_y`-window averaging (#1117); report only, no gate. |
 | `collision_statistics_refinement.py` | Measures collision-statistics changes under transport substep refinement. |
@@ -329,6 +331,8 @@ reviewed verdicts for the diagnostic rows, not merely rerunning their entry poin
 | `transition_radiation_omission.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Gate (explicit mode where applicable) |
 | `transport_core_goldens.py` | Remote CPU capture/check; unmeasured | Existing reviewed golden directory; capture is not a validation verdict | Gate (explicit mode where applicable) |
 | `transverse_recoil_527.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Diagnostic |
+| `shi_2024_matrix_elements_1103.py` | CPU analytic/table; ~10 s | Packaged physics/catalog data and `tests/data/recoil/shi-2024-fig2.json` | Gate (exit 1 on attribution or classical-limit failure) |
+| `digitize_shi_2024_fig2_1103.py` | CPU raster; ~2–5 min | Publisher PDF (not redistributed); pymupdf, scikit-image | Diagnostic |
 | `shaped_electron_1102.py` | CPU analytic/table; ~25–45 s | Packaged physics only (no catalog tables) | Diagnostic |
 | `planar_exit_out_of_plane.py` | `pyrite remote` GPU (CuPy) or CPU; 128 cells ≈ 1.5–3 min per arm on RTX 5080, 32 cells ≈ 80 s local CPU (4 workers, ~370 MB) | Packaged physics only (no catalog tables) | Diagnostic |
 | `xraylib_cascade_oracle.py` | Remote CPU oracle; 1.46 s (one sample) | Optional xraylib installation; packaged EADL cascade data | Gate (explicit mode where applicable) |
