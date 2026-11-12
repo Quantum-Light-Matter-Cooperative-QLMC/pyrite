@@ -1,0 +1,566 @@
+{
+ "issue": 1125,
+ "date": "2026-11-11",
+ "job": 12011,
+ "revision": "accb83407",
+ "host": "qlmc: AMD Ryzen 9 9950X3D (8 CPUs allocated), NVIDIA GeForce RTX 5080 (driver 610.47)",
+ "workload": "as density-matrix-2026-11-11.json; --loop numpy cupy times the bare restricted Strang step (flux totals on device, one sync per repeat)",
+ "arms": {
+  "openblas4": {
+   "revision": "",
+   "host": "DESKTOP-QNIHO3D",
+   "cpu_count": 32,
+   "threads": {
+    "OMP_NUM_THREADS": null,
+    "OPENBLAS_NUM_THREADS": "4"
+   },
+   "numpy": "2.5.4",
+   "args": {
+    "orders": [
+     24,
+     32,
+     40,
+     56
+    ],
+    "cells": 16,
+    "thickness_um": 2.0,
+    "dz": 250.0,
+    "stopping": 0.0,
+    "repeats": 3,
+    "loop": [
+     "numpy",
+     "cupy"
+    ],
+    "out": "density_gpu_1125_t4.json"
+   },
+   "entries": [
+    {
+     "loops": [
+      {
+       "namespace": "numpy",
+       "walls": [
+        0.22153155808337033,
+        0.22375540900975466,
+        0.22721461101900786
+       ],
+       "ms_per_step": 2.796942612621933,
+       "max_density_deviation": 0.0,
+       "free_flux_deviation": 2.0816681711721685e-17,
+       "overflow_flux_deviation": 2.3592239273284576e-16
+      },
+      {
+       "namespace": "cupy",
+       "walls": [
+        0.09686491696629673,
+        0.09716512798331678,
+        0.09732230100780725
+       ],
+       "ms_per_step": 1.2145640997914597,
+       "max_density_deviation": 1.951563910473908e-17,
+       "free_flux_deviation": 0.0,
+       "overflow_flux_deviation": 8.534839501805891e-16
+      }
+     ],
+     "orders": 24,
+     "basis_size": 49,
+     "n_grid": 74,
+     "subspace_size": 513,
+     "steps": 80,
+     "kernel_s": 0.30198775499593467,
+     "runs": [
+      {
+       "jump": 0.2035126998089254,
+       "propagators": 0.0027539549628272653,
+       "loss_rate": 0.0033666560193523765,
+       "reproject": 0.0,
+       "other": 0.03161580616142601,
+       "wall": 0.24124911695253104
+      },
+      {
+       "jump": 0.20561991806607693,
+       "propagators": 0.0034184710821136832,
+       "loss_rate": 0.003575870185159147,
+       "reproject": 0.0,
+       "other": 0.03218655870296061,
+       "wall": 0.24480081803631037
+      },
+      {
+       "jump": 0.20462603773921728,
+       "propagators": 0.002985727973282337,
+       "loss_rate": 0.0035100302193313837,
+       "reproject": 0.0,
+       "other": 0.03132589207962155,
+       "wall": 0.24244768801145256
+      }
+     ],
+     "trace": 0.9181295350089527,
+     "total_flux": 0.06622043871787318
+    },
+    {
+     "loops": [
+      {
+       "namespace": "numpy",
+       "walls": [
+        0.3397331100422889,
+        0.3434227689867839,
+        0.3413998839678243
+       ],
+       "ms_per_step": 4.2674985495978035,
+       "max_density_deviation": 0.0,
+       "free_flux_deviation": 3.469446951953614e-17,
+       "overflow_flux_deviation": 5.0133508455729725e-16
+      },
+      {
+       "namespace": "cupy",
+       "walls": [
+        0.14276343991514295,
+        0.14238602796103805,
+        0.13966937398072332
+       ],
+       "ms_per_step": 1.7798253495129757,
+       "max_density_deviation": 2.3418766925686896e-17,
+       "free_flux_deviation": 2.7755575615628914e-17,
+       "overflow_flux_deviation": 5.516420653606247e-16
+      }
+     ],
+     "orders": 32,
+     "basis_size": 65,
+     "n_grid": 98,
+     "subspace_size": 513,
+     "steps": 80,
+     "kernel_s": 0.7673575519584119,
+     "runs": [
+      {
+       "jump": 0.30376845120918006,
+       "propagators": 0.002919803955592215,
+       "loss_rate": 0.004436642513610423,
+       "reproject": 0.0,
+       "other": 0.03343078028410673,
+       "wall": 0.3445556779624894
+      },
+      {
+       "jump": 0.3075864518759772,
+       "propagators": 0.0028642830438911915,
+       "loss_rate": 0.0041679388377815485,
+       "reproject": 0.0,
+       "other": 0.033917106222361326,
+       "wall": 0.3485357799800113
+      },
+      {
+       "jump": 0.30559615592937917,
+       "propagators": 0.0028904650826007128,
+       "loss_rate": 0.004827301832847297,
+       "reproject": 0.0,
+       "other": 0.03390862711239606,
+       "wall": 0.34722254995722324
+      }
+     ],
+     "trace": 0.918328447316236,
+     "total_flux": 0.06602313776204419
+    },
+    {
+     "loops": [
+      {
+       "namespace": "numpy",
+       "walls": [
+        0.5434324159286916,
+        0.545658127986826,
+        0.5497812419198453
+       ],
+       "ms_per_step": 6.820726599835325,
+       "max_density_deviation": 0.0,
+       "free_flux_deviation": 1.3877787807814457e-17,
+       "overflow_flux_deviation": 6.461844948013606e-16
+      },
+      {
+       "namespace": "cupy",
+       "walls": [
+        0.18202815297991037,
+        0.17607744003180414,
+        0.17387693491764367
+       ],
+       "ms_per_step": 2.200968000397552,
+       "max_density_deviation": 2.6020852139652106e-17,
+       "free_flux_deviation": 0.0,
+       "overflow_flux_deviation": 1.5595164049031496e-15
+      }
+     ],
+     "orders": 40,
+     "basis_size": 81,
+     "n_grid": 122,
+     "subspace_size": 513,
+     "steps": 80,
+     "kernel_s": 1.7761958660557866,
+     "runs": [
+      {
+       "jump": 0.5285350560443476,
+       "propagators": 0.0030338880605995655,
+       "loss_rate": 0.006665054359473288,
+       "reproject": 0.0,
+       "other": 0.04046004358679056,
+       "wall": 0.578694042051211
+      },
+      {
+       "jump": 0.5291011896915734,
+       "propagators": 0.0031029978999868035,
+       "loss_rate": 0.006964227184653282,
+       "reproject": 0.0,
+       "other": 0.039934821194037795,
+       "wall": 0.5791032359702513
+      },
+      {
+       "jump": 0.537466604844667,
+       "propagators": 0.002995006972923875,
+       "loss_rate": 0.007462570909410715,
+       "reproject": 0.0,
+       "other": 0.04118567518889904,
+       "wall": 0.5891098579159006
+      }
+     ],
+     "trace": 0.9183292579583127,
+     "total_flux": 0.06602230679398607
+    },
+    {
+     "loops": [
+      {
+       "namespace": "numpy",
+       "walls": [
+        1.1489348040195182,
+        1.144409102969803,
+        1.1634581169346347
+       ],
+       "ms_per_step": 14.361685050243977,
+       "max_density_deviation": 0.0,
+       "free_flux_deviation": 2.7755575615628914e-17,
+       "overflow_flux_deviation": 1.4046923346722195e-15
+      },
+      {
+       "namespace": "cupy",
+       "walls": [
+        0.3047810469288379,
+        0.29373277293052524,
+        0.292918493039906
+       ],
+       "ms_per_step": 3.6716596616315655,
+       "max_density_deviation": 2.0816681711721685e-17,
+       "free_flux_deviation": 2.0816681711721685e-17,
+       "overflow_flux_deviation": 6.396792817664476e-16
+      }
+     ],
+     "orders": 56,
+     "basis_size": 113,
+     "n_grid": 170,
+     "subspace_size": 513,
+     "steps": 80,
+     "kernel_s": 5.278528296970762,
+     "runs": [
+      {
+       "jump": 1.1217701768036932,
+       "propagators": 0.0033378259977325797,
+       "loss_rate": 0.013014522497542202,
+       "reproject": 0.0,
+       "other": 0.048057496664114296,
+       "wall": 1.1861800219630823
+      },
+      {
+       "jump": 1.1199042417574674,
+       "propagators": 0.0033991870004683733,
+       "loss_rate": 0.01309741975273937,
+       "reproject": 0.0,
+       "other": 0.047940739430487156,
+       "wall": 1.1843415879411623
+      },
+      {
+       "jump": 1.1224749988177791,
+       "propagators": 0.003319117007777095,
+       "loss_rate": 0.012883342918939888,
+       "reproject": 0.0,
+       "other": 0.04768326424527913,
+       "wall": 1.1863607229897752
+      }
+     ],
+     "trace": 0.9183296985344873,
+     "total_flux": 0.06602182870465378
+    }
+   ]
+  },
+  "openblas8": {
+   "revision": "",
+   "host": "DESKTOP-QNIHO3D",
+   "cpu_count": 32,
+   "threads": {
+    "OMP_NUM_THREADS": null,
+    "OPENBLAS_NUM_THREADS": "8"
+   },
+   "numpy": "2.5.4",
+   "args": {
+    "orders": [
+     24,
+     32,
+     40,
+     56
+    ],
+    "cells": 16,
+    "thickness_um": 2.0,
+    "dz": 250.0,
+    "stopping": 0.0,
+    "repeats": 3,
+    "loop": [
+     "numpy",
+     "cupy"
+    ],
+    "out": "density_gpu_1125_t8.json"
+   },
+   "entries": [
+    {
+     "loops": [
+      {
+       "namespace": "numpy",
+       "walls": [
+        0.2296628700569272,
+        0.22890267497859895,
+        0.227558713988401
+       ],
+       "ms_per_step": 2.861283437232487,
+       "max_density_deviation": 0.0,
+       "free_flux_deviation": 2.7755575615628914e-17,
+       "overflow_flux_deviation": 2.671474153004283e-16
+      },
+      {
+       "namespace": "cupy",
+       "walls": [
+        0.09804066806100309,
+        0.09738326200749725,
+        0.0974189629778266
+       ],
+       "ms_per_step": 1.2177370372228324,
+       "max_density_deviation": 1.951563910473908e-17,
+       "free_flux_deviation": 6.938893903907228e-18,
+       "overflow_flux_deviation": 1.0200174038743626e-15
+      }
+     ],
+     "orders": 24,
+     "basis_size": 49,
+     "n_grid": 74,
+     "subspace_size": 513,
+     "steps": 80,
+     "kernel_s": 0.2737853300059214,
+     "runs": [
+      {
+       "jump": 0.20283515809569508,
+       "propagators": 0.0030622569611296058,
+       "loss_rate": 0.003394762403331697,
+       "reproject": 0.0,
+       "other": 0.03125089651439339,
+       "wall": 0.24054307397454977
+      },
+      {
+       "jump": 0.2022581793135032,
+       "propagators": 0.0030753370374441147,
+       "loss_rate": 0.00340190005954355,
+       "reproject": 0.0,
+       "other": 0.03143269463907927,
+       "wall": 0.24016811104957014
+      },
+      {
+       "jump": 0.20163841976318508,
+       "propagators": 0.003011296968907118,
+       "loss_rate": 0.0032709374791011214,
+       "reproject": 0.0,
+       "other": 0.03108808782417327,
+       "wall": 0.2390087420353666
+      }
+     ],
+     "trace": 0.9181295350089527,
+     "total_flux": 0.06622043871787307
+    },
+    {
+     "loops": [
+      {
+       "namespace": "numpy",
+       "walls": [
+        0.3608698289608583,
+        0.3635564959840849,
+        0.36638227105140686
+       ],
+       "ms_per_step": 4.544456199801061,
+       "max_density_deviation": 0.0,
+       "free_flux_deviation": 3.469446951953614e-17,
+       "overflow_flux_deviation": 5.0133508455729725e-16
+      },
+      {
+       "namespace": "cupy",
+       "walls": [
+        0.13791269797366112,
+        0.13757833105046302,
+        0.13738841994199902
+       ],
+       "ms_per_step": 1.7197291381307878,
+       "max_density_deviation": 2.3418766925686896e-17,
+       "free_flux_deviation": 2.7755575615628914e-17,
+       "overflow_flux_deviation": 5.516420653606247e-16
+      }
+     ],
+     "orders": 32,
+     "basis_size": 65,
+     "n_grid": 98,
+     "subspace_size": 513,
+     "steps": 80,
+     "kernel_s": 0.5430312000680715,
+     "runs": [
+      {
+       "jump": 0.3333262420492247,
+       "propagators": 0.0032299490412697196,
+       "loss_rate": 0.004180799936875701,
+       "reproject": 0.0,
+       "other": 0.03482803888618946,
+       "wall": 0.37556502991355956
+      },
+      {
+       "jump": 0.3333488127682358,
+       "propagators": 0.0031471779802814126,
+       "loss_rate": 0.004415228380821645,
+       "reproject": 0.0,
+       "other": 0.03424681688193232,
+       "wall": 0.3751580360112712
+      },
+      {
+       "jump": 0.33312985266093165,
+       "propagators": 0.003339419956319034,
+       "loss_rate": 0.004080286133103073,
+       "reproject": 0.0,
+       "other": 0.03420994523912668,
+       "wall": 0.37475950398948044
+      }
+     ],
+     "trace": 0.918328447316236,
+     "total_flux": 0.06602313776204419
+    },
+    {
+     "loops": [
+      {
+       "namespace": "numpy",
+       "walls": [
+        0.5304762909654528,
+        0.5275452369824052,
+        0.5295403960626572
+       ],
+       "ms_per_step": 6.6192549507832155,
+       "max_density_deviation": 0.0,
+       "free_flux_deviation": 1.3877787807814457e-17,
+       "overflow_flux_deviation": 6.461844948013606e-16
+      },
+      {
+       "namespace": "cupy",
+       "walls": [
+        0.1796811040258035,
+        0.17541189503390342,
+        0.1744602379621938
+       ],
+       "ms_per_step": 2.1926486879237927,
+       "max_density_deviation": 2.6020852139652106e-17,
+       "free_flux_deviation": 0.0,
+       "overflow_flux_deviation": 1.5595164049031496e-15
+      }
+     ],
+     "orders": 40,
+     "basis_size": 81,
+     "n_grid": 122,
+     "subspace_size": 513,
+     "steps": 80,
+     "kernel_s": 1.4448035389650613,
+     "runs": [
+      {
+       "jump": 0.48704199655912817,
+       "propagators": 0.0032738579902797937,
+       "loss_rate": 0.007205593981780112,
+       "reproject": 0.0,
+       "other": 0.03979013045318425,
+       "wall": 0.5373115789843723
+      },
+      {
+       "jump": 0.48565690929535776,
+       "propagators": 0.0032352179987356067,
+       "loss_rate": 0.007557444856502116,
+       "reproject": 0.0,
+       "other": 0.03810978285036981,
+       "wall": 0.5345593550009653
+      },
+      {
+       "jump": 0.5128132014069706,
+       "propagators": 0.0032230179058387876,
+       "loss_rate": 0.007266877801157534,
+       "reproject": 0.0,
+       "other": 0.03853563987649977,
+       "wall": 0.5618387369904667
+      }
+     ],
+     "trace": 0.9183292579583127,
+     "total_flux": 0.06602230679398607
+    },
+    {
+     "loops": [
+      {
+       "namespace": "numpy",
+       "walls": [
+        1.2182665840955451,
+        1.2256237629335374,
+        1.1811996839242056
+       ],
+       "ms_per_step": 15.228332301194314,
+       "max_density_deviation": 0.0,
+       "free_flux_deviation": 6.938893903907228e-18,
+       "overflow_flux_deviation": 1.4836222528291643e-15
+      },
+      {
+       "namespace": "cupy",
+       "walls": [
+        0.2994551680749282,
+        0.2929132500430569,
+        0.2924738759174943
+       ],
+       "ms_per_step": 3.6614156255382113,
+       "max_density_deviation": 1.7780915628762273e-17,
+       "free_flux_deviation": 6.938893903907228e-18,
+       "overflow_flux_deviation": 8.929489092590615e-16
+      }
+     ],
+     "orders": 56,
+     "basis_size": 113,
+     "n_grid": 170,
+     "subspace_size": 513,
+     "steps": 80,
+     "kernel_s": 4.685832427931018,
+     "runs": [
+      {
+       "jump": 1.189562825136818,
+       "propagators": 0.0038144420832395554,
+       "loss_rate": 0.009054525406099856,
+       "reproject": 0.0,
+       "other": 0.04674925736617297,
+       "wall": 1.2491810499923304
+      },
+      {
+       "jump": 1.1569400948937982,
+       "propagators": 0.0034911399707198143,
+       "loss_rate": 0.00804911379236728,
+       "reproject": 0.0,
+       "other": 0.04223464138340205,
+       "wall": 1.2107149900402874
+      },
+      {
+       "jump": 1.1364794461987913,
+       "propagators": 0.004020354012027383,
+       "loss_rate": 0.012856392655521631,
+       "reproject": 0.0,
+       "other": 0.04802403214853257,
+       "wall": 1.2013802250148728
+      }
+     ],
+     "trace": 0.9183296985344873,
+     "total_flux": 0.06602182870465352
+    }
+   ]
+  }
+ }
+}

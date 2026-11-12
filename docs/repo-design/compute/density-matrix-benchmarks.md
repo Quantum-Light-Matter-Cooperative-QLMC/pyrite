@@ -66,3 +66,37 @@ At H = 24, cProfile put most of the solve in `jump()`, in batched dense
 At H = 56 the restricted jump takes 8.7 ms. Of that, the free-flux diagonal of
 the 80 out-of-subspace slots costs 2.3 ms, the two grid maps 2.2 ms and the
 Bloch convolution about 1.3 ms; the rest is elementwise work.
+
+## GPU step prototype
+
+[Machine-readable measurements](data/density-matrix-gpu-2026-11-11.json).
+Remote job 12011 ran revision `accb83407` on qlmc: an AMD Ryzen 9 9950X3D
+with 8 CPUs allocated and an RTX 5080 (consumer Blackwell, fp64 at about 1/64
+rate). `--loop numpy cupy` runs the bare restricted Strang step, with no
+recording or stopping, on each array namespace. Flux totals stay on the
+device, with one sync per repeat. The table gives medians of three repeats
+after a 5-step warm-up, with `OPENBLAS_NUM_THREADS=4`; 8 threads gives the
+same figures within 6%.
+
+| H | host loop ms/step | CuPy loop ms/step | speedup |
+|---:|---:|---:|---:|
+| 24 | 2.80 | 1.21 | 2.3× |
+| 32 | 4.27 | 1.78 | 2.4× |
+| 40 | 6.82 | 2.20 | 3.1× |
+| 56 | 14.36 | 3.67 | 3.9× |
+
+The final density matches `propagate` to 2.6e-17 and the flux totals to
+1.6e-15. At 3.67 ms/step, a 120 µm Kephart solve at the anchor settings
+(19,200 steps) takes about 70 s on the GPU. On the box CPU it takes about
+280 s. No fp64-capable datacenter GPU was available to measure.
+
+## Numba
+
+Numba has no FFT inside `@njit` without the `rocket-fft` extension, and the
+matmuls belong in BLAS. A direct length-16 cyclic Bloch convolution fused with
+the trace was 2× slower than `scipy.fft` (6.9 vs 3.5 ms at H = 56, 8 threads).
+Threaded Numba versions of the two reductions did save time: the gram trace
+went from 0.56 to 0.25 ms and the rest diagonal from 0.58 to 0.13 ms. That is
+about 0.75 ms of the 8.4 ms jump (~9%), too little to justify a JIT path now.
+At H = 56 the jump splits into BLAS matmuls (48%), the FFT pair (25%) and
+elementwise passes (26%).
