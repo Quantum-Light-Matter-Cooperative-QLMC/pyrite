@@ -110,18 +110,27 @@ def sinc_feature_spacing(
     return step, aliased, int(width.size)
 
 
-def coherent_retardation(segments, n_hat, *, electron_limit=None):
+def coherent_retardation(segments, n_hat, *, electron_limit=None, physical_electrons=None):
     """Per-row retardation scalar ``d`` the coherent reducer phases with [Ang].
 
-    ``d_j = t_mid,j - n_hat . r_j`` in the reducer's own geometry
-    (``lines/_setup.py``): when bunch offsets make decoherence active on an
-    infinite slab, each electron is evaluated at its offset-free transverse
-    position, ``r - (x0_e, y0_e, 0)``, so ``n_hat_perp . r0_perp,e`` is added
-    back here. A finite footprint, or no offsets at all, keeps the sampled
-    positions. The longitudinal ``t0`` never enters (``t_ang`` is the
-    relative age). Returns ``(d, t_L, elec_id)`` as host float arrays over every
-    row; ``electron_limit`` only selects the offset population, as in the
-    reducer.
+    ``d_j = t_mid,j - n_hat . r_j`` in the reducer's own per-route geometry
+    (``cxr/_setup.py::_coherent_offsets`` and the ``physical_electrons``
+    override in ``_prepare_spectrum``), with ``t_mid = t_ang + t_L / 2``:
+
+    - no nonzero launch offset in the line population: sampled positions,
+      no ``t0`` (``t_ang`` is the relative age);
+    - offsets, ``physical_electrons`` set, and no analytic offset average
+      (infinite slab without an imposed bunch front): the realized field,
+      ``d_j = t_mid,j + t0_j - n_hat . r_j`` with sampled positions;
+    - any other offset case (infinite slab without ``physical_electrons``,
+      finite footprint, or bunch-front gradient): offset-free, each electron at
+      ``r - (x0_e, y0_e, 0)``, so ``n_hat_perp . r0_perp,e`` is added back and
+      ``t0`` never enters.
+
+    Assumes the population, footprint and bunch-front flags the reducer reads
+    are the ones stored on ``segments``. Returns ``(d, t_L, elec_id)`` as host
+    float arrays over every row; ``electron_limit`` only selects the offset
+    population, as in the reducer.
 
     Validation: coherent-line-grid-fringe-spacing
     Validation: coherent-line-grid-windowed-resolution
@@ -130,26 +139,33 @@ def coherent_retardation(segments, n_hat, *, electron_limit=None):
     energy = _host(segments[energy_field]).astype(float, copy=False)
     length = _host(segments["L_ang"]).astype(float, copy=False)
     r_mid = _host(segments["r_mid"]).astype(float, copy=False).reshape(-1, 3)
-    start_time = segments.get("t_ang")
-    start_time = (
-        np.zeros(energy.size) if start_time is None else _host(start_time).astype(float, copy=False)
-    )
     elec_id = _host(segments["elec_id"])
     n_vec = np.asarray(n_hat, dtype=float)
     t_L = length / beta_from_keV(energy)
-    d = (start_time + 0.5 * t_L) - (r_mid @ n_vec)
-    finite_footprint = (
-        segments.get("crystal_width_ang") is not None
-        and segments.get("crystal_height_ang") is not None
+    d = (_row_field(segments, "t_ang", energy.size) + 0.5 * t_L) - (r_mid @ n_vec)
+    population = _offset_population(segments, electron_limit)
+    if population is None:
+        return d, t_L, elec_id
+    analytic_offsets = bool(
+        (
+            segments.get("crystal_width_ang") is not None
+            and segments.get("crystal_height_ang") is not None
+        )
+        or (segments.get("beam_entry") or {}).get("bunch_front_gradient")
     )
-    if not finite_footprint:
-        population = _offset_population(segments, electron_limit)
-        if population is not None:
-            _t0_pop, xy0_pop = population
-            if xy0_pop.shape[0] and elec_id.size:
-                owner = np.clip(elec_id, 0, xy0_pop.shape[0] - 1)
-                d = d + xy0_pop[owner] @ n_vec[:2]
+    if physical_electrons is not None and not analytic_offsets:
+        return d + _row_field(segments, "t0_ang", energy.size), t_L, elec_id
+    _t0_pop, xy0_pop = population
+    if xy0_pop.shape[0] and elec_id.size:
+        owner = np.clip(elec_id, 0, xy0_pop.shape[0] - 1)
+        d = d + xy0_pop[owner] @ n_vec[:2]
     return d, t_L, elec_id
+
+
+def _row_field(segments, name, size):
+    """Optional per-row host float field, zeros when absent."""
+    value = segments.get(name)
+    return np.zeros(size) if value is None else _host(value).astype(float, copy=False)
 
 
 def _offset_population(segments, electron_limit):
@@ -168,7 +184,9 @@ def _offset_population(segments, electron_limit):
     return None
 
 
-def coherent_fringe_spacing(segments, n_hat, *, electron_limit=None, grouped=False):
+def coherent_fringe_spacing(
+    segments, n_hat, *, electron_limit=None, grouped=False, physical_electrons=None
+):
     """Largest uniform step resolving the coherent route's interference fringes.
 
     The coherent route sums the complex field before squaring, so the spectrum
@@ -181,8 +199,9 @@ def coherent_fringe_spacing(segments, n_hat, *, electron_limit=None, grouped=Fal
     ``L_esc delta_omega`` term is smaller by ``1 - n_re ~ 1e-5``). The fastest
     fringe therefore has period ``2 pi / (s_max - s_min)`` and the Nyquist step
     is ``pi HBARC_EV_ANG / D_span`` over the span of ``d``. ``d`` is taken in the
-    reducer's own geometry (:func:`coherent_retardation`), offset-free on an
-    infinite slab with active decoherence.
+    reducer's own per-route geometry (:func:`coherent_retardation`): offset-free
+    whenever offsets are averaged, the realized ``t0`` and sampled offsets on the
+    ``physical_electrons`` route without an analytic average.
 
     This is NOT the incoherent :func:`sinc_feature_spacing` width. Along one
     segment the increment of ``d`` is exactly ``(1 - beta v.n) t_L``, the very
@@ -192,14 +211,18 @@ def coherent_fringe_spacing(segments, n_hat, *, electron_limit=None, grouped=Fal
 
     ``grouped=True`` returns the widest single-electron span, which is the
     band limit of the ``sum_e |S_e|^2`` decoherence floor; the default spans
-    every segment, the band limit of the ``|sum_e S_e|^2`` term.
+    every segment, the band limit of the ``|sum_e S_e|^2`` term. A zero span
+    (for example one segment) returns ``inf``: no inter-segment fringe exists
+    and the per-segment envelope step ``pi HBARC_EV_ANG / Delta d`` governs.
 
     Returns ``(step_eV, span_ang, n_segments)``. Validation: coherent-line-grid-fringe-spacing.
     """
     energy_field = "E_repr_keV" if segments.get("E_repr_keV") is not None else "E_keV"
     energy = _host(segments[energy_field]).astype(float, copy=False)
     direction = _host(segments["v_hat"]).astype(float, copy=False)
-    d, t_L, elec_id = coherent_retardation(segments, n_hat, electron_limit=electron_limit)
+    d, t_L, elec_id = coherent_retardation(
+        segments, n_hat, electron_limit=electron_limit, physical_electrons=physical_electrons
+    )
     if electron_limit is not None:
         line = elec_id < int(electron_limit)
         energy, direction = energy[line], direction[line]

@@ -26,7 +26,7 @@ e^{i \phi_j(E)},
           - L_{\mathrm{esc},j}\, \Delta\omega(E),
 $$
 
-with $\omega(E) = E / \hbar c$ and $d_j = t_{\mathrm{mid},j} - \hat n \cdot \mathbf r_j$ in ångström at $c=1$ (`montecarlo/spectrum/cxr/_setup.py`). The estimator reads $d_j$ through `diagnostics.coherent_retardation`, in the reducer's own geometry: on an infinite slab with active decoherence each electron sits at its offset-free transverse position, as `montecarlo/spectrum/cxr/_setup.py` evaluates it; a finite footprint keeps the sampled positions. Every measurement below is on a finite footprint. The spectrum is $|A(E)|^2$, so it carries cross terms $j,k$ whose phase runs over the output grid at the **difference of per-segment phase slopes**
+with $\omega(E) = E / \hbar c$ and $d_j = t_{\mathrm{mid},j} - \hat n \cdot \mathbf r_j$ in ångström at $c=1$ (`montecarlo/spectrum/cxr/_setup.py`). The estimator reads $d_j$ through `diagnostics.coherent_retardation`, in the reducer's own per-route geometry (`_coherent_offsets` and the `physical_electrons` override in `_prepare_spectrum`, both in `montecarlo/spectrum/cxr/_setup.py`): with no nonzero launch offset, the sampled positions; with offsets, `physical_electrons` set and no analytic offset average (infinite slab, no imposed bunch front), the realized field $d_j + t_{0,j}$ on sampled positions; every other offset case (infinite slab without `physical_electrons`, finite footprint, bunch-front gradient) offset-free, each electron at $\mathbf r - (x_{0,e}, y_{0,e}, 0)$ so that $d_j \mathrel{+}= \hat{\mathbf n}_\perp\cdot\mathbf r_{0\perp,e}$ and $t_0$ never enters (#1098). Every measurement below is on a finite footprint and predates the offset-free finite-footprint reducer (`917ec678a`, #370): its quoted all-electron spans include the projected beam footprint, which the current reducer's flat term no longer carries; they are historical and were not re-measured. The spectrum is $|A(E)|^2$, so it carries cross terms $j,k$ whose phase runs over the output grid at the **difference of per-segment phase slopes**
 
 $$
 s_j = \frac{\mathrm d \phi_j}{\mathrm d E}
@@ -44,7 +44,7 @@ $$
 
 ### Limiting case
 
-For a single segment, $D \to 0$ and $h_\mathrm{coh} \to \infty$: the only remaining scale is the segment's own $\mathrm{sinc}^2$ envelope, and the coherent route collapses to the incoherent self-term $|A|^2 t_L^2 \mathrm{sinc}^2$ (the limit already pinned by `test_coherent_emission.py`). The band limit is then correctly the incoherent one.
+For a single segment, $D \to 0$ and the estimator returns $h_\mathrm{coh} = \infty$: no inter-segment fringe exists, and the only remaining scale is the segment's own $\mathrm{sinc}^2$ envelope, whose shape-Nyquist step is $\pi\hbar c / \Delta d$ (half the incoherent first-zero distance). The coherent route collapses to the incoherent self-term $|A|^2 t_L^2 \mathrm{sinc}^2$ (the limit already pinned by `test_coherent_emission.py`). The estimator does not itself return the incoherent width.
 
 ### Why the incoherent estimator cannot be rescaled into this one
 
@@ -310,3 +310,19 @@ offset removal that the reducer has applied since `917ec678a`. On the
 ledger's single-segment check should read "the estimator returns $\infty$ and
 the per-segment envelope, at $\pi\hbar c/\Delta d$, governs", not "returns the
 incoherent width". Sign-off remains a human decision.
+
+### Remediation (#1098)
+
+`coherent_retardation` now selects $d_j$ by the same predicate as the reducer:
+no offsets keeps the sampled geometry; offsets with `physical_electrons` and no
+analytic average (`finite footprint or bunch_front_gradient`) add the realized
+`t0_ang` on sampled positions; every other offset case adds back
+$\hat{\mathbf n}_\perp\cdot\mathbf r_{0\perp,e}$ (offset-free).
+`_refuse_coherent_resolution` passes `physical_bunch_electrons(case)`, the same
+population the case driver hands the reducer. Both mismatches above are
+removed; the refusal decision is unchanged and only its quoted steps/spans
+move. Regression: `tests/energy-grid/test_coherent_line_grid.py` compares the
+estimator against the reducer's own `_prepare_spectrum(...).d_all_geom` on the
+infinite-slab offset-free, finite-footprint and `physical_electrons` routes
+(the latter two fail on the pre-fix estimator), and pins the bunch-front
+precedence and the single-segment `(inf, 0.0, 1)` limit.
