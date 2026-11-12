@@ -8,6 +8,7 @@ Bloch carrier sectors have distinct Hamiltonians, H_q=T(k+q)+U.
 
 from __future__ import annotations
 
+import functools
 import warnings
 from collections import OrderedDict
 from dataclasses import dataclass
@@ -15,15 +16,20 @@ from dataclasses import dataclass
 import numpy as np
 from scipy.linalg import eigh
 from scipy.sparse.linalg import LinearOperator, eigsh, lobpcg
-from threadpoolctl import threadpool_limits
+from threadpoolctl import threadpool_info, threadpool_limits
 
 from pyrite.materials.crystal import HBAR2_2M_EV_ANG2
 
 from .bloch import longitudinal_kinematics
 
 MAX_DENSE_DIMENSION = 256
+# Dense momentum-space solves up to 48 x 48 cost one LAPACK call per carrier
+# sector, versus thousands of FFT matvecs for ARPACK (#1124).
+MAX_DENSE_MOMENTUM_DIMENSION = 48 * 48
 MAX_SPECTRAL_STATES = 64
-MAX_CACHED_SECTORS = 64
+# Electronic kicks give each jumped trajectory its own sector; keep all of a
+# run's sectors resident (bounded by bytes below) so later depths reuse them.
+MAX_CACHED_SECTORS = 4096
 MAX_SOLVE_BYTES = 64 << 20
 # Large enough to hold a full batched flush group of 96^2 x 2-cell sectors.
 HOST_SPECTRAL_CACHE_BYTES = 256 << 20
@@ -45,6 +51,56 @@ class DiscreteSpectrum:
 
     energies_eV: np.ndarray
     vectors: np.ndarray
+
+
+_MOMENTUM_POTENTIAL: dict = {}
+# OpenBLAS zheevr at n <= 2304 is 3-8x slower on 16 threads than on 4 (#1124).
+_DENSE_BLAS_THREADS = 4
+
+
+@functools.cache
+def _dense_threads():
+    """At most four BLAS threads; never raise a caller's (e.g. xdist) limit."""
+    counts = [i["num_threads"] for i in threadpool_info() if i["user_api"] == "blas"]
+    return min([_DENSE_BLAS_THREADS, *counts])
+
+
+def momentum_potential(potential):
+    """Plane-wave matrix of ``U(r)`` in the unitary (``norm="ortho"``) FFT basis.
+
+    ``F U F^†`` is circulant: element ``[k, k']`` is ``fft2(U)[k - k'] / n``
+    (indices mod grid). The most recent potential is cached; do not mutate it.
+    """
+    potential = np.asarray(potential, float)
+    key = (potential.shape, potential.tobytes())
+    if key not in _MOMENTUM_POTENTIAL:
+        _MOMENTUM_POTENTIAL.clear()
+        nx, ny = potential.shape
+        spectrum = np.fft.fft2(potential) / potential.size
+        dx = (np.arange(nx)[:, None] - np.arange(nx)[None, :]) % nx
+        dy = (np.arange(ny)[:, None] - np.arange(ny)[None, :]) % ny
+        matrix = spectrum[dx[:, None, :, None], dy[None, :, None, :]]
+        _MOMENTUM_POTENTIAL[key] = matrix.reshape(potential.size, potential.size)
+    return _MOMENTUM_POTENTIAL[key]
+
+
+def dense_momentum_spectrum(potential, kinetic, count, xp=np):
+    """Lowest ``count`` eigenpairs of ``F^† T F + U`` from one Hermitian solve.
+
+    The same operator as the split-step FFT and the matrix-free solvers, in the
+    plane-wave basis; returned real-space columns are Euclidean-orthonormal.
+    Only the lower triangle is read, so ``h`` is exactly Hermitian.
+    """
+    shape, n = potential.shape, potential.size
+    h = xp.asarray(momentum_potential(potential)) + xp.diag(xp.asarray(kinetic).reshape(n))
+    if xp is np:
+        with threadpool_limits(_dense_threads(), user_api="blas"):
+            energies, rows = eigh(h, subset_by_index=(0, count - 1), check_finite=False)
+    else:
+        energies, rows = xp.linalg.eigh(h)
+        energies, rows = energies[:count], rows[:, :count]
+    vectors = xp.fft.ifft2(rows.T.reshape(count, *shape), norm="ortho").reshape(count, n).T
+    return energies, vectors
 
 
 def _warm_lobpcg(kinetic, potential, guess, count):
@@ -117,7 +173,9 @@ def transverse_spectrum(grid, potential_eV, kinetic_energy_eV, tilt_inv_ang, cou
     ``guess`` (real-space columns, shape ``(n, m)``) only warm-starts the
     matrix-free solve: LOBPCG pairs are kept only if every residual
     ``|H v - E v| <= 1e-9 max(|E|, 1)`` eV; otherwise ARPACK runs unseeded.
-    BLAS runs single-threaded here: these small blocks oversubscribe cores.
+    Grids up to ``MAX_DENSE_MOMENTUM_DIMENSION`` points use one dense
+    plane-wave solve; matrix-free BLAS runs single-threaded (small blocks
+    oversubscribe cores).
     """
     n = int(np.prod(grid.shape))
     if not 1 <= count <= n or (n > MAX_DENSE_DIMENSION and count > MAX_SPECTRAL_STATES + 1):
@@ -137,11 +195,8 @@ def transverse_spectrum(grid, potential_eV, kinetic_energy_eV, tilt_inv_ang, cou
         state = v.reshape(grid.shape)
         return (np.fft.ifft2(kinetic * np.fft.fft2(state)) + potential * state).reshape(n)
 
-    if n <= MAX_DENSE_DIMENSION:
-        # Hermitize only to remove rounding-level numerical asymmetry.
-        h = np.column_stack([apply(col) for col in np.eye(n)])
-        h = (h + h.conj().T) / 2
-        energies, vectors = eigh(h, subset_by_index=(0, count - 1), check_finite=False)
+    if n <= MAX_DENSE_MOMENTUM_DIMENSION:
+        energies, vectors = dense_momentum_spectrum(potential, kinetic, count)
     else:
         with threadpool_limits(1, user_api="blas"):
             solved = None if guess is None else _warm_lobpcg(kinetic, potential, guess, count)
@@ -281,13 +336,19 @@ class AxialSpectralObservable:
         self._base_spectrum = base
         self._pending = []
         self._pending_bytes = 0
-        if representation == "energy_bins":
-            # Pending states and the bounded iterative solver coexist with caches.
-            from ._axial_spectral_batch import solver_workspace_bytes
+        self.scratch_bytes += self._solver_scratch_bytes(n)
 
-            self.scratch_bytes += PENDING_SPECTRAL_BYTES + solver_workspace_bytes(
-                n, self.count + int(self.count < n)
-            )
+    def _solver_scratch_bytes(self, n):
+        """Device sector-solve workspace, in closed form on dense grids."""
+        # One dense solve holds the potential matrix, H and eigh workspace.
+        dense = 4 * n * n * 16 if n <= MAX_DENSE_MOMENTUM_DIMENSION else 0
+        if self.representation != "energy_bins":
+            return dense
+        if dense:
+            return dense + PENDING_SPECTRAL_BYTES
+        from ._axial_spectral_batch import solver_workspace_bytes
+
+        return PENDING_SPECTRAL_BYTES + solver_workspace_bytes(n, self.count + int(self.count < n))
 
     def _guess(self, q):
         """Nearest cached sector's eigenvectors, carrier-shifted by a grid ``G``.
@@ -319,8 +380,9 @@ class AxialSpectralObservable:
                 )
             n = int(np.prod(self.grid.shape))
             extra = 1 if self.count < n else 0
+            guess = self._guess(q) if n > MAX_DENSE_MOMENTUM_DIMENSION else None
             self._cache[q] = transverse_spectrum(
-                self.grid, self.potential, self.energy_eV, q, self.count + extra, self._guess(q)
+                self.grid, self.potential, self.energy_eV, q, self.count + extra, guess
             )
             if len(self._cache) > self._max_sectors:
                 self._cache.popitem(last=False)
@@ -406,7 +468,10 @@ class AxialSpectralObservable:
             group = keys[start : start + self._max_sectors]
             missing = [q for q in group if q not in self._cache]
             spectra = {}
-            if missing and self.representation == "energy_bins" and xp is not np:
+            n = int(np.prod(self.grid.shape))
+            if missing and xp is not np and n <= MAX_DENSE_MOMENTUM_DIMENSION:
+                spectra = {q: self._device_dense(xp, q) for q in missing}
+            elif missing and self.representation == "energy_bins" and xp is not np:
                 solved = transverse_spectra_batch(
                     self.grid,
                     self.potential,
@@ -421,6 +486,18 @@ class AxialSpectralObservable:
             self._flush_sectors(group, spectra)
         self._pending.clear()
         self._pending_bytes = 0
+
+    def _device_dense(self, xp, q):
+        """Exact device sector solve; spectra are returned on host like the cache."""
+        gamma, _ = longitudinal_kinematics(self.energy_eV)
+        kinetic = (
+            HBAR2_2M_EV_ANG2
+            / gamma
+            * ((self.grid.kx[:, None] + q[0]) ** 2 + (self.grid.ky[None, :] + q[1]) ** 2)
+        )
+        count = self.count + int(self.count < self.potential.size)
+        energies, vectors = dense_momentum_spectrum(self.potential, kinetic, count, xp)
+        return DiscreteSpectrum(xp.asnumpy(energies), xp.asnumpy(vectors))
 
     def _flush_sectors(self, keys, spectra):
         for q in keys:

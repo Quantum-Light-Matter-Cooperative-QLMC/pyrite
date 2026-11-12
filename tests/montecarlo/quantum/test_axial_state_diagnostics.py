@@ -56,6 +56,28 @@ def test_sparse_degenerate_eigenvectors_form_orthonormal_projectors():
         assert population == pytest.approx(1, abs=1e-10)
 
 
+def test_two_cell_base_sector_keeps_both_members_of_a_degenerate_pair():
+    """Unshifted ARPACK dropped one -6.596 eV partner here (#1124), skewing bins."""
+    from pyrite.materials.channeling.axial import axial_profile
+
+    profile = axial_profile("silicon", (0, 0, 1))
+    grid = RealSpaceGrid((2 * profile.period_ang[0], 2 * profile.period_ang[1]), (32, 32))
+    potential = profile.on_grid((2, 2), grid.shape)
+    energies = transverse_spectrum(grid, potential, 5e6, (0, 0), 7).energies_eV
+    full = np.linalg.eigvalsh(
+        diagnostics.momentum_potential(potential) + np.diag(_kinetic(grid, 5e6).ravel())
+    )
+    np.testing.assert_allclose(energies, full[:7], atol=1e-10)
+    assert energies[5] - energies[4] < 1e-9 < energies[6] - energies[5]
+
+
+def _kinetic(grid, energy_eV):
+    from pyrite.montecarlo.channeling.bloch import longitudinal_kinematics
+
+    gamma, _ = longitudinal_kinematics(energy_eV)
+    return diagnostics.HBAR2_2M_EV_ANG2 / gamma * (grid.kx[:, None] ** 2 + grid.ky[None, :] ** 2)
+
+
 def test_partial_orthogonal_population_and_separate_omitted_weight():
     grid = _grid()
     pot = np.zeros(grid.shape)
@@ -238,19 +260,33 @@ def test_degenerate_subspace_population_is_basis_invariant():
     assert original == pytest.approx(rotated, abs=1e-12)
 
 
-def test_warm_started_sector_matches_unseeded_arpack():
+def test_warm_started_sector_and_dense_solve_match_unseeded_arpack(monkeypatch):
     grid = RealSpaceGrid((5.43, 5.43), (24, 24))
     x, y = grid.x[:, None], grid.y[None, :]
     pot = -20 * np.exp(-((x - 2.7) ** 2 + (y - 2.7) ** 2) / 0.3) + np.zeros(grid.shape)
-    base = transverse_spectrum(grid, pot, 5e6, (0.0, 0.0), 9)
     q = (1.31, -0.47)
+    dense = transverse_spectrum(grid, pot, 5e6, q, 9)  # plane-wave dense default
+    monkeypatch.setattr(diagnostics, "MAX_DENSE_MOMENTUM_DIMENSION", 0)  # matrix-free
+    base = transverse_spectrum(grid, pot, 5e6, (0.0, 0.0), 9)
     cold = transverse_spectrum(grid, pot, 5e6, q, 9)
     m = [round(v / (2 * np.pi / e)) for v, e in zip(q, grid.extent_ang, strict=True)]
     shift = np.exp(-2j * np.pi * (m[0] * x / grid.extent_ang[0] + m[1] * y / grid.extent_ang[1]))
     with mock.patch.object(diagnostics, "eigsh", side_effect=AssertionError("ARPACK fallback")):
         warm = transverse_spectrum(grid, pot, 5e6, q, 9, base.vectors * shift.reshape(-1, 1))
-    np.testing.assert_allclose(warm.energies_eV, cold.energies_eV, atol=1e-9)
     # Compare projectors on the lowest 8 states: basis-invariant within degeneracies.
     p_cold = cold.vectors[:, :8] @ cold.vectors[:, :8].conj().T
-    p_warm = warm.vectors[:, :8] @ warm.vectors[:, :8].conj().T
-    np.testing.assert_allclose(p_warm, p_cold, atol=1e-8)
+    for other in (warm, dense):
+        np.testing.assert_allclose(other.energies_eV, cold.energies_eV, atol=1e-9)
+        p_other = other.vectors[:, :8] @ other.vectors[:, :8].conj().T
+        np.testing.assert_allclose(p_other, p_cold, atol=1e-8)
+    np.testing.assert_allclose(dense.vectors.conj().T @ dense.vectors, np.eye(9), atol=1e-12)
+
+
+def test_momentum_potential_is_the_split_step_potential_operator():
+    grid = RealSpaceGrid((5.0, 4.0), (6, 4))
+    rng = np.random.default_rng(1124)
+    pot = rng.normal(size=grid.shape)
+    phi = rng.normal(size=grid.shape) + 1j * rng.normal(size=grid.shape)
+    expected = np.fft.fft2(pot * np.fft.ifft2(phi, norm="ortho"), norm="ortho")
+    actual = diagnostics.momentum_potential(pot) @ phi.ravel()
+    np.testing.assert_allclose(actual, expected.ravel(), atol=1e-13)
