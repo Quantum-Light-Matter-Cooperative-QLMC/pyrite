@@ -1,0 +1,464 @@
+{
+  "job": 12012,
+  "kephart_job": 12013,
+  "backend": {
+    "revision": "",
+    "host": "qlmc gpu node",
+    "cpu_count": 32,
+    "threads": {
+      "OMP_NUM_THREADS": null,
+      "OPENBLAS_NUM_THREADS": "4"
+    },
+    "numpy": "2.5.4",
+    "args": {
+      "orders": [
+        24,
+        32,
+        40,
+        56
+      ],
+      "cells": 16,
+      "thickness_um": 2.0,
+      "dz": 250.0,
+      "stopping": 0.0,
+      "repeats": 3,
+      "backend": [
+        "cpu",
+        "cuda"
+      ],
+      "out": "density_gpu_1125_backend.json"
+    },
+    "entries": [
+      {
+        "orders": 24,
+        "basis_size": 49,
+        "n_grid": 74,
+        "subspace_size": 513,
+        "steps": 80,
+        "kernel_s": 0.285759071004577,
+        "backends": {
+          "cpu": {
+            "runs": [
+              {
+                "jump": 0.2050148758571595,
+                "propagators": 0.003246124950237572,
+                "loss_rate": 0.003295268164947629,
+                "reproject": 0.0,
+                "other": 0.030853131087496877,
+                "wall": 0.24240940005984157
+              },
+              {
+                "jump": 0.2047050588298589,
+                "propagators": 0.002726042061112821,
+                "loss_rate": 0.0032802935456857085,
+                "reproject": 0.0,
+                "other": 0.030580870574340224,
+                "wall": 0.24129226501099765
+              },
+              {
+                "jump": 0.20419108297210187,
+                "propagators": 0.002682722988538444,
+                "loss_rate": 0.003393464954569936,
+                "reproject": 0.0,
+                "other": 0.030216415063478053,
+                "wall": 0.2404836859786883
+              }
+            ],
+            "max_density_deviation": 0.0,
+            "max_flux_deviation": 0.0
+          },
+          "cuda": {
+            "runs": [
+              {
+                "jump": 0.08230528538115323,
+                "propagators": 0.002732452005147934,
+                "loss_rate": 0.013635091367177665,
+                "reproject": 0.0,
+                "other": 0.02923192025627941,
+                "wall": 0.12790474900975823
+              },
+              {
+                "jump": 0.0804585232399404,
+                "propagators": 0.0027140219463035464,
+                "loss_rate": 0.013742261216975749,
+                "reproject": 0.0,
+                "other": 0.02572825865354389,
+                "wall": 0.12264306505676359
+              },
+              {
+                "jump": 0.0819406972732395,
+                "propagators": 0.0027252830332145095,
+                "loss_rate": 0.013676249654963613,
+                "reproject": 0.0,
+                "other": 0.025418961071409285,
+                "wall": 0.1237611910328269
+              }
+            ],
+            "max_density_deviation": 1.951563910473908e-17,
+            "max_flux_deviation": 9.992007221626409e-16
+          }
+        },
+        "trace": 0.9181295350089527,
+        "total_flux": 0.06622043871787317
+      },
+      {
+        "orders": 32,
+        "basis_size": 65,
+        "n_grid": 98,
+        "subspace_size": 513,
+        "steps": 80,
+        "kernel_s": 0.7030168389901519,
+        "backends": {
+          "cpu": {
+            "runs": [
+              {
+                "jump": 0.30085333914030343,
+                "propagators": 0.002999871037900448,
+                "loss_rate": 0.0034204707480967045,
+                "reproject": 0.0,
+                "other": 0.030967219965532422,
+                "wall": 0.338240900891833
+              },
+              {
+                "jump": 0.3015458139125258,
+                "propagators": 0.002888159011490643,
+                "loss_rate": 0.0035996054066345096,
+                "reproject": 0.0,
+                "other": 0.031764064566232264,
+                "wall": 0.3397976428968832
+              },
+              {
+                "jump": 0.3004040765808895,
+                "propagators": 0.0029522900003939867,
+                "loss_rate": 0.0034703303826972842,
+                "reproject": 0.0,
+                "other": 0.031451659044250846,
+                "wall": 0.33827835600823164
+              }
+            ],
+            "max_density_deviation": 0.0,
+            "max_flux_deviation": 0.0
+          },
+          "cuda": {
+            "runs": [
+              {
+                "jump": 0.08699165703728795,
+                "propagators": 0.0028557690093293786,
+                "loss_rate": 0.013751583639532328,
+                "reproject": 0.0,
+                "other": 0.049092229339294136,
+                "wall": 0.1526912390254438
+              },
+              {
+                "jump": 0.08625393582042307,
+                "propagators": 0.002850559074431658,
+                "loss_rate": 0.013287227367982268,
+                "reproject": 0.0,
+                "other": 0.04709832475055009,
+                "wall": 0.14949004701338708
+              },
+              {
+                "jump": 0.08831228187773377,
+                "propagators": 0.002922479994595051,
+                "loss_rate": 0.013452599523589015,
+                "reproject": 0.0,
+                "other": 0.04972288862336427,
+                "wall": 0.1544102500192821
+              }
+            ],
+            "max_density_deviation": 2.3418766925686896e-17,
+            "max_flux_deviation": 5.828670879282072e-16
+          }
+        },
+        "trace": 0.918328447316236,
+        "total_flux": 0.06602313776204422
+      },
+      {
+        "orders": 40,
+        "basis_size": 81,
+        "n_grid": 122,
+        "subspace_size": 513,
+        "steps": 80,
+        "kernel_s": 1.5774799130158499,
+        "backends": {
+          "cpu": {
+            "runs": [
+              {
+                "jump": 0.461207774002105,
+                "propagators": 0.0030512709636241198,
+                "loss_rate": 0.004263940383680165,
+                "reproject": 0.0,
+                "other": 0.033381123561412096,
+                "wall": 0.5019041089108214
+              },
+              {
+                "jump": 0.4600965428398922,
+                "propagators": 0.0029616800602525473,
+                "loss_rate": 0.004312035744078457,
+                "reproject": 0.0,
+                "other": 0.03291965136304498,
+                "wall": 0.5002899100072682
+              },
+              {
+                "jump": 0.4683355671586469,
+                "propagators": 0.0030830909963697195,
+                "loss_rate": 0.004361229599453509,
+                "reproject": 0.0,
+                "other": 0.0330467012245208,
+                "wall": 0.5088265889789909
+              }
+            ],
+            "max_density_deviation": 0.0,
+            "max_flux_deviation": 0.0
+          },
+          "cuda": {
+            "runs": [
+              {
+                "jump": 0.10345275374129415,
+                "propagators": 0.003138371044769883,
+                "loss_rate": 0.013189961202442646,
+                "reproject": 0.0,
+                "other": 0.07005434297025204,
+                "wall": 0.1898354289587587
+              },
+              {
+                "jump": 0.10306989657692611,
+                "propagators": 0.002999319927766919,
+                "loss_rate": 0.013554273755289614,
+                "reproject": 0.0,
+                "other": 0.06676681875251234,
+                "wall": 0.18639030901249498
+              },
+              {
+                "jump": 0.10253148421179503,
+                "propagators": 0.002976980060338974,
+                "loss_rate": 0.013456424698233604,
+                "reproject": 0.0,
+                "other": 0.06783731502946466,
+                "wall": 0.18680220399983227
+              }
+            ],
+            "max_density_deviation": 2.6020852139652106e-17,
+            "max_flux_deviation": 1.6930901125533637e-15
+          }
+        },
+        "trace": 0.9183292579583127,
+        "total_flux": 0.06602230679398607
+      },
+      {
+        "orders": 56,
+        "basis_size": 113,
+        "n_grid": 170,
+        "subspace_size": 513,
+        "steps": 80,
+        "kernel_s": 4.780210168915801,
+        "backends": {
+          "cpu": {
+            "runs": [
+              {
+                "jump": 1.0823667821241543,
+                "propagators": 0.0031651300378143787,
+                "loss_rate": 0.013119633542373776,
+                "reproject": 0.0,
+                "other": 0.04110173333901912,
+                "wall": 1.1397532790433615
+              },
+              {
+                "jump": 1.0773255438543856,
+                "propagators": 0.0032229190692305565,
+                "loss_rate": 0.012795673101209104,
+                "reproject": 0.0,
+                "other": 0.04204934893641621,
+                "wall": 1.1353934849612415
+              },
+              {
+                "jump": 1.0741893064696342,
+                "propagators": 0.0033272430300712585,
+                "loss_rate": 0.012671016855165362,
+                "reproject": 0.0,
+                "other": 0.04114916571415961,
+                "wall": 1.1313367320690304
+              }
+            ],
+            "max_density_deviation": 0.0,
+            "max_flux_deviation": 0.0
+          },
+          "cuda": {
+            "runs": [
+              {
+                "jump": 0.14276185689959675,
+                "propagators": 0.0032574329525232315,
+                "loss_rate": 0.014386617578566074,
+                "reproject": 0.0,
+                "other": 0.14307165460195392,
+                "wall": 0.30347756203264
+              },
+              {
+                "jump": 0.14431948342826217,
+                "propagators": 0.0032332519767805934,
+                "loss_rate": 0.01417248067446053,
+                "reproject": 0.0,
+                "other": 0.14397839084267616,
+                "wall": 0.30570360692217946
+              },
+              {
+                "jump": 0.1435054159956053,
+                "propagators": 0.003199511906132102,
+                "loss_rate": 0.01420186657924205,
+                "reproject": 0.0,
+                "other": 0.1447743244934827,
+                "wall": 0.30568111897446215
+              }
+            ],
+            "max_density_deviation": 2.0816681711721685e-17,
+            "max_flux_deviation": 4.85722573273506e-16
+          }
+        },
+        "trace": 0.9183296985344873,
+        "total_flux": 0.0660218287046538
+      }
+    ]
+  },
+  "stopping_100_eV_per_ang": {
+    "revision": "",
+    "host": "qlmc gpu node",
+    "cpu_count": 32,
+    "threads": {
+      "OMP_NUM_THREADS": null,
+      "OPENBLAS_NUM_THREADS": "4"
+    },
+    "numpy": "2.5.4",
+    "args": {
+      "orders": [
+        40,
+        56
+      ],
+      "cells": 16,
+      "thickness_um": 4.0,
+      "dz": 250.0,
+      "stopping": 100.0,
+      "repeats": 2,
+      "backend": [
+        "cpu",
+        "cuda"
+      ],
+      "out": "density_gpu_1125_stopping.json"
+    },
+    "entries": [
+      {
+        "orders": 40,
+        "basis_size": 81,
+        "n_grid": 122,
+        "subspace_size": 449,
+        "steps": 160,
+        "kernel_s": 1.5820776100736111,
+        "backends": {
+          "cpu": {
+            "runs": [
+              {
+                "jump": 1.0815116264857352,
+                "propagators": 0.42464815208222717,
+                "loss_rate": 0.008723711827769876,
+                "reproject": 1.8500515085179359,
+                "other": 0.306764904060401,
+                "wall": 3.671699902974069
+              },
+              {
+                "jump": 1.0871063127415255,
+                "propagators": 0.42445286992006004,
+                "loss_rate": 0.008664008579216897,
+                "reproject": 1.8511873221723363,
+                "other": 0.316715978551656,
+                "wall": 3.6881264919647947
+              }
+            ],
+            "max_density_deviation": 0.0,
+            "max_flux_deviation": 0.0
+          },
+          "cuda": {
+            "runs": [
+              {
+                "jump": 0.20989118749275804,
+                "propagators": 0.42997668124735355,
+                "loss_rate": 0.027885099756531417,
+                "reproject": 1.8232033496024087,
+                "other": 0.6420244438340887,
+                "wall": 3.1329807619331405
+              },
+              {
+                "jump": 0.20545077312272042,
+                "propagators": 0.42935494519770145,
+                "loss_rate": 0.02769731031730771,
+                "reproject": 1.8267107727006078,
+                "other": 0.7098713926970959,
+                "wall": 3.1990851940354332
+              }
+            ],
+            "max_density_deviation": 1.2576745213771147e-17,
+            "max_flux_deviation": 3.774758283725532e-15
+          }
+        },
+        "trace": 0.8033679663878999,
+        "total_flux": 0.16838996854079047
+      },
+      {
+        "orders": 56,
+        "basis_size": 113,
+        "n_grid": 170,
+        "subspace_size": 449,
+        "steps": 160,
+        "kernel_s": 4.734958554035984,
+        "backends": {
+          "cpu": {
+            "runs": [
+              {
+                "jump": 2.2276042023440823,
+                "propagators": 0.4750894324388355,
+                "loss_rate": 0.01628261641599238,
+                "reproject": 3.5100488044554368,
+                "other": 0.5305375714087859,
+                "wall": 6.759562627063133
+              },
+              {
+                "jump": 2.207787725608796,
+                "propagators": 0.4731526755494997,
+                "loss_rate": 0.01601080922409892,
+                "reproject": 3.4917525452328846,
+                "other": 0.5242777653038502,
+                "wall": 6.712981520919129
+              }
+            ],
+            "max_density_deviation": 0.0,
+            "max_flux_deviation": 0.0
+          },
+          "cuda": {
+            "runs": [
+              {
+                "jump": 0.23087893158663064,
+                "propagators": 0.4904629646334797,
+                "loss_rate": 0.02856729563791305,
+                "reproject": 3.514253891655244,
+                "other": 1.8862018154468387,
+                "wall": 6.150364898960106
+              },
+              {
+                "jump": 0.22974332910962403,
+                "propagators": 0.4863782003521919,
+                "loss_rate": 0.02844122110400349,
+                "reproject": 3.504660033620894,
+                "other": 1.8630199367180467,
+                "wall": 6.11224272090476
+              }
+            ],
+            "max_density_deviation": 1.6046192161490564e-17,
+            "max_flux_deviation": 1.5265566588595902e-15
+          }
+        },
+        "trace": 0.8033684498056674,
+        "total_flux": 0.16838942362862733
+      }
+    ]
+  },
+  "synced_revision": "18e3feb28",
+  "note": "rsync copy without .git; 'revision' fields are empty"
+}
