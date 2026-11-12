@@ -1,16 +1,48 @@
 """Profile numerical controls and coupled transport validation."""
 
-from pyrite._numerics import PROFILE_NUMERICS_KEYS, SAMPLING_KEYS, validate_profile_numerics
+import tomlkit
+
+from pyrite._numerics import (
+    CHANNELING_KEYS,
+    PROFILE_NUMERICS_KEYS,
+    SAMPLING_KEYS,
+    validate_profile_numerics,
+)
+from pyrite.quantum._channeling import CHANNELING_FIELD_TABLE_KEYS, channeling_table_values
 
 from ._profile_document import existing_profile, values_item
 from .profile_cxr_grid import _check_cxr_grid_policy, profile_cxr_grid_values
 
 
+def _set_field(target, key, value):
+    """Write one flat field to its profile location: the channeling table or the row."""
+    if key not in CHANNELING_KEYS:
+        target[key] = value
+        return
+    table = target.get("channeling")
+    if table is None:
+        table = target["channeling"] = tomlkit.table()
+    table[CHANNELING_FIELD_TABLE_KEYS[key]] = value
+
+
+def _pop_field(target, key):
+    """Remove one flat field from its profile location; drop an emptied table."""
+    if key not in CHANNELING_KEYS:
+        target.pop(key, None)
+        return
+    table = target.get("channeling")
+    if table is None:
+        return
+    table.pop(CHANNELING_FIELD_TABLE_KEYS[key], None)
+    if not table:
+        target.pop("channeling", None)
+
+
 def profile_numerics_values(profile):
     """Return explicit profile numerics as plain Python values."""
-    values = {}
+    values = channeling_table_values(profile)
     for key in PROFILE_NUMERICS_KEYS:
-        if key not in profile:
+        if key not in profile or key in CHANNELING_KEYS:
             continue
         value = profile[key]
         if key in SAMPLING_KEYS:
@@ -35,7 +67,7 @@ def set_numerics(document, name, updates):
     merged = {**profile_numerics_values(target), **updates}
     validate_profile_numerics(merged)
     for key, value in updates.items():
-        target[key] = values_item([value]) if key in SAMPLING_KEYS else value
+        _set_field(target, key, values_item([value]) if key in SAMPLING_KEYS else value)
     _check_cxr_grid_policy(target, profile_cxr_grid_values(target))
     return tuple(updates)
 
@@ -44,13 +76,13 @@ def reset_numerics(document, name, fields=()):
     """Remove selected explicit numerics, or every explicit field when empty."""
     target = existing_profile(document, name)
     selected = tuple(fields) or PROFILE_NUMERICS_KEYS
-    removed = tuple(key for key in selected if key in target)
     remaining = profile_numerics_values(target)
+    removed = tuple(key for key in selected if key in remaining)
     for key in selected:
         remaining.pop(key, None)
     validate_profile_numerics(remaining)
     for key in removed:
-        target.pop(key, None)
+        _pop_field(target, key)
     return removed
 
 
@@ -60,7 +92,7 @@ def _apply_transport_updates(target, updates):
         return
     validate_profile_numerics({**profile_numerics_values(target), **updates})
     for key, value in updates.items():
-        target[key] = value
+        _set_field(target, key, value)
 
 
 def profile_resolution(document, profile, **options):

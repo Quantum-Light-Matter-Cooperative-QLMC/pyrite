@@ -25,14 +25,15 @@ Build a beam, target and detector, then call {py:func}`pyrite.simulate` with
 those three components, or pass a complete `Scene` as `simulate(scene)`.
 The canonical `Scene` dataclass fields are the physical `beam`, `target`,
 `detector` geometry and ordered `filters`. Legacy constructor inputs for
-`physics`, `numerics`, `quantum` and `acquisition` remain accepted through a
+`physics`, `numerics`, `channeling` and `acquisition` remain accepted through a
 compatibility adapter, but are excluded from the physical dataclass value and
 its `asdict()` representation. Prefer passing `physics=` and `numerics=` to
 `simulate()` and acquisition through `Observation`. Pass an independent
-{py:class}`pyrite.quantum.QuantumSetup` with `quantum=`; omission inherits a
-legacy Scene setup and explicit `quantum=None` disables it.
+{py:class}`pyrite.quantum.Channeling` with `channeling=`; omission inherits
+`Scene.channeling` and explicit `channeling=None` disables it. The former
+`quantum=QuantumSetup(...)` spelling was removed (#1017).
 `pyrite.api.build_case` uses the same precedence and validation rules, and
-unsupported or contradictory quantum settings fail before case preparation or
+unsupported or contradictory channeling settings fail before case preparation or
 transport. Effective quantum solver controls are recorded in result numerics.
 Target tilt
 and azimuth retain full floating-point precision in scenes and profile sweeps.
@@ -56,7 +57,7 @@ settings raise; start from a detector without embedded response/scorer and a
 scene without acquisition to reuse one physical definition across observations.
 Names are labels and do not change scientific identity.
 `result.provenance["input_scene"]` retains the original scene for both legacy
-and independently composed calls. The `"physics"`, `"quantum"` and
+and independently composed calls. The `"physics"`, `"channeling"` and
 `"acquisition"` provenance keys expose the effective independent configuration;
 `"numerics"` retains the effective numerical controls. These values do not
 change case or observation identity. Meanwhile,

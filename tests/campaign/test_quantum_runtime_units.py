@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 from pyrite import quantum as states
+from pyrite.quantum import Channeling, ChannelingNumerics
 from pyrite.quantum.planar_source import (
     PlanarStateProjection,
     propagate_planar_source,
@@ -145,10 +146,7 @@ def test_runtime_factories_reject_dimension_mismatches(factory, kwargs, field):
 
 
 def _projection():
-    setup = SimpleNamespace(
-        region=SimpleNamespace(zone_max_ang=None),
-        numerics=SimpleNamespace(step_ang=5.0),
-    )
+    channeling = Channeling("planar", plane=(1, 1, 0), numerics=ChannelingNumerics(step_ang=5.0))
     return PlanarStateProjection(
         "digest",
         "silicon",
@@ -158,7 +156,7 @@ def _projection():
         5.0,
         0.0,
         "averaged",
-        setup,
+        channeling,
         np.zeros((1, 1, 1)),
         np.zeros((1, 1, 1)),
         np.zeros(1),

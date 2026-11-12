@@ -391,7 +391,7 @@ def warn_overflow(ensemble: ZoneEnsemble, name: str) -> None:
         warnings.warn(
             f"case {name!r}: {share:.0%} of electrons dechannel beyond the plane-wave band "
             "and are handed off at its edge angle (a lower bound); raise "
-            "Numerics.channeling_basis_size",
+            "ChannelingNumerics.basis_size",
             UserWarning,
             stacklevel=3,
         )

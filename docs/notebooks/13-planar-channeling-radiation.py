@@ -24,25 +24,22 @@ def _():
     import matplotlib.pyplot as plt
     import numpy as np
 
-    from pyrite.experimental.quantum import propagate_planar_source, score_planar_source
-    from pyrite.quantum import (
-        QuantumDynamics,
-        QuantumNumerics,
-        QuantumRegion,
-        QuantumSetup,
-        TransverseStateSpec,
+    from pyrite.experimental.quantum import (
+        project_planar_source,
+        propagate_planar_source,
+        score_planar_source,
     )
+    from pyrite.quantum import Channeling, ChannelingNumerics, TransverseStateSpec
     from pyrite.units import ureg
 
     return (
-        QuantumDynamics,
-        QuantumNumerics,
-        QuantumRegion,
-        QuantumSetup,
+        Channeling,
+        ChannelingNumerics,
         TransverseStateSpec,
         mo,
         np,
         plt,
+        project_planar_source,
         propagate_planar_source,
         score_planar_source,
         ureg,
@@ -63,15 +60,16 @@ def _(mo):
 
 
 @app.cell
-def _(QuantumDynamics, QuantumNumerics, QuantumRegion, QuantumSetup, TransverseStateSpec, ureg):
+def _(Channeling, ChannelingNumerics, TransverseStateSpec, project_planar_source, ureg):
     source = TransverseStateSpec.recipe("gaussian", waist=1 * ureg.angstrom, dimension=1)
-    setup = QuantumSetup(
-        region=QuantumRegion(kind="planar", plane_hkl=(1, 1, 0)),
-        dynamics=QuantumDynamics(kind="channeling"),
-        numerics=QuantumNumerics(basis_size=8, bloch_cells=4, step_length=2 * ureg.nm),
+    channeling = Channeling(
+        "planar",
+        plane=(1, 1, 0),
+        numerics=ChannelingNumerics(basis_size=8, bloch_cells=4, step_length=2 * ureg.nm),
     )
-    entry = setup.project_state(
+    entry = project_planar_source(
         source,
+        channeling=channeling,
         crystal="silicon",
         kinetic_energy_eV=17 * ureg.MeV,
         incidence_rad=0 * ureg.mrad,

@@ -273,8 +273,7 @@ script to quantities.
 | Detectors, poses and filters | `observation_angle_deg`, `center_mm`, `pitch_mm`, `size_mm`, `thickness_mm` | `observation_angle`, `center`, `pitch`, `size`, `thickness` | Both supported |
 | Acquisition | `exposure_s`, `measured_edges_eV`, `hit_threshold_eV` | `exposure`, `measured_edges`, `hit_threshold` | Both supported |
 | Physics and energy grids | `*_cutoff_eV`, `secondary_threshold_eV`, `EnergyBins.cxr`/`brem` | `inelastic_cutoff`, `radiative_cutoff`, `secondary_threshold`; `cxr_energies`/`brem_energies` | Both supported |
-| Quantum setup and recipes | `step_ang`, `zone_max_ang`, `waist_ang`, `kinetic_energy_eV`, … | `step_length`, `zone_max_length`, `waist`, `kinetic_energy`, … | Both supported |
-| `Numerics.channeling_*` lengths | `channeling_dz_ang`, `channeling_zone_max_ang` | Set through `QuantumNumerics` / `QuantumRegion` | Numeric only |
+| Channeling section and recipes | `step_ang`, `zone_max_ang`, `waist_ang`, `kinetic_energy_eV`, … | `step_length`, `zone_max_length`, `waist`, `kinetic_energy`, … | Both supported |
 | Experimental axial diagnostic, real-space solvers, response grids | `*_eV`, `*_ang`, `*_rad` | — | Numeric only; quantities raise `TypeError` |
 | Material schema values | `lattice` (Å, deg), `V_cell`, `B_ang2`, composition | `lattice_parameters`, `cell_volume`, `b_factor`, `number_densities`, `mosaic_fwhm` | Numeric records; detached quantity read-back |
 | Channeling transverse states | `centre`, `k_extent`, `k_resolution`, `axes`, `offset` | `centre_position`, `momentum_extent`, `momentum_resolution`, `sample_positions`, `displacement` | Numeric solver contracts; quantity read-back |

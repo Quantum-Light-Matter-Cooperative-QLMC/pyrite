@@ -2,7 +2,7 @@
 
 Scene's embedded run fields remain compatibility inputs during the migration.
 Resolve them once, before material preparation, and keep requested settings
-separate from effective quantum-adapted settings. This is not a public RunSpec.
+separate from effective settings. This is not a public RunSpec.
 """
 
 from __future__ import annotations
@@ -15,7 +15,8 @@ from .._sampling import AdaptiveSampling
 from .._spec_defaults import UNSET, _Unset
 from ..instrument import Acquisition, Filter, FilterPlate, NativeAcquisition, PlanarDetector
 from ..observations.spec import Observation, bind_observation
-from ..quantum import QuantumSetup
+from ..quantum import Channeling
+from ..quantum._channeling import validate_channeling_run
 
 if TYPE_CHECKING:
     from ..detectors import Detector
@@ -40,7 +41,7 @@ class ResolvedSimulation:
         provenance: dict[str, Any] = {
             "input_scene": self.input_scene,
             "physics": self.physics,
-            "quantum": self.scene.quantum,
+            "channeling": self.scene.channeling,
             "acquisition": self.scene.acquisition,
         }
         if self.executor is not None:
@@ -53,24 +54,21 @@ class ResolvedSimulation:
 
 
 def resolve_models(scene: Scene, numerics: Numerics) -> tuple[Physics, Numerics]:
-    """Adapt quantum settings once and validate source/model applicability."""
+    """Validate the channeling section and source/model applicability once."""
     physics = resolve_physics(scene.physics, numerics)
-    if scene.quantum is not None:
-        physics, numerics = scene.quantum.lower(physics, numerics)
-    physics.validate_transport(numerics.energy_model)
-    if physics.channeling_model == "axial" and (
-        physics.channeling_axial is None or physics.channeling_axial.get("version") != 2
-    ):
-        from .axial_spec import refuse_unverified_axial_run
+    channeling = scene.channeling
+    validate_channeling_run(channeling, physics, numerics.energy_model)
+    if channeling is not None:
+        from ..quantum._admission import refuse_unverified_axial_settings
 
-        refuse_unverified_axial_run()
+        refuse_unverified_axial_settings(channeling.model, channeling.axial)
     # Version 2 can be lowered to a strictly validated Case record. The runner
     # still refuses every axial case until the #994 production adapter lands.
     if scene.beam.state is not None:
         from ..montecarlo.channeling.planar_injection import source_record
         from ..montecarlo.transverse import TransverseDistribution
 
-        if physics.channeling_model != "planar":
+        if channeling is None or channeling.model != "planar":
             raise ValueError("Beam.state production requires planar channeling")
         if isinstance(scene.beam.transverse, TransverseDistribution):
             raise ValueError("Beam.state cannot combine with classical Twiss slopes")
@@ -109,7 +107,7 @@ def resolve_simulation(
     *,
     physics: Physics | None = None,
     numerics: Numerics | None = None,
-    quantum: QuantumSetup | None | _Unset = UNSET,
+    channeling: Channeling | None | _Unset = UNSET,
     filters: tuple[FilterPlate | Filter, ...] | None = None,
     acquisition: Acquisition | NativeAcquisition | None = None,
     observation: Observation | None = None,
@@ -119,7 +117,7 @@ def resolve_simulation(
     """Resolve Scene/component compatibility and explicit run overrides.
 
     Physics/numerics retain their historical ``None``-means-inherit behavior.
-    Omitted quantum inherits Scene.quantum; explicit ``None`` disables it.
+    Omitted channeling inherits Scene.channeling; explicit ``None`` disables it.
     No transport, table loading, response generation or output writes occur.
     """
     from .model import Scene
@@ -130,12 +128,12 @@ def resolve_simulation(
         scene = beam
         numerics = scene.numerics if numerics is None else numerics
         physics = scene.physics if physics is None else physics
-        quantum = scene.quantum if quantum is UNSET else quantum
+        channeling = scene.channeling if channeling is UNSET else channeling
     else:
         if target is None:
             raise TypeError("simulate requires a target")
         numerics = Numerics() if numerics is None else numerics
-        quantum = None if quantum is UNSET else quantum
+        channeling = None if channeling is UNSET else channeling
         scene = None
     if not isinstance(numerics, Numerics):
         raise TypeError("numerics must be a Numerics")
@@ -144,8 +142,8 @@ def resolve_simulation(
 
         validate_executor(executor, numerics)
     physics = resolve_physics(physics, numerics)
-    if quantum is not None and not isinstance(quantum, QuantumSetup):
-        raise TypeError("quantum must be a QuantumSetup or None")
+    if channeling is not None and not isinstance(channeling, Channeling):
+        raise TypeError("channeling must be a Channeling or None")
     input_scene = scene
     if scene is None:
         scene = Scene(
@@ -156,10 +154,10 @@ def resolve_simulation(
             acquisition=acquisition,
             physics=physics,
             numerics=numerics,
-            quantum=quantum,
+            channeling=channeling,
         )
     else:
-        scene = replace(scene, physics=physics, numerics=numerics, quantum=quantum)
+        scene = replace(scene, physics=physics, numerics=numerics, channeling=channeling)
     input_scene = scene if input_scene is None else input_scene
     scene, observation = _bind_scene_observation(scene, observation)
     if require_detector and scene.detector is None:

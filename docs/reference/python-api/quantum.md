@@ -1,6 +1,6 @@
 # Quantum and channeling
 
-Use `pyrite.quantum` for portable source specifications, quantum configuration,
+Use `pyrite.quantum` for portable source specifications, the channeling section,
 nonportable runtime states, and state factories. The API contract is distinct
 from scientific validation: most direct channeling solvers are **experimental**,
 and only the bounded planar Bloch density-matrix recipe is admitted by
@@ -15,8 +15,10 @@ does not make its outputs serializable or production-admitted.
 
 ## Portable sources and configuration
 
-`TransverseStateSpec` is a portable recipe; the four configuration objects
-select physical quantum regions, dynamics, and numerical representation.
+`TransverseStateSpec` is a portable recipe. `Channeling` is the single public
+channeling section passed as `simulate(..., channeling=...)` or
+`Scene(..., channeling=...)`; `ChannelingNumerics` holds its zone numerics.
+Off is `channeling=None`.
 
 ```{eval-rst}
 .. autosummary::
@@ -24,10 +26,8 @@ select physical quantum regions, dynamics, and numerical representation.
    :nosignatures:
 
    pyrite.quantum.TransverseStateSpec
-   pyrite.quantum.QuantumSetup
-   pyrite.quantum.QuantumRegion
-   pyrite.quantum.QuantumDynamics
-   pyrite.quantum.QuantumNumerics
+   pyrite.quantum.Channeling
+   pyrite.quantum.ChannelingNumerics
 ```
 
 ## Runtime state objects

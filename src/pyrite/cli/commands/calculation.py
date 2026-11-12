@@ -4,7 +4,7 @@
 beam`` and ``pyrite detector`` manage theirs. ``pyrite profile numerics`` /
 ``pyrite profile physics`` show and edit one profile's own fields, which
 override its attached preset. The two field sets are disjoint and follow the
-API partition (``pyrite._numerics.PHYSICS_FIELDS``).
+API partition (``pyrite._numerics.PHYSICS_KEYS``).
 
 Issue #1078 deprecations kept here: ``numerics|physics show|set|reset|validate
 PROFILE`` (taken when the name is a profile, not a preset), physics flags and
@@ -20,7 +20,7 @@ from tomlkit.exceptions import ParseError
 from pyrite.campaign import _profile_document, config_presets, profile_numerics, profile_summary
 
 from ..._config_presets import NUMERICS, PHYSICS
-from ..._numerics import PHYSICS_FIELDS
+from ..._numerics import PHYSICS_KEYS
 from ...console import json as cli_json
 from ...console.output import CLIError, emit_json_result, emit_result, output_option
 from .. import _catalog_io, _completion
@@ -98,7 +98,7 @@ def _show(name, json_output, *, physics, legacy=False):
                 "fields": [
                     row
                     for row in cast(list[dict[str, Any]], group["fields"])
-                    if (row["key"] in PHYSICS_FIELDS) == physics
+                    if (row["key"] in PHYSICS_KEYS) == physics
                 ],
             }
             for group in resolution.groups()
@@ -290,7 +290,7 @@ def _build_profile_group(physics):
         return _show(name, json_output, physics=physics)
 
     group.add_command(
-        click.Command(
+        _calculation_options.ChannelingSectionCommand(
             "set",
             params=_profile_set_params(physics),
             callback=lambda **values: _set(**values, physics=physics),
@@ -395,11 +395,20 @@ def _dispatching(kind, verb, preset_command, profile_command):
             profile_command, **{k: v for k, v in values.items() if k in profile_names}
         )
 
-    params = [*preset_command.params, *(copy(param) for param in extra)]
+    # A profile-only flag (the [channeling] table, #1017) replaces the preset's
+    # removed-flag guard of the same spelling; the preset route reports it as
+    # profile-only above.
+    profile_opts = {opt for param in extra for opt in getattr(param, "opts", ())}
+    kept = [
+        param
+        for param in preset_command.params
+        if param.expose_value or not profile_opts.intersection(getattr(param, "opts", ()))
+    ]
+    params = [*kept, *(copy(param) for param in extra)]
     for param in params:
         if param.name == "name" and isinstance(param, click.Argument):
             param.metavar = "NAME"
-    return click.Command(
+    return _calculation_options.ChannelingSectionCommand(
         verb,
         params=params,
         callback=callback,

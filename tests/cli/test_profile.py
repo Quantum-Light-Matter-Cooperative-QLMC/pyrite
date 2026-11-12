@@ -1892,8 +1892,10 @@ def test_channeling_numerics_round_trip_and_reset(tmp_path, monkeypatch):
     result = invoke(profile.command, arguments)
     assert_clean_result(result, stdout="updated numerics for profile sub_100keV\n")
     values = tomlkit.parse(catalog.read_text())["profiles"]["sub_100keV"]
-    assert values["channeling_plane"] == [1, -1, 0]
-    assert values["channeling_basis_size"] == 12
+    assert "channeling_plane" not in values
+    assert values["channeling"]["plane"] == [1, -1, 0]
+    assert values["channeling"]["basis_size"] == 12
+    assert values["channeling"]["step_ang"] == 500
     shown = invoke(profile.command, ["physics", "show", "sub_100keV", "-o", "json"])
     assert_clean_result(shown)
     fields = {row["key"]: row for row in json.loads(shown.stdout)["payload"]["fields"]}
@@ -1907,7 +1909,9 @@ def test_channeling_numerics_round_trip_and_reset(tmp_path, monkeypatch):
         profile.command, ["physics", "reset", "sub_100keV", "channeling-model", "channeling-plane"]
     )
     assert_clean_result(reset)
-    assert "channeling_model" not in tomlkit.parse(catalog.read_text())["profiles"]["sub_100keV"]
+    table = tomlkit.parse(catalog.read_text())["profiles"]["sub_100keV"]["channeling"]
+    assert "model" not in table and "plane" not in table
+    assert table["basis_size"] == 12
 
 
 def _show_section(stdout, title):
@@ -1961,7 +1965,11 @@ def test_show_channeling_section_collapses_when_off_and_lists_all_when_on(tmp_pa
         assert label in on_section
     assert_table_row(on_section, "channeling-model", "planar profile")
     assert "channeling-" not in _show_section(on.stdout, "Physics / transport")
-    assert "channeling_model" in catalog.read_text()
+    assert "channeling_model" not in catalog.read_text()
+    assert (
+        tomlkit.parse(catalog.read_text())["profiles"]["sub_100keV"]["channeling"]["model"]
+        == "planar"
+    )
 
 
 def test_numerics_and_physics_json_split_the_eight_channeling_keys(tmp_path, monkeypatch):

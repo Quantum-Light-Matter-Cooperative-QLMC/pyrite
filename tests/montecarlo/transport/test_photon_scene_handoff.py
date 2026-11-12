@@ -288,7 +288,7 @@ def test_independent_photon_configuration_matches_legacy_case(monkeypatch, entry
                 physics=physics,
                 numerics=controls,
                 observation=Observation(name=name),
-                quantum=None,
+                channeling=None,
                 **options,
             )
     for case in captured:

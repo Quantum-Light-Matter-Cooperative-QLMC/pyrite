@@ -19,6 +19,7 @@ from typing import Any
 
 from ._cxr_vocabulary import catalog_key
 from ._numerics import (
+    CHANNELING_KEYS,
     CONVERGENCE_KEYS,
     PHYSICS_FIELDS,
     PROFILE_NUMERICS_KEYS,
@@ -57,12 +58,14 @@ class PresetKind:
         return self.table
 
 
+# Channeling is a profile-only [channeling] table (#1017), not a preset field.
+_PRESET_KEYS = tuple(key for key in PROFILE_NUMERICS_KEYS if key not in CHANNELING_KEYS)
 PHYSICS = PresetKind(
-    "physics", ("emission", *(key for key in PROFILE_NUMERICS_KEYS if key in PHYSICS_FIELDS))
+    "physics", ("emission", *(key for key in _PRESET_KEYS if key in PHYSICS_FIELDS))
 )
 NUMERICS = PresetKind(
     "numerics",
-    tuple(key for key in PROFILE_NUMERICS_KEYS if key not in PHYSICS_FIELDS),
+    tuple(key for key in _PRESET_KEYS if key not in PHYSICS_FIELDS),
     ("precision", "line_grid_policy"),
 )
 KINDS = (PHYSICS, NUMERICS)
@@ -72,7 +75,7 @@ _UNIT_FIELDS = {
     "secondary_threshold_eV": ("eV", "energy"),
     "radiative_cutoff_eV": ("eV", "energy"),
     "transition_lattice_origin_ang": ("angstrom", "length"),
-    "channeling_dz_ang": ("angstrom", "length"),
+    "channeling_dz_ang": ("angstrom", "length"),  # profile [channeling] step_ang
     "channeling_zone_max_ang": ("angstrom", "length"),
 }
 
@@ -286,8 +289,7 @@ def load_numerics(name: str, *, catalog: Any = None) -> Numerics:
     Numerics
         The preset's ``sampling`` policy (``cxr_histories``/``brem_histories``
         counts or an ``adaptive_sampling`` table), integration,
-        reflection/mosaic and channeling-zone numerics over the built-in
-        defaults.
+        and reflection/mosaic numerics over the built-in defaults.
         Energy bins and execution-only fields keep their defaults; a
         ``line_grid_policy`` applies only to catalog profiles. Adjust the
         result with :func:`dataclasses.replace`.

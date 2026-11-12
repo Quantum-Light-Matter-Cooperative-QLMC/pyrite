@@ -117,8 +117,8 @@ the original incident-electron denominator.
 [`pyrite.photon_events.simulate_photon_events`](../../research/physics/photon-secondary-feedback.md#scene-physical-event-source-boundary)
 selects one physical event component from a Scene with retained charged cascades.
 Both photon Scene entry points accept independent `physics=`, `numerics=`,
-`quantum=` and `observation=` through the shared simulation resolver. Omitted
-quantum inherits legacy Scene settings; `quantum=None` disables that setup.
+`channeling=` and `observation=` through the shared simulation resolver. Omitted
+channeling inherits `Scene.channeling`; `channeling=None` disables it.
 Their ideal, unpixelated aperture restrictions still apply to observations.
 Both remain outside the supported API contract. Physical event observations
 have a separate [reduced event tally artifact](../../research/physics/photon-secondary-feedback.md#reduced-event-observation-persistence),

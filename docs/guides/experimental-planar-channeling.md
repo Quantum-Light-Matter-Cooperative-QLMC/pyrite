@@ -45,16 +45,21 @@ planes, not the laboratory tilt.
 ```python
 import numpy as np
 import pyrite as pr
-from pyrite.experimental.quantum import propagate_planar_source, score_planar_source
+from pyrite.experimental.quantum import (
+    project_planar_source,
+    propagate_planar_source,
+    score_planar_source,
+)
 
 source = pr.TransverseStateSpec.recipe("gaussian", waist_ang=1, dimension=1)
-setup = pr.QuantumSetup(
-    region=pr.QuantumRegion(kind="planar", plane_hkl=(1, 1, 0)),
-    dynamics=pr.QuantumDynamics(kind="channeling"),
-    numerics=pr.QuantumNumerics(basis_size=8, bloch_cells=4, step_ang=50),
+channeling = pr.quantum.Channeling(
+    "planar",
+    plane=(1, 1, 0),
+    numerics=pr.quantum.ChannelingNumerics(basis_size=8, bloch_cells=4, step_ang=50),
 )
-entry = setup.project_state(
+entry = project_planar_source(
     source,
+    channeling=channeling,
     crystal="silicon",
     kinetic_energy_eV=17e6,
     incidence_rad=0,
@@ -101,37 +106,39 @@ pyrite profile physics set my_channeling \
 pyrite run my_channeling
 ```
 
-From Python, select the same zone in `Physics`:
+From Python, pass the same zone as `channeling=` (`channeling=None`, the
+default, is off):
 
 ```python
 import numpy as np
 import pyrite as pr
 
 result = pr.simulate(
-    pr.Beam(energy_keV=17_000, transverse=pr.Spot(), longitudinal=pr.PointBunch()),
-    pr.Slab(
+    pr.Beam(
+        energy_keV=17_000,
+        transverse=pr.beams.Spot(),
+        longitudinal=pr.beams.PointBunch(),
+    ),
+    pr.geometry.Slab(
         "silicon",
         thickness_ang=20_000,
         tilt_deg=3,
         tilt_azim_deg=45,
-        footprint=pr.Footprint(5, 5),
+        footprint=pr.geometry.Footprint(5, 5),
     ),
     pr.Detector(
         0,
-        acceptance=pr.SensorAcceptance(
+        acceptance=pr.detectors.SensorAcceptance(
             distance_mm=1_000,
             width_mm=3,
             height_mm=3,
         ),
     ),
-    physics=pr.Physics(
-        channeling_model="planar",
-        channeling_plane=(1, -1, 0),
-        radiative_model="uncoupled",
-    ),
+    physics=pr.Physics(radiative_model="uncoupled"),
+    channeling=pr.quantum.Channeling("planar", plane=(1, -1, 0)),
     numerics=pr.Numerics(
         sampling=pr.config.FixedSampling(cxr_histories=200, brem_histories=200),
-        energy_bins=pr.EnergyBins(
+        energy_bins=pr.detectors.EnergyBins(
             cxr=np.arange(1_000, 24_000, 50),
             brem=np.arange(1_000, 17_000_000, 500),
         ),
@@ -153,12 +160,13 @@ To run it anyway, accept that its results may be very inaccurate:
 pyrite profile physics set my_channeling --channeling-admission accept-inaccurate
 ```
 
-In Python, pass `pr.Physics(..., channeling_admission="accept-inaccurate")`.
+In Python, pass `pr.quantum.Channeling(..., admission="accept-inaccurate")`.
 The run warns, and its case record and results are marked `unadmitted`
 with no error budget.
 
-Check convergence in `channeling_basis_size`, `channeling_bloch_cells`,
-`channeling_dz_ang` and `channeling_zone_max_ang` before interpreting CR.
+Check convergence in the zone numerics (`ChannelingNumerics.basis_size`,
+`bloch_cells`, `step_ang` and `zone_max_ang`; profile `[channeling]` table keys
+of the same names) before interpreting CR.
 The [supported and refused paths](../reference/quantum-api.md#supported-and-refused-paths)
 list the scenes and options the zone rejects.
 

@@ -12,7 +12,8 @@ For a standalone public-API walkthrough, open [Axial channeling: crystal strings
 **Experimental — not rigorously validated.** These are finite-grid model
 outputs, not experimental data or measured dechanneling. No convergence or
 predictive-accuracy claim is made. Standard runs with
-`Physics(channeling_model="axial")` admit only the two calibrated cases of the
+`channeling=pyrite.quantum.Channeling("axial", axial=...)` (profile
+`[channeling]` table `model = "axial"`) admit only the two calibrated cases of the
 [first axial envelope](../research/physics/axial-first-envelope-886.md) and
 refuse every other case.
 :::

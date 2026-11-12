@@ -16,21 +16,21 @@ from pyrite.units import ureg
 ENERGY_EV = 17e6
 
 
-def _setup(**numerics):
-    return pr.QuantumSetup(
-        region=pr.QuantumRegion(kind="planar", plane_hkl=(1, 1, 0)),
-        dynamics=pr.QuantumDynamics(kind="channeling"),
-        numerics=pr.QuantumNumerics(basis_size=4, bloch_cells=2, step_ang=20.0, **numerics),
+def _channeling(**numerics):
+    return pr.Channeling(
+        "planar",
+        plane=(1, 1, 0),
+        numerics=pr.ChannelingNumerics(basis_size=4, bloch_cells=2, step_ang=20.0, **numerics),
         admission="accept-inaccurate",
     )
 
 
-def _project(spec, *, impact="averaged", setup=None, **kwargs):
+def _project(spec, *, impact="averaged", channeling=None, **kwargs):
     options = dict(crystal="silicon", kinetic_energy_eV=ENERGY_EV, incidence_rad=0.0)
     options.update(kwargs)
     return project_planar_source(
         spec,
-        setup=_setup() if setup is None else setup,
+        channeling=_channeling() if channeling is None else channeling,
         impact=impact,
         **options,
     )
@@ -66,8 +66,9 @@ def test_projected_entry_is_identical_to_existing_solver_reference():
 
 def test_diagnostic_propagation_uses_exact_projected_initial():
     spec = pr.TransverseStateSpec.recipe("gaussian", waist_ang=1.0, dimension=1)
-    setup = _setup()
-    projection = setup.project_state(spec, crystal="silicon", kinetic_energy_eV=ENERGY_EV)
+    projection = project_planar_source(
+        spec, channeling=_channeling(), crystal="silicon", kinetic_energy_eV=ENERGY_EV
+    )
     actual = propagate_planar_source(projection, depth_ang=40.0)
     profile, cached = zone_solver(
         "silicon", (1, 1, 0), 293.15, ENERGY_EV, 4, 2, projection.margin_eV
@@ -136,11 +137,24 @@ def test_averaged_impact_forgets_translation():
 def test_refusal_before_case_creation_or_propagation():
     spec = pr.TransverseStateSpec.recipe("gaussian", waist_ang=1.0, dimension=1)
     with pytest.raises(ValueError, match="planar source diagnostics"):
-        _project(spec, setup=pr.QuantumSetup())
+        _project(spec, method="mcwf")
+    with pytest.raises(ValueError, match="planar source diagnostics"):
+        _project(spec, representation="real-space")
+    with pytest.raises(ValueError, match="unknown quantum propagation method"):
+        _project(spec, method="exact")
+    with pytest.raises(TypeError, match="channeling must be a Channeling"):
+        _project(spec, channeling=pr.Physics())
     # Match #624's early axial admission, even when diagnostics are requested.
-    axial = pr.QuantumSetup(region=pr.QuantumRegion(kind="axial", axis_uvw=(0, 0, 1)))
+    axial = pr.Channeling(
+        "axial",
+        axial={
+            "axis_uvw": [0, 0, 1],
+            "zone_max_ang": 1000.0,
+            "entry": {"version": 1, "kind": "gaussian", "waist_ang": 0.5},
+        },
+    )
     with pytest.raises(ValueError, match="#623"):
-        _project(spec, setup=axial)
+        _project(spec, channeling=axial)
     with pytest.raises(ValueError, match="calibrated"):
         _project(
             pr.TransverseStateSpec.recipe(
@@ -151,10 +165,7 @@ def test_refusal_before_case_creation_or_propagation():
         _project(spec, impact="silently-reinterpret")
     with pytest.raises(ValueError, match="incidence_rad"):
         _project(spec, incidence_rad=float("nan"))
-    capped = replace(
-        _setup(), region=pr.QuantumRegion(kind="planar", plane_hkl=(1, 1, 0), zone_max_ang=20.0)
-    )
-    projection = _project(spec, setup=capped)
+    projection = _project(spec, channeling=_channeling(zone_max_ang=20.0))
     with pytest.raises(ValueError, match="zone_max_ang"):
         propagate_planar_source(projection, depth_ang=21.0)
     with pytest.raises(ValueError, match="nonnegative"):
@@ -199,7 +210,7 @@ def test_scoring_matches_existing_emitter_from_the_same_projected_state():
             incidence_rad=proj.incidence_rad,
             entry_state=state.build(),
             entry_impact=impact,
-            dz_ang=proj.setup.numerics.step_ang,
+            dz_ang=proj.channeling.numerics.step_ang,
             sample_ang=40.0,
             absorption=False,
         )
@@ -254,13 +265,7 @@ def test_preprojected_cr_input_validates_population_and_exclusivity():
             proj, depth_ang=20.0, photon_energy_eV=grid, theta_rad=0.0, aperture_rad=-0.1
         )
     with pytest.raises(ValueError, match="zone_max_ang"):
-        capped = replace(
-            proj,
-            setup=replace(
-                proj.setup,
-                region=pr.QuantumRegion(kind="planar", plane_hkl=(1, 1, 0), zone_max_ang=10.0),
-            ),
-        )
+        capped = replace(proj, channeling=_channeling(zone_max_ang=10.0))
         score_planar_source(capped, depth_ang=20.0, photon_energy_eV=grid, theta_rad=0.0)
 
 
@@ -286,8 +291,9 @@ def test_projection_refuses_temperature_difference_as_absolute_temperature(unit)
     with pytest.raises(ValueError, match="project_planar_source.temperature_K.*difference"):
         _project(spec, temperature_K=ureg.Quantity(20, unit))
     with pytest.raises(ValueError, match="project_planar_source.temperature_K.*difference"):
-        _setup().project_state(
+        project_planar_source(
             spec,
+            channeling=_channeling(),
             crystal="silicon",
             kinetic_energy_eV=ENERGY_EV,
             incidence_rad=0.0,

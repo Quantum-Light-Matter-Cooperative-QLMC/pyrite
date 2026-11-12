@@ -43,7 +43,7 @@ if TYPE_CHECKING:
     from .montecarlo.case import Case
     from .montecarlo.runner.photon_emission import PhotonContinuumScore
     from .observations.spec import Observation
-    from .quantum import QuantumSetup
+    from .quantum import Channeling
 
 
 @dataclass(frozen=True, slots=True)
@@ -193,7 +193,7 @@ def simulate_photon_continuum(
     charged_feedback: bool = False,
     physics: Physics | None = None,
     numerics: Numerics | None = None,
-    quantum: QuantumSetup | None | _Unset = UNSET,
+    channeling: Channeling | None | _Unset = UNSET,
     observation: Observation | None = None,
 ) -> PhotonContinuumObservation:
     """Run existing primary electron transport once, then score tracked brem hits.
@@ -216,14 +216,14 @@ def simulate_photon_continuum(
     bremsstrahlung energy losses are those of the chosen coupled transport.
 
     Independent ``physics`` and ``numerics`` override legacy Scene settings.
-    Omitted ``quantum`` inherits ``Scene.quantum``; explicit ``None`` disables that setup.
+    Omitted ``channeling`` inherits ``Scene.channeling``; explicit ``None`` disables that setup.
     ``observation`` binds through the shared resolver, subject to this API's
     ideal, unpixelated aperture restrictions. The input Scene is unchanged.
 
     Validation: photon-continuum-scene-handoff, photon-secondary-feedback.
     """
     request = resolve_simulation(
-        scene, physics=physics, numerics=numerics, quantum=quantum, observation=observation
+        scene, physics=physics, numerics=numerics, channeling=channeling, observation=observation
     )
     scene = request.scene
     detector, numerics, low, electron, high = _preflight(

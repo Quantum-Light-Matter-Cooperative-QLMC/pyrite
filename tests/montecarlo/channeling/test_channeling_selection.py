@@ -18,16 +18,13 @@ from pyrite.montecarlo import runner
 from pyrite.montecarlo.case import Case, channeling_case_record
 from pyrite.montecarlo.channeling import CHANNELING_MODEL, DECHANNELING_MARGIN_EV
 from pyrite.montecarlo.transport import SegmentEvent, check_segment_event_contract
+from pyrite.quantum import Channeling, ChannelingNumerics
 
-PLANAR = dict(
-    channeling_model="planar",
-    channeling_admission="accept-inaccurate",
-    channeling_plane=(1, -1, 0),
-    radiative_model="uncoupled",
-)
+PLANAR = Channeling("planar", plane=(1, -1, 0), admission="accept-inaccurate")
+UNCOUPLED = dict(radiative_model="uncoupled")
 
 
-def _scene(physics=None, *, energy_keV=5000.0, **slab):
+def _scene(physics=None, *, energy_keV=5000.0, channeling=PLANAR, **slab):
     slab = {"thickness_ang": 20000.0, "tilt_deg": 3.0, "tilt_azim_deg": 45.0, **slab}
     return pr.Scene(
         pr.Beam(
@@ -36,6 +33,7 @@ def _scene(physics=None, *, energy_keV=5000.0, **slab):
         pr.geometry.Slab("silicon", footprint=pr.geometry.Footprint(5.0, 5.0), **slab),
         pr.Detector(),
         physics=physics,
+        channeling=channeling,
     )
 
 
@@ -45,22 +43,22 @@ def _case(physics=None, numerics=None, **kwargs):
 
 @pytest.fixture(scope="module")
 def planar_case():
-    return _case(pr.Physics(**PLANAR))
+    return _case(pr.Physics(**UNCOUPLED))
 
 
 # -- selection ---------------------------------------------------------------
 
 
 def test_off_is_the_default_and_adds_nothing():
-    default = _case()
-    explicit = _case(pr.Physics(channeling_model="off"))
+    default = _case(channeling=None)
+    explicit = _case(pr.Physics(), channeling=None)
     assert "channeling" not in default
     assert default.to_dict().keys() == explicit.to_dict().keys()
     assert case_content_key(default) == case_content_key(explicit)
 
 
 def test_planar_adds_one_record_and_the_marker(planar_case):
-    off = _case(pr.Physics(radiative_model="uncoupled"))
+    off = _case(pr.Physics(**UNCOUPLED), channeling=None)
     record = planar_case["channeling"]
     assert record == channeling_case_record(
         (1, -1, 0),
@@ -85,8 +83,8 @@ def test_planar_adds_one_record_and_the_marker(planar_case):
 
 
 def test_numerics_fields_enter_the_record_and_key(planar_case):
-    numerics = pr.Numerics(channeling_basis_size=12, channeling_zone_max_ang=1e4)
-    case = _case(pr.Physics(**PLANAR), numerics)
+    channeling = replace(PLANAR, numerics=ChannelingNumerics(basis_size=12, zone_max_ang=1e4))
+    case = _case(pr.Physics(**UNCOUPLED), channeling=channeling)
     assert case["channeling"]["basis_size"] == 12
     assert case["channeling"]["zone_max_ang"] == 1e4
     assert case_content_key(case) != case_content_key(planar_case)
@@ -95,45 +93,55 @@ def test_numerics_fields_enter_the_record_and_key(planar_case):
 @pytest.mark.parametrize(
     "changes, message",
     [
-        ({"channeling_model": "axial"}, "channeling_plane is planar-only"),
-        ({"channeling_plane": None}, "requires channeling_plane"),
-        ({"channeling_plane": (0, 0, 0)}, "nonzero"),
-        ({"channeling_plane": (1, 1)}, "three integer"),
-        ({"radiative_model": "auto"}, "radiative_model='uncoupled'"),
-        ({"emission": "coherent"}, "incoherent emission only"),
+        ({"model": "axial"}, "planar-only"),
+        ({"plane": None}, "requires plane"),
+        ({"plane": (0, 0, 0)}, "nonzero"),
+        ({"plane": (1, 1)}, "three integer"),
     ],
 )
-def test_physics_refuses_unsupported_selections(changes, message):
+def test_channeling_refuses_unsupported_selections(changes, message):
     with pytest.raises(ValueError, match=message):
-        pr.Physics(**{**PLANAR, **changes})
+        replace(PLANAR, **changes)
 
 
-def test_physics_refuses_plane_without_model_and_secondaries():
-    with pytest.raises(ValueError, match="requires channeling_model='planar'"):
-        pr.Physics(channeling_plane=(1, 1, 0))
-    with pytest.raises(ValueError, match="secondary transport"):
-        pr.Physics(
-            **PLANAR,
-            inelastic_model="shell-soft-hard",
-            inelastic_cutoff_eV=50.0,
-            secondary_threshold_eV=1e4,
-        )
+@pytest.mark.parametrize(
+    "physics, message",
+    [
+        ({"radiative_model": "auto"}, "radiative_model='uncoupled'"),
+        ({**UNCOUPLED, "emission": "coherent"}, "incoherent emission only"),
+        (
+            {
+                **UNCOUPLED,
+                "inelastic_model": "shell-soft-hard",
+                "inelastic_cutoff_eV": 50.0,
+                "secondary_threshold_eV": 1e4,
+            },
+            "secondary transport",
+        ),
+    ],
+)
+def test_run_refuses_unsupported_physics(physics, message):
+    with pytest.raises(ValueError, match=message):
+        _case(pr.Physics(**physics))
     with pytest.raises(ValueError, match="energy_model='midpoint'"):
-        pr.Physics(**PLANAR, inelastic_model="continuous").validate_transport("frozen")
+        _case(
+            pr.Physics(**UNCOUPLED, inelastic_model="continuous"),
+            pr.Numerics(energy_model="frozen"),
+        )
 
 
 @pytest.mark.parametrize(
     "field, value",
     [
-        ("channeling_basis_size", 0),
-        ("channeling_bloch_cells", True),
-        ("channeling_dz_ang", -1.0),
-        ("channeling_zone_max_ang", float("inf")),
+        ("basis_size", 0),
+        ("bloch_cells", True),
+        ("step_ang", -1.0),
+        ("zone_max_ang", float("inf")),
     ],
 )
 def test_numerics_validates_channeling_controls(field, value):
     with pytest.raises(ValueError, match=field):
-        pr.Numerics(**{field: value})
+        ChannelingNumerics(**{field: value})
 
 
 # -- gates -------------------------------------------------------------------
@@ -141,9 +149,9 @@ def test_numerics_validates_channeling_controls(field, value):
 
 def test_gates_refuse_high_energy_and_warn_above_30_mev():
     with pytest.raises(ValueError, match="up to 100 MeV"):
-        _case(pr.Physics(**PLANAR), energy_keV=150e3)
+        _case(pr.Physics(**UNCOUPLED), energy_keV=150e3)
     with pytest.warns(UserWarning, match="#439"):
-        _case(pr.Physics(**PLANAR), energy_keV=40e3)
+        _case(pr.Physics(**UNCOUPLED), energy_keV=40e3)
 
 
 def test_gates_refuse_crystals_without_thermal_data():
@@ -155,7 +163,8 @@ def test_gates_refuse_crystals_without_thermal_data():
             "hopg", thickness_ang=20000.0, tilt_deg=3.0, footprint=pr.geometry.Footprint(5.0, 5.0)
         ),
         pr.Detector(),
-        physics=pr.Physics(**{**PLANAR, "channeling_plane": (0, 0, 1)}),
+        physics=pr.Physics(**UNCOUPLED),
+        channeling=replace(PLANAR, plane=(0, 0, 1)),
     )
     with pytest.raises(ChannelingDataError, match="no channeling thermal data"):
         api.build_case(scene, pr.Numerics())
@@ -172,12 +181,12 @@ def test_gates_refuse_no_bound_state(monkeypatch):
 
     monkeypatch.setattr(static, "transverse_states", unbound)
     with pytest.raises(ValueError, match="no bound transverse state"):
-        _case(pr.Physics(**PLANAR))
+        _case(pr.Physics(**UNCOUPLED))
 
 
 def test_gates_warn_near_a_low_index_axis():
     with pytest.warns(UserWarning, match="omits axial channeling"):
-        _case(pr.Physics(**PLANAR), tilt_deg=0.5)
+        _case(pr.Physics(**UNCOUPLED), tilt_deg=0.5)
 
 
 @pytest.mark.parametrize(

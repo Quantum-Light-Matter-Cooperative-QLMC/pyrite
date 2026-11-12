@@ -44,7 +44,9 @@ def test_profile_case_and_identity_survive_independent_composition(profile_parts
         numerics,
         physics,
         detector_id,
+        channeling,
     ) = profile_parts
+    assert channeling is None
     legacy = Scene(
         beam,
         target,
@@ -192,7 +194,7 @@ def test_pixel_profile_without_declared_brem_resolves_the_automatic_continuum_gr
     from pyrite._continuum_grid import automatic_continuum_grid
     from pyrite.materials import load_material_catalog
 
-    beam, target, detector, filters, _, acquisition, numerics, physics, _ = profile_parts
+    beam, target, detector, filters, _, acquisition, numerics, physics, _, _ = profile_parts
     scan = load_material_catalog(profile="pixelated_detector_demo").material("hopg").scan
     assert not scan.E_grid_brem_declared
     energy_keV = float(scan.energy_keV[0])

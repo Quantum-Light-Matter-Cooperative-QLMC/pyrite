@@ -18,7 +18,7 @@ from ..campaign.model import Numerics, Scene
 from ..campaign.resolution import UNSET, _Unset
 from ..observations import ObservationStore, StoredObservation, observation_from_result
 from ..observations.spec import Observation
-from ..quantum import QuantumSetup
+from ..quantum import Channeling
 
 
 @dataclass(frozen=True)
@@ -44,7 +44,7 @@ def produce_observation(
     store: ObservationStore,
     *,
     physics: Physics | None = None,
-    quantum: QuantumSetup | None | _Unset = UNSET,
+    channeling: Channeling | None | _Unset = UNSET,
     observation: Observation | None = None,
 ) -> ObservationRun:
     """Return the stored observation for ``scene``, transporting only if needed.
@@ -60,8 +60,8 @@ def produce_observation(
         Destination store. The result is indexed under its source content key.
     physics
         Optional override of the scene's legacy model selection.
-    quantum
-        Independent quantum setup. Omission inherits ``Scene.quantum``;
+    channeling
+        Independent channeling setup. Omission inherits ``Scene.channeling``;
         explicit ``None`` disables it, as in :func:`pyrite.simulate`.
     observation
         Independent detector response, acquisition and scoring request.
@@ -72,7 +72,7 @@ def produce_observation(
         The persisted observation and whether transport ran.
     """
     reused = api.observation_plan(
-        scene, numerics, physics=physics, quantum=quantum, observation=observation
+        scene, numerics, physics=physics, channeling=channeling, observation=observation
     ).find_reusable(store)
     if reused is not None:
         store.put(reused)
@@ -81,7 +81,7 @@ def produce_observation(
         scene,
         numerics=numerics,
         physics=physics,
-        quantum=quantum,
+        channeling=channeling,
         observation=observation,
     )
     produced = observation_from_result(result)

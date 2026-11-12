@@ -56,7 +56,7 @@ from .montecarlo.spectrum import (
 from .montecarlo.transport import STOPPING_MODEL
 from .observations.plan import ObservationPlan, PixelSampling
 from .observations.spec import Observation
-from .quantum import QuantumSetup
+from .quantum import Channeling
 from .results.model import CxrSpectra, Result, SpectralDensity
 from .results.temporal import TemporalIntensity
 
@@ -258,7 +258,7 @@ def simulate(
     numerics: Numerics | None = None,
     filters: tuple[FilterPlate | Filter, ...] | None = None,
     acquisition: Acquisition | NativeAcquisition | None = None,
-    quantum: QuantumSetup | None | _Unset = UNSET,
+    channeling: Channeling | None | _Unset = UNSET,
     observation: Observation | None = None,
     executor: "Executor | None" = None,
     progress: "Callable[[SimulationProgress], None] | None" = None,
@@ -277,7 +277,7 @@ def simulate(
     beam
         Scalar :class:`~pyrite.Beam` description, or a complete
         :class:`~pyrite.Scene`. With a scene, omit target, detector, filters
-        and acquisition; physics, numerics and quantum may override its settings.
+        and acquisition; physics, numerics and channeling may override its settings.
     target
         Scalar :class:`~pyrite.Target`, :class:`~pyrite.geometry.Slab` or :class:`~pyrite.geometry.Stack`.
     detector
@@ -293,11 +293,11 @@ def simulate(
     acquisition
         Concrete reporting edges or an ``Acquisition.native(...)`` request;
         requires a physical pixel detector with native response scoring.
-    quantum
-        Independent :class:`~pyrite.quantum.QuantumSetup`. Omit to inherit
-        ``Scene.quantum``; explicit ``None`` disables the scene's setup.
-        Unsupported setups and conflicting legacy channeling fields refuse
-        before transport. Component calls default to no quantum setup.
+    channeling
+        Opt-in :class:`~pyrite.quantum.Channeling` zone. Omit to inherit
+        ``Scene.channeling``; explicit ``None`` disables the scene's zone.
+        Unsupported model combinations refuse before transport. Component
+        calls default to no channeling.
     observation
         Independent response, acquisition and numerical sampling request.
         References the scene's detector or supplies a virtual angular detector.
@@ -338,7 +338,7 @@ def simulate(
         numerics=numerics,
         filters=filters,
         acquisition=acquisition,
-        quantum=quantum,
+        channeling=channeling,
         observation=observation,
         executor=executor,
         require_detector=True,
@@ -499,7 +499,7 @@ def observation_plan(
     numerics: Numerics,
     *,
     physics: Physics | None = None,
-    quantum: QuantumSetup | None | _Unset = UNSET,
+    channeling: Channeling | None | _Unset = UNSET,
     observation: Observation | None = None,
 ) -> ObservationPlan:
     """Plan ``scene``'s counting observation without running transport.
@@ -514,7 +514,7 @@ def observation_plan(
         If ``scene`` lacks a pixelated detector or an acquisition.
     """
     request = resolve_simulation(
-        scene, numerics=numerics, physics=physics, quantum=quantum, observation=observation
+        scene, numerics=numerics, physics=physics, channeling=channeling, observation=observation
     )
     scene = request.scene
     detector = scene.detector

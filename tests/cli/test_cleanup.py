@@ -5,7 +5,7 @@ import json
 import pytest
 
 from pyrite._catalog_layout import bundled_catalog, read_raw
-from pyrite._numerics import PHYSICS_FIELDS
+from pyrite._numerics import PHYSICS_KEYS
 from pyrite.catalog_edit import CatalogDraft
 from pyrite.cli import command
 from pyrite.detectors.editing import create_detector
@@ -105,7 +105,7 @@ def test_calculation_groups_have_api_field_ownership_and_scoped_resets(_isolate_
             row for group in payload["groups"] for row in group["fields"]
         ]
         assert fields
-        assert all((field["key"] in PHYSICS_FIELDS) == (noun == "physics") for field in fields)
+        assert all((field["key"] in PHYSICS_KEYS) == (noun == "physics") for field in fields)
     before = snapshot(_isolate_user_catalog)
     frozen = invoke(
         command, ["profile", "numerics", "set", "campaign", "--mosaic-nodes", "7", "--dry-run"]

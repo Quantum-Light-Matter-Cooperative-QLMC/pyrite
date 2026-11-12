@@ -185,16 +185,10 @@ if TYPE_CHECKING:
         ResolvedObservation as ResolvedObservation,
     )
     from pyrite.quantum import (
-        QuantumDynamics as QuantumDynamics,
+        Channeling as Channeling,
     )
     from pyrite.quantum import (
-        QuantumNumerics as QuantumNumerics,
-    )
-    from pyrite.quantum import (
-        QuantumRegion as QuantumRegion,
-    )
-    from pyrite.quantum import (
-        QuantumSetup as QuantumSetup,
+        ChannelingNumerics as ChannelingNumerics,
     )
     from pyrite.quantum.state import TransverseStateSpec as TransverseStateSpec
     from pyrite.results.directional import DirectionalSpectrum as DirectionalSpectrum
@@ -251,10 +245,8 @@ _PUBLIC_OBJECTS = {
     "PhotonTransport": ("pyrite._photon_config", "PhotonTransport"),
     "ExecutionConfig": ("pyrite._numerics_groups", "ExecutionConfig"),
     "KernelTuning": ("pyrite._numerics_groups", "KernelTuning"),
-    "QuantumRegion": ("pyrite.quantum", "QuantumRegion"),
-    "QuantumDynamics": ("pyrite.quantum", "QuantumDynamics"),
-    "QuantumNumerics": ("pyrite.quantum", "QuantumNumerics"),
-    "QuantumSetup": ("pyrite.quantum", "QuantumSetup"),
+    "Channeling": ("pyrite.quantum", "Channeling"),
+    "ChannelingNumerics": ("pyrite.quantum", "ChannelingNumerics"),
     "TransverseStateSpec": ("pyrite.quantum.state", "TransverseStateSpec"),
     "CxrSpectra": ("pyrite.results.model", "CxrSpectra"),
     "Detector": ("pyrite.detectors", "Detector"),
@@ -314,6 +306,10 @@ def __getattr__(name: str) -> Any:
     try:
         module_name, attribute = _PUBLIC_OBJECTS[name]
     except KeyError as exc:
+        if name.startswith("Quantum"):  # removed setup classes name their replacement (#1017)
+            from pyrite.quantum import removed_quantum_name
+
+            raise (removed_quantum_name(name) or AttributeError(name)) from exc
         raise AttributeError(name) from exc
 
     value = getattr(import_module(module_name), attribute)

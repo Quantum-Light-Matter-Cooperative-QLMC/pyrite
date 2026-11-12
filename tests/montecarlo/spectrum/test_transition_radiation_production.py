@@ -54,12 +54,13 @@ def test_physics_selector_and_lowering():
     assert pr.Physics().transition_radiation == "off"
     with pytest.raises(ValueError, match="transition_radiation must be one of"):
         pr.Physics(transition_radiation="crossing")
-    with pytest.raises(ValueError, match="channeling_model='planar'"):
-        pr.Physics(
-            transition_radiation="history",
-            channeling_model="planar",
-            channeling_plane=(0, 0, 2),
-            radiative_model="uncoupled",
+    from pyrite.quantum._channeling import validate_channeling_run
+
+    with pytest.raises(ValueError, match="Channeling\\(model='planar'\\)"):
+        validate_channeling_run(
+            pr.Channeling("planar", plane=(0, 0, 2)),
+            pr.Physics(transition_radiation="history", radiative_model="uncoupled"),
+            "midpoint",
         )
     with pytest.raises(ValueError, match="energy_model='midpoint'"):
         pr.Physics(transition_radiation="history").validate_transport("frozen")

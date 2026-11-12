@@ -160,8 +160,11 @@ PXR/CBS is recorded as an omission.
 
 ## Run surfaces (#521)
 
-Profiles select `channeling_model = "planar"` and `channeling_plane` in
-`numerics`, alongside the zone resolution controls. Fixed-count CPU/CUDA sweeps,
+Profiles select the zone in a `[channeling]` table (`model = "planar"`,
+`plane`, and the zone resolution controls `basis_size`, `bloch_cells`,
+`step_ang`, `zone_max_ang`); Python passes the same section as
+`simulate(..., channeling=pyrite.quantum.Channeling(...))` (#1017). Both lower
+to the unchanged flat `channeling_*` case record. Fixed-count CPU/CUDA sweeps,
 physical-detector directions and observations score the same deterministic
 ensemble source. Replay and line recompute rescore it on the requested grid;
 bremsstrahlung repair preserves the stored channel. Channeling-off identities
@@ -233,7 +236,8 @@ carrier-fibred planar reference (#1056,
 Admission is curated rather than set by an ε threshold. The measured Kephart
 configurations (ε 113–572%) are not admitted.
 
-`Physics(channeling_admission="accept-inaccurate")` is the shared opt-in. The
+`Channeling(admission="accept-inaccurate")` (profile `[channeling]`
+`admission`) is the shared opt-in. The
 user acknowledges that an unadmitted case may give very inaccurate results.
 The case then runs, records an `unadmitted` admission with no ε, and never
 shares a content key with an admitted case. The opt-in relaxes only the table

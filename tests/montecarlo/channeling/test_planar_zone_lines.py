@@ -20,15 +20,16 @@ TILT_AZIM_DEG = 46.0
 
 
 def _case(tilt_azim_deg=TILT_AZIM_DEG, channeling=True, thickness_ang=20000.0):
-    physics = (
-        pr.Physics(
-            channeling_model="planar",
-            channeling_admission="accept-inaccurate",
-            channeling_plane=(1, -1, 0),
-            radiative_model="uncoupled",
+    physics = pr.Physics(radiative_model="uncoupled")
+    zone = (
+        pr.Channeling(
+            "planar",
+            plane=(1, -1, 0),
+            numerics=pr.ChannelingNumerics(basis_size=8, bloch_cells=4, step_ang=1000.0),
+            admission="accept-inaccurate",
         )
         if channeling
-        else pr.Physics(radiative_model="uncoupled")
+        else None
     )
     scene = pr.Scene(
         pr.Beam(energy_keV=17000.0, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()),
@@ -41,15 +42,11 @@ def _case(tilt_azim_deg=TILT_AZIM_DEG, channeling=True, thickness_ang=20000.0):
         ),
         PointDetector(),
         physics=physics,
+        channeling=zone,
     )
     numerics = pr.Numerics(
         sampling=FixedSampling(cxr_histories=12, brem_histories=1),
         energy_bins=EnergyBins(cxr=np.linspace(5e3, 25e3, 81)),
-        **(
-            dict(channeling_basis_size=8, channeling_bloch_cells=4, channeling_dz_ang=1000.0)
-            if channeling
-            else {}
-        ),
     )
     return build_case(scene, numerics)
 

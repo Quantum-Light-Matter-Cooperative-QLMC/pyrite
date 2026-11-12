@@ -4,7 +4,7 @@ from dataclasses import replace
 
 import pytest
 
-from pyrite import Numerics, Physics
+from pyrite import Physics
 from pyrite.campaign.axial_cases import axial_channeling_record
 from pyrite.campaign.axial_spec import (
     AXIAL_FIBRE_MODEL_MARKER,
@@ -13,21 +13,18 @@ from pyrite.campaign.axial_spec import (
 )
 from pyrite.campaign.channeling_cases import resolve_channeling
 from pyrite.montecarlo.case import Case
+from pyrite.quantum import Channeling
 from pyrite.quantum._admission import AxialAdmissionError
 from pyrite.quantum._axial_envelope import ADMITTED_AXIAL_CASES
+from pyrite.quantum._channeling import validate_channeling_run
 
 
 def spec(axis=(0, 0, 1)):
     return {"version": 2, "axis_uvw": list(axis)}
 
 
-def physics(*, coherent=False):
-    return Physics(
-        channeling_model="axial",
-        channeling_axial=spec(),
-        emission=("incoherent", "coherent") if coherent else "incoherent",
-        radiative_model="uncoupled",
-    )
+def channeling():
+    return Channeling("axial", axial=spec())
 
 
 def case(*, tilt=0.088, azimuth=225.0, coherent=False):
@@ -72,7 +69,7 @@ def test_public_v2_is_minimal_roundtripping_and_distinct_from_v1():
     normalized = resolve_axial_spec(spec((0, 0, 2)))
     assert normalized == {"version": 2, "model": "axial", "axis_uvw": [0, 0, 1]}
     assert resolve_axial_spec(normalized) == normalized
-    assert physics().channeling_axial == normalized
+    assert channeling().axial == normalized
     assert axial_spec_identity(normalized) == axial_spec_identity(spec())
     v1 = resolve_axial_spec(
         {
@@ -117,14 +114,14 @@ def test_repository_record_is_detached_and_includes_provenance():
 
 
 def test_case_a_resolves_with_its_declared_bound():
-    out = resolve_channeling([case()], physics(), Numerics())
+    out = resolve_channeling([case()], channeling())
     assert out[0]["channeling"] == axial_channeling_record(ADMITTED_AXIAL_CASES["si-fibre/A"])
     assert out[0]["channeling"]["free_free"] == "bound"
 
 
 def test_case_b_resolves_with_its_declared_bound():
     entry = ADMITTED_AXIAL_CASES["si-fibre/B"]
-    out = resolve_channeling([case(tilt=0.0)], physics(), Numerics())
+    out = resolve_channeling([case(tilt=0.0)], channeling())
     assert out[0]["channeling"]["case_key"] == entry.key
     assert out[0]["channeling"]["free_free_upper"] == entry.free_free_upper
 
@@ -134,17 +131,21 @@ def test_coherent_emission_is_refused_for_every_axial_case(tilt):
     # Native CBS is scored per flight regardless of the flag; it adds only
     # bunch-phased scoring, which has no axial contract (#994).
     with pytest.raises(ValueError, match="incoherent emission"):
-        physics(coherent=True)
+        validate_channeling_run(
+            channeling(),
+            Physics(emission=("incoherent", "coherent"), radiative_model="uncoupled"),
+            "midpoint",
+        )
     with pytest.raises(AxialAdmissionError, match="does not support coherent emission"):
-        resolve_channeling([case(tilt=tilt, coherent=True)], physics(), Numerics())
+        resolve_channeling([case(tilt=tilt, coherent=True)], channeling())
 
 
 def test_v2_refuses_other_energies_observables_and_tampered_records():
     with pytest.raises(AxialAdmissionError, match="kinetic_energy"):
-        resolve_channeling([replace(case(), E0_keV=3000)], physics(), Numerics())
+        resolve_channeling([replace(case(), E0_keV=3000)], channeling())
     with pytest.raises(AxialAdmissionError, match="on-axis"):
-        resolve_channeling([replace(case(), theta_obs_rad=0.001)], physics(), Numerics())
-    resolved = resolve_channeling([case()], physics(), Numerics())[0]
+        resolve_channeling([replace(case(), theta_obs_rad=0.001)], channeling())
+    resolved = resolve_channeling([case()], channeling())[0]
     fake = dict(resolved["channeling"])
     fake["depth_budget"] = 0.0
     with pytest.raises(AxialAdmissionError, match="differs from repository"):

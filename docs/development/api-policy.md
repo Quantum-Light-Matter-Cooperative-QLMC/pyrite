@@ -192,7 +192,7 @@ scene field extraction is tracked in
 and follows the #680 composition RFC, in coordination with observation
 ownership (#703) and quantum setup (#704), without blocking established
 domain-import migrations.
-`ExecutionConfig` and `QuantumSetup` remain supported at root pending these
+`ExecutionConfig` remains supported at root pending these
 decisions; curation does not introduce a simulation request type or endorse a
 future composition model.
 

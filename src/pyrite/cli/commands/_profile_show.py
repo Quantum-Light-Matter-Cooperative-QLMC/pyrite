@@ -1,7 +1,7 @@
 """Human profile summary, grouped by the CLI's settings owners."""
 
 from pyrite._energy_grid_encoding import encode_energy_grid
-from pyrite._numerics import PHYSICS_FIELDS
+from pyrite._numerics import PHYSICS_KEYS
 from pyrite.campaign import _profile_document, profile_cxr_grid, profile_detectors
 from pyrite.cli import _catalog_io
 from pyrite.console.output import emit_result
@@ -157,7 +157,7 @@ def _numerics_group_rows(group, numerics_names, adaptive_active):
             if group["name"] == "sampling" and adaptive_active
             else _display(row["effective"]),
             row["source"],
-            row["key"] in PHYSICS_FIELDS,
+            row["key"] in PHYSICS_KEYS,
         )
         for row in fields
     ]

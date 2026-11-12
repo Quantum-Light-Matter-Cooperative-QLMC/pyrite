@@ -34,7 +34,7 @@ from pyrite.config import Physics, Numerics, AngularSampling, load_physics
 from pyrite.detectors import AngularDetector, PlanarDetector, PixelGrid, PlanarPose
 from pyrite.detectors import Timepix3Response, IdealPhotonCounter
 from pyrite.observations import Acquisition, Observation, PixelSampling, ObservationPlan
-from pyrite.quantum import QuantumSetup, TransverseStateSpec
+from pyrite.quantum import Channeling, TransverseStateSpec
 ```
 
 The **detectors** namespace owns virtual angular acceptance, physical pixel
@@ -152,6 +152,8 @@ public API.
 | `AcquisitionBatch` | Deferred | `pyrite.results.AcquisitionBatch` | Acquired pixel counts are result values; root migration awaits #707 facade approval. |
 | `Analysis` | Deferred | `pyrite.campaign.model.Analysis` | Keep the existing import pending canonical ownership review in #707. |
 | `Beam` | Retained | `pyrite.Beam` | Foundational simulation entry point. |
+| `Channeling` | Deferred | `pyrite.quantum.Channeling` | Experimental channeling section (#1017); canonical in pyrite.quantum, root alias kept without warnings. |
+| `ChannelingNumerics` | Deferred | `pyrite.quantum.ChannelingNumerics` | Experimental channeling section (#1017); canonical in pyrite.quantum, root alias kept without warnings. |
 | `CxrSpectra` | Deferred | `pyrite.results.model.CxrSpectra` | Keep the existing import pending canonical ownership review in #707. |
 | `Detector` | Retained | `pyrite.Detector` | Foundational simulation entry point. |
 | `DirectionalSpectrum` | Deferred | `pyrite.results.directional.DirectionalSpectrum` | Keep the existing import pending canonical ownership review in #707. |
@@ -163,10 +165,6 @@ public API.
 | `PixelMetadata` | Deferred | `pyrite.results.model.PixelMetadata` | Keep the existing import pending canonical ownership review in #707. |
 | `PixelRayMap` | Deferred | `pyrite.results.model.PixelRayMap` | Keep the existing import pending canonical ownership review in #707. |
 | `Provenance` | Deferred | `pyrite.results.provenance.Provenance` | Keep the existing import pending canonical ownership review in #707. |
-| `QuantumDynamics` | Deferred | `pyrite.quantum.QuantumDynamics` | Canonical quantum ownership is resolved in #704; retain the root alias without warnings pending a separate migration decision. |
-| `QuantumNumerics` | Deferred | `pyrite.quantum.QuantumNumerics` | Canonical quantum ownership is resolved in #704; retain the root alias without warnings pending a separate migration decision. |
-| `QuantumRegion` | Deferred | `pyrite.quantum.QuantumRegion` | Canonical quantum ownership is resolved in #704; retain the root alias without warnings pending a separate migration decision. |
-| `QuantumSetup` | Deferred | `pyrite.quantum.QuantumSetup` | Canonical quantum ownership is resolved in #704; retain the root alias without warnings pending a separate migration decision. |
 | `Result` | Retained | `pyrite.Result` | Foundational simulation entry point. |
 | `Scene` | Retained | `pyrite.Scene` | Foundational simulation entry point. |
 | `SpatialResult` | Deferred | `pyrite.results.model.SpatialResult` | Keep the existing import pending canonical ownership review in #707. |

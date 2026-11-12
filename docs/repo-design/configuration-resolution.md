@@ -210,10 +210,11 @@ Every `Physics`/`Numerics` field has exactly one owner in the import-light
 
 | Owner | Fields |
 | --- | --- |
-| Physical model (`Physics`) | `emission`, `brem_source`, `straggling`, `inelastic_model`, `inelastic_cutoff_eV`, `secondary_threshold_eV`, `elastic_model`, `transport_mode`, `mixed_c1`, `mixed_c2`, `mixed_max_step_um`, `bremsstrahlung_model`, `radiative_model`, `radiative_cutoff_eV`, `pair_production_model`, `positron_transport`, `atomic_electron_deflection`, `channeling_model`, `channeling_plane`, `channeling_axial`, `transition_radiation`, `transition_lattice_origin_ang`, `shell_ionization_model`, `photon_transport` |
+| Physical model (`Physics`) | `emission`, `brem_source`, `straggling`, `inelastic_model`, `inelastic_cutoff_eV`, `secondary_threshold_eV`, `elastic_model`, `transport_mode`, `mixed_c1`, `mixed_c2`, `mixed_max_step_um`, `bremsstrahlung_model`, `radiative_model`, `radiative_cutoff_eV`, `pair_production_model`, `positron_transport`, `atomic_electron_deflection`, `transition_radiation`, `transition_lattice_origin_ang`, `shell_ionization_model`, `photon_transport` |
 | Sampling and convergence (`Numerics`) | `sampling`, `cxr_reflections`, `seed` |
-| Numerical approximation (`Numerics`) | `energy_model`, `max_dE_frac`, `energy_bins`, `transport`, `radiation`, `channeling_basis_size`, `channeling_bloch_cells`, `channeling_dz_ang`, `channeling_zone_max_ang` |
+| Numerical approximation (`Numerics`) | `energy_model`, `max_dE_frac`, `energy_bins`, `transport`, `radiation` |
 | Kernel tuning (`Numerics`) | `transport_core`, `cxr_chunk`, `brem_chunk`, `execution` |
+| Channeling (`pyrite.quantum.Channeling`) | No `Physics` or `Numerics` fields (#1017). `model`, `plane`, `axial`, `admission` and `ChannelingNumerics` (`basis_size`, `bloch_cells`, `step_ang`, `zone_max_ang`); profiles use a `[channeling]` table. |
 | Scheduling and resources (`pyrite.execution`) | No `Physics` or `Numerics` fields. `ExecutionProfile`, `Executor`, `ResourceRequest`, Dask and SLURM backends. |
 
 ### KernelTuning is a compatibility alias

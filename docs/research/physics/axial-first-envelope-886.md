@@ -8,8 +8,9 @@ Every other axial case refuses before work or writes. The selector and
 
 ## Admitted cases
 
-Selected with `Physics(channeling_model="axial", channeling_axial={"version": 2,
-"axis_uvw": [0, 0, 1]})` and observed with `pyrite.detectors.PointDetector()`. Every numeric comes from the lookup; the version 1 recipe of
+Selected with `channeling=pyrite.quantum.Channeling("axial", axial={"version": 2,
+"axis_uvw": [0, 0, 1]})` (before #1017: `Physics(channeling_model="axial", ...)`)
+and observed with `pyrite.detectors.PointDetector()`. Every numeric comes from the lookup; the version 1 recipe of
 #624 stays parseable and refuses at run.
 
 | Key | Case | Depth budget ε (95%) | In-cut free→free block | Evidence |

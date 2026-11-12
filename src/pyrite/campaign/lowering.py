@@ -12,7 +12,7 @@ from .._sampling import case_budget
 from ..instrument import PlanarDetector
 from ..montecarlo import Case
 from ..observations.spec import Observation
-from ..quantum import QuantumSetup
+from ..quantum import Channeling
 from .channeling_cases import resolve_channeling
 from .resolution import UNSET, ResolvedSimulation, _Unset, resolve_models, resolve_simulation
 from .transition_cases import (
@@ -37,23 +37,27 @@ def build_case(
     numerics: Numerics | None = None,
     *,
     physics: Physics | None = None,
-    quantum: QuantumSetup | None | _Unset = UNSET,
+    channeling: Channeling | None | _Unset = UNSET,
     observation: Observation | None = None,
 ) -> Case:
     """Resolve and lower one scene to the existing typed transport input.
 
-    Explicit physics/numerics override legacy scene settings. Omitted quantum
-    inherits ``Scene.quantum``; explicit ``None`` disables the quantum setup.
+    Explicit physics/numerics override legacy scene settings. Omitted channeling
+    inherits ``Scene.channeling``; explicit ``None`` disables the channeling setup.
     """
     return lower_simulation(
         resolve_simulation(
-            scene, numerics=numerics, physics=physics, quantum=quantum, observation=observation
+            scene,
+            numerics=numerics,
+            physics=physics,
+            channeling=channeling,
+            observation=observation,
         )
     )
 
 
 def lower_simulation(request: ResolvedSimulation) -> Case:
-    """Lower effective settings without repeating defaults or quantum adaptation."""
+    """Lower effective settings without repeating defaults or model validation."""
     scene, physics, numerics = request.scene, request.physics, request.numerics
     convergence = numerics.cxr_reflections
     scalar_detector = (
@@ -106,7 +110,7 @@ def lower_simulation(request: ResolvedSimulation) -> Case:
     # Opt-in channeling zone (#506) and TR component (#103): "off" is unchanged.
     cases = resolve_shell_ionization(resolve_transition_radiation(cases, physics), physics)
     cases = resolve_transport_mode(cases, physics)
-    case = resolve_channeling(cases, physics, numerics)[0]
+    case = resolve_channeling(cases, scene.channeling)[0]
     if scene.beam.state is not None:
         from ..montecarlo.channeling.planar_injection import source_record
 
@@ -143,7 +147,7 @@ def build_sweep_cases(
     numerics: Numerics | None = None,
     *,
     physics: Physics | None = None,
-    quantum: QuantumSetup | None | _Unset = UNSET,
+    channeling: Channeling | None | _Unset = UNSET,
     observation: Observation | None = None,
     check_kinematic_validity: bool = True,
 ) -> list[Case]:
@@ -154,7 +158,7 @@ def build_sweep_cases(
             sweep.base,
             numerics=numerics,
             physics=physics,
-            quantum=quantum,
+            channeling=channeling,
             observation=observation,
         )
         physics, resolved_numerics = request.physics, request.numerics
@@ -169,7 +173,7 @@ def build_sweep_cases(
                     point,
                     numerics=request.scene.numerics,
                     physics=request.scene.physics,
-                    quantum=request.scene.quantum,
+                    channeling=request.scene.channeling,
                     observation=observation,
                 )
         if observation is not None:
@@ -221,7 +225,7 @@ def build_sweep_cases(
         )
         cases = resolve_shell_ionization(resolve_transition_radiation(cases, physics), physics)
         cases = resolve_transport_mode(cases, physics)
-        cases = resolve_channeling(cases, physics, resolved_numerics)
+        cases = resolve_channeling(cases, request.scene.channeling)
         return _with_run_options(cases, resolved_numerics)
     if not check_kinematic_validity:
         raise ValueError("check_kinematic_validity=False requires a configured legacy sweep")
@@ -231,8 +235,8 @@ def build_sweep_cases(
         overrides["numerics"] = numerics
     if physics is not None:
         overrides["physics"] = physics
-    if quantum is not UNSET:
-        overrides["quantum"] = quantum
+    if channeling is not UNSET:
+        overrides["channeling"] = channeling
     if overrides:
         sweep = replace(sweep, base=replace(sweep.base, **overrides))
     cases = []

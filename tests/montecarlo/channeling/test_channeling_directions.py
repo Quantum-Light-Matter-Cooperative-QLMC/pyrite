@@ -9,6 +9,13 @@ from pyrite.config import FixedSampling
 from pyrite.detectors import EnergyBins
 from pyrite.montecarlo import runner
 
+ZONE = pr.Channeling(
+    "planar",
+    plane=(1, -1, 0),
+    numerics=pr.ChannelingNumerics(basis_size=8, bloch_cells=4, step_ang=500.0),
+    admission="accept-inaccurate",
+)
+
 
 @pytest.fixture(scope="module")
 def case():
@@ -22,20 +29,13 @@ def case():
             footprint=pr.geometry.Footprint(5.0, 5.0),
         ),
         pr.Detector(),
-        physics=pr.Physics(
-            channeling_model="planar",
-            channeling_admission="accept-inaccurate",
-            channeling_plane=(1, -1, 0),
-            radiative_model="uncoupled",
-        ),
+        physics=pr.Physics(radiative_model="uncoupled"),
+        channeling=ZONE,
     )
     return api.build_case(
         scene,
         pr.Numerics(
             sampling=FixedSampling(cxr_histories=4, brem_histories=4),
-            channeling_basis_size=8,
-            channeling_bloch_cells=4,
-            channeling_dz_ang=500.0,
             energy_bins=EnergyBins(
                 cxr=np.linspace(1500.0, 3000.0, 31), brem=np.array([5000.0, 10000.0])
             ),
@@ -83,12 +83,8 @@ def test_planar_observation_carries_channeling_once(case, monkeypatch, acquisiti
         pr.Beam(5000.0, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()),
         pr.geometry.Slab("silicon", 5000.0, footprint=pr.geometry.Footprint(5.0, 5.0)),
         detector,
-        physics=pr.Physics(
-            channeling_model="planar",
-            channeling_admission="accept-inaccurate",
-            channeling_plane=(1, -1, 0),
-            radiative_model="uncoupled",
-        ),
+        physics=pr.Physics(radiative_model="uncoupled"),
+        channeling=ZONE,
         acquisition=(
             pr.observations.Acquisition(exposure_s=1.0, measured_edges_eV=(0, 1500, 3000))
             if acquisition

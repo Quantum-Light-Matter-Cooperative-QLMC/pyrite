@@ -6,26 +6,25 @@ from dataclasses import asdict
 import matplotlib.pyplot as plt
 import numpy as np
 
-from pyrite.experimental.quantum import propagate_planar_source, score_planar_source
-from pyrite.quantum import (
-    QuantumDynamics,
-    QuantumNumerics,
-    QuantumRegion,
-    QuantumSetup,
-    TransverseStateSpec,
+from pyrite.experimental.quantum import (
+    project_planar_source,
+    propagate_planar_source,
+    score_planar_source,
 )
+from pyrite.quantum import Channeling, ChannelingNumerics, TransverseStateSpec
 
 
 def calculate(depth_ang=2_000.0, incidence_rad=0.0):
     """Project one Gaussian, evolve its density, and score forward radiation."""
     source = TransverseStateSpec.recipe("gaussian", waist_ang=1.0, dimension=1)
-    setup = QuantumSetup(
-        region=QuantumRegion(kind="planar", plane_hkl=(1, 1, 0)),
-        dynamics=QuantumDynamics(kind="channeling"),
-        numerics=QuantumNumerics(basis_size=8, bloch_cells=4, step_ang=20.0),
+    channeling = Channeling(
+        "planar",
+        plane=(1, 1, 0),
+        numerics=ChannelingNumerics(basis_size=8, bloch_cells=4, step_ang=20.0),
     )
-    entry = setup.project_state(
+    entry = project_planar_source(
         source,
+        channeling=channeling,
         crystal="silicon",
         kinetic_energy_eV=17e6,
         incidence_rad=incidence_rad,
@@ -51,7 +50,7 @@ def compute(depth_ang=2_000.0, incidence_rad=0.0):
     return {
         "source": source.to_dict(),
         "source_digest": source.digest,
-        "setup": asdict(entry.setup),
+        "channeling": asdict(entry.channeling),
         "settings": {
             "crystal": entry.crystal,
             "plane_hkl": entry.plane_hkl,

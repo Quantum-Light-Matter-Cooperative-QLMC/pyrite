@@ -3,14 +3,14 @@
 ``pyrite profile numerics show`` and ``pyrite profile physics show`` are
 disjoint: Numerics owns sampling, reflections/mosaic, integration and the
 channeling grid; Physics owns emission, models, cutoffs and the channeling
-model (the API partition ``pyrite._numerics.PHYSICS_FIELDS``). Named presets
+model (the API partition ``pyrite._numerics.PHYSICS_KEYS``). Named presets
 render through the same groups.
 """
 
 from collections.abc import Iterable, Mapping
 from typing import Any
 
-from pyrite._numerics import CHANNELING_KEYS, CONVERGENCE_KEYS, PHYSICS_FIELDS, SAMPLING_KEYS
+from pyrite._numerics import CHANNELING_KEYS, CONVERGENCE_KEYS, PHYSICS_KEYS, SAMPLING_KEYS
 from pyrite._precision import Precision
 from pyrite.campaign.profile_precision import policy_view
 from pyrite.console.tables import emit_settings, value_source
@@ -21,11 +21,11 @@ _NUMERICS_GROUPS = (
     ("Sampling", (*SAMPLING_KEYS, "precision")),
     ("Reflections and mosaic", CONVERGENCE_KEYS),
     ("CXR grid", ("cxr_grid_policy",)),
-    ("Channeling grid", tuple(key for key in CHANNELING_KEYS if key not in PHYSICS_FIELDS)),
+    ("Channeling grid", tuple(key for key in CHANNELING_KEYS if key not in PHYSICS_KEYS)),
 )
 _PHYSICS_GROUPS = (
     ("Emission", ("emission",)),
-    ("Channeling", tuple(key for key in CHANNELING_KEYS if key in PHYSICS_FIELDS)),
+    ("Channeling", tuple(key for key in CHANNELING_KEYS if key in PHYSICS_KEYS)),
 )
 _POLICY_LABELS = (
     ("target_rse", "target rse"),
@@ -88,7 +88,7 @@ def sampling_rows(rows: list[Row], adaptive: Mapping[str, Any] | None):
 
 def emit_numerics(rows: Iterable[Row], *, adaptive: Mapping[str, Any] | None = None) -> None:
     """Render Numerics-owned rows in groups; physics rows are ignored."""
-    selected = [row for row in rows if row["key"] not in PHYSICS_FIELDS]
+    selected = [row for row in rows if row["key"] not in PHYSICS_KEYS]
     for title, group in _grouped(selected, _NUMERICS_GROUPS, "Integration"):
         emit_settings(
             title, sampling_rows(group, adaptive) if title == "Sampling" else _plain(group)
@@ -97,6 +97,6 @@ def emit_numerics(rows: Iterable[Row], *, adaptive: Mapping[str, Any] | None = N
 
 def emit_physics(rows: Iterable[Row]) -> None:
     """Render Physics-owned rows (plus emission) in groups."""
-    selected = [row for row in rows if row["key"] in PHYSICS_FIELDS or row["key"] == "emission"]
+    selected = [row for row in rows if row["key"] in PHYSICS_KEYS or row["key"] == "emission"]
     for title, group in _grouped(selected, _PHYSICS_GROUPS, "Models and cutoffs"):
         emit_settings(title, _plain(group))

@@ -54,7 +54,7 @@ kernels and persisted records continue to contain ordinary magnitudes.
 | `RectangularBody`, `Footprint`, planar detector poses/pixels, filters | Existing mm |
 | Detector acceptance | Existing degrees and sr |
 | `Physics` energy cutoffs, `Numerics` channeling depths, `EnergyBins` | Existing eV and Å |
-| `QuantumRegion.zone_max_ang`, `QuantumNumerics.step_ang`, portable transverse-state lengths/energies/angles, planar source diagnostic inputs | Existing Å, eV, rad, K |
+| `ChannelingNumerics.zone_max_ang`, `ChannelingNumerics.step_ang`, portable transverse-state lengths/energies/angles, planar source diagnostic inputs | Existing Å, eV, rad, K |
 | `Acquisition` exposure, measured edges, threshold | Existing seconds and eV |
 | Material scan grids and profile beam/detector/filter/response/acquisition fields | Existing field-specific units, resolved from numeric TOML values or explicit strings |
 
@@ -91,17 +91,19 @@ pitch_mm = ["55 um", "55 um"]
 exposure_s = "500 ms"
 measured_edges_eV = ["0 eV", "0.1 keV", "200 eV"]
 
+[profiles.demo.channeling]
+model = "planar"
+plane = [1, 1, 0]
+step_ang = "0.1 nm"
+
 [physics.demo]
 inelastic_model = "shell-soft-hard"
 inelastic_cutoff_eV = "2 keV"
-
-[numerics.demo]
-channeling_dz_ang = "0.1 nm"
 ```
 
 The TOML keys remain the catalog's existing unit-suffixed names; explicit
 strings only choose a compatible input unit. Physics preset energy cutoffs and
-lattice origins, plus Numerics channeling lengths, use the same parser and
+lattice origins, plus profile `[channeling]` lengths, use the same parser and
 canonical values as their Python configuration fields. Malformed strings and
 dimension mismatches are reported at the offending catalog path. Numeric catalog
 files do not import Pint.
@@ -279,7 +281,7 @@ promoting every implementation module to public API.
 | `pyrite.geometry.RectangularBody.thickness_mm` | Number or length quantity → mm | `bodies.py`, `campaign/geometry.py` | Keep current body serialization and units |
 | `pyrite.detectors.PlanarPose.center_mm`, `PixelGrid.pitch_mm` | Numeric components or compatible quantities, including array magnitudes → numeric mm components | `_planar_geometry.py`, persisted geometry in `observations/store.py` | Preserve coordinate and pixel representations |
 | `pyrite.observations.Acquisition.exposure_s`, `measured_edges_eV` | Numbers/components or compatible quantities → s/eV | `instrument/observation.py`, persisted acquisition in `observations/store.py` | Preserve exposure and measured-bin meaning |
-| `pyrite.config.Physics.inelastic_cutoff_eV`, `Numerics.channeling_dz_ang` | Number or compatible quantity → eV/Å; `Physics` adds keyword-only `inelastic_cutoff`, `secondary_threshold`, `radiative_cutoff` (eV) and `transition_lattice_origin` (Å) with fresh read-back and `with_*` replacement | `_numerics.py`, preset parsing in `_config_presets.py` | Keep numeric controls and preset keys; `Numerics.channeling_*` lengths stay numeric, with `QuantumNumerics.step_length` / `QuantumRegion.zone_max_length` as their semantic owners |
+| `pyrite.config.Physics.inelastic_cutoff_eV`, profile `[channeling]` `step_ang` | Number or compatible quantity → eV/Å; `Physics` adds keyword-only `inelastic_cutoff`, `secondary_threshold`, `radiative_cutoff` (eV) and `transition_lattice_origin` (Å) with fresh read-back and `with_*` replacement | `_numerics.py`, preset parsing in `_config_presets.py` | Keep numeric controls and preset keys; the stored `channeling_*` lengths stay numeric, with `ChannelingNumerics.step_length` / `zone_max_length` as their semantic owners |
 | `pyrite.quantum.TransverseStateSpec` recipe lengths/energies/angles | Numbers or compatible quantities → Å/eV/rad; semantic quantity keywords with `parameter_quantities` read-back and `with_parameters` replacement | `quantum/state.py` numeric JSON schema; runtime adapters in `montecarlo/channeling/states.py` | Preserve recipe-specific units and JSON identity |
 
 Coverage remains selective. A helper import is not evidence that every physical

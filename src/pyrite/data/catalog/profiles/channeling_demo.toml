@@ -20,6 +20,8 @@ detector = "forward"
 emission = "incoherent"
 energy_model = "midpoint"
 radiative_model = "uncoupled"
-channeling_model = "planar"
-channeling_plane = [1, -1, 0]
 E_grid_line = {arange = {start = 1000.0, stop = 24000.0, step = 50.0}}
+
+[channeling]
+model = "planar"
+plane = [1, -1, 0]

@@ -17,8 +17,15 @@ from pyrite.montecarlo.channeling.planar_injection import (
     source_spec,
 )
 
+ZONE = pr.Channeling(
+    "planar",
+    plane=(1, -1, 0),
+    numerics=pr.ChannelingNumerics(basis_size=8, bloch_cells=4, step_ang=250.0),
+    admission="accept-inaccurate",
+)
 
-def _scene(state=None, *, physics=None, energy_spread_frac=None):
+
+def _scene(state=None, *, physics=None, channeling=ZONE, energy_spread_frac=None):
     return pr.Scene(
         pr.Beam(
             energy_keV=5000.0,
@@ -35,13 +42,8 @@ def _scene(state=None, *, physics=None, energy_spread_frac=None):
             footprint=pr.geometry.Footprint(5.0, 5.0),
         ),
         pr.Detector(),
-        physics=physics
-        or pr.Physics(
-            channeling_model="planar",
-            channeling_admission="accept-inaccurate",
-            channeling_plane=(1, -1, 0),
-            radiative_model="uncoupled",
-        ),
+        physics=physics or pr.Physics(radiative_model="uncoupled"),
+        channeling=channeling,
     )
 
 
@@ -58,9 +60,6 @@ def _numerics():
             cxr=np.linspace(1e3, 2e3, 9),
             brem=np.linspace(1e3, 2e3, 9),
         ),
-        channeling_basis_size=8,
-        channeling_bloch_cells=4,
-        channeling_dz_ang=250.0,
     )
 
 
@@ -101,13 +100,13 @@ def test_unsupported_quantum_sources_refuse_before_case_creation(spec, pattern):
 
 def test_source_requires_planar_and_monoenergetic_beam():
     with pytest.raises(ValueError, match="planar"):
-        api.build_case(_scene(_gaussian(), physics=pr.Physics()), _numerics())
+        api.build_case(_scene(_gaussian(), physics=pr.Physics(), channeling=None), _numerics())
     with pytest.raises(ValueError, match="monoenergetic"):
         api.build_case(_scene(_gaussian(), energy_spread_frac=0.01), _numerics())
     case = api.build_case(_scene(), _numerics())
     with pytest.raises(ValueError, match="requires a planar"):
         replace(
-            api.build_case(_scene(physics=pr.Physics()), _numerics()),
+            api.build_case(_scene(physics=pr.Physics(), channeling=None), _numerics()),
             channeling_source=source_record(_gaussian()),
         )
     with pytest.raises(ValueError, match="channeling_source"):

@@ -33,7 +33,7 @@ def test_api_object_page_ownership_and_navigation():
         "pyrite.detectors.Detector",
         "pyrite.observations.Observation",
         "pyrite.results.Settings",
-        "pyrite.quantum.QuantumSetup",
+        "pyrite.quantum.Channeling",
         "pyrite.storage.CaseArtifactStore",
     ):
         assert obj in owners

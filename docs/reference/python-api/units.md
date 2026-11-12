@@ -69,8 +69,9 @@ length; each reads back as a fresh eV/Å quantity (or `None`) and replaces via
 `with_*`. `EnergyBins.cxr` / `brem` keep returning numeric eV arrays;
 `cxr_energies` / `brem_energies` return fresh quantities and
 `with_cxr_energies` / `with_brem_energies` replace a grid. Planar channeling
-lengths use `QuantumNumerics.step_length` and `QuantumRegion.zone_max_length`;
-the flat `Numerics.channeling_*` fields stay numeric.
+lengths use `ChannelingNumerics.step_length` and
+`ChannelingNumerics.zone_max_length`; the numeric `step_ang`/`zone_max_ang`
+fields and the stored flat `channeling_*` record stay numeric.
 `PlanarDetector(size=...)` and `FilterPlate(thickness=..., size=...)` take a
 positive two-component `(width_x, height_y)` length and a positive scalar
 thickness; they read back as fresh mm quantities and replace via `with_size` /

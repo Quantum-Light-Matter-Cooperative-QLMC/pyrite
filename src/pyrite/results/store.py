@@ -20,6 +20,7 @@ import numpy as np
 
 from .._mixed_elastic_policy import validate_transport_mode
 from .._numerics import (
+    CHANNELING_KEYS,
     HISTORICAL_SELECTOR_OMISSIONS,
     PHYSICS_FIELDS,
     Physics,
@@ -28,8 +29,6 @@ from .._numerics import (
     default_radiative_cutoff,
     validate_atomic_electron_deflection,
     validate_bremsstrahlung_model,
-    validate_channeling_numerics,
-    validate_channeling_physics,
     validate_elastic_model,
     validate_inelastic_numerics,
     validate_pair_production_numerics,
@@ -48,6 +47,7 @@ from ..montecarlo import (
     mosaic_fwhm_eV,
     mosaic_psi_rad,
 )
+from ..quantum._channeling import channeling_from_fields, validate_channeling_run
 
 PER_NA = 6.2415e9  # electrons/s at 1 nA
 DEFAULT_BUNCH_CHARGE_PC = 1.0
@@ -145,7 +145,8 @@ class Settings:
         Opt-in mixed elastic transport and its parameters (#894); see
         :class:`~pyrite.Physics`.
     channeling_model, channeling_plane
-        Opt-in planar entrance zone and its Miller indices; defaults to off.
+        Opt-in channeling zone and its Miller indices; defaults to off. These
+        flat fields are the stored lowering of :class:`~pyrite.quantum.Channeling`.
     channeling_admission
         ``"admitted"`` (default) or the ``"accept-inaccurate"`` opt-in for
         channeling cases outside the admission tables (#1105).
@@ -156,7 +157,9 @@ class Settings:
         ``"eedl"`` (default) or the opt-in ``"bote-salvat"`` characteristic
         primary-vacancy cross sections (#92).
     channeling_basis_size, channeling_bloch_cells, channeling_dz_ang, channeling_zone_max_ang
-        Zone basis, Bloch grid, depth step and optional length cap, as in Numerics.
+        Zone basis, Bloch grid, depth step and optional length cap, as in
+        :class:`~pyrite.quantum.ChannelingNumerics` (``step_ang`` is stored
+        as ``channeling_dz_ang``).
     emission
         ``"incoherent"``, ``"coherent"``, or ``"both"`` line policy.
     temporal_profile
@@ -266,12 +269,18 @@ class Settings:
             self.transport_mode, self.mixed_c1, self.mixed_c2, self.mixed_max_step_um
         )
         validate_shell_ionization_model(self.shell_ionization_model)
-        if (
-            self.channeling_model != "off"
-            or self.channeling_plane is not None
-            or self.channeling_axial is not None
-            or self.channeling_admission != "admitted"
-        ):
+        if self.transition_radiation != "off" or self.transition_lattice_origin_ang is not None:
+            validate_transition_physics(
+                Physics(
+                    transition_radiation=self.transition_radiation,
+                    transition_lattice_origin_ang=self.transition_lattice_origin_ang,
+                ),
+                self.energy_model,
+            )
+        channeling = channeling_from_fields({key: getattr(self, key) for key in CHANNELING_KEYS})
+        if channeling is not None:
+            self.channeling_plane = channeling.plane
+            self.channeling_axial = None if channeling.axial is None else dict(channeling.axial)
             physics = Physics(
                 # Photon observations are selected on Scene/Case, not analysis Settings.
                 **{
@@ -281,27 +290,7 @@ class Settings:
                 },
                 emission=_emission_selection(self.emission),
             )
-            self.channeling_plane = physics.channeling_plane
-            self.channeling_axial = (
-                None if physics.channeling_axial is None else dict(physics.channeling_axial)
-            )
-            validate_channeling_physics(physics, self.energy_model)
-        if self.transition_radiation != "off" or self.transition_lattice_origin_ang is not None:
-            validate_transition_physics(
-                Physics(
-                    transition_radiation=self.transition_radiation,
-                    transition_lattice_origin_ang=self.transition_lattice_origin_ang,
-                    channeling_model=self.channeling_model,
-                    channeling_plane=self.channeling_plane,
-                ),
-                self.energy_model,
-            )
-        validate_channeling_numerics(
-            self.channeling_basis_size,
-            self.channeling_bloch_cells,
-            self.channeling_dz_ang,
-            self.channeling_zone_max_ang,
-        )
+            validate_channeling_run(channeling, physics, self.energy_model)
 
     @property
     def coherent_emission(self) -> bool:
