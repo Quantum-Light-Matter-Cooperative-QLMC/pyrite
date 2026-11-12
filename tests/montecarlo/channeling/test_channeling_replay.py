@@ -133,6 +133,14 @@ def test_brem_repair_keeps_channeling_source_untouched(channeling_run, monkeypat
     np.testing.assert_array_equal(record["brem"], 4.0)
 
 
+def test_brem_repair_replays_the_zone_transport(channeling_run):
+    # Live brem scores the zone rows and handed-off native rows (#1148); an
+    # amorphous re-transport would drop the zone and change the population.
+    case, transport, live = channeling_run
+    repaired = runner._brem_for_case(case, transport["E_brem"])
+    np.testing.assert_allclose(repaired, live["brem_wide"], rtol=1e-12, atol=0.0)
+
+
 @pytest.mark.parametrize("broken", [None, np.array([np.nan]), np.array([1.0])])
 def test_reline_repairs_stale_channeling_on_an_unchanged_grid(channeling_run, monkeypatch, broken):
     from pyrite.montecarlo.runner import channeling_emission
