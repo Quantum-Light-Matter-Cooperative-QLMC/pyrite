@@ -167,7 +167,7 @@ def run_cuda(
     solver,
     entry,
     depths_ang,
-    n_electrons,
+    histories,
     *,
     seed,
     step_ang,
@@ -179,7 +179,7 @@ def run_cuda(
 ):
     """Execute CUDA MCWF; returned result owns NumPy arrays only."""
     _callback_check(observable, jump_hook)
-    steps = _depth_steps(depths_ang, n_electrons, step_ang)
+    steps = _depth_steps(depths_ang, histories, step_ang)
     backend = select_cupy_backend()
     cp = backend.xp
     components = _sample_components(solver.grid, entry)
@@ -205,8 +205,8 @@ def run_cuda(
     jumps = {"tds": 0, "sink": 0, "electronic": 0}
     history = {kind: np.zeros(steps.size, dtype=np.int64) for kind in jumps}
     absorbed = 0
-    for start in range(0, n_electrons, size_limit):
-        ids = range(start, min(start + size_limit, n_electrons))
+    for start in range(0, histories, size_limit):
+        ids = range(start, min(start + size_limit, histories))
         rngs = [electron_rng(seed, e) for e in ids]
         batch = _Batch(
             device,
@@ -233,14 +233,14 @@ def run_cuda(
             if observable is density_observable
             else observable(sampled[0], base_tilt)
         ) * 0
-    values = cp.stack([(s if s is not None else template * 0) / n_electrons for s in sums])
+    values = cp.stack([(s if s is not None else template * 0) / histories for s in sums])
     return AxialMCWFResult(
         steps * step_ang,
         cp.asnumpy(values),
-        alive / n_electrons,
+        alive / histories,
         np.asarray(sinks),
         jumps,
-        int(n_electrons),
+        int(histories),
         history,
     )
 

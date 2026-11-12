@@ -58,8 +58,8 @@ def test_existing_quantum_diagnostic_links_are_preserved():
     assert "## Solver diagnostic contracts" in content
     for old_api in (
         "pyrite.montecarlo.channeling.spatial.spatial_density",
-        "pyrite.montecarlo.channeling.axial_diagnostic.AxialDiagnosticConfig",
-        "pyrite.montecarlo.channeling.axial_diagnostic.AxialDiagnosticResult",
-        "pyrite.montecarlo.channeling.axial_diagnostic.axial_diagnostic",
+        "pyrite.montecarlo.channeling.axial_propagation.AxialPropagationConfig",
+        "pyrite.montecarlo.channeling.axial_propagation.AxialPropagationResult",
+        "pyrite.montecarlo.channeling.axial_propagation.propagate_axial",
     ):
         assert f"   {old_api}\n" in content

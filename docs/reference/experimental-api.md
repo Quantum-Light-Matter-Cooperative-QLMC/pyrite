@@ -10,7 +10,7 @@ an attribute may load the existing implementation and its dependencies.
 ```python
 from pyrite.experimental.radiation import directional_sources
 from pyrite.experimental.observations import load_photon_events
-from pyrite.experimental.quantum import AxialDiagnosticConfig
+from pyrite.experimental.quantum import AxialPropagationConfig
 ```
 
 Aliases do not change pickle module paths, dataclass identity, on-disk schemas,

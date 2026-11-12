@@ -27,7 +27,7 @@ from pyrite.montecarlo.channeling import (
     IncidentEnergyEnsemble,
     axial_energy_mcwf,
 )
-from pyrite.montecarlo.channeling.axial_diagnostic import AxialDiagnosticConfig
+from pyrite.montecarlo.channeling.axial_propagation import AxialPropagationConfig
 
 
 def _summary(result):
@@ -58,7 +58,7 @@ def measure(cp, points, electrons, nodes, depth, chunks, *, energy, cpu_electron
         if nodes == 1
         else IncidentEnergyEnsemble(energy, energy_spread_frac=spread, order=nodes)
     )
-    config = AxialDiagnosticConfig(
+    config = AxialPropagationConfig(
         mode="mcwf",
         kinetic_energy_eV=energy,
         shape=(points, points),

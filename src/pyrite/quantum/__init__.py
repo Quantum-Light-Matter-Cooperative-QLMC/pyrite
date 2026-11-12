@@ -30,15 +30,6 @@ if TYPE_CHECKING:
     from pyrite.montecarlo.channeling.axial_bloch import (
         axial_states as axial_states,
     )
-    from pyrite.montecarlo.channeling.axial_diagnostic import (
-        AxialDiagnosticConfig as AxialDiagnosticConfig,
-    )
-    from pyrite.montecarlo.channeling.axial_diagnostic import (
-        AxialDiagnosticResult as AxialDiagnosticResult,
-    )
-    from pyrite.montecarlo.channeling.axial_diagnostic import (
-        axial_diagnostic as axial_diagnostic,
-    )
     from pyrite.montecarlo.channeling.axial_emission import (
         axial_line_catalog as axial_line_catalog,
     )
@@ -50,6 +41,15 @@ if TYPE_CHECKING:
     )
     from pyrite.montecarlo.channeling.axial_mcwf import (
         AxialMCWFResult as AxialMCWFResult,
+    )
+    from pyrite.montecarlo.channeling.axial_propagation import (
+        AxialPropagationConfig as AxialPropagationConfig,
+    )
+    from pyrite.montecarlo.channeling.axial_propagation import (
+        AxialPropagationResult as AxialPropagationResult,
+    )
+    from pyrite.montecarlo.channeling.axial_propagation import (
+        propagate_axial as propagate_axial,
     )
     from pyrite.montecarlo.channeling.bloch import (
         entry_populations as entry_populations,
@@ -177,13 +177,13 @@ if TYPE_CHECKING:
 
 
 _EXPORTS = {
-    "AxialDiagnosticConfig": (
-        "pyrite.montecarlo.channeling.axial_diagnostic",
-        "AxialDiagnosticConfig",
+    "AxialPropagationConfig": (
+        "pyrite.montecarlo.channeling.axial_propagation",
+        "AxialPropagationConfig",
     ),
-    "AxialDiagnosticResult": (
-        "pyrite.montecarlo.channeling.axial_diagnostic",
-        "AxialDiagnosticResult",
+    "AxialPropagationResult": (
+        "pyrite.montecarlo.channeling.axial_propagation",
+        "AxialPropagationResult",
     ),
     "AxialMCWF": ("pyrite.montecarlo.channeling.axial_mcwf", "AxialMCWF"),
     "AxialMCWFResult": ("pyrite.montecarlo.channeling.axial_mcwf", "AxialMCWFResult"),
@@ -204,7 +204,7 @@ _EXPORTS = {
     "TransverseStateSpec": ("pyrite.quantum.state", "TransverseStateSpec"),
     "airy": ("pyrite.montecarlo.channeling.states", "airy"),
     "aperture_probe": ("pyrite.montecarlo.channeling.states", "aperture_probe"),
-    "axial_diagnostic": ("pyrite.montecarlo.channeling.axial_diagnostic", "axial_diagnostic"),
+    "propagate_axial": ("pyrite.montecarlo.channeling.axial_propagation", "propagate_axial"),
     "bessel_gauss": ("pyrite.montecarlo.channeling.states", "bessel_gauss"),
     "donut": ("pyrite.montecarlo.channeling.states", "donut"),
     "electronic_kernel": ("pyrite.montecarlo.channeling.operators", "electronic_kernel"),
@@ -244,10 +244,10 @@ _EXPORTS = {
 }
 
 __all__ = [
-    "AxialDiagnosticConfig",
-    "AxialDiagnosticResult",
     "AxialMCWF",
     "AxialMCWFResult",
+    "AxialPropagationConfig",
+    "AxialPropagationResult",
     "AxialStates",
     "Channeling",
     "ChannelingNumerics",
@@ -269,7 +269,6 @@ __all__ = [
     "TransverseStateSpec",
     "airy",
     "aperture_probe",
-    "axial_diagnostic",
     "axial_line_catalog",
     "axial_profile",
     "axial_states",
@@ -291,6 +290,7 @@ __all__ = [
     "planar_fiber_inputs",
     "planar_profile",
     "project_planar_source",
+    "propagate_axial",
     "propagate_planar_source",
     "score_planar_source",
     "superpose",

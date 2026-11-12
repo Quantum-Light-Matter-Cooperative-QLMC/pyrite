@@ -13,9 +13,9 @@ from pyrite.montecarlo.channeling import (  # noqa: E402
     IncidentEnergyEnsemble,
     axial_energy_mcwf,
 )
-from pyrite.montecarlo.channeling.axial_diagnostic import AxialDiagnosticConfig  # noqa: E402
 from pyrite.montecarlo.channeling.axial_dissipator import axial_dissipator  # noqa: E402
 from pyrite.montecarlo.channeling.axial_mcwf import AxialMCWF  # noqa: E402
+from pyrite.montecarlo.channeling.axial_propagation import AxialPropagationConfig  # noqa: E402
 from pyrite.montecarlo.channeling.states import gaussian  # noqa: E402
 
 TRAJECTORY_TAG = 0x6272
@@ -42,7 +42,7 @@ def _config(**overrides):
         mechanisms=("tds", "electronic"),
     )
     values.update(overrides)
-    return AxialDiagnosticConfig(**values)
+    return AxialPropagationConfig(**values)
 
 
 def _two_energy_beam(center=1e6, spread=0.1):

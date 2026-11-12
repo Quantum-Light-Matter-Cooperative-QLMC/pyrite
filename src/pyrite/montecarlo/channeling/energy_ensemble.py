@@ -544,7 +544,7 @@ def axial_energy_diagnostic(
     energy.  Such arrays must describe a *common physical labeling* across
     nodes; projectors onto unrelated eigenstates cannot be meaningfully added.
     """
-    from .axial_diagnostic import axial_diagnostic
+    from .axial_propagation import propagate_axial
 
     nodes = ensemble.quadrature()
     pairs = tuple(tuple(pair) for pair in coherence_pairs)
@@ -587,7 +587,7 @@ def axial_energy_diagnostic(
                 return np.concatenate((g1, np.asarray(user_observer(phi, tilt)).ravel()))
         else:
             observer = user_observer
-        result = axial_diagnostic(
+        result = propagate_axial(
             replace(config, kinetic_energy_eV=float(energy)),
             entry=entry,
             observable=observer,
@@ -693,7 +693,7 @@ def axial_energy_spectrum(
 
     from scipy.special import ndtr
 
-    from .axial_diagnostic import axial_diagnostic
+    from .axial_propagation import propagate_axial
 
     app = import_module("pyrite.apps.axial_channeling")
     edges = np.asarray(photon_energy_edges_eV, dtype=float)
@@ -717,7 +717,7 @@ def axial_energy_spectrum(
     widths = np.diff(edges)
     for energy, weight in zip(nodes.energies_eV, nodes.weights, strict=True):
         specific = replace(config, kinetic_energy_eV=float(energy))
-        diag = axial_diagnostic(specific, entry=entry, observable=app._level_observable(specific))
+        diag = propagate_axial(specific, entry=entry, observable=app._level_observable(specific))
         radiation = app.axial_radiation(diag)
         if radiation is None:
             if kept is not None:

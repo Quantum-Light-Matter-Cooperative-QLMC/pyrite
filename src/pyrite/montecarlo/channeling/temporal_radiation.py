@@ -18,7 +18,7 @@ emission through the crystal, which bounds each photon's coherence time).
 The bunch envelope never broadens the time-integrated spectrum.
 
 The deterministic paths reuse the #626 per-energy solvers (planar
-``DensityMatrixSolver``/``channeling_spectrum``, axial ``axial_diagnostic``)
+``DensityMatrixSolver``/``channeling_spectrum``, axial ``propagate_axial``)
 with the configured nominal transverse entry; :func:`axial_phase_space_mcwf`
 runs #627 energy-resolved MCWF trajectories with every record's own energy,
 slope and impact. No longitudinal coherence (#629) or energy loss is modeled.
@@ -478,7 +478,7 @@ def axial_time_resolved_spectrum(
 ) -> TimeResolvedSpectrum:
     """Forward axial line emission of a correlated bunch versus arrival time.
 
-    Each node runs ``axial_diagnostic`` with its energy-specific line
+    Each node runs ``propagate_axial`` with its energy-specific line
     catalog; the stored depths of ``config`` are the emission windows (the
     accumulated per-line yields are differenced between stored depths).
     Helicity channels use each window's accumulated ``T_++`` and ``T_--``.
@@ -489,7 +489,7 @@ def axial_time_resolved_spectrum(
 
     Validation: cr-retarded-photon-arrival, cr-temporal-slice-ensemble
     """
-    from .axial_diagnostic import axial_diagnostic
+    from .axial_propagation import propagate_axial
 
     app = import_module("pyrite.apps.axial_channeling")
     edges = _edges("photon_energy_edges_eV", photon_energy_edges_eV)
@@ -501,7 +501,7 @@ def axial_time_resolved_spectrum(
     window = np.zeros((nodes.size, depth.size - 1, 3, edges.size - 1))
     for k, energy in enumerate(nodes.energies_eV):
         specific = replace(config, kinetic_energy_eV=float(energy))
-        diagnostic = axial_diagnostic(
+        diagnostic = propagate_axial(
             specific, entry=entry, observable=app._level_observable(specific)
         )
         radiation = app.axial_radiation(diagnostic)

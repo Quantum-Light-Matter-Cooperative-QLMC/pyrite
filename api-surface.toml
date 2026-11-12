@@ -118,8 +118,8 @@ ureg = { target = "pyrite.units:ureg", status = "advanced-stable" }
 [package_exports."pyrite.quantum"]
 Channeling = { target = "pyrite.quantum:Channeling", status = "experimental" }
 ChannelingNumerics = { target = "pyrite.quantum:ChannelingNumerics", status = "experimental" }
-AxialDiagnosticConfig = { target = "pyrite.montecarlo.channeling.axial_diagnostic:AxialDiagnosticConfig", status = "experimental" }
-AxialDiagnosticResult = { target = "pyrite.montecarlo.channeling.axial_diagnostic:AxialDiagnosticResult", status = "experimental" }
+AxialPropagationConfig = { target = "pyrite.montecarlo.channeling.axial_propagation:AxialPropagationConfig", status = "experimental" }
+AxialPropagationResult = { target = "pyrite.montecarlo.channeling.axial_propagation:AxialPropagationResult", status = "experimental" }
 AxialMCWF = { target = "pyrite.montecarlo.channeling.axial_mcwf:AxialMCWF", status = "experimental" }
 AxialMCWFResult = { target = "pyrite.montecarlo.channeling.axial_mcwf:AxialMCWFResult", status = "experimental" }
 DensityMatrixResult = { target = "pyrite.montecarlo.channeling.density:DensityMatrixResult", status = "experimental" }
@@ -141,7 +141,7 @@ TransverseState = { target = "pyrite.montecarlo.channeling.states:TransverseStat
 TransverseStateSpec = { target = "pyrite.quantum.state:TransverseStateSpec", status = "experimental" }
 airy = { target = "pyrite.montecarlo.channeling.states:airy", status = "experimental" }
 aperture_probe = { target = "pyrite.montecarlo.channeling.states:aperture_probe", status = "experimental" }
-axial_diagnostic = { target = "pyrite.montecarlo.channeling.axial_diagnostic:axial_diagnostic", status = "experimental" }
+propagate_axial = { target = "pyrite.montecarlo.channeling.axial_propagation:propagate_axial", status = "experimental" }
 bessel_gauss = { target = "pyrite.montecarlo.channeling.states:bessel_gauss", status = "experimental" }
 donut = { target = "pyrite.montecarlo.channeling.states:donut", status = "experimental" }
 electronic_kernel = { target = "pyrite.montecarlo.channeling.operators:electronic_kernel", status = "experimental" }
@@ -351,10 +351,10 @@ run_cases = { target = "pyrite.montecarlo.runner:run_cases", status = "advanced-
 [package_exports."pyrite.montecarlo.channeling.spatial"]
 spatial_density = { target = "pyrite.montecarlo.channeling.spatial:spatial_density", status = "experimental" }
 
-[package_exports."pyrite.montecarlo.channeling.axial_diagnostic"]
-AxialDiagnosticConfig = { target = "pyrite.montecarlo.channeling.axial_diagnostic:AxialDiagnosticConfig", status = "experimental" }
-AxialDiagnosticResult = { target = "pyrite.montecarlo.channeling.axial_diagnostic:AxialDiagnosticResult", status = "experimental" }
-axial_diagnostic = { target = "pyrite.montecarlo.channeling.axial_diagnostic:axial_diagnostic", status = "experimental" }
+[package_exports."pyrite.montecarlo.channeling.axial_propagation"]
+AxialPropagationConfig = { target = "pyrite.montecarlo.channeling.axial_propagation:AxialPropagationConfig", status = "experimental" }
+AxialPropagationResult = { target = "pyrite.montecarlo.channeling.axial_propagation:AxialPropagationResult", status = "experimental" }
+propagate_axial = { target = "pyrite.montecarlo.channeling.axial_propagation:propagate_axial", status = "experimental" }
 
 [package_exports."pyrite.config"]
 AdaptiveSampling = { target = "pyrite._sampling:AdaptiveSampling", status = "advanced-stable" }
@@ -506,9 +506,9 @@ MCWFSolver = { target = "pyrite.montecarlo.channeling.mcwf:MCWFSolver", status =
 MCWFResult = { target = "pyrite.montecarlo.channeling.mcwf:MCWFResult", status = "experimental" }
 AxialMCWF = { target = "pyrite.montecarlo.channeling.axial_mcwf:AxialMCWF", status = "experimental" }
 AxialMCWFResult = { target = "pyrite.montecarlo.channeling.axial_mcwf:AxialMCWFResult", status = "experimental" }
-AxialDiagnosticConfig = { target = "pyrite.montecarlo.channeling.axial_diagnostic:AxialDiagnosticConfig", status = "experimental" }
-AxialDiagnosticResult = { target = "pyrite.montecarlo.channeling.axial_diagnostic:AxialDiagnosticResult", status = "experimental" }
-axial_diagnostic = { target = "pyrite.montecarlo.channeling.axial_diagnostic:axial_diagnostic", status = "experimental" }
+AxialPropagationConfig = { target = "pyrite.montecarlo.channeling.axial_propagation:AxialPropagationConfig", status = "experimental" }
+AxialPropagationResult = { target = "pyrite.montecarlo.channeling.axial_propagation:AxialPropagationResult", status = "experimental" }
+propagate_axial = { target = "pyrite.montecarlo.channeling.axial_propagation:propagate_axial", status = "experimental" }
 PlanarStateProjection = { target = "pyrite.quantum.planar_source:PlanarStateProjection", status = "experimental" }
 project_planar_source = { target = "pyrite.quantum.planar_source:project_planar_source", status = "experimental" }
 propagate_planar_source = { target = "pyrite.quantum.planar_source:propagate_planar_source", status = "experimental" }

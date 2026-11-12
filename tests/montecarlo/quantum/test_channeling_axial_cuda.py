@@ -185,7 +185,7 @@ def test_cuda_deterministic_propagation_and_device_callbacks():
     zeros = np.zeros(d.grid.shape)
     d = replace(d, tds_grid_rate=zeros, tds_sink_rate=zeros, electronic_rate=zeros)
     entry = states.gaussian(waist_ang=0.6)
-    kwargs = dict(depths_ang=[0, 100], n_electrons=4, seed=7, step_ang=10)
+    kwargs = dict(depths_ang=[0, 100], histories=4, seed=7, step_ang=10)
     host = AxialMCWF(d, 1e6, potential).run(entry, **kwargs)
     device = AxialMCWF(d, 1e6, potential, backend="cuda").run(entry, **kwargs)
     np.testing.assert_allclose(device.observables, host.observables, rtol=2e-11, atol=1e-12)
@@ -210,7 +210,7 @@ def test_cuda_threshold_blocks_preserve_exact_seeded_trajectories(monkeypatch):
     d, potential = _case(shape=(8, 8))
     solver = AxialMCWF(d, 1e6, potential, backend="cuda")
     entry = states.gaussian(waist_ang=0.6)
-    kwargs = dict(n_electrons=8, seed=17, step_ang=10, batch_size=8)
+    kwargs = dict(histories=8, seed=17, step_ang=10, batch_size=8)
     monkeypatch.setattr(_axial_cuda, "_CHECK_STEPS", 1)
     reference = solver.run(entry, [0, 500, 1000], **kwargs)
     monkeypatch.setattr(_axial_cuda, "_CHECK_STEPS", 8)
@@ -227,7 +227,7 @@ def test_cuda_stream_batch_recording_and_stochastic_parity():
     d, potential = _case()
     entry = states.gaussian(waist_ang=0.6)
     solver = AxialMCWF(d, 1e6, potential, backend="cuda")
-    kwargs = dict(n_electrons=128, seed=17, step_ang=10)
+    kwargs = dict(histories=128, seed=17, step_ang=10)
     first = solver.run(entry, [2000], batch_size=32, **kwargs)
     second = solver.run(entry, [0, 500, 2000], batch_size=7, **kwargs)
     assert first.jumps == second.jumps
@@ -239,7 +239,7 @@ def test_cuda_stream_batch_recording_and_stochastic_parity():
     host = AxialMCWF(d, 1e6, potential).run(entry, [2000], **kwargs)
     # Predeclared conservative independent-ensemble Hoeffding bound (four sigma
     # worst-case Bernoulli variance) for survival and four quadrant populations.
-    tolerance = 4 * np.sqrt(0.5 / kwargs["n_electrons"])
+    tolerance = 4 * np.sqrt(0.5 / kwargs["histories"])
     np.testing.assert_allclose(first.surviving, host.surviving, atol=tolerance, rtol=0)
     for x in (slice(0, 6), slice(6, 12)):
         for y in (slice(0, 6), slice(6, 12)):

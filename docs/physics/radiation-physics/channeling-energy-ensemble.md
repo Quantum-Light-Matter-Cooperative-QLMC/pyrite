@@ -69,10 +69,10 @@ Planar `energy_spread_eV` analytical line broadening is **incompatible** with th
 ## Axial examples
 
 ```python
-from pyrite.montecarlo.channeling.axial_diagnostic import AxialDiagnosticConfig
+from pyrite.montecarlo.channeling.axial_propagation import AxialPropagationConfig
 from pyrite.montecarlo.channeling import axial_energy_diagnostic, axial_energy_spectrum
 
-config = AxialDiagnosticConfig(
+config = AxialPropagationConfig(
     kinetic_energy_eV=5e6,
     depths_ang=(0.0, 50.0, 100.0),
     step_ang=5.0,
@@ -95,7 +95,7 @@ radiation = axial_energy_spectrum(ensemble, config, edges)
 # photon_density_per_eV: photons per incident electron per eV
 ```
 
-`axial_energy_diagnostic` constructs the energy-specific axial Hamiltonian, dissipator, real-space propagation and optional OAM projection on every node via `axial_diagnostic`. `coherence_pairs` is bounded to 128 pairs of flattened physical-grid pixels, with the carrier tilt phase included. Off-diagonal coherence is averaged as $\langle\psi(x_i)\psi^*(x_j)\rangle$ **per energy**, never by averaging amplitudes. Results at more than one node have no unique wavefunction or phase. For a monoenergetic pure coherent state, the original wavefunction is preserved exactly. `observable_factory(E)` can construct an energy-dependent, density-linear additional observable; its labels must have a common physical meaning across energies.
+`axial_energy_diagnostic` constructs the energy-specific axial Hamiltonian, dissipator, real-space propagation and optional OAM projection on every node via `propagate_axial`. `coherence_pairs` is bounded to 128 pairs of flattened physical-grid pixels, with the carrier tilt phase included. Off-diagonal coherence is averaged as $\langle\psi(x_i)\psi^*(x_j)\rangle$ **per energy**, never by averaging amplitudes. Results at more than one node have no unique wavefunction or phase. For a monoenergetic pure coherent state, the original wavefunction is preserved exactly. `observable_factory(E)` can construct an energy-dependent, density-linear additional observable; its labels must have a common physical meaning across energies.
 
 `axial_energy_spectrum` independently constructs the energy-dependent axial line catalog and forward photon energies at every node. Its spectrum is an incident-normalized intensity histogram across **photon-energy bin edges** (not an average of line *indices*). `detector_sigma_eV` optionally integrates a Gaussian *instrument* response over each bin; it is not a second incident-energy spread. Yield outside the requested photon-energy range is not included, and no renormalization of the emitted spectrum is applied. Helicity channels are accumulated separately.
 

@@ -28,22 +28,22 @@ def _():
     import pyrite as pr
     from pyrite.config import FixedSampling
     from pyrite.detectors import EnergyBins, PointDetector
-    from pyrite.experimental.quantum import AxialDiagnosticConfig, axial_diagnostic
+    from pyrite.experimental.quantum import AxialPropagationConfig, propagate_axial
     from pyrite.quantum import gaussian, laguerre_gauss
     from pyrite.units import ureg
 
     return (
-        AxialDiagnosticConfig,
+        AxialPropagationConfig,
         EnergyBins,
         FixedSampling,
         PointDetector,
-        axial_diagnostic,
         gaussian,
         laguerre_gauss,
         mo,
         np,
         plt,
         pr,
+        propagate_axial,
         replace,
         ureg,
     )
@@ -100,14 +100,14 @@ def _(mo):
 
 
 @app.cell
-def _(AxialDiagnosticConfig, gaussian, laguerre_gauss, ureg):
+def _(AxialPropagationConfig, gaussian, laguerre_gauss, ureg):
     # Edit the waist, energy, and recorded depths for quick experiments.
     # Keep the OAM disk inside the supercell. Increasing cell count without
     # increasing grid shape coarsens the spatial resolution.
     waist = 0.60 * ureg.angstrom
     kinetic_energy = 5 * ureg.MeV
 
-    config = AxialDiagnosticConfig(
+    config = AxialPropagationConfig(
         crystal="silicon",
         axis=(0, 0, 1),
         kinetic_energy_eV=kinetic_energy.to("eV").magnitude,
@@ -130,10 +130,10 @@ def _(AxialDiagnosticConfig, gaussian, laguerre_gauss, ureg):
 
 
 @app.cell
-def _(axial_diagnostic, config, gaussian_entry, replace, vortex_entry):
-    vortex = axial_diagnostic(config, entry=vortex_entry)
+def _(config, gaussian_entry, propagate_axial, replace, vortex_entry):
+    vortex = propagate_axial(config, entry=vortex_entry)
     # The Gaussian reference changes both amplitude profile and phase structure.
-    gaussian_result = axial_diagnostic(
+    gaussian_result = propagate_axial(
         replace(config, oam_string=None, record_current=False), entry=gaussian_entry
     )
     return gaussian_result, vortex
@@ -314,14 +314,14 @@ def _(mo):
 
 
 @app.cell
-def _(axial_diagnostic, config, replace, vortex_entry):
+def _(config, propagate_axial, replace, vortex_entry):
     scattering_config = replace(
         config,
         mode="mcwf",
         shape=(24, 24),
         depths_ang=(0.0, 100.0, 300.0, 500.0),  # Å
         step_ang=10.0,
-        n_electrons=12,
+        histories=12,
         seed=17,
         oam_string=None,  # keep the small ensemble inexpensive
         record_current=False,
@@ -329,7 +329,7 @@ def _(axial_diagnostic, config, replace, vortex_entry):
         spectral_representation="energy_bins",
         spectral_energy_bins=8,
     )
-    scattered = axial_diagnostic(scattering_config, entry=vortex_entry, record_metrics=True)
+    scattered = propagate_axial(scattering_config, entry=vortex_entry, record_metrics=True)
     return (scattered,)
 
 

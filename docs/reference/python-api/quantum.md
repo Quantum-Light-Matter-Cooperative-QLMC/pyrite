@@ -91,9 +91,9 @@ existing code owners. The same axial objects can be imported from the
    :nosignatures:
 
    pyrite.montecarlo.channeling.spatial.spatial_density
-   pyrite.montecarlo.channeling.axial_diagnostic.AxialDiagnosticConfig
-   pyrite.montecarlo.channeling.axial_diagnostic.AxialDiagnosticResult
-   pyrite.montecarlo.channeling.axial_diagnostic.axial_diagnostic
+   pyrite.montecarlo.channeling.axial_propagation.AxialPropagationConfig
+   pyrite.montecarlo.channeling.axial_propagation.AxialPropagationResult
+   pyrite.montecarlo.channeling.axial_propagation.propagate_axial
 ```
 
 ## Solver diagnostic contracts
@@ -101,7 +101,7 @@ existing code owners. The same axial objects can be imported from the
 | Entry | Owner / status | Scientific contract and effects |
 | --- | --- | --- |
 | `spatial_density` | Quantum/channeling, experimental | Density matrix, basis eigenfunctions and spatial grid (angstrom); Born-rule probability density (1/angstrom), including retained survival weight, without conditioning or renormalization. Array compatibility errors propagate; no transport or artifact I/O. |
-| `AxialDiagnosticConfig`, `AxialDiagnosticResult`, `axial_diagnostic` | Quantum/channeling, experimental | Bounded solver configuration (field-specific units), populations and incident-normalized spatial density on recorded depths; retained solver/configuration diagnostics. Explicit solver/allocation limits and invalid configurations raise. No standard axial transport integration. Ownership consolidation belongs to #704. |
+| `AxialPropagationConfig`, `AxialPropagationResult`, `propagate_axial` | Quantum/channeling, experimental | Bounded solver configuration (field-specific units), populations and incident-normalized spatial density on recorded depths; retained solver/configuration diagnostics. Explicit solver/allocation limits and invalid configurations raise. No standard axial transport integration. Ownership consolidation belongs to #704. |
 
 For planar channeling, `DensityMatrixSolver.propagate(spatial_x_ang=...)`
 records density per incident electron per Å on the supplied grid. Its cell

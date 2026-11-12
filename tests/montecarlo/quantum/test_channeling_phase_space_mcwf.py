@@ -12,12 +12,12 @@ from pyrite.montecarlo.channeling import (  # noqa: E402
     axial_phase_space_mcwf,
     axial_temporal_slices,
 )
-from pyrite.montecarlo.channeling.axial_diagnostic import (  # noqa: E402
-    AxialDiagnosticConfig,
-    axial_diagnostic,
-)
 from pyrite.montecarlo.channeling.axial_dissipator import axial_dissipator  # noqa: E402
 from pyrite.montecarlo.channeling.axial_mcwf import AxialMCWF  # noqa: E402
+from pyrite.montecarlo.channeling.axial_propagation import (  # noqa: E402
+    AxialPropagationConfig,
+    propagate_axial,
+)
 from pyrite.montecarlo.channeling.mcwf import mcwf_stream_key  # noqa: E402
 from pyrite.montecarlo.channeling.states import gaussian, translate  # noqa: E402
 
@@ -34,10 +34,10 @@ def _space(t, energy, position=None, slope=None, weights=None):
 
 
 def test_axial_slices_are_invariant_to_arrival_time_spread():
-    cfg = AxialDiagnosticConfig(
+    cfg = AxialPropagationConfig(
         kinetic_energy_eV=10e6, shape=(12, 12), depths_ang=(0.0, 4.0), step_ang=1.0
     )
-    direct = axial_diagnostic(cfg)
+    direct = propagate_axial(cfg)
     space = _space(np.linspace(-500.0, 500.0, 8), 10e6)
     result = axial_temporal_slices(space, cfg, [-600.0, 0.0, 50.0, 600.0])
     assert result.slices.probability.tolist() == [0.5, 0.0, 0.5]
@@ -49,7 +49,7 @@ def test_axial_slices_are_invariant_to_arrival_time_spread():
 
 
 def test_mcwf_records_keep_their_own_energy_slope_and_impact():
-    cfg = AxialDiagnosticConfig(
+    cfg = AxialPropagationConfig(
         mode="mcwf",
         kinetic_energy_eV=10e6,
         mechanisms=("tds",),
@@ -89,7 +89,7 @@ def test_mcwf_records_keep_their_own_energy_slope_and_impact():
 
 
 def test_mcwf_slices_cover_records_and_reduce_by_incident_count():
-    cfg = AxialDiagnosticConfig(
+    cfg = AxialPropagationConfig(
         mode="mcwf",
         kinetic_energy_eV=10e6,
         mechanisms=("tds",),

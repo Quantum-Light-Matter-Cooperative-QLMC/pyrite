@@ -6,13 +6,13 @@ from dataclasses import asdict
 import matplotlib.pyplot as plt
 import numpy as np
 
-from pyrite.experimental.quantum import AxialDiagnosticConfig, axial_diagnostic
+from pyrite.experimental.quantum import AxialPropagationConfig, propagate_axial
 from pyrite.quantum import gaussian
 
 
 def calculate(depth_ang=500.0, waist_ang=0.5):
     """Evolve a pure Gaussian in a periodic Si[001] supercell on CPU."""
-    config = AxialDiagnosticConfig(
+    config = AxialPropagationConfig(
         crystal="silicon",
         axis=(0, 0, 1),
         kinetic_energy_eV=5e6,
@@ -24,7 +24,7 @@ def calculate(depth_ang=500.0, waist_ang=0.5):
         backend="cpu",
     )
     entry = gaussian(waist_ang=waist_ang, dimension=2, center_ang=(1.0, 1.0))
-    result = axial_diagnostic(config, entry=entry)
+    result = propagate_axial(config, entry=entry)
     waves = result.wavefunctions_per_ang
     overlap = np.abs(np.sum(waves[0].conj() * waves, axis=(1, 2))) ** 2
     overlap *= result.grid.cell_area_ang2**2

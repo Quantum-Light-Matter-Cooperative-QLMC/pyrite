@@ -23,7 +23,7 @@ from .vortex import CylindricalProjection
 
 
 @dataclass(frozen=True)
-class AxialDiagnosticConfig:
+class AxialPropagationConfig:
     """Solver configuration; lengths in Å, kinetic energy in eV, tilt in rad.
 
     ``cells`` counts periodic projected crystal cells; ``shape`` is the total
@@ -44,7 +44,7 @@ class AxialDiagnosticConfig:
     step_ang: float = 5.0
     tilt_rad: tuple[float, float] = (0.0, 0.0)
     mode: Literal["unitary", "mcwf"] = "unitary"
-    n_electrons: int = 16
+    histories: int = 16
     seed: int = 0
     mechanisms: tuple[str, ...] = ("tds", "electronic")
     oam_string: int | None = None
@@ -65,7 +65,7 @@ class AxialDiagnosticConfig:
 
     def __post_init__(self) -> None:
         for name, unit in _NUMERIC_FIELD_UNITS:
-            reject_quantity(getattr(self, name), field=f"AxialDiagnosticConfig.{name}", unit=unit)
+            reject_quantity(getattr(self, name), field=f"AxialPropagationConfig.{name}", unit=unit)
 
 
 _NUMERIC_FIELD_UNITS = (
@@ -78,13 +78,13 @@ _NUMERIC_FIELD_UNITS = (
     ("spectral_cutoff_eV", "eV"),
     ("cells", "dimensionless count"),
     ("shape", "dimensionless count"),
-    ("n_electrons", "dimensionless count"),
+    ("histories", "dimensionless count"),
     ("spectral_states", "dimensionless count"),
     ("spectral_energy_bins", "dimensionless count"),
 )
 
 
-def _validate(config: AxialDiagnosticConfig) -> None:
+def _validate(config: AxialPropagationConfig) -> None:
     for name in ("kinetic_energy_eV", "temperature_K", "step_ang", "oam_radius_ang"):
         value = getattr(config, name)
         if not np.isfinite(value) or value <= 0:
@@ -116,8 +116,8 @@ def _validate(config: AxialDiagnosticConfig) -> None:
         raise ValueError("depths_ang must be multiples of step_ang")
     if config.mode not in ("unitary", "mcwf"):
         raise ValueError("mode must be 'unitary' or 'mcwf' ('coherent' is now 'unitary')")
-    if not isinstance(config.n_electrons, Integral) or config.n_electrons < 1:
-        raise ValueError("n_electrons must be a positive integer")
+    if not isinstance(config.histories, Integral) or config.histories < 1:
+        raise ValueError("histories must be a positive integer")
     if not isinstance(config.seed, Integral) or config.seed < 0:
         raise ValueError("seed must be a nonnegative integer")
     if set(config.mechanisms) - {"tds", "electronic"}:
@@ -155,7 +155,7 @@ def _validate(config: AxialDiagnosticConfig) -> None:
 
 
 @dataclass(frozen=True)
-class AxialDiagnosticResult:
+class AxialPropagationResult:
     """Stored diagnostic, with incident-electron density in Å⁻².
 
     Integrating ``density_per_ang2`` over the periodic grid equals ``surviving``.
@@ -170,7 +170,7 @@ class AxialDiagnosticResult:
     weighted like ``density_per_ang2`` (per incident electron).
     """
 
-    config: AxialDiagnosticConfig
+    config: AxialPropagationConfig
     entry: EntryState
     profile: AxialProfile
     grid: RealSpaceGrid
@@ -291,7 +291,7 @@ class _DiagnosticRecording:
             for f in (spectral, coherence, current)
             if f is not None
         )
-        self.electrons = config.n_electrons if config.mode == "mcwf" else None
+        self.histories = config.histories if config.mode == "mcwf" else None
 
     def __call__(self, phi, tilt):
         xp = np
@@ -305,7 +305,7 @@ class _DiagnosticRecording:
         if self.metrics is None:
             return None
         return self.metrics.finish(
-            stacked[:, -self.width :], surviving, density, electrons=self.electrons
+            stacked[:, -self.width :], surviving, density, histories=self.histories
         )
 
     def prepare_batch(self, states, tilts, total=None):
@@ -346,14 +346,14 @@ def _validate_backend(config):
         raise ValueError("CUDA diagnostic backend requires MCWF mode")
 
 
-def axial_diagnostic(
-    config: AxialDiagnosticConfig = AxialDiagnosticConfig(),
+def propagate_axial(
+    config: AxialPropagationConfig = AxialPropagationConfig(),
     *,
     entry: EntryState | TransverseStateSpec | None = None,
     observable: Callable[[np.ndarray, tuple[float, float]], np.ndarray] | None = None,
     record_metrics: bool = False,
     base_dir: str | Path | None = None,
-) -> AxialDiagnosticResult:
+) -> AxialPropagationResult:
     """Assemble the experimental axial diagnostic with optional stored ensemble metrics.
 
     ``entry`` uses the existing 2D pure/mixture interface; omitted means a
@@ -477,7 +477,7 @@ def axial_diagnostic(
         mcwf = AxialMCWF(dissipator, config.kinetic_energy_eV, potential, **backend).run(
             entry,
             config.depths_ang,
-            config.n_electrons,
+            config.histories,
             seed=config.seed,
             step_ang=config.step_ang,
             tilt_rad=config.tilt_rad,
@@ -486,7 +486,7 @@ def axial_diagnostic(
         stacked, waves, jumps = mcwf.observables, None, mcwf.jumps
         numerical_sink = (
             np.searchsorted(np.sort(mcwf.sink_depths_ang), config.depths_ang, side="right")
-            / config.n_electrons
+            / config.histories
         )
         jump_history = getattr(mcwf, "jump_history", None)
     count = grid.shape[0] * grid.shape[1]
@@ -524,7 +524,7 @@ def axial_diagnostic(
         surviving = density.sum(axis=(1, 2)) * grid.cell_area_ang2
     else:
         surviving = mcwf.surviving
-    return AxialDiagnosticResult(
+    return AxialPropagationResult(
         config,
         entry,
         profile,

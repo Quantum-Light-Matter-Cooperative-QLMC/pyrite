@@ -21,10 +21,10 @@ from pyrite.montecarlo.channeling import (
     AxialEnergyMCWFOptions,
     axial_energy_mcwf,
 )
-from pyrite.montecarlo.channeling.axial_diagnostic import AxialDiagnosticConfig
+from pyrite.montecarlo.channeling.axial_propagation import AxialPropagationConfig
 
 spec = IncidentEnergyEnsemble(5e6, energy_spread_frac=0.002, order=9)
-config = AxialDiagnosticConfig(
+config = AxialPropagationConfig(
     kinetic_energy_eV=5e6,
     mode="mcwf",
     shape=(32, 32),

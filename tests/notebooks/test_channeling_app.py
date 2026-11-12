@@ -146,7 +146,7 @@ def test_axial_app_executes_same_api_and_reuses_solve(mode):
 
     from pyrite.apps.axial_channeling import solve_axial_demo
     from pyrite.apps.channeling_app import app
-    from pyrite.montecarlo.channeling.axial_diagnostic import axial_diagnostic
+    from pyrite.montecarlo.channeling.axial_propagation import propagate_axial
 
     values = dict(
         crystal="silicon",
@@ -187,7 +187,7 @@ def test_axial_app_executes_same_api_and_reuses_solve(mode):
         }
     )
     result = definitions["axial_result"]
-    direct = axial_diagnostic(result.config, entry=result.entry)
+    direct = propagate_axial(result.config, entry=result.entry)
     np.testing.assert_allclose(result.density_per_ang2, direct.density_per_ang2)
     assert solve_axial_demo(result.config, "Gaussian", 0.5, (0, 0), record_metrics=True) is result
     assert (
@@ -204,9 +204,9 @@ def test_axial_app_bounds_and_cache():
     import matplotlib.pyplot as plt
 
     from pyrite.apps.axial_channeling import axial_demo_figure, solve_axial_demo
-    from pyrite.montecarlo.channeling.axial_diagnostic import AxialDiagnosticConfig
+    from pyrite.montecarlo.channeling.axial_propagation import AxialPropagationConfig
 
-    config = AxialDiagnosticConfig(shape=(16, 16))
+    config = AxialPropagationConfig(shape=(16, 16))
     result = solve_axial_demo(config, "Equal ±1 mixture")
     assert solve_axial_demo(config, "Equal ±1 mixture") is result
     assert result.wavefunctions_per_ang is None
@@ -215,10 +215,10 @@ def test_axial_app_bounds_and_cache():
     plt.close(figure)
     for updates in (
         {"shape": (64, 64)},
-        {"n_electrons": 33},
+        {"histories": 33},
         {"depths_ang": tuple(range(0, 500, 10))},
         {"depths_ang": (0.0, 1e8)},
-        {"mode": "mcwf", "n_electrons": 32, "depths_ang": (0.0, 1e7)},
+        {"mode": "mcwf", "histories": 32, "depths_ang": (0.0, 1e7)},
     ):
         with pytest.raises(ValueError, match="app limit"):
             solve_axial_demo(replace(config, **updates))
@@ -239,9 +239,9 @@ def test_axial_maps_center_the_origin_string():
     import matplotlib.pyplot as plt
 
     from pyrite.apps.axial_channeling import axial_demo_figure, solve_axial_demo
-    from pyrite.montecarlo.channeling.axial_diagnostic import AxialDiagnosticConfig
+    from pyrite.montecarlo.channeling.axial_propagation import AxialPropagationConfig
 
-    result = solve_axial_demo(AxialDiagnosticConfig(shape=(16, 16), depths_ang=(0.0,)))
+    result = solve_axial_demo(AxialPropagationConfig(shape=(16, 16), depths_ang=(0.0,)))
     figure = axial_demo_figure(result, 0)
     for ax, pick in ((figure.axes[0], np.argmin), (figure.axes[1], np.argmax)):
         image = ax.images[0]
@@ -275,9 +275,9 @@ def test_axial_radiation_reports_vortex_helicity_and_far_field():
         axial_radiation_figures,
         solve_axial_demo,
     )
-    from pyrite.montecarlo.channeling.axial_diagnostic import AxialDiagnosticConfig
+    from pyrite.montecarlo.channeling.axial_propagation import AxialPropagationConfig
 
-    config = AxialDiagnosticConfig(shape=(32, 32), depths_ang=axial_demo_depths(500, 5))
+    config = AxialPropagationConfig(shape=(32, 32), depths_ang=axial_demo_depths(500, 5))
     vortex = axial_radiation(solve_axial_demo(config, "Vortex +1"))
     options, strongest = axial_line_options(vortex)
     assert options[strongest] == 0 and len(vortex.catalog.lines) == 1
@@ -350,5 +350,5 @@ def test_metric_views_are_cached_array_consumers():
         }
         if calls & {"metric_figure", "axial_metric_figure"}:
             views.append(cell)
-            assert not calls & {"solve_axial_demo", "axial_diagnostic", "DensityMatrixSolver"}
+            assert not calls & {"solve_axial_demo", "propagate_axial", "DensityMatrixSolver"}
     assert len(views) == 2

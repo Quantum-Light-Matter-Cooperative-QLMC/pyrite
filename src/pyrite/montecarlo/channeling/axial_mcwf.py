@@ -83,11 +83,11 @@ class AxialMCWFResult:
     jumps
         Total jumps per mechanism: ``tds``, ``sink``, ``electronic``, plus
         ``absorbed`` (hook absorptions) when a ``jump_hook`` is given.
-    n_electrons
+    histories
         Trajectories run.
     jump_history
         Cumulative raw ensemble jump counts at each recorded depth, by
-        mechanism. Divide by ``n_electrons`` for counts per incident electron.
+        mechanism. Divide by ``histories`` for counts per incident electron.
     """
 
     depths_ang: np.ndarray
@@ -95,7 +95,7 @@ class AxialMCWFResult:
     surviving: np.ndarray
     sink_depths_ang: np.ndarray
     jumps: dict[str, int]
-    n_electrons: int
+    histories: int
     jump_history: dict[str, np.ndarray] | None = None
 
 
@@ -217,7 +217,7 @@ class AxialMCWF:
         self,
         entry: EntryState | TransverseStateSpec,
         depths_ang: Sequence[float],
-        n_electrons: int,
+        histories: int,
         *,
         seed: int = 0,
         step_ang: float = 5.0,
@@ -228,7 +228,7 @@ class AxialMCWF:
         memory_budget_bytes: int | None = None,
         base_dir: str | Path | None = None,
     ) -> AxialMCWFResult:
-        """Run ``n_electrons`` trajectories from ``entry`` and average ``observable``.
+        """Run ``histories`` trajectories from ``entry`` and average ``observable``.
 
         ``depths_ang`` must be ascending multiples of ``step_ang`` (rounded to
         the nearest step). ``tilt_rad`` is the mean carrier tilt.
@@ -261,7 +261,7 @@ class AxialMCWF:
                 self,
                 entry,
                 depths_ang,
-                n_electrons,
+                histories,
                 seed=seed,
                 step_ang=step_ang,
                 tilt_rad=tilt_rad,
@@ -275,7 +275,7 @@ class AxialMCWF:
         return self._run_cpu(
             entry,
             depths_ang,
-            n_electrons,
+            histories,
             seed=seed,
             step_ang=step_ang,
             tilt_rad=tilt_rad,
@@ -288,7 +288,7 @@ class AxialMCWF:
         self,
         entry,
         depths_ang,
-        n_electrons,
+        histories,
         *,
         seed,
         step_ang,
@@ -298,7 +298,7 @@ class AxialMCWF:
         batch_size,
     ) -> AxialMCWFResult:
         """Historical NumPy trajectory loop; preserves CPU RNG draws/event order."""
-        steps = _depth_steps(depths_ang, n_electrons, step_ang)
+        steps = _depth_steps(depths_ang, histories, step_ang)
         components = _sample_components(self.grid, entry)
         mix = np.array([w for w, _ in components])
         base_tilt = (self.momentum * tilt_rad[0], self.momentum * tilt_rad[1])
@@ -313,8 +313,8 @@ class AxialMCWF:
         cells = self.grid.shape[0] * self.grid.shape[1]
 
         batch = batch_size
-        for start in range(0, n_electrons, batch):
-            rngs = [_rng(seed, e) for e in range(start, min(start + batch, n_electrons))]
+        for start in range(0, histories, batch):
+            rngs = [_rng(seed, e) for e in range(start, min(start + batch, histories))]
             size = len(rngs)
             phi = np.empty((size, *self.grid.shape), dtype=complex)
             for b, rng in enumerate(rngs):
@@ -366,23 +366,21 @@ class AxialMCWF:
         template = next((s for s in sums if s is not None), None)
         if template is None:
             template = np.asarray(observable(components[0][1], base_tilt)) * 0.0
-        observables = np.stack(
-            [(s if s is not None else template * 0.0) / n_electrons for s in sums]
-        )
+        observables = np.stack([(s if s is not None else template * 0.0) / histories for s in sums])
         return AxialMCWFResult(
             depths_ang=steps * step_ang,
             observables=observables,
-            surviving=alive / n_electrons,
+            surviving=alive / histories,
             sink_depths_ang=np.asarray(sinks),
             jumps=jumps,
-            n_electrons=int(n_electrons),
+            histories=int(histories),
             jump_history=history,
         )
 
 
-def _depth_steps(depths, n_electrons, step):
-    if n_electrons < 1 or not np.isfinite(step) or step <= 0:
-        raise ValueError("n_electrons must be >= 1 and step_ang positive")
+def _depth_steps(depths, histories, step):
+    if histories < 1 or not np.isfinite(step) or step <= 0:
+        raise ValueError("histories must be >= 1 and step_ang positive")
     depths = np.asarray(depths, dtype=float)
     if depths.ndim != 1 or not depths.size or not np.all(np.isfinite(depths)):
         raise ValueError("depths must be nonempty finite one-dimensional samples")

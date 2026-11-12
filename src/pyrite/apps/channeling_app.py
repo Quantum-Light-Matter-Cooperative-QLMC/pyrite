@@ -606,11 +606,11 @@ def _(axial_form, mo):
         axial_demo_figure,
         solve_axial_demo,
     )
-    from pyrite.montecarlo.channeling.axial_diagnostic import AxialDiagnosticConfig
+    from pyrite.montecarlo.channeling.axial_propagation import AxialPropagationConfig
 
     mo.stop(axial_form.value is None, mo.md("Choose settings and press **Run axial diagnostic**."))
     _v = axial_form.value
-    axial_config = AxialDiagnosticConfig(
+    axial_config = AxialPropagationConfig(
         crystal=_v["crystal"],
         axis=(0, 0, 1) if _v["axis"] == "001" else (1, 1, 0),
         kinetic_energy_eV=_v["energy"] * 1e6,
@@ -635,7 +635,7 @@ def _(axial_form, mo):
         coherence_reference_index=(
             None if _v["ref_auto"] else (int(_v["ref_x"]), int(_v["ref_y"]))
         ),
-        n_electrons=int(_v["electrons"]),
+        histories=int(_v["electrons"]),
         seed=int(_v["seed"]),
         oam_string=0 if _v["oam"] else None,
     )

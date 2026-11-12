@@ -291,13 +291,13 @@
       "exception": "#680: accept 59 -> 60 for the optional channeling_source admission guard. Source-specific checks already live in validate_source_case; the dispatcher must also reject source records without planar channeling. Moving this single guard would only hide a constructor invariant."
     },
     {
-      "path": "src/pyrite/montecarlo/channeling/axial_diagnostic.py",
+      "path": "src/pyrite/montecarlo/channeling/axial_propagation.py",
       "name": "_validate",
       "cc": 44
     },
     {
-      "path": "src/pyrite/montecarlo/channeling/axial_diagnostic.py",
-      "name": "axial_diagnostic",
+      "path": "src/pyrite/montecarlo/channeling/axial_propagation.py",
+      "name": "propagate_axial",
       "cc": 33
     },
     {

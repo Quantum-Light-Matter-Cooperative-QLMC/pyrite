@@ -140,6 +140,20 @@ def test_axial_states_left_materials_without_alias():
         from pyrite.materials.channeling.axial import AxialStates  # noqa: F401
 
 
+@pytest.mark.parametrize(
+    "name", ["AxialDiagnosticConfig", "AxialDiagnosticResult", "axial_diagnostic"]
+)
+def test_pre_rename_axial_names_are_gone_without_alias(name):
+    from pyrite.experimental import quantum as experimental
+
+    for namespace in (quantum, experimental):
+        assert name not in namespace.__all__
+        with pytest.raises(AttributeError, match=name):
+            getattr(namespace, name)
+    with pytest.raises(ModuleNotFoundError):
+        importlib.import_module("pyrite.montecarlo.channeling.axial_diagnostic")
+
+
 def test_facade_rejects_unreviewed_engine_helpers():
     assert "zone_solver" not in quantum.__all__
     with pytest.raises(AttributeError, match="zone_solver"):

@@ -6,16 +6,16 @@ from functools import lru_cache
 import numpy as np
 
 from pyrite.materials.channeling.axial import axial_profile
-from pyrite.montecarlo.channeling.axial_diagnostic import (
-    AxialDiagnosticConfig,
-    AxialDiagnosticResult,
-    axial_diagnostic,
-)
 from pyrite.montecarlo.channeling.axial_emission import (
     AxialLineCatalog,
     LevelDensity,
     axial_line_catalog,
     photon_angular_momentum,
+)
+from pyrite.montecarlo.channeling.axial_propagation import (
+    AxialPropagationConfig,
+    AxialPropagationResult,
+    propagate_axial,
 )
 from pyrite.montecarlo.channeling.dipole import dipole_rate_per_ang
 from pyrite.montecarlo.channeling.realspace import RealSpaceGrid
@@ -44,12 +44,12 @@ def axial_demo_depths(
 
 @lru_cache(maxsize=4)
 def solve_axial_demo(
-    config: AxialDiagnosticConfig,
+    config: AxialPropagationConfig,
     preset: str = "Gaussian",
     waist_ang: float = 0.5,
     impact_ang: tuple[float, float] = (0.0, 0.0),
     record_metrics: bool = True,
-) -> AxialDiagnosticResult:
+) -> AxialPropagationResult:
     """Cache app runs while keeping explicit backend-dependent resource bounds."""
     cuda = config.backend == "cuda"
     if cuda and config.mode != "mcwf":
@@ -67,7 +67,7 @@ def solve_axial_demo(
         max(config.shape) > max_grid
         or max(config.cells) > max_cells
         or config.step_ang < min_step
-        or config.n_electrons > max_electrons
+        or config.histories > max_electrons
         or len(config.depths_ang) > max_depths
     ):
         raise ValueError(
@@ -92,7 +92,7 @@ def solve_axial_demo(
     else:
         raise ValueError("unknown axial entry preset")
     if config.mode == "mcwf":
-        trajectories = config.n_electrons
+        trajectories = config.histories
     else:
         trajectories = len(entry.components) if isinstance(entry, MixedState) else 1
     steps = config.depths_ang[-1] / config.step_ang
@@ -103,7 +103,7 @@ def solve_axial_demo(
             "use a coarser step, fewer electrons, or run the diagnostic outside the app"
         )
     levels = _level_observable(config)
-    return axial_diagnostic(config, entry=entry, observable=levels, record_metrics=record_metrics)
+    return propagate_axial(config, entry=entry, observable=levels, record_metrics=record_metrics)
 
 
 @lru_cache(maxsize=4)
@@ -144,7 +144,7 @@ class _RolledLevelDensity:
         return self.levels.sum_batch(xp.roll(states, self.shift, axis=(-2, -1)), tilts)
 
 
-def _level_observable(config: AxialDiagnosticConfig) -> _RolledLevelDensity | None:
+def _level_observable(config: AxialPropagationConfig) -> _RolledLevelDensity | None:
     catalog = _catalog(config.crystal, config.axis, config.kinetic_energy_eV, config.temperature_K)
     if catalog is None:
         return None
@@ -180,7 +180,7 @@ class AxialRadiation:
         return u @ self.cumulative[sample, line] @ u.conj().T
 
 
-def axial_radiation(result: AxialDiagnosticResult) -> AxialRadiation | None:
+def axial_radiation(result: AxialPropagationResult) -> AxialRadiation | None:
     """Return line emission from a demo solve, or ``None`` without a line catalog.
 
     Validation: cr-axial-helicity-emission
@@ -213,7 +213,7 @@ def _centered(values: np.ndarray, grid):
     return np.roll(values, shift, axis=(0, 1)).T, tuple(extent)
 
 
-def _axial_view(axes, result: AxialDiagnosticResult, view: str):
+def _axial_view(axes, result: AxialPropagationResult, view: str):
     """Crop only the plot axes; the solved periodic state remains unchanged."""
     if view not in ("full", "unit_cell"):
         raise ValueError("view must be full or unit_cell")
@@ -225,7 +225,7 @@ def _axial_view(axes, result: AxialDiagnosticResult, view: str):
                 ax.set(xlim=(-lx / 2, lx / 2), ylim=(-ly / 2, ly / 2))
 
 
-def axial_flux_figure(result: AxialDiagnosticResult, sample: int, view: str = "full"):
+def axial_flux_figure(result: AxialPropagationResult, sample: int, view: str = "full"):
     """Plot stored (cached-solve) probability flow without recomputing MCWF."""
     import matplotlib.pyplot as plt
 
@@ -302,7 +302,7 @@ def axial_flux_figure(result: AxialDiagnosticResult, sample: int, view: str = "f
 
 
 def axial_demo_figure(
-    result: AxialDiagnosticResult, sample: int, conditional: bool = False, view: str = "full"
+    result: AxialPropagationResult, sample: int, conditional: bool = False, view: str = "full"
 ):
     """Draw recorded arrays; phase is a coherent envelope or ensemble relative phase."""
     import matplotlib.pyplot as plt
@@ -342,7 +342,7 @@ def axial_demo_figure(
             result.coherence_second_moment[sample],
             result.density_per_ang2[sample],
             result.coherence_reference_index,
-            result.config.n_electrons if result.config.mode == "mcwf" else None,
+            result.config.histories if result.config.mode == "mcwf" else None,
         )
         shown, extent = _centered(phase, result.grid)
         mesh = axes[2].imshow(
@@ -367,7 +367,7 @@ def axial_demo_figure(
     return fig
 
 
-def axial_coherence_figure(result: AxialDiagnosticResult, sample: int, view: str = "full"):
+def axial_coherence_figure(result: AxialPropagationResult, sample: int, view: str = "full"):
     """Plot cached normalized spatial coherence; never reconstruct from density."""
     import matplotlib.pyplot as plt
 
@@ -381,7 +381,7 @@ def axial_coherence_figure(result: AxialDiagnosticResult, sample: int, view: str
         result.coherence_second_moment[sample],
         result.density_per_ang2[sample],
         result.coherence_reference_index,
-        result.config.n_electrons if result.config.mode == "mcwf" else None,
+        result.config.histories if result.config.mode == "mcwf" else None,
     )
     fig, axes = plt.subplots(1, 2, figsize=(10, 4), constrained_layout=True)
     for ax, values, title, cmap, bounds in (
@@ -411,7 +411,7 @@ def axial_coherence_figure(result: AxialDiagnosticResult, sample: int, view: str
     return fig
 
 
-def axial_spectral_population_data(result: AxialDiagnosticResult):
+def axial_spectral_population_data(result: AxialPropagationResult):
     """Return orthonormal spectral populations, independently of local line weights."""
     if result.spectral_populations is None:
         return None
@@ -503,7 +503,7 @@ def axial_line_options(radiation: AxialRadiation) -> tuple[dict[str, int], str]:
     return dict(zip(labels, range(len(labels)), strict=True)), labels[strongest]
 
 
-def axial_population_data(result: AxialDiagnosticResult):
+def axial_population_data(result: AxialPropagationResult):
     """Stored string-0 level weights, retaining degeneracy labels and residuals."""
     observable = _level_observable(result.config)
     if observable is None or result.observables is None:

@@ -179,22 +179,22 @@ def test_recording_does_not_change_cpu_trajectories_or_survival():
     """Integration: extra observables may not consume a trajectory RNG draw."""
     from dataclasses import replace
 
-    from pyrite.montecarlo.channeling.axial_diagnostic import (
-        AxialDiagnosticConfig,
-        axial_diagnostic,
+    from pyrite.montecarlo.channeling.axial_propagation import (
+        AxialPropagationConfig,
+        propagate_axial,
     )
 
-    config = AxialDiagnosticConfig(
+    config = AxialPropagationConfig(
         shape=(8, 8),
         depths_ang=(0.0, 5.0, 10.0),
         step_ang=5,
         mode="mcwf",
         mechanisms=("tds",),
-        n_electrons=3,
+        histories=3,
         seed=42,
     )
-    base = axial_diagnostic(config)
-    measured = axial_diagnostic(
+    base = propagate_axial(config)
+    measured = propagate_axial(
         replace(
             config,
             spectral_states=8,

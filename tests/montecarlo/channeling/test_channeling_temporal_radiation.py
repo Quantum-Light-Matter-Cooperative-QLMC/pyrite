@@ -216,8 +216,8 @@ def _fake_axial(monkeypatch):
             cumulative=cumulative,
         )
 
-    fake_diag = types.ModuleType("pyrite.montecarlo.channeling.axial_diagnostic")
-    fake_diag.axial_diagnostic = solve
+    fake_diag = types.ModuleType("pyrite.montecarlo.channeling.axial_propagation")
+    fake_diag.propagate_axial = solve
     fake_app = types.ModuleType("pyrite.apps.axial_channeling")
     fake_app._level_observable = lambda config: None
     fake_app.axial_radiation = radiation

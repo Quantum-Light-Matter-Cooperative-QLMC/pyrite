@@ -39,7 +39,7 @@ runtime factories stay under `pyrite.quantum`. See the
 | Crystal profiles and Bloch states | `planar_profile`, `axial_profile`, `transverse_states`, `axial_states`, `AxialStates`, `entry_populations`, `longitudinal_kinematics`, `line_energy_eV`, `M_E_EV` | Experimental (#1147). Profiles are beam-independent crystal potentials (angstrom, eV); Bloch states, entry populations, kinematics and Doppler line energies take the beam Lorentz factor. `M_E_EV` is the electron rest energy as a float in eV. Runtime values only; no portable contract. |
 | Emission and exit diagnostics | `channeling_spectrum`, `axial_line_catalog`, `classical_exit_angles`, `coherent_exit_distribution` | Experimental direct diagnostics (#1147); outputs keep their existing units and per-electron normalization. |
 | Fibre research adapters | `planar_fiber_inputs`, `unravel_fiber_outgoing` | Experimental research adapters (#1147) used by the repository fibre-source studies; no production admission. |
-| Axial solving/results | `AxialMCWF`, `AxialMCWFResult`, `AxialDiagnosticConfig`, `AxialDiagnosticResult`, `axial_diagnostic` | Experimental direct diagnostics; production axial admission is unchanged. The high-level diagnostic collects grid, escape, phase-space and optional emission summaries. |
+| Axial solving/results | `AxialMCWF`, `AxialMCWFResult`, `AxialPropagationConfig`, `AxialPropagationResult`, `propagate_axial` | Experimental direct diagnostics; production axial admission is unchanged. The high-level diagnostic collects grid, escape, phase-space and optional emission summaries. |
 
 Existing `pyrite` root aliases, `pyrite.quantum.state.TransverseStateSpec`,
 `pyrite.quantum.planar_source` bridge functions, and the
@@ -334,8 +334,8 @@ factory Pint boundary. Axial diagnostics remain experimental and do not enable
 
 ### Configuration and normalization
 
-`axial_diagnostic(config, *, entry=None, observable=None, record_metrics=False)`
-runs one `AxialDiagnosticConfig`; see
+`propagate_axial(config, *, entry=None, observable=None, record_metrics=False)`
+runs one `AxialPropagationConfig`; see
 [the axial guide](../guides/experimental-axial-channeling.md#run-an-mcwf-diagnostic-from-python)
 for a complete call.
 

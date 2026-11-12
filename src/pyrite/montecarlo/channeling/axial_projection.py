@@ -247,7 +247,7 @@ def run_spectral_mcwf(
     projector: SpectralProjector,
     entry: EntryState | TransverseStateSpec,
     depths_ang: Sequence[float],
-    n_electrons: int,
+    histories: int,
     *,
     seed: int = 0,
     step_ang: float = 5.0,
@@ -276,7 +276,7 @@ def run_spectral_mcwf(
     if solver.backend != "cpu":
         raise ValueError("spectral MCWF research reference supports only CPU")
     entry = axial_entry(entry, base_dir)
-    steps = _depth_steps(depths_ang, n_electrons, step_ang)
+    steps = _depth_steps(depths_ang, histories, step_ang)
     stepper = SpectralNoJump(
         projector,
         solver.grid.cell_area_ang2,
@@ -290,7 +290,7 @@ def run_spectral_mcwf(
     tilt = (solver.momentum * tilt_rad[0], solver.momentum * tilt_rad[1])
     total = None
     sinks: list[float] = []
-    for electron in range(n_electrons):
+    for electron in range(histories):
         result = _trajectory(
             solver, stepper, components, mix, steps, seed, electron, tilt, observable, jump_hook
         )
@@ -308,10 +308,10 @@ def run_spectral_mcwf(
     assert total is not None
     return AxialMCWFResult(
         total.depths_ang,
-        total.observables / n_electrons,
-        total.surviving / n_electrons,
+        total.observables / histories,
+        total.surviving / histories,
         np.asarray(sinks),
         total.jumps,
-        n_electrons,
+        histories,
         total.jump_history,
     )
