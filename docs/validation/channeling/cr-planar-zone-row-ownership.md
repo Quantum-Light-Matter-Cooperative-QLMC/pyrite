@@ -253,7 +253,7 @@ asserts, near 14 keV.
 
 ## Model marker and baseline
 
-`CHANNELING_MODEL` is `planar-density-matrix-emission-v6`
+`CHANNELING_MODEL` is `planar-density-matrix-emission-v7`
 (`src/pyrite/montecarlo/channeling/handoff.py:58`). It enters provenance
 only when the case has a channeling record (`_physics_provenance.py:139-142`),
 so channeling-off identities do not change. Axial cases carry the same marker

@@ -220,6 +220,17 @@ class DensityMatrixSolver:
 
     # -- basis and operators -------------------------------------------------
 
+    def restore_entry_basis(self) -> None:
+        """Return the shared solver to its entry basis ``gamma0`` and ``_scale = 1``.
+
+        :meth:`propagate` with stopping reprojects and leaves the basis at the
+        exit-face ``gamma``. Anything that builds operators or catalogs from
+        ``self.basis`` (:func:`.emission_lines`, MCWF) calls this first, so a
+        cached solver scores identically whether or not transport ran on it.
+        """
+        if self.basis.gamma != self.gamma0 or self._scale != 1.0:
+            self.basis, self._scale = self._basis(self.gamma0), 1.0
+
     def _toeplitz(self, coefficients: np.ndarray) -> np.ndarray:
         """Plane-wave matrix ``<h|f(x)|h'> = f_{h-h'}`` of a periodic function."""
         lag = self.orders[:, None] - self.orders[None, :]
@@ -448,8 +459,7 @@ class DensityMatrixSolver:
         spatial_history = [] if spatial_x is not None else None
         steps = max(1, int(round(thickness_ang / dz_ang)))
         dz = thickness_ang / steps
-        if self.basis.gamma != self.gamma0:
-            self.basis, self._scale = self._basis(self.gamma0), 1.0
+        self.restore_entry_basis()
         if initial is None:
             rho, free, outside = self.entry_state(incidence_rad, divergence_rad)
             entry = float(free.sum()) + outside

@@ -308,3 +308,12 @@ block (`final_states="tracked"`). This changed `CHANNELING_MODEL` to
 so `v·g = 0` for the own row and its native zone-row line was already zero:
 `spec`, `spec_characteristic`, `brem`, the rows and the fates keep their
 expectations. `spec_channeling` is not pinned here.
+
+## Solver entry basis for CR scoring (#1090)
+
+`emission_lines` (and MCWF/`propagate`) now restore the cached solver to its
+entry basis before building operators, so in-process transport no longer leaves
+the line catalog on the exit-face basis. This changed `CHANNELING_MODEL` to
+`planar-density-matrix-emission-v7`. Re-pinned: only the `case_content_key` in
+`channeling.json`. `spec_channeling` is not pinned here and every other
+expectation is unchanged.

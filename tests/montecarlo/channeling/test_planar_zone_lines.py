@@ -19,7 +19,7 @@ from pyrite.montecarlo.runner.planar_zone_lines import is_own_row, planar_zone_l
 TILT_AZIM_DEG = 46.0
 
 
-def _case(tilt_azim_deg=TILT_AZIM_DEG, channeling=True):
+def _case(tilt_azim_deg=TILT_AZIM_DEG, channeling=True, thickness_ang=20000.0):
     physics = (
         pr.Physics(
             channeling_model="planar", channeling_plane=(1, -1, 0), radiative_model="uncoupled"
@@ -31,7 +31,7 @@ def _case(tilt_azim_deg=TILT_AZIM_DEG, channeling=True):
         pr.Beam(energy_keV=17000.0, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()),
         pr.geometry.Slab(
             "silicon",
-            thickness_ang=20000.0,
+            thickness_ang=thickness_ang,
             tilt_deg=3.0,
             tilt_azim_deg=tilt_azim_deg,
             footprint=pr.geometry.Footprint(5.0, 5.0),
@@ -150,3 +150,41 @@ def test_channeling_off_line_scoring_is_untouched():
     case = _case(channeling=False)
     assert case.get("channeling") is None
     assert planar_zone_line_parts(case, {"L_ang": np.zeros(0)}) is None
+
+
+def test_spec_channeling_is_independent_of_call_order_and_process():
+    """#1090: transport leaves the cached solver at the exit-face basis.
+
+    Scoring after in-process transport must equal scoring twice in a row and
+    equal a score on a freshly built solver (a worker process or a replay).
+    5 um: the stopping drift passes the 1e-4 reprojection tolerance (2 um does not).
+    """
+    channeling_emission.zone_solver.cache_clear()
+    case = _case(thickness_ang=50000.0)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", UserWarning)  # small basis: overflow warning
+        transport = runner._transport_case(case, transport_core="per-electron")
+    record = case["channeling"]
+
+    def solver():
+        return channeling_emission.zone_solver(
+            case["crystal"],
+            tuple(record["plane_hkl"]),
+            float(record["temperature_K"]),
+            float(case["E0_keV"]) * 1e3,
+            int(record["basis_size"]),
+            int(record["bloch_cells"]),
+            float(record["margin_eV"]),
+        )[1]
+
+    stale = solver()
+    # Precondition: the shared solver really was left on the reprojected basis.
+    assert stale.basis.gamma != stale.gamma0 and stale._scale != 1.0
+    first = channeling_emission.case_channeling_spectrum(case, transport)
+    second = channeling_emission.case_channeling_spectrum(case, transport)
+    assert first.max() > 0.0
+    np.testing.assert_array_equal(first, second)
+
+    channeling_emission.zone_solver.cache_clear()
+    fresh = channeling_emission.case_channeling_spectrum(case, transport)
+    np.testing.assert_array_equal(first, fresh)
