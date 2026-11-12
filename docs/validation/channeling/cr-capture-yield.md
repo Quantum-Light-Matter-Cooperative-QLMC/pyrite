@@ -47,3 +47,35 @@ The claimed 0.38–0.39 over margins 30–300 eV, $H=8$–16 and $n_{\rm cells}=
 `rederived`. Suggested Notes edit: replace "capture widths are upper estimates" with "approximate; full-dynamics $G(z)$ agrees within 2% on 4- and 16-cell grids".
 
 Toctree: this page is new. `docs/validation/index.md` needs a `channeling/cr-capture-yield` entry next to `channeling/cr-capture-bound`; the verifier did not edit the index.
+
+## Upper band straddling the barrier (#1091)
+
+Line groups are keyed by the band pair $(u, l)$ across Bloch blocks. When band
+$u$ is bound in some blocks and above the barrier in others, the group holds
+bound→bound rows and capture rows. The coherence-transfer generator
+$K_{k'k}=\langle f_{k'}|\mathcal J(|f_k\rangle\langle i_k|)|i_{k'}\rangle$
+acts on the band-pair coherence whatever the barrier label of $i_k$, so the
+rows keep their shared modes $K=V\,\mathrm{diag}(\mu)\,V^{-1}$.
+
+The field radiated by mode $m$ is $\sum_k a_k^*\sigma_k$, so the weight
+$w_m=(a^\dagger V)_m(V^{-1}s)_m$ is linear in the radiating amplitudes. For a
+partition of the rows into kinds $P$, set $a_P$ equal to $a$ on $P$ and zero
+elsewhere:
+
+$$
+w_m^{P}=(a_P^\dagger V)_m\,(V^{-1}s)_m,\qquad
+\sum_P w_m^{P}=w_m,\qquad
+\sum_m w_m^{P}=a_P^\dagger s=\sum_{k\in P}Y_k .
+$$
+
+Because each mode profile has unit area, the line and capture spectra
+integrate to exactly the line and capture yields of `EmissionLines.rates`,
+and their sum is the unsplit group spectrum. Before #1091 the whole group
+went to the kind of its first row. At Si(110), 12.5 MeV, 4 cells, $H=8$,
+300 eV margin, 1 mrad divergence and 5000 Å, groups (3,0), (3,2) and (3,1)
+mix kinds. Capture was overstated by 15% and bound→bound understated by
+5.7%. The total changes at rounding level only ($\le 10^{-15}$ relative).
+
+A cluster inside one block takes its strongest member's kind and can, in
+principle, merge an initial state just below the barrier with one just above
+it. The anchor case has no such cluster.

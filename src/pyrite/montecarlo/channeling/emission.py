@@ -144,7 +144,9 @@ class LineGroup:
     left: np.ndarray
     hbar_v_eV_ang: float
 
-    def modes(self, yields: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def modes(
+        self, yields: np.ndarray, emitting: np.ndarray | None = None
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Mode centres, half widths [eV, transverse] and complex weights.
 
         ``yields`` are the (absorbed) photon yields of the group's lines; the
@@ -153,10 +155,19 @@ class LineGroup:
         The transverse spectrum is ``Re sum_m conj(w_m) (i/pi)/(x_m + i h_m)``,
         ``x_m = E - centre_m``.
 
-        Validation: cr-line-shape
+        ``emitting`` (boolean, one per line) keeps only those lines' radiating
+        amplitudes, ``w_m^P = (a_P^dagger V)_m (V^-1 s)_m`` with ``a_P`` zero
+        off ``P``. The modes and the source are unchanged, so the weights of
+        a partition of the lines add to ``w_m`` and sum over modes to the
+        yields of ``P`` (``a_P^dagger V V^-1 s = sum_{k in P} yield_k``).
+        This splits a group whose upper band straddles the barrier across
+        blocks into its bound -> bound and capture emission (#1091).
+
+        Validation: cr-line-shape, cr-capture-yield
         """
         source = np.asarray(yields, dtype=float) / np.conj(self.amplitude)
-        weight = (np.conj(self.amplitude) @ self.right) * (self.left @ source)
+        radiating = self.amplitude if emitting is None else np.where(emitting, self.amplitude, 0)
+        weight = (np.conj(radiating) @ self.right) * (self.left @ source)
         return (
             self.hbar_v_eV_ang * self.eigenvalues.imag,
             -self.hbar_v_eV_ang * self.eigenvalues.real,
@@ -277,9 +288,13 @@ class EmissionLines:
         """Line, capture and free -> free spectra; see :meth:`spectrum`.
 
         The free -> free part is zero unless the catalog was built with
-        ``final_states="tracked"``.
+        ``final_states="tracked"``. A group whose rows differ in kind (an
+        upper band bound in some blocks, above the barrier in others) keeps
+        its shared modes and credits each kind with the emission of its own
+        rows (:meth:`LineGroup.modes` ``emitting``); the parts sum to the
+        group spectrum (#1091).
 
-        Validation: cr-line-shape, cr-yield-assembly, cr-planar-free-free-block
+        Validation: cr-line-shape, cr-yield-assembly, cr-capture-yield, cr-planar-free-free-block
         """
         energies = np.asarray(photon_energy_eV, dtype=float)
         denom = float(_denominator(self.gamma, theta_e_rad))
@@ -287,6 +302,7 @@ class EmissionLines:
         out = [np.zeros(energies.shape) for _ in range(3)]
         for group in self.groups:
             members = group.lines
+            kinds = self.kind[members]
             centre, hwhm, weight = group.modes(np.asarray(yields)[members])
             centre, hwhm = centre / denom, hwhm / denom
             strength = self.strength_per_ang[members]
@@ -297,7 +313,14 @@ class EmissionLines:
                     "line has zero width: supply a scattering kernel or a beam energy spread"
                 )
             profile = _complex_profile(energies[..., None] - centre, hwhm, sigma)
-            out[int(self.kind[members[0]])] += (np.conj(weight) * profile).real.sum(axis=-1)
+            if np.all(kinds == kinds[0]):
+                out[int(kinds[0])] += (np.conj(weight) * profile).real.sum(axis=-1)
+                continue
+            # The upper band straddles the barrier across blocks: shared modes,
+            # each kind credited with its own rows' emission (#1091).
+            for kind in np.unique(kinds):
+                part = group.modes(np.asarray(yields)[members], emitting=kinds == kind)[2]
+                out[int(kind)] += (np.conj(part) * profile).real.sum(axis=-1)
         return out[KIND_LINE], out[KIND_CAPTURE], out[KIND_FREE_FREE]
 
 
