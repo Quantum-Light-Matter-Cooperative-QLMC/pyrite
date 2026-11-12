@@ -1,0 +1,98 @@
+{
+  "source": {
+    "citation": "H. Genz, L. Groening, P. Hoffmann-Stascheck, A. Richter, M. Hofer, J. Hormes, U. Nething, J. P. F. Sellschop, C. Toepffer and M. Weber, Phys. Rev. B 53, 8922-8936 (1996)",
+    "doi": "10.1103/PhysRevB.53.8922",
+    "zotero_item": "EUYFS8M6",
+    "zotero_attachment": "7MLFPYYP",
+    "verified": "2026-11-11",
+    "method": "Tables I, IV, V and VII transcribed from the text layer and checked against 100-110 dpi renders of PDF pages 8, 12, 13 and 14 (printed pp. 8929, 8933-8935)"
+  },
+  "material": "diamond",
+  "crystals": {
+    "thickness_um": [13, 20, 30, 55],
+    "thickness_uncertainty_um": 2,
+    "types": {"13": "natural Ia", "20": "natural Ia", "30": "natural Ia", "55": "natural IIa"},
+    "type_note": "The text says the four crystals are of type Ia and IIa and later attributes the better 55 um agreement to that crystal being IIa instead of Ia (p. 8933)."
+  },
+  "temperature": "not stated (room temperature assumed)",
+  "beam": {
+    "kinetic_energy_MeV": [5.2, 9.0],
+    "energy_note": "Stated as 'electron energy'; taken as kinetic, the convention under which tests/montecarlo/channeling/test_channeling_bloch.py already reproduces the 9.0 MeV (110) line.",
+    "divergence_mrad": 0.3,
+    "divergence_note": "'of the order of 0.3 mrad' (p. 8926); RMS versus FWHM and plane orientation not stated.",
+    "relative_energy_spread": 0.002,
+    "energy_spread_note": "Delta E / E ~ 2e-3, measured; RMS versus FWHM not stated.",
+    "spot_diameter_mm_max": 1.0
+  },
+  "detector": {
+    "type": "Si(Li), on the beam axis (0 deg)",
+    "distance_cm": 250,
+    "solid_angle_sr": 2.6e-6,
+    "resolution": "not stated",
+    "note": "Solid angle and efficiency calibrated from the 1/E bremsstrahlung shape and x-ray fluorescence (Refs. 19, 23, 25). A circular aperture of 2.6e-6 sr has half-angle 0.91 mrad."
+  },
+  "analysis": {
+    "fit": "Each bound-to-bound line fitted with a Voigt profile, free-to-bound and free-to-free with a Gaussian, background with a 1/E-like function, after subtraction of the random-orientation spectrum (p. 8927).",
+    "corrections": "Detector efficiency, self-absorption, energy calibration and charge normalization are listed among the reduction steps (p. 8927). The 5.2 MeV text attributes the flat thickness dependence to self-absorption of the few-keV line, so Table I is read as the observed (absorbed) yield; this reading is an interpretation.",
+    "width_definition": "Table IV is the line width of the fitted profile; Table V defines the theoretical Gamma_tot as the FWHM of the computed spectrum. Units keV (implied by Table V).",
+    "energy_definition": "Table VII is the centre of gravity of the fitted Voigt profile."
+  },
+  "theory_note": "Italic rows are the authors' master-equation calculation with thermal and electronic scattering, Bloch and Doppler broadening and self-absorption; their 5.2 MeV yields had to be multiplied by 0.55 ((110)) and 0.38 ((111)) to match (Fig. 4).",
+  "yields_table1": {
+    "units": "photons / (electron sr), in units of 1e-3",
+    "rows": [
+      {"plane": [1, 1, 0], "transition": [1, 0], "kinetic_energy_MeV": 5.2, "measured": [3.2, 3.3, 4.7, 4.1], "uncertainty": [0.3, 0.3, 0.5, 0.4], "theory": [6.1, 7.1, 7.2, 6.9]},
+      {"plane": [1, 1, 0], "transition": [1, 0], "kinetic_energy_MeV": 9.0, "measured": [27.8, 48.4, 56.1, 77.0], "uncertainty": [3.2, 5.7, 6.4, 7.9], "theory": [32.0, 42.5, 50.0, 65.9]},
+      {"plane": [1, 1, 1], "transition": [2, 1], "kinetic_energy_MeV": 5.2, "measured": [1.1, 1.5, 1.4, 1.4], "uncertainty": [0.1, 0.2, 0.2, 0.2], "theory": [4.5, 4.5, 4.0, 3.0]},
+      {"plane": [1, 1, 1], "transition": [2, 1], "kinetic_energy_MeV": 9.0, "measured": [14.9, 32.9, 39.5, 50.9], "uncertainty": [1.6, 3.8, 4.9, 4.9], "theory": [20.0, 25.0, 31.3, 41.2]},
+      {"plane": [1, 1, 1], "transition": [1, 0], "kinetic_energy_MeV": 9.0, "measured": [1.5, 1.4, 1.7, 2.4], "uncertainty": [0.2, 0.2, 0.3, 0.4], "theory": [2.9, 4.1, 4.3, 6.4]},
+      {"plane": [1, 1, 1], "transition": [3, 2], "kinetic_energy_MeV": 9.0, "measured": [9.4, 13.1, 23.4, 25.4], "uncertainty": [1.5, 2.1, 2.9, 4.3], "theory": [11.0, 14.6, 17.0, 17.3]},
+      {"plane": [1, 1, 1], "transition": "4-1 and 3-0", "kinetic_energy_MeV": 9.0, "measured": [2.7, 5.0, 6.0, 7.7], "uncertainty": [0.2, 0.5, 0.7, 0.8], "theory": [3.4, 4.5, 4.9, 7.3]}
+    ]
+  },
+  "widths_table4": {
+    "units": "keV",
+    "rows": [
+      {"plane": [1, 1, 0], "transition": [1, 0], "kinetic_energy_MeV": 5.2, "measured": [0.79, 0.86, 0.86, 0.98], "uncertainty": [0.02, 0.02, 0.02, 0.02], "theory": [0.79, 0.79, 0.79, 0.79]},
+      {"plane": [1, 1, 0], "transition": [1, 0], "kinetic_energy_MeV": 9.0, "measured": [0.73, 0.84, 0.86, 0.93], "uncertainty": [0.02, 0.02, 0.02, 0.02], "theory": [0.66, 0.68, 0.70, 0.72]},
+      {"plane": [1, 1, 1], "transition": [2, 1], "kinetic_energy_MeV": 5.2, "measured": [0.24, 0.29, 0.36, 0.39], "uncertainty": [0.04, 0.06, 0.06, 0.04], "theory": [0.22, 0.23, 0.23, 0.23]},
+      {"plane": [1, 1, 1], "transition": [2, 1], "kinetic_energy_MeV": 9.0, "measured": [0.58, 0.78, 0.81, 0.88], "uncertainty": [0.02, 0.02, 0.02, 0.02], "theory": [0.41, 0.43, 0.47, 0.47]},
+      {"plane": [1, 1, 1], "transition": [3, 2], "kinetic_energy_MeV": 9.0, "measured": [0.69, 0.97, 0.95, 0.52], "uncertainty": [0.03, 0.03, 0.07, 0.03], "theory": null},
+      {"plane": [1, 1, 1], "transition": "4-1 and 3-0", "kinetic_energy_MeV": 9.0, "measured": [0.98, 0.77, 0.72, 0.80], "uncertainty": [0.08, 0.08, 0.10, 0.20], "theory": null}
+    ]
+  },
+  "width_budget_table5": {
+    "units": "keV",
+    "note": "Authors' theoretical contributions; Gamma_in is incoherent thermal + electronic, Gamma_Bloch the band-dispersion spread (max - min transition energy), Gamma_Dop = 2 gamma^2 <theta^2> hbar omega (Eq. 18), Gamma_tot the FWHM of the computed spectrum, Gamma_opt an optical-potential incoherent width. Thickness not stated.",
+    "rows": [
+      {"plane": [1, 1, 0], "transition": [1, 0], "kinetic_energy_MeV": 5.2, "gamma_in": 0.09, "gamma_bloch": 0.72, "gamma_dop": 0.15, "gamma_tot": 0.79, "gamma_opt": 0.16},
+      {"plane": [1, 1, 0], "transition": [1, 0], "kinetic_energy_MeV": 9.0, "gamma_in": 0.18, "gamma_bloch": 0.56, "gamma_dop": 0.35, "gamma_tot": 0.72, "gamma_opt": 0.37},
+      {"plane": [1, 1, 1], "transition": [2, 1], "kinetic_energy_MeV": 5.2, "gamma_in": 0.12, "gamma_bloch": 0.12, "gamma_dop": 0.10, "gamma_tot": 0.23, "gamma_opt": 0.16},
+      {"plane": [1, 1, 1], "transition": [2, 1], "kinetic_energy_MeV": 9.0, "gamma_in": 0.25, "gamma_bloch": 0.02, "gamma_dop": 0.26, "gamma_tot": 0.47, "gamma_opt": 0.37}
+    ]
+  },
+  "energies_table7": {
+    "units": "keV",
+    "rows": [
+      {"plane": [1, 1, 0], "transition": [1, 0], "kinetic_energy_MeV": 5.2, "measured": [3.35, 3.41, 3.42, 3.45], "uncertainty": [0.05, 0.05, 0.05, 0.05], "theory": [3.27, 3.21, 3.18, 3.20]},
+      {"plane": [1, 1, 0], "transition": [1, 0], "kinetic_energy_MeV": 9.0, "measured": [7.93, 7.91, 7.80, 7.90], "uncertainty": [0.08, 0.08, 0.08, 0.08], "theory": [7.90, 7.90, 7.88, 7.9]},
+      {"plane": [1, 1, 1], "transition": [2, 1], "kinetic_energy_MeV": 5.2, "measured": [2.69, 2.72, 2.73, 2.77], "uncertainty": [0.05, 0.05, 0.05, 0.05], "theory": [2.39, 2.41, 2.39, 2.40]},
+      {"plane": [1, 1, 1], "transition": [2, 1], "kinetic_energy_MeV": 9.0, "measured": [5.94, 5.91, 5.89, 5.66], "uncertainty": [0.07, 0.07, 0.07, 0.07], "theory": [5.76, 5.72, 5.73, 5.73]},
+      {"plane": [1, 1, 1], "transition": [1, 0], "kinetic_energy_MeV": 9.0, "measured": [3.16, 3.14, 3.15, 3.08], "uncertainty": [0.04, 0.03, 0.04, 0.04], "theory": [2.91, 2.91, 2.92, 3.02]},
+      {"plane": [1, 1, 1], "transition": [3, 2], "kinetic_energy_MeV": 9.0, "measured": [3.84, 3.82, 3.85, 3.80], "uncertainty": [0.04, 0.04, 0.05, 0.05], "theory": [3.84, 3.82, 3.85, 3.65]},
+      {"plane": [1, 1, 1], "transition": "4-1 and 3-0", "kinetic_energy_MeV": 9.0, "measured": [12.37, 12.30, 12.58, 12.52], "uncertainty": [0.09, 0.08, 0.08, 0.09], "theory": [12.34, 12.33, 12.32, 12.32]}
+    ]
+  },
+  "occupation_lengths_table3_um": {
+    "note": "1/e lengths from fitting I ~ 1 - exp(-z/l_occ) to the Table I yields.",
+    "rows": [
+      {"plane": [1, 1, 1], "kinetic_energy_MeV": 5.2, "transition": [2, 1], "value": 18.9, "uncertainty": 2.4},
+      {"plane": [1, 1, 1], "kinetic_energy_MeV": 9.0, "transition": [1, 0], "value": 29.3, "uncertainty": 4.1},
+      {"plane": [1, 1, 1], "kinetic_energy_MeV": 9.0, "transition": [2, 1], "value": 28.8, "uncertainty": 3.9},
+      {"plane": [1, 1, 1], "kinetic_energy_MeV": 9.0, "transition": [3, 2], "value": 34.6, "uncertainty": 4.3},
+      {"plane": [1, 1, 1], "kinetic_energy_MeV": 9.0, "transition": "4-1", "value": 29.4, "uncertainty": 3.5},
+      {"plane": [1, 1, 0], "kinetic_energy_MeV": 5.2, "transition": [1, 0], "value": 17.5, "uncertainty": 1.5},
+      {"plane": [1, 1, 0], "kinetic_energy_MeV": 9.0, "transition": [1, 0], "value": 27.6, "uncertainty": 3.4}
+    ]
+  }
+}

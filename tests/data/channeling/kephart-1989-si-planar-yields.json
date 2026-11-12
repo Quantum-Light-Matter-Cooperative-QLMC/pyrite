@@ -1,0 +1,46 @@
+{
+  "source": {
+    "citation": "J. O. Kephart, R. H. Pantell, B. L. Berman, S. Datz, H. Park and R. K. Klein, Phys. Rev. B 40, 4249-4263 (1989)",
+    "doi": "10.1103/PhysRevB.40.4249",
+    "zotero_item": "QLNUXTFL",
+    "zotero_attachment": "FJVSBAWG",
+    "verified": "2026-11-11",
+    "method": "Sec. V D text, Figs. 16-17 captions and Tables I-II transcribed from the text layer and checked against 130 dpi renders of PDF pages 12-13 (printed pp. 4260-4261)"
+  },
+  "material": "silicon",
+  "temperature": "not stated (293.15 K assumed, as in checks/kephart_occupation.py)",
+  "kinetic_energy_MeV": 16.92,
+  "beam": {
+    "divergence_mrad": 2.2,
+    "divergence_note": "Table II average beam divergence inferred from the measured initial populations, not measured directly; Sec. V D says (100) is consistent with 1.8 mrad and (110) with about 2.5 mrad, the beam being visibly elliptical."
+  },
+  "detector": {
+    "type": "Ge detector on the beam axis",
+    "note": "Collimation, solid angle and resolution are given in Ref. 6 (R. K. Klein et al., Phys. Rev. B 31, 68 (1985)), which is not in the Zotero library; a point forward detector is assumed. Yields are per sr, so the solid angle cancels."
+  },
+  "normalization": "Absolute flux from the random-orientation bremsstrahlung yield between 80 and 100 keV (Sec. IV). For thicknesses above 10 um the plotted fluxes are multiplied by exp[mu(E) Z] (absorption-corrected, open squares).",
+  "multiple_scattering_bound": "Sec. V E: no perceptible broadening or asymmetry of the 1->0 peaks; the channeled in-plane multiple-scattering angle after 15 um is below 15 mrad (A < 4 in A sqrt(z/um) mrad), against 2.5 sqrt(z/um) mrad for unchanneled electrons projected on one dimension.",
+  "integrated_exponential_fits": {
+    "units": "Y(Z) = A (1 - exp(-Z / L)), A in photons/(electron sr), L in um; slope = A / L in photons/(electron sr um)",
+    "rows": [
+      {"plane": [1, 0, 0], "transition": [1, 0], "figure": "16", "amplitude": 0.05, "length_um": 16, "slope_text": 0.0031, "calculated_flux_full_population": 0.027, "initial_population_percent": 11.6, "theory_population_percent": 9.2},
+      {"plane": [1, 1, 0], "transition": [1, 0], "figure": "17(a)", "amplitude": 0.058, "length_um": 20, "slope_text": 0.0029, "calculated_flux_full_population": 0.053, "initial_population_percent": 5.5, "theory_population_percent": 6.5},
+      {"plane": [1, 1, 0], "transition": [2, 1], "figure": "17(b)", "amplitude": 0.037, "length_um": 20, "slope_text": 0.0019, "calculated_flux_full_population": 0.033, "initial_population_percent": 5.6, "theory_population_percent": 6.5},
+      {"plane": [1, 1, 0], "transition": [3, 0], "figure": "17(d)", "amplitude": 0.0046, "length_um": 17, "slope_text": 0.00027, "calculated_flux_full_population": 0.0043, "initial_population_percent": 6.3, "theory_population_percent": 6.5}
+    ],
+    "notes": [
+      "Fig. 17(d) caption prints 0.046(1 - exp(-Z/17)); the plotted curve saturates near 0.0046 and the text slope 0.00027 x 17 um = 0.0046, so 0.046 is taken as a misprint.",
+      "Table I gives the (110) n = 2 length as 17 um after a parallel sum with the 120 um photon absorption length; the 17(b) fit itself uses 20 um.",
+      "Sec. V D gives the (100) initial population as 12%; Table II lists 11.6%.",
+      "Fig. 17(c) (3->2, ~6 keV) has no fit: detector efficiency is very small there.",
+      "Scatter: at 80-100 um the (110) 1->0 points span about 0.037-0.072 photons/(e sr) for different beam conditions; Table I lengths are quoted with about +-20% uncertainty."
+    ]
+  },
+  "line_energies_text_keV": {
+    "100_1_0": 13,
+    "110_2_1": 10,
+    "110_3_2": 6,
+    "110_3_0": 35,
+    "note": "Approximate values stated in the text (Secs. IV and V D), not fitted centroids."
+  }
+}
