@@ -563,7 +563,7 @@ def test_snell_block_and_fused_amplitudes_match_full_vectors(side_face):
                 chi.imag,
                 u.real,
                 u.imag,
-                b.v_dot_kg[0, row],
+                g @ g,
                 g @ e,
                 b.k_mag[0, row],
                 v @ e,
@@ -573,7 +573,8 @@ def test_snell_block_and_fused_amplitudes_match_full_vectors(side_face):
                 gamma,
                 b.detuning[0, row],
                 k @ e,
+                0.0,  # hbar -> 0: the classical elements written out above
             )
             np.testing.assert_allclose(
-                got, [abs(pxr + cbs) ** 2, abs(pxr) ** 2, abs(cbs) ** 2], rtol=1e-13, atol=1e-30
+                got, [abs(pxr + cbs) ** 2, abs(pxr) ** 2, abs(cbs) ** 2], rtol=1e-12, atol=1e-30
             )

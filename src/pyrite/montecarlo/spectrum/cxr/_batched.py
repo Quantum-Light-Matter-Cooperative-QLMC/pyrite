@@ -49,6 +49,8 @@ from ._per_hkl import (
 )
 from ._recoil import (
     _line_recoil_terms,
+    _quantum_line_factors,
+    _recoil_compton_ang,
     _recoil_formation_line,
     _recoil_inverse_energy,
     _recoil_line_allowed,
@@ -550,6 +552,7 @@ def _batched_coherent_block(st, bt, blk, coh_blocks, coh_counts):
 
     Validation: coherent-formation-absorption
     Validation: line-grid-emission-ceiling
+    Validation: cbs-amplitude
     """
     seg_elec_id = st.seg_elec_id
     seg_r_geom = st.seg_r_geom
@@ -571,7 +574,6 @@ def _batched_coherent_block(st, bt, blk, coh_blocks, coh_counts):
     omega_res = blk.omega_res
     detuning = blk.detuning
     k_dot_g = blk.k_dot_g
-    v_dot_kg = blk.v_dot_kg
     k_dot_v = blk.k_dot_v
     vdg = blk.vdg
     k_mag = blk.k_mag
@@ -586,6 +588,7 @@ def _batched_coherent_block(st, bt, blk, coh_blocks, coh_counts):
     # polarizations add incoherently. Validation: xray-in-medium-resonance
     chi = chi_re + 1j * chi_im
     eUg_over_m = u_re + 1j * u_im  # u_re/u_im already carry 1/M_E_EV
+    h = _recoil_compton_ang()
     pol_A = []
     for E_pol, g_dot_e in ((ES, G_DOT_ES[None, :]), (EP, G_DOT_EP[None, :])):
         ex, ey, ez = E_pol[:, 0][None, :], E_pol[:, 1][None, :], E_pol[:, 2][None, :]
@@ -599,11 +602,11 @@ def _batched_coherent_block(st, bt, blk, coh_blocks, coh_counts):
             * delta
             * (grad[:, 0, None] * ex + grad[:, 1, None] * ey + grad[:, 2, None] * ez)
         )
-        A_PXR = chi / detuning * (v_dot_kg * (g_dot_e + k_dot_e) - k_mag**2 * v_dot_e)
-        braced_ge = g_dot_e - vdg * v_dot_e
-        braced_kg = k_dot_g - k_dot_v * vdg
-        A_CBS = -eUg_over_m / (gamma * vdg) * (braced_ge + v_dot_e * braced_kg / vdg)
-        pol_A.append(A_PXR + A_CBS)
+        # Exact second-order elements (_quantum_line_factors).
+        pxr_num, f_cbs = _quantum_line_factors(
+            h, gamma, vdg, k_dot_v, k_dot_g, bt.g2, k_mag**2, v_dot_e, g_dot_e, k_dot_e
+        )
+        pol_A.append(chi / detuning * pxr_num + eUg_over_m * f_cbs)
 
     # Piece-end attenuation and escape-phase slope ride on the vacuum sinc
     # centre/width. Refraction is already in F; shifting that centre again
@@ -771,6 +774,7 @@ def _batched_incoherent_block(st, bt, blk, cxr_batch):
     here. Returns early when the block has no surviving line.
 
     Validation: segment-escape-average
+    Validation: cbs-amplitude
     """
     # NVTX sub-ranges are a no-op off the profiled GPU path. Lazy import:
     # runner imports this module, so a top-level import would be circular.
@@ -792,7 +796,6 @@ def _batched_incoherent_block(st, bt, blk, cxr_batch):
     omega_res = blk.omega_res
     detuning = blk.detuning
     k_dot_g = blk.k_dot_g
-    v_dot_kg = blk.v_dot_kg
     k_dot_v = blk.k_dot_v
     vdg = blk.vdg
     k_mag = blk.k_mag
@@ -814,7 +817,7 @@ def _batched_incoherent_block(st, bt, blk, cxr_batch):
             chi_im,
             u_re,
             u_im,
-            v_dot_kg,
+            bt.g2,
             g_dot_e,
             k_mag,
             v_dot_e,
@@ -824,6 +827,7 @@ def _batched_incoherent_block(st, bt, blk, cxr_batch):
             gamma,
             detuning,
             k_dot_e,
+            _recoil_compton_ang(),
         )
         A2 = A2 + a2
         A2_pxr = A2_pxr + a2p

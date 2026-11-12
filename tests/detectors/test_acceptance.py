@@ -206,7 +206,7 @@ def test_equal_acceptance_preserves_lowered_case_and_both_identities():
     # #1019: BremsLib fp32-cell-mb-v1 identity.
     assert (
         case_content_key(cases[1])
-        == "80c10f7d5500117c667ea9594187f4046b1ba61da576eeaf1078a0b6cd64507a"
+        == "9ae8b9a1be686433ea5e5804c1250b6f085672200ef97c85ae55ebaf246af598"
     )
     sweeps = [
         LegacySweep(material="hopg", beam=beam.to_spec(), target=target, detector=d)
@@ -216,7 +216,7 @@ def test_equal_acceptance_preserves_lowered_case_and_both_identities():
     assert identities[0] == identities[1]
     assert (
         identities[1]["parameter_sha256"]
-        == "b5ada5962667cbf8c43254c1d8af75004c83b48b2c0176fce4b714054fb622e9"
+        == "a420097734abb608a8b9557f3c8643ee697345fadeb42abad4bfd5886d41d6c0"
     )
     # Pin to the pre-object payload vocabulary; no acceptance metadata enters identity.
     assert "detector" not in identities[0]["resolved_parameters"]["sweep"]

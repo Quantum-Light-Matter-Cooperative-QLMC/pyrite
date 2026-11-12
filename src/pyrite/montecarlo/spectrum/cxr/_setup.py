@@ -47,7 +47,10 @@ from ._temporal import segment_arrival_times
 # a float64-formed decrement table, which moves float32 device lines at MeV.
 # v6 (#1099): every line route places, widens and phases lines on the exact
 # recoil root (line-recoil-in-medium-root), a percent-level shift at 10-100 keV.
-CXR_ESCAPE_MODEL = "segment-mean-v6-exact-recoil"
+# v7 (#1134): PXR/CBS amplitudes are the exact second-order elements (quantum
+# CB denominators and transition currents, cbs-amplitude), percent-level
+# sub-100 keV line intensities.
+CXR_ESCAPE_MODEL = "segment-mean-v7-quantum-elements"
 
 
 #: Size of the most recent line setups' tabulation, for performance telemetry.
