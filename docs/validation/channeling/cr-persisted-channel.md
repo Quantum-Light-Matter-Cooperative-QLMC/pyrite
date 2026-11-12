@@ -309,3 +309,18 @@ rates, reevaluating the exponential attenuation there, and applying a
 new trapezoid. Both converge to the same expected path integral as the
 original sampling interval tends to zero; this refinement changes the
 quadrature approximation rather than the source equation.
+
+## Entry basis of the scored solver (#1090)
+
+`zone_solver` is cached and shared by transport and CR scoring. Transport
+propagates with continuous stopping, which reprojects the density matrix and
+leaves `solver.basis` at the exit-face $\gamma$ with
+$\mathrm{scale}=(\beta_0/\beta)^2\ne1$. The scored catalog $\{a_{fi}\}$ and
+generators are built from the solver's eigenbasis, while the scored
+$\rho(z)$ starts from the entry state in the $\gamma_0$ basis. They must use
+the same basis, so `emission_lines` restores $\gamma_0$ and scale 1 before
+building anything; `propagate` and MCWF already did so for $\rho$. At Si(110),
+17 MeV, 5 µm the stale catalog changed the first score after transport by
+$2.5\times10^{-3}$ (relative). The regression test scores after in-process
+transport twice and on a freshly built solver and requires bit-identical
+output. The constant-energy approximation itself is unchanged.

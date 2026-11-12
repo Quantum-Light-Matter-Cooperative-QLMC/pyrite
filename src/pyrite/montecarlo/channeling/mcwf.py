@@ -272,8 +272,7 @@ class MCWFSolver:
             raise ValueError("n_electrons, thickness_ang and dz_ang must be positive")
         solver = self.solver
         # A shared density solver may have left its basis at a slowed-down gamma.
-        if solver.basis.gamma != solver.gamma0 or solver._scale != 1.0:
-            solver.basis, solver._scale = solver._basis(solver.gamma0), 1.0
+        solver.restore_entry_basis()
         steps = max(1, int(round(thickness_ang / dz_ang)))
         dz = thickness_ang / steps
         half = solver._propagators(dz, solver.hbar_v0)

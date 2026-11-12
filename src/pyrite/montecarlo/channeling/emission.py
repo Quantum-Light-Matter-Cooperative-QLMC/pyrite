@@ -421,6 +421,8 @@ def emission_lines(
     if final_states not in _FINAL_STATES:
         raise ValueError(f"final_states must be one of {_FINAL_STATES}, got {final_states!r}")
     tracked = final_states == "tracked"
+    # A cached solver may sit at the exit-face basis after transport (#1090).
+    solver.restore_entry_basis()
     basis = solver.basis
     gamma = float(basis.gamma)
     beta = float(_beta(gamma))
