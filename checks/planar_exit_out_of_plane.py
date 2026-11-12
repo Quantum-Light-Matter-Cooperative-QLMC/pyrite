@@ -13,7 +13,18 @@ Usage::
 ``ARM.json`` keys (defaults in ``DEFAULTS``): ``case`` (Gridnev case index),
 ``mechanisms``, ``n_cells``, ``max_order``, ``dz_ang``, ``eta_steps_ang``,
 ``energy_scale``, ``divergences_rad``, ``thicknesses_um``, ``backend``
-(``numpy``/``cupy``), ``workers``. Report-only diagnostic: no pass/fail exit.
+(``numpy``/``cupy``), ``workers``, ``incidence_rad``, ``beam_mixtures``,
+``theta_y_windows_rad``. Report-only diagnostic: no pass/fail exit.
+
+An empty ``mechanisms`` list is the coherent control: a zero kernel on the same
+Bloch grid, so its cut is the marginal times the ``theta_y`` Gaussian.
+``incidence_rad`` tilts the in-plane beam axis. ``beam_mixtures`` replaces the
+pure Gaussians of ``divergences_rad`` by incoherent mixtures
+``[[weight, sigma], ...]`` of Gaussians that are round in ``(theta_x,
+theta_y)``; everything is linear in the entry state, so each component is
+propagated once and the cuts add. ``theta_y_windows_rad`` adds the contrast of
+the cut averaged over ``|theta_y| <= w`` (a finite film/microphotometer
+aperture) for each half-width ``w``.
 
 ``capture_curves`` writes an NPZ beside OUT.json (one curve per JSON row).
 ``uniform_electronic_density`` replaces only the electronic-density harmonics
@@ -48,7 +59,12 @@ DEFAULTS = {
     "workers": 6,
     "capture_curves": False,
     "uniform_electronic_density": False,
+    "incidence_rad": 0.0,
+    "beam_mixtures": None,
+    "theta_y_windows_rad": [],
 }
+#: theta_y samples (Simpson) per averaging window.
+WINDOW_NODES = 21
 ORDERS = range(-4, 5)
 
 
@@ -82,6 +98,38 @@ def _cell_kernel(args):
     return kernel.cell_kernel(n_grid)
 
 
+def _zero_kernel(kernel):
+    from dataclasses import replace
+
+    return replace(
+        kernel,
+        momentum_kernel=np.zeros_like(kernel.momentum_kernel),
+        diagonal_coefficients=np.zeros_like(kernel.diagonal_coefficients),
+    )
+
+
+def _mixture_cut(solver, blocks, eta, eta_w, mixture, theta_y=0.0):
+    """Weighted sum of per-component cuts; returns (cut density, marginal weights, cut)."""
+    from pyrite.montecarlo.channeling.exit_out_of_plane import exit_cut
+
+    density, marginal, cut = 0.0, 0.0, None
+    for weight, sigma in mixture:
+        cut = exit_cut(solver, blocks[sigma], eta, eta_w, sigma, theta_y)
+        density = density + weight * cut.density_per_rad
+        marginal = marginal + weight * cut.marginal.weights
+    return density, marginal, cut
+
+
+def _window_contrasts(solver, blocks, eta, eta_w, mixture, half_width):
+    from scipy.integrate import simpson
+
+    thetas = np.linspace(-half_width, half_width, WINDOW_NODES)
+    stack = [_mixture_cut(solver, blocks, eta, eta_w, mixture, t)[0] for t in thetas]
+    mean = simpson(np.stack(stack), x=thetas, axis=0) / (2.0 * half_width)
+    cut = _mixture_cut(solver, blocks, eta, eta_w, mixture)[2]
+    return _contrasts(cut.angles_rad, mean, cut.order_spacing_rad)
+
+
 def _contrasts(angles, weights, spacing):
     from pyrite.montecarlo.channeling.exit_out_of_plane import local_contrast
 
@@ -96,8 +144,8 @@ def _order_weights(angles, weights, spacing):
 def run(arm_path: str, out_path: str) -> None:
     from pyrite.montecarlo.channeling import DensityMatrixSolver
     from pyrite.montecarlo.channeling.exit_out_of_plane import (
+        _momentum_inv_ang,
         eta_nodes,
-        exit_cut,
         out_of_plane_kernel,
         propagate_batch,
     )
@@ -108,49 +156,68 @@ def run(arm_path: str, out_path: str) -> None:
     if arm["backend"] == "cupy":
         import cupy as xp  # noqa: PLC0415
     started = time.time()
+    mechanisms = tuple(arm["mechanisms"])
     base = out_of_plane_kernel(
         profile,
         kinetic,
         0.0,
-        mechanisms=tuple(arm["mechanisms"]),
+        mechanisms=mechanisms or ("tds",),
         n_cells=arm["n_cells"],
         max_order=arm["max_order"],
     )
+    if not mechanisms:
+        base = _zero_kernel(base)
     solver = DensityMatrixSolver(profile, kinetic, base)
+    mixtures = arm["beam_mixtures"] or [[[1.0, sigma]] for sigma in arm["divergences_rad"]]
+    sigmas = sorted({float(sigma) for mixture in mixtures for _, sigma in mixture})
     # Validate all incident widths before building the expensive eta batch.
-    entries = [(sigma, solver.entry_state(0.0, sigma)[0]) for sigma in arm["divergences_rad"]]
-    eta, eta_w = eta_nodes(min(arm["divergences_rad"]), kinetic, tuple(arm["eta_steps_ang"]))
-    jobs = [(arm, float(value), solver.n_grid) for value in eta[1:]]
-    with ProcessPoolExecutor(arm["workers"]) as pool:
-        kernels = np.stack([solver._cell_kernel0, *pool.map(_cell_kernel, jobs)])
+    entries = {sigma: solver.entry_state(arm["incidence_rad"], sigma)[0] for sigma in sigmas}
+    fine, mid, coarse = arm["eta_steps_ang"]
+    # eta_max follows the narrowest beam; the panel step resolves the widest.
+    coarse = min(coarse, 0.25 / (_momentum_inv_ang(kinetic) * sigmas[-1]))
+    eta, eta_w = eta_nodes(sigmas[0], kinetic, (fine, mid, coarse))
+    if mechanisms:
+        jobs = [(arm, float(value), solver.n_grid) for value in eta[1:]]
+        with ProcessPoolExecutor(arm["workers"]) as pool:
+            kernels = np.stack([solver._cell_kernel0, *pool.map(_cell_kernel, jobs)])
+    else:
+        kernels = np.zeros((eta.size,) + solver._cell_kernel0.shape, dtype=complex)
     built = time.time()
     depths = [1e4 * value for value in arm["thicknesses_um"]]
+    propagated = {
+        sigma: propagate_batch(solver, kernels, rho, depths, arm["dz_ang"], xp=xp)
+        for sigma, rho in entries.items()
+    }
     rows = []
     cuts, marginals = [], []
-    for sigma, rho in entries:
-        weights = propagate_batch(solver, kernels, rho, depths, arm["dz_ang"], xp=xp)
-        for depth, block in zip(depths, weights, strict=True):
-            cut = exit_cut(solver, block, eta, eta_w, sigma)
+    for mixture in mixtures:
+        for index, depth in enumerate(depths):
+            blocks = {sigma: propagated[sigma][index] for sigma in propagated}
+            density, marginal_w, cut = _mixture_cut(solver, blocks, eta, eta_w, mixture)
             marginal = cut.marginal
             if arm["capture_curves"]:
-                cuts.append(cut.density_per_rad)
-                marginals.append(marginal.weights)
-            rows.append(
-                {
-                    "divergence_rad": sigma,
-                    "thickness_um": depth / 1e4,
-                    "cut_contrast": _contrasts(
-                        cut.angles_rad, cut.density_per_rad, cut.order_spacing_rad
-                    ),
-                    "marginal_contrast": _contrasts(
-                        marginal.angles_rad, marginal.weights, marginal.order_spacing_rad
-                    ),
-                    "marginal_order_weights": _order_weights(
-                        marginal.angles_rad, marginal.weights, marginal.order_spacing_rad
-                    ),
-                    "unresolved": marginal.unresolved,
+                cuts.append(density)
+                marginals.append(marginal_w)
+            row = {
+                "beam_mixture": mixture,
+                "divergence_rad": mixture[0][1] if len(mixture) == 1 else None,
+                "incidence_rad": arm["incidence_rad"],
+                "thickness_um": depth / 1e4,
+                "cut_contrast": _contrasts(cut.angles_rad, density, cut.order_spacing_rad),
+                "marginal_contrast": _contrasts(
+                    marginal.angles_rad, marginal_w, marginal.order_spacing_rad
+                ),
+                "marginal_order_weights": _order_weights(
+                    marginal.angles_rad, marginal_w, marginal.order_spacing_rad
+                ),
+                "unresolved": float(1.0 - np.sum(marginal_w)),
+            }
+            if arm["theta_y_windows_rad"]:
+                row["window_contrast"] = {
+                    str(w): _window_contrasts(solver, blocks, eta, eta_w, mixture, w)
+                    for w in arm["theta_y_windows_rad"]
                 }
-            )
+            rows.append(row)
     sha = subprocess.run(
         ["git", "rev-parse", "HEAD"], capture_output=True, text=True, cwd=Path(__file__).parents[1]
     ).stdout.strip() or os.environ.get("PYRITE_SYNCED_SHA", "unknown")
@@ -179,7 +246,10 @@ def run(arm_path: str, out_path: str) -> None:
 
 
 def report(paths: list[str]) -> None:
-    head = "| case | E scale | mech | n_cells | sigma mrad | L um | cut m=0..3 | marginal m=0..3 |"
+    head = (
+        "| case | E scale | mech | n_cells | beam w x sigma mrad | L um | cut m=-3..3 | "
+        "marginal m=0..3 |"
+    )
     print(head)
     print("|" + "---|" * 8)
     for path in paths:
@@ -189,11 +259,13 @@ def report(paths: list[str]) -> None:
             f"({''.join(map(str, case['plane_hkl']))}) {case['total_energy_MeV']} [{case['spots']}]"
         )
         for row in data["rows"]:
-            cut = " ".join(f"{row['cut_contrast'][str(m)]:.2f}" for m in range(4))
+            cut = " ".join(f"{row['cut_contrast'][str(m)]:.2f}" for m in range(-3, 4))
             marg = " ".join(f"{row['marginal_contrast'][str(m)]:.2f}" for m in range(4))
+            mixture = row.get("beam_mixture") or [[1.0, row["divergence_rad"]]]
+            beam = "+".join(f"{w:g}x{1e3 * s:.3f}" for w, s in mixture)
             print(
-                f"| {label} | {arm['energy_scale']} | {'+'.join(arm['mechanisms'])} | "
-                f"{arm['n_cells']} | {1e3 * row['divergence_rad']:.3f} | "
+                f"| {label} | {arm['energy_scale']} | {'+'.join(arm['mechanisms']) or 'coherent'} | "
+                f"{arm['n_cells']} | {beam} | "
                 f"{row['thickness_um']} | {cut} | {marg} |"
             )
 
