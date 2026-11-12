@@ -190,7 +190,8 @@ their total. That total includes correlated displacements of neighbouring
 string atoms, a factor $1+0.7(C-1)=1.18$–$1.28$ on the thermal part. The
 model's independent-string TDS omits these correlations, so a deficit of this
 size is expected. Measured widths are therefore reproduced to the stated
-physics scope, not beyond it. Correlated TDS would be a model extension.
+physics scope, not beyond it. The correlated-TDS extension is in
+[Correlated-string TDS (#1045)](#correlated-string-tds-1045).
 Fits at other energies have $\chi^2/\nu$ up to 20, because neighbouring
 lines fall inside the window, so those widths are not used.
 
@@ -221,16 +222,64 @@ changes the 0.088° area by −2%. At 0.15° the free→2p line crosses the wind
 
 Claim `cr-axial-correlated-tds` adds the transverse displacement correlations
 of neighbouring atoms in one string as extra continuum-TDS shells. The Si
-input is Nielsen & Weber (1980), bond-charge model at 300 K. Over the six
-nearest string atoms it reproduces Andersen's Table 2 $C$: 1.238 for ⟨100⟩
-(Andersen 1.25) and 1.420 for ⟨111⟩ (Andersen 1.40). The research runs
-keep the 10 nearest partners, about $1/\alpha Z$. For comparison:
+input is Nielsen & Weber (1980), adiabatic bond-charge model at 300 K
+(Zotero `PQ7CVU28`):
 
-- Andersen's uncorrelated estimates are 466 eV and 595 eV.
-- The 1s + 2p loss rates rise by 11–14% (⟨100⟩) and 22–25% (⟨111⟩).
-- Andersen's factor $1+0.7(C-1)$ gives 17% and 29%.
+- (111) $c=0.240$, (400) 0.071 and (800) 0.028, digitized from Figs. 3(b) and 4(b);
+- other string partners from the fitted envelope $c=0.381\,r^{-1.186}$.
 
-Remote reruns of the Table 2 arms and the Fig. 11 tilt points are pending.
+Over the six nearest string atoms this gives Andersen's Table 2 $C$: 1.238
+for ⟨100⟩ (Andersen: 1.25) and 1.420 for ⟨111⟩ (Andersen: 1.40). The
+research arms keep the ten nearest partners, about $1/\alpha Z$ (`c10`).
+The six-partner set (`c6`) is a range sensitivity check.
+
+**Run setup.** Remote arms at `c29a7339f`, jobs 11467–11485, are in the
+[record](../../validation/check-records/axial-source/correlated-tds-1045-remote.json).
+They use the #992 Andersen settings plus `correlated_partners`, the same
+seed and incident IDs, and `absorption=false`. The uncorrelated control
+(`c0`) reproduces the #992 spectra to that record's 5-significant-figure
+rounding. Ratios are paired c/c0 with a delete-group jackknife SE (10
+groups of 100-primary chunks).
+
+**2p→1s widths (Table 2), eV.**
+
+| Case | $\Gamma_\mathrm{exp}$ | Andersen total | c0 | c6 | c10 | c10/c0 |
+|---|---|---|---|---|---|---|
+| ⟨100⟩ 4 MeV 2 µm, 0.1° | 688 | 588 | 524(5) | 567(6) | 570(7) (−17%) | 1.089(8) |
+| ⟨111⟩ 4 MeV 0.5 µm, 0° | 950 | 807 | 813(14) | 914(17) | 931(18) (−2%) | 1.146(22) |
+| ⟨111⟩ 4 MeV 0.5 µm, 0.06° | 950 | 807 | 724(5) | 829(7) | 845(7) (−11%) | 1.167(9) |
+
+The correlations widen the line by 9% on ⟨100⟩ and 15–17% on ⟨111⟩.
+Going from six to ten partners adds 1–2%. The ⟨111⟩ widths now lie within
+2–11% of measurement, inside its stated "at least 10%" uncertainty. ⟨100⟩
+2 µm stays 17% low. The gain is about what the 1s + 2p loss rates predict:
++11–14% (⟨100⟩) and +22–25% (⟨111⟩), diluted by the electronic and
+thickness parts of the fitted width. Andersen's factor $1+0.7(C-1)$ is
+17% and 29% on the thermal part.
+
+**Absolute 2p→1s yield (Fig. 11; ⟨100⟩ 3.5 MeV 0.3 µm), counts.**
+
+| Tilt (°) | 0.06 | 0.075 | 0.088 | 0.088 (az 45°) | 0.10 |
+|---|---|---|---|---|---|
+| Measured | 11890 | 13150 | 13500 | 13500 | 13140 |
+| c0 | 12470(110) | 14850(90) | 15510(90) | 15230(90) | 14250(80) |
+| c10 | 11300(110) | 14060(110) | 14740(100) | 14510(110) | 13440(90) |
+| c10 / measured | 0.95 | 1.07 | 1.09 | 1.08 | 1.02 |
+| c10/c0 area | 0.907(10) | 0.947(12) | 0.950(9) | 0.953(7) | 0.943(8) |
+| c10 width (eV) | 564(6) | 597(5) | 617(4) | 597(5) | 597(4) |
+
+Stronger incoherent scattering lowers the main-lobe line area by 5–9%.
+Model/data moves from 1.05–1.15 to 0.95–1.09. With the ~5% beam-divergence
+reduction estimated above, the remaining excess is ≤4%. Agreement is
+research evidence. It does not change the claim's status, and the
+production `AxialFibreCase` path and default output are unchanged.
+
+**Remaining gap.**
+
+- ⟨100⟩ 2 µm is the only Table 2 case still well below measurement.
+- The sudden-approximation truncation stands in for longitudinal dephasing.
+- Inter-string correlations are omitted.
+- The Si input holds at 300 K only.
 
 ## Off-axis observation and polarization
 
