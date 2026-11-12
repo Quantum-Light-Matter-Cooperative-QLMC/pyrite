@@ -429,6 +429,9 @@ def main(argv=None):
     parser.add_argument("--models", nargs="+", default=["kernel", "none", "amorphous"])
     parser.add_argument("--grid", type=int, default=2400, help="photon-energy grid points")
     parser.add_argument("--n-divergence", type=int, default=15)
+    parser.add_argument(
+        "--divergence-scale", type=float, default=1.0, help="multiply the stated beam divergence"
+    )
     parser.add_argument("--no-history-reuse", action="store_true")
     parser.add_argument("--out", required=True)
     args = parser.parse_args(argv)
@@ -437,6 +440,7 @@ def main(argv=None):
     cases = [c for name in args.datasets for c in DATASETS[name]()]
     if args.cases:
         cases = [c for c in cases if any(token in c.key for token in args.cases)]
+    cases = [replace(c, divergence_rad=c.divergence_rad * args.divergence_scale) for c in cases]
     rows = []
     for case in cases:
         row = run_case(
