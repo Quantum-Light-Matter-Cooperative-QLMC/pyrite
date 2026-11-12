@@ -348,15 +348,24 @@ def line_metrics(grid, spectrum, window):
     }
 
 
-def run_case(case, *, cells, orders, dz_ang, n_bins, models, n_grid, n_divergence):
+def run_case(case, *, cells, orders, dz_ang, n_bins, models, n_grid, n_divergence, tds_scale=1.0):
     """Spectrum observables of one case for every in-plane model."""
     start = time.perf_counter()
     profile = planar_profile(case.material, case.hkl, TEMPERATURE_K)
     energy = case.kinetic_energy_eV
     tds = tds_kernel(profile, energy, n_cells=cells, max_order=orders)
+    if tds_scale != 1.0:
+        # Sensitivity arm only: a uniform factor on the Einstein TDS kernel
+        # (loss and jumps alike) stands in for a correlation enhancement C.
+        tds = replace(
+            tds,
+            momentum_kernel=tds_scale * tds.momentum_kernel,
+            diagonal_coefficients=tds_scale * tds.diagonal_coefficients,
+        )
     el = electronic_kernel(profile, energy, n_cells=cells, max_order=orders)
     solver = DensityMatrixSolver(profile, energy, tds + el)
     weights = bound_rate_weights(solver, (tds, el), case.divergence_rad)
+    weights = (weights[0] * tds_scale, weights[1])  # in-plane diffusion scales alike
     probe = channeling_spectrum(solver, SAMPLE_ANG, np.array([1.0]), 0.0, dz_ang=dz_ang)
     centres = probe.lines.forward_energy_eV()[probe.lines.kind == 0]
     grid = np.linspace(0.35 * centres.min(), 1.6 * centres.max(), n_grid)
@@ -370,6 +379,8 @@ def run_case(case, *, cells, orders, dz_ang, n_bins, models, n_grid, n_divergenc
         "hkl": list(case.hkl),
         "kinetic_energy_MeV": energy / 1e6,
         "barrier_eV": solver.barrier_eV,
+        "tds_scale": tds_scale,
+        "divergence_rad": case.divergence_rad,
         "y_rate_weights": list(weights),
         "edges_um": (edges / 1e4).tolist(),
         "models": {},
@@ -432,6 +443,9 @@ def main(argv=None):
     parser.add_argument(
         "--divergence-scale", type=float, default=1.0, help="multiply the stated beam divergence"
     )
+    parser.add_argument(
+        "--tds-scale", type=float, default=1.0, help="sensitivity: multiply the TDS kernel"
+    )
     parser.add_argument("--no-history-reuse", action="store_true")
     parser.add_argument("--out", required=True)
     args = parser.parse_args(argv)
@@ -452,6 +466,7 @@ def main(argv=None):
             models=args.models,
             n_grid=args.grid,
             n_divergence=args.n_divergence,
+            tds_scale=args.tds_scale,
         )
         rows.append(row)
         kernel = row["models"][args.models[0]]["thicknesses"]
