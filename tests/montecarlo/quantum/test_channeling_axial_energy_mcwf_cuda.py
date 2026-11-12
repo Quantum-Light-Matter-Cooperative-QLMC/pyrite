@@ -106,7 +106,7 @@ def test_cuda_mono_energy_uses_global_ids_of_direct_cuda_solver():
     out = axial_energy_mcwf(
         IncidentEnergyEnsemble(1e6),
         cfg,
-        options=AxialEnergyMCWFOptions(n_electrons=24, seed=17, chunk_size=10, backend="cuda"),
+        options=AxialEnergyMCWFOptions(histories=24, seed=17, chunk_size=10, backend="cuda"),
     )
     profile = axial_profile(cfg.crystal, cfg.axis, cfg.temperature_K)
     dissipator = axial_dissipator(profile, 1e6, cfg.cells, cfg.shape, mechanisms=cfg.mechanisms)
@@ -133,7 +133,7 @@ def test_cuda_batches_chunks_and_restart_preserve_histories():
 
     def run(chunk, **extra):
         options = AxialEnergyMCWFOptions(
-            n_electrons=40,
+            histories=40,
             seed=27,
             chunk_size=chunk,
             backend="cuda",
@@ -144,7 +144,7 @@ def test_cuda_batches_chunks_and_restart_preserve_histories():
     whole = run(40)
     snapshots = []
     split = run(3, checkpoint_every=16, checkpoint_callback=snapshots.append)
-    assert [s.processed_electrons for s in snapshots] == [16, 32]
+    assert [s.processed_histories for s in snapshots] == [16, 32]
     resumed = run(9, resume_from=snapshots[0])
     assert sum(whole.jumps.values()) > 0
     for other in (split, resumed):
@@ -160,7 +160,7 @@ def test_cuda_batches_chunks_and_restart_preserve_histories():
         axial_energy_mcwf(
             beam,
             cfg,
-            options=AxialEnergyMCWFOptions(n_electrons=40, seed=27),
+            options=AxialEnergyMCWFOptions(histories=40, seed=27),
             resume_from=snapshots[0],
             **kwargs,
         )
@@ -183,7 +183,7 @@ def test_cuda_no_jump_reductions_match_cpu_reference():
         backend: axial_energy_mcwf(
             beam,
             cfg,
-            options=AxialEnergyMCWFOptions(n_electrons=12, seed=5, chunk_size=5, backend=backend),
+            options=AxialEnergyMCWFOptions(histories=12, seed=5, chunk_size=5, backend=backend),
             **common,
         )
         for backend in ("cpu", "cuda")
@@ -222,7 +222,7 @@ def test_cuda_energy_conditioned_statistics_match_cpu():
                 beam,
                 cfg,
                 options=AxialEnergyMCWFOptions(
-                    n_electrons=n, seed=seed, chunk_size=n, backend=backend
+                    histories=n, seed=seed, chunk_size=n, backend=backend
                 ),
                 entry_factory=_tilted_entry,
             )

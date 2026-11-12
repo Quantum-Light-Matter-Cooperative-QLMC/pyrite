@@ -764,7 +764,7 @@ def axial_phase_space_mcwf(
             axial_energy_mcwf(
                 nodes.ensemble(),
                 config,
-                options=replace(options, n_electrons=int(records.size), seed=seed),
+                options=replace(options, histories=int(records.size), seed=seed),
                 entry_factory=factory,
                 electron_energies_eV=energies[records],
                 energy_bin_edges_eV=tuple(bin_edges.tolist()),

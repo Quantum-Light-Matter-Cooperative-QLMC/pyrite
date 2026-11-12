@@ -43,7 +43,7 @@ def _rng(seed: int, electron_id: int, tag: int) -> np.random.Generator:
 
 def sample_electron_energies(
     distribution: IncidentEnergyEnsemble,
-    n_electrons: int,
+    histories: int,
     *,
     seed: int = 0,
     sampling: Literal["binned", "continuous"] = "binned",
@@ -55,18 +55,18 @@ def sample_electron_energies(
     distribution as appropriate. Monoenergetic energy is returned exactly.
     Both modes are deterministic for a given seed and global electron count.
     """
-    if not isinstance(n_electrons, int) or not 1 <= n_electrons <= 100_000:
-        raise ValueError("n_electrons must be between 1 and 100000")
+    if not isinstance(histories, int) or not 1 <= histories <= 100_000:
+        raise ValueError("histories must be between 1 and 100000")
     if not isinstance(seed, int) or not 0 <= seed < 2**63:
         raise ValueError("seed must be a nonnegative integer below 2**63")
     if sampling not in ("binned", "continuous"):
         raise ValueError("sampling must be 'binned' or 'continuous'")
     q = distribution.quadrature()
     if q.is_monoenergetic:
-        return np.full(n_electrons, float(q.energies_eV[0]))
-    energies = np.empty(n_electrons)
+        return np.full(histories, float(q.energies_eV[0]))
+    energies = np.empty(histories)
     cumulative = np.cumsum(q.weights)
-    for i in range(n_electrons):
+    for i in range(histories):
         u = float(_rng(seed, i, _ENERGY_TAG).random())
         if sampling == "binned" or q.method == "explicit":
             energies[i] = q.energies_eV[min(np.searchsorted(cumulative, u), len(cumulative) - 1)]
@@ -84,7 +84,7 @@ def sample_electron_energies(
 class AxialEnergyMCWFOptions:
     """Bounded execution contract; ``chunk_size`` changes admission, not streams.
 
-    ``work_limit`` bounds ``n_electrons * pixels * split_steps``; the
+    ``work_limit`` bounds ``histories * pixels * split_steps``; the
     ``storage_limit_bytes`` bounds returned arrays and per-electron energies,
     not temporary solver allocations (which depend on the dissipator tables).
     ``max_cached_solvers`` limits resident energy-dependent dissipators (on
@@ -92,7 +92,7 @@ class AxialEnergyMCWFOptions:
     batch). ``memory_budget_bytes`` optionally caps CUDA device admission.
     """
 
-    n_electrons: int = 64
+    histories: int = 64
     seed: int = 0
     sampling: Literal["binned", "continuous"] = "binned"
     chunk_size: int = 32
@@ -117,7 +117,7 @@ def _check_backend(options: AxialEnergyMCWFOptions) -> None:
 def _check_options(options: AxialEnergyMCWFOptions, config: Any) -> None:
     _check_backend(options)
     for name, lo, hi in (
-        ("n_electrons", 1, 100_000),
+        ("histories", 1, 100_000),
         ("seed", 0, 2**63 - 1),
         ("chunk_size", 1, 10_000),
         ("max_bins", 1, 256),
@@ -147,7 +147,7 @@ def _check_options(options: AxialEnergyMCWFOptions, config: Any) -> None:
         raise ValueError("depths must be multiples of step_ang")
     if any(d < 2 for d in config.shape) or any(d < 1 for d in config.cells):
         raise ValueError("invalid axial grid")
-    work = options.n_electrons * prod(config.shape) * int(np.max(np.rint(ratio)))
+    work = options.histories * prod(config.shape) * int(np.max(np.rint(ratio)))
     if work > options.work_limit:
         raise ValueError(f"work estimate {work} exceeds work_limit {options.work_limit}")
 
@@ -232,7 +232,7 @@ def _energy_bins(
 
 @dataclass(frozen=True)
 class AxialEnergyMCWFCheckpoint:
-    """Bounded, resumable *raw sums* after the first ``processed_electrons`` IDs.
+    """Bounded, resumable *raw sums* after the first ``processed_histories`` IDs.
 
     Snapshot arrays are independent read-only copies. To resume, supply the
     same configuration, entrance/observable factories and distribution.
@@ -240,7 +240,7 @@ class AxialEnergyMCWFCheckpoint:
     but cannot fingerprint arbitrary Python callback implementations.
     """
 
-    processed_electrons: int
+    processed_histories: int
     signature: str
     bin_counts_processed: np.ndarray
     density_sums: np.ndarray
@@ -411,7 +411,7 @@ def _restart_signature(
         np.asarray(config.shape),
         np.asarray(config.cells),
         np.asarray(config.axis),
-        np.asarray([options.seed, options.n_electrons]),
+        np.asarray([options.seed, options.histories]),
         np.asarray(
             [
                 config.step_ang,
@@ -447,11 +447,11 @@ def _restore_checkpoint(cp, fingerprint, options, ids, nb, density_bins, surviva
     if (
         not isinstance(cp, AxialEnergyMCWFCheckpoint)
         or cp.signature != fingerprint
-        or not 0 <= cp.processed_electrons <= options.n_electrons
+        or not 0 <= cp.processed_histories <= options.histories
     ):
         raise ValueError("checkpoint has incompatible assignment/configuration signature")
     if not np.array_equal(
-        cp.bin_counts_processed, np.bincount(ids[: cp.processed_electrons], minlength=nb)
+        cp.bin_counts_processed, np.bincount(ids[: cp.processed_histories], minlength=nb)
     ):
         raise ValueError("checkpoint contains inconsistent processed bin counts")
     if cp.density_sums.shape != density_bins.shape or cp.survival_sums.shape != survival_bins.shape:
@@ -472,7 +472,7 @@ def _restore_checkpoint(cp, fingerprint, options, ids, nb, density_bins, surviva
         additional_bins = np.array(cp.observable_sums, copy=True)
     if len(cp.jumps_by_bin) != nb:
         raise ValueError("checkpoint jump bins differ")
-    return additional_bins, [dict(b) for b in cp.jumps_by_bin], cp.processed_electrons
+    return additional_bins, [dict(b) for b in cp.jumps_by_bin], cp.processed_histories
 
 
 class _EnergySolvers:
@@ -612,13 +612,13 @@ def axial_energy_mcwf(
     nodes = distribution.quadrature()
     if electron_energies_eV is None:
         energies = sample_electron_energies(
-            distribution, options.n_electrons, seed=options.seed, sampling=options.sampling
+            distribution, options.histories, seed=options.seed, sampling=options.sampling
         )
         discrete = options.sampling == "binned" or nodes.method in ("mono", "explicit")
     else:
         energies = np.asarray(electron_energies_eV, dtype=float)
         if (
-            energies.shape != (options.n_electrons,)
+            energies.shape != (options.histories,)
             or not np.all(np.isfinite(energies))
             or np.any(energies <= 0)
         ):
@@ -826,7 +826,7 @@ def axial_energy_mcwf(
         return bool(
             options.checkpoint_every
             and processed % options.checkpoint_every == 0
-            and processed < options.n_electrons
+            and processed < options.histories
         )
 
     if options.backend == "cuda":
@@ -861,10 +861,10 @@ def axial_energy_mcwf(
             if checkpoint_due(processed):
                 emit_checkpoint(processed)
     cpu_starts = (
-        () if options.backend == "cuda" else range(next_id, options.n_electrons, options.chunk_size)
+        () if options.backend == "cuda" else range(next_id, options.histories, options.chunk_size)
     )
     for start in cpu_starts:
-        for eid in range(start, min(options.n_electrons, start + options.chunk_size)):
+        for eid in range(start, min(options.histories, start + options.chunk_size)):
             energy = float(energies[eid])
             solver, level_observer, level_size = solvers.get(energy)
             current_entry, tilt_rad = entry_for(eid, energy)
@@ -885,7 +885,7 @@ def axial_energy_mcwf(
                 )
 
             # Unique seed for (global_id, stochastic trajectory) even when all
-            # runs pass n_electrons=1 to the existing MCWF backend.
+            # runs pass histories=1 to the existing MCWF backend.
             stream_seed = int(mcwf_stream_key(options.seed ^ _TRAJECTORY_TAG, eid))
             electron = solver.run(
                 current_entry,
@@ -921,7 +921,7 @@ def axial_energy_mcwf(
         additional_bins /= denom.reshape((nb,) + (1,) * (additional_bins.ndim - 1))
     if photons_bins is not None:
         photons_bins /= denom[:, None, None]
-    weights = counts / options.n_electrons
+    weights = counts / options.histories
     jumps = {
         name: sum(item.get(name, 0) for item in jumps_bins)
         for name in {key for item in jumps_bins for key in item}
@@ -940,7 +940,7 @@ def axial_energy_mcwf(
             else "global-ID admission chunks; energy groups in first-ID order; device batch sums"
         ),
         memory_budget_bytes=options.memory_budget_bytes,
-        n_electrons=options.n_electrons,
+        histories=options.histories,
         seed=options.seed,
         sampling=options.sampling,
         chunk_size=options.chunk_size,

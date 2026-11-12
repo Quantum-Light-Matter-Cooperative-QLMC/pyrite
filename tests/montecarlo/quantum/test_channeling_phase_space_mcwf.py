@@ -62,7 +62,7 @@ def test_mcwf_records_keep_their_own_energy_slope_and_impact():
     slope = np.array([[2e-4, 0.0], [-2e-4, 1e-4]])
     space = _space([0.0, 10.0], [8e6, 12e6], position=position, slope=slope)
     result = axial_phase_space_mcwf(
-        space, cfg, options=AxialEnergyMCWFOptions(n_electrons=7, seed=628)
+        space, cfg, options=AxialEnergyMCWFOptions(histories=7, seed=628)
     )
     (run,) = result.runs
     assert run.bin_counts.tolist() == [1, 1]
