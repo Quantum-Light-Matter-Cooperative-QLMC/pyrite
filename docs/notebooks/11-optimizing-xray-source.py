@@ -3,7 +3,7 @@
 # dependencies = [
 #     "endf-parserpy==0.17.0",
 #     "marimo>=0.23.3",
-#     "pyrite-mc[optimization]==0.31.0",
+#     "pyrite-mc[optimization]==0.32.0",
 #     "matplotlib>=3.11",
 #     "numpy>=2",
 # ]
