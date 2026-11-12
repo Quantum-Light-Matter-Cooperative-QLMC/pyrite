@@ -539,9 +539,12 @@ def _refuse_coherent_resolution(case, segments, n_hat, Ne, payload):
         return
     if payload.get("windows") is not None:
         return
-    step, span, _ = coherent_fringe_spacing(segments, n_hat, electron_limit=Ne)
+    population = physical_bunch_electrons(case)
+    step, span, _ = coherent_fringe_spacing(
+        segments, n_hat, electron_limit=Ne, physical_electrons=population
+    )
     grouped_step, grouped_span, _ = coherent_fringe_spacing(
-        segments, n_hat, electron_limit=Ne, grouped=True
+        segments, n_hat, electron_limit=Ne, grouped=True, physical_electrons=population
     )
     raise ValueError(
         "automatic line-grid resolution does not support coherent_emission without "
