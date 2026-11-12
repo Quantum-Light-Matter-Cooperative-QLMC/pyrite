@@ -22,6 +22,9 @@ runs locally in about a minute::
     PYRITE_MC_BACKEND=cpu uv run python checks/kephart_occupation.py \
         --cases si110_17 --margins inf --orders 24 --cells 16 --dz 250 --out k.json
 
+``--backend cuda`` runs the depth step on the GPU (#1125); the anchor settings
+(``--orders 56 --dz 62.5``) then take minutes rather than an hour per group.
+
 Validation: cr-dechanneling-collapse
 """
 
@@ -299,7 +302,9 @@ def boundary_candidates(profile, energy_eV, orders, margins, angle_multiples, ga
     return candidates, spectrum
 
 
-def run_case_group(keys, margin, orders, cells, dz_ang, *, boundary=None, spectrum=None):
+def run_case_group(
+    keys, margin, orders, cells, dz_ang, *, boundary=None, spectrum=None, backend="cpu"
+):
     """Solve one (plane, energy) configuration and fit every case sharing it."""
     first = CASES[keys[0]]
     profile = planar_profile("silicon", first.hkl, TEMPERATURE_K)
@@ -313,7 +318,11 @@ def run_case_group(keys, margin, orders, cells, dz_ang, *, boundary=None, spectr
     thickness_um = max(CASES[k].thickness_range_um[1] for k in keys)
     record_every = max(1, int(round(0.5e4 / dz_ang)))  # every ~0.5 um
     result = solver.propagate(
-        thickness_um * 1e4, dz_ang, divergence_rad=first.divergence_rad, record_every=record_every
+        thickness_um * 1e4,
+        dz_ang,
+        divergence_rad=first.divergence_rad,
+        record_every=record_every,
+        backend=backend,
     )
     solve_s = time.perf_counter() - start - kernel_s
     z_um = result.z_ang / 1e4
@@ -368,6 +377,7 @@ def run_case_group(keys, margin, orders, cells, dz_ang, *, boundary=None, spectr
         "max_order": orders,
         "n_cells": cells,
         "dz_ang": dz_ang,
+        "backend": backend,
         "barrier_eV": result.barrier_eV,
         "entry_flux": result.entry_flux,
         "final_trace": float(result.trace[-1]),
@@ -501,6 +511,9 @@ def main(argv=None) -> int:
     )
     parser.add_argument("--tolerance", type=float, default=TOLERANCE)
     parser.add_argument(
+        "--backend", choices=("cpu", "cuda"), default="cpu", help="propagate depth-step device"
+    )
+    parser.add_argument(
         "--outlier",
         action="append",
         default=[],
@@ -536,7 +549,14 @@ def main(argv=None) -> int:
         for boundary in candidates:
             margin = boundary["margin_eV"]
             run = run_case_group(
-                keys, margin, orders, cells, dz, boundary=boundary, spectrum=spectrum
+                keys,
+                margin,
+                orders,
+                cells,
+                dz,
+                boundary=boundary,
+                spectrum=spectrum,
+                backend=args.backend,
             )
             report["runs"].append(run)
             summary = ", ".join(
