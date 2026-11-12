@@ -10,6 +10,11 @@ correction on line yields against the Debye-Waller and f' sensitivity.
 Units: eV and Angstrom.
 
 Checks (fail -> exit 1):
+0. Reference pin: the production helper reproduces an independent 60-digit
+   mpmath evaluation (explicit momenta, on-shell energies, currents, exact
+   vacuum root) at the pinned Si (222) 30 keV geometry to <= 1e-12. Its printed
+   constants are the ones pinned in
+   ``tests/montecarlo/spectrum/test_quantum_cb_elements.py``.
 1. Closed form = independent vector elements: relative error <= 1e-8 over
    random kinematics at 10 keV-1 GeV, both elements and both orderings.
 2. hbar -> 0 identity: h = 0 reproduces the classical production elements
@@ -30,6 +35,7 @@ Validation: cbs-amplitude
 import json
 from pathlib import Path
 
+import mpmath as mp
 import numpy as np
 from scipy.optimize import brentq
 
@@ -70,6 +76,90 @@ def vector_elements(gamma, v, g, k, e, hbarc=HBARC):
 
 def _factors(h, gamma, v, g, k, e):
     return _quantum_line_factors(h, gamma, v @ g, k @ v, k @ g, g @ g, k @ k, v @ e, g @ e, k @ e)
+
+
+def reference_pin():
+    """60-digit reference at the pinned geometry; imports no PyRITE physics.
+
+    Si (222), a = 5.431 Angstrom, 30 keV along +z, photon at 100 deg in x-z,
+    sigma = y and pi = n x y. Momenta in mc, energies in mc^2,
+    h = hbar c/mc^2 with hbar c = 1973.269804 eV Angstrom and
+    mc^2 = 510998.95 eV. The lattice transfer is -h g and the photon momentum
+    h k = h omega n. The exact vacuum root solves
+    E(p - h g - h k) + h omega = E(p). Returns omega [1/Angstrom] and, per
+    polarization, the quantum and classical (pxr_num, f_cbs).
+    """
+    with mp.workdps(60):
+        h = mp.mpf("1973.269804") / mp.mpf("510998.95")
+        gamma = 1 + mp.mpf(30000) / mp.mpf("510998.95")
+        beta = mp.sqrt(1 - 1 / gamma**2)
+        v = [mp.mpf(0), mp.mpf(0), beta]
+        g = [2 * 2 * mp.pi / mp.mpf("5.431")] * 3
+        th = mp.radians(100)
+        n = [mp.sin(th), mp.mpf(0), mp.cos(th)]
+        e_s = [mp.mpf(0), mp.mpf(1), mp.mpf(0)]
+        e_p = [
+            n[1] * e_s[2] - n[2] * e_s[1],
+            n[2] * e_s[0] - n[0] * e_s[2],
+            n[0] * e_s[1] - n[1] * e_s[0],
+        ]
+
+        def dot(a, b):
+            return sum(x * y for x, y in zip(a, b, strict=True))
+
+        def lin(a, b, s):
+            return [x + s * y for x, y in zip(a, b, strict=True)]
+
+        def energy(p):
+            return mp.sqrt(1 + dot(p, p))
+
+        def current(pa, pb):
+            return [x / (energy(pa) + energy(pb)) for x in lin(pa, pb, 1)]
+
+        p_i = [gamma * x for x in v]
+        p_1 = lin(p_i, g, -h)
+        omega = mp.findroot(
+            lambda w: energy(lin(p_1, n, -h * w)) + h * w - gamma, dot(v, g) / (1 - dot(v, n))
+        )
+        k = [omega * x for x in n]
+        p_2, p_f = lin(p_i, k, -h), lin(p_1, k, -h)
+        kg = lin(k, g, 1)
+        j_fi = current(p_i, p_f)
+        out = {"omega": omega}
+        for name, e in (("sigma", e_s), ("pi", e_p)):
+            pxr = dot(j_fi, kg) * dot(kg, e) - dot(k, k) * dot(j_fi, e)
+            cbs = dot(current(p_1, p_f), e) / (gamma - energy(p_1)) + dot(current(p_i, p_2), e) / (
+                energy(p_f) - energy(p_2)
+            )
+            vg = dot(v, g)
+            pxr0 = dot(v, kg) * dot(kg, e) - dot(k, k) * dot(v, e)
+            cbs0 = -(dot(g, e) - vg * dot(v, e) + dot(v, e) * (dot(k, g) - dot(k, v) * vg) / vg) / (
+                gamma * vg
+            )
+            out[name] = (pxr, cbs, pxr0, cbs0)
+        return out
+
+
+def check_reference_pin():
+    ref = reference_pin()
+    gamma = 1 + 3e4 / MC2
+    v = np.array([0.0, 0.0, np.sqrt(1 - 1 / gamma**2)])
+    g = np.full(3, 4 * np.pi / 5.431)
+    th = np.radians(100.0)
+    n = np.array([np.sin(th), 0.0, np.cos(th)])
+    k = float(ref["omega"]) * n
+    e_s = np.array([0.0, 1.0, 0.0])
+    worst = 0.0
+    print(f"0. reference pin: omega = {mp.nstr(ref['omega'], 20)} 1/Angstrom")
+    for name, e in (("sigma", e_s), ("pi", np.cross(n, e_s))):
+        pxr, cbs, pxr0, cbs0 = (float(x) for x in ref[name])
+        print(f"   {name}: quantum ({pxr!r}, {cbs!r}); classical ({pxr0!r}, {cbs0!r})")
+        got = (*_factors(H_RED, gamma, v, g, k, e), *_factors(0.0, gamma, v, g, k, e))
+        worst = max(
+            worst, *(abs(a / b - 1) for a, b in zip(got, (pxr, cbs, pxr0, cbs0), strict=True))
+        )
+    print(f"   production / reference: max relative deviation {worst:.1e}")
+    return worst <= 1e-12
 
 
 def check_closed_form(rng):
@@ -218,7 +308,7 @@ def check_size():
 
 def main():
     rng = np.random.default_rng(1134)
-    results = [check_closed_form(rng), check_classical(rng), check_size()]
+    results = [check_reference_pin(), check_closed_form(rng), check_classical(rng), check_size()]
     if not all(results):
         print("FAIL")
         raise SystemExit(1)

@@ -627,3 +627,9 @@ All sites pass the unshifted $\mathbf v\cdot\mathbf g$, not $\mathbf v\cdot\math
 - `Checks`: append "2026-11-12 fresh-context: elements rederived from two-ordering second-order PT with convective currents; closed form, identity, $h\to0$ limit, CUDA twins and the $\mathbf k$/$g^2$/$k^2$ inputs at all four production sites verified; 60-digit independent reference agrees to $\le4\times10^{-13}$ over 10 keV–1 GeV".
 - `Source`: qualify the convective-current substitution (finding 2).
 - `Anchor`: `tests/montecarlo/spectrum/test_quantum_cb_elements.py::test_pinned_si_30kev_row` is a candidate for `anchored` once the owner confirms that its pinned values are reference values.
+
+## 2026-11-12 — reference anchor (#1144)
+
+`tests/montecarlo/spectrum/test_quantum_cb_elements.py::test_reference_pin_si_222_30kev` pins production `pxr_num` and `f_cbs`. It covers the quantum and classical values for σ and π at one geometry: Si (222), $a=5.431$ Å, 30 keV along $+z$, photon at 100° in x–z, on the exact vacuum root $\omega=0.686657461470681$ Å⁻¹.
+
+The reference is `checks/quantum_cb_elements_1134.py::reference_pin`. It is a 60-digit mpmath evaluation built from explicit momenta, on-shell energies and convective currents, with the root solved by `findroot`, and it imports no PyRITE physics. Production agrees to $7.8\times10^{-16}$ and the test tolerance is $10^{-12}$. The classical σ value equals $-(\mathbf g\cdot\mathbf e)/(\gamma\,\mathbf v\cdot\mathbf g)$, which pins the single $1/\gamma$. At this geometry the quantum elements differ from the classical ones by −4.6 % (PXR) and +4.1 % (CBS) for σ, and by −5.0 % and +5.4 % for π.
