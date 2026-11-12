@@ -186,21 +186,25 @@ def _profile_cases(material, profile):
 
 
 def test_channeling_demo_and_off_profile_identities_are_unchanged():
-    """Pins measured on ``main`` before #1017: the input spelling moved, keys did not."""
+    """The #1017 spelling migration preserves identity within a model generation.
+
+    Pins refreshed for #1134's ``segment-mean-v7-quantum-elements`` marker;
+    restoring the v6 marker reproduces every pre-#1134 pin.
+    """
     sweep, settings, cases = _profile_cases("silicon", "channeling_demo")
     assert [profiles.case_content_key(case) for case in cases] == [
-        "69c30a338816a8c89500b9e494fa772cf4df0e29fef6a18f75883916043d0e36"
+        "c867a462600faaf9897cdff5c6c094013c9ee61704551822aec495d74bb55690"
     ]
     assert profiles.named_profile_stem("silicon", catalog_profile="channeling_demo") == (
-        "silicon@channeling_demo-fb31c7b9f25c"
+        "silicon@channeling_demo-74b97cf175a9"
     )
     identity = profiles.dataset_identity("silicon", settings, sweep)
     assert identity["parameter_sha256"] == (
-        "55503dcfe268a5dcb6d1e69cc8a8770e7e29d330a83d99ea0a0ca8f4b6339a90"
+        "e51f6c12c59cf372efff6e184299f9d456b69ee6953eff09a1fb3b2442e96e87"
     )
     sweep = material_sweep("hopg", catalog_profile="standard")
     settings = profiles.profile_run_settings(default_settings(), "standard", sweep=sweep)
     assert profiles.dataset_identity("hopg", settings, sweep)["parameter_sha256"] == (
-        "478eb92d24ec6341df21101bdb10021447b7c281340c26e9962551989cff65fa"
+        "77e336a1663d8d762ac8fbcaee97b1c4097f6a9dfe470cc0b1e216309b35acfe"
     )
-    assert profiles.named_profile_stem("hopg") == "hopg@full-478eb92d24ec"
+    assert profiles.named_profile_stem("hopg") == "hopg@full-77e336a1663d"
