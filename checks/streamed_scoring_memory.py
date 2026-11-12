@@ -29,6 +29,17 @@ scoring (``joined-device`` skips both copies).
 
 The case is a production-style coupled BremsLib midpoint run on a slab
 (1 um unless THICKNESS_ANG is given) with explicit line and continuum bins (no case-local grid resolution).
+
+``STREAM_GRID`` (#1001) selects the line grid: ``final`` (default, the
+explicit bins above), ``policy`` (the scene's automatic ``line_grid_policy``)
+or ``measured`` (``resonance-population`` bandwidth, ``resonance-local``
+spacing, ``bin-mean`` quadrature). Policy arms disable the line-grid speed
+cache, so every arm resolves its grid. They time grid resolution as phase
+``grid`` (joined) or ``grid_pass`` (streamed, the whole first transport pass;
+its pool releases are ``grid_pass.release``), and record the resolved grid,
+the evidence bytes of the streamed grid pass, and its resolution record.
+MODE ``grid-pass`` runs only the streamed grid pass (no scoring), for its
+memory and wall against NE. ``compare`` requires bitwise-equal ``E_grid``.
 """
 
 import json
@@ -44,6 +55,7 @@ import numpy as np
 from pyrite.config import FixedSampling
 
 SPECTRA = ("spec", "spec_characteristic", "brem_wide")
+GRID = os.environ.get("STREAM_GRID", "final")
 
 
 def _case(material, ne, e0_kev, thickness_ang=1.0e4, seed=None, tilt_deg=30.0, azim_deg=0.0):
@@ -51,12 +63,11 @@ def _case(material, ne, e0_kev, thickness_ang=1.0e4, seed=None, tilt_deg=30.0, a
     from pyrite import api
     from pyrite.detectors import EnergyBins
 
+    cxr = np.linspace(1000.0, 20000.0, 400) if GRID == "final" else None
     numerics = pr.Numerics(
         sampling=FixedSampling(cxr_histories=ne, brem_histories=ne),
         energy_model="midpoint",
-        energy_bins=EnergyBins(
-            cxr=np.linspace(1000.0, 20000.0, 400), brem=np.arange(1000.0, e0_kev * 1e3, 1000.0)
-        ),
+        energy_bins=EnergyBins(cxr=cxr, brem=np.arange(1000.0, e0_kev * 1e3, 1000.0)),
     )
     physics = pr.Physics(
         bremsstrahlung_model="bremslib",
@@ -77,7 +88,23 @@ def _case(material, ne, e0_kev, thickness_ang=1.0e4, seed=None, tilt_deg=30.0, a
         physics=physics,
     )
     case = api.build_case(scene, numerics)
-    assert case.get("line_grid_policy") is None, "benchmark needs a final line grid"
+    assert (case.get("line_grid_policy") is None) == (GRID == "final"), GRID
+    if GRID == "measured":
+        from pyrite._cxr_grid_policy import resolve_cxr_grid_policy
+
+        band = case["line_grid_policy"]["bandwidth"]
+        policy = resolve_cxr_grid_policy(
+            start_eV=band["start_eV"],
+            stop_eV=band["stop_eV"],
+            per_call={
+                "bandwidth": "resonance-population",
+                "resolution": "resonance-local",
+                "quadrature": "bin-mean",
+            },
+        ).payload()
+        case = replace(case, line_grid_policy=policy, line_quadrature="bin-mean")
+    elif GRID != "policy" and GRID != "final":
+        raise SystemExit(f"unknown STREAM_GRID {GRID!r}")
     case = replace(case, E_cut_lines_keV=5.0, E_cut_brem_keV=5.0)
     return case if seed is None else replace(case, seed=int(seed))
 
@@ -99,6 +126,7 @@ class _Phases:
         self.calls: dict[str, int] = {}
         self.segment_bytes = 0
         self.block_rows: list[int] = []
+        self.prefix = ""
 
     def _count(self, segs):
         self.block_rows.append(int(segs["L_ang"].shape[0]))
@@ -119,8 +147,9 @@ class _Phases:
                 return out
             finally:
                 _sync()
-                self.seconds[name] = self.seconds.get(name, 0.0) + time.perf_counter() - t0
-                self.calls[name] = self.calls.get(name, 0) + 1
+                key = self.prefix + name
+                self.seconds[key] = self.seconds.get(key, 0.0) + time.perf_counter() - t0
+                self.calls[key] = self.calls.get(key, 0) + 1
 
         return timed
 
@@ -129,7 +158,22 @@ def _instrument(mode, phases):
     """Patch the runner seams of ``mode`` with ``phases`` timers."""
     from pyrite import _backend
     from pyrite.montecarlo import runner
-    from pyrite.montecarlo.runner import streamed_scoring
+    from pyrite.montecarlo.runner import case_driver, cxr_grid, streamed_line_grid, streamed_scoring
+
+    # Every policy arm resolves its grid (#1001); a warm cache would skip it.
+    cxr_grid.cached_coordinates = lambda key: None
+    cxr_grid.store_coordinates = lambda key, record: None
+    case_driver.resolve_cxr_grid = phases.wrap("grid", case_driver.resolve_cxr_grid)
+    real_grid_pass = streamed_line_grid.resolve_streamed_line_grid
+
+    def grid_pass(*args, **kwargs):
+        phases.prefix = "grid_pass."
+        try:
+            return real_grid_pass(*args, **kwargs)
+        finally:
+            phases.prefix = ""
+
+    streamed_line_grid.resolve_streamed_line_grid = phases.wrap("grid_pass", grid_pass)
 
     if mode.startswith("joined"):
         last = [None]
@@ -256,6 +300,22 @@ def run(
             out = runner.run_case(case, transport_core=core, keep_segments_on_device=True)
         elif mode == "streamed":
             out = run_case_streamed(case, int(block), transport_core=core)
+        elif mode == "grid-pass":
+            from pyrite.montecarlo.runner import streamed_line_grid
+            from pyrite.montecarlo.runner.artifacts import _case_geometry
+
+            _, _, _, n_hat, groove = _case_geometry(case)
+            grid, record, info = streamed_line_grid.resolve_streamed_line_grid(
+                case, int(block), transport_core=core, n_hat=n_hat, groove=groove
+            )
+            out = {
+                "E_grid": grid,
+                "line_grid_resolved": record,
+                "_streamed_line_grid_pass": info,
+                "n_segments": -1,
+                "eta": float("nan"),
+                **{key: [] for key in SPECTRA},
+            }
         elif mode == "streamed-complete":
             from pyrite.montecarlo.transport import hard_radiative
 
@@ -268,13 +328,18 @@ def run(
             raise SystemExit(f"unknown mode {mode!r}")
     wall = time.perf_counter() - t0
     if mode.startswith("streamed"):
-        accounted = phases.seconds.get("score", 0.0) + phases.seconds.get("release", 0.0)
+        accounted = (
+            phases.seconds.get("score", 0.0)
+            + phases.seconds.get("release", 0.0)
+            + phases.seconds.get("grid_pass", 0.0)
+        )
         phases.seconds["transport"] = wall - accounted
     rss_peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     record = {
         "mode": mode,
         "Ne": int(ne),
-        "block": int(block) if mode.startswith("streamed") else None,
+        "block": int(block) if mode.startswith(("streamed", "grid-pass")) else None,
+        "grid": GRID,
         "schedule": os.environ.get("PYRITE_MC_TRANSPORT_SCHEDULE", "default"),
         "material": material,
         "E0_keV": float(e0_kev),
@@ -303,11 +368,30 @@ def run(
             and not (isinstance(v, list) and len(v) > 64)
         },
         **{key: np.asarray(out[key]).tolist() for key in SPECTRA},
+        "E_grid_points": int(np.asarray(out["E_grid"]).size),
+        "E_grid": np.asarray(out["E_grid"]).tolist() if GRID != "final" else None,
+        "grid_pass": out.get("_streamed_line_grid_pass"),
+        "line_grid_resolved": _jsonable(out.get("line_grid_resolved")),
     }
     with open(out_path, "w") as handle:
         json.dump(record, handle)
-    summary = {k: v for k, v in record.items() if k not in SPECTRA}
+    summary = {
+        k: v for k, v in record.items() if k not in (*SPECTRA, "E_grid", "line_grid_resolved")
+    }
     print(json.dumps(summary))
+
+
+def _jsonable(value):
+    """A resolution record as JSON values (numpy scalars and arrays to lists)."""
+    return None if value is None else json.loads(json.dumps(value, default=_numpy_default))
+
+
+def _numpy_default(value):
+    if isinstance(value, np.ndarray):
+        return value.tolist()
+    if isinstance(value, np.generic):
+        return value.item()
+    raise TypeError(type(value).__name__)
 
 
 def compare(ref_path, *others):
@@ -315,6 +399,9 @@ def compare(ref_path, *others):
     worst = 0.0
     for path in others:
         other = json.load(open(path))
+        if other.get("E_grid") != ref.get("E_grid"):
+            print(f"{path} E_grid differs from {ref_path}")
+            return 1
         assert other["n_segments"] == ref["n_segments"] and other["eta"] == ref["eta"], path
         for key in SPECTRA:
             a, b = np.asarray(other[key]), np.asarray(ref[key])
