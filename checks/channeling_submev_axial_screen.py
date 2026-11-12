@@ -37,9 +37,10 @@ import numpy as np
 from scipy import ndimage
 
 from pyrite.materials.attenuation import plasma_energy_eV
-from pyrite.materials.channeling.axial import axial_profile, axial_states
+from pyrite.materials.channeling.axial import axial_profile
 from pyrite.materials.crystal import HBAR2_2M_EV_ANG2, HBARC_EV_ANG, M_E_EV
 from pyrite.montecarlo.channeling import line_energy_eV, longitudinal_kinematics
+from pyrite.montecarlo.channeling.axial_bloch import axial_states
 from pyrite.montecarlo.channeling.axial_emission import axial_line_catalog
 
 ENERGIES_KEV = (30, 50, 100, 200, 300, 500, 750, 1000)

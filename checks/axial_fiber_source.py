@@ -127,8 +127,9 @@ def _tilted_entry(o: dict, info: dict, channels, entry):
     theta = np.deg2rad(float(o["tilt_deg"]))
     if theta == 0.0:
         return (0.0, 0.0), entry
-    from pyrite.materials.channeling.axial import axial_profile, axial_states
+    from pyrite.materials.channeling.axial import axial_profile
     from pyrite.montecarlo.channeling import longitudinal_kinematics
+    from pyrite.montecarlo.channeling.axial_bloch import axial_states
 
     phi = np.deg2rad(float(o["tilt_azimuth_deg"]))
     k_perp = info["k_inv_ang"] * np.sin(theta) * np.array([np.cos(phi), np.sin(phi)])

@@ -139,6 +139,45 @@ presence in the reference does not broaden production admission; consult the
    pyrite.experimental.quantum.score_planar_source
 ```
 
+### Crystal profiles, Bloch states and emission helpers
+
+Experimental channeling helpers (#1147): crystal potentials, beam-dependent
+Bloch states and kinematics, line and spectrum diagnostics, exit-angle
+distributions and the fibre research adapters. Import them from
+`pyrite.quantum`; their implementation modules are internal.
+
+```{eval-rst}
+.. autosummary::
+   :toctree: ../../_autosummary
+   :nosignatures:
+
+   pyrite.quantum.planar_profile
+   pyrite.quantum.axial_profile
+   pyrite.quantum.transverse_states
+   pyrite.quantum.axial_states
+   pyrite.quantum.AxialStates
+   pyrite.quantum.entry_populations
+   pyrite.quantum.longitudinal_kinematics
+   pyrite.quantum.line_energy_eV
+   pyrite.quantum.channeling_spectrum
+   pyrite.quantum.axial_line_catalog
+   pyrite.quantum.classical_exit_angles
+   pyrite.quantum.coherent_exit_distribution
+   pyrite.quantum.planar_fiber_inputs
+   pyrite.quantum.unravel_fiber_outgoing
+```
+
+`M_E_EV` is the electron rest energy, a plain `float` in eV (no Quantity).
+
+```{eval-rst}
+.. autosummary::
+   :toctree: ../../_autosummary
+   :template: autosummary/public-data.rst
+   :nosignatures:
+
+   pyrite.quantum.M_E_EV
+```
+
 ### Scattering operators
 
 These experimental operators remain at `pyrite.quantum`; they are not part of

@@ -91,7 +91,7 @@ This is the path that keeps the energy–transverse correlations of every record
 
 ```python
 import numpy as np
-from pyrite.materials.channeling import planar_profile
+from pyrite.quantum import planar_profile
 from pyrite.montecarlo.channeling import (
     LinearEnergyChirp,
     planar_solver_factory,

@@ -88,8 +88,9 @@ def axial_fiber_inputs(case: AxialFibreCase) -> AxialFiberInputs:
 
     Validation: cr-axial-persisted-channel
     """
-    from ...materials.channeling.axial import axial_profile, axial_states
+    from ...materials.channeling.axial import axial_profile
     from ...materials.crystal import HBARC_EV_ANG, M_E_EV
+    from .axial_bloch import axial_states
     from .axial_dissipator import axial_dissipator
     from .axial_tds_continuum import TdsString
     from .bloch import longitudinal_kinematics

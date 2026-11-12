@@ -18,6 +18,18 @@ from typing import TYPE_CHECKING, Any
 from ._channeling import Channeling, ChannelingNumerics
 
 if TYPE_CHECKING:
+    from pyrite.materials.channeling.axial import (
+        axial_profile as axial_profile,
+    )
+    from pyrite.materials.channeling.potential import (
+        planar_profile as planar_profile,
+    )
+    from pyrite.montecarlo.channeling.axial_bloch import (
+        AxialStates as AxialStates,
+    )
+    from pyrite.montecarlo.channeling.axial_bloch import (
+        axial_states as axial_states,
+    )
     from pyrite.montecarlo.channeling.axial_diagnostic import (
         AxialDiagnosticConfig as AxialDiagnosticConfig,
     )
@@ -27,17 +39,44 @@ if TYPE_CHECKING:
     from pyrite.montecarlo.channeling.axial_diagnostic import (
         axial_diagnostic as axial_diagnostic,
     )
+    from pyrite.montecarlo.channeling.axial_emission import (
+        axial_line_catalog as axial_line_catalog,
+    )
+    from pyrite.montecarlo.channeling.axial_fiber_unraveling import (
+        unravel_fiber_outgoing as unravel_fiber_outgoing,
+    )
     from pyrite.montecarlo.channeling.axial_mcwf import (
         AxialMCWF as AxialMCWF,
     )
     from pyrite.montecarlo.channeling.axial_mcwf import (
         AxialMCWFResult as AxialMCWFResult,
     )
+    from pyrite.montecarlo.channeling.bloch import (
+        entry_populations as entry_populations,
+    )
+    from pyrite.montecarlo.channeling.bloch import (
+        line_energy_eV as line_energy_eV,
+    )
+    from pyrite.montecarlo.channeling.bloch import (
+        longitudinal_kinematics as longitudinal_kinematics,
+    )
+    from pyrite.montecarlo.channeling.bloch import (
+        transverse_states as transverse_states,
+    )
     from pyrite.montecarlo.channeling.density import (
         DensityMatrixResult as DensityMatrixResult,
     )
     from pyrite.montecarlo.channeling.density import (
         DensityMatrixSolver as DensityMatrixSolver,
+    )
+    from pyrite.montecarlo.channeling.emission import (
+        channeling_spectrum as channeling_spectrum,
+    )
+    from pyrite.montecarlo.channeling.exit_angular import (
+        classical_exit_angles as classical_exit_angles,
+    )
+    from pyrite.montecarlo.channeling.exit_angular import (
+        coherent_exit_distribution as coherent_exit_distribution,
     )
     from pyrite.montecarlo.channeling.mcwf import (
         MCWFResult as MCWFResult,
@@ -53,6 +92,9 @@ if TYPE_CHECKING:
     )
     from pyrite.montecarlo.channeling.operators import (
         tds_kernel as tds_kernel,
+    )
+    from pyrite.montecarlo.channeling.planar_fiber import (
+        planar_fiber_inputs as planar_fiber_inputs,
     )
     from pyrite.montecarlo.channeling.realspace import (
         RealSpaceGrid as RealSpaceGrid,
@@ -130,6 +172,9 @@ if TYPE_CHECKING:
         TransverseStateSpec as TransverseStateSpec,
     )
 
+    #: Electron rest energy ``m_e c^2`` [eV], a plain float (no Quantity).
+    M_E_EV: float
+
 
 _EXPORTS = {
     "AxialDiagnosticConfig": (
@@ -175,6 +220,27 @@ _EXPORTS = {
     "superpose": ("pyrite.montecarlo.channeling.states", "superpose"),
     "tds_kernel": ("pyrite.montecarlo.channeling.operators", "tds_kernel"),
     "translate": ("pyrite.montecarlo.channeling.states", "translate"),
+    "AxialStates": ("pyrite.montecarlo.channeling.axial_bloch", "AxialStates"),
+    "M_E_EV": ("pyrite.materials.crystal", "M_E_EV"),
+    "axial_line_catalog": ("pyrite.montecarlo.channeling.axial_emission", "axial_line_catalog"),
+    "axial_profile": ("pyrite.materials.channeling.axial", "axial_profile"),
+    "axial_states": ("pyrite.montecarlo.channeling.axial_bloch", "axial_states"),
+    "channeling_spectrum": ("pyrite.montecarlo.channeling.emission", "channeling_spectrum"),
+    "classical_exit_angles": ("pyrite.montecarlo.channeling.exit_angular", "classical_exit_angles"),
+    "coherent_exit_distribution": (
+        "pyrite.montecarlo.channeling.exit_angular",
+        "coherent_exit_distribution",
+    ),
+    "entry_populations": ("pyrite.montecarlo.channeling.bloch", "entry_populations"),
+    "line_energy_eV": ("pyrite.montecarlo.channeling.bloch", "line_energy_eV"),
+    "longitudinal_kinematics": ("pyrite.montecarlo.channeling.bloch", "longitudinal_kinematics"),
+    "planar_fiber_inputs": ("pyrite.montecarlo.channeling.planar_fiber", "planar_fiber_inputs"),
+    "planar_profile": ("pyrite.materials.channeling.potential", "planar_profile"),
+    "transverse_states": ("pyrite.montecarlo.channeling.bloch", "transverse_states"),
+    "unravel_fiber_outgoing": (
+        "pyrite.montecarlo.channeling.axial_fiber_unraveling",
+        "unravel_fiber_outgoing",
+    ),
 }
 
 __all__ = [
@@ -182,6 +248,7 @@ __all__ = [
     "AxialDiagnosticResult",
     "AxialMCWF",
     "AxialMCWFResult",
+    "AxialStates",
     "Channeling",
     "ChannelingNumerics",
     "DensityMatrixResult",
@@ -189,6 +256,7 @@ __all__ = [
     "EntryState",
     "MCWFResult",
     "MCWFSolver",
+    "M_E_EV",
     "MixedState",
     "PlanarStateProjection",
     "RealSpaceGrid",
@@ -202,21 +270,34 @@ __all__ = [
     "airy",
     "aperture_probe",
     "axial_diagnostic",
+    "axial_line_catalog",
+    "axial_profile",
+    "axial_states",
     "bessel_gauss",
+    "channeling_spectrum",
+    "classical_exit_angles",
+    "coherent_exit_distribution",
     "donut",
     "electronic_kernel",
+    "entry_populations",
     "from_abtem",
     "from_array",
     "gaussian",
     "hermite_gauss",
     "laguerre_gauss",
+    "line_energy_eV",
+    "longitudinal_kinematics",
     "mixture",
+    "planar_fiber_inputs",
+    "planar_profile",
     "project_planar_source",
     "propagate_planar_source",
     "score_planar_source",
     "superpose",
     "tds_kernel",
     "translate",
+    "transverse_states",
+    "unravel_fiber_outgoing",
 ]
 
 

@@ -157,6 +157,23 @@ score_planar_source = { target = "pyrite.quantum.planar_source:score_planar_sour
 superpose = { target = "pyrite.montecarlo.channeling.states:superpose", status = "experimental" }
 tds_kernel = { target = "pyrite.montecarlo.channeling.operators:tds_kernel", status = "experimental" }
 translate = { target = "pyrite.montecarlo.channeling.states:translate", status = "experimental" }
+# #1147: channeling solver/physics helpers; targets stay in their implementation modules.
+# axial_states/AxialStates moved from materials.channeling.axial (clean break, never public).
+AxialStates = { target = "pyrite.montecarlo.channeling.axial_bloch:AxialStates", status = "experimental" }
+M_E_EV = { target = "pyrite.materials.crystal:M_E_EV", status = "experimental" }
+axial_line_catalog = { target = "pyrite.montecarlo.channeling.axial_emission:axial_line_catalog", status = "experimental" }
+axial_profile = { target = "pyrite.materials.channeling.axial:axial_profile", status = "experimental" }
+axial_states = { target = "pyrite.montecarlo.channeling.axial_bloch:axial_states", status = "experimental" }
+channeling_spectrum = { target = "pyrite.montecarlo.channeling.emission:channeling_spectrum", status = "experimental" }
+classical_exit_angles = { target = "pyrite.montecarlo.channeling.exit_angular:classical_exit_angles", status = "experimental" }
+coherent_exit_distribution = { target = "pyrite.montecarlo.channeling.exit_angular:coherent_exit_distribution", status = "experimental" }
+entry_populations = { target = "pyrite.montecarlo.channeling.bloch:entry_populations", status = "experimental" }
+line_energy_eV = { target = "pyrite.montecarlo.channeling.bloch:line_energy_eV", status = "experimental" }
+longitudinal_kinematics = { target = "pyrite.montecarlo.channeling.bloch:longitudinal_kinematics", status = "experimental" }
+planar_fiber_inputs = { target = "pyrite.montecarlo.channeling.planar_fiber:planar_fiber_inputs", status = "experimental" }
+planar_profile = { target = "pyrite.materials.channeling.potential:planar_profile", status = "experimental" }
+transverse_states = { target = "pyrite.montecarlo.channeling.bloch:transverse_states", status = "experimental" }
+unravel_fiber_outgoing = { target = "pyrite.montecarlo.channeling.axial_fiber_unraveling:unravel_fiber_outgoing", status = "experimental" }
 
 # #955: existing spectral quantity carriers own explicit rate/current states and native tables;
 # Result.accepted_spectra owns matching acceptance. No new exported carrier or storage fields.

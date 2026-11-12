@@ -31,7 +31,24 @@ def test_quantum_exports_are_experimental_and_documented():
         f"missing: {sorted(portable - set(listed))}; unexpected: {sorted(set(listed) - portable)}"
     )
     experimental = set(re.findall(pattern, experimental_content, re.M))
-    assert experimental == {"ScatteringKernel", "electronic_kernel", "tds_kernel"}
+    helpers = {
+        "planar_profile",
+        "axial_profile",
+        "transverse_states",
+        "axial_states",
+        "AxialStates",
+        "entry_populations",
+        "longitudinal_kinematics",
+        "line_energy_eV",
+        "channeling_spectrum",
+        "axial_line_catalog",
+        "classical_exit_angles",
+        "coherent_exit_distribution",
+        "planar_fiber_inputs",
+        "unravel_fiber_outgoing",
+        "M_E_EV",
+    }
+    assert experimental == {"ScatteringKernel", "electronic_kernel", "tds_kernel"} | helpers
     assert all(exports[name]["status"] == "experimental" for name in experimental)
     assert ":toctree: ../../_autosummary" in content
 

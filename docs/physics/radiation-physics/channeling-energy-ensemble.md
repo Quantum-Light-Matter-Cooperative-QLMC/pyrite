@@ -21,7 +21,7 @@ Explicit nodes permit measured or asymmetric distributions. Nodes must have posi
 
 ```python
 import numpy as np
-from pyrite.materials.channeling import planar_profile
+from pyrite.quantum import planar_profile
 from pyrite.montecarlo.channeling import (
     IncidentEnergyEnsemble,
     planar_solver_factory,
