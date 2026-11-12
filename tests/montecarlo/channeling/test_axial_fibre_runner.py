@@ -113,6 +113,21 @@ def test_runner_admits_a_runnable_case_and_no_caller_record(case_b, runnable_b):
     admit_axial_channeling({"channeling": None})
 
 
+def test_runner_private_keys_neither_block_nor_grant_admission(case_b, runnable_b):
+    """#1123: the GPU retry's runtime cache key is not a case field."""
+    admit_axial_channeling({**case_b.to_dict(), "_spectrum_phase_cache": {}})
+    forged = case_b.to_dict()
+    forged["channeling"] = {**forged["channeling"], "depth_budget": 0.0}
+    with pytest.raises(AxialAdmissionError, match="differs from repository"):
+        admit_axial_channeling({**forged, "_spectrum_phase_cache": {}})
+    with pytest.raises(AxialAdmissionError, match="#623"):
+        admit_axial_channeling(
+            {"channeling": {"model": "axial", "axis_uvw": [0, 0, 1]}, "_spectrum_phase_cache": {}}
+        )
+    with pytest.raises(AxialAdmissionError, match="not a complete case record"):
+        admit_axial_channeling({**case_b.to_dict(), "not_a_field": 1, "_spectrum_phase_cache": {}})
+
+
 def test_marking_one_case_runnable_admits_no_other(runnable_b):
     case = fibre_case("A")
     assert case["channeling"]["free_free"] == "bound"
@@ -285,6 +300,17 @@ def test_source_and_budgets_round_trip_through_results_and_checkpoints(case_b, p
     assert diagnostics["entrance_weight"] == info["entrance_weight"]
     np.testing.assert_array_equal(diagnostics["spec_channeling_sem"], info["source"]["sem"])
     assert diagnostics["spec_channeling_sem"].shape == record["spec_channeling"].shape
+
+
+@pytest.mark.slow
+def test_gpu_policy_spectrum_recovery_runs_an_admitted_case(case_b, produced, monkeypatch):
+    """#1123: the GPU-policy retry wrapper reaches the spectrum phase."""
+    transport, out = produced
+    monkeypatch.setattr(runner._RESOURCE_POLICY, "gpu", True)
+    monkeypatch.setattr(runner, "_ensure_pool_limit", lambda: None)
+    retried = runner._spectrum_with_recovery(case_b.to_dict(), transport)
+    np.testing.assert_array_equal(retried["spec_channeling"], out["spec_channeling"])
+    assert retried["_recovery_path"] == "device_spectrum"
 
 
 @pytest.mark.slow
