@@ -120,9 +120,9 @@ def test_calculation_groups_have_api_field_ownership_and_scoped_resets(_isolate_
     assert bad.exit_code == 2
     assert "No such option" in bad.stderr
     moved = invoke(command, ["profile", "numerics", "set", "campaign", "--straggling"])
-    assert moved.exit_code == 0
-    assert "use 'pyrite profile physics set'" in moved.stderr
-    assert read_raw(bundled_catalog())["profiles"]["campaign"]["straggling"] is True
+    assert moved.exit_code == 2
+    assert "No such option" in moved.stderr
+    assert "straggling" not in read_raw(bundled_catalog())["profiles"]["campaign"]
 
 
 def test_calculation_cross_model_errors_and_dry_run_do_not_write(_isolate_user_catalog):

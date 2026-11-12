@@ -5,13 +5,8 @@ beam`` and ``pyrite detector`` manage theirs. ``pyrite profile numerics`` /
 ``pyrite profile physics`` show and edit one profile's own fields, which
 override its attached preset. The two field sets are disjoint and follow the
 API partition (``pyrite._numerics.PHYSICS_KEYS``).
-
-Issue #1078 deprecations kept here: ``numerics|physics show|set|reset|validate
-PROFILE`` (taken when the name is a profile, not a preset), physics flags and
-fields on ``profile numerics set|reset``, and the ``preset`` subgroups.
 """
 
-from copy import copy
 from typing import Any, cast
 
 import click
@@ -24,7 +19,6 @@ from ..._numerics import PHYSICS_KEYS
 from ...console import json as cli_json
 from ...console.output import CLIError, emit_json_result, emit_result, output_option
 from .. import _catalog_io, _completion
-from .._deprecations import DeprecatedOption, warn_form
 from .._groups import LazyGroup
 from . import _calculation_options, _calculation_view
 from ._profile_shared import confirm_standard, write
@@ -75,19 +69,10 @@ def _emission_row(document, target):
     }
 
 
-def _show(name, json_output, *, physics, legacy=False):
-    """Show PROFILE's own Numerics or Physics fields.
-
-    ``legacy`` keeps the ``pyrite.numerics|physics.show`` JSON payload of the
-    deprecated ``pyrite numerics|physics show PROFILE``; otherwise numerics
-    uses ``cxr.profile.numerics.show`` (groups) and physics
-    ``pyrite.profile.physics.show`` (fields).
-    """
+def _show(name, json_output, *, physics):
+    """Show PROFILE's own Numerics or Physics fields."""
     noun = _noun(physics)
-    if legacy:
-        schema = f"pyrite.{noun}.show"
-    else:
-        schema = "pyrite.profile.physics.show" if physics else "cxr.profile.numerics.show"
+    schema = "pyrite.profile.physics.show" if physics else "cxr.profile.numerics.show"
     try:
         _, document = _catalog_io.catalog_text()
         target = _profile_document.existing_profile(document, name)
@@ -108,7 +93,7 @@ def _show(name, json_output, *, physics, legacy=False):
             fields.insert(0, _emission_row(document, target))
         kind = PHYSICS if physics else NUMERICS
         preset = config_presets.profile_preset(document, kind, target)[0]
-        if legacy or physics:
+        if physics:
             payload: dict[str, Any] = {"profile": name, "preset": preset, "fields": fields}
         else:
             payload = {
@@ -165,8 +150,6 @@ def _set(name, yes, dry_run, *, physics, emission=None, **values):
 
 def _reset(name, selected, yes, dry_run, *, physics):
     names = _field_names(physics)
-    if not physics and any(field not in names for field in selected):
-        warn_form("profile numerics reset PHYSICS-FIELD", "pyrite profile physics reset")
     every = (*names, *(("emission",) if physics else ()))
     fields = tuple(selected) or every
     try:
@@ -201,22 +184,6 @@ def _validate(name):
     emit_result(f"valid profile {name}")
 
 
-def _deprecated(params):
-    """Hidden `DeprecatedOption` copies: they still save, and warn per flag (#1078)."""
-    deprecated = []
-    for param in params:
-        if param.callback is not None:  # pragma: no cover - field options carry no callback
-            raise AssertionError(f"{param.name} has a callback")
-        option = copy(param)
-        option.__class__ = DeprecatedOption
-        option = cast(DeprecatedOption, option)
-        option.deprecated_flag = param.opts[0]
-        option.callback = option._warn
-        option.hidden = True
-        deprecated.append(option)
-    return deprecated
-
-
 def _profile_set_params(physics):
     params: list[click.Parameter] = [
         click.Argument(("name",), metavar="PROFILE", shell_complete=_completion.complete_profile),
@@ -230,9 +197,6 @@ def _profile_set_params(physics):
                 help="CXR modes; cross-model constraints are validated before saving.",
             )
         )
-    else:
-        # Deprecated: physics flags still accepted here; they warn and save as Physics.
-        params.extend(_deprecated(_calculation_options.field_params(physics=True)))
     params += [
         click.Option(("-y", "--yes"), is_flag=True, help="Skip the standard-profile confirmation."),
         click.Option(("--dry-run",), is_flag=True, help="Validate and preview without saving."),
@@ -242,7 +206,7 @@ def _profile_set_params(physics):
 
 def _profile_reset_choices(physics):
     names = tuple(_field_names(physics))
-    return (*names, "emission") if physics else (*names, *_field_names(True))
+    return (*names, "emission") if physics else names
 
 
 def _build_profile_group(physics):
@@ -333,97 +297,11 @@ profile_physics_command = _build_profile_group(physics=True)
 # --------------------------------------------------------------------------- #
 
 
-def _route(kind, name):
-    """``"preset"`` when NAME is a preset, ``"profile"`` for a profile-only name."""
-    try:
-        _, document = _catalog_io.catalog_text()
-    except (OSError, ValueError, ParseError) as exc:
-        raise CLIError(str(exc)) from None
-    if name in config_presets.preset_rows(document, kind):
-        return "preset"
-    return "profile" if name in _catalog_io.profile_rows(document) else "preset"
-
-
-def _dispatching(kind, verb, preset_command, profile_command):
-    """``pyrite <kind> VERB NAME``: a preset, or (deprecated) a profile's fields."""
-    noun = kind.table
-    preset_names = {param.name for param in preset_command.params}
-    profile_names = {param.name for param in profile_command.params}
-    extra = [
-        param
-        for param in profile_command.params
-        if param.name not in preset_names and not param.hidden
-    ]
-
-    def callback(**values):
-        ctx = click.get_current_context()
-        name = values["name"]
-        if _route(kind, name) == "preset":
-            stray = [
-                param.name
-                for param in extra
-                if ctx.get_parameter_source(param.name or "")
-                is click.core.ParameterSource.COMMANDLINE
-            ]
-            if stray:
-                raise click.UsageError(
-                    f"{', '.join('--' + (s or '').replace('_', '-') for s in stray)} applies to "
-                    f"profiles; use 'pyrite profile {noun} {verb}'"
-                )
-            return ctx.invoke(
-                preset_command, **{k: v for k, v in values.items() if k in preset_names}
-            )
-        if values.get("description") is not None:
-            raise click.UsageError(f"--description applies to {noun} presets, not profiles")
-        if (
-            kind is NUMERICS
-            and verb == "set"
-            and any(
-                ctx.get_parameter_source(key) is click.core.ParameterSource.COMMANDLINE
-                for key in preset_names - profile_names
-            )
-        ):
-            raise click.UsageError(
-                "Sampling options here apply to named presets. To switch this profile, use "
-                f"'pyrite profile numerics adaptive-sampling enable {name}' or "
-                f"'pyrite profile numerics adaptive-sampling disable {name}'."
-            )
-        warn_form(f"{noun} {verb} PROFILE", f"pyrite profile {noun} {verb} {name}")
-        if verb == "show":  # the deprecated route keeps its JSON payload
-            return _show(name, values["json_output"], physics=kind is PHYSICS, legacy=True)
-        return ctx.invoke(
-            profile_command, **{k: v for k, v in values.items() if k in profile_names}
-        )
-
-    # A profile-only flag (the [channeling] table, #1017) replaces the preset's
-    # removed-flag guard of the same spelling; the preset route reports it as
-    # profile-only above.
-    profile_opts = {opt for param in extra for opt in getattr(param, "opts", ())}
-    kept = [
-        param
-        for param in preset_command.params
-        if param.expose_value or not profile_opts.intersection(getattr(param, "opts", ()))
-    ]
-    params = [*kept, *(copy(param) for param in extra)]
-    for param in params:
-        if param.name == "name" and isinstance(param, click.Argument):
-            param.metavar = "NAME"
-    return _calculation_options.ChannelingSectionCommand(
-        verb,
-        params=params,
-        callback=callback,
-        help=preset_command.help,
-        short_help=preset_command.short_help,
-        no_args_is_help=preset_command.no_args_is_help,
-    )
-
-
 def _build_noun(kind, help_text, lazy_commands, lazy_help, lazy_hidden):
     from . import config_preset
 
     presets = config_preset.build(kind)
     physics = kind is PHYSICS
-    profile_group = profile_physics_command if physics else profile_numerics_command
     group = LazyGroup(
         kind.table,
         lazy_commands=lazy_commands,
@@ -434,15 +312,8 @@ def _build_noun(kind, help_text, lazy_commands, lazy_help, lazy_hidden):
         no_args_is_help=True,
         help=help_text,
     )
-    for name, command in presets.commands.items():
-        if name in ("show", "set", "reset", "validate"):
-            profile_command = profile_group.commands[name]
-            group.add_command(_dispatching(kind, name, command, profile_command))
-        else:
-            group.add_command(command)
-    alias = copy(presets)
-    alias.hidden = True
-    group.add_command(alias, "preset")
+    for command in presets.commands.values():
+        group.add_command(command)
     return group
 
 
@@ -473,10 +344,8 @@ numerics_command = _build_noun(
     Physical models live under pyrite physics.
     """,
     {
-        "adaptive-sampling": "pyrite.cli.commands._profile_precision.command",
-        "cxr-grid": "pyrite.cli.commands._profile_cxr_grid.command",
         "energy-grid": "pyrite.cli.commands.energy_grid_surface.material_command",
     },
     {"energy-grid": "Derive and inspect specialist photon-grid artifacts."},
-    ("adaptive-sampling", "cxr-grid"),
+    (),
 )

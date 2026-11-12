@@ -9,7 +9,7 @@ Detail page of the [repository map](../repo_map.md). Start from the front page; 
 
 ## `cli/_deprecations.py`
 RFC D7 deprecation harness: frozen `Deprecation` registry keyed by command path, `DeprecatingGroup(click.Group)` that warns once per invocation in `resolve_command` (before callbacks and `--help`), and `scripts/generate_cli_deprecations.py` regenerates [CLI deprecations](../repo-design/cli/cli-deprecations.md) from the registry.
-- `DEPRECATED_FORMS` + `warn_form` cover deprecated argument shapes of live commands (profile names routed through preset nouns); the generator renders them under "Argument forms" and `pyrite-dev release` schedules their removal.
+- `DEPRECATED_FORMS` + `warn_form` provide the registry and warning substrate for deprecated argument shapes of live commands; the generator renders them under "Argument forms" and `pyrite-dev release` schedules their removal.
 - Public: `DEPRECATIONS`, `Deprecation`, `DeprecatingGroup`, `message`, `warn`, `invocation_path`, `SUPPORT_WINDOW_MINORS`.
 - Wired into `cli/_groups.py` (`LazyGroup(DeprecatingGroup)`), `cli/commands/profile.py`, `cli/commands/sweep.py`, `cli/commands/energy_grid.py`, `cli/commands/remote.py`.
 

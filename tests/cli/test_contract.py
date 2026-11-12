@@ -121,7 +121,7 @@ _REMOVED_OPTIONS.update(
         ("profile set", "--line-trials"),
         ("profile add", "--line-trials"),
         ("profile numerics set", "--line-trials"),
-        ("numerics adaptive-sampling disable", "--line-trials"),
+        ("profile numerics adaptive-sampling disable", "--line-trials"),
     )
 )
 
@@ -144,6 +144,34 @@ _REMOVED_OPTIONS.update(
             )
             for flag in ("--cxr-trials", "--brem-trials")
         ),
+    )
+)
+
+
+# The 0.32 physics-on-numerics cohort reached removal at 0.34.
+_REMOVED_OPTIONS.update(
+    (("profile", "numerics", "set"), flag)
+    for flag in (
+        "--straggling",
+        "--no-straggling",
+        "--no-positron-transport",
+        "--inelastic-model",
+        "--inelastic-cutoff-ev",
+        "--secondary-threshold-ev",
+        "--elastic-model",
+        "--bremsstrahlung-model",
+        "--radiative-model",
+        "--radiative-cutoff-ev",
+        "--pair-production-model",
+        "--positron-transport",
+        "--atomic-electron-deflection",
+        "--transport-mode",
+        "--mixed-c1",
+        "--mixed-c2",
+        "--shell-ionization-model",
+        "--channeling-model",
+        "--channeling-plane",
+        "--channeling-admission",
     )
 )
 

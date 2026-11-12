@@ -5,7 +5,7 @@ import tomlkit
 
 from pyrite.cli import command as root_command
 from pyrite.cli.commands import profile
-from pyrite.cli.commands.calculation import numerics_command
+from pyrite.cli.commands.calculation import profile_numerics_command as numerics_command
 from tests.cli.test_profile import _CATALOG, _catalog
 from tests.helpers.cli import assert_clean_result, assert_row, assert_table_row, invoke
 
