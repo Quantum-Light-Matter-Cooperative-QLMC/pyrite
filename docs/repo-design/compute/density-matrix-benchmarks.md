@@ -77,7 +77,7 @@ record and reprojection steps, so the density crosses to the host only there
 output is bit-identical to the host-only step.
 
 [Machine-readable measurements](data/density-matrix-gpu-2026-11-12.json).
-Remote job 12012 ran revision `18e3feb28` on qlmc: an AMD Ryzen 9 9950X3D
+Remote job 12012 ran revision `18e3feb28` (`ac7dc6d99` after rebase onto `73981696e`) on qlmc: an AMD Ryzen 9 9950X3D
 with 8 CPUs allocated and an RTX 5080 (consumer Blackwell, fp64 at about 1/64
 rate). `--backend cpu cuda` times the full `propagate` on each backend with the
 protocol above (no stopping), at `OPENBLAS_NUM_THREADS=4`.
@@ -90,7 +90,7 @@ protocol above (no stopping), at `OPENBLAS_NUM_THREADS=4`.
 | 56 | 14.19 | 3.82 | 3.7× |
 
 The CUDA density matches CPU to 2.6e-17 and the total flux to 1.7e-15. The
-step-loop prototype that preceded it (job 12011, revision `accb83407`,
+step-loop prototype that preceded it (job 12011, revision `accb83407`, rebased as `c284f15e3`;
 `data/density-matrix-gpu-2026-11-11.json`) ran 1.21–3.67 ms/step on the
 same box; the production path adds per-step bookkeeping only.
 
