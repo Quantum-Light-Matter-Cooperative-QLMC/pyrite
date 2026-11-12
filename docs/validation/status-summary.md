@@ -24,7 +24,7 @@ Oldest current automated evidence: `2026-09-15T15:45:30.982686+00:00` (UTC times
 | `signed-off` | 0 |
 | `anchored` | 122 |
 | `rederived` | 122 |
-| `filtered` | 14 |
+| `filtered` | 13 |
 | `unverified` | 79 |
 | `discrepancy` | 5 |
 | **Total** | **342** |
