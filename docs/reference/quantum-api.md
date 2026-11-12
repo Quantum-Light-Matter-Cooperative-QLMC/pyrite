@@ -207,6 +207,42 @@ energy axis, so integrated yields are unchanged. `line_yield` is a
 dimensionless count per incident electron, `line_rates` is per Å of depth and
 `theta`/`phi` are in radians. Density-matrix and MCWF results remain numeric.
 
+### Admission and the unadmitted opt-in
+
+Standard planar and axial channeling runs execute only cases held in a
+repository admission table (#1105). Every other case refuses before any
+transport with `PlanarAdmissionError` or `AxialAdmissionError`, both
+`ValueError` subclasses. The message names the closest entry's mismatched
+fields and the opt-in.
+
+| Model | Table | Entries | Matched fields |
+| --- | --- | --- | --- |
+| Planar | `pyrite.quantum._planar_envelope.ADMITTED_PLANAR_CASES` | `si110-17MeV-2um` (`channeling_demo`, ε = 4.86% at 95%) | crystal, plane (up to sign), kinetic energy, thickness range, plane incidence (beam in the planes), temperature, margin, zone numerics, plane-wave beam |
+| Axial | `pyrite.quantum._axial_envelope.ADMITTED_AXIAL_CASES` | `si-fibre/A`, `si-fibre/B` | crystal, axis, kinetic energy, thickness, tilt and azimuth, temperature, observable |
+
+Admitted planar cases record `Case.channeling["admission"]` =
+`{"status": "admitted", "case_key", "epsilon", "joint_confidence",
+"observable", "evidence_id", "evidence_record"}`. ε bounds the band-weighted
+on-axis line source at crystal thickness, not individual bins. Admitted axial
+records carry `depth_budget`, the free→free bound and evidence, as before.
+
+`channeling_admission="accept-inaccurate"` runs an unadmitted case. It is
+accepted by `Physics`, `Settings`, the profile key `channeling_admission`,
+CLI `--channeling-admission` and `QuantumSetup(admission=...)`. The default is
+`"admitted"`, and the opt-in requires a channeling model. Such a case:
+
+- warns at lowering;
+- records planar `admission = {"status": "unadmitted"}`, or axial
+  `admission = case_key = "unadmitted"` with the default fibre numerics;
+- carries no ε, band, free→free bound or evidence in its record, transport
+  provenance or persisted results;
+- never shares a content key with an admitted case. An admitted case cannot
+  be relabelled unadmitted: the runner re-resolves the record before work.
+
+The opt-in relaxes only the table match. The 100 MeV ceiling, bound-state,
+thermal-data and geometry gates still refuse, as do the axial slab-normal,
+plane-wave, entrance-order-window, on-axis and unsupported-option checks.
+
 ### Specify and inspect quantum entrance states
 
 `TransverseStateSpec` describes a transverse wavefunction or an **incoherent**

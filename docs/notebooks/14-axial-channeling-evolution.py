@@ -400,6 +400,11 @@ def _(mo):
     explicit energy grid inside the band. The result is a source density in
     photons / electron / eV / sr, not detector counts.
 
+    Every other case refuses before transport. To run one anyway, set
+    `channeling_admission="accept-inaccurate"`, accepting results that may
+    be very inaccurate. The record is then marked `unadmitted` and carries no
+    ε or free→free bound.
+
     Each line history costs a few CPU seconds (about 4 s here), so we use
     **32 channeling histories**, seed 7. That is enough to show the shape,
     not to resolve individual lines; the calibration itself used 20 000.

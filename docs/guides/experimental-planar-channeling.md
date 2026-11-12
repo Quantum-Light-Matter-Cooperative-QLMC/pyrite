@@ -141,6 +141,22 @@ cr = result.channeling  # photons / (incident electron · eV · sr), or None
 combined = result.combined_cxr()  # includes CR
 ```
 
+Only measured cases run by default. `channeling_demo` is the one admitted
+planar case, and its results carry a relative error budget ε = 4.9%. A change
+to the crystal, plane, energy, thickness, incidence, beam spread or zone
+numerics moves the case outside the
+[admission table](../reference/quantum-api.md#admission-and-the-unadmitted-opt-in).
+Such a run refuses before transport, and the error message names the opt-in.
+To run it anyway, accept that its results may be very inaccurate:
+
+```bash
+pyrite profile physics set my_channeling --channeling-admission accept-inaccurate
+```
+
+In Python, pass `pr.Physics(..., channeling_admission="accept-inaccurate")`.
+The run warns, and its case record and results are marked `unadmitted`
+with no error budget.
+
 Check convergence in `channeling_basis_size`, `channeling_bloch_cells`,
 `channeling_dz_ang` and `channeling_zone_max_ang` before interpreting CR.
 The [supported and refused paths](../reference/quantum-api.md#supported-and-refused-paths)

@@ -219,7 +219,34 @@ planar tier. Each outcome below is recorded with its ledger claim; see the
   [first envelope](../research/physics/axial-first-envelope-886.md) lists the
   evidence needed to widen it.
 
+## Admission tables (#1105)
+
+Planar and axial standard runs both refuse, before transport, every case that
+is not in a repository admission table with a measured error budget. The axial
+table is the #994 lookup above. The planar table
+(`pyrite.quantum._planar_envelope`) holds one entry: the `channeling_demo` case
+(Si (1-10), 17 MeV, 2 µm, beam in the planes, default zone numerics,
+293.15 K, 300 eV margin). Its ε = 4.9% (95%) bounds the band-weighted
+on-axis line source. It was measured with the #993 paired-arm method on the
+carrier-fibred planar reference (#1056,
+[dechanneling boundary note](../research/physics/dechanneling-boundary.md#paired-arm-source-budgets-993-method)).
+Admission is curated rather than set by an ε threshold. The measured Kephart
+configurations (ε 113–572%) are not admitted.
+
+`Physics(channeling_admission="accept-inaccurate")` is the shared opt-in. The
+user acknowledges that an unadmitted case may give very inaccurate results.
+The case then runs, records an `unadmitted` admission with no ε, and never
+shares a content key with an admitted case. The opt-in relaxes only the table
+match. Energy, bound-state, thermal-data, solver-window, geometry and
+observable refusals still apply.
+
 ## Consequences
+
+- **Default refusal (#1105):** planar runs that previously ran on generic
+  gates alone now need the opt-in unless they match the admission table.
+  Planar case records gained an `admission` field (`CHANNELING_MODEL`
+  `planar-density-matrix-emission-v8`). Admitted axial records and
+  channeling-off identities are unchanged.
 
 - **Layered-material thermal data (#525):** keep the existing isotropic
   Si/diamond rows. Layered support requires site identifiers tied to the CIF
