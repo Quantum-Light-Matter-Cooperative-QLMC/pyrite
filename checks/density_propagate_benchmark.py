@@ -13,6 +13,15 @@ Run locally for small bands, on ``pyrite remote`` for ``H >= 56``::
     PYRITE_MC_BACKEND=cpu uv run python checks/density_propagate_benchmark.py \
         --orders 24 32 40 --thickness-um 2 --dz 250 --repeats 3 --out bench.json
 
+``--loop numpy cupy`` additionally times the bare restricted Strang step (no
+recording, flux totals kept on the device, one sync at the end) on each array
+namespace: a GPU prototype measured against the identical loop on the host. It
+checks the final state against ``propagate`` and reports the maximum deviation.
+CuPy runs need a CUDA host (``pyrite remote``)::
+
+    uv run python checks/density_propagate_benchmark.py --orders 24 40 56 \
+        --loop numpy cupy --out gpu.json
+
 Performance evidence only; no physics-validation claim.
 """
 
@@ -73,7 +82,15 @@ def _instrument(solver: DensityMatrixSolver, totals: dict[str, float]) -> None:
         setattr(solver, name, _timed(totals, phase, getattr(solver, name)))
 
 
-def run(orders: int, cells: int, thickness_um: float, dz_ang: float, stopping: float, repeats: int):
+def run(
+    orders: int,
+    cells: int,
+    thickness_um: float,
+    dz_ang: float,
+    stopping: float,
+    repeats: int,
+    loop: tuple[str, ...] = (),
+):
     """Time ``repeats`` solves at band ``orders``; return the phase split per repeat."""
     profile = planar_profile("silicon", (1, 1, 0), TEMPERATURE_K)
     start = time.perf_counter()
@@ -104,7 +121,9 @@ def run(orders: int, cells: int, thickness_um: float, dz_ang: float, stopping: f
         phases["wall"] = wall
         runs.append(phases)
     steps = max(1, int(round(thickness_um * 1e4 / dz_ang)))
+    loops = [step_loop(solver, steps, thickness_um * 1e4 / steps, name, repeats) for name in loop]
     return {
+        "loops": loops,
         "orders": orders,
         "basis_size": int(solver.orders.size),
         "n_grid": solver.n_grid,
@@ -117,16 +136,95 @@ def run(orders: int, cells: int, thickness_um: float, dz_ang: float, stopping: f
     }
 
 
+def _namespace(name: str):
+    if name == "numpy":
+        return np, lambda: None
+    import cupy
+
+    return cupy, cupy.cuda.Device().synchronize
+
+
+def step_loop(solver: DensityMatrixSolver, steps: int, dz: float, name: str, repeats: int):
+    """Time the restricted Strang step on namespace ``name``; return timings and parity.
+
+    Mirrors :meth:`DensityMatrixSolver.propagate` without stopping or recording.
+    """
+    xp, synchronize = _namespace(name)
+    solver.restore_entry_basis()
+    rho0, _, _ = solver.entry_state(0.0, DIVERGENCE_RAD)
+    ops = solver._operators(restricted=True)
+    half = xp.asarray(ops.restrict(solver._propagators(dz, solver.hbar_v0)))
+    half_h = xp.ascontiguousarray(xp.conj(xp.swapaxes(half, 1, 2)))
+    to_grid, from_grid = xp.asarray(ops.to_grid), xp.asarray(ops.from_grid)
+    rest_grid = xp.asarray(ops.rest_grid)
+    rest_grid_c = xp.conj(rest_grid)
+    keep = xp.asarray(ops.keep)
+    mask = keep[:, :, None] & keep[:, None, :]
+    kernel, gram, loss = (
+        xp.asarray(a) for a in (solver._cell_kernel0, solver._wave_gram, ops.loss)
+    )
+    factor = 1.0 / float(solver.n_grid) ** 2
+
+    def jump(rho):
+        back = xp.fft.ifft(xp.fft.fft(to_grid @ rho @ from_grid, axis=0) * kernel, axis=0)
+        eigen = from_grid @ back @ to_grid * factor
+        diagonal = xp.real(xp.einsum("rnn->rn", eigen))
+        free = xp.sum(xp.where(keep, 0.0, diagonal))
+        free = free + xp.sum(xp.real(rest_grid_c * (back @ rest_grid))) * factor
+        band = xp.real(xp.sum(back * gram)) * factor
+        return eigen * mask, free, band
+
+    def run_steps(count):
+        rho = xp.asarray(ops.restrict(rho0))
+        free_total = overflow = xp.zeros((), dtype=float)
+        for _ in range(count):
+            rho = half @ rho @ half_h
+            first, free1, band1 = jump(rho)
+            second, free2, band2 = jump(first)
+            loss1 = xp.real(xp.einsum("rij,rji->", loss, rho))
+            loss2 = xp.real(xp.einsum("rij,rji->", loss, first))
+            rho = rho + dz * first + 0.5 * dz**2 * second
+            free_total = free_total + dz * free1 + 0.5 * dz**2 * free2
+            overflow = overflow + dz * (loss1 - band1) + 0.5 * dz**2 * (loss2 - band2)
+            rho = half @ rho @ half_h
+            rho = 0.5 * (rho + xp.conj(xp.swapaxes(rho, 1, 2)))
+        synchronize()
+        return rho, free_total, overflow
+
+    run_steps(min(steps, 5))  # warm-up: plans, kernels, pools
+    walls = []
+    for _ in range(repeats):
+        start = time.perf_counter()
+        rho, free_total, overflow = run_steps(steps)
+        walls.append(time.perf_counter() - start)
+    host = rho.get() if hasattr(rho, "get") else rho
+    reference = solver.propagate(steps * dz, dz, divergence_rad=DIVERGENCE_RAD, record_every=10**9)
+    return {
+        "namespace": name,
+        "walls": walls,
+        "ms_per_step": float(np.median(walls)) / steps * 1e3,
+        "max_density_deviation": float(np.abs(ops.expand(host) - reference.final_density).max()),
+        "free_flux_deviation": abs(float(free_total) - float(reference.free_flux[-1])),
+        "overflow_flux_deviation": abs(float(overflow) - float(reference.overflow_flux[-1])),
+    }
+
+
 def _summary(entry: dict) -> str:
     walls = np.array([r["wall"] for r in entry["runs"]])
     jump = np.median([r["jump"] for r in entry["runs"]])
     prop = np.median([r["propagators"] for r in entry["runs"]])
     loss = np.median([r["loss_rate"] for r in entry["runs"]])
     wall = np.median(walls)
+    loops = "".join(
+        f" | {item['namespace']} loop {item['ms_per_step']:.2f}ms/step"
+        f" (dev {item['max_density_deviation']:.1e})"
+        for item in entry["loops"]
+    )
     return (
         f"H={entry['orders']:3d} N={entry['basis_size']:3d} n_grid={entry['n_grid']:3d} "
         f"steps={entry['steps']:4d} wall={wall:8.3f}s (min {walls.min():.3f}, max {walls.max():.3f}) "
         f"jump={jump:.3f} prop={prop:.3f} loss={loss:.3f} per-step={wall / entry['steps'] * 1e3:.2f}ms"
+        + loops
     )
 
 
@@ -138,6 +236,7 @@ def main() -> int:
     parser.add_argument("--dz", type=float, default=250.0, help="depth step [angstrom]")
     parser.add_argument("--stopping", type=float, default=0.0, help="eV/angstrom")
     parser.add_argument("--repeats", type=int, default=3)
+    parser.add_argument("--loop", nargs="*", choices=("numpy", "cupy"), default=[])
     parser.add_argument("--out", type=Path)
     args = parser.parse_args()
     revision = subprocess.run(
@@ -145,7 +244,15 @@ def main() -> int:
     ).stdout.strip()
     entries = []
     for orders in args.orders:
-        entry = run(orders, args.cells, args.thickness_um, args.dz, args.stopping, args.repeats)
+        entry = run(
+            orders,
+            args.cells,
+            args.thickness_um,
+            args.dz,
+            args.stopping,
+            args.repeats,
+            tuple(args.loop),
+        )
         print(_summary(entry), flush=True)
         entries.append(entry)
     record = {
