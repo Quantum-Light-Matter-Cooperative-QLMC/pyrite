@@ -49,6 +49,16 @@ characteristic spectra, bremsstrahlung spectra and comparison tolerances
 remain unchanged. The mode-off diagnostic still checks bitwise equality
 before and after photon-transport diagnostics.
 
+## Exact second-order PXR/CB elements v7 generation (#1134)
+
+Replacing the classical PXR/CBS amplitudes with the exact second-order elements
+(quantum intermediate denominators and transition currents) changed
+`CXR_ESCAPE_MODEL` from v6 to v7 (`segment-mean-v7-quantum-elements`). The generation-dependent `case_content_key` and `parameter_sha256` hashes in
+`resolved.json` and `channeling.json` were re-pinned. CI run 43293482496 exposed
+stale output pins: the legacy, EEDL-fallback, multilayer and coherent `spec`
+arrays, plus coherent `spec_coherent`, were regenerated on CPU/NumPy fp64
+at 5d8ad5277. Seeded transport is unchanged; existing tolerances are preserved.
+
 ## Always-on Ter–Mikaelian coupling (#439)
 
 Applying the dielectric factor `k²/(k² + (γħω_p)²)` to every coupled BremsLib

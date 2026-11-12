@@ -43,7 +43,13 @@ from ._kernels import (
     _rowdot3,
     _sincsq_lineshape,
 )
-from ._recoil import _line_recoil_terms, _recoil_line_allowed, _recoil_slope_factor
+from ._recoil import (
+    _line_recoil_terms,
+    _quantum_line_factors,
+    _recoil_compton_ang,
+    _recoil_line_allowed,
+    _recoil_slope_factor,
+)
 from ._temporal import (
     CoherentRow,
     add_boxes,
@@ -804,6 +810,7 @@ def _accumulate_reflection(
 
     Validation: segment-escape-average
     Validation: temporal-intensity-profile
+    Validation: cbs-amplitude
     """
     # NVTX sub-ranges are a no-op off the profiled GPU path. Lazy import:
     # runner imports this module, so a top-level import would be circular.
@@ -897,12 +904,11 @@ def _accumulate_reflection(
     k_mag = om * xp.sqrt(xp.where(grad2 == 0.0, 1.0, 1.0 - 2.0 * delta + delta**2 * grad2))
     k_dot_v = om * ((1.0 - dnm) + r_den_i)
     k_dot_g = om * (n_dot_g + delta * _matvec3(grad[idx], g_vec_d))
-    v_dot_kg = vdg + k_dot_v
     detuning = g2 + 2.0 * k_dot_g
 
-    # -- 5. Eq. (13) + relativistic Eq. (14) amplitudes, per segment ----------
-    # CBS braced product {a;b} = a.b - (a.v)(b.v) and 1/gamma prefactor
-    # (Zhai SI Eq. 6).
+    # -- 5. Eq. (13)/(14) amplitudes with the exact second-order quantum
+    # denominators and transition currents (_quantum_line_factors).
+    h = _recoil_compton_ang()
     gamma = gamma_all[idx]
     A2 = xp.zeros(idx.size, dtype=REAL)
     A2_pxr = xp.zeros(idx.size, dtype=REAL)
@@ -915,11 +921,12 @@ def _accumulate_reflection(
             # Complex amplitudes retained verbatim -- the phased-field paths
             # (global-coherent and flight-grouped) keep the un-reassociated
             # expression and their goldens are unaffected.
-            A_PXR = chi / detuning * (v_dot_kg * (g_dot_e + k_dot_e) - k_mag**2 * v_dot_e)
-            braced_ge = g_dot_e - vdg * v_dot_e
-            braced_kg = k_dot_g - k_dot_v * vdg
-            A_CBS = -eUg_over_m / (gamma * vdg) * (braced_ge + v_dot_e * braced_kg / vdg)
-            pol_A.append(A_PXR + A_CBS)  # keep phase: orthogonal pols still add incoherently
+            pxr_num, f_cbs = _quantum_line_factors(
+                h, gamma, vdg, k_dot_v, k_dot_g, g2, k_mag**2, v_dot_e, g_dot_e, k_dot_e
+            )
+            pol_A.append(
+                chi / detuning * pxr_num + eUg_over_m * f_cbs
+            )  # keep phase: orthogonal pols still add incoherently
             continue
         # Incoherent |A|^2 in one fused real kernel (reassociated, NOT
         # bit-for-bit; ledger + regen required -- see _cxr_amp_sq_core,
@@ -929,7 +936,7 @@ def _accumulate_reflection(
             chi.imag,
             eUg_over_m.real,
             eUg_over_m.imag,
-            v_dot_kg,
+            g2,
             g_dot_e,
             k_mag,
             v_dot_e,
@@ -939,6 +946,7 @@ def _accumulate_reflection(
             gamma,
             detuning,
             k_dot_e,
+            h,
         )
         A2 += a2
         A2_pxr += a2_pxr

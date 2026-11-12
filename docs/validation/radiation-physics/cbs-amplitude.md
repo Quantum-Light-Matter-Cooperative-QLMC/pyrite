@@ -432,3 +432,204 @@ This row's own validity condition detects the sample correctly: with `U_g/mc² =
 **What actually bounds the limit now.** `_in_medium_kinematics` (and its CUDA prologue twin) check that the resonance fixed point converged — the last pass must move `denom` by less than `_RESONANCE_ROOT_RTOL = 1e-3` — and carry NaN out for failures, which drop on the caller's existing finite mask. That guard rejects the near-Cherenkov roots that produce the unbounded `1/(v·g)²`, and it is ledgered under `xray-in-medium-resonance`, whose 2026-08-20 addendum carries the full trace. The 10 eV cut remains, but as an out-of-grid/energy-window filter, not as this row's guarantee.
 
 Scope of this addendum: it corrects the **justification** recorded for one cheap filter. The `U_g` derivation, the braced `A_CBS` assembly, the single `1/γ` and the relative PXR/CBS sign are untouched, and the `rederived` verdict stands. The filter table row above wants rewording alongside a fresh-context re-run of this row by whoever owns it; it was corrected in place rather than rewritten by the branch (`feature/relativistic-bethe-stopping`) that found the defect.
+
+## 2026-11-12 — exact second-order elements (#1134)
+
+Production `A_PXR` and `A_CBS` now use the exact second-order elements. These replace the classical (first-order-in-ħ) forms derived above. The classical forms are recovered exactly at ħ = 0. Implementation: `montecarlo/spectrum/cxr/_recoil.py::_quantum_line_factors`, used by the fused incoherent kernel (`_kernels.py::_cxr_amp_sq_core`), the per-hkl and batched complex amplitudes, and the CUDA coherent prologue twins `_quantum_pxr_numerator` / `_quantum_cbs_factor`. `CXR_ESCAPE_MODEL` moves to `segment-mean-v7-quantum-elements`.
+
+### Source and conventions
+
+Source: Shi et al., *Nat. Commun.* **15**, 7803 (2024), SI Eqs. (S12)–(S15). These are second-order perturbation theory in the photon field and the crystal potential, with plane-wave electron states. The common factor $-e\sqrt{\hbar/2\varepsilon_0\omega V}$ is dropped.
+
+Conventions: energies are in units of $mc^2$, and $h=\hbar c/mc^2$ is the reduced Compton wavelength in Å. The production lattice vector is $\mathbf g$, the electron absorbs $-\hbar\mathbf g$ (Shi's $\mathbf g_{\rm Shi}=-\mathbf g$), and it emits a photon of wavevector $\mathbf k$. The initial momentum is $\mathbf p_i=\gamma\mathbf v$. The states are
+
+$$
+\mathbf p_1=\mathbf p_i-h\mathbf g,\quad \mathbf p_2=\mathbf p_i-h\mathbf k,\quad \mathbf p_f=\mathbf p_i-h(\mathbf g+\mathbf k),
+$$
+
+each with on-shell energy $E=\sqrt{1+p^2}$. The convective transition current between two states is $\mathbf j_{ab}=(\mathbf p_a+\mathbf p_b)/(E_a+E_b)$. With production's coupling signs, which the classical limit below fixes, the elements are
+
+$$
+A_{\rm PXR}=\frac{\chi_{\mathbf g}}{|\mathbf k+\mathbf g|^2-k^2}\Big[(\mathbf j_{fi}\!\cdot\!(\mathbf k+\mathbf g))\,(\mathbf g+\mathbf k)\!\cdot\!\mathbf e-k^2\,\mathbf j_{fi}\!\cdot\!\mathbf e\Big],
+\qquad
+A_{\rm CBS}=\frac{U_{\mathbf g}}{mc^2}\Big[\frac{\mathbf j_{f1}\!\cdot\!\mathbf e}{E_i-E_1}+\frac{\mathbf j_{2i}\!\cdot\!\mathbf e}{E_f-E_2}\Big].
+$$
+
+### Cancellation-free closed form
+
+The two CB time orderings each scale as $1/h$, and their sum is $O(1)$. Evaluating them directly loses about $\log_{10}(1/\eta)$ digits, which is not acceptable in the float32 CUDA prologue. Let
+
+$$
+n_1=hg^2-2\gamma\,\mathbf v\!\cdot\!\mathbf g,\quad n_2=n_1+2h\,\mathbf k\!\cdot\!\mathbf g,\quad n_f=h|\mathbf g+\mathbf k|^2-2\gamma\,\mathbf v\!\cdot\!(\mathbf g+\mathbf k).
+$$
+
+Then $E_1-E_i=h\,n_1/(E_1+E_i)$ and $E_f-E_2=h\,n_2/(E_f+E_2)$, and the identity
+
+$$
+(E_f+E_2)(E_1+E_f)-(E_1+E_i)(E_i+E_2)=(E_f-E_i)\,\Sigma,\qquad \Sigma=E_i+E_f+E_1+E_2,
+$$
+
+with $E_f-E_i=h\,n_f/(E_i+E_f)$, gives
+
+$$
+f_{\rm CBS}=\frac{2(\mathbf g\!\cdot\!\mathbf e)\,s_1}{s_3\,n_1}
++x\,\frac{n_1\,(n_f/s_{if})\,\Sigma-2\,s_1 s_4\,\mathbf k\!\cdot\!\mathbf g}{s_3\,s_4\,n_1 n_2},
+\qquad A_{\rm CBS}=\frac{U_{\mathbf g}}{mc^2}f_{\rm CBS},
+$$
+
+where $s_1=E_1+E_i$, $s_3=E_1+E_f$, $s_4=E_i+E_2$, $s_{if}=E_i+E_f$ and $x=2\gamma\,\mathbf v\!\cdot\!\mathbf e-h\,\mathbf k\!\cdot\!\mathbf e$. Every $h$ has cancelled. The PXR current gives
+
+$$
+\mathbf j_{fi}\!\cdot\!(\mathbf k+\mathbf g)=-n_f/s_{if},\qquad
+\mathbf j_{fi}\!\cdot\!\mathbf e=\big(2\gamma\,\mathbf v\!\cdot\!\mathbf e-h(\mathbf g+\mathbf k)\!\cdot\!\mathbf e\big)/s_{if}.
+$$
+
+Only the scalar products production already forms enter ($\mathbf v\!\cdot\!\mathbf g$, $\mathbf k\!\cdot\!\mathbf v$, $\mathbf k\!\cdot\!\mathbf g$, $g^2$, $k^2$ and the three $\cdot\mathbf e$). With refraction, $\mathbf k$ is the same first-order Snell vector the root uses.
+
+### Limits
+
+- **Classical, $h\to0$.** All energies equal $\gamma$, $\Sigma=4\gamma$, $n_1=n_2=-2\gamma\,\mathbf v\!\cdot\!\mathbf g$ and $n_f/s_{if}=-\mathbf v\!\cdot\!(\mathbf g+\mathbf k)$. This gives
+
+  $$
+  f_{\rm CBS}\to-\frac{1}{\gamma\,\mathbf v\!\cdot\!\mathbf g}\Big[\mathbf g\!\cdot\!\mathbf e-(\mathbf v\!\cdot\!\mathbf g)(\mathbf v\!\cdot\!\mathbf e)+(\mathbf v\!\cdot\!\mathbf e)\frac{\mathbf k\!\cdot\!\mathbf g-(\mathbf k\!\cdot\!\mathbf v)(\mathbf v\!\cdot\!\mathbf g)}{\mathbf v\!\cdot\!\mathbf g}\Big],
+  $$
+
+  which is the braced $A_{\rm CBS}$ of the second pass. Likewise $\mathbf j_{fi}\to\mathbf v$ recovers $A_{\rm PXR}$. This holds for any $\mathbf k$, not only at the classical resonance. The second-order quantum elements therefore give an independent derivation of the classical braced form. That includes the single $1/\gamma$, both $(\mathbf v\cdot\mathbf g)$ denominators and the relative PXR/CBS sign.
+- **Expansion parameter.** The leading correction is of order $\eta=h\{\mathbf g;\mathbf g\}/(2\gamma|\mathbf v\!\cdot\!\mathbf g|)$, with $\{\mathbf g;\mathbf g\}=g^2-(\mathbf v\!\cdot\!\mathbf g)^2$. This is the intermediate-state recoil $\hbar^2g^2/2\gamma m$ relative to the classical denominator $\hbar\,\mathbf v\!\cdot\!\mathbf g$. The PXR current adds $O(hg_\perp/2\gamma\beta)$. On Shi's Fig. 2 rows, the yield-weighted $\eta$ is 0.16 at 10 keV, 0.08 at 30 keV, 0.04 at 100 keV, 0.02 at 300 keV and 0.002 at 5 MeV.
+- **Validity.** The derivation is second order in $\chi_{\mathbf g}$ and $U_{\mathbf g}$ (truncation needs $|U_{\mathbf g}|\ll\hbar\omega D$), with plane-wave states and a spinless convective current. Dirac magnetic-moment terms enter the intensity at $O(\eta^2)$, about 2.6 % at 10 keV. There are no Bloch-wave dynamical effects and no multiple scattering. It fails at real intermediate-state poles, $n_1$ or $n_2\to0$. These are the quantum counterpart of the classical $\mathbf v\!\cdot\!\mathbf g\to0$ limit, and the `xray-in-medium-resonance` convergence guard and the positive-mass-shell guard (`line-recoil-in-medium-root`) still bound them.
+
+### Numerical evidence (`checks/quantum_cb_elements_1134.py`)
+
+1. **Closed form against the vector elements.** The elements are evaluated from $\mathbf p$, on-shell $E$ and $\mathbf j$, with cancellation-free energy differences. Over 1000 random kinematics from 10 keV to 1 GeV, both polarizations, the maximum relative error is $1.6\times10^{-9}$, limited by the vector reference at 1 GeV.
+2. **$h=0$ identity** with the classical production elements: $3.7\times10^{-13}$.
+3. **Against Shi's elements.** The vector form equals `checks/shi_2024_matrix_elements_1103.py::shi_row` element by element ($\le 10^{-13}$) once its $\mathbf g_{\rm Shi}=-\mathbf g$ and overall sign are mapped. The classical limit of that model matches production at the classical root to $10^{-8}$.
+4. **float32.** The closed form in float32 agrees with float64 to $\le10^{-4}$ of the classical element scale from 10 keV to 1 GeV.
+
+### Size against the Debye–Waller and f′ floor
+
+The figure is the summed line yield $\omega\sum_{\rm pol}|A|^2$ at the exact root, with quantum elements over classical elements. Couplings are production $\chi_{\mathbf g}$ and $U_{\mathbf g}$. The floor is the response to +10 % $B$ and +10 % $f'$, added in quadrature. These are nominal stand-ins: the catalog records no B uncertainty for Si, HOPG's two-site spread is 6 %, and Chantler f′ quotes about 1–20 % depending on edge proximity.
+
+| Case | Quantum effect | +10 % B | +10 % f′ | Floor |
+|---|---|---|---|---|
+| Si 10 keV, $n_z=2$ | +1.3 % | −2.2 % | −1.6 % | 2.8 % |
+| Si 10 keV, $n_z=3$ | **+6.2 %** | −2.3 % | −2.5 % | 3.4 % |
+| Si 30 keV, $n_z=2$ | **+5.7 %** | −1.9 % | −3.0 % | 3.5 % |
+| Si 30 keV, $n_z=3$ | +3.8 % | −2.0 % | −3.8 % | 4.3 % |
+| Si 100 keV, $n_z=2$ | +1.7 % | −1.8 % | −1.8 % | 2.5 % |
+| Si 100 keV, $n_z=3$ | +1.0 % | −2.3 % | +0.4 % | 2.3 % |
+| Si 5 MeV, $n_z=2$ / $3$ | −0.2 % / −0.0 % | | | 1.7 % / 2.0 % |
+| HOPG 11.7 keV (Huang 130°), (002)+(004) | **−1.9 %** | −0.7 % | +1.1 % | 1.3 % |
+| hBN 14.0 keV (Huang 119°), (002)+(004) | −1.7 % | −1.8 % | +0.8 % | 2.0 % |
+
+Per row the effect is larger than these group sums. At 30 keV ($n_z=2$) the median row moves by +20 %, the CB-only change reaches +36 % (the #1103 figure), and weak rows where PXR and CBS nearly cancel move by up to 4×. The PXR-current correction partly offsets the CB increase, so group sums are smaller than CB-only changes. Production numbers moved accordingly: the #1103 check's §3 exact-root PXR+CBS / PXR-only areas at 30 keV are now 4.28 ($n_z=-2$) and 3.11 ($-3$), previously 4.12 and 3.00.
+
+**Decision.** In three of the nine cases the effect exceeds the floor, and per row it does so broadly. The exact form costs a few more scalar operations and reproduces the classical elements bit-equivalently in the limit, so it was implemented rather than recorded as below the floor.
+
+### 2026-11-12 fresh-context verification
+
+This is an independent check of the #1134 elements at commit `7397a2e69`, made by a context that did not write them. Order of work: I read the ledger row and this write-up only up to the "2026-11-12" heading. From that I wrote the elements and an independent reference, without having seen `_quantum_line_factors`, its CUDA twins, or the section above. Only after that did I read the implementation and the section. I took the sign conventions from the second pass: $U(\mathbf r)=\sum U_{\mathbf g}e^{-i\mathbf g\cdot\mathbf r}$, $U^{\rm code}_{\mathbf g}=-U^{\rm phys}_{\mathbf g}$, and $A^{\rm code}=-S$ for both mechanisms.
+
+**Independent elements.** Units: momenta in $mc$, energies in $mc^2$, $h=\hbar c/mc^2$. Because $\langle\mathbf p'|e^{-i\mathbf g\cdot\mathbf r}|\mathbf p\rangle$ is nonzero only for $\mathbf p'=\mathbf p-h\mathbf g$, the lattice transfer is $-h\mathbf g$. CB comes from old-fashioned second-order perturbation theory with two time orderings:
+
+- Scatter, then emit. The intermediate state is $\mathbf p_1=\mathbf p_i-h\mathbf g$, with denominator $E_i-E_1$.
+- Emit, then scatter. The intermediate state is $\mathbf p_2=\mathbf p_i-h\mathbf k$ plus a photon, with denominator $E_i-E_2-h\omega=E_f-E_2$ when the final state is on shell.
+
+Both orderings use the same coupling product, so
+
+$$
+f_{\rm CBS}=\frac{\boldsymbol\epsilon\cdot\mathbf j_{1f}}{E_i-E_1}+\frac{\boldsymbol\epsilon\cdot\mathbf j_{i2}}{E_f-E_2},
+\qquad
+\mathbf j_{ab}=\frac{\mathbf p_a+\mathbf p_b}{E_a+E_b}.
+$$
+
+I expanded this by hand with $E(\mathbf p-h\mathbf q)=\gamma-h\,\mathbf v\cdot\mathbf q+h^2\{\mathbf q;\mathbf q\}/2\gamma+O(h^3)$. The $O(1/h)$ terms cancel, and the $O(h^0)$ term is
+
+$$
+f_{\rm CBS}\to-\frac{1}{\gamma\,\mathbf v\cdot\mathbf g}\Big[\{\mathbf g;\boldsymbol\epsilon\}+(\mathbf v\cdot\boldsymbol\epsilon)\frac{\{\mathbf k;\mathbf g\}}{\mathbf v\cdot\mathbf g}\Big].
+$$
+
+So $A_{\rm CBS}=(U^{\rm code}_{\mathbf g}/mc^2)\,f_{\rm CBS}$ with coefficient $+1$. Neither the $\{\mathbf g;\boldsymbol\epsilon\}$ term nor the $\{\mathbf k;\mathbf g\}$ term appears in either ordering at $O(h^0)$. Each one comes from the $O(h)$ difference of the currents and denominators between the two orderings. With equal currents $\mathbf j=\mathbf v$, the $\{\mathbf g;\boldsymbol\epsilon\}$ term would cancel.
+
+For PXR, the source is the Coulomb field of the $i\to f$ transition density, with $\mathbf q=\mathbf k+\mathbf g$ and $\omega_{fi}=(E_i-E_f)/h$. For this current, $h\,\mathbf q\cdot\mathbf j_{if}=(p_i^2-p_f^2)/(E_i+E_f)=E_i-E_f$ exactly. The convective current is therefore exactly conserved, and $\omega_{fi}=\mathbf j_{if}\cdot(\mathbf k+\mathbf g)$ for any $\mathbf k$. Mapping onto the code sign as in the second pass gives the numerator $N_{\rm PXR}$ (`pxr_num`):
+
+$$
+N_{\rm PXR}=\big(\mathbf j_{if}\cdot(\mathbf k+\mathbf g)\big)\big((\mathbf g+\mathbf k)\cdot\boldsymbol\epsilon\big)-k^2\,\mathbf j_{if}\cdot\boldsymbol\epsilon ,
+$$
+
+where $k^2$ is the refracted $|\mathbf k|^2$. This is the same $\varepsilon_0$-level convention as the classical code; see "What remains blocked", item 2.
+
+**Expansion parameter and validity.**
+
+- **Recoil expansion.** The quantum corrections are a series in $\eta=h\{\mathbf g;\mathbf g\}/(2\gamma\lvert\mathbf v\cdot\mathbf g\rvert)$, plus $O(hg/\gamma)$ from the currents. This agrees with the section above.
+- **Coupling truncation.** Second order in the couplings requires $\lvert\chi_{\mathbf g}\rvert\ll1$ and $\lvert U_{\mathbf g}\rvert\ll mc^2\lvert E_i-E_1\rvert$.
+- **Where the poles sit on the root.** On the exact vacuum root I find, as identities,
+
+  $$
+  n_1=-2\gamma\,\omega D_{\rm exact},\qquad n_2=-2\gamma\,\omega(1-\mathbf v\cdot\hat{\mathbf n}).
+  $$
+
+  I checked both numerically to $10^{-60}$ over 500 random cases with mpmath.
+  - $n_2<0$ whenever $\omega>0$. The second-ordering pole would require free single-photon emission, which is kinematically forbidden, so it is never reached.
+  - $n_1$ vanishes only as $\omega D\to0$. The truncation condition then reads $\lvert U_{\mathbf g}\rvert\ll\hbar\omega D$. This is the regime already bounded by the `xray-in-medium-resonance` convergence guard and the positive-mass-shell guard, and it is the quantum form of the second pass's $\lvert U_{\mathbf g}\rvert g^2/(\gamma mc^2(\mathbf v\cdot\mathbf g)^2)\ll1$.
+  - Under refraction these identities hold up to $O(h\delta)$.
+
+  The validity bullet above names the poles but not the truncation inequality. Adding the inequality is a wording improvement, not a defect.
+
+**Implementation comparison.** Every term was checked by hand against my elements:
+
+- $E_1^2=\gamma^2+hn_1$, $E_2^2=\gamma^2+h(hk^2-2\gamma\,\mathbf k\cdot\mathbf v)$ and $E_f^2=\gamma^2+hn_f$. These match `e_1`, `e_2` and `e_f`.
+- $E_f-E_2=hn_2/(E_f+E_2)$, with $n_2=n_1+2h\,\mathbf k\cdot\mathbf g$.
+- $\boldsymbol\epsilon\cdot(\mathbf p_1+\mathbf p_f)=x-2h\,\mathbf g\cdot\boldsymbol\epsilon$, where $x=2\gamma\,\mathbf v\cdot\boldsymbol\epsilon-h\,\mathbf k\cdot\boldsymbol\epsilon$.
+- The cancellation-removing identity $(E_f+E_2)(E_1+E_f)-(E_1+\gamma)(\gamma+E_2)=(E_f-\gamma)\Sigma$ is correct. Expanded, the left side is $E_f^2-\gamma^2+(E_1+E_2)(E_f-\gamma)$. With $E_f-\gamma=hn_f/s_{if}$, the explicit $1/h$ cancels exactly.
+- The resulting expression equals `f_cbs` term for term, including the leading $2(\mathbf g\cdot\boldsymbol\epsilon)s_1/(s_3n_1)$.
+- `pxr_num` equals $\big(-n_f(\mathbf g+\mathbf k)\cdot\boldsymbol\epsilon-k^2(2\gamma\,\mathbf v\cdot\boldsymbol\epsilon-h(\mathbf g+\mathbf k)\cdot\boldsymbol\epsilon)\big)/s_{if}$, which is my form.
+
+Sign mapping: `chi` multiplies `pxr_num/detuning` and `U_g/m` multiplies `f_cbs`, with no extra sign. Given the second pass's $U^{\rm code}=-U^{\rm phys}$, this reproduces $A^{\rm code}=-(S_{\rm PXR}+S_{\rm CBS})$, so the relative sign is unchanged.
+
+The CUDA twins `_quantum_pxr_numerator` and `_quantum_cbs_factor` contain the same algebra in the same evaluation order. `F32_TWO` is exactly 2, and `h_red = inv_energy*gamma` is $\hbar c/mc^2$, which is 0 under the hook.
+
+Production sites:
+
+| site | $\mathbf k\cdot\mathbf v$ | $\mathbf k\cdot\mathbf g$ | $k^2$ | $\mathbf k\cdot\boldsymbol\epsilon$ | $g^2$, $\mathbf v\cdot\mathbf g$ |
+| --- | --- | --- | --- | --- | --- |
+| `_per_hkl.py::_accumulate_reflection` (complex and fused paths) | $\omega(1-D+r_{\rm den})$ | $\omega(\hat{\mathbf n}\cdot\mathbf g+\delta\nabla L\cdot\mathbf g)$ | `k_mag**2` | $\omega\delta\nabla L\cdot\boldsymbol\epsilon$ | production `g2`, unshifted `v_dot_g` |
+| `_batched.py::_batched_coherent_block` | `_cxr_kin_core`, same | same, via `n_dot_g_blk` | `k_mag**2` | same | `bt.g2`, `vdg` |
+| `_batched.py::_batched_incoherent_block` → `_kernels.py::_cxr_amp_sq_core` | same | same | `om*om` with `om = k_mag` | `_polarization_terms`, same | same |
+| CUDA prologue | `omega*((1-resonance_denom)+recoil_den)` | same | `k_mag*k_mag` | same | `g2[reflection]`, `v_dot_g` |
+
+Every site uses the single vector $\mathbf k_{\rm eff}=\omega(\hat{\mathbf n}+\delta\nabla L)$:
+
+- $1-D+r_{\rm den}=\mathbf v\cdot\hat{\mathbf n}+\delta\,\mathbf v\cdot\nabla L$.
+- $\lvert\mathbf k_{\rm eff}\rvert^2=\omega^2(1-2\delta+\delta^2\lvert\nabla L\rvert^2)$, using $\hat{\mathbf n}\cdot\nabla L=-1$ from $\nabla L=-\mathbf e/(\mathbf e\cdot\hat{\mathbf n})$.
+
+All sites pass the unshifted $\mathbf v\cdot\mathbf g$, not $\mathbf v\cdot\mathbf g-r_{\rm num}$. That is correct, because $n_1$ already carries the recoil $hg^2$.
+
+**Numerical certification.** The reference script (`ref.py` and `cert.py` in the verifier's scratch space) imports no PyRITE physics. It builds $\mathbf p_i,\mathbf p_1,\mathbf p_2,\mathbf p_f$, the on-shell energies and the currents in 60-digit mpmath.
+
+- **Kinematics.** 4000 random cases with $T$ log-uniform from 10 keV to 1 GeV, random $\mathbf g$ ($\lvert g_i\rvert\le6$ Å$^{-1}$) and random $\mathbf k$ off shell, with a small non-transverse $\mathbf k\cdot\boldsymbol\epsilon$.
+- **CPU closed form against the reference:** maximum relative error $8.1\times10^{-14}$ (`pxr_num`) and $4.2\times10^{-13}$ (`f_cbs`).
+- **Exact vacuum root:** on my own solve of $E_i-E_f=h\lvert\mathbf k\rvert$, $3.2\times10^{-13}$ and $2.7\times10^{-13}$. There `pxr_num` also equals the $\omega_{fi}^2$ form.
+- **$h=0$ against the classical braced form**, for arbitrary $\mathbf k$: $2.6\times10^{-13}$.
+- **CUDA twins in float64.** I parsed them from source with `xp = numpy`. They are bit-identical to the CPU root.
+- **CUDA twins in float32**, at the exact root: median relative error about $10^{-7}$ at every decade from 10 keV to 1 GeV, and maximum $3.3\times10^{-5}$. No residual $1/h$ loss.
+- **Repository evidence:** `checks/quantum_cb_elements_1134.py` gives PASS. Its numbers are $1.6\times10^{-9}$ and $3.7\times10^{-13}$, and its yield table matches the table above. `tests/montecarlo/spectrum/test_quantum_cb_elements.py` gives 7 passed.
+
+**Findings (none is a factor or sign discrepancy in the computed amplitude).**
+
+1. **Docstring label.** The `_quantum_line_factors` docstring says "exact intermediate denominators `E_1 - E_i` and `E_f - E_2`". The code and the element above use $E_i-E_1$. With $E_1-E_i$, the first ordering would flip sign and the $1/h$ terms would not cancel. Only the docstring needs correcting, to `E_i - E_1`.
+2. **Citation precision.** The convective current $(\mathbf p+\mathbf p')/(E+E')$ is not Shi's printed approximation. Per `shi-2024-fig2-intensity-attribution.md`, Shi takes $u_{\mathbf q}\approx u_{\mathbf q_i}$, so every current is $\mathbf v_i$, which loses the $\{\mathbf g;\boldsymbol\epsilon\}$ term. Production is the default `current="gordon"` variant of `shi_row`. The "Source" field is therefore better stated as "Shi SI (S12)–(S15) two-ordering structure with exact denominators, and Shi's $u_{\mathbf q}\approx u_{\mathbf q_i}$ replaced by the exactly conserved convective current". That replacement is what makes the classical limit come out right.
+3. **Scope of "exact".** The elements are exact to second order in the couplings, for plane waves and a spinless convective current. They omit Dirac magnetic-moment terms. For an unpolarized beam those terms average out of the interference and enter the intensity at $O(h^2)$, comparable to $\eta^2$ (about 2.6 % at the 10 keV yield-weighted $\eta=0.16$). That is below the $O(\eta)$ corrections retained here, but not negligible at 10 keV.
+4. **In-medium on-shell.** The root is the exact vacuum recoil root plus first-order Snell, so $E_i-E_f(\mathbf k_{\rm eff})=\hbar\omega$ holds only up to $O(h\delta)$. As a result, `pxr_num` uses $\omega_{fi}$ rather than $\omega$, and $E_f-E_2$ stands in for $E_i-E_2-\hbar\omega$, both at that order, which is negligible. This is owned by `line-recoil-in-medium-root`.
+
+**Verdict:** `rederived` for the #1134 elements. `U_g` is unchanged from the first pass. The status change belongs to the task owner, never `signed-off`. Suggested ledger edit:
+
+- `Status`: `unverified` → `rederived`.
+- `Checks`: append "2026-11-12 fresh-context: elements rederived from two-ordering second-order PT with convective currents; closed form, identity, $h\to0$ limit, CUDA twins and the $\mathbf k$/$g^2$/$k^2$ inputs at all four production sites verified; 60-digit independent reference agrees to $\le4\times10^{-13}$ over 10 keV–1 GeV".
+- `Source`: qualify the convective-current substitution (finding 2).
+- `Anchor`: `tests/montecarlo/spectrum/test_quantum_cb_elements.py::test_pinned_si_30kev_row` is a candidate for `anchored` once the owner confirms that its pinned values are reference values.
+
+## 2026-11-12 — reference anchor (#1144)
+
+`tests/montecarlo/spectrum/test_quantum_cb_elements.py::test_reference_pin_si_222_30kev` pins production `pxr_num` and `f_cbs`. It covers the quantum and classical values for σ and π at one geometry: Si (222), $a=5.431$ Å, 30 keV along $+z$, photon at 100° in x–z, on the exact vacuum root $\omega=0.686657461470681$ Å⁻¹.
+
+The reference is `checks/quantum_cb_elements_1134.py::reference_pin`. It is a 60-digit mpmath evaluation built from explicit momenta, on-shell energies and convective currents, with the root solved by `findroot`, and it imports no PyRITE physics. Production agrees to $7.8\times10^{-16}$ and the test tolerance is $10^{-12}$. The classical σ value equals $-(\mathbf g\cdot\mathbf e)/(\gamma\,\mathbf v\cdot\mathbf g)$, which pins the single $1/\gamma$. At this geometry the quantum elements differ from the classical ones by −4.6 % (PXR) and +4.1 % (CBS) for σ, and by −5.0 % and +5.4 % for π.
