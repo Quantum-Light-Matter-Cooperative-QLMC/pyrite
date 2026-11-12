@@ -90,3 +90,45 @@ def test_full_jump_matches_dense_plane_wave_map(solver):
     assert band_trace == pytest.approx(np.einsum("rhh->", plane).real, rel=1e-12)
     loss = np.einsum("hk,rkh->", solver._loss_toeplitz, sandwich(vectors, rho)).real
     assert solver.loss_rate(rho) == pytest.approx(loss, rel=1e-12)
+
+
+def test_unknown_backend_is_refused(solver):
+    with pytest.raises(ValueError, match="backend"):
+        solver.propagate(1000.0, 100.0, backend="rocm")  # type: ignore[arg-type]
+
+
+def test_cuda_step_matches_cpu(solver):
+    cupy = pytest.importorskip("cupy")
+    try:
+        if cupy.cuda.runtime.getDeviceCount() < 1:
+            pytest.skip("no CUDA device")
+    except Exception as exc:
+        pytest.skip(f"CUDA unavailable: {exc}")
+    cpu_sources: list[np.ndarray] = []
+    cpu = _solve(solver, cpu_sources)
+    cuda_sources: list[np.ndarray] = []
+    cuda = solver.propagate(
+        3000.0,
+        100.0,
+        divergence_rad=1e-3,
+        stopping_eV_per_ang=200.0,
+        reprojection_tolerance=1e-3,
+        record_every=7,
+        jump_source_observer=cuda_sources.append,
+        backend="cuda",
+    )
+    assert cuda.reprojection_flux[-1] > 0.0
+    for name in (
+        "band_populations",
+        "trace",
+        "free_flux",
+        "overflow_flux",
+        "reprojection_flux",
+        "free_flux_by_energy",
+        "final_density",
+    ):
+        np.testing.assert_allclose(
+            getattr(cuda, name), getattr(cpu, name), rtol=1e-10, atol=1e-13, err_msg=name
+        )
+    assert isinstance(cuda.final_density, np.ndarray)
+    np.testing.assert_allclose(sum(cuda_sources), sum(cpu_sources), atol=1e-9)

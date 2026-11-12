@@ -43,7 +43,8 @@ Lengths in angstroms, energies in eV.
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields, replace
+from typing import Any, Literal
 
 import numpy as np
 from scipy import fft as sp_fft
@@ -71,12 +72,28 @@ DECHANNELING_MARGIN_PROVENANCE = (
 
 
 def _adjoint(matrices: np.ndarray) -> np.ndarray:
-    return np.conj(np.swapaxes(matrices, -1, -2))
+    return matrices.swapaxes(-1, -2).conj()
 
 
 def _sandwich(outer: np.ndarray, inner: np.ndarray) -> np.ndarray:
     """Batched ``A B A^dagger``."""
     return outer @ inner @ _adjoint(outer)
+
+
+def _host(value: Any) -> np.ndarray:
+    """``value`` as a NumPy array; device (CuPy) arrays are copied back."""
+    return value.get() if hasattr(value, "get") else np.asarray(value)
+
+
+def _array_namespace(backend: str) -> Any:
+    """Array module for :meth:`DensityMatrixSolver.propagate`'s ``backend``."""
+    if backend == "cpu":
+        return np
+    if backend == "cuda":
+        from ..._backend import select_cupy_backend
+
+        return select_cupy_backend().xp
+    raise ValueError("backend must be 'cpu' or 'cuda'")
 
 
 @dataclass(frozen=True)
@@ -166,7 +183,9 @@ class _JumpOperators:
 
     ``active`` must hold every subspace state of every block; ``rest`` is its
     complement, whose jump diagonals are free flux. ``to_grid[r] = W_r V_r[:, active]``
-    takes a slot-restricted density straight to cell-grid samples.
+    takes a slot-restricted density straight to cell-grid samples. The array
+    fields live on namespace ``xp``; :meth:`on` copies them to a device, while
+    :meth:`restrict`/:meth:`expand` act on host densities.
     """
 
     active: np.ndarray  # (A,) eigenstate slots
@@ -177,6 +196,16 @@ class _JumpOperators:
     rest_grid: np.ndarray  # (n_cells, n_grid, N - A)
     vectors: np.ndarray  # (n_cells, N, A), plane-wave columns of the active slots
     loss: np.ndarray  # (n_cells, A, A), V^dagger C(x, x) V at unit kernel scale
+    cell_kernel: np.ndarray  # (n_cells, n_grid, n_grid), the solver's unit-scale cell kernel
+    wave_gram: np.ndarray  # (n_cells, n_grid, n_grid), (W W^dagger)^T per block
+    xp: Any = np
+
+    def on(self, xp: Any) -> _JumpOperators:
+        """These maps with every array field copied to namespace ``xp``."""
+        if xp is self.xp:
+            return self
+        arrays = {f.name: xp.asarray(getattr(self, f.name)) for f in fields(self) if f.name != "xp"}
+        return replace(self, xp=xp, **arrays)
 
     def restrict(self, rho: np.ndarray) -> np.ndarray:
         return np.ascontiguousarray(rho[:, self.active][:, :, self.active])
@@ -320,40 +349,51 @@ class DensityMatrixSolver:
                 rest_grid=self._waves @ basis.vectors[:, :, rest],
                 vectors=vectors,
                 loss=_adjoint(vectors) @ self._loss_toeplitz @ vectors,
+                cell_kernel=self._cell_kernel0,
+                wave_gram=self._wave_gram,
             )
         return basis.operators[key]
 
-    def _loss_rate(self, ops: _JumpOperators, rho: np.ndarray) -> float:
-        return float(np.einsum("rij,rji->", ops.loss, rho).real * self._scale)
+    def _loss_rate(self, ops: _JumpOperators, rho: Any) -> Any:
+        """Loss rate on the slots of ``ops`` as a 0-d array on ``ops.xp`` (no sync)."""
+        return ops.xp.einsum("rij,rji->", ops.loss, rho).real * self._scale
 
     def loss_rate(self, rho: np.ndarray) -> float:
         """Full loss ``tr(C(x, x) rho)`` [1/angstrom], every momentum transfer included."""
-        return self._loss_rate(self._operators(restricted=False), rho)
+        return float(self._loss_rate(self._operators(restricted=False), rho))
 
-    def _jump(self, ops: _JumpOperators, rho: np.ndarray) -> tuple[np.ndarray, np.ndarray, float]:
+    def _jump(self, ops: _JumpOperators, rho: Any) -> tuple[Any, Any, Any]:
         """:meth:`jump` on the slots of ``ops``; ``rho`` and ``J_S`` are slot-restricted.
+
+        Runs on ``ops.xp``; ``band_trace`` is a 0-d array there, so a device step
+        never synchronises with the host.
 
         Validation: cr-density-matrix-split-operator
         """
+        xp = ops.xp
         # Everything below is linear in ``back``; the kernel scale and the grid
         # normalisation are applied to the small outputs, not the grid arrays.
         factor = self._scale / float(self.n_grid) ** 2
-        # The Bloch convolution runs on ``scipy.fft`` in place; callers may raise
-        # its thread count with ``scipy.fft.set_workers``.
-        product = sp_fft.fft(ops.to_grid @ rho @ ops.from_grid, axis=0, overwrite_x=True)
-        product *= self._cell_kernel0
-        back = sp_fft.ifft(product, axis=0, overwrite_x=True)
+        grid = ops.to_grid @ rho @ ops.from_grid
+        if xp is np:
+            # ``scipy.fft`` in place; callers may raise its thread count with
+            # ``scipy.fft.set_workers``.
+            product = sp_fft.fft(grid, axis=0, overwrite_x=True)
+            product *= ops.cell_kernel
+            back = sp_fft.ifft(product, axis=0, overwrite_x=True)
+        else:
+            back = xp.fft.ifft(xp.fft.fft(grid, axis=0) * ops.cell_kernel, axis=0)
         eigen = ops.from_grid @ back @ ops.to_grid * factor
-        diagonal = np.einsum("rnn->rn", eigen).real
-        free = np.zeros((self.n_cells, self.orders.size))
-        free[:, ops.active] = np.where(ops.keep, 0.0, diagonal)
+        diagonal = xp.einsum("rnn->rn", eigen).real
+        free = xp.zeros((self.n_cells, self.orders.size))
+        free[:, ops.active] = xp.where(ops.keep, 0.0, diagonal)
         if ops.rest.size:
             outgoing = back @ ops.rest_grid
             free[:, ops.rest] = (
-                np.einsum("ran,ran->rn", ops.rest_grid.conj(), outgoing).real * factor
+                xp.einsum("ran,ran->rn", ops.rest_grid.conj(), outgoing).real * factor
             )
         inside = eigen * (ops.keep[:, :, None] & ops.keep[:, None, :])
-        band_trace = float(np.einsum("rab,rab->", back, self._wave_gram).real) * factor
+        band_trace = xp.einsum("rab,rab->", back, ops.wave_gram).real * factor
         return inside, free, band_trace
 
     def jump(self, rho: np.ndarray) -> tuple[np.ndarray, np.ndarray, float]:
@@ -366,7 +406,8 @@ class DensityMatrixSolver:
 
         Validation: cr-density-matrix-split-operator
         """
-        return self._jump(self._operators(restricted=False), rho)
+        inside, free, band_trace = self._jump(self._operators(restricted=False), rho)
+        return inside, free, float(band_trace)
 
     # -- states ----------------------------------------------------------------
 
@@ -483,6 +524,28 @@ class DensityMatrixSolver:
 
     # -- depth evolution -----------------------------------------------------------
 
+    def _strang_step(
+        self, ops: _JumpOperators, half: Any, rho: Any, dz: float
+    ) -> tuple[Any, Any, Any, Any]:
+        """One Strang step on ``ops.xp``: ``(rho, source, free, overflow)``.
+
+        ``source`` is the step's incoming jump density in the slot basis before
+        the kernel scale; ``free`` is ``(n_cells, N)`` and ``overflow`` a 0-d
+        array, both still on ``ops.xp``.
+
+        Validation: cr-density-matrix-split-operator
+        """
+        rho = _sandwich(half, rho)
+        first, free1, band1 = self._jump(ops, rho)
+        second, free2, band2 = self._jump(ops, first)
+        loss1, loss2 = self._loss_rate(ops, rho), self._loss_rate(ops, first)
+        source = dz * rho + 0.5 * dz**2 * first
+        rho = rho + dz * first + 0.5 * dz**2 * second
+        free = dz * free1 + 0.5 * dz**2 * free2
+        overflow = dz * (loss1 - band1) + 0.5 * dz**2 * (loss2 - band2)
+        rho = _sandwich(half, rho)
+        return 0.5 * (rho + _adjoint(rho)), source, free, overflow
+
     def propagate(
         self,
         thickness_ang: float,
@@ -498,6 +561,7 @@ class DensityMatrixSolver:
         spatial_x_ang: np.ndarray | None = None,
         record_metrics: bool = False,
         jump_source_observer: Callable[[np.ndarray], None] | None = None,
+        backend: Literal["cpu", "cuda"] = "cpu",
     ) -> DensityMatrixResult:
         """Integrate the entry state to ``thickness_ang`` with steps ``dz_ang``.
 
@@ -525,9 +589,17 @@ class DensityMatrixSolver:
         Summing these arrays permits a linear differential-kernel diagnostic
         without retaining a density history. The callback receives a new array.
 
+        ``backend="cuda"`` runs the depth step on the CuPy device (CUDA or ROCm;
+        never a silent CPU fallback) in fp64. The entry state, recording,
+        reprojection and the result stay on the host; the density crosses to
+        the host only on record and reprojection steps, and on every step when
+        ``jump_source_observer`` is set. Results agree with ``"cpu"`` to
+        rounding (#1125).
+
         Validation: cr-density-matrix-split-operator, cr-dechanneling-collapse,
         cr-planar-overflow-spectrum
         """
+        xp = _array_namespace(backend)
         if thickness_ang <= 0.0 or dz_ang <= 0.0:
             raise ValueError("thickness_ang and dz_ang must be positive")
         if record_every < 1 or int(record_every) != record_every:
@@ -591,42 +663,48 @@ class DensityMatrixSolver:
             for key in ("free", "overflow", "reprojection"):
                 history[key].append(totals[key])
 
+        # Free and overflow flux accumulate on ``xp`` and reach ``totals`` (and the
+        # E_perp bins of the basis they were booked in) only when flushed.
+        pending = {"free": xp.zeros((self.n_cells, self.orders.size)), "overflow": 0.0}
+
+        def flush() -> None:
+            weights = _host(pending["free"])
+            totals["free"] += float(weights.sum())
+            totals["overflow"] += float(pending["overflow"])
+            bin_free(weights)
+            pending["free"], pending["overflow"] = xp.zeros_like(pending["free"]), 0.0
+
         record(0.0, rho)
         # The no-jump propagator is zero outside S, so the step runs on the slots
         # holding a subspace state; ``rho`` stays restricted to them until output.
-        ops = self._operators(restricted=True)
-        half, rho = ops.restrict(half), ops.restrict(rho)
+        host_ops = self._operators(restricted=True)
+        ops = host_ops.on(xp)
+        half, rho = xp.asarray(host_ops.restrict(half)), xp.asarray(host_ops.restrict(rho))
         for step in range(1, steps + 1):
-            rho = _sandwich(half, rho)
-            first, free1, band1 = self._jump(ops, rho)
-            second, free2, band2 = self._jump(ops, first)
-            loss1, loss2 = self._loss_rate(ops, rho), self._loss_rate(ops, first)
+            rho, source, free_step, overflow_step = self._strang_step(ops, half, rho, dz)
             if jump_source_observer is not None:
-                jump_source_observer(
-                    _sandwich(ops.vectors, dz * rho + 0.5 * dz**2 * first) * self._scale
-                )
-            rho = rho + dz * first + 0.5 * dz**2 * second
-            free_step = dz * free1 + 0.5 * dz**2 * free2
-            totals["free"] += float(free_step.sum())
-            totals["overflow"] += dz * (loss1 - band1) + 0.5 * dz**2 * (loss2 - band2)
-            bin_free(free_step)
-            rho = _sandwich(half, rho)
-            rho = 0.5 * (rho + np.conj(np.swapaxes(rho, 1, 2)))
+                jump_source_observer(_sandwich(host_ops.vectors, _host(source)) * self._scale)
+            pending["free"] = pending["free"] + free_step
+            pending["overflow"] = pending["overflow"] + overflow_step
             if stopping_eV_per_ang:
                 energy = self.energy_eV - stopping_eV_per_ang * step * dz
                 gamma, beta = longitudinal_kinematics(energy)
                 if abs(gamma / gamma_basis - 1.0) > reprojection_tolerance:
-                    before = float(np.einsum("rnn->", rho).real)
-                    full, lost = self._reproject(ops.expand(rho), gamma)
+                    flush()
+                    before = float(xp.einsum("rnn->", rho).real)
+                    full, lost = self._reproject(host_ops.expand(_host(rho)), gamma)
                     bin_free(lost)
                     totals["reprojection"] += before - float(np.einsum("rnn->", full).real)
                     gamma_basis, hbar_v = gamma, HBARC_EV_ANG * beta
                     self._scale = (self.beta0 / beta) ** 2
-                    ops = self._operators(restricted=True)
-                    half, rho = ops.restrict(self._propagators(dz, hbar_v)), ops.restrict(full)
+                    host_ops = self._operators(restricted=True)
+                    ops = host_ops.on(xp)
+                    half = xp.asarray(host_ops.restrict(self._propagators(dz, hbar_v)))
+                    rho = xp.asarray(host_ops.restrict(full))
             if step % record_every == 0 or step == steps:
-                record(step * dz, ops.expand(rho))
-        rho = ops.expand(rho)
+                flush()
+                record(step * dz, host_ops.expand(_host(rho)))
+        rho = host_ops.expand(_host(rho))
         bands = np.zeros((len(history["bands"]), self.orders.size))
         for row, populations in enumerate(history["bands"]):
             bands[row, : populations.size] = populations
