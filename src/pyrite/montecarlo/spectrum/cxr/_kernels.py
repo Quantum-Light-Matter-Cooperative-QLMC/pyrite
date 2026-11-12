@@ -25,6 +25,7 @@ from ...transport import (
 )
 from ...transport._continuation_join import _copy_bytes
 from . import _fused
+from ._recoil import _quantum_line_factors
 
 # ---- segment-sum CXR spectrum ------------------------------------------------
 # Owning registry for every per-row transform: layer filtering, population
@@ -145,7 +146,7 @@ def _cxr_amp_sq_core(
     chi_im,
     u_re,
     u_im,
-    v_dot_kg,
+    g2,
     g_dot_e,
     om,
     v_dot_e,
@@ -154,20 +155,24 @@ def _cxr_amp_sq_core(
     k_dot_v,
     gamma,
     detuning,
-    k_dot_e=0.0,
+    k_dot_e,
+    h,
 ):
     """One polarization's |A|^2, |A_PXR|^2, |A_CBS|^2 (Feranchuk Eq. 13/14) as a single
     fused GPU kernel. Replaces the per-reflection storm of complex CuPy elementwise
     kernels (chi/detuning, the CBS braced product, three ``abs()**2``) that made up
     the bulk of the residual ``pyrite.lines`` GPU-idle after the sincsq fuse.
+    Validation: cbs-amplitude
 
     Split the complex amplitudes into real/imag: A_PXR = chi * f_pxr and
     A_CBS = eUg/m * f_cbs with REAL scalars
 
-        f_pxr = (v.kg * (g.e + k.e) - k^2 v.e) / detuning
-        f_cbs = -({g.e - (v.g)(v.e)} + v.e * {k.g - (k.v)(v.g)}/(v.g)) / (gamma * v.g)
+        f_pxr = pxr_num / detuning,   (pxr_num, f_cbs) = _quantum_line_factors(...)
 
-    so every op is real and the kernel fuses. |A_PXR + A_CBS|^2 is expanded on the
+    the exact second-order elements, which at ``h = hbar c/m c^2 = 0`` are
+    ``(v.kg (g.e + k.e) - k^2 v.e)`` and
+    ``-({g.e - (v.g)(v.e)} + v.e {k.g - (k.v)(v.g)}/(v.g)) / (gamma v.g)``,
+    so every op is real and the kernel fuses. ``om`` is ``|k|``. |A_PXR + A_CBS|^2 is expanded on the
     real/imag components, |A_PXR|^2 = |chi|^2 f_pxr^2, |A_CBS|^2 = |eUg/m|^2 f_cbs^2.
 
     NOT bit-for-bit vs the old complex expression -- the multiply/divide are
@@ -177,10 +182,10 @@ def _cxr_amp_sq_core(
     required -- regenerate the affected spectrum goldens (regen-golden) before this
     is signed off. Validation: line-amplitude-fusion
     """
-    f_pxr = (v_dot_kg * (g_dot_e + k_dot_e) - om * om * v_dot_e) / detuning
-    braced_ge = g_dot_e - vdg * v_dot_e
-    braced_kg = k_dot_g - k_dot_v * vdg
-    f_cbs = -(braced_ge + v_dot_e * braced_kg / vdg) / (gamma * vdg)
+    pxr_num, f_cbs = _quantum_line_factors(
+        h, gamma, vdg, k_dot_v, k_dot_g, g2, om * om, v_dot_e, g_dot_e, k_dot_e
+    )
+    f_pxr = pxr_num / detuning
     re = chi_re * f_pxr + u_re * f_cbs
     im = chi_im * f_pxr + u_im * f_cbs
     a2 = re * re + im * im

@@ -432,3 +432,95 @@ This row's own validity condition detects the sample correctly: with `U_g/mc² =
 **What actually bounds the limit now.** `_in_medium_kinematics` (and its CUDA prologue twin) check that the resonance fixed point converged — the last pass must move `denom` by less than `_RESONANCE_ROOT_RTOL = 1e-3` — and carry NaN out for failures, which drop on the caller's existing finite mask. That guard rejects the near-Cherenkov roots that produce the unbounded `1/(v·g)²`, and it is ledgered under `xray-in-medium-resonance`, whose 2026-08-20 addendum carries the full trace. The 10 eV cut remains, but as an out-of-grid/energy-window filter, not as this row's guarantee.
 
 Scope of this addendum: it corrects the **justification** recorded for one cheap filter. The `U_g` derivation, the braced `A_CBS` assembly, the single `1/γ` and the relative PXR/CBS sign are untouched, and the `rederived` verdict stands. The filter table row above wants rewording alongside a fresh-context re-run of this row by whoever owns it; it was corrected in place rather than rewritten by the branch (`feature/relativistic-bethe-stopping`) that found the defect.
+
+## 2026-11-12 — exact second-order elements (#1134)
+
+Production `A_PXR` and `A_CBS` now use the exact second-order elements. These replace the classical (first-order-in-ħ) forms derived above. The classical forms are recovered exactly at ħ = 0. Implementation: `montecarlo/spectrum/cxr/_recoil.py::_quantum_line_factors`, used by the fused incoherent kernel (`_kernels.py::_cxr_amp_sq_core`), the per-hkl and batched complex amplitudes, and the CUDA coherent prologue twins `_quantum_pxr_numerator` / `_quantum_cbs_factor`. `CXR_ESCAPE_MODEL` moves to `segment-mean-v7-quantum-elements`.
+
+### Source and conventions
+
+Source: Shi et al., *Nat. Commun.* **15**, 7803 (2024), SI Eqs. (S12)–(S15). These are second-order perturbation theory in the photon field and the crystal potential, with plane-wave electron states. The common factor $-e\sqrt{\hbar/2\varepsilon_0\omega V}$ is dropped.
+
+Conventions: energies are in units of $mc^2$, and $h=\hbar c/mc^2$ is the reduced Compton wavelength in Å. The production lattice vector is $\mathbf g$, the electron absorbs $-\hbar\mathbf g$ (Shi's $\mathbf g_{\rm Shi}=-\mathbf g$), and it emits a photon of wavevector $\mathbf k$. The initial momentum is $\mathbf p_i=\gamma\mathbf v$. The states are
+
+$$
+\mathbf p_1=\mathbf p_i-h\mathbf g,\quad \mathbf p_2=\mathbf p_i-h\mathbf k,\quad \mathbf p_f=\mathbf p_i-h(\mathbf g+\mathbf k),
+$$
+
+each with on-shell energy $E=\sqrt{1+p^2}$. The convective transition current between two states is $\mathbf j_{ab}=(\mathbf p_a+\mathbf p_b)/(E_a+E_b)$. With production's coupling signs, which the classical limit below fixes, the elements are
+
+$$
+A_{\rm PXR}=\frac{\chi_{\mathbf g}}{|\mathbf k+\mathbf g|^2-k^2}\Big[(\mathbf j_{fi}\!\cdot\!(\mathbf k+\mathbf g))\,(\mathbf g+\mathbf k)\!\cdot\!\mathbf e-k^2\,\mathbf j_{fi}\!\cdot\!\mathbf e\Big],
+\qquad
+A_{\rm CBS}=\frac{U_{\mathbf g}}{mc^2}\Big[\frac{\mathbf j_{f1}\!\cdot\!\mathbf e}{E_i-E_1}+\frac{\mathbf j_{2i}\!\cdot\!\mathbf e}{E_f-E_2}\Big].
+$$
+
+### Cancellation-free closed form
+
+The two CB time orderings each scale as $1/h$, and their sum is $O(1)$. Evaluating them directly loses about $\log_{10}(1/\eta)$ digits, which is not acceptable in the float32 CUDA prologue. Let
+
+$$
+n_1=hg^2-2\gamma\,\mathbf v\!\cdot\!\mathbf g,\quad n_2=n_1+2h\,\mathbf k\!\cdot\!\mathbf g,\quad n_f=h|\mathbf g+\mathbf k|^2-2\gamma\,\mathbf v\!\cdot\!(\mathbf g+\mathbf k).
+$$
+
+Then $E_1-E_i=h\,n_1/(E_1+E_i)$ and $E_f-E_2=h\,n_2/(E_f+E_2)$, and the identity
+
+$$
+(E_f+E_2)(E_1+E_f)-(E_1+E_i)(E_i+E_2)=(E_f-E_i)\,\Sigma,\qquad \Sigma=E_i+E_f+E_1+E_2,
+$$
+
+with $E_f-E_i=h\,n_f/(E_i+E_f)$, gives
+
+$$
+f_{\rm CBS}=\frac{2(\mathbf g\!\cdot\!\mathbf e)\,s_1}{s_3\,n_1}
++x\,\frac{n_1\,(n_f/s_{if})\,\Sigma-2\,s_1 s_4\,\mathbf k\!\cdot\!\mathbf g}{s_3\,s_4\,n_1 n_2},
+\qquad A_{\rm CBS}=\frac{U_{\mathbf g}}{mc^2}f_{\rm CBS},
+$$
+
+where $s_1=E_1+E_i$, $s_3=E_1+E_f$, $s_4=E_i+E_2$, $s_{if}=E_i+E_f$ and $x=2\gamma\,\mathbf v\!\cdot\!\mathbf e-h\,\mathbf k\!\cdot\!\mathbf e$. Every $h$ has cancelled. The PXR current gives
+
+$$
+\mathbf j_{fi}\!\cdot\!(\mathbf k+\mathbf g)=-n_f/s_{if},\qquad
+\mathbf j_{fi}\!\cdot\!\mathbf e=\big(2\gamma\,\mathbf v\!\cdot\!\mathbf e-h(\mathbf g+\mathbf k)\!\cdot\!\mathbf e\big)/s_{if}.
+$$
+
+Only the scalar products production already forms enter ($\mathbf v\!\cdot\!\mathbf g$, $\mathbf k\!\cdot\!\mathbf v$, $\mathbf k\!\cdot\!\mathbf g$, $g^2$, $k^2$ and the three $\cdot\mathbf e$). With refraction, $\mathbf k$ is the same first-order Snell vector the root uses.
+
+### Limits
+
+- **Classical, $h\to0$.** All energies equal $\gamma$, $\Sigma=4\gamma$, $n_1=n_2=-2\gamma\,\mathbf v\!\cdot\!\mathbf g$ and $n_f/s_{if}=-\mathbf v\!\cdot\!(\mathbf g+\mathbf k)$. This gives
+
+  $$
+  f_{\rm CBS}\to-\frac{1}{\gamma\,\mathbf v\!\cdot\!\mathbf g}\Big[\mathbf g\!\cdot\!\mathbf e-(\mathbf v\!\cdot\!\mathbf g)(\mathbf v\!\cdot\!\mathbf e)+(\mathbf v\!\cdot\!\mathbf e)\frac{\mathbf k\!\cdot\!\mathbf g-(\mathbf k\!\cdot\!\mathbf v)(\mathbf v\!\cdot\!\mathbf g)}{\mathbf v\!\cdot\!\mathbf g}\Big],
+  $$
+
+  which is the braced $A_{\rm CBS}$ of the second pass. Likewise $\mathbf j_{fi}\to\mathbf v$ recovers $A_{\rm PXR}$. This holds for any $\mathbf k$, not only at the classical resonance. The second-order quantum elements therefore give an independent derivation of the classical braced form. That includes the single $1/\gamma$, both $(\mathbf v\cdot\mathbf g)$ denominators and the relative PXR/CBS sign.
+- **Expansion parameter.** The leading correction is of order $\eta=h\{\mathbf g;\mathbf g\}/(2\gamma|\mathbf v\!\cdot\!\mathbf g|)$, with $\{\mathbf g;\mathbf g\}=g^2-(\mathbf v\!\cdot\!\mathbf g)^2$. This is the intermediate-state recoil $\hbar^2g^2/2\gamma m$ relative to the classical denominator $\hbar\,\mathbf v\!\cdot\!\mathbf g$. The PXR current adds $O(hg_\perp/2\gamma\beta)$. On Shi's Fig. 2 rows, the yield-weighted $\eta$ is 0.16 at 10 keV, 0.08 at 30 keV, 0.04 at 100 keV, 0.02 at 300 keV and 0.002 at 5 MeV.
+- **Validity.** The derivation is second order in $\chi_{\mathbf g}$ and $U_{\mathbf g}$ with plane-wave states, with no Bloch-wave dynamical effects and no multiple scattering. It fails at real intermediate-state poles, $n_1$ or $n_2\to0$. These are the quantum counterpart of the classical $\mathbf v\!\cdot\!\mathbf g\to0$ limit, and the `xray-in-medium-resonance` convergence guard and the positive-mass-shell guard (`line-recoil-in-medium-root`) still bound them.
+
+### Numerical evidence (`checks/quantum_cb_elements_1134.py`)
+
+1. **Closed form against the vector elements.** The elements are evaluated from $\mathbf p$, on-shell $E$ and $\mathbf j$, with cancellation-free energy differences. Over 1000 random kinematics from 10 keV to 1 GeV, both polarizations, the maximum relative error is $1.6\times10^{-9}$, limited by the vector reference at 1 GeV.
+2. **$h=0$ identity** with the classical production elements: $3.7\times10^{-13}$.
+3. **Against Shi's elements.** The vector form equals `checks/shi_2024_matrix_elements_1103.py::shi_row` element by element ($\le 10^{-13}$) once its $\mathbf g_{\rm Shi}=-\mathbf g$ and overall sign are mapped. The classical limit of that model matches production at the classical root to $10^{-8}$.
+4. **float32.** The closed form in float32 agrees with float64 to $\le10^{-4}$ of the classical element scale from 10 keV to 1 GeV.
+
+### Size against the Debye–Waller and f′ floor
+
+The figure is the summed line yield $\omega\sum_{\rm pol}|A|^2$ at the exact root, with quantum elements over classical elements. Couplings are production $\chi_{\mathbf g}$ and $U_{\mathbf g}$. The floor is the response to +10 % $B$ and +10 % $f'$, added in quadrature. These are nominal stand-ins: the catalog records no B uncertainty for Si, HOPG's two-site spread is 6 %, and Chantler f′ quotes about 1–20 % depending on edge proximity.
+
+| Case | Quantum effect | +10 % B | +10 % f′ | Floor |
+|---|---|---|---|---|
+| Si 10 keV, $n_z=2$ | +1.3 % | −2.2 % | −1.6 % | 2.8 % |
+| Si 10 keV, $n_z=3$ | **+6.2 %** | −2.3 % | −2.5 % | 3.4 % |
+| Si 30 keV, $n_z=2$ | **+5.7 %** | −1.9 % | −3.0 % | 3.5 % |
+| Si 30 keV, $n_z=3$ | +3.8 % | −2.0 % | −3.8 % | 4.3 % |
+| Si 100 keV, $n_z=2$ | +1.7 % | −1.8 % | −1.8 % | 2.5 % |
+| Si 100 keV, $n_z=3$ | +1.0 % | −2.3 % | +0.4 % | 2.3 % |
+| Si 5 MeV, $n_z=2$ / $3$ | −0.2 % / −0.0 % | | | 1.7 % / 2.0 % |
+| HOPG 11.7 keV (Huang 130°), (002)+(004) | **−1.9 %** | −0.7 % | +1.1 % | 1.3 % |
+| hBN 14.0 keV (Huang 119°), (002)+(004) | −1.7 % | −1.8 % | +0.8 % | 2.0 % |
+
+Per row the effect is larger than these group sums. At 30 keV ($n_z=2$) the median row moves by +20 %, the CB-only change reaches +36 % (the #1103 figure), and weak rows where PXR and CBS nearly cancel move by up to 4×. The PXR-current correction partly offsets the CB increase, so group sums are smaller than CB-only changes. Production numbers moved accordingly: the #1103 check's §3 exact-root PXR+CBS / PXR-only areas at 30 keV are now 4.28 ($n_z=-2$) and 3.11 ($-3$), previously 4.12 and 3.00.
+
+**Decision.** In three of the nine cases the effect exceeds the floor, and per row it does so broadly. The exact form costs a few more scalar operations and reproduces the classical elements bit-equivalently in the limit, so it was implemented rather than recorded as below the floor.

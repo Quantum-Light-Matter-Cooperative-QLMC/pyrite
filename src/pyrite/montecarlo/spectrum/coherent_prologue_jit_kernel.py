@@ -81,6 +81,40 @@ def _interp_elemental_mu(
 
 
 @jit.rawkernel(device=True)
+def _quantum_pxr_numerator(h, gamma, vdg, k_dot_v, k_dot_g, g2, k2, v_dot_e, g_dot_e, k_dot_e):
+    """Device twin of ``_quantum_line_factors``' PXR numerator.
+
+    Validation: cbs-amplitude
+    """
+    n_f = h * (g2 + F32_TWO * k_dot_g + k2) - F32_TWO * gamma * (vdg + k_dot_v)
+    s_if = gamma + xp.sqrt(gamma * gamma + h * n_f)
+    ge_ke = g_dot_e + k_dot_e
+    return (-n_f * ge_ke - k2 * (F32_TWO * gamma * v_dot_e - h * ge_ke)) / s_if
+
+
+@jit.rawkernel(device=True)
+def _quantum_cbs_factor(h, gamma, vdg, k_dot_v, k_dot_g, g2, k2, v_dot_e, g_dot_e, k_dot_e):
+    """Device twin of ``_quantum_line_factors``' CBS factor ``f_cbs``.
+
+    Validation: cbs-amplitude
+    """
+    gg = gamma * gamma
+    n_1 = h * g2 - F32_TWO * gamma * vdg
+    n_2 = n_1 + F32_TWO * h * k_dot_g
+    n_f = h * (g2 + F32_TWO * k_dot_g + k2) - F32_TWO * gamma * (vdg + k_dot_v)
+    e_1 = xp.sqrt(gg + h * n_1)
+    e_2 = xp.sqrt(gg + h * (h * k2 - F32_TWO * gamma * k_dot_v))
+    e_f = xp.sqrt(gg + h * n_f)
+    s_if = gamma + e_f
+    s_1 = e_1 + gamma
+    s_3 = e_1 + e_f
+    s_4 = gamma + e_2
+    x = F32_TWO * gamma * v_dot_e - h * k_dot_e
+    inner = n_1 * (n_f / s_if) * (s_if + e_1 + e_2) - F32_TWO * s_1 * s_4 * k_dot_g
+    return F32_TWO * g_dot_e * s_1 / (s_3 * n_1) + x * inner / (s_3 * s_4 * n_1 * n_2)
+
+
+@jit.rawkernel(device=True)
 def _bracket_index(grid, energy_eV, n_samples):
     """Equivalent to ``clip(searchsorted(grid, energy_eV), 1, n_samples - 1)``."""
     lower_idx = U32_ZERO
@@ -267,11 +301,13 @@ def _coherent_prologue_kernel(
             k_mag = omega * xp.sqrt(F32_ONE - F32_TWO * delta + delta * delta * gradient_norm_sq)
     k_dot_v = omega * ((F32_ONE - resonance_denom) + recoil_den)
     k_dot_g = omega * (n_dot_g[reflection] + delta * (grad_x * gx + grad_y * gy + grad_z * gz))
-    v_dot_kg = v_dot_g + k_dot_v
     detuning = g2[reflection] + F32_TWO * k_dot_g
 
     duration = t_L[segment]
     lorentz_factor = gamma[segment]
+    h_red = inv_energy * lorentz_factor
+    g2_r = g2[reflection]
+    k2 = k_mag * k_mag
     # Formation mode (issue #181): the attenuation moves out of the amplitude
     # into the per-piece formation constants of ``_formation.
     # formation_coefficients`` -- tau at the piece ends, ordered along travel --
@@ -319,18 +355,19 @@ def _coherent_prologue_kernel(
     # sigma polarization: A = chi*f_pxr + (U/m)*f_cbs, with both scalar
     # kinematic factors REAL. This is the real/imag expansion of the existing
     # coherent complex expression, preserving its phase information.
+    # Exact second-order elements (``_quantum_line_factors``); h = hbar c/m c^2
+    # is zero under the classical hook. Validation: cbs-amplitude
     g_dot_e = g_dot_es[reflection]
     v_dot_e = vx * esx + vy * esy + vz * esz
     k_dot_e = omega * delta * (grad_x * esx + grad_y * esy + grad_z * esz)
-    numerator = v_dot_kg * (g_dot_e + k_dot_e) - k_mag * k_mag * v_dot_e
-    braced_ge = g_dot_e - v_dot_g * v_dot_e
-    braced_kg = k_dot_g - k_dot_v * v_dot_g
-    bracket = braced_ge + v_dot_e * braced_kg / v_dot_g
-    cbs_denominator = lorentz_factor * v_dot_g
-    # Preserve the coherent eager expression order as closely as scalar real/imag
-    # arithmetic allows: (chi/detuning)*numerator and (-u/cbs_denominator)*bracket.
-    amplitude_real = (chi_re / detuning) * numerator + (-u_re / cbs_denominator) * bracket
-    amplitude_imag = (chi_im / detuning) * numerator + (-u_im / cbs_denominator) * bracket
+    numerator = _quantum_pxr_numerator(
+        h_red, lorentz_factor, v_dot_g, k_dot_v, k_dot_g, g2_r, k2, v_dot_e, g_dot_e, k_dot_e
+    )
+    f_cbs = _quantum_cbs_factor(
+        h_red, lorentz_factor, v_dot_g, k_dot_v, k_dot_g, g2_r, k2, v_dot_e, g_dot_e, k_dot_e
+    )
+    amplitude_real = (chi_re / detuning) * numerator + u_re * f_cbs
+    amplitude_imag = (chi_im / detuning) * numerator + u_im * f_cbs
     sigma_re = field_scale * amplitude_real
     sigma_im = field_scale * amplitude_imag
 
@@ -338,12 +375,14 @@ def _coherent_prologue_kernel(
     g_dot_e = g_dot_ep[reflection]
     v_dot_e = vx * epx + vy * epy + vz * epz
     k_dot_e = omega * delta * (grad_x * epx + grad_y * epy + grad_z * epz)
-    numerator = v_dot_kg * (g_dot_e + k_dot_e) - k_mag * k_mag * v_dot_e
-    braced_ge = g_dot_e - v_dot_g * v_dot_e
-    braced_kg = k_dot_g - k_dot_v * v_dot_g
-    bracket = braced_ge + v_dot_e * braced_kg / v_dot_g
-    amplitude_real = (chi_re / detuning) * numerator + (-u_re / cbs_denominator) * bracket
-    amplitude_imag = (chi_im / detuning) * numerator + (-u_im / cbs_denominator) * bracket
+    numerator = _quantum_pxr_numerator(
+        h_red, lorentz_factor, v_dot_g, k_dot_v, k_dot_g, g2_r, k2, v_dot_e, g_dot_e, k_dot_e
+    )
+    f_cbs = _quantum_cbs_factor(
+        h_red, lorentz_factor, v_dot_g, k_dot_v, k_dot_g, g2_r, k2, v_dot_e, g_dot_e, k_dot_e
+    )
+    amplitude_real = (chi_re / detuning) * numerator + u_re * f_cbs
+    amplitude_imag = (chi_im / detuning) * numerator + u_im * f_cbs
     pi_re = field_scale * amplitude_real
     pi_im = field_scale * amplitude_imag
 
