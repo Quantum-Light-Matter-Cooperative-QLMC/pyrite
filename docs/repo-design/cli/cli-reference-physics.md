@@ -188,11 +188,8 @@ Usage: pyrite physics reset [OPTIONS] NAME [FIELDS]...
   Return selected fields, or all fields, of NAME to built-in defaults.
 
 Options:
-  NAME
-  [FIELDS]...
-  --dry-run    Print proposed TOML diff; write nothing.
-  -y, --yes    Skip the standard-profile confirmation.
-  -h, --help   Show this message and exit.
+  --dry-run   Print proposed TOML diff; write nothing.
+  -h, --help  Show this message and exit.
 ```
 
 ## `pyrite physics set`
@@ -204,7 +201,6 @@ Usage: pyrite physics set [OPTIONS] NAME
   referencing profiles before saving.
 
 Options:
-  NAME
   --straggling / --no-straggling  Enable or disable collision energy-loss straggling
                                   (restricted soft loss in shell mode).
   --inelastic-model [auto|continuous|shell-soft-hard]
@@ -283,23 +279,7 @@ Options:
                                   before saving.
   --description TEXT              Replace the display description.
   --dry-run                       Print proposed TOML diff; write nothing.
-  -y, --yes                       Skip the standard-profile confirmation.
   -h, --help                      Show this message and exit.
-
-Channeling options (profile [channeling] table):
-  --channeling-model [off|planar]
-                                  Planar quantum entrance zone (default off); requires
-                                  plane, midpoint, uncoupled radiation and incoherent
-                                  emission. Disable with profile physics reset PROFILE
-                                  channeling-model channeling-plane channeling-
-                                  admission.
-  --channeling-plane H K L        Nonzero Miller indices of the planar channeling
-                                  family; requires planar.
-  --channeling-admission [admitted|accept-inaccurate]
-                                  admitted (default) runs only channeling cases in the
-                                  measured admission tables; accept-inaccurate runs any
-                                  other case, acknowledging possibly very inaccurate
-                                  results, marked unadmitted with no error budget.
 ```
 
 ## `pyrite physics show`
@@ -310,7 +290,6 @@ Usage: pyrite physics show [OPTIONS] NAME
   Show NAME's stored and effective fields with their source.
 
 Options:
-  NAME
   -o, --output [table|json]  Output format; only json is a stable automation contract.
                              [default: table]
   -h, --help                 Show this message and exit.
@@ -324,6 +303,5 @@ Usage: pyrite physics validate [OPTIONS] NAME
   Validate NAME and every profile that references it; write nothing.
 
 Options:
-  NAME
   -h, --help  Show this message and exit.
 ```

@@ -427,7 +427,7 @@ def test_removed_profile_line_grid_does_not_resolve_as_a_command():
         ("profile add", "--line-trials"),
         ("profile create", "--line-trials"),
         ("profile numerics set", "--line-trials"),
-        ("numerics adaptive-sampling disable", "--line-trials"),
+        ("profile numerics adaptive-sampling disable", "--line-trials"),
         ("profile set", "--line-trials"),
     ],
 )

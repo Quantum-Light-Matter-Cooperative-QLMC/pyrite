@@ -1,6 +1,4 @@
-"""Every deprecated argument form still runs, warns once and keeps its exit code (#1078)."""
-
-import json
+"""The 0.32 argument forms are removed in 0.34; profile commands remain explicit."""
 
 import pytest
 
@@ -34,32 +32,15 @@ def campaign():
     assert created.exit_code == 0, created.output
 
 
-def test_every_registered_form_is_exercised():
-    assert _INVOCATIONS.keys() == DEPRECATED_FORMS.keys()
+def test_no_argument_forms_remain_deprecated():
+    assert not DEPRECATED_FORMS
 
 
 @pytest.mark.parametrize("form", sorted(_INVOCATIONS))
-def test_deprecated_form_runs_and_warns_once(campaign, form):
+def test_removed_form_rejects_profile(campaign, form):
     result = invoke(command, _INVOCATIONS[form])
-
-    assert result.exit_code == 0, result.output
-    warnings = [line for line in result.stderr.splitlines() if "is deprecated" in line]
-    entry = DEPRECATED_FORMS[form]
-    prefix = (
-        f"warning: 'pyrite {entry.path}' is deprecated and will be removed in "
-        f"{entry.remove_in}; use 'pyrite profile "
-    )
-    assert len(warnings) == 1
-    assert warnings[0].startswith(prefix), warnings[0]
-
-
-@pytest.mark.parametrize("noun", ["numerics", "physics"])
-def test_deprecated_show_keeps_json_stdout_clean(campaign, noun):
-    result = invoke(command, [noun, "show", "campaign", "-o", "json"])
-
-    assert result.exit_code == 0, result.output
-    assert json.loads(result.stdout)["schema"] == f"pyrite.{noun}.show"
-    assert "is deprecated" in result.stderr
+    assert result.exit_code in (1, 2), result.output
+    assert "is deprecated" not in result.stderr
 
 
 @pytest.mark.parametrize("noun", ["numerics", "physics"])
@@ -68,3 +49,47 @@ def test_unknown_name_keeps_runtime_exit_code_without_warning(noun):
 
     assert result.exit_code == 1
     assert "is deprecated" not in result.stderr
+
+
+@pytest.mark.parametrize(
+    "noun, child",
+    [
+        ("numerics", "preset"),
+        ("physics", "preset"),
+        ("numerics", "adaptive-sampling"),
+        ("numerics", "cxr-grid"),
+    ],
+)
+def test_removed_subgroups(noun, child):
+    result = invoke(command, [noun, child, "--help"])
+    assert result.exit_code == 2
+    assert "No such command" in result.stderr
+
+
+@pytest.mark.parametrize(
+    "flag",
+    [
+        "--straggling",
+        "--inelastic-model",
+        "--inelastic-cutoff-ev",
+        "--secondary-threshold-ev",
+        "--elastic-model",
+        "--bremsstrahlung-model",
+        "--radiative-model",
+        "--radiative-cutoff-ev",
+        "--pair-production-model",
+        "--positron-transport",
+        "--atomic-electron-deflection",
+        "--transport-mode",
+        "--mixed-c1",
+        "--mixed-c2",
+        "--shell-ionization-model",
+        "--channeling-model",
+        "--channeling-plane",
+        "--channeling-admission",
+    ],
+)
+def test_profile_numerics_rejects_physics_flags(campaign, flag):
+    result = invoke(command, ["profile", "numerics", "set", "campaign", flag])
+    assert result.exit_code == 2
+    assert "No such option" in result.stderr
