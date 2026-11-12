@@ -17,6 +17,7 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     "checks/pxr_optimization.py": (),
     # #610 capture-policy benchmark: engineering evidence, not a physics claim.
     "checks/pyrite_issue610_overlap_benchmark.py": (),
+    "checks/density_propagate_benchmark.py": (),
     # #278 / #286 measurement diagnostics: they record grid error, accuracy vs electron
     # count and per-flush cost as study evidence, not as an independent physics claim.
     # Continuum benchmark diagnostics: engineering evidence, no physics verdict.

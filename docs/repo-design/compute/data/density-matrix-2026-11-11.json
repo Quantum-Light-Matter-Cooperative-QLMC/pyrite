@@ -1,0 +1,689 @@
+{
+ "issue": 1125,
+ "date": "2026-11-11",
+ "host_cpu": "13th Gen Intel Core i7-13620H (16 logical CPUs), shared developer laptop",
+ "baseline_revision": "39bc51b04",
+ "workload": "Si(110) 16.92 MeV, 2.2 mrad divergence, TDS + electronic kernel, n_cells=16, margin 300 eV, 2 um at dz=250 A (80 steps), no stopping; 1 warm-up + 3 repeats per H in one process",
+ "arms": {
+  "main_openblas4": {
+   "revision": "39bc51b04",
+   "host": "alex-XPS-15-9530",
+   "cpu_count": 16,
+   "threads": {
+    "OMP_NUM_THREADS": null,
+    "OPENBLAS_NUM_THREADS": "4"
+   },
+   "numpy": "2.5.4",
+   "args": {
+    "orders": [
+     24,
+     32,
+     40,
+     56
+    ],
+    "cells": 16,
+    "thickness_um": 2.0,
+    "dz": 250.0,
+    "stopping": 0.0,
+    "repeats": 3,
+    "out": "/home/alex/dev/pyrite/.worktrees/issue-1125-density-fft/scratch/final_main_4.json"
+   },
+   "entries": [
+    {
+     "orders": 24,
+     "basis_size": 49,
+     "n_grid": 74,
+     "subspace_size": 513,
+     "steps": 80,
+     "kernel_s": 0.37083956599235535,
+     "runs": [
+      {
+       "jump": 0.515548166091321,
+       "propagators": 0.0028220060048624873,
+       "loss_rate": 0.08968243113486096,
+       "reproject": 0.0,
+       "other": 0.11087860475527123,
+       "wall": 0.7189312079863157
+      },
+      {
+       "jump": 0.5170144890726078,
+       "propagators": 0.005341532989405096,
+       "loss_rate": 0.09154290487640537,
+       "reproject": 0.0,
+       "other": 0.11206207604845986,
+       "wall": 0.7259610029868782
+      },
+      {
+       "jump": 0.5015358598902822,
+       "propagators": 0.00357347700628452,
+       "loss_rate": 0.08969570879708044,
+       "reproject": 0.0,
+       "other": 0.10953176929615438,
+       "wall": 0.7043368149898015
+      }
+     ],
+     "trace": 0.9181295350089788,
+     "total_flux": 0.06622043871787407
+    },
+    {
+     "orders": 32,
+     "basis_size": 65,
+     "n_grid": 98,
+     "subspace_size": 513,
+     "steps": 80,
+     "kernel_s": 0.8239369989896659,
+     "runs": [
+      {
+       "jump": 0.9027728008222766,
+       "propagators": 0.0029264749900903553,
+       "loss_rate": 0.136659079027595,
+       "reproject": 0.0,
+       "other": 0.17138897915720008,
+       "wall": 1.213747333997162
+      },
+      {
+       "jump": 0.8773777070455253,
+       "propagators": 0.0030579099839087576,
+       "loss_rate": 0.13234689412638545,
+       "reproject": 0.0,
+       "other": 0.1670741458365228,
+       "wall": 1.1798566569923423
+      },
+      {
+       "jump": 0.8859431222372223,
+       "propagators": 0.003033710003364831,
+       "loss_rate": 0.13558386781369336,
+       "reproject": 0.0,
+       "other": 0.16865874093491584,
+       "wall": 1.1932194409891963
+      }
+     ],
+     "trace": 0.9183284473162816,
+     "total_flux": 0.0660231377620454
+    },
+    {
+     "orders": 40,
+     "basis_size": 81,
+     "n_grid": 122,
+     "subspace_size": 513,
+     "steps": 80,
+     "kernel_s": 1.837577528989641,
+     "runs": [
+      {
+       "jump": 1.4373362302430905,
+       "propagators": 0.003073442989261821,
+       "loss_rate": 0.2139253169298172,
+       "reproject": 0.0,
+       "other": 0.2630504348198883,
+       "wall": 1.9173854249820579
+      },
+      {
+       "jump": 1.4725917289615609,
+       "propagators": 0.002922995015978813,
+       "loss_rate": 0.22101820819079876,
+       "reproject": 0.0,
+       "other": 0.27198231883812696,
+       "wall": 1.9685152510064654
+      },
+      {
+       "jump": 1.4683123411086854,
+       "propagators": 0.0031480510078836232,
+       "loss_rate": 0.21897785406326875,
+       "reproject": 0.0,
+       "other": 0.26943768380442634,
+       "wall": 1.959875929984264
+      }
+     ],
+     "trace": 0.9183292579583567,
+     "total_flux": 0.06602230679399519
+    },
+    {
+     "orders": 56,
+     "basis_size": 113,
+     "n_grid": 170,
+     "subspace_size": 513,
+     "steps": 80,
+     "kernel_s": 4.724512130982475,
+     "runs": [
+      {
+       "jump": 3.3611244490894023,
+       "propagators": 0.003451893979217857,
+       "loss_rate": 0.4961599121161271,
+       "reproject": 0.0,
+       "other": 0.5993645908019971,
+       "wall": 4.460100845986744
+      },
+      {
+       "jump": 3.4256208520091604,
+       "propagators": 0.0033989950024988502,
+       "loss_rate": 0.507100192073267,
+       "reproject": 0.0,
+       "other": 0.6087465479213279,
+       "wall": 4.544866587006254
+      },
+      {
+       "jump": 3.7094090260507073,
+       "propagators": 0.003324605990201235,
+       "loss_rate": 0.5465468737820629,
+       "reproject": 0.0,
+       "other": 0.6488244431675412,
+       "wall": 4.908104948990513
+      }
+     ],
+     "trace": 0.9183296985345278,
+     "total_flux": 0.06602182870466086
+    }
+   ]
+  },
+  "main_openblas16": {
+   "revision": "39bc51b04",
+   "host": "alex-XPS-15-9530",
+   "cpu_count": 16,
+   "threads": {
+    "OMP_NUM_THREADS": null,
+    "OPENBLAS_NUM_THREADS": "16"
+   },
+   "numpy": "2.5.4",
+   "args": {
+    "orders": [
+     24,
+     32,
+     40,
+     56
+    ],
+    "cells": 16,
+    "thickness_um": 2.0,
+    "dz": 250.0,
+    "stopping": 0.0,
+    "repeats": 3,
+    "out": "/home/alex/dev/pyrite/.worktrees/issue-1125-density-fft/scratch/final_main_16.json"
+   },
+   "entries": [
+    {
+     "orders": 24,
+     "basis_size": 49,
+     "n_grid": 74,
+     "subspace_size": 513,
+     "steps": 80,
+     "kernel_s": 1.0355527480132878,
+     "runs": [
+      {
+       "jump": 0.7158856450114399,
+       "propagators": 0.11757639498682693,
+       "loss_rate": 0.10840471004485153,
+       "reproject": 0.0,
+       "other": 0.13073522693593986,
+       "wall": 1.0726019769790582
+      },
+      {
+       "jump": 0.8224511559237726,
+       "propagators": 0.15843587898416445,
+       "loss_rate": 0.12793521891580895,
+       "reproject": 0.0,
+       "other": 0.1563777991977986,
+       "wall": 1.2652000530215446
+      },
+      {
+       "jump": 0.6924672498134896,
+       "propagators": 0.04966539001907222,
+       "loss_rate": 0.10692837709211744,
+       "reproject": 0.0,
+       "other": 0.1321008600643836,
+       "wall": 0.9811618769890629
+      }
+     ],
+     "trace": 0.9181295350089788,
+     "total_flux": 0.06622043871787414
+    },
+    {
+     "orders": 32,
+     "basis_size": 65,
+     "n_grid": 98,
+     "subspace_size": 513,
+     "steps": 80,
+     "kernel_s": 1.0711761309939902,
+     "runs": [
+      {
+       "jump": 1.7109403889335226,
+       "propagators": 0.1499827530060429,
+       "loss_rate": 0.1662346399098169,
+       "reproject": 0.0,
+       "other": 0.22705357614904642,
+       "wall": 2.254211357998429
+      },
+      {
+       "jump": 2.987914476194419,
+       "propagators": 0.14824765600496903,
+       "loss_rate": 0.2545215451682452,
+       "reproject": 0.0,
+       "other": 0.34870175464311615,
+       "wall": 3.7393854320107494
+      },
+      {
+       "jump": 1.2950993521371856,
+       "propagators": 0.2253331630199682,
+       "loss_rate": 0.19572819699533284,
+       "reproject": 0.0,
+       "other": 0.3049649968452286,
+       "wall": 2.0211257089977153
+      }
+     ],
+     "trace": 0.9183284473162818,
+     "total_flux": 0.06602313776204524
+    },
+    {
+     "orders": 40,
+     "basis_size": 81,
+     "n_grid": 122,
+     "subspace_size": 513,
+     "steps": 80,
+     "kernel_s": 2.706101571995532,
+     "runs": [
+      {
+       "jump": 3.5284897909441497,
+       "propagators": 0.4184590610093437,
+       "loss_rate": 0.6535561639757361,
+       "reproject": 0.0,
+       "other": 0.836896424065344,
+       "wall": 5.437401439994574
+      },
+      {
+       "jump": 3.298494102054974,
+       "propagators": 0.18770642898743972,
+       "loss_rate": 0.5280247810878791,
+       "reproject": 0.0,
+       "other": 0.7387628168507945,
+       "wall": 4.752988128981087
+      },
+      {
+       "jump": 2.511089868785348,
+       "propagators": 0.18115676901652478,
+       "loss_rate": 0.3939541010186076,
+       "reproject": 0.0,
+       "other": 0.6449377791723236,
+       "wall": 3.731138517992804
+      }
+     ],
+     "trace": 0.9183292579583568,
+     "total_flux": 0.06602230679399494
+    },
+    {
+     "orders": 56,
+     "basis_size": 113,
+     "n_grid": 170,
+     "subspace_size": 513,
+     "steps": 80,
+     "kernel_s": 5.628504109015921,
+     "runs": [
+      {
+       "jump": 8.319839144853177,
+       "propagators": 0.28552643200964667,
+       "loss_rate": 1.6274776841746643,
+       "reproject": 0.0,
+       "other": 2.0760909659729805,
+       "wall": 12.308934227010468
+      },
+      {
+       "jump": 5.708182309928816,
+       "propagators": 0.3962848780211061,
+       "loss_rate": 0.9777829501254018,
+       "reproject": 0.0,
+       "other": 1.063536253903294,
+       "wall": 8.145786391978618
+      },
+      {
+       "jump": 6.961913011939032,
+       "propagators": 0.3961942700261716,
+       "loss_rate": 1.1249232540430967,
+       "reproject": 0.0,
+       "other": 1.361720253014937,
+       "wall": 9.844750789023237
+      }
+     ],
+     "trace": 0.9183296985345283,
+     "total_flux": 0.06602182870466124
+    }
+   ]
+  },
+  "branch_openblas4": {
+   "revision": "39bc51b04",
+   "host": "alex-XPS-15-9530",
+   "cpu_count": 16,
+   "threads": {
+    "OMP_NUM_THREADS": null,
+    "OPENBLAS_NUM_THREADS": "4"
+   },
+   "numpy": "2.5.4",
+   "args": {
+    "orders": [
+     24,
+     32,
+     40,
+     56
+    ],
+    "cells": 16,
+    "thickness_um": 2.0,
+    "dz": 250.0,
+    "stopping": 0.0,
+    "repeats": 3,
+    "out": "/home/alex/dev/pyrite/.worktrees/issue-1125-density-fft/scratch/final_branch_4.json"
+   },
+   "entries": [
+    {
+     "orders": 24,
+     "basis_size": 49,
+     "n_grid": 74,
+     "subspace_size": 513,
+     "steps": 80,
+     "kernel_s": 0.3851207559928298,
+     "runs": [
+      {
+       "jump": 0.3308357267524116,
+       "propagators": 0.0031805780017748475,
+       "loss_rate": 0.005194474069867283,
+       "reproject": 0.0,
+       "other": 0.0614527661819011,
+       "wall": 0.4006635450059548
+      },
+      {
+       "jump": 0.3122593269799836,
+       "propagators": 0.0030403370037674904,
+       "loss_rate": 0.00469847593922168,
+       "reproject": 0.0,
+       "other": 0.05550096105434932,
+       "wall": 0.3754991009773221
+      },
+      {
+       "jump": 0.31880637592985295,
+       "propagators": 0.0031902329938020557,
+       "loss_rate": 0.00461818091571331,
+       "reproject": 0.0,
+       "other": 0.05514239217154682,
+       "wall": 0.38175718201091513
+      }
+     ],
+     "trace": 0.9181295350089788,
+     "total_flux": 0.06622043871787417
+    },
+    {
+     "orders": 32,
+     "basis_size": 65,
+     "n_grid": 98,
+     "subspace_size": 513,
+     "steps": 80,
+     "kernel_s": 0.9289971359830815,
+     "runs": [
+      {
+       "jump": 0.4432850250741467,
+       "propagators": 0.002601785003207624,
+       "loss_rate": 0.00457667198497802,
+       "reproject": 0.0,
+       "other": 0.056980417924933136,
+       "wall": 0.5074438999872655
+      },
+      {
+       "jump": 0.45721397001761943,
+       "propagators": 0.0036632129922509193,
+       "loss_rate": 0.004637359059415758,
+       "reproject": 0.0,
+       "other": 0.05704299794160761,
+       "wall": 0.5225575400108937
+      },
+      {
+       "jump": 0.4579923538840376,
+       "propagators": 0.0029645859904121608,
+       "loss_rate": 0.00467344286153093,
+       "reproject": 0.0,
+       "other": 0.05709977928199805,
+       "wall": 0.5227301620179787
+      }
+     ],
+     "trace": 0.9183284473162816,
+     "total_flux": 0.06602313776204413
+    },
+    {
+     "orders": 40,
+     "basis_size": 81,
+     "n_grid": 122,
+     "subspace_size": 513,
+     "steps": 80,
+     "kernel_s": 1.758233246015152,
+     "runs": [
+      {
+       "jump": 0.6900790829386096,
+       "propagators": 0.003137880004942417,
+       "loss_rate": 0.005363847216358408,
+       "reproject": 0.0,
+       "other": 0.06178721986361779,
+       "wall": 0.7603680300235283
+      },
+      {
+       "jump": 0.6767275320889894,
+       "propagators": 0.003212440002243966,
+       "loss_rate": 0.0052736868092324585,
+       "reproject": 0.0,
+       "other": 0.060332009103149176,
+       "wall": 0.745545668003615
+      },
+      {
+       "jump": 0.668225763074588,
+       "propagators": 0.0031292460043914616,
+       "loss_rate": 0.005153487087227404,
+       "reproject": 0.0,
+       "other": 0.05946319384383969,
+       "wall": 0.7359716900100466
+      }
+     ],
+     "trace": 0.9183292579583568,
+     "total_flux": 0.06602230679398782
+    },
+    {
+     "orders": 56,
+     "basis_size": 113,
+     "n_grid": 170,
+     "subspace_size": 513,
+     "steps": 80,
+     "kernel_s": 4.925295465014642,
+     "runs": [
+      {
+       "jump": 1.450450537900906,
+       "propagators": 0.0032660799915902317,
+       "loss_rate": 0.005731579061830416,
+       "reproject": 0.0,
+       "other": 0.06536171102197841,
+       "wall": 1.5248099079763051
+      },
+      {
+       "jump": 1.6877102660364471,
+       "propagators": 0.0033431390183977783,
+       "loss_rate": 0.006258846668060869,
+       "reproject": 0.0,
+       "other": 0.07487692328868434,
+       "wall": 1.7721891750115901
+      },
+      {
+       "jump": 1.4194543012126815,
+       "propagators": 0.0034152980078943074,
+       "loss_rate": 0.005540622922126204,
+       "reproject": 0.0,
+       "other": 0.06383787386585027,
+       "wall": 1.4922480960085522
+      }
+     ],
+     "trace": 0.9183296985345276,
+     "total_flux": 0.06602182870465208
+    }
+   ]
+  },
+  "branch_openblas16": {
+   "revision": "39bc51b04",
+   "host": "alex-XPS-15-9530",
+   "cpu_count": 16,
+   "threads": {
+    "OMP_NUM_THREADS": null,
+    "OPENBLAS_NUM_THREADS": "16"
+   },
+   "numpy": "2.5.4",
+   "args": {
+    "orders": [
+     24,
+     32,
+     40,
+     56
+    ],
+    "cells": 16,
+    "thickness_um": 2.0,
+    "dz": 250.0,
+    "stopping": 0.0,
+    "repeats": 3,
+    "out": "/home/alex/dev/pyrite/.worktrees/issue-1125-density-fft/scratch/final_branch_16.json"
+   },
+   "entries": [
+    {
+     "orders": 24,
+     "basis_size": 49,
+     "n_grid": 74,
+     "subspace_size": 513,
+     "steps": 80,
+     "kernel_s": 2.788906108995434,
+     "runs": [
+      {
+       "jump": 0.3453113226860296,
+       "propagators": 0.08506241400027648,
+       "loss_rate": 0.004754156921990216,
+       "reproject": 0.0,
+       "other": 0.05650720538687892,
+       "wall": 0.4916350989951752
+      },
+      {
+       "jump": 0.41737997595919296,
+       "propagators": 0.08976201200857759,
+       "loss_rate": 0.004996345000108704,
+       "reproject": 0.0,
+       "other": 0.059559359040576965,
+       "wall": 0.5716976920084562
+      },
+      {
+       "jump": 0.37017042326624505,
+       "propagators": 0.0990869740198832,
+       "loss_rate": 0.004874502046732232,
+       "reproject": 0.0,
+       "other": 0.06224800966447219,
+       "wall": 0.5363799089973327
+      }
+     ],
+     "trace": 0.9181295350089789,
+     "total_flux": 0.0662204387178741
+    },
+    {
+     "orders": 32,
+     "basis_size": 65,
+     "n_grid": 98,
+     "subspace_size": 513,
+     "steps": 80,
+     "kernel_s": 0.9524252929841168,
+     "runs": [
+      {
+       "jump": 0.7031736650096718,
+       "propagators": 0.1719344619777985,
+       "loss_rate": 0.0057137310795951635,
+       "reproject": 0.0,
+       "other": 0.06495064494083636,
+       "wall": 0.9457725030079018
+      },
+      {
+       "jump": 0.8606410149659496,
+       "propagators": 0.11333643199759535,
+       "loss_rate": 0.009664799785241485,
+       "reproject": 0.0,
+       "other": 0.11596374426153488,
+       "wall": 1.0996059910103213
+      },
+      {
+       "jump": 0.7017979977827054,
+       "propagators": 0.09432263599592261,
+       "loss_rate": 0.007290610927157104,
+       "reproject": 0.0,
+       "other": 0.07636968727456406,
+       "wall": 0.8797809319803491
+      }
+     ],
+     "trace": 0.9183284473162816,
+     "total_flux": 0.0660231377620437
+    },
+    {
+     "orders": 40,
+     "basis_size": 81,
+     "n_grid": 122,
+     "subspace_size": 513,
+     "steps": 80,
+     "kernel_s": 4.278676290996373,
+     "runs": [
+      {
+       "jump": 3.474710141046671,
+       "propagators": 0.26403099999879487,
+       "loss_rate": 0.01171915527083911,
+       "reproject": 0.0,
+       "other": 0.13423381268512458,
+       "wall": 3.8846941090014298
+      },
+      {
+       "jump": 2.3237751678097993,
+       "propagators": 0.3356274300022051,
+       "loss_rate": 0.011671018903143704,
+       "reproject": 0.0,
+       "other": 0.24601810227613896,
+       "wall": 2.917091718991287
+      },
+      {
+       "jump": 1.3308348702266812,
+       "propagators": 0.16092944800038822,
+       "loss_rate": 0.007788316026562825,
+       "reproject": 0.0,
+       "other": 0.07976064275135286,
+       "wall": 1.5793132770049851
+      }
+     ],
+     "trace": 0.9183292579583568,
+     "total_flux": 0.06602230679398781
+    },
+    {
+     "orders": 56,
+     "basis_size": 113,
+     "n_grid": 170,
+     "subspace_size": 513,
+     "steps": 80,
+     "kernel_s": 5.964989803003846,
+     "runs": [
+      {
+       "jump": 3.569159409875283,
+       "propagators": 0.47744534400408156,
+       "loss_rate": 0.00786242206231691,
+       "reproject": 0.0,
+       "other": 0.08835935505339876,
+       "wall": 4.14282653099508
+      },
+      {
+       "jump": 3.8338707159855403,
+       "propagators": 0.5817334080056753,
+       "loss_rate": 0.00796237969188951,
+       "reproject": 0.0,
+       "other": 0.0880381723109167,
+       "wall": 4.511604675994022
+      },
+      {
+       "jump": 2.2785493931442033,
+       "propagators": 0.4779352369951084,
+       "loss_rate": 0.007914380956208333,
+       "reproject": 0.0,
+       "other": 0.08532953090616502,
+       "wall": 2.849728542001685
+      }
+     ],
+     "trace": 0.9183296985345277,
+     "total_flux": 0.06602182870465241
+    }
+   ]
+  }
+ }
+}
