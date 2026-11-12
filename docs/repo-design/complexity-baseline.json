@@ -32,7 +32,7 @@
       "cc": 35
     },
     {
-      "path": "src/pyrite/campaign/axial_spec.py",
+      "path": "src/pyrite/quantum/_axial_spec.py",
       "name": "_entry",
       "cc": 24
     },

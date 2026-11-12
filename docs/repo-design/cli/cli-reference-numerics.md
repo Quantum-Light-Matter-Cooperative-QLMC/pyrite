@@ -78,6 +78,16 @@ Options:
   --maximum-fractional-energy-loss FRACTION
                                   Cap one row's fractional mean energy loss; positive
                                   values require midpoint.  [x>=0.0]
+  --channeling-basis-size INTEGER RANGE
+                                  Transverse plane-wave band |h| <= H (default 16).
+                                  [x>=1]
+  --channeling-bloch-cells INTEGER RANGE
+                                  Bloch-grid supercell size (default 16).  [x>=1]
+  --channeling-dz-ang FLOAT RANGE
+                                  Zone depth step in angstrom (default 250).  [x>0]
+  --channeling-zone-max-ang FLOAT RANGE
+                                  Zone length cap in angstrom (default first layer
+                                  thickness).  [x>0]
   --sampling [fixed|adaptive]     Select adaptive or fixed sampling. Adaptive options
                                   select adaptive; --cxr-histories or --brem-histories
                                   select fixed. Switching replaces the previous sampling
@@ -164,11 +174,9 @@ Usage: pyrite numerics reset [OPTIONS] NAME [FIELDS]...
   Return selected fields, or all fields, of NAME to built-in defaults.
 
 Options:
-  NAME
-  [FIELDS]...
-  --dry-run    Print proposed TOML diff; write nothing.
-  -y, --yes    Skip the standard-profile confirmation.
-  -h, --help   Show this message and exit.
+  --dry-run   Print proposed TOML diff; write nothing.
+  -y, --yes   Skip the standard-profile confirmation.
+  -h, --help  Show this message and exit.
 ```
 
 ## `pyrite numerics set`
@@ -180,7 +188,6 @@ Usage: pyrite numerics set [OPTIONS] NAME
   referencing profiles before saving.
 
 Options:
-  NAME
   --cxr-histories N               Select fixed sampling and set this estimator's history
                                   count.  [x>=1]
   --brem-histories N              Select fixed sampling and set this estimator's history
@@ -195,6 +202,16 @@ Options:
   --maximum-fractional-energy-loss FRACTION
                                   Cap one row's fractional mean energy loss; positive
                                   values require midpoint.  [x>=0.0]
+  --channeling-basis-size INTEGER RANGE
+                                  Transverse plane-wave band |h| <= H (default 16).
+                                  [x>=1]
+  --channeling-bloch-cells INTEGER RANGE
+                                  Bloch-grid supercell size (default 16).  [x>=1]
+  --channeling-dz-ang FLOAT RANGE
+                                  Zone depth step in angstrom (default 250).  [x>0]
+  --channeling-zone-max-ang FLOAT RANGE
+                                  Zone length cap in angstrom (default first layer
+                                  thickness).  [x>0]
   --sampling [fixed|adaptive]     Select adaptive or fixed sampling. Adaptive options
                                   select adaptive; --cxr-histories or --brem-histories
                                   select fixed. Switching replaces the previous sampling
@@ -234,20 +251,6 @@ Options:
   --dry-run                       Print proposed TOML diff; write nothing.
   -y, --yes                       Skip the standard-profile confirmation.
   -h, --help                      Show this message and exit.
-
-Channeling options (profile [channeling] table):
-  --channeling-basis-size INTEGER RANGE
-                                  Transverse plane-wave band |h| <= H (table basis_size;
-                                  default 16).  [x>=1]
-  --channeling-bloch-cells INTEGER RANGE
-                                  Bloch-grid supercell size (table bloch_cells; default
-                                  16).  [x>=1]
-  --channeling-dz-ang FLOAT RANGE
-                                  Zone depth step in angstrom (table step_ang; default
-                                  250).  [x>0]
-  --channeling-zone-max-ang FLOAT RANGE
-                                  Zone length cap in angstrom (table zone_max_ang;
-                                  default first layer thickness).  [x>0]
 ```
 
 ## `pyrite numerics show`
@@ -258,7 +261,6 @@ Usage: pyrite numerics show [OPTIONS] NAME
   Show NAME's stored and effective fields with their source.
 
 Options:
-  NAME
   -o, --output [table|json]  Output format; only json is a stable automation contract.
                              [default: table]
   -h, --help                 Show this message and exit.
@@ -272,7 +274,6 @@ Usage: pyrite numerics validate [OPTIONS] NAME
   Validate NAME and every profile that references it; write nothing.
 
 Options:
-  NAME
   -h, --help  Show this message and exit.
 ```
 

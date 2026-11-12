@@ -6,16 +6,16 @@ import pytest
 
 from pyrite import Physics
 from pyrite.campaign.axial_cases import axial_channeling_record
-from pyrite.campaign.axial_spec import (
-    AXIAL_FIBRE_MODEL_MARKER,
-    axial_spec_identity,
-    resolve_axial_spec,
-)
 from pyrite.campaign.channeling_cases import resolve_channeling
 from pyrite.montecarlo.case import Case
 from pyrite.quantum import Channeling
 from pyrite.quantum._admission import AxialAdmissionError
 from pyrite.quantum._axial_envelope import ADMITTED_AXIAL_CASES
+from pyrite.quantum._axial_spec import (
+    AXIAL_FIBRE_MODEL_MARKER,
+    axial_spec_identity,
+    resolve_axial_spec,
+)
 from pyrite.quantum._channeling import validate_channeling_run
 
 

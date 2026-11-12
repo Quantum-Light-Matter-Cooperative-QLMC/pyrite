@@ -12,12 +12,12 @@ import numpy as np
 
 from .. import DATA_DIR, _config_presets
 from .._catalog_layout import ARTIFACT_DIR, catalog_root
+from .._channeling_table import channeling_table_values
 from .._cxr_grid_policy import PROFILE_CXR_GRID_SELECTORS
 from .._cxr_vocabulary import catalog_key
 from .._energy_grid_artifacts import ArtifactError, load_artifact
 from .._numerics import CHANNELING_KEYS, validate_profile_numerics
 from .._precision import Precision
-from ..quantum._channeling import channeling_table_values
 from ._beam_detector_parse import (
     _parse_detector_entry,
     _parse_filter_rows,

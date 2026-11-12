@@ -19,8 +19,8 @@ from math import gcd
 from numbers import Integral, Real
 from typing import Any
 
-from ..quantum._admission import refuse_unverified_axial_run as refuse_unverified_axial_run
-from ..quantum._axial_envelope import AXIAL_FIBRE_MODEL_MARKER as AXIAL_FIBRE_MODEL_MARKER
+from ._admission import refuse_unverified_axial_run as refuse_unverified_axial_run
+from ._axial_envelope import AXIAL_FIBRE_MODEL_MARKER as AXIAL_FIBRE_MODEL_MARKER
 
 # Do not re-key the v1 research configuration; this is a distinct *production*
 # model generation and must not collide with planar or the v1 recipe.

@@ -11,7 +11,7 @@ wrapping and finite-grid numerical sinks are *not* physical escape events.
 
 The `Physics` facade takes `channeling_model="axial"` together with a
 `channeling_axial` mapping; the matching profile numerics keys have the same
-names. Both go through `campaign.axial_spec.resolve_axial_spec` before run
+names. Both go through `quantum._axial_spec.resolve_axial_spec` (formerly `campaign.axial_spec`) before run
 admission. The versioned canonical mapping is JSON-safe, strictly tagged,
 and rejects unknown keys and nonfinite/scalar-array values. A minimal proposed
 configuration is:

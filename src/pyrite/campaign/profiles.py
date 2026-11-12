@@ -51,10 +51,10 @@ from ..montecarlo.spectrum.cxr._bin_quadrature import _bin_reduction_markers
 from ..montecarlo.spectrum.transition_radiation_crossings import TRANSITION_MODEL
 from ..montecarlo.transport import STOPPING_MODEL
 from ..montecarlo.transport.precision import TRANSPORT_PRECISION_MODEL
+from ..quantum._axial_spec import AXIAL_FIBRE_MODEL_MARKER, AXIAL_MODEL_MARKER, resolve_axial_spec
 from ..quantum._channeling import CHANNELING_OFF_FIELDS
 from ..results import Settings
 from ..xsgen.bremslib.tables import resolve_bremsstrahlung_model
-from .axial_spec import AXIAL_FIBRE_MODEL_MARKER, AXIAL_MODEL_MARKER, resolve_axial_spec
 from .identity_options import (
     _CONTENT_KEY_DENYLIST,
     pop_identity_options,

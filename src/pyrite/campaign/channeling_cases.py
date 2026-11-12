@@ -123,8 +123,8 @@ def _warn_unadmitted(case: Case, model: str) -> None:
 def _resolve_axial(cases: list[Case], channeling: Channeling) -> list[Case]:
     from ..quantum._admission import AxialAdmissionError
     from ..quantum._axial_envelope import match_axial_case, unadmitted_axial_case
+    from ..quantum._axial_spec import refuse_unverified_axial_run
     from .axial_cases import axial_case_query, axial_channeling_record
-    from .axial_spec import refuse_unverified_axial_run
 
     if channeling.axial is None or channeling.axial["version"] != 2:
         refuse_unverified_axial_run()  # v1 remains parseable, never executable
