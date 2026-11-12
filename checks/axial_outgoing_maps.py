@@ -363,6 +363,7 @@ def material_fiber_channels(
     axis: tuple[int, int, int] = (0, 0, 1),
     tail_theta_max_rad: float | None = None,
     energy_eV: float = 5e6,
+    correlated_partners: int = 0,
 ):
     """Si one-cell fiber channels (default 5 MeV): TDS + electronic kicks.
 
@@ -375,7 +376,10 @@ def material_fiber_channels(
     :class:`TdsString` per dissipator source (any number of strings per cell).
     ``tail_theta_max_rad`` classifies string outputs beyond the box with
     ``|K| <= k theta_max`` as ``"tail"`` records (``cr-axial-tds-tail``); None
-    keeps them unresolved.
+    keeps them unresolved. ``correlated_partners`` > 0 (``tds="strings"``
+    only) adds the Nielsen & Weber transverse correlations of that many
+    nearest string atoms (``cr-axial-correlated-tds``); 0 is bitwise the
+    independent-atom model.
 
     Kick columns are ``sqrt(c_i) sqrt(rho_{q_i})`` harmonics on the cell
     lattice truncated at ``|n| <= harmonic_max``; the dropped fraction of
@@ -390,6 +394,10 @@ def material_fiber_channels(
     from pyrite.montecarlo.channeling.axial_dissipator import axial_dissipator
     from pyrite.montecarlo.channeling.axial_fiber_unraveling import FiberChannels
     from pyrite.montecarlo.channeling.axial_tds_continuum import TdsString
+    from pyrite.montecarlo.channeling.axial_tds_correlation import (
+        correlated_strings,
+        silicon_string_correlations,
+    )
     from pyrite.montecarlo.channeling.operators import _potential
 
     if tds not in ("lattice", "strings"):
@@ -414,15 +422,22 @@ def material_fiber_channels(
         return lambda q: -_potential(element, q) / hbar_v
 
     strings = ()
+    if correlated_partners and tds != "strings":
+        raise ValueError("correlated_partners needs tds='strings'")
+    shells = silicon_string_correlations(axis, correlated_partners) if correlated_partners else ()
     if tds == "strings":
         strings = tuple(
-            TdsString(
-                tuple(src.position_ang),
-                src.displacement_ang2,
-                src.linear_density,
-                phase_of(src.element),
-            )
+            s
             for src in dissipator.tds_sources
+            for s in correlated_strings(
+                TdsString(
+                    tuple(src.position_ang),
+                    src.displacement_ang2,
+                    src.linear_density,
+                    phase_of(src.element),
+                ),
+                shells,
+            )
         )
         kraus = np.zeros((int(np.prod(2 * span + 1)), 1))
         lattice_loss = np.zeros((len(zero.orders),) * 2)
@@ -488,6 +503,13 @@ def material_fiber_channels(
         "energy_eV": energy,
         "potential_extrema_eV": [float(x) for x in profile.extrema()],
     }
+    if shells:
+        info["correlation"] = {
+            "source": "Nielsen & Weber, J. Phys. C 13, 2449 (1980), BCM 300 K",
+            "partners": int(correlated_partners),
+            "shells": [[s.coefficient, s.partners] for s in shells],
+            "tds_channels": len(strings),
+        }
     return channels, entry, hbar_v, info
 
 

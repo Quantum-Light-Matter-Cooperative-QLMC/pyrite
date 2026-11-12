@@ -217,6 +217,21 @@ changes the 0.088° area by −2%. At 0.15° the free→2p line crosses the wind
 (Andersen fixed its ratio for this reason), and the single-line fit fails
 (χ²/ν = 30). That point is not compared.
 
+## Correlated-string TDS (#1045)
+
+Claim `cr-axial-correlated-tds` adds the transverse displacement correlations
+of neighbouring atoms in one string as extra continuum-TDS shells. The Si
+input is Nielsen & Weber (1980), bond-charge model at 300 K. Over the six
+nearest string atoms it reproduces Andersen's Table 2 $C$: 1.238 for ⟨100⟩
+(Andersen 1.25) and 1.420 for ⟨111⟩ (Andersen 1.40). The research runs
+keep the 10 nearest partners, about $1/\alpha Z$. For comparison:
+
+- Andersen's uncorrelated estimates are 466 eV and 595 eV.
+- The 1s + 2p loss rates rise by 11–14% (⟨100⟩) and 22–25% (⟨111⟩).
+- Andersen's factor $1+0.7(C-1)$ gives 17% and 29%.
+
+Remote reruns of the Table 2 arms and the Fig. 11 tilt points are pending.
+
 ## Off-axis observation and polarization
 
 `fiber_angular_source` (claim `cr-axial-fiber-angular`) scores the same

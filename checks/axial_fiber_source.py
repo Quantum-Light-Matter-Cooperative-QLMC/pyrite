@@ -22,7 +22,10 @@ entrance plane wave sits at order n with carrier k_perp - n g folded into
 the return-flux reference of ``checks/axial_outgoing_convergence.py``.
 ``cut_multiple`` (default 1) sets the cut target ``U_max + m (U_max - U_min)``
 when ``target_eV`` is None. ``harmonic_max`` and ``grid_points`` set the electronic-kick harmonic cutoff
-and the density grid of ``material_fiber_channels``.
+and the density grid of ``material_fiber_channels``. ``correlated_partners``
+(default 0, the independent-atom model) adds the Nielsen & Weber (1980)
+transverse displacement correlations of that many nearest string atoms
+(``cr-axial-correlated-tds``, #1045).
 
 Depth calibration (#993): ``checkpoints_ang`` (list of slab thicknesses on the
 depth grid) switches the chunk to
@@ -78,6 +81,7 @@ DEFAULTS = {
     "cut_multiple": 1.0,
     "checkpoints_ang": None,
     "drift_span_ang": 15.0,
+    "correlated_partners": 0,
 }
 
 
@@ -104,6 +108,7 @@ def build(options: dict):
         energy_eV=float(o["energy_eV"]),
         harmonic_max=int(o["harmonic_max"]),
         grid_points=int(o["grid_points"]),
+        correlated_partners=int(o["correlated_partners"]),
     )
     if o["reference"]:  # P = R: the whole order window is retained (no cut)
         channels = dataclasses.replace(channels, cut=lambda energies: np.inf)
