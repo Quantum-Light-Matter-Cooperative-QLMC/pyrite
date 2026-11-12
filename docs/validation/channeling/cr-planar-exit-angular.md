@@ -172,3 +172,76 @@ discrepancy, not a refutation. The slow regression
 `test_gridnev_1987_si110_spots_survive_in_the_film_cut` anchors the Si(110)
 1.87 MeV three-spot cut. Fresh-context review of the 2D observable
 (`filtered`) is pending.
+The order ±2 discrepancy is resolved as a bound in the next section.
+
+## Order ±2 at Si(110) 4.15 MeV (#1117)
+
+Implementation-context diagnostics, separate from the independent verdict.
+The [study record](../check-records/planar-exit-1117-study.json) holds 127
+rows from SLURM array 11451 (`checks/planar_exit_out_of_plane.py`, 128 cells,
+`max_order` 8, dz 20 Å). Contrasts are local `θ_y = 0` cut contrasts.
+
+### Source
+
+Photo 4b of Fig. 1 (Si(110), 4.15 MeV) shows orders 0 and ±1 as three
+bright spots of similar size. Order +2 is a small, faint spot, and order −2
+is not visible in the reproduction. The scale bar (0.1°) puts the spot
+spacing at 0.09°, which is $\lambda/d$ at this energy. The "5 spots" is the
+$N_l$ class of Table 1, which groups 4b with photo 7c (Si(111), 2.45 MeV).
+Photo 7c shows five clear spots. The text states one divergence (0.02°) and
+one orientation accuracy (0.005°) for all settings. The experiment therefore
+records ±2 near visibility and asymmetric, not as strong as ±1.
+
+### Mechanism and depth
+
+| L (µm) | Coherent ±2 | TDS only ±2 | Electronic only ±2 | Both 0/±1/±2 |
+|---|---|---|---|---|
+| 0.5 | 11.36 | 9.22 | 4.51 | 3.84 / 4.97 / 3.77 |
+| 1.0 | 5.80 | 4.51 | 1.73 | 4.53 / 2.67 / 1.54 |
+| 1.5 | 0.12 | 3.23 | 0.95 | 3.98 / 1.71 / 1.12 |
+| 1.8 | 6.18 | 5.31 | 1.21 | 2.57 / 1.79 / 1.13 |
+| 2.0 | 14.23 | 6.66 | 1.20 | 2.17 / 1.70 / 1.09 |
+| 2.2 | 17.14 | 6.04 | 1.09 | 2.09 / 1.53 / 1.04 |
+| 2.5 | 5.68 | 3.96 | 0.96 | 1.99 / 1.35 / 1.00 |
+
+σ = 0.175 mrad. The record holds every 0.1 µm. **The electronic kernel
+removes order ±2.** TDS alone keeps it at 4–7 over 1.8–2.2 µm. With both
+kernels the contrast decays monotonically to about 1.1 by 1.2 µm and then
+stays flat. The coherent Pendellösung minimum is at 1.5 µm, and 2 µm is near a
+coherent maximum, so a thickness error cannot recover the spot. Replacing the
+electronic density by its cell average gives 1.06 at 2 µm against 1.09, so
+LDA localization is not the cause.
+
+### Experimental systematics
+
+| Variation (L = 1.8 / 2.0 / 2.2 µm) | Order −2 | Order +2 |
+|---|---|---|
+| Nominal (σ = 0.175 mrad, no tilt) | 1.13 / 1.09 / 1.04 | same |
+| Tilt 0.044 mrad | 1.14 / 1.10 / 1.06 | 1.10 / 1.07 / 1.02 |
+| Tilt 0.087 mrad (0.005°) | 1.15 / 1.10 / 1.06 | 1.06 / 1.04 / 1.00 |
+| Tilt 0.131 / 0.175 mrad (2 µm) | 1.09 / 1.07 | 1.01 / 0.98 |
+| σ = 0.10 mrad, tilt 0.087 mrad | **1.39 / 1.25** / 1.18 | 1.18 / 1.16 / 1.06 |
+| σ = 0.25 mrad, tilt 0.087 mrad | 1.04 / 1.02 / 1.01 | 1.00 / 0.99 / 0.97 |
+| 0.7 × 0.10 + 0.3 × 0.35 mrad mixture | 1.25 / 1.18 / 1.11 | same |
+| 0.5 × 0.10 + 0.5 × 0.25 mrad mixture | 1.20 / 1.14 / 1.08 | same |
+| 0.8 × 0.175 + 0.2 × 0.50 mrad halo | 1.09 / 1.06 / 1.03 | same |
+| θ_y window ±0.0875 / ±0.175 / ±0.35 mrad (nominal, 2 µm) | 1.09 / 1.08 / 1.05 | same |
+
+A tilt makes the pattern asymmetric, like photo 4b. Within the stated 0.005°
+it moves the stronger side by only +0.01. Order ±2 crosses 1.2 on one side
+only when the beam core is narrower than σ = 0.175 mrad (σ = 0.10 mrad, or a
+narrow-core mixture). A halo or a finite $\theta_y$ aperture lowers the
+contrast. The tilt controls keep the other three counts: at 0.087 mrad,
+order ±2 is ≤ 0.97 at Si(100) 5.70 MeV and ≤ 1.03 at Si(110) 1.87 MeV, and
+stays ≥ 1.22 at Si(111) 2.45 MeV over L.
+
+### Decision
+
+The open model puts order ±2 at the visibility edge (1.04–1.10 at the
+nominal beam and 2 µm, up to 1.25 one-sided for a narrower core with the
+stated tilt). The photograph also shows ±2 at the edge: one faint spot and
+one missing. The mismatch is within the film's nonlinearity and the beam's
+core width, which the source does not constrain beyond Δθ₀ ≈ 0.02°. It is
+not evidence of a kernel gap, so no kernel issue is filed. The electronic
+kernel sets the order-±2 contrast here; a 2D film comparison cannot test its
+strength more finely than this bound.
