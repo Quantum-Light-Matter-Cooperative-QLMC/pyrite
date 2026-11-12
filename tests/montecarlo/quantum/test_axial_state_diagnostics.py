@@ -238,19 +238,33 @@ def test_degenerate_subspace_population_is_basis_invariant():
     assert original == pytest.approx(rotated, abs=1e-12)
 
 
-def test_warm_started_sector_matches_unseeded_arpack():
+def test_warm_started_sector_and_dense_solve_match_unseeded_arpack(monkeypatch):
     grid = RealSpaceGrid((5.43, 5.43), (24, 24))
     x, y = grid.x[:, None], grid.y[None, :]
     pot = -20 * np.exp(-((x - 2.7) ** 2 + (y - 2.7) ** 2) / 0.3) + np.zeros(grid.shape)
-    base = transverse_spectrum(grid, pot, 5e6, (0.0, 0.0), 9)
     q = (1.31, -0.47)
+    dense = transverse_spectrum(grid, pot, 5e6, q, 9)  # plane-wave dense default
+    monkeypatch.setattr(diagnostics, "MAX_DENSE_MOMENTUM_DIMENSION", 0)  # matrix-free
+    base = transverse_spectrum(grid, pot, 5e6, (0.0, 0.0), 9)
     cold = transverse_spectrum(grid, pot, 5e6, q, 9)
     m = [round(v / (2 * np.pi / e)) for v, e in zip(q, grid.extent_ang, strict=True)]
     shift = np.exp(-2j * np.pi * (m[0] * x / grid.extent_ang[0] + m[1] * y / grid.extent_ang[1]))
     with mock.patch.object(diagnostics, "eigsh", side_effect=AssertionError("ARPACK fallback")):
         warm = transverse_spectrum(grid, pot, 5e6, q, 9, base.vectors * shift.reshape(-1, 1))
-    np.testing.assert_allclose(warm.energies_eV, cold.energies_eV, atol=1e-9)
     # Compare projectors on the lowest 8 states: basis-invariant within degeneracies.
     p_cold = cold.vectors[:, :8] @ cold.vectors[:, :8].conj().T
-    p_warm = warm.vectors[:, :8] @ warm.vectors[:, :8].conj().T
-    np.testing.assert_allclose(p_warm, p_cold, atol=1e-8)
+    for other in (warm, dense):
+        np.testing.assert_allclose(other.energies_eV, cold.energies_eV, atol=1e-9)
+        p_other = other.vectors[:, :8] @ other.vectors[:, :8].conj().T
+        np.testing.assert_allclose(p_other, p_cold, atol=1e-8)
+    np.testing.assert_allclose(dense.vectors.conj().T @ dense.vectors, np.eye(9), atol=1e-12)
+
+
+def test_momentum_potential_is_the_split_step_potential_operator():
+    grid = RealSpaceGrid((5.0, 4.0), (6, 4))
+    rng = np.random.default_rng(1124)
+    pot = rng.normal(size=grid.shape)
+    phi = rng.normal(size=grid.shape) + 1j * rng.normal(size=grid.shape)
+    expected = np.fft.fft2(pot * np.fft.ifft2(phi, norm="ortho"), norm="ortho")
+    actual = diagnostics.momentum_potential(pot) @ phi.ravel()
+    np.testing.assert_allclose(actual, expected.ravel(), atol=1e-13)

@@ -6,6 +6,8 @@ Unconverged sectors are returned as ``None`` for the canonical host fallback.
 
 from __future__ import annotations
 
+import functools
+
 import numpy as np
 from threadpoolctl import threadpool_limits
 
@@ -28,12 +30,9 @@ def _sector_bytes(n, count):
     return 12 * _block(n, count) * n * 16
 
 
-def solver_workspace_bytes(n, count):
-    """Device workspace for up to ``MAX_BATCH_SECTORS`` sectors per batch.
-
-    Capped by ``SOLVER_BUDGET_BYTES`` and a quarter of device memory, so smaller
-    GPUs keep admission headroom for propagation.
-    """
+@functools.cache
+def _device_cap():
+    """Quarter of total device memory; probed once (CUDA init is slow, #1124)."""
     cap = SOLVER_BUDGET_BYTES
     try:
         import cupy
@@ -41,7 +40,16 @@ def solver_workspace_bytes(n, count):
         cap = min(cap, cupy.cuda.Device().mem_info[1] // 4)
     except Exception:  # no usable CUDA device: only CUDA admission reads this
         pass
-    return min(cap, MAX_BATCH_SECTORS * _sector_bytes(n, count))
+    return cap
+
+
+def solver_workspace_bytes(n, count):
+    """Device workspace for up to ``MAX_BATCH_SECTORS`` sectors per batch.
+
+    Capped by ``SOLVER_BUDGET_BYTES`` and a quarter of device memory, so smaller
+    GPUs keep admission headroom for propagation.
+    """
+    return min(_device_cap(), MAX_BATCH_SECTORS * _sector_bytes(n, count))
 
 
 def _host(xp, value):

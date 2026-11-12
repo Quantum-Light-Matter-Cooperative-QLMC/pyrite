@@ -60,10 +60,25 @@ def test_level_density_batch_retains_complex_off_diagonal_entries(rolled):
     np.testing.assert_allclose(op.sum_batch(states, tilts), expected, atol=2e-12, rtol=2e-12)
 
 
+def test_cuda_dense_sector_solves_match_scalar_host():
+    cp = _cuda()
+    grid, potential, states, tilts = _case()
+    kwargs = dict(count=4, representation="energy_bins", energy_edges_eV=[-100, 0, 100])
+    host = AxialSpectralObservable(grid, potential, 5e6, (0, 0), **kwargs)
+    expected = sum(host(p, q) for p, q in zip(states, tilts, strict=True))
+    op = AxialSpectralObservable(grid, potential, 5e6, (0, 0), **kwargs)
+    destination = cp.zeros(op.recording_width)
+    op.defer_batch(cp.asarray(states), cp.asarray(tilts), destination)
+    op.flush()
+    np.testing.assert_allclose(cp.asnumpy(destination), expected, atol=1e-10, rtol=0)
+
+
 def test_cuda_deferred_recording_matches_scalar_host_with_sector_fallback(monkeypatch):
     cp = _cuda()
     from pyrite.montecarlo.channeling import _axial_spectral_batch as batch
 
+    # Route through the large-grid Chebyshev solver, as above 48 x 48.
+    monkeypatch.setattr(axial_state_diagnostics, "MAX_DENSE_MOMENTUM_DIMENSION", 0)
     grid, potential, states, tilts = _case()
     kwargs = dict(count=4, representation="energy_bins", energy_edges_eV=[-100, 0, 100])
     host = AxialSpectralObservable(grid, potential, 5e6, (0, 0), **kwargs)
