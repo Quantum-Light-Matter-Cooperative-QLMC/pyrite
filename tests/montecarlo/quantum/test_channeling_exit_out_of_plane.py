@@ -1,6 +1,8 @@
 """Out-of-plane-resolved planar exit distribution (cr-planar-exit-out-of-plane)."""
 
+import json
 from dataclasses import replace
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -22,6 +24,7 @@ from pyrite.montecarlo.channeling.exit_out_of_plane import (
 )
 
 ENERGY = 4e6
+GRIDNEV = Path(__file__).parents[2] / "data/channeling/gridnev-1987-si-planar-spots.json"
 GRID = {"n_cells": 8, "max_order": 4}
 
 
@@ -225,6 +228,44 @@ def test_cut_marginal_is_the_open_exit_distribution(si110):
     np.testing.assert_allclose(cut.marginal.weights, reference.weights, atol=1e-12)
     np.testing.assert_allclose(cut.angles_rad, reference.angles_rad, rtol=1e-12)
     assert np.all(cut.density_per_rad > -1e-9)
+
+
+@pytest.mark.slow
+def test_gridnev_1987_si110_spots_survive_in_the_film_cut():
+    """Si(110), total 1.87 MeV, 2 um: three spots in the theta_y = 0 cut.
+
+    Gridnev et al. (1987) photograph three spots (orders 0, +-1). With TDS and
+    electronic kernels the theta_y-integrated marginal is nearly smooth
+    (contrast < 1.15), but the 2D density a film records keeps them
+    (n_cells=128 study, #1109: 1.66/2.01 at orders 0/1; here 1.87/1.91).
+    """
+    gridnev = json.loads(GRIDNEV.read_text())
+    case = gridnev["cases"][1]
+    assert case["spots"] == 3
+    sigma = np.deg2rad(gridnev["beam"]["divergence_deg"]) / 2.0
+    kinetic = case["total_energy_MeV"] * 1e6 - M_E_EV
+    profile = planar_profile("silicon", tuple(case["plane_hkl"]), 293.15)
+    cut = out_of_plane_exit_cut(
+        profile,
+        kinetic,
+        gridnev["thickness_um"] * 1e4,
+        40.0,
+        divergence_rad=sigma,
+        n_cells=32,
+        max_order=8,
+        eta_steps_ang=(0.2, 0.8, 4.0),
+    )
+    marginal = cut.marginal
+    cut_contrast = {m: cut.local_contrast(m) for m in range(-3, 4)}
+    marginal_contrast = {
+        m: local_contrast(marginal.angles_rad, marginal.weights, marginal.order_spacing_rad, m)
+        for m in (-1, 0, 1)
+    }
+    visible = [m for m, value in cut_contrast.items() if value > 1.2]
+    assert visible == [-1, 0, 1]
+    assert min(cut_contrast[m] for m in visible) > 1.6
+    assert max(abs(cut_contrast[m] - 1.0) for m in (-3, -2, 2, 3)) < 0.05
+    assert max(marginal_contrast.values()) < 1.15
 
 
 def test_local_contrast_on_a_comb():
