@@ -294,7 +294,7 @@ reviewed verdicts for the diagnostic rows, not merely rerunning their entry poin
 | `collision_statistics_refinement.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Diagnostic |
 | `cross_reflection_coherence.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Diagnostic |
 | `dans_diffraction_oracle.py` | Remote CPU oracle; 3.20 s (one sample) | Optional Dans_Diffraction installation; packaged crystal definitions | Gate (explicit mode where applicable) |
-| `density_propagate_benchmark.py` | CPU solver; ~10 s for the default bands at 4 BLAS threads; `--loop cupy` needs a CUDA host (#1125) | Packaged physics/catalog data; CuPy for `--loop cupy` | Measurement record (no gate) |
+| `density_propagate_benchmark.py` | CPU solver; ~10 s for the default bands at 4 BLAS threads; `--backend cuda` needs a CUDA host (#1125) | Packaged physics/catalog data; CuPy for `--backend cuda` | Measurement record (no gate) |
 | `detector_solid_angle_check.py` | Remote CPU transport; 6.90 s (one sample) | Pinned tables/catalog | Gate only on the `n_side = 1` identity; broadening is report-only |
 | `elsepa_line_sensitivity.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Diagnostic |
 | `energy_loss_straggling_observables.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Diagnostic |

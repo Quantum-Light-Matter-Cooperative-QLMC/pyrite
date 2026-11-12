@@ -67,28 +67,47 @@ At H = 56 the restricted jump takes 8.7 ms. Of that, the free-flux diagonal of
 the 80 out-of-subspace slots costs 2.3 ms, the two grid maps 2.2 ms and the
 Bloch convolution about 1.3 ms; the rest is elementwise work.
 
-## GPU step prototype
+## GPU depth step
 
-[Machine-readable measurements](data/density-matrix-gpu-2026-11-11.json).
-Remote job 12011 ran revision `accb83407` on qlmc: an AMD Ryzen 9 9950X3D
+`propagate(backend="cuda")` runs the restricted Strang step on the CuPy device
+in fp64. The entry state, recording, reprojection and the result stay on the
+host. Free and overflow flux accumulate on the device and are flushed on
+record and reprojection steps, so the density crosses to the host only there
+(and on every step when `jump_source_observer` is set). The default `"cpu"`
+output is bit-identical to the host-only step.
+
+[Machine-readable measurements](data/density-matrix-gpu-2026-11-12.json).
+Remote job 12012 ran revision `18e3feb28` on qlmc: an AMD Ryzen 9 9950X3D
 with 8 CPUs allocated and an RTX 5080 (consumer Blackwell, fp64 at about 1/64
-rate). `--loop numpy cupy` runs the bare restricted Strang step, with no
-recording or stopping, on each array namespace. Flux totals stay on the
-device, with one sync per repeat. The table gives medians of three repeats
-after a 5-step warm-up, with `OPENBLAS_NUM_THREADS=4`; 8 threads gives the
-same figures within 6%.
+rate). `--backend cpu cuda` times the full `propagate` on each backend with the
+protocol above (no stopping), at `OPENBLAS_NUM_THREADS=4`.
 
-| H | host loop ms/step | CuPy loop ms/step | speedup |
+| H | CPU ms/step | CUDA ms/step | speedup |
 |---:|---:|---:|---:|
-| 24 | 2.80 | 1.21 | 2.3× |
-| 32 | 4.27 | 1.78 | 2.4× |
-| 40 | 6.82 | 2.20 | 3.1× |
-| 56 | 14.36 | 3.67 | 3.9× |
+| 24 | 3.02 | 1.55 | 1.9× |
+| 32 | 4.23 | 1.91 | 2.2× |
+| 40 | 6.27 | 2.34 | 2.7× |
+| 56 | 14.19 | 3.82 | 3.7× |
 
-The final density matches `propagate` to 2.6e-17 and the flux totals to
-1.6e-15. At 3.67 ms/step, a 120 µm Kephart solve at the anchor settings
-(19,200 steps) takes about 70 s on the GPU. On the box CPU it takes about
-280 s. No fp64-capable datacenter GPU was available to measure.
+The CUDA density matches CPU to 2.6e-17 and the total flux to 1.7e-15. The
+step-loop prototype that preceded it (job 12011, revision `accb83407`,
+`data/density-matrix-gpu-2026-11-11.json`) ran 1.21–3.67 ms/step on the
+same box; the production path adds per-step bookkeeping only.
+
+End to end, job 12013 ran the Kephart anchor (`checks/kephart_occupation.py
+--cases si110_17 si100_17 --margins 300 --orders 56 --cells 16 --dz 62.5
+--backend cuda`). The solves took 82 s and 74 s, against 511 s and 364 s on
+the laptop CPU and 2261 s and 1987 s for the stored remote records. Every
+occupation length, including the detector-weighted fits, matches the CPU run
+to 7e-10 relative, so the stored-record agreement (1.4e-5) is unchanged.
+
+Reprojection stays on the host and is not accelerated. With `--stopping 100`
+(eV/Å) and the default 1e-4 tolerance, the basis is rebuilt on every step, and
+both backends take 38–42 ms/step at H = 56 (4 µm, 160 steps). Of the CUDA
+solve's 6.1 s, host reprojection takes 3.5 s and propagator rebuilds 0.5 s.
+That stopping power is about 2500× physical silicon (~0.04 eV/Å at 17 MeV).
+Physical stopping at the same tolerance reprojects about 25 times in a 120 µm,
+19,200-step solve.
 
 ## Numba
 
