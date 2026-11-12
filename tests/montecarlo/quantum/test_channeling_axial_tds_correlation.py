@@ -182,6 +182,7 @@ def test_silicon_input_reproduces_andersen_table2_correlation_sums():
     [
         (lambda: silicon_string_correlations((1, 1, 0)), "100"),
         (lambda: silicon_string_correlations((0, 0, 1), -1), "nonnegative"),
+        (lambda: silicon_string_correlations((0, 0, 1), 25), "exceeds"),
         (lambda: correlated_strings(_string(), (PairCorrelation(-0.1, 1.0),)), "0, 1"),
         (lambda: correlated_strings(_string(), (PairCorrelation(1.2, 1.0),)), "0, 1"),
         (lambda: correlated_strings(_string(), (PairCorrelation(0.2, -1.0),)), "partner"),

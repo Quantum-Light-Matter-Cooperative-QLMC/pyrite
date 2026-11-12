@@ -19,7 +19,9 @@ $$
 
 so each correlated shell is one extra :class:`TdsString` (linear density
 ``partners * lambda``) and the existing sampler, loss and jump apply
-unchanged. ``c = 0`` adds nothing (bitwise the uncorrelated model); ``c = 1``
+unchanged. A tail record from a shell string carries the common mode ``v``
+as its displacement (a classical launch offset within the thermal spread).
+``c = 0`` adds nothing (bitwise the uncorrelated model); ``c = 1``
 with one partner doubles the rate (Andersen et al. 1982, Sec. 6).
 
 Validation: cr-axial-correlated-tds
@@ -127,8 +129,11 @@ def silicon_string_correlations(axis, partners: int = 10) -> tuple[PairCorrelati
     if isinstance(partners, bool) or int(partners) != partners or partners < 0:
         raise ValueError("partners must be a nonnegative integer")
     k, p = NIELSEN_WEBER_SI_ENVELOPE
+    available = _string_partners(axis)
+    if partners > sum(count for _, count in available):
+        raise ValueError("partners exceeds the enumerated string range")
     shells, left = [], int(partners)
-    for r2, count in _string_partners(axis):
+    for r2, count in available:
         if left == 0:
             break
         c = NIELSEN_WEBER_SI_300K.get(r2, k * float(r2) ** (-0.5 * p))

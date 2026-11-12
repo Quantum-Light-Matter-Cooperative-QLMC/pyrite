@@ -1,7 +1,7 @@
 # `cr-axial-correlated-tds`: correlated thermal displacements within an axial string
 
-**Status:** task-owner derivation (2026-11-11, #1045), awaiting fresh-context
-verification. Code: `src/pyrite/montecarlo/channeling/axial_tds_correlation.py`.
+**Status:** task-owner derivation (2026-11-11, #1045); fresh-context verdict
+`rederived` (below), anchored by the regression test. Code: `src/pyrite/montecarlo/channeling/axial_tds_correlation.py`.
 Research path: `checks/axial_outgoing_maps.py::material_fiber_channels(correlated_partners=…)`
 and `checks/axial_fiber_source.py` (`correlated_partners`, default 0).
 
@@ -103,7 +103,7 @@ thermal spread.
   scattering doubles (Andersen Sec. 6).
 - Small $c$: the pair kernel is $\approx c\,a^2(t\cdot t')\chi\chi'$,
   linear in $c$, but below $c\times$ the self kernel because
-  $e^{x}-1>x$. That is the origin of Andersen's
+  $e^{x}-1>x$. This is consistent with Andersen's
   $1+0.7(C-1)$ rather than $C$.
 - Negative $c$ is refused: the shell kernel would not be PSD on its own.
 
@@ -126,7 +126,7 @@ vector is then the string axis. Values were digitized from a 400 dpi render
 Further 300 K points from Fig. 4(b) are not string partners: (220) 0.105,
 (311) 0.086, (331) 0.075, (224) 0.062, (440) 0.054, (551) 0.038,
 (660) 0.030. Together with (400) and (800) they fit
-$c=0.381\,r^{-1.186}$ ($r$ in $a/4$, 10% rms). N&W state that the overall
+$c=0.381\,r^{-1.186}$ ($r$ in $a/4$, 8% relative rms). N&W state that the overall
 decay roughly follows the Debye $1/r$ law. String partners that N&W did not
 compute use this envelope:
 
@@ -135,8 +135,8 @@ compute use this envelope:
 
 **Cross-check with Andersen Table 2.** Over the six nearest string atoms
 (Andersen's definition) this input gives $C=1.238$ for ⟨100⟩ (Andersen:
-1.25) and $C=1.420$ for ⟨111⟩ (Andersen: 1.40). Andersen's $C$ evidently
-came from the same source. Ten partners (≈ $1/\alpha Z$) give 1.288 and 1.480.
+1.25) and $C=1.420$ for ⟨111⟩ (Andersen: 1.40). Andersen's ref. [19] is
+Nielsen & Weber (1980). Ten partners (≈ $1/\alpha Z$) give 1.288 and 1.480.
 The Debye model is not used: N&W and Andersen both note that it overstates
 transverse correlations in Si: the 300 K Debye curve of Fig. 4(b) lies below 0.7 at (111) ($c>0.3$) against the BCM 0.24.
 The input is for room temperature only.
@@ -177,7 +177,8 @@ All in `tests/montecarlo/quantum/test_channeling_axial_tds_correlation.py`:
   rejected (>20σ).
 - **Si input.** The six-partner $C$ is within 0.025 of Andersen Table 2. The
   nearest shells are N&W's direct values.
-- **Refusals.** Other axes, negative partner counts, and $c\notin[0,1]$.
+- **Refusals.** Other axes, negative partner counts, partner counts beyond
+  the enumerated string range, and $c\notin[0,1]$.
 - **Injected faults, all detected:** shell damping $(1-c)\to c$; shell
   variance $ca^2\to a^2$; partner multiplicity dropped; zero shells not
   skipped; and a perturbed N&W (400) value.
@@ -191,3 +192,97 @@ All in `tests/montecarlo/quantum/test_channeling_axial_tds_correlation.py`:
   are omitted (optional in #1045).
 - Si at 300 K only (N&W BCM); no temperature dependence.
 - Correlation is isotropic in the transverse plane, and $c\ge0$.
+
+## Fresh-context verification (2026-11-11)
+
+Independent verifier in a fresh context, at commit `c29a7339f`. The
+derivation was written first, from the ledger row, the docstrings,
+Andersen et al. (1982) Sec. 6 and Table 2, and Nielsen & Weber (1980)
+Eq. (15b) and Figs. 3(b) and 4(b). Only then were the implementation bodies,
+the wiring and the task-owner derivation read. No files were edited.
+
+- **Claim**: `cr-axial-correlated-tds`, `montecarlo/channeling/axial_tds_correlation.py::{PairCorrelation,correlated_strings,silicon_string_correlations}`.
+- **Filters**: units pass; limits pass; signs and conventions pass.
+- **Re-derivation**: `matches`.
+- **Verdict**: `rederived`. The anchor test is green (12 passed), so the
+  claim moves to `anchored`. Human sign-off remains in #277.
+
+### Independent derivation
+
+**Pair kernel.** In the sudden approximation the string phase fluctuation is
+$\delta V(t)=\varphi(t)e^{-it\cdot\mathbf r}\sum_jw_t(u_j)$. The Born–Markov
+per-length kernel is
+$\lambda\varphi\varphi'e^{-i(t-t')\cdot\mathbf r}\sum_j\mathbb E[w_t(u_0)w_{t'}(u_j)^*]$,
+summed over ordered pairs, so a shell with $m$ partners per atom counts $m$
+times. With $\mathrm{Var}(t\cdot u_0-t'\cdot u_j)=a^2(t^2+t'^2-2c\,t\cdot t')$,
+the pair term is $\chi_t\chi_{t'}(e^{ca^2t\cdot t'}-1)$.
+
+**Common-mode form.** Take $v\sim N(0,ca^2)$ and
+$w^{(c)}_t=e^{-(1-c)a^2t^2/2}(e^{-it\cdot v}-e^{-ca^2t^2/2})$. These
+reproduce the pair term exactly. Setting $t=k-G/2$ and $t'=k+G/2$ gives the
+stated $D_c(G)$, which is `overlap_transform` of $(\varphi_c,ca^2)$. Gain
+and loss come from one Kraus family.
+
+**Complete positivity.** For $c\ge0$ the shell is a Schur-product series
+of PSD kernels. For $c<0$ the diagonal is negative, so the refusal is
+correct. For $c>1$ the pair covariance is not PSD.
+
+**Limits.**
+- $c=0$ gives zero.
+- $c=1$, $m=1$ gives Andersen's factor of two.
+- Small $c$ gives a contribution linear in $c$.
+
+**Si data.** N&W Eq. (15b) gives $1-c$ for string partners, and Andersen's
+ref. [19] is N&W.
+
+**Diamond geometry.** Explicit lattice enumeration in $a/4$ units gives
+$r^2$ (partners):
+
+- ⟨100⟩: 16 (2), 64 (2), 144 (2), 256 (2), …
+- ⟨111⟩: 3 (1), 27 (1), 48 (2), 75 (1), 147 (1), 192 (2), 243 (1), 363 (1).
+
+The sets are the same from A and B sites and for equivalent axes.
+`_string_partners` matches this enumeration for $r^2\le400$.
+
+### Comparison with the implementation
+
+All items match.
+
+- Shell phase $\varphi e^{-(1-c)a^2q^2/2}$: a default-argument closure, so no late binding.
+- Variance $ca^2$, density $m\lambda$, same position: `dataclasses.replace`.
+- $c=0$ or $m=0$ returns the input object.
+- Refusals.
+- Loss through `overlap_transform`.
+- N&W values and envelope.
+- Wiring (`checks/axial_outgoing_maps.py`): the same shells go on every cell string; [110] and `tds="lattice"` are refused; the default 0 builds the strings as before.
+- Tail-launch indices stay consistent (`self.strings = channels.tds_strings`).
+
+### Independent numerical evidence
+
+Own scripts, in the session scratchpad (`v/check_*.py`).
+
+| Check | Result |
+|---|---|
+| Shell `StringChannel.loss` vs own adaptive `dblquad` of the original pair kernel ($\varphi=1.7(1+q^2/2)^{-3/2}$, $a^2=0.05$, off-centre string, $g=(0.8,1.25)$ Å⁻¹; $(c,m)$ = (0.05,2), (0.3,2), (0.7,1), (0.95,3)) | max rel. 1.0e-14 to 1.4e-15 (self 2.0e-9) |
+| Total rate, self + shell, random window state | rel. 2e-10 to 8e-10 |
+| PSD of the shell Γ | $c=0.05$–0.95: min eigenvalue > 0; $c=-0.3$: all negative (refusal justified) |
+| $c=1$, $m=1$ | loss `array_equal`; rate ratio exactly 2 |
+| Explicit 25-atom chain, ⟨111⟩ alternating geometry, OU correlation $e^{-\Delta z/3\,\text{Å}}$, Cholesky, A/B average, vs the sum of 13 shell kernels | $\lvert z\rvert\le1.48$ (1M and 2.5M samples, three transfer pairs including $t\cdot t'<0$); self alone rejected at 31–189σ |
+| Si $C$, six partners, own enumeration and digitization | ⟨100⟩ 1.238; ⟨111⟩ 1.4199 (Andersen 1.25, 1.40); ten partners 1.288, 1.480 |
+| Wiring, 4 MeV plane-wave rate ratio, six partners | ⟨100⟩ 1.1409, ⟨111⟩ 1.2568 |
+| Own N&W digitization (300 dpi): (111) / (400) / (800) | $c$ = 0.239–0.240 / 0.070–0.071 / 0.028–0.029; own envelope $0.382r^{-1.186}$ agrees with the code's within ≤1e-4 at every envelope partner |
+
+### Findings (none blocking), and how they were resolved
+
+1. A tail record from a shell string carries the common mode $v$, not an
+   atom position. This is now stated in the module docstring and the ledger
+   Notes. Its effect is at most a sub-$a$ launch offset.
+2. `silicon_string_correlations` silently capped `partners` at the
+   enumerated range (24 for ⟨100⟩, 48 for ⟨111⟩). It now refuses, and the
+   anchor test covers the refusal.
+3. The sudden-approximation truncation is adequately stated. The farthest
+   of ten partners reaches about 1 rad of $q_zz$, but has $c\le0.03$.
+4. Wording: the source of Andersen's $C$ is now definite (ref. [19]); the
+   0.7 factor is now "consistent with"; the envelope rms is now 8%.
+5. Negative $c$ is a representational limit only. All N&W string-partner
+   values are positive.
