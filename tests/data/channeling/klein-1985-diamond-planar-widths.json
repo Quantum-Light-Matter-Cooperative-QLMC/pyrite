@@ -1,0 +1,50 @@
+{
+  "source": {
+    "citation": "R. K. Klein, J. O. Kephart, R. H. Pantell, H. Park, B. L. Berman, R. L. Swent, S. Datz and R. W. Fearick, Phys. Rev. B 31, 68-92 (1985)",
+    "doi": "10.1103/PhysRevB.31.68",
+    "zotero_item": "XRHV9YJK",
+    "zotero_attachment": "3Q9K73K2",
+    "verified": "2026-11-11",
+    "method": "Table III (p. 84) and Secs. II C, III transcribed from the Zotero full-text cache of attachment 3Q9K73K2; the PDF itself was not on disk at transcription time, and the Table I text layer is scrambled. Re-check against the PDF before pinning a test to these values."
+  },
+  "material": "diamond",
+  "crystal": {
+    "type": "natural IIa, free from nitrogen-platelet defects",
+    "thickness_um": 23,
+    "cut": "normal to <100>"
+  },
+  "temperature": "not stated (room temperature assumed)",
+  "beam": {
+    "energy_spread_fraction_max": 0.0025,
+    "divergence_fwhm_mrad": {"16.9": [0.6, 0.4], "30.5": 0.3, "54.5": 0.3},
+    "divergence_note": "16.9 MeV: about 0.6 mrad FWHM horizontally and 0.4 vertically (elliptical); 30.5 and 54.5 MeV: below 0.3 mrad FWHM. Plane orientation relative to the ellipse not stated."
+  },
+  "detector": {
+    "resolution_fwhm_keV": {"16.9": 2.0, "30.5": 1.0, "54.5": 2.0},
+    "type": {"16.9": "Ge(Li)", "30.5": "intrinsic Ge", "54.5": "Ge(Li)"},
+    "acceptance": "4.9 mm diameter Ta collimator about one third of the way to the detector; distances not given in the cached text, so a point forward detector is assumed."
+  },
+  "analysis": {
+    "fit": "Background-subtracted spectra fitted with independent Lorentzian lines (Sec. IV); observed widths are the fitted Lorentzian FWHM of the detector-convolved spectrum.",
+    "theory": "Calculated linewidth 1: quadrature sum of coherence-length (optical potential), multiple-scattering Doppler, Bloch and detector-resolution widths (Sec. II C). Calculated linewidth 2 adds a 0.9 um defect coherence length.",
+    "authors_conclusion": "Calculated widths are much narrower than observed; widths observed with a synthetic diamond at 54 MeV are much narrower and in fair agreement with calculation, so the excess is attributed to incoherent scattering by defects with ~0.9-1 um spacing."
+  },
+  "multiple_scattering_mrad": {"54.5": 2.0, "16.9": 6.6, "note": "Authors' average in-plane multiple-scattering angle for 23 um (Eq. 22)."},
+  "widths_table3": {
+    "units": "keV",
+    "rows": [
+      {"plane": [1, 1, 0], "kinetic_energy_MeV": 16.9, "transition": [1, 0], "energy_keV": 23.3, "measured": 3.3, "uncertainty": 0.4, "calc_1": 2.3, "calc_2_defect": 2.5},
+      {"plane": [1, 1, 0], "kinetic_energy_MeV": 30.5, "transition": [1, 0], "energy_keV": 60.1, "measured": 6.0, "uncertainty": 0.3, "calc_1": 3.6, "calc_2_defect": 5.8},
+      {"plane": [1, 1, 0], "kinetic_energy_MeV": 30.5, "transition": [2, 1], "energy_keV": 35.3, "measured": 5.2, "uncertainty": 0.3, "calc_1": 2.2, "calc_2_defect": 4.4},
+      {"plane": [1, 1, 0], "kinetic_energy_MeV": 30.5, "transition": [3, 2], "energy_keV": 24.5, "measured": 4.8, "uncertainty": 0.3, "calc_1": 5.7, "calc_2_defect": 6.7},
+      {"plane": [1, 1, 0], "kinetic_energy_MeV": 54.5, "transition": [1, 0], "energy_keV": 161.0, "measured": 20.5, "uncertainty": 0.6, "calc_1": 10.3, "calc_2_defect": 19.2},
+      {"plane": [1, 1, 0], "kinetic_energy_MeV": 54.5, "transition": [2, 1], "energy_keV": 103.8, "measured": 19.2, "uncertainty": 1.0, "calc_1": 6.5, "calc_2_defect": 15.6},
+      {"plane": [1, 1, 0], "kinetic_energy_MeV": 54.5, "transition": [3, 2], "energy_keV": 78.0, "measured": 15.6, "uncertainty": 0.6, "calc_1": 4.9, "calc_2_defect": 14.2},
+      {"plane": [1, 1, 0], "kinetic_energy_MeV": 54.5, "transition": [4, 3], "energy_keV": 60.3, "measured": 11.2, "uncertainty": 1.5, "calc_1": 8.3, "calc_2_defect": 15.1},
+      {"plane": [1, 0, 0], "kinetic_energy_MeV": 30.5, "transition": [1, 0], "energy_keV": 43.0, "measured": 5.9, "uncertainty": 0.3, "calc_1": 5.5, "calc_2_defect": 6.7},
+      {"plane": [1, 0, 0], "kinetic_energy_MeV": 54.5, "transition": [1, 0], "energy_keV": 119.8, "measured": 18.7, "uncertainty": 0.7, "calc_1": 7.3, "calc_2_defect": 15.3},
+      {"plane": [1, 0, 0], "kinetic_energy_MeV": 54.5, "transition": [2, 1], "energy_keV": 64.7, "measured": 23.8, "uncertainty": 3.0, "calc_1": 20.3, "calc_2_defect": 23.4}
+    ],
+    "note": "Column alignment of the cached text was checked by the energy/width/calc ordering of every row; Table I (energies and widths for all planes) supersedes Ref. 3 but is not transcribed because its cached text layer is scrambled."
+  }
+}

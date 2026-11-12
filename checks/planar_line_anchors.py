@@ -13,6 +13,11 @@ Datasets (transcribed with provenance under ``tests/data/channeling/``):
 * Azadegan et al., Phys. Rev. B 74, 045209 (2006): diamond (110) 1->0,
   42.5 um, observed FWHM including the stated CdTe resolution.
   ``azadegan-2006-diamond110-widths.json``.
+* Klein et al., Phys. Rev. B 31, 68 (1985): natural IIa diamond (110),
+  23 um, 16.9 and 30.5 MeV, Table III Lorentzian FWHM of the
+  detector-convolved lines (Ge 2 keV / 1 keV FWHM); the authors attribute
+  their excess widths to crystal defects.
+  ``klein-1985-diamond-planar-widths.json``.
 
 Model: :func:`~pyrite.montecarlo.channeling.channeling_spectrum` with the TDS
 plus electronic kernel at 293.15 K and the declared 300 eV collapse margin,
@@ -52,7 +57,7 @@ Runs: each case is a few minutes at the default grid; the full set and the
 grid/bin convergence arms belong on ``pyrite remote``::
 
     PYRITE_MC_BACKEND=cpu uv run python checks/planar_line_anchors.py \
-        --datasets genz kephart azadegan --out planar_anchors.json
+        --datasets genz kephart azadegan klein --out planar_anchors.json
 
 Validation: cr-line-shape, cr-yield-assembly
 """
@@ -185,7 +190,37 @@ def _azadegan_cases():
     ]
 
 
-DATASETS = {"genz": _genz_cases, "kephart": _kephart_cases, "azadegan": _azadegan_cases}
+def _klein_cases():
+    data = json.loads((DATA / "klein-1985-diamond-planar-widths.json").read_text())
+    fwhm_to_rms = 1.0 / 2.3548200450309493
+    out = []
+    for mev, transitions in ((16.9, ((1, 0),)), (30.5, ((1, 0), (2, 1), (3, 2)))):
+        divergence = np.mean(np.atleast_1d(data["beam"]["divergence_fwhm_mrad"][f"{mev:g}"]))
+        out.append(
+            Case(
+                f"klein_110_{mev:g}_23",
+                "klein",
+                "diamond",
+                (1, 1, 0),
+                mev * 1e6,
+                (float(data["crystal"]["thickness_um"]),),
+                divergence * 1e-3 * fwhm_to_rms,
+                data["beam"]["energy_spread_fraction_max"] * fwhm_to_rms,
+                0.0,
+                data["detector"]["resolution_fwhm_keV"][f"{mev:g}"] * 1e3,
+                True,
+                transitions,
+            )
+        )
+    return out
+
+
+DATASETS = {
+    "genz": _genz_cases,
+    "kephart": _kephart_cases,
+    "azadegan": _azadegan_cases,
+    "klein": _klein_cases,
+}
 
 
 def inplane_rms(model, profile, material, energy_eV, weights, sigma0, z_ang):
@@ -444,6 +479,7 @@ def report(paths, out):
     genz = json.loads((DATA / "genz-1996-diamond-planar.json").read_text())
     kephart = json.loads((DATA / "kephart-1989-si-planar-yields.json").read_text())
     azadegan = json.loads((DATA / "azadegan-2006-diamond110-widths.json").read_text())
+    klein = json.loads((DATA / "klein-1985-diamond-planar-widths.json").read_text())
     thick = genz["crystals"]["thickness_um"]
     rows = []
     for path in paths:
@@ -499,6 +535,17 @@ def report(paths, out):
                                     )
                                     base["measured_slope"] = fit["slope_text"]
                                     base["model_slope_estimate"] = m["yield_per_sr"] / z
+                        elif case["dataset"] == "klein":
+                            for kl in klein["widths_table3"]["rows"]:
+                                if (
+                                    kl["plane"] == case["hkl"]
+                                    and kl["transition"] == transition
+                                    and np.isclose(kl["kinetic_energy_MeV"], mev)
+                                ):
+                                    base["measured_fwhm"] = kl["measured"]
+                                    base["measured_fwhm_err"] = kl["uncertainty"]
+                                    base["measured_centroid"] = kl["energy_keV"]
+                                    base["klein_calc_1"] = kl["calc_1"]
                         else:
                             for az in azadegan["rows_42p5um"]:
                                 if np.isclose(az["kinetic_energy_MeV"], mev):
