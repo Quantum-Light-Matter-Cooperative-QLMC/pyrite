@@ -15,7 +15,9 @@ coherent step is exact phases. The jump term is applied in position space,
 where it is an elementwise product: blocks -> ``rho(x_a, x_b + j d)`` on a
 cell grid of ``n_grid`` points by an FFT over ``r``, times the cell kernel,
 and back. ``n_grid >= 3 H + 2`` keeps product momenta from aliasing into the
-band.
+band. The depth step evolves only the eigenstate slots that hold a subspace
+state in some block (the no-jump propagator vanishes elsewhere), mapping them
+straight to the cell grid; the cost then follows ``|S|``, not ``N`` (#1125).
 
 **Collapse rule (dechanneling).** Only the subspace ``S`` of states with
 ``E_perp < barrier + margin`` evolves. Jumps into in-basis states above the
@@ -44,6 +46,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 
 import numpy as np
+from scipy import fft as sp_fft
 from scipy.linalg import expm
 
 from ...materials.channeling.potential import PlanarProfile
@@ -154,6 +157,35 @@ class _Basis:
     energies: np.ndarray  # (n_cells, N)
     vectors: np.ndarray  # (n_cells, N, N); column n is state n in plane waves
     subspace: np.ndarray = field(init=False)  # (n_cells, N) bool, set by the solver
+    operators: dict = field(default_factory=dict, repr=False)  # cached _JumpOperators
+
+
+@dataclass(frozen=True)
+class _JumpOperators:
+    """Jump and loss maps restricted to eigenstate slots ``active`` of one basis.
+
+    ``active`` must hold every subspace state of every block; ``rest`` is its
+    complement, whose jump diagonals are free flux. ``to_grid[r] = W_r V_r[:, active]``
+    takes a slot-restricted density straight to cell-grid samples.
+    """
+
+    active: np.ndarray  # (A,) eigenstate slots
+    rest: np.ndarray  # (N - A,) the other slots
+    keep: np.ndarray  # (n_cells, A) bool, subspace membership of each active slot
+    to_grid: np.ndarray  # (n_cells, n_grid, A)
+    from_grid: np.ndarray  # (n_cells, A, n_grid), adjoint of to_grid
+    rest_grid: np.ndarray  # (n_cells, n_grid, N - A)
+    vectors: np.ndarray  # (n_cells, N, A), plane-wave columns of the active slots
+    loss: np.ndarray  # (n_cells, A, A), V^dagger C(x, x) V at unit kernel scale
+
+    def restrict(self, rho: np.ndarray) -> np.ndarray:
+        return np.ascontiguousarray(rho[:, self.active][:, :, self.active])
+
+    def expand(self, rho: np.ndarray) -> np.ndarray:
+        size = self.active.size + self.rest.size
+        full = np.zeros((rho.shape[0], size, size), dtype=complex)
+        full[:, self.active[:, None], self.active[None, :]] = rho
+        return full
 
 
 class DensityMatrixSolver:
@@ -213,6 +245,8 @@ class DensityMatrixSolver:
         x = np.arange(self.n_grid) * profile.period_ang / self.n_grid
         waves = self.kappa[:, None] + self.orders[None, :] * g
         self._waves = np.exp(1j * waves[:, None, :] * x[None, :, None])  # (r, a, h)
+        # (W W^dagger)^T per block: tr(W^dagger B W) = sum(B * gram) is the band trace.
+        self._wave_gram = np.swapaxes(self._waves @ _adjoint(self._waves), -1, -2)
         self._cell_kernel0 = kernel.cell_kernel(self.n_grid)
         self._loss_toeplitz = self._toeplitz(kernel.diagonal_coefficients)
         self.basis = self._basis(self.gamma0)
@@ -261,10 +295,66 @@ class DensityMatrixSolver:
             out[r][np.ix_(keep, keep)] = expm(-0.5j * dz / hbar_v * h_eff)
         return out
 
+    def _operators(self, *, restricted: bool) -> _JumpOperators:
+        """Jump/loss maps of the current basis on every slot or only subspace slots.
+
+        The restricted maps act on the slots holding a subspace state in some
+        block; :meth:`propagate` evolves only those, since the no-jump propagator
+        is zero outside ``S``. The cost per step then scales with ``|S|``, which the
+        fixed cutoff holds near constant as the plane-wave band grows (#1125).
+        """
+        basis = self.basis
+        key = "restricted" if restricted else "full"
+        if key not in basis.operators:
+            size = self.orders.size
+            mask = basis.subspace.any(axis=0) if restricted else np.ones(size, dtype=bool)
+            active, rest = np.flatnonzero(mask), np.flatnonzero(~mask)
+            vectors = np.ascontiguousarray(basis.vectors[:, :, active])
+            to_grid = self._waves @ vectors
+            basis.operators[key] = _JumpOperators(
+                active=active,
+                rest=rest,
+                keep=basis.subspace[:, active],
+                to_grid=to_grid,
+                from_grid=np.ascontiguousarray(_adjoint(to_grid)),
+                rest_grid=self._waves @ basis.vectors[:, :, rest],
+                vectors=vectors,
+                loss=_adjoint(vectors) @ self._loss_toeplitz @ vectors,
+            )
+        return basis.operators[key]
+
+    def _loss_rate(self, ops: _JumpOperators, rho: np.ndarray) -> float:
+        return float(np.einsum("rij,rji->", ops.loss, rho).real * self._scale)
+
     def loss_rate(self, rho: np.ndarray) -> float:
         """Full loss ``tr(C(x, x) rho)`` [1/angstrom], every momentum transfer included."""
-        plane = _sandwich(self.basis.vectors, rho)
-        return float(np.einsum("hk,rkh->", self._loss_toeplitz, plane).real * self._scale)
+        return self._loss_rate(self._operators(restricted=False), rho)
+
+    def _jump(self, ops: _JumpOperators, rho: np.ndarray) -> tuple[np.ndarray, np.ndarray, float]:
+        """:meth:`jump` on the slots of ``ops``; ``rho`` and ``J_S`` are slot-restricted.
+
+        Validation: cr-density-matrix-split-operator
+        """
+        # Everything below is linear in ``back``; the kernel scale and the grid
+        # normalisation are applied to the small outputs, not the grid arrays.
+        factor = self._scale / float(self.n_grid) ** 2
+        # The Bloch convolution runs on ``scipy.fft`` in place; callers may raise
+        # its thread count with ``scipy.fft.set_workers``.
+        product = sp_fft.fft(ops.to_grid @ rho @ ops.from_grid, axis=0, overwrite_x=True)
+        product *= self._cell_kernel0
+        back = sp_fft.ifft(product, axis=0, overwrite_x=True)
+        eigen = ops.from_grid @ back @ ops.to_grid * factor
+        diagonal = np.einsum("rnn->rn", eigen).real
+        free = np.zeros((self.n_cells, self.orders.size))
+        free[:, ops.active] = np.where(ops.keep, 0.0, diagonal)
+        if ops.rest.size:
+            outgoing = back @ ops.rest_grid
+            free[:, ops.rest] = (
+                np.einsum("ran,ran->rn", ops.rest_grid.conj(), outgoing).real * factor
+            )
+        inside = eigen * (ops.keep[:, :, None] & ops.keep[:, None, :])
+        band_trace = float(np.einsum("rab,rab->", back, self._wave_gram).real) * factor
+        return inside, free, band_trace
 
     def jump(self, rho: np.ndarray) -> tuple[np.ndarray, np.ndarray, float]:
         """Apply ``J(rho) = C(x, x') rho(x, x')`` and project it onto the basis.
@@ -276,17 +366,7 @@ class DensityMatrixSolver:
 
         Validation: cr-density-matrix-split-operator
         """
-        v = self.basis.vectors
-        grid = _sandwich(self._waves, _sandwich(v, rho))
-        product = np.fft.fft(grid, axis=0) * self._cell_kernel0 * self._scale
-        back = np.fft.ifft(product, axis=0)
-        plane = _sandwich(_adjoint(self._waves), back) / self.n_grid**2
-        eigen = _sandwich(_adjoint(v), plane)
-        keep = self.basis.subspace
-        free = np.where(keep, 0.0, np.einsum("rnn->rn", eigen).real)
-        inside = eigen * (keep[:, :, None] & keep[:, None, :])
-        band_trace = float(np.einsum("rhh->", plane).real)
-        return inside, free, band_trace
+        return self._jump(self._operators(restricted=False), rho)
 
     # -- states ----------------------------------------------------------------
 
@@ -489,7 +569,7 @@ class DensityMatrixSolver:
             for key in ("z", "E", "bands", "bound", "trace", "free", "overflow", "reprojection")
         }
 
-        def record(z: float) -> None:
+        def record(z: float, rho: np.ndarray) -> None:
             if record_metrics:
                 metric_history.append(density_metrics(rho, self.basis.energies))
             if spatial_history is not None and spatial_x is not None:
@@ -511,15 +591,19 @@ class DensityMatrixSolver:
             for key in ("free", "overflow", "reprojection"):
                 history[key].append(totals[key])
 
-        record(0.0)
+        record(0.0, rho)
+        # The no-jump propagator is zero outside S, so the step runs on the slots
+        # holding a subspace state; ``rho`` stays restricted to them until output.
+        ops = self._operators(restricted=True)
+        half, rho = ops.restrict(half), ops.restrict(rho)
         for step in range(1, steps + 1):
             rho = _sandwich(half, rho)
-            first, free1, band1 = self.jump(rho)
-            second, free2, band2 = self.jump(first)
-            loss1, loss2 = self.loss_rate(rho), self.loss_rate(first)
+            first, free1, band1 = self._jump(ops, rho)
+            second, free2, band2 = self._jump(ops, first)
+            loss1, loss2 = self._loss_rate(ops, rho), self._loss_rate(ops, first)
             if jump_source_observer is not None:
                 jump_source_observer(
-                    _sandwich(self.basis.vectors, dz * rho + 0.5 * dz**2 * first) * self._scale
+                    _sandwich(ops.vectors, dz * rho + 0.5 * dz**2 * first) * self._scale
                 )
             rho = rho + dz * first + 0.5 * dz**2 * second
             free_step = dz * free1 + 0.5 * dz**2 * free2
@@ -533,14 +617,16 @@ class DensityMatrixSolver:
                 gamma, beta = longitudinal_kinematics(energy)
                 if abs(gamma / gamma_basis - 1.0) > reprojection_tolerance:
                     before = float(np.einsum("rnn->", rho).real)
-                    rho, lost = self._reproject(rho, gamma)
+                    full, lost = self._reproject(ops.expand(rho), gamma)
                     bin_free(lost)
-                    totals["reprojection"] += before - float(np.einsum("rnn->", rho).real)
+                    totals["reprojection"] += before - float(np.einsum("rnn->", full).real)
                     gamma_basis, hbar_v = gamma, HBARC_EV_ANG * beta
                     self._scale = (self.beta0 / beta) ** 2
-                    half = self._propagators(dz, hbar_v)
+                    ops = self._operators(restricted=True)
+                    half, rho = ops.restrict(self._propagators(dz, hbar_v)), ops.restrict(full)
             if step % record_every == 0 or step == steps:
-                record(step * dz)
+                record(step * dz, ops.expand(rho))
+        rho = ops.expand(rho)
         bands = np.zeros((len(history["bands"]), self.orders.size))
         for row, populations in enumerate(history["bands"]):
             bands[row, : populations.size] = populations
