@@ -53,10 +53,11 @@ before and after photon-transport diagnostics.
 
 Replacing the classical PXR/CBS amplitudes with the exact second-order elements
 (quantum intermediate denominators and transition currents) changed
-`CXR_ESCAPE_MODEL` from v6 to v7 (`segment-mean-v7-quantum-elements`). Only
-the generation-dependent `case_content_key` and `parameter_sha256` hashes in
-`resolved.json` and `channeling.json` were re-pinned. The recorded output
-families in `outputs.json` hold within their tolerances on CPU/NumPy fp64.
+`CXR_ESCAPE_MODEL` from v6 to v7 (`segment-mean-v7-quantum-elements`). The generation-dependent `case_content_key` and `parameter_sha256` hashes in
+`resolved.json` and `channeling.json` were re-pinned. CI run 43293482496 exposed
+stale output pins: the legacy, EEDL-fallback, multilayer and coherent `spec`
+arrays, plus coherent `spec_coherent`, were regenerated on CPU/NumPy fp64
+at 5d8ad5277. Seeded transport is unchanged; existing tolerances are preserved.
 
 ## Always-on Ter–Mikaelian coupling (#439)
 
