@@ -276,11 +276,17 @@ class ElectronicChannels:
 
         Validation: cr-lindblad-jump-operators
         """
-        q_perp = np.asarray(q_perp, dtype=float)[..., None]
-        q2 = q_perp**2 + self.distant_qmin_inv_ang**2
+        q_perp = np.asarray(q_perp, dtype=float)
+        # Conservative support test; retain the per-shell boundary arithmetic below.
+        active = q_perp**2 + np.min(self.distant_qmin_inv_ang**2) <= np.max(
+            self.distant_qmax_inv_ang**2
+        )
+        result = np.zeros_like(q_perp)
+        q2 = q_perp[active, None] ** 2 + self.distant_qmin_inv_ang**2
         recoil = np.sqrt(HBARC_EV_ANG**2 * q2 + M_E_EV**2) - M_E_EV
         value = self.distant_ang2 / (np.pi * q2 * (1.0 + recoil / M_E_EV))
-        return np.where(q2 <= self.distant_qmax_inv_ang**2, value, 0.0).sum(axis=-1)
+        result[active] = np.where(q2 <= self.distant_qmax_inv_ang**2, value, 0.0).sum(axis=-1)
+        return result[()]
 
     def close_loss(self, loss_eV):
         """Close Møller ``dsigma/dW`` per electron [angstrom^2 / eV], summed over shells.
@@ -312,10 +318,12 @@ class ElectronicChannels:
         q = np.asarray(q_perp, dtype=float)
         x = 2.0 * (HBARC_EV_ANG * q) ** 2 / (M_E_EV * self.energy_eV)
         valid = x < 1.0
-        root = np.sqrt(np.where(valid, 1.0 - x, 1.0))
-        loss = (HBARC_EV_ANG * q) ** 2 / (M_E_EV * (1.0 + root))
+        root = np.sqrt(1.0 - x[valid])
+        loss = (HBARC_EV_ANG * q[valid]) ** 2 / (M_E_EV * (1.0 + root))
         jacobian = HBARC_EV_ANG**2 / (2.0 * M_E_EV * root)  # dW / dq_perp^2
-        return np.where(valid, self.close_loss(loss) * jacobian / np.pi, 0.0)
+        result = np.zeros_like(q)
+        result[valid] = self.close_loss(loss) * jacobian / np.pi
+        return result
 
     def weight(self, q_perp):
         """Total ``dsigma/d^2q_perp`` per electron [angstrom^4]."""
@@ -667,6 +675,40 @@ def _tds_diagonal(profile, sites, covariances, hbar_v, max_harmonic):
     return coefficients / (2.0 * np.pi * hbar_v) ** 2
 
 
+def _tds_order_strengths(element, cov, p, g, n_cells, harmonics, q_y):
+    """Reuse lattice-shifted potential samples across TDS harmonics.
+
+    ``p`` has the same two quadrature offsets in every momentum bin. A shift
+    by ``n g`` is therefore a slice offset of ``2 n n_cells``. For ``S_xy = 0``
+    the Gaussian also separates into a momentum factor and a q_y factor, so
+    two contractions replace the full covariance arrays for each harmonic.
+    The original covariance expression handles nonzero ``S_xy``.
+
+    Validation: cr-lindblad-jump-operators, cr-planar-exit-out-of-plane
+    """
+    sxx, sxy, syy = cov
+    nodes, weights = q_y
+    values = None if sxy != 0.0 else _potential(element, np.hypot(p[:, None], nodes))
+    damped_weights = weights * np.exp(-syy * nodes**2)
+    strengths = {}
+    for n in harmonics:
+        shift = 2 * n * n_cells
+        start, stop = max(0, -shift), min(p.size, p.size - shift)
+        bra, ket = slice(start, stop), slice(start + shift, stop + shift)
+        if values is None:
+            strengths[n] = _tds_strength(element, cov, p[bra], np.array([n * g]), q_y)[:, 0]
+            continue
+        plain = np.einsum("pi,pi,i->p", values[ket], values[bra], weights)
+        damped = np.einsum("pi,pi,i->p", values[ket], values[bra], damped_weights)
+        damping = np.exp(-0.5 * sxx * (p[ket] ** 2 + p[bra] ** 2))
+        strengths[n] = (
+            2.0
+            * (np.exp(-0.5 * sxx * (n * g) ** 2) * plain - damping * damped)
+            / (2.0 * np.pi) ** 2
+        )
+    return strengths
+
+
 def tds_kernel(
     profile: PlanarProfile,
     kinetic_energy_eV: float,
@@ -674,6 +716,7 @@ def tds_kernel(
     n_cells: int = DEFAULT_CELLS,
     max_order: int = DEFAULT_MAX_ORDER,
     beam_uvw=None,
+    out_of_plane_ang: float = 0.0,
 ) -> ScatteringKernel:
     """Return the Einstein-model thermal diffuse scattering kernel.
 
@@ -694,12 +737,24 @@ def tds_kernel(
     Limits: ``T -> 0`` keeps only zero-point TDS; ``a -> 0`` gives ``C = 0``;
     ``C ∝ 1/v^2``, so ``W ∝ 1/v`` with no ``gamma``.
 
-    Validation: cr-lindblad-jump-operators
+    ``out_of_plane_ang = eta > 0`` returns the out-of-plane transform used by
+    :mod:`.exit_out_of_plane`: the jump (gain) part carries ``cos(q_y eta)``,
+    the Fourier factor of the out-of-plane momentum ``q_y`` each jump adds,
+    while the diagonal (loss) is unchanged. That kernel is not positive
+    semidefinite and is not a Lindblad generator on its own.
+    This cosine-only transform requires ``S_xy = 0`` for every species;
+    a cross covariance needs the omitted odd-in-``q_y`` sine term.
+
+    Validation: cr-lindblad-jump-operators, cr-planar-exit-out-of-plane
     """
     _check_grid(n_cells, max_order)
     hbar_v = _kinematics(kinetic_energy_eV)
     g = profile.g_inv_ang
     covariances = _transverse_covariances(profile, beam_uvw)
+    if out_of_plane_ang != 0.0 and any(
+        abs(cov[1]) > 1e-12 * max(cov[0], cov[2]) for cov in covariances.values()
+    ):
+        raise ValueError("out_of_plane_ang requires zero thermal cross covariance S_xy")
     a2_min = min(_min_eigenvalue(cov) for cov in covariances.values())
     # Terms carry exp(-a^2 G^2 / 4) at most (a^2 the smallest eigenvalue of S);
     # stop below 1e-12.
@@ -709,22 +764,24 @@ def tds_kernel(
     bins = _transfer_bins(n_cells, max_order)
     sub, sub_w = _GL[2]
     p = (bins[:, None] * width + 0.5 * width * sub[None, :]).ravel()
-    q_y = _panels(_geometric_edges(0.05, _Q_MAX_INV_ANG), 8)
+    q_y = _out_of_plane_panels(_geometric_edges(0.05, _Q_MAX_INV_ANG), out_of_plane_ang)
     size = 2 * max_order + 1
     kernel = np.zeros((n_cells, size, size), dtype=complex)
     residue = bins % n_cells
     bra_order = (bins - residue) // n_cells
-    for n in range(-min(max_harmonic, 2 * max_order), min(max_harmonic, 2 * max_order) + 1):
+    harmonics = range(-min(max_harmonic, 2 * max_order), min(max_harmonic, 2 * max_order) + 1)
+    strengths = {
+        element: _tds_order_strengths(element, covariances[element], p, g, n_cells, harmonics, q_y)
+        for element in sites
+    }
+    for n in harmonics:
         ket_order = bra_order + n
         keep = np.abs(ket_order) <= max_order
         if not keep.any():
             continue
-        p_keep = p.reshape(bins.size, sub.size)[keep].ravel()
         entry = np.zeros(int(keep.sum()), dtype=complex)
         for element, density in sites.items():
-            strength = _tds_strength(element, covariances[element], p_keep, np.array([n * g]), q_y)[
-                :, 0
-            ]
+            strength = strengths[element][n]
             binned = strength.reshape(-1, sub.size) @ (0.5 * width * sub_w)
             entry += density[max_harmonic + n] * binned
         kernel[residue[keep], ket_order[keep] + max_order, bra_order[keep] + max_order] += entry
@@ -809,6 +866,21 @@ def _oscillatory_panels(edges: np.ndarray, delta: float):
     return q, w
 
 
+def _out_of_plane_panels(edges: np.ndarray, eta_ang: float, order: int = 8):
+    """``q_y`` nodes and weights for ``int dq_y f(q_y) cos(q_y eta)`` over ``edges``.
+
+    ``eta = 0`` returns the plain composite rule. Otherwise the panels and tail
+    taper of :func:`_oscillatory_panels` resolve the cosine, and the weights
+    carry ``cos(q_y eta)``.
+    """
+    if eta_ang < 0.0 or not np.isfinite(eta_ang):
+        raise ValueError("out_of_plane_ang must be finite and non-negative")
+    if eta_ang == 0.0:
+        return _panels(edges, order)
+    q, w = _oscillatory_panels(np.asarray(edges, dtype=float), eta_ang)
+    return q, w * np.cos(q * eta_ang)
+
+
 def _close_loss_nodes(channels: ElectronicChannels):
     """Loss nodes and weights over every close range, split at each shell's edges."""
     lower = float(np.min(channels.close_lower_eV))
@@ -889,6 +961,7 @@ def electronic_kernel(
     oscillators: MaterialShellOscillators | None = None,
     valence=None,
     c_axis: str | None = None,
+    out_of_plane_ang: float = 0.0,
 ) -> ScatteringKernel:
     """Return the local-density electronic-excitation kernel.
 
@@ -914,7 +987,11 @@ def electronic_kernel(
     diffusion ``int w(q) (1 - cos q_x Delta)``; ``q -> 0`` jumps do not
     decohere.
 
-    Validation: cr-lindblad-jump-operators, cr-valence-directional-loss
+    ``out_of_plane_ang`` weights the jump part by ``cos(q_y eta)`` and keeps
+    the full loss diagonal, as in :func:`tds_kernel`.
+
+    Validation: cr-lindblad-jump-operators, cr-valence-directional-loss,
+    cr-planar-exit-out-of-plane
     """
     _check_grid(n_cells, max_order)
     hbar_v = _kinematics(kinetic_energy_eV)
@@ -942,7 +1019,9 @@ def electronic_kernel(
     centre_x, centre_w = _panels(_geometric_edges(q_floor, 0.5 * width, 1.5), 8)
     centre_p = np.concatenate([-centre_x, centre_x])
     centre_pw = np.concatenate([centre_w, centre_w])
-    q_y, q_yw = _panels(_geometric_edges(q_floor, _Q_MAX_INV_ANG, 1.5), 8)
+    q_y, q_yw = _out_of_plane_panels(
+        _geometric_edges(q_floor, _Q_MAX_INV_ANG, 1.5), out_of_plane_ang
+    )
     # Abel-type weights onto the log-q table: A[l, t] = int_bin dp int dq_y w(q) hat_t(q).
     abel = np.zeros((bins.size, root.log_q.size))
     for index, (nodes, node_w) in enumerate(zip(p, p_w, strict=True)):

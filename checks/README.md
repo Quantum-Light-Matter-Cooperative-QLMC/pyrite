@@ -116,6 +116,7 @@ run through the collector.
 | `transition_radiation_omission.py` | Exact planar-stack transition radiation of every boundary crossing, bounded over the detector acceptance, against the production bremsstrahlung density for tens-of-keV and MeV scenes; per-band omission bias against `target_rse / 3` (#102). Small CPU runs. |
 | `transverse_recoil_527.py` | Transverse-recoil PXR prototype and detector-resolution observability table against Shi 2024 Fig. 2 (#527). |
 | `shaped_electron_1102.py` | Shaped-electron (two-component momentum superposition) CXR interference against its mixture: final-state trace, phase, offset and registration scans, two-beam Bloch check of Shi 2024 Fig. 5 (#1102); research reference, no gate. |
+| `planar_exit_out_of_plane.py` | Gridnev (1987) Si planar spot visibility: local contrast of the out-of-plane-resolved `θ_y = 0` exit cut and of the `θ_y`-integrated marginal for configured E/L/σ, grid, `η` and dz arms, with optional NPZ curves and a uniform-electronic-density (LDA) control (#1109); report only, no gate. |
 | `collision_statistics_refinement.py` | Measures collision-statistics changes under transport substep refinement. |
 | `cross_reflection_coherence.py` | Bounds the coherent-spectrum effect of omitted cross-reflection terms. |
 | `abtem_channeling_oracle.py` | abTEM frozen-phonon multislice of oriented Si (beam `[1 −1 n]` in the (110) planes; Einstein displacements), projected on PyRITE Bloch states. Compares `P_n(z)` with the TDS-only density solver and gates on `--tolerance`. Runs on CPU or GPU (`--device gpu`, CuPy) (#504; `oracle` group). |
@@ -325,6 +326,7 @@ reviewed verdicts for the diagnostic rows, not merely rerunning their entry poin
 | `transport_core_goldens.py` | Remote CPU capture/check; unmeasured | Existing reviewed golden directory; capture is not a validation verdict | Gate (explicit mode where applicable) |
 | `transverse_recoil_527.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Diagnostic |
 | `shaped_electron_1102.py` | CPU analytic/table; ~25–45 s | Packaged physics only (no catalog tables) | Diagnostic |
+| `planar_exit_out_of_plane.py` | `pyrite remote` GPU (CuPy) or CPU; 128 cells ≈ 1.5–3 min per arm on RTX 5080, 32 cells ≈ 80 s local CPU (4 workers, ~370 MB) | Packaged physics only (no catalog tables) | Diagnostic |
 | `xraylib_cascade_oracle.py` | Remote CPU oracle; 1.46 s (one sample) | Optional xraylib installation; packaged EADL cascade data | Gate (explicit mode where applicable) |
 
 ### First bounded table-recipe measurements

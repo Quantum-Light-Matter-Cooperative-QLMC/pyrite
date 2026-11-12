@@ -103,3 +103,72 @@ No single (energy, $L$) reproduces both panels with this potential. The classica
 ## Verdict
 
 `rederived`. The coherent amplitude, the divergence average, the open-system plane-wave diagonal with its sink bookkeeping, and the classical Verlet deflection all match an independent derivation and independent numerics to round-off or truncation level. The energy-convention claim (total energy) and the recorded 4 MeV quantum-panel discrepancy, which lies in the source rather than the code, are both confirmed.
+
+## Electronic spot investigation (#1109)
+
+These are implementation-context diagnostics, separate from the independent
+verdict above. Energies are total; kinetic is total minus $m_ec^2$.
+
+### Rate decomposition
+
+The [diagnostic record](../check-records/planar-exit-1109.json) uses
+Si(110), total 1.87 MeV, 32 Bloch cells. The electronic jump rate is
+4.4215/µm, but the retained rate into nearest orders $|\Delta h|\geq1$ is
+0.4164/µm: 0.04865 from valence distant, 0.07393 from core distant and
+0.29386 from close collisions ($\Delta h=\lfloor\Delta k_x/g+1/2\rfloor$).
+The retained electronic second angular moment is
+$1.416\times10^{-5}$ rad²/µm, against $7.273\times10^{-5}$ rad²/µm for TDS.
+Loss minus retained gain includes quadrature error (core distant
+−0.000124/µm), not a negative physical sink. The valence part matches an
+independent PENELOPE-2024 δ-plasmon estimate (Eq. 3.104; ledger
+`cr-lindblad-jump-operators`). Its 0.0097 mrad screening angle is not a
+typical kick: the per-event projected rms is 0.49 mrad.
+
+### Observable, not kernel
+
+A film records the 2D exit density. Electronic kicks are isotropic in
+$q_\perp$, so the scattered halo spreads over $\theta_y$ while the unscattered
+spots stay within the beam's $\sigma_y$. The $\theta_y$-integrated marginal
+returns that halo under every order and looks smooth. The `θ_y = 0` cut of
+`cr-planar-exit-out-of-plane` does not. Local contrast is the order-center
+value divided by its mean over $0.15<|\theta_x/s-m|<0.35$, $s=\lambda/d$.
+The [study record](../check-records/planar-exit-1109-study.json) holds 182
+rows, from SLURM arrays 11407/11412/11423/11432, with per-arm CPU/GPU parity
+1.04e-16.
+
+| Setting (photographed spots) | Cut contrast, orders 0/1/2 | Marginal, order 1 | Model spots (>1.2) |
+|---|---|---|---|
+| Si(100), 5.70 MeV (3) | 1.39 / 1.43 / 0.97 | 1.08 | 3 |
+| Si(110), 1.87 MeV (3) | 1.66 / 2.01 / 1.00 | 1.10 | 3 |
+| Si(110), 4.15 MeV (5) | 2.17 / 1.70 / 1.09 | 1.15 | **3** |
+| Si(111), 2.45 MeV (5) | 1.21 / 1.61 / 1.58 | 1.09 | 5 |
+
+Nominal: σ = 0.175 mrad (Eq. 2 of the paper: Δθ₀ = 0.02° is 2σ),
+L = 2 µm, 128 cells, `max_order` 8, dz 20 Å.
+
+**Numerical systematics** are below 2 % in contrast at each setting:
+64 vs 128 cells (Si(110) 1.87 MeV, orders 0/1: 1.687/1.991 → 1.657/2.008;
+32 cells 1.876/1.914), `max_order` 12, finer `η` panels and dz 10 Å.
+**Experimental systematics** (E ±1 %, L = 1.8/2.0/2.2 µm, σ =
+0.10/0.175/0.25 mrad) are rows of the study record. With a 1.2 threshold, the counts at
+σ = 0.175 mrad match in 9/9 E×L rows at Si(100) 5.70 and Si(110) 1.87 MeV, and
+in 6/9 at Si(111) 2.45 MeV. At σ = 0.25 mrad the weaker orders fall toward 1.1
+and the counts drop.
+
+**LDA control.** Replacing the electronic density by its cell average, in
+both gain and loss, changes the Si(110) 1.87 MeV cut contrasts from
+1.66/2.01 to 1.84/1.91. The marginal stays smooth (order 1: 1.10 → 1.09). The
+retained $|\Delta h|\geq1$ rate is 0.4161 versus 0.4157/µm. The local-density
+localization does not inject the order transfer.
+
+**Verdict (issue outcome (b)).** The erasure was a property of the 1D
+marginal observable. It was not a kernel artefact, so no kernel or model
+marker changed. **Remaining discrepancy:** Si(110) 4.15 MeV gives 3 spots
+against 5 photographed. Its order-±2 contrast is 1.04–1.13 at σ = 0.175 mrad
+over E ±1 % and L; it reaches 1.15–1.37 only at σ = 0.10 mrad and is
+0.99–1.03 at 0.25 mrad. A nonlinear film could show a 10 % shoulder.
+Gridnev's intensity scale is unknown, so this remains a quantified
+discrepancy, not a refutation. The slow regression
+`test_gridnev_1987_si110_spots_survive_in_the_film_cut` anchors the Si(110)
+1.87 MeV three-spot cut. Fresh-context review of the 2D observable
+(`filtered`) is pending.
