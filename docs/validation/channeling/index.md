@@ -55,6 +55,7 @@ cr-axial-absorbing-jump-unraveling
 cr-axial-fiber-unraveling
 cr-axial-continuum-tds-jumps
 cr-axial-tds-tail
+cr-axial-correlated-tds
 cr-axial-zone-handoff-physical
 cr-axial-depth-budget
 cr-axial-depth-calibration

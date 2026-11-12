@@ -166,8 +166,17 @@ def compare(merged: dict, data: dict) -> dict:
     axis = _axis(o)
     out = {
         "settings": {
-            k: o.get(k) for k in ("axis", "energy_eV", "thickness_ang", "tilt_deg", "absorption")
+            k: o.get(k)
+            for k in (
+                "axis",
+                "energy_eV",
+                "thickness_ang",
+                "tilt_deg",
+                "absorption",
+                "correlated_partners",
+            )
         },
+        "correlation": merged.get("info", {}).get("correlation"),
         "incidents": merged["incidents"],
         "line_energies": line_energies(merged, data),
     }
