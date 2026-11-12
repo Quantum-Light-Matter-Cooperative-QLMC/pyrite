@@ -22,7 +22,7 @@ from pyrite.detectors import EnergyBins
 
 numerics = pr.Numerics(
     sampling=FixedSampling(cxr_histories=64_000, brem_histories=64_000),
-    # Streaming needs a final line grid: give explicit energy bins.
+    # Optional: explicit energy bins skip the grid-resolution pass.
     energy_bins=EnergyBins(
         cxr=np.linspace(8000.0, 9000.0, 400), brem=np.arange(1000.0, 300001.0, 1000.0)
     ),
@@ -34,6 +34,18 @@ result = pr.simulate(scene, numerics=numerics)
 `result` has the same fields, case and identity digest as the default run.
 Spectra agree with it to floating-point summation order; transport counts
 (backscatter and hit fractions, segment count) are exact.
+
+## Automatic line grids
+
+Without explicit `energy_bins`, the line grid is resolved automatically from
+every electron's trajectories. Streaming then transports the scene twice: a
+first pass keeps only the compact per-segment data the grid needs and resolves
+the same grid as the default run, and a second pass scores on it. The extra
+pass costs one transport, plus one line evaluation on a two-point axis under
+the `resonance-population` bandwidth. A grid already in the line-grid cache
+skips it. Memory for that pass still grows with the electron count, at
+about 16 bytes per line segment, plus about 12 bytes per production line under
+the `resonance-population` bandwidth (24 with `PYRITE_FP64=1`).
 
 ## Choose the block size
 
@@ -82,8 +94,8 @@ These raise `ValueError` before any transport:
 
 - coherent emission, temporal profiles, photon transport and transition
   radiation;
-- channeling, adaptive precision, automatic line-grid resolution (no explicit
-  `energy_bins`), and GDF beams;
+- channeling, adaptive precision, windowed automatic line grids, and GDF
+  beams;
 - the lockstep transport core;
 - a `PlanarDetector`, `pyrite.phases.simulate_transport`, directional source
   scans, and batch executors.

@@ -416,7 +416,44 @@ def _direction_populations(case, segments, n_hat, Ne, abs_layers, groove, start,
     return populations
 
 
-def _measured_cxr_grid(payload, case, segments, n_hats, Ne, target_step, abs_layers, groove):
+class SegmentGridEvidence:
+    """What policy resolution reads from one joined segment population.
+
+    :class:`.streamed_line_grid.BlockGridEvidence` serves the same two
+    quantities accumulated over whole-electron blocks (#1001).
+    """
+
+    def __init__(self, case, segments, Ne, abs_layers=None, groove=None):
+        self.case, self.segments, self.Ne = case, segments, Ne
+        self.abs_layers, self.groove = abs_layers, groove
+
+    def sinc_spacing(self, n_hat, aliased_weight_limit):
+        """:func:`sinc_feature_spacing` of the line population along ``n_hat``."""
+        return sinc_feature_spacing(
+            self.segments,
+            n_hat,
+            electron_limit=self.Ne,
+            aliased_weight_limit=aliased_weight_limit,
+        )
+
+    def populations(self, n_hat, start, ceiling, profile):
+        """Every production line along ``n_hat`` over ``(start, ceiling)``."""
+        return _direction_populations(
+            self.case,
+            self.segments,
+            n_hat,
+            self.Ne,
+            self.abs_layers,
+            self.groove,
+            start,
+            ceiling,
+            profile,
+        )
+
+
+def _measured_cxr_grid(
+    payload, case, segments, n_hats, Ne, target_step, abs_layers, groove, *, evidence=None
+):
     """``resonance-population`` axis of this case (#192), under the ceiling cap.
 
     Uniform at the sinc-Nyquist step, or -- under ``resonance-local`` -- fine
@@ -429,6 +466,8 @@ def _measured_cxr_grid(payload, case, segments, n_hats, Ne, target_step, abs_lay
 
     Validation: line-grid-resonance-local-spacing
     """
+    if evidence is None:
+        evidence = SegmentGridEvidence(case, segments, Ne, abs_layers, groove)
     bandwidth = payload["bandwidth"]
     resolution = payload["resolution"]
     profile_enabled = bool(case.get("_profile_line_grid_stages", False))
@@ -440,9 +479,7 @@ def _measured_cxr_grid(payload, case, segments, n_hats, Ne, target_step, abs_lay
     direction_populations = []
     bandwidth_records = []
     for n_hat in n_hats:
-        populations = _direction_populations(
-            case, segments, n_hat, Ne, abs_layers, groove, start, ceiling, profile
-        )
+        populations = evidence.populations(n_hat, start, ceiling, profile)
         stage_started = perf_counter() if profile_enabled else 0.0
         _direction_stop, direction_record = case_cxr_stop_eV(
             case,
@@ -574,20 +611,12 @@ def _resolve_policy_cxr_grid(payload, case, segments, n_hat, Ne, abs_layers, gro
     )
 
 
-def _resolve_policy_grid(payload, case, segments, n_hats, Ne, abs_layers, groove, *, observation):
-    """Resolve one policy grid that serves every direction in ``n_hats``.
+def _policy_cache_key(payload, case, n_hats, *, observation):
+    """Speed-cache key of one policy grid, and the coherent dispersion law it read.
 
-    The uniform spacing is the finest any direction needs, and windowed or
-    measured seeds are the union over directions. ``observation``
-    distinguishes a physical detector's direction set from the case's own
-    scalar direction in the speed-cache key; the scalar grid and its cache
-    entries are unchanged.
+    The key reads only the policy and the case, never the segments, so a hit
+    needs no transport (#1001).
     """
-    profile_enabled = bool(case.get("_profile_line_grid_stages", False))
-    profile_started = perf_counter() if profile_enabled else 0.0
-    profile_rss_before = _resident_mib() if profile_enabled else None
-    for n_hat in n_hats:
-        _refuse_coherent_resolution(case, segments, n_hat, Ne, payload)
     windowed = payload.get("windows") is not None
     measured = payload["bandwidth"]["policy"] == RESONANCE_BANDWIDTH_POLICY
     keys = (
@@ -630,27 +659,69 @@ def _resolve_policy_grid(payload, case, segments, n_hats, Ne, abs_layers, groove
             "cluster_separation": COHERENT_JUMP_CLUSTER_SEPARATION,
             "oversampling": COHERENT_NYQUIST_OVERSAMPLING,
         }
-    key = coordinate_cache_key(payload, inputs)
+    return coordinate_cache_key(payload, inputs), dispersion_law
+
+
+def _cached_policy_grid(key):
+    """``(grid, record)`` of a usable speed-cache entry, or ``None``."""
     cached = cached_coordinates(key)
-    if cached is not None:
-        grid = _cached_grid(cached)
-        if grid is not None:
-            _warn_lineshape_precision(cached)
-            _warn_coherent_dispersion(cached)
-            record = {**cached, "cache": "hit", "cache_key": key}
-            if profile_enabled:
-                record["cxr_grid_profile"] = {
-                    "cache_hit": True,
-                    "resolution_wall_s": perf_counter() - profile_started,
-                    "rss_before_resolution_mib": profile_rss_before,
-                    "rss_after_resolution_mib": _resident_mib(),
-                }
-            return grid, record
+    if cached is None:
+        return None
+    grid = _cached_grid(cached)
+    if grid is None:
+        return None
+    _warn_lineshape_precision(cached)
+    _warn_coherent_dispersion(cached)
+    return grid, {**cached, "cache": "hit", "cache_key": key}
+
+
+def cached_policy_cxr_grid(case):
+    """The case's policy line grid from the speed cache alone, or ``None``.
+
+    Equal to what :func:`resolve_cxr_grid` returns on the same hit; live
+    streaming uses it to skip its grid transport pass (#1001).
+    """
+    # The scalar key never reads the direction.
+    key, _ = _policy_cache_key(case["line_grid_policy"], case, (), observation=False)
+    return _cached_policy_grid(key)
+
+
+def _resolve_policy_grid(
+    payload, case, segments, n_hats, Ne, abs_layers, groove, *, observation, evidence=None
+):
+    """Resolve one policy grid that serves every direction in ``n_hats``.
+
+    The uniform spacing is the finest any direction needs, and windowed or
+    measured seeds are the union over directions. ``observation``
+    distinguishes a physical detector's direction set from the case's own
+    scalar direction in the speed-cache key; the scalar grid and its cache
+    entries are unchanged. ``evidence`` (default: read from ``segments``)
+    supplies the sinc spacing and measured line populations; windowed and
+    coherent resolution read ``segments`` directly.
+    """
+    profile_enabled = bool(case.get("_profile_line_grid_stages", False))
+    profile_started = perf_counter() if profile_enabled else 0.0
+    profile_rss_before = _resident_mib() if profile_enabled else None
+    for n_hat in n_hats:
+        _refuse_coherent_resolution(case, segments, n_hat, Ne, payload)
+    if evidence is None:
+        evidence = SegmentGridEvidence(case, segments, Ne, abs_layers, groove)
+    windowed = payload.get("windows") is not None
+    measured = payload["bandwidth"]["policy"] == RESONANCE_BANDWIDTH_POLICY
+    key, dispersion_law = _policy_cache_key(payload, case, n_hats, observation=observation)
+    hit = _cached_policy_grid(key)
+    if hit is not None:
+        grid, record = hit
+        if profile_enabled:
+            record["cxr_grid_profile"] = {
+                "cache_hit": True,
+                "resolution_wall_s": perf_counter() - profile_started,
+                "rss_before_resolution_mib": profile_rss_before,
+                "rss_after_resolution_mib": _resident_mib(),
+            }
+        return grid, record
     limit = float(payload["resolution"]["aliased_weight_limit"])
-    spacings = [
-        sinc_feature_spacing(segments, n_hat, electron_limit=Ne, aliased_weight_limit=limit)
-        for n_hat in n_hats
-    ]
+    spacings = [evidence.sinc_spacing(n_hat, limit) for n_hat in n_hats]
     steps = [spacing[0] for spacing in spacings]
     target_step = min(steps)
     _, aliased_fraction, spacing_segments = spacings[steps.index(target_step)]
@@ -670,7 +741,15 @@ def _resolve_policy_grid(payload, case, segments, n_hats, Ne, abs_layers, groove
             )
         elif measured:
             grid, record, bandwidth_record = _measured_cxr_grid(
-                payload, case, segments, n_hats, Ne, target_step, abs_layers, groove
+                payload,
+                case,
+                segments,
+                n_hats,
+                Ne,
+                target_step,
+                abs_layers,
+                groove,
+                evidence=evidence,
             )
         else:
             grid, record = resolved_coordinates(payload, target_step, dtype=REAL)

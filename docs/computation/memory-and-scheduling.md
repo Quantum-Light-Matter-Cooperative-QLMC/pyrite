@@ -169,6 +169,17 @@ The pools use different per-worker budgets:
 
 The pipeline also **prefetches** two cases beyond its worker count, so a worker always has the next case queued. Each in-flight case is a host-resident segment payload the driver holds, so prefetch depth is charged against host RAM exactly like a worker rather than being treated as free.
 
+### Live streaming with an automatic line grid
+
+Live streamed scoring keeps segment memory proportional to the electron block,
+but an automatic line grid still needs evidence from every electron. Its grid
+pass keeps 16 bytes per line segment, plus three reals per production line under
+the `resonance-population` bandwidth. The sinc reduction peaks at about three
+times its samples, because it sorts them. At MeV this term dominates: about 122 kB per
+electron for h-BN at 5 MeV, 1 mm. Explicit `energy_bins` or a cached grid
+avoid it. Measurements are in
+[Live streamed scoring](../repo-design/compute/streamed-scoring.md#resolved-line-grids-memory-and-wall-time).
+
 ## Reading the runtime plan
 
 Before a sweep starts, the resolved topology and budgets are available as a runtime plan — the engine, the effective worker count, the per-worker memory budget, the prefetch depth, the representative chunk sizes, the backend and its device, any fallback reason, and both the requested and resolved resource policy.

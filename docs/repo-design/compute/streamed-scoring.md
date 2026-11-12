@@ -62,14 +62,15 @@ spectra) remains the default and the reference.
 
 Supported: incoherent line `spec`, characteristic lines and the EEDL or BremsLib
 continuum, including coupled BremsLib radiative transport, on the per-electron
-or CUDA core, with a fixed electron count and a final line grid.
+or CUDA core, with a fixed electron count and either a final line grid or a
+non-windowed `line_grid_policy` (see [Resolved line grids](#resolved-line-grids)).
 
 `streaming_refusal(case, live=True)` refuses the following before any transport:
 
 | Case key | Reason |
 |---|---|
 | `coherent_emission`, `temporal_profile`, `photon_transport`, bunch `transition_radiation` | Need every segment or history at once (shared with artifact streaming). |
-| `line_grid_policy`, `_diagnostic_line_grid` | The line grid is resolved from the whole transported population. |
+| windowed `line_grid_policy`, `_diagnostic_line_grid` | Window seed providers and the diagnostic derivation read the whole transported population. |
 | `adaptive_precision` | The electron count, and hence the normalization, is decided during the run. |
 | `transition_radiation` | Electron-block transport refuses it; artifact replay still streams per-history TR. |
 | `channeling`, `gdf_source` | Refused by electron-block transport. |
@@ -77,6 +78,43 @@ or CUDA core, with a fixed electron count and a final line grid.
 The lockstep core shares one generator across electrons and cannot run in
 blocks; pin `transport_core="per-electron"` or `"cuda"` (`"auto"` can resolve
 to lockstep at small electron counts).
+
+### Resolved line grids
+
+A `line_grid_policy` grid is resolved from the whole line population before
+any line is scored, so a streamed policy case runs two transport passes over
+the same electron blocks (#1001). Primary streams are addressed by
+`(seed, electron, draw)`, so both passes see the same histories; no disk is
+used.
+
+1. **Grid pass.** `runner/streamed_line_grid.py::BlockGridEvidence` keeps,
+   per block, only what policy resolution reads along the case direction: the
+   valid sinc `(width, t_L^2)` samples of every line row (16 bytes each) and,
+   for the `resonance-population` bandwidth, every production line's
+   `(energy, width, weight)` (three backend reals each). It then calls the
+   joined resolver (`cxr_grid._resolve_policy_grid`) with that evidence in
+   place of segments, so the grid, its record and its speed-cache entry are
+   the joined path's own.
+2. **Scoring pass.** Transport again and score each block on the resolved grid,
+   as for a final grid.
+
+A speed-cache hit (`cxr_grid.cached_policy_cxr_grid`) needs no trajectories,
+so it skips the grid pass. The output's private `_streamed_line_grid_pass`
+records whether the pass ran and how many evidence bytes it held.
+
+Equality: the sinc samples of consecutive whole-electron blocks concatenate to
+the joined samples, so the sinc spacing, and with it the uniform grid, is
+exact. `resonance-local` seeds are integer coverage counts. The
+`resonance-population` stop search sums line masses per collected chunk, and
+chunk boundaries follow the blocks, so its sums can differ from the joined
+path's in the last ulp. The stop is rounded up to a whole 100 eV step, so the
+grid differs only if a tail ratio lands within rounding of the truncation
+limit. The truncation audit and `line_grid_resolved` record match the joined
+path to summation order.
+
+Memory: segment rows still follow the block size, but the grid-pass evidence
+grows with the electron count. Windowed policies are refused because their
+seed providers read the whole population.
 
 ### Cascades
 
@@ -118,7 +156,11 @@ replay them under the new scheme.
 `tests/montecarlo/cascades/test_coupled_radiative_runner.py::test_streamed_scoring_matches_the_joined_coupled_run`
 compare streamed and joined spectra at `rtol=1e-12` over several block sizes,
 with unequal line and continuum populations and with coupled BremsLib straggled
-transport. `tests/montecarlo/transport/test_streamed_cascades.py` does the same
+transport. `tests/montecarlo/transport/test_streamed_line_grid.py` compares a streamed
+`sinc-nyquist` and a `resonance-local` policy grid with the joined path's: the
+grid bit for bit, spectra at `rtol=1e-12`, provenance records at summation
+order, and a cached grid skipping the grid pass.
+`tests/montecarlo/transport/test_streamed_cascades.py` does the same
 for shell cascades, uncoupled (to generation 2) and coupled, at block sizes 1,
 a nondivisor, `N` and above `N`, with `Ne` above and below `Ne_brem`.
 `tests/montecarlo/cascades/test_cascade_lineage.py` shows that blocked shell,
@@ -497,3 +539,58 @@ runs, so W's float32 continuum differs by up to 3.6e-5 of its peak at 262,144
 electrons. With `PYRITE_FP64=1` at 32,768 W electrons, memory-target blocks agree
 with the joined run to 5.4e-15 of the peak and a whole-run block is bitwise
 identical (2026-11-05).
+
+## Resolved line grids: memory and wall time
+
+`checks/streamed_line_grid_1001.sbatch` (jobs 12054 and 12055, code
+`0ca247990`, single runs, CUDA core, float32 scoring) measured the two-pass
+route of [Resolved line grids](#resolved-line-grids). The speed cache is
+disabled in every arm, so each one resolves its grid. Host peak is
+`ru_maxrss` (about 640 MiB before the run). Device figures are CuPy pool
+reserved / used MiB above the pre-run level.
+
+| Case | Arm | N | Block | Host peak | Device | Wall (s) | Grid (s) | Grid points |
+|---|---|---|---|---|---|---|---|---|
+| Si 300 keV, 10 µm, automatic policy | joined | 64,000 | | 1964 | 5965 / 2812 | 19.8 | 1.0 | 68,651 |
+| | streamed | 64,000 | 4,000 | 1029 | 1471 / 1272 | 21.2 | 2.8 (pass) | 68,651 |
+| | streamed | 64,000 | 16,000 | 1025 | 3364 / 1410 | 20.0 | 2.1 (pass) | 68,651 |
+| h-BN 5 MeV, 1 mm, `resonance-local` | joined | 2,048 | | 2329 | 9033 / 4184 | 81.1 | 6.3 | 135,846 |
+| | streamed | 2,048 | 512 | 1478 | 7804 / 1425 | 81.3 | 10.2 (pass) | 135,846 |
+
+Every streamed grid is bitwise equal to the joined one, and transport counts
+are exact. The largest per-bin relative spectrum difference is 1.9e-5 for Si and
+5.3e-5 for h-BN, both in `brem_wide`. That is float32 summation order, as in
+[Equivalence on CUDA](#equivalence-on-cuda); CPU tests agree at `rtol=1e-12`.
+Wall time costs 1 to 7% on Si and nothing measurable on h-BN, where scoring
+dominates. The grid pass replaces the joined path's transport and grid
+resolution, and the scoring pass's transport is cheap next to scoring.
+
+The grid pass alone (`grid-pass` mode), against N:
+
+| Case | N | Evidence (MB) | Host peak (MiB) | Device used (MiB) | Wall (s) |
+|---|---|---|---|---|---|
+| Si, automatic policy, block 4,000 | 16,000 | 18.9 | 798 | 181 | 1.2 |
+| | 64,000 | 75.8 | 991 | 177 | 2.9 |
+| | 256,000 | 303.3 | 1953 | 181 | 10.0 |
+| h-BN, `resonance-local`, block 512 | 512 | 62.5 | 1036 | 1355 | 4.0 |
+| | 2,048 | 250.3 | 1476 | 1353 | 10.3 |
+| | 8,192 | 1001.1 | 3124 | 3650 | 24.3 |
+
+Evidence grows linearly with N: about 1.2 kB per Si electron (74 segments at
+16 bytes) and about 122 kB per h-BN electron, of which roughly 50 kB is sinc
+samples and the rest production lines. Host peak above the pre-run level is
+about 4.5 times the evidence at the largest N. That run joined the blocks
+with a full copy and kept every input while sorting. The grid pass now joins
+into one preallocated array, releasing each block as it is copied, and the sinc
+reduction releases each input once its sorted copy exists. The result is
+unchanged. On 10^7 synthetic samples the reduction's peak fell from 4.1 to 3.0
+times the sinc evidence; the stable argsort's own workspace sets the rest. The
+grid pass has not been re-measured on the box since this change.
+Extrapolated, 10^6 h-BN primaries need about 120 GB of
+evidence, so at #879's scale the grid pass, not segment rows, bounds host
+memory. Device memory during the h-BN grid pass belongs to the two-node line
+evaluation. Its used peak rose at N = 8,192, probably from one heavy block, but
+this was not resolved. The measured h-BN stop also moves with N (288 keV at
+2,048 and the 966 keV ceiling at 8,192, which needs 368,084 points), as it does
+on the joined path.
+
