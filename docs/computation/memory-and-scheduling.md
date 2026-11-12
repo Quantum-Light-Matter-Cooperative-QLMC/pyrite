@@ -174,8 +174,8 @@ The pipeline also **prefetches** two cases beyond its worker count, so a worker 
 Live streamed scoring keeps segment memory proportional to the electron block,
 but an automatic line grid still needs evidence from every electron. Its grid
 pass keeps 16 bytes per line segment, plus three reals per production line under
-the `resonance-population` bandwidth. The sinc reduction holds about four
-times that at its peak. At MeV this term dominates: about 122 kB per
+the `resonance-population` bandwidth. The sinc reduction peaks at about three
+times its samples, because it sorts them. At MeV this term dominates: about 122 kB per
 electron for h-BN at 5 MeV, 1 mm. Explicit `energy_bins` or a cached grid
 avoid it. Measurements are in
 [Live streamed scoring](../repo-design/compute/streamed-scoring.md#resolved-line-grids-memory-and-wall-time).

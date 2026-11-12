@@ -15,7 +15,7 @@ from pyrite._cxr_grid_policy import resolve_cxr_grid_policy
 from pyrite.campaign.sweep import BeamSpec, Sweep, build_cases
 from pyrite.console.config import output_dir
 from pyrite.montecarlo import runner
-from pyrite.montecarlo.runner.streamed_line_grid import WINDOWED_POLICY_REFUSAL
+from pyrite.montecarlo.runner.streamed_line_grid import WINDOWED_POLICY_REFUSAL, _drain
 from pyrite.montecarlo.runner.streamed_scoring import run_case_streamed, streaming_refusal
 
 SPECTRA = ("spec", "spec_characteristic", "brem_wide", "brem")
@@ -132,3 +132,12 @@ def test_windowed_policies_are_refused_before_transport(monkeypatch):
     monkeypatch.setattr(runner, "_transport_case", None)
     with pytest.raises(ValueError, match="windowed line_grid_policy"):
         run_case_streamed(case, 10)
+
+
+def test_drain_joins_blocks_in_order_and_releases_them():
+    blocks = [np.arange(3.0), np.empty(0), np.arange(3.0, 7.0)]
+    expected = np.concatenate(blocks)
+    joined = _drain(blocks)
+    np.testing.assert_array_equal(joined, expected)
+    assert joined.dtype == expected.dtype and blocks == []
+    assert _drain([]).size == 0

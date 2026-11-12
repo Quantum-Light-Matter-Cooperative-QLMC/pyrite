@@ -44,3 +44,27 @@ def test_sinc_feature_spacing_uses_t_squared_weighted_alias_tail():
     expected_short_flight = 2.0 * np.pi * HBARC_EV_ANG / (1.0 / beta)
     assert spacing == pytest.approx(expected_short_flight)
     assert aliased == pytest.approx(0.5)
+
+
+def test_sample_reduction_consumes_its_input_and_matches_the_spacing():
+    """The memory-bounded reduction keeps the joined arithmetic (#1001)."""
+    from pyrite.montecarlo.spectrum.diagnostics import (
+        sinc_feature_samples,
+        sinc_spacing_from_samples,
+    )
+
+    rng = np.random.default_rng(3)
+    n = 500
+    v_hat = rng.normal(size=(n, 3))
+    v_hat /= np.linalg.norm(v_hat, axis=1)[:, None]
+    segments = {
+        "E_keV": rng.uniform(20.0, 300.0, n),
+        "L_ang": rng.uniform(10.0, 1e4, n),
+        "v_hat": v_hat,
+        "elec_id": rng.integers(0, 40, n),
+    }
+    n_hat = np.array([0.0, 0.0, 1.0])
+    expected = sinc_feature_spacing(segments, n_hat, electron_limit=30, aliased_weight_limit=1e-3)
+    samples = list(sinc_feature_samples(segments, n_hat, electron_limit=30))
+    assert sinc_spacing_from_samples(samples, aliased_weight_limit=1e-3) == expected
+    assert samples == []

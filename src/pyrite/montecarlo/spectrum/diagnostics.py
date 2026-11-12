@@ -76,8 +76,8 @@ def sinc_feature_spacing(
     """
     if not 0.0 <= float(aliased_weight_limit) < 1.0:
         raise ValueError("aliased_weight_limit must be in [0, 1)")
-    width, weight = sinc_feature_samples(segments, n_hat, electron_limit=electron_limit)
-    return sinc_spacing_from_samples(width, weight, aliased_weight_limit=aliased_weight_limit)
+    samples = list(sinc_feature_samples(segments, n_hat, electron_limit=electron_limit))
+    return sinc_spacing_from_samples(samples, aliased_weight_limit=aliased_weight_limit)
 
 
 def sinc_feature_samples(segments, n_hat, *, electron_limit=None):
@@ -110,15 +110,24 @@ def sinc_feature_samples(segments, n_hat, *, electron_limit=None):
     return width[valid], weight[valid]
 
 
-def sinc_spacing_from_samples(width, weight, *, aliased_weight_limit=0.01):
-    """The :func:`sinc_feature_spacing` quantile of valid ``(width, weight)`` samples."""
+def sinc_spacing_from_samples(samples, *, aliased_weight_limit=0.01):
+    """The :func:`sinc_feature_spacing` quantile of valid ``[width, weight]`` samples.
+
+    Consumes ``samples`` (emptied in place): each input array is released as
+    soon as its sorted copy exists, so the peak is the samples plus one sort
+    order and one sorted array (#1001). The arithmetic is unchanged.
+    """
     if not 0.0 <= float(aliased_weight_limit) < 1.0:
         raise ValueError("aliased_weight_limit must be in [0, 1)")
+    width, weight = samples
+    samples.clear()
     if width.size == 0:
         raise ValueError("cannot derive sinc spacing: diagnostic transport has no valid segments")
 
     order = np.argsort(width, kind="stable")
-    width, weight = width[order], weight[order]
+    width = width[order]
+    weight = weight[order]
+    del order
     cumulative = np.cumsum(weight)
     total = float(cumulative[-1])
     index = int(np.searchsorted(cumulative, float(aliased_weight_limit) * total, side="left"))

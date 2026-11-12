@@ -56,8 +56,8 @@ class BlockGridEvidence:
         bandwidth = payload["bandwidth"]
         self.band = (float(bandwidth["start_eV"]), float(bandwidth["stop_eV"]))
         self.measured = bandwidth["policy"] == RESONANCE_BANDWIDTH_POLICY
-        self._width: list[np.ndarray] = []
-        self._weight: list[np.ndarray] = []
+        self._width: list[np.ndarray] | None = []
+        self._weight: list[np.ndarray] | None = []
         self._populations: list = []
 
     def add(self, segs) -> None:
@@ -78,6 +78,8 @@ class BlockGridEvidence:
                 *self.band,
                 None,
             )
+        if self._width is None or self._weight is None:
+            raise RuntimeError("streamed sinc evidence was already reduced")
         self._width.append(width)
         self._weight.append(weight)
         self._populations.extend(populations)
@@ -85,7 +87,7 @@ class BlockGridEvidence:
     @property
     def nbytes(self) -> int:
         """Host bytes the evidence holds."""
-        arrays = [*self._width, *self._weight]
+        arrays = [*(self._width or ()), *(self._weight or ())]
         arrays += [
             array
             for population in self._populations
@@ -102,12 +104,13 @@ class BlockGridEvidence:
         from ..spectrum.diagnostics import sinc_spacing_from_samples
 
         self._check_direction(n_hat)
-        if len(self._width) != 1:  # join once; later calls reuse the joined arrays
-            self._width = [np.concatenate(self._width) if self._width else np.empty(0)]
-            self._weight = [np.concatenate(self._weight) if self._weight else np.empty(0)]
-        return sinc_spacing_from_samples(
-            self._width[0], self._weight[0], aliased_weight_limit=aliased_weight_limit
-        )
+        width, weight = self._width, self._weight
+        if width is None or weight is None:
+            raise RuntimeError("streamed sinc evidence was already reduced")
+        samples = [_drain(width), _drain(weight)]
+        del width, weight
+        self._width = self._weight = None
+        return sinc_spacing_from_samples(samples, aliased_weight_limit=aliased_weight_limit)
 
     def populations(self, n_hat, start, ceiling, profile):
         """Every accumulated production line over the policy band."""
@@ -116,6 +119,23 @@ class BlockGridEvidence:
         if not self.measured or (float(start), float(ceiling)) != self.band:
             raise ValueError("streamed line-grid evidence holds no lines for this band")
         return list(self._populations)
+
+
+def _drain(blocks: list[np.ndarray]) -> np.ndarray:
+    """Join ``blocks`` in order into one array, releasing each as it is copied.
+
+    Equal to ``np.concatenate(blocks)``; the peak is the result plus one block
+    rather than twice the total (#1001).
+    """
+    size = sum(block.size for block in blocks)
+    joined = np.empty(size, dtype=blocks[0].dtype if blocks else float)
+    offset = 0
+    blocks.reverse()
+    while blocks:
+        block = blocks.pop()
+        joined[offset : offset + block.size] = block
+        offset += block.size
+    return joined
 
 
 def resolve_streamed_line_grid(

@@ -579,9 +579,14 @@ The grid pass alone (`grid-pass` mode), against N:
 Evidence grows linearly with N: about 1.2 kB per Si electron (74 segments at
 16 bytes) and about 122 kB per h-BN electron, of which roughly 50 kB is sinc
 samples and the rest production lines. Host peak above the pre-run level is
-about 4.5 times the evidence at the largest N. The sinc reduction joins the
-blocks and then sorts, so it holds copies, the sort order and the cumulative
-sum together. Extrapolated, 10^6 h-BN primaries need about 120 GB of
+about 4.5 times the evidence at the largest N. That run joined the blocks
+with a full copy and kept every input while sorting. The grid pass now joins
+into one preallocated array, releasing each block as it is copied, and the sinc
+reduction releases each input once its sorted copy exists. The result is
+unchanged. On 10^7 synthetic samples the reduction's peak fell from 4.1 to 3.0
+times the sinc evidence; the stable argsort's own workspace sets the rest. The
+grid pass has not been re-measured on the box since this change.
+Extrapolated, 10^6 h-BN primaries need about 120 GB of
 evidence, so at #879's scale the grid pass, not segment rows, bounds host
 memory. Device memory during the h-BN grid pass belongs to the two-node line
 evaluation. Its used peak rose at N = 8,192, probably from one heavy block, but
