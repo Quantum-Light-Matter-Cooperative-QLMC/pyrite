@@ -359,7 +359,7 @@ call; persisted observation production can reuse compatible true-spatial factors
 `Sweep.cases(numerics=controls, physics=models, observation=observation)` binds
 the same request to every expanded scene without executing transport. Common
 run overrides apply before sweep axes; detector references follow each point's
-physical geometry. `quantum=` uses the same inherit/override/disable rules.
+physical geometry. `channeling=` uses the same inherit/override/disable rules.
 
 Legacy Scene run settings and detector response/scorer constructor arguments
 remain supported through compatibility adapters. Observation omission inherits

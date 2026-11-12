@@ -221,15 +221,13 @@ def test_native_request_reuses_and_resolves_before_identity(tmp_path, transports
 
 
 @pytest.mark.parametrize("embedded", [False, True])
-def test_quantum_observation_preserves_solver_settings_and_reuses_source(
+def test_channeling_observation_preserves_solver_settings_and_reuses_source(
     tmp_path, transports, embedded
 ):
-    from pyrite.quantum import QuantumDynamics, QuantumNumerics, QuantumRegion, QuantumSetup
-
-    setup = QuantumSetup(
-        region=QuantumRegion(kind="planar", plane_hkl=(1, -1, 0)),
-        dynamics=QuantumDynamics(kind="channeling"),
-        numerics=QuantumNumerics(basis_size=12, bloch_cells=8, step_ang=100.0),
+    channeling = pr.Channeling(
+        "planar",
+        plane=(1, -1, 0),
+        numerics=pr.ChannelingNumerics(basis_size=12, bloch_cells=8, step_ang=100.0),
         admission="accept-inaccurate",
     )
     scene = _scene(
@@ -238,27 +236,21 @@ def test_quantum_observation_preserves_solver_settings_and_reuses_source(
             "silicon", 5_000.0, tilt_deg=30.0, footprint=pr.geometry.Footprint(5.0, 5.0)
         ),
         physics=pr.Physics(radiative_model="uncoupled"),
-        quantum=setup if embedded else None,
+        channeling=channeling if embedded else None,
     )
-    # Independent legacy inputs describe the same production channeling case.
+    # Independent component inputs describe the same production channeling case.
     reference = api.simulate(
         scene.beam,
         scene.target,
         scene.detector,
-        physics=pr.Physics(
-            channeling_model="planar",
-            channeling_admission="accept-inaccurate",
-            channeling_plane=(1, -1, 0),
-            radiative_model="uncoupled",
-        ),
-        numerics=replace(
-            NUMERICS, channeling_basis_size=12, channeling_bloch_cells=8, channeling_dz_ang=100.0
-        ),
+        physics=pr.Physics(radiative_model="uncoupled"),
+        numerics=NUMERICS,
+        channeling=channeling,
         filters=scene.filters,
         acquisition=scene.acquisition,
     )
     store = ObservationStore("silicon", root=tmp_path)
-    overrides = {} if embedded else {"quantum": setup}
+    overrides = {} if embedded else {"channeling": channeling}
     first = produce_observation(scene, NUMERICS, store, **overrides)
     second = produce_observation(scene, NUMERICS, store, **overrides)
 
@@ -269,5 +261,4 @@ def test_quantum_observation_preserves_solver_settings_and_reuses_source(
     np.testing.assert_array_equal(
         second.observation.acquisition_image(), reference.acquisition_image()
     )
-    assert scene.quantum is (setup if embedded else None)
-    assert scene.physics.channeling_model == "off"
+    assert scene.channeling is (channeling if embedded else None)

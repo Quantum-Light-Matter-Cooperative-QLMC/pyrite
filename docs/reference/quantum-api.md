@@ -11,9 +11,9 @@ The entire quantum and channeling API, planar included, has `experimental`
 compatibility status and may change incompatibly in a minor release
 ([lifecycle](experimental-api.md)). Quantum channeling is also research
 software, not a validated production model. The production adapter
-admits only the existing planar Bloch density-matrix channeling recipe;
-unitary, MCWF, axial, and other configurations still explicitly refuse in
-`QuantumSetup.lower`. Direct diagnostic solvers do not imply production
+admits only the existing planar Bloch density-matrix channeling recipe, and
+axial cases only inside their calibrated envelope; the planar diagnostic
+bridge refuses unitary, MCWF and real-space knobs. Direct diagnostic solvers do not imply production
 admission. See the [planar](../guides/experimental-planar-channeling.md) and
 [axial](../guides/experimental-axial-channeling.md) workflow restrictions.
 
@@ -29,7 +29,7 @@ runtime factories stay under `pyrite.quantum`. See the
 | Role | Names | API status and persistence |
 | --- | --- | --- |
 | Portable source | `TransverseStateSpec` | Advanced-stable; `to_dict`/`from_dict`, canonical JSON and content digest retain schema `pyrite.quantum.transverse-state.v1`. Sampled `.npy` content stays external and is checked on runtime conversion. |
-| Configuration | `QuantumRegion`, `QuantumDynamics`, `QuantumNumerics`, `QuantumSetup` | Advanced-stable immutable values; existing constructors, pickle paths and production lowering are unchanged. These remain quantum-owned rather than duplicated in `pyrite.config`. |
+| Configuration | `Channeling`, `ChannelingNumerics` | Experimental frozen values (#1017): the single public channeling section passed as `simulate(..., channeling=...)` or `Scene(..., channeling=...)`; `channeling=None` is off. They lower to the stored flat `channeling_*` case record, so case keys are unchanged. Quantum-owned rather than duplicated in `pyrite.config`. |
 | Runtime state types | `TransverseState`, `SampledState`, `Superposition`, `MixedState`, `Translated`, `EntryState` | Advanced-stable diagnostic interfaces; nonportable wavefunctions, arrays, or mixtures, with no portable JSON contract. |
 | Runtime factories | `gaussian`, `hermite_gauss`, `laguerre_gauss`, `donut`, `bessel_gauss`, `airy`, `aperture_probe`, `from_array`, `from_abtem`, `superpose`, `mixture`, `translate` | Advanced-stable runtime interfaces; coherent superpositions add amplitudes, incoherent mixtures add weighted densities. `from_abtem` needs the caller's abTEM wave object. |
 | Planar source bridge | `PlanarStateProjection`, `project_planar_source`, `propagate_planar_source`, `score_planar_source` | Experimental diagnostic projection, evolution and radiation scoring; does not construct a production case. |
@@ -113,7 +113,7 @@ coherent_norm = np.sum(coherent_density) * grid.cell_area_ang2
 
 ## Density-matrix example: direct planar diagnostic
 
-The production `QuantumSetup` adapter supports planar Bloch density-matrix
+Production `Channeling(model="planar")` runs use planar Bloch density-matrix
 channeling, subject to the existing transport restrictions. This example
 instead runs the direct experimental solver, without transport or radiation
 scoring. Its deliberately small basis is an API smoke example, not a converged
@@ -138,8 +138,9 @@ x_ang = np.linspace(0.0, profile.period_ang, 16, endpoint=False)
 density_result = solver.propagate(10.0, 5.0, spatial_x_ang=x_ang)
 ```
 
-For portable-state projection use `QuantumSetup.project_state` or
-`project_planar_source`, followed by `propagate_planar_source` or
+For portable-state projection use
+`project_planar_source(state, channeling=Channeling("planar", plane=...), ...)`,
+followed by `propagate_planar_source` or
 `score_planar_source`. `impact="fixed"` retains positional coherence;
 `impact="averaged"` averages over lattice position. Projection's retained,
 free, and outside populations describe **entry**, not evolved escape. Scored
@@ -155,7 +156,7 @@ launched, standard errors, and cumulative flux fractions. Sixteen trajectories
 demonstrate the interface; they are insufficient for a quantitative comparison
 with the density-matrix expectation. Seed and electron indices retain their
 existing stream semantics. This direct MCWF run does not make
-`QuantumNumerics(method="mcwf")` production-admitted.
+MCWF production-admitted; `project_planar_source(..., method="mcwf")` refuses.
 
 ```python
 from pyrite.quantum import MCWFSolver
@@ -176,26 +177,27 @@ characteristic radiation and bremsstrahlung; it is not Cherenkov radiation.
 
 ### Production planar channeling
 
-`Physics(channeling_model="planar", channeling_plane=(h, k, l))` (CLI:
-`pyrite physics set NAME --channeling-model planar --channeling-plane H K L`)
+`simulate(..., channeling=Channeling("planar", plane=(h, k, l)))` (profile
+`[channeling]` table `model = "planar"`, `plane = [h, k, l]`; CLI:
+`pyrite profile physics set PROFILE --channeling-model planar --channeling-plane H K L`)
 admits the planar zone in `simulate` and profile runs; the packaged
 `channeling_demo` profile is a 17 MeV, 2 µm silicon example with a forward
 detector. `Result.channeling` holds CR in
 photons/(incident electron · eV · sr), or `None` when the zone is inactive;
 `Result.combined_cxr()` includes it. Profile runs persist a `channeling.h5`
-component that the analysis app can select. `channeling_basis_size`,
-`channeling_bloch_cells`, `channeling_dz_ang` and `channeling_zone_max_ang`
+component that the analysis app can select. `ChannelingNumerics(basis_size,
+bloch_cells, step_ang, zone_max_ang)` (the same `[channeling]` table keys)
 control the zone's numerical representation and require independent
 convergence checks. To run it, follow
 [Add planar channeling to a transport run](../guides/experimental-planar-channeling.md#add-planar-channeling-to-a-transport-run).
 
-`QuantumRegion(..., zone_max_length=Q_(2, "nm"))` and
-`QuantumNumerics(step_length=Q_(10, "nm"))` take explicit positive scalar Pint
+`ChannelingNumerics(zone_max_length=Q_(2, "nm"))` and
+`ChannelingNumerics(step_length=Q_(10, "nm"))` take explicit positive scalar Pint
 lengths for the zone cap and depth step. Each conflicts with its numeric
 `zone_max_ang`/`step_ang` spelling, reads back as a fresh Å quantity
 (`zone_max_length` is `None` when uncapped) and is replaced by
 `with_zone_max_length` (which also accepts `None`) or `with_step_length`. Numeric
-fields, pickles and the lowered `channeling_*` controls are unchanged;
+fields and the lowered `channeling_*` controls are unchanged;
 `basis_size` and `bloch_cells` stay counts.
 
 Diagnostic outputs keep their numeric fields. `PlanarStateProjection` adds
@@ -226,9 +228,9 @@ Admitted planar cases record `Case.channeling["admission"]` =
 on-axis line source at crystal thickness, not individual bins. Admitted axial
 records carry `depth_budget`, the free→free bound and evidence, as before.
 
-`channeling_admission="accept-inaccurate"` runs an unadmitted case. It is
-accepted by `Physics`, `Settings`, the profile key `channeling_admission`,
-CLI `--channeling-admission` and `QuantumSetup(admission=...)`. The default is
+`Channeling(admission="accept-inaccurate")` runs an unadmitted case. The
+profile `[channeling]` table key `admission`, CLI `--channeling-admission` and
+the stored `Settings.channeling_admission` record carry it. The default is
 `"admitted"`, and the opt-in requires a channeling model. Such a case:
 
 - warns at lowering;
@@ -326,7 +328,7 @@ Use `pyrite.experimental.quantum` for direct axial diagnostics and
 `pyrite.quantum` for runtime entry states. Configuration fields use bare numeric
 Å, eV and radians; the direct solver configuration is outside the runtime
 factory Pint boundary. Axial diagnostics remain experimental and do not enable
-`Physics(channeling_model="axial")` in production transport.
+`Channeling(model="axial")` outside its admitted envelope.
 
 ### Configuration and normalization
 

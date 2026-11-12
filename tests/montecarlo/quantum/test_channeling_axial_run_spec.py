@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from pyrite.campaign.axial_spec import (
+from pyrite.quantum._axial_spec import (
     AXIAL_MODEL_MARKER,
     axial_spec_identity,
     refuse_unverified_axial_run,

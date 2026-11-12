@@ -67,9 +67,7 @@ def calculation_defaults(kind: str) -> dict[str, Any]:
         secondary_threshold_eV=1000.0,
         radiative_cutoff_eV=1000.0,
         pair_production_model="penelope-2024",
-        channeling_plane=[0, 0, 1],
         transition_lattice_origin_ang=[0.0, 0.0, 0.0],
-        channeling_zone_max_ang=1000.0,
         max_reflections=10,
     )
     suggestions = {key: values[key] for key in policy.scalar_keys if values.get(key) is not None}

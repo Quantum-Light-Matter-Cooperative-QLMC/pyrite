@@ -17,12 +17,12 @@ import math
 from dataclasses import dataclass
 from importlib import import_module
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 
 from .._units import normalize_unit
-from . import QuantumSetup
+from ._channeling import Channeling
 from .state import TransverseStateSpec
 
 if TYPE_CHECKING:
@@ -46,24 +46,23 @@ def _positive(name: str, value: float, *, zero: bool = False) -> float:
     return number
 
 
-def _setup_supported(setup: QuantumSetup) -> None:
-    if not isinstance(setup, QuantumSetup):
-        raise TypeError("setup must be a QuantumSetup")
-    if setup.region.kind == "axial":
+def _channeling_supported(channeling: Channeling, representation: str, method: str) -> None:
+    if not isinstance(channeling, Channeling):
+        raise TypeError("channeling must be a Channeling")
+    if channeling.model == "axial":
         # #624 central admission is shared with all production consumers.
         # Do not construct planar kernels or allocate a quantum grid first.
         from ._admission import refuse_unverified_axial_run
 
         refuse_unverified_axial_run()
-    if (
-        setup.region.kind != "planar"
-        or setup.dynamics.kind != "channeling"
-        or setup.numerics.representation != "bloch"
-        or setup.numerics.method != "density-matrix"
-    ):
+    if representation not in ("bloch", "real-space"):
+        raise ValueError("unknown quantum representation")
+    if method not in ("unitary", "density-matrix", "mcwf"):
+        raise ValueError("unknown quantum propagation method")
+    if representation != "bloch" or method != "density-matrix":
         raise ValueError(
-            "planar source diagnostics require a planar channeling region and "
-            "Bloch density-matrix dynamics; axial/other solvers are not supported"
+            "planar source diagnostics require planar channeling with Bloch "
+            "density-matrix dynamics; axial/other solvers are not supported"
         )
 
 
@@ -109,7 +108,7 @@ class PlanarStateProjection:
     margin_eV: float
     incidence_rad: float
     impact: str
-    setup: QuantumSetup
+    channeling: Channeling
     plane_density: np.ndarray
     subspace_density: np.ndarray
     free_population: np.ndarray
@@ -166,8 +165,8 @@ def _solver_for(projection: PlanarStateProjection):
         projection.plane_hkl,
         projection.temperature_K,
         projection.kinetic_energy_eV,
-        projection.setup.numerics.basis_size,
-        projection.setup.numerics.bloch_cells,
+        projection.channeling.numerics.basis_size,
+        projection.channeling.numerics.bloch_cells,
         projection.margin_eV,
     )
     return DensityMatrixSolver(
@@ -181,7 +180,7 @@ def _solver_for(projection: PlanarStateProjection):
 def project_planar_source(
     state: TransverseStateSpec,
     *,
-    setup: QuantumSetup,
+    channeling: Channeling,
     crystal: str,
     kinetic_energy_eV: float,
     incidence_rad: float = 0.0,
@@ -189,11 +188,17 @@ def project_planar_source(
     temperature_K: float = 293.15,
     margin_eV: float | None = None,
     base_dir: str | Path | None = None,
+    representation: Literal["bloch", "real-space"] = "bloch",
+    method: Literal["unitary", "density-matrix", "mcwf"] = "density-matrix",
 ) -> PlanarStateProjection:
     """Project a portable source into the *existing* planar Bloch density solver.
 
+    ``channeling`` supplies the plane and zone numerics. ``representation``
+    and ``method`` select the diagnostic solver; only ``"bloch"`` with
+    ``"density-matrix"`` is implemented and the others refuse.
+
     The angle is signed and must already include the surface refraction
-    computed by :func:`pyrite.materials.channeling.entry.plane_incidence`
+    computed by :func:`pyrite.montecarlo.channeling.entry.plane_incidence`
     for an actual Scene. Neither the beam-frame orientation nor an arbitrary
     crystal alignment is inferred from the source specification.
 
@@ -201,7 +206,7 @@ def project_planar_source(
     ``'fixed'`` preserves coherent inter-order phase. A 2-D OAM beam has its
     in-plane momentum traced out and the planar solver cannot resolve OAM.
     """
-    _setup_supported(setup)
+    _channeling_supported(channeling, representation, method)
     if not isinstance(state, TransverseStateSpec):
         raise TypeError("state must be a TransverseStateSpec")
     if not isinstance(crystal, str) or not crystal.strip():
@@ -257,7 +262,7 @@ def project_planar_source(
     states = import_module("pyrite.montecarlo.channeling.states")
     planar_entry_density = states.planar_entry_density
 
-    plane = setup.region.plane_hkl
+    plane = channeling.plane
     assert plane is not None
     metadata = PlanarStateProjection(
         state_digest=state.digest,
@@ -268,7 +273,7 @@ def project_planar_source(
         margin_eV=margin,
         incidence_rad=float(incidence_rad),
         impact=impact,
-        setup=setup,
+        channeling=channeling,
         plane_density=np.empty((0,)),
         subspace_density=np.empty((0,)),
         free_population=np.empty((0,)),
@@ -290,7 +295,7 @@ def project_planar_source(
         margin_eV=margin,
         incidence_rad=float(incidence_rad),
         impact=impact,
-        setup=setup,
+        channeling=channeling,
         plane_density=_readonly(wave_density),
         subspace_density=_readonly(rho),
         free_population=_readonly(free),
@@ -339,9 +344,9 @@ def propagate_planar_source(
         ),
         zero=True,
     )
-    cap = projection.setup.region.zone_max_ang
+    cap = projection.channeling.numerics.zone_max_ang
     if cap is not None and depth > cap:
-        raise ValueError("depth_ang exceeds the quantum region's physical zone_max_ang")
+        raise ValueError("depth_ang exceeds the channeling zone's zone_max_ang")
     if type(record_every) is not int or record_every <= 0:
         raise ValueError("record_every must be a positive integer")
     if not isinstance(record_metrics, bool):
@@ -349,7 +354,7 @@ def propagate_planar_source(
     solver = _solver_for(projection)
     return solver.propagate(
         depth,
-        projection.setup.numerics.step_ang,
+        projection.channeling.numerics.step_ang,
         initial=projection.initial,
         stopping_eV_per_ang=stopping,
         record_every=record_every,
@@ -479,9 +484,9 @@ def score_planar_source(
             depth_ang, "angstrom", field="score_planar_source.depth_ang", expected="length"
         ),
     )
-    cap = projection.setup.region.zone_max_ang
+    cap = projection.channeling.numerics.zone_max_ang
     if cap is not None and depth > cap:
-        raise ValueError("depth_ang exceeds the quantum region's physical zone_max_ang")
+        raise ValueError("depth_ang exceeds the channeling zone's zone_max_ang")
     sample = _positive(
         "sample_ang",
         normalize_unit(
@@ -550,7 +555,7 @@ def score_planar_source(
         theta_rad,
         phi_rad,
         entry_initial=projection.initial,
-        dz_ang=projection.setup.numerics.step_ang,
+        dz_ang=projection.channeling.numerics.step_ang,
         sample_ang=sample,
         divergence_y_rad=float(divergence_y_rad),
         energy_spread_eV=float(energy_spread_eV),

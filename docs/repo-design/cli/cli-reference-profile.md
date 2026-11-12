@@ -726,6 +726,7 @@ Usage: pyrite profile numerics set [OPTIONS] PROFILE
   adaptive sampling with 'pyrite profile numerics adaptive-sampling enable PROFILE'.
 
 Options:
+  PROFILE
   --cxr-histories N               Fixed Monte Carlo electron histories used to estimate
                                   the CXR spectrum; setting it selects fixed counts.
                                   Adaptive sampling (the default) is restored by 'pyrite
@@ -746,19 +747,23 @@ Options:
   --maximum-fractional-energy-loss FRACTION
                                   Cap one row's fractional mean energy loss; positive
                                   values require midpoint.  [x>=0.0]
-  --channeling-basis-size INTEGER RANGE
-                                  Transverse plane-wave band |h| <= H (default 16).
-                                  [x>=1]
-  --channeling-bloch-cells INTEGER RANGE
-                                  Bloch-grid supercell size (default 16).  [x>=1]
-  --channeling-dz-ang FLOAT RANGE
-                                  Zone depth step in angstrom (default 250).  [x>0]
-  --channeling-zone-max-ang FLOAT RANGE
-                                  Zone length cap in angstrom (default first layer
-                                  thickness).  [x>0]
   -y, --yes                       Skip the standard-profile confirmation.
   --dry-run                       Validate and preview without saving.
   -h, --help                      Show this message and exit.
+
+Channeling options (profile [channeling] table):
+  --channeling-basis-size INTEGER RANGE
+                                  Transverse plane-wave band |h| <= H (table basis_size;
+                                  default 16).  [x>=1]
+  --channeling-bloch-cells INTEGER RANGE
+                                  Bloch-grid supercell size (table bloch_cells; default
+                                  16).  [x>=1]
+  --channeling-dz-ang FLOAT RANGE
+                                  Zone depth step in angstrom (table step_ang; default
+                                  250).  [x>0]
+  --channeling-zone-max-ang FLOAT RANGE
+                                  Zone length cap in angstrom (table zone_max_ang;
+                                  default first layer thickness).  [x>0]
 ```
 
 ## `pyrite profile numerics show`
@@ -1127,6 +1132,7 @@ Usage: pyrite profile physics set [OPTIONS] PROFILE
   Set PROFILE physics fields; validate and atomically save, or preview with --dry-run.
 
 Options:
+  PROFILE
   --straggling / --no-straggling  Enable or disable collision energy-loss straggling
                                   (restricted soft loss in shell mode).
   --inelastic-model [auto|continuous|shell-soft-hard]
@@ -1200,6 +1206,14 @@ Options:
                                   subshell cross sections, or the opt-in bote-salvat
                                   K/L/M fit (needs 'pyrite tables fetch bote-salvat';
                                   EEDL for higher shells).
+  --emission [incoherent|coherent|both]
+                                  CXR modes; cross-model constraints are validated
+                                  before saving.
+  -y, --yes                       Skip the standard-profile confirmation.
+  --dry-run                       Validate and preview without saving.
+  -h, --help                      Show this message and exit.
+
+Channeling options (profile [channeling] table):
   --channeling-model [off|planar]
                                   Planar quantum entrance zone (default off); requires
                                   plane, midpoint, uncoupled radiation and incoherent
@@ -1213,12 +1227,6 @@ Options:
                                   measured admission tables; accept-inaccurate runs any
                                   other case, acknowledging possibly very inaccurate
                                   results, marked unadmitted with no error budget.
-  --emission [incoherent|coherent|both]
-                                  CXR modes; cross-model constraints are validated
-                                  before saving.
-  -y, --yes                       Skip the standard-profile confirmation.
-  --dry-run                       Validate and preview without saving.
-  -h, --help                      Show this message and exit.
 ```
 
 ## `pyrite profile physics show`

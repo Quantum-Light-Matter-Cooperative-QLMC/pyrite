@@ -166,18 +166,22 @@ def _assert_output_values(actual, expected, path):
         )
 
 
-def _channeling_scene(physics_kwargs=None):
+def _channeling_scene(physics_kwargs=None, zone=None):
     import pyrite as pr
+    from pyrite.quantum import Channeling, ChannelingNumerics
 
     physics = pr.Physics(
         elastic_model="mott",
         inelastic_model="continuous",
         bremsstrahlung_model="eedl",
         radiative_model="uncoupled",
-        channeling_model="planar",
-        channeling_admission="accept-inaccurate",
-        channeling_plane=(1, -1, 0),
         **(physics_kwargs or {}),
+    )
+    channeling = Channeling(
+        "planar",
+        plane=(1, -1, 0),
+        numerics=zone or ChannelingNumerics(),
+        admission="accept-inaccurate",
     )
     return pr.Scene(
         pr.Beam(energy_keV=5000.0, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()),
@@ -190,6 +194,7 @@ def _channeling_scene(physics_kwargs=None):
         ),
         pr.Detector(),
         physics=physics,
+        channeling=channeling,
     )
 
 
@@ -214,11 +219,11 @@ def channeling_output_baseline():
     numerics = pr.Numerics(
         sampling=FixedSampling(cxr_histories=16, brem_histories=16),
         energy_bins=EnergyBins(**_CHANNELING_BINS),
-        channeling_basis_size=12,
-        channeling_bloch_cells=4,
-        channeling_dz_ang=500.0,
     )
-    case = build_case(_channeling_scene(), numerics)
+    from pyrite.quantum import ChannelingNumerics
+
+    zone = ChannelingNumerics(basis_size=12, bloch_cells=4, step_ang=500.0)
+    case = build_case(_channeling_scene(zone=zone), numerics)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", UserWarning)  # small basis: overflow warning
         transport = runner._transport_case(case, transport_core="per-electron")

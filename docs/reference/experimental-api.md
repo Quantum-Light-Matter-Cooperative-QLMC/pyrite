@@ -44,7 +44,8 @@ all research diagnostics can be used in production `Case` instances.
 | `PhotonTransport` | `config` | Experimental configuration; accepted cases and feature combinations remain governed by lowering. | Not yet admitted |
 | Scalar optical response from `materials.optical` | `materials` | Provisional optical/TR reference response: explicit source, interpolation intervals, isotropic scalar model, no material inference. | Not yet admitted |
 | Density-matrix/MCWF solvers, axial diagnostics and planar source bridge | `quantum` / `pyrite.quantum` | Experimental diagnostics. Only the existing planar density-matrix recipe is admitted to production; axial/coherent diagnostics are not. Runtime states are nonportable. | `experimental.quantum` |
-| `QuantumSetup`, `TransverseStateSpec`, runtime factories | `quantum` | **Advanced-stable** API contracts; scientific validation still separately bounded. | Intentionally excluded |
+| `Channeling`, `ChannelingNumerics` | `quantum` | Experimental channeling section for `simulate(..., channeling=...)` (#1017); replaced `QuantumSetup` without a deprecation window. | Intentionally excluded |
+| `TransverseStateSpec`, runtime factories | `quantum` | **Advanced-stable** API contracts; scientific validation still separately bounded. | Intentionally excluded |
 
 Physical parameter ranges, model assumptions, data restrictions, and backend
 limitations remain documented in the existing [planar](../guides/experimental-planar-channeling.md),

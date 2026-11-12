@@ -16,7 +16,8 @@ from pyrite.campaign.profiles import (
     variant_stem,
 )
 from pyrite.campaign.sweep import BeamSpec, Sweep
-from pyrite.materials.catalog import load_material_catalog
+from pyrite.materials.catalog import MaterialConfigError, load_material_catalog
+from pyrite.quantum._channeling import CHANNELING_FIELD_TABLE_KEYS
 from pyrite.results import Settings
 from tests.helpers.user_catalog import USER_CATALOG_FIXTURE
 
@@ -77,7 +78,7 @@ def test_channeling_identity_changes_only_for_enabled_zone(monkeypatch):
 @pytest.mark.parametrize(
     "values, match",
     [
-        ({"channeling_model": "planar"}, "requires channeling_plane"),
+        ({"channeling_model": "planar"}, "requires plane"),
         ({**PLANAR, "channeling_basis_size": 0}, "positive integer"),
         ({**PLANAR, "channeling_plane": [0, 0, 0]}, "nonzero"),
         ({**PLANAR, "radiative_model": "auto"}, "requires radiative_model"),
@@ -94,8 +95,13 @@ def test_catalog_retains_channeling_profile_fields(tmp_path):
     shutil.copytree(USER_CATALOG_FIXTURE, catalog_root, dirs_exist_ok=True)
     path = catalog_root / "profiles" / "hopg_short.toml"
     document = tomlkit.parse(path.read_text())
-    document.update(PLANAR)
+    document["radiative_model"] = "uncoupled"
     document["emission"] = "incoherent"
+    document["channeling"] = {
+        CHANNELING_FIELD_TABLE_KEYS[key]: value
+        for key, value in PLANAR.items()
+        if key in CHANNELING_FIELD_TABLE_KEYS
+    }
     path.write_text(tomlkit.dumps(document))
     catalog = load_material_catalog(catalog_root, profile="hopg_short")
     values = catalog.profile_numerics("hopg_short")
@@ -107,3 +113,15 @@ def test_catalog_retains_channeling_profile_fields(tmp_path):
     assert settings.channeling_plane == (1, -1, 0)
     assert settings.channeling_basis_size == 12
     assert settings.precision is None
+
+
+def test_catalog_refuses_flat_channeling_profile_keys(tmp_path):
+    catalog_root = tmp_path / "catalog"
+    shutil.copytree(DATA_DIR / "catalog", catalog_root)
+    shutil.copytree(USER_CATALOG_FIXTURE, catalog_root, dirs_exist_ok=True)
+    path = catalog_root / "profiles" / "hopg_short.toml"
+    document = tomlkit.parse(path.read_text())
+    document["channeling_model"] = "planar"
+    path.write_text(tomlkit.dumps(document))
+    with pytest.raises(MaterialConfigError, match=r"channeling_model was removed.*\[channeling\]"):
+        load_material_catalog(catalog_root, profile="hopg_short")

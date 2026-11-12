@@ -28,7 +28,7 @@ has historical omission rules: missing elastic means Mott, missing continuum
 means EEDL, missing radiative keys mean uncoupled, and a missing `channeling`
 record means amorphous transport (channeling off; #506). The `channeling` record
 and its `CHANNELING_MODEL` identity marker join a case and its content key only
-when `Physics.channeling_model="planar"`, so channeling-off payloads, keys and
+when a planar `pyrite.quantum.Channeling` section is selected, so channeling-off payloads, keys and
 RNG streams are unchanged. Profiles and checkpoints cannot select it until the
 persisted channel (#507). The direct transport API's
 ELSEPA default does not change an old case. Do not resolve `auto` again at scoring

@@ -63,29 +63,38 @@ def test_bundled_numerics_reference_restates_built_ins():
     assert "pyrite numerics create NAME --from default" in refused.stderr
 
 
-def test_unit_bearing_numerics_preset_resolves_to_canonical_values(_isolate_user_catalog):
+def test_unit_bearing_physics_preset_resolves_to_canonical_values(_isolate_user_catalog):
     write_preset(
         _isolate_user_catalog,
-        "numerics",
+        "physics",
         "unit-inputs",
-        'channeling_dz_ang = "0.1 nm"\nchanneling_zone_max_ang = "10 nm"\n',
+        'inelastic_cutoff_eV = "0.05 keV"\n',
     )
 
-    numerics = pyrite.config.load_numerics("unit-inputs", catalog=load_material_catalog())
-    assert numerics.channeling_dz_ang == 1.0
-    assert numerics.channeling_zone_max_ang == 100.0
+    physics = pyrite.config.load_physics("unit-inputs", catalog=load_material_catalog())
+    assert physics.inelastic_cutoff_eV == 50.0
 
 
-def test_unit_bearing_numerics_preset_rejects_wrong_dimensions(_isolate_user_catalog):
+def test_unit_bearing_physics_preset_rejects_wrong_dimensions(_isolate_user_catalog):
     write_preset(
         _isolate_user_catalog,
-        "numerics",
+        "physics",
         "bad-units",
-        'channeling_dz_ang = "2 keV"\n',
+        'inelastic_cutoff_eV = "2 nm"\n',
     )
 
-    with pytest.raises(MaterialConfigError, match="numerics.channeling_dz_ang.*length"):
+    with pytest.raises(MaterialConfigError, match="physics.inelastic_cutoff_eV.*energy"):
         load_material_catalog()
+
+
+def test_presets_have_no_channeling_section(_isolate_user_catalog):
+    # Channeling is the profile-only [channeling] table (#1017).
+    write_preset(_isolate_user_catalog, "numerics", "zone", "channeling_dz_ang = 100.0\n")
+    with pytest.raises(MaterialConfigError, match="channeling_dz_ang"):
+        load_material_catalog()
+    refused = invoke(command, ["numerics", "create", "z", "--channeling-dz-ang", "100"])
+    assert refused.exit_code == 2
+    assert "pyrite profile numerics set PROFILE --channeling-dz-ang" in refused.stderr
 
 
 def test_numerics_preset_resolves_into_profiles_with_provenance(_isolate_user_catalog):

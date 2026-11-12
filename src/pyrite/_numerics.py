@@ -208,6 +208,34 @@ def _optional_quantity(value: object, unit: str) -> "Quantity | None":
     return Q_(np.array(value, dtype=float), unit)
 
 
+#: Removed ``Physics`` channeling arguments (#1017) and their replacement.
+_REMOVED_PHYSICS_ARGUMENTS = {
+    name: f"pyrite.quantum.Channeling({key}=...) via simulate(..., channeling=...)"
+    for name, key in (
+        ("channeling_model", "model"),
+        ("channeling_plane", "plane"),
+        ("channeling_axial", "axial"),
+        ("channeling_admission", "admission"),
+    )
+}
+
+
+def _reject_removed_physics_arguments[T: type](cls: T) -> T:
+    """Name the ``Channeling`` replacement for removed ``Physics`` arguments."""
+    init = cls.__init__
+
+    @wraps(init)
+    def __init__(self, *args, **kwargs):
+        for name, replacement in _REMOVED_PHYSICS_ARGUMENTS.items():
+            if name in kwargs:
+                raise TypeError(f"Physics({name}=...) was removed; use {replacement}")
+        init(self, *args, **kwargs)
+
+    cls.__init__ = __init__  # ty: ignore[invalid-assignment]
+    return cls
+
+
+@_reject_removed_physics_arguments
 @dataclass(frozen=True, init=False)
 class Physics:
     """Choose emission and particle-interaction models, independently of sampling.
@@ -217,6 +245,8 @@ class Physics:
     spectrum and returns zeros for the last two). Transport model defaults and
     cutoff units are identical to the profile schema: cutoffs are in eV.
     Integration compatibility is checked when combined with :class:`Numerics`.
+    Channeling is not a Physics field: pass :class:`pyrite.quantum.Channeling`
+    as ``simulate(..., channeling=...)`` (#1017).
 
     Parameters
     ----------
@@ -295,31 +325,12 @@ class Physics:
         soft/hard transport. A deprecated-``"mott"`` case that resolves to
         shell soft/hard keeps elastic-only deflection, with a warning.
         ``"none"`` reproduces elastic-only transport bit for bit.
-    channeling_model
-        ``"off"`` (default) treats the crystal as amorphous for transport.
-        ``"planar"`` (ADR-0018) owns each electron from crystal entry in a
-        planar quantum channeling zone until it dechannels, then hands it to
-        native transport. Requires ``channeling_plane``, midpoint integration,
-        ``radiative_model="uncoupled"``, incoherent emission and no secondary
-        transport; see :class:`Numerics` for its zone numerics.
-    channeling_plane
-        Miller indices ``(h, k, l)`` of the channeling plane family; required
-        by, and only accepted with, ``channeling_model="planar"``.
-    channeling_admission
-        ``"admitted"`` (default) runs only planar or axial cases in the
-        repository admission tables, which carry a measured relative error
-        budget, and refuses every other case before transport.
-        ``"accept-inaccurate"`` acknowledges that a case outside the tables may
-        give very inaccurate results and runs it anyway; its case identity,
-        provenance and results are marked ``"unadmitted"`` with no error
-        budget. Physical-validity refusals (energy, bound states, thermal
-        data, solver windows) still apply. Requires a channeling model (#1105).
     transition_radiation
         ``"off"`` (default), ``"history"`` or ``"bunch"``: score planar-stack
         transition radiation from the transported boundary crossings as the
         separate ``spec_transition`` component (#103), per history or with
         coherent bunch (CTR) terms. Requires ``energy_model="midpoint"``;
-        excludes channeling.
+        excludes :class:`~pyrite.quantum.Channeling`.
         ``"two-beam"`` opts into experimental transported-history Maxwell
         PXR/DTR/CBS scoring (CPU, one perfect crystal layer and reflection).
         It replaces the line scorer and retains signed TR/line interference.
@@ -363,9 +374,6 @@ class Physics:
     pair_production_model: Literal["penelope-2024"] | None = None
     positron_transport: bool = False
     atomic_electron_deflection: Literal["kawrakow", "none"] = "kawrakow"
-    channeling_model: Literal["off", "planar", "axial"] = "off"
-    channeling_plane: tuple[int, int, int] | None = None
-    channeling_axial: Mapping[str, object] | None = None
     transition_radiation: Literal["off", "history", "bunch", "two-beam"] = "off"
     transition_lattice_origin_ang: tuple[float, float, float] | None = None
     shell_ionization_model: Literal["eedl", "bote-salvat"] = "eedl"
@@ -374,7 +382,6 @@ class Physics:
     mixed_c1: float | None = None
     mixed_c2: float | None = None
     mixed_max_step_um: float | None = None
-    channeling_admission: Literal["admitted", "accept-inaccurate"] = "admitted"
 
     def __init__(
         self,
@@ -391,9 +398,6 @@ class Physics:
         pair_production_model: Literal["penelope-2024"] | None = None,
         positron_transport: bool = False,
         atomic_electron_deflection: Literal["kawrakow", "none"] = "kawrakow",
-        channeling_model: Literal["off", "planar", "axial"] = "off",
-        channeling_plane: tuple[int, int, int] | None = None,
-        channeling_axial: Mapping[str, object] | None = None,
         transition_radiation: Literal["off", "history", "bunch", "two-beam"] = "off",
         transition_lattice_origin_ang: tuple[float, float, float] | None | _Unset = UNSET,
         shell_ionization_model: Literal["eedl", "bote-salvat"] = "eedl",
@@ -402,7 +406,6 @@ class Physics:
         mixed_c1: float | None = None,
         mixed_c2: float | None = None,
         mixed_max_step_um: float | None = None,
-        channeling_admission: Literal["admitted", "accept-inaccurate"] = "admitted",
         *,
         inelastic_cutoff: object = UNSET,
         secondary_threshold: object = UNSET,
@@ -438,6 +441,8 @@ class Physics:
     def __setstate__(self, state: dict[str, Any]) -> None:
         """Restore historical selector omissions independently of constructor defaults."""
         restored = {**HISTORICAL_SELECTOR_OMISSIONS, **state}
+        for name in CHANNELING_KEYS:  # removed fields (#1017); cases keep the record
+            restored.pop(name, None)
         for name, value in restored.items():
             object.__setattr__(self, name, value)
 
@@ -511,12 +516,6 @@ class Physics:
                     )
                 ),
             )
-        if self.channeling_plane is not None:
-            object.__setattr__(self, "channeling_plane", _miller(self.channeling_plane))
-        if self.channeling_axial is not None:
-            from .campaign.axial_spec import resolve_axial_spec
-
-            object.__setattr__(self, "channeling_axial", resolve_axial_spec(self.channeling_axial))
         if self.brem_source is None:
             object.__setattr__(self, "brem_source", "none")
         if self.brem_source not in {"mc", "external", "none"}:
@@ -577,7 +576,6 @@ class Physics:
         )
         validate_atomic_electron_deflection(self.atomic_electron_deflection)
         validate_shell_ionization_model(self.shell_ionization_model)
-        validate_channeling_physics(self, energy_model)
         validate_transition_physics(self, energy_model)
         if self.photon_transport is not None:
             if not isinstance(self.photon_transport, PhotonTransport):
@@ -587,6 +585,17 @@ class Physics:
 
 
 PHYSICS_FIELDS = tuple(f.name for f in fields(Physics))
+#: Channeling selectors shown and edited with the physics controls; the
+#: remaining channeling fields are zone numerics. Both live in the profile's
+#: ``[channeling]`` table and lower to :class:`pyrite.quantum.Channeling`.
+CHANNELING_PHYSICS_KEYS = (
+    "channeling_model",
+    "channeling_plane",
+    "channeling_axial",
+    "channeling_admission",
+)
+#: Profile/CLI ownership partition: physics-owned profile keys.
+PHYSICS_KEYS = (*PHYSICS_FIELDS, *CHANNELING_PHYSICS_KEYS)
 
 
 #: Removed ``Numerics`` arguments and the ``sampling=`` spelling replacing each.
@@ -594,6 +603,15 @@ _REMOVED_NUMERICS_ARGUMENTS = {
     "cxr_trials": "sampling=FixedSampling(cxr_histories=...)",
     "brem_trials": "sampling=FixedSampling(brem_histories=...)",
     "precision": "sampling=AdaptiveSampling(...)",
+    **{
+        name: f"pyrite.quantum.ChannelingNumerics({key}=...) via simulate(..., channeling=...)"
+        for name, key in (
+            ("channeling_basis_size", "basis_size"),
+            ("channeling_bloch_cells", "bloch_cells"),
+            ("channeling_dz_ang", "step_ang"),
+            ("channeling_zone_max_ang", "zone_max_ang"),
+        )
+    },
 }
 
 
@@ -636,14 +654,8 @@ class Numerics:
     ``energy_bins`` holds sampled true-photon energies; ``None`` uses catalog
     defaults.
     ``cxr_reflections`` controls reflection truncation and mosaic quadrature.
-    The ``channeling_*`` fields are the planar channeling zone's numerics, used
-    only with ``Physics(channeling_model="planar")``: ``channeling_basis_size``
-    is the plane-wave band ``|h| <= H`` of the transverse basis,
-    ``channeling_bloch_cells`` the Bloch-grid supercell size,
-    ``channeling_dz_ang`` the density-matrix depth step [angstrom] and
-    ``channeling_zone_max_ang`` an optional zone-length cap [angstrom] beyond
-    which still-channeled electrons are handed off (``None``: the first
-    layer's thickness).
+    Channeling-zone numerics belong to
+    :class:`pyrite.quantum.ChannelingNumerics`, not to Numerics.
     ``line_roulette`` opts an incoherent scalar-detector run into
     inverse-probability scoring of its CXR lines; ``None`` is analog scoring
     and adds nothing to case identity.
@@ -666,40 +678,9 @@ class Numerics:
     transport: "TransportNumerics | None" = None
     radiation: "RadiationNumerics | None" = None
     execution: "ExecutionConfig | None" = None
-    channeling_basis_size: int = 16
-    channeling_bloch_cells: int = 16
-    channeling_dz_ang: float = 250.0
-    channeling_zone_max_ang: float | None = None
 
     def __post_init__(self) -> None:
-        object.__setattr__(
-            self,
-            "channeling_dz_ang",
-            normalize_unit(
-                self.channeling_dz_ang,
-                "angstrom",
-                field="Numerics.channeling_dz_ang",
-                expected="length",
-            ),
-        )
-        if self.channeling_zone_max_ang is not None:
-            object.__setattr__(
-                self,
-                "channeling_zone_max_ang",
-                normalize_unit(
-                    self.channeling_zone_max_ang,
-                    "angstrom",
-                    field="Numerics.channeling_zone_max_ang",
-                    expected="length",
-                ),
-            )
         self._resolve_typed_groups()
-        validate_channeling_numerics(
-            self.channeling_basis_size,
-            self.channeling_bloch_cells,
-            self.channeling_dz_ang,
-            self.channeling_zone_max_ang,
-        )
         if not isinstance(self.sampling, (FixedSampling, AdaptiveSampling)):
             raise TypeError("sampling must be a FixedSampling or AdaptiveSampling")
         if isinstance(self.sampling, AdaptiveSampling) and self.transport_core == "lockstep":
@@ -921,76 +902,6 @@ def resolve_physics(physics: Physics | None, numerics: Numerics) -> Physics:
     return resolved
 
 
-def _miller(value: object) -> tuple[int, int, int]:
-    if isinstance(value, (str, bytes)) or not isinstance(value, Sequence) or len(value) != 3:
-        raise ValueError("channeling_plane must be three integer Miller indices")
-    if any(isinstance(v, bool) or not isinstance(v, (int, np.integer)) for v in value):
-        raise ValueError("channeling_plane must be three integer Miller indices")
-    hkl = (int(value[0]), int(value[1]), int(value[2]))
-    if hkl == (0, 0, 0):
-        raise ValueError("channeling_plane must be nonzero")
-    return hkl
-
-
-def _validate_channeling_admission(model: str, admission: object) -> None:
-    """Refuse an unknown admission value, or the opt-in without a model (#1105)."""
-    from .quantum._admission import CHANNELING_ADMISSION_DEFAULT, CHANNELING_ADMISSIONS
-
-    if admission not in CHANNELING_ADMISSIONS:
-        raise ValueError(f"channeling_admission must be one of {', '.join(CHANNELING_ADMISSIONS)}")
-    if model == "off" and admission != CHANNELING_ADMISSION_DEFAULT:
-        raise ValueError("channeling_admission requires a channeling model")
-
-
-def validate_channeling_physics(physics: "Physics", energy_model: str) -> None:
-    """Validate the channeling selector and its run-level compatibility (#506).
-
-    The zone is a one-way handoff into native transport; combinations whose
-    support would be non-trivial are refused before any work (ADR-0017
-    tier-3 rule). Per-case gates (material data, bound states, energy, axis
-    proximity, geometry) run in ``campaign.channeling_cases``.
-    """
-    model = physics.channeling_model
-    if model not in CHANNELING_MODELS:
-        raise ValueError(f"channeling_model must be one of {', '.join(CHANNELING_MODELS)}")
-    _validate_channeling_admission(model, physics.channeling_admission)
-    if model == "off":
-        if physics.channeling_plane is not None:
-            raise ValueError("channeling_plane requires channeling_model='planar'")
-        if physics.channeling_axial is not None:
-            raise ValueError("channeling_axial requires a matching channeling_model='axial'")
-        return
-    if model == "axial":
-        if physics.channeling_plane is not None:
-            raise ValueError("channeling_plane is planar-only; use channeling_axial.axis_uvw")
-        if physics.channeling_axial is None:
-            raise ValueError("channeling_model='axial' requires channeling_axial")
-        if energy_model != "midpoint":
-            raise ValueError("channeling_model='axial' requires energy_model='midpoint'")
-        if physics.radiative_model != "uncoupled":
-            raise ValueError("axial channeling requires radiative_model='uncoupled'")
-        if physics.secondary_threshold_eV is not None:
-            raise ValueError("axial channeling cannot transport secondaries")
-        if "coherent" in cast(tuple[str, ...], physics.emission):
-            raise ValueError("axial channeling currently requires incoherent emission")
-        return
-    if physics.channeling_axial is not None:
-        raise ValueError("channeling_axial requires channeling_model='axial'")
-    if physics.channeling_plane is None:
-        raise ValueError("channeling_model='planar' requires channeling_plane")
-    if energy_model != "midpoint":
-        raise ValueError("channeling_model='planar' requires energy_model='midpoint'")
-    if physics.radiative_model != "uncoupled":
-        raise ValueError(
-            "channeling_model='planar' requires radiative_model='uncoupled': coupled "
-            "radiative transport inside the zone is unsupported"
-        )
-    if physics.secondary_threshold_eV is not None:
-        raise ValueError("channeling_model='planar' does not support secondary transport")
-    if "coherent" in cast(tuple[str, ...], physics.emission):
-        raise ValueError("channeling_model='planar' supports incoherent emission only")
-
-
 def validate_transition_physics(physics: "Physics", energy_model: str) -> None:
     """Validate the transition-radiation selector against the run (#103).
 
@@ -1015,32 +926,6 @@ def validate_transition_physics(physics: "Physics", energy_model: str) -> None:
         return
     if energy_model != "midpoint":
         raise ValueError("transition_radiation requires energy_model='midpoint'")
-    if physics.channeling_model != "off":
-        raise ValueError(
-            f"transition_radiation does not support channeling_model={physics.channeling_model!r}"
-        )
-
-
-def validate_channeling_numerics(
-    basis_size: object, bloch_cells: object, dz_ang: object, zone_max_ang: object
-) -> None:
-    """Validate the planar channeling zone's numerical controls."""
-    for name, value in (
-        ("channeling_basis_size", basis_size),
-        ("channeling_bloch_cells", bloch_cells),
-    ):
-        if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
-            raise ValueError(f"{name} must be a positive integer")
-    for name, value in (("channeling_dz_ang", dz_ang), ("channeling_zone_max_ang", zone_max_ang)):
-        if value is None and name == "channeling_zone_max_ang":
-            continue
-        if (
-            isinstance(value, bool)
-            or not isinstance(value, (int, float))
-            or not np.isfinite(value)
-            or value <= 0.0
-        ):
-            raise ValueError(f"{name} must be finite and positive")
 
 
 def validate_atomic_electron_deflection(model: object) -> None:
@@ -1230,7 +1115,9 @@ def validate_profile_numerics(values: Mapping[str, object]) -> None:
     convergence_values: dict[str, Any] = {
         key: values[key] for key in CONVERGENCE_KEYS if key in values
     }
-    transport_values: dict[str, Any] = {key: values[key] for key in TRANSPORT_KEYS if key in values}
+    transport_values: dict[str, Any] = {
+        key: values[key] for key in TRANSPORT_KEYS if key in values and key not in CHANNELING_KEYS
+    }
     reflections = CxrReflections(**convergence_values)
     # Partial frozen overrides may inherit an explicit continuous/auto preset.
     # Full effective combinations are validated after preset/profile resolution.
@@ -1247,3 +1134,9 @@ def validate_profile_numerics(values: Mapping[str, object]) -> None:
         cxr_reflections=reflections,
     )
     resolve_physics(physics, numerics)
+    from .quantum._channeling import channeling_from_fields, validate_channeling_run
+
+    channeling = channeling_from_fields(
+        {key: values[key] for key in CHANNELING_KEYS if key in values}
+    )
+    validate_channeling_run(channeling, physics, numerics.energy_model)

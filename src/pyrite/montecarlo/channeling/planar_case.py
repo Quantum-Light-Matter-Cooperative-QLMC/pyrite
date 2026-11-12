@@ -5,7 +5,7 @@ planes in the same slab frame as native transport
 (:func:`~pyrite.montecarlo.channeling.handoff.case_plane_incidence`). A case
 is admitted only when every resolved field equals one entry of
 :data:`~pyrite.quantum._planar_envelope.ADMITTED_PLANAR_CASES`; otherwise it
-runs only under ``channeling_admission="accept-inaccurate"`` and its record is
+runs only under ``Channeling(admission="accept-inaccurate")`` and its record is
 ``{"status": "unadmitted"}`` with no error budget.
 
 Validation: cr-planar-fiber-unraveling

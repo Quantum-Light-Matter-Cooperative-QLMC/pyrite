@@ -21,13 +21,7 @@ def test_deleted_root_modules_are_gone_and_root_names_keep_identity():
     for old in ("states", "quantum_state", "planar_source", "_channeling_admission"):
         with pytest.raises(ModuleNotFoundError):
             importlib.import_module(f"pyrite.{old}")
-    for name in (
-        "QuantumRegion",
-        "QuantumDynamics",
-        "QuantumNumerics",
-        "QuantumSetup",
-        "TransverseStateSpec",
-    ):
+    for name in ("Channeling", "ChannelingNumerics", "TransverseStateSpec"):
         assert getattr(quantum, name) is getattr(pyrite, name)
 
 
@@ -41,16 +35,15 @@ def test_spec_and_configuration_keep_wire_identity():
     assert SCHEMA == "pyrite.quantum.transverse-state.v1"
     values = [
         spec,
-        quantum.QuantumRegion(kind="planar", plane_hkl=(1, 1, 0)),
-        quantum.QuantumDynamics(kind="channeling"),
-        quantum.QuantumNumerics(),
-        quantum.QuantumSetup(),
+        quantum.Channeling("planar", plane=(1, 1, 0)),
+        quantum.ChannelingNumerics(step_ang=100.0),
     ]
     for value in values:
         cls = type(value)
-        expected_module = "pyrite.quantum.state" if value is spec else "pyrite.quantum"
+        expected_module = "pyrite.quantum.state" if value is spec else "pyrite.quantum._channeling"
         assert cls.__module__ == expected_module
         assert getattr(importlib.import_module(expected_module), cls.__name__) is cls
+        assert getattr(quantum, cls.__name__) is cls
         assert pickle.loads(pickle.dumps(value)) == value
 
 
@@ -68,15 +61,14 @@ class BlockEngines(importlib.abc.MetaPathFinder):
 
 sys.meta_path.insert(0, BlockEngines())
 from pyrite import quantum
-from pyrite.quantum import (QuantumSetup, QuantumRegion, QuantumDynamics,
-                           QuantumNumerics, TransverseStateSpec)
+from pyrite.quantum import Channeling, ChannelingNumerics, TransverseStateSpec
 assert "MCWFSolver" in dir(quantum)
 assert "MCWFSolver" not in vars(quantum)
 assert "pyrite.materials.catalog" not in sys.modules
 assert set(quantum.__all__) <= set(dir(quantum))
 spec = TransverseStateSpec.recipe("gaussian", waist_ang=1.0, dimension=1)
 assert TransverseStateSpec.from_dict(spec.to_dict()) == spec
-QuantumSetup()
+Channeling("planar", plane=(1, 1, 0), numerics=ChannelingNumerics())
 """
     subprocess.run([sys.executable, "-c", script], check=True, capture_output=True, text=True)
 
@@ -94,7 +86,7 @@ from pyrite.montecarlo.channeling import states
 assert quantum.TransverseStateSpec is state.TransverseStateSpec
 assert quantum.gaussian is states.gaussian
 assert quantum.PlanarStateProjection is planar_source.PlanarStateProjection
-assert quantum.QuantumSetup is planar_source.QuantumSetup
+assert quantum.Channeling is planar_source.Channeling
 """
     subprocess.run([sys.executable, "-c", script], check=True, capture_output=True, text=True)
 

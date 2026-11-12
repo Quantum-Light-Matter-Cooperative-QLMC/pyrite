@@ -12,10 +12,11 @@ import numpy as np
 
 from .. import DATA_DIR, _config_presets
 from .._catalog_layout import ARTIFACT_DIR, catalog_root
+from .._channeling_table import channeling_table_values
 from .._cxr_grid_policy import PROFILE_CXR_GRID_SELECTORS
 from .._cxr_vocabulary import catalog_key
 from .._energy_grid_artifacts import ArtifactError, load_artifact
-from .._numerics import validate_profile_numerics
+from .._numerics import CHANNELING_KEYS, validate_profile_numerics
 from .._precision import Precision
 from ._beam_detector_parse import (
     _parse_detector_entry,
@@ -551,6 +552,26 @@ def _parse_profile_scalar_numerics(
     return values
 
 
+def _flatten_profile_channeling(
+    row: Mapping[str, object], path: str, errors: _Errors
+) -> dict[str, object]:
+    """Lower a ``[channeling]`` table to the internal flat fields (#1017).
+
+    Flat ``channeling_*`` profile keys were removed and refuse with the table
+    spelling; the table itself never reaches the scan/numerics key checks.
+    """
+    out = {name: item for name, item in row.items() if name != "channeling"}
+    try:
+        flat = channeling_table_values(row)
+    except ValueError as exc:
+        errors.add(f"{path}.channeling", str(exc))
+        for name in CHANNELING_KEYS:
+            out.pop(name, None)
+        return out
+    out.update(flat)
+    return out
+
+
 def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, object]]:
     """Parse ``[profiles.*]`` campaign rows.
 
@@ -568,6 +589,7 @@ def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, obje
         row = _table(value, path, errors)
         if row is None:
             continue
+        row = _flatten_profile_channeling(row, path, errors)
         errors.keys(
             row,
             path,

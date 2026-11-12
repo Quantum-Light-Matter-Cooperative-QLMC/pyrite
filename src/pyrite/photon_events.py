@@ -33,7 +33,7 @@ if TYPE_CHECKING:
     from .montecarlo.runner.photon_emission import PhotonContinuumScore
     from .montecarlo.transport.photon_event_sources import PrimaryRelaxationSources
     from .observations.spec import Observation
-    from .quantum import QuantumSetup
+    from .quantum import Channeling
 
 
 MODEL = EVENT_MODEL
@@ -107,7 +107,7 @@ def simulate_photon_events(
     charged_feedback: bool = False,
     physics: Physics | None = None,
     numerics: Numerics | None = None,
-    quantum: QuantumSetup | None | _Unset = UNSET,
+    channeling: Channeling | None | _Unset = UNSET,
     observation: Observation | None = None,
 ) -> PhotonEventObservation:
     """Transport one Scene once and score one physical photon emission component.
@@ -135,7 +135,7 @@ def simulate_photon_events(
     separately; source selection, seed, cutoffs, geometry and feedback enter
     only the explicit observation identity.
     Independent ``physics`` and ``numerics`` override legacy Scene settings.
-    Omitted ``quantum`` inherits ``Scene.quantum``; explicit ``None`` disables that setup.
+    Omitted ``channeling`` inherits ``Scene.channeling``; explicit ``None`` disables that setup.
     ``observation`` binds through the shared resolver, subject to this API's
     ideal, unpixelated aperture restrictions. The input Scene is unchanged.
 
@@ -156,7 +156,7 @@ def simulate_photon_events(
     if seed is not None and (type(seed) is not int or not 0 <= seed < 2**64):
         raise ValueError("seed must be an unsigned 64-bit integer or None")
     request = resolve_simulation(
-        scene, physics=physics, numerics=numerics, quantum=quantum, observation=observation
+        scene, physics=physics, numerics=numerics, channeling=channeling, observation=observation
     )
     scene = request.scene
     detector, numerics = _preflight_scene(scene)

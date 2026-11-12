@@ -164,7 +164,7 @@ AXIAL_RUN_CLAIMS: tuple[str, ...] = (
 def require_runnable_axial_case(key: object) -> None:
     """Refuse a calibrated case whose production claims are not yet anchored.
 
-    An unadmitted case (``channeling_admission="accept-inaccurate"``) runs the
+    An unadmitted case (``Channeling(admission="accept-inaccurate")``) runs the
     same adapter outside every calibrated entry and is never gated here.
     """
     if key != UNADMITTED and key not in RUNNABLE_AXIAL_CASES:
@@ -246,7 +246,7 @@ def match_axial_case(query: AxialCaseQuery) -> AdmittedAxialCase:
 
 @dataclass(frozen=True)
 class UnadmittedAxialCase:
-    """An axial case run under ``channeling_admission="accept-inaccurate"`` (#1105).
+    """An axial case run under ``Channeling(admission="accept-inaccurate")`` (#1105).
 
     The resolved physical fields of a case outside the lookup, run with the
     default fibre numerics. It carries no calibrated band, depth budget or

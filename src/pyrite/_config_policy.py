@@ -1,5 +1,8 @@
 """Field-ownership inventory for the existing Physics and Numerics schemas.
 
+Channeling settings belong to :class:`pyrite.quantum.Channeling` (#1017), not
+to either schema.
+
 Descriptive metadata only, not a second validator, resolver, or serialization.
 """
 
@@ -30,10 +33,6 @@ PHYSICS_FIELD_OWNERS = MappingProxyType(
         "pair_production_model": PHYSICAL_MODEL,
         "positron_transport": PHYSICAL_MODEL,
         "atomic_electron_deflection": PHYSICAL_MODEL,
-        "channeling_model": PHYSICAL_MODEL,
-        "channeling_plane": PHYSICAL_MODEL,
-        "channeling_axial": PHYSICAL_MODEL,
-        "channeling_admission": PHYSICAL_MODEL,
         "transition_radiation": PHYSICAL_MODEL,
         "transition_lattice_origin_ang": PHYSICAL_MODEL,
         "shell_ionization_model": PHYSICAL_MODEL,
@@ -57,10 +56,6 @@ NUMERICS_FIELD_OWNERS = MappingProxyType(
         "transport": NUMERICAL_APPROXIMATION,
         "radiation": NUMERICAL_APPROXIMATION,
         "execution": KERNEL_TUNING,
-        "channeling_basis_size": NUMERICAL_APPROXIMATION,
-        "channeling_bloch_cells": NUMERICAL_APPROXIMATION,
-        "channeling_dz_ang": NUMERICAL_APPROXIMATION,
-        "channeling_zone_max_ang": NUMERICAL_APPROXIMATION,
     }
 )
 # Scheduler/resource settings are owned by pyrite.execution, not these fields.

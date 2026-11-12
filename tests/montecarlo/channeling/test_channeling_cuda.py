@@ -42,19 +42,19 @@ def _case(*, elastic="elsepa", plane=(1, -1, 0), unit_bearing=False):
         ),
         pr.Detector(),
         physics=pr.Physics(
-            channeling_model="planar",
-            channeling_admission="accept-inaccurate",
-            channeling_plane=plane,
             radiative_model="uncoupled",
             inelastic_model="continuous",
             elastic_model=elastic,
         ),
+        channeling=pr.Channeling(
+            "planar",
+            plane=plane,
+            numerics=pr.ChannelingNumerics(basis_size=8, bloch_cells=4, step_ang=500.0),
+            admission="accept-inaccurate",
+        ),
     )
     numerics = pr.Numerics(
         sampling=FixedSampling(cxr_histories=32, brem_histories=48),
-        channeling_basis_size=8,
-        channeling_bloch_cells=4,
-        channeling_dz_ang=500.0,
         energy_bins=EnergyBins(
             cxr=np.linspace(1500.0, 3000.0, 31), brem=np.array([5000.0, 10000.0])
         ),

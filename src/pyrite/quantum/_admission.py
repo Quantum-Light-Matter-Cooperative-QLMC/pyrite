@@ -63,7 +63,7 @@ def refuse_axial_channeling_cases(cases: Iterable[Mapping[str, Any]]) -> None:
         refuse_axial_channeling(case)
 
 
-#: ``Physics.channeling_admission`` values (#1105). The default runs only cases
+#: ``Channeling.admission`` values (#1105). The default runs only cases
 #: in a repository admission table; the opt-in acknowledges that a case outside
 #: it may give very inaccurate results and marks every output unadmitted.
 CHANNELING_ADMISSION_DEFAULT = "admitted"
@@ -80,8 +80,8 @@ class PlanarAdmissionError(ValueError):
 def unadmitted_hint() -> str:
     """Refusal suffix naming the opt-in, shared by planar and axial."""
     return (
-        f"; to run it anyway set channeling_admission='{CHANNELING_ADMISSION_OPT_IN}' "
-        f"(profile key channeling_admission, CLI --channeling-admission "
+        f"; to run it anyway set Channeling(admission='{CHANNELING_ADMISSION_OPT_IN}') "
+        f"(profile [channeling] admission, CLI --channeling-admission "
         f"{CHANNELING_ADMISSION_OPT_IN}), acknowledging that its results may be very "
         "inaccurate: they are marked unadmitted and carry no error budget"
     )

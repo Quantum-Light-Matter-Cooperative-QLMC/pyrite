@@ -27,6 +27,7 @@ from pyrite.quantum._axial_envelope import ADMITTED_AXIAL_CASES
 from pyrite.results.store import store_result
 
 LINES, BREM = 4, 6
+FIBRE = {"version": 2, "axis_uvw": [0, 0, 1]}
 GRID = np.linspace(800.0, 10000.0, 47)
 
 
@@ -49,14 +50,14 @@ def fibre_case(key="B", *, lines=LINES, brem=BREM, thickness_ang=3000.0, admissi
         sampling=FixedSampling(cxr_histories=lines, brem_histories=brem),
         energy_bins=EnergyBins(cxr=GRID, brem=GRID),
     )
-    physics = pr.Physics(
-        channeling_model="axial",
-        channeling_axial={"version": 2, "axis_uvw": [0, 0, 1]},
-        emission="incoherent",
-        radiative_model="uncoupled",
-        channeling_admission=admission,
+    physics = pr.Physics(emission="incoherent", radiative_model="uncoupled")
+    channeling = pr.Channeling("axial", axial=FIBRE, admission=admission)
+    return build_case(
+        pr.Scene(beam, target, PointDetector()),
+        numerics,
+        physics=physics,
+        channeling=channeling,
     )
-    return build_case(pr.Scene(beam, target, PointDetector()), numerics, physics=physics)
 
 
 @pytest.fixture(scope="module")
@@ -181,11 +182,7 @@ def test_a_finite_aperture_detector_refuses_at_lowering():
         cut=pr.geometry.CrystalCut(surface_hkl=(0, 0, 1)),
         allow_normal_incidence=True,
     )
-    physics = pr.Physics(
-        channeling_model="axial",
-        channeling_axial={"version": 2, "axis_uvw": [0, 0, 1]},
-        radiative_model="uncoupled",
-    )
+    physics = pr.Physics(radiative_model="uncoupled")
     numerics = pr.Numerics(
         sampling=FixedSampling(cxr_histories=2, brem_histories=2),
         energy_bins=EnergyBins(cxr=GRID, brem=GRID),
@@ -195,7 +192,12 @@ def test_a_finite_aperture_detector_refuses_at_lowering():
         (PointDetector(observation_angle_deg=1.0), "zero-aperture"),
     ):
         with pytest.raises(AxialAdmissionError, match=message):
-            build_case(pr.Scene(beam, target, detector), numerics, physics=physics)
+            build_case(
+                pr.Scene(beam, target, detector),
+                numerics,
+                physics=physics,
+                channeling=pr.Channeling("axial", axial=FIBRE),
+            )
 
 
 def test_axis_must_be_the_slab_normal(case_b):
@@ -332,11 +334,8 @@ def test_public_simulate_runs_a_runnable_case_from_public_inputs(runnable_b, pro
         beam,
         target,
         PointDetector(),
-        physics=pr.Physics(
-            channeling_model="axial",
-            channeling_axial={"version": 2, "axis_uvw": [0, 0, 1]},
-            radiative_model="uncoupled",
-        ),
+        physics=pr.Physics(radiative_model="uncoupled"),
+        channeling=pr.Channeling("axial", axial=FIBRE),
         numerics=pr.Numerics(
             sampling=FixedSampling(cxr_histories=LINES, brem_histories=BREM),
             energy_bins=EnergyBins(cxr=GRID, brem=GRID),

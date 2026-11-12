@@ -9,7 +9,7 @@
     {
       "path": "src/pyrite/_catalog_layout.py",
       "name": "source_files",
-      "cc": 23
+      "cc": 22
     },
     {
       "path": "src/pyrite/_cxr_grid_policy.py",
@@ -32,7 +32,7 @@
       "cc": 35
     },
     {
-      "path": "src/pyrite/campaign/axial_spec.py",
+      "path": "src/pyrite/quantum/_axial_spec.py",
       "name": "_entry",
       "cc": 24
     },
@@ -318,12 +318,7 @@
     {
       "path": "src/pyrite/montecarlo/channeling/axial_state_diagnostics.py",
       "name": "AxialSpectralObservable.__init__",
-      "cc": 33
-    },
-    {
-      "path": "src/pyrite/montecarlo/channeling/density.py",
-      "name": "DensityMatrixSolver.propagate",
-      "cc": 21
+      "cc": 32
     },
     {
       "path": "src/pyrite/montecarlo/channeling/emission.py",
@@ -349,7 +344,7 @@
     {
       "path": "src/pyrite/montecarlo/channeling/mcwf.py",
       "name": "MCWFSolver.run",
-      "cc": 23
+      "cc": 21
     },
     {
       "path": "src/pyrite/montecarlo/eadl_relaxation.py",

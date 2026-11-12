@@ -12,8 +12,10 @@ from typing import Any
 
 import numpy as np
 
-from .._numerics import _emission_selection
+from .._numerics import CHANNELING_KEYS, _emission_selection
 from .._sampling import FixedSampling, SamplingPolicy, adaptive_sampling
+from ..quantum import Channeling
+from ..quantum._channeling import channeling_from_fields
 from .geometry import Footprint, Slab, Stack
 from .model import Analysis, CxrReflections, Numerics, Physics, Scene, Sweep
 
@@ -89,6 +91,7 @@ def sweep_from_legacy(old_sweep: Any, settings: Any) -> Sweep:
         detector=old_sweep.detector,
         physics=physics_from_legacy(settings),
         numerics=numerics_from_legacy(old_sweep, settings),
+        channeling=channeling_from_legacy(settings),
     )
     return Sweep(base=scene, axes=axes)
 
@@ -120,12 +123,16 @@ def physics_from_legacy(settings: Any) -> Physics:
         pair_production_model=getattr(settings, "pair_production_model", None),
         positron_transport=getattr(settings, "positron_transport", False),
         atomic_electron_deflection=getattr(settings, "atomic_electron_deflection", "kawrakow"),
-        channeling_model=getattr(settings, "channeling_model", "off"),
-        channeling_plane=getattr(settings, "channeling_plane", None),
-        channeling_admission=getattr(settings, "channeling_admission", "admitted"),
         transition_radiation=getattr(settings, "transition_radiation", "off"),
         transition_lattice_origin_ang=getattr(settings, "transition_lattice_origin_ang", None),
         shell_ionization_model=getattr(settings, "shell_ionization_model", "eedl"),
+    )
+
+
+def channeling_from_legacy(settings: Any) -> Channeling | None:
+    """Rebuild the public channeling section from flat legacy settings fields."""
+    return channeling_from_fields(
+        {key: getattr(settings, key) for key in CHANNELING_KEYS if hasattr(settings, key)}
     )
 
 
@@ -144,10 +151,6 @@ def numerics_from_legacy(old_sweep: Any, settings: Any) -> Numerics:
     )
     return Numerics(
         sampling=sampling,
-        channeling_basis_size=getattr(settings, "channeling_basis_size", 16),
-        channeling_bloch_cells=getattr(settings, "channeling_bloch_cells", 16),
-        channeling_dz_ang=getattr(settings, "channeling_dz_ang", 250.0),
-        channeling_zone_max_ang=getattr(settings, "channeling_zone_max_ang", None),
         energy_bins=old_sweep.energy_bins,
         cxr_chunk=old_sweep.spec_chunk,
         brem_chunk=old_sweep.brem_chunk,
@@ -174,6 +177,7 @@ def analysis_from_legacy(settings: Any) -> Analysis:
 __all__ = [
     "adapt_configured_sweep",
     "analysis_from_legacy",
+    "channeling_from_legacy",
     "numerics_from_legacy",
     "sweep_from_legacy",
 ]

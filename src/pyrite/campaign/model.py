@@ -19,7 +19,7 @@ from ..detectors import Detector, EnergyBins
 from ..instrument import Acquisition, Filter, FilterPlate, NativeAcquisition, PlanarDetector
 from ..instrument.model import validate_downstream_scene
 from ..observations.spec import Observation
-from ..quantum import QuantumSetup
+from ..quantum import Channeling
 from .beam import Beam, BunchFrontTilt
 from .geometry import Slab, Stack
 from .geometry import Target as LegacyTarget
@@ -65,7 +65,7 @@ def _restore_scene(
     acquisition: Acquisition | NativeAcquisition | None,
     physics: Physics,
     numerics: Numerics,
-    quantum: QuantumSetup | None,
+    channeling: Channeling | None,
 ) -> "Scene":
     return Scene(
         beam,
@@ -75,7 +75,7 @@ def _restore_scene(
         acquisition=acquisition,
         physics=physics,
         numerics=numerics,
-        quantum=quantum,
+        channeling=channeling,
     )
 
 
@@ -115,15 +115,15 @@ def _scalar_target(target: LegacyTarget | Target) -> LegacyTarget | Target:
     raise TypeError("Scene.target must be a Slab or Stack or Target")
 
 
-def _scene_controls(physics, numerics, quantum):
+def _scene_controls(physics, numerics, channeling):
     if physics is _SCENE_DEFAULT_PHYSICS or physics is None:
         physics = Physics()
     if numerics is _SCENE_DEFAULT_NUMERICS:
         numerics = Numerics()
     if not isinstance(numerics, Numerics):
         raise TypeError("Scene.numerics must be a Numerics")
-    if quantum is not None and not isinstance(quantum, QuantumSetup):
-        raise TypeError("Scene.quantum must be a QuantumSetup or None")
+    if channeling is not None and not isinstance(channeling, Channeling):
+        raise TypeError("Scene.channeling must be a Channeling or None")
     if not isinstance(physics, Physics):
         raise TypeError("Scene.physics must be a Physics")
     return physics, numerics
@@ -194,7 +194,7 @@ class Scene:
     filters
         Ordered :class:`~pyrite.geometry.Filter` or :class:`~pyrite.geometry.FilterPlate` instances
         between the source and a planar detector.
-    physics, numerics, quantum, acquisition
+    physics, numerics, channeling, acquisition
         Legacy composition inputs accepted for compatibility. They are not
         stored on the physical Scene and are excluded from dataclass fields
         and serialization. Pass them to :func:`pyrite.simulate` or an
@@ -215,16 +215,16 @@ class Scene:
     acquisition: InitVar[Acquisition | NativeAcquisition | None] = None
     physics: InitVar[Physics] = field(default=_SCENE_DEFAULT_PHYSICS, kw_only=True)
     numerics: InitVar[Numerics] = field(default=_SCENE_DEFAULT_NUMERICS, kw_only=True)
-    quantum: InitVar[QuantumSetup | None] = field(default=None, kw_only=True)
+    channeling: InitVar[Channeling | None] = field(default=None, kw_only=True)
 
     def __post_init__(
         self,
         acquisition: Acquisition | NativeAcquisition | None,
         physics: Physics,
         numerics: Numerics,
-        quantum: QuantumSetup | None,
+        channeling: Channeling | None,
     ) -> None:
-        physics, numerics = _scene_controls(physics, numerics, quantum)
+        physics, numerics = _scene_controls(physics, numerics, channeling)
         if isinstance(self.beam, BeamSpec):
             object.__setattr__(self, "beam", Beam.from_spec(self.beam))
         if not isinstance(self.beam, Beam):
@@ -238,11 +238,11 @@ class Scene:
             replace(self.beam, energy_keV=_one_float("beam.energy_keV", self.beam.energy_keV)),
         )
         object.__setattr__(self, "target", _scalar_target(self.target))
-        _remember_scene_compatibility(self, (acquisition, physics, numerics, quantum))
+        _remember_scene_compatibility(self, (acquisition, physics, numerics, channeling))
 
     def __getattr__(self, name: str) -> Any:
         """Expose constructor-era run settings without storing them on Scene."""
-        names = ("acquisition", "physics", "numerics", "quantum")
+        names = ("acquisition", "physics", "numerics", "channeling")
         if name not in names:
             raise AttributeError(name)
         stored = _SCENE_COMPATIBILITY.get(id(self))
@@ -263,7 +263,7 @@ class Scene:
                 self.acquisition,
                 self.physics,
                 self.numerics,
-                self.quantum,
+                self.channeling,
             ),
         )
 
@@ -315,7 +315,7 @@ class Scene:
 # InitVar defaults are captured by the generated constructor. Remove the
 # class-level defaults so compatibility reads come from the per-instance
 # sidecar instead of appearing as ordinary class attributes.
-for _compatibility_name in ("acquisition", "physics", "numerics", "quantum"):
+for _compatibility_name in ("acquisition", "physics", "numerics", "channeling"):
     delattr(Scene, _compatibility_name)
 
 
@@ -487,7 +487,7 @@ class Sweep:
         numerics: Numerics | None = None,
         *,
         physics: Physics | None = None,
-        quantum: QuantumSetup | None | _Unset = UNSET,
+        channeling: Channeling | None | _Unset = UNSET,
         observation: Observation | None = None,
     ) -> list[Any]:
         """Lower every expanded scene without executing or persisting it.
@@ -498,8 +498,8 @@ class Sweep:
             Sampling and execution controls; overrides the base scene before axes apply.
         physics
             Independent model selection; overrides the base before axes apply.
-        quantum
-            Independent quantum setup. Omit to inherit the base setting;
+        channeling
+            Independent channeling setup. Omit to inherit the base setting;
             explicit ``None`` disables it before axes apply.
         observation
             Observation request bound separately to every expanded scene.
@@ -513,7 +513,7 @@ class Sweep:
         from .lowering import build_sweep_cases
 
         return build_sweep_cases(
-            self, numerics, physics=physics, quantum=quantum, observation=observation
+            self, numerics, physics=physics, channeling=channeling, observation=observation
         )
 
 

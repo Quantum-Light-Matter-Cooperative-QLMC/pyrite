@@ -110,17 +110,17 @@ def produced():
         energy_bins=EnergyBins(
             cxr=np.linspace(1500.0, 3000.0, 31), brem=np.array([5000.0, 10000.0])
         ),
-        channeling_basis_size=8,
-        channeling_bloch_cells=4,
-        channeling_dz_ang=500.0,
     )
-    physics = pr.Physics(
-        channeling_model="planar",
-        channeling_admission="accept-inaccurate",
-        channeling_plane=(1, -1, 0),
-        radiative_model="uncoupled",
+    physics = pr.Physics(radiative_model="uncoupled")
+    channeling = pr.Channeling(
+        "planar",
+        plane=(1, -1, 0),
+        numerics=pr.ChannelingNumerics(basis_size=8, bloch_cells=4, step_ang=500.0),
+        admission="accept-inaccurate",
     )
-    return pr.simulate(beam, target, pr.Detector(), physics=physics, numerics=numerics)
+    return pr.simulate(
+        beam, target, pr.Detector(), physics=physics, numerics=numerics, channeling=channeling
+    )
 
 
 def test_public_result_produces_a_separate_finite_channel(produced):

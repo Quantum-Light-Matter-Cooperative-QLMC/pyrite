@@ -30,16 +30,17 @@ from pyrite.montecarlo.channeling.handoff import (
 )
 from pyrite.montecarlo.transport import SegmentEvent, check_segment_event_contract
 
-SMALL = dict(channeling_basis_size=12, channeling_bloch_cells=4, channeling_dz_ang=500.0)
+SMALL = dict(basis_size=12, bloch_cells=4, step_ang=500.0)
 N = 200
 
 
 def _case(plane=(1, -1, 0), *, n=N, numerics=SMALL, thickness_ang=10000.0):
-    physics = pr.Physics(
-        channeling_model="planar",
-        channeling_admission="accept-inaccurate",
-        channeling_plane=plane,
-        radiative_model="uncoupled",
+    physics = pr.Physics(radiative_model="uncoupled")
+    channeling = pr.Channeling(
+        "planar",
+        plane=plane,
+        numerics=pr.ChannelingNumerics(**numerics),
+        admission="accept-inaccurate",
     )
     scene = pr.Scene(
         pr.Beam(energy_keV=5000.0, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()),
@@ -52,13 +53,13 @@ def _case(plane=(1, -1, 0), *, n=N, numerics=SMALL, thickness_ang=10000.0):
         ),
         pr.Detector(),
         physics=physics,
+        channeling=channeling,
     )
     return api.build_case(
         scene,
         pr.Numerics(
             sampling=FixedSampling(cxr_histories=n, brem_histories=n),
             energy_bins=pr.detectors.EnergyBins(cxr=np.linspace(1e3, 2e3, 9)),
-            **numerics,
         ),
     )
 
@@ -244,12 +245,12 @@ def test_run_case_scores_spectra_and_reports_the_zone(zone):
 
 
 def test_zone_cap_shorter_than_the_path_is_refused():
-    case = _case(numerics={**SMALL, "channeling_zone_max_ang": 100.0}, n=4)
+    case = _case(numerics={**SMALL, "zone_max_ang": 100.0}, n=4)
     with pytest.raises(ValueError, match="forced handoff"):
         runner._transport_case(case, transport_core="per-electron")
 
 
 def test_overflow_above_ten_percent_warns():
-    case = _case(numerics={**SMALL, "channeling_basis_size": 6}, n=4)
-    with pytest.warns(UserWarning, match="raise Numerics.channeling_basis_size"):
+    case = _case(numerics={**SMALL, "basis_size": 6}, n=4)
+    with pytest.warns(UserWarning, match="raise ChannelingNumerics.basis_size"):
         runner._transport_case(case, transport_core="per-electron")

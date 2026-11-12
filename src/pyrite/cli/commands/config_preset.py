@@ -7,10 +7,11 @@ from tomlkit.exceptions import ParseError
 
 from pyrite._catalog_layout import object_sources
 from pyrite._config_presets import NUMERICS, PHYSICS, preset_values
-from pyrite._numerics import PHYSICS_FIELDS, PROFILE_NUMERICS_KEYS, SAMPLING_KEYS
+from pyrite._numerics import PHYSICS_KEYS, PROFILE_NUMERICS_KEYS, SAMPLING_KEYS
 from pyrite.campaign import config_presets
 from pyrite.campaign.profiles import resolve_numerics
 from pyrite.cli import _catalog_io, _completion
+from pyrite.cli._deprecations import removed_option
 from pyrite.console import json as cli_json
 from pyrite.console.output import (
     CLIError,
@@ -50,7 +51,7 @@ def _field_rows(kind, preset, values):
         row
         for group in resolution.groups()
         for row in cast(list[dict[str, Any]], group["fields"])
-        if (row["key"] in PHYSICS_FIELDS) == physics
+        if (row["key"] in PHYSICS_KEYS) == physics
     ]
     if "precision" in values:
         rows = [row for row in rows if row["key"] not in SAMPLING_KEYS]
@@ -99,7 +100,7 @@ def _sampling_changes(mode, options, updates):
 
 def build(kind):
     """Return the ``pyrite <kind> preset`` command group."""
-    fields = _calculation_options.field_names(physics=kind is PHYSICS)
+    fields = _calculation_options.field_names(physics=kind is PHYSICS, channeling=False)
     complete = _COMPLETE[kind]
     noun = f"{kind.table} preset"
 
@@ -115,7 +116,17 @@ def build(kind):
 
     def setting_params():
         # Removed budget flags (#1007) keep naming their replacement.
-        params = _calculation_options.field_params(physics=kind is PHYSICS)
+        params = _calculation_options.field_params(physics=kind is PHYSICS, channeling=False)
+        # Channeling left the Physics/Numerics presets for the profile's
+        # [channeling] table (#1017); the old flags name the profile command.
+        command = "physics" if kind is PHYSICS else "numerics"
+        for flag in _calculation_options.CHANNELING_FLAGS:
+            if (_calculation_options.FIELD_NAMES[flag] in PHYSICS_KEYS) == (kind is PHYSICS):
+                params.extend(
+                    removed_option(f"--{flag}", f"pyrite profile {command} set PROFILE --{flag}")(
+                        lambda: None
+                    ).__click_params__
+                )
         if kind is PHYSICS:
             params.append(
                 click.Option(

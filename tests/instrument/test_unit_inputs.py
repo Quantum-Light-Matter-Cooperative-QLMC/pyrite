@@ -10,7 +10,7 @@ import pint
 import pytest
 
 from pyrite.beams import Beam, BunchFrontTilt, LongitudinalDistribution, PointBunch, Spot
-from pyrite.config import Numerics, Physics
+from pyrite.config import Physics
 from pyrite.detectors import AngularAcceptance, Detector, EnergyBins, PixelGrid, PlanarPose
 from pyrite.geometry import RectangularBody, SubstanceRef, Target
 from pyrite.observations import Acquisition
@@ -220,9 +220,11 @@ def test_target_beam_timing_physics_and_numerics_normalize_units() -> None:
     bins = EnergyBins(cxr=np.array([0.1, 0.2]) * ureg.keV)
     assert np.array_equal(bins.cxr, np.array([100.0, 200.0]))
     physics = Physics(inelastic_cutoff_eV=0.5 * ureg.keV)
-    numerics = Numerics(channeling_dz_ang=0.025 * ureg.um)
+    from pyrite.quantum import ChannelingNumerics
+
+    zone = ChannelingNumerics(step_ang=0.025 * ureg.um)
     assert physics.inelastic_cutoff_eV == 500.0
-    assert numerics.channeling_dz_ang == 250.0
+    assert zone.step_ang == 250.0
 
 
 @pytest.mark.parametrize(

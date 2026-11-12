@@ -24,7 +24,6 @@ from .._energy_grid_encoding import encode_energy_grid
 from .._numerics import (
     CHANNELING_KEYS,
     DEFAULT_RADIATIVE_CUTOFF_EV,
-    PHYSICS_FIELDS,
     PROFILE_NUMERICS_KEYS,
     SAMPLING_KEYS,
     TRANSPORT_KEYS,
@@ -52,9 +51,10 @@ from ..montecarlo.spectrum.cxr._bin_quadrature import _bin_reduction_markers
 from ..montecarlo.spectrum.transition_radiation_crossings import TRANSITION_MODEL
 from ..montecarlo.transport import STOPPING_MODEL
 from ..montecarlo.transport.precision import TRANSPORT_PRECISION_MODEL
+from ..quantum._axial_spec import AXIAL_FIBRE_MODEL_MARKER, AXIAL_MODEL_MARKER, resolve_axial_spec
+from ..quantum._channeling import CHANNELING_OFF_FIELDS
 from ..results import Settings
 from ..xsgen.bremslib.tables import resolve_bremsstrahlung_model
-from .axial_spec import AXIAL_FIBRE_MODEL_MARKER, AXIAL_MODEL_MARKER, resolve_axial_spec
 from .identity_options import (
     _CONTENT_KEY_DENYLIST,
     pop_identity_options,
@@ -141,12 +141,7 @@ def resolve_numerics(
         "transition_lattice_origin_ang": physics.transition_lattice_origin_ang,
         "shell_ionization_model": physics.shell_ionization_model,
     }
-    effective.update(
-        {
-            key: getattr(physics if key in PHYSICS_FIELDS else numerics, key)
-            for key in CHANNELING_KEYS
-        }
-    )
+    effective.update(CHANNELING_OFF_FIELDS)
     sources = {
         key: "default" if key in SAMPLING_KEYS else "built-in" for key in PROFILE_NUMERICS_KEYS
     }

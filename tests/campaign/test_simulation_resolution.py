@@ -10,7 +10,7 @@ from pyrite.beams import Beam, PointBunch, Spot
 from pyrite.config import FixedSampling, Numerics, Physics
 from pyrite.detectors import Detector, EnergyBins
 from pyrite.geometry import Footprint, Slab
-from pyrite.quantum import QuantumDynamics, QuantumNumerics, QuantumRegion, QuantumSetup
+from pyrite.quantum import Channeling, ChannelingNumerics
 from tests.helpers.case_compare import assert_same_case
 
 
@@ -33,11 +33,11 @@ def numerics():
 
 
 @pytest.fixture
-def quantum():
-    return QuantumSetup(
-        region=QuantumRegion(kind="planar", plane_hkl=(1, -1, 0)),
-        dynamics=QuantumDynamics(kind="channeling"),
-        numerics=QuantumNumerics(basis_size=12, bloch_cells=8, step_ang=100.0),
+def channeling():
+    return Channeling(
+        "planar",
+        plane=(1, -1, 0),
+        numerics=ChannelingNumerics(basis_size=12, bloch_cells=8, step_ang=100.0),
         admission="accept-inaccurate",
     )
 
@@ -80,62 +80,58 @@ def test_one_scene_runs_under_independent_configurations(scene, numerics, transp
     assert scene == original
 
 
-def test_quantum_component_scene_and_legacy_calls_are_equivalent(
-    scene, numerics, quantum, transport
+def test_channeling_component_scene_and_embedded_calls_are_equivalent(
+    scene, numerics, channeling, transport
 ):
-    independent = api.simulate(scene, numerics=numerics, quantum=quantum)
+    independent = api.simulate(scene, numerics=numerics, channeling=channeling)
     components = api.simulate(
         scene.beam,
         scene.target,
         scene.detector,
         physics=scene.physics,
         numerics=numerics,
-        quantum=quantum,
+        channeling=channeling,
     )
-    embedded = api.simulate(replace(scene, numerics=numerics, quantum=quantum))
-    # Compare against the preexisting explicit planar fields, independently
-    # of QuantumSetup.lower or the new resolver.
-    legacy = api.simulate(
-        scene,
-        physics=replace(
-            scene.physics,
-            channeling_model="planar",
-            channeling_admission="accept-inaccurate",
-            channeling_plane=(1, -1, 0),
-        ),
-        numerics=replace(
-            numerics, channeling_basis_size=12, channeling_bloch_cells=8, channeling_dz_ang=100.0
-        ),
+    embedded = api.simulate(replace(scene, numerics=numerics, channeling=channeling))
+
+    record = independent.case["channeling"]
+    assert (record["plane_hkl"], record["basis_size"], record["bloch_cells"]) == (
+        (1, -1, 0),
+        12,
+        8,
     )
+    assert record["dz_ang"] == 100.0
+    for result in (components, embedded):
+        assert result.case.to_dict() == independent.case.to_dict()
+        assert result.provenance.identity_digest == independent.provenance.identity_digest
+        np.testing.assert_array_equal(
+            result.cxr.incoherent.density, independent.cxr.incoherent.density
+        )
+        assert result.provenance.scene.channeling is channeling
+    assert independent.provenance["channeling"] is channeling
+    assert scene.channeling is None
 
-    for result in (independent, components, embedded):
-        assert result.case.to_dict() == legacy.case.to_dict()
-        assert result.provenance.identity_digest == legacy.provenance.identity_digest
-        np.testing.assert_array_equal(result.cxr.incoherent.density, legacy.cxr.incoherent.density)
-        assert result.provenance.numerics.channeling_dz_ang == 100.0
-        assert result.provenance.scene.quantum is quantum
-    assert scene.quantum is None
-    assert scene.numerics.channeling_dz_ang == 250.0
 
-
-def test_quantum_omission_override_and_explicit_disable(scene, numerics, quantum):
-    embedded = replace(scene, quantum=quantum)
+def test_channeling_omission_override_and_explicit_disable(scene, numerics, channeling):
+    embedded = replace(scene, channeling=channeling)
     inherited = api.build_case(embedded, numerics)
-    disabled = api.build_case(embedded, numerics, quantum=None)
+    disabled = api.build_case(embedded, numerics, channeling=None)
     changed = api.build_case(
         embedded,
         numerics,
-        quantum=replace(quantum, numerics=replace(quantum.numerics, step_ang=125.0)),
+        channeling=replace(channeling, numerics=replace(channeling.numerics, step_ang=125.0)),
     )
 
     assert inherited["channeling"]["dz_ang"] == 100.0
     assert changed["channeling"]["dz_ang"] == 125.0
     assert disabled.to_dict() == api.build_case(scene, numerics).to_dict()
-    assert embedded.quantum is quantum
+    assert embedded.channeling is channeling
 
 
-@pytest.mark.parametrize("mode", ["legacy-conflict", "unsupported", "invalid-type"])
-def test_quantum_errors_precede_material_preparation(scene, numerics, quantum, monkeypatch, mode):
+@pytest.mark.parametrize("mode", ["unsupported-physics", "invalid-type"])
+def test_channeling_errors_precede_material_preparation(
+    scene, numerics, channeling, monkeypatch, mode
+):
     from pyrite.campaign import lowering
 
     def forbidden(*args, **kwargs):
@@ -143,36 +139,28 @@ def test_quantum_errors_precede_material_preparation(scene, numerics, quantum, m
 
     monkeypatch.setattr(lowering, "build_cases", forbidden)
     physics = scene.physics
-    error, message = ValueError, "diagnostic-only"
-    if mode == "legacy-conflict":
-        physics = replace(
-            physics,
-            channeling_model="planar",
-            channeling_admission="accept-inaccurate",
-            channeling_plane=(1, -1, 0),
-        )
-        message = "conflicts with legacy Physics.channeling_model"
-    elif mode == "unsupported":
-        quantum = replace(quantum, numerics=replace(quantum.numerics, method="mcwf"))
+    if mode == "unsupported-physics":
+        physics = replace(physics, emission=("incoherent", "coherent"))
+        error, message = ValueError, "incoherent emission only"
     else:
-        quantum = object()
-        error, message = TypeError, "quantum must be a QuantumSetup or None"
+        channeling = object()
+        error, message = TypeError, "channeling must be a Channeling or None"
     with pytest.raises(error, match=message):
-        api.simulate(scene, numerics=numerics, physics=physics, quantum=quantum)
+        api.simulate(scene, numerics=numerics, physics=physics, channeling=channeling)
     with pytest.raises(error, match=message):
-        api.build_case(scene, numerics, physics=physics, quantum=quantum)
+        api.build_case(scene, numerics, physics=physics, channeling=channeling)
 
 
-def test_sweep_keeps_quantum_controls_and_seed_order(scene, numerics, quantum):
+def test_sweep_keeps_channeling_controls_and_seed_order(scene, numerics, channeling):
     sweep = Sweep(replace(scene, numerics=numerics), {"beam.energy_keV": (5000, 6000)})
-    cases = sweep.cases(quantum=quantum)
+    cases = sweep.cases(channeling=channeling)
     assert [case["seed"] for case in cases] == [1, 2]
     assert [case["E0_keV"] for case in cases] == [5000, 6000]
     assert all(case["channeling"]["dz_ang"] == 100.0 for case in cases)
-    assert sweep.base.quantum is None
+    assert sweep.base.channeling is None
 
 
-def test_configured_quantum_observation_matches_scene_lowering(scene, numerics, quantum):
+def test_configured_channeling_observation_matches_scene_lowering(scene, numerics, channeling):
     from pyrite.campaign.legacy import adapt_configured_sweep
     from pyrite.campaign.sweep import Sweep as ConfiguredSweep
     from pyrite.campaign.sweep import build_cases
@@ -187,10 +175,10 @@ def test_configured_quantum_observation_matches_scene_lowering(scene, numerics, 
     )
     sweep = adapt_configured_sweep(old, Settings(n_electrons=1, n_electrons_brem=1))
     observation = Observation(detector=Detector(45.0))
-    actual = sweep.cases(numerics, physics=scene.physics, quantum=quantum, observation=observation)[
-        0
-    ]
-    expected = api.build_case(scene, numerics, quantum=quantum, observation=observation)
+    actual = sweep.cases(
+        numerics, physics=scene.physics, channeling=channeling, observation=observation
+    )[0]
+    expected = api.build_case(scene, numerics, channeling=channeling, observation=observation)
     assert actual.to_dict() == expected.to_dict()
     # Resolving another request leaves the adapter's original physics untouched.
     np.testing.assert_equal(sweep.cases()[0].to_dict(), build_cases(old, 1, 1)[0].to_dict())
@@ -222,6 +210,6 @@ def test_result_records_independent_effective_configuration(scene, numerics, tra
     result = api.simulate(scene, physics=physics, numerics=numerics)
     assert result.provenance["input_scene"] is scene
     assert result.provenance["physics"] == physics
-    assert result.provenance["quantum"] is None
+    assert result.provenance["channeling"] is None
     assert result.provenance["acquisition"] is None
     assert scene.physics.brem_source != "none"

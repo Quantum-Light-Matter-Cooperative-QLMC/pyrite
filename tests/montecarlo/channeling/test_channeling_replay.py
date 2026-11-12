@@ -19,6 +19,14 @@ from pyrite.results.store import store_result
 pytestmark = pytest.mark.slow
 
 
+ZONE = pr.Channeling(
+    "planar",
+    plane=(1, -1, 0),
+    numerics=pr.ChannelingNumerics(basis_size=8, bloch_cells=4, step_ang=500.0),
+    admission="accept-inaccurate",
+)
+
+
 @pytest.fixture(scope="module")
 def channeling_run():
     scene = pr.Scene(
@@ -31,21 +39,14 @@ def channeling_run():
             footprint=pr.geometry.Footprint(5.0, 5.0),
         ),
         pr.Detector(),
-        physics=pr.Physics(
-            channeling_model="planar",
-            channeling_admission="accept-inaccurate",
-            channeling_plane=(1, -1, 0),
-            radiative_model="uncoupled",
-        ),
+        physics=pr.Physics(radiative_model="uncoupled"),
+        channeling=ZONE,
     )
     numerics = pr.Numerics(
         sampling=FixedSampling(cxr_histories=4, brem_histories=6),
         energy_bins=EnergyBins(
             cxr=np.linspace(1500.0, 3000.0, 31), brem=np.array([5000.0, 10000.0])
         ),
-        channeling_basis_size=8,
-        channeling_bloch_cells=4,
-        channeling_dz_ang=500.0,
     )
     case = api.build_case(scene, numerics).to_dict()
     transport = runner._transport_case(case)

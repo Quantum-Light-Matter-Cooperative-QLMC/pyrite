@@ -18,6 +18,12 @@
 # "accept-inaccurate"; appended last positionally. Channeling cases outside the
 # admission tables refuse by default; opt-in cases persist an "unadmitted"
 # record. Off cases and the default value keep their identity; no new exports.
+# #1017: pyrite.quantum.Channeling / ChannelingNumerics (also root aliases) replace
+# QuantumSetup/QuantumRegion/QuantumDynamics/QuantumNumerics and the
+# Physics/Numerics channeling_* fields (hard break; removed names raise errors
+# naming the replacement). simulate(..., channeling=) and Scene.channeling replace
+# quantum=; profiles use a [channeling] table. Stored Settings/case identity keep
+# the flat channeling_* record, so case keys are unchanged.
 schema_version = 1
 canonical_facades = ["beams", "geometry", "config", "detectors", "observations", "transport", "radiation"]
 
@@ -27,6 +33,8 @@ Analysis = { target = "pyrite.campaign.model:Analysis", status = "advanced-stabl
 # Beam's additive quantity boundaries (kinetic_energy, repetition_rate, bunch_charge)
 # retains this class binding, numeric dataclass storage and legacy imports.
 Beam = { target = "pyrite.campaign.beam:Beam", status = "stable", domain = "beams", root_role = "core" }
+Channeling = { target = "pyrite.quantum:Channeling", status = "experimental", domain = "quantum", root_role = "experimental" }
+ChannelingNumerics = { target = "pyrite.quantum:ChannelingNumerics", status = "experimental", domain = "quantum", root_role = "experimental" }
 CxrSpectra = { target = "pyrite.results.model:CxrSpectra", status = "advanced-stable", domain = "results", root_role = "specialized" }
 Detector = { target = "pyrite.detectors:Detector", status = "stable", domain = "detectors", root_role = "core" }
 DirectionalSpectrum = { target = "pyrite.results.directional:DirectionalSpectrum", status = "experimental", domain = "results", root_role = "experimental" }
@@ -38,10 +46,6 @@ Physics = { target = "pyrite._numerics:Physics", status = "stable", domain = "co
 PixelMetadata = { target = "pyrite.results.model:PixelMetadata", status = "advanced-stable", domain = "results", root_role = "specialized" }
 PixelRayMap = { target = "pyrite.results.model:PixelRayMap", status = "advanced-stable", domain = "results", root_role = "specialized" }
 Provenance = { target = "pyrite.results.provenance:Provenance", status = "advanced-stable", domain = "results", root_role = "specialized" }
-QuantumDynamics = { target = "pyrite.quantum:QuantumDynamics", status = "experimental", domain = "quantum", root_role = "experimental" }
-QuantumNumerics = { target = "pyrite.quantum:QuantumNumerics", status = "experimental", domain = "quantum", root_role = "experimental" }
-QuantumRegion = { target = "pyrite.quantum:QuantumRegion", status = "experimental", domain = "quantum", root_role = "experimental" }
-QuantumSetup = { target = "pyrite.quantum:QuantumSetup", status = "experimental", domain = "quantum", root_role = "experimental" }
 Result = { target = "pyrite.results.model:Result", status = "stable", domain = "results", root_role = "core" }
 Scene = { target = "pyrite.campaign.model:Scene", status = "stable", domain = "campaign", root_role = "core" }
 SpatialResult = { target = "pyrite.results.model:SpatialResult", status = "advanced-stable", domain = "results", root_role = "specialized" }
@@ -112,10 +116,8 @@ Q_ = { target = "pyrite.units:Q_", status = "advanced-stable" }
 ureg = { target = "pyrite.units:ureg", status = "advanced-stable" }
 
 [package_exports."pyrite.quantum"]
-QuantumSetup = { target = "pyrite.quantum:QuantumSetup", status = "experimental" }
-QuantumRegion = { target = "pyrite.quantum:QuantumRegion", status = "experimental" }
-QuantumDynamics = { target = "pyrite.quantum:QuantumDynamics", status = "experimental" }
-QuantumNumerics = { target = "pyrite.quantum:QuantumNumerics", status = "experimental" }
+Channeling = { target = "pyrite.quantum:Channeling", status = "experimental" }
+ChannelingNumerics = { target = "pyrite.quantum:ChannelingNumerics", status = "experimental" }
 AxialDiagnosticConfig = { target = "pyrite.montecarlo.channeling.axial_diagnostic:AxialDiagnosticConfig", status = "experimental" }
 AxialDiagnosticResult = { target = "pyrite.montecarlo.channeling.axial_diagnostic:AxialDiagnosticResult", status = "experimental" }
 AxialMCWF = { target = "pyrite.montecarlo.channeling.axial_mcwf:AxialMCWF", status = "experimental" }
@@ -418,6 +420,8 @@ radiation_band_metrics = { target = "pyrite.results.radiation:radiation_band_met
 AcquisitionBatch = { classification = "deferred", canonical = "pyrite.results:AcquisitionBatch", reason = "Await formal canonical facade approval in #707; preserve both supported results and observations imports." }
 Analysis = { classification = "deferred", canonical = "pyrite.campaign.model:Analysis", reason = "Keep the existing import pending canonical ownership review in #707." }
 Beam = { classification = "retained", canonical = "pyrite:Beam", reason = "Foundational simulation entry point." }
+Channeling = { classification = "deferred", canonical = "pyrite.quantum:Channeling", reason = "Experimental channeling section (#1017); canonical in pyrite.quantum, root alias kept without warnings." }
+ChannelingNumerics = { classification = "deferred", canonical = "pyrite.quantum:ChannelingNumerics", reason = "Experimental channeling section (#1017); canonical in pyrite.quantum, root alias kept without warnings." }
 CxrSpectra = { classification = "deferred", canonical = "pyrite.results.model:CxrSpectra", reason = "Keep the existing import pending canonical ownership review in #707." }
 Detector = { classification = "retained", canonical = "pyrite:Detector", reason = "Foundational simulation entry point." }
 DirectionalSpectrum = { classification = "deferred", canonical = "pyrite.results.directional:DirectionalSpectrum", reason = "Keep the existing import pending canonical ownership review in #707." }
@@ -429,10 +433,6 @@ Physics = { classification = "retained", canonical = "pyrite:Physics", reason = 
 PixelMetadata = { classification = "deferred", canonical = "pyrite.results.model:PixelMetadata", reason = "Keep the existing import pending canonical ownership review in #707." }
 PixelRayMap = { classification = "deferred", canonical = "pyrite.results.model:PixelRayMap", reason = "Keep the existing import pending canonical ownership review in #707." }
 Provenance = { classification = "deferred", canonical = "pyrite.results.provenance:Provenance", reason = "Keep the existing import pending canonical ownership review in #707." }
-QuantumDynamics = { classification = "deferred", canonical = "pyrite.quantum:QuantumDynamics", reason = "Canonical quantum ownership is resolved in #704; retain the root alias without warnings pending a separate migration decision." }
-QuantumNumerics = { classification = "deferred", canonical = "pyrite.quantum:QuantumNumerics", reason = "Canonical quantum ownership is resolved in #704; retain the root alias without warnings pending a separate migration decision." }
-QuantumRegion = { classification = "deferred", canonical = "pyrite.quantum:QuantumRegion", reason = "Canonical quantum ownership is resolved in #704; retain the root alias without warnings pending a separate migration decision." }
-QuantumSetup = { classification = "deferred", canonical = "pyrite.quantum:QuantumSetup", reason = "Canonical quantum ownership is resolved in #704; retain the root alias without warnings pending a separate migration decision." }
 Result = { classification = "retained", canonical = "pyrite:Result", reason = "Foundational simulation entry point." }
 Scene = { classification = "retained", canonical = "pyrite:Scene", reason = "Foundational simulation entry point." }
 SpatialResult = { classification = "deferred", canonical = "pyrite.results.model:SpatialResult", reason = "Keep the existing import pending canonical ownership review in #707." }

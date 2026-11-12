@@ -382,7 +382,8 @@ def _(mo):
     ## 4. Run an admitted axial case
 
     The diagnostics above never produce a photon spectrum. A standard run with
-    `Physics(channeling_model="axial")` does, but only for cases held in the
+    `channeling=pr.quantum.Channeling("axial", axial=...)` does, but only for
+    cases held in the
     repository's calibrated lookup. Two are admitted, both Si⟨100⟩ at 3.5 MeV
     through a 0.3 µm slab:
 
@@ -401,7 +402,7 @@ def _(mo):
     photons / electron / eV / sr, not detector counts.
 
     Every other case refuses before transport. To run one anyway, set
-    `channeling_admission="accept-inaccurate"`, accepting results that may
+    `Channeling(..., admission="accept-inaccurate")`, accepting results that may
     be very inaccurate. The record is then marked `unadmitted` and carries no
     ε or free→free bound.
 
@@ -434,11 +435,8 @@ def _(EnergyBins, FixedSampling, PointDetector, np, pr):
                 allow_normal_incidence=True,
             ),
             PointDetector(),  # on axis, zero aperture
-            physics=pr.Physics(
-                channeling_model="axial",
-                channeling_axial={"version": 2, "axis_uvw": [0, 0, 1]},
-                radiative_model="uncoupled",
-            ),
+            physics=pr.Physics(radiative_model="uncoupled"),
+            channeling=pr.quantum.Channeling("axial", axial={"version": 2, "axis_uvw": [0, 0, 1]}),
             numerics=pr.Numerics(
                 sampling=FixedSampling(cxr_histories=histories, brem_histories=histories),
                 energy_bins=EnergyBins(cxr=photon_grid_eV, brem=photon_grid_eV),

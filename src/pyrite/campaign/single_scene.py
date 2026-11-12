@@ -9,6 +9,7 @@ import numpy as np
 from .._energy_grid_encoding import encode_energy_grid
 from .._numerics import _emission_selection, default_inelastic_cutoff, default_radiative_cutoff
 from .._sampling import FixedSampling, SamplingPolicy, adaptive_sampling
+from ..quantum._channeling import channeling_from_fields
 from .observation import filter_from_config, physical_detector_from_config
 
 if TYPE_CHECKING:
@@ -171,10 +172,6 @@ def resolve_pixel_scene(
             sampling=_profile_sampling(catalog, scan, profile_name, command_name),
             energy_model=cast(Literal["frozen", "midpoint"], energy_model),
             max_dE_frac=float(max_dE_frac),
-            channeling_basis_size=int(transport.get("channeling_basis_size", 16)),
-            channeling_bloch_cells=int(transport.get("channeling_bloch_cells", 16)),
-            channeling_dz_ang=float(transport.get("channeling_dz_ang", 250.0)),
-            channeling_zone_max_ang=cast(float | None, transport.get("channeling_zone_max_ang")),
         ),
         Physics(
             emission=_emission_selection(catalog.profile_emission(profile_name) or "incoherent"),
@@ -212,15 +209,6 @@ def resolve_pixel_scene(
             pair_production_model=cast(
                 Literal["penelope-2024"] | None, transport.get("pair_production_model")
             ),
-            channeling_model=cast(
-                Literal["off", "planar", "axial"], transport.get("channeling_model", "off")
-            ),
-            channeling_plane=cast(tuple[int, int, int] | None, transport.get("channeling_plane")),
-            channeling_axial=cast(Mapping[str, object] | None, transport.get("channeling_axial")),
-            channeling_admission=cast(
-                Literal["admitted", "accept-inaccurate"],
-                transport.get("channeling_admission", "admitted"),
-            ),
             transition_radiation=cast(
                 Literal["off", "history", "bunch", "two-beam"],
                 transport.get("transition_radiation", "off"),
@@ -239,6 +227,7 @@ def resolve_pixel_scene(
             ),
         ),
         detector_id,
+        channeling_from_fields(transport),
     )
 
 
@@ -268,13 +257,15 @@ def compose_pixel_scene(components: tuple[Any, ...]) -> ProfileSimulation:
     from .model import Scene
 
     beam, target, detector, filters, scorer, acquisition, numerics, physics, detector_id = (
-        components
+        components[:9]
     )
+    # Injected resolvers may still return the older nine-element tuple.
+    channeling = components[9] if len(components) > 9 else None
     if not isinstance(detector, PlanarDetector):
         raise TypeError("pixel profile composition requires a PlanarDetector")
     physical = replace(detector, response=None, scorer=None)
     return ProfileSimulation(
-        scene=Scene(beam, target, physical, filters=filters),
+        scene=Scene(beam, target, physical, filters=filters, channeling=channeling),
         physics=physics,
         numerics=numerics,
         observation=Observation(

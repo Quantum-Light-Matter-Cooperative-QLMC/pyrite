@@ -69,15 +69,15 @@ def _case(args, crystal, azimuth_deg):
         energy_bins=EnergyBins(
             cxr=np.linspace(args.e_min_keV * 1e3, args.e_max_keV * 1e3, args.n_energy)
         ),
-        channeling_basis_size=args.basis,
-        channeling_bloch_cells=args.cells,
-        channeling_dz_ang=args.dz,
     )
-    physics = pr.Physics(
-        channeling_model="planar",
-        channeling_admission="accept-inaccurate",
-        channeling_plane=PLANES[crystal],
-        radiative_model="uncoupled",
+    physics = pr.Physics(radiative_model="uncoupled")
+    channeling = pr.quantum.Channeling(
+        "planar",
+        plane=PLANES[crystal],
+        numerics=pr.quantum.ChannelingNumerics(
+            basis_size=args.basis, bloch_cells=args.cells, step_ang=args.dz
+        ),
+        admission="accept-inaccurate",
     )
     beam = pr.Beam(
         energy_keV=args.energy_MeV * 1e3,
@@ -91,7 +91,12 @@ def _case(args, crystal, azimuth_deg):
         tilt_azim_deg=azimuth_deg,
         footprint=pr.geometry.Footprint(5.0, 5.0),
     )
-    return build_case(pr.Scene(beam, target, PointDetector()), numerics, physics=physics)
+    return build_case(
+        pr.Scene(beam, target, PointDetector()),
+        numerics,
+        physics=physics,
+        channeling=channeling,
+    )
 
 
 def _azimuth_for(args, crystal, psi_rad):

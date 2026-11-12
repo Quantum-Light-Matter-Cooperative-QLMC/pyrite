@@ -3,26 +3,21 @@
 This import-light module is the canonical quantum facade. The whole
 surface, including planar channeling, is experimental. Runtime wavefunctions are nonportable. See the quantum API guide.
 
-Only the established planar density-matrix zone can be lowered to production
-cases. Unsupported recipes fail before case construction; FFT-grid escape is
-never interpreted as physical dechanneling.
+:class:`Channeling` is the run section of the channeling zone, passed as
+``simulate(..., channeling=...)``. Only the planar density-matrix zone and
+repository-calibrated axial fibre cases lower to production cases.
+Unsupported recipes fail before case construction; FFT-grid escape is never
+interpreted as physical dechanneling.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field, replace
 from importlib import import_module
-from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal, Self
+from typing import TYPE_CHECKING, Any
 
-from .._numerics import Numerics, Physics, _miller, validate_channeling_numerics
-from .._sampling import AdaptiveSampling
-from .._spec_defaults import UNSET, _Unset
-from .._units import _positive_length_quantity, normalize_unit
+from ._channeling import Channeling, ChannelingNumerics
 
 if TYPE_CHECKING:
-    from pint import Quantity
-
     from pyrite.montecarlo.channeling.axial_diagnostic import (
         AxialDiagnosticConfig as AxialDiagnosticConfig,
     )
@@ -136,278 +131,6 @@ if TYPE_CHECKING:
     )
 
 
-def _angstrom(value: float) -> Quantity:
-    """Fresh registry-owned scalar angstrom read-back."""
-    from ..units import Q_
-
-    return Q_(float(value), "angstrom")
-
-
-def _length_spelling(owner: str, numeric_name: str, numeric: Any, name: str, semantic: object):
-    """Resolve a numeric-angstrom field against its keyword-only semantic length."""
-    if semantic is UNSET:
-        return numeric
-    if numeric is not UNSET:
-        raise TypeError(f"{owner}.{numeric_name} and {name} are mutually exclusive")
-    return _positive_length_quantity(semantic, unit="angstrom", field=f"{owner}.{name}", shape=())
-
-
-@dataclass(frozen=True, init=False)
-class QuantumRegion:
-    """Physical region and handoff cap, not an FFT grid or numerical boundary.
-
-    ``zone_max_ang`` is the optional zone-length cap in Å. Keyword-only
-    ``zone_max_length`` takes an explicit positive scalar Pint length instead;
-    the property reads it back as a fresh Å quantity (``None`` when uncapped)
-    and ``with_zone_max_length`` replaces it.
-    """
-
-    kind: Literal["free", "planar", "axial"] = "free"
-    plane_hkl: tuple[int, int, int] | None = None
-    axis_uvw: tuple[int, int, int] | None = None
-    zone_max_ang: float | None = None
-
-    def __init__(
-        self,
-        kind: Literal["free", "planar", "axial"] = "free",
-        plane_hkl: tuple[int, int, int] | None = None,
-        axis_uvw: tuple[int, int, int] | None = None,
-        zone_max_ang: float | None | _Unset = UNSET,
-        *,
-        zone_max_length: object = UNSET,
-    ) -> None:
-        zone = _length_spelling(
-            "QuantumRegion", "zone_max_ang", zone_max_ang, "zone_max_length", zone_max_length
-        )
-        object.__setattr__(self, "kind", kind)
-        object.__setattr__(self, "plane_hkl", plane_hkl)
-        object.__setattr__(self, "axis_uvw", axis_uvw)
-        object.__setattr__(self, "zone_max_ang", None if zone is UNSET else zone)
-        self.__post_init__()
-
-    @property
-    def zone_max_length(self) -> Quantity | None:
-        """Fresh Å zone-length cap, or ``None`` when the region is uncapped."""
-        return None if self.zone_max_ang is None else _angstrom(self.zone_max_ang)
-
-    def with_zone_max_length(self, zone_max_length: object) -> Self:
-        """Copy with an explicit positive length cap, or ``None`` to remove it."""
-        if zone_max_length is None:
-            return replace(self, zone_max_ang=None)
-        length = _length_spelling(
-            "QuantumRegion", "zone_max_ang", UNSET, "zone_max_length", zone_max_length
-        )
-        return replace(self, zone_max_ang=length)
-
-    def __post_init__(self) -> None:
-        if self.zone_max_ang is not None:
-            object.__setattr__(
-                self,
-                "zone_max_ang",
-                normalize_unit(
-                    self.zone_max_ang,
-                    "angstrom",
-                    field="QuantumRegion.zone_max_ang",
-                    expected="length",
-                ),
-            )
-        if self.kind not in ("free", "planar", "axial"):
-            raise ValueError("unknown quantum region kind")
-        if self.kind == "planar":
-            if self.plane_hkl is None:
-                raise ValueError("planar quantum region requires plane_hkl")
-            object.__setattr__(self, "plane_hkl", _miller(self.plane_hkl))
-            if self.axis_uvw is not None:
-                raise ValueError("planar quantum region cannot set axis_uvw")
-        elif self.kind == "axial":
-            if self.axis_uvw is None:
-                raise ValueError("axial quantum region requires axis_uvw")
-            object.__setattr__(self, "axis_uvw", _miller(self.axis_uvw))
-            if self.plane_hkl is not None:
-                raise ValueError("axial quantum region cannot set plane_hkl")
-        elif any(v is not None for v in (self.plane_hkl, self.axis_uvw, self.zone_max_ang)):
-            raise ValueError("free quantum region cannot set alignment or zone cap")
-        if self.zone_max_ang is not None:
-            validate_channeling_numerics(16, 16, 250.0, self.zone_max_ang)
-
-
-@dataclass(frozen=True)
-class QuantumDynamics:
-    """Physical dynamics recipe, separate from discretization and source."""
-
-    kind: Literal["free", "channeling"] = "free"
-
-    def __post_init__(self) -> None:
-        if self.kind not in ("free", "channeling"):
-            raise ValueError("unknown quantum dynamics kind")
-
-
-@dataclass(frozen=True, init=False)
-class QuantumNumerics:
-    """Propagation representation and numerical integration controls.
-
-    ``step_ang`` is the depth step in Å. Keyword-only ``step_length`` takes an
-    explicit positive scalar Pint length instead; the property reads it back
-    as a fresh Å quantity and ``with_step_length`` replaces it. ``basis_size``
-    and ``bloch_cells`` are counts, not quantities.
-    """
-
-    representation: Literal["bloch", "real-space"] = "bloch"
-    method: Literal["unitary", "density-matrix", "mcwf"] = "density-matrix"
-    basis_size: int = 16
-    bloch_cells: int = 16
-    step_ang: float = 250.0
-
-    def __init__(
-        self,
-        representation: Literal["bloch", "real-space"] = "bloch",
-        method: Literal["unitary", "density-matrix", "mcwf"] = "density-matrix",
-        basis_size: int = 16,
-        bloch_cells: int = 16,
-        step_ang: float | _Unset = UNSET,
-        *,
-        step_length: object = UNSET,
-    ) -> None:
-        step = _length_spelling("QuantumNumerics", "step_ang", step_ang, "step_length", step_length)
-        object.__setattr__(self, "representation", representation)
-        object.__setattr__(self, "method", method)
-        object.__setattr__(self, "basis_size", basis_size)
-        object.__setattr__(self, "bloch_cells", bloch_cells)
-        object.__setattr__(self, "step_ang", 250.0 if step is UNSET else step)
-        self.__post_init__()
-
-    @property
-    def step_length(self) -> Quantity:
-        """Fresh Å quantity for the propagation depth step."""
-        return _angstrom(self.step_ang)
-
-    def with_step_length(self, step_length: object) -> Self:
-        """Copy with an explicit positive step length; preserve other controls."""
-        step = _length_spelling("QuantumNumerics", "step_ang", UNSET, "step_length", step_length)
-        return replace(self, step_ang=step)
-
-    def __post_init__(self) -> None:
-        object.__setattr__(
-            self,
-            "step_ang",
-            normalize_unit(
-                self.step_ang,
-                "angstrom",
-                field="QuantumNumerics.step_ang",
-                expected="length",
-            ),
-        )
-        if self.representation not in ("bloch", "real-space"):
-            raise ValueError("unknown quantum representation")
-        if self.method not in ("unitary", "density-matrix", "mcwf"):
-            raise ValueError("unknown quantum propagation method")
-        validate_channeling_numerics(self.basis_size, self.bloch_cells, self.step_ang, None)
-
-
-@dataclass(frozen=True)
-class QuantumSetup:
-    """Reusable quantum stage for simulation or legacy Scene construction.
-
-    Pass independently as ``simulate(..., quantum=setup)``. Only planar Bloch
-    density-matrix channeling is supported in production; other configurations
-    explicitly refuse. ``admission`` lowers to ``Physics.channeling_admission``:
-    ``"admitted"`` (default) runs only cases in the measured admission table;
-    ``"accept-inaccurate"`` runs any other case, acknowledging that its
-    results may be very inaccurate, and marks them unadmitted (#1105).
-    """
-
-    region: QuantumRegion = field(default_factory=QuantumRegion)
-    dynamics: QuantumDynamics = field(default_factory=QuantumDynamics)
-    numerics: QuantumNumerics = field(default_factory=QuantumNumerics)
-    admission: Literal["admitted", "accept-inaccurate"] = "admitted"
-
-    def __post_init__(self) -> None:
-        for name, cls in (
-            ("region", QuantumRegion),
-            ("dynamics", QuantumDynamics),
-            ("numerics", QuantumNumerics),
-        ):
-            if not isinstance(getattr(self, name), cls):
-                raise TypeError(f"QuantumSetup.{name} must be {cls.__name__}")
-        from ._admission import CHANNELING_ADMISSIONS
-
-        if self.admission not in CHANNELING_ADMISSIONS:
-            raise ValueError(f"QuantumSetup.admission must be one of {CHANNELING_ADMISSIONS}")
-
-    def lower(self, physics: Physics, numerics: Numerics) -> tuple[Physics, Numerics]:
-        """Adapt supported planar configuration to unchanged versioned case fields."""
-        if self.region.kind == "axial":
-            from ._admission import refuse_unverified_axial_run
-
-            refuse_unverified_axial_run()
-        if (
-            self.region.kind != "planar"
-            or self.dynamics.kind != "channeling"
-            or self.numerics.representation != "bloch"
-            or self.numerics.method != "density-matrix"
-        ):
-            raise ValueError(
-                "quantum production supports only planar Bloch density-matrix "
-                "channeling; other configurations are diagnostic-only"
-            )
-        if physics.channeling_model != "off" or physics.channeling_axial is not None:
-            raise ValueError("Scene.quantum conflicts with legacy Physics.channeling_model")
-        if isinstance(numerics.sampling, AdaptiveSampling):
-            raise ValueError("adaptive precision is unsupported by planar quantum channeling")
-        values = dict(
-            channeling_basis_size=self.numerics.basis_size,
-            channeling_bloch_cells=self.numerics.bloch_cells,
-            channeling_dz_ang=self.numerics.step_ang,
-            channeling_zone_max_ang=self.region.zone_max_ang,
-        )
-        defaults = Numerics()
-        for name, value in values.items():
-            current = getattr(numerics, name)
-            if current != getattr(defaults, name) and current != value:
-                raise ValueError(f"Scene.quantum conflicts with legacy Numerics.{name}")
-        return (
-            replace(
-                physics,
-                channeling_model="planar",
-                channeling_plane=self.region.plane_hkl,
-                channeling_admission=self.admission,
-            ),
-            replace(numerics, **values),
-        )
-
-    def project_state(
-        self,
-        state: TransverseStateSpec,
-        *,
-        crystal: str,
-        kinetic_energy_eV: float,
-        incidence_rad: float = 0.0,
-        impact: str = "averaged",
-        temperature_K: float = 293.15,
-        margin_eV: float | None = None,
-        base_dir: str | Path | None = None,
-    ) -> PlanarStateProjection:
-        """Project a portable state for diagnostic planar density evolution.
-
-        This does not admit production transport or persisted CR emission.
-        The incidence is the *effective refracted* angle to the planes.
-        Axial configurations use #624's shared physical-admission refusal.
-        """
-        from .planar_source import project_planar_source
-
-        return project_planar_source(
-            state,
-            setup=self,
-            crystal=crystal,
-            kinetic_energy_eV=kinetic_energy_eV,
-            incidence_rad=incidence_rad,
-            impact=impact,
-            temperature_K=temperature_K,
-            margin_eV=margin_eV,
-            base_dir=base_dir,
-        )
-
-
 _EXPORTS = {
     "AxialDiagnosticConfig": (
         "pyrite.montecarlo.channeling.axial_diagnostic",
@@ -459,6 +182,8 @@ __all__ = [
     "AxialDiagnosticResult",
     "AxialMCWF",
     "AxialMCWFResult",
+    "Channeling",
+    "ChannelingNumerics",
     "DensityMatrixResult",
     "DensityMatrixSolver",
     "EntryState",
@@ -466,10 +191,6 @@ __all__ = [
     "MCWFSolver",
     "MixedState",
     "PlanarStateProjection",
-    "QuantumDynamics",
-    "QuantumNumerics",
-    "QuantumRegion",
-    "QuantumSetup",
     "RealSpaceGrid",
     "SampledState",
     "ScatteringKernel",
@@ -499,8 +220,31 @@ __all__ = [
 ]
 
 
+#: Classes removed by #1017 without a deprecation window (experimental surface).
+_REMOVED = {
+    "QuantumSetup": "Channeling",
+    "QuantumRegion": "Channeling(model=..., plane=...)",
+    "QuantumDynamics": "Channeling",
+    "QuantumNumerics": "ChannelingNumerics",
+}
+
+
+def removed_quantum_name(name: str) -> AttributeError | None:
+    """The error naming the replacement of a removed quantum setup class."""
+    replacement = _REMOVED.get(name)
+    if replacement is None:
+        return None
+    return AttributeError(
+        f"pyrite.quantum.{name} was removed; use pyrite.quantum.{replacement} and pass it "
+        "as simulate(..., channeling=...)"
+    )
+
+
 def __getattr__(name: str) -> Any:
     """Resolve an advanced contract only when requested, preserving type identity."""
+    removed = removed_quantum_name(name)
+    if removed is not None:
+        raise removed
     try:
         module, attribute = _EXPORTS[name]
     except KeyError as exc:

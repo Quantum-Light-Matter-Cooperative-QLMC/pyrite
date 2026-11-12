@@ -359,7 +359,7 @@ def axial_diagnostic(
     ``entry`` uses the existing 2D pure/mixture interface; omitted means a
     Gaussian of waist 0.5 Å at the coordinate origin. No amplitudes are averaged
     across mixture components or MCWF electrons. This adds no physics and does
-    not enable ``Physics(channeling_model="axial")``. ``observable(phi, tilt)``
+    not enable ``Channeling(model="axial")``. ``observable(phi, tilt)``
     (``AxialMCWF`` signature, tilt in Å⁻¹) must be linear in ``|phi><phi|``;
     it is averaged with the same weights as the density. See the axial diagnostic
     guide for periodic boundaries, convergence and validation limits.

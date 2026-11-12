@@ -3,7 +3,7 @@
 One declaration serves ``pyrite profile numerics|physics set`` and
 ``pyrite numerics|physics create|set``; :func:`field_params` copies the
 options a given owner accepts. The API partition
-(``pyrite._numerics.PHYSICS_FIELDS``) decides whether a field is Physics or
+(``pyrite._numerics.PHYSICS_KEYS``) decides whether a field is Physics or
 Numerics.
 """
 
@@ -11,7 +11,7 @@ from copy import copy
 
 import click
 
-from pyrite._numerics import PHYSICS_FIELDS
+from pyrite._numerics import CHANNELING_KEYS, PHYSICS_KEYS
 from pyrite.cli._deprecations import canonical_option, removed_option
 from pyrite.cli.commands import _profile_shared
 
@@ -63,9 +63,46 @@ FIELD_NAMES = {
 }
 
 
-def field_names(*, physics: bool) -> dict[str, str]:
-    """Option spelling -> field for the Physics or the Numerics owner."""
-    return {flag: key for flag, key in FIELD_NAMES.items() if (key in PHYSICS_FIELDS) == physics}
+def field_names(*, physics: bool, channeling: bool = True) -> dict[str, str]:
+    """Option spelling -> field for the Physics or the Numerics owner.
+
+    ``channeling=False`` drops the ``[channeling]`` table fields, which only
+    profiles carry (#1017); named presets have no channeling section.
+    """
+    return {
+        flag: key
+        for flag, key in FIELD_NAMES.items()
+        if (key in PHYSICS_KEYS) == physics and (channeling or key not in CHANNELING_KEYS)
+    }
+
+
+#: Channeling option spellings, in declaration order.
+CHANNELING_FLAGS = tuple(flag for flag, key in FIELD_NAMES.items() if key in CHANNELING_KEYS)
+
+
+class ChannelingSectionCommand(click.Command):
+    """Command whose ``--channeling-*`` options render under their own heading.
+
+    The flags write the profile's ``[channeling]`` table (#1017), so help lists
+    them apart from the Physics/Numerics fields.
+    """
+
+    def format_options(self, ctx: click.Context, formatter: click.HelpFormatter) -> None:
+        """Render ordinary options, then the channeling-table options."""
+        flags = {f"--{flag}" for flag in CHANNELING_FLAGS}
+        rows: list[tuple[str, str]] = []
+        channeling: list[tuple[str, str]] = []
+        for param in self.get_params(ctx):
+            record = param.get_help_record(ctx)
+            if record is not None:
+                target = channeling if flags.intersection(getattr(param, "opts", ())) else rows
+                target.append(record)
+        if rows:
+            with formatter.section("Options"):
+                formatter.write_dl(rows)
+        if channeling:
+            with formatter.section("Channeling options (profile [channeling] table)"):
+                formatter.write_dl(channeling)
 
 
 @removed_option("--cxr-trials", "--cxr-histories")
@@ -257,22 +294,22 @@ def field_names(*, physics: bool) -> dict[str, str]:
 @click.option(
     "--channeling-basis-size",
     type=click.IntRange(min=1),
-    help="Transverse plane-wave band |h| <= H (default 16).",
+    help="Transverse plane-wave band |h| <= H (table basis_size; default 16).",
 )
 @click.option(
     "--channeling-bloch-cells",
     type=click.IntRange(min=1),
-    help="Bloch-grid supercell size (default 16).",
+    help="Bloch-grid supercell size (table bloch_cells; default 16).",
 )
 @click.option(
     "--channeling-dz-ang",
     type=click.FloatRange(min=0, min_open=True),
-    help="Zone depth step in angstrom (default 250).",
+    help="Zone depth step in angstrom (table step_ang; default 250).",
 )
 @click.option(
     "--channeling-zone-max-ang",
     type=click.FloatRange(min=0, min_open=True),
-    help="Zone length cap in angstrom (default first layer thickness).",
+    help="Zone length cap in angstrom (table zone_max_ang; default first layer thickness).",
 )
 def _options_holder(**_values):
     """Parameter holder; never invoked."""
@@ -281,9 +318,11 @@ def _options_holder(**_values):
 _PARAMS = list(reversed(getattr(_options_holder, "__click_params__", [])))
 
 
-def field_params(*, physics: bool, removed: bool = True) -> list[click.Parameter]:
+def field_params(
+    *, physics: bool, removed: bool = True, channeling: bool = True
+) -> list[click.Parameter]:
     """Fresh copies of the owner's field options (plus removed-spelling guards)."""
-    names = field_names(physics=physics)
+    names = field_names(physics=physics, channeling=channeling)
     return [
         copy(param)
         for param in _PARAMS

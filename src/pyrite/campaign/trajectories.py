@@ -146,7 +146,7 @@ def trajectory_case(
     if execution.stream_block_electrons is not None or execution.stream_memory_mib is not None:
         raise ValueError("stream_block_electrons and stream_memory_mib require pyrite.simulate")
     scene = Scene(beam, target, detector=detector)
-    if physics.channeling_model != "off" or scene.beam.state is not None:
+    if scene.beam.state is not None:
         raise ValueError("channeling and Beam.state require pyrite.simulate")
     if physics.photon_transport is not None:
         raise ValueError("photon aperture scoring requires pyrite.simulate")
