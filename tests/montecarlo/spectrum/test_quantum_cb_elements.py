@@ -6,7 +6,14 @@ Validation: cbs-amplitude
 import numpy as np
 import pytest
 
-from pyrite.montecarlo.spectrum.cxr._recoil import _quantum_line_factors
+from pyrite._backend import _to_cpu
+from pyrite.montecarlo.spectrum.cxr import _recoil
+
+
+def _quantum_line_factors(*args):
+    """Host values of the production helper (CuPy scalars under CUDA)."""
+    return tuple(float(_to_cpu(x)) for x in _recoil._quantum_line_factors(*args))
+
 
 MC2 = 510998.95
 H = 1973.269804 / MC2  # hbar c / m c^2 [Angstrom]
