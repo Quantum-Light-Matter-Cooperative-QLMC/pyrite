@@ -34,13 +34,13 @@ from .fallbacks import measure_block_fallbacks
 #: Case keys whose spectra need every segment at once.
 STREAM_REFUSED_KEYS = ("coherent_emission", "temporal_profile", "photon_transport")
 
-#: Further case keys live streaming refuses (#611): a population-resolved line
-#: grid, adaptive electron counts, the channeling zone join, GDF beams, and
-#: transition radiation (electron-block transport refuses it; artifact replay
-#: still streams it). Cascades stream since #923.
+#: Further case keys live streaming refuses (#611): the diagnostic line-grid
+#: derivation, adaptive electron counts, the channeling zone join, GDF beams,
+#: and transition radiation (electron-block transport refuses it; artifact
+#: replay still streams it). Cascades stream since #923; non-windowed
+#: ``line_grid_policy`` grids since #1001.
 LIVE_STREAM_REFUSED_KEYS = (
     "transition_radiation",
-    "line_grid_policy",
     "_diagnostic_line_grid",
     "adaptive_precision",
     "channeling",
@@ -60,6 +60,9 @@ def streaming_refusal(case: Mapping[str, Any], *, live: bool = False) -> str | N
         for key in LIVE_STREAM_REFUSED_KEYS:
             if case.get(key) is not None:
                 return f"{key} is not supported by live streamed scoring"
+        from .streamed_line_grid import policy_streaming_refusal
+
+        return policy_streaming_refusal(case)
     return None
 
 
@@ -255,7 +258,10 @@ def run_case_streamed(
     Transports ``[0, max(Ne, Ne_brem))`` in electron blocks of
     ``block_electrons`` (a count, or a :class:`.stream_sizing.MemoryBlockSizer`)
     on the per-electron/CUDA core, scores each block as soon
-    as it finishes and releases it. The spectra equal :func:`.run_case`'s up to
+    as it finishes and releases it. A ``line_grid_policy`` grid is first
+    resolved by a transport pass of its own
+    (:func:`.streamed_line_grid.resolve_streamed_line_grid`) unless the speed
+    cache holds it. The spectra equal :func:`.run_case`'s up to
     floating-point summation order; transport counts are exact. Cases outside
     :func:`streaming_refusal` (``live=True``) raise ``ValueError`` before any
     transport.
@@ -269,20 +275,28 @@ def run_case_streamed(
     if reason is not None:
         raise ValueError(f"cannot stream this case's spectra: {reason}")
     E_grid, E_brem, _, n_hat, groove = _case_geometry(case)
-    inputs = dict(
-        E_grid=E_grid,
-        E_brem=E_brem,
-        n_hat=n_hat,
-        groove=groove,
-        Ne_lines=case["Ne"],
-        Ne_brem=case["Ne_brem"],
-    )
-    scorer = BlockSpectrumScorer(case, inputs)
+    grid_record = grid_pass = None
     # Same allocator cap as the joined spectrum phase.
     _ensure_pool_limit()
 
     sized = not isinstance(block_electrons, int)
     with block_electrons.pool_limit() if sized else nullcontext():
+        if case.get("line_grid_policy") is not None:
+            from .streamed_line_grid import resolve_streamed_line_grid
+
+            # Pass 1 of 2: the grid needs the whole line population (#1001).
+            E_grid, grid_record, grid_pass = resolve_streamed_line_grid(
+                case, block_electrons, transport_core=transport_core, n_hat=n_hat, groove=groove
+            )
+        inputs = dict(
+            E_grid=E_grid,
+            E_brem=E_brem,
+            n_hat=n_hat,
+            groove=groove,
+            Ne_lines=case["Ne"],
+            Ne_brem=case["Ne_brem"],
+        )
+        scorer = BlockSpectrumScorer(case, inputs)
         with collect_line_data_coverage() as line_coverage:
             tp = _transport_case(
                 case,
@@ -297,7 +311,10 @@ def run_case_streamed(
         n_backscattered=int(counts["n_backscattered"]),
         n_missed=int(counts["n_missed"]),
         line_coverage=line_coverage,
+        diagnostic_grid=grid_record,
     )
+    if grid_pass is not None:
+        out["_streamed_line_grid_pass"] = grid_pass
     from .recovery import RECOVERY_KEYS
 
     out.update({key: tp[key] for key in RECOVERY_KEYS if key in tp})

@@ -424,9 +424,13 @@ def _transport_case(
     # Line resolution needs the transport distribution, so it is chosen after
     # the case's own trajectories exist and before the spectrum phase. No second
     # Monte Carlo job is started for either path; see runner/line_grid.py.
-    E_grid, diagnostic_grid_result = resolve_cxr_grid(
-        case, segs_all, n_hat, Ne, E_grid, layers, groove
-    )
+    # A block consumer keeps the rows, so live streaming resolves its own grid
+    # (runner/streamed_line_grid.py).
+    diagnostic_grid_result = None
+    if block_consumer is None:
+        E_grid, diagnostic_grid_result = resolve_cxr_grid(
+            case, segs_all, n_hat, Ne, E_grid, layers, groove
+        )
 
     spectrum_inputs: dict[str, Any] = dict(
         E_grid=E_grid,

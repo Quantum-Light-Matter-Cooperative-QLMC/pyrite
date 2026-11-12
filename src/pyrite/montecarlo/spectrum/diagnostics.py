@@ -76,6 +76,17 @@ def sinc_feature_spacing(
     """
     if not 0.0 <= float(aliased_weight_limit) < 1.0:
         raise ValueError("aliased_weight_limit must be in [0, 1)")
+    width, weight = sinc_feature_samples(segments, n_hat, electron_limit=electron_limit)
+    return sinc_spacing_from_samples(width, weight, aliased_weight_limit=aliased_weight_limit)
+
+
+def sinc_feature_samples(segments, n_hat, *, electron_limit=None):
+    """Valid per-row ``(first-zero width [eV], t_L**2 weight)`` of :func:`sinc_feature_spacing`.
+
+    Elementwise in the rows, in row order, so the samples of consecutive
+    whole-electron blocks concatenate to those of the joined population
+    (#1001).
+    """
     energy_field = "E_repr_keV" if segments.get("E_repr_keV") is not None else "E_keV"
     energy = _host(segments[energy_field]).astype(float, copy=False)
     length = _host(segments["L_ang"]).astype(float, copy=False)
@@ -96,7 +107,13 @@ def sinc_feature_spacing(
         & (weight > 0.0)
         & (denominator > 0.0)
     )
-    width, weight = width[valid], weight[valid]
+    return width[valid], weight[valid]
+
+
+def sinc_spacing_from_samples(width, weight, *, aliased_weight_limit=0.01):
+    """The :func:`sinc_feature_spacing` quantile of valid ``(width, weight)`` samples."""
+    if not 0.0 <= float(aliased_weight_limit) < 1.0:
+        raise ValueError("aliased_weight_limit must be in [0, 1)")
     if width.size == 0:
         raise ValueError("cannot derive sinc spacing: diagnostic transport has no valid segments")
 
