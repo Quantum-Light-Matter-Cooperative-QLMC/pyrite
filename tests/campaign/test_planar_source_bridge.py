@@ -21,6 +21,7 @@ def _setup(**numerics):
         region=pr.QuantumRegion(kind="planar", plane_hkl=(1, 1, 0)),
         dynamics=pr.QuantumDynamics(kind="channeling"),
         numerics=pr.QuantumNumerics(basis_size=4, bloch_cells=2, step_ang=20.0, **numerics),
+        admission="accept-inaccurate",
     )
 
 

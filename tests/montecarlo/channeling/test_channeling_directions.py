@@ -23,7 +23,10 @@ def case():
         ),
         pr.Detector(),
         physics=pr.Physics(
-            channeling_model="planar", channeling_plane=(1, -1, 0), radiative_model="uncoupled"
+            channeling_model="planar",
+            channeling_admission="accept-inaccurate",
+            channeling_plane=(1, -1, 0),
+            radiative_model="uncoupled",
         ),
     )
     return api.build_case(
@@ -81,7 +84,10 @@ def test_planar_observation_carries_channeling_once(case, monkeypatch, acquisiti
         pr.geometry.Slab("silicon", 5000.0, footprint=pr.geometry.Footprint(5.0, 5.0)),
         detector,
         physics=pr.Physics(
-            channeling_model="planar", channeling_plane=(1, -1, 0), radiative_model="uncoupled"
+            channeling_model="planar",
+            channeling_admission="accept-inaccurate",
+            channeling_plane=(1, -1, 0),
+            radiative_model="uncoupled",
         ),
         acquisition=(
             pr.observations.Acquisition(exposure_s=1.0, measured_edges_eV=(0, 1500, 3000))

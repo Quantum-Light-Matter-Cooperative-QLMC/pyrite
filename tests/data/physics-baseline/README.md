@@ -317,3 +317,14 @@ the line catalog on the exit-face basis. This changed `CHANNELING_MODEL` to
 `planar-density-matrix-emission-v7`. Re-pinned: only the `case_content_key` in
 `channeling.json`. `spec_channeling` is not pinned here and every other
 expectation is unchanged.
+
+## Channeling admission (#1105)
+
+Planar channeling cases outside the measured admission table now refuse by
+default; the fixture's 5 MeV case runs under
+`channeling_admission="accept-inaccurate"`, and its `Case.channeling` record
+gains `"admission": {"status": "unadmitted"}`. This changed `CHANNELING_MODEL`
+to `planar-density-matrix-emission-v8`. Re-pinned: the `channeling` record and
+the `case_content_key` in `channeling.json`. No numerical output changes; every
+other expectation is unchanged. The resolved-case test ignores only the
+unadmitted warning.

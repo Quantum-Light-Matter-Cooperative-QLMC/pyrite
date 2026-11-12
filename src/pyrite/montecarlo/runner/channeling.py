@@ -167,12 +167,14 @@ def transport_channeling_case(
 
     Validation: cr-zone-handoff-accounting
     """
+    from ..channeling.planar_case import require_planar_admission
     from ..transport.beam_entry import sample_primary_entry, table_energy_range
     from ..transport.kinematics import stream_keys
     from ..transport.secondaries import LaunchState, SecondaryPass
     from ..transport.stopping import prepare_sbethe_stopping_table, sbethe_stopping_keV_per_ang
     from .step_budget import retry_step_budget
 
+    require_planar_admission(case)  # before any transport (#1105)
     Ne = int(E_cut_by_electrons.size)
     seed = int(case["seed"])
     E0 = float(case["E0_keV"])
@@ -300,5 +302,6 @@ def transport_channeling_case(
         "psi_edge_rad": ensemble.psi_edge_rad,
         "mean_handoff_psi_rad": float(handed_psi.mean()) if handed_psi.size else 0.0,
         "margin_eV": float(case["channeling"]["margin_eV"]),
+        "admission": dict(case["channeling"]["admission"]),
     }
     return out

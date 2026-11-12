@@ -1204,9 +1204,15 @@ Options:
                                   Planar quantum entrance zone (default off); requires
                                   plane, midpoint, uncoupled radiation and incoherent
                                   emission. Disable with profile physics reset PROFILE
-                                  channeling-model channeling-plane.
+                                  channeling-model channeling-plane channeling-
+                                  admission.
   --channeling-plane H K L        Nonzero Miller indices of the planar channeling
                                   family; requires planar.
+  --channeling-admission [admitted|accept-inaccurate]
+                                  admitted (default) runs only channeling cases in the
+                                  measured admission tables; accept-inaccurate runs any
+                                  other case, acknowledging possibly very inaccurate
+                                  results, marked unadmitted with no error budget.
   --emission [incoherent|coherent|both]
                                   CXR modes; cross-model constraints are validated
                                   before saving.

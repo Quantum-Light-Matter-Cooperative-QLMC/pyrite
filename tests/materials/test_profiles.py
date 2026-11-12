@@ -298,6 +298,10 @@ def test_channeling_demo_lowers_to_one_planar_case():
     assert case["theta_obs_rad"] == 0.0
     assert case["channeling"]["plane_hkl"] == (1, -1, 0)
     assert case["channeling"]["basis_size"] == 16
+    # The demo is the admitted planar entry and carries its measured budget (#1105).
+    assert case["channeling"]["admission"]["case_key"] == "si110-17MeV-2um"
+    assert case["channeling"]["admission"]["epsilon"] < 0.05
+    assert settings.channeling_admission == "admitted"
 
 
 def test_case_content_key_excludes_label_perf_and_flux_scale_fields():

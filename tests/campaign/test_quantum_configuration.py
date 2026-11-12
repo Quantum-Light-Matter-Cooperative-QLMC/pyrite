@@ -19,9 +19,16 @@ def _planar():
 def test_planar_adapter_matches_existing_legacy_controls():
     physics, numerics = _planar().lower(Physics(radiative_model="uncoupled"), Numerics())
     assert physics == Physics(
-        channeling_model="planar", channeling_plane=(1, 1, 0), radiative_model="uncoupled"
+        channeling_model="planar",
+        channeling_plane=(1, 1, 0),
+        radiative_model="uncoupled",
     )
     assert numerics == Numerics()
+    opted = replace(_planar(), admission="accept-inaccurate")
+    physics, _ = opted.lower(Physics(radiative_model="uncoupled"), Numerics())
+    assert physics.channeling_admission == "accept-inaccurate"
+    with pytest.raises(ValueError, match="QuantumSetup.admission"):
+        replace(_planar(), admission="yes")
 
 
 def test_custom_planar_grid_lowering():
@@ -90,7 +97,10 @@ def test_legacy_conflicts_refused():
     with pytest.raises(ValueError, match="Physics.channeling_model"):
         _planar().lower(
             Physics(
-                channeling_model="planar", channeling_plane=(1, 1, 0), radiative_model="uncoupled"
+                channeling_model="planar",
+                channeling_admission="accept-inaccurate",
+                channeling_plane=(1, 1, 0),
+                radiative_model="uncoupled",
             ),
             Numerics(),
         )

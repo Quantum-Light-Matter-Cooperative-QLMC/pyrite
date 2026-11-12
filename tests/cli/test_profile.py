@@ -1964,7 +1964,7 @@ def test_show_channeling_section_collapses_when_off_and_lists_all_when_on(tmp_pa
     assert "channeling_model" in catalog.read_text()
 
 
-def test_numerics_and_physics_json_split_the_seven_channeling_keys(tmp_path, monkeypatch):
+def test_numerics_and_physics_json_split_the_eight_channeling_keys(tmp_path, monkeypatch):
     _catalog(tmp_path, monkeypatch)
     physics = invoke(profile.command, ["physics", "show", "sub_100keV", "-o", "json"])
     assert_clean_result(physics)
@@ -1972,7 +1972,7 @@ def test_numerics_and_physics_json_split_the_seven_channeling_keys(tmp_path, mon
         row["key"]
         for row in json.loads(physics.stdout)["payload"]["fields"]
         if row["key"].startswith("channeling_")
-    ] == ["channeling_model", "channeling_plane", "channeling_axial"]
+    ] == ["channeling_model", "channeling_plane", "channeling_axial", "channeling_admission"]
     shown = invoke(profile.command, ["numerics", "show", "sub_100keV", "-o", "json"])
     assert_clean_result(shown)
     groups = {group["name"]: group for group in json.loads(shown.stdout)["payload"]["groups"]}

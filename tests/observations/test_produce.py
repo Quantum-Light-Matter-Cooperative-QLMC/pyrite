@@ -230,6 +230,7 @@ def test_quantum_observation_preserves_solver_settings_and_reuses_source(
         region=QuantumRegion(kind="planar", plane_hkl=(1, -1, 0)),
         dynamics=QuantumDynamics(kind="channeling"),
         numerics=QuantumNumerics(basis_size=12, bloch_cells=8, step_ang=100.0),
+        admission="accept-inaccurate",
     )
     scene = _scene(
         beam=replace(_scene().beam, energy_keV=5_000.0),
@@ -245,7 +246,10 @@ def test_quantum_observation_preserves_solver_settings_and_reuses_source(
         scene.target,
         scene.detector,
         physics=pr.Physics(
-            channeling_model="planar", channeling_plane=(1, -1, 0), radiative_model="uncoupled"
+            channeling_model="planar",
+            channeling_admission="accept-inaccurate",
+            channeling_plane=(1, -1, 0),
+            radiative_model="uncoupled",
         ),
         numerics=replace(
             NUMERICS, channeling_basis_size=12, channeling_bloch_cells=8, channeling_dz_ang=100.0

@@ -32,7 +32,10 @@ def channeling_run():
         ),
         pr.Detector(),
         physics=pr.Physics(
-            channeling_model="planar", channeling_plane=(1, -1, 0), radiative_model="uncoupled"
+            channeling_model="planar",
+            channeling_admission="accept-inaccurate",
+            channeling_plane=(1, -1, 0),
+            radiative_model="uncoupled",
         ),
     )
     numerics = pr.Numerics(

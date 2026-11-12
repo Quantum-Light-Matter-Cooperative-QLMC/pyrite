@@ -52,6 +52,7 @@ FIELD_NAMES = {
     "atomic-electron-deflection": "atomic_electron_deflection",
     "channeling-model": "channeling_model",
     "channeling-axial": "channeling_axial",
+    "channeling-admission": "channeling_admission",
     "transition-radiation": "transition_radiation",
     "shell-ionization-model": "shell_ionization_model",
     "channeling-plane": "channeling_plane",
@@ -238,13 +239,20 @@ def field_names(*, physics: bool) -> dict[str, str]:
     type=click.Choice(("off", "planar")),
     help="Planar quantum entrance zone (default off); requires plane, midpoint, uncoupled "
     "radiation and incoherent emission. Disable with profile physics reset PROFILE "
-    "channeling-model channeling-plane.",
+    "channeling-model channeling-plane channeling-admission.",
 )
 @click.option(
     "--channeling-plane",
     type=(int, int, int),
     metavar="H K L",
     help="Nonzero Miller indices of the planar channeling family; requires planar.",
+)
+@click.option(
+    "--channeling-admission",
+    type=click.Choice(("admitted", "accept-inaccurate")),
+    help="admitted (default) runs only channeling cases in the measured admission "
+    "tables; accept-inaccurate runs any other case, acknowledging possibly very "
+    "inaccurate results, marked unadmitted with no error budget.",
 )
 @click.option(
     "--channeling-basis-size",

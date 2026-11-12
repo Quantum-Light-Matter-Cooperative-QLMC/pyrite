@@ -58,6 +58,7 @@ CHANNELING_KEYS = (
     "channeling_model",
     "channeling_plane",
     "channeling_axial",
+    "channeling_admission",
     "channeling_basis_size",
     "channeling_bloch_cells",
     "channeling_dz_ang",
@@ -304,6 +305,15 @@ class Physics:
     channeling_plane
         Miller indices ``(h, k, l)`` of the channeling plane family; required
         by, and only accepted with, ``channeling_model="planar"``.
+    channeling_admission
+        ``"admitted"`` (default) runs only planar or axial cases in the
+        repository admission tables, which carry a measured relative error
+        budget, and refuses every other case before transport.
+        ``"accept-inaccurate"`` acknowledges that a case outside the tables may
+        give very inaccurate results and runs it anyway; its case identity,
+        provenance and results are marked ``"unadmitted"`` with no error
+        budget. Physical-validity refusals (energy, bound states, thermal
+        data, solver windows) still apply. Requires a channeling model (#1105).
     transition_radiation
         ``"off"`` (default), ``"history"`` or ``"bunch"``: score planar-stack
         transition radiation from the transported boundary crossings as the
@@ -364,6 +374,7 @@ class Physics:
     mixed_c1: float | None = None
     mixed_c2: float | None = None
     mixed_max_step_um: float | None = None
+    channeling_admission: Literal["admitted", "accept-inaccurate"] = "admitted"
 
     def __init__(
         self,
@@ -391,6 +402,7 @@ class Physics:
         mixed_c1: float | None = None,
         mixed_c2: float | None = None,
         mixed_max_step_um: float | None = None,
+        channeling_admission: Literal["admitted", "accept-inaccurate"] = "admitted",
         *,
         inelastic_cutoff: object = UNSET,
         secondary_threshold: object = UNSET,
@@ -920,6 +932,16 @@ def _miller(value: object) -> tuple[int, int, int]:
     return hkl
 
 
+def _validate_channeling_admission(model: str, admission: object) -> None:
+    """Refuse an unknown admission value, or the opt-in without a model (#1105)."""
+    from .quantum._admission import CHANNELING_ADMISSION_DEFAULT, CHANNELING_ADMISSIONS
+
+    if admission not in CHANNELING_ADMISSIONS:
+        raise ValueError(f"channeling_admission must be one of {', '.join(CHANNELING_ADMISSIONS)}")
+    if model == "off" and admission != CHANNELING_ADMISSION_DEFAULT:
+        raise ValueError("channeling_admission requires a channeling model")
+
+
 def validate_channeling_physics(physics: "Physics", energy_model: str) -> None:
     """Validate the channeling selector and its run-level compatibility (#506).
 
@@ -931,6 +953,7 @@ def validate_channeling_physics(physics: "Physics", energy_model: str) -> None:
     model = physics.channeling_model
     if model not in CHANNELING_MODELS:
         raise ValueError(f"channeling_model must be one of {', '.join(CHANNELING_MODELS)}")
+    _validate_channeling_admission(model, physics.channeling_admission)
     if model == "off":
         if physics.channeling_plane is not None:
             raise ValueError("channeling_plane requires channeling_model='planar'")

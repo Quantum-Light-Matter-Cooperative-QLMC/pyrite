@@ -30,7 +30,7 @@ LINES, BREM = 4, 6
 GRID = np.linspace(800.0, 10000.0, 47)
 
 
-def fibre_case(key="B", *, lines=LINES, brem=BREM):
+def fibre_case(key="B", *, lines=LINES, brem=BREM, thickness_ang=3000.0, admission="admitted"):
     """A calibrated case lowered from public objects alone."""
     tilt = dict(tilt_deg=0.088, tilt_azim_deg=225.0) if key == "A" else dict(tilt_deg=0.0)
     beam = pr.Beam(
@@ -38,7 +38,7 @@ def fibre_case(key="B", *, lines=LINES, brem=BREM):
     )
     target = pr.geometry.Slab(
         "silicon",
-        thickness_ang=3000.0,
+        thickness_ang=thickness_ang,
         width=None,
         height=None,
         cut=pr.geometry.CrystalCut(surface_hkl=(0, 0, 1)),
@@ -54,6 +54,7 @@ def fibre_case(key="B", *, lines=LINES, brem=BREM):
         channeling_axial={"version": 2, "axis_uvw": [0, 0, 1]},
         emission="incoherent",
         radiative_model="uncoupled",
+        channeling_admission=admission,
     )
     return build_case(pr.Scene(beam, target, PointDetector()), numerics, physics=physics)
 
@@ -417,3 +418,26 @@ def test_admitted_cases_persist_the_fibre_source_and_their_free_free_bound(produ
     assert stored["free_free_in_cut"] == entry.free_free_in_cut
     assert stored["free_free_record"] == entry.free_free_record
     assert stored["fibre_numerics"]["boundary"] == "max"
+
+
+@pytest.mark.slow
+def test_unadmitted_case_runs_under_the_opt_in_and_persists_no_budget(tmp_path):
+    """#1105: a thinner slab runs with the default fibre numerics, marked unadmitted."""
+    with pytest.raises(AxialAdmissionError, match="accept-inaccurate"):
+        fibre_case(thickness_ang=2000.0)
+    with pytest.warns(UserWarning, match="very inaccurate"):
+        case = fibre_case(thickness_ang=2000.0, admission="accept-inaccurate")
+    admit_axial_channeling(case)
+    transport = runner._transport_case(case)
+    out = runner._spectrum_case(case, transport)
+    assert np.isfinite(out["spec_channeling"]).all()
+    info = transport["segs"]["channeling"]
+    assert info["admission"] == info["case_key"] == "unadmitted"
+    assert not {"depth_budget", "free_free_upper"} & set(info)
+    records = {}
+    store_result(records, case, dict(out))
+    _checkpoint_store.save("silicon", tmp_path, records)
+    loaded = _checkpoint_store.load("silicon", tmp_path)
+    stored = next(iter(next(iter(loaded.values())).values()))["case"]["channeling"]
+    assert stored["admission"] == "unadmitted"
+    assert not {"depth_budget", "free_free_upper", "evidence_record"} & set(stored)

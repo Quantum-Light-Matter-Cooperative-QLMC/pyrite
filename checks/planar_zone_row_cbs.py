@@ -74,7 +74,10 @@ def _case(args, crystal, azimuth_deg):
         channeling_dz_ang=args.dz,
     )
     physics = pr.Physics(
-        channeling_model="planar", channeling_plane=PLANES[crystal], radiative_model="uncoupled"
+        channeling_model="planar",
+        channeling_admission="accept-inaccurate",
+        channeling_plane=PLANES[crystal],
+        radiative_model="uncoupled",
     )
     beam = pr.Beam(
         energy_keV=args.energy_MeV * 1e3,

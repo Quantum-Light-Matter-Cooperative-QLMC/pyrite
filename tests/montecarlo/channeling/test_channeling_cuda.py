@@ -43,6 +43,7 @@ def _case(*, elastic="elsepa", plane=(1, -1, 0), unit_bearing=False):
         pr.Detector(),
         physics=pr.Physics(
             channeling_model="planar",
+            channeling_admission="accept-inaccurate",
             channeling_plane=plane,
             radiative_model="uncoupled",
             inelastic_model="continuous",

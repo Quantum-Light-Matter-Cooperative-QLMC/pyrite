@@ -217,6 +217,10 @@ def resolve_pixel_scene(
             ),
             channeling_plane=cast(tuple[int, int, int] | None, transport.get("channeling_plane")),
             channeling_axial=cast(Mapping[str, object] | None, transport.get("channeling_axial")),
+            channeling_admission=cast(
+                Literal["admitted", "accept-inaccurate"],
+                transport.get("channeling_admission", "admitted"),
+            ),
             transition_radiation=cast(
                 Literal["off", "history", "bunch", "two-beam"],
                 transport.get("transition_radiation", "off"),

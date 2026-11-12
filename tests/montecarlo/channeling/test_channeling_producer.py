@@ -115,7 +115,10 @@ def produced():
         channeling_dz_ang=500.0,
     )
     physics = pr.Physics(
-        channeling_model="planar", channeling_plane=(1, -1, 0), radiative_model="uncoupled"
+        channeling_model="planar",
+        channeling_admission="accept-inaccurate",
+        channeling_plane=(1, -1, 0),
+        radiative_model="uncoupled",
     )
     return pr.simulate(beam, target, pr.Detector(), physics=physics, numerics=numerics)
 

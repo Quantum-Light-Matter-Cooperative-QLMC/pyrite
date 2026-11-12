@@ -61,3 +61,27 @@ def refuse_axial_channeling_cases(cases: Iterable[Mapping[str, Any]]) -> None:
     """Refuse a whole batch before any case can read caches, write, or execute."""
     for case in cases:
         refuse_axial_channeling(case)
+
+
+#: ``Physics.channeling_admission`` values (#1105). The default runs only cases
+#: in a repository admission table; the opt-in acknowledges that a case outside
+#: it may give very inaccurate results and marks every output unadmitted.
+CHANNELING_ADMISSION_DEFAULT = "admitted"
+CHANNELING_ADMISSION_OPT_IN = "accept-inaccurate"
+CHANNELING_ADMISSIONS = (CHANNELING_ADMISSION_DEFAULT, CHANNELING_ADMISSION_OPT_IN)
+#: Admission status of a resolved case run under the opt-in; it carries no ε.
+UNADMITTED = "unadmitted"
+
+
+class PlanarAdmissionError(ValueError):
+    """A planar production case lies outside the measured admission table."""
+
+
+def unadmitted_hint() -> str:
+    """Refusal suffix naming the opt-in, shared by planar and axial."""
+    return (
+        f"; to run it anyway set channeling_admission='{CHANNELING_ADMISSION_OPT_IN}' "
+        f"(profile key channeling_admission, CLI --channeling-admission "
+        f"{CHANNELING_ADMISSION_OPT_IN}), acknowledging that its results may be very "
+        "inaccurate: they are marked unadmitted and carry no error budget"
+    )

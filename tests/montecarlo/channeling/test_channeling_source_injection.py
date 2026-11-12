@@ -38,6 +38,7 @@ def _scene(state=None, *, physics=None, energy_spread_frac=None):
         physics=physics
         or pr.Physics(
             channeling_model="planar",
+            channeling_admission="accept-inaccurate",
             channeling_plane=(1, -1, 0),
             radiative_model="uncoupled",
         ),

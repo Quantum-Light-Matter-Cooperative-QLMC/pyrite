@@ -33,6 +33,7 @@ PHYSICS_FIELD_OWNERS = MappingProxyType(
         "channeling_model": PHYSICAL_MODEL,
         "channeling_plane": PHYSICAL_MODEL,
         "channeling_axial": PHYSICAL_MODEL,
+        "channeling_admission": PHYSICAL_MODEL,
         "transition_radiation": PHYSICAL_MODEL,
         "transition_lattice_origin_ang": PHYSICAL_MODEL,
         "shell_ionization_model": PHYSICAL_MODEL,
