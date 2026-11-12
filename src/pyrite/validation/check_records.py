@@ -76,6 +76,8 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     # #1055 ownership measurement: records ratios, without a pass/fail gate.
     "checks/planar_zone_row_cbs.py": (),
     "checks/channeling_detector_components.py": (),
+    # #1148 measured omission of channeled-state PXR on planar zone rows: a report.
+    "checks/channeling_zone_pxr_modulation.py": ("cr-planar-zone-pxr-modulation",),
     # Axial handoff research diagnostics are recorded in the ledger notes, not
     # as physical validation verdicts.
     "checks/axial_escape_accounting.py": (),

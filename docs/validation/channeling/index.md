@@ -36,6 +36,7 @@ cr-capture-bound
 cr-capture-yield
 cr-planar-free-free-block
 cr-planar-zone-row-ownership
+cr-planar-zone-pxr-modulation
 cr-transition-radiation-bound
 cr-zone-incoherent-flux-weight
 cr-zone-handoff-accounting

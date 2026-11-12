@@ -25,6 +25,12 @@ sums are additive over rows), 1 otherwise.
         --electrons 50 --json scratch/channeling_detector_components.json
 
 Band integrals are photons/sr per incident electron over the case line grid.
+With ``--detector-solid-angle-sr``, tensor Gauss quadrature integrates a square
+face aimed at the sample; outputs become photons per incident electron.
+``--polar-deg`` selects beam-relative centres in the first Bragg plane.
+Converge ``--detector-order`` explicitly; this is not a certified error bound.
+Example JUNGFRAU acceptance: ``--detector-solid-angle-sr 2.05e-4
+--detector-distance-mm 5000 --polar-deg 30 37.5 45``.
 
 Evidence for the #1148 baseline; no ledger claim yet.
 """
@@ -100,6 +106,28 @@ def _score(runner, case, transport, n_hat):
     return {key: _band(out[key], grid) if out.get(key) is not None else None for key in COMPONENTS}
 
 
+def _detector_score(runner, case, transport, beam, n_hat, args):
+    if args.detector_solid_angle_sr is None:
+        return _score(runner, case, transport, n_hat)
+    from pyrite.validation.channeling_detector import square_aperture_rule
+
+    rays, weights, _ = square_aperture_rule(
+        beam,
+        n_hat,
+        args.detector_solid_angle_sr,
+        args.detector_distance_mm,
+        args.detector_order,
+    )
+    point_case = {**case, "dtheta_obs_rad": 0.0, "domega_sr": 0.0}
+    total = dict.fromkeys(COMPONENTS)
+    for ray, weight in zip(rays, weights, strict=True):
+        value = _score(runner, point_case, transport, ray)
+        for component, band in value.items():
+            if band is not None:
+                total[component] = (total[component] or 0.0) + float(weight) * band
+    return total
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--profile", default="channeling_demo")
@@ -112,7 +140,50 @@ def main(argv=None) -> int:
         action="store_true",
         help="force node-sampled lines (aliases sub-eV zone lines on coarse grids)",
     )
+    parser.add_argument(
+        "--detector-solid-angle-sr",
+        type=float,
+        default=None,
+        help="integrate a source-facing square; default: original direction probes",
+    )
+    parser.add_argument(
+        "--detector-distance-mm",
+        type=float,
+        default=5000.0,
+        help="source-to-face distance [mm], default: 5000",
+    )
+    parser.add_argument(
+        "--detector-order",
+        type=int,
+        default=3,
+        help="Gauss integration order per square side, default: 3; converge explicitly",
+    )
+    parser.add_argument(
+        "--polar-deg",
+        type=float,
+        nargs="+",
+        default=None,
+        help="replace probes by these beam-relative polar angles in the first Bragg plane",
+    )
     args = parser.parse_args(argv)
+    if args.polar_deg is not None and any(
+        not np.isfinite(v) or not 0 <= v <= 180 for v in args.polar_deg
+    ):
+        parser.error("--polar-deg values must be finite and between 0 and 180 inclusive")
+    detector_side_mm = None
+    if args.detector_solid_angle_sr is not None:
+        from pyrite.validation.channeling_detector import square_aperture_rule
+
+        try:
+            _, _, detector_side_mm = square_aperture_rule(
+                [0, 0, 1],
+                [1, 0, 0],
+                args.detector_solid_angle_sr,
+                args.detector_distance_mm,
+                args.detector_order,
+            )
+        except ValueError as error:
+            parser.error(str(error))
 
     from pyrite.montecarlo import runner
     from pyrite.montecarlo.geometry import tilted_geometry
@@ -157,6 +228,20 @@ def main(argv=None) -> int:
             probe = n_hat + axis / gamma
             directions.append((label + tag, probe / np.linalg.norm(probe), energy))
 
+    if args.polar_deg is not None:
+        if not bragg:
+            parser.error("--polar-deg needs an in-band Bragg reflection to define the azimuth")
+        reference = bragg[0][1]
+        tangent = reference - (reference @ beam) * beam
+        tangent /= np.linalg.norm(tangent)
+        directions = [
+            (
+                f"polar-{angle:g}",
+                np.cos(np.deg2rad(angle)) * beam + np.sin(np.deg2rad(angle)) * tangent,
+                None,
+            )
+            for angle in args.polar_deg
+        ]
     zone_t = {**on_t, "segs": _subset(on_t["segs"], zone)}
     native_t = {**on_t, "segs": _subset(on_t["segs"], ~zone)}
     record = {
@@ -170,6 +255,15 @@ def main(argv=None) -> int:
         ),
         "fates": on_t["segs"]["channeling"]["fates"],
         "directions": [],
+        "detector": {
+            "solid_angle_sr": args.detector_solid_angle_sr,
+            "distance_mm": args.detector_distance_mm,
+            "side_mm": detector_side_mm,
+            "azimuth_reference": bragg[0][0] if args.polar_deg is not None else None,
+            "quadrature_order": args.detector_order,
+            "pose": "source-facing square, horizontal in diffraction plane",
+            "units": "photons/electron" if args.detector_solid_angle_sr else "photons/sr/electron",
+        },
     }
     ok = True
     for label, n_hat, energy in directions:
@@ -177,10 +271,10 @@ def main(argv=None) -> int:
             "label": label,
             "n_hat": [float(v) for v in n_hat],
             "bragg_eV": energy,
-            "on_all": _score(runner, case, on_t, n_hat),
-            "on_zone": _score(runner, case, zone_t, n_hat),
-            "on_native": _score(runner, case, native_t, n_hat),
-            "off": _score(runner, off, off_t, n_hat),
+            "on_all": _detector_score(runner, case, on_t, beam, n_hat, args),
+            "on_zone": _detector_score(runner, case, zone_t, beam, n_hat, args),
+            "on_native": _detector_score(runner, case, native_t, beam, n_hat, args),
+            "off": _detector_score(runner, off, off_t, beam, n_hat, args),
         }
         for key in ("spec", "spec_characteristic", "brem"):
             total, part_z, part_n = (row[arm][key] for arm in ("on_all", "on_zone", "on_native"))
@@ -193,6 +287,7 @@ def main(argv=None) -> int:
         f"{args.profile}: Ne={args.electrons}, zone rows {record['zone_rows']}/{record['rows']}, "
         f"zone path fraction {record['zone_path_fraction']:.3f}, fates {record['fates']}"
     )
+    print(f"band-integral units: {record['detector']['units']}")
     header = (
         f"{'direction':>14} {'component':>20} {'off':>11} {'on':>11} {'on/off':>7} {'zone%':>6}"
     )
