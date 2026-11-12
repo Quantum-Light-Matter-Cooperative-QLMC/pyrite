@@ -47,3 +47,103 @@ The claimed 0.38–0.39 over margins 30–300 eV, $H=8$–16 and $n_{\rm cells}=
 `rederived`. Suggested Notes edit: replace "capture widths are upper estimates" with "approximate; full-dynamics $G(z)$ agrees within 2% on 4- and 16-cell grids".
 
 Toctree: this page is new. `docs/validation/index.md` needs a `channeling/cr-capture-yield` entry next to `channeling/cr-capture-bound`; the verifier did not edit the index.
+
+## Upper band straddling the barrier (#1091)
+
+Line groups are keyed by the band pair $(u, l)$ across Bloch blocks. When band
+$u$ is bound in some blocks and above the barrier in others, the group holds
+bound→bound rows and capture rows. The coherence-transfer generator
+$K_{k'k}=\langle f_{k'}|\mathcal J(|f_k\rangle\langle i_k|)|i_{k'}\rangle$
+acts on the band-pair coherence whatever the barrier label of $i_k$, so the
+rows keep their shared modes $K=V\,\mathrm{diag}(\mu)\,V^{-1}$.
+
+The field radiated by mode $m$ is $\sum_k a_k^*\sigma_k$, so the weight
+$w_m=(a^\dagger V)_m(V^{-1}s)_m$ is linear in the radiating amplitudes. For a
+partition of the rows into kinds $P$, set $a_P$ equal to $a$ on $P$ and zero
+elsewhere:
+
+$$
+w_m^{P}=(a_P^\dagger V)_m\,(V^{-1}s)_m,\qquad
+\sum_P w_m^{P}=w_m,\qquad
+\sum_m w_m^{P}=a_P^\dagger s=\sum_{k\in P}Y_k .
+$$
+
+Because each mode profile has unit area, the line and capture spectra
+integrate to exactly the line and capture yields of `EmissionLines.rates`,
+and their sum is the unsplit group spectrum. Before #1091 the whole group
+went to the kind of its first row. At Si(110), 12.5 MeV, 4 cells, $H=8$,
+300 eV margin, 1 mrad divergence and 5000 Å, groups (3,0), (3,2) and (3,1)
+mix kinds. Capture was overstated by 15% and bound→bound understated by
+5.7%. The total changes at rounding level only ($\le 10^{-15}$ relative).
+
+A cluster inside one block takes its strongest member's kind and can, in
+principle, merge an initial state just below the barrier with one just above
+it. The anchor case has no such cluster.
+
+### Fresh-context verification of the split (2026-11-11)
+
+**Derivation.** By the quantum regression theorem the group spectrum per
+transverse eV is
+
+$$
+S(E)=\frac{1}{\pi\hbar v}\,\mathrm{Re}\int_0^\infty d\tau\,
+e^{-iE\tau/\hbar v}\,a^\dagger e^{K\tau}s
+=\frac{1}{\pi\hbar v}\,\mathrm{Re}\,a^\dagger\left(\frac{iE}{\hbar v}-K\right)^{-1}s ,
+$$
+
+with $s_k=Y_k/a_k^*$. The source $\sigma_k\rho$ lives in block $k$ only, so
+$C(0)=a^\dagger s=\sum_k Y_k$ has no cross terms. With
+$K=V\,\mathrm{diag}(\mu)\,V^{-1}$ the resolvent is a sum of poles with
+weights $(a^\dagger V)_m(V^{-1}s)_m$. Replacing $a$ by $a_P$ at the
+radiating (late-time) end is linear, so $\sum_P w_m^P=w_m$ and
+$\sum_m w_m^P=a_P^\dagger s=\sum_{k\in P}Y_k$. Attributing the photon to
+the source end instead, $(a^\dagger V)_m(V^{-1}s_P)_m$, gives the same
+per-kind integral $a^\dagger s_P=\sum_{k\in P}Y_k$. Only the per-kind line
+shapes depend on the choice: cross-block terms $a_{k'}^*\,(e^{K\tau})_{k'k}\,s_k$
+with $k'$ and $k$ of different kinds have no unique kind label. The
+radiating-end convention credits the dipole that radiates at detection. It
+is a definition, not an observable; the per-kind integrated yields are
+convention-free and equal `EmissionLines.rates`.
+
+**Shared modes.** The off-diagonal elements
+$K_{k'k}=\langle f_{k'}|\mathcal J(|f_k\rangle\langle i_k|)|i_{k'}\rangle$ are
+the gain from scattering kicks that move band-pair coherence between Bloch
+blocks. The diagonal already carries the full loss $(\Gamma_i+\Gamma_f)/2$.
+Keying groups on kind would drop the gain between kinds while keeping the
+loss, which broadens the lines and changes the total spectrum. The barrier
+label is an energy classification, not a dynamical boundary of $\mathcal J$.
+
+**Numbers** (Si(110), 12.5 MeV, 4 cells, $H=8$, 300 eV margin, 293.15 K,
+1 mrad, 5000 Å, $dz=250$ Å, no absorption; independent verifier
+script, not committed). The three mixed groups are $(3,0)$ and
+$(3,2)$ (kinds C C L C over blocks 0–3) and $(3,1)$ (C L C over blocks 1–3).
+
+- $K$ rebuilt from `solver.jump`/`loss_rate` agrees with
+  $V\,\mathrm{diag}(\mu)\,V^{-1}$ to $2\times10^{-10}$ relative. Off-diagonal
+  elements reach 0.11–0.18 of the largest diagonal damping.
+- Per-kind spectra from the resolvent above (no eigendecomposition) match
+  `kind_spectra` to $\le 2\times10^{-10}$ of peak for every mixed group and
+  kind. A direct $\int d\tau\,e^{-iE\tau/\hbar v}\,a_P^\dagger e^{K\tau}s$
+  quadrature at the strongest mode agrees to $3\times10^{-5}$ (step-limited),
+  which confirms the transform sign.
+- $a_P^\dagger s=a^\dagger s_P=\sum_{k\in P}Y_k$ to printed precision. Over
+  $\pm 2$ MeV the line and capture spectra integrate to their yields to
+  $-1.2\times10^{-4}$ (Lorentzian tails outside the window), and
+  line + capture equals the unsplit sum to $8\times10^{-13}$ of peak.
+- Old attribution: line yield $-5.69\%$, capture $+14.70\%$, which reproduces
+  the write-up.
+- Source-end and radiating-end per-kind shapes differ by $\le 1.8\%$ of peak
+  in $(3,0)$ and $(3,2)$.
+- Of 151 rows (20 multi-member), no cluster mixes bound and free initial
+  states.
+
+**Residuals.** A per-kind part of a mixed group is not positive-definite. In
+$(3,1)$ the bound row ($Y=2\times10^{-18}$) has a dispersive lobe of $-0.40$
+of its own peak, but its magnitude is $3\times10^{-12}$ of the line-spectrum
+peak, and the summed line and capture spectra stay non-negative. The
+Gaussian $\gamma$-spread exponent is strength-weighted over the whole group
+and shared by both kinds, which affects shapes only for
+`sigma_gamma_rel > 0`. Cluster kind mixing is still assigned to the strongest
+member. It is absent here.
+
+**Verdict:** `rederived`.

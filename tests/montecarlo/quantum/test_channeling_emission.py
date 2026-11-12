@@ -701,3 +701,48 @@ def test_tracked_partition_is_exact_when_a_final_band_straddles_the_barrier(si11
         np.testing.assert_allclose(
             b.spectrum - b.free_free_spectrum, a.spectrum, rtol=0.0, atol=1e-12 * b.spectrum.max()
         )
+
+
+STRADDLE_EV = 12.5e6  # Si(110), 4 cells, H = 8: band 3 is bound only in block 2
+
+
+@pytest.fixture(scope="module")
+def straddling(si110):
+    kernel = tds_kernel(si110, STRADDLE_EV, **GRID) + electronic_kernel(si110, STRADDLE_EV, **GRID)
+    return DensityMatrixSolver(si110, STRADDLE_EV, kernel, margin_eV=300.0)
+
+
+def test_straddling_upper_band_credits_each_kind_its_own_rows(straddling):
+    """#1091: one (upper, lower) group holds line and capture rows across blocks.
+
+    The rows share coherence-transfer modes; each kind is credited with the
+    emission radiated by its own rows, so over all energies the line and
+    capture spectra integrate to the line and capture yields.
+    """
+    grid = np.linspace(2e3, 2e5, 201)
+    result = channeling_spectrum(
+        straddling, 5000.0, grid, 0.0, divergence_rad=1e-3, dz_ang=250.0, absorption=False
+    )
+    lines, yields = result.lines, result.line_yield
+    mixed = [g for g in lines.groups if np.unique(lines.kind[g.lines]).size > 1]
+    shares = [
+        yields[g.lines][lines.kind[g.lines] == KIND_LINE].sum() / yields[g.lines].sum()
+        for g in mixed
+    ]
+    assert max(shares) > 0.2  # bound -> bound rows radiate a real share of a mixed group
+    for group in mixed:
+        kinds, own = lines.kind[group.lines], yields[group.lines]
+        whole = group.modes(own)[2]
+        parts = [group.modes(own, emitting=kinds == kind)[2] for kind in (KIND_LINE, KIND_CAPTURE)]
+        np.testing.assert_allclose(
+            parts[0] + parts[1], whole, rtol=0, atol=1e-12 * abs(whole).max()
+        )
+        for kind, part in zip((KIND_LINE, KIND_CAPTURE), parts, strict=True):
+            assert part.sum().real == pytest.approx(own[kinds == kind].sum(), rel=1e-9)
+
+    wide = np.linspace(-2e6, 2e6, 400001)
+    line, capture, free = lines.kind_spectra(wide, yields, 0.0)
+    assert not np.any(free)
+    for spectrum, kind in ((line, KIND_LINE), (capture, KIND_CAPTURE)):
+        integral = np.trapezoid(spectrum, wide)  # unit-area lab profiles
+        assert integral == pytest.approx(yields[lines.kind == kind].sum(), rel=1e-3)
