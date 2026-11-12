@@ -75,6 +75,7 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     "checks/channeling_overflow.py": ("cr-planar-overflow-spectrum",),
     # #1055 ownership measurement: records ratios, without a pass/fail gate.
     "checks/planar_zone_row_cbs.py": (),
+    "checks/channeling_detector_components.py": (),
     # Axial handoff research diagnostics are recorded in the ledger notes, not
     # as physical validation verdicts.
     "checks/axial_escape_accounting.py": (),
