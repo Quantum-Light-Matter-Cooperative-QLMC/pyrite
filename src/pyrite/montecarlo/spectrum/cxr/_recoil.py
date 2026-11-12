@@ -39,7 +39,7 @@ def _quantum_line_factors(h, gamma, vdg, k_dot_v, k_dot_g, g2, k2, v_dot_e, g_do
     ``A_CBS = (U_g/m) f_cbs``. The electron enters with ``p_i = gamma m v``,
     absorbs the lattice transfer ``-hbar g`` and emits ``hbar k``. ``f_cbs`` is
     the sum of both time orderings of the second-order CB element, with the
-    exact intermediate denominators ``E_1 - E_i`` and ``E_f - E_2``. Both
+    exact intermediate denominators ``E_i - E_1`` and ``E_f - E_2``. Both
     terms carry convective transition currents ``(p + p')/(E + E')`` and are
     combined algebraically, so no ``1/hbar`` cancellation remains. The PXR
     numerator takes the same current between the initial and final states
@@ -48,7 +48,9 @@ def _quantum_line_factors(h, gamma, vdg, k_dot_v, k_dot_g, g2, k2, v_dot_e, g_do
     ``v.(k+g)(g.e + k.e) - k^2 v.e`` and
     ``-({g;e} + (v.e){k;g}/(v.g)) / (gamma v.g)``. Valid away from the
     real intermediate-state poles ``n_1, n_2 -> 0``, which is the quantum
-    form of the classical ``v.g -> 0`` limit.
+    form of the classical ``v.g -> 0`` limit. Exact to second order in
+    ``chi_g``/``U_g`` for plane-wave states and a spinless convective current;
+    Dirac magnetic-moment terms enter the intensity at ``O(h^2)``.
     Derivation: docs/validation/radiation-physics/cbs-amplitude.md.
 
     Validation: cbs-amplitude
