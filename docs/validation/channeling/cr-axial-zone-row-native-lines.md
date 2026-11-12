@@ -1,12 +1,93 @@
-# `cr-axial-zone-row-native-lines`: axial zone rows score no native lines
+# `cr-axial-zone-row-native-lines`: native axial reflection ownership
 
-**Status:** see the [ledger row](../ledger-channeling.md#cr-axial-zone-row-native-lines). Fresh-context independent verification (2026-11-09, #994, HEAD `f0cbdeb58`).
+**Status:** see the [ledger row](../ledger-channeling.md#cr-axial-zone-row-native-lines).
+Fresh-context independent rederivation, 2026-11-12, #1148.
 
-The claim has three parts. Native PXR/CBS line scoring for an admitted axial
-fibre case drops the entrance-zone rows. The zone's in-cut on-axis line-band
-emission is then owned by the fibre source (`boundary="max"`) plus a declared
-one-sided free→free bound. Characteristic and incoherent bremsstrahlung
-scoring, and every planar or non-channeling case, are unchanged.
+The native spectrum is the sum of nonzero axial-order reflections on all
+rows and zero-order reflections on continuation rows only. Each part keeps
+the same incident-electron normalization. The fibre source and its declared
+in-cut free→free omission are unchanged. This supersedes #994's blanket zone-row
+removal; that rule also removed off-zone reflections absent from the transverse
+source, although their resonances lie outside the original admitted band.
+
+## Sources consulted before implementation
+
+Repository claim and derivation `cr-axial-2d-eigenproblem`, ADR-0018 emission ownership, current `cr-axial-zone-row-native-lines` claim and write-up. Primary supporting source: Wagner et al., Phys. Rev. Accel. Beams 22, 054502 (2019), DOI https://doi.org/10.1103/PhysRevAccelBeams.22.054502, continuum axial potential described as Fourier sum over reciprocal vectors perpendicular to the axis. Publisher abstract/search text accessible; full-text PDF retrieval failed, so no unverified equation number claimed. The elementary Fourier projection below independently establishes the selection.
+
+## Derivation fixed before implementation inspection
+
+Let the nonsingular direct-lattice matrix have columns $\mathbf a_i$, $A=(\mathbf a_1,\mathbf a_2,\mathbf a_3)$, and the reciprocal matrix be $B=2\pi A^{-\mathsf T}$. For integer index columns $h=(h,k,l)$ and $u=(u,v,w)$,
+
+$$
+\mathbf G=Bh,\quad \mathbf t=Au,\quad \mathbf G\cdot\mathbf t=2\pi h^{\mathsf T}u.
+$$
+
+The continuum projection along a full lattice translation is
+
+$$
+\overline U(\mathbf r)=\int_0^1 U(\mathbf r+s\mathbf t)\,ds
+=\sum_h U_h e^{i\mathbf G\cdot\mathbf r}\int_0^1e^{2\pi i(h^{\mathsf T}u)s}\,ds
+=\sum_{h^{\mathsf T}u=0}U_he^{i\mathbf G\cdot\mathbf r}.
+$$
+
+Thus the existing transverse source contains precisely the zero longitudinal-order Fourier sector; the nonzero-order sector is absent from its continuum Hamiltonian. The predicate is exact integer arithmetic and applies to every valid lattice metric, including oblique cells. The Euclidean dot product of Cartesian `hkl` and Cartesian axis would generally be wrong; fractional reciprocal/direct integer indices are dual. For an orthogonal frame rotation $R$, $(R\mathbf G)\cdot(R\mathbf t)=\mathbf G\cdot\mathbf t$, so sample tilt and crystal-cut rotations cannot change ownership. Beam tilt also cannot redefine the continuum lattice axis.
+
+The required native row/reflection ownership table is:
+
+| row | $h\cdot u=0$ | $h\cdot u\ne0$ |
+| --- | --- | --- |
+| entrance zone | source-owned; omit native | native-owned; score native |
+| continuation after handoff | score native | score native |
+
+Incident electron normalization $1/N_e$ remains unchanged; removing rows changes only the sum. No extra survival factor follows from this ownership derivation.
+
+## Limits and accuracy boundary
+
+- Axis reversal and any nonzero integer rescaling leave the zero-set invariant. $\pm h$ partners receive the same ownership.
+- All-zero `hkl` is transverse but is normally excluded from physical reflection lists. Zero axis must be refused by axis validation.
+- With no zone rows, the ordinary native spectrum is recovered. No channeling/planar case must keep its existing rule.
+- At exact beam-axis alignment, nonzero-order reflections still have $\mathbf v\cdot\mathbf G\ne0$; their resonance must not be removed merely because the zero-order native line vanishes. Their absence in the old 800 eV–10 keV on-axis envelope was an energy-band fact, not a general ownership fact.
+- Removing native zero-order CBS prevents the known perturbative duplicate of the transverse-force source. This does not prove that the complete PXR amplitude is represented by that source; omitting channeled-state PXR remains an accuracy limitation, especially off axis.
+- Restored nonzero-order native PXR/CBS uses a straight mean-row/free-electron approximation inside the zone. The selection proves sector ownership, not quantitative accuracy for a channeled-state scattering amplitude, angular modulation, finite-depth interference, or cross-sector interference.
+- Existing `free_free_upper` is a measured on-axis in-cut transverse-source omission bound for the admitted calibration cases. It cannot become a bound on restored nonzero-order native radiation, arbitrary detector angles/apertures, or all-energy total-spectrum accuracy.
+
+## Implementation and regression anchors
+
+`runner.axial.axial_zone_line_parts` classifies each reflection using the
+integer pairing, with `native_line_rows` selecting continuation rows for the
+zero-order part. Case views set `channeling=None` to prevent recursive
+partitioning. The shared scorer adds the two incoherent reflection groups.
+No transport, handoff, characteristic, bremsstrahlung, planar or off-case
+algorithm is changed. `AXIAL_FIBRE_MODEL_MARKER` v3 prevents reuse of v2 output.
+
+Independent numeric verification on an oblique direct cell and a rotated
+reciprocal frame agreed with the integer predicate to less than $10^{-12}$;
+the returned row groups and unchanged incident normalization were checked.
+
+The anchors in `tests/montecarlo/channeling/test_axial_fibre_runner.py` check:
+
+- synthetic partitions for three axes, with every reflection appearing once;
+- actual si-fibre/A spectra equal the explicit two-part sum bit for bit;
+- the restored nonzero-order zone contribution is positive at an oblique probe;
+- zero-order reflections equal the native-continuation-only score;
+- original exact-axis si-fibre/B output, source estimates, lookup bounds and
+  checkpoint provenance remain covered by their existing tests.
+
+The oblique probe tests the native scorer directly; it does not admit a
+standard off-axis axial run or certify the fibre source there. The original
+`free_free_upper` values (A 8.06%, B 18.9%) remain on-axis, in-cut, band-integral
+source bounds; they do not bound restored native emission or detector totals.
+
+Fresh-context verdict: **rederived** for the ownership equation. Regression
+anchors establish the implementation of that equation, not the accuracy of
+the straight-row channeled-state approximation. Human sign-off remains separate.
+
+## Historical blanket-removal evidence (#994)
+
+The following derivation and numerical records describe the previous v2 rule.
+Its transverse-source free→free bounds remain evidence for that restricted
+on-axis band. The blanket removal and former implementation assertions are
+superseded by the reflection partition above.
 
 ## Inputs used before reading the implementation
 

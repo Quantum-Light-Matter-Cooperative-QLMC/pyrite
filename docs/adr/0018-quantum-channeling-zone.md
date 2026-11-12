@@ -123,6 +123,23 @@ whose long-wavelength bound→bound limit is the dipole rate.
 - Squaring per-trajectory field amplitudes across MCWF trajectories is not a
   valid estimator.
 
+*Outcome (#1148, planar v9):* zone rows carry depth-averaged flux weights
+for incoherent bremsstrahlung and shell-resolved characteristic emission.
+The weights are normalized expectations of localization kernels in the retained
+transverse density; native continuation rows retain unit weight. Shell
+localization uses the shell GOS and Slater form factor, with the distant
+transverse term uniform. The brem kernel uses normalized screened-Born
+transfer shapes with nuclear/electron strengths $Z^2:Z$; it neglects
+photon-energy-dependent localization and distinct screening logarithms.
+These are model assumptions, without a measured orientation-dependent error
+bound. Axial zone rows remain unweighted. See
+[`cr-zone-incoherent-flux-weight`](../validation/ledger-channeling.md#cr-zone-incoherent-flux-weight).
+
+Straight zone rows can produce lines narrower than the energy-grid spacing.
+Planar cases with off-own-row reflections warn when using node sampling;
+`channeling_demo` selects bin-mean quadrature to preserve bin-integrated yield.
+This does not bound omitted channeled-state PXR modulation or angular spread.
+
 CR is first exposed through a diagnostic API. It becomes the persisted additive
 channel `spec_channeling` only after its anchors pass.
 *Outcome (#507):* planar Python runs produce `spec_channeling` separately from PXR/CBS and characteristic emission, on the native line grid. Checkpoints store it in optional `channeling.h5`; common totals and the analysis component selector add it once. `CHANNELING_MODEL` v2 distinguishes enabled output identities, with off unchanged. The source reuses the constant-energy diagnostic estimator, slab-normal attenuation in a laterally infinite photon slab, and independently averaged finite electron path limits. Measured linewidth gaps remain explicit; persistence does not certify them.
@@ -208,9 +225,11 @@ planar tier. Each outcome below is recorded with its ledger claim; see the
   with Andersen et al., NIM 194, 209 (1982); see the
   [#992 note](../research/physics/axial-material-source-992.md).
 - **Zone-row ownership (#994).** Native PXR/CBS scores
-  no lines on axial zone rows (the planar tier drops only the own reciprocal
-  row, #1055), so the fibre source alone owns the zone's line
-  band. The in-cut free→free block that CBS would have carried is omitted and
+  zero-order reflections (`h·axis_uvw = 0`) only outside the zone. Since
+  #1148 (axial marker v3), nonzero-order reflections retain zone rows because
+  they are absent from the transverse continuum source. This partitions
+  ownership without certifying the native channeled-state approximation.
+  Standard off-axis/finite-aperture axial runs remain refused. The in-cut free→free block that CBS would have carried is omitted and
   stored as a declared one-sided bound: 8.06% for A, 18.9% for B
   (`cr-axial-zone-row-native-lines`).
 - **Admission (#886, #994).** Standard runs admit only cases in the
@@ -230,7 +249,9 @@ table is the #994 lookup above. The planar table
 (`pyrite.quantum._planar_envelope`) holds one entry: the `channeling_demo` case
 (Si (1-10), 17 MeV, 2 µm, beam in the planes, default zone numerics,
 293.15 K, 300 eV margin). Its ε = 4.9% (95%) bounds the band-weighted
-on-axis line source. It was measured with the #993 paired-arm method on the
+on-axis `spec_channeling` line source only. It does not bound native PXR/CBS,
+incoherent bremsstrahlung or characteristic emission at a physical detector.
+It was measured with the #993 paired-arm method on the
 carrier-fibred planar reference (#1056,
 [dechanneling boundary note](../research/physics/dechanneling-boundary.md#paired-arm-source-budgets-993-method)).
 Admission is curated rather than set by an ε threshold. The measured Kephart

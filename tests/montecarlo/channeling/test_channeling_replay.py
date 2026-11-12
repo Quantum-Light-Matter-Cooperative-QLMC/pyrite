@@ -133,6 +133,25 @@ def test_brem_repair_keeps_channeling_source_untouched(channeling_run, monkeypat
     np.testing.assert_array_equal(record["brem"], 4.0)
 
 
+def test_zone_rows_carry_flux_weights_that_the_live_spectra_use(channeling_run):
+    # Local incoherent emission on zone rows follows the channeled flux (#1148).
+    case, transport, live = channeling_run
+    segs = transport["segs"]
+    zone = np.asarray(segs["channeling_zone"], dtype=bool)
+    weights = np.asarray(segs["channeling_flux"])
+    assert segs["channeling_flux_keys"][0] == "brem" and "14:K" in segs["channeling_flux_keys"]
+    assert zone.any() and weights.shape == (zone.size, len(segs["channeling_flux_keys"]))
+    np.testing.assert_array_equal(weights[~zone], 1.0)
+    assert np.all(weights[zone] > 0.0) and not np.allclose(weights[zone], 1.0)
+    plain = {k: v for k, v in segs.items() if k not in ("channeling_flux", "channeling_flux_keys")}
+    unweighted = runner._spectrum_case(case, {**transport, "segs": plain})
+    assert not np.allclose(unweighted["brem_wide"], live["brem_wide"], rtol=1e-6, atol=0)
+    assert not np.allclose(
+        unweighted["spec_characteristic"], live["spec_characteristic"], rtol=1e-6, atol=0
+    )
+    np.testing.assert_array_equal(unweighted["spec"], live["spec"])  # lines are not weighted
+
+
 def test_brem_repair_replays_the_zone_transport(channeling_run):
     # Live brem scores the zone rows and handed-off native rows (#1148); an
     # amorphous re-transport would drop the zone and change the population.

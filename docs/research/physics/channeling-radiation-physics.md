@@ -306,12 +306,12 @@ The same six steps with dimension bumped to 2:
 | Amorphous/misaligned e⁻ transport | native transport cores | Includes multiple scattering, ionization, bremsstrahlung and secondaries. Range extension is #439/#440. |
 | Transverse states, evolution, CR emission | channeling zone | This document; ADR-0018. |
 | Incoherent scattering *of channeled electrons* | channeling zone (jump operators $L_k$) | Native multiple scattering is **off** inside the zone. The jump operators *are* the multiple-scattering model there, so running both double-counts. |
-| Bremsstrahlung of channeled electrons | existing scorers on tagged straight zone segments | Close-collision bremsstrahlung during the ~µm channeled path is small. Channeling-enhanced bremsstrahlung is folded into the validity budget rather than modeled. |
+| Bremsstrahlung of channeled electrons | native scorer with planar zone flux weights | #1148 adds depth-averaged screened-Born localization weights; photon-energy dependence and a measured detector error bound remain open. Axial rows remain unweighted. |
 | Energy loss in the channeled zone | channeling zone, as continuous loss | v1: amorphous stopping power over the µm-scale zone (the error is small because $\Delta T \ll T$). Refinement: scale per state by the $\rho_e(x)$ overlap. |
 | δ-ray production in the zone | neither (folded into stopping) | Explicit limitation; acceptable because the channeled path ≪ the total path. |
 | Dechanneled / never-channeled electrons | native transport, entered through the secondaries launch seam | One-way handoff of $(\mathbf r,\hat{\mathbf v},T,t)$ sampled from the dechanneling flux; event code `EVENT_DECHANNEL`. |
 | PXR/CBS during the channeled zone | existing PXR/CBS kernel on tagged straight mean segments | Channeled-state modulation is an omission (§9, item 10). |
-| Characteristic emission | existing scorer | Channeling-modulated (ALCHEMI-type) yields are a research diagnostic (#501). |
+| Characteristic emission | native scorer with shell-resolved planar zone weights | #1148 uses shell GOS localization and Slater form factors; EEDL sets the magnitude. Axial weighting and a quantitative orientation-dependent anchor remain open. |
 | $\gamma(z)$ drift feeding back into line energies | channeling zone, optional | Negligible over µm occupation lengths. |
 | On-axis line band of axial zone rows | axial fibre source | Native PXR/CBS scores no lines on these rows; the omitted in-cut free→free block is a declared one-sided bound (#994, `cr-axial-zone-row-native-lines`). |
 | ≥200 MeV channeling | quasiclassical (Geant4 `G4ChannelingFastSimModel`/`G4BaierKatkov`) | External validation reference only, never a backend. |

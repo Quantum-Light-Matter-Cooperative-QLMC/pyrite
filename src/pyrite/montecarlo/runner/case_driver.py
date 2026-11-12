@@ -521,7 +521,8 @@ def _cxr_for_segments(
     chunk-halving retry. A case that fits runs as one unchanged call; coherent
     sums, which may couple electrons, are never split. Mixed-transport cases
     refuse here, the one entry every CXR route shares (#990), an axial
-    fibre case drops its zone rows here (#994), and a planar channeling case
+    fibre case drops zone rows only for transverse-potential reflections
+    (#1148), and a planar channeling case
     scores its own reciprocal row only on rows outside the zone (#1055,
     :func:`.planar_zone_lines.planar_zone_line_parts`).
 
@@ -530,10 +531,6 @@ def _cxr_for_segments(
     from ..._mixed_elastic_policy import refuse_mixed_cxr
 
     refuse_mixed_cxr(case)
-    if case.get("channeling") is not None:  # axial zone rows score no native lines (#994)
-        from .axial import native_line_rows
-
-        segs = native_line_rows(case, segs)
     if (case.get("transition_radiation") or {}).get("model") == "two-beam":
         from .dtr_emission import case_dtr_spectrum
 
@@ -549,8 +546,12 @@ def _cxr_for_segments(
             coherent=bool(case.get("coherent_emission", False)) if coherent is None else coherent,
             count=Ne,
         )
-    parts = planar_zone_line_parts(case, segs)
-    if parts is not None:  # planar zone rows: own-row lines belong to spec_channeling (#1055)
+    from .axial import axial_zone_line_parts
+
+    parts = axial_zone_line_parts(case, segs)
+    if parts is None:
+        parts = planar_zone_line_parts(case, segs)
+    if parts is not None:  # source-owned transverse reflections exclude zone rows
         return _score_line_parts(
             parts,
             E_grid,
@@ -618,7 +619,7 @@ def _score_line_parts(parts, E_grid, n_hat, abs_layers, groove, **options):
     Reflections never interfere, so splitting them between row sets adds.
     Audits, temporal profiles and coefficient collectors accumulate.
 
-    Validation: cr-planar-zone-row-ownership
+    Validation: cr-planar-zone-row-ownership, cr-axial-zone-row-native-lines
     """
     spec = None
     for part_case, part_segs in parts:

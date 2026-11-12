@@ -79,7 +79,7 @@ def test_public_v2_is_minimal_roundtripping_and_distinct_from_v1():
         }
     )
     assert axial_spec_identity(normalized) != axial_spec_identity(v1)
-    assert AXIAL_FIBRE_MODEL_MARKER == "axial-fibre-v2"
+    assert AXIAL_FIBRE_MODEL_MARKER == "axial-fibre-v3"
 
 
 @pytest.mark.parametrize(
@@ -103,7 +103,7 @@ def test_public_v2_never_accepts_caller_physics(additional):
 def test_repository_record_is_detached_and_includes_provenance():
     entry = ADMITTED_AXIAL_CASES["si-fibre/A"]
     rec = axial_channeling_record(entry)
-    assert rec["model_marker"] == "axial-fibre-v2"
+    assert rec["model_marker"] == "axial-fibre-v3"
     assert rec["free_free"] == "bound"
     assert rec["free_free_upper"] == entry.free_free_upper
     assert rec["fibre_numerics"]["boundary"] == "max"

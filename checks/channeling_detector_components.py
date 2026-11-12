@@ -14,10 +14,10 @@ the beam in the plane):
 - ``spec_channeling``: the expected-value CR source (rows play no part).
 
 The channeling-on transport is scored on all rows, on zone rows only and on
-native rows only, so the zone's share of each component is explicit. All zone
-rows are scored as amorphous plane-wave path (straight mean segment, no
-angular spread); this check measures how much of each detector signal rests
-on that approximation. It is a report, not a gate: exit 0 when every number is
+native rows only, so the zone's share of each component is explicit. Native PXR/CBS on zone
+rows uses a plane-wave path (straight mean segment, no angular spread);
+incoherent brem and characteristic use the planar flux weights (#1148).
+This check separates the detector contributions under those approximations. It is a report, not a gate: exit 0 when every number is
 finite and the zone/native split adds up to the full-row score (incoherent
 sums are additive over rows), 1 otherwise.
 
@@ -110,7 +110,7 @@ def main(argv=None) -> int:
     parser.add_argument(
         "--node-sampling",
         action="store_true",
-        help="keep the profile's node-sampled lines (aliases sub-eV zone lines on coarse grids)",
+        help="force node-sampled lines (aliases sub-eV zone lines on coarse grids)",
     )
     args = parser.parse_args(argv)
 
@@ -121,7 +121,9 @@ def main(argv=None) -> int:
     if case.get("channeling") is None or case["channeling"].get("model") != "planar":
         raise SystemExit(f"profile {args.profile!r} is not a planar channeling case")
     case.update(Ne=args.electrons, Ne_brem=args.electrons)
-    if not args.node_sampling:
+    if args.node_sampling:
+        case.pop("line_quadrature", None)
+    else:
         # A straight 2 um zone row radiates a sub-eV line; node sampling on a
         # 50 eV grid aliases it, so band integrals use exact bin masses.
         case["line_quadrature"] = "bin-mean"

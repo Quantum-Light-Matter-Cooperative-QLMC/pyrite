@@ -16,9 +16,10 @@ its on-axis photon estimate and its terminal fate; nothing is drawn twice.
   transported no further and are counted in the diagnostics.
 * Zone rows: each line electron's straight segment along the beam from the
   entrance face to its terminal depth, with the constant-stopping energy and
-  clock of :func:`.zone_energy_and_clock`. They score no native PXR/CBS lines
-  (:func:`native_line_rows`): the fibre source owns the line-band emission of
-  the zone, and the in-cut free→free block it omits is carried as the entry's
+  clock of :func:`.zone_energy_and_clock`. Native PXR/CBS retains reflections
+  outside the zone axis on these rows (:func:`axial_zone_line_parts`);
+  transverse-potential reflections belong to the fibre source. The in-cut
+  free→free block it omits is carried as the entry's
   declared one-sided bound. Characteristic and incoherent bremsstrahlung
   scoring on zone rows is unchanged.
 * Bremsstrahlung-only electrons (IDs from ``Ne`` on) run native amorphous
@@ -164,9 +165,10 @@ def _axial_zone_rows(template, records, zone, r0, v0, E_keV, clock, t0):
 
 
 def native_line_rows(case, segs):
-    """Rows of ``segs`` that native PXR/CBS line scoring may read.
+    """Rows that transverse-potential native PXR/CBS scoring may read.
 
-    For an axial fibre case the zone rows are removed, so the line spectrum
+    For an axial fibre case the zone rows are removed from this part, so
+    its spectrum
     ``spec`` is the sum over native rows only:
     ``spec = (1/Ne) sum_{rows not in zone} dN/(dE dOmega)``. The scalars
     (``Ne``, thickness) are kept, so the per-incident-electron normalization
@@ -198,6 +200,37 @@ def native_line_rows(case, segs):
         if out.get(key) is not None:
             out[key] = out[key][keep]
     return out
+
+
+def axial_zone_line_parts(case, segs):
+    """Partition native axial lines by reciprocal axial order (#1148).
+
+    Reflections with ``h*u + k*v + l*w == 0`` belong to the transverse
+    continuum potential and score only outside the zone. All other reflections
+    retain every row. This is an ownership partition, not an accuracy bound
+    for the plane-wave approximation on channeled paths.
+
+    Validation: cr-axial-zone-row-native-lines
+    """
+    record = case.get("channeling")
+    if not isinstance(record, Mapping) or record.get("model") != "axial":
+        return None
+    from .planar_zone_lines import _LineCase
+
+    native = native_line_rows(case, segs)  # validate the tag even if no transverse line
+    axis = tuple(int(v) for v in record["axis_uvw"])
+    transverse, other = [], []
+    for hkl in case["hkl_list"]:
+        indices = tuple(int(v) for v in hkl)
+        (
+            transverse if sum(h * u for h, u in zip(indices, axis, strict=True)) == 0 else other
+        ).append(indices)
+    parts = []
+    if other:
+        parts.append((_LineCase(case, hkl_list=other, channeling=None), segs))
+    if transverse:
+        parts.append((_LineCase(case, hkl_list=transverse, channeling=None), native))
+    return parts or None
 
 
 def transport_axial_case(

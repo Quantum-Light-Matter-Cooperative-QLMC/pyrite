@@ -188,3 +188,20 @@ def test_spec_channeling_is_independent_of_call_order_and_process():
     channeling_emission.zone_solver.cache_clear()
     fresh = channeling_emission.case_channeling_spectrum(case, transport)
     np.testing.assert_array_equal(first, fresh)
+
+
+@pytest.mark.parametrize("bin_mean", [False, True])
+def test_narrow_zone_line_sampling_warning(bin_mean):
+    from dataclasses import replace
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        case = _case()
+    assert any("narrow zone-row PXR" in str(item.message) for item in caught)
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        if bin_mean:
+            replace(case, line_quadrature="bin-mean")
+        else:
+            replace(case, hkl_list=((2, -2, 0),))
+    assert not any("narrow zone-row PXR" in str(item.message) for item in caught)

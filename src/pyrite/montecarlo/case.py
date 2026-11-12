@@ -559,6 +559,7 @@ class Case(Mapping[str, Any]):
         from .channeling.planar_case import check_admission_record
 
         check_admission_record(record["admission"])
+        self._warn_channeling_line_sampling(hkl)
         if self.energy_model != "midpoint":
             raise ValueError("channeling requires energy_model='midpoint'")
         refused = {
@@ -577,6 +578,22 @@ class Case(Mapping[str, Any]):
             raise ValueError("channeling supports a single-layer slab only")
         if self.mosaic_fwhm_rad or self.mosaic_mc_fwhm_rad:
             raise ValueError("channeling does not support mosaic crystals")
+
+    def _warn_channeling_line_sampling(self, plane_hkl) -> None:
+        """Warn before work when narrow native zone lines use node sampling."""
+        if self.line_quadrature == "bin-mean":
+            return
+        if not any(np.any(np.cross(hkl, plane_hkl)) for hkl in self.hkl_list):
+            return
+        import warnings
+
+        warnings.warn(
+            "planar channeling with off-own-row reflections uses node sampling: "
+            "narrow zone-row PXR lines can alias; use line_quadrature='bin-mean' "
+            "(#1148)",
+            UserWarning,
+            stacklevel=3,
+        )
 
     def _validate_axial_channeling(self, record: Mapping[str, object]) -> None:
         """Reject uncalibrated, tampered or unsupported v2 fibre records.

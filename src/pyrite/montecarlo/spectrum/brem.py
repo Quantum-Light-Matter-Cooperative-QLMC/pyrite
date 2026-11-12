@@ -923,6 +923,7 @@ def mc_brem_spectrum(
     Validation: segment-escape-average
     Validation: substep-radiation-invariance
     Validation: adaptive-sample-size-stopping
+    Validation: cr-zone-incoherent-flux-weight
     """
     if photon_block is not None:
         arguments = dict(locals())  # every parameter, so blocks rescore exactly this call
@@ -988,6 +989,12 @@ def mc_brem_spectrum(
     )
     seg_L = seg_L[owner] * fraction
     seg_E = seg_E[owner]
+    # Planar channeling zone rows weight the local (screened-nucleus) brem rate
+    # by the channeled flux; seg_L is only the path weight here (#1148).
+    # Validation: cr-zone-incoherent-flux-weight
+    from .channeling_flux import flux_scaled_length
+
+    seg_L = flux_scaled_length(segments, seg_L, brem_idx[owner])
     # BremsLib keeps EEDL staged too: it is the isotropic fallback for an
     # element without a table and for segments outside a table's energy range.
     bremslib_staged: dict = {}

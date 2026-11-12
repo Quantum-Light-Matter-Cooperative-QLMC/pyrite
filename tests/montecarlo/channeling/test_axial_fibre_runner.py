@@ -288,7 +288,7 @@ def test_source_and_budgets_round_trip_through_results_and_checkpoints(case_b, p
     np.testing.assert_array_equal(record["spec_channeling"], out["spec_channeling"])
     stored = record["case"]["channeling"]
     entry = ADMITTED_AXIAL_CASES["si-fibre/B"]
-    assert stored["model_marker"] == "axial-fibre-v2"
+    assert stored["model_marker"] == "axial-fibre-v3"
     assert stored["depth_budget"] == entry.depth_budget
     assert stored["free_free"] == "bound"
     assert stored["free_free_upper"] == entry.free_free_upper
@@ -378,28 +378,53 @@ def produced_a():
     return case, transport, runner._spectrum_case(case, transport)
 
 
+@pytest.mark.parametrize("axis", [(0, 0, 1), (1, 1, 0), (2, -1, 3)])
+def test_axial_line_partition_uses_direct_reciprocal_pairing(axis):
+    from pyrite.montecarlo.runner.axial import axial_zone_line_parts
+
+    hkls = [(1, 1, 1), (2, -2, 0), (0, 0, 2), (-1, -1, -1)]
+    case = {"channeling": {"model": "axial", "axis_uvw": axis}, "hkl_list": hkls}
+    segs = {"L_ang": np.array([2.0, 3.0]), "channeling_zone": np.array([True, False]), "Ne": 1}
+    parts = axial_zone_line_parts(case, segs)
+    for part, rows in parts:
+        assert part.get("channeling") is None
+        for hkl in part["hkl_list"]:
+            if np.dot(hkl, axis) == 0:
+                np.testing.assert_array_equal(rows["L_ang"], [3.0])
+            else:
+                assert rows is segs
+    assert sorted(h for part, _ in parts for h in part["hkl_list"]) == sorted(hkls)
+    assert axial_zone_line_parts({"channeling": None}, segs) is None
+
+
 @pytest.mark.slow
-def test_axial_zone_rows_score_no_native_lines(produced_a):
-    """No double count: lines come from native rows, the zone from the fibre source."""
+def test_axial_zone_rows_restore_only_off_zone_reflections(produced_a):
+    """Real spectra: both reflection groups sum once, with zone rows only off axis."""
     from pyrite.montecarlo.runner.axial import native_line_rows
 
-    case, transport, out = produced_a
-    segs, grid, n_hat = transport["segs"], transport["E_grid"], transport["n_hat"]
-    zone = np.asarray(segs["channeling_zone"])
-    assert zone.sum() == LINES
+    case, transport, _ = produced_a
+    segs, grid = transport["segs"], transport["E_grid"]
+    axis = case["channeling"]["axis_uvw"]
+    transverse = [h for h in case["hkl_list"] if np.dot(h, axis) == 0]
+    other = [h for h in case["hkl_list"] if np.dot(h, axis) != 0]
+    assert transverse and other
     native = native_line_rows(case, segs)
-    assert native["L_ang"].size == zone.size - LINES and native["Ne"] == segs["Ne"]
-    plain = {key: value for key, value in case.to_dict().items() if key != "channeling"}
-    score = lambda rows: runner._cxr_for_segments(  # noqa: E731
-        rows, grid, plain, n_hat, None, None, coherent=False, Ne=LINES
-    )
-    np.testing.assert_array_equal(out["spec"], score(native))
-    # Exact recoil can remove every forward in-band zone line. Use an
-    # oblique diagnostic direction to keep the exclusion check non-vacuous.
     n_hat = np.array([np.sin(np.pi / 3), 0.0, np.cos(np.pi / 3)])
-    with_zone = score(segs)  # what a free plane-wave reading of the zone rows would add
-    removed = np.trapezoid(with_zone - score(native), grid)
-    assert removed > 0.0
+
+    def score(rows, hkls, channeling=None):
+        view = {**case.to_dict(), "channeling": channeling, "hkl_list": hkls}
+        return runner._cxr_for_segments(
+            rows, grid, view, n_hat, None, None, coherent=False, Ne=LINES
+        )
+
+    expected = score(segs, other) + score(native, transverse)
+    actual = score(segs, case["hkl_list"], case["channeling"])
+    np.testing.assert_array_equal(actual, expected)
+    restored = score(segs, other) - score(native, other)
+    assert np.trapezoid(restored, grid) > 0.0
+    np.testing.assert_array_equal(
+        score(segs, transverse, case["channeling"]), score(native, transverse)
+    )
 
 
 @pytest.mark.slow

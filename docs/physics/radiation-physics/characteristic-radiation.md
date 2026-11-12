@@ -144,3 +144,18 @@ Atomic relaxation is incoherent, so one component adds to either the incoherent 
 This window convention and the EADL cascade are encoded in the characteristic-model marker used by dataset identities and case-content keys. The marker includes the EEDL and EADL checksums, the endf-parserpy and xraydb versions, and the fluorescence-yield source, and ends `eadl-cascade-eadl-yields-lorentzian-segment-escape-v7` by default. The opt-in Bote--Salvat backend appends `/bote-salvat-ionization-<parameter checksum>`, so its records can never share an identity with EEDL ones; the default marker is unchanged. Records written under earlier markers are not reused: `v6` records hold L-shell-only Coster--Kronig yields on a line-energy cutoff, which is not the same spectrum.
 
 Implementation owner: `pyrite.montecarlo.spectrum.characteristic.mc_characteristic_spectrum`. The source-to-code mapping, dimensional analysis, assumptions, and regression anchors are recorded in [Characteristic-radiation validation](../../validation/radiation-physics/characteristic-radiation.md) under ledger row `characteristic-radiation`.
+
+## Planar channeling zone weights
+
+Planar channeling zone rows weight vacancy creation separately for each
+resolved shell, before the relaxation cascade. The normalized localization
+kernel combines shell GOS transfer, a Slater form factor and thermal site
+density; distant transverse ionization remains uniform. Shells unresolved by
+the catalog, native continuation rows and axial rows retain unit weight.
+
+The weights are density expectations, not per-trajectory squared amplitudes.
+They reproduce the amorphous rate for uniform transverse density. They do
+not have a measured orientation-dependent accuracy bound; channeling admission
+ε covers `spec_channeling` only. See the
+[validation claim](../../validation/ledger-channeling.md#cr-zone-incoherent-flux-weight)
+for assumptions and checks.

@@ -146,6 +146,26 @@ def join_zone_rows(native, native_rows, zone) -> dict[str, Any]:
     return out
 
 
+def _attach_flux_weights(ensemble, native_rows, zone, zone_lengths):
+    """Add ``channeling_flux`` to native (1) and zone rows; return the zone means (#1148).
+
+    Zone rows carry the depth average of the retained-ensemble factors
+    ``F_c(z)`` over their own length. Returns ``{}`` when the ensemble has
+    no factors (an empty mapping; rows stay unweighted).
+
+    Validation: cr-zone-incoherent-flux-weight
+    """
+    if ensemble.flux_factors is None:
+        return {}
+    from ..channeling.flux_weights import row_flux_weights
+
+    keys = ensemble.flux_keys
+    native_rows["channeling_flux"] = np.ones((native_rows["L_ang"].size, len(keys)))
+    zone["channeling_flux"] = row_flux_weights(ensemble.z_ang, ensemble.flux_factors, zone_lengths)
+    means = zone["channeling_flux"].mean(axis=0) if zone_lengths.size else np.ones(len(keys))
+    return dict(zip(keys, (float(v) for v in means), strict=True))
+
+
 def transport_channeling_case(
     case,
     keep,
@@ -274,7 +294,9 @@ def transport_channeling_case(
         template, z_ids, r0[z_ids], v0[z_ids], E_keV[z_ids], clock[z_ids], t0[z_ids],
         length[z_ids], kind[z_ids],
     )  # fmt: skip
+    flux_mean = _attach_flux_weights(ensemble, native_rows, zone, length[z_ids])  # (#1148)
     out = join_zone_rows(native, native_rows, zone)
+    out["channeling_flux_keys"] = ensemble.flux_keys
     out.update(initial_r_ang=r0, initial_v_hat=v0, initial_E_keV=E_keV, initial_t0_ang=t0, Ne=Ne)
     if record is not None:
         out["beam_entry"] = record
@@ -303,5 +325,6 @@ def transport_channeling_case(
         "mean_handoff_psi_rad": float(handed_psi.mean()) if handed_psi.size else 0.0,
         "margin_eV": float(case["channeling"]["margin_eV"]),
         "admission": dict(case["channeling"]["admission"]),
+        "zone_flux_weight_mean": flux_mean,
     }
     return out

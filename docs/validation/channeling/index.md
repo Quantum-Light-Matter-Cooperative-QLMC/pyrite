@@ -37,6 +37,7 @@ cr-capture-yield
 cr-planar-free-free-block
 cr-planar-zone-row-ownership
 cr-transition-radiation-bound
+cr-zone-incoherent-flux-weight
 cr-zone-handoff-accounting
 cr-planar-conditional-source
 cr-planar-overflow-spectrum

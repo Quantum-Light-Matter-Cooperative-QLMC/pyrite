@@ -40,7 +40,7 @@ from ._admission import UNADMITTED, AxialAdmissionError, unadmitted_hint
 _REL_TOL = 1e-9
 #: Model generation of the calibrated fibre source; distinct from planar and
 #: from the non-executable v1 axial recipe.
-AXIAL_FIBRE_MODEL_MARKER = "axial-fibre-v2"
+AXIAL_FIBRE_MODEL_MARKER = "axial-fibre-v3"
 
 
 @dataclass(frozen=True)
