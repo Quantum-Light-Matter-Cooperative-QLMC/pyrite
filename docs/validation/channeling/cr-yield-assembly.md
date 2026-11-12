@@ -100,3 +100,7 @@ The band-centre calculation above uses $k=0$, $H=16$, four Bloch cells, 293.15 K
 The Watson sources do not supply a planar peak-position benchmark for this model. [Watson and Koehler, Phys. Rev. B **25**, 3079 (1982)](https://doi.org/10.1103/PhysRevB.25.3079), Zotero `DXH6CSY9` / PDF `JKVKGGI2`, printed page 3082, reports no planar transitions above the approximately 1 keV detector cutoff for electrons of 3 MeV or less. The earlier 1981 paper (`JRVHCQY3` / `E5NJ535S`) states the same exclusion in its abstract. Their observed channeling lines are axial. They must not be relabelled as planar anchors.
 
 The Azadegan 2013 numerical example is a theoretical calculation, rather than an independent ELBE measurement. Its use and the measured Azadegan 2006 widths are audited in [cr-line-shape](cr-line-shape.md).
+
+## Measured planar absolute yields (#1057)
+
+[Planar line anchors](../../research/physics/planar-line-anchors-1057.md) compares the model with the Kephart (1989) Si(110) 16.92 MeV absorption-corrected yield fits. The model/measured ratio at 1 µm is 1.03 for 1→0, 0.97 for 2→1 and 1.35 for 3→0. At 80–120 µm the 1→0 and 2→1 ratios fall to about 0.65. That thick-crystal deficit lies in the ρ(z) occupation history, not in the assembly.

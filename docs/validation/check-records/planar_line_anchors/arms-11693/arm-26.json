@@ -1,0 +1,81 @@
+{
+ "check": "planar_line_anchors",
+ "revision": "unknown",
+ "host": "qlmc-queen",
+ "backend": "cpu",
+ "temperature_K": 293.15,
+ "settings": {
+  "datasets": [
+   "genz"
+  ],
+  "cases": [
+   "genz_110_5.2_13"
+  ],
+  "cells": 8,
+  "orders": 16,
+  "dz": 100.0,
+  "bins": 3,
+  "models": [
+   "kernel"
+  ],
+  "grid": 2400,
+  "n_divergence": 15,
+  "divergence_scale": 1.0,
+  "no_history_reuse": true,
+  "out": "scratch/anchors/arm-26.json"
+ },
+ "cases": [
+  {
+   "case": "genz_110_5.2_13",
+   "dataset": "genz",
+   "material": "diamond",
+   "hkl": [
+    1,
+    1,
+    0
+   ],
+   "kinetic_energy_MeV": 5.2,
+   "barrier_eV": 8.199770031776064,
+   "y_rate_weights": [
+    2.0521935206623816,
+    1.0229948331118186
+   ],
+   "edges_um": [
+    0.0,
+    1.45,
+    5.8,
+    13.0
+   ],
+   "models": {
+    "kernel": {
+     "sigma_y_mrad": [
+      1.5889312415993193,
+      7.51640974328859,
+      14.662748311037399
+     ],
+     "thicknesses": [
+      {
+       "thickness_um": 13.0,
+       "lines": {
+        "1-0": {
+         "yield_per_sr": 0.003751609875290278,
+         "centroid_eV": 2980.5400582357192,
+         "peak_eV": 2821.8141075108033,
+         "fwhm_eV": 606.5332871068385,
+         "fwhm_clipped": false,
+         "with_capture_yield_per_sr": 0.004846844644713235,
+         "window_eV": [
+          2065.452808346626,
+          4107.729796566811
+         ],
+         "contamination": 0.2335992251971154
+        }
+       }
+      }
+     ]
+    }
+   },
+   "seconds": 97.00111115910113
+  }
+ ]
+}

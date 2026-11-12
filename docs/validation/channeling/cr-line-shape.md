@@ -392,3 +392,7 @@ $\gamma=E_e/(mc^2)$, 300 K, 33 plane waves gives forward 1→0 energies
 14.6/17/30/34 MeV. These differ from Table IV's fitted $E_0$ by
 0.9%/0.3%/3.4%/2.6%. No beam-energy retuning is assumed in the comparison
 table above, and this diagnostic does not validate any linewidth.
+
+## Measured planar widths (#1057)
+
+[Planar line anchors](../../research/physics/planar-line-anchors-1057.md) compares the model with measured 1→0 widths from Genz (1996), Azadegan (2006) and Klein (1985), all in natural or type Ia/IIa diamond. The comparison includes the detector acceptance and resolution and in-plane angular diffusion. The model is 20–50% narrower than the measurements, but within about 20% of each source's own defect-free calculation. Klein attributes the excess width to crystal defects. The audited sources contain no Si planar widths. No width is pinned, and the status stays `rederived`.
