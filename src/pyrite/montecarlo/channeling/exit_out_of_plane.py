@@ -283,6 +283,9 @@ def exit_cut(
     ``eta_ang[0]`` must be 0 (the marginal; its weight is ignored). The marginal's unresolved weight
     is ``1 - total``, which includes the integrator's balance defect.
 
+    The ``eta`` rule of :func:`eta_nodes` resolves ``|theta_y_rad|`` up to about
+    ``10 divergence_y_rad`` (zero-kernel error 4e-4 of the peak there, 6 % at 20).
+
     Validation: cr-planar-exit-out-of-plane
     """
     eta = np.asarray(eta_ang, dtype=float)
