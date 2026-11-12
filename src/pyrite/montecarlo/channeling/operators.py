@@ -742,6 +742,8 @@ def tds_kernel(
     the Fourier factor of the out-of-plane momentum ``q_y`` each jump adds,
     while the diagonal (loss) is unchanged. That kernel is not positive
     semidefinite and is not a Lindblad generator on its own.
+    This cosine-only transform requires ``S_xy = 0`` for every species;
+    a cross covariance needs the omitted odd-in-``q_y`` sine term.
 
     Validation: cr-lindblad-jump-operators, cr-planar-exit-out-of-plane
     """
@@ -749,6 +751,10 @@ def tds_kernel(
     hbar_v = _kinematics(kinetic_energy_eV)
     g = profile.g_inv_ang
     covariances = _transverse_covariances(profile, beam_uvw)
+    if out_of_plane_ang != 0.0 and any(
+        abs(cov[1]) > 1e-12 * max(cov[0], cov[2]) for cov in covariances.values()
+    ):
+        raise ValueError("out_of_plane_ang requires zero thermal cross covariance S_xy")
     a2_min = min(_min_eigenvalue(cov) for cov in covariances.values())
     # Terms carry exp(-a^2 G^2 / 4) at most (a^2 the smallest eigenvalue of S);
     # stop below 1e-12.

@@ -25,6 +25,9 @@ cos(p theta_y eta) exp(-(p sigma_y eta)^2 / 2) P~(theta_x, eta)``.
 Gauss--Legendre panels, fine near 0, where ``P~`` falls on the scale of the
 largest frequent kicks.
 
+The cosine transform supports thermal covariances with ``S_xy = 0``.
+Nonzero cross covariances also need an odd sine transform and are refused.
+
 **Batched integrator.** :func:`propagate_batch` advances one entry state
 under many cell kernels with the Strang step of
 :meth:`~.density.DensityMatrixSolver.propagate` (no stopping, so no

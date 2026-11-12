@@ -9,7 +9,13 @@ from scipy import integrate
 
 from pyrite.materials.atomic import Z_TABLE
 from pyrite.materials.channeling import ChannelingDataError, planar_profile
-from pyrite.materials.crystal import CRYSTALS, HBARC_EV_ANG, M_E_EV, _direct_lattice_vectors
+from pyrite.materials.crystal import (
+    CRYSTALS,
+    HBARC_EV_ANG,
+    M_E_EV,
+    R_E_ANG,
+    _direct_lattice_vectors,
+)
 from pyrite.montecarlo.channeling import (
     decoherence_rate,
     electronic_channels,
@@ -17,6 +23,7 @@ from pyrite.montecarlo.channeling import (
     longitudinal_kinematics,
     tds_kernel,
 )
+from pyrite.montecarlo.channeling import operators as op
 from pyrite.montecarlo.channeling.operators import (
     _kinematics,
     _site_densities,
@@ -268,6 +275,60 @@ def test_electronic_support_masks_preserve_shell_edges(shape):
     close = np.where(valid, channels.close_loss(loss) * jacobian / np.pi, 0.0)
     np.testing.assert_array_equal(channels.distant(q), distant)
     np.testing.assert_array_equal(channels.close(q), close)
+
+
+@pytest.mark.parametrize("total_energy", [1.87e6, 5.70e6])
+def test_silicon_plasmon_angular_transfer_matches_bethe_disk(si110, monkeypatch, total_energy):
+    # PENELOPE-2024 Eq. 3.104, p126: independent delta-oscillator oracle
+    # with measured Si inputs f=4, W=16.7 eV. The q_min angle is not an
+    # rms kick: the Bethe disk's logarithmic tail reaches q_perp ~2.09/A.
+    energy = total_energy - M_E_EV
+    beta = np.sqrt(1.0 - (M_E_EV / total_energy) ** 2)
+    momentum = np.sqrt(energy * (energy + 2 * M_E_EV)) / HBARC_EV_ANG
+    loss = 16.7
+    outgoing = np.sqrt((energy - loss) * (energy - loss + 2 * M_E_EV)) / HBARC_EV_ANG
+    qmin = (2 * loss * total_energy - loss**2) / (HBARC_EV_ANG**2 * (momentum + outgoing))
+    ridge = np.sqrt(loss * (loss + 2 * M_E_EV) / HBARC_EV_ANG**2 - qmin**2)
+    strength = 2 * np.pi * R_E_ANG**2 * M_E_EV / beta**2 * (4 / 14) / loss
+    density = 14 * 8 / CRYSTALS["silicon"]["V_cell"]
+
+    def radial(q):
+        q2 = q**2 + qmin**2
+        return 2 * density * strength * q / (q2 * np.sqrt(1 + (HBARC_EV_ANG / M_E_EV) ** 2 * q2))
+
+    threshold = si110.g_inv_ang / 2
+    rate = integrate.quad(radial, 0.0, ridge, points=[qmin], epsabs=1e-13)[0]
+    moment = integrate.quad(
+        lambda q: radial(q) * q**2 / (2 * momentum**2), 0.0, ridge, epsabs=1e-16
+    )[0]
+    high = integrate.quad(
+        lambda q: radial(q) * (2 / np.pi) * np.arccos(threshold / q),
+        threshold,
+        ridge,
+        epsabs=1e-13,
+    )[0]
+
+    def valence_only(oscillators, kinetic):
+        channels = electronic_channels(oscillators, kinetic)
+        return replace(
+            channels,
+            distant_ang2=np.where(
+                np.arange(channels.distant_ang2.size) == 0, channels.distant_ang2, 0
+            ),
+            close_ang2_eV=np.zeros_like(channels.close_ang2_eV),
+        )
+
+    monkeypatch.setattr(op, "electronic_channels", valence_only)
+    flat = replace(si110, electron_density=np.array([density], dtype=complex))
+    kernel = electronic_kernel(flat, energy, n_cells=128, max_order=2)
+    weights = np.einsum("rii->ri", kernel.momentum_kernel).real
+    transfer = (np.arange(128)[:, None] / 128 + kernel.orders[None, :]) * si110.g_inv_ang
+    orders = np.floor(transfer / si110.g_inv_ang + 0.5).astype(int)
+    # 0.2% covers Cartesian ridge quadrature plus finite-bin momentum
+    # quantization, matching the existing independent kernel-oracle budget.
+    assert weights.sum() == pytest.approx(rate, rel=2e-3)
+    assert (weights * (transfer / momentum) ** 2).sum() == pytest.approx(moment, rel=2e-3)
+    assert weights[np.abs(orders) >= 1].sum() == pytest.approx(high, rel=2e-3)
 
 
 def test_uniform_density_gives_pure_momentum_diffusion(si110):

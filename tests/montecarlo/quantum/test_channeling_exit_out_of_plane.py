@@ -120,8 +120,7 @@ def test_electronic_transform_matches_single_oscillator_hankel_integral(si110, m
     assert _in_band_trace(kernel) == pytest.approx(expected, rel=2e-3)
 
 
-@pytest.mark.parametrize("eta", [0.0, 1.5])
-@pytest.mark.parametrize("cross", [0.0, 0.001])
+@pytest.mark.parametrize("eta,cross", [(0.0, 0.0), (1.5, 0.0), (0.0, 0.001)])
 def test_tds_lattice_reuse_matches_direct_covariance(si110, monkeypatch, eta, cross):
     # Reference the original, unseparated covariance integral on each
     # retained bin; do not use the optimized lattice slices/contractions.
@@ -150,6 +149,12 @@ def test_tds_lattice_reuse_matches_direct_covariance(si110, monkeypatch, eta, cr
         fast.momentum_kernel, reference.momentum_kernel, rtol=1e-11, atol=1e-18
     )
     np.testing.assert_array_equal(fast.diagonal_coefficients, reference.diagonal_coefficients)
+
+
+def test_out_of_plane_transform_rejects_odd_thermal_kernel(si110, monkeypatch):
+    monkeypatch.setattr(op, "_transverse_covariances", lambda *_: {"Si": (0.005, 0.001, 0.007)})
+    with pytest.raises(ValueError, match="cross covariance S_xy"):
+        tds_kernel(si110, ENERGY, **GRID, out_of_plane_ang=1.5)
 
 
 def test_batch_integrator_matches_density_solver(si110):
