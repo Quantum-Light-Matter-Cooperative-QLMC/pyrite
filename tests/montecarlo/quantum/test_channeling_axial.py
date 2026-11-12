@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from functools import cache
 from pathlib import Path
 
@@ -13,8 +14,8 @@ from scipy.special import eval_genlaguerre
 
 from pyrite.materials.channeling import planar_profile
 from pyrite.materials.channeling.axial import axial_profile, axial_states
-from pyrite.materials.crystal import CRYSTALS
-from pyrite.montecarlo.channeling import longitudinal_kinematics, states
+from pyrite.materials.crystal import CRYSTALS, HBAR2_2M_EV_ANG2, HBARC_EV_ANG
+from pyrite.montecarlo.channeling import longitudinal_kinematics, states, transverse_states
 from pyrite.montecarlo.channeling.axial_emission import axial_line_catalog
 from pyrite.montecarlo.channeling.realspace import RealSpaceGrid, SplitStepPropagator
 
@@ -255,6 +256,97 @@ def test_tilt_along_plane_converges_to_planar():
     assert errors[2] < 0.01
     # Approaches as 1/theta^2.
     assert errors[1] / errors[2] == pytest.approx(4.0, rel=0.25)
+
+
+def _bloch_forward_amplitude(profile, kinetic, depths, n_plane_waves):
+    """``A(L) = sum_n |c_0n|^2 exp(-i E_n L / hbar v)`` for the k = 0 plane wave."""
+    gamma, beta = longitudinal_kinematics(kinetic)
+    solved = transverse_states(profile, gamma, 0.0, n_plane_waves)
+    weights = np.abs(solved.coefficients[n_plane_waves]) ** 2
+    phases = np.exp(-1j * np.outer(depths, solved.energies_eV) / (HBARC_EV_ANG * beta))
+    return phases @ weights, solved
+
+
+def _split_step_forward_amplitude(profile, kinetic, depths, n_x, step):
+    """Grid overlap ``<phi_0|phi(L)>`` of a plane wave under a y-uniform planar potential."""
+    grid = RealSpaceGrid((profile.period_ang, 1.0), (n_x, 2))
+    sheet = np.repeat(profile.potential(grid.x)[:, None], 2, axis=1)
+    prop = SplitStepPropagator(grid, kinetic, potential_eV=sheet)
+    entry = np.full(grid.shape, grid.area_ang2**-0.5, dtype=complex)
+    return np.array(
+        [
+            np.vdot(entry, out) * grid.cell_area_ang2
+            for _, out in prop.trajectory(entry, depths, step_ang=step)
+        ]
+    )
+
+
+def _parabolic_profile(base, depth_eV, n_harmonics):
+    """Periodic parabola ``U = 4 U_0 x^2 / d^2`` on ``|x| < d/2``, mean removed.
+
+    Its Fourier coefficients are ``U_m = 2 U_0 (-1)^m / (pi m)^2``; the mean is ``U_0 / 3``.
+    """
+    m = np.arange(1, n_harmonics + 1)
+    coefficients = np.zeros(n_harmonics + 1, dtype=complex)
+    coefficients[1:] = 2.0 * depth_eV * (-1.0) ** m / (np.pi * m) ** 2
+    return replace(base, potential_eV=coefficients)
+
+
+@pytest.mark.parametrize("charge", [-1, +1], ids=["electron", "positron"])
+def test_split_step_forward_amplitude_matches_planar_bloch(charge):
+    """Feit--Fleck--Steiger correlation ``A(L)`` agrees between both solvers (#1108).
+
+    100 MeV, Si (110), plane wave along the planes, over ~2.5 positron
+    oscillation periods (T ~ 9000 A); positrons see the sign-flipped profile.
+    """
+    kinetic = 100e6
+    silicon = planar_profile("silicon", (1, 1, 0))
+    profile = replace(silicon, potential_eV=-charge * silicon.potential_eV)
+    depths = np.linspace(0.0, 2.25e4, 46)
+    bloch, _ = _bloch_forward_amplitude(profile, kinetic, depths, 40)
+    errors = []
+    for step in (2.0, 1.0):
+        errors.append(
+            np.abs(_split_step_forward_amplitude(profile, kinetic, depths, 64, step) - bloch).max()
+        )
+    assert errors[1] < 1e-5
+    # Strang phase error is second order in the step.
+    assert errors[0] / errors[1] == pytest.approx(4.0, rel=0.05)
+    # Nontrivial: A(L) wanders far from 1 (sigma_t / A = 2 [1 - Re A] is O(1)).
+    assert (1.0 - bloch.real).max() > 0.5
+
+
+def test_forward_amplitude_parabolic_harmonic_revival():
+    """Periodic parabola: harmonic spectrum, A(T) ~ -1 and A(2T) -> 1 (Shul'ga & Shulga 2019).
+
+    In the U_min = 0 convention a harmonic spectrum ``E_n = hbar Omega (n + 1/2)``
+    gives ``A(T) = -1`` and ``A(2T) = 1`` on the bound subspace. The cusp at the
+    barrier leaves a residual that shrinks as more levels fit in the well.
+    """
+    depth = 22.7
+    silicon = planar_profile("silicon", (1, 1, 0))
+    period = silicon.period_ang
+    profile = _parabolic_profile(silicon, depth, 24)
+    revivals = []
+    for kinetic in (100e6, 1e9):
+        gamma, beta = longitudinal_kinematics(kinetic)
+        quantum = np.sqrt(16.0 * depth / period**2 * HBAR2_2M_EV_ANG2 / gamma)
+        oscillation = 2.0 * np.pi * HBARC_EV_ANG * beta / quantum
+        depths = np.array([oscillation, 2.0 * oscillation])
+        amplitude, solved = _bloch_forward_amplitude(profile, kinetic, depths, 60)
+        # Mean-zero profile -> U_min = 0 convention: E -> E + U_0 / 3.
+        amplitude = amplitude * np.exp(-1j * depth / 3.0 * depths / (HBARC_EV_ANG * beta))
+        levels = (solved.energies_eV[:4] + depth / 3.0) / quantum
+        np.testing.assert_allclose(levels, np.arange(4) + 0.5, atol=1e-4)
+        sigma = 2.0 * (1.0 - amplitude.real)
+        revivals.append(abs(amplitude[1]))
+        if kinetic == 100e6:
+            # Reproduces their Fig. 2: sigma_t / A = 3.87 at T, 0.25 at 2T.
+            assert sigma == pytest.approx([3.866, 0.252], abs=2e-3)
+            grid_amplitude = _split_step_forward_amplitude(profile, kinetic, depths, 128, 1.0)
+            raw = _bloch_forward_amplitude(profile, kinetic, depths, 60)[0]
+            np.testing.assert_allclose(grid_amplitude, raw, atol=1e-5)
+    assert revivals[1] > revivals[0] > 0.85
 
 
 def test_grid_sampling_rejects_planar_states_and_mixes():

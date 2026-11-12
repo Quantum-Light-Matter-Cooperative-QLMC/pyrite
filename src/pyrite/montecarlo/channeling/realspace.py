@@ -16,7 +16,10 @@ diagonal in momentum. Strang splitting
 
 with ``K = exp(-i hbar |k + k_t|^2 dz / 2 gamma m v)`` and
 ``V = exp(-i (U - i W) dz / hbar v)`` is unitary for ``W = 0`` and
-second-order accurate (Strang, SIAM J. Numer. Anal. 5, 506 (1968)).
+second-order accurate (Strang, SIAM J. Numer. Anal. 5, 506 (1968)). The FFT
+split-step method is that of Feit, Fleck & Steiger, J. Comput. Phys. 47, 412
+(1982); Dabagov & Ognev, Nucl. Instrum. Methods B 30, 185 (1988) applied it to
+channeling with an absorptive thermal-scattering potential.
 
 **Grid.** A ``L_x x L_y`` supercell sampled at ``n_x x n_y`` points, periodic.
 States are stored as ``psi(r) = exp(i k_t . r) phi(r)`` with periodic ``phi``:

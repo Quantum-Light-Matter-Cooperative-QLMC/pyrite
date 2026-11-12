@@ -107,4 +107,28 @@ The anchor tests independently reproduce the §4 closed forms. The Airy test use
 
 2. **The planar-limit numbers mix in a splitting error at the largest tilt.** The ledger quotes 9.6, 1.6 and 0.42 % at $\Delta z=2$ Å. At $\Delta z=0.5$ Å the errors are 9.62, 1.57 and 0.387 % at 20, 50 and 100 mrad, plus 0.098 % at 200 mrad. Successive ratios are 6.13, 4.06 and 3.94, so the converged ratio matches $\theta^{-2}$ more closely. At $\Delta z=2$ Å the 100 mrad point carries about 9 % splitting contamination, and the 200 mrad point stalls at 0.37 %. The test tolerance (`rel=0.25`) covers this.
 3. **The model is paraxial in the axis frame.** The model uses $\mathbf k_t=k\boldsymbol\theta$ rather than $k\sin\boldsymbol\theta$, and drops the quartic dispersion term $p_\perp^4/8p^3$. Relative to the exact dispersion, the transverse group velocity has an $O(\theta^3)$ correction and the transverse mass has an $O(\theta^2)$ correction, about $1.5\,\theta^2$, or 1.5 % at 100 mrad. This is the stated model, and it is unchanged by the splitting.
+   Dabagov & Ognev (1988, eq. 11) keep $\partial_z^2$ and propagate with the non-paraxial kinetic phase $k_\perp^2/(K+\sqrt{K^2-k_\perp^2})=K-\sqrt{K^2-k_\perp^2}$ per unit depth. Its expansion $k_\perp^2/2K+k_\perp^4/8K^3+\dots$ shows that the paraxial symbol used here drops exactly that quartic term.
 4. **The "tilt within the plane leaves planar evolution unchanged" check is structurally trivial.** For a $y$-uniform $\phi$ under a $y$-independent $U$, $k_t$ enters only as a global phase, so the test cannot detect a wrong sign or magnitude of $k_t$. The tilted-Gaussian drift check in §7 covers both.
+
+## 9. Forward-amplitude cross-check (#1108)
+
+**Method sources.** The split-step propagator with an FFT kinetic step is the spectral method of Feit, Fleck & Steiger, J. Comput. Phys. 47, 412 (1982). Their method recovers eigenvalues by Fourier-transforming the correlation function $A(L)$ below. Kozlov, Shul'ga & Cherkaskiy, Phys. Lett. A 374, 4690 (2010) apply the same method to channeling. Dabagov & Ognev, Nucl. Instrum. Methods B 30, 185 (1988) is the direct channeling prior art. They propagate MeV electrons in Si (110) and ⟨111⟩ by symmetrized split-step FFT steps with an absorptive thermal-scattering potential $W(\mathbf r)$, and they read the band spectrum from the $z$-Fourier transform of $\psi(\mathbf r_0,z)$. Strang (1968) supplies the second-order error bound of §2.
+
+**Correlation function.** For a plane wave $|k_0\rangle$ entering along the planes,
+
+$$
+A(L)=\langle k_0|e^{-iHL/\hbar v}|k_0\rangle=\sum_n|c_{0n}|^2e^{-iE_nL/\hbar v},
+$$
+
+with $c_{0n}$ the order-0 Bloch coefficient at $k=0$. The same quantity enters the total cross-section $\sigma_t/(L_xL_y)=2[1-\mathrm{Re}\,A(L)]$ (Shul'ga & Shulga, Phys. Lett. B 791, 225 (2019)). Shifting the potential zero by $\Delta$ multiplies $A$ by $e^{-i\Delta L/\hbar v}$. Their parabola $U=4U_0x^2/d^2$ has $U_{\min}=0$ and mean $U_0/3$, so the mean-zero `PlanarProfile` convention needs $A_{\min}=A_{\rm mean}\,e^{-iU_0L/3\hbar v}$. Its Fourier coefficients are $U_m=2U_0(-1)^m/(\pi m)^2$. Its harmonic levels $E_n=\hbar\Omega(n+\tfrac12)$, with $\hbar\Omega=\sqrt{8U_0\hbar^2/\gamma m d^2}$ and $T=2\pi\hbar v/\hbar\Omega$, give $A(T)=-1$ and $A(2T)=1$ on the harmonic subspace.
+
+**Checks** (`tests/montecarlo/quantum/test_channeling_axial.py`):
+
+| Case | Result |
+| --- | --- |
+| Si (110), 100 MeV, y-uniform $64\times2$ grid, plane-wave entry, 46 depths over 0–2.25 µm; Bloch sum at $M=40$ | $\max\lvert A_{\rm ss}-A_{\rm Bloch}\rvert$ $1.2\times10^{-5}$ → $3.1\times10^{-6}$ (electrons) and $3.5\times10^{-6}$ → $8.7\times10^{-7}$ (positrons) for $dz=2\to1$ Å; ratio 4.0 |
+| Parabola, $U_0=22.7$ eV, 24 harmonics, $M=60$ | $(E_n+U_0/3)/\hbar\Omega=n+\tfrac12$ to $4\times10^{-5}$ for $n<4$ |
+| Same, 100 MeV ($T=8975$ Å) | $\sigma_t/A=3.866$ at $T$ and $0.252$ at $2T$, reproducing the zero of their Fig. 2; split-step ($128\times2$, $dz=1$ Å) agrees to $1.2\times10^{-6}$ |
+| Same, 1 GeV | $\lvert A(2T)\rvert$ rises from 0.876 to 0.938 as more levels fit in the well; the cusp at the barrier keeps it below 1 |
+
+The grid must resolve the potential without aliasing: with 64 harmonics on a 64-point grid, the parabola disagrees at $10^{-2}$, independent of $dz$. The realistic profile has no $\sigma_t$ zero. Over $1.5T\le L\le4T$ ($T$ the parabolic period above), the minimum of $2[1-\mathrm{Re}\,A]$ is 0.80 (positrons) and 0.58 (electrons) in the mean-zero convention, and 0.69 and 0.67 with $U_{\min}=0$ (Bloch sum, $M=40$). These are diagnostic checks of the propagator against an independent eigenbasis; the propagator and default output are unchanged.
