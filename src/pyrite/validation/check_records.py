@@ -115,6 +115,10 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     "checks/recoil_in_crystal_527.py": ("line-recoil-in-crystal",),
     "checks/transverse_recoil_527.py": ("quantum-recoil-observability",),
     "checks/shaped_electron_1102.py": ("quantum-shaped-cxr-interference",),
+    "checks/planar_exit_out_of_plane.py": (
+        "cr-planar-exit-out-of-plane",
+        "cr-planar-exit-angular",
+    ),
     "checks/channeling_material_survey.py": (),
     "checks/channeling_submev_screen.py": (),
     "checks/srd164_inner_shell_comparison.py": (),
