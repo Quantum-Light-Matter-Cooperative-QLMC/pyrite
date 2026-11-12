@@ -829,7 +829,9 @@ def admit_axial_channeling(case: Mapping[str, Any]) -> None:
     (observable, line band, free→free owner, unsupported options), and only
     when the repository marks that entry runnable. A raw mapping is validated
     as a :class:`Case`, so no record, key or budget a caller writes can grant
-    admission.
+    admission. The runner's private ``_``-prefixed runtime keys (for example
+    the retry's ``_spectrum_phase_cache``, #1123) are not case fields and are
+    dropped before that validation; no ``Case`` field starts with ``_``.
     """
     from ..quantum._admission import is_axial_channeling, refuse_unverified_axial_run
 
@@ -846,7 +848,7 @@ def admit_axial_channeling(case: Mapping[str, Any]) -> None:
         case._validate_axial_channeling(record)
     else:
         try:
-            Case(**dict(case))
+            Case(**{k: v for k, v in case.items() if not str(k).startswith("_")})
         except TypeError as error:
             raise AxialAdmissionError(
                 f"axial case is not a complete case record: {error}"
