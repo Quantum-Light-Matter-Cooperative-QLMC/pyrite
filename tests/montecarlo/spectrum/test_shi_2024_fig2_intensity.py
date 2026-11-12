@@ -124,7 +124,8 @@ def test_sub_mev_area_excess_needs_cbs_on_one_side_only(T_keV, nz, monkeypatch):
     """Shi's sub-MeV QM/CL excess (2.9-5.8) appears only with CBS in QM alone.
 
     With CBS on both sides the exact-root area is the classical one to within
-    the recoil Jacobian; the residual factor <= 2.2 at 300 keV and n_z = -3 is
+    the recoil Jacobian and the K-edge couplings at the shifted roots
+    (0.89-1.07); the residual factor <= 2.2 at 300 keV and n_z = -3 is
     shared by an independent evaluation of Shi's own inputs
     (``checks/shi_2024_matrix_elements_1103.py``).
     """
