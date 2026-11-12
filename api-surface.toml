@@ -13,6 +13,11 @@
 # cxr_trials, brem_trials, precision and positional arguments were removed (hard break).
 # Budget fields are *_histories; pyrite.config.Precision was removed (use
 # AdaptiveSampling). Stored adaptive_precision payloads keep *_electrons keys.
+# #1105: Physics.channeling_admission (also Settings, profile key and CLI
+# --channeling-admission) and QuantumSetup.admission, "admitted" (default) or
+# "accept-inaccurate"; appended last positionally. Channeling cases outside the
+# admission tables refuse by default; opt-in cases persist an "unadmitted"
+# record. Off cases and the default value keep their identity; no new exports.
 schema_version = 1
 canonical_facades = ["beams", "geometry", "config", "detectors", "observations", "transport", "radiation"]
 

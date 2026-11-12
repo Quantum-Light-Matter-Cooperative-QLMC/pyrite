@@ -180,6 +180,8 @@ def test_channeling_case_and_identity_baseline():
 
     with warnings.catch_warnings():
         warnings.simplefilter("error", UserWarning)  # the fixture geometry passes every gate
+        # ...except the admission table: it runs under the #1105 opt-in.
+        warnings.filterwarnings("ignore", "case .* outside the measured admission", UserWarning)
         actual = resolved_channeling_baseline()
     expected = json.loads(
         (Path(__file__).parents[2] / "data/physics-baseline/channeling.json").read_text()

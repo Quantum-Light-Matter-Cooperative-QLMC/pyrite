@@ -298,7 +298,10 @@
       "basis_size": 16,
       "bloch_cells": 16,
       "dz_ang": 250.0,
-      "zone_max_ang": null
+      "zone_max_ang": null,
+      "admission": {
+        "status": "unadmitted"
+      }
     },
     "beam_uvw": null,
     "surface_hkl": [
@@ -320,5 +323,5 @@
     "dtheta_obs_rad": 0.0351963661580141,
     "domega_sr": 0.0012390399999999998
   },
-  "case_content_key": "746308b6a58546c54e273faa29609f00661044c4932eaabc29e39eb869b00b00"
+  "case_content_key": "a1ac03f1412f51b31c2b5da6e08cbaa233bc8d56f47f48fe37ed9c43c54cba85"
 }

@@ -310,12 +310,16 @@ class QuantumSetup:
 
     Pass independently as ``simulate(..., quantum=setup)``. Only planar Bloch
     density-matrix channeling is supported in production; other configurations
-    explicitly refuse.
+    explicitly refuse. ``admission`` lowers to ``Physics.channeling_admission``:
+    ``"admitted"`` (default) runs only cases in the measured admission table;
+    ``"accept-inaccurate"`` runs any other case, acknowledging that its
+    results may be very inaccurate, and marks them unadmitted (#1105).
     """
 
     region: QuantumRegion = field(default_factory=QuantumRegion)
     dynamics: QuantumDynamics = field(default_factory=QuantumDynamics)
     numerics: QuantumNumerics = field(default_factory=QuantumNumerics)
+    admission: Literal["admitted", "accept-inaccurate"] = "admitted"
 
     def __post_init__(self) -> None:
         for name, cls in (
@@ -325,6 +329,10 @@ class QuantumSetup:
         ):
             if not isinstance(getattr(self, name), cls):
                 raise TypeError(f"QuantumSetup.{name} must be {cls.__name__}")
+        from ._admission import CHANNELING_ADMISSIONS
+
+        if self.admission not in CHANNELING_ADMISSIONS:
+            raise ValueError(f"QuantumSetup.admission must be one of {CHANNELING_ADMISSIONS}")
 
     def lower(self, physics: Physics, numerics: Numerics) -> tuple[Physics, Numerics]:
         """Adapt supported planar configuration to unchanged versioned case fields."""
@@ -358,7 +366,12 @@ class QuantumSetup:
             if current != getattr(defaults, name) and current != value:
                 raise ValueError(f"Scene.quantum conflicts with legacy Numerics.{name}")
         return (
-            replace(physics, channeling_model="planar", channeling_plane=self.region.plane_hkl),
+            replace(
+                physics,
+                channeling_model="planar",
+                channeling_plane=self.region.plane_hkl,
+                channeling_admission=self.admission,
+            ),
             replace(numerics, **values),
         )
 

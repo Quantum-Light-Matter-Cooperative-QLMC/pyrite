@@ -22,6 +22,7 @@ from tests.helpers.user_catalog import USER_CATALOG_FIXTURE
 
 PLANAR = {
     "channeling_model": "planar",
+    "channeling_admission": "accept-inaccurate",
     "channeling_plane": [1, -1, 0],
     "radiative_model": "uncoupled",
     "channeling_basis_size": 12,

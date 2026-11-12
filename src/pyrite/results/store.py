@@ -146,6 +146,9 @@ class Settings:
         :class:`~pyrite.Physics`.
     channeling_model, channeling_plane
         Opt-in planar entrance zone and its Miller indices; defaults to off.
+    channeling_admission
+        ``"admitted"`` (default) or the ``"accept-inaccurate"`` opt-in for
+        channeling cases outside the admission tables (#1105).
     transition_radiation
         Opt-in ``"history"`` or ``"bunch"`` transition-radiation component
         (#103); defaults to ``"off"``.
@@ -195,6 +198,7 @@ class Settings:
     channeling_bloch_cells: int = 16
     channeling_dz_ang: float = 250.0
     channeling_zone_max_ang: float | None = None
+    channeling_admission: Literal["admitted", "accept-inaccurate"] = "admitted"
     transition_radiation: Literal["off", "history", "bunch", "two-beam"] = "off"
     transition_lattice_origin_ang: tuple[float, float, float] | None = None
     shell_ionization_model: Literal["eedl", "bote-salvat"] = "eedl"
@@ -266,6 +270,7 @@ class Settings:
             self.channeling_model != "off"
             or self.channeling_plane is not None
             or self.channeling_axial is not None
+            or self.channeling_admission != "admitted"
         ):
             physics = Physics(
                 # Photon observations are selected on Scene/Case, not analysis Settings.

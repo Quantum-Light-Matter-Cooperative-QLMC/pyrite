@@ -175,6 +175,7 @@ def _channeling_scene(physics_kwargs=None):
         bremsstrahlung_model="eedl",
         radiative_model="uncoupled",
         channeling_model="planar",
+        channeling_admission="accept-inaccurate",
         channeling_plane=(1, -1, 0),
         **(physics_kwargs or {}),
     )

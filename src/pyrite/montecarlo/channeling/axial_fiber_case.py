@@ -17,7 +17,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from ...quantum._axial_envelope import AdmittedAxialCase
+from ...quantum._axial_envelope import AdmittedAxialCase, AxialFibreCase, UnadmittedAxialCase
 from .axial_fiber_unraveling import FiberChannels
 
 _GAP_WINDOW_EV = 2.0  # provisional cut-search half-width of the research driver
@@ -83,7 +83,7 @@ def _kick_columns(dissipator, harmonic_max: int, grid_points: int):
     return np.array(columns), np.array(nodes)
 
 
-def axial_fiber_inputs(case: AdmittedAxialCase) -> AxialFiberInputs:
+def axial_fiber_inputs(case: AxialFibreCase) -> AxialFiberInputs:
     """Build the calibrated fibre-source inputs of ``case``.
 
     Validation: cr-axial-persisted-channel
@@ -95,8 +95,8 @@ def axial_fiber_inputs(case: AdmittedAxialCase) -> AxialFiberInputs:
     from .bloch import longitudinal_kinematics
     from .operators import _potential
 
-    if not isinstance(case, AdmittedAxialCase):
-        raise TypeError("axial_fiber_inputs requires an admitted case")
+    if not isinstance(case, AdmittedAxialCase | UnadmittedAxialCase):
+        raise TypeError("axial_fiber_inputs requires a resolved axial case")
     n = case.numerics
     profile = axial_profile(case.crystal, case.axis_uvw, temperature_K=case.temperature_K)
     u_min, u_max = (float(x) for x in profile.extrema())
@@ -159,7 +159,7 @@ def axial_fiber_inputs(case: AdmittedAxialCase) -> AxialFiberInputs:
     )
 
 
-def _tilted_entry(case: AdmittedAxialCase, k_inv_ang: float, g: np.ndarray, orders: np.ndarray):
+def _tilted_entry(case: AxialFibreCase, k_inv_ang: float, g: np.ndarray, orders: np.ndarray):
     """Folded carrier and entrance order of the plane wave tilted by ``case.tilt_deg``."""
     theta = np.deg2rad(case.tilt_deg)
     if theta == 0.0:

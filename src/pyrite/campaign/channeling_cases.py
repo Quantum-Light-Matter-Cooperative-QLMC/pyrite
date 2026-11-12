@@ -11,7 +11,12 @@ known and before any transport:
   until #439, so physical-support claims stop there;
 - fewer than one bound state at the beam energy (``n_b < 1``) is refused;
 - a beam within a few axial critical angles of a low-index axis warns, since
-  the planar model ignores axial channeling.
+  the planar model ignores axial channeling;
+- a case outside the measured admission table (planar
+  ``ADMITTED_PLANAR_CASES``, axial ``ADMITTED_AXIAL_CASES``) is refused unless
+  ``Physics.channeling_admission="accept-inaccurate"``, which runs it with an
+  ``unadmitted`` record and no error budget, and warns (#1105). The opt-in
+  relaxes only the table match, never the gates above.
 
 Geometries the one-way handoff does not support (stacks, grooves, mosaic,
 GDF beams) are refused by :class:`~pyrite.montecarlo.case.Case` itself.
@@ -89,24 +94,78 @@ def resolve_channeling(cases: list[Case], physics: Physics, numerics: Numerics) 
     ------
     ValueError
         For a crystal without channeling data, an energy above 100 MeV, no
-        bound state at the beam energy, or an unsupported case combination.
+        bound state at the beam energy, an unsupported case combination, or
+        (by default) a case outside the admission table.
     """
     if physics.channeling_model == "axial":
-        from ..quantum._axial_envelope import match_axial_case
-        from .axial_cases import axial_case_query, axial_channeling_record
-        from .axial_spec import refuse_unverified_axial_run
+        return _resolve_axial(cases, physics)
+    if physics.channeling_model == "off":
+        return cases
+    return _resolve_planar(cases, physics, numerics)
 
-        if physics.channeling_axial is None or physics.channeling_axial["version"] != 2:
-            refuse_unverified_axial_run()  # v1 remains parseable, never executable
-        u, v, w = cast(list[int], physics.channeling_axial["axis_uvw"])
-        axis = (u, v, w)
-        out = []
-        for case in cases:
-            # Match only resolved physical cases; do not infer or extrapolate
-            # calibration settings from an API/profile recipe.
-            admitted = match_axial_case(axial_case_query(case, axis, CHANNELING_TEMPERATURE_K))
-            out.append(replace(case, channeling=axial_channeling_record(admitted)))
-        return out
+
+def _accepts_unadmitted(physics: Physics) -> bool:
+    from ..quantum._admission import CHANNELING_ADMISSION_OPT_IN
+
+    return physics.channeling_admission == CHANNELING_ADMISSION_OPT_IN
+
+
+def _warn_unadmitted(case: Case, model: str) -> None:
+    warnings.warn(
+        f"case {case['name']!r}: {model} channeling case is outside the measured admission "
+        "table and runs under channeling_admission='accept-inaccurate'; its results may be "
+        "very inaccurate and are marked unadmitted, with no error budget (#1105)",
+        UserWarning,
+        stacklevel=4,
+    )
+
+
+def _resolve_axial(cases: list[Case], physics: Physics) -> list[Case]:
+    from ..quantum._admission import AxialAdmissionError
+    from ..quantum._axial_envelope import match_axial_case, unadmitted_axial_case
+    from .axial_cases import axial_case_query, axial_channeling_record
+    from .axial_spec import refuse_unverified_axial_run
+
+    if physics.channeling_axial is None or physics.channeling_axial["version"] != 2:
+        refuse_unverified_axial_run()  # v1 remains parseable, never executable
+    u, v, w = cast(list[int], physics.channeling_axial["axis_uvw"])
+    axis = (u, v, w)
+    out = []
+    for case in cases:
+        # Match only resolved physical cases; do not infer or extrapolate
+        # calibration settings from an API/profile recipe.
+        query = axial_case_query(case, axis, CHANNELING_TEMPERATURE_K)
+        try:
+            resolved = match_axial_case(query)
+        except AxialAdmissionError:
+            if not _accepts_unadmitted(physics):
+                raise
+            resolved = unadmitted_axial_case(query)
+            _warn_unadmitted(case, "axial")
+        out.append(replace(case, channeling=axial_channeling_record(resolved)))
+    return out
+
+
+def _planar_admission(case: Case, zone: dict[str, object], physics: Physics):
+    """Admission record of one planar case, or refuse (#1105)."""
+    from ..montecarlo.channeling.planar_case import (
+        UNADMITTED_RECORD,
+        planar_admission_record,
+        planar_case_query,
+    )
+    from ..quantum._admission import PlanarAdmissionError
+    from ..quantum._planar_envelope import match_planar_case
+
+    try:
+        return planar_admission_record(match_planar_case(planar_case_query(case, zone)))
+    except PlanarAdmissionError as error:
+        if not _accepts_unadmitted(physics):
+            raise PlanarAdmissionError(f"case {case['name']!r}: {error}") from None
+    _warn_unadmitted(case, "planar")
+    return dict(UNADMITTED_RECORD)
+
+
+def _resolve_planar(cases: list[Case], physics: Physics, numerics: Numerics) -> list[Case]:
     from ..materials.channeling import planar_profile
     from ..montecarlo.channeling import (
         DECHANNELING_MARGIN_EV,
@@ -114,10 +173,8 @@ def resolve_channeling(cases: list[Case], physics: Physics, numerics: Numerics) 
         transverse_states,
     )
 
-    if physics.channeling_model == "off":
-        return cases
     assert physics.channeling_plane is not None  # Physics validated the pair
-    record = channeling_case_record(
+    zone = channeling_case_record(
         physics.channeling_plane,
         temperature_K=CHANNELING_TEMPERATURE_K,
         margin_eV=DECHANNELING_MARGIN_EV,
@@ -125,6 +182,7 @@ def resolve_channeling(cases: list[Case], physics: Physics, numerics: Numerics) 
         bloch_cells=numerics.channeling_bloch_cells,
         dz_ang=numerics.channeling_dz_ang,
         zone_max_ang=numerics.channeling_zone_max_ang,
+        admission={},
     )
     out = []
     for case in cases:
@@ -139,14 +197,14 @@ def resolve_channeling(cases: list[Case], physics: Physics, numerics: Numerics) 
                 f"case {case['name']!r}: above 30 MeV, transport after dechanneling lacks "
                 "radiative energy loss (#439); channeling results are not physically supported",
                 UserWarning,
-                stacklevel=3,
+                stacklevel=4,
             )
-        profile = planar_profile(case["crystal"], record["plane_hkl"], CHANNELING_TEMPERATURE_K)
+        profile = planar_profile(case["crystal"], zone["plane_hkl"], CHANNELING_TEMPERATURE_K)
         gamma, _ = longitudinal_kinematics(energy_keV * 1e3)
         n_bound = transverse_states(profile, gamma).n_bound
         if n_bound < 1:
             raise ValueError(
-                f"case {case['name']!r}: plane {record['plane_hkl']} of {case['crystal']!r} "
+                f"case {case['name']!r}: plane {zone['plane_hkl']} of {case['crystal']!r} "
                 f"has no bound transverse state at {energy_keV:g} keV"
             )
         nearest = _axis_proximity(case)
@@ -157,7 +215,8 @@ def resolve_channeling(cases: list[Case], physics: Physics, numerics: Numerics) 
                 f"<{''.join(str(c) for c in uvw)}> axis (axial critical angle "
                 f"{psi_1 * 1e3:.3g} mrad); the planar zone omits axial channeling",
                 UserWarning,
-                stacklevel=3,
+                stacklevel=4,
             )
-        out.append(replace(case, channeling=dict(record)))
+        admission = _planar_admission(case, zone, physics)
+        out.append(replace(case, channeling={**zone, "admission": admission}))
     return out

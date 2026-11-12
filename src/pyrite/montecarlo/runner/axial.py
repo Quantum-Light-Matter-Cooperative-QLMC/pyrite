@@ -318,10 +318,7 @@ def transport_axial_case(
         "fate_fractions": weights,
         "entrance_weight": float(source.events[0].weight),
         "stopping_keV_per_ang": S,
-        "depth_budget": admitted.depth_budget,
-        "joint_confidence": admitted.joint_confidence,
-        "free_free": admitted.free_free,
-        "free_free_upper": admitted.free_free_upper,
+        **_budget_provenance(admitted),
         "source": {
             "E_eV": source.photon_energy_eV,
             "spectrum": source.spectrum,
@@ -329,6 +326,21 @@ def transport_axial_case(
         },
     }
     return out
+
+
+def _budget_provenance(admitted) -> dict[str, object]:
+    """Declared budgets of an admitted entry, or the unadmitted marker (#1105)."""
+    from ...quantum._axial_envelope import UnadmittedAxialCase
+
+    if isinstance(admitted, UnadmittedAxialCase):
+        return {"admission": admitted.key}  # no epsilon, no free->free bound
+    return {
+        "admission": "admitted",
+        "depth_budget": admitted.depth_budget,
+        "joint_confidence": admitted.joint_confidence,
+        "free_free": admitted.free_free,
+        "free_free_upper": admitted.free_free_upper,
+    }
 
 
 #: Run diagnostics persisted with every admitted axial record (#994).

@@ -256,8 +256,10 @@ class Case(Mapping[str, Any]):
     channeling
         Opt-in planar quantum channeling zone (ADR-0018, #506): the resolved
         record ``{"model": "planar", "plane_hkl", "temperature_K",
-        "margin_eV", "basis_size", "bloch_cells", "dz_ang", "zone_max_ang"}``
-        (see :func:`channeling_case_record`). Absent is amorphous transport,
+        "margin_eV", "basis_size", "bloch_cells", "dz_ang", "zone_max_ang",
+        "admission"}`` (see :func:`channeling_case_record`); ``admission`` is
+        the admission-table entry with its epsilon, or ``{"status":
+        "unadmitted"}`` under the opt-in (#1105). Absent is amorphous transport,
         so every pre-channeling case key stays valid. Requires
         ``energy_model``; excludes coupled radiative transport, secondaries,
         coherent emission, grooves, multilayer stacks, mosaic and GDF beams.
@@ -554,6 +556,9 @@ class Case(Mapping[str, Any]):
         for key in ("basis_size", "bloch_cells"):
             _positive_int(f"channeling {key}", record[key])
         _positive_optional("channeling zone_max_ang", record["zone_max_ang"])
+        from .channeling.planar_case import check_admission_record
+
+        check_admission_record(record["admission"])
         if self.energy_model != "midpoint":
             raise ValueError("channeling requires energy_model='midpoint'")
         refused = {
@@ -791,6 +796,7 @@ CHANNELING_RECORD_KEYS = (
     "bloch_cells",
     "dz_ang",
     "zone_max_ang",
+    "admission",
 )
 
 
@@ -876,8 +882,13 @@ def channeling_case_record(
     bloch_cells: int,
     dz_ang: float,
     zone_max_ang: float | None,
+    admission: Mapping[str, object],
 ) -> dict[str, object]:
-    """Return the canonical ``Case.channeling`` record for a planar zone."""
+    """Return the canonical ``Case.channeling`` record for a planar zone.
+
+    ``admission`` is ``planar_admission_record(entry)`` or the unadmitted
+    record of :mod:`~pyrite.montecarlo.channeling.planar_case` (#1105).
+    """
     return {
         "model": "planar",
         "plane_hkl": tuple(int(v) for v in plane_hkl),
@@ -887,6 +898,7 @@ def channeling_case_record(
         "bloch_cells": int(bloch_cells),
         "dz_ang": float(dz_ang),
         "zone_max_ang": None if zone_max_ang is None else float(zone_max_ang),
+        "admission": dict(admission),
     }
 
 

@@ -36,7 +36,10 @@ N = 200
 
 def _case(plane=(1, -1, 0), *, n=N, numerics=SMALL, thickness_ang=10000.0):
     physics = pr.Physics(
-        channeling_model="planar", channeling_plane=plane, radiative_model="uncoupled"
+        channeling_model="planar",
+        channeling_admission="accept-inaccurate",
+        channeling_plane=plane,
+        radiative_model="uncoupled",
     )
     scene = pr.Scene(
         pr.Beam(energy_keV=5000.0, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()),
@@ -179,6 +182,7 @@ def test_population_accounting_closes(zone):
     p = np.array(list(info["probabilities"].values()))
     np.testing.assert_allclose(p.sum(), 1.0, rtol=1e-12)
     assert abs(info["balance_defect"]) < 2e-2  # O(dz^2) at dz = 500 angstrom
+    assert info["admission"] == {"status": "unadmitted"}  # opt-in case, no epsilon (#1105)
     tagged = segs["channeling_zone"]
     handed = int(np.count_nonzero(segs["event_kind"][tagged] == SegmentEvent.DECHANNEL))
     exited = int(np.count_nonzero(segs["event_kind"][tagged] != SegmentEvent.DECHANNEL))

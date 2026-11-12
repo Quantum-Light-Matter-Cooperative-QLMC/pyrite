@@ -31,11 +31,11 @@ from __future__ import annotations
 
 import math
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Literal
 
-from ._admission import AxialAdmissionError
+from ._admission import UNADMITTED, AxialAdmissionError, unadmitted_hint
 
 _REL_TOL = 1e-9
 #: Model generation of the calibrated fibre source; distinct from planar and
@@ -162,8 +162,12 @@ AXIAL_RUN_CLAIMS: tuple[str, ...] = (
 
 
 def require_runnable_axial_case(key: object) -> None:
-    """Refuse a calibrated case whose production claims are not yet anchored."""
-    if key not in RUNNABLE_AXIAL_CASES:
+    """Refuse a calibrated case whose production claims are not yet anchored.
+
+    An unadmitted case (``channeling_admission="accept-inaccurate"``) runs the
+    same adapter outside every calibrated entry and is never gated here.
+    """
+    if key != UNADMITTED and key not in RUNNABLE_AXIAL_CASES:
         raise AxialAdmissionError(
             f"axial case {key} is calibrated but not yet runnable: the production "
             "adapter claim cr-axial-persisted-channel is not anchored for it (#994)"
@@ -236,18 +240,71 @@ def match_axial_case(query: AxialCaseQuery) -> AdmittedAxialCase:
     detail = "" if best is None else f"; closest {best[0]} differs in {', '.join(best[1])}"
     raise AxialAdmissionError(
         "axial case is outside the admitted envelope (#994; "
-        "docs/research/physics/axial-first-envelope-886.md)" + detail
+        "docs/research/physics/axial-first-envelope-886.md)" + detail + unadmitted_hint()
     )
 
 
-def check_axial_line_band(case: AdmittedAxialCase, energy_eV) -> None:
+@dataclass(frozen=True)
+class UnadmittedAxialCase:
+    """An axial case run under ``channeling_admission="accept-inaccurate"`` (#1105).
+
+    The resolved physical fields of a case outside the lookup, run with the
+    default fibre numerics. It carries no calibrated band, depth budget or
+    free->free bound: its results may be very inaccurate. Solver-validity
+    refusals (slab normal, plane wave, entrance order window, observable,
+    unsupported options) still apply.
+    """
+
+    crystal: str
+    axis_uvw: tuple[int, int, int]
+    kinetic_energy_eV: float
+    thickness_ang: float
+    tilt_deg: float
+    tilt_azimuth_deg: float
+    temperature_K: float
+    numerics: AxialFibreNumerics = field(default_factory=AxialFibreNumerics)
+    observable: str = "on-axis"
+    particle: str = "electron"
+    key: str = UNADMITTED
+
+
+#: A resolved axial fibre case: a lookup entry or an opted-in unadmitted case.
+AxialFibreCase = AdmittedAxialCase | UnadmittedAxialCase
+
+
+def unadmitted_axial_case(query: AxialCaseQuery) -> UnadmittedAxialCase:
+    """Unadmitted case for ``query``; refuses a query that matches an entry."""
+    try:
+        admitted = match_axial_case(query)
+    except AxialAdmissionError:
+        pass
+    else:
+        raise AxialAdmissionError(f"axial case is admitted as {admitted.key}; it is not unadmitted")
+    if query.observable != "on-axis" or query.particle != "electron":
+        raise AxialAdmissionError("axial fibre supports on-axis electron cases only")
+    return UnadmittedAxialCase(
+        crystal=query.crystal,
+        axis_uvw=query.axis_uvw,
+        kinetic_energy_eV=float(query.kinetic_energy_eV),
+        thickness_ang=float(query.thickness_ang),
+        tilt_deg=float(query.tilt_deg),
+        tilt_azimuth_deg=float(query.tilt_azimuth_deg),
+        temperature_K=float(query.temperature_K),
+    )
+
+
+def check_axial_line_band(case: AxialFibreCase, energy_eV) -> None:
     """Refuse a line grid reaching outside the calibrated band of ``case``.
+
+    An unadmitted case has no calibrated band; only an empty grid refuses.
 
     Validation: cr-axial-depth-calibration
     """
     values = [float(e) for e in energy_eV]
     if not values:
         raise AxialAdmissionError("axial line grid is empty")
+    if isinstance(case, UnadmittedAxialCase):
+        return
     lo, hi = case.band_eV
     if min(values) < lo or max(values) > hi:
         raise AxialAdmissionError(

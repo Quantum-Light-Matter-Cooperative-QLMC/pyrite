@@ -38,6 +38,7 @@ def quantum():
         region=QuantumRegion(kind="planar", plane_hkl=(1, -1, 0)),
         dynamics=QuantumDynamics(kind="channeling"),
         numerics=QuantumNumerics(basis_size=12, bloch_cells=8, step_ang=100.0),
+        admission="accept-inaccurate",
     )
 
 
@@ -96,7 +97,12 @@ def test_quantum_component_scene_and_legacy_calls_are_equivalent(
     # of QuantumSetup.lower or the new resolver.
     legacy = api.simulate(
         scene,
-        physics=replace(scene.physics, channeling_model="planar", channeling_plane=(1, -1, 0)),
+        physics=replace(
+            scene.physics,
+            channeling_model="planar",
+            channeling_admission="accept-inaccurate",
+            channeling_plane=(1, -1, 0),
+        ),
         numerics=replace(
             numerics, channeling_basis_size=12, channeling_bloch_cells=8, channeling_dz_ang=100.0
         ),
@@ -139,7 +145,12 @@ def test_quantum_errors_precede_material_preparation(scene, numerics, quantum, m
     physics = scene.physics
     error, message = ValueError, "diagnostic-only"
     if mode == "legacy-conflict":
-        physics = replace(physics, channeling_model="planar", channeling_plane=(1, -1, 0))
+        physics = replace(
+            physics,
+            channeling_model="planar",
+            channeling_admission="accept-inaccurate",
+            channeling_plane=(1, -1, 0),
+        )
         message = "conflicts with legacy Physics.channeling_model"
     elif mode == "unsupported":
         quantum = replace(quantum, numerics=replace(quantum.numerics, method="mcwf"))

@@ -22,7 +22,10 @@ TILT_AZIM_DEG = 46.0
 def _case(tilt_azim_deg=TILT_AZIM_DEG, channeling=True, thickness_ang=20000.0):
     physics = (
         pr.Physics(
-            channeling_model="planar", channeling_plane=(1, -1, 0), radiative_model="uncoupled"
+            channeling_model="planar",
+            channeling_admission="accept-inaccurate",
+            channeling_plane=(1, -1, 0),
+            radiative_model="uncoupled",
         )
         if channeling
         else pr.Physics(radiative_model="uncoupled")

@@ -438,6 +438,27 @@ def _axial_marker(spec: Mapping[str, object]) -> str:
     return AXIAL_FIBRE_MODEL_MARKER if spec["version"] == 2 else AXIAL_MODEL_MARKER
 
 
+def _channeling_identity(settings_payload: dict[str, Any]) -> dict[str, object]:
+    """Pop the channeling settings; return their hashed identity, empty when off.
+
+    Channeling is opt-in: every inert field is stripped before hashing, and the
+    admission opt-in joins only when set (divergence-only, #1105).
+    """
+    channeling = {key: settings_payload.pop(key, None) for key in CHANNELING_KEYS}
+    if channeling["channeling_admission"] in (None, "admitted"):
+        channeling.pop("channeling_admission")
+    if channeling["channeling_model"] in (None, "off"):
+        return {}
+    if channeling["channeling_model"] == "axial":
+        # Expand defaults before hashing; do not alias planar or v1.
+        channeling["channeling_axial"] = resolve_axial_spec(channeling["channeling_axial"])
+        model_marker = _axial_marker(channeling["channeling_axial"])
+    else:
+        channeling.pop("channeling_axial", None)  # planar identity remains bit-for-bit
+        model_marker = CHANNELING_MODEL
+    return {"channeling": channeling, "channeling_model": model_marker}
+
+
 def _identity_v1(
     material: str,
     settings: Settings,
@@ -480,18 +501,7 @@ def _identity_v1(
     if catalog_profile != "standard":
         resolved["catalog_profile"] = catalog_profile
     settings_payload = resolved["settings"]
-    # Channeling is opt-in: strip every new inert field before hashing.
-    channeling = {key: settings_payload.pop(key, None) for key in CHANNELING_KEYS}
-    if channeling["channeling_model"] not in (None, "off"):
-        if channeling["channeling_model"] == "axial":
-            # Expand defaults before hashing; do not alias planar or v1.
-            channeling["channeling_axial"] = resolve_axial_spec(channeling["channeling_axial"])
-            model_marker = _axial_marker(channeling["channeling_axial"])
-        else:
-            channeling.pop("channeling_axial", None)  # planar identity remains bit-for-bit
-            model_marker = CHANNELING_MODEL
-        resolved["channeling"] = channeling
-        resolved["channeling_model"] = model_marker
+    resolved.update(_channeling_identity(settings_payload))
     # Transition radiation (#103) is opt-in on the same divergence-only rule.
     transition = settings_payload.pop("transition_radiation", "off")
     origin = settings_payload.pop("transition_lattice_origin_ang", None)

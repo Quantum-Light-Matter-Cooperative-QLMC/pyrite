@@ -58,7 +58,10 @@ def test_off_and_planar_selector_compatibility():
     assert Physics().channeling_axial is None
     assert (
         Physics(
-            channeling_model="planar", channeling_plane=(1, -1, 0), radiative_model="uncoupled"
+            channeling_model="planar",
+            channeling_admission="accept-inaccurate",
+            channeling_plane=(1, -1, 0),
+            radiative_model="uncoupled",
         ).channeling_axial
         is None
     )
@@ -67,6 +70,7 @@ def test_off_and_planar_selector_compatibility():
     with pytest.raises(ValueError, match="requires channeling_model='axial'"):
         Physics(
             channeling_model="planar",
+            channeling_admission="accept-inaccurate",
             channeling_plane=(1, -1, 0),
             channeling_axial=_spec(),
             radiative_model="uncoupled",

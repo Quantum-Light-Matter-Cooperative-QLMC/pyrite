@@ -21,13 +21,16 @@ from typing import Any
 
 import numpy as np
 
-from ...quantum._admission import AxialAdmissionError
+from ...quantum._admission import UNADMITTED, AxialAdmissionError
 from ...quantum._axial_envelope import (
     ADMITTED_AXIAL_CASES,
     AXIAL_FIBRE_MODEL_MARKER,
     AdmittedAxialCase,
     AxialCaseQuery,
+    AxialFibreCase,
+    UnadmittedAxialCase,
     match_axial_case,
+    unadmitted_axial_case,
 )
 
 Case = Mapping[str, Any]
@@ -93,15 +96,17 @@ def axial_case_query(case: Case, axis_uvw: tuple[int, int, int], temperature_K: 
     )
 
 
-def axial_channeling_record(admitted: AdmittedAxialCase) -> dict[str, object]:
+def axial_channeling_record(admitted: AxialFibreCase) -> dict[str, object]:
     """Freeze the calibrated fibre model and its evidence into Case.channeling.
 
     This records an admission *lookup result*, never caller-provided settings.
     The digest covers resolved source settings. An independent model-generation
-    marker separates it from planar and the unverified v1 axial recipe.
+    marker separates it from planar and the unverified v1 axial recipe. An
+    unadmitted case (#1105) records ``"admission": "unadmitted"`` and its own
+    resolved settings, with no band, budget, free->free bound or evidence.
     """
-    if not isinstance(admitted, AdmittedAxialCase):
-        raise TypeError("axial_channeling_record requires an admitted case")
+    if not isinstance(admitted, AdmittedAxialCase | UnadmittedAxialCase):
+        raise TypeError("axial_channeling_record requires a resolved axial case")
     settings = {
         "crystal": admitted.crystal,
         "axis_uvw": list(admitted.axis_uvw),
@@ -115,6 +120,18 @@ def axial_channeling_record(admitted: AdmittedAxialCase) -> dict[str, object]:
     settings_digest = hashlib.sha256(
         json.dumps(settings, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
     ).hexdigest()
+    if isinstance(admitted, UnadmittedAxialCase):
+        return {
+            "model": "axial",
+            "model_marker": AXIAL_FIBRE_MODEL_MARKER,
+            "case_key": UNADMITTED,
+            "admission": UNADMITTED,
+            "settings_digest": settings_digest,
+            "axis_uvw": list(admitted.axis_uvw),
+            "temperature_K": admitted.temperature_K,
+            "fibre_numerics": settings["numerics"],
+            "observable": admitted.observable,
+        }
     return {
         "model": "axial",
         "model_marker": AXIAL_FIBRE_MODEL_MARKER,
@@ -159,18 +176,32 @@ def axial_zone_frame(case: Case, axis_uvw: tuple[int, int, int]) -> np.ndarray:
     return frame
 
 
-def admitted_axial_case(case: Case) -> AdmittedAxialCase:
+def admitted_axial_case(case: Case) -> AxialFibreCase:
     """Re-resolve ``case`` against the repository lookup and return its entry.
 
     The stored record must equal the lookup result for the case's own physical
-    fields: a case key, budget or record alone grants nothing.
+    fields: a case key, budget or record alone grants nothing. An unadmitted
+    record (#1105) re-resolves to an :class:`UnadmittedAxialCase` and refuses
+    when the case matches an entry.
     """
     record = case.get("channeling")
     key = record.get("case_key") if isinstance(record, Mapping) else None
-    if not isinstance(key, str) or key not in ADMITTED_AXIAL_CASES:
+    admitted: AxialFibreCase
+    if key == UNADMITTED and isinstance(record, Mapping):
+        axis = record.get("axis_uvw")
+        if not isinstance(axis, list) or len(axis) != 3:
+            raise AxialAdmissionError("unadmitted axial record has no axis (#1105)")
+        query = axial_case_query(
+            case, (int(axis[0]), int(axis[1]), int(axis[2])), float(record["temperature_K"])
+        )
+        admitted = unadmitted_axial_case(query)
+    elif not isinstance(key, str) or key not in ADMITTED_AXIAL_CASES:
         raise AxialAdmissionError("axial record has no repository-owned admission (#994)")
-    template = ADMITTED_AXIAL_CASES[key]
-    admitted = match_axial_case(axial_case_query(case, template.axis_uvw, template.temperature_K))
+    else:
+        template = ADMITTED_AXIAL_CASES[key]
+        admitted = match_axial_case(
+            axial_case_query(case, template.axis_uvw, template.temperature_K)
+        )
     if not isinstance(record, Mapping) or dict(record) != axial_channeling_record(admitted):
         raise AxialAdmissionError("axial resolved record differs from repository lookup (#994)")
     axial_zone_frame(case, admitted.axis_uvw)

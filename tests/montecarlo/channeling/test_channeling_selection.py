@@ -19,7 +19,12 @@ from pyrite.montecarlo.case import Case, channeling_case_record
 from pyrite.montecarlo.channeling import CHANNELING_MODEL, DECHANNELING_MARGIN_EV
 from pyrite.montecarlo.transport import SegmentEvent, check_segment_event_contract
 
-PLANAR = dict(channeling_model="planar", channeling_plane=(1, -1, 0), radiative_model="uncoupled")
+PLANAR = dict(
+    channeling_model="planar",
+    channeling_admission="accept-inaccurate",
+    channeling_plane=(1, -1, 0),
+    radiative_model="uncoupled",
+)
 
 
 def _scene(physics=None, *, energy_keV=5000.0, **slab):
@@ -65,6 +70,7 @@ def test_planar_adds_one_record_and_the_marker(planar_case):
         bloch_cells=16,
         dz_ang=250.0,
         zone_max_ang=None,
+        admission={"status": "unadmitted"},
     )
     assert case_content_key({k: v for k, v in planar_case.items() if k != "channeling"}) == (
         case_content_key(off)
