@@ -32,7 +32,7 @@ class EnsembleMetrics:
     purity_probe_sem: np.ndarray
     basis: str
     probes: int = 0
-    electrons: int | None = None
+    histories: int | None = None
 
 
 def _energy_spread(first, second):
@@ -149,7 +149,7 @@ class AxialMetricsObservable:
         second = xp.sum(xp.abs(hphi) ** 2) * self.grid.cell_area_ang2
         return xp.concatenate((actions.ravel(), xp.stack((first, second))))
 
-    def finish(self, values, survival, density, *, electrons=None) -> EnsembleMetrics:
+    def finish(self, values, survival, density, *, histories=None) -> EnsembleMetrics:
         """Reduce stored ensemble density actions; raw estimates may exceed bounds."""
         actions = values[:, :-2].reshape(len(values), self.probes, -1)
         squares = np.sum(np.abs(actions) ** 2, axis=-1)
@@ -167,5 +167,5 @@ class AxialMetricsObservable:
             sem,
             "physical position grid",
             self.probes,
-            electrons,
+            histories,
         )

@@ -52,22 +52,22 @@ def test_metric_budget_refuses_before_probe_allocation():
 
 
 def test_axial_recording_preserves_trajectories():
-    from pyrite.montecarlo.channeling.axial_diagnostic import (
-        AxialDiagnosticConfig,
-        axial_diagnostic,
+    from pyrite.montecarlo.channeling.axial_propagation import (
+        AxialPropagationConfig,
+        propagate_axial,
     )
 
-    config = AxialDiagnosticConfig(
-        shape=(8, 8), depths_ang=(0.0, 10.0), mode="mcwf", n_electrons=3, mechanisms=()
+    config = AxialPropagationConfig(
+        shape=(8, 8), depths_ang=(0.0, 10.0), mode="mcwf", histories=3, mechanisms=()
     )
-    plain = axial_diagnostic(config)
-    recorded = axial_diagnostic(config, record_metrics=True)
+    plain = propagate_axial(config)
+    recorded = propagate_axial(config, record_metrics=True)
     np.testing.assert_allclose(
         plain.density_per_ang2, recorded.density_per_ang2, rtol=1e-15, atol=0
     )
     np.testing.assert_array_equal(plain.surviving, recorded.surviving)
     assert plain.jumps == recorded.jumps
-    assert recorded.metrics.electrons == 3
+    assert recorded.metrics.histories == 3
 
 
 def test_complex_probe_actions_and_carrier_energy_match_dense_oracle():

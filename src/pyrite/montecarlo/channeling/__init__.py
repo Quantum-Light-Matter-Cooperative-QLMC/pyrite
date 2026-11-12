@@ -11,7 +11,8 @@ bounds the excluded transition-radiation background. :mod:`.states` builds
 user-definable entry wavefunctions (Gaussian, Hermite/Laguerre-Gauss vortex,
 Bessel, Airy, aberrated aperture probes, sampled arrays, abTEM waves) and
 projects them onto the planar Bloch basis. :mod:`.bloch` solves the planar Bloch
-eigenproblem at a beam energy and :mod:`.entry` maps sample tilt onto plane incidence. :mod:`.exit_angular` gives the
+eigenproblem at a beam energy (:mod:`.axial_bloch` the axial 2D one) and
+:mod:`.entry` maps sample tilt onto plane incidence. :mod:`.exit_angular` gives the
 angular distribution of electrons leaving the crystal. :mod:`.realspace` is the
 experimental axial tier's periodic split-step backend. CPU only.
 """

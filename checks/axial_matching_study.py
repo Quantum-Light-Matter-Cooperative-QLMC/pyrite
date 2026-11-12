@@ -303,8 +303,9 @@ def bloch_report(max_order: int = 6, cells_list=(1, 2, 3)) -> dict:
     ``cells x cells`` Bloch grids. Bounded grids only.
     Validation: cr-axial-zone-handoff-accounting
     """
-    from pyrite.materials.channeling.axial import axial_profile, axial_states
+    from pyrite.materials.channeling.axial import axial_profile
     from pyrite.montecarlo.channeling import longitudinal_kinematics
+    from pyrite.montecarlo.channeling.axial_bloch import axial_states
     from pyrite.montecarlo.channeling.axial_dissipator import axial_dissipator
     from pyrite.montecarlo.channeling.operators import _potential
 
@@ -376,8 +377,9 @@ def report() -> dict:
     maximum of U. Bounded grids only: not converged material predictions.
     Validation: cr-axial-zone-handoff-accounting
     """
-    from pyrite.materials.channeling.axial import axial_profile, axial_states
+    from pyrite.materials.channeling.axial import axial_profile
     from pyrite.montecarlo.channeling import longitudinal_kinematics
+    from pyrite.montecarlo.channeling.axial_bloch import axial_states
     from pyrite.montecarlo.channeling.axial_dissipator import axial_dissipator
     from pyrite.montecarlo.channeling.operators import _potential
 

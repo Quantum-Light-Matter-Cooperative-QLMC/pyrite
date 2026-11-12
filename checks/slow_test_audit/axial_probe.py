@@ -8,8 +8,9 @@ import time
 import numpy as np
 from threadpoolctl import threadpool_info
 
-from pyrite.materials.channeling.axial import axial_profile, axial_states
+from pyrite.materials.channeling.axial import axial_profile
 from pyrite.montecarlo.channeling import longitudinal_kinematics
+from pyrite.montecarlo.channeling.axial_bloch import axial_states
 from pyrite.montecarlo.channeling.axial_emission import axial_line_catalog
 
 uvw = tuple(int(c) for c in sys.argv[1])

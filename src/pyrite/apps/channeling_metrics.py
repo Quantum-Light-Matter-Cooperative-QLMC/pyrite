@@ -77,7 +77,7 @@ def axial_accounting_figure(result):
     axes[0].legend(fontsize=8)
     if result.jump_history:
         for name, counts in result.jump_history.items():
-            axes[1].plot(z, counts / result.config.n_electrons, label=name)
+            axes[1].plot(z, counts / result.config.histories, label=name)
         axes[1].legend()
     axes[1].set(ylabel="Cumulative jumps per incident electron", title="Quantum jumps")
     if result.oam_populations is not None:

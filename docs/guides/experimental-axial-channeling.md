@@ -73,11 +73,11 @@ interface only; check results against independent seeds.
 
 ```python
 from pyrite.experimental.quantum import (
-    AxialDiagnosticConfig,
-    axial_diagnostic,
+    AxialPropagationConfig,
+    propagate_axial,
 )
 
-config = AxialDiagnosticConfig(
+config = AxialPropagationConfig(
     crystal="silicon",
     axis=(0, 0, 1),
     kinetic_energy_eV=5e6,
@@ -86,7 +86,7 @@ config = AxialDiagnosticConfig(
     depths_ang=(0, 250, 500),
     step_ang=5,
     mode="mcwf",
-    n_electrons=16,
+    histories=16,
     seed=17,
     spectral_states=16,
     spectral_representation="energy_bins",
@@ -95,7 +95,7 @@ config = AxialDiagnosticConfig(
     record_current_divergence=True,
     current_contour=(0, 0, 12, 12),
 )
-result = axial_diagnostic(config, record_metrics=True)
+result = propagate_axial(config, record_metrics=True)
 print(result.surviving, result.density_per_ang2.shape)
 ```
 
@@ -110,7 +110,7 @@ entry = mixture(
         (0.5, laguerre_gauss(-1, waist_ang=0.5)),
     ]
 )
-result = axial_diagnostic(config, entry=entry, record_metrics=True)
+result = propagate_axial(config, entry=entry, record_metrics=True)
 ```
 
 (cuda-execution)=
@@ -120,7 +120,7 @@ use different random draws, so compare ensemble statistics, not tracks:
 ```python
 from dataclasses import replace
 
-gpu_result = axial_diagnostic(replace(config, backend="cuda"), record_metrics=True)
+gpu_result = propagate_axial(replace(config, backend="cuda"), record_metrics=True)
 ```
 
 The [observable table](../reference/quantum-api.md#interpret-the-recorded-observables)

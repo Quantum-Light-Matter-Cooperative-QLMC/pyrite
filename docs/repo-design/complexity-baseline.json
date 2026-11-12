@@ -32,11 +32,6 @@
       "cc": 35
     },
     {
-      "path": "src/pyrite/quantum/_axial_spec.py",
-      "name": "_entry",
-      "cc": 24
-    },
-    {
       "path": "src/pyrite/campaign/beam.py",
       "name": "Beam.__post_init__",
       "cc": 21
@@ -291,16 +286,6 @@
       "exception": "#680: accept 59 -> 60 for the optional channeling_source admission guard. Source-specific checks already live in validate_source_case; the dispatcher must also reject source records without planar channeling. Moving this single guard would only hide a constructor invariant."
     },
     {
-      "path": "src/pyrite/montecarlo/channeling/axial_diagnostic.py",
-      "name": "_validate",
-      "cc": 44
-    },
-    {
-      "path": "src/pyrite/montecarlo/channeling/axial_diagnostic.py",
-      "name": "axial_diagnostic",
-      "cc": 33
-    },
-    {
       "path": "src/pyrite/montecarlo/channeling/axial_dissipator.py",
       "name": "axial_dissipator",
       "cc": 22
@@ -309,6 +294,16 @@
       "path": "src/pyrite/montecarlo/channeling/axial_energy_mcwf.py",
       "name": "axial_energy_mcwf",
       "cc": 69
+    },
+    {
+      "path": "src/pyrite/montecarlo/channeling/axial_propagation.py",
+      "name": "_validate",
+      "cc": 44
+    },
+    {
+      "path": "src/pyrite/montecarlo/channeling/axial_propagation.py",
+      "name": "propagate_axial",
+      "cc": 33
     },
     {
       "path": "src/pyrite/montecarlo/channeling/axial_source_assembly.py",
@@ -371,11 +366,6 @@
       "name": "transport_channeling_case",
       "cc": 22,
       "exception": "#680: accept 26 -> 29 for optional source momentum sampling, optional beam-entry provenance and conditional-versus-legacy handoff selection. Source sampling and bin propagation already have separate owners in planar_injection. The remaining branches belong to the ordered entrance -> zone -> handoff -> native continuation orchestration, preserving electron IDs and RNG streams; extracting them solely for CC would obscure that data flow."
-    },
-    {
-      "path": "src/pyrite/montecarlo/runner/cxr_grid.py",
-      "name": "_resolve_policy_grid",
-      "cc": 27
     },
     {
       "path": "src/pyrite/montecarlo/shell_configuration.py",
@@ -639,6 +629,11 @@
       "path": "src/pyrite/plots/mpl/trajectories.py",
       "name": "plot_trajectory_grid",
       "cc": 27
+    },
+    {
+      "path": "src/pyrite/quantum/_axial_spec.py",
+      "name": "_entry",
+      "cc": 24
     },
     {
       "path": "src/pyrite/quantum/state.py",

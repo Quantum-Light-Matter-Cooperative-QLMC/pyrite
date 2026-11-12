@@ -38,9 +38,10 @@ import sys
 import numpy as np
 from scipy.signal import convolve2d
 
-from pyrite.materials.channeling.axial import axial_profile, axial_states
+from pyrite.materials.channeling.axial import axial_profile
 from pyrite.materials.crystal import HBARC_EV_ANG, M_E_EV
 from pyrite.montecarlo.channeling import longitudinal_kinematics
+from pyrite.montecarlo.channeling.axial_bloch import axial_states
 from pyrite.montecarlo.channeling.entry import mean_inner_potential_eV
 
 TEMPERATURE_K = 293.15

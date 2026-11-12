@@ -179,8 +179,9 @@ def material_case(max_order: int, target_eV: float, window_eV: float = 2.0) -> d
     The entrance is the zero-tilt plane wave projected on P (subunit trace).
     Validation: cr-axial-zone-handoff-accounting
     """
-    from pyrite.materials.channeling.axial import axial_profile, axial_states
+    from pyrite.materials.channeling.axial import axial_profile
     from pyrite.montecarlo.channeling import longitudinal_kinematics
+    from pyrite.montecarlo.channeling.axial_bloch import axial_states
     from pyrite.montecarlo.channeling.axial_dissipator import axial_dissipator
     from pyrite.montecarlo.channeling.operators import _potential
 
@@ -388,9 +389,10 @@ def material_fiber_channels(
     Returns ``(channels, entry_orders, hbar_v, info)``.
     Validation: cr-axial-zone-handoff-accounting
     """
-    from pyrite.materials.channeling.axial import axial_profile, axial_states
+    from pyrite.materials.channeling.axial import axial_profile
     from pyrite.materials.crystal import HBARC_EV_ANG, M_E_EV
     from pyrite.montecarlo.channeling import longitudinal_kinematics
+    from pyrite.montecarlo.channeling.axial_bloch import axial_states
     from pyrite.montecarlo.channeling.axial_dissipator import axial_dissipator
     from pyrite.montecarlo.channeling.axial_fiber_unraveling import FiberChannels
     from pyrite.montecarlo.channeling.axial_tds_continuum import TdsString

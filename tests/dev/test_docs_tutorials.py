@@ -146,9 +146,7 @@ def test_planar_diagnostic_renders_cached_native_arrays_without_solving(tutorial
         plt.close("all")
 
 
-def test_axial_diagnostic_renders_cached_density_and_overlap_without_solving(
-    tutorials, monkeypatch
-):
+def test_propagate_axial_renders_cached_density_and_overlap_without_solving(tutorials, monkeypatch):
     import matplotlib
 
     matplotlib.use("Agg")
@@ -159,7 +157,7 @@ def test_axial_diagnostic_renders_cached_density_and_overlap_without_solving(
     def forbid_solve(*args, **kwargs):
         pytest.fail("documentation rendering must never run axial quantum solvers")
 
-    for name in ("compute", "calculate", "axial_diagnostic"):
+    for name in ("compute", "calculate", "propagate_axial"):
         monkeypatch.setattr(example, name, forbid_solve)
     monkeypatch.setattr(tutorials, "load_example", lambda _: example)
     data = tutorials.checked_output("experimental_axial_channeling")

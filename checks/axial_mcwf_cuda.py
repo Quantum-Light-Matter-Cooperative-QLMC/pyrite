@@ -40,7 +40,7 @@ def measure(shape, electrons, depth, cp, *, cells=1, energy=1e6, cpu_electrons=N
     for backend in ("cpu", "cuda"):
         solver = AxialMCWF(d, energy, potential, backend=backend)
         args = dict(
-            depths_ang=[0, depth / 2, depth], n_electrons=counts[backend], seed=17, step_ang=10
+            depths_ang=[0, depth / 2, depth], histories=counts[backend], seed=17, step_ang=10
         )
         times = []
         for _repeat in range(repeats + 1):

@@ -21,10 +21,10 @@ from pyrite.montecarlo.channeling import (
     AxialEnergyMCWFOptions,
     axial_energy_mcwf,
 )
-from pyrite.montecarlo.channeling.axial_diagnostic import AxialDiagnosticConfig
+from pyrite.montecarlo.channeling.axial_propagation import AxialPropagationConfig
 
 spec = IncidentEnergyEnsemble(5e6, energy_spread_frac=0.002, order=9)
-config = AxialDiagnosticConfig(
+config = AxialPropagationConfig(
     kinetic_energy_eV=5e6,
     mode="mcwf",
     shape=(32, 32),
@@ -32,7 +32,7 @@ config = AxialDiagnosticConfig(
     step_ang=2.0,
     oam_string=0,
 )
-options = AxialEnergyMCWFOptions(n_electrons=200, seed=627, chunk_size=25)
+options = AxialEnergyMCWFOptions(histories=200, seed=627, chunk_size=25)
 results = axial_energy_mcwf(
     spec,
     config,
@@ -43,10 +43,10 @@ results = axial_energy_mcwf(
 # Per incident electron: surviving, density_per_ang2, coherence_per_ang2
 # Energy-conditioned arrays: surviving_by_bin, density_by_bin_per_ang2,
 # oam_populations_by_bin, jumps_by_bin, photon_density_by_bin_per_eV
-assert results.bin_counts.sum() == options.n_electrons
+assert results.bin_counts.sum() == options.histories
 ```
 
-`result.energies_eV[i]` is the actual assigned kinetic energy of electron `i`; the energy histogram uses `energy_bin_edges_eV`, `energy_bin_centers_eV` and `bin_counts`. Empty quadrature bins have zero conditioned reductions. `surviving_by_bin[b]` is a fraction of the electrons **assigned to that bin**. The unconditional average is `sum_b (bin_counts[b] / n_electrons) * conditioned[b]`. `jumps_by_bin` stores **integer event counts**, not probabilities or wavefunction phases. `coherence_per_ang2` is the lab-frame fixed-pixel coherence (the diagonal is a density).
+`result.energies_eV[i]` is the actual assigned kinetic energy of electron `i`; the energy histogram uses `energy_bin_edges_eV`, `energy_bin_centers_eV` and `bin_counts`. Empty quadrature bins have zero conditioned reductions. `surviving_by_bin[b]` is a fraction of the electrons **assigned to that bin**. The unconditional average is `sum_b (bin_counts[b] / histories) * conditioned[b]`. `jumps_by_bin` stores **integer event counts**, not probabilities or wavefunction phases. `coherence_per_ang2` is the lab-frame fixed-pixel coherence (the diagonal is a density).
 
 For the optional radiation histogram, the energy-specific on-column bound-state catalog and polarization lines are independently built at every assigned energy. Each trajectory's **polarization intensity** is integrated across depth and deposited into fixed **photon-energy bin edges**; distinct photon energies/lines are never averaged by line index. `photon_density_per_eV` and the energy-bin-conditioned version are photons per incident electron per eV. `helicity_plus_per_eV` and `helicity_minus_per_eV` are separately reduced. `detector_sigma_eV` represents **instrument** smearing only; it does not apply an additional incident-energy spread. Radiation is zero where no supported on-column line catalog exists. This radiation model inherits the approximations/validity limits of the experimental axial line diagnostic.
 
@@ -54,20 +54,20 @@ For the optional radiation histogram, the energy-specific on-column bound-state 
 
 ```python
 checkpoints = []
-opts = AxialEnergyMCWFOptions(n_electrons=200, seed=627, checkpoint_every=50)
+opts = AxialEnergyMCWFOptions(histories=200, seed=627, checkpoint_every=50)
 r = axial_energy_mcwf(spec, config, options=opts, checkpoint_callback=checkpoints.append)
 # Resume deterministically from a previously persisted checkpoint object:
 r2 = axial_energy_mcwf(
     spec,
     config,
-    options=AxialEnergyMCWFOptions(n_electrons=200, seed=627, chunk_size=7),
+    options=AxialEnergyMCWFOptions(histories=200, seed=627, chunk_size=7),
     resume_from=checkpoints[-1],
 )
 ```
 
 `AxialEnergyMCWFCheckpoint` is a bounded, read-only snapshot of raw running bin sums, event counts and the last processed global electron ID. The callback receives the full object; **the API does not itself write files**. The caller may persist it (for example as a trusted Python pickle or a custom NPZ serializer), then supply `resume_from`. Its digest validates assignments, simulation geometry, observed pixel pairs, energy binning and detector energy grid. The caller must ensure that the same entry/observable/radiation callbacks and physics version are restored; arbitrary callback source cannot be hashed. The callback is emitted every `checkpoint_every` electrons, excluding the final total; no snapshots are retained by default. Snapshots require approximately twice the reduction memory and count against the bound.
 
-Limits are explicit: at most 100,000 electrons; at most 256 energy bins and 128 pixel coherence pairs; at most 4,096 photon-energy bins; at most 2,048 distinct solver energies by default (`max_distinct_energies`); maximum 8 concurrently cached energy solvers; `work_limit` bounds `electrons * pixels * split steps`; `storage_limit_bytes` preflights returned reductions and per-electron level-observable histories. **Solver-internal dissipator cache and FFT scratch allocations are not hard-capped by this number** and may consume additional RAM. If continuous sampling needs more distinct energies, increase that cap and plan for repeated solver construction. It is much more expensive than reusing a small quadrature grid.
+Limits are explicit: at most 100,000 histories; at most 256 energy bins and 128 pixel coherence pairs; at most 4,096 photon-energy bins; at most 2,048 distinct solver energies by default (`max_distinct_energies`); maximum 8 concurrently cached energy solvers; `work_limit` bounds `electrons * pixels * split steps`; `storage_limit_bytes` preflights returned reductions and per-electron level-observable histories. **Solver-internal dissipator cache and FFT scratch allocations are not hard-capped by this number** and may consume additional RAM. If continuous sampling needs more distinct energies, increase that cap and plan for repeated solver construction. It is much more expensive than reusing a small quadrature grid.
 
 ## Validation status
 

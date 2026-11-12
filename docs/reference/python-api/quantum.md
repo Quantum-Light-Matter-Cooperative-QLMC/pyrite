@@ -91,9 +91,9 @@ existing code owners. The same axial objects can be imported from the
    :nosignatures:
 
    pyrite.montecarlo.channeling.spatial.spatial_density
-   pyrite.montecarlo.channeling.axial_diagnostic.AxialDiagnosticConfig
-   pyrite.montecarlo.channeling.axial_diagnostic.AxialDiagnosticResult
-   pyrite.montecarlo.channeling.axial_diagnostic.axial_diagnostic
+   pyrite.montecarlo.channeling.axial_propagation.AxialPropagationConfig
+   pyrite.montecarlo.channeling.axial_propagation.AxialPropagationResult
+   pyrite.montecarlo.channeling.axial_propagation.propagate_axial
 ```
 
 ## Solver diagnostic contracts
@@ -101,7 +101,7 @@ existing code owners. The same axial objects can be imported from the
 | Entry | Owner / status | Scientific contract and effects |
 | --- | --- | --- |
 | `spatial_density` | Quantum/channeling, experimental | Density matrix, basis eigenfunctions and spatial grid (angstrom); Born-rule probability density (1/angstrom), including retained survival weight, without conditioning or renormalization. Array compatibility errors propagate; no transport or artifact I/O. |
-| `AxialDiagnosticConfig`, `AxialDiagnosticResult`, `axial_diagnostic` | Quantum/channeling, experimental | Bounded solver configuration (field-specific units), populations and incident-normalized spatial density on recorded depths; retained solver/configuration diagnostics. Explicit solver/allocation limits and invalid configurations raise. No standard axial transport integration. Ownership consolidation belongs to #704. |
+| `AxialPropagationConfig`, `AxialPropagationResult`, `propagate_axial` | Quantum/channeling, experimental | Bounded solver configuration (field-specific units), populations and incident-normalized spatial density on recorded depths; retained solver/configuration diagnostics. Explicit solver/allocation limits and invalid configurations raise. No standard axial transport integration. Ownership consolidation belongs to #704. |
 
 For planar channeling, `DensityMatrixSolver.propagate(spatial_x_ang=...)`
 records density per incident electron per Å on the supplied grid. Its cell
@@ -137,6 +137,45 @@ presence in the reference does not broaden production admission; consult the
    pyrite.experimental.quantum.project_planar_source
    pyrite.experimental.quantum.propagate_planar_source
    pyrite.experimental.quantum.score_planar_source
+```
+
+### Crystal profiles, Bloch states and emission helpers
+
+Experimental channeling helpers (#1147): crystal potentials, beam-dependent
+Bloch states and kinematics, line and spectrum diagnostics, exit-angle
+distributions and the fibre research adapters. Import them from
+`pyrite.quantum`; their implementation modules are internal.
+
+```{eval-rst}
+.. autosummary::
+   :toctree: ../../_autosummary
+   :nosignatures:
+
+   pyrite.quantum.planar_profile
+   pyrite.quantum.axial_profile
+   pyrite.quantum.transverse_states
+   pyrite.quantum.axial_states
+   pyrite.quantum.AxialStates
+   pyrite.quantum.entry_populations
+   pyrite.quantum.longitudinal_kinematics
+   pyrite.quantum.line_energy_eV
+   pyrite.quantum.channeling_spectrum
+   pyrite.quantum.axial_line_catalog
+   pyrite.quantum.classical_exit_angles
+   pyrite.quantum.coherent_exit_distribution
+   pyrite.quantum.planar_fiber_inputs
+   pyrite.quantum.unravel_fiber_outgoing
+```
+
+`M_E_EV` is the electron rest energy, a plain `float` in eV (no Quantity).
+
+```{eval-rst}
+.. autosummary::
+   :toctree: ../../_autosummary
+   :template: autosummary/public-data.rst
+   :nosignatures:
+
+   pyrite.quantum.M_E_EV
 ```
 
 ### Scattering operators

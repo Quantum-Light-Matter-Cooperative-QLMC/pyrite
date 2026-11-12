@@ -3,20 +3,20 @@
 import numpy as np
 import pytest
 
-from pyrite.montecarlo.channeling.axial_diagnostic import (
-    AxialDiagnosticConfig,
+from pyrite.montecarlo.channeling.axial_flux import AxialFluxObservable
+from pyrite.montecarlo.channeling.axial_propagation import (
+    AxialPropagationConfig,
     _DiagnosticRecording,
     _validate,
-    axial_diagnostic,
+    propagate_axial,
 )
-from pyrite.montecarlo.channeling.axial_flux import AxialFluxObservable
 from pyrite.montecarlo.channeling.realspace import RealSpaceGrid
 
 
 def _config(**changes):
     from dataclasses import replace
 
-    cfg = AxialDiagnosticConfig(
+    cfg = AxialPropagationConfig(
         crystal="silicon",
         axis=(0, 0, 1),
         kinetic_energy_eV=5e6,
@@ -46,7 +46,7 @@ def test_recording_settings_are_explicitly_admitted():
 
 
 def test_coherent_online_current_and_full_periodic_contour():
-    result = axial_diagnostic(_config())
+    result = propagate_axial(_config())
     assert result.transverse_current_per_ang2.shape == (2, 2, 16, 16)
     assert result.transverse_divergence_per_ang3.shape == (2, 16, 16)
     assert result.contour_flux_per_ang.shape == (2, 4)
@@ -62,7 +62,7 @@ def test_coherent_online_current_and_full_periodic_contour():
 
 
 def test_mcwf_current_is_normalized_per_incident_electron():
-    result = axial_diagnostic(_config(mode="mcwf", n_electrons=2, mechanisms=()))
+    result = propagate_axial(_config(mode="mcwf", histories=2, mechanisms=()))
     assert result.transverse_current_per_ang2.shape == (2, 2, 16, 16)
     assert result.contour_flux_per_ang.shape == (2, 4)
     np.testing.assert_allclose(result.contour_flux_per_ang.sum(axis=1), 0, atol=1e-12)
@@ -94,6 +94,6 @@ def test_cuda_online_current_regression_when_available():
             pytest.skip("CUDA unavailable")
     except Exception as exc:
         pytest.skip(f"CUDA unavailable: {exc}")
-    result = axial_diagnostic(_config(backend="cuda", mode="mcwf", n_electrons=2, mechanisms=()))
+    result = propagate_axial(_config(backend="cuda", mode="mcwf", histories=2, mechanisms=()))
     np.testing.assert_allclose(result.contour_flux_per_ang.sum(axis=1), 0, atol=1e-10)
     assert np.isfinite(result.transverse_current_per_ang2).all()

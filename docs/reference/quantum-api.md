@@ -34,9 +34,12 @@ runtime factories stay under `pyrite.quantum`. See the
 | Runtime factories | `gaussian`, `hermite_gauss`, `laguerre_gauss`, `donut`, `bessel_gauss`, `airy`, `aperture_probe`, `from_array`, `from_abtem`, `superpose`, `mixture`, `translate` | Advanced-stable runtime interfaces; coherent superpositions add amplitudes, incoherent mixtures add weighted densities. `from_abtem` needs the caller's abTEM wave object. |
 | Planar source bridge | `PlanarStateProjection`, `project_planar_source`, `propagate_planar_source`, `score_planar_source` | Experimental diagnostic projection, evolution and radiation scoring; does not construct a production case. |
 | Planar solvers/results | `DensityMatrixSolver`, `DensityMatrixResult`, `MCWFSolver`, `MCWFResult` | Experimental direct solvers; results are runtime numerical histories, not portable source specifications or checkpoints. |
-| Scattering inputs | `ScatteringKernel`, `tds_kernel`, `electronic_kernel` | Experimental solver-building interfaces; retain existing operator normalization and defaults. Profiles come from `pyrite.materials.channeling`. |
+| Scattering inputs | `ScatteringKernel`, `tds_kernel`, `electronic_kernel` | Experimental solver-building interfaces; retain existing operator normalization and defaults. Profiles come from `planar_profile`/`axial_profile`. |
 | Coherent real-space solving | `RealSpaceGrid`, `SplitStepPropagator` | Experimental periodic-grid diagnostics; finite grid loss is not physical dechanneling. |
-| Axial solving/results | `AxialMCWF`, `AxialMCWFResult`, `AxialDiagnosticConfig`, `AxialDiagnosticResult`, `axial_diagnostic` | Experimental direct diagnostics; production axial admission is unchanged. The high-level diagnostic collects grid, escape, phase-space and optional emission summaries. |
+| Crystal profiles and Bloch states | `planar_profile`, `axial_profile`, `transverse_states`, `axial_states`, `AxialStates`, `entry_populations`, `longitudinal_kinematics`, `line_energy_eV`, `M_E_EV` | Experimental (#1147). Profiles are beam-independent crystal potentials (angstrom, eV); Bloch states, entry populations, kinematics and Doppler line energies take the beam Lorentz factor. `M_E_EV` is the electron rest energy as a float in eV. Runtime values only; no portable contract. |
+| Emission and exit diagnostics | `channeling_spectrum`, `axial_line_catalog`, `classical_exit_angles`, `coherent_exit_distribution` | Experimental direct diagnostics (#1147); outputs keep their existing units and per-electron normalization. |
+| Fibre research adapters | `planar_fiber_inputs`, `unravel_fiber_outgoing` | Experimental research adapters (#1147) used by the repository fibre-source studies; no production admission. |
+| Axial solving/results | `AxialMCWF`, `AxialMCWFResult`, `AxialPropagationConfig`, `AxialPropagationResult`, `propagate_axial` | Experimental direct diagnostics; production axial admission is unchanged. The high-level diagnostic collects grid, escape, phase-space and optional emission summaries. |
 
 Existing `pyrite` root aliases, `pyrite.quantum.state.TransverseStateSpec`,
 `pyrite.quantum.planar_source` bridge functions, and the
@@ -127,8 +130,7 @@ remain unchanged.
 
 ```python
 import numpy as np
-from pyrite.materials.channeling import planar_profile
-from pyrite.quantum import DensityMatrixSolver, electronic_kernel, tds_kernel
+from pyrite.quantum import DensityMatrixSolver, electronic_kernel, planar_profile, tds_kernel
 
 profile = planar_profile("silicon", (1, 1, 0), 293.15)
 kernel = tds_kernel(profile, 17e6, n_cells=2, max_order=2)
@@ -332,8 +334,8 @@ factory Pint boundary. Axial diagnostics remain experimental and do not enable
 
 ### Configuration and normalization
 
-`axial_diagnostic(config, *, entry=None, observable=None, record_metrics=False)`
-runs one `AxialDiagnosticConfig`; see
+`propagate_axial(config, *, entry=None, observable=None, record_metrics=False)`
+runs one `AxialPropagationConfig`; see
 [the axial guide](../guides/experimental-axial-channeling.md#run-an-mcwf-diagnostic-from-python)
 for a complete call.
 

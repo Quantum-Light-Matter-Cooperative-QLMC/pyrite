@@ -9,9 +9,10 @@ import pytest
 from scipy.special import j0
 
 from pyrite.materials.channeling import planar_profile
-from pyrite.materials.channeling.axial import axial_profile, axial_states
+from pyrite.materials.channeling.axial import axial_profile
 from pyrite.materials.crystal import HBAR2_2M_EV_ANG2
 from pyrite.montecarlo.channeling import longitudinal_kinematics, operators, states
+from pyrite.montecarlo.channeling.axial_bloch import axial_states
 from pyrite.montecarlo.channeling.axial_dissipator import axial_dissipator
 from pyrite.montecarlo.channeling.axial_mcwf import AxialMCWF
 from pyrite.montecarlo.channeling.operators import (

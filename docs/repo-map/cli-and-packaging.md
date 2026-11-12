@@ -166,7 +166,7 @@ band yields and component semantics used by `apps/analysis_ui/radiation.py`.
 The channeling app also offers a bounded experimental axial mode through
 `apps/axial_channeling.py` (entry presets, cached solves, stored-array plotting,
 string-0 level densities and helicity-split line yields via `axial_radiation`).
-`montecarlo/channeling/axial_diagnostic.py` assembles coherent/MCWF solvers with
+`montecarlo/channeling/axial_propagation.py` assembles coherent/MCWF solvers with
 typed configuration/results, incident-normalized density, optional string-centred
 OAM and bounded ensemble metrics. `AxialMCWF` selects CPU or lazy CUDA execution;
 `_axial_cuda*` owns device propagation, jumps and incident-addressed Philox draws.

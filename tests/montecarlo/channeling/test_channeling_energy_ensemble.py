@@ -243,8 +243,8 @@ def _axial_fixture(monkeypatch):
             wavefunctions_per_ang=phi[None].repeat(2, axis=0),
         )
 
-    fake = types.ModuleType("pyrite.montecarlo.channeling.axial_diagnostic")
-    fake.axial_diagnostic = solve
+    fake = types.ModuleType("pyrite.montecarlo.channeling.axial_propagation")
+    fake.propagate_axial = solve
     monkeypatch.setitem(sys.modules, fake.__name__, fake)
     return solve
 

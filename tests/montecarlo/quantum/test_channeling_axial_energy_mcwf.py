@@ -169,14 +169,14 @@ def test_chunk_invariance_conservation_and_correlated_entrance(lib):
         seen.append((e, i))
         return object(), ((e - 100.0) * 0.0001, 0.0)
 
-    options = mod.AxialEnergyMCWFOptions(n_electrons=43, seed=100, chunk_size=1)
+    options = mod.AxialEnergyMCWFOptions(histories=43, seed=100, chunk_size=1)
     a = mod.axial_energy_mcwf(
         dist, config, options=options, entry_factory=entry_factory, coherence_pairs=[(0, 1), (2, 3)]
     )
     b = mod.axial_energy_mcwf(
         dist,
         config,
-        options=mod.AxialEnergyMCWFOptions(n_electrons=43, seed=100, chunk_size=11),
+        options=mod.AxialEnergyMCWFOptions(histories=43, seed=100, chunk_size=11),
         entry_factory=entry_factory,
         coherence_pairs=[(0, 1), (2, 3)],
     )
@@ -210,7 +210,7 @@ def test_fixed_energy_reference_and_oam_population(lib):
     config.oam_string = 0
     d = base.IncidentEnergyEnsemble(100.0)
     out = mod.axial_energy_mcwf(
-        d, config, options=mod.AxialEnergyMCWFOptions(n_electrons=9, chunk_size=3, seed=1)
+        d, config, options=mod.AxialEnergyMCWFOptions(histories=9, chunk_size=3, seed=1)
     )
     assert out.bin_counts.tolist() == [9]
     np.testing.assert_array_equal(out.oam_populations, out.oam_populations_by_bin[0])
@@ -221,7 +221,7 @@ def test_fixed_energy_reference_and_oam_population(lib):
 def test_bounds_and_cuda_envelope_refusals(lib):
     base, mod, config, state = lib
     dist = base.IncidentEnergyEnsemble(100.0)
-    cuda = mod.AxialEnergyMCWFOptions(n_electrons=2, backend="cuda")
+    cuda = mod.AxialEnergyMCWFOptions(histories=2, backend="cuda")
     with pytest.raises(ValueError, match="backend"):
         mod.axial_energy_mcwf(dist, config, options=mod.AxialEnergyMCWFOptions(backend="sycl"))
     with pytest.raises(ValueError, match="memory_budget_bytes"):
@@ -251,21 +251,19 @@ def test_bounds_and_cuda_envelope_refusals(lib):
     assert state.solvers == []
     with pytest.raises(ValueError, match="work_limit"):
         mod.axial_energy_mcwf(
-            dist, config, options=mod.AxialEnergyMCWFOptions(n_electrons=10, work_limit=10)
+            dist, config, options=mod.AxialEnergyMCWFOptions(histories=10, work_limit=10)
         )
     with pytest.raises(ValueError, match="storage_limit"):
         mod.axial_energy_mcwf(
             dist,
             config,
-            options=mod.AxialEnergyMCWFOptions(
-                n_electrons=20, storage_limit_bytes=1024, max_bins=32
-            ),
+            options=mod.AxialEnergyMCWFOptions(histories=20, storage_limit_bytes=1024, max_bins=32),
         )
     with pytest.raises(ValueError, match="outside"):
         mod.axial_energy_mcwf(
             dist,
             config,
-            options=mod.AxialEnergyMCWFOptions(n_electrons=3),
+            options=mod.AxialEnergyMCWFOptions(histories=3),
             electron_energies_eV=[80.0, 100.0, 120.0],
             energy_bin_edges_eV=[90.0, 110.0],
         )
@@ -273,7 +271,7 @@ def test_bounds_and_cuda_envelope_refusals(lib):
         mod.axial_energy_mcwf(
             dist,
             config,
-            options=mod.AxialEnergyMCWFOptions(n_electrons=2),
+            options=mod.AxialEnergyMCWFOptions(histories=2),
             solver_factory=lambda e, g, p: SimpleNamespace(kinetic_energy_eV=e + 1, grid=g),
         )
 
@@ -309,7 +307,7 @@ def test_energy_shifted_radiation_histogram_is_incoherent(lib, monkeypatch):
     out = mod.axial_energy_mcwf(
         dist,
         config,
-        options=mod.AxialEnergyMCWFOptions(n_electrons=30, seed=18),
+        options=mod.AxialEnergyMCWFOptions(histories=30, seed=18),
         photon_energy_edges_eV=[170.0, 200.0, 240.0],
         radiation_factory=lambda energy, grid: LevelObserver(energy),
     )
@@ -333,7 +331,7 @@ def test_custom_common_population_observable_is_conditioned_by_energy(lib):
     a = mod.axial_energy_mcwf(
         dist,
         config,
-        options=mod.AxialEnergyMCWFOptions(n_electrons=20, seed=17),
+        options=mod.AxialEnergyMCWFOptions(histories=20, seed=17),
         observable_factory=lambda e: lambda phi, tilt: np.array([e / 100.0, 1.0]),
     )
     assert a.observables_by_bin.shape == (2, 2, 2)
@@ -355,14 +353,12 @@ def test_bounded_checkpoint_can_resume_with_different_chunk_admission(lib):
     first = mod.axial_energy_mcwf(
         d,
         config,
-        options=mod.AxialEnergyMCWFOptions(
-            n_electrons=15, seed=27, chunk_size=2, checkpoint_every=5
-        ),
+        options=mod.AxialEnergyMCWFOptions(histories=15, seed=27, chunk_size=2, checkpoint_every=5),
         checkpoint_callback=checkpoint,
         coherence_pairs=[(0, 1)],
         observable_factory=lambda e: lambda phi, tilt: np.array([e]),
     )
-    assert [cp.processed_electrons for cp in snapshots] == [5, 10]
+    assert [cp.processed_histories for cp in snapshots] == [5, 10]
     assert snapshots[0].bin_counts_processed.sum() == 5
     assert not snapshots[0].density_sums.flags.writeable
     with pytest.raises(ValueError):
@@ -370,7 +366,7 @@ def test_bounded_checkpoint_can_resume_with_different_chunk_admission(lib):
     resumed = mod.axial_energy_mcwf(
         d,
         config,
-        options=mod.AxialEnergyMCWFOptions(n_electrons=15, seed=27, chunk_size=7),
+        options=mod.AxialEnergyMCWFOptions(histories=15, seed=27, chunk_size=7),
         resume_from=snapshots[1],
         coherence_pairs=[(0, 1)],
         observable_factory=lambda e: lambda phi, tilt: np.array([e]),
@@ -390,7 +386,7 @@ def test_bounded_checkpoint_can_resume_with_different_chunk_admission(lib):
         mod.axial_energy_mcwf(
             d,
             config,
-            options=mod.AxialEnergyMCWFOptions(n_electrons=15, seed=28),
+            options=mod.AxialEnergyMCWFOptions(histories=15, seed=28),
             resume_from=snapshots[1],
             coherence_pairs=[(0, 1)],
         )

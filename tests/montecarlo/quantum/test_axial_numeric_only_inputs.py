@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from pyrite.montecarlo.channeling.axial_diagnostic import AxialDiagnosticConfig
+from pyrite.montecarlo.channeling.axial_propagation import AxialPropagationConfig
 from pyrite.montecarlo.channeling.realspace import RealSpaceGrid, SplitStepPropagator
 from pyrite.units import ureg
 
@@ -50,7 +50,7 @@ def test_split_step_energy_refuses_quantity() -> None:
         ("spectral_cutoff_eV", 1 * ureg.eV),
     ],
 )
-def test_axial_diagnostic_config_refuses_quantities_at_construction(name, value) -> None:
-    with pytest.raises(TypeError, match=rf"AxialDiagnosticConfig\.{name} is numeric-only"):
-        AxialDiagnosticConfig(**{name: value})
-    assert AxialDiagnosticConfig().kinetic_energy_eV == 5e6
+def test_propagate_axial_config_refuses_quantities_at_construction(name, value) -> None:
+    with pytest.raises(TypeError, match=rf"AxialPropagationConfig\.{name} is numeric-only"):
+        AxialPropagationConfig(**{name: value})
+    assert AxialPropagationConfig().kinetic_energy_eV == 5e6

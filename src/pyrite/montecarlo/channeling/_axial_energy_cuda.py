@@ -134,11 +134,11 @@ class _DeviceSolvers:
         self.cp.get_default_memory_pool().free_all_blocks()
 
 
-def chunk_ends(start: int, n_electrons: int, chunk_size: int, checkpoint_every: int) -> list[int]:
+def chunk_ends(start: int, histories: int, chunk_size: int, checkpoint_every: int) -> list[int]:
     """Admission chunk ends in global-ID order, split at every checkpoint boundary."""
     ends = []
-    while start < n_electrons:
-        end = min(start + chunk_size, n_electrons)
+    while start < histories:
+        end = min(start + chunk_size, histories)
         if checkpoint_every:
             end = min(end, (start // checkpoint_every + 1) * checkpoint_every)
         ends.append(end)
@@ -169,7 +169,7 @@ def cuda_energy_groups(
     resident = _DeviceSolvers(cp, options.max_cached_solvers, step_ang)
     start = start_id
     for end in chunk_ends(
-        start_id, options.n_electrons, options.chunk_size, options.checkpoint_every
+        start_id, options.histories, options.chunk_size, options.checkpoint_every
     ):
         groups: OrderedDict[float, list[tuple[int, Any, Sequence[float]]]] = OrderedDict()
         for eid in range(start, end):

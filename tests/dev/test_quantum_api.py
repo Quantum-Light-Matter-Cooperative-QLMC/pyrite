@@ -100,6 +100,60 @@ def test_experimental_quantum_exports_are_pinned_to_pyrite_quantum():
         assert getattr(experimental, name) is getattr(quantum, name)
 
 
+_CHANNELING_HELPERS = {
+    "planar_profile": "pyrite.materials.channeling.potential",
+    "axial_profile": "pyrite.materials.channeling.axial",
+    "axial_states": "pyrite.montecarlo.channeling.axial_bloch",
+    "AxialStates": "pyrite.montecarlo.channeling.axial_bloch",
+    "transverse_states": "pyrite.montecarlo.channeling.bloch",
+    "entry_populations": "pyrite.montecarlo.channeling.bloch",
+    "longitudinal_kinematics": "pyrite.montecarlo.channeling.bloch",
+    "line_energy_eV": "pyrite.montecarlo.channeling.bloch",
+    "channeling_spectrum": "pyrite.montecarlo.channeling.emission",
+    "axial_line_catalog": "pyrite.montecarlo.channeling.axial_emission",
+    "classical_exit_angles": "pyrite.montecarlo.channeling.exit_angular",
+    "coherent_exit_distribution": "pyrite.montecarlo.channeling.exit_angular",
+    "planar_fiber_inputs": "pyrite.montecarlo.channeling.planar_fiber",
+    "unravel_fiber_outgoing": "pyrite.montecarlo.channeling.axial_fiber_unraveling",
+    "M_E_EV": "pyrite.materials.crystal",
+}
+
+
+@pytest.mark.parametrize(("name", "module"), sorted(_CHANNELING_HELPERS.items()))
+def test_channeling_helpers_resolve_from_quantum_with_identity(name, module):
+    assert name in quantum.__all__
+    assert getattr(quantum, name) is getattr(importlib.import_module(module), name)
+
+
+def test_m_e_ev_is_the_plain_float_rest_energy():
+    assert type(quantum.M_E_EV) is float
+    assert quantum.M_E_EV == pytest.approx(510998.95)
+
+
+def test_axial_states_left_materials_without_alias():
+    from pyrite.montecarlo.channeling import axial_bloch
+
+    assert quantum.axial_states.__module__ == axial_bloch.__name__
+    with pytest.raises(ImportError, match="axial_states"):
+        from pyrite.materials.channeling.axial import axial_states  # noqa: F401
+    with pytest.raises(ImportError, match="AxialStates"):
+        from pyrite.materials.channeling.axial import AxialStates  # noqa: F401
+
+
+@pytest.mark.parametrize(
+    "name", ["AxialDiagnosticConfig", "AxialDiagnosticResult", "axial_diagnostic"]
+)
+def test_pre_rename_axial_names_are_gone_without_alias(name):
+    from pyrite.experimental import quantum as experimental
+
+    for namespace in (quantum, experimental):
+        assert name not in namespace.__all__
+        with pytest.raises(AttributeError, match=name):
+            getattr(namespace, name)
+    with pytest.raises(ModuleNotFoundError):
+        importlib.import_module("pyrite.montecarlo.channeling.axial_diagnostic")
+
+
 def test_facade_rejects_unreviewed_engine_helpers():
     assert "zone_solver" not in quantum.__all__
     with pytest.raises(AttributeError, match="zone_solver"):

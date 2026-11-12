@@ -122,7 +122,7 @@ solver-facing states. The corresponding read-back exposes **derived geometry
 and quadrature hints**, not an exact reconstruction of each original preset:
 
 ```python
-from pyrite.montecarlo.channeling.states import gaussian, translate, aperture_probe
+from pyrite.quantum import aperture_probe, gaussian, translate
 
 state = gaussian(waist_ang=2 * ureg.nm, dimension=1)
 state.centre_position  # array quantity in Å

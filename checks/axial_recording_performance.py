@@ -43,9 +43,9 @@ def main():
 
     from pyrite.apps.axial_channeling import _level_observable
     from pyrite.montecarlo.channeling import axial_state_diagnostics as spectral
-    from pyrite.montecarlo.channeling.axial_diagnostic import (
-        AxialDiagnosticConfig,
-        axial_diagnostic,
+    from pyrite.montecarlo.channeling.axial_propagation import (
+        AxialPropagationConfig,
+        propagate_axial,
     )
     from pyrite.montecarlo.channeling.states import gaussian
 
@@ -82,12 +82,12 @@ def main():
     depths = tuple(
         np.unique(np.rint(np.linspace(0, args.depth / args.step, args.samples))) * args.step
     )
-    config = AxialDiagnosticConfig(
+    config = AxialPropagationConfig(
         mode="mcwf",
         backend="cuda",
         shape=(args.points,) * 2,
         cells=(args.cells,) * 2,
-        n_electrons=args.electrons,
+        histories=args.electrons,
         step_ang=args.step,
         depths_ang=depths,
         seed=args.seed,
@@ -98,7 +98,7 @@ def main():
     entry = gaussian(waist_ang=0.5)
 
     def run():
-        return axial_diagnostic(
+        return propagate_axial(
             config, entry=entry, observable=observer, record_metrics=args.recording == "all"
         )
 

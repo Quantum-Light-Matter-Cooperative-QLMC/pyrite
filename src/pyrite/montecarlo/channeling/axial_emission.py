@@ -34,7 +34,7 @@ Korotchenko & Kunashenko, arXiv:2403.01930; Knyazev & Serbo, Phys. Usp. 61,
 net helicity is an aperture effect; ``J_z`` is not.
 
 **Levels.** Lines use the ``k = 0`` single-cell eigenstates of
-:func:`~pyrite.materials.channeling.axial.axial_states`. Only flat bands
+:func:`~pyrite.montecarlo.channeling.axial_bloch.axial_states`. Only flat bands
 (bandwidth over the Brillouin zone below ``max_bandwidth_eV``) are kept; their
 on-column orbitals are the ``k = 0`` Bloch functions cut to the string's
 Wigner–Seitz cell (tight binding). Dipoles use the exact velocity form
@@ -50,8 +50,9 @@ from functools import lru_cache
 
 import numpy as np
 
-from ...materials.channeling.axial import AxialProfile, AxialStates, axial_states
+from ...materials.channeling.axial import AxialProfile
 from ...materials.crystal import HBAR2_2M_EV_ANG2, M_E_EV
+from .axial_bloch import AxialStates, axial_states
 from .bloch import doppler_denominator, longitudinal_kinematics
 from .dipole import dipole_rate_per_ang
 from .realspace import RealSpaceGrid
