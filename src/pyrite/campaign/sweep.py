@@ -30,16 +30,14 @@ from __future__ import annotations
 
 import math
 import warnings
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from dataclasses import InitVar, dataclass, field, replace
-from functools import lru_cache, partial
 from itertools import product
 from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 
 from .._cascade_rng_policy import CASCADE_RNG_MODEL
-from .._continuum_grid import automatic_continuum_grid
 from .._cxr_grid_policy import (
     AUTOMATIC_BANDWIDTH_POLICY,
     RESONANCE_BANDWIDTH_POLICY,
@@ -63,14 +61,17 @@ from .._numerics import (
     validate_elastic_model,
     validate_inelastic_numerics,
 )
-from .._photon_continuum_floor import continuum_medium_key, floored_lattice_start_eV
 from .._precision import Precision
 from ..detectors import Detector
-from ..materials import CATALOG, LayerSpec, MediumSpec
+from ..materials import CATALOG, LayerSpec
 from ..materials.crystal import reciprocal_g_vector
 from ..montecarlo.bunch_front import BunchFrontTilt, resolve_front_tilt
 from ..montecarlo.case import Case
 from ..montecarlo.transverse import TransverseDistribution, resolve_transverse_distribution
+from ._continuum_case_grid import (
+    case_brem_resolver,
+    floored_brem_case_grid,
+)
 from .beam_cases import beam_case_keys, beam_distribution_keys
 from .bremsstrahlung_cases import (
     grooved_radiative_keys,
@@ -660,13 +661,22 @@ def _automatic_cxr_grid_policy(sweep: Sweep, cp: dict, energy_keV: float) -> Cxr
     simulation, reads no checkpoint, and writes nothing to the profile or the
     catalog.
 
+    One axis carries every radiator's lines, so in a layered target the
+    bandwidth and data ceiling are taken over the film ``cp`` and each
+    crystalline layer beneath it (#1164): the axis stops at the highest
+    kinematic stop and below the lowest data ceiling of any radiator.
+
     Validation: line-grid-emission-ceiling
     Validation: line-grid-kinematic-bandwidth
     """
     from ..montecarlo.transport.beam_entry import upper_beam_energy_keV
 
-    spec = CATALOG.crystal(cp["crystal"])
-    magnitudes = [reciprocal_g_vector(hkl, spec.lattice)[1] for hkl in cp["hkl_list"]]
+    radiators = [(cp["crystal"], cp["hkl_list"]), *_stack_line_radiators(sweep)]
+    magnitudes = [
+        reciprocal_g_vector(hkl, CATALOG.crystal(crystal).lattice)[1]
+        for crystal, hkl_list in radiators
+        for hkl in hkl_list
+    ]
     start = cxr_start_eV(energy_keV)
     # Bounds use the declared upper incident energy, E0 (1 + 6 f) for a spread
     # beam: the sampler clamps there, so no electron starts above it.
@@ -678,6 +688,9 @@ def _automatic_cxr_grid_policy(sweep: Sweep, cp: dict, energy_keV: float) -> Cxr
         bandwidth_policy=AUTOMATIC_BANDWIDTH_POLICY,
         per_call=sweep.cxr_grid_policy,
     )
+    if len(radiators) > 1:
+        sources = {**dict(policy.sources), "bandwidth_radiators": STACK_LINE_BANDWIDTH_MODEL}
+        policy = replace(policy, sources=tuple(sorted(sources.items())))
     if policy.bandwidth_policy != AUTOMATIC_BANDWIDTH_POLICY:
         # The measured bandwidth keeps the closed-form bound as its cap; its
         # axis already stops where the case's own lines do.
@@ -695,7 +708,15 @@ def _automatic_cxr_grid_policy(sweep: Sweep, cp: dict, energy_keV: float) -> Cxr
 
     # Round each limit by its own rule BEFORE taking the minimum: a kinetic
     # limit just below the data onset would otherwise round up across it.
-    data_eV = _cxr_emission_ceiling(CRYSTALS[cp["crystal"]], cp["composition"])
+    data_eV = min(
+        [
+            _cxr_emission_ceiling(CRYSTALS[cp["crystal"]], cp["composition"]),
+            *(
+                _cxr_emission_ceiling(CRYSTALS[crystal], list(CATALOG.crystal(crystal).composition))
+                for crystal, _hkl in radiators[1:]
+            ),
+        ]
+    )
     limits = {
         "energy conservation": math.ceil(upper_keV * 1.0e3 / STOP_ROUND_TO_EV) * STOP_ROUND_TO_EV,
         # largest node strictly below the onset
@@ -710,6 +731,26 @@ def _automatic_cxr_grid_policy(sweep: Sweep, cp: dict, energy_keV: float) -> Cxr
         return policy
     sources = {**dict(policy.sources), "stop_eV": label}
     return replace(policy, stop_eV=float(cap), sources=tuple(sorted(sources.items())))
+
+
+#: Provenance of a layered target's automatic line-axis bandwidth, taken over
+#: every crystalline layer's reflections rather than the film's alone (#1164).
+#: Recorded in the case policy's ``sources`` only when a layer radiates, so a
+#: bare slab's policy payload, and therefore its identity, is unchanged.
+STACK_LINE_BANDWIDTH_MODEL = "stack-radiator-union-v1"
+
+
+def _stack_line_radiators(sweep: Sweep) -> list[tuple[str, list]]:
+    """``(crystal, hkl_list)`` of each crystalline layer beneath the film.
+
+    The same reflections :meth:`~pyrite.campaign.geometry.Stack.lower` gives each
+    layer radiator, so the axis is resolved from the lines the case scores.
+    """
+    assert sweep.target is not None  # Sweep.__post_init__ always resolves one
+    radiators = (
+        layer_radiator(layer, sweep.n_families) for layer in sweep.target._below_film() or ()
+    )
+    return [(r["crystal"], r["hkl_list"]) for r in radiators if r is not None]
 
 
 BARE_SWEEP_GRID_MODEL = "automatic-v1"
@@ -818,76 +859,6 @@ def _brem_grid(sweep: Sweep, energies: np.ndarray, cxr_grids: tuple[np.ndarray, 
         # No stored rows: use the resolved automatic line grids.
         brem_start = min(float(np.atleast_1d(grid)[0]) for grid in cxr_grids)
     return np.arange(brem_start, float(energies.max()) * 1e3 + 50.0, 50.0)  # type: ignore[reportArgumentType]
-
-
-def _floored_brem_case_grid(sweep: Sweep, brem_grid: np.ndarray) -> Any:
-    """Encode the continuum grid and floor a uniform band at the medium's start.
-
-    A uniform band declares a `start`, but the energy below which the
-    continuum and photon-escape models carry no validity is a property of
-    the *medium*, not of the profile that declared the band. Resolving it
-    here -- the first place the band and the material meet -- is what lets
-    a profile-level default stay at 0.0 and still never produce a node
-    outside the modelled band, and what keeps two profiles sharing the
-    same material agreeing on the grid, which a per-profile stored start
-    could not do. A declared start ABOVE the floor is an ordinary
-    bandwidth choice and is kept, matching
-    ``energy_grid.floor.geometric_continuum_grid``. Nonuniform grids are
-    passed through: their builders resolve their own floor, and a sweep
-    with no catalog material names no medium to take a floor from.
-    """
-    brem_case_grid = encode_energy_grid(brem_grid)
-    if isinstance(brem_case_grid, tuple) and sweep.material is not None:
-        start, stop, step = brem_case_grid
-        brem_case_grid = (max(start, floored_lattice_start_eV(sweep.material, step)), stop, step)
-    return brem_case_grid
-
-
-def automatic_continuum_medium(sweep: Sweep) -> str | MediumSpec | None:
-    """The medium whose automatic continuum grid every case uses, or ``None``.
-
-    Cases resolve :func:`~pyrite._continuum_grid.automatic_continuum_grid` when
-    no continuum grid is declared (``energy_bins.brem is None``: a profile with
-    no ``E_grid_brem``, or a sweep built without one) and the sweep names a
-    catalog material whose floor and absorption edges the grid is built from.
-    Declared bands and explicit grids keep their own nodes.
-    """
-    if sweep.energy_bins.brem is not None or sweep.material is None:
-        return None
-    return continuum_medium_key(sweep.material)
-
-
-@lru_cache(maxsize=256)
-def _automatic_grid_nodes(medium: str | MediumSpec, endpoint_eV: float) -> np.ndarray:
-    nodes = automatic_continuum_grid(medium, endpoint_eV)
-    nodes.setflags(write=False)
-    return nodes
-
-
-def _automatic_case_brem_grid(medium: str | MediumSpec, energy_keV: float) -> Any:
-    """Exact refined geometric nodes from the medium floor to just past ``E0`` (#278)."""
-    return encode_energy_grid(_automatic_grid_nodes(medium, energy_keV * 1e3))
-
-
-def _case_brem_resolver(sweep: Sweep, brem_case_grid: Any) -> Callable[[float], Any]:
-    """Per-``E0`` (keV) case continuum grid: automatic for an undeclared one (#278)."""
-    medium = automatic_continuum_medium(sweep)
-    if medium is not None:
-        return partial(_automatic_case_brem_grid, medium)
-    band = sweep.brem_band or sweep.energy_bins.brem is None
-    return partial(_case_brem_grid, brem_case_grid, band=band)
-
-
-def _case_brem_grid(brem_case_grid: Any, energy_keV: float, *, band: bool) -> Any:
-    """A uniform band stops one step past this case's beam energy; others stay exact.
-
-    ``band`` is False for an explicit ``EnergyBins.brem``: a uniform explicit
-    grid is the requested nodes, not a step to extend to E0 (issue #815).
-    """
-    if not band or not isinstance(brem_case_grid, tuple):
-        return brem_case_grid
-    start, _, step = brem_case_grid
-    return (start, energy_keV * 1e3 + step, step)
 
 
 def _detector_acceptance(detector: Detector | SourceDirection) -> tuple[float, float]:
@@ -1140,8 +1111,8 @@ def build_cases(
     material_spec = CATALOG.materials.get(target.material)
     name_stem = material_spec.key if material_spec is not None else target.material
     mosaic_analytic_rad, mosaic_mc_rad = _mosaic_case_keys(sweep, cp)
-    brem_case_grid = _floored_brem_case_grid(sweep, brem_grid)
-    case_brem = _case_brem_resolver(sweep, brem_case_grid)
+    brem_case_grid = floored_brem_case_grid(sweep, brem_grid)
+    case_brem = case_brem_resolver(sweep, brem_case_grid)
     ne_pairs = list(
         product(
             _history_counts(sweep.n_electrons, n_electrons, "cxr_histories"),
