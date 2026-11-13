@@ -25,6 +25,7 @@ from ...transport import (
 )
 from ...transport._continuation_join import _copy_bytes
 from . import _fused
+from ._line_tables import fill_tables_in_batches
 from ._position_twins import shorten_position_twin, stage_row, with_position_twins
 from ._recoil import _quantum_line_factors
 
@@ -1237,8 +1238,13 @@ def _reflection_tables(crystal, hkl_list, E_tab, B_ang2, use_henke):
     directly, so the tabulation count has exactly one seam -- the coherent
     emission tests patch it here and see both routes.
 
+    Tabulation runs in reflection batches (:mod:`._line_tables`, #1167).
+
     Validation: line-reflection-coupling-tables
     Validation: line-energy-dispersion
     """
-    tables = emission_coupling_tables(crystal, hkl_list, E_tab, B_ang2, use_henke, xp=xp)
-    return tuple(xp.ascontiguousarray(table, dtype=REAL) for table in tables)
+    return fill_tables_in_batches(
+        lambda batch: emission_coupling_tables(crystal, batch, E_tab, B_ang2, use_henke, xp=xp),
+        hkl_list,
+        int(np.size(E_tab)),
+    )

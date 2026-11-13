@@ -13,7 +13,7 @@ from typing import Any
 
 import numpy as np
 
-from ...._backend import REAL, _to_cpu, xp
+from ...._backend import REAL, BackendResourceError, _to_cpu, xp
 from ....materials.attenuation import _normalize_composition
 from ....materials.crystal import CRYSTALS, HBARC_EV_ANG, refractive_index
 from ...geometry import _mosaic_quadrature, _orientation_R
@@ -33,6 +33,7 @@ from ._kernels import (
     _vacuum_doppler,
     _validate_groove_escape_direction,
 )
+from ._line_tables import line_table_bytes
 from ._temporal import segment_arrival_times
 
 # Generation marker for the line route's photon-escape model, hashed into the
@@ -201,6 +202,29 @@ class _SpectrumSetup:
     capture_mosaic_weight: float = 1.0
     # Nonincreasing transverse bound sup F_perp for the row, or None.
     capture_transverse_envelope: Any = None
+
+
+def _admit_line_tables(n_hkl, n_tab):
+    """Refuse a reflection list whose chi/U tables exceed the device budget.
+
+    The tables scale with ``n_hkl * n_tab`` and are independent of the
+    segment chunk, so chunk admission cannot bound them (#1167). Failing
+    here names the cause instead of an allocator OOM that chunk-halving
+    retries cannot fix.
+    """
+    from ...runner import _RESOURCE_POLICY  # runner imports this module
+
+    budget = _RESOURCE_POLICY.device_budget_bytes
+    if not _RESOURCE_POLICY.gpu or budget is None:
+        return
+    need = line_table_bytes(n_hkl, n_tab, np.dtype(REAL).itemsize)
+    if need > budget:
+        raise BackendResourceError(
+            f"CXR line tables for {n_hkl} reflections x {n_tab} tabulation points "
+            f"need {need / 2**30:.2f} GiB, over the device budget "
+            f"{budget / 2**30:.2f} GiB; score the incoherent spectrum over "
+            f"reflection subsets and sum them, or narrow the energy grid"
+        )
 
 
 def _flight_groups(segments):
@@ -781,6 +805,7 @@ def _prepare_spectrum(request):
         SETUP_STATS.get("line_table_mib", 0.0),
         _table_rows * E_tab.size * np.dtype(REAL).itemsize / 2**20,
     )
+    _admit_line_tables(len(request.hkl_list), E_tab.size)
     # Each elemental coefficient is stored as log(mu_i) [log(1/Ang)] and
     # interpolated linearly against log(E) before summing. This reproduces the
     # pinned xraydb non-f1 Chantler rule; interpolating the compound total in
