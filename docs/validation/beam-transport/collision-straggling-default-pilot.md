@@ -107,3 +107,79 @@ or external-code accuracy, and held-out equal-precision timing. Reuse the
 [equal-precision protocol](equal-precision-protocol.md) and #510's adapters for
 those measurements. The pilot alone warrants no default, model marker, dataset
 identity or omission-semantics change.
+
+## Stage 2: energy coverage and larger populations
+
+The 2026-11-12 replacement study at revision
+`2506344f44dadb0273017f99c541fc823fe74406` uses
+{download}`protocol-stage2.json <../../../checks/straggling_defaults/protocol-stage2.json>`:
+5/30/100/300 keV, slabs at 0.05/0.3/0.6 of the corrected-SBETHE range,
+and three independent seeds × 8192 primaries per on/off arm. The 5 keV
+beam tracks down to 1 keV; other energies track down to 5 keV. Physics,
+FP64, cutoffs and the absence of a numerical energy cap remain pinned.
+This is a new sensitivity dataset; the deleted original stage-2 evidence
+was not recovered or pooled.
+
+All 120 groups (360 records, 2,949,120 measured primaries) are complete.
+Raw-file and job manifests pass; the largest primary energy residual is
+$3.53\times10^{-12}$ keV. The
+{download}`compressed report <../check-records/straggling-defaults-stage2.json.gz>`
+retains group moments, conditional variances/quantiles, pointwise intervals,
+table identities, per-device assignment and separate overlap diagnostics.
+
+NVIDIA RTX 5080 jobs cover silicon, HOPG and MoS₂; AMD Radeon 8060S jobs
+cover WSe₂ and sapphire. Every on/off pair stays on one device. The common
+`core="cuda"` record names the shared CuPy kernel implementation, not the
+GPU vendor; the report's device map and raw `backend.txt`/allocation files
+identify the ROCm runs. Do not compare materials' timing ratios as a
+cross-device benchmark.
+
+For the 48 shell-material comparisons, all transmission and backscatter
+intervals lie within the predeclared ±2-percentage-point diagnostic margin.
+Shell conditional transmitted-energy comparisons are inside their ±2% margin
+in 39 cases and unresolved in nine; none is outside. Zero variance and small
+transmitted populations remain unresolved by construction. These margins
+bound the sampled on/off sensitivity at these settings, not model bias,
+variance accuracy, rare tails or numerical convergence.
+
+Sapphire's continuous/Urban control remains materially different. At 0.6 range,
+its conditional transmitted-energy mean increases beyond the 2% diagnostic
+margin at every energy:
+
+| Beam energy (keV) | On − off mean (keV) | Pointwise approximate 95% interval (keV) |
+| ---: | ---: | ---: |
+| 5 | +0.467 | [+0.445, +0.489] |
+| 30 | +2.018 | [+1.892, +2.143] |
+| 100 | +5.716 | [+5.271, +6.162] |
+| 300 | +15.299 | [+14.037, +16.562] |
+
+The other sapphire conditional-energy comparisons include seven inside-margin
+and one unresolved result. No experiment or independent transport code is used
+here, so these differences do not establish improved accuracy.
+
+### Cross-device overlap and preservation
+
+A separate silicon 300 keV AMD run repeats all six NVIDIA arms with the same
+seeds and table digests (18 records, 147,456 primaries). It is excluded from
+the baseline counts and cannot be pooled as independent replicas. Of 180
+per-replica score-field comparisons, 162 meet `rtol=1e-12, atol=1e-10`.
+The remaining comparisons concern final energy and path length: maximum
+absolute differences are $7.11\times10^{-10}$ keV and
+$1.81\times10^{-5}$ Å, respectively. This records small arithmetic differences
+in one overlap scene; it does not certify general CPU/GPU or cross-device
+parity. AMD logs also report SharedSignalPool resource-leak warnings; complete
+samples and checksums do not establish that runtime cleanup is correct.
+
+The frozen raw archive is `straggling-642-stage2-20261112.tar.gz`, SHA-256
+`046cb89d235f8abebb5bc30b019f51b051fac5eb1612c9aad7d01712c62af496`.
+It includes source snapshots, protocol, scores, device/allocation records,
+runtime scripts and job logs. Keep a copy outside disposable study checkouts.
+NVIDIA baseline jobs are 12022 and 12024–12034; AMD baseline jobs are
+12045–12052, with overlap 12043. Job 12021 failed before simulation and is
+retained as failed-start provenance only.
+
+The broader rollout gates remain open: layered/grooved coverage, active
+step/cutoff convergence, detector/line observables, independently matched
+accuracy references, rare-tail qualification, applied-loss anchors and
+held-out equal-precision performance including setup and GPU peak memory.
+No default, model marker or physics-ledger status changes follow from stage 2.

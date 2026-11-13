@@ -23,6 +23,7 @@ from pyrite.montecarlo.transport.events import (
     EVENT_HARD_INELASTIC,
     EVENT_HARD_RADIATIVE,
     EVENT_SOFT_HINGE,
+    check_segment_event_contract,
 )
 from pyrite.montecarlo.transport.mixed_elastic import MixedElasticParameters
 from tests.montecarlo.collisions.test_mixed_elastic import (
@@ -183,6 +184,26 @@ def test_kernel_matches_the_cpu_core_in_aggregate(precision, extra, thickness):
     }.items():
         spread = np.hypot(a.std() / np.sqrt(a.size), b.std() / np.sqrt(b.size))
         assert abs(a.mean() - b.mean()) < 5.0 * spread, name
+
+
+@pytest.mark.parametrize("precision", PRECISIONS)
+@pytest.mark.parametrize(
+    ("extra", "Ne"),
+    [
+        pytest.param(_shell_kwargs, 100, id="inelastic"),
+        pytest.param(_radiative_kwargs, 400, id="radiative"),
+    ],
+)
+def test_delta_rows_continue_their_flight(precision, extra, Ne):
+    """The kernel keeps a delta's flight open, as the CPU core does."""
+    rows = _cuda(precision=precision, seed=23, Ne=Ne, thickness=1e6, **extra())
+    kind = rows["event_kind"]
+    after = np.flatnonzero(kind[:-1] == EVENT_DELTA)
+    after = after[rows["electron_id"][after + 1] == rows["electron_id"][after]]
+    assert after.size
+    np.testing.assert_array_equal(rows["flight_id"][after + 1], rows["flight_id"][after])
+    np.testing.assert_array_equal(rows["substep_id"][after + 1], rows["substep_id"][after] + 1)
+    check_segment_event_contract(rows)
 
 
 @pytest.mark.slow

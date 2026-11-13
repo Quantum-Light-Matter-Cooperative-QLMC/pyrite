@@ -115,3 +115,21 @@ def test_incomplete_or_zero_variance_evidence_cannot_qualify(complete, se, delta
     protocol = {"diagnostic_margins": {"terminal_fraction_absolute": 0.02}}
     result = compare(groups, protocol)
     assert result[0]["differences"]["transmitted"]["outcome"] == expected
+
+
+def test_beam_settings_resolve_stage_energies():
+    script = Path(__file__).resolve().parents[2] / "checks/straggling_defaults/study.py"
+    beam_settings = runpy.run_path(str(script))["beam_settings"]
+    stage1 = {"energy_keV": 30.0, "electron_cutoff_keV": 5.0}
+    assert beam_settings(stage1, None) == (30.0, 5.0)
+    stage2 = {
+        "energies_keV": [5, 300],
+        "electron_cutoff_keV": 5.0,
+        "electron_cutoffs_keV": {"5": 1.0},
+    }
+    assert beam_settings(stage2, 5.0) == (5.0, 1.0)
+    assert beam_settings(stage2, 300.0) == (300.0, 5.0)
+    with pytest.raises(ValueError, match="not in the protocol"):
+        beam_settings(stage2, 100.0)
+    with pytest.raises(ValueError, match="not in the protocol"):
+        beam_settings(stage2, None)

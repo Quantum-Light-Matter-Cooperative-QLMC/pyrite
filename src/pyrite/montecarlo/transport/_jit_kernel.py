@@ -998,16 +998,14 @@ def _transport_kernel(
             if exits_top or exits_bottom or exits_side or at_energy_cutoff:
                 running = False
             else:
-                # Every remaining outcome closes the physical flight, so the
-                # next iteration opens a new one and redraws the collision.
+                # Every remaining outcome but a mixed delta closes the physical
+                # flight, so the next iteration opens a new one.
+                prior_substep_id = substep_id
                 flight_id += I32_ONE
                 substep_id = I32_ZERO
                 if mixed_on == I32_ONE:
-                    # Hinge and delta rows are fictitious for the hard processes:
-                    # their optical depths survive, and a new flight still starts.
-                    # Rows are recorded, so each takes the branch below that does
-                    # its work, with zero loss: rotate for a hinge, nothing for a
-                    # delta. Off, this folds and that code is the detailed kernel's.
+                    # Hinge/delta rows are fictitious for the hard processes (their
+                    # depths survive). Off, this folds to the detailed kernel's code.
                     if segment_event == EVENT_SOFT_HINGE:
                         mix_state[mix_at + I32_MIX_HINGE] = -F64_ONE
                         hard_cos = F64_ONE - F64_TWO * _mixed_hinge_mu(
@@ -1025,7 +1023,7 @@ def _transport_kernel(
                         elastic_draw_counter = elastic_draw_counter + np.uint64(2)
                         segment_event = EVENT_HARD_INELASTIC
                     elif segment_event == EVENT_DELTA:
-                        # A rejected proposal has used up its clock only.
+                        # A rejected proposal used its clock only; its flight goes on.
                         mix_end = np.int32(mix_state[mix_at + I32_MIX_END])
                         if mix_end == I32_END_ELASTIC:
                             elastic_optical_depth = -F64_ONE
@@ -1034,6 +1032,8 @@ def _transport_kernel(
                         elif mix_end == I32_END_RADIATIVE:
                             radiative_optical_depth = -F64_ONE
                         mix_state[mix_at + I32_MIX_LEFT] = -F64_ONE
+                        flight_id -= I32_ONE
+                        substep_id = prior_substep_id + I32_ONE
                         segment_event = EVENT_HARD_RADIATIVE
                     else:
                         elastic_optical_depth = -F64_ONE

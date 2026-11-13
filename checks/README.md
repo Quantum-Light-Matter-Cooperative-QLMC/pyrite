@@ -38,6 +38,7 @@ its `electron-transport` claim stays `missing` until a reviewed golden set is
 run through the collector.
 
 | Artifact | Purpose |
+| `defaults_spectral_gate_642.py` | Remote-only fixed-band transport/spectral sensitivity pilot (#1142/#1143): preserved trajectories, node refinement, bin-mean replay, MoS₂-on-Si layered scene, exact-MC mosaic node ladder, terminal ledger and shape metrics; no accuracy/default verdict. |
 |---|---|
 | `mixed_elastic/` | Paired equivalence, cost, and Geant4 comparison for mixed elastic transport (#894); see its README for the frozen protocol and run files. |
 | `cherenkov_geant4/` | Geant4 11.4.2 `G4Cerenkov` reference for bulk Cherenkov yield (#587): minimal Geant4 app, `compare.py`, sbatch and pinned `reference/` outputs. Needs a Geant4 build; independent reference, does not sign off the `frank-tamm-homogeneous-dielectric` claim. |
@@ -300,6 +301,7 @@ reviewed verdicts for the diagnostic rows, not merely rerunning their entry poin
 | `collision_statistics_refinement.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Diagnostic |
 | `cross_reflection_coherence.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Diagnostic |
 | `dans_diffraction_oracle.py` | Remote CPU oracle; 3.20 s (one sample) | Optional Dans_Diffraction installation; packaged crystal definitions | Gate (explicit mode where applicable) |
+| `defaults_spectral_gate_642.py` | Remote GPU only; unmeasured bounded 64-primary pilot per arm | Pinned catalog/tables; trusted private trajectory pickle; 0.5–10 keV band, four scoring calls per grid; enforce batch time/memory limits | Diagnostic, not an accuracy gate |
 | `density_propagate_benchmark.py` | CPU solver; ~10 s for the default bands at 4 BLAS threads; `--backend cuda` needs a CUDA host (#1125) | Packaged physics/catalog data; CuPy for `--backend cuda` | Measurement record (no gate) |
 | `detector_solid_angle_check.py` | Remote CPU transport; 6.90 s (one sample) | Pinned tables/catalog | Gate only on the `n_side = 1` identity; broadening is report-only |
 | `elsepa_line_sensitivity.py` | Remote CPU transport/solver; unmeasured | Pinned tables/catalog and case inputs; convergence grids/ensembles may be expensive | Diagnostic |
