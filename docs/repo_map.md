@@ -76,7 +76,7 @@ dedicated section yet; the column names the page covering their closest owner.
 | `validation` | Validation adapters, oracles and catalog checks | [Core physics](repo-map/core-physics.md), [CLI](repo-map/cli-and-packaging.md) |
 | `xsgen` | Generation and resolution of external Fortran tables | [Core physics](repo-map/core-physics.md) |
 
-Root modules (`api.py`, `phases.py`, `_backend.py`, `_precision.py`, …) are
+Root modules (`api.py`, `scoring.py`, `phases.py`, `_backend.py`, `_precision.py`, …) are
 described on the detail page of the area that uses them.
 
 ## Static package dependency DAG

@@ -44,9 +44,10 @@ their historical expansion. `campaign/lowering.py` projects
 `Numerics.energy_bins` onto the legacy campaign adapter, whose `energy_bins`
 field feeds the existing case builder. Detectors own acceptance and response.
 `campaign/trajectories.py` owns the typed public `simulate_trajectories`
-(#936): it lowers Beam/Target/Physics/Numerics through `build_case` and the
-runner's case adapters, then calls the private flat engine
-`montecarlo.transport._simulate_trajectories`.
+(#936, #1162): it lowers Beam/Target/Physics/Numerics through the simulation
+resolver and runs the runner's production transport phase, or the private
+flat engine `montecarlo.transport._simulate_trajectories` for explicit
+`E_cut_keV`/`max_steps`.
 
 `_executor_contract.py` owns import-light executor admission/provenance shared by
 composition and dispatch; `execution._simulation` preserves the legacy aliases.
@@ -104,9 +105,24 @@ Filesystem-free simulation seam. `simulate` combines scalar beam, target, and de
 - Public: root-lazy `simulate`, whose experimental `progress=` routes `SimulationProgress` (`_simulation_progress.py`) from per-batch transport and per-stage spectrum sinks (`runner._TRANSPORT_PROGRESS`/`_SPECTRUM_PROGRESS`, installed by `runner.transport_options.run_progress`) for in-process runs.
 - Deps: `campaign.model`, `campaign.sweep`, `campaign.profiles`, `detectors`, `montecarlo`, `results`.
 
-### `phases.py`
+### `scoring.py`, `campaign/trajectory_product.py`, `campaign/trajectory_io.py`
 
-Experimental scalar-detector phase split (#776): `simulate_transport` runs `runner._transport_case` (segments kept on the device for CUDA) into a `TransportedScene`; `score_spectra` runs only `_spectrum_with_recovery` on it, any number of times, with optional spectral chunk changes, and builds the same `Result` as `simulate` through `api._scalar_result`. Disk-backed replay stays `pyrite trajectories score`.
+Stable two-step workflow (#1162). `campaign.trajectories.simulate_trajectories`
+runs the production transport phase (`runner._transport_case`, per-history
+cutoffs, retrying step budget) into a typed `Trajectories` (resolved scene,
+physics, numerics, case, segments, fingerprint; Mapping over the segment dict is
+deprecated); explicit `E_cut_keV`/`max_steps` keep the flat-engine call and are
+not scorable. `scoring.score_spectra` re-lowers the scoring components, refuses
+any non-scoring case-field, transport-tuning, table, grooved-geometry or
+coherent/temporal-placement difference (`ScoringRefusedError.field`), rebuilds
+spectrum inputs through `runner.case_driver.case_spectrum_inputs` and runs
+`_spectrum_with_recovery` (scalar) or `api._simulate_planar` with an injected
+directional scorer (planar), building `Result` via `api._scalar_result`.
+`trajectory_io.save_trajectories`/`load_trajectories` (facade `pyrite.storage`)
+reuse the trajectory artifact; load rebinds caller components by case digest,
+and scene-less loads replay the recorded case (`api._case_result`), streamed
+through `runner.stream_spectrum_from_artifact` when `stream=True`.
+`phases.py` keeps `SimulationProgress` and deprecated aliases.
 
 ### `campaign/sweep.py`
 Turn `Sweep` definition into Cartesian product of `run_case` dicts.
@@ -276,9 +292,9 @@ physics: transport (`electron_batch`, `schedule`, `continuation_rows`) and
 spectrum (`cxr_chunk`, `brem_chunk`) dimensions are independent Optuna studies
 (exhaustive for small lattices), measured by one persistent
 `_kernel_worker.py` process per tuning (JSON lines over stdin/stdout).
-Transport candidates time `phases.simulate_transport` and compare a digest of
-the transported arrays; spectrum candidates rescore one kept transport with
-`phases.score_spectra`. The fastest candidate must survive interleaved
+Transport candidates time `campaign.trajectories.scene_trajectories` and
+compare a digest of the transported arrays; spectrum candidates rescore one
+kept transport with `scoring.score_spectra`. The fastest candidate must survive interleaved
 re-timing against the baseline (`min_speedup`). Tests:
 `tests/optimization/test_kernel_tuning.py` (fake worker),
 `tests/montecarlo/transport/test_transport_kernel_tuning_cuda.py` (device). Guide:

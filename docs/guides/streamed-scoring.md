@@ -97,8 +97,8 @@ These raise `ValueError` before any transport:
 - channeling, adaptive precision, windowed automatic line grids, and GDF
   beams;
 - the lockstep transport core;
-- a `PlanarDetector`, `pyrite.phases.simulate_transport`, directional source
-  scans, and batch executors.
+- a `PlanarDetector`, `pyrite.transport.simulate_trajectories`, directional
+  source scans, and batch executors.
 
 The design and its eligibility table are in
 [Live streamed scoring](../repo-design/compute/streamed-scoring.md).

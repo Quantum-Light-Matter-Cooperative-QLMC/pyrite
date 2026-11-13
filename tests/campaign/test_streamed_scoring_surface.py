@@ -6,20 +6,19 @@ fails before transport.
 """
 
 import pickle
-from dataclasses import replace
 
 import numpy as np
 import pytest
 
 import pyrite as pr
 import pyrite.config as cfg
-from pyrite import phases
 from pyrite.campaign.profiles import case_content_key
 from pyrite.config import FixedSampling
 from pyrite.detectors import EnergyBins
 from pyrite.execution import LocalExecutor
 from pyrite.montecarlo import runner
 from pyrite.montecarlo.runner.transport_options import transport_tuning
+from pyrite.transport import simulate_trajectories
 
 BINS = EnergyBins(cxr=np.linspace(250.0, 320.0, 15), brem=np.arange(1000.0, 30001.0, 1000.0))
 
@@ -95,7 +94,8 @@ def test_unsupported_case_fails_before_transport(monkeypatch):
 def test_other_entry_points_fail_before_transport(monkeypatch):
     _no_transport(monkeypatch)
     with pytest.raises(ValueError, match="supported only by pyrite.simulate"):
-        phases.simulate_transport(replace(_scene(), numerics=_numerics(5)))
+        scene = _scene()
+        simulate_trajectories(scene.beam, scene.target, numerics=_numerics(5))
     # Planar, directional and photon paths enter transport through this guard.
     with pytest.raises(ValueError, match="supported only by pyrite.simulate"):
         with transport_tuning(_numerics(5)):
@@ -136,7 +136,7 @@ def test_memory_target_stays_out_of_case_identity_and_old_pickles_restore():
 
 def test_memory_target_refused_outside_simulate():
     with pytest.raises(ValueError, match="streamed scoring"):
-        phases.simulate_transport(_scene(), numerics=_memory_numerics(64))
+        simulate_trajectories(_scene().beam, _scene().target, numerics=_memory_numerics(64))
     with pytest.raises(ValueError, match="streamed scoring"):
         pr.simulate(
             _scene(),

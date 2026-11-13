@@ -11,9 +11,9 @@ the simulation prints goes to stderr):
     ``{"event": "result", "samples_s": [...], "check": {...}}`` or
     ``{"event": "error", "message": str}``.
 
-``transport`` times :func:`pyrite.phases.simulate_transport` only and checks a
+``transport`` times :func:`pyrite.transport.simulate_trajectories` only and checks a
 digest of every transported array. ``spectrum`` transports once per worker
-with the baseline tuning, then times :func:`pyrite.phases.score_spectra` on
+with the baseline tuning, then times :func:`pyrite.score_spectra` on
 that kept transport. ``total`` times :func:`pyrite.simulate`. Spectra are
 saved as ``<workdir>/<label>.npz`` for the coordinator to compare.
 """
@@ -178,15 +178,16 @@ class _Session:
         return progress
 
     def _kept_transport(self):
-        from ..phases import simulate_transport
+        from ..campaign.trajectories import scene_trajectories
 
         if self._transport is None:
             numerics = self.scene.numerics.with_kernel_tuning(self.base)
-            self._transport = simulate_transport(self.scene, numerics=numerics)
+            self._transport = scene_trajectories(self.scene, numerics=numerics)
         return self._transport
 
     def measure(self, phase: str, tuning: Any, label: str, warmups: int, repeats: int):
-        from ..phases import score_spectra, simulate_transport
+        from ..campaign.trajectories import scene_trajectories
+        from ..scoring import score_spectra
 
         numerics = self.scene.numerics.with_kernel_tuning(tuning)
         if phase == "spectrum":
@@ -202,11 +203,15 @@ class _Session:
             )
 
             def run(progress):
-                return score_spectra(transported, kernel_tuning=spectral, progress=progress)
+                return score_spectra(
+                    transported,
+                    numerics=transported.numerics.with_kernel_tuning(spectral),
+                    progress=progress,
+                )
         elif phase == "transport":
 
             def run(progress):
-                return simulate_transport(self.scene, numerics=numerics, progress=progress)
+                return scene_trajectories(self.scene, numerics=numerics, progress=progress)
         else:
 
             def run(progress):

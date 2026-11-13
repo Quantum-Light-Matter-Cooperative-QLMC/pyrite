@@ -214,6 +214,7 @@ if TYPE_CHECKING:
         SpectralFactors as SpectralFactors,
     )
     from pyrite.results.provenance import Provenance as Provenance
+    from pyrite.scoring import score_spectra as score_spectra
     from pyrite.xsgen.install import fetch_tables as fetch_tables
 
     # Domain module handles are part of the dot-access API, e.g. pr.beams.Beam.
@@ -264,6 +265,7 @@ _PUBLIC_OBJECTS = {
     "fetch_tables": ("pyrite.xsgen.install", "fetch_tables"),
     "photon_energies": ("pyrite.materials.emission", "photon_energies"),
     "simulate": ("pyrite.api", "simulate"),
+    "score_spectra": ("pyrite.scoring", "score_spectra"),
     "DirectionalSpectrum": ("pyrite.results.directional", "DirectionalSpectrum"),
 }
 
@@ -332,6 +334,7 @@ _ROOT_API = (
     "Physics",
     "Numerics",
     "simulate",
+    "score_spectra",
     "Result",
     "photon_energies",
 )

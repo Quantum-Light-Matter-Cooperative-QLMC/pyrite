@@ -359,7 +359,7 @@
     {
       "path": "src/pyrite/montecarlo/runner/case_driver.py",
       "name": "_transport_case",
-      "cc": 23
+      "cc": 22
     },
     {
       "path": "src/pyrite/montecarlo/runner/channeling.py",

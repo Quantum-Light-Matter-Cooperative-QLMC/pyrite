@@ -1,4 +1,4 @@
-"""Separate transport and spectrum phases of a scalar simulation (#776)."""
+"""Deprecated ``pyrite.phases`` transport/spectrum split (#776), now delegating (#1162)."""
 
 from dataclasses import replace
 
@@ -12,7 +12,10 @@ from pyrite.config import FixedSampling, Numerics
 from pyrite.detectors import Detector, PlanarDetector, PlanarPose
 from pyrite.geometry import Footprint, Slab
 from pyrite.montecarlo import runner
-from pyrite.phases import SimulationProgress, TransportedScene, score_spectra, simulate_transport
+from pyrite.phases import SimulationProgress, score_spectra, simulate_transport
+from pyrite.transport import Trajectories
+
+pytestmark = pytest.mark.filterwarnings("ignore:pyrite.phases:DeprecationWarning")
 
 
 @pytest.fixture(scope="module")
@@ -46,7 +49,7 @@ def _family(result, path):
 
 
 def test_phases_reproduce_simulate(scene, transported):
-    assert isinstance(transported, TransportedScene)
+    assert isinstance(transported, Trajectories)
     assert transported.segment_count > 0
     expected = simulate(scene)
     first = score_spectra(transported)
@@ -63,7 +66,10 @@ def test_spectral_chunks_rescore_without_transport(transported, monkeypatch):
     tuning = cfg.KernelTuning(cxr_chunk=3, brem_chunk=5)
     result = score_spectra(transported, kernel_tuning=tuning)
     assert result.provenance["numerics"].kernel_tuning == tuning
-    assert result.case == transported.case
+    assert (
+        result.provenance["identity_digest"]
+        == score_spectra(transported).provenance["identity_digest"]
+    )
     # Chunking changes only summation order: a few ulp of the backend precision.
     eps = np.finfo(result.cxr.incoherent.density.dtype).eps
     _assert_same(result, score_spectra(transported), rtol=100 * eps)
@@ -71,7 +77,7 @@ def test_spectral_chunks_rescore_without_transport(transported, monkeypatch):
 
 def test_transport_settings_are_fixed_by_the_transport(transported):
     changed = cfg.KernelTuning(transport=cfg.TransportKernelTuning(electron_batch=64))
-    with pytest.raises(ValueError, match="only the spectral chunks and CXR launch"):
+    with pytest.raises(ValueError, match="kernel_tuning.transport"):
         score_spectra(transported, kernel_tuning=changed)
     with pytest.raises(TypeError, match="simulate_transport"):
         score_spectra(object())
@@ -102,3 +108,14 @@ def test_pixel_detectors_are_refused(scene, monkeypatch):
     )
     with pytest.raises(ValueError, match="scalar detectors"):
         simulate_transport(pixel)
+
+
+def test_phase_names_warn_and_delegate(scene):
+    import pyrite.phases as phases
+
+    with pytest.warns(DeprecationWarning, match="pyrite.transport.simulate_trajectories"):
+        transported = phases.simulate_transport(scene)
+    with pytest.warns(DeprecationWarning, match="pyrite.score_spectra"):
+        phases.score_spectra(transported)
+    with pytest.warns(DeprecationWarning, match="pyrite.transport.Trajectories"):
+        assert phases.TransportedScene is Trajectories

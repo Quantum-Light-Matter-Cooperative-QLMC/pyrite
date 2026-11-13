@@ -17,9 +17,16 @@ The entries below use generated docstrings, signatures, and source links. API su
    pyrite.Physics
    pyrite.Numerics
    pyrite.simulate
+   pyrite.score_spectra
 ```
 
 ## Scene simulation
+
+To transport once and score many detectors or grids, use the two-step
+workflow: {py:func}`pyrite.transport.simulate_trajectories` then
+{py:func}`pyrite.score_spectra`, which returns the same `Result` as
+`simulate` for the same components. See
+[simulate once, score many times](../trajectory-workflows.md#simulate-once-score-many-times).
 
 Build a beam, target and detector, then call {py:func}`pyrite.simulate` with
 those three components, or pass a complete `Scene` as `simulate(scene)`.

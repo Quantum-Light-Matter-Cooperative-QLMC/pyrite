@@ -67,7 +67,7 @@ def _(mo):
     for 16 GB cards.
 
     This tutorial **needs an NVIDIA GPU**; on Molab, choose a GPU runtime. The
-    tuner, `pyrite.phases` and the kernel-tuning fields are experimental.
+    tuner and the kernel-tuning fields are experimental.
     Timings depend on the device, driver, precision and other work on the
     machine.
     """)
@@ -239,8 +239,8 @@ def _(mo):
     mo.md(r"""
     ## Where the time goes
 
-    `simulate_transport` stops after transport; `score_spectra` scores the
-    kept segments. Timing them separately shows which phase is worth tuning.
+    `pyrite.transport.simulate_trajectories` stops after transport;
+    `pyrite.score_spectra` scores the kept segments. Timing them separately shows which phase is worth tuning.
     The first, untimed run compiles the kernels.
     """)
     return
@@ -250,7 +250,19 @@ def _(mo):
 def _(mo, scene, tables_ready):
     from time import perf_counter
 
-    from pyrite.phases import score_spectra, simulate_transport
+    from pyrite import score_spectra
+    from pyrite.transport import simulate_trajectories
+
+    def _simulate_transport(progress=None):
+        return simulate_trajectories(
+            scene.beam,
+            scene.target,
+            physics=scene.physics,
+            numerics=scene.numerics,
+            detector=scene.detector,
+            keep_segments_on_device=True,
+            transport_progress=progress,
+        )
 
     assert tables_ready
     with mo.status.progress_bar(total=100, title="One untimed run, then timed phases") as _bar:
@@ -261,9 +273,12 @@ def _(mo, scene, tables_ready):
                 subtitle=f"{event.phase}: {event.stage} {event.done:,}/{event.total:,}",
             )
 
-        score_spectra(simulate_transport(scene))  # compile kernels first
+        def show_transport(done, total):
+            _bar.update(increment=0, subtitle=f"transport: electrons {done:,}/{total:,}")
+
+        score_spectra(_simulate_transport())  # compile kernels first
         _started = perf_counter()
-        transported = simulate_transport(scene, progress=show)
+        transported = _simulate_transport(progress=show_transport)
         _bar.update(increment=50)
         transport_s = perf_counter() - _started
         _started = perf_counter()

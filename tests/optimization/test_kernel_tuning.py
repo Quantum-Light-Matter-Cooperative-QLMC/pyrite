@@ -136,12 +136,16 @@ def test_spectrum_worker_applies_all_proposed_launch_controls(monkeypatch, tmp_p
     session._forward = lambda *_args: lambda _event: None
     observed = []
 
-    def fake_score(_transport, *, kernel_tuning, progress):
+    session._transport = SimpleNamespace(
+        numerics=SimpleNamespace(kernel_tuning=base, with_kernel_tuning=lambda value: value)
+    )
+
+    def fake_score(_transport, *, numerics, progress):
         assert callable(progress)
-        observed.append(kernel_tuning)
+        observed.append(numerics)
         return SimpleNamespace(provenance={})
 
-    monkeypatch.setattr("pyrite.phases.score_spectra", fake_score)
+    monkeypatch.setattr("pyrite.scoring.score_spectra", fake_score)
     monkeypatch.setattr(kw, "save_spectra", lambda _result, path: path.touch())
     samples, check = session.measure("spectrum", candidate, "spectrum-test", warmups=0, repeats=1)
     # One initial phase warmup and one timed score are both configured identically.

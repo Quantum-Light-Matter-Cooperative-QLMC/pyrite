@@ -150,6 +150,7 @@ def test_lockstep_buffer_replay_stops_at_the_requested_limit(monkeypatch):
 
 
 def test_every_default_step_limit_agrees():
-    for function in (simulate_trajectories, public_simulate_trajectories):
-        limit = inspect.signature(function).parameters["max_steps"].default
-        assert limit == runner.TRANSPORT_MAX_STEPS == 400_000
+    limit = inspect.signature(simulate_trajectories).parameters["max_steps"].default
+    assert limit == runner.TRANSPORT_MAX_STEPS == 400_000
+    # The public default is the production retrying budget (#1162).
+    assert inspect.signature(public_simulate_trajectories).parameters["max_steps"].default is None

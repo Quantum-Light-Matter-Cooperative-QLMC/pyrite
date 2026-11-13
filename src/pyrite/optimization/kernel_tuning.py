@@ -2,9 +2,9 @@
 
 ``tune_kernels`` tunes transport and spectrum controls as two independent
 studies by default. Transport candidates run only electron transport
-(:func:`pyrite.phases.simulate_transport`) and must reproduce the baseline's
+(:func:`pyrite.transport.simulate_trajectories`) and must reproduce the baseline's
 transported arrays bit for bit. Spectrum candidates rescore one kept
-transport (:func:`pyrite.phases.score_spectra`) and must reproduce its spectra
+transport (:func:`pyrite.score_spectra`) and must reproduce its spectra
 within tolerance. The controls are execution choices, not physical
 parameters, so this is separate from :class:`OptimizationStudy`. Results are
 specific to the GPU, driver, precision and workload that produced them.
@@ -445,9 +445,9 @@ def tune_kernels(
 
     With ``objective="phases"`` (default) the transport and spectrum
     dimensions are independent studies: transport candidates time
-    :func:`~pyrite.phases.simulate_transport` alone and must reproduce the
+    :func:`~pyrite.transport.simulate_trajectories` alone and must reproduce the
     baseline transport bit for bit; spectrum candidates time
-    :func:`~pyrite.phases.score_spectra` on one kept baseline transport, and
+    :func:`~pyrite.score_spectra` on one kept baseline transport, and
     their spectra must match the baseline's within ``rtol``/``atol``. Each
     phase searches only its own dimensions, so the work is the sum of the two
     search spaces, not their product, and ``best`` joins both winners.

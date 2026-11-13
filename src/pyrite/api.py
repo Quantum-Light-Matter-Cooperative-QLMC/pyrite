@@ -5,7 +5,7 @@ import json
 import subprocess
 from collections.abc import Mapping
 from dataclasses import fields, is_dataclass
-from functools import cache
+from functools import cache, partial
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
@@ -396,12 +396,33 @@ def _scalar_result(
     output: Mapping[str, Any],
     numerics: Numerics | None = None,
 ) -> Result:
-    """``Result`` of one scalar-detector ``run_case`` output; shared with :mod:`pyrite.phases`."""
+    """``Result`` of one scalar-detector ``run_case`` output; shared with :mod:`pyrite.scoring`."""
     scene = request.scene
     resolved_numerics = request.numerics if numerics is None else numerics
+    return _case_result(
+        case,
+        xsgen_tables,
+        output,
+        brem_source=cast(str, scene.physics.brem_source),
+        numerics=resolved_numerics,
+        provenance={**request.composition_provenance, "scene": scene},
+    )
+
+
+def _case_result(
+    case: Case,
+    xsgen_tables: Mapping[str, str],
+    output: Mapping[str, Any],
+    *,
+    brem_source: str,
+    numerics: Numerics | None,
+    provenance: Mapping[str, Any],
+) -> Result:
+    """Scalar ``Result`` of one spectrum-phase output; ``provenance`` leads the record."""
+    resolved_numerics = numerics
     background_energy = output.get("E_grid_brem", output["E_grid"])
     background = output.get("brem_wide", output["brem"])
-    if scene.physics.brem_source != "mc":
+    if brem_source != "mc":
         background = np.zeros_like(background)
     coherent = output.get("spec_coherent")
     characteristic = output.get("spec_characteristic")
@@ -432,8 +453,7 @@ def _scalar_result(
         ),
         case=case,
         provenance={
-            **request.composition_provenance,
-            "scene": scene,
+            **provenance,
             "numerics": resolved_numerics,
             "identity_digest": case_content_key(case, xsgen_tables=xsgen_tables),
             # Automatic case-local line grids (issue #101): the policy is what
@@ -570,8 +590,15 @@ def _simulate_planar(
     request: ResolvedSimulation,
     case: Case,
     xsgen_tables: Mapping[str, str],
+    directional: "Callable[[np.ndarray], dict[str, Any]] | None" = None,
 ) -> Result:
+    """Planar-detector ``Result``; ``directional(directions)`` scores a kept transport.
+
+    ``None`` transports here; :func:`pyrite.score_spectra` supplies its own.
+    """
     scene, numerics = request.scene, request.numerics
+    if directional is None:
+        directional = partial(_execute_planar, request, case, xsgen_tables)
     detector = scene.detector
     assert isinstance(detector, PlanarDetector)
     scorer = _detector_scorer(detector)
@@ -582,7 +609,7 @@ def _simulate_planar(
     if scene.acquisition is None:
         sampling = PixelSampling.of(detector, scorer.angular_shape)
         directions = sampling.directions_sample(tilt_deg=tilt_deg, tilt_azim_deg=tilt_azim_deg)
-        output = _execute_planar(request, case, xsgen_tables, directions)
+        output = directional(directions)
         spatial = sampling.spatial(
             output,
             detector=detector,
@@ -614,7 +641,7 @@ def _simulate_planar(
             brem_source=cast(str, scene.physics.brem_source),
             line_quadrature=case.get("line_quadrature"),
         )
-        output = _execute_planar(request, case, xsgen_tables, plan.directions_sample)
+        output = directional(plan.directions_sample)
         stored = plan.assemble(output, provenance={})
         spatial = stored.spatial
         observation_digest = stored.digest

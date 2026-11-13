@@ -131,7 +131,8 @@ def test_tune_kernels_accepts_exact_quanta_on_a_real_device():
 
 def test_phases_reproduce_simulate_on_the_device():
     """Resident CUDA segments rescored by score_spectra equal simulate bit for bit."""
-    from pyrite.phases import score_spectra, simulate_transport
+    from pyrite import score_spectra
+    from pyrite.campaign.trajectories import scene_trajectories as simulate_transport
 
     scene = _scene(cfg.TransportKernelTuning())
     expected = pr.simulate(scene)

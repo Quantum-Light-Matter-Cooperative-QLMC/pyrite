@@ -46,22 +46,20 @@ parameters, and is separate from `OptimizationStudy`. See
    pyrite.optimization.TuningProgress
 ```
 
-### Separate transport and spectrum phases
+### Simulation progress events
 
-`simulate_transport` runs only electron transport of a scalar-detector scene;
-`score_spectra` scores its kept segments, as often as needed, without
-transporting again. `SimulationProgress` is the event type of their
-`progress=` callbacks and of `pyrite.simulate(..., progress=...)`. See
-[run the phases yourself](../../guides/batch-chunk-tuning.md#run-the-phases-yourself).
+`SimulationProgress` is the event type of `progress=` callbacks in
+`pyrite.simulate` and `pyrite.score_spectra`. The former experimental
+`pyrite.phases.simulate_transport`, `score_spectra` and `TransportedScene` are
+deprecated aliases of the stable two-step workflow
+([simulate once, score many times](../trajectory-workflows.md#simulate-once-score-many-times))
+and warn until their removal in 0.37.0.
 
 ```{eval-rst}
 .. autosummary::
    :toctree: ../../_autosummary
    :nosignatures:
 
-   pyrite.phases.simulate_transport
-   pyrite.phases.score_spectra
-   pyrite.phases.TransportedScene
    pyrite.phases.SimulationProgress
 ```
 
