@@ -88,8 +88,12 @@ from pyrite.config import KernelTuning
 from pyrite.transport import simulate_trajectories
 
 transported = simulate_trajectories(
-    scene.beam, scene.target, physics=physics, numerics=numerics,
-    detector=scene.detector, keep_segments_on_device=True,
+    scene.beam,
+    scene.target,
+    physics=physics,
+    numerics=numerics,
+    detector=scene.detector,
+    keep_segments_on_device=True,
 )  # no spectra
 first = pyrite.score_spectra(transported)  # equals pr.simulate(scene)
 chunks = numerics.with_kernel_tuning(KernelTuning(cxr_chunk=32768))
