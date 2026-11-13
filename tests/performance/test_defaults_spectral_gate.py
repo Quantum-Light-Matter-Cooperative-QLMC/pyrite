@@ -41,3 +41,56 @@ def test_mosaic_mc_case_moves_catalog_width_to_the_exact_route():
     assert case["mosaic_mc_nodes"] == 9
     with pytest.raises(ValueError, match="no catalog mosaic"):
         _gate()["mosaic_mc_case"]({"crystal": "silicon"}, 5)
+
+
+def test_versus_judges_each_observable_on_its_own_margin():
+    gate = _gate()
+    reference = dict(
+        yield_per_primary=1.0,
+        centroid_eV=1000.0,
+        peak_density_per_eV=2.0,
+        dominant_fwhm_eV=None,
+        band_masses_100eV=[1.0, 1.0],
+    )
+    # Same mass, same centroid, higher peak: shape fails although mass passes.
+    candidate = dict(reference, peak_density_per_eV=2.1, band_masses_100eV=[2.0, 2.0])
+    out = gate["versus"](candidate, reference)
+    assert out["yield_per_primary"] == 0.0 and out["mass_l1"] == 0.0
+    assert out["peak_density_per_eV"] == pytest.approx(0.05)
+    assert out["dominant_fwhm_eV"] is None
+    margin = out["within_margin"]
+    assert margin["yield_per_primary"] and margin["mass_l1"]
+    assert margin["peak_density_per_eV"] is False and margin["dominant_fwhm_eV"] is None
+
+
+def test_matched_grid_keeps_policy_spacing_on_the_fixed_band():
+    gate = _gate()
+    uniform = gate["matched_grid"](
+        np.linspace(10, 20000, 101), {"actual_spacing_eV": 0.5}, "node", 3.0
+    )
+    assert uniform[0] == 500 and uniform[-1] == 10000
+    np.testing.assert_allclose(np.diff(uniform), 0.5)
+    local = np.r_[np.arange(10, 900, 3.0), np.arange(900, 12000, 0.25)]
+    local_record = {"resolution_policy": "resonance-local"}
+    clipped = gate["matched_grid"](local, local_record, "bin-mean", 3.0)
+    assert clipped[0] == 500 and clipped[-1] == 10000
+    np.testing.assert_array_equal(clipped[1:-1], local[(local > 500) & (local < 10000)])
+    # A measured edge below the band top continues at the backbone spacing.
+    short = local[local <= 3700]
+    filled = gate["matched_grid"](short, local_record, "bin-mean", 3.0)
+    assert filled[-1] == 10000 and np.diff(filled).max() <= 3.0 + 1e-9
+    np.testing.assert_array_equal(filled[1 : 1 + (short > 500).sum()], short[short > 500])
+
+
+@pytest.mark.parametrize("name", ["sinc", "sinc-bin", "measured", "measured-bin", "measured-local"])
+def test_policy_case_attaches_the_production_payload(name):
+    gate = _gate()
+    sweep = gate["scene_sweep"]("hopg", 30.0, 20000.0)
+    frozen = {"Ne": 8, "seed": 642501, "crystal": "hopg"}
+    case = gate["policy_case"](frozen, sweep, gate["POLICY_ARMS"][name])
+    payload = case["line_grid_policy"]
+    selectors = gate["POLICY_ARMS"][name]
+    assert payload["bandwidth"]["policy"] == selectors.get("bandwidth", "kinematic-ceiling")
+    assert payload["resolution"]["policy"] == selectors.get("resolution", "sinc-nyquist")
+    assert case["line_quadrature"] == selectors.get("quadrature", "node")
+    assert case["seed"] == 642501 and case["Ne"] == 8
