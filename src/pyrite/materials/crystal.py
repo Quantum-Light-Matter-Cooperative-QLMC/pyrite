@@ -493,8 +493,10 @@ def reflection_coupling_tables(crystal, hkl_list, photon_E_eV, B_ang2=0.0, use_h
             dispersive[el] = (xp.asarray(fp), xp.asarray(fpp))
     chi_scale = -R_E_ANG * (HC_EV_ANG / E) ** 2 / (np.pi * info["V_cell"])
     u_scale = 4.0 * np.pi * E2_EV_ANG / info["V_cell"] / M_E_EV
-    rows = ([], [], [], [])
-    for hkl in hkl_list:
+    # Fill preallocated tables row by row: stacking per-reflection rows kept
+    # every table resident twice, which OOMed thousands of reflections (#1167).
+    tables = tuple(xp.empty((len(hkl_list), E.size), dtype=np.float64) for _ in range(4))
+    for i, hkl in enumerate(hkl_list):
         hkl = np.asarray(hkl, dtype=float)
         _, g = reciprocal_g_vector(hkl, info["lattice"])
         dwf = debye_waller(g, B_ang2)
@@ -513,11 +515,11 @@ def reflection_coupling_tables(crystal, hkl_list, photon_E_eV, B_ang2=0.0, use_h
             fp, fpp = dispersive[el]
             s_re += w.real * fp - w.imag * fpp
             s_im += w.imag * fp + w.real * fpp
-        rows[0].append(chi_scale * (dwf * s_re))
-        rows[1].append(chi_scale * (dwf * s_im))
-        rows[2].append(u_scale * (dwf / g**2) * acc_re)
-        rows[3].append(u_scale * (dwf / g**2) * acc_im)
-    return tuple(xp.stack(row) for row in rows)
+        tables[0][i] = chi_scale * (dwf * s_re)
+        tables[1][i] = chi_scale * (dwf * s_im)
+        tables[2][i] = u_scale * (dwf / g**2) * acc_re
+        tables[3][i] = u_scale * (dwf / g**2) * acc_im
+    return tables
 
 
 def emission_coupling_tables(crystal, hkl_list, photon_E_eV, B_ang2=0.0, use_henke=False, xp=np):
