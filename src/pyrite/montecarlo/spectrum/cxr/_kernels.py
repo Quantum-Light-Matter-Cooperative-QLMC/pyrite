@@ -25,6 +25,7 @@ from ...transport import (
 )
 from ...transport._continuation_join import _copy_bytes
 from . import _fused
+from ._position_twins import shorten_position_twin, stage_row, with_position_twins
 from ._recoil import _quantum_line_factors
 
 # ---- segment-sum CXR spectrum ------------------------------------------------
@@ -58,6 +59,9 @@ _SEG_ARRAYS = (
     "track_id",
     "parent_id",
     "generation",
+    # Float64 position/age twins of float32 staging (``_position_twins``).
+    "r_mid_f64",
+    "t_ang_f64",
 )
 
 
@@ -888,7 +892,7 @@ def _clip_segments_to_cutoff(segments, E_cut_keV, composition, layers=None):
     # existing device gather. Stage after selection to retain the same REAL
     # conversion and non-flushing FP64-to-FP32 cast.
     host_idx = None
-    out = dict(segments)
+    out = dict(with_position_twins(segments))
     with _RowStager() as stage:
         for key in _SEG_ARRAYS:
             if key in out:
@@ -896,9 +900,9 @@ def _clip_segments_to_cutoff(segments, E_cut_keV, composition, layers=None):
                 if isinstance(row, np.ndarray):
                     if host_idx is None:
                         host_idx = _to_cpu(keep_idx)
-                    out[key] = stage(row[host_idx])
+                    out[key] = stage_row(key, row[host_idx], stage)
                 else:
-                    out[key] = stage(row)[keep_idx]
+                    out[key] = stage_row(key, row, stage)[keep_idx]
 
     E = xp.asarray(out["E_keV"], dtype=REAL)
     old_L = xp.asarray(out["L_ang"], dtype=REAL)
@@ -925,6 +929,7 @@ def _clip_segments_to_cutoff(segments, E_cut_keV, composition, layers=None):
     start = old_mid - REAL(0.5) * old_L[:, None] * direction
     out["L_ang"] = new_L
     out["r_mid"] = start + REAL(0.5) * new_L[:, None] * direction
+    shorten_position_twin(out, old_L, new_L, direction)
     if midpoint_rows:
         # A clipped flight is a shorter flight, so the transported end state no
         # longer describes it -- but the clip rule above is the transport core's
@@ -975,13 +980,13 @@ def _segments_on_device(segments):
 
     On the CPU backend `xp` is NumPy and the arrays already carry the kernels'
     dtype, so nothing is copied at all."""
-    out = dict(segments)
+    out = dict(with_position_twins(segments))
     with _RowStager() as stage:
         for k in _SEG_ARRAYS:
             a = out.get(k)
             if a is None:
                 continue
-            out[k] = stage(a)
+            out[k] = stage_row(k, a, stage)
     return out
 
 

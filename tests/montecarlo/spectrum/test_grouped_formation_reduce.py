@@ -105,16 +105,22 @@ def test_rejects_more_than_two_polarizations_and_skips_empty():
     np.testing.assert_array_equal(out, np.ones(5))
 
 
+@pytest.mark.parametrize("staged", [False, True])
+@pytest.mark.parametrize("E_cut_keV", [None, 1.0])
 @pytest.mark.parametrize("piece_real", [np.float64, np.float32])
-def test_grouped_spectrum_is_invariant_to_a_large_transverse_translation(piece_real, monkeypatch):
+def test_grouped_spectrum_is_invariant_to_a_large_translation(
+    piece_real, E_cut_keV, staged, monkeypatch
+):
     """A rigid 1e7 Angstrom footprint offset adds one phase per flight.
 
-    With ``piece_real=float32`` the piece columns are cast as on a float32
-    device; the grouped phase twin must still read float64 midpoints, or each
-    row's ``n_hat.r`` picks up ~1 Angstrom of quantization (#1152).
+    With ``piece_real=float32`` the segment rows are staged as on a float32
+    device (``_segments_on_device`` or the energy cutoff's upload) and the
+    piece columns cast; the
+    grouped phase twin must still read float64 midpoints, or each row's
+    ``n_hat.r`` picks up ~1 Angstrom of quantization (#1152).
     """
     from pyrite.montecarlo.spectrum import mc_cxr_spectrum, subdivide_flights
-    from pyrite.montecarlo.spectrum.cxr import _formation
+    from pyrite.montecarlo.spectrum.cxr import _formation, _kernels, _position_twins
     from tests.montecarlo.spectrum.test_substep_invariance import (
         CARBON,
         CXR_GRID_EV,
@@ -122,10 +128,14 @@ def test_grouped_spectrum_is_invariant_to_a_large_transverse_translation(piece_r
         _flights,
     )
 
+    kwargs = dict(CXR_KWARGS, E_cut_keV=E_cut_keV)
     rows, _ = subdivide_flights(_flights(Ne=6), composition=CARBON, max_dE_frac=1e-3)
-    ref = mc_cxr_spectrum(rows, CXR_GRID_EV, **CXR_KWARGS)
+    ref = mc_cxr_spectrum(rows, CXR_GRID_EV, **kwargs)
     shifted = dict(rows)
     shifted["r_mid"] = rows["r_mid"] + np.array([1.3e7, -0.9e7, 0.0])
-    monkeypatch.setattr(_formation, "REAL", piece_real)
-    got = mc_cxr_spectrum(shifted, CXR_GRID_EV, **CXR_KWARGS)
+    for module in (_formation, _kernels, _position_twins):
+        monkeypatch.setattr(module, "REAL", piece_real)
+    if staged:
+        shifted = _kernels._segments_on_device(shifted)
+    got = mc_cxr_spectrum(shifted, CXR_GRID_EV, **kwargs)
     np.testing.assert_allclose(got, ref, rtol=1e-6, atol=1e-6 * ref.max())
