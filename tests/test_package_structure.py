@@ -60,6 +60,7 @@ def test_root_exports_stay_frozen() -> None:
         "fetch_tables",
         "photon_energies",
         "simulate",
+        "score_spectra",
         "DirectionalSpectrum",
     ]
 
