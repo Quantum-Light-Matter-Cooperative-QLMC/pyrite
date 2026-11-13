@@ -25,7 +25,7 @@ def test_inventory_uses_dataset_union_without_lowering_cases_or_execution(monkey
     def resolve(args, material):
         calls.append((material, args.detector_id, args.quick, args.high_energy_floor_map))
         return (
-            None,
+            SimpleNamespace(channeling_model=None),  # only axial runs lower cases (#624)
             args.detector_id,
             {
                 "parameter_sha256": "dataset-" + args.detector_id,

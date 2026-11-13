@@ -32,6 +32,7 @@ import subprocess
 import sys
 import threading
 import time
+from collections.abc import Mapping
 from contextlib import redirect_stderr, redirect_stdout
 from dataclasses import replace
 from pathlib import Path
@@ -874,6 +875,7 @@ def _run_material(args, material, max_seconds=None):
     if summary is not None:
         print(summary)
     _print_sweep_header(args, material, cases, settings, identity)
+    _print_axial_notice(cases)
     if getattr(args, "execution_plan", False):
         from ..execution.inspection import inspect_execution
         from ..execution.profiles import resolve_execution_profile
@@ -1014,6 +1016,25 @@ def _print_sweep_header(args, material, cases, settings, identity):
         f"crystal orientation: beam_uvw={cases[0]['beam_uvw']} "
         f"hkl_list ({len(cases[0]['hkl_list'])} reflections)={cases[0]['hkl_list']}"
     )
+
+
+def _print_axial_notice(cases):
+    """Warn on stderr that an axial fibre run uses the experimental selector (#994)."""
+    keys = sorted(
+        {
+            str(record.get("case_key"))
+            for case in cases
+            if isinstance(record := case.get("channeling"), Mapping)
+            and record.get("model") == "axial"
+        }
+    )
+    if keys:
+        print(
+            f"{_cli_core.paint('warning', 'warning')}: experimental axial fibre channeling "
+            f"({', '.join(keys)}): on-axis point-source density with the calibrated depth "
+            "budget recorded in each case, not detected counts (#994)",
+            file=sys.stderr,
+        )
 
 
 def _write_campaign_lock(ckpt, material, identity):

@@ -72,6 +72,14 @@ Local scan resolution checks the effective profile settings before resolving
 material sweeps or checkpoint identities. Remote run submission resolves that
 same inventory before busy/live-job probes, synchronization or staging, for
 full, quick and CPU-profiling runs. A dry run applies the same admission.
+
+Since the profile parity change (#624), a profile can express the admitted
+fibre cases: a `kind = "point"` detector and a named target with
+`cut = {surface_hkl = [...]}` and `footprint = "unbounded"` (see the
+[first envelope](axial-first-envelope-886.md#running-an-admitted-case-from-a-profile)).
+For an axial profile, remote inventory resolution also lowers the cases, so
+per-case admission (lookup match, on-axis zero aperture, band, slab) accepts or
+refuses exactly as a local run does, still before any remote effect.
 Direct `run_sweep` and `run_cases` calls preflight the entire batch before
 checkpoint-directory creation, cache/resume processing or worker dispatch.
 Cached results cannot bypass admission.
