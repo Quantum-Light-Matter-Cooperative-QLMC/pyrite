@@ -50,7 +50,7 @@ from ...._backend import REAL, xp
 from ...transport import beta_from_keV
 from ..segment_escape import segment_escape_paths
 from ._kernels import _SEG_ARRAYS
-from ._position_twins import F64_TWIN_KEYS
+from ._position_twins import F64_TWINS
 from ._recoil import _recoil_formation_line
 
 # |w|^2 below which F takes its second-order series. The closed form loses
@@ -179,9 +179,10 @@ def expand_escape_pieces(segments, n_hat, *, layers=None, groove=None, keep_f64=
             pieces[key] = xp.asarray(pieces[key])[owner]
     L_parent = xp.asarray(segments["L_ang"], dtype=np.float64)[owner]
     v_hat = xp.asarray(pieces["v_hat"], dtype=np.float64)
-    # Float64 sources: ``<key>_f64`` twins the cutoff staging kept, else the rows.
-    twins = {key: pieces.pop(f"{key}_f64", None) for key in F64_TWIN_KEYS}
-    r_src = pieces["r_mid"] if twins["r_mid"] is None else xp.asarray(twins["r_mid"])[owner]
+    # Float64 sources: the staging twins (``_position_twins``), gathered with
+    # the rows above, else the rows themselves.
+    twins = {key: pieces.pop(twin, None) for twin, key in F64_TWINS.items()}
+    r_src = pieces["r_mid"] if twins["r_mid"] is None else twins["r_mid"]
     r_mid = xp.asarray(r_src, dtype=np.float64)
     shift = (offset + 0.5 * fraction - 0.5) * L_parent
     r_piece = r_mid + shift[:, None] * v_hat
@@ -195,7 +196,7 @@ def expand_escape_pieces(segments, n_hat, *, layers=None, groove=None, keep_f64=
         xp.zeros(owner.size, dtype=np.float64)
         if pieces.get("t_ang") is None
         else xp.asarray(
-            pieces["t_ang"] if twins["t_ang"] is None else xp.asarray(twins["t_ang"])[owner],
+            pieces["t_ang"] if twins["t_ang"] is None else twins["t_ang"],
             dtype=np.float64,
         )
     )

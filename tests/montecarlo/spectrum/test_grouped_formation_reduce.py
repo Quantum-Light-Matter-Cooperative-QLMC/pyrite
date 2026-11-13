@@ -105,13 +105,17 @@ def test_rejects_more_than_two_polarizations_and_skips_empty():
     np.testing.assert_array_equal(out, np.ones(5))
 
 
+@pytest.mark.parametrize("staged", [False, True])
 @pytest.mark.parametrize("E_cut_keV", [None, 1.0])
 @pytest.mark.parametrize("piece_real", [np.float64, np.float32])
-def test_grouped_spectrum_is_invariant_to_a_large_translation(piece_real, E_cut_keV, monkeypatch):
+def test_grouped_spectrum_is_invariant_to_a_large_translation(
+    piece_real, E_cut_keV, staged, monkeypatch
+):
     """A rigid 1e7 Angstrom footprint offset adds one phase per flight.
 
     With ``piece_real=float32`` the segment rows are staged as on a float32
-    device (the energy cutoff's upload) and the piece columns cast; the
+    device (``_segments_on_device`` or the energy cutoff's upload) and the
+    piece columns cast; the
     grouped phase twin must still read float64 midpoints, or each row's
     ``n_hat.r`` picks up ~1 Angstrom of quantization (#1152).
     """
@@ -131,5 +135,7 @@ def test_grouped_spectrum_is_invariant_to_a_large_translation(piece_real, E_cut_
     shifted["r_mid"] = rows["r_mid"] + np.array([1.3e7, -0.9e7, 0.0])
     for module in (_formation, _kernels, _position_twins):
         monkeypatch.setattr(module, "REAL", piece_real)
+    if staged:
+        shifted = _kernels._segments_on_device(shifted)
     got = mc_cxr_spectrum(shifted, CXR_GRID_EV, **kwargs)
     np.testing.assert_allclose(got, ref, rtol=1e-6, atol=1e-6 * ref.max())
