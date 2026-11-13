@@ -58,3 +58,40 @@ def test_lowers_to_a_zero_aperture_case():
     assert case["theta_obs_rad"] == pytest.approx(np.deg2rad(20.0))
     assert case["dtheta_obs_rad"] == 0.0
     assert case["domega_sr"] == 0.0
+
+
+@pytest.mark.parametrize(
+    ("row", "message"),
+    [
+        ({"kind": "line"}, "must be 'point'"),
+        ({"kind": "point", "polar_acceptance_deg": 1.0}, "no angular acceptance"),
+        ({"kind": "point", "solid_angle_sr": 1e-3}, "no angular acceptance"),
+        ({"kind": "point", "shape": [2, 2]}, "pixel detector acceptance"),
+    ],
+)
+def test_profile_point_kind_is_validated_at_load(tmp_path, row, message):
+    """#624: a catalog ``kind = "point"`` excludes every acceptance field."""
+    import tomlkit
+
+    from pyrite._catalog_layout import bundled_catalog, read_text
+    from pyrite.materials import MaterialConfigError
+    from pyrite.materials.catalog import load_material_catalog
+
+    document = tomlkit.parse(read_text(bundled_catalog()))
+    document["detectors"]["bad"] = row
+    path = tmp_path / "catalog.toml"
+    path.write_text(tomlkit.dumps(document))
+    with pytest.raises(MaterialConfigError, match=message):
+        load_material_catalog(path)
+
+
+def test_packaged_point_detector_resolves_to_point_detector():
+    from pyrite.campaign.config import catalog_detector
+    from pyrite.materials import CATALOG
+
+    assert CATALOG.detectors["point"] == {"kind": "point", "observation_angle_deg": 0.0}
+    assert type(catalog_detector("channeling_demo")) is Detector
+    spec = dict(CATALOG.detectors["point"])
+    from pyrite.campaign.profile_detectors import _scalar_detector
+
+    assert _scalar_detector(spec) == PointDetector()

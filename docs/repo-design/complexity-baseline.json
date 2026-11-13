@@ -44,7 +44,7 @@
     {
       "path": "src/pyrite/campaign/config.py",
       "name": "material_sweep",
-      "cc": 37
+      "cc": 36
     },
     {
       "path": "src/pyrite/campaign/front_matching.py",

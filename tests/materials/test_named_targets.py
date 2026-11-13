@@ -278,3 +278,71 @@ def test_remote_catalog_layer_transfer_covers_preset_tables():
     from pyrite._catalog_layout import LAYERED_TABLES
 
     assert {"filters", "targets"} <= set(LAYERED_TABLES)
+
+
+def test_cut_and_unbounded_footprint_lower_to_the_slab_api(document, tmp_path):
+    """#624: the admitted axial geometry is expressible from a named target."""
+    from pyrite.geometry import CrystalCut
+
+    document["targets"] = {
+        "fibre": {
+            **SLAB,
+            "thickness_ang": 3000.0,
+            "tilt_deg": 0.0,
+            "allow_normal_incidence": True,
+            "footprint": "unbounded",
+            "cut": {"surface_hkl": [0, 0, 1]},
+        }
+    }
+    catalog = load(document, tmp_path)
+    target = load_target("fibre", catalog=catalog)
+    assert target == Slab(
+        "silicon",
+        thickness_ang=3000.0,
+        tilt_deg=0.0,
+        width=None,
+        height=None,
+        cut=CrystalCut(surface_hkl=(0, 0, 1)),
+        allow_normal_incidence=True,
+    )
+    plain = load_target("plain", catalog=load(_with_plain(document), tmp_path))
+    assert plain.footprint is not None and plain._crystal_cut() is None
+
+
+def _with_plain(document):
+    document["targets"] = {"plain": SLAB}
+    return document
+
+
+@pytest.mark.parametrize(
+    ("change", "message"),
+    [
+        ({"footprint": "infinite"}, "must be 'unbounded'"),
+        (
+            {"footprint": "unbounded", "crystal_width_mm": 1, "crystal_height_mm": 1},
+            "excludes crystal_width_mm",
+        ),
+        ({"cut": [0, 0, 1]}, "must be a table"),
+        ({"cut": {"surface_hkl": [0, 0, 0]}}, "must be nonzero"),
+        ({"cut": {"surface_hkl": [0, 0, 1], "roll_deg": 1.0}}, "roll_deg"),
+    ],
+)
+def test_invalid_cut_and_footprint_rejected(document, tmp_path, change, message):
+    document["targets"] = {"bad": {**SLAB, **change}}
+    with pytest.raises(MaterialConfigError, match=message):
+        load(document, tmp_path)
+
+
+def test_a_stack_has_no_cut(document, tmp_path):
+    document["targets"] = {
+        "bad": {
+            "kind": "stack",
+            "cut": {"surface_hkl": [0, 0, 1]},
+            "layers": [
+                {"material": "silicon", "thickness_ang": 100},
+                {"material": "sio2", "thickness_ang": 100},
+            ],
+        }
+    }
+    with pytest.raises(MaterialConfigError, match="targets.bad"):
+        load(document, tmp_path)

@@ -229,6 +229,10 @@ Admitted planar cases record `Case.channeling["admission"]` =
 "observable", "evidence_id", "evidence_record"}`. ε bounds the band-weighted
 on-axis line source at crystal thickness, not individual bins. Admitted axial
 records carry `depth_budget`, the free→free bound and evidence, as before.
+Axial cases also run from a profile, the CLI and `pyrite run --remote`: the
+profile names the packaged `point` detector (`kind = "point"`) and a named
+target with `cut = {surface_hkl = [0, 0, 1]}` and `footprint = "unbounded"`;
+see [running an admitted case from a profile](../research/physics/axial-first-envelope-886.md#running-an-admitted-case-from-a-profile).
 
 `Channeling(admission="accept-inaccurate")` runs an unadmitted case. The
 profile `[channeling]` table key `admission`, CLI `--channeling-admission` and

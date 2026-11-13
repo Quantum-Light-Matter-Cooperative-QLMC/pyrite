@@ -69,6 +69,12 @@ _BEAM_KEYS = (
     }
 )
 _DETECTOR_KEYS = frozenset({"observation_angle_deg", "polar_acceptance_deg", "solid_angle_sr"})
+#: ``kind = "point"`` selects :class:`~pyrite.detectors.PointDetector`: one
+#: observation direction with zero angular acceptance (#624). It is the only
+#: detector ``kind`` and excludes both acceptance fields.
+DETECTOR_KIND_KEY = "kind"
+POINT_DETECTOR_KIND = "point"
+_POINT_EXCLUDED_KEYS = ("polar_acceptance_deg", "solid_angle_sr")
 #: Accepted range per acceptance field, as ``(minimum, maximum, strictly_positive)``.
 #: These mirror ``detectors.spec.Detector.__post_init__`` exactly, including its
 #: message wording, so a catalog block and a hand-built ``Detector`` reject the
@@ -476,6 +482,22 @@ def _parse_beams(raw: object, errors: _Errors) -> dict[str, Mapping[str, object]
     return out
 
 
+def _point_kind(table: Mapping[str, object], path: str, errors: _Errors) -> bool | None:
+    """Whether ``table`` is a valid point detector; ``None`` after an error."""
+    if DETECTOR_KIND_KEY not in table:
+        return False
+    if table[DETECTOR_KIND_KEY] != POINT_DETECTOR_KIND:
+        errors.add(f"{path}.{DETECTOR_KIND_KEY}", f"must be {POINT_DETECTOR_KIND!r}")
+        return None
+    conflicts = [key for key in _POINT_EXCLUDED_KEYS if key in table]
+    if conflicts:
+        errors.add(
+            path, "a point detector has no angular acceptance; remove " + ", ".join(conflicts)
+        )
+        return None
+    return True
+
+
 def _parse_profile_detector(raw: object, path: str, errors: _Errors) -> Mapping[str, object] | None:
     """Validate one portable ``[profiles.NAME.detector]`` block.
 
@@ -492,7 +514,10 @@ def _parse_profile_detector(raw: object, path: str, errors: _Errors) -> Mapping[
     table = _table(raw, path, errors)
     if table is None:
         return None
-    errors.keys(table, path, set(_DETECTOR_KEYS | _DEPRECATED_DETECTOR_KEYS))
+    errors.keys(table, path, set(_DETECTOR_KEYS | _DEPRECATED_DETECTOR_KEYS | {DETECTOR_KIND_KEY}))
+    point = _point_kind(table, path, errors)
+    if point is None:
+        return None
     for key in sorted(table.keys() & _DEPRECATED_DETECTOR_KEYS):
         warnings.warn(
             f"{path}.{key} is deprecated and ignored; configure a Detector response object",
@@ -544,6 +569,8 @@ def _parse_profile_detector(raw: object, path: str, errors: _Errors) -> Mapping[
                 errors.add(path, _DETECTOR_UPPER_BOUND_MESSAGES[key])
                 return None
         spec[key] = value
+    if point:
+        spec[DETECTOR_KIND_KEY] = POINT_DETECTOR_KIND
     return MappingProxyType(spec)
 
 
@@ -1069,7 +1096,7 @@ def _parse_detector_entry(raw: object, path: str, errors: _Errors) -> Mapping[st
     if row is None:
         return None
     pixel_keys = set(_PHYSICAL_DETECTOR_KEYS)
-    scalar_keys = set(_DETECTOR_KEYS | _DEPRECATED_DETECTOR_KEYS)
+    scalar_keys = set(_DETECTOR_KEYS | _DEPRECATED_DETECTOR_KEYS | {DETECTOR_KIND_KEY})
     errors.keys(row, path, pixel_keys | scalar_keys)
     has_pixel = bool(row.keys() & (pixel_keys - {"distance_mm"}))
     has_scalar = bool(row.keys() & (scalar_keys - {"distance_mm"}))

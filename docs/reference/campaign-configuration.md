@@ -274,7 +274,9 @@ shortcut updates a sole collection entry; multiple entries need ID-targeted edit
 
 `list`/`show` JSON use `cxr.profile.detector.list` / `cxr.profile.detector.show`
 envelopes. List contains `profile` and ID-keyed `detectors`; show contains
-`profile`, `id`, `kind`, `reference`, `settings` and projected `acceptance`.
+`profile`, `id`, `kind`, `reference`, `settings` and projected `acceptance`;
+`kind` is `scalar`, `point` (a `kind = "point"` row with zero acceptance) or
+`pixel`.
 Each `[[profiles.NAME.filters]]` is one `FilterPlate`, edited in declared order
 with `profile filter add|set|rm|list|show`.
 

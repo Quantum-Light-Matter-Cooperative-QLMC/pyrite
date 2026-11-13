@@ -27,8 +27,9 @@ from typing import Any
 import numpy as np
 
 from .._numerics import CONVERGENCE_KEYS
-from ..detectors import Detector, EnergyBins
+from ..detectors import Detector, EnergyBins, PointDetector
 from ..materials import CATALOG, MaterialSpec, load_material_catalog
+from ..materials._beam_detector_parse import DETECTOR_KIND_KEY, POINT_DETECTOR_KIND
 from ..montecarlo.runner.case_tables import _case_elastic_kwargs
 from ..montecarlo.runner.step_budget import retry_step_budget
 from ..montecarlo.transport import _simulate_trajectories as simulate_trajectories
@@ -112,7 +113,9 @@ def catalog_detector(catalog_profile: str = "standard", detector_id: str | None 
     """Build the detector a catalog profile resolves to.
 
     ``Catalog.profile_detector`` returns validated acceptance fields; an empty
-    mapping means every default stands.
+    mapping means every default stands. ``kind = "point"`` builds a
+    :class:`~pyrite.detectors.PointDetector` (on axis unless the spec names an
+    observation angle).
     """
     detectors = _catalog(catalog_profile).profile_detector_set(catalog_profile)
     if detector_id is None:
@@ -134,6 +137,8 @@ def catalog_detector(catalog_profile: str = "standard", detector_id: str | None 
             observation_angle_deg=projection.observation_angle_deg,
             _legacy_acceptance=(projection.polar_acceptance_deg, projection.solid_angle_sr),
         )
+    if spec.get(DETECTOR_KIND_KEY) == POINT_DETECTOR_KIND:
+        return PointDetector(spec.get("observation_angle_deg", 0.0))
     return Detector(
         observation_angle_deg=spec.get(
             "observation_angle_deg", DEFAULT_CATALOG_DETECTOR.observation_angle_deg
@@ -195,6 +200,45 @@ def material_grid(material: str) -> dict[str, object]:
     if spec.stack:
         grid["stack"] = spec.stack
     return grid
+
+
+def _point_override(point: PointDetector, supplied: dict[str, Any]) -> PointDetector:
+    """A profile point detector with an optional observation-angle override.
+
+    Acceptance overrides are refused: a point detector has none, and a
+    nonzero aperture must never be projected onto it.
+    """
+    conflicts = sorted(set(supplied) - {"observation_angle_deg"})
+    if conflicts:
+        raise ValueError(
+            "the profile detector is a point detector with no angular acceptance; remove "
+            + ", ".join(conflicts)
+        )
+    if "observation_angle_deg" not in supplied:
+        return point
+    return PointDetector(supplied["observation_angle_deg"], response=point.response)
+
+
+def _scalar_override(
+    detector: Any, resolved_catalog_detector: Detector, supplied_legacy: dict[str, Any]
+) -> Any:
+    """The explicit detector, or the catalog detector with legacy overrides applied."""
+    if detector is not None:
+        return detector
+    if isinstance(resolved_catalog_detector, PointDetector):
+        return _point_override(resolved_catalog_detector, supplied_legacy)
+    return Detector(
+        observation_angle_deg=supplied_legacy.get(
+            "observation_angle_deg", resolved_catalog_detector.observation_angle_deg
+        ),
+        _legacy_acceptance=(
+            supplied_legacy.get(
+                "polar_acceptance_deg", resolved_catalog_detector.polar_acceptance_deg
+            ),
+            supplied_legacy.get("solid_angle_sr", resolved_catalog_detector.solid_angle_sr),
+        ),
+        response=resolved_catalog_detector.response,
+    )
 
 
 def material_sweep(
@@ -261,22 +305,7 @@ def material_sweep(
             raise ValueError(
                 "conflicting detector= and legacy detector override(s): " + ", ".join(conflicts)
             )
-    resolved_detector = (
-        detector
-        if detector is not None
-        else Detector(
-            observation_angle_deg=supplied_legacy.get(
-                "observation_angle_deg", resolved_catalog_detector.observation_angle_deg
-            ),
-            _legacy_acceptance=(
-                supplied_legacy.get(
-                    "polar_acceptance_deg", resolved_catalog_detector.polar_acceptance_deg
-                ),
-                supplied_legacy.get("solid_angle_sr", resolved_catalog_detector.solid_angle_sr),
-            ),
-            response=resolved_catalog_detector.response,
-        )
-    )
+    resolved_detector = _scalar_override(detector, resolved_catalog_detector, supplied_legacy)
     observation = resolve_profile_observation(
         _catalog(catalog_profile), catalog_profile, detector_id=detector_id
     )

@@ -8,6 +8,20 @@ import json
 from argparse import Namespace
 
 
+def _admit_axial_cases(settings, sweep) -> None:
+    """Lower an axial run's cases so local per-case admission refuses before remote work.
+
+    Scan resolution refuses only an unverified axial selector; each fibre case
+    is admitted against the repository lookup when its cases are built (#624).
+    Other runs are not lowered here.
+    """
+    if settings.channeling_model != "axial":
+        return
+    from ..api import build_configured_cases
+
+    build_configured_cases(sweep, settings)
+
+
 def resolve_inventory(request: dict) -> dict:
     """Resolve every material/detector using the scan's catalog and table paths."""
     from ..materials import CATALOG
@@ -23,7 +37,8 @@ def resolve_inventory(request: dict) -> dict:
                 detector_id=detector_id,
                 high_energy_floor_map=request.get("high_energy_floor_map", {}),
             )
-            _settings, _sweep, identity, stem = _resolved_run(args, material)
+            settings, sweep, identity, stem = _resolved_run(args, material)
+            _admit_axial_cases(settings, sweep)
             # The existing dataset digest includes model generations, selected
             # parameters and the union of consumed tables. Do not lower every
             # case or substitute this union for per-case CAS/source keys.

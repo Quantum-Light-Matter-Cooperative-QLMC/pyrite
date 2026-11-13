@@ -16,6 +16,7 @@ from pyrite.cli.commands._detector_shared import (
     apply_detector_fields,
     collect_detector_updates,
     detector_cli_options,
+    point_option,
 )
 from pyrite.cli.commands._pixel_detector_shared import pixel_changes, pixel_cli_options
 from pyrite.console import json as cli_json
@@ -106,6 +107,8 @@ def _detector_payload(document, name):
 
 def _emit_show(payload, origin=None):
     rows: list[tuple[str, object]] = [("label", payload["label"])] if payload.get("label") else []
+    if payload.get("kind") == "point":
+        rows.append(("kind", "point (zero angular acceptance)"))
     for key, label, unit in _DISPLAY_FIELDS:
         if key in payload:
             rows.append((label, f"{payload[key]:g} {unit}"))
@@ -269,6 +272,7 @@ def create_command(
 @click.argument("name", shell_complete=_cli_completion.complete_detector)
 @click.option("--label", help="Display-only description; never affects parameter_sha256.")
 @detector_cli_options
+@point_option
 @pixel_cli_options
 @click.option("-y", "--yes", "yes", is_flag=True, help="Skip overwrite confirmation.")
 @click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing.")
@@ -278,12 +282,15 @@ def set_command(
     observation_angle_deg,
     polar_acceptance_deg,
     solid_angle_sr,
+    point,
     yes,
     dry_run,
     **values,
 ):
     """Update fields on an existing named detector NAME."""
-    updates = collect_detector_updates(observation_angle_deg, polar_acceptance_deg, solid_angle_sr)
+    updates = collect_detector_updates(
+        observation_angle_deg, polar_acceptance_deg, solid_angle_sr, point=point
+    )
     pixel = pixel_changes(values)
     if not updates and not any(pixel) and label is None:
         raise click.UsageError("provide --label or a detector-geometry option")
@@ -292,6 +299,10 @@ def set_command(
         target = _existing_detector(document, name)
         _catalog_io.require_writable_object("detectors", name)
         overwriting = [key for key in updates if key in target]
+        if point:  # --point removes any stored acceptance
+            overwriting += [
+                key for key in ("polar_acceptance_deg", "solid_angle_sr") if key in target
+            ]
         if label is not None and "label" in target:
             overwriting.append("label")
     except (OSError, ValueError, ParseError) as exc:

@@ -7,7 +7,7 @@ from typing import Any
 
 import numpy as np
 
-from ._catalog_decode import _Errors, _number, _readonly
+from ._catalog_decode import _direction, _Errors, _number, _readonly
 from ._named_filters import _NAME
 from ._parse import TRANSPORT_ELEMENTS, _material_elements, _parse_layer
 from ._schema import CrystalSpec, MaterialSpec, MediumSpec
@@ -24,10 +24,14 @@ GEOMETRY_KEYS = frozenset(
         "mosaic",
         "allow_normal_incidence",
         "cut",
+        "footprint",
         "substrate",
         "stack",
     }
 )
+#: ``footprint = "unbounded"``: a laterally unbounded slab (``Slab(width=None,
+#: height=None)``). Omission keeps the historical finite 5 mm footprint.
+UNBOUNDED_FOOTPRINT = "unbounded"
 
 
 def _scalar(row, key, path, errors, *, default=None, positive=False):
@@ -59,13 +63,37 @@ def _geometry(row, path, errors):
     if azimuth is not None and np.isclose(azimuth, 90.0):
         errors.add(f"{path}.tilt_azim_deg", "90 degrees is unsupported")
     # Omission means the historical finite 5 mm footprint; both keys must be
-    # supplied together. Infinite footprints are outside this initial codec.
+    # supplied together. ``footprint = "unbounded"`` replaces both (#624).
     widths = ("crystal_width_mm" in row, "crystal_height_mm" in row)
+    if "footprint" in row:
+        if row["footprint"] != UNBOUNDED_FOOTPRINT:
+            errors.add(f"{path}.footprint", f"must be {UNBOUNDED_FOOTPRINT!r}")
+        elif any(widths):
+            errors.add(path, "footprint = 'unbounded' excludes crystal_width_mm/crystal_height_mm")
+        values["crystal_width_mm"] = values["crystal_height_mm"] = None
+        return values
     if widths[0] != widths[1]:
         errors.add(path, "crystal_width_mm and crystal_height_mm must be supplied together")
     for key in ("crystal_width_mm", "crystal_height_mm"):
         values[key] = _scalar(row, key, path, errors, default=5.0, positive=True)
     return values
+
+
+def _cut(row, path, values, errors):
+    """``cut = {surface_hkl = [h, k, l]}``: the slab-normal plane (``CrystalCut``)."""
+    if "cut" not in row:
+        return
+    cut = row["cut"]
+    if not isinstance(cut, Mapping):
+        errors.add(f"{path}.cut", "must be a table such as {surface_hkl = [0, 0, 1]}")
+        return
+    errors.keys(cut, f"{path}.cut", {"surface_hkl"})
+    if "surface_hkl" not in cut:
+        errors.add(f"{path}.cut", "requires surface_hkl")
+        return
+    surface = _direction(cut["surface_hkl"], f"{path}.cut.surface_hkl", errors)
+    if surface is not None:
+        values["cut"] = MappingProxyType({"surface_hkl": surface})
 
 
 def _body(row, kind, path, values, crystals, media, errors):
@@ -129,12 +157,17 @@ def _definition(name, row, materials, crystals, media, errors):
         "crystal_height_mm",
         "allow_normal_incidence",
         "mosaic",
+        "footprint",
     }
     errors.keys(
         row,
         path,
         allowed
-        | ({"material", "thickness_ang", "groove_spacing_ang"} if kind == "slab" else {"layers"}),
+        | (
+            {"material", "thickness_ang", "groove_spacing_ang", "cut"}
+            if kind == "slab"
+            else {"layers"}
+        ),
     )
     if "description" in row and (
         not isinstance(row["description"], str) or not row["description"].strip()
@@ -142,6 +175,7 @@ def _definition(name, row, materials, crystals, media, errors):
         errors.add(f"{path}.description", "must be a nonempty string")
     before = len(errors.items)
     values = _geometry(row, path, errors)
+    _cut(row, path, values, errors)
     material, layers = _body(row, kind, path, values, crystals, media, errors)
     if not isinstance(material, str) or material not in materials:
         errors.add(f"{path}.material", "entrance must reference a runnable material recipe")

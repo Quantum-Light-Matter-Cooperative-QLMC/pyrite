@@ -104,3 +104,68 @@ def test_remote_cli_axial_refusal_is_a_runtime_diagnostic(axial_profile, monkeyp
     assert result.stdout == ""
     assert "#623" in result.stderr
     assert "Traceback" not in result.output
+
+
+@pytest.fixture
+def fibre_profiles(_isolate_user_catalog):
+    """User-layer profiles for the admitted fibre cases and an unadmitted slab (#624)."""
+    from tests.helpers.axial_profiles import axial_profiles
+
+    with axial_profiles(_isolate_user_catalog) as layer:
+        yield layer
+
+
+def _record_remote_effects(monkeypatch):
+    effects = []
+    monkeypatch.setattr(queue, "_refuse_if_busy", lambda *_a: effects.append("busy"))
+    monkeypatch.setattr(queue, "_refuse_if_profile_live", lambda *_a: effects.append("live"))
+    monkeypatch.setattr(queue, "_profile_jobid", lambda profile: profile)
+    monkeypatch.setattr(transport, "sync_code", lambda *_a, **_k: effects.append("sync"))
+    monkeypatch.setattr(
+        queue, "_stage_job_script", lambda jobid, *_a: effects.append(("stage", jobid))
+    )
+    monkeypatch.setattr(
+        queue, "_submit_staged_job", lambda *_a, **_k: effects.append("submit") or "4242"
+    )
+    return effects
+
+
+@pytest.mark.parametrize("profile", ["axial_fibre_a", "axial_fibre_b"])
+def test_admitted_fibre_profile_submits_and_stages(fibre_profiles, monkeypatch, profile):
+    effects = _record_remote_effects(monkeypatch)
+    submission = queue.start_queue(
+        ["silicon"], catalog_profile=profile, chunk_minutes=0, _return_submission=True
+    )
+    assert effects == ["busy", "live", "sync", ("stage", profile), "submit"]
+    assert submission.scheduler_id == "4242"
+    assert submission.stems and submission.stems[0].startswith(f"silicon@{profile}-")
+    assert profile in submission.script
+
+
+@pytest.mark.parametrize(
+    ("profile", "message"),
+    [
+        ("axial_fibre_thin", "accept-inaccurate"),
+        ("axial_fibre_finite", "laterally unbounded"),
+        ("axial_fibre_aperture", "zero-aperture"),
+        ("axial_fibre_off_axis", "zero-aperture"),
+    ],
+)
+@pytest.mark.parametrize("dry_run", [False, True])
+def test_unadmitted_fibre_profile_refuses_before_remote_effects(
+    fibre_profiles, monkeypatch, profile, message, dry_run
+):
+    def forbidden(*_args, **_kwargs):
+        pytest.fail("remote operation started")
+
+    for owner, name in (
+        (queue, "_refuse_if_busy"),
+        (queue, "_refuse_if_profile_live"),
+        (transport, "sync_code"),
+        (transport, "_ssh_capture"),
+        (queue, "_stage_job_script"),
+        (queue, "_submit_staged_job"),
+    ):
+        monkeypatch.setattr(owner, name, forbidden)
+    with pytest.raises(ValueError, match=message):
+        queue.start_queue(["silicon"], catalog_profile=profile, dry_run=dry_run)

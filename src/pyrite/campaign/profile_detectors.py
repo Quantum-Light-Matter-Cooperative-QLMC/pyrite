@@ -3,7 +3,8 @@
 import tomlkit
 
 from pyrite.detectors.editing import _toml_value, merge_pixel_detector
-from pyrite.detectors.spec import Detector
+from pyrite.detectors.spec import Detector, PointDetector
+from pyrite.materials._beam_detector_parse import DETECTOR_KIND_KEY, POINT_DETECTOR_KIND
 
 from ._profile_document import clone_grid, existing_profile
 
@@ -25,9 +26,16 @@ def physical_detector_row(profile):
     return physical
 
 
+def is_point_detector(values):
+    """Whether a scalar detector row declares ``kind = "point"`` (#624)."""
+    return values.get(DETECTOR_KIND_KEY) == POINT_DETECTOR_KIND
+
+
 def _scalar_detector(values):
     """Build the scalar ``Detector`` a legacy detector row resolves to."""
     angle = values.get("observation_angle_deg")
+    if is_point_detector(values):
+        return PointDetector(0.0 if angle is None else angle)
     return Detector(
         **({} if angle is None else {"observation_angle_deg": angle}),
         _legacy_acceptance=(values.get("polar_acceptance_deg"), values.get("solid_angle_sr")),

@@ -58,6 +58,7 @@ def require_explicit_detector(profile: str, detectors: Mapping[str, Mapping[str,
         name
         for name, spec in detectors.items()
         if "distance_mm" not in spec
+        and spec.get("kind") != "point"
         and any(
             key not in spec
             for key in ("observation_angle_deg", "polar_acceptance_deg", "solid_angle_sr")

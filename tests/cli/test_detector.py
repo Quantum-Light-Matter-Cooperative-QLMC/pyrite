@@ -176,3 +176,29 @@ def test_delete_refuses_referenced_and_removes_orphan(tmp_path, monkeypatch):
     assert_clean_result(deleted)
     assert json.loads(deleted.stdout)["payload"] == {"deleted": "orphan"}
     assert "[detectors.orphan]" not in path.read_text()
+
+
+def test_set_point_replaces_acceptance_and_refuses_it_after(tmp_path, monkeypatch):
+    """#624: --point stores kind = "point" and removes the acceptance fields."""
+    import tomlkit
+
+    path = _catalog(tmp_path, monkeypatch)
+    result = invoke(detector.command, ["set", "eds", "--point", "--observation-angle", "0", "-y"])
+    assert_clean_result(result)
+    row = tomlkit.parse(path.read_text())["detectors"]["eds"]
+    assert row.unwrap() == {"observation_angle_deg": 0.0, "kind": "point"}
+    shown = invoke(detector.command, ["show", "eds"])
+    assert_row(shown.stdout, "kind", "point (zero angular acceptance)")
+    refused = invoke(detector.command, ["set", "eds", "--polar-acceptance", "1"])
+    assert refused.exit_code == 2
+    assert "point detector with no angular acceptance" in refused.stderr
+    assert tomlkit.parse(path.read_text())["detectors"]["eds"].unwrap() == row.unwrap()
+
+
+def test_point_excludes_acceptance_options(tmp_path, monkeypatch):
+    path = _catalog(tmp_path, monkeypatch)
+    before = path.read_text()
+    result = invoke(detector.command, ["set", "eds", "--point", "--solid-angle", "0.1"])
+    assert result.exit_code == 2
+    assert "--point has no angular acceptance" in result.stderr
+    assert path.read_text() == before
