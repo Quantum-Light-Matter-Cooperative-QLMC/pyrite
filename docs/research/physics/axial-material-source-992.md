@@ -423,3 +423,152 @@ bound: 8.06% for A and 18.9% for B (mean + 3 SE). Above-cut free→free stays
 unbounded for both. An earlier decision had A take the block from native CBS on
 its tilted zone rows; the comparison below showed that native CBS does not
 reproduce it, and that decision was superseded.
+
+## CPU source cost and the GPU question (#1154)
+
+The admitted A/B source is substantially cheaper than the older, thicker
+research arms quoted above. On a Ryzen 9 9950X3D CPU node, with one BLAS/OpenMP
+thread per worker, the measured source work is 0.112 s/history for A and
+0.104 s/history for B. These are 32-history batches in four serial chunks of
+eight, seed 1154, using the admitted physical inputs and numerical settings
+through `axial_fiber_inputs`. The explicit photon grid has 185 points over
+0.8–10 keV, with exit absorption enabled. This is source timing, excluding
+native continuation and the rest of a production campaign.
+
+| Case | Source work (s/history) | Warm batch wall (s) | Histories/wall-s | Peak worker RSS (MiB) |
+|---|---:|---:|---:|---:|
+| A, 0.088° | 0.112 | 4.390 | 7.29 | 340 |
+| B, aligned | 0.104 | 4.110 | 7.79 | 361 |
+
+Wall time includes pool startup, input construction, result hashing and return.
+The first repeat is retained separately as cold; the table uses the median
+of the next two identical-workload repeats. Peak RSS includes imports and
+setup in each worker; it is not the simultaneous process-tree peak.
+The CPU matrix runs serially on one node to avoid contention between arms.
+The source itself is unchanged: profiling checks bitwise equality of the
+spectra, spectral errors, complex correlations, retained traces and terminal
+events. This engineering check changes no validation status or admission.
+
+The entrance Hamiltonian has 361 order coefficients, 61 retained levels and
+5 bound levels for both cases, with 672 electronic kick nodes and 201 recorded
+depths. A fixed-depth batch could share channel tables and scoring geometry.
+Jump depths, terminal fates and post-jump carrier sectors differ between
+histories, so their carrier eigensystems and companion states cannot all share
+one propagator. The short admitted workload must therefore be measured
+separately from the thicker research cases before choosing a GPU port.
+
+Reproduction: `checks/axial_source_performance.sbatch`, submitted with
+`--array=0-23%1` from a clean, isolated checkout synced through `pyrite remote`.
+The [CPU evidence record](../../validation/check-records/axial-source/source-performance-1154-cpu.json)
+preserves commands, workload settings, source revision, cold/warm measurements,
+result digests and profile timings. Published operator paths and node names
+are placeholders; numerical measurements are unchanged.
+
+### Where the time goes
+
+Separate 32-history, single-call profiles give the following fractions of
+`fiber_on_axis_source` time. The rows are disjoint; the jump row includes
+constructing the new carrier's eigenbasis. Both full profiles reproduce their
+unprofiled result digests exactly.
+
+| Phase | A | B |
+|---|---:|---:|
+| Channel-engine construction | 9.5% | 10.5% |
+| No-jump search, companion propagation and depth recording | 14.8% | 13.7% |
+| TDS/electronic jump selection and new carrier basis | 45.4% | 43.2% |
+| Companion jump maps | 8.4% | 8.7% |
+| Weyl outgoing measurement | 0.08% | 0.18% |
+| Line-grid scoring | 20.2% | 22.0% |
+| Other source work | 1.7% | 1.8% |
+
+The primary waiting-time search alone is about 0.2%. These admitted cases
+use continuum-string TDS; they have no nonzero discrete lattice-Kraus-column
+draw. Accelerating a fixed no-jump step alone would miss the main cost.
+Line scoring already spends most of its time in NumPy contractions; adding
+Numba to the small waiting/draw control loops cannot remove the carrier
+eigensolves or these contractions.
+
+### Numerical and process scaling
+
+Each numerical probe changes one setting, with the same seed and incident IDs.
+The following ratios use source work per history, excluding input construction;
+they measure cost, not numerical adequacy of the overridden settings.
+
+| Probe against admitted numerics | A cost ratio | B cost ratio |
+|---|---:|---:|
+| Order window M: 9 → 11 | 1.76 | 1.74 |
+| Outgoing box B: 20 → 24 | 1.04 | 1.04 |
+| Recorded-depth spacing: 15 → 7.5 Å | 1.73 | 1.76 |
+| Recorded-depth spacing: 15 → 30 Å | 0.78 | 0.78 |
+| Kick harmonic cutoff: 4 → 2 | 1.00 | 1.03 |
+| Kick harmonic cutoff: 4 → 6 | 1.04 | 1.05 |
+
+A separate matched Si ⟨111⟩, 2.99 MeV, aligned pair changes thickness
+from 0.3 to 1.1 µm, keeping the other numerical controls fixed. Source cost
+rises from 0.185–0.186 to 0.641–0.644 s/history, about 3.46×; peak worker
+RSS rises from 359–368 to 807 MiB. The two repeats of this physical pair
+come from identical overrides of the A and B input records; they are neither
+additional admitted cases nor independent random ensembles.
+
+For B, 64 histories with chunks of eight give the following process scaling:
+
+| Workers | Warm wall (s) | Histories/wall-s | Speedup |
+|---:|---:|---:|---:|
+| 1 | 8.163 | 7.84 | 1.00× |
+| 2 | 4.307 | 14.86 | 1.90× |
+| 4 | 2.613 | 24.50 | 3.12× |
+| 8 | 2.124 | 30.13 | 3.84× |
+
+At four workers, chunks of two give 10.88 histories/s; chunks of sixteen
+give 29.47/s. Larger chunks amortize input/channel construction. The existing
+production adapter already calls the source over a whole case; this measured
+parallelism is the research source-chunk path, not an implemented intra-case
+production pool. The late thickness replicate, worker scaling, bound-population
+arms and full profiles shared the node with another eight-CPU allocation.
+These timings describe that shared-node workload, not exclusive-node capacity;
+the close timing repeats do not measure uncertainty across seeds or node loads.
+
+### GPU assessment and CPU-first decision
+
+Retain the CPU production source and prioritize CPU work before a GPU port:
+reuse immutable inputs across research chunks, avoid very small chunks, and
+investigate a shared/precomputed scoring contraction and controlled history
+parallelism. No optimization is implemented by these measurements. Any change
+to production reduction order needs its own numerical-identity checks.
+
+A partial GPU implementation that makes no-jump/companion propagation,
+companion jumps and line scoring free, while leaving channel construction,
+carrier solves and jump selection on one CPU controller, has an optimistic
+B source-only ceiling of about 23 histories/s. This Amdahl estimate uses the
+measured 44.4% accelerated share and the unprofiled 32-history single-call
+rate; it excludes transfers, launch costs and input construction. It is already
+below the measured 30 histories/s process-chunk throughput. A competitive
+GPU port would need batched carrier eigensolves and jump maps as well, rather
+than just a CuPy no-jump loop. Common channels/depths can be shared, but generic
+post-jump sectors, waiting times and terminal fates still require independent
+per-history state and stream handling. No achieved GPU fibre throughput is
+claimed. A twofold improvement over the measured CPU batch would require the
+entire 64-history GPU request to finish in roughly 1.06 s.
+
+### Matched population observable
+
+The comparison observable is incident-normalized weight in the instantaneous
+Hamiltonian block below the potential maximum, at 0, 500, …, 3000 Å, and
+its trapezoidal depth exposure. This is not a photon-yield comparison.
+Three CPU fibre ensembles of 512 histories (seeds 1154–1156, four workers)
+give final bound weight 0.5398 and exposure 2103(25) Å, where the parenthesized
+error is the SEM across three seed means. Their wall times are 9.00–9.54 s
+per ensemble, including startup/setup. The full per-seed/depth data are in the
+evidence record; three seeds give limited precision for interval estimates.
+
+The finite-grid arm starts from the full plane wave; the fibre starts from
+its retained projection with the incident entry weight. The fibre absorbs
+outgoing cut/window outcomes; a finite periodic supercell permits return flux
+and discretizes transverse transfer/Bloch sectors, with its own out-of-band
+sink. Thus equal observable definitions do not make their generators equal.
+The CUDA protocol varies points per cell, supercell size and propagation step,
+and includes full bound-projector eigensolves and transfers in its arm cost.
+Until those results establish convergence and uncertainty, these CPU records
+support neither grid/fibre agreement nor replacing the validated fibre source
+with grid MCWF. The CPU-first decision does not lift the GPU gate or widen the
+admitted envelope.

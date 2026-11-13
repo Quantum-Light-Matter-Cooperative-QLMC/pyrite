@@ -263,6 +263,8 @@ def main():
         parser.error("count must be a multiple of chunk; both >=2; repeats/workers >=1")
     if ns.mode == "grid-bound" and ns.workers != 1:
         parser.error("grid comparator uses one device process")
+    if ns.mode == "grid-bound" and (ns.case != "B" or json.loads(ns.overrides)):
+        parser.error("grid comparator requires aligned B without overrides")
     grid = dict(cells=ns.cells, points=ns.points, step=ns.step, backend=ns.backend)
     jobs = [
         (ns.case, json.loads(ns.overrides), ns.mode, i, ns.chunk, ns.seed, grid)
@@ -274,8 +276,13 @@ def main():
     # A fresh worker pool on every repeat keeps process/setup policy identical.
     for _ in range(ns.repeats):
         start = time.perf_counter()
-        with ProcessPoolExecutor(max_workers=ns.workers) as pool:
-            rows = list(pool.map(worker, jobs))
+        if ns.mode == "grid-bound":
+            # Imports may initialize CUDA. Keep its context in this process;
+            # a forkserver-preloaded main module must not pass it to a child.
+            rows = [worker(jobs[0])]
+        else:
+            with ProcessPoolExecutor(max_workers=ns.workers) as pool:
+                rows = list(pool.map(worker, jobs))
         samples.append({"wall_s": time.perf_counter() - start, "chunks": rows})
     out = {
         "status": "research measurement; no claim/admission changes",
