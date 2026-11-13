@@ -295,6 +295,10 @@ def families_case(case, sweep, n):
     out in-plane families, so its axis is the explicit (00l) harmonic order
     ``l = 2, 4, ..., 2n`` -- a study ladder, not a production selector.
 
+    A string point ``"g<G>"`` instead keeps every nonforbidden reflection with
+    ``|g| <= G`` 1/angstrom in every radiator (the family count is then not the
+    truncation; the reciprocal cutoff is). Production enumerates to 8/angstrom.
+
     Returns the case, the production line-axis support (film crystal only) and
     the support every radiator's own reflections need under the same resolver.
     """
@@ -302,19 +306,31 @@ def families_case(case, sweep, n):
 
     from pyrite.campaign.geometry import crystal_params
     from pyrite.campaign.sweep import _automatic_cxr_grid_policy, build_cases
+    from pyrite.materials.crystal import dominant_reflections
 
-    built = build_cases(replace(sweep, n_families=int(n)), n_electrons=1, n_electrons_brem=1)[0]
+    g_max = float(n[1:]) if isinstance(n, str) else None
+    families = 4 if g_max is not None else int(n)
+    built = build_cases(replace(sweep, n_families=families), n_electrons=1, n_electrons_brem=1)[0]
     out = dict(case, hkl_list=built["hkl_list"])
-    if case["crystal"] == "hopg":
-        out["hkl_list"] = [(0, 0, s * 2 * k) for k in range(1, n + 1) for s in (1, -1)]
-    radiators = [dict(crystal=case["crystal"], hkl_list=out["hkl_list"])]
     if case.get("layer_radiators") is not None:
-        out["layer_radiators"] = built["layer_radiators"]
-        radiators = [r for r in out["layer_radiators"] if r is not None]
+        out["layer_radiators"] = [None if r is None else dict(r) for r in built["layer_radiators"]]
+    radiators = out.get("layer_radiators") or [out]
+    radiators = [r for r in radiators if r is not None]
+    if case["crystal"] == "hopg":
+        if g_max is not None:
+            raise ValueError("HOPG uses its (00l) order ladder, not a reciprocal cutoff")
+        out["hkl_list"] = [(0, 0, s * 2 * k) for k in range(1, n + 1) for s in (1, -1)]
+    elif g_max is not None:
+        for r in radiators:
+            r["hkl_list"] = dominant_reflections(
+                r["crystal"], n_families=10**9, B_ang2=r["B_ang2"], g_max_invang=g_max
+            )
+        if case.get("layer_radiators") is not None:
+            out["hkl_list"] = radiators[0]["hkl_list"]
     supports = [
         _automatic_cxr_grid_policy(
             sweep,
-            dict(crystal_params(r["crystal"], int(n)), hkl_list=r["hkl_list"]),
+            dict(crystal_params(r["crystal"], families), hkl_list=r["hkl_list"]),
             float(case["E0_keV"]),
         )
         for r in radiators
@@ -350,7 +366,7 @@ def score_families(case, sweep, ladder, ns, reference_spacing, wide_spacing, syn
         fcase, production, needed = cases[n]
         scorer = CaseLadder(fcase, transport=tp)
         row = dict(
-            n=int(n),
+            n=n,
             reflections=len(fcase["hkl_list"]),
             production_support_eV=production,
             all_radiator_support_eV=needed,
@@ -760,9 +776,10 @@ def main():
     )
     parser.add_argument(
         "--families",
-        type=lambda text: [int(x) for x in text.split(",") if x],
+        type=lambda text: [x if x.startswith("g") else int(x) for x in text.split(",") if x],
         default=[],
-        help="ascending reflection ladder (n_families; HOPG: (00l) orders); last is reference",
+        help="ascending reflection ladder: n_families counts (HOPG: (00l) orders) or g<G> "
+        "reciprocal cutoffs in 1/angstrom; last is reference",
     )
     parser.add_argument(
         "--families-wide-spacing",
@@ -771,8 +788,8 @@ def main():
         help="node spacing (eV) of the full-support yield axis for --families",
     )
     args = parser.parse_args()
-    if args.families and args.families != sorted(set(args.families)):
-        parser.error("--families must be strictly ascending")
+    if len(set(args.families)) != len(args.families):
+        parser.error("--families points must be distinct")
     if len(args.continuum_reference_divisors) != 3:
         parser.error("--continuum-reference-divisors needs exactly three values")
     unknown = sorted(set(args.policy_arms) - set(POLICY_ARMS))

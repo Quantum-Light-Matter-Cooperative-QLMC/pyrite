@@ -170,3 +170,20 @@ def test_families_case_varies_only_the_reflection_set():
     assert [len(r["hkl_list"]) for r in one["layer_radiators"]] == [2, 8]
     assert one["abs_layers"] == layered["abs_layers"]
     assert need > film_stop  # Si substrate lines pass the film-only production stop
+
+
+def test_families_case_reciprocal_cutoff_keeps_every_reflection_inside_it():
+    gate = _gate()
+    frozen = {"crystal": "silicon", "hkl_list": [(1, 1, 1)], "E0_keV": 300.0, "B_ang2": 0.46}
+    sweep = gate["scene_sweep"]("silicon", 300.0, 1e5)
+    full8, *_ = gate["families_case"](frozen, sweep, "g8")
+    n12, *_ = gate["families_case"](frozen, sweep, 12)
+    assert sorted(full8["hkl_list"]) == sorted(n12["hkl_list"])  # n=12 exhausts g<=8
+    wider, *_ = gate["families_case"](frozen, sweep, "g10")
+    assert set(full8["hkl_list"]) < set(wider["hkl_list"])
+    layered = gate["layered_case"](8, 642501)
+    lay, *_ = gate["families_case"](layered, gate["scene_sweep"]("mos2-on-si", 30.0, None), "g6")
+    assert lay["hkl_list"] == lay["layer_radiators"][0]["hkl_list"]
+    assert layered["layer_radiators"][1]["hkl_list"] != lay["layer_radiators"][1]["hkl_list"]
+    with pytest.raises(ValueError, match="HOPG"):
+        gate["families_case"]({"crystal": "hopg"}, gate["scene_sweep"]("hopg", 30.0, 2e4), "g8")
