@@ -282,15 +282,18 @@ def _grouped_phase64(segments, t_L_all, n_hat, grouped):
     ``d = t_mid + t0 - n_hat.r_mid``, the ``d_all`` of the phased routes,
     kept in float64 so ``_grouped`` can reference every row to its flight's
     first row before any float32 cast: absolute ages and ``g.r`` reach ~1e4
-    rad, the intra-flight differences only the flight's own extent.
+    rad, the intra-flight differences only the flight's own extent. Reads the
+    pieces' float64 midpoints/ages (``expand_escape_pieces``), not their REAL
+    casts: positions near 1e7 Angstrom (footprints, bunch offsets) would
+    otherwise carry ~1 Angstrom per-row quantization into ``n_hat.r``.
     Validation: coherent-formation-absorption
     """
     if not grouped:
         return None
     n_rows = int(xp.asarray(segments["L_ang"]).shape[0])
     zeros = np.zeros(n_rows)
-    r64 = xp.asarray(segments["r_mid"], dtype=np.float64)
-    t64 = xp.asarray(segments.get("t_ang", zeros), dtype=np.float64)
+    r64 = xp.asarray(segments.get("r_mid_f64", segments["r_mid"]), dtype=np.float64)
+    t64 = xp.asarray(segments.get("t_ang_f64", segments.get("t_ang", zeros)), dtype=np.float64)
     t64 = t64 + xp.asarray(segments.get("t0_ang", zeros), dtype=np.float64)
     t64 = t64 + 0.5 * t_L_all.astype(np.float64)
     return t64 - r64 @ xp.asarray(n_hat, dtype=np.float64), r64
@@ -721,7 +724,7 @@ def _prepare_spectrum(request):
     escape_ends = None
     if n_rows:
         segments, piece_owner, esc_start, esc_end = expand_escape_pieces(
-            segments, n_hat, layers=layers, groove=groove, xp=xp
+            segments, n_hat, layers=layers, groove=groove, keep_f64=grouped, xp=xp
         )
         if coherent or grouped:
             escape_ends = (esc_start, esc_end)

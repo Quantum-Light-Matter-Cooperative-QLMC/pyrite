@@ -103,3 +103,29 @@ def test_rejects_more_than_two_polarizations_and_skips_empty():
     out = np.ones(5)
     accumulate_grouped_formation(lines, d, g_phase, L_esc, coefs, np.array([0]), grids, out, 1.0)
     np.testing.assert_array_equal(out, np.ones(5))
+
+
+@pytest.mark.parametrize("piece_real", [np.float64, np.float32])
+def test_grouped_spectrum_is_invariant_to_a_large_transverse_translation(piece_real, monkeypatch):
+    """A rigid 1e7 Angstrom footprint offset adds one phase per flight.
+
+    With ``piece_real=float32`` the piece columns are cast as on a float32
+    device; the grouped phase twin must still read float64 midpoints, or each
+    row's ``n_hat.r`` picks up ~1 Angstrom of quantization (#1152).
+    """
+    from pyrite.montecarlo.spectrum import mc_cxr_spectrum, subdivide_flights
+    from pyrite.montecarlo.spectrum.cxr import _formation
+    from tests.montecarlo.spectrum.test_substep_invariance import (
+        CARBON,
+        CXR_GRID_EV,
+        CXR_KWARGS,
+        _flights,
+    )
+
+    rows, _ = subdivide_flights(_flights(Ne=6), composition=CARBON, max_dE_frac=1e-3)
+    ref = mc_cxr_spectrum(rows, CXR_GRID_EV, **CXR_KWARGS)
+    shifted = dict(rows)
+    shifted["r_mid"] = rows["r_mid"] + np.array([1.3e7, -0.9e7, 0.0])
+    monkeypatch.setattr(_formation, "REAL", piece_real)
+    got = mc_cxr_spectrum(shifted, CXR_GRID_EV, **CXR_KWARGS)
+    np.testing.assert_allclose(got, ref, rtol=1e-6, atol=1e-6 * ref.max())
