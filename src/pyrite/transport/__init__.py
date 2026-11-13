@@ -1,6 +1,7 @@
 """Advanced transport and saved-trajectory analysis.
 
-All listed exports are advanced-stable. Case remains a supported lowered record;
+All listed exports are advanced-stable; ``Trajectories`` is the typed
+product ``pyrite.score_spectra`` scores (#1162). Case remains a supported lowered record;
 prefer Scene and pyrite.simulate for full-scene calculations. Segment positions
 and lengths use angstroms, electron energies keV; summary units are in column
 names. Saved-capture reductions perform file I/O only when called.
@@ -16,6 +17,7 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from pyrite.campaign.trajectories import simulate_trajectories as simulate_trajectories
+    from pyrite.campaign.trajectory_product import Trajectories as Trajectories
     from pyrite.montecarlo.case import Case as Case
     from pyrite.montecarlo.trajectory_balance import (
         capture_secondary_energy_balance as capture_secondary_energy_balance,
@@ -27,10 +29,13 @@ if TYPE_CHECKING:
     from pyrite.montecarlo.trajectory_summary import (
         summarize_trajectories as summarize_trajectories,
     )
+    from pyrite.scoring import ScoringRefusedError as ScoringRefusedError
 
 _EXPORTS = {
     "Case": ("pyrite.montecarlo.case", "Case"),
     "simulate_trajectories": ("pyrite.campaign.trajectories", "simulate_trajectories"),
+    "Trajectories": ("pyrite.campaign.trajectory_product", "Trajectories"),
+    "ScoringRefusedError": ("pyrite.scoring", "ScoringRefusedError"),
     "summarize_trajectories": ("pyrite.montecarlo.trajectory_summary", "summarize_trajectories"),
     "iter_primary_summaries": ("pyrite.montecarlo.trajectory_summary", "iter_primary_summaries"),
     "depth_loss_profile": ("pyrite.montecarlo.trajectory_summary", "depth_loss_profile"),
@@ -43,6 +48,8 @@ _EXPORTS = {
 __all__ = [
     "Case",
     "simulate_trajectories",
+    "Trajectories",
+    "ScoringRefusedError",
     "summarize_trajectories",
     "iter_primary_summaries",
     "depth_loss_profile",

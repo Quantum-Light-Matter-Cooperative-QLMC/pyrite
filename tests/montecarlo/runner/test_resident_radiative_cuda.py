@@ -1,6 +1,6 @@
 """Resident CUDA segments for a coupled-radiative MeV scene (#905).
 
-``simulate_transport`` keeps a ``bremslib-soft-hard`` scene's segment rows on
+``scene_trajectories`` (formerly ``pyrite.phases.simulate_transport``) keeps a ``bremslib-soft-hard`` scene's segment rows on
 the device; hard-photon completion downloads only the photon rows. The rows
 and the scored ``Result`` must equal the host-segment path bit for bit. These
 tests need a CUDA device and run through ``pyrite remote``.
@@ -11,8 +11,9 @@ Validation: gpu-transport-core
 import numpy as np
 import pytest
 
-from pyrite import Scene
+from pyrite import Scene, score_spectra
 from pyrite.beams import Beam, PointBunch, PointSpot
+from pyrite.campaign.trajectories import scene_trajectories as simulate_transport
 from pyrite.config import (
     CxrReflections,
     ExecutionConfig,
@@ -23,7 +24,6 @@ from pyrite.config import (
 from pyrite.detectors import Detector, EnergyBins
 from pyrite.geometry import Footprint, Slab
 from pyrite.montecarlo import runner
-from pyrite.phases import score_spectra, simulate_transport
 from pyrite.units import ureg
 
 try:  # pragma: no cover - depends on the machine, not the branch

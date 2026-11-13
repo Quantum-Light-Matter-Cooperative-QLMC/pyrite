@@ -214,6 +214,7 @@ def _transport_case(
     block_electrons=None,
     block_monitor=None,
     block_consumer=None,
+    engine_options=None,
 ):
     """Transport phase of run_case: the line + brem trajectories. Returns the
     segments + geometry + grids the spectrum phase consumes.
@@ -247,6 +248,9 @@ def _transport_case(
     ``segs`` then holds only the additive transport counts. Used by
     :func:`.streamed_scoring.run_case_streamed`.
 
+    engine_options: internal (#1162). Read-only engine keywords that consume no
+    random draws (``collect_diagnostics``), forwarded to every transport call.
+
     Validation: grazing-beam-projection
     """
     from .emission_adapters import select_emission
@@ -278,7 +282,7 @@ def _transport_case(
             )
     timed = _pkg._TIMING or record_timing
     t0 = perf_counter() if timed else 0.0
-    E_grid, E_brem, beam, n_hat, groove = _case_geometry(case)
+    _, _, beam, n_hat, groove = _case_geometry(case)
     tilt_polar_rad = np.deg2rad(case.get("tilt_deg", 0.0))
     tilt_azim_rad = np.deg2rad(case.get("tilt_azim_deg", 0.0))
     # film-on-substrate stack drives multilayer transport too (substrate
@@ -290,23 +294,8 @@ def _transport_case(
     Ne_brem = case["Ne_brem"]
     Ne_transport = max(Ne, Ne_brem)
 
-    electron_ids = np.arange(Ne_transport)
-
-    cxr_mask = electron_ids < Ne
-    brem_mask = electron_ids < Ne_brem
-
-    combined_transport_mask = cxr_mask & brem_mask
-    cxr_only_transport_mask = cxr_mask & ~brem_mask
-    brem_only_transport_mask = brem_mask & ~cxr_mask
-
     E_cut_lines = case.get("E_cut_lines_keV", 5.0)
-    E_cut_brem = case.get("E_cut_brem_keV", 1.0)
-
-    E_cut_by_electrons = np.empty(Ne_transport, dtype=np.float64)
-
-    E_cut_by_electrons[cxr_only_transport_mask] = E_cut_lines
-    E_cut_by_electrons[brem_only_transport_mask] = E_cut_brem
-    E_cut_by_electrons[combined_transport_mask] = min(E_cut_lines, E_cut_brem)
+    E_cut_by_electrons = electron_cutoffs(case)
 
     core = _pkg._case_transport_core(case, transport_core)
     core, zone_transport = _zone_transport(case, core)
@@ -347,6 +336,7 @@ def _transport_case(
             **beam_kw,
             **progress_kw,
             **schedule_kw,
+            **(engine_options or {}),
             **({} if block_kw is None else block_kw),
         }
         if block_monitor is not None:
@@ -426,20 +416,8 @@ def _transport_case(
     # Monte Carlo job is started for either path; see runner/line_grid.py.
     # A block consumer keeps the rows, so live streaming resolves its own grid
     # (runner/streamed_line_grid.py).
-    diagnostic_grid_result = None
-    if block_consumer is None:
-        E_grid, diagnostic_grid_result = resolve_cxr_grid(
-            case, segs_all, n_hat, Ne, E_grid, layers, groove
-        )
-
-    spectrum_inputs: dict[str, Any] = dict(
-        E_grid=E_grid,
-        E_brem=E_brem,
-        n_hat=n_hat,
-        Ne_lines=Ne,
-        Ne_brem=Ne_brem,
-        groove=groove,
-        diagnostic_grid=diagnostic_grid_result,
+    spectrum_inputs = case_spectrum_inputs(
+        case, segs_all, Ne, Ne_brem, resolve_grid=block_consumer is None
     )
     if trajectory_capture is not None:
         from ..._physics_provenance import resolved_physics_view
@@ -473,6 +451,50 @@ def _transport_case(
         tp["_t_worker_return"] = perf_counter()
 
     return tp
+
+
+def electron_cutoffs(case) -> np.ndarray:
+    """Per-history termination energies (keV) of ``case``'s transport population.
+
+    Line-only histories stop at ``E_cut_lines_keV`` (default 5), continuum-only
+    ones at ``E_cut_brem_keV`` (default 1), and shared histories at the lower.
+    """
+    Ne, Ne_brem = case["Ne"], case["Ne_brem"]
+    electron_ids = np.arange(max(Ne, Ne_brem))
+    cxr_mask = electron_ids < Ne
+    brem_mask = electron_ids < Ne_brem
+    E_cut_lines = case.get("E_cut_lines_keV", 5.0)
+    E_cut_brem = case.get("E_cut_brem_keV", 1.0)
+    cutoffs = np.empty(electron_ids.size, dtype=np.float64)
+    cutoffs[cxr_mask & ~brem_mask] = E_cut_lines
+    cutoffs[brem_mask & ~cxr_mask] = E_cut_brem
+    cutoffs[cxr_mask & brem_mask] = min(E_cut_lines, E_cut_brem)
+    return cutoffs
+
+
+def case_spectrum_inputs(case, segs, Ne, Ne_brem, *, resolve_grid=True) -> dict[str, Any]:
+    """Spectrum-phase inputs of ``case`` on its transported ``segs`` (#1162).
+
+    The case determines the grids, observation direction and groove; the
+    automatic line grid, when the case requests one, is resolved from these
+    segments. :func:`_transport_case` and :func:`pyrite.score_spectra` share
+    this derivation, so scoring a kept transport reproduces the live run.
+    """
+    E_grid, E_brem, _beam, n_hat, groove = _case_geometry(case)
+    diagnostic_grid_result = None
+    if resolve_grid:
+        E_grid, diagnostic_grid_result = resolve_cxr_grid(
+            case, segs, n_hat, Ne, E_grid, case.get("abs_layers"), groove
+        )
+    return dict(
+        E_grid=E_grid,
+        E_brem=E_brem,
+        n_hat=n_hat,
+        Ne_lines=Ne,
+        Ne_brem=Ne_brem,
+        groove=groove,
+        diagnostic_grid=diagnostic_grid_result,
+    )
 
 
 def _cxr_for_segments(

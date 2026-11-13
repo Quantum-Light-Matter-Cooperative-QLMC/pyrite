@@ -60,6 +60,10 @@ photon_energies = { target = "pyrite.materials.emission:photon_energies", status
 # no public request-wrapper export or change to serialized Case identity.
 # progress= (#776) is an additive, experimental keyword; it never changes results.
 simulate = { target = "pyrite.api:simulate", status = "stable", domain = "simulation", root_role = "core" }
+# #1162: second step of the stable two-step workflow; scores a Trajectories
+# without transporting and returns the Result simulate would. Absorbs the
+# experimental pyrite.phases.score_spectra (now a deprecated alias).
+score_spectra = { target = "pyrite.scoring:score_spectra", status = "stable", domain = "simulation", root_role = "core" }
 
 # Supported subpackage spellings are opt-in. Unlisted legacy package imports
 # remain importable but are not automatically classified as stable.
@@ -461,10 +465,15 @@ TransverseStateSpec = { classification = "deferred", canonical = "pyrite.quantum
 fetch_tables = { classification = "deferred", canonical = "pyrite.xsgen.install:fetch_tables", reason = "Keep the existing import pending canonical ownership review in #707." }
 photon_energies = { classification = "retained", canonical = "pyrite:photon_energies", reason = "Approved deterministic line-energy convenience exception." }
 simulate = { classification = "retained", canonical = "pyrite:simulate", reason = "Foundational simulation entry point." }
+score_spectra = { classification = "retained", canonical = "pyrite:score_spectra", reason = "Foundational two-step simulation entry point (#1162), the scoring counterpart of simulate." }
 
 [package_exports."pyrite.transport"]
 Case = { target = "pyrite.montecarlo.case:Case", status = "advanced-stable" }
+# #1162: simulate_trajectories returns the typed Trajectories (Mapping-compatible
+# for one deprecation window); its default cutoff/step budget are now production.
 simulate_trajectories = { target = "pyrite.campaign.trajectories:simulate_trajectories", status = "advanced-stable" }
+Trajectories = { target = "pyrite.campaign.trajectory_product:Trajectories", status = "advanced-stable" }
+ScoringRefusedError = { target = "pyrite.scoring:ScoringRefusedError", status = "advanced-stable" }
 summarize_trajectories = { target = "pyrite.montecarlo.trajectory_summary:summarize_trajectories", status = "advanced-stable" }
 iter_primary_summaries = { target = "pyrite.montecarlo.trajectory_summary:iter_primary_summaries", status = "advanced-stable" }
 depth_loss_profile = { target = "pyrite.montecarlo.trajectory_summary:depth_loss_profile", status = "advanced-stable" }
@@ -545,10 +554,10 @@ KernelPhaseResult = { target = "pyrite.optimization.kernel_tuning:KernelPhaseRes
 TuningProgress = { target = "pyrite.optimization.kernel_tuning:TuningProgress", status = "experimental" }
 
 # Scalar transport/spectrum phases run separately (#776); scoring never transports.
+# #1162: simulate_transport, score_spectra and TransportedScene are deprecated
+# aliases of simulate_trajectories, pyrite.score_spectra and Trajectories
+# (API_DEPRECATIONS); they leave the supported inventory and warn until removal.
 [package_exports."pyrite.phases"]
-simulate_transport = { target = "pyrite.phases:simulate_transport", status = "experimental" }
-score_spectra = { target = "pyrite.phases:score_spectra", status = "experimental" }
-TransportedScene = { target = "pyrite.phases:TransportedScene", status = "experimental" }
 SimulationProgress = { target = "pyrite._simulation_progress:SimulationProgress", status = "experimental" }
 
 # Explicit remote I/O; experimental synchronous job-handle lifecycle (#899).

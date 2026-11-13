@@ -46,7 +46,18 @@ ALLOWED_DOMAINS = frozenset(
     }
 )
 CORE_ROOT = frozenset(
-    {"Beam", "Target", "Detector", "Scene", "Sweep", "Physics", "Numerics", "simulate", "Result"}
+    {
+        "Beam",
+        "Target",
+        "Detector",
+        "Scene",
+        "Sweep",
+        "Physics",
+        "Numerics",
+        "simulate",
+        "score_spectra",
+        "Result",
+    }
 )
 ROOT_METADATA = ("DATA_DIR", "__version__")
 

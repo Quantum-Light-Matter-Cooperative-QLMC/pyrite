@@ -79,7 +79,11 @@ def test_typed_seeded_parity(inputs, spot):
         energy_model="midpoint",
         max_dE_frac=0.02,
     )
-    actual = simulate_trajectories(beam, target, physics=physics, numerics=numerics)
+    # An explicit cutoff keeps the flat-engine boundary of #936; the default
+    # production cutoffs are pinned against pyrite.simulate in test_score_spectra.
+    actual = simulate_trajectories(
+        beam, target, physics=physics, numerics=numerics, E_cut_keV=5.0
+    ).segments
     assert actual.keys() == reference.keys()
     for key, expected in reference.items():
         if isinstance(expected, np.ndarray):
@@ -150,7 +154,7 @@ def test_execution_and_output_controls(inputs, monkeypatch):
         max_steps=20,
         collect_diagnostics=True,
         transport_progress=callback,
-    )
+    ).segments
     assert kw["transport_core"] == "per-electron"
     assert kw["per_electron_config"].max_batch == 7
     assert kw["per_electron_config"].scratch_budget_bytes == 8 * 1024**2
@@ -170,7 +174,9 @@ def test_explicit_inelastic_lut_rule_matches_case_driver(inputs, monkeypatch, co
         numerics, execution=ExecutionConfig(transport_core=core), transport_core="auto"
     )
     monkeypatch.setattr(transport_api, "_simulate_trajectories", lambda **kw: kw)
-    kw = simulate_trajectories(beam, target, physics=physics, numerics=numerics)
+    kw = simulate_trajectories(
+        beam, target, physics=physics, numerics=numerics, E_cut_keV=5.0
+    ).segments
     assert kw["transport_core"] == core
     assert kw["inelastic_model"] == "shell-soft-hard"
     assert ("transport_lut_config" in kw) is disabled

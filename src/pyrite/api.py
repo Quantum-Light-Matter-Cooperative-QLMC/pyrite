@@ -5,7 +5,7 @@ import json
 import subprocess
 from collections.abc import Mapping
 from dataclasses import fields, is_dataclass
-from functools import cache
+from functools import cache, partial
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
@@ -570,8 +570,15 @@ def _simulate_planar(
     request: ResolvedSimulation,
     case: Case,
     xsgen_tables: Mapping[str, str],
+    directional: "Callable[[np.ndarray], dict[str, Any]] | None" = None,
 ) -> Result:
+    """Planar-detector ``Result``; ``directional(directions)`` scores a kept transport.
+
+    ``None`` transports here; :func:`pyrite.score_spectra` supplies its own.
+    """
     scene, numerics = request.scene, request.numerics
+    if directional is None:
+        directional = partial(_execute_planar, request, case, xsgen_tables)
     detector = scene.detector
     assert isinstance(detector, PlanarDetector)
     scorer = _detector_scorer(detector)
@@ -582,7 +589,7 @@ def _simulate_planar(
     if scene.acquisition is None:
         sampling = PixelSampling.of(detector, scorer.angular_shape)
         directions = sampling.directions_sample(tilt_deg=tilt_deg, tilt_azim_deg=tilt_azim_deg)
-        output = _execute_planar(request, case, xsgen_tables, directions)
+        output = directional(directions)
         spatial = sampling.spatial(
             output,
             detector=detector,
@@ -614,7 +621,7 @@ def _simulate_planar(
             brem_source=cast(str, scene.physics.brem_source),
             line_quadrature=case.get("line_quadrature"),
         )
-        output = _execute_planar(request, case, xsgen_tables, plan.directions_sample)
+        output = directional(plan.directions_sample)
         stored = plan.assemble(output, provenance={})
         spatial = stored.spatial
         observation_digest = stored.digest

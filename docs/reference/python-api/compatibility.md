@@ -176,6 +176,7 @@ public API.
 | `fetch_tables` | Deferred | `pyrite.xsgen.install.fetch_tables` | Keep the existing import pending canonical ownership review in #707. |
 | `photon_energies` | Retained | `pyrite.photon_energies` | Approved deterministic line-energy convenience exception. |
 | `simulate` | Retained | `pyrite.simulate` | Foundational simulation entry point. |
+| `score_spectra` | Retained | `pyrite.score_spectra` | Foundational two-step simulation entry point (#1162), the scoring counterpart of simulate. |
 
 ## Selected package contracts
 
