@@ -113,3 +113,98 @@ Independent numerical checks, separate from the implementation formula:
 | External-code, hardware-parity, measured-yield evidence | not asserted | No independent absolute orientation-dependent yield is established here. |
 
 Recommend ledger status **rederived** for this explicit model. The analytic and integration tests anchor mathematical subclaims, but this report does not claim an external measurement anchor or human sign-off. Rendered-math verification is performed by the task owner with the repository docs checks.
+
+## Axial extension (#1148)
+
+Fresh-context verifier of the axial fibre extension, reviewed on the uncommitted working tree over `e606ac427`. The derivation below was recorded from the ledger row before reading `axial_flux_weights.py` or the fibre/runner diffs. Scientific verdict: **rederived within the stated localization model**. Human sign-off is separate. This section supersedes the earlier statement above that axial rows remain unweighted.
+
+### Independent derivation
+
+**Yield along a history.** A local incoherent process with native macroscopic rate $n\sigma_c$ and diagonal localization $k_c(\mathbf r)$ has, for a normalized transverse state $\psi_h(\mathbf r;z)$ of history $h$, conditional rate $n\sigma_c F_h(z)$ with
+
+$$
+F_h(z)=\frac{\langle\lvert\psi_h\rvert^2 k_c\rangle_{\rm cell}}
+{\langle\lvert\psi_h\rvert^2\rangle_{\rm cell}\langle k_c\rangle_{\rm cell}}.
+$$
+
+Along a straight row of direction cosine $v_z$, $dl=dz/v_z$, so the expected yield is $n\sigma_c\int_0^{L}F_h\,dl=n\sigma_c L\,\bar F_h$ with $L=z_h/v_z$ and $\bar F_h=z_h^{-1}\int_0^{z_h}F_h\,dz$. The weight is therefore a **depth** average multiplying the **path** length. Let $w_h$ be the history weight and $a_h(z)=1(z<z_h)$ its retained indicator. The ensemble factor
+
+$$
+F(z)=\frac{\sum_h w_h a_h(z)F_h(z)}{\sum_h w_h a_h(z)}
+$$
+
+satisfies $\sum_h w_h a_h(z)F(z)=\sum_h w_h a_h(z)F_h(z)$ pointwise, hence
+
+$$
+\sum_h w_h\int_0^{z_h}F(z)\,dz=\sum_h w_h\int_0^{z_h}F_h(z)\,dz
+$$
+
+exactly in continuous depth. Two qualifications apply: the identity is in depth, while the path carries $1/v_{z,h}$; and on the recorded depth grid both sides are piecewise-linear quadratures, so they agree only to that quadrature. The first is harmless in expectation because the fibre states use one carrier independent of the beam direction $v_{z,h}$. For normalized states, $\sum_h w_h a_h F_h$ equals $\operatorname{Re}\sum_{\mathbf Q}\rho_{\mathbf Q}K^*_{c,\mathbf Q}$ with $\rho_{\mathbf Q}=\sum_h w_h a_h\rho_{h,\mathbf Q}$ and $\rho_0=\sum_h w_h a_h$, which is the ledger form.
+
+**Harmonic overlap.** With $\psi(\mathbf r)=e^{i\boldsymbol\kappa\cdot\mathbf r}\sum_{\mathbf G}\psi_{\mathbf G}e^{i\mathbf G\cdot\mathbf r}$,
+
+$$
+\lvert\psi\rvert^2=\sum_{\mathbf Q}\rho_{\mathbf Q}e^{i\mathbf Q\cdot\mathbf r},
+\qquad
+\rho_{\mathbf Q}=\sum_{\mathbf G}\psi^*_{\mathbf G}\psi_{\mathbf G+\mathbf Q}.
+$$
+
+The carrier cancels. For a real kernel $k_c=\sum_{\mathbf Q}k_{c,\mathbf Q}e^{i\mathbf Q\cdot\mathbf r}$, $k_{c,-\mathbf Q}=k^*_{c,\mathbf Q}$, and the cell mean is
+
+$$
+\langle\lvert\psi\rvert^2k_c\rangle_{\rm cell}=\sum_{\mathbf Q}\rho_{\mathbf Q}k_{c,-\mathbf Q}
+=\sum_{\mathbf Q}\rho_{\mathbf Q}k^*_{c,\mathbf Q},
+\qquad
+F=\frac{\operatorname{Re}\sum_{\mathbf Q}\rho_{\mathbf Q}K^*_{c,\mathbf Q}}{\rho_0},
+\quad K_{c,\mathbf Q}=\frac{k_{c,\mathbf Q}}{k_{c,0}}.
+$$
+
+The full sum is already real because $\rho_{-\mathbf Q}=\rho^*_{\mathbf Q}$; taking the real part only removes rounding. The Hamiltonian convention $\langle\mathbf G_i\rvert V\lvert\mathbf G_j\rangle=V_{\mathbf G_i-\mathbf G_j}$ with $V(\mathbf r)=\sum V_{\mathbf G}e^{i\mathbf G\cdot\mathbf r}$ is the same positive-exponential convention.
+
+**String density.** Strings at $\mathbf R_s$ with linear density $\lambda_{s,\rm el}$ in a cell of area $A$, each smeared by an isotropic in-plane Gaussian with variance $a^2_{\rm el}$ per axis, give
+
+$$
+n_{\rm el}(\mathbf Q)=\frac1A\int_{\rm cell}n_{\rm el}(\mathbf r)e^{-i\mathbf Q\cdot\mathbf r}\,d^2r
+=\sum_s\frac{\lambda_{s,\rm el}}{A}e^{-i\mathbf Q\cdot\mathbf R_s}e^{-a^2_{\rm el}Q^2/2},
+$$
+
+in Å$^{-3}$. The planar factor $e^{-Bs^2}$ with $s=G/4\pi$ and $B=8\pi^2\langle u^2\rangle$ equals $e^{-\langle u^2\rangle G^2/2}$, so $a^2_{\rm el}$ is the same one-axis mean-square displacement; the Debye–Waller factor belongs in $n_{\rm el}$ once. The shell and bremsstrahlung transforms are isotropic, so they enter at $\lvert\mathbf Q\rvert$, with the transverse-ionization and $f_0(0)=Z$ terms at $\mathbf Q=0$ only.
+
+**Truncation and sampling.** State orders $\lvert G_i\rvert\le M_i$ give density harmonics $\lvert Q_i\rvert\le 2M_i$ only. Truncating the kernel at $2M_i$ is therefore exact for the in-window state. On a DFT grid of $N_i$ points per axis, $\lvert\psi\rvert^2$ has $4M_i+1$ distinct frequencies, so $N_i\ge 4M_i+1$ avoids aliasing; $4M_i+2$ suffices.
+
+**Limits.** A single order gives $\rho_{\mathbf Q}=\delta_{\mathbf Q0}\lvert\psi_{\mathbf G}\rvert^2$ and $F=1$. A zero state has $\rho_0=0$ and is assigned $F=1$ by convention. A uniform density gives $F=1$ for every kernel.
+
+### Implementation comparison
+
+| Item | Code | Result |
+| --- | --- | --- |
+| Overlap and conjugation | `AxialFluxKernels.factors`: places window orders at $-M_i..M_i$ modulo $N_i=4M_i+2$, `ifft2`, squares, `fft2`, extracts $-2M_i..2M_i$, $\operatorname{Re}\sum\rho_{\mathbf Q}K^*_{\mathbf Q}/\rho_0$ | matches; `fft2` coefficient at index $q$ is that of $e^{+i\mathbf Q\cdot\mathbf r}$ |
+| Order layout | `reshape(2Mx+1, 2My+1)` versus `axial_states` and `_Engine` orders from `meshgrid(..., indexing="ij")`; `chi.reshape(self.shape)` in the engine | consistent C order, $x$ outer |
+| Fibre state | `fiber.vectors @ (u / norm)`; `vectors` are retained `eigh` columns, so the window state is unit norm | matches; `factors` also divides by its own $\rho_0$ |
+| Kernel unflattening | stable `argsort` of $m^2+n^2$ puts the unique $\mathbf Q=0$ first; `flat[order] = kernels[key]` is the inverse permutation | matches; `kernels[key][0]` is $\mathbf Q=0$ |
+| String density | `_string_densities`: $\lambda/A\,e^{-i\mathbf Q\cdot\mathbf R}e^{-a^2Q^2/2}$, $a^2=\tfrac12{\rm tr}$ of the in-plane block | matches; no second Debye–Waller factor in the shared helpers when `profile=None` |
+| Ensemble | `_Companions.segment` adds $F_h$ at recorded depths where the history is retained; `_primaries` scales by `event.weight`; `fiber_on_axis_source` divides by $\sum w_h a_h$ | matches; the entry weight is the common projection of one entry state |
+| Row weight | `_axial_zone_rows` returns terminal `depth`; rows have `L = depth / v0[:, 2]`; `_attach_axial_flux` averages $F$ over `[0, depth]` | depth average times path length, as derived |
+| Row/history pairing | record depths come from `sample_physical_handoff(events=source.events)`, the same terminal events that set $a_h$ | consistent |
+
+### Independent numerical checks
+
+Scratch scripts `scratch/axial_flux_check.py` and `scratch/axial_kernel_check.py` gave the following results:
+
+- Random 35-order state, $M=(2,3)$, $g=(1.3,0.9)$ Å$^{-1}$, nonzero carrier, random Hermitian kernel: direct $64\times64$ real-space cell quadrature $1.0119359750869323$ versus `factors` $1.0119359750869321$. Unequal $M_x,M_y$ would expose a transposed layout. A single order and a zero state gave exactly 1.
+- Si $\langle001\rangle$, 300 K, 3.5 MeV, $M=(2,3)$: per-$\mathbf Q$ kernels from separately evaluated two-point calls ($\mathbf Q=0$ prepended, independent string-density sum) matched the unflattened array to $1.0\times10^{-15}$. Hermitian symmetry held to $2.8\times10^{-17}$. Summed string densities matched `nuclear_density` to $1.2\times10^{-14}$ (scale $0.050$ Å$^{-3}$).
+- `test_axial_flux_weights.py` passed (4 tests). `test_channeling_axial_fiber_regression.py -k flux` passed (2 tests, including the dense-GKSL oracle). `test_axial_fibre_runner.py -k flux_weights` with `--slow` passed. Its printed zone means were brem 3.2994, K 2.0418, L1 1.1545, L2 1.1063 and L3 1.1063, matching the ledger's rounded values.
+
+### Filter verdicts
+
+| Filter | Result | Scope |
+| --- | --- | --- |
+| Dimensions | pass | $F$, $W$ dimensionless; $n_{\rm el}$ in Å$^{-3}$; normalization by the $\mathbf Q=0$ harmonic removes strengths. |
+| Limits | pass | Single order, zero state, uniform density, and exact no-jump expectation. |
+| Signs/conventions | pass | $e^{+i\mathbf G\cdot\mathbf r}$ synthesis, $e^{-i\mathbf Q\cdot\mathbf R}$ string phase, $K^*$ conjugation; brute-force check. |
+| Depth vs path | pass | Depth-averaged $W$ times $L=z/v_z$. |
+| Truncation | pass | Kernel at $2M_i$ exact for in-window states; DFT $4M_i+2$ non-aliasing. Window truncation of the state itself is inherited from `cr-axial-persisted-channel`. |
+| "Summed weighted path identical" | concern, wording | Exact in continuous depth for the depth integral. On the recorded grid it holds only to piecewise-linear quadrature. With per-history $1/v_{z,h}$ it holds in expectation, not sample by sample. |
+| Notation | minor | The ledger quotes "L2,3"; the code keys `14:L2` and `14:L3` separately, which have equal values here. |
+
+Recommend ledger status **rederived** for the axial extension within the stated model. Suggested wording: replace "(the summed weighted path is identical)" with "(the summed depth-weighted path equals the per-history sum exactly in continuous depth; on the recorded depth grid to the piecewise-linear quadrature, and with per-history direction cosines in expectation)".

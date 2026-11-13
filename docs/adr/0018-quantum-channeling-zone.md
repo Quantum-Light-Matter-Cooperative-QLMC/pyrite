@@ -132,7 +132,8 @@ transverse term uniform. The brem kernel uses normalized screened-Born
 transfer shapes with nuclear/electron strengths $Z^2:Z$; it neglects
 photon-energy-dependent localization and distinct screening logarithms.
 These are model assumptions, without a measured orientation-dependent error
-bound. Axial zone rows remain unweighted. See
+bound. Axial fibre zone rows (axial v4) carry the same weights over the
+2D cell, from the retained density of the fibre primaries. See
 [`cr-zone-incoherent-flux-weight`](../validation/ledger-channeling.md#cr-zone-incoherent-flux-weight).
 
 Straight zone rows can produce lines narrower than the energy-grid spacing.

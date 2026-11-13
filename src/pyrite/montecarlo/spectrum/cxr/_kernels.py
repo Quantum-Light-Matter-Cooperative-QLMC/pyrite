@@ -60,11 +60,9 @@ _SEG_ARRAYS = (
     "track_id",
     "parent_id",
     "generation",
-    # Float64 position/age twins of float32 staging (``_position_twins``).
-    "r_mid_f64",
+    "r_mid_f64",  # float64 position/age twins of float32 staging (``_position_twins``)
     "t_ang_f64",
-    # Planar channeling zone only (#1148): (n_rows, n_keys) local-emission weights.
-    "channeling_flux",
+    "channeling_flux",  # channeling zone rows (#1148): (n_rows, n_keys) local-emission weights
 )
 
 

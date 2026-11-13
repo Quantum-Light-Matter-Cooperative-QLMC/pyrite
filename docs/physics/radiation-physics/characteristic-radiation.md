@@ -145,13 +145,14 @@ This window convention and the EADL cascade are encoded in the characteristic-mo
 
 Implementation owner: `pyrite.montecarlo.spectrum.characteristic.mc_characteristic_spectrum`. The source-to-code mapping, dimensional analysis, assumptions, and regression anchors are recorded in [Characteristic-radiation validation](../../validation/radiation-physics/characteristic-radiation.md) under ledger row `characteristic-radiation`.
 
-## Planar channeling zone weights
+## Channeling zone weights
 
-Planar channeling zone rows weight vacancy creation separately for each
+Planar and axial channeling zone rows weight vacancy creation separately for each
 resolved shell, before the relaxation cascade. The normalized localization
 kernel combines shell GOS transfer, a Slater form factor and thermal site
 density; distant transverse ionization remains uniform. Shells unresolved by
-the catalog, native continuation rows and axial rows retain unit weight.
+the catalog and native continuation rows retain unit weight. Axial rows use
+the 2D cell and the retained density of the fibre primaries.
 
 The weights are density expectations, not per-trajectory squared amplitudes.
 They reproduce the amorphous rate for uniform transverse density. They do

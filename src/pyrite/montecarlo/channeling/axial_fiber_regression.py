@@ -85,14 +85,20 @@ class _Companions:
     frame where the primary's unnormalized state is ``right @ (e^{-i z lam /
     hbar v} a)``; the physical companion is that vector divided by the same
     norm as the primary. ``values[i, j, a, b]`` accumulates
-    ``<w_jb(z_i)|J_a|u(z_i)>`` for ``i >= j``.
+    ``<w_jb(z_i)|J_a|u(z_i)>`` for ``i >= j``. With ``flux``, ``flux_sum[i]``
+    accumulates the local-emission factors ``F_c`` of the normalized state
+    at each recorded depth (#1148).
 
     Validation: cr-axial-fiber-regression, cr-axial-fiber-angular
+    Validation: cr-zone-incoherent-flux-weight
     """
 
-    def __init__(self, engine, depths, gamma, boundary_eV):
+    def __init__(self, engine, depths, gamma, boundary_eV, flux=None):
         self.engine, self.depths, self.gamma = engine, depths, gamma
         self.boundary = boundary_eV
+        # Optional local-emission factors F_c of each recorded state (#1148).
+        self.flux = flux
+        self.flux_sum = None if flux is None else np.zeros((depths.size, len(flux.keys)))
         nx, ny = (np.arange(-m, m + 1) for m in engine.m)
         self.orders = np.stack(np.meshgrid(nx, ny, indexing="ij"), -1).reshape(-1, 2)
         size = depths.size
@@ -138,6 +144,8 @@ class _Companions:
             u = right @ (np.exp(rate * (z - start)) * a)
             norm = float(np.linalg.norm(u))
             self._record(i, u / norm, norm, right, inverse, currents)
+            if self.flux is not None and self.flux_sum is not None:
+                self.flux_sum[i] += self.flux.factors(fiber.vectors @ (u / norm))
         if not final and self.y is not None:
             self.y = self.y * np.exp(rate * (stop - here))[:, None]
 
@@ -162,6 +170,9 @@ class FiberOnAxisSource:
     elementwise standard error of its real and imaginary parts (``i >= j``).
     ``events`` are the primary terminal events, identical to
     :func:`.unravel_fiber_outgoing` for the same inputs.
+    ``flux_keys``/``flux_factors`` ``(n_z, n_keys)`` are the ensemble
+    local-emission factors ``F_c(z)`` of the retained density when requested
+    (#1148, :mod:`.axial_flux_weights`); ``F = 1`` where nothing survives.
     """
 
     photon_energy_eV: np.ndarray
@@ -170,6 +181,8 @@ class FiberOnAxisSource:
     correlation: RegressionCorrelation
     correlation_sem: tuple[np.ndarray, np.ndarray]
     events: list[FiberEvent]
+    flux_keys: tuple[str, ...] = ()
+    flux_factors: np.ndarray | None = None
 
 
 def signed_on_axis_spectrum(
@@ -259,8 +272,14 @@ def _primaries(
     window,
     search_step_ang,
     depth_tolerance_ang,
+    flux=None,
+    flux_total=None,
 ):
     """Yield ``(event, W * values, W * alive)`` for each primary history.
+
+    With ``flux`` (:class:`.axial_flux_weights.AxialFluxKernels`) each history
+    also adds ``W * sum_alive F_c`` per depth into ``flux_total`` in place
+    (#1148); no draw changes.
 
     Validation: cr-axial-fiber-regression, cr-axial-fiber-angular
     """
@@ -276,7 +295,7 @@ def _primaries(
         raise ValueError("window must be a unit-norm array on the outgoing box shape")
     kappa = (float(carrier_inv_ang[0]), float(carrier_inv_ang[1]))
     for incident in incident_ids:
-        carry = _Companions(engine, z, gamma, boundary_eV)
+        carry = _Companions(engine, z, gamma, boundary_eV, flux)
         event = _trajectory(
             engine,
             entry,
@@ -289,6 +308,8 @@ def _primaries(
             depth_tolerance_ang,
             carry=carry,
         )
+        if flux is not None:
+            flux_total += event.weight * carry.flux_sum
         yield event, event.weight * carry.values, event.weight * carry.alive
 
 
@@ -310,6 +331,7 @@ def fiber_on_axis_source(
     search_step_ang: float = 100.0,
     depth_tolerance_ang: float = 1e-6,
     max_working_bytes: int = 256 * 1024**2,
+    flux_kernels=None,
 ) -> FiberOnAxisSource:
     r"""Estimate the on-axis two-time source of the fibred absorbing model.
 
@@ -329,14 +351,18 @@ def fiber_on_axis_source(
     ``depths_ang`` must end at the slab path; ``window`` is the outgoing Weyl
     window (default a unit delta), which affects no jump draw. Emission after
     an electron leaves the retained subspace is excluded by construction.
+    ``flux_kernels`` (:class:`.axial_flux_weights.AxialFluxKernels` on the
+    channels' order window) adds the ensemble factors ``flux_factors``;
+    draws, events and spectra are unchanged.
 
-    Validation: cr-axial-fiber-regression
+    Validation: cr-axial-fiber-regression, cr-zone-incoherent-flux-weight
     """
     z, energies = _admit(
         depths_ang, photon_energy_eV, kinetic_energy_eV, hbar_v_eV_ang, max_working_bytes
     )
     amplitude = _amplitude(absorption_inv_ang, exit_path_ang, energies, z)
     gamma, _ = longitudinal_kinematics(kinetic_energy_eV)
+    flux_total = None if flux_kernels is None else np.zeros((z.size, len(flux_kernels.keys)))
     primaries = _primaries(
         channels,
         entry_orders,
@@ -350,6 +376,8 @@ def fiber_on_axis_source(
         window,
         search_step_ang,
         depth_tolerance_ang,
+        flux_kernels,
+        flux_total,
     )
     shape = (z.size, z.size, 2, 2)
     totals = [np.zeros(shape, dtype=complex), np.zeros(shape), np.zeros(shape)]
@@ -376,6 +404,13 @@ def fiber_on_axis_source(
     upper = np.triu_indices(z.size, 1)
     full[upper] = np.swapaxes(mean, 0, 1)[upper].conj().swapaxes(-1, -2)
     correlation = RegressionCorrelation(z.copy(), full, alive / count, 0)
+    flux_keys: tuple[str, ...] = ()
+    flux_factors = None
+    if flux_kernels is not None:
+        with np.errstate(invalid="ignore", divide="ignore"):
+            factors = flux_total / alive[:, None]
+        flux_keys = tuple(flux_kernels.keys)
+        flux_factors = np.where(alive[:, None] > 0.0, factors, 1.0)
     return FiberOnAxisSource(
         energies.copy(),
         spectra.mean(axis=0),
@@ -383,6 +418,8 @@ def fiber_on_axis_source(
         correlation,
         sems,
         events,
+        flux_keys,
+        flux_factors,
     )
 
 

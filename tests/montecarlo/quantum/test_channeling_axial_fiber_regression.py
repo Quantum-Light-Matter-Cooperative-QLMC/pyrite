@@ -106,6 +106,9 @@ def _currents(kappa):
     )
 
 
+_DENSITIES = {}  # retained densities of the last _dense call per arguments (#1148 tests)
+
+
 def _dense(lattice_scale, kick_scale, box=1):
     """Independent block GKSL model on P(kappa_0) + P(kappa_1); returns G[i, j, a, b]."""
     channels = _channels(lattice_scale, kick_scale, box)
@@ -157,6 +160,7 @@ def _dense(lattice_scale, kick_scale, box=1):
     for step in steps:
         rho = step @ rho
         densities.append(rho.reshape((size, size), order="F"))
+    _DENSITIES[(lattice_scale, kick_scale, box)] = densities
     for j, density in enumerate(densities):
         x = [(density @ currents[b].conj().T).ravel(order="F") for b in range(2)]
         for i in range(j, count):
@@ -384,3 +388,64 @@ def test_refusals():
         _source(channels, entry, 2, max_working_bytes=1000)
     with pytest.raises(ValueError, match="two primaries"):
         _source(channels, entry, 1)
+
+
+def _flux_kernel():
+    """A real (Hermitian-consistent) random kernel on the M = 1 window (#1148)."""
+    from pyrite.montecarlo.channeling.axial_flux_weights import AxialFluxKernels
+
+    rng = np.random.default_rng(3)
+    k = 0.2 * (rng.normal(size=(5, 5)) + 1j * rng.normal(size=(5, 5)))
+    k = 0.5 * (k + k[::-1, ::-1].conj())
+    k[2, 2] = 1.0
+    return AxialFluxKernels(("a",), k[None], (1, 1))
+
+
+def _flux_operator(kernel):
+    """``A[G, G'] = conj(K[G' - G])`` on the window orders: F = psi^dagger A psi."""
+    h = kernel.harmonics[0]
+    a = np.zeros((len(ORDERS), len(ORDERS)), dtype=complex)
+    for i, p in enumerate(ORDERS):
+        for j, r in enumerate(ORDERS):
+            q = r - p
+            a[i, j] = np.conj(h[q[0] + 2, q[1] + 2])
+    return a
+
+
+def _oracle_flux(lattice_scale, kick_scale, operator):
+    """Ensemble F(z) of the dense GKSL densities (both carrier blocks)."""
+    _dense(lattice_scale, kick_scale)
+    from_dense = _DENSITIES[(lattice_scale, kick_scale, 1)]
+    blocks = [_currents(k)[2] for k in CARRIERS]
+    out = []
+    for density in from_dense:
+        num = sum(
+            np.trace(density[c * KEEP : (c + 1) * KEEP, c * KEEP : (c + 1) * KEEP]
+                     @ (v.conj().T @ operator @ v)).real
+            for c, v in enumerate(blocks)
+        )  # fmt: skip
+        out.append(num / np.trace(density).real)
+    return np.array(out)
+
+
+def test_flux_factors_without_jumps_are_the_exact_state_expectation():
+    kernel = _flux_kernel()
+    channels, entry, *_ = _dense(0.0, 0.0)
+    plain = _source(channels, entry, 3)
+    source = _source(channels, entry, 3, flux_kernels=kernel)
+    assert source.events == plain.events
+    np.testing.assert_array_equal(source.spectrum, plain.spectrum)
+    expected = _oracle_flux(0.0, 0.0, _flux_operator(kernel))
+    np.testing.assert_allclose(source.flux_factors[:, 0], expected, rtol=1e-10)
+    assert np.ptp(expected) > 1e-6  # the weak toy potential still moves the state
+
+
+def test_flux_factors_with_jumps_match_the_dense_oracle():
+    kernel = _flux_kernel()
+    channels, entry, *_ = _dense(0.004, 0.006)
+    plain = _cached_source(0.004, 0.006)
+    source = _source(channels, entry, 1500, flux_kernels=kernel)
+    assert source.events == plain.events
+    np.testing.assert_array_equal(source.spectrum, plain.spectrum)
+    expected = _oracle_flux(0.004, 0.006, _flux_operator(kernel))
+    np.testing.assert_allclose(source.flux_factors[:, 0], expected, atol=0.02)

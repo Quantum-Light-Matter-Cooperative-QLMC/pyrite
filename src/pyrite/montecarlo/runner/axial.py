@@ -20,8 +20,9 @@ its on-axis photon estimate and its terminal fate; nothing is drawn twice.
   outside the zone axis on these rows (:func:`axial_zone_line_parts`);
   transverse-potential reflections belong to the fibre source. The in-cut
   free→free block it omits is carried as the entry's
-  declared one-sided bound. Characteristic and incoherent bremsstrahlung
-  scoring on zone rows is unchanged.
+  declared one-sided bound. Incoherent bremsstrahlung and characteristic
+  emission on zone rows carry the fibre ensemble's local-emission weight
+  ``channeling_flux`` (:mod:`..channeling.axial_flux_weights`, #1148).
 * Bremsstrahlung-only electrons (IDs from ``Ne`` on) run native amorphous
   transport from the entrance face, as in planar channeling.
 
@@ -72,6 +73,7 @@ def fibre_source_and_fates(case, admitted, r0, clock, t0, keys, stopping_keV_per
     from ..channeling.axial_fiber_case import MATCHING_WINDOW_EV, axial_fiber_inputs
     from ..channeling.axial_fiber_regression import fiber_on_axis_source
     from ..channeling.axial_fiber_unraveling import _Engine
+    from ..channeling.axial_flux_weights import cached_axial_flux_kernels
     from ..channeling.axial_outgoing_launch import (
         AxialIncident,
         AxialMatchingDeclaration,
@@ -88,8 +90,16 @@ def fibre_source_and_fates(case, admitted, r0, clock, t0, keys, stopping_keV_per
         inputs.target_eV, inputs.boundary_eV, inputs.potential_min_eV, window_eV=MATCHING_WINDOW_EV
     )
     channels = matching_checked_channels(inputs.channels, matching)
-    window = np.zeros(_Engine(channels, inputs.hbar_v_eV_ang).box_shape, dtype=complex)
+    engine = _Engine(channels, inputs.hbar_v_eV_ang)
+    window = np.zeros(engine.box_shape, dtype=complex)
     window[0, 0] = 1.0
+    flux_kernels = cached_axial_flux_kernels(
+        admitted.crystal,
+        tuple(admitted.axis_uvw),
+        float(admitted.temperature_K),
+        float(admitted.kinetic_energy_eV),
+        tuple(int(v) for v in engine.m),
+    )
     depths = inputs.depths_ang
     seed = int(case["seed"])
     count = int(r0.shape[0])
@@ -114,6 +124,7 @@ def fibre_source_and_fates(case, admitted, r0, clock, t0, keys, stopping_keV_per
         photon_energy_eV=energies,
         incident_ids=range(count),
         boundary_eV=inputs.boundary_eV,
+        flux_kernels=flux_kernels,
         **attenuation,
         **shared,
     )
@@ -161,7 +172,25 @@ def _axial_zone_rows(template, records, zone, r0, v0, E_keV, clock, t0):
     rows["E_end_keV"] = np.asarray([e for e, _ in state], dtype=float).reshape(-1) / 1e3
     rows["E_repr_keV"] = 0.5 * (rows["E_start_keV"] + rows["E_end_keV"])
     rows["t_end_ang"] = clock[ids] + np.asarray([t for _, t in state], dtype=float).reshape(-1)
-    return rows, ids
+    return rows, ids, depth
+
+
+def _attach_axial_flux(source, native_rows, zone_rows, zone_depth_ang, depths_ang):
+    """Add ``channeling_flux`` to native (1) and zone rows; return the zone means (#1148).
+
+    Zone rows carry the depth average of the fibre ensemble's ``F_c(z)`` over
+    ``[0, depth]`` of their own history.
+
+    Validation: cr-zone-incoherent-flux-weight
+    """
+    from ..channeling.flux_weights import row_flux_weights
+
+    keys = source.flux_keys
+    native_rows["channeling_flux"] = np.ones((native_rows["L_ang"].size, len(keys)))
+    zone_rows["channeling_flux"] = row_flux_weights(depths_ang, source.flux_factors, zone_depth_ang)
+    weights = zone_rows["channeling_flux"]
+    means = weights.mean(axis=0) if zone_depth_ang.size else np.ones(len(keys))
+    return dict(zip(keys, (float(v) for v in means), strict=True))
 
 
 def native_line_rows(case, segs):
@@ -331,10 +360,14 @@ def transport_axial_case(
     native_rows["electron_id"] = run_ids[local].astype(np.int64)
     zoned = np.zeros(Ne, dtype=bool)
     template = {"rows": native_rows, "_S": S}
-    zone_rows, z_ids = _axial_zone_rows(template, records, zone, r0, v0, E_keV, clock, t0)
+    zone_rows, z_ids, z_depth = _axial_zone_rows(template, records, zone, r0, v0, E_keV, clock, t0)
     zoned[z_ids] = True
     native_rows["flight_id"] = native_rows["flight_id"] + zoned[run_ids][local]
+    flux_mean = _attach_axial_flux(
+        source, native_rows, zone_rows, z_depth, source.correlation.depths_ang
+    )
     out = join_zone_rows(native, native_rows, zone_rows)
+    out["channeling_flux_keys"] = source.flux_keys
     out.update(initial_r_ang=r0, initial_v_hat=v0, initial_E_keV=E_keV, initial_t0_ang=t0, Ne=Ne)
     if record is not None:
         out["beam_entry"] = record
@@ -351,6 +384,7 @@ def transport_axial_case(
         "fate_fractions": weights,
         "entrance_weight": float(source.events[0].weight),
         "stopping_keV_per_ang": S,
+        "zone_flux_weight_mean": flux_mean,
         **_budget_provenance(admitted),
         "source": {
             "E_eV": source.photon_energy_eV,

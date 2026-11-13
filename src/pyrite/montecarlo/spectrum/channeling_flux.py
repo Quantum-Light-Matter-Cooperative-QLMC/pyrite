@@ -1,6 +1,6 @@
 """Per-row channeling flux weights read by the incoherent scorers (#1148).
 
-Planar channeling transport attaches ``channeling_flux`` ``(n_rows, n_keys)``
+Planar and axial channeling transport attach ``channeling_flux`` ``(n_rows, n_keys)``
 and ``channeling_flux_keys`` to its rows (:mod:`..channeling.flux_weights`):
 the relative yield of a local incoherent process on each row, ``1`` on native
 rows. Rows without the key (every non-channeling case) are unweighted, so their
