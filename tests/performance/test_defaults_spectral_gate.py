@@ -144,3 +144,29 @@ def test_unrefined_continuum_twin_matches_the_production_step():
     np.testing.assert_allclose(np.diff(np.log(twin)), np.diff(np.log(twin))[0], rtol=1e-9)
     assert abs(np.diff(np.log(twin))[0] - 0.005) < 1e-5
     assert refined.size > twin.size  # edge and tip anchors only add nodes
+
+
+def test_families_case_varies_only_the_reflection_set():
+    gate = _gate()
+    frozen = {"crystal": "silicon", "hkl_list": [(1, 1, 1)], "Ne": 8, "seed": 1, "E0_keV": 300.0}
+    sweep = gate["scene_sweep"]("silicon", 300.0, 1e5)
+    small, (start, stop1), _ = gate["families_case"](frozen, sweep, 1)
+    large, (_, stop8), _ = gate["families_case"](frozen, sweep, 8)
+    assert {k: v for k, v in small.items() if k != "hkl_list"} == {
+        k: v for k, v in frozen.items() if k != "hkl_list"
+    }
+    assert len(small["hkl_list"]) < len(large["hkl_list"])
+    assert set(map(tuple, small["hkl_list"])) <= set(map(tuple, large["hkl_list"]))
+    assert start < stop1 <= stop8
+    hopg, (_, hopg_stop), _ = gate["families_case"](
+        {"crystal": "hopg", "E0_keV": 30.0}, gate["scene_sweep"]("hopg", 30.0, 2e4), 3
+    )
+    assert hopg["hkl_list"] == [(0, 0, 2), (0, 0, -2), (0, 0, 4), (0, 0, -4), (0, 0, 6), (0, 0, -6)]
+    assert hopg_stop > 3700.0  # (006) resolves past the catalog (004) stop
+    layered = gate["layered_case"](8, 642501)
+    one, (_, film_stop), (_, need) = gate["families_case"](
+        layered, gate["scene_sweep"]("mos2-on-si", 30.0, None), 1
+    )
+    assert [len(r["hkl_list"]) for r in one["layer_radiators"]] == [2, 8]
+    assert one["abs_layers"] == layered["abs_layers"]
+    assert need > film_stop  # Si substrate lines pass the film-only production stop

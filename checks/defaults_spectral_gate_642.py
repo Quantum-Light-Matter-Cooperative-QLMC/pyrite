@@ -287,6 +287,109 @@ def score_policies(case, sweep, ladder, names, reference_spacing, sync):
     )
 
 
+def families_case(case, sweep, n):
+    """``case`` with the reflection set of ladder point ``n``; transport unchanged.
+
+    Production crystals rebuild through ``build_cases`` at ``n_families=n`` (every
+    layer radiator follows). HOPG's catalog pins (002)/(004) and texture rules
+    out in-plane families, so its axis is the explicit (00l) harmonic order
+    ``l = 2, 4, ..., 2n`` -- a study ladder, not a production selector.
+
+    Returns the case, the production line-axis support (film crystal only) and
+    the support every radiator's own reflections need under the same resolver.
+    """
+    from dataclasses import replace
+
+    from pyrite.campaign.geometry import crystal_params
+    from pyrite.campaign.sweep import _automatic_cxr_grid_policy, build_cases
+
+    built = build_cases(replace(sweep, n_families=int(n)), n_electrons=1, n_electrons_brem=1)[0]
+    out = dict(case, hkl_list=built["hkl_list"])
+    if case["crystal"] == "hopg":
+        out["hkl_list"] = [(0, 0, s * 2 * k) for k in range(1, n + 1) for s in (1, -1)]
+    radiators = [dict(crystal=case["crystal"], hkl_list=out["hkl_list"])]
+    if case.get("layer_radiators") is not None:
+        out["layer_radiators"] = built["layer_radiators"]
+        radiators = [r for r in out["layer_radiators"] if r is not None]
+    supports = [
+        _automatic_cxr_grid_policy(
+            sweep,
+            dict(crystal_params(r["crystal"], int(n)), hkl_list=r["hkl_list"]),
+            float(case["E0_keV"]),
+        )
+        for r in radiators
+    ]
+    bandwidth = built["line_grid_policy"]["bandwidth"]
+    production = (float(bandwidth["start_eV"]), float(bandwidth["stop_eV"]))
+    if case["crystal"] == "hopg":
+        production = (float(supports[0].start_eV), float(supports[0].stop_eV))
+    needed = (min(p.start_eV for p in supports), max(p.stop_eV for p in supports))
+    return out, production, tuple(float(x) for x in needed)
+
+
+def score_families(case, sweep, ladder, ns, reference_spacing, wide_spacing, sync):
+    """Score each reflection set on the saved transport against the largest.
+
+    Band (0.5--10 keV, node ``reference_spacing``): yield, centroid, peak, FWHM,
+    100 eV mass shape. Wide (node ``wide_spacing`` over every radiator's own
+    resolved support at the largest set): full-support yield, so lines leaving
+    the band -- or a film-only production axis -- are not missed. The yield
+    the production support omits is recorded per set. Each observable keeps
+    its own margin.
+    """
+    from pyrite.energy_grid.convergence_case import CaseLadder
+
+    tp = ladder.transport
+    cases = {n: families_case(case, sweep, n) for n in ns}
+    start = min(needed[0] for *_, needed in cases.values())
+    stop = max(needed[1] for *_, needed in cases.values())
+    wide = axis(start, stop, wide_spacing, "node")
+    band = axis(*BAND, reference_spacing, "node")
+    rows = []
+    for n in ns:
+        fcase, production, needed = cases[n]
+        scorer = CaseLadder(fcase, transport=tp)
+        row = dict(
+            n=int(n),
+            reflections=len(fcase["hkl_list"]),
+            production_support_eV=production,
+            all_radiator_support_eV=needed,
+        )
+        if fcase.get("layer_radiators") is not None:
+            row["layer_reflections"] = [
+                None if r is None else len(r["hkl_list"]) for r in fcase["layer_radiators"]
+            ]
+        for label, grid, edges in (("band", band, None), ("wide", wide, band_edges(start, stop))):
+            sync()
+            begin = time.perf_counter()
+            density = scorer.lines(grid)
+            sync()
+            row[label] = dict(
+                nodes=int(grid.size),
+                first_s=time.perf_counter() - begin,
+                metrics=metrics(grid, density, "node", edges=edges),
+            )
+            if label == "wide":
+                lo, hi = production
+                inside = window_mass(grid, density, lo, hi)
+                row["outside_production_support_fraction"] = 1.0 - inside / float(
+                    np.trapezoid(density, grid)
+                )
+        rows.append(row)
+    top = rows[-1]
+    for row in rows:
+        for label in ("band", "wide"):
+            row[label]["versus_largest"] = versus(row[label]["metrics"], top[label]["metrics"])
+    return dict(
+        axis="00l-orders" if case["crystal"] == "hopg" else "n_families",
+        band_spacing_eV=reference_spacing,
+        wide_spacing_eV=wide_spacing,
+        wide_support_eV=[start, stop],
+        margins=MARGINS,
+        families=rows,
+    )
+
+
 #: Continuum-only margins (#1143 Plan 4): integral observables at 1e-3, local
 #: (floor, edge, tip, log-band shape, line/background) at 1e-2. Numerical only.
 CONTINUUM_MARGINS = dict(
@@ -655,7 +758,21 @@ def main():
         default=[4, 8, 16],
         help="three divisors of the default step: coarser check, reference, finer check",
     )
+    parser.add_argument(
+        "--families",
+        type=lambda text: [int(x) for x in text.split(",") if x],
+        default=[],
+        help="ascending reflection ladder (n_families; HOPG: (00l) orders); last is reference",
+    )
+    parser.add_argument(
+        "--families-wide-spacing",
+        type=float,
+        default=0.375,
+        help="node spacing (eV) of the full-support yield axis for --families",
+    )
     args = parser.parse_args()
+    if args.families and args.families != sorted(set(args.families)):
+        parser.error("--families must be strictly ascending")
     if len(args.continuum_reference_divisors) != 3:
         parser.error("--continuum-reference-divisors needs exactly three values")
     unknown = sorted(set(args.policy_arms) - set(POLICY_ARMS))
@@ -820,6 +937,22 @@ def main():
             sync,
         )
         assert segment_fingerprint(ladder.segments) == ladder.fingerprint
+        (args.output / "report.json").write_text(
+            json.dumps(report, indent=2, allow_nan=False) + "\n"
+        )
+    if args.families:
+        sweep = scene_sweep(args.material, float(case["E0_keV"]), float(case["thickness_ang"]))
+        report["family_arms"] = score_families(
+            case,
+            sweep,
+            ladder,
+            args.families,
+            args.policy_reference_spacing,
+            args.families_wide_spacing,
+            sync,
+        )
+        assert segment_fingerprint(ladder.segments) == ladder.fingerprint
+        report["host_peak_rss_kib"] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
         (args.output / "report.json").write_text(
             json.dumps(report, indent=2, allow_nan=False) + "\n"
         )
