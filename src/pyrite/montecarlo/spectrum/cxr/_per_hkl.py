@@ -20,7 +20,7 @@ from ..coherent_transverse import transverse_envelope, transverse_form_factor
 from ..segment_escape import piece_mean_transmission
 from . import _policy
 from ._bin_quadrature import sincsq_bin_lineshape
-from ._cpu_reduce import accumulate_sincsq, numpy_backend
+from ._cpu_reduce import accumulate_grouped_formation, accumulate_sincsq, numpy_backend
 from ._formation import (
     _formation_cxr,
     formation_profile,
@@ -817,7 +817,6 @@ def _accumulate_reflection(
     from ...runner import _nsys_pop, _nsys_push
 
     req = st.request
-    chunk = req.chunk
     components = req.components
     layers = req.layers
     groove = req.groove
@@ -1022,19 +1021,20 @@ def _accumulate_reflection(
         gid = gid[perm]
         starts = np.flatnonzero(np.concatenate(([True], gid[1:] != gid[:-1])))
         bounds = np.append(starts, sel.size)
-        for ka, kb in _flight_blocks(bounds, chunk):
-            rows = sel[bounds[ka] : bounds[kb]]
-            block_lines = cxr_rows.take(rows)
-            # Blocks break only on flight boundaries, so no flight is split
-            # across two reductions and squared twice.
-            offsets = bounds[ka:kb] - bounds[ka]
-            for e_sl in _energy_slices(rows.size, chunk, omega_grid.size):
-                arg = d[rows][:, None] * omega_grid[None, e_sl] - g_phase[rows][:, None]
-                arg = arg - L_esc[rows][:, None] * delta_omega_grid[None, e_sl]
-                SP = _formation_SP(st, block_lines, e_sl) * xp.exp(1j * arg)
-                for c in coefs:
-                    field = np.add.reduceat(c[rows][:, None] * SP, offsets, axis=0)
-                    spec[e_sl] += (xp.abs(field) ** 2).sum(axis=0) * wm
+        # Fused host kernel: one (row, energy) element at a time, O(rows + n_E)
+        # memory, no sinc cutoff (the route never windows). _setup refuses the
+        # device backends, so the NumPy namespace is guaranteed here.
+        accumulate_grouped_formation(
+            cxr_rows.take(sel),
+            d[sel],
+            g_phase[sel],
+            L_esc[sel],
+            [c[sel] for c in coefs],
+            bounds,
+            (E_grid, omega_grid, delta_omega_grid),
+            spec,
+            wm,
+        )
         return
 
     # -- 7c. coherent (phased) accumulation -----------------------------------

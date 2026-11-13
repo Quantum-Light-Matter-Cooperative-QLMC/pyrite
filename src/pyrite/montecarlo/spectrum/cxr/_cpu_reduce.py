@@ -79,3 +79,95 @@ def accumulate_sincsq(E_r, a_width, weights, E_grid, targets):
     )
     for t, tgt in enumerate(targets):
         tgt += out[t]
+
+
+# ---------------------------------------------------------------------------
+# Flight-grouped incoherent reduction (substepped transport).
+#
+# ``sum_f sum_pol |sum_{j in f} c_pol,j F_j(E) exp(i phi_j(E))|^2`` -- the same
+# per-row complex field ``_per_hkl`` §7b builds with dense ``(rows, n_E)``
+# temporaries and ``np.add.reduceat``, evaluated here one ``(row, energy)``
+# element at a time. ``F`` is :func:`._formation.formation_factor` (closed form
+# and its ``|w|^2 < FORMATION_SERIES_W2`` series, same expressions), and
+# ``phi = d omega - g.r - L_esc delta omega``. Rows arrive sorted by flight
+# with ``starts`` the group offsets (length ``n_flights + 1``); each flight's
+# rows are summed in input order, so only the summation of whole-flight
+# intensities over flights is reassociated against the reference.
+# Validation: coherent-formation-absorption
+# ---------------------------------------------------------------------------
+@njit(parallel=True, cache=True)
+def _grouped_formation_reduce(  # pragma: no cover - numba
+    E_vac, a_vac, half_dL, apb, bma, q, d, g_phase, L_esc, coefs, starts,
+    E_grid, omega_grid, delta_omega_grid, series_w2, out,
+):  # fmt: skip
+    n_pol = coefs.shape[0]
+    n_flights = starts.shape[0] - 1
+    for e in prange(E_grid.shape[0]):
+        E = E_grid[e]
+        om = omega_grid[e]
+        dom = delta_omega_grid[e]
+        total = 0.0
+        for f in range(n_flights):
+            s_re = 0.0
+            s_im = 0.0
+            p_re = 0.0
+            p_im = 0.0
+            for j in range(starts[f], starts[f + 1]):
+                v = a_vac[j] * (E - E_vac[j]) - half_dL[j] * dom
+                qj = q[j]
+                w2 = qj * qj + v * v
+                if w2 < series_w2:
+                    h = 0.5 * apb[j]
+                    f_re = h * (1.0 - qj * qj / 3.0 - v * v / 6.0)
+                    f_im = -h * qj * v / 3.0
+                else:
+                    sv = np.sin(v)
+                    cv = np.cos(v)
+                    inv = 1.0 / (2.0 * w2)
+                    f_re = (v * apb[j] * sv - qj * bma[j] * cv) * inv
+                    f_im = -(v * bma[j] * cv + qj * apb[j] * sv) * inv
+                arg = d[j] * om - g_phase[j] - L_esc[j] * dom
+                ca = np.cos(arg)
+                sa = np.sin(arg)
+                x_re = f_re * ca - f_im * sa
+                x_im = f_re * sa + f_im * ca
+                c = coefs[0, j]
+                s_re += c.real * x_re - c.imag * x_im
+                s_im += c.real * x_im + c.imag * x_re
+                if n_pol > 1:
+                    c = coefs[1, j]
+                    p_re += c.real * x_re - c.imag * x_im
+                    p_im += c.real * x_im + c.imag * x_re
+            total += s_re * s_re + s_im * s_im + p_re * p_re + p_im * p_im
+        out[e] += total
+
+
+def accumulate_grouped_formation(lines, d, g_phase, L_esc, coefs, starts, grids, out, weight):
+    """Add ``weight * sum_f sum_pol |field_{f,pol}|^2`` into ``out`` (NumPy only).
+
+    ``lines`` is the ``(E_vac, a_vac, half_dL, apb, bma, q)`` formation tuple,
+    ``d``/``g_phase``/``L_esc`` the per-row phase terms and ``coefs`` one or
+    two per-row complex polarization coefficients, all already sorted so that
+    flight ``f`` occupies rows ``starts[f]:starts[f + 1]``. ``grids`` is
+    ``(E_grid, omega_grid, delta_omega_grid)``. Memory is O(rows + n_E): no
+    ``(rows, n_E)`` temporary is formed. Validation: coherent-formation-absorption
+    """
+    from ._formation import FORMATION_SERIES_W2
+
+    if not 1 <= len(coefs) <= 2:
+        raise ValueError("accumulate_grouped_formation takes one or two polarizations")
+    E_grid = grids[0]
+    if E_grid.size == 0 or starts.size < 2:
+        return
+    f64 = [np.ascontiguousarray(a, dtype=np.float64) for a in (*lines, d, g_phase, L_esc)]
+    grid64 = [np.ascontiguousarray(g, dtype=np.float64) for g in grids]
+    acc = np.zeros(E_grid.size, dtype=np.float64)
+    _grouped_formation_reduce(
+        *f64,
+        np.ascontiguousarray(np.stack(coefs), dtype=np.complex128),
+        np.ascontiguousarray(starts, dtype=np.int64),
+        *grid64,
+        float(FORMATION_SERIES_W2),
+        acc,
+    )
+    out += acc * weight
