@@ -34,6 +34,7 @@ bremslib-electron-electron
 bremslib-high-energy-extension
 dielectric-suppression
 dtr-two-beam-boundary
+line-tr-phase-reconciliation
 closed-form-flux
 coherent-emission
 pair-production-sampling
