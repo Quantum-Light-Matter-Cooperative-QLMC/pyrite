@@ -124,7 +124,7 @@ See the [physical-units boundary and supported fields](physical-units.md).
 
 A named beam contains display metadata plus transverse and longitudinal source parameters. Profiles attach it with `beam = "NAME"`; the name and label are removed during resolution so identity follows values. The full field and unit reference is [Beam phase space](../physics/beam-transport/beam-phase-space.md).
 
-`[profiles.NAME.detectors.ID]` declares one detector with scalar acceptance or pixel geometry; `[profiles.NAME.detectors]` may instead map an ID to a named `[detectors.REFERENCE]` object. Named objects support both geometries. Pixel rows may contain detector-specific `scorer`, `response`, and `acquisition` tables; their scalar acceptance is derived from pose and grid. IDs identify result/checkpoint ownership and therefore enter new collection identities, while the referenced object's name and display label do not. Legacy `detector` and `physical_detector` rows remain readable and migrate to IDs `default` and `physical`; they cannot be combined with a `detectors` collection. A profile without any detector declaration resolves one implicit scalar `default`, deprecated in 0.9.0 and refused from 0.11.0. Partial scalar acceptance follows the same window. The bundled `reference` object explicitly declares the existing Timepix3 aperture with ideal response and raw spectra; selecting it through the legacy single-detector field preserves checkpoint identity. See [campaign configuration](../reference/campaign-configuration.md#detector-collections-filters-and-counting-observations) for the complete form and identity behavior.
+`[profiles.NAME.detectors.ID]` declares one detector with scalar acceptance or pixel geometry; `[profiles.NAME.detectors]` may instead map an ID to a named `[detectors.REFERENCE]` object. Named objects support both geometries. Pixel rows may contain detector-specific `scorer`, `response`, and `acquisition` tables; their scalar acceptance is derived from pose and grid. IDs identify result/checkpoint ownership and therefore enter new collection identities, while the referenced object's name and display label do not. Legacy `detector` and `physical_detector` rows remain readable and migrate to IDs `default` and `physical`; they cannot be combined with a `detectors` collection. A profile without any detector declaration resolves one implicit scalar `default`, deprecated in 0.9.0 and refused from 0.11.0. Partial scalar acceptance follows the same window. The bundled `reference` object explicitly declares the existing Timepix3 aperture with ideal response and raw spectra; selecting it through the legacy single-detector field preserves checkpoint identity. A scalar row with `kind = "point"` is an ideal point observer (`PointDetector`): optional `observation_angle_deg` (default 0, on axis) and no `polar_acceptance_deg` or `solid_angle_sr`, which it refuses; the bundled `point` object is the on-axis form that admitted axial fibre cases require. `pyrite detector set NAME --point` and `pyrite profile detector set PROFILE ID --point` write it. See [campaign configuration](../reference/campaign-configuration.md#detector-collections-filters-and-counting-observations) for the complete form and identity behavior.
 
 ## Physics and numerics presets
 
@@ -178,9 +178,13 @@ Both variants accept scalar tilts (defaults 30 and 0 degrees), paired positive
 `crystal_width_mm` / `crystal_height_mm` (defaults 5 mm each), and optional
 boolean `mosaic` / `allow_normal_incidence` (both false). Slabs optionally
 accept positive `groove_spacing_ang` with the existing groove restrictions.
-Optional `description` is nonempty display metadata. Crystal-cut tables,
-infinite footprints, array sweeps, arbitrary variants and unknown fields
-are rejected by this initial codec.
+`footprint = "unbounded"` replaces both dimensions with a laterally unbounded
+slab (`Slab(width=None, height=None)`) and excludes them. Slabs also accept
+`cut = {surface_hkl = [h, k, l]}`, the nonzero slab-normal plane of
+`CrystalCut(surface_hkl=...)`. Omitting either key keeps the existing finite
+footprint and catalog orientation, so existing identities are unchanged.
+Optional `description` is nonempty display metadata. Other cut fields,
+array sweeps, arbitrary variants and unknown fields are rejected.
 
 Names are reserved case-insensitively across bundled/user layers. Bundled
 objects remain read-only. Python uses `pyrite.geometry.load_target(NAME)`

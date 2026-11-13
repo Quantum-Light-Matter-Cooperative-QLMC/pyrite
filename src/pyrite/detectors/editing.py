@@ -6,13 +6,30 @@ from copy import deepcopy
 import tomlkit
 
 SCALAR_FIELDS = ("observation_angle_deg", "polar_acceptance_deg", "solid_angle_sr")
+#: Scalar ``kind`` of an ideal point observer (``PointDetector``, #624).
+POINT_DETECTOR_KIND = "point"
+_ACCEPTANCE_FIELDS = ("polar_acceptance_deg", "solid_angle_sr")
+
+
+def _patch_point(target, scalar):
+    """Keep a point detector free of acceptance; ``kind`` removes stored acceptance."""
+    if scalar.get("kind") == POINT_DETECTOR_KIND:
+        for key in _ACCEPTANCE_FIELDS:
+            target.pop(key, None)
+    elif target.get("kind") == POINT_DETECTOR_KIND and any(
+        key in scalar for key in _ACCEPTANCE_FIELDS
+    ):
+        raise ValueError(
+            "this is a point detector with no angular acceptance; it accepts only "
+            "--observation-angle"
+        )
 
 
 def patch_detector(target, scalar, pixel):
     """Apply already typed values; domain constructors validate the resulting draft."""
     geometry, scorer, response, acquisition = pixel
     if any(pixel):
-        if scalar or any(key in target for key in SCALAR_FIELDS):
+        if scalar or any(key in target for key in (*SCALAR_FIELDS, "kind")):
             raise ValueError("pixel geometry cannot be combined with scalar acceptance")
         if "distance_mm" not in target and "distance_mm" not in geometry:
             raise ValueError("creating pixel geometry requires --distance-mm")
@@ -21,6 +38,7 @@ def patch_detector(target, scalar, pixel):
         )
     elif scalar and "distance_mm" in target:
         raise ValueError("pixel detector acceptance is derived from its geometry")
+    _patch_point(target, scalar)
     target.update(scalar)
 
 

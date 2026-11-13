@@ -10,6 +10,15 @@ if TYPE_CHECKING:
     from .geometry import Slab, Stack
 
 
+def _typed_cut(values: dict[str, Any]) -> None:
+    """Replace a decoded ``cut`` mapping by its :class:`CrystalCut` value."""
+    cut = values.get("cut")
+    if cut is not None:
+        from .geometry import CrystalCut
+
+        values["cut"] = CrystalCut(surface_hkl=tuple(cut["surface_hkl"]))
+
+
 def target_from_preset(fields, catalog):
     """Lower recipe references through the same flat adapter used by campaigns."""
     from .flat_geometry import target_from_flat
@@ -17,6 +26,7 @@ def target_from_preset(fields, catalog):
     values = dict(fields)
     values["material"] = catalog.materials[values["material"]].crystal_key
     values["stack"] = values["stack"] or None
+    _typed_cut(values)
     return target_from_flat(**values)
 
 
@@ -57,6 +67,7 @@ def material_target(spec: MaterialSpec) -> Any:
         )
         values["material"] = spec.crystal_key
         values["stack"] = values["stack"] or None
+        _typed_cut(values)
         return target_from_flat(**values)
     return target_from_flat(
         spec.crystal_key,

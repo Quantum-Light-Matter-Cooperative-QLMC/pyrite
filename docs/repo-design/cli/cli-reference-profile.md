@@ -324,6 +324,9 @@ Options:
                                   replacement.  [0.0<x<=180.0]
   --solid-angle SR                Detector solid angle in sr; scalar replacement.
                                   [0.0<x<=12.566370614359172]
+  --point                         Make this a point detector (kind = "point"): one
+                                  observation direction, zero angular acceptance;
+                                  removes and excludes --polar-acceptance/--solid-angle.
   --distance-mm MM                Source-to-detector distance in mm; required to create.
   --polar-deg DEG                 Detector-centre polar angle from the beam axis in
                                   degrees [0, 180].  [0.0<=x<=180.0]

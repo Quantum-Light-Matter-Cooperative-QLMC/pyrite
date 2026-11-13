@@ -1,0 +1,7 @@
+# Ideal point observer on the beam axis: one direction, zero angular
+# acceptance (pyrite.detectors.PointDetector). Source spectra are photons per
+# incident electron per eV per sr along that direction, with no aperture
+# average and no counting scale. Admitted axial fibre cases require it.
+label = "On-axis point observer, zero angular acceptance"
+kind = "point"
+observation_angle_deg = 0.0

@@ -4,7 +4,7 @@ import math
 
 import click
 
-from pyrite.detectors.editing import patch_detector
+from pyrite.detectors.editing import POINT_DETECTOR_KIND, patch_detector
 
 
 def detector_cli_options(function):
@@ -32,8 +32,22 @@ def detector_cli_options(function):
     return function
 
 
-def collect_detector_updates(observation_angle_deg, polar_acceptance_deg, solid_angle_sr):
-    return {
+def point_option(function):
+    """``--point``: an ideal point observer with zero angular acceptance (#624)."""
+    return click.option(
+        "--point",
+        is_flag=True,
+        help=(
+            'Make this a point detector (kind = "point"): one observation direction, '
+            "zero angular acceptance; removes and excludes --polar-acceptance/--solid-angle."
+        ),
+    )(function)
+
+
+def collect_detector_updates(
+    observation_angle_deg, polar_acceptance_deg, solid_angle_sr, *, point=False
+):
+    updates = {
         key: value
         for key, value in {
             "observation_angle_deg": observation_angle_deg,
@@ -42,6 +56,13 @@ def collect_detector_updates(observation_angle_deg, polar_acceptance_deg, solid_
         }.items()
         if value is not None
     }
+    if point:
+        if updates.keys() & {"polar_acceptance_deg", "solid_angle_sr"}:
+            raise click.UsageError(
+                "--point has no angular acceptance; drop --polar-acceptance/--solid-angle"
+            )
+        updates["kind"] = POINT_DETECTOR_KIND
+    return updates
 
 
 def write_detector_fields(table, updates):

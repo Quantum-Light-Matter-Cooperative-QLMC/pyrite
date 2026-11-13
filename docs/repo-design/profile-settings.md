@@ -154,6 +154,10 @@ aperture at 400 mm as one ideal scalar detector (90°, 2.016603235051288° full
 polar span, 0.0012390399999999998 sr), exposing raw spectra without pixel/count
 acquisition.
 External complete catalogs need their own copy of the object.
+A `kind = "point"` detector (bundled `point`; `detector set NAME --point` or
+`profile detector set PROFILE ID --point`) is explicit without acceptance
+fields: it is an ideal on-axis (or `observation_angle_deg`) point observer with
+zero acceptance, as admitted axial fibre cases require (#624).
 
 ## Creation and cloning
 

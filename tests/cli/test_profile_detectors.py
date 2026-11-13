@@ -327,3 +327,18 @@ def test_native_reporting_on_named_detector_and_inline_copy(catalog):
     resolved = resolve_profile_observation(load_material_catalog(catalog), "standard")
     assert resolved.acquisition.measured_edges_eV == (0, 100, 200)
     assert "reporting_bins" not in row(catalog)["detectors"]["default"]["acquisition"]
+
+
+def test_profile_detector_set_point_resolves_a_point_detector(catalog):
+    """#624: an inline profile detector becomes kind = "point" and lowers to PointDetector."""
+    from pyrite.campaign.profile_detectors import _scalar_detector
+    from pyrite.detectors import PointDetector
+
+    call("set", "standard", "default", "--inline-copy", "--point", "--observation-angle", "0", "-y")
+    entry = row(catalog)["detector"].unwrap()
+    assert entry["kind"] == "point"
+    assert not {"polar_acceptance_deg", "solid_angle_sr"} & entry.keys()
+    assert _scalar_detector(entry) == PointDetector()
+    payloads = profile_summary.detector_payloads(tomlkit.parse(catalog.read_text()), row(catalog))
+    assert payloads["default"]["kind"] == "point"
+    assert payloads["default"]["acceptance"]["solid_angle_sr"] == 0.0

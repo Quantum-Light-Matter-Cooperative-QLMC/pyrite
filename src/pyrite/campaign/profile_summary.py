@@ -19,6 +19,7 @@ from .profile_cxr_grid import profile_cxr_grid_values
 from .profile_detectors import (
     ACTIVE_DETECTOR_FIELDS,
     _scalar_detector,
+    is_point_detector,
     physical_detector_row,
     profile_detector_entries,
 )
@@ -61,7 +62,7 @@ def _detector_payload(document, entry):
     if "distance_mm" not in values:
         acceptance = _acceptance(_scalar_detector(values))
         return {
-            "kind": "scalar",
+            "kind": "point" if is_point_detector(values) else "scalar",
             "reference": reference,
             "settings": acceptance.copy(),
             "acceptance": acceptance,

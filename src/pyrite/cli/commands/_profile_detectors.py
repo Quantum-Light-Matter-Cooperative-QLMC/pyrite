@@ -20,6 +20,7 @@ from pyrite.cli.commands._detector_shared import (
     apply_detector_fields,
     collect_detector_updates,
     detector_cli_options,
+    point_option,
 )
 from pyrite.cli.commands._pixel_detector_shared import pixel_changes, pixel_cli_options
 from pyrite.cli.commands._profile_shared import confirm_standard, write
@@ -213,6 +214,7 @@ def add_command(profile_name, identifier, reference, yes, dry_run):
     help="Copy the current named object into this profile before editing.",
 )
 @detector_cli_options
+@point_option
 @pixel_cli_options
 @click.option("-y", "--yes", is_flag=True, help="Skip the standard-profile confirmation.")
 @click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing.")
@@ -226,6 +228,7 @@ def set_command(
     observation_angle_deg,
     polar_acceptance_deg,
     solid_angle_sr,
+    point,
     **values,
 ):
     """Replace ID's reference, or update its inline scalar/pixel settings.
@@ -233,7 +236,9 @@ def set_command(
     Legacy 'physical' may be created with --distance-mm. A shared named object
     is never edited implicitly. Use --inline-copy for a profile-local copy.
     """
-    scalar = collect_detector_updates(observation_angle_deg, polar_acceptance_deg, solid_angle_sr)
+    scalar = collect_detector_updates(
+        observation_angle_deg, polar_acceptance_deg, solid_angle_sr, point=point
+    )
     pixel = pixel_changes(values)
     if reference is not None and (inline_copy or scalar or any(pixel)):
         raise click.UsageError("use --detector REF separately from inline edits")
