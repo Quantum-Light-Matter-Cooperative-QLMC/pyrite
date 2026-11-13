@@ -343,7 +343,56 @@ def families_case(case, sweep, n):
     return out, production, tuple(float(x) for x in needed)
 
 
-def score_families(case, sweep, ladder, ns, reference_spacing, wide_spacing, sync):
+def reflection_chunks(case, max_reflections):
+    """``case`` split into cases of at most ``max_reflections`` reflections per radiator.
+
+    Incoherent line densities add over reflections, so the chunk spectra sum to
+    the one-call spectrum on the same energy axis. Chunking reflections, not
+    energy, keeps the scored window -- production keeps only lines resonant
+    within the window +-20 % of its span and anchors its absorption tabulation
+    to it, so an energy chunk drops neighbouring sinc tails. Production sizes
+    its coupling-table energy chunk without the reflection count
+    (``runner/chunking.py``), which OOMs thousands of reflections.
+    """
+    from math import ceil
+
+    layered = case.get("layer_radiators") is not None
+    radiators = case["layer_radiators"] if layered else [case]
+    count = max(len(r["hkl_list"]) for r in radiators if r is not None)
+    parts = max(1, ceil(count / max(1, int(max_reflections))))
+    if parts == 1:
+        return [case]
+    width = ceil(count / parts)
+    chunks = []
+    for i in range(parts):
+        sl = slice(i * width, (i + 1) * width)
+        if not layered:
+            chunks.append(dict(case, hkl_list=case["hkl_list"][sl]))
+            continue
+        layers = [
+            None if r is None or not r["hkl_list"][sl] else dict(r, hkl_list=r["hkl_list"][sl])
+            for r in radiators
+        ]
+        if any(r is not None for r in layers):
+            first = next(r for r in layers if r is not None)
+            chunks.append(dict(case, layer_radiators=layers, hkl_list=first["hkl_list"]))
+    return chunks
+
+
+def chunked_lines(scorer, chunks, grid):
+    """Sum of ``scorer.lines(grid)`` over reflection-chunk cases; restores ``scorer.case``."""
+    whole = scorer.case
+    try:
+        total = np.zeros(grid.size)
+        for chunk in chunks:
+            scorer.case = chunk
+            total += scorer.lines(grid)
+        return total
+    finally:
+        scorer.case = whole
+
+
+def score_families(case, sweep, ladder, ns, reference_spacing, wide_spacing, sync, max_reflections):
     """Score each reflection set on the saved transport against the largest.
 
     Band (0.5--10 keV, node ``reference_spacing``): yield, centroid, peak, FWHM,
@@ -364,7 +413,8 @@ def score_families(case, sweep, ladder, ns, reference_spacing, wide_spacing, syn
     rows = []
     for n in ns:
         fcase, production, needed = cases[n]
-        scorer = CaseLadder(fcase, transport=tp)
+        scorer = CaseLadder(fcase, transport=tp)  # one device copy of the segments
+        chunks = reflection_chunks(fcase, max_reflections)
         row = dict(
             n=n,
             reflections=len(fcase["hkl_list"]),
@@ -378,10 +428,11 @@ def score_families(case, sweep, ladder, ns, reference_spacing, wide_spacing, syn
         for label, grid, edges in (("band", band, None), ("wide", wide, band_edges(start, stop))):
             sync()
             begin = time.perf_counter()
-            density = scorer.lines(grid)
+            density = chunked_lines(scorer, chunks, grid)
             sync()
             row[label] = dict(
                 nodes=int(grid.size),
+                reflection_chunks=len(chunks),
                 first_s=time.perf_counter() - begin,
                 metrics=metrics(grid, density, "node", edges=edges),
             )
@@ -401,6 +452,7 @@ def score_families(case, sweep, ladder, ns, reference_spacing, wide_spacing, syn
         band_spacing_eV=reference_spacing,
         wide_spacing_eV=wide_spacing,
         wide_support_eV=[start, stop],
+        max_reflections_per_call=max_reflections,
         margins=MARGINS,
         families=rows,
     )
@@ -787,6 +839,12 @@ def main():
         default=0.375,
         help="node spacing (eV) of the full-support yield axis for --families",
     )
+    parser.add_argument(
+        "--families-max-reflections",
+        type=int,
+        default=1024,
+        help="reflections per radiator per line call for --families (bounds device tables)",
+    )
     args = parser.parse_args()
     if len(set(args.families)) != len(args.families):
         parser.error("--families points must be distinct")
@@ -967,6 +1025,7 @@ def main():
             args.policy_reference_spacing,
             args.families_wide_spacing,
             sync,
+            args.families_max_reflections,
         )
         assert segment_fingerprint(ladder.segments) == ladder.fingerprint
         report["host_peak_rss_kib"] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss

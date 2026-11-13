@@ -187,3 +187,26 @@ def test_families_case_reciprocal_cutoff_keeps_every_reflection_inside_it():
     assert layered["layer_radiators"][1]["hkl_list"] != lay["layer_radiators"][1]["hkl_list"]
     with pytest.raises(ValueError, match="HOPG"):
         gate["families_case"]({"crystal": "hopg"}, gate["scene_sweep"]("hopg", 30.0, 2e4), "g8")
+
+
+def test_reflection_chunks_partition_every_radiator_without_touching_the_rest():
+    gate = _gate()
+    hkl = [(h, 1, 1) for h in range(10)]
+    single = {"crystal": "silicon", "hkl_list": hkl, "Ne": 8}
+    parts = gate["reflection_chunks"](single, 4)
+    assert [len(p["hkl_list"]) for p in parts] == [4, 4, 2]
+    assert sum((p["hkl_list"] for p in parts), []) == hkl
+    assert all(
+        {k: v for k, v in p.items() if k != "hkl_list"} == {"crystal": "silicon", "Ne": 8}
+        for p in parts
+    )
+    assert gate["reflection_chunks"](single, 10) == [single]
+    film = {"crystal": "mos2", "hkl_list": hkl[:3]}
+    sub = {"crystal": "silicon", "hkl_list": hkl}
+    layered = {"crystal": "mos2", "hkl_list": hkl[:3], "layer_radiators": [film, sub, None]}
+    parts = gate["reflection_chunks"](layered, 4)
+    films = [p["layer_radiators"][0] for p in parts]
+    assert sum((f["hkl_list"] for f in films if f is not None), []) == film["hkl_list"]
+    assert films[1:] == [None, None]
+    assert sum((p["layer_radiators"][1]["hkl_list"] for p in parts), []) == hkl
+    assert all(p["layer_radiators"][2] is None for p in parts)
