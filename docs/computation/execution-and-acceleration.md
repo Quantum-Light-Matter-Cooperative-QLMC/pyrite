@@ -255,7 +255,7 @@ Enabling a new core changes numerical output, which under the [validation method
 The following unsupported combinations and invalid inputs raise errors:
 
 * **Explicit CUDA transport for a grooved run.** The CUDA core does not support facet exit and re-entry yet (#973). Automatic selection uses lockstep for grooved runs; `transport_core="per-electron"` runs them on the exact per-electron CPU core, which also supports electron blocks (#972).
-* **Flight-grouped incoherent CXR on a non-NumPy backend.** The segmented complex accumulation has no device equivalent, so substepped rows raise. The fallback would be the row-incoherent sum, which is a different physical claim.
+* **Flight-grouped incoherent CXR on float64 CuPy.** NumPy runs the fused host kernel and float32 CuPy runs the segmented intensity kernel (#1152); a float64 device build has no port, so substepped rows raise. The fallback would be the row-incoherent sum, which is a different physical claim.
 * **Layered or component-resolved substepped grouping.** The per-layer refractive decrement along the escape path is not modelled, so these raise too.
 * **Device residency on a non-CUDA core.** Only CUDA transport produces resident segment arrays.
 * **An explicit accelerator backend that is unavailable, or whose device lacks native `float64`.** Raises; only `auto` may substitute.
