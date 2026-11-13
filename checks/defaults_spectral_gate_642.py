@@ -350,9 +350,10 @@ def reflection_chunks(case, max_reflections):
     the one-call spectrum on the same energy axis. Chunking reflections, not
     energy, keeps the scored window -- production keeps only lines resonant
     within the window +-20 % of its span and anchors its absorption tabulation
-    to it, so an energy chunk drops neighbouring sinc tails. Production sizes
-    its coupling-table energy chunk without the reflection count
-    (``runner/chunking.py``), which OOMs thousands of reflections.
+    to it, so an energy chunk drops neighbouring sinc tails. Production (#1167)
+    batches the coupling-table transient but still holds the full
+    (reflections x tabulation) tables and refuses lists past the device
+    budget; tens of thousands of reflections over a wide support need this.
     """
     from math import ceil
 
