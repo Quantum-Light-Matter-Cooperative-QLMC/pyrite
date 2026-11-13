@@ -25,6 +25,7 @@ from ...transport import (
 )
 from ...transport._continuation_join import _copy_bytes
 from . import _fused
+from ._position_twins import keep_position_twins, shorten_position_twin
 from ._recoil import _quantum_line_factors
 
 # ---- segment-sum CXR spectrum ------------------------------------------------
@@ -899,6 +900,7 @@ def _clip_segments_to_cutoff(segments, E_cut_keV, composition, layers=None):
                     out[key] = stage(row[host_idx])
                 else:
                     out[key] = stage(row)[keep_idx]
+    keep_position_twins(out, segments, host_idx, keep_idx)
 
     E = xp.asarray(out["E_keV"], dtype=REAL)
     old_L = xp.asarray(out["L_ang"], dtype=REAL)
@@ -925,6 +927,7 @@ def _clip_segments_to_cutoff(segments, E_cut_keV, composition, layers=None):
     start = old_mid - REAL(0.5) * old_L[:, None] * direction
     out["L_ang"] = new_L
     out["r_mid"] = start + REAL(0.5) * new_L[:, None] * direction
+    shorten_position_twin(out, old_L, new_L, direction)
     if midpoint_rows:
         # A clipped flight is a shorter flight, so the transported end state no
         # longer describes it -- but the clip rule above is the transport core's
