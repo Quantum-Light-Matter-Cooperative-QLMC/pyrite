@@ -94,3 +94,53 @@ def test_policy_case_attaches_the_production_payload(name):
     assert payload["resolution"]["policy"] == selectors.get("resolution", "sinc-nyquist")
     assert case["line_quadrature"] == selectors.get("quadrature", "node")
     assert case["seed"] == 642501 and case["Ne"] == 8
+
+
+def test_window_mass_integrates_the_node_interpolant_exactly():
+    gate = _gate()
+    grid = np.array([1.0, 2.0, 4.0])
+    density = np.array([0.0, 2.0, 2.0])
+    # Linear ramp 0->2 on [1, 2], flat 2 on [2, 4]; zero past the support.
+    assert gate["window_mass"](grid, density, 1.5, 3.0) == pytest.approx(0.75 + 2.0)
+    assert gate["window_mass"](grid, density, 3.0, 9.0) == pytest.approx(2.0)
+
+
+def test_continuum_features_flag_unrefined_substrate_edges():
+    gate = _gate()
+    layered = gate["continuum_features"](gate["layered_case"](8, 642501))
+    assert layered["medium"] == "mos2" and layered["tip_eV"] == 30000.0
+    refined = {k for k, v in layered["edges"].items() if v["refined"]}
+    substrate = {k for k, v in layered["edges"].items() if not v["refined"]}
+    assert any(k.startswith("Mo K") for k in refined)
+    assert any(k.startswith("Si K (EPDL)") for k in substrate)
+    slab = gate["continuum_features"]({"crystal": "hopg", "E0_keV": 30.0})
+    assert all(v["refined"] for v in slab["edges"].values())
+
+
+def test_continuum_versus_keeps_local_failures_visible_under_conserved_yield():
+    gate = _gate()
+    features = gate["continuum_features"]({"crystal": "hopg", "E0_keV": 30.0})
+    grid = gate["continuum_grid"]("hopg", 30000.0, 0.0025, True)
+    smooth = 1.0 / grid
+    reference = gate["continuum_metrics"](grid, smooth, features)
+    same = gate["continuum_versus"](reference, reference)
+    assert all(same["within_margin"].values())
+    # Move mass across the Si K edge window without changing the total.
+    edge = next(v["edge_eV"] for k, v in features["edges"].items() if k.startswith("Si K"))
+    bump = np.where((grid > edge * 0.995) & (grid < edge), 1.2, 1.0)
+    bump = np.where((grid > edge) & (grid < edge * 1.005), 0.8, bump)
+    out = gate["continuum_versus"](
+        gate["continuum_metrics"](grid, smooth * bump, features), reference
+    )
+    assert out["within_margin"]["yield_per_primary"]
+    assert out["within_margin"]["edge_jump"] is False
+
+
+def test_unrefined_continuum_twin_matches_the_production_step():
+    gate = _gate()
+    refined = gate["continuum_grid"]("silicon", 300000.0, 0.005, True)
+    twin = gate["continuum_grid"]("silicon", 300000.0, 0.005, False)
+    assert twin[0] == refined[0] and twin[-1] > 300000.0
+    np.testing.assert_allclose(np.diff(np.log(twin)), np.diff(np.log(twin))[0], rtol=1e-9)
+    assert abs(np.diff(np.log(twin))[0] - 0.005) < 1e-5
+    assert refined.size > twin.size  # edge and tip anchors only add nodes

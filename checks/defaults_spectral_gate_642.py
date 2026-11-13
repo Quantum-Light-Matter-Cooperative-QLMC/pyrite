@@ -287,6 +287,239 @@ def score_policies(case, sweep, ladder, names, reference_spacing, sync):
     )
 
 
+#: Continuum-only margins (#1143 Plan 4): integral observables at 1e-3, local
+#: (floor, edge, tip, log-band shape, line/background) at 1e-2. Numerical only.
+CONTINUUM_MARGINS = dict(
+    yield_per_primary=1e-3,
+    centroid_eV=1e-3,
+    log_band_l1=1e-2,
+    floor_mass=1e-2,
+    edge_mass=1e-2,
+    edge_jump=1e-2,
+    tip_mass=1e-2,
+    line_background_ratio=1e-2,
+)
+#: Relative half-width of the edge windows, the floor window and the tip window.
+EDGE_WINDOW, FLOOR_WINDOW, TIP_WINDOW = 0.01, 0.25, 0.05
+LOG_BANDS = 32
+
+
+def window_mass(grid, density, lo, hi):
+    """Exact integral of the piecewise-linear node interpolant over ``[lo, hi]``.
+
+    Zero outside the grid support, so a window past the tip carries no mass.
+    """
+    lo, hi = max(lo, float(grid[0])), min(hi, float(grid[-1]))
+    if hi <= lo:
+        return 0.0
+    inner = grid[(grid > lo) & (grid < hi)]
+    x = np.r_[lo, inner, hi]
+    return float(np.trapezoid(np.interp(x, grid, density, left=0.0, right=0.0), x))
+
+
+def continuum_features(case):
+    """Floor, tip and located edges of every radiating/absorbing crystal in the scene.
+
+    The production continuum refines only ``case['crystal']`` plus the detector
+    path, so a layered substrate's own edges are listed here (flagged
+    ``refined=False``) to measure what that omission costs.
+    """
+    from pyrite._continuum_grid import (
+        DETECTOR_PATH_ELEMENTS,
+        EDGE_KIND,
+        continuum_refinement_marks,
+    )
+    from pyrite.energy_grid.floor import photon_continuum_floor_eV
+    from pyrite.energy_grid.refine import case_endpoint_eV
+
+    medium = str(case["crystal"])
+    floor, tip = photon_continuum_floor_eV(medium), case_endpoint_eV(case)
+    crystals = [medium] + [
+        str(r["crystal"]) for r in case.get("layer_radiators") or () if r["crystal"] != medium
+    ]
+    edges = {}
+    for index, crystal in enumerate(dict.fromkeys(crystals)):
+        path = DETECTOR_PATH_ELEMENTS if index == 0 else ()
+        marks, _ = continuum_refinement_marks(crystal, floor, tip, path_elements=path)
+        for mark in marks:
+            if mark.kind == EDGE_KIND:
+                centre = 0.5 * (mark.anchors_eV[0] + mark.anchors_eV[-1])
+                key = f"{mark.label}@{centre:.1f}"
+                edges.setdefault(key, dict(edge_eV=centre, refined=index == 0))
+    return dict(medium=medium, floor_eV=floor, tip_eV=tip, edges=edges)
+
+
+def continuum_metrics(grid, density, features):
+    """Intrinsic continuum observables on the node interpolant (no detector)."""
+    if not np.isfinite(density).all() or np.trapezoid(density, grid) <= 0:
+        raise ValueError("nonpositive continuum yield or nonfinite continuum")
+    floor, tip = features["floor_eV"], features["tip_eV"]
+    total = window_mass(grid, density, floor, tip)
+    x = np.r_[floor, grid[(grid > floor) & (grid < tip)], tip]
+    first = float(np.trapezoid(x * np.interp(x, grid, density, left=0, right=0), x))
+    bands = np.geomspace(floor, tip, LOG_BANDS + 1)
+    edges = {}
+    for key, edge in features["edges"].items():
+        e = edge["edge_eV"]
+        below = window_mass(grid, density, e * (1 - EDGE_WINDOW), e)
+        above = window_mass(grid, density, e, e * (1 + EDGE_WINDOW))
+        edges[key] = dict(below=below, above=above, jump=above / below if below > 0 else None)
+    return dict(
+        yield_per_primary=total,
+        centroid_eV=first / total,
+        log_band_masses=[
+            window_mass(grid, density, a, b) for a, b in zip(bands[:-1], bands[1:], strict=True)
+        ],
+        floor_mass=window_mass(grid, density, floor, floor * (1 + FLOOR_WINDOW)),
+        tip_mass=window_mass(grid, density, tip * (1 - TIP_WINDOW), tip),
+        edges=edges,
+    )
+
+
+def continuum_versus(candidate, reference):
+    """Signed relative changes, one verdict per observable; edges report their worst."""
+
+    def rel(c, r):
+        return None if c is None or r is None or r == 0 else (c - r) / r
+
+    out = {k: rel(candidate[k], reference[k]) for k in ("yield_per_primary", "centroid_eV")}
+    out["floor_mass"] = rel(candidate["floor_mass"], reference["floor_mass"])
+    out["tip_mass"] = rel(candidate["tip_mass"], reference["tip_mass"])
+    cb, rb = (np.asarray(m["log_band_masses"], dtype=float) for m in (candidate, reference))
+    out["log_band_l1"] = float(np.abs(cb / cb.sum() - rb / rb.sum()).sum())
+    per_edge = {}
+    for key, ref in reference["edges"].items():
+        cand = candidate["edges"][key]
+        per_edge[key] = dict(
+            below=rel(cand["below"], ref["below"]),
+            above=rel(cand["above"], ref["above"]),
+            jump=rel(cand["jump"], ref["jump"]),
+        )
+    out["edges"] = per_edge
+
+    def worst(values):
+        values = [abs(v) for v in values if v is not None]
+        return max(values) if values else None
+
+    out["edge_mass"] = worst(v[s] for v in per_edge.values() for s in ("below", "above"))
+    out["edge_jump"] = worst(v["jump"] for v in per_edge.values())
+    out["within_margin"] = {
+        key: None if out.get(key) is None else bool(abs(out[key]) <= margin)
+        for key, margin in CONTINUUM_MARGINS.items()
+        if key != "line_background_ratio"
+    }
+    return out
+
+
+def continuum_grid(material, tip_eV, step, refined):
+    """Production refined continuum at ``step`` in ln E, or its unrefined geometric twin.
+
+    The twin spans the same floor to ``tip * exp(step)`` with the nearest node
+    count, so edges and the tip fall wherever the lattice puts them.
+    """
+    from pyrite.energy_grid.floor import geometric_continuum_grid, photon_continuum_floor_eV
+    from pyrite.energy_grid.refine import automatic_continuum_grid
+
+    if refined:
+        return automatic_continuum_grid(material, tip_eV, log_step=step)
+    stop = tip_eV * np.exp(step)
+    count = int(round(np.log(stop / photon_continuum_floor_eV(material)) / step)) + 1
+    return geometric_continuum_grid(material, stop, count)
+
+
+def score_continuum(case, ladder, steps, reference_divisors, line_spacing, sync):
+    """Plan 4: continuum floor/edges/tip and line/background on one saved transport.
+
+    Every candidate is scored against a refined reference at
+    ``default_step / reference_divisors[1]``, whose own refinement pair is
+    reported first. The dominant-line window is fixed from a node line reference
+    on the band, so only the continuum changes between candidates; its truth is
+    the continuum evaluated directly on that window, not interpolated.
+    """
+    from pyrite._continuum_grid import CONTINUUM_LOG_STEP
+    from pyrite.energy_grid.bandwidth_check import _dominant_fwhm_eV
+    from pyrite.energy_grid.convergence_case import CaseLadder
+
+    features = continuum_features(case)
+    medium, tip = features["medium"], features["tip_eV"]
+    tp = ladder.transport
+    node = CaseLadder(dict(case, line_quadrature="node"), transport=tp)
+
+    def evaluate(grid):
+        sync()
+        begin = time.perf_counter()
+        density = node.continuum(grid)
+        sync()
+        return density, time.perf_counter() - begin
+
+    line_grid = axis(*BAND, line_spacing, "node")
+    line = node.lines(line_grid)
+    fwhm = float(_dominant_fwhm_eV(line_grid, line))
+    window = None
+    if np.isfinite(fwhm):
+        peak = float(line_grid[np.argmax(line)])
+        window = (max(BAND[0], peak - 3 * fwhm), min(BAND[1], peak + 3 * fwhm))
+        inside = line_grid[(line_grid > window[0]) & (line_grid < window[1])]
+        direct_grid = np.r_[window[0], inside, window[1]]
+        direct, _ = evaluate(direct_grid)
+        line_mass = window_mass(line_grid, line, *window)
+        direct_ratio = line_mass / window_mass(direct_grid, direct, *window)
+
+    def row(label, step, refined):
+        grid = continuum_grid(medium, tip, step, refined)
+        density, first_s = evaluate(grid)
+        out = dict(
+            label=label,
+            log_step=step,
+            refined=refined,
+            nodes=int(grid.size),
+            support_eV=[float(grid[0]), float(grid[-1])],
+            first_s=first_s,
+            metrics=continuum_metrics(grid, density, features),
+        )
+        if window is not None:
+            ratio = line_mass / window_mass(grid, density, *window)
+            out["line_background_ratio"] = ratio
+            out["line_background_vs_direct"] = (ratio - direct_ratio) / direct_ratio
+        return out
+
+    ladder_rows = [
+        row(f"refined/{d}", CONTINUUM_LOG_STEP / d, True) for d in (1, *reference_divisors)
+    ]
+    reference = ladder_rows[2]["metrics"]
+    candidates = [
+        row(f"{'refined' if refined else 'geometric'}-{step:g}", step, refined)
+        for step in steps
+        for refined in (True, False)
+    ]
+    for item in ladder_rows + candidates:
+        item["versus_reference"] = continuum_versus(item["metrics"], reference)
+        if "line_background_vs_direct" in item:
+            item["versus_reference"]["within_margin"]["line_background_ratio"] = bool(
+                abs(item["line_background_vs_direct"]) <= CONTINUUM_MARGINS["line_background_ratio"]
+            )
+    production = np.asarray(tp["E_brem"], dtype=float)
+    default = continuum_grid(medium, tip, CONTINUUM_LOG_STEP, True)
+    return dict(
+        features=features,
+        margins=CONTINUUM_MARGINS,
+        windows=dict(edge=EDGE_WINDOW, floor=FLOOR_WINDOW, tip=TIP_WINDOW, log_bands=LOG_BANDS),
+        reference=ladder_rows[2]["label"],
+        refinement_check=dict(
+            coarser_vs_reference=continuum_versus(ladder_rows[1]["metrics"], reference),
+            finer_vs_reference=continuum_versus(ladder_rows[3]["metrics"], reference),
+        ),
+        line_window_eV=None if window is None else list(window),
+        line_fwhm_eV=fwhm if np.isfinite(fwhm) else None,
+        line_background_direct=None if window is None else direct_ratio,
+        saved_transport_grid_is_default=bool(
+            production.shape == default.shape and np.array_equal(production, default)
+        ),
+        ladder=ladder_rows,
+        candidates=candidates,
+    )
+
+
 def runtime():
     """Host replay must not initialize a GPU or change saved transport."""
     from pyrite._backend import BACKEND
@@ -405,7 +638,26 @@ def main():
         default=0.09375,
         help="node reference spacing (eV) for policy arms; 0.09375 passed refinement",
     )
+    parser.add_argument(
+        "--continuum",
+        action="store_true",
+        help="score continuum floor/edges/tip and line/background (refined vs geometric)",
+    )
+    parser.add_argument(
+        "--continuum-steps",
+        type=lambda text: [float(x) for x in text.split(",") if x],
+        default=[0.01, 0.005, 0.0025],
+        help="comma-separated ln-E candidate steps; each scored refined and unrefined",
+    )
+    parser.add_argument(
+        "--continuum-reference-divisors",
+        type=lambda text: [int(x) for x in text.split(",") if x],
+        default=[4, 8, 16],
+        help="three divisors of the default step: coarser check, reference, finer check",
+    )
     args = parser.parse_args()
+    if len(args.continuum_reference_divisors) != 3:
+        parser.error("--continuum-reference-divisors needs exactly three values")
     unknown = sorted(set(args.policy_arms) - set(POLICY_ARMS))
     if unknown:
         parser.error(f"unknown policy arms {unknown}")
@@ -558,6 +810,19 @@ def main():
             json.dumps(report, indent=2, allow_nan=False) + "\n"
         )
         print(json.dumps(dict(arm=args.arm, spectrum=label, metrics=record["metrics"])), flush=True)
+    if args.continuum:
+        report["continuum_arms"] = score_continuum(
+            case,
+            ladder,
+            args.continuum_steps,
+            args.continuum_reference_divisors,
+            args.policy_reference_spacing,
+            sync,
+        )
+        assert segment_fingerprint(ladder.segments) == ladder.fingerprint
+        (args.output / "report.json").write_text(
+            json.dumps(report, indent=2, allow_nan=False) + "\n"
+        )
     if args.policy_arms:
         sweep = scene_sweep(args.material, float(case["E0_keV"]), float(case["thickness_ang"]))
         report["policy_arms"] = score_policies(
