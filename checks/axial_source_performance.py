@@ -135,7 +135,12 @@ class GridBound:
 
         projector = runpy.run_path(str(Path(__file__).with_name("axial_mcwf_return_flux.py")))
         self.projector = projector["GridProjector"](
-            potential, solver.grid.kx, solver.grid.ky, cells, HBAR2_2M_EV_ANG2 / solver.gamma
+            potential,
+            solver.grid.kx,
+            solver.grid.ky,
+            cells,
+            HBAR2_2M_EV_ANG2 / solver.gamma,
+            cache_size=8,
         )
         self.boundary = boundary
         self.seconds = 0.0
