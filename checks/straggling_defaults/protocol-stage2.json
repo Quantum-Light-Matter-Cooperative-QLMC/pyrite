@@ -1,0 +1,20 @@
+{
+  "schema": "pyrite.straggling-defaults.protocol.v2",
+  "stage": 2,
+  "energies_keV": [5, 30, 100, 300],
+  "electron_cutoff_keV": 5.0,
+  "electron_cutoffs_keV": {"5": 1.0},
+  "range_fractions": [0.05, 0.3, 0.6],
+  "materials": {"hopg": "shell-soft-hard", "silicon": "shell-soft-hard", "mos2": "shell-soft-hard", "wse2": "shell-soft-hard", "sapphire": "continuous"},
+  "histories": 8192,
+  "seeds": {"off": [642301, 642302, 642303], "on": [642401, 642402, 642403]},
+  "warmup_seed": 1642301,
+  "max_steps": 80000,
+  "scratch_mib": 2048,
+  "max_de_frac": 0.0,
+  "inelastic_cutoff_eV": 50.0,
+  "radiative_cutoff_eV": 1000.0,
+  "transport_precision": "fp64",
+  "diagnostic_margins": {"terminal_fraction_absolute": 0.02, "transmitted_energy_mean_relative": 0.02},
+  "deferred": ["layered and grooved runs", "line and detector-band estimators", "active step and collision-cutoff convergence", "external-code/experimental accuracy", "equal achieved precision and held-out timing", "rare-tail qualification beyond 24,576 primaries per arm", "global default decision"]
+}

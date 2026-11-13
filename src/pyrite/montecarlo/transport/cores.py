@@ -1041,8 +1041,8 @@ def make_cpu_transport_core(
             else:
                 if mixed:
                     if event_j == EVENT_SOFT_HINGE or event_j == EVENT_DELTA:
-                        # Fictitious for the hard processes: their optical
-                        # depths keep running, and a new flight starts.
+                        # Fictitious for the hard processes. A hinge opens a new
+                        # flight; a delta continues it (FLIGHT_CONTINUING).
                         if event_j == EVENT_SOFT_HINGE:
                             dirs[e, 0], dirs[e, 1], dirs[e, 2] = _hinge_direction(
                                 dirs[e, 0], dirs[e, 1], dirs[e, 2], mix_length[e], E_keV[e], L,
@@ -1051,6 +1051,7 @@ def make_cpu_transport_core(
                             )  # fmt: skip
                             draws[e] += np.uint64(2)
                             mix_hinge[e] = -1.0
+                            flight_id[e], substep_id[e] = flight_id[e] + 1, 0
                         else:
                             # A rejected proposal has used up its clock; the
                             # other optical depths keep running.
@@ -1061,8 +1062,7 @@ def make_cpu_transport_core(
                             elif radiative and mix_end[e] == STEP_END_RADIATIVE:
                                 tau_rad[e] = -1.0
                             mix_left[e] = -1.0
-                        flight_id[e] += 1
-                        substep_id[e] = 0
+                            substep_id[e] += 1
                         material_steps[e] += 1
                         continue
                     # A hard event or surface ends the step (Sec. 4.4, (vi)).

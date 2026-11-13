@@ -10,7 +10,7 @@ from typing import NamedTuple
 
 TRANSPORT_MODES = ("single-scattering", "mixed")
 #: Case identity of the scheme: bump when its numerical output changes.
-MIXED_ELASTIC_MODEL = "penelope-random-hinge.v2"
+MIXED_ELASTIC_MODEL = "penelope-random-hinge.v3"
 #: PENELOPE's accepted range of C1 and C2 (PENELOPE-2024, Sec. 4.4).
 MIXED_PARAMETER_MAX = 0.2
 MIXED_DEFAULT_C1 = 0.05

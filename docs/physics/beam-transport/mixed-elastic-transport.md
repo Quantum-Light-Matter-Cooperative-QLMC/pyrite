@@ -101,7 +101,7 @@ energy tallies by up to 10%. A hundredth removed the shift. An explicit
   line width. Standard bremsstrahlung is not reachable, because spectrum runs
   always score CXR (#990).
 - `transport_mode` and its parameters are part of a case's identity, recorded
-  under the model marker `penelope-random-hinge.v2`. A default case carries no
+  under the model marker `penelope-random-hinge.v3`. A default case carries no
   mixed keys.
 
 ## Validation

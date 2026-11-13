@@ -7,6 +7,8 @@ from pathlib import Path
 
 import numpy as np
 
+MATCH_KEYS = ["energy_keV", "material", "fraction", "core", "cap", "cutoff_eV"]
+
 
 def read_groups(root, protocol_path):
     protocol = json.loads(protocol_path.read_bytes())
@@ -35,6 +37,7 @@ def read_groups(root, protocol_path):
         ):
             raise ValueError(f"population/seed mismatch: {path}")
         key = (
+            record.get("energy_keV", protocol.get("energy_keV")),
             record["material"],
             record["range_fraction"],
             record["core"],
@@ -61,7 +64,7 @@ def read_groups(root, protocol_path):
 def summarize_group(key, replicas, protocol):
     from pyrite.perf.precision import primary_moments
 
-    material, fraction, core, cap, cutoff, switch = key
+    energy, material, fraction, core, cap, cutoff, switch = key
     wanted = set(protocol["seeds"][switch])
     complete = {r["seed"] for r, _ in replicas} == wanted
     scores = {k: np.concatenate([s[k] for _, s in replicas]) for k in replicas[0][1]}
@@ -70,6 +73,7 @@ def summarize_group(key, replicas, protocol):
     stopped_path = scores["path_ang"][scores["stopped"].astype(bool)]
     times = [r["transport_s"] for r, _ in replicas]
     return dict(
+        energy_keV=energy,
         material=material,
         fraction=fraction,
         core=core,
@@ -104,8 +108,7 @@ def comparisons(groups, protocol):
             (
                 g
                 for g in groups
-                if all(g[k] == off[k] for k in ["material", "fraction", "core", "cap", "cutoff_eV"])
-                and g["straggling"] == "on"
+                if all(g.get(k) == off.get(k) for k in MATCH_KEYS) and g["straggling"] == "on"
             ),
             None,
         )
@@ -158,6 +161,7 @@ def comparisons(groups, protocol):
             )
         results.append(
             dict(
+                energy_keV=off.get("energy_keV"),
                 material=off["material"],
                 fraction=off["fraction"],
                 core=off["core"],
@@ -179,13 +183,16 @@ def main():
     args = parser.parse_args()
     protocol, raw = read_groups(args.root, args.protocol)
     groups = [summarize_group(k, v, protocol) for k, v in sorted(raw.items())]
+    energies = protocol.get("energies_keV", [protocol.get("energy_keV")])
     missing = [
-        (m, f, s)
+        (e, m, f, s)
+        for e in energies
         for m in protocol["materials"]
         for f in protocol["range_fractions"]
         for s in ["off", "on"]
         if not any(
-            g["material"] == m
+            g["energy_keV"] == e
+            and g["material"] == m
             and g["fraction"] == f
             and g["straggling"] == s
             and g["core"] == "cuda"

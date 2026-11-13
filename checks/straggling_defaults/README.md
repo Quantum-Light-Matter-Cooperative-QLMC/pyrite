@@ -74,3 +74,30 @@ observables, rare-tail populations, independent accuracy references, and
 held-out equal-precision timing. Reuse #510's comparator/scorer infrastructure
 for those gates. No default/identity/model marker changes are warranted by this
 pilot alone; historical omission semantics remain unchanged.
+
+## Stage 2: energy coverage and sized populations
+
+`protocol-stage2.json` adds coverage that stage 1 deferred:
+
+- **Energies:** 5, 30, 100 and 300 keV. The tracking threshold is 5 keV, or 1 keV
+  for the 5 keV beam, which is the lower bound of the stopping table.
+- **Slabs:** 0.05, 0.3 and 0.6 of the range. Stage 1's 0.8 slabs left only tens of
+  transmitted primaries.
+- **Population:** 8192 primaries per seed, with three independent seeds per arm.
+- **Precision:** `transport_precision="fp64"` is pinned. Exact CUDA now defaults to
+  mixed precision, and leaving it implicit would change arithmetic between stages.
+
+Materials, pinned models, the energy ledger and the event-contract checks match
+stage 1. Each `run_stage2.sbatch MATERIAL ENERGY_KEV` allocation runs every slab
+fraction with straggling off and then on. Each arm has a 900 s timeout by default.
+The script records `SOURCE_SHA`, which the submitter writes into the staged
+checkout. Analyze with:
+
+```bash
+uv run python checks/straggling_defaults/analyze.py RAW_ROOT summary.json \
+  --protocol checks/straggling_defaults/protocol-stage2.json
+```
+
+Stage 2 is still sensitivity evidence. It does not cover layered or grooved
+scenes, detector or line observables, step or cutoff convergence, independent
+accuracy references, or equal-precision timing.

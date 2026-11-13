@@ -126,7 +126,7 @@ Every midpoint row records, in `event_kind` (`int8`), the event that ended it. T
   - yes
   - unchanged
 * - 10
-  - `DELTA` (reserved)
+  - `DELTA` (mixed transport)
   - numerical node
   - no
   - unchanged
@@ -144,7 +144,7 @@ Every midpoint row records, in `event_kind` (`int8`), the event that ended it. T
 
 **Physical segment boundaries.** Elastic collisions, hard inelastic collisions, and hard radiative events are the physical interactions. Each one closes the flight: the next row opens `flight_id + 1` at `substep_id = 0`, and the default radiation reductions add the two flights incoherently. A hard radiative event keeps the electron's direction, following the PENELOPE-2024 convention (NEA/MBDAV/R(2024)1, §3.3), which leaves the photon recoil unmodelled and assigns the angular deflection to the elastic model; its discrete energy loss still ends the flight, because the emission resonance and phase velocity jump with the energy. Geometry events and the cutoff also close the flight. They are bookkeeping boundaries rather than interactions: the collision budget is redrawn after them, which the memoryless free-path law makes exact.
 
-**Numerical nodes.** A `SUBSTEP` row, and a future fictitious (`DELTA`) interaction of a majorant free-path sampler, are integration detail. The next row keeps `flight_id`, advances `substep_id` by one, and continues the direction, energy, clock, position, and collision budget unchanged. Such rows never decohere a flight: the flight-grouped CXR reduction sums them as one complex amplitude (see `substep-radiation-invariance`).
+**Numerical nodes.** A `SUBSTEP` row and a mixed-transport `DELTA` row (a step limit or rejected thinned proposal, no state change) are integration detail. The next row keeps `flight_id`, advances `substep_id` by one, and continues the direction, energy, clock and position unchanged. A `SUBSTEP` also keeps the collision budget; after a `DELTA` only the expired clock is redrawn, which the memoryless free-path law makes exact. Such rows never decohere a flight: the flight-grouped CXR reduction sums them as one complex amplitude (see `substep-radiation-invariance`).
 
 **Invariants.** `check_segment_event_contract` enforces, on rows in any order:
 

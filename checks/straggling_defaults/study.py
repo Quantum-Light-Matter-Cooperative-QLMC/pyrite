@@ -70,7 +70,7 @@ def range_ang(table, energy, cutoff):
     return float(np.trapezoid(1 / rates, grid))
 
 
-def transport_inputs(protocol, material, fraction, core, cap, cutoff):
+def transport_inputs(protocol, material, fraction, core, cap, cutoff, energy, tracking):
     from pyrite.montecarlo.transport import TransportLUTConfig
     from pyrite.montecarlo.transport.batching import PerElectronTransportConfig
     from pyrite.xsgen.bremslib.tables import load_bremsstrahlung_tables
@@ -83,15 +83,15 @@ def transport_inputs(protocol, material, fraction, core, cap, cutoff):
     elastic = resolve_layer_tables(comp)
     brem = load_bremsstrahlung_tables([el for el, _ in comp])
     table = stopping.arrays()
-    distance = range_ang(table, protocol["energy_keV"], protocol["electron_cutoff_keV"])
+    distance = range_ang(table, energy, tracking)
     kwargs = dict(
-        E0_keV=protocol["energy_keV"],
+        E0_keV=energy,
         Ne=protocol["histories"],
         thickness_ang=fraction * distance,
         composition=comp,
         crystal_width_mm=10.0,
         crystal_height_mm=10.0,
-        E_cut_keV=protocol["electron_cutoff_keV"],
+        E_cut_keV=tracking,
         energy_model="midpoint",
         max_dE_frac=cap,
         max_steps=protocol["max_steps"],
@@ -103,6 +103,7 @@ def transport_inputs(protocol, material, fraction, core, cap, cutoff):
         radiative_cutoff_eV=protocol["radiative_cutoff_eV"],
         bremslib_tables=brem,
         transport_core=core,
+        transport_precision=protocol.get("transport_precision", "auto"),
         transport_lut_config=TransportLUTConfig(enabled=False),
         per_electron_config=PerElectronTransportConfig(
             scratch_budget_bytes=protocol["scratch_mib"] * 1024**2
@@ -122,14 +123,29 @@ def transport_inputs(protocol, material, fraction, core, cap, cutoff):
     return kwargs, tables, distance
 
 
+def beam_settings(protocol, energy):
+    """Return the sampled energy and its tracking threshold, both keV.
+
+    Stage-1 protocols carry one ``energy_keV``; later stages list
+    ``energies_keV`` with optional per-energy ``electron_cutoffs_keV``.
+    """
+    energies = protocol.get("energies_keV", [protocol.get("energy_keV")])
+    energy = energies[0] if energy is None and len(energies) == 1 else energy
+    if energy not in energies:
+        raise ValueError(f"energy {energy!r} keV is not in the protocol {energies}")
+    cutoffs = protocol.get("electron_cutoffs_keV", {})
+    return float(energy), float(cutoffs.get(f"{energy:g}", protocol["electron_cutoff_keV"]))
+
+
 def run(args, protocol):
     from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
     from pyrite.perf.precision import primary_moments
 
     cap = protocol["max_de_frac"] if args.cap is None else args.cap
     cutoff = protocol["inelastic_cutoff_eV"] if args.cutoff is None else args.cutoff
+    energy, tracking = beam_settings(protocol, args.energy)
     kwargs, tables, distance = transport_inputs(
-        protocol, args.material, args.fraction, args.core, cap, cutoff
+        protocol, args.material, args.fraction, args.core, cap, cutoff, energy, tracking
     )
     enabled = args.straggling == "on"
     seeds = protocol["seeds"][args.straggling]
@@ -147,7 +163,7 @@ def run(args, protocol):
         result = simulate_trajectories(**kwargs, seed=seed, straggling=enabled)
         sync()
         elapsed = time.perf_counter() - begin
-        scores, residual = primary_scores(result, protocol["histories"], protocol["energy_keV"])
+        scores, residual = primary_scores(result, protocol["histories"], energy)
         return scores, elapsed, residual
 
     _, warmup_s, _ = sample(protocol["warmup_seed"])
@@ -155,6 +171,9 @@ def run(args, protocol):
         schema="pyrite.straggling-defaults.sample.v1",
         protocol_sha256=digest(args.protocol),
         material=args.material,
+        energy_keV=energy,
+        electron_cutoff_keV=tracking,
+        transport_precision=kwargs["transport_precision"],
         range_fraction=args.fraction,
         csda_range_ang=distance,
         thickness_ang=kwargs["thickness_ang"],
@@ -199,6 +218,7 @@ def main():
     parser.add_argument("--core", choices=["cuda", "per-electron"], default="cuda")
     parser.add_argument("--cap", type=float)
     parser.add_argument("--cutoff", type=float)
+    parser.add_argument("--energy", type=float, help="beam energy in keV (multi-energy protocols)")
     args = parser.parse_args()
     protocol = json.loads(args.protocol.read_bytes())
     if args.material not in protocol["materials"] or args.fraction <= 0:

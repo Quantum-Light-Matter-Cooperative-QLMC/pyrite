@@ -22,6 +22,7 @@ from pyrite.montecarlo.transport.events import (
     EVENT_HARD_RADIATIVE,
     EVENT_SOFT_HINGE,
     EVENT_SUBSTEP,
+    check_segment_event_contract,
 )
 from pyrite.montecarlo.transport.mixed_elastic import (
     MIXED_MAX_STEP_LAYER_FRACTION,
@@ -495,6 +496,23 @@ def test_thinned_hard_processes_keep_the_detailed_event_count(extra, event, Ne, 
     assert np.any(mixed["event_kind"] == EVENT_DELTA)
 
 
+@pytest.mark.parametrize(
+    ("extra", "Ne"),
+    [(_shell_kwargs, 100), (_radiative_kwargs, 400)],
+    ids=["inelastic", "radiative"],
+)
+def test_delta_rows_continue_their_flight(extra, Ne):
+    """A rejected proposal is a numerical node: it must not split the flight."""
+    rows = _transport(MixedElasticParameters(), seed=23, Ne=Ne, thickness=1e6, **extra())
+    kind = rows["event_kind"]
+    after = np.flatnonzero(kind[:-1] == EVENT_DELTA)
+    after = after[rows["electron_id"][after + 1] == rows["electron_id"][after]]
+    assert after.size
+    np.testing.assert_array_equal(rows["flight_id"][after + 1], rows["flight_id"][after])
+    np.testing.assert_array_equal(rows["substep_id"][after + 1], rows["substep_id"][after] + 1)
+    check_segment_event_contract(rows)
+
+
 def test_compound_rates_add_over_elements():
     composition = [("Mo", 0.0186), ("Se", 0.0372)]
     tables = {"elastic_tables": [[_sr_table(42), _sr_table(34)]], "composition": composition}
@@ -692,7 +710,7 @@ def test_mixed_case_records_model_marker_and_default_does_not():
     markers = dict(
         resolved_physics_view(_lowered(_mixed_physics()), table_markers={}).model_markers
     )
-    assert markers["mixed_elastic_model"] == "penelope-random-hinge.v2"
+    assert markers["mixed_elastic_model"] == "penelope-random-hinge.v3"
     assert "mixed_elastic_model" not in dict(
         resolved_physics_view(_lowered(), table_markers={}).model_markers
     )
