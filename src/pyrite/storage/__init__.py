@@ -1,4 +1,4 @@
-"""Persistence facade for checkpoints, observations, and execution artifacts.
+"""Persistence facade for checkpoints, observations, trajectories and execution artifacts.
 
 Storage objects describe bytes on disk, not new scientific result types.
 Classes and functions are imported lazily from their original implementations;
@@ -14,6 +14,12 @@ from importlib import import_module
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from pyrite.campaign.trajectory_io import (
+        load_trajectories as load_trajectories,
+    )
+    from pyrite.campaign.trajectory_io import (
+        save_trajectories as save_trajectories,
+    )
     from pyrite.checkpoints.persistence import (
         checkpoint_manifest as checkpoint_manifest,
     )
@@ -76,6 +82,8 @@ _EXPORTS = {
     "DirectionalArtifactRef": ("pyrite.execution.artifacts", "DirectionalArtifactRef"),
     "directional_content_key": ("pyrite.execution.artifacts", "directional_content_key"),
     "load_directional_result": ("pyrite.execution.artifacts", "load_directional_result"),
+    "save_trajectories": ("pyrite.campaign.trajectory_io", "save_trajectories"),
+    "load_trajectories": ("pyrite.campaign.trajectory_io", "load_trajectories"),
 }
 
 __all__ = [
@@ -94,6 +102,8 @@ __all__ = [
     "DirectionalArtifactRef",
     "directional_content_key",
     "load_directional_result",
+    "save_trajectories",
+    "load_trajectories",
 ]
 
 

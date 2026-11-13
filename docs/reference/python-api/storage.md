@@ -27,6 +27,22 @@ Resolve checkpoint locations and inspect or load persisted components.
    pyrite.storage.load_checkpoint
 ```
 
+## Saved trajectories
+
+Save a {py:class}`pyrite.transport.Trajectories` as the trajectory artifact
+`pyrite run --trajectories` writes, and reopen either kind for
+{py:func}`pyrite.score_spectra`. See
+[simulate once, score many times](../trajectory-workflows.md#simulate-once-score-many-times).
+
+```{eval-rst}
+.. autosummary::
+   :toctree: ../../_autosummary
+   :nosignatures:
+
+   pyrite.storage.save_trajectories
+   pyrite.storage.load_trajectories
+```
+
 ## Stored observations
 
 Persist measurement observations separately from simulation results.

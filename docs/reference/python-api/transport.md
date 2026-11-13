@@ -11,6 +11,8 @@ The entries below use generated docstrings, signatures, and source links. API su
 
    pyrite.transport.Case
    pyrite.transport.simulate_trajectories
+   pyrite.transport.Trajectories
+   pyrite.transport.ScoringRefusedError
    pyrite.transport.summarize_trajectories
    pyrite.transport.iter_primary_summaries
    pyrite.transport.depth_loss_profile
@@ -112,20 +114,30 @@ from pyrite.config import FixedSampling, Numerics, Physics
 from pyrite.geometry import Slab
 from pyrite.transport import simulate_trajectories
 
-segments = simulate_trajectories(
+trajectories = simulate_trajectories(
     Beam(30.0, transverse=PointSpot(), longitudinal=PointBunch()),
     Slab("silicon", 1000.0, tilt_deg=30.0, width=None, height=None),
     physics=Physics(
         inelastic_model="continuous", radiative_model="uncoupled", bremsstrahlung_model="eedl"
     ),
     numerics=Numerics(sampling=FixedSampling(100, 100), seed=4, transport_core="per-electron"),
-    E_cut_keV=5.0,
 )
+segments = trajectories.segments
 ```
 
+The result is a `Trajectories` (#1162): `segments` holds the transport-output
+arrays, and the object also carries the resolved scene, policies and case so
+{py:func}`pyrite.score_spectra` can score it
+([two-step scoring](../trajectory-workflows.md#simulate-once-score-many-times)). Indexing the
+object itself, as the former dict, still works with a `DeprecationWarning`.
 The incident population is the larger of the two fixed sampling counts.
-`E_cut_keV` remains an explicit positive termination energy for every primary,
-independent of scoring grids. `max_steps`, `keep_segments_on_device`,
+By default the transport is the production transport phase of
+`pyrite.simulate`: per-history cutoffs (`E_cut_lines_keV`, 5 keV, for line
+histories; `E_cut_brem_keV`, 1 keV, for continuum histories; the lower for
+shared ones) and the retrying step budget. Before #1162 the default was one
+5 keV cutoff for every primary. An explicit positive `E_cut_keV` applies to
+every primary and an explicit `max_steps` fixes the step limit; such results
+are not scorable. `keep_segments_on_device`,
 `collect_diagnostics`, and `transport_progress` remain output/execution controls.
 An optional scalar `detector` supplies observation geometry for target-dependent
 bunch timing; omission uses the canonical detector-free source direction.

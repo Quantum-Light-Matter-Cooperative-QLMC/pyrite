@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from ..montecarlo.case import Case
     from .model import Numerics, Scene
 
-__all__ = ["Trajectories"]
+__all__ = ["ScoringRefusedError", "Trajectories"]
 
 _MAPPING_DEPRECATION = (
     "dict-style access to simulate_trajectories() output is deprecated and will be "
@@ -61,21 +61,51 @@ def segment_fingerprint(segments: Mapping[str, Any]) -> str:
     return f"{rows}:{digest.hexdigest()}"
 
 
+class ScoringRefusedError(ValueError):
+    """A scoring request would have changed the transport it scores.
+
+    ``field`` names the offending input.
+    """
+
+    def __init__(self, field: str, message: str):
+        super().__init__(message)
+        self.field = field
+
+
+def _same(a: Any, b: Any) -> bool:
+    if isinstance(a, np.ndarray) or isinstance(b, np.ndarray):
+        return np.array_equal(np.asarray(a), np.asarray(b))
+    try:
+        result = a == b
+    except (TypeError, ValueError):
+        return False
+    if isinstance(result, np.ndarray):
+        return bool(result.all()) and np.shape(a) == np.shape(b)
+    return bool(result)
+
+
+def _short(value: Any) -> str:
+    text = repr(value)
+    return text if len(text) <= 80 else text[:77] + "..."
+
+
 @dataclass(frozen=True, eq=False)
 class Trajectories(Mapping[str, Any]):
     """One fixed-seed electron transport and the resolved scene it came from.
 
     Returned by :func:`pyrite.transport.simulate_trajectories` and
     :func:`pyrite.storage.load_trajectories`; pass it to
-    :func:`pyrite.score_spectra`. It holds every transported segment, so its
+    :func:`pyrite.score_spectra` and save it with
+    :func:`pyrite.storage.save_trajectories`. It holds every transported segment, so its
     memory is that of the transport; CUDA segments stay on the device when
     requested.
 
     Attributes
     ----------
     scene
-        Beam, target and capture detector (``None`` for detector-free
-        transport). Downstream filters and acquisition are not part of it.
+        Beam, target and capture detector (detector ``None`` for
+        detector-free transport). Downstream filters and acquisition are not
+        part of it. ``None`` for an artifact loaded without its components.
     physics, numerics
         The resolved policies the transport used.
     case
@@ -92,7 +122,7 @@ class Trajectories(Mapping[str, Any]):
     scene: Scene | None
     physics: Physics | None
     numerics: Numerics | None
-    case: Case
+    case: Case | Mapping[str, Any]
     _transport: dict[str, Any] = field(repr=False)
     _xsgen_tables: Mapping[str, str] = field(repr=False, default_factory=dict)
     #: Explicit engine controls that make this transport differ from production.
@@ -100,6 +130,8 @@ class Trajectories(Mapping[str, Any]):
     #: Recorded fingerprint of a loaded artifact; verified on first access.
     _stored_fingerprint: str | None = field(repr=False, default=None)
     _source: str | None = field(repr=False, default=None)
+    #: Segments stay in the artifact at ``_source``; scoring streams them.
+    _stream: bool = field(repr=False, default=False)
 
     @property
     def segments(self) -> Mapping[str, Any]:
@@ -109,6 +141,11 @@ class Trajectories(Mapping[str, Any]):
     @property
     def segment_count(self) -> int:
         """Number of transported electron segments."""
+        if self._stream:
+            from ..montecarlo.trajectories import read_trajectory_header
+
+            assert self._source is not None
+            return int(read_trajectory_header(self._source)["segment_count"])
         return int(_host(self.segments["L_ang"]).size)
 
     @cached_property
@@ -119,7 +156,7 @@ class Trajectories(Mapping[str, Any]):
     @property
     def scorable(self) -> bool:
         """Whether :func:`pyrite.score_spectra` accepts this transport."""
-        return self.scene is not None and not self._engine_overrides
+        return not self._engine_overrides
 
     # Deprecated Mapping view of the former dict output (#1162).
     def _warn(self) -> None:

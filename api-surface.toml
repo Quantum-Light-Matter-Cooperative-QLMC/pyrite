@@ -235,6 +235,10 @@ CaseArtifactStore = { target = "pyrite.execution.artifacts:CaseArtifactStore", s
 DirectionalArtifactRef = { target = "pyrite.execution.artifacts:DirectionalArtifactRef", status = "advanced-stable" }
 directional_content_key = { target = "pyrite.execution.artifacts:directional_content_key", status = "advanced-stable" }
 load_directional_result = { target = "pyrite.execution.artifacts:load_directional_result", status = "advanced-stable" }
+# #1162: Trajectories persist as the existing trajectory artifact (schema >= 2);
+# load rebinds caller components and refuses a different case.
+save_trajectories = { target = "pyrite.campaign.trajectory_io:save_trajectories", status = "advanced-stable" }
+load_trajectories = { target = "pyrite.campaign.trajectory_io:load_trajectories", status = "advanced-stable" }
 
 # Historical underscored __all__ entries: compatibility only, not public APIs.
 # Exact sets are guarded; new private exports require a deliberate review.

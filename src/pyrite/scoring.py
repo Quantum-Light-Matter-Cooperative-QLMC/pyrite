@@ -15,11 +15,11 @@ transport read is refused before spectrum work, naming the field.
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 
-from .campaign.trajectory_product import Trajectories
+from .campaign.trajectory_product import ScoringRefusedError, Trajectories, _same, _short
 
 if TYPE_CHECKING:
     from ._numerics import Physics
@@ -28,6 +28,7 @@ if TYPE_CHECKING:
     from .detectors import Detector, PlanarDetector
     from .instrument import Acquisition, FilterPlate, NativeAcquisition
     from .instrument.filter import Filter
+    from .montecarlo.case import Case
     from .observations.spec import Observation
     from .results.model import Result
 
@@ -80,17 +81,6 @@ _FIELD_OWNERS = {
     "E_cut_lines_keV": "line electron cutoff",
     "E_cut_brem_keV": "continuum electron cutoff",
 }
-
-
-class ScoringRefusedError(ValueError):
-    """A scoring request would have changed the transport it scores.
-
-    ``field`` names the offending input.
-    """
-
-    def __init__(self, field: str, message: str):
-        super().__init__(message)
-        self.field = field
 
 
 def score_spectra(
@@ -163,7 +153,9 @@ def score_spectra(
         raise TypeError("trajectories must be a pyrite.transport.Trajectories")
     _refuse_unscorable(trajectories)
     scene = trajectories.scene
-    assert scene is not None
+    if scene is None:
+        _refuse_rebinding(detector, physics, numerics, filters, acquisition, observation)
+        return _score_recorded(trajectories, progress)
     detector = scene.detector if detector is None else detector
     if detector is None:
         raise ValueError(
@@ -184,6 +176,11 @@ def score_spectra(
     case, xsgen_tables = _source_case(request)
     refuse_mixed_cxr(case)
     check_transport_identity(trajectories, request.numerics, case, xsgen_tables)
+    if trajectories._stream:
+        _require_recorded_case(trajectories, case, request.scene.detector)
+        with transport_tuning(request.numerics), run_progress(progress):
+            output = _streamed_output(trajectories)
+        return _scalar_result(request, case, xsgen_tables, output)
     transport = _scoring_transport(trajectories, case)
     if isinstance(request.scene.detector, PlanarDetector):
         if request.numerics.temporal_profile:
@@ -204,6 +201,67 @@ def score_spectra(
     return _scalar_result(request, case, xsgen_tables, output)
 
 
+def _refuse_rebinding(*inputs: Any) -> None:
+    if any(value is not None for value in inputs):
+        raise ScoringRefusedError(
+            "scene",
+            "these trajectories were loaded without their components, so they score only "
+            "their recorded case; pass beam, target, physics, numerics and the capture "
+            "detector to pyrite.storage.load_trajectories to score other detectors or grids",
+        )
+
+
+def _score_recorded(trajectories: Trajectories, progress) -> Result:
+    """Replay a loaded artifact's own case with its recorded spectrum inputs."""
+    from .api import _case_result
+    from .montecarlo.runner import _spectrum_with_recovery
+    from .montecarlo.runner.transport_options import run_progress
+
+    case = trajectories.case
+    with run_progress(progress):
+        if trajectories._stream:
+            output = _streamed_output(trajectories)
+        else:
+            output = _spectrum_with_recovery(
+                case, dict(trajectories._transport), segs_owner=trajectories._transport
+            )
+    return _case_result(
+        cast("Case", case),  # a run artifact may record a legacy mapping case
+        trajectories._xsgen_tables,
+        output,
+        brem_source="mc",
+        numerics=None,
+        provenance={"scene": None, "trajectory_artifact": trajectories._source},
+    )
+
+
+def _require_recorded_case(trajectories: Trajectories, case, detector) -> None:
+    from .detectors import PlanarDetector
+
+    if isinstance(detector, PlanarDetector):
+        raise ScoringRefusedError(
+            "detector", "streamed scoring supports the recorded scalar detector only"
+        )
+    for key in sorted(set(trajectories.case) | set(case)):
+        if not _same(trajectories.case.get(key), case.get(key)):
+            raise ScoringRefusedError(
+                key,
+                f"streamed scoring replays the recorded case only ({key} differs); "
+                "load with stream=False to score other detectors or grids",
+            )
+
+
+def _streamed_output(trajectories: Trajectories) -> dict[str, Any]:
+    from .montecarlo.runner.artifacts import stream_spectrum_from_artifact
+    from .montecarlo.trajectories import TrajectoryArtifactError
+
+    assert trajectories._source is not None
+    try:
+        return stream_spectrum_from_artifact(trajectories._source)
+    except TrajectoryArtifactError as error:
+        raise ScoringRefusedError("stream", str(error)) from error
+
+
 def _refuse_unscorable(trajectories: Trajectories) -> None:
     for name, value in trajectories._engine_overrides.items():
         raise ScoringRefusedError(
@@ -212,14 +270,8 @@ def _refuse_unscorable(trajectories: Trajectories) -> None:
             "pyrite.simulate uses the production default, so transport again with "
             f"simulate_trajectories(..., {name}=None)",
         )
-    if trajectories.scene is None:
-        raise ScoringRefusedError(
-            "scene",
-            "these trajectories carry no typed scene; score them with "
-            "`pyrite trajectories score` or recapture with simulate_trajectories",
-        )
     stored = trajectories._stored_fingerprint
-    if stored is not None and stored != trajectories.fingerprint:
+    if stored is not None and not trajectories._stream and stored != trajectories.fingerprint:
         raise ScoringRefusedError(
             "fingerprint",
             f"trajectory artifact {trajectories._source} segments do not match their "
@@ -299,20 +351,3 @@ def _scoring_transport(trajectories: Trajectories, case) -> dict[str, Any]:
         **trajectories._transport,
         **case_spectrum_inputs(case, segs, case["Ne"], case["Ne_brem"]),
     }
-
-
-def _same(a: Any, b: Any) -> bool:
-    if isinstance(a, np.ndarray) or isinstance(b, np.ndarray):
-        return np.array_equal(np.asarray(a), np.asarray(b))
-    try:
-        result = a == b
-    except (TypeError, ValueError):
-        return False
-    if isinstance(result, np.ndarray):
-        return bool(result.all()) and np.shape(a) == np.shape(b)
-    return bool(result)
-
-
-def _short(value: Any) -> str:
-    text = repr(value)
-    return text if len(text) <= 80 else text[:77] + "..."

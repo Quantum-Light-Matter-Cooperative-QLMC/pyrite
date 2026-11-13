@@ -41,9 +41,9 @@ tuned = scene.numerics.with_kernel_tuning(result.best)  # use in a fresh process
 ```
 
 The two groups are **separate studies**. Transport candidates run only
-electron transport ({func}`pyrite.phases.simulate_transport`) and must
+electron transport ({func}`pyrite.transport.simulate_trajectories`) and must
 reproduce the baseline's transported arrays bit for bit. Spectrum candidates
-rescore one kept baseline transport ({func}`pyrite.phases.score_spectra`):
+rescore one kept baseline transport ({func}`pyrite.score_spectra`):
 no transport is repeated, and their spectral grids must equal the baseline's
 and densities agree within `rtol`/`atol`. Transport controls do not change
 the transport, so neither study depends on the other's winner; the searches
@@ -79,22 +79,29 @@ device.
 
 ## Run the phases yourself
 
-The phase functions are ordinary experimental API, independent of tuning:
+The phases are the stable two-step workflow, independent of tuning:
 
 <!-- verify: skip (requires a CUDA device) -->
 ```python
+import pyrite
 from pyrite.config import KernelTuning
-from pyrite.phases import score_spectra, simulate_transport
+from pyrite.transport import simulate_trajectories
 
-transported = simulate_transport(scene, progress=print)  # no spectra
-first = score_spectra(transported)  # equals pr.simulate(scene)
-again = score_spectra(transported, kernel_tuning=KernelTuning(cxr_chunk=32768))
+transported = simulate_trajectories(
+    scene.beam, scene.target, physics=physics, numerics=numerics,
+    detector=scene.detector, keep_segments_on_device=True,
+)  # no spectra
+first = pyrite.score_spectra(transported)  # equals pr.simulate(scene)
+chunks = numerics.with_kernel_tuning(KernelTuning(cxr_chunk=32768))
+again = pyrite.score_spectra(transported, numerics=chunks)
 ```
 
-`score_spectra` never transports; it changes only spectral chunks. The kept
-transport holds every segment, on the device for CUDA, until released. To
-persist a transport and rescore it later from disk, use
-`pyrite run --trajectories` and `pyrite trajectories score`.
+`score_spectra` never transports; transport settings are fixed by the kept
+transport and a changed one is refused. The kept transport holds every
+segment, on the device for CUDA, until released. To persist a transport and
+rescore it later from disk, use `pyrite.storage.save_trajectories` (see
+[simulate once, score many times](../reference/trajectory-workflows.md#simulate-once-score-many-times))
+or `pyrite run --trajectories` and `pyrite trajectories score`.
 `pyrite.simulate(..., progress=callback)` reports the same
 `SimulationProgress` events (transport batches, then spectrum stages) for any
 in-process run.

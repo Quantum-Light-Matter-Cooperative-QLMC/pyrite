@@ -135,6 +135,96 @@ The close-up crystal is a lateral crop around the selected tracks, retains the r
 
 `--color` takes any cell array (`generation`, `layer`, `event_kind`, `t_start_ang`, ...); an unknown name lists the available ones. `--threshold FIELD LOW HIGH` repeats. Headless hosts need `pvbatch --force-offscreen-rendering` or an OSMesa/EGL ParaView build. In the GUI, use **Macros > Import new macro...** with the same file, select an opened export in the Pipeline Browser, and run the macro. For a remote capture, export a subset there and copy the `.vtp`, or connect the ParaView client to a `pvserver` on that host.
 
+## Simulate once, score many times
+
+`pyrite.simulate` transports electrons and scores their spectra in one call.
+The two-step workflow splits those phases so that one fixed-seed transport can
+be scored under several detectors, observation directions, line grids or
+quadratures with no transport noise between them:
+
+<!-- verify: skip (illustrative; see tests/campaign/test_score_spectra.py) -->
+```python
+import pyrite
+from pyrite.detectors import Detector
+from pyrite.transport import simulate_trajectories
+
+trajectories = simulate_trajectories(beam, target, physics=physics, numerics=numerics)
+front = pyrite.score_spectra(trajectories, Detector(observation_angle_deg=90.0))
+side = pyrite.score_spectra(trajectories, Detector(observation_angle_deg=60.0))
+```
+
+{py:func}`pyrite.transport.simulate_trajectories` returns a
+{py:class}`pyrite.transport.Trajectories`: the segment arrays
+(`trajectories.segments`, angstrom and keV as in the
+[transport outputs](../physics/beam-transport/transport-outputs.md)), the
+resolved beam, target, capture detector, `Physics`, `Numerics` and case, and a
+segment fingerprint. {py:func}`pyrite.score_spectra` runs only the production
+spectrum phase on it (lines, characteristic, bremsstrahlung, transition
+radiation and the automatic line grid) and returns the same
+{py:class}`pyrite.Result` as `pyrite.simulate` for the same components: source
+photon densities per incident electron per eV per sr, or observation averages
+and spatial data for a planar detector. On one backend the two are bit for bit
+equal. `score_spectra` never transports.
+
+**What may change between scores.** Any detector, observation, acquisition and
+filters, and the spectrum-phase settings of `physics=`/`numerics=`: line grids
+and their policy, quadrature, reflections, emission mode, temporal output,
+line roulette, spectral chunks and CXR launch controls. A detector-free
+transport (`detector=None`) must be given a detector to score.
+
+**What is refused.** Anything that would have changed the transport, checked by
+comparing the lowered scoring case with the transported one field by field:
+target, beam, transport physics or numerics, seed, history population, table
+identity, transport kernel tuning, and explicit `E_cut_keV`/`max_steps`. A
+grooved target's transport geometry depends on the observation angle, so its
+detector angle is fixed; coherent and temporal scoring need the capture
+detector's placement. Every refusal raises
+{py:class}`pyrite.transport.ScoringRefusedError` (a `ValueError`) before any
+spectrum work; its `field` names the input.
+
+**Transport defaults.** Since #1162 `simulate_trajectories` uses the production
+per-history cutoffs (5 keV for line histories, 1 keV for continuum histories,
+the lower for shared ones) and the retrying step budget, exactly as
+`pyrite.simulate`. Earlier releases stopped every primary at 5 keV. Pass
+`E_cut_keV`/`max_steps` for a single explicit cutoff or limit; such
+trajectories are for transport analysis and cannot be scored.
+
+**Saving.** {py:func}`pyrite.storage.save_trajectories` writes the same HDF5
+artifact as `pyrite run --trajectories`, plus the segment fingerprint.
+{py:func}`pyrite.storage.load_trajectories` reopens either kind. Pass the
+components the transport was made from to score any detector again; they must
+lower to the stored case exactly, otherwise the first differing field is named:
+
+<!-- verify: skip (illustrative) -->
+```python
+from pyrite.storage import load_trajectories, save_trajectories
+
+path = save_trajectories(trajectories, "hopg.h5")
+again = load_trajectories(path, beam, target, physics=physics, numerics=numerics)
+recorded = load_trajectories("pyrite-output/trajectories/.../E0_30keV.h5")
+pyrite.score_spectra(recorded)  # the recorded case and detector only
+```
+
+Without components, which is how run captures load, the result replays only
+its recorded case and detector, with the inputs the run stored; this is the
+computation `pyrite trajectories score` performs. That command scores into run
+checkpoints and therefore accepts run captures only. `stream=True` leaves the
+segments on disk and scores the recorded case in bounded-memory electron
+blocks; streamed spectra equal in-memory ones to floating-point summation order
+(rtol 1e-12 in tests), and coherent or temporal cases are refused. The
+fingerprint of an in-memory load is verified before scoring.
+
+**When to prefer two steps.** Transport dominates a case: #186 measured CPU
+transport at 6–14× the CUDA spectrum phase for 40 keV hopg, hBN and MoS₂, and
+an artifact read costs about 1.2 µs per segment against about 9.6 µs per
+segment of CPU transport. Scoring a kept transport is therefore much cheaper
+than transporting again, and comparisons between scores carry no transport
+noise. Keep one-shot `pyrite.simulate` for a single score, adaptive sampling,
+channeling, quantum entry states, streamed scoring and photon aperture
+tallies, which `simulate_trajectories` does not admit. In memory, a
+`Trajectories` holds every segment; save it and load with `stream=True` when
+it does not fit.
+
 ## Analyze saved trajectory captures
 
 Schema-2/3 trajectory artifacts can be reduced without running transport by

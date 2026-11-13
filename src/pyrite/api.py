@@ -396,12 +396,33 @@ def _scalar_result(
     output: Mapping[str, Any],
     numerics: Numerics | None = None,
 ) -> Result:
-    """``Result`` of one scalar-detector ``run_case`` output; shared with :mod:`pyrite.phases`."""
+    """``Result`` of one scalar-detector ``run_case`` output; shared with :mod:`pyrite.scoring`."""
     scene = request.scene
     resolved_numerics = request.numerics if numerics is None else numerics
+    return _case_result(
+        case,
+        xsgen_tables,
+        output,
+        brem_source=cast(str, scene.physics.brem_source),
+        numerics=resolved_numerics,
+        provenance={**request.composition_provenance, "scene": scene},
+    )
+
+
+def _case_result(
+    case: Case,
+    xsgen_tables: Mapping[str, str],
+    output: Mapping[str, Any],
+    *,
+    brem_source: str,
+    numerics: Numerics | None,
+    provenance: Mapping[str, Any],
+) -> Result:
+    """Scalar ``Result`` of one spectrum-phase output; ``provenance`` leads the record."""
+    resolved_numerics = numerics
     background_energy = output.get("E_grid_brem", output["E_grid"])
     background = output.get("brem_wide", output["brem"])
-    if scene.physics.brem_source != "mc":
+    if brem_source != "mc":
         background = np.zeros_like(background)
     coherent = output.get("spec_coherent")
     characteristic = output.get("spec_characteristic")
@@ -432,8 +453,7 @@ def _scalar_result(
         ),
         case=case,
         provenance={
-            **request.composition_provenance,
-            "scene": scene,
+            **provenance,
             "numerics": resolved_numerics,
             "identity_digest": case_content_key(case, xsgen_tables=xsgen_tables),
             # Automatic case-local line grids (issue #101): the policy is what
