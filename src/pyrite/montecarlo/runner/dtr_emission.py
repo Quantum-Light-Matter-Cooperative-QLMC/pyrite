@@ -2,7 +2,8 @@
 
 The existing TR component remains separate. The line slot is a signed
 correction to it, so their sum is the squared joint Maxwell field, including
-interference. This model is experimental and independently unverified.
+interference. The transported charge-current accounting is independently
+rederived; this experimental model has no published-spectrum anchor.
 
 Validation: dtr-transported-current, line-tr-phase-reconciliation
 """

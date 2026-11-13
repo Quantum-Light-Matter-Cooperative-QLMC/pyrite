@@ -349,9 +349,12 @@ a fresh spectral-grid convergence check.
 line scorer with the experimental CPU transported-current solve. The default
 remains `"off"`: no two-beam field is computed and existing default cache
 identities are preserved. `"history"` and `"bunch"` retain their earlier
-homogeneous-stack TR behavior. The new claims remain **unverified**;
-passing the consistency checks below does not establish independent physics
-validation or the published DTR/PXR anchor.
+homogeneous-stack TR behavior. The transported charge-current claim is
+**rederived**: its [independent Maxwell derivation](../../validation/radiation-physics/dtr-transported-current.md)
+checks the modal source, exterior continuations and field/power accounting.
+The locally straight crossing-TR baseline remains an approximation. The
+consistency checks below do not establish a published DTR/PXR anchor,
+transport accuracy or hardware parity.
 
 The first production scope is one reflection in one perfect crystal layer,
 with homogeneous outer layers, planar faces, equal line/continuum trial counts
