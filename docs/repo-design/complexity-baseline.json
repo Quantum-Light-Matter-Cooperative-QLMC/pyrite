@@ -485,7 +485,7 @@
     {
       "path": "src/pyrite/montecarlo/spectrum/cxr/_per_hkl.py",
       "name": "_accumulate_reflection",
-      "cc": 23
+      "cc": 22
     },
     {
       "path": "src/pyrite/montecarlo/spectrum/cxr/_per_hkl.py",

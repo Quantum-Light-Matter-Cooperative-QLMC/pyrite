@@ -20,12 +20,13 @@ from ..coherent_transverse import transverse_envelope, transverse_form_factor
 from ..segment_escape import piece_mean_transmission
 from . import _policy
 from ._bin_quadrature import sincsq_bin_lineshape
-from ._cpu_reduce import accumulate_grouped_formation, accumulate_sincsq, numpy_backend
+from ._cpu_reduce import accumulate_sincsq, numpy_backend
 from ._formation import (
     _formation_cxr,
     formation_profile,
     formation_window_half_width,
 )
+from ._grouped import accumulate_flight_grouped
 from ._kernels import (
     _accumulate_edge_truncation,
     _audit_skips_reduction,
@@ -826,7 +827,6 @@ def _accumulate_reflection(
     spec = st.spec
     spec_pxr = st.spec_pxr
     spec_cbs = st.spec_cbs
-    seg_r = st.seg_r
     cxr_electron = st.cxr_electron
     v_all = st.v_all
     gamma_all = st.gamma_all
@@ -836,9 +836,6 @@ def _accumulate_reflection(
     E_tab_g = st.E_tab_g
     log_mu_tab_g = st.log_mu_tab_g
     delta_tab_g = st.delta_tab_g
-    omega_grid = st.omega_grid
-    delta_omega_grid = st.delta_omega_grid
-    d_all = st.d_all
 
     # -- 1. per-piece Snell resonance (Zhai SI Eqs. 7-9) ---------------------
     #   omega_res = v.g / (1 - v.n - delta v.grad L)   [1/Ang]   (>0 radiates)
@@ -993,11 +990,9 @@ def _accumulate_reflection(
     # the point -- and not the number of independent emitters.
     if gid_all is not None:  # i.e. ``grouped``, narrowed for the gather below
         amp = xp.sqrt(ALPHA_FS * om / (4.0 * xp.pi**2 * HBARC_EV_ANG))
-        d = d_all[idx] + recoil_phase[0]
-        g_phase = _matvec3(seg_r[idx], g_vec_d) + recoil_phase[1]
         coefs = [(amp * t_L) * A_e for A_e in pol_A]
         good = _formation_good(amp, t_L, cxr_rows, coefs)
-        sel = np.flatnonzero(good)
+        sel = xp.flatnonzero(good)
         if sel.size == 0:
             return
         if st.temporal_buf is not None:
@@ -1013,28 +1008,7 @@ def _accumulate_reflection(
                 HBARC_EV_ANG * a_vac,
                 mass,
             )
-        gid = gid_all[idx[sel]]
-        # Gather this flight's rows together; a stable sort leaves already
-        # grouped input (and each group's internal row order) untouched.
-        perm = np.argsort(gid, kind="stable")
-        sel = sel[perm]
-        gid = gid[perm]
-        starts = np.flatnonzero(np.concatenate(([True], gid[1:] != gid[:-1])))
-        bounds = np.append(starts, sel.size)
-        # Fused host kernel: one (row, energy) element at a time, O(rows + n_E)
-        # memory, no sinc cutoff (the route never windows). _setup refuses the
-        # device backends, so the NumPy namespace is guaranteed here.
-        accumulate_grouped_formation(
-            cxr_rows.take(sel),
-            d[sel],
-            g_phase[sel],
-            L_esc[sel],
-            [c[sel] for c in coefs],
-            bounds,
-            (E_grid, omega_grid, delta_omega_grid),
-            spec,
-            wm,
-        )
+        accumulate_flight_grouped(st, idx, sel, coefs, cxr_rows, L_esc, recoil_phase, g_vec_d, wm)
         return
 
     # -- 7c. coherent (phased) accumulation -----------------------------------

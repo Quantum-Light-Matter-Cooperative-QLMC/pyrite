@@ -14,8 +14,6 @@ import pytest
 from pyrite._backend import xp
 from pyrite.montecarlo.spectrum.cxr import _batched, _setup
 
-_HOST = getattr(xp, "__name__", "") == "numpy"
-
 
 @pytest.mark.parametrize("duplicate", [False, True])
 @pytest.mark.parametrize("stride", [1, 2**40])
@@ -30,9 +28,23 @@ def test_device_flight_flag_matches_host_grouping(duplicate, stride):
     segments = {"flight_id": xp.asarray(flight), "elec_id": xp.asarray(owner)}
     grouped, gid = _setup._flight_groups(segments)
     assert grouped is duplicate
-    # Only the host backend builds group ids; a device backend refuses grouped.
-    assert (gid is None) is (not (duplicate and _HOST))
+    # Both backends build group ids exactly when some flight has several rows.
+    assert (gid is None) is (not duplicate)
     assert _setup._device_rows_share_flight(xp.asarray(flight), xp.asarray(owner)) is duplicate
+
+
+def test_device_flight_ids_match_host_ids():
+    """The device id builder numbers groups like the host lexsort (#1152)."""
+    rng = np.random.default_rng(11)
+    owner = rng.integers(0, 9, 400)
+    flight = rng.integers(-3, 25, 400)
+    order = np.lexsort((flight, owner))
+    new = np.ones(400, dtype=bool)
+    new[1:] = (flight[order][1:] != flight[order][:-1]) | (owner[order][1:] != owner[order][:-1])
+    host = np.empty(400, dtype=np.int64)
+    host[order] = np.cumsum(new) - 1
+    gid = _setup._device_flight_ids(xp.asarray(flight), xp.asarray(owner))
+    np.testing.assert_array_equal(np.asarray(getattr(gid, "get", lambda: gid)()), host)
 
 
 def test_device_flight_flag_overflow_fallback():
