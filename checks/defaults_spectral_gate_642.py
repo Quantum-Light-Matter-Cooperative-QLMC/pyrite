@@ -98,14 +98,55 @@ def runtime():
     from pyrite._backend import BACKEND
 
     if BACKEND.name == "cpu":
-        return lambda: None, "cpu", lambda: 0
+        return lambda: None, "cpu", lambda: 0, None
     import cupy
 
     return (
         cupy.cuda.Device().synchronize,
         str(cupy.cuda.runtime.getDeviceProperties(0)["name"]),
         lambda: cupy.get_default_memory_pool().total_bytes(),
+        device_peak_probe(cupy),
     )
+
+
+def device_peak_probe(cupy):
+    """One untimed call: peak CuPy-pool bytes in use, and pool reservation.
+
+    The pool is emptied first, so its reservation after the call is the
+    call's reservation high-water. A hook tracks rounded in-use bytes; it
+    slows malloc, so it never wraps a timed call.
+    """
+    pool = cupy.get_default_memory_pool()
+
+    class Peak(cupy.cuda.MemoryHook):
+        name = "Peak"
+
+        def __init__(self):
+            self.live = self.peak = 0
+
+        def malloc_postprocess(self, **kw):
+            if kw["mem_ptr"]:
+                self.live += kw["mem_size"]
+                self.peak = max(self.peak, self.live)
+
+        def free_postprocess(self, **kw):
+            self.live -= kw["mem_size"]
+
+    def probe(call, *args):
+        cupy.cuda.Device().synchronize()
+        pool.free_all_blocks()
+        base = pool.used_bytes()
+        hook = Peak()
+        with hook:
+            call(*args)
+            cupy.cuda.Device().synchronize()
+        return dict(
+            device_peak_in_use_bytes=int(base + hook.peak),
+            device_pool_reserved_after_emptied_call_bytes=int(pool.total_bytes()),
+            device_in_use_before_call_bytes=int(base),
+        )
+
+    return probe
 
 
 def main():
@@ -212,7 +253,7 @@ def main():
     elif args.arm == "mixed-elastic":
         # Use the model's own validated tuning defaults; admission may refuse.
         case.update(transport_mode="mixed", mixed_c1=0.05, mixed_c2=0.05)
-    sync, device, pool_bytes = runtime()
+    sync, device, pool_bytes, peak_probe = runtime()
     args.output.mkdir(parents=True, exist_ok=False)
     sync()
     start = time.perf_counter()
@@ -289,6 +330,7 @@ def main():
             sync()
             times.append(time.perf_counter() - begin)
         label = f"{quadrature}-{spacing}"
+        memory = None if peak_probe is None else peak_probe(scorer.lines, grid)
         np.savez_compressed(args.output / f"{label}.npz", grid_eV=grid, density=density)
         record = dict(
             quadrature=quadrature,
@@ -297,6 +339,7 @@ def main():
             first_s=times[0],
             warm_s=times[1:],
             metrics=metrics(grid, density, quadrature),
+            device_memory=memory,
         )
         records.append(record)
         assert segment_fingerprint(ladder.segments) == ladder.fingerprint
