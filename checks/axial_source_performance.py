@@ -215,7 +215,7 @@ def profile_rows(profiler):
                 cumulative_s=cumulative,
             )
         )
-    return sorted(rows, key=lambda row: row["cumulative_s"], reverse=True)[:80]
+    return sorted(rows, key=lambda row: row["cumulative_s"], reverse=True)
 
 
 def worker(args):
@@ -295,7 +295,11 @@ def main():
             for k in ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS")
         },
         "samples": samples,
-        "cache_policy": "fresh input engine per chunk; fresh pool per repeat; first sample cold, later filesystem/import caches warm",
+        "cache_policy": (
+            "single process; fresh solver/projector per repeat; driver imports and any CUDA context precede request timer; kernel/filesystem caches may be warm"
+            if ns.mode == "grid-bound"
+            else "fresh input engine per chunk; fresh pool per repeat; first sample cold, later filesystem/import caches warm"
+        ),
     }
     if ns.profile:
         profiler = cProfile.Profile()

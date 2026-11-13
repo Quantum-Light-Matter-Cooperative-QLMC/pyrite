@@ -566,9 +566,55 @@ its retained projection with the incident entry weight. The fibre absorbs
 outgoing cut/window outcomes; a finite periodic supercell permits return flux
 and discretizes transverse transfer/Bloch sectors, with its own out-of-band
 sink. Thus equal observable definitions do not make their generators equal.
-The CUDA protocol varies points per cell, supercell size and propagation step,
-and includes full bound-projector eigensolves and transfers in its arm cost.
-Until those results establish convergence and uncertainty, these CPU records
-support neither grid/fibre agreement nor replacing the validated fibre source
-with grid MCWF. The CPU-first decision does not lift the GPU gate or widen the
-admitted envelope.
+Other differences remain: the fibre truncates electronic density harmonics at
+four on a 32-point density grid, while the real-space model uses its represented
+density harmonics; continuum-string TDS and projected waiting-time evolution
+also differ from discrete-supercell transfers and full-grid Strang/fixed-step
+MCWF. A discrepancy cannot be assigned solely to return flux.
+
+The completed RTX 5080 study uses 32 histories per seed, seeds 1154–1156,
+and varies points per cell, supercell size and propagation step. All five
+local refinement comparisons meet the predeclared criterion: an exposure
+change below 5% and compatible with zero within twice the paired seed-mean
+SEM. These are local refinement checks, not a rigorous numerical error bound
+or a full joint Bloch-sector/grid-limit extrapolation.
+
+| Refinement | Exposure change | Paired-difference SEM (Å) |
+|---|---:|---:|
+| 1×1 cells, 24 → 32 points/cell | +0.17% | 2.99 |
+| 2×2 cells, 24 → 32 points/cell | +0.18% | 3.12 |
+| 1×1 → 2×2 cells, 24 points/cell | −0.10% | 2.47 |
+| 2×2 → 3×3 cells, 24 points/cell | −0.06% | 1.44 |
+| 2×2 cells, step 5 → 2.5 Å | +0.02% | 0.31 |
+
+Using 2×2 cells, 32 points/cell and a 5 Å propagation step as the grid
+reference gives:
+
+| Model | Total histories | Bound weight at 3000 Å | Bound exposure (Å) | Request wall per seed (s) |
+|---|---:|---:|---:|---:|
+| Fibre, CPU, four workers | 1536 | 0.540 ± 0.008 | 2103 ± 25 | 9.00–9.54 (512 histories) |
+| Grid, RTX 5080 | 96 | 0.583 ± 0.067 | 2199 ± 141 | 121.85–156.27 (32 histories) |
+
+Errors are SEMs across three seed means. The grid-minus-fibre exposure is
+96 ± 117 Å using seed-paired differences, a central shift of +4.6% that is
+unresolved at this precision. Matching integer seeds between unlike
+unravellings does not make their trajectories shared. These results establish
+neither statistical equivalence nor a photon-source error budget.
+
+The grid request includes 120.79–155.19 s of CPU full-spectral projection and
+host/device transfer; it is dominated by the diagnostic observable. Subtracting
+that timer leaves about 1.1 s, including input/solver construction and device
+work; this subtraction is not a kernel benchmark. Request timers exclude
+driver imports and initial CUDA-context creation; the fibre timer includes its
+internal worker-pool startup. Kernel caches may already be warm. Unequal
+ensemble sizes, observable costs and cache conditions prevent interpreting
+these arm costs as a source speedup comparison.
+
+The [paired evidence record](../../validation/check-records/axial-source/grid-fiber-comparison-1154.json)
+preserves all 18 CUDA runs, CPU ensembles, per-seed/depth observables, uncertainty
+calculations, refinement results and the exact single-process launch script.
+The initial forkserver launch failed before propagation; direct single-process
+CUDA execution passed and produced this study. The CPU-first decision remains:
+grid MCWF is diagnostic and needs independent photon-source/depth-budget
+evidence before any production admission. No GPU gate, model marker, claim
+status or admitted envelope changes here.

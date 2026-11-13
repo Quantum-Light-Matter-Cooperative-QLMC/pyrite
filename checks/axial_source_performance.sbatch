@@ -10,6 +10,7 @@
 set -euo pipefail
 export PATH=$HOME/.local/bin:$PATH
 export UV_PROJECT_ENVIRONMENT=/tmp/pyrite-1154-cpu UV_CACHE_DIR=/tmp/pyrite-uv-cache
+export PYRITE_MC_BACKEND=cpu
 export PYRITE_HOME=$PWD PYRITE_CATALOG=$PWD/src/pyrite/data/catalog PYRITE_USER_CATALOG=$PWD/user-catalog
 export OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1
 args=(--count 32 --chunk 8 --repeats 3)
