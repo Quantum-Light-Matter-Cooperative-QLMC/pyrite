@@ -319,3 +319,34 @@ def test_automatic_continuum_grid_bits_are_machine_independent(medium, endpoint_
     assert nodes.size == size
     assert np.all(np.diff(nodes) > 0.0)
     assert hashlib.sha256(nodes.tobytes()).hexdigest() == digest
+
+
+def test_stack_media_anchor_every_layer_edge_and_take_the_highest_floor():
+    """#1164: a layered target's grid anchors each layer's EPDL edges, not the film's only.
+
+    MoS2 on Si: the substrate's own Si K edge carries no anchor pair in the
+    film-only grid (only the detector-path Chantler Si K does), which left a
+    5-9 % edge-window error. With the substrate as a stack medium both Si K
+    anchors are grid nodes. The floor is the higher of the two media floors.
+    """
+    from pyrite._continuum_grid import automatic_continuum_grid
+
+    endpoint = 30.0e3
+    film = automatic_continuum_grid("mos2", endpoint)
+    np.testing.assert_array_equal(film, automatic_continuum_grid("mos2", endpoint, stack_media=()))
+    stacked = automatic_continuum_grid("mos2", endpoint, stack_media=("silicon",))
+
+    band = (float(stacked[0]), float(stacked[-1]))
+    film_marks, _ = continuum_refinement_marks("mos2", *band)
+    marks, summary = continuum_refinement_marks("mos2", *band, stack_media=("silicon",))
+    film_labels = {mark.label for mark in film_marks}
+    added = [mark for mark in marks if mark.label not in film_labels]
+    assert "Si K (EPDL)" in {mark.label for mark in added}
+    assert "Si" in summary["elements"]
+    for mark in added:
+        assert np.isin(mark.anchors_eV, stacked).all(), mark.label
+    assert stacked[0] == max(photon_continuum_floor_eV(m) for m in ("mos2", "silicon"))
+    # A substrate with the higher floor raises the stack floor.
+    assert automatic_continuum_grid("hopg", endpoint, stack_media=("sapphire",))[0] == (
+        photon_continuum_floor_eV("sapphire")
+    )

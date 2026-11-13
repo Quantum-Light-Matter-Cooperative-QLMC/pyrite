@@ -251,7 +251,9 @@ def _automatic_policy(material, energy_keV, per_call=None, energy_spread_frac=No
     from pyrite.campaign.sweep import _automatic_cxr_grid_policy
 
     beam = SimpleNamespace(energy_spread_frac=energy_spread_frac)
-    sweep = SimpleNamespace(cxr_grid_policy=per_call, beam=beam)
+    # A bare slab: no layers beneath the film contribute reflections.
+    target = SimpleNamespace(_below_film=lambda: None)
+    sweep = SimpleNamespace(cxr_grid_policy=per_call, beam=beam, target=target, n_families=4)
     return _automatic_cxr_grid_policy(sweep, crystal_params(material), energy_keV)
 
 

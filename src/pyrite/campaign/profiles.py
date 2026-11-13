@@ -19,7 +19,7 @@ from typing import Any, Literal
 
 import numpy as np
 
-from .._continuum_grid import CONTINUUM_GRID_MODEL
+from .._continuum_grid import CONTINUUM_GRID_MODEL, STACK_CONTINUUM_GRID_MODEL
 from .._energy_grid_encoding import encode_energy_grid
 from .._numerics import (
     CHANNELING_KEYS,
@@ -55,6 +55,7 @@ from ..quantum._axial_spec import AXIAL_FIBRE_MODEL_MARKER, AXIAL_MODEL_MARKER, 
 from ..quantum._channeling import CHANNELING_OFF_FIELDS
 from ..results import Settings
 from ..xsgen.bremslib.tables import resolve_bremsstrahlung_model
+from ._continuum_case_grid import automatic_continuum_medium, automatic_continuum_stack_media
 from .identity_options import (
     _CONTENT_KEY_DENYLIST,
     pop_identity_options,
@@ -67,7 +68,6 @@ from .sweep import (
     TIMEPIX3_DOMEGA_SR,
     TIMEPIX3_DTHETA_OBS_DEG,
     Sweep,
-    automatic_continuum_medium,
     beam_replace,
     build_cases,
     crystal_params,
@@ -315,7 +315,13 @@ def _project_target_detector_and_bins(sweep_payload: dict[str, Any], sweep: Swee
     # policy is part of the dataset identity (#278); sweeps with a declared grid
     # keep their historical digest.
     if automatic_continuum_medium(sweep) is not None:
-        sweep_payload["continuum_grid_model"] = CONTINUUM_GRID_MODEL
+        # A stack's grid spans every layer's medium (#1164); a bare slab's is
+        # unchanged, so only stacks fork onto the stack model.
+        sweep_payload["continuum_grid_model"] = (
+            STACK_CONTINUUM_GRID_MODEL
+            if automatic_continuum_stack_media(sweep)
+            else CONTINUUM_GRID_MODEL
+        )
     sweep_payload["e_grid_eV"] = None
     # Response is applied only to response-free source arrays at read time. It must not
     # fork transport/checkpoint identity, which is deliberately reusable by

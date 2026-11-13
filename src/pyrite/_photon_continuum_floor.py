@@ -116,10 +116,10 @@ def continuum_medium_key(material: str | MediumSpec) -> str | MediumSpec:
     key, or an explicit :class:`~pyrite.materials.MediumSpec` -- passes through
     unchanged.
 
-    This is a naming lookup, not a physics choice: the substrate a photon
-    escapes through has its own plasma energy, and a stack whose *substrate*
-    floor exceeded its film's would need that decided rather than resolved
-    here. No catalog stack is in that position today.
+    This is a naming lookup, not a physics choice. A stack's automatic
+    continuum grid takes the highest floor over the film and every layer
+    beneath it (``_continuum_grid.automatic_continuum_grid(stack_media=...)``,
+    #1164); a declared uniform band still floors at the film's medium.
     """
     if not isinstance(material, str):
         return material

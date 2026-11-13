@@ -1411,3 +1411,42 @@ def test_scan_grid_rows_mark_excluded_and_empty_slots():
     (row,) = rows  # single tilt
     excluded_at_30 = row["cells"][energies.index(cases[0]["E0_keV"])]["excluded"]
     assert excluded_at_30 == pytest.approx(1.0)
+
+
+def test_layered_sweep_grids_span_every_layer_and_leave_the_film_alone():
+    """#1164: a stack's automatic continuum marks and line axis cover each layer.
+
+    MoS2 2000 A on 20 um Si at 30 keV: the film-only line axis stopped at
+    3.0 keV while the substrate's own reflections need 4.5 keV, and the
+    continuum lacked the substrate's EPDL edges. The bare film is unchanged.
+    """
+    from pyrite._continuum_grid import automatic_continuum_grid
+    from pyrite.campaign.sweep import STACK_LINE_BANDWIDTH_MODEL, _automatic_cxr_grid_policy
+
+    beam = BeamSpec(energy_keV=30.0)
+    target = Stack.on_substrate("mos2", 2000.0, "silicon", 2.0e5, footprint=None, tilt_deg=30.0)
+    (stacked,) = build_cases(Sweep(material="mos2", beam=beam, target=target), 1, 1)
+    (film,) = build_cases(Sweep(material="mos2", beam=beam), 1, 1)
+    (substrate,) = build_cases(Sweep(material="silicon", beam=beam), 1, 1)
+
+    np.testing.assert_array_equal(
+        decode_energy_grid(stacked["E_grid_brem"]),
+        automatic_continuum_grid("mos2", 30.0e3, stack_media=("silicon",)),
+    )
+    np.testing.assert_array_equal(
+        decode_energy_grid(film["E_grid_brem"]), automatic_continuum_grid("mos2", 30.0e3)
+    )
+    stops = {
+        name: case["line_grid_policy"]["bandwidth"]["stop_eV"]
+        for name, case in (("stack", stacked), ("film", film), ("substrate", substrate))
+    }
+    assert stops["film"] < stops["substrate"]
+    assert stops["stack"] == max(stops["film"], stops["substrate"])
+    assert stacked["line_grid_policy"]["sources"]["bandwidth_radiators"] == (
+        STACK_LINE_BANDWIDTH_MODEL
+    )
+    assert "bandwidth_radiators" not in film["line_grid_policy"]["sources"]
+    # The reline path resolves the same union from the sweep.
+    sweep = Sweep(material="mos2", beam=beam, target=target)
+    policy = _automatic_cxr_grid_policy(sweep, crystal_params("mos2"), 30.0)
+    assert policy.stop_eV == stops["stack"]

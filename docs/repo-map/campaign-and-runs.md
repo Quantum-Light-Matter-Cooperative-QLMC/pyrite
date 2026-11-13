@@ -136,6 +136,10 @@ Turn `Sweep` definition into Cartesian product of `run_case` dicts.
 Beam phase-space case keys for `build_cases`: `beam_case_keys` validates the bunch-front source and refuses declarative transverse/longitudinal policies mixed with legacy fields, then returns the flat beam keys that join a case only where they diverge from defaults (plus the GPT `gdf_source` record); `beam_distribution_keys` resolves the declarative policies at one geometry and beam energy.
 - Deps: `materials` (`CATALOG`), `montecarlo.bunch_front`, `montecarlo.transverse`, `campaign.longitudinal`.
 
+### `campaign/_continuum_case_grid.py`
+Per-case continuum grids for `build_cases`: `floored_brem_case_grid` floors a declared uniform band at its medium's start, and `case_brem_resolver` returns each `E0`'s grid — the declared one, or the automatic refined geometric grid (#278) whose floor and edge anchors span the film and, in a layered target, every layer beneath it (`automatic_continuum_stack_media`, #1164). `automatic_continuum_medium`/`automatic_continuum_stack_media` also decide the `continuum_grid_model` identity marker in `campaign/profiles.py`.
+- Deps: `_continuum_grid`, `_photon_continuum_floor`, `_energy_grid_encoding`.
+
 ### `campaign/thick_target.py`
 Thick-target screen run by `build_cases` after the kinematic screen: `warn_thick_target` emits `ThickTargetWarning` when a case above the pair threshold traverses more than `THICK_TARGET_X0_FRACTION` (0.05) radiation lengths, since photons are attenuated rather than transported (#341). `traversed_radiation_lengths` sums `t_i/X0_i` over transport layers at the case tilt. Changes no case key or identity (#439).
 - Deps: `materials.radiation_length`.

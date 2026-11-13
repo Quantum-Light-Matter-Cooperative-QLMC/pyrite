@@ -18,8 +18,9 @@ continuum is over most of the band. It says nothing about an integrand that is
 *not* smooth on the scale of its own local step, and the modelled continuum
 contains two such features:
 
-* **absorption edges** of every element in the modelled path -- the medium and
-  the detector's silicon sensor -- where the escape factor ``exp(-mu l)`` steps
+* **absorption edges** of every element in the modelled path -- every medium of
+  the target (the film and, in a layered target, each layer beneath it) and the
+  detector's silicon sensor -- where the escape factor ``exp(-mu l)`` steps
   by a finite ratio over an energy interval far narrower than the local
   geometric step; and
 * **kinematic endpoints** -- the bremsstrahlung tip at the highest instantaneous
@@ -49,6 +50,7 @@ from .materials import MediumSpec
 
 __all__ = [
     "CONTINUUM_GRID_MODEL",
+    "STACK_CONTINUUM_GRID_MODEL",
     "CONTINUUM_LOG_STEP",
     "DETECTOR_PATH_ELEMENTS",
     "EDGE_KIND",
@@ -152,6 +154,17 @@ def _medium_elements(material: str | MediumSpec) -> set[str]:
     return {str(element) for element, _density in _resolve_composition(material)}
 
 
+def _stack_floor_eV(material: str | MediumSpec, stack_media: Sequence[str | MediumSpec]) -> float:
+    """Highest :func:`photon_continuum_floor_eV` over the film and its stack media.
+
+    Every layer both radiates the continuum and lies on some escape path, so a
+    node below any layer's floor sits where that layer's emission or escape
+    model carries no validity. The stack floor is therefore the maximum, and a
+    bare slab (no stack media) keeps its own floor exactly.
+    """
+    return max(photon_continuum_floor_eV(medium) for medium in (material, *stack_media))
+
+
 def continuum_refinement_marks(
     material: str | MediumSpec,
     floor_eV: float,
@@ -160,6 +173,7 @@ def continuum_refinement_marks(
     endpoint_eV: float | None = None,
     path_elements: Iterable[str] = DETECTOR_PATH_ELEMENTS,
     local_spacing_eV: float | None = None,
+    stack_media: Iterable[str | MediumSpec] = (),
 ) -> tuple[list[RefinementMark], dict[str, Any]]:
     """Features of the modelled continuum the geometric baseline under-resolves.
 
@@ -188,6 +202,10 @@ def continuum_refinement_marks(
         separation. Required whenever ``endpoint_eV`` is given: the anchors
         match the resolution the grid already has there rather than imposing one
         of their own, and that is a property of the grid, not of this band.
+    stack_media
+        Media of the layers beneath the film in a layered target. Each radiates
+        and absorbs, and its escape ``mu`` is EPDL like the film's, so its
+        elements join the medium elements (#1164). Empty for a bare slab.
 
     Returns
     -------
@@ -205,7 +223,7 @@ def continuum_refinement_marks(
 
     # The medium's escape mu is EPDL; the detection path's Si sensor response
     # reads Chantler f2. Each contributes the edges of the table it reads.
-    medium = _medium_elements(material)
+    medium = set().union(*(_medium_elements(m) for m in (material, *stack_media)))
     path = {str(value) for value in path_elements}
     elements = medium | path
     brackets, edge_summary = absorption_edge_brackets(medium, floor, stop, tables=("epdl",))
@@ -412,6 +430,7 @@ def _refine_baseline(
     *,
     endpoint_eV: float | None,
     path_elements: Iterable[str],
+    stack_media: Sequence[str | MediumSpec] = (),
 ) -> tuple[np.ndarray, dict[str, Any]]:
     floor, stop = float(baseline[0]), float(baseline[-1])
     marks, summary = continuum_refinement_marks(
@@ -425,6 +444,7 @@ def _refine_baseline(
             if endpoint_eV is not None and np.isfinite(endpoint_eV)
             else None
         ),
+        stack_media=stack_media,
     )
     nodes, cost = refine_continuum_nodes(baseline, marks)
     return nodes, {**summary, **cost, "marks": len(marks)}
@@ -520,6 +540,13 @@ CONTINUUM_RATIO = _exp_series(CONTINUUM_LOG_STEP)
 #: so node bits, and therefore case content keys, are machine-independent.
 CONTINUUM_GRID_MODEL = f"refined-geometric-v2/dlnE={CONTINUUM_LOG_STEP:g}"
 
+#: Identity of the default continuum grid over a layered target, whose floor and
+#: edge anchors span every layer's medium (#1164). Only stack sweeps carry it: a
+#: bare slab's grid is unchanged node for node, so its datasets keep
+#: :data:`CONTINUUM_GRID_MODEL`, while a stack's earlier film-only grid never
+#: shares a dataset with this one.
+STACK_CONTINUUM_GRID_MODEL = f"{CONTINUUM_GRID_MODEL}+stack-media-v1"
+
 
 def _deterministic_geometric_nodes(floor: float, stop: float, ratio: float) -> np.ndarray:
     """``floor * ratio**k`` by repeated multiplication, closed exactly at ``stop``.
@@ -547,6 +574,7 @@ def automatic_continuum_grid(
     *,
     floor_eV: float | None = None,
     log_step: float = CONTINUUM_LOG_STEP,
+    stack_media: Sequence[str | MediumSpec] = (),
 ) -> np.ndarray:
     """Default continuum grid for one case: refined geometric, floor to past the endpoint.
 
@@ -557,6 +585,11 @@ def automatic_continuum_grid(
     edges get theirs. Above the endpoint the continuum is identically zero, as
     the uniform band it replaces also extended one step past ``E0``.
 
+    ``stack_media`` names the media beneath the film of a layered target. Their
+    absorption edges are anchored like the film's, and the floor is the highest
+    floor over the film and every layer. Empty (a bare slab) leaves the grid
+    exactly as the film alone defines it.
+
     Validation: continuum-node-refinement
     """
     endpoint = float(endpoint_eV)
@@ -565,7 +598,8 @@ def automatic_continuum_grid(
         raise ValueError("endpoint_eV must be a finite positive energy")
     if not np.isfinite(step) or step <= 0.0:
         raise ValueError("log_step must be a finite positive number")
-    floor = photon_continuum_floor_eV(material) if floor_eV is None else float(floor_eV)
+    stack_media = tuple(stack_media)
+    floor = _stack_floor_eV(material, stack_media) if floor_eV is None else float(floor_eV)
     ratio = CONTINUUM_RATIO if step == CONTINUUM_LOG_STEP else _exp_series(step)
     stop = endpoint * ratio
     if stop <= floor:
@@ -574,6 +608,11 @@ def automatic_continuum_grid(
         )
     baseline = _deterministic_geometric_nodes(floor, stop, ratio)
     nodes, _ = _refine_baseline(
-        material, baseline, step, endpoint_eV=endpoint, path_elements=DETECTOR_PATH_ELEMENTS
+        material,
+        baseline,
+        step,
+        endpoint_eV=endpoint,
+        path_elements=DETECTOR_PATH_ELEMENTS,
+        stack_media=stack_media,
     )
     return nodes

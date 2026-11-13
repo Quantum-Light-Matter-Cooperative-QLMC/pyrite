@@ -13,10 +13,12 @@ from pyrite import DATA_DIR
 from pyrite._continuum_grid import (
     CONTINUUM_GRID_MODEL,
     CONTINUUM_LOG_STEP,
+    STACK_CONTINUUM_GRID_MODEL,
     automatic_continuum_grid,
 )
 from pyrite._photon_continuum_floor import continuum_medium_key
 from pyrite.campaign import profile_lifecycle, profile_summary, profiles
+from pyrite.campaign._continuum_case_grid import automatic_continuum_stack_media
 from pyrite.campaign.config import default_settings, material_sweep
 from pyrite.campaign.profiles import (
     IDENTITY_MIGRATIONS,
@@ -29,7 +31,12 @@ from pyrite.campaign.profiles import (
     named_profile_stem,
     variant_stem,
 )
-from pyrite.campaign.sweep import BeamSpec, build_cases, target_replace
+from pyrite.campaign.sweep import (
+    BeamSpec,
+    Stack,
+    build_cases,
+    target_replace,
+)
 from pyrite.checkpoints import _checkpoint_store
 from pyrite.detectors import AngularAcceptance, Detector, Timepix3
 from pyrite.materials import CATALOG
@@ -170,6 +177,23 @@ def test_explicit_uniform_brem_grid_does_not_share_catalog_band_identity():
         band_identity["parameter_sha256"],
         explicit_identity["parameter_sha256"],
     }
+
+
+def test_stack_continuum_grid_forks_only_stack_identities():
+    """#1164: a stack's grid spans its layers' media, so only stacks fork the model."""
+    slab = material_sweep("mos2")
+    stack = replace(
+        slab,
+        target=Stack.on_substrate("mos2", 2000.0, "silicon", 2.0e5, footprint=None, tilt_deg=30.0),
+    )
+    assert automatic_continuum_stack_media(slab) == ()
+    assert automatic_continuum_stack_media(stack) == ("silicon",)
+    slab_sweep = dataset_identity("mos2", default_settings(), slab)["resolved_parameters"]["sweep"]
+    stack_sweep = dataset_identity("mos2", default_settings(), stack)["resolved_parameters"][
+        "sweep"
+    ]
+    assert slab_sweep["continuum_grid_model"] == CONTINUUM_GRID_MODEL
+    assert stack_sweep["continuum_grid_model"] == STACK_CONTINUUM_GRID_MODEL
 
 
 def test_high_energy_profile_range_is_part_of_dataset_identity():
@@ -1125,12 +1149,16 @@ def test_undeclared_case_brem_grid_is_automatic_refined_geometric(catalog_profil
         )
         assert sweep.energy_bins.brem is None, (catalog_profile, material)
         medium = continuum_medium_key(sweep.material)
+        # A catalog stack's grid also spans its layers' media (#1164).
+        stack_media = automatic_continuum_stack_media(sweep)
         for case in build_cases(
             sweep, n_electrons=300, n_electrons_brem=150, inelastic_model="auto"
         ):
             endpoint = case["E0_keV"] * 1e3
             grid = np.asarray(case["E_grid_brem"], dtype=float)
-            np.testing.assert_array_equal(grid, automatic_continuum_grid(medium, endpoint))
+            np.testing.assert_array_equal(
+                grid, automatic_continuum_grid(medium, endpoint, stack_media=stack_media)
+            )
             assert np.all(np.diff(grid) > 0.0)
             assert grid[-1] > endpoint
             # Anchor merging drops samples near an anchor, widening a neighbour
