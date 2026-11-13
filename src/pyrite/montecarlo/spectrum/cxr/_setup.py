@@ -180,6 +180,8 @@ class _SpectrumSetup:
     # (no bunch ``t0``), over which the exact-recoil phase accumulates.
     # Validation: line-recoil-in-medium-root
     seg_t_mid: Any = None
+    # Flight-grouped route only: float64 ``(d, r_mid)`` per row (see setup).
+    grouped_phase64: Any = None
     # Bin-mean quadrature only: FP64 bin edges and inverse widths on the
     # accumulation routes' device (``_bin_quadrature.bin_axis``).
     bin_edges: Any = None
@@ -207,16 +209,19 @@ def _flight_groups(segments):
     Groups are keyed by ``(owner, flight_id)`` value, the owner being the
     track under secondary transport (#94) and the electron otherwise.
     ``grouped`` is False when every group is a single row; ``gid_all`` then
-    stays None. A device backend has no grouped reduction (the caller refuses
-    ``grouped``), so it only needs the flag: it is decided on the device by
-    sorting one packed key, instead of downloading both key columns and
-    lexsorting them on the host, which cost ~0.5 s per call at 2e7 rows.
-    Validation: substep-radiation-invariance
+    stays None. On a device backend the flag is decided first by sorting one
+    packed key, instead of downloading both key columns and lexsorting them on
+    the host (~0.5 s per call at 2e7 rows); only grouped rows then pay for the
+    device-resident ids. Validation: substep-radiation-invariance
     """
     track = segments.get("track_id")
     owner = segments["elec_id"] if track is None else track
     if getattr(xp, "__name__", "") != "numpy":
-        return _device_rows_share_flight(xp.asarray(segments["flight_id"]), xp.asarray(owner)), None
+        flight = xp.asarray(segments["flight_id"])
+        owner = xp.asarray(owner)
+        if not _device_rows_share_flight(flight, owner):
+            return False, None
+        return True, _device_flight_ids(flight, owner)
     flight_key = _to_cpu(xp.asarray(segments["flight_id"]))
     electron_key = _to_cpu(xp.asarray(owner))
     order = np.lexsort((flight_key, electron_key))
@@ -254,6 +259,44 @@ def _device_rows_share_flight(flight, owner):
     order = xp.lexsort(xp.stack([flight, owner]))
     flight, owner = flight[order], owner[order]
     return bool(_to_cpu(xp.any((flight[1:] == flight[:-1]) & (owner[1:] == owner[:-1]))))
+
+
+def _device_flight_ids(flight, owner):
+    """Dense ``(owner, flight)`` group ids, computed on the device.
+
+    Same ids as the host branch of :func:`_flight_groups`: groups numbered in
+    ``(owner, flight)`` lexicographic order. Validation: substep-radiation-invariance
+    """
+    order = xp.lexsort(xp.stack([flight.astype(np.int64), owner.astype(np.int64)]))
+    f, o = flight[order], owner[order]
+    new_group = xp.ones(f.size, dtype=bool)
+    new_group[1:] = (f[1:] != f[:-1]) | (o[1:] != o[:-1])
+    gid = xp.empty(f.size, dtype=np.int64)
+    gid[order] = xp.cumsum(new_group) - 1
+    return gid
+
+
+def _grouped_phase64(segments, t_L_all, n_hat, grouped):
+    """Float64 ``(d, r_mid)`` per row for the flight-grouped reduction, else None.
+
+    ``d = t_mid + t0 - n_hat.r_mid``, the ``d_all`` of the phased routes,
+    kept in float64 so ``_grouped`` can reference every row to its flight's
+    first row before any float32 cast: absolute ages and ``g.r`` reach ~1e4
+    rad, the intra-flight differences only the flight's own extent. Reads the
+    pieces' float64 midpoints/ages (``expand_escape_pieces``), not their REAL
+    casts: positions near 1e7 Angstrom (footprints, bunch offsets) would
+    otherwise carry ~1 Angstrom per-row quantization into ``n_hat.r``.
+    Validation: coherent-formation-absorption
+    """
+    if not grouped:
+        return None
+    n_rows = int(xp.asarray(segments["L_ang"]).shape[0])
+    zeros = np.zeros(n_rows)
+    r64 = xp.asarray(segments.get("r_mid_f64", segments["r_mid"]), dtype=np.float64)
+    t64 = xp.asarray(segments.get("t_ang_f64", segments.get("t_ang", zeros)), dtype=np.float64)
+    t64 = t64 + xp.asarray(segments.get("t0_ang", zeros), dtype=np.float64)
+    t64 = t64 + 0.5 * t_L_all.astype(np.float64)
+    return t64 - r64 @ xp.asarray(n_hat, dtype=np.float64), r64
 
 
 def _refuse_grooved_offset_factorization(request, xy0_pop, analytic_offsets, xp):
@@ -313,11 +356,13 @@ def _refuse_grouped_reduction(request, grouped):
     """Refuse routes the flight-grouped incoherent reduction does not cover."""
     if not grouped:
         return
-    if getattr(xp, "__name__", "") != "numpy":
+    backend = getattr(xp, "__name__", "")
+    if backend != "numpy" and not (backend == "cupy" and np.dtype(REAL) == np.float32):
         raise ValueError(
-            "flight-grouped incoherent CXR is host-only: the segmented complex "
-            "reduction over numerical substeps has no device port yet. Run the "
-            "spectrum on the NumPy backend, or transport without max_dE_frac."
+            "flight-grouped incoherent CXR runs on the NumPy backend or on the "
+            "float32 CuPy segmented kernel only; this device configuration "
+            f"({backend}, {np.dtype(REAL).name}) has no port. Run the spectrum on "
+            "the NumPy backend, unset PYRITE_FP64, or transport without max_dE_frac."
         )
     if request.layers is not None:
         # Same unmodelled per-layer delta as the coherent path: the grouped
@@ -593,6 +638,7 @@ def _prepare_spectrum(request):
     # need an explicit absent value. Nothing below reads one where the original
     # would have raised UnboundLocalError.
     cdtype = omega_grid = delta_omega_grid = d_all = seg_t_mid = None
+    grouped_phase64 = None
 
     info = CRYSTALS[crystal]
     n_atoms = len(info["basis"]) / info["V_cell"]
@@ -678,12 +724,12 @@ def _prepare_spectrum(request):
     escape_ends = None
     if n_rows:
         segments, piece_owner, esc_start, esc_end = expand_escape_pieces(
-            segments, n_hat, layers=layers, groove=groove, xp=xp
+            segments, n_hat, layers=layers, groove=groove, keep_f64=grouped, xp=xp
         )
         if coherent or grouped:
             escape_ends = (esc_start, esc_end)
         if gid_all is not None:
-            gid_all = gid_all[np.asarray(_to_cpu(piece_owner))]
+            gid_all = gid_all[piece_owner]
 
     # Every per-row emission coefficient is evaluated at ONE energy along the
     # row. Under ``energy_model="midpoint"`` transport supplies the propagator's
@@ -792,6 +838,7 @@ def _prepare_spectrum(request):
         seg_t_mid = seg_t + 0.5 * t_L_all
         d_all = (seg_t_mid + seg_t0) - _matvec3(seg_r, n_hat_d)
         omega_grid = E_grid / HBARC_EV_ANG
+        grouped_phase64 = _grouped_phase64(segments, t_L_all, n_hat, grouped)
 
         # In-medium propagation phase: each segment's field picks up
         # -delta(E) omega(E) L_esc,j over the SAME in-crystal escape path the
@@ -927,6 +974,7 @@ def _prepare_spectrum(request):
         escape_gradient=escape_gradient,
         piece_fraction=piece_fraction,
         seg_t_mid=seg_t_mid,
+        grouped_phase64=grouped_phase64,
         temporal_buf=temporal_buf,
         temporal_tau=temporal_tau,
         temporal_tau_geo=temporal_tau_geo,

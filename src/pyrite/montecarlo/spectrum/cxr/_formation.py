@@ -141,7 +141,7 @@ def formation_window_half_width(a_vac, half_dL, delta_omega_max, sinc_cutoff):
     return (sinc_cutoff + abs(half_dL) * delta_omega_max) / a_vac
 
 
-def expand_escape_pieces(segments, n_hat, *, layers=None, groove=None, xp=np):
+def expand_escape_pieces(segments, n_hat, *, layers=None, groove=None, keep_f64=False, xp=np):
     """Split every segment at its linear escape pieces into collinear rows.
 
     Returns ``(pieces, owner, L_start, L_end)``. ``pieces`` is a copy of
@@ -154,7 +154,9 @@ def expand_escape_pieces(segments, n_hat, *, layers=None, groove=None, xp=np):
     flight-grouped callers require a single slab, while incoherent callers
     recompute per-layer attenuation on the expanded geometry. Parent length
     and piece fraction preserve their segment-level sinc model. The pieces of
-    a straight flight sum exactly to its field.
+    a straight flight sum exactly to its field. ``keep_f64`` also stores the
+    pieces' float64 midpoints and start ages as ``r_mid_f64``/``t_ang_f64``
+    for the flight-grouped phase twin.
     Validation: coherent-formation-absorption
     """
     n_rows = int(xp.asarray(segments["L_ang"]).shape[0])
@@ -178,7 +180,8 @@ def expand_escape_pieces(segments, n_hat, *, layers=None, groove=None, xp=np):
     v_hat = xp.asarray(pieces["v_hat"], dtype=np.float64)
     r_mid = xp.asarray(pieces["r_mid"], dtype=np.float64)
     shift = (offset + 0.5 * fraction - 0.5) * L_parent
-    pieces["r_mid"] = (r_mid + shift[:, None] * v_hat).astype(REAL)
+    r_piece = r_mid + shift[:, None] * v_hat
+    pieces["r_mid"] = r_piece.astype(REAL)
     pieces["L_ang"] = (fraction * L_parent).astype(REAL)
     E_field = "E_repr_keV" if segments.get("E_repr_keV") is not None else "E_keV"
     beta = beta_from_keV(xp.asarray(pieces[E_field], dtype=np.float64))
@@ -189,7 +192,15 @@ def expand_escape_pieces(segments, n_hat, *, layers=None, groove=None, xp=np):
         if pieces.get("t_ang") is None
         else xp.asarray(pieces["t_ang"], dtype=np.float64)
     )
-    pieces["t_ang"] = (t_start + offset * L_parent / beta).astype(REAL)
+    t_piece = t_start + offset * L_parent / beta
+    pieces["t_ang"] = t_piece.astype(REAL)
+    # Float64 copies (``keep_f64``) for the flight-grouped phase twin (``_setup._grouped_phase64``):
+    # beam footprints and bunch offsets put |r| near 1e7 Angstrom, where a
+    # float32 REAL quantizes each row's n_hat.r to ~1 Angstrom and destroys the
+    # intra-flight phase. Validation: coherent-formation-absorption
+    if keep_f64:
+        pieces["r_mid_f64"] = r_piece
+        pieces["t_ang_f64"] = t_piece
     return pieces, owner, path_start[:, 0].astype(REAL), path_end[:, 0].astype(REAL)
 
 

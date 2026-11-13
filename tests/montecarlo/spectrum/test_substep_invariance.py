@@ -17,14 +17,13 @@ from pyrite.montecarlo.transport import _simulate_trajectories as simulate_traje
 from tests.helpers import host_backend_only
 
 # The grouped reduction that makes substeps add as field before they are squared
-# is a segmented COMPLEX reduction with no device port yet, so
-# ``_prepare_spectrum`` fails closed on an accelerator (see its "host-only"
-# guard). Every claim below that drives it therefore states the host requirement
-# instead of asserting a behaviour the selected backend cannot produce; the
-# guard itself is pinned by ``test_substepped_rows_fail_closed_on_unported_options``.
+# runs on the host in float64 and, on CuPy, only through the float32 segmented
+# kernel (parity: test_grouped_reduction_cuda.py). The exact (1e-9) claims below
+# are float64 statements, so they state the host requirement; the guard for
+# unported backends is pinned by ``test_substepped_rows_fail_closed_on_unported_options``.
 _grouped_is_host_only = host_backend_only(
-    "flight-grouped incoherent CXR: the segmented complex reduction over "
-    "numerical substeps has no device port"
+    "flight-grouped incoherent CXR: these exact checks are float64 host "
+    "statements; device parity is covered separately"
 )
 
 CARBON = [("C", 0.1136)]
@@ -238,11 +237,11 @@ def test_grouped_reduction_equals_a_coherent_sum_per_physical_flight():
 @pytest.mark.parametrize(
     "bad",
     [
-        # On a real accelerator the host-only guard fires FIRST and reports the
-        # missing device port, which is the more useful message: dropping
-        # components would not make the run work there.
+        # The components refusal is a host statement here: on an accelerator
+        # the run also exercises the device admission first.
         pytest.param("components", marks=_grouped_is_host_only),
-        "cuda",
+        # Simulated on the host: a CuPy-named namespace with float64 REAL.
+        pytest.param("cuda", marks=_grouped_is_host_only),
     ],
 )
 def test_substepped_rows_fail_closed_on_unported_options(bad, monkeypatch):
@@ -253,9 +252,10 @@ def test_substepped_rows_fail_closed_on_unported_options(bad, monkeypatch):
         with pytest.raises(ValueError, match="incompatible with numerical substeps"):
             mc_cxr_spectrum(rows, CXR_GRID_EV, components=True, **CXR_KWARGS)
     else:
-        # The host-only guard reads `xp` in `_prepare_spectrum`, so the fake
+        # The backend guard reads `xp` in `_prepare_spectrum`, so the fake
         # backend has to land on the submodule that owns it -- rebinding the
-        # `lines` package attribute would not reach the route.
+        # `lines` package attribute would not reach the route. A CuPy name
+        # with the host's float64 REAL is the unported FP64-device case.
         from pyrite.montecarlo.spectrum.cxr import _setup
 
         class _FakeCupy:
@@ -265,7 +265,7 @@ def test_substepped_rows_fail_closed_on_unported_options(bad, monkeypatch):
                 return getattr(np, name)
 
         monkeypatch.setattr(_setup, "xp", _FakeCupy())
-        with pytest.raises(ValueError, match="host-only"):
+        with pytest.raises(ValueError, match="has no port"):
             mc_cxr_spectrum(rows, CXR_GRID_EV, **CXR_KWARGS)
 
 
