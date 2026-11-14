@@ -57,6 +57,9 @@ Validation: sinc-bin-integration
 Validation: sinc-bin-far-envelope
 """
 
+from contextlib import contextmanager
+from contextvars import ContextVar
+
 import numpy as np
 
 from ...._backend import REAL, _to_cpu, xp
@@ -742,6 +745,61 @@ def sincsq_bin_lineshape(
 
 CXR_BIN_REDUCTION_MODEL = "line-major-auto-v3-series"
 
+#: Experimental ``(method, flush_lines)`` override of the batched CUDA
+#: bin-mean reduction (#1192). Benchmark-only: it is not case identity and is
+#: not recorded in ``line_reduction_model``; a default switch must bump that
+#: marker instead.
+_EXPERIMENTAL_REDUCTION: ContextVar[tuple[str, int] | None] = ContextVar(
+    "pyrite_experimental_bin_reduction", default=None
+)
+
+
+@contextmanager
+def experimental_bin_reduction(method: str, *, flush_lines: int = 20_000_000):
+    """Run batched bin-mean reductions with ``method`` (e.g. ``"fourier"``).
+
+    ``flush_lines`` replaces the batch target for this scope, so per-call
+    Fourier setup is amortised over more lines. Not case identity; for
+    benchmarks and cross-checks only.
+    """
+    if method not in _REDUCTION_METHODS:
+        raise ValueError(f"method must be one of {_REDUCTION_METHODS}")
+    if flush_lines < 1:
+        raise ValueError("flush_lines must be positive")
+    token = _EXPERIMENTAL_REDUCTION.set((method, int(flush_lines)))
+    try:
+        yield
+    finally:
+        _EXPERIMENTAL_REDUCTION.reset(token)
+
+
+def experimental_flush_lines() -> int | None:
+    """Batch target of an active :func:`experimental_bin_reduction`, if any."""
+    active = _EXPERIMENTAL_REDUCTION.get()
+    return None if active is None else active[1]
+
+
+_REDUCTION_METHODS = ("auto", "pairs", "tree", "sparse", "fourier")
+
+
+def _fourier_reduce(E_r, aw, w, edges, *, out):
+    """``out += `` the cuFINUFFT Fourier reduction on a uniform bin axis.
+
+    Refuses axes that are not uniform ``c_k +- h/2`` bins.
+
+    Validation: cxr-line-fourier-reduction
+    """
+    from ._bin_fourier import uniform_bin_axis
+    from ._fourier_cuda import cuda_fourier_bin_mean_reduce
+
+    edges = _to_cpu(edges)
+    axis = uniform_bin_axis(0.5 * (edges[:-1] + edges[1:]))
+    h = axis[1]
+    if abs(edges[0] - (axis[0] - 0.5 * h)) > 1e-9 * h:
+        raise ValueError("Fourier reduction needs bins c_k +- h/2")
+    out += cuda_fourier_bin_mean_reduce(E_r, aw, w, axis).astype(out.dtype)
+    return out
+
 
 def _bin_reduction_markers(resolved):
     """Numerical generation for bin-mean cases, including policy-only identities."""
@@ -768,10 +826,14 @@ def run_bin_mean_reduction_kernel(
     accumulation of near pairs, compensated float32 far pairs, and one cast to
     the spectrum dtype. Bins beyond
     ``exact_widths`` first-zero widths take the far-field envelope.
+    ``method="fourier"`` (or an active :func:`experimental_bin_reduction`)
+    instead evaluates every bin without the envelope through the experimental
+    cuFINUFFT route on a uniform axis; ``exact_widths`` does not apply to it.
 
     Validation: sinc-bin-integration
     Validation: sinc-bin-far-envelope
     Validation: sinc-bin-near-far
+    Validation: cxr-line-fourier-reduction
     """
     import cupy
 
@@ -779,8 +841,13 @@ def run_bin_mean_reduction_kernel(
     n_cxr_rows = int(E_r.size)
     if n_bins == 0 or n_cxr_rows == 0:
         return out
-    if method not in ("auto", "pairs", "tree", "sparse"):
-        raise ValueError("method must be 'auto', 'pairs', 'tree', or 'sparse'")
+    active = _EXPERIMENTAL_REDUCTION.get()
+    if method == "auto" and active is not None:
+        method = active[0]
+    if method not in _REDUCTION_METHODS:
+        raise ValueError(f"method must be one of {_REDUCTION_METHODS}")
+    if method == "fourier":
+        return _fourier_reduce(E_r, aw, w, edges, out=out)
     # Keep cheap small flushes on all pairs. From 1e9 pairs the fused line-major
     # route beat the tree and all pairs on every measured flush (#1003, job 4059).
     # An infinite exact window has no far nodes, so it stays on all pairs.

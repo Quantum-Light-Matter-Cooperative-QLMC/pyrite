@@ -124,3 +124,21 @@ def test_refuses_nonpositive_widths():
     grid, _ = _axis(10.0, 1.0, 8)
     with pytest.raises(ValueError, match="positive finite a_width"):
         fourier_bin_mean_reduce([12.0], [0.0], [1.0], grid)
+
+
+def test_experimental_reduction_scope_is_validated_and_restored():
+    from pyrite.montecarlo.spectrum.cxr._bin_quadrature import (
+        experimental_bin_reduction,
+        experimental_flush_lines,
+    )
+
+    with pytest.raises(ValueError, match="method"):
+        with experimental_bin_reduction("fft"):
+            pass
+    with pytest.raises(ValueError, match="flush_lines"):
+        with experimental_bin_reduction("fourier", flush_lines=0):
+            pass
+    assert experimental_flush_lines() is None
+    with experimental_bin_reduction("fourier", flush_lines=123):
+        assert experimental_flush_lines() == 123
+    assert experimental_flush_lines() is None
