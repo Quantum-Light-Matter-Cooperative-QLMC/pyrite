@@ -7,6 +7,8 @@ explicit refusals, and that node sampling stays the default.
 Validation: sinc-bin-integration
 """
 
+import contextlib
+
 import numpy as np
 import pytest
 from scipy.integrate import quad
@@ -206,24 +208,46 @@ def test_per_hkl_and_batched_routes_agree_under_bin_mean():
     )
 
 
-def test_fused_and_fallback_routes_agree(monkeypatch):
+def _reduction_tolerance(reduction, grid, rtol):
+    """Exact-route ``rtol``, or the Fourier route's per-peak ``residual_tol`` budget.
+
+    ``None`` keeps the default, which is the Fourier route on uniform CUDA axes
+    (#1192). Its ``residual_tol`` is per line peak, so many spread lines sum to
+    a few 1e-6 of the spectrum peak (5e-6 here, 8e-6 on layered g30); the gate
+    is the near/far route's own pointwise far-envelope allowance, 2.5e-5.
+    """
+    edges = _energy_bin_edges_and_widths(grid)[0]
+    with bq.bin_reduction_override(reduction) if reduction else contextlib.nullcontext():
+        fourier = bq.resolve_bin_reduction(edges)[0] == "fourier"
+    return (
+        (lambda ref: {"rtol": 0.0, "atol": 2.5e-5 * np.max(np.abs(ref))})
+        if fourier
+        else (lambda ref: {"rtol": rtol, "atol": 0.0})
+    )
+
+
+@pytest.mark.parametrize("reduction", ["auto", None])
+def test_fused_and_fallback_routes_agree(monkeypatch, reduction):
     """Off CUDA float32 both spellings take the fallback; on it, the fused kernel."""
     grid = _uniform_axis(3.0, 701.0, 1499.0)
-    fused = to_host(mc_cxr_spectrum(_long_flights(), grid, line_quadrature="bin-mean", **_KW))
+    tol = _reduction_tolerance(reduction, grid, scaled_rtol(1e-12, eps_multiple=64.0))
+    with bq.bin_reduction_override(reduction) if reduction else contextlib.nullcontext():
+        fused = to_host(mc_cxr_spectrum(_long_flights(), grid, line_quadrature="bin-mean", **_KW))
     monkeypatch.setattr(_policy, "_USE_JIT_CXR_REDUCTION", False)
     fallback = to_host(mc_cxr_spectrum(_long_flights(), grid, line_quadrature="bin-mean", **_KW))
-    np.testing.assert_allclose(fused, fallback, rtol=scaled_rtol(1e-12, eps_multiple=64.0))
+    np.testing.assert_allclose(fused, fallback, **tol(fallback))
 
 
-def test_components_are_supported_and_sum_to_the_total_parts():
+@pytest.mark.parametrize("reduction", ["auto", None])
+def test_components_are_supported_and_sum_to_the_total_parts(reduction):
     grid = _uniform_axis(3.0, 701.0, 1499.0)
-    total = mc_cxr_spectrum(_long_flights(), grid, line_quadrature="bin-mean", **_KW)
-    both = mc_cxr_spectrum(
-        _long_flights(), grid, line_quadrature="bin-mean", components=True, **_KW
-    )
-    np.testing.assert_allclose(
-        to_host(both[0]), to_host(total), rtol=scaled_rtol(1e-12, eps_multiple=8.0)
-    )
+    tol = _reduction_tolerance(reduction, grid, scaled_rtol(1e-12, eps_multiple=8.0))
+    with bq.bin_reduction_override(reduction) if reduction else contextlib.nullcontext():
+        total = to_host(mc_cxr_spectrum(_long_flights(), grid, line_quadrature="bin-mean", **_KW))
+        both = mc_cxr_spectrum(
+            _long_flights(), grid, line_quadrature="bin-mean", components=True, **_KW
+        )
+    np.testing.assert_allclose(to_host(both[0]), total, **tol(total))
     assert np.all(to_host(both[1]) >= 0.0) and np.all(to_host(both[2]) >= 0.0)
 
 

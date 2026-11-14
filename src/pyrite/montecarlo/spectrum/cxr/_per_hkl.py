@@ -19,7 +19,8 @@ from ..coherent_population import mixed_row_power, pair_scale
 from ..coherent_transverse import transverse_envelope, transverse_form_factor
 from ..segment_escape import piece_mean_transmission
 from . import _policy
-from ._bin_quadrature import sincsq_bin_lineshape
+from ._bin_quadrature import resolve_bin_reduction, sincsq_bin_lineshape
+from ._bin_queue import BinLineQueues
 from ._cpu_reduce import accumulate_sincsq, numpy_backend
 from ._escape_mu import escape_mu_tables
 from ._formation import (
@@ -1077,6 +1078,29 @@ def _accumulate_reflection(
     _nsys_pop()
 
 
+def _reduce_bin_mean(st, targets, E_r, a_width, good):
+    """Bin-mean quadrature (setup refused sinc_cutoff): each row's profile
+    integrated over each node's bin, written as the bin mean. When the
+    device Fourier reduction applies (#1192), the rows are queued instead and
+    reduced together after the last row.
+
+    Validation: sinc-bin-integration
+    """
+    if st.bin_line_queues is not None:
+        st.bin_line_queues.add(targets, E_r, a_width, good)
+        return
+    chunk = st.request.chunk
+    n_rows = E_r.size
+    for j0 in range(0, n_rows, chunk):
+        sl = slice(j0, min(j0 + chunk, n_rows))
+        m = good[sl]
+        if not m.any():
+            continue
+        S = sincsq_bin_lineshape(a_width[sl][m], E_r[sl][m], st.bin_edges, st.bin_inv_width)
+        for w, tgt in targets:
+            tgt += w[sl][m] @ S
+
+
 def _reduce_lineshapes(st, targets, E_r, a_width, good):
     """Step 7 reduction: add each ``(w, tgt)`` pair's ``w @ sinc^2`` for the
     ``good`` rows, under bin-mean, full-axis node, or ``sinc_cutoff``-windowed
@@ -1087,17 +1111,7 @@ def _reduce_lineshapes(st, targets, E_r, a_width, good):
     E_grid = st.E_grid
     n_rows = E_r.size
     if st.bin_edges is not None:
-        # Bin-mean quadrature (setup refused sinc_cutoff): each row's profile
-        # integrated over each node's bin, written as the bin mean.
-        # Validation: sinc-bin-integration
-        for j0 in range(0, n_rows, chunk):
-            sl = slice(j0, min(j0 + chunk, n_rows))
-            m = good[sl]
-            if not m.any():
-                continue
-            S = sincsq_bin_lineshape(a_width[sl][m], E_r[sl][m], st.bin_edges, st.bin_inv_width)
-            for w, tgt in targets:
-                tgt += w[sl][m] @ S
+        _reduce_bin_mean(st, targets, E_r, a_width, good)
     elif st.row_tail is not None:
         # Support-windowed node reduction with the analytic far tail.
         # Validation: node-support-window-tail
@@ -1211,6 +1225,9 @@ def _accumulate_per_hkl(st):
     mu_tables = escape_mu_tables(req, st.abs_comp)
     _nsys_pop()
 
+    edges = st.bin_edges
+    if edges is not None and not numpy_backend() and resolve_bin_reduction(edges)[0] == "fourier":
+        st.bin_line_queues = BinLineQueues(st.E_grid, edges, st.bin_inv_width)
     for i_row, (wm, i_hkl) in enumerate(zip(wm_rows, hkl_of_row, strict=True)):
         _accumulate_reflection(
             st,
@@ -1228,3 +1245,6 @@ def _accumulate_per_hkl(st):
             wm,
             mu_tables,
         )
+    if st.bin_line_queues is not None:
+        st.bin_line_queues.flush()
+    st.bin_line_queues = None

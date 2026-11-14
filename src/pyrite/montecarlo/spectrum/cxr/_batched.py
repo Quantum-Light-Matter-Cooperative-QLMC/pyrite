@@ -18,7 +18,11 @@ from ..segment_escape import piece_mean_transmission
 from . import _fused, _policy
 from ._attribution import record_cxr_attribution
 from ._batched_finalize import _batched_coherent_finalize as _batched_coherent_finalize
-from ._bin_quadrature import run_bin_mean_reduction_kernel, sincsq_bin_lineshape
+from ._bin_quadrature import (
+    resolve_bin_reduction,
+    run_bin_mean_reduction_kernel,
+    sincsq_bin_lineshape,
+)
 from ._cpu_reduce import accumulate_sincsq
 from ._cpu_reduce import numpy_backend as _numpy_backend
 from ._escape_mu import escape_mu, escape_mu_tables
@@ -150,6 +154,10 @@ class _CxrBatch:
         # kernel for its closed-form bin-mean counterpart.
         self.bin_edges = bin_edges
         self.bin_inv_width = bin_inv_width
+        # Device bin-mean reduction: Fourier on a uniform axis, else near/far.
+        self.method, self.fourier_axis, self.flush_lines = (
+            ("auto", None, None) if bin_edges is None else resolve_bin_reduction(bin_edges)
+        )
         self.E_r = []
         self.aw = []
         self.w = []
@@ -161,7 +169,7 @@ class _CxrBatch:
         self.aw.append(aw)
         self.w.append(w)
         self.n_cxr_rows += int(E_r.size)
-        if self.n_cxr_rows >= _policy._JIT_CXR_BATCH_TARGET:
+        if self.n_cxr_rows >= (self.flush_lines or _policy._JIT_CXR_BATCH_TARGET):
             self.flush()
 
     def flush(self):
@@ -199,6 +207,8 @@ class _CxrBatch:
                 self.bin_edges,
                 self.bin_inv_width,
                 out=self.spec,
+                method=self.method,
+                fourier_axis=self.fourier_axis,
             )
         else:
             run_reduction_kernel(

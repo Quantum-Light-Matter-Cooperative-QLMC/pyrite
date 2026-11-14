@@ -266,6 +266,8 @@ Measured on the layered MoS2-on-Si g30 frozen replay (job 12560, RTX 5080), on t
 
 Over the three-chunk sum the relative yield changes by $8.4\times10^{-8}$ and every #1143 band metric by at most $1.5\times10^{-6}$. The pointwise $|\Delta|/\text{peak}\le8\times10^{-6}$ is inside the near/far route's own $1.2\times10^{-5}$ far-envelope bound. A full 79-chunk Fourier pass takes 53 s.
 
+On ROCm (qlmc 12572, Radeon 8060S iGPU, ES transform), the same replay's chunks 0 and 78 match the CUDA near/far reference within $4.1\times10^{-6}$ and $8.0\times10^{-6}$ of peak, with yield ratios $1+7.7\times10^{-8}$ and $1+2.3\times10^{-8}$. They run 3.3× and 5.7× faster than the ROCm near/far route. That route, which the default replaces on ROCm, returns only 1.5–3% of the CUDA yield on this layered scene. This is a pre-existing ROCm defect, tracked separately. A full Fourier pass takes 258 s there.
+
 ## Independent verification
 
 Fresh-context verifier, 2026-11-14, worktree HEAD `7b216478d`. The verifier derived the transform, the Poisson identity, the envelope image sum, and both remainder bounds from the ledger row and the `sinc-bin-integration` profile and bin convention. That derivation came before the implementation body or the derivation above was read. The verifier changed only this section. Scratch scripts are outside the repository.

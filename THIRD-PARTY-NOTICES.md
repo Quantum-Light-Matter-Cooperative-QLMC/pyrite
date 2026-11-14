@@ -30,6 +30,22 @@ tables derived or resampled from their output.
   When redistributing Gemmi binaries, retain its notices and provide access
   to the corresponding Gemmi source under MPL-2.0.
 
+## cuFINUFFT (GPU non-uniform FFT)
+
+- **Authors**: Flatiron Institute; FINUFFT and cuFINUFFT contributors
+  (A. H. Barnett, J. F. Magland, L. af Klinteberg, Y.-H. Shih, M. Barbone and others).
+- **License**: Apache License 2.0.
+- **Source and license**: [upstream FINUFFT repository](https://github.com/flatironinstitute/finufft)
+  (includes cuFINUFFT), [Apache-2.0 text](https://github.com/flatironinstitute/finufft/blob/master/LICENSE).
+  `uv.lock` identifies the installed release.
+- **Nature of PyRITE's use**: an unmodified optional runtime dependency (the
+  `nvidia` extra) for type-1 non-uniform FFTs in the default CUDA incoherent
+  CXR bin-mean reduction (#1192). PyRITE's own line-shape physics, mode
+  planning and fallback kernels remain in PyRITE. The wheels' CUDA 12 runtime
+  libraries come from NVIDIA's `nvidia-*-cu12` packages under NVIDIA's terms.
+  Users of cuFINUFFT in published work are asked to cite Shih et al., IPDPSW
+  2021, and Barnett, Magland and af Klinteberg, SIAM J. Sci. Comput. 41 (2019).
+
 ## EPICS2025 EADL atomic relaxation data
 
 - **Author**: D. E. Cullen, Livermore Evaluated Atomic Data Library (EADL),

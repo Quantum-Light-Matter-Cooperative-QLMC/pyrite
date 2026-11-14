@@ -57,6 +57,9 @@ Validation: sinc-bin-integration
 Validation: sinc-bin-far-envelope
 """
 
+from contextlib import contextmanager
+from contextvars import ContextVar
+
 import numpy as np
 
 from ...._backend import REAL, _to_cpu, xp
@@ -740,7 +743,110 @@ def sincsq_bin_lineshape(
     return xp.asarray(host, dtype=REAL)
 
 
-CXR_BIN_REDUCTION_MODEL = "line-major-auto-v3-series"
+#: Numerical generation of device bin-mean reductions (case identity marker).
+#: v4 (#1192): CUDA flushes on a uniform ``c_k +- h/2`` axis use the exact
+#: Fourier-domain reduction (no far-field envelope); other axes and backends
+#: keep the near/far kernel.
+CXR_BIN_REDUCTION_MODEL = "fourier-auto-v4"
+#: Lines per Fourier-route flush: amortises the per-call FFT and planning.
+FOURIER_FLUSH_LINES = 10_000_000
+
+#: ``(method, flush_lines)`` override of the resolved device bin-mean
+#: reduction, for benchmarks and cross-checks. Not case identity.
+_REDUCTION_OVERRIDE: ContextVar[tuple[str, int | None] | None] = ContextVar(
+    "pyrite_bin_reduction_override", default=None
+)
+_REDUCTION_METHODS = ("auto", "pairs", "tree", "sparse", "fourier")
+_FALLBACK_WARNED: list[str] = []
+
+
+@contextmanager
+def bin_reduction_override(method: str, *, flush_lines: int | None = None):
+    """Force device bin-mean reductions in this scope to ``method``.
+
+    ``"fourier"`` requires a uniform axis; ``"auto"``/``"pairs"``/``"tree"``/
+    ``"sparse"`` select the near/far kernel. ``flush_lines`` replaces the
+    batch target. Not case identity: for benchmarks and cross-checks only.
+    """
+    if method not in _REDUCTION_METHODS:
+        raise ValueError(f"method must be one of {_REDUCTION_METHODS}")
+    if flush_lines is not None and flush_lines < 1:
+        raise ValueError("flush_lines must be positive")
+    token = _REDUCTION_OVERRIDE.set((method, flush_lines))
+    try:
+        yield
+    finally:
+        _REDUCTION_OVERRIDE.reset(token)
+
+
+def fourier_bin_axis(edges):
+    """``(c0, h, n)`` when ``edges`` are uniform ``c_k +- h/2`` bins, else ``None``."""
+    from ._bin_fourier import uniform_bin_axis
+
+    edges = np.asarray(_to_cpu(edges), dtype=np.float64)
+    try:
+        axis = uniform_bin_axis(0.5 * (edges[:-1] + edges[1:]))
+    except ValueError:
+        return None
+    if abs(edges[0] - (axis[0] - 0.5 * axis[1])) > 1e-9 * axis[1]:
+        return None
+    return axis
+
+
+def fourier_backend_available() -> bool:
+    """Whether this process can run the device Fourier reduction.
+
+    Needs the CuPy backend. ROCm uses the portable ES transform
+    (``_fourier_spread``); CUDA needs an importable cuFINUFFT (preloaded by
+    ``_fourier_cuda.cufinufft_module``). A CUDA process without it warns
+    once and keeps the near/far kernel.
+    """
+    if not _cupy_backend():
+        return False
+    import cupy
+
+    if cupy.cuda.runtime.is_hip:
+        return True
+    from ._fourier_cuda import cufinufft_module
+
+    try:
+        cufinufft_module()
+    except (ImportError, OSError) as exc:
+        if not _FALLBACK_WARNED:
+            _FALLBACK_WARNED.append(str(exc))
+            import warnings
+
+            warnings.warn(
+                "cuFINUFFT is unavailable, so bin-mean lines use the near/far "
+                f"kernel instead of the Fourier reduction ({exc}); install "
+                "pyrite-mc[nvidia]",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+        return False
+    return True
+
+
+def resolve_bin_reduction(edges):
+    """``(method, axis, flush_lines)`` for device bin-mean flushes on ``edges``.
+
+    Default: ``"fourier"`` with its uniform axis when available, else
+    ``"auto"`` (near/far). An active :func:`bin_reduction_override` wins.
+    ``flush_lines`` is ``None`` for the caller's default batch target.
+
+    Validation: cxr-line-fourier-reduction
+    """
+    override = _REDUCTION_OVERRIDE.get()
+    method, flush = override if override is not None else ("auto", None)
+    axis = None
+    if method == "fourier" or (override is None and fourier_backend_available()):
+        axis = fourier_bin_axis(edges)
+        if axis is None and method == "fourier":
+            raise ValueError("Fourier reduction needs a uniform c_k +- h/2 bin axis")
+        method = "auto" if axis is None else "fourier"
+    if method == "fourier" and flush is None:
+        flush = FOURIER_FLUSH_LINES
+    return method, axis, flush
 
 
 def _bin_reduction_markers(resolved):
@@ -760,6 +866,7 @@ def run_bin_mean_reduction_kernel(
     out,
     exact_widths: float | None = BIN_MEAN_EXACT_WIDTHS,
     method: str = "auto",
+    fourier_axis=None,
 ):
     """Fused CUDA bin-mean line reduction: ``out[k] += sum_l w_l * mean_k(line l)``.
 
@@ -768,10 +875,15 @@ def run_bin_mean_reduction_kernel(
     accumulation of near pairs, compensated float32 far pairs, and one cast to
     the spectrum dtype. Bins beyond
     ``exact_widths`` first-zero widths take the far-field envelope.
+    ``method="fourier"`` instead evaluates every bin without the envelope
+    through the device Fourier route on a uniform axis (``fourier_axis`` from
+    :func:`fourier_bin_axis`, computed when omitted); ``exact_widths`` does not
+    apply to it. Callers pick the method with :func:`resolve_bin_reduction`.
 
     Validation: sinc-bin-integration
     Validation: sinc-bin-far-envelope
     Validation: sinc-bin-near-far
+    Validation: cxr-line-fourier-reduction
     """
     import cupy
 
@@ -779,8 +891,16 @@ def run_bin_mean_reduction_kernel(
     n_cxr_rows = int(E_r.size)
     if n_bins == 0 or n_cxr_rows == 0:
         return out
-    if method not in ("auto", "pairs", "tree", "sparse"):
-        raise ValueError("method must be 'auto', 'pairs', 'tree', or 'sparse'")
+    if method not in _REDUCTION_METHODS:
+        raise ValueError(f"method must be one of {_REDUCTION_METHODS}")
+    if method == "fourier":
+        from ._fourier_cuda import cuda_fourier_bin_mean_reduce
+
+        axis = fourier_axis if fourier_axis is not None else fourier_bin_axis(edges)
+        if axis is None:
+            raise ValueError("Fourier reduction needs a uniform c_k +- h/2 bin axis")
+        out += cuda_fourier_bin_mean_reduce(E_r, aw, w, axis).astype(out.dtype)
+        return out
     # Keep cheap small flushes on all pairs. From 1e9 pairs the fused line-major
     # route beat the tree and all pairs on every measured flush (#1003, job 4059).
     # An infinite exact window has no far nodes, so it stays on all pairs.

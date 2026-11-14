@@ -68,6 +68,13 @@ external-db = [
 ]
 nvidia = [
     "cupy-cuda13x[ctk]>=14.1.1",
+    # Fourier-domain incoherent line reduction (#1192). The only cuFINUFFT
+    # wheel links CUDA 12 cudart/cuFFT; their wheels ride alongside the CUDA 13
+    # CuPy runtime and are preloaded by ``cxr._fourier_cuda``.
+    "cufinufft>=2.5.1,<2.6",
+    "nvidia-cuda-runtime-cu12>=12.9.79,<13",
+    "nvidia-cufft-cu12>=11.4.1.4,<12",
+    "nvidia-nvjitlink-cu12>=12.9.86,<13",
 ]
 # AMD's current ``amd-cupy`` wheels are CPython 3.10-only. PyRITE requires
 # Python 3.13+, so this extra builds upstream CuPy against ROCm instead. It must
