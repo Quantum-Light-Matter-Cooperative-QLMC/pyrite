@@ -190,19 +190,19 @@ def test_channeling_demo_and_off_profile_identities_are_unchanged():
 
     Pins refreshed for #1134's ``segment-mean-v7-quantum-elements`` marker;
     restoring the v6 marker reproduces every pre-#1134 pin. The demo content
-    key follows ``CHANNELING_MODEL`` v9 (#1148 zone flux weights).
+    key follows ``CHANNELING_MODEL`` v10 (#1166 zone-row PXR/DCR source).
     """
     sweep, settings, cases = _profile_cases("silicon", "channeling_demo")
     assert cases[0].line_quadrature == "bin-mean"
     assert [profiles.case_content_key(case) for case in cases] == [
-        "b7f4a43ecb618f14a38143c7bb492024de7eb94c7b6303357612c0b6e01d9736"
+        "f4865755c235aba46754861eae0fd14f2cab037da638a294c76ea16d28a96ac6"
     ]
     assert profiles.named_profile_stem("silicon", catalog_profile="channeling_demo") == (
-        "silicon@channeling_demo-fc430b8eec13"
+        "silicon@channeling_demo-c86288499325"
     )
     identity = profiles.dataset_identity("silicon", settings, sweep)
     assert identity["parameter_sha256"] == (
-        "b2e81da4525a34f0b81c910ae5285c89f9a7b4e0fbbf6ebe0e87713230989cd1"
+        "45641bf27811662624a7e15f444ae91855eabba89fc96504410b0e0ae935edeb"
     )
     sweep = material_sweep("hopg", catalog_profile="standard")
     settings = profiles.profile_run_settings(default_settings(), "standard", sweep=sweep)

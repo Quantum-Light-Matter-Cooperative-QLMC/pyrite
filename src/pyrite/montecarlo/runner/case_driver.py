@@ -529,7 +529,8 @@ def _cxr_for_segments(
     refuse here, the one entry every CXR route shares (#990), an axial
     fibre case drops zone rows only for transverse-potential reflections
     (#1148), and a planar channeling case
-    scores its own reciprocal row only on rows outside the zone (#1055,
+    scores its own reciprocal row and the zone-source reflections only on
+    rows outside the zone (#1055, #1166,
     :func:`.planar_zone_lines.planar_zone_line_parts`).
 
     Validation: cr-axial-zone-row-native-lines, cr-planar-zone-row-ownership
@@ -556,7 +557,7 @@ def _cxr_for_segments(
 
     parts = axial_zone_line_parts(case, segs)
     if parts is None:
-        parts = planar_zone_line_parts(case, segs)
+        parts = planar_zone_line_parts(case, segs, n_hat)
     if parts is not None:  # source-owned transverse reflections exclude zone rows
         return _score_line_parts(
             parts,
