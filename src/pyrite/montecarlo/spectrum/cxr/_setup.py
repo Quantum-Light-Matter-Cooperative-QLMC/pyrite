@@ -199,6 +199,9 @@ class _SpectrumSetup:
     # The same accumulator when the per-row route windows too, else None: the
     # automatic device policy keeps per-row lines on the dense reducer.
     row_tail: Any = None
+    # Per-hkl route under an experimental bin reduction (#1192) only: queued
+    # lines per target spectrum, reduced together once all rows are scored.
+    bin_line_queues: Any = None
     # Opt-in temporal profile only: this call's float64 buffer and the
     # realized / offset-free retarded arrival times per row.
     # Validation: temporal-intensity-profile
