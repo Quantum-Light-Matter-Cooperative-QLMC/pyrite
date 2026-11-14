@@ -792,13 +792,23 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 
 ## `reflection-yield-tolerance-selector`
 
-- **Claim:** Incoherent line densities add over reflections, so the in-band yield of a set of reflections is the sum of its $\lvert g\rvert$-shell yields $s_k$. These are measured on the case's own transport with the production line kernels, on a `bin-mean` axis tiling the band, where the integrated yield is exact (`sinc-bin-integration`). After shell $k$, the omitted in-band fraction is estimated by the geometric continuation $s_k r/(1-r)$, with $r=s_k/s_{k-1}\in(0,1)$, divided by $\sum_{j\le k}s_j$. The selector keeps the shells up to the first $k$ where at least two consecutive shells have decayed and the estimate is $\le$ tol. Rationale: above the low-order region the shell ratio is the Debye–Waller factor $\exp(-2B\,\Delta(g^2)/16\pi^2)$ times the shell multiplicity growth $\approx((G+\Delta)/G)^2$. That ratio falls with $G$, so the geometric estimate is conservative once the sequence is DW-dominated.
+- **Claim:** Incoherent line densities add over reflections, so the in-band yield of a reflection set is the sum of its $\lvert g\rvert$-shell yields $s_k$. These are measured on the case's own transport with the production line kernels, on a `bin-mean` axis tiling the band, where the integrated yield is exact to $O(10^{-5})$ under the `sinc-bin-far-envelope` far route.
+  - **Estimate:** after shell $k$, the omitted in-band fraction is extrapolated geometrically as $s_k r/(1-r)\,/\sum_{j\le k}s_j$, with $r=\max(s_k/s_{k-1},\,s_{k-1}/s_{k-2})\in(0,1)$.
+  - **Stop rule:** the selector keeps the shells up to the first $k$ where at least two consecutive shells have decayed and the estimate is $\le$ tol. A zero-yield shell never counts as converged.
+  - **Not a bound.** The smooth Debye–Waller × multiplicity ratio $((G+\Delta)/G)^2e^{-2B(2G\Delta+\Delta^2)/16\pi^2}$ is strictly decreasing in $G$. Real shells also carry $f_0(s)^2$, which is non-monotone for Si at 13–16 Å⁻¹, and lattice-count fluctuations of 10–40 % in a single ratio. The max-of-two-ratios rule is what absorbs these.
 - **Code:** `montecarlo/runner/reflection_cutoff.py::{geometric_tail_fraction,select_reflection_cutoff}`
 - **Source:** Additivity of incoherent line intensities over reflections (`line-hkl-batch`); Debye–Waller $W=B(\lvert g\rvert/4\pi)^2$ (`structure-factor`); geometric-series remainder.
 - **Status:** unverified
-- **Checks:** exact remainder on a geometric sequence; refusal before decay; low-order dips do not stop the search; the shells partition `dominant_reflections` at each cutoff. Prototype (local Si 300 keV / 10 µm, 20 electrons, 0.5–10 keV): measured shell ratio 0.51 at g28→30 against the DW prediction 0.51; tail estimate at g22 is 6.6e-3 against 6.67e-3 measured to g40.
+- **Checks:** unit tests on the estimator and stop rule, plus a local prototype.
+  - **Unit tests:** exact remainder on a geometric sequence; refusal before three decaying shells; max-of-two-ratios after a dip; a lone deep dip and a zero shell do not stop the search; the shells partition `dominant_reflections` at each cutoff.
+  - **Prototype** (local Si 300 keV / 10 µm, 20 electrons, 0.5–10 keV): the measured shell ratio at g28→30 is 0.51. The DW factor alone gives 0.51 and DW × multiplicity² gives 0.58, so this does not test the multiplicity term. The single-ratio estimate at g22 was 6.6e-3 against 6.67e-3 measured to g40.
 - **Anchor:** `tests/montecarlo/runner/test_reflection_cutoff.py`
-- **Notes:** Issue #1173 P3. Opt-in; no default uses it yet. Validation on the 12083/12115 frozen transports against the g30/g40 references is P5. The low-order region (|g| ≲ 20 Å⁻¹ for Si) is not geometric; the two-decaying-shell rule guards it but proves nothing there. The tolerance applies per radiator to that radiator's own in-band yield.
+- **Notes:** Issue #1173 P3. Opt-in; no default uses it yet.
+  - **Fresh-context verification (2026-11-13):** verdict `discrepancy` on the earlier single-ratio estimator and its "conservative" wording. Additivity, shell partition and band tiling were confirmed: the keep window and the tabulation depend only on the energy axis. In an independent structure-factor proxy with Si and 2H-MoS₂, in-band slabs and two beam directions, the single-ratio stop omitted up to 1.5× tol (tol ≤ 1e-2, $G\ge24$) and about 3× tol at the Si $f_0$ shoulder ($G\approx14$, tol of a few percent). It also stopped falsely on a zero shell.
+  - **Fixes applied:** max-of-two-ratios (worst 0.93× tol over six proxy variants at tol ≤ 1e-2), a zero shell gives `inf`, and tests that exercise the guard. Re-verification of the fixed estimator, and of the production-kernel omission on the 12083/12115 transports, is P5.
+  - **Si metric floor:** `dominant_reflections` stops at its 1e-9 metric floor near 66 Å⁻¹ for Si. The last shell is then partial, which biases $r$ low only for a tail reported at an unconverged cap.
+  - **Scope:** the tolerance applies per radiator, to that radiator's own in-band yield.
+  - [Derivation](radiation-physics/reflection-yield-tolerance-selector.md).
 
 ## `coherent-physical-bunch-population`
 

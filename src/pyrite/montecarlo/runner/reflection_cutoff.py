@@ -31,8 +31,8 @@ __all__ = [
     "select_reflection_cutoff",
 ]
 
-#: Shell width in 1/Angstrom. Above |g| ~ 20 the measured Si shell shares
-#: halve per 2 /A, so a shell is one Debye--Waller e-fold of the tail.
+#: Shell width in 1/Angstrom. Near |g| ~ 30 the measured Si shell shares
+#: halve per 2 /A (0.47--0.70 Debye--Waller e-folds per shell at |g| = 20--30).
 DEFAULT_SHELL_WIDTH_INVANG = 2.0
 
 #: Waasmaier--Kirfel f0 validity, s = |g| / 4 pi <= 6 /A.
@@ -89,13 +89,16 @@ def reflection_shells(
 def geometric_tail_fraction(shell_yields: Sequence[float]) -> float:
     """Estimated yield beyond the last shell, as a fraction of the shells so far.
 
-    With successive shell yields ``s_{k-1}, s_k`` and ratio ``r = s_k / s_{k-1}``,
-    a geometric continuation leaves ``s_k r / (1 - r)``. The ratio is the
-    Debye--Waller factor ``exp(-2 B Delta(g^2) / (16 pi^2))`` times the shell
-    multiplicity growth, so it falls with ``G``. That makes the estimate
-    conservative once the sequence decays.
+    A geometric continuation from the last shell ``s_k`` with ratio ``r`` leaves
+    ``s_k r / (1 - r)``. The ratio is ``r = max(s_k / s_{k-1}, s_{k-1} / s_{k-2})``,
+    the larger of the last two. One ratio alone under-predicts after a
+    shell-to-shell dip. Real shells carry ``f0(s)**2`` and lattice-count
+    fluctuations (10--40 % in a single ratio) on top of the smooth
+    Debye--Waller times multiplicity decay. This is an extrapolation, not a
+    bound.
 
-    Returns ``inf`` until the last two shells decay (``0 < r < 1``).
+    Returns ``inf`` until three shells exist and both ratios lie in ``(0, 1)``.
+    A zero shell never counts as converged.
 
     Limiting case: an exactly geometric sequence ``s_k = r^k`` returns its exact
     remaining sum over its partial sum.
@@ -103,20 +106,12 @@ def geometric_tail_fraction(shell_yields: Sequence[float]) -> float:
     Validation: reflection-yield-tolerance-selector
     """
     yields = np.asarray(shell_yields, dtype=float)
-    if yields.size < 2 or not np.all(np.isfinite(yields)) or np.any(yields < 0.0):
+    if yields.size < 3 or not np.all(np.isfinite(yields)) or np.any(yields <= 0.0):
         return float("inf")
-    kept = float(yields.sum())
-    last, previous = float(yields[-1]), float(yields[-2])
-    if kept <= 0.0:
+    ratio = max(float(yields[-1] / yields[-2]), float(yields[-2] / yields[-3]))
+    if not ratio < 1.0:
         return float("inf")
-    if last == 0.0:
-        return 0.0
-    if previous <= 0.0:
-        return float("inf")
-    ratio = last / previous
-    if not 0.0 < ratio < 1.0:
-        return float("inf")
-    return last * ratio / (1.0 - ratio) / kept
+    return float(yields[-1]) * ratio / (1.0 - ratio) / float(yields.sum())
 
 
 @dataclass(frozen=True)
@@ -147,8 +142,8 @@ def select_reflection_cutoff(
     ``in_band_yield(hkls)`` returns one shell's incoherent line yield in the
     band. Incoherent line yields add over reflections, so shell yields add.
     Scoring stops at the first shell where :func:`geometric_tail_fraction` is
-    at most ``tolerance`` and at least two shells have decayed in a row. That
-    avoids stopping on a dip between strong low-order shells. If ``shells``
+    at most ``tolerance`` and at least two shells have decayed in a row. Both
+    conditions guard against stopping on a dip between strong low-order shells. If ``shells``
     runs out first, the result keeps every shell and reports
     ``converged=False``.
 

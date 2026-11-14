@@ -34,7 +34,10 @@ def test_geometric_tail_is_exact_for_a_geometric_sequence():
     assert geometric_tail_fraction(shells) == pytest.approx(remaining / shells.sum())
 
 
-@pytest.mark.parametrize("shells", [[1.0], [1.0, 1.0], [1.0, 2.0], [0.0, 1.0], [1.0, math.nan]])
+@pytest.mark.parametrize(
+    "shells",
+    [[1.0, 0.5], [1.0, 1.0, 1.0], [1.0, 0.5, 0.6], [1.0, 0.5, 0.0], [1.0, 0.5, math.nan]],
+)
 def test_geometric_tail_refuses_until_the_sequence_decays(shells):
     assert geometric_tail_fraction(shells) == math.inf
 
@@ -83,3 +86,24 @@ def test_selection_reports_an_unconverged_cap():
     assert len(result.hkl_list) == 3
     with pytest.raises(ValueError):
         select_reflection_cutoff(score, shells, 0.0)
+
+
+def test_tail_takes_the_larger_of_the_last_two_ratios():
+    # After a dip (0.1 then 0.08), one ratio (0.8) would claim a smaller tail
+    # than the ratio across the dip allows; max picks 0.8 only when it is larger.
+    assert geometric_tail_fraction([1.0, 0.1, 0.08]) == pytest.approx(0.08 * 0.8 / 0.2 / 1.18)
+    assert geometric_tail_fraction([1.0, 0.5, 0.05]) == pytest.approx(0.05 * 0.5 / 0.5 / 1.55)
+
+
+def test_a_lone_deep_dip_does_not_stop_the_search():
+    shells, score = _synthetic([1.0, 1.2, 0.001, 1.0, 0.9])
+    result = select_reflection_cutoff(score, shells, 1e-2)
+    assert not result.converged
+    assert len(result.hkl_list) == 5
+
+
+def test_a_zero_shell_does_not_stop_the_search():
+    shells, score = _synthetic([1.0, 0.5, 0.0, 0.4, 0.3])
+    result = select_reflection_cutoff(score, shells, 1e-3)
+    assert not result.converged
+    assert len(result.hkl_list) == 5

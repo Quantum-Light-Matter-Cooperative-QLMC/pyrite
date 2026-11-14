@@ -76,6 +76,7 @@ line-absorption-tabulation
 line-tabulation-root-support
 kinematic-validity-envelope
 cxr-high-order-kinematic-scope
+reflection-yield-tolerance-selector
 line-energy-dispersion
 line-recoil-in-crystal
 line-reflection-coupling-tables
