@@ -129,8 +129,7 @@ class DeviceNodeTail(NodeTail):
         L = self.length
         nfft = next_fast_len(3 * L - 2, real=True)
         j = cp.arange(-(L - 1), L, dtype=cp.float64)
-        inv = cp.zeros_like(j)
-        cp.divide(1.0, j * self.step, out=inv, where=j != 0)
+        inv = cp.where(j == 0, 0.0, 1.0 / (cp.where(j == 0, 1.0, j) * self.step))
         kernels = [cp.fft.rfft(inv**k, nfft) for k in (2, 3, 4)]
         for t, tgt in enumerate(targets):
             total = self.correction[t] + cp.asarray(self._direct[t])

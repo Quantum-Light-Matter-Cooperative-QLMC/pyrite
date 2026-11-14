@@ -38,6 +38,7 @@ its `electron-transport` claim stays `missing` until a reviewed golden set is
 run through the collector.
 
 | Artifact | Purpose |
+| `node_support_window_1191.py` | Paired full-node/support-window qualification on trusted #1142/#1143 transport pickles: alternating warm calls, spectral margins and line/background; remote GPU only, no independent physics verdict. |
 | `defaults_spectral_gate_642.py` | Remote-only fixed-band transport/spectral sensitivity pilot (#1142/#1143): preserved trajectories, node refinement, bin-mean replay, MoS₂-on-Si layered scene, exact-MC mosaic node ladder, automatic line-grid policy arms (sinc-Nyquist, measured bandwidth, resonance-local; native and matched-band support against a node reference, per-observable margins), intrinsic continuum arms (refined vs unrefined geometric ln-E steps against a refined reference: yield, centroid, log-band shape, floor, per-edge window masses/jump incl. unrefined substrate edges, tip, dominant-line/background vs direct evaluation), reflection-family ladder (n_families, HOPG (00l) orders; band shape vs the largest set, full-support yield over every radiator incl. film-only production-axis omission), terminal ledger and shape metrics; no accuracy/default verdict. |
 |---|---|
 | `mixed_elastic/` | Paired equivalence, cost, and Geant4 comparison for mixed elastic transport (#894); see its README for the frozen protocol and run files. |
@@ -151,6 +152,7 @@ run through the collector.
 | `feranchuk_vs_zhai_check.py` | Analytic-versus-transport comparison through the maintained Zhai anchor pipeline. |
 | `kinematic_validity_check.py` | Kinematic-approximation audit; its validity parameters are supporting diagnostics, not separate ledger claims. |
 | `longitudinal_coherence_regimes.py` | Regime tables for the #629 research note: PINEM Talbot lengths, quantum versus classical harmonic-bunching caps, the ordinary-beam pair factor, and recoil-exact Si/diamond(110) CR lines. Exits 0 when the internal limits hold; under a second on CPU. |
+| `node_support_window_1191.py` | Remote GPU; reference-grid replays can take minutes per capped call. Three warm repeats plus first calls per arm; no transport is generated. |
 | `line_window_backend_agreement.py` | CUDA versus CPU line-route agreement on a production window plan, float32 and FP64, on one pickled transport (#101). |
 | `mosaic_mc_check.py` | Perfect-crystal limit, quadrature convergence, broadening, and yield checks. |
 | `multilayer_check.py` | First-slice stack transport and front/back escape checks. |
