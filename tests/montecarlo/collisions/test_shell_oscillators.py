@@ -94,8 +94,9 @@ def test_packaged_conduction_bands_are_sourced():
         "2h_tase2",
         "zrse2",
         "tungsten",
+        "gaas",
     }
-    assert all("doi:10." in band.source for band in bands.values())
+    assert all("doi:10." in band.source or "OSTI:" in band.source for band in bands.values())
 
 
 def test_packaged_conduction_band_keys_resolve_to_bundled_crystals_or_media():
@@ -263,3 +264,17 @@ def test_rejects_unphysical_conduction_inputs(band, mean_excitation, error):
 def test_rejects_missing_element_shells():
     with pytest.raises(ValueError, match="no atomic shells"):
         so.build_shell_oscillators({2: 1.0}, 41.8, 1.0, {})
+
+
+_BAND = '[x]\nformula = { Si = 1 }\nelectrons_per_formula = 4\nresonance_eV = 16.7\nsource = "s"\n'
+
+
+@pytest.mark.parametrize("ids", ['doi = "10.1/x"\nosti = "1"\n', ""])
+def test_conduction_band_needs_exactly_one_persistent_id(ids):
+    with pytest.raises(ValueError, match="invalid conduction-band entry"):
+        so._parse_conduction_bands((_BAND + ids).encode(), "fixture")
+
+
+def test_conduction_band_accepts_an_osti_record_in_place_of_a_doi():
+    bands = so._parse_conduction_bands((_BAND + 'osti = "42"\n').encode(), "fixture")
+    assert bands["x"].source == "s; OSTI:42"
