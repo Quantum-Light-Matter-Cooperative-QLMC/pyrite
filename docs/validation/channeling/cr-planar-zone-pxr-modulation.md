@@ -179,6 +179,29 @@ This is the vertex-correct form the second verifier asked for. $p=\kappa+\nu G$ 
 
 Anchors: `tests/montecarlo/channeling/test_zone_pxr.py`, `tests/montecarlo/channeling/test_planar_zone_pxr.py`.
 
+## Production measurement (#1166 acceptance)
+
+`checks/channeling_zone_pxr_modulation.py --production` scores the production source on a live 64-electron `channeling_demo` transport. It captures the depth populations that `case_channeling_spectrum` passes to the source. For each reflection the independent finite-slab reference is the native zone-row band × this check's model/native ratio, which is the same ratio as in the table above. Rays use order-3 JUNGFRAU squares (2.05e-4 sr at 5 m). The source owns a reflection when `source_reflections` does at the square's centre; other reflections keep native scoring on both sides. The runs are qlmc jobs 12336_0–9 at code `815362840`, on one CPU each, at 1.0–1.3 GB per centre. Record: `docs/validation/check-records/planar-zone/zone-pxr-production-1166-ne64.json`.
+
+| centre | production / reference, zone rows | incl. native rows outside the zone | production / native, zone rows |
+|---|---|---|---|
+| (0 0 −4)-az 30° | 1.0802 | 1.0737 | 1.0766 |
+| (0 0 −4)-az 37.5° | 1.0116 | 1.0106 | 1.0090 |
+| (0 0 −4)-az 42.807° | 1.0205 | 1.0187 | 1.0183 |
+| (0 0 −4)-az 44.479° | 1.0245 | 1.0223 | 1.0225 |
+| (0 0 −4)-az 45° | 1.0256 | 1.0234 | 1.0237 |
+| (−1 −1 3) mirror | 1.0296 | 1.0274 | **1.4856** |
+| (−1 −1 3) minus-in peak | 1.0074 | 1.0069 | 1.0618 |
+| (−1 −1 3)-az 30° | 1.0811 | 1.0745 | 1.0770 |
+| (−1 −1 3)-az 37.5° | 1.0200 | 1.0183 | 1.0175 |
+| (−1 −1 3)-az 45° | 1.0232 | 1.0214 | **1.2336** |
+
+Every centre is within the ≤10% band-integrated acceptance. The DCR enhancement over native survives into production: 1.49 at the mirror and 1.23 at 45°.
+
+The largest residual, +8% at both 30° arms, sits in the (±1 ∓1 1) pair. That pair carries 87% of the band there. At 37.5° the same pair is within 0.3%. Reflections with a smaller share run 2–5% high at most centres. The check's model is kinematic and applies escape at $E_0$. The source adds $\chi_0$ refraction and two-beam absorption on both legs and the Pendellösung depletion, so a few-percent offset is expected. The 30° excess has not been decomposed further.
+
+Since #1166, `channeling_detector_components` books the source's zone-row PXR/DCR under `spec_channeling`, not `spec`. At (0 0 −4)-az 30°, where every zone reflection is owned, the zone `spec` holds only DBR. Its `spec + spec_channeling` with channeling on, against `spec` with it off, is 1.08, 1.02 and 1.035 at 30°, 37.5° and 45° (job 12337, `docs/validation/check-records/planar-zone/detector-components-1166-dbr-ne64.json`).
+
 ## Native frozen-root error near poles (#1166 item 3)
 
 Native line scoring evaluates the photon field at the free root, so within a few line widths of a Bragg pole the $1/\det$ factor varies across the line. The #1148 check's free-electron finite-slab Born line, over the native frozen-root line (`free_born_over_native`, order-3 squares), bounds this error at every #1148 centre. The total band is within 0.5% (mirror 1.0050, 45° 1.0020, all others ≤ 0.07%). The worst single reflection is 1.7% ((1 1 −3), 15–16 eV from its pole). The single mirror ray reaches ×1.28, but the aperture average removes most of it. On zone rows, the source owns these Laue reflections and integrates the slab kernel exactly. Elsewhere the native error stays within that bound, far below the ≤10% acceptance. No fix is applied; the bound is recorded on `finite-time-lineshape`.

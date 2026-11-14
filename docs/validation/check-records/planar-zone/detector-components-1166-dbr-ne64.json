@@ -1,0 +1,145 @@
+{
+ "issue": 1166,
+ "code_sha": "8153628400acf148e03ea23378831bd96399f4cb",
+ "host": "qlmc-ace CPU (job 12337), BLAS/OpenMP/numba 1 thread; 5h26m, 3.8 GB",
+ "command": "checks/channeling_detector_components.py --electrons 64 --max-bragg 1 --detector-solid-angle-sr 2.05e-4 --detector-distance-mm 5000 --detector-order 3 --polar-deg 30 37.5 45",
+ "note": "Intrinsic source yields only (no detector response). Since #1166 the zone source scores source-owned reflections' zone-row PXR/DCR in spec_channeling, so compare spec+spec_channeling with #1148: on/off 1.08 (30 deg), 1.02 (37.5), 1.035 (45); at 30 deg every zone reflection is owned and zone spec is DBR only. spec_dbr (included in spec) is ~1e-14/electron on these off-mirror arms, <1e-4 of spec.",
+ "arms": [
+  {
+   "profile": "channeling_demo",
+   "electrons": 64,
+   "line_quadrature": "bin-mean",
+   "zone_rows": 64,
+   "rows": 112,
+   "zone_path_fraction": 0.9217875545572213,
+   "fates": {
+    "entry": 0,
+    "free": 0,
+    "overflow": 6,
+    "bound": 58
+   },
+   "directions": [
+    {
+     "label": "polar-30",
+     "n_hat": [
+      0.32101976096010304,
+      0.32101976096010304,
+      0.891006524188368
+     ],
+     "bragg_eV": null,
+     "on_all": {
+      "spec": 3.840148699632316e-11,
+      "spec_characteristic": 1.541172788835637e-08,
+      "brem": 6.379498493780144e-10,
+      "spec_channeling": 4.294368306702166e-10,
+      "spec_dbr": 1.1568655886065565e-14
+     },
+     "on_zone": {
+      "spec": 1.0976774002365621e-14,
+      "spec_characteristic": 1.435761609859186e-08,
+      "brem": 5.993908926994057e-10,
+      "spec_channeling": 4.294368306702166e-10,
+      "spec_dbr": 1.0976774002365621e-14
+     },
+     "on_native": {
+      "spec": 3.839051022232081e-11,
+      "spec_characteristic": 1.0541117897645187e-09,
+      "brem": 3.855895667860869e-11,
+      "spec_channeling": 4.294368306702166e-10,
+      "spec_dbr": 5.918818836999341e-16
+     },
+     "off": {
+      "spec": 4.3090542675126244e-10,
+      "spec_characteristic": 1.3263893849241888e-08,
+      "brem": 4.84609912571504e-10,
+      "spec_channeling": null,
+      "spec_dbr": 8.721584588986561e-15
+     }
+    },
+    {
+     "label": "polar-37.5",
+     "n_hat": [
+      0.40050969103590356,
+      0.4005096910359036,
+      0.8241261886220158
+     ],
+     "bragg_eV": null,
+     "on_all": {
+      "spec": 1.7018912531755183e-10,
+      "spec_characteristic": 1.5284038685708096e-08,
+      "brem": 2.766218792678519e-10,
+      "spec_channeling": 3.761319483268183e-11,
+      "spec_dbr": 6.595643843975132e-15
+     },
+     "on_zone": {
+      "spec": 1.511142655949902e-10,
+      "spec_characteristic": 1.4237757936629422e-08,
+      "brem": 2.5990239217347103e-10,
+      "spec_channeling": 3.761319483268183e-11,
+      "spec_dbr": 6.2583562513883046e-15
+     },
+     "on_native": {
+      "spec": 1.907485972256162e-11,
+      "spec_characteristic": 1.0462807490786677e-09,
+      "brem": 1.6719487094380894e-11,
+      "spec_channeling": 3.761319483268183e-11,
+      "spec_dbr": 3.3728759258682627e-16
+     },
+     "off": {
+      "spec": 2.0373346064100357e-10,
+      "spec_characteristic": 1.31528779728598e-08,
+      "brem": 2.10063657602456e-10,
+      "spec_channeling": null,
+      "spec_dbr": 4.9734648622605536e-15
+     }
+    },
+    {
+     "label": "polar-45",
+     "n_hat": [
+      0.473146789255815,
+      0.473146789255815,
+      0.7431448254773945
+     ],
+     "bragg_eV": null,
+     "on_all": {
+      "spec": 6.957041230255386e-11,
+      "spec_characteristic": 1.510410150084955e-08,
+      "brem": 1.394472764396107e-10,
+      "spec_channeling": 5.1187084563494326e-11,
+      "spec_dbr": 1.2371185499477308e-14
+     },
+     "on_zone": {
+      "spec": 5.853919987345336e-11,
+      "spec_characteristic": 1.406882381152422e-08,
+      "brem": 1.3101845632255067e-10,
+      "spec_channeling": 5.1187084563494326e-11,
+      "spec_dbr": 1.1743364029800864e-14
+     },
+     "on_native": {
+      "spec": 1.1031212429100497e-11,
+      "spec_characteristic": 1.03527768932533e-09,
+      "brem": 8.428820117060061e-12,
+      "spec_channeling": 5.1187084563494326e-11,
+      "spec_dbr": 6.278214696764567e-16
+     },
+     "off": {
+      "spec": 1.168587693016488e-10,
+      "spec_characteristic": 1.299671470953299e-08,
+      "brem": 1.0587220894044506e-10,
+      "spec_channeling": null,
+      "spec_dbr": 9.344426470601678e-15
+     }
+    }
+   ],
+   "detector": {
+    "solid_angle_sr": 0.000205,
+    "distance_mm": 5000.0,
+    "side_mm": 71.59093984205035,
+    "azimuth_reference": "(0 0 -4)",
+    "quadrature_order": 3,
+    "pose": "source-facing square, horizontal in diffraction plane",
+    "units": "photons/electron"
+   }
+  }
+ ]
+}
