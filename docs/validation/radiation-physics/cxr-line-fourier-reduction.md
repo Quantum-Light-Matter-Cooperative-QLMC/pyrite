@@ -151,6 +151,30 @@ triangle sum, including signed weights and remote resonances. Regrouping
 changes floating-point summation and can cause cancellation near a triangle
 endpoint; no backend error bound or speedup is inferred from exact indexing.
 
+A prototype callback in `_fourier_transform.py` uses optional FINUFFT type 1
+with two source rows. For an interval of $m=j_1-j_0$ modes, the centred
+library indices $k=-\lfloor m/2\rfloor,\ldots,\lceil m/2\rceil-1$ are
+shifted by $s=j_0+\lfloor m/2\rfloor$: modulating source strengths by
+$e^{-is\phi_l}$ and using `isign=-1`, `modeord=0` returns increasing requested
+indices $j=k+s$. The prototype requests complex128, `eps=1e-12` and one CPU
+thread explicitly. FINUFFT remains an isolated optional runtime import, not
+a declared dependency or production route. Its requested tolerance is not a
+bound on the final spectrum, especially after subtracting triangle moments.
+The callback convention was checked against the current
+[FINUFFT Python interface](https://finufft.readthedocs.io/en/latest/python.html)
+and [mode ordering options](https://finufft.readthedocs.io/en/latest/opts.html),
+then tested with version 2.5.1.
+
+The provisional hybrid uses FINUFFT only for rectangles with at least 64
+sources, 32 modes, and 262144 source-mode pairs. Other rectangles use a direct
+DFT blocked over both source and mode axes, with at most 262144 complex
+exponentials per temporary matrix. This limits that workspace, not total
+process memory or output arrays. These thresholds match the frozen cost
+audit; they are not measured CPU/GPU crossover rules. Tests check signs,
+odd/even shifted intervals, batching, bounded direct blocks, and that small
+fallbacks do not import FINUFFT. Optional tests skip when it is unavailable;
+the explicit isolated test run includes them.
+
 A line can participate in multiple transforms (at most the number of binary
 digits of its last mode). Many small rectangles may make transform setup
 expensive. Input duplication, transform counts and direct-fallback work must
