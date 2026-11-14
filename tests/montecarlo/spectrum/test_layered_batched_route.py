@@ -195,3 +195,27 @@ def test_batched_route_matches_the_per_hkl_loop_on_host_attenuation(monkeypatch,
         monkeypatch, E_grid_eV=np.arange(500.0, 4000.0, 2.0), **geometry
     )
     _assert_routes_agree(batched, per_hkl)
+
+
+def test_exact_mu_table_selects_the_host_interval_between_float_adjacent_knots(monkeypatch):
+    """A threshold one ulp above another knot: the right-continuous value, not the jump.
+
+    Regression for a midpoint probe that rounds onto the upper knot (#1194 verifier).
+    """
+    import pyrite.montecarlo.spectrum.cxr._escape_mu as escape_mu_module
+    from pyrite.materials.atomic import Z_TABLE
+    from pyrite.materials.photon_cross_sections import PHOTON_CHANNELS
+
+    a = np.nextafter(1000.0, np.inf)
+    b = np.nextafter(a, np.inf)
+    flat = (np.array([1.0, a, 1.0e11]), np.array([1.0, 1.0, 1.0]))
+    step = (np.array([b, 1.0e11]), np.array([5.0, 5.0]))
+    zero = (np.array([1.0, 1.0e11]), np.array([0.0, 0.0]))
+    mts = list(PHOTON_CHANNELS.values())
+    fake = {Z_TABLE["C"]: {mts[0]: flat, mts[1]: step, **{mt: zero for mt in mts[2:]}}}
+    monkeypatch.setattr(escape_mu_module, "_table", lambda: fake)
+    monkeypatch.setattr(escape_mu_module, "REAL", np.float64)
+
+    out = to_host(exact_mu_table([("C", 1.0)])(xp.asarray([a, b, 2000.0], dtype=np.float64)))
+
+    np.testing.assert_array_equal(out, [1.0, 6.0, 6.0])

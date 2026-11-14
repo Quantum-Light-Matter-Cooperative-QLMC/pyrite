@@ -68,9 +68,11 @@ def exact_mu_table(composition):
         for mt in PHOTON_CHANNELS.values()
     ]
     knots = np.unique(np.concatenate([e for _, (e, _s) in channels]))
-    # A point inside each union interval selects every channel's interval
-    # there; past the last knot each channel continues its last interval.
-    probe = np.append(0.5 * (knots[:-1] + knots[1:]), 2.0 * knots[-1])
+    # Each union knot, searched side="right" exactly as the host does,
+    # selects every channel's interval on [u_j, u_{j+1}); past the last knot
+    # the clip continues each channel's last interval. (A midpoint probe can
+    # round onto u_{j+1} between float-adjacent knots.)
+    probe = knots
     value = np.zeros_like(knots)
     slope = np.zeros_like(knots)
     for n_i, (e, s) in channels:
