@@ -48,6 +48,7 @@ from ..montecarlo.spectrum.coherent_population import (
     physical_bunch_electrons,
 )
 from ..montecarlo.spectrum.cxr._bin_quadrature import _bin_reduction_markers
+from ..montecarlo.spectrum.diffracted_brem import DIFFRACTED_BREM_MODEL
 from ..montecarlo.spectrum.transition_radiation_crossings import TRANSITION_MODEL
 from ..montecarlo.transport import STOPPING_MODEL
 from ..montecarlo.transport.precision import TRANSPORT_PRECISION_MODEL
@@ -423,6 +424,8 @@ def _model_generation_markers(emission: str) -> dict[str, Any]:
     markers["characteristic_model"] = CHARACTERISTIC_MODEL
     # The PXR/CBS line route's escape model (segment-mean escape since #181).
     markers["line_escape_model"] = CXR_ESCAPE_MODEL
+    # Diffracted bremsstrahlung joined the line spectra in #1166.
+    markers["diffracted_brem_model"] = DIFFRACTED_BREM_MODEL
     if emission != "incoherent":
         markers["coherent_population_model"] = COHERENT_POPULATION_MODEL
     # Every photon-escape factor reads the narrow-beam mu, sourced from
@@ -676,6 +679,7 @@ def case_content_key(
         "stopping_model": STOPPING_MODEL,
         "characteristic_model": case_characteristic_marker(case),
         "line_escape_model": CXR_ESCAPE_MODEL,
+        "diffracted_brem_model": DIFFRACTED_BREM_MODEL,
         "attenuation_model": ATTENUATION_MODEL,
         "transport_precision_model": TRANSPORT_PRECISION_MODEL,
         "bremsstrahlung_model": (

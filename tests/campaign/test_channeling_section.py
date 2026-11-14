@@ -190,23 +190,24 @@ def test_channeling_demo_and_off_profile_identities_are_unchanged():
 
     Pins refreshed for #1134's ``segment-mean-v7-quantum-elements`` marker;
     restoring the v6 marker reproduces every pre-#1134 pin. The demo content
-    key follows ``CHANNELING_MODEL`` v10 (#1166 zone-row PXR/DCR source).
+    key follows ``CHANNELING_MODEL`` v10 (#1166 zone-row PXR/DCR source); every
+    pin, channeling-off included, follows ``DIFFRACTED_BREM_MODEL`` (#1166 DBR).
     """
     sweep, settings, cases = _profile_cases("silicon", "channeling_demo")
     assert cases[0].line_quadrature == "bin-mean"
     assert [profiles.case_content_key(case) for case in cases] == [
-        "f4865755c235aba46754861eae0fd14f2cab037da638a294c76ea16d28a96ac6"
+        "94c318b8bf4697c0b9304cd01f6ab35d74ad242686678143496ba49f53d5be21"
     ]
     assert profiles.named_profile_stem("silicon", catalog_profile="channeling_demo") == (
-        "silicon@channeling_demo-c86288499325"
+        "silicon@channeling_demo-1082437ae4a7"
     )
     identity = profiles.dataset_identity("silicon", settings, sweep)
     assert identity["parameter_sha256"] == (
-        "45641bf27811662624a7e15f444ae91855eabba89fc96504410b0e0ae935edeb"
+        "0c3237110d50f65b0f9786a36d7ee8db470fc58cdb4d494f67d36034ff98a74d"
     )
     sweep = material_sweep("hopg", catalog_profile="standard")
     settings = profiles.profile_run_settings(default_settings(), "standard", sweep=sweep)
     assert profiles.dataset_identity("hopg", settings, sweep)["parameter_sha256"] == (
-        "a56397dab3df3121199c0cde7a323aee57c75dcd95925a5479e56a17e0695bac"
+        "373b980c3a681da4f2a46a388538b30c449318e1a111c2d5429051e3165ceee8"
     )
-    assert profiles.named_profile_stem("hopg") == "hopg@full-a56397dab3df"
+    assert profiles.named_profile_stem("hopg") == "hopg@full-373b980c3a68"

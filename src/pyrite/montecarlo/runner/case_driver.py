@@ -982,7 +982,7 @@ def _characteristic_phase(emission, batch, Ne_brem):
 def _spectrum_case_impl(case, tp, record_timing=False):
     """Implement :func:`_spectrum_case` inside its optional Nsight range.
 
-    Validation: temporal-intensity-profile
+    Validation: temporal-intensity-profile, diffracted-bremsstrahlung
     """
     from dataclasses import replace as batch_replace
 
@@ -1099,6 +1099,18 @@ def _spectrum_case_impl(case, tp, record_timing=False):
                 raise
             raise _SpectrumPhaseOOM("brem", error) from error
     _spectrum_stage_done("brem")
+    # DIFFRACTED BREM (#1166): forward brem Bragg-diffracted into n_hat, an
+    # incoherent line added to both CXR line spectra.
+    from .diffracted_brem import case_diffracted_brem
+
+    spec_dbr = _finished_or_run(
+        phase_cache,
+        "diffracted_brem",
+        lambda: case_diffracted_brem(case, segs_dev, E_grid, n_hat, Ne_brem),
+    )
+    spec = spec + spec_dbr
+    if spec_coherent is not None:
+        spec_coherent = spec_coherent + spec_dbr
     with _pkg._nsys_range("pyrite.interpolate"):
         brem = np.interp(E_grid, E_brem, brem_wide)  # brem under the lines (line grid)
     # Return this case's GPU scratch on the A2 cadence so the CuPy memory pool

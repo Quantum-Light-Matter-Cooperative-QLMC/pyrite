@@ -11,7 +11,10 @@ the beam in the plane):
 - ``spec``: native PXR/CBS lines (own row already dropped on zone rows, #1055);
 - ``spec_characteristic``: EEDL shell-ionization lines;
 - ``brem``: incoherent bremsstrahlung on the line grid;
-- ``spec_channeling``: the expected-value CR source (rows play no part).
+- ``spec_channeling``: the expected-value CR source (rows play no part), with
+  the zone-row PXR/DCR source of source-owned reflections (#1166);
+- ``spec_dbr``: the diffracted bremsstrahlung part of ``spec`` (#1166),
+  reported separately; ``spec`` includes it.
 
 The channeling-on transport is scored on all rows, on zone rows only and on
 native rows only, so the zone's share of each component is explicit. Native PXR/CBS on zone
@@ -44,7 +47,7 @@ import warnings
 
 import numpy as np
 
-COMPONENTS = ("spec", "spec_characteristic", "brem", "spec_channeling")
+COMPONENTS = ("spec", "spec_characteristic", "brem", "spec_channeling", "spec_dbr")
 
 
 def _profile_case(profile: str, material: str):
@@ -101,8 +104,13 @@ def _band(spectrum, grid):
 
 
 def _score(runner, case, transport, n_hat):
+    from pyrite.montecarlo.runner.diffracted_brem import case_diffracted_brem
+
     out = runner._spectrum_case(case, {**transport, "n_hat": n_hat})
     grid = np.asarray(out["E_grid"], dtype=float)
+    out["spec_dbr"] = case_diffracted_brem(
+        case, transport["segs"], grid, n_hat, transport["Ne_brem"]
+    )
     return {key: _band(out[key], grid) if out.get(key) is not None else None for key in COMPONENTS}
 
 
@@ -276,7 +284,7 @@ def main(argv=None) -> int:
             "on_native": _detector_score(runner, case, native_t, beam, n_hat, args),
             "off": _detector_score(runner, off, off_t, beam, n_hat, args),
         }
-        for key in ("spec", "spec_characteristic", "brem"):
+        for key in ("spec", "spec_characteristic", "brem", "spec_dbr"):
             total, part_z, part_n = (row[arm][key] for arm in ("on_all", "on_zone", "on_native"))
             finite = all(np.isfinite(v) for v in (total, part_z, part_n, row["off"][key]))
             additive = np.isclose(part_z + part_n, total, rtol=1e-9, atol=1e-30)

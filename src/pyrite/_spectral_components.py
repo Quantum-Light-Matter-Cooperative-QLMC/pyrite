@@ -2,8 +2,10 @@
 
 Run outputs and result records carry each emission channel as its own array:
 
-- ``spec``: incoherent PXR/CBS line density on ``E_grid``;
-- ``spec_coherent``: optional coherent PXR/CBS line density on ``E_grid``;
+- ``spec``: incoherent PXR/CBS line density on ``E_grid``, plus the incoherent
+  diffracted bremsstrahlung lines (#1166);
+- ``spec_coherent``: optional coherent PXR/CBS line density on ``E_grid``, plus
+  the same incoherent diffracted bremsstrahlung lines;
 - ``spec_characteristic``: characteristic (atomic relaxation) density on
   ``E_grid``;
 - ``spec_channeling``: optional planar channeling-radiation density on

@@ -179,6 +179,10 @@ This is the vertex-correct form the second verifier asked for. $p=\kappa+\nu G$ 
 
 Anchors: `tests/montecarlo/channeling/test_zone_pxr.py`, `tests/montecarlo/channeling/test_planar_zone_pxr.py`.
 
+## Native frozen-root error near poles (#1166 item 3)
+
+Native line scoring evaluates the photon field at the free root, so within a few line widths of a Bragg pole the $1/\det$ factor varies across the line. The #1148 check's free-electron finite-slab Born line, over the native frozen-root line (`free_born_over_native`, order-3 squares), bounds this error at every #1148 centre. The total band is within 0.5% (mirror 1.0050, 45° 1.0020, all others ≤ 0.07%). The worst single reflection is 1.7% ((1 1 −3), 15–16 eV from its pole). The single mirror ray reaches ×1.28, but the aperture average removes most of it. On zone rows, the source owns these Laue reflections and integrates the slab kernel exactly. Elsewhere the native error stays within that bound, far below the ≤10% acceptance. No fix is applied; the bound is recorded on `finite-time-lineshape`.
+
 ## Fresh-context verification (#1166)
 
 2026-11-13, two passes by an independent verifier (`physics-validator`) against the uncommitted fixes.

@@ -53,6 +53,7 @@ def resolved_physics_view(
     from .montecarlo.spectrum.brem_bremslib import BREMSSTRAHLUNG_BREMSLIB_MODEL
     from .montecarlo.spectrum.characteristic import characteristic_model_marker
     from .montecarlo.spectrum.coherent_population import COHERENT_POPULATION_MODEL
+    from .montecarlo.spectrum.diffracted_brem import DIFFRACTED_BREM_MODEL
     from .montecarlo.trajectories import _jsonable
     from .montecarlo.transport import STOPPING_MODEL
 
@@ -116,6 +117,7 @@ def resolved_physics_view(
             else CHARACTERISTIC_MODEL
         ),
         "line_escape_model": CXR_ESCAPE_MODEL,
+        "diffracted_brem_model": DIFFRACTED_BREM_MODEL,
         "attenuation_model": ATTENUATION_MODEL,
         "bremsstrahlung_model": (
             BREMSSTRAHLUNG_BREMSLIB_MODEL

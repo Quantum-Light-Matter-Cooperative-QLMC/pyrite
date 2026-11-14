@@ -19,6 +19,7 @@ optical-ctr-population
 frank-tamm-homogeneous-dielectric
 brem-source-comparison
 brem-spectrum
+diffracted-bremsstrahlung
 bremslib-angular-model
 bremslib-coupled-expected-spectrum
 bremslib-radiative-event-spectrum
