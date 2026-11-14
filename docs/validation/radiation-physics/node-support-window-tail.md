@@ -235,7 +235,9 @@ Windowed grouped scoring cuts the HOPG cap-arm penalty over the uncapped call
 from 250-1040x to 54-180x. Two cases do not speed up. First, device per-row
 windowing loses to the dense float32 reducer; the default policy therefore
 keeps CuPy per-row lines on the dense reducer, so they equal the full-node
-reference. Second, host window planning dominates thin-Si capped calls
+reference. At `971ffd0f3`, the uncapped thin-HOPG and near-range-Si replays
+under the default are bitwise identical to the reference. Their cost ratios
+are 0.94 and 1.00, and CUDA parity passed (6 tests). Second, host window planning dominates thin-Si capped calls
 (interpolation and endpoint clustering, about 2.4 s of a 4.9 s call). Seeded
 physics-baseline cases use coarse grids whose beats are unresolved, so the
 automatic policy evaluates them exactly (agreement $10^{-15}$).
