@@ -99,6 +99,7 @@ transverse-bunch-form-factor
 xray-chi-zero
 xray-in-medium-propagation-phase
 xray-in-medium-resonance
+xray-layered-escape-phase
 xray-refractive-index
 zhai-hbn-921-detected
 ```

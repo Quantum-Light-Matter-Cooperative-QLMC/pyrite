@@ -1,7 +1,8 @@
 """Flight-grouped incoherent reduction: rows of one flight add as fields.
 
 ``sum_f sum_pol |sum_{j in f} c_pol,j F_j(E) exp(i phi_j(E))|^2`` with
-``phi_j = d_j omega - g.r_j - L_esc,j delta omega`` (``_per_hkl`` §7b). Every
+``phi_j = d_j omega - g.r_j - L_esc,j delta omega`` (``_per_hkl`` §7b);
+through a K-layer stack the escape term is ``sum_l L_l delta_l omega``. Every
 row's phase terms are first referenced to its flight's first row: a phase
 common to one flight cancels in ``|field|^2``, so this is exact, and it keeps
 the arguments at the flight's own extent instead of the trajectory's absolute
@@ -13,7 +14,7 @@ The NumPy backend takes the fused host kernel
 segmented intensity kernel of the coherent streaming route, keyed by flight
 instead of electron. ``_setup`` refuses every other backend.
 
-Validation: coherent-formation-absorption
+Validation: coherent-formation-absorption, xray-layered-escape-phase
 """
 
 import numpy as np
@@ -54,7 +55,8 @@ def accumulate_flight_grouped(st, idx, sel, coefs, cxr_rows, L_esc, recoil_phase
 
     ``idx`` are the reflection's kept rows, ``sel`` the finite ones within
     them; ``coefs``, ``cxr_rows``, ``L_esc`` and ``recoil_phase`` are indexed
-    like ``idx``. Validation: coherent-formation-absorption
+    like ``idx``. Validation: coherent-formation-absorption,
+    xray-layered-escape-phase
     """
     perm, starts, bounds, flight = _flight_layout(st.gid_all[idx[sel]])
     sel = sel[perm]
@@ -76,7 +78,10 @@ def accumulate_flight_grouped(st, idx, sel, coefs, cxr_rows, L_esc, recoil_phase
 
 
 def _device_grouped(lines, d, g_phase, L_rel, coefs, bounds, grids, spec, wm):
-    """Float32 CuPy segmented reduction of the referenced rows."""
+    """Float32 CuPy segmented reduction of the referenced rows.
+
+    Layered rows go to the kernel layer-major. Validation: xray-layered-escape-phase
+    """
     from ..coherent_grouped_jit_kernel import run_coherent_grouped_intensity_kernel
 
     def f32(a):
