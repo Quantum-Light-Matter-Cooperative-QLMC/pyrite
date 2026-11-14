@@ -8,8 +8,10 @@ from pyrite.montecarlo.spectrum.cxr._fourier_cutoffs import (
     partitioned_positive_modes,
 )
 
+_RANDOM_COUNTS = np.sort(np.random.default_rng(1192).integers(0, 700, 400)).tolist()
 
-@pytest.mark.parametrize("counts", [[0], [0, 0], [1], [3, 3, 8], list(range(65))])
+
+@pytest.mark.parametrize("counts", [[0], [0, 0], [1], [3, 3, 8], list(range(65)), _RANDOM_COUNTS])
 def test_rectangles_cover_each_active_pair_once(counts):
     counts = np.array(counts, dtype=np.int64)
     cover = np.zeros((counts.size, int(counts.max()) + 1), dtype=int)
