@@ -361,3 +361,38 @@ def test_score_families_sel_point_runs_the_incremental_selector_on_the_band(monk
     assert abs(row["band"]["versus_largest"]["yield_per_primary"]) < 2e-3
     with pytest.raises(ValueError, match="reference"):
         gate["score_families"](*args[:3], ["g24", "sel1e-3"], 5.0, 0.0, lambda: None, 512)
+
+
+def test_transport_arms_change_one_choice_and_pass_physics_validation():
+    from pyrite._numerics import Physics
+
+    arms = _gate()["ARM_OVERRIDES"]
+    assert arms["baseline"] == {}
+    pinned = dict(
+        inelastic_model="shell-soft-hard",
+        inelastic_cutoff_eV=50.0,
+        straggling=False,
+        elastic_model="elsepa",
+        bremsstrahlung_model="bremslib",
+        radiative_model="bremslib-soft-hard",
+        radiative_cutoff_eV=1000.0,
+        atomic_electron_deflection="kawrakow",
+    )
+    for name, overrides in arms.items():
+        if name == "mixed-elastic":
+            assert overrides["transport_mode"] == "mixed"
+        else:
+            assert len(overrides) <= 1, name
+        physics = {
+            k: v for k, v in overrides.items() if k not in ("max_dE_frac", "transport_precision")
+        }
+        Physics(**{**pinned, **physics}).validate_transport("midpoint")
+
+
+def test_frozen_integration_is_inadmissible_under_pinned_physics():
+    from pyrite._numerics import Physics
+
+    with pytest.raises(ValueError, match="midpoint"):
+        Physics(
+            inelastic_model="shell-soft-hard", radiative_model="bremslib-soft-hard"
+        ).validate_transport("frozen")

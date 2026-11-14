@@ -996,6 +996,27 @@ def device_peak_probe(cupy):
     return probe
 
 
+#: Pinned-transport changes per arm; each changes one choice from the baseline.
+#: Cap values are relative to the pilot ladder (not fractions of a baseline
+#: cap). ``frozen`` integration is not an arm: shell-soft-hard inelastic and
+#: coupled radiative transport both require midpoint integration, so it is
+#: inadmissible under production physics. ``mixed-elastic`` uses the model's
+#: documented C1 = C2 = 0.05; CXR scoring refuses mixed transport (#990).
+ARM_OVERRIDES = {
+    "baseline": {},
+    "half-cap": {"max_dE_frac": 0.00025},
+    "quarter-cap": {"max_dE_frac": 0.000125},
+    "cut25": {"inelastic_cutoff_eV": 25.0},
+    "cut35": {"inelastic_cutoff_eV": 35.0},
+    "cut100": {"inelastic_cutoff_eV": 100.0},
+    "rad500": {"radiative_cutoff_eV": 500.0},
+    "rad2000": {"radiative_cutoff_eV": 2000.0},
+    "straggling": {"straggling": True},
+    "mixed-precision": {"transport_precision": "mixed"},
+    "mixed-elastic": {"transport_mode": "mixed", "mixed_c1": 0.05, "mixed_c2": 0.05},
+}
+
+
 def main():
     global BAND
     parser = argparse.ArgumentParser(description=__doc__)
@@ -1003,22 +1024,25 @@ def main():
     parser.add_argument("output", type=Path)
     parser.add_argument(
         "--arm",
-        choices=[
-            "baseline",
-            "half-cap",
-            "quarter-cap",
-            "cut25",
-            "cut35",
-            "cut100",
-            "mixed-precision",
-            "mixed-elastic",
-        ],
+        choices=list(ARM_OVERRIDES),
         default="baseline",
     )
     parser.add_argument("--seed", type=int, default=642501)
     parser.add_argument("--histories", type=int, default=64)
     parser.add_argument("--replay", type=Path, help="trusted same-source transport pickle")
     parser.add_argument("--transport-only", action="store_true")
+    parser.add_argument(
+        "--transport-core",
+        choices=["cuda", "auto", "lockstep", "per-electron"],
+        default="cuda",
+        help="transport core for fresh (non-replay) transport; host runs use auto/lockstep",
+    )
+    parser.add_argument(
+        "--transport-repeats",
+        type=int,
+        default=1,
+        help="fresh transports in-process (first + warm) for setup-free transport timing",
+    )
     parser.add_argument(
         "--node-spacings",
         type=lambda text: [float(x) for x in text.split(",") if x],
@@ -1181,15 +1205,7 @@ def main():
         radiative_cutoff_eV=1000.0,
         atomic_electron_deflection="kawrakow",
     )
-    if args.arm in ("half-cap", "quarter-cap"):
-        case["max_dE_frac"] = 0.00025 if args.arm == "half-cap" else 0.000125
-    elif args.arm in ("cut25", "cut35", "cut100"):
-        case["inelastic_cutoff_eV"] = {"cut25": 25.0, "cut35": 35.0, "cut100": 100.0}[args.arm]
-    elif args.arm == "mixed-precision":
-        case["transport_precision"] = "mixed"
-    elif args.arm == "mixed-elastic":
-        # Use the model's own validated tuning defaults; admission may refuse.
-        case.update(transport_mode="mixed", mixed_c1=0.05, mixed_c2=0.05)
+    case.update(ARM_OVERRIDES[args.arm])
     sync, device, pool_bytes, peak_probe = runtime()
     args.output.mkdir(parents=True, exist_ok=False)
     sync()
@@ -1205,9 +1221,22 @@ def main():
             raise ValueError("replay material/seed/population mismatch")
         ladder = CaseLadder(case, transport=saved["transport"])
     else:
-        ladder = CaseLadder(case, transport_core="cuda")
+        ladder = CaseLadder(case, transport_core=args.transport_core)
     sync()
     transport_s = time.perf_counter() - start
+    rss_after_transport_kib = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    transport_warm_s, warm_fingerprints_match = [], True
+    for _ in range(0 if args.replay else args.transport_repeats - 1):
+        # Same case and seed in the same process: the warm cost excludes
+        # first-call setup (JIT, tables, device context). Determinism is checked,
+        # not assumed; only the first transport is kept.
+        sync()
+        begin = time.perf_counter()
+        again = CaseLadder(case, transport_core=args.transport_core)
+        sync()
+        transport_warm_s.append(time.perf_counter() - begin)
+        warm_fingerprints_match &= again.fingerprint == ladder.fingerprint
+        del again
     payload = args.output / "transport.pkl"
     payload.write_bytes(pickle.dumps(dict(case=case, transport=ladder.transport), protocol=5))
     score = runpy.run_path(str(Path(__file__).with_name("straggling_defaults") / "study.py"))[
@@ -1233,6 +1262,7 @@ def main():
         mosaic_sampling=args.mosaic_sampling,
         mosaic_seed=case.get("seed") if args.mosaic_sampling == "history" else None,
         arm=args.arm,
+        arm_overrides=ARM_OVERRIDES[args.arm],
         seed=args.seed,
         histories=args.histories,
         backend=BACKEND.name,
@@ -1244,6 +1274,11 @@ def main():
         source_revision=Path("SOURCE_SHA").read_text().strip(),
         transport_s_including_first_setup=None if args.replay else transport_s,
         replay_adoption_s=transport_s if args.replay else None,
+        transport_core=None if args.replay else args.transport_core,
+        transport_warm_s=transport_warm_s,
+        transport_warm_fingerprints_match=warm_fingerprints_match,
+        host_peak_rss_after_first_transport_kib=rss_after_transport_kib,
+        numba_threads=int(os.environ.get("NUMBA_NUM_THREADS", "0")) or None,
         fingerprint=ladder.fingerprint,
         transport_sha256=hashlib.sha256(payload.read_bytes()).hexdigest(),
         qualification="sensitivity only; no accuracy or equal-precision verdict",
