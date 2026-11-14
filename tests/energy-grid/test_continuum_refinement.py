@@ -350,3 +350,149 @@ def test_stack_media_anchor_every_layer_edge_and_take_the_highest_floor():
     assert automatic_continuum_grid("hopg", endpoint, stack_media=("sapphire",))[0] == (
         photon_continuum_floor_eV("sapphire")
     )
+
+
+# --- overlapping marks (#1171) ----------------------------------------------
+
+
+def _mark(label, below, above, spacing, *, first=None, last=None, centred=True):
+    from pyrite.energy_grid.refine import RefinementMark
+
+    return RefinementMark(
+        kind=EDGE_KIND,
+        label=label,
+        anchors_eV=(below, above),
+        first_eV=below if first is None else first,
+        last_eV=above if last is None else last,
+        spacing_eV=spacing,
+        centred=centred,
+    )
+
+
+def _anchor_failures(grid, marks):
+    """Marks whose feature does not sit on a bin boundary of ``grid``.
+
+    A centred pair (EPDL edge, kinematic endpoint) must put a bin edge -- a
+    midpoint of two adjacent nodes -- exactly on its feature; a Chantler pair
+    must be two adjacent grid nodes.
+    """
+    lo, hi = float(grid[0]), float(grid[-1])
+    midpoints = 0.5 * (grid[:-1] + grid[1:])
+    failures = []
+    for mark in marks:
+        below, above = mark.anchors_eV
+        if not (lo < below and above < hi):
+            continue
+        if mark.centred:
+            feature = 0.5 * (below + above)
+            if np.min(np.abs(midpoints - feature)) > 1.0e-12 * feature:
+                failures.append(mark.label)
+            continue
+        index = int(np.searchsorted(grid, below))
+        if not (index + 1 < grid.size and grid[index] == below and grid[index + 1] == above):
+            failures.append(mark.label)
+    return failures
+
+
+def test_another_marks_samples_never_split_an_anchor_pair():
+    """A neighbourhood sample inside another mark's pair is rejected, not kept.
+
+    Before #1171 the sorted cross-mark merge kept the first coordinate of any
+    close pair, so a coarse mark's sample landing inside a fine mark's pair
+    either split it or dropped its anchor.
+    """
+    from pyrite.energy_grid.refine import refine_continuum_nodes
+
+    baseline = np.linspace(100.0, 200.0, 21)
+    coarse = _mark("coarse", 140.0, 146.0, 6.0, first=128.0, last=158.0)  # samples 128,134,...,158
+    fine = _mark("fine", 151.6, 152.4, 0.8)  # 152 sits inside, 151.6/152.4 ~0.4 off a sample
+    nodes, summary = refine_continuum_nodes(baseline, [coarse, fine])
+    assert _anchor_failures(nodes, [coarse, fine]) == []
+    assert summary["split_anchor_pairs"] == []
+    assert not np.any((nodes > 151.6) & (nodes < 152.4))
+    assert {151.6, 152.4, 140.0, 146.0} <= set(nodes.tolist())
+
+
+def test_interleaved_centred_pairs_both_keep_their_bin_boundary():
+    """Two edges closer than their pairs are wide share one node between them.
+
+    The PtTe2-on-gold case: Pt M4 at 2206.0 eV and Au M5 at 2210.0 eV, pairs
+    5.6 and 4.7 eV wide. No grid holds both pairs adjacent; the joined chain
+    2204, 2208, 2212 puts a bin edge exactly on each edge.
+    """
+    from pyrite.energy_grid.refine import refine_continuum_nodes
+
+    baseline = np.linspace(2100.0, 2300.0, 41)
+    platinum = _mark("Pt M4", 2203.194, 2208.806, 5.612)
+    gold = _mark("Au M5", 2207.633, 2212.367, 4.734)
+    nodes, summary = refine_continuum_nodes(baseline, [gold, platinum])
+    assert _anchor_failures(nodes, [platinum, gold]) == []
+    assert summary["joined_anchor_pairs"] == 2
+    window = nodes[(nodes > 2200.0) & (nodes < 2215.0)]
+    np.testing.assert_allclose(window, [2204.0, 2208.0, 2212.0], rtol=0.0, atol=1.0e-9)
+
+
+def test_a_baseline_node_at_a_pair_midpoint_is_displaced():
+    """The strict half-spacing test alone kept a node exactly on the feature."""
+    from pyrite.energy_grid.refine import refine_continuum_nodes
+
+    baseline = np.array([100.0, 150.0, 200.0])
+    nodes, _ = refine_continuum_nodes(baseline, [_mark("edge", 149.0, 151.0, 2.0)])
+    np.testing.assert_array_equal(nodes, [100.0, 149.0, 151.0, 200.0])
+
+
+#: Films and stacks whose marks overlap: the S L2 doublet in every sulfide,
+#: Ta M2 beside S K, and gold M edges under W, Pt and S films (#1171 evidence).
+OVERLAP_CASES = [
+    ("mos2", ()),
+    ("ws2", ()),
+    ("2h_tas2", ()),
+    ("tungsten", ("gold",)),
+    ("ptte2", ("gold",)),
+    ("ws2", ("gold",)),
+    ("mos2", ("sio2", "silicon")),
+]
+
+
+def _automatic_grid_anchor_failures(film, stack_media, endpoint_eV=30.0e3):
+    from pyrite._continuum_grid import CONTINUUM_LOG_STEP, automatic_continuum_grid
+
+    grid = automatic_continuum_grid(film, endpoint_eV, stack_media=stack_media)
+    marks, _ = continuum_refinement_marks(
+        film,
+        float(grid[0]),
+        float(grid[-1]),
+        endpoint_eV=endpoint_eV,
+        local_spacing_eV=endpoint_eV * CONTINUUM_LOG_STEP,
+        stack_media=stack_media,
+    )
+    assert marks
+    return grid, _anchor_failures(grid, marks)
+
+
+@pytest.mark.parametrize(("film", "stack_media"), OVERLAP_CASES)
+def test_overlapping_marks_keep_every_feature_on_a_bin_boundary(film, stack_media):
+    grid, failures = _automatic_grid_anchor_failures(film, stack_media)
+    assert failures == []
+    validate_backend_coordinates(grid, dtype=np.float32)
+
+
+def test_every_catalog_material_keeps_every_feature_on_a_bin_boundary():
+    """Anchor integrity over every catalog material, as a bare film and as shipped."""
+    from pyrite.materials.catalog import _get_default_catalog
+
+    catalog = _get_default_catalog()
+    cases = {}
+    for key in catalog.material_keys:
+        spec = catalog.materials[key]
+        below = [layer.material for layer in spec.stack]
+        below += [spec.substrate] if spec.substrate else []
+        stack = tuple(dict.fromkeys(m for m in below if m and m != spec.crystal_key))
+        cases[(spec.crystal_key, ())] = key
+        cases[(spec.crystal_key, stack)] = key
+    failures = {}
+    for (film, stack), key in cases.items():
+        _grid, failed = _automatic_grid_anchor_failures(film, stack)
+        if failed:
+            failures[f"{key}: {film}/{','.join(stack)}"] = failed
+    assert failures == {}
