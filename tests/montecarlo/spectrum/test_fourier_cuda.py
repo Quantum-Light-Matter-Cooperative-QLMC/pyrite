@@ -140,7 +140,7 @@ def test_experimental_reduction_scope_routes_batched_kernel(cp):
         )
     assert np.max(abs(cp.asnumpy(out) - exact)) < 1e-7 * np.abs(w).sum()
     clamped = np.r_[0.0, edges[1:]]
-    with pytest.raises(ValueError, match="c_k"):
+    with pytest.raises(ValueError, match="uniform"):
         run_bin_mean_reduction_kernel(
             cp.asarray(e32),
             cp.asarray(a32),
