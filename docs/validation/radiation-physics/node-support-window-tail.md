@@ -176,6 +176,12 @@ windows add exact minus $K$. Distant poles use geometric recentering (at most
 $1/32$ of distance); far poles whose windows reach the band use direct
 calculation. Nonuniform grids retain the full-node reference.
 
+Per-row supports covering at least one quarter of the grid are evaluated
+exactly over the full grid on both backends. CuPy uses the existing tuned
+dense reducer for these broad rows, with at most four times their support
+work; narrow rows use the window kernel. This selection also keeps the
+backend approximation identical. Empty tail deposits skip the device FFT.
+
 NumPy and float32 CuPy share the plan. CuPy fields use float32, while tail
 corrections, atomic accumulation and FFT use float64. FP64 CuPy retains the
 reference. CPU/GPU parity tests check implementation agreement, not independent

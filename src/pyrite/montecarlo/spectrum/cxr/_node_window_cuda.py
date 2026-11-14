@@ -122,7 +122,7 @@ class DeviceNodeTail(NodeTail):
         super().__init__(E_grid, n_targets, x_c)
         self.correction = cp.zeros((n_targets, self.n), dtype=cp.float64)
 
-    def apply(self, targets):
+    def _device_kernel_spectra(self):
         import cupy as cp
         from scipy.fft import next_fast_len
 
@@ -130,10 +130,18 @@ class DeviceNodeTail(NodeTail):
         nfft = next_fast_len(3 * L - 2, real=True)
         j = cp.arange(-(L - 1), L, dtype=cp.float64)
         inv = cp.where(j == 0, 0.0, 1.0 / (cp.where(j == 0, 1.0, j) * self.step))
-        kernels = [cp.fft.rfft(inv**k, nfft) for k in (2, 3, 4)]
+        return nfft, [cp.fft.rfft(inv**k, nfft) for k in (2, 3, 4)]
+
+    def apply(self, targets):
+        import cupy as cp
+
+        kernels = None
+        L = self.length
         for t, tgt in enumerate(targets):
             total = self.correction[t] + cp.asarray(self._direct[t])
             if np.any(self._dep[t]):
+                if kernels is None:
+                    nfft, kernels = self._device_kernel_spectra()
                 dep = cp.asarray(self._dep[t])
                 full = cp.fft.irfft(
                     sum(cp.fft.rfft(dep[k], nfft) * kernels[k] for k in range(3)), nfft
@@ -151,16 +159,58 @@ def _plan_arrays(plan):
     return tuple(layout[k] for k in range(4)) + (_device(np.stack(mom), np.float64),)
 
 
+def _accumulate_dense_rows(E_r, a_width, weights, E_grid, tail, target_ids):
+    """Use the tuned full-node reducer for supports covering >=1/4 of the grid.
+
+    Its work is at most four times those supports, preserving support scaling
+    while avoiding the scatter kernel's broad-line atomic cost.
+    """
+    from dataclasses import replace
+
+    import cupy as cp
+
+    from ...runner.transport_options import spectrum_launch_overrides
+    from ..cxr_jit_kernel import DEFAULT_SPECTRUM_KERNEL_CONFIG, run_reduction_kernel
+
+    config = replace(DEFAULT_SPECTRUM_KERNEL_CONFIG, **spectrum_launch_overrides())
+    for t, slot in enumerate(target_ids):
+        result = cp.zeros(E_grid.size, dtype=cp.float32)
+        run_reduction_kernel(
+            _device(E_r, np.float32),
+            _device(a_width, np.float32),
+            _device(weights[t], np.float32),
+            _device(E_grid, np.float32),
+            out=result,
+            config=config,
+        )
+        tail.correction[slot] += result
+
+
 def accumulate_rows(E_r, a_width, weights, E_grid, targets, tail, target_ids):
     """Windowed device sinc² reduction, retaining corrections until tail apply."""
     import cupy as cp
 
     if E_r.size == 0 or E_grid.size == 0:
         return
+    target_ids = tuple(target_ids)
     er, a = _host(cp.stack((E_r, a_width)))
     device_weights = _device(cp.stack(weights), np.float64)
     w = _host(device_weights)
     plan = row_window_plan(tail, er, a)
+    # Dense evaluation is also exact on broad/direct reference fallbacks.
+    broad = plan[2] - plan[1] + 1 >= 0.25 * tail.n
+    if broad.any():
+        ids = cp.asarray(np.flatnonzero(broad))
+        _accumulate_dense_rows(
+            E_r[ids], a_width[ids], device_weights[:, ids], E_grid, tail, target_ids
+        )
+        ids = cp.asarray(np.flatnonzero(~broad))
+        E_r, a_width = E_r[ids], a_width[ids]
+        device_weights = cp.ascontiguousarray(device_weights[:, ids])
+        er, w = er[~broad], w[:, ~broad]
+        plan = tuple(v[~broad] for v in plan)
+        if er.size == 0:
+            return
     out = cp.zeros((len(weights), tail.n), dtype=cp.float64)
     _kernel("window_rows")(
         (er.size,),

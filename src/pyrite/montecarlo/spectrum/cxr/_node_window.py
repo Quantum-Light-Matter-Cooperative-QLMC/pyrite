@@ -227,6 +227,11 @@ def row_window_plan(tail, E_r, a_width):
     if tail.resolved_only:
         unresolved = a * tail.step > np.pi / 4
         lo[unresolved], hi[unresolved], mode[unresolved] = 0, tail.n - 1, _MODE_DIRECT
+    # Broad supports take the exact reference on both backends. The device
+    # can use its tuned dense reducer, at <=4x the support work, without a
+    # backend-dependent tail approximation.
+    broad = hi - lo + 1 >= 0.25 * tail.n
+    lo[broad], hi[broad], mode[broad] = 0, tail.n - 1, _MODE_DIRECT
     mu2 = 0.5 / (a * a)
     return node, lo, hi, mode, mu2, 2.0 * eps * mu2, 3.0 * eps * eps * mu2
 
