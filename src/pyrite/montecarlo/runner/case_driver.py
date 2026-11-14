@@ -28,7 +28,12 @@ import numpy as np
 
 from ..._backend import BACKEND
 from ..._physics_fallback import collect_physics_fallbacks
-from ..case import AxialAdmissionError, Case, admit_axial_channeling, refuse_axial_channeling
+from ..case import (
+    AxialAdmissionError,
+    Case,
+    admit_axial_channeling,
+    refuse_axial_directions,
+)
 from ..spectrum import _segments_in_layer, _segments_on_device, mc_cxr_spectrum
 from ..spectrum.coherent_population import physical_bunch_electrons
 from ..spectrum.cxr import _setup as _cxr_setup
@@ -129,7 +134,7 @@ def run_case(
     """
     _adaptive.validate_directions(case, observation_directions)
     if observation_directions is not None:
-        refuse_axial_channeling(case, "directional scoring")
+        refuse_axial_directions(case)
     transport = _pkg._transport_case(
         case,
         record_timing,
@@ -167,6 +172,7 @@ def run_case_directions(
     photon geometry in the electron navigator.
     """
     _adaptive.validate_directions(case, n_hats)
+    refuse_axial_directions(case)
     directions = validated_directions(n_hats)
     transport = _pkg._transport_case(
         case,

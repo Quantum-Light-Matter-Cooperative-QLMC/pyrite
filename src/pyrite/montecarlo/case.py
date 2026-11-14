@@ -12,6 +12,7 @@ from .._cxr_grid_policy import LOCAL_RESOLUTION_POLICY
 from ..quantum._admission import AxialAdmissionError as AxialAdmissionError
 from ..quantum._admission import refuse_axial_channeling as refuse_axial_channeling
 from ..quantum._admission import refuse_axial_channeling_cases as refuse_axial_channeling_cases
+from ..quantum._admission import refuse_axial_directions as refuse_axial_directions
 
 type Composition = list[tuple[str, float]]
 type MillerIndex = tuple[int, int, int]
@@ -611,12 +612,8 @@ class Case(Mapping[str, Any]):
         admitted = admitted_axial_case(self)
         if self.energy_model != "midpoint":
             raise AxialAdmissionError("axial fibre requires midpoint transport")
-        if self.theta_obs_rad != 0 or self.dtheta_obs_rad != 0 or self.domega_sr != 0:
-            raise AxialAdmissionError(
-                "axial fibre supports on-axis, zero-aperture scoring only (got "
-                f"theta_obs_rad={self.theta_obs_rad:g}, dtheta_obs_rad={self.dtheta_obs_rad:g}, "
-                f"domega_sr={self.domega_sr:g})"
-            )
+        # Off-axis or finite-aperture observation resolves to the "directional"
+        # observable, which no admitted entry matches (#1148).
         check_axial_line_band(admitted, decode_energy_grid(self.E_grid_line))
         if self.coherent_emission is not _ABSENT:
             # Native CBS is scored per flight with or without this flag; the

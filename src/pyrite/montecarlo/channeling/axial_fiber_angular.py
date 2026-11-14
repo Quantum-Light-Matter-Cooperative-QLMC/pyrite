@@ -138,6 +138,34 @@ def _check_phase_step(z, energies, theta, beta, hbar_v, max_phase_step):
         )
 
 
+def linear_depth_weights(depths_ang, rate_inv_ang) -> np.ndarray:
+    r"""Exact weights ``c[e, i] = int hat_i(z) e^{i omega_e z} dz`` of linear interpolation.
+
+    ``hat_i`` is the piecewise-linear hat function of node ``z_i``; on an
+    interval ``[z_k, z_k + h]`` with ``u = omega h`` the left and right nodes
+    receive ``h e^{i omega z_k}`` times ``int_0^1 (1-t) e^{iut} dt`` and
+    ``int_0^1 t e^{iut} dt``. As ``omega -> 0`` these are the trapezoid weights
+    ``w_i e^{i omega z_i}``; unlike them they never alias a fast external phase
+    (#1148). Small ``|u|`` uses the Taylor series.
+
+    Validation: cr-axial-directional-observation
+    """
+    z = np.asarray(depths_ang, dtype=float)
+    omega = np.asarray(rate_inv_ang, dtype=float)[:, None]
+    h = np.diff(z)[None, :]
+    u = omega * h
+    small = np.abs(u) < 1e-3
+    safe = np.where(small, 1.0, u)
+    e = np.exp(1j * safe)
+    right = np.where(small, 0.5 + 1j * u / 3 - u**2 / 8, e / (1j * safe) + (e - 1.0) / safe**2)
+    left = np.where(small, 0.5 + 1j * u / 6 - u**2 / 24, 1j / safe - (e - 1.0) / safe**2)
+    base = h * np.exp(1j * omega * z[None, :-1])
+    out = np.zeros((omega.shape[0], z.size), dtype=complex)
+    out[:, :-1] += base * left
+    out[:, 1:] += base * right
+    return out
+
+
 def polarization_spectrum(
     values: np.ndarray,
     depths_ang,
@@ -148,6 +176,7 @@ def polarization_spectrum(
     *,
     amplitude: np.ndarray | None = None,
     max_phase_step: float = 1.0,
+    quadrature: str = "trapezoid",
 ) -> np.ndarray:
     r"""Polarization matrices ``S[t, p, lambda, lambda', e]`` from a full two-current ``G``.
 
@@ -157,9 +186,12 @@ def polarization_spectrum(
     $1/\cos\theta$ for the oblique exit path. The largest phase step
     $E(1-\beta\cos\theta)\Delta z/\hbar v$ must not exceed
     ``max_phase_step`` (rad), or line replicas alias into the grid.
+    ``quadrature="linear"`` instead integrates the external phase exactly
+    against the linearly interpolated correlation
+    (:func:`linear_depth_weights`), so no step cap applies (#1148).
     Signed, unclipped estimator.
 
-    Validation: cr-axial-fiber-angular
+    Validation: cr-axial-fiber-angular, cr-axial-directional-observation
     """
     z = np.asarray(depths_ang, dtype=float)
     energies = np.asarray(photon_energy_eV, dtype=float)
@@ -170,14 +202,20 @@ def polarization_spectrum(
     gamma, beta = longitudinal_kinematics(kinetic_energy_eV)
     hbar_v = HBARC_EV_ANG * beta
     spacing = np.diff(z)
-    _check_phase_step(z, energies, theta, beta, hbar_v, max_phase_step)
+    if quadrature not in ("trapezoid", "linear"):
+        raise ValueError("quadrature must be 'trapezoid' or 'linear'")
+    if quadrature == "trapezoid":
+        _check_phase_step(z, energies, theta, beta, hbar_v, max_phase_step)
     weights = np.r_[spacing[0], spacing[:-1] + spacing[1:], spacing[-1]] / 2
     coeff = angular_coefficients(theta, phi, beta)
     out = np.zeros((theta.size, phi.size, 2, 2, energies.size), dtype=complex)
     flat = g.transpose(2, 3, 0, 1).reshape(4, z.size, z.size)
     for t, angle in enumerate(theta):
         rate = _phase_rate(energies, angle, beta, hbar_v)
-        v = weights[None, :] * np.exp(1j * rate[:, None] * z[None, :])
+        if quadrature == "linear":
+            v = linear_depth_weights(z, rate)
+        else:
+            v = weights[None, :] * np.exp(1j * rate[:, None] * z[None, :])
         if amplitude is not None:
             v = v * np.asarray(amplitude) ** (1.0 / np.cos(angle))
         moments = (np.matmul(v[None], flat) * v.conj()[None]).sum(-1).T.reshape(-1, 2, 2)

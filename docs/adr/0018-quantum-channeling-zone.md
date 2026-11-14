@@ -230,7 +230,11 @@ planar tier. Each outcome below is recorded with its ledger claim; see the
   #1148 (axial marker v3), nonzero-order reflections retain zone rows because
   they are absent from the transverse continuum source. This partitions
   ownership without certifying the native channeled-state approximation.
-  Standard off-axis/finite-aperture axial runs remain refused. The in-cut free→free block that CBS would have carried is omitted and
+  Standard off-axis/finite-aperture axial runs remain refused; under
+  `admission="accept-inaccurate"` they lower to the unadmitted `directional`
+  observable and score the fibre's two-current correlation at each direction
+  with exact linear-interpolation depth weights
+  (`cr-axial-directional-observation`, #1148). The in-cut free→free block that CBS would have carried is omitted and
   stored as a declared one-sided bound: 8.06% for A, 18.9% for B
   (`cr-axial-zone-row-native-lines`).
 - **Admission (#886, #994).** Standard runs admit only cases in the

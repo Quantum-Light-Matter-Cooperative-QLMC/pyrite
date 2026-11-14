@@ -173,6 +173,9 @@ class FiberOnAxisSource:
     ``flux_keys``/``flux_factors`` ``(n_z, n_keys)`` are the ensemble
     local-emission factors ``F_c(z)`` of the retained density when requested
     (#1148, :mod:`.axial_flux_weights`); ``F = 1`` where nothing survives.
+    ``batch_correlations`` ``(B, n_z, n_z, 2, 2)`` are the lower (``i >= j``)
+    two-current means of ``B`` contiguous incident batches of sizes
+    ``batch_sizes`` when requested, for directional standard errors (#1148).
     """
 
     photon_energy_eV: np.ndarray
@@ -183,6 +186,8 @@ class FiberOnAxisSource:
     events: list[FiberEvent]
     flux_keys: tuple[str, ...] = ()
     flux_factors: np.ndarray | None = None
+    batch_correlations: np.ndarray | None = None
+    batch_sizes: np.ndarray | None = None
 
 
 def signed_on_axis_spectrum(
@@ -332,6 +337,7 @@ def fiber_on_axis_source(
     depth_tolerance_ang: float = 1e-6,
     max_working_bytes: int = 256 * 1024**2,
     flux_kernels=None,
+    batches: int = 0,
 ) -> FiberOnAxisSource:
     r"""Estimate the on-axis two-time source of the fibred absorbing model.
 
@@ -353,9 +359,11 @@ def fiber_on_axis_source(
     an electron leaves the retained subspace is excluded by construction.
     ``flux_kernels`` (:class:`.axial_flux_weights.AxialFluxKernels` on the
     channels' order window) adds the ensemble factors ``flux_factors``;
-    draws, events and spectra are unchanged.
+    ``batches >= 2`` adds ``batch_correlations``. Neither changes draws,
+    events or spectra.
 
     Validation: cr-axial-fiber-regression, cr-zone-incoherent-flux-weight
+    Validation: cr-axial-directional-observation
     """
     z, energies = _admit(
         depths_ang, photon_energy_eV, kinetic_energy_eV, hbar_v_eV_ang, max_working_bytes
@@ -363,6 +371,7 @@ def fiber_on_axis_source(
     amplitude = _amplitude(absorption_inv_ang, exit_path_ang, energies, z)
     gamma, _ = longitudinal_kinematics(kinetic_energy_eV)
     flux_total = None if flux_kernels is None else np.zeros((z.size, len(flux_kernels.keys)))
+    incident_ids = list(incident_ids)
     primaries = _primaries(
         channels,
         entry_orders,
@@ -382,7 +391,17 @@ def fiber_on_axis_source(
     shape = (z.size, z.size, 2, 2)
     totals = [np.zeros(shape, dtype=complex), np.zeros(shape), np.zeros(shape)]
     spectra, alive, events = [], np.zeros(z.size), []
-    for event, estimate, live in primaries:
+    ids = incident_ids
+    group = np.zeros(len(ids), dtype=int)
+    if batches:
+        if isinstance(batches, bool) or not 2 <= int(batches) <= len(ids):
+            raise ValueError("batches must be 0 or between 2 and the number of incidents")
+        for b, part in enumerate(np.array_split(np.arange(len(ids)), int(batches))):
+            group[part] = b
+    batch_sums = np.zeros((int(batches), *shape), dtype=complex) if batches else None
+    for index, (event, estimate, live) in enumerate(primaries):
+        if batch_sums is not None:
+            batch_sums[group[index]] += estimate
         totals[0] += estimate
         totals[1] += estimate.real**2
         totals[2] += estimate.imag**2
@@ -405,7 +424,10 @@ def fiber_on_axis_source(
     full[upper] = np.swapaxes(mean, 0, 1)[upper].conj().swapaxes(-1, -2)
     correlation = RegressionCorrelation(z.copy(), full, alive / count, 0)
     flux_keys: tuple[str, ...] = ()
-    flux_factors = None
+    flux_factors = batch_means = sizes = None
+    if batch_sums is not None:
+        sizes = np.bincount(group, minlength=int(batches)).astype(float)
+        batch_means = batch_sums / sizes[:, None, None, None, None]
     if flux_kernels is not None:
         with np.errstate(invalid="ignore", divide="ignore"):
             factors = flux_total / alive[:, None]
@@ -420,6 +442,8 @@ def fiber_on_axis_source(
         events,
         flux_keys,
         flux_factors,
+        batch_means,
+        sizes,
     )
 
 

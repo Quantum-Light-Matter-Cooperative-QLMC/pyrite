@@ -31,7 +31,13 @@ refuses. The observation direction ``theta_obs = 0`` is the beam direction,
 which for a tilted case differs from the axis by the tilt (1.5 mrad for
 si-fibre/A, against 1/gamma = 128 mrad); the source is evaluated on axis.
 
+An unadmitted case lowered with the ``"directional"`` observable (off-axis,
+finite aperture or a physical detector, under the admission opt-in) also keeps
+the fibre correlation and its batch means; its spectrum at each direction is
+:func:`.axial_directional.directional_spectrum` (#1148).
+
 Validation: cr-axial-persisted-channel
+Validation: cr-axial-directional-observation
 """
 
 from __future__ import annotations
@@ -43,6 +49,12 @@ import numpy as np
 
 from ...quantum._admission import AxialAdmissionError
 from ..transport.events import EVENT_DECHANNEL, EVENT_EXIT_BOTTOM
+from .axial_directional import (
+    DIRECTIONAL_BATCHES,
+    cached_directional_spectrum,
+    directional_record,
+    is_directional,
+)
 from .axial_native import axial_native_plan
 from .channeling import _COUNTERS, _LAUNCH_BEAM_ARGS, _row_arrays, _zone_rows, join_zone_rows
 
@@ -125,6 +137,7 @@ def fibre_source_and_fates(case, admitted, r0, clock, t0, keys, stopping_keV_per
         incident_ids=range(count),
         boundary_eV=inputs.boundary_eV,
         flux_kernels=flux_kernels,
+        batches=min(DIRECTIONAL_BATCHES, count) if is_directional(case) else 0,
         **attenuation,
         **shared,
     )
@@ -392,6 +405,10 @@ def transport_axial_case(
             "sem": source.sem,
         },
     }
+    if is_directional(case):  # unadmitted directional observable (#1148)
+        out["channeling"]["directional"] = directional_record(
+            source, zone.frame_lab, admitted.kinetic_energy_eV, admitted.numerics.absorption
+        )
     return out
 
 
@@ -429,14 +446,18 @@ def case_axial_diagnostics(case, transport) -> dict[str, Any]:
     that scored ``spec_channeling``.
 
     Validation: cr-axial-persisted-channel
+    Validation: cr-axial-directional-observation
     """
     case_axial_spectrum(case, transport)  # same source checks
     info = transport["segs"]["channeling"]
+    sem = info["source"]["sem"]
+    if is_directional(case):
+        sem = cached_directional_spectrum(case, transport)[1]
     return {
         **{key: int(info[key]) for key in _DIAGNOSTIC_COUNTS},
         "fate_fractions": {fate: float(value) for fate, value in info["fate_fractions"].items()},
         "entrance_weight": float(info["entrance_weight"]),
-        "spec_channeling_sem": np.asarray(info["source"]["sem"], dtype=float).copy(),
+        "spec_channeling_sem": np.asarray(sem, dtype=float).copy(),
     }
 
 
@@ -447,12 +468,15 @@ def case_axial_spectrum(case, transport) -> np.ndarray:
     the fates; a transport result without it, or on another grid, refuses.
 
     Validation: cr-axial-persisted-channel
+    Validation: cr-axial-directional-observation
     """
     info = transport["segs"].get("channeling")
     source = info.get("source") if isinstance(info, dict) else None
     grid = np.asarray(transport["E_grid"], dtype=float)
     if source is None or info.get("model") != case["channeling"]["model_marker"]:
         raise AxialAdmissionError("axial transport carries no fibre source (#994)")
+    if is_directional(case):
+        return cached_directional_spectrum(case, transport)[0].copy()
     if source["E_eV"].shape != grid.shape or not np.array_equal(source["E_eV"], grid):
         raise AxialAdmissionError("axial fibre source was scored on another line grid (#994)")
     spectrum = np.asarray(source["spectrum"], dtype=float)

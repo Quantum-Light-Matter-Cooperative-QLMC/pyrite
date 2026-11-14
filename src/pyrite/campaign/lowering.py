@@ -110,7 +110,9 @@ def lower_simulation(request: ResolvedSimulation) -> Case:
     # Opt-in channeling zone (#506) and TR component (#103): "off" is unchanged.
     cases = resolve_shell_ionization(resolve_transition_radiation(cases, physics), physics)
     cases = resolve_transport_mode(cases, physics)
-    case = resolve_channeling(cases, scene.channeling)[0]
+    case = resolve_channeling(
+        cases, scene.channeling, directional=isinstance(scene.detector, PlanarDetector)
+    )[0]
     if scene.beam.state is not None:
         from ..montecarlo.channeling.planar_injection import source_record
 
@@ -225,7 +227,11 @@ def build_sweep_cases(
         )
         cases = resolve_shell_ionization(resolve_transition_radiation(cases, physics), physics)
         cases = resolve_transport_mode(cases, physics)
-        cases = resolve_channeling(cases, request.scene.channeling)
+        cases = resolve_channeling(
+            cases,
+            request.scene.channeling,
+            directional=isinstance(request.scene.detector, PlanarDetector),
+        )
         return _with_run_options(cases, resolved_numerics)
     if not check_kinematic_validity:
         raise ValueError("check_kinematic_validity=False requires a configured legacy sweep")

@@ -41,6 +41,10 @@ _REL_TOL = 1e-9
 #: Model generation of the calibrated fibre source; distinct from planar and
 #: from the non-executable v1 axial recipe.
 AXIAL_FIBRE_MODEL_MARKER = "axial-fibre-v4"
+#: Observables of the fibre source. Admitted entries are calibrated on axis
+#: only; ``"directional"`` (off-axis angle, finite aperture or a physical
+#: detector, #1148) never matches an entry and runs only unadmitted.
+AXIAL_OBSERVABLES = ("on-axis", "directional")
 
 
 @dataclass(frozen=True)
@@ -238,6 +242,12 @@ def match_axial_case(query: AxialCaseQuery) -> AdmittedAxialCase:
         if best is None or len(missing) < len(best[1]):
             best = (key, missing)
     detail = "" if best is None else f"; closest {best[0]} differs in {', '.join(best[1])}"
+    if best is not None and "observable" in best[1]:
+        detail += (
+            " (entries are calibrated for on-axis, zero-aperture scoring only; "
+            "off-axis, finite-aperture and physical-detector observation is "
+            "directional and unadmitted, #1148)"
+        )
     raise AxialAdmissionError(
         "axial case is outside the admitted envelope (#994; "
         "docs/research/physics/axial-first-envelope-886.md)" + detail + unadmitted_hint()
@@ -280,8 +290,8 @@ def unadmitted_axial_case(query: AxialCaseQuery) -> UnadmittedAxialCase:
         pass
     else:
         raise AxialAdmissionError(f"axial case is admitted as {admitted.key}; it is not unadmitted")
-    if query.observable != "on-axis" or query.particle != "electron":
-        raise AxialAdmissionError("axial fibre supports on-axis electron cases only")
+    if query.observable not in AXIAL_OBSERVABLES or query.particle != "electron":
+        raise AxialAdmissionError("axial fibre supports on-axis or directional electron cases only")
     return UnadmittedAxialCase(
         crystal=query.crystal,
         axis_uvw=query.axis_uvw,
@@ -290,6 +300,7 @@ def unadmitted_axial_case(query: AxialCaseQuery) -> UnadmittedAxialCase:
         tilt_deg=float(query.tilt_deg),
         tilt_azimuth_deg=float(query.tilt_azimuth_deg),
         temperature_K=float(query.temperature_K),
+        observable=query.observable,
     )
 
 
