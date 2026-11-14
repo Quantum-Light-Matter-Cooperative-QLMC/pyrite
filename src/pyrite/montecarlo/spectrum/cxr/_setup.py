@@ -34,6 +34,7 @@ from ._kernels import (
     _validate_groove_escape_direction,
 )
 from ._line_tables import line_table_bytes
+from ._node_window import NodeTail, uniform_step
 from ._temporal import segment_arrival_times
 
 # Generation marker for the line route's photon-escape model, hashed into the
@@ -91,6 +92,7 @@ class SpectrumRequest:
     azimuth_rad: Any = 0.0
     recip_miscut_rad: Any = None
     sinc_cutoff: Any = None
+    node_support_cutoff: Any = None
     components: Any = False
     layers: Any = None
     mosaic_fwhm_rad: Any = None
@@ -187,6 +189,10 @@ class _SpectrumSetup:
     # accumulation routes' device (``_bin_quadrature.bin_axis``).
     bin_edges: Any = None
     bin_inv_width: Any = None
+    # Support-windowed node reduction only: the per-call far-tail accumulator
+    # (``_node_window.NodeTail``), applied before finalization.
+    # Validation: node-support-window-tail
+    node_tail: Any = None
     # Opt-in temporal profile only: this call's float64 buffer and the
     # realized / offset-free retarded arrival times per row.
     # Validation: temporal-intensity-profile
@@ -374,6 +380,42 @@ def _refuse_incompatible_request(request):
             "Single-slab absorbers (with or without a groove or a finite "
             "footprint) are supported."
         )
+    _refuse_node_support_cutoff(request)
+
+
+def _refuse_node_support_cutoff(request):
+    """Validate ``node_support_cutoff`` and refuse the routes it does not cover."""
+    x_c = request.node_support_cutoff
+    if x_c is None:
+        return
+    if not np.isfinite(x_c) or x_c <= 0:
+        raise ValueError("node_support_cutoff must be finite and positive")
+    if request.coherent:
+        raise ValueError(
+            "node_support_cutoff windows the incoherent node reduction only; the "
+            "coherent route's windowing is sinc_cutoff"
+        )
+    if request.sinc_cutoff is not None:
+        raise ValueError(
+            "node_support_cutoff (windowed, tail kept) and sinc_cutoff (tail dropped) are exclusive"
+        )
+    if request.line_quadrature != "node":
+        raise ValueError("node_support_cutoff applies to line_quadrature='node' only")
+
+
+def _node_tail(request, E_grid_host):
+    """The far-tail accumulator of the windowed node reduction, or None.
+
+    Host (NumPy) backend and uniform grids only; elsewhere the full-node
+    reduction runs, which is the reference the window approximates.
+    Validation: node-support-window-tail
+    """
+    if request.node_support_cutoff is None or getattr(xp, "__name__", "") != "numpy":
+        return None
+    if uniform_step(E_grid_host) is None:
+        return None
+    n_targets = 3 if request.components else 1
+    return NodeTail(E_grid_host, n_targets, request.node_support_cutoff)
 
 
 def _refuse_grouped_reduction(request, grouped):
@@ -774,6 +816,7 @@ def _prepare_spectrum(request):
     v_all = beta_all[:, None] * seg_v  # velocity vectors (c=1)
 
     bin_edges, bin_inv_width = _bin_mean_axis(request, grouped, E_grid_eV)
+    node_tail = _node_tail(request, E_grid_host)
 
     # chi_g / U_g are smooth in energy AWAY from absorption edges, so evaluate
     # them on a tabulation grid and interpolate at the per-segment resonance
@@ -993,6 +1036,7 @@ def _prepare_spectrum(request):
         decoherence_A_pop=offsets.decoherence_A_pop,
         xy0_pop=offsets.xy0_pop,
         bin_edges=bin_edges,
+        node_tail=node_tail,
         bin_inv_width=bin_inv_width,
         escape_pieces=escape_pieces,
         escape_ends=escape_ends,

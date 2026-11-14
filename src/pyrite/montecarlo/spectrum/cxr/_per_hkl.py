@@ -44,6 +44,7 @@ from ._kernels import (
     _rowdot3,
     _sincsq_lineshape,
 )
+from ._node_window import accumulate_sincsq_windowed
 from ._recoil import (
     _line_recoil_terms,
     _quantum_line_factors,
@@ -1086,6 +1087,18 @@ def _reduce_lineshapes(st, targets, E_r, a_width, good):
             S = sincsq_bin_lineshape(a_width[sl][m], E_r[sl][m], st.bin_edges, st.bin_inv_width)
             for w, tgt in targets:
                 tgt += w[sl][m] @ S
+    elif st.node_tail is not None:
+        # Support-windowed node reduction with the analytic far tail.
+        # Validation: node-support-window-tail
+        accumulate_sincsq_windowed(
+            E_r[good],
+            a_width[good],
+            [w[good] for w, _ in targets],
+            E_grid,
+            [t for _, t in targets],
+            st.node_tail,
+            range(len(targets)),
+        )
     elif sinc_cutoff is None and numpy_backend():
         accumulate_sincsq(
             E_r[good], a_width[good], [w[good] for w, _ in targets], E_grid, [t for _, t in targets]

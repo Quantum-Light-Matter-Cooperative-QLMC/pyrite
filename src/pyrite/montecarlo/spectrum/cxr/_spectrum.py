@@ -38,6 +38,7 @@ def mc_cxr_spectrum(
     recip_miscut_rad: tuple[float, float] | None = None,
     sinc_cutoff=None,
     components=False,
+    node_support_cutoff=None,
     layers=None,
     mosaic_fwhm_rad=None,
     mosaic_nodes=1,
@@ -124,6 +125,16 @@ def mc_cxr_spectrum(
         Crystal-orientation controls.
     sinc_cutoff
         Optional dimensionless finite-time tail cutoff; ``None`` is exact.
+    node_support_cutoff
+        Optional ``x_c`` of the support-windowed incoherent node reduction
+        (per-row and flight-grouped routes): each line or flight is evaluated
+        exactly within ``|v| <= x_c`` of its pole and by its cycle-averaged
+        far-field expansion elsewhere, so cost scales with support while the
+        tail mass is kept (``O(1/x_c^2)`` yield error; 100 is the qualified
+        value). ``None`` is the full-node reference. Host backend and uniform
+        grids only; other configurations run the full-node reduction.
+        Refused with ``coherent``, ``sinc_cutoff`` and bin-mean quadrature.
+        Validation: node-support-window-tail
     components
         Return separate PXR and CBS diagonal contributions with the total.
     mosaic_fwhm_rad, mosaic_nodes
@@ -228,6 +239,7 @@ def mc_cxr_spectrum(
         azimuth_rad=azimuth_rad,
         recip_miscut_rad=recip_miscut_rad,
         sinc_cutoff=sinc_cutoff,
+        node_support_cutoff=node_support_cutoff,
         components=components,
         layers=layers,
         mosaic_fwhm_rad=mosaic_fwhm_rad,
@@ -342,6 +354,10 @@ def _mc_spectrum(request):
         _accumulate_per_hkl(st)
     else:
         _accumulate_batched(st)
+    if st.node_tail is not None:
+        # Far tails of every windowed line, one convolution per call.
+        # Validation: node-support-window-tail
+        st.node_tail.apply([st.spec, st.spec_pxr, st.spec_cbs][: 3 if request.components else 1])
     result = _finalize_spectrum(st)
     if coverage is not None:
         publish_line_data_coverage(coverage)

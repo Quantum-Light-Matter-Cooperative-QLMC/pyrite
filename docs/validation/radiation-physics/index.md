@@ -21,6 +21,7 @@ brem-source-comparison
 brem-spectrum
 diffracted-bremsstrahlung
 diffracted-characteristic-radiation
+node-support-window-tail
 bremslib-angular-model
 bremslib-coupled-expected-spectrum
 bremslib-radiative-event-spectrum

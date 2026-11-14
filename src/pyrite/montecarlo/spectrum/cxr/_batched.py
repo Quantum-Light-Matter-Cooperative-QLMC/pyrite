@@ -42,6 +42,7 @@ from ._kernels import (
     _segment_escape_distance,
     _sincsq_lineshape,
 )
+from ._node_window import accumulate_sincsq_windowed
 from ._per_hkl import (
     _flat_energy_keep,
     _flat_view,
@@ -871,7 +872,18 @@ def _batched_incoherent_block(st, bt, blk, cxr_batch):
     if components:
         targets.append((pref * A2_pxr * WM, spec_pxr))
         targets.append((pref * A2_cbs * WM, spec_cbs))
-    if st.bin_edges is None and _numpy_backend():
+    if st.node_tail is not None:  # Validation: node-support-window-tail
+        accumulate_sincsq_windowed(
+            E_r_f,
+            aw_f,
+            [w.reshape(-1)[gm_idx] for w, _ in targets],
+            E_grid,
+            [tgt for _, tgt in targets],
+            st.node_tail,
+            range(len(targets)),
+        )
+        targets = []
+    elif st.bin_edges is None and _numpy_backend():
         accumulate_sincsq(
             E_r_f,
             aw_f,

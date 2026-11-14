@@ -21,6 +21,7 @@ import numpy as np
 from ...._backend import xp
 from ....materials.crystal import HBARC_EV_ANG
 from ._cpu_reduce import accumulate_grouped_formation, numpy_backend
+from ._node_window import accumulate_grouped_windowed
 
 
 def _flight_layout(gid):
@@ -64,6 +65,11 @@ def accumulate_flight_grouped(st, idx, sel, coefs, cxr_rows, L_esc, recoil_phase
     lines = cxr_rows.take(sel)
     sel_coefs = [c[sel] for c in coefs]
     grids = (st.E_grid, st.omega_grid, st.delta_omega_grid)
+    if st.node_tail is not None:  # host only (setup); Validation: node-support-window-tail
+        accumulate_grouped_windowed(
+            lines, d, g_phase, L_rel, sel_coefs, bounds, grids, st.spec, wm, st.node_tail
+        )
+        return
     if numpy_backend():
         accumulate_grouped_formation(
             lines, d, g_phase, L_rel, sel_coefs, bounds, grids, st.spec, wm
