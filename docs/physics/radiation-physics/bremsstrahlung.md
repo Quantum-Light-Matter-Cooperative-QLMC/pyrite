@@ -218,3 +218,24 @@ partials and FP32 primary sums without changing the source-table model identity.
 ## Validation
 
 Ledger rows: `bremslib-angular-model` for the default direction-resolved backend, `bremslib-radiative-partition` and `bremslib-radiative-event-spectrum` for the coupled mode, `dielectric-suppression` for its Ter--Mikaelian factor, `bremslib-electron-electron` for the electron--electron term, `brem-spectrum` for EEDL parsing, interpolation, normalization, fallback selection, and per-segment assembly, `external-brem-subtraction` for the weighted scale-only sideband fit that consumes a loaded external background, `substep-radiation-invariance` for the representative-energy evaluation, `radiation-error-estimators` for the opt-in quadrature estimator, and `finite-transverse-crystal` / `blazed-groove-geometry` for the escape variants. The full derivation, dimensional analysis, limits, and numeric comparison are in [Bremsstrahlung spectrum validation](../../validation/radiation-physics/brem-spectrum.md), with the literature comparison in [external bremsstrahlung comparison](../../validation/literature-ref/external-bremsstrahlung-comparison.md). Implementation owner: `pyrite.montecarlo.spectrum.brem.mc_brem_spectrum`.
+
+## Channeling zone weights
+
+Planar and axial channeling zone rows multiply the native per-length spectrum by a
+depth-averaged transverse-flux weight. Its normalized screened-Born kernel
+combines nuclear and electron localization with strengths $Z^2:Z$.
+The kernel is evaluated at entrance energy and neglects photon-energy-dependent
+localization and distinct nuclear/electron screening logarithms. Native
+continuation rows retain unit weight; axial rows average over the 2D cell.
+
+The weights are density expectations, not per-trajectory squared amplitudes.
+They reproduce the amorphous rate for uniform transverse density. They do
+not have a measured orientation-dependent accuracy bound; channeling admission
+ε covers `spec_channeling` only. See the
+[validation claim](../../validation/ledger-channeling.md#cr-zone-incoherent-flux-weight)
+for assumptions and checks.
+
+Zone rows are straight mean segments; the omitted angular spread of the
+channeled electrons changes zone-row brem by about 2% forward and well under 1%
+at large angles for `channeling_demo`
+([measured bound](../../validation/ledger-channeling.md#cr-zone-row-angular-spread)).

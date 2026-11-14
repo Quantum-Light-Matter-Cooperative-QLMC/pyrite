@@ -81,7 +81,26 @@ def axial_beam_angles(case: Case, axis_uvw: tuple[int, int, int]) -> tuple[float
     return tilt, math.degrees(math.atan2(y, x))
 
 
-def axial_case_query(case: Case, axis_uvw: tuple[int, int, int], temperature_K: float):
+def axial_observable(case: Case, directional: bool = False) -> str:
+    """``"directional"`` for an off-axis angle, finite aperture or ``directional``.
+
+    Otherwise ``"on-axis"``: the zero-aperture beam-direction source the
+    admitted entries are calibrated for (#1148).
+
+    Validation: cr-axial-directional-observation
+    """
+    fields = ("theta_obs_rad", "dtheta_obs_rad", "domega_sr")
+    if directional or any(float(case.get(name, 0.0) or 0.0) != 0.0 for name in fields):
+        return "directional"
+    return "on-axis"
+
+
+def axial_case_query(
+    case: Case,
+    axis_uvw: tuple[int, int, int],
+    temperature_K: float,
+    observable: str = "on-axis",
+):
     """Admission query of one lowered case for the axial fibre model."""
     tilt, azimuth = axial_beam_angles(case, axis_uvw)
     return AxialCaseQuery(
@@ -93,6 +112,7 @@ def axial_case_query(case: Case, axis_uvw: tuple[int, int, int], temperature_K: 
         tilt_azimuth_deg=azimuth,
         temperature_K=float(temperature_K),
         particle=str(case.get("particle", "electron")),
+        observable=observable,
     )
 
 
@@ -191,8 +211,12 @@ def admitted_axial_case(case: Case) -> AxialFibreCase:
         axis = record.get("axis_uvw")
         if not isinstance(axis, list) or len(axis) != 3:
             raise AxialAdmissionError("unadmitted axial record has no axis (#1105)")
+        observable = axial_observable(case, record.get("observable") == "directional")
         query = axial_case_query(
-            case, (int(axis[0]), int(axis[1]), int(axis[2])), float(record["temperature_K"])
+            case,
+            (int(axis[0]), int(axis[1]), int(axis[2])),
+            float(record["temperature_K"]),
+            observable,
         )
         admitted = unadmitted_axial_case(query)
     elif not isinstance(key, str) or key not in ADMITTED_AXIAL_CASES:
@@ -200,7 +224,9 @@ def admitted_axial_case(case: Case) -> AxialFibreCase:
     else:
         template = ADMITTED_AXIAL_CASES[key]
         admitted = match_axial_case(
-            axial_case_query(case, template.axis_uvw, template.temperature_K)
+            axial_case_query(
+                case, template.axis_uvw, template.temperature_K, axial_observable(case)
+            )
         )
     if not isinstance(record, Mapping) or dict(record) != axial_channeling_record(admitted):
         raise AxialAdmissionError("axial resolved record differs from repository lookup (#994)")

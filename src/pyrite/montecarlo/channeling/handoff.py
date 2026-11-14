@@ -55,7 +55,7 @@ import numpy as np
 #: Physics-generation marker of the planar zone and its handoff. It joins
 #: ``case_content_key`` and run provenance only for cases with a ``channeling``
 #: record, so channeling-off identities are unchanged.
-CHANNELING_MODEL = "planar-density-matrix-emission-v8"
+CHANNELING_MODEL = "planar-density-matrix-emission-v9"
 
 #: Per-electron fates, in sampling order.
 FATE_ENTRY, FATE_FREE, FATE_OVERFLOW, FATE_BOUND = 0, 1, 2, 3
@@ -136,6 +136,10 @@ class ZoneEnsemble:
     path_ang: float
     incidence_rad: float
     divergence_rad: float
+    #: Column keys and ``(n_z, n_keys)`` relative local-emission yields
+    #: ``F_c(z)`` of the retained ensemble (#1148, :mod:`.flux_weights`).
+    flux_keys: tuple[str, ...] = ()
+    flux_factors: np.ndarray | None = None
 
     @property
     def probabilities(self) -> np.ndarray:
@@ -200,9 +204,39 @@ def _solve(
         incidence_rad=incidence_rad,
         divergence_rad=divergence_rad,
         stopping_eV_per_ang=stopping_eV_per_ang,
+        spatial_x_ang=_cell_grid(profile, basis_size),
     )
     minimum, _ = profile.extrema()
     return result, solver, profile, divergence_rad, float(solver.barrier_eV - minimum)
+
+
+def _cell_grid(profile, basis_size: int) -> np.ndarray:
+    """Uniform cell grid on which recorded densities give exact flux factors.
+
+    Densities carry harmonics ``|m| <= 2 H`` and the kernels are kept to
+    ``2 H``, so ``8 H`` points integrate their product exactly.
+    """
+    n_x = 8 * max(int(basis_size), 1)
+    return np.arange(n_x) * profile.period_ang / n_x
+
+
+def _flux(case, profile, result):
+    """``(keys, F_c(z))`` of the recorded retained densities (#1148).
+
+    Validation: cr-zone-incoherent-flux-weight
+    """
+    from .flux_weights import _cached_kernels, flux_factors
+
+    record = case["channeling"]
+    kernels = _cached_kernels(
+        case["crystal"],
+        tuple(int(v) for v in record["plane_hkl"]),
+        float(record["temperature_K"]),
+        float(case["E0_keV"]) * 1e3,
+        2 * int(record["basis_size"]),
+    )
+    x = _cell_grid(profile, int(record["basis_size"]))
+    return kernels.keys, flux_factors(kernels, x, result.spatial_density_per_ang)
 
 
 def case_plane_incidence(case):
@@ -239,7 +273,7 @@ def solve_zone(case, beam_dir: np.ndarray, v_hat: np.ndarray, stopping_keV_per_a
     ValueError
         If ``zone_max_ang`` is shorter than the mean path through the slab.
 
-    Validation: cr-zone-handoff-accounting
+    Validation: cr-zone-handoff-accounting, cr-zone-incoherent-flux-weight
     """
     from ...materials.crystal import HBARC_EV_ANG
 
@@ -283,6 +317,7 @@ def solve_zone(case, beam_dir: np.ndarray, v_hat: np.ndarray, stopping_keV_per_a
             float(record["dz_ang"]),
             initial=initial,
             stopping_eV_per_ang=float(stopping_keV_per_ang) * 1e3,
+            spatial_x_ang=_cell_grid(profile, int(record["basis_size"])),
         )
         minimum, _ = profile.extrema()
         depth_eV = float(solver.barrier_eV - minimum)
@@ -291,6 +326,7 @@ def solve_zone(case, beam_dir: np.ndarray, v_hat: np.ndarray, stopping_keV_per_a
     gamma, beta = solver.gamma0, solver.beta0
     pc_eV = gamma * beta * 510998.95
     pv_eV = pc_eV * beta
+    flux_keys, flux = _flux(case, profile, result)
     band_edge = (int(record["basis_size"]) + 0.5) * profile.g_inv_ang * HBARC_EV_ANG / pc_eV
     return ZoneEnsemble(
         z_ang=np.asarray(result.z_ang),
@@ -311,6 +347,8 @@ def solve_zone(case, beam_dir: np.ndarray, v_hat: np.ndarray, stopping_keV_per_a
         path_ang=path,
         incidence_rad=float(incidence.effective_rad),
         divergence_rad=float(divergence),
+        flux_keys=flux_keys,
+        flux_factors=flux,
     )
 
 

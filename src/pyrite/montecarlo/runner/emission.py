@@ -282,10 +282,18 @@ def _brem_for_case(case, E_brem):
     no per-layer sum, ``brem_chunk`` ignored -- silently dropping substrate
     backscatter/brem and cross-stack absorption on stacked/multilayer records.
 
+    A channeling case replays the live zone transport (zone rows plus native
+    continuation, #1148); an amorphous re-transport would drop the zone.
+
     Validation: grazing-beam-projection
     """
     from .. import runner
 
+    if case.get("channeling") is not None:
+        segs, _E, n_hat, abs_layers, groove = runner._transport_cxr_for_case(case, E_brem)
+        return runner._brem_wide_from_segments(
+            segs, E_brem, case, n_hat, abs_layers, groove=groove, Ne=case["Ne_brem"]
+        )
     abs_layers = case.get("abs_layers")
     tilt_polar_rad = np.deg2rad(case.get("tilt_deg", 0.0))
     tilt_azim_rad = np.deg2rad(case.get("tilt_azim_deg", 0.0))

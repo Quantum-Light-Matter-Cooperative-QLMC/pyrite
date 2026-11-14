@@ -9,3 +9,4 @@ from ..montecarlo.channeling.axial_case import ALIGNED_TILT_DEG as ALIGNED_TILT_
 from ..montecarlo.channeling.axial_case import axial_beam_angles as axial_beam_angles
 from ..montecarlo.channeling.axial_case import axial_case_query as axial_case_query
 from ..montecarlo.channeling.axial_case import axial_channeling_record as axial_channeling_record
+from ..montecarlo.channeling.axial_case import axial_observable as axial_observable

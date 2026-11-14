@@ -16,11 +16,13 @@ its on-axis photon estimate and its terminal fate; nothing is drawn twice.
   transported no further and are counted in the diagnostics.
 * Zone rows: each line electron's straight segment along the beam from the
   entrance face to its terminal depth, with the constant-stopping energy and
-  clock of :func:`.zone_energy_and_clock`. They score no native PXR/CBS lines
-  (:func:`native_line_rows`): the fibre source owns the line-band emission of
-  the zone, and the in-cut free→free block it omits is carried as the entry's
-  declared one-sided bound. Characteristic and incoherent bremsstrahlung
-  scoring on zone rows is unchanged.
+  clock of :func:`.zone_energy_and_clock`. Native PXR/CBS retains reflections
+  outside the zone axis on these rows (:func:`axial_zone_line_parts`);
+  transverse-potential reflections belong to the fibre source. The in-cut
+  free→free block it omits is carried as the entry's
+  declared one-sided bound. Incoherent bremsstrahlung and characteristic
+  emission on zone rows carry the fibre ensemble's local-emission weight
+  ``channeling_flux`` (:mod:`..channeling.axial_flux_weights`, #1148).
 * Bremsstrahlung-only electrons (IDs from ``Ne`` on) run native amorphous
   transport from the entrance face, as in planar channeling.
 
@@ -29,7 +31,13 @@ refuses. The observation direction ``theta_obs = 0`` is the beam direction,
 which for a tilted case differs from the axis by the tilt (1.5 mrad for
 si-fibre/A, against 1/gamma = 128 mrad); the source is evaluated on axis.
 
+An unadmitted case lowered with the ``"directional"`` observable (off-axis,
+finite aperture or a physical detector, under the admission opt-in) also keeps
+the fibre correlation and its batch means; its spectrum at each direction is
+:func:`.axial_directional.directional_spectrum` (#1148).
+
 Validation: cr-axial-persisted-channel
+Validation: cr-axial-directional-observation
 """
 
 from __future__ import annotations
@@ -41,6 +49,12 @@ import numpy as np
 
 from ...quantum._admission import AxialAdmissionError
 from ..transport.events import EVENT_DECHANNEL, EVENT_EXIT_BOTTOM
+from .axial_directional import (
+    DIRECTIONAL_BATCHES,
+    cached_directional_spectrum,
+    directional_record,
+    is_directional,
+)
 from .axial_native import axial_native_plan
 from .channeling import _COUNTERS, _LAUNCH_BEAM_ARGS, _row_arrays, _zone_rows, join_zone_rows
 
@@ -71,6 +85,7 @@ def fibre_source_and_fates(case, admitted, r0, clock, t0, keys, stopping_keV_per
     from ..channeling.axial_fiber_case import MATCHING_WINDOW_EV, axial_fiber_inputs
     from ..channeling.axial_fiber_regression import fiber_on_axis_source
     from ..channeling.axial_fiber_unraveling import _Engine
+    from ..channeling.axial_flux_weights import cached_axial_flux_kernels
     from ..channeling.axial_outgoing_launch import (
         AxialIncident,
         AxialMatchingDeclaration,
@@ -87,8 +102,16 @@ def fibre_source_and_fates(case, admitted, r0, clock, t0, keys, stopping_keV_per
         inputs.target_eV, inputs.boundary_eV, inputs.potential_min_eV, window_eV=MATCHING_WINDOW_EV
     )
     channels = matching_checked_channels(inputs.channels, matching)
-    window = np.zeros(_Engine(channels, inputs.hbar_v_eV_ang).box_shape, dtype=complex)
+    engine = _Engine(channels, inputs.hbar_v_eV_ang)
+    window = np.zeros(engine.box_shape, dtype=complex)
     window[0, 0] = 1.0
+    flux_kernels = cached_axial_flux_kernels(
+        admitted.crystal,
+        tuple(admitted.axis_uvw),
+        float(admitted.temperature_K),
+        float(admitted.kinetic_energy_eV),
+        tuple(int(v) for v in engine.m),
+    )
     depths = inputs.depths_ang
     seed = int(case["seed"])
     count = int(r0.shape[0])
@@ -113,6 +136,8 @@ def fibre_source_and_fates(case, admitted, r0, clock, t0, keys, stopping_keV_per
         photon_energy_eV=energies,
         incident_ids=range(count),
         boundary_eV=inputs.boundary_eV,
+        flux_kernels=flux_kernels,
+        batches=min(DIRECTIONAL_BATCHES, count) if is_directional(case) else 0,
         **attenuation,
         **shared,
     )
@@ -160,13 +185,32 @@ def _axial_zone_rows(template, records, zone, r0, v0, E_keV, clock, t0):
     rows["E_end_keV"] = np.asarray([e for e, _ in state], dtype=float).reshape(-1) / 1e3
     rows["E_repr_keV"] = 0.5 * (rows["E_start_keV"] + rows["E_end_keV"])
     rows["t_end_ang"] = clock[ids] + np.asarray([t for _, t in state], dtype=float).reshape(-1)
-    return rows, ids
+    return rows, ids, depth
+
+
+def _attach_axial_flux(source, native_rows, zone_rows, zone_depth_ang, depths_ang):
+    """Add ``channeling_flux`` to native (1) and zone rows; return the zone means (#1148).
+
+    Zone rows carry the depth average of the fibre ensemble's ``F_c(z)`` over
+    ``[0, depth]`` of their own history.
+
+    Validation: cr-zone-incoherent-flux-weight
+    """
+    from ..channeling.flux_weights import row_flux_weights
+
+    keys = source.flux_keys
+    native_rows["channeling_flux"] = np.ones((native_rows["L_ang"].size, len(keys)))
+    zone_rows["channeling_flux"] = row_flux_weights(depths_ang, source.flux_factors, zone_depth_ang)
+    weights = zone_rows["channeling_flux"]
+    means = weights.mean(axis=0) if zone_depth_ang.size else np.ones(len(keys))
+    return dict(zip(keys, (float(v) for v in means), strict=True))
 
 
 def native_line_rows(case, segs):
-    """Rows of ``segs`` that native PXR/CBS line scoring may read.
+    """Rows that transverse-potential native PXR/CBS scoring may read.
 
-    For an axial fibre case the zone rows are removed, so the line spectrum
+    For an axial fibre case the zone rows are removed from this part, so
+    its spectrum
     ``spec`` is the sum over native rows only:
     ``spec = (1/Ne) sum_{rows not in zone} dN/(dE dOmega)``. The scalars
     (``Ne``, thickness) are kept, so the per-incident-electron normalization
@@ -198,6 +242,37 @@ def native_line_rows(case, segs):
         if out.get(key) is not None:
             out[key] = out[key][keep]
     return out
+
+
+def axial_zone_line_parts(case, segs):
+    """Partition native axial lines by reciprocal axial order (#1148).
+
+    Reflections with ``h*u + k*v + l*w == 0`` belong to the transverse
+    continuum potential and score only outside the zone. All other reflections
+    retain every row. This is an ownership partition, not an accuracy bound
+    for the plane-wave approximation on channeled paths.
+
+    Validation: cr-axial-zone-row-native-lines
+    """
+    record = case.get("channeling")
+    if not isinstance(record, Mapping) or record.get("model") != "axial":
+        return None
+    from .planar_zone_lines import _LineCase
+
+    native = native_line_rows(case, segs)  # validate the tag even if no transverse line
+    axis = tuple(int(v) for v in record["axis_uvw"])
+    transverse, other = [], []
+    for hkl in case["hkl_list"]:
+        indices = tuple(int(v) for v in hkl)
+        (
+            transverse if sum(h * u for h, u in zip(indices, axis, strict=True)) == 0 else other
+        ).append(indices)
+    parts = []
+    if other:
+        parts.append((_LineCase(case, hkl_list=other, channeling=None), segs))
+    if transverse:
+        parts.append((_LineCase(case, hkl_list=transverse, channeling=None), native))
+    return parts or None
 
 
 def transport_axial_case(
@@ -298,10 +373,14 @@ def transport_axial_case(
     native_rows["electron_id"] = run_ids[local].astype(np.int64)
     zoned = np.zeros(Ne, dtype=bool)
     template = {"rows": native_rows, "_S": S}
-    zone_rows, z_ids = _axial_zone_rows(template, records, zone, r0, v0, E_keV, clock, t0)
+    zone_rows, z_ids, z_depth = _axial_zone_rows(template, records, zone, r0, v0, E_keV, clock, t0)
     zoned[z_ids] = True
     native_rows["flight_id"] = native_rows["flight_id"] + zoned[run_ids][local]
+    flux_mean = _attach_axial_flux(
+        source, native_rows, zone_rows, z_depth, source.correlation.depths_ang
+    )
     out = join_zone_rows(native, native_rows, zone_rows)
+    out["channeling_flux_keys"] = source.flux_keys
     out.update(initial_r_ang=r0, initial_v_hat=v0, initial_E_keV=E_keV, initial_t0_ang=t0, Ne=Ne)
     if record is not None:
         out["beam_entry"] = record
@@ -318,6 +397,7 @@ def transport_axial_case(
         "fate_fractions": weights,
         "entrance_weight": float(source.events[0].weight),
         "stopping_keV_per_ang": S,
+        "zone_flux_weight_mean": flux_mean,
         **_budget_provenance(admitted),
         "source": {
             "E_eV": source.photon_energy_eV,
@@ -325,6 +405,10 @@ def transport_axial_case(
             "sem": source.sem,
         },
     }
+    if is_directional(case):  # unadmitted directional observable (#1148)
+        out["channeling"]["directional"] = directional_record(
+            source, zone.frame_lab, admitted.kinetic_energy_eV, admitted.numerics.absorption
+        )
     return out
 
 
@@ -362,14 +446,18 @@ def case_axial_diagnostics(case, transport) -> dict[str, Any]:
     that scored ``spec_channeling``.
 
     Validation: cr-axial-persisted-channel
+    Validation: cr-axial-directional-observation
     """
     case_axial_spectrum(case, transport)  # same source checks
     info = transport["segs"]["channeling"]
+    sem = info["source"]["sem"]
+    if is_directional(case):
+        sem = cached_directional_spectrum(case, transport)[1]
     return {
         **{key: int(info[key]) for key in _DIAGNOSTIC_COUNTS},
         "fate_fractions": {fate: float(value) for fate, value in info["fate_fractions"].items()},
         "entrance_weight": float(info["entrance_weight"]),
-        "spec_channeling_sem": np.asarray(info["source"]["sem"], dtype=float).copy(),
+        "spec_channeling_sem": np.asarray(sem, dtype=float).copy(),
     }
 
 
@@ -380,12 +468,15 @@ def case_axial_spectrum(case, transport) -> np.ndarray:
     the fates; a transport result without it, or on another grid, refuses.
 
     Validation: cr-axial-persisted-channel
+    Validation: cr-axial-directional-observation
     """
     info = transport["segs"].get("channeling")
     source = info.get("source") if isinstance(info, dict) else None
     grid = np.asarray(transport["E_grid"], dtype=float)
     if source is None or info.get("model") != case["channeling"]["model_marker"]:
         raise AxialAdmissionError("axial transport carries no fibre source (#994)")
+    if is_directional(case):
+        return cached_directional_spectrum(case, transport)[0].copy()
     if source["E_eV"].shape != grid.shape or not np.array_equal(source["E_eV"], grid):
         raise AxialAdmissionError("axial fibre source was scored on another line grid (#994)")
     spectrum = np.asarray(source["spectrum"], dtype=float)

@@ -797,6 +797,7 @@ def _accumulate_line_yields(
     number_density_ang3,
     shell_tables=None,
     packed_shells=None,
+    shell_weight=None,
 ):
     """Segment-summed yield of every characteristic line (#872).
 
@@ -806,6 +807,11 @@ def _accumulate_line_yields(
     segment-sum reduction orders regroup (float rounding). ``response`` is
     ``(n_shell, n_line)`` and ``mu_by_line`` ``(n_layer, n_line)``, one row
     for a single slab, matching the ``(n_segment, n_layer)`` escape paths.
+    ``shell_weight`` ``(n_segment, n_shell)`` scales each row's shell
+    ionization by its channeling flux weight (#1148); ``None`` leaves rows
+    unweighted.
+
+    Validation: cr-zone-incoherent-flux-weight
     """
     n_lines = int(response.shape[1])
     line_yields = xp.zeros(n_lines, dtype=REAL)
@@ -815,6 +821,8 @@ def _accumulate_line_yields(
         shell_sigma_cm2 = _interpolate_shell_cross_sections(
             table, seg_E[sl], shell_tables, packed_shells
         )
+        if shell_weight is not None:
+            shell_sigma_cm2 = shell_sigma_cm2 * shell_weight[sl]
         path_cm = number_density_ang3 * 1.0e24 * (seg_L[sl] * 1.0e-8)
         group = max(1, _LINE_BATCH_ELEMENTS // max(rows, 1))
         for first in range(0, n_lines, group):
@@ -940,6 +948,21 @@ def _prepared_lines_cached(cache, key_parts, table, comp, layers, edges, widths,
     if key not in cache:
         cache[key] = _prepare_lines(table, comp, layers, edges, widths, cutoff)
     return cache[key]
+
+
+def _shell_flux_weight(segments, table, rows):
+    """Channeling flux weight of each scored row and ionized shell, or ``None`` (#1148).
+
+    Planar channeling zone rows carry the relative inner-shell ionization
+    yield of the channeled flux per ``(Z, shell)``; native rows carry 1.
+
+    Validation: cr-zone-incoherent-flux-weight
+    """
+    from .channeling_flux import flux_columns
+
+    keys = tuple(f"{int(table.atomic_number)}:{label}" for label in table.ionization_shell_labels)
+    columns = flux_columns(segments, keys)
+    return None if columns is None else xp.asarray(columns, dtype=REAL)[rows]
 
 
 def mc_characteristic_spectrum(
@@ -1083,6 +1106,7 @@ def mc_characteristic_spectrum(
     seg_L = seg_L[owner] * fraction
     seg_E = seg_E[owner]
     severe_truncation: list[tuple[str, str, float]] = []
+    flux_rows = segment_index[owner]
 
     for el, number_density_ang3 in comp:
         table = all_tables[el]
@@ -1118,6 +1142,7 @@ def mc_characteristic_spectrum(
             number_density_ang3=number_density_ang3,
             shell_tables=prepared.shell_tables,
             packed_shells=prepared.packed_shells,
+            shell_weight=_shell_flux_weight(segments, table, flux_rows),
         )
         for profile, line_yield in zip(prepared.profiles, line_yields, strict=True):
             spec += line_yield * profile

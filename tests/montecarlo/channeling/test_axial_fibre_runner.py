@@ -213,14 +213,21 @@ def produced(case_b):
     return transport, runner._spectrum_case(case_b, transport)
 
 
-def _direct_source(case, key):
+def _direct_source(case, key, *, flux=False):
     """The admitted entry's fibre estimator called directly, outside the runner."""
     from pyrite.materials.attenuation import linear_attenuation_inv_mm
+    from pyrite.materials.channeling.axial import axial_profile
     from pyrite.montecarlo.channeling.axial_fiber_case import axial_fiber_inputs
     from pyrite.montecarlo.channeling.axial_fiber_regression import fiber_on_axis_source
+    from pyrite.montecarlo.channeling.axial_flux_weights import axial_flux_kernels
 
     entry = ADMITTED_AXIAL_CASES[key]
     inputs = axial_fiber_inputs(entry)
+    extra = {}
+    if flux:
+        profile = axial_profile(entry.crystal, entry.axis_uvw, temperature_K=entry.temperature_K)
+        order = entry.numerics.max_order
+        extra["flux_kernels"] = axial_flux_kernels(profile, entry.kinetic_energy_eV, (order, order))
     return fiber_on_axis_source(
         inputs.channels,
         inputs.entry_orders,
@@ -235,6 +242,7 @@ def _direct_source(case, key):
         absorption_inv_ang=linear_attenuation_inv_mm("silicon", GRID) * 1e-7,
         exit_path_ang=inputs.depths_ang[-1] - inputs.depths_ang,
         search_step_ang=inputs.search_step_ang,
+        **extra,
     )
 
 
@@ -288,7 +296,7 @@ def test_source_and_budgets_round_trip_through_results_and_checkpoints(case_b, p
     np.testing.assert_array_equal(record["spec_channeling"], out["spec_channeling"])
     stored = record["case"]["channeling"]
     entry = ADMITTED_AXIAL_CASES["si-fibre/B"]
-    assert stored["model_marker"] == "axial-fibre-v2"
+    assert stored["model_marker"] == "axial-fibre-v4"
     assert stored["depth_budget"] == entry.depth_budget
     assert stored["free_free"] == "bound"
     assert stored["free_free_upper"] == entry.free_free_upper
@@ -378,28 +386,53 @@ def produced_a():
     return case, transport, runner._spectrum_case(case, transport)
 
 
+@pytest.mark.parametrize("axis", [(0, 0, 1), (1, 1, 0), (2, -1, 3)])
+def test_axial_line_partition_uses_direct_reciprocal_pairing(axis):
+    from pyrite.montecarlo.runner.axial import axial_zone_line_parts
+
+    hkls = [(1, 1, 1), (2, -2, 0), (0, 0, 2), (-1, -1, -1)]
+    case = {"channeling": {"model": "axial", "axis_uvw": axis}, "hkl_list": hkls}
+    segs = {"L_ang": np.array([2.0, 3.0]), "channeling_zone": np.array([True, False]), "Ne": 1}
+    parts = axial_zone_line_parts(case, segs)
+    for part, rows in parts:
+        assert part.get("channeling") is None
+        for hkl in part["hkl_list"]:
+            if np.dot(hkl, axis) == 0:
+                np.testing.assert_array_equal(rows["L_ang"], [3.0])
+            else:
+                assert rows is segs
+    assert sorted(h for part, _ in parts for h in part["hkl_list"]) == sorted(hkls)
+    assert axial_zone_line_parts({"channeling": None}, segs) is None
+
+
 @pytest.mark.slow
-def test_axial_zone_rows_score_no_native_lines(produced_a):
-    """No double count: lines come from native rows, the zone from the fibre source."""
+def test_axial_zone_rows_restore_only_off_zone_reflections(produced_a):
+    """Real spectra: both reflection groups sum once, with zone rows only off axis."""
     from pyrite.montecarlo.runner.axial import native_line_rows
 
-    case, transport, out = produced_a
-    segs, grid, n_hat = transport["segs"], transport["E_grid"], transport["n_hat"]
-    zone = np.asarray(segs["channeling_zone"])
-    assert zone.sum() == LINES
+    case, transport, _ = produced_a
+    segs, grid = transport["segs"], transport["E_grid"]
+    axis = case["channeling"]["axis_uvw"]
+    transverse = [h for h in case["hkl_list"] if np.dot(h, axis) == 0]
+    other = [h for h in case["hkl_list"] if np.dot(h, axis) != 0]
+    assert transverse and other
     native = native_line_rows(case, segs)
-    assert native["L_ang"].size == zone.size - LINES and native["Ne"] == segs["Ne"]
-    plain = {key: value for key, value in case.to_dict().items() if key != "channeling"}
-    score = lambda rows: runner._cxr_for_segments(  # noqa: E731
-        rows, grid, plain, n_hat, None, None, coherent=False, Ne=LINES
-    )
-    np.testing.assert_array_equal(out["spec"], score(native))
-    # Exact recoil can remove every forward in-band zone line. Use an
-    # oblique diagnostic direction to keep the exclusion check non-vacuous.
     n_hat = np.array([np.sin(np.pi / 3), 0.0, np.cos(np.pi / 3)])
-    with_zone = score(segs)  # what a free plane-wave reading of the zone rows would add
-    removed = np.trapezoid(with_zone - score(native), grid)
-    assert removed > 0.0
+
+    def score(rows, hkls, channeling=None):
+        view = {**case.to_dict(), "channeling": channeling, "hkl_list": hkls}
+        return runner._cxr_for_segments(
+            rows, grid, view, n_hat, None, None, coherent=False, Ne=LINES
+        )
+
+    expected = score(segs, other) + score(native, transverse)
+    actual = score(segs, case["hkl_list"], case["channeling"])
+    np.testing.assert_array_equal(actual, expected)
+    restored = score(segs, other) - score(native, other)
+    assert np.trapezoid(restored, grid) > 0.0
+    np.testing.assert_array_equal(
+        score(segs, transverse, case["channeling"]), score(native, transverse)
+    )
 
 
 @pytest.mark.slow
@@ -466,3 +499,27 @@ def test_unadmitted_case_runs_under_the_opt_in_and_persists_no_budget(tmp_path):
     stored = next(iter(next(iter(loaded.values())).values()))["case"]["channeling"]
     assert stored["admission"] == "unadmitted"
     assert not {"depth_budget", "free_free_upper", "evidence_record"} & set(stored)
+
+
+@pytest.mark.slow
+def test_axial_zone_rows_carry_the_fibre_flux_weights(case_b, produced):
+    """Zone rows: depth averages of the fibre ensemble F_c(z); native rows: 1 (#1148)."""
+    from pyrite.montecarlo.channeling.flux_weights import BREM_KEY, row_flux_weights
+
+    transport, _ = produced
+    segs = transport["segs"]
+    keys = tuple(segs["channeling_flux_keys"])
+    assert keys[0] == BREM_KEY and "14:K" in keys
+    weights = np.asarray(segs["channeling_flux"])
+    zone = np.asarray(segs["channeling_zone"], dtype=bool)
+    assert zone.any() and (~zone).any()
+    np.testing.assert_array_equal(weights[~zone], 1.0)
+    source = _direct_source(case_b, "si-fibre/B", flux=True)
+    assert source.flux_keys == keys
+    depth = np.asarray(segs["L_ang"])[zone] * np.asarray(segs["v_hat"])[zone, 2]
+    expected = row_flux_weights(source.correlation.depths_ang, source.flux_factors, depth)
+    np.testing.assert_allclose(weights[zone], expected, rtol=1e-12)
+    means = segs["channeling"]["zone_flux_weight_mean"]
+    assert set(means) == set(keys)
+    print({key: round(value, 4) for key, value in means.items()})
+    assert means[BREM_KEY] > means["14:K"] > 1.0  # aligned 3.5 MeV on <100>: string-local

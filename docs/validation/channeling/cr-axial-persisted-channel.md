@@ -104,7 +104,7 @@ $S_{\rm ch}$ occupies only the `spec_channeling` slot. `spec` is the
 native-row sum alone. Totals add each line component once. The resolved case
 record (lookup result: key, digest, numerics, $\varepsilon$, free→free owner,
 bound and records) is part of the case content, so its content key differs from
-an otherwise identical channeling-off case. The `axial-fibre-v2` marker keeps it
+an otherwise identical channeling-off case. The `axial-fibre-v4` marker keeps it
 apart from the planar marker and from the v1 recipe.
 
 ## Comparison with the implementation

@@ -189,18 +189,20 @@ def test_channeling_demo_and_off_profile_identities_are_unchanged():
     """The #1017 spelling migration preserves identity within a model generation.
 
     Pins refreshed for #1134's ``segment-mean-v7-quantum-elements`` marker;
-    restoring the v6 marker reproduces every pre-#1134 pin.
+    restoring the v6 marker reproduces every pre-#1134 pin. The demo content
+    key follows ``CHANNELING_MODEL`` v9 (#1148 zone flux weights).
     """
     sweep, settings, cases = _profile_cases("silicon", "channeling_demo")
+    assert cases[0].line_quadrature == "bin-mean"
     assert [profiles.case_content_key(case) for case in cases] == [
-        "c867a462600faaf9897cdff5c6c094013c9ee61704551822aec495d74bb55690"
+        "b7f4a43ecb618f14a38143c7bb492024de7eb94c7b6303357612c0b6e01d9736"
     ]
     assert profiles.named_profile_stem("silicon", catalog_profile="channeling_demo") == (
-        "silicon@channeling_demo-e2858dbb5aaa"
+        "silicon@channeling_demo-fc430b8eec13"
     )
     identity = profiles.dataset_identity("silicon", settings, sweep)
     assert identity["parameter_sha256"] == (
-        "22c8066eb499e4cd7a21723b48278888a5aca8f360fa4198eca9a64d009e4112"
+        "b2e81da4525a34f0b81c910ae5285c89f9a7b4e0fbbf6ebe0e87713230989cd1"
     )
     sweep = material_sweep("hopg", catalog_profile="standard")
     settings = profiles.profile_run_settings(default_settings(), "standard", sweep=sweep)

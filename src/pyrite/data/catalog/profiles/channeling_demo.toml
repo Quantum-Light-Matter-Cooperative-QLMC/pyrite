@@ -22,6 +22,10 @@ energy_model = "midpoint"
 radiative_model = "uncoupled"
 E_grid_line = {arange = {start = 1000.0, stop = 24000.0, step = 50.0}}
 
+# Resolve narrow native zone-row lines as bin averages (#1148).
+[cxr_grid_policy]
+quadrature = "bin-mean"
+
 [channeling]
 model = "planar"
 plane = [1, -1, 0]

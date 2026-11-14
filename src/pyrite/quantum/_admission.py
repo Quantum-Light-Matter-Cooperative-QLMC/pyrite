@@ -57,6 +57,26 @@ def refuse_axial_channeling(case: Mapping[str, Any], consumer: str | None = None
     refuse_unverified_axial_run()
 
 
+def refuse_axial_directions(case: Mapping[str, Any]) -> None:
+    """Refuse observation directions for an axial case lowered on axis (#1148).
+
+    Admitted fibre entries are calibrated for the on-axis, zero-aperture
+    source only. Directional scoring needs the ``"directional"`` observable,
+    which lowering assigns to off-axis, finite-aperture or physical-detector
+    observation and which runs only under the admission opt-in.
+
+    Validation: cr-axial-directional-observation
+    """
+    if not is_axial_channeling(case):
+        return
+    record = case.get("channeling")
+    if not isinstance(record, Mapping) or record.get("observable") != "directional":
+        raise AxialAdmissionError(
+            "directional scoring of an axial fibre case needs the directional "
+            "observable: lower it with its physical detector or off-axis angle" + unadmitted_hint()
+        )
+
+
 def refuse_axial_channeling_cases(cases: Iterable[Mapping[str, Any]]) -> None:
     """Refuse a whole batch before any case can read caches, write, or execute."""
     for case in cases:

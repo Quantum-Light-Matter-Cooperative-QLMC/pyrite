@@ -12,6 +12,7 @@ from .._cxr_grid_policy import LOCAL_RESOLUTION_POLICY
 from ..quantum._admission import AxialAdmissionError as AxialAdmissionError
 from ..quantum._admission import refuse_axial_channeling as refuse_axial_channeling
 from ..quantum._admission import refuse_axial_channeling_cases as refuse_axial_channeling_cases
+from ..quantum._admission import refuse_axial_directions as refuse_axial_directions
 
 type Composition = list[tuple[str, float]]
 type MillerIndex = tuple[int, int, int]
@@ -559,6 +560,7 @@ class Case(Mapping[str, Any]):
         from .channeling.planar_case import check_admission_record
 
         check_admission_record(record["admission"])
+        self._warn_channeling_line_sampling(hkl)
         if self.energy_model != "midpoint":
             raise ValueError("channeling requires energy_model='midpoint'")
         refused = {
@@ -578,6 +580,22 @@ class Case(Mapping[str, Any]):
         if self.mosaic_fwhm_rad or self.mosaic_mc_fwhm_rad:
             raise ValueError("channeling does not support mosaic crystals")
 
+    def _warn_channeling_line_sampling(self, plane_hkl) -> None:
+        """Warn before work when narrow native zone lines use node sampling."""
+        if self.line_quadrature == "bin-mean":
+            return
+        if not any(np.any(np.cross(hkl, plane_hkl)) for hkl in self.hkl_list):
+            return
+        import warnings
+
+        warnings.warn(
+            "planar channeling with off-own-row reflections uses node sampling: "
+            "narrow zone-row PXR lines can alias; use line_quadrature='bin-mean' "
+            "(#1148)",
+            UserWarning,
+            stacklevel=3,
+        )
+
     def _validate_axial_channeling(self, record: Mapping[str, object]) -> None:
         """Reject uncalibrated, tampered or unsupported v2 fibre records.
 
@@ -594,11 +612,12 @@ class Case(Mapping[str, Any]):
         admitted = admitted_axial_case(self)
         if self.energy_model != "midpoint":
             raise AxialAdmissionError("axial fibre requires midpoint transport")
-        if self.theta_obs_rad != 0 or self.dtheta_obs_rad != 0 or self.domega_sr != 0:
+        # Off-axis or finite-aperture observation resolves to the "directional"
+        # observable, which no admitted entry matches (#1148).
+        if record.get("observable") == "directional" and int(self.Ne) < 2:
             raise AxialAdmissionError(
-                "axial fibre supports on-axis, zero-aperture scoring only (got "
-                f"theta_obs_rad={self.theta_obs_rad:g}, dtheta_obs_rad={self.dtheta_obs_rad:g}, "
-                f"domega_sr={self.domega_sr:g})"
+                f"directional axial scoring needs at least 2 line electrons (Ne={self.Ne}) "
+                "for its batch standard error (#1148)"
             )
         check_axial_line_band(admitted, decode_energy_grid(self.E_grid_line))
         if self.coherent_emission is not _ABSENT:

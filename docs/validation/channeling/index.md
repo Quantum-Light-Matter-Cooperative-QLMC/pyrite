@@ -36,7 +36,9 @@ cr-capture-bound
 cr-capture-yield
 cr-planar-free-free-block
 cr-planar-zone-row-ownership
+cr-planar-zone-pxr-modulation
 cr-transition-radiation-bound
+cr-zone-incoherent-flux-weight
 cr-zone-handoff-accounting
 cr-planar-conditional-source
 cr-planar-overflow-spectrum
@@ -68,6 +70,8 @@ cr-axial-qrt-source-normalization
 cr-axial-source-partition
 cr-axial-fiber-regression
 cr-axial-fiber-angular
+cr-axial-directional-observation
+cr-zone-row-angular-spread
 cr-axial-cuda-backend
 cr-axial-realspace-propagation
 cr-axial-realspace-dissipator

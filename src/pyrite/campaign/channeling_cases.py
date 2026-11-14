@@ -85,10 +85,15 @@ def _axis_proximity(case: Case) -> tuple[tuple[int, int, int], float, float] | N
     return best
 
 
-def resolve_channeling(cases: list[Case], channeling: Channeling | None) -> list[Case]:
+def resolve_channeling(
+    cases: list[Case], channeling: Channeling | None, *, directional: bool = False
+) -> list[Case]:
     """Attach the channeling record to every case and apply the gates.
 
-    Returns ``cases`` unchanged when ``channeling`` is ``None``.
+    Returns ``cases`` unchanged when ``channeling`` is ``None``. ``directional``
+    marks cases observed by a physical detector; an axial case is then a
+    directional observable, which only ``admission="accept-inaccurate"`` runs
+    (#1148).
 
     Raises
     ------
@@ -100,7 +105,7 @@ def resolve_channeling(cases: list[Case], channeling: Channeling | None) -> list
     if channeling is None:
         return cases
     if channeling.model == "axial":
-        return _resolve_axial(cases, channeling)
+        return _resolve_axial(cases, channeling, directional)
     return _resolve_planar(cases, channeling)
 
 
@@ -120,11 +125,11 @@ def _warn_unadmitted(case: Case, model: str) -> None:
     )
 
 
-def _resolve_axial(cases: list[Case], channeling: Channeling) -> list[Case]:
+def _resolve_axial(cases: list[Case], channeling: Channeling, directional: bool) -> list[Case]:
     from ..quantum._admission import AxialAdmissionError
     from ..quantum._axial_envelope import match_axial_case, unadmitted_axial_case
     from ..quantum._axial_spec import refuse_unverified_axial_run
-    from .axial_cases import axial_case_query, axial_channeling_record
+    from .axial_cases import axial_case_query, axial_channeling_record, axial_observable
 
     if channeling.axial is None or channeling.axial["version"] != 2:
         refuse_unverified_axial_run()  # v1 remains parseable, never executable
@@ -134,7 +139,9 @@ def _resolve_axial(cases: list[Case], channeling: Channeling) -> list[Case]:
     for case in cases:
         # Match only resolved physical cases; do not infer or extrapolate
         # calibration settings from an API/profile recipe.
-        query = axial_case_query(case, axis, CHANNELING_TEMPERATURE_K)
+        query = axial_case_query(
+            case, axis, CHANNELING_TEMPERATURE_K, axial_observable(case, directional)
+        )
         try:
             resolved = match_axial_case(query)
         except AxialAdmissionError:

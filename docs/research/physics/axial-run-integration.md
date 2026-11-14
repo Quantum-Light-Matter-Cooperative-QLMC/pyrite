@@ -261,7 +261,7 @@ Once a selector is admitted, every downstream path needs variant dispatch.
 | CUDA continuation: `runner.channeling` | CPU quantum zone followed by native CUDA | Early axial refusal until the joint launch contract is covered on both backends | Refused (CPU only) |
 | Adaptive precision: `runner.adaptive` | Refused | Refused until an independent per-electron CR variance contract exists | Refused |
 | Capture/blocks: `runner._check_channeling_transport` | Refused | Keep refusal; a block-local MCWF solve changes the source ensemble | Refused |
-| Checkpoint/dataset/provenance: `checkpoints.persistence`, `campaign.profiles`, `_physics_provenance` | Optional channel storage and planar marker | Tagged axial identity, atomic compatible persistence, no reuse of a planar cache | `axial-fibre-v2` marker in the resolved record; planar and off identities unchanged |
+| Checkpoint/dataset/provenance: `checkpoints.persistence`, `campaign.profiles`, `_physics_provenance` | Optional channel storage and planar marker | Tagged axial identity, atomic compatible persistence, no reuse of a planar cache | `axial-fibre-v3` marker in the resolved record; planar and off identities unchanged |
 | Remote submission: `remote`, CLI validation | Forwards planar resolved settings | Refuse unsupported settings locally before sync/submission | Refused before sync or staging; a profile cannot yet express an admitted case (no zero-aperture detector) |
 
 Refusals must run before table preparation, quantum solves, native transport,
