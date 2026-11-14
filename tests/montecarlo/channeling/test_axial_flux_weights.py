@@ -73,3 +73,34 @@ def test_a_state_on_the_strings_enhances_nuclear_local_emission(profile, kernels
     assert on[brem] > 1.2 and on[k_shell] > 1.05
     assert on[brem] > on[k_shell]  # K-shell ionization is less local than the nucleus
     assert between[brem] < on[brem]
+
+
+@pytest.mark.parametrize(("axis", "hkl"), [(0, (1, 1, 0)), (1, (1, -1, 0))])
+def test_a_state_uniform_along_one_cell_axis_gives_the_planar_weight(profile, kernels, axis, hkl):
+    """Planar-symmetric limit (#1175): orders on one cell axis reproduce the planar F.
+
+    The Si <001> cell is the 1.92 A square of the {110} planes, so a density
+    uniform along ``y`` (``x``) is a (110) ((1-10)) planar density; its axial
+    ``F_c`` must equal :func:`.flux_weights.flux_factors` of the same 1D state.
+    """
+    from pyrite.materials.channeling.potential import planar_profile
+    from pyrite.montecarlo.channeling.flux_weights import flux_factors, flux_kernels
+
+    mx, my = ORDER
+    plane = planar_profile("silicon", hkl, 300.0)
+    assert plane.g_inv_ang == pytest.approx(profile.g_inv_ang[axis], rel=1e-12)
+    planar = flux_kernels(plane, 3.5e6, 2 * ORDER[axis])
+    assert planar.keys == kernels.keys
+    rng = np.random.default_rng(1175)
+    line = rng.normal(size=2 * ORDER[axis] + 1) + 1j * rng.normal(size=2 * ORDER[axis] + 1)
+    orders = np.zeros((2 * mx + 1, 2 * my + 1), dtype=complex)
+    if axis == 0:
+        orders[:, my] = line
+    else:
+        orders[mx, :] = line
+    x = np.arange(256) * (2.0 * np.pi / plane.g_inv_ang) / 256
+    m = np.arange(-ORDER[axis], ORDER[axis] + 1)
+    psi = np.exp(1j * plane.g_inv_ang * np.multiply.outer(x, m)) @ line
+    expected = flux_factors(planar, x, (np.abs(psi) ** 2)[None])[0]
+    np.testing.assert_allclose(kernels.factors(orders.ravel()), expected, rtol=1e-12)
+    assert np.ptp(expected) > 0.1  # a non-trivial planar density
