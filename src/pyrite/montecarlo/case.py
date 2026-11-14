@@ -614,6 +614,11 @@ class Case(Mapping[str, Any]):
             raise AxialAdmissionError("axial fibre requires midpoint transport")
         # Off-axis or finite-aperture observation resolves to the "directional"
         # observable, which no admitted entry matches (#1148).
+        if record.get("observable") == "directional" and int(self.Ne) < 2:
+            raise AxialAdmissionError(
+                f"directional axial scoring needs at least 2 line electrons (Ne={self.Ne}) "
+                "for its batch standard error (#1148)"
+            )
         check_axial_line_band(admitted, decode_energy_grid(self.E_grid_line))
         if self.coherent_emission is not _ABSENT:
             # Native CBS is scored per flight with or without this flag; the

@@ -17,8 +17,11 @@ source's nodes. The depth sum uses the exact linear-interpolation weights
 whose Doppler phase step exceeds the on-axis trapezoid cap, alias no line
 replicas. The standard error follows from the batch spread (``S`` is linear
 in ``G``). Directions at or beyond 90 degrees from the axis score zero: the
-fibre source is forward emission only (the boosted dipole pattern there is
-``O(gamma^-6)`` of its forward peak).
+fibre source is forward emission only (resonances there lie at
+``E <= Delta_fi``, below the keV grid; the angular density at 90 degrees is
+about ``gamma^-4/4`` of the forward peak). Each line comes out low by about
+``(Delta_fi dz / hbar v)^2 / 6`` at any angle (the linear quadrature's peak
+factor ``sinc^4``): about 6% for an 80 eV transition at the default 15 A step.
 
 Validation: cr-axial-directional-observation
 """

@@ -142,6 +142,11 @@ def test_directional_observation_is_unadmitted_and_needs_the_opt_in(detector):
     assert case["channeling"]["observable"] == "directional"
 
 
+def test_directional_observation_refuses_fewer_than_two_line_electrons():
+    with pytest.raises(AxialAdmissionError, match="at least 2 line electrons"):
+        _scene(PointDetector(observation_angle_deg=1.0), lines=1)
+
+
 def test_on_axis_point_detector_stays_admitted():
     case = _scene(PointDetector())
     assert case["channeling"]["case_key"] == "si-fibre/B"
