@@ -199,12 +199,13 @@ def test_production_row_weights_match_the_real_space_reference(zone):
     assert set(reference) == {fw.BREM_KEY, "14:K", "14:L1", "14:L2", "14:L3"}
     for key, value in reference.items():
         assert production[key] == pytest.approx(value, rel=RTOL), key
-    # Recorded reference values (2026-11-13).
-    assert reference[fw.BREM_KEY] == pytest.approx(1.3406491, abs=1e-6)
-    assert reference["14:K"] == pytest.approx(1.1755646, abs=1e-6)
-    assert reference["14:L1"] == pytest.approx(1.0569468, abs=1e-6)
-    assert reference["14:L2"] == pytest.approx(1.0417790, abs=1e-6)
-    assert reference["14:L3"] == pytest.approx(1.0417962, abs=1e-6)
+    # Recorded reference values (2026-11-13; re-pinned 2026-11-14 for the
+    # measured Si bonding charge, #1177, which reshapes the zone density).
+    assert reference[fw.BREM_KEY] == pytest.approx(1.3418340, abs=1e-6)
+    assert reference["14:K"] == pytest.approx(1.1762400, abs=1e-6)
+    assert reference["14:L1"] == pytest.approx(1.0570164, abs=1e-6)
+    assert reference["14:L2"] == pytest.approx(1.0417924, abs=1e-6)
+    assert reference["14:L3"] == pytest.approx(1.0418096, abs=1e-6)
 
 
 def test_brem_reference_resolves_the_form_factor_fit_range_convention(zone):

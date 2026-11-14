@@ -10,6 +10,7 @@ for sources, criteria and limitations, follow each record or the
 
 2h-tas2-debye-waller-002
 2ha-niobium-dichalcogenides
+bonding-charge-structure-factors
 crystal-db-comparison
 debye-waller-audit
 hbn-structure

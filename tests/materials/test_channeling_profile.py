@@ -168,14 +168,17 @@ def test_si111_coefficient_against_cbed_structure_factors():
     volts_per_inv_ang2 = (2 * np.pi * HBARC_EV_ANG) ** 2 / (2 * gamma * M_E_EV)
     v111 = 0.4736e-1 * volts_per_inv_ang2  # 5.144 V
     v222 = 0.921e-3 * volts_per_inv_ang2  # 0.100 V
+    iam = planar_profile("silicon", (1, 1, 1), 293.15, bonding_charge=False)
+    # Independent atoms overestimate the bonding-sensitive (111) by ~6%, and
+    # (222) is forbidden for spherical harmonic atoms.
+    assert 1.04 < abs(iam.potential_eV[1]) / v111 < 1.08
+    assert abs(iam.potential_eV[2]) < 1e-12
+    # The X-ray (Cummings--Hart, Alkire) bonding charge reproduces this
+    # independent CBED measurement: (111) to 0.1%, (222) within Zuo's 5.4%.
+    # Validation: bonding-charge-structure-factors
     profile = planar_profile("silicon", (1, 1, 1), 293.15)
-    # Independent atoms overestimate the bonding-sensitive (111) by ~6%; the
-    # X-ray Pendellosung value in Zuo's Table 2 agrees with the CBED value.
-    assert 1.0 < abs(profile.potential_eV[1]) / v111 < 1.08
-    # (222) is forbidden for spherical harmonic atoms; the measured 0.1 V is
-    # bonding charge the independent-atom potential omits (2% of V_111).
-    assert abs(profile.potential_eV[2]) < 1e-12
-    assert v222 < 0.03 * v111
+    assert abs(profile.potential_eV[1]) / v111 == pytest.approx(1.0, abs=1e-3)
+    assert abs(profile.potential_eV[2]) == pytest.approx(v222, rel=0.050 / 0.921)
 
 
 def _diamond_structure_modulus(hkl):
@@ -190,7 +193,7 @@ def _diamond_structure_modulus(hkl):
         ((1, 1, 0), 1, (2, 2, 0), 15.404, (0.99, 1.01)),
         ((1, 1, 0), 2, (4, 4, 0), 9.659, (0.99, 1.01)),
         ((1, 1, 0), 3, (6, 6, 0), 5.913, (0.99, 1.01)),
-        ((1, 1, 1), 1, (1, 1, 1), 18.574, (1.05, 1.15)),
+        ((1, 1, 1), 1, (1, 1, 1), 18.574, (0.98, 1.03)),
     ],
 )
 def test_diamond_coefficients_against_xray_structure_factors(
@@ -215,8 +218,13 @@ def test_diamond_coefficients_against_xray_structure_factors(
     )
     profile = planar_profile("diamond", plane, 293.15)
     # The (110) family is independent-atom to within 0.5%; bonding charge
-    # lowers the measured (111) potential by ~10%.
+    # lowers the measured (111) potential by ~10%, which the Takama et al.
+    # correction (bonding-charge-structure-factors) reproduces from an
+    # independent data set to ~1.5%.
     assert ratio[0] < abs(profile.potential_eV[harmonic]) / measured < ratio[1]
+    iam = planar_profile("diamond", plane, 293.15, bonding_charge=False)
+    if hkl == (1, 1, 1):
+        assert 1.05 < abs(iam.potential_eV[harmonic]) / measured < 1.15
 
 
 def test_density_means_and_heating(si110):

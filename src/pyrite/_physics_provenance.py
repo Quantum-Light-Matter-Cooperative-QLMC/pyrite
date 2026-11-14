@@ -9,7 +9,7 @@ Validation: bote-salvat-ionization-backend
 import json
 from collections.abc import Mapping
 from pathlib import PurePath
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from ._mixed_elastic_policy import mixed_provenance_markers
 from ._physics_contract import (
@@ -134,6 +134,7 @@ def resolved_physics_view(
         )
     )
     markers.update(mixed_provenance_markers(resolved))
+    markers.update(_structure_factor_markers(resolved))
     if resolved.get("photon_transport") is not None:
         markers["photon_transport_model"] = resolved["photon_transport"]["model"]
     if resolved.get("coherent_emission", False):
@@ -168,3 +169,14 @@ def resolved_physics_view(
         ),
         backend_availability=backend_availability,
     )
+
+
+def _structure_factor_markers(resolved: Mapping[str, Any]) -> dict[str, str]:
+    """Measured structure-factor marker of the case's crystals; empty when none carries data."""
+    from .materials.crystal import structure_factor_marker
+
+    radiators = resolved.get("layer_radiators") or ()
+    marker = structure_factor_marker(
+        [resolved.get("crystal"), *(r.get("crystal") for r in radiators if r)]
+    )
+    return {} if marker is None else {"structure_factor_model": marker}

@@ -5,3 +5,30 @@ formula = "C"
 cod_id = 9008564
 B_ang2 = 0.21
 surface_hkl = [4, 0, 0]
+
+# Measured low-order structure factors (bonding charge, issue #1177). Values are
+# the dynamic per-atom F of Lu, Zunger & Deutsch Table V (TTKS column): Takama,
+# Tsuchiya, Kobayashi & Sato (1990) Pendelloesung on synthetic diamond, with
+# F(222) from Weiss & Middleton; B is the LZD single-B fit to that set (Table I).
+# Same per-atom convention and bond-centre origin as silicon.toml.
+[measured_structure_factors]
+validation_id = "bonding-charge-structure-factors"
+citation = "Z. W. Lu, A. Zunger and M. Deutsch, Phys. Rev. B 47, 9385 (1993), Table V (TTKS); T. Takama et al., Acta Cryst. A 46, 514 (1990)"
+doi = "10.1103/PhysRevB.47.9385"
+zotero_item = "JSSDI5LU"
+convention = "dynamic-per-atom"
+B_ang2 = 0.1379
+temperature = "room temperature"
+origin = [0.125, 0.125, 0.125]
+reflections = [
+  { hkl = [1, 1, 1], F = 3.247, sigma = 0.011 },
+  { hkl = [2, 2, 0], F = 1.920, sigma = 0.005 },
+  { hkl = [3, 1, 1], F = 1.648, sigma = 0.004 },
+  { hkl = [2, 2, 2], F = 0.144, sigma = 0.010 },
+  { hkl = [4, 0, 0], F = 1.491, sigma = 0.006 },
+  { hkl = [3, 3, 1], F = 1.483, sigma = 0.007 },
+  { hkl = [4, 2, 2], F = 1.363, sigma = 0.010 },
+  { hkl = [3, 3, 3], F = 1.287, sigma = 0.005 },
+  { hkl = [5, 1, 1], F = 1.310, sigma = 0.002 },
+  { hkl = [4, 4, 0], F = 1.198, sigma = 0.003 },
+]

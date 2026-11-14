@@ -34,7 +34,13 @@ from math import gcd
 import numpy as np
 
 from ..atomic import Z_TABLE, cromer_mann_f0
-from ..crystal import CRYSTALS, E2_EV_ANG, _direct_lattice_vectors, reciprocal_g_vector
+from ..crystal import (
+    CRYSTALS,
+    E2_EV_ANG,
+    _direct_lattice_vectors,
+    bonding_charge_correction,
+    reciprocal_g_vector,
+)
 from .thermal import ChannelingDataError, UniaxialThermalSite, thermal_site
 
 # Waasmaier--Kirfel f0 fits are valid to s = sin(theta)/lambda = 6 / angstrom.
@@ -156,6 +162,7 @@ def planar_profile(
     temperature_K: float = 293.15,
     *,
     s_max_inv_ang: float = F0_S_MAX_INV_ANG,
+    bonding_charge: bool = True,
 ) -> PlanarProfile:
     """Return the thermally averaged planar continuum profile of a catalog crystal.
 
@@ -171,6 +178,11 @@ def planar_profile(
     s_max_inv_ang
         Highest ``s = g / (4 pi)`` kept [1/angstrom]; defaults to the validity
         limit of the form-factor fits.
+    bonding_charge
+        Add the measured bonding-charge correction ``dF`` of
+        :func:`pyrite.materials.crystal.bonding_charge_correction` to ``f`` in
+        every harmonic (``U_n`` and the electron density), smeared with the
+        site ``B``; ``False`` gives the independent-atom potential.
 
     Returns
     -------
@@ -182,7 +194,8 @@ def planar_profile(
     ChannelingDataError
         If any basis element lacks channeling thermal data.
 
-    Validation: cr-planar-continuum-potential, cr-mott-bethe-factor
+    Validation: cr-planar-continuum-potential, cr-mott-bethe-factor,
+    bonding-charge-structure-factors
     """
     info = CRYSTALS[crystal]
     basis = info["basis"]
@@ -214,6 +227,8 @@ def planar_profile(
         electrons += site_sum * f0
         with np.errstate(divide="ignore", invalid="ignore"):
             potential[1:] += (Z_TABLE[el] - f0[1:]) / g_n[1:] ** 2 * site_sum[1:]
+    if bonding_charge:
+        _add_bonding_charge(crystal, hkl_c, n, g_n, s_n, basis, b_factors, potential, electrons)
     potential *= -4.0 * np.pi * E2_EV_ANG / volume
     nuclear /= volume
     electrons /= volume
@@ -235,6 +250,22 @@ def planar_profile(
         covariances_ang2=covariances,
         normal=g_vec / g_prim,
     )
+
+
+def _add_bonding_charge(crystal, hkl_c, n, g_n, s_n, basis, b_factors, potential, electrons):
+    """Add ``dF(-n hkl)`` (this module's ``exp(-i g.R)`` convention) to the planar sums in place.
+
+    ``f -> f + dF`` in the electron density and ``Z - f -> Z - f - dF`` in the
+    potential accumulator, smeared with the basis-mean Debye--Waller factor.
+
+    Validation: bonding-charge-structure-factors
+    """
+    debye = np.mean([np.exp(-b_factors[el] * s_n**2) for el, _ in basis], axis=0)
+    for m in n[1:]:
+        delta = bonding_charge_correction(crystal, [-int(m) * v for v in hkl_c]) * debye[m]
+        if delta:
+            electrons[m] += delta
+            potential[m] -= delta / g_n[m] ** 2
 
 
 def _is_hexagonal(lattice) -> bool:

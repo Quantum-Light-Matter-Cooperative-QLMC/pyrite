@@ -45,6 +45,29 @@ One scalar $B$ is applied to **every** site in the cell. There is no per-site $B
 
 Which variant of $F_j$ enters {eq}`eq-structure-factor-definition` is a policy, described in full in [Atomic form factors](../atomic-physics/atomic-form-factors.md). In short: the production line-spectrum path uses the full complex $f_0 + f' + i f''$; a caller that explicitly asks for the non-resonant treatment still gets the complex factor for the hard-coded edge-prone element set, so a crystal with an in-band absorption edge cannot quietly be evaluated without its anomalous terms. Form factors are computed once per **unique element**, not once per site, since $F$ depends only on the element and $|\mathbf g|$.
 
+## Measured low-order structure factors (bonding charge)
+
+The independent-atom sum misses the valence charge that covalent bonding piles up between neighbours. In silicon and diamond this changes the lowest reflections by up to a few percent and gives the independent-atom-extinct $(222)$ reflection a small nonzero value. A catalog crystal may therefore carry a `[measured_structure_factors]` table of measured dynamic structure factors, and every structure-factor sum then adds the static correction
+
+```{math}
+:label: eq-structure-factor-bonding-charge
+
+\Delta F(\mathbf g) = F_{\rm meas}(\mathbf g)\,e^{+B_{\rm src}s^2} - F_{\rm IAM}^{\rm static}(\mathbf g),
+\qquad
+S \to S + \Delta F(\mathbf g)\,e^{-W}.
+```
+
+Here $B_{\rm src}$ is the Debye–Waller factor the source's dynamic values carry, and $e^{-W}$ is the caller's own factor: the catalog $B$ for $\chi_{\mathbf g}$, and the phonon-DOS $B(T)$ for channeling. Values are tabulated per atom (`dynamic-per-atom`), as in the sources. An allowed reflection keeps the independent-atom phase, $F_{\rm meas,cell} = F\,P(\mathbf g)$ with $P = \sum_j e^{i\mathbf g\cdot\mathbf R_j}$. An extinct one, with $P = 0$, takes the phase of the source's centrosymmetric origin $\mathbf o$, $F_{\rm meas,cell} = N F e^{i\mathbf g\cdot\mathbf o}$. For silicon and diamond $\mathbf o$ is a bond centre, so $(222)$ has the phase of positive charge in the bonds. Each tabulated reflection stands for its whole $m\bar 3m$ family, so the table is accepted only for cubic, single-element crystals.
+
+The same $\Delta F$ enters the Mott–Bethe potentials as $Z - f_0 \to Z - f_0 - \Delta F$: in $U_{\mathbf g}$, in the planar channeling coefficients $U_n$ and in the axial string potential. The anomalous $f'$ and $f''$ stay in the per-atom factors, because the sources correct their values for anomalous dispersion. Every structure-factor function takes `bonding_charge=False` to return the pure independent-atom sum.
+
+| Crystal | Source | Effect |
+|---|---|---|
+| Si | Cummings & Hart (1988) Pendellösung set; $F(222)$ from Alkire, Yelon & Schneider (1982); tabulated by Lu, Zunger & Deutsch (1993), Table III | $F(111)$ +1.8%; $\lvert F_{\rm cell}(222)\rvert$ = 1.456 e; $U_{111}$, $U_{222}$ match CBED (Zuo 1999) to 0.1% and 2% |
+| diamond | Takama et al. (1990) Pendellösung; $F(222)$ from Weiss & Middleton; LZD Table V | $F(111)$ +8%; (111) planar well 6.5% shallower; Klein et al. (1985) bonding-corrected (111) channeling lines reproduced |
+
+Identity: the crystal-conditional `structure_factor_model` marker joins dataset and case digests only for crystals that carry the table. Validation: `bonding-charge-structure-factors`.
+
 ## What the structure factor feeds
 
 | Quantity | Relation | Documented in |
@@ -71,7 +94,7 @@ Extinction follows from the phase convention: for diamond, {eq}`eq-structure-fac
 ## Assumptions and limits
 
 * **Kinematic** (single-scattering) theory. No dynamical diffraction, no extinction corrections, no multiple-beam effects. This suits thin films and mosaic crystals; it is a limit for thick, high-quality perfect crystals at strong reflections.
-* Independent, spherical, neutral atoms — the form-factor approximation carried in from the atomic layer.
+* Independent, spherical, neutral atoms — the form-factor approximation carried in from the atomic layer — except for the reflections a crystal's measured structure-factor table lists (Si and diamond; see above). Reflections beyond that table use the independent-atom sum.
 * A single isotropic scalar $B$ per crystal, applied to every site.
 * No thermal diffuse scattering: the intensity removed from the Bragg peak by {eq}`eq-structure-factor-debye-waller` is not re-emitted anywhere in the model.
 * No temperature knob. $B$ is a static catalog value; a sample at a different temperature from the source refinement is not represented.

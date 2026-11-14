@@ -97,9 +97,12 @@ def test_diamond_structure_factor_extinct(hkl):
     # Validation: structure-factor. Two-atom diamond basis (000),(1/4,1/4,1/4):
     # phase = exp(i pi (h+k+l)/2); for h+k+l = 2 (mod 4) the identical-atom sum
     # cancels exactly, so (222) and (200) are systematically absent.
-    S, g = structure_factor("diamond", hkl, 8000.0)
+    S, g = structure_factor("diamond", hkl, 8000.0, bonding_charge=False)
 
     assert g > 0 and abs(S) < 1e-6
+    # Measured bonding charge lifts (222) (bonding-charge-structure-factors); (200) stays absent.
+    S_measured, _ = structure_factor("diamond", hkl, 8000.0)
+    assert (abs(S_measured) > 1.0) == (sorted(map(abs, hkl)) == [2, 2, 2])
 
 
 @pytest.mark.parametrize("hkl", [(1, 1, 1), (2, 2, 0), (3, 1, 1), (4, 0, 0)])
@@ -842,8 +845,11 @@ def test_U_g_is_static_mott_bethe_for_edge_prone_si():
     energies = np.array([1000.0, 1839.0, 10000.0])
     expected = 4.31638  # eV, B = 0.48 A^2; electrostatic Z - f0 value
     for use_henke in (False, True):
-        got = U_g("silicon", (2, 2, 0), energies, 0.48, use_henke)
+        got = U_g("silicon", (2, 2, 0), energies, 0.48, use_henke, bonding_charge=False)
         np.testing.assert_allclose(got.real, expected, rtol=1e-5)
+        # The measured bonding-charge correction is static as well.
+        bonded = U_g("silicon", (2, 2, 0), energies, 0.48, use_henke)
+        np.testing.assert_allclose(bonded, bonded[0], rtol=1e-14)
     # chi_g keeps the edge-prone anomalous policy.
     chi = chi_g("silicon", (2, 2, 0), energies, 0.48)
     assert abs(chi[1] / chi[2]) != pytest.approx(abs(chi[0] / chi[2]))

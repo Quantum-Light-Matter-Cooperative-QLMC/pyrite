@@ -26,12 +26,15 @@ mapping-style ``CRYSTALS`` compatibility registry. Depends on materials.atomic
 (cromer_mann_f0, atomic_form_factor, henke_dispersion, Z_TABLE).
 """
 
+from types import MappingProxyType
+
 import numpy as np
 
 from ._cif import (
     crystals_crystal_to_crystal_info as crystals_crystal_to_crystal_info,
 )
 from ._cif import load_crystal_from_cif as load_crystal_from_cif
+from ._structure_factors import bonding_corrections
 from .atomic import (
     Z_TABLE,
     atomic_form_factor,
@@ -170,9 +173,80 @@ def load_crystals(catalog=None):
             "basis": spec.basis,
             "V_cell": spec.V_cell,
             "mosaic_fwhm_deg": spec.mosaic_fwhm_deg,
+            "bonding_dF": _bonding_table(spec),
         }
         for key, spec in catalog.crystals.items()
     }
+
+
+def _bonding_table(spec):
+    """Static bonding-charge corrections of a catalog crystal, keyed by integer ``hkl``."""
+    record = getattr(spec, "measured_structure_factors", None)
+    if record is None:
+        return MappingProxyType({})
+    lattice = spec.lattice
+    table = bonding_corrections(
+        record,
+        lattice,
+        spec.basis,
+        g_of=lambda hkl: reciprocal_g_vector(hkl, lattice)[1],
+        f0_of=cromer_mann_f0,
+    )
+    return MappingProxyType(dict(table))
+
+
+#: Generation of the measured low-order structure-factor model (#1177). It joins
+#: dataset and case identities only when a referenced crystal carries measured
+#: structure factors, so every other material keeps its historical digest.
+STRUCTURE_FACTOR_MODEL = "measured-low-order-v1"
+
+
+def structure_factor_marker(crystals):
+    """Identity marker for the bonding-charge data of ``crystals``, or ``None``.
+
+    ``None`` when no listed crystal carries measured structure factors;
+    otherwise :data:`STRUCTURE_FACTOR_MODEL` plus a digest of every such
+    crystal's static correction table, so a data or convention change re-keys
+    checkpoints.
+
+    Validation: bonding-charge-structure-factors
+    """
+    import hashlib
+    import json
+
+    payload = {}
+    for key in sorted({str(c) for c in crystals if c is not None}):
+        table = CRYSTALS.get(key, {}).get("bonding_dF")
+        if table:
+            payload[key] = [
+                [*hkl, repr(float(v.real)), repr(float(v.imag))] for hkl, v in sorted(table.items())
+            ]
+    if not payload:
+        return None
+    digest = hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()[:16]
+    return f"{STRUCTURE_FACTOR_MODEL}/{digest}"
+
+
+def bonding_charge_correction(crystal, hkl):
+    """Return the static bonding-charge correction ``dF(G)`` [electrons/cell].
+
+    The measured-minus-independent-atom structure factor of
+    :mod:`pyrite.materials._structure_factors`, before thermal smearing, in the
+    ``S(g) = sum F exp(+i g.R)`` convention of :func:`structure_factor`. Zero
+    for crystals without measured structure factors and for unlisted or
+    non-integer ``hkl``. Callers multiply it by their own Debye--Waller factor.
+    It is real-symmetric: ``dF(-G) = conj(dF(G))``.
+
+    Validation: bonding-charge-structure-factors
+    """
+    table = CRYSTALS[crystal].get("bonding_dF")
+    if not table:
+        return 0.0 + 0.0j
+    values = np.asarray(hkl, dtype=float)
+    key = tuple(int(v) for v in np.rint(values))
+    if not np.array_equal(values, key):
+        return 0.0 + 0.0j
+    return complex(table.get(key, 0.0))
 
 
 CRYSTALS = load_crystals()
@@ -221,7 +295,9 @@ def _basis_F(basis, g, photon_E_eV, use_henke):
     return [cache[el] for el, _ in basis]
 
 
-def structure_factor(crystal, hkl, photon_E_eV, B_ang2=0.0, use_henke=False):
+def structure_factor(
+    crystal, hkl, photon_E_eV, B_ang2=0.0, use_henke=False, *, bonding_charge=True
+):
     """Return the crystal structure factor and reciprocal magnitude.
 
     Implements ``S(g) = sum_i F_i(g) exp(i*g.R_i) exp(-W_i)`` from Eq. (3).
@@ -240,6 +316,11 @@ def structure_factor(crystal, hkl, photon_E_eV, B_ang2=0.0, use_henke=False):
         Isotropic Debye--Waller ``B`` factor in square angstroms.
     use_henke
         Include anomalous energy-dependent corrections.
+    bonding_charge
+        Add the measured bonding-charge correction
+        :func:`bonding_charge_correction` (thermally smeared with the same
+        ``B``) when the crystal carries measured structure factors; ``False``
+        gives the pure independent-atom sum.
 
     Returns
     -------
@@ -250,6 +331,8 @@ def structure_factor(crystal, hkl, photon_E_eV, B_ang2=0.0, use_henke=False):
     Validation: structure-factor
 
     Validation: debye-waller-catalog-provenance
+
+    Validation: bonding-charge-structure-factors
     """
     info = CRYSTALS[crystal]
     hkl = np.asarray(hkl, dtype=float)
@@ -261,11 +344,13 @@ def structure_factor(crystal, hkl, photon_E_eV, B_ang2=0.0, use_henke=False):
     ):
         phase = np.exp(1j * 2.0 * np.pi * np.dot(hkl, R))
         S += F * phase * dwf
+    if bonding_charge:
+        S = S + bonding_charge_correction(crystal, hkl) * dwf
     return S, g
 
 
 # ---- couplings: chi_g (PXR) and U_g (CBS) ----------------------------------
-def chi_g(crystal, hkl, photon_E_eV, B_ang2=0.0, use_henke=False):
+def chi_g(crystal, hkl, photon_E_eV, B_ang2=0.0, use_henke=False, *, bonding_charge=True):
     """Return the polarizability Fourier component from Feranchuk Eq. (3).
 
     With the Debye--Waller factor already included in ``S(g)`` by
@@ -291,6 +376,9 @@ def chi_g(crystal, hkl, photon_E_eV, B_ang2=0.0, use_henke=False):
         Isotropic Debye--Waller ``B`` factor in square angstroms.
     use_henke
         Include anomalous energy-dependent form-factor corrections.
+    bonding_charge
+        Include measured bonding-charge corrections (see
+        :func:`structure_factor`).
 
     Returns
     -------
@@ -299,7 +387,9 @@ def chi_g(crystal, hkl, photon_E_eV, B_ang2=0.0, use_henke=False):
 
     Validation: pxr-amplitude
     """
-    S, _ = structure_factor(crystal, hkl, photon_E_eV, B_ang2, use_henke)
+    S, _ = structure_factor(
+        crystal, hkl, photon_E_eV, B_ang2, use_henke, bonding_charge=bonding_charge
+    )
     lam = HC_EV_ANG / photon_E_eV  # wavelength [Angstrom]
     return -R_E_ANG * lam**2 / (np.pi * CRYSTALS[crystal]["V_cell"]) * S
 
@@ -385,7 +475,7 @@ def refractive_index(crystal, photon_E_eV, use_henke=True):
     return np.sqrt(1.0 + chi_0(crystal, photon_E_eV, use_henke))
 
 
-def U_g(crystal, hkl, photon_E_eV, B_ang2=0.0, use_henke=False):
+def U_g(crystal, hkl, photon_E_eV, B_ang2=0.0, use_henke=False, *, bonding_charge=True):
     """Return the crystal-potential Fourier component for CBS coupling.
 
     Implements Eq. (4), folded with the inverse-volume factor of Eq. (14) and
@@ -409,6 +499,10 @@ def U_g(crystal, hkl, photon_E_eV, B_ang2=0.0, use_henke=False):
     use_henke
         Accepted for signature parity with :func:`chi_g`; ignored, because the
         static potential carries no anomalous correction.
+    bonding_charge
+        Replace ``f0`` by ``f0 + dF`` (:func:`bonding_charge_correction`) when the
+        crystal carries measured structure factors: the bonding charge screens
+        the nuclei like the atomic electrons do.
 
     Returns
     -------
@@ -418,6 +512,8 @@ def U_g(crystal, hkl, photon_E_eV, B_ang2=0.0, use_henke=False):
     Validation: cbs-amplitude
 
     Validation: debye-waller-catalog-provenance
+
+    Validation: bonding-charge-structure-factors
     """
     info = CRYSTALS[crystal]
     hkl = np.asarray(hkl, dtype=float)
@@ -427,6 +523,8 @@ def U_g(crystal, hkl, photon_E_eV, B_ang2=0.0, use_henke=False):
     for el, R in info["basis"]:
         phase = np.exp(1j * 2.0 * np.pi * np.dot(hkl, R))
         acc += phase * (Z_TABLE[el] - cromer_mann_f0(el, g)) / g**2 * dwf
+    if bonding_charge:
+        acc = acc - bonding_charge_correction(crystal, hkl) / g**2 * dwf
     result = 4.0 * np.pi * E2_EV_ANG * acc / info["V_cell"]
     # The static CBS coupling is energy-independent, but callers still receive
     # one value per requested energy so it can share the chi_g tabulation/
@@ -436,7 +534,9 @@ def U_g(crystal, hkl, photon_E_eV, B_ang2=0.0, use_henke=False):
     return result
 
 
-def reflection_coupling_tables(crystal, hkl_list, photon_E_eV, B_ang2=0.0, use_henke=False, xp=np):
+def reflection_coupling_tables(
+    crystal, hkl_list, photon_E_eV, B_ang2=0.0, use_henke=False, xp=np, *, bonding_charge=True
+):
     """Tabulate :func:`chi_g` and ``U_g/m_e`` for several reflections at once.
 
     ``chi_g`` is linear in the per-atom form factor
@@ -473,6 +573,9 @@ def reflection_coupling_tables(crystal, hkl_list, photon_E_eV, B_ang2=0.0, use_h
         always carry them).
     xp
         Array module for the energy arithmetic.
+    bonding_charge
+        Add the measured bonding-charge correction ``dF`` to ``c_g`` and
+        subtract it from ``a_g``, exactly as :func:`chi_g`/:func:`U_g`.
 
     Returns
     -------
@@ -480,7 +583,7 @@ def reflection_coupling_tables(crystal, hkl_list, photon_E_eV, B_ang2=0.0, use_h
         ``(N_hkl, N_E)`` float64 ``xp`` arrays: dimensionless ``chi_g`` and
         dimensionless ``U_g/m_e``.
 
-    Validation: line-reflection-coupling-tables
+    Validation: line-reflection-coupling-tables, bonding-charge-structure-factors
     """
     info = CRYSTALS[crystal]
     basis = info["basis"]
@@ -505,6 +608,9 @@ def reflection_coupling_tables(crystal, hkl_list, photon_E_eV, B_ang2=0.0, use_h
             weights[el] = weights.get(el, 0.0) + np.exp(1j * 2.0 * np.pi * np.dot(hkl, R))
         c = sum(w * cromer_mann_f0(el, g) for el, w in weights.items())
         a = sum(w * (Z_TABLE[el] - cromer_mann_f0(el, g)) for el, w in weights.items())
+        if bonding_charge:
+            delta = bonding_charge_correction(crystal, hkl)
+            c, a = c + delta, a - delta
         s_re = xp.full(E.shape, float(np.real(c)))
         s_im = xp.full(E.shape, float(np.imag(c)))
         acc_re = xp.full(E.shape, float(np.real(a)))

@@ -197,8 +197,15 @@ def test_caller_observable_is_weighted_like_the_density(mode):
     np.testing.assert_allclose(result.oam_populations, plain.oam_populations)
 
 
-def test_renamed_mcwf_run_reproduces_pre_rename_numbers():
-    """#1147 rename is name-only: values pinned from ``axial_diagnostic`` at bbc0b1023."""
+def test_renamed_mcwf_run_reproduces_pre_rename_numbers(monkeypatch):
+    """#1147 rename is name-only: values pinned from ``axial_diagnostic`` at bbc0b1023.
+
+    Pinned before the measured bonding charge (#1177), so the run uses the
+    independent-atom silicon potential the pins were taken with.
+    """
+    from pyrite.materials.crystal import CRYSTALS
+
+    monkeypatch.setitem(CRYSTALS["silicon"], "bonding_dF", {})
     config = AxialPropagationConfig(
         shape=(12, 12),
         depths_ang=(0.0, 100.0, 500.0),

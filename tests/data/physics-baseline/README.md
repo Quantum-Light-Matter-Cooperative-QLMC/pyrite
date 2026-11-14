@@ -127,6 +127,23 @@ as photon-node independence requires (#819). Transport signatures and the
 line, characteristic, coherent and detected `brem` arrays keep their
 expectations. All tolerances are unchanged.
 
+## Measured Si bonding charge (#1177)
+
+Silicon now carries measured low-order structure factors (Cummings & Hart;
+Alkire et al. (222)), so `chi_g`, `U_g` and the planar/axial channeling
+potentials add the static bonding-charge correction
+(`bonding-charge-structure-factors`). Identity uses the crystal-conditional
+`structure_factor_model` marker rather than a global model bump, so only
+silicon/diamond digests move. Re-pinned (2026-11-14, CPU/NumPy fp64, Python
+3.14): every `case_content_key` and `parameter_sha256` in `resolved.json`
+and `channeling.json` (resolved case payloads unchanged); in `outputs.json`
+the legacy, EEDL-fallback, multilayer and coherent `spec` (−0.29 to −0.32%)
+and coherent `spec_coherent` (−0.42%), and the channeling family's
+`path_ang` (4e-8 relative), `spec_characteristic` and `brem` (≤ 7e-4).
+With `CRYSTALS["silicon"]["bonding_dF"]` emptied, every prior expectation is
+reproduced. Non-channeling transport, characteristic and continuum outputs
+and all tolerances are unchanged.
+
 ## Fixture inputs
 
 `resolved.json` stores full resolved case mappings, `case_content_key` and
