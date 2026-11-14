@@ -21,23 +21,40 @@ from ._bin_fourier import (
 from ._fourier_cutoffs import cutoff_rectangles
 
 
-def cufinufft_mode_transform(phase, strengths, j0, j1, *, eps=1e-12):
+def cufinufft_mode_transform(phase, strengths, j0, j1, *, eps=1e-12, plans=None):
     """Two-row type-1 transform of device arrays into modes j0..j1-1.
 
     Same modulation/sign/order convention as the host FINUFFT callback.
-    Plan execution is synchronized before plan destruction, including on a
-    non-default stream. Tolerance is not a final spectrum error guarantee.
+    ``plans`` (a dict, keyed by mode count) lets one call site reuse a plan
+    across transforms of equal size; only ``setpts`` repeats. The caller
+    then owns the plans and must synchronize before dropping them. Without
+    it, execution is synchronized before the one-shot plan is destroyed,
+    including on a non-default stream. Tolerance is not a final spectrum
+    error guarantee.
 
     Validation: cxr-line-fourier-reduction
     """
     cp = import_module("cupy")
-    cufinufft = import_module("cufinufft")
     modes = j1 - j0
     shift = j0 + modes // 2
     phase = cp.ascontiguousarray(phase, dtype=cp.float64)
     sources = cp.ascontiguousarray(strengths * cp.exp(-1j * shift * phase), dtype=cp.complex128)
-    stream = cp.cuda.get_current_stream()
-    plan = cufinufft.Plan(
+    plan = None if plans is None else plans.get(modes)
+    if plan is None:
+        plan = _plan(cp, modes, eps)
+        if plans is not None:
+            plans[modes] = plan
+    plan.setpts(phase)
+    out = plan.execute(sources)
+    if plans is None:
+        cp.cuda.get_current_stream().synchronize()
+    return out
+
+
+def _plan(cp, modes, eps):
+    """Two-transform FP64 type-1 plan on the current device and stream."""
+    cufinufft = import_module("cufinufft")
+    return cufinufft.Plan(
         1,
         (modes,),
         n_trans=2,
@@ -46,12 +63,8 @@ def cufinufft_mode_transform(phase, strengths, j0, j1, *, eps=1e-12):
         dtype="complex128",
         modeord=0,
         gpu_device_id=cp.cuda.Device().id,
-        gpu_stream=stream.ptr,
+        gpu_stream=cp.cuda.get_current_stream().ptr,
     )
-    plan.setpts(phase)
-    out = plan.execute(sources)
-    stream.synchronize()
-    return out
 
 
 @lru_cache(maxsize=1)
@@ -110,15 +123,21 @@ def cuda_positive_modes(E_res, a_width, weight, c0, period, *, eps=1e-12, use_nu
     linear = cp.asarray(weight[order] * np.pi / (2.0 * a * a), dtype=cp.float64)
     out = cp.zeros(last + 1, dtype=cp.complex128)
     direct = []
+    plans = {}
     for j0, j1, lo, hi in cutoff_rectangles(counts):
         modes, sources = j1 - j0, hi - lo
         if use_nufft and sources >= 64 and modes >= 32 and sources * modes >= 262144:
             strengths = cp.stack((constant[lo:hi], linear[lo:hi]))
-            moments = cufinufft_mode_transform(phase[lo:hi], strengths, j0, j1, eps=eps)
+            moments = cufinufft_mode_transform(
+                phase[lo:hi], strengths, j0, j1, eps=eps, plans=plans
+            )
             t = dt * cp.arange(j0, j1, dtype=cp.float64)
             out[j0:j1] += moments[0] - t * moments[1]
         else:
             direct.append((j0, j1, lo, hi))
+    if plans:
+        cp.cuda.get_current_stream().synchronize()
+        plans.clear()
     if direct:
         rectangles = cp.asarray(direct, dtype=cp.int64)
         _direct_kernel()(
