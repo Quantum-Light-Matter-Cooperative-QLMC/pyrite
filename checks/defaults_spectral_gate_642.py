@@ -91,23 +91,31 @@ def layered_case(histories, seed):
     return case
 
 
-def mosaic_mc_case(case, nodes):
+def mosaic_mc_case(case, nodes, sampling="quadrature", mosaic_seed=None):
     """Exact MC mosaic average at the crystal's catalog FWHM; analytic term off.
 
     The analytic route only broadens at detector convolution, so it leaves the
     intrinsic source spectrum unchanged; only this route is a source-level ladder.
+    ``sampling="history"`` draws ``nodes`` crystallites per history (#1185);
+    ``mosaic_seed`` replaces the scoring-time case seed, which only the
+    mosaic draws read on a replayed transport.
     """
     from pyrite.materials import CATALOG
 
     fwhm_deg = CATALOG.crystal(case["crystal"]).mosaic_fwhm_deg
     if not fwhm_deg:
         raise ValueError(f"{case['crystal']!r} has no catalog mosaic FWHM")
-    return dict(
+    out = dict(
         case,
         mosaic_fwhm_rad=None,
         mosaic_mc_fwhm_rad=float(np.deg2rad(fwhm_deg)),
         mosaic_mc_nodes=int(nodes),
     )
+    if sampling == "history":
+        out["mosaic_mc_sampling"] = "history"
+    if mosaic_seed is not None:
+        out["seed"] = int(mosaic_seed)
+    return out
 
 
 #: Production automatic line-grid policies: arm name -> profile selector table.
@@ -838,6 +846,18 @@ def main():
         help="score with the exact MC mosaic route at the catalog FWHM and N nodes per axis",
     )
     parser.add_argument(
+        "--mosaic-sampling",
+        choices=["quadrature", "history"],
+        default="quadrature",
+        help="exact-MC mosaic orientation rule: GH nodes**2, or nodes draws per history",
+    )
+    parser.add_argument(
+        "--mosaic-seed",
+        type=int,
+        default=None,
+        help="scoring seed for history-sampled crystallites (replayed transport unchanged)",
+    )
+    parser.add_argument(
         "--policy-arms",
         type=lambda text: [x for x in text.split(",") if x],
         default=[],
@@ -973,7 +993,7 @@ def main():
     np.savez_compressed(args.output / "primary.npz", **primary)
     records = []
     if args.mosaic_mc_nodes is not None:
-        case = mosaic_mc_case(case, args.mosaic_mc_nodes)
+        case = mosaic_mc_case(case, args.mosaic_mc_nodes, args.mosaic_sampling, args.mosaic_seed)
     arms = [("node", h) for h in args.node_spacings]
     bin_mean = args.bin_mean_spacings
     if bin_mean is None:
@@ -986,6 +1006,8 @@ def main():
         thickness_ang=float(case["thickness_ang"]),
         mosaic_mc_nodes=args.mosaic_mc_nodes,
         mosaic_mc_fwhm_rad=case.get("mosaic_mc_fwhm_rad"),
+        mosaic_sampling=args.mosaic_sampling,
+        mosaic_seed=case.get("seed") if args.mosaic_sampling == "history" else None,
         arm=args.arm,
         seed=args.seed,
         histories=args.histories,
