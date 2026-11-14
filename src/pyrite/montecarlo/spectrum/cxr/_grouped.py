@@ -102,8 +102,10 @@ def _device_grouped(lines, d, g_phase, L_rel, coefs, bounds, grids, spec, wm):
     n_layers = 1 if delta_omega.ndim == 1 else int(delta_omega.shape[0])
     if n_layers > 1:
         # Layer-major flattening: column k of every row, then row k of the grid.
-        L_rel = L_rel.T
-        half_dL = f32(xp.asarray(lines[2]).T)
+        # The kernel indexes flat ``layer * n + i``, so pass 1-D buffers.
+        L_rel = f32(L_rel.T).ravel()
+        half_dL = f32(xp.asarray(lines[2]).T).ravel()
+        delta_omega = f32(delta_omega).ravel()
     out = xp.zeros(E_grid.size, dtype=xp.float32)
     run_coherent_grouped_intensity_kernel(
         E_vac,
