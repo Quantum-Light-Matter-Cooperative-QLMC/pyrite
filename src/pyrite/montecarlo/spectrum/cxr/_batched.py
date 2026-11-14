@@ -42,6 +42,7 @@ from ._kernels import (
     _segment_escape_distance,
     _sincsq_lineshape,
 )
+from ._node_window import accumulate_sincsq_windowed
 from ._per_hkl import (
     _flat_energy_keep,
     _flat_view,
@@ -138,9 +139,10 @@ class _CxrBatch:
     the batched route's incoherent step be its own function.
     """
 
-    def __init__(self, spec, E_grid, bin_edges=None, bin_inv_width=None):
+    def __init__(self, spec, E_grid, bin_edges=None, bin_inv_width=None, node_tail=None):
         self.spec = spec
         self.E_grid = E_grid
+        self.node_tail = node_tail
         # Set only under bin-mean quadrature, which swaps the node-sampling
         # kernel for its closed-form bin-mean counterpart.
         self.bin_edges = bin_edges
@@ -182,7 +184,11 @@ class _CxrBatch:
 
         _nsys_push("pyrite.lines.reduce")
 
-        if self.bin_edges is not None:  # Validation: sinc-bin-integration
+        if self.node_tail is not None:  # Validation: node-support-window-tail
+            accumulate_sincsq_windowed(
+                E_r_batch, aw_batch, [w_batch], self.E_grid, [self.spec], self.node_tail, [0]
+            )
+        elif self.bin_edges is not None:  # Validation: sinc-bin-integration
             run_bin_mean_reduction_kernel(
                 E_r_batch,
                 aw_batch,
@@ -871,7 +877,18 @@ def _batched_incoherent_block(st, bt, blk, cxr_batch):
     if components:
         targets.append((pref * A2_pxr * WM, spec_pxr))
         targets.append((pref * A2_cbs * WM, spec_cbs))
-    if st.bin_edges is None and _numpy_backend():
+    if st.row_tail is not None:  # Validation: node-support-window-tail
+        accumulate_sincsq_windowed(
+            E_r_f,
+            aw_f,
+            [w.reshape(-1)[gm_idx] for w, _ in targets],
+            E_grid,
+            [tgt for _, tgt in targets],
+            st.row_tail,
+            range(len(targets)),
+        )
+        targets = []
+    elif st.bin_edges is None and _numpy_backend():
         accumulate_sincsq(
             E_r_f,
             aw_f,
@@ -1161,7 +1178,9 @@ def _accumulate_batched(st):
     coh_blocks = []
     coh_counts = []
     cxr_batch = (
-        _CxrBatch(spec, E_grid, st.bin_edges, st.bin_inv_width) if _use_jit_cxr_reduction else None
+        _CxrBatch(spec, E_grid, st.bin_edges, st.bin_inv_width, st.row_tail)
+        if _use_jit_cxr_reduction
+        else None
     )
 
     step = _launch_rows(bt, cxr_batch, coherent, req.truncation_audit)

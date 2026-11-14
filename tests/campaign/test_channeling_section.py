@@ -188,8 +188,8 @@ def _profile_cases(material, profile):
 def test_channeling_demo_and_off_profile_identities_are_unchanged():
     """The #1017 spelling migration preserves identity within a model generation.
 
-    Pins refreshed for #1134's ``segment-mean-v7-quantum-elements`` marker;
-    restoring the v6 marker reproduces every pre-#1134 pin. The demo content
+    Pins refreshed for #1191's ``segment-mean-v8-node-support-tail`` marker;
+    restoring the v7 marker reproduces every pre-#1191 pin. The demo content
     key follows ``CHANNELING_MODEL`` v10 (#1166 zone-row PXR/DCR source); every
     pin, channeling-off included, follows ``DIFFRACTED_BREM_MODEL`` (#1166 DBR). The
     silicon pins carry the crystal-conditional ``structure_factor_model`` marker
@@ -198,18 +198,18 @@ def test_channeling_demo_and_off_profile_identities_are_unchanged():
     sweep, settings, cases = _profile_cases("silicon", "channeling_demo")
     assert cases[0].line_quadrature == "bin-mean"
     assert [profiles.case_content_key(case) for case in cases] == [
-        "827cb61f6c833d6a9edbee235be23e90b1b095ca9cd2c1f58e4db0f71fa1c651"
+        "f32e4da3af54044bf764739f5fb54a8ae623490fa8c938cdcfe940943e4c18a8"
     ]
     assert profiles.named_profile_stem("silicon", catalog_profile="channeling_demo") == (
-        "silicon@channeling_demo-0c409103b114"
+        "silicon@channeling_demo-f1af32d4dc6b"
     )
     identity = profiles.dataset_identity("silicon", settings, sweep)
     assert identity["parameter_sha256"] == (
-        "ac4a9dff2b226f3cb1c108c78ba3f089b7b4007d102d9ccb44c0a0f86e8c838e"
+        "99f307ab508fb6167d24f716797fc81bd9843382e433f517625d7ab397e8cf7b"
     )
     sweep = material_sweep("hopg", catalog_profile="standard")
     settings = profiles.profile_run_settings(default_settings(), "standard", sweep=sweep)
     assert profiles.dataset_identity("hopg", settings, sweep)["parameter_sha256"] == (
-        "59377bcf80d7d412a766bc933caa8b3f46c0e52d85479e6a75ac437e8aa9b703"
+        "315b1c5a294dab4bf6efcf2e302cce36498abadc36715d5659bebff3595d5da3"
     )
-    assert profiles.named_profile_stem("hopg") == "hopg@full-59377bcf80d7"
+    assert profiles.named_profile_stem("hopg") == "hopg@full-315b1c5a294d"
