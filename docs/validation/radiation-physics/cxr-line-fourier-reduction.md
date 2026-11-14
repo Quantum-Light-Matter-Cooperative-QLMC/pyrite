@@ -116,6 +116,46 @@ Total modes are $\sum_l\lceil 2a_lP/2\pi\rceil=\sum_l P/W_l$. Narrow lines domin
 
 Human sign-off pending.
 
+## Exact integer-cutoff transform plan
+
+The experimental planner `_fourier_cutoffs.py` reorganizes the existing
+positive-mode sum without approximating widths or triangle support. It is
+not connected to the production scorer or to a NUFFT dependency.
+
+Set $J_l=\lfloor2a_l/\Delta t\rfloor$. A zero-amplitude endpoint at
+$t=2a_l$ may be included. Sort lines by $J_l$, then partition the active
+pairs $\{(l,j):1\le j\le J_l\}$ into disjoint rectangles. Starting with
+a power-of-two mode interval $[1,2^k+1)$ covering all active modes, emit
+the lines whose cutoffs cover the entire interval. Bisect the interval
+for the remaining lines, discarding inactive pairs. At unit-length leaves
+every remaining active pair is emitted. Thus each active pair occurs once,
+and every emitted rectangle has a power-of-two mode count. Line membership
+is a contiguous slice in the cutoff-sorted array; the traversal stores only
+a depth-first stack, without duplicating line-index arrays.
+
+Within each rectangle all triangle factors are active. Two transforms of
+the same phases $\phi_l=(E_l-c_0)\Delta t$ suffice:
+
+$$
+A_j=\sum_l\frac{\pi w_l}{a_l}e^{-ij\phi_l},\qquad
+B_j=\sum_l\frac{\pi w_l}{2a_l^2}e^{-ij\phi_l},\qquad
+G_j=A_j-t_jB_j.
+$$
+
+The sums here are over the rectangle's lines only. Summing its contributions
+recovers the original coefficient exactly in real arithmetic. The bin sinc
+multiplier, zero mode, folding and image correction remain separate.
+`partitioned_positive_modes` accepts a batched transform callback with this
+contract; tests use a direct DFT and compare against an independent full
+triangle sum, including signed weights and remote resonances. Regrouping
+changes floating-point summation and can cause cancellation near a triangle
+endpoint; no backend error bound or speedup is inferred from exact indexing.
+
+A line can participate in multiple transforms (at most the number of binary
+digits of its last mode). Many small rectangles may make transform setup
+expensive. Input duplication, transform counts and direct-fallback work must
+be measured on frozen scenes before choosing this as the device design.
+
 ## Experimental broad-line split
 
 Validation: `cxr-line-broad-interpolation`. **Status: unverified**; this
