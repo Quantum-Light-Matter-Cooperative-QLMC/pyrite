@@ -1066,6 +1066,32 @@ def _accumulate_reflection(
     _nsys_pop()
 
 
+def _reduce_bin_mean(st, targets, E_r, a_width, good):
+    """Bin-mean quadrature (setup refused sinc_cutoff): each row's profile
+    integrated over each node's bin, written as the bin mean. Under an
+    experimental bin reduction (#1192) the rows are queued instead and
+    reduced together after the last row.
+
+    Validation: sinc-bin-integration
+    """
+    if st.bin_line_queues is not None:
+        for w, tgt in targets:
+            st.bin_line_queues.setdefault(id(tgt), _queue_for(st, tgt)).append(
+                E_r[good], a_width[good], w[good]
+            )
+        return
+    chunk = st.request.chunk
+    n_rows = E_r.size
+    for j0 in range(0, n_rows, chunk):
+        sl = slice(j0, min(j0 + chunk, n_rows))
+        m = good[sl]
+        if not m.any():
+            continue
+        S = sincsq_bin_lineshape(a_width[sl][m], E_r[sl][m], st.bin_edges, st.bin_inv_width)
+        for w, tgt in targets:
+            tgt += w[sl][m] @ S
+
+
 def _reduce_lineshapes(st, targets, E_r, a_width, good):
     """Step 7 reduction: add each ``(w, tgt)`` pair's ``w @ sinc^2`` for the
     ``good`` rows, under bin-mean, full-axis node, or ``sinc_cutoff``-windowed
@@ -1075,24 +1101,8 @@ def _reduce_lineshapes(st, targets, E_r, a_width, good):
     sinc_cutoff = st.request.sinc_cutoff
     E_grid = st.E_grid
     n_rows = E_r.size
-    if st.bin_line_queues is not None:
-        # Experimental Fourier reduction (#1192): queue, reduce at the end.
-        for w, tgt in targets:
-            st.bin_line_queues.setdefault(id(tgt), _queue_for(st, tgt)).append(
-                E_r[good], a_width[good], w[good]
-            )
-    elif st.bin_edges is not None:
-        # Bin-mean quadrature (setup refused sinc_cutoff): each row's profile
-        # integrated over each node's bin, written as the bin mean.
-        # Validation: sinc-bin-integration
-        for j0 in range(0, n_rows, chunk):
-            sl = slice(j0, min(j0 + chunk, n_rows))
-            m = good[sl]
-            if not m.any():
-                continue
-            S = sincsq_bin_lineshape(a_width[sl][m], E_r[sl][m], st.bin_edges, st.bin_inv_width)
-            for w, tgt in targets:
-                tgt += w[sl][m] @ S
+    if st.bin_edges is not None:
+        _reduce_bin_mean(st, targets, E_r, a_width, good)
     elif st.row_tail is not None:
         # Support-windowed node reduction with the analytic far tail.
         # Validation: node-support-window-tail
