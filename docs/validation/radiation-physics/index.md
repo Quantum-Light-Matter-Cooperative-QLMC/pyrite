@@ -75,6 +75,7 @@ finite-time-lineshape
 line-absorption-tabulation
 line-tabulation-root-support
 kinematic-validity-envelope
+cxr-high-order-kinematic-scope
 line-energy-dispersion
 line-recoil-in-crystal
 line-reflection-coupling-tables
