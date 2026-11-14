@@ -12,17 +12,20 @@ kernel treats the same row as a free plane wave at the beam angle and would
 count it again (measured 5.4× the free→free block for Si(110) at 0.8 mrad,
 17 MeV, #1055).
 
-So native line scoring of a planar channeling case is the sum of two
-incoherent parts (reflections are always summed incoherently):
+Reflections off the own row are modulated by the same tracked states and,
+near a Bragg pole, carry diffracted channeling radiation (#1166). The zone
+PXR/DCR source (:mod:`.planar_zone_pxr`) owns every such reflection that it
+supports towards the scored direction (two-beam Laue geometry with a
+physical root), so native line scoring of a planar channeling case is the
+sum of two incoherent parts (reflections are always summed incoherently):
 
-``spec = S[other rows; all rows] + S[own row; rows not in zone]``.
+``spec = S[unowned; all rows] + S[own row + source-owned; rows not in zone]``.
 
-Other reflections keep every row: the one-dimensional planar potential holds
-no other row, so the zone source has no counterpart for them. The per-incident
+Unowned reflections (Bragg-case or no root) keep every row. The per-incident
 -electron normalization ``Ne`` is unchanged. Characteristic and incoherent
 bremsstrahlung scoring never pass through here.
 
-Validation: cr-planar-zone-row-ownership
+Validation: cr-planar-zone-row-ownership, cr-planar-zone-pxr-modulation
 """
 
 from __future__ import annotations
@@ -73,25 +76,32 @@ def _rows(segs, keep):
     return out
 
 
-def planar_zone_line_parts(case, segs):
+def planar_zone_line_parts(case, segs, n_hat=None):
     """Split native line scoring of a planar channeling case into its parts.
 
     Returns ``None`` for every case that is not planar channeling, or whose
-    reflections hold no own-row member; scoring is then unchanged. Otherwise
-    returns ``[(case_view, rows), ...]``: the other reflections on all rows
-    and the own-row reflections on the rows outside the zone. Each view drops
+    reflections hold no zone-owned member; scoring is then unchanged.
+    Otherwise returns ``[(case_view, rows), ...]``: the unowned reflections on
+    all rows and the zone-owned ones on the rows outside the zone. Zone-owned
+    are the own-row reflections and, towards ``n_hat`` (when given), the
+    reflections of :func:`.planar_zone_pxr.source_reflections`. Each view drops
     the ``channeling`` record, so the parts are scored as ordinary cases.
     A planar transport without the ``channeling_zone`` tag, or a multilayer
     radiator stack, refuses.
 
-    Validation: cr-planar-zone-row-ownership
+    Validation: cr-planar-zone-row-ownership, cr-planar-zone-pxr-modulation
     """
     record = case.get("channeling")
     if not isinstance(record, Mapping) or record.get("model") != "planar":
         return None
     plane = tuple(int(v) for v in record["plane_hkl"])
     hkls = [tuple(int(v) for v in hkl) for hkl in case["hkl_list"]]
-    own = [hkl for hkl in hkls if is_own_row(hkl, plane)]
+    owned = {hkl for hkl in hkls if is_own_row(hkl, plane)}
+    if n_hat is not None:
+        from .planar_zone_pxr import source_reflections
+
+        owned |= {row[0] for row in source_reflections(case, n_hat)}
+    own = [hkl for hkl in hkls if hkl in owned]
     if not own:
         return None
     if case.get("layer_radiators") is not None:
@@ -102,7 +112,7 @@ def planar_zone_line_parts(case, segs):
     from ..._backend import _to_cpu
 
     outside = np.flatnonzero(~np.asarray(_to_cpu(zone), dtype=bool))
-    other = [hkl for hkl in hkls if not is_own_row(hkl, plane)]
+    other = [hkl for hkl in hkls if hkl not in owned]
     parts = []
     if other:
         parts.append((_LineCase(case, hkl_list=other, channeling=None), segs))

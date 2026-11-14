@@ -126,6 +126,11 @@ class BlockSpectrumScorer:
         )
         brem_batch = replace(batch, electron_limit=self.Ne_brem)
         spec = self.emission.cxr.evaluate(batch, "spec").values
+        # Diffracted brem (#1166) is a track-length sum over a fixed electron
+        # count, so it adds over blocks like the native lines it joins.
+        from .diffracted_brem import case_diffracted_brem
+
+        spec = spec + case_diffracted_brem(case, block, self.E_grid, self.n_hat, self.Ne_brem)
         characteristic = self.row_recovery.evaluate(
             self.emission.characteristic, brem_batch, "spec_characteristic"
         )

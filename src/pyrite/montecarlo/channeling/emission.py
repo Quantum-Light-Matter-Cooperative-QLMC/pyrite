@@ -644,6 +644,7 @@ class _History:
     rates: np.ndarray  # (n_z, n_lines) [1/angstrom]
     bound: np.ndarray  # (n_z,)
     interval_weight: np.ndarray | None = None
+    populations: np.ndarray | None = None  # (n_z, n_fibre, n_state) diagonal of rho
 
     def integrate(self, values: np.ndarray) -> np.ndarray:
         """Path integral per incident electron; values have depth as axis zero.
@@ -655,6 +656,13 @@ class _History:
         weight = np.diff(self.z_ang) * self.interval_weight
         weight = weight.reshape((-1,) + (1,) * (values.ndim - 1))
         return np.sum(0.5 * (values[:-1] + values[1:]) * weight, axis=0)
+
+    def path_populations(self) -> np.ndarray | None:
+        """``int dz <i|rho|i>`` per fibre and state, or ``None`` without a population history.
+
+        Validation: cr-planar-zone-pxr-modulation
+        """
+        return None if self.populations is None else self.integrate(self.populations)
 
     def censored(self, path_limits_ang: np.ndarray | Sequence[float]) -> _History:
         """Interpolate at face/cutoff endpoints and weight surviving entrance paths.
@@ -677,7 +685,13 @@ class _History:
             rates[:, i] = np.interp(z, xp, np.asarray(self.rates[:, i], dtype=np.float64))
         weight = (limits.size - np.searchsorted(limits, z[1:], side="left")) / limits.size
         bound = np.interp(z, xp, np.asarray(self.bound, dtype=np.float64))
-        return _History(z, rates, bound, weight)
+        populations = None
+        if self.populations is not None:
+            flat = self.populations.reshape(self.populations.shape[0], -1)
+            populations = np.stack(
+                [np.interp(z, xp, flat[:, i]) for i in range(flat.shape[1])], axis=1
+            ).reshape((z.size,) + self.populations.shape[1:])
+        return _History(z, rates, bound, weight, populations)
 
 
 def _validated_entry_initial(solver: DensityMatrixSolver, initial) -> tuple[np.ndarray, float]:
@@ -746,16 +760,19 @@ def _depth_history(
         )
         entry = float(free.sum()) + outside
     z, rates, bound = [0.0], [lines.rates(rho)], [solver.bound_population(rho)]
+    populations = [np.einsum("rii->ri", rho).real]
     for index in range(1, segments + 1):
         result = solver.propagate(seg, step, initial=(rho, entry))
         rho, entry = result.final_density, result.total_flux[-1]
         z.append(index * seg)
         rates.append(lines.rates(rho))
         bound.append(float(result.bound_population[-1]))
+        populations.append(np.einsum("rii->ri", rho).real)
     return _History(
         z_ang=np.asarray(z),
         rates=np.asarray(rates).reshape(len(z), lines.size),
         bound=np.asarray(bound),
+        populations=np.asarray(populations),
     )
 
 
@@ -791,6 +808,10 @@ class ChannelingSpectrum:
     line_yield
         Depth-integrated photons per electron per catalog entry over
         ``4 pi``, before absorption.
+    path_populations
+        ``int dz <i|rho(z)|i>`` per Bloch fibre and state [angstrom per
+        incident electron], censored like ``line_yield``; the zone-row
+        PXR/DCR source (:mod:`.zone_pxr`) reads it (#1166).
     """
 
     photon_energy_eV: np.ndarray
@@ -805,6 +826,7 @@ class ChannelingSpectrum:
     bound_population: np.ndarray
     line_yield: np.ndarray
     free_free_spectrum: np.ndarray | None = None
+    path_populations: np.ndarray | None = None
 
     @property
     def total_line_yield(self) -> float:
@@ -1080,6 +1102,7 @@ def channeling_spectrum(
         bound_population=history.bound,
         line_yield=line_yield,
         free_free_spectrum=free_free,
+        path_populations=history.path_populations(),
     )
 
 

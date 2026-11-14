@@ -1,6 +1,6 @@
 # Channeled-state PXR modulation on planar zone rows
 
-Validation: `cr-planar-zone-pxr-modulation`. Status: **unverified**, a measured *failure* of the omission bound at Bragg-pole geometries (#1148). Implementation deferred to #1166.
+Validation: `cr-planar-zone-pxr-modulation`. Status: **rederived**. #1148 measured the omission and found it fails at Bragg-pole geometries (sections below). #1166 implements the source ([Implementation](#implementation-1166)), and a fresh-context verification re-derived it ([below](#fresh-context-verification-1166)). The production re-measurement at the #1148 centres is pending.
 
 ## Question
 
@@ -134,3 +134,92 @@ Two fresh-context verifications (2026-11-13), both `concern`; status stays **unv
 Robustness: the mirror failure is DCR and robust (the 2.42 vs 2.47 agreement is within the independent estimate's ~20–30% systematics; 30% less DCR still gives ≈1.31). The 45° failure (≈1.19) has no independent DCR estimate and is marginal if DCR were overstated 2×. All passes are robust. The free-electron test's `estimate ≈ free_born` assertion is near-tautological (free states make every pair elastic); `≈ native` is the real check. A vertex-correct $K_{\rm pre}$ and an off-plane closure test with bound states belong to the implementation in #1166.
 
 Never `signed-off` by an agent; human sign-off in #277.
+
+## Implementation (#1166)
+
+`channeling/zone_pxr.py` implements the source and `runner/planar_zone_pxr.py` wires it into `spec_channeling`. Native line scoring drops every source-owned reflection on zone rows ([`cr-planar-zone-row-ownership`](cr-planar-zone-row-ownership.md)). A reflection is source-owned towards $\hat n$ when $v\cdot g>0$, it has a physical exact-recoil root, and both $\hat n\cdot\hat s$ and $\hat Q\cdot\hat s$ exceed $3\sqrt{|\chi_0|}$ (Laue geometry, outside total external reflection). `CHANNELING_MODEL` is `planar-density-matrix-emission-v10`.
+
+**Two-beam mode.** The reciprocity mode enters through the exit face with unit transmitted and zero diffracted amplitude. In the inward depth $u=\zeta_L-\zeta$, with the physical $\chi$ ($\operatorname{Im}\chi_0>0$ absorbs), it obeys
+
+$$
+\frac{dP}{du}=iNP,\qquad N=\begin{pmatrix}k\chi_0/2n_s & a\\ b & q+k^2\chi_0/2Q_s\end{pmatrix},\qquad ab=\frac{k^4|\chi_g|^2C_s^2}{4k\,n_sQ_s},
+$$
+
+with $q=-\det/(2Q_s)$. Relative to the kinematic particular amplitude $\chi_gF_s/\det$, the diffracted profile is $P(z)=-q\,[e^{i\lambda_1s(L-z)}-e^{i\lambda_2s(L-z)}]/(\lambda_1-\lambda_2)$, where $\lambda_{1,2}$ are the eigenvalues of $N$. Its kinematic limit is the #1148 profile $1-e^{iqs(L-z)}$. The $z$ integral is closed-form,
+
+$$
+K_{fi}=\frac{\psi(\Delta_{fi},\lambda_1s)-\psi(\Delta_{fi},\lambda_2s)}{2Q_s(\lambda_1-\lambda_2)},\qquad
+\psi(x,\mu)=\int_0^Le^{ixz+i\mu(L-z)}dz=\frac{e^{ixL}-e^{i\mu L}}{i(x-\mu)},
+$$
+
+and it stays finite at the pole: $q/\det$ cancels. $\psi$ keeps both exponentials bounded when $\operatorname{Im}\mu>0$; the product form $e^{i\mu L}\varphi(x-\mu)$ overflowed at soft, grazing roots. $\operatorname{Im}\chi_0$ supplies the photon escape absorption, $\operatorname{Re}\chi_0$ the refraction shift, and $ab$ the Pendellösung depletion. For Si(113) at 10 keV and $t=2$ µm, $\sqrt{ab}\,t\approx0.2$, so the dynamical change is $\approx x^2/3\approx1$–2%. The #1148 estimate of about −10% took $\Lambda_0/\pi$ for the Pendellösung period $\Lambda_0$.
+
+**Pre-crystal vertex.** Before entry the electron is the plane wave $|p\rangle$. Both $e^{-iQ_xx}$ and the velocity vertex act on it, so $\sum_i\langle i|p\rangle M_{fi}=\langle f|M|p\rangle$ and
+
+$$
+M^{\rm pre}_{fi,s}=\Bigl[\beta\hat v\cdot F_s+(F_s\cdot\hat x)\tfrac{v_x(p-Q_x/2)}{c}\Bigr]A_{fi},\qquad
+\Delta_{\rm pre}=\frac{D(E-E_0)-2CpQ_x}{\hbar c\beta}.
+$$
+
+This is the vertex-correct form the second verifier asked for. $p=\kappa+\nu G$ is the true momentum of each entering plane wave. The entry density is an incoherent mixture of plane waves, from beam divergence or the source spot, so every entering order carries its own $\Delta_{\rm pre}$ and entrance vertex, and its intensity is weighted by its entry weight. A state $i$ averages over the entering waves with weight $w_\nu|\langle i|\kappa+\nu G\rangle|^2$, normalized per state, so it interferes only with the waves that fed it; this is exact in the free limit. Fibres fed only by scattering keep a pre-crystal term at the folded $\kappa$, the same stationary path-mean approximation. Folding $p$ into $[-G/2,G/2)$, as the first implementation did, was 2–17% off for $\nu=1$–4 within 12 eV of a mirror pole (fresh-context verifier, #1166). Tilted #1055 cases enter at $\nu\approx2$–3. It differs from the #1148 elastic split in two ways: off the plane, and through the velocity vertex at the mirror, where $\hat v\cdot F_s\to0$. At the single mirror ray the source gives 24.2 against the check's 22.8. Line centres carry $+CQ_x^2$, the transverse recoil already in $E_0$, so free states return exactly to the free root.
+
+**CBS.** Native scores $A=A_{\rm PXR}+A_{\rm CBS}$ coherently. The source therefore adds $u_gf_{{\rm cbs},s}A_{fi}K^{\rm cbs}_{fi}$, with $\chi_g$ and $u_g=U_g/mc^2$ taken from native's `emission_coupling_tables` (so the PXR–CBS phase matches native), native's exact $f_{\rm cbs}$ at the beam velocity, and $K^{\rm cbs}$ the transmitted branch of the same mode. CBS shares the momentum transfer $Q=k+g$ and hence $A_{fi}$; it has no pre-crystal term. Without it the source missed the native zone-row band by 6–11% in the test fixture, with ±(20–80)% per reflection from PXR–CBS interference. CBS distorted-wave resolvents stay out of scope.
+
+**Numerics.** Pairs holding the weakest $10^{-7}$ of the frozen weight are dropped. The energy window spans the PXR centres $E_{fi}$ and the DCR phase-match energies (only for inelastic pairs; elastic ones never phase-match) $\pm200$ slab widths, capped at ±1.5 keV. The step is a quarter width, because $|\varphi_L|^2$ is band-limited. Output is bin-mean or node, following the case's `line_quadrature`. The source averages the detector cone and the in-plane divergence (5 Gauss–Hermite nodes, a rotation about the plane normal). Cost is about 3 s per ray and reflection for the demo zone (16 fibres × 33 waves).
+
+| check | result |
+|---|---|
+| two-beam profile vs `expm` of $N$ | $10^{-8}$ |
+| $K$ vs quadrature of $e^{i\Delta z}P$; $K_{\rm pre}$ vs upstream continuation | $10^{-6}$; $10^{-12}$ |
+| kinematic elastic pair = Born line | $10^{-9}$ |
+| free electron far from a pole vs native PXR and PXR+CBS analytic band | $3\times10^{-3}$ |
+| bound-state closure at $Q_x\neq0$ (deep cosine potential, tilted entrance) | $10^{-8}$ |
+| 17 MeV Si(1-10) fixture at 35° and 40° Laue directions (poles 3–60 keV away): source band / replaced native zone-row band | 1.007, 1.007 |
+| `channeling_demo` mirror / minus-in single rays, (1 1 −3), / plane-wave | 24.2 / 1.009 |
+
+Anchors: `tests/montecarlo/channeling/test_zone_pxr.py`, `tests/montecarlo/channeling/test_planar_zone_pxr.py`.
+
+## Production measurement (#1166 acceptance)
+
+`checks/channeling_zone_pxr_modulation.py --production` scores the production source on a live 64-electron `channeling_demo` transport. It captures the depth populations that `case_channeling_spectrum` passes to the source. For each reflection the independent finite-slab reference is the native zone-row band × this check's model/native ratio, which is the same ratio as in the table above. Rays use order-3 JUNGFRAU squares (2.05e-4 sr at 5 m). The source owns a reflection when `source_reflections` does at the square's centre; other reflections keep native scoring on both sides. The runs are qlmc jobs 12336_0–9 at code `815362840`, on one CPU each, at 1.0–1.3 GB per centre. Record: `docs/validation/check-records/planar-zone/zone-pxr-production-1166-ne64.json`.
+
+| centre | production / reference, zone rows | incl. native rows outside the zone | production / native, zone rows |
+|---|---|---|---|
+| (0 0 −4)-az 30° | 1.0802 | 1.0737 | 1.0766 |
+| (0 0 −4)-az 37.5° | 1.0116 | 1.0106 | 1.0090 |
+| (0 0 −4)-az 42.807° | 1.0205 | 1.0187 | 1.0183 |
+| (0 0 −4)-az 44.479° | 1.0245 | 1.0223 | 1.0225 |
+| (0 0 −4)-az 45° | 1.0256 | 1.0234 | 1.0237 |
+| (−1 −1 3) mirror | 1.0296 | 1.0274 | **1.4856** |
+| (−1 −1 3) minus-in peak | 1.0074 | 1.0069 | 1.0618 |
+| (−1 −1 3)-az 30° | 1.0811 | 1.0745 | 1.0770 |
+| (−1 −1 3)-az 37.5° | 1.0200 | 1.0183 | 1.0175 |
+| (−1 −1 3)-az 45° | 1.0232 | 1.0214 | **1.2336** |
+
+Every centre is within the ≤10% band-integrated acceptance. The DCR enhancement over native survives into production: 1.49 at the mirror and 1.23 at 45°.
+
+The largest residual, +8% at both 30° arms, sits in the (±1 ∓1 1) pair. That pair carries 87% of the band there. At 37.5° the same pair is within 0.3%. Reflections with a smaller share run 2–5% high at most centres. The check's model is kinematic and applies escape at $E_0$. The source adds $\chi_0$ refraction and two-beam absorption on both legs and the Pendellösung depletion, so a few-percent offset is expected. The 30° excess has not been decomposed further.
+
+Since #1166, `channeling_detector_components` books the source's zone-row PXR/DCR under `spec_channeling`, not `spec`. At (0 0 −4)-az 30°, where every zone reflection is owned, the zone `spec` holds only DBR. Its `spec + spec_channeling` with channeling on, against `spec` with it off, is 1.08, 1.02 and 1.035 at 30°, 37.5° and 45° (job 12337, `docs/validation/check-records/planar-zone/detector-components-1166-dbr-ne64.json`).
+
+## Native frozen-root error near poles (#1166 item 3)
+
+Native line scoring evaluates the photon field at the free root, so within a few line widths of a Bragg pole the $1/\det$ factor varies across the line. The #1148 check's free-electron finite-slab Born line, over the native frozen-root line (`free_born_over_native`, order-3 squares), bounds this error at every #1148 centre. The total band is within 0.5% (mirror 1.0050, 45° 1.0020, all others ≤ 0.07%). The worst single reflection is 1.7% ((1 1 −3), 15–16 eV from its pole). The single mirror ray reaches ×1.28, but the aperture average removes most of it. On zone rows, the source owns these Laue reflections and integrates the slab kernel exactly. Elsewhere the native error stays within that bound, far below the ≤10% acceptance. No fix is applied; the bound is recorded on `finite-time-lineshape`.
+
+## Fresh-context verification (#1166)
+
+2026-11-13, two passes by an independent verifier (`physics-validator`) against the uncommitted fixes.
+
+| item | first pass | re-check |
+|---|---|---|
+| mode matrix $N$, $ab$, $C_s$, $\chi_0$ sign and conversion | pass | pass |
+| $K$, $K_{\rm pre}$; $K+K_{\rm pre}=\varphi(\Delta)/(\det+2Q_s\Delta/s)$ | pass (algebraic) | pass |
+| pre-crystal vertex: forms and $\Delta_{\rm pre}$ | **discrepancy**: folded $p$ off by 2.2 / 6.7 / 17% at $\nu=1/2/4$, 11.7 eV from the pole | fixed (code/Born = 1.00000 at $\nu=1,2,4,-3$). Mixed entry with entry weight only was 3.9% off; now per-state overlap weights |
+| line centres $+CQ_x^2$ | pass | pass |
+| absolute normalization ($\int|\varphi_L|^2dE=2\pi L\hbar c\beta/D$) | pass | pass |
+| CBS phase | concern: $\chi(h)$ vs native $\overline{\chi(-h)}$, a phase of up to 0.15 rad | fixed (native tables) |
+| ownership | concern: decided per node; could double count | fixed (decided once at the centre) |
+| window and pruning | pass; ±1.5 keV cap below 200 widths for $D<0.13$ | documented |
+
+Assumption the verifier added: the longitudinal part $\det(e_s\cdot\hat Q)\hat Q$ of $F_s$ is a local response and strictly carries only $\varphi_L$. The source gives it the homogeneous waves too. The effect is zero for σ and at the pole, and 0.2% of a bound-state band 24 eV from the pole. Verdict after the fixes: `rederived`. Probes: `scratch/verify_1166_{probe,probe2,coupling,recheck}.py` in the task worktree (not committed).
+

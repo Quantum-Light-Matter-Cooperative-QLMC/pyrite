@@ -338,3 +338,14 @@ to `planar-density-matrix-emission-v8`. Re-pinned: the `channeling` record and
 the `case_content_key` in `channeling.json`. No numerical output changes; every
 other expectation is unchanged. The resolved-case test ignores only the
 unadmitted warning.
+
+## Diffracted bremsstrahlung generation (#1166)
+
+Native diffracted bremsstrahlung adds the `diffracted_brem_model` marker
+(`two-beam-laue-dbr-v1`) to every dataset identity and case content key. Only
+the generation-dependent `case_content_key` and `parameter_sha256` hashes in
+`resolved.json` and `channeling.json` were re-pinned. None of the recorded
+small cases puts a Laue Bragg line in its grid toward its detector, so every
+recorded output keeps its expectation and tolerance. `CHANNELING_MODEL` v10
+(the #1166 zone-row PXR/DCR source) moved the channeling content key in the
+same pass.

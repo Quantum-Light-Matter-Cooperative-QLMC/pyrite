@@ -36,6 +36,20 @@ the #1148 JUNGFRAU arms, tensor Gauss order ``--order``):
 - ``hard_ratio_estimate``: same for reflections with ``E0 >= 2 keV``;
 - per-reflection ratios, Bragg-pole offsets and windowed weight leakage.
 
+With ``--production`` the check also scores the production zone-row source
+(:func:`pyrite.montecarlo.runner.planar_zone_pxr.case_zone_pxr_spectrum`, #1166)
+on the same rays and reflections. The reference per reflection is the native
+zone-row band (``_cxr_for_segments`` on zone rows, bin-mean) times this model's
+``estimate / native`` ratio, so normalization cancels. Reported per centre:
+
+- ``production_over_reference_zone``: production zone-row band (the source for
+  source-owned reflections, native for the rest) over the reference;
+- ``production_over_reference_total``: the same with the native rows outside
+  the zone added to both, i.e. the reflections' whole ``spec`` share.
+
+The production source adds CBS, ``chi_0`` and the two-beam coupling that this
+model omits; native's CBS carries over through the ratio.
+
 Assumptions: kinematic two-beam diffraction (2 um << extinction length),
 flat ``chi_g`` across the +-400 eV window, refraction and ``chi_0`` omitted,
 stationary depth-averaged density (finite state lifetimes omitted), diagonal
@@ -295,6 +309,96 @@ def _centres(model, m, case):
     return out
 
 
+def _production_state(case, electrons):
+    """Production transport and the zone source's inputs, captured once (#1166)."""
+    from pyrite.montecarlo import runner
+    from pyrite.montecarlo.runner import channeling_emission, planar_zone_pxr
+
+    case = {**case, "Ne": electrons, "Ne_brem": electrons, "line_quadrature": "bin-mean"}
+    transport = runner._transport_case(case, transport_core="per-electron")
+    seen = {}
+    original = planar_zone_pxr.case_zone_pxr_spectrum
+
+    def spy(*args, **kwargs):
+        seen.update(args=args, kwargs=kwargs)
+        return original(*args, **kwargs)
+
+    planar_zone_pxr.case_zone_pxr_spectrum = spy
+    try:
+        # Populations come from the depth history; a two-node grid skips the
+        # forward CR spectrum, which this check does not score.
+        grid = np.asarray(transport["E_grid"], dtype=float)[[0, -1]]
+        channeling_emission.case_channeling_spectrum(case, {**transport, "E_grid": grid})
+    finally:
+        planar_zone_pxr.case_zone_pxr_spectrum = original
+    return dict(case=case, transport=transport, source=original, **seen)
+
+
+def _production_bands(state, hkl, n):
+    """``(production, native)`` zone-row and native outside bands of one reflection.
+
+    At one ray, point detector [photons/sr/electron]. Production is the source
+    for source-owned reflections and native zone rows otherwise.
+    """
+    from pyrite.montecarlo import runner
+    from pyrite.montecarlo.runner.planar_zone_lines import _rows
+    from pyrite.montecarlo.runner.planar_zone_pxr import source_reflections
+
+    case, transport = state["case"], state["transport"]
+    segs = transport["segs"]
+    zone = np.asarray(segs["channeling_zone"], dtype=bool)
+    grid = np.asarray(transport["E_grid"], dtype=float)
+    point = {**case, "dtheta_obs_rad": 0.0, "domega_sr": 0.0, "hkl_list": [hkl]}
+    plain = {**point, "channeling": None}
+
+    def native(keep):
+        rows = _rows(segs, np.flatnonzero(keep))
+        lines = runner._cxr_for_segments(
+            rows, grid, plain, n, None, None, coherent=False,
+            Ne=transport["Ne_lines"], table_cache={},
+        )  # fmt: skip
+        return float(np.trapezoid(np.asarray(lines, dtype=float), grid))
+
+    native_zone, outside = native(zone), native(~zone)
+    if not any(row[0] == hkl for row in source_reflections(point, n)):
+        return native_zone, native_zone, outside
+    _case, solver, populations, path, _grid, _n = state["args"]
+    band = state["source"](point, solver, populations, path, grid, n, **state["kwargs"])
+    return float(np.trapezoid(band, grid)), native_zone, outside
+
+
+def _score_production(state, centre, row, args):
+    """Production / independent-reference band ratios at one centre (#1166)."""
+    from pyrite.validation.channeling_detector import square_aperture_rule
+
+    beam = np.asarray(state["beam"], float)
+    rays, weights, _ = square_aperture_rule(
+        beam, centre, args.solid_angle_sr, args.distance_mm, args.order
+    )
+    sums = np.zeros(4)  # production zone, native zone, reference zone, outside
+    per_g = {}
+    for hkl_text, info in row["reflections"].items():
+        hkl = tuple(int(v) for v in hkl_text.strip("()").split(","))
+        bands = np.zeros(3)
+        for n, w in zip(rays, weights, strict=True):
+            bands += w * np.asarray(_production_bands(state, hkl, np.asarray(n, float)))
+        prod, native_zone, outside = bands
+        reference = native_zone * info["ratio"]
+        per_g[hkl_text] = dict(
+            production_zone=prod, native_zone=native_zone, reference_zone=reference,
+            outside=outside, ratio_zone=prod / reference if reference else None,
+        )  # fmt: skip
+        sums += (prod, native_zone, reference, outside)
+    prod, native_zone, reference, outside = sums
+    return dict(
+        production_over_reference_zone=prod / reference,
+        production_over_reference_total=(prod + outside) / (reference + outside),
+        production_over_native_zone=prod / native_zone,
+        zone_share_of_native=native_zone / (native_zone + outside),
+        reflections=per_g,
+    )
+
+
 def _score_centre(model, label, centre, args):
     from pyrite.validation.channeling_detector import square_aperture_rule
 
@@ -375,6 +479,10 @@ def main(argv=None) -> int:
     parser.add_argument("--distance-mm", type=float, default=5000.0)
     parser.add_argument("--centre", default="", help="score only centres whose label contains this")
     parser.add_argument("--json", default=None, help="write the record here")
+    parser.add_argument(
+        "--production", action="store_true", help="also score the production zone source (#1166)"
+    )
+    parser.add_argument("--electrons", type=int, default=50, help="production Ne = Ne_brem")
     args = parser.parse_args(argv)
     start = time.perf_counter()
     m = runpy.run_path(str(Path(__file__).with_name("channeling_detector_components.py")))
@@ -382,12 +490,24 @@ def main(argv=None) -> int:
     if case.get("channeling", {}).get("model") != "planar":
         raise SystemExit(f"profile {args.profile!r} is not a planar channeling case")
     model = Model(case, _capture_density(case))
+    state = _production_state(case, args.electrons) if args.production else None
     results, ok = [], True
     for label, centre in _centres(model, m, case):
         if args.centre and args.centre not in label:
             continue
         row = _score_centre(model, label, centre, args)
         ok &= all(np.isfinite(v) for v in row["totals"].values())
+        if state is not None:
+            row["production"] = _score_production({**state, "beam": model.beam}, centre, row, args)
+            p = row["production"]
+            ok &= bool(np.isfinite(p["production_over_reference_total"]))
+            print(
+                f"{label:30s} production/reference zone {p['production_over_reference_zone']:.4f}"
+                f"  total {p['production_over_reference_total']:.4f}"
+                f"  production/native zone {p['production_over_native_zone']:.4f}"
+                f"  zone share {p['zone_share_of_native']:.3f}",
+                flush=True,
+            )
         results.append(row)
         hard = row["hard_ratio_estimate"]
         print(

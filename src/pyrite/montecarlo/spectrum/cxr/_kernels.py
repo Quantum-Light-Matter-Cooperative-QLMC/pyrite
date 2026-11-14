@@ -1236,12 +1236,10 @@ def _reflection_tables(crystal, hkl_list, E_tab, B_ang2, use_henke):
 
     Both accumulation routes call this rather than the materials layer
     directly, so the tabulation count has exactly one seam -- the coherent
-    emission tests patch it here and see both routes.
+    emission tests patch it here and see both routes. Tabulation runs in
+    reflection batches (:mod:`._line_tables`, #1167).
 
-    Tabulation runs in reflection batches (:mod:`._line_tables`, #1167).
-
-    Validation: line-reflection-coupling-tables
-    Validation: line-energy-dispersion
+    Validation: line-reflection-coupling-tables, line-energy-dispersion
     """
     return fill_tables_in_batches(
         lambda batch: emission_coupling_tables(crystal, batch, E_tab, B_ang2, use_henke, xp=xp),

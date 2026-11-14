@@ -138,7 +138,7 @@ def test_typed_case_content_key_matches_pre_case_golden():
     # #278: angle-f64-v1 preserves forward emission angles on FP32 backends.
     # #1019: fp32-cell-mb-v1 forms FP32 BremsLib cells in millibarn.
     assert case_content_key(case) == (
-        "28cb08fd9fd955372c8573f54ef64c39ce453d3c0e30d1b248782921f7e795b2"
+        "8f8ed79abec82a6cfe7de01e1b100a99e2917521302e8f2f5e8013a07804c67b"
     )
 
 
@@ -149,7 +149,7 @@ def test_dataset_identity_dispatches_through_recorded_v1():
     assert set(IDENTITY_MIGRATIONS) == {1}
     assert identity["identity_version"] == 1
     assert identity["parameter_sha256"] == (
-        "fabe61e93e8396967e7a8d54875591e69af2c459d505980e46e48993ca03f03f"
+        "55cd91833ebafbd66a08e7475de339a56c6d07a8006d86ca99a43fd1332c505a"
     )
     with pytest.raises(ValueError, match="unsupported dataset identity version"):
         dataset_identity("hopg", default_settings(), sweep, identity_version=2)
@@ -589,7 +589,7 @@ def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
     sweep_payload = identity["resolved_parameters"]["sweep"]
 
     assert identity["parameter_sha256"] == (
-        "fabe61e93e8396967e7a8d54875591e69af2c459d505980e46e48993ca03f03f"
+        "55cd91833ebafbd66a08e7475de339a56c6d07a8006d86ca99a43fd1332c505a"
     )
     assert "detector" not in sweep_payload
     assert sweep_payload["theta_obs_deg"] == 90.0
@@ -603,43 +603,43 @@ def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
         (
             "hopg_hbn_gaussian_200fs",
             "hopg",
-            "307283f1bbf91a1ba36030088a865790a65353d768ff0decce9938f4bba9bd78",
+            "d1f14f20b3c7452ef68ac98b7fd1d4e5bc163ec9aceff35b43a4753390f40822",
         ),
         (
             "hopg_hbn_gaussian_200fs",
             "hbn",
-            "936e06223fb22ca2a2d605df47e8cbbe7d1951ee7a2443767fa25abac6035e0a",
+            "f9a0e9ab35a129f5bdf7b933025808c0b1ffa1f7597540f2b0b076bfaf88f06b",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hopg",
-            "30e8609523002485dac161ca53473bfecb065442c32cf8c435c3dc46f4d1633b",
+            "2d8845fe6f23c90462788a2c28855c36845ff144d95dabcafc34bdd238fbe226",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hbn",
-            "fc8a950f22464d2ef300f603655f7f2985f0163a0e0059505fb06c49108a6421",
+            "54cb31495c605ceee5facddf0dbca37a7a76897b326f400db8cf453a7557f204",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hopg",
-            "090d5197d979ffefcc997beae0cb1484fe47edb7540692663e18286aab18beee",
+            "0b9724cc2f70aee60bc4fae08d0b481485c7999e60b289d682304c97104f4167",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hbn",
-            "d54444000b19edf136272f179bfedc8c7c414a001f5b2ad8b6d5bfe8f7980bde",
+            "91bd74a8f544e7681c79d7bcd359f2ce2e2dbf8f625c6ae65b6990e2c6f10920",
         ),
         (
             "hopg_emittance_demo",
             "hopg",
-            "5b8354201944a94e43acadf30fc51adb7bd02baf697c0723b31d42a481277e3c",
+            "613691068bf1ffa66255e23bcde791691fdc25938fa377938b4a16e066aa9de3",
         ),
         (
             "promising_low_ne",
             "hopg",
             # #465: coherent operator identity advanced to physical-distinct-pairs-v4.
-            "a069259def39e687dca5a4ee4b70a7922f72770b1e08f6abcaa54951aeaa6695",
+            "ebd524c94a01fbe2e0b4fead5ba27e30cdb24e3980f009ebaa4d74812230e840",
         ),
     ],
 )
@@ -856,7 +856,7 @@ def test_emission_modes_yield_three_distinct_digests_incoherent_unchanged():
     # issue #256's dropped uniform E_grid_brem override, which the sweep-level
     # payload hashes although no case grid changed) must stay bit-for-bit.
     assert incoherent["parameter_sha256"] == (
-        "fabe61e93e8396967e7a8d54875591e69af2c459d505980e46e48993ca03f03f"
+        "55cd91833ebafbd66a08e7475de339a56c6d07a8006d86ca99a43fd1332c505a"
     )
 
 
@@ -918,8 +918,8 @@ def test_retired_survey_stems_resolve_only_from_their_sidecar(tmp_path, stem):
 @pytest.mark.parametrize(
     ("profile", "material", "stem"),
     [
-        ("standard", "hopg", "hopg@full-a56397dab3df"),
-        ("standard", "mose2", "mose2@full-ec76b1a02157"),
+        ("standard", "hopg", "hopg@full-373b980c3a68"),
+        ("standard", "mose2", "mose2@full-ad06178fd9b5"),
     ],
 )
 def test_named_profile_stems_are_pinned(profile, material, stem):
@@ -1106,14 +1106,14 @@ def test_atomic_electron_deflection_forks_identity_and_none_restores_it():
     # The pre-#317 pins of test_dataset_identity_dispatches_through_recorded_v1
     # and test_typed_case_content_key_matches_pre_case_golden.
     assert dataset_identity("hopg", off, sweep)["parameter_sha256"] == (
-        "bec00b5a89da7972bebd5c801f6ac49e50fa2301dd588ae515b8224fd54b0b44"
+        "91a6a26d320e5e70595537dc49e1ac4ca8b7456be71a5c8254aa60e3d93bfb0d"
     )
     case = build_cases(
         sweep, n_electrons=300, n_electrons_brem=150, atomic_electron_deflection="none"
     )[0]
     assert "atomic_electron_deflection" not in case
     assert case_content_key(case) == (
-        "ed9520ba7a3d1b23ee62e00691d6a3a84b60fe0136a70acd925660157e804dc4"
+        "4b6471e9791cd3c6fbf4c8c08658485d22b431a587b366a0b594cefcf6431df5"
     )
     with pytest.raises(ValueError, match="atomic_electron_deflection"):
         build_cases(sweep, 4, 4, atomic_electron_deflection="z1")

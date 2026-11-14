@@ -98,11 +98,12 @@ def test_fixed_n_identity_matches_the_pre_precision_baseline():
     )
     # Re-pinned for the deliberate CBS v4 (#513) and line-kinematics v5 (#439)
     # identity generations, then the corrected-stopping v2 marker (1f22f89c), then
-    # #278's automatic continuum grid (``continuum_grid_model`` joins the identity).
+    # #278's automatic continuum grid (``continuum_grid_model`` joins the identity),
+    # then #1166's diffracted-brem marker.
     identity = dataset_identity("hopg", Settings(), sweep, bremsstrahlung_model="eedl")
     assert (
         identity["parameter_sha256"]
-        == "62ab5886db533f4199fb461c4ad36317070c26c55ccd71e057a2b2f1cd51d7a4"
+        == "4e5a4d7dd31ff6ccd8696651d77df028a9a69c40d6412aba88994533541abe86"
     )
     case = build_cases(
         sweep,
@@ -113,7 +114,7 @@ def test_fixed_n_identity_matches_the_pre_precision_baseline():
     )[0]
     assert "adaptive_precision" not in case
     assert (
-        case_content_key(case) == "b5949c93b5dff1cb808c2c2939f64bc7a7bb775c15526c6a5d8121ebf8b1a7b2"
+        case_content_key(case) == "eca293f849d9f8ae73ff230b60aebf6090b41f5bb43d79599efc6f861c479509"
     )
 
 

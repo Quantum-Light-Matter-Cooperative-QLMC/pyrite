@@ -446,8 +446,12 @@ def test_exact_axis_zone_rows_score_no_native_lines(case_b, produced):
     score = lambda rows: runner._cxr_for_segments(  # noqa: E731
         rows, grid, plain, n_hat, None, None, coherent=False, Ne=LINES
     )
-    np.testing.assert_array_equal(out["spec"], score(native_line_rows(case_b, segs)))
-    np.testing.assert_array_equal(score(segs), out["spec"])
+    # ``spec`` also carries diffracted brem (#1166), which is independent of row ownership.
+    from pyrite.montecarlo.runner.diffracted_brem import case_diffracted_brem
+
+    lines = out["spec"] - case_diffracted_brem(case_b, segs, grid, n_hat, transport["Ne_brem"])
+    np.testing.assert_allclose(lines, score(native_line_rows(case_b, segs)), rtol=1e-12, atol=0)
+    np.testing.assert_allclose(score(segs), lines, rtol=1e-12, atol=0)
 
 
 @pytest.mark.slow

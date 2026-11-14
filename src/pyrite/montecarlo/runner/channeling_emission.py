@@ -49,9 +49,13 @@ def case_channeling_spectrum(case, transport) -> np.ndarray:
     lateral slab, so side-escaping photon geometries are outside this model.
     The source scores bound→bound, capture and the in-cut free→free block
     (``final_states="tracked"``); native line scoring drops the plane's own
-    reciprocal row on zone rows, so the two never overlap (#1055).
+    reciprocal row on zone rows, so the two never overlap (#1055). It adds
+    the zone-row PXR/DCR of the source-owned other reflections
+    (:mod:`.planar_zone_pxr`), which native scoring also drops on zone rows
+    (#1166).
 
-    Validation: cr-persisted-channel, cr-planar-zone-row-ownership
+    Validation: cr-persisted-channel, cr-planar-zone-row-ownership,
+    cr-planar-zone-pxr-modulation
     """
     refuse_axial_channeling(case)
     if "channeling" not in transport["segs"] or "channeling_beam_dir" not in transport:
@@ -124,7 +128,21 @@ def case_channeling_spectrum(case, transport) -> np.ndarray:
         # including the in-cut free->free block (#1055).
         final_states="tracked",
     )
-    return result.spectrum
+    from .planar_zone_pxr import case_zone_pxr_spectrum
+
+    # ... and PXR/DCR of the other reflections on zone rows (#1166).
+    zone_pxr = case_zone_pxr_spectrum(
+        case,
+        solver,
+        getattr(result, "path_populations", None),
+        float(info["path_ang"]),
+        np.asarray(transport["E_grid"]),
+        np.asarray(transport["n_hat"]),
+        in_plane_rms_rad=float(np.std(in_plane)),
+        incidence_rad=float(info["incidence_rad"]),
+        divergence_rad=float(info["divergence_rad"]),
+    )
+    return result.spectrum + zone_pxr
 
 
 def rescore_channeling_spectrum(case, energy_eV, n_hat=None) -> np.ndarray:
