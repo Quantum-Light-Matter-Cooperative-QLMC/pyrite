@@ -40,7 +40,7 @@ on a different axis and are owned by issue #101
 """
 
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Literal, overload
 
 import numpy as np
@@ -95,6 +95,12 @@ class RefinementMark:
     they are what removes the first-order error term. ``first_eV``/``last_eV``
     bound the neighbourhood sampled at ``spacing_eV``; for a mark that needs
     anchors only, the two coincide with the anchor span.
+
+    ``centred`` marks a pair whose feature sits exactly at its midpoint (an
+    EPDL edge, the kinematic endpoint), so what the pair must deliver is a bin
+    boundary at that midpoint rather than the two coordinates themselves. A
+    Chantler pair is two native table nodes with the jump somewhere between
+    them, and is not centred.
     """
 
     kind: str
@@ -103,6 +109,7 @@ class RefinementMark:
     first_eV: float
     last_eV: float
     spacing_eV: float
+    centred: bool = False
 
     def nodes(self) -> np.ndarray:
         """Anchors plus the neighbourhood samples, sorted and merged.
@@ -228,12 +235,13 @@ def continuum_refinement_marks(
     elements = medium | path
     brackets, edge_summary = absorption_edge_brackets(medium, floor, stop, tables=("epdl",))
     path_brackets, path_summary = absorption_edge_brackets(path, floor, stop, tables=("chantler",))
+    centred_count = len(brackets)
     brackets = brackets + path_brackets
     edge_summary = {"skipped": [*edge_summary["skipped"], *path_summary["skipped"]]}
 
     marks: list[RefinementMark] = []
     outside: list[str] = []
-    for bracket in brackets:
+    for index, bracket in enumerate(brackets):
         # Degrade gracefully at the band edges: an edge whose jump itself lies
         # outside the modelled band places no requirement on a grid over it, and
         # a neighbourhood that only partly fits is clipped rather than refused.
@@ -250,6 +258,9 @@ def continuum_refinement_marks(
                 first_eV=first,
                 last_eV=last,
                 spacing_eV=bracket.spacing_eV,
+                # EPDL pairs straddle the edge symmetrically; Chantler pairs
+                # are native table nodes.
+                centred=index < centred_count,
             )
         )
 
@@ -285,10 +296,136 @@ def continuum_refinement_marks(
                         first_eV=endpoint - half,
                         last_eV=endpoint - half,
                         spacing_eV=spacing,
+                        centred=True,
                     )
                 )
                 summary["endpoint_eV"] = endpoint
     return marks, summary
+
+
+def _join_overlapping_pairs(
+    marks: Sequence[RefinementMark], lo: float, hi: float
+) -> tuple[list[RefinementMark], int]:
+    """Re-anchor centred pairs whose spans overlap so every feature keeps its boundary.
+
+    Two features closer than their pairs are wide (Pt M4 four eV below Au M5 in
+    PtTe2 on gold) cannot both keep their own pair as adjacent nodes. What a
+    centred pair delivers is a bin boundary on its feature, and a chain of
+    nodes ``x_0 < x_1 < ...`` with ``x_k + x_(k+1) = 2 E_k`` delivers it for
+    every ``E_k`` at once (bin edges are node midpoints). The chain starts from
+    a shared node at the midpoint between the first two features, which makes
+    the two joined intervals equal, and continues while the next pair still
+    overlaps and every interval stays wider than the merge tolerance. Features
+    within the merge tolerance of each other are one feature: the later takes
+    the earlier's pair.
+
+    Returns the marks (re-anchored where joined) and how many were re-anchored.
+    """
+    result = list(marks)
+    centred = sorted(
+        (sum(mark.anchors_eV) / 2.0, index)
+        for index, mark in enumerate(marks)
+        if mark.centred
+        and len(mark.anchors_eV) == 2
+        and lo < min(mark.anchors_eV)
+        and max(mark.anchors_eV) < hi
+    )
+    joined = 0
+    nodes: list[float] = []
+    members: list[int] = []
+    # Same-feature marks, each with the chain position whose pair it shares.
+    shared_with: list[tuple[int, int]] = []
+
+    def flush() -> int:
+        for index, k in shared_with:
+            result[index] = replace(marks[index], anchors_eV=(nodes[k], nodes[k + 1]))
+        if len(members) < 2:
+            return len(shared_with)
+        for k, member in enumerate(members):
+            result[member] = replace(marks[member], anchors_eV=(nodes[k], nodes[k + 1]))
+        return len(members) + len(shared_with)
+
+    for feature, index in centred:
+        below, above = sorted(marks[index].anchors_eV)
+        if members:
+            last = members[-1]
+            prior = 0.5 * (nodes[-2] + nodes[-1])
+            tolerance = MERGE_FRACTION * min(marks[index].spacing_eV, marks[last].spacing_eV)
+            if below - nodes[-1] <= tolerance:
+                if feature - prior <= tolerance:
+                    shared_with.append((index, len(members) - 1))
+                    continue
+                if len(members) == 1:
+                    shared = 0.5 * (prior + feature)
+                    candidate = [2.0 * prior - shared, shared]
+                else:
+                    candidate = list(nodes)
+                following = 2.0 * feature - candidate[-1]
+                # The new interval is 2 (feature - candidate[-1]); both it and
+                # the one before must exceed the merge tolerance.
+                half = 0.5 * tolerance
+                if candidate[-1] < feature - half and following > feature + half:
+                    nodes, members = [*candidate, following], [*members, index]
+                    continue
+        joined += flush()
+        nodes, members, shared_with = [below, above], [index], []
+    joined += flush()
+    return result, joined
+
+
+def _split_mark_nodes(
+    marks: Sequence[RefinementMark], lo: float, hi: float
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Interior anchors, samples, their half-spacing guards, and anchor pairs.
+
+    Anchors and samples come back sorted, each with the half spacing of the mark
+    that produced it; an anchor several marks share keeps the finest guard.
+    ``pairs`` is ``(n, 2)``: the span of every mark with two or more interior
+    anchors, the interval the mark needs to stay a single grid interval.
+    """
+    anchor_parts: list[tuple[float, float]] = []
+    sample_parts: list[tuple[float, float]] = []
+    pairs: list[tuple[float, float]] = []
+    for mark in marks:
+        half = 0.5 * mark.spacing_eV
+        own = np.unique(np.asarray(mark.anchors_eV, dtype=float))
+        own = own[(own > lo) & (own < hi)]
+        anchor_parts.extend((float(value), half) for value in own)
+        if own.size >= 2:
+            pairs.append((float(own[0]), float(own[-1])))
+        nodes = mark.nodes()
+        nodes = nodes[(nodes > lo) & (nodes < hi) & ~np.isin(nodes, own)]
+        sample_parts.extend((float(value), half) for value in nodes)
+
+    def _sorted(parts: list[tuple[float, float]]) -> tuple[np.ndarray, np.ndarray]:
+        if not parts:
+            return np.empty(0), np.empty(0)
+        table = np.asarray(sorted(parts), dtype=float)
+        return table[:, 0], table[:, 1]
+
+    anchors, anchor_guard = _sorted(anchor_parts)
+    if anchors.size:
+        # Sorted by (value, guard), so the first of each run of equal values
+        # carries the finest guard.
+        first = np.concatenate(([True], np.diff(anchors) > 0.0))
+        anchors, anchor_guard = anchors[first], anchor_guard[first]
+    samples, sample_guard = _sorted(sample_parts)
+    return (
+        anchors,
+        anchor_guard,
+        samples,
+        sample_guard,
+        np.asarray(pairs, dtype=float).reshape(-1, 2),
+    )
+
+
+def _strictly_inside_pairs(values: np.ndarray, pairs: np.ndarray) -> np.ndarray:
+    """Whether each value lies strictly between the two anchors of some pair."""
+    if values.size == 0 or pairs.size == 0:
+        return np.zeros(values.size, dtype=bool)
+    return np.any(
+        (values[:, None] > pairs[None, :, 0]) & (values[:, None] < pairs[None, :, 1]), axis=1
+    )
 
 
 def refine_continuum_nodes(
@@ -304,7 +441,16 @@ def refine_continuum_nodes(
     dropped, so the floor and ceiling of the returned grid are exactly the
     baseline's.
 
-    Returns ``(nodes, summary)`` with the node-count cost of the refinement.
+    Every anchor survives (#1171): no sample or baseline node is kept strictly
+    inside any mark's anchor pair, and centred pairs whose spans overlap are
+    re-anchored as one chain (:func:`_join_overlapping_pairs`) so each feature
+    still sits on a bin boundary.
+
+    Returns ``(nodes, summary)`` with the node-count cost of the refinement,
+    the number of re-anchored pairs, and the labels of any pair left split
+    (none for a centred overlap the chain can resolve).
+
+    Validation: continuum-node-refinement
     """
     baseline = np.asarray(baseline_eV, dtype=float)
     if baseline.ndim != 1 or baseline.size < 2:
@@ -315,53 +461,74 @@ def refine_continuum_nodes(
         return baseline.copy(), {"baseline_nodes": int(baseline.size), "added_nodes": 0}
 
     lo, hi = float(baseline[0]), float(baseline[-1])
-    inserted: list[np.ndarray] = []
-    guarded: list[np.ndarray] = []
-    for mark in marks:
-        nodes = mark.nodes()
-        nodes = nodes[(nodes > lo) & (nodes < hi)]
-        if nodes.size == 0:
-            continue
-        inserted.append(nodes)
-        guarded.append(np.asarray([0.5 * mark.spacing_eV], dtype=float).repeat(nodes.size))
-    if not inserted:
+    marks, joined = _join_overlapping_pairs(marks, lo, hi)
+    anchors, anchor_guard, samples, sample_guard, pairs = _split_mark_nodes(marks, lo, hi)
+    if anchors.size == 0 and samples.size == 0:
         return baseline.copy(), {"baseline_nodes": int(baseline.size), "added_nodes": 0}
 
-    new_nodes = np.concatenate(inserted)
-    guard = np.concatenate(guarded)
+    # Marks can overlap -- a secondary shell beside a stronger one (Se L2 beside
+    # L3), or another layer's edge a few eV away in a stack, seeds a
+    # neighbourhood inside its neighbour's. Anchors are the derived coordinates
+    # that put a bin boundary on each feature, so every one survives the merge
+    # (#1171): a sample strictly inside any mark's anchor pair is rejected,
+    # since it would split the pair and move the boundary off the feature, and
+    # the remaining samples merge against every kept node on the in-mark rule,
+    # judged by the finer of the two spacings, so an overlap cannot open a
+    # near-degenerate interval.
+    inside = _strictly_inside_pairs(samples, pairs)
+    samples, sample_guard = samples[~inside], sample_guard[~inside]
+    keep = np.ones(samples.size, dtype=bool)
+    last_kept = -1
+    for index, sample in enumerate(samples):
+        right = int(np.searchsorted(anchors, sample))
+        near = [(anchors[i], anchor_guard[i]) for i in (right - 1, right) if 0 <= i < anchors.size]
+        if last_kept >= 0:
+            near.append((samples[last_kept], sample_guard[last_kept]))
+        guard_here = sample_guard[index]
+        if any(
+            abs(sample - value) <= MERGE_FRACTION * 2.0 * min(guard_here, other)
+            for value, other in near
+        ):
+            keep[index] = False
+        else:
+            last_kept = index
+    new_nodes = np.concatenate((anchors, samples[keep]))
+    guard = np.concatenate((anchor_guard, sample_guard[keep]))
     order = np.argsort(new_nodes, kind="stable")
     new_nodes, guard = new_nodes[order], guard[order]
 
-    # Marks can overlap -- a secondary shell beside a stronger one (Se L2 beside
-    # L3) seeds a neighbourhood inside its neighbour's. Merge across marks on
-    # the same rule used inside one, judged by the finer of the two spacings, so
-    # an overlap cannot open a near-degenerate interval.
-    keep = np.ones(new_nodes.size, dtype=bool)
-    previous = 0
-    for index in range(1, new_nodes.size):
-        tolerance = MERGE_FRACTION * 2.0 * min(guard[index], guard[previous])
-        if new_nodes[index] - new_nodes[previous] <= tolerance:
-            keep[index] = False
-        else:
-            previous = index
-    new_nodes, guard = new_nodes[keep], guard[keep]
-
-    # Drop a baseline node only when a mark node stands in for it; the band
-    # endpoints always survive.
+    # Drop a baseline node when a mark node stands in for it, or when it lies
+    # strictly inside an anchor pair (including exactly at the pair's
+    # midpoint, which the half-spacing test alone keeps); the band endpoints
+    # always survive.
     nearest = np.searchsorted(new_nodes, baseline)
     left = np.clip(nearest - 1, 0, new_nodes.size - 1)
     right = np.clip(nearest, 0, new_nodes.size - 1)
-    displaced = (np.abs(baseline - new_nodes[left]) < guard[left]) | (
-        np.abs(baseline - new_nodes[right]) < guard[right]
+    displaced = (
+        (np.abs(baseline - new_nodes[left]) < guard[left])
+        | (np.abs(baseline - new_nodes[right]) < guard[right])
+        | _strictly_inside_pairs(baseline, pairs)
     )
     displaced[0] = displaced[-1] = False
 
     merged = np.unique(np.concatenate((baseline[~displaced], new_nodes)))
+    # A pair left split is one whose features could not be chained (a
+    # non-centred Chantler pair interleaved with another): reported, not hidden.
+    split = [
+        mark.label
+        for mark in marks
+        if len(mark.anchors_eV) >= 2
+        and lo < min(mark.anchors_eV)
+        and max(mark.anchors_eV) < hi
+        and np.any((merged > min(mark.anchors_eV)) & (merged < max(mark.anchors_eV)))
+    ]
     return merged, {
         "baseline_nodes": int(baseline.size),
         "added_nodes": int(merged.size - baseline.size),
         "displaced_baseline_nodes": int(np.count_nonzero(displaced)),
         "mark_nodes": int(new_nodes.size),
+        "joined_anchor_pairs": joined,
+        "split_anchor_pairs": split,
     }
 
 
@@ -538,7 +705,10 @@ CONTINUUM_RATIO = _exp_series(CONTINUUM_LOG_STEP)
 #: default never share a dataset with it. ``v2`` builds the nodes from
 #: correctly rounded basic operations only (no ``log``/``exp``/``geomspace``),
 #: so node bits, and therefore case content keys, are machine-independent.
-CONTINUUM_GRID_MODEL = f"refined-geometric-v2/dlnE={CONTINUUM_LOG_STEP:g}"
+#: ``v3`` keeps every anchor through the cross-mark merge and joins overlapping
+#: centred pairs, so each feature sits on a bin boundary even where marks
+#: overlap (#1171).
+CONTINUUM_GRID_MODEL = f"refined-geometric-v3/dlnE={CONTINUUM_LOG_STEP:g}"
 
 #: Identity of the default continuum grid over a layered target, whose floor and
 #: edge anchors span every layer's medium (#1164). Only stack sweeps carry it: a
