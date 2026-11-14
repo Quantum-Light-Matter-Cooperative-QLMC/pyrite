@@ -18,7 +18,11 @@ from ..segment_escape import piece_mean_transmission
 from . import _fused, _policy
 from ._attribution import record_cxr_attribution
 from ._batched_finalize import _batched_coherent_finalize as _batched_coherent_finalize
-from ._bin_quadrature import run_bin_mean_reduction_kernel, sincsq_bin_lineshape
+from ._bin_quadrature import (
+    experimental_flush_lines,
+    run_bin_mean_reduction_kernel,
+    sincsq_bin_lineshape,
+)
 from ._cpu_reduce import accumulate_sincsq
 from ._cpu_reduce import numpy_backend as _numpy_backend
 from ._escape_mu import escape_mu, escape_mu_tables
@@ -161,7 +165,10 @@ class _CxrBatch:
         self.aw.append(aw)
         self.w.append(w)
         self.n_cxr_rows += int(E_r.size)
-        if self.n_cxr_rows >= _policy._JIT_CXR_BATCH_TARGET:
+        target = (experimental_flush_lines() if self.bin_edges is not None else None) or (
+            _policy._JIT_CXR_BATCH_TARGET
+        )
+        if self.n_cxr_rows >= target:
             self.flush()
 
     def flush(self):

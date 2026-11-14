@@ -125,19 +125,20 @@ def image_residual_bounds(a_width: object, P: float, U: float, h: float, band: f
     return pointwise, width_sq / (4.0 * np.pi * d * d) + centre
 
 
-def _inv_sin_sq_minus_inv_sq(x):
-    """``1/sin^2 x - 1/x^2`` for ``|x| < pi``, without cancellation near 0."""
-    x = np.asarray(x, dtype=np.float64)
-    out = np.empty_like(x)
-    small = np.abs(x) < 0.2
-    y = x[small] ** 2
+def _inv_sin_sq_minus_inv_sq(x, xp=np):
+    """``1/sin^2 x - 1/x^2`` for ``|x| < pi``, without cancellation near 0.
+
+    ``xp`` is the array module (NumPy, or CuPy for the device route).
+    """
+    x = xp.asarray(x, dtype=xp.float64)
+    small = xp.abs(x) < 0.2
+    y = x * x
     # Laurent series of csc^2 through x^12; the first omitted term
     # (3617 x^14 / 10854718875) is < 6e-17 at |x| = 0.2.
     tail = 2 / 10395 + y * (1382 / 58046625 + y * (4 / 1403325))
-    out[small] = 1 / 3 + y * (1 / 15 + y * (2 / 189 + y * (1 / 675 + y * tail)))
-    xb = x[~small]
-    out[~small] = 1.0 / np.sin(xb) ** 2 - 1.0 / (xb * xb)
-    return out
+    series = 1 / 3 + y * (1 / 15 + y * (2 / 189 + y * (1 / 675 + y * tail)))
+    xb = xp.where(small, 1.0, x)
+    return xp.where(small, series, 1.0 / xp.sin(xb) ** 2 - 1.0 / (xb * xb))
 
 
 def _folded_modes(E_res, a_width, w, c0, h, n_fft):
@@ -172,8 +173,11 @@ def _folded_modes(E_res, a_width, w, c0, h, n_fft):
     return g0, folded_re + 1j * folded_im
 
 
-def _envelope_image_correction(E_res, a_width, w, c0, h, n_bins, P):
-    """Band values of ``sum_l (w_l / 2 a_l^2) sum_{n != 0} 1/(c - E_l + n P)^2``."""
+def _envelope_image_correction(E_res, a_width, w, c0, h, n_bins, P, xp=np):
+    """Band values of ``sum_l (w_l / 2 a_l^2) sum_{n != 0} 1/(c - E_l + n P)^2``.
+
+    Line arrays live on ``xp``; the 24-node fit and the result are host FP64.
+    """
     q = w / (2.0 * a_width * a_width)
     lo, hi = c0, c0 + (n_bins - 1) * h
     k = np.arange(_CHEB_NODES)
@@ -182,7 +186,8 @@ def _envelope_image_correction(E_res, a_width, w, c0, h, n_bins, P):
     vals = np.empty(_CHEB_NODES)
     scale = (np.pi / P) ** 2
     for i, c in enumerate(cn):
-        vals[i] = scale * np.dot(q, _inv_sin_sq_minus_inv_sq(np.pi * (c - E_res) / P))
+        image = _inv_sin_sq_minus_inv_sq(np.pi * (float(c) - E_res) / P, xp)
+        vals[i] = scale * float(xp.dot(q, image))
     coef = np.polynomial.chebyshev.chebfit(xn, vals, _CHEB_NODES - 1)
     c = c0 + h * np.arange(n_bins)
     xc = (2.0 * c - (lo + hi)) / (hi - lo)

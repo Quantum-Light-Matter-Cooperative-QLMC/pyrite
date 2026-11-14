@@ -28,13 +28,17 @@ def broad_bin_mean_error_bound(width_min, h, centre_span):
     return interpolation + (2 * _BROAD_NODES - 1) * gauss
 
 
-def broad_bin_mean_reduce(E_res, a_width, weight, c0, h, n_bins, *, tolerance):
+def broad_bin_mean_reduce(
+    E_res, a_width, weight, c0, h, n_bins, *, tolerance, xp=np, block=_BROAD_BLOCK
+):
     """Sum broad scalar lines on uniform bins, using bounded temporary storage.
 
     Inputs have been validated by the host reference. Signed weights are
     allowed; the absolute bound scales with ``sum(abs(weight))``. Refuses
     widths insufficient for the fixed 64-node approximation. No line is
-    discarded. Does not include energy-dependent attenuation/escape factors.
+    discarded. Line weights are per-line scalars, as in the production
+    reduction contract. Line arrays live on ``xp`` (NumPy or CuPy) in blocks
+    of ``block`` lines; the 64-node fit and the result are host FP64.
 
     Validation: cxr-line-broad-interpolation
     """
@@ -46,14 +50,15 @@ def broad_bin_mean_reduce(E_res, a_width, weight, c0, h, n_bins, *, tolerance):
             "broad-line interpolation bound exceeds residual_tol; increase broad_width_eV"
         )
     xn = np.cos(np.pi * (np.arange(_BROAD_NODES) + 0.5) / _BROAD_NODES)
-    centres = c0 + 0.5 * span * (1.0 + xn)
+    centres = xp.asarray(c0 + 0.5 * span * (1.0 + xn))
     gx, gw = np.polynomial.legendre.leggauss(4)
-    values = np.zeros(_BROAD_NODES)
-    for start in range(0, E_res.size, _BROAD_BLOCK):
-        sl = slice(start, start + _BROAD_BLOCK)
+    values = xp.zeros(_BROAD_NODES)
+    for start in range(0, E_res.size, block):
+        sl = slice(start, start + block)
         for x, q in zip(gx, gw, strict=True):
-            phase = (centres[None, :] + 0.5 * h * x - E_res[sl, None]) / width[sl, None]
-            values += 0.5 * q * (weight[sl] @ np.sinc(phase) ** 2)
-    coefficients = np.polynomial.chebyshev.chebfit(xn, values, _BROAD_NODES - 1)
+            phase = (centres[None, :] + 0.5 * h * float(x) - E_res[sl, None]) / width[sl, None]
+            values += 0.5 * float(q) * (weight[sl] @ xp.sinc(phase) ** 2)
+    host_values = np.asarray(getattr(values, "get", lambda: values)())
+    coefficients = np.polynomial.chebyshev.chebfit(xn, host_values, _BROAD_NODES - 1)
     targets = 2.0 * np.arange(n_bins) / (n_bins - 1) - 1.0
     return np.polynomial.chebyshev.chebval(targets, coefficients)

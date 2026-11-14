@@ -1,6 +1,7 @@
 """Experimental CUDA scalar coefficients; optional CuPy/cuFINUFFT imports.
 
-No production scorer calls this module. Host planning and uploads are included
+Production reaches it only through the opt-in ``method="fourier"`` bin-mean
+reduction. Host planning and uploads are included
 in each call; output stays on the current CUDA stream/device in complex128.
 Validation: cxr-line-fourier-reduction
 """
@@ -10,6 +11,13 @@ from importlib import import_module
 
 import numpy as np
 
+from ._bin_broad import broad_bin_mean_reduce
+from ._bin_fourier import (
+    FOURIER_MIN_RESIDUAL_TOL,
+    FOURIER_RESIDUAL_TOL,
+    _envelope_image_correction,
+    fourier_period,
+)
 from ._fourier_cutoffs import cutoff_rectangles
 
 
@@ -116,4 +124,87 @@ def cuda_positive_modes(E_res, a_width, weight, c0, period, *, eps=1e-12, use_nu
         _direct_kernel()(
             (len(direct),), (128,), (phase, constant, linear, rectangles, np.float64(dt), out)
         )
+    return out
+
+
+#: Lines per broad-route block on the device ((block, 64) FP64 temporaries).
+_DEVICE_BROAD_BLOCK = 1 << 16
+
+
+def cuda_fourier_bin_mean_reduce(
+    E_res,
+    a_width,
+    weight,
+    axis,
+    *,
+    residual_tol=FOURIER_RESIDUAL_TOL,
+    broad_width_eV=1000.0,
+    eps=1e-12,
+):
+    """Device counterpart of ``fourier_bin_mean_reduce(..., broad_width_eV=...)``.
+
+    ``axis = (c0, h, n_bins)`` from ``uniform_bin_axis``. Line arrays may be
+    host or CuPy arrays of any float dtype; arithmetic is FP64 on the device.
+    Returns the ``(n_bins,)`` FP64 device spectrum ``sum_l w_l mean_k(l)``:
+    broad lines on the 64-node route, the rest from exact-cutoff hybrid
+    coefficients, the bin multiplier, ``j mod N`` folding, one cuFFT inverse
+    and the closed-form envelope-image correction. Same bounds as the host
+    reference, plus the cuFINUFFT tolerance ``eps``. Planning, period choice
+    and the small Chebyshev fits run on host.
+
+    Validation: cxr-line-fourier-reduction, cxr-line-broad-interpolation
+    """
+    cp = import_module("cupy")
+    c0, h, n_bins = axis
+    if not residual_tol >= FOURIER_MIN_RESIDUAL_TOL:
+        raise ValueError(f"residual_tol must be >= {FOURIER_MIN_RESIDUAL_TOL:g}")
+    E = cp.asarray(E_res, dtype=cp.float64).ravel()
+    a = cp.asarray(a_width, dtype=cp.float64).ravel()
+    w = cp.asarray(weight, dtype=cp.float64).ravel()
+    if not (E.shape == a.shape == w.shape):
+        raise ValueError("E_res, a_width and weight must have one shape")
+    keep = cp.flatnonzero(w != 0.0)
+    E, a, w = E[keep], a[keep], w[keep]
+    out = cp.zeros(n_bins, dtype=cp.float64)
+    if E.size == 0:
+        return out
+    finite = cp.isfinite(E).all() & cp.isfinite(w).all() & cp.isfinite(a).all()
+    if not bool(finite & (a > 0.0).all()):
+        raise ValueError("lines need finite E_res and weight and positive finite a_width")
+    broad = a <= np.pi / broad_width_eV
+    if bool(broad.any()):
+        sel = cp.flatnonzero(broad)
+        values = broad_bin_mean_reduce(
+            E[sel],
+            a[sel],
+            w[sel],
+            c0,
+            h,
+            n_bins,
+            tolerance=residual_tol,
+            xp=cp,
+            block=_DEVICE_BROAD_BLOCK,
+        )
+        out += cp.asarray(values)
+        rest = cp.flatnonzero(~broad)
+        E, a, w = E[rest], a[rest], w[rest]
+        if E.size == 0:
+            return out
+    e_host, a_host, w_host = (cp.asnumpy(x) for x in (E, a, w))
+    n_fft, P, _ = fourier_period(e_host, a_host, c0, h, n_bins, residual_tol=residual_tol)
+    positive = cuda_positive_modes(e_host, a_host, w_host, c0, P, eps=eps)
+    t = (2.0 * np.pi / P) * cp.arange(positive.size, dtype=cp.float64)
+    positive *= cp.sinc(t * (h / (2.0 * np.pi)))
+    positive[0] = 0.0
+    if positive.size <= n_fft:
+        folded = cp.zeros(n_fft, dtype=cp.complex128)
+        folded[: positive.size] = positive
+    else:
+        idx = cp.arange(positive.size) % n_fft
+        folded = cp.bincount(idx, positive.real, minlength=n_fft) + 1j * cp.bincount(
+            idx, positive.imag, minlength=n_fft
+        )
+    g0 = float(cp.sum(w * np.pi / a))
+    out += (g0 + 2.0 * (n_fft * cp.fft.ifft(folded)).real[:n_bins]) / P
+    out -= cp.asarray(_envelope_image_correction(E, a, w, c0, h, n_bins, P, cp))
     return out
