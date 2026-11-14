@@ -240,3 +240,47 @@ $$
 **Adjudicated convention.** The first reference pass took the catalog $f_0$ literally. It extrapolated the Waasmaier–Kirfel fit past $s=6$ Å$^{-1}$, where the fit tends to $c=0.145$ rather than 0, and gave $W_{\rm brem}=1.3403964$, $1.9\times10^{-4}$ below production. Shells agreed to $5\times10^{-7}$ in that pass. Inspection showed that production zeroes $f_0$ beyond the fit range in the brem transfer weights only (`_screened_transform`; `F0_S_MAX_INV_ANG`). The kernel-harmonic $f_0(G)$ is not cut. With that convention, the reference agrees as tabulated. Zeroing is the better physical limit because $F\to0$ at large $q$. The ledger does not state this convention, so recording it in Assumptions is recommended. The test pins the $-1.9\times10^{-4}$ effect so that the tolerance demonstrably resolves it. A second, smaller convention is that production sets $f_0(0)=Z=14$, while the fit sums to 13.9989. A uniform correction for this changes $W_{\rm brem}$ by $-1.3\times10^{-6}$, inside tolerance.
 
 **Scope.** This anchors production against an independent evaluation of the *stated localization model* at one admitted zone. It does not test the model against measurement, the diagonal approximation, or retained-density accuracy.
+
+## Measured GaAs (400) comparison (#1178) — fresh-context verification 2026-11-13
+
+Fresh-context verifier. Sources were read before the check body. These were Schowalter et al. (2009) Table 6 and Sec. 4 (rendered PDF page 11), Kundmann & Gronsky LBL-25204 (OSTI 6890669 full text) and Nüchter & Sigle (1995) Secs. 3, 6 and 7.2 with Fig. 6 (printed pp. 178–179, rendered at 220 dpi). Scratch scripts live under `scratch/verifier/`.
+
+**Thermal rows.** The Table 6 (LDA) GaAs values are $\langle u^2\rangle_{\rm Ga}=3.397, 6.038, 11.658, 17.368\times10^{-3}$ Å$^2$ and $\langle u^2\rangle_{\rm As}=2.949, 5.201, 10.014, 14.909\times10^{-3}$ Å$^2$ at 100, 200, 400 and 600 K. With $8\pi^2=78.957$, these give the tabulated `B_ang2` to all four digits. Table 6 lists $\langle u^2(\nu;T)\rangle$ per element. The paper's Eq. 42, $\langle u^2\rangle=(\hbar/2M_\nu)\coth(\hbar\omega/2k_BT)/\omega$, is the one-dimensional oscillator mean square. That matches `thermal.py`'s $B=8\pi^2\langle u_x^2\rangle$. Sec. 4 quotes Stahn et al. (1998) at 287 K as Ga 0.00844 and As 0.00716 Å$^2$, against LDA values of 0.00845 and 0.00726 (0.1 % and 1.4 %). Linear interpolation of the 200 and 400 K rows gives 0.008483 and 0.007295 Å$^2$, which is +0.5 % and +1.9 % from the measurement. The TOML comment is correct.
+
+**Conduction band.** LBL-25204 Table 1 gives GaAs $E_p=16.09\pm0.04$ eV and $\Gamma_p=4.0\pm0.1$ eV. The values come from a $\chi^2$ lineshape fit to Fourier-log-deconvolved single-loss spectra, and the text notes d-shell features on the high-loss side. The 8 electrons are Ga $4s^24p^1$ plus As $4s^24p^3$, which consumes the outermost shells as the file convention requires. The free-electron estimate for 8 e per $a^3/4$ ($a=5.653$ Å) is about 15.6 eV, consistent with that count. The OSTI record carries no DOI. `_persistent_id` requires exactly one of `doi`/`osti`, and its `ValueError` falls inside the existing `except`. This is correct, and the tests pass.
+
+**Digitization.** Axis ticks were calibrated in pixels for each panel. A ring-template circle detector searched a $\pm9$ px window around every digitized point of panels (a)–(d), all 103 points, with a visual zoom check of the ambiguous panel (c) peak region. The located circles agree within 0.015 in ratio everywhere. In $k_x/g_{400}$ they agree within 0.02 except in the overlapping $\xi<0.08$ clusters and the dense 0.47–0.55 and 0.75–0.85 groups. There the detector cannot separate neighbouring circles (offsets up to 0.037), but visual inspection puts the markers on circles. No misreading exceeds 0.03 in ratio. Spot-checked half error bars (for example (a) 0.20, (c) 0.19, 0.31 and 0.36) agree within 0.01. The five low-tilt points are given evenly spaced $\xi=0.02$–$0.06$, whereas the drawn circles span about $-0.005$ to $0.08$. The model has zero slope at $\xi=0$, so this is immaterial. Panel (c) 0.36 sits about 0.02 left of the 0.38 used in the other panels for the same tilt. Experimental conditions match Sec. 6 and Table 2: 400 keV, 300 K, JEM 4000FX, Ge detector, 400 row, and wedge 0–300 nm estimated and 0–303 nm fitted. No convergence is stated; Sec. 8 recommends only that divergence be "small compared with the Bragg angle". The paper names only "L" lines and never specifies a subshell, so L3 ($L\alpha$) is a modelling choice.
+
+**Observable.** For uniform illumination of a wedge $t\in[0,T]$, with $N(t)=\int_0^tI(z)\,dz$, the paper's Eq. 20 average is
+
+$$
+\bar N=\frac1T\int_0^T N(t)\,dt=\int_0^T I(z)\,\frac{T-z}{T}\,dz .
+$$
+
+Here $I=P\,F_c+(1-P)$. Sec. 3 treats inelastically scattered electrons as plane waves of homogeneous cell intensity (Hall 1966), so $W=1$ for $1-P$ is the stated model. `F_c` is the retained-density-normalized factor (`weighted / total`), so $P\,F_c$ is the coherent yield per incident electron. For tilt, $\xi=k_x/g_{400}$ maps to incidence $\psi=\xi g_{400}/p$. The solver's `entry_lattice` takes $k_x=p\psi$ with the same $p$, so the angle cancels exactly and refraction does not enter $k_x$. The profile period is 2.82685 Å, which is $a/2$, so $g_{400}=4\pi/d=2g_{200}$. The grid $k_x=l\,g_{200}/n$ is $\xi=l/2n$, which equals `tilt_grid`'s step $1/32$ at $n=16$, so no snapping occurs. Shell cross sections and detector efficiency are tilt-independent factors, so one scale per ratio is the paper's normalization. The scale is $s=\sum wMD/\sum wM^2$ with $w=\sigma^{-2}$, which a numerical minimization confirms. Using $\sigma$ as half the drawn bar assumes ±1σ bars, which the paper does not state.
+
+**Independent recomputation.** This used the zone-solver outputs with its own Simpson quadrature of the $(T-z)/T$ form. At $\xi=0$ it gives Ga-K/Ga-L 1.05285, As-K/As-L 1.08284, Ga-K/As-L 0.80522 and Ga-K/As-K 0.74362 (unscaled). At $\xi=0.5$ it gives 0.99949, 0.97454, 1.11571 and 1.14485. Both rows are identical to `row_weights` to 5 digits, and so are $\xi=0.25$ and $0.34375$. The rerun default and `--ladder` arms reproduce the committed record exactly. The incidence relations are $p=382.20$ Å$^{-1}$, $g_{400}=4.4457$ Å$^{-1}$ and 11.632 mrad per unit $\xi$ (Bragg 5.816 mrad). This makes $\sigma_\xi=0.18$ and $0.21$ equal to 2.09 and 2.44 mrad rms. The smear was checked two ways.
+
+- An independent continuous Gaussian quadrature on $\lvert\xi\rvert$ over a grid extended to $\xi=2.5$ reproduces the check's $\chi^2/N$ within 0.01. The $\xi_{\max}=1.75$ edge truncation is negligible.
+- The solver's native `divergence_rad` gives an incoherent Gaussian mixture of grid momenta in one propagation. At $\xi=0$, 0.25 and 0.375 it agrees with `smear` to $\le10^{-4}$. This confirms the mirror and the incoherent sum of counts before the ratio.
+
+| Ratio | $\chi^2/N$, $\sigma_\xi=0$ | 0.18 | 0.21 | Flat-line null |
+| --- | --- | --- | --- | --- |
+| Ga-K/Ga-L | 0.50 | 0.73 | 0.81 | 2.07 |
+| As-K/As-L | 0.96 | 1.13 | 1.29 | 3.91 |
+| Ga-K/As-L | 10.79 | 2.81 | 2.61 | 6.10 |
+| Ga-K/As-K | 13.13 | 3.18 | 3.90 | 19.82 |
+
+**Sensitivities.** The ladder (basis 16, cells 32, dz 5 Å) moves $\chi^2/N$ by at most 0.28 (Ga-K/As-K at cells 32) and 0.14 in the same-element ratios. Varying the wedge to $T=200$, 250 and 350 nm gives cross ratios of 12.6, 12.0 and 9.5 (Ga-K/As-L) and 14.0, 14.1 and 11.9 (Ga-K/As-K), with same-element values 0.48–1.07. Using L2, L1 or L3 + ½L2 instead of L3 changes every ratio by ≤ 0.65 in $\chi^2/N$. Thickness uncertainty and L-subshell assignment therefore do not explain the cross-element failure.
+
+**Adjudication.** The observable, normalization, tilt mapping, grid and smear match the paper's stated model, and the stated numbers reproduce. The same-element passes are discriminating: the plane-wave prediction beats a flat line ($\chi^2/N$ 0.50 vs 2.07 and 0.96 vs 3.91) and places the 400 dip at 0.594. Ga-K/As-K involves two strongly localized K shells and fails at $\chi^2/N=13.1$, which isolates the sublattice flux partition near the 200 position as the discrepancy. This supports the ledger's interpretation. For Ga-K/As-L, the plane-wave prediction ($\chi^2/N=10.8$) is worse than a constant (6.1). The scaled contrast is max/min 2.31/1.33 = 1.74, against about 1.37 measured. The authors' own fitted curve in Fig. 6(c), read by eye, also rises steeply through 0.2–0.3 but reaches only about 2.03/1.54. Their "excellent agreement" is a visual judgement, not a $\chi^2$ against these bars.
+
+| Filter | Result | Note |
+| --- | --- | --- |
+| Reference data (thermal, plasmon) | pass | Values, conversion and 1D convention verified against source. |
+| Digitization | pass | ≤ 0.015 in ratio; $\xi$ ≤ 0.02 for isolated points; the low-tilt spread is idealized. |
+| Units/tilt mapping | pass | 2.1–2.4 mrad conversion verified. |
+| Observable/limits | pass | The wedge average equals N&S Eq. 20; $P\to1$ recovers the coherent limit and $F_c\equiv1$ gives a flat ratio. |
+| Pass criterion | pass, wording | $\chi^2/N\le1.5$ against half bars, one scale; it assumes ±1σ bars. |
+
+**Verdict:** confirmed with findings for the #1178 measured-comparison extension. The status stays `anchored`. Only the same-element shapes are measured anchors.
