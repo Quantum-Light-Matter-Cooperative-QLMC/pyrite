@@ -65,19 +65,26 @@ def case_diffracted_characteristic(case, segments, E_grid, n_hat, Ne) -> np.ndar
     """Kossel term of ``case``'s characteristic spectrum toward ``n_hat`` (#1176).
 
     Signed correction to ``spec_characteristic`` [photons/eV/sr/electron]: the
-    two-beam diffracted gain and direct-beam depletion of each line near a
-    Laue Bragg energy. Uses the case's ``shell_ionization_model``,
+    two-beam diffracted gain, direct-beam depletion and standing-wave term of
+    each line near a Laue Bragg energy, with each element's emitter phase on
+    the crystal basis. Uses the case's ``shell_ionization_model``,
     ``E_cut_brem_keV`` and ``line_quadrature``; zero outside the claim.
 
     Validation: diffracted-characteristic-radiation
     """
     from ..spectrum.diffracted_brem import bragg_reflections
-    from ..spectrum.diffracted_characteristic import diffracted_characteristic_spectrum
+    from ..spectrum.diffracted_characteristic import (
+        diffracted_characteristic_spectrum,
+        emitter_phases,
+    )
 
     grid = np.asarray(E_grid, dtype=float)
     if not _in_claim(case, segments):
         return np.zeros(grid.size)
-    reflections = bragg_reflections(case, n_hat, grid)
+    reflections = [
+        (g, chi, chi_0, emitter_phases(case["crystal"], hkl, chi_mode, case.get("B_ang2", 0.0)))
+        for g, chi, chi_0, (hkl, chi_mode) in bragg_reflections(case, n_hat, grid, detail=True)
+    ]
     if not reflections:
         return np.zeros(grid.size)
     return diffracted_characteristic_spectrum(

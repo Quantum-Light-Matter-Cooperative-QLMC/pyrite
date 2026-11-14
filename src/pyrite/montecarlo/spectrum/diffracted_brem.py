@@ -68,8 +68,12 @@ _WIDTHS = 200.0
 _MAX_NODES = 40000
 
 
-def laue_mode_intensities(energy_eV, n_hat, g, s_hat, chi_g_abs, chi_0, depth_ang):
+def laue_mode_intensities(energy_eV, n_hat, g, s_hat, chi_g_abs, chi_0, depth_ang, cross=False):
     """Polarization-mean ``(|T_s(u, E)|^2, |D_s(u, E)|^2)`` of the two-beam Laue mode.
+
+    With ``cross=True`` a third array ``X = (1/2) sum_s 2 C_s conj(T_s) D_s``
+    (complex) is returned, with ``D_s`` for a real positive coupling ``b``; a
+    coupling of phase ``e^{i phi}`` multiplies it by ``e^{i phi}`` (#1176).
 
     Both arrays are ``(n_depth, n_E)``. ``T`` is the transmitted amplitude
     (``P(0) = (1, 0)``), ``T(u) = exp(i lambda_2 u) [(lambda_2 - N_22)
@@ -96,6 +100,7 @@ def laue_mode_intensities(energy_eV, n_hat, g, s_hat, chi_g_abs, chi_0, depth_an
     Qhat = Q / np.linalg.norm(Q, axis=1)[:, None]
     T2 = np.zeros((u.size, E.size))
     D2 = np.zeros((u.size, E.size))
+    X = np.zeros((u.size, E.size), dtype=complex)
     for e in (es, np.cross(es, n)):
         C = np.linalg.norm(e[None, :] - Qhat * (Qhat @ e)[:, None], axis=1)
         b2 = k**4 * chi_g_abs**2 * C**2 / (4.0 * Qs**2)
@@ -114,10 +119,13 @@ def laue_mode_intensities(energy_eV, n_hat, g, s_hat, chi_g_abs, chi_0, depth_an
             1j * u[:, None] * (1.0 + 0.5j * x),
         )
         phase = np.exp(1j * lam2[None, :] * u[:, None])
-        D2 += 0.5 * b2[None, :] * np.abs(phase * ratio) ** 2
+        diffracted = np.sqrt(b2)[None, :] * phase * ratio
+        D2 += 0.5 * np.abs(diffracted) ** 2
         transmitted = phase * ((lam2 - q - kaph)[None, :] * ratio + np.exp(1j * x))
         T2 += 0.5 * np.abs(transmitted) ** 2
-    return T2, D2
+        if cross:
+            X += C[None, :] * np.conj(transmitted) * diffracted
+    return (T2, D2, X) if cross else (T2, D2)
 
 
 def laue_diffracted_intensity(energy_eV, n_hat, g, s_hat, chi_g_abs, chi_0, depth_ang):
@@ -268,15 +276,20 @@ def deposit(E_fine, S, grid, quadrature):
     return np.diff(at) / np.diff(edges)
 
 
-def bragg_reflections(case, n_hat, energy_grid, margin_eV=1500.0):
+def bragg_reflections(case, n_hat, energy_grid, margin_eV=1500.0, detail=False):
     """``[(g_sample, |chi_g|, chi_0), ...]`` of ``case`` with a Laue Bragg line in the grid.
+
+    ``detail=True`` appends ``(hkl, chi_mode)`` to each entry: ``chi_mode =
+    conj(chi(-hkl))`` is the complex coupling of the time-reversed mode (the
+    incoming wave along ``-n`` diffracts with ``-g``; ``e^{-i omega t}``
+    fields), of modulus ``|chi_g|``.
 
     A reflection qualifies when ``n.g < 0`` puts ``E_B`` within ``margin_eV``
     of the grid and both ``n.s`` and ``Q_hat.s`` exceed ``3 sqrt(|chi_0|)``
     (Laue, outside total external reflection). ``chi_0`` is returned with
     ``Im > 0`` absorbing.
 
-    Validation: diffracted-bremsstrahlung
+    Validation: diffracted-bremsstrahlung, diffracted-characteristic-radiation
     """
     from ...materials.crystal import (
         CRYSTALS,
@@ -315,8 +328,9 @@ def bragg_reflections(case, n_hat, energy_grid, margin_eV=1500.0):
         cr, ci, _, _ = emission_coupling_tables(
             case["crystal"], [hkl], np.array([E_B]), case.get("B_ang2", 0.0), use_henke=True
         )
-        chi = abs(complex(float(np.ravel(cr)[0]), float(np.ravel(ci)[0])))
-        out.append((g, chi, complex(c0.real, abs(c0.imag))))
+        chi_mode = complex(float(np.ravel(cr)[0]), float(np.ravel(ci)[0]))
+        entry = (g, abs(chi_mode), complex(c0.real, abs(c0.imag)))
+        out.append((*entry, (hkl, chi_mode)) if detail else entry)
     return out
 
 

@@ -53,6 +53,68 @@ def test_transmitted_intensity_solves_the_two_beam_mode():
     np.testing.assert_allclose(D2, want_D, rtol=1e-8, atol=1e-30)
 
 
+def test_standing_wave_cross_term_solves_the_mode_with_a_complex_coupling():
+    """``Re(phi X)`` equals ``(1/2) sum_s 2 C_s Re(conj(T) D e^{i psi})`` for complex ``chi_g``."""
+    chi, psi, chi_0 = 3e-5 * np.exp(0.7j), 1.1, complex(-2e-5, 4e-7)
+    E = E_B + np.array([-3.0, 0.0, 0.7, 4.0])
+    u = np.array([0.0, 3000.0, 20000.0])
+    _, _, X = db.laue_mode_intensities(E, N_HAT, G, S_HAT, abs(chi), chi_0, u, cross=True)
+    got = np.real(np.exp(1j * (np.angle(chi) + psi)) * X)
+    want = np.zeros_like(got)
+    for j, e in enumerate(E):
+        k = e / HBARC_EV_ANG
+        Q = k * N_HAT + G
+        Qh = Q / np.linalg.norm(Q)
+        ns, Qs = N_HAT @ S_HAT, Q @ S_HAT
+        q = -(G @ G + 2 * k * (N_HAT @ G)) / (2 * Qs)
+        es = np.cross(N_HAT, G)
+        es /= np.linalg.norm(es)
+        for pol in (es, np.cross(es, N_HAT)):
+            C = np.linalg.norm(pol - Qh * (Qh @ pol))
+            a = k**2 * np.conj(chi) * C / (2 * k * ns)
+            b = k**2 * chi * C / (2 * Qs)
+            N = np.array([[k * chi_0 / (2 * ns), a], [b, q + k**2 * chi_0 / (2 * Qs)]])
+            for i, depth in enumerate(u):
+                T, D = expm(1j * N * depth) @ np.array([1.0, 0.0])
+                want[i, j] += C * np.real(np.conj(T) * D * np.exp(1j * psi))
+    np.testing.assert_allclose(got, want, rtol=1e-8, atol=1e-14)
+
+
+def test_kinematic_cross_term_band_is_pi_times_the_coupling():
+    """Wide line, no absorption: ``int dE Im X = pi sum_s C_s b_s hbar c Q_s/|n.g|``.
+
+    From ``D = b (e^{iqu} - 1)/q``: ``int dq sin(qu)/q = pi``, while
+    ``(cos qu - 1)/q`` is odd, so ``Re X`` integrates to a small window
+    residual. The band of ``Re(phi X) = Re(phi) Re X - Im(phi) Im X`` is
+    therefore ``-pi Im(phi)`` times the coupling, and a centrosymmetric (real)
+    emitter phase leaves only a dispersive profile.
+    """
+    chi_g, depth = 1e-8, 200000.0
+    E = E_B + np.arange(-30.0, 30.0, 0.002)  # sin(qu)/q truncation ~ 1/(q u) < 1e-3
+    _, _, X = db.laue_mode_intensities(E, N_HAT, G, S_HAT, chi_g, 0j, [depth], cross=True)
+    k = E_B / HBARC_EV_ANG
+    Q = k * N_HAT + G
+    Qh = Q / np.linalg.norm(Q)
+    es = np.cross(N_HAT, G)
+    es /= np.linalg.norm(es)
+    coupling = 0.0
+    for pol in (es, np.cross(es, N_HAT)):
+        C = np.linalg.norm(pol - Qh * (Qh @ pol))
+        coupling += C * k**2 * chi_g * C / (2 * Q @ S_HAT)
+    want = np.pi * coupling * HBARC_EV_ANG * (Q @ S_HAT) / abs(N_HAT @ G)
+    assert np.trapezoid(X[0].imag, E) == pytest.approx(want, rel=3e-3)
+    assert abs(np.trapezoid(X[0].real, E)) < 0.02 * want  # O(dE / E_B) window residual
+
+
+def test_emitter_phases_follow_the_sublattice():
+    ge = dc.emitter_phases("ge", (-4, 0, 0), -1.0 + 0.0j, B_ang2=0.0)
+    assert ge == {"Ge": pytest.approx(-1.0 + 0.0j)}
+    gaas = dc.emitter_phases("gaas", (2, 0, 0), 1.0 + 0.0j, B_ang2=0.5)
+    assert gaas["Ga"] == pytest.approx(-gaas["As"]) and abs(gaas["Ga"].imag) < 1e-12
+    assert 0.0 < gaas["Ga"].real < 1.0  # Debye--Waller coherent fraction
+    assert dc.emitter_phases("ge", (-4, 0, 0), 0j) == {}
+
+
 def test_no_coupling_is_plain_attenuation_and_no_kossel_term():
     """``chi_g -> 0``: ``|T|^2 = exp(-k Im chi_0 u / n_s)``, ``D = 0``, Kossel term 0."""
     chi_0 = complex(-2e-5, 4e-7)
@@ -188,7 +250,7 @@ def test_line_depth_yields_match_native_characteristic(germanium):
     u = case["thickness_ang"] - 0.5 * (edges[1:] + edges[:-1])
     bin_edges, widths = _energy_bin_edges_and_widths(grid)
     want = np.zeros(grid.size)
-    for energy, fwhm, weight in lines:
+    for energy, fwhm, weight, _element in lines:
         mu = float(np.asarray(_mu_total_inv_ang(case["composition"], np.array([energy])))[0])
         want += weight @ np.exp(-mu * u / n[2]) * _lorentzian_bin_weights(bin_edges, energy, fwhm)
     native = mc_characteristic_spectrum(
@@ -204,7 +266,11 @@ def test_line_depth_yields_match_native_characteristic(germanium):
 
 
 def test_ge_ka1_kossel_line_on_its_cone(germanium):
-    """On the asymmetric (-4 0 0) Kossel cone the K-alpha1 line gains; off it, nothing."""
+    """On the asymmetric (-4 0 0) Kossel cone the K-alpha1 line gains; off it, nothing.
+
+    The Ge standing-wave phase ``phi = -exp(-W)`` (real) makes the profile
+    dispersive: depleted below the line, enhanced above.
+    """
     from pyrite.montecarlo.runner.diffracted_brem import case_diffracted_characteristic
 
     case, transport = germanium
@@ -217,6 +283,20 @@ def test_ge_ka1_kossel_line_on_its_cone(germanium):
     peak = grid[np.argmax(kossel)]
     assert abs(peak - E_line) < 10.0 and kossel.max() > 0.0
     assert np.all(np.isfinite(kossel))
+    # The standing-wave term is active (Ge on its own sites) and dispersive.
+    reflections = db.bragg_reflections(case, n, grid, detail=True)
+    phases = dict(
+        (tuple(hkl), dc.emitter_phases(case["crystal"], hkl, chi, case.get("B_ang2", 0.0)))
+        for *_, (hkl, chi) in reflections
+    )
+    assert phases[(-4, 0, 0)]["Ge"].real == pytest.approx(-0.927, abs=0.01)
+    intensity_only = dc.diffracted_characteristic_spectrum(
+        transport["segs"], grid, [r[:3] for r in reflections], n, case["composition"],
+        case["thickness_ang"], Ne=transport["Ne_brem"], E_cut_keV=case.get("E_cut_brem_keV", 1.0),
+    )  # fmt: skip
+    standing = kossel - intensity_only
+    below, above = standing[grid < E_line], standing[grid > E_line]
+    assert below[-3:].min() < 0.0 < above[:3].max()
     zero = [(g, 0.0, complex(-2e-5, 4e-7))]
     assert not np.any(
         dc.diffracted_characteristic_spectrum(

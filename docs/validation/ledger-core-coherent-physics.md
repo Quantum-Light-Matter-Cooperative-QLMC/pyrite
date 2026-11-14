@@ -815,12 +815,38 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 
 ## `diffracted-characteristic-radiation`
 
-- **Claim:** every perfect single-slab crystal case adds to `spec_characteristic` the signed Kossel term of each characteristic line near a Laue Bragg energy `E_B = −ħc g²/(2 n·g)` toward `n`: `S(E) = Y 𝓛(E) Σ_k w_k ½Σ_s[|T_s|² + |D_s|² − |T_0|²](L − z_k, E)`. `Y` is the line's unattenuated yield [photons/sr/electron], `𝓛` its unit-area natural Lorentzian, and `w_k` its depth distribution. `T_s(u) = [(λ_1 − N_22)e^{iλ_1u} − (λ_2 − N_22)e^{iλ_2u}]/(λ_1 − λ_2)` and `D_s` are the transmitted and diffracted amplitudes of the two-beam Laue reciprocity mode of `diffracted-bremsstrahlung` (`P(0) = (1, 0)`), and `|T_0|² = exp(−k Im χ_0 u/n_s)` is the attenuation that native scoring already books. Isotropic incoherent emission gives `j(Q̂) = j(n̂)` and no `T`–`D` cross term. Without absorption, flux conservation `n_s|T|² + (Q_s/k)|D|² = n_s` reduces the bracket to `(1 − γ_h/γ_n)|D|²`, so symmetric Laue moves no flux.
-- **Code:** `src/pyrite/montecarlo/spectrum/diffracted_brem.py::{laue_mode_intensities,bragg_window}`; `src/pyrite/montecarlo/spectrum/diffracted_characteristic.py::{line_depth_yields,kossel_term,diffracted_characteristic_spectrum}`; `src/pyrite/montecarlo/runner/diffracted_brem.py::case_diffracted_characteristic`, called from `src/pyrite/montecarlo/runner/case_driver.py::_spectrum_case_impl` and `src/pyrite/montecarlo/runner/streamed_scoring.py::BlockSpectrumScorer.add`. Marker `DIFFRACTED_BREM_MODEL = two-beam-laue-dbr-kossel-v2`.
-- **Source:** reciprocity emission into the two-beam Laue mode (`diffracted-bremsstrahlung`); two-beam dynamical diffraction and kinematic Laue integrated reflectivity (Authier, *Dynamical Theory of X-ray Diffraction*); Kossel lines as internal point sources seen through the crystal's diffraction (reciprocity). The derivation is the author's ([write-up](radiation-physics/diffracted-characteristic-radiation.md)).
-- **Assumptions:** those of `diffracted-bremsstrahlung`: two-beam Laue above `3√|χ_0|`; perfect, laterally infinite single slab; `χ` taken at `E_B` and flat across the window; `χ_gχ_{−g} → |χ_g|²`, i.e. no Borrmann absorption, so contrast holds for `μL/γ ≲ 1` and thick-crystal Kossel contrast is not claimed. Unpolarized, isotropic lines with natural Lorentzian shapes. Two-beam absorption comes from `Im χ_0` (photoabsorption) while native escape uses total `μ`; the subtraction uses the same `χ_0`. Lines farther than 100 FWHM outside the Bragg window are skipped. The Bragg-window step is at most FWHM/8 of the nearest line, still capped at 40 000 nodes. 64 depth bins. No Bragg-case Kossel lines, mosaic crystals, layers or grooves. Electron-side orientation effects on ionization are excluded.
-- **Limiting cases:** `|T|²` and `|D|²` solve the mode (`expm`, 1e-8). `χ_g → 0` gives plain attenuation, `D = 0` and a zero term (1e-12). Flux is conserved without absorption (1e-12). The symmetric non-absorbing Laue term is 0 (1e-12). The kinematic band equals `Y 𝓛(E_B)(1 − γ_h/γ_n) R_E` with textbook `R_θ` (1e-2). Depth yields × native escape reproduce `mc_characteristic_spectrum` (2e-3).
+- **Claim:** every perfect single-slab crystal case adds to `spec_characteristic` the signed Kossel term of each characteristic line near a Laue Bragg energy `E_B = −ħc g²/(2 n·g)` toward `n`. The term is `S(E) = Y 𝓛(E) Σ_k w_k [½Σ_s(|T_s|² + |D_s|²) − |T_0|² + Re(φ_Z X)](L − z_k, E)`, with `X = ½Σ_s 2C_s T_s* D_s`.
+  - `Y` is the line's unattenuated yield [photons/sr/electron], `𝓛` its unit-area natural Lorentzian, and `w_k` its depth distribution.
+  - `T_s(u) = [(λ_1 − N_22)e^{iλ_1u} − (λ_2 − N_22)e^{iλ_2u}]/(λ_1 − λ_2)` and `D_s` are the transmitted and diffracted amplitudes of the two-beam Laue reciprocity mode of `diffracted-bremsstrahlung` (`P(0) = (1, 0)`). `|T_0|² = exp(−k Im χ_0 u/n_s)` is the attenuation that native scoring already books.
+  - Reciprocity gives `p·E(r_j)` for the field of a wave incident along `−n` that diffracts with `−g`. Averaged over orientation, an isotropic emitter on lattice site `r_j` adds the standing-wave cross term `C_s Re(T_s* D_s e^{−ig·r_j})`, first order in `χ_g`.
+  - With `D` computed for a real coupling `|χ_g|`, the emitter phase is `φ_Z = (χ_mode/|χ_g|)⟨e^{−2πi hkl·R_j}⟩_{j∈Z} e^{−W}`. Here `χ_mode = conj(χ(−hkl))` and `e^{−W}` is the Debye–Waller coherent fraction; `φ = 0` for an element off the crystal basis.
+  - Without absorption, flux conservation `n_s|T|² + (Q_s/k)|D|² = n_s` reduces the intensity part to `(1 − γ_h/γ_n)|D|²`. The kinematic band of `Re(φX)` is `−π Im φ Σ_s C_s b_s ħcQ_s/|n·g|`, so a real (centrosymmetric) phase gives a dispersive profile.
+- **Code:** `src/pyrite/montecarlo/spectrum/diffracted_brem.py::{laue_mode_intensities,bragg_window,bragg_reflections}`; `src/pyrite/montecarlo/spectrum/diffracted_characteristic.py::{line_depth_yields,kossel_term,emitter_phases,diffracted_characteristic_spectrum}`; `src/pyrite/montecarlo/runner/diffracted_brem.py::case_diffracted_characteristic`, called from `src/pyrite/montecarlo/runner/case_driver.py::_spectrum_case_impl` and `src/pyrite/montecarlo/runner/streamed_scoring.py::BlockSpectrumScorer.add`. Marker `DIFFRACTED_BREM_MODEL = two-beam-laue-dbr-kossel-v2`.
+- **Source:** reciprocity emission into the two-beam Laue mode (`diffracted-bremsstrahlung`); two-beam dynamical diffraction, kinematic Laue integrated reflectivity and the X-ray standing-wave field (Authier, *Dynamical Theory of X-ray Diffraction*); Kossel lines as X-ray standing waves in reverse, via reciprocity. The derivation is the author's ([write-up](radiation-physics/diffracted-characteristic-radiation.md)).
+- **Assumptions:** those of `diffracted-bremsstrahlung`:
+  - two-beam Laue above `3√|χ_0|`;
+  - perfect, laterally infinite single slab;
+  - `χ` taken at `E_B` and flat across the window;
+  - `χ_gχ_{−g} → |χ_g|²`, i.e. no Borrmann absorption, a relative `O(ε μL/γ)` error with `ε = |Im χ_g|/Im χ_0`, so the claim holds for `ε μL/γ ≪ 1`; thick-crystal Kossel contrast is not claimed.
+
+  Plus:
+  - unpolarized, isotropic lines with natural Lorentzians, emitted equally by every basis site of the element (no site-resolved ionization), with an isotropic Debye–Waller factor from the case `B`;
+  - two-beam absorption from `Im χ_0` (photoabsorption) while native escape uses total `μ`, with the subtraction using the same `χ_0`;
+  - lines farther than 100 FWHM outside the Bragg window are skipped;
+  - Bragg-window step at most FWHM/8 of the nearest line, still capped at 40 000 nodes; 64 depth bins;
+  - no Bragg-case Kossel lines, mosaic crystals, layers or grooves; electron-side orientation effects on ionization are excluded.
+- **Limiting cases:**
+  - `|T|²` and `|D|²` solve the mode (`expm`, 1e-8);
+  - `Re(φX)` matches `expm` with complex `χ_g` and an emitter phase (1e-8);
+  - `χ_g → 0` gives plain attenuation, `D = 0` and a zero term (1e-12);
+  - flux is conserved without absorption (1e-12); the symmetric non-absorbing intensity term is 0 (1e-12);
+  - the kinematic intensity band equals `Y 𝓛(E_B)(1 − γ_h/γ_n) R_E` with textbook `R_θ` (1e-2);
+  - kinematic `∫ dE Im X = π Σ_s C_s b_s ħcQ_s/|n·g|` (3e-3);
+  - depth yields × native escape reproduce `mc_characteristic_spectrum` (2e-3).
 - **Status:** filtered
-- **Checks:** Ge 100 keV, 2 µm, detector on the Kα1 Kossel cone of (−4 0 0) (`γ_n − γ_h = 0.63`): the gain peaks at the line, the Kossel band is about 5% of the native K band and the peak is +14%. The runner adds exactly this term to `spec_characteristic`; out-of-claim cases add nothing.
-- **Anchor:** `tests/montecarlo/spectrum/test_diffracted_characteristic.py` (analytic). No measured Kossel profile located in Zotero.
-- **Notes:** #1176. Changes `spec_characteristic` only near Kossel cones. The marker bump re-pins every dataset identity and content key. Human sign-off in #277.
+- **Checks:** Ge 100 keV, 2 µm, detector on the Kα1 Kossel cone of (−4 0 0) (`γ_n − γ_h = 0.63`, `φ_Ge = −0.927`). The profile is dispersive: −44% of native from 2 eV below the line to the line, and +76% 2 eV above. The ±15 eV band is +11% of native; the intensity terms alone give +21%. The runner adds exactly this term to `spec_characteristic`; out-of-claim cases add nothing.
+- **Anchor:** `tests/montecarlo/spectrum/test_diffracted_characteristic.py` (analytic). No measured Kossel profile has been located in Zotero.
+- **Notes:** #1176. Changes `spec_characteristic` only near Kossel cones; the marker bump re-pins every dataset identity and content key.
+  - **2026-11-14 fresh-context verdict `discrepancy`** ([write-up](radiation-physics/diffracted-characteristic-radiation.md#fresh-context-verification-2026-11-14)): the first-order standing-wave cross term was omitted. Everything else re-derived (mode, `T_s`, flux conservation, kinematic band, no double count, depth yields, numerics, wiring); the Borrmann validity condition was tightened.
+  - The cross term is now scored with complex `χ_mode` and per-element sublattice phases. Status stays `filtered` pending a fresh-context re-check.
+  - Human sign-off in #277.
