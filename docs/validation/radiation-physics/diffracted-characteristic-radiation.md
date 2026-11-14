@@ -128,10 +128,38 @@ DBR therefore keeps no depletion term, and its output is unchanged. The omission
 
 ## Anchor
 
-Analytic anchors only (the tests). No measured thin-slab profile with stated thickness has been located; Hall 1966 (`MPCKVBM9`) concerns the electron-side Borrmann effect. Two measured candidates are in Zotero (PXR-CBS collection):
+**Measured anchor: emitter phase and dispersive sign.** Faigel, Bortel & Tegze, *Sci. Rep.* **6**, 22904 (2016), doi:10.1038/srep22904 (Zotero `JBG7MXA6`), measured Ga/As Kα and Kβ Kossel profiles of GaAs with 14.4 keV synchrotron excitation. They fitted each profile with dynamical theory for the structure-factor phase Φ relative to the emitting sublattice. Their Table 1 lists 24 Laue rows.
 
-- Faigel, Bortel & Tegze, *Sci. Rep.* **6**, 22904 (2016), doi:10.1038/srep22904 (`JBG7MXA6`). It reports 24 Laue-case Ga/As Kα Kossel profiles of GaAs (synchrotron excitation, 14.4 keV), fitted with Hannon–Trammell dynamical theory; the line shape encodes the structure-factor phase relative to the emitter site. The crystals are thick (Borrmann-dominated), so this checks only the sign and shape of $\operatorname{Re}(\phi_ZX)$ per element, not the magnitude.
-- Bortel et al., arXiv:2310.18203 (2023) (`TX6HBKQC`), with GaAs/GaP Kossel patterns from a single XFEL pulse and finite-slab Laue/Bragg formulas.
+Their amplitude is `F = A e^{iΦ}`, proportional to `+S`, while `χ` is proportional to `−S`. Their Φ therefore corresponds to our `arg(−φ_Z)`. Two printed rows are excluded, (1 3 3̄) As Kα and (1̄ 5 3̄) Ga Kα: for those, their own calculated Φc contradicts the zinc-blende `h+k+l mod 4` sublattice rule, so the indices are likely misprinted.
+
+| Comparison, 22 rows | rms | mean | max |
+|---|---|---|---|
+| `arg(−φ_Z)` vs measured Φm | 9.2° | −5.7° | 19.7° |
+| `arg(−φ_Z)` vs their calculated Φc | 9.3° | −8.6° | 16.3° |
+| fully conjugated convention vs Φm | 74.5° | 39.4° | 103.4° |
+
+- The agreement with Φm (rms 9.2°) is within their quoted ~10° fit error. The fully conjugated convention is excluded, which pins `χ_mode = conj(χ(−hkl))` and the site phase `e^{−ig·r_j}`. Including the two misprinted rows gives an rms of 28.4°.
+- The f″ offsets Φm − Φc are smaller than the fit error and are not resolved.
+- `test_emitter_phase_matches_measured_gaas_kossel_phases` pins the 22-row comparison: rms < 12°, max < 25°, and the conjugated convention > 50°.
+
+**Dispersive sign (probe, not pinned).** Their Fig. 4 shows the Φ ≈ 0 Laue lines (Ga Kβ 220, As Kα 4 2̄ 2) dark below the Bragg angle (δ < 0) and bright above it.
+
+- A scratch scan of a thick GaAs slab reproduces dark-below/bright-above. The setup was emitters weighted by 14.4 keV excitation depth, with the detector rotated through the cone.
+- The sign holds for every Φ ≈ 0 line tried, for surfaces (001), (110), (111) and (100).
+- The one exception is (0 4 4̄) As Kβ on (110), where both sides are about 1e-4, so it is effectively flat.
+
+The Ge-cone test pins the same dispersive sign analytically.
+
+**Not anchored: magnitude.** The data cannot anchor the magnitude:
+
+- the crystals are thick and Borrmann-affected, outside `ε μL/γ ≪ 1`;
+- the surface orientation is unstated;
+- the fitted Gaussian broadening is 20–100× the theoretical width;
+- the profiles are normalized to total fluorescence.
+
+Order-of-magnitude contrasts (1–10%) are consistent. No measured thin-slab profile with stated thickness has been located.
+
+Bortel et al., arXiv:2310.18203 (2023) (Zotero `TX6HBKQC`), gives single-pulse XFEL GaAs/GaP Kossel patterns with finite-slab formulas. It is a candidate for a magnitude anchor if the thickness and geometry can be extracted.
 
 ## Fresh-context verification (2026-11-14)
 

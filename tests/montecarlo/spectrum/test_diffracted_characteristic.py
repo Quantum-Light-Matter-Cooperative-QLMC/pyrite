@@ -115,6 +115,69 @@ def test_emitter_phases_follow_the_sublattice():
     assert dc.emitter_phases("ge", (-4, 0, 0), 0j) == {}
 
 
+# Faigel, Bortel & Tegze, Sci. Rep. 6, 22904 (2016), Table 1, Laue rows:
+# (hkl, measured Phi_m [deg], emitter, line). Phi is the structure-factor phase
+# with the emitter at the origin (their F = A e^{i Phi} is proportional to +S,
+# chi to -S). Rows (1 3 -3) As Ka and (-1 5 -3) Ga Ka are omitted: their printed
+# Phi_c contradicts the zinc-blende h+k+l mod 4 rule (likely index misprints).
+FAIGEL_LAUE = [
+    ((3, -1, 3), 313.1, "As", "Kb1"),
+    ((2, -4, -2), 5.6, "As", "Kb1"),
+    ((0, 4, -4), -6.5, "As", "Kb1"),
+    ((2, 2, 0), 13.8, "As", "Ka1"),
+    ((-1, 3, 1), 47.5, "As", "Ka1"),
+    ((-3, -1, 3), 37.0, "As", "Ka1"),
+    ((4, -2, 2), -0.9, "As", "Ka1"),
+    ((1, -5, -3), 315.5, "As", "Ka1"),
+    ((-3, -1, 5), 318.5, "As", "Ka1"),
+    ((-3, 3, 5), 311.9, "As", "Ka1"),
+    ((3, 5, 3), 39.5, "As", "Ka1"),
+    ((2, 2, 0), 13.6, "Ga", "Kb1"),
+    ((-1, 3, 1), 313.5, "Ga", "Kb1"),
+    ((-1, -3, 3), 310.4, "Ga", "Kb1"),
+    ((4, -2, 2), -6.0, "Ga", "Kb1"),
+    ((2, 2, 0), 15.2, "Ga", "Ka1"),
+    ((-1, 3, 1), 313.5, "Ga", "Ka1"),
+    ((3, 3, 1), 312.4, "Ga", "Ka1"),
+    ((3, -1, -3), 312.5, "Ga", "Ka1"),
+    ((2, 2, -4), -17.5, "Ga", "Ka1"),
+    ((3, -3, 3), 313.5, "Ga", "Ka1"),
+    ((5, -1, 3), 312.8, "Ga", "Ka1"),
+]
+
+
+def test_emitter_phase_matches_measured_gaas_kossel_phases():
+    """``arg(-phi_Z)`` reproduces the measured Kossel-line phases of GaAs (anchor).
+
+    Our coupling convention gives rms ~9 deg against ``Phi_m`` (their stated
+    error ~10 deg); the fully conjugated convention is ~75 deg off.
+    """
+    from pyrite.materials.crystal import emission_coupling_tables
+    from pyrite.montecarlo.spectrum.characteristic import load_characteristic_cross_sections
+
+    B = 0.62  # GaAs room-temperature Debye--Waller [A^2]
+    energies = {}
+    for el in ("Ga", "As"):
+        table = load_characteristic_cross_sections(el)
+        labels = list(table.line_labels)
+        for line in ("Ka1", "Kb1"):
+            energies[el, line] = float(table.line_energy_eV[labels.index(line)])
+    ours, conj = [], []
+    for hkl, phi_m, el, line in FAIGEL_LAUE:
+        cr, ci, _, _ = emission_coupling_tables(
+            "gaas", [hkl], np.array([energies[el, line]]), B, use_henke=True
+        )
+        chi = complex(float(np.ravel(cr)[0]), float(np.ravel(ci)[0]))
+        phi = dc.emitter_phases("gaas", hkl, chi, B)[el]
+        ours.append(np.degrees(np.angle(-phi)) - phi_m)
+        conj.append(np.degrees(np.angle(-np.conj(phi))) - phi_m)
+    ours = (np.array(ours) + 180.0) % 360.0 - 180.0
+    conj = (np.array(conj) + 180.0) % 360.0 - 180.0
+    assert np.sqrt(np.mean(ours**2)) < 12.0
+    assert np.abs(ours).max() < 25.0
+    assert np.sqrt(np.mean(conj**2)) > 50.0
+
+
 def test_no_coupling_is_plain_attenuation_and_no_kossel_term():
     """``chi_g -> 0``: ``|T|^2 = exp(-k Im chi_0 u / n_s)``, ``D = 0``, Kossel term 0."""
     chi_0 = complex(-2e-5, 4e-7)
