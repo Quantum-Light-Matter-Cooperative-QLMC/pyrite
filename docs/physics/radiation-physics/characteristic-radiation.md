@@ -160,3 +160,8 @@ not have a measured orientation-dependent accuracy bound; channeling admission
 ε covers `spec_channeling` only. See the
 [validation claim](../../validation/ledger-channeling.md#cr-zone-incoherent-flux-weight)
 for assumptions and checks.
+
+Zone rows are straight mean segments; since characteristic emission is
+isotropic, their omitted angular spread changes it only through the escape
+path, by about 3e-6
+([measured bound](../../validation/ledger-channeling.md#cr-zone-row-angular-spread)).

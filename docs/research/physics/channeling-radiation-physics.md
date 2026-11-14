@@ -310,10 +310,10 @@ The same six steps with dimension bumped to 2:
 | Energy loss in the channeled zone | channeling zone, as continuous loss | v1: amorphous stopping power over the µm-scale zone (the error is small because $\Delta T \ll T$). Refinement: scale per state by the $\rho_e(x)$ overlap. |
 | δ-ray production in the zone | neither (folded into stopping) | Explicit limitation; acceptable because the channeled path ≪ the total path. |
 | Dechanneled / never-channeled electrons | native transport, entered through the secondaries launch seam | One-way handoff of $(\mathbf r,\hat{\mathbf v},T,t)$ sampled from the dechanneling flux; event code `EVENT_DECHANNEL`. |
-| PXR/CBS during the channeled zone | existing PXR/CBS kernel on tagged straight mean segments | Channeled-state modulation is an omission (§9, item 10). |
+| PXR/CBS during the channeled zone | existing PXR/CBS kernel on tagged straight mean segments | Channeled-state modulation is an omission (§9, item 10). The rows' angular spread is a measured omission: ≈2% of the zone-row band yield forward, ≤0.5% at the Bragg and #1148 detector probes (`cr-zone-row-angular-spread`, applies to brem and characteristic rows too). |
 | Characteristic emission | native scorer with shell-resolved planar and axial zone weights | #1148 uses shell GOS localization and Slater form factors; EEDL sets the magnitude. A quantitative orientation-dependent anchor remains open. |
 | $\gamma(z)$ drift feeding back into line energies | channeling zone, optional | Negligible over µm occupation lengths. |
-| On-axis line band of axial zone rows | axial fibre source | Native PXR/CBS scores no lines on these rows; the omitted in-cut free→free block is a declared one-sided bound (#994, `cr-axial-zone-row-native-lines`). |
+| On-axis line band of axial zone rows | axial fibre source | Native PXR/CBS scores no lines on these rows; the omitted in-cut free→free block is a declared one-sided bound (#994, `cr-axial-zone-row-native-lines`). Off-axis, finite-aperture and detector observation score the fibre correlation per direction, unadmitted only (`cr-axial-directional-observation`, #1148). |
 | ≥200 MeV channeling | quasiclassical (Geant4 `G4ChannelingFastSimModel`/`G4BaierKatkov`) | External validation reference only, never a backend. |
 
 The handoff is one-directional in v1. Once dechanneled, an electron does not re-enter the channeling zone. Rechanneling of near-aligned quasi-free electrons is real but second-order at these dechanneling lengths, and is recorded as a known omission in profile metadata.

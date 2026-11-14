@@ -234,3 +234,8 @@ not have a measured orientation-dependent accuracy bound; channeling admission
 ε covers `spec_channeling` only. See the
 [validation claim](../../validation/ledger-channeling.md#cr-zone-incoherent-flux-weight)
 for assumptions and checks.
+
+Zone rows are straight mean segments; the omitted angular spread of the
+channeled electrons changes zone-row brem by about 2% forward and well under 1%
+at large angles for `channeling_demo`
+([measured bound](../../validation/ledger-channeling.md#cr-zone-row-angular-spread)).

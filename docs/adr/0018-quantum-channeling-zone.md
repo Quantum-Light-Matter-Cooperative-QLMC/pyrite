@@ -139,7 +139,11 @@ bound. Axial fibre zone rows (axial v4) carry the same weights over the
 Straight zone rows can produce lines narrower than the energy-grid spacing.
 Planar cases with off-own-row reflections warn when using node sampling;
 `channeling_demo` selects bin-mean quadrature to preserve bin-integrated yield.
-This does not bound omitted channeled-state PXR modulation or angular spread.
+This does not bound omitted channeled-state PXR modulation
+(`cr-planar-zone-pxr-modulation`, #1166). The rows' omitted angular spread is a
+measured second-order omission: for `channeling_demo` it shifts zone-row
+`spec` and `brem` by ≈2% forward and ≤0.5% at the Bragg and detector probes,
+and characteristic emission by ~3e-6 (`cr-zone-row-angular-spread`, #1148).
 
 CR is first exposed through a diagnostic API. It becomes the persisted additive
 channel `spec_channeling` only after its anchors pass.
