@@ -529,6 +529,16 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Checks:** Required: triangle transform and its support $2a$; Poisson identity and exact mode folding for lines narrower than a bin; envelope image closed form and its Laurent evaluation; both remainder bounds and the $P\ge2U'$ condition; period choice meets `residual_tol`; limits (total mass $G_0$, delta line, $P\to\infty$); host agreement with `_host_bin_mean(exact_widths=None)` on random, narrow and out-of-band line sets
 - **Anchor:** `tests/montecarlo/spectrum/test_bin_fourier.py`
 - **Notes:** Issue #1192. Fresh-context verification (2026-11-14, `7b216478d`) returned a narrow `discrepancy`: the yield bound omitted the bin-centre envelope term and the $\csc^2$ Laurent coefficients were misstated. Both were fixed, and the re-check rederived the claim; its 50-digit residual cases sit at 0.0026–0.20 of the corrected bounds. Anchored by the host regression against the exact bin mean. Human sign-off pending. Host FP64 reference only; no production route, default or case identity changes. Nonuniform and clamped axes are refused. The issue text's support $|t|<a$ is corrected to $|t|<2a$. NUFFT/device route, measured width distribution and production benchmarks are pending (#1192 Plan items 1, 4, 5).
+## `cxr-line-broad-interpolation`
+
+- **Claim:** for scalar sinc-squared lines of first-zero widths $W_l\ge W_0$, a 64-root Chebyshev interpolant of uniform-bin means on centre span $L$ has absolute error at most $[2(\pi L/(2W_0))^{64}/64!+127\cdot2(\pi h/W_0)^8/8!]\sum_l|w_l|$ before floating-point errors; the second term includes amplified four-point Gauss bin-averaging error
+- **Code:** `montecarlo/spectrum/cxr/_bin_broad.py::broad_bin_mean_reduce`, `::broad_bin_mean_error_bound`, `montecarlo/spectrum/cxr/_bin_fourier.py::fourier_bin_mean_reduce`
+- **Source:** triangular transform and bin convention of `cxr-line-fourier-reduction`; derivative bound from compact positive Fourier measure; Chebyshev interpolation remainder and exactness of four-point Gauss quadrature through degree seven ([implementation-context derivation](radiation-physics/cxr-line-fourier-reduction.md#experimental-broad-line-split))
+- **Status:** unverified
+- **Checks:** Required: fresh-context verification of derivative, interpolation and amplified quadrature bounds; source-to-code agreement; broad-only and mixed exact-bin comparisons; signed weights, remote resonances and vanishing bin width; refusal of insufficient resolution; frozen chunk comparison with production energy-dependent factors kept explicit
+- **Anchor:** `tests/montecarlo/spectrum/test_bin_broad.py`
+- **Notes:** Issue #1192. Opt-in private host reference only (`broad_width_eV`, default None). No production/default/model changes. Existing Fourier claim remains anchored for its unsplit route. Numerical tests and scalar census probes are not independent validation of this new bound; human sign-off pending.
+
 ## `pxr-amplitude`
 
 - **Claim:** `χ_g` PXR susceptibility amplitude

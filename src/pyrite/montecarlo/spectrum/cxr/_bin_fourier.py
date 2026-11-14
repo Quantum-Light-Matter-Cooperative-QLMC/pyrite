@@ -196,6 +196,7 @@ def fourier_bin_mean_reduce(
     E_grid_eV: object,
     *,
     residual_tol: float = FOURIER_RESIDUAL_TOL,
+    broad_width_eV: float | None = None,
 ) -> np.ndarray:
     """``sum_l w_l mean_k(line l)`` on a uniform axis, FP64, shape ``(n_bins,)``.
 
@@ -204,9 +205,19 @@ def fourier_bin_mean_reduce(
     to the bounded image remainder (:func:`image_residual_bounds`). Bins are
     ``c_k +- h/2`` (the ``bin_axis`` convention on a uniform axis).
 
-    Validation: cxr-line-fourier-reduction
+    ``broad_width_eV`` opts into a separate 64-node interpolation for lines
+    whose first-zero width is at least this threshold [eV]. This experimental
+    split has its own unverified bound, plus FP64 error; it avoids letting
+    those lines enlarge the Fourier period. ``None`` preserves the unsplit
+    reference. Both routes retain all lines and require uniform bins.
+
+    Validation: cxr-line-fourier-reduction, cxr-line-broad-interpolation
     """
     c0, h, n_bins = uniform_bin_axis(E_grid_eV)
+    if not residual_tol >= FOURIER_MIN_RESIDUAL_TOL:
+        raise ValueError(f"residual_tol must be >= {FOURIER_MIN_RESIDUAL_TOL:g}")
+    if broad_width_eV is not None and not (np.isfinite(broad_width_eV) and broad_width_eV > 0):
+        raise ValueError("broad_width_eV must be finite and positive")
     E = np.atleast_1d(np.asarray(E_res, dtype=np.float64))
     a = np.atleast_1d(np.asarray(a_width, dtype=np.float64))
     w = np.atleast_1d(np.asarray(weight, dtype=np.float64))
@@ -219,7 +230,19 @@ def fourier_bin_mean_reduce(
     finite = np.all(np.isfinite(E)) and np.all(np.isfinite(w)) and np.all(np.isfinite(a))
     if not (finite and np.all(a > 0.0)):
         raise ValueError("lines need finite E_res and weight and positive finite a_width")
+    broad = np.zeros(n_bins)
+    if broad_width_eV is not None:
+        from ._bin_broad import broad_bin_mean_reduce
+
+        select = a <= np.pi / broad_width_eV
+        if np.any(select):
+            broad = broad_bin_mean_reduce(
+                E[select], a[select], w[select], c0, h, n_bins, tolerance=residual_tol
+            )
+            E, a, w = E[~select], a[~select], w[~select]
+        if E.size == 0:
+            return broad
     n_fft, P, _ = fourier_period(E, a, c0, h, n_bins, residual_tol=residual_tol)
     g0, folded = _folded_modes(E, a, w, c0, h, n_fft)
     periodic = (g0 + 2.0 * (n_fft * sf.ifft(folded)).real[:n_bins]) / P
-    return periodic - _envelope_image_correction(E, a, w, c0, h, n_bins, P)
+    return broad + periodic - _envelope_image_correction(E, a, w, c0, h, n_bins, P)

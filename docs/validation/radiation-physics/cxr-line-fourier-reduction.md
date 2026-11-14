@@ -116,6 +116,72 @@ Total modes are $\sum_l\lceil 2a_lP/2\pi\rceil=\sum_l P/W_l$. Narrow lines domin
 
 Human sign-off pending.
 
+## Experimental broad-line split
+
+Validation: `cxr-line-broad-interpolation`. **Status: unverified**; this
+implementation-context derivation is separate from the anchored Fourier claim
+above. Independent verification is pending.
+
+`fourier_bin_mean_reduce(..., broad_width_eV=W0)` retains every line but
+evaluates widths $W_l\ge W_0$ separately, using 64 Chebyshev root nodes over
+the bin-centre interval. Only the remaining lines set the Fourier period.
+The default `None` preserves the unsplit reference; production does not call
+this reference. Line weights must be constant in energy. Signed weights are
+allowed, with all error bounds scaled by $\sum_l|w_l|$.
+
+For a unit-peak line, the triangular Fourier transform above is a positive
+measure of unit total mass supported on $|t|\le 2\pi/W_l$. Differentiating
+its inverse transform therefore bounds the $m$th energy derivative by
+$(2\pi/W_0)^m$. Averaging over a fixed-width bin preserves this bound.
+On an interval of length $L=(n_{\rm bins}-1)h$, the monic polynomial whose
+roots are the $r=64$ Chebyshev nodes has supremum $2(L/4)^r$. The interpolation
+remainder is thus at most
+
+$$
+\epsilon_I\sum_l|w_l|,
+\qquad \epsilon_I=\frac{2}{r!}\left(\frac{\pi L}{2W_0}\right)^r.
+$$
+
+The bin averages at interpolation nodes use four-point Gauss--Legendre
+quadrature. Its positive normalized weights sum to one and it integrates
+degree-seven polynomials exactly. Expanding a line about its bin centre
+through degree seven bounds both the integral remainder and quadrature
+remainder by $(\pi h/W_0)^8/8!$. Their difference is bounded by
+
+$$
+\epsilon_Q=\frac{2}{8!}\left(\frac{\pi h}{W_0}\right)^8.
+$$
+
+Each nonconstant Chebyshev coefficient of interpolation-node errors bounded
+by $\epsilon_Q$ has magnitude at most $2\epsilon_Q$ by the discrete cosine
+formula; the constant coefficient is at most $\epsilon_Q$. Since
+$|T_k(x)|\le1$, the interpolated quadrature error is at most
+$(2r-1)\epsilon_Q$. The total exact-arithmetic pointwise bound is
+
+$$
+|\Delta\bar\rho_k|\le
+\left[\epsilon_I+(2r-1)\epsilon_Q\right]\sum_l|w_l|.
+$$
+
+`broad_bin_mean_error_bound` computes this coefficient using the minimum
+actual broad width; the reducer refuses a split exceeding `residual_tol`.
+FP64 evaluation, summation, phase formation and interpolation rounding are
+additional errors. This is an **absolute** bound; it does not guarantee
+relative band yield for distant resonances or cancellation of signed weights.
+Multiplying by $n_{\rm bins}h$ gives an absolute bound on integrated error.
+
+Limits: $W_0\to\infty$ suppresses both error terms; $h\to0$ removes the
+quadrature term; an underresolved broad split is refused instead of silently
+approximated. An all-broad call avoids any padded FFT. Nonuniform/clamped
+bins remain refused, and energy-dependent attenuation/escape cannot be
+silently absorbed into constant weights.
+
+Tests in `tests/montecarlo/spectrum/test_bin_broad.py` compare broad-only and
+mixed reductions with the exact bin primitive, include negative weights,
+out-of-band resonances, threshold equality, a high-precision bin integral,
+and refusal of inadequate interpolation or bin quadrature resolution.
+These regression checks do not constitute independent validation.
+
 ## Independent verification
 
 Fresh-context verifier, 2026-11-14, worktree HEAD `7b216478d`. The verifier derived the transform, the Poisson identity, the envelope image sum, and both remainder bounds from the ledger row and the `sinc-bin-integration` profile and bin convention. That derivation came before the implementation body or the derivation above was read. The verifier changed only this section. Scratch scripts are outside the repository.
