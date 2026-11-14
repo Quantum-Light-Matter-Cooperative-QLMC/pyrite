@@ -7,14 +7,17 @@ Validation: cxr-line-fourier-reduction
 import numpy as np
 
 
-def cutoff_rectangles(sorted_last_mode):
-    """Yield disjoint active rectangles as ``(j0, j1, l0, l1)`` slices.
+def cutoff_rectangle_array(sorted_last_mode):
+    """Disjoint active rectangles as an ``(n, 4)`` int64 array of ``(j0, j1, l0, l1)``.
 
-    Input: ascending nonnegative integer last active modes, one per line.
-    Each line contributes exactly to modes ``1 <= j <= last_mode``. Returned
-    half-open line slices refer to this sorted input. Mode intervals have
-    power-of-two lengths. The planner keeps only a depth-first stack, rather
-    than allocating a line-by-mode mask or duplicated line-index arrays.
+    Input: ascending nonnegative integer last active modes ``c_l``, one per
+    line. Line ``l`` is active exactly on modes ``1 <= j <= c_l``. Writing
+    ``[1, c] = U_{bit b of c} (s_b, s_b + 2^b]`` with ``s_b = (c >> (b+1)) << (b+1)``
+    gives each line one power-of-two mode block per set bit. Lines sharing
+    ``(b, s_b)`` have ``c`` in ``[s_b + 2^b, s_b + 2^(b+1))``, a contiguous run
+    of the sorted input, so each group is one half-open line slice. Each
+    bit is one vectorized pass; no line-by-mode mask or duplicated line
+    indices are allocated.
 
     Validation: cxr-line-fourier-reduction
     """
@@ -23,22 +26,28 @@ def cutoff_rectangles(sorted_last_mode):
         raise ValueError("last modes must be a one-dimensional integer array")
     if np.any(counts < 0) or np.any(counts[1:] < counts[:-1]):
         raise ValueError("last modes must be nonnegative and sorted")
-    if counts.size == 0 or counts[-1] == 0:
-        return
-    size = 1 << (int(counts[-1]) - 1).bit_length()
-    stack = [(1, size + 1, 0, counts.size)]
-    while stack:
-        j0, j1, lo, hi = stack.pop()
-        lo = max(lo, int(np.searchsorted(counts, j0)))
-        if lo >= hi:
+    counts = counts.astype(np.int64)
+    parts = [np.empty((0, 4), dtype=np.int64)]
+    top = int(counts[-1]).bit_length() if counts.size else 0
+    for b in range(top - 1, -1, -1):
+        idx = np.flatnonzero((counts >> b) & 1)
+        if idx.size == 0:
             continue
-        cut = min(hi, max(lo, int(np.searchsorted(counts, j1 - 1))))
-        if cut < hi:
-            yield j0, j1, cut, hi
-        if lo < cut:
-            mid = (j0 + j1) // 2
-            stack.append((mid, j1, lo, cut))
-            stack.append((j0, mid, lo, cut))
+        start = (counts[idx] >> (b + 1)) << (b + 1)
+        breaks = np.flatnonzero(np.diff(start)) + 1
+        first = np.r_[0, breaks]
+        last = np.r_[breaks, idx.size] - 1
+        j0 = start[first] + 1
+        parts.append(np.stack((j0, j0 + (1 << b), idx[first], idx[last] + 1), axis=1))
+    return np.concatenate(parts)
+
+
+def cutoff_rectangles(sorted_last_mode):
+    """Yield :func:`cutoff_rectangle_array` rows as ``(j0, j1, l0, l1)`` ints.
+
+    Validation: cxr-line-fourier-reduction
+    """
+    yield from (tuple(row) for row in cutoff_rectangle_array(sorted_last_mode).tolist())
 
 
 def partitioned_positive_modes(E_res, a_width, weight, c0, period, transform):

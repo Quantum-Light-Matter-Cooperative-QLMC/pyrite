@@ -18,7 +18,7 @@ from ._bin_fourier import (
     _envelope_image_correction,
     fourier_period,
 )
-from ._fourier_cutoffs import cutoff_rectangles
+from ._fourier_cutoffs import cutoff_rectangle_array
 
 
 def cufinufft_mode_transform(phase, strengths, j0, j1, *, eps=1e-12, plans=None):
@@ -122,26 +122,26 @@ def cuda_positive_modes(E_res, a_width, weight, c0, period, *, eps=1e-12, use_nu
     constant = cp.asarray(weight[order] * np.pi / a, dtype=cp.float64)
     linear = cp.asarray(weight[order] * np.pi / (2.0 * a * a), dtype=cp.float64)
     out = cp.zeros(last + 1, dtype=cp.complex128)
-    direct = []
+    rects = cutoff_rectangle_array(counts)
+    modes, sources = rects[:, 1] - rects[:, 0], rects[:, 3] - rects[:, 2]
+    large = (sources >= 64) & (modes >= 32) & (sources * modes >= 262144)
+    if not use_nufft:
+        large[:] = False
     plans = {}
-    for j0, j1, lo, hi in cutoff_rectangles(counts):
-        modes, sources = j1 - j0, hi - lo
-        if use_nufft and sources >= 64 and modes >= 32 and sources * modes >= 262144:
-            strengths = cp.stack((constant[lo:hi], linear[lo:hi]))
-            moments = cufinufft_mode_transform(
-                phase[lo:hi], strengths, j0, j1, eps=eps, plans=plans
-            )
-            t = dt * cp.arange(j0, j1, dtype=cp.float64)
-            out[j0:j1] += moments[0] - t * moments[1]
-        else:
-            direct.append((j0, j1, lo, hi))
+    for j0, j1, lo, hi in rects[large].tolist():
+        strengths = cp.stack((constant[lo:hi], linear[lo:hi]))
+        moments = cufinufft_mode_transform(phase[lo:hi], strengths, j0, j1, eps=eps, plans=plans)
+        t = dt * cp.arange(j0, j1, dtype=cp.float64)
+        out[j0:j1] += moments[0] - t * moments[1]
     if plans:
         cp.cuda.get_current_stream().synchronize()
         plans.clear()
-    if direct:
-        rectangles = cp.asarray(direct, dtype=cp.int64)
+    direct = rects[~large]
+    if direct.size:
         _direct_kernel()(
-            (len(direct),), (128,), (phase, constant, linear, rectangles, np.float64(dt), out)
+            (len(direct),),
+            (128,),
+            (phase, constant, linear, cp.asarray(direct), np.float64(dt), out),
         )
     return out
 
