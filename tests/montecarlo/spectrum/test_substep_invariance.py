@@ -407,3 +407,20 @@ def test_grouped_stack_carries_each_layers_delta_over_its_own_path():
     )
     silicon_film = mc_cxr_spectrum(rows, CXR_GRID_EV, layers=layers, **kwargs)
     assert np.abs(silicon_film - carbon_film).max() > 1e-3 * carbon_film.max()
+
+
+@_grouped_is_host_only
+def test_grouped_stack_takes_the_full_node_reduction():
+    """Validation: xray-layered-escape-phase, node-support-window-tail.
+
+    The support window plans one scalar delta-omega grid, so a layered stack's
+    flight-grouped route runs the full-node reference under any cutoff.
+    """
+    hopg_c = _hopg_carbon()
+    kwargs = dict(CXR_KWARGS, composition=hopg_c)
+    layers = [(0.0, 1500.0, [("Si", 0.04994)]), (1500.0, 4000.0, hopg_c)]
+    rows, _ = subdivide_flights(_flights(Ne=8), composition=CARBON, max_dE_frac=1e-3)
+    full = mc_cxr_spectrum(rows, CXR_GRID_EV, layers=layers, node_support_cutoff=None, **kwargs)
+    for x_c in ("auto", 20.0):
+        out = mc_cxr_spectrum(rows, CXR_GRID_EV, layers=layers, node_support_cutoff=x_c, **kwargs)
+        np.testing.assert_array_equal(out, full)

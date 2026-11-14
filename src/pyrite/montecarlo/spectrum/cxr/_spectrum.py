@@ -133,7 +133,8 @@ def mc_cxr_spectrum(
         tail mass is retained (isolated resolved-line signed yield error is
         ``O(1/x_c^2)``, mass-L1 is ``O(1/x_c)``; grouped accuracy is qualified
         on saved scenes). ``None`` is the full-node reference. NumPy or float32 CuPy on
-        uniform grids only; other configurations run the full-node reduction.
+        uniform grids only; other configurations, and the flight-grouped route
+        through ``layers``, run the full-node reduction.
         Explicit numeric cutoffs are refused with ``coherent``, ``sinc_cutoff``
         and bin-mean quadrature. The default ``"auto"`` selects 100 on
         supported routes and retains exact full-node evaluation for lines
