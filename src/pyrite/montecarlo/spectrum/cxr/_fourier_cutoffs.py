@@ -7,7 +7,7 @@ Validation: cxr-line-fourier-reduction
 import numpy as np
 
 
-def cutoff_rectangle_array(sorted_last_mode):
+def cutoff_rectangle_array(sorted_last_mode, *, xp=np):
     """Disjoint active rectangles as an ``(n, 4)`` int64 array of ``(j0, j1, l0, l1)``.
 
     Input: ascending nonnegative integer last active modes ``c_l``, one per
@@ -17,29 +17,29 @@ def cutoff_rectangle_array(sorted_last_mode):
     ``(b, s_b)`` have ``c`` in ``[s_b + 2^b, s_b + 2^(b+1))``, a contiguous run
     of the sorted input, so each group is one half-open line slice. Each
     bit is one vectorized pass; no line-by-mode mask or duplicated line
-    indices are allocated.
+    indices are allocated. ``xp`` is the array module (NumPy or CuPy).
 
     Validation: cxr-line-fourier-reduction
     """
-    counts = np.asarray(sorted_last_mode)
+    counts = xp.asarray(sorted_last_mode)
     if counts.ndim != 1 or not np.issubdtype(counts.dtype, np.integer):
         raise ValueError("last modes must be a one-dimensional integer array")
-    if np.any(counts < 0) or np.any(counts[1:] < counts[:-1]):
+    if bool(xp.any(counts < 0)) or bool(xp.any(counts[1:] < counts[:-1])):
         raise ValueError("last modes must be nonnegative and sorted")
-    counts = counts.astype(np.int64)
-    parts = [np.empty((0, 4), dtype=np.int64)]
+    counts = counts.astype(xp.int64)
+    parts = [xp.empty((0, 4), dtype=xp.int64)]
     top = int(counts[-1]).bit_length() if counts.size else 0
     for b in range(top - 1, -1, -1):
-        idx = np.flatnonzero((counts >> b) & 1)
+        idx = xp.flatnonzero((counts >> b) & 1)
         if idx.size == 0:
             continue
         start = (counts[idx] >> (b + 1)) << (b + 1)
-        breaks = np.flatnonzero(np.diff(start)) + 1
-        first = np.r_[0, breaks]
-        last = np.r_[breaks, idx.size] - 1
+        breaks = xp.flatnonzero(xp.diff(start)) + 1
+        first = xp.concatenate((xp.zeros(1, dtype=breaks.dtype), breaks))
+        last = xp.concatenate((breaks, xp.full(1, idx.size, dtype=breaks.dtype))) - 1
         j0 = start[first] + 1
-        parts.append(np.stack((j0, j0 + (1 << b), idx[first], idx[last] + 1), axis=1))
-    return np.concatenate(parts)
+        parts.append(xp.stack((j0, j0 + (1 << b), idx[first], idx[last] + 1), axis=1))
+    return xp.concatenate(parts)
 
 
 def cutoff_rectangles(sorted_last_mode):
