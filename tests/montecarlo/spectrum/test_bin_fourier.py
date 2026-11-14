@@ -28,7 +28,7 @@ def _exact(E, a, w, edges):
 def _bounds(E, a, grid, tol):
     c0, h, n = uniform_bin_axis(grid)
     _, P, U = fourier_period(E, a, c0, h, n, residual_tol=tol)
-    return image_residual_bounds(a, P, U, h)
+    return image_residual_bounds(a, P, U, h, (n - 1) * h + h)
 
 
 @pytest.mark.parametrize("seed", [1, 7])
@@ -101,6 +101,23 @@ def test_zero_weight_lines_and_empty_input():
 def test_refuses_axes_outside_the_uniform_bin_convention(grid, match):
     with pytest.raises(ValueError, match=match):
         fourier_bin_mean_reduce([1.5], [1.0], [1.0], grid)
+
+
+def test_refuses_tolerance_below_the_rounding_floor():
+    grid, _ = _axis(10.0, 1.0, 8)
+    with pytest.raises(ValueError, match="residual_tol"):
+        fourier_bin_mean_reduce([12.0], [1.0], [1.0], grid, residual_tol=1e-14)
+
+
+def test_laurent_branch_is_continuous_with_the_direct_form():
+    from pyrite.montecarlo.spectrum.cxr._bin_fourier import _inv_sin_sq_minus_inv_sq
+
+    mpmath = pytest.importorskip("mpmath")
+    x = np.array([0.02, 0.1, 0.1999, 0.2])
+    with mpmath.workdps(40):
+        exact = [float(mpmath.csc(mpmath.mpf(v)) ** 2 - 1 / mpmath.mpf(v) ** 2) for v in x]
+    np.testing.assert_allclose(_inv_sin_sq_minus_inv_sq(x[:3]), exact[:3], rtol=1e-15, atol=0)
+    np.testing.assert_allclose(_inv_sin_sq_minus_inv_sq(x[3:]), exact[3:], rtol=1e-12, atol=0)
 
 
 def test_refuses_nonpositive_widths():
