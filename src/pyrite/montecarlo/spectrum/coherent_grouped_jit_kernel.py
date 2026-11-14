@@ -30,9 +30,9 @@ from .coherent_stream_jit_kernel import (
 
 @jit.rawkernel(device=True)
 def _medium_shift(delta_omega, energy_index, n_layers):
-    # One layer: delta*omega at this energy. K layers: 1, since _escape_weight
-    # already folded each layer's delta*omega into the row term.
-    # Validation: xray-layered-escape-phase
+    """One layer: ``delta omega`` at this energy. K layers: 1, since
+    ``_escape_weight`` already folded each layer's ``delta_l omega`` into the
+    row term. Validation: xray-layered-escape-phase"""
     if n_layers == U32_ONE:
         return delta_omega[energy_index]
     return F32_ONE
@@ -40,11 +40,11 @@ def _medium_shift(delta_omega, energy_index, n_layers):
 
 @jit.rawkernel(device=True)
 def _escape_weight(values, delta_omega, segment, energy_index, n_segments, n_energies, n_layers):
-    # One layer: the row scalar, multiplied by the hoisted delta*omega as before.
-    # K layers (layer-major): sum_l values_l delta_l omega, multiplied by 1.
-    # It runs for a block's second energy even when the block has none (the
-    # value is then unused), so the read is clamped into the grid.
-    # Validation: xray-layered-escape-phase
+    """One layer: the row scalar, times the hoisted ``delta omega`` as before.
+    K layers (layer-major): ``sum_l values_l delta_l omega``, times 1. It runs
+    for a block's second energy even when the block has none (the value is
+    then unused), so the read is clamped into the grid.
+    Validation: xray-layered-escape-phase"""
     if n_layers == U32_ONE:
         return values[segment]
     energy = energy_index

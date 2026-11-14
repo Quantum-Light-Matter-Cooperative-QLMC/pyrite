@@ -103,6 +103,10 @@ def _grouped_formation_reduce(  # pragma: no cover - numba
     E_vac, a_vac, half_dL, apb, bma, q, d, g_phase, L_esc, coefs, starts,
     E_grid, omega_grid, delta_omega_grid, series_w2, out,
 ):  # fmt: skip
+    """Per-energy flight-grouped intensity; see the block comment above.
+
+    Validation: coherent-formation-absorption, xray-layered-escape-phase
+    """
     n_pol = coefs.shape[0]
     n_flights = starts.shape[0] - 1
     n_layers = delta_omega_grid.shape[0]
