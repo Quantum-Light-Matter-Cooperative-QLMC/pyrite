@@ -1,6 +1,6 @@
 # Diffracted characteristic radiation (Kossel lines)
 
-Validation: `diffracted-characteristic-radiation`. Status: **filtered** (verifier `discrepancy` resolved by scoring the standing-wave term; re-verification pending). Issue #1176.
+Validation: `diffracted-characteristic-radiation`. Status: **rederived** (first verifier `discrepancy` resolved by scoring the standing-wave term; fresh-context re-check `rederived`). Issue #1176.
 
 ## Need
 
@@ -103,7 +103,7 @@ DBR therefore keeps no depletion term, and its output is unchanged. The omission
 
 ## Assumptions
 
-- Those of DBR: two-beam Laue (both angles above $3\sqrt{|\chi_0|}$), perfect laterally infinite single slab, $\chi_g$ and $\chi_0$ taken at $E_B$ and flat across the window, and $\chi_g\chi_{-g}\to|\chi_g|^2$. The last means there is no anomalous (Borrmann) absorption. It changes the bracket by a relative $O(\epsilon\,\mu L/\gamma)$, $\epsilon=|\operatorname{Im}\chi_g|/\operatorname{Im}\chi_0$ (about 0.9 for Ge (400)), so contrast is reliable only for $\epsilon\,\mu L/\gamma\ll1$ (0.04 at the Ge check). Thick-crystal Kossel contrast is dominated by Borrmann absorption and is not claimed.
+- Those of DBR: two-beam Laue (both angles above $3\sqrt{|\chi_0|}$), perfect laterally infinite single slab, $\chi_g$ and $\chi_0$ taken at $E_B$ and flat across the window, and $\chi_g\chi_{-g}\to|\chi_g|^2$. The last means there is no anomalous (Borrmann) absorption. It changes the bracket by a relative $O(\epsilon\,\mu L/\gamma)$, with $\epsilon=|\chi''_g|/\chi''_0$ and $\chi''_g$ the Fourier coefficient of $\operatorname{Im}\chi(\mathbf r)$. That is about 0.9 for Ge (400) and 0.86 for GaAs (111); it is origin-independent, unlike $|\operatorname{Im}\chi_g|$ for noncentrosymmetric crystals. Contrast is therefore reliable only for $\epsilon\,\mu L/\gamma\ll1$ (0.037 at the Ge check). No thickness guard enforces this, as for DBR. Thick-crystal Kossel contrast is dominated by Borrmann absorption and is not claimed.
 - Unpolarized, isotropic lines with natural Lorentzian shapes, emitted by atoms on the crystal's own basis sites (isotropic Debye–Waller coherent fraction from the case $B$). Emitters off the basis carry $\phi=0$. Site-resolved ionization (electron Bloch-wave effects) is not weighted: every site of an element emits equally.
 - The two-beam absorption is photoabsorption ($\chi_0$, Henke), while native escape uses total $\mu$ (EPDL). The subtraction uses the same $\chi_0$, so the term vanishes off Bragg.
 - Lines farther than 100 FWHM outside a Bragg window are skipped.
@@ -128,7 +128,10 @@ DBR therefore keeps no depletion term, and its output is unchanged. The omission
 
 ## Anchor
 
-None yet. Zotero has no quantitative Kossel-profile dataset: searches for Kossel, Borrmann and fluorescence diffraction, and the Channeling Radiation and PXR-CBS collections, found none. Hall 1966 concerns the electron-side Borrmann effect, not photon Kossel contrast. A measured transmission Kossel profile with stated thickness and geometry would allow `anchored`.
+Analytic anchors only (the tests). No measured thin-slab profile with stated thickness has been located; Hall 1966 (`MPCKVBM9`) concerns the electron-side Borrmann effect. Two measured candidates are in Zotero (PXR-CBS collection):
+
+- Faigel, Bortel & Tegze, *Sci. Rep.* **6**, 22904 (2016), doi:10.1038/srep22904 (`JBG7MXA6`). It reports 24 Laue-case Ga/As Kα Kossel profiles of GaAs (synchrotron excitation, 14.4 keV), fitted with Hannon–Trammell dynamical theory; the line shape encodes the structure-factor phase relative to the emitter site. The crystals are thick (Borrmann-dominated), so this checks only the sign and shape of $\operatorname{Re}(\phi_ZX)$ per element, not the magnitude.
+- Bortel et al., arXiv:2310.18203 (2023) (`TX6HBKQC`), with GaAs/GaP Kossel patterns from a single XFEL pulse and finite-slab Laue/Bragg formulas.
 
 ## Fresh-context verification (2026-11-14)
 
@@ -197,3 +200,68 @@ Two remedies are possible. The first scores the cross term, with $\chi_g$'s phas
 ### Resolution (task owner, 2026-11-14)
 
 The first remedy is implemented. `laue_mode_intensities(cross=True)` returns $X$, `bragg_reflections(detail=True)` supplies $\chi_{\rm mode}=\overline{\chi(-hkl)}$, and `emitter_phases` forms $\phi_Z$. The reciprocity sign ($h=-g$ for the wave incident along $-\hat n$) and the $e^{-i\omega t}$ conjugation were re-derived above. For Ge (400), $\phi=-0.927$ matches the verifier's $-|\chi_g|F_c/|\chi_g|$ with $F_c\approx0.93$. The Borrmann validity statement is tightened to $\epsilon\,\mu L/\gamma\ll1$. Status stays `filtered` until a fresh-context re-check.
+
+## Fresh-context re-verification (2026-11-14, after `383e55b89`)
+
+A second independent verifier re-derived the standing-wave term before reading `emitter_phases`, `_kossel_modes` or the `cross=True` branch, then compared at commit `383e55b89`. Probes: `scratch/verify2_kossel_xsw_probe.py` (independent field construction), `scratch/verify2_misc.py` (kinematic band, phases, element keys).
+
+### Independent derivation
+
+**Convention.** Fields go as $e^{-i\omega t}$, with $\chi(\mathbf r)=\sum_{\mathbf h}\chi_{\mathbf h}e^{i\mathbf h\cdot\mathbf r}$ and $\operatorname{Im}\chi_0>0$. Tabulated factors $F=f_0+f'+if''$ with $f''>0$ belong to the $e^{+i\omega t}$ convention, so
+
+$$
+\chi_{\mathbf h}=-\frac{r_e\lambda^2}{\pi V_{\rm cell}}\sum_l\overline{F_l}\,e^{-W_l}\,e^{-i\mathbf h\cdot\mathbf r_l}.
+$$
+
+The crystal module's `chi_g` is $\chi^{\rm cr}(hkl)=-\frac{r_e\lambda^2}{\pi V}\sum_lF_le^{-W}e^{+2\pi i\,hkl\cdot\mathbf R_l}$, so $\chi_{\mathbf g}=\overline{\chi^{\rm cr}(hkl)}$ and $\chi_{-\mathbf g}=\overline{\chi^{\rm cr}(-hkl)}$.
+
+**Reciprocal wave.** By Lorentz reciprocity (symmetric scalar $\varepsilon$, no conjugation of the medium), the amplitude toward $\hat{\mathbf n}$ with polarization $\hat{\mathbf e}$ from a dipole $\mathbf p$ at $\mathbf r_j$ is $\mathbf p\cdot\mathbf E(\mathbf r_j)$. Here $\mathbf E$ is the field of a plane wave incident along $-\hat{\mathbf n}$, $\mathbf K_0=-k\hat{\mathbf n}$. A Bragg partner $\mathbf K_0+\mathbf h$ with $\lvert\mathbf K_0+\mathbf h\rvert=k$ needs $h^2=2k\,\hat{\mathbf n}\cdot\mathbf h$. The reflection condition $g^2=-2k\,\hat{\mathbf n}\cdot\mathbf g$ therefore selects $\mathbf h=-\mathbf g$, and $\mathbf K_h=-k\hat{\mathbf Q}$ is the time-reverse of the emission direction. Insert $\mathbf E=T\hat{\mathbf e}_0e^{i\mathbf K_0\cdot\mathbf r}+D\hat{\mathbf e}_he^{i(\mathbf K_0-\mathbf g)\cdot\mathbf r}$ into $\nabla^2\mathbf E+k^2(1+\chi)\mathbf E=0$, with the inward depth $u$, $\mathbf K_0\cdot\hat{\mathbf u}=k\gamma_n$ and $\mathbf K_h\cdot\hat{\mathbf u}=Q_s$:
+
+$$
+T'=i\Big[\frac{k\chi_0}{2\gamma_n}T+\underbrace{\frac{kC\chi_{\mathbf g}}{2\gamma_n}}_{a}D\Big],\qquad
+D'=i\Big[\underbrace{\frac{k^2C\chi_{-\mathbf g}}{2Q_s}}_{b}T+\Big(\frac{k^2-\lvert k\hat{\mathbf n}+\mathbf g\rvert^2}{2Q_s}+\frac{k^2\chi_0}{2Q_s}\Big)D\Big].
+$$
+
+$D$ is coupled by $\chi_{-\mathbf g}$ (field convention), and $T$ by $\chi_{\mathbf g}$. Here $C=\hat{\mathbf e}_0\cdot\hat{\mathbf e}_h$, and $\hat{\mathbf e}_h$ is any unit transverse vector to $\hat{\mathbf Q}$ in the $\hat{\mathbf e}_0$, $\hat{\mathbf Q}$ plane. The products $Cb\propto C^2$ and $ab\propto C^2$ are independent of the sign choice of $\hat{\mathbf e}_h$.
+
+**Site intensity.** The carrier $e^{i\mathbf K_0\cdot\mathbf r_j}$ is common to both waves, so for an isotropic, unpolarized emitter
+
+$$
+\tfrac12\sum_s\big\lvert T_s\hat{\mathbf e}_0+D_s\hat{\mathbf e}_he^{-i\mathbf g\cdot\mathbf r_j}\big\rvert^2
+=\tfrac12\sum_s\Big[\lvert T_s\rvert^2+\lvert D_s\rvert^2+2C_s\operatorname{Re}\big(\overline{T_s}D_se^{-i\mathbf g\cdot\mathbf r_j}\big)\Big].
+$$
+
+The exponent is $e^{-i\mathbf g\cdot\mathbf r_j}$. A forward first-Born check confirms it: the spherical wave from $\mathbf r_j$, scattered by $\chi_{\mathbf h}e^{i\mathbf h\cdot\mathbf r}$ into $\hat{\mathbf n}$, is stationary for $\mathbf h=-\mathbf g$ along $\hat{\mathbf Q}$, with relative factor $\chi_{-\mathbf g}e^{-i\mathbf g\cdot\mathbf r_j}$. The product $\chi_{-\mathbf g}e^{-i\mathbf g\cdot\mathbf r_j}=-\frac{r_e\lambda^2}{\pi V}\sum_l\overline{F_l}e^{-W}e^{i\mathbf g\cdot(\mathbf r_l-\mathbf r_j)}$ does not depend on the origin. A thermal displacement of the emitter multiplies the cross term by $e^{-W}$, while the coherent field already carries $e^{-W}$ inside $\chi_{-\mathbf g}$.
+
+**Real-coupling solution.** $T$ and the eigenvalues depend on $a,b$ only through $ab\propto\chi_{\mathbf g}\chi_{-\mathbf g}$, and $D=b\,(e^{i\lambda_1u}-e^{i\lambda_2u})/(\lambda_1-\lambda_2)$ is linear in $b$. With $ab\to k^3C^2\lvert\chi_{-\mathbf g}\rvert^2/(4\gamma_nQ_s)$ and $b_{\rm code}=k^2C\lvert\chi_{-\mathbf g}\rvert/(2Q_s)$, the true diffracted amplitude is $D=D_{\rm code}\,\chi_{-\mathbf g}/\lvert\chi_{-\mathbf g}\rvert$. Hence
+
+$$
+\phi_Z=\frac{\chi_{-\mathbf g}}{\lvert\chi_{-\mathbf g}\rvert}\big\langle e^{-2\pi i\,hkl\cdot\mathbf R_j}\big\rangle_{j\in Z}e^{-W},\qquad \chi_{-\mathbf g}=\overline{\chi^{\rm cr}(-hkl)},
+$$
+
+which is the claim's expression. The modulus in the denominator must equal the `chi_g_abs` the mode uses. In the code both are $\lvert\chi_{\rm mode}\rvert$ (`bragg_reflections` returns `abs(chi_mode)`, and `emitter_phases` divides by `abs(chi_mode)`). For a Bijvoet pair this differs from $\lvert\chi^{\rm cr}(hkl)\rvert$, so using $\lvert\chi_{\rm mode}\rvert$ consistently is required, and it is done.
+
+**Kinematic band.** With $T=1$ and $D=b(e^{iqu}-1)/q$, and $dq/dE=\lvert\hat{\mathbf n}\cdot\mathbf g\rvert/(\hbar cQ_s)$ at $E_B$,
+
+$$
+\int dE\,\operatorname{Im}X=\pi\sum_sC_sb_s\frac{\hbar cQ_s}{\lvert\hat{\mathbf n}\cdot\mathbf g\rvert},\qquad \int dE\,\operatorname{Re}(\phi X)=-\operatorname{Im}\phi\int dE\,\operatorname{Im}X.
+$$
+
+$\operatorname{Re}X=Cb(\cos qu-1)/q$ is odd in $q$. Since $dq/dE>0$ ($\hat{\mathbf n}\cdot\mathbf g<0$), a real negative $\phi$ (Ge) depletes the line below $E_B$ and enhances it above.
+
+### Comparison with the code
+
+| item | result |
+|---|---|
+| 1. reciprocal $\mathbf h$, exponent sign, coupling component | $\mathbf h=-\mathbf g$, $e^{-i\mathbf g\cdot\mathbf r_j}$ and $D\propto\chi_{-\mathbf g}=\overline{\chi^{\rm cr}(-hkl)}$, all as in the code. `chi_mode` from `bragg_reflections(detail=True)` equals my $\chi_{-\mathbf g}$, built from `atomic_form_factor` with my own Fourier sum, to $\le4\times10^{-15}$ relative for GaAs (111), $(\bar1\bar1\bar1)$, (200), $(\bar200)$, (311) and (400) at the As K$\alpha_1$ energy 10543.7 eV, where Ga is above its K edge ($f''_{\rm Ga}=3.75$). **Pass** |
+| 1. full field, noncentrosymmetric sites | Independent construction: `scipy.linalg.expm` of my $N$ with complex $a,b$ ($ab$ set to the code's $\lvert\chi\rvert^2$ value), with $\lvert p\cdot E\rvert^2$ at every Ga or As basis site, thermally averaged along $\mathbf g$ by 40-node Gauss–Hermite ($B=0.6$ Å²), $\chi$ held at $E_B$. Against the code's $\tfrac12\sum_s(\lvert T\rvert^2+\lvert D\rvert^2)+\operatorname{Re}(\phi_ZX)$, over 27 energies across the window and $u=0.3,1,2$ µm, the maximum absolute difference is $2\times10^{-12}$ to $6\times10^{-12}$ for every reflection and both elements, on brackets of order 0.1–1.4. A deliberate conjugation error ($\chi^{\rm cr}(hkl)$ in place of $\overline{\chi^{\rm cr}(-hkl)}$) on GaAs (111) changes the cross term by $7.4\times10^{-2}$ (As) and $7.3\times10^{-2}$ (Ga), against a cross-term peak of 0.42–0.45, so the test resolves the convention. **Pass** |
+| 2. $D_{\rm true}=D_{\rm code}\chi_{\rm mode}/\lvert\chi_g\rvert$, $C_s$ | $T$ and the eigenvalues depend only on $ab$, and $D$ is linear in $b$, so the rescaling is exact under $\chi_{\mathbf g}\chi_{-\mathbf g}\to\lvert\chi_{\rm mode}\rvert^2$. The code's $C=\lvert\hat{\mathbf e}-\hat{\mathbf Q}(\hat{\mathbf Q}\cdot\hat{\mathbf e})\rvert\ge0$ enters both $b$ (through $\sqrt{b^2}$) and $X$. My probe uses the signed basis $\hat{\mathbf e}_h=\sigma\times\hat{\mathbf Q}$, $C_\pi=\hat{\mathbf n}\cdot\hat{\mathbf Q}$, and agrees to $10^{-12}$ (the product $C_sb_s$ is basis-invariant). **Pass** |
+| 3. kinematic band, dispersive profile | `laue_mode_intensities` with $\lvert\chi_g\rvert=10^{-8}$, $\chi_0=0$, $u=0.5$ µm, asymmetric geometry: $\int dE\,\operatorname{Im}X$ / prediction = 1.0028 over ±400 eV. Taking $\phi=0.5i$ gives band/prediction $-0.501$, i.e. $-\operatorname{Im}\phi$. $\int\operatorname{Re}X$/prediction is $-1\times10^{-4}$, $-0.007$, $-0.014$ and $-0.061$ over ±10, 40, 100 and 400 eV. The $1/q$ tail of $\operatorname{Re}X$ is only conditionally convergent: $q(E)$ and $Q_s(E)$ are not exactly linear, so a wide window leaves a small net band for real $\phi$. In scoring, the Lorentzian weight confines this, so it is not a finding. Ge $(\bar400)$, $B=0.6$: $\phi=-0.9273+0.0301i$. $\operatorname{Re}\phi$ matches $-e^{-W}\approx-0.93$. The small $\operatorname{Im}\phi>0$ is the $f''$ of $\overline F$ and gives a small negative kinematic band. **Pass** |
+| 3. Debye–Waller | Amplitude $e^{-W}$, $W=B(g/4\pi)^2$, from `debye_waller` with the case $B$ (Ge 0.6, GaAs 0.62 Å²). $\chi_{\rm mode}$ also carries $e^{-W}$ (`B_ang2` is passed to `emission_coupling_tables`), so the cross term goes as $e^{-2W}$. My independent thermal average reproduces this at $10^{-12}$. **Pass** |
+| 4. no double count, depth yields, wiring | Off Bragg, $D\to0$ makes both $X$ and $\lvert T\rvert^2-\lvert T_0\rvert^2\to0$. The depth-yield and runner tests pass. Element keys agree between the case composition and the crystal basis (`ge`: Ge/Ge; `gaas`: As, Ga/As, Ga), so the phase lookup is not silently dropped. **Pass** |
+| 4. Borrmann validity | With full $\chi_{\mathbf g}\chi_{-\mathbf g}$, my bracket differs from the code by up to $2$–$8\times10^{-2}$ for GaAs at 2 µm, 10.5 keV ($\mu=0.064$ µm⁻¹). That matches $O(\epsilon\mu L/\gamma)\approx0.16$, so the stated assumption describes the error. At the Ge check, $\epsilon\mu L/\gamma_n\approx0.93\times0.040=0.037$. **Concern (non-blocking)**: (a) for noncentrosymmetric crystals the record's $\epsilon=\lvert\operatorname{Im}\chi_g\rvert/\operatorname{Im}\chi_0$ depends on the origin (GaAs (111) gives 6.8 by that formula). It should read $\epsilon=\lvert\chi''_{\mathbf g}\rvert/\chi''_0$, with $\chi''_{\mathbf g}$ the Fourier coefficient of $\operatorname{Im}\chi(\mathbf r)$, i.e. $\lvert\sum_lf''_le^{-W}e^{-i\mathbf g\cdot\mathbf r_l}\rvert/\sum_lf''_l\approx0.86$ for GaAs (111). (b) `_in_claim` does not gate on $\epsilon\mu L/\gamma$, so thick crystals are scored outside the stated validity, as for DBR |
+| 5. tests | `tests/montecarlo/spectrum/test_diffracted_characteristic.py` with `test_diffracted_brem.py`: 21 passed |
+
+### Verdict
+
+`rederived`. The standing-wave term, its reciprocal-vector sign, the exponent sign, the $\chi_{-\mathbf g}$ coupling and its translation to $\overline{\chi^{\rm cr}(-hkl)}$, the $\lvert\chi_{\rm mode}\rvert$ normalization, the $C_s$ convention and the Debye–Waller usage all match an independent construction to $10^{-12}$, including noncentrosymmetric GaAs reflections on both sublattices. Two non-blocking notes remain: define $\epsilon$ from the absorptive Fourier coefficient, and consider a runtime warning or gate for $\epsilon\mu L/\gamma$ not small. Status changes are for the task owner. Human sign-off is tracked in #277.

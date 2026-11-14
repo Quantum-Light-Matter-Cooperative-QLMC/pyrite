@@ -33,8 +33,10 @@ dispersive, and kinematically its band is ``-pi Im(phi)`` times the coupling.
 Assumptions: those of ``diffracted-bremsstrahlung`` (two-beam Laue, perfect
 single slab, ``chi_g chi_-g -> |chi_g|^2``, so no anomalous (Borrmann)
 absorption: Kossel contrast is reliable for ``eps mu L / gamma << 1``, ``eps =
-|Im chi_g| / Im chi_0``), plus: unpolarized isotropic lines from atoms on the
-crystal's own sites, isotropic Debye--Waller factor from the case ``B``; the two-beam absorption ``Im chi_0`` is photoabsorption while
+|chi''_g| / chi''_0`` with ``chi''_g`` the Fourier coefficient of ``Im chi(r)``;
+not enforced), plus: unpolarized isotropic lines from atoms on the
+crystal's own sites, isotropic Debye--Waller factor from the case ``B``; the
+two-beam absorption ``Im chi_0`` is photoabsorption while
 native escape uses the total ``mu`` (the subtraction uses the same
 ``chi_0``, so the term still vanishes off Bragg); a line enters a reflection
 only within 100 FWHM of that reflection's Bragg window. The same direct-beam

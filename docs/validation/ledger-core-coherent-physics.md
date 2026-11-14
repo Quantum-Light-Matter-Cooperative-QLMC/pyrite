@@ -827,7 +827,7 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
   - two-beam Laue above `3√|χ_0|`;
   - perfect, laterally infinite single slab;
   - `χ` taken at `E_B` and flat across the window;
-  - `χ_gχ_{−g} → |χ_g|²`, i.e. no Borrmann absorption, a relative `O(ε μL/γ)` error with `ε = |Im χ_g|/Im χ_0`, so the claim holds for `ε μL/γ ≪ 1`; thick-crystal Kossel contrast is not claimed.
+  - `χ_gχ_{−g} → |χ_g|²`, i.e. no Borrmann absorption, a relative `O(ε μL/γ)` error with `ε = |χ''_g|/χ''_0`, where `χ''_g` is the Fourier coefficient of `Im χ(r)` (origin-independent; 0.9 for Ge (400), 0.86 for GaAs (111)). The claim holds for `ε μL/γ ≪ 1` (0.037 at the Ge check). No thickness guard enforces this, as for DBR: thicker crystals are scored outside the claim. Thick-crystal Kossel contrast is not claimed.
 
   Plus:
   - unpolarized, isotropic lines with natural Lorentzians, emitted equally by every basis site of the element (no site-resolved ionization), with an isotropic Debye–Waller factor from the case `B`;
@@ -843,10 +843,11 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
   - the kinematic intensity band equals `Y 𝓛(E_B)(1 − γ_h/γ_n) R_E` with textbook `R_θ` (1e-2);
   - kinematic `∫ dE Im X = π Σ_s C_s b_s ħcQ_s/|n·g|` (3e-3);
   - depth yields × native escape reproduce `mc_characteristic_spectrum` (2e-3).
-- **Status:** filtered
+- **Status:** rederived
 - **Checks:** Ge 100 keV, 2 µm, detector on the Kα1 Kossel cone of (−4 0 0) (`γ_n − γ_h = 0.63`, `φ_Ge = −0.927`). The profile is dispersive: −44% of native from 2 eV below the line to the line, and +76% 2 eV above. The ±15 eV band is +11% of native; the intensity terms alone give +21%. The runner adds exactly this term to `spec_characteristic`; out-of-claim cases add nothing.
-- **Anchor:** `tests/montecarlo/spectrum/test_diffracted_characteristic.py` (analytic). No measured Kossel profile has been located in Zotero.
+- **Anchor:** `tests/montecarlo/spectrum/test_diffracted_characteristic.py` (analytic). Candidate measured data: Faigel, Bortel & Tegze, Sci. Rep. 6, 22904 (2016), doi:10.1038/srep22904 (Zotero `JBG7MXA6`), with 24 Laue-case GaAs Ga/As Kα Kossel profiles fitted by dynamical theory. Those crystals are thick, so the data can check only the sign and shape of the standing-wave term, not its magnitude, which is outside `ε μL/γ ≪ 1`. Bortel et al., arXiv:2310.18203 (2023) (Zotero `TX6HBKQC`), uses finite-slab Laue formulas on GaAs/GaP. No measured thin-slab profile with stated thickness has been located.
 - **Notes:** #1176. Changes `spec_characteristic` only near Kossel cones; the marker bump re-pins every dataset identity and content key.
   - **2026-11-14 fresh-context verdict `discrepancy`** ([write-up](radiation-physics/diffracted-characteristic-radiation.md#fresh-context-verification-2026-11-14)): the first-order standing-wave cross term was omitted. Everything else re-derived (mode, `T_s`, flux conservation, kinematic band, no double count, depth yields, numerics, wiring); the Borrmann validity condition was tightened.
-  - The cross term is now scored with complex `χ_mode` and per-element sublattice phases. Status stays `filtered` pending a fresh-context re-check.
+  - The cross term is now scored with complex `χ_mode` and per-element sublattice phases (`383e55b89`).
+  - **2026-11-14 fresh-context re-check: `rederived`.** It confirmed `h = −g`, the site phase `e^{−ig·r_j}` and `χ_mode = conj(χ(−hkl))` (to 4e-15 against an independent Fourier sum). An independent full-field `|p·E|²` site and thermal average for GaAs (111), (200), (311), (400) and both elements matches intensity + `Re(φ_Z X)` to 2–6e-12; the wrong convention shifts it by 7e-2 of a ~0.45 peak. The kinematic `∫Im X` ratio is 1.0028. Concerns applied: ε is defined by the absorptive Fourier coefficient; no thickness guard. Status applied by the task owner.
   - Human sign-off in #277.
