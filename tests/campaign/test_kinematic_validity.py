@@ -159,3 +159,41 @@ def test_unsupported_optical_energy_is_recorded():
     audit = case_kinematic_validity(_case(E0_keV=1e-6))
     assert audit["reflections"][0]["status"] == "outside_optical_data"
     json.dumps(audit, allow_nan=False)
+
+
+def test_high_order_silicon_set_stays_kinematic_and_ranks_with_born_parameter():
+    """#1173 P1: the full |g| <= 22 /A Si set at 300 keV never trips photon mixing.
+
+    The central-ray Born parameter falls with the ``dominant_reflections``
+    ranking metric (both scale as |F_g| e^-W / g^2), so the strongest
+    reflection sets the maximum and every high-order line is more kinematic.
+    """
+    from pyrite.materials.crystal import dominant_reflections, reciprocal_g_vector
+
+    case = build_cases(
+        material_sweep(
+            "silicon", thickness_ang=1e5, energy_keV=300.0, tilt_deg=45, tilt_azim_deg=180
+        ),
+        n_electrons=1,
+        n_electrons_brem=1,
+    )[0]
+    hkls = dominant_reflections(
+        "silicon", n_families=10**9, B_ang2=case["B_ang2"], g_max_invang=22.0
+    )
+    assert len(hkls) == 5408
+    records = []
+    for start in range(0, len(hkls), 400):
+        part = dict(case, hkl_list=hkls[start : start + 400])
+        records.extend(case_kinematic_validity(part)["reflections"])
+    evaluated = [r for r in records if r["status"] == "evaluated"]
+    assert len(evaluated) > 2600
+    dyn = np.array([r["dyn"] for r in evaluated])
+    assert not any(r["photon_mixing"] for r in evaluated)
+    assert dyn.max() == pytest.approx(6.54e-5, rel=0.02)
+    lattice = CRYSTALS["silicon"]["lattice"]
+    g = np.array(
+        [np.linalg.norm(reciprocal_g_vector(tuple(r["hkl"]), lattice)[0]) for r in evaluated]
+    )
+    low, high = dyn[g <= 6.0], dyn[g >= 18.0]
+    assert low.size and high.size
+    assert np.median(high) < 1e-2 * np.median(low)

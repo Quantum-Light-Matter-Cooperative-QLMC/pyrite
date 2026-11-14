@@ -801,8 +801,13 @@ def dominant_reflections(
 ):
     """
     Automatically select the strongest reflection FAMILIES of a crystal,
-    Zhai-style (their Table 5 keeps the four planes of largest ``abs(chi_g)`` per
-    crystal; everything weaker contributes < ~30%).
+    Zhai-style (their Table 5 keeps the four planes of largest ``abs(chi_g)``
+    per crystal). Ranking by coupling does not bound the omitted line yield.
+    On the #642 scenes, against a reference converged at ``|g| <= 30`` 1/Angstrom,
+    four families miss 61 % (Si 300 keV) and 78 % (MoS2 on Si, 30 keV) of the
+    0.5--10 keV incoherent line yield (#1143, #1173). Weak high-order lines are
+    numerous, and their resonance ``E ~ v.g`` is low wherever ``g`` is nearly
+    transverse to the beam.
 
     Enumerates reciprocal vectors with ``abs(g) <= g_max_invang`` and ranks by
     ``abs(S(g))*exp(-W)/g**2``, which is proportional to ``abs(chi_g)`` at each
@@ -839,6 +844,15 @@ def dominant_reflections(
     -------
     list of tuple
         Miller-index triples ordered by decreasing family strength.
+
+    Notes
+    -----
+    The ranking metric ``abs(S) exp(-W) / g**2`` is also, up to an ``O(1)``
+    geometric factor, the photon Born parameter ``D`` of each reflection, so
+    weaker (higher-order) families are more kinematic. The scope of the line
+    model for high-order sets is ledgered separately.
+
+    Validation: cxr-high-order-kinematic-scope
     """
     fams = _reflection_families(crystal, E_ref_eV, B_ang2, use_henke, g_max_invang)
     ranked = sorted(fams.items(), key=lambda kv: -kv[0][1])

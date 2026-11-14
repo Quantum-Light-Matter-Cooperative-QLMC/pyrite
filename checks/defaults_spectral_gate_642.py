@@ -432,6 +432,77 @@ def chunked_lines(scorer, chunks, grid):
         scorer.case = whole
 
 
+def tolerance_cutoff(case, scorer, tol, max_reflections, g_max=40.0):
+    """Measured reciprocal cutoff for in-band tolerance ``tol`` (#1173 P3).
+
+    Each radiator's |g| shells are scored separately on the saved transport,
+    with ``bin-mean`` bins tiling ``BAND`` (exact in-band yield). Each stops
+    once its geometric tail estimate is at most ``tol`` of its own kept yield.
+    The ladder applies one cutoff to every radiator, so the largest is used.
+    Returns ``("g<G>", pilot record)``.
+    """
+    from pyrite.montecarlo.runner.reflection_cutoff import (
+        band_bin_grid,
+        reflection_shells,
+        select_reflection_cutoff,
+    )
+
+    if case["crystal"] == "hopg":
+        raise ValueError("HOPG uses its (00l) order ladder, not a tolerance cutoff")
+    grid = band_bin_grid(*BAND)
+    width = float(grid[1] - grid[0])
+    layered = case.get("layer_radiators") is not None
+    radiators = list(enumerate(case["layer_radiators"])) if layered else [(None, case)]
+    whole = scorer.case
+    record = dict(tolerance=tol, band_eV=list(BAND), bin_eV=width, g_max_invang=g_max, radiators=[])
+    cutoffs = []
+    try:
+        for index, radiator in radiators:
+            if radiator is None:
+                continue
+
+            def score(hkls, index=index, radiator=radiator):
+                if index is None:
+                    pilot = dict(case, hkl_list=hkls, line_quadrature="bin-mean")
+                else:
+                    layers = [None] * len(case["layer_radiators"])
+                    layers[index] = dict(radiator, hkl_list=hkls)
+                    pilot = dict(
+                        case, layer_radiators=layers, hkl_list=hkls, line_quadrature="bin-mean"
+                    )
+                return float(
+                    chunked_lines(scorer, reflection_chunks(pilot, max_reflections), grid).sum()
+                    * width
+                )
+
+            begin = time.perf_counter()
+            shells = reflection_shells(radiator["crystal"], float(radiator["B_ang2"]), g_max)
+            result = select_reflection_cutoff(score, shells, tol)
+            cutoffs.append(result.cutoff_invang)
+            record["radiators"].append(
+                dict(
+                    layer=index,
+                    crystal=radiator["crystal"],
+                    cutoff_invang=result.cutoff_invang,
+                    reflections=len(result.hkl_list),
+                    tail_fraction=result.tail_fraction
+                    if np.isfinite(result.tail_fraction)
+                    else None,
+                    converged=result.converged,
+                    pilot_s=time.perf_counter() - begin,
+                    shells=[
+                        dict(upper=u, n=n, yield_=y, tail=t if np.isfinite(t) else None)
+                        for u, n, y, t in result.shells
+                    ],
+                )
+            )
+    finally:
+        scorer.case = whole
+    cutoff = max(cutoffs)
+    record["cutoff_invang"] = cutoff
+    return f"g{cutoff:g}", record
+
+
 def score_families(case, sweep, ladder, ns, reference_spacing, wide_spacing, sync, max_reflections):
     """Score each reflection set on the saved transport against the largest.
 
@@ -445,18 +516,36 @@ def score_families(case, sweep, ladder, ns, reference_spacing, wide_spacing, syn
     from pyrite.energy_grid.convergence_case import CaseLadder
 
     tp = ladder.transport
+    pilots = {}
+    if any(isinstance(n, str) and n.startswith("tol") for n in ns):
+        pilot_scorer = CaseLadder(case, transport=tp)
+        resolved = []
+        for n in ns:
+            if isinstance(n, str) and n.startswith("tol"):
+                point, pilots[n] = tolerance_cutoff(
+                    case, pilot_scorer, float(n[3:]), max_reflections
+                )
+                resolved.append(point)
+            else:
+                resolved.append(n)
+        labels = list(ns)
+        ns = resolved
+    else:
+        labels = list(ns)
     cases = {n: families_case(case, sweep, n) for n in ns}
     start = min(needed[0] for *_, needed in cases.values())
     stop = max(needed[1] for *_, needed in cases.values())
     wide = axis(start, stop, wide_spacing, "node")
     band = axis(*BAND, reference_spacing, "node")
     rows = []
-    for n in ns:
+    for label_n, n in zip(labels, ns, strict=True):
         fcase, production, needed = cases[n]
         scorer = CaseLadder(fcase, transport=tp)  # one device copy of the segments
         chunks = reflection_chunks(fcase, max_reflections)
         row = dict(
-            n=n,
+            n=label_n,
+            resolved=n,
+            pilot=pilots.get(label_n),
             reflections=len(fcase["hkl_list"]),
             production_support_eV=production,
             all_radiator_support_eV=needed,
@@ -868,10 +957,12 @@ def main():
     )
     parser.add_argument(
         "--families",
-        type=lambda text: [x if x.startswith("g") else int(x) for x in text.split(",") if x],
+        type=lambda text: [
+            x if x.startswith(("g", "tol")) else int(x) for x in text.split(",") if x
+        ],
         default=[],
-        help="ascending reflection ladder: n_families counts (HOPG: (00l) orders) or g<G> "
-        "reciprocal cutoffs in 1/angstrom; last is reference",
+        help="ascending reflection ladder: n_families counts (HOPG: (00l) orders), g<G> "
+        "reciprocal cutoffs in 1/angstrom, or tol<x> measured cutoffs (#1173); last is reference",
     )
     parser.add_argument(
         "--families-wide-spacing",
