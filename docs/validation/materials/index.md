@@ -18,6 +18,7 @@ hopg-debye-waller-00l
 mos2-debye-waller-00l
 mosaic-analytic
 mosaic-mc
+mosaic-mc-sampled
 multilayer-stack
 oriented-v2o5-tis2
 pdte2-debye-waller-001

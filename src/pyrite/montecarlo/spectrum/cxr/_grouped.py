@@ -35,7 +35,11 @@ def _flight_layout(gid):
 
 
 def _referenced_phases(st, idx, sel, starts, flight, recoil_phase, g_vec_d, L_esc):
-    """Float64 ``(d, g.r, L_esc)`` per sorted row minus its flight's first row."""
+    """Float64 ``(d, g.r, L_esc)`` per sorted row minus its flight's first row.
+
+    ``g_vec_d`` is one vector, or per row ``(n, 3)`` aligned with ``idx``
+    under the sampled mosaic. Validation: mosaic-mc-sampled
+    """
     d64, r64 = st.grouped_phase64
     f64 = np.float64
 
@@ -48,7 +52,7 @@ def _referenced_phases(st, idx, sel, starts, flight, recoil_phase, g_vec_d, L_es
     if g_vec_d.ndim == 2:
         # Per-history crystallite (``g_vec_d`` aligned with ``idx``): every row
         # of one flight shares its history's g, so the flight-common phase
-        # still cancels. Validation: mosaic-mc-sampled
+        # still cancels.
         g_dot_dr = (dr * g_vec_d[sel].astype(f64)).sum(axis=1)
     else:
         g_dot_dr = dr @ g_vec_d.astype(f64)

@@ -289,7 +289,7 @@ Generated browsing views of every claim in the [detailed validation ledger](phys
 |---|---|---|
 | [`mosaic-analytic`](ledger-mosaicity-multilayer.md#mosaic-analytic) | analytic broadening `FWHM = E·\|tan ψ\|·η` | `rederived` |
 | [`mosaic-mc`](ledger-mosaicity-multilayer.md#mosaic-mc) | exact per-orientation incoherent average (2-D Gauss–Hermite) | `rederived` |
-| [`mosaic-mc-sampled`](ledger-mosaicity-multilayer.md#mosaic-mc-sampled) | per-history sampled crystallite orientations are an unbiased estimator of the `mosaic-mc` incoherent orientation average: history `e` holds `K` tilts `σ Φ⁻¹((p_k + s_e) mod 1)` (rank-1 lattice `p_k`, counter shift `s_e`, `σ = η/2.3548`) for all its rows and reflections, each weighted `1/K` | `filtered` |
+| [`mosaic-mc-sampled`](ledger-mosaicity-multilayer.md#mosaic-mc-sampled) | per-history sampled crystallite orientations are an unbiased estimator of the `mosaic-mc` incoherent orientation average: history `e` holds `K` tilts `σ Φ⁻¹((p_k + s_e) mod 1)` (rank-1 lattice `p_k`, counter shift `s_e`, `σ = η/2.3548`) for all its rows and reflections, each weighted `1/K` | `rederived` |
 | [`multilayer-stack`](ledger-mosaicity-multilayer.md#multilayer-stack) | film-on-substrate transport + absorption | `rederived` |
 
 ## Detector forward models (downstream — lower risk)
