@@ -95,7 +95,7 @@ def test_timing_flag_is_read_late_from_the_package(monkeypatch):
 
 
 @pytest.mark.parametrize("layered", [False, True])
-@pytest.mark.parametrize("cutoff", [None, 100.0])
+@pytest.mark.parametrize("cutoff", [None, 100.0, "absent"])
 def test_cxr_runner_forwards_node_support_control(monkeypatch, layered, cutoff):
     import numpy as np
 
@@ -105,7 +105,7 @@ def test_cxr_runner_forwards_node_support_control(monkeypatch, layered, cutoff):
         seen.append(kwargs["node_support_cutoff"])
         return np.zeros(grid.size)
 
-    case = dict(_CASE, node_support_cutoff=cutoff)
+    case = dict(_CASE) if cutoff == "absent" else dict(_CASE, node_support_cutoff=cutoff)
     segs = {"L_ang": np.ones(1)}
     layers = None
     if layered:
@@ -114,4 +114,4 @@ def test_cxr_runner_forwards_node_support_control(monkeypatch, layered, cutoff):
         monkeypatch.setattr(case_driver, "_segments_in_layer", lambda *_: segs)
     monkeypatch.setattr(case_driver, "mc_cxr_spectrum", spectrum)
     case_driver._cxr_for_segments_once(segs, np.arange(1000.0, 1010.0), case, None, layers, None)
-    assert seen == [cutoff]
+    assert seen == ["auto" if cutoff == "absent" else cutoff]

@@ -49,6 +49,18 @@ characteristic spectra, bremsstrahlung spectra and comparison tolerances
 remain unchanged. The mode-off diagnostic still checks bitwise equality
 before and after photon-transport diagnostics.
 
+## Support-windowed node reduction v8 generation (#1191)
+
+Defaulting incoherent node scoring to the support-windowed reduction with its
+analytic far tail (`node_support_cutoff="auto"`, ledger
+`node-support-window-tail`) changed `CXR_ESCAPE_MODEL` from v7 to v8
+(`segment-mean-v8-node-support-tail`). The generation-dependent
+`case_content_key` and `parameter_sha256` hashes in `resolved.json` and
+`channeling.json` were re-pinned from a read-only prospective identity map.
+The historical explicit-EEDL fallback pins were recomputed from their stored
+case payload; no removed fallback behavior was re-enabled. Seeded transport
+is unchanged and existing tolerances are preserved.
+
 ## Exact second-order PXR/CB elements v7 generation (#1134)
 
 Replacing the classical PXR/CBS amplitudes with the exact second-order elements

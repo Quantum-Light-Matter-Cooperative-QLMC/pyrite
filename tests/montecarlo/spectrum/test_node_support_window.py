@@ -229,11 +229,32 @@ def test_spectrum_option_matches_full_node(substeps):
     if substeps:
         rows, _ = subdivide_flights(rows, composition=CARBON, max_dE_frac=1e-3)
     kwargs = dict(CXR_KWARGS, components=not substeps)
-    ref = mc_cxr_spectrum(rows, grid, **kwargs)
+    ref = mc_cxr_spectrum(rows, grid, node_support_cutoff=None, **kwargs)
     got = mc_cxr_spectrum(rows, grid, node_support_cutoff=100.0, **kwargs)
     for r, o in zip(np.atleast_2d(ref), np.atleast_2d(got), strict=True):
         dy, l1 = _yield_l1(r, o)
         assert abs(dy) < 1e-4 and l1 < 2e-3
+
+
+def test_default_is_automatic_window_and_none_is_reference():
+    from pyrite.montecarlo.spectrum import mc_cxr_spectrum, subdivide_flights
+    from tests.montecarlo.spectrum.test_substep_invariance import (
+        CARBON,
+        CXR_KWARGS,
+        _flights,
+    )
+
+    grid = np.arange(700.0, 1300.0, 0.05)
+    rows, _ = subdivide_flights(_flights(Ne=4), composition=CARBON, max_dE_frac=1e-3)
+    kwargs = dict(CXR_KWARGS, components=False)
+    default = mc_cxr_spectrum(rows, grid, **kwargs)
+    np.testing.assert_array_equal(
+        default, mc_cxr_spectrum(rows, grid, node_support_cutoff="auto", **kwargs)
+    )
+    ref = mc_cxr_spectrum(rows, grid, node_support_cutoff=None, **kwargs)
+    assert not np.array_equal(default, ref)
+    dy, l1 = _yield_l1(ref, default)
+    assert abs(dy) < 1e-4 and l1 < 2e-3
 
 
 @pytest.mark.parametrize(

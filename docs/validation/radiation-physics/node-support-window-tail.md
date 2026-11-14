@@ -166,10 +166,13 @@ centroid, peak, FWHM, binned mass-L1 and line/background accuracy require the
 saved-scene qualification; no universal relative tolerance follows from the
 per-endpoint envelopes above. Node sampling must resolve the relevant beat;
 coarse or aliasing grids cannot inherit the isolated continuous-integral bound.
-The opt-in automatic policy retains exact full-node evaluation whenever the
-fastest endpoint beat has fewer than four samples per cycle; explicit numeric
-cutoffs remain available for controlled qualification. Unsupported routes stay
-on their reference reduction.
+The automatic policy (the default since `CXR_ESCAPE_MODEL` v8) retains exact
+full-node evaluation whenever the fastest endpoint beat has fewer than four
+samples per cycle; explicit numeric cutoffs remain available for controlled
+qualification, and `node_support_cutoff=None` selects the full-node reference.
+Unsupported routes stay on their reference reduction. On CuPy the automatic
+policy windows only the flight-grouped route: per-row lines keep the dense
+full-node reducer, which is exact and faster on every measured uncapped scene.
 
 The tail $K(0)=0$ is added everywhere by float64 FFT convolution, and exact
 windows add exact minus $K$. Distant poles use geometric recentering (at most
@@ -200,8 +203,42 @@ trusted #1142/#1143 transports, reporting first calls separately from three
 warm repeats. It applies the existing yield/centroid $10^{-3}$ and peak/FWHM,
 normalized 100 eV mass-L1, fixed-window line/background $10^{-2}$ margins.
 Reports retain code identity, transport digest, population, backend, cap,
-grid, memory and timing spread. Measurements before the revised fences do
-not qualify their changed support or cost; the final revision needs new runs.
+grid, memory and timing spread.
+
+### Frozen-scene qualification (RTX 5080, 2026-11-14)
+
+Automatic policy against the full-node reference, 1024 histories, 0.09375 eV
+grids (near-range Si 0.1875 eV), warm medians in seconds per call. Cap arms ran
+at `2d6495f31` and uncapped arms were rerun at `52cd8e78b`. Grouped planning and
+kernels are identical between the two revisions. Every scene passes every
+margin. Yield shifts are about $10^{-5}$ uncapped (tail-correction level) and
+at most $10^{-6}$ capped; mass-L1 is at most $6\times10^{-6}$. The largest
+timing spread is 0.036, except the two sub-0.1 s HOPG uncapped arms, where
+only the first warm repeat is slow.
+
+| Scene | Arm | Full-node | Window | Speedup |
+|---|---|---:|---:|---:|
+| thin HOPG | uncapped | 0.0438 | 0.0554 | 0.79 |
+| thin HOPG | half-cap | 10.94 | 2.97 | 3.68 |
+| thin HOPG | quarter-cap | 26.30 | 6.14 | 4.28 |
+| thin Si | uncapped | 0.516 | 0.745 | 0.69 |
+| thin Si | half-cap | 3.69 | 5.75 | 0.64 |
+| thin Si | quarter-cap | 5.90 | 7.76 | 0.76 |
+| layered | uncapped | 1.072 | 0.604 | 1.78 |
+| near-range HOPG | uncapped | 0.0765 | 0.106 | 0.72 |
+| near-range HOPG | half-cap | 34.60 | 9.66 | 3.58 |
+| near-range HOPG | quarter-cap | 79.86 | 18.98 | 4.21 |
+| near-range Si | uncapped | 0.948 | 1.821 | 0.52 |
+| near-range Si | half-cap | 92.19 | 71.23 | 1.29 |
+
+Windowed grouped scoring cuts the HOPG cap-arm penalty over the uncapped call
+from 250-1040x to 54-180x. Two cases do not speed up. First, device per-row
+windowing loses to the dense float32 reducer; the default policy therefore
+keeps CuPy per-row lines on the dense reducer, so they equal the full-node
+reference. Second, host window planning dominates thin-Si capped calls
+(interpolation and endpoint clustering, about 2.4 s of a 4.9 s call). Seeded
+physics-baseline cases use coarse grids whose beats are unresolved, so the
+automatic policy evaluates them exactly (agreement $10^{-15}$).
 
 
 ## Independent verdict (2026-11-14)

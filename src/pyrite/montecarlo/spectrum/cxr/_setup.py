@@ -52,7 +52,10 @@ from ._temporal import segment_arrival_times
 # v7 (#1134): PXR/CBS amplitudes are the exact second-order elements (quantum
 # CB denominators and transition currents, cbs-amplitude), percent-level
 # sub-100 keV line intensities.
-CXR_ESCAPE_MODEL = "segment-mean-v7-quantum-elements"
+# v8 (#1191): incoherent node scoring defaults to the support-windowed
+# reduction with its analytic far tail (node-support-window-tail), a ~1e-5
+# relative yield shift on the frozen #1142/#1143 scenes.
+CXR_ESCAPE_MODEL = "segment-mean-v8-node-support-tail"
 
 
 #: Size of the most recent line setups' tabulation, for performance telemetry.
@@ -92,7 +95,7 @@ class SpectrumRequest:
     azimuth_rad: Any = 0.0
     recip_miscut_rad: Any = None
     sinc_cutoff: Any = None
-    node_support_cutoff: Any = None
+    node_support_cutoff: Any = "auto"
     components: Any = False
     layers: Any = None
     mosaic_fwhm_rad: Any = None
@@ -193,6 +196,9 @@ class _SpectrumSetup:
     # (``_node_window.NodeTail``), applied before finalization.
     # Validation: node-support-window-tail
     node_tail: Any = None
+    # The same accumulator when the per-row route windows too, else None: the
+    # automatic device policy keeps per-row lines on the dense reducer.
+    row_tail: Any = None
     # Opt-in temporal profile only: this call's float64 buffer and the
     # realized / offset-free retarded arrival times per row.
     # Validation: temporal-intensity-profile
@@ -407,7 +413,8 @@ def _node_tail(request, E_grid_host):
     """The far-tail accumulator of the windowed node reduction, or None.
 
     NumPy/float32 CuPy backends and uniform grids only; elsewhere the full-node
-    reduction runs, which is the reference the window approximates.
+    reduction runs, which is the reference the window approximates. Under
+    ``"auto"`` on CuPy only the flight-grouped route windows (``windows_rows``).
     Validation: node-support-window-tail
     """
     x_c = request.node_support_cutoff
@@ -433,7 +440,17 @@ def _node_tail(request, E_grid_host):
     else:
         tail = NodeTail(E_grid_host, n_targets, x_c)
     tail.resolved_only = automatic
+    # Automatic device policy: the dense float32 per-row reducer outruns the
+    # support scatter on every measured uncapped scene (#1191 qualification),
+    # so only the flight-grouped route windows there. Full-node per-row
+    # scoring is the reference, so this is exact for those lines.
+    tail.windows_rows = not (automatic and getattr(xp, "__name__", "") == "cupy")
     return tail
+
+
+def _row_tail(node_tail):
+    """The accumulator the per-row route windows into, or None (dense reducer)."""
+    return node_tail if node_tail is not None and node_tail.windows_rows else None
 
 
 def _refuse_grouped_reduction(request, grouped):
@@ -1055,6 +1072,7 @@ def _prepare_spectrum(request):
         xy0_pop=offsets.xy0_pop,
         bin_edges=bin_edges,
         node_tail=node_tail,
+        row_tail=_row_tail(node_tail),
         bin_inv_width=bin_inv_width,
         escape_pieces=escape_pieces,
         escape_ends=escape_ends,

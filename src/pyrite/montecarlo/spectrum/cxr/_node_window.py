@@ -91,6 +91,7 @@ class NodeTail:
         self.pad = self.n
         self.x_c = float(x_c)
         self.resolved_only = False
+        self.windows_rows = True
         L = self.n + 2 * self.pad
         self._dep = np.zeros((n_targets, 3, L))
         self._far = [[] for _ in range(n_targets)]

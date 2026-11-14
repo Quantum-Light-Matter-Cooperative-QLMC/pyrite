@@ -168,7 +168,8 @@ def _yield(grid, spec):
 def test_bin_mean_yield_is_spacing_independent_where_node_sampling_aliases():
     segs = _long_flights()
     dense = _uniform_axis(0.002, 701.0, 1499.0)
-    reference = _yield(dense, mc_cxr_spectrum(segs, dense, **_KW))
+    # Exact node reference: the default support window adds ~1e-5 tail error.
+    reference = _yield(dense, mc_cxr_spectrum(segs, dense, node_support_cutoff=None, **_KW))
     for spacing in SPACINGS_EV:
         grid = _uniform_axis(spacing, 701.0, 1499.0)
         binned = _yield(grid, mc_cxr_spectrum(segs, grid, line_quadrature="bin-mean", **_KW))

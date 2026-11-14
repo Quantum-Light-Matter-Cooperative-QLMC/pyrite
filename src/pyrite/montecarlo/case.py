@@ -272,9 +272,10 @@ class Case(Mapping[str, Any]):
         floor the inter-electron blend may omit; absent is the policy default
         and ``0`` the full blend. Validation: coherent-flat-term-omission
     node_support_cutoff
-        Dimensionless support width for incoherent node scoring; absent/None
-        retains the full-node reference. Positive values retain analytic tails;
-        "auto" additionally checks node resolution and skips unsupported routes.
+        Dimensionless support width for incoherent node scoring; absent is
+        "auto" (x_c=100 on supported routes, unresolved beats and unsupported
+        routes kept exact); None retains the full-node reference. Positive
+        values window every supported route with analytic tails.
     line_roulette
         Opt-in incoherent line-scoring roulette as a
         :class:`pyrite._line_roulette.LineRoulette` record; absent is analog

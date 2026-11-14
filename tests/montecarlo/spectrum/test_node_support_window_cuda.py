@@ -84,7 +84,7 @@ def test_public_batched_spectrum_uses_device_window(monkeypatch, cutoff):
         pytest.skip("run with PYRITE_TEST_BACKEND=cuda or rocm")
     grid = np.arange(700.0, 1300.0, 0.1)
     rows = _flights(Ne=2)
-    ref = mc_cxr_spectrum(rows, grid, components=False, **CXR_KWARGS)
+    ref = mc_cxr_spectrum(rows, grid, components=False, node_support_cutoff=None, **CXR_KWARGS)
     calls = []
     original = _node_window_cuda.accumulate_rows
 
@@ -94,6 +94,7 @@ def test_public_batched_spectrum_uses_device_window(monkeypatch, cutoff):
 
     monkeypatch.setattr(_node_window_cuda, "accumulate_rows", record)
     got = mc_cxr_spectrum(rows, grid, components=False, node_support_cutoff=cutoff, **CXR_KWARGS)
-    assert sum(calls) > 0
+    # Automatic device policy keeps per-row lines on the dense reducer.
+    assert (sum(calls) > 0) == (cutoff != "auto")
     assert abs(got.sum() / ref.sum() - 1) < 1e-4
     assert np.abs(got - ref).sum() / ref.sum() < 2e-3

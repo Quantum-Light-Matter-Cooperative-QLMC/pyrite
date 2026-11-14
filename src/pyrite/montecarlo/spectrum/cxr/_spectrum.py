@@ -38,7 +38,7 @@ def mc_cxr_spectrum(
     recip_miscut_rad: tuple[float, float] | None = None,
     sinc_cutoff=None,
     components=False,
-    node_support_cutoff=None,
+    node_support_cutoff="auto",
     layers=None,
     mosaic_fwhm_rad=None,
     mosaic_nodes=1,
@@ -135,10 +135,12 @@ def mc_cxr_spectrum(
         on saved scenes). ``None`` is the full-node reference. NumPy or float32 CuPy on
         uniform grids only; other configurations run the full-node reduction.
         Explicit numeric cutoffs are refused with ``coherent``, ``sinc_cutoff``
-        and bin-mean quadrature. ``"auto"`` selects 100 on supported routes and
-        retains exact full-node evaluation for lines whose beat is unresolved
-        (fewer than four samples per fastest phase cycle); unsupported routes
-        retain their reference reduction.
+        and bin-mean quadrature. The default ``"auto"`` selects 100 on
+        supported routes and retains exact full-node evaluation for lines
+        whose beat is unresolved (fewer than four samples per fastest phase
+        cycle); unsupported routes retain their reference reduction, and on
+        CuPy only the flight-grouped route windows (the dense per-row reducer
+        is faster there).
         Validation: node-support-window-tail
     components
         Return separate PXR and CBS diagonal contributions with the total.

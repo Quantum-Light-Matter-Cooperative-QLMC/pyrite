@@ -877,14 +877,14 @@ def _batched_incoherent_block(st, bt, blk, cxr_batch):
     if components:
         targets.append((pref * A2_pxr * WM, spec_pxr))
         targets.append((pref * A2_cbs * WM, spec_cbs))
-    if st.node_tail is not None:  # Validation: node-support-window-tail
+    if st.row_tail is not None:  # Validation: node-support-window-tail
         accumulate_sincsq_windowed(
             E_r_f,
             aw_f,
             [w.reshape(-1)[gm_idx] for w, _ in targets],
             E_grid,
             [tgt for _, tgt in targets],
-            st.node_tail,
+            st.row_tail,
             range(len(targets)),
         )
         targets = []
@@ -1178,7 +1178,7 @@ def _accumulate_batched(st):
     coh_blocks = []
     coh_counts = []
     cxr_batch = (
-        _CxrBatch(spec, E_grid, st.bin_edges, st.bin_inv_width, st.node_tail)
+        _CxrBatch(spec, E_grid, st.bin_edges, st.bin_inv_width, st.row_tail)
         if _use_jit_cxr_reduction
         else None
     )
