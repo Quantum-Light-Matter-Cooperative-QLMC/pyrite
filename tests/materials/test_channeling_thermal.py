@@ -1,4 +1,4 @@
-"""Uniaxial layered thermal rows: source values, window and projection limits."""
+"""Channeling thermal rows: uniaxial layered source values, window and projection limits; GaAs rows."""
 
 import numpy as np
 import pytest
@@ -48,3 +48,13 @@ def test_uniaxial_projection_limits():
     assert site.b_factor_along(0.25, 295.0) == pytest.approx(
         8 * np.pi**2 * (0.75 * 0.0038 + 0.25 * 0.0049)
     )
+
+
+def test_gaas_rows_reproduce_the_measured_room_temperature_displacements():
+    # Schowalter et al. (2009) Table 6 (LDA) rows; Stahn et al. (1998) measured
+    # <u^2> at 287 K: Ga 0.00844, As 0.00716 angstrom^2 (quoted in Schowalter
+    # Sec. 4). Linear interpolation between the 200/400 K rows stays within 2%.
+    for element, u2 in (("Ga", 0.00844), ("As", 0.00716)):
+        b = thermal_b_factor("gaas", element, 287.0)
+        assert b == pytest.approx(8.0 * np.pi**2 * u2, rel=0.02), element
+    assert thermal_b_factor("gaas", "Ga", 300.0) > thermal_b_factor("gaas", "As", 300.0)

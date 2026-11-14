@@ -72,6 +72,14 @@ def load_conduction_bands(path: str | Path | None = None) -> dict[str, Conductio
     }
 
 
+def _persistent_id(entry: Mapping[str, object]) -> str:
+    """Return ``doi:<doi>`` or, for a report without one, ``OSTI:<id>``."""
+    doi, osti = str(entry.get("doi", "")), str(entry.get("osti", ""))
+    if bool(doi) == bool(osti):
+        raise ValueError("conduction-band entry needs exactly one of doi or osti")
+    return f"doi:{doi}" if doi else f"OSTI:{osti}"
+
+
 @lru_cache(maxsize=8)
 def _parse_conduction_bands(data: bytes, source: str) -> dict[str, ConductionBand]:
     """Reuse validated records by exact contents and source-specific diagnostics."""
@@ -83,7 +91,7 @@ def _parse_conduction_bands(data: bytes, source: str) -> dict[str, ConductionBan
             band = ConductionBand(
                 float(entry["electrons_per_formula"]),
                 float(entry["resonance_eV"]),
-                f"{entry['source']}; doi:{entry['doi']}",
+                f"{entry['source']}; {_persistent_id(entry)}",
                 formula,
             )
         except (KeyError, TypeError, ValueError) as exc:
