@@ -14,7 +14,6 @@ from dataclasses import replace
 import numpy as np
 
 from ...._backend import REAL, _to_cpu, xp
-from ....materials.attenuation import _mu_total_inv_ang
 from ....materials.crystal import ALPHA_FS, HBARC_EV_ANG, reciprocal_g_vector
 from ..coherent_population import mixed_row_power, pair_scale
 from ..coherent_transverse import transverse_envelope, transverse_form_factor
@@ -22,6 +21,7 @@ from ..segment_escape import piece_mean_transmission
 from . import _policy
 from ._bin_quadrature import sincsq_bin_lineshape
 from ._cpu_reduce import accumulate_sincsq, numpy_backend
+from ._escape_mu import escape_mu_tables
 from ._formation import (
     _formation_cxr,
     formation_profile,
@@ -800,7 +800,20 @@ def _accumulate_reflection_coherent(
 
 
 def _accumulate_reflection(
-    st, g_vec_d, e_s, e_p, g2, n_dot_g, g_dot_es, g_dot_ep, chi_re, chi_im, u_re, u_im, wm
+    st,
+    g_vec_d,
+    e_s,
+    e_p,
+    g2,
+    n_dot_g,
+    g_dot_es,
+    g_dot_ep,
+    chi_re,
+    chi_im,
+    u_re,
+    u_im,
+    wm,
+    mu_tables=None,
 ):
     """Add one reflection's contribution for crystallite reciprocal vector
     ``g_vec_d``, scaled by the mosaic-quadrature weight ``wm``, into spec /
@@ -821,10 +834,7 @@ def _accumulate_reflection(
 
     req = st.request
     components = req.components
-    layers = req.layers
-    groove = req.groove
     coherent = req.coherent
-    abs_comp = st.abs_comp
     E_grid = st.E_grid
     spec = st.spec
     spec_pxr = st.spec_pxr
@@ -958,13 +968,13 @@ def _accumulate_reflection(
     # ``segment_escape``). Only mu depends on the orientation-shifted line
     # energy E_r, so it is evaluated here per orientation: the tabulated
     # compound value for a single slab, exact per-point values for a groove
-    # (Validation: blazed-groove-geometry) or per layer.
-    if groove is not None:
-        mu_layers = [_mu_total_inv_ang(abs_comp, E_r)]
-    elif layers is None:
+    # (Validation: blazed-groove-geometry) or per layer. The exact values come
+    # from ``mu_tables``, the per-composition device tables the caller builds
+    # once (``_escape_mu``), not a host EPDL call per row and layer (#1194).
+    if mu_tables is None:
         mu_layers = [mu_i]
     else:
-        mu_layers = [_mu_total_inv_ang(comp, E_r) for _, _, comp in layers]
+        mu_layers = [table(E_r) for table in mu_tables]
     if coherent or grouped:
         # Coherent and flight-grouped reductions: the rows are linear escape
         # pieces (``_setup``), and each carries its exact complex formation
@@ -1197,6 +1207,8 @@ def _accumulate_per_hkl(st):
     N_DOT_G = _matvec3(G, n_hat_d)
     G_DOT_ES = _rowdot3(G, ES)
     G_DOT_EP = _rowdot3(G, EP)
+    # Exact per-layer (or groove) escape mu, folded once per call.
+    mu_tables = escape_mu_tables(req, st.abs_comp)
     _nsys_pop()
 
     for i_row, (wm, i_hkl) in enumerate(zip(wm_rows, hkl_of_row, strict=True)):
@@ -1214,4 +1226,5 @@ def _accumulate_per_hkl(st):
             U_RE[i_hkl],
             U_IM[i_hkl],
             wm,
+            mu_tables,
         )

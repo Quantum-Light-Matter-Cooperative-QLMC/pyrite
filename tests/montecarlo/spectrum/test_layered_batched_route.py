@@ -169,3 +169,29 @@ def test_exact_mu_table_is_nan_outside_the_epdl_band():
     table = exact_mu_table(GRAPHITE)
     out = to_host(table(xp.asarray([0.5, 2.0e11], dtype=REAL)))
     assert np.isnan(out).all()
+
+
+def _host_mu_tables(request, abs_comp):
+    """The pre-#1194 per-hkl escape mu: one host EPDL call per row and layer."""
+    comps = [comp for _, _, comp in request.layers] if request.layers is not None else [abs_comp]
+    return tuple(
+        (lambda E, comp=comp: xp.asarray(_mu_total_inv_ang(comp, E), dtype=REAL)) for comp in comps
+    )
+
+
+@pytest.mark.parametrize(
+    "geometry",
+    [
+        pytest.param({"layers": LAYERS, "n_hat": TILTED_N_HAT}, id="layered"),
+        pytest.param({"groove": GROOVE, "n_hat": GROOVE_N_HAT}, id="grooved"),
+    ],
+)
+def test_batched_route_matches_the_per_hkl_loop_on_host_attenuation(monkeypatch, geometry):
+    """Independent reference: the per-hkl loop on the host EPDL sum, not the device table."""
+    import pyrite.montecarlo.spectrum.cxr._per_hkl as per_hkl_module
+
+    monkeypatch.setattr(per_hkl_module, "escape_mu_tables", _host_mu_tables)
+    batched, per_hkl = _both_routes(
+        monkeypatch, E_grid_eV=np.arange(500.0, 4000.0, 2.0), **geometry
+    )
+    _assert_routes_agree(batched, per_hkl)
