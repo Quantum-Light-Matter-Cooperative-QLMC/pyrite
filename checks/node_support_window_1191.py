@@ -111,7 +111,7 @@ def main():
     parser.add_argument("source", type=Path)
     parser.add_argument("output", type=Path)
     parser.add_argument("--spacing", type=float, default=0.09375)
-    parser.add_argument("--cutoff", type=float, default=100.0)
+    parser.add_argument("--cutoff", type=lambda v: v if v == "auto" else float(v), default=100.0)
     parser.add_argument("--repeats", type=int, default=3)
     args = parser.parse_args()
     if args.repeats < 2:

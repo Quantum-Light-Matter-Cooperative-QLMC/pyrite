@@ -200,7 +200,7 @@ def test_node_support_cutoff_restores_old_slots_and_round_trips_new_key():
     restored.__setstate__(old_state)
     assert "node_support_cutoff" not in restored
     assert restored == legacy
-    for cutoff in (None, 100.0):
+    for cutoff in (None, 100.0, "auto"):
         case = Case(**dict(legacy, node_support_cutoff=cutoff))
         assert pickle.loads(pickle.dumps(case)).get("node_support_cutoff") == cutoff
         assert Case(**case.to_dict()) == case

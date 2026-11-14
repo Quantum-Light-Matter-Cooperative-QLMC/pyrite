@@ -72,7 +72,9 @@ def test_device_window_matches_host(grouped, cutoff):
         assert np.abs(got - ref).sum() / np.abs(ref).sum() < 3e-4
 
 
-def test_public_batched_spectrum_uses_device_window(monkeypatch):
+@pytest.mark.slow
+@pytest.mark.parametrize("cutoff", [100.0, "auto"])
+def test_public_batched_spectrum_uses_device_window(monkeypatch, cutoff):
     from pyrite._backend import BACKEND, CUPY_BACKENDS
     from pyrite.montecarlo.spectrum import mc_cxr_spectrum
     from pyrite.montecarlo.spectrum.cxr import _node_window_cuda
@@ -91,7 +93,7 @@ def test_public_batched_spectrum_uses_device_window(monkeypatch):
         return original(*args)
 
     monkeypatch.setattr(_node_window_cuda, "accumulate_rows", record)
-    got = mc_cxr_spectrum(rows, grid, components=False, node_support_cutoff=100.0, **CXR_KWARGS)
+    got = mc_cxr_spectrum(rows, grid, components=False, node_support_cutoff=cutoff, **CXR_KWARGS)
     assert sum(calls) > 0
     assert abs(got.sum() / ref.sum() - 1) < 1e-4
     assert np.abs(got - ref).sum() / ref.sum() < 2e-3

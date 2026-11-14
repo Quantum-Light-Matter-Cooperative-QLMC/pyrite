@@ -1,145 +1,210 @@
 # Support-windowed node reduction with an analytic far tail
 
-Validation: `node-support-window-tail`. Status: **unverified** (issue #1191).
+Validation: `node-support-window-tail`. Status: **rederived**
+(issue #1191), applied by the task owner after the fresh-context recheck below.
+No human sign-off implied.
 
-## Need
+## Quantity, source and conventions
 
-The incoherent CXR node reduction evaluates every kept line on every grid node.
-In the flight-grouped (substepped) route it evaluates every flight's coherent
-row sum on every node. Cost is therefore lines × nodes, although a line's mass
-sits within a few dozen first-zero widths of its pole. Truncating the profile
-at $|v| > x_c$ would drop $1/(\pi x_c)$ of each line's mass (0.3 % at
-$x_c = 100$); holding the #1143 yield margin that way needs $x_c \approx 3\times10^4$.
-The human decision on #1191 is to keep the tail analytically.
+Source: the exact linear-escape formation integral in
+[coherent-formation-absorption](coherent-formation-absorption.md), with the
+straight-flight split limit of `substep-radiation-invariance`. This record
+checks the algebra and explicit approximation envelopes of a numerical
+reduction. Relative spectral accuracy is qualified separately on saved scenes.
 
-## Derivation
-
-**Endpoint form.** A flight's rows $j$ (linear escape pieces of contiguous
-substeps) carry the formation field of `coherent-formation-absorption`:
-
-$$
-S(E)=\sum_j c_j e^{i\phi_j}\,\frac{b_j e^{iv_j}-a_j e^{-iv_j}}{2w_j},\qquad
-w_j=iv_j-q_j=i a_j\,(E-p_j),\qquad p_j=E_{k,j}-\frac{i q_j}{a_j},
-$$
-
-with $a_j=e^{-\tau_{\mathrm{start}}/2}$, $b_j=e^{-\tau_{\mathrm{end}}/2}$ and
-$E_{k,j}=E_{\mathrm{vac},j}+\tfrac12\Delta L_j\,\delta\omega(E_{\mathrm{vac},j})/a_j$.
-This is exact, so $S$ is a sum of endpoint amplitudes
-$\gamma_k e^{i\psi_k(E)}/(E-p_k)$:
-
-- end: $\gamma=c\,b/(2ia)$, $\psi=\phi+v$;
-- start: $\gamma=-c\,a/(2ia)$, $\psi=\phi-v$.
-
-$\psi_k$ is the emission phase $\omega t-\mathbf g\cdot\mathbf r-\omega\delta L_{\mathrm{esc}}$
-at that endpoint. Its energy slope is the endpoint's observer arrival time.
-
-**Cancellation at junctions.** Two contiguous rows share a junction point, its
-time and its escape distance. The two terms there therefore have the same
-$\psi$, the same slope and the same attenuation ($b_j=a_{j+1}$). With
-$c\propto t_L$ and $a\propto t_L$ they cancel exactly for an unchirped
-straight flight; energy loss along the flight leaves an $O(\Delta\beta)$
-residual. This is the split invariance of `substep-radiation-invariance`
-restated at the endpoints. Far from the poles only the flight's two outer
-endpoints survive, so the far field follows the *flight's* width
-$a_F=\sum_j a_j$, not a substep's.
-
-**Cycle average.** Endpoints with different slopes beat at their slope
-difference. Averaged over that beat their cross terms vanish, so
+Use $s_j$ for the formation slope [eV$^{-1}$], $h_j=\Delta L_j/2$ [angstrom],
+$d(E)=\delta\omega(E)$ [angstrom$^{-1}$], and $u_j,b_j$ for dimensionless start
+and end attenuation amplitudes. The formation mismatch and field are
 
 $$
-\langle|S|^2\rangle=\sum_{\text{clusters}}\Big|\sum_{k\in C}\frac{g_k}{x-e_k}\Big|^2,\qquad
-g_k=\gamma_k e^{i\psi_k(E_n)},\; x=E-E_n,\; e_k=p_k-E_n .
+v_j=s_j(E-E_{v,j})-h_jd(E),\qquad
+F_j=\frac{b_je^{iv_j}-u_je^{-iv_j}}{2(iv_j-q_j)},\qquad
+S(E)=\sum_j c_j e^{i\phi_j(E)}F_j(E).
 $$
 
-A cluster is a set of endpoints with equal slope (tolerance $10^{-3}\cdot 2a_F$).
-Expanded to second order in $e_k/x$ about the flight's node $E_n$:
+The coefficients $c_j$ contain the caller's field weight. The reduction sums
+$|S|^2$ over polarizations and flights, then applies the caller's angular and
+per-primary normalization. Endpoint moments $m_2,m_3,m_4$ have units intensity
+$\times$ eV$^2$, eV$^3$, eV$^4$; their inverse powers return intensity.
+
+## Independent derivation and the repaired discrepancies
+
+The first fresh-context review of source `37a1c11ae` found two failures:
+adjacent slope comparisons chained distinct endpoints into one cluster for a
+1024-way straight split, and freezing $d(E)$ was incorrectly described as an
+exact pole decomposition. These failed the limits filter. Both now have
+regression tests; the revised fences below replace the unsupported claims.
+
+### Affine mismatch and complex-pole sign
+
+If $d(E)=\beta E+\gamma$, define
 
 $$
-\langle|S|^2\rangle=\frac{|A_0|^2}{x^2}+\frac{2\,\mathrm{Re}(A_0A_1^*)}{x^3}+\frac{|A_1|^2+2\,\mathrm{Re}(A_0A_2^*)}{x^4},
-\qquad A_m=\sum_k g_k e_k^m .
+A_j=s_j-h_j\beta,\qquad
+E_{k,j}=\frac{s_jE_{v,j}+h_j\gamma}{A_j},\qquad
+p_j=E_{k,j}-i\frac{q_j}{A_j}.
 $$
 
-Absorption enters through the complex poles; chirp and refraction enter through
-the spread of $\mathrm{Re}\,e_k$. **Limit:** for one undamped row,
-$A_0=\gamma$, $|\gamma_{\mathrm{end}}|^2+|\gamma_{\mathrm{start}}|^2=|c|^2/(2a^2)$,
-which is the cycle average $\langle\sin^2\rangle/(a x)^2$ of $|c|^2\mathrm{sinc}^2(ax)$.
-The incoherent per-row route is the same expansion with a real pole:
-$m_2=w/(2a^2)$, $m_3=2\varepsilon m_2$, $m_4=3\varepsilon^2m_2$, $\varepsilon=E_r-E_n$.
+Then $iv_j-q_j=iA_j(E-p_j)$ exactly. Endpoint residues are
+$c_jb_j/(2iA_j)$ and $-c_ju_j/(2iA_j)$, with phases $\phi_j+v_j$ and
+$\phi_j-v_j$. Both the residues and pole width use $A_j$, not $s_j$.
+Nonpositive $A_j$ falls back to exact full-grid evaluation. Affine recognition
+allows only float64 arithmetic roundoff, not a fitted curvature tolerance.
 
-**Window.** A flight is evaluated exactly on nodes with $|E-E_n|\le \mathrm{spread}+W$, where
+An independent probe with $s=1$, $h=10000$, $\beta=10^{-6}$, $E_v=990$
+gives $A=0.99$, $E_k=1000$, and $m_2=0.5/0.99^2=0.5101520253035404$.
+The revised implementation agrees to roundoff.
+
+### Non-affine dispersion is a bounded denominator surrogate
+
+For general tabulated $d$, freeze its denominator at $d(E_v)$:
+$p=E_v+hd(E_v)/s-iq/s$. The omitted term is
+$\Delta w=-ih[d(E)-d(E_v)]$; it is **not zero**. Let
 
 $$
-W=x_c\max\!\Big(\frac1{a_F},\;\max_j\frac{|q_j|}{a_j},\;\frac{2}{g_{\min}}\Big).
+D_j=\max\bigl(|d_{\min}-d(E_{v,j})|,|d_{\max}-d(E_{v,j})|\bigr).
 $$
 
-Here $g_{\min}$ is the smallest slope gap between *significant* clusters
-(intensity $\ge10^{-4}$ of the flight's largest). The first term makes the
-flight's ends beat $x_c$ times across the window. The second keeps the complex
-pole offset at $\le 1/x_c$ of $x$. The third covers non-contiguous rows, whose
-uncancelled endpoints may beat slowly; such flights fall back toward the full
-node sum rather than being approximated.
+The exact window includes a reach of at least $x_c|h_j|D_j/s_j$ from every
+real pole centre. On every far node,
 
-**Bookkeeping.** $K(x)=m_2/x^2+m_3/x^3+m_4/x^4$ (with $K(0)=0$) is added to
-every node by one float64 FFT convolution per call. Inside its window each
-flight adds (exact − $K$), so each node holds the exact value inside the window
-and the tail outside it. Poles beyond a band-wide margin are aggregated into
-geometric bins (re-centred by $\le 1/32$ of their distance). A far pole whose
-window still reaches the band is evaluated directly.
+$$
+\rho_j=\frac{|\Delta w_j|}{|w_{0,j}|}\le\frac1{x_c}<1,\qquad
+\left|\frac1{w_j}-\frac1{w_{0,j}}\right|
+\le\frac{\rho_j}{1-\rho_j}\frac1{|w_{0,j}|}.
+$$
 
-## Assumptions
+Sum these endpoint field-error envelopes **before** bounding intensity.
+If $B_d$ is that sum and $S_0$ the frozen-denominator field, then
+$\bigl||S|^2-|S_0|^2\bigr|\le2|S_0|B_d+B_d^2$.
+This is an absolute endpoint-envelope bound. It does not guarantee a small
+relative intensity error when endpoints interfere destructively. It is
+separate from the weak-cluster budget below. For $x_c\le1$, grouped scoring
+uses the exact full-grid reference.
 
-- Rows of one flight are contiguous linear escape pieces on one straight path.
-  This is what transport substeps and `expand_escape_pieces` produce; the
-  slope-gap term makes other inputs safe but slow.
-- The grid is uniform. Other grids keep the full-node reduction.
-- The reduction samples the profile at nodes. The tail replaces $\sin^2$ samples
-  by their mean $\tfrac12$, which matches the reference only where nodes resolve
-  the beat ($a\,\Delta E\ll\pi$). That holds on the #1143 reference grids by
-  construction.
+### Phase clusters and junction cancellation
 
-## Error
+Let $d_i$ be the observer-arrival length (midpoint time times light speed
+minus the observation-direction path projection), distinct from dispersion
+$d(E)$. Every endpoint has the phase function
 
-Plain truncation would lose $1/(\pi x_c)$ of the mass. The tail leaves:
+$$
+\psi_i(E)=\kappa_iE+\lambda_i d(E)+\zeta_i,\qquad
+\kappa_i=d_i/\hbar c\pm s_i,\quad
+\lambda_i=-L_{\mathrm{esc},i}\mp h_i.
+$$
 
-- the $\cos 2v/(2v^2)$ oscillation, $O(1/x_c^2)$ of line mass;
-- the expansion remainder, $O((\mathrm{spread}/W)^3)$;
-- cross terms of residual junctions, $O(\sqrt{10^{-4}}/(\pi x_c))$.
+For affine-corrected rows the equivalent coefficients use $A_i$ and the
+transformed centre. Cluster membership compares each endpoint with **one
+representative**, never its preceding neighbor. Its maximum band drift is
+bounded by
 
-Measured at $x_c=100$ against the full-node kernels (anchors below):
+$$
+\eta_i=|\Delta\kappa_i|\max_{E\in\mathrm{band}}|E-E_n|
+       +|\Delta\lambda_i|\max_{E\in\mathrm{band}}|d(E)-d(E_n)|.
+$$
 
-| case | yield | mass-L1 |
-|---|---|---|
-| 1500 random lines, in/out of band, 3 targets | $<5\times10^{-5}$ | $<3\times10^{-4}$ |
-| 120 contiguous flights, 1–32 rows, chirp $\le1\%$, absorption, refraction | $<5\times10^{-5}$ | $<2\times10^{-3}$ |
-| straight flight split 1 vs 16 rows | identical to $10^{-9}$ | — |
-| random non-contiguous rows (guard active) | $<10^{-5}$ | $<10^{-4}$ |
+Only $\eta_i\le10^{-3}$ rad joins the representative; the constant phase at
+$E_n$ stays in the complex residue. Since $|e^{it}-1|\le|t|$, the field-error
+bound is the sum of $|g_i|\eta_i/(|x|-|e_i|)$, in addition to the denominator
+error above. Equal secant slopes alone do not establish equal nonlinear
+phase functions.
 
-The centroid error is below $10^{-5}$ relative. All of these lie well inside
-the #1143 margins (yield and centroid $10^{-3}$, peak/FWHM and mass-L1 $10^{-2}$).
-With grid-wide windows both routes reproduce the reference to FFT roundoff.
+A shared junction cancels exactly only when its attenuation, phase function,
+pole and residue $c/A$ match. A transparent unchirped straight flight meets
+that condition. Chirped rows need not cancel; their residual endpoints remain
+in the expansion and window fences. Splits into 1, 16 and 1024 pieces now give
+identical windows and moments, including $m_2=0.5$ for $s_F=c_F=1$.
 
-## Device implementation and replay qualification
+### Multipole field and intensity remainder
 
-NumPy and float32 CuPy share the host window/moment plan. On CuPy, one block
-owns a line or flight and adjacent lanes visit adjacent support nodes. Formation
-fields use float32; corrections, atomic accumulation, and the FFT use float64
-to preserve cancellation near each pole. The correction stays in float64 until
-the tail is added. FP64 CuPy and nonuniform grids retain the full-node reference.
+For $x=E-E_n$, $e_i=p_i-E_n$, and $g_i=\gamma_i e^{i\psi_i(E_n)}$, define
+$A_m=\sum_i g_i e_i^m$ within a cluster. Expanding the rational field gives
 
-`tests/montecarlo/spectrum/test_node_support_window_cuda.py` compares both
-backends with identical quantized inputs: multiple polarization/weight targets,
-split flights with absorption/refraction, direct and far poles, and full-band
-windows. The peak tolerance is $3\times10^{-5}$ plus $3\times10^{-4}$ relative,
-and the relative L1 tolerance is $3\times10^{-4}$. All four tests passed on an
-RTX 5080 (job 12496, source `c95480569`). This is implementation parity evidence;
-the ledger claim remains unverified.
+$$
+T(x)=\frac{A_0}{x}+\frac{A_1}{x^2}+\frac{A_2}{x^3},\qquad
+|R(x)|\le\sum_i\frac{|g_i||e_i|^3}{|x|^3(|x|-|e_i|)}.
+$$
 
-`checks/node_support_window_1191.py` replays a trusted transport pickle through
-both runner routes using `Case.node_support_cutoff` (`None` for the reference,
-100 for support windows). It alternates arm order, reports the first call
-separately from three warm calls, and applies the #1143 yield, centroid, peak,
-FWHM and normalized 100 eV mass-L1 margins. A fixed reference peak window also
-checks line/background against the same directly evaluated continuum. Reports
-include transport digests, synced code identity, backend, grid, population,
-cap, memory, and timing spread. These replays establish numerical/performance
-qualification; they do not provide independent physics validation.
+The exact radius enforces $\max|e_i|/|x|\le0.1$. Averaging the intercluster
+beats and retaining intensity through $x^{-4}$ gives
+
+$$
+K(x)=\frac{|A_0|^2}{x^2}+\frac{2\Re(A_0A_1^*)}{x^3}
+ +\frac{|A_1|^2+2\Re(A_0A_2^*)}{x^4}.
+$$
+
+The truncation error includes **both** $2|T||R|+|R|^2$ and the discarded
+intensity terms $2\Re(A_1A_2^*)/x^5+|A_2|^2/x^6$. The field remainder alone
+is not a bound on the entire intensity error.
+
+### Aggregate weak fields and all-interval beats
+
+At the provisional smallest far distance $r$, the weak-cluster envelope uses
+$|A_0|+|A_1|/r+|A_2|/r^2+r|R(r)|$, plus the phase-drift envelope, summed over
+polarizations. Thus $A_0=0$ does not hide a nonzero $A_1$. Weak clusters may
+be excluded from the beat-gap fence only when their **total** envelope is at
+most $10^{-2}$ times the largest cluster's envelope; otherwise all of them
+remain. This controls omitted surrogate interference by
+$2B_{\mathrm{ret}}B_{\mathrm{weak}}+B_{\mathrm{weak}}^2$; it is not the
+nonlinear-denominator error budget.
+
+For retained clusters the beat derivative is
+$\Delta\kappa+\Delta\lambda d'(E)$. Every interval of the tabulated dispersion
+contributes to the minimum derivative bound. The implementation subtracts
+$(\lambda_{\max}-\lambda_{\min})\max|d'-d_{\mathrm{sec}}|$ from the smallest
+retained secant gap. This is a conservative lower bound for **any** retained
+pair. A nonpositive bound uses full-grid exact windows; otherwise the beat
+reach is at least $2x_c/g_{\min}$.
+
+## Error scope and bookkeeping
+
+The signed integrated oscillatory error of a resolved isolated sinc-squared
+line is $O(x_c^{-2})$. Its mass-L1 error is **$O(x_c^{-1})$**, as is its missing
+mass under plain truncation ($1/(\pi x_c)$). General grouped relative yield,
+centroid, peak, FWHM, binned mass-L1 and line/background accuracy require the
+saved-scene qualification; no universal relative tolerance follows from the
+per-endpoint envelopes above. Node sampling must resolve the relevant beat;
+coarse or aliasing grids cannot inherit the isolated continuous-integral bound.
+The opt-in automatic policy retains exact full-node evaluation whenever the
+fastest endpoint beat has fewer than four samples per cycle; explicit numeric
+cutoffs remain available for controlled qualification. Unsupported routes stay
+on their reference reduction.
+
+The tail $K(0)=0$ is added everywhere by float64 FFT convolution, and exact
+windows add exact minus $K$. Distant poles use geometric recentering (at most
+$1/32$ of distance); far poles whose windows reach the band use direct
+calculation. Nonuniform grids retain the full-node reference.
+
+NumPy and float32 CuPy share the plan. CuPy fields use float32, while tail
+corrections, atomic accumulation and FFT use float64. FP64 CuPy retains the
+reference. CPU/GPU parity tests check implementation agreement, not independent
+correctness of their shared plan.
+
+## Evidence and qualification
+
+Fast anchors: `tests/montecarlo/spectrum/test_node_support_window.py`, including
+affine dispersion, 1024-way splitting, grid-wide exactness, random flights,
+and far/direct poles. CUDA parity includes both kernels and the public fused
+batch route (`test_node_support_window_cuda.py`; five tests passed on the RTX
+5080 at `98944f5eb`, before the revised validation fences).
+
+`checks/node_support_window_1191.py` alternates reference/window calls on
+trusted #1142/#1143 transports, reporting first calls separately from three
+warm repeats. It applies the existing yield/centroid $10^{-3}$ and peak/FWHM,
+normalized 100 eV mass-L1, fixed-window line/background $10^{-2}$ margins.
+Reports retain code identity, transport digest, population, backend, cap,
+grid, memory and timing spread. Measurements before the revised fences do
+not qualify their changed support or cost; the final revision needs new runs.
+
+
+## Independent verdict (2026-11-14)
+
+A fresh verifier returned **rederived** for the revised conditional
+mathematical claim: units, limits, signs and conventions pass; independent
+straight-flight and affine-dispersion probes match. The verifier reran 19
+host regressions and 9 documentation checks (28 passed), inspected the rendered
+article (80 math elements, no literal dollar delimiters), and confirmed the
+cited earlier CUDA revision exists. The task owner applied the status.
+Revised hardware parity, scene margins and cost remain separate acceptance
+work; neither this verdict nor those measurements imply human sign-off.

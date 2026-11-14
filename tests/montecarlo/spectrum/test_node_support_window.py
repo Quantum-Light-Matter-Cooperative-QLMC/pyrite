@@ -183,7 +183,7 @@ def test_grouped_window_grows_with_the_flight_not_its_substeps():
         return lines, d - d[0], vg * (s_mid - s_mid[0]), 0 * one, [T + 0j], np.array([0, n])
 
     outs, plans = [], []
-    for n in (1, 16):
+    for n in (1, 16, 1024):
         case = split(n)
         tail = NodeTail(E, 1, 100.0)
         plans.append(grouped_window_plan(tail, *case[:5], case[5], grids))
@@ -191,9 +191,10 @@ def test_grouped_window_grows_with_the_flight_not_its_substeps():
         accumulate_grouped_windowed(*case, grids, out, 1.0, tail)
         tail.apply([out])
         outs.append(out)
-    for unsplit, substeps in zip(*plans, strict=True):
-        np.testing.assert_allclose(substeps, unsplit, rtol=1e-9, atol=1e-12 * np.max(unsplit))
-    np.testing.assert_allclose(outs[1], outs[0], rtol=0, atol=1e-9 * outs[0].max())
+    for plan, out in zip(plans[1:], outs[1:], strict=True):
+        for unsplit, substeps in zip(plans[0], plan, strict=True):
+            np.testing.assert_allclose(substeps, unsplit, rtol=1e-9, atol=1e-12 * np.max(unsplit))
+        np.testing.assert_allclose(out, outs[0], rtol=0, atol=1e-9 * outs[0].max())
 
 
 def test_grouped_with_grid_wide_windows_reproduces_the_reference():
@@ -254,3 +255,96 @@ def test_spectrum_option_refusals(extra, match):
 
     with pytest.raises(ValueError, match=match):
         mc_cxr_spectrum(_flights(Ne=2), CXR_GRID_EV, **CXR_KWARGS, **extra)
+
+
+def test_grouped_affine_dispersion_uses_effective_slope_and_pole():
+    # Independent identity: v=(a-h*b)E-a*Ev-h*c, not a*(E-Ek).
+    E = np.linspace(500.0, 1500.0, 10001)
+    lines = tuple(np.array([v]) for v in (990.0, 1.0, 10000.0, 2.0, 0.0, 0.0))
+    zero = np.zeros(1)
+    tail = NodeTail(E, 1, 100.0)
+    plan = grouped_window_plan(
+        tail,
+        lines,
+        zero,
+        zero,
+        zero,
+        [np.ones(1, dtype=complex)],
+        np.array([0, 1]),
+        (E, E / HBARC, 1e-6 * E),
+    )
+    node, _, _, _, m2, m3, m4 = plan
+    assert tail.E0 + node[0] * tail.step == pytest.approx(1000.0)
+    assert m2[0] == pytest.approx(0.5 / 0.99**2)
+    assert m3[0] == pytest.approx(0.0, abs=1e-10)
+    assert m4[0] == pytest.approx(0.0, abs=1e-10)
+
+
+@pytest.mark.parametrize("small_cutoff", [0.5, 1.0])
+def test_grouped_small_cutoff_uses_full_reference(small_cutoff):
+    case = _contiguous_flights(np.random.default_rng(91), 3, max_rows=3)
+    ref, got = _grouped(case, _grids(np.linspace(500.0, 4000.0, 1001)), small_cutoff)
+    np.testing.assert_allclose(got, ref, rtol=1e-12, atol=1e-12 * ref.max())
+
+
+def test_grouped_nonpositive_affine_slope_uses_full_reference():
+    E = np.linspace(500.0, 1500.0, 1001)
+    lines = tuple(np.array([v]) for v in (990.0, 1.0, 1e6, 2.0, 0.0, 0.0))
+    zero = np.zeros(1)
+    case = lines, zero, zero, zero, [np.ones(1, dtype=complex)], np.array([0, 1])
+    ref, got = _grouped(case, (E, E / HBARC, 2e-6 * E), 100.0)
+    np.testing.assert_allclose(got, ref, rtol=1e-12, atol=1e-12 * ref.max())
+
+
+def test_stationary_dispersion_beat_forces_full_grid():
+    # The beat derivative .1 - 1000*d'(E) crosses zero inside the band,
+    # even though its band-centred secant derivative is .1.
+    E = np.linspace(1000.0, 2000.0, 1001)
+    lines = tuple(np.full(2, v) for v in (1500.0, 1.0, 0.0, 2.0, 0.0, 0.0))
+    d = np.array([0.0, 0.1 * HBARC])
+    L = np.array([0.0, 1000.0])
+    grids = E, E / HBARC, 1e-6 * (E - 1500.0) ** 2
+    case = lines, d, np.zeros(2), L, [np.ones(2, dtype=complex)], np.array([0, 2])
+    plan = grouped_window_plan(NodeTail(E, 1, 100.0), *case, grids)
+    assert plan[1][0] == 0 and plan[2][0] == E.size - 1
+    ref, got = _grouped(case, grids, 100.0)
+    np.testing.assert_allclose(got, ref, rtol=1e-12, atol=1e-12 * ref.max())
+
+
+def test_automatic_policy_retains_exact_unresolved_node_samples():
+    # Integer-pi samples have zero wings; replacing these by the cycle average
+    # would introduce a finite bias, so automatic scoring must keep them exact.
+    E = np.arange(500.0, 1505.0, 5.0)
+    er, a = np.array([1000.0]), np.array([np.pi / 5])
+    weights = [np.ones(1)]
+    ref = [np.zeros(E.size)]
+    accumulate_sincsq(er, a, weights, E, ref)
+    tail = NodeTail(E, 1, 100.0)
+    tail.resolved_only = True
+    got = [np.zeros(E.size)]
+    accumulate_sincsq_windowed(er, a, weights, E, got, tail, [0])
+    tail.apply(got)
+    np.testing.assert_allclose(got, ref, rtol=0, atol=1e-12)
+
+
+@pytest.mark.parametrize(
+    "extra", [{"coherent": True}, {"sinc_cutoff": 50.0}, {"line_quadrature": "bin-mean"}]
+)
+def test_automatic_policy_keeps_unsupported_routes_on_reference(extra):
+    from pyrite.montecarlo.spectrum.cxr._setup import (
+        SpectrumRequest,
+        _node_tail,
+        _refuse_node_support_cutoff,
+    )
+
+    E = np.arange(500.0, 1500.0, 1.0)
+    request = SpectrumRequest(
+        segments={},
+        E_grid_eV=E,
+        crystal="hopg",
+        hkl_list=[],
+        node_support_cutoff="auto",
+        **extra,
+    )
+    _refuse_node_support_cutoff(request)
+    assert _node_tail(request, E) is None

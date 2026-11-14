@@ -1,75 +1,32 @@
-"""Support-windowed node reduction with an analytic far tail (issue #1191).
+"""Support-windowed incoherent node scoring with a cycle-averaged far tail.
 
-The default node reduction evaluates every kept line, or every flight's
-coherent substep sum, on every grid node. A line's intensity is concentrated
-near its pole, and far from it the profile is a smooth inverse power. This
-module evaluates each line or flight exactly only on a window of nodes around
-its pole. Everywhere else it uses the cycle-averaged far-field expansion of the
-same field, and that expansion is summed over all lines by one FFT
-convolution per call.
+Reference: the formation integral in ``coherent-formation-absorption``.
+For an affine mismatch v=A(E-Ek), F=(b exp(iv)-a exp(-iv))/(2(iv-q))
+is an exact sum of endpoint fields gamma exp(i psi)/(E-p), p=Ek-iq/A.
+For general tabulated dispersion the poles are a frozen-dispersion surrogate:
+the plan widens its exact window so the endpoint denominator perturbation is
+at most rho=1/x_c<1 outside it. This bounds FIELD error against the summed
+raw endpoint envelope, not relative intensity after destructive interference.
 
-Far field of a flight
----------------------
-A flight's rows ``j`` (linear escape pieces of contiguous substeps) carry the
-formation field (``coherent-formation-absorption``)
+Endpoint clusters compare complete phase functions against ONE representative
+across the scored band. For x=E-En and e=p-En, their surrogate field moments
+A_m=sum gamma exp(i psi(En))*e**m give the averaged intensity
+K=|A0|²/x²+2 Re(A0 A1*)/x³+(|A1|²+2 Re(A0 A2*))/x⁴.
+The window ensures max|e|/|x|<=0.1. Field remainder, discarded x^-5/x^-6
+intensity terms, phase drift and intercluster beats are distinct error terms.
+The weak-cluster budget includes higher moments and the geometric remainder;
+it never substitutes for the separate nonlinear-denominator error bound.
 
-    S(E) = sum_j c_j e^{i phi_j} [b_j e^{i v_j} - a_j e^{-i v_j}] / (2 w_j),
-    w_j = i v_j - q_j = i a_j (E - p_j),   p_j = E_k,j - i q_j / a_j,
+A constant straight flight with matching endpoint rational functions cancels
+at shared junctions, independently of its subdivision count. Chirped flights
+need not cancel. The all-interval beat-gap fence can widen them to full-node
+scoring. xc<=1 or a nonpositive affine slope uses the reference outright.
 
-with ``E_k,j = E_vac,j + (dL_j/2) delta omega(E_vac,j)/a_j`` the
-refraction-shifted centre. Each term is an *endpoint* amplitude ``gamma_k
-e^{i psi_k(E)}/(E - p_k)`` with
-
-- end:   ``gamma = c b/(2 i a)``,  ``psi = phi + v``;
-- start: ``gamma = -c a/(2 i a)``, ``psi = phi - v``.
-
-``psi_k`` is the emission phase at that endpoint. Its energy slope is the
-endpoint's observer arrival time. A junction shared by contiguous rows has
-equal phases and slopes on both sides, so its two terms add coherently and
-cancel to first order (exactly for an unchirped, unabsorbed straight flight).
-That cancellation is what makes the substep sum equal the unsplit flight.
-Endpoints with different arrival times beat at ``|delta slope|``. Averaged over
-that beat their cross terms vanish, so the cycle-averaged far intensity is
-the incoherent sum over *clusters* of equal-slope endpoints:
-
-    <|S|^2> = sum_clusters |sum_k gamma_k e^{i psi_k(E_n)} / (x - e_k)|^2,
-    x = E - E_n,   e_k = p_k - E_n,
-
-expanded to second order in ``e_k/x`` about the flight's node ``E_n``:
-
-    <|S|^2> = |A0|^2/x^2 + 2 Re(A0 A1*)/x^3 + (|A1|^2 + 2 Re(A0 A2*))/x^4,
-    A_m = sum_k gamma_k e^{i psi_k(E_n)} e_k^m.
-
-Absorption enters through the complex pole and chirp (energy loss along the
-flight) through the spread of ``e_k``. The undamped single line recovers the
-cycle average ``1/(2 a^2 x^2)`` of ``sinc^2``. For the incoherent per-row
-``sinc^2`` route each row is its own flight with ``A0 = 1``, ``A_m =
-eps^m``, ``eps = E_r - E_n``: ``m2 = w/(2 a^2)``, ``m3 = 2 eps m2``, ``m4 = 3
-eps^2 m2``.
-
-Window and error
-----------------
-A flight is exact on nodes with ``|E - E_n| <= spread + W``, where ``W = x_c
-max(1/a_F, max_j |q_j|/a_j)`` and ``a_F = sum_j a_j`` is the flight's own sinc
-slope. The window scales with the *flight*, not with its substeps: the
-expansion needs only that every non-cancelling endpoint pair beats at least
-``x_c`` times across it. For a straight flight those endpoints are its two
-ends, at ``2 a_F``. Truncating the profile would drop ``1/(pi x_c)`` of each
-line's mass. The tail keeps it, leaving the oscillating remainder
-``O(1/x_c^2)`` plus the expansion's ``O((spread/W)^3)``. The prototype on
-substep flights (1-64 rows, chirp, absorption) gives yield ``<= 3e-5`` and
-centroid ``<= 2e-3`` eV at ``x_c = 100``, with the substep count irrelevant.
-
-Exactness bookkeeping
----------------------
-The tail kernel ``K(x) = m2/x^2 + m3/x^3 + m4/x^4`` (with ``K(0) = 0``) is added
-to *every* node by convolution. Inside its window each flight adds ``exact -
-K``, so outside the window the node holds ``K`` and inside it holds the exact
-value. Poles in a band-wide margin beyond the grid go through the same
-convolution. Farther poles are aggregated into geometric bins evaluated
-directly, or, when their window still reaches the band, evaluated directly
-per flight. The grid must be uniform; callers keep the full-node reduction
-otherwise.
+The analytic tail is added on every node by float64 FFT convolution, and each
+window contributes exact-K. Nonuniform grids retain the reference. Signed
+integrated oscillatory error of a resolved isolated sinc² line is O(x_c^-2),
+but its mass-L1 error is O(x_c^-1). General spectral margins require frozen-
+scene qualification; these formulas are not a universal relative-error bound.
 
 Validation: node-support-window-tail
 """
@@ -83,8 +40,8 @@ from ....materials.crystal import HBARC_EV_ANG
 DEFAULT_NODE_SUPPORT_CUTOFF = 100.0
 # Relative node-spacing tolerance below which a grid counts as uniform.
 _UNIFORM_RTOL = 1.0e-9
-# Endpoint slopes closer than this fraction of the flight's own end-to-end
-# beat (2 a_F) are one coherent cluster.
+# Maximum phase drift [rad] of any cluster member against its representative
+# over the entire scored band. Adjacent near-equalities must never chain.
 _CLUSTER_TOL = 1.0e-3
 # Geometric far-bin ratio: a far pole is re-centred by at most this fraction
 # of its distance to the band.
@@ -133,6 +90,7 @@ class NodeTail:
         self.n = int(np.asarray(E_grid).size)
         self.pad = self.n
         self.x_c = float(x_c)
+        self.resolved_only = False
         L = self.n + 2 * self.pad
         self._dep = np.zeros((n_targets, 3, L))
         self._far = [[] for _ in range(n_targets)]
@@ -266,8 +224,41 @@ def row_window_plan(tail, E_r, a_width):
     eps = E_r - (tail.E0 + node * tail.step)
     R = _radius(tail, np.abs(eps) + tail.x_c / a)
     lo, hi, mode = _window_layout(tail, node, R)
+    if tail.resolved_only:
+        unresolved = a * tail.step > np.pi / 4
+        lo[unresolved], hi[unresolved], mode[unresolved] = 0, tail.n - 1, _MODE_DIRECT
     mu2 = 0.5 / (a * a)
     return node, lo, hi, mode, mu2, 2.0 * eps * mu2, 3.0 * eps * eps * mu2
+
+
+def _affine_formation(lines, E_grid, dom_grid):
+    """Exact affine-dispersion poles/slopes, or the frozen-dispersion surrogate.
+
+    Non-affine dispersion gets an explicit denominator perturbation fence in
+    the window plan. Validation: node-support-window-tail
+    """
+    E_vac, a, h, apb, bma, q = lines
+    b = (dom_grid[-1] - dom_grid[0]) / (E_grid[-1] - E_grid[0])
+    c = dom_grid[0] - b * E_grid[0]
+    tol = 16 * np.finfo(np.float64).eps * max(np.max(np.abs(dom_grid)), 1e-300)
+    if np.max(np.abs(dom_grid - (b * E_grid + c))) <= tol:
+        slope = a - h * b
+        if np.any(slope <= 0):
+            return None
+        return (a * E_vac + h * c) / slope, slope, np.zeros_like(h), apb, bma, q
+    return lines
+
+
+def _full_grid_plan(tail, n_f):
+    """Reference evaluation without any tail deposits."""
+    zero = np.zeros(n_f, dtype=np.int64)
+    return (
+        zero,
+        zero,
+        np.full(n_f, tail.n - 1),
+        np.ones(n_f, dtype=np.int64),
+        *(np.zeros(n_f) for _ in range(3)),
+    )
 
 
 def grouped_window_plan(tail, lines, d, g_phase, L_esc, coefs, starts, grids):
@@ -283,13 +274,18 @@ def grouped_window_plan(tail, lines, d, g_phase, L_esc, coefs, starts, grids):
     E_grid, _, dom_grid = (np.asarray(g, dtype=np.float64) for g in grids)
     starts = np.asarray(starts, dtype=np.int64)
     n_f = starts.size - 1
+    effective = _affine_formation((E_vac, a_vac, half_dL, apb, bma, q), E_grid, dom_grid)
+    if effective is None or tail.x_c <= 1:
+        return _full_grid_plan(tail, n_f)
+    E_vac, a_vac, half_dL, apb, bma, q = effective
     heads = starts[:-1]
     fl = np.repeat(np.arange(n_f), np.diff(starts))
 
     def dom(E):
         return np.interp(E, E_grid, dom_grid)
 
-    Ek = E_vac + half_dL * dom(E_vac) / a_vac
+    dom_vac = dom(E_vac)
+    Ek = E_vac + half_dL * dom_vac / a_vac
     pole = Ek - 1j * q / a_vac
     re_min = np.minimum.reduceat(Ek, heads)
     re_max = np.maximum.reduceat(Ek, heads)
@@ -298,18 +294,23 @@ def grouped_window_plan(tail, lines, d, g_phase, L_esc, coefs, starts, grids):
     a_F = np.add.reduceat(a_vac, heads)
     q_rate = np.maximum.reduceat(np.abs(q) / a_vac, heads)
     W = tail.x_c * np.maximum(1.0 / a_F, q_rate)
+    # Bound the non-affine denominator error on the whole scored band:
+    # |delta w|/|w_frozen| <= 1/x_c < 1 outside the exact window.
+    D = np.maximum(np.abs(dom_grid.min() - dom_vac), np.abs(dom_grid.max() - dom_vac))
+    W = np.maximum(W, tail.x_c * np.maximum.reduceat(np.abs(half_dL) * D / a_vac, heads))
     spread = np.maximum(np.abs(re_min - E_n), np.abs(re_max - E_n))
 
     # Endpoint phases at E_n and their slopes across the provisional reach.
-    def psi(E, sign):
-        om = E / HBARC_EV_ANG
+    def both(E):
         dw = dom(E)
         v = a_vac * (E - E_vac) - half_dL * dw
-        return d * om - g_phase - L_esc * dw + sign * v
+        phase = d * (E / HBARC_EV_ANG) - g_phase - L_esc * dw
+        return np.concatenate((phase + v, phase - v))
 
-    def both(E):
-        return np.concatenate((psi(E, 1.0), psi(E, -1.0)))
-
+    # Keep the geometric multipole ratio <= 0.1; the remainder is bounded,
+    # even when chirp rather than the natural width dominates the pole spread.
+    pole_extent = np.maximum.reduceat(np.abs(pole - E_n[fl]), heads)
+    W = np.maximum(W, 10.0 * pole_extent - spread)
     En_r, H_r = E_n[fl], (spread + W)[fl]
     slope = (both(En_r + H_r) - both(En_r - H_r)) / (2.0 * np.concatenate((H_r, H_r)))
     inv = 1.0 / (2j * a_vac)
@@ -318,32 +319,83 @@ def grouped_window_plan(tail, lines, d, g_phase, L_esc, coefs, starts, grids):
         for c in (np.asarray(c, dtype=np.complex128) for c in coefs)
     ]
     fl2 = np.concatenate((fl, fl))
+    kappa = np.concatenate((d / HBARC_EV_ANG + a_vac, d / HBARC_EV_ANG - a_vac))
+    lam = np.concatenate((-L_esc - half_dL, -L_esc + half_dL))
+    e_span = np.maximum(np.abs(E_grid[0] - E_n), np.abs(E_grid[-1] - E_n))
+    dom_span = np.maximum(np.abs(dom_grid.min() - dom(E_n)), np.abs(dom_grid.max() - dom(E_n)))
     clusters = _endpoint_clusters(
-        fl2, slope, both(En_r), np.concatenate((pole, pole)) - E_n[fl2], gammas, a_F
+        fl2,
+        slope,
+        both(En_r),
+        np.concatenate((pole, pole)) - E_n[fl2],
+        gammas,
+        kappa,
+        lam,
+        e_span,
+        dom_span,
+        spread + W,
     )
-    cl_flight, cl_slope, cl_m = clusters
+    cl_flight, cl_slope, cl_m, envelope, cl_lam = clusters
     m2, m3, m4 = (np.bincount(cl_flight, m, n_f) for m in cl_m)
-    W = np.maximum(W, 2.0 * tail.x_c / _significant_gap(cl_flight, cl_slope, cl_m[0], n_f))
+    d_secant = (dom(E_n + spread + W) - dom(E_n - spread - W)) / (2 * (spread + W))
+    derivatives = np.diff(dom_grid) / np.diff(E_grid)
+    drift = np.maximum(np.abs(derivatives.min() - d_secant), np.abs(derivatives.max() - d_secant))
+    gap = _significant_gap(cl_flight, cl_slope, envelope, cl_lam, drift, n_f)
+    beat_reach = np.full(n_f, np.inf)
+    np.divide(2.0 * tail.x_c, gap, out=beat_reach, where=gap > 0)
+    W = np.maximum(W, beat_reach)
     R = _radius(tail, spread + W)
     lo, hi, mode = _window_layout(tail, node, R)
+    if tail.resolved_only:
+        k_max = np.maximum.reduceat(d / HBARC_EV_ANG + a_vac, heads)
+        k_min = np.minimum.reduceat(d / HBARC_EV_ANG - a_vac, heads)
+        l_max = np.maximum.reduceat(-L_esc + np.abs(half_dL), heads)
+        l_min = np.minimum.reduceat(-L_esc - np.abs(half_dL), heads)
+        beat_span = k_max - k_min + (l_max - l_min) * np.max(np.abs(derivatives))
+        unresolved = beat_span * tail.step > np.pi / 2
+        lo[unresolved], hi[unresolved], mode[unresolved] = 0, tail.n - 1, _MODE_DIRECT
     return node, lo, hi, mode, m2, m3, m4
 
 
-def _endpoint_clusters(fl2, slope, psi_n, e, gammas, a_F):
-    """Equal-slope endpoint clusters and their intensity moments.
+@njit(cache=True)
+def _cluster_heads(flight, kappa, lam, e_span, dom_span):
+    """Bound each phase function against ONE representative, never its neighbor.
 
-    Endpoints sort by ``(flight, slope)``; a slope step above ``_CLUSTER_TOL``
-    of the flight's end-to-end beat ``2 a_F`` starts a new cluster. Returns
-    ``(flight, slope, (m2, m3, m4))`` per cluster, moments summed over
-    polarizations. Validation: node-support-window-tail
+    Validation: node-support-window-tail
+    """
+    heads = [0]
+    first = 0
+    for i in range(1, flight.size):
+        f = flight[i]
+        phase_drift = (
+            abs(kappa[i] - kappa[first]) * e_span[f] + abs(lam[i] - lam[first]) * dom_span[f]
+        )
+        if f != flight[first] or phase_drift > _CLUSTER_TOL:
+            heads.append(i)
+            first = i
+    return np.asarray(heads, dtype=np.int64)
+
+
+def _endpoint_clusters(fl2, slope, psi_n, e, gammas, kappa, lam, e_span, dom_span, radius):
+    """Moments and a multipole-plus-remainder envelope of phase clusters.
+
+    The envelope includes A1/A2 even when A0 cancels, as well as phase drift
+    against the cluster representative. Validation: node-support-window-tail
     """
     order = np.lexsort((slope, fl2))
     fl2, slope, e = fl2[order], slope[order], e[order]
-    new = np.ones(fl2.size, dtype=bool)
-    new[1:] = (fl2[1:] != fl2[:-1]) | (np.diff(slope) > _CLUSTER_TOL * 2.0 * a_F[fl2[1:]])
-    heads = np.flatnonzero(new)
+    kappa, lam = kappa[order], lam[order]
+    heads = _cluster_heads(fl2, kappa, lam, e_span, dom_span)
+    counts = np.diff(np.r_[heads, fl2.size])
+    representative = np.repeat(heads, counts)
+    phase_drift = (
+        np.abs(kappa - kappa[representative]) * e_span[fl2]
+        + np.abs(lam - lam[representative]) * dom_span[fl2]
+    )
     phase = np.exp(1j * psi_n[order])
-    m2 = m3 = m4 = 0.0
+    r = radius[fl2[heads]]
+    extent = np.maximum.reduceat(np.abs(e), heads)
+    m2 = m3 = m4 = envelope = 0.0
     for gam in gammas:
         g = gam[order] * phase
         A0 = np.add.reduceat(g, heads)
@@ -352,25 +404,34 @@ def _endpoint_clusters(fl2, slope, psi_n, e, gammas, a_F):
         m2 = m2 + np.abs(A0) ** 2
         m3 = m3 + 2.0 * (A0 * A1.conj()).real
         m4 = m4 + np.abs(A1) ** 2 + 2.0 * (A0 * A2.conj()).real
-    return fl2[heads], slope[heads], (m2, m3, m4)
+        remainder = np.add.reduceat(np.abs(g) * np.abs(e) ** 3, heads) / (r * r * (r - extent))
+        phase_error = np.add.reduceat(np.abs(g) * phase_drift, heads) * r / (r - extent)
+        envelope = (
+            envelope + np.abs(A0) + np.abs(A1) / r + np.abs(A2) / (r * r) + remainder + phase_error
+        )
+    return fl2[heads], slope[heads], (m2, m3, m4), envelope, lam[heads]
 
 
-def _significant_gap(cl_flight, cl_slope, cl_m2, n_f):
-    """Smallest slope gap between a flight's significant clusters (else inf).
+def _significant_gap(cl_flight, cl_slope, envelope, cl_lam, drift, n_f):
+    """Conservative all-interval beat gap with an aggregate weak-field budget.
 
-    Clusters holding at least ``_SIGNIFICANT_M2`` of the flight's largest
-    cluster intensity must beat ``x_c`` times across the window: the cross
-    term of two that beat slower is not averaged out. Cancelled substep
-    junctions fall below it. Validation: node-support-window-tail
+    Excluding many individually small clusters must not hide a large total
+    endpoint field. Validation: node-support-window-tail
     """
     peak = np.zeros(n_f)
-    np.maximum.at(peak, cl_flight, cl_m2)
-    keep = cl_m2 >= _SIGNIFICANT_M2 * peak[cl_flight]
-    f, s = cl_flight[keep], cl_slope[keep]
+    np.maximum.at(peak, cl_flight, envelope)
+    small = envelope <= np.sqrt(_SIGNIFICANT_M2) * peak[cl_flight]
+    omitted = np.bincount(cl_flight, np.where(small, envelope, 0.0), minlength=n_f)
+    keep = ~small | (omitted[cl_flight] > np.sqrt(_SIGNIFICANT_M2) * peak[cl_flight])
+    f, s, lam = cl_flight[keep], cl_slope[keep], cl_lam[keep]
     gap = np.full(n_f, np.inf)
     same = f[1:] == f[:-1]
     np.minimum.at(gap, f[1:][same], np.diff(s)[same])
-    return gap
+    l_min, l_max = np.full(n_f, np.inf), np.full(n_f, -np.inf)
+    np.minimum.at(l_min, f, lam)
+    np.maximum.at(l_max, f, lam)
+    span = np.maximum(l_max - l_min, 0.0)
+    return np.maximum(gap - span * drift, 0.0)
 
 
 # ---------------------------------------------------------------------------

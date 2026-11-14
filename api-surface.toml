@@ -7,6 +7,7 @@
 # flat engine controls are private.
 # Case.node_support_cutoff appends an optional pickle slot for incoherent node
 # support windows with analytic tails; None retains the full-node reference.
+# "auto" checks resolved sampling and retains reference scoring on unsupported routes.
 # Case.radiative_moment_model persists approximation identity; absence replays exact.
 # Settings.allow_fallback and Case.allow_physics_fallback add explicit campaign
 # admission (#262); Case.physics_fallbacks carries preflight provenance to workers.

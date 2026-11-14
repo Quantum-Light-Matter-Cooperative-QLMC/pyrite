@@ -273,7 +273,8 @@ class Case(Mapping[str, Any]):
         and ``0`` the full blend. Validation: coherent-flat-term-omission
     node_support_cutoff
         Dimensionless support width for incoherent node scoring; absent/None
-        retains the full-node reference. Positive values retain analytic tails.
+        retains the full-node reference. Positive values retain analytic tails;
+        "auto" additionally checks node resolution and skips unsupported routes.
     line_roulette
         Opt-in incoherent line-scoring roulette as a
         :class:`pyrite._line_roulette.LineRoulette` record; absent is analog
@@ -384,7 +385,7 @@ class Case(Mapping[str, Any]):
     # Opt-in line-scoring roulette, appended to retain historical pickle offsets.
     line_roulette: dict[str, object] | _Absent = _ABSENT
     # Append: frozen-scene pickles retain all historical positional offsets.
-    node_support_cutoff: float | None | _Absent = _ABSENT
+    node_support_cutoff: float | Literal["auto"] | None | _Absent = _ABSENT
 
     def __setstate__(self, state: list[Any]) -> None:
         """Restore frozen-slot pickles, filling newly appended optional fields."""
@@ -693,6 +694,8 @@ class Case(Mapping[str, Any]):
 
     def _validate_node_support_cutoff(self) -> None:
         """Admit the optional incoherent node-window numerical policy."""
+        if self.node_support_cutoff == "auto":
+            return
         if self.node_support_cutoff is not _ABSENT and self.node_support_cutoff is not None:
             _positive("node_support_cutoff", self.node_support_cutoff)
             if self.get("coherent_emission", False):

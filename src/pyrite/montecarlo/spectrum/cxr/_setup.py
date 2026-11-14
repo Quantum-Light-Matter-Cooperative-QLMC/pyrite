@@ -34,7 +34,7 @@ from ._kernels import (
     _validate_groove_escape_direction,
 )
 from ._line_tables import line_table_bytes
-from ._node_window import NodeTail, uniform_step
+from ._node_window import DEFAULT_NODE_SUPPORT_CUTOFF, NodeTail, uniform_step
 from ._temporal import segment_arrival_times
 
 # Generation marker for the line route's photon-escape model, hashed into the
@@ -386,7 +386,7 @@ def _refuse_incompatible_request(request):
 def _refuse_node_support_cutoff(request):
     """Validate ``node_support_cutoff`` and refuse the routes it does not cover."""
     x_c = request.node_support_cutoff
-    if x_c is None:
+    if x_c is None or x_c == "auto":
         return
     if not np.isfinite(x_c) or x_c <= 0:
         raise ValueError("node_support_cutoff must be finite and positive")
@@ -410,8 +410,17 @@ def _node_tail(request, E_grid_host):
     reduction runs, which is the reference the window approximates.
     Validation: node-support-window-tail
     """
-    if request.node_support_cutoff is None:
+    x_c = request.node_support_cutoff
+    automatic = x_c == "auto"
+    if x_c is None or (
+        automatic
+        and (
+            request.coherent or request.sinc_cutoff is not None or request.line_quadrature != "node"
+        )
+    ):
         return None
+    if automatic:
+        x_c = DEFAULT_NODE_SUPPORT_CUTOFF
     if uniform_step(E_grid_host) is None:
         return None
     n_targets = 3 if request.components else 1
@@ -420,8 +429,11 @@ def _node_tail(request, E_grid_host):
             return None
         from ._node_window_cuda import DeviceNodeTail
 
-        return DeviceNodeTail(E_grid_host, n_targets, request.node_support_cutoff)
-    return NodeTail(E_grid_host, n_targets, request.node_support_cutoff)
+        tail = DeviceNodeTail(E_grid_host, n_targets, x_c)
+    else:
+        tail = NodeTail(E_grid_host, n_targets, x_c)
+    tail.resolved_only = automatic
+    return tail
 
 
 def _refuse_grouped_reduction(request, grouped):

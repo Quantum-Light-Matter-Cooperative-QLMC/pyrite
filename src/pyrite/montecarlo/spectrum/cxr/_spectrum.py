@@ -130,10 +130,15 @@ def mc_cxr_spectrum(
         (per-row and flight-grouped routes): each line or flight is evaluated
         exactly within ``|v| <= x_c`` of its pole and by its cycle-averaged
         far-field expansion elsewhere, so cost scales with support while the
-        tail mass is kept (``O(1/x_c^2)`` yield error; 100 is the qualified
-        value). ``None`` is the full-node reference. NumPy or float32 CuPy on
+        tail mass is retained (isolated resolved-line signed yield error is
+        ``O(1/x_c^2)``, mass-L1 is ``O(1/x_c)``; grouped accuracy is qualified
+        on saved scenes). ``None`` is the full-node reference. NumPy or float32 CuPy on
         uniform grids only; other configurations run the full-node reduction.
-        Refused with ``coherent``, ``sinc_cutoff`` and bin-mean quadrature.
+        Explicit numeric cutoffs are refused with ``coherent``, ``sinc_cutoff``
+        and bin-mean quadrature. ``"auto"`` selects 100 on supported routes and
+        retains exact full-node evaluation for lines whose beat is unresolved
+        (fewer than four samples per fastest phase cycle); unsupported routes
+        retain their reference reduction.
         Validation: node-support-window-tail
     components
         Return separate PXR and CBS diagonal contributions with the total.
