@@ -982,7 +982,8 @@ def _characteristic_phase(emission, batch, Ne_brem):
 def _spectrum_case_impl(case, tp, record_timing=False):
     """Implement :func:`_spectrum_case` inside its optional Nsight range.
 
-    Validation: temporal-intensity-profile, diffracted-bremsstrahlung
+    Validation: temporal-intensity-profile, diffracted-bremsstrahlung,
+    diffracted-characteristic-radiation
     """
     from dataclasses import replace as batch_replace
 
@@ -1081,6 +1082,15 @@ def _spectrum_case_impl(case, tp, record_timing=False):
     # components through pyrite._spectral_components (issue #123).
     spec_characteristic = _finished_or_run(
         phase_cache, "characteristic", lambda: _characteristic_phase(emission, batch, Ne_brem)
+    )
+    # KOSSEL LINES (#1176): two-beam diffracted gain and direct-beam depletion
+    # of characteristic lines near a Laue Bragg energy toward n_hat.
+    from .diffracted_brem import case_diffracted_characteristic
+
+    spec_characteristic = spec_characteristic + _finished_or_run(
+        phase_cache,
+        "diffracted_characteristic",
+        lambda: case_diffracted_characteristic(case, segs_dev, E_grid, n_hat, Ne_brem),
     )
     _spectrum_stage_done("characteristic")
 

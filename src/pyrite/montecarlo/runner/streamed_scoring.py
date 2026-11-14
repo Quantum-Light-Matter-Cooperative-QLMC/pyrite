@@ -102,7 +102,10 @@ class BlockSpectrumScorer:
 
     @measure_block_fallbacks
     def add(self, segs: Mapping[str, Any]) -> None:
-        """Score one whole-electron block and add it to the running totals."""
+        """Score one whole-electron block and add it to the running totals.
+
+        Validation: diffracted-characteristic-radiation
+        """
         from . import _segments_on_device
         from .emission_adapters import EmissionBatch
         from .streamed_recovery import stage_continuum_rows
@@ -128,12 +131,12 @@ class BlockSpectrumScorer:
         spec = self.emission.cxr.evaluate(batch, "spec").values
         # Diffracted brem (#1166) is a track-length sum over a fixed electron
         # count, so it adds over blocks like the native lines it joins.
-        from .diffracted_brem import case_diffracted_brem
+        from .diffracted_brem import case_diffracted_brem, case_diffracted_characteristic
 
         spec = spec + case_diffracted_brem(case, block, self.E_grid, self.n_hat, self.Ne_brem)
         characteristic = self.row_recovery.evaluate(
             self.emission.characteristic, brem_batch, "spec_characteristic"
-        )
+        ) + case_diffracted_characteristic(case, block, self.E_grid, self.n_hat, self.Ne_brem)
         brem = None
         fallback_snapshot = self.fallbacks.snapshot()
         if not self._restage_continuum:

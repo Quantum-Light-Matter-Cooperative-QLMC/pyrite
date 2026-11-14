@@ -64,7 +64,15 @@ which is linear in the remaining depth. Averaged over a uniform emission depth t
 | full / estimate: (0 2 −2) 7 keV, (1 1 −3) 10 keV, (−1 3 1) 8.6 keV | 0.94, 0.99, 0.98 |
 | DBR / native PXR, same reflection, mirror rays, 6–10 keV | 0.36–24 |
 
-**Omitted direct-beam depletion (assumption).** The same mode's transmitted amplitude weights the native direct emission toward $\hat n$. Without absorption, flux conservation $\gamma_n|T|^2+\gamma_h|D|^2=\gamma_n$ means that emission loses $(\gamma_h/\gamma_n)|D|^2$ near $E_B$. That term is not scored. Relative to the scored gain it is of order $j(\hat n,E)/j(\hat Q,E)$. At mirror rays $\hat Q$ lies in the forward cone and $\hat n$ is tens of degrees off it, so the ratio falls roughly like $(\gamma\theta_{n})^{-4}$ and the depletion is negligible. It is not negligible for an isotropic source such as a characteristic line (Kossel contrast). That case and the depletion term are tracked in #1176.
+**Omitted direct-beam depletion (assumption, #1176).** The same mode's transmitted amplitude weights the native direct emission toward $\hat n$. Without absorption, flux conservation $\gamma_n|T|^2+\gamma_h|D|^2=\gamma_n$ means that emission loses $(\gamma_h/\gamma_n)|D|^2$ near $E_B$. That term is not scored. Relative to the scored gain it is of order $j(\hat n,E)/j(\hat Q,E)$. A one-ray estimate at the mirror rays integrates the depth-weighted $|T|^2-|T_0|^2$ against the gain:
+
+| reflection | $j(\hat n)/j(\hat Q)$ | depletion / gain |
+|---|---|---|
+| (0 2 −2) | 3.2e-6 | −5.8e-6 |
+| (1 1 −3) | 6.9e-6 | −1.0e-5 |
+| (−1 3 1) | 3.9e-6 | −6.1e-6 |
+
+The depletion is negligible, so DBR keeps no depletion term. For an isotropic source such as a characteristic line it is the same size as the gain. Kossel lines score both terms: see [`diffracted-characteristic-radiation`](diffracted-characteristic-radiation.md).
 
 At (0 2 −2), $\sqrt{ab}\,t\approx0.6$: the Pendellösung depletion is −5% and two-beam absorption −4%. The independent estimate has neither.
 

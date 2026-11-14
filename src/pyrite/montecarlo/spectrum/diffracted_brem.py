@@ -58,8 +58,9 @@ import numpy as np
 
 from ..._backend import _to_cpu, xp
 
-#: Native model marker; changes the default spectrum of every crystal case.
-DIFFRACTED_BREM_MODEL = "two-beam-laue-dbr-v1"
+#: Native two-beam Laue model marker: DBR in the line spectra (#1166) and the
+#: Kossel term of the characteristic spectrum (v2, #1176).
+DIFFRACTED_BREM_MODEL = "two-beam-laue-dbr-kossel-v2"
 
 _HBARC_EV_ANG = 1973.269804
 _DEPTH_BINS = 64
@@ -67,10 +68,17 @@ _WIDTHS = 200.0
 _MAX_NODES = 40000
 
 
-def laue_diffracted_intensity(energy_eV, n_hat, g, s_hat, chi_g_abs, chi_0, depth_ang):
-    """Polarization-mean ``|D_s(u, E)|^2`` of the two-beam Laue mode, ``(n_depth, n_E)``.
+def laue_mode_intensities(energy_eV, n_hat, g, s_hat, chi_g_abs, chi_0, depth_ang):
+    """Polarization-mean ``(|T_s(u, E)|^2, |D_s(u, E)|^2)`` of the two-beam Laue mode.
 
-    Validation: diffracted-bremsstrahlung
+    Both arrays are ``(n_depth, n_E)``. ``T`` is the transmitted amplitude
+    (``P(0) = (1, 0)``), ``T(u) = exp(i lambda_2 u) [(lambda_2 - N_22)
+    (exp(i x) - 1)/(lambda_1 - lambda_2) + exp(i x)]`` with
+    ``x = (lambda_1 - lambda_2) u``; it reduces to ``exp(i k chi_0 u / 2 n_s)``
+    for ``chi_g -> 0`` and obeys ``n_s |T|^2 + (Q_s/k) |D|^2 = n_s`` without
+    absorption (#1176).
+
+    Validation: diffracted-bremsstrahlung, diffracted-characteristic-radiation
     """
     E = np.atleast_1d(np.asarray(energy_eV, dtype=float))
     u = np.atleast_1d(np.asarray(depth_ang, dtype=float))
@@ -86,7 +94,8 @@ def laue_diffracted_intensity(energy_eV, n_hat, g, s_hat, chi_g_abs, chi_0, dept
     es = np.cross(n, g)
     es /= np.linalg.norm(es)
     Qhat = Q / np.linalg.norm(Q, axis=1)[:, None]
-    out = np.zeros((u.size, E.size))
+    T2 = np.zeros((u.size, E.size))
+    D2 = np.zeros((u.size, E.size))
     for e in (es, np.cross(es, n)):
         C = np.linalg.norm(e[None, :] - Qhat * (Qhat @ e)[:, None], axis=1)
         b2 = k**4 * chi_g_abs**2 * C**2 / (4.0 * Qs**2)
@@ -104,9 +113,19 @@ def laue_diffracted_intensity(energy_eV, n_hat, g, s_hat, chi_g_abs, chi_0, dept
             np.expm1(1j * x) / np.where(split == 0, 1.0, split)[None, :],
             1j * u[:, None] * (1.0 + 0.5j * x),
         )
-        amp = np.exp(1j * lam2[None, :] * u[:, None]) * ratio
-        out += 0.5 * b2[None, :] * np.abs(amp) ** 2
-    return out
+        phase = np.exp(1j * lam2[None, :] * u[:, None])
+        D2 += 0.5 * b2[None, :] * np.abs(phase * ratio) ** 2
+        transmitted = phase * ((lam2 - q - kaph)[None, :] * ratio + np.exp(1j * x))
+        T2 += 0.5 * np.abs(transmitted) ** 2
+    return T2, D2
+
+
+def laue_diffracted_intensity(energy_eV, n_hat, g, s_hat, chi_g_abs, chi_0, depth_ang):
+    """Polarization-mean ``|D_s(u, E)|^2`` of the two-beam Laue mode, ``(n_depth, n_E)``.
+
+    Validation: diffracted-bremsstrahlung
+    """
+    return laue_mode_intensities(energy_eV, n_hat, g, s_hat, chi_g_abs, chi_0, depth_ang)[1]
 
 
 def _segment_density(segments, energy_eV, direction, composition, *, model, tables, Ne, E_cut_keV):
@@ -171,36 +190,37 @@ def _segment_density(segments, energy_eV, direction, composition, *, model, tabl
 def _depth_histogram(z0, z1, weight, thickness, bins):
     """Row weights spread uniformly over ``[z0, z1]`` onto ``bins`` equal depth bins.
 
+    ``weight`` is ``(n_row,)`` or ``(n_row, m)``; the result is ``(bins,)`` or
+    ``(bins, m)``.
+
     Validation: diffracted-bremsstrahlung
     """
     edges = np.linspace(0.0, thickness, bins + 1)
     lo = np.clip(z0, 0.0, thickness)
     hi = np.clip(z1, 0.0, thickness)
-    out = np.zeros(bins)
+    weight = np.asarray(weight, dtype=float)
+    columns = weight.reshape(weight.shape[0], -1)
+    out = np.zeros((bins, columns.shape[1]))
     for start in range(0, lo.size, 100_000):
         sl = slice(start, start + 100_000)
-        a, c, w = lo[sl, None], hi[sl, None], weight[sl, None]
+        a, c = lo[sl, None], hi[sl, None]
         overlap = np.clip(np.minimum(c, edges[None, 1:]) - np.maximum(a, edges[None, :-1]), 0, None)
         width = c - a
         point = (width[:, 0] <= 0.0)[:, None] & (a >= edges[None, :-1]) & (a < edges[None, 1:])
         share = np.where(width > 0.0, overlap / np.where(width > 0.0, width, 1.0), point)
-        out += np.sum(w * share, axis=0)
-    return edges, out
+        out += share.T @ columns[sl]
+    return edges, (out[:, 0] if weight.ndim == 1 else out)
 
 
-def reflection_line(depth_weight, edges, energy_grid, n_hat, g, s_hat, E_B, chi_g_abs, chi_0):
-    """``(E_fine, S)`` of one reflection: the depth-weighted DBR line [photons/eV/sr].
+def bragg_window(thickness, n_hat, g, s_hat, E_B, chi_g_abs, chi_0, max_step=np.inf):
+    """Fine energy nodes around the refraction-shifted Bragg energy of one reflection.
 
-    ``depth_weight[k]`` is the brem density emitted in depth bin ``k``; the
-    line ``S(E) = sum_k depth_weight_k |D(L - z_k, E)|^2`` is sampled on a grid
-    resolving ``2 pi / L`` in ``q`` over ``+-200`` widths plus 20 Pendelloesung
-    widths, capped at ``_MAX_NODES`` nodes.
+    The grid resolves ``2 pi / L`` in ``q`` (and ``max_step``) over ``+-200``
+    kinematic widths plus 20 Pendelloesung widths, within +-1.5 keV and
+    ``_MAX_NODES`` nodes.
 
-    Validation: diffracted-bremsstrahlung
+    Validation: diffracted-bremsstrahlung, diffracted-characteristic-radiation
     """
-    thickness = float(edges[-1])
-    centres = 0.5 * (edges[:-1] + edges[1:])
-    u = thickness - centres
     k = E_B / _HBARC_EV_ANG
     Qs = float((k * n_hat + g) @ s_hat)
     dE_dq = _HBARC_EV_ANG * Qs / abs(float(n_hat @ g))
@@ -208,11 +228,25 @@ def reflection_line(depth_weight, edges, energy_grid, n_hat, g, s_hat, E_B, chi_
     width_q = 2.0 * np.pi / thickness
     half_q = _WIDTHS * width_q + 20.0 * 2.0 * coupling
     span = min(half_q * dE_dq, 1500.0)
-    step = min(width_q / 4.0 * dE_dq, 2.0 * span / 2000.0)
+    step = min(width_q / 4.0 * dE_dq, 2.0 * span / 2000.0, max_step)
     step = max(step, 2.0 * span / _MAX_NODES)
     # Resonance q = Re(kappa_0 - kappa_h): the refraction shift of the line.
     shift = float(np.real(chi_0)) * (k / (2.0 * float(n_hat @ s_hat)) - k**2 / (2.0 * Qs)) * dE_dq
-    E = E_B + shift + np.arange(-span, span + step, step)
+    return E_B + shift + np.arange(-span, span + step, step)
+
+
+def reflection_line(depth_weight, edges, energy_grid, n_hat, g, s_hat, E_B, chi_g_abs, chi_0):
+    """``(E_fine, S)`` of one reflection: the depth-weighted DBR line [photons/eV/sr].
+
+    ``depth_weight[k]`` is the brem density emitted in depth bin ``k``; the
+    line ``S(E) = sum_k depth_weight_k |D(L - z_k, E)|^2`` is sampled on
+    :func:`bragg_window`.
+
+    Validation: diffracted-bremsstrahlung
+    """
+    thickness = float(edges[-1])
+    u = thickness - 0.5 * (edges[:-1] + edges[1:])
+    E = bragg_window(thickness, n_hat, g, s_hat, E_B, chi_g_abs, chi_0)
     S = depth_weight @ laue_diffracted_intensity(E, n_hat, g, s_hat, chi_g_abs, chi_0, u)
     return E, S
 
