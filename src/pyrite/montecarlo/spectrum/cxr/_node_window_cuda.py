@@ -147,9 +147,8 @@ class DeviceNodeTail(NodeTail):
 
 def _plan_arrays(plan):
     node, lo, hi, mode, *mom = plan
-    return tuple(_device(a, np.int64) for a in (node, lo, hi, mode)) + (
-        _device(np.stack(mom), np.float64),
-    )
+    layout = _device(np.stack((node, lo, hi, mode)), np.int64)
+    return tuple(layout[k] for k in range(4)) + (_device(np.stack(mom), np.float64),)
 
 
 def accumulate_rows(E_r, a_width, weights, E_grid, targets, tail, target_ids):
@@ -158,8 +157,9 @@ def accumulate_rows(E_r, a_width, weights, E_grid, targets, tail, target_ids):
 
     if E_r.size == 0 or E_grid.size == 0:
         return
-    er, a = _host(E_r), _host(a_width)
-    w = np.stack([_host(v) for v in weights]).astype(np.float64)
+    er, a = _host(cp.stack((E_r, a_width)))
+    device_weights = _device(cp.stack(weights), np.float64)
+    w = _host(device_weights)
     plan = row_window_plan(tail, er, a)
     out = cp.zeros((len(weights), tail.n), dtype=cp.float64)
     _kernel("window_rows")(
@@ -168,7 +168,7 @@ def accumulate_rows(E_r, a_width, weights, E_grid, targets, tail, target_ids):
         (
             _device(E_r, np.float32),
             _device(a_width, np.float32),
-            _device(w, np.float64),
+            device_weights,
             _device(E_grid, np.float32),
             *_plan_arrays(plan),
             np.float64(tail.step),
@@ -193,21 +193,27 @@ def accumulate_flights(lines, d, g_phase, L_esc, coefs, starts, grids, out, weig
 
     if grids[0].size == 0 or starts.size < 2:
         return
-    rows = [_host(a) for a in (*lines, d, g_phase, L_esc)]
-    cs = [_host(c) for c in coefs]
+    packed = cp.stack((*lines, d, g_phase, L_esc))
+    rows = _host(packed)
+    cs = _host(cp.stack(coefs))
     bounds = _host(starts)
-    plan = grouped_window_plan(tail, rows[:6], *rows[6:], cs, bounds, [_host(g) for g in grids])
+    if not hasattr(tail, "formation_grids"):
+        tail.formation_grids = _device(cp.stack(grids), np.float32)
+        tail.formation_grids_host = _host(cp.stack(grids))
+    plan = grouped_window_plan(
+        tail, rows[:6], *rows[6:], list(cs), bounds, tail.formation_grids_host
+    )
     acc = cp.zeros(tail.n, dtype=cp.float64)
     nf, nr = bounds.size - 1, rows[0].size
-    coef = np.stack([v for c in cs for v in (c.real, c.imag)])
+    coef = cp.stack([v for c in coefs for v in (c.real, c.imag)])
     _kernel("window_flights")(
         (nf,),
         (128,),
         (
-            _device(np.stack(rows), np.float32),
+            _device(packed, np.float32),
             _device(coef, np.float32),
             _device(bounds, np.int64),
-            _device(cp.stack(grids), np.float32),
+            tail.formation_grids,
             *_plan_arrays(plan),
             np.float64(tail.step),
             np.float32(FORMATION_SERIES_W2),

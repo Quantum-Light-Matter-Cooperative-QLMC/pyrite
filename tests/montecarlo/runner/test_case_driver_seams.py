@@ -92,3 +92,26 @@ def test_timing_flag_is_read_late_from_the_package(monkeypatch):
     with pytest.raises(RuntimeError, match="impl"):
         runner._spectrum_case(_CASE, {})
     assert cleared == [1]
+
+
+@pytest.mark.parametrize("layered", [False, True])
+@pytest.mark.parametrize("cutoff", [None, 100.0])
+def test_cxr_runner_forwards_node_support_control(monkeypatch, layered, cutoff):
+    import numpy as np
+
+    seen = []
+
+    def spectrum(_segs, grid, **kwargs):
+        seen.append(kwargs["node_support_cutoff"])
+        return np.zeros(grid.size)
+
+    case = dict(_CASE, node_support_cutoff=cutoff)
+    segs = {"L_ang": np.ones(1)}
+    layers = None
+    if layered:
+        case["layer_radiators"] = [None, {k: case[k] for k in ("crystal", "hkl_list", "B_ang2")}]
+        layers = [(0, 1, case["composition"])] * 2
+        monkeypatch.setattr(case_driver, "_segments_in_layer", lambda *_: segs)
+    monkeypatch.setattr(case_driver, "mc_cxr_spectrum", spectrum)
+    case_driver._cxr_for_segments_once(segs, np.arange(1000.0, 1010.0), case, None, layers, None)
+    assert seen == [cutoff]

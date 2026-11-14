@@ -117,3 +117,29 @@ Measured at $x_c=100$ against the full-node kernels (anchors below):
 The centroid error is below $10^{-5}$ relative. All of these lie well inside
 the #1143 margins (yield and centroid $10^{-3}$, peak/FWHM and mass-L1 $10^{-2}$).
 With grid-wide windows both routes reproduce the reference to FFT roundoff.
+
+## Device implementation and replay qualification
+
+NumPy and float32 CuPy share the host window/moment plan. On CuPy, one block
+owns a line or flight and adjacent lanes visit adjacent support nodes. Formation
+fields use float32; corrections, atomic accumulation, and the FFT use float64
+to preserve cancellation near each pole. The correction stays in float64 until
+the tail is added. FP64 CuPy and nonuniform grids retain the full-node reference.
+
+`tests/montecarlo/spectrum/test_node_support_window_cuda.py` compares both
+backends with identical quantized inputs: multiple polarization/weight targets,
+split flights with absorption/refraction, direct and far poles, and full-band
+windows. The peak tolerance is $3\times10^{-5}$ plus $3\times10^{-4}$ relative,
+and the relative L1 tolerance is $3\times10^{-4}$. All four tests passed on an
+RTX 5080 (job 12496, source `c95480569`). This is implementation parity evidence;
+the ledger claim remains unverified.
+
+`checks/node_support_window_1191.py` replays a trusted transport pickle through
+both runner routes using `Case.node_support_cutoff` (`None` for the reference,
+100 for support windows). It alternates arm order, reports the first call
+separately from three warm calls, and applies the #1143 yield, centroid, peak,
+FWHM and normalized 100 eV mass-L1 margins. A fixed reference peak window also
+checks line/background against the same directly evaluated continuum. Reports
+include transport digests, synced code identity, backend, grid, population,
+cap, memory, and timing spread. These replays establish numerical/performance
+qualification; they do not provide independent physics validation.

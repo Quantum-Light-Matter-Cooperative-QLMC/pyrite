@@ -131,8 +131,8 @@ def mc_cxr_spectrum(
         exactly within ``|v| <= x_c`` of its pole and by its cycle-averaged
         far-field expansion elsewhere, so cost scales with support while the
         tail mass is kept (``O(1/x_c^2)`` yield error; 100 is the qualified
-        value). ``None`` is the full-node reference. Host backend and uniform
-        grids only; other configurations run the full-node reduction.
+        value). ``None`` is the full-node reference. NumPy or float32 CuPy on
+        uniform grids only; other configurations run the full-node reduction.
         Refused with ``coherent``, ``sinc_cutoff`` and bin-mean quadrature.
         Validation: node-support-window-tail
     components
