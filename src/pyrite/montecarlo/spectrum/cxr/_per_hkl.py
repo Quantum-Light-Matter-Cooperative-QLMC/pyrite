@@ -966,9 +966,11 @@ def _accumulate_reflection(
     if coherent or grouped:
         # Coherent and flight-grouped reductions: the rows are linear escape
         # pieces (``_setup``), and each carries its exact complex formation
-        # integral under absorption and the escape-path refractive slope.
-        # Both routes refuse layers, so one mu. Validation: coherent-formation-absorption
-        L_esc, cxr_rows, recoil_phase = _formation_cxr(st, idx, t_L, vdg, mu_layers[0], g2, n_dot_g)
+        # integral under absorption and the escape-path refractive slope. The
+        # coherent route refuses layers; the grouped one carries per-layer
+        # escape paths, mu and delta. Validation: coherent-formation-absorption,
+        # xray-layered-escape-phase
+        L_esc, cxr_rows, recoil_phase = _formation_cxr(st, idx, t_L, vdg, mu_layers, g2, n_dot_g)
     else:
         # Incoherent route: the segment mean of exp(-tau) over the same escape
         # geometry, split into linear pieces (issue #181, as #176 for

@@ -84,7 +84,7 @@ Incoherent pieces retain the parent segment's duration in the sinc and weight, m
 
 ### Propagation phase
 
-Under the coherent policy the same dispersion relation moves the segment-to-segment propagation phase: each segment's field picks up $-\delta(E)\,\omega(E)\,L_{{\rm esc},j}$ over its in-crystal escape path, the real partner of the amplitude factor $e^{-\tau/2}$ applied over that same path. This is refused for layered absorbers, whose per-layer $\delta$ is not modelled.
+Under the coherent policy the same dispersion relation moves the segment-to-segment propagation phase: each segment's field picks up $-\delta(E)\,\omega(E)\,L_{{\rm esc},j}$ over its in-crystal escape path, the real partner of the amplitude factor $e^{-\tau/2}$ applied over that same path. Through a layered stack the flight-grouped incoherent route (energy-capped transport) sums the leg per layer, $-\omega(E)\sum_l\delta_l(E)\,L_l$, with $\delta_l$ from each layer's composition and $L_l$ the escape path inside it, the real partner of $\tau=\sum_l\mu_l L_l$ ([Validation: `xray-layered-escape-phase`](../../validation/ledger-crystallography-atomic-data.md#xray-layered-escape-phase)). The coherent route through a stack is still refused.
 
 Both factors vary along a segment, and both are integrated along each linear escape piece rather than frozen at its midpoint: the piece field is $t_L e^{i\Phi_c}F$ with $F=e^{-\tau_c/2}\sinh w/w$, $w=iv-q$, $q=(\tau_{\rm end}-\tau_{\rm start})/4$ and $v=a_{\rm vac}(E-E_{\rm vac})-\delta\omega\,\Delta L_{\rm esc}/2$ on the vacuum sinc centre and width. Pieces of a straight flight therefore sum to it exactly. The coherent line centre is where this full phase is stationary: the same first-order Snell root as the incoherent route. See [Validation: `coherent-formation-absorption`](../../validation/radiation-physics/coherent-formation-absorption.md).
 
@@ -126,7 +126,7 @@ escape. It is not implemented; the limits below still apply.
 
 ## Validation
 
-Ledger rows: `absorption-length` for photoabsorption and `narrow-beam-total-attenuation` for total removal, `line-absorption-tabulation` and `self-absorption` for the interpolated and layered escape, `multilayer-stack` for the stack, `finite-transverse-crystal` for the prism escape, `blazed-groove-geometry` (**`unverified`**) for the groove, and `xray-chi-zero`, `xray-refractive-index`, `xray-in-medium-resonance`, `xray-in-medium-propagation-phase` for the dispersion model; `segment-escape-average` and `coherent-formation-absorption` for the escape along a segment.
+Ledger rows: `absorption-length` for photoabsorption and `narrow-beam-total-attenuation` for total removal, `line-absorption-tabulation` and `self-absorption` for the interpolated and layered escape, `multilayer-stack` for the stack, `finite-transverse-crystal` for the prism escape, `blazed-groove-geometry` (**`unverified`**) for the groove, and `xray-chi-zero`, `xray-refractive-index`, `xray-in-medium-resonance`, `xray-in-medium-propagation-phase`, `xray-layered-escape-phase` for the dispersion model; `segment-escape-average` and `coherent-formation-absorption` for the escape along a segment.
 
 The propagation-phase derivation record still contains a complex-index factorization with an inconsistent attenuation sign; the separate real-phase and transmission factors above match the implementation. That record needs correction before sign-off. Consult the [validation ledger](../../validation/physics-validation-ledger.md) before scientific use.
 

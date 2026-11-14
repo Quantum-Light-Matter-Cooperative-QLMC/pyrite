@@ -151,14 +151,14 @@ def expand_escape_pieces(segments, n_hat, *, layers=None, groove=None, keep_f64=
     parent's ``t_ang`` advanced by the piece offset over the parent's speed at
     the spectrum's evaluation energy, so the flight clock is unchanged.
     ``L_start``/``L_end`` are the escape distances at the piece ends, ordered
-    along travel. The returned scalar endpoints are the first layer’s paths; coherent and
-    flight-grouped callers require a single slab, while incoherent callers
-    recompute per-layer attenuation on the expanded geometry. Parent length
+    along travel: shape ``(n,)`` for a single slab or groove, ``(n, K)`` per
+    layer for a ``K``-layer stack (each layer's path is affine on a piece, so
+    its ends fix it; ``xray-layered-escape-phase``). Parent length
     and piece fraction preserve their segment-level sinc model. The pieces of
     a straight flight sum exactly to its field. ``keep_f64`` also stores the
     pieces' float64 midpoints and start ages as ``r_mid_f64``/``t_ang_f64``
     for the flight-grouped phase twin.
-    Validation: coherent-formation-absorption
+    Validation: coherent-formation-absorption, xray-layered-escape-phase
     """
     n_rows = int(xp.asarray(segments["L_ang"]).shape[0])
     owner, fraction, path_start, path_end = segment_escape_paths(
@@ -209,7 +209,9 @@ def expand_escape_pieces(segments, n_hat, *, layers=None, groove=None, keep_f64=
     if keep_f64:
         pieces["r_mid_f64"] = r_piece
         pieces["t_ang_f64"] = t_piece
-    return pieces, owner, path_start[:, 0].astype(REAL), path_end[:, 0].astype(REAL)
+    if layers is None:
+        path_start, path_end = path_start[:, 0], path_end[:, 0]
+    return pieces, owner, path_start.astype(REAL), path_end.astype(REAL)
 
 
 __all__ = [
@@ -240,13 +242,16 @@ class _FormationLines(tuple):
         return _FormationLines(a[sel] for a in self)
 
 
-def _formation_cxr(st, idx, t_L, v_dot_g, mu, g2, n_dot_g):
+def _formation_cxr(st, idx, t_L, v_dot_g, mu_layers, g2, n_dot_g):
     """Formation-factor lines and midpoint escape for the kept piece rows ``idx``.
 
     The escape distance is affine on each piece row (``_setup`` split the
     segments), so its end values give the midpoint phase distance
     ``(L_start + L_end)/2``, the refractive slope ``half_dL``, and the
-    attenuation ``tau = mu L`` at both ends. The sinc centre and width are the
+    attenuation ``tau = mu L`` at both ends. ``mu_layers`` holds one per-row
+    ``mu`` per escape column: a single slab has one, a ``K``-layer stack one
+    per layer, with ``tau = sum_l mu_l L_l`` and ``L``/``half_dL`` returned as
+    ``(n, K)`` per-layer paths (``xray-layered-escape-phase``). The sinc centre and width are the
     VACUUM ones: the in-medium part of the intra-piece phase slope is the
     escape-path term, which ``half_dL`` carries.
 
@@ -255,11 +260,18 @@ def _formation_cxr(st, idx, t_L, v_dot_g, mu, g2, n_dot_g):
     mismatch's extra phase over the electron's own age; every phased
     consumer adds it to ``d`` and ``g.r``.
     Returns ``(L_esc_mid, lines, recoil_phase)``.
-    Validation: coherent-formation-absorption, line-recoil-in-medium-root
+    Validation: coherent-formation-absorption, line-recoil-in-medium-root,
+    xray-layered-escape-phase
     """
     L_start, L_end = (a[idx] for a in st.escape_ends)
     denom_vac = st.denom_all[idx]
-    apb, bma, q = formation_coefficients(mu * L_start, mu * L_end, xp=xp)
+    if L_start.ndim == 1:
+        tau_start, tau_end = mu_layers[0] * L_start, mu_layers[0] * L_end
+    else:
+        mu = xp.stack([xp.asarray(m, dtype=REAL) for m in mu_layers], axis=1)
+        tau_start = (mu * L_start).sum(axis=1)
+        tau_end = (mu * L_end).sum(axis=1)
+    apb, bma, q = formation_coefficients(tau_start, tau_end, xp=xp)
     E_c, a_c, d_shift, g_shift = _recoil_formation_line(
         v_dot_g, denom_vac, t_L, st.gamma_all[idx], g2, n_dot_g, st.seg_t_mid[idx]
     )
