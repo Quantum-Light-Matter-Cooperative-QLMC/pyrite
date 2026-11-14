@@ -253,7 +253,9 @@ def test_gridnev_1987_spot_counts_and_band_populations(gridnev, case):
     data = gridnev["cases"][case]
     profile = planar_profile("silicon", tuple(data["plane_hkl"]), 293.15)
     kinetic = data["total_energy_MeV"] * 1e6 - M_E_EV
-    populations = entry_populations(profile, kinetic, 0.0)
+    # Table 1 is the authors' independent-atom calculation, not a measurement.
+    iam = planar_profile("silicon", tuple(data["plane_hkl"]), 293.15, bonding_charge=False)
+    populations = entry_populations(iam, kinetic, 0.0)
     np.testing.assert_allclose(populations[:5], data["table1_populations"], atol=0.015)
     sigma = np.deg2rad(gridnev["beam"]["divergence_deg"]) / 2.0
     dist = coherent_exit_distribution(

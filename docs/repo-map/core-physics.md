@@ -91,8 +91,11 @@ Structural adapter around Gemmi 0.7: CIF parsing, symmetry expansion, cell param
 
 ## `materials/crystal.py`
 Catalog-backed crystal compatibility projection, structure factors, X-ray optical constants — physics data layer under Monte Carlo.
-- Public: `load_crystals`, `load_crystal_from_cif`, `crystals_crystal_to_crystal_info`, `reciprocal_g_vector`, `g_mag`, `debye_waller`, `structure_factor`, `chi_g`, `U_g`, `absorption_length_ang`, `dominant_reflections`, `beta_from_Ee`; `CRYSTALS` registry.
-- Deps: `materials.atomic`, `materials.catalog`, `materials._cif`.
+- Public: `load_crystals`, `load_crystal_from_cif`, `crystals_crystal_to_crystal_info`, `reciprocal_g_vector`, `g_mag`, `debye_waller`, `structure_factor`, `chi_g`, `U_g`, `absorption_length_ang`, `dominant_reflections`, `beta_from_Ee`, `bonding_charge_correction`, `structure_factor_marker`/`STRUCTURE_FACTOR_MODEL`; `CRYSTALS` registry (each entry carries its static `bonding_dF` table). Structure-factor and potential functions take `bonding_charge=False` for the pure independent-atom sum (#1177).
+- Deps: `materials.atomic`, `materials.catalog`, `materials._cif`, `materials._structure_factors`.
+
+## `materials/_structure_factors.py`
+Measured low-order structure factors (#1177): the frozen `MeasuredStructureFactors` catalog record, its decoder for the optional crystal `[measured_structure_factors]` table (cubic single-element cells only), and `bonding_corrections`, the static bonding-charge table `dF(G)` over each tabulated `m-3m` family. `crystal.load_crystals` projects it into `CRYSTALS`; `channeling.potential`/`axial` add it to the planar and axial harmonics. Ledger: `bonding-charge-structure-factors`. Deps: `materials._catalog_decode`, NumPy.
 
 ## `materials/emission.py`
 Supported vacuum photon-energy comparison API. Resolves catalogue entrance crystals and primary parallel reflections or explicit Miller triples, applies the catalogue crystal cut and sample tilt, and returns material-leading NumPy arrays in broadcast/grid modes. `materials.crystal._orientation_R` owns the shared cut rotation; `montecarlo.geometry._orientation_R` forwards to it for existing callers.

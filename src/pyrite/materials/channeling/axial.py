@@ -42,6 +42,7 @@ from ..crystal import (
     E2_EV_ANG,
     _direct_lattice_vectors,
     _reciprocal_basis,
+    bonding_charge_correction,
 )
 from .potential import _EXTINCTION_RTOL, F0_S_MAX_INV_ANG, _coprime
 from .thermal import thermal_b_factor
@@ -244,6 +245,7 @@ def axial_profile(
     *,
     s_max_inv_ang: float = F0_S_MAX_INV_ANG,
     displacements_ang2: Mapping[str, object] | Sequence[object] | None = None,
+    bonding_charge: bool = True,
 ) -> AxialProfile:
     """Return the thermally averaged string potential of a catalog crystal axis.
 
@@ -263,6 +265,11 @@ def axial_profile(
         value or one value per basis site, each a scalar ``<u^2>`` per axis or a
         symmetric 3x3 Cartesian tensor [angstrom^2]. The catalog default is
         isotropic, ``B / 8 pi^2`` per element.
+    bonding_charge
+        Add the measured bonding-charge correction ``dF`` of
+        :func:`pyrite.materials.crystal.bonding_charge_correction` to ``f`` in
+        every zone reflection, smeared with the site-mean Debye--Waller factor;
+        ``False`` gives the independent-atom potential.
 
     Returns
     -------
@@ -274,7 +281,7 @@ def axial_profile(
     ValueError
         If the projected lattice has no rectangular cell.
 
-    Validation: cr-axial-2d-eigenproblem
+    Validation: cr-axial-2d-eigenproblem, bonding-charge-structure-factors
     """
     info = CRYSTALS[crystal]
     basis = info["basis"]
@@ -305,9 +312,15 @@ def axial_profile(
     f0 = {el: cromer_mann_f0(el, g_mag) for el in set(elements)}
     z = np.array([Z_TABLE[el] for el in elements], dtype=float)
     f_sites = np.stack([f0[el] for el in elements], 1)
-    potential = -4.0 * np.pi * E2_EV_ANG / volume * ((z - f_sites) * structure).sum(1) / g_mag**2
+    screening = ((z - f_sites) * structure).sum(1)
+    electrons = (f_sites * structure).sum(1)
+    if bonding_charge:
+        # dF(-G) in this module's exp(-i G.R) convention (bonding-charge-structure-factors).
+        delta = np.array([bonding_charge_correction(crystal, -row) for row in hkl]) * debye.mean(1)
+        screening, electrons = screening - delta, electrons + delta
+    potential = -4.0 * np.pi * E2_EV_ANG / volume * screening / g_mag**2
     nuclear = structure.sum(1) / volume
-    electrons = (f_sites * structure).sum(1) / volume
+    electrons = electrons / volume
 
     live = np.abs(potential) > _EXTINCTION_RTOL * np.abs(potential).max()
     if not live.any():

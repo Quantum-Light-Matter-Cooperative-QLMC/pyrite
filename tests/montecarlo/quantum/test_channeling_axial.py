@@ -62,7 +62,8 @@ def test_cell_and_strings_silicon():
     assert len(p110.strings) == 4
     # Dumbbell: string pairs a/4 apart along y.
     ys = sorted(s.position_ang[1] for s in p110.strings if abs(s.position_ang[0]) < 1e-9)
-    assert np.isclose(ys[1] - ys[0], a / 4.0)
+    gap = (ys[1] - ys[0]) % a
+    assert np.isclose(min(gap, a - gap), a / 4.0)  # periodic: the cell's y sign is a free choice
     for profile in (p001, p110, axial_profile("silicon", (1, 1, 1))):
         total = sum(sum(s.linear_density.values()) for s in profile.strings)
         assert np.isclose(total, 8.0 * profile.area_ang2 / a**3, rtol=1e-12)

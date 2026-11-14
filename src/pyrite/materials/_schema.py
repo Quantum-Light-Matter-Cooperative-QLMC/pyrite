@@ -15,6 +15,7 @@ from .._units import reject_quantity
 from ._catalog_decode import CxrGridByEnergy, _number
 from ._curves import TabulatedCurve
 from ._identity import CutFrame, MaterialIdentity, hexagonal_setting, reduce_indices
+from ._structure_factors import MeasuredStructureFactors
 
 _SCAN_KEYS = (
     "thickness_ang",
@@ -210,6 +211,8 @@ class CrystalSpec:
         Parsed crystallographic lattice, basis, composition, and volume.
     surface_hkl
         Optional Miller indices of the surface normal.
+    measured_structure_factors
+        Optional measured low-order structure factors (bonding charge, #1177).
     """
 
     key: str
@@ -227,6 +230,7 @@ class CrystalSpec:
     layers_per_cell: int | None
     info: CrystalInfo
     surface_hkl: tuple[int, int, int] | None
+    measured_structure_factors: MeasuredStructureFactors | None = None
 
     def __post_init__(self) -> None:
         reject_quantity(self.B_ang2, field="CrystalSpec.B_ang2", unit="angstrom**2")

@@ -51,6 +51,7 @@ from ._schema import (
     MediumSpec,
     ScanSpec,
 )
+from ._structure_factors import parse_measured_structure_factors
 from ._transport_data import TRANSPORT_ELEMENTS
 
 logger = logging.getLogger(__name__)
@@ -159,6 +160,7 @@ def _parse_crystals(raw: object, errors: _Errors, *, source: Path) -> dict[str, 
         "hkl_families",
         "hkl_reason",
         "layers_per_cell",
+        "measured_structure_factors",
     }
     required = {"cif", "validation_id", "formula", "B_ang2"}
     for key, value in table.items():
@@ -244,6 +246,12 @@ def _parse_crystals(raw: object, errors: _Errors, *, source: Path) -> dict[str, 
             else:
                 layers = layers_raw
         info = _parse_info(key, cif, mosaic, f"{path}.cif", errors) if cif else None
+        measured = parse_measured_structure_factors(
+            row.get("measured_structure_factors"),
+            f"{path}.measured_structure_factors",
+            errors,
+            info,
+        )
         if (
             cif is not None
             and info is not None
@@ -266,6 +274,7 @@ def _parse_crystals(raw: object, errors: _Errors, *, source: Path) -> dict[str, 
                 hkl_reason=reason_raw.strip() if isinstance(reason_raw, str) else None,
                 layers_per_cell=layers,
                 info=info,
+                measured_structure_factors=measured,
             )
     return out
 

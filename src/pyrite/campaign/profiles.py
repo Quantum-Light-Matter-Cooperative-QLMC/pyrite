@@ -37,6 +37,7 @@ from .._numerics import (
     validate_profile_numerics,
 )
 from .._precision import Precision, _brem_band_reduction_markers
+from ..materials.crystal import structure_factor_marker
 from ..materials.photon_cross_sections import ATTENUATION_MODEL
 from ..montecarlo.case import Case
 from ..montecarlo.channeling.handoff import CHANNELING_MODEL
@@ -437,6 +438,39 @@ def _model_generation_markers(emission: str) -> dict[str, Any]:
     return markers
 
 
+def _structure_factor_identity(crystals) -> dict[str, str]:
+    """Measured structure-factor marker; empty unless a crystal carries the data (#1177).
+
+    Divergence-only: digests of crystals without measured structure factors
+    stay bit-for-bit.
+    """
+    marker = structure_factor_marker(crystals)
+    return {} if marker is None else {"structure_factor_model": marker}
+
+
+def _target_crystals(target: Any, crystal: str) -> list[str]:
+    """Crystal keys of a sweep target: its entrance crystal plus any crystal layers."""
+    from ..materials import CATALOG
+
+    keys = [crystal]
+    for layer in getattr(target, "layers", ()) or ():
+        material = getattr(layer, "material", None)
+        if not isinstance(material, str):
+            continue
+        if material in CATALOG.materials:
+            keys.append(CATALOG.material(material).crystal_key)
+        elif material in CATALOG.crystals:
+            keys.append(material)
+    return keys
+
+
+def _case_crystals(case: Case | Mapping[str, Any]) -> list[str]:
+    """Crystal keys a case evaluates structure factors for."""
+    keys = [case.get("crystal")]
+    keys += [r.get("crystal") for r in case.get("layer_radiators") or () if r]
+    return [str(key) for key in keys if key is not None]
+
+
 def _axial_marker(spec: Mapping[str, object]) -> str:
     """Model marker of a resolved axial spec: calibrated fibre (v2) or the v1 recipe."""
     return AXIAL_FIBRE_MODEL_MARKER if spec["version"] == 2 else AXIAL_MODEL_MARKER
@@ -547,6 +581,9 @@ def _identity_v1(
     if transport_numerics:
         resolved["transport_numerics"] = transport_numerics
     resolved.update(_model_generation_markers(options.emission))
+    resolved.update(
+        _structure_factor_identity(_target_crystals(sweep.target, crystallography["crystal"]))
+    )
     resolved.update(_bin_reduction_markers(sweep_payload))
     resolved.update(shell_ionization)
     requested = (
@@ -692,6 +729,7 @@ def case_content_key(
         ),
     }
     payload.update(_bin_reduction_markers(case))
+    payload.update(_structure_factor_identity(_case_crystals(case)))
     payload.update(
         _brem_band_reduction_markers(
             case.get("adaptive_precision"),

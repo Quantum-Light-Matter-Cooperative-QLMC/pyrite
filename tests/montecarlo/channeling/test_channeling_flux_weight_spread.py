@@ -114,9 +114,10 @@ def test_production_kernels_reproduce_the_recorded_row_weights(demo_zone):
     weights = dict(
         zip(kernels.keys, fw.row_flux_weights(z, factors, np.array([z[-1]]))[0], strict=True)
     )
-    # Production values on the demo full path (recorded 2026-11-12, #1148).
-    assert weights[fw.BREM_KEY] == pytest.approx(1.34065, rel=1e-4)
-    assert weights["14:K"] == pytest.approx(1.17556, rel=1e-4)
+    # Production values on the demo full path (recorded 2026-11-12, #1148;
+    # re-pinned for the measured Si bonding charge, #1177: +0.09% / +0.06%).
+    assert weights[fw.BREM_KEY] == pytest.approx(1.34183, rel=1e-4)
+    assert weights["14:K"] == pytest.approx(1.17624, rel=1e-4)
 
 
 def test_k_shell_weight_is_insensitive_to_transverse_localization(demo_zone):

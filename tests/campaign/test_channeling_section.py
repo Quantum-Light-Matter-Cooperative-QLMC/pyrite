@@ -191,19 +191,21 @@ def test_channeling_demo_and_off_profile_identities_are_unchanged():
     Pins refreshed for #1134's ``segment-mean-v7-quantum-elements`` marker;
     restoring the v6 marker reproduces every pre-#1134 pin. The demo content
     key follows ``CHANNELING_MODEL`` v10 (#1166 zone-row PXR/DCR source); every
-    pin, channeling-off included, follows ``DIFFRACTED_BREM_MODEL`` (#1166 DBR).
+    pin, channeling-off included, follows ``DIFFRACTED_BREM_MODEL`` (#1166 DBR). The
+    silicon pins carry the crystal-conditional ``structure_factor_model`` marker
+    (#1177 measured bonding charge); hopg, which has no measured table, is unchanged.
     """
     sweep, settings, cases = _profile_cases("silicon", "channeling_demo")
     assert cases[0].line_quadrature == "bin-mean"
     assert [profiles.case_content_key(case) for case in cases] == [
-        "94c318b8bf4697c0b9304cd01f6ab35d74ad242686678143496ba49f53d5be21"
+        "ad6f730d7a62cef580be4d107f12e7133be73b86dae80d7b27c9a775926b0a80"
     ]
     assert profiles.named_profile_stem("silicon", catalog_profile="channeling_demo") == (
-        "silicon@channeling_demo-1082437ae4a7"
+        "silicon@channeling_demo-aa77bf915438"
     )
     identity = profiles.dataset_identity("silicon", settings, sweep)
     assert identity["parameter_sha256"] == (
-        "0c3237110d50f65b0f9786a36d7ee8db470fc58cdb4d494f67d36034ff98a74d"
+        "f2e052460462a4d8867f5bfea3db770dfcfe0302f95bfa4f07b9d1efa823ac72"
     )
     sweep = material_sweep("hopg", catalog_profile="standard")
     settings = profiles.profile_run_settings(default_settings(), "standard", sweep=sweep)
