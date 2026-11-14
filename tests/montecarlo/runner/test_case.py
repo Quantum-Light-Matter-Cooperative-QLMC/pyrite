@@ -189,3 +189,24 @@ def test_channeling_case_and_identity_baseline():
         (Path(__file__).parents[2] / "data/physics-baseline/channeling.json").read_text()
     )
     assert json.loads(json.dumps(actual, default=lambda array: array.tolist())) == expected
+
+
+def test_node_support_cutoff_restores_old_slots_and_round_trips_new_key():
+    from dataclasses import fields
+
+    legacy = Case(**_legacy_case())
+    old_state = [getattr(legacy, f.name) for f in fields(Case) if f.name != "node_support_cutoff"]
+    restored = object.__new__(Case)
+    restored.__setstate__(old_state)
+    assert "node_support_cutoff" not in restored
+    assert restored == legacy
+    for cutoff in (None, 100.0):
+        case = Case(**dict(legacy, node_support_cutoff=cutoff))
+        assert pickle.loads(pickle.dumps(case)).get("node_support_cutoff") == cutoff
+        assert Case(**case.to_dict()) == case
+
+
+@pytest.mark.parametrize("cutoff", [0.0, -1.0, float("inf"), float("nan")])
+def test_node_support_cutoff_rejects_invalid_values(cutoff):
+    with pytest.raises(ValueError, match="node_support_cutoff"):
+        Case(**dict(_legacy_case(), node_support_cutoff=cutoff))

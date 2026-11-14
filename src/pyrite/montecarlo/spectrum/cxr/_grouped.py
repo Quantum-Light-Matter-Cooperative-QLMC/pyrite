@@ -65,7 +65,7 @@ def accumulate_flight_grouped(st, idx, sel, coefs, cxr_rows, L_esc, recoil_phase
     lines = cxr_rows.take(sel)
     sel_coefs = [c[sel] for c in coefs]
     grids = (st.E_grid, st.omega_grid, st.delta_omega_grid)
-    if st.node_tail is not None:  # host only (setup); Validation: node-support-window-tail
+    if st.node_tail is not None:  # Validation: node-support-window-tail
         accumulate_grouped_windowed(
             lines, d, g_phase, L_rel, sel_coefs, bounds, grids, st.spec, wm, st.node_tail
         )

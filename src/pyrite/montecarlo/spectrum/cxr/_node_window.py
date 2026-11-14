@@ -425,6 +425,11 @@ def accumulate_sincsq_windowed(E_r, a_width, weights, E_grid, targets, tail, tar
 
     ``target_ids[t]`` is ``targets[t]``'s slot in ``tail``. Validation: node-support-window-tail
     """
+    if hasattr(tail, "correction"):
+        from ._node_window_cuda import accumulate_rows
+
+        accumulate_rows(E_r, a_width, weights, E_grid, targets, tail, target_ids)
+        return
     if E_r.size == 0 or E_grid.size == 0:
         return
     E_r = np.ascontiguousarray(E_r, dtype=np.float64)
@@ -507,6 +512,11 @@ def accumulate_grouped_windowed(lines, d, g_phase, L_esc, coefs, starts, grids, 
 
     Validation: node-support-window-tail, coherent-formation-absorption
     """
+    if hasattr(tail, "correction"):
+        from ._node_window_cuda import accumulate_flights
+
+        accumulate_flights(lines, d, g_phase, L_esc, coefs, starts, grids, out, weight, tail)
+        return
     from ._formation import FORMATION_SERIES_W2
 
     E_grid = grids[0]

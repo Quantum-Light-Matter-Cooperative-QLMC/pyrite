@@ -148,6 +148,7 @@ _CASE_KEY_ORDER = (
     "line_roulette",
     "allow_physics_fallback",
     "physics_fallbacks",
+    "node_support_cutoff",
 )
 
 
@@ -270,6 +271,9 @@ class Case(Mapping[str, Any]):
         Manual coherent-reducer control: the share of a row's per-electron
         floor the inter-electron blend may omit; absent is the policy default
         and ``0`` the full blend. Validation: coherent-flat-term-omission
+    node_support_cutoff
+        Dimensionless support width for incoherent node scoring; absent/None
+        retains the full-node reference. Positive values retain analytic tails.
     line_roulette
         Opt-in incoherent line-scoring roulette as a
         :class:`pyrite._line_roulette.LineRoulette` record; absent is analog
@@ -379,6 +383,8 @@ class Case(Mapping[str, Any]):
     physics_fallbacks: list[dict[str, Any]] | _Absent = _ABSENT
     # Opt-in line-scoring roulette, appended to retain historical pickle offsets.
     line_roulette: dict[str, object] | _Absent = _ABSENT
+    # Append: frozen-scene pickles retain all historical positional offsets.
+    node_support_cutoff: float | None | _Absent = _ABSENT
 
     def __setstate__(self, state: list[Any]) -> None:
         """Restore frozen-slot pickles, filling newly appended optional fields."""
@@ -507,6 +513,7 @@ class Case(Mapping[str, Any]):
         self._validate_transition_radiation()
         self._validate_photon_transport()
         self._validate_line_roulette()
+        self._validate_node_support_cutoff()
         if self.coherent_flat_omission_limit is not _ABSENT:
             _positive(
                 "coherent_flat_omission_limit", self.coherent_flat_omission_limit, allow_zero=True
@@ -683,6 +690,17 @@ class Case(Mapping[str, Any]):
         for key, what in refused.items():
             if getattr(self, key) is not _ABSENT:
                 raise ValueError(f"transport_mode='mixed' does not support {what}")
+
+    def _validate_node_support_cutoff(self) -> None:
+        """Admit the optional incoherent node-window numerical policy."""
+        if self.node_support_cutoff is not _ABSENT and self.node_support_cutoff is not None:
+            _positive("node_support_cutoff", self.node_support_cutoff)
+            if self.get("coherent_emission", False):
+                raise ValueError("node_support_cutoff is incoherent-only")
+            if self.get("sinc_cutoff") is not None:
+                raise ValueError("node_support_cutoff and sinc_cutoff are exclusive")
+            if self.get("line_quadrature", "node") != "node":
+                raise ValueError("node_support_cutoff needs line_quadrature='node'")
 
     def _validate_line_roulette(self) -> None:
         if isinstance(self.line_roulette, _Absent):

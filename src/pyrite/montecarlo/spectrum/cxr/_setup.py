@@ -406,15 +406,19 @@ def _refuse_node_support_cutoff(request):
 def _node_tail(request, E_grid_host):
     """The far-tail accumulator of the windowed node reduction, or None.
 
-    Host (NumPy) backend and uniform grids only; elsewhere the full-node
+    NumPy/CuPy backends and uniform grids only; elsewhere the full-node
     reduction runs, which is the reference the window approximates.
     Validation: node-support-window-tail
     """
-    if request.node_support_cutoff is None or getattr(xp, "__name__", "") != "numpy":
+    if request.node_support_cutoff is None:
         return None
     if uniform_step(E_grid_host) is None:
         return None
     n_targets = 3 if request.components else 1
+    if getattr(xp, "__name__", "") == "cupy":
+        from ._node_window_cuda import DeviceNodeTail
+
+        return DeviceNodeTail(E_grid_host, n_targets, request.node_support_cutoff)
     return NodeTail(E_grid_host, n_targets, request.node_support_cutoff)
 
 
