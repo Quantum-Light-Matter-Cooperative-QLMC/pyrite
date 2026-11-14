@@ -25,12 +25,12 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 ## `mosaic-mc-sampled`
 
 - **Claim:** per-history sampled crystallite orientations are an unbiased estimator of the `mosaic-mc` incoherent orientation average: history `e` holds `K` tilts `σ Φ⁻¹((p_k + s_e) mod 1)` (rank-1 lattice `p_k`, counter shift `s_e`, `σ = η/2.3548`) for all its rows and reflections, each weighted `1/K`
-- **Code:** `montecarlo/spectrum/cxr/_mosaic_sampled.py`; `montecarlo/spectrum/cxr/_per_hkl.py::_accumulate_sampled_mosaic`; `montecarlo/spectrum/cxr/_setup.py::_refuse_mosaic_sampling`; `montecarlo/spectrum/reflection_rows.py::reflection_rows`
+- **Code:** `montecarlo/spectrum/cxr/_mosaic_sampled.py`; `montecarlo/spectrum/cxr/_mosaic_sampled.py::accumulate_sampled_mosaic`; `montecarlo/spectrum/cxr/_grouped.py::_referenced_phases`; `montecarlo/spectrum/cxr/_setup.py::_refuse_mosaic_sampling`; `montecarlo/spectrum/reflection_rows.py::reflection_rows`
 - **Source:** `docs/physics/materials/crystal-mosaicity.md` (sampled crystallites)
-- **Status:** filtered
+- **Status:** rederived
 - **Checks:** per-axis tilt mean/σ/correlation; draws a pure function of `(seed, elec_id)` (subset, order, block invariant); vector Rodrigues and polarization pairs equal the scalar forms to 1e-15; η→0 bit-identical to the perfect crystal; yield, centroid and RMS width of 16 mosaic seeds equal converged GH N=33 within 5 standard errors (thin HOPG, 3.5°, 30° miscut); substepped flights keep their history crystallite in the grouped reduction
 - **Anchor:** `tests/montecarlo/spectrum/test_mosaic_sampled.py`
-- **Notes:** granularity is per history (crystallite larger than the electron track; user decision on #1185); incoherent only — the coherent route refuses it; draws live in the `SeedSequence(seed).spawn(8)[7]` child, so transport is untouched
+- **Notes:** granularity is per history (crystallite larger than the electron track; user decision on #1185); incoherent only — the coherent route refuses it; draws live in the `SeedSequence(seed).spawn(8)[7]` child, so transport is untouched. Fresh-context re-derivation matches. It checked three things: each lattice draw is an exact Gaussian sample (KS on 200k histories); a nonlinear test integrand agrees with an 80-point GH rule within |z| < 0.7 for K = 1–8; and the sampled spectrum equals explicit-rotation GH rows to 1e-14, including on grouped flights. [validation write-up](materials/mosaic-mc-sampled.md)
 
 ## `multilayer-stack`
 
