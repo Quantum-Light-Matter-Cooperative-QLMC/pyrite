@@ -17,7 +17,12 @@ from pyrite.montecarlo.channeling.planar_case import (
 )
 from pyrite.quantum import Channeling, ChannelingNumerics
 from pyrite.quantum._admission import AxialAdmissionError, PlanarAdmissionError
-from pyrite.quantum._axial_envelope import ADMITTED_AXIAL_CASES, UnadmittedAxialCase
+from pyrite.quantum._axial_envelope import (
+    ADMITTED_AXIAL_CASES,
+    AxialCaseQuery,
+    UnadmittedAxialCase,
+    unadmitted_axial_case,
+)
 from pyrite.quantum._channeling import channeling_from_fields
 from pyrite.quantum._planar_envelope import ADMITTED_PLANAR_CASES
 from tests.campaign.test_axial_fibre_milestone3 import case as axial_case
@@ -169,7 +174,18 @@ def test_admitted_axial_case_cannot_run_as_unadmitted():
         replace(out, thickness_ang=3000.0)
 
 
-def test_axial_solver_refusals_hold_under_the_opt_in():
+def test_axial_off_axis_opt_in_resolves_as_directional():
+    # #1148 made off-axis observation the supported "directional" observable.
     opted = replace(axial_channeling(), **OPT_IN)
-    with pytest.raises(AxialAdmissionError, match="on-axis"):
-        resolve_channeling([replace(axial_case(), thickness_ang=2000.0, theta_obs_rad=1e-3)], opted)
+    off_axis = replace(axial_case(), thickness_ang=2000.0, theta_obs_rad=1e-3)
+    with pytest.warns(UserWarning, match="very inaccurate"):
+        (out,) = resolve_channeling([off_axis], opted)
+    assert out["channeling"]["admission"] == "unadmitted"
+    assert out["channeling"]["observable"] == "directional"
+
+
+def test_axial_solver_refusals_hold_under_the_opt_in():
+    # Cases carry no particle field; the envelope still refuses non-electrons.
+    query = AxialCaseQuery("silicon", (0, 0, 1), 3.5e6, 2000.0, 0.0, 0.0, 293.15, "positron")
+    with pytest.raises(AxialAdmissionError, match="on-axis or directional electron"):
+        unadmitted_axial_case(query)

@@ -284,3 +284,56 @@ Here $I=P\,F_c+(1-P)$. Sec. 3 treats inelastically scattered electrons as plane 
 | Pass criterion | pass, wording | $\chi^2/N\le1.5$ against half bars, one scale; it assumes ±1σ bars. |
 
 **Verdict:** confirmed with findings for the #1178 measured-comparison extension. The status stays `anchored`. Only the same-element shapes are measured anchors.
+
+## Axial planar limit and Trofymenko shared physics (#1175)
+
+Implementation-context evidence, not a fresh-context verification. The axial extension above is unchanged and so is its status.
+
+**Planar-symmetric limit.** The Si $\langle001\rangle$ cell is the 1.92 Å square of the $\{110\}$ planes. A state whose orders lie on one cell axis, $\psi_{\mathbf G}\neq0$ only for $\mathbf G=(m g_x,0)$, has $\rho_{\mathbf Q}=0$ for $Q_y\neq0$, so $F=\operatorname{Re}\sum_m\rho_m K^*_{(m g_x,0)}/\rho_0$. Because $\sum_s\lambda_s e^{-iQ_xX_s}/A$ is the (110) plane density and the Debye–Waller factor is the same one-axis $\langle u^2\rangle$, the axial kernel on $Q_y=0$ equals the planar (110) kernel. The two agree to $5\times10^{-15}$, and the axial $F$ of a random 1D state equals the planar `flux_factors` value to $10^{-12}$ on both axes (`test_axial_flux_weights.py`).
+
+**No overlap point.** Trofymenko & Kyryllin, PRA 113, 032808 (2026), simulate Si $\langle100\rangle$/(100)/(110) at 1–1000 GeV through 40 µm, with CXR escaping from a 12 µm Kα layer. Andreyashkin et al. (2001) measure W $\langle111\rangle$ at 600–1000 MeV over 1.2 mm. The admitted axial cases are si-fibre/A (0.088° tilt) and si-fibre/B (aligned), both Si $\langle001\rangle$, 3.5 MeV, 0.3 µm (`ADMITTED_AXIAL_CASES`), and W is not a channeling catalog crystal. A 1 GeV fibre would need about $\sqrt{\gamma}$ ≈ 16 times the order window per axis and depths 100 times larger. The comparison is therefore limited to shared physics evaluated on the same transverse density.
+
+**Impact-parameter K profile.** Trofymenko's distant-collision weight, Eq. (6), is $w(r)\propto(1-e^{-r^2/b^2})/r^2$, with $r_{\min}=(\hbar/2m\omega_K)^{1/2}$ [Eq. (5)]. Since $\int_0^{\rho_0}(1-e^{-r^2/b^2})\,dr/r=\ln(\rho_0/b)+C/2$ for $\rho_0\gg b$, matching Eq. (4) gives $b=r_{\min}e^{C/2}$; Eq. (7) adds $\eta=0.995$ from their discrete-atom average (0.5% in $b$). For Si K ($U_K$ = 1844 eV), $r_{\min}$ = 0.0455 Å $=1/\zeta$ of the production Slater orbital, $b$ = 0.0604 Å, and the adiabatic cutoff $\beta\gamma\hbar c/U_K$ is 8.33 Å. The alternative kernel sums $w$ over strings inside $\rho_0$ = 5 Å [Eq. (9)] as the 2D Hankel transform $\int_0^{\rho_0}(1-e^{-r^2/b^2})J_0(Qr)\,dr/r$. It keeps the remainder, out to the adiabatic cutoff, uniform and replaces the production uniform distant-transverse term ($\delta_{\mathbf Q0}\sigma_t$, 24% of the K kernel at 3.5 MeV). Taking the remainder to the full adiabatic radius instead changes nothing at four digits. On the si-fibre/B ensemble (full-path $W$), the alternative raises $W_K$ above production:
+
+| Primaries | production $W_K$ | Eq. (6) $W_K$ | ratio |
+| --- | --- | --- | --- |
+| 4 | 1.8268 | 1.9324 | 1.058 |
+| 32 | 1.9002 | 2.0171 | 1.062 |
+| 128 | 2.0162 | 2.1489 | 1.066 |
+
+The ensemble mean moves with the number of primaries, but the ratio is stable. This gives their profile shape to the transverse magnitude only, not their model: it is an over-localization bound (about twice the planar demo spread, +1.6…+3.0%, within the ≤10% tolerance). Localizing only the transverse-photon part of Fermi's split gives 0.9995 (fresh-context check below), so the production uniform term is essentially right.
+
+**Orientation ordering.** At a common 3.5 MeV, 0.3 µm and aligned entry, the planar zone solves (basis 12/16 and dz 15/7.5 Å agree to four digits) and the axial fibre give the following weights:
+
+| Orientation | well depth (eV) | $W_{\rm brem}$ | $W_K$ |
+| --- | --- | --- | --- |
+| axial $\langle001\rangle$ (full-path $W$, 4 primaries; zone-row means 3.30/2.04) | — | 3.00 | 1.83 |
+| (110) | 21.0 (Trofymenko: 21.4) | 1.863 | 1.473 |
+| (100) | 11.7 (Trofymenko: 11.8) | 1.740 | 1.413 |
+
+For electrons, Trofymenko's Fig. 4 places (110) farther from random than (100), and Fig. 5 has axial channeling highest (1.67× random at $\vartheta$ = 20°). PyRITE reproduces this ordering. The magnitudes are not comparable: their yields integrate GeV dechanneling over the escape layer, whereas these are 0.3 µm zone means at 3.5 MeV. Test: `test_axial_flux_weight_trofymenko.py` (slow; 8–42 s locally, mostly fixture setup).
+
+### Fresh-context verification of the #1175 evidence (2026-11-13)
+
+**Planar limit (independent).** Projected along $[001]$, the eight Si atoms of the conventional cell fall on a square lattice of side $a/2\sqrt2=1.9201$ Å along $[110]$ and $[1\bar10]$, with one atom per string per period $a$. The rectangular cell therefore holds one string, with $\lambda/A=8/a^3=0.04994$ Å$^{-3}$. A (110) plane of spacing $d=a/2\sqrt2$ carries $\sigma=\lambda/d_y$, so $\sigma/d_x=\lambda/A$ on every harmonic $(mg_x,0)$. The axial Debye–Waller factor $e^{-a^2Q^2/2}$ reduces on $Q_y=0$ to the planar $e^{-B s^2}$ only if $a^2$ is the one-axis $\langle u_x^2\rangle$. The code gives $a^2=0.0062215$ Å$^2=B/8\pi^2$, and the hand-built $n(Q_x)$ reproduces `_string_densities` (for example, 0.048307 Å$^{-3}$ at $m=1$). With both kernels normalized at $Q=0$ and $\rho_{\mathbf Q}$ confined to $Q_y=0$, Parseval gives $F_{\rm axial}=F_{\rm planar}$. Reproduced kernel agreement on $Q_y=0$, $|m|\le6$: brem $5.1\times10^{-15}$, K $2.3\times10^{-15}$, L $\le8\times10^{-16}$.
+
+The test is non-trivial for cell geometry, string phase, Debye–Waller convention (a 2D $\langle u^2\rangle$ would fail), $(x,y)$ layout on both axes, and the FFT-versus-grid evaluation of $F$. It shares the radial kernel functions (`_shell_harmonics`, `_brem_harmonics`) with the planar path, so it does not test kernel physics.
+
+**Eqs. (5)–(7), (9).** Transcribed correctly: $\int_0^{\rho_0}(1-e^{-r^2/b^2})\,dr/r=\tfrac12[\ln(\rho_0^2/b^2)+C+E_1(\rho_0^2/b^2)]$ (quadrature 4.705484 against $\ln(\rho_0/b)+C/2$ = 4.705484). The 2D Fourier coefficient of $\sum_s\lambda_s w(|\mathbf r-\mathbf X_s|)\,\Theta(\rho_0-|\mathbf r-\mathbf X_s|)$ is $n(\mathbf Q)\,2\pi\int_0^{\rho_0}w\,J_0(Qr)\,r\,dr$, as coded. The fraction of the profile inside $\rho_0$ is 0.902. Reproduced: $r_{\min}$ = 0.045455 Å ($1/\zeta$ = 0.045455 Å), $b$ = 0.060359 Å, $\beta\gamma\hbar c/U_K$ = 8.331 Å, and transverse fraction 0.2387. The text extraction prints Euler's constant as "0.5572"; the code's $C=0.5772$ is required by the derivation. Matching Eq. (4) alone gives $\eta=1$. The 0.995 belongs to their discrete 21-atom average and is immaterial here, at 0.5% in $b$.
+
+**Like-for-like.** This is only partial. Their Eq. (6) profile describes all distant collisions. The test gives this $1/r^2$ shape to the PENELOPE transverse magnitude alone and keeps the production localization of the distant-longitudinal and close terms. In Fermi's impact-parameter split, the transverse-photon amplitude is $\kappa K_1(\kappa r)-k_vK_1(k_vr)$, with $\kappa=\omega/\gamma v$ and $k_v=\omega/v$, which cancels for $r\ll v/\omega$ = 1.06 Å. On the same 4-primary si-fibre/B ensemble:
+
+| Transverse profile | $W_K$ | ratio to production |
+| --- | --- | --- |
+| uniform (production) | 1.8268 | 1 |
+| Eq. (6), strings in $\rho_0$, uniform beyond (test) | 1.9324 | 1.0578 |
+| $(1-e^{-r^2/b^2})(\kappa K_1(\kappa r))^2$, all strings | 1.9406 | 1.0623 |
+| transverse-photon part only, $(\kappa K_1-k_vK_1)^2$ | 1.8258 | 0.9995 |
+
+The hard adiabatic cutoff matches a continuous $K_1$ profile to 0.5%. The +5.8% is an over-localization bound on the transverse term, not a correction expected from Trofymenko's physics.
+
+**Orientation and well depths.** The text supports (110) farther from random than (100) for electrons (Fig. 4) and the axial electron ratio 1.67 at $\vartheta$ = 20°, $\theta=0$ (Fig. 5 discussion). The full ordering axial > (110) needs the figures, not the text. The 11.8 and 21.4 eV depths are quoted for positrons. With one plane per period, the electron and positron wells have equal depth. The lower PyRITE values are consistent with its larger $u_{\rm rms}$ (0.0789 Å against their $r_T$ = 0.075 Å). The tests pass (8/8), but the slow module took 42 s locally, 36 s of it fixture setup, not the stated "about 8 s".
+
+**Findings.** (i) `ADMITTED_AXIAL_CASES` holds si-fibre/A (0.088° tilt) and si-fibre/B; "the only admitted axial case is si-fibre/B" should name both, and the no-overlap conclusion is unchanged. (ii) Describe the Eq. (6) substitution as a localization-spread bound that uses their profile shape for the transverse magnitude only, not as their model. (iii) Label the orientation-table axial weights as full-path $W$ (brem 3.00, K 1.83, 4 primaries), distinct from the ledger's zone-row means (3.30, 2.04). (iv) Fix the runtime figure.
+
+**Verdict:** confirmed with findings; status unchanged.
