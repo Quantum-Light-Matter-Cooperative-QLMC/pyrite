@@ -58,8 +58,9 @@ import numpy as np
 
 from ..._backend import _to_cpu, xp
 
-#: Native model marker; changes the default spectrum of every crystal case.
-DIFFRACTED_BREM_MODEL = "two-beam-laue-dbr-v1"
+#: Native two-beam Laue model marker: DBR in the line spectra (#1166) and the
+#: Kossel term of the characteristic spectrum (v2, #1176).
+DIFFRACTED_BREM_MODEL = "two-beam-laue-dbr-kossel-v2"
 
 _HBARC_EV_ANG = 1973.269804
 _DEPTH_BINS = 64
@@ -67,10 +68,21 @@ _WIDTHS = 200.0
 _MAX_NODES = 40000
 
 
-def laue_diffracted_intensity(energy_eV, n_hat, g, s_hat, chi_g_abs, chi_0, depth_ang):
-    """Polarization-mean ``|D_s(u, E)|^2`` of the two-beam Laue mode, ``(n_depth, n_E)``.
+def laue_mode_intensities(energy_eV, n_hat, g, s_hat, chi_g_abs, chi_0, depth_ang, cross=False):
+    """Polarization-mean ``(|T_s(u, E)|^2, |D_s(u, E)|^2)`` of the two-beam Laue mode.
 
-    Validation: diffracted-bremsstrahlung
+    With ``cross=True`` a third array ``X = (1/2) sum_s 2 C_s conj(T_s) D_s``
+    (complex) is returned, with ``D_s`` for a real positive coupling ``b``; a
+    coupling of phase ``e^{i phi}`` multiplies it by ``e^{i phi}`` (#1176).
+
+    Both arrays are ``(n_depth, n_E)``. ``T`` is the transmitted amplitude
+    (``P(0) = (1, 0)``), ``T(u) = exp(i lambda_2 u) [(lambda_2 - N_22)
+    (exp(i x) - 1)/(lambda_1 - lambda_2) + exp(i x)]`` with
+    ``x = (lambda_1 - lambda_2) u``; it reduces to ``exp(i k chi_0 u / 2 n_s)``
+    for ``chi_g -> 0`` and obeys ``n_s |T|^2 + (Q_s/k) |D|^2 = n_s`` without
+    absorption (#1176).
+
+    Validation: diffracted-bremsstrahlung, diffracted-characteristic-radiation
     """
     E = np.atleast_1d(np.asarray(energy_eV, dtype=float))
     u = np.atleast_1d(np.asarray(depth_ang, dtype=float))
@@ -86,7 +98,9 @@ def laue_diffracted_intensity(energy_eV, n_hat, g, s_hat, chi_g_abs, chi_0, dept
     es = np.cross(n, g)
     es /= np.linalg.norm(es)
     Qhat = Q / np.linalg.norm(Q, axis=1)[:, None]
-    out = np.zeros((u.size, E.size))
+    T2 = np.zeros((u.size, E.size))
+    D2 = np.zeros((u.size, E.size))
+    X = np.zeros((u.size, E.size), dtype=complex)
     for e in (es, np.cross(es, n)):
         C = np.linalg.norm(e[None, :] - Qhat * (Qhat @ e)[:, None], axis=1)
         b2 = k**4 * chi_g_abs**2 * C**2 / (4.0 * Qs**2)
@@ -104,9 +118,22 @@ def laue_diffracted_intensity(energy_eV, n_hat, g, s_hat, chi_g_abs, chi_0, dept
             np.expm1(1j * x) / np.where(split == 0, 1.0, split)[None, :],
             1j * u[:, None] * (1.0 + 0.5j * x),
         )
-        amp = np.exp(1j * lam2[None, :] * u[:, None]) * ratio
-        out += 0.5 * b2[None, :] * np.abs(amp) ** 2
-    return out
+        phase = np.exp(1j * lam2[None, :] * u[:, None])
+        diffracted = np.sqrt(b2)[None, :] * phase * ratio
+        D2 += 0.5 * np.abs(diffracted) ** 2
+        transmitted = phase * ((lam2 - q - kaph)[None, :] * ratio + np.exp(1j * x))
+        T2 += 0.5 * np.abs(transmitted) ** 2
+        if cross:
+            X += C[None, :] * np.conj(transmitted) * diffracted
+    return (T2, D2, X) if cross else (T2, D2)
+
+
+def laue_diffracted_intensity(energy_eV, n_hat, g, s_hat, chi_g_abs, chi_0, depth_ang):
+    """Polarization-mean ``|D_s(u, E)|^2`` of the two-beam Laue mode, ``(n_depth, n_E)``.
+
+    Validation: diffracted-bremsstrahlung
+    """
+    return laue_mode_intensities(energy_eV, n_hat, g, s_hat, chi_g_abs, chi_0, depth_ang)[1]
 
 
 def _segment_density(segments, energy_eV, direction, composition, *, model, tables, Ne, E_cut_keV):
@@ -165,42 +192,64 @@ def _segment_density(segments, energy_eV, direction, composition, *, model, tabl
             dsig = xp.where(directional[0].available[:, None], directional[1], dsig)
         density += n_i * 1e24 * path_cm * dsig[:, 0]
     density = density / (4.0 * np.pi) / Ne
-    return (_to_cpu(z - half), _to_cpu(z + half), _to_cpu(density))
+    return z - half, z + half, density
 
 
 def _depth_histogram(z0, z1, weight, thickness, bins):
     """Row weights spread uniformly over ``[z0, z1]`` onto ``bins`` equal depth bins.
 
+    ``weight`` is ``(n_row,)`` or ``(n_row, m)``; the result is ``(bins,)`` or
+    ``(bins, m)`` on the host. Ranges are clipped to the slab; a zero-width row
+    deposits in the bin holding it (none at ``z = thickness``). The scatter runs
+    on the array backend in ``O(n_row)``: a row's partial first and last bins
+    are deposited directly and its full interior bins through a difference
+    array, so only the ``bins``-row result leaves the device.
+
     Validation: diffracted-bremsstrahlung
     """
+    thickness = float(thickness)
     edges = np.linspace(0.0, thickness, bins + 1)
-    lo = np.clip(z0, 0.0, thickness)
-    hi = np.clip(z1, 0.0, thickness)
-    out = np.zeros(bins)
-    for start in range(0, lo.size, 100_000):
-        sl = slice(start, start + 100_000)
-        a, c, w = lo[sl, None], hi[sl, None], weight[sl, None]
-        overlap = np.clip(np.minimum(c, edges[None, 1:]) - np.maximum(a, edges[None, :-1]), 0, None)
-        width = c - a
-        point = (width[:, 0] <= 0.0)[:, None] & (a >= edges[None, :-1]) & (a < edges[None, 1:])
-        share = np.where(width > 0.0, overlap / np.where(width > 0.0, width, 1.0), point)
-        out += np.sum(w * share, axis=0)
-    return edges, out
+    dz = thickness / bins
+    lo = xp.clip(xp.asarray(z0, dtype=float), 0.0, thickness)
+    hi = xp.clip(xp.asarray(z1, dtype=float), 0.0, thickness)
+    weight = xp.asarray(weight, dtype=float)
+    columns = weight.reshape(weight.shape[0], int(np.prod(weight.shape[1:])))
+    m = columns.shape[1]
+    first = xp.minimum(xp.floor(lo / dz).astype(xp.int64), bins - 1)
+    last = xp.minimum(xp.floor(hi / dz).astype(xp.int64), bins - 1)
+    width = hi - lo
+    point = width <= 0.0
+    keep = ~point | (lo < thickness)  # a point exactly at the far face is dropped
+    single = point | (first == last)
+    # Per-row fractions of the weight: partial first bin, partial last bin,
+    # and each full interior bin (zero unless the row spans three bins).
+    inverse = xp.where(keep, 1.0, 0.0) / xp.where(single, 1.0, width)
+    head = xp.where(single, 1.0, (first + 1) * dz - lo) * inverse
+    tail = xp.where(single, 0.0, hi - last * dz) * inverse
+    inner = xp.where(last - first > 1, dz * inverse, 0.0)
+    # One bincount per column over (bins + 1) slots for each part; the
+    # difference array's closing entry may land at slot ``bins``.
+    index = xp.concatenate([first, last, first + 1 + (bins + 1), last + (bins + 1)])
+    fraction = xp.concatenate([head, tail, inner, -inner])
+    out = xp.empty((bins, m))
+    for c in range(m):
+        both = xp.bincount(
+            index, weights=fraction * xp.tile(columns[:, c], 4), minlength=2 * (bins + 1)
+        )
+        out[:, c] = both[:bins] + xp.cumsum(both[bins + 1 :])[:bins]
+    out = _to_cpu(out)
+    return edges, (out[:, 0] if weight.ndim == 1 else out)
 
 
-def reflection_line(depth_weight, edges, energy_grid, n_hat, g, s_hat, E_B, chi_g_abs, chi_0):
-    """``(E_fine, S)`` of one reflection: the depth-weighted DBR line [photons/eV/sr].
+def bragg_window(thickness, n_hat, g, s_hat, E_B, chi_g_abs, chi_0, max_step=np.inf):
+    """Fine energy nodes around the refraction-shifted Bragg energy of one reflection.
 
-    ``depth_weight[k]`` is the brem density emitted in depth bin ``k``; the
-    line ``S(E) = sum_k depth_weight_k |D(L - z_k, E)|^2`` is sampled on a grid
-    resolving ``2 pi / L`` in ``q`` over ``+-200`` widths plus 20 Pendelloesung
-    widths, capped at ``_MAX_NODES`` nodes.
+    The grid resolves ``2 pi / L`` in ``q`` (and ``max_step``) over ``+-200``
+    kinematic widths plus 20 Pendelloesung widths, within +-1.5 keV and
+    ``_MAX_NODES`` nodes.
 
-    Validation: diffracted-bremsstrahlung
+    Validation: diffracted-bremsstrahlung, diffracted-characteristic-radiation
     """
-    thickness = float(edges[-1])
-    centres = 0.5 * (edges[:-1] + edges[1:])
-    u = thickness - centres
     k = E_B / _HBARC_EV_ANG
     Qs = float((k * n_hat + g) @ s_hat)
     dE_dq = _HBARC_EV_ANG * Qs / abs(float(n_hat @ g))
@@ -208,11 +257,25 @@ def reflection_line(depth_weight, edges, energy_grid, n_hat, g, s_hat, E_B, chi_
     width_q = 2.0 * np.pi / thickness
     half_q = _WIDTHS * width_q + 20.0 * 2.0 * coupling
     span = min(half_q * dE_dq, 1500.0)
-    step = min(width_q / 4.0 * dE_dq, 2.0 * span / 2000.0)
+    step = min(width_q / 4.0 * dE_dq, 2.0 * span / 2000.0, max_step)
     step = max(step, 2.0 * span / _MAX_NODES)
     # Resonance q = Re(kappa_0 - kappa_h): the refraction shift of the line.
     shift = float(np.real(chi_0)) * (k / (2.0 * float(n_hat @ s_hat)) - k**2 / (2.0 * Qs)) * dE_dq
-    E = E_B + shift + np.arange(-span, span + step, step)
+    return E_B + shift + np.arange(-span, span + step, step)
+
+
+def reflection_line(depth_weight, edges, energy_grid, n_hat, g, s_hat, E_B, chi_g_abs, chi_0):
+    """``(E_fine, S)`` of one reflection: the depth-weighted DBR line [photons/eV/sr].
+
+    ``depth_weight[k]`` is the brem density emitted in depth bin ``k``; the
+    line ``S(E) = sum_k depth_weight_k |D(L - z_k, E)|^2`` is sampled on
+    :func:`bragg_window`.
+
+    Validation: diffracted-bremsstrahlung
+    """
+    thickness = float(edges[-1])
+    u = thickness - 0.5 * (edges[:-1] + edges[1:])
+    E = bragg_window(thickness, n_hat, g, s_hat, E_B, chi_g_abs, chi_0)
     S = depth_weight @ laue_diffracted_intensity(E, n_hat, g, s_hat, chi_g_abs, chi_0, u)
     return E, S
 
@@ -234,15 +297,20 @@ def deposit(E_fine, S, grid, quadrature):
     return np.diff(at) / np.diff(edges)
 
 
-def bragg_reflections(case, n_hat, energy_grid, margin_eV=1500.0):
+def bragg_reflections(case, n_hat, energy_grid, margin_eV=1500.0, detail=False):
     """``[(g_sample, |chi_g|, chi_0), ...]`` of ``case`` with a Laue Bragg line in the grid.
+
+    ``detail=True`` appends ``(hkl, chi_mode)`` to each entry: ``chi_mode =
+    conj(chi(-hkl))`` is the complex coupling of the time-reversed mode (the
+    incoming wave along ``-n`` diffracts with ``-g``; ``e^{-i omega t}``
+    fields), of modulus ``|chi_g|``.
 
     A reflection qualifies when ``n.g < 0`` puts ``E_B`` within ``margin_eV``
     of the grid and both ``n.s`` and ``Q_hat.s`` exceed ``3 sqrt(|chi_0|)``
     (Laue, outside total external reflection). ``chi_0`` is returned with
     ``Im > 0`` absorbing.
 
-    Validation: diffracted-bremsstrahlung
+    Validation: diffracted-bremsstrahlung, diffracted-characteristic-radiation
     """
     from ...materials.crystal import (
         CRYSTALS,
@@ -281,8 +349,62 @@ def bragg_reflections(case, n_hat, energy_grid, margin_eV=1500.0):
         cr, ci, _, _ = emission_coupling_tables(
             case["crystal"], [hkl], np.array([E_B]), case.get("B_ang2", 0.0), use_henke=True
         )
-        chi = abs(complex(float(np.ravel(cr)[0]), float(np.ravel(ci)[0])))
-        out.append((g, chi, complex(c0.real, abs(c0.imag))))
+        chi_mode = complex(float(np.ravel(cr)[0]), float(np.ravel(ci)[0]))
+        entry = (g, abs(chi_mode), complex(c0.real, abs(c0.imag)))
+        out.append((*entry, (hkl, chi_mode)) if detail else entry)
+    return out
+
+
+def _bragg_energy(g, n):
+    return -_HBARC_EV_ANG * float(g @ g) / (2.0 * float(n @ g))
+
+
+def dbr_depth_weights(
+    segments, reflections, n_hat, composition, thickness_ang, *, model, tables, Ne, E_cut_keV
+):  # fmt: skip
+    """Per-reflection DBR source depth weights, ``[(bins,), ...]`` on the host.
+
+    Each is the unattenuated brem density toward the reflection's ``Q_hat`` at
+    its Bragg energy [photons/eV/sr/electron], binned in depth. Linear in the
+    segments, so whole-electron blocks add.
+
+    Validation: diffracted-bremsstrahlung
+    """
+    n = np.asarray(n_hat, dtype=float)
+    n = n / np.linalg.norm(n)
+    out = []
+    for g, _chi_g_abs, _chi_0 in reflections:
+        E_B = _bragg_energy(g, n)
+        direction = E_B / _HBARC_EV_ANG * n + g
+        direction /= np.linalg.norm(direction)
+        z0, z1, j = _segment_density(
+            segments, E_B, direction, composition,
+            model=model, tables=tables, Ne=Ne, E_cut_keV=E_cut_keV,
+        )  # fmt: skip
+        out.append(_depth_histogram(z0, z1, j, float(thickness_ang), _DEPTH_BINS)[1])
+    return out
+
+
+def dbr_from_depth_weights(
+    weights, energy_grid, reflections, n_hat, thickness_ang, *,
+    quadrature="node", s_hat=(0.0, 0.0, 1.0),
+):  # fmt: skip
+    """DBR density on ``energy_grid`` from :func:`dbr_depth_weights` output.
+
+    Validation: diffracted-bremsstrahlung
+    """
+    grid = np.asarray(energy_grid, dtype=float)
+    out = np.zeros(grid.size)
+    n = np.asarray(n_hat, dtype=float)
+    n = n / np.linalg.norm(n)
+    s = np.asarray(s_hat, dtype=float)
+    edges = np.linspace(0.0, float(thickness_ang), _DEPTH_BINS + 1)
+    for (g, chi_g_abs, chi_0), weight in zip(reflections, weights, strict=True):
+        if not np.any(weight > 0.0):
+            continue
+        E_B = _bragg_energy(g, n)
+        E, S = reflection_line(weight, edges, grid, n, g, s, E_B, chi_g_abs, chi_0)
+        out += deposit(E, S, grid, quadrature)
     return out
 
 
@@ -298,22 +420,10 @@ def diffracted_brem_spectrum(
 
     Validation: diffracted-bremsstrahlung
     """
-    grid = np.asarray(energy_grid, dtype=float)
-    out = np.zeros(grid.size)
-    n = np.asarray(n_hat, dtype=float)
-    n = n / np.linalg.norm(n)
-    s = np.asarray(s_hat, dtype=float)
-    for g, chi_g_abs, chi_0 in reflections:
-        E_B = -_HBARC_EV_ANG * float(g @ g) / (2.0 * float(n @ g))
-        direction = E_B / _HBARC_EV_ANG * n + g
-        direction /= np.linalg.norm(direction)
-        z0, z1, j = _segment_density(
-            segments, E_B, direction, composition,
-            model=model, tables=tables, Ne=Ne, E_cut_keV=E_cut_keV,
-        )  # fmt: skip
-        if not np.any(j > 0.0):
-            continue
-        edges, weight = _depth_histogram(z0, z1, j, float(thickness_ang), _DEPTH_BINS)
-        E, S = reflection_line(weight, edges, grid, n, g, s, E_B, chi_g_abs, chi_0)
-        out += deposit(E, S, grid, quadrature)
-    return out
+    weights = dbr_depth_weights(
+        segments, reflections, n_hat, composition, thickness_ang,
+        model=model, tables=tables, Ne=Ne, E_cut_keV=E_cut_keV,
+    )  # fmt: skip
+    return dbr_from_depth_weights(
+        weights, energy_grid, reflections, n_hat, thickness_ang, quadrature=quadrature, s_hat=s_hat
+    )

@@ -112,6 +112,41 @@ def _mirror(case, hkl):
     return g, beam - 2 * (beam @ g) * g / (g @ g)
 
 
+def _dense_depth_histogram(z0, z1, weight, thickness, bins):
+    """Reference: per-row overlap with every bin (the pre-scatter implementation)."""
+    edges = np.linspace(0.0, thickness, bins + 1)
+    a, c = np.clip(z0, 0.0, thickness)[:, None], np.clip(z1, 0.0, thickness)[:, None]
+    overlap = np.clip(np.minimum(c, edges[None, 1:]) - np.maximum(a, edges[None, :-1]), 0, None)
+    width = c - a
+    point = (width[:, 0] <= 0.0)[:, None] & (a >= edges[None, :-1]) & (a < edges[None, 1:])
+    share = np.where(width > 0.0, overlap / np.where(width > 0.0, width, 1.0), point)
+    return share.T @ weight
+
+
+def test_depth_scatter_matches_the_dense_overlap():
+    """``O(rows)`` scatter equals per-row overlap: multi-bin, single-bin, point,
+    edge-touching, clipped and outside rows, 1-D and 2-D weights."""
+    rng = np.random.default_rng(3)
+    L, bins = 1000.0, 16
+    z = rng.uniform(-100.0, L + 100.0, 4000)
+    h = rng.choice([0.0, 1e-9, 3.0, 40.0, 400.0], z.size) * rng.random(z.size)
+    z0, z1 = z - h, z + h
+    edge = L / bins * np.arange(bins + 1)
+    z0[:40], z1[:40] = edge[5], edge[5]  # points on an edge
+    z0[40:80], z1[40:80] = edge[3], edge[7]  # spans ending on edges
+    z0[80:90], z1[80:90] = L, L  # point at the far face: dropped
+    z0[90:100], z1[90:100] = edge[-2] + 1.0, L  # ends at the far face
+    w = rng.random((z.size, 3))
+    edges, got = db._depth_histogram(z0, z1, w, L, bins)
+    np.testing.assert_allclose(edges, np.linspace(0.0, L, bins + 1))
+    np.testing.assert_allclose(got, _dense_depth_histogram(z0, z1, w, L, bins), rtol=1e-12)
+    _, one = db._depth_histogram(z0, z1, w[:, 0], L, bins)
+    for empty in (np.zeros(0), np.zeros((0, 3))):
+        assert not np.any(db._depth_histogram(np.zeros(0), np.zeros(0), empty, L, bins)[1])
+    assert one.shape == (bins,)
+    np.testing.assert_allclose(one, got[:, 0], rtol=1e-12)
+
+
 @pytest.mark.parametrize("hkl", [(1, 1, -3), (-1, 3, 1)])
 def test_kinematic_dbr_matches_forward_brem_times_integrated_reflectivity(plain, hkl):
     """Independent estimate: native brem toward ``Q_hat`` x kinematic ``R_E`` x mean depth 1/2.

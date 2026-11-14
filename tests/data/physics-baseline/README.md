@@ -366,3 +366,13 @@ small cases puts a Laue Bragg line in its grid toward its detector, so every
 recorded output keeps its expectation and tolerance. `CHANNELING_MODEL` v10
 (the #1166 zone-row PXR/DCR source) moved the channeling content key in the
 same pass.
+
+## Kossel-line generation (#1176)
+
+`DIFFRACTED_BREM_MODEL` moved to `two-beam-laue-dbr-kossel-v2`: the native
+Kossel term (diffracted gain and direct-beam depletion of characteristic lines
+near a Laue Bragg energy) joins `spec_characteristic`. Only the
+generation-dependent `case_content_key` and `parameter_sha256` hashes in
+`resolved.json` and `channeling.json` were re-pinned; recorded outputs keep
+their expectations and tolerances. The hashes were re-pinned again on top of the
+#1177 bonding-charge structure-factor generation.
