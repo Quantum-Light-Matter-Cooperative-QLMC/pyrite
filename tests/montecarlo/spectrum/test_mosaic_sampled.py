@@ -13,6 +13,7 @@ Validation: mosaic-mc-sampled
 import numpy as np
 import pytest
 
+from pyrite._backend import REAL
 from pyrite.montecarlo import _small_tilt_R
 from pyrite.montecarlo.spectrum import mc_cxr_spectrum, subdivide_flights
 from pyrite.montecarlo.spectrum.cxr._kernels import _polarization_pair
@@ -261,3 +262,55 @@ def _sweep_case(**kw):
     from pyrite.campaign.sweep import build_cases
 
     return dict(build_cases(_sweep(**kw))[0])
+
+
+# ---- layered / grooved escape and device bin-mean ---------------------------
+@pytest.mark.parametrize("quadrature", ["node", "bin-mean"])
+@pytest.mark.parametrize("geometry", ["layered", "grooved"])
+def test_vanishing_sampled_mosaic_keeps_the_exact_layered_escape(geometry, quadrature):
+    """A ~0 sampled tilt reproduces the perfect crystal on layered/grooved slabs.
+
+    The sampled pass must use the same exact per-layer (or groove) escape mu
+    tables as the GH loop (#1194), and on a device its bin-mean lines go through
+    the same Fourier queues (#1192). A 1e-12 rad crystallite moves the lines by
+    ~1e-9 eV, so any mismatch is the escape or reduction route, not the mosaic.
+    """
+    from tests.montecarlo.spectrum.test_layered_batched_route import (
+        GROOVE,
+        GROOVE_N_HAT,
+        HKLS,
+        LAYERS,
+        TILTED_N_HAT,
+        _segments,
+    )
+
+    over = (
+        {"layers": LAYERS, "n_hat": TILTED_N_HAT}
+        if geometry == "layered"
+        else {"groove": GROOVE, "n_hat": GROOVE_N_HAT}
+    )
+    kw = dict(
+        E_grid_eV=np.arange(500.0, 4000.0, 2.0),
+        crystal="hopg",
+        hkl_list=HKLS,
+        B_ang2=0.8,
+        line_quadrature=quadrature,
+        **over,
+    )
+    perfect = np.asarray(to_host(mc_cxr_spectrum(_segments(), **kw)))
+    sampled = np.asarray(
+        to_host(
+            mc_cxr_spectrum(
+                _segments(),
+                **kw,
+                mosaic_fwhm_rad=1e-12,
+                mosaic_nodes=1,
+                mosaic_sampling="history",
+                mosaic_seed=4,
+            )
+        )
+    )
+    rtol = 1e-6 if np.dtype(REAL) == np.float64 else 1e-4
+    peak = float(np.abs(perfect).max())
+    assert peak > 0.0
+    np.testing.assert_allclose(sampled, perfect, rtol=rtol, atol=rtol * 1e-2 * peak)

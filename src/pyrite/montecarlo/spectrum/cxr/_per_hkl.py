@@ -1205,9 +1205,17 @@ def _accumulate_per_hkl(st):
     CHI_RE, CHI_IM, U_RE, U_IM = _reflection_tables(  # (N_hkl, N_tab)
         crystal, hkl_list, E_tab, B_ang2, use_henke
     )
+    # Exact per-layer (or groove) escape mu, folded once per call.
+    mu_tables = escape_mu_tables(req, st.abs_comp)
+    edges = st.bin_edges
+    if edges is not None and not numpy_backend() and resolve_bin_reduction(edges)[0] == "fourier":
+        st.bin_line_queues = BinLineQueues(st.E_grid, edges, st.bin_inv_width)
     if st.mosaic_sampled is not None:
         _nsys_pop()
-        accumulate_sampled_mosaic(st, (CHI_RE, CHI_IM, U_RE, U_IM), _accumulate_reflection)
+        accumulate_sampled_mosaic(
+            st, (CHI_RE, CHI_IM, U_RE, U_IM), _accumulate_reflection, mu_tables
+        )
+        _flush_bin_line_queues(st)
         return
     orients = ((None, 1.0),) if mosaic_quad is None else mosaic_quad
     for i_hkl, hkl in enumerate(hkl_list):
@@ -1231,13 +1239,8 @@ def _accumulate_per_hkl(st):
     N_DOT_G = _matvec3(G, n_hat_d)
     G_DOT_ES = _rowdot3(G, ES)
     G_DOT_EP = _rowdot3(G, EP)
-    # Exact per-layer (or groove) escape mu, folded once per call.
-    mu_tables = escape_mu_tables(req, st.abs_comp)
     _nsys_pop()
 
-    edges = st.bin_edges
-    if edges is not None and not numpy_backend() and resolve_bin_reduction(edges)[0] == "fourier":
-        st.bin_line_queues = BinLineQueues(st.E_grid, edges, st.bin_inv_width)
     for i_row, (wm, i_hkl) in enumerate(zip(wm_rows, hkl_of_row, strict=True)):
         _accumulate_reflection(
             st,
@@ -1255,6 +1258,11 @@ def _accumulate_per_hkl(st):
             wm,
             mu_tables,
         )
+    _flush_bin_line_queues(st)
+
+
+def _flush_bin_line_queues(st):
+    """Reduce the Fourier bin-mean lines queued by this call, if any."""
     if st.bin_line_queues is not None:
         st.bin_line_queues.flush()
     st.bin_line_queues = None

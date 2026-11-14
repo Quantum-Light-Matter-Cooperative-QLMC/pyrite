@@ -179,14 +179,15 @@ def kept_orientation(idx, g_vec, *per_row):
     return tuple(a[idx] for a in (g_vec, *per_row))
 
 
-def accumulate_sampled_mosaic(st, tables, accumulate_reflection):
+def accumulate_sampled_mosaic(st, tables, accumulate_reflection, mu_tables=None):
     """Per-history sampled mosaic: one ``accumulate_reflection`` pass per
     (reflection, draw), with ``g`` and its polarization pair gathered per
     segment row from the row's history crystallite, weight ``1/K``.
 
     The rotated rows are formed per HISTORY on the host in float64 and
     gathered to segments on the device, so every backend sees the same
-    crystallite. ``|g|`` is rotation-invariant.
+    crystallite. ``|g|`` is rotation-invariant. ``mu_tables`` are the exact
+    per-layer (or groove) escape tables the GH loop passes too.
     Validation: mosaic-mc-sampled
     """
     from ...._backend import REAL, xp
@@ -219,6 +220,7 @@ def accumulate_sampled_mosaic(st, tables, accumulate_reflection):
                 u_re[i_hkl],
                 u_im[i_hkl],
                 wm,
+                mu_tables,
             )
 
 
