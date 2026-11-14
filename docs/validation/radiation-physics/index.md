@@ -95,6 +95,7 @@ sinc-bin-far-envelope
 sinc-bin-integration
 sinc-bin-midpoint-series
 sinc-bin-near-far
+cxr-line-fourier-reduction
 spectral-support-yield-conservation
 spxr-physical-population
 transverse-bunch-form-factor
