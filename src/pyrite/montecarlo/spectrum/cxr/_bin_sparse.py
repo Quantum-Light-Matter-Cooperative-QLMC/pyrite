@@ -29,6 +29,9 @@ _WARP_LANES = 32
 #: Bins per warp job: 32 lanes read 32 edges, which bound 31 bins.
 _JOB_BINS = _WARP_LANES - 1
 _NEAR_THREADS = 256
+#: Grid cap for the near kernel, which strides over the remaining jobs. Keeps
+#: ``blocks * _NEAR_THREADS`` far below HIP's uint32 work-item grid (#1196).
+_NEAR_MAX_BLOCKS = 1 << 16
 _FAR_THREADS = 128
 _FIXED_POINT_BITS = 61
 
@@ -48,55 +51,62 @@ extern "C" __global__ void pyrite_sparse_near_reduce(
     const double *edges, const double *inv_width, unsigned long long *fixed,
     long long n_jobs, int n_lines, double scale, float far_widths
 ) {
-    const long long job = (long long)blockIdx.x * (blockDim.x >> 5) + (threadIdx.x >> 5);
-    if (job >= n_jobs) return;
-    /* The last line with offset <= job: lines without near bins add no jobs,
-       so they share the next line's offset and the search passes over them. */
-    int line = 0, past = n_lines;
-    while (past - line > 1) {
-        const int middle = line + (past - line) / 2;
-        if (job_offsets[middle] <= job) line = middle; else past = middle;
-    }
-    /* Lane k reads edge `bin` and owns the bin above it for k < PYRITE_JOB_BINS.
-       A bin's upper edge is the next bin's lower edge, so each exact pair's
-       upper Si tail is the next lane's lower one, passed down the warp: one
-       tail per edge instead of two per pair, the same doubles either way. */
-    const int lane = threadIdx.x & 31;
-    const int bin = near_first[line] + (int)(job - job_offsets[line]) * PYRITE_JOB_BINS + lane;
-    const int stop = near_stop[line];
-    const bool owns = lane < PYRITE_JOB_BINS && bin < stop;
-    const double a_line = (double)a[line], e_line = (double)e[line];
-    double value = 0.0;
-    int exact = 0;
-    if (owns) {
-        const double lo = edges[bin], hi = edges[bin + 1];
-        const float lo_f = (float)lo, hi_f = (float)hi;
-        float mean;
-        if (pyrite_sincsq_far_mean(
-                a[line], e[line], 0.0f, lo_f, (float)(lo - (double)lo_f), hi_f,
-                (float)(hi - (double)hi_f), far_widths, &mean)) {
-            value = (double)mean;
-        } else {
-            exact = !pyrite_sincsq_series_mean(a_line, e_line, lo, hi, &value);
+    /* Grid-stride over warp jobs. HIP dispatch packets hold the grid size in
+       work-items as uint32, so one warp per job silently truncates past 2^32
+       threads on ROCm (#1196); the host caps the grid well below that. A job
+       is warp-uniform, so every lane takes the same trip count and the
+       shuffles below stay converged. */
+    const long long grid_warps = (long long)gridDim.x * (blockDim.x >> 5);
+    for (long long job = (long long)blockIdx.x * (blockDim.x >> 5) + (threadIdx.x >> 5);
+         job < n_jobs; job += grid_warps) {
+        /* The last line with offset <= job: lines without near bins add no jobs,
+           so they share the next line's offset and the search passes over them. */
+        int line = 0, past = n_lines;
+        while (past - line > 1) {
+            const int middle = line + (past - line) / 2;
+            if (job_offsets[middle] <= job) line = middle; else past = middle;
         }
-    }
-    const int below_exact = PYRITE_SHFL_UP(exact);
-    double x = 0.0, tail = 0.0;
-    if (bin <= stop && (exact || (lane > 0 && below_exact))) {
-        x = a_line * (edges[bin] - e_line) / PYRITE_PI;
-        tail = pyrite_sincsq_tail(x);
-    }
-    const double x_hi = PYRITE_SHFL_DOWN(x);
-    const double tail_hi = PYRITE_SHFL_DOWN(tail);
-    if (exact) {
-        double mass = tail_hi - tail;
-        if (x < 0.0 && x_hi >= 0.0) {
-            mass += 1.0;
+        /* Lane k reads edge `bin` and owns the bin above it for k < PYRITE_JOB_BINS.
+           A bin's upper edge is the next bin's lower edge, so each exact pair's
+           upper Si tail is the next lane's lower one, passed down the warp: one
+           tail per edge instead of two per pair, the same doubles either way. */
+        const int lane = threadIdx.x & 31;
+        const int bin = near_first[line] + (int)(job - job_offsets[line]) * PYRITE_JOB_BINS + lane;
+        const int stop = near_stop[line];
+        const bool owns = lane < PYRITE_JOB_BINS && bin < stop;
+        const double a_line = (double)a[line], e_line = (double)e[line];
+        double value = 0.0;
+        int exact = 0;
+        if (owns) {
+            const double lo = edges[bin], hi = edges[bin + 1];
+            const float lo_f = (float)lo, hi_f = (float)hi;
+            float mean;
+            if (pyrite_sincsq_far_mean(
+                    a[line], e[line], 0.0f, lo_f, (float)(lo - (double)lo_f), hi_f,
+                    (float)(hi - (double)hi_f), far_widths, &mean)) {
+                value = (double)mean;
+            } else {
+                exact = !pyrite_sincsq_series_mean(a_line, e_line, lo, hi, &value);
+            }
         }
-        value = mass * (PYRITE_PI / a_line) * inv_width[bin];
-    }
-    if (owns) {
-        atomicAdd(&fixed[bin], (unsigned long long)llrint(scale * ((double)w[line] * value)));
+        const int below_exact = PYRITE_SHFL_UP(exact);
+        double x = 0.0, tail = 0.0;
+        if (bin <= stop && (exact || (lane > 0 && below_exact))) {
+            x = a_line * (edges[bin] - e_line) / PYRITE_PI;
+            tail = pyrite_sincsq_tail(x);
+        }
+        const double x_hi = PYRITE_SHFL_DOWN(x);
+        const double tail_hi = PYRITE_SHFL_DOWN(tail);
+        if (exact) {
+            double mass = tail_hi - tail;
+            if (x < 0.0 && x_hi >= 0.0) {
+                mass += 1.0;
+            }
+            value = mass * (PYRITE_PI / a_line) * inv_width[bin];
+        }
+        if (owns) {
+            atomicAdd(&fixed[bin], (unsigned long long)llrint(scale * ((double)w[line] * value)));
+        }
     }
 }
 """
@@ -159,7 +169,7 @@ def run_sparse_near(tree, first, stop, offsets, n_jobs, scale, edges, inv_width,
     if n_jobs:
         warps = _NEAR_THREADS // _WARP_LANES
         _NEAR_KERNEL(
-            ((n_jobs + warps - 1) // warps,),
+            (min((n_jobs + warps - 1) // warps, _NEAR_MAX_BLOCKS),),
             (_NEAR_THREADS,),
             (
                 cupy.asarray(tree[0]),
