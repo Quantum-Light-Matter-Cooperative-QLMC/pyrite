@@ -322,3 +322,88 @@ def test_transport_substeps_reach_the_grouped_reduction(core):
     per_flight /= rows["Ne"]
 
     np.testing.assert_allclose(grouped, per_flight, rtol=1e-9, atol=1e-9 * grouped.max())
+
+
+# --- layered absorbers (#1180) ------------------------------------------------
+#
+# The intra-flight escape phase through a stack is ``-omega sum_l delta_l L_l``,
+# the real partner of ``_stack_tau``'s ``sum_l mu_l L_l``. ``HOPG_C`` is the
+# crystal's own carbon density, so a layer of it has the crystal's delta to
+# rounding and the absorber composition matches the slab route's.
+
+
+def _hopg_carbon():
+    from pyrite.materials.crystal import CRYSTALS
+
+    info = CRYSTALS["hopg"]
+    return [("C", len(info["basis"]) / info["V_cell"])]
+
+
+@_grouped_is_host_only
+def test_grouped_stack_reduces_to_the_single_slab():
+    """Validation: xray-layered-escape-phase.
+
+    Splitting one material at an internal interface only cuts each flight's
+    escape pieces there, which the grouped sum reassembles exactly; one layer
+    is the single slab up to the slab route's tabulated mu (measured 1.3e-7).
+    """
+    hopg_c = _hopg_carbon()
+    kwargs = dict(CXR_KWARGS, composition=hopg_c)
+    rows, _ = subdivide_flights(_flights(Ne=8), composition=CARBON, max_dE_frac=1e-3)
+    slab = mc_cxr_spectrum(rows, CXR_GRID_EV, **kwargs)
+    one = mc_cxr_spectrum(rows, CXR_GRID_EV, layers=[(0.0, 4000.0, hopg_c)], **kwargs)
+    two = mc_cxr_spectrum(
+        rows, CXR_GRID_EV, layers=[(0.0, 1500.0, hopg_c), (1500.0, 4000.0, hopg_c)], **kwargs
+    )
+    assert slab.max() > 0.0
+    np.testing.assert_allclose(two, one, rtol=1e-9, atol=1e-12 * one.max())
+    np.testing.assert_allclose(one, slab, rtol=0.0, atol=1e-6 * slab.max())
+
+
+@_grouped_is_host_only
+def test_grouped_stack_carries_each_layers_delta_over_its_own_path():
+    """Validation: xray-layered-escape-phase.
+
+    The setup hands the reduction per-layer escape paths whose sum is the slab
+    path and a per-layer ``delta_l omega`` grid built from each composition;
+    a different film changes the scored line.
+    """
+    from pyrite.materials.crystal import HBARC_EV_ANG, composition_refractive_decrement
+    from pyrite.montecarlo.spectrum.cxr._setup import SpectrumRequest, _prepare_spectrum
+
+    hopg_c = _hopg_carbon()
+    silicon = [("Si", 0.04994)]
+    layers = [(0.0, 1500.0, silicon), (1500.0, 4000.0, hopg_c)]
+    kwargs = dict(CXR_KWARGS, composition=hopg_c)
+    rows, _ = subdivide_flights(_flights(Ne=8), composition=CARBON, max_dE_frac=1e-3)
+
+    def setup(stack):
+        request = SpectrumRequest(segments=rows, E_grid_eV=CXR_GRID_EV, layers=stack, **kwargs)
+        return _prepare_spectrum(request)
+
+    stacked = setup(layers)
+    assert stacked.grouped
+    # Front-face escape (n_z < 0): the layer paths at a piece end at depth z
+    # are min(z, 1500)/|n_z| in the film and max(z - 1500, 0)/|n_z| below.
+    n_z = float(stacked.n_hat[2])
+    assert n_z < 0.0
+    pieces = stacked.segments
+    half = 0.5 * np.asarray(pieces["L_ang"], dtype=float)[:, None]
+    r_mid = np.asarray(pieces["r_mid"], dtype=float)
+    v_hat = np.asarray(pieces["v_hat"], dtype=float)
+    for sign, end in zip((-1.0, 1.0), stacked.escape_ends, strict=True):
+        z = np.clip((r_mid + sign * half * v_hat)[:, 2], 0.0, 4000.0)
+        expected = np.stack([np.minimum(z, 1500.0), np.maximum(z - 1500.0, 0.0)], axis=1)
+        np.testing.assert_allclose(end, expected / abs(n_z), rtol=0.0, atol=2e-3)
+    assert (stacked.escape_ends[0][:, 1] > 0.0).any()
+
+    omega = CXR_GRID_EV / HBARC_EV_ANG
+    for row, (*_, comp) in zip(stacked.layer_delta_omega, layers, strict=True):
+        expected = composition_refractive_decrement(comp, CXR_GRID_EV) * omega
+        np.testing.assert_allclose(row, expected, rtol=1e-12)
+
+    carbon_film = mc_cxr_spectrum(
+        rows, CXR_GRID_EV, layers=[(0.0, 1500.0, hopg_c), (1500.0, 4000.0, hopg_c)], **kwargs
+    )
+    silicon_film = mc_cxr_spectrum(rows, CXR_GRID_EV, layers=layers, **kwargs)
+    assert np.abs(silicon_film - carbon_film).max() > 1e-3 * carbon_film.max()
