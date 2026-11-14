@@ -822,6 +822,18 @@ def main():
     parser.add_argument("--replay", type=Path, help="trusted same-source transport pickle")
     parser.add_argument("--transport-only", action="store_true")
     parser.add_argument(
+        "--transport-core",
+        choices=["cuda", "auto", "lockstep", "per-electron"],
+        default="cuda",
+        help="transport core for fresh (non-replay) transport; host runs use auto/lockstep",
+    )
+    parser.add_argument(
+        "--transport-repeats",
+        type=int,
+        default=1,
+        help="fresh transports in-process (first + warm) for setup-free transport timing",
+    )
+    parser.add_argument(
         "--node-spacings",
         type=lambda text: [float(x) for x in text.split(",") if x],
         default=[0.75, 0.375, 0.1875],
@@ -965,9 +977,22 @@ def main():
             raise ValueError("replay material/seed/population mismatch")
         ladder = CaseLadder(case, transport=saved["transport"])
     else:
-        ladder = CaseLadder(case, transport_core="cuda")
+        ladder = CaseLadder(case, transport_core=args.transport_core)
     sync()
     transport_s = time.perf_counter() - start
+    rss_after_transport_kib = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    transport_warm_s, warm_fingerprints_match = [], True
+    for _ in range(0 if args.replay else args.transport_repeats - 1):
+        # Same case and seed in the same process: the warm cost excludes
+        # first-call setup (JIT, tables, device context). Determinism is checked,
+        # not assumed; only the first transport is kept.
+        sync()
+        begin = time.perf_counter()
+        again = CaseLadder(case, transport_core=args.transport_core)
+        sync()
+        transport_warm_s.append(time.perf_counter() - begin)
+        warm_fingerprints_match &= again.fingerprint == ladder.fingerprint
+        del again
     payload = args.output / "transport.pkl"
     payload.write_bytes(pickle.dumps(dict(case=case, transport=ladder.transport), protocol=5))
     score = runpy.run_path(str(Path(__file__).with_name("straggling_defaults") / "study.py"))[
@@ -1003,6 +1028,11 @@ def main():
         source_revision=Path("SOURCE_SHA").read_text().strip(),
         transport_s_including_first_setup=None if args.replay else transport_s,
         replay_adoption_s=transport_s if args.replay else None,
+        transport_core=None if args.replay else args.transport_core,
+        transport_warm_s=transport_warm_s,
+        transport_warm_fingerprints_match=warm_fingerprints_match,
+        host_peak_rss_after_first_transport_kib=rss_after_transport_kib,
+        numba_threads=int(os.environ.get("NUMBA_NUM_THREADS", "0")) or None,
         fingerprint=ladder.fingerprint,
         transport_sha256=hashlib.sha256(payload.read_bytes()).hexdigest(),
         qualification="sensitivity only; no accuracy or equal-precision verdict",
