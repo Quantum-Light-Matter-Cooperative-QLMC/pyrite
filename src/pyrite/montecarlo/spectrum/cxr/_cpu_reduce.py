@@ -89,7 +89,10 @@ def accumulate_sincsq(E_r, a_width, weights, E_grid, targets):
 # temporaries and ``np.add.reduceat``, evaluated here one ``(row, energy)``
 # element at a time. ``F`` is :func:`._formation.formation_factor` (closed form
 # and its ``|w|^2 < FORMATION_SERIES_W2`` series, same expressions), and
-# ``phi = d omega - g.r - L_esc delta omega``. Rows arrive sorted by flight
+# ``phi = d omega - g.r - L_esc delta omega``. Through a K-layer stack the
+# escape terms are per layer, ``sum_l L_l delta_l omega`` (and likewise the
+# ``half_dL`` slope); ``K = 1`` keeps the single-slab products verbatim.
+# Validation: xray-layered-escape-phase. Rows arrive sorted by flight
 # with ``starts`` the group offsets (length ``n_flights + 1``); each flight's
 # rows are summed in input order, so only the summation of whole-flight
 # intensities over flights is reassociated against the reference.
@@ -102,10 +105,13 @@ def _grouped_formation_reduce(  # pragma: no cover - numba
 ):  # fmt: skip
     n_pol = coefs.shape[0]
     n_flights = starts.shape[0] - 1
+    n_layers = delta_omega_grid.shape[0]
     for e in prange(E_grid.shape[0]):
         E = E_grid[e]
         om = omega_grid[e]
-        dom = delta_omega_grid[e]
+        # K = 1: the row scalars multiply this grid value, as before. K > 1:
+        # the per-row sums below already carry delta_l omega, times 1.0.
+        dom = delta_omega_grid[0, e] if n_layers == 1 else 1.0
         total = 0.0
         for f in range(n_flights):
             s_re = 0.0
@@ -113,7 +119,16 @@ def _grouped_formation_reduce(  # pragma: no cover - numba
             p_re = 0.0
             p_im = 0.0
             for j in range(starts[f], starts[f + 1]):
-                v = a_vac[j] * (E - E_vac[j]) - half_dL[j] * dom
+                if n_layers == 1:
+                    h_j = half_dL[j, 0]
+                    l_j = L_esc[j, 0]
+                else:
+                    h_j = 0.0
+                    l_j = 0.0
+                    for k in range(n_layers):
+                        h_j += half_dL[j, k] * delta_omega_grid[k, e]
+                        l_j += L_esc[j, k] * delta_omega_grid[k, e]
+                v = a_vac[j] * (E - E_vac[j]) - h_j * dom
                 qj = q[j]
                 w2 = qj * qj + v * v
                 if w2 < series_w2:
@@ -126,7 +141,7 @@ def _grouped_formation_reduce(  # pragma: no cover - numba
                     inv = 1.0 / (2.0 * w2)
                     f_re = (v * apb[j] * sv - qj * bma[j] * cv) * inv
                     f_im = -(v * bma[j] * cv + qj * apb[j] * sv) * inv
-                arg = d[j] * om - g_phase[j] - L_esc[j] * dom
+                arg = d[j] * om - g_phase[j] - l_j * dom
                 ca = np.cos(arg)
                 sa = np.sin(arg)
                 x_re = f_re * ca - f_im * sa
@@ -149,8 +164,11 @@ def accumulate_grouped_formation(lines, d, g_phase, L_esc, coefs, starts, grids,
     ``d``/``g_phase``/``L_esc`` the per-row phase terms and ``coefs`` one or
     two per-row complex polarization coefficients, all already sorted so that
     flight ``f`` occupies rows ``starts[f]:starts[f + 1]``. ``grids`` is
-    ``(E_grid, omega_grid, delta_omega_grid)``. Memory is O(rows + n_E): no
-    ``(rows, n_E)`` temporary is formed. Validation: coherent-formation-absorption
+    ``(E_grid, omega_grid, delta_omega_grid)``. A single slab passes ``(n,)``
+    ``L_esc``/``half_dL`` and an ``(n_E,)`` delta-omega grid; a ``K``-layer
+    stack passes ``(n, K)`` per-layer paths and a ``(K, n_E)`` grid. Memory is
+    O(rows + n_E): no ``(rows, n_E)`` temporary is formed.
+    Validation: coherent-formation-absorption, xray-layered-escape-phase
     """
     from ._formation import FORMATION_SERIES_W2
 
@@ -159,8 +177,20 @@ def accumulate_grouped_formation(lines, d, g_phase, L_esc, coefs, starts, grids,
     E_grid = grids[0]
     if E_grid.size == 0 or starts.size < 2:
         return
-    f64 = [np.ascontiguousarray(a, dtype=np.float64) for a in (*lines, d, g_phase, L_esc)]
+    E_vac, a_vac, half_dL, apb, bma, q = lines
+    n_rows = int(np.asarray(E_vac).shape[0])
+
+    def per_layer(a):
+        return np.ascontiguousarray(np.reshape(a, (n_rows, -1)), dtype=np.float64)
+
+    f64 = [np.ascontiguousarray(a, dtype=np.float64) for a in (E_vac, a_vac)]
+    f64.append(per_layer(half_dL))
+    f64 += [np.ascontiguousarray(a, dtype=np.float64) for a in (apb, bma, q, d, g_phase)]
+    f64.append(per_layer(L_esc))
     grid64 = [np.ascontiguousarray(g, dtype=np.float64) for g in grids]
+    grid64[2] = np.ascontiguousarray(np.reshape(grid64[2], (-1, E_grid.size)))
+    if f64[2].shape[1] != grid64[2].shape[0] or f64[-1].shape[1] != grid64[2].shape[0]:
+        raise ValueError("per-layer escape paths and delta-omega rows must agree")
     acc = np.zeros(E_grid.size, dtype=np.float64)
     _grouped_formation_reduce(
         *f64,

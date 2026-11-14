@@ -15,7 +15,12 @@ import numpy as np
 
 from ...._backend import REAL, BackendResourceError, _to_cpu, xp
 from ....materials.attenuation import _normalize_composition
-from ....materials.crystal import CRYSTALS, HBARC_EV_ANG, refractive_index
+from ....materials.crystal import (
+    CRYSTALS,
+    HBARC_EV_ANG,
+    composition_refractive_decrement,
+    refractive_index,
+)
 from ...geometry import _mosaic_quadrature, _orientation_R
 from ...transport import C_ANG_PER_FS, beta_from_keV
 from ..coherent_population import pair_scale
@@ -183,6 +188,10 @@ class _SpectrumSetup:
     seg_t_mid: Any = None
     # Flight-grouped route only: float64 ``(d, r_mid)`` per row (see setup).
     grouped_phase64: Any = None
+    # Flight-grouped route through a K-layer stack only: ``(K, n_E)`` per-layer
+    # ``delta_l(E) omega(E)``, paired with the ``(n, K)`` per-layer
+    # ``escape_ends``. Validation: xray-layered-escape-phase
+    layer_delta_omega: Any = None
     # Bin-mean quadrature only: FP64 bin edges and inverse widths on the
     # accumulation routes' device (``_bin_quadrature.bin_axis``).
     bin_edges: Any = None
@@ -376,6 +385,25 @@ def _refuse_incompatible_request(request):
         )
 
 
+def _layer_delta_omega(layers, E_grid_eV, omega_grid, use_henke):
+    """``(K, n_E)`` per-layer ``delta_l(E) omega(E)`` on the output grid, or None.
+
+    The stacked escape-leg phase is ``-omega(E) sum_l delta_l(E) L_l``, the
+    real partner of ``_stack_tau``'s ``sum_l mu_l L_l``: each layer's own
+    decrement over the escape path inside it (straight, refraction-free
+    escape, no interface reflection). ``delta_l`` comes from the layer's
+    composition (``composition_refractive_decrement``), formed in float64
+    before the cast. A single layer gives the single-slab phase with the
+    layer's composition in place of the crystal's.
+    Validation: xray-layered-escape-phase
+    """
+    if layers is None:
+        return None
+    E = np.asarray(E_grid_eV, dtype=np.float64)
+    deltas = np.stack([composition_refractive_decrement(comp, E, use_henke) for *_, comp in layers])
+    return xp.asarray(deltas, dtype=REAL) * omega_grid[None, :]
+
+
 def _refuse_grouped_reduction(request, grouped):
     """Refuse routes the flight-grouped incoherent reduction does not cover."""
     if not grouped:
@@ -387,14 +415,6 @@ def _refuse_grouped_reduction(request, grouped):
             "float32 CuPy segmented kernel only; this device configuration "
             f"({backend}, {np.dtype(REAL).name}) has no port. Run the spectrum on "
             "the NumPy backend, unset PYRITE_FP64, or transport without max_dE_frac."
-        )
-    if request.layers is not None:
-        # Same unmodelled per-layer delta as the coherent path: the grouped
-        # reduction carries the dispersive propagation phase too.
-        raise NotImplementedError(
-            "the in-medium dispersion does not cover numerical substeps through "
-            "a LAYERED absorber: the intra-flight coherent sum needs the "
-            "per-layer dispersive propagation phase, which is not modelled."
         )
     if request.components:
         raise ValueError(
@@ -662,7 +682,7 @@ def _prepare_spectrum(request):
     # need an explicit absent value. Nothing below reads one where the original
     # would have raised UnboundLocalError.
     cdtype = omega_grid = delta_omega_grid = d_all = seg_t_mid = None
-    grouped_phase64 = None
+    grouped_phase64 = layer_delta_omega = None
 
     info = CRYSTALS[crystal]
     n_atoms = len(info["basis"]) / info["V_cell"]
@@ -881,6 +901,7 @@ def _prepare_spectrum(request):
             )
             * omega_grid
         )
+        layer_delta_omega = _layer_delta_omega(layers, E_grid_eV, omega_grid, use_henke)
 
     # Inter-electron decoherence terms; see _coherent_offsets.
     flat_omission_limit = float(request.coherent_flat_omission_limit)
@@ -1000,6 +1021,7 @@ def _prepare_spectrum(request):
         piece_fraction=piece_fraction,
         seg_t_mid=seg_t_mid,
         grouped_phase64=grouped_phase64,
+        layer_delta_omega=layer_delta_omega,
         temporal_buf=temporal_buf,
         temporal_tau=temporal_tau,
         temporal_tau_geo=temporal_tau_geo,

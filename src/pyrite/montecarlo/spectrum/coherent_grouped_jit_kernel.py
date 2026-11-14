@@ -16,6 +16,7 @@ from .coherent_jit_kernel import _formation_im, _formation_re
 from .coherent_stream_jit_kernel import (
     _FIELD_KERNELS,
     DEFAULT_COHERENT_STREAM_KERNEL_CONFIG,
+    F32_ONE,
     F32_ZERO,
     U32_ONE,
     U32_TWO,
@@ -25,6 +26,36 @@ from .coherent_stream_jit_kernel import (
     _sinc_windowed,
     _validate_threads,
 )
+
+
+@jit.rawkernel(device=True)
+def _medium_shift(delta_omega, energy_index, n_layers):
+    # One layer: delta*omega at this energy. K layers: 1, since _escape_weight
+    # already folded each layer's delta*omega into the row term.
+    # Validation: xray-layered-escape-phase
+    if n_layers == U32_ONE:
+        return delta_omega[energy_index]
+    return F32_ONE
+
+
+@jit.rawkernel(device=True)
+def _escape_weight(values, delta_omega, segment, energy_index, n_segments, n_energies, n_layers):
+    # One layer: the row scalar, multiplied by the hoisted delta*omega as before.
+    # K layers (layer-major): sum_l values_l delta_l omega, multiplied by 1.
+    # It runs for a block's second energy even when the block has none (the
+    # value is then unused), so the read is clamped into the grid.
+    # Validation: xray-layered-escape-phase
+    if n_layers == U32_ONE:
+        return values[segment]
+    energy = energy_index
+    if energy >= n_energies:
+        energy = n_energies - U32_ONE
+    total = F32_ZERO
+    layer = U32_ZERO
+    while layer < n_layers:
+        total += values[layer * n_segments + segment] * delta_omega[layer * n_energies + energy]
+        layer += U32_ONE
+    return total
 
 
 @jit.rawkernel()
@@ -58,8 +89,15 @@ def _grouped_intensity_kernel(
     n_energies,
     n_energy_blocks,
     energies_per_block,
+    n_layers,
 ):
-    """Accumulate ``sum_e |sum_{j in e} field_j|^2`` without per-e launches."""
+    """Accumulate ``sum_e |sum_{j in e} field_j|^2`` without per-e launches.
+
+    ``n_layers > 1`` takes layer-major per-layer escape paths and
+    ``delta_l omega`` rows and forms ``sum_l L_l delta_l omega`` per
+    (segment, energy); ``n_layers == 1`` keeps the single-slab products.
+    Validation: xray-layered-escape-phase
+    """
     block = jit.blockIdx.x
     reflection = block // n_energy_blocks
     energy_block = block - reflection * n_energy_blocks
@@ -73,13 +111,13 @@ def _grouped_intensity_kernel(
     photon0_eV = energies_eV[energy_index0]
     medium_shift0 = F32_ZERO
     if use_medium:
-        medium_shift0 = delta_omega[energy_index0]
+        medium_shift0 = _medium_shift(delta_omega, energy_index0, n_layers)
     photon1_eV = F32_ZERO
     medium_shift1 = F32_ZERO
     if has_energy_1:
         photon1_eV = energies_eV[energy_index1]
         if use_medium:
-            medium_shift1 = delta_omega[energy_index1]
+            medium_shift1 = _medium_shift(delta_omega, energy_index1, n_layers)
 
     intensity_sum_0 = F32_ZERO
     intensity_sum_1 = F32_ZERO
@@ -118,22 +156,38 @@ def _grouped_intensity_kernel(
                 sinc_slope = sinc_slopes[sinc_slope_index]
                 phase_rate = phase_slope[phase_slope_index]
                 lattice_phase = g_phase[line_id]
-                escape_distance = F32_ZERO
-                if use_medium:
-                    escape_distance = escape_distances[segment]
-                half_path_change = F32_ZERO
+                escape_distance0 = F32_ZERO
+                escape_distance1 = F32_ZERO
+                half_path_change0 = F32_ZERO
+                half_path_change1 = F32_ZERO
                 end_sum = F32_ZERO
                 end_diff = F32_ZERO
                 absorb_q = F32_ZERO
+                if use_medium:
+                    escape_distance0 = _escape_weight(
+                        escape_distances, delta_omega, segment, energy_index0,
+                        n_segments, n_energies, n_layers,
+                    )  # fmt: skip
+                    escape_distance1 = _escape_weight(
+                        escape_distances, delta_omega, segment, energy_index1,
+                        n_segments, n_energies, n_layers,
+                    )  # fmt: skip
                 if use_formation:
-                    half_path_change = half_escape_changes[segment]
+                    half_path_change0 = _escape_weight(
+                        half_escape_changes, delta_omega, segment, energy_index0,
+                        n_segments, n_energies, n_layers,
+                    )  # fmt: skip
+                    half_path_change1 = _escape_weight(
+                        half_escape_changes, delta_omega, segment, energy_index1,
+                        n_segments, n_energies, n_layers,
+                    )  # fmt: skip
                     end_sum = endpoint_sums[line_id]
                     end_diff = endpoint_diffs[line_id]
                     absorb_q = attenuation_q_values[line_id]
 
                 if use_formation:
                     phase_arg = (
-                        sinc_slope * (photon0_eV - resonance_eV) - half_path_change * medium_shift0
+                        sinc_slope * (photon0_eV - resonance_eV) - half_path_change0 * medium_shift0
                     )
                     form_real = F32_ZERO
                     form_imag = F32_ZERO
@@ -149,7 +203,7 @@ def _grouped_intensity_kernel(
                             phase_arg, sin_arg, cos_arg, end_sum, end_diff, absorb_q
                         )
                     phase = (
-                        phase_rate * photon0_eV - lattice_phase - escape_distance * medium_shift0
+                        phase_rate * photon0_eV - lattice_phase - escape_distance0 * medium_shift0
                     )
                     cos_phase = xp.cos(phase)
                     sin_phase = xp.sin(phase)
@@ -164,7 +218,7 @@ def _grouped_intensity_kernel(
                     sinc_value = _sinc_windowed(sinc_argument, sinc_cutoff, use_sinc_cutoff)
                     phase = phase_rate * photon0_eV - lattice_phase
                     if use_medium:
-                        phase = phase - escape_distance * medium_shift0
+                        phase = phase - escape_distance0 * medium_shift0
                     cos_phase = xp.cos(phase)
                     sin_phase = xp.sin(phase)
                     sigma_re_sum0 += sinc_value * (sigma_re * cos_phase - sigma_im * sin_phase)
@@ -176,7 +230,7 @@ def _grouped_intensity_kernel(
                     if use_formation:
                         phase_arg = (
                             sinc_slope * (photon1_eV - resonance_eV)
-                            - half_path_change * medium_shift1
+                            - half_path_change1 * medium_shift1
                         )
                         form_real = F32_ZERO
                         form_imag = F32_ZERO
@@ -194,7 +248,7 @@ def _grouped_intensity_kernel(
                         phase = (
                             phase_rate * photon1_eV
                             - lattice_phase
-                            - escape_distance * medium_shift1
+                            - escape_distance1 * medium_shift1
                         )
                         cos_phase = xp.cos(phase)
                         sin_phase = xp.sin(phase)
@@ -209,7 +263,7 @@ def _grouped_intensity_kernel(
                         sinc_value = _sinc_windowed(sinc_argument, sinc_cutoff, use_sinc_cutoff)
                         phase = phase_rate * photon1_eV - lattice_phase
                         if use_medium:
-                            phase = phase - escape_distance * medium_shift1
+                            phase = phase - escape_distance1 * medium_shift1
                         cos_phase = xp.cos(phase)
                         sin_phase = xp.sin(phase)
                         sigma_re_sum1 += sinc_value * (sigma_re * cos_phase - sigma_im * sin_phase)
@@ -275,14 +329,19 @@ def run_coherent_grouped_intensity_kernel(
     q=None,
     sinc_cutoff=None,
     config=DEFAULT_COHERENT_STREAM_KERNEL_CONFIG,
+    n_layers=1,
 ):
     """Add grouped field intensities for one compact, whole-electron block.
+
+    ``n_layers > 1`` (flight-grouped layered stacks) takes ``L_esc`` and
+    ``half_dL`` layer-major, ``(K, n_seg)`` flattened, and ``delta_omega`` as
+    ``(K, n_E)``; the escape phase is ``sum_l L_l delta_l omega``.
 
     ``sinc_cutoff`` uses the same unscaled-argument window as the flat field
     accumulator so both terms of the decoherence blend have identical support,
     and the same formation mode (``half_dL``, ``apb``, ``bma``, ``q``).
 
-    Validation: coherent-formation-absorption
+    Validation: coherent-formation-absorption, xray-layered-escape-phase
     """
     n_threads = int(config.reduction_nthreads)
     _validate_threads(n_threads, "reduction_nthreads")
@@ -291,6 +350,7 @@ def run_coherent_grouped_intensity_kernel(
         raise ValueError(f"energies_per_block must be one of {tuple(_FIELD_KERNELS)}")
     n_g = int(n_g)
     n_seg = int(n_seg)
+    n_layers = int(n_layers)
     n_energies = int(E_grid.size)
     n_groups = int(group_starts.size) - 1
     if n_groups < 0:
@@ -309,14 +369,21 @@ def run_coherent_grouped_intensity_kernel(
         raise ValueError("L_esc and delta_omega must be given together")
     use_medium = L_esc is not None
     if use_medium:
-        if int(L_esc.size) != n_seg:
-            raise ValueError("L_esc must have one entry per segment")
-        if int(delta_omega.size) != n_energies:
-            raise ValueError("delta_omega must have one entry per energy bin")
+        if int(L_esc.size) != n_seg * n_layers:
+            raise ValueError("L_esc must have one entry per segment and layer")
+        if int(delta_omega.size) != n_energies * n_layers:
+            raise ValueError("delta_omega must have one entry per energy bin and layer")
     else:
         L_esc = delta_omega = _dummy()
     use_formation, half_dL, apb, bma, q = _formation_args(
-        half_dL, apb, bma, q, use_medium=use_medium, n_seg=n_seg, n_pairs=n_g * n_seg
+        half_dL,
+        apb,
+        bma,
+        q,
+        use_medium=use_medium,
+        n_seg=n_seg,
+        n_pairs=n_g * n_seg,
+        n_layers=n_layers,
     )
     use_sinc_cutoff = sinc_cutoff is not None
     cutoff = np.float32(0.0 if sinc_cutoff is None else sinc_cutoff)
@@ -354,6 +421,7 @@ def run_coherent_grouped_intensity_kernel(
             np.uint32(n_energies),
             np.uint32(n_energy_blocks),
             np.uint32(energies_per_block),
+            np.uint32(n_layers),
         ),
         shared_mem=2 * n_threads * np.dtype(np.float32).itemsize,
     )

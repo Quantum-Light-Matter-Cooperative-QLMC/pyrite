@@ -385,6 +385,40 @@ def refractive_index(crystal, photon_E_eV, use_henke=True):
     return np.sqrt(1.0 + chi_0(crystal, photon_E_eV, use_henke))
 
 
+def composition_refractive_decrement(composition, photon_E_eV, use_henke=True):
+    """Real decrement ``delta = 1 - Re n`` of a homogeneous composition.
+
+    The forward polarizability of :func:`chi_0`, with the unit-cell sum
+    replaced by atomic number densities:
+
+        chi_0 = - r_e lambda^2 / pi * sum_i n_i (f1_i + i f2_i),
+        delta = 1 - Re sqrt(1 + chi_0),
+
+    ``composition`` is ``[(element, n_i [1/Angstrom^3]), ...]``, the layer
+    format of ``materials.attenuation._stack_tau``. Same Henke convention
+    ``f1 = Z + f'`` and the same exact square root as
+    :func:`refractive_index`; ``use_henke=False`` keeps only ``Z``.
+
+    Limiting case: a composition with ``n_i = N_i / V_cell`` from a crystal's
+    basis reproduces ``1 - Re refractive_index(crystal)`` to rounding (the
+    per-site sum is regrouped per element).
+
+    Validation: xray-layered-escape-phase
+    """
+    E = np.asarray(photon_E_eV, dtype=float)
+    S = np.zeros(E.shape, dtype=complex)
+    for el, n_i in composition:
+        if use_henke:
+            fp, fpp = henke_dispersion(el, E)
+            S = S + float(n_i) * ((Z_TABLE[el] + fp) + 1j * fpp)
+        else:
+            S = S + float(n_i) * float(Z_TABLE[el])
+    with np.errstate(divide="ignore", invalid="ignore"):
+        lam = HC_EV_ANG / E
+        chi = -R_E_ANG * lam**2 / np.pi * S
+    return 1.0 - np.sqrt(1.0 + chi).real
+
+
 def U_g(crystal, hkl, photon_E_eV, B_ang2=0.0, use_henke=False):
     """Return the crystal-potential Fourier component for CBS coupling.
 

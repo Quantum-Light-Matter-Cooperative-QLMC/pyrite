@@ -63,7 +63,10 @@ def accumulate_flight_grouped(st, idx, sel, coefs, cxr_rows, L_esc, recoil_phase
     )
     lines = cxr_rows.take(sel)
     sel_coefs = [c[sel] for c in coefs]
-    grids = (st.E_grid, st.omega_grid, st.delta_omega_grid)
+    # A layered stack carries (n, K) paths against the (K, n_E) per-layer grid.
+    # Validation: xray-layered-escape-phase
+    layer_dom = getattr(st, "layer_delta_omega", None)
+    grids = (st.E_grid, st.omega_grid, st.delta_omega_grid if layer_dom is None else layer_dom)
     if numpy_backend():
         accumulate_grouped_formation(
             lines, d, g_phase, L_rel, sel_coefs, bounds, grids, st.spec, wm
@@ -83,6 +86,11 @@ def _device_grouped(lines, d, g_phase, L_rel, coefs, bounds, grids, spec, wm):
     sigma = coefs[0]
     pi = coefs[1] if len(coefs) > 1 else xp.zeros_like(sigma)
     E_grid, _, delta_omega = grids
+    n_layers = 1 if delta_omega.ndim == 1 else int(delta_omega.shape[0])
+    if n_layers > 1:
+        # Layer-major flattening: column k of every row, then row k of the grid.
+        L_rel = L_rel.T
+        half_dL = f32(xp.asarray(lines[2]).T)
     out = xp.zeros(E_grid.size, dtype=xp.float32)
     run_coherent_grouped_intensity_kernel(
         E_vac,
@@ -105,5 +113,6 @@ def _device_grouped(lines, d, g_phase, L_rel, coefs, bounds, grids, spec, wm):
         bma=bma,
         q=q,
         sinc_cutoff=None,
+        n_layers=n_layers,
     )
     spec += out * wm

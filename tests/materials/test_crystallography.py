@@ -11,6 +11,7 @@ from pyrite.materials.crystal import (
     absorption_length_ang,
     chi_0,
     chi_g,
+    composition_refractive_decrement,
     debye_waller,
     dominant_reflections,
     emission_coupling_tables,
@@ -548,6 +549,27 @@ def test_chi_0_vanishes_and_index_tends_to_vacuum_at_high_energy():
     # loosened to allow the f1(E) dispersion riding on top.
     assert high == pytest.approx(low / 100.0, rel=0.15)
     assert refractive_index("silicon", 20000.0) == pytest.approx(1.0 + 0j, abs=1e-5)
+
+
+@pytest.mark.parametrize("name", ["silicon", "hopg", "mos2"])
+@pytest.mark.parametrize("use_henke", [True, False])
+def test_composition_decrement_reproduces_the_crystal_index(name, use_henke):
+    """Validation: xray-layered-escape-phase.
+
+    Limiting case: the basis densities ``N_i / V_cell`` give the crystal's own
+    ``1 - Re n`` to rounding, so a stack layer of the crystal's composition
+    carries the single-slab escape phase.
+    """
+    info = CRYSTALS[name]
+    counts = {}
+    for el, _ in info["basis"]:
+        counts[el] = counts.get(el, 0) + 1
+    comp = [(el, n / info["V_cell"]) for el, n in counts.items()]
+    E = np.linspace(800.0, 30000.0, 97)
+    expected = 1.0 - refractive_index(name, E, use_henke).real
+    got = composition_refractive_decrement(comp, E, use_henke)
+    np.testing.assert_allclose(got, expected, rtol=1e-12)
+    assert np.all(got > 0.0)
 
 
 def test_chi_0_without_henke_is_real_thomson_limit():
