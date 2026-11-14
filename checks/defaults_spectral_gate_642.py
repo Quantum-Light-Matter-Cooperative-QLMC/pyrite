@@ -787,22 +787,34 @@ def device_peak_probe(cupy):
     return probe
 
 
+#: Pinned-transport changes per arm; each changes one choice from the baseline.
+#: Cap values are relative to the pilot ladder (not fractions of a baseline
+#: cap). ``frozen`` integration is not an arm: shell-soft-hard inelastic and
+#: coupled radiative transport both require midpoint integration, so it is
+#: inadmissible under production physics. ``mixed-elastic`` uses the model's
+#: documented C1 = C2 = 0.05; CXR scoring refuses mixed transport (#990).
+ARM_OVERRIDES = {
+    "baseline": {},
+    "half-cap": {"max_dE_frac": 0.00025},
+    "quarter-cap": {"max_dE_frac": 0.000125},
+    "cut25": {"inelastic_cutoff_eV": 25.0},
+    "cut35": {"inelastic_cutoff_eV": 35.0},
+    "cut100": {"inelastic_cutoff_eV": 100.0},
+    "rad500": {"radiative_cutoff_eV": 500.0},
+    "rad2000": {"radiative_cutoff_eV": 2000.0},
+    "straggling": {"straggling": True},
+    "mixed-precision": {"transport_precision": "mixed"},
+    "mixed-elastic": {"transport_mode": "mixed", "mixed_c1": 0.05, "mixed_c2": 0.05},
+}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("material", choices=["hopg", "silicon", "mos2-on-si"])
     parser.add_argument("output", type=Path)
     parser.add_argument(
         "--arm",
-        choices=[
-            "baseline",
-            "half-cap",
-            "quarter-cap",
-            "cut25",
-            "cut35",
-            "cut100",
-            "mixed-precision",
-            "mixed-elastic",
-        ],
+        choices=list(ARM_OVERRIDES),
         default="baseline",
     )
     parser.add_argument("--seed", type=int, default=642501)
@@ -937,15 +949,7 @@ def main():
         radiative_cutoff_eV=1000.0,
         atomic_electron_deflection="kawrakow",
     )
-    if args.arm in ("half-cap", "quarter-cap"):
-        case["max_dE_frac"] = 0.00025 if args.arm == "half-cap" else 0.000125
-    elif args.arm in ("cut25", "cut35", "cut100"):
-        case["inelastic_cutoff_eV"] = {"cut25": 25.0, "cut35": 35.0, "cut100": 100.0}[args.arm]
-    elif args.arm == "mixed-precision":
-        case["transport_precision"] = "mixed"
-    elif args.arm == "mixed-elastic":
-        # Use the model's own validated tuning defaults; admission may refuse.
-        case.update(transport_mode="mixed", mixed_c1=0.05, mixed_c2=0.05)
+    case.update(ARM_OVERRIDES[args.arm])
     sync, device, pool_bytes, peak_probe = runtime()
     args.output.mkdir(parents=True, exist_ok=False)
     sync()
@@ -987,6 +991,7 @@ def main():
         mosaic_mc_nodes=args.mosaic_mc_nodes,
         mosaic_mc_fwhm_rad=case.get("mosaic_mc_fwhm_rad"),
         arm=args.arm,
+        arm_overrides=ARM_OVERRIDES[args.arm],
         seed=args.seed,
         histories=args.histories,
         backend=BACKEND.name,

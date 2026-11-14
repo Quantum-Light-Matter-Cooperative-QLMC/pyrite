@@ -225,3 +225,38 @@ def test_timed_calls_flags_noisy_warm_timings_unresolved():
         record["warm_relative_spread"] <= gate["TIMING_SPREAD_LIMIT"]
     )
     assert len(record["grid_sha256"]) == 64
+
+
+def test_transport_arms_change_one_choice_and_pass_physics_validation():
+    from pyrite._numerics import Physics
+
+    arms = _gate()["ARM_OVERRIDES"]
+    assert arms["baseline"] == {}
+    pinned = dict(
+        inelastic_model="shell-soft-hard",
+        inelastic_cutoff_eV=50.0,
+        straggling=False,
+        elastic_model="elsepa",
+        bremsstrahlung_model="bremslib",
+        radiative_model="bremslib-soft-hard",
+        radiative_cutoff_eV=1000.0,
+        atomic_electron_deflection="kawrakow",
+    )
+    for name, overrides in arms.items():
+        if name == "mixed-elastic":
+            assert overrides["transport_mode"] == "mixed"
+        else:
+            assert len(overrides) <= 1, name
+        physics = {
+            k: v for k, v in overrides.items() if k not in ("max_dE_frac", "transport_precision")
+        }
+        Physics(**{**pinned, **physics}).validate_transport("midpoint")
+
+
+def test_frozen_integration_is_inadmissible_under_pinned_physics():
+    from pyrite._numerics import Physics
+
+    with pytest.raises(ValueError, match="midpoint"):
+        Physics(
+            inelastic_model="shell-soft-hard", radiative_model="bremslib-soft-hard"
+        ).validate_transport("frozen")
