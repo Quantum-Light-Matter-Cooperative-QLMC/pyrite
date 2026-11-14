@@ -42,6 +42,8 @@ def mc_cxr_spectrum(
     layers=None,
     mosaic_fwhm_rad=None,
     mosaic_nodes=1,
+    mosaic_sampling="quadrature",
+    mosaic_seed=None,
     surface_hkl: tuple[int, int, int] | None = None,
     groove=None,
     coherent=False,
@@ -147,6 +149,12 @@ def mc_cxr_spectrum(
         Return separate PXR and CBS diagonal contributions with the total.
     mosaic_fwhm_rad, mosaic_nodes
         Mosaic rocking-curve FWHM and quadrature nodes per tilt axis.
+    mosaic_sampling, mosaic_seed
+        ``"quadrature"`` (default) evaluates every row at the
+        ``mosaic_nodes**2`` Gauss-Hermite tilts. ``"history"`` draws
+        ``mosaic_nodes`` crystallite tilts per electron history from the run
+        ``mosaic_seed``, shared by all its rows and reflections, each weighted
+        ``1/mosaic_nodes``; incoherent only. Validation: mosaic-mc-sampled
     layers, groove
         Optional film-first absorber stack, and optional blazed-groove escape
         geometry for the beam-entrance face.
@@ -252,6 +260,8 @@ def mc_cxr_spectrum(
         layers=layers,
         mosaic_fwhm_rad=mosaic_fwhm_rad,
         mosaic_nodes=mosaic_nodes,
+        mosaic_sampling=mosaic_sampling,
+        mosaic_seed=mosaic_seed,
         surface_hkl=surface_hkl,
         groove=groove,
         coherent=coherent,
@@ -326,7 +336,8 @@ def _needs_per_hkl_route(st):
     substepped configuration.
 
     An opt-in temporal profile also takes this route: its hooks sit on the
-    per-row line data every policy computes here.
+    per-row line data every policy computes here. So does the per-history
+    sampled mosaic, whose reciprocal vector varies per segment row.
     """
     req = st.request
     stream_handles_cutoff = (
@@ -343,6 +354,7 @@ def _needs_per_hkl_route(st):
         or st.grouped
         or req.temporal is not None
         or req.coefficient_capture is not None
+        or st.mosaic_sampled is not None
     )
 
 

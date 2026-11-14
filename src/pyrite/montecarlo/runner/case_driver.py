@@ -674,6 +674,10 @@ def _cxr_for_segments_once(
         mosaic_fwhm_rad=case.get("mosaic_mc_fwhm_rad"),
         mosaic_nodes=case.get("mosaic_mc_nodes", 1),
     )
+    if case.get("mosaic_mc_sampling") == "history":
+        # One crystallite per history from the run seed's own child stream;
+        # transport draws are untouched. Validation: mosaic-mc-sampled
+        mosaic_kw.update(mosaic_sampling="history", mosaic_seed=int(case["seed"]))
     spec_chunk = _admit_chunk(
         case.get("spec_chunk") or _RESOURCE_POLICY.spec_chunk or _adaptive_chunk(E_grid.size),
         E_grid.size,
