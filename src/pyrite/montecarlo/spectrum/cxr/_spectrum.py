@@ -311,7 +311,11 @@ def _needs_per_hkl_route(st):
     The batched ``(n_seg, N_g)`` path covers the single-slab absorber, with or
     without a finite crystal footprint -- the escape DISTANCE is g-independent
     either way, so it hoists -- for both coherent and incoherent emission.
-    Layered and grooved absorbers stay on the proven per-hkl loop. Coherent
+    Incoherent layered and grooved absorbers take it too: their escape pieces
+    are g-independent as well, and only the per-layer mu(E_res) varies per
+    row (``_escape_mu``). Coherent layered and grooved runs stay on the
+    per-hkl loop, as does any layered or grooved run with
+    ``_policy._BATCH_LAYERED_ESCAPE`` off (the cross-check route). Coherent
     sinc-windowed runs use it except when the CUDA-fp32 streaming kernel can
     apply the same cutoff without materializing dense field matrices.
 
@@ -331,8 +335,10 @@ def _needs_per_hkl_route(st):
     )
     return bool(
         (req.coherent and req.sinc_cutoff is not None and not stream_handles_cutoff)
-        or req.groove is not None
-        or req.layers is not None
+        or (
+            (req.groove is not None or req.layers is not None)
+            and (req.coherent or not _policy._BATCH_LAYERED_ESCAPE)
+        )
         or st.grouped
         or req.temporal is not None
         or req.coefficient_capture is not None

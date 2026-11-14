@@ -1,9 +1,10 @@
 """Per-(reflection, orientation) accumulation route for the CXR CXR spectrum.
 
 The route ``_needs_per_hkl_route`` selects when a request carries something the
-batched tables cannot express (layered stacks, grooved escape, flight-grouped
-coherence). It walks one reflection at a time and is the reference the batched
-route is checked against.
+batched tables cannot express (coherent layered or grooved escape,
+flight-grouped coherence, temporal profiles). It walks one reflection at a time
+and is the reference the batched route is checked against, including for the
+incoherent layered and grooved absorbers the batched route now owns.
 
 Validation: coherent-formation-absorption
 """
@@ -1135,9 +1136,11 @@ def _accumulate_per_hkl(st):
     """Phase 2, compatibility route: one :func:`_accumulate_reflection` pass
     per (reflection, crystallite orientation) row.
 
-    Owns the layered and grooved absorbers, coherent runs that ask for
+    Owns coherent layered and grooved absorbers, coherent runs that ask for
     sinc_cutoff windowing, and the flight-grouped incoherent reduction --
-    everything the batched ``(n_seg, N_g)`` path does not cover. The stacking
+    everything the batched ``(n_seg, N_g)`` path does not cover. Incoherent
+    layered and grooved runs reach it only with
+    ``_policy._BATCH_LAYERED_ESCAPE`` off, as the cross-check reference. The stacking
     prologue does every host->device transfer once per case rather than once
     per row.
     """

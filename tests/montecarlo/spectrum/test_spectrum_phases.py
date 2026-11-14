@@ -303,7 +303,8 @@ _STREAM_HANDLES_CUTOFF = (
     [
         ({}, False),
         ({"segments": _segments(footprint=True)}, False),
-        ({"layers": [(0.0, 4000.0, [("C", 0.1136)])]}, True),
+        # Incoherent layered absorbers batch (#1194); coherent ones cannot reach setup.
+        ({"layers": [(0.0, 4000.0, [("C", 0.1136)])]}, False),
         # The CUDA-fp32 streaming kernel applies the sinc cutoff itself (see
         # ``_needs_per_hkl_route``), so only there the batched route is kept.
         ({"coherent": True, "sinc_cutoff": 3.0}, not _STREAM_HANDLES_CUTOFF),

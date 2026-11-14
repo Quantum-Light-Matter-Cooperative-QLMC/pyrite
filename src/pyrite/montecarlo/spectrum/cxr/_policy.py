@@ -15,6 +15,9 @@ _USE_JIT_COHERENT_REDUCTION = True
 _USE_JIT_COHERENT_STREAM = True
 _JIT_CXR_BATCH_TARGET = 400_000
 _JIT_COHERENT_PAIR_TARGET = 1_000_000
+# Incoherent layered/grooved absorbers take the batched route (#1194); off
+# restores the per-hkl loop, which stays the cross-check reference.
+_BATCH_LAYERED_ESCAPE = True
 # Incoherent fused-reduction launches group whole ``1_000_000``-pair reduction
 # units up to this many (segment, reflection) pairs, using at most this share
 # of the device headroom at this many bytes of temporaries per pair (#906).

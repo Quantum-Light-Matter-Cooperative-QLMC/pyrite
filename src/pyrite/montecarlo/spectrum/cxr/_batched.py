@@ -21,6 +21,7 @@ from ._batched_finalize import _batched_coherent_finalize as _batched_coherent_f
 from ._bin_quadrature import run_bin_mean_reduction_kernel, sincsq_bin_lineshape
 from ._cpu_reduce import accumulate_sincsq
 from ._cpu_reduce import numpy_backend as _numpy_backend
+from ._escape_mu import escape_mu, escape_mu_tables
 from ._formation import formation_coefficients
 from ._kernels import (
     _PREF_C1,
@@ -95,6 +96,8 @@ class _BatchedTables:
     G_DOT_EP: Any
     wm_rows: Any
     L_esc_full: Any
+    # Exact per-layer mu tables of a layered or grooved incoherent request.
+    escape_mu: Any = None
 
 
 @dataclass
@@ -415,6 +418,7 @@ def _batched_tables(st):
         G_DOT_EP=G_DOT_EP,
         wm_rows=wm_rows,
         L_esc_full=L_esc_full,
+        escape_mu=None if coherent else escape_mu_tables(req, st.abs_comp),
     )
 
 
@@ -688,19 +692,24 @@ def _polarization_terms(st, blk, ex, ey, ez):
     return v_dot_e, omega_res * delta * (g0 * ex + g1 * ey + g2 * ez)
 
 
-def _escape_weights(st, blk, A2, WM):
+def _escape_weights(st, blk, A2, WM, mu_tables=None):
     """Steps 6+7: ``(T_abs, pref, a_width, weight, good)`` for the block.
 
-    mu(E_res) reuses the step-3 interp bracket (no fresh searchsorted).
+    mu(E_res) reuses the step-3 interp bracket (no fresh searchsorted) on a
+    single slab. A layered or grooved absorber passes ``mu_tables`` instead:
+    exact per-point mu per layer, as the per-hkl loop evaluates it.
     T_abs is the segment mean of exp(-L_esc(s) mu) over the linear escape
     pieces, not its midpoint value: exact integrated line yield, sinc^2
     shape kept (issue #181). Validation: segment-escape-average
     """
     frac, path_start, path_end = (a[blk.sb] for a in st.escape_pieces)
     piece_fraction = st.piece_fraction[blk.sb][:, None]
-    T_abs = _fused.piece_transmission(frac, path_start, path_end, blk.mu, piece_fraction)
+    mu = blk.mu[..., None] if mu_tables is None else escape_mu(mu_tables, blk.E_res)
+    T_abs = None
+    if mu.shape[-1] == 1:
+        T_abs = _fused.piece_transmission(frac, path_start, path_end, mu[..., 0], piece_fraction)
     if T_abs is None:
-        T_abs = piece_mean_transmission(frac, path_start, path_end, blk.mu[..., None], xp=xp)
+        T_abs = piece_mean_transmission(frac, path_start, path_end, mu, xp=xp)
         T_abs *= piece_fraction
     denom, t_L, keep = blk.slope, blk.t_L, blk.keep
     pref = _cxr_weight_core(blk.omega_res, t_L, T_abs, ALPHA_FS, _PREF_C1)
@@ -840,7 +849,7 @@ def _batched_incoherent_block(st, bt, blk, cxr_batch):
         A2_cbs = A2_cbs + a2c
 
     # -- 6+7. Beer-Lambert escape factor + weights (fused prefactor) -----
-    T_abs, pref, a_width, weight, good = _escape_weights(st, blk, A2, WM)
+    T_abs, pref, a_width, weight, good = _escape_weights(st, blk, A2, WM, bt.escape_mu)
     # Resolve the mask once. CuPy otherwise performs one blocking
     # survivor-count readback for ``any`` and one for every boolean
     # gather below. Integer gathers preserve the same flattened order.
@@ -914,7 +923,8 @@ def _accumulate_batched(st):
     grid instead of once per reflection.
 
     Covers the single-slab absorber, with or without a finite crystal
-    footprint, for both coherent and incoherent emission. Segments are walked
+    footprint, for both coherent and incoherent emission, and layered or
+    grooved absorbers for incoherent emission. Segments are walked
     in blocks sized to bound the ``(n_block, N_g)`` temporaries.
     """
     # NVTX sub-ranges are a no-op off the profiled GPU path. Lazy import:
