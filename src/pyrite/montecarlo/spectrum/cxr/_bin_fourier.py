@@ -38,6 +38,9 @@ import scipy.fft as sf
 FOURIER_SPAN_PAD = 3.0
 #: Default pointwise image residual, relative to each line's peak density.
 FOURIER_RESIDUAL_TOL = 1.0e-6
+#: Smallest accepted ``residual_tol``: below it FP64 rounding of the mode sum
+#: dominates and the bound no longer describes the error.
+FOURIER_MIN_RESIDUAL_TOL = 1.0e-12
 #: Chebyshev nodes for the smooth envelope-image correction over the band.
 _CHEB_NODES = 24
 #: Host block size in (line, mode) elements.
@@ -84,6 +87,8 @@ def fourier_period(
 
     Validation: cxr-line-fourier-reduction
     """
+    if not residual_tol >= FOURIER_MIN_RESIDUAL_TOL:
+        raise ValueError(f"residual_tol must be >= {FOURIER_MIN_RESIDUAL_TOL:g}")
     E = np.asarray(E_res, dtype=np.float64)
     a = np.asarray(a_width, dtype=np.float64)
     lo = min(c0 - 0.5 * h, float(E.min()))
@@ -96,25 +101,28 @@ def fourier_period(
     return n_fft, n_fft * h, span
 
 
-def image_residual_bounds(a_width: object, P: float, U: float, h: float):
+def image_residual_bounds(a_width: object, P: float, U: float, h: float, band: float):
     """Per-line ``(pointwise, yield)`` bounds on the uncorrected image remainder.
 
     ``pointwise`` is relative to the line's peak density ``w_l`` and bounds
     every bin; ``yield`` is relative to the whole-line mass ``pi w_l / a_l``
-    and bounds the band integral. With ``W = pi / a`` and ``D = P - U - h/2``:
-    ``W^2 (1 + h^2/D^2) / (6 D^2)`` and ``W^2 / (4 pi D^2)``; the ``h^2/D^2``
-    term covers the bin-centre form of the envelope correction. Both need
-    ``P >= 2 (U + h/2)``.
+    and bounds the integral over a band of length ``band`` [eV]. With
+    ``W = pi / a`` and ``D = P - U - h/2`` (needs ``D >= h``):
+    ``W^2 (1 + h^2/D^2) / (6 D^2)`` and
+    ``W^2 / (4 pi D^2) + pi^2 W h^2 band / (270 D^4)``. The ``h^2`` terms
+    cover the bin-centre form of the envelope correction.
 
     Validation: cxr-line-fourier-reduction
     """
     a = np.asarray(a_width, dtype=np.float64)
     d = P - U - 0.5 * h
-    if not P >= 2.0 * (U + 0.5 * h):
-        raise ValueError("image bounds need P >= 2 (U + h/2)")
-    width_sq = (np.pi / a) ** 2
+    if not d >= h:
+        raise ValueError("image bounds need P - U - h/2 >= h")
+    width = np.pi / a
+    width_sq = width * width
     pointwise = width_sq * (1.0 + (h / d) ** 2) / (6.0 * d * d)
-    return pointwise, width_sq / (4.0 * np.pi * d * d)
+    centre = np.pi**2 * width * h * h * band / (270.0 * d**4)
+    return pointwise, width_sq / (4.0 * np.pi * d * d) + centre
 
 
 def _inv_sin_sq_minus_inv_sq(x):
@@ -123,8 +131,10 @@ def _inv_sin_sq_minus_inv_sq(x):
     out = np.empty_like(x)
     small = np.abs(x) < 0.2
     y = x[small] ** 2
-    # Laurent series of csc^2; the first omitted term is < 1e-17 at |x| = 0.2.
-    out[small] = 1 / 3 + y * (1 / 15 + y * (2 / 189 + y * (1 / 675 + y * (2 / 10395))))
+    # Laurent series of csc^2 through x^12; the first omitted term
+    # (3617 x^14 / 10854718875) is < 6e-17 at |x| = 0.2.
+    tail = 2 / 10395 + y * (1382 / 58046625 + y * (4 / 1403325))
+    out[small] = 1 / 3 + y * (1 / 15 + y * (2 / 189 + y * (1 / 675 + y * tail)))
     xb = x[~small]
     out[~small] = 1.0 / np.sin(xb) ** 2 - 1.0 / (xb * xb)
     return out
