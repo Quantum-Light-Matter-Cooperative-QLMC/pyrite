@@ -210,3 +210,18 @@ def test_reflection_chunks_partition_every_radiator_without_touching_the_rest():
     assert films[1:] == [None, None]
     assert sum((p["layer_radiators"][1]["hkl_list"] for p in parts), []) == hkl
     assert all(p["layer_radiators"][2] is None for p in parts)
+
+
+def test_timed_calls_flags_noisy_warm_timings_unresolved():
+    gate = _gate()
+    grid = np.linspace(0.0, 1.0, 5)
+    out, record = gate["timed_calls"](lambda g: 2 * g, grid, 1, lambda: None)
+    np.testing.assert_array_equal(out, 2 * grid)
+    assert record["warm_s"] == [] and record["warm_resolved"] is False
+    assert record["warm_median_s"] is None and record["device_memory"] is None
+    _, record = gate["timed_calls"](lambda g: g, grid, 5, lambda: None, lambda call, g: {"peak": 1})
+    assert len(record["warm_s"]) == 4 and record["device_memory"] == {"peak": 1}
+    assert record["warm_resolved"] == (
+        record["warm_relative_spread"] <= gate["TIMING_SPREAD_LIMIT"]
+    )
+    assert len(record["grid_sha256"]) == 64

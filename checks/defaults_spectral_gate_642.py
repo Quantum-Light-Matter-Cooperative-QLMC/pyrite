@@ -134,6 +134,44 @@ MARGINS = dict(
     mass_l1=1e-2,
 )
 BAND = (500.0, 10000.0)
+#: Warm timings whose relative spread (max - min) / median exceeds this are
+#: reported unresolved: no point estimate is claimed from them (#1143 Plan 5).
+TIMING_SPREAD_LIMIT = 0.2
+
+
+def timed_calls(call, grid, repeats, sync, probe=None):
+    """First call, ``repeats - 1`` synchronized warm calls, and statistics.
+
+    ``first_s - warm_median_s`` estimates compile/first-setup cost; it is
+    labeled an estimate, not a measured compile time. Device peak memory comes
+    from one extra untimed probe call. Returns ``(density, record)``.
+    """
+    times = []
+    for _ in range(max(1, int(repeats))):
+        sync()
+        begin = time.perf_counter()
+        density = call(grid)
+        sync()
+        times.append(time.perf_counter() - begin)
+    warm = times[1:]
+    record = dict(
+        first_s=times[0],
+        warm_s=warm,
+        grid_sha256=hashlib.sha256(np.ascontiguousarray(grid, dtype=float).tobytes()).hexdigest(),
+    )
+    if len(warm) >= 3:
+        median = float(np.median(warm))
+        spread = (max(warm) - min(warm)) / median
+        record.update(
+            warm_median_s=median,
+            warm_relative_spread=spread,
+            first_minus_warm_s_estimate=times[0] - median,
+            warm_resolved=bool(spread <= TIMING_SPREAD_LIMIT),
+        )
+    else:
+        record.update(warm_median_s=None, warm_resolved=False)
+    record["device_memory"] = None if probe is None else probe(call, grid)
+    return density, record
 
 
 def band_edges(start, stop):
@@ -205,7 +243,7 @@ def matched_grid(grid, record, quadrature, backbone_eV):
     return axis(lo, hi, float(record["actual_spacing_eV"]), quadrature)
 
 
-def score_policies(case, sweep, ladder, names, reference_spacing, sync):
+def score_policies(case, sweep, ladder, names, reference_spacing, sync, repeats=1, probe=None):
     """Resolve each policy from the saved trajectories and score it twice.
 
     ``native`` is the production axis (own support) against a node reference
@@ -252,7 +290,11 @@ def score_policies(case, sweep, ladder, names, reference_spacing, sync):
             continue
         grid = np.asarray(grid, dtype=float)
         row["record"] = json.loads(json.dumps(record, default=_jsonable))
+        sync()
+        begin = time.perf_counter()
         scorer = CaseLadder(pcase, transport=tp)
+        sync()
+        row["scorer_setup_s"] = time.perf_counter() - begin
         backbone = float(pcase["line_grid_policy"]["resolution"]["max_spacing_eV"])
         start, stop = float(grid[0]), float(grid[-1])
         for label, g, ref, edges in (
@@ -264,17 +306,14 @@ def score_policies(case, sweep, ladder, names, reference_spacing, sync):
                 None,
             ),
         ):
-            sync()
-            begin = time.perf_counter()
-            density = scorer.lines(g)
-            sync()
+            density, timing = timed_calls(scorer.lines, g, repeats, sync, probe)
             m = metrics(g, density, quadrature, edges=edges)
             row[label] = dict(
                 nodes=int(g.size),
                 support_eV=[float(g[0]), float(g[-1])],
                 min_spacing_eV=float(np.diff(g).min()),
                 max_spacing_eV=float(np.diff(g).max()),
-                first_s=time.perf_counter() - begin,
+                **timing,
                 metrics=m,
                 versus_reference=versus(m, ref),
             )
@@ -974,26 +1013,22 @@ def main():
         return
     for quadrature, spacing in arms:
         scoring_case = dict(case, line_quadrature=quadrature)
+        sync()
+        begin = time.perf_counter()
         scorer = CaseLadder(scoring_case, transport=ladder.transport)
+        sync()
+        setup_s = time.perf_counter() - begin
         grid = axis(500, 10000, spacing, quadrature)
-        times = []
-        for _ in range(max(1, args.repeats)):
-            sync()
-            begin = time.perf_counter()
-            density = scorer.lines(grid)
-            sync()
-            times.append(time.perf_counter() - begin)
+        density, timing = timed_calls(scorer.lines, grid, args.repeats, sync, peak_probe)
         label = f"{quadrature}-{spacing}"
-        memory = None if peak_probe is None else peak_probe(scorer.lines, grid)
         np.savez_compressed(args.output / f"{label}.npz", grid_eV=grid, density=density)
         record = dict(
             quadrature=quadrature,
             spacing_eV=spacing,
             nodes=len(grid),
-            first_s=times[0],
-            warm_s=times[1:],
+            scorer_setup_s=setup_s,
+            **timing,
             metrics=metrics(grid, density, quadrature),
-            device_memory=memory,
         )
         records.append(record)
         assert segment_fingerprint(ladder.segments) == ladder.fingerprint
@@ -1036,7 +1071,14 @@ def main():
     if args.policy_arms:
         sweep = scene_sweep(args.material, float(case["E0_keV"]), float(case["thickness_ang"]))
         report["policy_arms"] = score_policies(
-            case, sweep, ladder, args.policy_arms, args.policy_reference_spacing, sync
+            case,
+            sweep,
+            ladder,
+            args.policy_arms,
+            args.policy_reference_spacing,
+            sync,
+            repeats=args.repeats,
+            probe=peak_probe,
         )
         assert segment_fingerprint(ladder.segments) == ladder.fingerprint
         report["host_peak_rss_kib"] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
