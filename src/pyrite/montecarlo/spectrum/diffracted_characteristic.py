@@ -50,7 +50,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from ..._backend import REAL, _to_cpu, xp
+from ..._backend import REAL, xp
 from .diffracted_brem import (
     _DEPTH_BINS,
     _HBARC_EV_ANG,
@@ -103,8 +103,8 @@ def line_depth_yields(
     L = xp.asarray(segments["L_ang"], dtype=REAL)[rows]
     field = "E_repr_keV" if segments.get("E_repr_keV") is not None else "E_keV"
     T = xp.asarray(segments[field], dtype=REAL)[rows]
-    z = _to_cpu(xp.asarray(segments["r_mid"], dtype=float)[rows, 2])
-    half = 0.5 * np.abs(_to_cpu(L) * _to_cpu(xp.asarray(segments["v_hat"], dtype=float)[rows, 2]))
+    z = xp.asarray(segments["r_mid"], dtype=float)[rows, 2]
+    half = 0.5 * xp.abs(L * xp.asarray(segments["v_hat"], dtype=float)[rows, 2])
     lines = []
     edges = np.linspace(0.0, float(thickness_ang), _DEPTH_BINS + 1)
     for el, number_density in comp:
@@ -120,7 +120,7 @@ def line_depth_yields(
         weight = _shell_flux_weight(segments, table, rows)
         if weight is not None:
             sigma = sigma * weight
-        per_shell = _to_cpu(sigma * (number_density * 1.0e24 * L * 1.0e-8)[:, None])
+        per_shell = sigma * (number_density * 1.0e24 * L * 1.0e-8)[:, None]
         edges, by_shell = _depth_histogram(
             z - half, z + half, per_shell, thickness_ang, _DEPTH_BINS
         )
@@ -196,17 +196,29 @@ def diffracted_characteristic_spectrum(
 
     Validation: diffracted-characteristic-radiation
     """
-    grid = np.asarray(energy_grid, dtype=float)
-    out = np.zeros(grid.size)
     if not reflections:
-        return out
-    n = np.asarray(n_hat, dtype=float)
-    n = n / np.linalg.norm(n)
-    s = np.asarray(s_hat, dtype=float)
+        return np.zeros(np.asarray(energy_grid).size)
     edges, lines = line_depth_yields(
         segments, composition, thickness_ang,
         Ne=Ne, E_cut_keV=E_cut_keV, ionization_model=ionization_model,
     )  # fmt: skip
+    return kossel_from_yields(
+        edges, lines, energy_grid, reflections, n_hat, quadrature=quadrature, s_hat=s_hat
+    )
+
+
+def kossel_from_yields(
+    edges, lines, energy_grid, reflections, n_hat, *, quadrature="node", s_hat=(0.0, 0.0, 1.0)
+):  # fmt: skip
+    """Kossel term on ``energy_grid`` from :func:`line_depth_yields` output.
+
+    Validation: diffracted-characteristic-radiation
+    """
+    grid = np.asarray(energy_grid, dtype=float)
+    out = np.zeros(grid.size)
+    n = np.asarray(n_hat, dtype=float)
+    n = n / np.linalg.norm(n)
+    s = np.asarray(s_hat, dtype=float)
     for g, chi_g_abs, chi_0, *rest in reflections:
         phases = rest[0] if rest else {}
         E_B = -_HBARC_EV_ANG * float(g @ g) / (2.0 * float(n @ g))

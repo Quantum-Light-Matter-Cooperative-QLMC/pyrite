@@ -402,3 +402,41 @@ def test_spectrum_adds_kossel_term_to_characteristic(germanium, monkeypatch):
             mapping, transport["segs"], grid, n, transport["Ne_brem"]
         )
         assert not np.any(out)
+
+
+def test_block_depth_accumulation_equals_the_joined_terms(germanium):
+    """Streamed blocks sum depth weights and solve once: equal to the joined DBR and Kossel."""
+    from pyrite.montecarlo.runner.diffracted_brem import (
+        DiffractedDepthAccumulator,
+        case_diffracted_brem,
+        case_diffracted_characteristic,
+    )
+
+    case, transport = germanium
+    segs, Ne = transport["segs"], int(transport["Ne_brem"])
+    _, n = _kossel_direction(case, (-4, 0, 0), _ka1()[0])
+    grid = np.asarray(transport["E_grid"], dtype=float)
+    rows = np.asarray(segs["L_ang"]).shape[0]
+    electron = np.asarray(segs["elec_id"])
+    accumulator = DiffractedDepthAccumulator(case, grid, n)
+    for block in np.array_split(np.unique(electron), 3):
+        mask = np.isin(electron, block)
+        accumulator.add(
+            {
+                key: value[mask]
+                if isinstance(value, np.ndarray) and value.shape[:1] == (rows,)
+                else value
+                for key, value in segs.items()
+            },
+            Ne,
+        )
+    dbr, kossel = accumulator.spectra()
+    want_kossel = case_diffracted_characteristic(case, segs, grid, n, Ne)
+    want_dbr = case_diffracted_brem(case, segs, grid, n, Ne)
+    assert np.abs(want_kossel).max() > 0.0
+    np.testing.assert_allclose(
+        kossel, want_kossel, rtol=1e-9, atol=1e-12 * np.abs(want_kossel).max()
+    )
+    np.testing.assert_allclose(
+        dbr, want_dbr, rtol=1e-9, atol=1e-12 * max(np.abs(want_dbr).max(), 1e-300)
+    )

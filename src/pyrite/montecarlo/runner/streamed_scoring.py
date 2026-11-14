@@ -97,6 +97,9 @@ class BlockSpectrumScorer:
         self.audit = cxr_truncation_audit(case, self.E_grid, n_electrons=self.Ne_lines)
         self.line_screen = line_screen_for(case, self.Ne_lines)
         self.table_cache: dict = {}
+        from .diffracted_brem import DiffractedDepthAccumulator
+
+        self.diffracted = DiffractedDepthAccumulator(case, self.E_grid, self.n_hat)
         self.totals: tuple | None = None
         self.n_segments = 0
 
@@ -129,14 +132,13 @@ class BlockSpectrumScorer:
         )
         brem_batch = replace(batch, electron_limit=self.Ne_brem)
         spec = self.emission.cxr.evaluate(batch, "spec").values
-        # Diffracted brem (#1166) is a track-length sum over a fixed electron
-        # count, so it adds over blocks like the native lines it joins.
-        from .diffracted_brem import case_diffracted_brem, case_diffracted_characteristic
-
-        spec = spec + case_diffracted_brem(case, block, self.E_grid, self.n_hat, self.Ne_brem)
+        # Diffracted brem (#1166) and Kossel lines (#1176) are track-length sums
+        # over a fixed electron count: blocks add their depth weights, and the
+        # two-beam mode is solved once in :meth:`result`.
+        self.diffracted.add(block, self.Ne_brem)
         characteristic = self.row_recovery.evaluate(
             self.emission.characteristic, brem_batch, "spec_characteristic"
-        ) + case_diffracted_characteristic(case, block, self.E_grid, self.n_hat, self.Ne_brem)
+        )
         brem = None
         fallback_snapshot = self.fallbacks.snapshot()
         if not self._restage_continuum:
@@ -207,7 +209,10 @@ class BlockSpectrumScorer:
         line_coverage,
         diagnostic_grid=None,
     ) -> dict[str, Any]:
-        """The spectrum-phase output from the accumulated totals and counts."""
+        """The spectrum-phase output from the accumulated totals and counts.
+
+        Validation: diffracted-bremsstrahlung, diffracted-characteristic-radiation
+        """
         from .cxr_grid import check_cxr_truncation
 
         case, E_grid, E_brem = self.case, self.E_grid, self.E_brem
@@ -216,6 +221,8 @@ class BlockSpectrumScorer:
             brem_wide, spec_transition = np.zeros(E_brem.shape), None
         else:
             spec, spec_characteristic, brem_wide, spec_transition = self.totals
+        dbr, kossel = self.diffracted.spectra()
+        spec, spec_characteristic = spec + dbr, spec_characteristic + kossel
         truncation = None if self.audit is None else check_cxr_truncation(case, self.audit)
         out = dict(
             line_data_coverage=line_coverage,
