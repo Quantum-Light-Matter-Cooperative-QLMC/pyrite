@@ -38,7 +38,7 @@ its `electron-transport` claim stays `missing` until a reviewed golden set is
 run through the collector.
 
 | Artifact | Purpose |
-| `defaults_spectral_gate_642.py` | Remote-only fixed-band transport/spectral sensitivity pilot (#1142/#1143): preserved trajectories, node refinement, bin-mean replay, MoS₂-on-Si layered scene, exact-MC mosaic node ladder, terminal ledger and shape metrics; no accuracy/default verdict. |
+| `defaults_spectral_gate_642.py` | Remote-only fixed-band transport/spectral sensitivity pilot (#1142/#1143): preserved trajectories, node refinement, bin-mean replay, MoS₂-on-Si layered scene, exact-MC mosaic node ladder, automatic line-grid policy arms (sinc-Nyquist, measured bandwidth, resonance-local; native and matched-band support against a node reference, per-observable margins), intrinsic continuum arms (refined vs unrefined geometric ln-E steps against a refined reference: yield, centroid, log-band shape, floor, per-edge window masses/jump incl. unrefined substrate edges, tip, dominant-line/background vs direct evaluation), reflection-family ladder (n_families, HOPG (00l) orders; band shape vs the largest set, full-support yield over every radiator incl. film-only production-axis omission), terminal ledger and shape metrics; no accuracy/default verdict. |
 |---|---|
 | `mixed_elastic/` | Paired equivalence, cost, and Geant4 comparison for mixed elastic transport (#894); see its README for the frozen protocol and run files. |
 | `cherenkov_geant4/` | Geant4 11.4.2 `G4Cerenkov` reference for bulk Cherenkov yield (#587): minimal Geant4 app, `compare.py`, sbatch and pinned `reference/` outputs. Needs a Geant4 build; independent reference, does not sign off the `frank-tamm-homogeneous-dielectric` claim. |
