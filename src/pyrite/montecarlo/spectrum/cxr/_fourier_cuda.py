@@ -98,14 +98,15 @@ extern "C" __global__ void rectangles(
 
 
 def cuda_positive_modes(E_res, a_width, weight, c0, period, *, eps=1e-12, use_nufft=True):
-    """Exact-support hybrid coefficients from validated host scalar arrays.
+    """Exact-support hybrid coefficients from validated scalar line arrays.
 
     Mirrors ``partitioned_positive_modes`` (no zero mode or bin multiplier).
     Large rectangles use two-row cuFINUFFT; all others share one direct CUDA
     launch with FP64 atomic accumulation. Summation order can vary between
     executions. ``use_nufft=False`` is an equal-workload GPU direct baseline.
     Thresholds are provisional CPU-audit thresholds, not tuned GPU crossovers.
-    Input contract is the host planner's finite arrays/positive widths/period.
+    Input contract is the host planner's finite arrays/positive widths/period;
+    host or CuPy arrays, planned and evaluated on the device.
 
     Validation: cxr-line-fourier-reduction
     """
@@ -113,16 +114,17 @@ def cuda_positive_modes(E_res, a_width, weight, c0, period, *, eps=1e-12, use_nu
     if cp.cuda.runtime.is_hip:
         raise ValueError("cuFINUFFT prototype requires CUDA")
     dt = 2.0 * np.pi / period
-    counts = np.floor(2.0 * a_width / dt).astype(np.int64)
-    order = np.argsort(counts, kind="stable")
+    E_res, a_width, weight = (cp.asarray(x, dtype=cp.float64) for x in (E_res, a_width, weight))
+    counts = cp.floor(2.0 * a_width / dt).astype(cp.int64)
+    order = cp.argsort(counts)
     counts = counts[order]
     last = int(counts[-1]) if counts.size else 0
-    phase = cp.asarray((E_res[order] - c0) * dt, dtype=cp.float64)
+    phase = (E_res[order] - c0) * dt
     a = a_width[order]
-    constant = cp.asarray(weight[order] * np.pi / a, dtype=cp.float64)
-    linear = cp.asarray(weight[order] * np.pi / (2.0 * a * a), dtype=cp.float64)
+    constant = weight[order] * np.pi / a
+    linear = constant / (2.0 * a)
     out = cp.zeros(last + 1, dtype=cp.complex128)
-    rects = cutoff_rectangle_array(counts)
+    rects = cp.asnumpy(cutoff_rectangle_array(counts, xp=cp))
     modes, sources = rects[:, 1] - rects[:, 0], rects[:, 3] - rects[:, 2]
     large = (sources >= 64) & (modes >= 32) & (sources * modes >= 262144)
     if not use_nufft:
@@ -209,9 +211,10 @@ def cuda_fourier_bin_mean_reduce(
         E, a, w = E[rest], a[rest], w[rest]
         if E.size == 0:
             return out
-    e_host, a_host, w_host = (cp.asnumpy(x) for x in (E, a, w))
-    n_fft, P, _ = fourier_period(e_host, a_host, c0, h, n_bins, residual_tol=residual_tol)
-    positive = cuda_positive_modes(e_host, a_host, w_host, c0, P, eps=eps)
+    # The period depends only on the resonance extrema and the widest line.
+    extrema = cp.asnumpy(cp.stack((E.min(), E.max(), a.min())))
+    n_fft, P, _ = fourier_period(extrema[:2], extrema[2:], c0, h, n_bins, residual_tol=residual_tol)
+    positive = cuda_positive_modes(E, a, w, c0, P, eps=eps)
     t = (2.0 * np.pi / P) * cp.arange(positive.size, dtype=cp.float64)
     positive *= cp.sinc(t * (h / (2.0 * np.pi)))
     positive[0] = 0.0
