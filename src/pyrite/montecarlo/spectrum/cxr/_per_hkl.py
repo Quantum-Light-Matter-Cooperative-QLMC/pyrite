@@ -19,7 +19,7 @@ from ..coherent_population import mixed_row_power, pair_scale
 from ..coherent_transverse import transverse_envelope, transverse_form_factor
 from ..segment_escape import piece_mean_transmission
 from . import _policy
-from ._bin_quadrature import sincsq_bin_lineshape
+from ._bin_quadrature import experimental_flush_lines, sincsq_bin_lineshape
 from ._cpu_reduce import accumulate_sincsq, numpy_backend
 from ._formation import (
     _formation_cxr,
@@ -1075,7 +1075,13 @@ def _reduce_lineshapes(st, targets, E_r, a_width, good):
     sinc_cutoff = st.request.sinc_cutoff
     E_grid = st.E_grid
     n_rows = E_r.size
-    if st.bin_edges is not None:
+    if st.bin_line_queues is not None:
+        # Experimental Fourier reduction (#1192): queue, reduce at the end.
+        for w, tgt in targets:
+            st.bin_line_queues.setdefault(id(tgt), _queue_for(st, tgt)).append(
+                E_r[good], a_width[good], w[good]
+            )
+    elif st.bin_edges is not None:
         # Bin-mean quadrature (setup refused sinc_cutoff): each row's profile
         # integrated over each node's bin, written as the bin mean.
         # Validation: sinc-bin-integration
@@ -1196,6 +1202,8 @@ def _accumulate_per_hkl(st):
     G_DOT_EP = _rowdot3(G, EP)
     _nsys_pop()
 
+    if st.bin_edges is not None and experimental_flush_lines() is not None and not numpy_backend():
+        st.bin_line_queues = {}
     for i_row, (wm, i_hkl) in enumerate(zip(wm_rows, hkl_of_row, strict=True)):
         _accumulate_reflection(
             st,
@@ -1212,3 +1220,13 @@ def _accumulate_per_hkl(st):
             U_IM[i_hkl],
             wm,
         )
+    for queue in (st.bin_line_queues or {}).values():
+        queue.flush()
+    st.bin_line_queues = None
+
+
+def _queue_for(st, target):
+    """A fused-reduction line queue that flushes into ``target``."""
+    from ._batched import _CxrBatch  # _batched imports this module
+
+    return _CxrBatch(target, st.E_grid, st.bin_edges, st.bin_inv_width)
