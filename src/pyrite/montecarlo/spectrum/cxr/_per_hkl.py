@@ -44,6 +44,7 @@ from ._kernels import (
     _rowdot3,
     _sincsq_lineshape,
 )
+from ._mosaic_sampled import accumulate_sampled_mosaic, dot_g, kept_orientation
 from ._recoil import (
     _line_recoil_terms,
     _quantum_line_factors,
@@ -807,7 +808,9 @@ def _accumulate_reflection(
     tabulations (chi/u on E_tab_g) depend on hkl and energy only -- NOT on
     the mosaic orientation -- while g and its sigma/pi polarization pair
     (``e_s``, ``e_p``) vary per orientation. wm = 1.0 for the perfect-crystal
-    path.
+    path. Under the per-history sampled mosaic ``g_vec_d``, ``e_s``, ``e_p``
+    are ``(n_seg, 3)`` and ``n_dot_g``, ``g_dot_es``, ``g_dot_ep`` are
+    ``(n_seg,)`` -- one crystallite per row's history (Validation: mosaic-mc-sampled).
 
     Validation: segment-escape-average
     Validation: temporal-intensity-profile
@@ -841,7 +844,7 @@ def _accumulate_reflection(
     #   omega_res = v.g / (1 - v.n - delta v.grad L)   [1/Ang]   (>0 radiates)
     #   exact recoil: v.g -> v.g - r_num, denominator + r_den
     #   (Validation: line-recoil-in-medium-root)
-    v_dot_g = _matvec3(v_all, g_vec_d)
+    v_dot_g = dot_g(v_all, g_vec_d)
     r_num, r_den, inv_E = _line_recoil_terms(gamma_all, g2, n_dot_g)
     grad = st.escape_gradient
     denom, delta_seg = _in_medium_kinematics(
@@ -868,6 +871,9 @@ def _accumulate_reflection(
     if not keep.any():
         return
     idx = xp.flatnonzero(keep)
+    g_vec_d, e_s, e_p, n_dot_g, g_dot_es, g_dot_ep = kept_orientation(
+        idx, g_vec_d, e_s, e_p, n_dot_g, g_dot_es, g_dot_ep
+    )
 
     E_r = E_res[idx]  # line energy per kept segment [eV]
     om = omega_res[idx]  # same in 1/Ang
@@ -899,7 +905,7 @@ def _accumulate_reflection(
     grad2 = (grad[idx] ** 2).sum(axis=1)
     k_mag = om * xp.sqrt(xp.where(grad2 == 0.0, 1.0, 1.0 - 2.0 * delta + delta**2 * grad2))
     k_dot_v = om * ((1.0 - dnm) + r_den_i)
-    k_dot_g = om * (n_dot_g + delta * _matvec3(grad[idx], g_vec_d))
+    k_dot_g = om * (n_dot_g + delta * dot_g(grad[idx], g_vec_d))
     detuning = g2 + 2.0 * k_dot_g
 
     # -- 5. Eq. (13)/(14) amplitudes with the exact second-order quantum
@@ -911,8 +917,8 @@ def _accumulate_reflection(
     A2_cbs = xp.zeros(idx.size, dtype=REAL)
     pol_A = []  # complex A = A_PXR + A_CBS per polarization (coherent path)
     for e_d, g_dot_e in ((e_s, g_dot_es), (e_p, g_dot_ep)):
-        v_dot_e = _matvec3(v, e_d)
-        k_dot_e = om * delta * _matvec3(grad[idx], e_d)
+        v_dot_e = dot_g(v, e_d)
+        k_dot_e = om * delta * dot_g(grad[idx], e_d)
         if coherent or grouped:
             # Complex amplitudes retained verbatim -- the phased-field paths
             # (global-coherent and flight-grouped) keep the un-reassociated
@@ -1159,6 +1165,10 @@ def _accumulate_per_hkl(st):
     CHI_RE, CHI_IM, U_RE, U_IM = _reflection_tables(  # (N_hkl, N_tab)
         crystal, hkl_list, E_tab, B_ang2, use_henke
     )
+    if st.mosaic_sampled is not None:
+        _nsys_pop()
+        accumulate_sampled_mosaic(st, (CHI_RE, CHI_IM, U_RE, U_IM), _accumulate_reflection)
+        return
     orients = ((None, 1.0),) if mosaic_quad is None else mosaic_quad
     for i_hkl, hkl in enumerate(hkl_list):
         # reciprocal vector in the sample frame: construction frame by default

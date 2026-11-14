@@ -151,6 +151,8 @@ def resonance_populations(
     recip_miscut_rad=None,
     mosaic_fwhm_rad=None,
     mosaic_nodes: int = 1,
+    mosaic_sampling: str = "quadrature",
+    mosaic_seed: int | None = None,
     electron_limit: int | None = None,
     label_prefix: str = "",
     composition: Iterable[tuple[str, float]] | None = None,
@@ -177,6 +179,8 @@ def resonance_populations(
         recip_miscut_rad=recip_miscut_rad,
         mosaic_fwhm_rad=mosaic_fwhm_rad,
         mosaic_nodes=mosaic_nodes,
+        mosaic_sampling=mosaic_sampling,
+        mosaic_seed=mosaic_seed,
         electron_limit=electron_limit,
         label_prefix=label_prefix,
         composition=composition,
@@ -388,6 +392,8 @@ def kinematic_cxr_seeds(
     recip_miscut_rad=None,
     mosaic_fwhm_rad=None,
     mosaic_nodes: int = 1,
+    mosaic_sampling: str = "quadrature",
+    mosaic_seed: int | None = None,
     electron_limit: int | None = None,
     label_prefix: str = "",
     composition: Iterable[tuple[str, float]] | None = None,
@@ -466,6 +472,8 @@ def kinematic_cxr_seeds(
         recip_miscut_rad=recip_miscut_rad,
         mosaic_fwhm_rad=mosaic_fwhm_rad,
         mosaic_nodes=mosaic_nodes,
+        mosaic_sampling=mosaic_sampling,
+        mosaic_seed=mosaic_seed,
         electron_limit=electron_limit,
         label_prefix=label_prefix,
         composition=composition,
@@ -839,8 +847,7 @@ def _kinematic_provider(context: SeedContext):
             surface_hkl=radiator.get("surface_hkl"),
             azimuth_rad=radiator.get("azimuth_rad", case.get("azimuth_rad", 0.0)),
             recip_miscut_rad=radiator.get("recip_miscut_rad", case.get("recip_miscut_rad")),
-            mosaic_fwhm_rad=case.get("mosaic_mc_fwhm_rad"),
-            mosaic_nodes=case.get("mosaic_mc_nodes", 1),
+            **_case_mosaic(case),
             electron_limit=context.electron_limit,
             label_prefix=label_prefix,
             composition=composition,
@@ -910,8 +917,7 @@ def case_resonance_populations(
                 surface_hkl=radiator.get("surface_hkl"),
                 azimuth_rad=radiator.get("azimuth_rad", case.get("azimuth_rad", 0.0)),
                 recip_miscut_rad=radiator.get("recip_miscut_rad", case.get("recip_miscut_rad")),
-                mosaic_fwhm_rad=case.get("mosaic_mc_fwhm_rad"),
-                mosaic_nodes=case.get("mosaic_mc_nodes", 1),
+                **_case_mosaic(case),
                 electron_limit=electron_limit,
                 label_prefix=prefix,
                 composition=composition,
@@ -1180,3 +1186,14 @@ def collect_feature_seeds(
         seeds.extend(provided)
         summaries[name] = {**dict(summary), "seeds": len(provided)}
     return seeds, summaries
+
+
+def _case_mosaic(case):
+    """The exact-mosaic keywords a case's line spectrum is scored with."""
+    kw = {
+        "mosaic_fwhm_rad": case.get("mosaic_mc_fwhm_rad"),
+        "mosaic_nodes": case.get("mosaic_mc_nodes", 1),
+    }
+    if case.get("mosaic_mc_sampling") == "history":
+        kw.update(mosaic_sampling="history", mosaic_seed=int(case["seed"]))
+    return kw

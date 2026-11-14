@@ -22,6 +22,16 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Anchor:** `checks/mosaic_mc_check.py`; `tests/montecarlo/spectrum/test_mosaic_mc.py`
 - **Notes:** broadens PXR+CBS; no grazing divergence; [validation write-up](materials/mosaic-mc.md)
 
+## `mosaic-mc-sampled`
+
+- **Claim:** per-history sampled crystallite orientations are an unbiased estimator of the `mosaic-mc` incoherent orientation average: history `e` holds `K` tilts `σ Φ⁻¹((p_k + s_e) mod 1)` (rank-1 lattice `p_k`, counter shift `s_e`, `σ = η/2.3548`) for all its rows and reflections, each weighted `1/K`
+- **Code:** `montecarlo/spectrum/cxr/_mosaic_sampled.py`; `montecarlo/spectrum/cxr/_per_hkl.py::_accumulate_sampled_mosaic`; `montecarlo/spectrum/cxr/_setup.py::_refuse_mosaic_sampling`; `montecarlo/spectrum/reflection_rows.py::reflection_rows`
+- **Source:** `docs/physics/materials/crystal-mosaicity.md` (sampled crystallites)
+- **Status:** filtered
+- **Checks:** per-axis tilt mean/σ/correlation; draws a pure function of `(seed, elec_id)` (subset, order, block invariant); vector Rodrigues and polarization pairs equal the scalar forms to 1e-15; η→0 bit-identical to the perfect crystal; yield, centroid and RMS width of 16 mosaic seeds equal converged GH N=33 within 5 standard errors (thin HOPG, 3.5°, 30° miscut); substepped flights keep their history crystallite in the grouped reduction
+- **Anchor:** `tests/montecarlo/spectrum/test_mosaic_sampled.py`
+- **Notes:** granularity is per history (crystallite larger than the electron track; user decision on #1185); incoherent only — the coherent route refuses it; draws live in the `SeedSequence(seed).spawn(8)[7]` child, so transport is untouched
+
 ## `multilayer-stack`
 
 - **Claim:** film-on-substrate transport + absorption

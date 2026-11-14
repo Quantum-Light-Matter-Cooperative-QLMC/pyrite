@@ -454,8 +454,12 @@ class Sweep:
     #       and the mosaic yield change); the analytic term is then suppressed so the
     #       broadening is not double-counted. Costs mosaic_nodes**2 x the line hot loop
     #       (serial under CuPy). See docs/physics/materials/crystal-mosaicity.md.
+    #   "mc-sampled"          -> the same exact average estimated with mosaic_nodes
+    #       crystallite tilts drawn per electron history (cost mosaic_nodes x;
+    #       incoherent emission only; #1185).
     mosaic_route: str = "analytic"
-    mosaic_nodes: int = 5  # Gauss-Hermite nodes/tilt-axis for mosaic_route="mc" (K=nodes^2)
+    # Gauss-Hermite nodes/tilt-axis for "mc" (K=nodes^2); draws per history for "mc-sampled"
+    mosaic_nodes: int = 5
     # Per-call automatic line-grid policy (issue #101). The TOP of the precedence
     # chain together with an explicit ``EnergyBins.cxr``: supplying one here
     # outranks ``PYRITE_ENERGY_GRID_*`` and any stored catalog row. Accepts
@@ -907,11 +911,24 @@ def _mosaic_case_keys(sweep: Sweep, cp: dict) -> tuple[float | None, float | Non
             else CATALOG.crystal(cp["crystal"]).mosaic_fwhm_deg
         )
     mosaic_fwhm_rad = float(np.deg2rad(mosaic_deg)) if mosaic_deg else None
-    if sweep.mosaic_route not in ("analytic", "mc"):
-        raise ValueError(f"mosaic_route must be 'analytic' or 'mc', got {sweep.mosaic_route!r}")
-    if mosaic_fwhm_rad is not None and sweep.mosaic_route == "mc":
+    if sweep.mosaic_route not in ("analytic", "mc", "mc-sampled"):
+        raise ValueError(
+            f"mosaic_route must be 'analytic', 'mc' or 'mc-sampled', got {sweep.mosaic_route!r}"
+        )
+    if mosaic_fwhm_rad is not None and sweep.mosaic_route in ("mc", "mc-sampled"):
         return None, mosaic_fwhm_rad
     return mosaic_fwhm_rad, None
+
+
+def _mosaic_sampling_keys(sweep: Sweep, mosaic_mc_rad: float | None) -> dict[str, str]:
+    """``mosaic_mc_sampling`` for the per-history sampled exact route (#1185).
+
+    Absent for the Gauss-Hermite route, so its case keys and identity are
+    unchanged. Validation: mosaic-mc-sampled
+    """
+    if mosaic_mc_rad is not None and sweep.mosaic_route == "mc-sampled":
+        return {"mosaic_mc_sampling": "history"}
+    return {}
 
 
 def _history_counts(grid: Any, fallback: Any, label: str) -> list[int]:
@@ -1181,6 +1198,7 @@ def build_cases(
                         mosaic_fwhm_rad=mosaic_analytic_rad,  # analytic term (None if route="mc")
                         mosaic_mc_fwhm_rad=mosaic_mc_rad,  # exact MC route (None if route="analytic")
                         mosaic_mc_nodes=sweep.mosaic_nodes,
+                        **_mosaic_sampling_keys(sweep, mosaic_mc_rad),
                         brem_file=None,
                         Ne=ne_line,
                         Ne_brem=ne_brem,

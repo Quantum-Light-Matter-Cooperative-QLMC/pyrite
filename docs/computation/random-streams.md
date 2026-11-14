@@ -58,6 +58,11 @@ Inside a beam or bunch child, draws are counter-addressed per electron (`child_s
 * - `spawn(6)[5]`
   - Relative energy spread
   - Per-electron energy deviation: counter draw 0
+* - `spawn(8)[7]`
+  - Mosaic crystallite orientation (`mosaic_route="mc-sampled"`)
+  - Per-history Cranley–Patterson shift of the tilt lattice: counter draws
+    0 (x) and 1 (y), keyed by `elec_id`; scoring-only, never read by
+    transport
 ```
 
 The main free-path and scattering-angle draws use the run generator directly and are never spawned from, which is what makes the children disjoint from transport rather than merely different.

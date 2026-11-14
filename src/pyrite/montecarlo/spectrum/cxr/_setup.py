@@ -16,7 +16,7 @@ import numpy as np
 from ...._backend import REAL, BackendResourceError, _to_cpu, xp
 from ....materials.attenuation import _normalize_composition
 from ....materials.crystal import CRYSTALS, HBARC_EV_ANG, refractive_index
-from ...geometry import _mosaic_quadrature, _orientation_R
+from ...geometry import _orientation_R
 from ...transport import C_ANG_PER_FS, beta_from_keV
 from ..coherent_population import pair_scale
 from ..coherent_transverse import require_footprint_support, transverse_spot
@@ -34,6 +34,7 @@ from ._kernels import (
     _validate_groove_escape_direction,
 )
 from ._line_tables import line_table_bytes
+from ._mosaic_sampled import mosaic_orientations
 from ._temporal import segment_arrival_times
 
 # Generation marker for the line route's photon-escape model, hashed into the
@@ -95,6 +96,8 @@ class SpectrumRequest:
     layers: Any = None
     mosaic_fwhm_rad: Any = None
     mosaic_nodes: Any = 1
+    mosaic_sampling: Any = "quadrature"
+    mosaic_seed: Any = None
     surface_hkl: Any = None
     groove: Any = None
     coherent: Any = False
@@ -202,6 +205,10 @@ class _SpectrumSetup:
     capture_mosaic_weight: float = 1.0
     # Nonincreasing transverse bound sup F_perp for the row, or None.
     capture_transverse_envelope: Any = None
+    # ``mosaic_sampling="history"`` only: per-history crystallite tilts
+    # (``_mosaic_sampled.SampledMosaic``); ``mosaic_quad`` is then None.
+    # Validation: mosaic-mc-sampled
+    mosaic_sampled: Any = None
 
 
 def _admit_line_tables(n_hkl, n_tab):
@@ -365,6 +372,7 @@ def _refuse_incompatible_request(request):
             "coherent sum runs within one electron_id, which would make a whole "
             "shower one emitter (see shell-soft-hard-transport.md)"
         )
+    _refuse_mosaic_sampling(request)
     if request.coherent and request.layers is not None:
         raise NotImplementedError(
             "the in-medium dispersion does not cover the coherent path through "
@@ -373,6 +381,28 @@ def _refuse_incompatible_request(request):
             "partner of _stack_tau's per-layer mu -- which is not modelled. "
             "Single-slab absorbers (with or without a groove or a finite "
             "footprint) are supported."
+        )
+
+
+def _refuse_mosaic_sampling(request):
+    """Validate the mosaic orientation rule before setup.
+
+    ``"history"`` draws one crystallite per electron history; a phase-coherent
+    sum across histories would interfere different crystallites' fields, so
+    the coherent route refuses it. Validation: mosaic-mc-sampled
+    """
+    sampling = request.mosaic_sampling
+    if sampling not in ("quadrature", "history"):
+        raise ValueError(f"mosaic_sampling must be 'quadrature' or 'history', got {sampling!r}")
+    if sampling != "history" or not request.mosaic_fwhm_rad:
+        return
+    if request.mosaic_seed is None:
+        raise ValueError("mosaic_sampling='history' needs mosaic_seed (the run seed)")
+    if request.coherent:
+        raise NotImplementedError(
+            "mosaic_sampling='history' is incoherent-only: a coherent sum across "
+            "histories would interfere fields of different crystallites. Use the "
+            "Gauss-Hermite quadrature (mosaic_sampling='quadrature') for coherent runs."
         )
 
 
@@ -648,8 +678,6 @@ def _prepare_spectrum(request):
     azimuth_rad = request.azimuth_rad
     recip_miscut_rad = request.recip_miscut_rad
     layers = request.layers
-    mosaic_fwhm_rad = request.mosaic_fwhm_rad
-    mosaic_nodes = request.mosaic_nodes
     surface_hkl = request.surface_hkl
     groove = request.groove
     coherent = request.coherent
@@ -903,7 +931,9 @@ def _prepare_spectrum(request):
     # today's single-orientation result bit-for-bit). Otherwise a list of
     # (rotation, weight) tilting g across the Gaussian mosaic cone, summed
     # incoherently below (docs/physics/materials/crystal-mosaicity.md route 2).
-    mosaic_quad = _mosaic_quadrature(mosaic_fwhm_rad, mosaic_nodes)
+    # Or, under ``mosaic_sampling="history"``, one crystallite per history:
+    # K = mosaic_nodes draws, weight 1/K each. Validation: mosaic-mc-sampled
+    mosaic_quad, mosaic_sampled = mosaic_orientations(request, _to_cpu(seg_elec_id))
 
     # Finite transverse dimensions make the escape distance a nearest-face
     # query rather than the plain slab path. It is g-independent either way,
@@ -978,6 +1008,7 @@ def _prepare_spectrum(request):
         log_mu_tab_g=log_mu_tab_g,
         delta_tab_g=delta_tab_g,
         mosaic_quad=mosaic_quad,
+        mosaic_sampled=mosaic_sampled,
         finite_footprint=finite_footprint,
         cdtype=cdtype,
         omega_grid=omega_grid,

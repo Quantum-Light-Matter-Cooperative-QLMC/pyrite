@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
     from ._numerics_groups import ExecutionConfig, RadiationNumerics, TransportNumerics
 
-MosaicRoute = Literal["analytic", "mc"]
+MosaicRoute = Literal["analytic", "mc", "mc-sampled"]
 EmissionMode = Literal["incoherent", "coherent"]
 EmissionSelection = (
     EmissionMode
@@ -157,9 +157,13 @@ class CxrReflections:
     max_reflections
         Optional cap on individual reflections after family expansion.
     mosaic_nodes
-        Number of quadrature nodes used for mosaic averaging.
+        Number of quadrature nodes per tilt axis used for mosaic averaging
+        (``nodes**2`` orientations); under ``"mc-sampled"``, the number of
+        crystallite tilts drawn per electron history.
     mosaic_route
-        Mosaic integration strategy, ``"analytic"`` or ``"mc"``.
+        Mosaic integration strategy: ``"analytic"`` detector broadening,
+        ``"mc"`` Gauss-Hermite orientation quadrature, or ``"mc-sampled"``
+        per-history sampled crystallites (incoherent emission only).
     """
 
     n_families: int = 4
@@ -176,8 +180,8 @@ class CxrReflections:
             raise ValueError("max_reflections must be a positive integer or None")
         if type(self.mosaic_nodes) is not int or self.mosaic_nodes <= 0:
             raise ValueError("mosaic_nodes must be a positive integer")
-        if self.mosaic_route not in {"analytic", "mc"}:
-            raise ValueError("mosaic_route must be 'analytic' or 'mc'")
+        if self.mosaic_route not in {"analytic", "mc", "mc-sampled"}:
+            raise ValueError("mosaic_route must be 'analytic', 'mc' or 'mc-sampled'")
 
 
 #: Keyword-only ``Physics`` energy quantities and their numeric eV fields.

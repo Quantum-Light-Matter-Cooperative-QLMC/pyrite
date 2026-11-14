@@ -60,11 +60,28 @@ The **moments converge fast.** Integrated yield, mean energy and the second-mome
 
 The **detailed lineshape converges slowly when the mosaic spread ≫ the unbroadened source-line width.** Each node contributes a shifted copy of the narrow base line; for HOPG (00l) the energy shift is essentially 1-D in the in-plane tilt, so a handful of nodes gives a handful of discrete copies and the summed line is *lumpy* until the node spacing in energy drops below the unbroadened core width. A smooth broad lineshape needs `mosaic_nodes` scaling with (mosaic width / unbroadened source width): HOPG ZYH (3.5°) on a thin film needs ~30–40 nodes/axis for a smooth core; ZYA/ZYB (0.4/0.8°) are smooth by ~9–13. Cost is K = `mosaic_nodes²` evaluations of the line hot loop, **serial under CuPy**, so the broad-lineshape regime is genuinely expensive. The `CxrReflections` default (`mosaic_nodes=5`) targets converged moments; raise it for a publication-quality broad lineshape.
 
+### Sampled crystallites (`mosaic_route="mc-sampled"`)
+
+The sampled route estimates the same incoherent average without the node set (#1185). Each electron **history** is one crystallite: it gets `K = mosaic_nodes` tilts drawn from the mosaic Gaussian, and every row of that history and every reflection is scored at each tilt with weight `1/K` (one crystallite rotates every **g**). Because the observable is linear in the single-orientation spectrum,
+
+$$
+\mathbb{E}\Big[\tfrac1K \textstyle\sum_k S(E;\,\mathbf t_{e,k})\Big] = \int S(E;\mathbf t)\,p_\eta(\mathbf t)\,d^2\mathbf t ,
+$$
+
+so the estimator is unbiased for the `mosaic-mc` average. The tilts are continuous, so the replica bias disappears. The error is statistical and falls with the number of histories, and the cost is `K` rather than `nodes²` evaluations of the line loop.
+
+- **Draws.** Draw `k` of history `e` is `σ Φ⁻¹((p_k + s_e) mod 1)` per axis. `p_k` is a `K`-point rank-1 (Fibonacci-type) lattice, and `s_e` is a per-history Cranley–Patterson shift. Each draw is an exact Gaussian sample, and the lattice stratifies a history's `K` draws. `K = 1` is plain Monte Carlo.
+- **RNG.** The shift is counter draws 0 and 1 in the `SeedSequence(seed).spawn(8)[7]` child ([random streams](../../computation/random-streams.md)), keyed by `elec_id`. It never touches transport. It depends only on `(seed, elec_id)`, never on chunking, electron blocks or backend. The tilts are formed on the host in float64 and gathered per row on the device.
+- **Granularity.** Per history means a crystallite larger than the electron track, which was the decision recorded on #1185. All granularities share the same mean; only the error bars and the seed-level correlations differ.
+- **Scope.** The sampled route covers incoherent emission, including the flight-grouped reduction (a flight's substeps share their history's crystallite). The coherent route refuses it, because a phase-coherent sum across histories would interfere different crystallites. `η → 0` returns the perfect crystal bit-for-bit. Line-grid window seeds use the same per-history tilts.
+- **Validation.** Ledger row `mosaic-mc-sampled`; tests in `tests/montecarlo/spectrum/test_mosaic_sampled.py`.
+
 ### Where it lives
 
 - `montecarlo._mosaic_quadrature(fwhm_rad, nodes)` / `_small_tilt_R(dx, dy)` — the quadrature and the tilt rotation.
 - `montecarlo.mc_cxr_spectrum(..., mosaic_fwhm_rad, mosaic_nodes)` — the orientation loop.
-- `montecarlo.run_case` / `_spectrum_case` — read `case["mosaic_mc_fwhm_rad"]` / `case["mosaic_mc_nodes"]`.
+- `montecarlo.run_case` / `_spectrum_case` — read `case["mosaic_mc_fwhm_rad"]` / `case["mosaic_mc_nodes"]`, and `case["mosaic_mc_sampling"] == "history"` for the sampled route.
+- `montecarlo/spectrum/cxr/_mosaic_sampled.py` — the per-history tilts (`mc_cxr_spectrum(..., mosaic_sampling="history", mosaic_seed=seed)`).
 - `Scene(target=Slab(…, mosaic=True), …)` with `Numerics(cxr_reflections=CxrReflections(mosaic_route="mc", mosaic_nodes=…))` sets the `mosaic_mc_*` case keys **and turns the analyti `store_result` term off** — the two routes are mutually exclusive (applying both double-counts the broadening).
 - Checks: `checks/mosaic_mc_check.py`; synthetic unit tests (quadrature + wiring): `tests/montecarlo/spectrum/test_mosaic_mc.py`.
 

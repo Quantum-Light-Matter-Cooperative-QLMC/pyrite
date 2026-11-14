@@ -45,7 +45,14 @@ def _referenced_phases(st, idx, sel, starts, flight, recoil_phase, g_vec_d, L_es
     rows = idx[sel]
     d = minus_first(d64[rows] + recoil_phase[0][sel].astype(f64))
     dr = minus_first(r64[rows])
-    g_phase = dr @ g_vec_d.astype(f64) + minus_first(recoil_phase[1][sel].astype(f64))
+    if g_vec_d.ndim == 2:
+        # Per-history crystallite (``g_vec_d`` aligned with ``idx``): every row
+        # of one flight shares its history's g, so the flight-common phase
+        # still cancels. Validation: mosaic-mc-sampled
+        g_dot_dr = (dr * g_vec_d[sel].astype(f64)).sum(axis=1)
+    else:
+        g_dot_dr = dr @ g_vec_d.astype(f64)
+    g_phase = g_dot_dr + minus_first(recoil_phase[1][sel].astype(f64))
     return d, g_phase, minus_first(L_esc[sel].astype(f64))
 
 
@@ -54,7 +61,8 @@ def accumulate_flight_grouped(st, idx, sel, coefs, cxr_rows, L_esc, recoil_phase
 
     ``idx`` are the reflection's kept rows, ``sel`` the finite ones within
     them; ``coefs``, ``cxr_rows``, ``L_esc`` and ``recoil_phase`` are indexed
-    like ``idx``. Validation: coherent-formation-absorption
+    like ``idx``; so is ``g_vec_d`` when it is per row ``(n, 3)`` (sampled
+    mosaic). Validation: coherent-formation-absorption
     """
     perm, starts, bounds, flight = _flight_layout(st.gid_all[idx[sel]])
     sel = sel[perm]

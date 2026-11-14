@@ -23,7 +23,7 @@ _RADIATIVE_MODEL_VALUES = ("auto", "uncoupled", "bremslib-soft-hard")
 _PAIR_PRODUCTION_MODEL_VALUES = ("penelope-2024",)
 _ATOMIC_ELECTRON_DEFLECTION_VALUES = ("kawrakow", "none")
 _SHELL_IONIZATION_MODEL_VALUES = ("eedl", "bote-salvat")
-_MOSAIC_ROUTE_VALUES = ("analytic", "mc")
+_MOSAIC_ROUTE_VALUES = ("analytic", "mc", "mc-sampled")
 
 #: Option spelling -> catalog/API field name.
 FIELD_NAMES = {

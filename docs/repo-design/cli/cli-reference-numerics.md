@@ -72,7 +72,8 @@ Options:
   --maximum-reflections N         Cap resolved reflections after family expansion.
                                   [x>=1]
   --mosaic-nodes N                Gauss-Hermite nodes per mosaic tilt axis.  [x>=1]
-  --mosaic-route [analytic|mc]    Mosaic broadening route.
+  --mosaic-route [analytic|mc|mc-sampled]
+                                  Mosaic broadening route.
   --energy-model [frozen|midpoint]
                                   Transport clock model.
   --maximum-fractional-energy-loss FRACTION
@@ -185,7 +186,8 @@ Options:
   --maximum-reflections N         Cap resolved reflections after family expansion.
                                   [x>=1]
   --mosaic-nodes N                Gauss-Hermite nodes per mosaic tilt axis.  [x>=1]
-  --mosaic-route [analytic|mc]    Mosaic broadening route.
+  --mosaic-route [analytic|mc|mc-sampled]
+                                  Mosaic broadening route.
   --energy-model [frozen|midpoint]
                                   Transport clock model.
   --maximum-fractional-energy-loss FRACTION

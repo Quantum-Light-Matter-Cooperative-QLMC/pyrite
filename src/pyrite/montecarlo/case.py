@@ -125,6 +125,7 @@ _CASE_KEY_ORDER = (
     "mosaic_fwhm_rad",
     "mosaic_mc_fwhm_rad",
     "mosaic_mc_nodes",
+    "mosaic_mc_sampling",
     "abs_layers",
     "layer_radiators",
     "brem_file",
@@ -185,6 +186,11 @@ class Case(Mapping[str, Any]):
         Optional direct-axis or reciprocal-surface orientation.
     mosaic_fwhm_rad, mosaic_mc_fwhm_rad, mosaic_mc_nodes
         Analytic and quadrature mosaic controls.
+    mosaic_mc_sampling
+        Opt-in ``"history"``: the exact mosaic route draws ``mosaic_mc_nodes``
+        crystallite tilts per electron history instead of the Gauss-Hermite
+        rule (#1185); absent is the quadrature. Incoherent only.
+        Validation: mosaic-mc-sampled
     abs_layers, layer_radiators
         Optional film-first absorber and coherent-radiator payloads.
     brem_file
@@ -334,6 +340,8 @@ class Case(Mapping[str, Any]):
     # Its own key rather than only a policy field, so a recompute that pins
     # explicit coordinates and drops the policy keeps the quadrature it used.
     line_quadrature: Literal["bin-mean"] | _Absent = _ABSENT
+    # Exact-mosaic orientation rule (#1185): absent is Gauss-Hermite.
+    mosaic_mc_sampling: Literal["history"] | _Absent = _ABSENT
     groove_spacing_ang: float | _Absent = _ABSENT
     coherent_emission: Literal[True] | _Absent = _ABSENT
     temporal_profile: Literal[True] | _Absent = _ABSENT
@@ -511,6 +519,7 @@ class Case(Mapping[str, Any]):
             _positive(
                 "coherent_flat_omission_limit", self.coherent_flat_omission_limit, allow_zero=True
             )
+        self._validate_mosaic_sampling()
         if self.line_quadrature is not _ABSENT:
             if self.line_quadrature != "bin-mean":
                 raise ValueError("line_quadrature must be absent or 'bin-mean'")
@@ -525,6 +534,23 @@ class Case(Mapping[str, Any]):
                     "line_quadrature='bin-mean' is incompatible with max_dE_frac: "
                     "numerical substeps add amplitudes before squaring"
                 )
+
+    def _validate_mosaic_sampling(self) -> None:
+        """Per-history crystallites need the exact route and incoherent emission.
+
+        Validation: mosaic-mc-sampled
+        """
+        if self.mosaic_mc_sampling is _ABSENT:
+            return
+        if self.mosaic_mc_sampling != "history":
+            raise ValueError("mosaic_mc_sampling must be absent or 'history'")
+        if not self.mosaic_mc_fwhm_rad:
+            raise ValueError("mosaic_mc_sampling='history' needs mosaic_mc_fwhm_rad")
+        if self.coherent_emission is not _ABSENT:
+            raise ValueError(
+                "mosaic_mc_sampling='history' is incoherent-only: a coherent sum "
+                "across histories would interfere different crystallites' fields"
+            )
 
     def _validate_photon_transport(self) -> None:
         """Validate only enabled photon records, preserving legacy omissions."""
