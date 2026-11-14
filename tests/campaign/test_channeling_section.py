@@ -198,14 +198,14 @@ def test_channeling_demo_and_off_profile_identities_are_unchanged():
     sweep, settings, cases = _profile_cases("silicon", "channeling_demo")
     assert cases[0].line_quadrature == "bin-mean"
     assert [profiles.case_content_key(case) for case in cases] == [
-        "124c6e940f70c1849308cfdfb2ad675f035b86521efd5726d73b472d2c6c6780"
+        "ad6f730d7a62cef580be4d107f12e7133be73b86dae80d7b27c9a775926b0a80"
     ]
     assert profiles.named_profile_stem("silicon", catalog_profile="channeling_demo") == (
-        "silicon@channeling_demo-bb3b5dfde6d3"
+        "silicon@channeling_demo-aa77bf915438"
     )
     identity = profiles.dataset_identity("silicon", settings, sweep)
     assert identity["parameter_sha256"] == (
-        "d18cddb08c332d94021aba73841eb89e7a64c83169bc7952ca3b95348e7b6344"
+        "f2e052460462a4d8867f5bfea3db770dfcfe0302f95bfa4f07b9d1efa823ac72"
     )
     sweep = material_sweep("hopg", catalog_profile="standard")
     settings = profiles.profile_run_settings(default_settings(), "standard", sweep=sweep)

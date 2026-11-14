@@ -174,6 +174,7 @@ def load_crystals(catalog=None):
             "V_cell": spec.V_cell,
             "mosaic_fwhm_deg": spec.mosaic_fwhm_deg,
             "bonding_dF": _bonding_table(spec),
+            "bonding_source": _bonding_source(spec),
         }
         for key, spec in catalog.crystals.items()
     }
@@ -195,6 +196,21 @@ def _bonding_table(spec):
     return MappingProxyType(dict(table))
 
 
+def _bonding_source(spec):
+    """Canonical JSON of a crystal's measured structure-factor record, or ``None``.
+
+    Built from the catalog's decimal inputs only, so identity digests are
+    bit-stable across platforms; derived floats (``exp``/``sin``) are not.
+    """
+    import dataclasses
+    import json
+
+    record = getattr(spec, "measured_structure_factors", None)
+    if record is None:
+        return None
+    return json.dumps(dataclasses.asdict(record), sort_keys=True, default=list)
+
+
 #: Generation of the measured low-order structure-factor model (#1177). It joins
 #: dataset and case identities only when a referenced crystal carries measured
 #: structure factors, so every other material keeps its historical digest.
@@ -206,8 +222,10 @@ def structure_factor_marker(crystals):
 
     ``None`` when no listed crystal carries measured structure factors;
     otherwise :data:`STRUCTURE_FACTOR_MODEL` plus a digest of every such
-    crystal's static correction table, so a data or convention change re-keys
-    checkpoints.
+    crystal's catalog record (measured values, source ``B``, origin,
+    convention), so a data change re-keys checkpoints. Derivation changes bump
+    :data:`STRUCTURE_FACTOR_MODEL`. The record, not the derived floats, is
+    hashed so the digest is identical on every platform.
 
     Validation: bonding-charge-structure-factors
     """
@@ -216,11 +234,9 @@ def structure_factor_marker(crystals):
 
     payload = {}
     for key in sorted({str(c) for c in crystals if c is not None}):
-        table = CRYSTALS.get(key, {}).get("bonding_dF")
-        if table:
-            payload[key] = [
-                [*hkl, repr(float(v.real)), repr(float(v.imag))] for hkl, v in sorted(table.items())
-            ]
+        source = CRYSTALS.get(key, {}).get("bonding_source")
+        if source:
+            payload[key] = source
     if not payload:
         return None
     digest = hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()[:16]

@@ -213,6 +213,16 @@ def test_identity_marker_only_for_crystals_with_measured_data():
     assert structure_factor_marker(["diamond", "silicon"]) not in (None, marker)
 
 
+def test_identity_marker_is_platform_stable():
+    """The digest hashes catalog decimals, never derived ``exp``/``sin`` floats.
+
+    Hashing the derived correction table gave different case keys on CI and
+    locally (last-bit libm differences); this pin catches that regression.
+    """
+    assert structure_factor_marker(["silicon"]) == "measured-low-order-v1/dd35857a0a72b4d8"
+    assert structure_factor_marker(["diamond"]) == "measured-low-order-v1/f5c2bd7cb62cd347"
+
+
 def _raw(**overrides):
     raw = {
         "validation_id": "bonding-charge-structure-factors",

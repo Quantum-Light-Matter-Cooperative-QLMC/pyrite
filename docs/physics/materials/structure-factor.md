@@ -66,7 +66,7 @@ The same $\Delta F$ enters the Mott–Bethe potentials as $Z - f_0 \to Z - f_0 -
 | Si | Cummings & Hart (1988) Pendellösung set; $F(222)$ from Alkire, Yelon & Schneider (1982); tabulated by Lu, Zunger & Deutsch (1993), Table III | $F(111)$ +1.8%; $\lvert F_{\rm cell}(222)\rvert$ = 1.456 e; $U_{111}$, $U_{222}$ match CBED (Zuo 1999) to 0.1% and 2% |
 | diamond | Takama et al. (1990) Pendellösung; $F(222)$ from Weiss & Middleton; LZD Table V | $F(111)$ +8%; (111) planar well 6.5% shallower; Klein et al. (1985) bonding-corrected (111) channeling lines reproduced |
 
-Identity: the crystal-conditional `structure_factor_model` marker joins dataset and case digests only for crystals that carry the table. Validation: `bonding-charge-structure-factors`.
+Identity: the crystal-conditional `structure_factor_model` marker joins dataset and case digests only for crystals that carry the table. It hashes the catalog record (measured values, source `B`, origin, convention), not the derived floats, so digests are identical on every platform; derivation changes bump the marker version. Validation: `bonding-charge-structure-factors`.
 
 ## What the structure factor feeds
 
