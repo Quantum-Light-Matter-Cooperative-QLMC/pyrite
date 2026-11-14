@@ -208,3 +208,35 @@ Scratch scripts `scratch/axial_flux_check.py` and `scratch/axial_kernel_check.py
 | Notation | minor | The ledger quotes "L2,3"; the code keys `14:L2` and `14:L3` separately, which have equal values here. |
 
 Recommend ledger status **rederived** for the axial extension within the stated model. Suggested wording: replace "(the summed weighted path is identical)" with "(the summed depth-weighted path equals the per-history sum exactly in continuous depth; on the recorded depth grid to the piecewise-linear quadrature, and with per-history direction cosines in expectation)".
+
+## Real-space reference anchor (2026-11-13)
+
+Fresh-context verifier. The reference was built from the ledger Claim/Assumptions fields and recorded before `flux_weights.py` was read. It is evaluated in position $x$ across the (110) cell, not from Fourier harmonics. Test: `tests/montecarlo/channeling/test_channeling_flux_weight_reference.py` (slow, about 6 s).
+
+**Inputs owned by other claims.** These are the admitted `channeling_demo` zone solve (Si(1-10), 17 MeV, $H=16$, $L=2.0027$ µm), its retained $\rho(x;z)$ on the 128-point cell grid, the plane period $d=1.9201$ Å with one plane per period at $x=0$, Debye–Waller $B_{\rm Si}=0.4817$ Å$^2$, the catalog PENELOPE oscillators with their zeroth GOS moments at $E_0$, and the Waasmaier–Kirfel $f_0$ coefficients of Si.
+
+**Real-space kernels.** Write $e^{-Bs_G^2}=e^{-u^2G^2/2}$ with $u^2=B/8\pi^2$. Also write $e^{-G^2/2q^2}$ as a normalized 1D Gaussian of variance $1/q^2$. Then every localized term is a periodized Gaussian of variance $u^2+1/q_\perp^2$, averaged over the process's transfer weights and convolved with the projected source density:
+
+$$
+K_c(x)=\sum_j\int d\mu_c(q_\perp)\,\bigl[P_c\ast\mathcal N(0,u^2+q_\perp^{-2})\bigr](x-jd)\;+\;\frac{\sigma_{t,c}}{d}.
+$$
+
+- **Shells.** $P_s(y)=\zeta\,\Gamma(N+2,2\zeta\lvert y\rvert)/[(N+2)\Gamma(N+2)]$ is the 1D projection of the normalized Slater density $r^Ne^{-2\zeta r}$, with $N=2n-2$ and $\zeta=\sqrt{2U_s/E_h}/a_0$. The distant-longitudinal weight is $dQ/[Q(Q+2mc^2)]$ on $[Q_-,U_s]$, with $(\hbar cq_\perp)^2=Q(Q+2mc^2)-(cp_0-cp_1)^2$ at $W_s$. The close weight is Møller $W^{-2}F^{(-)}(E_0+U_s,W)$ on $[U_s,(E_0+U_s)/2]$, with free-target $Q=W$ and $q_\perp$ the same way. Their strengths come from the zeroth moments. The distant-transverse moment is the uniform term.
+- **Brem.** The nuclear term is $Z^2$ times a thermal point source. The electron term is $\sum_i a_i\,\mathcal N(0,b_i/8\pi^2)+c\,\delta$, the real-space form of $f_0(s)=\sum_ia_ie^{-b_is^2}+c$. Each term is averaged over its normalized $[1-F/Z]^2\,dq/q$ or $[1-(F/Z)^2]\,dq/q$ transfer on $(0,mc/\hbar]$.
+- $F_c(z)=\langle\rho K_c\rangle/(\langle\rho\rangle\langle K_c\rangle)$ uses the periodic rectangle rule on the 128 cell points. $W_c$ uses the trapezoid in $z$, which is the exact integral of the piecewise-linear samples.
+
+**Quadrature convergence.** The reference uses Gauss–Legendre in $\ln q$ or $\ln W$ with $n_q=128$–$800$ nodes, a periodic convolution grid of 4096–16384 points, Gaussian image sums to $12\sigma$, and uniform periodization for $\sigma>3d$. All $W$ agree to better than $10^{-8}$. Halving the cell grid to 64 points leaves $W_{\rm brem}$ unchanged to $10^{-16}$. The retained density is therefore band-limited, and the harmonic truncation at $2H$ is exact.
+
+| Key | Reference $W$ | Production $W$ | Relative difference |
+| --- | --- | --- | --- |
+| brem | 1.3406491 | 1.3406469 | $-1.7\times10^{-6}$ |
+| 14:K | 1.1755646 | 1.1755641 | $-4\times10^{-7}$ |
+| 14:L1 | 1.0569468 | 1.0569468 | $<10^{-7}$ |
+| 14:L2 | 1.0417790 | 1.0417790 | $<10^{-7}$ |
+| 14:L3 | 1.0417962 | 1.0417961 | $-1\times10^{-7}$ |
+
+**Tolerance.** The test uses $10^{-5}$ relative. The reference quadrature contributes $<10^{-8}$. Production-side effects of order $2\times10^{-6}$ cover the residual brem difference of $-1.7\times10^{-6}$. These are its panel quadrature, its lower transfer limit $q=10^{-3}$ Å$^{-1}$ instead of $\delta\to0$ ($+1.9\times10^{-6}$ when applied to the reference), and $f_0(0)=Z$ (below). The reference values are also pinned to $\pm10^{-6}$ absolute.
+
+**Adjudicated convention.** The first reference pass took the catalog $f_0$ literally. It extrapolated the Waasmaier–Kirfel fit past $s=6$ Å$^{-1}$, where the fit tends to $c=0.145$ rather than 0, and gave $W_{\rm brem}=1.3403964$, $1.9\times10^{-4}$ below production. Shells agreed to $5\times10^{-7}$ in that pass. Inspection showed that production zeroes $f_0$ beyond the fit range in the brem transfer weights only (`_screened_transform`; `F0_S_MAX_INV_ANG`). The kernel-harmonic $f_0(G)$ is not cut. With that convention, the reference agrees as tabulated. Zeroing is the better physical limit because $F\to0$ at large $q$. The ledger does not state this convention, so recording it in Assumptions is recommended. The test pins the $-1.9\times10^{-4}$ effect so that the tolerance demonstrably resolves it. A second, smaller convention is that production sets $f_0(0)=Z=14$, while the fit sums to 13.9989. A uniform correction for this changes $W_{\rm brem}$ by $-1.3\times10^{-6}$, inside tolerance.
+
+**Scope.** This anchors production against an independent evaluation of the *stated localization model* at one admitted zone. It does not test the model against measurement, the diagonal approximation, or retained-density accuracy.
