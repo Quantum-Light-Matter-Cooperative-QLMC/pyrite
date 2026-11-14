@@ -361,7 +361,10 @@ def _join_overlapping_pairs(
                 else:
                     candidate = list(nodes)
                 following = 2.0 * feature - candidate[-1]
-                if candidate[-1] < feature - tolerance and following > feature + tolerance:
+                # The new interval is 2 (feature - candidate[-1]); both it and
+                # the one before must exceed the merge tolerance.
+                half = 0.5 * tolerance
+                if candidate[-1] < feature - half and following > feature + half:
                     nodes, members = [*candidate, following], [*members, index]
                     continue
         joined += flush()

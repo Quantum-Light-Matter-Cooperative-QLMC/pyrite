@@ -496,3 +496,21 @@ def test_every_catalog_material_keeps_every_feature_on_a_bin_boundary():
         if failed:
             failures[f"{key}: {film}/{','.join(stack)}"] = failed
     assert failures == {}
+
+
+def test_close_centred_pairs_chain_down_to_the_merge_tolerance():
+    """Features 0.3 spacing apart (tolerance 0.25) are chained, not left split.
+
+    Fresh-context verification of #1171 found the chain test demanded intervals
+    above twice the tolerance, leaving such pairs split with both edges off a
+    bin boundary.
+    """
+    from pyrite.energy_grid.refine import refine_continuum_nodes
+
+    baseline = np.linspace(80.0, 120.0, 9)
+    first = _mark("E1", 99.5, 100.5, 1.0)
+    second = _mark("E2", 99.8, 100.8, 1.0)
+    nodes, summary = refine_continuum_nodes(baseline, [first, second])
+    assert _anchor_failures(nodes, [first, second]) == []
+    assert summary["split_anchor_pairs"] == []
+    assert np.min(np.diff(nodes)) > 0.25

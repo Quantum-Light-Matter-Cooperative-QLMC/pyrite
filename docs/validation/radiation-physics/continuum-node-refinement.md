@@ -199,3 +199,148 @@ bits: HOPG has 2772 nodes and tungsten 2406 at 30 keV.
 `rederived`. The policy, anchors, limiting case, and deterministic construction
 match the derivation. The ledger text needs the documentation corrections in
 findings 1–3.
+
+## Addendum: cross-mark anchor merge (#1171, 2026-11-13)
+
+Fresh-context verification of commit `c4fcd8347`
+(`_continuum_grid.py::refine_continuum_nodes`, `_join_overlapping_pairs`,
+`_split_mark_nodes`, `_strictly_inside_pairs`; `RefinementMark.centred`). The
+derivation below was written from the ledger row and the semantics page before
+the new function bodies were read.
+
+### What an anchor must deliver
+
+Bin edges are node midpoints ({eq}`eq-grid-midpoint-edges` on the semantics
+page). The first-order term of the previous section vanishes for a jump at
+$E$ exactly when some adjacent pair $x_k<x_{k+1}$ satisfies
+
+$$
+x_k+x_{k+1}=2E .
+$$
+
+For an EPDL edge and the kinematic endpoint the jump is exact at $E$, so this
+condition is the whole requirement; the coordinates $E\mp\tfrac12 s$ are one
+solution of it, not the requirement itself. For a Chantler edge the model's
+jump is spread over one native interval $[a,b]$, so the requirement is that
+$a$ and $b$ are adjacent nodes.
+
+### Two overlapping centred pairs
+
+Let $E_1<E_2$ with $E_2-E_1=d$, and let the pairs overlap,
+$E_2-\tfrac12 s_2<E_1+\tfrac12 s_1$. Two bin edges need at least three nodes
+$x_0<x_1<x_2$ with $x_0+x_1=2E_1$ and $x_1+x_2=2E_2$. Then
+
+$$
+x_1-x_0=2(x_1-E_1),\qquad x_2-x_1=2(E_2-x_1),
+$$
+
+so monotonicity requires $E_1<x_1<E_2$, and the smaller of the two intervals
+is largest at $x_1=\tfrac12(E_1+E_2)$, where both equal $d$. The node $x_1$
+then owns exactly the bin $[E_1,E_2]$, on which $\mu$ is smooth. A third
+overlapping edge extends the chain by $x_{k+1}=2E_k-x_k$, which is valid while
+$x_k<E_k$.
+
+Comparison with the alternatives:
+
+* Keeping one pair and dropping the other leaves a jump $J$ inside a bin at
+  some offset, an error $O(J\,s)$, first order.
+* Keeping both pairs as coordinates generally puts neither feature on a bin
+  edge, so both edges keep first-order errors.
+* The chain removes the first-order term for every feature. Its only cost is
+  that the outer nodes sit off their bin centres. For smooth $n$, a node
+  offset $\delta$ from its bin centre gives an error of $n'\delta w$ on a bin
+  of width $w$, which is $O(h^2 n')$ on two bins, i.e. second order.
+
+Moving an EPDL pair off $E\mp\tfrac12 s$ therefore does not weaken the
+quadrature argument of `eq-grid-quadrature-error`. That argument needs a bin
+edge on the jump, not the native spacing $s$. Nor does the chain refine below
+the model's resolution. Its intervals are $d$, the separation the two tables
+themselves place between the edges.
+
+### Comparison with the implementation
+
+`_join_overlapping_pairs` forms $x_1=\tfrac12(E_1+E_2)$,
+$x_0=2E_1-x_1$, $x_2=2E_2-x_1$, and extends the chain by
+`following = 2*feature - candidate[-1]`. This matches the derivation.
+Samples and baseline nodes strictly inside any pair are removed
+(`_strictly_inside_pairs`), and samples merge against the neighbouring anchors
+and the last kept sample with tolerance $\tfrac14\min(s)$. Anchors are never
+merged away. Chantler pairs are never re-anchored. A Chantler pair interleaved
+with another pair is reported in `split_anchor_pairs` and is not resolved.
+
+**Finding (tolerance factor 2).** The docstring, the ledger note and the brief
+all state that the chain continues while every interval exceeds
+$\tau=\tfrac14\min(s)$. The extension test is
+`candidate[-1] < feature - tolerance`. That bounds the half-interval
+$E_k-x_k$, so it requires intervals $>2\tau$. For $\tau<d\le 2\tau$ the
+features are neither treated as one feature nor chained. Both pairs are then
+kept as coordinates, and both features lie off a bin edge by $d/2$. A
+synthetic probe with $s=1$ and $E_1=1000$ eV confirms this:
+
+| $d$ (eV) | bin-edge offsets $E_1$, $E_2$ (eV) | outcome |
+|---|---|---|
+| 0.1–0.25 | 0, $d$ | one feature (shared pair) |
+| 0.30 | 0.15, 0.15 | split, reported |
+| 0.45 | 0.225, 0.225 | split, reported |
+| 0.50 | 0.25, 0.25 | split; $E_1$ falls on a node |
+| 0.55–0.99 | 0, 0 | chained |
+
+The chain at $d=0.3$ would have intervals of $0.3>\tau$. No catalog case falls
+in this window (scan below). Either the test should be `> tolerance / 2` on the
+half-interval, or the documented rule should say $2\tau$. In the shared-feature
+regime ($d\le\tau$), the later feature sits off its bin edge by up to $\tau$.
+Centring the shared pair on $\tfrac12(E_1+E_2)$ would halve that.
+
+### Independent scan
+
+An independent script checked every catalog material, both bare and as shipped,
+plus W, PtTe$_2$ and WS$_2$ on Au, MoS$_2$ on Si, HOPG and W, each at
+$E_0\in\{10,30,100,300,1000\}$ keV (280 grids). It recomputed the marks with
+`continuum_refinement_marks` and required:
+
+* for each centred mark, a node midpoint within $10^{-9}E$ of the feature;
+* for each Chantler mark, its two anchors as adjacent nodes;
+* fixed band endpoints, strictly increasing nodes, and
+  `validate_backend_coordinates(float32)`.
+
+| | `main` (`bc35cdae1`) | branch (`c4fcd8347`) |
+|---|---|---|
+| feature violations | 170 in 85 grids (S $L_2$ in 15 film/stack combinations, Ta $M_2$ in TaS$_2$, W $M_3$ on Au, Pt $M_4$ on Au; worst offset $0.47$ of the local interval) | 0 |
+| endpoint, monotonicity, FP32 failures | 0 | 0 |
+| grids with a smaller minimum interval than `main` | — | 0 |
+| node-count change | — | $-1$ to $-4$ in 80 grids |
+| smallest interval | 0.0295 eV at 46.19 eV (ZrTe$_5$) | same (pre-existing) |
+
+HOPG and W at 30 keV and 1 MeV are bit-identical between the two (SHA-256
+prefixes `e1691b83…`, `9a73475f…`, `c8ee638b…`, `92254ebc…`; 2772 and 2406
+nodes at 30 keV).
+
+Local checks:
+
+* PtTe$_2$ on Au gives nodes 2197.58, **2204, 2208, 2212**, 2214.42, with bin
+  edges at exactly 2206 and 2210 eV.
+* In MoS$_2$ the two EPDL pairs at 168 and 170 eV do not overlap. They were
+  fixed by sample rejection alone, with bin edges at 168.0 and 170.0.
+* In TaS$_2$ the S K sample at 2473.60 eV sits 0.36 eV from the Ta $M_2$
+  anchor at 2473.24, above the 0.24 eV tolerance.
+* On MoS$_2$/Si, the Chantler Si K pair (1837.98, 1838.82) and the EPDL Si K
+  pair (1843.54, 1844.46) both survive.
+
+Both EPDL S edges carry the label `S L2 (EPDL)`. The labels are cosmetic; the
+anchors are distinct.
+
+### Verdict (#1171)
+
+`rederived` for the claimed behaviour on every catalog and named stack
+configuration. One finding remains: the chain tolerance is $2\tau$, where the
+documentation states $\tau$. It is reachable only in user-built media, and it
+is reported through `split_anchor_pairs`, not hidden. The ledger note's
+"smallest interval 0.36 eV" holds only for the overlap regions. The global
+minimum is 0.0295 eV at 46.19 eV in ZrTe$_5$, unchanged from `main`.
+
+**Resolution (implementation context, same PR).** The extension test now
+bounds the half-interval by $\tau/2$, so the chain continues while every
+interval exceeds $\tau$, as documented. The $d=0.3$ probe is pinned by
+`test_close_centred_pairs_chain_down_to_the_merge_tolerance`. The ledger
+note now qualifies the 0.36 eV figure as the overlap-region minimum. The
+shared-feature offset ($d\le\tau$) is left as is.
