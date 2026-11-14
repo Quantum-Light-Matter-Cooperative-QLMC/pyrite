@@ -225,3 +225,56 @@ def test_timed_calls_flags_noisy_warm_timings_unresolved():
         record["warm_relative_spread"] <= gate["TIMING_SPREAD_LIMIT"]
     )
     assert len(record["grid_sha256"]) == 64
+
+
+def test_score_families_scores_each_resolved_set_once_and_checkpoints(monkeypatch):
+    import pyrite.energy_grid.convergence_case as convergence_case
+
+    gate = _gate()
+    module = gate["score_families"].__globals__
+    calls = []
+
+    def families_case(case, sweep, n):
+        return (
+            dict(case, hkl_list=[(1, 1, 1)] * (n if isinstance(n, int) else 9)),
+            (
+                500.0,
+                10_000.0,
+            ),
+            (500.0, 10_000.0),
+        )
+
+    def chunked_lines(scorer, chunks, grid):
+        calls.append(len(scorer.case["hkl_list"]))
+        return np.exp(-(((grid - 3000.0) / 500.0) ** 2)) * len(scorer.case["hkl_list"])
+
+    class Ladder:
+        def __init__(self, case, transport=None):
+            self.case = case
+
+    monkeypatch.setitem(module, "families_case", families_case)
+    monkeypatch.setitem(module, "chunked_lines", chunked_lines)
+    monkeypatch.setitem(module, "tolerance_cutoff", lambda *a: ("g30", {"cutoff_invang": 30}))
+    monkeypatch.setattr(convergence_case, "CaseLadder", Ladder)
+    seen = []
+    record = gate["score_families"](
+        {"crystal": "silicon"},
+        None,
+        type("L", (), {"transport": None})(),
+        [4, "tol1e-3", "g30"],
+        5.0,
+        0.0,
+        lambda: None,
+        512,
+        on_row=lambda partial: seen.append(len(partial["families"])),
+    )
+    assert calls == [4, 9]
+    assert seen == [1, 2]
+    rows = record["families"]
+    assert [r["n"] for r in rows] == [4, "tol1e-3", "g30"]
+    assert rows[2]["duplicate_of"] == "g30" and rows[2]["pilot"] is None
+    assert rows[1]["pilot"] == {"cutoff_invang": 30}
+    assert record["wide_spacing_eV"] is None
+    assert all("wide" not in r for r in rows)
+    assert rows[1]["band"]["versus_largest"]["yield_per_primary"] == 0.0
+    assert rows[0]["band"]["versus_largest"]["yield_per_primary"] < 0.0
