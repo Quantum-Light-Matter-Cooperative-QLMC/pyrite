@@ -9,6 +9,11 @@ derivation sections were written from the ledger row, the sibling rows
 `montecarlo/runner/reflection_cutoff.py` were read. The code comparison and the
 numerics come after them.
 
+The original single-ratio derivation and adjudication below are historical.
+The current max-of-two implementation and superseding review appear under
+[Current re-verification](#current-re-verification-2026-11-14). The historical
+missing-test and zero-shell findings do not describe the current code.
+
 ## Claim, sources and conventions
 
 The selector partitions the non-forbidden reflections into shells
@@ -72,15 +77,14 @@ the averaged envelope. By `sinc-bin-far-envelope`, each line's integrated
 yield over any contiguous run of far bins then changes by at most
 $3/(2\pi^3K^2)=1.2\times10^{-5}$ of that line's whole mass. Summed over
 lines, the in-band error is at most $1.2\times10^{-5}$ times the total mass of
-the kept lines. Kept lines also include those resonant in the $\pm20\,\%$
-padding, which put only tails into the band. The pad adds at most 40 % of
-span, so for a roughly flat line population the bound is
-$\lesssim2\times10^{-5}$ of the in-band yield. The in-band yield is therefore
-exact to $O(10^{-5})$ relative, not exactly. That is negligible against any
-tolerance $\ge10^{-4}$. Float32 accumulation adds about $10^{-7}$
-(`sinc-bin-integration`, CUDA). The in-band yield also omits the band tails
-of lines resonant beyond the keep window. This is a production keep-window
-property shared by every call, not an additivity defect.
+the kept lines. Kept lines include resonances in the $\pm20\,\%$ padding,
+which can contribute only tails to the band. Converting this whole-line-mass
+allowance to a relative in-band allowance requires the ratio of complete
+kept-line mass to retained in-band mass. That ratio is not bounded for an
+arbitrary narrow band. Bin-width weighting integrates the represented means;
+accuracy inherits route-specific approximations and accumulation errors. The
+production keep window also drops tails of lines outside its padded span,
+a shared approximation rather than an additivity defect.
 
 ### 3. Geometric remainder and its conservativeness
 
@@ -92,7 +96,7 @@ T_k=\sum_{j\ge1}s_{k+j}\le s_k\sum_{j\ge1}r_k^{\,j}=\frac{s_kr_k}{1-r_k},
 $$
 
 with equality for an exactly geometric sequence. The estimate is an upper
-bound **if and only if** the later ratios do not exceed the current one,
+bound **if** the later ratios do not exceed the current one,
 which is a property of the sequence and not of the formula.
 
 **Smooth claim model.** For
@@ -297,7 +301,7 @@ stop. A pilot followed by a second scoring pass would cost about twice as
 much.
 
 Checked on CPU: splitting one call into halves, or into the selector's shells,
-reproduces the single-call spectrum to $3	imes10^{-15}$ of peak. The
+reproduces the single-call spectrum to $3\times10^{-15}$ of peak. The
 selector's own sum matches the single call of its selected set to $10^{-9}$
 relative (`test_reflection_selection_spectrum.py`). The automatic line axis
 has to exist before the selected set is known, so its bandwidth uses the
@@ -312,12 +316,13 @@ four-family set on those routes. Catalog-pinned sets remain pinned. The
 both dataset and case identities carry it. This policy change does not alter
 the shell estimator or upgrade this claim's validation status.
 
-## Adjudication
+## Historical adjudication (2026-11-13)
 
 - Formula, guards (except $r=0$), shell partition, band tiling and additivity
   match the independent derivation.
-- In-band bin-mean yield is exact to $O(10^{-5})$ relative under the
-  production far envelope, not exactly.
+- The bin-width sum integrates represented bin means. The whole-line-mass
+  far-envelope allowance does not imply a universal relative in-band bound
+  (corrected in section 2 and the current re-verification below).
 - The stated smooth model $\rho(G)$ is strictly decreasing for all $G$. That
   is proven above, and the multiplicity factor does not oppose it.
 - The claim's conclusion, "the geometric estimate is conservative once the
@@ -338,3 +343,99 @@ code behavior outside the claim: $r=0$ returns tail 0 and can stop.
 
 Verdict: **discrepancy** (claim wording plus the $r=0$ edge). No numerical
 fault was found in the estimator formula.
+
+
+## Current re-verification (2026-11-14)
+
+A fresh read-only verifier derived the expression from the source conventions
+before inspecting implementation bodies. For fixed transport, direction, axis,
+material/absorption factors and quadrature weights,
+
+$$
+S_k=\sum_{j\le k}s_j,\qquad
+r_k=\max\!\left(\frac{s_k}{s_{k-1}},\frac{s_{k-1}}{s_{k-2}}\right),\qquad
+\widehat T_k=\frac{s_kr_k}{1-r_k},\qquad
+\tau_k=\frac{\widehat T_k}{S_k}.
+$$
+
+Shell yields have units photons per primary per steradian; $\tau_k$ is
+dimensionless. The remainder is exact for a genuinely geometric continuation.
+The sufficient condition that every future ratio is at most $r_k<1$ is not
+established by the last two observed ratios. Independently,
+
+$$
+\frac{d\log\rho}{dG}
+=-\frac{2\Delta}{G(G+\Delta)}-\frac{B\Delta}{4\pi^2}<0
+$$
+
+for $G,\Delta>0$, $B\ge0$. This smooth-envelope result does not establish
+monotonicity of actual lattice-shell yields.
+
+The formula, kept-yield normalization, zero/invalid-yield guards and cap
+exhaustion match the current code. Shell scoring preserves the complete
+absorption stack while changing only the active radiator and reflections.
+No cross-reflection normalization was found. The original discrepancy is
+superseded for the fixed estimator; no numerical implementation fault was
+found in this review.
+
+The review required the wording corrections now applied above: whole-line
+error versus relative in-band error, a sufficient rather than necessary ratio
+condition, and extrapolation rather than a bound. The ledger's old assertion
+that every tail estimate was within 3% of measured omission was also removed:
+film/substrate estimates refer to their own yields, whereas the recorded
+layered gap refers to their sum. For seed 642501 the weighted combined estimate
+is $8.21362\times10^{-4}$, versus measured g40 omission relative to kept yield
+$7.19300\times10^{-4}$ (estimate about 14.2% above the measured gap).
+
+The verifier checked raw report hashes and every fixture shell yield/count,
+tail value and scene gap. Jobs 12672/12673 at `110c92aae` supply the production
+sequences in `tests/data/reflection_selection_1173.json`. The new regression
+pins G30 and selected-HKL digests for Si slab, MoS₂ film and Si substrate,
+with 13,688 / 40,198 / 13,688 reflections and tail fractions
+$3.679296\times10^{-4}$ / $6.230099\times10^{-4}$ / $9.557996\times10^{-4}$.
+It replays measured scalar yields rather than rerunning GPU kernels or proving
+physical accuracy independently.
+
+| Filter | Result |
+|---|---|
+| Units, estimator limits, signs/conventions | Pass |
+| Formula, guards, normalization, fixed-axis additivity | Match the independent derivation |
+| Reference/provenance | Raw report hashes and measured fixture values match; source commit exists |
+| Tolerance | Empirical finite-g40 qualification for these scenes, not a universal error certificate |
+| Numerical accuracy | Inherits node/bin-mean production approximation and reduction route |
+| Backend/axis coverage | Anchors use uniform ROCm bin-mean/Fourier; CPU cost, automatic-axis qualification and nonuniform ROCm near/far (#1196) remain outside this evidence |
+
+Independent focused checks: cutoff and production-spectrum modules, 23 passed;
+documentation static checks, 9 passed. The owner separately ran all 19 cutoff
+tests, with each new measured anchor below 0.4 s. Human sign-off is not granted.
+
+
+The verifier's final verdict is **rederived** after these wording corrections.
+The owner promotes the narrowed algorithmic claim to **anchored** using the
+local green reference-value regressions named in the ledger. New-anchor CI
+has not been observed; this status does not imply CI success or human sign-off.
+
+## Additional qualification at the approved default
+
+Job 12678 at `80c03a680`, qlmc-ace ROCm, replays seed 642501 of the same
+frozen transports on a 0.5–3 keV uniform bin-mean axis at 0.09375 eV
+(26,667 coordinates). Both scenes pass every #1143 margin against g40:
+
+| Scene | Selected cutoff / reflections | Yield gap vs g40 | Peak gap vs g40 | Selector call |
+|---|---|---|---|---|
+| Si | G28 / 11,180 | −4.77e-4 | −1.15e-4 | 13.0 s |
+| MoS₂ / Si | G28 / 32,832; G30 / 13,688 | −4.94e-4 | −3.75e-4 | 113.4 s |
+
+The narrower band reduces the Si slab and film sets; the layered substrate
+keeps G30. These are ordered first-call latencies, not a controlled cold/warm
+speedup comparison. Calls are bounded at 512 reflections. Reports, source
+scripts, sync/replay hashes and allocation/device metadata are archived at
+`qlmc:~/pyrite-1173-flip/evidence/flip/12678-narrow/`.
+
+Job 12679 measures the Si 300 keV automatic axis with production node
+quadrature on the same frozen transport. It resolves 420,113 coordinates over
+50–300,000 eV at 0.713976 eV spacing in 0.030 s. Incremental selection takes
+194.0 s, keeps G30 / 13,688 reflections and estimates a 7.06e-4 tail. This
+measures the automatic-axis budget and cost, not its independent spectral
+accuracy. Evidence: `qlmc:~/pyrite-1173-flip/evidence/flip/12679-auto/`.
+CPU cost is not established by these GPU measurements.
