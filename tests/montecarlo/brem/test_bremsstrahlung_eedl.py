@@ -178,6 +178,18 @@ def test_bethe_heitler_remains_an_explicit_backend():
     np.testing.assert_array_equal(to_host(selected), to_host(historical))
 
 
+@pytest.mark.parametrize("model", ["eedl", "bethe-heitler"])
+def test_explicit_covered_backend_is_not_a_physics_fallback(model):
+    """Explicit choices stay admissible under strict campaign filters (#262)."""
+    from pyrite._physics_fallback import collect_physics_fallbacks
+
+    with collect_physics_fallbacks(allow=False) as audit:
+        brem._bremsstrahlung_dsigma_dk(
+            "C", np.array([10.0, 30.0]), np.array([700.0, 2000.0]), cross_section_model=model
+        )
+    assert audit.events() == []
+
+
 def test_missing_eedl_element_warns_and_falls_back_to_bethe_heitler(monkeypatch):
     def unavailable(_element, *, data_dir=None):
         del data_dir
