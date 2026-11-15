@@ -178,7 +178,10 @@ See [device operators and transfer boundaries](../../physics/radiation-physics/o
 `pyrite.detectors.optical_ctr_inference.fit_gaussian_ctr(charge_jitter=...)`
 takes a `ChargeJitterModel` (mean electrons, relative charge RMS, shots per
 scan point, `"none"` or `"per-shot-charge"` normalization) for shot-averaged
-scans. `pyrite.detectors.optical_interferogram_convergence.interferogram_convergence`
+scans, or `systematics=` a tuple of
+`pyrite.detectors.optical_ctr_systematics.CTRSystematicMode` (dimensionless
+1σ fractional transverse or port-response shapes on the template energy grid,
+profiled as unit-Gaussian pulls). `pyrite.detectors.optical_interferogram_convergence.interferogram_convergence`
 reports energy-node, mirror-step and mirror-range refinement changes of a
 symmetric two-port scan (mirror travel in m, energies in eV). Both are
 host-NumPy analysis helpers; see

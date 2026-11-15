@@ -12,7 +12,9 @@ The same ideal Martin--Puplett port transfer and calibrated pulse detector as
 ``optical_interferometer`` are used. The fitted common positive normalization
 and independent constant port offsets are optional nuisance parameters. A
 known fractional prior on the common normalization is supported, but this
-is NOT a full uncertainty model for charge, transverse source, or optics.
+is NOT a full uncertainty model for charge, transverse source, or optics;
+declared transverse/response shapes enter as ``systematics`` modes
+(``optical_ctr_systematics``).
 
 A conditional profile-likelihood interval (Delta chi2=3.841 for 95%, one
 parameter, independent known Gaussian voltage errors) is reported, with None
@@ -29,9 +31,14 @@ from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 
 import numpy as np
-from scipy.optimize import brentq, minimize_scalar
+from scipy.optimize import brentq, lsq_linear, minimize_scalar
 
 from .optical_ctr_jitter import ChargeJitterModel, jitter_profile_at_sigma
+from .optical_ctr_systematics import (
+    CTRSystematicMode,
+    systematic_voltage_modes,
+    validate_systematics,
+)
 from .optical_energy import CalibratedPulseEnergyDetector
 from .optical_interferometer import (
     IdealMartinPuplett,
@@ -41,6 +48,7 @@ from .optical_interferometer import (
 )
 
 __all__ = [
+    "CTRSystematicMode",
     "ChargeJitterModel",
     "GaussianCTRTemplates",
     "OpticalVoltageScan",
@@ -56,6 +64,7 @@ _DELTA_CHI2_95 = 3.841458820694124
 _STATISTICS = (
     "Independent normal voltage errors, known variances; delta chi2 = 3.841 for one parameter; no systematic covariance",
     "Normal readout errors plus port-correlated, parameter-dependent charge-jitter covariance; delta(-2 ln L) = 3.841 for one parameter; no other systematic covariance",
+    "Independent normal voltage errors, known variances, plus declared linear Gaussian transverse/response modes fully correlated across energy (profiled pulls); delta chi2 = 3.841 for one parameter",
 )
 
 
@@ -379,53 +388,222 @@ def gaussian_ctr_forward_voltage(
     return voltages + offsets[None, :]
 
 
-def _profile_at_sigma(
-    sigma, templates, kernel, scan, *, fit_scale, fit_offsets, scale_prior_rms_fraction
-):
-    model = kernel @ templates.photon_density(sigma)
-    y, uncertainty = scan.voltage_v_ports, scan.uncertainty_v_ports
-    values = y.flatten()
-    weights = (1 / uncertainty).flatten()
-    base = model.flatten()
-    design = []
-    base_norm = max(float(np.max(np.abs(base))), 1e-300)
+def _pull_bounds(shapes):
+    """Box on each pull from ``1 + a_k u_k(E) >= 0`` for all ``E`` (physical
+    efficiency or pair envelope): ``-1/max u_k <= a_k <= -1/min u_k``."""
+    lower = np.full(len(shapes), -np.inf)
+    upper = np.full(len(shapes), np.inf)
+    for k, u in enumerate(shapes):
+        if np.max(u) > 0:
+            lower[k] = -1.0 / np.max(u)
+        if np.min(u) < 0:
+            upper[k] = -1.0 / np.min(u)
+    return lower, upper
+
+
+def _nuisance_design(model, drift, *, fit_scale, fit_offsets, scale_prior, shapes):
+    """Nuisance columns with their kinds, norms, prior rows and bounds.
+
+    Each column ``x_j`` multiplies parameter ``value_j * norm_j``; a prior
+    pseudo-row ``(row_j * coef_j - target_j)`` constrains it: ``(s - 1) / f``
+    for the scale and the unit-Gaussian pull for each systematic mode. Scale
+    and offset columns are normalized; pull columns are not (norm 1, prior
+    row 1), so a mode with negligible voltage effect stays well conditioned.
+    Bounds: scale ``>= 0``; pulls in their physical box.
+    """
+    port_index = np.indices(model.shape)[1].flatten()
+    entries = []  # (column, kind, prior_per_unit or None, target, normalize, lower, upper)
     if fit_scale:
-        design.append(base / base_norm)
-        target = values
-    else:
-        target = values - base
-    if fit_offsets:
-        design.extend(
-            (np.indices(model.shape)[1] == port).astype(float).flatten() for port in (0, 1)
+        prior = None if scale_prior is None else 1 / scale_prior
+        entries.append(
+            (model.flatten(), "scale", prior, 0.0 if prior is None else prior, True, 0.0, np.inf)
         )
-    if design:
-        x = np.column_stack(design)
-        wx, wy = x * weights[:, None], target * weights
-        if fit_scale and scale_prior_rms_fraction is not None:
-            prior_row = np.zeros(x.shape[1])
-            prior_row[0] = 1.0 / (base_norm * scale_prior_rms_fraction)
-            wx = np.vstack((wx, prior_row))
-            wy = np.r_[wy, 1.0 / scale_prior_rms_fraction]
-        values_hat = np.linalg.lstsq(wx, wy, rcond=None)[0]
-        if fit_scale and values_hat[0] < 0:
-            # Physical amplitude nonnegative; re-solve the offsets with scale 0.
-            values_hat[0] = 0.0
-            if fit_offsets:
-                for p in range(2):
-                    weight_sq = 1 / uncertainty[:, p] ** 2
-                    values_hat[p + 1] = float(np.average(y[:, p], weights=weight_sq))
-    else:
-        values_hat = np.empty(0)
-    scale = float(values_hat[0] / base_norm) if fit_scale else 1.0
-    offsets = (
-        tuple(map(float, values_hat[(1 if fit_scale else 0) :])) if fit_offsets else (0.0, 0.0)
+    if fit_offsets:
+        entries.extend(
+            ((port_index == port).astype(float), "offset", None, 0.0, True, -np.inf, np.inf)
+            for port in (0, 1)
+        )
+    if drift is not None:
+        lower, upper = _pull_bounds(shapes)
+        entries.extend(
+            (mode.flatten(), "systematic", 1.0, 0.0, False, lo, hi)
+            for mode, lo, hi in zip(drift, lower, upper, strict=True)
+        )
+    norms = np.array([max(float(np.max(np.abs(e[0]))), 1e-300) if e[4] else 1.0 for e in entries])
+    columns = [e[0] / n for e, n in zip(entries, norms, strict=True)]
+    priors = [None if e[2] is None else e[2] / n for e, n in zip(entries, norms, strict=True)]
+    bounds = (
+        np.array([e[5] * n for e, n in zip(entries, norms, strict=True)]),
+        np.array([e[6] * n for e, n in zip(entries, norms, strict=True)]),
     )
+    return columns, [e[1] for e in entries], norms, priors, [e[3] for e in entries], bounds
+
+
+def _solve_with_priors(columns, priors, targets, weights, target, bounds):
+    """Bounded weighted least squares with prior pseudo-rows (convex)."""
+    x = np.column_stack(columns) * weights[:, None]
+    rhs = target * weights
+    rows, extra = [], []
+    for j, prior in enumerate(priors):
+        if prior is not None:
+            row = np.zeros(len(columns))
+            row[j] = prior
+            rows.append(row)
+            extra.append(targets[j])
+    if rows:
+        x, rhs = np.vstack((x, rows)), np.r_[rhs, extra]
+    if np.all(np.isinf(bounds[0])) and np.all(np.isinf(bounds[1])):
+        return np.linalg.lstsq(x, rhs, rcond=None)[0]
+    return lsq_linear(x, rhs, bounds=bounds, method="bvls", tol=1e-12).x
+
+
+def _linear_profile(model, drift, scan, *, fit_scale, fit_offsets, scale_prior, shapes=None):
+    """Weighted least squares with the scale (if fitted) multiplying ``model`` only.
+
+    Exact for ``drift is None`` or a fixed scale. The scale is bounded below
+    by zero (physical amplitude) and each pull to its physical box. Returns
+    ``(chi2, scale, offsets, predicted, pulls)`` with the prior terms in
+    ``chi2``.
+    """
+    y, uncertainty = scan.voltage_v_ports, scan.uncertainty_v_ports
+    columns, kinds, norms, priors, targets, bounds = _nuisance_design(
+        model,
+        drift,
+        fit_scale=fit_scale,
+        fit_offsets=fit_offsets,
+        scale_prior=scale_prior,
+        shapes=shapes,
+    )
+    weights = (1 / uncertainty).flatten()
+    target = y.flatten() - (0.0 if fit_scale else model.flatten())
+    coef = (
+        _solve_with_priors(columns, priors, targets, weights, target, bounds)
+        if columns
+        else np.zeros(0)
+    )
+    values = coef / norms
+    picked = {
+        kind: values[[k == kind for k in kinds]] for kind in ("scale", "offset", "systematic")
+    }
+    scale = float(picked["scale"][0]) if fit_scale else 1.0
+    offsets = tuple(map(float, picked["offset"])) if fit_offsets else (0.0, 0.0)
+    pulls = picked["systematic"]
     predicted = scale * model + np.array(offsets)[None, :]
-    resid = (y - predicted) / uncertainty
-    chi2 = float(np.sum(resid**2))
-    if fit_scale and scale_prior_rms_fraction is not None:
-        chi2 += float(((scale - 1) / scale_prior_rms_fraction) ** 2)
-    return chi2, scale, offsets, predicted
+    if drift is not None:
+        predicted = predicted + np.tensordot(pulls, drift, axes=1)
+    chi2 = float(np.sum(((y - predicted) / uncertainty) ** 2)) + float(np.sum(pulls**2))
+    if fit_scale and scale_prior is not None:
+        chi2 += float(((scale - 1) / scale_prior) ** 2)
+    return chi2, scale, offsets, predicted, pulls
+
+
+def _bilinear_profile(model, drift, scan, *, fit_offsets, scale_prior, shapes, grid_points=48):
+    """Exact profile of ``s (K + sum_k a_k D_k) + offsets`` over ``s >= 0``.
+
+    At fixed ``s`` the pulls and offsets solve a bounded linear least squares
+    (``_linear_profile`` with ``s K`` and ``s D_k``; pulls in their physical
+    box), so ``chi2(s)`` is continuous but can be multimodal: as ``s -> 0`` a
+    pull's voltage ``s a_k D_k`` becomes cheap. ``s`` is searched globally:
+    ``s = 0``, a log-spaced grid from ``1e-6 s_ref`` to ``s_max`` (grown x4
+    while the best point is at the upper edge, at most 8 times) and bounded
+    Brent from every grid local minimum. ``s_ref`` is the largest linear-fit
+    scale (mode-free, additive modes) or the prior's ``1 + 5 f``. Without the
+    physical box, a mode that scales both ports alike is degenerate with
+    ``s`` and ``chi2(s)`` would reach a finite asymptote as ``s -> inf``.
+    """
+
+    def at(s):
+        chi2, _, offsets, predicted, pulls = _linear_profile(
+            s * model,
+            s * drift,
+            scan,
+            fit_scale=False,
+            fit_offsets=fit_offsets,
+            scale_prior=None,
+            shapes=shapes,
+        )
+        if scale_prior is not None:
+            chi2 += ((s - 1) / scale_prior) ** 2
+        return chi2, float(s), offsets, predicted, pulls
+
+    guesses = [
+        _linear_profile(
+            model,
+            d,
+            scan,
+            fit_scale=True,
+            fit_offsets=fit_offsets,
+            scale_prior=scale_prior,
+            shapes=shapes,
+        )[1]
+        for d in (None, drift)
+    ]
+    reference = max(*guesses, 1.0 + 5.0 * scale_prior if scale_prior is not None else 0.0)
+    if reference <= 0:
+        reference = 1.0
+    upper = 3.0 * reference
+    for _ in range(9):
+        grid = np.r_[0.0, np.geomspace(1e-6 * reference, upper, grid_points), guesses]
+        grid = np.unique(grid[grid >= 0])
+        values = np.array([at(s)[0] for s in grid])
+        if int(np.argmin(values)) < grid.size - 1:
+            break
+        upper *= 4.0
+    best = at(grid[int(np.argmin(values))])
+    for i in range(grid.size):
+        left, right = values[max(i - 1, 0)], values[min(i + 1, grid.size - 1)]
+        if values[i] <= left and values[i] <= right:
+            solution = minimize_scalar(
+                lambda s: at(s)[0],
+                bounds=(grid[max(i - 1, 0)], grid[min(i + 1, grid.size - 1)]),
+                method="bounded",
+                options={"xatol": 1e-12 * upper},
+            )
+            candidate = at(float(solution.x))
+            if candidate[0] < best[0]:
+                best = candidate
+    return best
+
+
+def _profile_at_sigma(
+    sigma,
+    templates,
+    kernel,
+    scan,
+    *,
+    fit_scale,
+    fit_offsets,
+    scale_prior_rms_fraction,
+    modes=(),
+):
+    """Profile scale, port offsets and systematic pulls at one duration.
+
+    Returns ``(chi2, scale, offsets, predicted, pulls)``; ``chi2`` includes
+    the prior terms. With modes and a fitted scale the exact bilinear model
+    ``s (K + sum_k a_k D_k)`` is profiled. Pulls are confined to their
+    physical box ``1 + a_k u_k(E) >= 0``.
+    """
+    model = kernel @ templates.photon_density(sigma)
+    drift = systematic_voltage_modes(modes, templates, kernel, sigma) if modes else None
+    shapes = np.array([m.relative_rms for m in modes]) if modes else None
+    if drift is not None and fit_scale:
+        return _bilinear_profile(
+            model,
+            drift,
+            scan,
+            fit_offsets=fit_offsets,
+            scale_prior=scale_prior_rms_fraction,
+            shapes=shapes,
+        )
+    return _linear_profile(
+        model,
+        drift,
+        scan,
+        fit_scale=fit_scale,
+        fit_offsets=fit_offsets,
+        scale_prior=scale_prior_rms_fraction,
+        shapes=shapes,
+    )
 
 
 def _check_fit_arguments(
@@ -519,6 +697,7 @@ def fit_gaussian_ctr(
     profile_points: int = 101,
     max_spectral_elements: int = 4_000_000,
     charge_jitter: ChargeJitterModel | None = None,
+    systematics: tuple[CTRSystematicMode, ...] = (),
 ) -> GaussianCTRFit:
     """Fit Gaussian RMS time and conditionally profile its 95% interval.
 
@@ -535,6 +714,13 @@ def fit_gaussian_ctr(
     the profile is ``-2 ln L`` instead of chi-square (the reported
     ``chi_square`` is then its quadratic form). Pass templates of the mean
     bunch, not ones already processed by ``with_charge_jitter``.
+
+    ``systematics`` declares transverse-source and port-response modes
+    (``optical_ctr_systematics``), each a unit-Gaussian linear nuisance
+    profiled with the scale and offsets; the interval then includes them.
+    Fitted pulls are reported in ``metadata["systematic_pulls"]``. Each mode
+    adds one parameter and one prior constraint, so the degrees of freedom
+    are unchanged. Not combinable with ``charge_jitter``.
 
     Validation: optical-instrument-observable
     """
@@ -556,6 +742,12 @@ def fit_gaussian_ctr(
     if data_count <= nuisance_count + 1:
         raise ValueError("insufficient scan points for Gaussian CTR fit")
 
+    modes = validate_systematics(
+        systematics,
+        templates.energy_eV,
+        free_scale=fit_scale and scale_prior_rms_fraction is None,
+        charge_jitter=charge_jitter is not None,
+    )
     if charge_jitter is not None:
         if not isinstance(charge_jitter, ChargeJitterModel):
             raise TypeError("charge_jitter must be a ChargeJitterModel")
@@ -572,9 +764,10 @@ def fit_gaussian_ctr(
             fit_scale=fit_scale,
             fit_offsets=fit_offsets,
             scale_prior_rms_fraction=scale_prior_rms_fraction,
+            modes=modes,
         )
         if charge_jitter is None:
-            return (*plain, plain[0])
+            return (*plain[:4], plain[0])
         temporal = np.exp(-np.square(templates.energy_eV * float(sigma) / _HBAR_EV_FS))
         coherent_v = kernel @ (templates.coherent_envelope_photons_per_eV_per_pulse * temporal)
         return jitter_profile_at_sigma(
@@ -594,12 +787,27 @@ def fit_gaussian_ctr(
     objective, scale, offsets, predicted, chi2 = profile(sigma)
     threshold = objective + _DELTA_CHI2_95
     low_ci, high_ci, multimodal = _profile_interval(profile, grid, values, threshold)
+    pulls = (
+        _profile_at_sigma(
+            sigma,
+            templates,
+            kernel,
+            scan,
+            fit_scale=fit_scale,
+            fit_offsets=fit_offsets,
+            scale_prior_rms_fraction=scale_prior_rms_fraction,
+            modes=modes,
+        )[4]
+        if modes
+        else ()
+    )
     for p, detector in enumerate(detectors):
         if detector.saturation_v is not None and np.any(predicted[:, p] >= detector.saturation_v):
             raise ValueError(
                 "fitted expected voltage crosses detector saturation; linear fit invalid"
             )
     ew, factors = templates.coherent_coverage(sigma)
+    statistics = _STATISTICS[2 if modes else int(charge_jitter is not None)]
     metadata = {
         "model": "gaussian-ctr-conditional-v1",
         "template_provenance": templates.provenance,
@@ -624,7 +832,9 @@ def fit_gaussian_ctr(
         if charge_jitter is None
         else "-2 ln L with parameter-dependent two-port jitter covariance",
         "profile_objective_minimum": objective,
-        "conditional_statistics": _STATISTICS[charge_jitter is not None],
+        "conditional_statistics": statistics,
+        "systematic_modes": [m.describe() for m in modes],
+        "systematic_pulls": {m.name: float(a) for m, a in zip(modes, pulls, strict=True)},
         "missing_band": "No data or source spectrum outside the supplied band; missing-band continuation and phase remain unspecified",
         "physical_normalization": "Templates already per physical bunch; no additional N or N(N-1) multiplier",
     }
@@ -646,8 +856,13 @@ def fit_gaussian_ctr(
             "Gaussian independent temporal offsets; sigma is RMS, not FWHM",
             "templates contain physical bunch population, transverse acceptance and polarization",
             "no missing-band extrapolation or unique-profile/phase reconstruction",
-            _STATISTICS[charge_jitter is not None],
-            "ideal Jones Martin-Puplett transfer, calibration held fixed",
+            statistics,
+            "ideal Jones Martin-Puplett transfer"
+            + (
+                "; spectral response varied only by the declared modes"
+                if modes
+                else ", calibration held fixed"
+            ),
         ),
         metadata=json.loads(json.dumps(metadata, sort_keys=True)),
     )
