@@ -148,8 +148,10 @@ def test_default_resolution_routes_uniform_axes_through_fourier(cp, monkeypatch)
         run_bin_mean_reduction_kernel,
     )
 
-    # The default follows the array backend; pin it to CuPy for this check.
+    # The default follows the array backend; pin it to CuPy for this check. The
+    # session backend stays CPU, so device edges also need a CuPy-aware host copy.
     monkeypatch.setattr(_bin_quadrature, "_cupy_backend", lambda: True)
+    monkeypatch.setattr(_bin_quadrature, "_to_cpu", cp.asnumpy)
     rng = np.random.default_rng(642)
     e, a, w = _line_set(rng, 300)
     e32, a32, w32 = (np.asarray(x, dtype=np.float32) for x in (e, a, w))
