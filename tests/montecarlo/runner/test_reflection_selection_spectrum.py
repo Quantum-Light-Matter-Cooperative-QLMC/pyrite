@@ -70,3 +70,44 @@ def test_selection_refuses_coherent_emission():
     coherent = dict(case, reflection_selection=SELECTION, coherent_emission="both")
     with pytest.raises(ValueError, match="incoherent lines only"):
         runner._spectrum_case(coherent, tp)
+
+
+def test_streamed_block_scoring_refuses_selection():
+    from pyrite.montecarlo.runner.streamed_scoring import streaming_refusal
+
+    case, _ = _transported()
+    assert streaming_refusal(case) is None
+    reason = streaming_refusal(dict(case, reflection_selection=SELECTION))
+    assert reason is not None and "reflection_selection" in reason
+
+
+def test_simulate_reports_the_selection_in_provenance():
+    import pyrite as pr
+
+    scene = pr.Scene(
+        pr.Beam(energy_keV=30.0, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()),
+        pr.geometry.Slab(
+            "silicon",
+            thickness_ang=20_000.0,
+            tilt_deg=30.0,
+            footprint=pr.geometry.Footprint(5.0, 5.0),
+        ),
+        pr.Detector(),
+    )
+
+    def numerics(**reflections):
+        return pr.Numerics(
+            sampling=pr.config.FixedSampling(cxr_histories=6, brem_histories=3),
+            seed=7,
+            energy_bins=EnergyBins(
+                cxr=np.arange(500.0, 8000.0, 25.0), brem=np.arange(1000.0, 30001.0, 1000.0)
+            ),
+            cxr_reflections=pr.config.CxrReflections(**reflections),
+        )
+
+    result = pr.simulate(scene, numerics=numerics(line_yield_tolerance=0.3))
+    record = result.provenance.reflection_selection
+    assert record["tolerance"] == 0.3 and record["radiators"][0]["crystal"] == "silicon"
+    assert record["radiators"][0]["converged"]
+    plain = pr.simulate(scene, numerics=numerics()).provenance
+    assert plain.reflection_selection is None and "reflection_selection" not in plain

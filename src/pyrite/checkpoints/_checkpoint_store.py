@@ -38,7 +38,15 @@ _LINE_COMPONENT_KEY = {
     "photon": "photon_aperture",
 }
 _SHARED_KEYS = frozenset(
-    {"case", "E_grid", "scale", "adaptive_sampling", "physics_fallbacks", "line_roulette"}
+    {
+        "case",
+        "E_grid",
+        "scale",
+        "adaptive_sampling",
+        "physics_fallbacks",
+        "line_roulette",
+        "reflection_selection",
+    }
 )
 
 

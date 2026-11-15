@@ -95,6 +95,10 @@ class Provenance(Mapping[str, Any]):
     line_roulette: Mapping[str, Any] | None = None
     """Line-scoring roulette runs only: the policy, threshold, selected
     primaries and rows, analog and weighted line mass, and added variance."""
+    reflection_selection: Mapping[str, Any] | None = None
+    """Measured reflection-selection runs only (#1173): ``model``,
+    ``tolerance``, ``quadrature``, and per radiator its ``cutoff_invang``,
+    reflection count, tail estimate, convergence and shell yields."""
     line_grid_policy: Mapping[str, Any] | None = None
     """Automatic CXR-grid runs only: the grid policy and tolerances."""
     line_grid_resolved: Mapping[str, Any] | None = None

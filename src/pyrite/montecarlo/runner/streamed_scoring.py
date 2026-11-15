@@ -31,8 +31,14 @@ import numpy as np
 from ..._physics_fallback import FallbackAudit
 from .fallbacks import measure_block_fallbacks
 
-#: Case keys whose spectra need every segment at once.
-STREAM_REFUSED_KEYS = ("coherent_emission", "temporal_profile", "photon_transport")
+#: Case keys whose spectra need every segment at once. A measured reflection
+#: selection (#1173) measures shell yields over every segment before it stops.
+STREAM_REFUSED_KEYS = (
+    "coherent_emission",
+    "temporal_profile",
+    "photon_transport",
+    "reflection_selection",
+)
 
 #: Further case keys live streaming refuses (#611): the diagnostic line-grid
 #: derivation, adaptive electron counts, the channeling zone join, GDF beams,

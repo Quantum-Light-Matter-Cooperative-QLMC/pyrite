@@ -285,6 +285,28 @@ They do not pin the following:
 
 No test exercises production kernels.
 
+## Production scoring (#1173 P4)
+
+The spectrum phase applies the selector on the production line axis rather
+than a separate coarse pilot. Each shell's incoherent density is evaluated
+with the case's own line quadrature and integrated against the axis weights:
+trapezoid weights for `node`, bin widths for `bin-mean`. By additivity
+(section 1), the sum of the scored shells is the line spectrum of the selected
+set on that axis. The selection therefore costs about one shell beyond its
+stop. A pilot followed by a second scoring pass would cost about twice as
+much.
+
+Checked on CPU: splitting one call into halves, or into the selector's shells,
+reproduces the single-call spectrum to $3	imes10^{-15}$ of peak. The
+selector's own sum matches the single call of its selected set to $10^{-9}$
+relative (`test_reflection_selection_spectrum.py`). The automatic line axis
+has to exist before the selected set is known, so its bandwidth uses the
+$\lvert g\rvert$ cap (`reflection-selection-cap-v1` in the policy sources).
+Diffracted bremsstrahlung and Kossel terms are a separate two-beam model and
+keep the case's build-time reflections. Coherent emission, line roulette,
+temporal profiles, channeling, two-beam transition radiation and streamed
+block scoring are refused.
+
 ## Adjudication
 
 - Formula, guards (except $r=0$), shell partition, band tiling and additivity

@@ -33,6 +33,7 @@ FIELD_NAMES = {
     "maximum-reflections": "max_reflections",
     "mosaic-nodes": "mosaic_nodes",
     "mosaic-route": "mosaic_route",
+    "line-yield-tolerance": "line_yield_tolerance",
     "straggling": "straggling",
     "energy-model": "energy_model",
     "maximum-fractional-energy-loss": "max_dE_frac",
@@ -153,6 +154,13 @@ class ChannelingSectionCommand(click.Command):
     "--mosaic-route",
     type=click.Choice(_MOSAIC_ROUTE_VALUES),
     help="Mosaic broadening route.",
+)
+@click.option(
+    "--line-yield-tolerance",
+    type=click.FloatRange(min=0.0, max=1.0, min_open=True, max_open=True),
+    metavar="FRACTION",
+    help="Opt-in measured reflection cutoff: stop |g| shells once the estimated "
+    "omitted incoherent line yield is at most FRACTION of the kept yield.",
 )
 @click.option(
     "--straggling/--no-straggling",

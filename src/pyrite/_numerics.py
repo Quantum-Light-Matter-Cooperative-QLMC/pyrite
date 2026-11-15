@@ -53,7 +53,13 @@ def _emission_selection(value: object) -> tuple[EmissionMode, ...]:
 
 
 SAMPLING_KEYS = ("n_electrons", "n_electrons_brem")
-CONVERGENCE_KEYS = ("n_families", "max_reflections", "mosaic_nodes", "mosaic_route")
+CONVERGENCE_KEYS = (
+    "n_families",
+    "max_reflections",
+    "mosaic_nodes",
+    "mosaic_route",
+    "line_yield_tolerance",
+)
 CHANNELING_KEYS = (
     "channeling_model",
     "channeling_plane",
@@ -160,12 +166,21 @@ class CxrReflections:
         Number of quadrature nodes used for mosaic averaging.
     mosaic_route
         Mosaic integration strategy, ``"analytic"`` or ``"mc"``.
+    line_yield_tolerance
+        Opt-in measured reflection selection (#1173). The spectrum phase
+        scores incoherent lines in reciprocal shells ``|g|`` of 2 1/Angstrom up
+        to the form-factor range (75.4 1/Angstrom) and stops where the
+        estimated line yield beyond the kept shells is at most this fraction
+        of the kept yield on the line axis. ``None`` (default) keeps the
+        ``n_families`` set. Incoherent emission only; diffracted-brem and
+        Kossel terms keep the ``n_families`` set.
     """
 
     n_families: int = 4
     max_reflections: int | None = None
     mosaic_nodes: int = 5
     mosaic_route: MosaicRoute = "analytic"
+    line_yield_tolerance: float | None = None
 
     def __post_init__(self) -> None:
         if type(self.n_families) is not int or self.n_families <= 0:
@@ -178,6 +193,12 @@ class CxrReflections:
             raise ValueError("mosaic_nodes must be a positive integer")
         if self.mosaic_route not in {"analytic", "mc"}:
             raise ValueError("mosaic_route must be 'analytic' or 'mc'")
+        if self.line_yield_tolerance is not None and not (
+            isinstance(self.line_yield_tolerance, int | float)
+            and not isinstance(self.line_yield_tolerance, bool)
+            and 0.0 < self.line_yield_tolerance < 1.0
+        ):
+            raise ValueError("line_yield_tolerance must lie in (0, 1) or be None")
 
 
 #: Keyword-only ``Physics`` energy quantities and their numeric eV fields.

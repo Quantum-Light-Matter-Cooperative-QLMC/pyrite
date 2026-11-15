@@ -166,3 +166,21 @@ def test_681_executor_and_resource_contract_not_shadowed():
     assert callable(LocalExecutor().execute)
     assert isinstance(ResourceRequest(), ResourceRequest)
     assert "pyrite.execution" not in pr.ExecutionConfig.__module__
+
+
+def test_line_yield_tolerance_lowers_to_a_selection_record_and_leaves_default_identity():
+    from pyrite.montecarlo.runner.reflection_cutoff import REFLECTION_SELECTION_MODEL
+
+    reflections = pr.config.CxrReflections(line_yield_tolerance=1e-3)
+    selected = _case(pr.Numerics(cxr_reflections=reflections))
+    record = selected.to_dict()["reflection_selection"]
+    assert record["model"] == REFLECTION_SELECTION_MODEL and record["tolerance"] == 1e-3
+    plain = _case(pr.Numerics())
+    assert "reflection_selection" not in plain.to_dict()
+    _same_case(plain, _case(pr.Numerics(cxr_reflections=pr.config.CxrReflections())))
+    assert case_content_key(selected) != case_content_key(plain)
+    for bad in (0.0, 1.0, -1e-3, True):
+        with pytest.raises(ValueError, match="line_yield_tolerance"):
+            pr.config.CxrReflections(line_yield_tolerance=bad)
+    with pytest.raises(ValueError, match="incoherent lines only"):
+        replace(selected, coherent_emission=True)

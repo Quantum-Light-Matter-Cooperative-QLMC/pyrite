@@ -120,6 +120,7 @@ def resolve_numerics(
         "n_electrons_brem": DEFAULT_N_ELECTRONS_BREM,
         "n_families": convergence.n_families,
         "max_reflections": None,
+        "line_yield_tolerance": None,
         "mosaic_nodes": convergence.mosaic_nodes,
         "mosaic_route": convergence.mosaic_route,
         "straggling": physics.straggling,
@@ -530,7 +531,8 @@ def _identity_v1(
     # Hash compatibility: the P2.4 electron-count sweep grids join the payload
     # only when actually set, so pre-existing runs keep their historical
     # parameter_sha256 (and therefore their checkpoint identity) bit-for-bit.
-    for key in ("n_electrons", "n_electrons_brem", "line_grid_policy"):
+    # The measured reflection selection (#1173) follows the same rule.
+    for key in ("n_electrons", "n_electrons_brem", "line_grid_policy", "line_yield_tolerance"):
         if sweep_payload.get(key) is None:
             sweep_payload.pop(key, None)
     # Same compatibility rule for catalog_profile (Phase 3 decision 2): only

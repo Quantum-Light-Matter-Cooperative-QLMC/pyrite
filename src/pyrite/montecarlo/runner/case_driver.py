@@ -923,7 +923,13 @@ def _line_phase(
     truncation_audit,
     coherent_audit,
 ):
-    """Score the line spectra and run their audits; tag an allocator OOM by phase."""
+    """Score the line spectra and run their audits; tag an allocator OOM by phase.
+
+    A case with ``reflection_selection`` scores its incoherent lines shell by
+    shell on ``E_grid`` and returns the selection record.
+
+    Validation: reflection-yield-tolerance-selector
+    """
     from dataclasses import replace as batch_replace
 
     temporal, temporal_coherent = temporal_profiles

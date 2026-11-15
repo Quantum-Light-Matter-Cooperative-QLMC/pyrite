@@ -35,11 +35,13 @@ __all__ = [
     "geometric_tail_fraction",
     "axis_yield_weights",
     "iter_reflection_shells",
+    "reflection_selection_record",
     "prune_case_reflections",
     "reflection_shells",
     "select_case_reflections",
     "select_reflection_cutoff",
     "selected_line_spectrum",
+    "validate_reflection_selection",
 ]
 
 #: Shell width in 1/Angstrom. Near |g| ~ 30 the measured Si shell shares
@@ -428,3 +430,66 @@ def selected_line_spectrum(
         ],
     )
     return spectrum, record
+
+
+_SELECTION_KEYS = frozenset({"model", "tolerance", "g_max_invang", "shell_width_invang"})
+
+
+def reflection_selection_record(
+    tolerance: float,
+    g_max_invang: float = F0_RANGE_INVANG,
+    shell_width_invang: float = DEFAULT_SHELL_WIDTH_INVANG,
+) -> dict:
+    """The case record of a measured selection at ``tolerance`` (validated)."""
+    record = dict(
+        model=REFLECTION_SELECTION_MODEL,
+        tolerance=float(tolerance),
+        g_max_invang=float(g_max_invang),
+        shell_width_invang=float(shell_width_invang),
+    )
+    validate_reflection_selection(record)
+    return record
+
+
+def validate_reflection_selection(record, case=None) -> None:
+    """Refuse a malformed record, or one ``case`` cannot score.
+
+    The selection scores incoherent lines shell by shell, so it refuses
+    coherent emission, line roulette, temporal profiles, channeling and the
+    two-beam transition-radiation route, whose line paths it does not drive.
+
+    Validation: reflection-yield-tolerance-selector
+    """
+    if not isinstance(record, dict) or set(record) != _SELECTION_KEYS:
+        raise ValueError(f"reflection_selection must have keys {sorted(_SELECTION_KEYS)}")
+    if record["model"] != REFLECTION_SELECTION_MODEL:
+        raise ValueError(f"unknown reflection selection model {record['model']!r}")
+    if not 0.0 < float(record["tolerance"]) < 1.0:
+        raise ValueError("reflection_selection tolerance must lie in (0, 1)")
+    if not 0.0 < float(record["g_max_invang"]) <= F0_RANGE_INVANG:
+        raise ValueError(
+            f"reflection_selection g_max_invang must lie in (0, {F0_RANGE_INVANG:.1f}]"
+        )
+    if not 0.0 < float(record["shell_width_invang"]) < float(record["g_max_invang"]):
+        raise ValueError("reflection_selection shell width must lie in (0, g_max_invang)")
+    if case is None:
+        return
+    get = case.get
+    refused = [
+        name
+        for name, active in (
+            ("coherent emission", get("coherent_emission")),
+            ("line roulette", get("line_roulette") is not None),
+            ("temporal profiles", get("temporal_profile")),
+            ("channeling", get("channeling") is not None),
+            (
+                "two-beam transition radiation",
+                (get("transition_radiation") or {}).get("model") == "two-beam",
+            ),
+        )
+        if active
+    ]
+    if refused:
+        raise ValueError(
+            "reflection_selection scores incoherent lines only; refused with " + ", ".join(refused)
+        )
