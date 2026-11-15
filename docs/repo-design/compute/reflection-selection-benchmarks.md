@@ -22,11 +22,18 @@ the tolerance, the estimator or the selected sets. Two changes landed:
    `CXR_REFLECTION_SELECTION_MODEL` is `measured-shell-cutoff-v3` (code
    274a2c2fb).
 
-`n_tab` grows with the output **span**, not its spacing. The internal
-tabulation is a 1 eV mesh over the span ±20 %, joined with the Henke and EPDL
-edge energies. A 0.5–10 keV band has 13,616 points, so a call holds 8,192
-reflections. A 50 eV–300 keV automatic axis has 362,289 points, so a call holds
-370 reflections. #1201 tracks a coarser tabulation away from the edges.
+`n_tab` grows with the output **span**, not its spacing. When #1200 was
+measured, the internal tabulation was a 1 eV mesh over the span ±20 %, joined
+with the Henke and EPDL edge energies. A 0.5–10 keV band had 13,616 points, so
+a call held 8,192 reflections. A 50 eV–300 keV automatic axis had 362,289
+points, so a call held 370 reflections. The measurements below are from that
+mesh.
+
+Since #1201 the mesh is edge-resolved geometric: spacing `max(1 eV, 1e-3 E)`,
+with the 1 eV mesh kept within 3 % of every edge
+([`line-absorption-tabulation`](../../validation/radiation-physics/line-absorption-tabulation.md)).
+On Si the band now has 5,310 points and the automatic axis 9,322, so both hold
+8,192 reflections per float32 call.
 
 ## Protocol
 
