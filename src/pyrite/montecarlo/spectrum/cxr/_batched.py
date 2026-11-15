@@ -41,7 +41,7 @@ from ._kernels import (
     _interp_index,
     _log_interp_fraction,
     _matvec3,
-    _polarization_pair,
+    _polarization_pairs,
     _reflection_tables,
     _rowdot3,
     _segment_escape_distance,
@@ -284,7 +284,7 @@ def _batched_reflection_tables(st):
     tables = None if _table_cache is None else _table_cache.get(table_key)
     if tables is None:
         _nsys_push("pyrite.lines.tab")
-        g_rows, es_rows, ep_rows, wm_rows, table_rows = [], [], [], [], []
+        g_rows, wm_rows, table_rows = [], [], []
         # One coupling row per reflection; its mosaic orientations index it
         # through ROW_TABLE rather than carrying (N_g, N_tab) copies.
         CHI_RE, CHI_IM, U_RE, U_IM = _reflection_tables(  # (N_hkl, N_tab)
@@ -296,16 +296,14 @@ def _batched_reflection_tables(st):
             if R_orient is not None:
                 g_vec = R_orient @ g_vec
             for R_m, wm in orients:
-                gd = g_vec if R_m is None else R_m @ g_vec
-                e_s, e_p = _polarization_pair(n_hat, gd)
-                g_rows.append(gd)
-                es_rows.append(e_s)
-                ep_rows.append(e_p)
+                g_rows.append(g_vec if R_m is None else R_m @ g_vec)
                 wm_rows.append(wm)
                 table_rows.append(i_hkl)
-        G = xp.asarray(np.array(g_rows), dtype=REAL)  # (N_g, 3)
-        ES = xp.asarray(np.array(es_rows), dtype=REAL)
-        EP = xp.asarray(np.array(ep_rows), dtype=REAL)
+        g_host = np.array(g_rows, dtype=float).reshape(-1, 3)
+        es_rows, ep_rows = _polarization_pairs(n_hat, g_host)  # (N_g, 3) each
+        G = xp.asarray(g_host, dtype=REAL)  # (N_g, 3)
+        ES = xp.asarray(es_rows, dtype=REAL)
+        EP = xp.asarray(ep_rows, dtype=REAL)
         WM = xp.asarray(np.array(wm_rows), dtype=REAL)[None, :]  # (1, N_g)
         ROW_TABLE = xp.asarray(np.array(table_rows, dtype=np.int32))  # (N_g,)
         G2 = _rowdot3(G, G)

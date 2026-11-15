@@ -646,13 +646,22 @@ def reflection_coupling_tables(
             dispersive[el] = (xp.asarray(fp), xp.asarray(fpp))
     chi_scale = -R_E_ANG * (HC_EV_ANG / E) ** 2 / (np.pi * info["V_cell"])
     u_scale = 4.0 * np.pi * E2_EV_ANG / info["V_cell"] / M_E_EV
-    # Fill preallocated tables row by row: stacking per-reflection rows kept
-    # every table resident twice, which OOMed thousands of reflections (#1167).
-    tables = tuple(xp.empty((len(hkl_list), E.size), dtype=np.float64) for _ in range(4))
+    # Per-reflection scalars on the host, then whole-table array operations:
+    # a row-by-row fill issued several device operations per reflection, the
+    # dominant selection cost at tens of thousands of reflections (#1200).
+    # Every element sees the row fill's operations in the same order, so the
+    # tables are bit-identical to it.
+    n_hkl = len(hkl_list)
+    dwf = np.empty(n_hkl)
+    u_coef = np.empty(n_hkl)
+    c_parts = np.empty((2, n_hkl))
+    a_parts = np.empty((2, n_hkl))
+    w_parts = {el: np.empty((2, n_hkl)) for el in dispersive}
     for i, hkl in enumerate(hkl_list):
         hkl = np.asarray(hkl, dtype=float)
         _, g = reciprocal_g_vector(hkl, info["lattice"])
-        dwf = debye_waller(g, B_ang2)
+        dwf[i] = debye_waller(g, B_ang2)
+        u_coef[i] = u_scale * (dwf[i] / g**2)
         weights = {}
         for el, R in basis:
             weights[el] = weights.get(el, 0.0) + np.exp(1j * 2.0 * np.pi * np.dot(hkl, R))
@@ -661,21 +670,39 @@ def reflection_coupling_tables(
         if bonding_charge:
             delta = bonding_charge_correction(crystal, hkl)
             c, a = c + delta, a - delta
-        s_re = xp.full(E.shape, float(np.real(c)))
-        s_im = xp.full(E.shape, float(np.imag(c)))
-        acc_re = xp.full(E.shape, float(np.real(a)))
-        acc_im = xp.full(E.shape, float(np.imag(a)))
-        for el, w in weights.items():
-            if el not in dispersive:
-                continue
-            fp, fpp = dispersive[el]
-            s_re += w.real * fp - w.imag * fpp
-            s_im += w.imag * fp + w.real * fpp
-        tables[0][i] = chi_scale * (dwf * s_re)
-        tables[1][i] = chi_scale * (dwf * s_im)
-        tables[2][i] = u_scale * (dwf / g**2) * acc_re
-        tables[3][i] = u_scale * (dwf / g**2) * acc_im
-    return tables
+        c_parts[:, i] = np.real(c), np.imag(c)
+        a_parts[:, i] = np.real(a), np.imag(a)
+        for el in w_parts:
+            w_parts[el][:, i] = weights[el].real, weights[el].imag
+    shape = (n_hkl, E.size)
+    s_re = xp.empty(shape, dtype=np.float64)
+    s_im = xp.empty(shape, dtype=np.float64)
+    s_re[...] = xp.asarray(c_parts[0])[:, None]
+    s_im[...] = xp.asarray(c_parts[1])[:, None]
+    # Elements in basis order, as the per-row weights dict iterated them.
+    for el in dict.fromkeys(el for el, _ in basis):
+        if el not in dispersive:
+            continue
+        fp, fpp = (v[None, :] for v in dispersive[el])
+        w_re, w_im = (xp.asarray(v)[:, None] for v in w_parts[el])
+        term = w_re * fp
+        term -= w_im * fpp
+        s_re += term
+        term = w_im * fp
+        term += w_re * fpp
+        s_im += term
+        del term
+    # chi_scale * (dwf * s); IEEE products commute, so in place is exact.
+    dwf_d = xp.asarray(dwf)[:, None]
+    for s in (s_re, s_im):
+        s *= dwf_d
+        s *= chi_scale[None, :]
+    u_tables = []
+    for part in a_parts:
+        u = xp.empty(shape, dtype=np.float64)
+        u[...] = xp.asarray(u_coef * part)[:, None]
+        u_tables.append(u)
+    return s_re, s_im, u_tables[0], u_tables[1]
 
 
 def emission_coupling_tables(crystal, hkl_list, photon_E_eV, B_ang2=0.0, use_henke=False, xp=np):
@@ -705,7 +732,10 @@ def emission_coupling_tables(crystal, hkl_list, photon_E_eV, B_ang2=0.0, use_hen
     chi_re, chi_im, u_re, u_im = reflection_coupling_tables(
         crystal, mates, photon_E_eV, B_ang2, use_henke, xp=xp
     )
-    return chi_re, -chi_im, u_re, -u_im
+    # In-place negation is exact and keeps no second copy per table.
+    xp.negative(chi_im, out=chi_im)
+    xp.negative(u_im, out=u_im)
+    return chi_re, chi_im, u_re, u_im
 
 
 # ---- absorption length ------------------------------------------------------
