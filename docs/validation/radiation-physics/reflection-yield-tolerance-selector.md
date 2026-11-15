@@ -403,7 +403,7 @@ physical accuracy independently.
 | Reference/provenance | Raw report hashes and measured fixture values match; source commit exists |
 | Tolerance | Empirical finite-g40 qualification for these scenes, not a universal error certificate |
 | Numerical accuracy | Inherits node/bin-mean production approximation and reduction route |
-| Backend/axis coverage | Anchors use uniform ROCm bin-mean/Fourier; CPU cost, automatic-axis qualification and nonuniform ROCm near/far (#1196) remain outside this evidence |
+| Backend/axis coverage | Anchors use uniform ROCm bin-mean/Fourier; CPU cost, automatic-axis qualification and nonuniform ROCm remain outside this evidence; the final rebase includes the upstream #1196 near/far repair |
 
 Independent focused checks: cutoff and production-spectrum modules, 23 passed;
 documentation static checks, 9 passed. The owner separately ran all 19 cutoff
@@ -439,3 +439,18 @@ quadrature on the same frozen transport. It resolves 420,113 coordinates over
 measures the automatic-axis budget and cost, not its independent spectral
 accuracy. Evidence: `qlmc:~/pyrite-1173-flip/evidence/flip/12679-auto/`.
 CPU cost is not established by these GPU measurements.
+
+
+The same-axis g40 reference (job 12680, 452.8 s scoring) measures a
+−6.4471e-4 yield gap for the automatic selection, within the 1e-3 yield
+target. Peak and FWHM gaps are −2.43e-6 and −2.86e-6. The full-support
+centroid gap is −1.2214e-3, exceeding the harness's 1e-3 centroid diagnostic
+margin; this full-support observable is not qualified by the passing
+0.5–10 keV comparisons. No claim that every full-support diagnostic passes
+follows from the yield tolerance. The original declared-band qualification
+remains unchanged. Reference and selection use the same 420,113-node axis
+and frozen transport; evidence is archived at
+`qlmc:~/pyrite-1173-flip/evidence/flip/12680-auto-reference/`.
+These jobs used pre-rebase source `80c03a680`; the later upstream #1196
+repair affects the nonuniform ROCm near/far route, which these node and
+uniform Fourier measurements do not use.
