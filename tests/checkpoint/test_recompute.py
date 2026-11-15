@@ -996,7 +996,7 @@ def test_repair_line_spec_from_config_targets_the_grid_build_cases_would_use(mon
 
     stored_keV, auto_keV = 30.0, 37.0
     stored_grid = np.linspace(10.0, 2000.0, 500)
-    base_sweep = material_sweep("mos2")
+    base_sweep = replace(material_sweep("mos2"), n_families=4)
     sweep = replace(
         base_sweep,
         energy_bins=replace(base_sweep.energy_bins, cxr_by_energy={stored_keV: stored_grid}),
@@ -1035,6 +1035,15 @@ def test_repair_line_spec_from_config_targets_the_grid_build_cases_would_use(mon
         assert r["brem"].shape == r["E_grid"].shape
         # explicit coordinates outrank any automatic case-local policy
         assert "line_grid_policy" not in r["case"]
+
+    # The new default must also use the same candidate-cap bandwidth during
+    # repair as during case construction, rather than the four-family grid.
+    from pyrite.checkpoints._repair_planning import _target_cxr_grid
+
+    automatic = replace(sweep, n_families=None)
+    built = build_cases(replace(automatic, beam=replace(automatic.beam, energy_keV=auto_keV)))[0]
+    repaired = _target_cxr_grid(automatic, records[auto_keV], None, True)
+    np.testing.assert_allclose(repaired, decode_energy_grid(built["E_grid_line"]))
 
 
 def test_reline_checkpoints_forwards_flags(monkeypatch, tmp_path):

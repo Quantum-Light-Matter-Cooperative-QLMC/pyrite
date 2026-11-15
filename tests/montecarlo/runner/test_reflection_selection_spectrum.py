@@ -20,6 +20,7 @@ SELECTION = dict(tolerance=0.3, g_max_invang=16.0, shell_width_invang=2.0)
 def _transported():
     sweep = Sweep(
         material="silicon",
+        n_families=4,
         beam=BeamSpec(energy_keV=30.0),
         thickness_ang=20000.0,
         tilt_deg=30.0,
@@ -109,5 +110,5 @@ def test_simulate_reports_the_selection_in_provenance():
     record = result.provenance.reflection_selection
     assert record["tolerance"] == 0.3 and record["radiators"][0]["crystal"] == "silicon"
     assert record["radiators"][0]["converged"]
-    plain = pr.simulate(scene, numerics=numerics()).provenance
+    plain = pr.simulate(scene, numerics=numerics(n_families=4)).provenance
     assert plain.reflection_selection is None and "reflection_selection" not in plain

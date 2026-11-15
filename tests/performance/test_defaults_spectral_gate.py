@@ -25,6 +25,18 @@ def _gate():
     return runpy.run_path(str(script))
 
 
+def test_narrowed_band_metrics_use_only_the_declared_band(monkeypatch):
+    gate = _gate()
+    monkeypatch.setitem(gate["metrics"].__globals__, "BAND", (500.0, 3000.0))
+    for quadrature in ("node", "bin-mean"):
+        grid = gate["axis"](500, 3000, 1, quadrature)
+        result = gate["metrics"](grid, np.ones(grid.size), quadrature)
+        assert result["yield_per_primary"] == pytest.approx(2500)
+        assert result["centroid_eV"] == pytest.approx(1750)
+        assert len(result["band_masses_100eV"]) == 25
+        np.testing.assert_allclose(result["band_masses_100eV"], 100, rtol=1e-12)
+
+
 def test_layered_scene_is_a_shell_admitted_two_crystal_stack():
     case = _gate()["layered_case"](8, 642501)
     assert case["crystal"] == "mos2"
@@ -320,7 +332,7 @@ def test_score_families_sel_point_runs_the_incremental_selector_on_the_band(monk
     case = {"crystal": "silicon", "B_ang2": 0.46}
 
     def lines_of(hkls, grid):
-        weight = sum(np.exp(-0.05 * (h * h + k * k + l * l)) for h, k, l in hkls)
+        weight = sum(np.exp(-0.05 * (h * h + k * k + ell * ell)) for h, k, ell in hkls)
         return np.exp(-(((grid - 3000.0) / 500.0) ** 2)) * weight
 
     class Ladder:

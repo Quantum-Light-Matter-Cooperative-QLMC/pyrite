@@ -14,6 +14,7 @@ from ..montecarlo import Case
 from ..observations.spec import Observation
 from ..quantum import Channeling
 from .channeling_cases import resolve_channeling
+from .reflection_selection import reflection_controls
 from .resolution import UNSET, ResolvedSimulation, _Unset, resolve_models, resolve_simulation
 from .transition_cases import (
     resolve_shell_ionization,
@@ -59,7 +60,7 @@ def build_case(
 def lower_simulation(request: ResolvedSimulation) -> Case:
     """Lower effective settings without repeating defaults or model validation."""
     scene, physics, numerics = request.scene, request.physics, request.numerics
-    convergence = numerics.cxr_reflections
+    convergence = reflection_controls(numerics, physics, scene.channeling)
     scalar_detector = (
         scene.detector.scalar_detector()
         if isinstance(scene.detector, PlanarDetector)
@@ -187,8 +188,9 @@ def build_sweep_cases(
                     detector.scalar_detector() if isinstance(detector, PlanarDetector) else detector
                 ),
             )
+        convergence = reflection_controls(resolved_numerics, physics, request.scene.channeling)
+        old_sweep = replace(old_sweep, n_families=convergence.n_families)
         if numerics is not None:
-            convergence = resolved_numerics.cxr_reflections
             energy_bins = resolved_numerics.energy_bins or EnergyBins()
             old_sweep = replace(
                 old_sweep,

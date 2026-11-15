@@ -417,13 +417,13 @@ class Sweep:
     crystal_height_mm: InitVar[ScalarOrSeq | None] = retired_flat_input("crystal_height_mm")
     # fixed setup (single values) ------------------------------------------
     theta_obs_deg: InitVar[float | None] = None
-    n_families: int = 4
+    n_families: int | None = None
     # Optional resolved-profile cap applied after catalog-pinned or dynamically
     # selected reflections. None preserves the complete production set.
     max_reflections: int | None = None
-    # Opt-in measured reflection selection (#1173): the spectrum phase scores
+    # Measured reflection selection (#1173): the spectrum phase scores
     # |g| shells up to the f0 cap until the estimated in-band tail is at most
-    # this fraction of the kept line yield. None keeps the n_families set.
+    # this fraction of the kept line yield. Both knobs omitted selects 1e-3.
     line_yield_tolerance: float | None = None
     dtheta_obs_deg: InitVar[float | None] = None
     domega_sr: InitVar[float | None] = None
@@ -650,7 +650,7 @@ def sweep_crystal_params(sweep: Sweep) -> dict[str, Any]:
     :func:`_cxr_grid_for_energy` resolves a line grid against.
     """
     assert sweep.target is not None  # Sweep.__post_init__ always resolves one
-    cp = crystal_params(sweep.target.material, sweep.n_families)
+    cp = crystal_params(sweep.target.material, sweep.n_families or 4)
     if sweep.max_reflections is not None:
         cp["hkl_list"] = cp["hkl_list"][: sweep.max_reflections]
     return cp
@@ -766,7 +766,7 @@ def _stack_line_radiators(sweep: Sweep) -> list[tuple[str, list]]:
     """
     assert sweep.target is not None  # Sweep.__post_init__ always resolves one
     radiators = (
-        layer_radiator(layer, sweep.n_families) for layer in sweep.target._below_film() or ()
+        layer_radiator(layer, sweep.n_families or 4) for layer in sweep.target._below_film() or ()
     )
     return [(r["crystal"], r["hkl_list"]) for r in radiators if r is not None]
 
@@ -1097,6 +1097,11 @@ def build_cases(
 
     Validation: inelastic-angular-deflection
     """
+    from .reflection_selection import resolve_reflection_sweep
+
+    sweep, automatic_selection = resolve_reflection_sweep(
+        sweep, coherent_emission, temporal_profile
+    )
     assert sweep.target is not None  # Sweep.__post_init__ always resolves one
     assert sweep.detector is not None
     n_electrons, n_electrons_brem = _electron_budget(
@@ -1156,7 +1161,7 @@ def build_cases(
         cp,
         name_stem=name_stem,
         beam_uvw=beam_uvw,
-        n_families=sweep.n_families,
+        n_families=sweep.n_families or 4,
         orientation=orientation,
     )
     grooved = any(g.case_keys().get("groove_spacing_ang") is not None for g in geometries)
@@ -1183,6 +1188,8 @@ def build_cases(
         selection_keys["reflection_selection"] = reflection_selection_record(
             sweep.line_yield_tolerance
         )
+        if automatic_selection:
+            selection_keys["reflection_selection"]["automatic"] = True
     cases = []
     for i_c, geometry in enumerate(geometries):
         for i_e, E0 in enumerate(energies):

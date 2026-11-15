@@ -369,6 +369,7 @@ propagate_axial = { target = "pyrite.montecarlo.channeling.axial_propagation:pro
 
 [package_exports."pyrite.config"]
 AdaptiveSampling = { target = "pyrite._sampling:AdaptiveSampling", status = "advanced-stable" }
+# #1173: omitted family count uses tolerance selection; explicit counts retain fixed sets.
 CxrReflections = { target = "pyrite._numerics:CxrReflections", status = "advanced-stable" }
 FixedSampling = { target = "pyrite._sampling:FixedSampling", status = "advanced-stable" }
 LineRoulette = { target = "pyrite._line_roulette:LineRoulette", status = "experimental" }

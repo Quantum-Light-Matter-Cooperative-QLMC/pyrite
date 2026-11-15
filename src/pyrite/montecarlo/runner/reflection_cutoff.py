@@ -19,6 +19,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from ..._numerics import CXR_REFLECTION_SELECTION_MODEL
 from ...materials.crystal import (
     CRYSTALS,
     _reflection_families,
@@ -53,7 +54,7 @@ F0_RANGE_INVANG = 4.0 * np.pi * 6.0
 
 #: Identity of the measured shell-cutoff selection; bump on any change that
 #: moves a selected set or its spectrum.
-REFLECTION_SELECTION_MODEL = "measured-shell-cutoff-v1"
+REFLECTION_SELECTION_MODEL = CXR_REFLECTION_SELECTION_MODEL
 
 #: Shells after the first decaying pair before the tail estimate may stop.
 _MIN_DECAYING_SHELLS = 2
@@ -460,8 +461,13 @@ def validate_reflection_selection(record, case=None) -> None:
 
     Validation: reflection-yield-tolerance-selector
     """
-    if not isinstance(record, dict) or set(record) != _SELECTION_KEYS:
+    if not isinstance(record, dict) or set(record) not in (
+        _SELECTION_KEYS,
+        _SELECTION_KEYS | {"automatic"},
+    ):
         raise ValueError(f"reflection_selection must have keys {sorted(_SELECTION_KEYS)}")
+    if "automatic" in record and record["automatic"] is not True:
+        raise ValueError("reflection_selection automatic must be True when present")
     if record["model"] != REFLECTION_SELECTION_MODEL:
         raise ValueError(f"unknown reflection selection model {record['model']!r}")
     if not 0.0 < float(record["tolerance"]) < 1.0:

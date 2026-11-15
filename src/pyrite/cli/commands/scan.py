@@ -131,7 +131,7 @@ def _trajectories_dir(ctx, param, value):
     "--n-families",
     type=_cli_core.POSITIVE_INT,
     default=None,
-    help="Override positive dominant reflection-family count.",
+    help="Use a positive reflection-family count instead of automatic line-yield selection.",
 )
 @click.option(
     "--checkpoint-dir",

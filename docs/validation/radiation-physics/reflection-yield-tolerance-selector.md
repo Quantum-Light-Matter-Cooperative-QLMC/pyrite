@@ -305,7 +305,12 @@ $\lvert g\rvert$ cap (`reflection-selection-cap-v1` in the policy sources).
 Diffracted bremsstrahlung and Kossel terms are a separate two-beam model and
 keep the case's build-time reflections. Coherent emission, line roulette,
 temporal profiles, channeling, two-beam transition radiation and streamed
-block scoring are refused.
+block scoring are refused when selection is explicitly requested. Since the
+user-approved #1173 default flip, an automatic request falls back to the
+four-family set on those routes. Catalog-pinned sets remain pinned. The
+`CXR_REFLECTION_SELECTION_MODEL` generation is `measured-shell-cutoff-v2`;
+both dataset and case identities carry it. This policy change does not alter
+the shell estimator or upgrade this claim's validation status.
 
 ## Adjudication
 

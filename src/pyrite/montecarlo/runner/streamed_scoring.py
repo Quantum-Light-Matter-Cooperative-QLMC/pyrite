@@ -54,9 +54,18 @@ LIVE_STREAM_REFUSED_KEYS = (
 )
 
 
+def _streaming_case(case: Mapping[str, Any]) -> Mapping[str, Any]:
+    """Use the build-time family set for automatic selection in streamed runs."""
+    if (case.get("reflection_selection") or {}).get("automatic"):
+        return {key: value for key, value in case.items() if key != "reflection_selection"}
+    return case
+
+
 def streaming_refusal(case: Mapping[str, Any], *, live: bool = False) -> str | None:
     """Why ``case`` cannot be scored in whole-electron blocks, or ``None``."""
     for key in STREAM_REFUSED_KEYS:
+        if key == "reflection_selection" and (case.get(key) or {}).get("automatic"):
+            continue
         if case.get(key):
             return f"{key} needs every segment at once"
     transition = case.get("transition_radiation")
@@ -88,7 +97,8 @@ class BlockSpectrumScorer:
         from .line_roulette import line_screen_for
         from .streamed_recovery import EscapeScoringRecovery, RowScoringRecovery
 
-        self.case = case
+        self.case = _streaming_case(case)
+        case = self.case
         self.fallbacks = FallbackAudit(
             case.get("allow_physics_fallback", False), case.get("physics_fallbacks", ())
         )
@@ -292,6 +302,7 @@ def run_case_streamed(
     from .artifacts import _case_geometry
     from .oom import _ensure_pool_limit
 
+    case = _streaming_case(case)
     reason = streaming_refusal(case, live=True)
     if reason is not None:
         raise ValueError(f"cannot stream this case's spectra: {reason}")

@@ -1,10 +1,38 @@
 # Reflection selection
 
-Coherent emission is a sum over reciprocal-lattice vectors, and that sum has to be truncated. Which reflections enter is a modelling decision with a direct cost consequence — the line-spectrum kernel's work scales with the number of reflections — and a direct physics consequence, since an omitted strong reflection is a missing line. PyRITE resolves it two ways: an automatic structure-based ranking, and an explicit per-crystal pin.
+Line emission is a sum over reciprocal-lattice vectors, and that sum has to be truncated. Which reflections enter affects both yield and scoring cost. PyRITE uses measured line-yield selection for supported incoherent runs, a family count for other routes or explicit requests, and catalog pins for textured crystals.
+
+## Default measured selection
+
+With neither `n_families`, `max_reflections` nor `line_yield_tolerance` set,
+the spectrum phase scores reciprocal shells until the estimated omitted yield
+is at most 1e-3 of the kept yield on the requested line axis. Shell spectra
+are retained and summed. The automatic axis bounds the candidate cap before
+selection, so it may be substantially wider than the four-family axis.
+The estimator is qualified on the Si and MoS₂/Si scenes in
+[the selector evidence](../../validation/radiation-physics/reflection-yield-tolerance-selector.md);
+it is not a rigorous error bound for arbitrary scenes.
+
+An explicit `CxrReflections(n_families=4)` or `--n-families 4` restores the
+four-family policy. Explicit counts take precedence over automatic selection.
+An explicit `line_yield_tolerance` requests selection and retains its
+incompatibility errors. Automatic selection falls back to four families for
+coherent emission, line roulette, temporal profiles, channeling, two-beam
+transition radiation and streamed scoring. Catalog-pinned lists remain pinned.
+Diffracted bremsstrahlung and Kossel terms keep the build-time reflection set.
+
+The accuracy gain has a measured cost. On qlmc-ace (ROCm), the 64-history,
+0.5–10 keV gate at 0.09375 eV bin spacing took 26.3 s for Si and
+176–208 s for layered MoS₂/Si with incremental selection. The four-family
+arms took about 1–2 s. These measurements exclude transport and do not
+establish CPU or full automatic-axis costs. Qualification continues in
+[#1173](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/1173);
+batching and performance admission are tracked in
+[#1200](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/1200).
 
 ## Automatic ranking
 
-The default path enumerates candidate reflections and keeps the strongest *families*.
+The fixed-family path enumerates candidate reflections and keeps the strongest *families*.
 
 **Enumeration.** All integer triples with $|\mathbf g| \le g_{\max}$ are generated, with $g_{\max} = 8$ $\AA^{-1}$ by default. The per-axis index bound is exact rather than a guess:
 
@@ -30,7 +58,9 @@ with the Debye–Waller factor already inside $S$. The $1/g^2$ is not a heuristi
 
 **Cutoff.** Families whose metric falls below $10^{-9}$ of the top family are dropped as forbidden or negligible, which removes extinct reflections without a special case for them.
 
-The default of four families follows the published practice this project benchmarks against, where the four planes of largest $|\chi_{\mathbf g}|$ are retained per crystal and everything weaker contributes below roughly 30 %.
+Four families follow the published practice this project benchmarks against.
+That truncation does not bound omitted yield: the #1143 Si and layered
+MoS₂/Si scenes lose about 61 % and 78–79 % of their 0.5–10 keV yield.
 
 ## Explicit pinning
 

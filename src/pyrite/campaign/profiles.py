@@ -414,7 +414,12 @@ def _model_generation_markers(emission: str) -> dict[str, Any]:
     # The in-medium photon dispersion is unconditional physics now, not an
     # opt-in model; digests minted before it used the retired vacuum
     # k = omega kinematics.
-    markers: dict[str, Any] = {"line_kinematics": "in-medium"}
+    from .._numerics import CXR_REFLECTION_SELECTION_MODEL
+
+    markers: dict[str, Any] = {
+        "line_kinematics": "in-medium",
+        "reflection_selection_model": CXR_REFLECTION_SELECTION_MODEL,
+    }
     # Production resolves one shell- and density-effect-corrected SBETHE table
     # per material; the former Joy--Luo/Berger--Seltzer splice remains
     # reference-only. ``xsgen_tables`` separates different generated inputs
@@ -513,7 +518,7 @@ def _identity_v1(
     Validation: bote-salvat-ionization-backend
     """
     assert sweep.target is not None
-    crystallography = crystal_params(sweep.target.material, sweep.n_families)
+    crystallography = crystal_params(sweep.target.material, sweep.n_families or 4)
     resolved = {
         "material": material,
         "fidelity": LEGACY_IDENTITY_TIER,
@@ -713,8 +718,11 @@ def case_content_key(
 
     Validation: bote-salvat-ionization-backend
     """
+    from .._numerics import CXR_REFLECTION_SELECTION_MODEL
+
     payload = {
         "schema": CASE_CONTENT_KEY_SCHEMA,
+        "reflection_selection_model": CXR_REFLECTION_SELECTION_MODEL,
         "stopping_model": STOPPING_MODEL,
         "characteristic_model": case_characteristic_marker(case),
         "line_escape_model": CXR_ESCAPE_MODEL,

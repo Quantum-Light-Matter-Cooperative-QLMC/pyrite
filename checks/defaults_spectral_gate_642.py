@@ -1,6 +1,6 @@
 """Remote-only bounded transport/spectrum sensitivity pilot (#1142, #1143).
 
-No default or physics verdict. Fixed 0.5--10 keV reporting band; reference
+No default or physics verdict. Default 0.5--10 keV reporting band; reference
 refinement and changed-transport statistical qualification remain separate.
 Our own pickle is retained for trusted, same-source replay only.
 """
@@ -49,7 +49,7 @@ def metrics(grid, density, quadrature, edges=None):
         band_masses_100eV=_bin_masses(
             grid,
             density,
-            np.linspace(500, 10000, 96) if edges is None else edges,
+            band_edges(*BAND) if edges is None else edges,
             quadrature=quadrature,
         ).tolist(),
     )
@@ -989,6 +989,7 @@ def device_peak_probe(cupy):
 
 
 def main():
+    global BAND
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("material", choices=["hopg", "silicon", "mos2-on-si"])
     parser.add_argument("output", type=Path)
@@ -1078,6 +1079,14 @@ def main():
         "incremental selection on the band axis (#1173); last is reference",
     )
     parser.add_argument(
+        "--families-band",
+        type=float,
+        nargs=2,
+        default=BAND,
+        metavar=("START_EV", "STOP_EV"),
+        help="qualification band in eV (default: 500 10000); applies to metrics and pilots",
+    )
+    parser.add_argument(
         "--families-wide-spacing",
         type=float,
         default=0.375,
@@ -1096,6 +1105,11 @@ def main():
         help="reflections per radiator per line call for --families (bounds device tables)",
     )
     args = parser.parse_args()
+    if not (
+        np.isfinite(args.families_band).all() and 0 < args.families_band[0] < args.families_band[1]
+    ):
+        parser.error("--families-band requires finite 0 < START_EV < STOP_EV")
+    BAND = tuple(args.families_band)
     if len(set(args.families)) != len(args.families):
         parser.error("--families points must be distinct")
     if len(args.continuum_reference_divisors) != 3:
@@ -1204,7 +1218,7 @@ def main():
         replay_transport_sha256=None
         if args.replay is None
         else hashlib.sha256(args.replay.read_bytes()).hexdigest(),
-        band_eV=[500, 10000],
+        band_eV=list(BAND),
         source_revision=Path("SOURCE_SHA").read_text().strip(),
         transport_s_including_first_setup=None if args.replay else transport_s,
         replay_adoption_s=transport_s if args.replay else None,
