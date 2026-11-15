@@ -178,6 +178,9 @@ coherent_exit_distribution = { target = "pyrite.montecarlo.channeling.exit_angul
 AxialExitMap = { target = "pyrite.montecarlo.channeling.axial_exit_map:AxialExitMap", status = "experimental" }
 axial_incidence_nodes = { target = "pyrite.montecarlo.channeling.axial_exit_map:axial_incidence_nodes", status = "experimental" }
 coherent_axial_exit_map = { target = "pyrite.montecarlo.channeling.axial_exit_map:coherent_axial_exit_map", status = "experimental" }
+# #1217: thickness/divergence sweep reusing one Bloch solve per incidence node.
+coherent_exit_sweep = { target = "pyrite.montecarlo.channeling.exit_angular:coherent_exit_sweep", status = "experimental" }
+divergence_sweep_nodes = { target = "pyrite.montecarlo.channeling.exit_angular:divergence_sweep_nodes", status = "experimental" }
 entry_populations = { target = "pyrite.montecarlo.channeling.bloch:entry_populations", status = "experimental" }
 line_energy_eV = { target = "pyrite.montecarlo.channeling.bloch:line_energy_eV", status = "experimental" }
 longitudinal_kinematics = { target = "pyrite.montecarlo.channeling.bloch:longitudinal_kinematics", status = "experimental" }

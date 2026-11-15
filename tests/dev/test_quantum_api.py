@@ -113,6 +113,8 @@ _CHANNELING_HELPERS = {
     "axial_line_catalog": "pyrite.montecarlo.channeling.axial_emission",
     "classical_exit_angles": "pyrite.montecarlo.channeling.exit_angular",
     "coherent_exit_distribution": "pyrite.montecarlo.channeling.exit_angular",
+    "coherent_exit_sweep": "pyrite.montecarlo.channeling.exit_angular",
+    "divergence_sweep_nodes": "pyrite.montecarlo.channeling.exit_angular",
     "planar_fiber_inputs": "pyrite.montecarlo.channeling.planar_fiber",
     "unravel_fiber_outgoing": "pyrite.montecarlo.channeling.axial_fiber_unraveling",
     "M_E_EV": "pyrite.materials.crystal",
