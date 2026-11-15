@@ -29,13 +29,17 @@ from ...materials.crystal import (
 __all__ = [
     "DEFAULT_SHELL_WIDTH_INVANG",
     "F0_RANGE_INVANG",
+    "REFLECTION_SELECTION_MODEL",
     "ReflectionCutoff",
     "band_bin_grid",
     "geometric_tail_fraction",
+    "axis_yield_weights",
     "iter_reflection_shells",
     "prune_case_reflections",
     "reflection_shells",
+    "select_case_reflections",
     "select_reflection_cutoff",
+    "selected_line_spectrum",
 ]
 
 #: Shell width in 1/Angstrom. Near |g| ~ 30 the measured Si shell shares
@@ -44,6 +48,10 @@ DEFAULT_SHELL_WIDTH_INVANG = 2.0
 
 #: Waasmaier--Kirfel f0 validity, s = |g| / 4 pi <= 6 /A.
 F0_RANGE_INVANG = 4.0 * np.pi * 6.0
+
+#: Identity of the measured shell-cutoff selection; bump on any change that
+#: moves a selected set or its spectrum.
+REFLECTION_SELECTION_MODEL = "measured-shell-cutoff-v1"
 
 #: Shells after the first decaying pair before the tail estimate may stop.
 _MIN_DECAYING_SHELLS = 2
@@ -221,13 +229,111 @@ def select_reflection_cutoff(
     return ReflectionCutoff(table[-1][0], kept, tol, tail, False, tuple(table))
 
 
-def _pilot_case(case: dict, layer: int | None, hkls: list) -> dict:
-    """``case`` radiating only ``hkls`` from radiator ``layer``, as a ``bin-mean`` call."""
+def _pilot_case(case: dict, layer: int | None, hkls: list, quadrature: str | None) -> dict:
+    """``case`` radiating only ``hkls`` from radiator ``layer``.
+
+    ``quadrature`` overrides ``line_quadrature`` when given.
+    """
+    extra = {} if quadrature is None else {"line_quadrature": quadrature}
     if layer is None:
-        return dict(case, hkl_list=hkls, line_quadrature="bin-mean")
+        return dict(case, hkl_list=hkls, **extra)
     layers: list = [None] * len(case["layer_radiators"])
     layers[layer] = dict(case["layer_radiators"][layer], hkl_list=hkls)
-    return dict(case, layer_radiators=layers, hkl_list=hkls, line_quadrature="bin-mean")
+    return dict(case, layer_radiators=layers, hkl_list=hkls, **extra)
+
+
+def axis_yield_weights(grid: np.ndarray, quadrature: str) -> np.ndarray:
+    """Weights ``w`` with ``density @ w`` the integrated yield on ``grid``.
+
+    ``node``: trapezoid weights over the nodes. ``bin-mean``: the bin widths
+    of the production bins (midpoint inner edges, reflected outer
+    half-widths), on which the integral is exact.
+    """
+    grid = np.asarray(grid, dtype=float)
+    if quadrature == "bin-mean":
+        from ..spectrum.characteristic import _energy_bin_edges_and_widths
+
+        return np.asarray(_energy_bin_edges_and_widths(grid)[1], dtype=float)
+    if quadrature != "node":
+        raise ValueError(f"unknown line quadrature {quadrature!r}")
+    if grid.size < 2:
+        raise ValueError("a node axis needs at least two nodes")
+    step = np.diff(grid)
+    weights = np.zeros(grid.size)
+    weights[:-1] += 0.5 * step
+    weights[1:] += 0.5 * step
+    return weights
+
+
+def select_case_reflections(
+    case: dict,
+    line_density: Callable[[dict, np.ndarray], np.ndarray],
+    tolerance: float,
+    grid: np.ndarray,
+    weights: np.ndarray,
+    *,
+    quadrature: str | None = None,
+    g_max_invang: float = F0_RANGE_INVANG,
+    width_invang: float = DEFAULT_SHELL_WIDTH_INVANG,
+    max_reflections: int = 512,
+) -> tuple[dict, list[ReflectionCutoff], np.ndarray]:
+    """Cut each radiator at its measured cutoff and keep the scored spectrum.
+
+    Every crystalline radiator (the slab, or each non-``None`` entry of
+    ``layer_radiators``) runs :func:`select_reflection_cutoff` on its own
+    candidate shells up to ``g_max_invang``. A shell's yield is
+    ``line_density(pilot, grid) @ weights``, where ``pilot`` radiates that
+    shell alone from that radiator (``line_quadrature`` set to
+    ``quadrature`` when given), in calls of at most ``max_reflections``
+    reflections. Incoherent line densities add over reflections and
+    radiators, so the sum of the scored shells is the line spectrum of the
+    selected set on ``grid``, and a per-radiator tolerance bounds the
+    estimated omission of the whole case by the same fraction.
+
+    ``line_density`` is the caller's production line scorer on the case's
+    transported segments. A layered case's ``hkl_list`` mirrors its first
+    radiator. Returns the pruned case, the per-radiator outcomes in radiator
+    order, and the spectrum.
+
+    Validation: reflection-yield-tolerance-selector
+    """
+    weights = np.asarray(weights, dtype=float)
+    chunk = max(1, int(max_reflections))
+    layered = case.get("layer_radiators") is not None
+    radiators = list(enumerate(case["layer_radiators"])) if layered else [(None, case)]
+    out = dict(case)
+    if layered:
+        out["layer_radiators"] = list(case["layer_radiators"])
+    outcomes = []
+    total: np.ndarray | None = None
+    for layer, radiator in radiators:
+        if radiator is None:
+            continue
+
+        def shell_yield(hkls: list, layer: int | None = layer) -> float:
+            nonlocal total
+            shell = 0.0
+            for i in range(0, len(hkls), chunk):
+                pilot = _pilot_case(case, layer, hkls[i : i + chunk], quadrature)
+                density = np.asarray(line_density(pilot, grid), dtype=float)
+                total = density if total is None else total + density
+                shell += float(density @ weights)
+            return shell
+
+        shells = iter_reflection_shells(
+            radiator["crystal"], float(radiator["B_ang2"]), g_max_invang, width_invang
+        )
+        result = select_reflection_cutoff(shell_yield, shells, tolerance)
+        outcomes.append(result)
+        if layer is None:
+            out["hkl_list"] = result.hkl_list
+        else:
+            out["layer_radiators"][layer] = dict(radiator, hkl_list=result.hkl_list)
+    if layered:
+        out["hkl_list"] = next(r for r in out["layer_radiators"] if r is not None)["hkl_list"]
+    if total is None:
+        total = np.zeros(np.shape(grid))
+    return out, outcomes, total
 
 
 def prune_case_reflections(
@@ -241,54 +347,84 @@ def prune_case_reflections(
     width_invang: float = DEFAULT_SHELL_WIDTH_INVANG,
     max_reflections: int = 512,
 ) -> tuple[dict, list[ReflectionCutoff]]:
-    """``case`` with each radiator's reflections cut at its measured cutoff.
+    """:func:`select_case_reflections` on coarse ``bin-mean`` bins tiling ``band_eV``.
 
-    Every crystalline radiator (the slab, or each non-``None`` entry of
-    ``layer_radiators``) runs :func:`select_reflection_cutoff` on its own
-    candidate shells up to ``g_max_invang``. A shell's in-band yield is
-    ``line_density(pilot, grid).sum() * h`` on :func:`band_bin_grid` bins
-    tiling ``band_eV``, where ``pilot`` radiates that shell alone from that
-    radiator with ``line_quadrature="bin-mean"`` (exact in-band yield at any
-    bin width), in calls of at most ``max_reflections`` reflections. Line
-    yields add over reflections and radiators, so a per-radiator tolerance
-    bounds the estimated omission of the whole case by the same fraction.
-
-    ``line_density`` is the caller's production line scorer on the case's
-    transported segments. A layered case's ``hkl_list`` mirrors its first
-    radiator. Returns the pruned case and the per-radiator outcomes in
-    radiator order.
+    The bin-mean integral is exact at any bin width, so the pilot measures
+    each shell's in-band yield on :func:`band_bin_grid` at ``bin_eV``.
+    Returns the pruned case and the per-radiator outcomes.
 
     Validation: reflection-yield-tolerance-selector
     """
     grid = band_bin_grid(*band_eV, bin_eV)
-    h = float(grid[1] - grid[0])
-    chunk = max(1, int(max_reflections))
+    pruned, outcomes, _ = select_case_reflections(
+        case,
+        line_density,
+        tolerance,
+        grid,
+        np.full(grid.size, float(grid[1] - grid[0])),
+        quadrature="bin-mean",
+        g_max_invang=g_max_invang,
+        width_invang=width_invang,
+        max_reflections=max_reflections,
+    )
+    return pruned, outcomes
+
+
+def selected_line_spectrum(
+    case: dict, evaluate: Callable[[dict], object], grid: np.ndarray
+) -> tuple[np.ndarray, dict]:
+    """Incoherent line spectrum of ``case`` under its ``reflection_selection``.
+
+    ``evaluate(pilot)`` is the spectrum phase's line evaluation of ``pilot``
+    (the case radiating one shell chunk) on ``grid``. Shells are scored on the
+    production axis in the case's own ``line_quadrature`` and summed, so the
+    selection costs about one shell beyond its stop rather than a second pass.
+    Returns the host spectrum and the selection record: model, tolerance,
+    and per radiator its cutoff, reflection count, tail estimate, convergence
+    and shell table.
+
+    Validation: reflection-yield-tolerance-selector
+    """
+    from ..._backend import _to_cpu
+
+    selection = case["reflection_selection"]
+    quadrature = case.get("line_quadrature", "node")
+    _, outcomes, spectrum = select_case_reflections(
+        case,
+        lambda pilot, _grid: np.asarray(_to_cpu(evaluate(pilot)), dtype=float),
+        float(selection["tolerance"]),
+        grid,
+        axis_yield_weights(grid, quadrature),
+        g_max_invang=float(selection["g_max_invang"]),
+        width_invang=float(selection["shell_width_invang"]),
+        max_reflections=int(selection.get("max_reflections", 512)),
+    )
     layered = case.get("layer_radiators") is not None
-    radiators = list(enumerate(case["layer_radiators"])) if layered else [(None, case)]
-    out = dict(case)
-    if layered:
-        out["layer_radiators"] = list(case["layer_radiators"])
-    outcomes = []
-    for layer, radiator in radiators:
-        if radiator is None:
-            continue
-
-        def shell_yield(hkls: list, layer: int | None = layer) -> float:
-            total = 0.0
-            for i in range(0, len(hkls), chunk):
-                pilot = _pilot_case(case, layer, hkls[i : i + chunk])
-                total += float(np.sum(line_density(pilot, grid)))
-            return total * h
-
-        shells = iter_reflection_shells(
-            radiator["crystal"], float(radiator["B_ang2"]), g_max_invang, width_invang
-        )
-        result = select_reflection_cutoff(shell_yield, shells, tolerance)
-        outcomes.append(result)
-        if layer is None:
-            out["hkl_list"] = result.hkl_list
-        else:
-            out["layer_radiators"][layer] = dict(radiator, hkl_list=result.hkl_list)
-    if layered:
-        out["hkl_list"] = next(r for r in out["layer_radiators"] if r is not None)["hkl_list"]
-    return out, outcomes
+    radiators = [
+        (layer, radiator)
+        for layer, radiator in (enumerate(case["layer_radiators"]) if layered else [(None, case)])
+        if radiator is not None
+    ]
+    record = dict(
+        model=REFLECTION_SELECTION_MODEL,
+        tolerance=float(selection["tolerance"]),
+        quadrature=quadrature,
+        radiators=[
+            dict(
+                layer=layer,
+                crystal=radiator["crystal"],
+                cutoff_invang=outcome.cutoff_invang,
+                reflections=len(outcome.hkl_list),
+                tail_fraction=outcome.tail_fraction if np.isfinite(outcome.tail_fraction) else None,
+                converged=outcome.converged,
+                shells=[
+                    dict(
+                        upper_invang=u, reflections=n, yield_=y, tail=t if np.isfinite(t) else None
+                    )
+                    for u, n, y, t in outcome.shells
+                ],
+            )
+            for (layer, radiator), outcome in zip(radiators, outcomes, strict=True)
+        ],
+    )
+    return spectrum, record

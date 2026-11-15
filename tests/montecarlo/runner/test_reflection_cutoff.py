@@ -162,3 +162,28 @@ def test_prune_cuts_each_radiator_on_its_own_shells_in_bounded_calls():
     assert radiators[2]["hkl_list"] == outcomes[1].hkl_list
     assert layered["layer_radiators"][2]["hkl_list"] == [(1, 1, 1)]
     assert {sum(r is not None for r in c["layer_radiators"]) for c in calls} == {1}
+
+
+def test_selection_keeps_the_spectrum_of_the_selected_set_on_the_axis():
+    from pyrite.montecarlo.runner.reflection_cutoff import (
+        axis_yield_weights,
+        select_case_reflections,
+    )
+
+    calls = []
+    grid = np.linspace(500.0, 10_000.0, 41)
+    weights = axis_yield_weights(grid, "node")
+    np.testing.assert_allclose(weights @ np.ones(grid.size), 9500.0)
+    slab = dict(crystal="silicon", B_ang2=0.46, hkl_list=[(1, 1, 1)], line_quadrature="node")
+    pruned, (outcome,), spectrum = select_case_reflections(
+        slab, _g_decay_density(calls), 1e-3, grid, weights, max_reflections=64
+    )
+    assert {c["line_quadrature"] for c in calls} == {"node"}
+    whole = _g_decay_density([])(dict(slab, hkl_list=outcome.hkl_list), grid)
+    np.testing.assert_allclose(spectrum, whole, rtol=1e-12)
+    assert sum(row[2] for row in outcome.shells) == pytest.approx(whole @ weights)
+    assert pruned["hkl_list"] == outcome.hkl_list
+    bins = axis_yield_weights(grid, "bin-mean")
+    assert bins.sum() == pytest.approx(9500.0 + (grid[1] - grid[0]))
+    with pytest.raises(ValueError):
+        axis_yield_weights(grid, "simpson")
