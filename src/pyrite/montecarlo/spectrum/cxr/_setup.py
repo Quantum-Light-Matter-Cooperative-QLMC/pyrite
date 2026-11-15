@@ -60,7 +60,10 @@ from ._temporal import segment_arrival_times
 # v8 (#1191): incoherent node scoring defaults to the support-windowed
 # reduction with its analytic far tail (node-support-window-tail), a ~1e-5
 # relative yield shift on the frozen #1142/#1143 scenes.
-CXR_ESCAPE_MODEL = "segment-mean-v8-node-support-tail"
+# v9 (#1201): line coupling/escape tables use the edge-resolved geometric mesh
+# (spacing max(1 eV, 1e-3 E), 1 eV within 3 % of edges) instead of a uniform
+# 1 eV mesh (line-absorption-tabulation).
+CXR_ESCAPE_MODEL = "segment-mean-v9-edge-geometric-tables"
 
 
 #: Size of the most recent line setups' tabulation, for performance telemetry.
@@ -915,10 +918,11 @@ def _prepare_spectrum(request):
     # energies ON THE GPU (step 3) -- a few ms over ~10^3 grid points instead of
     # ~0.25 s/case over ~10^5 segments, and E_res stays on the device (no
     # per-reflection GPU->CPU->GPU round-trip; that structure-factor CPU cost was
-    # what capped GPU utilisation on a fast card). The grid is a 1 eV mesh UNION
-    # the basis and absorber elements' native Henke energies, which densely
-    # sample the edges -- a plain uniform mesh mis-resolves the edge jumps (tens
-    # of % at e.g. the C K-edge). Window matches the keep mask below.
+    # what capped GPU utilisation on a fast card). The grid is the edge-resolved
+    # geometric mesh (1 eV near edges, 1e-3 E elsewhere; #1201) UNION the basis
+    # and absorber elements' native Henke energies, which densely sample the
+    # edges -- a plain mesh mis-resolves the edge jumps (tens of % at e.g. the
+    # C K-edge). Window matches the keep mask below.
     E_tab = _line_tabulation_grid(info, abs_comp, E_grid_eV, use_henke)
     E_tab_g = xp.asarray(E_tab, dtype=REAL)
     # chi/U re+im per reflection, log(mu) per absorber, Re n.

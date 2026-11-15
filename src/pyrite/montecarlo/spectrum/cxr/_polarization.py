@@ -30,7 +30,9 @@ def _polarization_pairs(k_hat, g_rows):
     npl[degenerate] = 1.0
     e_s = n_plane / npl[:, None]
     e_p = np.cross(e_s, k_hat[None, :])
-    e_p /= _row_norms(e_p)[:, None]
+    epl = _row_norms(e_p)
+    epl[degenerate] = 1.0  # zero rows, replaced below; avoids a 0/0 warning
+    e_p /= epl[:, None]
     for i in np.flatnonzero(degenerate):
         e_s[i], e_p[i] = _polarization_pair(k_hat, g_rows[i])
     return e_s, e_p

@@ -28,6 +28,13 @@ from . import _fused
 from ._line_tables import fill_tables_in_batches
 from ._position_twins import shorten_position_twin, stage_row, with_position_twins
 from ._recoil import _quantum_line_factors
+from ._tabulation_mesh import (  # noqa: F401 - kernel-facing re-exports
+    _LINE_TAB_EDGE_WINDOW,
+    _LINE_TAB_RATIO,
+    _cxr_tabulation_grid,
+    _epdl_mesh_nodes,
+    _line_mesh,
+)
 
 # ---- segment-sum CXR spectrum ------------------------------------------------
 # Owning registry for every per-row transform: layer filtering, population
@@ -346,59 +353,6 @@ def _elemental_log_mu_table(composition, energy_grid):
         for element, density in composition
     ]
     return np.log(np.stack(rows, axis=0))
-
-
-def _epdl_mesh_nodes(element, lo, hi):
-    """EPDL knots of ``element`` in ``[lo, hi]``, edges as float32-exact pairs.
-
-    The escape ``mu`` is lin-lin between EPDL knots, so a mesh interval that
-    straddles a knot interpolates across a slope change; every channel's knots
-    become mesh nodes. At a photoionization edge ``mu`` is discontinuous: a
-    pair of adjacent float32 values with the edge in ``(below, above]`` keeps
-    the jump inside one ulp-wide interval at either ``REAL`` precision.
-
-    Validation: line-absorption-tabulation
-    """
-    from ....materials.atomic import Z_TABLE
-    from ....materials.photon_cross_sections import _table, photoelectric_edges
-
-    nodes = [
-        knots[(knots >= lo) & (knots <= hi)]
-        for knots, _sigma in _table()[Z_TABLE[element]].values()
-    ]
-    for edge_eV, _jump in photoelectric_edges(element):
-        if not lo <= edge_eV <= hi:
-            continue
-        above = np.float32(edge_eV)
-        if float(above) < edge_eV:
-            above = np.nextafter(above, np.float32(np.inf))
-        below = np.nextafter(above, np.float32(-np.inf))
-        nodes.append(np.array([float(below), float(above)]))
-    return np.concatenate(nodes)
-
-
-def _cxr_tabulation_grid(crystal_info, composition, lo, hi):
-    """Shared 1 eV/native-Chantler line grid, including absorber elements.
-
-    Absorber elements also contribute their EPDL knots and edge node pairs,
-    where the escape ``mu`` changes slope or jumps (:func:`_epdl_mesh_nodes`).
-
-    Validation: line-absorption-tabulation
-    """
-    from ....materials.atomic import load_henke
-
-    grids = [np.arange(lo, hi + 1.0, 1.0)]
-    elements = {element for element, _ in crystal_info["basis"]}
-    elements.update(element for element, _density in composition)
-    for element in elements:
-        try:
-            native_energy = load_henke(element)[0]
-            grids.append(native_energy[(native_energy >= lo) & (native_energy <= hi)])
-        except Exception:
-            pass
-    for element, _density in composition:
-        grids.append(_epdl_mesh_nodes(element, lo, hi))
-    return np.unique(np.concatenate(grids))
 
 
 def _cxr_table_nan_onsets(crystal_info, composition, use_henke):
