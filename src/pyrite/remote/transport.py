@@ -16,7 +16,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 
-from .._env import env_value
+from .._util.env import env_value
+from .._util.hashing import file_sha256
 from ..console import dashboard as presentation
 from . import config
 from .reporting import is_quiet, report
@@ -101,11 +102,7 @@ def _local_sha256(path: Path) -> str | None:
     """Return a checkpoint's SHA-256 digest, or ``None`` when it is absent."""
     if not path.is_file():
         return None
-    digest = hashlib.sha256()
-    with path.open("rb") as source:
-        for chunk in iter(lambda: source.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+    return file_sha256(path)
 
 
 def _remote_sha256(path: str) -> str:
@@ -627,11 +624,7 @@ def _entry_digest(local: Path) -> str:
     """Digest one payload file's content as it will exist on the box."""
     if local.suffix.lower() in config.TEXT_EXTS:
         return hashlib.sha256(_normalized_text_bytes(local)).hexdigest()
-    digest = hashlib.sha256()
-    with local.open("rb") as source:
-        for chunk in iter(lambda: source.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+    return file_sha256(local)
 
 
 def _payload_digest(entries: list[tuple[str, Path]]) -> str:

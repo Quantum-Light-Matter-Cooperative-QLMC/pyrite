@@ -82,7 +82,7 @@ the historical lowering. This is not a scheduler profile
 
 ## Deprecated spellings
 
-Removal dates live in `pyrite._api_deprecations`.
+Removal dates live in `pyrite._util.deprecations`.
 
 | Removed | Replacement | Notes |
 | --- | --- | --- |

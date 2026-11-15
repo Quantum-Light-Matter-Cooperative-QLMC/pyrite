@@ -14,8 +14,8 @@ from typing import cast
 import numpy as np
 import pandas as pd
 
-from .._formatting import fmt_thickness
 from .._spectral_components import cxr_spectrum
+from .._util.formatting import fmt_thickness
 from ..detectors import Detector, LegacyEDS
 from ..materials import CATALOG
 from .metrics import cxr_metrics

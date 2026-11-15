@@ -2,7 +2,7 @@
 
 import pytest
 
-from pyrite._env import GENERATED_INVOCATION_ENV
+from pyrite._util.env import GENERATED_INVOCATION_ENV
 from pyrite.remote import _queue_scripts, scripts
 from pyrite.runs import scan
 

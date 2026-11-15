@@ -47,6 +47,7 @@ dedicated section yet; the column names the page covering their closest owner.
 | Package | Owns | Nearest detail page |
 |---|---|---|
 | `_entry` | Thin `python -m` shims invoked on the remote box | [Entry points](repo-map/entry-points.md) |
+| `_util` | Domain-free private helpers: atomic writes, file/JSON digests, env, extras, deprecation schedules | [CLI & packaging](repo-map/cli-and-packaging.md) |
 | `apps` | Packaged marimo apps and validation resources | [CLI & packaging](repo-map/cli-and-packaging.md) |
 | `beams` | Public beam and source-distribution descriptions | [Campaign](repo-map/campaign-and-runs.md) |
 | `campaign` | Campaign configuration, profiles, sweep construction, case lowering | [Campaign](repo-map/campaign-and-runs.md) |
@@ -92,165 +93,185 @@ behind lazy dispatch, ``__getattr__``, or ``import_module`` are outside this sca
 ```text
 Components (a + b denotes a static import cycle):
   p0: _entry
-  p1: apps
-  p2: beams
-  p3: campaign
-  p4: checkpoints
-  p5: cli
-  p6: config
-  p7: console
-  p8: detectors
-  p9: devtools
-  p10: energy_grid
-  p11: execution
-  p12: experimental
-  p13: geometry
-  p14: instrument
-  p15: materials
-  p16: montecarlo
-  p17: observations
-  p18: optimization
-  p19: perf
-  p20: plots
-  p21: quantum
-  p22: radiation
-  p23: remote
-  p24: results
-  p25: runs
-  p26: storage
-  p27: tools
-  p28: transport
-  p29: validation
-  p30: xsgen
+  p1: _util
+  p2: apps
+  p3: beams
+  p4: campaign
+  p5: checkpoints
+  p6: cli
+  p7: config
+  p8: console
+  p9: detectors
+  p10: devtools
+  p11: energy_grid
+  p12: execution
+  p13: experimental
+  p14: geometry
+  p15: instrument
+  p16: materials
+  p17: montecarlo
+  p18: observations
+  p19: optimization
+  p20: perf
+  p21: plots
+  p22: quantum
+  p23: radiation
+  p24: remote
+  p25: results
+  p26: runs
+  p27: storage
+  p28: tools
+  p29: transport
+  p30: validation
+  p31: xsgen
 Edges (importer -> imported):
-  p0 -> p15
-  p0 -> p29
-  p0 -> p5
-  p0 -> p7
-  p1 -> p13
-  p1 -> p15
-  p1 -> p16
-  p1 -> p17
-  p1 -> p2
-  p1 -> p20
-  p1 -> p23
-  p1 -> p24
-  p1 -> p25
-  p1 -> p26
-  p1 -> p29
-  p1 -> p3
-  p1 -> p4
-  p1 -> p6
-  p1 -> p7
-  p1 -> p8
-  p10 -> p15
-  p10 -> p16
-  p10 -> p23
-  p10 -> p24
-  p10 -> p3
+  p0 -> p16
+  p0 -> p30
+  p0 -> p6
+  p0 -> p8
+  p10 -> p1
+  p10 -> p11
+  p10 -> p21
+  p10 -> p25
+  p10 -> p26
+  p10 -> p30
   p10 -> p4
-  p10 -> p7
+  p10 -> p6
   p10 -> p8
+  p11 -> p1
   p11 -> p16
-  p11 -> p3
+  p11 -> p17
+  p11 -> p24
+  p11 -> p25
   p11 -> p4
-  p14 -> p15
-  p14 -> p8
-  p16 -> p15
-  p16 -> p21
-  p16 -> p30
-  p16 -> p7
-  p17 -> p14
+  p11 -> p5
+  p11 -> p8
+  p11 -> p9
+  p12 -> p1
+  p12 -> p17
+  p12 -> p4
+  p12 -> p5
+  p15 -> p1
+  p15 -> p16
+  p15 -> p9
+  p16 -> p1
+  p17 -> p1
   p17 -> p16
-  p17 -> p24
-  p17 -> p7
+  p17 -> p22
+  p17 -> p31
   p17 -> p8
-  p18 -> p24
+  p18 -> p1
+  p18 -> p15
+  p18 -> p17
   p18 -> p25
-  p18 -> p3
-  p19 -> p15
-  p19 -> p16
-  p19 -> p3
-  p19 -> p7
-  p20 -> p15
+  p18 -> p8
+  p18 -> p9
+  p19 -> p25
+  p19 -> p26
+  p19 -> p4
+  p2 -> p1
+  p2 -> p14
+  p2 -> p16
+  p2 -> p17
+  p2 -> p18
+  p2 -> p21
+  p2 -> p24
+  p2 -> p25
+  p2 -> p26
+  p2 -> p27
+  p2 -> p3
+  p2 -> p30
+  p2 -> p4
+  p2 -> p5
+  p2 -> p7
+  p2 -> p8
+  p2 -> p9
   p20 -> p16
-  p20 -> p24
-  p20 -> p7
+  p20 -> p17
+  p20 -> p4
   p20 -> p8
-  p21 -> p15
-  p23 -> p15
-  p23 -> p16
-  p23 -> p19
-  p23 -> p24
-  p23 -> p25
-  p23 -> p29
-  p23 -> p3
-  p23 -> p30
-  p23 -> p4
-  p23 -> p7
-  p24 -> p14
-  p24 -> p15
+  p21 -> p1
+  p21 -> p16
+  p21 -> p17
+  p21 -> p25
+  p21 -> p8
+  p21 -> p9
+  p22 -> p1
+  p22 -> p16
+  p24 -> p1
   p24 -> p16
-  p24 -> p21
+  p24 -> p17
+  p24 -> p20
+  p24 -> p25
+  p24 -> p26
+  p24 -> p30
+  p24 -> p31
+  p24 -> p4
+  p24 -> p5
   p24 -> p8
-  p25 -> p11
-  p25 -> p14
+  p25 -> p1
   p25 -> p15
   p25 -> p16
   p25 -> p17
-  p25 -> p19
-  p25 -> p21
-  p25 -> p24
-  p25 -> p3
-  p25 -> p30
-  p25 -> p4
-  p25 -> p7
-  p29 -> p15
-  p29 -> p16
-  p29 -> p3
-  p29 -> p4
-  p29 -> p7
-  p29 -> p8
-  p3 -> p13
-  p3 -> p14
-  p3 -> p15
-  p3 -> p16
-  p3 -> p17
-  p3 -> p21
-  p3 -> p24
-  p3 -> p30
-  p3 -> p6
-  p3 -> p8
-  p30 -> p15
-  p30 -> p7
+  p25 -> p22
+  p25 -> p9
+  p26 -> p1
+  p26 -> p12
+  p26 -> p15
+  p26 -> p16
+  p26 -> p17
+  p26 -> p18
+  p26 -> p20
+  p26 -> p22
+  p26 -> p25
+  p26 -> p31
+  p26 -> p4
+  p26 -> p5
+  p26 -> p8
+  p30 -> p16
+  p30 -> p17
+  p30 -> p4
+  p30 -> p5
+  p30 -> p8
+  p30 -> p9
+  p31 -> p1
+  p31 -> p16
+  p31 -> p8
+  p4 -> p1
+  p4 -> p14
   p4 -> p15
   p4 -> p16
-  p4 -> p24
-  p4 -> p3
+  p4 -> p17
+  p4 -> p18
+  p4 -> p22
+  p4 -> p25
+  p4 -> p31
   p4 -> p7
-  p5 -> p10
-  p5 -> p13
-  p5 -> p14
-  p5 -> p15
+  p4 -> p9
+  p5 -> p1
   p5 -> p16
-  p5 -> p19
-  p5 -> p23
+  p5 -> p17
   p5 -> p25
-  p5 -> p3
-  p5 -> p30
   p5 -> p4
-  p5 -> p7
   p5 -> p8
-  p7 -> p15
-  p8 -> p15
-  p8 -> p6
-  p9 -> p10
-  p9 -> p20
-  p9 -> p24
-  p9 -> p25
-  p9 -> p29
-  p9 -> p3
-  p9 -> p5
+  p6 -> p1
+  p6 -> p11
+  p6 -> p14
+  p6 -> p15
+  p6 -> p16
+  p6 -> p17
+  p6 -> p20
+  p6 -> p24
+  p6 -> p26
+  p6 -> p31
+  p6 -> p4
+  p6 -> p5
+  p6 -> p8
+  p6 -> p9
+  p8 -> p1
+  p8 -> p16
+  p9 -> p1
+  p9 -> p16
   p9 -> p7
 ```
 <!-- END GENERATED PACKAGE DEPENDENCIES -->

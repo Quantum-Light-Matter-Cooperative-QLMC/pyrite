@@ -6,7 +6,7 @@ from pathlib import Path
 
 import click
 
-from ..._env import set_canonical_env
+from ..._util.env import set_canonical_env
 from ...console import config as _cli_config
 from ...console import output as _cli_core
 from ...console.outputs import output_default, output_dir, output_label

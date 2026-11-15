@@ -12,8 +12,6 @@ Validation: cr-axial-persisted-channel
 
 from __future__ import annotations
 
-import hashlib
-import json
 import math
 from collections.abc import Mapping
 from dataclasses import asdict
@@ -21,6 +19,7 @@ from typing import Any
 
 import numpy as np
 
+from ..._util.hashing import canonical_json_digest
 from ...quantum._admission import UNADMITTED, AxialAdmissionError
 from ...quantum._axial_envelope import (
     ADMITTED_AXIAL_CASES,
@@ -137,9 +136,7 @@ def axial_channeling_record(admitted: AxialFibreCase) -> dict[str, object]:
         "temperature_K": admitted.temperature_K,
         "numerics": asdict(admitted.numerics),
     }
-    settings_digest = hashlib.sha256(
-        json.dumps(settings, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
-    ).hexdigest()
+    settings_digest = canonical_json_digest(settings)
     if isinstance(admitted, UnadmittedAxialCase):
         return {
             "model": "axial",

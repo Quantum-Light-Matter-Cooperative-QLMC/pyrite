@@ -1,3 +1,6 @@
+"""Compact human-readable labels for display."""
+
+
 def fmt_thickness(t_ang):
     """Compact human thickness label from Angstroms: 316A / 31.6nm / 17um / 1mm."""
     if t_ang < 1e2:

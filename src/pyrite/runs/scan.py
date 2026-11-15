@@ -40,12 +40,12 @@ from pathlib import Path
 import click
 
 from .._catalog_keys import material_keys
-from .._env import GENERATED_INVOCATION_ENV, set_canonical_env
 from .._physics_fallback import PhysicsFallbackWarning, fallback_cases
 from .._progress import (  # noqa: F401  (re-exported: progress helpers' historical scan import path)
     _ProgressTimer,
     _write_progress_record,
 )
+from .._util.env import GENERATED_INVOCATION_ENV, set_canonical_env
 from ..console import dashboard as _dashboard
 from ..console import json as cli_json
 from ..console import output as _cli_core

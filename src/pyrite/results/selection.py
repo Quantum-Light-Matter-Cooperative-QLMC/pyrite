@@ -14,8 +14,8 @@ flux), collapsing hundreds of azimuth runs to one row/curve each.
 
 import numpy as np
 
-from .._formatting import fmt_thickness
 from .._spectral_components import cxr_spectrum
+from .._util.formatting import fmt_thickness
 
 
 # ---- record selection --------------------------------------------------------

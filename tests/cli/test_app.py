@@ -195,7 +195,7 @@ def test_split_app_export_never_launches(monkeypatch, tmp_path):
 
 
 def _hide_modules(monkeypatch, *names):
-    import pyrite._extras as extras
+    import pyrite._util.extras as extras
 
     real_find_spec = extras.find_spec
     monkeypatch.setattr(

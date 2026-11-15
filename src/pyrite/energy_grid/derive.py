@@ -26,13 +26,13 @@ running them one at a time.
 import argparse
 import json
 import os
-import tempfile
 import time
 from dataclasses import asdict, dataclass
 
 import numpy as np
 
 from pyrite._cxr_grid_policy import AUTOMATIC_RESOLUTION_POLICY, COVERAGE_BANDWIDTH_POLICY
+from pyrite._util.io import atomic_write_json
 from pyrite.campaign.config import material_sweep
 from pyrite.campaign.sweep import _unique_angles, build_cases
 from pyrite.energy_grid.bounds import coverage_energy, cxr_start_eV, margined_stop
@@ -351,24 +351,6 @@ def _geometry_plan(materials, reference_scan, tilts=None, azimuths=None, thickne
     return coarse, []
 
 
-def _atomic_write_json(path, rows):
-    """Write ``rows`` to ``path`` atomically (temp file in the same dir + rename)
-    so a killed slice never leaves a half-written checkpoint that a resume would
-    choke on."""
-    directory = os.path.dirname(os.path.abspath(path)) or "."
-    fd, tmp = tempfile.mkstemp(dir=directory, suffix=".tmp")
-    try:
-        with os.fdopen(fd, "w") as f:
-            json.dump(rows, f, indent=2)
-        os.replace(tmp, path)
-    except BaseException:
-        try:
-            os.remove(tmp)
-        except OSError:
-            pass
-        raise
-
-
 def derive_bounds(
     materials,
     energies,
@@ -619,11 +601,11 @@ def _run_one_material(
 
     def _save(rows):
         if path:
-            _atomic_write_json(path, rows)
+            atomic_write_json(path, rows)
 
     def _save_phase(value):
         if phase_path:
-            _atomic_write_json(phase_path, value or {})
+            atomic_write_json(phase_path, value or {})
 
     rows, complete = derive_bounds(
         [material],
@@ -644,7 +626,7 @@ def _run_one_material(
         thicknesses=thicknesses,
     )
     if path and complete:
-        _atomic_write_json(path, rows)
+        atomic_write_json(path, rows)
     return rows, complete
 
 
@@ -710,7 +692,7 @@ def derive_all_materials(
             complete = False
             break
     if complete and json_out:
-        _atomic_write_json(json_out, combined)
+        atomic_write_json(json_out, combined)
     return combined, complete
 
 
@@ -876,7 +858,7 @@ def main(argv=None):
             f"step={brem['step_eV']:g} eV"
         )
     if args.json_out and complete:
-        _atomic_write_json(args.json_out, combined)
+        atomic_write_json(args.json_out, combined)
         print(f"[analyze_line_grid_bounds] wrote {args.json_out}")
     if not complete:
         print("[analyze_line_grid_bounds] slice budget exhausted; work remains")

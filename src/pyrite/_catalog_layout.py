@@ -21,9 +21,7 @@ object files whose content changed. This module stays import-light (no
 catalog keys through it; ``tomlkit`` is imported only by the text round trip.
 """
 
-import os
 import re
-import tempfile
 import tomllib
 from collections.abc import Generator
 from contextlib import contextmanager
@@ -31,6 +29,7 @@ from contextvars import ContextVar
 from pathlib import Path
 from typing import Any
 
+from ._util.io import atomic_write_text
 from .paths import data_dir
 
 MANIFEST = "catalog.toml"
@@ -346,18 +345,6 @@ def split_text(text: str) -> dict[str, str]:
     return files
 
 
-def _atomic_write(path: Path, text: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, temporary = tempfile.mkstemp(dir=path.parent, prefix=".", suffix=".tmp")
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as stream:
-            stream.write(text)
-        os.replace(temporary, path)
-    except BaseException:
-        Path(temporary).unlink(missing_ok=True)
-        raise
-
-
 class BundledProfileError(CatalogLayoutError):
     """A user edit would change a bundled object (historic profile error name)."""
 
@@ -399,7 +386,7 @@ def write_text(path: Path | str, text: str) -> None:
     """
     path = Path(path)
     if not path.is_dir():
-        _atomic_write(path, text)
+        atomic_write_text(path, text)
         return
     wanted = split_text(text)
     files = dict(source_files(path))
@@ -449,7 +436,7 @@ def write_text(path: Path | str, text: str) -> None:
             )
         )
     for relative, content in changed.items():
-        _atomic_write(target(relative), content)
+        atomic_write_text(target(relative), content)
     for relative in removed:
         files[relative].unlink()
 

@@ -16,8 +16,8 @@ from typing import TYPE_CHECKING, Self
 
 import numpy as np
 
-from ._spec_defaults import UNSET, _Unset
 from ._units import _length_vector, _quantity_spelling, _scalar_quantity, normalize_unit
+from ._util.spec_defaults import UNSET, _Unset
 
 if TYPE_CHECKING:
     from pint import Quantity

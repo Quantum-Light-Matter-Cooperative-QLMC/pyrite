@@ -9,7 +9,7 @@ from typing import Any
 
 from ..._backend import BACKEND, BackendResourceError, BackendUnavailableError
 from ..._energy_grid_encoding import decode_energy_grid
-from ..._env import env_value
+from ..._util.env import env_value
 from ...quantum._admission import is_axial_channeling as _is_axial
 from ..case import AxialAdmissionError, admit_axial_channeling_cases
 from . import (

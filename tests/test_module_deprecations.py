@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from pyrite._module_deprecations import MODULE_DEPRECATIONS, PUBLIC_EXPORT_DEPRECATIONS, _window
+from pyrite._util.deprecations import MODULE_DEPRECATIONS, PUBLIC_EXPORT_DEPRECATIONS, _window
 
 
 def _live_module_shims() -> set[str]:

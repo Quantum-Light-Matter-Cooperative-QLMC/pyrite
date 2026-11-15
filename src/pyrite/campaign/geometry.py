@@ -32,11 +32,11 @@ from typing import TYPE_CHECKING, Any, Protocol, Self, cast
 
 import numpy as np
 
-from .._formatting import fmt_thickness
-from .._spec_defaults import UNSET as _UNSET
-from .._spec_defaults import _Unset
 from .._units import _positive_length_quantity as _geometry_length
 from .._units import normalize_unit
+from .._util.formatting import fmt_thickness
+from .._util.spec_defaults import UNSET as _UNSET
+from .._util.spec_defaults import _Unset
 from ..materials import CATALOG, LayerSpec
 from ..materials._composition import resolve_composition
 from ..materials.crystal import dominant_reflections

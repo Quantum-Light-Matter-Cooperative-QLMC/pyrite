@@ -22,9 +22,9 @@ from typing import TYPE_CHECKING, Any, Self
 
 import numpy as np
 
-from .._spec_defaults import UNSET as _UNSET
-from .._spec_defaults import _Unset
 from .._units import _is_pint_quantity, _scalar_quantity, normalize_unit
+from .._util.spec_defaults import UNSET as _UNSET
+from .._util.spec_defaults import _Unset
 from ..montecarlo.bunch_front import BunchFrontTilt, validate_front_source
 from ..montecarlo.transverse import TransverseDistribution
 from ..quantum.state import TransverseStateSpec

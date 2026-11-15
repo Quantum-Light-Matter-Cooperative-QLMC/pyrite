@@ -5,9 +5,9 @@ from numbers import Real
 from typing import TYPE_CHECKING, Literal, Self
 
 from ._planar_geometry import _positive_pair, _positive_real
-from ._spec_defaults import UNSET as _UNSET
-from ._spec_defaults import _Unset
 from ._units import _positive_length_quantity, normalize_unit
+from ._util.spec_defaults import UNSET as _UNSET
+from ._util.spec_defaults import _Unset
 from .materials._composition import has_positive_number_densities, resolve_composition
 from .materials._schema import MaterialCatalog, MediumSpec
 

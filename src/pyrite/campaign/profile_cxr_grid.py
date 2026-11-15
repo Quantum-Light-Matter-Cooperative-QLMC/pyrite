@@ -4,7 +4,7 @@ import tomlkit
 
 from pyrite._cxr_grid_policy import ENVIRONMENT_NAMES as CXR_GRID_ENVIRONMENT_NAMES
 from pyrite._cxr_grid_policy import PROFILE_CXR_GRID_SELECTORS, check_selector_combination
-from pyrite._env import env_value
+from pyrite._util.env import env_value
 
 from ._profile_document import energy_grid_refs, existing_profile, profile_overrides
 

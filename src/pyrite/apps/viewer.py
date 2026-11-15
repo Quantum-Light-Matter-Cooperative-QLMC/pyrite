@@ -17,7 +17,7 @@ launcher and the notebook share lives lower still, in
 from typing import Any
 
 from .._app_defaults import get_viewer_default, set_viewer_default
-from .._env import env_value
+from .._util.env import env_value
 
 
 def get_default_material():

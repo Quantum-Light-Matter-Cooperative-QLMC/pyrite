@@ -160,7 +160,7 @@ class Trajectories(Mapping[str, Any]):
 
     # Deprecated Mapping view of the former dict output (#1162).
     def _warn(self) -> None:
-        from .._api_deprecations import API_DEPRECATIONS
+        from .._util.deprecations import API_DEPRECATIONS
 
         entry = API_DEPRECATIONS["simulate_trajectories()[...]"]
         warnings.warn(

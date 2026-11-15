@@ -1,6 +1,6 @@
 from collections.abc import Sequence
 
-from pyrite._formatting import fmt_thickness
+from pyrite._util.formatting import fmt_thickness
 from pyrite.plots._frames import _HEATMAP_QUANTITIES
 from pyrite.results import records, sweep_values, thicknesses_by_energy
 

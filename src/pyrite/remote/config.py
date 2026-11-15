@@ -10,7 +10,7 @@ from dataclasses import dataclass, replace
 from functools import cache
 from pathlib import Path, PurePosixPath
 
-from .._env import env_value
+from .._util.env import env_value
 from ..console.outputs import LEGACY_LAYOUT, OUTPUT_DIRNAME
 
 # Compatibility override for tests and callers that historically patched this

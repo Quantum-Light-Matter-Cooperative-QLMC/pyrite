@@ -70,7 +70,7 @@ and ``PYRITE_REMOTE_UV`` when they differ.
 # ``remote.<name>`` at call time (as ``energy_grid/job.py`` does).
 # ---------------------------------------------------------------------------
 
-from .._env import env_value
+from .._util.env import env_value
 from . import (
     config,
     lifecycle,

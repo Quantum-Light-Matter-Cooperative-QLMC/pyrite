@@ -63,6 +63,18 @@ These are **intended** layers, not a claim the current source already conforms.
 moving serialized dataclasses or changing `__module__`/pickle paths merely to
 satisfy the diagram; a separate, reviewed type-ownership slice is needed.
 
+### Domain-free helpers
+
+`pyrite._util` is the bottom layer: atomic text/JSON writes (`io`), streamed
+file and canonical-JSON digests (`hashing`), environment reads (`env`),
+optional-extra hints (`extras`), deprecation schedules (`deprecations`), the
+omission sentinel (`spec_defaults`) and small display formatters
+(`formatting`). Its modules import only the standard library and third-party
+packages. The `util-imports-no-pyrite` import-linter contract forbids any
+`pyrite.*` import from it, so every layer may depend on it. Put a helper here
+only if it carries no domain knowledge; shared *domain* leaves such as
+`_grid_semantics` or `_component_support` stay at the package root.
+
 ## Initial cycle removal
 
 A concrete direct-import cycle on main was:

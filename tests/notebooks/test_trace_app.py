@@ -213,7 +213,7 @@ def test_penetration_controls_offer_material_presets_and_uncapped_energy() -> No
 def test_thickness_controls_and_context_use_shared_human_units() -> None:
     source = APP.read_text()
 
-    assert "from pyrite._formatting import fmt_thickness" in source
+    assert "from pyrite._util.formatting import fmt_thickness" in source
     assert "build_configured_cases(_sweep, settings, check_kinematic_validity=False)" in source
     # The preset-thickness dropdown labels its options in human units.
     assert "fmt_thickness(value)" in source

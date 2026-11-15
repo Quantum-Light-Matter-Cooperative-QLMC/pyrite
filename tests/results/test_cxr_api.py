@@ -223,16 +223,16 @@ def test_old_sweep_axis_path_is_removed():
 
 
 def test_removed_api_alias_helpers_are_unavailable():
-    from pyrite import _api_deprecations
+    from pyrite._util import deprecations
 
-    assert not hasattr(_api_deprecations, "renamed_fields")
-    assert not hasattr(_api_deprecations, "warn_renamed")
+    assert not hasattr(deprecations, "renamed_fields")
+    assert not hasattr(deprecations, "warn_renamed")
 
 
 @pytest.mark.parametrize("suffix", ["CHUNK", "BUDGET_MB"])
 @pytest.mark.parametrize("value", ["", "0", "128"])
 def test_cxr_environment_uses_canonical_names(monkeypatch, suffix, value):
-    from pyrite._env import env_value, set_canonical_env
+    from pyrite._util.env import env_value, set_canonical_env
 
     canonical = f"PYRITE_MC_CXR_{suffix}"
     legacy = f"PYRITE_MC_SPEC_{suffix}"

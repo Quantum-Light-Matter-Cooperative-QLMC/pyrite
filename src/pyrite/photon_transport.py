@@ -29,8 +29,8 @@ from ._photon_support import (
 from ._photon_support import (
     _scene_feedback as _scene_feedback,
 )
-from ._spec_defaults import UNSET, _Unset
 from ._units import reject_quantity
+from ._util.spec_defaults import UNSET, _Unset
 from .campaign.resolution import resolve_simulation
 
 if TYPE_CHECKING:

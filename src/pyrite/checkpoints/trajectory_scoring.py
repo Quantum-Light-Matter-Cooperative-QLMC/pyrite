@@ -12,7 +12,6 @@ nor written, as with ``pyrite run --no-cache``.
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 from collections.abc import Callable, Iterable
@@ -20,6 +19,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from .._util.hashing import file_sha256
 from ..montecarlo.case import refuse_axial_channeling
 from ..montecarlo.trajectories import (
     TrajectoryArtifact,
@@ -31,17 +31,6 @@ from ..montecarlo.trajectories import (
 #: Records scored between checkpoint saves; an interrupted run resumes from the
 #: last save.
 SAVE_EVERY = 25
-
-_HASH_BLOCK_BYTES = 8 * 1024 * 1024
-
-
-def file_sha256(path: str | os.PathLike[str]) -> str:
-    """SHA-256 of a file's bytes, read in bounded blocks."""
-    digest = hashlib.sha256()
-    with open(path, "rb") as handle:
-        while block := handle.read(_HASH_BLOCK_BYTES):
-            digest.update(block)
-    return digest.hexdigest()
 
 
 @dataclass

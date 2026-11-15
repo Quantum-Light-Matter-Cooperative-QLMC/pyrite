@@ -6,7 +6,7 @@ docs/validation/geometry/blazed-groove-geometry.md)."""
 import numpy as np
 from click.testing import CliRunner
 
-from pyrite._formatting import fmt_thickness
+from pyrite._util.formatting import fmt_thickness
 from pyrite.campaign.config import material_sweep
 from pyrite.campaign.sweep import BeamSpec, Sweep, build_cases
 from pyrite.cli.commands import blaze as blaze_cli

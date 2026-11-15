@@ -16,14 +16,14 @@ have no network, so installation stays an explicit step.
 Validation: bote-salvat-ionization-backend
 """
 
-import hashlib
 import os
 import shutil
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
-_CHUNK = 1 << 20
+from ._util.hashing import file_sha256
+
 #: PyRITE's own GitHub Release downloads: mirrors and derived data.
 _RELEASES = "https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/releases/download"
 
@@ -224,15 +224,6 @@ def require_dataset(name: str) -> Path:
             f"Install it with {fetch_hint(name)}."
         )
     return path
-
-
-def file_sha256(path: Path) -> str:
-    """Return the SHA-256 of one file, streamed."""
-    digest = hashlib.sha256()
-    with Path(path).open("rb") as stream:
-        for block in iter(lambda: stream.read(_CHUNK), b""):
-            digest.update(block)
-    return digest.hexdigest()
 
 
 def verify_dataset(name: str) -> str:

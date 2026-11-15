@@ -26,7 +26,7 @@ def check_root_policy(root: Path, names: set[str], core: frozenset[str]) -> list
         payload = tomllib.loads((root / "api-surface.toml").read_text(encoding="utf-8"))
         policies = payload.get("root_policy", {})
         retained = _literal(root / "src/pyrite/__init__.py", "_ROOT_API")
-        replacements = _literal(root / "src/pyrite/_api_deprecations.py", "ROOT_API_REPLACEMENTS")
+        replacements = _literal(root / "src/pyrite/_util/deprecations.py", "ROOT_API_REPLACEMENTS")
     except (OSError, SyntaxError, ValueError, TypeError) as exc:
         return [f"root policy: cannot read reviewed declarations: {exc}"]
     if not isinstance(policies, dict):

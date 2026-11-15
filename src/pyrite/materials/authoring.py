@@ -4,7 +4,6 @@ No build or save operation generates transport tables or downloads data.
 """
 
 import hashlib
-import json
 import math
 import os
 import re
@@ -18,8 +17,9 @@ from typing import TYPE_CHECKING, Any
 from scipy.constants import Avogadro
 
 from .. import _catalog_layout as layout
-from .._spec_defaults import UNSET, _Unset
 from .._units import _scalar_quantity, reject_quantity
+from .._util.hashing import canonical_json_digest
+from .._util.spec_defaults import UNSET, _Unset
 from ._catalog_decode import _Errors
 from ._parse import _parse_crystals, _parse_media
 from ._schema import MaterialConfigError, MediumSpec
@@ -173,9 +173,7 @@ def _definition(
 
     physical = {"kind": kind, "record": record}
     # The managed CIF filename is a content hash, not a registration name.
-    identity = hashlib.sha256(
-        json.dumps(physical, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
-    ).hexdigest()
+    identity = canonical_json_digest(physical)
     return MaterialDefinition(
         name,
         kind,

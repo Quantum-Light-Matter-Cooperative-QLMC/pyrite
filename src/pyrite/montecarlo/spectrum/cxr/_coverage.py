@@ -12,7 +12,7 @@ from contextvars import ContextVar
 import numpy as np
 
 from ...._backend import REAL, _to_cpu, xp
-from ...._env import env_value
+from ...._util.env import env_value
 from ....materials.atomic import _chantler_bounds
 from ....materials.crystal import _EDGE_PRONE, HBARC_EV_ANG, reciprocal_g_vector
 from ....materials.photon_cross_sections import EPDL_E_MIN_EV

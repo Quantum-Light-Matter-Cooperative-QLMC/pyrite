@@ -7,9 +7,9 @@ from dataclasses import dataclass, replace
 from numbers import Real
 from typing import TYPE_CHECKING, Literal, Self
 
-from .._spec_defaults import UNSET as _UNSET
-from .._spec_defaults import _Unset
 from .._units import normalize_unit
+from .._util.spec_defaults import UNSET as _UNSET
+from .._util.spec_defaults import _Unset
 from ..bodies import RectangularBody, SubstanceRef
 from . import geometry
 from ._geometry_values import _angle_spelling, _quantity_geometry, _scalar_angle_quantity

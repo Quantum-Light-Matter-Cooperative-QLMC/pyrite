@@ -48,7 +48,7 @@ quadrature
 
 This module is a leaf on purpose. ``energy_grid`` imports ``montecarlo.runner``,
 so the runner cannot import ``energy_grid``; and #64 may move the energy-grid CLI
-entirely. Only ``numpy``, ``pyrite._env``, ``pyrite.paths``, the grid leaves
+entirely. Only ``numpy``, ``pyrite._util.env``, ``pyrite.paths``, the grid leaves
 ``_grid_semantics`` and ``_cxr_windows``, and the pure
 ``pyrite.materials.crystal`` kinematics are used here.
 """
@@ -65,12 +65,12 @@ from typing import Any
 import numpy as np
 
 from ._cxr_windows import WindowPlan
-from ._env import env_value
 from ._grid_semantics import (
     resolution_num,
     validate_backend_coordinates,
     validate_backend_spacing,
 )
+from ._util.env import env_value
 from .console.outputs import output_dir
 
 __all__ = [

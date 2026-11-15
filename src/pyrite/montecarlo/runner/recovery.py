@@ -8,7 +8,7 @@ from time import perf_counter
 import numpy as np
 
 from ..._backend import BackendResourceError
-from ..._env import env_value
+from ..._util.env import env_value
 
 _ENGINE = ContextVar("runner_recovery_engine", default="auto")
 RECOVERY_KEYS = (
