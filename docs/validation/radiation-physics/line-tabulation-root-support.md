@@ -54,10 +54,12 @@ pass conditionally; sign/convention pass (the upper endpoint is excluded).
 
 The inspected setup helper chooses the basis refraction endpoint only with
 `use_henke=True`; otherwise it returns the previous maximum table onset.
-`_cxr_tabulation_grid` uses the original lower endpoint and unit arange stride,
+`_cxr_tabulation_grid` builds its base mesh (`_line_mesh`, #1201) from the lower
+endpoint alone: unit stride, then geometric, with 1 eV edge windows anchored at
+the lower endpoint, cut at the first node at or above the upper endpoint. It
 then unions native Chantler and EPDL nodes. The minimum basis endpoint is itself
 a retained native Chantler node, so shortening the upper endpoint preserves the
-finite prefix exactly. The arange may retain an additional NaN node after that
+finite prefix exactly. The base mesh may retain an additional NaN node after that
 endpoint; retaining extra NaN nodes is harmless. If the lower endpoint already
 exceeds the bound, the upper endpoint becomes at least one eV greater than the
 lower endpoint, retaining a valid multi-node mesh of NaN decrements.

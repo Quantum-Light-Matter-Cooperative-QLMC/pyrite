@@ -200,23 +200,24 @@ def test_channeling_demo_and_off_profile_identities_are_unchanged():
     ``line-major-auto-v3-series`` reproduces the prior pins.
     #1173 re-mints every pin for ``measured-shell-cutoff-v2``; unsupported
     channeling routes retain four-family scoring. #1200 re-mints them for
-    ``measured-shell-cutoff-v3`` (table-sized selection calls).
+    ``measured-shell-cutoff-v3`` (table-sized selection calls), and #1201 for
+    ``segment-mean-v9-edge-geometric-tables`` (line-table mesh).
     """
     sweep, settings, cases = _profile_cases("silicon", "channeling_demo")
     assert cases[0].line_quadrature == "bin-mean"
     assert [profiles.case_content_key(case) for case in cases] == [
-        "68566d14cff5ea637d0dafa32926e7b1ebb394f56b1776bca34e337bca915b38"
+        "c177e9592467cf4f9f26927f4fe5bb7d23bc15bdce5e96cf5ed38084e6c5887e"
     ]
     assert profiles.named_profile_stem("silicon", catalog_profile="channeling_demo") == (
-        "silicon@channeling_demo-456d15be8d36"
+        "silicon@channeling_demo-286b406844d3"
     )
     identity = profiles.dataset_identity("silicon", settings, sweep)
     assert identity["parameter_sha256"] == (
-        "9744573925eb08ec7b680fa7271b18ac90f39517807f7fcc057c93a98f1ca838"
+        "226724b0bc7eaa0b762a17605d70af79b41a054d2d15e2a1a5beac6c16e5beb2"
     )
     sweep = material_sweep("hopg", catalog_profile="standard")
     settings = profiles.profile_run_settings(default_settings(), "standard", sweep=sweep)
     assert profiles.dataset_identity("hopg", settings, sweep)["parameter_sha256"] == (
-        "8ad25ee69cb3397ce2c33275b2e11ea9e7588aa5940882e67d708379fcb9bf3e"
+        "8216eed19f0e33d3ddac3da492637a1d0739897279764146d11e0a9da959bcc1"
     )
-    assert profiles.named_profile_stem("hopg") == "hopg@full-8ad25ee69cb3"
+    assert profiles.named_profile_stem("hopg") == "hopg@full-8216eed19f0e"

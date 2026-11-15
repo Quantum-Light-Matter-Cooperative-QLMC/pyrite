@@ -43,15 +43,15 @@ ARMS = ("uniform", "edge-geometric")
 
 @contextmanager
 def mesh_arm(arm):
-    from pyrite.montecarlo.spectrum.cxr import _kernels
+    from pyrite.montecarlo.spectrum.cxr import _tabulation_mesh as mesh
 
-    original = _kernels._line_mesh
+    original = mesh._line_mesh
     if arm == "uniform":
-        _kernels._line_mesh = lambda lo, hi, _edges: np.arange(lo, hi + 1.0, 1.0)
+        mesh._line_mesh = lambda lo, hi, _edges: np.arange(lo, hi + 1.0, 1.0)
     try:
         yield
     finally:
-        _kernels._line_mesh = original
+        mesh._line_mesh = original
 
 
 def compare(density, reference, weights):

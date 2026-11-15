@@ -61,6 +61,17 @@ The historical explicit-EEDL fallback pins were recomputed from their stored
 case payload; no removed fallback behavior was re-enabled. Seeded transport
 is unchanged and existing tolerances are preserved.
 
+## Edge-geometric line tables v9 generation (#1201)
+
+Tabulating the line coupling and escape tables on the edge-resolved geometric
+mesh (spacing `max(1 eV, 1e-3 E)`, the 1 eV mesh kept within 3 % of every
+edge) instead of a uniform 1 eV mesh changed `CXR_ESCAPE_MODEL` from v8 to v9
+(`segment-mean-v9-edge-geometric-tables`). Only the generation-dependent
+`case_content_key` and `parameter_sha256` hashes in `resolved.json` and
+`channeling.json` were re-pinned; every case payload is unchanged. The
+recorded CXR output families stay within their existing tolerances on
+CPU/NumPy fp64 without re-pinning, including the slow-marked checks.
+
 ## Exact second-order PXR/CB elements v7 generation (#1134)
 
 Replacing the classical PXR/CBS amplitudes with the exact second-order elements

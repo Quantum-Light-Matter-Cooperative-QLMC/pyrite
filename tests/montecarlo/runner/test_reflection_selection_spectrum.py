@@ -136,8 +136,10 @@ def test_call_size_follows_tabulation_length_not_device():
     fine = line_table_points("silicon", composition, np.linspace(500.0, 10000.0, 95001))
     wide = line_table_points("silicon", composition, np.linspace(50.0, 300000.0, 9501))
     assert band == fine  # the span sets the tables, not the axis spacing
-    assert wide > 10 * band
-    assert selection_reflections_per_call(wide) < selection_reflections_per_call(band)
+    # #1201: the edge-geometric mesh grows ~logarithmically with the span
+    # (Si 50 eV-300 keV: 9,322 points, not the 1 eV mesh's 362,299).
+    assert band < wide < 2 * band
+    assert selection_reflections_per_call(wide) <= selection_reflections_per_call(band)
 
 
 def test_selection_records_call_size_and_refuses_before_scoring(monkeypatch):

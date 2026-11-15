@@ -117,8 +117,9 @@ stored logarithmic coefficients.
 The implementation matches the boxed elemental interpolation and the stable
 fraction. `_elemental_log_mu_table` samples EPDL totals per composition entry;
 `_interp_elemental_mu` exponentiates each blended row before summing.
-`_cxr_tabulation_grid` unions the 1 eV mesh, basis/absorber Chantler energies,
-and absorber EPDL knots. `_epdl_mesh_nodes` adds adjacent float32 values around
+`_cxr_tabulation_grid` unions the edge-resolved base mesh `_line_mesh` (spacing
+`max(1 eV, 1e-3 E)`, with the 1 eV mesh kept within 3 % of every basis/absorber
+EPDL edge; #1201), basis/absorber Chantler energies, and absorber EPDL knots. `_epdl_mesh_nodes` adds adjacent float32 values around
 each repeated-energy photoelectric edge. The repeated energy itself survives
 `np.unique`, so exact float64 edge nodes retain the right-hand value, while the
 interval immediately below that node smooths the jump. The discontinuous
