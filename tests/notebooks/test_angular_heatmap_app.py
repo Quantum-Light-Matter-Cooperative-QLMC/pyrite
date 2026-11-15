@@ -133,7 +133,15 @@ def test_default_grid_refinement_and_history_normalization():
     coarse = calculate_maps(config)[0]["pxr-cbs"]
     fine = calculate_maps(replace(config, angle_points=144, energy_points=2049))[0]["pxr-cbs"]
     shared = coarse.supported & fine.supported[::2]
-    np.testing.assert_array_equal(coarse.density[shared], fine.density[::2, ::2][shared])
+    # Full-node scoring made shared nodes bit-identical; the default support
+    # window (#1191, x_c = 100) evaluates far tails analytically per grid, an
+    # O(1/x_c^2) difference at the peak's scale.
+    np.testing.assert_allclose(
+        coarse.density[shared],
+        fine.density[::2, ::2][shared],
+        rtol=1e-12,
+        atol=2e-4 * np.nanmax(coarse.density),
+    )
     a = np.trapezoid(coarse.density[shared], coarse.energy_eV, axis=1)
     b = np.trapezoid(fine.density[::2][shared], fine.energy_eV, axis=1)
     assert np.sum(abs(a - b)) / np.sum(b) < 0.01

@@ -212,9 +212,14 @@ def test_realized_pair_matches_fixed_transport_and_spectra(spread, core):
         mask = (energies >= 1000) & (energies <= 10000)
         # Batch and whole-population reductions associate sums differently;
         # CUDA reductions use float32, including brem arrays widened on return.
+        # The windowed node reduction's analytic far tail (#1191) carries that
+        # rounding at the peak's scale into low tail bins.
         reduction_dtype = np.float32 if core == "cuda" else output[key].dtype
         tolerance = max(1e-12, 8 * np.finfo(reduction_dtype).eps)
-        np.testing.assert_allclose(batches[key]["mean"], output[key][mask], rtol=tolerance)
+        expected = output[key][mask]
+        np.testing.assert_allclose(
+            batches[key]["mean"], expected, rtol=tolerance, atol=tolerance * np.abs(expected).max()
+        )
 
 
 def test_shared_policy_serialization_and_rule_are_unchanged():

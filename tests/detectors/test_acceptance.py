@@ -206,9 +206,10 @@ def test_equal_acceptance_preserves_lowered_case_and_both_identities():
     # #1019: BremsLib fp32-cell-mb-v1 identity.
     # #1166: the two-beam-laue-dbr-v1 diffracted-brem marker.
     # #1176: two-beam-laue-dbr-kossel-v2 (Kossel lines).
+    # #1191: segment-mean-v8-node-support-tail escape marker.
     assert (
         case_content_key(cases[1])
-        == "de21a177839fe8cc390b912a3ecc3190a11d8532ab31727d69bd3b4dfe4bde17"
+        == "001d3890a77a3b77b778aa64db18a42765691dd9e6b4c6b737a85cdd2626aafd"
     )
     sweeps = [
         LegacySweep(material="hopg", beam=beam.to_spec(), target=target, detector=d)
@@ -218,7 +219,7 @@ def test_equal_acceptance_preserves_lowered_case_and_both_identities():
     assert identities[0] == identities[1]
     assert (
         identities[1]["parameter_sha256"]
-        == "42939060378aa660ac561422b556d9b624b178a590f0273249e679a5cbfb3df0"
+        == "4a54a743349dd62a902054e2ba077c357940c0cf0aaba4086397bdc6512a439c"
     )
     # Pin to the pre-object payload vocabulary; no acceptance metadata enters identity.
     assert "detector" not in identities[0]["resolved_parameters"]["sweep"]

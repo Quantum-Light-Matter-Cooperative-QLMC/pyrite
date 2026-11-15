@@ -99,11 +99,11 @@ def test_fixed_n_identity_matches_the_pre_precision_baseline():
     # Re-pinned for the deliberate CBS v4 (#513) and line-kinematics v5 (#439)
     # identity generations, then the corrected-stopping v2 marker (1f22f89c), then
     # #278's automatic continuum grid (``continuum_grid_model`` joins the identity),
-    # then #1166's diffracted-brem marker.
+    # then #1166's diffracted-brem marker, then #1191's v8 node-support escape marker.
     identity = dataset_identity("hopg", Settings(), sweep, bremsstrahlung_model="eedl")
     assert (
         identity["parameter_sha256"]
-        == "4ecebc9295b0b18f9c8201dcb0f54057d24962ebef6bc780a9096d3dbfc89e32"
+        == "6caf5b29d58995d9c282cde7f27388fd6ea7a5888c61fb3775fd47a69229866a"
     )
     case = build_cases(
         sweep,
@@ -114,7 +114,7 @@ def test_fixed_n_identity_matches_the_pre_precision_baseline():
     )[0]
     assert "adaptive_precision" not in case
     assert (
-        case_content_key(case) == "a46ac3b4df35d8e7bad7b6074a50597198a751a3497403d7f5424a738b0a8000"
+        case_content_key(case) == "e260fa77c548b5a96755c2dd56445bc3e6fc4813db8584600e03957324a72abf"
     )
 
 
@@ -352,10 +352,13 @@ def test_mixed_cpu_pool_preserves_fixed_case_and_adaptive_provenance(scene, monk
     assert outputs[0]["adaptive_sampling"] == expected_adaptive["adaptive_sampling"]
     assert "adaptive_sampling" not in outputs[1]
     for field in ("spec", "spec_characteristic", "brem", "brem_wide"):
-        # Parent/worker BLAS reductions may differ by a few ulps. The
-        # adaptive/fixed comparison within one process is exact above.
+        # Parent/worker BLAS reductions may differ by a few ulps, and the
+        # windowed node reduction's far tail (#1191) chunks by thread count, so
+        # low tail bins carry peak-scale rounding. The adaptive/fixed comparison
+        # within one process is exact above.
+        expected = expected_adaptive[field]
         np.testing.assert_allclose(
-            outputs[0][field], expected_adaptive[field], rtol=2e-14, atol=0.0
+            outputs[0][field], expected, rtol=2e-14, atol=1e-14 * np.abs(expected).max()
         )
         np.testing.assert_array_equal(outputs[1][field], expected_fixed[field])
 
