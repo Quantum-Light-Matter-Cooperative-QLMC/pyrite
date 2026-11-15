@@ -77,3 +77,35 @@ def test_zone_source_reproduces_native_zone_rows_far_from_poles(laue, monkeypatc
     channeling_emission.case_channeling_spectrum(case, transport)
     assert np.isfinite(seen["source"]).all() and native.sum() > 0
     assert seen["source"].sum() == pytest.approx(native.sum(), rel=0.02)
+
+
+def test_source_kernel_sees_the_in_plane_beam_for_an_off_plane_tilt(laue, monkeypatch):
+    """The off-plane tilt enters through the entrance momentum ``p``, not the slab beam.
+
+    The fixture's beam sits ~0.9 mrad off the plane; a tilted ``SlabGeometry``
+    and its roots would count that ``psi`` twice (1.3--1.8x near a pole,
+    #1148 verification 2026-11-14).
+    """
+    from pyrite.materials.recoil import recoil_resonance_eV
+    from pyrite.montecarlo.channeling import zone_pxr
+    from pyrite.montecarlo.channeling.handoff import case_plane_incidence
+
+    case, transport = laue
+    x_hat = np.asarray(case_plane_incidence(case).plane_normal, dtype=float)
+    x_hat /= np.linalg.norm(x_hat)
+    full = planar_zone_pxr._beam(case)
+    assert abs(full @ x_hat) > 5e-4
+    calls = []
+
+    def capture(states, geometry, g, n, E0, grid, *args, **kwargs):
+        calls.append((geometry.beam.copy(), g, n, E0))
+        return np.zeros(np.asarray(grid).size)
+
+    monkeypatch.setattr(zone_pxr, "binned_reflection_spectrum", capture)
+    channeling_emission.case_channeling_spectrum(case, transport)
+    assert calls
+    energy_eV = float(case["E0_keV"]) * 1e3
+    for beam, g, n, E0 in calls:
+        assert abs(beam @ x_hat) < 1e-12
+        assert E0 == pytest.approx(float(recoil_resonance_eV(energy_eV, beam, g, n)), rel=1e-12)
+        assert abs(E0 - float(recoil_resonance_eV(energy_eV, full, g, n))) > 1e-3

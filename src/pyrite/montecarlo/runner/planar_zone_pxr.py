@@ -94,6 +94,22 @@ def _beam(case):
     return beam / np.linalg.norm(beam)
 
 
+def in_plane_beam(beam, x_hat):
+    """Unit projection of ``beam`` onto the plane with unit normal ``x_hat``.
+
+    The zone states carry the beam's motion along ``x_hat`` (entry at the
+    true transverse momentum ``p = P psi``, the ``v_x`` vertex and the
+    ``2 C p Q_x`` line shift), so the longitudinal direction that fixes the
+    slab geometry and the exact-recoil roots is the in-plane part; the full
+    tilted beam would count ``psi`` twice.
+
+    Validation: cr-planar-zone-pxr-modulation
+    """
+    beam = np.asarray(beam, dtype=float)
+    out = beam - (beam @ x_hat) * x_hat
+    return out / np.linalg.norm(out)
+
+
 def entry_weights(case, solver, incidence_rad, divergence_rad):
     """``(n_cells, n_orders)`` plane-wave diagonal of the zone's entry density.
 
@@ -186,7 +202,9 @@ def case_zone_pxr_spectrum(
     once, at ``n_hat`` and the mean beam, exactly as native line scoring drops
     it (:func:`.planar_zone_lines.planar_zone_line_parts`): a node scores only
     reflections owned there, and an owned reflection without a Laue root at
-    some node is skipped at that node. ``incidence_rad`` and
+    some node is skipped at that node. Geometry and roots use the in-plane
+    part of the beam (:func:`in_plane_beam`); ownership uses the full beam,
+    as native does. ``incidence_rad`` and
     ``divergence_rad`` give the entry (:func:`entry_weights`).
 
     Validation: cr-planar-zone-pxr-modulation
@@ -217,7 +235,7 @@ def case_zone_pxr_spectrum(
         psi, psi_weight = in_plane_rms_rad * nodes, psi_weight / psi_weight.sum()
     else:
         psi, psi_weight = np.zeros(1), np.ones(1)
-    beam0 = _beam(case)
+    beam0 = in_plane_beam(_beam(case), x_hat)
     owned = {row[0] for row in source_reflections(case, n0)}
     for r, c, wa in zip(radius, chi, weights, strict=True):
         n = np.cos(r) * n0 + np.sin(r) * (np.cos(c) * t1 + np.sin(c) * t2)
