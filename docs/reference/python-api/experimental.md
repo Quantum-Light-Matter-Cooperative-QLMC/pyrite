@@ -169,7 +169,12 @@ integrates collected photon densities shaped `(..., energy)` on a shared
 nonuniform energy grid. Its `OpticalPulseBatchReading` carries per-pulse
 joules, isolated-pulse volts, noise/saturation and optional average watts over
 the batch axes. NumPy/CuPy inputs select the backend; `predict` retains the
-single-spectrum interface returning host scalars. Calibration remains explicit
+single-spectrum interface returning host scalars. Readings include collected photons per pulse.
+`pyrite.detectors.optical_temporal` adds the normalized channel impulse
+response (`DetectorTemporalResponse`; time constants in s, transfer in s),
+steady-state pulse trains with DC V/W and lock-in readings
+(`predict_pulse_train`) and ADC counts (`Digitizer`), host NumPy.
+Calibration remains explicit
 and bounded; these provisional operators supply no measured response by default.
 `OpticalSpectralCoherency`, calibrated Jones transfers and
 `polarized_interferogram` preserve that backend through the forward reductions.

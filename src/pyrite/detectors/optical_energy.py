@@ -79,6 +79,11 @@ class _ReadingQuantities:
         return _quantity(cast(Any, self).noise_rms_voltage_v, "V")
 
     @property
+    def incident_photons(self) -> Quantity | None:
+        """Collected photons per pulse (dimensionless), or ``None``."""
+        return _optional_quantity(cast(Any, self).incident_photons_per_pulse, "dimensionless")
+
+    @property
     def average_incident_power(self) -> Quantity | None:
         """Average collected optical power in W, or ``None``."""
         return _optional_quantity(cast(Any, self).average_incident_power_w, "W")
@@ -102,6 +107,7 @@ class OpticalPulseReading(_ReadingQuantities):
     response_sha256: str
     average_incident_power_w: float | None
     average_absorbed_power_w: float | None
+    incident_photons_per_pulse: float | None = None
 
 
 @dataclass(frozen=True, eq=False)
@@ -122,6 +128,7 @@ class OpticalPulseBatchReading(_ReadingQuantities):
     response_sha256: str
     average_incident_power_w: Any
     average_absorbed_power_w: Any
+    incident_photons_per_pulse: Any = None
 
 
 @dataclass(frozen=True, eq=False)
@@ -251,6 +258,7 @@ class CalibratedPulseEnergyDetector:
             average_absorbed_power_w=None
             if repetition_hz is None
             else float(out.average_absorbed_power_w),
+            incident_photons_per_pulse=float(out.incident_photons_per_pulse),
         )
 
     def predict_batch(
@@ -290,6 +298,7 @@ class CalibratedPulseEnergyDetector:
         absorption = xp.interp(energy, xp.asarray(self.energy_eV), xp.asarray(self.efficiency))
         density = photons * energy * _ELECTRON_VOLT_J
         widths = xp.diff(energy) / 2
+        photon_count = xp.sum((photons[..., 1:] + photons[..., :-1]) * widths, axis=-1)
         incident = xp.sum((density[..., 1:] + density[..., :-1]) * widths, axis=-1)
         absorbed_density = density * absorption
         absorbed = xp.sum(
@@ -318,4 +327,5 @@ class CalibratedPulseEnergyDetector:
             response_sha256=self.response_sha256,
             average_incident_power_w=None if repetition_hz is None else incident * repetition_hz,
             average_absorbed_power_w=None if repetition_hz is None else absorbed * repetition_hz,
+            incident_photons_per_pulse=photon_count,
         )
