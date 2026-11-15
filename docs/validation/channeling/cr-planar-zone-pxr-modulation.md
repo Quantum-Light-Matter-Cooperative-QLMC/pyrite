@@ -223,3 +223,79 @@ Native line scoring evaluates the photon field at the free root, so within a few
 
 Assumption the verifier added: the longitudinal part $\det(e_s\cdot\hat Q)\hat Q$ of $F_s$ is a local response and strictly carries only $\varphi_L$. The source gives it the homogeneous waves too. The effect is zero for σ and at the pole, and 0.2% of a bound-state band 24 eV from the pole. Verdict after the fixes: `rederived`. Probes: `scratch/verify_1166_{probe,probe2,coupling,recheck}.py` in the task worktree (not committed).
 
+
+## Fresh-context re-verification of the pre-crystal vertex fix (2026-11-14)
+
+Scope: the per-state entrance weighting (`ZoneStates.entrance_waves`, `entry_weights`, `zone_states`, `reflection_spectrum`) and the Anchor tests, at `main` `b39807cbe`. Probes: `scratch/i1148/verifier/{free_born_indep,tilt_double,tilt_probe}.py` (not committed).
+
+**Independent derivation.** Before entry the electron is an incoherent mixture of transverse plane waves $|p_\nu\rangle$, $p_\nu=\kappa+\nu G$, with weights $w_\nu$. Inside, $|p_\nu\rangle=\sum_ic_{i\nu}|i\rangle$ with $c_{i\nu}=\langle i|p_\nu\rangle$. The recoil convention $p_f=p_i-\hbar g-\hbar k$ (`recoil_resonance_eV`) gives the transverse transfer $p\to p-Q_x$, $Q_x=(k+g)\cdot\hat x$, so the vertex operator is $e^{-iQ_xx}$. Acting on $|p\rangle$, the velocity vertex $\tfrac12\{v_x,e^{-iQ_xx}\}$ gives $v_x(p-Q_x/2)$. The amplitude for wave $\nu$ into $|f\rangle$ is
+
+$$
+a_{f\nu}=\chi_g\Bigl[\sum_ic_{i\nu}M_{fi}K_{fi}+\bigl(\beta\hat v\cdot F_s+(F_s\cdot\hat x)\tfrac{v_x(p_\nu-Q_x/2)}{c}\bigr)\langle f|e^{-iQ_xx}|p_\nu\rangle K_{\rm pre}(\Delta_\nu)\Bigr],
+$$
+
+where $\langle f|e^{-iQ_xx}|p_\nu\rangle=\sum_ic_{i\nu}A_{fi}$. For a free electron, $\varepsilon_i-\varepsilon_f+CQ_x^2=C[p^2-(p-Q_x)^2+Q_x^2]=2CpQ_x$, so $\Delta_\nu=[D(E-E_0)-2Cp_\nu Q_x]/\hbar c\beta$, which equals $\Delta_{fi}$ of the free pair. Keeping only the diagonal $i=j$ terms of $\sum_\nu w_\nu\lvert a_{f\nu}\rvert^2$ gives, per state, $\sum_\nu w_\nu\lvert c_{i\nu}\rvert^2\,\lvert M_{fi}K_{fi}+M^{\rm pre}_{fi}(p_\nu)K_{\rm pre}(\Delta_\nu)\rvert^2$. That is an intensity average over $\nu$ with normalized weights $w_\nu\lvert c_{i\nu}\rvert^2/\sum_{\nu'}w_{\nu'}\lvert c_{i\nu'}\rvert^2$, times $p_i$. The production code replaces $p_i$ by the path-mean $\bar p_i$, which is the stated stationary assumption. In the free limit $c_{i\nu}=\delta$, so this is exact, and the pre-crystal-only intensity summed over $f$ is exact for any basis by closure.
+
+**Comparison with the code.** `entrance_waves` (`zone_pxr.py:140-164`), `entrance_vertex` (`:235-241`) and `reflection_spectrum` (`:510-518`, an incoherent intensity sum over $\nu$ with weight $w_{i\nu}\bar p_i$) match this derivation term for term. The lattice convention $k_x=lG/n_{\rm cells}$, with $l=r+\nu n_{\rm cells}$ and $\kappa_r=rG/n_{\rm cells}\in[0,G)$, makes $p$ the true momentum. Both $p$ and $Q_x$ are measured along `case_plane_incidence(case).plane_normal`.
+
+**Numerical check against an independent reference.** The reference is a free electron moving along $\hat v'=(p/P,0,\sqrt{1-(p/P)^2})$. It uses an exact-recoil root along $\hat v'$, the vertex $\beta\hat v'\cdot F_s$ built in the script, and the Born line $\varphi(\Delta')/(\det+2Q_s\Delta'/s')$, obtained from the slab-truncated $\chi_g$ field. It uses no `zone_pxr` helpers. The test geometry has the pole 11.7 eV from the root; production uses the in-plane beam with entrance $p$.
+
+| $\nu$ | production / independent | folded $p$ / independent |
+|---|---|---|
+| −3 | 1.0030 | 1.655 |
+| −1 | 1.0009 | 1.038 |
+| 0 | 1.0001 | 1.0001 |
+| 1 | 0.9996 | 1.021 |
+| 2 | 0.9995 | 1.066 |
+| 4 | 1.0003 | 1.173 |
+
+The sign of $Q_x$ relative to $p$ is confirmed: $\pm\nu$ are asymmetric and both match. For mixed entry ($0.7$ at $\nu=0$, $0.3$ at $\nu=2$), production / independent incoherent Born sum is 0.99984. An emulation of the old entry-weight-only averaging gives 1.0384, which reproduces the reported 3.9%.
+
+**Finding: off-plane mean incidence counts the transverse velocity twice.** `case_zone_pxr_spectrum` sets `beam0 = _beam(case)` (`planar_zone_pxr.py:220`), the full tilted beam, with $\hat v\cdot\hat x=\psi$. That beam enters `SlabGeometry` (`:226`), `alpha = beta F·beam` (`zone_pxr.py:342`) and the root `E0 = recoil_resonance_eV(..., beam, ...)` (`planar_zone_pxr.py:55,68`). `entry_weights` also places the entrance at $p=P\psi$. The transverse velocity and Doppler shift $\hbar v_xQ_x$ are therefore counted in $\hat v$ and $E_0$, and again in $v_x(p)$ and $2CpQ_x$. With the beam tilted by $\psi$ and entrance $p=P\psi$, production equals the independent free Born line at $2\psi$ to 0.9999, 1.0009 and 1.0032 ($\nu=1,2,3$). Against the true $\psi$ it gives 1.31, 1.56 and 1.78 ($\psi=0.40$, 0.77 and 1.14 mrad, 12 eV from a mirror-side pole). `channeling_demo` (tilt azimuth 45°) has $\psi\approx0$ and is unaffected, so the #1166 production record stands. The `test_planar_zone_pxr` fixture (tilt azimuth 46°) has $\psi=0.913$ mrad, $p=2.48G$, but its roots are 3–60 keV from their poles, so the 2% band test cannot see this. The write-up's premise, "the beam lies in the plane", is not enforced in the runner. The fix belongs to the implementer: use the beam projected onto the plane, $\hat v_\parallel\propto\hat v-(\hat v\cdot\hat x)\hat x$, for the geometry, the root and the in-plane rotation.
+
+**Anchor audit.**
+
+- `test_entrance_beyond_half_g_uses_the_true_entrance_momentum` and `test_mixed_entry_returns_the_incoherent_free_born_sum` use a 2e-3 tolerance, enough to catch the 2–17% and 3.9% errors. Their reference, however, is built from production `entrance_vertex`, `photon_mode.q`, `phi` and the $E_0+2CpQ_x/D$ centre. They pin the folding and weighting, but not the vertex form or the $p$–$Q_x$ convention. Those are confirmed only by the probe above.
+- `test_entrance_vertex_closes_over_bound_states_off_the_plane` compares production with production. It is a closure identity (1e-8), not a reference.
+- `test_kernels_*`, `test_kinematic_*` and the profile-vs-`expm` test check numerics against independent quadrature or `expm`. They are sound but carry no vertex information.
+- `test_free_electron_far_from_a_pole_*` compares against `plane_wave_band_yield` (3e-3). That shares `photon_mode` `alpha` and `cbs`, so it independently checks only the kernel.
+- `test_planar_zone_pxr.py`: the ownership partition (1e-12, native kernel) is independent. The slow band-vs-native test (2%) is independent but far from poles, so it is insensitive to the pre-crystal term and to the tilt double count.
+- `test_zone_pxr_modulation_check.py` (slow) tests the #1148 check script's model, not the production source. Its `≈ native` (1%) assertion is the meaningful one.
+
+All 13 tests pass (`pyrite-dev test --slow` over the three modules, 13.0 s).
+
+**Verdict:** `discrepancy`, for off-plane mean incidence only. The fix itself (per-state overlap weights, true $p$) is re-derived and matches an independent reference to ≤0.3%. A promotion to `anchored` would need two additions: an anchor whose free-electron reference is built independently of `entrance_vertex` (tilted free electron, exact-recoil root), and a tilted-beam case ($\hat v\cdot\hat x\neq0$) near a pole.
+
+**Resolution (#1148, 2026-11-14).** `case_zone_pxr_spectrum` now passes `in_plane_beam(beam, x_hat)` (unit projection onto the plane) to `SlabGeometry`, the roots and the in-plane divergence rotation; ownership still uses the full beam, shared with native (`planar_zone_line_parts`). `CHANNELING_MODEL` is `planar-density-matrix-emission-v11`. New anchors: `tests/montecarlo/channeling/test_zone_pxr_free_reference.py`, the independent tilted free-electron Born reference above (5e-3 after the second check), and `test_planar_zone_pxr.py::test_source_kernel_sees_the_in_plane_beam_for_an_off_plane_tilt`, which fails on the 0.913 mrad fixture without the fix.
+
+## Fresh-context check of the in-plane beam fix (2026-11-14)
+
+Scope: `git diff b39807cbe..2f3f86413` (`in_plane_beam`, its use in `case_zone_pxr_spectrum`, the two new anchors and the ledger row). Probes: `scratch/verifier2/{sign_probe,inplane_e2e,margins,ownership}.py` in the task worktree (not committed).
+
+**Removal of the double count.** The zone kernel's frame is a longitudinal axis `geometry.beam` orthogonal to `geometry.x_hat`, with the transverse motion carried by the states: entry at $p$, the vertex $v_x(p-Q_x/2)$ and the $2CpQ_x$ shift. A free electron along $\hat v=\cos\psi\,\hat v_\parallel+\sin\psi\,\hat x$ therefore maps to `SlabGeometry` beam $\hat v_\parallel=(\hat v-(\hat v\cdot\hat x)\hat x)/\lvert\cdot\rvert$, root along $\hat v_\parallel$, and entrance $p=P\sin\psi$. `in_plane_beam` is exactly this projection. It feeds `SlabGeometry`, the vertex `alpha = beta F·beam` and `source_reflections(case, n, beam)` at every node. The in-plane divergence rotation `_rotate(beam0, x_hat, angle)` is about $\hat x$ and keeps $\hat v_\parallel\cdot\hat x=0$ (checked to 0).
+
+**Sign and magnitude of $p$.** `entry_weights` centres the entry at $k_x=P\theta$ with $\theta=$ `incidence_rad`, where `incidence_rad` is `case_plane_incidence(case).effective_rad` $=(\mathbf p_{\rm in}\cdot\hat x)/P_{\rm out}$, along the same `plane_normal` used as `x_hat`. For the fixture plane ($(1\bar10)$, $\hat x_z=0$), refraction leaves the tangential momentum unchanged, so `effective_rad` equals `_beam(case)·x_hat` to all printed digits, with the same sign, at six tilts and azimuths ($\psi=+9.13\times10^{-4}$, $\pm1.52\times10^{-4}$, $+8.73\times10^{-3}$, $+7.38\times10^{-3}$, $-3.37\times10^{-2}$). `_beam(case)` equals `PlaneIncidence.beam_dir` to $10^{-16}$. For an inclined plane ($\hat x_z\neq0$), `effective_rad` carries the refracted transverse momentum, which is the physical entry. The projection only fixes the longitudinal axis, so it introduces no inconsistency.
+
+**Numerical end to end (runner wiring, generic tilt).** The beam is tilted off-plane by $\psi=p/P$ and in-plane by $\eta$. Production uses `in_plane_beam`, the root along it and free entry at $p$. The reference, written in the probe, is the free Born band along the true $\hat v$ with the exact-recoil root along $\hat v$. The geometry is 11.7 eV from a pole.
+
+| $\nu$ | $\psi$ [mrad] | fixed / ref ($\eta=0$) | old / ref ($\eta=0$) | fixed / ref ($\eta=3$ mrad) | old / ref ($\eta=3$ mrad) |
+|---|---|---|---|---|---|
+| −2 | −0.704 | 1.0015 | 0.575 | 1.0027 | 0.945 |
+| −1 | −0.335 | 1.0008 | 0.755 | 1.0010 | 0.958 |
+| 1 | 0.403 | 0.9996 | 1.301 | 0.9995 | 1.080 |
+| 2 | 0.772 | 0.9993 | 1.551 | 0.9995 | 1.175 |
+| 3 | 1.141 | 0.9994 | 1.768 | 1.0000 | 1.282 |
+
+The fix matches the reference at the true $\psi$ to ≤0.27%. The old wiring reproduces the reported 1.31–1.78×.
+
+**Ownership versus per-node roots.** Ownership (`source_reflections(case, n0)`, full beam) is the same criterion native `planar_zone_line_parts` applies, so the native/source partition stays exact. Per-node roots now use $\hat v_\parallel$. A reflection owned with the full beam that lacks an in-plane root is skipped, so it is lost from both native and source. A reflection that qualifies only in-plane is never source-scored, so nothing is double counted. On the 17 MeV Si$(1\bar10)$ fixture at $\psi=0.91$ mrad, the owned and in-plane root sets are identical at 30°, 40° and 60° (root shifts up to 158 eV). Sets differ only at $\psi=52$ mrad, where 2–4 $(1\,\bar1\,l)$ reflections with $\mathbf g\parallel\hat x$ are lost at 30° and 40°. That is about 35 critical angles, with entry far outside the plane-wave band, so it lies outside the planar zone's regime. It is covered by the existing assumption "skips one without a Laue root there", which now applies at the centre node too.
+
+**Anchors.**
+
+- `test_zone_pxr_free_reference.py` is independent. Its Born band, vertex, exact-recoil root along $\hat v'(p)$ and slab line are hand-built. It shares only `recoil_resonance_eV`, a kinematic utility used on a different axis, and `ALPHA_FS`. Measured margins at the test's own grid: production / reference = 1.00298, 1.00087, 0.99963, 0.99945, 1.00029 at $\nu=-3,-1,1,2,4$. A geometry tilted by $\psi$ gives 0.67–1.97, so the anchor discriminates. **Concern:** $\nu=-3$ passes `rel=3e-3` with a margin of $2\times10^{-5}$. The residual grows with $\lvert p\rvert$ and is the first-order model difference, not grid noise; the prior 0.01 eV probe also gave 1.0030. A tolerance of 5e-3, still below every error it guards (≥2%), would not look tuned.
+- `test_source_kernel_sees_the_in_plane_beam_for_an_off_plane_tilt` is a wiring check, not a reference value. Without the fix, `|beam·x_hat| = 9.1e-4` fails its `< 1e-12` assertion, and the root must equal the in-plane root. **Gap:** no test pins the runner's entrance $p=P\psi$ (`entry_weights` has no test). A regression that zeroed the incidence while keeping the in-plane beam would pass both anchors. This verification confirmed the sign and magnitude only by probe.
+- Green: the three zone-PXR modules give 18 passed and 1 slow skipped. With `--slow`, `test_planar_zone_pxr.py` and `test_zone_pxr_free_reference.py` give 9 passed. `tests/dev/test_validation_ledger.py` gives 18 passed.
+
+**Ledger row.** Code (adds `in_plane_beam`, which carries a `Validation:` marker), Assumptions (projected beam for geometry, vertex and roots; $\psi$ only through $p$), Anchor (12 eV from a pole, measured 11.65 eV; $\nu$ list; 3e-3) and Notes (1.31–1.78× at 0.40–1.14 mrad; the $2\psi$ equivalence; demo $\psi\approx0$) match the code and the measurements above.
+
+**Verdict:** `anchored`. The fix is correct and matches an independent reference at the true $\psi$ in a generic tilt. Two non-blocking items remain: the $\nu=-3$ tolerance margin, and the unanchored runner entrance $p=P\psi$.

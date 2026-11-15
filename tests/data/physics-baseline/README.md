@@ -388,3 +388,11 @@ generation-dependent `case_content_key` and `parameter_sha256` hashes in
 `resolved.json` and `channeling.json` were re-pinned; recorded outputs keep
 their expectations and tolerances. The hashes were re-pinned again on top of the
 #1177 bonding-charge structure-factor generation.
+
+## In-plane zone PXR beam (#1148)
+
+`CHANNELING_MODEL` v11: the zone PXR/DCR source takes the beam projected onto
+the channeling plane, because the off-plane tilt is already carried by the
+entrance momentum. Only the `case_content_key` in `channeling.json` was
+re-pinned. The recorded case has tilt azimuth 45°, so ψ ≈ 0 and its output
+keeps its expectation and tolerance.
