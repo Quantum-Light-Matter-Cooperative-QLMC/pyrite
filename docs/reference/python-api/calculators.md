@@ -37,7 +37,7 @@ numeric. They do not change numeric records or scientific identity. See
 | Materials | `absorption_length_ang` | `absorption_length_q` | Energy eV, density Å⁻³; intensity length Å |
 | Materials | `dominant_reflections` | `dominant_reflections_q` | Reflection records with documented amplitudes and reciprocal magnitudes |
 | Materials | `linear_attenuation_inv_mm` | `linear_attenuation_q` | Energy eV; attenuation mm⁻¹ |
-| Radiation | `photon_energies` | `photon_energies_q` | Beam energy keV, geometry in documented units; line energies eV |
+| Radiation | `photon_energies` | `photon_energies_q` | Beam energy eV, geometry in documented units; line energies eV |
 | Detectors | `detector_efficiency` | `detector_efficiency_q` | Energy eV; dimensionless efficiency |
 | Detectors | `convolve_detector` | `convolve_detector_q` | Energy and FWHM eV; caller spectral normalization preserved |
 | Transport | `depth_loss_profile` | — | In-memory transport block, depth edges Å; loss table in keV |

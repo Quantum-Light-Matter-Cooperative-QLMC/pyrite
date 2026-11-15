@@ -239,7 +239,8 @@ def _(
     tilts,
     ureg,
 ):
-    from pyrite.radiation import directional_sources, photon_energies
+    from pyrite.radiation import directional_sources
+    from pyrite.tools import photon_energies
 
     assert tables_ready
     observation_angles = np.linspace(4, 180.0, 181) * ureg.degree

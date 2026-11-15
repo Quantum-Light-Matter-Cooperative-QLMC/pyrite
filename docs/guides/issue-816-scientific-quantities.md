@@ -1,5 +1,10 @@
 # Scientific helper quantities (#816)
 
+Import these calculators from `pyrite.tools`; the
+[Scientific calculators reference](../reference/python-api/calculators.md) lists
+the numeric/Pint pairs and their units. Existing implementation imports remain
+supported same-object aliases.
+
 These adapters are **opt-in**, separate from the long-established numeric
 functions. No `*_eV`, `*_ang`, `*_mm` solver entry point changes behavior and
 numeric scientific contracts remain supported without deprecation.
@@ -8,14 +13,14 @@ numeric scientific contracts remain supported without deprecation.
 
 `pyrite.materials.crystal` remains the **canonical owner** of the five scalar
 constants; the numeric values, precision and reference conventions are
-unchanged. `pyrite.materials.quantities.crystal_constants()` returns new Pint
+unchanged. `pyrite.tools.crystal_constants()` returns new Pint
 quantities reconstructed from them. The constant `M_E_EV` is a *rest energy*,
 not mass in kg. `E2_EV_ANG` is the Gaussian-convention Coulomb coupling
 `alpha * hbar*c` (eV Å), not SI charge squared.
 
 ```python
 from pyrite.units import Q_, ureg
-from pyrite.materials.quantities import (
+from pyrite.tools import (
     crystal_constants,
     atomic_form_factor_q,
     reciprocal_g_vector_q,
@@ -50,7 +55,7 @@ properties when inspecting them.
 
 ```python
 import numpy as np
-from pyrite.detectors.quantities import (
+from pyrite.tools import (
     grating_q,
     grating_parameters,
     ccd_q,

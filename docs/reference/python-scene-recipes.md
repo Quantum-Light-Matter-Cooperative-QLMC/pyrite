@@ -149,12 +149,13 @@ studies use [Campaign configuration](campaign-configuration.md) and
 
 ## Compare photon energies
 
-Compute vacuum CXR line-centre energies without transport. Unlike
+Use the [scientific calculators](python-api/calculators.md) in `pyrite.tools`
+to compute vacuum CXR line-centre energies without transport. Unlike
 `Beam.energy_keV`, this function accepts electron kinetic energy in **eV**.
 
 ```python
 import numpy as np
-from pyrite.radiation import photon_energies
+from pyrite.tools import photon_energies
 
 angles = np.linspace(20.0, 160.0, 141)
 energies_eV = photon_energies(

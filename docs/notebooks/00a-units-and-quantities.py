@@ -282,7 +282,7 @@ def _(mo):
 
     Some lower-level public functions intentionally take plain magnitudes,
     with their unit **in the parameter name** (for example
-    `photon_energies(..., E_eV, tilt_deg=..., theta_obs_deg=...)`).
+    `pyrite.tools.photon_energies(..., beam_energy_eV, tilt_deg=..., theta_obs_deg=...)`).
     Only at these boundaries, convert then extract `.magnitude`. Do not hand
     such a function a Pint quantity and hope it will guess.
     """)

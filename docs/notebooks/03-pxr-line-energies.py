@@ -53,7 +53,7 @@ def _(mo):
 @app.cell
 def _():
     from pyrite.materials import load_material_catalog
-    from pyrite.radiation import photon_energies
+    from pyrite.tools import photon_energies
 
     catalog = load_material_catalog()
     return catalog, photon_energies
