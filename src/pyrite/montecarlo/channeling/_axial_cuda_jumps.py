@@ -170,7 +170,7 @@ class DeviceJumps:
 
     def _tds_jump(self, phi, density, rng):
         d = self.dissipator
-        weights = cp.einsum("sij,ij->s", d.tds_source_rates, density)
+        weights = d.tds_source_weights(density)
         source = _choose(rng, weights)
         src = d.tds_sources[source]
         sigma = math.sqrt(src.displacement_ang2)

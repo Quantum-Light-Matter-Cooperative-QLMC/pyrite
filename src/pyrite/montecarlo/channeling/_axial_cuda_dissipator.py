@@ -8,7 +8,7 @@ from __future__ import annotations
 import cupy as cp
 import numpy as np
 
-from .axial_dissipator import _pad_index
+from .axial_dissipator import _image_weights, _pad_index
 from .realspace import RealSpaceGrid
 
 
@@ -23,7 +23,12 @@ class _DeviceGrid:
 
 
 class DeviceDissipator:
-    """Upload immutable jump data once; evaluate the CPU equations on CUDA."""
+    """Upload immutable jump data once; evaluate the CPU equations on CUDA.
+
+    TDS caches are keyed by element (spectra, self-convolution, envelope
+    geometry); source positions enter as separable phases per call, so
+    resident memory does not grow with the supercell image count.
+    """
 
     def __init__(self, dissipator):
         self.grid = _DeviceGrid(dissipator.grid.extent_ang, dissipator.grid.shape)
@@ -34,7 +39,8 @@ class DeviceDissipator:
         self._spectra = {}
         self._phases = {}
         self.tds_sources = dissipator.tds_sources
-        self.tds_source_rates = cp.asarray(dissipator.tds_source_rates)
+        self.tds_base_spectra = cp.asarray(dissipator.tds_base_spectra)
+        self.tds_image_cells = dissipator.tds_image_cells
         self.phase_spectra = {k: cp.asarray(v) for k, v in dissipator.phase_spectra.items()}
         self.electronic_q_inv_ang = cp.asarray(dissipator.electronic_q_inv_ang)
         self.electronic_q_host = dissipator.electronic_q_inv_ang
@@ -43,6 +49,15 @@ class DeviceDissipator:
         self.electronic_damping = cp.asarray(dissipator.electronic_damping)
         self._electronic_indices = cp.asarray(np.flatnonzero(dissipator.electron_density))
         self._electronic_density = self.electron_density.ravel()[self._electronic_indices]
+
+    def tds_source_weights(self, density: cp.ndarray) -> cp.ndarray:
+        """``sum_r rate_s(r) |psi(r)|^2`` per source (image-lattice correlation)."""
+        return _image_weights(cp, self.tds_base_spectra, self.tds_image_cells, density)
+
+    def _position_phase(self, grid, position):
+        """``exp(-i k.r0)`` on ``grid`` as an outer product of 1D phases."""
+        x0, y0 = position
+        return cp.exp(-1j * grid.kx * x0)[:, None] * cp.exp(-1j * grid.ky * y0)[None, :]
 
     def tds_phase(self, source: int, offset_ang) -> cp.ndarray:
         """``phi_u(r) - <phi>(r)`` of one source displaced by ``offset_ang`` (real).
@@ -54,12 +69,10 @@ class DeviceDissipator:
         kx = self.grid.kx[:, None]
         ky = self.grid.ky[None, :]
         spectrum = self.phase_spectra[src.element]
-        if source not in self._phases:
-            x0, y0 = src.position_ang
-            base = spectrum * cp.exp(-1j * (kx * x0 + ky * y0))
-            mean = cp.exp(-0.5 * src.displacement_ang2 * (kx**2 + ky**2))
-            self._phases[source] = base, mean
-        base, mean = self._phases[source]
+        if src.element not in self._phases:
+            self._phases[src.element] = cp.exp(-0.5 * src.displacement_ang2 * (kx**2 + ky**2))
+        mean = self._phases[src.element]
+        base = spectrum * self._position_phase(self.grid, src.position_ang)
         offsets = cp.asarray(offset_ang, dtype=float)
         single = offsets.ndim == 1
         offsets = cp.atleast_2d(offsets)
@@ -77,9 +90,15 @@ class DeviceDissipator:
         a 2x-oversampled momentum grid (FFT layout, ``2n_x x 2n_y``) and the
         expansion is exact for every displacement.
         """
-        if source not in self._spectra:
-            self._spectra[source] = self._source_spectrum(source)
-        spectrum, rows, cols, convolution, mean_field, extension, shift = self._spectra[source]
+        src = self.tds_sources[source]
+        if src.element not in self._spectra:
+            self._spectra[src.element] = self._element_spectrum(src)
+        spectrum, rows, cols, convolution, damp, extension = self._spectra[src.element]
+        mean_field = (
+            cp.fft.ifft2(spectrum * damp * self._position_phase(self.grid, src.position_ang)).real
+            * spectrum.size
+        )
+        shift = self._position_phase(self.fine, src.position_ang)
         area = self.grid.cell_area_ang2
         overlap = cp.conj(cp.fft.fft2(density))
         extended = overlap[extension]
@@ -89,8 +108,7 @@ class DeviceDissipator:
         out[0, 0] += cp.sum(density * mean_field**2) * area
         return out
 
-    def _source_spectrum(self, source):
-        src = self.tds_sources[source]
+    def _element_spectrum(self, src):
         nx, ny = self.grid.shape
         spectrum = self.phase_spectra[src.element]
         kx, ky = self.grid.kx[:, None], self.grid.ky[None, :]
@@ -98,24 +116,10 @@ class DeviceDissipator:
         padded = cp.zeros(self.fine.shape, dtype=complex)
         padded[cp.ix_(rows, cols)] = spectrum
         convolution = cp.fft.fft2(cp.fft.ifft2(padded) ** 2) * padded.size
-        mean_field = (
-            cp.fft.ifft2(
-                spectrum
-                * cp.exp(-0.5 * src.displacement_ang2 * (kx**2 + ky**2))
-                * cp.exp(-1j * (kx * src.position_ang[0] + ky * src.position_ang[1]))
-            ).real
-            * spectrum.size
-        )
+        damp = cp.exp(-0.5 * src.displacement_ang2 * (kx**2 + ky**2))
         fx = cp.rint(self.fine.kx / (2 * cp.pi / self.grid.extent_ang[0])).astype(int) % nx
         fy = cp.rint(self.fine.ky / (2 * cp.pi / self.grid.extent_ang[1])).astype(int) % ny
-        shift = cp.exp(
-            -1j
-            * (
-                self.fine.kx[:, None] * src.position_ang[0]
-                + self.fine.ky[None, :] * src.position_ang[1]
-            )
-        )
-        return spectrum, rows, cols, convolution, mean_field, cp.ix_(fx, fy), shift
+        return spectrum, rows, cols, convolution, damp, cp.ix_(fx, fy)
 
     def tds_weight(self, coefficients: cp.ndarray, offsets) -> cp.ndarray:
         """Evaluate :meth:`tds_weight_spectrum` coefficients at displacements ``(n, 2)``."""
@@ -157,9 +161,10 @@ class DeviceDissipator:
         return cp.max(cp.where(masks, values[None], -cp.inf), axis=(1, 2)) + slack
 
     def source_envelope(self, source, coefficients, edges_ang):
-        if source not in self._envelopes:
-            self._envelopes[source] = self._envelope_geometry(edges_ang)
-        return self._envelope_values(coefficients, self._envelopes[source])
+        key = self.tds_sources[source].element
+        if key not in self._envelopes:
+            self._envelopes[key] = self._envelope_geometry(edges_ang)
+        return self._envelope_values(coefficients, self._envelopes[key])
 
     def smoothed_density(self, q_inv_ang: float) -> cp.ndarray:
         """``rho_q(r)`` on the grid [1/angstrom^3], clipped at zero."""
