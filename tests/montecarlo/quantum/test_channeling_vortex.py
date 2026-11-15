@@ -9,7 +9,11 @@ from pyrite.materials.channeling.axial import axial_profile
 from pyrite.montecarlo.channeling import longitudinal_kinematics, states
 from pyrite.montecarlo.channeling.axial_bloch import axial_states
 from pyrite.montecarlo.channeling.realspace import RealSpaceGrid, SplitStepPropagator
-from pyrite.montecarlo.channeling.vortex import CylindricalProjection, angular_momentum
+from pyrite.montecarlo.channeling.vortex import (
+    CylindricalProjection,
+    angular_momentum,
+    site_rotation_order,
+)
 
 GRID = RealSpaceGrid((20.0, 20.0), (64, 64))
 CENTER = (10.0, 10.0)
@@ -149,3 +153,33 @@ def test_off_centre_or_wide_vortex_loses_selectivity(tungsten_string, offset_cel
     phi = grid.sample(states.laguerre_gauss(1, 0, waist_ang=waist_ang, center_ang=entry))
     for depth, out in propagator.trajectory(phi, [500.0], step_ang=1.0):
         assert _two_p_population(grid, orbitals, out) < 0.02, depth
+
+
+def test_site_symmetry_guard_accepts_c4_and_refuses_paired_strings():
+    # Shul'ga et al., NIMB 370, 1 (2016): on Si <110> the strings pair up, so no
+    # string site has C_m (m >= 3) and l is not a label; Si <001> sites are C_4.
+    si001 = axial_profile("silicon", (0, 0, 1))
+    cell = si001.period_ang[0]
+    grid = RealSpaceGrid((4 * cell, 4 * cell), (64, 64))
+    center = (2 * cell, 2 * cell)
+    accepted = CylindricalProjection(grid, center, 0.5 * cell, profile=si001)
+    assert accepted.site_order == 4
+    assert site_rotation_order(axial_profile("silicon", (1, 1, 1)), (0.0, 0.0), 0.5) == 6
+
+    si110 = axial_profile("silicon", (1, 1, 0))
+    lx, ly = si110.period_ang
+    grid = RealSpaceGrid((2 * lx, 2 * ly), (64, 64))
+    string = si110.strings[0].position_ang
+    a, b = np.asarray(string), np.asarray(si110.strings[2].position_ang) - (0.0, ly)
+    assert np.hypot(*(b - a)) < 1.4  # the close pair (1.36 A)
+    for site, order in ((string, 1), (tuple(0.5 * (a + b)), 2)):
+        assert site_rotation_order(si110, site, 0.5) == order
+        with pytest.raises(ValueError, match="accept-asymmetric"):
+            CylindricalProjection(grid, site, 0.5, profile=si110)
+    with pytest.warns(UserWarning, match="mixed-l"):
+        opted = CylindricalProjection(
+            grid, string, 0.5, profile=si110, symmetry="accept-asymmetric"
+        )
+    assert opted.site_order == 1
+    with pytest.raises(ValueError, match="symmetry must be"):
+        CylindricalProjection(grid, string, 0.5, profile=si110, symmetry="off")

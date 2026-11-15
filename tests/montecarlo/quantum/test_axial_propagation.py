@@ -55,6 +55,17 @@ def test_unitary_matches_direct_propagator_and_projection(config):
     assert "experimental" in result.experimental_model
 
 
+def test_oam_on_paired_string_axis_needs_explicit_opt_in(config):
+    # #1107: Si <110> string sites lack C_m >= 3, so l is not a label there.
+    paired = replace(config, axis=(1, 1, 0), oam_string=0, tilt_rad=(0.0, 0.0))
+    entry = laguerre_gauss(1, waist_ang=0.3)
+    with pytest.raises(ValueError, match="accept-asymmetric"):
+        propagate_axial(paired, entry=entry)
+    with pytest.warns(UserWarning, match="mixed-l"):
+        result = propagate_axial(replace(paired, oam_symmetry="accept-asymmetric"), entry=entry)
+    assert result.oam_populations.shape[-1] == 17
+
+
 def test_unitary_mixture_adds_densities_not_amplitudes(config):
     a = gaussian(waist_ang=0.5)
     b = laguerre_gauss(-1, waist_ang=0.7)

@@ -83,8 +83,8 @@ def lib(monkeypatch):
     class Projection:
         ells = np.array([-1, 0, 1])
 
-        def __init__(self, *args):
-            pass
+        def __init__(self, *args, profile=None, symmetry="required"):
+            assert symmetry == "required"
 
         def __call__(self, phi, tilt):
             return np.array([0.0, 1.0, 0.0])

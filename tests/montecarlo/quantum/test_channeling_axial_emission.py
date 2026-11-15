@@ -222,3 +222,25 @@ def test_far_field_of_a_jz_plus_line_winds_only_the_opposite_circular_component(
     np.testing.assert_allclose(
         np.abs(field[1][1:]) ** 2, helicity_pattern(theta[1:], gamma, 1, -1), rtol=2e-2
     )
+
+
+def test_single_string_lines_are_labelled_and_unchanged(tungsten):
+    catalog = tungsten[0]
+    (line,) = catalog.lines
+    assert line.string_class == "single_string" and line.on_string_fraction is None
+    assert catalog.photon_energy_eV(line) > catalog.optics_floor_eV
+    assert catalog.is_channeling_line(line)
+
+
+def test_si110_sub_mev_tunnelling_splittings_are_inter_string():
+    # #1219/#585: at 300 keV the Si <110> catalog pairs are splittings of string
+    # ground orbitals (R ~ 0.25), far below 3 hbar omega_p; the zero-dipole
+    # near-degenerate pairs (dipoles ~1e-13 A by symmetry) are not lines.
+    catalog = axial_line_catalog(axial_profile("silicon", (1, 1, 0)), 300e3)
+    pairs = {(ln.initial, ln.final): ln for ln in catalog.lines}
+    assert set(pairs) == {(2, 1), (3, 0)}
+    for line in pairs.values():
+        assert line.string_class == "inter_string"
+        assert line.on_string_fraction == pytest.approx(0.26, abs=0.02)
+        assert catalog.below_optics_floor(line)
+        assert not catalog.is_channeling_line(line)

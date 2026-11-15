@@ -40,6 +40,20 @@ on-column orbitals are the ``k = 0`` Bloch functions cut to the string's
 Wigner–Seitz cell (tight binding). Dipoles use the exact velocity form
 ``<f|r|i> = -i (hbar^2/gamma m) <f|k|i> / (E_f - E_i)``.
 
+**Multi-string cells.** With several strings per cell the levels include
+tunnelling splittings of one string orbital across strings; transitions
+between them are not channeling-radiation lines (Shul'ga et al., NIMB 370, 1
+(2016); #585). Each line of such a cell carries a ``string_class`` from the
+on-string momentum fraction ``R = ||p_fi on D||_F / ||p_fi||_F``, ``D`` the
+discs of radius ``d / 4`` about every string (``d`` the nearest distinct string
+distance, images included): ``on_string`` for ``R >= 0.8``, ``inter_string``
+for ``R <= 0.4``, else ``mixed``. Pairs closer than ``MIN_MULTISTRING_GAP_EV``
+are splittings and labelled ``inter_string`` (``R`` is unstable there), and
+pairs with Frobenius dipole below ``DIPOLE_FLOOR_ANG`` are not lines. One-string
+cells keep every line, labelled ``single_string``. A line whose forward photon
+lies below ``OPTICS_FLOOR_PLASMA_MULTIPLE`` times the medium plasma energy has
+no optics model (:meth:`AxialLineCatalog.below_optics_floor`).
+
 Lengths in angstroms, energies in eV, angular momenta in hbar.
 """
 
@@ -47,9 +61,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from functools import lru_cache
+from typing import Literal
 
 import numpy as np
 
+from ...materials.attenuation import plasma_energy_eV
 from ...materials.channeling.axial import AxialProfile
 from ...materials.crystal import HBAR2_2M_EV_ANG2, M_E_EV
 from .axial_bloch import AxialStates, axial_states
@@ -59,6 +75,17 @@ from .realspace import RealSpaceGrid
 
 #: Default flat-band limit for a level to enter the line catalog [eV].
 DEFAULT_MAX_BANDWIDTH_EV = 0.1
+#: Multi-string ``R`` thresholds at disc radius ``d / 4`` (#585 classifier).
+ON_STRING_MIN = 0.8
+INTER_STRING_MAX = 0.4
+#: Multi-string pairs closer than this are inter-string splittings [eV].
+MIN_MULTISTRING_GAP_EV = 1.0
+#: Multi-string pairs below this Frobenius dipole are not lines [angstrom].
+DIPOLE_FLOOR_ANG = 1e-6
+#: Forward photons below this multiple of the plasma energy have no optics model.
+OPTICS_FLOOR_PLASMA_MULTIPLE = 3.0
+
+StringClass = Literal["single_string", "on_string", "mixed", "inter_string"]
 
 
 @dataclass(frozen=True)
@@ -93,12 +120,21 @@ class AxialLine:
     dipole_ang
         ``<f| r_a |i>`` [angstrom], shape ``(2, n_final, n_initial)`` for
         ``a = x, y``.
+    string_class
+        ``single_string`` (one string per cell) or, on multi-string cells,
+        ``on_string``, ``mixed`` or ``inter_string`` (module docstring).
+        Only ``single_string`` and ``on_string`` lines are channeling lines.
+    on_string_fraction
+        ``R`` at disc radius ``d / 4``; ``None`` for one-string cells and for
+        splittings below ``MIN_MULTISTRING_GAP_EV``.
     """
 
     initial: int
     final: int
     delta_eV: float
     dipole_ang: np.ndarray
+    string_class: StringClass = "single_string"
+    on_string_fraction: float | None = None
 
     @property
     def circular_ang(self) -> np.ndarray:
@@ -134,6 +170,24 @@ class AxialLineCatalog:
     def photon_energy_eV(self, line: AxialLine, theta_rad=0.0):
         """Lab photon energy ``Delta E / (1 - beta cos theta)`` [eV]."""
         return line.delta_eV / doppler_denominator(self.kinetic_energy_eV, theta_rad)
+
+    @property
+    def optics_floor_eV(self) -> float:
+        """``OPTICS_FLOOR_PLASMA_MULTIPLE`` times the crystal's plasma energy [eV]."""
+        return OPTICS_FLOOR_PLASMA_MULTIPLE * plasma_energy_eV(self.profile.crystal)
+
+    def below_optics_floor(self, line: AxialLine) -> bool:
+        """Whether the forward photon lies below :attr:`optics_floor_eV`."""
+        return bool(self.photon_energy_eV(line) < self.optics_floor_eV)
+
+    def is_channeling_line(self, line: AxialLine) -> bool:
+        """On-string (or one-string-cell) line with a forward photon above the optics floor.
+
+        Validation: cr-axial-helicity-emission
+        """
+        return line.string_class in ("single_string", "on_string") and not (
+            self.below_optics_floor(line)
+        )
 
     def yield_per_ang(self, line: AxialLine, rho_initial: np.ndarray) -> float:
         """Photons per angstrom from ``rho_initial`` (trace = level population)."""
@@ -175,6 +229,9 @@ def axial_line_catalog(
 ) -> AxialLineCatalog:
     """Return the flat bound levels of ``profile`` and every dipole line between them.
 
+    On multi-string cells each line is classified on-string, mixed or
+    inter-string and dipole-forbidden pairs are dropped (module docstring).
+
     Validation: cr-axial-helicity-emission
     """
     gamma, _ = longitudinal_kinematics(float(kinetic_energy_eV))
@@ -208,6 +265,8 @@ def axial_line_catalog(
     # Velocity form: <f|r|i> = -i (hbar^2 / gamma m) <f|k|i> / (E_f - E_i).
     k = np.stack([states.orders[:, 0] * gx, states.orders[:, 1] * gy])
     c = states.coefficients
+    multi = len(profile.strings) > 1
+    fraction = _OnStringFraction(states, levels) if multi else None
     lines = []
     for i, upper in enumerate(levels):
         for f, lower in enumerate(levels[:i]):
@@ -216,7 +275,16 @@ def axial_line_catalog(
             momentum = np.einsum("bf,ab,bi->afi", cf.conj(), k, ci)
             delta = upper.energy_eV - lower.energy_eV
             dipole = -1j * (2.0 * HBAR2_2M_EV_ANG2 / gamma) * momentum / (-delta)
-            lines.append(AxialLine(i, f, float(delta), dipole))
+            if fraction is None:
+                lines.append(AxialLine(i, f, float(delta), dipole))
+                continue
+            if np.sqrt(np.sum(np.abs(dipole) ** 2) / len(upper.states)) <= DIPOLE_FLOOR_ANG:
+                continue
+            if delta < MIN_MULTISTRING_GAP_EV:
+                lines.append(AxialLine(i, f, float(delta), dipole, "inter_string"))
+                continue
+            r = fraction(upper.states, lower.states)
+            lines.append(AxialLine(i, f, float(delta), dipole, _classify(r), r))
     string = profile.strings[0].position_ang if profile.strings else (0.0, 0.0)
     return AxialLineCatalog(
         profile=profile,
@@ -227,6 +295,71 @@ def axial_line_catalog(
         lines=tuple(lines),
         _string_ang=(float(string[0]), float(string[1])),
     )
+
+
+def _classify(r: float) -> StringClass:
+    if r >= ON_STRING_MIN:
+        return "on_string"
+    if r <= INTER_STRING_MAX:
+        return "inter_string"
+    return "mixed"
+
+
+class _OnStringFraction:
+    """``R`` of level pairs from the ``k = 0`` velocity-form integrand on a cell grid.
+
+    The integrand ``u_f^* (G u_i)`` is cell-periodic, so its cell integral
+    splits over the disc set ``D`` without an origin choice. The grid holds
+    every product of two basis functions exactly (``>= 4 M + 2`` points).
+
+    Validation: cr-axial-helicity-emission
+    """
+
+    def __init__(self, states: AxialStates, levels) -> None:
+        profile = states.profile
+        orders = states.orders
+        shape = tuple(max(128, 4 * int(np.abs(orders[:, a]).max()) + 2) for a in (0, 1))
+        lx, ly = profile.period_ang
+        x = np.arange(shape[0]) / shape[0] * lx
+        y = np.arange(shape[1]) / shape[1] * ly
+        gx_grid, gy_grid = np.meshgrid(x, y, indexing="ij")
+        radius = _nearest_string_distance(profile) / 4.0
+        self.mask = np.zeros(shape, bool)
+        for s in profile.strings:
+            dx = (gx_grid - s.position_ang[0] + lx / 2) % lx - lx / 2
+            dy = (gy_grid - s.position_ang[1] + ly / 2) % ly - ly / 2
+            self.mask |= dx * dx + dy * dy < radius * radius
+        gx, gy = profile.g_inv_ang
+        ix, iy = orders[:, 0] % shape[0], orders[:, 1] % shape[1]
+        self.fields = {}
+        for level in levels:
+            for n in level.states:
+                coeff = states.coefficients[:, n]
+                spec = np.zeros((3, *shape), complex)
+                spec[0, ix, iy] = coeff
+                spec[1, ix, iy] = orders[:, 0] * gx * coeff
+                spec[2, ix, iy] = orders[:, 1] * gy * coeff
+                self.fields[n] = np.fft.ifft2(spec, axes=(1, 2))
+
+    def __call__(self, upper, lower) -> float:
+        total = disc = 0.0
+        for i in upper:
+            for f in lower:
+                integrand = self.fields[f][0].conj()[None] * self.fields[i][1:]
+                total += float(np.sum(np.abs(integrand.mean(axis=(1, 2))) ** 2))
+                part = (integrand * self.mask).mean(axis=(1, 2))
+                disc += float(np.sum(np.abs(part) ** 2))
+        return float(np.sqrt(disc / total))
+
+
+def _nearest_string_distance(profile: AxialProfile) -> float:
+    """Smallest distance between distinct strings, periodic images included [angstrom]."""
+    period = np.asarray(profile.period_ang)
+    pos = np.array([s.position_ang for s in profile.strings])
+    shifts = np.array([(a, b) for a in (-1, 0, 1) for b in (-1, 0, 1)]) * period
+    d = pos[None, :, None, :] + shifts[None, None] - pos[:, None, None, :]
+    r = np.linalg.norm(d, axis=-1)
+    return float(r[r > 1e-9].min())
 
 
 # ---------------------------------------------------------------------------
