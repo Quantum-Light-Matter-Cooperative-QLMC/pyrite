@@ -530,6 +530,9 @@ the close timing repeats do not measure uncertainty across seeds or node loads.
 
 ### GPU assessment and CPU-first decision
 
+The admitted workload is already small. A 4,000-history B source is about
+420 CPU-s of source work, or roughly 2–3 minutes of wall time at the measured
+eight-worker research-chunk rate. That cost does not justify a GPU port.
 Retain the CPU production source and prioritize CPU work before a GPU port:
 reuse immutable inputs across research chunks, avoid very small chunks, and
 investigate a shared/precomputed scoring contraction and controlled history
@@ -538,11 +541,17 @@ to production reduction order needs its own numerical-identity checks.
 
 A partial GPU implementation that makes no-jump/companion propagation,
 companion jumps and line scoring free, while leaving channel construction,
-carrier solves and jump selection on one CPU controller, has an optimistic
-B source-only ceiling of about 23 histories/s. This Amdahl estimate uses the
-measured 44.4% accelerated share and the unprofiled 32-history single-call
-rate; it excludes transfers, launch costs and input construction. It is already
-below the measured 30 histories/s process-chunk throughput. A competitive
+carrier solves and jump selection on the CPU, is bounded per CPU controller by
+the measured 44.4% (B) and 43.4% (A) accelerated shares: at most about 1.8×.
+For B this lifts one controller from the unprofiled 32-history single-call
+rate of 13.0 histories/s to an optimistic 23 histories/s. The bound excludes
+transfers, launch costs and input construction. Several controllers could feed
+one GPU, so this per-controller ceiling must not be compared directly with the
+eight-worker CPU throughput. Applying the same 1.8× to the measured
+30 histories/s gives an optimistic node-level figure near 54 histories/s.
+That eight-worker baseline scaled only 3.84× and shared the node, so it is not
+an exclusive-node capacity. A 1.8× ceiling on a minutes-long workload is not
+worth a partial port. A competitive
 GPU port would need batched carrier eigensolves and jump maps as well, rather
 than just a CuPy no-jump loop. Common channels/depths can be shared, but generic
 post-jump sectors, waiting times and terminal fates still require independent
@@ -599,7 +608,15 @@ Errors are SEMs across three seed means. The grid-minus-fibre exposure is
 96 ± 117 Å using seed-paired differences, a central shift of +4.6% that is
 unresolved at this precision. Matching integer seeds between unlike
 unravellings does not make their trajectories shared. These results establish
-neither statistical equivalence nor a photon-source error budget.
+neither statistical equivalence nor a photon-source error budget. With three
+seeds (two degrees of freedom), the two-sided 95% interval is about
+±500 Å, roughly ±24% of the exposure. The study therefore cannot exclude
+model differences of that size. The grid weight lies above the fibre weight
+at every checkpoint, but that pattern is not significant at this sample size.
+Resolving a few-percent difference would need many more seeds and grid
+histories; most grid cost here is the diagnostic projection. The comparison
+does not inform the GPU decision. Rejecting grid MCWF as the production source
+rests on the admission rule that it needs its own evidence.
 
 The grid request includes 120.79–155.19 s of CPU full-spectral projection and
 host/device transfer; it is dominated by the diagnostic observable. Subtracting
