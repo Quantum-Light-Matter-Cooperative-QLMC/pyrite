@@ -744,7 +744,8 @@ Options:
   --maximum-reflections N         Cap resolved reflections after family expansion.
                                   [x>=1]
   --mosaic-nodes N                Gauss-Hermite nodes per mosaic tilt axis.  [x>=1]
-  --mosaic-route [analytic|mc]    Mosaic broadening route.
+  --mosaic-route [analytic|mc|mc-sampled]
+                                  Mosaic broadening route.
   --line-yield-tolerance FRACTION
                                   Opt-in measured reflection cutoff: stop |g| shells
                                   once the estimated omitted incoherent line yield is at
