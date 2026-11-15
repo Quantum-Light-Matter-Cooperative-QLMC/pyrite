@@ -117,7 +117,9 @@ def test_polarization_pairs_match_scalar_rows():
     k_hat = np.array([0.6, -0.1, 0.79])
     k_hat /= np.linalg.norm(k_hat)
     rows = np.vstack([rng.normal(size=(64, 3)) * 7.0, 3.0 * k_hat])  # last row degenerate
-    e_s, e_p = _kernels._polarization_pairs(k_hat, rows)
+    from pyrite.montecarlo.spectrum.cxr._polarization import _polarization_pairs
+
+    e_s, e_p = _polarization_pairs(k_hat, rows)
     for i, g in enumerate(rows):
         s, p = _kernels._polarization_pair(k_hat, g)
         np.testing.assert_array_equal(e_s[i], s, strict=True)

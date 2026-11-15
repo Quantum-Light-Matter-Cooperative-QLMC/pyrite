@@ -41,7 +41,6 @@ from ._kernels import (
     _interp_index,
     _log_interp_fraction,
     _matvec3,
-    _polarization_pairs,
     _reflection_tables,
     _rowdot3,
     _segment_escape_distance,
@@ -53,6 +52,7 @@ from ._per_hkl import (
     _flat_view,
     _row_decoherence_factor,
 )
+from ._polarization import _polarization_pairs
 from ._recoil import (
     _line_recoil_terms,
     _quantum_line_factors,
