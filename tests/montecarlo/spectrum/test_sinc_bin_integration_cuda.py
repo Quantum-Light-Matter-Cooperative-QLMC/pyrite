@@ -310,3 +310,68 @@ def test_series_dispatch_takes_only_window_bins():
     # device sincospi does not have; scale the tolerance with |x|.
     tol = 1e-13 * envelope * np.maximum(1.0, np.abs(xc[window]))
     np.testing.assert_array_less(np.abs(series[window] - host), tol)
+
+
+@pytest.mark.parametrize("max_blocks", [1, 3])
+def test_sparse_near_grid_stride_is_bitwise_independent_of_the_grid_cap(monkeypatch, max_blocks):
+    """Validation: sinc-bin-near-far -- capped grids stride over every warp job (#1196)."""
+    from pyrite.montecarlo.spectrum.cxr import _bin_sparse
+
+    rng = np.random.default_rng(1196)
+    edges = np.linspace(900.0, 1300.0, 2001)
+    inv_width = 1.0 / np.diff(edges)
+    e = rng.uniform(850, 1350, 500).astype(np.float32)
+    a = (np.pi / rng.uniform(0.02, 5.0, len(e))).astype(np.float32)
+    w = rng.uniform(0.01, 1.0, len(e)).astype(np.float32)
+    args = (cp.asarray(e), cp.asarray(a), cp.asarray(w), cp.asarray(edges), cp.asarray(inv_width))
+    full = cp.zeros(len(inv_width), dtype=cp.float64)
+    _bin_sparse.run_sparse_reduction(*args, out=full)
+    monkeypatch.setattr(_bin_sparse, "_NEAR_MAX_BLOCKS", max_blocks)
+    capped = cp.zeros_like(full)
+    _bin_sparse.run_sparse_reduction(*args, out=capped)
+    np.testing.assert_array_equal(cp.asnumpy(capped), cp.asnumpy(full))
+
+
+@pytest.mark.slow
+def test_sparse_near_keeps_every_job_past_a_uint32_thread_grid():
+    """Validation: sinc-bin-near-far -- HIP holds grid work-items in uint32 (#1196).
+
+    One warp per job put ``n_jobs * 32 > 2**32`` threads in one launch, which
+    ROCm silently truncated and lost 97-98% of the production yield.
+    """
+    from pyrite.montecarlo.spectrum.cxr import _bin_sparse
+
+    edges = np.linspace(0.0, 4200.0, 4_200_001)
+    inv_width = 1.0 / np.diff(edges)
+    rng = np.random.default_rng(1196)
+    e = rng.uniform(1100.0, 3100.0, 2400).astype(np.float32)
+    # 64 first-zero widths span 1000 eV: ~2e6 near bins, ~6.5e4 jobs per line.
+    a = np.full(len(e), 64.0 * np.pi / 1000.0, dtype=np.float32)
+    w = rng.uniform(0.5, 1.0, len(e)).astype(np.float32)
+    _, first, stop, _, n_jobs, _ = _bin_sparse.prepare_sparse_reduction(
+        cp.asarray(e), cp.asarray(a), cp.asarray(w), cp.asarray(edges)
+    )
+    assert n_jobs * _bin_sparse._WARP_LANES > 2**32
+    out = cp.zeros(len(inv_width), dtype=cp.float64)
+    bq.run_bin_mean_reduction_kernel(
+        cp.asarray(e),
+        cp.asarray(a),
+        cp.asarray(w),
+        cp.asarray(edges),
+        cp.asarray(inv_width),
+        out=out,
+        method="sparse",
+    )
+    mean = cp.asnumpy(out)
+    captured, _ = bq.sincsq_window_mass(a.astype(float), e.astype(float), edges)
+    total = float(np.sum(mean / inv_width))
+    assert abs(total / float(np.sum(w * captured)) - 1.0) < 1e-5
+    # Bins spread over the whole axis, against the host near/far evaluator.
+    bins = np.linspace(0, len(inv_width) - 1, 64).astype(int)
+    host = np.array(
+        [
+            np.sum(w * bq._host_bin_mean(a, e, edges[b : b + 2], inv_width[b : b + 1], 64.0)[:, 0])
+            for b in bins
+        ]
+    )
+    np.testing.assert_allclose(mean[bins], host, rtol=1e-5, atol=1e-6 * np.abs(host).max())
