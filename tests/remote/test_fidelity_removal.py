@@ -29,8 +29,10 @@ def test_queue_script_no_longer_forwards_fidelity():
 
 
 def test_nsys_reexec_marks_child_as_generated_invocation(monkeypatch, tmp_path):
-    monkeypatch.delenv(GENERATED_INVOCATION_ENV, raising=False)
-    monkeypatch.delenv("PYRITE_MC_NSYS", raising=False)
+    # Register restoration even when these variables were initially absent:
+    # the mocked exec returns control after production code sets both flags.
+    monkeypatch.setenv(GENERATED_INVOCATION_ENV, "")
+    monkeypatch.setenv("PYRITE_MC_NSYS", "")
     monkeypatch.setattr(scan.shutil, "which", lambda _name: "/usr/bin/nsys")
 
     class _Execd(Exception):

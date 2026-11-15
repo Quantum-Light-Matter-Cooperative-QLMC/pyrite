@@ -55,7 +55,7 @@ def _case(**kw):
 
 @pytest.mark.slow
 def test_case_schema_and_runner_kwargs():
-    legacy = _case(inelastic_model="continuous")
+    legacy = _case(inelastic_model="continuous", straggling=False)
     assert runner._case_inelastic_kwargs(legacy) == {}
     shell = _case(inelastic_model="shell-soft-hard", inelastic_cutoff_eV=50.0)
     assert isinstance(shell, Case)
