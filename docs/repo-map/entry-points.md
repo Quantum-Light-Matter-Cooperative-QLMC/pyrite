@@ -4,6 +4,8 @@ Detail page of the [repository map](../repo_map.md). Start from the front page; 
 
 ## Entry points
 
+- **`tools/__init__.py`**: lazy, governed same-object aliases for deterministic material, radiation, detector and in-memory trajectory calculators. Artifact readers stay with `transport` and `beams`; see [Scientific calculators](../reference/python-api/calculators.md).
+
 - **`pyrite.quantum`** is a package (`__init__` facade, `state`, `planar_source`, `_admission`) and owns the `Channeling`/`ChannelingNumerics` run section (`quantum/_channeling.py`, #1017) plus a curated lazy facade for portable `TransverseStateSpec`, nonportable runtime factories, planar projection, and selected experimental planar/axial solvers and diagnostics. Definitions live in `quantum/state.py`, `quantum/planar_source.py`, and `montecarlo.channeling` leaves (the former root `quantum_state`, `states`, `planar_source` and `_channeling_admission` modules are deleted without aliases); the facade preserves object/pickle identity and production admission. `api-surface.toml` governs this module through `package_exports`; the [quantum API contracts](../reference/quantum-api.md) lists status, units, and bounded examples.
 - **Advanced scientific facades**: `transport/__init__.py` lazily aliases the supported lowered `Case`, trajectory simulation and saved-capture summaries; `radiation/__init__.py` aliases deterministic line energies, three supported spectrum functions and experimental directional sources. No engine moves or numerical changes; existing implementation paths retain compatibility. `DirectionalSpectrum` remains owned by `results.directional`. Contracts and migration: [advanced API](../reference/python-api/transport.md#advanced-transport-and-radiation).
 

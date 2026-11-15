@@ -13,6 +13,7 @@ import pytest
 from pyrite.devtools import api_surface
 
 _BEAM_OWNERS = {
+    "capture_beam_metrics": "pyrite.campaign.beam_metrics",
     "Beam": "pyrite.campaign.beam",
     "BunchFrontTilt": "pyrite.campaign.beam",
     "GdfSource": "pyrite.campaign.beam",
@@ -183,6 +184,7 @@ def test_canonical_names_match_reviewed_manifest() -> None:
     domains, errors = api_surface.read_facade_domains(root / "api-surface.toml")
     assert not errors
     assert set(domains) == {
+        "tools",
         "beams",
         "geometry",
         "config",

@@ -189,3 +189,17 @@ contracts documented in these namespace pages as advanced-stable, with quantum a
 `pyrite.results.Provenance`. A declaration in `__all__` alone is **not** an
 API-support promise; consult the [API policy](../../development/api-policy.md)
 for status and compatibility rules.
+
+## Scientific calculator imports
+
+Use `pyrite.tools` for the [reviewed deterministic calculators](calculators.md).
+Existing `pyrite.materials.atomic`, `.crystal`, `.attenuation`, `.quantities`,
+`pyrite.detectors.response` and `.quantities` imports remain supported with
+unchanged status. Each calculator alias resolves to the same function object;
+signatures, units, results and scientific identities are unchanged. No deep
+calculator path is deprecated by this migration. `pyrite.photon_energies` and
+`pyrite.radiation.photon_energies` remain supported aliases.
+
+Saved-capture summaries remain on `pyrite.transport`; beam diagnostics use
+`pyrite.beams.capture_beam_metrics`, with the existing
+`pyrite.campaign.beam_metrics.capture_beam_metrics` path retained.

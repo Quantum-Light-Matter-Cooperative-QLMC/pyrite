@@ -28,7 +28,7 @@
 # quantum=; profiles use a [channeling] table. Stored Settings/case identity keep
 # the flat channeling_* record, so case keys are unchanged.
 schema_version = 1
-canonical_facades = ["beams", "geometry", "config", "detectors", "observations", "transport", "radiation"]
+canonical_facades = ["tools", "beams", "geometry", "config", "detectors", "observations", "transport", "radiation"]
 
 [root_exports]
 AcquisitionBatch = { target = "pyrite.instrument:AcquisitionBatch", status = "advanced-stable", domain = "results", root_role = "specialized" }
@@ -534,6 +534,7 @@ RealSpaceGrid = { target = "pyrite.montecarlo.channeling.realspace:RealSpaceGrid
 SplitStepPropagator = { target = "pyrite.montecarlo.channeling.realspace:SplitStepPropagator", status = "experimental" }
 
 [package_exports."pyrite.beams"]
+capture_beam_metrics = { target = "pyrite.campaign.beam_metrics:capture_beam_metrics", status = "advanced-stable" }
 BunchFrontTilt = { target = "pyrite.campaign.beam:BunchFrontTilt", status = "advanced-stable" }
 # Offsets owns additive semantic time inputs, read-back and replacement; its numeric
 # dataclass fields and transport records remain unchanged.
@@ -577,3 +578,53 @@ RemoteStatus = { target = "pyrite.remote.client:RemoteStatus", status = "experim
 PullResult = { target = "pyrite.remote.client:PullResult", status = "experimental" }
 RemoteError = { target = "pyrite.remote.client:RemoteError", status = "experimental" }
 submit = { target = "pyrite.remote.client:submit", status = "experimental" }
+
+# #1030: deterministic calculators; concrete imports remain supported aliases.
+[package_exports."pyrite.tools"]
+U_g = { target = "pyrite.materials.crystal:U_g", status = "advanced-stable" }
+U_g_q = { target = "pyrite.materials.quantities:U_g_q", status = "advanced-stable" }
+absorption_length_ang = { target = "pyrite.materials.crystal:absorption_length_ang", status = "advanced-stable" }
+absorption_length_q = { target = "pyrite.materials.quantities:absorption_length_q", status = "advanced-stable" }
+angular_dispersion_q = { target = "pyrite.detectors.quantities:angular_dispersion_q", status = "advanced-stable" }
+atomic_form_factor = { target = "pyrite.materials.atomic:atomic_form_factor", status = "advanced-stable" }
+atomic_form_factor_q = { target = "pyrite.materials.quantities:atomic_form_factor_q", status = "advanced-stable" }
+bin_to_pixels_q = { target = "pyrite.detectors.quantities:bin_to_pixels_q", status = "advanced-stable" }
+ccd_parameters = { target = "pyrite.detectors.quantities:ccd_parameters", status = "advanced-stable" }
+ccd_q = { target = "pyrite.detectors.quantities:ccd_q", status = "advanced-stable" }
+charge_cloud_sigma_q = { target = "pyrite.detectors.quantities:charge_cloud_sigma_q", status = "advanced-stable" }
+chi_g = { target = "pyrite.materials.crystal:chi_g", status = "advanced-stable" }
+chi_g_q = { target = "pyrite.materials.quantities:chi_g_q", status = "advanced-stable" }
+coating_number_density_q = { target = "pyrite.detectors.quantities:coating_number_density_q", status = "advanced-stable" }
+convolve_detector = { target = "pyrite.detectors.response:convolve_detector", status = "advanced-stable" }
+convolve_detector_q = { target = "pyrite.detectors.quantities:convolve_detector_q", status = "advanced-stable" }
+cromer_mann_f0 = { target = "pyrite.materials.atomic:cromer_mann_f0", status = "advanced-stable" }
+cromer_mann_f0_q = { target = "pyrite.materials.quantities:cromer_mann_f0_q", status = "advanced-stable" }
+crystal_constants = { target = "pyrite.materials.quantities:crystal_constants", status = "advanced-stable" }
+depth_loss_profile = { target = "pyrite.montecarlo.trajectory_summary:depth_loss_profile", status = "advanced-stable" }
+detected_image_q = { target = "pyrite.detectors.quantities:detected_image_q", status = "advanced-stable" }
+detector_efficiency = { target = "pyrite.detectors.response:detector_efficiency", status = "advanced-stable" }
+detector_efficiency_q = { target = "pyrite.detectors.quantities:detector_efficiency_q", status = "advanced-stable" }
+detector_position_q = { target = "pyrite.detectors.quantities:detector_position_q", status = "advanced-stable" }
+diffraction_angle_q = { target = "pyrite.detectors.quantities:diffraction_angle_q", status = "advanced-stable" }
+disperse_spectrum_q = { target = "pyrite.detectors.quantities:disperse_spectrum_q", status = "advanced-stable" }
+dominant_reflections = { target = "pyrite.materials.crystal:dominant_reflections", status = "advanced-stable" }
+dominant_reflections_q = { target = "pyrite.materials.quantities:dominant_reflections_q", status = "advanced-stable" }
+energy_fwhm_q = { target = "pyrite.detectors.quantities:energy_fwhm_q", status = "advanced-stable" }
+grating_parameters = { target = "pyrite.detectors.quantities:grating_parameters", status = "advanced-stable" }
+grating_q = { target = "pyrite.detectors.quantities:grating_q", status = "advanced-stable" }
+grating_reflectivity_q = { target = "pyrite.detectors.quantities:grating_reflectivity_q", status = "advanced-stable" }
+grating_throughput_q = { target = "pyrite.detectors.quantities:grating_throughput_q", status = "advanced-stable" }
+groove_spacing_q = { target = "pyrite.detectors.quantities:groove_spacing_q", status = "advanced-stable" }
+henke_dispersion = { target = "pyrite.materials.atomic:henke_dispersion", status = "advanced-stable" }
+henke_dispersion_q = { target = "pyrite.materials.quantities:henke_dispersion_q", status = "advanced-stable" }
+linear_attenuation_inv_mm = { target = "pyrite.materials.attenuation:linear_attenuation_inv_mm", status = "advanced-stable" }
+linear_attenuation_q = { target = "pyrite.materials.quantities:linear_attenuation_q", status = "advanced-stable" }
+photon_energies = { target = "pyrite.materials.emission:photon_energies", status = "advanced-stable" }
+photon_energies_q = { target = "pyrite.materials.quantities:photon_energies_q", status = "advanced-stable" }
+qe_absorption_q = { target = "pyrite.detectors.quantities:qe_absorption_q", status = "advanced-stable" }
+reciprocal_g_vector = { target = "pyrite.materials.crystal:reciprocal_g_vector", status = "advanced-stable" }
+reciprocal_g_vector_q = { target = "pyrite.materials.quantities:reciprocal_g_vector_q", status = "advanced-stable" }
+resolving_power_q = { target = "pyrite.detectors.quantities:resolving_power_q", status = "advanced-stable" }
+structure_factor = { target = "pyrite.materials.crystal:structure_factor", status = "advanced-stable" }
+structure_factor_q = { target = "pyrite.materials.quantities:structure_factor_q", status = "advanced-stable" }
+wavelength_q = { target = "pyrite.detectors.quantities:wavelength_q", status = "advanced-stable" }

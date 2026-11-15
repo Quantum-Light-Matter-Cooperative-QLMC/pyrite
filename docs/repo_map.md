@@ -72,6 +72,7 @@ dedicated section yet; the column names the page covering their closest owner.
 | `results` | Result containers, reductions and views | [Results & downstream](repo-map/results-and-instruments.md) |
 | `runs` | Local run, scan and blazed-sweep drivers | [Campaign](repo-map/campaign-and-runs.md) |
 | `storage` | Persistence facade for checkpoints, observations, execution artifacts | [Campaign](repo-map/campaign-and-runs.md) |
+| `tools` | Deterministic scientific calculator facade | [Entry points](repo-map/entry-points.md) |
 | `transport` | Advanced transport and saved-trajectory analysis facade | [Entry points](repo-map/entry-points.md) |
 | `validation` | Validation adapters, oracles and catalog checks | [Core physics](repo-map/core-physics.md), [CLI](repo-map/cli-and-packaging.md) |
 | `xsgen` | Generation and resolution of external Fortran tables | [Core physics](repo-map/core-physics.md) |
@@ -117,12 +118,13 @@ Components (a + b denotes a static import cycle):
   p24: results
   p25: runs
   p26: storage
-  p27: transport
-  p28: validation
-  p29: xsgen
+  p27: tools
+  p28: transport
+  p29: validation
+  p30: xsgen
 Edges (importer -> imported):
   p0 -> p15
-  p0 -> p28
+  p0 -> p29
   p0 -> p5
   p0 -> p7
   p1 -> p13
@@ -135,7 +137,7 @@ Edges (importer -> imported):
   p1 -> p24
   p1 -> p25
   p1 -> p26
-  p1 -> p28
+  p1 -> p29
   p1 -> p3
   p1 -> p4
   p1 -> p6
@@ -156,7 +158,7 @@ Edges (importer -> imported):
   p14 -> p8
   p16 -> p15
   p16 -> p21
-  p16 -> p29
+  p16 -> p30
   p16 -> p7
   p17 -> p14
   p17 -> p16
@@ -181,9 +183,9 @@ Edges (importer -> imported):
   p23 -> p19
   p23 -> p24
   p23 -> p25
-  p23 -> p28
   p23 -> p29
   p23 -> p3
+  p23 -> p30
   p23 -> p4
   p23 -> p7
   p24 -> p14
@@ -199,18 +201,16 @@ Edges (importer -> imported):
   p25 -> p19
   p25 -> p21
   p25 -> p24
-  p25 -> p29
   p25 -> p3
+  p25 -> p30
   p25 -> p4
   p25 -> p7
-  p28 -> p15
-  p28 -> p16
-  p28 -> p3
-  p28 -> p4
-  p28 -> p7
-  p28 -> p8
   p29 -> p15
+  p29 -> p16
+  p29 -> p3
+  p29 -> p4
   p29 -> p7
+  p29 -> p8
   p3 -> p13
   p3 -> p14
   p3 -> p15
@@ -218,9 +218,11 @@ Edges (importer -> imported):
   p3 -> p17
   p3 -> p21
   p3 -> p24
-  p3 -> p29
+  p3 -> p30
   p3 -> p6
   p3 -> p8
+  p30 -> p15
+  p30 -> p7
   p4 -> p15
   p4 -> p16
   p4 -> p24
@@ -234,8 +236,8 @@ Edges (importer -> imported):
   p5 -> p19
   p5 -> p23
   p5 -> p25
-  p5 -> p29
   p5 -> p3
+  p5 -> p30
   p5 -> p4
   p5 -> p7
   p5 -> p8
@@ -246,7 +248,7 @@ Edges (importer -> imported):
   p9 -> p20
   p9 -> p24
   p9 -> p25
-  p9 -> p28
+  p9 -> p29
   p9 -> p3
   p9 -> p5
   p9 -> p7

@@ -9,6 +9,7 @@ Public API stability is governed by `api-surface.toml`. It is **not** equivalent
 | [Core simulation](core.md) | Scene construction and simulation entry points |
 | [Beams and particle distributions](beams.md) | Spots, bunch timing and imported particles |
 | [Geometry and targets](geometry.md) | Slabs, stacks, bodies, cuts and filters |
+| [Scientific calculators](calculators.md) | Deterministic calculations, numeric units and Pint pairs |
 | [Materials and crystallography](materials.md) | Catalogs, authoring and material response |
 | [Detectors and response](detectors.md) | Acceptance, pixel geometry and response |
 | [Observations and acquisitions](observations.md) | Measurement requests and acquisition |
@@ -31,6 +32,7 @@ core
 beams
 geometry
 materials
+calculators
 detectors
 observations
 config
