@@ -86,10 +86,13 @@ from .energy_time import (
 )
 from .entry import PlaneIncidence, mean_inner_potential_eV, plane_incidence
 from .exit_angular import (
+    CoherentExitSweep,
     ExitAngularDistribution,
     classical_exit_angles,
     coherent_exit_distribution,
+    coherent_exit_sweep,
     density_exit_distribution,
+    divergence_sweep_nodes,
     open_exit_distribution,
 )
 from .handoff import CHANNELING_MODEL
@@ -142,6 +145,7 @@ __all__ = [
     "DensityMatrixResult",
     "DensityMatrixSolver",
     "ElectronicChannels",
+    "CoherentExitSweep",
     "ExitAngularDistribution",
     "EmissionLines",
     "EnergyQuadrature",
@@ -165,8 +169,10 @@ __all__ = [
     "channeling_spectrum",
     "classical_exit_angles",
     "coherent_exit_distribution",
+    "coherent_exit_sweep",
     "decoherence_rate",
     "density_exit_distribution",
+    "divergence_sweep_nodes",
     "dipole_rate_per_ang",
     "dipole_far_field",
     "dipole_stokes",

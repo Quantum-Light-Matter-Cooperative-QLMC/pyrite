@@ -198,6 +198,175 @@ def coherent_exit_distribution(
     )
 
 
+#: Default divergence-sweep grid step: this many nodes per narrowest ``sigma``.
+DEFAULT_NODES_PER_SIGMA = 16
+
+
+def divergence_sweep_nodes(
+    incidence_rad: float, divergences_rad, nodes_per_sigma: int = DEFAULT_NODES_PER_SIGMA
+) -> np.ndarray:
+    """Return one uniform incidence grid shared by every divergence in ``divergences_rad``.
+
+    Midpoint nodes with step ``min(sigma) / nodes_per_sigma`` cover
+    ``incidence_rad +- DIVERGENCE_SPAN max(sigma)``, so
+    :meth:`CoherentExitSweep.gaussian_weights` can reweight one set of Bloch
+    solves for each ``sigma``.
+
+    Validation: cr-planar-exit-angular
+    """
+    sigma = np.asarray(divergences_rad, dtype=float).ravel()
+    if sigma.size == 0 or np.any(sigma <= 0.0):
+        raise ValueError("divergences_rad must be non-empty and positive")
+    if nodes_per_sigma < 1:
+        raise ValueError("nodes_per_sigma must be >= 1")
+    half = DIVERGENCE_SPAN * sigma.max()
+    n_nodes = int(np.ceil(2.0 * half * nodes_per_sigma / sigma.min()))
+    step = 2.0 * half / n_nodes
+    return float(incidence_rad) - half + step * (np.arange(n_nodes) + 0.5)
+
+
+@dataclass(frozen=True)
+class CoherentExitSweep:
+    """Coherent exit weights of one Bloch solve per incidence node at several thicknesses.
+
+    Attributes
+    ----------
+    thicknesses_ang
+        Crystal thicknesses ``L`` [angstrom], shape ``(n_L,)``.
+    incidence_rad
+        Incidence nodes ``psi`` [rad], shape ``(n_psi,)``.
+    angles_rad
+        Exit angle ``(k + m g) / p`` of each order at each node [rad], shape
+        ``(n_psi, n_orders)``.
+    order_weights
+        ``|a_m(L)|^2`` per unit node weight, shape ``(n_L, n_psi, n_orders)``;
+        zero on unresolved nodes.
+    resolved
+        Whether the entry order of each node lies in the plane-wave basis.
+    order_spacing_rad
+        Diffraction-comb spacing ``g / p = lambda / d`` [rad].
+
+    Validation: cr-planar-exit-angular
+    """
+
+    thicknesses_ang: np.ndarray
+    incidence_rad: np.ndarray
+    angles_rad: np.ndarray
+    order_weights: np.ndarray
+    resolved: np.ndarray
+    order_spacing_rad: float
+
+    def gaussian_weights(self, incidence_rad: float, divergence_rad: float) -> np.ndarray:
+        """Return normalized Gaussian weights of the nodes within ``+-DIVERGENCE_SPAN sigma``.
+
+        On the uniform nodes of :func:`incidence_nodes` this reproduces its
+        weights; on a finer :func:`divergence_sweep_nodes` grid it converges to
+        them as the node spacing shrinks.
+        """
+        if divergence_rad <= 0.0:
+            raise ValueError("divergence_rad must be positive")
+        offset = (self.incidence_rad - float(incidence_rad)) / divergence_rad
+        weights = np.where(np.abs(offset) <= DIVERGENCE_SPAN, np.exp(-0.5 * offset**2), 0.0)
+        total = weights.sum()
+        if total <= 0.0:
+            raise ValueError("no incidence node lies within the divergence span")
+        return weights / total
+
+    def _node_weights(self, node_weights) -> np.ndarray:
+        weights = np.asarray(node_weights, dtype=float)
+        if weights.shape[:1] != self.incidence_rad.shape:
+            raise ValueError("node_weights must have one leading entry per incidence node")
+        return weights
+
+    def distribution(self, thickness_index: int, node_weights) -> ExitAngularDistribution:
+        """Return the exit distribution at ``thicknesses_ang[thickness_index]``.
+
+        ``node_weights`` (one per node, e.g. from :meth:`gaussian_weights` or
+        :func:`incidence_nodes`) are the incoherent incidence weights; weight on
+        unresolved nodes is reported as ``unresolved``.
+        """
+        weights = self._node_weights(node_weights)
+        keep = self.resolved & (weights != 0.0)
+        return ExitAngularDistribution(
+            angles_rad=self.angles_rad[keep].ravel(),
+            weights=(weights[keep, None] * self.order_weights[thickness_index, keep]).ravel(),
+            unresolved=float(weights[~self.resolved].sum()),
+            order_spacing_rad=self.order_spacing_rad,
+        )
+
+    def smoothed(self, theta_rad, resolution_rad: float, node_weights, *, chunk: int = 64):
+        """Return Gaussian-smoothed densities per radian at every thickness.
+
+        ``node_weights`` has shape ``(n_psi,)`` or ``(n_psi, n_sets)`` (one
+        column per divergence); the result has shape ``(n_L, n_theta)`` or
+        ``(n_L, n_theta, n_sets)``. Each slice equals
+        ``distribution(i, w).smoothed(theta_rad, resolution_rad)``.
+        """
+        if resolution_rad <= 0.0:
+            raise ValueError("resolution_rad must be positive")
+        weights = self._node_weights(node_weights)
+        columns = weights.reshape(weights.shape[0], -1)
+        theta = np.asarray(theta_rad, dtype=float).ravel()
+        norm = 1.0 / (np.sqrt(2.0 * np.pi) * resolution_rad)
+        out = np.zeros((self.thicknesses_ang.size, theta.size, columns.shape[1]))
+        for start in range(0, self.incidence_rad.size, chunk):
+            block = slice(start, start + chunk)
+            offset = (theta[:, None, None] - self.angles_rad[None, block]) / resolution_rad
+            kernel = norm * np.exp(-0.5 * offset**2)
+            per_node = np.einsum("tpm,lpm->ltp", kernel, self.order_weights[:, block])
+            out += per_node @ columns[block]
+        shape = (self.thicknesses_ang.size,) + np.shape(theta_rad) + weights.shape[1:]
+        return out.reshape(shape)
+
+
+def coherent_exit_sweep(
+    profile: PlanarProfile,
+    kinetic_energy_eV: float,
+    thicknesses_ang,
+    incidence_rad,
+    *,
+    n_plane_waves: int = DEFAULT_PLANE_WAVES,
+) -> CoherentExitSweep:
+    """Return coherent exit weights at many thicknesses from one Bloch solve per node.
+
+    The eigenstates of each incidence node ``psi`` do not depend on the
+    thickness, which enters only the phase ``exp(-i E_n L / hbar v)``, and a
+    divergence only reweights nodes. One :func:`transverse_states` solve per
+    node therefore serves every ``L`` and, through
+    :meth:`CoherentExitSweep.gaussian_weights`, every divergence. With the
+    nodes and weights of :func:`incidence_nodes`,
+    ``coherent_exit_sweep(...).distribution(i, w)`` is
+    :func:`coherent_exit_distribution` at ``thicknesses_ang[i]``. For a
+    divergence scan pass :func:`divergence_sweep_nodes`. Same assumptions as
+    :func:`coherent_exit_distribution`.
+
+    Validation: cr-planar-exit-angular
+    """
+    thickness = np.asarray(thicknesses_ang, dtype=float).ravel()
+    if np.any(thickness < 0.0):
+        raise ValueError("thicknesses_ang must be non-negative")
+    psi = np.asarray(incidence_rad, dtype=float).ravel()
+    gamma, _ = longitudinal_kinematics(kinetic_energy_eV)
+    p_inv_ang, hbar_v = _momentum_inv_ang(kinetic_energy_eV)
+    g = profile.g_inv_ang
+    n_orders = 2 * n_plane_waves + 1
+    angles = np.zeros((psi.size, n_orders))
+    weights = np.zeros((thickness.size, psi.size, n_orders))
+    resolved = np.zeros(psi.size, dtype=bool)
+    for node, angle in enumerate(psi):
+        k_x = p_inv_ang * angle
+        states = transverse_states(profile, gamma, k_x, n_plane_waves)
+        angles[node] = (states.k_inv_ang + states.orders * g) / p_inv_ang
+        m0 = int(np.round((k_x - states.k_inv_ang) / g))
+        if abs(m0) > n_plane_waves:
+            continue
+        resolved[node] = True
+        c = states.coefficients
+        phase = np.exp(-1j * np.multiply.outer(thickness, states.energies_eV) / hbar_v)
+        weights[:, node] = np.abs((phase * np.conj(c[m0 + n_plane_waves, :])) @ c.T) ** 2
+    return CoherentExitSweep(thickness, psi, angles, weights, resolved, g / p_inv_ang)
+
+
 def density_exit_distribution(
     solver: DensityMatrixSolver, rho: np.ndarray, unresolved: float = 0.0
 ) -> ExitAngularDistribution:

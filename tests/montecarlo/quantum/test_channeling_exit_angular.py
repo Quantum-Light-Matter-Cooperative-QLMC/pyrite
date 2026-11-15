@@ -19,7 +19,9 @@ from pyrite.montecarlo.channeling.exit_angular import (
     ExitAngularDistribution,
     classical_exit_angles,
     coherent_exit_distribution,
+    coherent_exit_sweep,
     density_exit_distribution,
+    divergence_sweep_nodes,
     incidence_nodes,
     open_exit_distribution,
 )
@@ -262,3 +264,67 @@ def test_gridnev_1987_spot_counts_and_band_populations(gridnev, case):
         profile, kinetic, gridnev["thickness_um"] * 1e4, divergence_rad=sigma, n_incidence=61
     )
     assert _spot_count(dist) == data["spots"]
+
+
+def test_sweep_matches_scalar_distribution_at_matching_nodes(si110):
+    kinetic, thicknesses = 3.489e6, np.array([0.0, 400.0, 800.0, 1300.0])
+    for incidence, sigma in ((0.0, 3e-4), (2e-4, 1.5e-4)):
+        psi, w = incidence_nodes(incidence, sigma, 41)
+        sweep = coherent_exit_sweep(si110, kinetic, thicknesses, psi, n_plane_waves=16)
+        np.testing.assert_allclose(sweep.gaussian_weights(incidence, sigma), w, rtol=1e-13)
+        theta = np.linspace(-4e-3, 4e-3, 81)
+        smoothed = sweep.smoothed(theta, 2e-5, np.stack([w, w], axis=1))
+        for i, length in enumerate(thicknesses):
+            scalar = coherent_exit_distribution(
+                si110,
+                kinetic,
+                length,
+                incidence_rad=incidence,
+                divergence_rad=sigma,
+                n_incidence=41,
+                n_plane_waves=16,
+            )
+            dist = sweep.distribution(i, w)
+            np.testing.assert_array_equal(dist.angles_rad, scalar.angles_rad)
+            np.testing.assert_allclose(dist.weights, scalar.weights, rtol=0, atol=1e-12)
+            assert dist.unresolved == pytest.approx(scalar.unresolved, abs=1e-12)
+            reference = scalar.smoothed(theta, 2e-5)
+            scale = reference.max()
+            np.testing.assert_allclose(smoothed[i, :, 0] / scale, reference / scale, atol=1e-12)
+            np.testing.assert_array_equal(smoothed[i, :, 0], smoothed[i, :, 1])
+
+
+def test_sweep_fixed_grid_converges_to_incidence_nodes(si110):
+    kinetic, length, sigmas = 3.489e6, 800.0, np.array([1e-4, 3e-4])
+    theta = np.linspace(-4e-3, 4e-3, 161)
+    errors = []
+    for per_sigma in (2, 4, 8, 16):
+        psi = divergence_sweep_nodes(0.0, sigmas, per_sigma)
+        assert np.diff(psi).max() <= sigmas.min() / per_sigma * (1 + 1e-12)
+        assert psi[0] >= -4 * sigmas.max() and psi[-1] <= 4 * sigmas.max()
+        sweep = coherent_exit_sweep(si110, kinetic, [length], psi, n_plane_waves=16)
+        weights = np.stack([sweep.gaussian_weights(0.0, s) for s in sigmas], axis=1)
+        density = sweep.smoothed(theta, 1e-4, weights)[0]
+        error = 0.0
+        for j, sigma in enumerate(sigmas):
+            ref = coherent_exit_distribution(
+                si110, kinetic, length, divergence_rad=sigma, n_incidence=961, n_plane_waves=16
+            ).smoothed(theta, 1e-4)
+            error = max(error, np.abs(density[:, j] - ref).max() / ref.max())
+        errors.append(error)
+    assert errors[-1] < 1e-3
+    assert errors[-1] < errors[0] / 10
+
+
+def test_sweep_validates_inputs(si110):
+    with pytest.raises(ValueError, match="non-negative"):
+        coherent_exit_sweep(si110, 3.489e6, [-1.0], [0.0])
+    with pytest.raises(ValueError, match="positive"):
+        divergence_sweep_nodes(0.0, [0.0, 1e-4])
+    sweep = coherent_exit_sweep(si110, 3.489e6, [0.0], [0.0], n_plane_waves=8)
+    dist = sweep.distribution(0, [1.0])
+    assert dist.total == pytest.approx(1.0) and dist.unresolved == 0.0
+    with pytest.raises(ValueError, match="one leading entry"):
+        sweep.distribution(0, [0.5, 0.5])
+    with pytest.raises(ValueError, match="within the divergence span"):
+        sweep.gaussian_weights(1.0, 1e-4)

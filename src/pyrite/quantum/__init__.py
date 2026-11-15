@@ -87,6 +87,12 @@ if TYPE_CHECKING:
     from pyrite.montecarlo.channeling.exit_angular import (
         coherent_exit_distribution as coherent_exit_distribution,
     )
+    from pyrite.montecarlo.channeling.exit_angular import (
+        coherent_exit_sweep as coherent_exit_sweep,
+    )
+    from pyrite.montecarlo.channeling.exit_angular import (
+        divergence_sweep_nodes as divergence_sweep_nodes,
+    )
     from pyrite.montecarlo.channeling.mcwf import (
         MCWFResult as MCWFResult,
     )
@@ -249,6 +255,11 @@ _EXPORTS = {
         "pyrite.montecarlo.channeling.axial_exit_map",
         "coherent_axial_exit_map",
     ),
+    "coherent_exit_sweep": ("pyrite.montecarlo.channeling.exit_angular", "coherent_exit_sweep"),
+    "divergence_sweep_nodes": (
+        "pyrite.montecarlo.channeling.exit_angular",
+        "divergence_sweep_nodes",
+    ),
     "entry_populations": ("pyrite.montecarlo.channeling.bloch", "entry_populations"),
     "line_energy_eV": ("pyrite.montecarlo.channeling.bloch", "line_energy_eV"),
     "longitudinal_kinematics": ("pyrite.montecarlo.channeling.bloch", "longitudinal_kinematics"),
@@ -297,6 +308,8 @@ __all__ = [
     "classical_exit_angles",
     "coherent_axial_exit_map",
     "coherent_exit_distribution",
+    "coherent_exit_sweep",
+    "divergence_sweep_nodes",
     "donut",
     "electronic_kernel",
     "entry_populations",

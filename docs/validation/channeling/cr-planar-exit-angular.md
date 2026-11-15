@@ -1,6 +1,6 @@
 # `cr-planar-exit-angular` re-derivation
 
-Claim: `montecarlo/channeling/exit_angular.py::{coherent_exit_distribution,density_exit_distribution,open_exit_distribution,classical_exit_angles,incidence_nodes,ExitAngularDistribution}`. Sources: Shulga, Shul'ga, Barsuk, Chaikovska & Chehab, NIMB 402, 16 (2017), Eqs. 1–9 and Fig. 4 (Zotero `BCIDCFDA`, read in full); Shul'ga & Shulga, PLB 769, 141 (2017), Eqs. 13–14 (cited by the module; not opened here, because NIMB 402 Eqs. 6–9 restate the same amplitude for the planar case).
+Claim: `montecarlo/channeling/exit_angular.py::{coherent_exit_distribution,density_exit_distribution,open_exit_distribution,classical_exit_angles,incidence_nodes,ExitAngularDistribution}` (the #1217 sweep path `coherent_exit_sweep` is anchored to `coherent_exit_distribution` by an equivalence test; see the ledger row). Sources: Shulga, Shul'ga, Barsuk, Chaikovska & Chehab, NIMB 402, 16 (2017), Eqs. 1–9 and Fig. 4 (Zotero `BCIDCFDA`, read in full); Shul'ga & Shulga, PLB 769, 141 (2017), Eqs. 13–14 (cited by the module; not opened here, because NIMB 402 Eqs. 6–9 restate the same amplitude for the planar case).
 
 ## Independent derivation (before reading the body)
 
