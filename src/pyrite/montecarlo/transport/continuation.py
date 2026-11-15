@@ -35,7 +35,7 @@ from typing import Any
 
 import numpy as np
 
-from ..._env import env_value
+from ..._util.env import env_value
 from ._continuation_join import RUN_BYTES, _copy_runs, join_rounds
 from .cores import (
     EXIT_BACKSCATTERED,

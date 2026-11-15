@@ -89,7 +89,7 @@ def test_prune_render_cache_keeps_newest_files(tmp_path, monkeypatch):
 
 
 def test_render_reveal_animation_raises_clear_error_when_deps_missing(monkeypatch):
-    import pyrite._extras as extras
+    import pyrite._util.extras as extras
 
     real_find_spec = extras.find_spec
     monkeypatch.setattr(

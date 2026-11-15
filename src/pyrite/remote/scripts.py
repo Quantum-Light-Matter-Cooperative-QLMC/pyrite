@@ -3,7 +3,7 @@
 import shlex
 import uuid
 
-from .._env import GENERATED_INVOCATION_ENV
+from .._util.env import GENERATED_INVOCATION_ENV
 from . import _queue_scripts, config, transport
 
 datetime = _queue_scripts.datetime

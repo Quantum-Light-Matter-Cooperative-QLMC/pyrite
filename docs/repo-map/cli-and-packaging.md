@@ -17,7 +17,7 @@ RFC D7 deprecation harness: frozen `Deprecation` registry keyed by command path,
 One module per `pyrite` subcommand group, holding only the Click layer. `scan`/`blaze` command wiring split out of the fused `scan.py`/`blaze.py` drivers; `energy_grid` owns the whole `pyrite energy-grid` group; `profile` owns named campaign defaults and membership; `material` owns effective-range inspection and per-profile overrides; `beam` owns named `[beams.*]` objects; `sweep` is hidden compatibility aliases only. `job` owns the canonical remote asynchronous-job lifecycle and delegates transport/state operations to `remote/`. Shared validated atomic TOML helpers stay in `cli/_catalog_io.py`.
 
 ## `console/`
-Terminal presentation primitives shared by the CLI and the domain packages, and the layer everything else may depend on without depending on `cli/`. It imports `paths`, `_env` and `_catalog_keys` and nothing else first-party.
+Terminal presentation primitives shared by the CLI and the domain packages, and the layer everything else may depend on without depending on `cli/`. It imports `paths`, `_util.env` and `_catalog_keys` and nothing else first-party.
 - `output.py` — colour, Click parameter types, destructive-action confirmation, result/diagnostic emission, JSON envelopes, and `run()`, which preserves the pyrite exit contract around Click.
 - `tables.py` — the one human renderer for `list`/`show` (`emit_table`, `emit_settings`, `emit_object`, `emit_named_list`) and the value-source/object-origin vocabulary ([CLI output vocabulary](../repo-design/cli/cli-output.md)); JSON never passes through it.
 - `json.py` — stable JSON payload adapters for automation.
@@ -32,6 +32,9 @@ Terminal presentation primitives shared by the CLI and the domain packages, and 
 
 ## `cli/_options.py`
 `-R/--remote`: the one shared option whose callback validates through `remote.config`, which `console/` sits below and cannot import.
+
+## `_util/`
+Domain-free internal helpers (#1029); no public API, and the `util-imports-no-pyrite` import-linter contract keeps every module free of `pyrite.*` imports. `io`: the one atomic text/JSON writer (`atomic_write_text`, `atomic_write_json`; hidden mkstemp sibling + `os.replace`, re-exported as `paths.atomic_write_text`). `hashing`: the one streamed `file_sha256` (re-exported by `datasets`, `checkpoints.trajectory_scoring`, `xsgen.bremslib.release`) and `canonical_json_digest` (compact sorted-key JSON; observation payload, photon-identity, managed-CIF and axial-settings digests). `env` (`env_value`, `GENERATED_INVOCATION_ENV`), `extras` (`require_extra`, `MissingExtraError`), `deprecations` (module, public-export and Python API removal schedules), `spec_defaults` (`UNSET` omission sentinel), `formatting` (`fmt_thickness`). Writers with different durability contracts stay with their owners: fsync'd shared-FS JSON (`execution/slurm`), binary lockfiles (`checkpoints/campaign_lock`), pid-named temporaries that keep umask file permissions rather than mkstemp 0600 (`_progress`, `perf/`, `observations/store`, checkpoint manifests). Tests: `tests/test_util_helpers.py`.
 
 ## `_catalog_keys.py`
 Offline `[materials|profiles|beams|detectors].*` key reads by listing the selected catalog directory's object files, without importing the scientific material modules. Shell completion, `runs.scan`'s material validation and checkpoint identity resolution all need catalog keys where a `materials` import would be far too expensive.

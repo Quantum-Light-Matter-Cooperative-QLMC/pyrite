@@ -5,7 +5,7 @@ import pytest
 from click.testing import CliRunner
 
 from pyrite import _dev
-from pyrite._env import GENERATED_INVOCATION_ENV
+from pyrite._util.env import GENERATED_INVOCATION_ENV
 from pyrite.cli import command
 from pyrite.cli._deprecations import (
     DEPRECATED_FLAGS,

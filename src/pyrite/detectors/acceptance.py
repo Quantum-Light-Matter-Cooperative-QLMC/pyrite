@@ -5,9 +5,9 @@ from dataclasses import dataclass, replace
 from numbers import Real
 from typing import TYPE_CHECKING, Any, Self, cast
 
-from .._spec_defaults import UNSET as _UNSET
-from .._spec_defaults import _Unset
 from .._units import _is_pint_quantity, _positive_length_quantity, normalize_unit
+from .._util.spec_defaults import UNSET as _UNSET
+from .._util.spec_defaults import _Unset
 
 if TYPE_CHECKING:
     from pint import Quantity

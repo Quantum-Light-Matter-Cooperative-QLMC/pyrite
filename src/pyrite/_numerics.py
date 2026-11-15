@@ -13,8 +13,8 @@ from ._line_roulette import LineRoulette
 from ._mixed_elastic_policy import MIXED_URBAN_REFUSAL, validate_transport_mode
 from ._photon_config import PhotonTransport
 from ._sampling import AdaptiveSampling, FixedSampling, SamplingPolicy
-from ._spec_defaults import UNSET, _Unset
 from ._units import _length_vector, _quantity_spelling, _scalar_quantity, normalize_unit
+from ._util.spec_defaults import UNSET, _Unset
 
 if TYPE_CHECKING:
     from pint import Quantity

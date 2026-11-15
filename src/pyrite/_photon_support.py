@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-import hashlib
-import json
-
 import numpy as np
+
+from ._util.hashing import canonical_json_digest
 
 MODEL = "bremslib-continuum-photon-only-cpu.v2"
 EVENT_MODEL = "physical-event-photon-cpu.v1"
@@ -113,9 +112,7 @@ def _identity(
             raise ValueError("unsupported photon observation execution backend")
         payload["execution"] = dict(execution)
         payload["model"] = CUDA_MODEL
-    digest = hashlib.sha256(
-        json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
-    ).hexdigest()
+    digest = canonical_json_digest(payload)
     return digest, payload
 
 
@@ -271,7 +268,5 @@ def _event_identity(
         charged_feedback=feedback_identity if charged_feedback else None,
         relaxation_feedback=feedback_identity if source == "characteristic" else None,
     )
-    digest = hashlib.sha256(
-        json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
-    ).hexdigest()
+    digest = canonical_json_digest(payload)
     return digest, payload

@@ -576,6 +576,13 @@ source_modules = ["pyrite.campaign"]
 forbidden_modules = ["pyrite.execution"]
 
 [[tool.importlinter.contracts]]
+id = "util-imports-no-pyrite"
+name = "Domain-free helpers (pyrite._util) import no other pyrite module"
+type = "forbidden"
+source_modules = ["pyrite._util"]
+forbidden_modules = ["pyrite.*"]
+
+[[tool.importlinter.contracts]]
 id = "devtools-stays-below-_dev"
 name = "devtools does not import the dev entry point"
 type = "forbidden"

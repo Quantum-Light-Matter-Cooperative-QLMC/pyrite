@@ -20,8 +20,8 @@ from .._channeling_table import (
 from .._channeling_table import CHANNELING_OFF_FIELDS as CHANNELING_OFF_FIELDS
 from .._channeling_table import CHANNELING_TABLE_KEYS as CHANNELING_TABLE_KEYS
 from .._channeling_table import channeling_table_values as channeling_table_values
-from .._spec_defaults import UNSET, _Unset
 from .._units import _positive_length_quantity, normalize_unit
+from .._util.spec_defaults import UNSET, _Unset
 
 if TYPE_CHECKING:
     from pint import Quantity

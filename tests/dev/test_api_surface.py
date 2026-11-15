@@ -26,7 +26,8 @@ def _project(tmp_path: Path) -> Path:
             f'{name} = {{target="pyrite.beam:{name}", status="stable", '
             'domain="beams", root_role="core"}'
         )
-    (source / "_api_deprecations.py").write_text("ROOT_API_REPLACEMENTS = {}\n")
+    (source / "_util").mkdir()
+    (source / "_util/deprecations.py").write_text("ROOT_API_REPLACEMENTS = {}\n")
     exports.append("[root_policy]")
     for name in sorted(mapping):
         exports.append(
@@ -198,7 +199,7 @@ def test_runtime_allowlist_and_warning_replacements_are_governed(tmp_path):
     root = _project(tmp_path)
     path = root / "src/pyrite/__init__.py"
     path.write_text(path.read_text().replace("_ROOT_API = (", "_ROOT_API = ('Surprise', "))
-    registry = root / "src/pyrite/_api_deprecations.py"
+    registry = root / "src/pyrite/_util/deprecations.py"
     registry.write_text("ROOT_API_REPLACEMENTS = {'pyrite.Beam': 'pyrite.beams.Beam'}\n")
     errors = check_root_policy(root, set(api_surface.CORE_ROOT), api_surface.CORE_ROOT)
     assert any("_ROOT_API differs" in error for error in errors)

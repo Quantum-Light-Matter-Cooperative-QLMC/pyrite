@@ -10,8 +10,6 @@ reason: it is a config lookup that returns a path, so it belongs above the path
 constants, not beside them.
 """
 
-import os
-import tempfile
 import tomllib
 from dataclasses import dataclass
 from os import PathLike
@@ -20,7 +18,8 @@ from pathlib import Path
 import tomlkit
 from tomlkit.exceptions import ParseError
 
-from .._env import env_value
+from .._util.env import env_value
+from .._util.io import atomic_write_text
 from ..paths import config_dir, data_dir, user_data_dir
 
 CONFIG_PATH = config_dir() / "config.toml"
@@ -176,15 +175,7 @@ def _load_document() -> tomlkit.TOMLDocument:
 
 
 def _write_document(document: tomlkit.TOMLDocument) -> None:
-    CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    fd, temporary = tempfile.mkstemp(dir=CONFIG_PATH.parent, suffix=".toml.tmp")
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as stream:
-            stream.write(tomlkit.dumps(document))
-        os.replace(temporary, CONFIG_PATH)
-    except BaseException:
-        Path(temporary).unlink(missing_ok=True)
-        raise
+    atomic_write_text(CONFIG_PATH, tomlkit.dumps(document))
 
 
 def set_stored(key: str, value: str) -> None:

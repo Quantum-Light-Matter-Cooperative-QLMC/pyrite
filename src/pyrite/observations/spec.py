@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 
-from .._spec_defaults import UNSET, _Unset
+from .._util.spec_defaults import UNSET, _Unset
 from ..detectors.spec import Detector, DetectorResponse
 from ..instrument.model import PixelScorer, PlanarDetector
 from ..instrument.observation import Acquisition, NativeAcquisition, response_payload

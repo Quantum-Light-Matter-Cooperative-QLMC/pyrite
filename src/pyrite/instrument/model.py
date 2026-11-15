@@ -22,8 +22,8 @@ from .._planar_geometry import (
     _positive_pair,
     _positive_real,
 )
-from .._spec_defaults import UNSET, _Unset
 from .._units import _quantity_spelling, _scalar_quantity, normalize_unit
+from .._util.spec_defaults import UNSET, _Unset
 from ..detectors.spec import Detector, DetectorResponse
 from ..materials import CATALOG, MediumSpec
 from ..materials._composition import has_positive_number_densities, resolve_composition

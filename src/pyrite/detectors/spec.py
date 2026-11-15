@@ -10,9 +10,9 @@ from typing import TYPE_CHECKING, Protocol
 import numpy as np
 
 from .._energy_bins import EnergyBins as EnergyBins
-from .._spec_defaults import UNSET as _UNSET
-from .._spec_defaults import _Unset
 from .._units import normalize_unit, reject_quantity
+from .._util.spec_defaults import UNSET as _UNSET
+from .._util.spec_defaults import _Unset
 from ..config.response_numerics import Timepix3ResponseNumerics
 from ._tabulated import TabulatedEfficiency
 from .acceptance import (

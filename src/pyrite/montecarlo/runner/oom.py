@@ -30,7 +30,7 @@ def _drop_traceback_locals(exc):
     debugging (``pdb.pm()``), at the cost of the device memory they pin."""
     import inspect
 
-    from ..._env import env_value
+    from ..._util.env import env_value
 
     if env_value(KEEP_OOM_FRAMES_ENV) == "1":
         return

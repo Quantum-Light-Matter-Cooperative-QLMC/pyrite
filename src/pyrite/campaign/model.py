@@ -13,8 +13,8 @@ from .._numerics import CxrReflections, Numerics, Physics
 from .._numerics import EmissionMode as EmissionMode
 from .._numerics import MosaicRoute as MosaicRoute
 from .._precision import Precision
-from .._spec_defaults import UNSET, _Unset
 from .._units import _is_pint_quantity
+from .._util.spec_defaults import UNSET, _Unset
 from ..detectors import Detector, EnergyBins
 from ..instrument import Acquisition, Filter, FilterPlate, NativeAcquisition, PlanarDetector
 from ..instrument.model import validate_downstream_scene

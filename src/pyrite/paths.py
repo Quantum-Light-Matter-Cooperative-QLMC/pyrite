@@ -6,11 +6,12 @@ resolves through the config store -- so it lives in
 """
 
 import os
-import tempfile
 from pathlib import Path
 
 import click
 from platformdirs import user_cache_path, user_data_path, user_state_path
+
+from ._util.io import atomic_write_text as atomic_write_text
 
 
 def data_dir() -> Path:
@@ -57,16 +58,3 @@ def cache_dir() -> Path:
 def user_data_dir() -> Path:
     """Return the reserved canonical platform-specific user data directory."""
     return Path(user_data_path("pyrite", appauthor=False))
-
-
-def atomic_write_text(path: Path, text: str, *, encoding: str = "utf-8") -> None:
-    """Atomically replace one mutable user-state text file."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, temporary = tempfile.mkstemp(dir=path.parent, suffix=f"{path.suffix}.tmp")
-    try:
-        with os.fdopen(fd, "w", encoding=encoding) as stream:
-            stream.write(text)
-        os.replace(temporary, path)
-    except BaseException:
-        Path(temporary).unlink(missing_ok=True)
-        raise

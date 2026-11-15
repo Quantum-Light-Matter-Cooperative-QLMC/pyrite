@@ -366,7 +366,7 @@ def test_mixed_cpu_pool_preserves_fixed_case_and_adaptive_provenance(scene, monk
 
 @pytest.mark.parametrize("inherited", ["auto", "per-electron", "lockstep"])
 def test_adaptive_worker_only_overrides_automatic_pool_pin(monkeypatch, inherited):
-    from pyrite._env import env_value
+    from pyrite._util.env import env_value
 
     monkeypatch.setattr(runner, "_WORKER_INHERITED_CORE", inherited)
     pinned = "lockstep" if inherited == "auto" else inherited

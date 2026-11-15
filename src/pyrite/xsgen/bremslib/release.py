@@ -28,7 +28,6 @@ key while holding different arrays.
 
 from __future__ import annotations
 
-import hashlib
 import json
 import shutil
 import tempfile
@@ -40,6 +39,7 @@ from typing import Any
 
 import numpy as np
 
+from ..._util.hashing import file_sha256
 from ...materials._transport_data import TRANSPORT_ELEMENTS
 from ...paths import data_dir
 from .._errors import TableNotFoundError
@@ -80,7 +80,6 @@ ARCHIVE_TABLE_DIR = "tables"
 
 #: Fixed member timestamp, so rebuilding identical tables gives identical bytes.
 _ZIP_EPOCH = (1980, 1, 1, 0, 0, 0)
-_DIGEST_CHUNK = 1 << 20
 
 
 def release_index_path() -> Path:
@@ -216,15 +215,6 @@ def load_release_index(path: Path | None = None) -> ReleaseIndex | None:
 def archive_member(key: str, suffix: str) -> str:
     """Return the archive member name for one file of table ``key``."""
     return f"{ARCHIVE_TABLE_DIR}/{key}{suffix}"
-
-
-def file_sha256(path: Path) -> str:
-    """Return the hex SHA-256 of a file, streamed."""
-    digest = hashlib.sha256()
-    with Path(path).open("rb") as stream:
-        while chunk := stream.read(_DIGEST_CHUNK):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def write_archive(archive: Path, tables: Iterable[StoredTable]) -> None:

@@ -92,8 +92,8 @@ the additive beam-energy interface keeps the numeric dataclass representation.
 5. Assess simulation physics, numerical reproducibility, checkpoint schemas,
    and content-addressed identities; do not change them for an import-only move.
 6. Add focused behavior/import tests, examples, and API documentation.
-7. If replacing a supported path, use the existing `_api_deprecations` /
-   `_module_deprecations` schedule; do not remove it immediately.
+7. If replacing a supported path, use the existing `pyrite._util.deprecations`
+   schedule; do not remove it immediately.
 
 ## Inventory and static check
 
@@ -126,9 +126,9 @@ underlying object; it may import scientific engines and requires a normal
 project environment. The static gate is included in `pyrite-dev verify`.
 `tests/dev/test_api_surface.py` also resolves the complete registered inventory
 in CI, catching missing canonical attributes and broken runtime aliases.
-Deprecation schedules remain owned by `_api_deprecations` and
-`_module_deprecations`, with their existing schedule and live-tree tests; the
-API inventory does not introduce a second removal schedule.
+Deprecation schedules remain owned by `pyrite._util.deprecations`, with their
+existing schedule and live-tree tests; the API inventory does not introduce a
+second removal schedule.
 
 A subprocess smoke test blocks optional GPU, plotting, and distributed
 backends *before* imports and exercises the canonical namespaces plus core

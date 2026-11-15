@@ -17,8 +17,8 @@ in identity markers and changes when that policy does.
 Validation: gpu-mixed-precision-tables
 """
 
-from ..._env import env_value
 from ..._numerics import TRANSPORT_PRECISIONS
+from ..._util.env import env_value
 
 #: Precision ``auto`` selects on the exact CUDA core.
 DEFAULT_TRANSPORT_PRECISION = "mixed"

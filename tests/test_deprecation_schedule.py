@@ -17,8 +17,12 @@ or being conspicuously absent.
 import pytest
 
 from pyrite import __version__
-from pyrite._api_deprecations import API_DEPRECATIONS, _window
-from pyrite._module_deprecations import MODULE_DEPRECATIONS, PUBLIC_EXPORT_DEPRECATIONS
+from pyrite._util.deprecations import (
+    API_DEPRECATIONS,
+    MODULE_DEPRECATIONS,
+    PUBLIC_EXPORT_DEPRECATIONS,
+    _window,
+)
 from pyrite.cli._deprecations import (
     DEPRECATED_FLAGS,
     DEPRECATED_FORMS,

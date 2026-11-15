@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import math
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, fields, is_dataclass, replace
@@ -13,9 +12,10 @@ from typing import TYPE_CHECKING, Any, Literal, Self, cast
 
 import numpy as np
 
-from .._spec_defaults import UNSET, _Unset
 from .._units import _is_pint_quantity, _scalar_quantity, normalize_unit
 from .._units import _quantity_spelling as _spelling
+from .._util.hashing import canonical_json_digest
+from .._util.spec_defaults import UNSET, _Unset
 from ..detectors import IdealPhotonCounter, Timepix3
 from ..materials import CATALOG, MediumSpec
 from ..materials._composition import resolve_composition
@@ -517,8 +517,7 @@ def _array_identity(array: np.ndarray) -> dict[str, Any]:
 
 def payload_digest(payload: Mapping[str, Any]) -> str:
     """SHA-256 of a canonical identity payload's compact sorted-key JSON."""
-    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
-    return hashlib.sha256(encoded).hexdigest()
+    return canonical_json_digest(payload, allow_nan=True)
 
 
 def _resolved_composition(material: str | MediumSpec) -> tuple[tuple[str, float], ...]:

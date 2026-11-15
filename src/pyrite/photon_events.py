@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any, Literal
 from ._photon_support import EVENT_MODEL
 from ._photon_support import _event_identity as _event_identity
 from ._photon_support import _event_sources as _event_sources
-from ._spec_defaults import UNSET, _Unset
+from ._util.spec_defaults import UNSET, _Unset
 from .campaign.resolution import resolve_simulation
 from .photon_transport import (
     _energy_edges,

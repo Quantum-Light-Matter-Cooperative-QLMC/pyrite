@@ -26,7 +26,7 @@ from dataclasses import dataclass
 import click
 from click.core import ParameterSource
 
-from .._env import GENERATED_INVOCATION_ENV, env_value
+from .._util.env import GENERATED_INVOCATION_ENV, env_value
 
 SUPPORT_WINDOW_MINORS = 2
 

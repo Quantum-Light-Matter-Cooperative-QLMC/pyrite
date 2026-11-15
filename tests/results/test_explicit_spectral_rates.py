@@ -289,7 +289,7 @@ def test_acquisition_counts_cannot_be_current_normalized():
 
 
 def test_legacy_flux_selectors_are_removed_and_native_tables_unchanged():
-    from pyrite._api_deprecations import API_DEPRECATIONS
+    from pyrite._util.deprecations import API_DEPRECATIONS
 
     result = scalar_result()
     for name in ("spectral_flux", "spectral_flux_units"):

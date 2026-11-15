@@ -593,7 +593,7 @@ def _adaptive_worker_call(function, case, *args, **kwargs):
     Explicit inherited CPU-core choices remain authoritative. Restore the pool
     default afterwards, so a fixed case in a mixed batch keeps its old draws.
     """
-    from ..._env import env_value, set_canonical_env
+    from ..._util.env import env_value, set_canonical_env
     from .. import runner
 
     if runner._WORKER_INHERITED_CORE not in ("", "auto", "cuda"):

@@ -21,8 +21,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from .._util.hashing import file_sha256
+
 _FORMAT = "pyrite.execution.case.v1"
-_BLOCK_BYTES = 1024 * 1024
 _KEY_PATTERN = re.compile(r"[a-fA-F0-9]{64}\Z")
 
 
@@ -49,13 +50,7 @@ def _material(value: str) -> str:
 
 
 def _digest(path: Path) -> tuple[str, int]:
-    h = hashlib.sha256()
-    size = 0
-    with path.open("rb") as stream:
-        while chunk := stream.read(_BLOCK_BYTES):
-            h.update(chunk)
-            size += len(chunk)
-    return h.hexdigest(), size
+    return file_sha256(path), path.stat().st_size
 
 
 @dataclass(frozen=True, slots=True)

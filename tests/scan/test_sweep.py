@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 
 from pyrite import materials as material_registry
-from pyrite._formatting import fmt_thickness
+from pyrite._util.formatting import fmt_thickness
 from pyrite.campaign.config import (
     MATERIALS,
     PENETRATION_TILT_DEG,

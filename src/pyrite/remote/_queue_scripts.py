@@ -4,7 +4,7 @@ import datetime
 import shlex
 import uuid
 
-from .._env import env_value
+from .._util.env import env_value
 from ..perf.py_spy import (
     PY_SPY_REQUIREMENT,
     PY_SPY_STATUS_SUFFIX,

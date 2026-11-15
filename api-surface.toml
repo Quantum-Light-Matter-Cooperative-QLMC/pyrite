@@ -444,7 +444,7 @@ alexs_spectrometer_image = { target = "pyrite.detectors.grating_image:alexs_spec
 [package_exports."pyrite.results.radiation"]
 radiation_band_metrics = { target = "pyrite.results.radiation:radiation_band_metrics", status = "advanced-stable" }
 
-# Complete root migration classification; schedules live only in _api_deprecations.py.
+# Complete root migration classification; schedules live only in _util/deprecations.py.
 [root_policy]
 AcquisitionBatch = { classification = "deferred", canonical = "pyrite.results:AcquisitionBatch", reason = "Await formal canonical facade approval in #707; preserve both supported results and observations imports." }
 Analysis = { classification = "deferred", canonical = "pyrite.campaign.model:Analysis", reason = "Keep the existing import pending canonical ownership review in #707." }

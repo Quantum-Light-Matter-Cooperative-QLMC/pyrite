@@ -7,7 +7,7 @@ from functools import cache
 
 import numpy as np
 
-from ..._env import env_value
+from ..._util.env import env_value
 from .continuation import (
     TransportContinuationConfig,
     _drive_continuation_rounds,

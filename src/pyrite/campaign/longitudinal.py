@@ -11,8 +11,8 @@ from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 
-from .._spec_defaults import UNSET as _UNSET
 from .._units import _is_pint_quantity, normalize_unit
+from .._util.spec_defaults import UNSET as _UNSET
 from ..materials.crystal import (
     HBARC_EV_ANG,
     HC_EV_ANG,

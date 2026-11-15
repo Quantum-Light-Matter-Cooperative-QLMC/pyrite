@@ -14,8 +14,8 @@ surface, and ``AGENTS.md`` for repository working conventions.
 import logging
 from typing import TYPE_CHECKING, Any
 
-from ._env import env_value
 from ._jit_cache import apply_managed_cache_env
+from ._util.env import env_value
 from .paths import data_dir
 
 __version__ = "0.34.0"

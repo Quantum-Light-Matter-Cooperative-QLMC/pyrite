@@ -23,7 +23,7 @@ import numpy as np
 
 from ..._backend import BACKEND
 from ..._energy_grid_encoding import decode_energy_grid as decode_energy_grid
-from ..._env import env_value, set_canonical_env
+from ..._util.env import env_value, set_canonical_env
 from .. import spectrum as _spectrum_mod
 from ..case import Case as Case
 from ..case import refuse_axial_channeling as refuse_axial_channeling

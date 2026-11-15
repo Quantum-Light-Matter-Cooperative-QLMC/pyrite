@@ -78,8 +78,11 @@ def _minor(version: str) -> tuple[int, int]:
 
 def removal_targets() -> dict[str, str]:
     """Every scheduled removal as ``label -> remove_in`` across all shim families."""
-    from pyrite._api_deprecations import API_DEPRECATIONS
-    from pyrite._module_deprecations import MODULE_DEPRECATIONS, PUBLIC_EXPORT_DEPRECATIONS
+    from pyrite._util.deprecations import (
+        API_DEPRECATIONS,
+        MODULE_DEPRECATIONS,
+        PUBLIC_EXPORT_DEPRECATIONS,
+    )
     from pyrite.cli._deprecations import (
         DEPRECATED_FLAGS,
         DEPRECATED_FORMS,

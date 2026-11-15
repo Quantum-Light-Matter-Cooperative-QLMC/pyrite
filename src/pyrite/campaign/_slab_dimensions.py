@@ -5,9 +5,9 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import TYPE_CHECKING, Any, Self, cast
 
-from .._spec_defaults import UNSET as _UNSET
-from .._spec_defaults import _Unset
 from .._units import _positive_length_quantity as _geometry_length
+from .._util.spec_defaults import UNSET as _UNSET
+from .._util.spec_defaults import _Unset
 from ._geometry_values import _quantity_geometry
 
 if TYPE_CHECKING:

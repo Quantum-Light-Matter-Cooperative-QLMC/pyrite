@@ -2,7 +2,7 @@
 
 import click
 
-from .._extras import MissingExtraError, require_extra
+from .._util.extras import MissingExtraError, require_extra
 
 
 def require_cli_extra(extra: str, *modules: str, feature: str) -> None:

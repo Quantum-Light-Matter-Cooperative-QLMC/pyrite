@@ -41,6 +41,7 @@ from pyrite.energy_grid.bounds import cxr_start_eV as _line_start_eV
 from pyrite.energy_grid.bounds import spacing_num
 
 from .._cxr_vocabulary import translate_catalog_text
+from .._util.io import atomic_write_text
 
 _CATALOG_PATH = bundled_catalog()
 
@@ -772,22 +773,6 @@ def _render_catalog(document) -> str:
     return translate_catalog_text(tomlkit.dumps(document), canonical=True)
 
 
-def _atomic_write(path, text):
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp = tempfile.mkstemp(dir=str(path.parent), suffix=".tmp")
-    try:
-        with os.fdopen(fd, "w") as f:
-            f.write(text)
-        os.replace(tmp, path)
-    except BaseException:
-        try:
-            os.remove(tmp)
-        except OSError:
-            pass
-        raise
-
-
 def _validate_catalog_text(path, text, *, profile: str | None = None):
     """Validate candidate catalog from a temporary file, without replacing live data."""
     loader = load_material_catalog
@@ -821,7 +806,7 @@ def _restore(path, text):
     if text is None:
         path.unlink(missing_ok=True)
     else:
-        _atomic_write(path, text)
+        atomic_write_text(path, text)
 
 
 def _print_diff(original, new_text):

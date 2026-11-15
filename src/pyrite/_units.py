@@ -205,10 +205,10 @@ def _quantity_spelling(
 ) -> Any:
     """Resolve a numeric field against its keyword-only quantity spelling.
 
-    Both spellings default to ``pyrite._spec_defaults.UNSET``; an omitted
+    Both spellings default to ``pyrite._util.spec_defaults.UNSET``; an omitted
     pair returns ``UNSET`` so the caller applies its own default.
     """
-    from ._spec_defaults import UNSET
+    from ._util.spec_defaults import UNSET
 
     if semantic is UNSET:
         return numeric

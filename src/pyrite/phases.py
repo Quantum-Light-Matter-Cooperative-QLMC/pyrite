@@ -35,7 +35,7 @@ def simulate_transport(
     :func:`pyrite.simulate` does and returns the typed
     :class:`~pyrite.transport.Trajectories`.
     """
-    from ._api_deprecations import warn_api
+    from ._util.deprecations import warn_api
     from .campaign.trajectories import scene_trajectories
 
     warn_api("pyrite.phases.simulate_transport")
@@ -53,7 +53,7 @@ def score_spectra(
     ``kernel_tuning`` becomes ``numerics=transported.numerics.with_kernel_tuning(...)``;
     its transport fields must equal the transport's.
     """
-    from ._api_deprecations import warn_api
+    from ._util.deprecations import warn_api
     from .campaign.trajectory_product import Trajectories
     from .campaign.trajectory_product import Trajectories as TransportedScene  # noqa: F401
     from .scoring import score_spectra as stable
@@ -69,7 +69,7 @@ def score_spectra(
 
 def __getattr__(name: str) -> Any:
     if name == "TransportedScene":
-        from ._api_deprecations import warn_api
+        from ._util.deprecations import warn_api
         from .campaign.trajectory_product import Trajectories
 
         warn_api("pyrite.phases.TransportedScene")

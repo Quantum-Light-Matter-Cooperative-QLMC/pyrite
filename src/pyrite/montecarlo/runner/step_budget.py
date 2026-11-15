@@ -1,6 +1,6 @@
 """Per-electron transport step budget and its retry after a step-limit abort."""
 
-from ..._env import env_value
+from ..._util.env import env_value
 from ..transport import TransportStepLimitError
 
 #: Default per-electron transport step limit. A smaller initial budget from

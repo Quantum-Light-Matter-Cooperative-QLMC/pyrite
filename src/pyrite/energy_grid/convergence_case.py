@@ -28,8 +28,6 @@ Validation: line-grid-sinc-convergence
 import argparse
 import json
 import math
-import os
-import tempfile
 import time
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict
@@ -42,6 +40,7 @@ from .._backend import BACKEND, _to_cpu
 from .._cxr_grid_policy import DEFAULT_RTOL
 from .._cxr_windows import build_window_plan
 from .._grid_semantics import resolution_num
+from .._util.io import atomic_write_json
 from ..campaign.config import material_sweep
 from ..campaign.sweep import build_cases
 from ..materials import CATALOG
@@ -425,23 +424,6 @@ def config_key(config: Mapping[str, Any]) -> str:
     )
 
 
-def _atomic_write_json(path: str | os.PathLike[str], payload: object) -> None:
-    target = Path(path)
-    directory = target.parent if str(target.parent) else Path(".")
-    directory.mkdir(parents=True, exist_ok=True)
-    descriptor, temporary = tempfile.mkstemp(dir=directory, suffix=".tmp")
-    try:
-        with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
-            json.dump(payload, stream, indent=2)
-        os.replace(temporary, target)
-    except BaseException:
-        try:
-            os.remove(temporary)
-        except OSError:
-            pass
-        raise
-
-
 def run_config(
     config: Mapping[str, Any],
     spacings_eV: Sequence[float],
@@ -767,7 +749,7 @@ def cmd_run(args: argparse.Namespace) -> int:
 
         def save(state, key=key):
             payload["configs"][key] = state
-            _atomic_write_json(path, payload)
+            atomic_write_json(path, payload)
 
         if out_of_time():
             complete = False
@@ -839,7 +821,7 @@ def cmd_run_windows(args: argparse.Namespace) -> int:
 
         def save(state, key=key):
             payload["configs"][key] = state
-            _atomic_write_json(path, payload)
+            atomic_write_json(path, payload)
 
         if out_of_time():
             complete = False

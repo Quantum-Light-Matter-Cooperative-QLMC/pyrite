@@ -5,7 +5,7 @@ import sys
 
 import pytest
 
-import pyrite._extras as extras
+import pyrite._util.extras as extras
 
 
 @pytest.mark.parametrize(

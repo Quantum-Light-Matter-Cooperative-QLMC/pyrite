@@ -21,7 +21,7 @@ from pyrite.plots.plotly.trajectories import (
     trajectory_volume_figure_from_data,
 )
 
-from ..._extras import require_extra
+from ..._util.extras import require_extra
 from ...console.outputs import output_dir
 
 _RENDER_SALT = "v3"  # bump on any change to the cache-key inputs or render format
@@ -62,7 +62,7 @@ def render_reveal_animation(
     ``progress_cb(k, n_frames)``, if given, is called once per frame after that
     frame's PNG has been rendered.
 
-    Returns ``Path(out_path)``. Raises :class:`~pyrite._extras.MissingExtraError`
+    Returns ``Path(out_path)``. Raises :class:`~pyrite._util.extras.MissingExtraError`
     naming the ``plots`` install extra if kaleido/imageio are not installed.
     """
     require_extra("plots", "imageio", "kaleido", feature="render_reveal_animation")

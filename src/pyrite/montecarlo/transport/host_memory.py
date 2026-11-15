@@ -16,7 +16,7 @@ import numpy as np
 import psutil
 
 from ..._backend import BackendResourceError
-from ..._env import env_value
+from ..._util.env import env_value
 
 
 class HostMemoryResourceError(BackendResourceError):

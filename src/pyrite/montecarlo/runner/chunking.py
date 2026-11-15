@@ -8,7 +8,7 @@ import numpy as np
 import psutil
 
 from ..._backend import _GPU, BACKEND
-from ..._env import env_value
+from ..._util.env import env_value
 from .. import spectrum as _spectrum_mod
 from .._resources import admitted_chunk, resolve_resource_policy
 from ..spectrum.brem_blocks import eedl_staged_panel_count
