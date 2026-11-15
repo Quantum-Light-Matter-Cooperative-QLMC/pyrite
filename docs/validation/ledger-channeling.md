@@ -321,6 +321,28 @@ change the eigenproblem or introduce a new physical selection rule.
 - **Anchor:** `tests/montecarlo/quantum/test_longitudinal_coherence_reference.py::{test_cr_recoil_root_solves_the_mass_shell,test_cr_forward_fixed_levels_is_baier_katkov,test_cr_first_order_shift,test_cr_recoil_is_anisotropic_in_photon_azimuth,test_cr_forbidden_branch_is_nan}`
 - **Notes:** Research reference only; production CR still uses `cr-doppler-line-energy`. Line positions are exact kinematics; matrix elements stay at transverse dipole order, neglecting `O(k_x a)` corrections. Absolute level offsets (the check uses the solver's `U_0 = 0`) matter only at `O(ε/E)`. Shifts are 0.06–0.37 % at 5–54 MeV for Si/diamond(110). **2026-11-08 fresh-context verdict `rederived`** ([write-up](channeling/cr-recoil-line-energy.md)): (a)–(e) re-derive. The implementation agrees with an independent 50-digit solve to 7e-16, and the forward BK gap equals `|ε_i|/E`. Owner source check 2026-11-08: BK Eq. (17) confirms the `ω → ωE/E′` form, which gives `ω_D(θ)/(1 + ħω_D(θ)/E)` independent of azimuth after replacing the trajectory operators by classical values. The off-axis `sin²θ cos²φ` term is per-level kinematics outside BK's classical-trajectory scope: free transverse `(ħk⊥)²` cancels, the bound plane-normal part does not. Wording fixes (level zero, `≃`, matrix-element phrasing, off-axis caveat) applied. The owner applies `anchored` with the named passing tests. Human sign-off belongs to #277.
 
+## `cr-submev-refractive-doppler`
+
+- **Claim:** research claim (#585). A transverse transition `Δε` of an electron at speed `βc`, emitting a photon of Minkowski momentum `nħω/c` in a homogeneous medium with `n = 1 − δ`, satisfies `ħω(1 − βn cos θ) = Δε` to first order in `ħω/E`. The forward line is `Δε/[1 − β(1 − δ)]`, with `δ` taken at the shifted line by fixed-point iteration; the relative shift is exactly `−x/(1 + x)` with `x = βδ/(1 − β)`. A line emitted uniformly through a slab of thickness `t` and leaving along the normal escapes with mean transmission `(1 − e^{−t/L})/(t/L)`, `L = λ/4πβ_idx`.
+- **Code:** `checks/channeling_submev_optics.py::{medium_line,escape}`
+- **Source:** energy and `p_z` conservation in the transverse-mass continuum model (`cr-doppler-line-energy`); classical phase matching `ω − k_z v = Ω`; {ref}`optics record <sec-submev-optics>`.
+- **Status:** rederived
+- **Checks:** constant-index medium line against the closed form; strong-refraction refusal; escape thin- and thick-slab limits; W ⟨001⟩ line record.
+- **Anchor:** `tests/check/test_channeling_submev_optics.py`
+- **Verification:** 2026-11-15 fresh-context verdict `rederived` ([write-up](channeling/cr-submev-refractive-doppler.md)): conservation and phase-matching routes agree; Abraham momentum gives the wrong sign; W shifts and δ checked by hand. Page and code findings addressed in the same change.
+- **Notes:** Research record only; production line energies use `cr-doppler-line-energy`. Isolated-atom Chantler tables in a homogeneous, isotropic medium. No medium line below `3ħω_p`, where `x > 0.3`, and no error bound within 3 % of an absorption edge. No dielectric theory of emission, surface or transition-radiation term, or absorptive line broadening. Human sign-off in #277.
+
+## `cr-submev-dirac-spin-correction`
+
+- **Claim:** research claim (#585). For a static potential energy `V` independent of `z`, the spin-free Klein–Gordon equation separates exactly into `[c²p⊥²/2E + V − V²/2E]φ = εφ` with `c²p_z² = E² − m²c⁴ − 2Eε`. The first-order Dirac correction beyond it is the matrix element `V_q u(p′)†u(p) = V_q (E + mc²)/(2E) [1 + c²(p′·p + iσ·(p′×p))/(E + mc²)²]` between on-shell positive-energy spinors at `E`. Its spin-free part is the Darwin term `ħ²c²∇²V/4E(E + mc²)`; its longitudinal spin part is the Thomas–BMT energy `ħcβ/2(E + mc²) σ·(∇V×ẑ)`. The on-shell form gives a signed correction, up to relative `O(V/(E + mc²))`.
+- **Code:** `checks/channeling_submev_w001_spin.py::dirac_terms`
+- **Source:** Dirac equation with the lower component eliminated at fixed `p_z`; `(σ·a)(σ·b) = a·b + iσ·(a×b)`; Thomas–BMT precession at `g = 2`; {ref}`finite-β audit <sec-submev-w001-finite-beta>`.
+- **Status:** rederived
+- **Checks:** forward matrix element unchanged; longitudinal spin–orbit matches BMT; spin Hamiltonian Hermitian with Kramers degeneracy; spin-free solve reproduces `axial_states`.
+- **Anchor:** `tests/check/test_channeling_submev_w001_spin.py`
+- **Verification:** 2026-11-15 fresh-context verdict `rederived` ([write-up](channeling/cr-submev-dirac-spin-correction.md)): Klein–Gordon separation, spinor product, Darwin and BMT coefficients, and code construction verified. The earlier sign-ambiguity and second-order-Born reasoning was wrong and is corrected; the common-`p_z` variant adds a spurious `O(V²/E)` term.
+- **Notes:** Research record only; the production transverse Hamiltonian is spin-free and drops `−V²/2E`. W ⟨001⟩ at `k = 0` only; no longitudinal lattice harmonics. Human sign-off in #277.
+
 ## `cr-mean-inner-potential`
 
 - **Claim:** the electron's mean potential energy in the crystal is the `g → 0` limit of the planar sum, `U_0 = −(4π e²/V) Σ_j Z_j⟨r²⟩_j/6`, using `f0(g) = Z − Z⟨r²⟩g²/6 + O(g⁴)`. It is the neutral independent-atom value and is negative, so electrons gain `−U_0` on entry.
