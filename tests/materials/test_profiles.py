@@ -987,7 +987,8 @@ def test_identity_from_stem_reads_sidecar_when_profile_edited_after_run(tmp_path
 
 @pytest.mark.slow
 def test_shell_inelastic_mode_forks_identity_and_case_payload_only_when_on():
-    default = replace(default_settings(), energy_model="midpoint")
+    # Isolate the inelastic-model identity from the shell straggling default (#642).
+    default = replace(default_settings(), energy_model="midpoint", straggling=False)
     settings = replace(
         default, inelastic_model="continuous", straggling=False, inelastic_cutoff_eV=None
     )
@@ -995,7 +996,7 @@ def test_shell_inelastic_mode_forks_identity_and_case_payload_only_when_on():
     base = dataset_identity("silicon", settings, sweep)
     shell = replace(settings, inelastic_model="shell-soft-hard", inelastic_cutoff_eV=50.0)
     active = dataset_identity("silicon", shell, sweep)
-    # The "auto" default (#281) resolves silicon to the shell mode at 50 eV.
+    # The default shell mode uses a 50 eV cutoff.
     explicit_default = dataset_identity("silicon", default, sweep)
     other_cutoff = dataset_identity("silicon", replace(shell, inelastic_cutoff_eV=100.0), sweep)
 
@@ -1028,6 +1029,7 @@ def test_shell_inelastic_mode_forks_identity_and_case_payload_only_when_on():
         energy_model="midpoint",
         inelastic_model="shell-soft-hard",
         inelastic_cutoff_eV=50.0,
+        straggling=False,
     )[0]
     assert "inelastic_model" not in legacy_case
     assert shell_case["inelastic_model"] == "shell-soft-hard"
