@@ -68,9 +68,11 @@ mesh (spacing `max(1 eV, 1e-3 E)`, the 1 eV mesh kept within 3 % of every
 edge) instead of a uniform 1 eV mesh changed `CXR_ESCAPE_MODEL` from v8 to v9
 (`segment-mean-v9-edge-geometric-tables`). Only the generation-dependent
 `case_content_key` and `parameter_sha256` hashes in `resolved.json` and
-`channeling.json` were re-pinned; every case payload is unchanged. The
-recorded CXR output families stay within their existing tolerances on
-CPU/NumPy fp64 without re-pinning, including the slow-marked checks.
+`channeling.json` were re-pinned; every case payload is unchanged. CI then showed that the legacy, EEDL-fallback, multilayer and coherent CXR
+`spec` arrays and the coherent `spec_coherent` array in `outputs.json` move by
+1.7e-6 to 3.3e-6 relative, outside their fp64 `rtol=1e-12`. They were
+re-pinned on CPU/NumPy fp64, Python 3.14. Transport signatures,
+characteristic and bremsstrahlung spectra, and every tolerance are unchanged.
 
 ## Exact second-order PXR/CB elements v7 generation (#1134)
 
