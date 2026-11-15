@@ -240,7 +240,7 @@ Shi's 30 nm films lose 42 % of the pathway coherence at 30 keV and 6–9 % at hi
 
 ## 7. Two-electron super/subradiance (Karnieli et al. 2021)
 
-{cite:t}`karnieli2021prl` show that "a pair of coincident path-entangled electrons can demonstrate either super- or subradiant light emission, depending on the two-particle wave function" (abstract). The PRL full text was not readable here, so its quantitative factors are not quoted.
+{cite:t}`karnieli2021prl` show that "a pair of coincident path-entangled electrons can demonstrate either super- or subradiant light emission, depending on the two-particle wave function" (abstract). Its source assumptions below are read from the arXiv version (arXiv:2011.02548); the PRL's quantitative factors are not quoted.
 
 - **Mechanism:** M3 with quantum correlations: the pair term of {eq}`eq-qce-pair` with a non-product $\rho^{(2)}$.
 - **Required basis:** the product of two single-electron transverse spaces, evolved by operator-Schmidt decomposition (§4). The path separation is the entangled degree of freedom.
@@ -248,6 +248,17 @@ Shi's 30 nm films lose 42 % of the pathway coherence at 30 keV and 6–9 % at hi
 - **Coincidence:** both electrons' emitted wave trains must overlap. A train emitted over a coherent length $\ell$ lasts $\tau\approx\ell(1/v-\cos\theta/c)$ in the lab. With $\ell=\ell(1\,\text{Å})$ in Si: $\tau\approx$ 0.5 fs forward and 0.7 fs at 90° at 30 keV; 0.4 fs and 1.7 fs at 300 keV; 23 as forward and 2.2 fs at 90° at 3 MeV.
 
 **No-go** for any PyRITE beam model. Random coincidences in a Poisson beam are classical mixtures. They contribute only the separable term of {eq}`eq-qce-iid`, which needs bunching, not entanglement. Entangled pairs need an engineered source with sub-fs coincidence, and no such source is specified. Revisit only with a concrete source model (follow-up F3, conditional).
+
+**Source gate (#528, surveyed 2026-11-15): closed.** The gate asks for a physical source of entangled or indistinguishable electron pairs, both arriving within the coincidence window $\tau$ above and with known transverse and longitudinal states. Karnieli et al. assume "two identical, delocalized wavepackets" with carrier momenta $\mathbf k\ne\mathbf k'$ and opposite spins ("as can be created in a Stern–Gerlach-type experiment"), arriving "simultaneously". They cite only H₂ double photoionization and cavity-mediated proposals as routes to such a state (arXiv:2011.02548, "Experimental considerations"). The table gives every candidate source found and the gate condition each one fails.
+
+| Candidate | Pair parameters (source) | Gate failure |
+| --- | --- | --- |
+| Coulomb-correlated pairs from fs photoemission at a nanotip, 200 keV UTEM | ≈160 fs laser pulse sets the emission-time spread; energy gap ≈1.7 eV between the two electrons; transverse momentum anticorrelation {cite:p}`haindl2023correlated` | No entanglement claimed: the correlation is reproduced by a classical point-particle simulation. Arrival separations are tens to hundreds of fs, so $\gg\tau$. |
+| Same source with a two-electron quantum walk for tomography, 190 keV | Single-electron coherence ≥4.7 fs FWHM; median nearest-neighbour separation ≈300 nm ≈ 30 fs at emission; 1.5 eV peak separation against a 1.15 eV single-electron width; best fit is an entangled fraction $f=0.18$ (negativity 7 %), "not significant" {cite:p}`tziperman2026walk` | Measured state is separable within error. The separation is ≈6× the coherence time and ≥14× $\tau$. The 1.5 eV split exceeds the 1.15 eV single-electron width, so the two electrons are largely distinguishable in energy. |
+| H₂ double photoionization {cite:p}`akoury2007doubleslit` | Path-entangled pair of slow (eV) electrons emitted into $4\pi$ | Not a beam: no collimation or acceleration that keeps the pair coherent, and its transverse state is not a channeling entry state. |
+| Cavity-mediated, Coulomb-focus or atom-heralded entanglement proposals | Theory only (references in arXiv:2011.02548 and arXiv:2505.03707) | No experiment and no source parameters. |
+
+**Verdict: no-go.** No experiment as of 2026-11-15 provides an entangled free-electron pair. The only measured beam pairs are separable and arrive separated by $\gtrsim30$ fs, compared with $\tau\approx0.02$–2.2 fs. They are classical mixtures, so they contribute only the separable term of {eq}`eq-qce-iid` (§8). The operator-Schmidt propagation (§4) is not implemented, and no ledger claim is added. Reopen F3 only when a source reports a significant entanglement witness for a collimated keV–MeV pair with arrival separation $\lesssim\tau$.
 
 ## 8. Dicke superradiance of CR from prebunched beams
 
@@ -286,7 +297,7 @@ Proposed only; no issues have been created.
 
 - **F1 — channeling-modulated incoherent background (conditional).** Gate: a readable quantitative orientation-dependent yield dataset (Taftø & Spence 1982 or an MeV characteristic or bremsstrahlung tilt scan), and a maintainer decision to modulate the #507 incoherent background. Scope: the factor {eq}`eq-qce-overlap` with an impact-parameter-delocalized inner-shell kernel, anchored against that dataset. Status target: `anchored`.
 - **F2 — recoil-resolved CXR operator (research).** Scope: a free-state transverse basis with both $\mathbf g_\perp$ components and $g_\parallel$; the crystal-mediated photon mode $\chi_{-\mathbf g}$; reproduce one Shi et al. 30 nm Si spectrum at 300 keV; regime bounds as in §6. Depends on #508 entry states and #56 jump operators. No production channel.
-- **F3 — entangled-pair emission (conditional on a source model).** Operator-Schmidt two-body propagation (§4) and the pair term. Only once a specific entangled-pair source with sub-fs coincidence is in scope.
+- **F3 — entangled-pair emission (conditional on a source model).** Operator-Schmidt two-body propagation (§4) and the pair term. Only once a specific entangled-pair source with sub-fs coincidence is in scope. The #528 source survey (§7) found none: no-go.
 - **F4 — channeling thermal data for layered crystals.** Anisotropic $\langle u_x^2\rangle$/$\langle u_z^2\rangle$ in `channeling_thermal.toml`. Done for 2H-MoS₂ (#535; its §3.2 cell is TDS-only, #1071) and diamond's valence input (#525). Open: HOPG, hBN and WSe₂ thermal rows (#540) and a supported directional MoS₂ electronic rate (#541).
 
-Documented no-go: Dicke CR at keV in planar Si/diamond (§8); the Shatnev phase-locked gain (§9).
+Documented no-go: entangled-pair super/subradiance for lack of a source (§7, #528); Dicke CR at keV in planar Si/diamond (§8); the Shatnev phase-locked gain (§9).
