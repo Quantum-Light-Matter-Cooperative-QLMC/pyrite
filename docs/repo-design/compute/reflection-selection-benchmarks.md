@@ -47,6 +47,9 @@ uv run python checks/cxr_selection_profile_1200.py silicon si.pkl out/si-band-no
 - **Hardware.** One NVIDIA RTX PRO 6000 Blackwell Server Edition (96 GiB) on a
   hosted notebook runtime, using the CUDA backend.
 - **Statistics.** Two passes give a range, not a confidence interval.
+- **Source revisions.** The commit IDs on this page are the revisions measured
+  on the device. Each report records its full SHA. They come before the branch
+  was rebased onto `main`, which changed documentation only.
 
 | Scene | Transport SHA-256 (prefix) | Segment rows |
 |---|---|---:|
@@ -110,6 +113,7 @@ calls cost more: 43.2 / 37.4 / 34.8 s at 128 / 256 / 512.
   budget, so selection is refused before scoring. A run with
   `PYRITE_ENERGY_GRID_MAX_POINTS=700000` took 667 s for its warm-up selection on
   this device, and selected the same 13,688-reflection set as the band axis.
+  Its timed arms were cancelled and not measured.
 - **Warm-up versus warm passes.** The first selection in a process includes
   table loading and JIT/kernel compilation. Warm-up times are in the JSON:
   13–53 s on the band axis, against 3–38 s for the warm passes.
