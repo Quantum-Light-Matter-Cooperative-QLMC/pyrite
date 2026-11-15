@@ -83,8 +83,10 @@ reports expected voltage and clipped voltage, an RMS-noise magnitude without
 adding random noise, and a SHA-256 fingerprint of the calibration. If a
 repetition frequency is given, it reports average incident/absorbed **optical
 power** in W without misapplying a pulse V/J gain as a DC V/W responsivity.
-No temporal impulse response, AC coupling, integration gate, thermal recovery,
-pile-up, shots/exposure, shot noise or instrument polarization is implied.
+Readings also report the collected photons per pulse $\int\Phi\,dE$. Temporal
+response, AC coupling, pulse trains and digitized counts are the separate
+operators below; integration gates, thermal recovery, shot noise and instrument
+polarization are not modeled.
 
 Minimal *synthetic* use (these values are not a measured calibration):
 
@@ -102,6 +104,58 @@ energy = np.linspace(0.2, 1.0, 101)
 collected_photons_per_eV_per_pulse = np.ones_like(energy) * 1e6
 reading = detector.predict(energy, collected_photons_per_eV_per_pulse, repetition_hz=1e6)
 print(reading.absorbed_joule_per_pulse, reading.expected_voltage_v)
+```
+
+### Temporal response, pulse trains, AC coupling and counts
+
+`pyrite.detectors.optical_temporal.DetectorTemporalResponse` is the measured
+linear impulse response of the whole channel, normalized to its isolated-pulse
+peak so the calibrated gain $G$ is unchanged:
+
+$$
+V(t)=G\sum_k U_k\,h(t-t_k),\qquad h(t)=\sum_j a_j e^{-t/\tau_j}\ (t\ge 0),\qquad \max_t h=1 .
+$$
+
+`single_pole(tau)` is a DC-coupled thermal detector (bolometer);
+`with_low_pass(tau)` adds amplifier/shaping rise; `with_ac_coupling(tau)`
+applies $\delta(t)-e^{-t/\tau}/\tau$. `pyroelectric(tau_T, tau_E)` is the thermal
+pole AC-coupled by $RC$, whose transfer $H(\omega)\propto i\omega/[(1+i\omega\tau_T)(1+i\omega\tau_E)]$
+is the standard voltage-responsivity shape (Porter 1981). For equal pulses $U$ at
+rate $f=1/T$:
+
+| Quantity | Expression |
+|---|---|
+| Transfer (s) | $H(\omega)=\sum_j a_j\tau_j/(1+i\omega\tau_j)$ |
+| DC responsivity (V/W) | $G\,H(0)=G\int h\,dt$; zero when AC-coupled |
+| Steady-state train | $G U\sum_j a_j e^{-s/\tau_j}/(1-e^{-T/\tau_j})$, $0\le s\le T$ after the latest pulse |
+| $n$-pulse train | same, times $1-e^{-mT/\tau_j}$ for the $m\le n$ pulses so far |
+| Mean | $G H(0)\cdot Uf$ (DC responsivity × average absorbed power) |
+| Lock-in fundamental (peak) | $2GUf\,\lvert H(2\pi f)\rvert$; RMS is $1/\sqrt2$ of it |
+| Pile-up ratio | steady-state peak / $G U$ |
+
+`predict_pulse_train(detector, absorbed_J, response, f)` returns these in V with
+both calibration hashes; `saturated` compares the steady-state peak with the
+detector's saturation voltage. `Digitizer` maps $N=N_0+gV$ to counts clipped to
+$[0,2^{\rm bits}-1]$, with noise $\sqrt{(g\sigma_V)^2+1/12}$ counts (uniform
+quantization; valid when the analog noise spans about one count or more).
+The pulse gain is never reused as a V/W responsivity: average-power readings
+need the temporal response. Shot noise, nonlinearity, thermal saturation and
+dead time are not modeled, and no measured response ships.
+
+```python
+import numpy as np
+from pyrite.detectors.optical_energy import CalibratedPulseEnergyDetector
+from pyrite.detectors.optical_temporal import DetectorTemporalResponse, predict_pulse_train
+
+detector = CalibratedPulseEnergyDetector(
+    energy_eV=np.array([0.01, 1.0]),
+    efficiency=np.array([0.5, 0.5]),
+    pulse_gain_v_per_j=1e6,
+    calibration_id="synthetic demo: NOT a real calibration",
+)
+pyro = DetectorTemporalResponse.pyroelectric(0.1, 1e-3, "synthetic demo")
+reading = predict_pulse_train(detector, 1e-6, pyro, repetition_hz=10.0)
+print(reading.fundamental_rms_v, reading.mean_v)  # lock-in signal; zero DC mean
 ```
 
 ## Boundaries and remaining gates
