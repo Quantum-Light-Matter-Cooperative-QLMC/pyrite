@@ -73,6 +73,7 @@ cr-axial-fiber-angular
 cr-axial-directional-observation
 cr-zone-row-angular-spread
 cr-axial-cuda-backend
+cr-axial-exit-angular
 cr-axial-realspace-propagation
 cr-axial-realspace-dissipator
 cr-vortex-string-coupling

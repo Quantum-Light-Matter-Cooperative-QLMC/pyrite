@@ -163,6 +163,9 @@ distributions and the fibre research adapters. Import them from
    pyrite.quantum.axial_line_catalog
    pyrite.quantum.classical_exit_angles
    pyrite.quantum.coherent_exit_distribution
+   pyrite.quantum.coherent_axial_exit_map
+   pyrite.quantum.AxialExitMap
+   pyrite.quantum.axial_incidence_nodes
    pyrite.quantum.planar_fiber_inputs
    pyrite.quantum.unravel_fiber_outgoing
 ```

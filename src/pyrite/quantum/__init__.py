@@ -33,6 +33,15 @@ if TYPE_CHECKING:
     from pyrite.montecarlo.channeling.axial_emission import (
         axial_line_catalog as axial_line_catalog,
     )
+    from pyrite.montecarlo.channeling.axial_exit_map import (
+        AxialExitMap as AxialExitMap,
+    )
+    from pyrite.montecarlo.channeling.axial_exit_map import (
+        axial_incidence_nodes as axial_incidence_nodes,
+    )
+    from pyrite.montecarlo.channeling.axial_exit_map import (
+        coherent_axial_exit_map as coherent_axial_exit_map,
+    )
     from pyrite.montecarlo.channeling.axial_fiber_unraveling import (
         unravel_fiber_outgoing as unravel_fiber_outgoing,
     )
@@ -231,6 +240,15 @@ _EXPORTS = {
         "pyrite.montecarlo.channeling.exit_angular",
         "coherent_exit_distribution",
     ),
+    "AxialExitMap": ("pyrite.montecarlo.channeling.axial_exit_map", "AxialExitMap"),
+    "axial_incidence_nodes": (
+        "pyrite.montecarlo.channeling.axial_exit_map",
+        "axial_incidence_nodes",
+    ),
+    "coherent_axial_exit_map": (
+        "pyrite.montecarlo.channeling.axial_exit_map",
+        "coherent_axial_exit_map",
+    ),
     "entry_populations": ("pyrite.montecarlo.channeling.bloch", "entry_populations"),
     "line_energy_eV": ("pyrite.montecarlo.channeling.bloch", "line_energy_eV"),
     "longitudinal_kinematics": ("pyrite.montecarlo.channeling.bloch", "longitudinal_kinematics"),
@@ -244,6 +262,7 @@ _EXPORTS = {
 }
 
 __all__ = [
+    "AxialExitMap",
     "AxialMCWF",
     "AxialMCWFResult",
     "AxialPropagationConfig",
@@ -269,12 +288,14 @@ __all__ = [
     "TransverseStateSpec",
     "airy",
     "aperture_probe",
+    "axial_incidence_nodes",
     "axial_line_catalog",
     "axial_profile",
     "axial_states",
     "bessel_gauss",
     "channeling_spectrum",
     "classical_exit_angles",
+    "coherent_axial_exit_map",
     "coherent_exit_distribution",
     "donut",
     "electronic_kernel",

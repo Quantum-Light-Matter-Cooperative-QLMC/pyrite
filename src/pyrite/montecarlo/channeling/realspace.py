@@ -137,10 +137,18 @@ class SplitStepPropagator:
     absorptive_eV
         Optional absorptive potential ``W >= 0`` on the grid [eV].
     tilt_rad
-        Mean carrier tilt ``(theta_x, theta_y)`` relative to ``z`` [rad].
+        Mean carrier tilt ``(theta_x, theta_y)`` relative to ``z`` [rad], or a
+        ``(n, 2)`` stack of tilts. A stack propagates ``n`` states at once: the
+        state arrays then carry a leading axis of length ``n`` (a single
+        ``(n_x, n_y)`` state is broadcast to every tilt).
+    backend
+        ``"cpu"`` (NumPy) or ``"cuda"`` (CuPy; states stay on the device and
+        :meth:`trajectory` yields device arrays).
 
-    Inputs are numeric-only; Pint quantities (including dimensionless tilts)
-    raise ``TypeError``.
+    The batch is ``n`` independent copies of the scalar Strang step: every
+    tilt's state sees only its own kinetic phase, so batched and per-tilt
+    propagation agree to rounding. Inputs are numeric-only; Pint quantities
+    (including dimensionless tilts) raise ``TypeError``.
 
     Validation: cr-axial-realspace-propagation
     """
@@ -152,7 +160,8 @@ class SplitStepPropagator:
         *,
         potential_eV: np.ndarray | None = None,
         absorptive_eV: np.ndarray | None = None,
-        tilt_rad: tuple[float, float] = (0.0, 0.0),
+        tilt_rad=(0.0, 0.0),
+        backend: str = "cpu",
     ) -> None:
         for name, value, unit in (
             ("kinetic_energy_eV", kinetic_energy_eV, "eV"),
@@ -163,14 +172,26 @@ class SplitStepPropagator:
             reject_quantity(value, field=f"SplitStepPropagator.{name}", unit=unit)
         if not np.isfinite(kinetic_energy_eV) or kinetic_energy_eV <= 0.0:
             raise ValueError("kinetic_energy_eV must be finite and positive")
+        if backend not in ("cpu", "cuda"):
+            raise ValueError("backend must be 'cpu' or 'cuda'")
+        tilts = np.asarray(tilt_rad, dtype=float)
+        if tilts.shape[-1:] != (2,) or tilts.ndim > 2 or not np.all(np.isfinite(tilts)):
+            raise ValueError("tilt_rad needs finite (theta_x, theta_y) or an (n, 2) stack")
         self.grid = grid
+        self.backend = backend
+        self.xp = np if backend == "cpu" else _cupy()
         self.gamma, beta = longitudinal_kinematics(float(kinetic_energy_eV))
         self.hbar_v = HBARC_EV_ANG * beta
         p = momentum_inv_ang(kinetic_energy_eV)
-        self.tilt_inv_ang = (p * float(tilt_rad[0]), p * float(tilt_rad[1]))
-        kx = grid.kx[:, None] + self.tilt_inv_ang[0]
-        ky = grid.ky[None, :] + self.tilt_inv_ang[1]
-        self._kinetic_eV = HBAR2_2M_EV_ANG2 / self.gamma * (kx**2 + ky**2)
+        #: Carrier momenta ``p theta`` [1/angstrom]: a pair, or an ``(n, 2)`` array.
+        self.tilt_inv_ang = (
+            (p * float(tilts[0]), p * float(tilts[1])) if tilts.ndim == 1 else p * tilts
+        )
+        carrier = np.atleast_2d(p * tilts)
+        kx = grid.kx[None, :, None] + carrier[:, 0, None, None]
+        ky = grid.ky[None, None, :] + carrier[:, 1, None, None]
+        kinetic = HBAR2_2M_EV_ANG2 / self.gamma * (kx**2 + ky**2)
+        self._kinetic_eV = kinetic[0] if tilts.ndim == 1 else kinetic
         u = np.zeros(grid.shape) if potential_eV is None else np.asarray(potential_eV, float)
         w = np.zeros(grid.shape) if absorptive_eV is None else np.asarray(absorptive_eV, float)
         if u.shape != grid.shape or w.shape != grid.shape:
@@ -180,26 +201,52 @@ class SplitStepPropagator:
         self._complex_potential = u - 1j * w
         self._step: float | None = None
 
+    @property
+    def batch_size(self) -> int | None:
+        """Number of stacked tilts, or ``None`` for a single tilt."""
+        return None if self._kinetic_eV.ndim == 2 else int(self._kinetic_eV.shape[0])
+
     def _factors(self, step: float) -> None:
         if self._step == step:
             return
-        self._half_kinetic = np.exp(-0.5j * step * self._kinetic_eV / self.hbar_v)
-        self._potential = np.exp(-1j * step * self._complex_potential / self.hbar_v)
+        xp = self.xp
+        self._half_kinetic = xp.asarray(np.exp(-0.5j * step * self._kinetic_eV / self.hbar_v))
+        self._potential = xp.asarray(np.exp(-1j * step * self._complex_potential / self.hbar_v))
         self._step = step
+
+    def _initial(self, phi):
+        state = self.xp.asarray(phi, dtype=complex)
+        batch = self.batch_size
+        if batch is None:
+            # One tilt: any leading batch of states shares its kinetic phase.
+            if state.ndim not in (2, 3) or state.shape[-2:] != self.grid.shape:
+                raise ValueError(f"phi must have the grid shape {self.grid.shape}")
+            return state
+        expected = (batch, *self.grid.shape)
+        if state.shape == self.grid.shape:
+            state = self.xp.broadcast_to(state, expected)
+        if state.shape != expected:
+            raise ValueError(f"phi must have shape {expected} (or the grid shape)")
+        return state
 
     def evolve(self, phi: np.ndarray, depth_ang: float, *, step_ang: float) -> np.ndarray:
         """Return ``phi`` after ``depth_ang``; the last step is shortened to land exactly."""
         for _, out in self.trajectory(phi, [depth_ang], step_ang=step_ang):
             return out
-        return np.array(phi, dtype=complex)
+        return self.xp.array(self._initial(phi))
 
     def trajectory(
         self, phi: np.ndarray, depths_ang: Iterable[float], *, step_ang: float
     ) -> Iterator[tuple[float, np.ndarray]]:
-        """Yield ``(z, phi(z))`` at each requested depth (ascending, >= 0)."""
+        """Yield ``(z, phi(z))`` at each requested depth (ascending, >= 0).
+
+        ``phi`` and the yielded states carry the leading tilt axis when the
+        propagator holds a tilt stack; arrays live on the propagator's backend.
+        """
         if step_ang <= 0.0:
             raise ValueError("step_ang must be positive")
-        state = np.fft.fft2(np.asarray(phi, dtype=complex))
+        fft = self.xp.fft
+        state = fft.fft2(self._initial(phi))
         z = 0.0
         for target in depths_ang:
             target = float(target)
@@ -211,10 +258,16 @@ class SplitStepPropagator:
                 self._factors(step)
                 for _ in range(n):
                     state *= self._half_kinetic
-                    state = np.fft.fft2(self._potential * np.fft.ifft2(state))
+                    state = fft.fft2(self._potential * fft.ifft2(state))
                     state *= self._half_kinetic
                 z = target
-            yield z, np.fft.ifft2(state)
+            yield z, fft.ifft2(state)
+
+
+def _cupy():
+    from ..._backend import select_cupy_backend
+
+    return select_cupy_backend().cp
 
 
 __all__ = ["RealSpaceGrid", "SplitStepPropagator"]
