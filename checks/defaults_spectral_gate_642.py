@@ -503,6 +503,69 @@ def tolerance_cutoff(case, scorer, tol, max_reflections, g_max=40.0):
     return f"g{cutoff:g}", record
 
 
+def selected_row(case, transport, label, grid, quadrature, max_reflections, sync):
+    """Production incremental selection (#1173 P4) at ``sel<x>``, timed on ``grid``.
+
+    Runs :func:`select_case_reflections` with the band axis as production
+    axis: each shell is scored once and the kept shells' sum is the spectrum,
+    so ``band.first_s`` is the whole selection cost (no separate pilot).
+    """
+    from pyrite.energy_grid.convergence_case import CaseLadder
+    from pyrite.montecarlo.runner.reflection_cutoff import (
+        axis_yield_weights,
+        select_case_reflections,
+    )
+
+    scorer = CaseLadder(case, transport=transport)
+
+    def line_density(pilot, axis_grid):
+        scorer.case = pilot
+        return scorer.lines(axis_grid)
+
+    sync()
+    begin = time.perf_counter()
+    pruned, outcomes, density = select_case_reflections(
+        case,
+        line_density,
+        float(label[3:]),
+        grid,
+        axis_yield_weights(grid, quadrature),
+        quadrature=None if quadrature == "node" else quadrature,
+        max_reflections=max_reflections,
+    )
+    sync()
+    elapsed = time.perf_counter() - begin
+    layers = pruned.get("layer_radiators")
+    return dict(
+        n=label,
+        resolved=label,
+        pilot=dict(
+            radiators=[
+                dict(
+                    cutoff_invang=o.cutoff_invang,
+                    reflections=len(o.hkl_list),
+                    tail_fraction=o.tail_fraction if np.isfinite(o.tail_fraction) else None,
+                    converged=o.converged,
+                    shells=[
+                        dict(upper=u, n=k, yield_=y, tail=t if np.isfinite(t) else None)
+                        for u, k, y, t in o.shells
+                    ],
+                )
+                for o in outcomes
+            ]
+        ),
+        reflections=len(pruned["hkl_list"]),
+        layer_reflections=None
+        if layers is None
+        else [None if r is None else len(r["hkl_list"]) for r in layers],
+        band=dict(
+            nodes=int(grid.size),
+            first_s=elapsed,
+            metrics=metrics(grid, density, quadrature),
+        ),
+    )
+
+
 def score_families(
     case,
     sweep,
@@ -551,7 +614,15 @@ def score_families(
         ns = resolved
     else:
         labels = list(ns)
-    cases = {n: families_case(case, sweep, n) for n in ns}
+    if isinstance(ns[-1], str) and ns[-1].startswith("sel"):
+        raise ValueError("the reference (last) ladder point must be a fixed set, not sel<x>")
+    if any(isinstance(n, str) and n.startswith("sel") for n in ns) and wide_spacing > 0:
+        raise ValueError("sel<x> points score the band only; pass wide_spacing <= 0")
+    cases = {
+        n: families_case(case, sweep, n)
+        for n in ns
+        if not (isinstance(n, str) and n.startswith("sel"))
+    }
     start = min(needed[0] for *_, needed in cases.values())
     stop = max(needed[1] for *_, needed in cases.values())
     axes = [("band", axis(*BAND, reference_spacing, quadrature), None)]
@@ -571,6 +642,13 @@ def score_families(
     rows = record["families"]
     scored = {}
     for label_n, n in zip(labels, ns, strict=True):
+        if isinstance(n, str) and n.startswith("sel"):
+            rows.append(
+                selected_row(case, tp, label_n, axes[0][1], quadrature, max_reflections, sync)
+            )
+            if on_row is not None:
+                on_row(record)
+            continue
         fcase, production, needed = cases[n]
         if quadrature != "node":
             fcase = dict(fcase, line_quadrature=quadrature)
@@ -992,11 +1070,12 @@ def main():
     parser.add_argument(
         "--families",
         type=lambda text: [
-            x if x.startswith(("g", "tol")) else int(x) for x in text.split(",") if x
+            x if x.startswith(("g", "tol", "sel")) else int(x) for x in text.split(",") if x
         ],
         default=[],
         help="ascending reflection ladder: n_families counts (HOPG: (00l) orders), g<G> "
-        "reciprocal cutoffs in 1/angstrom, or tol<x> measured cutoffs (#1173); last is reference",
+        "reciprocal cutoffs in 1/angstrom, tol<x> measured cutoffs, or sel<x> production "
+        "incremental selection on the band axis (#1173); last is reference",
     )
     parser.add_argument(
         "--families-wide-spacing",

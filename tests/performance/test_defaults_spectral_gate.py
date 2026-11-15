@@ -309,3 +309,43 @@ def test_score_families_bin_mean_band_sets_quadrature_and_refuses_wide(monkeypat
     assert record["families"][0]["band"]["versus_largest"]["yield_per_primary"] == -0.5
     with pytest.raises(ValueError, match="node-only"):
         gate["score_families"](*args, 0.375, lambda: None, 512, quadrature="bin-mean")
+
+
+def test_score_families_sel_point_runs_the_incremental_selector_on_the_band(monkeypatch):
+    import pyrite.energy_grid.convergence_case as convergence_case
+    from pyrite.materials.crystal import dominant_reflections
+
+    gate = _gate()
+    module = gate["score_families"].__globals__
+    case = {"crystal": "silicon", "B_ang2": 0.46}
+
+    def lines_of(hkls, grid):
+        weight = sum(np.exp(-0.05 * (h * h + k * k + l * l)) for h, k, l in hkls)
+        return np.exp(-(((grid - 3000.0) / 500.0) ** 2)) * weight
+
+    class Ladder:
+        def __init__(self, case, transport=None):
+            self.case = case
+
+        def lines(self, grid):
+            return lines_of(self.case["hkl_list"], grid)
+
+    reference = dominant_reflections("silicon", n_families=10**9, B_ang2=0.46, g_max_invang=24.0)
+    monkeypatch.setitem(
+        module,
+        "families_case",
+        lambda c, sweep, n: (dict(c, hkl_list=reference), (500.0, 1e4), (500.0, 1e4)),
+    )
+    monkeypatch.setitem(
+        module, "chunked_lines", lambda scorer, chunks, grid: Ladder(scorer.case).lines(grid)
+    )
+    monkeypatch.setattr(convergence_case, "CaseLadder", Ladder)
+    args = (case, None, type("L", (), {"transport": None})(), ["sel1e-3", "g24"], 5.0)
+    record = gate["score_families"](*args, 0.0, lambda: None, 512, quadrature="bin-mean")
+    row = record["families"][0]
+    (radiator,) = row["pilot"]["radiators"]
+    assert radiator["converged"] and radiator["tail_fraction"] <= 1e-3
+    assert row["reflections"] == radiator["reflections"] < len(reference)
+    assert abs(row["band"]["versus_largest"]["yield_per_primary"]) < 2e-3
+    with pytest.raises(ValueError, match="reference"):
+        gate["score_families"](*args[:3], ["g24", "sel1e-3"], 5.0, 0.0, lambda: None, 512)
