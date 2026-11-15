@@ -124,6 +124,7 @@ def _(np):
         physics=Physics(
             brem_source=None,
             inelastic_model="continuous",
+            straggling=False,
             radiative_model="uncoupled",
             bremsstrahlung_model="eedl",
         ),

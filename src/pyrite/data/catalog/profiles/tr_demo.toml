@@ -11,6 +11,7 @@ cxr_histories = {values = [2048]}
 brem_histories = {values = [4096]}
 energy_model = "midpoint"
 inelastic_model = "continuous"
+straggling = false
 radiative_model = "uncoupled"
 bremsstrahlung_model = "eedl"
 emission = "incoherent"

@@ -22,12 +22,11 @@ def test_numerics_validates_coupled_energy_controls():
 
 def test_transport_controls_lower_into_case_and_content_identity():
     sweep = material_sweep("hopg", energy_keV=[30.0], thickness_ang=[1000.0])
-    base = build_cases(sweep, n_electrons=1, n_electrons_brem=1)[0]
+    base = build_cases(sweep, n_electrons=1, n_electrons_brem=1, straggling=False)[0]
     active = build_cases(
         sweep,
         n_electrons=1,
         n_electrons_brem=1,
-        straggling=True,
         energy_model="midpoint",
         max_dE_frac=0.02,
     )[0]
@@ -86,6 +85,7 @@ def test_case_rejects_inconsistent_manual_transport_controls():
         n_electrons_brem=1,
         energy_model="frozen",
         inelastic_model="continuous",
+        straggling=False,
         radiative_model="uncoupled",
     )[0]
     with pytest.raises(ValueError, match="requires energy_model='midpoint'"):

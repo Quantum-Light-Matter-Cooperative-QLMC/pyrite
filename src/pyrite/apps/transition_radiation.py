@@ -250,6 +250,7 @@ def reference_physics(mode: str):
         radiative_model="uncoupled",
         bremsstrahlung_model="eedl",
         inelastic_model="continuous",
+        straggling=False,
     )
 
 

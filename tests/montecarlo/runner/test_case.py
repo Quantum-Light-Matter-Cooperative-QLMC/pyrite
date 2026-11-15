@@ -58,6 +58,7 @@ def test_case_round_trips_conditional_divergence_keys_in_legacy_order():
         coherent_emission=True,
         # Grooves admit neither shell nor coupled transport: spell the legacy fallbacks.
         inelastic_model="continuous",
+        straggling=False,
         radiative_model="uncoupled",
     )[0]
 

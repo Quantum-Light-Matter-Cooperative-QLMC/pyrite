@@ -1,5 +1,18 @@
 # Collision-straggling default pilot
 
+**Decision, 2026-11-15 (#642).** The project adopted a model-aware default.
+An omitted `straggling` resolves **on** for shell soft/hard transport, and
+explicit continuous stopping now requires an explicit choice, so Urban is never
+switched on implicitly. The evidence is the stage-2 matrix below, together with
+the intrinsic-spectrum arms of #1142 and the #1185 mosaic replays. Shell
+terminal observables did not change within their diagnostic margins. On thin
+30 keV HOPG, the dominant CXR FWHM widens by about 12% and the peak drops by
+about 6%. Silicon, the stopping MoS₂/Si stack and mosaic HOPG show no resolved
+change. Warm cost is unchanged, apart from first-use compilation. Continuous
+Urban stays opt-in because of its large sapphire sensitivity. This is a
+model-completeness decision, not a demonstrated accuracy improvement, and no
+ledger status changes. The historical pilot text below is retained as recorded.
+
 The 2026-10-23 pilot does **not qualify a default change**. It separates the
 incremental shell soft-loss fluctuations from continuous/Urban fluctuations
 under current transport models. Most near-range shell comparisons remain

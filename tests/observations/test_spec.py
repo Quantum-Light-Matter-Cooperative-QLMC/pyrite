@@ -322,7 +322,7 @@ def test_sweep_binds_each_geometry_and_applies_run_overrides_before_axes(scene, 
             "numerics.sampling.cxr_histories": (1, 2),
         },
     )
-    physics = replace(scene.physics, straggling=True)
+    physics = replace(scene.physics, straggling=False)
     cases = sweep.cases(
         replace(CONTROLS, sampling=replace(CONTROLS.sampling, cxr_histories=3)),
         physics=physics,
@@ -344,7 +344,7 @@ def test_sweep_binds_each_geometry_and_applies_run_overrides_before_axes(scene, 
             observation=observation,
         )
         assert replace(case, name=expected.name, seed=expected.seed) == expected
-    assert sweep.base.physics.straggling is False
+    assert sweep.base.physics.straggling is None
 
 
 @pytest.mark.parametrize("field", ["response", "scorer"])

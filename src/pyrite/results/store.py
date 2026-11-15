@@ -27,6 +27,7 @@ from .._numerics import (
     _emission_selection,
     default_inelastic_cutoff,
     default_radiative_cutoff,
+    default_straggling,
     validate_atomic_electron_deflection,
     validate_bremsstrahlung_model,
     validate_elastic_model,
@@ -112,7 +113,9 @@ class Settings:
     n_electrons, n_electrons_brem
         Default line and continuum macro-electron counts.
     straggling
-        Enable stochastic transport energy-loss straggling.
+        Soft energy-loss straggling. ``None`` (default) resolves to ``True``
+        for shell soft/hard and ``False`` for legacy ``"auto"``; continuous
+        stopping requires an explicit bool.
     energy_model, max_dE_frac
         Flight integration rule and optional fractional-loss substep cap.
     inelastic_model, inelastic_cutoff_eV
@@ -177,7 +180,7 @@ class Settings:
     brem_source: str = "mc"  # "mc" | "external" | "none"
     n_electrons: int = 450  # transport electrons for the lines
     n_electrons_brem: int = 100  # transport electrons for the background
-    straggling: bool = False
+    straggling: bool | None = None  # None: on for shell soft/hard, off for legacy auto
     energy_model: Literal["frozen", "midpoint"] = "midpoint"
     max_dE_frac: float = 0.0
     inelastic_model: Literal["auto", "continuous", "shell-soft-hard"] = "shell-soft-hard"
@@ -234,8 +237,7 @@ class Settings:
             raise TypeError("precision must be a Precision or None")
         if not isinstance(self.temporal_profile, bool):
             raise TypeError("temporal_profile must be a bool")
-        if not isinstance(self.straggling, bool):
-            raise TypeError("straggling must be a bool")
+        self.straggling = default_straggling(self.inelastic_model, self.straggling)
         if self.energy_model not in {"frozen", "midpoint"}:
             raise ValueError("energy_model must be 'frozen' or 'midpoint'")
         if not np.isfinite(self.max_dE_frac) or self.max_dE_frac < 0.0:

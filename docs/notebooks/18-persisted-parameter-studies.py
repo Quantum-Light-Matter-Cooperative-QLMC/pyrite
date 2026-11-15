@@ -99,6 +99,7 @@ def _(np):
     physics = Physics(
         brem_source="none",
         inelastic_model="continuous",
+        straggling=False,
         radiative_model="uncoupled",
     )
     cases = sweep.cases(numerics=numerics, physics=physics)

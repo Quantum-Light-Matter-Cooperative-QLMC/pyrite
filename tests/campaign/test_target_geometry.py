@@ -283,7 +283,10 @@ def _sweep(**kwargs):
 )
 def test_lower_reproduces_the_build_cases_geometry(sweep_kwargs, target):
     cases = build_cases(
-        _sweep(**sweep_kwargs), inelastic_model="continuous", radiative_model="uncoupled"
+        _sweep(**sweep_kwargs),
+        inelastic_model="continuous",
+        straggling=False,
+        radiative_model="uncoupled",
     )
     lowered = _lower(target)
 

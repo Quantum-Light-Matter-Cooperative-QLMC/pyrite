@@ -34,7 +34,7 @@ def _line_spectrum(energy_keV, *, energy_spread_frac=None):
     # default shell mode) send a few electrons to low energy, and their broad
     # low-photon-energy emission can outrank the resonance at this electron
     # count. The resonance derivative is independent of the loss law.
-    out = run_case(build_cases(sweep, inelastic_model="continuous")[0])
+    out = run_case(build_cases(sweep, inelastic_model="continuous", straggling=False)[0])
     # This regression is specifically about the PXR resonance derivative. The
     # new atomic characteristic component is beam-energy stationary over this
     # step and can dominate the combined peak, so remove its auditable array.

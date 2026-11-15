@@ -97,7 +97,10 @@ def test_grooved_default_requires_explicit_uncoupled():
         build_cases(sweep, 4, 4)
     with pytest.raises(ValueError, match="--allow-physics-fallback"):
         resolve_run_models(default_settings(), ["C"], grooved=True)
-    continuous = {"inelastic_model": "continuous"}  # shell transport also refuses grooves
+    continuous = {
+        "inelastic_model": "continuous",
+        "straggling": False,
+    }  # shell transport also refuses grooves
     with pytest.warns(UserWarning, match="unavailable for grooves"):
         legacy = build_cases(sweep, 4, 4, radiative_model="auto", **continuous)
     explicit = build_cases(sweep, 4, 4, radiative_model="uncoupled", **continuous)

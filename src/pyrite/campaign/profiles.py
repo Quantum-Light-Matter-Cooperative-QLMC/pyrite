@@ -32,6 +32,7 @@ from .._numerics import (
     Physics,
     default_inelastic_cutoff,
     default_radiative_cutoff,
+    default_straggling,
     history_counts,
     validate_bremsstrahlung_model,
     validate_profile_numerics,
@@ -168,6 +169,8 @@ def resolve_numerics(
     effective["inelastic_cutoff_eV"] = {
         "built-in": default_inelastic_cutoff(effective["inelastic_model"], None)
     }.get(sources["inelastic_cutoff_eV"], effective["inelastic_cutoff_eV"])
+    if sources["straggling"] == "built-in":
+        effective["straggling"] = default_straggling(effective["inelastic_model"], None)
     effective["radiative_cutoff_eV"] = {
         "built-in": default_radiative_cutoff(effective["radiative_model"], None)
     }.get(sources["radiative_cutoff_eV"], effective["radiative_cutoff_eV"])
@@ -906,7 +909,8 @@ def canonical_settings(settings: Settings, *, resolved_bremsstrahlung: bool = Tr
     bremsstrahlung = ("bremslib",) if resolved_bremsstrahlung else ("bremslib", "auto")
     return (
         settings.emission == "incoherent"
-        and not (settings.temporal_profile or settings.straggling or settings.allow_fallback)
+        and not (settings.temporal_profile or settings.allow_fallback)
+        and settings.straggling == (settings.inelastic_model == "shell-soft-hard")
         and settings.precision is None
         and settings.energy_model == "midpoint"
         and settings.max_dE_frac == 0.0

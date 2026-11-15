@@ -26,7 +26,9 @@ from tests.montecarlo.cascades.test_coupled_radiative_runner import (
 def selected(monkeypatch, synthetic_si_tables):
     from pyrite.campaign.profiles import case_content_key
 
-    base = _coupled_case(inelastic_model="continuous", atomic_electron_deflection="none")
+    base = _coupled_case(
+        inelastic_model="continuous", straggling=False, atomic_electron_deflection="none"
+    )
     config = pr.PhotonTransport(
         (1000, 3000, 10000), n_samples=32, source_ceiling_eV=20000, seed=341
     )
@@ -148,6 +150,7 @@ def test_public_simulate_returns_separate_aperture_after_one_primary_pass(
         physics=pr.Physics(
             elastic_model="mott",
             inelastic_model="continuous",
+            straggling=False,
             atomic_electron_deflection="none",
             bremsstrahlung_model="bremslib",
             radiative_model="bremslib-soft-hard",

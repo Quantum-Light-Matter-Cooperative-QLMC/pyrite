@@ -55,11 +55,10 @@ from .._energy_grid_encoding import encode_energy_grid
 from .._grid_semantics import resolution_num
 from .._numerics import (
     DEFAULT_INELASTIC_CUTOFF_EV,
-    default_inelastic_cutoff,
     default_radiative_cutoff,
+    resolve_inelastic_numerics,
     validate_bremsstrahlung_model,
     validate_elastic_model,
-    validate_inelastic_numerics,
 )
 from .._precision import Precision
 from ..detectors import Detector
@@ -1064,7 +1063,7 @@ def build_cases(
     n_electrons=450,
     n_electrons_brem=100,
     coherent_emission=False,
-    straggling=False,
+    straggling=None,
     energy_model="midpoint",
     max_dE_frac=0.0,
     inelastic_model="shell-soft-hard",
@@ -1112,9 +1111,8 @@ def build_cases(
     n_electrons, n_electrons_brem = _electron_budget(
         sweep, precision, n_electrons, n_electrons_brem
     )
-    inelastic_cutoff_eV = default_inelastic_cutoff(inelastic_model, inelastic_cutoff_eV)
-    validate_inelastic_numerics(
-        inelastic_model, inelastic_cutoff_eV, energy_model, secondary_threshold_eV
+    inelastic_cutoff_eV, straggling = resolve_inelastic_numerics(
+        inelastic_model, inelastic_cutoff_eV, straggling, energy_model, secondary_threshold_eV
     )
     validate_elastic_model(elastic_model)
     validate_bremsstrahlung_model(bremsstrahlung_model)

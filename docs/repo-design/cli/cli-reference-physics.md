@@ -61,8 +61,9 @@ Usage: pyrite physics create [OPTIONS] NAME
 
 Options:
   --from SOURCE                   Clone SOURCE's fields; options then override them.
-  --straggling / --no-straggling  Enable or disable collision energy-loss straggling
-                                  (restricted soft loss in shell mode).
+  --straggling / --no-straggling  Collision energy-loss straggling: restricted soft loss
+                                  in shell mode (default on), Urban fluctuations with
+                                  continuous stopping (choose explicitly).
   --inelastic-model [auto|continuous|shell-soft-hard]
                                   Collision energy-loss scheme: shell-soft-hard
                                   (default; midpoint, ungrooved, shell data for every
@@ -201,8 +202,9 @@ Usage: pyrite physics set [OPTIONS] NAME
   referencing profiles before saving.
 
 Options:
-  --straggling / --no-straggling  Enable or disable collision energy-loss straggling
-                                  (restricted soft loss in shell mode).
+  --straggling / --no-straggling  Collision energy-loss straggling: restricted soft loss
+                                  in shell mode (default on), Urban fluctuations with
+                                  continuous stopping (choose explicitly).
   --inelastic-model [auto|continuous|shell-soft-hard]
                                   Collision energy-loss scheme: shell-soft-hard
                                   (default; midpoint, ungrooved, shell data for every

@@ -300,7 +300,7 @@ def test_registered_medium_lowers_into_real_layered_case():
         beam=pr.Beam(energy_keV=30, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()),
         target=target,
         detector=pr.Detector(),
-        physics=pr.Physics(inelastic_model="continuous", brem_source="none"),
+        physics=pr.Physics(inelastic_model="continuous", straggling=False, brem_source="none"),
     )
     case = api.build_case(
         scene,

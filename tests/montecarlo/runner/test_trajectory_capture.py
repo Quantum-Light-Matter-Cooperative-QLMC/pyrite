@@ -738,7 +738,7 @@ def _production_case(kind, tmp_path, monkeypatch):
         sweep = material_sweep("hopg")
         sweep = replace(sweep, beam=replace(sweep.beam, energy_keV=77.0))
     options = (
-        {"inelastic_model": "continuous", "radiative_model": "uncoupled"}
+        {"inelastic_model": "continuous", "straggling": False, "radiative_model": "uncoupled"}
         if kind == "grooved"
         else {}
     )

@@ -11,6 +11,7 @@ brem_histories = {values = [100]}
 beam = "example"
 # Preserve the singleton adapter's historical frozen/continuous transport.
 inelastic_model = "continuous"
+straggling = false
 
 [detectors]
 camera = "pixelated_reference"

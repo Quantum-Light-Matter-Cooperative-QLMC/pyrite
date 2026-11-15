@@ -108,12 +108,15 @@ Missing installable reference data also raises: absent `pdatconf.p14` names
 ### Migrating conditional selection
 
 For uncovered materials, amorphous layers, grooves or frozen integration,
-choose `Physics(inelastic_model="continuous")` explicitly, or set
-`pyrite profile physics set PROFILE --inelastic-model continuous`.
-Continuous stopping omits hard inelastic events; this is an explicit physical
-approximation without a general accuracy bound. It takes no inelastic cutoff.
-When replacing an existing shell configuration, clear its inherited cutoff too:
-`replace(physics, inelastic_model="continuous", inelastic_cutoff_eV=None)`.
+choose `Physics(inelastic_model="continuous", straggling=False)` explicitly,
+or set `pyrite profile physics set PROFILE --inelastic-model continuous
+--no-straggling`. Continuous stopping omits hard inelastic events; this is an
+explicit physical approximation without a general accuracy bound. It takes no
+inelastic cutoff and has no straggling default: `straggling=False` keeps the
+historical deterministic loss, `straggling=True` selects unrestricted Urban
+fluctuations, and omitting it raises. When replacing an existing shell
+configuration, clear its inherited cutoff too:
+`replace(physics, inelastic_model="continuous", inelastic_cutoff_eV=None, straggling=False)`.
 
 Explicit `inelastic_model="auto"` retains the historical selection: shell at
 50 eV for supported scenes, otherwise continuous with a warning. Existing
@@ -128,9 +131,29 @@ The singleton pixel-profile adapter retains its historical frozen integration;
 `pixelated_detector_demo` explicitly selects continuous stopping to preserve
 its resolved model and identities. Other frozen adapter profiles must explicitly
 choose continuous stopping, or choose midpoint integration to use the shell model.
-`straggling=False` remains the default: hard events fluctuate, while the soft
-loss stays deterministic until the separate qualification gates pass. This
-selector migration changes admission of unsupported scenes, not the shell
-transport equations or their model marker.
+This selector migration changes admission of unsupported scenes, not the
+shell transport equations or their model marker.
+
+### Default soft-loss straggling
+
+An omitted `straggling` (`None` on `Physics`, profiles and `build_cases`)
+resolves with the inelastic model: **on** for `"shell-soft-hard"`, off for
+legacy `"auto"`, and an error for `"continuous"`. The shell default therefore
+samples the restricted soft-loss distribution above instead of debiting its
+mean. This completes the PENELOPE mixed scheme rather than adding a model: the
+hard tail is still sampled explicitly and Urban is never applied in shell mode.
+`straggling=False` keeps the deterministic soft-loss approximation.
+
+The decision (#642, 2026-11-15) rests on sensitivity evidence, not on an
+experimental accuracy comparison. Terminal transport observables did not
+change within the stage-2 margins. On thin 30 keV HOPG the intrinsic dominant
+CXR line widens by about 12% (peak −6%); silicon, layered and mosaic HOPG
+scenes show no resolved change, and warm cost is unchanged
+([pilot](../../validation/beam-transport/collision-straggling-default-pilot.md)).
+Cases record `straggling=True`, so default shell runs receive new content
+keys and dataset identities. Existing checkpoints refuse resumption under the
+new default (identity mismatch); resume them with an explicit `straggling=False`
+(`--no-straggling`), archive them, or `--recompute`. Stored omissions keep their
+historical deterministic meaning.
 
 `Validation: shell-soft-hard-transport` (rederived). See [shell soft/hard transport validation](../../validation/beam-transport/shell-soft-hard-transport.md).

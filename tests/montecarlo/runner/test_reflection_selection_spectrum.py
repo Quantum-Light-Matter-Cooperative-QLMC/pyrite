@@ -28,7 +28,8 @@ def _transported():
             cxr=np.arange(500.0, 8000.0, 25.0), brem=np.array([5000.0, 10000.0, 15000.0])
         ),
     )
-    case = build_cases(sweep, n_electrons=6, n_electrons_brem=3)[0]
+    # Deterministic soft loss keeps this six-history selection fixture stable.
+    case = build_cases(sweep, n_electrons=6, n_electrons_brem=3, straggling=False)[0]
     return case, runner._transport_case(case)
 
 

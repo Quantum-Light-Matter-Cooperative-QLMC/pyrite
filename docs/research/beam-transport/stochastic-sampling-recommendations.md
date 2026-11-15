@@ -32,7 +32,7 @@ Source paths in this document are relative to `src/pyrite/`.
 
 These descriptions apply to the implemented models, not to their validity at arbitrary energy. Inverse-CDF sampling of an approximate angular law does not validate that law against physical elastic-scattering data.
 
-Straggling defaults off. When enabled, its Poisson sampler splits large means into bounded-rate chunks and sums their counts; individual ionization transfers use an inverse CDF. This preserves the intended distribution within numerical limits but is not demonstrated to minimize runtime for every mean. An inadmissible Urban parameterization falls back to deterministic mean loss. Mean preservation in that branch must not be described as preservation of fluctuations or tails.
+Urban straggling has no default under explicit continuous stopping (shell mode defaults to its restricted soft-loss sampler since #642). When enabled, its Poisson sampler splits large means into bounded-rate chunks and sums their counts; individual ionization transfers use an inverse CDF. This preserves the intended distribution within numerical limits but is not demonstrated to minimize runtime for every mean. An inadmissible Urban parameterization falls back to deterministic mean loss. Mean preservation in that branch must not be described as preservation of fluctuations or tails.
 
 ## Beam tails are not reliably covered at small particle counts
 

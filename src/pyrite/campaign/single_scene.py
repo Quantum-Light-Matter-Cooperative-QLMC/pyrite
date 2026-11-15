@@ -147,9 +147,7 @@ def resolve_pixel_scene(
         filter_from_config(row) for row in catalog.profile_filters.get(profile_name, ())
     )
     transport = catalog.profile_numerics(profile_name) or {}
-    straggling = transport.get("straggling", False)
-    if not isinstance(straggling, bool):
-        raise TypeError("profile straggling must be a bool")
+    straggling = transport.get("straggling")  # Physics validates bool | None
     energy_model = transport.get("energy_model", "frozen")
     if energy_model not in {"frozen", "midpoint"}:
         raise ValueError("profile energy_model must be 'frozen' or 'midpoint'")

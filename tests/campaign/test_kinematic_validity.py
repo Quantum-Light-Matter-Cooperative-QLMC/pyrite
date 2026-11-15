@@ -89,6 +89,7 @@ def test_case_lowering_warns_for_thick_silicon():
         cases = build_cases(
             sweep,
             inelastic_model="continuous",
+            straggling=False,
             elastic_model="mott",
             bremsstrahlung_model="eedl",
             radiative_model="uncoupled",
@@ -124,6 +125,7 @@ def test_standard_profile_passes_screen(material):
         build_cases(
             sweep,
             inelastic_model="continuous",
+            straggling=False,
             elastic_model="mott",
             bremsstrahlung_model="eedl",
             radiative_model="uncoupled",
