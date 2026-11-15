@@ -406,3 +406,11 @@ control adopts measured selection. Only active identity pins in
 `CXR_REFLECTION_SELECTION_MODEL=measured-shell-cutoff-v2`; payload equality is
 asserted before re-pinning. The retired, refused `eedl-fallback` resolved entry
 remains historical. No output arrays or numerical tolerances are regenerated.
+
+## Table-sized selection calls (#1200)
+
+`CXR_REFLECTION_SELECTION_MODEL=measured-shell-cutoff-v3` sizes measured
+selection line calls from the tabulation length. Only the identity pins in
+`resolved.json` and `channeling.json` advance, and payload equality is
+asserted before re-pinning. The `eedl-fallback` entry stays historical. No
+output arrays or numerical tolerances are regenerated.

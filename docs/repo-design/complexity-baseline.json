@@ -495,7 +495,7 @@
     {
       "path": "src/pyrite/montecarlo/spectrum/cxr/_setup.py",
       "name": "_prepare_spectrum",
-      "cc": 36
+      "cc": 35
     },
     {
       "path": "src/pyrite/montecarlo/spectrum/cxr_seeds.py",

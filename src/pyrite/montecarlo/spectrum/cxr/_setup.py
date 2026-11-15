@@ -251,6 +251,40 @@ def _admit_line_tables(n_hkl, n_tab):
         )
 
 
+def _line_tabulation_grid(info, abs_comp, E_grid_eV, use_henke):
+    """The chi/U/mu/n tabulation energies of a line call on ``E_grid_eV``.
+
+    The output span padded by 20 % each side (the line keep window), floored
+    at 1 eV and cut at the root's finite refraction support, on the
+    edge-resolved mesh of :func:`._kernels._cxr_tabulation_grid`. It depends
+    on the axis span, not its spacing.
+
+    Validation: line-tabulation-nan-ceiling
+    """
+    pad = 0.2 * (float(E_grid_eV[-1]) - float(E_grid_eV[0]))
+    lo, hi = float(E_grid_eV[0]) - pad, float(E_grid_eV[-1]) + pad
+    lo = max(lo, 1.0)  # keep tabulation energies positive: chi_g/U_g need lambda = HC_EV_ANG / E
+    # Root iteration reads NaN refraction past its support when use_henke is
+    # enabled. Keep the finite prefix and NaN boundary to preserve all delta
+    # reads. Static coupling/attenuation suffixes can differ; final-root
+    # susceptibility remains NaN there, preserving existing score NaN masks.
+    # Without anomalous refraction retain the original all-table bound.
+    ceiling = _cxr_setup_ceiling(info, abs_comp, use_henke)
+    if ceiling < hi:
+        hi = max(ceiling, lo + 1.0)
+    return _cxr_tabulation_grid(info, abs_comp, lo, hi)
+
+
+def line_table_points(crystal, composition, E_grid_eV, use_henke=True):
+    """Tabulation points per reflection of a line call of ``crystal`` on ``E_grid_eV``.
+
+    ``composition`` is the absorber composition ``[(element, n_per_Ang3), ...]``
+    the call passes. Line tables hold four rows of this length per reflection.
+    """
+    grid = np.asarray(_to_cpu(E_grid_eV), dtype=float)
+    return int(_line_tabulation_grid(CRYSTALS[crystal], composition, grid, use_henke).size)
+
+
 def _flight_groups(segments):
     """Physical-flight group ids of the rows: ``(grouped, gid_all)``.
 
@@ -885,19 +919,7 @@ def _prepare_spectrum(request):
     # the basis and absorber elements' native Henke energies, which densely
     # sample the edges -- a plain uniform mesh mis-resolves the edge jumps (tens
     # of % at e.g. the C K-edge). Window matches the keep mask below.
-    _pad = 0.2 * (float(E_grid_eV[-1]) - float(E_grid_eV[0]))
-    _lo, _hi = float(E_grid_eV[0]) - _pad, float(E_grid_eV[-1]) + _pad
-    _lo = max(_lo, 1.0)  # keep tabulation energies positive: chi_g/U_g need lambda = HC_EV_ANG / E
-    # Root iteration reads NaN refraction past its support when use_henke is
-    # enabled. Keep the finite prefix and NaN boundary to preserve all delta
-    # reads. Static coupling/attenuation suffixes can differ; final-root
-    # susceptibility remains NaN there, preserving existing score NaN masks.
-    # Without anomalous refraction retain the original all-table bound.
-    # Validation: line-tabulation-nan-ceiling
-    _ceiling = _cxr_setup_ceiling(info, abs_comp, use_henke)
-    if _ceiling < _hi:
-        _hi = max(_ceiling, _lo + 1.0)
-    E_tab = _cxr_tabulation_grid(info, abs_comp, _lo, _hi)
+    E_tab = _line_tabulation_grid(info, abs_comp, E_grid_eV, use_henke)
     E_tab_g = xp.asarray(E_tab, dtype=REAL)
     # chi/U re+im per reflection, log(mu) per absorber, Re n.
     _table_rows = 4 * len(request.hkl_list) + len(abs_comp) + 1

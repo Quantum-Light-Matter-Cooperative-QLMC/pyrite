@@ -33,8 +33,16 @@ impractical for these wide-band, high-energy scenes; use a GPU or narrow the
 declared line axis. These measurements exclude transport. Selection, ledger
 status and the GPU measurements are in
 [#1173](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/1173);
-batching and performance admission are tracked in
-[#1200](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/1200).
+#1200 sizes each selection call by its coupling-table memory and admits it
+before scoring. With the sets unchanged, GPU selection got faster on three
+axes:
+
+- 1.6–2.2× faster on the 0.5–10 keV band.
+- 2.3× faster on the layered automatic axis.
+- No faster on the Si automatic axis.
+
+See the
+[reflection-selection benchmarks](../../repo-design/compute/reflection-selection-benchmarks.md).
 
 ## Automatic ranking
 

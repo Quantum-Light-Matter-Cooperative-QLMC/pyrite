@@ -42,6 +42,7 @@ __all__ = [
     "select_case_reflections",
     "select_reflection_cutoff",
     "selected_line_spectrum",
+    "selection_call_sizes",
     "validate_reflection_selection",
 ]
 
@@ -278,7 +279,7 @@ def select_case_reflections(
     quadrature: str | None = None,
     g_max_invang: float = F0_RANGE_INVANG,
     width_invang: float = DEFAULT_SHELL_WIDTH_INVANG,
-    max_reflections: int = 512,
+    max_reflections: int | Callable[[int | None, dict], int] = 512,
 ) -> tuple[dict, list[ReflectionCutoff], np.ndarray]:
     """Cut each radiator at its measured cutoff and keep the scored spectrum.
 
@@ -288,7 +289,8 @@ def select_case_reflections(
     ``line_density(pilot, grid) @ weights``, where ``pilot`` radiates that
     shell alone from that radiator (``line_quadrature`` set to
     ``quadrature`` when given), in calls of at most ``max_reflections``
-    reflections. Incoherent line densities add over reflections and
+    reflections, or of ``max_reflections(layer, radiator)`` when it is
+    callable. Incoherent line densities add over reflections and
     radiators, so the sum of the scored shells is the line spectrum of the
     selected set on ``grid``, and a per-radiator tolerance bounds the
     estimated omission of the whole case by the same fraction.
@@ -301,7 +303,6 @@ def select_case_reflections(
     Validation: reflection-yield-tolerance-selector
     """
     weights = np.asarray(weights, dtype=float)
-    chunk = max(1, int(max_reflections))
     layered = case.get("layer_radiators") is not None
     radiators = list(enumerate(case["layer_radiators"])) if layered else [(None, case)]
     out = dict(case)
@@ -312,8 +313,12 @@ def select_case_reflections(
     for layer, radiator in radiators:
         if radiator is None:
             continue
+        if isinstance(max_reflections, int):
+            chunk = max(1, max_reflections)
+        else:
+            chunk = max(1, int(max_reflections(layer, radiator)))
 
-        def shell_yield(hkls: list, layer: int | None = layer) -> float:
+        def shell_yield(hkls: list, layer: int | None = layer, chunk: int = chunk) -> float:
             nonlocal total
             shell = 0.0
             for i in range(0, len(hkls), chunk):
@@ -373,6 +378,40 @@ def prune_case_reflections(
     return pruned, outcomes
 
 
+def selection_call_sizes(case: dict, grid: np.ndarray) -> dict:
+    """Reflections per line call for each radiator, admitted before any scoring.
+
+    Each radiator's line tables hold four rows of its tabulation length per
+    reflection, and that length follows the axis span: about 1.4e4 points on
+    a 0.5--10 keV band, 3.6e5 on a 50 eV--300 keV automatic axis. The count
+    per call is :func:`~pyrite.montecarlo.spectrum.cxr._line_tables.selection_reflections_per_call`
+    of that length, which depends on the case and axis alone. A device whose
+    budget cannot hold one call's tables is refused here, before the first
+    shell is scored. Keys are the radiator layers (``None`` for a slab).
+
+    Validation: reflection-yield-tolerance-selector
+    """
+    from ..spectrum.cxr._line_tables import selection_reflections_per_call
+    from ..spectrum.cxr._setup import _admit_line_tables, line_table_points
+
+    layered = case.get("layer_radiators") is not None
+    if layered:
+        abs_layers = case["abs_layers"]
+        radiators = [
+            (layer, radiator, abs_layers[layer][2])
+            for layer, radiator in enumerate(case["layer_radiators"])
+            if radiator is not None
+        ]
+    else:
+        radiators = [(None, case, case["composition"])]
+    sizes = {}
+    for layer, radiator, composition in radiators:
+        n_tab = line_table_points(radiator["crystal"], composition, grid)
+        sizes[layer] = selection_reflections_per_call(n_tab)
+        _admit_line_tables(sizes[layer], n_tab)
+    return sizes
+
+
 def selected_line_spectrum(
     case: dict, evaluate: Callable[[dict], object], grid: np.ndarray
 ) -> tuple[np.ndarray, dict]:
@@ -392,6 +431,7 @@ def selected_line_spectrum(
 
     selection = case["reflection_selection"]
     quadrature = case.get("line_quadrature", "node")
+    per_call = selection_call_sizes(case, grid)
     _, outcomes, spectrum = select_case_reflections(
         case,
         lambda pilot, _grid: np.asarray(_to_cpu(evaluate(pilot)), dtype=float),
@@ -400,7 +440,7 @@ def selected_line_spectrum(
         axis_yield_weights(grid, quadrature),
         g_max_invang=float(selection["g_max_invang"]),
         width_invang=float(selection["shell_width_invang"]),
-        max_reflections=int(selection.get("max_reflections", 512)),
+        max_reflections=lambda layer, _radiator: per_call[layer],
     )
     layered = case.get("layer_radiators") is not None
     radiators = [
@@ -418,6 +458,7 @@ def selected_line_spectrum(
                 crystal=radiator["crystal"],
                 cutoff_invang=outcome.cutoff_invang,
                 reflections=len(outcome.hkl_list),
+                reflections_per_call=per_call[layer],
                 tail_fraction=outcome.tail_fraction if np.isfinite(outcome.tail_fraction) else None,
                 converged=outcome.converged,
                 shells=[

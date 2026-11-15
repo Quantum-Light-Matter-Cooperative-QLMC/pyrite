@@ -312,9 +312,15 @@ temporal profiles, channeling, two-beam transition radiation and streamed
 block scoring are refused when selection is explicitly requested. Since the
 user-approved #1173 default flip, an automatic request falls back to the
 four-family set on those routes. Catalog-pinned sets remain pinned. The
-`CXR_REFLECTION_SELECTION_MODEL` generation is `measured-shell-cutoff-v2`;
-both dataset and case identities carry it. This policy change does not alter
-the shell estimator or upgrade this claim's validation status.
+`CXR_REFLECTION_SELECTION_MODEL` generation is `measured-shell-cutoff-v3`;
+both dataset and case identities carry it. v3 (#1200) sizes each shell's line
+calls from the radiator's tabulation length (2 GiB of tables at the backend
+precision, 64--8192 reflections) instead of a fixed 512, and refuses a call
+the device budget cannot hold before the first shell is scored. Line spectra
+add over reflections, so this moves only the float summation order (at most
+4e-8 of the peak on the frozen #642 scenes, with identical selected sets
+and tail estimates). It does not alter the shell estimator or upgrade this
+claim's validation status.
 
 ## Historical adjudication (2026-11-13)
 

@@ -90,3 +90,37 @@ def test_admission_refuses_tables_over_device_budget(monkeypatch):
         _setup._admit_line_tables(5408, 69_331)
     monkeypatch.setattr(_RESOURCE_POLICY, "gpu", False)
     _setup._admit_line_tables(5408, 69_331)  # host runs are not device-admitted
+
+
+@pytest.mark.parametrize(("crystal", "henke"), [("silicon", True), ("mos2", True), ("gaas", False)])
+def test_coupling_table_rows_match_single_reflection_calls(crystal, henke):
+    """Whole-table fill (#1200): every row is bit-identical to its own one-row call.
+
+    Includes a noncentrosymmetric crystal (Bijvoet pairs) and the in-place
+    negation of ``emission_coupling_tables``.
+    """
+    from pyrite.materials.crystal import emission_coupling_tables
+
+    hkls = [(1, 1, 1), (-1, -1, -1), (2, 2, 0), (0, 0, 4), (3, 1, 1), (4, 4, 4), (1, 0, 3)]
+    energy = np.geomspace(800.0, 30000.0, 97)
+    batch = emission_coupling_tables(crystal, hkls, energy, 0.45, henke)
+    for i, hkl in enumerate(hkls):
+        single = emission_coupling_tables(crystal, [hkl], energy, 0.45, henke)
+        for whole, row in zip(batch, single, strict=True):
+            np.testing.assert_array_equal(whole[i], row[0], strict=True)
+            assert np.array_equal(np.signbit(whole[i]), np.signbit(row[0]))
+
+
+def test_polarization_pairs_match_scalar_rows():
+    """Vectorized polarization bases (#1200) equal the scalar ones bit for bit."""
+    rng = np.random.default_rng(1200)
+    k_hat = np.array([0.6, -0.1, 0.79])
+    k_hat /= np.linalg.norm(k_hat)
+    rows = np.vstack([rng.normal(size=(64, 3)) * 7.0, 3.0 * k_hat])  # last row degenerate
+    from pyrite.montecarlo.spectrum.cxr._polarization import _polarization_pairs
+
+    e_s, e_p = _polarization_pairs(k_hat, rows)
+    for i, g in enumerate(rows):
+        s, p = _kernels._polarization_pair(k_hat, g)
+        np.testing.assert_array_equal(e_s[i], s, strict=True)
+        np.testing.assert_array_equal(e_p[i], p, strict=True)
