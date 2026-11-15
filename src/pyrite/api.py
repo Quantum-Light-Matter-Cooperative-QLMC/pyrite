@@ -466,6 +466,11 @@ def _case_result(
                 else {}
             ),
             **({"line_roulette": output["line_roulette"]} if "line_roulette" in output else {}),
+            **(
+                {"reflection_selection": output["reflection_selection"]}
+                if "reflection_selection" in output
+                else {}
+            ),
             # Allocation retries ran smaller chunks than requested; absent when none.
             **(
                 {"spectrum_recovery": {k: output[k] for k in _RECOVERY_KEYS if k in output}}

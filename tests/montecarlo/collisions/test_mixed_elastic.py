@@ -658,7 +658,11 @@ def test_public_mixed_physics_cuts_rows():
     from pyrite.campaign.trajectories import simulate_trajectories
 
     scene = _mixed_scene()
-    numerics = pr.Numerics(sampling=FixedSampling(cxr_histories=40, brem_histories=40), seed=7)
+    numerics = pr.Numerics(
+        sampling=FixedSampling(cxr_histories=40, brem_histories=40),
+        seed=7,
+        cxr_reflections=pr.config.CxrReflections(n_families=4),
+    )
     rows = [
         simulate_trajectories(scene.beam, scene.target, physics=physics, numerics=numerics)[
             "E_end_keV"

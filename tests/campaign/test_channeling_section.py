@@ -198,22 +198,24 @@ def test_channeling_demo_and_off_profile_identities_are_unchanged():
     The bin-mean demo key follows ``CXR_BIN_REDUCTION_MODEL`` ``fourier-auto-v4``
     (#1192), as do the silicon stem and parameter hash; restoring
     ``line-major-auto-v3-series`` reproduces the prior pins.
+    #1173 re-mints every pin for ``measured-shell-cutoff-v2``; unsupported
+    channeling routes retain four-family scoring.
     """
     sweep, settings, cases = _profile_cases("silicon", "channeling_demo")
     assert cases[0].line_quadrature == "bin-mean"
     assert [profiles.case_content_key(case) for case in cases] == [
-        "d7ac852bd1a731cfb83985da2c2597191c632d013ecbcd362c6e3efa0a614910"
+        "e6d5d5d4191ad4df30a622780a39c2d47319cbb452c23f062a63a7220f39f52e"
     ]
     assert profiles.named_profile_stem("silicon", catalog_profile="channeling_demo") == (
-        "silicon@channeling_demo-3472498291e3"
+        "silicon@channeling_demo-d47feaeaf85b"
     )
     identity = profiles.dataset_identity("silicon", settings, sweep)
     assert identity["parameter_sha256"] == (
-        "2107a2901bf5b8458f56fcd0c050c6965c232e34bbfd39e6a45fd96379cd131f"
+        "69ee0ea927995df1b41be4f1fcbeddf553179d0d72fff33474b32e5b019a679e"
     )
     sweep = material_sweep("hopg", catalog_profile="standard")
     settings = profiles.profile_run_settings(default_settings(), "standard", sweep=sweep)
     assert profiles.dataset_identity("hopg", settings, sweep)["parameter_sha256"] == (
-        "315b1c5a294dab4bf6efcf2e302cce36498abadc36715d5659bebff3595d5da3"
+        "6d81fa8b95664cae582a925c080d2942625b83b2a021e925ac4585b94d24a02b"
     )
-    assert profiles.named_profile_stem("hopg") == "hopg@full-315b1c5a294d"
+    assert profiles.named_profile_stem("hopg") == "hopg@full-6d81fa8b9566"

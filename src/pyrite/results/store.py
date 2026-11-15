@@ -396,6 +396,8 @@ def store_result(results, case, out):
         results[name][E0]["adaptive_sampling"] = out["adaptive_sampling"]
     if out.get("line_roulette") is not None:
         results[name][E0]["line_roulette"] = out["line_roulette"]
+    if out.get("reflection_selection") is not None:
+        results[name][E0]["reflection_selection"] = out["reflection_selection"]
     # Artifact-scored records name the trajectory file they replayed (#186).
     if out.get("source_trajectory") is not None:
         results[name][E0]["source_trajectory"] = out["source_trajectory"]

@@ -12,11 +12,14 @@ from pyrite.config import FixedSampling
 from pyrite.execution import LocalExecutor, ResourceRequest
 
 
-def _scene():
+def _scene(material="hopg"):
     return pr.Scene(
         pr.Beam(energy_keV=30.0, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()),
         pr.geometry.Slab(
-            "hopg", thickness_ang=10_000.0, tilt_deg=30.0, footprint=pr.geometry.Footprint(5.0, 5.0)
+            material,
+            thickness_ang=10_000.0,
+            tilt_deg=30.0,
+            footprint=pr.geometry.Footprint(5.0, 5.0),
         ),
         pr.Detector(),
         physics=pr.Physics(bremsstrahlung_model="eedl", radiative_model="uncoupled"),
@@ -166,3 +169,95 @@ def test_681_executor_and_resource_contract_not_shadowed():
     assert callable(LocalExecutor().execute)
     assert isinstance(ResourceRequest(), ResourceRequest)
     assert "pyrite.execution" not in pr.ExecutionConfig.__module__
+
+
+def test_line_yield_tolerance_lowers_to_a_selection_record_and_leaves_default_identity():
+    from pyrite.montecarlo.runner.reflection_cutoff import REFLECTION_SELECTION_MODEL
+
+    reflections = pr.config.CxrReflections(line_yield_tolerance=1e-3)
+    selected = _case(pr.Numerics(cxr_reflections=reflections))
+    record = selected.to_dict()["reflection_selection"]
+    assert record["model"] == REFLECTION_SELECTION_MODEL and record["tolerance"] == 1e-3
+    plain = _case(pr.Numerics())
+    assert "reflection_selection" not in plain.to_dict()
+    _same_case(plain, _case(pr.Numerics(cxr_reflections=pr.config.CxrReflections())))
+    assert case_content_key(selected) != case_content_key(plain)
+    for bad in (0.0, 1.0, -1e-3, True):
+        with pytest.raises(ValueError, match="line_yield_tolerance"):
+            pr.config.CxrReflections(line_yield_tolerance=bad)
+    with pytest.raises(ValueError, match="incoherent lines only"):
+        replace(selected, coherent_emission=True)
+
+
+def test_default_selection_and_explicit_family_precedence():
+    scene = _scene("silicon")
+    automatic = build_case(scene)
+    record = automatic.to_dict()["reflection_selection"]
+    assert record["automatic"] is True and record["tolerance"] == 1e-3
+    fixed = build_case(scene, pr.Numerics(cxr_reflections=pr.config.CxrReflections(n_families=4)))
+    assert "reflection_selection" not in fixed.to_dict()
+    assert automatic.hkl_list == fixed.hkl_list
+    assert case_content_key(automatic) != case_content_key(fixed)
+    # Pinned texture reflections remain authoritative.
+    assert "reflection_selection" not in build_case(_scene()).to_dict()
+
+
+@pytest.mark.parametrize(
+    "mode", ["coherent", "temporal", "roulette", "blocks", "memory", "two-beam", "channeling"]
+)
+def test_automatic_selection_falls_back_on_unsupported_routes(mode):
+    physics = (
+        replace(_scene().physics, emission=("incoherent", "coherent"))
+        if mode == "coherent"
+        else None
+    )
+    if mode == "two-beam":
+        physics = replace(_scene().physics, transition_radiation="two-beam")
+    channeling = (
+        pr.quantum.Channeling("planar", plane=(1, 1, 0), admission="accept-inaccurate")
+        if mode == "channeling"
+        else None
+    )
+    # Two-beam TR already requires exactly one reflection, independently of
+    # the selection policy. Keep that existing admission contract.
+    reflections = pr.config.CxrReflections(max_reflections=1 if mode == "two-beam" else None)
+    options = {}
+    if mode == "two-beam":
+        from pyrite.detectors import EnergyBins
+
+        options["sampling"] = FixedSampling(8, 8)
+        options["energy_bins"] = EnergyBins(cxr=[500.0, 1000.0, 1500.0, 2000.0])
+    if mode == "temporal":
+        options["temporal_profile"] = True
+    elif mode == "roulette":
+        options["line_roulette"] = pr.config.LineRoulette(floor=0.1)
+    elif mode in {"blocks", "memory"}:
+        options["execution"] = pr.ExecutionConfig(
+            **{"stream_block_electrons" if mode == "blocks" else "stream_memory_mib": 5}
+        )
+    scene = _scene("silicon")
+    case = build_case(
+        scene,
+        pr.Numerics(cxr_reflections=reflections, **options),
+        physics=physics,
+        channeling=channeling,
+    )
+    fixed = build_case(
+        scene,
+        pr.Numerics(cxr_reflections=replace(reflections, n_families=4), **options),
+        physics=physics,
+        channeling=channeling,
+    )
+    assert "reflection_selection" not in case.to_dict()
+    _same_case(case, fixed)
+
+
+def test_streamed_artifact_selection_falls_back_without_mutating_the_case():
+    from pyrite.montecarlo.runner.streamed_scoring import _streaming_case, streaming_refusal
+
+    case = build_case(_scene("silicon")).to_dict()
+    streamed = _streaming_case(case)
+    assert "reflection_selection" not in streamed
+    assert streamed["hkl_list"] == case["hkl_list"]
+    assert streaming_refusal(case) is None
+    assert case["reflection_selection"]["automatic"]

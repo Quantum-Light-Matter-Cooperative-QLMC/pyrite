@@ -43,7 +43,8 @@ Options:
                                   without running cases.
   --quick                         Use a tiny smoke-test grid and write the
                                   <material>_quick/ component directory.
-  --n-families NUMBER             Override positive dominant reflection-family count.
+  --n-families NUMBER             Use a positive reflection-family count instead of
+                                  automatic line-yield selection.
   --checkpoint-dir DIR            Read and write component checkpoints in DIR.
                                   [default: (pyrite-output/checkpoints)]
   --max-minutes MINUTES           Soft wall-clock budget in minutes; exit 75 if

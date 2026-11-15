@@ -48,6 +48,7 @@ def _cascade_case(
         else {"radiative_model": "uncoupled"}
     )
     numerics = pr.Numerics(
+        cxr_reflections=pr.config.CxrReflections(n_families=4),
         sampling=FixedSampling(cxr_histories=Ne, brem_histories=Ne_brem),
         energy_model="midpoint",
         energy_bins=EnergyBins(
@@ -176,6 +177,7 @@ def _pair_case(monkeypatch, *, positrons, Ne, Ne_brem, seed=11):
         bremslib_tables, "load_bremsstrahlung_tables", lambda *_args, **_kwargs: {"Si": table}
     )
     numerics = pr.Numerics(
+        cxr_reflections=pr.config.CxrReflections(n_families=4),
         sampling=FixedSampling(cxr_histories=Ne, brem_histories=Ne_brem),
         energy_model="midpoint",
         seed=seed,

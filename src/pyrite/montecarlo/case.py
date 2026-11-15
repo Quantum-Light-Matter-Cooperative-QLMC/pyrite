@@ -149,6 +149,7 @@ _CASE_KEY_ORDER = (
     "allow_physics_fallback",
     "physics_fallbacks",
     "node_support_cutoff",
+    "reflection_selection",
 )
 
 
@@ -280,6 +281,13 @@ class Case(Mapping[str, Any]):
         Opt-in incoherent line-scoring roulette as a
         :class:`pyrite._line_roulette.LineRoulette` record; absent is analog
         scoring. Validation: line-scoring-roulette
+    reflection_selection
+        Opt-in measured reflection cutoff (#1173): ``model``, ``tolerance``,
+        ``g_max_invang`` and ``shell_width_invang``. The spectrum phase scores
+        incoherent lines shell by shell and stops where the estimated in-band
+        tail is at most ``tolerance``; ``hkl_list`` then only feeds the
+        diffracted-brem and Kossel terms. Absent scores ``hkl_list``.
+        Validation: reflection-yield-tolerance-selector
     """
 
     # Producer-required fields. Their declaration order need not match the
@@ -387,6 +395,8 @@ class Case(Mapping[str, Any]):
     line_roulette: dict[str, object] | _Absent = _ABSENT
     # Append: frozen-scene pickles retain all historical positional offsets.
     node_support_cutoff: float | Literal["auto"] | None | _Absent = _ABSENT
+    # Opt-in measured reflection selection (#1173), appended for pickle offsets.
+    reflection_selection: dict[str, object] | _Absent = _ABSENT
 
     def __setstate__(self, state: list[Any]) -> None:
         """Restore frozen-slot pickles, filling newly appended optional fields."""
@@ -516,6 +526,7 @@ class Case(Mapping[str, Any]):
         self._validate_photon_transport()
         self._validate_line_roulette()
         self._validate_node_support_cutoff()
+        self._validate_reflection_selection()
         if self.coherent_flat_omission_limit is not _ABSENT:
             _positive(
                 "coherent_flat_omission_limit", self.coherent_flat_omission_limit, allow_zero=True
@@ -705,6 +716,13 @@ class Case(Mapping[str, Any]):
                 raise ValueError("node_support_cutoff and sinc_cutoff are exclusive")
             if self.get("line_quadrature", "node") != "node":
                 raise ValueError("node_support_cutoff needs line_quadrature='node'")
+
+    def _validate_reflection_selection(self) -> None:
+        if isinstance(self.reflection_selection, _Absent):
+            return
+        from .runner.reflection_cutoff import validate_reflection_selection
+
+        validate_reflection_selection(self.reflection_selection, self)
 
     def _validate_line_roulette(self) -> None:
         if isinstance(self.line_roulette, _Absent):

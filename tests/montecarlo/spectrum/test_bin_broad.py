@@ -87,3 +87,35 @@ def test_split_still_checks_tolerance_and_axis():
         )
     with pytest.raises(ValueError, match="uniform"):
         fourier_bin_mean_reduce([12.0], [1e-6], [1.0], [10.0, 11.0, 13.0], broad_width_eV=1000.0)
+
+
+def test_broad_threshold_scales_with_bin_width_and_span():
+    from pyrite.montecarlo.spectrum.cxr._bin_broad import (
+        broad_bin_mean_error_bound,
+        broad_width_for_axis,
+    )
+
+    # The production 0.5--10 keV axis keeps the 1 keV threshold unchanged.
+    assert broad_width_for_axis(0.09375, 9500.0, 1e-6) == 1000.0
+    for h, span in [(500.0, 9000.0), (0.09375, 31300.0), (500.0, 205000.0)]:
+        width = broad_width_for_axis(h, span, 1e-6)
+        assert width > 1000.0
+        assert broad_bin_mean_error_bound(width, h, span) <= 1e-6
+        assert broad_bin_mean_error_bound(width / 2**0.125, h, span) > 1e-6
+
+
+def test_coarse_bins_reduce_exactly_with_the_scaled_threshold():
+    from pyrite.montecarlo.spectrum.cxr._bin_broad import broad_width_for_axis
+
+    grid = 500.0 + 500.0 * (np.arange(19) + 0.5)  # 500 eV bins tiling 0.5--10 keV
+    h = grid[1] - grid[0]
+    edges = np.r_[grid - h / 2, grid[-1] + h / 2]
+    E = np.array([480.0, 3000.0, 6100.0, 9990.0, 40000.0, 2500.0])
+    a = np.pi / np.array([3.0, 70.0, 900.0, 1200.0, 2e4, 2e5])
+    w = np.array([1.0, 2.0, 0.5, 3.0, 1.0, 0.25])
+    exact = w @ _host_bin_mean(a, E, edges, 1 / np.diff(edges), exact_widths=None)
+    with pytest.raises(ValueError, match="interpolation bound"):
+        fourier_bin_mean_reduce(E, a, w, grid, broad_width_eV=1000.0)
+    width = broad_width_for_axis(h, grid[-1] - grid[0], 1e-6)
+    out = fourier_bin_mean_reduce(E, a, w, grid, broad_width_eV=width)
+    np.testing.assert_allclose(out, exact, rtol=0, atol=2e-6 * np.abs(w).sum())

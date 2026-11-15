@@ -1,6 +1,6 @@
 """Remote-only bounded transport/spectrum sensitivity pilot (#1142, #1143).
 
-No default or physics verdict. Fixed 0.5--10 keV reporting band; reference
+No default or physics verdict. Default 0.5--10 keV reporting band; reference
 refinement and changed-transport statistical qualification remain separate.
 Our own pickle is retained for trusted, same-source replay only.
 """
@@ -49,7 +49,7 @@ def metrics(grid, density, quadrature, edges=None):
         band_masses_100eV=_bin_masses(
             grid,
             density,
-            np.linspace(500, 10000, 96) if edges is None else edges,
+            band_edges(*BAND) if edges is None else edges,
             quadrature=quadrature,
         ).tolist(),
     )
@@ -432,7 +432,152 @@ def chunked_lines(scorer, chunks, grid):
         scorer.case = whole
 
 
-def score_families(case, sweep, ladder, ns, reference_spacing, wide_spacing, sync, max_reflections):
+def tolerance_cutoff(case, scorer, tol, max_reflections, g_max=40.0):
+    """Measured reciprocal cutoff for in-band tolerance ``tol`` (#1173 P3).
+
+    Each radiator's |g| shells are scored separately on the saved transport,
+    with ``bin-mean`` bins tiling ``BAND`` (exact in-band yield). Each stops
+    once its geometric tail estimate is at most ``tol`` of its own kept yield.
+    The ladder applies one cutoff to every radiator, so the largest is used.
+    Returns ``("g<G>", pilot record)``.
+    """
+    from pyrite.montecarlo.runner.reflection_cutoff import (
+        band_bin_grid,
+        reflection_shells,
+        select_reflection_cutoff,
+    )
+
+    if case["crystal"] == "hopg":
+        raise ValueError("HOPG uses its (00l) order ladder, not a tolerance cutoff")
+    grid = band_bin_grid(*BAND)
+    width = float(grid[1] - grid[0])
+    layered = case.get("layer_radiators") is not None
+    radiators = list(enumerate(case["layer_radiators"])) if layered else [(None, case)]
+    whole = scorer.case
+    record = dict(tolerance=tol, band_eV=list(BAND), bin_eV=width, g_max_invang=g_max, radiators=[])
+    cutoffs = []
+    try:
+        for index, radiator in radiators:
+            if radiator is None:
+                continue
+
+            def score(hkls, index=index, radiator=radiator):
+                if index is None:
+                    pilot = dict(case, hkl_list=hkls, line_quadrature="bin-mean")
+                else:
+                    layers = [None] * len(case["layer_radiators"])
+                    layers[index] = dict(radiator, hkl_list=hkls)
+                    pilot = dict(
+                        case, layer_radiators=layers, hkl_list=hkls, line_quadrature="bin-mean"
+                    )
+                return float(
+                    chunked_lines(scorer, reflection_chunks(pilot, max_reflections), grid).sum()
+                    * width
+                )
+
+            begin = time.perf_counter()
+            shells = reflection_shells(radiator["crystal"], float(radiator["B_ang2"]), g_max)
+            result = select_reflection_cutoff(score, shells, tol)
+            cutoffs.append(result.cutoff_invang)
+            record["radiators"].append(
+                dict(
+                    layer=index,
+                    crystal=radiator["crystal"],
+                    cutoff_invang=result.cutoff_invang,
+                    reflections=len(result.hkl_list),
+                    tail_fraction=result.tail_fraction
+                    if np.isfinite(result.tail_fraction)
+                    else None,
+                    converged=result.converged,
+                    pilot_s=time.perf_counter() - begin,
+                    shells=[
+                        dict(upper=u, n=n, yield_=y, tail=t if np.isfinite(t) else None)
+                        for u, n, y, t in result.shells
+                    ],
+                )
+            )
+    finally:
+        scorer.case = whole
+    cutoff = max(cutoffs)
+    record["cutoff_invang"] = cutoff
+    return f"g{cutoff:g}", record
+
+
+def selected_row(case, transport, label, grid, quadrature, max_reflections, sync):
+    """Production incremental selection (#1173 P4) at ``sel<x>``, timed on ``grid``.
+
+    Runs :func:`select_case_reflections` with the band axis as production
+    axis: each shell is scored once and the kept shells' sum is the spectrum,
+    so ``band.first_s`` is the whole selection cost (no separate pilot).
+    """
+    from pyrite.energy_grid.convergence_case import CaseLadder
+    from pyrite.montecarlo.runner.reflection_cutoff import (
+        axis_yield_weights,
+        select_case_reflections,
+    )
+
+    scorer = CaseLadder(case, transport=transport)
+
+    def line_density(pilot, axis_grid):
+        scorer.case = pilot
+        return scorer.lines(axis_grid)
+
+    sync()
+    begin = time.perf_counter()
+    pruned, outcomes, density = select_case_reflections(
+        case,
+        line_density,
+        float(label[3:]),
+        grid,
+        axis_yield_weights(grid, quadrature),
+        quadrature=None if quadrature == "node" else quadrature,
+        max_reflections=max_reflections,
+    )
+    sync()
+    elapsed = time.perf_counter() - begin
+    layers = pruned.get("layer_radiators")
+    return dict(
+        n=label,
+        resolved=label,
+        pilot=dict(
+            radiators=[
+                dict(
+                    cutoff_invang=o.cutoff_invang,
+                    reflections=len(o.hkl_list),
+                    tail_fraction=o.tail_fraction if np.isfinite(o.tail_fraction) else None,
+                    converged=o.converged,
+                    shells=[
+                        dict(upper=u, n=k, yield_=y, tail=t if np.isfinite(t) else None)
+                        for u, k, y, t in o.shells
+                    ],
+                )
+                for o in outcomes
+            ]
+        ),
+        reflections=len(pruned["hkl_list"]),
+        layer_reflections=None
+        if layers is None
+        else [None if r is None else len(r["hkl_list"]) for r in layers],
+        band=dict(
+            nodes=int(grid.size),
+            first_s=elapsed,
+            metrics=metrics(grid, density, quadrature),
+        ),
+    )
+
+
+def score_families(
+    case,
+    sweep,
+    ladder,
+    ns,
+    reference_spacing,
+    wide_spacing,
+    sync,
+    max_reflections,
+    on_row=None,
+    quadrature="node",
+):
     """Score each reflection set on the saved transport against the largest.
 
     Band (0.5--10 keV, node ``reference_spacing``): yield, centroid, peak, FWHM,
@@ -440,23 +585,82 @@ def score_families(case, sweep, ladder, ns, reference_spacing, wide_spacing, syn
     resolved support at the largest set): full-support yield, so lines leaving
     the band -- or a film-only production axis -- are not missed. The yield
     the production support omits is recorded per set. Each observable keeps
-    its own margin.
+    its own margin. ``wide_spacing <= 0`` skips the wide axis. Points that
+    resolve to the same set (``tol<x>`` landing on a listed ``g<G>``) are scored
+    once. ``on_row(partial)`` receives the record after each scored point, so
+    a timeout keeps the finished points. ``quadrature="bin-mean"`` scores the
+    band on ``reference_spacing`` bins instead of nodes (the #1192 device
+    Fourier reduction); it needs ``wide_spacing <= 0``.
     """
     from pyrite.energy_grid.convergence_case import CaseLadder
 
+    if quadrature != "node" and wide_spacing > 0:
+        raise ValueError("the wide full-support axis is node-only; pass wide_spacing <= 0")
+
     tp = ladder.transport
-    cases = {n: families_case(case, sweep, n) for n in ns}
+    pilots = {}
+    if any(isinstance(n, str) and n.startswith("tol") for n in ns):
+        pilot_scorer = CaseLadder(case, transport=tp)
+        resolved = []
+        for n in ns:
+            if isinstance(n, str) and n.startswith("tol"):
+                point, pilots[n] = tolerance_cutoff(
+                    case, pilot_scorer, float(n[3:]), max_reflections
+                )
+                resolved.append(point)
+            else:
+                resolved.append(n)
+        labels = list(ns)
+        ns = resolved
+    else:
+        labels = list(ns)
+    if isinstance(ns[-1], str) and ns[-1].startswith("sel"):
+        raise ValueError("the reference (last) ladder point must be a fixed set, not sel<x>")
+    if any(isinstance(n, str) and n.startswith("sel") for n in ns) and wide_spacing > 0:
+        raise ValueError("sel<x> points score the band only; pass wide_spacing <= 0")
+    cases = {
+        n: families_case(case, sweep, n)
+        for n in ns
+        if not (isinstance(n, str) and n.startswith("sel"))
+    }
     start = min(needed[0] for *_, needed in cases.values())
     stop = max(needed[1] for *_, needed in cases.values())
-    wide = axis(start, stop, wide_spacing, "node")
-    band = axis(*BAND, reference_spacing, "node")
-    rows = []
-    for n in ns:
+    axes = [("band", axis(*BAND, reference_spacing, quadrature), None)]
+    if wide_spacing > 0:
+        axes.append(("wide", axis(start, stop, wide_spacing, "node"), band_edges(start, stop)))
+    names = [label for label, *_ in axes]
+    record = dict(
+        axis="00l-orders" if case["crystal"] == "hopg" else "n_families",
+        band_spacing_eV=reference_spacing,
+        band_quadrature=quadrature,
+        wide_spacing_eV=wide_spacing if wide_spacing > 0 else None,
+        wide_support_eV=[start, stop],
+        max_reflections_per_call=max_reflections,
+        margins=MARGINS,
+        families=[],
+    )
+    rows = record["families"]
+    scored = {}
+    for label_n, n in zip(labels, ns, strict=True):
+        if isinstance(n, str) and n.startswith("sel"):
+            rows.append(
+                selected_row(case, tp, label_n, axes[0][1], quadrature, max_reflections, sync)
+            )
+            if on_row is not None:
+                on_row(record)
+            continue
         fcase, production, needed = cases[n]
+        if quadrature != "node":
+            fcase = dict(fcase, line_quadrature=quadrature)
+        if n in scored:
+            rows.append(dict(scored[n], n=label_n, pilot=pilots.get(label_n), duplicate_of=n))
+            continue
         scorer = CaseLadder(fcase, transport=tp)  # one device copy of the segments
         chunks = reflection_chunks(fcase, max_reflections)
         row = dict(
-            n=n,
+            n=label_n,
+            resolved=n,
+            pilot=pilots.get(label_n),
             reflections=len(fcase["hkl_list"]),
             production_support_eV=production,
             all_radiator_support_eV=needed,
@@ -465,7 +669,7 @@ def score_families(case, sweep, ladder, ns, reference_spacing, wide_spacing, syn
             row["layer_reflections"] = [
                 None if r is None else len(r["hkl_list"]) for r in fcase["layer_radiators"]
             ]
-        for label, grid, edges in (("band", band, None), ("wide", wide, band_edges(start, stop))):
+        for label, grid, edges in axes:
             sync()
             begin = time.perf_counter()
             density = chunked_lines(scorer, chunks, grid)
@@ -474,7 +678,9 @@ def score_families(case, sweep, ladder, ns, reference_spacing, wide_spacing, syn
                 nodes=int(grid.size),
                 reflection_chunks=len(chunks),
                 first_s=time.perf_counter() - begin,
-                metrics=metrics(grid, density, "node", edges=edges),
+                metrics=metrics(
+                    grid, density, quadrature if label == "band" else "node", edges=edges
+                ),
             )
             if label == "wide":
                 lo, hi = production
@@ -483,19 +689,14 @@ def score_families(case, sweep, ladder, ns, reference_spacing, wide_spacing, syn
                     np.trapezoid(density, grid)
                 )
         rows.append(row)
+        scored[n] = row
+        if on_row is not None:
+            on_row(record)
     top = rows[-1]
     for row in rows:
-        for label in ("band", "wide"):
+        for label in names:
             row[label]["versus_largest"] = versus(row[label]["metrics"], top[label]["metrics"])
-    return dict(
-        axis="00l-orders" if case["crystal"] == "hopg" else "n_families",
-        band_spacing_eV=reference_spacing,
-        wide_spacing_eV=wide_spacing,
-        wide_support_eV=[start, stop],
-        max_reflections_per_call=max_reflections,
-        margins=MARGINS,
-        families=rows,
-    )
+    return record
 
 
 #: Continuum-only margins (#1143 Plan 4): integral observables at 1e-3, local
@@ -788,6 +989,7 @@ def device_peak_probe(cupy):
 
 
 def main():
+    global BAND
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("material", choices=["hopg", "silicon", "mos2-on-si"])
     parser.add_argument("output", type=Path)
@@ -868,16 +1070,33 @@ def main():
     )
     parser.add_argument(
         "--families",
-        type=lambda text: [x if x.startswith("g") else int(x) for x in text.split(",") if x],
+        type=lambda text: [
+            x if x.startswith(("g", "tol", "sel")) else int(x) for x in text.split(",") if x
+        ],
         default=[],
-        help="ascending reflection ladder: n_families counts (HOPG: (00l) orders) or g<G> "
-        "reciprocal cutoffs in 1/angstrom; last is reference",
+        help="ascending reflection ladder: n_families counts (HOPG: (00l) orders), g<G> "
+        "reciprocal cutoffs in 1/angstrom, tol<x> measured cutoffs, or sel<x> production "
+        "incremental selection on the band axis (#1173); last is reference",
+    )
+    parser.add_argument(
+        "--families-band",
+        type=float,
+        nargs=2,
+        default=BAND,
+        metavar=("START_EV", "STOP_EV"),
+        help="qualification band in eV (default: 500 10000); applies to metrics and pilots",
     )
     parser.add_argument(
         "--families-wide-spacing",
         type=float,
         default=0.375,
-        help="node spacing (eV) of the full-support yield axis for --families",
+        help="node spacing (eV) of the full-support yield axis for --families; 0 skips it",
+    )
+    parser.add_argument(
+        "--families-quadrature",
+        choices=("node", "bin-mean"),
+        default="node",
+        help="band-axis line quadrature for --families (bin-mean needs --families-wide-spacing 0)",
     )
     parser.add_argument(
         "--families-max-reflections",
@@ -886,6 +1105,11 @@ def main():
         help="reflections per radiator per line call for --families (bounds device tables)",
     )
     args = parser.parse_args()
+    if not (
+        np.isfinite(args.families_band).all() and 0 < args.families_band[0] < args.families_band[1]
+    ):
+        parser.error("--families-band requires finite 0 < START_EV < STOP_EV")
+    BAND = tuple(args.families_band)
     if len(set(args.families)) != len(args.families):
         parser.error("--families points must be distinct")
     if len(args.continuum_reference_divisors) != 3:
@@ -994,7 +1218,7 @@ def main():
         replay_transport_sha256=None
         if args.replay is None
         else hashlib.sha256(args.replay.read_bytes()).hexdigest(),
-        band_eV=[500, 10000],
+        band_eV=list(BAND),
         source_revision=Path("SOURCE_SHA").read_text().strip(),
         transport_s_including_first_setup=None if args.replay else transport_s,
         replay_adoption_s=transport_s if args.replay else None,
@@ -1062,6 +1286,10 @@ def main():
             args.families_wide_spacing,
             sync,
             args.families_max_reflections,
+            on_row=lambda partial: (args.output / "report.json").write_text(
+                json.dumps(dict(report, family_arms=partial), indent=2, allow_nan=False) + "\n"
+            ),
+            quadrature=args.families_quadrature,
         )
         assert segment_fingerprint(ladder.segments) == ladder.fingerprint
         report["host_peak_rss_kib"] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss

@@ -13,6 +13,7 @@ from pyrite.montecarlo import Case
 def _legacy_case(**sweep_kwargs):
     sweep = Sweep(
         material="mose2",
+        n_families=4,
         beam=BeamSpec(energy_keV=30.0),
         tilt_deg=5.0,
         **sweep_kwargs,
@@ -195,7 +196,9 @@ def test_node_support_cutoff_restores_old_slots_and_round_trips_new_key():
     from dataclasses import fields
 
     legacy = Case(**_legacy_case())
-    old_state = [getattr(legacy, f.name) for f in fields(Case) if f.name != "node_support_cutoff"]
+    declared = list(fields(Case))
+    old_end = next(i for i, field in enumerate(declared) if field.name == "node_support_cutoff")
+    old_state = [getattr(legacy, field.name) for field in declared[:old_end]]
     restored = object.__new__(Case)
     restored.__setstate__(old_state)
     assert "node_support_cutoff" not in restored

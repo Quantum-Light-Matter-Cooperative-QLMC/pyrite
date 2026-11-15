@@ -43,6 +43,7 @@ SCORING_ONLY_FIELDS = frozenset(
         "E_grid_brem",
         "line_grid_policy",
         "line_quadrature",
+        "reflection_selection",
         "sinc_cutoff",
         "brem_step_eV",
         "coherent_flat_omission_limit",

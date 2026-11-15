@@ -202,6 +202,13 @@ Built-in history counts (`DEFAULT_N_ELECTRONS`/`DEFAULT_N_ELECTRONS_BREM`), nume
 Run-option sections of the version-1 dataset identity: `pop_identity_options` strips run-affecting settings from the serialized settings, and `transport_numerics_payload` / `radiative_numerics_payload` return their divergence-only `transport_numerics` keys (auto inelastic resolution as the cases resolve it; coupled radiative keys only when BremsLib resolves on a flat face).
 - Deps: `_numerics`, `campaign.inelastic_cases`.
 
+### `campaign/reflection_selection.py`
+
+Automatic CXR selection policy is owned by `campaign/reflection_selection.py`:
+it resolves omitted family controls to tolerance 1e-3, preserves catalog pins
+and explicit counts/caps, and falls back on unsupported model/execution routes.
+`sweep.py`, public lowering and checkpoint grid repair share this policy.
+
 ### `campaign/numerics_resolution.py`
 Immutable resolved numerics with value provenance and stable CLI/JSON grouping; re-exported by `campaign/profiles.py`, which owns numerics resolution.
 - Public: `NumericsResolution`, `NUMERICS_GROUPS`.

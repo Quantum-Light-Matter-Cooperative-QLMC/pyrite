@@ -184,7 +184,12 @@ def _target_cxr_grid(
     the same lookup build_cases uses. Else the record's existing grid."""
     eg = np.asarray(r["E_grid"], float)
     if from_config and sweep is not None:
+        from ..campaign.reflection_selection import resolve_reflection_sweep
         from ..campaign.sweep import _cxr_grid_for_energy, sweep_crystal_params
+
+        sweep, _ = resolve_reflection_sweep(
+            sweep, r["case"].get("coherent_emission"), r["case"].get("temporal_profile")
+        )
 
         # Coordinates only: a returned policy payload describes a resolution the
         # runner would refine from its own trajectories, and reline pins the

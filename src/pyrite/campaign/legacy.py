@@ -160,6 +160,7 @@ def numerics_from_legacy(old_sweep: Any, settings: Any) -> Numerics:
             n_families=old_sweep.n_families,
             max_reflections=old_sweep.max_reflections,
             mosaic_nodes=old_sweep.mosaic_nodes,
+            line_yield_tolerance=old_sweep.line_yield_tolerance,
             mosaic_route=old_sweep.mosaic_route,
         ),
     )

@@ -120,6 +120,7 @@ def resolve_numerics(
         "n_electrons_brem": DEFAULT_N_ELECTRONS_BREM,
         "n_families": convergence.n_families,
         "max_reflections": None,
+        "line_yield_tolerance": None,
         "mosaic_nodes": convergence.mosaic_nodes,
         "mosaic_route": convergence.mosaic_route,
         "straggling": physics.straggling,
@@ -413,7 +414,12 @@ def _model_generation_markers(emission: str) -> dict[str, Any]:
     # The in-medium photon dispersion is unconditional physics now, not an
     # opt-in model; digests minted before it used the retired vacuum
     # k = omega kinematics.
-    markers: dict[str, Any] = {"line_kinematics": "in-medium"}
+    from .._numerics import CXR_REFLECTION_SELECTION_MODEL
+
+    markers: dict[str, Any] = {
+        "line_kinematics": "in-medium",
+        "reflection_selection_model": CXR_REFLECTION_SELECTION_MODEL,
+    }
     # Production resolves one shell- and density-effect-corrected SBETHE table
     # per material; the former Joy--Luo/Berger--Seltzer splice remains
     # reference-only. ``xsgen_tables`` separates different generated inputs
@@ -512,7 +518,7 @@ def _identity_v1(
     Validation: bote-salvat-ionization-backend
     """
     assert sweep.target is not None
-    crystallography = crystal_params(sweep.target.material, sweep.n_families)
+    crystallography = crystal_params(sweep.target.material, sweep.n_families or 4)
     resolved = {
         "material": material,
         "fidelity": LEGACY_IDENTITY_TIER,
@@ -530,7 +536,8 @@ def _identity_v1(
     # Hash compatibility: the P2.4 electron-count sweep grids join the payload
     # only when actually set, so pre-existing runs keep their historical
     # parameter_sha256 (and therefore their checkpoint identity) bit-for-bit.
-    for key in ("n_electrons", "n_electrons_brem", "line_grid_policy"):
+    # The measured reflection selection (#1173) follows the same rule.
+    for key in ("n_electrons", "n_electrons_brem", "line_grid_policy", "line_yield_tolerance"):
         if sweep_payload.get(key) is None:
             sweep_payload.pop(key, None)
     # Same compatibility rule for catalog_profile (Phase 3 decision 2): only
@@ -711,8 +718,11 @@ def case_content_key(
 
     Validation: bote-salvat-ionization-backend
     """
+    from .._numerics import CXR_REFLECTION_SELECTION_MODEL
+
     payload = {
         "schema": CASE_CONTENT_KEY_SCHEMA,
+        "reflection_selection_model": CXR_REFLECTION_SELECTION_MODEL,
         "stopping_model": STOPPING_MODEL,
         "characteristic_model": case_characteristic_marker(case),
         "line_escape_model": CXR_ESCAPE_MODEL,

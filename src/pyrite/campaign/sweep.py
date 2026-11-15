@@ -417,10 +417,14 @@ class Sweep:
     crystal_height_mm: InitVar[ScalarOrSeq | None] = retired_flat_input("crystal_height_mm")
     # fixed setup (single values) ------------------------------------------
     theta_obs_deg: InitVar[float | None] = None
-    n_families: int = 4
+    n_families: int | None = None
     # Optional resolved-profile cap applied after catalog-pinned or dynamically
     # selected reflections. None preserves the complete production set.
     max_reflections: int | None = None
+    # Measured reflection selection (#1173): the spectrum phase scores
+    # |g| shells up to the f0 cap until the estimated in-band tail is at most
+    # this fraction of the kept line yield. Both knobs omitted selects 1e-3.
+    line_yield_tolerance: float | None = None
     dtheta_obs_deg: InitVar[float | None] = None
     domega_sr: InitVar[float | None] = None
     beam_uvw: tuple | None = None  # None -> per-material default
@@ -646,7 +650,7 @@ def sweep_crystal_params(sweep: Sweep) -> dict[str, Any]:
     :func:`_cxr_grid_for_energy` resolves a line grid against.
     """
     assert sweep.target is not None  # Sweep.__post_init__ always resolves one
-    cp = crystal_params(sweep.target.material, sweep.n_families)
+    cp = crystal_params(sweep.target.material, sweep.n_families or 4)
     if sweep.max_reflections is not None:
         cp["hkl_list"] = cp["hkl_list"][: sweep.max_reflections]
     return cp
@@ -669,14 +673,21 @@ def _automatic_cxr_grid_policy(sweep: Sweep, cp: dict, energy_keV: float) -> Cxr
     Validation: line-grid-emission-ceiling
     Validation: line-grid-kinematic-bandwidth
     """
+    from ..montecarlo.runner.reflection_cutoff import F0_RANGE_INVANG
     from ..montecarlo.transport.beam_entry import upper_beam_energy_keV
 
     radiators = [(cp["crystal"], cp["hkl_list"]), *_stack_line_radiators(sweep)]
-    magnitudes = [
-        reciprocal_g_vector(hkl, CATALOG.crystal(crystal).lattice)[1]
-        for crystal, hkl_list in radiators
-        for hkl in hkl_list
-    ]
+    # A measured selection's lines reach |g| up to its cap, which bounds the
+    # axis before the spectrum phase knows the selected set (#1173).
+    magnitudes = (
+        [F0_RANGE_INVANG]
+        if sweep.line_yield_tolerance is not None
+        else [
+            reciprocal_g_vector(hkl, CATALOG.crystal(crystal).lattice)[1]
+            for crystal, hkl_list in radiators
+            for hkl in hkl_list
+        ]
+    )
     start = cxr_start_eV(energy_keV)
     # Bounds use the declared upper incident energy, E0 (1 + 6 f) for a spread
     # beam: the sampler clamps there, so no electron starts above it.
@@ -690,6 +701,9 @@ def _automatic_cxr_grid_policy(sweep: Sweep, cp: dict, energy_keV: float) -> Cxr
     )
     if len(radiators) > 1:
         sources = {**dict(policy.sources), "bandwidth_radiators": STACK_LINE_BANDWIDTH_MODEL}
+        policy = replace(policy, sources=tuple(sorted(sources.items())))
+    if sweep.line_yield_tolerance is not None:
+        sources = {**dict(policy.sources), "bandwidth_reflections": SELECTION_CAP_BANDWIDTH_MODEL}
         policy = replace(policy, sources=tuple(sorted(sources.items())))
     if policy.bandwidth_policy != AUTOMATIC_BANDWIDTH_POLICY:
         # The measured bandwidth keeps the closed-form bound as its cap; its
@@ -739,6 +753,10 @@ def _automatic_cxr_grid_policy(sweep: Sweep, cp: dict, energy_keV: float) -> Cxr
 #: bare slab's policy payload, and therefore its identity, is unchanged.
 STACK_LINE_BANDWIDTH_MODEL = "stack-radiator-union-v1"
 
+#: Provenance of an automatic bandwidth bounded by a measured reflection
+#: selection's |g| cap rather than the case's own reflections (#1173).
+SELECTION_CAP_BANDWIDTH_MODEL = "reflection-selection-cap-v1"
+
 
 def _stack_line_radiators(sweep: Sweep) -> list[tuple[str, list]]:
     """``(crystal, hkl_list)`` of each crystalline layer beneath the film.
@@ -748,7 +766,7 @@ def _stack_line_radiators(sweep: Sweep) -> list[tuple[str, list]]:
     """
     assert sweep.target is not None  # Sweep.__post_init__ always resolves one
     radiators = (
-        layer_radiator(layer, sweep.n_families) for layer in sweep.target._below_film() or ()
+        layer_radiator(layer, sweep.n_families or 4) for layer in sweep.target._below_film() or ()
     )
     return [(r["crystal"], r["hkl_list"]) for r in radiators if r is not None]
 
@@ -794,7 +812,9 @@ def _cxr_grid_for_energy(
     reoriented = bool(
         resolve_crystal_cut(sweep.target._crystal_cut(), cp["beam_uvw"], cp["surface_hkl"]).label
     )
-    if not override and not reoriented:
+    # Stored rows were derived for the family-truncated set, so a measured
+    # selection, whose lines reach its |g| cap, resolves automatically.
+    if not override and not reoriented and sweep.line_yield_tolerance is None:
         stored = (bins.cxr_by_energy or {}).get(float(energy_keV))
         if stored is not None:
             return np.asarray(stored, dtype=float), None
@@ -816,7 +836,12 @@ def _cxr_grid_for_energy(
         )
     grid = np.linspace(policy.start_eV, policy.stop_eV, num)
     payload = policy.payload()
-    if bins.cxr_by_energy is None and not override and not reoriented:
+    if (
+        bins.cxr_by_energy is None
+        and not override
+        and not reoriented
+        and sweep.line_yield_tolerance is None
+    ):
         payload["grid_model"] = BARE_SWEEP_GRID_MODEL
     return grid, payload
 
@@ -1072,6 +1097,11 @@ def build_cases(
 
     Validation: inelastic-angular-deflection
     """
+    from .reflection_selection import resolve_reflection_sweep
+
+    sweep, automatic_selection = resolve_reflection_sweep(
+        sweep, coherent_emission, temporal_profile
+    )
     assert sweep.target is not None  # Sweep.__post_init__ always resolves one
     assert sweep.detector is not None
     n_electrons, n_electrons_brem = _electron_budget(
@@ -1131,7 +1161,7 @@ def build_cases(
         cp,
         name_stem=name_stem,
         beam_uvw=beam_uvw,
-        n_families=sweep.n_families,
+        n_families=sweep.n_families or 4,
         orientation=orientation,
     )
     grooved = any(g.case_keys().get("groove_spacing_ang") is not None for g in geometries)
@@ -1151,6 +1181,15 @@ def build_cases(
         bremsstrahlung_model=bremsstrahlung_model,
         radiative=radiative,
     )
+    selection_keys = {}
+    if sweep.line_yield_tolerance is not None:
+        from ..montecarlo.runner.reflection_cutoff import reflection_selection_record
+
+        selection_keys["reflection_selection"] = reflection_selection_record(
+            sweep.line_yield_tolerance
+        )
+        if automatic_selection:
+            selection_keys["reflection_selection"]["automatic"] = True
     cases = []
     for i_c, geometry in enumerate(geometries):
         for i_e, E0 in enumerate(energies):
@@ -1193,6 +1232,7 @@ def build_cases(
                         # used downstream (detector model / unit scaling); ignored by run_case:
                         dtheta_obs_rad=np.deg2rad(dtheta),
                         domega_sr=domega,
+                        **selection_keys,
                     )
                 )
     return _resolve_case_models(

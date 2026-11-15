@@ -25,6 +25,18 @@ def _gate():
     return runpy.run_path(str(script))
 
 
+def test_narrowed_band_metrics_use_only_the_declared_band(monkeypatch):
+    gate = _gate()
+    monkeypatch.setitem(gate["metrics"].__globals__, "BAND", (500.0, 3000.0))
+    for quadrature in ("node", "bin-mean"):
+        grid = gate["axis"](500, 3000, 1, quadrature)
+        result = gate["metrics"](grid, np.ones(grid.size), quadrature)
+        assert result["yield_per_primary"] == pytest.approx(2500)
+        assert result["centroid_eV"] == pytest.approx(1750)
+        assert len(result["band_masses_100eV"]) == 25
+        np.testing.assert_allclose(result["band_masses_100eV"], 100, rtol=1e-12)
+
+
 def test_layered_scene_is_a_shell_admitted_two_crystal_stack():
     case = _gate()["layered_case"](8, 642501)
     assert case["crystal"] == "mos2"
@@ -225,3 +237,127 @@ def test_timed_calls_flags_noisy_warm_timings_unresolved():
         record["warm_relative_spread"] <= gate["TIMING_SPREAD_LIMIT"]
     )
     assert len(record["grid_sha256"]) == 64
+
+
+def test_score_families_scores_each_resolved_set_once_and_checkpoints(monkeypatch):
+    import pyrite.energy_grid.convergence_case as convergence_case
+
+    gate = _gate()
+    module = gate["score_families"].__globals__
+    calls = []
+
+    def families_case(case, sweep, n):
+        return (
+            dict(case, hkl_list=[(1, 1, 1)] * (n if isinstance(n, int) else 9)),
+            (
+                500.0,
+                10_000.0,
+            ),
+            (500.0, 10_000.0),
+        )
+
+    def chunked_lines(scorer, chunks, grid):
+        calls.append(len(scorer.case["hkl_list"]))
+        return np.exp(-(((grid - 3000.0) / 500.0) ** 2)) * len(scorer.case["hkl_list"])
+
+    class Ladder:
+        def __init__(self, case, transport=None):
+            self.case = case
+
+    monkeypatch.setitem(module, "families_case", families_case)
+    monkeypatch.setitem(module, "chunked_lines", chunked_lines)
+    monkeypatch.setitem(module, "tolerance_cutoff", lambda *a: ("g30", {"cutoff_invang": 30}))
+    monkeypatch.setattr(convergence_case, "CaseLadder", Ladder)
+    seen = []
+    record = gate["score_families"](
+        {"crystal": "silicon"},
+        None,
+        type("L", (), {"transport": None})(),
+        [4, "tol1e-3", "g30"],
+        5.0,
+        0.0,
+        lambda: None,
+        512,
+        on_row=lambda partial: seen.append(len(partial["families"])),
+    )
+    assert calls == [4, 9]
+    assert seen == [1, 2]
+    rows = record["families"]
+    assert [r["n"] for r in rows] == [4, "tol1e-3", "g30"]
+    assert rows[2]["duplicate_of"] == "g30" and rows[2]["pilot"] is None
+    assert rows[1]["pilot"] == {"cutoff_invang": 30}
+    assert record["wide_spacing_eV"] is None
+    assert all("wide" not in r for r in rows)
+    assert rows[1]["band"]["versus_largest"]["yield_per_primary"] == 0.0
+    assert rows[0]["band"]["versus_largest"]["yield_per_primary"] < 0.0
+
+
+def test_score_families_bin_mean_band_sets_quadrature_and_refuses_wide(monkeypatch):
+    import pyrite.energy_grid.convergence_case as convergence_case
+
+    gate = _gate()
+    module = gate["score_families"].__globals__
+    seen = []
+
+    def chunked_lines(scorer, chunks, grid):
+        seen.append((scorer.case.get("line_quadrature"), grid[0], grid.size))
+        return np.exp(-(((grid - 3000.0) / 500.0) ** 2)) * len(scorer.case["hkl_list"])
+
+    class Ladder:
+        def __init__(self, case, transport=None):
+            self.case = case
+
+    monkeypatch.setitem(
+        module,
+        "families_case",
+        lambda case, sweep, n: (dict(case, hkl_list=[(1, 1, 1)] * n), (500.0, 1e4), (500.0, 1e4)),
+    )
+    monkeypatch.setitem(module, "chunked_lines", chunked_lines)
+    monkeypatch.setattr(convergence_case, "CaseLadder", Ladder)
+    args = ({"crystal": "silicon"}, None, type("L", (), {"transport": None})(), [4, 8], 5.0)
+    record = gate["score_families"](*args, 0.0, lambda: None, 512, quadrature="bin-mean")
+    assert record["band_quadrature"] == "bin-mean"
+    assert seen == [("bin-mean", 502.5, 1900)] * 2
+    assert record["families"][0]["band"]["versus_largest"]["yield_per_primary"] == -0.5
+    with pytest.raises(ValueError, match="node-only"):
+        gate["score_families"](*args, 0.375, lambda: None, 512, quadrature="bin-mean")
+
+
+def test_score_families_sel_point_runs_the_incremental_selector_on_the_band(monkeypatch):
+    import pyrite.energy_grid.convergence_case as convergence_case
+    from pyrite.materials.crystal import dominant_reflections
+
+    gate = _gate()
+    module = gate["score_families"].__globals__
+    case = {"crystal": "silicon", "B_ang2": 0.46}
+
+    def lines_of(hkls, grid):
+        weight = sum(np.exp(-0.05 * (h * h + k * k + ell * ell)) for h, k, ell in hkls)
+        return np.exp(-(((grid - 3000.0) / 500.0) ** 2)) * weight
+
+    class Ladder:
+        def __init__(self, case, transport=None):
+            self.case = case
+
+        def lines(self, grid):
+            return lines_of(self.case["hkl_list"], grid)
+
+    reference = dominant_reflections("silicon", n_families=10**9, B_ang2=0.46, g_max_invang=24.0)
+    monkeypatch.setitem(
+        module,
+        "families_case",
+        lambda c, sweep, n: (dict(c, hkl_list=reference), (500.0, 1e4), (500.0, 1e4)),
+    )
+    monkeypatch.setitem(
+        module, "chunked_lines", lambda scorer, chunks, grid: Ladder(scorer.case).lines(grid)
+    )
+    monkeypatch.setattr(convergence_case, "CaseLadder", Ladder)
+    args = (case, None, type("L", (), {"transport": None})(), ["sel1e-3", "g24"], 5.0)
+    record = gate["score_families"](*args, 0.0, lambda: None, 512, quadrature="bin-mean")
+    row = record["families"][0]
+    (radiator,) = row["pilot"]["radiators"]
+    assert radiator["converged"] and radiator["tail_fraction"] <= 1e-3
+    assert row["reflections"] == radiator["reflections"] < len(reference)
+    assert abs(row["band"]["versus_largest"]["yield_per_primary"]) < 2e-3
+    with pytest.raises(ValueError, match="reference"):
+        gate["score_families"](*args[:3], ["g24", "sel1e-3"], 5.0, 0.0, lambda: None, 512)

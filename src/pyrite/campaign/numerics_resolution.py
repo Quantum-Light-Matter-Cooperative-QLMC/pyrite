@@ -20,6 +20,7 @@ NUMERICS_GROUPS = (
             ("max_reflections", "maximum reflections"),
             ("mosaic_nodes", "mosaic nodes"),
             ("mosaic_route", "mosaic route"),
+            ("line_yield_tolerance", "line-yield tolerance"),
         ),
     ),
     (

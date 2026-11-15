@@ -923,14 +923,38 @@ def _line_phase(
     truncation_audit,
     coherent_audit,
 ):
-    """Score the line spectra and run their audits; tag an allocator OOM by phase."""
+    """Score the line spectra and run their audits; tag an allocator OOM by phase.
+
+    A case with ``reflection_selection`` scores its incoherent lines shell by
+    shell on ``E_grid`` and returns the selection record.
+
+    Validation: reflection-yield-tolerance-selector
+    """
     from dataclasses import replace as batch_replace
 
     temporal, temporal_coherent = temporal_profiles
-    spec_coherent = None
+    spec_coherent = selection = None
+    if case.get("reflection_selection") is not None:
+        if want_coherent or batch.line_screen is not None or temporal is not None:
+            raise ValueError(
+                "reflection_selection scores incoherent lines only; it refuses coherent "
+                "emission, line roulette and temporal profiles"
+            )
+        from .reflection_cutoff import selected_line_spectrum
     with _pkg._nsys_range("pyrite.lines"), collect_line_data_coverage() as line_coverage:
         try:
-            spec = emission.cxr.evaluate(batch, "spec").values
+            if case.get("reflection_selection") is None:
+                spec = emission.cxr.evaluate(batch, "spec").values
+            else:
+                spec, selection = selected_line_spectrum(
+                    case,
+                    lambda pilot: (
+                        emission.cxr.evaluate(
+                            batch_replace(batch, case=pilot, table_cache={}), "spec"
+                        ).values
+                    ),
+                    E_grid,
+                )
 
             if want_coherent:
                 spec_coherent = emission.cxr.evaluate(
@@ -963,6 +987,7 @@ def _line_phase(
         coherent_yield_record,
         temporal,
         temporal_coherent,
+        selection,
     )
 
 
@@ -1060,6 +1085,7 @@ def _spectrum_case_impl(case, tp, record_timing=False):
         coherent_yield_record,
         temporal,
         temporal_coherent,
+        reflection_selection,
     ) = _finished_or_run(
         phase_cache,
         "lines",
@@ -1182,6 +1208,8 @@ def _spectrum_case_impl(case, tp, record_timing=False):
         out["spec_coherent"] = spec_coherent
     if line_screen is not None:
         out["line_roulette"] = line_screen.record()
+    if reflection_selection is not None:
+        out["reflection_selection"] = reflection_selection
     out.update(optional_line_components(case, tp))
     if coherent_yield_record is not None:
         out["line_grid_coherent_yield_audit"] = coherent_yield_record
