@@ -100,10 +100,18 @@ class AxialDissipator:
     tds_grid_rate, tds_sink_rate, electronic_rate
         ``C_grid(r, r)``, ``C(r, r) - C_grid(r, r)`` and ``C_el(r, r)`` [1/angstrom].
     tds_sources
-        Strings of the supercell.
-    tds_source_rates
-        ``lambda_s Var_u phi_band(r)`` per source [1/angstrom], shape
-        ``(n_sources, nx, ny)``; sums to ``tds_grid_rate``.
+        Strings of the supercell, grouped by base string: base ``b`` owns
+        sources ``b * n_images + (i * c_y + j)`` for image ``(i, j)``.
+    tds_base_rates
+        ``lambda_s Var_u phi_band(r)`` [1/angstrom] of each base string's
+        ``(0, 0)`` image, shape ``(n_bases, nx, ny)``. Image ``(i, j)`` is the
+        exact grid translation by ``(i nx / c_x, j ny / c_y)`` samples; the
+        rates of all sources sum to ``tds_grid_rate``.
+    tds_base_spectra
+        ``conj(FFT(tds_base_rates))`` for image-lattice correlations.
+    tds_image_cells
+        Image lattice ``(c_x, c_y)``; ``(1, 1)`` when the grid does not divide
+        into cells, in which case every source is its own base.
     phase_spectra
         Band-limited ``phi~_0(k)`` of an atom at the origin per element
         (supercell FFT layout, ``1/A`` normalization folded in).
@@ -120,7 +128,9 @@ class AxialDissipator:
     tds_sink_rate: np.ndarray
     electronic_rate: np.ndarray
     tds_sources: tuple[TDSSource, ...]
-    tds_source_rates: np.ndarray
+    tds_base_rates: np.ndarray
+    tds_base_spectra: np.ndarray
+    tds_image_cells: tuple[int, int]
     phase_spectra: dict[str, np.ndarray]
     electronic_q_inv_ang: np.ndarray
     electronic_weights: np.ndarray
@@ -138,6 +148,23 @@ class AxialDissipator:
         return 0.5 * self.hbar_v_eV_ang * self.total_rate
 
     # -- jumps ---------------------------------------------------------------
+
+    def tds_source_rate(self, source: int) -> np.ndarray:
+        """``lambda_s Var_u phi_band(r)`` of one source [1/angstrom]."""
+        cx, cy = self.tds_image_cells
+        base, image = divmod(source, cx * cy)
+        i, j = divmod(image, cy)
+        nx, ny = self.grid.shape
+        return np.roll(self.tds_base_rates[base], (i * nx // cx, j * ny // cy), axis=(0, 1))
+
+    def tds_source_weights(self, density: np.ndarray) -> np.ndarray:
+        """``sum_r rate_s(r) |psi(r)|^2`` per source, clamped at zero.
+
+        One image-lattice cross-correlation per base string: sampling the
+        correlation at the image offsets folds its spectrum onto the
+        ``c_x x c_y`` lattice, so the cost does not grow with the image count.
+        """
+        return _image_weights(np, self.tds_base_spectra, self.tds_image_cells, density)
 
     def tds_phase(self, source: int, offset_ang) -> np.ndarray:
         """``phi_u(r) - <phi>(r)`` of one source displaced by ``offset_ang`` (real).
@@ -309,77 +336,12 @@ def axial_dissipator(
     k2 = kx**2 + ky**2
     gx, gy = profile.g_inv_ang
 
-    sources: list[TDSSource] = []
-    source_rates: list[np.ndarray] = []
-    spectra: dict[str, np.ndarray] = {}
-    grid_rate = zero.copy()
-    sink_rate = zero.copy()
-    if "tds" in mechanisms:
-        a2 = _site_displacements(profile)
-        band = (np.abs(np.fft.fftfreq(nx) * nx) < nx / 2)[:, None] & (
-            np.abs(np.fft.fftfreq(ny) * ny) < ny / 2
-        )[None, :]
-        # Oversampled (2x) layout for E_u[phi_u^2].
-        fine = RealSpaceGrid(grid.extent_ang, (2 * nx, 2 * ny))
-        fkx, fky = fine.kx[:, None], fine.ky[None, :]
-        for element in sorted(a2):
-            v = _potential(element, np.sqrt(k2))
-            spectra[element] = np.where(band, -v / hbar_v / grid.area_ang2, 0.0)
-        full: dict[tuple[int, int], complex] = {}
-        a2_min = min(a2.values())
-        g_cut = np.sqrt(4.0 * -np.log(_TDS_TAIL) / a2_min)
-        m_max, n_max = int(np.ceil(g_cut / gx)), int(np.ceil(g_cut / gy))
-        mm, nn = np.meshgrid(
-            np.arange(-m_max, m_max + 1), np.arange(-n_max, n_max + 1), indexing="ij"
-        )
-        g_mag = np.hypot(mm * gx, nn * gy)
-        inside = g_mag <= g_cut
-        unique, inverse = np.unique(np.round(g_mag[inside], 9), return_inverse=True)
-        for element in sorted(a2):
-            strings = [s for s in profile.strings if element in s.linear_density]
-            transform = _tds_transform(element, a2[element], unique)[inverse]
-            for s in strings:
-                lam = s.linear_density[element]
-                phase = np.exp(
-                    -1j
-                    * (mm[inside] * gx * s.position_ang[0] + nn[inside] * gy * s.position_ang[1])
-                )
-                values = lam / profile.area_ang2 * phase * transform / (2.0 * np.pi * hbar_v) ** 2
-                for key, val in zip(zip(mm[inside], nn[inside], strict=True), values, strict=True):
-                    key = (int(key[0]), int(key[1]))
-                    full[key] = full.get(key, 0.0) + val
-                # Grid sources: every image of this string in the supercell.
-                for i in range(cx):
-                    for j in range(cy):
-                        pos = (
-                            s.position_ang[0] + i * profile.period_ang[0],
-                            s.position_ang[1] + j * profile.period_ang[1],
-                        )
-                        sources.append(TDSSource(element, pos, lam, a2[element]))
-        # In-grid variance per source.
-        for src in sources:
-            spec = spectra[src.element]
-            padded = np.zeros(fine.shape, dtype=complex)
-            padded[np.ix_(_pad_index(nx), _pad_index(ny))] = spec
-            phi0 = np.fft.ifft2(padded).real * padded.size
-            square = np.fft.fft2(phi0**2) / padded.size
-            shift = np.exp(-1j * (fkx * src.position_ang[0] + fky * src.position_ang[1]))
-            damp = np.exp(-0.5 * src.displacement_ang2 * (fkx**2 + fky**2))
-            second = (np.fft.ifft2(square * damp * shift).real * padded.size)[::2, ::2]
-            mean = (
-                np.fft.ifft2(
-                    spec
-                    * np.exp(-0.5 * src.displacement_ang2 * k2)
-                    * np.exp(-1j * (kx * src.position_ang[0] + ky * src.position_ang[1]))
-                ).real
-                * spec.size
-            )
-            rate = src.linear_density * (second - mean**2)
-            source_rates.append(rate)
-            grid_rate += rate
-        # Band-limited pointwise variance can exceed the full one on coarse grids;
-        # the sink is clamped at zero (no gain).
-        sink_rate = np.maximum(_fold(grid, (cx, cy), full) - grid_rate, 0.0)
+    tds = _tds_terms(profile, grid, (cx, cy), hbar_v) if "tds" in mechanisms else None
+    if tds is None:
+        sources, base_rates, image_cells, spectra = (), np.zeros((0, nx, ny)), (1, 1), {}
+        grid_rate, sink_rate = zero.copy(), zero.copy()
+    else:
+        sources, base_rates, image_cells, spectra, grid_rate, sink_rate = tds
 
     el_rate = zero.copy()
     q_nodes = np.zeros(0)
@@ -416,8 +378,10 @@ def axial_dissipator(
         tds_grid_rate=grid_rate,
         tds_sink_rate=sink_rate,
         electronic_rate=el_rate,
-        tds_sources=tuple(sources),
-        tds_source_rates=np.array(source_rates) if source_rates else np.zeros((0, *grid.shape)),
+        tds_sources=sources,
+        tds_base_rates=base_rates,
+        tds_base_spectra=np.conj(np.fft.fft2(base_rates, axes=(1, 2))),
+        tds_image_cells=image_cells,
         phase_spectra=spectra,
         electronic_q_inv_ang=q_nodes,
         electronic_weights=q_weights,
@@ -426,6 +390,112 @@ def axial_dissipator(
         if q_nodes.size
         else np.zeros((0, int(np.count_nonzero(density)))),
     )
+
+
+def _image_weights(xp, base_spectra, image_cells, density):
+    """Correlate ``density`` with every base rate at the image offsets (NumPy or CuPy)."""
+    cx, cy = image_cells
+    nx, ny = density.shape
+    sx, sy = nx // cx, ny // cy
+    product = base_spectra * xp.fft.fft2(density)[None]
+    folded = product.reshape(-1, sx, cx, sy, cy).sum(axis=(1, 3))
+    weights = xp.fft.ifft2(folded, axes=(1, 2)).real / (sx * sy)
+    return xp.maximum(weights.reshape(-1), 0.0)
+
+
+def _tds_terms(profile: AxialProfile, grid: RealSpaceGrid, cells, hbar_v: float):
+    """TDS sources, base rates, phase spectra, ``C_grid`` and the sink rate.
+
+    Images of a string are exact grid translations when ``shape`` divides into
+    ``cells``, so the in-grid variance is evaluated once per string and tiled;
+    otherwise every image is evaluated (and kept) as its own base.
+    """
+    cx, cy = cells
+    nx, ny = grid.shape
+    kx, ky = grid.kx[:, None], grid.ky[None, :]
+    k2 = kx**2 + ky**2
+    gx, gy = profile.g_inv_ang
+    a2 = _site_displacements(profile)
+    band = (np.abs(np.fft.fftfreq(nx) * nx) < nx / 2)[:, None] & (
+        np.abs(np.fft.fftfreq(ny) * ny) < ny / 2
+    )[None, :]
+    spectra = {
+        element: np.where(band, -_potential(element, np.sqrt(k2)) / hbar_v / grid.area_ang2, 0.0)
+        for element in sorted(a2)
+    }
+    # Oversampled (2x) layout for E_u[phi_u^2]; phi_0^2 depends only on the element.
+    fine = RealSpaceGrid(grid.extent_ang, (2 * nx, 2 * ny))
+    fkx, fky = fine.kx[:, None], fine.ky[None, :]
+    squares = {}
+    for element, spec in spectra.items():
+        padded = np.zeros(fine.shape, dtype=complex)
+        padded[np.ix_(_pad_index(nx), _pad_index(ny))] = spec
+        phi0 = np.fft.ifft2(padded).real * padded.size
+        squares[element] = np.fft.fft2(phi0**2)
+
+    def rate(src: TDSSource) -> np.ndarray:
+        x0, y0 = src.position_ang
+        damp = np.exp(-0.5 * src.displacement_ang2 * (fkx**2 + fky**2))
+        shift = np.exp(-1j * (fkx * x0 + fky * y0))
+        second = np.fft.ifft2(squares[src.element] * damp * shift).real[::2, ::2]
+        spec = spectra[src.element]
+        mean = (
+            np.fft.ifft2(
+                spec * np.exp(-0.5 * src.displacement_ang2 * k2) * np.exp(-1j * (kx * x0 + ky * y0))
+            ).real
+            * spec.size
+        )
+        return src.linear_density * (second - mean**2)
+
+    tiled = nx % cx == 0 and ny % cy == 0
+    full: dict[tuple[int, int], complex] = {}
+    a2_min = min(a2.values())
+    g_cut = np.sqrt(4.0 * -np.log(_TDS_TAIL) / a2_min)
+    m_max, n_max = int(np.ceil(g_cut / gx)), int(np.ceil(g_cut / gy))
+    mm, nn = np.meshgrid(np.arange(-m_max, m_max + 1), np.arange(-n_max, n_max + 1), indexing="ij")
+    g_mag = np.hypot(mm * gx, nn * gy)
+    inside = g_mag <= g_cut
+    unique, inverse = np.unique(np.round(g_mag[inside], 9), return_inverse=True)
+    keys = [(int(m), int(n)) for m, n in zip(mm[inside], nn[inside], strict=True)]
+    sources: list[TDSSource] = []
+    bases: list[np.ndarray] = []
+    for element in sorted(a2):
+        transform = _tds_transform(element, a2[element], unique)[inverse]
+        for s in (s for s in profile.strings if element in s.linear_density):
+            lam = s.linear_density[element]
+            phase = np.exp(
+                -1j * (mm[inside] * gx * s.position_ang[0] + nn[inside] * gy * s.position_ang[1])
+            )
+            values = lam / profile.area_ang2 * phase * transform / (2.0 * np.pi * hbar_v) ** 2
+            for key, val in zip(keys, values, strict=True):
+                full[key] = full.get(key, 0.0) + val
+            # Grid sources: every image of this string in the supercell.
+            images = [
+                TDSSource(
+                    element,
+                    (
+                        s.position_ang[0] + i * profile.period_ang[0],
+                        s.position_ang[1] + j * profile.period_ang[1],
+                    ),
+                    lam,
+                    a2[element],
+                )
+                for i in range(cx)
+                for j in range(cy)
+            ]
+            sources.extend(images)
+            bases.extend([rate(images[0])] if tiled else map(rate, images))
+    base_rates = np.array(bases)
+    if tiled:
+        cell = base_rates.reshape(-1, cx, nx // cx, cy, ny // cy).sum(axis=(0, 1, 3))
+        grid_rate = np.tile(cell, (cx, cy))
+    else:
+        grid_rate = base_rates.sum(axis=0)
+    # Band-limited pointwise variance can exceed the full one on coarse grids;
+    # the sink is clamped at zero (no gain).
+    sink_rate = np.maximum(_fold(grid, cells, full) - grid_rate, 0.0)
+    image_cells = (cx, cy) if tiled else (1, 1)
+    return tuple(sources), base_rates, image_cells, spectra, grid_rate, sink_rate
 
 
 def _pad_index_n(n: int, size: int) -> np.ndarray:

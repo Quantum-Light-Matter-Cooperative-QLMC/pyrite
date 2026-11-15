@@ -105,17 +105,18 @@ def _observe(cp, observable, lagged, half, live, tilts, area, total):
 def device_static_bytes(solver) -> int:
     """Resident device bytes of one solver's uploaded dissipator and jump scratch.
 
-    Energy-dependent: TDS source count, phase spectra and grid tables differ by
+    Energy-dependent: TDS base spectra, phase spectra and grid tables differ by
     kinetic energy, so callers caching several energies reserve each one.
+    Device TDS caches are per element, not per supercell image.
     """
     cells = int(np.prod(solver.grid.shape))
     d = solver.dissipator
     static = sum(v.nbytes for v in vars(d).values() if isinstance(v, np.ndarray))
     static += sum(v.nbytes for v in d.phase_spectra.values())
     # Fixed device spectra/scratch: fine-grid TDS coefficients, rejection GEMMs,
-    # source spectra and potential.
+    # per-element spectra and potential.
     static += cells * 16 * 48 + 131 * 131 * 8 * 4
-    static += len(d.tds_sources) * (
+    static += len(d.phase_spectra) * (
         cells * 16 * 12 + 15 * 131**2 + 131 * sum(solver.grid.shape) * 32
     )
     return static
