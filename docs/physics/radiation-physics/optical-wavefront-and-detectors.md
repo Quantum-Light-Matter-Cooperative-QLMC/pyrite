@@ -134,10 +134,13 @@ rate $f=1/T$:
 | Pile-up ratio | steady-state peak / $G U$ |
 
 `predict_pulse_train(detector, absorbed_J, response, f)` returns these in V with
-both calibration hashes; `saturated` compares the steady-state peak with the
-detector's saturation voltage. `Digitizer` maps $N=N_0+gV$ to counts clipped to
+both calibration hashes; `saturated` compares the larger steady-state swing
+(positive peak or AC-coupled negative minimum) with the detector's saturation
+voltage. Added shaping or coupling renormalizes $h$ to unit peak, so $G$ must be
+calibrated at that shaped output. `Digitizer` maps $N=N_0+gV$ to counts clipped to
 $[0,2^{\rm bits}-1]$, with noise $\sqrt{(g\sigma_V)^2+1/12}$ counts (uniform
-quantization; valid when the analog noise spans about one count or more).
+quantization of a noise-dithered round-to-nearest ADC; valid for analog noise
+of about 0.5 count or more).
 The pulse gain is never reused as a V/W responsivity: average-power readings
 need the temporal response. Shot noise, nonlinearity, thermal saturation and
 dead time are not modeled, and no measured response ships.
@@ -157,6 +160,52 @@ pyro = DetectorTemporalResponse.pyroelectric(0.1, 1e-3, "synthetic demo")
 reading = predict_pulse_train(detector, 1e-6, pyro, repetition_hz=10.0)
 print(reading.fundamental_rms_v, reading.mean_v)  # lock-in signal; zero DC mean
 ```
+
+### Detector-class calibration records
+
+`pyrite.detectors.optical_detector_schema.OpticalDetectorCalibration` holds one
+validated calibration: detector class, `calibration_id`, the measured spectral
+energy-absorption table and the class's scalar parameters (SI unit in each
+name). Missing or unsupported parameters, nonpositive values and unknown classes
+are refused; `schema_sha256` fingerprints the record and is carried into the
+built detector's `calibration_id`. `build()` returns the calibrated pulse
+detector and its impulse response:
+
+| Class | Required parameters | Impulse response |
+|---|---|---|
+| `energy_channel` | `pulse_gain_v_per_j`, `time_constant_s` | single pole |
+| `pyroelectric` | `pulse_gain_v_per_j`, `thermal_time_constant_s`, `electrical_time_constant_s` | thermal pole AC-coupled by $RC$ |
+| `bolometer` | `responsivity_v_per_w`, `thermal_time_constant_s`, `nep_w_per_sqrt_hz`, `noise_bandwidth_hz`, `operating_temperature_k` | single pole |
+| `golay` | `responsivity_v_per_w`, `responsivity_modulation_hz` ($>0$), `time_constant_s`, `nep_w_per_sqrt_hz`, `noise_bandwidth_hz` | single pole |
+
+Every class also accepts `shaping_time_constant_s` (amplifier low-pass) and
+`saturation_v`. Power-responsivity classes are calibrated under sinusoidal
+modulation at $f_m$ (fundamental voltage over fundamental absorbed power), so
+
+$$
+R(f_m)=G\,\lvert H(2\pi f_m)\rvert\ \Rightarrow\ G=R(f_m)/\lvert H(2\pi f_m)\rvert,
+\qquad \sigma_V = R(f_m)\,\mathrm{NEP}\,\sqrt{\Delta f},
+$$
+
+with $f_m=0$ the DC responsivity; an AC-coupled channel has no DC
+responsivity and is refused there (`pulse_gain_from_power_responsivity`).
+The noise formula assumes white output noise over the declared band, with NEP
+quoted at $f_m$.
+
+Enter calibrations at this model's reference plane, not raw datasheet numbers:
+
+- Responsivity and pulse gain are per **absorbed** power or energy; the
+  absorptance table is applied separately. Divide an incident-power datasheet
+  value by $A(\lambda_{\rm cal})$ first, or absorption is counted twice.
+- $R(f_m)$ is a sinusoidal-fundamental ratio. A 50 % square-wave chop of
+  on-power $P_{\rm on}$ read as lock-in RMS gives
+  $R=\pi V_{\rm rms}/(\sqrt2\,P_{\rm on})$; an unconverted chopped value
+  biases $G$ by $\pi/2$–$\pi/4$ depending on convention.
+- Voltages refer to the **shaped** output: a detector-head calibration combined
+  with `shaping_time_constant_s` biases $G$ by $\sqrt{1+(2\pi f_m\tau_s)^2}$.
+`spectrometer` and `camera` have declared calibration needs
+(`UNSUPPORTED_DETECTOR_CLASSES`) but no forward operator, and refuse with
+`NotImplementedError`. No measured calibration ships.
 
 ## Boundaries and remaining gates
 

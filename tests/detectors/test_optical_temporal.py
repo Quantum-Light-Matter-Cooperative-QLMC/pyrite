@@ -172,3 +172,29 @@ def test_energy_reading_reports_photons_per_pulse():
     assert out.incident_photons.to("dimensionless").magnitude == pytest.approx(4e6)
     batch = det.predict_batch(energy, np.full((2, 3), 2e6))
     np.testing.assert_allclose(batch.incident_photons_per_pulse, [4e6, 4e6])
+
+
+def test_rate_and_pulse_count_validation():
+    h = DetectorTemporalResponse.pyroelectric(0.1, 1e-3, ID)
+    for bad in (-1.0, 0.0, np.nan, np.inf):
+        with pytest.raises(ValueError, match="repetition_hz"):
+            h.steady_state(bad)
+    with pytest.raises(ValueError, match="n_pulses"):
+        h.train(np.array([0.0]), 10.0, n_pulses=2.7)
+    detector = CalibratedPulseEnergyDetector(
+        np.array([0.01, 1.0]), np.array([0.5, 0.5]), 1.0, ID, saturation_v=0.5
+    )
+    with pytest.raises(ValueError, match="repetition_hz"):
+        predict_pulse_train(detector, 1.0, h, -10.0)
+
+
+def test_ac_coupled_negative_swing_saturates():
+    h = DetectorTemporalResponse.pyroelectric(0.05, 2e-3, ID)
+    shape = h.steady_state(400.0)
+    assert shape.minimum < 0
+    lo, hi = sorted((shape.peak, -shape.minimum))
+    sat = 0.5 * (lo + hi)
+    detector = CalibratedPulseEnergyDetector(
+        np.array([0.01, 1.0]), np.array([0.5, 0.5]), 1.0, ID, saturation_v=sat
+    )
+    assert predict_pulse_train(detector, 1.0, h, 400.0).saturated
