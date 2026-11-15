@@ -1,6 +1,9 @@
 """Measured reciprocal-cutoff selection for incoherent CXR lines (#1173)."""
 
+import hashlib
+import json
 import math
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -16,6 +19,41 @@ from pyrite.montecarlo.runner.reflection_cutoff import (
     select_reflection_cutoff,
 )
 from pyrite.montecarlo.spectrum.characteristic import _energy_bin_edges_and_widths
+
+
+@pytest.mark.parametrize("index", [0, 1, 2], ids=["si-slab", "mos2-film", "si-substrate"])
+def test_production_gate_shells_pin_the_selected_set_and_tail(index):
+    """Freeze the measured #1173 production sequences, not a synthetic decay.
+
+    Jobs 12672/12673, seed 642501, frozen 12083/12115 transports; source and
+    report hashes are in the fixture. This replays selection, not kernels.
+    It anchors these scenes without asserting a universal omitted-yield bound.
+    """
+    evidence = json.loads(
+        (Path(__file__).parents[2] / "data" / "reflection_selection_1173.json").read_text()
+    )
+    sample = evidence["samples"][index]
+    measured = iter(sample["shells"])
+
+    def shell_yield(members):
+        shell = next(measured)
+        assert len(members) == shell["n"]
+        return shell["yield_"]
+
+    result = select_reflection_cutoff(
+        shell_yield,
+        reflection_shells(sample["crystal"], sample["B_ang2"], 32.0),
+        evidence["tolerance"],
+    )
+    assert result.converged and result.cutoff_invang == sample["cutoff_invang"]
+    assert len(result.hkl_list) == sample["reflections"]
+    digest = hashlib.sha256(
+        json.dumps(sorted(result.hkl_list), separators=(",", ":")).encode()
+    ).hexdigest()
+    assert digest == sample["hkl_sha256"]
+    assert result.tail_fraction == pytest.approx(sample["tail_fraction"], rel=1e-12)
+    assert result.tail_fraction <= evidence["tolerance"]
+    assert abs(sample["yield_gap_vs_g40"]) < evidence["tolerance"]
 
 
 def test_band_bin_grid_tiles_the_band_exactly():
