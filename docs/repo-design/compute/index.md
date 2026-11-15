@@ -33,6 +33,7 @@ physics-adapter-overhead
 cxr-launch-benchmarks
 continuum-grid-benchmarks
 density-matrix-benchmarks
+reflection-selection-benchmarks
 ```
 
 Earlier optimization rounds and paired phase-retention measurements remain in
