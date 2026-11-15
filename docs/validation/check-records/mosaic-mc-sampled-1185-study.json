@@ -1,0 +1,3278 @@
+{
+ "description": "Issue 1185 (PR 1206): per-history sampled mosaic route (mosaic_route='mc-sampled') on HOPG at the catalog 0.8 deg mosaic, intrinsic source spectra only (no detector response). convergence: jobs 12553 (Gauss-Hermite N=17/33/49/65) and 12554 (sampled K=16/64/256/1024 x 4 mosaic seeds), replays of #1143 job 12082, 64 histories x transport seeds 642501-3, node grid 0.1875 eV, qlmc-ace Radeon 8060S (ROCm). transport_arms: job 12666 (split as 12684/12687), #1142 t2 replays 12346-12349 (baseline/cut35/cut100/straggling) x seeds 1142201-4 x 16384 histories, sampled K=256 x 4 shared mosaic shifts 1185101-4, Fourier bin-mean 0.1875 eV, RTX 5080 (CUDA, cuFINUFFT). Straggling calls ran with --arm baseline because the harness at a2a7a4466 has no straggling arm choice; on --replay the case (straggling=True) comes from the pickle and --arm only labels the report, so the arm is the tag prefix. Metrics: checks/defaults_spectral_gate_642.py metrics(); margins yield/centroid 1e-3, peak/FWHM 1e-2.",
+ "margins": {
+  "yield_per_primary": 0.001,
+  "centroid_eV": 0.001,
+  "peak_density_per_eV": 0.01,
+  "dominant_fwhm_eV": 0.01
+ },
+ "convergence": {
+  "gh_12553": {
+   "path": "qlmc:~/pyrite-1185-s2/evidence/s1185/12553-gh",
+   "sha256sums_sha256": "1ff1056f330ccaa1ce36bad5c48fa36192e37da9d711f65c6152dd310b898472",
+   "n_calls": 12,
+   "calls": [
+    {
+     "tag": "gh17/642501",
+     "seed": 642501,
+     "histories": 64,
+     "mosaic_mc_nodes": 17,
+     "mosaic_sampling": "quadrature",
+     "mosaic_seed": null,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 28.028555403463542,
+     "warm_s": [
+      1.0835103681311011
+     ],
+     "device_peak_bytes": 699394048,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "ab51502cebf2d87911c0f734b88c2d5a74a6ff73c8bff038e75ef14d4442f93e",
+     "metrics": {
+      "yield_per_primary": 1.118537732822343e-06,
+      "centroid_eV": 897.2742060345021,
+      "peak_density_per_eV": 9.951123480789192e-09,
+      "dominant_fwhm_eV": 25.058258254503357
+     }
+    },
+    {
+     "tag": "gh17/642502",
+     "seed": 642502,
+     "histories": 64,
+     "mosaic_mc_nodes": 17,
+     "mosaic_sampling": "quadrature",
+     "mosaic_seed": null,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 2.01655915658921,
+     "warm_s": [
+      1.0154713857918978
+     ],
+     "device_peak_bytes": 646958080,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "4e16b9f85e36e31ae7cfd8b3ade9510dbf6f881fb538abc3226ba0d920cea5f1",
+     "metrics": {
+      "yield_per_primary": 1.0975811231966018e-06,
+      "centroid_eV": 913.5461968498964,
+      "peak_density_per_eV": 9.495535024939272e-09,
+      "dominant_fwhm_eV": 26.047306104938798
+     }
+    },
+    {
+     "tag": "gh17/642503",
+     "seed": 642503,
+     "histories": 64,
+     "mosaic_mc_nodes": 17,
+     "mosaic_sampling": "quadrature",
+     "mosaic_seed": null,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 1.7873039320111275,
+     "warm_s": [
+      1.0865386547520757
+     ],
+     "device_peak_bytes": 698006016,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "a26bbd1767865968161e79a8c9e139c0be04069b9163900893cd1141e883ce8d",
+     "metrics": {
+      "yield_per_primary": 1.1129449212900533e-06,
+      "centroid_eV": 910.0462833136718,
+      "peak_density_per_eV": 1.30734614245398e-08,
+      "dominant_fwhm_eV": 20.197840792872285
+     }
+    },
+    {
+     "tag": "gh33/642501",
+     "seed": 642501,
+     "histories": 64,
+     "mosaic_mc_nodes": 33,
+     "mosaic_sampling": "quadrature",
+     "mosaic_seed": null,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 4.222121984697878,
+     "warm_s": [
+      3.6074254577979445
+     ],
+     "device_peak_bytes": 1313169408,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "ab51502cebf2d87911c0f734b88c2d5a74a6ff73c8bff038e75ef14d4442f93e",
+     "metrics": {
+      "yield_per_primary": 1.1185112105480083e-06,
+      "centroid_eV": 897.282564561277,
+      "peak_density_per_eV": 9.14290421150099e-09,
+      "dominant_fwhm_eV": 31.519316837914857
+     }
+    },
+    {
+     "tag": "gh33/642502",
+     "seed": 642502,
+     "histories": 64,
+     "mosaic_mc_nodes": 33,
+     "mosaic_sampling": "quadrature",
+     "mosaic_seed": null,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 3.9197591627016664,
+     "warm_s": [
+      3.3862785724923015
+     ],
+     "device_peak_bytes": 1313001472,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "4e16b9f85e36e31ae7cfd8b3ade9510dbf6f881fb538abc3226ba0d920cea5f1",
+     "metrics": {
+      "yield_per_primary": 1.0975857854253095e-06,
+      "centroid_eV": 913.5502008377473,
+      "peak_density_per_eV": 9.100993736410601e-09,
+      "dominant_fwhm_eV": 33.360156393332886
+     }
+    },
+    {
+     "tag": "gh33/642503",
+     "seed": 642503,
+     "histories": 64,
+     "mosaic_mc_nodes": 33,
+     "mosaic_sampling": "quadrature",
+     "mosaic_seed": null,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 4.233005202375352,
+     "warm_s": [
+      3.636924136430025
+     ],
+     "device_peak_bytes": 1313135104,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "a26bbd1767865968161e79a8c9e139c0be04069b9163900893cd1141e883ce8d",
+     "metrics": {
+      "yield_per_primary": 1.1129477866736147e-06,
+      "centroid_eV": 910.0417349766822,
+      "peak_density_per_eV": 1.164041307788466e-08,
+      "dominant_fwhm_eV": 22.44805409408434
+     }
+    },
+    {
+     "tag": "gh49/642501",
+     "seed": 642501,
+     "histories": 64,
+     "mosaic_mc_nodes": 49,
+     "mosaic_sampling": "quadrature",
+     "mosaic_seed": null,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 6.581140170805156,
+     "warm_s": [
+      6.119390123523772
+     ],
+     "device_peak_bytes": 1315155968,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "ab51502cebf2d87911c0f734b88c2d5a74a6ff73c8bff038e75ef14d4442f93e",
+     "metrics": {
+      "yield_per_primary": 1.1185138791557181e-06,
+      "centroid_eV": 897.2791910119273,
+      "peak_density_per_eV": 8.816695817870368e-09,
+      "dominant_fwhm_eV": 35.72773316340715
+     }
+    },
+    {
+     "tag": "gh49/642502",
+     "seed": 642502,
+     "histories": 64,
+     "mosaic_mc_nodes": 49,
+     "mosaic_sampling": "quadrature",
+     "mosaic_seed": null,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 6.276065589860082,
+     "warm_s": [
+      5.7447231421247125
+     ],
+     "device_peak_bytes": 1314988032,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "4e16b9f85e36e31ae7cfd8b3ade9510dbf6f881fb538abc3226ba0d920cea5f1",
+     "metrics": {
+      "yield_per_primary": 1.097587300669302e-06,
+      "centroid_eV": 913.5532195715585,
+      "peak_density_per_eV": 9.008241264041317e-09,
+      "dominant_fwhm_eV": 49.07129744503595
+     }
+    },
+    {
+     "tag": "gh49/642503",
+     "seed": 642503,
+     "histories": 64,
+     "mosaic_mc_nodes": 49,
+     "mosaic_sampling": "quadrature",
+     "mosaic_seed": null,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 6.641574773006141,
+     "warm_s": [
+      6.18430525995791
+     ],
+     "device_peak_bytes": 1315121664,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "a26bbd1767865968161e79a8c9e139c0be04069b9163900893cd1141e883ce8d",
+     "metrics": {
+      "yield_per_primary": 1.1129480732440969e-06,
+      "centroid_eV": 910.0438889755576,
+      "peak_density_per_eV": 1.1066235927614798e-08,
+      "dominant_fwhm_eV": 25.865892538703747
+     }
+    },
+    {
+     "tag": "gh65/642501",
+     "seed": 642501,
+     "histories": 64,
+     "mosaic_mc_nodes": 65,
+     "mosaic_sampling": "quadrature",
+     "mosaic_seed": null,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 9.027090751565993,
+     "warm_s": [
+      8.67190123256296
+     ],
+     "device_peak_bytes": 1338898432,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "ab51502cebf2d87911c0f734b88c2d5a74a6ff73c8bff038e75ef14d4442f93e",
+     "metrics": {
+      "yield_per_primary": 1.1185127291244436e-06,
+      "centroid_eV": 897.2808354717043,
+      "peak_density_per_eV": 8.823140440483712e-09,
+      "dominant_fwhm_eV": 34.43330982581688
+     }
+    },
+    {
+     "tag": "gh65/642502",
+     "seed": 642502,
+     "histories": 64,
+     "mosaic_mc_nodes": 65,
+     "mosaic_sampling": "quadrature",
+     "mosaic_seed": null,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 8.564460747875273,
+     "warm_s": [
+      8.140210528858006
+     ],
+     "device_peak_bytes": 1337885696,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "4e16b9f85e36e31ae7cfd8b3ade9510dbf6f881fb538abc3226ba0d920cea5f1",
+     "metrics": {
+      "yield_per_primary": 1.097584013123688e-06,
+      "centroid_eV": 913.5515633543271,
+      "peak_density_per_eV": 8.934235573576643e-09,
+      "dominant_fwhm_eV": 49.57922491663055
+     }
+    },
+    {
+     "tag": "gh65/642503",
+     "seed": 642503,
+     "histories": 64,
+     "mosaic_mc_nodes": 65,
+     "mosaic_sampling": "quadrature",
+     "mosaic_seed": null,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 9.10265576839447,
+     "warm_s": [
+      8.745249917730689
+     ],
+     "device_peak_bytes": 1338533888,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "a26bbd1767865968161e79a8c9e139c0be04069b9163900893cd1141e883ce8d",
+     "metrics": {
+      "yield_per_primary": 1.1129465989642534e-06,
+      "centroid_eV": 910.0423413430873,
+      "peak_density_per_eV": 1.0738958167166857e-08,
+      "dominant_fwhm_eV": 27.638426936932433
+     }
+    }
+   ]
+  },
+  "sampled_12554": {
+   "path": "qlmc:~/pyrite-1185-s2/evidence/s1185/12554-sampled",
+   "sha256sums_sha256": "6f6441710d2b8775c866ee00c726cda14887191eb12a2429970cf8e4956a6d7c",
+   "n_calls": 48,
+   "calls": [
+    {
+     "tag": "s1024m1/642501",
+     "seed": 642501,
+     "histories": 64,
+     "mosaic_mc_nodes": 1024,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185001,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 29.640994984656572,
+     "warm_s": [
+      29.772165917791426
+     ],
+     "device_peak_bytes": 747778560,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "ab51502cebf2d87911c0f734b88c2d5a74a6ff73c8bff038e75ef14d4442f93e",
+     "metrics": {
+      "yield_per_primary": 1.1185183960033672e-06,
+      "centroid_eV": 897.2820970496591,
+      "peak_density_per_eV": 8.530671280482238e-09,
+      "dominant_fwhm_eV": 39.756290147777236
+     }
+    },
+    {
+     "tag": "s1024m1/642502",
+     "seed": 642502,
+     "histories": 64,
+     "mosaic_mc_nodes": 1024,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185001,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 28.13791410624981,
+     "warm_s": [
+      28.073206597939134
+     ],
+     "device_peak_bytes": 757335040,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "4e16b9f85e36e31ae7cfd8b3ade9510dbf6f881fb538abc3226ba0d920cea5f1",
+     "metrics": {
+      "yield_per_primary": 1.0975873359306046e-06,
+      "centroid_eV": 913.5522502613542,
+      "peak_density_per_eV": 8.635518966570999e-09,
+      "dominant_fwhm_eV": 52.438922771047146
+     }
+    },
+    {
+     "tag": "s1024m1/642503",
+     "seed": 642503,
+     "histories": 64,
+     "mosaic_mc_nodes": 1024,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185001,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 30.100585812702775,
+     "warm_s": [
+      29.892774197272956
+     ],
+     "device_peak_bytes": 745911296,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "a26bbd1767865968161e79a8c9e139c0be04069b9163900893cd1141e883ce8d",
+     "metrics": {
+      "yield_per_primary": 1.1129554234077938e-06,
+      "centroid_eV": 910.0419883218607,
+      "peak_density_per_eV": 1.011569050746175e-08,
+      "dominant_fwhm_eV": 40.56856458116215
+     }
+    },
+    {
+     "tag": "s1024m2/642501",
+     "seed": 642501,
+     "histories": 64,
+     "mosaic_mc_nodes": 1024,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185002,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 29.92114486824721,
+     "warm_s": [
+      29.840008397586644
+     ],
+     "device_peak_bytes": 747572736,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "ab51502cebf2d87911c0f734b88c2d5a74a6ff73c8bff038e75ef14d4442f93e",
+     "metrics": {
+      "yield_per_primary": 1.11851985050511e-06,
+      "centroid_eV": 897.2818713405458,
+      "peak_density_per_eV": 8.53522852395372e-09,
+      "dominant_fwhm_eV": 38.60168544277735
+     }
+    },
+    {
+     "tag": "s1024m2/642502",
+     "seed": 642502,
+     "histories": 64,
+     "mosaic_mc_nodes": 1024,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185002,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 28.480717789381742,
+     "warm_s": [
+      28.199374389834702
+     ],
+     "device_peak_bytes": 757132800,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "4e16b9f85e36e31ae7cfd8b3ade9510dbf6f881fb538abc3226ba0d920cea5f1",
+     "metrics": {
+      "yield_per_primary": 1.0975880927107113e-06,
+      "centroid_eV": 913.5531195691549,
+      "peak_density_per_eV": 8.635352877206515e-09,
+      "dominant_fwhm_eV": 52.40089031970081
+     }
+    },
+    {
+     "tag": "s1024m2/642503",
+     "seed": 642503,
+     "histories": 64,
+     "mosaic_mc_nodes": 1024,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185002,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 30.058794597163796,
+     "warm_s": [
+      29.635629940778017
+     ],
+     "device_peak_bytes": 746316800,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "a26bbd1767865968161e79a8c9e139c0be04069b9163900893cd1141e883ce8d",
+     "metrics": {
+      "yield_per_primary": 1.1129544482732394e-06,
+      "centroid_eV": 910.043553330802,
+      "peak_density_per_eV": 1.0123081040092075e-08,
+      "dominant_fwhm_eV": 40.50722981405215
+     }
+    },
+    {
+     "tag": "s1024m3/642501",
+     "seed": 642501,
+     "histories": 64,
+     "mosaic_mc_nodes": 1024,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185003,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 29.914091363549232,
+     "warm_s": [
+      29.791662264615297
+     ],
+     "device_peak_bytes": 746967552,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "ab51502cebf2d87911c0f734b88c2d5a74a6ff73c8bff038e75ef14d4442f93e",
+     "metrics": {
+      "yield_per_primary": 1.11850766054424e-06,
+      "centroid_eV": 897.2800026517731,
+      "peak_density_per_eV": 8.530760986502628e-09,
+      "dominant_fwhm_eV": 38.41096360267659
+     }
+    },
+    {
+     "tag": "s1024m3/642502",
+     "seed": 642502,
+     "histories": 64,
+     "mosaic_mc_nodes": 1024,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185003,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 28.50189263559878,
+     "warm_s": [
+      28.046020928770304
+     ],
+     "device_peak_bytes": 757537792,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "4e16b9f85e36e31ae7cfd8b3ade9510dbf6f881fb538abc3226ba0d920cea5f1",
+     "metrics": {
+      "yield_per_primary": 1.0975812032266116e-06,
+      "centroid_eV": 913.5500095846218,
+      "peak_density_per_eV": 8.637891291130018e-09,
+      "dominant_fwhm_eV": 52.37512333799452
+     }
+    },
+    {
+     "tag": "s1024m3/642503",
+     "seed": 642503,
+     "histories": 64,
+     "mosaic_mc_nodes": 1024,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185003,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 29.930313016287982,
+     "warm_s": [
+      29.818607460707426
+     ],
+     "device_peak_bytes": 747127296,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "a26bbd1767865968161e79a8c9e139c0be04069b9163900893cd1141e883ce8d",
+     "metrics": {
+      "yield_per_primary": 1.1129510582650234e-06,
+      "centroid_eV": 910.0410719429955,
+      "peak_density_per_eV": 1.0125487115431042e-08,
+      "dominant_fwhm_eV": 40.39303554509661
+     }
+    },
+    {
+     "tag": "s1024m4/642501",
+     "seed": 642501,
+     "histories": 64,
+     "mosaic_mc_nodes": 1024,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185004,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 30.15698997117579,
+     "warm_s": [
+      29.84995295945555
+     ],
+     "device_peak_bytes": 747169280,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "ab51502cebf2d87911c0f734b88c2d5a74a6ff73c8bff038e75ef14d4442f93e",
+     "metrics": {
+      "yield_per_primary": 1.1185177850683003e-06,
+      "centroid_eV": 897.2803170040175,
+      "peak_density_per_eV": 8.533148410094782e-09,
+      "dominant_fwhm_eV": 38.79767659675292
+     }
+    },
+    {
+     "tag": "s1024m4/642502",
+     "seed": 642502,
+     "histories": 64,
+     "mosaic_mc_nodes": 1024,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185004,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 28.530405703000724,
+     "warm_s": [
+      28.294463029131293
+     ],
+     "device_peak_bytes": 757335040,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "4e16b9f85e36e31ae7cfd8b3ade9510dbf6f881fb538abc3226ba0d920cea5f1",
+     "metrics": {
+      "yield_per_primary": 1.0975844054055996e-06,
+      "centroid_eV": 913.5511137268693,
+      "peak_density_per_eV": 8.645574922638843e-09,
+      "dominant_fwhm_eV": 52.363545170277575
+     }
+    },
+    {
+     "tag": "s1024m4/642503",
+     "seed": 642503,
+     "histories": 64,
+     "mosaic_mc_nodes": 1024,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185004,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 30.079930829815567,
+     "warm_s": [
+      29.741075169295073
+     ],
+     "device_peak_bytes": 746924544,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "a26bbd1767865968161e79a8c9e139c0be04069b9163900893cd1141e883ce8d",
+     "metrics": {
+      "yield_per_primary": 1.1129480855506915e-06,
+      "centroid_eV": 910.0421012984951,
+      "peak_density_per_eV": 1.0120179361194914e-08,
+      "dominant_fwhm_eV": 40.570770311062006
+     }
+    },
+    {
+     "tag": "s16m1/642501",
+     "seed": 642501,
+     "histories": 64,
+     "mosaic_mc_nodes": 16,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185001,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 5.606123458594084,
+     "warm_s": [
+      0.4494320582598448
+     ],
+     "device_peak_bytes": 746356736,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "ab51502cebf2d87911c0f734b88c2d5a74a6ff73c8bff038e75ef14d4442f93e",
+     "metrics": {
+      "yield_per_primary": 1.117944893986485e-06,
+      "centroid_eV": 897.2613596516262,
+      "peak_density_per_eV": 8.465129042178887e-09,
+      "dominant_fwhm_eV": 39.29103942988377
+     }
+    },
+    {
+     "tag": "s16m1/642502",
+     "seed": 642502,
+     "histories": 64,
+     "mosaic_mc_nodes": 16,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185001,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 0.8782355627045035,
+     "warm_s": [
+      0.42572754994034767
+     ],
+     "device_peak_bytes": 755891712,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "4e16b9f85e36e31ae7cfd8b3ade9510dbf6f881fb538abc3226ba0d920cea5f1",
+     "metrics": {
+      "yield_per_primary": 1.0971714010654447e-06,
+      "centroid_eV": 913.4675243603517,
+      "peak_density_per_eV": 8.76307915120833e-09,
+      "dominant_fwhm_eV": 36.678360803694886
+     }
+    },
+    {
+     "tag": "s16m1/642503",
+     "seed": 642503,
+     "histories": 64,
+     "mosaic_mc_nodes": 16,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185001,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 0.8534908359870315,
+     "warm_s": [
+      0.4483885206282139
+     ],
+     "device_peak_bytes": 745303552,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "a26bbd1767865968161e79a8c9e139c0be04069b9163900893cd1141e883ce8d",
+     "metrics": {
+      "yield_per_primary": 1.1123916943085424e-06,
+      "centroid_eV": 909.9076029931249,
+      "peak_density_per_eV": 1.069686206278675e-08,
+      "dominant_fwhm_eV": 27.487101011695813
+     }
+    },
+    {
+     "tag": "s16m2/642501",
+     "seed": 642501,
+     "histories": 64,
+     "mosaic_mc_nodes": 16,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185002,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 0.8489708798006177,
+     "warm_s": [
+      0.4478176636621356
+     ],
+     "device_peak_bytes": 746356736,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "ab51502cebf2d87911c0f734b88c2d5a74a6ff73c8bff038e75ef14d4442f93e",
+     "metrics": {
+      "yield_per_primary": 1.1183469757967317e-06,
+      "centroid_eV": 897.237991965403,
+      "peak_density_per_eV": 8.774026838409554e-09,
+      "dominant_fwhm_eV": 35.84162444745175
+     }
+    },
+    {
+     "tag": "s16m2/642502",
+     "seed": 642502,
+     "histories": 64,
+     "mosaic_mc_nodes": 16,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185002,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 0.826873205602169,
+     "warm_s": [
+      0.4237374197691679
+     ],
+     "device_peak_bytes": 756929536,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "4e16b9f85e36e31ae7cfd8b3ade9510dbf6f881fb538abc3226ba0d920cea5f1",
+     "metrics": {
+      "yield_per_primary": 1.0974051947887326e-06,
+      "centroid_eV": 913.4675587251983,
+      "peak_density_per_eV": 9.078481078006462e-09,
+      "dominant_fwhm_eV": 30.552137056816832
+     }
+    },
+    {
+     "tag": "s16m2/642503",
+     "seed": 642503,
+     "histories": 64,
+     "mosaic_mc_nodes": 16,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185002,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 0.8493730742484331,
+     "warm_s": [
+      0.44750513695180416
+     ],
+     "device_peak_bytes": 745303552,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "a26bbd1767865968161e79a8c9e139c0be04069b9163900893cd1141e883ce8d",
+     "metrics": {
+      "yield_per_primary": 1.1128500874541698e-06,
+      "centroid_eV": 910.0074010403789,
+      "peak_density_per_eV": 1.0056647958833764e-08,
+      "dominant_fwhm_eV": 29.026790163186774
+     }
+    },
+    {
+     "tag": "s16m3/642501",
+     "seed": 642501,
+     "histories": 64,
+     "mosaic_mc_nodes": 16,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185003,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 0.8546769497916102,
+     "warm_s": [
+      0.44731371477246284
+     ],
+     "device_peak_bytes": 746761728,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "ab51502cebf2d87911c0f734b88c2d5a74a6ff73c8bff038e75ef14d4442f93e",
+     "metrics": {
+      "yield_per_primary": 1.1182150201244416e-06,
+      "centroid_eV": 897.2437897214922,
+      "peak_density_per_eV": 9.138001466624246e-09,
+      "dominant_fwhm_eV": 33.38646003486372
+     }
+    },
+    {
+     "tag": "s16m3/642502",
+     "seed": 642502,
+     "histories": 64,
+     "mosaic_mc_nodes": 16,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185003,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 0.8325665453448892,
+     "warm_s": [
+      0.4235502677038312
+     ],
+     "device_peak_bytes": 756929536,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "4e16b9f85e36e31ae7cfd8b3ade9510dbf6f881fb538abc3226ba0d920cea5f1",
+     "metrics": {
+      "yield_per_primary": 1.0971788922723126e-06,
+      "centroid_eV": 913.5728835575085,
+      "peak_density_per_eV": 8.86899442775757e-09,
+      "dominant_fwhm_eV": 35.763200485816924
+     }
+    },
+    {
+     "tag": "s16m3/642503",
+     "seed": 642503,
+     "histories": 64,
+     "mosaic_mc_nodes": 16,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185003,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 0.8804748030379415,
+     "warm_s": [
+      0.44776271656155586
+     ],
+     "device_peak_bytes": 746114048,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "a26bbd1767865968161e79a8c9e139c0be04069b9163900893cd1141e883ce8d",
+     "metrics": {
+      "yield_per_primary": 1.1125252652924468e-06,
+      "centroid_eV": 909.9794093922169,
+      "peak_density_per_eV": 1.0293855545739916e-08,
+      "dominant_fwhm_eV": 28.645932491301096
+     }
+    },
+    {
+     "tag": "s16m4/642501",
+     "seed": 642501,
+     "histories": 64,
+     "mosaic_mc_nodes": 16,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185004,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 0.8599546141922474,
+     "warm_s": [
+      0.4473415231332183
+     ],
+     "device_peak_bytes": 746559488,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "ab51502cebf2d87911c0f734b88c2d5a74a6ff73c8bff038e75ef14d4442f93e",
+     "metrics": {
+      "yield_per_primary": 1.1183816129952162e-06,
+      "centroid_eV": 897.3005518215408,
+      "peak_density_per_eV": 8.688400221501524e-09,
+      "dominant_fwhm_eV": 36.08584836572243
+     }
+    },
+    {
+     "tag": "s16m4/642502",
+     "seed": 642502,
+     "histories": 64,
+     "mosaic_mc_nodes": 16,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185004,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 0.8866556519642472,
+     "warm_s": [
+      0.42651991825550795
+     ],
+     "device_peak_bytes": 756524032,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "4e16b9f85e36e31ae7cfd8b3ade9510dbf6f881fb538abc3226ba0d920cea5f1",
+     "metrics": {
+      "yield_per_primary": 1.0974440990941048e-06,
+      "centroid_eV": 913.5859463458661,
+      "peak_density_per_eV": 8.7324245612308e-09,
+      "dominant_fwhm_eV": 38.42970826090652
+     }
+    },
+    {
+     "tag": "s16m4/642503",
+     "seed": 642503,
+     "histories": 64,
+     "mosaic_mc_nodes": 16,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185004,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 0.8557480154559016,
+     "warm_s": [
+      0.447832434438169
+     ],
+     "device_peak_bytes": 746114048,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "a26bbd1767865968161e79a8c9e139c0be04069b9163900893cd1141e883ce8d",
+     "metrics": {
+      "yield_per_primary": 1.1128476004726775e-06,
+      "centroid_eV": 910.0755913709678,
+      "peak_density_per_eV": 1.0575925024625121e-08,
+      "dominant_fwhm_eV": 30.380724047096237
+     }
+    },
+    {
+     "tag": "s256m1/642501",
+     "seed": 642501,
+     "histories": 64,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185001,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 7.503976603038609,
+     "warm_s": [
+      7.101941383443773
+     ],
+     "device_peak_bytes": 747167232,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "ab51502cebf2d87911c0f734b88c2d5a74a6ff73c8bff038e75ef14d4442f93e",
+     "metrics": {
+      "yield_per_primary": 1.118485547775117e-06,
+      "centroid_eV": 897.2741404426754,
+      "peak_density_per_eV": 8.55995629933659e-09,
+      "dominant_fwhm_eV": 39.766027881639616
+     }
+    },
+    {
+     "tag": "s256m1/642502",
+     "seed": 642502,
+     "histories": 64,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185001,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 7.184302873909473,
+     "warm_s": [
+      6.762988286092877
+     ],
+     "device_peak_bytes": 756727296,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "4e16b9f85e36e31ae7cfd8b3ade9510dbf6f881fb538abc3226ba0d920cea5f1",
+     "metrics": {
+      "yield_per_primary": 1.0975629092409183e-06,
+      "centroid_eV": 913.546557996853,
+      "peak_density_per_eV": 8.652254912533408e-09,
+      "dominant_fwhm_eV": 52.23292093903956
+     }
+    },
+    {
+     "tag": "s256m1/642503",
+     "seed": 642503,
+     "histories": 64,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185001,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 7.624978418461978,
+     "warm_s": [
+      7.143304776400328
+     ],
+     "device_peak_bytes": 745911296,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "a26bbd1767865968161e79a8c9e139c0be04069b9163900893cd1141e883ce8d",
+     "metrics": {
+      "yield_per_primary": 1.1129195758588844e-06,
+      "centroid_eV": 910.0348008103302,
+      "peak_density_per_eV": 1.013591965914884e-08,
+      "dominant_fwhm_eV": 40.42726697614705
+     }
+    },
+    {
+     "tag": "s256m2/642501",
+     "seed": 642501,
+     "histories": 64,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185002,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 7.518940636888146,
+     "warm_s": [
+      7.1454081712290645
+     ],
+     "device_peak_bytes": 747369984,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "ab51502cebf2d87911c0f734b88c2d5a74a6ff73c8bff038e75ef14d4442f93e",
+     "metrics": {
+      "yield_per_primary": 1.1185391794492907e-06,
+      "centroid_eV": 897.282822150211,
+      "peak_density_per_eV": 8.551442221005345e-09,
+      "dominant_fwhm_eV": 39.0250203658444
+     }
+    },
+    {
+     "tag": "s256m2/642502",
+     "seed": 642502,
+     "histories": 64,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185002,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 7.233536798506975,
+     "warm_s": [
+      6.777052026242018
+     ],
+     "device_peak_bytes": 757132800,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "4e16b9f85e36e31ae7cfd8b3ade9510dbf6f881fb538abc3226ba0d920cea5f1",
+     "metrics": {
+      "yield_per_primary": 1.0976097667552027e-06,
+      "centroid_eV": 913.5546113134299,
+      "peak_density_per_eV": 8.649498894897079e-09,
+      "dominant_fwhm_eV": 52.43595994382633
+     }
+    },
+    {
+     "tag": "s256m2/642503",
+     "seed": 642503,
+     "histories": 64,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185002,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 7.615949924103916,
+     "warm_s": [
+      7.159177193418145
+     ],
+     "device_peak_bytes": 746114048,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "a26bbd1767865968161e79a8c9e139c0be04069b9163900893cd1141e883ce8d",
+     "metrics": {
+      "yield_per_primary": 1.1129739766610046e-06,
+      "centroid_eV": 910.045001023343,
+      "peak_density_per_eV": 1.0118309745621445e-08,
+      "dominant_fwhm_eV": 40.2369192910877
+     }
+    },
+    {
+     "tag": "s256m3/642501",
+     "seed": 642501,
+     "histories": 64,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185003,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 7.584274767898023,
+     "warm_s": [
+      7.174905175343156
+     ],
+     "device_peak_bytes": 746964480,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "ab51502cebf2d87911c0f734b88c2d5a74a6ff73c8bff038e75ef14d4442f93e",
+     "metrics": {
+      "yield_per_primary": 1.1184977585137402e-06,
+      "centroid_eV": 897.283705122151,
+      "peak_density_per_eV": 8.539304374721723e-09,
+      "dominant_fwhm_eV": 38.70186705981655
+     }
+    },
+    {
+     "tag": "s256m3/642502",
+     "seed": 642502,
+     "histories": 64,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185003,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 7.2422043373808265,
+     "warm_s": [
+      6.776783485896885
+     ],
+     "device_peak_bytes": 757132288,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "4e16b9f85e36e31ae7cfd8b3ade9510dbf6f881fb538abc3226ba0d920cea5f1",
+     "metrics": {
+      "yield_per_primary": 1.0975886365896e-06,
+      "centroid_eV": 913.5526805975051,
+      "peak_density_per_eV": 8.640650861480026e-09,
+      "dominant_fwhm_eV": 52.709469489203116
+     }
+    },
+    {
+     "tag": "s256m3/642503",
+     "seed": 642503,
+     "histories": 64,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185003,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 7.594387368299067,
+     "warm_s": [
+      7.157089866697788
+     ],
+     "device_peak_bytes": 746722304,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "a26bbd1767865968161e79a8c9e139c0be04069b9163900893cd1141e883ce8d",
+     "metrics": {
+      "yield_per_primary": 1.1129647656829957e-06,
+      "centroid_eV": 910.0418254717822,
+      "peak_density_per_eV": 1.0113352821861099e-08,
+      "dominant_fwhm_eV": 40.336696916528695
+     }
+    },
+    {
+     "tag": "s256m4/642501",
+     "seed": 642501,
+     "histories": 64,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185004,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 7.580077698454261,
+     "warm_s": [
+      7.183685559779406
+     ],
+     "device_peak_bytes": 746964992,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "ab51502cebf2d87911c0f734b88c2d5a74a6ff73c8bff038e75ef14d4442f93e",
+     "metrics": {
+      "yield_per_primary": 1.1185363746414824e-06,
+      "centroid_eV": 897.2812971332478,
+      "peak_density_per_eV": 8.551569230519362e-09,
+      "dominant_fwhm_eV": 37.97225349872008
+     }
+    },
+    {
+     "tag": "s256m4/642502",
+     "seed": 642502,
+     "histories": 64,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185004,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 7.186929518356919,
+     "warm_s": [
+      6.778604012914002
+     ],
+     "device_peak_bytes": 756929536,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "4e16b9f85e36e31ae7cfd8b3ade9510dbf6f881fb538abc3226ba0d920cea5f1",
+     "metrics": {
+      "yield_per_primary": 1.0976088993520117e-06,
+      "centroid_eV": 913.5531376513609,
+      "peak_density_per_eV": 8.628418868283916e-09,
+      "dominant_fwhm_eV": 52.57248738409146
+     }
+    },
+    {
+     "tag": "s256m4/642503",
+     "seed": 642503,
+     "histories": 64,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185004,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 7.619385324418545,
+     "warm_s": [
+      7.16456713527441
+     ],
+     "device_peak_bytes": 746519040,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "a26bbd1767865968161e79a8c9e139c0be04069b9163900893cd1141e883ce8d",
+     "metrics": {
+      "yield_per_primary": 1.1129760946535758e-06,
+      "centroid_eV": 910.0493930321156,
+      "peak_density_per_eV": 1.0114574067188187e-08,
+      "dominant_fwhm_eV": 40.35237699534105
+     }
+    },
+    {
+     "tag": "s64m1/642501",
+     "seed": 642501,
+     "histories": 64,
+     "mosaic_mc_nodes": 64,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185001,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 2.1823839088901877,
+     "warm_s": [
+      1.772931589744985
+     ],
+     "device_peak_bytes": 746761728,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "ab51502cebf2d87911c0f734b88c2d5a74a6ff73c8bff038e75ef14d4442f93e",
+     "metrics": {
+      "yield_per_primary": 1.1185932495763347e-06,
+      "centroid_eV": 897.2894876855731,
+      "peak_density_per_eV": 8.561070075074895e-09,
+      "dominant_fwhm_eV": 38.40325098496635
+     }
+    },
+    {
+     "tag": "s64m1/642502",
+     "seed": 642502,
+     "histories": 64,
+     "mosaic_mc_nodes": 64,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185001,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 2.0953529085963964,
+     "warm_s": [
+      1.684556462801993
+     ],
+     "device_peak_bytes": 757132288,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "4e16b9f85e36e31ae7cfd8b3ade9510dbf6f881fb538abc3226ba0d920cea5f1",
+     "metrics": {
+      "yield_per_primary": 1.0977067392728823e-06,
+      "centroid_eV": 913.5583903216672,
+      "peak_density_per_eV": 8.679993612759063e-09,
+      "dominant_fwhm_eV": 52.1658137252557
+     }
+    },
+    {
+     "tag": "s64m1/642503",
+     "seed": 642503,
+     "histories": 64,
+     "mosaic_mc_nodes": 64,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185001,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 2.218240615911782,
+     "warm_s": [
+      1.7801663568243384
+     ],
+     "device_peak_bytes": 746114048,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "a26bbd1767865968161e79a8c9e139c0be04069b9163900893cd1141e883ce8d",
+     "metrics": {
+      "yield_per_primary": 1.1130291191407606e-06,
+      "centroid_eV": 910.0330268659122,
+      "peak_density_per_eV": 1.0140307260542158e-08,
+      "dominant_fwhm_eV": 37.187454066643454
+     }
+    },
+    {
+     "tag": "s64m2/642501",
+     "seed": 642501,
+     "histories": 64,
+     "mosaic_mc_nodes": 64,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185002,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 2.1961495615541935,
+     "warm_s": [
+      1.7744853468611836
+     ],
+     "device_peak_bytes": 747775488,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "ab51502cebf2d87911c0f734b88c2d5a74a6ff73c8bff038e75ef14d4442f93e",
+     "metrics": {
+      "yield_per_primary": 1.1185864431744647e-06,
+      "centroid_eV": 897.287038483109,
+      "peak_density_per_eV": 8.527263339885849e-09,
+      "dominant_fwhm_eV": 38.16559598868025
+     }
+    },
+    {
+     "tag": "s64m2/642502",
+     "seed": 642502,
+     "histories": 64,
+     "mosaic_mc_nodes": 64,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185002,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 2.127368990331888,
+     "warm_s": [
+      1.6869744844734669
+     ],
+     "device_peak_bytes": 756930048,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "4e16b9f85e36e31ae7cfd8b3ade9510dbf6f881fb538abc3226ba0d920cea5f1",
+     "metrics": {
+      "yield_per_primary": 1.0976202385517776e-06,
+      "centroid_eV": 913.5548407992102,
+      "peak_density_per_eV": 8.655806738033789e-09,
+      "dominant_fwhm_eV": 51.83370983892132
+     }
+    },
+    {
+     "tag": "s64m2/642503",
+     "seed": 642503,
+     "histories": 64,
+     "mosaic_mc_nodes": 64,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185002,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 2.2571764765307307,
+     "warm_s": [
+      1.781986982561648
+     ],
+     "device_peak_bytes": 746316800,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "a26bbd1767865968161e79a8c9e139c0be04069b9163900893cd1141e883ce8d",
+     "metrics": {
+      "yield_per_primary": 1.1129726316926952e-06,
+      "centroid_eV": 910.0525830662993,
+      "peak_density_per_eV": 1.0097436664580073e-08,
+      "dominant_fwhm_eV": 39.802488731246285
+     }
+    },
+    {
+     "tag": "s64m3/642501",
+     "seed": 642501,
+     "histories": 64,
+     "mosaic_mc_nodes": 64,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185003,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 2.1819274481385946,
+     "warm_s": [
+      1.7766611175611615
+     ],
+     "device_peak_bytes": 746966528,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "ab51502cebf2d87911c0f734b88c2d5a74a6ff73c8bff038e75ef14d4442f93e",
+     "metrics": {
+      "yield_per_primary": 1.118501087958577e-06,
+      "centroid_eV": 897.2845831394083,
+      "peak_density_per_eV": 8.566498621576102e-09,
+      "dominant_fwhm_eV": 38.280963343161034
+     }
+    },
+    {
+     "tag": "s64m3/642502",
+     "seed": 642502,
+     "histories": 64,
+     "mosaic_mc_nodes": 64,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185003,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 2.141256095841527,
+     "warm_s": [
+      1.6829879665747285
+     ],
+     "device_peak_bytes": 757132288,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "4e16b9f85e36e31ae7cfd8b3ade9510dbf6f881fb538abc3226ba0d920cea5f1",
+     "metrics": {
+      "yield_per_primary": 1.0975448783701346e-06,
+      "centroid_eV": 913.5424479113284,
+      "peak_density_per_eV": 8.68924043828656e-09,
+      "dominant_fwhm_eV": 51.526507928136084
+     }
+    },
+    {
+     "tag": "s64m3/642503",
+     "seed": 642503,
+     "histories": 64,
+     "mosaic_mc_nodes": 64,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185003,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 2.183938995935023,
+     "warm_s": [
+      1.7795244017615914
+     ],
+     "device_peak_bytes": 746114048,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "a26bbd1767865968161e79a8c9e139c0be04069b9163900893cd1141e883ce8d",
+     "metrics": {
+      "yield_per_primary": 1.1129455584936062e-06,
+      "centroid_eV": 910.0305119084148,
+      "peak_density_per_eV": 1.0141408601782587e-08,
+      "dominant_fwhm_eV": 32.40330413608979
+     }
+    },
+    {
+     "tag": "s64m4/642501",
+     "seed": 642501,
+     "histories": 64,
+     "mosaic_mc_nodes": 64,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185004,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 2.187372736632824,
+     "warm_s": [
+      1.779561160132289
+     ],
+     "device_peak_bytes": 747167232,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "ab51502cebf2d87911c0f734b88c2d5a74a6ff73c8bff038e75ef14d4442f93e",
+     "metrics": {
+      "yield_per_primary": 1.1185363062023555e-06,
+      "centroid_eV": 897.2882621564472,
+      "peak_density_per_eV": 8.62411120294837e-09,
+      "dominant_fwhm_eV": 37.43489586293833
+     }
+    },
+    {
+     "tag": "s64m4/642502",
+     "seed": 642502,
+     "histories": 64,
+     "mosaic_mc_nodes": 64,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185004,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 2.2275747563689947,
+     "warm_s": [
+      1.6868270300328732
+     ],
+     "device_peak_bytes": 756321792,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "4e16b9f85e36e31ae7cfd8b3ade9510dbf6f881fb538abc3226ba0d920cea5f1",
+     "metrics": {
+      "yield_per_primary": 1.0976773652211652e-06,
+      "centroid_eV": 913.5538072595912,
+      "peak_density_per_eV": 8.649299054752646e-09,
+      "dominant_fwhm_eV": 52.05117763738258
+     }
+    },
+    {
+     "tag": "s64m4/642503",
+     "seed": 642503,
+     "histories": 64,
+     "mosaic_mc_nodes": 64,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185004,
+     "quadrature": "node",
+     "spacing_eV": 0.1875,
+     "first_s": 2.2435545194894075,
+     "warm_s": [
+      1.7832013135775924
+     ],
+     "device_peak_bytes": 746316800,
+     "backend": "rocm",
+     "device": "b'Radeon 8060S Graphics'",
+     "source_revision": "5538bac7af6bcfc9bc3e0c55bf72831b44f06072",
+     "replay_transport_sha256": "a26bbd1767865968161e79a8c9e139c0be04069b9163900893cd1141e883ce8d",
+     "metrics": {
+      "yield_per_primary": 1.1129896033784393e-06,
+      "centroid_eV": 910.0370332326039,
+      "peak_density_per_eV": 1.0121659954620554e-08,
+      "dominant_fwhm_eV": 39.71953665959438
+     }
+    }
+   ]
+  }
+ },
+ "transport_arms": {
+  "job_12666": {
+   "path": "qlmc:~/pyrite-1185-s3/evidence/s1185/12666-t2-sampled",
+   "sha256sums_sha256": "019296b58e268212cd86774a8531d4324f459a4c69848731e742035c6cc24297",
+   "n_calls": 64,
+   "calls": [
+    {
+     "tag": "baseline-1142201-m1185101",
+     "seed": 1142201,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185101,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 118.08138626092114,
+     "warm_s": [],
+     "device_peak_bytes": 2878133760,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "59877c1ff5cc19579f857b7c3f1a08f7d17607949f188c55423bada00ed57d6a",
+     "metrics": {
+      "yield_per_primary": 1.0934647073181991e-06,
+      "centroid_eV": 913.4926691935744,
+      "peak_density_per_eV": 8.424150266250763e-09,
+      "dominant_fwhm_eV": 38.90561903249545
+     }
+    },
+    {
+     "tag": "baseline-1142201-m1185102",
+     "seed": 1142201,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185102,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 117.41893694014288,
+     "warm_s": [],
+     "device_peak_bytes": 2878133760,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "59877c1ff5cc19579f857b7c3f1a08f7d17607949f188c55423bada00ed57d6a",
+     "metrics": {
+      "yield_per_primary": 1.0934666463784356e-06,
+      "centroid_eV": 913.4927234625482,
+      "peak_density_per_eV": 8.425918629484386e-09,
+      "dominant_fwhm_eV": 38.86021259667325
+     }
+    },
+    {
+     "tag": "baseline-1142201-m1185103",
+     "seed": 1142201,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185103,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 117.49646678194404,
+     "warm_s": [],
+     "device_peak_bytes": 2878133760,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "59877c1ff5cc19579f857b7c3f1a08f7d17607949f188c55423bada00ed57d6a",
+     "metrics": {
+      "yield_per_primary": 1.0934641393661787e-06,
+      "centroid_eV": 913.4925222086779,
+      "peak_density_per_eV": 8.425947051193816e-09,
+      "dominant_fwhm_eV": 38.827223246098356
+     }
+    },
+    {
+     "tag": "baseline-1142201-m1185104",
+     "seed": 1142201,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185104,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 117.90175605611876,
+     "warm_s": [],
+     "device_peak_bytes": 2878133760,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "59877c1ff5cc19579f857b7c3f1a08f7d17607949f188c55423bada00ed57d6a",
+     "metrics": {
+      "yield_per_primary": 1.0934679757807104e-06,
+      "centroid_eV": 913.4929251688791,
+      "peak_density_per_eV": 8.424942521401135e-09,
+      "dominant_fwhm_eV": 38.8764385612601
+     }
+    },
+    {
+     "tag": "baseline-1142202-m1185101",
+     "seed": 1142202,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185101,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 120.32793760788627,
+     "warm_s": [],
+     "device_peak_bytes": 2862121984,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "1799f9a62f4937222676d339c980947a8bdb47dc15d0ea6a80ccbfe8566e8db3",
+     "metrics": {
+      "yield_per_primary": 1.0956819608019025e-06,
+      "centroid_eV": 913.5390781101365,
+      "peak_density_per_eV": 8.563485920376479e-09,
+      "dominant_fwhm_eV": 36.140266838249204
+     }
+    },
+    {
+     "tag": "baseline-1142202-m1185102",
+     "seed": 1142202,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185102,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 116.70413493085653,
+     "warm_s": [],
+     "device_peak_bytes": 2862121984,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "1799f9a62f4937222676d339c980947a8bdb47dc15d0ea6a80ccbfe8566e8db3",
+     "metrics": {
+      "yield_per_primary": 1.095683121245572e-06,
+      "centroid_eV": 913.5393332805941,
+      "peak_density_per_eV": 8.564028597390916e-09,
+      "dominant_fwhm_eV": 36.051312359339704
+     }
+    },
+    {
+     "tag": "baseline-1142202-m1185103",
+     "seed": 1142202,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185103,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 120.41203756607138,
+     "warm_s": [],
+     "device_peak_bytes": 2862121984,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "1799f9a62f4937222676d339c980947a8bdb47dc15d0ea6a80ccbfe8566e8db3",
+     "metrics": {
+      "yield_per_primary": 1.0956815083464017e-06,
+      "centroid_eV": 913.5390018820236,
+      "peak_density_per_eV": 8.564390974186153e-09,
+      "dominant_fwhm_eV": 36.111128997794026
+     }
+    },
+    {
+     "tag": "baseline-1142202-m1185104",
+     "seed": 1142202,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185104,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 120.16423635696992,
+     "warm_s": [],
+     "device_peak_bytes": 2897806336,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "1799f9a62f4937222676d339c980947a8bdb47dc15d0ea6a80ccbfe8566e8db3",
+     "metrics": {
+      "yield_per_primary": 1.095684621800212e-06,
+      "centroid_eV": 913.5396294652148,
+      "peak_density_per_eV": 8.563558751006894e-09,
+      "dominant_fwhm_eV": 36.1115926207749
+     }
+    },
+    {
+     "tag": "baseline-1142203-m1185101",
+     "seed": 1142203,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185101,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 117.76235168497078,
+     "warm_s": [],
+     "device_peak_bytes": 2906734592,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "79b2bda21ef1eccf4060fb39c512e80a0b25dea4139ae577c104ccc7e951f72f",
+     "metrics": {
+      "yield_per_primary": 1.0945010188012042e-06,
+      "centroid_eV": 912.155897182997,
+      "peak_density_per_eV": 8.479175583886445e-09,
+      "dominant_fwhm_eV": 36.64802296439666
+     }
+    },
+    {
+     "tag": "baseline-1142203-m1185102",
+     "seed": 1142203,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185102,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 117.84072728292085,
+     "warm_s": [],
+     "device_peak_bytes": 2906734592,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "79b2bda21ef1eccf4060fb39c512e80a0b25dea4139ae577c104ccc7e951f72f",
+     "metrics": {
+      "yield_per_primary": 1.094500478564574e-06,
+      "centroid_eV": 912.156701372653,
+      "peak_density_per_eV": 8.478711954751361e-09,
+      "dominant_fwhm_eV": 36.672777868640765
+     }
+    },
+    {
+     "tag": "baseline-1142203-m1185103",
+     "seed": 1142203,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185103,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 120.41709664999507,
+     "warm_s": [],
+     "device_peak_bytes": 2906734592,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "79b2bda21ef1eccf4060fb39c512e80a0b25dea4139ae577c104ccc7e951f72f",
+     "metrics": {
+      "yield_per_primary": 1.0944998795097382e-06,
+      "centroid_eV": 912.155919894894,
+      "peak_density_per_eV": 8.477907265103113e-09,
+      "dominant_fwhm_eV": 36.70073851990378
+     }
+    },
+    {
+     "tag": "baseline-1142203-m1185104",
+     "seed": 1142203,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185104,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 118.89709643693641,
+     "warm_s": [],
+     "device_peak_bytes": 2906734592,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "79b2bda21ef1eccf4060fb39c512e80a0b25dea4139ae577c104ccc7e951f72f",
+     "metrics": {
+      "yield_per_primary": 1.0945028177793256e-06,
+      "centroid_eV": 912.1566405296473,
+      "peak_density_per_eV": 8.478965085600976e-09,
+      "dominant_fwhm_eV": 36.627412216687276
+     }
+    },
+    {
+     "tag": "baseline-1142204-m1185101",
+     "seed": 1142204,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185101,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 120.34776402800344,
+     "warm_s": [],
+     "device_peak_bytes": 2904385536,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "c00d12c12ce656a10bcbb31d192a80ebbdb4d44c1ae66af843b4b7ab742b6d8d",
+     "metrics": {
+      "yield_per_primary": 1.0993170990275138e-06,
+      "centroid_eV": 914.1921123884088,
+      "peak_density_per_eV": 8.493548087074032e-09,
+      "dominant_fwhm_eV": 36.76091679373167
+     }
+    },
+    {
+     "tag": "baseline-1142204-m1185102",
+     "seed": 1142204,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185102,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 117.31515104998834,
+     "warm_s": [],
+     "device_peak_bytes": 2904385536,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "c00d12c12ce656a10bcbb31d192a80ebbdb4d44c1ae66af843b4b7ab742b6d8d",
+     "metrics": {
+      "yield_per_primary": 1.0993175310276158e-06,
+      "centroid_eV": 914.1925265845898,
+      "peak_density_per_eV": 8.492468950294096e-09,
+      "dominant_fwhm_eV": 36.74837015782737
+     }
+    },
+    {
+     "tag": "baseline-1142204-m1185103",
+     "seed": 1142204,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185103,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 117.04144897009246,
+     "warm_s": [],
+     "device_peak_bytes": 2904385536,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "c00d12c12ce656a10bcbb31d192a80ebbdb4d44c1ae66af843b4b7ab742b6d8d",
+     "metrics": {
+      "yield_per_primary": 1.0993164855747281e-06,
+      "centroid_eV": 914.1922138524159,
+      "peak_density_per_eV": 8.495145031872653e-09,
+      "dominant_fwhm_eV": 36.74565192748037
+     }
+    },
+    {
+     "tag": "baseline-1142204-m1185104",
+     "seed": 1142204,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185104,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 117.17375725391321,
+     "warm_s": [],
+     "device_peak_bytes": 2904385536,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "c00d12c12ce656a10bcbb31d192a80ebbdb4d44c1ae66af843b4b7ab742b6d8d",
+     "metrics": {
+      "yield_per_primary": 1.099318564301487e-06,
+      "centroid_eV": 914.1927368441409,
+      "peak_density_per_eV": 8.495077530312756e-09,
+      "dominant_fwhm_eV": 36.66722700992875
+     }
+    },
+    {
+     "tag": "cut100-1142201-m1185101",
+     "seed": 1142201,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185101,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 117.02138141891919,
+     "warm_s": [],
+     "device_peak_bytes": 2822590464,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "02e0636c2a3ea1ff801984f040447bf048d0defee46c804df00a263009963403",
+     "metrics": {
+      "yield_per_primary": 1.095325873381673e-06,
+      "centroid_eV": 912.7549520241319,
+      "peak_density_per_eV": 8.701046994019634e-09,
+      "dominant_fwhm_eV": 32.641527727553125
+     }
+    },
+    {
+     "tag": "cut100-1142201-m1185102",
+     "seed": 1142201,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185102,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 117.57923710998148,
+     "warm_s": [],
+     "device_peak_bytes": 2822590464,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "02e0636c2a3ea1ff801984f040447bf048d0defee46c804df00a263009963403",
+     "metrics": {
+      "yield_per_primary": 1.0953271022902388e-06,
+      "centroid_eV": 912.7553251194411,
+      "peak_density_per_eV": 8.703560538947386e-09,
+      "dominant_fwhm_eV": 32.59836519334692
+     }
+    },
+    {
+     "tag": "cut100-1142201-m1185103",
+     "seed": 1142201,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185103,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 117.39554424607195,
+     "warm_s": [],
+     "device_peak_bytes": 2822590464,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "02e0636c2a3ea1ff801984f040447bf048d0defee46c804df00a263009963403",
+     "metrics": {
+      "yield_per_primary": 1.0953251981270681e-06,
+      "centroid_eV": 912.7551556172391,
+      "peak_density_per_eV": 8.703646692254097e-09,
+      "dominant_fwhm_eV": 32.567892372763254
+     }
+    },
+    {
+     "tag": "cut100-1142201-m1185104",
+     "seed": 1142201,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185104,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 117.77093830681406,
+     "warm_s": [],
+     "device_peak_bytes": 2822590464,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "02e0636c2a3ea1ff801984f040447bf048d0defee46c804df00a263009963403",
+     "metrics": {
+      "yield_per_primary": 1.0953280607312228e-06,
+      "centroid_eV": 912.7556352463104,
+      "peak_density_per_eV": 8.703218590255801e-09,
+      "dominant_fwhm_eV": 32.62621646519028
+     }
+    },
+    {
+     "tag": "cut100-1142202-m1185101",
+     "seed": 1142202,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185101,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 118.09613782796077,
+     "warm_s": [],
+     "device_peak_bytes": 2713467392,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "cb0080596b744846e5eb0923e712a1b2f2ebc1a1152fd8764bf8034db5b21caf",
+     "metrics": {
+      "yield_per_primary": 1.0985298093777021e-06,
+      "centroid_eV": 913.8540159729956,
+      "peak_density_per_eV": 8.81076545056203e-09,
+      "dominant_fwhm_eV": 31.336163355647727
+     }
+    },
+    {
+     "tag": "cut100-1142202-m1185102",
+     "seed": 1142202,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185102,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 117.46832415601239,
+     "warm_s": [],
+     "device_peak_bytes": 2713467392,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "cb0080596b744846e5eb0923e712a1b2f2ebc1a1152fd8764bf8034db5b21caf",
+     "metrics": {
+      "yield_per_primary": 1.0985309870017182e-06,
+      "centroid_eV": 913.8542603375018,
+      "peak_density_per_eV": 8.811085194793122e-09,
+      "dominant_fwhm_eV": 31.36288066384725
+     }
+    },
+    {
+     "tag": "cut100-1142202-m1185103",
+     "seed": 1142202,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185103,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 117.35321123083122,
+     "warm_s": [],
+     "device_peak_bytes": 2713467392,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "cb0080596b744846e5eb0923e712a1b2f2ebc1a1152fd8764bf8034db5b21caf",
+     "metrics": {
+      "yield_per_primary": 1.0985292775920972e-06,
+      "centroid_eV": 913.853993935974,
+      "peak_density_per_eV": 8.810637552869593e-09,
+      "dominant_fwhm_eV": 31.354594577638977
+     }
+    },
+    {
+     "tag": "cut100-1142202-m1185104",
+     "seed": 1142202,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185104,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 117.68480171100236,
+     "warm_s": [],
+     "device_peak_bytes": 2713467392,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "cb0080596b744846e5eb0923e712a1b2f2ebc1a1152fd8764bf8034db5b21caf",
+     "metrics": {
+      "yield_per_primary": 1.0985331045627513e-06,
+      "centroid_eV": 913.8542939539722,
+      "peak_density_per_eV": 8.808074269950339e-09,
+      "dominant_fwhm_eV": 31.388146988192148
+     }
+    },
+    {
+     "tag": "cut100-1142203-m1185101",
+     "seed": 1142203,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185101,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 120.37848224700429,
+     "warm_s": [],
+     "device_peak_bytes": 2754297344,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "a63e861e0a6a7d80a7e7413c4ea814429a4b0052268ff08f3f34f4e89555ab54",
+     "metrics": {
+      "yield_per_primary": 1.0954443133800368e-06,
+      "centroid_eV": 912.8488623392004,
+      "peak_density_per_eV": 8.707512044736632e-09,
+      "dominant_fwhm_eV": 29.85640252179428
+     }
+    },
+    {
+     "tag": "cut100-1142203-m1185102",
+     "seed": 1142203,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185102,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 120.34008900006302,
+     "warm_s": [],
+     "device_peak_bytes": 2754297344,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "a63e861e0a6a7d80a7e7413c4ea814429a4b0052268ff08f3f34f4e89555ab54",
+     "metrics": {
+      "yield_per_primary": 1.095445418425086e-06,
+      "centroid_eV": 912.8491836378497,
+      "peak_density_per_eV": 8.705792531316092e-09,
+      "dominant_fwhm_eV": 29.889965524093896
+     }
+    },
+    {
+     "tag": "cut100-1142203-m1185103",
+     "seed": 1142203,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185103,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 123.81790418107994,
+     "warm_s": [],
+     "device_peak_bytes": 2754297344,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "a63e861e0a6a7d80a7e7413c4ea814429a4b0052268ff08f3f34f4e89555ab54",
+     "metrics": {
+      "yield_per_primary": 1.0954442623390027e-06,
+      "centroid_eV": 912.8487484124071,
+      "peak_density_per_eV": 8.706107834655086e-09,
+      "dominant_fwhm_eV": 29.860602188408052
+     }
+    },
+    {
+     "tag": "cut100-1142203-m1185104",
+     "seed": 1142203,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185104,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 122.97439156216569,
+     "warm_s": [],
+     "device_peak_bytes": 2754297344,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "a63e861e0a6a7d80a7e7413c4ea814429a4b0052268ff08f3f34f4e89555ab54",
+     "metrics": {
+      "yield_per_primary": 1.0954463064301817e-06,
+      "centroid_eV": 912.8494170989356,
+      "peak_density_per_eV": 8.706494192267655e-09,
+      "dominant_fwhm_eV": 29.852754894645955
+     }
+    },
+    {
+     "tag": "cut100-1142204-m1185101",
+     "seed": 1142204,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185101,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 115.23958350392058,
+     "warm_s": [],
+     "device_peak_bytes": 2749086720,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "b1c63db260435e83979bf50f7bdfc2448f1eafa520b809d34bd15cdc9bc3f423",
+     "metrics": {
+      "yield_per_primary": 1.0953455827396655e-06,
+      "centroid_eV": 914.3613417430453,
+      "peak_density_per_eV": 8.714160060208087e-09,
+      "dominant_fwhm_eV": 30.88103936595155
+     }
+    },
+    {
+     "tag": "cut100-1142204-m1185102",
+     "seed": 1142204,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185102,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 118.97256143810228,
+     "warm_s": [],
+     "device_peak_bytes": 2749086720,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "b1c63db260435e83979bf50f7bdfc2448f1eafa520b809d34bd15cdc9bc3f423",
+     "metrics": {
+      "yield_per_primary": 1.0953454976635505e-06,
+      "centroid_eV": 914.3619078503801,
+      "peak_density_per_eV": 8.712735422022888e-09,
+      "dominant_fwhm_eV": 30.895531741236482
+     }
+    },
+    {
+     "tag": "cut100-1142204-m1185103",
+     "seed": 1142204,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185103,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 118.97110274899751,
+     "warm_s": [],
+     "device_peak_bytes": 2749086720,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "b1c63db260435e83979bf50f7bdfc2448f1eafa520b809d34bd15cdc9bc3f423",
+     "metrics": {
+      "yield_per_primary": 1.0953448076056734e-06,
+      "centroid_eV": 914.3610886627913,
+      "peak_density_per_eV": 8.711155352614242e-09,
+      "dominant_fwhm_eV": 30.94481219531633
+     }
+    },
+    {
+     "tag": "cut100-1142204-m1185104",
+     "seed": 1142204,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185104,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 118.6578456768766,
+     "warm_s": [],
+     "device_peak_bytes": 2749086720,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "b1c63db260435e83979bf50f7bdfc2448f1eafa520b809d34bd15cdc9bc3f423",
+     "metrics": {
+      "yield_per_primary": 1.0953461372779298e-06,
+      "centroid_eV": 914.3618819745161,
+      "peak_density_per_eV": 8.712631505147783e-09,
+      "dominant_fwhm_eV": 30.89932139710129
+     }
+    },
+    {
+     "tag": "cut35-1142201-m1185101",
+     "seed": 1142201,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185101,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 125.14437522296794,
+     "warm_s": [],
+     "device_peak_bytes": 3063425536,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "88176ec22b54bec8898b83486e603c2a27a438399a41be8f4522b8c0ce118a75",
+     "metrics": {
+      "yield_per_primary": 1.0969455990611888e-06,
+      "centroid_eV": 913.4175330434992,
+      "peak_density_per_eV": 8.210152557808215e-09,
+      "dominant_fwhm_eV": 45.87902714479719
+     }
+    },
+    {
+     "tag": "cut35-1142201-m1185102",
+     "seed": 1142201,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185102,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 122.88298877514899,
+     "warm_s": [],
+     "device_peak_bytes": 3063425536,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "88176ec22b54bec8898b83486e603c2a27a438399a41be8f4522b8c0ce118a75",
+     "metrics": {
+      "yield_per_primary": 1.0969469365835395e-06,
+      "centroid_eV": 913.4178490566674,
+      "peak_density_per_eV": 8.209495305777637e-09,
+      "dominant_fwhm_eV": 45.91838105836689
+     }
+    },
+    {
+     "tag": "cut35-1142201-m1185103",
+     "seed": 1142201,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185103,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 122.74011969706044,
+     "warm_s": [],
+     "device_peak_bytes": 3063425536,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "88176ec22b54bec8898b83486e603c2a27a438399a41be8f4522b8c0ce118a75",
+     "metrics": {
+      "yield_per_primary": 1.096946728260796e-06,
+      "centroid_eV": 913.4170967060966,
+      "peak_density_per_eV": 8.208782986685037e-09,
+      "dominant_fwhm_eV": 45.92717135073838
+     }
+    },
+    {
+     "tag": "cut35-1142201-m1185104",
+     "seed": 1142201,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185104,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 122.74540048907511,
+     "warm_s": [],
+     "device_peak_bytes": 3063425536,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "88176ec22b54bec8898b83486e603c2a27a438399a41be8f4522b8c0ce118a75",
+     "metrics": {
+      "yield_per_primary": 1.0969488643785001e-06,
+      "centroid_eV": 913.4180621063678,
+      "peak_density_per_eV": 8.20924928035538e-09,
+      "dominant_fwhm_eV": 45.927073281022444
+     }
+    },
+    {
+     "tag": "cut35-1142202-m1185101",
+     "seed": 1142202,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185101,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 125.58960260101594,
+     "warm_s": [],
+     "device_peak_bytes": 3087324672,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "805d045a8add00a3c20ea91b079e3959ff900795918e2673046162bb2bfa73c5",
+     "metrics": {
+      "yield_per_primary": 1.0949276999464078e-06,
+      "centroid_eV": 913.5502473297819,
+      "peak_density_per_eV": 8.349961611031631e-09,
+      "dominant_fwhm_eV": 42.881290948034234
+     }
+    },
+    {
+     "tag": "cut35-1142202-m1185102",
+     "seed": 1142202,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185102,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 125.6212798380293,
+     "warm_s": [],
+     "device_peak_bytes": 3087324672,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "805d045a8add00a3c20ea91b079e3959ff900795918e2673046162bb2bfa73c5",
+     "metrics": {
+      "yield_per_primary": 1.0949281831418869e-06,
+      "centroid_eV": 913.550515320726,
+      "peak_density_per_eV": 8.349499758253387e-09,
+      "dominant_fwhm_eV": 42.798866821323145
+     }
+    },
+    {
+     "tag": "cut35-1142202-m1185103",
+     "seed": 1142202,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185103,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 123.87153135519475,
+     "warm_s": [],
+     "device_peak_bytes": 3087324672,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "805d045a8add00a3c20ea91b079e3959ff900795918e2673046162bb2bfa73c5",
+     "metrics": {
+      "yield_per_primary": 1.094927380184979e-06,
+      "centroid_eV": 913.5501482366831,
+      "peak_density_per_eV": 8.349467783830278e-09,
+      "dominant_fwhm_eV": 42.87520130355733
+     }
+    },
+    {
+     "tag": "cut35-1142202-m1185104",
+     "seed": 1142202,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185104,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 125.63469894696027,
+     "warm_s": [],
+     "device_peak_bytes": 3087324672,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "805d045a8add00a3c20ea91b079e3959ff900795918e2673046162bb2bfa73c5",
+     "metrics": {
+      "yield_per_primary": 1.0949297969289251e-06,
+      "centroid_eV": 913.5506640257857,
+      "peak_density_per_eV": 8.349367419668852e-09,
+      "dominant_fwhm_eV": 42.83413352298044
+     }
+    },
+    {
+     "tag": "cut35-1142203-m1185101",
+     "seed": 1142203,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185101,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 125.24443920794874,
+     "warm_s": [],
+     "device_peak_bytes": 3082331648,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "32696b9a06bf5d342b10f72373dc9695c6cefb4b601c92cb022a3592745d45d5",
+     "metrics": {
+      "yield_per_primary": 1.0954628586667207e-06,
+      "centroid_eV": 911.7892569922433,
+      "peak_density_per_eV": 8.246284544100035e-09,
+      "dominant_fwhm_eV": 42.95692023432866
+     }
+    },
+    {
+     "tag": "cut35-1142203-m1185102",
+     "seed": 1142203,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185102,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 121.67537232907489,
+     "warm_s": [],
+     "device_peak_bytes": 3082331648,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "32696b9a06bf5d342b10f72373dc9695c6cefb4b601c92cb022a3592745d45d5",
+     "metrics": {
+      "yield_per_primary": 1.0954626502661936e-06,
+      "centroid_eV": 911.7896439555077,
+      "peak_density_per_eV": 8.24594614812213e-09,
+      "dominant_fwhm_eV": 42.97061723169918
+     }
+    },
+    {
+     "tag": "cut35-1142203-m1185103",
+     "seed": 1142203,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185103,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 123.84459636197425,
+     "warm_s": [],
+     "device_peak_bytes": 3082331648,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "32696b9a06bf5d342b10f72373dc9695c6cefb4b601c92cb022a3592745d45d5",
+     "metrics": {
+      "yield_per_primary": 1.0954613810216886e-06,
+      "centroid_eV": 911.7893531543776,
+      "peak_density_per_eV": 8.246901828101727e-09,
+      "dominant_fwhm_eV": 42.94538648550338
+     }
+    },
+    {
+     "tag": "cut35-1142203-m1185104",
+     "seed": 1142203,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185104,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 122.42967282398604,
+     "warm_s": [],
+     "device_peak_bytes": 3082331648,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "32696b9a06bf5d342b10f72373dc9695c6cefb4b601c92cb022a3592745d45d5",
+     "metrics": {
+      "yield_per_primary": 1.0954642630020555e-06,
+      "centroid_eV": 911.7896477309494,
+      "peak_density_per_eV": 8.245478078094948e-09,
+      "dominant_fwhm_eV": 42.998868984154
+     }
+    },
+    {
+     "tag": "cut35-1142204-m1185101",
+     "seed": 1142204,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185101,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 123.76930304197595,
+     "warm_s": [],
+     "device_peak_bytes": 3063513600,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "8158f0117e718d80a5bb96e7fc22a1ef0144d34917f7fd2e18ba11f922f49d0f",
+     "metrics": {
+      "yield_per_primary": 1.0949966857184087e-06,
+      "centroid_eV": 913.9293385559655,
+      "peak_density_per_eV": 8.286622943387556e-09,
+      "dominant_fwhm_eV": 44.444734507087446
+     }
+    },
+    {
+     "tag": "cut35-1142204-m1185102",
+     "seed": 1142204,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185102,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 124.02710184408352,
+     "warm_s": [],
+     "device_peak_bytes": 3063513600,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "8158f0117e718d80a5bb96e7fc22a1ef0144d34917f7fd2e18ba11f922f49d0f",
+     "metrics": {
+      "yield_per_primary": 1.0949970797547006e-06,
+      "centroid_eV": 913.9296579406459,
+      "peak_density_per_eV": 8.286320074546438e-09,
+      "dominant_fwhm_eV": 44.40624895376254
+     }
+    },
+    {
+     "tag": "cut35-1142204-m1185103",
+     "seed": 1142204,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185103,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 124.1710963579826,
+     "warm_s": [],
+     "device_peak_bytes": 3063513600,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "8158f0117e718d80a5bb96e7fc22a1ef0144d34917f7fd2e18ba11f922f49d0f",
+     "metrics": {
+      "yield_per_primary": 1.0949954560217579e-06,
+      "centroid_eV": 913.9295559289084,
+      "peak_density_per_eV": 8.286424879599963e-09,
+      "dominant_fwhm_eV": 44.38810335750634
+     }
+    },
+    {
+     "tag": "cut35-1142204-m1185104",
+     "seed": 1142204,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185104,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 124.0650642819237,
+     "warm_s": [],
+     "device_peak_bytes": 3063513600,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "8158f0117e718d80a5bb96e7fc22a1ef0144d34917f7fd2e18ba11f922f49d0f",
+     "metrics": {
+      "yield_per_primary": 1.0949974225663579e-06,
+      "centroid_eV": 913.9302146985035,
+      "peak_density_per_eV": 8.286061614626306e-09,
+      "dominant_fwhm_eV": 44.441540253788276
+     }
+    },
+    {
+     "tag": "straggling-1142201-m1185101",
+     "seed": 1142201,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185101,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 117.96037105796859,
+     "warm_s": [],
+     "device_peak_bytes": 2873779712,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "46b2ba1d4f93bca06b87eed068a5956a15f45ffcceccf936e3b72c223c68f1f1",
+     "metrics": {
+      "yield_per_primary": 1.0938615800096994e-06,
+      "centroid_eV": 913.4987420214059,
+      "peak_density_per_eV": 8.425322661764767e-09,
+      "dominant_fwhm_eV": 38.99695878048988
+     }
+    },
+    {
+     "tag": "straggling-1142201-m1185102",
+     "seed": 1142201,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185102,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 117.15729688387364,
+     "warm_s": [],
+     "device_peak_bytes": 2873779712,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "46b2ba1d4f93bca06b87eed068a5956a15f45ffcceccf936e3b72c223c68f1f1",
+     "metrics": {
+      "yield_per_primary": 1.0938632574517985e-06,
+      "centroid_eV": 913.4989385367472,
+      "peak_density_per_eV": 8.426712660991598e-09,
+      "dominant_fwhm_eV": 38.919724642562414
+     }
+    },
+    {
+     "tag": "straggling-1142201-m1185103",
+     "seed": 1142201,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185103,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 117.31719521596096,
+     "warm_s": [],
+     "device_peak_bytes": 2873779712,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "46b2ba1d4f93bca06b87eed068a5956a15f45ffcceccf936e3b72c223c68f1f1",
+     "metrics": {
+      "yield_per_primary": 1.0938612786055084e-06,
+      "centroid_eV": 913.4985116064995,
+      "peak_density_per_eV": 8.427612385730754e-09,
+      "dominant_fwhm_eV": 38.92167588093662
+     }
+    },
+    {
+     "tag": "straggling-1142201-m1185104",
+     "seed": 1142201,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185104,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 117.05759903113358,
+     "warm_s": [],
+     "device_peak_bytes": 2873779712,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "46b2ba1d4f93bca06b87eed068a5956a15f45ffcceccf936e3b72c223c68f1f1",
+     "metrics": {
+      "yield_per_primary": 1.093864977762951e-06,
+      "centroid_eV": 913.498943799988,
+      "peak_density_per_eV": 8.426477293710377e-09,
+      "dominant_fwhm_eV": 38.933172525543
+     }
+    },
+    {
+     "tag": "straggling-1142202-m1185101",
+     "seed": 1142202,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185101,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 116.97430199198425,
+     "warm_s": [],
+     "device_peak_bytes": 2865575424,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "8bcecbf6bb3b5c08f6792534631336557caa0e970f724436919e6b06dd167c24",
+     "metrics": {
+      "yield_per_primary": 1.0955186412796027e-06,
+      "centroid_eV": 913.4988708220814,
+      "peak_density_per_eV": 8.551974239878746e-09,
+      "dominant_fwhm_eV": 36.16594541569452
+     }
+    },
+    {
+     "tag": "straggling-1142202-m1185102",
+     "seed": 1142202,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185102,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 120.41899715620093,
+     "warm_s": [],
+     "device_peak_bytes": 2901259776,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "8bcecbf6bb3b5c08f6792534631336557caa0e970f724436919e6b06dd167c24",
+     "metrics": {
+      "yield_per_primary": 1.095520323582243e-06,
+      "centroid_eV": 913.4988729944313,
+      "peak_density_per_eV": 8.554047248310326e-09,
+      "dominant_fwhm_eV": 36.095471480789
+     }
+    },
+    {
+     "tag": "straggling-1142202-m1185103",
+     "seed": 1142202,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185103,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 120.0488790650852,
+     "warm_s": [],
+     "device_peak_bytes": 2901259776,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "8bcecbf6bb3b5c08f6792534631336557caa0e970f724436919e6b06dd167c24",
+     "metrics": {
+      "yield_per_primary": 1.0955190272068544e-06,
+      "centroid_eV": 913.4984626939222,
+      "peak_density_per_eV": 8.55222737072836e-09,
+      "dominant_fwhm_eV": 36.14039490985658
+     }
+    },
+    {
+     "tag": "straggling-1142202-m1185104",
+     "seed": 1142202,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185104,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 118.06149681378156,
+     "warm_s": [],
+     "device_peak_bytes": 2865575424,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "8bcecbf6bb3b5c08f6792534631336557caa0e970f724436919e6b06dd167c24",
+     "metrics": {
+      "yield_per_primary": 1.0955225395823126e-06,
+      "centroid_eV": 913.4989985034564,
+      "peak_density_per_eV": 8.552304642250874e-09,
+      "dominant_fwhm_eV": 36.162479900296944
+     }
+    },
+    {
+     "tag": "straggling-1142203-m1185101",
+     "seed": 1142203,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185101,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 121.22249059099704,
+     "warm_s": [],
+     "device_peak_bytes": 2940967424,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "8f04a8b4e8f55a6bf301fa1f81d97417a926416b8b6a44104a37229ce6533d1c",
+     "metrics": {
+      "yield_per_primary": 1.094582985061639e-06,
+      "centroid_eV": 912.3171273990018,
+      "peak_density_per_eV": 8.459577927055761e-09,
+      "dominant_fwhm_eV": 37.509267401896295
+     }
+    },
+    {
+     "tag": "straggling-1142203-m1185102",
+     "seed": 1142203,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185102,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 121.4475054340437,
+     "warm_s": [],
+     "device_peak_bytes": 2940967424,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "8f04a8b4e8f55a6bf301fa1f81d97417a926416b8b6a44104a37229ce6533d1c",
+     "metrics": {
+      "yield_per_primary": 1.0945822202577417e-06,
+      "centroid_eV": 912.3178514316858,
+      "peak_density_per_eV": 8.457565314756721e-09,
+      "dominant_fwhm_eV": 37.5532046723813
+     }
+    },
+    {
+     "tag": "straggling-1142203-m1185103",
+     "seed": 1142203,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185103,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 118.72002680110745,
+     "warm_s": [],
+     "device_peak_bytes": 2940967424,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "8f04a8b4e8f55a6bf301fa1f81d97417a926416b8b6a44104a37229ce6533d1c",
+     "metrics": {
+      "yield_per_primary": 1.0945823208489584e-06,
+      "centroid_eV": 912.3170042982314,
+      "peak_density_per_eV": 8.459872802291102e-09,
+      "dominant_fwhm_eV": 37.425499443665785
+     }
+    },
+    {
+     "tag": "straggling-1142203-m1185104",
+     "seed": 1142203,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185104,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 117.71303086588159,
+     "warm_s": [],
+     "device_peak_bytes": 2940967424,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "8f04a8b4e8f55a6bf301fa1f81d97417a926416b8b6a44104a37229ce6533d1c",
+     "metrics": {
+      "yield_per_primary": 1.0945850352713687e-06,
+      "centroid_eV": 912.3177243077203,
+      "peak_density_per_eV": 8.458803435473783e-09,
+      "dominant_fwhm_eV": 37.50076068579858
+     }
+    },
+    {
+     "tag": "straggling-1142204-m1185101",
+     "seed": 1142204,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185101,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 117.53674976411276,
+     "warm_s": [],
+     "device_peak_bytes": 2872423424,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "26cd2038d38940406900e2ed0a545c8e7d687dbe68bb028dcac9acca6c14907c",
+     "metrics": {
+      "yield_per_primary": 1.0996291941447108e-06,
+      "centroid_eV": 914.2918389439088,
+      "peak_density_per_eV": 8.496761516596507e-09,
+      "dominant_fwhm_eV": 36.8360673421555
+     }
+    },
+    {
+     "tag": "straggling-1142204-m1185102",
+     "seed": 1142204,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185102,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 117.45837228186429,
+     "warm_s": [],
+     "device_peak_bytes": 2872423424,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "26cd2038d38940406900e2ed0a545c8e7d687dbe68bb028dcac9acca6c14907c",
+     "metrics": {
+      "yield_per_primary": 1.09962934853372e-06,
+      "centroid_eV": 914.2924756415938,
+      "peak_density_per_eV": 8.496155778914272e-09,
+      "dominant_fwhm_eV": 36.88483267666527
+     }
+    },
+    {
+     "tag": "straggling-1142204-m1185103",
+     "seed": 1142204,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185103,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 117.4687372657936,
+     "warm_s": [],
+     "device_peak_bytes": 2872423424,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "26cd2038d38940406900e2ed0a545c8e7d687dbe68bb028dcac9acca6c14907c",
+     "metrics": {
+      "yield_per_primary": 1.0996279130420456e-06,
+      "centroid_eV": 914.2921144460935,
+      "peak_density_per_eV": 8.496669146040858e-09,
+      "dominant_fwhm_eV": 36.888020120575334
+     }
+    },
+    {
+     "tag": "straggling-1142204-m1185104",
+     "seed": 1142204,
+     "histories": 16384,
+     "mosaic_mc_nodes": 256,
+     "mosaic_sampling": "history",
+     "mosaic_seed": 1185104,
+     "quadrature": "bin-mean",
+     "spacing_eV": 0.1875,
+     "first_s": 117.16256719711237,
+     "warm_s": [],
+     "device_peak_bytes": 2872423424,
+     "backend": "cuda",
+     "device": "b'NVIDIA GeForce RTX 5080'",
+     "source_revision": "a2a7a44667d61d9dc2fe9067b72acabe1e2a3f07",
+     "replay_transport_sha256": "26cd2038d38940406900e2ed0a545c8e7d687dbe68bb028dcac9acca6c14907c",
+     "metrics": {
+      "yield_per_primary": 1.0996304976567582e-06,
+      "centroid_eV": 914.2925391714109,
+      "peak_density_per_eV": 8.495595338331441e-09,
+      "dominant_fwhm_eV": 36.84467642792197
+     }
+    }
+   ]
+  },
+  "analysis": {
+   "devices": [
+    [
+     "cuda",
+     "b'NVIDIA GeForce RTX 5080'",
+     "a2a7a4466"
+    ]
+   ],
+   "per_seed": {
+    "baseline-1142201": {
+     "yield_per_primary": 1.0934658672108809e-06,
+     "centroid_eV": 913.492710008611,
+     "peak_density_per_eV": 8.425239617082525e-09,
+     "dominant_fwhm_eV": 38.86693150402698
+    },
+    "baseline-1142202": {
+     "yield_per_primary": 1.095682803048522e-06,
+     "centroid_eV": 913.5392606847624,
+     "peak_density_per_eV": 8.56386606074011e-09,
+     "dominant_fwhm_eV": 36.105099884681294
+    },
+    "baseline-1142203": {
+     "yield_per_primary": 1.0945010486637103e-06,
+     "centroid_eV": 912.1562897452378,
+     "peak_density_per_eV": 8.478689972335474e-09,
+     "dominant_fwhm_eV": 36.66352365191358
+    },
+    "baseline-1142204": {
+     "yield_per_primary": 1.0993174199828362e-06,
+     "centroid_eV": 914.1923974175404,
+     "peak_density_per_eV": 8.494059899888384e-09,
+     "dominant_fwhm_eV": 36.729638903227624
+    },
+    "cut35-1142201": {
+     "yield_per_primary": 1.096947032071006e-06,
+     "centroid_eV": 913.4176352284022,
+     "peak_density_per_eV": 8.209420032656567e-09,
+     "dominant_fwhm_eV": 45.91270392353965
+    },
+    "cut35-1142202": {
+     "yield_per_primary": 1.0949282650505495e-06,
+     "centroid_eV": 913.5503937284051,
+     "peak_density_per_eV": 8.349574143196037e-09,
+     "dominant_fwhm_eV": 42.847637079587116
+    },
+    "cut35-1142203": {
+     "yield_per_primary": 1.0954627882391647e-06,
+     "centroid_eV": 911.789475458358,
+     "peak_density_per_eV": 8.24615264960471e-09,
+     "dominant_fwhm_eV": 42.968580495138326
+    },
+    "cut35-1142204": {
+     "yield_per_primary": 1.0949966610153065e-06,
+     "centroid_eV": 913.9296917811287,
+     "peak_density_per_eV": 8.286357378040066e-09,
+     "dominant_fwhm_eV": 44.42077491754287
+    },
+    "cut100-1142201": {
+     "yield_per_primary": 1.0953265586325508e-06,
+     "centroid_eV": 912.7552670019978,
+     "peak_density_per_eV": 8.70286820386923e-09,
+     "dominant_fwhm_eV": 32.6062840098399
+    },
+    "cut100-1142202": {
+     "yield_per_primary": 1.0985307946335671e-06,
+     "centroid_eV": 913.8541410502754,
+     "peak_density_per_eV": 8.809932339204352e-09,
+     "dominant_fwhm_eV": 31.363042014431585
+    },
+    "cut100-1142203": {
+     "yield_per_primary": 1.0954450751435766e-06,
+     "centroid_eV": 912.8490528723004,
+     "peak_density_per_eV": 8.706476650743866e-09,
+     "dominant_fwhm_eV": 29.864812942547132
+    },
+    "cut100-1142204": {
+     "yield_per_primary": 1.0953455063217048e-06,
+     "centroid_eV": 914.3615550578002,
+     "peak_density_per_eV": 8.712559118606578e-09,
+     "dominant_fwhm_eV": 30.90666068112921
+    },
+    "straggling-1142201": {
+     "yield_per_primary": 1.0938627734574892e-06,
+     "centroid_eV": 913.4987839913625,
+     "peak_density_per_eV": 8.426531250549374e-09,
+     "dominant_fwhm_eV": 38.94377259471378
+    },
+    "straggling-1142202": {
+     "yield_per_primary": 1.095520132912753e-06,
+     "centroid_eV": 913.498801253646,
+     "peak_density_per_eV": 8.552638375292076e-09,
+     "dominant_fwhm_eV": 36.142817390444634
+    },
+    "straggling-1142203": {
+     "yield_per_primary": 1.094583140359927e-06,
+     "centroid_eV": 912.3174268592888,
+     "peak_density_per_eV": 8.458954869894342e-09,
+     "dominant_fwhm_eV": 37.499233468666944
+    },
+    "straggling-1142204": {
+     "yield_per_primary": 1.0996292383443085e-06,
+     "centroid_eV": 914.2922420508852,
+     "peak_density_per_eV": 8.49629544497077e-09,
+     "dominant_fwhm_eV": 36.864067635711876
+    }
+   },
+   "deltas": {
+    "cut35": {
+     "yield_per_primary": {
+      "per_seed": [
+       0.0031836063333230413,
+       -0.0006886463818480681,
+       0.0008787013741362593,
+       -0.0039304016192130975
+      ],
+      "mean": -0.00013918507340046626,
+      "sem": 0.0014931026471578942,
+      "exceeds_margin": false
+     },
+     "centroid_eV": {
+      "per_seed": [
+       -8.218432329698544e-05,
+       1.218671612890354e-05,
+       -0.00040213973307390294,
+       -0.00028736361968639823
+      ],
+      "mean": -0.00018987523998209577,
+      "sem": 9.442217555954696e-05,
+      "exceeds_margin": false
+     },
+     "centroid_shift_eV": [
+      -0.07507478020875169,
+      0.011133043642644225,
+      -0.3668142868798441,
+      -0.26270563641173794
+     ],
+     "peak_density_per_eV": {
+      "per_seed": [
+       -0.025615839339260482,
+       -0.025022801153612884,
+       -0.027426090998667663,
+       -0.024452679201267258
+      ],
+      "mean": -0.02562935267320207,
+      "sem": 0.0006442642073108281,
+      "exceeds_margin": true
+     },
+     "dominant_fwhm_eV": {
+      "per_seed": [
+       0.18127935874697654,
+       0.1867475015009321,
+       0.17197083682096292,
+       0.2093986285729421
+      ],
+      "mean": 0.18734908141045342,
+      "sem": 0.00795757693608253,
+      "exceeds_margin": true
+     }
+    },
+    "cut100": {
+     "yield_per_primary": {
+      "per_seed": [
+       0.0017016456365628319,
+       0.002599284735619767,
+       0.0008625176568071158,
+       -0.0036130726111784917
+      ],
+      "mean": 0.0003875938544528057,
+      "sem": 0.001379891101596219,
+      "exceeds_margin": false
+     },
+     "centroid_eV": {
+      "per_seed": [
+       -0.00080727848020401,
+       0.0003446818095995674,
+       0.0007594785398630233,
+       0.00018503505469702475
+      ],
+      "mean": 0.00012047923098890134,
+      "sem": 0.0003321004790282881,
+      "exceeds_margin": false
+     },
+     "centroid_shift_eV": [
+      -0.7374430066131481,
+      0.3148803655129768,
+      0.6927631270625625,
+      0.16915764025975477
+     ],
+     "peak_density_per_eV": {
+      "per_seed": [
+       0.03295201079193055,
+       0.028733083483439614,
+       0.026865786949590298,
+       0.02572376711412927
+      ],
+      "mean": 0.028568662084772434,
+      "sem": 0.0015872930680064718,
+      "exceeds_margin": true
+     },
+     "dominant_fwhm_eV": {
+      "per_seed": [
+       -0.16107902661516826,
+       -0.13134038918035718,
+       -0.1854352782322275,
+       -0.1585362229517241
+      ],
+      "mean": -0.15909772924486926,
+      "sem": 0.011061861065184203,
+      "exceeds_margin": true
+     }
+    },
+    "straggling": {
+     "yield_per_primary": {
+      "per_seed": [
+       0.00036298000560441857,
+       -0.00014846462435691432,
+       7.500376204938597e-05,
+       0.0002836472485601149
+      ],
+      "mean": 0.00014329159796425128,
+      "sem": 0.00011465441803622798,
+      "exceeds_margin": false
+     },
+     "centroid_eV": {
+      "per_seed": [
+       6.649185795293278e-06,
+       -4.428866153616262e-05,
+       0.000176655158619754,
+       0.00010921621490922462
+      ],
+      "mean": 6.205797444702732e-05,
+      "sem": 4.977964368812643e-05,
+      "exceeds_margin": false
+     },
+     "centroid_shift_eV": [
+      0.006073982751559015,
+      -0.04045943111646011,
+      0.16113711405103004,
+      0.09984463334478733
+     ],
+     "peak_density_per_eV": {
+      "per_seed": [
+       0.000153305250123692,
+       -0.001311053368700632,
+       -0.0023276122261250975,
+       0.00026318922973622705
+      ],
+      "mean": -0.0008055427787414526,
+      "sem": 0.0006214106269624874,
+      "exceeds_margin": false
+     },
+     "dominant_fwhm_eV": {
+      "per_seed": [
+       0.0019770300281831688,
+       0.001044658673810872,
+       0.022794039784273412,
+       0.003659952466138705
+      ],
+      "mean": 0.0073689202381015395,
+      "sem": 0.005170102507982235,
+      "exceeds_margin": false
+     }
+    }
+   },
+   "shift_scatter": {
+    "yield_per_primary": 1.1609583673365989e-06,
+    "centroid_eV": 3.152051662584708e-07,
+    "peak_density_per_eV": 9.416937251742215e-05,
+    "dominant_fwhm_eV": 0.0008779283974248092
+   }
+  },
+  "analysis_script_sha256": "e7b62d1a7cbd8f4289d3e9be09a0c61415a7106a9add655a38fcbca05c45205b"
+ }
+}

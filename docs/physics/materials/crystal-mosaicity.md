@@ -75,6 +75,7 @@ so the estimator is unbiased for the `mosaic-mc` average. The tilts are continuo
 - **Granularity.** Per history means a crystallite larger than the electron track, which was the decision recorded on #1185. All granularities share the same mean; only the error bars and the seed-level correlations differ.
 - **Scope.** The sampled route covers incoherent emission, including the flight-grouped reduction (a flight's substeps share their history's crystallite). The coherent route refuses it, because a phase-coherent sum across histories would interfere different crystallites. `η → 0` returns the perfect crystal bit-for-bit. Line-grid window seeds use the same per-history tilts.
 - **Validation.** Ledger row `mosaic-mc-sampled`; tests in `tests/montecarlo/spectrum/test_mosaic_sampled.py`.
+- **Convergence and cost.** On HOPG at 0.8°, sampled `K = 256` meets the #1143 shape margins, where Gauss–Hermite `N = 65` is still 5–32 % narrow in FWHM. At production populations (16384 histories) one mosaic shift suffices. See the [production-scale studies](../../validation/materials/mosaic-mc-sampled.md#production-scale-studies-1185).
 
 ### Where it lives
 

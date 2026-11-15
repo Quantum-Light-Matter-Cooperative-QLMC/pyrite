@@ -119,3 +119,57 @@ An attempted per-history decomposition by remapping other histories' `elec_id` o
 - **Verdict**: `rederived`
 - **Write-up**: `docs/validation/materials/mosaic-mc-sampled.md`
 - **Suggested ledger change**: status `filtered` → `rederived`; fix **Code** `montecarlo/spectrum/cxr/_per_hkl.py::_accumulate_sampled_mosaic` → `montecarlo/spectrum/cxr/_mosaic_sampled.py::accumulate_sampled_mosaic` (optionally add `montecarlo/spectrum/cxr/_grouped.py::_referenced_phases`); append to **Notes** "fresh-context re-derivation: draws exact Gaussian per axis, $1/K$ weighting reproduces the GH-normalized mean, per-row machinery equals explicit $R(\mathbf t)$ rotations to $10^{-14}$ (incoherent and grouped), history additivity to $10^{-16}$; `[validation write-up](materials/mosaic-mc-sampled.md)`"; add the page to the `docs/validation/materials/index.md` toctree. Never `signed-off`.
+
+## Production-scale studies (#1185)
+
+The [study record](../check-records/mosaic-mc-sampled-1185-study.json) holds per-call metrics, timings, devices, source SHAs and replay hashes for the three jobs below. It also holds the paired analysis. All comparisons use intrinsic source spectra: no detector response.
+- Metrics come from `checks/defaults_spectral_gate_642.py::metrics`: yield per primary, centroid, peak density and dominant half-maximum FWHM.
+- Margins are the #1143 ones: yield and centroid $10^{-3}$, peak and FWHM $10^{-2}$.
+- Raw evidence with `SHA256SUMS` is on `qlmc` under `~/pyrite-1185-s2/evidence/s1185/` and `~/pyrite-1185-s3/evidence/s1185/12666-t2-sampled/`.
+
+### Convergence against Gauss–Hermite (jobs 12553, 12554)
+
+- **Scene:** HOPG at the catalog 0.8° mosaic, replays of #1143 job 12082.
+- **Population:** 64 histories × transport seeds 642501–3.
+- **Grid and device:** node grid 0.1875 eV, Radeon 8060S (ROCm), source `5538bac7a`.
+- **Reference:** sampled $K=1024$, averaged over 4 mosaic seeds at each transport seed.
+- **Table:** ranges over the 3 transport seeds. Sampled arms are averaged over 4 mosaic seeds. Centroid is in eV, the rest relative.
+
+| arm | warm s/call | yield | centroid [eV] | peak | FWHM |
+|---|---:|---|---|---|---|
+| GH $N=17$ | 1.08 | $-7\times10^{-6}$…$+2.0\times10^{-5}$ | $\pm7\times10^{-3}$ | +9.9…+29 % | −50…−36 % |
+| GH $N=33$ | 3.61 | $\le4.2\times10^{-6}$ | $\pm1.5\times10^{-3}$ | +5.4…+15 % | −45…−19 % |
+| GH $N=49$ | 6.12 | $\le3.8\times10^{-6}$ | $\pm1.9\times10^{-3}$ | +3.3…+9.3 % | −36…−6.3 % |
+| GH $N=65$ | 8.67 | $\le5.1\times10^{-6}$ | $\pm2.4\times10^{-4}$ | +3.4…+6.1 % | −32…−5.4 % |
+| sampled $K=16$ ×4 | 0.45 | $-2.7\times10^{-4}$ | −0.05…−0.02 | +2.6…+2.8 % | −33…−7.1 % |
+| sampled $K=64$ ×4 | 1.78 | $+2.9$…$+4.7\times10^{-5}$ | $\pm6\times10^{-3}$ | +0.04…+0.44 % | −8.0…−1.0 % |
+| sampled $K=256$ ×4 | 7.14 | $\le6.7\times10^{-6}$ | $\pm5.8\times10^{-4}$ | −0.006…+0.21 % | −0.42…+0.18 % |
+| sampled $K=1024$ ×4 | 29.8 | ref | ref | ref | ref |
+
+- Gauss–Hermite approaches the reference monotonically and slowly. At $N=65$ (4225 orientations) the peak is still 3–6 % high and the FWHM 5–32 % narrow, because discrete replicas split the half-maximum crossing.
+- Sampled $K=256$ ×4 passes every margin.
+- Yield and centroid agree with Gauss–Hermite within statistics at every $N$ and $K$.
+- At 64 histories, single-run FWHM scatter falls more slowly than $1/\sqrt K$ (2.2 % at $K=256$, 1.7 % at $K=1024$). At this population, converging the FWHM needs several independent mosaic shifts.
+
+### Transport arms on the sampled route (job 12666)
+
+- **Scene:** #1142 HOPG t2 replays: 12346 baseline ($W_c=50$ eV), 12347 cut35, 12348 cut100, 12349 straggling.
+- **Population:** transport seeds 1142201–4 × 16384 histories.
+- **Mosaic:** $K=256$ × 4 mosaic shifts 1185101–4, shared across arms.
+- **Grid and device:** Fourier bin-mean 0.1875 eV, RTX 5080 (CUDA), source `a2a7a4466`.
+- **Method:** spectra are averaged over the 4 shifts at each transport seed, then each arm is compared with baseline at the same transport seed. Values are mean ± standard error over the 4 seeds.
+
+| arm vs baseline | yield | centroid | peak | FWHM |
+|---|---|---|---|---|
+| cut35 | $(-1.4\pm15)\times10^{-4}$ | $(-1.9\pm0.9)\times10^{-4}$ | **−2.56 % ± 0.06 %** | **+18.7 % ± 0.8 %** |
+| cut100 | $(+3.9\pm14)\times10^{-4}$ | $(+1.2\pm3.3)\times10^{-4}$ | **+2.86 % ± 0.16 %** | **−15.9 % ± 1.1 %** |
+| straggling | $(+1.4\pm1.1)\times10^{-4}$ | $(+0.6\pm0.5)\times10^{-4}$ | −0.08 % ± 0.06 % | +0.74 % ± 0.52 % |
+
+- Baseline mosaic FWHM is 36.1–38.9 eV.
+- The inelastic cutoff moves the mosaic line shape far beyond margin, with a consistent sign on every seed. The peak shifts match the perfect-crystal #1142 line/background shifts (−2.5 % and +3.0 %). This dependence is a transport question, tracked in #1208, not a property of this estimator.
+- Straggling is within every margin.
+- The cut arms re-simulate transport, so their yield deltas are transport noise ($1$–$4\times10^{-3}$ per seed).
+- **At production populations the estimator noise is negligible.** Single-shift 1σ scatter at $K=256$ is $9\times10^{-5}$ in peak, $9\times10^{-4}$ in FWHM and $10^{-6}$ in yield. The baseline seed-to-seed spread is 0.7 % in peak and 3.3 % in FWHM. One shift is enough here, so the several-shift requirement above applies only to small populations.
+- **Cost:** 115–126 s per first bin-mean scoring call on the RTX 5080, with 2.9 GB device peak. The Radeon 8060S took more than 25 min per call on this scene.
+- Whether this route should become the mosaic default is #1207.
+- **Harness note.** The straggling calls ran with `--arm baseline`, because the harness at `a2a7a4466` has no `straggling` choice. Under `--replay` the case, including `straggling=True`, comes from the transport pickle, and `--arm` only labels the report. The arm is therefore the call's tag prefix.
