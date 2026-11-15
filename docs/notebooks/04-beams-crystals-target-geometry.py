@@ -115,7 +115,7 @@ def _(mo):
 @app.cell
 def _(np, source, tables_ready):
     assert tables_ready  # Wait for reference-table installation before transport.
-    from pyrite.radiation import photon_energies
+    from pyrite.tools import photon_energies
 
     tilts_deg = (20.0, 30.0, 40.0)
     tilt_spectra = [source(tilt_deg=_tilt) for _tilt in tilts_deg]

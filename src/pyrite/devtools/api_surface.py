@@ -25,6 +25,7 @@ ALLOWED_STATUSES = frozenset({"stable", "advanced-stable", "experimental", "inte
 ALLOWED_ROOT_ROLES = frozenset({"core", "specialized", "experimental"})
 ALLOWED_DOMAINS = frozenset(
     {
+        "tools",
         "beams",
         "geometry",
         "materials",

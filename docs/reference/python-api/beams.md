@@ -24,14 +24,14 @@ Use `pyrite.beams.Beam` with these transverse and longitudinal descriptions. Its
 
 ## Advanced saved diagnostics
 
-This individually governed implementation path is advanced-stable; it does not promote other beam-metrics leaf exports.
+Use the advanced-stable domain alias below. The existing concrete path remains a supported same-object alias; other beam-metrics leaf exports are not promoted.
 
 ```{eval-rst}
 .. autosummary::
    :toctree: ../../_autosummary
    :nosignatures:
 
-   pyrite.campaign.beam_metrics.capture_beam_metrics
+   pyrite.beams.capture_beam_metrics
 ```
 
 
@@ -151,3 +151,14 @@ unchanged. Sweep and optimization paths `beam.repetition_rate` and
 | Entry | Owner / status | Scientific contract and effects |
 | --- | --- | --- |
 | `capture_beam_metrics` | Beam diagnostics, advanced-stable | Reads a bounded deterministic prefix of stored initial particles (including missed entries); returns beam metrics plus sampled/available counts. Metric field units follow `BeamMetrics`; invalid prefix limits or missing artifact data raise. No new transport. |
+
+The historical generated reference remains available:
+
+```{eval-rst}
+.. autosummary::
+   :toctree: ../../_autosummary
+   :template: autosummary/public-alias.rst
+   :nosignatures:
+
+   pyrite.campaign.beam_metrics.capture_beam_metrics
+```

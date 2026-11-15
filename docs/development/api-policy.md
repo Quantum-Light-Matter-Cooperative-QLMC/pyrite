@@ -30,7 +30,7 @@ alias is deprecated. All existing imports keep working during the support window
 
 ## Canonical ownership
 
-The **public** domains are `beams`, `geometry`, `materials`, `detectors`,
+The **public** domains are `tools`, `beams`, `geometry`, `materials`, `detectors`,
 `observations`, `units`, `config`, `quantum`, `transport`, `radiation`, `campaign`,
 `execution`, `remote`, `optimization`, `results`, `storage`, `plots`, `experimental`,
 `simulation`, and `datasets`.
@@ -42,6 +42,32 @@ implementation already exists elsewhere. New root exports require explicit
 architectural review. Domain facades may initially re-export a concrete
 implementation without moving it. A compatibility alias must resolve to the
 **same object** as its canonical import.
+
+### Scientific calculators: architecture review (#1030)
+
+`pyrite.tools` is the canonical discovery/import facade for the reviewed small,
+deterministic scientific calculators. Membership requires a calculation on
+explicit values or material specifications, documented numeric units or explicit
+Pint arguments, no Monte Carlo sampling, no artifact/checkpoint I/O, no dataset
+fetch, and no CUDA initialization. Existing bundled reference-table lookups are
+allowed when evaluating a calculator. Importing the namespace itself must load
+neither datasets nor numerical engines. Resolving a member loads its existing
+implementation and dependencies lazily.
+
+This cross-cutting facade is an explicit exception to domain-local import
+ownership: `tools` owns calculator discovery, while each implementation's scientific
+domain still owns its equations, validation, units and numerical behavior. Its
+reviewed inventory is explicit in `api-surface.toml`; it does not automatically
+promote other implementation helpers. Existing domain and concrete paths remain
+supported same-object aliases, with unchanged status and no new deprecation.
+The approved root `photon_energies` convenience alias remains available. No new
+root exports, wrappers, implementation moves or scientific identity changes are
+introduced.
+
+Saved-capture readers remain under `pyrite.transport` and `pyrite.beams` because
+they perform artifact I/O. The [Scientific calculators reference](../reference/python-api/calculators.md)
+indexes these related diagnostics alongside the calculators. New calculator
+members require the same API review as other public concepts.
 
 Public configuration values should be immutable, typed, validated, and safe to
 import without initializing CUDA, plotting, schedulers, or loading datasets.
@@ -71,7 +97,7 @@ the additive beam-energy interface keeps the numeric dataclass representation.
 
 ## Inventory and static check
 
-`api-surface.toml` records **all existing root lazy exports**, the seven active
+`api-surface.toml` records **all existing root lazy exports**, the active
 canonical facades, and the supported package and leaf-module contracts documented
 in the API reference. Its `target` is the *current concrete binding*, while
 `domain` identifies the owning public domain; some domains have no facade yet.
@@ -209,7 +235,7 @@ Use a **method** when the operation depends on an object's invariant or
 returns a related value, such as `SpatialResult.pixel_metadata()` or a
 quantity-aware `with_width()` replacement. Use a **stateless function** when
 explicit arguments define the calculation, such as
-`pyrite.materials.crystal.structure_factor`. Preserve numeric units and
+`pyrite.tools.structure_factor`. Preserve numeric units and
 normalization; opt-in quantity wrappers remain distinct from numeric kernels.
 
 Use a **factory** when construction requires a choice of representation or

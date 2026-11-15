@@ -34,9 +34,11 @@ if TYPE_CHECKING:
     from pyrite.campaign.beam import (
         TransverseSpot as TransverseSpot,
     )
+    from pyrite.campaign.beam_metrics import capture_beam_metrics as capture_beam_metrics
     from pyrite.campaign.longitudinal import LongitudinalDistribution as LongitudinalDistribution
 
 _EXPORTS = {
+    "capture_beam_metrics": ("pyrite.campaign.beam_metrics", "capture_beam_metrics"),
     "Beam": ("pyrite.campaign.beam", "Beam"),
     "BunchFrontTilt": ("pyrite.campaign.beam", "BunchFrontTilt"),
     "GdfSource": ("pyrite.campaign.beam", "GdfSource"),
@@ -49,6 +51,7 @@ _EXPORTS = {
 }
 
 __all__ = [
+    "capture_beam_metrics",
     "Beam",
     "BunchFrontTilt",
     "GdfSource",
