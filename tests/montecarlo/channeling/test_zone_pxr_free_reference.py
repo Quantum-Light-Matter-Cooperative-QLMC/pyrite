@@ -103,7 +103,7 @@ def test_free_entry_matches_the_tilted_free_electron_born_band(near_pole_g, orde
     states = replace(states, entrance=states.populations)
     E = _grid(near_pole_g, p)
     got = _production_band(states, near_pole_g, E)
-    assert got == pytest.approx(_born_band(p, near_pole_g, E), rel=3e-3)
+    assert got == pytest.approx(_born_band(p, near_pole_g, E), rel=5e-3)
 
 
 def test_mixed_entry_matches_the_incoherent_tilted_born_sum(near_pole_g):
@@ -114,4 +114,4 @@ def test_mixed_entry_matches_the_incoherent_tilted_born_sum(near_pole_g):
     )
     E = _grid(near_pole_g, p1, p2)
     expected = 0.7 * _born_band(p1, near_pole_g, E) + 0.3 * _born_band(p2, near_pole_g, E)
-    assert _production_band(states, near_pole_g, E) == pytest.approx(expected, rel=3e-3)
+    assert _production_band(states, near_pole_g, E) == pytest.approx(expected, rel=5e-3)

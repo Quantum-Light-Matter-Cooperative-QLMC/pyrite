@@ -101,9 +101,18 @@ def test_source_kernel_sees_the_in_plane_beam_for_an_off_plane_tilt(laue, monkey
         calls.append((geometry.beam.copy(), g, n, E0))
         return np.zeros(np.asarray(grid).size)
 
+    incidence = []
+    entry = planar_zone_pxr.entry_weights
+
+    def entry_spy(case, solver, incidence_rad, divergence_rad):
+        incidence.append(incidence_rad)
+        return entry(case, solver, incidence_rad, divergence_rad)
+
     monkeypatch.setattr(zone_pxr, "binned_reflection_spectrum", capture)
+    monkeypatch.setattr(planar_zone_pxr, "entry_weights", entry_spy)
     channeling_emission.case_channeling_spectrum(case, transport)
     assert calls
+    assert incidence == [pytest.approx(float(full @ x_hat), rel=1e-9)]  # p = P psi
     energy_eV = float(case["E0_keV"]) * 1e3
     for beam, g, n, E0 in calls:
         assert abs(beam @ x_hat) < 1e-12
