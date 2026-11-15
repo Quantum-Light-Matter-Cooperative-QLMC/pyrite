@@ -458,8 +458,9 @@ class Sweep:
     #       and the mosaic yield change); the analytic term is then suppressed so the
     #       broadening is not double-counted. Costs mosaic_nodes**2 x the line hot loop
     #       (serial under CuPy). See docs/physics/materials/crystal-mosaicity.md.
+    #   "mc-sampled"          -> that average from mosaic_nodes tilts drawn per history (#1185).
     mosaic_route: str = "analytic"
-    mosaic_nodes: int = 5  # Gauss-Hermite nodes/tilt-axis for mosaic_route="mc" (K=nodes^2)
+    mosaic_nodes: int = 5  # "mc": GH nodes/tilt axis (K=nodes^2); "mc-sampled": draws/history
     # Per-call automatic line-grid policy (issue #101). The TOP of the precedence
     # chain together with an explicit ``EnergyBins.cxr``: supplying one here
     # outranks ``PYRITE_ENERGY_GRID_*`` and any stored catalog row. Accepts
@@ -914,14 +915,14 @@ def _sweep_orientation(sweep: Sweep, cp: dict) -> ResolvedCut:
     return resolve_crystal_cut(cut, beam_uvw, surface_hkl)
 
 
-def _mosaic_case_keys(sweep: Sweep, cp: dict) -> tuple[float | None, float | None]:
-    """Return ``(analytic_rad, mc_rad)``: the mosaic FWHM on at most one route.
+def _mosaic_case_keys(sweep: Sweep, cp: dict) -> dict[str, Any]:
+    """Case mosaic keys: the mosaic FWHM on at most one route, plus its rule.
 
     Crystal mosaicity is None unless the run enables it AND the crystal has a
     mosaic_fwhm_deg (or the Sweep overrides it); None is a perfect crystal, so
-    store_result adds no mosaic term (exact no-op). The exact MC route does the
-    broadening INSIDE mc_cxr_spectrum and turns the analytic store_result term
-    OFF (mutually exclusive -- applying both double-counts).
+    store_result adds no mosaic term (exact no-op). The exact MC routes do the
+    broadening INSIDE mc_cxr_spectrum and turn the analytic store_result term
+    OFF (mutually exclusive -- applying both double-counts). Validation: mosaic-mc-sampled
     """
     assert sweep.target is not None
     mosaic_deg = None
@@ -932,11 +933,15 @@ def _mosaic_case_keys(sweep: Sweep, cp: dict) -> tuple[float | None, float | Non
             else CATALOG.crystal(cp["crystal"]).mosaic_fwhm_deg
         )
     mosaic_fwhm_rad = float(np.deg2rad(mosaic_deg)) if mosaic_deg else None
-    if sweep.mosaic_route not in ("analytic", "mc"):
-        raise ValueError(f"mosaic_route must be 'analytic' or 'mc', got {sweep.mosaic_route!r}")
-    if mosaic_fwhm_rad is not None and sweep.mosaic_route == "mc":
-        return None, mosaic_fwhm_rad
-    return mosaic_fwhm_rad, None
+    if sweep.mosaic_route not in ("analytic", "mc", "mc-sampled"):
+        raise ValueError(f"mosaic_route must be analytic, mc or mc-sampled: {sweep.mosaic_route!r}")
+    keys: dict[str, Any] = {"mosaic_mc_nodes": sweep.mosaic_nodes}
+    if mosaic_fwhm_rad is None or sweep.mosaic_route == "analytic":
+        return keys | {"mosaic_fwhm_rad": mosaic_fwhm_rad, "mosaic_mc_fwhm_rad": None}
+    keys |= {"mosaic_fwhm_rad": None, "mosaic_mc_fwhm_rad": mosaic_fwhm_rad}
+    if sweep.mosaic_route == "mc-sampled":  # Gauss-Hermite case keys stay unchanged
+        keys["mosaic_mc_sampling"] = "history"
+    return keys
 
 
 def _history_counts(grid: Any, fallback: Any, label: str) -> list[int]:
@@ -1140,7 +1145,6 @@ def build_cases(
     # metadata and editing one must not invalidate stored checkpoints.
     material_spec = CATALOG.materials.get(target.material)
     name_stem = material_spec.key if material_spec is not None else target.material
-    mosaic_analytic_rad, mosaic_mc_rad = _mosaic_case_keys(sweep, cp)
     brem_case_grid = floored_brem_case_grid(sweep, brem_grid)
     case_brem = case_brem_resolver(sweep, brem_case_grid)
     ne_pairs = list(
@@ -1217,9 +1221,7 @@ def build_cases(
                         **model_keys,
                         beam_uvw=beam_uvw,
                         surface_hkl=surface_hkl,
-                        mosaic_fwhm_rad=mosaic_analytic_rad,  # analytic term (None if route="mc")
-                        mosaic_mc_fwhm_rad=mosaic_mc_rad,  # exact MC route (None if route="analytic")
-                        mosaic_mc_nodes=sweep.mosaic_nodes,
+                        **_mosaic_case_keys(sweep, cp),  # FWHM on one route + rule
                         brem_file=None,
                         Ne=ne_line,
                         Ne_brem=ne_brem,

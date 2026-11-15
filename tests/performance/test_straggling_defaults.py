@@ -45,6 +45,46 @@ def test_missing_primary_is_rejected(score, monkeypatch):
         score({"electron_id": np.array([0]), "event_kind": np.array([5])}, 2, 30.0)
 
 
+def test_beam_miss_counted_by_transport_is_scored_not_rejected(score, monkeypatch):
+    from pyrite.montecarlo.transport import events
+
+    monkeypatch.setattr(events, "check_segment_event_contract", lambda result: None)
+    # Primary 1 landed off the crystal face: no rows, counted in n_missed.
+    result = {
+        "electron_id": np.array([0, 2]),
+        "event_kind": np.array([5, 4]),
+        "E_start_keV": np.array([30.0, 30.0]),
+        "E_end_keV": np.array([29.0, 28.0]),
+        "hard_W_keV": np.zeros(2),
+        "hard_radiative_k_eV": np.zeros(2),
+        "L_ang": np.array([1.0, 2.0]),
+        "n_missed": 1,
+    }
+    scores, error = score(result, 3, 30.0)
+    assert error == 0
+    np.testing.assert_array_equal(scores["missed"], [0, 1, 0])
+    np.testing.assert_array_equal(scores["final_keV"], [29, 30, 28])
+    np.testing.assert_array_equal(scores["rows"], [1, 0, 1])
+    # A row-less primary that transport did not count as missed stays refused.
+    with pytest.raises(ValueError, match="incomplete"):
+        score(result | {"n_missed": 0}, 3, 30.0)
+    # So does a primary with rows but no terminal record.
+    partial = result | {
+        k: np.append(result[k], v)
+        for k, v in {
+            "electron_id": 1,
+            "event_kind": 8,
+            "E_start_keV": 30.0,
+            "E_end_keV": 30.0,
+            "hard_W_keV": 0.0,
+            "hard_radiative_k_eV": 0.0,
+            "L_ang": 1.0,
+        }.items()
+    }
+    with pytest.raises(ValueError, match="incomplete"):
+        score(partial, 3, 30.0)
+
+
 def test_evidence_rejects_corruption_and_duplicate_seeds(tmp_path):
     script = Path(__file__).resolve().parents[2] / "checks/straggling_defaults/analyze.py"
     read_groups = runpy.run_path(str(script))["read_groups"]

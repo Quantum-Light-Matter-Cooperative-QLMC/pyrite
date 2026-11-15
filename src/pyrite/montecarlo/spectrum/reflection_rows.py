@@ -58,6 +58,8 @@ def reflection_rows(
     recip_miscut_rad=None,
     mosaic_fwhm_rad=None,
     mosaic_nodes: int = 1,
+    mosaic_sampling: str = "quadrature",
+    mosaic_seed: int | None = None,
     electron_limit: int | None = None,
     label_prefix: str = "",
     composition: Iterable[tuple[str, float]] | None = None,
@@ -69,6 +71,10 @@ def reflection_rows(
     The shared kinematics behind :func:`resonance_populations` and the
     coherent window seeds; see :func:`kinematic_cxr_seeds` for the source
     equation and root solver.
+
+    Under ``mosaic_sampling="history"`` each orientation entry is one draw
+    of every piece's own history crystallite (weight ``1/mosaic_nodes``), the
+    rows the per-history sampled route scores. Validation: mosaic-mc-sampled
 
     Validation: line-window-seeding, line-kinematics-precision
     """
@@ -92,6 +98,8 @@ def reflection_rows(
     length = _host(segments["L_ang"]).astype(float, copy=False)
     direction = _host(segments["v_hat"]).astype(float, copy=False).reshape(-1, 3)
     index = np.arange(energy.size)
+    history = mosaic_sampling == "history" and bool(mosaic_fwhm_rad)
+    owner = _host(segments["elec_id"]).astype(np.int64, copy=False) if history else index
     if electron_limit is not None:
         line = _host(segments["elec_id"]) < int(electron_limit)
         energy, length, direction = energy[line], length[line], direction[line]
@@ -111,6 +119,7 @@ def reflection_rows(
     gamma = gamma[usable]
     n_vector = np.asarray(n_hat, dtype=float)
     gradient, index = gradient[usable], index[usable]
+    owner = owner[index]
     v_dot_grad = np.sum(velocity * gradient, axis=1)
     grad2 = np.sum(gradient**2, axis=1)
     flight_time = parent_length[usable] / beta[usable]
@@ -136,7 +145,9 @@ def reflection_rows(
     rotation = _orientation_R(
         lattice, beam_uvw, azimuth_rad, recip_miscut_rad, surface_hkl=surface_hkl
     )
-    orientations = _mosaic_quadrature(mosaic_fwhm_rad, mosaic_nodes) or [(None, 1.0)]
+    sampled, orientations = _seed_orientations(
+        history, owner, mosaic_seed, mosaic_fwhm_rad, mosaic_nodes
+    )
 
     reflections = []
     for hkl in hkl_list:
@@ -145,13 +156,13 @@ def reflection_rows(
             g_vector = rotation @ g_vector
         rows = []
         for mosaic_rotation, mosaic_weight in orientations:
-            g_row = g_vector if mosaic_rotation is None else mosaic_rotation @ g_vector
+            v_dot_g, n_dot_g, g2 = _orientation_terms(
+                sampled, mosaic_rotation, g_vector, velocity, n_vector
+            )
             # Exact recoil root and slope, as the kernels place each line.
             # Validation: line-recoil-in-medium-root
-            r_num, r_den, inv_E = _line_recoil_terms(
-                gamma, float(g_row @ g_row), float(n_vector @ g_row)
-            )
-            numerator = velocity @ g_row - r_num
+            r_num, r_den, inv_E = _line_recoil_terms(gamma, g2, n_dot_g)
+            numerator = v_dot_g - r_num
             with np.errstate(divide="ignore", invalid="ignore"):
                 if refractive is None:
                     denominator = vacuum + r_den
@@ -175,3 +186,30 @@ def reflection_rows(
         weight=weight,
         reflections=reflections,
     )
+
+
+def _seed_orientations(history, owner, seed, fwhm_rad, nodes):
+    """``(sampled, [(orientation, weight)])``: GH rotations, or draw indices.
+
+    Validation: mosaic-mc, mosaic-mc-sampled
+    """
+    if not history:
+        return None, _mosaic_quadrature(fwhm_rad, nodes) or [(None, 1.0)]
+    from .cxr._mosaic_sampled import sampled_mosaic
+
+    sampled = sampled_mosaic(owner, seed, fwhm_rad, nodes)
+    return sampled, [(draw, 1.0 / sampled.draws) for draw in range(sampled.draws)]
+
+
+def _orientation_terms(sampled, orientation, g_vector, velocity, n_vector):
+    """``(v.g, n.g, g.g)`` of one orientation entry over the usable pieces.
+
+    Sampled entries rotate ``g`` by each piece's own history crystallite;
+    ``|g|`` is rotation-invariant. Validation: mosaic-mc-sampled
+    """
+    if sampled is not None:
+        g_row = sampled.orientation_rows(g_vector, n_vector, orientation)[0]
+        g_row = g_row[sampled.row_history]
+        return np.sum(velocity * g_row, axis=1), g_row @ n_vector, float(g_vector @ g_vector)
+    g_row = g_vector if orientation is None else orientation @ g_vector
+    return velocity @ g_row, float(n_vector @ g_row), float(g_row @ g_row)

@@ -19,7 +19,13 @@ def digest(path):
 
 
 def primary_scores(result, n, energy_keV):
-    """Keep hard debits on terminal rows and refuse incomplete populations."""
+    """Keep hard debits on terminal rows and refuse incomplete populations.
+
+    A primary whose beam entry lands off the finite crystal face is a beam
+    miss: transport counts it in ``n_missed`` and emits no rows. Such a
+    primary scores ``missed = 1`` and leaves with its incident energy; any
+    other primary without exactly one terminal row is refused.
+    """
     from pyrite.montecarlo.transport.events import check_segment_event_contract
     from pyrite.perf.precision import grouped_scores
 
@@ -27,7 +33,15 @@ def primary_scores(result, n, energy_keV):
     ids = np.asarray(result["electron_id"], dtype=int)
     kind = np.asarray(result["event_kind"])
     terminal = np.isin(kind, [4, 5, 6, 7])
-    if not np.array_equal(np.sort(ids[terminal]), np.arange(n)):
+    if ids.size and (ids.min() < 0 or ids.max() >= n):
+        raise ValueError("incomplete or duplicate primary terminal records")
+    count = np.bincount(ids[terminal], minlength=n)
+    missed = count == 0
+    if (
+        np.any(count > 1)
+        or int(missed.sum()) != int(result.get("n_missed", 0) or 0)
+        or np.isin(np.flatnonzero(missed), ids).any()
+    ):
         raise ValueError("incomplete or duplicate primary terminal records")
     start = np.asarray(result["E_start_keV"])
     end = np.asarray(result["E_end_keV"])
@@ -35,11 +49,11 @@ def primary_scores(result, n, energy_keV):
     photons = np.asarray(result["hard_radiative_k_eV"]) * 1e-3
     remaining = end[terminal] - hard[terminal] - photons[terminal]
     loss = grouped_scores(ids, start - end + hard + photons, n)
-    final = grouped_scores(ids[terminal], remaining, n)
+    final = grouped_scores(ids[terminal], remaining, n) + energy_keV * missed
     residual = float(np.max(np.abs(loss + final - energy_keV)))
     if residual > 1e-7 or np.any(remaining < -1e-9):
         raise ValueError(f"primary energy ledger failed: {residual} keV")
-    scores = {"final_keV": final}
+    scores = {"final_keV": final, "missed": missed.astype(np.float64)}
     for name, code in [
         ("backscattered", 4),
         ("transmitted", 5),

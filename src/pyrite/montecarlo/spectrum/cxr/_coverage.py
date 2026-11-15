@@ -16,6 +16,7 @@ from ...._env import env_value
 from ....materials.atomic import _chantler_bounds
 from ....materials.crystal import _EDGE_PRONE, HBARC_EV_ANG, reciprocal_g_vector
 from ....materials.photon_cross_sections import EPDL_E_MIN_EV
+from ...geometry import _mosaic_quadrature
 from ..reflection_rows import MIN_RESONANCE_EV
 from ._kernels import (
     _cxr_emission_ceiling,
@@ -156,6 +157,19 @@ _COUNT_KEYS = (
 _PAIR_BUDGET = 1 << 19
 
 
+def _screening_orientations(st):
+    """Orientations the coverage screen counts against.
+
+    The per-history sampled mosaic has no fixed orientation set; it screens
+    against the Gauss-Hermite nodes of the same width and ``mosaic_nodes``,
+    which span the same tilt cone. Counts stay unweighted diagnostics.
+    """
+    if st.mosaic_sampled is not None:
+        req = st.request
+        return _mosaic_quadrature(req.mosaic_fwhm_rad, max(int(req.mosaic_nodes), 2))
+    return st.mosaic_quad or [(None, 1.0)]
+
+
 def _reflection_rows(st):
     """Float64 lab-frame g of every requested reflection and weighted orientation."""
     rows = []
@@ -163,7 +177,7 @@ def _reflection_rows(st):
         g, _ = reciprocal_g_vector(hkl, st.info["lattice"])
         if st.R_orient is not None:
             g = st.R_orient @ g
-        for rotation, weight in st.mosaic_quad or [(None, 1.0)]:
+        for rotation, weight in _screening_orientations(st):
             if weight > 0:
                 rows.append(np.asarray(g if rotation is None else rotation @ g, dtype=np.float64))
     return np.asarray(rows, dtype=np.float64).reshape(-1, 3)

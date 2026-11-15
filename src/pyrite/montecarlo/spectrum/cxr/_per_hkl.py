@@ -19,8 +19,8 @@ from ..coherent_population import mixed_row_power, pair_scale
 from ..coherent_transverse import transverse_envelope, transverse_form_factor
 from ..segment_escape import piece_mean_transmission
 from . import _policy
-from ._bin_quadrature import resolve_bin_reduction, sincsq_bin_lineshape
-from ._bin_queue import BinLineQueues
+from ._bin_quadrature import sincsq_bin_lineshape
+from ._bin_queue import flush_bin_line_queues, open_bin_line_queues
 from ._cpu_reduce import accumulate_sincsq, numpy_backend
 from ._escape_mu import escape_mu_tables
 from ._formation import (
@@ -46,6 +46,7 @@ from ._kernels import (
     _rowdot3,
     _sincsq_lineshape,
 )
+from ._mosaic_sampled import accumulate_sampled_mosaic, dot_g, kept_orientation
 from ._node_window import accumulate_sincsq_windowed
 from ._recoil import (
     _line_recoil_terms,
@@ -823,7 +824,7 @@ def _accumulate_reflection(
     tabulations (chi/u on E_tab_g) depend on hkl and energy only -- NOT on
     the mosaic orientation -- while g and its sigma/pi polarization pair
     (``e_s``, ``e_p``) vary per orientation. wm = 1.0 for the perfect-crystal
-    path.
+    path. The sampled mosaic passes g, e_s, e_p and dots per row (mosaic-mc-sampled).
 
     Validation: segment-escape-average
     Validation: temporal-intensity-profile
@@ -854,7 +855,7 @@ def _accumulate_reflection(
     #   omega_res = v.g / (1 - v.n - delta v.grad L)   [1/Ang]   (>0 radiates)
     #   exact recoil: v.g -> v.g - r_num, denominator + r_den
     #   (Validation: line-recoil-in-medium-root)
-    v_dot_g = _matvec3(v_all, g_vec_d)
+    v_dot_g = dot_g(v_all, g_vec_d)
     r_num, r_den, inv_E = _line_recoil_terms(gamma_all, g2, n_dot_g)
     grad = st.escape_gradient
     denom, delta_seg = _in_medium_kinematics(
@@ -881,6 +882,8 @@ def _accumulate_reflection(
     if not keep.any():
         return
     idx = xp.flatnonzero(keep)
+    orient = kept_orientation(idx, g_vec_d, e_s, e_p, n_dot_g, g_dot_es, g_dot_ep)
+    g_vec_d, e_s, e_p, n_dot_g, g_dot_es, g_dot_ep = orient
 
     E_r = E_res[idx]  # line energy per kept segment [eV]
     om = omega_res[idx]  # same in 1/Ang
@@ -912,7 +915,7 @@ def _accumulate_reflection(
     grad2 = (grad[idx] ** 2).sum(axis=1)
     k_mag = om * xp.sqrt(xp.where(grad2 == 0.0, 1.0, 1.0 - 2.0 * delta + delta**2 * grad2))
     k_dot_v = om * ((1.0 - dnm) + r_den_i)
-    k_dot_g = om * (n_dot_g + delta * _matvec3(grad[idx], g_vec_d))
+    k_dot_g = om * (n_dot_g + delta * dot_g(grad[idx], g_vec_d))
     detuning = g2 + 2.0 * k_dot_g
 
     # -- 5. Eq. (13)/(14) amplitudes with the exact second-order quantum
@@ -924,8 +927,8 @@ def _accumulate_reflection(
     A2_cbs = xp.zeros(idx.size, dtype=REAL)
     pol_A = []  # complex A = A_PXR + A_CBS per polarization (coherent path)
     for e_d, g_dot_e in ((e_s, g_dot_es), (e_p, g_dot_ep)):
-        v_dot_e = _matvec3(v, e_d)
-        k_dot_e = om * delta * _matvec3(grad[idx], e_d)
+        v_dot_e = dot_g(v, e_d)
+        k_dot_e = om * delta * dot_g(grad[idx], e_d)
         if coherent or grouped:
             # Complex amplitudes retained verbatim -- the phased-field paths
             # (global-coherent and flight-grouped) keep the un-reassociated
@@ -1184,21 +1187,25 @@ def _accumulate_per_hkl(st):
     E_tab = st.E_tab
     mosaic_quad = st.mosaic_quad
 
-    # Stacking prologue: every host->device transfer this path needs is done
-    # ONCE per case here, not once per (reflection, orientation) inside the
-    # loop. Previously each pass re-uploaded the four chi/U tabulations plus
-    # g and its two polarization vectors -- ~90 xp.asarray calls per case,
-    # 15% of GPU-phase tottime on the 3060 Ti profile (hopg_coherent, 4
-    # reflections). The chi/U rows are keyed by REFLECTION (they do not
-    # depend on the mosaic orientation), the geometry rows by
-    # (reflection, orientation). U_g/m_e is now pre-scaled at table build and
-    # the fallback shares one interpolation bracket; these are algebraically
-    # identical with only float-rounding-level movement.
+    # Stacking prologue: every host->device transfer is done ONCE per case, not
+    # per (reflection, orientation) row (per-row uploads were 15% of GPU-phase
+    # time, 3060 Ti hopg_coherent). chi/U rows are keyed by REFLECTION, geometry
+    # rows by (reflection, orientation); U_g/m_e is pre-scaled at table build.
     _nsys_push("pyrite.lines.tab")
     g_rows, es_rows, ep_rows, wm_rows, hkl_of_row = [], [], [], [], []
     CHI_RE, CHI_IM, U_RE, U_IM = _reflection_tables(  # (N_hkl, N_tab)
         crystal, hkl_list, E_tab, B_ang2, use_henke
     )
+    # Exact per-layer (or groove) escape mu, folded once per call.
+    mu_tables = escape_mu_tables(req, st.abs_comp)
+    open_bin_line_queues(st)
+    if st.mosaic_sampled is not None:
+        _nsys_pop()
+        accumulate_sampled_mosaic(
+            st, (CHI_RE, CHI_IM, U_RE, U_IM), _accumulate_reflection, mu_tables
+        )
+        flush_bin_line_queues(st)
+        return
     orients = ((None, 1.0),) if mosaic_quad is None else mosaic_quad
     for i_hkl, hkl in enumerate(hkl_list):
         # reciprocal vector in the sample frame: construction frame by default
@@ -1221,13 +1228,8 @@ def _accumulate_per_hkl(st):
     N_DOT_G = _matvec3(G, n_hat_d)
     G_DOT_ES = _rowdot3(G, ES)
     G_DOT_EP = _rowdot3(G, EP)
-    # Exact per-layer (or groove) escape mu, folded once per call.
-    mu_tables = escape_mu_tables(req, st.abs_comp)
     _nsys_pop()
 
-    edges = st.bin_edges
-    if edges is not None and not numpy_backend() and resolve_bin_reduction(edges)[0] == "fourier":
-        st.bin_line_queues = BinLineQueues(st.E_grid, edges, st.bin_inv_width)
     for i_row, (wm, i_hkl) in enumerate(zip(wm_rows, hkl_of_row, strict=True)):
         _accumulate_reflection(
             st,
@@ -1245,6 +1247,4 @@ def _accumulate_per_hkl(st):
             wm,
             mu_tables,
         )
-    if st.bin_line_queues is not None:
-        st.bin_line_queues.flush()
-    st.bin_line_queues = None
+    flush_bin_line_queues(st)
