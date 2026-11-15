@@ -32,8 +32,33 @@ mesh.
 Since #1201 the mesh is edge-resolved geometric: spacing `max(1 eV, 1e-3 E)`,
 with the 1 eV mesh kept within 3 % of every edge
 ([`line-absorption-tabulation`](../../validation/radiation-physics/line-absorption-tabulation.md)).
-On Si the band now has 5,310 points and the automatic axis 9,322, so both hold
+On Si the band now has 5,249 points and the automatic axis 9,261, so both hold
 8,192 reflections per float32 call.
+
+## Edge-geometric mesh (#1201)
+
+[Machine-readable measurements](data/line-table-mesh-2026-11-15.json). The
+profiler is `checks/cxr_tab_grid_1201.py`. It runs the production selection
+with the former uniform 1 eV mesh and with the edge-geometric mesh,
+round-robin, two passes each after one warm-up per arm. The hardware was
+MoLab's RTX PRO 6000 (CUDA, float32), and the code was 43d0bae9f. The frozen
+#642 transports are as above. Spreads were below 1 %. "Pool" is the device
+memory-pool reservation after the selection.
+
+| Scene / axis | `n_tab` | Reflections per call | Wall (s) | Pool (GB) |
+|---|---|---|---|---|
+| Si automatic | 362,289 → 9,261 | 370 → 8,192 | 35.6 → 28.2 | 5.18 → 3.98 |
+| Si band node | 13,616 → 5,249 | 8,192 | 2.96 → 2.94 | 4.57 → 3.45 |
+| Si band bin-mean | 13,616 → 5,249 | 8,192 | 6.14 → 6.10 | 3.84 → 1.91 |
+| Layered automatic | 38,560 → 8,602 | ~3,500 → 8,192 | 11.8 → 11.2 | 9.85 → 7.90 |
+| Layered band node | 14,186 → 6,070 | 8,192 | 24.3 → 24.2 | 10.48 → 6.92 |
+
+Every arm selects the same reflection set. Against the uniform-mesh spectrum,
+yield moves by at most 5.1e-7. The maximum difference is at most 2.9e-6 of
+the peak, and at most 2.4e-5 relative over nodes above 1e-3 of the peak. The
+accuracy record is the
+[`line-absorption-tabulation`](../../validation/radiation-physics/line-absorption-tabulation.md)
+ledger row.
 
 ## Protocol
 
