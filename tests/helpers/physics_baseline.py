@@ -20,6 +20,7 @@ def resolved_baseline(kind):
     """
     sweep = Sweep(
         material="silicon",
+        n_families=4,
         beam=BeamSpec(energy_keV=40.0),
         thickness_ang=20000.0,
         tilt_deg=30.0,
@@ -217,6 +218,7 @@ def channeling_output_baseline():
     from pyrite.montecarlo import runner
 
     numerics = pr.Numerics(
+        cxr_reflections=pr.config.CxrReflections(n_families=4),
         sampling=FixedSampling(cxr_histories=16, brem_histories=16),
         energy_bins=EnergyBins(**_CHANNELING_BINS),
     )
@@ -257,6 +259,7 @@ def resolved_channeling_baseline():
 
     scene = _channeling_scene()
     numerics = pr.Numerics(
+        cxr_reflections=pr.config.CxrReflections(n_families=4),
         sampling=FixedSampling(cxr_histories=4, brem_histories=4),
         energy_bins=EnergyBins(**_CHANNELING_BINS),
     )

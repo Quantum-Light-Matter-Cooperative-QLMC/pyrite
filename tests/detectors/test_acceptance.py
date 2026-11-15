@@ -209,7 +209,7 @@ def test_equal_acceptance_preserves_lowered_case_and_both_identities():
     # #1191: segment-mean-v8-node-support-tail escape marker.
     assert (
         case_content_key(cases[1])
-        == "001d3890a77a3b77b778aa64db18a42765691dd9e6b4c6b737a85cdd2626aafd"
+        == "33a93cc5a9a0ba34167893369ff41477fba3a69e97cc8dc981a009d4955fc04b"
     )
     sweeps = [
         LegacySweep(material="hopg", beam=beam.to_spec(), target=target, detector=d)
@@ -219,7 +219,7 @@ def test_equal_acceptance_preserves_lowered_case_and_both_identities():
     assert identities[0] == identities[1]
     assert (
         identities[1]["parameter_sha256"]
-        == "4a54a743349dd62a902054e2ba077c357940c0cf0aaba4086397bdc6512a439c"
+        == "68b9c888ad408851ad23deca868945bbe567fc98f15039cbb369b282677e7f71"
     )
     # Pin to the pre-object payload vocabulary; no acceptance metadata enters identity.
     assert "detector" not in identities[0]["resolved_parameters"]["sweep"]

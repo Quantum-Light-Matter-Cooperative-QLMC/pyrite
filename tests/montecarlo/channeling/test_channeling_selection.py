@@ -38,7 +38,8 @@ def _scene(physics=None, *, energy_keV=5000.0, channeling=PLANAR, **slab):
 
 
 def _case(physics=None, numerics=None, **kwargs):
-    return api.build_case(_scene(physics, **kwargs), numerics or pr.Numerics())
+    fixed = pr.Numerics(cxr_reflections=pr.config.CxrReflections(n_families=4))
+    return api.build_case(_scene(physics, **kwargs), numerics or fixed)
 
 
 @pytest.fixture(scope="module")

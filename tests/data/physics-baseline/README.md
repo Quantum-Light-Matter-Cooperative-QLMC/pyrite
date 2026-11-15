@@ -396,3 +396,13 @@ the channeling plane, because the off-plane tilt is already carried by the
 entrance momentum. Only the `case_content_key` in `channeling.json` was
 re-pinned. The recorded case has tilt azimuth 45°, so ψ ≈ 0 and its output
 keeps its expectation and tolerance.
+
+## Measured reflection-selection policy (#1173)
+
+The compatibility fixtures now request `n_families=4` explicitly, preserving
+all resolved case payloads and recorded numerical outputs while the omitted
+control adopts measured selection. Only active identity pins in
+`resolved.json` and `channeling.json` advance for
+`CXR_REFLECTION_SELECTION_MODEL=measured-shell-cutoff-v2`; payload equality is
+asserted before re-pinning. The retired, refused `eedl-fallback` resolved entry
+remains historical. No output arrays or numerical tolerances are regenerated.

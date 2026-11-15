@@ -431,7 +431,7 @@ def test_missing_material_rows_reach_automatic_case_policy(tmp_path, monkeypatch
         text += f"\n[energy_grids.sample]\nline_by_energy = [{own_entries}]\n"
     catalog = load_material_catalog(_write_catalog(tmp_path, text))
     monkeypatch.setattr(config, "CATALOG", catalog)
-    cases = build_cases(config.material_sweep("sample"))
+    cases = build_cases(config.material_sweep("sample", n_families=4))
     for case in cases:
         if own_entries is not None and case["E0_keV"] == 25.0:
             assert "line_grid_policy" not in case
@@ -441,6 +441,11 @@ def test_missing_material_rows_reach_automatic_case_policy(tmp_path, monkeypatch
         else:
             assert case["line_grid_policy"]["resolution"]["policy"] == "sinc-nyquist"
             assert case["line_grid_policy"]["bandwidth"]["policy"] == "kinematic-ceiling"
+
+    # Family-derived cached rows cannot bound the new selector's candidate set.
+    selected = build_cases(config.material_sweep("sample"))
+    assert all(case["reflection_selection"]["automatic"] for case in selected)
+    assert all("line_grid_policy" in case for case in selected)
 
 
 def test_material_config_error_groups_identical_messages_across_materials(tmp_path):

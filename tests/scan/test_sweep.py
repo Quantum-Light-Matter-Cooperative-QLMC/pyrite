@@ -215,6 +215,7 @@ def test_build_cases_selects_and_encodes_line_grid_for_each_beam_energy():
     cases = build_cases(
         Sweep(
             material="mose2",
+            n_families=4,
             thickness_ang=100.0,
             beam=BeamSpec(energy_keV=[30.0, 50.0]),
             tilt_deg=5.0,
@@ -297,6 +298,7 @@ def test_missing_per_beam_line_grid_resolves_automatically(monkeypatch):
     cases = build_cases(
         Sweep(
             material="mose2",
+            n_families=4,
             beam=BeamSpec(energy_keV=[30.0, 50.0]),
             energy_bins=_bins(cxr_by_energy={30.0: np.array([10.0])}),
         )
@@ -1425,9 +1427,9 @@ def test_layered_sweep_grids_span_every_layer_and_leave_the_film_alone():
 
     beam = BeamSpec(energy_keV=30.0)
     target = Stack.on_substrate("mos2", 2000.0, "silicon", 2.0e5, footprint=None, tilt_deg=30.0)
-    (stacked,) = build_cases(Sweep(material="mos2", beam=beam, target=target), 1, 1)
-    (film,) = build_cases(Sweep(material="mos2", beam=beam), 1, 1)
-    (substrate,) = build_cases(Sweep(material="silicon", beam=beam), 1, 1)
+    (stacked,) = build_cases(Sweep(material="mos2", beam=beam, target=target, n_families=4), 1, 1)
+    (film,) = build_cases(Sweep(material="mos2", beam=beam, n_families=4), 1, 1)
+    (substrate,) = build_cases(Sweep(material="silicon", beam=beam, n_families=4), 1, 1)
 
     np.testing.assert_array_equal(
         decode_energy_grid(stacked["E_grid_brem"]),

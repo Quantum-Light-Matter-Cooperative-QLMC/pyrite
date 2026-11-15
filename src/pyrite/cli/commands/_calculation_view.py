@@ -53,6 +53,22 @@ def _plain(rows: Iterable[Row]) -> list[tuple[str, object, object]]:
     return [(row["label"], row["effective"], row["source"]) for row in rows]
 
 
+def reflection_rows(rows: list[Row]) -> list[tuple[str, object, object]]:
+    """Describe omitted reflection controls as their requested automatic policy."""
+    values = {row["key"]: row["effective"] for row in rows}
+    if values.get("n_families") is not None:
+        return _plain(rows)
+    automatic = values.get("max_reflections") is None
+    display = {
+        "n_families": "automatic" if automatic or values.get("line_yield_tolerance") else 4,
+    }
+    if automatic and values.get("line_yield_tolerance") is None:
+        display["line_yield_tolerance"] = "automatic (0.001)"
+    return [
+        (row["label"], display.get(row["key"], row["effective"]), row["source"]) for row in rows
+    ]
+
+
 def sampling_rows(rows: list[Row], adaptive: Mapping[str, Any] | None):
     """Sampling rows led by the history-count mode; fixed counts unused when adaptive."""
     if adaptive is None:
@@ -90,9 +106,13 @@ def emit_numerics(rows: Iterable[Row], *, adaptive: Mapping[str, Any] | None = N
     """Render Numerics-owned rows in groups; physics rows are ignored."""
     selected = [row for row in rows if row["key"] not in PHYSICS_KEYS]
     for title, group in _grouped(selected, _NUMERICS_GROUPS, "Integration"):
-        emit_settings(
-            title, sampling_rows(group, adaptive) if title == "Sampling" else _plain(group)
-        )
+        if title == "Sampling":
+            values = sampling_rows(group, adaptive)
+        elif title == "Reflections and mosaic":
+            values = reflection_rows(group)
+        else:
+            values = _plain(group)
+        emit_settings(title, values)
 
 
 def emit_physics(rows: Iterable[Row]) -> None:

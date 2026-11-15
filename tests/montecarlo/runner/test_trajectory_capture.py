@@ -708,6 +708,7 @@ def _production_case(kind, tmp_path, monkeypatch):
     elif kind == "multilayer":
         sweep = Sweep(
             material="mose2",
+            n_families=4,
             beam=BeamSpec(energy_keV=30.0),
             target=Stack.on_substrate(
                 "mose2", 300.0, "silicon", 3000.0, tilt_deg=-30.0, footprint=Footprint(5.0, 5.0)
@@ -717,6 +718,7 @@ def _production_case(kind, tmp_path, monkeypatch):
     elif kind == "secondaries":
         sweep = Sweep(
             material="silicon",
+            n_families=4,
             thickness_ang=2e4,
             beam=BeamSpec(energy_keV=30.0),
             tilt_deg=30.0,

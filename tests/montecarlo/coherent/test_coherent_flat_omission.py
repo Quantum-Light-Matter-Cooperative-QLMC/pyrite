@@ -468,7 +468,7 @@ def test_runner_limit_defaults_to_policy_and_honours_the_case():
 def test_case_validates_the_limit():
     from pyrite.campaign.sweep import BeamSpec, Sweep, build_cases
 
-    sweep = Sweep(material="mose2", beam=BeamSpec(energy_keV=30.0), tilt_deg=5.0)
+    sweep = Sweep(material="mose2", beam=BeamSpec(energy_keV=30.0), tilt_deg=5.0, n_families=4)
     legacy = build_cases(sweep, n_electrons=2, n_electrons_brem=1)[0]
     legacy = legacy.to_dict() if isinstance(legacy, Case) else dict(legacy)
     assert "coherent_flat_omission_limit" not in Case(**legacy)
