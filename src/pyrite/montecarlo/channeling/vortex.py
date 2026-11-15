@@ -24,19 +24,68 @@ alias-free; the radial integral is Gauss–Legendre. A plane wave of any tilt
 gives ``P_l = P_{-l}`` (Jacobi–Anger), hence ``<L_z> = 0`` about every
 centre.
 
+**Site symmetry.** ``l`` labels a crystal state only where the projected
+potential is ``C_m``-symmetric about ``c`` with ``m >= 3`` (``l mod m`` is
+conserved, so ``l = +1`` and ``-1`` stay distinct), and only for states below
+the inter-string saddle. On Si ⟨110⟩ the strings form close pairs: no string
+site or pair centre has ``C_m``, ``m >= 3``, and above the saddle the motion
+is chaotic (Shul'ga, Syshchenko, Tarnovsky & Isupov, NIMB 370, 1 (2016)).
+Given the ``profile``, :class:`CylindricalProjection` refuses such a centre
+unless ``symmetry="accept-asymmetric"`` acknowledges that ``P_l`` is then not a
+quantum-number distribution.
+
 Lengths in angstroms, momenta in 1/angstrom; ``L_z`` in units of ``hbar``.
 """
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass, field
+from typing import Literal
 
 import numpy as np
 
+from ...materials.channeling.axial import AxialProfile
 from .realspace import RealSpaceGrid
 
 #: Azimuthal nodes added above twice the largest occupied ``|l|``.
 _THETA_MARGIN = 16
+#: Smallest site rotation order for which ``l`` labels states.
+MIN_ELL_SITE_ORDER = 3
+#: Relative ``C_m`` residual (of the potential's full range) accepted as symmetric.
+SITE_SYMMETRY_TOL = 1e-6
+_SITE_ORDERS = (6, 4, 3, 2)
+_SITE_THETA = 48  # divisible by every order in _SITE_ORDERS
+
+SiteSymmetry = Literal["required", "accept-asymmetric"]
+
+
+def site_rotation_order(
+    profile: AxialProfile, center_ang, radius_ang: float, *, tol: float = SITE_SYMMETRY_TOL
+) -> int:
+    """Largest ``m`` in (6, 4, 3, 2) with ``U`` ``C_m``-symmetric about ``center_ang``, else 1.
+
+    ``U`` is the profile's Fourier series, sampled exactly on 6 rings over
+    ``(0, radius_ang]`` at 48 azimuths; ``C_m`` holds when the largest change
+    under a ``2 pi / m`` rotation is at most ``tol`` times ``max U - min U``.
+
+    Validation: cr-vortex-string-coupling
+    """
+    theta = 2.0 * np.pi * np.arange(_SITE_THETA) / _SITE_THETA
+    rho = np.linspace(radius_ang / 6.0, radius_ang, 6)
+    x = center_ang[0] + np.multiply.outer(rho, np.cos(theta)).ravel()
+    y = center_ang[1] + np.multiply.outer(rho, np.sin(theta)).ravel()
+    coeff = profile.potential_eV
+    m_max, n_max = (n // 2 for n in coeff.shape)
+    gx, gy = profile.g_inv_ang
+    ex = np.exp(1j * gx * np.multiply.outer(x, np.arange(-m_max, m_max + 1)))
+    ey = np.exp(1j * gy * np.multiply.outer(y, np.arange(-n_max, n_max + 1)))
+    u = np.einsum("pm,mn,pn->p", ex, coeff, ey).real.reshape(rho.size, _SITE_THETA)
+    low, high = profile.extrema()
+    for m in _SITE_ORDERS:
+        if np.abs(np.roll(u, -_SITE_THETA // m, axis=1) - u).max() <= tol * (high - low):
+            return m
+    return 1
 
 
 @dataclass(frozen=True)
@@ -64,6 +113,17 @@ class CylindricalProjection:
         Gauss–Legendre nodes in ``rho``; resolve the occupied band,
         ``n_radial >~ k_occ R`` (the default is exact to 1e-12 for smooth
         probes but ~1e-3 for white noise at ``k R ~ 100``).
+    profile
+        Crystal profile of the state (keyword-only). When given, the centre's
+        :func:`site_rotation_order` over the disk must be at least
+        ``MIN_ELL_SITE_ORDER``; omit it only for geometry-only use (free
+        vortex probes, analytic checks).
+    symmetry
+        ``"required"`` (default) raises ``ValueError`` below that order;
+        ``"accept-asymmetric"`` projects anyway with a ``UserWarning``,
+        acknowledging that ``P_l`` then mixes ``l`` and is not a label.
+    site_order
+        The computed rotation order, or ``None`` without a profile.
 
     Validation: cr-vortex-string-coupling
     """
@@ -73,6 +133,9 @@ class CylindricalProjection:
     radius_ang: float
     max_ell: int = 8
     n_radial: int = 48
+    profile: AxialProfile | None = field(default=None, kw_only=True, repr=False)
+    symmetry: SiteSymmetry = field(default="required", kw_only=True)
+    site_order: int | None = field(init=False, default=None)
     _rho: np.ndarray = field(init=False, repr=False)
     _rho_weight: np.ndarray = field(init=False, repr=False)
 
@@ -81,10 +144,32 @@ class CylindricalProjection:
             raise ValueError("radius_ang must be positive and 2R must fit in the cell")
         if self.max_ell < 0 or self.n_radial < 2:
             raise ValueError("max_ell must be >= 0 and n_radial >= 2")
+        if self.symmetry not in ("required", "accept-asymmetric"):
+            raise ValueError("symmetry must be 'required' or 'accept-asymmetric'")
+        if self.profile is not None:
+            self._check_site(self.profile)
         nodes, weights = np.polynomial.legendre.leggauss(self.n_radial)
         rho = 0.5 * self.radius_ang * (nodes + 1.0)
         object.__setattr__(self, "_rho", rho)
         object.__setattr__(self, "_rho_weight", 0.5 * self.radius_ang * weights * rho)
+
+    def _check_site(self, profile: AxialProfile) -> None:
+        order = site_rotation_order(profile, self.center_ang, self.radius_ang)
+        object.__setattr__(self, "site_order", order)
+        if order >= MIN_ELL_SITE_ORDER:
+            return
+        message = (
+            f"centre {tuple(self.center_ang)} of {profile.crystal} "
+            f"{profile.uvw} has site rotation order C_{order} < C_{MIN_ELL_SITE_ORDER}"
+            " over the disk, so l is not an approximate quantum number there "
+            "(paired strings, e.g. Si <110>; Shul'ga et al. 2016)"
+        )
+        if self.symmetry == "required":
+            raise ValueError(
+                f"{message}; pass symmetry='accept-asymmetric' to project P_l anyway "
+                "and accept that it is not an angular-momentum distribution"
+            )
+        warnings.warn(f"{message}; P_l is reported as a mixed-l projection", stacklevel=3)
 
     @property
     def ells(self) -> np.ndarray:
@@ -158,4 +243,4 @@ def angular_momentum(populations: np.ndarray, ells: np.ndarray) -> np.ndarray:
     return np.asarray(populations) @ np.asarray(ells, dtype=float)
 
 
-__all__ = ["CylindricalProjection", "angular_momentum"]
+__all__ = ["CylindricalProjection", "angular_momentum", "site_rotation_order"]

@@ -690,7 +690,12 @@ def axial_energy_mcwf(
         ):
             raise ValueError("oam_string must index a profile string")
         projection = CylindricalProjection(
-            grid, profile.strings[config.oam_string].position_ang, config.oam_radius_ang, 8
+            grid,
+            profile.strings[config.oam_string].position_ang,
+            config.oam_radius_ang,
+            8,
+            profile=profile,
+            symmetry=getattr(config, "oam_symmetry", "required"),
         )
     x = np.arange(config.shape[0]) * grid.extent_ang[0] / config.shape[0]
     y = np.arange(config.shape[1]) * grid.extent_ang[1] / config.shape[1]

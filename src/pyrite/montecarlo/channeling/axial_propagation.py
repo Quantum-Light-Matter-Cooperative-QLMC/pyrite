@@ -30,7 +30,9 @@ class AxialPropagationConfig:
     FFT grid. Depths must be increasing nonnegative multiples of ``step_ang``.
     MCWF uses the existing per-electron Philox streams keyed by seed/electron.
     ``oam_string`` optionally selects a profile string; the projection uses a
-    disk of radius ``oam_radius_ang`` and reports modes -8 through 8.
+    disk of radius ``oam_radius_ang`` and reports modes -8 through 8. It is
+    refused on string sites without ``C_m >= 3`` symmetry (e.g. Si <110>)
+    unless ``oam_symmetry="accept-asymmetric"`` (:class:`.vortex.CylindricalProjection`).
     Fields are numeric-only; Pint quantities raise ``TypeError`` at construction.
     """
 
@@ -62,6 +64,7 @@ class AxialPropagationConfig:
     record_current_divergence: bool = False
     # (x_start, y_start, width_pixels, height_pixels), with periodic wrap.
     current_contour: tuple[int, int, int, int] | None = None
+    oam_symmetry: Literal["required", "accept-asymmetric"] = "required"
 
     def __post_init__(self) -> None:
         for name, unit in _NUMERIC_FIELD_UNITS:
@@ -435,7 +438,14 @@ def propagate_axial(
         ):
             raise ValueError("oam_string must index a profile string")
         origin = profile.strings[config.oam_string].position_ang
-        projection = CylindricalProjection(grid, origin, config.oam_radius_ang, 8)
+        projection = CylindricalProjection(
+            grid,
+            origin,
+            config.oam_radius_ang,
+            8,
+            profile=profile,
+            symmetry=config.oam_symmetry,
+        )
     from .axial_flux import AxialFluxObservable, FluxContour
 
     current = None

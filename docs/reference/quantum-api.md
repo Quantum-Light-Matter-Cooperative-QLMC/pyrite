@@ -362,7 +362,7 @@ Custom Gaussian, vortex or incoherent-mixture entry states from
 | `spectral_states`, `spectral_populations` | Projection onto orthonormal finite-grid transverse eigenstates. `energy_bins` compares changing momentum sectors after electronic kicks; `states` needs a fixed sector (disable electronic kicks). Omitted projector weight is not dechanneling. |
 | `record_coherence`, coherence maps | Reference-point first-order mutual coherence `g1(r,r0)`, its magnitude and phase. Low-density and poorly resolved regions are masked; it is **not** an ensemble wavefunction phase. |
 | `record_metrics=True` | Ensemble purity, basis-dependent coherence and transverse-energy moments. Small MCWF ensembles require independent seed checks. |
-| `oam_string`, `oam_populations` | Local disk projection onto OAM modes ℓ = −8…8; not whole-cell OAM or photon OAM. |
+| `oam_string`, `oam_populations` | Local disk projection onto OAM modes ℓ = −8…8; not whole-cell OAM or photon OAM. Refused about string sites without `C_m`, `m ≥ 3` symmetry (paired strings, e.g. Si ⟨110⟩), where ℓ is not a label, unless `oam_symmetry="accept-asymmetric"`. |
 | `record_current`, `transverse_current_per_ang2` | Carrier-inclusive transverse probability current, incident-normalized. |
 | `record_current_divergence`, `current_contour` | Discrete current divergence and outward contour flux; these describe redistribution, not absorption or escape. |
 
