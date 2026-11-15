@@ -24,8 +24,14 @@ Diffracted bremsstrahlung and Kossel terms keep the build-time reflection set.
 The accuracy gain has a measured cost. On qlmc-ace (ROCm), the 64-history,
 0.5–10 keV gate at 0.09375 eV bin spacing took 26.3 s for Si and
 176–208 s for layered MoS₂/Si with incremental selection. The four-family
-arms took about 1–2 s. These measurements exclude transport and do not
-establish CPU or full automatic-axis costs. Qualification continues in
+arms took about 1–2 s. On two CPU threads (qlmc-queen, same gate, node
+quadrature, 101,335 nodes), Si took 24 s at four families and 2,185 s
+(about 36 min) for the measured selection, which keeps G30 / 13,688
+reflections. Layered MoS₂/Si took 156 s at four families, and its selected arm
+had not finished when the 90 min job limit cancelled it. Treat the CPU path as
+impractical for these wide-band, high-energy scenes; use a GPU or narrow the
+declared line axis. These measurements exclude transport. Selection, ledger
+status and the GPU measurements are in
 [#1173](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/1173);
 batching and performance admission are tracked in
 [#1200](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/1200).
