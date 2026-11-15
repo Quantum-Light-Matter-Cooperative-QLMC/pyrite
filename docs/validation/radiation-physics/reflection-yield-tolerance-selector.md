@@ -403,7 +403,7 @@ physical accuracy independently.
 | Reference/provenance | Raw report hashes and measured fixture values match; source commit exists |
 | Tolerance | Empirical finite-g40 qualification for these scenes, not a universal error certificate |
 | Numerical accuracy | Inherits node/bin-mean production approximation and reduction route |
-| Backend/axis coverage | Anchors use uniform ROCm bin-mean/Fourier; CPU cost, automatic-axis qualification and nonuniform ROCm remain outside this evidence; the final rebase includes the upstream #1196 near/far repair |
+| Backend/axis coverage | Anchors use uniform ROCm bin-mean/Fourier; Si CPU cost is measured (job 12677) but layered CPU cost is not (time limit), and nonuniform ROCm remains outside this evidence; automatic-axis qualification is the Si GPU run only; the final rebase includes the upstream #1196 near/far repair |
 
 Independent focused checks: cutoff and production-spectrum modules, 23 passed;
 documentation static checks, 9 passed. The owner separately ran all 19 cutoff
@@ -438,7 +438,29 @@ quadrature on the same frozen transport. It resolves 420,113 coordinates over
 194.0 s, keeps G30 / 13,688 reflections and estimates a 7.06e-4 tail. This
 measures the automatic-axis budget and cost, not its independent spectral
 accuracy. Evidence: `qlmc:~/pyrite-1173-flip/evidence/flip/12679-auto/`.
-CPU cost is not established by these GPU measurements.
+CPU cost is not established by these GPU measurements; see job 12677 below.
+
+Job 12677 (qlmc-queen CPU, 2 threads, 16 GiB, 90 min cap, seed 642501) replays
+both frozen transports on the 0.5–10 keV node axis at 0.09375 eV (101,335
+nodes), ladder `4, sel1e-3, g30`:
+
+| Scene | n=4 first call | `sel1e-3` first call | Selected set |
+|---|---|---|---|
+| Si 300 keV / 10 µm | 24.0 s | 2,184.5 s | G30 / 13,688; tail estimate 3.68e-4 |
+| MoS₂ 2000 Å / Si 30 keV | 156.4 s | not finished (cancelled at the time limit) | none |
+
+For Si the selection lands on the `g30` set, so the harness scores it once and
+both arms share the 2,184.5 s figure (peak host RSS 0.95 GiB). The selected
+spectrum equals the g30 spectrum to 1e-12 relative on every observable, so the
+selection changes nothing but the set. The four-family arm misses the same
+#1143 gate margins: yield −61.5 %, centroid −34 %, peak −9.0 %, FWHM
+−13.6 %. For layered MoS₂/Si no selected-arm result exists on CPU: the job was
+cancelled at the limit with its report holding only the four-family arm. This is
+a bounded failure, not a pass or a measured cost; it says only that the CPU
+selection costs more than the roughly 14 min it ran. Only first-call wall times
+were taken, so these are not cold/warm speedup claims. CPU cost at the full
+automatic axis (420,113 nodes) was not measured. Cost reduction is tracked in
+#1200. Evidence: `qlmc:~/pyrite-1173-flip/evidence/flip/12677-cpu/`.
 
 
 The same-axis g40 reference (job 12680, 452.8 s scoring) measures a
