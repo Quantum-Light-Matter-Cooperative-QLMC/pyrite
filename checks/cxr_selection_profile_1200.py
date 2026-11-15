@@ -157,9 +157,10 @@ def main():
     parser.add_argument("--tolerance", type=float, default=1e-3)
     parser.add_argument(
         "--max-reflections",
-        type=lambda text: [int(x) for x in text.split(",") if x],
+        type=lambda text: [x if x == "auto" else int(x) for x in text.split(",") if x],
         default=[512],
-        help="comma-separated reflections per line call; first is the parity baseline",
+        help="comma-separated reflections per line call, or 'auto' for the production "
+        "table-sized calls (selection_call_sizes); first is the parity baseline",
     )
     parser.add_argument("--repeats", type=int, default=1, help="round-robin passes per arm")
     parser.add_argument(
@@ -172,6 +173,7 @@ def main():
     from pyrite.montecarlo.runner.reflection_cutoff import (
         axis_yield_weights,
         select_case_reflections,
+        selection_call_sizes,
     )
 
     gate = runpy.run_path(str(GATE))
@@ -226,10 +228,19 @@ def main():
     scorer = CaseLadder(case, transport=transport)
     weights = axis_yield_weights(grid, quadrature)
 
+    report["auto_reflections_per_call"] = {
+        str(k): v for k, v in selection_call_sizes(case, grid).items()
+    }
+    save()
+
     def select(max_reflections):
         def line_density(pilot, axis_grid):
             scorer.case = pilot
             return scorer.lines(axis_grid)
+
+        if max_reflections == "auto":
+            sizes = selection_call_sizes(case, grid)
+            max_reflections = lambda layer, _radiator: sizes[layer]  # noqa: E731
 
         return select_case_reflections(
             case,

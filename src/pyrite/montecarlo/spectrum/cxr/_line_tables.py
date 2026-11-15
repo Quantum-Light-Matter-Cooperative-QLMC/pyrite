@@ -41,3 +41,35 @@ def line_table_bytes(n_hkl, n_tab, itemsize):
         4 * int(n_hkl) * n_tab * int(itemsize)
         + _BATCH_TABLES * 8 * _batch_rows(n_hkl, n_tab) * n_tab
     )
+
+
+#: Table bytes one measured-selection line call may hold, at the backend's
+#: precision. Fixed rather than read from the device budget so that a
+#: selection's chunking, hence its float summation order, is the same on every
+#: device of a backend (#1200). Measured on the #642 Si 300 keV automatic axis
+#: (3.6e5 tabulation points, CUDA): 128 / 256 / 512 reflections per call took
+#: 43.6 / 37.5 / 34.8 s, with device peaks near 1.15 x the tables.
+SELECTION_CALL_TABLE_BYTES = 2 << 30
+
+#: Bounds on reflections per selection call. Fewer calls amortise the per-call
+#: prologue and bin-mean flush; the floor keeps a very wide axis from
+#: degenerating into single-reflection calls.
+SELECTION_CALL_REFLECTIONS = (64, 8192)
+
+
+def selection_reflections_per_call(n_tab, itemsize=None):
+    """Reflections per measured-selection line call for ``n_tab`` tabulation points.
+
+    The largest count whose four table rows of ``itemsize`` bytes (``REAL``
+    by default) fit :data:`SELECTION_CALL_TABLE_BYTES`, clamped to
+    :data:`SELECTION_CALL_REFLECTIONS`. It depends on the case, the axis and
+    the backend precision, never on the device memory; admission against the
+    device budget is separate.
+    """
+    if itemsize is None:
+        import numpy as np
+
+        itemsize = np.dtype(REAL).itemsize
+    lo, hi = SELECTION_CALL_REFLECTIONS
+    per_reflection = 4 * int(itemsize) * max(1, int(n_tab))
+    return int(min(hi, max(lo, SELECTION_CALL_TABLE_BYTES // per_reflection)))

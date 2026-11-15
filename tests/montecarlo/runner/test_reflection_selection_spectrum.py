@@ -112,3 +112,54 @@ def test_simulate_reports_the_selection_in_provenance():
     assert record["radiators"][0]["converged"]
     plain = pr.simulate(scene, numerics=numerics(n_families=4)).provenance
     assert plain.reflection_selection is None and "reflection_selection" not in plain
+
+
+def test_call_size_follows_tabulation_length_not_device():
+    """Reflections per selection call (#1200): set by the table length alone, clamped."""
+    from pyrite.montecarlo.spectrum.cxr._line_tables import (
+        SELECTION_CALL_REFLECTIONS,
+        SELECTION_CALL_TABLE_BYTES,
+        selection_reflections_per_call,
+    )
+    from pyrite.montecarlo.spectrum.cxr._setup import line_table_points
+
+    lo, hi = SELECTION_CALL_REFLECTIONS
+    assert selection_reflections_per_call(1) == hi
+    assert selection_reflections_per_call(10**9) == lo
+    n_tab = 200_000
+    count = selection_reflections_per_call(n_tab, itemsize=4)
+    assert count * 16 * n_tab <= SELECTION_CALL_TABLE_BYTES < (count + 1) * 16 * n_tab
+    assert selection_reflections_per_call(n_tab, itemsize=8) == count // 2
+    case, _ = _transported()
+    composition = case["composition"]
+    band = line_table_points("silicon", composition, np.linspace(500.0, 10000.0, 9501))
+    fine = line_table_points("silicon", composition, np.linspace(500.0, 10000.0, 95001))
+    wide = line_table_points("silicon", composition, np.linspace(50.0, 300000.0, 9501))
+    assert band == fine  # the span sets the tables, not the axis spacing
+    assert wide > 10 * band
+    assert selection_reflections_per_call(wide) < selection_reflections_per_call(band)
+
+
+def test_selection_records_call_size_and_refuses_before_scoring(monkeypatch):
+    from dataclasses import replace
+
+    from pyrite._backend import BackendResourceError
+    from pyrite.montecarlo.runner import reflection_cutoff
+
+    case, tp = _transported()
+    selected = dict(case, reflection_selection=SELECTION)
+    grid = np.asarray(tp["E_grid"])
+    sizes = reflection_cutoff.selection_call_sizes(selected, grid)
+    out = runner._spectrum_case(selected, tp)
+    (radiator,) = out["reflection_selection"]["radiators"]
+    assert radiator["reflections_per_call"] == sizes[None]
+
+    calls = []
+    monkeypatch.setattr(
+        runner,
+        "_RESOURCE_POLICY",
+        replace(runner._RESOURCE_POLICY, gpu=True, device_budget_bytes=1),
+    )
+    with pytest.raises(BackendResourceError, match="line tables"):
+        reflection_cutoff.selected_line_spectrum(selected, calls.append, grid)
+    assert calls == []
