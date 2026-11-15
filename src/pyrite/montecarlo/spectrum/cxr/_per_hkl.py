@@ -19,8 +19,8 @@ from ..coherent_population import mixed_row_power, pair_scale
 from ..coherent_transverse import transverse_envelope, transverse_form_factor
 from ..segment_escape import piece_mean_transmission
 from . import _policy
-from ._bin_quadrature import resolve_bin_reduction, sincsq_bin_lineshape
-from ._bin_queue import BinLineQueues
+from ._bin_quadrature import sincsq_bin_lineshape
+from ._bin_queue import flush_bin_line_queues, open_bin_line_queues
 from ._cpu_reduce import accumulate_sincsq, numpy_backend
 from ._escape_mu import escape_mu_tables
 from ._formation import (
@@ -824,9 +824,7 @@ def _accumulate_reflection(
     tabulations (chi/u on E_tab_g) depend on hkl and energy only -- NOT on
     the mosaic orientation -- while g and its sigma/pi polarization pair
     (``e_s``, ``e_p``) vary per orientation. wm = 1.0 for the perfect-crystal
-    path. Under the per-history sampled mosaic ``g_vec_d``, ``e_s``, ``e_p``
-    are ``(n_seg, 3)`` and ``n_dot_g``, ``g_dot_es``, ``g_dot_ep`` are
-    ``(n_seg,)`` -- one crystallite per row's history (Validation: mosaic-mc-sampled).
+    path. The sampled mosaic passes g, e_s, e_p and dots per row (mosaic-mc-sampled).
 
     Validation: segment-escape-average
     Validation: temporal-intensity-profile
@@ -884,9 +882,8 @@ def _accumulate_reflection(
     if not keep.any():
         return
     idx = xp.flatnonzero(keep)
-    g_vec_d, e_s, e_p, n_dot_g, g_dot_es, g_dot_ep = kept_orientation(
-        idx, g_vec_d, e_s, e_p, n_dot_g, g_dot_es, g_dot_ep
-    )
+    orient = kept_orientation(idx, g_vec_d, e_s, e_p, n_dot_g, g_dot_es, g_dot_ep)
+    g_vec_d, e_s, e_p, n_dot_g, g_dot_es, g_dot_ep = orient
 
     E_r = E_res[idx]  # line energy per kept segment [eV]
     om = omega_res[idx]  # same in 1/Ang
@@ -1190,16 +1187,10 @@ def _accumulate_per_hkl(st):
     E_tab = st.E_tab
     mosaic_quad = st.mosaic_quad
 
-    # Stacking prologue: every host->device transfer this path needs is done
-    # ONCE per case here, not once per (reflection, orientation) inside the
-    # loop. Previously each pass re-uploaded the four chi/U tabulations plus
-    # g and its two polarization vectors -- ~90 xp.asarray calls per case,
-    # 15% of GPU-phase tottime on the 3060 Ti profile (hopg_coherent, 4
-    # reflections). The chi/U rows are keyed by REFLECTION (they do not
-    # depend on the mosaic orientation), the geometry rows by
-    # (reflection, orientation). U_g/m_e is now pre-scaled at table build and
-    # the fallback shares one interpolation bracket; these are algebraically
-    # identical with only float-rounding-level movement.
+    # Stacking prologue: every host->device transfer is done ONCE per case, not
+    # per (reflection, orientation) row (per-row uploads were 15% of GPU-phase
+    # time, 3060 Ti hopg_coherent). chi/U rows are keyed by REFLECTION, geometry
+    # rows by (reflection, orientation); U_g/m_e is pre-scaled at table build.
     _nsys_push("pyrite.lines.tab")
     g_rows, es_rows, ep_rows, wm_rows, hkl_of_row = [], [], [], [], []
     CHI_RE, CHI_IM, U_RE, U_IM = _reflection_tables(  # (N_hkl, N_tab)
@@ -1207,15 +1198,13 @@ def _accumulate_per_hkl(st):
     )
     # Exact per-layer (or groove) escape mu, folded once per call.
     mu_tables = escape_mu_tables(req, st.abs_comp)
-    edges = st.bin_edges
-    if edges is not None and not numpy_backend() and resolve_bin_reduction(edges)[0] == "fourier":
-        st.bin_line_queues = BinLineQueues(st.E_grid, edges, st.bin_inv_width)
+    open_bin_line_queues(st)
     if st.mosaic_sampled is not None:
         _nsys_pop()
         accumulate_sampled_mosaic(
             st, (CHI_RE, CHI_IM, U_RE, U_IM), _accumulate_reflection, mu_tables
         )
-        _flush_bin_line_queues(st)
+        flush_bin_line_queues(st)
         return
     orients = ((None, 1.0),) if mosaic_quad is None else mosaic_quad
     for i_hkl, hkl in enumerate(hkl_list):
@@ -1258,11 +1247,4 @@ def _accumulate_per_hkl(st):
             wm,
             mu_tables,
         )
-    _flush_bin_line_queues(st)
-
-
-def _flush_bin_line_queues(st):
-    """Reduce the Fourier bin-mean lines queued by this call, if any."""
-    if st.bin_line_queues is not None:
-        st.bin_line_queues.flush()
-    st.bin_line_queues = None
+    flush_bin_line_queues(st)

@@ -9,6 +9,9 @@ from __future__ import annotations
 
 from typing import Any
 
+from ._bin_quadrature import resolve_bin_reduction
+from ._cpu_reduce import numpy_backend
+
 
 class BinLineQueues:
     """Lazily created ``_CxrBatch`` queues keyed by output target."""
@@ -32,3 +35,17 @@ class BinLineQueues:
         for queue in self._queues.values():
             queue.flush()
         self._queues.clear()
+
+
+def open_bin_line_queues(st) -> None:
+    """Attach queues to ``st`` when its bin-mean lines use the device Fourier reduction."""
+    edges = st.bin_edges
+    if edges is not None and not numpy_backend() and resolve_bin_reduction(edges)[0] == "fourier":
+        st.bin_line_queues = BinLineQueues(st.E_grid, edges, st.bin_inv_width)
+
+
+def flush_bin_line_queues(st) -> None:
+    """Reduce the lines ``st`` queued during this call, if any, and detach the queues."""
+    if st.bin_line_queues is not None:
+        st.bin_line_queues.flush()
+    st.bin_line_queues = None
