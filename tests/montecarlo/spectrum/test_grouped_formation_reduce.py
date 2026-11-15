@@ -12,6 +12,7 @@ from pyrite.montecarlo.spectrum.cxr._cpu_reduce import accumulate_grouped_format
 from pyrite.montecarlo.spectrum.cxr._formation import (
     FORMATION_SERIES_W2,
     formation_coefficients,
+    formation_factor,
     formation_profile,
 )
 
@@ -103,6 +104,92 @@ def test_rejects_more_than_two_polarizations_and_skips_empty():
     out = np.ones(5)
     accumulate_grouped_formation(lines, d, g_phase, L_esc, coefs, np.array([0]), grids, out, 1.0)
     np.testing.assert_array_equal(out, np.ones(5))
+
+
+def layered_case(rng, n_layers, **kwargs):
+    """``_case`` with ``(n, K)`` per-layer paths and a ``(K, n_E)`` delta-omega grid."""
+    lines, d, g_phase, _, coefs, bounds, grids = _case(rng, **kwargs)
+    n_rows, n_E = lines[0].size, grids[0].size
+    half_dL = rng.uniform(-50.0, 50.0, (n_rows, n_layers))
+    L_esc = rng.uniform(0.0, 2.0e4, (n_rows, n_layers))
+    dom = 1e-6 * grids[1][None, :] * rng.uniform(0.3, 3.0, (n_layers, n_E))
+    lines = (lines[0], lines[1], half_dL, *lines[3:])
+    return lines, d, g_phase, L_esc, coefs, bounds, (grids[0], grids[1], dom)
+
+
+def _layered_reference(lines, d, g_phase, L_esc, coefs, bounds, grids):
+    """Dense ``sum_f |sum_j c_j F_j e^{i phi_j}|^2`` with per-layer escape terms.
+
+    ``v = a (E - E_vac) - sum_l half_dL_l delta_l omega`` and ``phi = d omega -
+    g.r - sum_l L_l delta_l omega``. Validation: xray-layered-escape-phase
+    """
+    E_vac, a_vac, half_dL, apb, bma, q = lines
+    E_grid, omega_grid, dom = grids
+    v = a_vac[:, None] * (E_grid[None, :] - E_vac[:, None]) - half_dL @ dom
+    F = formation_factor(v, apb[:, None], bma[:, None], q[:, None], xp=np)
+    arg = d[:, None] * omega_grid[None, :] - g_phase[:, None] - L_esc @ dom
+    SP = F * np.exp(1j * arg)
+    out = np.zeros(E_grid.size)
+    for c in coefs:
+        field = np.add.reduceat(c[:, None] * SP, bounds[:-1], axis=0)
+        out += (np.abs(field) ** 2).sum(axis=0)
+    return out
+
+
+@pytest.mark.parametrize("n_pol", [1, 2])
+def test_layered_escape_phase_matches_dense_reference(n_pol):
+    """Validation: xray-layered-escape-phase."""
+    rng = np.random.default_rng(1180)
+    lines, d, g_phase, L_esc, coefs, bounds, grids = layered_case(rng, 3)
+    coefs = coefs[:n_pol]
+    out = np.zeros(grids[0].size)
+
+    accumulate_grouped_formation(lines, d, g_phase, L_esc, coefs, bounds, grids, out, 1.0)
+
+    ref = _layered_reference(lines, d, g_phase, L_esc, coefs, bounds, grids)
+    np.testing.assert_allclose(out, ref, rtol=1e-11, atol=1e-13 * ref.max())
+
+
+def test_single_layer_columns_reduce_to_the_slab_kernel_bit_for_bit():
+    """``(n, 1)``/``(1, n_E)`` inputs take the slab arithmetic exactly."""
+    rng = np.random.default_rng(11)
+    lines, d, g_phase, L_esc, coefs, bounds, grids = _case(rng)
+    slab = np.zeros(grids[0].size)
+    accumulate_grouped_formation(lines, d, g_phase, L_esc, coefs, bounds, grids, slab, 1.0)
+
+    lines1 = (*lines[:2], lines[2][:, None], *lines[3:])
+    grids1 = (grids[0], grids[1], grids[2][None, :])
+    one = np.zeros(grids[0].size)
+    accumulate_grouped_formation(
+        lines1, d, g_phase, L_esc[:, None], coefs, bounds, grids1, one, 1.0
+    )
+    np.testing.assert_array_equal(one, slab)
+
+
+def test_layers_sharing_one_delta_add_their_paths():
+    """Two layers with one ``delta`` equal one layer carrying the summed path."""
+    rng = np.random.default_rng(13)
+    lines, d, g_phase, L_esc, coefs, bounds, grids = layered_case(rng, 2)
+    dom = np.repeat(grids[2][:1], 2, axis=0)
+    two = np.zeros(grids[0].size)
+    accumulate_grouped_formation(
+        lines, d, g_phase, L_esc, coefs, bounds, (*grids[:2], dom), two, 1.0
+    )
+    merged = (*lines[:2], lines[2].sum(axis=1), *lines[3:])
+    one = np.zeros(grids[0].size)
+    accumulate_grouped_formation(
+        merged, d, g_phase, L_esc.sum(axis=1), coefs, bounds, (*grids[:2], dom[0]), one, 1.0
+    )
+    np.testing.assert_allclose(two, one, rtol=1e-11, atol=1e-13 * one.max())
+
+
+def test_rejects_mismatched_layer_columns():
+    rng = np.random.default_rng(17)
+    lines, d, g_phase, L_esc, coefs, bounds, grids = layered_case(rng, 2, n_rows=20, n_flights=3)
+    with pytest.raises(ValueError, match="per-layer"):
+        accumulate_grouped_formation(
+            lines, d, g_phase, L_esc, coefs, bounds, (*grids[:2], grids[2][:1]), np.zeros(211), 1.0
+        )
 
 
 @pytest.mark.parametrize("staged", [False, True])

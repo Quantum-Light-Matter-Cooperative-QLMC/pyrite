@@ -1,7 +1,8 @@
 """Flight-grouped incoherent reduction: rows of one flight add as fields.
 
 ``sum_f sum_pol |sum_{j in f} c_pol,j F_j(E) exp(i phi_j(E))|^2`` with
-``phi_j = d_j omega - g.r_j - L_esc,j delta omega`` (``_per_hkl`` §7b). Every
+``phi_j = d_j omega - g.r_j - L_esc,j delta omega`` (``_per_hkl`` §7b);
+through a K-layer stack the escape term is ``sum_l L_l delta_l omega``. Every
 row's phase terms are first referenced to its flight's first row: a phase
 common to one flight cancels in ``|field|^2``, so this is exact, and it keeps
 the arguments at the flight's own extent instead of the trajectory's absolute
@@ -13,7 +14,7 @@ The NumPy backend takes the fused host kernel
 segmented intensity kernel of the coherent streaming route, keyed by flight
 instead of electron. ``_setup`` refuses every other backend.
 
-Validation: coherent-formation-absorption
+Validation: coherent-formation-absorption, xray-layered-escape-phase
 """
 
 import numpy as np
@@ -55,7 +56,8 @@ def accumulate_flight_grouped(st, idx, sel, coefs, cxr_rows, L_esc, recoil_phase
 
     ``idx`` are the reflection's kept rows, ``sel`` the finite ones within
     them; ``coefs``, ``cxr_rows``, ``L_esc`` and ``recoil_phase`` are indexed
-    like ``idx``. Validation: coherent-formation-absorption
+    like ``idx``. Validation: coherent-formation-absorption,
+    xray-layered-escape-phase
     """
     perm, starts, bounds, flight = _flight_layout(st.gid_all[idx[sel]])
     sel = sel[perm]
@@ -64,8 +66,13 @@ def accumulate_flight_grouped(st, idx, sel, coefs, cxr_rows, L_esc, recoil_phase
     )
     lines = cxr_rows.take(sel)
     sel_coefs = [c[sel] for c in coefs]
-    grids = (st.E_grid, st.omega_grid, st.delta_omega_grid)
-    if st.node_tail is not None:  # Validation: node-support-window-tail
+    # A layered stack carries (n, K) paths against the (K, n_E) per-layer grid.
+    # Validation: xray-layered-escape-phase
+    layer_dom = getattr(st, "layer_delta_omega", None)
+    grids = (st.E_grid, st.omega_grid, st.delta_omega_grid if layer_dom is None else layer_dom)
+    # The window plans a scalar delta-omega grid; a layered stack takes the
+    # full-node reduction, which is the reference the window approximates.
+    if st.node_tail is not None and layer_dom is None:  # Validation: node-support-window-tail
         accumulate_grouped_windowed(
             lines, d, g_phase, L_rel, sel_coefs, bounds, grids, st.spec, wm, st.node_tail
         )
@@ -79,7 +86,10 @@ def accumulate_flight_grouped(st, idx, sel, coefs, cxr_rows, L_esc, recoil_phase
 
 
 def _device_grouped(lines, d, g_phase, L_rel, coefs, bounds, grids, spec, wm):
-    """Float32 CuPy segmented reduction of the referenced rows."""
+    """Float32 CuPy segmented reduction of the referenced rows.
+
+    Layered rows go to the kernel layer-major. Validation: xray-layered-escape-phase
+    """
     from ..coherent_grouped_jit_kernel import run_coherent_grouped_intensity_kernel
 
     def f32(a):
@@ -89,6 +99,13 @@ def _device_grouped(lines, d, g_phase, L_rel, coefs, bounds, grids, spec, wm):
     sigma = coefs[0]
     pi = coefs[1] if len(coefs) > 1 else xp.zeros_like(sigma)
     E_grid, _, delta_omega = grids
+    n_layers = 1 if delta_omega.ndim == 1 else int(delta_omega.shape[0])
+    if n_layers > 1:
+        # Layer-major flattening: column k of every row, then row k of the grid.
+        # The kernel indexes flat ``layer * n + i``, so pass 1-D buffers.
+        L_rel = f32(L_rel.T).ravel()
+        half_dL = f32(xp.asarray(lines[2]).T).ravel()
+        delta_omega = f32(delta_omega).ravel()
     out = xp.zeros(E_grid.size, dtype=xp.float32)
     run_coherent_grouped_intensity_kernel(
         E_vac,
@@ -111,5 +128,6 @@ def _device_grouped(lines, d, g_phase, L_rel, coefs, bounds, grids, spec, wm):
         bma=bma,
         q=q,
         sinc_cutoff=None,
+        n_layers=n_layers,
     )
     spec += out * wm

@@ -62,7 +62,11 @@ def _joined(case):
 def _assert_matches(streamed, reference):
     np.testing.assert_array_equal(streamed["E_grid"], reference["E_grid"])
     for key in SPECTRA:
-        np.testing.assert_allclose(streamed[key], reference[key], rtol=1e-12, atol=0, err_msg=key)
+        # Summation order; the windowed far tail (#1191) puts peak-scale rounding in low bins.
+        scale = np.abs(reference[key]).max()
+        np.testing.assert_allclose(
+            streamed[key], reference[key], rtol=1e-12, atol=1e-14 * scale, err_msg=key
+        )
     for key in ("eta", "hit_frac", "n_segments"):
         assert streamed[key] == reference[key], key
     for key in ("line_grid_resolved", "line_grid_diagnostic"):

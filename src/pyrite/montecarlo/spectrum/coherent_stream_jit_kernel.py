@@ -491,8 +491,11 @@ def _validate_threads(nthreads, name):
         raise ValueError(f"{name} must be one of 32, 64, 128, 256, 512, 1024")
 
 
-def _formation_args(half_dL, apb, bma, q, *, use_medium, n_seg, n_pairs):
-    """Validate the field kernels' formation arguments; bind dummies when off."""
+def _formation_args(half_dL, apb, bma, q, *, use_medium, n_seg, n_pairs, n_layers=1):
+    """Validate the field kernels' formation arguments; bind dummies when off.
+
+    ``n_layers > 1`` (grouped kernel only) takes layer-major ``half_dL``.
+    """
     formation = (half_dL, apb, bma, q)
     use_formation = half_dL is not None
     if any((f is None) == use_formation for f in formation):
@@ -502,8 +505,8 @@ def _formation_args(half_dL, apb, bma, q, *, use_medium, n_seg, n_pairs):
         return False, dummy, dummy, dummy, dummy
     if not use_medium:
         raise ValueError("the formation factor needs L_esc and delta_omega")
-    if int(half_dL.size) != n_seg:
-        raise ValueError("half_dL must have one entry per segment")
+    if int(half_dL.size) != n_seg * n_layers:
+        raise ValueError("half_dL must have one entry per segment and layer")
     if any(int(f.size) != n_pairs for f in (apb, bma, q)):
         raise ValueError("apb, bma and q must use the pair layout n_g*n_seg")
     return True, half_dL, apb, bma, q
