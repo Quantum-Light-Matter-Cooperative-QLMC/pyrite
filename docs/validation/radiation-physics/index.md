@@ -52,6 +52,8 @@ photon-continuous-source
 photon-continuous-source-scoring
 photon-continuum-scene-handoff
 photon-full-track-thick-brem
+photon-alloy-secondary-fluorescence
+photon-annihilation-escape
 coherent-formation-absorption
 coherent-inter-electron-decoherence
 quantum-pair-population-normalization

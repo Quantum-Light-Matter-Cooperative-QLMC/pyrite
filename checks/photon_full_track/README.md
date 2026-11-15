@@ -274,3 +274,112 @@ reports and provenance are under `cascade-matrix-results/`. Historical
 references and the 98/100 regression remain intact. After fresh-context
 adjudication the ledger claim is `anchored` (2026-10-29). See the canonical
 [corrected matrix evidence](../../docs/validation/radiation-physics/photon-full-track-thick-brem.md#complete-cascade-eight-case-matrix-2026-10-27).
+
+## Binary-compound secondary fluorescence (GaAs)
+
+`alloy_fluorescence.py` compares secondary fluorescence in a binary target,
+the original Plan's alloy comparison. Monoenergetic photons enter 0.2 mm of
+GaAs normally, using the full-track footprint and both apertures. Geant4 uses
+the NIST material `G4_GALLIUM_ARSENIDE` (5.31 g/cm³, Ga:As = 1:1), so the
+existing patched TestEm5 needs no rebuild. PyRITE uses the same atom
+densities. As Kα (10.51–10.54 keV) and Kβ (11.73 keV) lie above the Ga K edge
+(10.367 keV), so As fluorescence re-excites Ga. GaAs is a compound, not a
+metallic alloy, but the secondary-fluorescence physics is the same.
+
+| Incident | Ga K source | Gated windows |
+|---|---|---|
+| 11.5 keV, below the As K edge (11.867 keV) | primary only | Ga Kα 9.0–9.5, Kβ 10.0–10.5 keV |
+| 15, 30 keV | primary + As→Ga secondary | also As Kα 10.5–11.0, Kβ 11.5–12.0 keV |
+
+Both engines kill charged secondaries at creation. Geant4 uses the
+complete-cascade settings (Auger on, deexcitation cuts ignored). Gates were
+fixed before any PyRITE spectrum was inspected. A window is gated when it
+holds ≥ 1,000 Geant4 counts. It passes when
+`|P − G| ≤ max(0.05 G, 3σ)` on raw window counts per incident photon. σ
+combines both engines' independent history-block errors. The adjacent
+single-bin windows leave no clean side windows, so there is no continuum
+subtraction. PyRITE also reports the fraction of its Ga photoabsorptions
+above the K edge that later flights cause (mostly As fluorescence). This
+shows how large the secondary contribution under test is, and is not a gate.
+
+Known unseparated differences: Geant4 Penelope Compton creates
+shell-vacancy fluorescence, whereas PyRITE's free-electron Compton does not.
+Geant4 also uses its own EADL-derived fluorescence data, against EADL2025.
+
+```bash
+# isolated git-archive checkout on the box, after `uv sync --locked`
+uv run python checks/photon_full_track/alloy_fluorescence.py macros macros \
+  --events 100000 --shards 10
+mkdir -p results
+# PHOTON_DATA_ROOT, PHOTON_G4_ROOT, PHOTON_G4_ENV, PHOTON_MICROMAMBA as above
+sbatch --export=ALL checks/photon_full_track/run_alloy_fluorescence.sbatch
+for c in gaas_11p5kev gaas_15kev gaas_30kev; do for e in geant4 pyrite; do
+  uv run python checks/photon_full_track/alloy_fluorescence.py merge \
+    alloy-results/${c}_$e.json.gz results/${c}_s*_$e.json.gz; done; done
+uv run python checks/photon_full_track/alloy_fluorescence.py compare alloy-results \
+  --output alloy-results/report.json
+```
+
+To diagnose the reference, write `--physics emlivermore` macros, then submit
+with `PHOTON_G4_PHYSICS=emlivermore` and `--array=1-30`. Merge into
+`*_geant4_emlivermore.json.gz` and run `compare --geant4 emlivermore`. This
+arm is report-only and uses the same gates.
+
+Collected 2026-11-15 (`alloy-results/`): Penelope job **12771** passes **2/7**
+pre-registered gates. Every Ga K failure is a PyRITE excess, up to 1.93 at
+11.5 keV, where no secondary path exists; As K agrees within 1.3%. The
+Livermore arm, job **12843**, passes **8/8** with the same gates. A rough
+analytic Ga Kα estimate at 11.5 keV matches PyRITE and Livermore. The claim
+`photon-alloy-secondary-fluorescence` was anchored against the Livermore
+reference after fresh-context adjudication. An independent xraylib analytic
+yield showed that Penelope's Ga K yield in GaAs is about 2× low, while
+Penelope is correct for pure Ga, Ge and As. The window keyed `Ga_Kb` also
+holds As Kα2, and `As_Ka` holds only As Kα1. See the
+[validation evidence](../../docs/validation/radiation-physics/photon-alloy-secondary-fluorescence.md).
+
+## 511 keV photon escape
+
+`annihilation_escape.py` tests the photon part of annihilation-photon escape.
+It is separate from positron transport, which the coupled-chain validation
+covers. 510.99895 keV photons travel along +z in the thick-target W 4 mm and
+Si 25 mm slabs from two source positions:
+
+- `ext`: 1 nm upstream of the entrance face;
+- `int`: mid-depth, standing in for a photon born at an annihilation point.
+
+Footprint, apertures and charged-secondary suppression match the other checks,
+and Geant4 uses complete vacancy cascades.
+
+Gates were fixed before any spectrum from either engine was inspected. The
+pre-registered reference is Geant4 `empenelope`; `emlivermore` is report-only.
+Per configuration and aperture, an observable with ≥ 1,000 reference counts
+passes when `|P − G| ≤ max(tol · G, 3σ)`:
+
+| Observable | Tolerance |
+|---|---|
+| Uncollided (direct) counts, 504–520 keV | 2% |
+| Redistributed counts, 10–100, 100–300, 300–504 keV | 5% |
+| W only: raw W Kα window, 57–60 keV | 10% |
+
+Known unseparated difference: Geant4 Penelope Compton uses the impulse
+approximation (Doppler broadening, shell vacancies). PyRITE uses the
+incoherent scattering function without Doppler broadening. This moves photons
+near the single-scatter Compton edges more than it changes the band integrals.
+
+```bash
+uv run python checks/photon_full_track/annihilation_escape.py macros macros --events 100000
+uv run python checks/photon_full_track/annihilation_escape.py macros macros --events 100000 \
+  --physics emlivermore
+mkdir -p results
+sbatch --export=ALL checks/photon_full_track/run_annihilation_escape.sbatch
+PHOTON_G4_PHYSICS=emlivermore sbatch --export=ALL --array=1-40 \
+  checks/photon_full_track/run_annihilation_escape.sbatch
+# merge results/<config>_s*_{pyrite,geant4,geant4_emlivermore}.json.gz into
+# escape-results/<config>_<arm>.json.gz, then:
+uv run python checks/photon_full_track/annihilation_escape.py compare escape-results \
+  --output escape-results/report-penelope.json
+```
+
+The near-edge diagnostic for the GaAs comparison is `alloy_edge_scan.py`, run
+with `run_alloy_edge_scan.sbatch`. It is a Geant4-only Penelope/Livermore
+K-alpha scan over pure Ga, Ge and As and has no gate.
