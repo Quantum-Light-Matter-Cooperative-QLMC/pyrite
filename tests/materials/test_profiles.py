@@ -139,8 +139,9 @@ def test_typed_case_content_key_matches_pre_case_golden():
     # #1019: fp32-cell-mb-v1 forms FP32 BremsLib cells in millibarn.
     # #1173: measured-shell-cutoff-v2 identifies the approved selection policy.
     # #1200: measured-shell-cutoff-v3 sizes selection calls from the table length.
+    # #642: shell transport defaults to restricted soft-loss straggling.
     assert case_content_key(case) == (
-        "e8eab763d9d61d2f7525b6c9292596fc3aa8d72259e3b234ac49d69962f0e7a4"
+        "c86103dd109b81acbef0f71d64c8583e308e8187c1b5008c79e417d308b5591e"
     )
 
 
@@ -151,7 +152,7 @@ def test_dataset_identity_dispatches_through_recorded_v1():
     assert set(IDENTITY_MIGRATIONS) == {1}
     assert identity["identity_version"] == 1
     assert identity["parameter_sha256"] == (
-        "cc5a9f65928411bcaf9189b7d87ec7d465f54dd408016e4b52d2113d01dd28f6"
+        "45646654fd3d7abc3736af4d0c8645071ce95662a0207f1c3fe0de652e121cba"
     )
     with pytest.raises(ValueError, match="unsupported dataset identity version"):
         dataset_identity("hopg", default_settings(), sweep, identity_version=2)
@@ -374,7 +375,7 @@ def test_transport_numerics_fork_dataset_identity_only_when_nondefault():
     base = dataset_identity("hopg", settings, sweep)
     explicit_defaults = dataset_identity(
         "hopg",
-        replace(settings, straggling=False, energy_model="midpoint", max_dE_frac=0.0),
+        replace(settings, straggling=True, energy_model="midpoint", max_dE_frac=0.0),
         sweep,
     )
     active = dataset_identity(
@@ -385,6 +386,7 @@ def test_transport_numerics_fork_dataset_identity_only_when_nondefault():
 
     assert explicit_defaults["parameter_sha256"] == base["parameter_sha256"]
     assert base["resolved_parameters"]["transport_numerics"] == {
+        "straggling": True,
         "energy_model": "midpoint",
         "inelastic_model": "shell-soft-hard",
         "inelastic_cutoff_eV": 50.0,
@@ -591,7 +593,7 @@ def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
     sweep_payload = identity["resolved_parameters"]["sweep"]
 
     assert identity["parameter_sha256"] == (
-        "cc5a9f65928411bcaf9189b7d87ec7d465f54dd408016e4b52d2113d01dd28f6"
+        "45646654fd3d7abc3736af4d0c8645071ce95662a0207f1c3fe0de652e121cba"
     )
     assert "detector" not in sweep_payload
     assert sweep_payload["theta_obs_deg"] == 90.0
@@ -605,43 +607,43 @@ def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
         (
             "hopg_hbn_gaussian_200fs",
             "hopg",
-            "639a74d191f223992f2ba27e03d8eaad4da09208363f18d467f2bab2421192a4",
+            "5eb54f9a43dba32bfd641c60582f1982df1aa49166d5086ba9105cdf5c47350c",
         ),
         (
             "hopg_hbn_gaussian_200fs",
             "hbn",
-            "f9a68cf3a5f867fd3db87016cbd4b4119a74723ce205171855c84c43fe4dd848",
+            "a3166cdfcf417998cec609bfaaa8a0778e31638fe4a2630a37ef93adc48518e4",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hopg",
-            "b58b92725fa0afd7b6dbb7a880bab21901d6acc45d1fe80b9449edf660964a96",
+            "9c668ad8e201bf5e62b8de77098412052131d3534bbaa17eaf1227f725bc74ca",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hbn",
-            "6dad7ddc61dbfa3c501f962cb4ffb644b730cb6864a6fe8eda2ff1485ed86663",
+            "8d537883797db0d32ca15f7237136358ce45547f6b284964aeff264223a641c8",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hopg",
-            "060debf43349e0beb3fa0b82897d76dc7bd81e28aaa9d6b7c080e507a8bf63c0",
+            "464e868eea93f31c2229fd22521657251ee3dee31c91c6d35a4ac1707e766b75",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hbn",
-            "6b17b9d28307959c9e840726e6b2499c9f99a3291c9ebfeb788afcbf896543e8",
+            "b93fc5e0ad7659dc22d7f0795eee3abc2759d8de9dda27f930e0464c4e85ecdb",
         ),
         (
             "hopg_emittance_demo",
             "hopg",
-            "478c586d28f4b517dc1995ff13a040295f2f14c51bf8d0abb93741a3d8efb2ee",
+            "4208418491e826f18d109d7a6c12b44682c3ccd12db1907d5fca256d3e5219ce",
         ),
         (
             "promising_low_ne",
             "hopg",
             # #465: coherent operator identity advanced to physical-distinct-pairs-v4.
-            "c12c4b1d1985bb3a1d30764d41243a31ef0dc234e8730b4bb8dba951a76f6c70",
+            "8dde9001c03b876e05ba36ed698019a5eba38849fd63816b6955bad16e3640ae",
         ),
     ],
 )
@@ -660,7 +662,8 @@ def test_named_beam_migration_keeps_shipped_profile_digests_bit_for_bit(
     `l-shell-ck-lorentzian-v5` L-shell Coster--Kronig relaxation marker, for
     issue #89's ELSEPA elastic model becoming the default, for issue
     #181's segment-mean line-escape marker, and for issue #317's default
-    atomic-electron deflection, and for #187’s Snell resonance marker.
+    atomic-electron deflection, and for #187’s Snell resonance marker, and
+    for #642's default restricted soft-loss straggling in shell transport.
     ``promising_low_ne`` alone moved for #361, when predicted identities began
     applying the profile's own run settings: its ``emission = "both"`` is in
     every identity the runner writes, and the earlier pin omitted it.
@@ -868,9 +871,10 @@ def test_emission_modes_yield_three_distinct_digests_incoherent_unchanged():
     # default continuum of issue #86, and again for issue #181's line-escape
     # marker, and again for issue #91's EADL relaxation cascade, and again for
     # issue #256's dropped uniform E_grid_brem override, which the sweep-level
-    # payload hashes although no case grid changed) must stay bit-for-bit.
+    # payload hashes although no case grid changed, and again for #642's
+    # default restricted soft-loss straggling) must stay bit-for-bit.
     assert incoherent["parameter_sha256"] == (
-        "cc5a9f65928411bcaf9189b7d87ec7d465f54dd408016e4b52d2113d01dd28f6"
+        "45646654fd3d7abc3736af4d0c8645071ce95662a0207f1c3fe0de652e121cba"
     )
 
 
@@ -932,8 +936,8 @@ def test_retired_survey_stems_resolve_only_from_their_sidecar(tmp_path, stem):
 @pytest.mark.parametrize(
     ("profile", "material", "stem"),
     [
-        ("standard", "hopg", "hopg@full-8216eed19f0e"),
-        ("standard", "mose2", "mose2@full-7008b8ba80d4"),
+        ("standard", "hopg", "hopg@full-64de02e7ea75"),
+        ("standard", "mose2", "mose2@full-5a6b23fe6bbe"),
     ],
 )
 def test_named_profile_stems_are_pinned(profile, material, stem):
@@ -984,7 +988,9 @@ def test_identity_from_stem_reads_sidecar_when_profile_edited_after_run(tmp_path
 @pytest.mark.slow
 def test_shell_inelastic_mode_forks_identity_and_case_payload_only_when_on():
     default = replace(default_settings(), energy_model="midpoint")
-    settings = replace(default, inelastic_model="continuous", inelastic_cutoff_eV=None)
+    settings = replace(
+        default, inelastic_model="continuous", straggling=False, inelastic_cutoff_eV=None
+    )
     sweep = material_sweep("silicon")
     base = dataset_identity("silicon", settings, sweep)
     shell = replace(settings, inelastic_model="shell-soft-hard", inelastic_cutoff_eV=50.0)
@@ -1012,7 +1018,9 @@ def test_shell_inelastic_mode_forks_identity_and_case_payload_only_when_on():
         == 3
     )
 
-    legacy_case = build_cases(sweep, 4, 4, energy_model="midpoint", inelastic_model="continuous")[0]
+    legacy_case = build_cases(
+        sweep, 4, 4, energy_model="midpoint", inelastic_model="continuous", straggling=False
+    )[0]
     shell_case = build_cases(
         sweep,
         4,
@@ -1052,11 +1060,19 @@ def test_secondary_threshold_forks_identity_and_case_payload_only_when_set():
     assert secondary["secondary_threshold_eV"] == 1000.0
     assert profiles.case_content_key(secondary) != profiles.case_content_key(plain)
     with pytest.raises(ValueError, match="requires inelastic_model='shell-soft-hard'"):
-        build_cases(sweep, 4, 4, inelastic_model="continuous", secondary_threshold_eV=1000.0)
+        build_cases(
+            sweep,
+            4,
+            4,
+            inelastic_model="continuous",
+            straggling=False,
+            secondary_threshold_eV=1000.0,
+        )
     with pytest.raises(ValueError, match="requires inelastic_model='shell-soft-hard'"):
         replace(
             default_settings(),
             inelastic_model="continuous",
+            straggling=False,
             inelastic_cutoff_eV=None,
             secondary_threshold_eV=1000.0,
         )
@@ -1073,6 +1089,7 @@ def test_default_elsepa_model_forks_identity_and_case_payload_from_mott():
     assert settings.elastic_model == "elsepa"
     assert explicit_default["parameter_sha256"] == base["parameter_sha256"]
     assert base["resolved_parameters"]["transport_numerics"] == {
+        "straggling": True,
         "energy_model": "midpoint",
         "inelastic_model": "shell-soft-hard",
         "inelastic_cutoff_eV": 50.0,
@@ -1114,7 +1131,8 @@ def test_atomic_electron_deflection_forks_identity_and_none_restores_it():
     """#317 is on by default; "none" omits its key; pins include #187’s Snell line marker."""
     settings = default_settings()
     sweep = material_sweep("hopg")
-    off = replace(settings, atomic_electron_deflection="none")
+    # Deterministic soft loss keeps these pins on their pre-#642 transport.
+    off = replace(settings, atomic_electron_deflection="none", straggling=False)
 
     assert settings.atomic_electron_deflection == "kawrakow"
     # The pre-#317 pins of test_dataset_identity_dispatches_through_recorded_v1
@@ -1123,7 +1141,11 @@ def test_atomic_electron_deflection_forks_identity_and_none_restores_it():
         "0e4e9037c5608186b72e24a2392414ae9ea120b4f67008aea095e5d5ad5460ae"
     )
     case = build_cases(
-        sweep, n_electrons=300, n_electrons_brem=150, atomic_electron_deflection="none"
+        sweep,
+        n_electrons=300,
+        n_electrons_brem=150,
+        atomic_electron_deflection="none",
+        straggling=False,
     )[0]
     assert "atomic_electron_deflection" not in case
     assert case_content_key(case) == (
@@ -1137,7 +1159,9 @@ def test_mott_shell_cases_keep_elastic_only_deflection_with_a_warning():
     sweep = material_sweep("silicon")
     with pytest.warns(UserWarning, match="needs elastic_model='elsepa'"):
         shell = build_cases(sweep, 4, 4, elastic_model="mott")[0]
-    continuous = build_cases(sweep, 4, 4, elastic_model="mott", inelastic_model="continuous")[0]
+    continuous = build_cases(
+        sweep, 4, 4, elastic_model="mott", inelastic_model="continuous", straggling=False
+    )[0]
     assert shell["inelastic_model"] == "shell-soft-hard"
     assert "atomic_electron_deflection" not in shell
     assert continuous["atomic_electron_deflection"] == "kawrakow"

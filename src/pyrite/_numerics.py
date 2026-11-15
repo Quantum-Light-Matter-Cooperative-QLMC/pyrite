@@ -140,6 +140,7 @@ HISTORICAL_SELECTOR_OMISSIONS: dict[str, object] = {
     "bremsstrahlung_model": "auto",
     "radiative_model": "auto",
     "radiative_cutoff_eV": None,
+    "straggling": False,
 }
 #: Exact CUDA transport kernel precisions (#838). ``auto`` resolves through
 #: ``montecarlo.transport.precision.resolve_transport_precision``.
@@ -297,7 +298,13 @@ class Physics:
         disables continuum scoring and is stored as ``"none"`` for case and
         checkpoint compatibility; the string ``"none"`` is also accepted.
     straggling
-        Enable stochastic per-flight energy-loss straggling.
+        Stochastic soft energy-loss straggling. ``None`` (default) selects the
+        model default: on (restricted soft-loss fluctuations) for
+        ``inelastic_model="shell-soft-hard"`` and off for legacy ``"auto"``.
+        ``inelastic_model="continuous"`` requires an explicit ``True`` (Urban
+        fluctuations around the continuous loss) or ``False`` (deterministic
+        loss). ``False`` keeps the soft loss deterministic; shell hard events
+        still fluctuate.
     inelastic_model, inelastic_cutoff_eV
         ``"shell-soft-hard"`` (default) uses explicit hard inelastic collisions
         with a 50 eV cutoff when omitted. Requires shell data for every layer,
@@ -399,7 +406,7 @@ class Physics:
 
     emission: EmissionSelection = "incoherent"
     brem_source: Literal["mc", "external", "none"] | None = "mc"
-    straggling: bool = False
+    straggling: bool | None = None
     inelastic_model: Literal["auto", "continuous", "shell-soft-hard"] = "shell-soft-hard"
     inelastic_cutoff_eV: float | None = None
     secondary_threshold_eV: float | None = None
@@ -423,7 +430,7 @@ class Physics:
         self,
         emission: EmissionSelection = "incoherent",
         brem_source: Literal["mc", "external", "none"] | None = "mc",
-        straggling: bool = False,
+        straggling: bool | None = None,
         inelastic_model: Literal["auto", "continuous", "shell-soft-hard"] = "shell-soft-hard",
         inelastic_cutoff_eV: float | None | _Unset = UNSET,
         secondary_threshold_eV: float | None | _Unset = UNSET,
@@ -571,8 +578,7 @@ class Physics:
 
     def validate_transport(self, energy_model: str) -> None:
         """Check model values and their compatibility with the integration scheme."""
-        if not isinstance(self.straggling, bool):
-            raise TypeError("straggling must be a bool")
+        straggling = default_straggling(self.inelastic_model, self.straggling)
         validate_inelastic_numerics(
             self.inelastic_model,
             self.inelastic_cutoff_eV,
@@ -589,18 +595,14 @@ class Physics:
             raise ValueError(
                 "transport_mode='mixed' requires elastic_model='elsepa' and energy_model='midpoint'"
             )
-        if (
-            self.transport_mode == "mixed"
-            and self.straggling
-            and self.inelastic_model == "continuous"
-        ):
+        if self.transport_mode == "mixed" and straggling and self.inelastic_model == "continuous":
             raise ValueError(MIXED_URBAN_REFUSAL)
         validate_bremsstrahlung_model(self.bremsstrahlung_model)
         validate_radiative_numerics(
             self.radiative_model,
             self.radiative_cutoff_eV,
             energy_model,
-            self.straggling,
+            straggling,
             self.bremsstrahlung_model,
         )
         validate_pair_production_numerics(
@@ -1076,6 +1078,49 @@ def default_inelastic_cutoff(model: object, cutoff_eV: float | None) -> float | 
     if cutoff_eV is None and model == "shell-soft-hard":
         return DEFAULT_INELASTIC_CUTOFF_EV
     return cutoff_eV
+
+
+CONTINUOUS_STRAGGLING_CHOICE = (
+    "inelastic_model='continuous' requires an explicit straggling choice: "
+    "straggling=True adds Urban fluctuations around the continuous loss, "
+    "straggling=False keeps it deterministic"
+)
+
+
+def resolve_inelastic_numerics(
+    model: object,
+    cutoff_eV: float | None,
+    straggling: object,
+    energy_model: object,
+    secondary_threshold_eV: object = None,
+) -> tuple[float | None, bool]:
+    """Fill a new run's omitted cutoff and straggling flag, then validate the mode.
+
+    Omitted straggling resolves on for shell soft/hard, off for legacy ``"auto"``
+    and is refused for continuous stopping (:func:`default_straggling`).
+    """
+    cutoff_eV = default_inelastic_cutoff(model, cutoff_eV)
+    resolved = default_straggling(model, straggling)
+    validate_inelastic_numerics(model, cutoff_eV, energy_model, secondary_threshold_eV)
+    return cutoff_eV, resolved
+
+
+def default_straggling(model: object, straggling: object) -> bool:
+    """Resolve an omitted (``None``) straggling flag for a new run.
+
+    Shell soft/hard transport defaults to restricted soft-loss fluctuations;
+    legacy ``"auto"`` keeps its historical deterministic soft loss; continuous
+    stopping has no default, so Urban fluctuations are never enabled silently.
+    """
+    if straggling is None:
+        if model == "shell-soft-hard":
+            return True
+        if model == "continuous":
+            raise ValueError(CONTINUOUS_STRAGGLING_CHOICE)
+        return False
+    if not isinstance(straggling, bool):
+        raise TypeError("straggling must be a bool or None")
+    return straggling
 
 
 def validate_inelastic_numerics(

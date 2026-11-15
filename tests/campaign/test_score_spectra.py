@@ -31,7 +31,9 @@ GROOVED = Slab(
     entrance_face=BlazedGrooves(2.0e4),
     footprint=Footprint(5.0, 5.0),
 )
-GROOVED_PHYSICS = Physics(radiative_model="uncoupled", inelastic_model="continuous")
+GROOVED_PHYSICS = Physics(
+    radiative_model="uncoupled", inelastic_model="continuous", straggling=False
+)
 STACK = Stack((Layer("hopg", 500.0), Layer("silicon", 500.0)), 30.0, footprint=None)
 AUTO_GRID = Slab("mose2", 1000.0, tilt_deg=30.0, footprint=Footprint(5.0, 5.0))
 FAMILIES = ("cxr.incoherent", "brem", "characteristic")
@@ -136,7 +138,7 @@ def _no_spectra(monkeypatch):
             "numerics.kernel_tuning.transport",
             id="transport-tuning",
         ),
-        pytest.param(NUMERICS, Physics(straggling=True), "straggling", id="transport-physics"),
+        pytest.param(NUMERICS, Physics(straggling=False), "straggling", id="transport-physics"),
     ],
 )
 def test_transport_inputs_are_refused(flat, numerics, physics, field, monkeypatch):

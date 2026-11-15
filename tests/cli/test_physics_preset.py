@@ -62,7 +62,8 @@ def test_unit_bearing_physics_preset_resolves_before_profile_identity(_isolate_u
 
 
 def test_bundled_reference_preset_restates_built_in_physics():
-    assert pyrite.config.load_physics("electron-standard") == pyrite.Physics()
+    # The preset spells the shell default's resolved straggling explicitly.
+    assert pyrite.config.load_physics("electron-standard") == pyrite.Physics(straggling=True)
     refused = invoke(command, ["physics", "set", "electron-standard", "--straggling"])
     assert refused.exit_code == 1
     assert "read-only" in refused.stderr
@@ -155,6 +156,7 @@ def test_invalid_combinations_and_references_write_nothing(_isolate_user_catalog
         "uncoupled",
         "--inelastic-model",
         "continuous",
+        "--no-straggling",
     )
     ok("profile", "numerics", "set", "campaign", "--energy-model", "frozen")
     ok(
@@ -165,6 +167,7 @@ def test_invalid_combinations_and_references_write_nothing(_isolate_user_catalog
         "uncoupled",
         "--inelastic-model",
         "continuous",
+        "--no-straggling",
     )
     before = snapshot(_isolate_user_catalog)
 
@@ -181,6 +184,10 @@ def test_invalid_combinations_and_references_write_nothing(_isolate_user_catalog
         ],
     )
     assert rejected.exit_code == 1
+    # Continuous stopping never inherits a straggling default (#642).
+    implicit = invoke(command, ["physics", "create", "bad", "--inelastic-model", "continuous"])
+    assert implicit.exit_code == 1
+    assert "explicit straggling choice" in implicit.stderr
     # A valid preset that conflicts with a referencing profile's numerics.
     ok("profile", "set", "campaign", "--physics", "coupled")
     reset = invoke(command, ["profile", "physics", "reset", "campaign", "inelastic-model", "--yes"])

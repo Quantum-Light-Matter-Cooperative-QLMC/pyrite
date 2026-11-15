@@ -19,7 +19,7 @@ def test_new_defaults_and_historical_pickle_omissions(owner):
     assert (current.inelastic_model, current.inelastic_cutoff_eV, current.straggling) == (
         "shell-soft-hard",
         50.0,
-        False,
+        True if owner is Settings else None,
     )
     assert pickle.loads(pickle.dumps(current)) == current
     old = owner(inelastic_model="auto")
@@ -27,22 +27,29 @@ def test_new_defaults_and_historical_pickle_omissions(owner):
     del old.__dict__["inelastic_cutoff_eV"]
     restored = pickle.loads(pickle.dumps(old))
     assert (restored.inelastic_model, restored.inelastic_cutoff_eV) == ("auto", None)
-    assert owner(inelastic_model="continuous").inelastic_cutoff_eV is None
+    assert owner(inelastic_model="continuous", straggling=False).inelastic_cutoff_eV is None
 
 
 def test_resolved_legacy_cases_and_dataset_identities_are_reusable():
     sweep = material_sweep("silicon")
     current = default_settings()
-    legacy = replace(current, inelastic_model="auto", inelastic_cutoff_eV=None)
+    # Legacy auto keeps deterministic soft loss, so it matches explicit shell + no straggling.
+    deterministic = replace(current, straggling=False)
+    legacy = replace(current, inelastic_model="auto", inelastic_cutoff_eV=None, straggling=False)
     assert (
-        dataset_identity("silicon", current, sweep)["parameter_sha256"]
+        dataset_identity("silicon", deterministic, sweep)["parameter_sha256"]
         == (dataset_identity("silicon", legacy, sweep)["parameter_sha256"])
     )
-    cases = build_cases(sweep, 4, 4)
+    assert (
+        dataset_identity("silicon", current, sweep)["parameter_sha256"]
+        != dataset_identity("silicon", legacy, sweep)["parameter_sha256"]
+    )
+    cases = build_cases(sweep, 4, 4, straggling=False)
     old = build_cases(sweep, 4, 4, inelastic_model="auto")
     assert cases == old
     assert case_content_key(cases[0]) == case_content_key(pickle.loads(pickle.dumps(old[0])))
-    assert all(not case.get("straggling", False) for case in cases)
+    assert all(not case.get("straggling", False) for case in old)
+    assert all(case["straggling"] is True for case in build_cases(sweep, 4, 4))
 
 
 @pytest.mark.parametrize(
@@ -57,7 +64,13 @@ def test_unsupported_default_scenes_require_explicit_continuous(material, energy
     with pytest.raises(ValueError, match=reason):
         build_cases(sweep, 4, 4, energy_model=energy, radiative_model="uncoupled")
     continuous = build_cases(
-        sweep, 4, 4, energy_model=energy, inelastic_model="continuous", radiative_model="uncoupled"
+        sweep,
+        4,
+        4,
+        energy_model=energy,
+        inelastic_model="continuous",
+        straggling=False,
+        radiative_model="uncoupled",
     )
     assert all(case.get("inelastic_model") is None for case in continuous)
 
@@ -80,18 +93,30 @@ def test_layer_and_groove_admission():
             validate_explicit_shell_cases([changed], 50.0, "midpoint")
 
 
-@pytest.mark.parametrize("model", ["continuous", "auto"])
-def test_profile_explicit_model_does_not_inherit_shell_only_cutoff(model):
-    resolved = resolve_numerics({"inelastic_model": model})
-    assert resolved.effective["inelastic_model"] == model
+@pytest.mark.parametrize(
+    "explicit",
+    [{"inelastic_model": "continuous", "straggling": False}, {"inelastic_model": "auto"}],
+)
+def test_profile_explicit_model_does_not_inherit_shell_only_cutoff(explicit):
+    resolved = resolve_numerics(explicit)
+    assert resolved.effective["inelastic_model"] == explicit["inelastic_model"]
     assert resolved.effective["inelastic_cutoff_eV"] is None
+    assert resolved.effective["straggling"] is False
 
 
 def test_continuous_preset_survives_partial_frozen_profile_override():
     resolved = resolve_numerics(
         {"energy_model": "frozen"},
-        named={"inelastic_model": "continuous", "radiative_model": "uncoupled"},
-        named_sources={"inelastic_model": "physics preset", "radiative_model": "physics preset"},
+        named={
+            "inelastic_model": "continuous",
+            "straggling": False,
+            "radiative_model": "uncoupled",
+        },
+        named_sources={
+            "inelastic_model": "physics preset",
+            "straggling": "physics preset",
+            "radiative_model": "physics preset",
+        },
     )
     assert resolved.effective["inelastic_model"] == "continuous"
     assert resolved.effective["inelastic_cutoff_eV"] is None

@@ -36,6 +36,7 @@ def inputs(monkeypatch):
         Physics(
             elastic_model="mott",
             inelastic_model="continuous",
+            straggling=False,
             radiative_model="uncoupled",
             bremsstrahlung_model="eedl",
             atomic_electron_deflection="none",

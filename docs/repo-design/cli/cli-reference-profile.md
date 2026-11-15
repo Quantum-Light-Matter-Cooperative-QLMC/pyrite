@@ -156,8 +156,9 @@ Options:
                                   CXR spectrum; positive integers.
   -b, --brem-histories N,...      Monte Carlo electron histories used to estimate
                                   bremsstrahlung; positive integers.
-  --straggling / --no-straggling  Enable or disable collision energy-loss straggling
-                                  (restricted soft loss in shell mode).
+  --straggling / --no-straggling  Collision energy-loss straggling: restricted soft loss
+                                  in shell mode (default on), Urban fluctuations with
+                                  continuous stopping (choose explicitly).
   --energy-model [frozen|midpoint]
                                   Transport clock model (frozen or midpoint).
   --max-de-frac FRACTION          Cap one transport row's fractional mean energy loss;
@@ -628,8 +629,9 @@ Options:
                                   CXR spectrum; positive integers.
   -b, --brem-histories N,...      Monte Carlo electron histories used to estimate
                                   bremsstrahlung; positive integers.
-  --straggling / --no-straggling  Enable or disable collision energy-loss straggling
-                                  (restricted soft loss in shell mode).
+  --straggling / --no-straggling  Collision energy-loss straggling: restricted soft loss
+                                  in shell mode (default on), Urban fluctuations with
+                                  continuous stopping (choose explicitly).
   --energy-model [frozen|midpoint]
                                   Transport clock model (frozen or midpoint).
   --max-de-frac FRACTION          Cap one transport row's fractional mean energy loss;
@@ -1141,8 +1143,9 @@ Usage: pyrite profile physics set [OPTIONS] PROFILE
 
 Options:
   PROFILE
-  --straggling / --no-straggling  Enable or disable collision energy-loss straggling
-                                  (restricted soft loss in shell mode).
+  --straggling / --no-straggling  Collision energy-loss straggling: restricted soft loss
+                                  in shell mode (default on), Urban fluctuations with
+                                  continuous stopping (choose explicitly).
   --inelastic-model [auto|continuous|shell-soft-hard]
                                   Collision energy-loss scheme: shell-soft-hard
                                   (default; midpoint, ungrooved, shell data for every

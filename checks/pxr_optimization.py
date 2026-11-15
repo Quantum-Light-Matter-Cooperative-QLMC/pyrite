@@ -73,6 +73,7 @@ def scene(histories: int = 32, step_eV: float = 2.0) -> pr.Scene:
             brem_source=None,
             elastic_model="elsepa",
             inelastic_model="continuous",
+            straggling=False,
             radiative_model="uncoupled",
             bremsstrahlung_model="eedl",
         ),

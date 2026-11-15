@@ -32,6 +32,8 @@ def resolved_baseline(kind):
         elastic_model="mott",
         inelastic_model="continuous",
         inelastic_cutoff_eV=None,
+        # Pinned baselines keep deterministic soft loss, including the shell cascade.
+        straggling=False,
         bremsstrahlung_model="eedl",
         radiative_model="uncoupled",
         radiative_cutoff_eV=None,
@@ -174,6 +176,7 @@ def _channeling_scene(physics_kwargs=None, zone=None):
     physics = pr.Physics(
         elastic_model="mott",
         inelastic_model="continuous",
+        straggling=False,
         bremsstrahlung_model="eedl",
         radiative_model="uncoupled",
         **(physics_kwargs or {}),

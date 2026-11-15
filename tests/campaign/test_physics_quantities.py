@@ -41,7 +41,7 @@ def test_physics_energies_match_numeric_fields() -> None:
 
 
 def test_physics_positional_defaults_and_none_readback() -> None:
-    positional = Physics("incoherent", "mc", False, "shell-soft-hard", 50.0)
+    positional = Physics("incoherent", "mc", None, "shell-soft-hard", 50.0)
     assert positional == Physics(**SHELL, inelastic_cutoff=Q_(50, "eV"))
     default = Physics()
     assert default.inelastic_cutoff_eV == 50.0
@@ -50,7 +50,12 @@ def test_physics_positional_defaults_and_none_readback() -> None:
     assert default.radiative_cutoff.magnitude == 1000.0
     assert Physics(radiative_model="uncoupled").radiative_cutoff is None
     assert default.transition_lattice_origin is None
-    assert Physics(inelastic_model="continuous", inelastic_cutoff=None).inelastic_cutoff is None
+    assert (
+        Physics(
+            inelastic_model="continuous", straggling=False, inelastic_cutoff=None
+        ).inelastic_cutoff
+        is None
+    )
 
 
 def test_physics_replacement_is_validated_and_detached() -> None:
@@ -65,7 +70,9 @@ def test_physics_replacement_is_validated_and_detached() -> None:
     cleared = physics.with_secondary_threshold(Q_(1, "keV")).with_secondary_threshold(None)
     assert cleared.secondary_threshold_eV is None
     with pytest.raises(ValueError, match="secondary_threshold_eV requires"):
-        Physics(inelastic_model="continuous").with_secondary_threshold(Q_(1, "keV"))
+        Physics(inelastic_model="continuous", straggling=False).with_secondary_threshold(
+            Q_(1, "keV")
+        )
 
 
 def test_lattice_origin_quantity() -> None:

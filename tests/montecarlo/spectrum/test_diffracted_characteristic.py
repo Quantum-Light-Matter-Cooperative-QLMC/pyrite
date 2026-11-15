@@ -252,7 +252,9 @@ def germanium():
         pr.Beam(energy_keV=100.0, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()),
         pr.geometry.Slab("ge", thickness_ang=20000.0, footprint=pr.geometry.Footprint(5.0, 5.0)),
         PointDetector(),
-        physics=pr.Physics(radiative_model="uncoupled", inelastic_model="continuous"),
+        physics=pr.Physics(
+            radiative_model="uncoupled", inelastic_model="continuous", straggling=False
+        ),
     )
     numerics = pr.Numerics(
         sampling=FixedSampling(cxr_histories=20, brem_histories=1),

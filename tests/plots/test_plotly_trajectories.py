@@ -448,6 +448,7 @@ def _hopg_grooved_case(spacing_ang=2.0e4, tilt_deg=45.0, energy=30.0, thickness_
         settings.n_electrons,
         settings.n_electrons_brem,
         inelastic_model="continuous",
+        straggling=False,
         radiative_model="uncoupled",
     )[0]
 

@@ -100,11 +100,12 @@ def test_fixed_n_identity_matches_the_pre_precision_baseline():
     # identity generations, then the corrected-stopping v2 marker (1f22f89c), then
     # #278's automatic continuum grid (``continuum_grid_model`` joins the identity),
     # then #1166's diffracted-brem marker, then #1191's v8 node-support escape marker,
-    # then #1201's v9 edge-geometric line-table escape marker.
+    # then #1201's v9 edge-geometric line-table escape marker, then #642's default
+    # shell soft-loss straggling (straggling=False reproduces the prior pins).
     identity = dataset_identity("hopg", Settings(), sweep, bremsstrahlung_model="eedl")
     assert (
         identity["parameter_sha256"]
-        == "76648d90e7839aad6203049f431faf86bcc8837a5ef883b12aa4406b8b958c72"
+        == "c5312ff535f0109e29ec5441b47885b4531786b81ac7e9a28094723cba281a9f"
     )
     case = build_cases(
         sweep,
@@ -115,7 +116,7 @@ def test_fixed_n_identity_matches_the_pre_precision_baseline():
     )[0]
     assert "adaptive_precision" not in case
     assert (
-        case_content_key(case) == "77ab2718014855e3e204fd1cc51f0a9af06507c9d3a0f36f160a6f6e1c347138"
+        case_content_key(case) == "229caeeed6830bdeda38d600022bf2de1b2d2e558de78abb973abc0d392c0440"
     )
 
 

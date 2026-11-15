@@ -214,6 +214,7 @@ def test_build_cases_attaches_abs_layers_only_with_substrate():
     plain = build_cases(
         Sweep(material="mose2", tilt_deg=30.0, beam=BeamSpec(energy_keV=30.0)),
         inelastic_model="continuous",
+        straggling=False,
         radiative_model="uncoupled",
     )
     assert all(c["abs_layers"] is None for c in plain)
@@ -227,6 +228,7 @@ def test_build_cases_attaches_abs_layers_only_with_substrate():
             ),
         ),
         inelastic_model="continuous",
+        straggling=False,
         radiative_model="uncoupled",
     )
     for c in stacked:
@@ -262,6 +264,7 @@ def test_build_cases_layer_radiators_match_stack():
     plain = build_cases(
         Sweep(material="mose2", tilt_deg=30.0, beam=BeamSpec(energy_keV=30.0)),
         inelastic_model="continuous",
+        straggling=False,
         radiative_model="uncoupled",
     )
     assert all(c["layer_radiators"] is None for c in plain)
@@ -276,6 +279,7 @@ def test_build_cases_layer_radiators_match_stack():
             ),
         ),
         inelastic_model="continuous",
+        straggling=False,
         radiative_model="uncoupled",
     )[0]
     film, sub = amorph["layer_radiators"]
@@ -296,6 +300,7 @@ def test_build_cases_layer_radiators_match_stack():
             ),
         ),
         inelastic_model="continuous",
+        straggling=False,
         radiative_model="uncoupled",
     )[0]
     assert cryst["layer_radiators"][1]["crystal"] == "sapphire"
@@ -351,7 +356,9 @@ def test_build_cases_stack_three_layers():
             LayerSpec("silicon", 5e6, azimuth_deg=15.0),
         ),
     )
-    case = build_cases(sw, inelastic_model="continuous", radiative_model="uncoupled")[0]
+    case = build_cases(
+        sw, inelastic_model="continuous", straggling=False, radiative_model="uncoupled"
+    )[0]
     assert len(case["abs_layers"]) == len(case["layer_radiators"]) == 3
     film_rad, oxide, si = case["layer_radiators"]
     assert film_rad["crystal"] == "mos2"
@@ -368,11 +375,13 @@ def test_build_cases_substrate_sugar_matches_single_layer_stack():
         sugar = build_cases(
             Sweep(**kw, substrate="sapphire", substrate_thickness_ang=1e6),
             inelastic_model="continuous",
+            straggling=False,
             radiative_model="uncoupled",
         )[0]
     general = build_cases(
         Sweep(**kw, stack=(LayerSpec("sapphire", 1e6),)),
         inelastic_model="continuous",
+        straggling=False,
         radiative_model="uncoupled",
     )[0]
     helper = build_cases(
@@ -384,6 +393,7 @@ def test_build_cases_substrate_sugar_matches_single_layer_stack():
             ),
         ),
         inelastic_model="continuous",
+        straggling=False,
         radiative_model="uncoupled",
     )[0]
     for key in ("abs_layers", "layer_radiators", "name"):

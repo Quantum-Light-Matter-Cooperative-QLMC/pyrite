@@ -65,6 +65,7 @@ def _case(substrate):
         n_electrons=600,
         n_electrons_brem=120,
         inelastic_model="continuous",
+        straggling=False,
         radiative_model="uncoupled",
     )[0]
 

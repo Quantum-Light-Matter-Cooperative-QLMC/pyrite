@@ -196,7 +196,7 @@ def test_show_and_bare_name_alias(tmp_path, monkeypatch):
     assert_table_row(shown.stdout, "kind", "scalar")
     assert "pixel" not in shown.stdout
     assert_table_row(shown.stdout, "emission", "incoherent (default)")
-    assert_table_row(shown.stdout, "straggling", "false default")
+    assert_table_row(shown.stdout, "straggling", "true default")
     assert_table_row(shown.stdout, "energy-model", "midpoint default")
     assert_table_row(shown.stdout, "maximum-fractional-energy-loss", "0 default")
 

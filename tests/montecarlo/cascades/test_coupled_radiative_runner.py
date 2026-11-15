@@ -169,6 +169,7 @@ def test_grooves_fall_back_to_uncoupled_without_a_coupling_identity(
             4,
             energy_model="midpoint",
             inelastic_model="continuous",
+            straggling=False,
             bremsstrahlung_model=bremsstrahlung_model,
             radiative_model="auto",
         )
@@ -312,6 +313,7 @@ def test_layered_stack_scores_each_layer_with_its_own_composition(synthetic_si_t
         ),
         # Amorphous SiO2 has no shell data: keep the historical continuous stopping.
         inelastic_model="continuous",
+        straggling=False,
     )
     assert case["abs_layers"] is not None and len(case["abs_layers"]) == 2
     tp = runner._transport_case(case)

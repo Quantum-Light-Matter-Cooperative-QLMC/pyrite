@@ -44,6 +44,7 @@ def _case(*, elastic="elsepa", plane=(1, -1, 0), unit_bearing=False):
         physics=pr.Physics(
             radiative_model="uncoupled",
             inelastic_model="continuous",
+            straggling=False,
             elastic_model=elastic,
         ),
         channeling=pr.Channeling(

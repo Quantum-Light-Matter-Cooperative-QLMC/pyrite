@@ -96,6 +96,7 @@ def _(mo, tables_ready):
             ),
             physics=Physics(
                 inelastic_model="continuous",
+                straggling=False,
                 elastic_model="elsepa",
                 bremsstrahlung_model="eedl",
                 radiative_model="uncoupled",

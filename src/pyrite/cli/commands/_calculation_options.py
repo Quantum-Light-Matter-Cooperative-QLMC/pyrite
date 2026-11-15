@@ -165,7 +165,7 @@ class ChannelingSectionCommand(click.Command):
 @click.option(
     "--straggling/--no-straggling",
     default=None,
-    help="Enable or disable collision energy-loss straggling (restricted soft loss in shell mode).",
+    help="Collision energy-loss straggling: restricted soft loss in shell mode (default on), Urban fluctuations with continuous stopping (choose explicitly).",
 )
 @click.option(
     "--energy-model", type=click.Choice(_ENERGY_MODEL_VALUES), help="Transport clock model."

@@ -41,9 +41,9 @@ def test_inelastic_settings_validate_coupling(owner):
         )
     configured(energy_model="midpoint", inelastic_model="shell-soft-hard")
     with pytest.raises(ValueError, match="requires inelastic_model"):
-        owner(inelastic_model="continuous", inelastic_cutoff_eV=50.0)
+        owner(inelastic_model="continuous", straggling=False, inelastic_cutoff_eV=50.0)
     with pytest.raises(ValueError, match="requires inelastic_model"):
-        owner(inelastic_model="continuous", secondary_threshold_eV=100.0)
+        owner(inelastic_model="continuous", straggling=False, secondary_threshold_eV=100.0)
     with pytest.raises(ValueError, match="inelastic_model must be one of"):
         owner(inelastic_model="dielectric")
 
@@ -155,7 +155,9 @@ def test_auto_identity_records_the_resolved_model(material, shell):
     from pyrite.campaign.config import default_settings
     from pyrite.campaign.profiles import dataset_identity
 
-    settings = replace(default_settings(), inelastic_model="auto", inelastic_cutoff_eV=None)
+    settings = replace(
+        default_settings(), inelastic_model="auto", inelastic_cutoff_eV=None, straggling=False
+    )
     identity = dataset_identity(material, settings, material_sweep(material))
     numerics = identity["resolved_parameters"]["transport_numerics"]
     if shell:
@@ -165,7 +167,7 @@ def test_auto_identity_records_the_resolved_model(material, shell):
         assert "inelastic_model" not in numerics
         continuous = dataset_identity(
             material,
-            replace(settings, inelastic_model="continuous"),
+            replace(settings, inelastic_model="continuous", straggling=False),
             material_sweep(material),
         )
         assert continuous["parameter_sha256"] == identity["parameter_sha256"]

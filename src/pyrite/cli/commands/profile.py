@@ -118,7 +118,7 @@ def _transport_cli_options(function):
     function = click.option(
         "--straggling/--no-straggling",
         default=None,
-        help="Enable or disable collision energy-loss straggling (restricted soft loss in shell mode).",
+        help="Collision energy-loss straggling: restricted soft loss in shell mode (default on), Urban fluctuations with continuous stopping (choose explicitly).",
     )(function)
     return function
 

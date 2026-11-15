@@ -96,7 +96,7 @@ def test_canonical_physical_inputs_compose_layered_scenes_and_sweeps(gdf):
         layers=(Layer("hopg", 1e4), Layer("sio2", 2850.0), Layer("silicon", 5e6)),
         footprint=Footprint(5.0, 5.0),
     )
-    physics = Physics(inelastic_model="continuous")
+    physics = Physics(inelastic_model="continuous", straggling=False)
     scene = Scene(beam=beam, target=target, physics=physics)
     expanded = [value for _, value in Sweep(scene, {"beam.energy_keV": [30.0, 50.0]}).expand()]
     assert [value.beam.energy_keV for value in expanded] == [30.0, 50.0]

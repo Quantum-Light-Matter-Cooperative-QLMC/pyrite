@@ -208,9 +208,10 @@ def test_equal_acceptance_preserves_lowered_case_and_both_identities():
     # #1176: two-beam-laue-dbr-kossel-v2 (Kossel lines).
     # #1191: segment-mean-v8-node-support-tail escape marker.
     # #1201: segment-mean-v9-edge-geometric-tables escape marker.
+    # #642: default shell soft-loss straggling (straggling=False keeps 0ea5469b...).
     assert (
         case_content_key(cases[1])
-        == "0ea5469bf477cf8b2d2fcf4da8a3ec0c79c042855d3047cf410b56d329ddde09"
+        == "0cc250cdad4f6e14cec55d6cb9cdc61576b4869466be8cb79ab5ac425f3089e4"
     )
     sweeps = [
         LegacySweep(material="hopg", beam=beam.to_spec(), target=target, detector=d)
@@ -220,7 +221,7 @@ def test_equal_acceptance_preserves_lowered_case_and_both_identities():
     assert identities[0] == identities[1]
     assert (
         identities[1]["parameter_sha256"]
-        == "84a25df15b3729b1cae4a069ee09e36ff2041c459378a615c6787307293faed2"
+        == "2b5735942647d06052617fb8c3102e0de0ba52a53e5302a3096983b588f0726f"
     )
     # Pin to the pre-object payload vocabulary; no acceptance metadata enters identity.
     assert "detector" not in identities[0]["resolved_parameters"]["sweep"]

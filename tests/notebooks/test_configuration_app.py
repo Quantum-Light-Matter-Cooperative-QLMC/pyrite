@@ -594,6 +594,7 @@ def test_saved_notebook_profile_reaches_existing_pipeline_and_preserves_identity
             n_electrons=10,
             n_electrons_brem=5,
             inelastic_model="continuous",
+            straggling=False,
             bremsstrahlung_model="eedl",
             radiative_model="uncoupled",
             check_kinematic_validity=False,

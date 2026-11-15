@@ -126,7 +126,7 @@ def test_run_refuses_unsupported_physics(physics, message):
         _case(pr.Physics(**physics))
     with pytest.raises(ValueError, match="energy_model='midpoint'"):
         _case(
-            pr.Physics(**UNCOUPLED, inelastic_model="continuous"),
+            pr.Physics(**UNCOUPLED, inelastic_model="continuous", straggling=False),
             pr.Numerics(energy_model="frozen"),
         )
 
