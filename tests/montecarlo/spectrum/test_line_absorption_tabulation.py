@@ -251,3 +251,63 @@ def test_last_root_update_can_cross_support_without_changing_on_shortened_mesh()
     np.testing.assert_array_equal(full[1], short[1])
     assert np.isfinite(short[0]).all()
     assert (numerator / short[0] > ceiling).all()
+
+
+def test_line_mesh_is_geometric_away_from_edges_and_1ev_near_them():
+    """Validation: line-absorption-tabulation (#1201)"""
+    from pyrite.montecarlo.spectrum.cxr._kernels import (
+        _LINE_TAB_EDGE_WINDOW,
+        _LINE_TAB_RATIO,
+        _line_mesh,
+    )
+
+    lo, hi, edges = 1.0, 300_000.0, [1839.0, 20_000.0]
+    mesh = _line_mesh(lo, hi, edges)
+    spacing = np.diff(mesh)
+    assert mesh[0] == lo and mesh[-1] >= hi and mesh[-2] < hi
+    assert np.all(spacing <= np.maximum(1.0, _LINE_TAB_RATIO * mesh[1:]) * (1 + 1e-12))
+    assert mesh.size < 0.05 * (hi - lo)
+    for edge in edges:
+        half = _LINE_TAB_EDGE_WINDOW * edge
+        uniform = lo + np.arange(np.ceil(edge - half - lo), np.floor(edge + half - lo) + 1.0)
+        assert np.all(np.isin(uniform, mesh))
+    # Nodes depend on lo, not hi: a smaller hi keeps a prefix.
+    short = _line_mesh(lo, 25_000.0, edges)
+    np.testing.assert_array_equal(short, mesh[: short.size])
+
+
+@pytest.mark.parametrize(
+    ("crystal", "hkl"),
+    [
+        ("silicon", [(1, 1, 1), (4, 0, 0)]),
+        ("mos2", [(0, 0, 2), (1, 1, 0)]),
+        ("tungsten", [(1, 1, 0), (2, 0, 0)]),
+    ],
+)
+def test_coarse_line_tables_interpolate_within_bound_away_from_edges(crystal, hkl):
+    """Validation: line-absorption-tabulation (#1201)
+
+    Away from edge windows the geometric mesh interpolates chi_g and
+    ``delta = 1 - Re n`` linearly at second order in ``spacing/E = 1e-3``;
+    measured worst case ``5e-5`` (W 200 ``chi_im``) over 1-40 keV. Mesh
+    midpoints are the adversarial queries.
+    """
+    from pyrite.materials.photon_cross_sections import photoelectric_edges
+    from pyrite.montecarlo.spectrum.cxr._kernels import _LINE_TAB_EDGE_WINDOW, _LINE_TAB_RATIO
+
+    info = CRYSTALS[crystal]
+    grid = _cxr_tabulation_grid(info, [], 1.0, 40_000.0)
+    query = np.sqrt(grid[1:] * grid[:-1])
+    edges = np.array([e for el, _ in info["basis"] for e, _jump in photoelectric_edges(el)])
+    far = np.all(np.abs(query[:, None] / edges[None] - 1.0) > _LINE_TAB_EDGE_WINDOW, axis=1)
+    query = query[far & (query > 1.0 / _LINE_TAB_RATIO)]
+
+    def tables(energy):
+        chi_re, chi_im, _u_re, _u_im = reflection_coupling_tables(crystal, hkl, energy, 0.0, True)
+        delta = 1.0 - np.asarray(refractive_index(crystal, energy, True).real)
+        return np.vstack([chi_re, chi_im, delta[None]])
+
+    idx, frac, below, above = _interp_index(query, grid)
+    rows = tables(grid)
+    got = np.vstack([_interp_gather1d(idx, frac, below, above, row) for row in rows])
+    np.testing.assert_allclose(got, tables(query), rtol=1e-4, atol=0.0)

@@ -377,20 +377,65 @@ def _epdl_mesh_nodes(element, lo, hi):
     return np.concatenate(nodes)
 
 
-def _cxr_tabulation_grid(crystal_info, composition, lo, hi):
-    """Shared 1 eV/native-Chantler line grid, including absorber elements.
+# Relative node spacing of the line-table mesh away from absorption edges, and
+# the half-width (relative to the edge energy) of the 1 eV window kept around
+# every edge. Measured (#1201) against direct evaluation over 1 eV-300 keV for
+# Si, MoS2 and W: the excess interpolation error over the 1 eV mesh is <= 2e-4
+# of the local table scale for chi_g, <= 2e-5 for delta, <= 2e-6 for mu.
+_LINE_TAB_RATIO = 1.0e-3
+_LINE_TAB_EDGE_WINDOW = 0.03
 
-    Absorber elements also contribute their EPDL knots and edge node pairs,
-    where the escape ``mu`` changes slope or jumps (:func:`_epdl_mesh_nodes`).
+
+def _line_mesh(lo, hi, edges):
+    """Edge-resolved line-table mesh on ``[lo, hi]``, in eV.
+
+    The node spacing is ``max(1 eV, _LINE_TAB_RATIO * E)``: the 1 eV mesh
+    ``lo + k`` up to ``1/_LINE_TAB_RATIO`` eV, then geometric. Within
+    ``_LINE_TAB_EDGE_WINDOW * E_edge`` of each edge in ``edges`` the 1 eV mesh
+    ``lo + k`` is kept, so there the grid contains every node of the uniform
+    mesh. Away from edges the tables (``chi_g ~ E**-2 F``, ``delta``,
+    ``log mu``) are smooth and linear interpolation errs at second order,
+    ``~ (spacing/E)**2``. The last node is the first at or above ``hi``. Every
+    node depends on ``lo`` but not on ``hi``, so a smaller ``hi`` keeps a
+    prefix of the mesh.
+
+    Validation: line-absorption-tabulation
+    """
+    switch = max(lo, 1.0 / _LINE_TAB_RATIO)
+    nodes = [np.arange(lo, min(hi, switch) + 1.0, 1.0)]
+    if hi > switch:
+        n_geom = int(np.ceil(np.log(hi / switch) / np.log1p(_LINE_TAB_RATIO)))
+        nodes.append(switch * (1.0 + _LINE_TAB_RATIO) ** np.arange(n_geom + 1))
+    top = min(node[node >= hi].min() for node in nodes if node[-1] >= hi)
+    for edge in edges:
+        start = max(lo, edge * (1.0 - _LINE_TAB_EDGE_WINDOW), switch)
+        stop = min(top, edge * (1.0 + _LINE_TAB_EDGE_WINDOW))
+        if start < stop:
+            nodes.append(lo + np.arange(np.floor(start - lo), np.ceil(stop - lo) + 1.0))
+    mesh = np.unique(np.concatenate(nodes))
+    return mesh[mesh <= top]
+
+
+def _cxr_tabulation_grid(crystal_info, composition, lo, hi):
+    """Shared edge-resolved/native-Chantler line grid, with absorber elements.
+
+    The base mesh is :func:`_line_mesh` with 1 eV windows around the EPDL
+    photoionization edges of every basis and absorber element. Each element
+    adds its native Chantler energies, where the ``f'``/``f''`` interpolants
+    change slope; absorber elements also contribute their EPDL knots and edge
+    node pairs, where the escape ``mu`` changes slope or jumps
+    (:func:`_epdl_mesh_nodes`).
 
     Validation: line-absorption-tabulation
     """
     from ....materials.atomic import load_henke
+    from ....materials.photon_cross_sections import photoelectric_edges
 
-    grids = [np.arange(lo, hi + 1.0, 1.0)]
     elements = {element for element, _ in crystal_info["basis"]}
     elements.update(element for element, _density in composition)
-    for element in elements:
+    edges = sorted(edge for element in elements for edge, _jump in photoelectric_edges(element))
+    grids = [_line_mesh(lo, hi, edges)]
+    for element in sorted(elements):
         try:
             native_energy = load_henke(element)[0]
             grids.append(native_energy[(native_energy >= lo) & (native_energy <= hi)])
