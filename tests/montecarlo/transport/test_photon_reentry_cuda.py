@@ -79,8 +79,17 @@ def test_public_cuda_filter_feedback_is_explicit_and_one_primary_pass(
         assert clips  # includes an empty zero-source queue; no CPU geometry fallback
 
 
+@pytest.mark.usefixtures("fp64_transport")
 @pytest.mark.parametrize("species", [0, 1])
 def test_real_cuda_charged_gap_filter_matches_cpu(cuda, silicon_stage, species):
+    """Device scene feedback reproduces the CPU reference at FP64 rounding.
+
+    The comparison is FP64 to FP64 (#901). The default mixed-precision kernel
+    (#838) differs from the CPU by about 1e-7 per step. Over a full slowing-down
+    track that grows to a different trajectory, with the annihilation point off
+    by 5-8%. Mixed-precision agreement is a statistical claim, checked by the
+    #838 refinement gate, not here.
+    """
     from pyrite.montecarlo.transport.photon_navigation import PhotonBox
 
     _, base = silicon_stage
@@ -102,6 +111,8 @@ def test_real_cuda_charged_gap_filter_matches_cpu(cuda, silicon_stage, species):
     )
     rows = _rows([3e5], species, z=0.5)
     expected, actual = _closed(host, rows), _closed(device, rows)
+    if species == 1:  # the annihilation pair makes the photon comparison trajectory-sensitive
+        assert expected.photons["energy_eV"].size == 2
     for name in ("escaped_eV", "deposited_eV", "binding_eV", "radiated_eV", "rest_energy_eV"):
         np.testing.assert_allclose(
             getattr(actual, name), getattr(expected, name), rtol=2e-10, atol=1e-6
