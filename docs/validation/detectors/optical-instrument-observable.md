@@ -528,3 +528,182 @@ Part C verdict: **rederived**. One informational note: the Nyquist test uses the
 - **Re-derivation**: `matches`. Divergences are wording/readings only: stale metadata `optical_ctr_inference.py:623,645`; Leissner test readings (0.10 THz, 2.5 ps, 4.5 ps, −0.55 "relative") against 0.1056 THz, 2.24 ps, 4.1 ps, −0.611.
 - **Verdict**: `rederived` (A, B, C).
 - **Suggested ledger change**: `anchored` with the proposed scope once the Leissner readings and depth wording are corrected. Add "normalized to the central maximum; ideal 45° optics; not inference, jitter, calibration or absolute modulation depth". Record jitter coverage 0.941 ± 0.003 over 7200 fits. Never `signed-off`.
+
+## Transverse-source and detector-response systematic modes (fresh-context review, 2026-11-14)
+
+**Scope.** Commit `88994e94a`:
+`src/pyrite/detectors/optical_ctr_systematics.py::{CTRSystematicMode, systematic_voltage_modes}`,
+and their use in
+`src/pyrite/detectors/optical_ctr_inference.py::{_nuisance_design, _solve_with_priors, _profile_at_sigma, fit_gaussian_ctr(systematics=)}`;
+tests `tests/detectors/test_optical_ctr_systematics.py`; the physics section
+"Declared transverse-source and detector-response shapes" in
+`docs/physics/radiation-physics/optical-wavefront-and-detectors.md`. The
+response kernel $R$, the Gaussian template, and the plain/jitter fits are
+covered by the earlier sections and are used here as given.
+
+### S.1 Independent derivation
+
+This section was written from the module and function docstrings, the physics section and the signatures, before the implementation bodies were read.
+
+**Linear model.** The calibrated port voltage is $V_p(d)=\sum_E R_p(d,E)\,\Phi(E;\sigma)$, with
+$R_p=T_p(d,E)\,\eta_p(E)\,E\,w_E\,e\,G_p$ ($T_p$ the Martin–Puplett port transfer, $w_E$ the trapezoid width) and
+$\Phi=\Phi_{\rm self}+\Phi_{\rm pair,0}\,F(E;\sigma)$, $F=\exp[-(E\sigma/\hbar)^2]$.
+A transverse 1σ fractional change $u_k$ of the pair envelope gives
+$\Phi_{\rm pair,0}\to\Phi_{\rm pair,0}(1+a_ku_k)$. This is a source change, so it acts on both ports:
+
+$$
+D_k=R\,(u_k\,\Phi_{\rm pair,0}\,F).
+$$
+
+A response change $\eta_p\to\eta_p(1+a_ku_k)$ enters $R_p$ linearly:
+
+$$
+D_k[:,p]=R_p\,(u_k\,\Phi),\qquad p\in\{0,1\}\ \text{or both}.
+$$
+
+Both are exactly linear in $a_k$. With a source scale $s$ multiplying $\Phi$, the **exact** expectation is
+
+$$
+V=s\Bigl(K+\sum_k a_kD_k\Bigr)+\mathbf o .
+$$
+
+The implemented model $sK+\sum_ka_kD_k+\mathbf o$ is the reparametrization $a_k'=s\,a_k$. It is exact in the mean, but the prior $a_k\sim\mathcal N(0,1)$ becomes $a_k'\sim\mathcal N(0,s^2)$. Keeping a unit prior on $a_k'$ therefore declares a fractional 1σ of $u_k/s$ instead of $u_k$. The error is a factor $s$ on the systematic width, so it is first order in $s-1$ only while $s\approx1$. For a free scale with $s\to0$ the declared mode becomes effectively unconstrained.
+
+**Marginal identity.** For residual $\mathbf r=\mathbf y-sK-\mathbf o$ and diagonal readout covariance $C$, completing the square in $\mathbf a$ (Woodbury) gives
+
+$$
+\min_{\mathbf a}\Bigl[(\mathbf r-D\mathbf a)^{\mathsf T}C^{-1}(\mathbf r-D\mathbf a)+\mathbf a^{\mathsf T}\mathbf a\Bigr]
+=\mathbf r^{\mathsf T}(C+DD^{\mathsf T})^{-1}\mathbf r,
+\qquad
+\hat{\mathbf a}=D^{\mathsf T}(C+DD^{\mathsf T})^{-1}\mathbf r .
+$$
+
+Joint minimization over $(s,\mathbf o,\mathbf a)$ is therefore GLS in $(s,\mathbf o)$ with covariance $C+DD^{\mathsf T}$. A scale prior adds $((s-1)/f)^2$. The constraint $s\ge0$ makes this a convex quadratic program with one bound. If the unconstrained optimum has $s<0$, the constrained optimum lies at $s=0$ with the other parameters re-solved, and the prior term then contributes $1/f^2$. Because $D_k(\sigma)$ depends on $\sigma$, this profile is the constrained-nuisance (auxiliary-measurement) likelihood. It is not the Gaussian marginal likelihood, which would add $\ln\det(C+DD^{\mathsf T})$. The profile is a valid likelihood with $\mathbf a$ as parameters and $\mathbf a_{\rm obs}=\mathbf 0$ as unit-variance pseudo-data, so $\Delta\chi^2=3.841$ is its one-parameter Wilks interval. Each mode adds one parameter and one pseudo-datum, so the degrees of freedom are unchanged. Its frequentist guarantee is for the ensemble in which the pseudo-measurement fluctuates, i.e. $a\sim\mathcal N(0,1)$. For a *fixed* true pull the shrinkage of $\hat a$ towards 0 biases $\hat\sigma$ whenever $D_k$ is not orthogonal to $\partial K/\partial\sigma$.
+
+**Prior pseudo-rows with normalized columns.** For a column $x_j=c_j/n_j$ the coefficient is $\beta_j=\theta_jn_j$. The scale row $\beta_s/(fn_s)-1/f=(s-1)/f$ and the pull row $\beta_k/n_k=a_k$ are correct.
+
+**Degeneracy.** For $u=-A(E/E_0)^2$,
+$D=-\tfrac{A}{E_0^2}R(E^2\Phi_{\rm pair,0}F)$ and
+$\partial K/\partial\sigma=-\tfrac{2\sigma}{\hbar^2}R(E^2\Phi_{\rm pair,0}F)$. So
+
+$$
+D=\frac{A\hbar^2}{2\sigma E_0^2}\,\frac{\partial K}{\partial\sigma}
+$$
+
+holds *exactly*, and the shift per unit pull is $\delta=A\hbar^2/(2\sigma E_0^2)$. Units: eV²s²/(s·eV²) = s. Only the linearization of $K$ in $\sigma$ is first order. To that order the profile half-width becomes $1.96\sqrt{\sigma_{\rm stat}^2+\delta^2}$.
+
+**`from_shifted_density`.** $u=(\Phi_{\rm shift}-\Phi_{\rm nom})/\Phi_{\rm nom}$ where $\Phi_{\rm nom}>0$, else 0. Expected refusals: a port on a transverse mode, an all-zero mode, a grid mismatch, duplicate names, and combination with `charge_jitter` (the jitter $-2\ln L$ has a parameter-dependent covariance and is a separate likelihood).
+
+### S.2 Comparison with the implementation
+
+| Item | Independent | Code | Result |
+|---|---|---|---|
+| Transverse $D_k$ | $R(u\Phi_{\rm pair,0}F)$, both ports | `optical_ctr_systematics.py:147` | match |
+| Response $D_k$ | $R_p(u\Phi)$ on the declared port(s) | `:149–151` | match |
+| $\hbar$ | $0.6582119569\ \mathrm{eV\,fs}$ | `:48` | match |
+| Scale/pull prior rows | $(s-1)/f$; $a_k$ | `optical_ctr_inference.py:403–414` | match |
+| Negative-scale clamp | $s=0$, re-solve, prior adds $1/f^2$ | `:467–471`, `:483–484` | match |
+| Reported $\chi^2$ | data + $\sum a_k^2$ + scale prior | `:482–484` | match |
+| d.o.f. | unchanged | `:619`, `:723` | match |
+| Mode/scale coupling | $s\sum a_kD_k$ (exact) | $\sum a_kD_k$ (`:481`) | **diverges** for $s$ far from 1 (S.4, finding 1) |
+| `from_shifted_density`, refusals | as above | `optical_ctr_systematics.py:70–130`; `optical_ctr_inference.py:624–626` | match |
+
+### S.3 Numerical checks (independent scripts, `scratch/syst_*.py`)
+
+The setup is 150 (coverage: 120) energy nodes over 0.5–25 meV, 61 (41) delays, unequal port efficiencies and gains, and $\sigma=200$–210 fs. $R$ is taken from `_response_kernel` as a fixed linear operator; it reproduces `gaussian_ctr_forward_voltage` to $1.1\times10^{-10}$, which is the $\hbar$ rounding of my script.
+
+- **$D_k$.** A central finite difference of my exact forward model (pair envelope or port efficiency scaled by $1\pm u_k$) agrees with `systematic_voltage_modes` to $1.1\times10^{-10}$ for transverse, port-0, port-1 and both-port response modes. Single-port modes leave the other port exactly zero.
+- **Marginal identity with nuisances.** Six cases: scale only; scale and offsets; scale, offsets and prior $f=0.1$; fixed scale with offsets; and the negative-scale clamp without and with a prior. Comparing `_profile_at_sigma` to my GLS with $C+DD^{\mathsf T}$, $\chi^2$ agrees to $\le9\times10^{-10}$, $s$ to $10^{-8}$, offsets to $3\times10^{-14}$ V, and pulls (against $D^{\mathsf T}(C+DD^{\mathsf T})^{-1}\mathbf r$) to $2\times10^{-8}$.
+- **Degeneracy.** The least-squares ratio $D/(\partial K/\partial\sigma)$ equals $A\hbar^2/(2\sigma E_0^2)$ to $2\times10^{-8}$ at 100, 200 and 400 fs, with an orthogonal residual of $9\times10^{-9}$, so the relation is exact. For noiseless data at 200 fs, $A=0.02$ and $E_0=3.3$ meV, the widening is $\sqrt{w_1^2-w_0^2}/1.96=1.965$ fs against $\delta=1.989$ fs: 1.2 % linearization error.
+- **Coverage** (1000 seeded scans per row, $\sigma_{\rm true}=200$ fs, bounds 20–1000 fs, 61 profile points, `rip` $=0.2\cos(2\pi E/6\,\mathrm{meV})$ transverse, `r1` $=0.05\sin(3E/E_{\max})$ port-1 response, `g` $=-0.1(E/3.3\,\mathrm{meV})^2$ transverse):
+
+| Data / fit | noise [V] | coverage | median width [fs] |
+|---|---|---|---|
+| no modes declared, true `rip` pull 1.5 | $10^{-3}$ / $3\times10^{-4}$ | 0.168 / 0.000 | 12.8 / 3.8 |
+| `rip`+`r1`, pulls $\sim\mathcal N(0,1)$, fixed scale | $3\times10^{-4}$ | 0.937 ± 0.008 | 9.7 |
+| `g` (degenerate), pull $\sim\mathcal N(0,1)$, fixed scale | $10^{-3}$ / $3\times10^{-4}$ | 0.952 / 0.953 (± 0.007) | 46.1 / 44.1 |
+| `rip`+`r1`, pulls fixed (1.5, −1), fixed scale | $10^{-3}$ / $3\times10^{-4}$ | 0.877 / 0.928 | 24.1 / 9.9 |
+| `g`, pull fixed 1.5, fixed scale | $10^{-3}$ / $3\times10^{-4}$ | 0.970 / 1.000 | 42.2 / 39.7 |
+| `rip`+`r1`, pulls $\sim\mathcal N(0,1)$, **scale fitted**, $s_{\rm true}=1.0$ | $3\times10^{-4}$ | **0.851 ± 0.011** | 32.8 |
+| same, $s_{\rm true}=1.2$ / 2.0 | $3\times10^{-4}$ | **0.855 / 0.875** | 25.7 / 14.8 |
+| no systematics, no modes, scale fitted (300 scans) | $3\times10^{-4}$ | 0.960 ± 0.011 | — |
+| `rip`+`r1` $\sim\mathcal N(0,1)$, scale fitted with prior $f=0.1$ (300) | $3\times10^{-4}$ | 0.990 ± 0.006 | — |
+
+The fixed-pull rows are predicted by my linearized GLS bias/variance calculation: 0.865, 0.970, 0.917 and 1.000 against the observed 0.877, 0.970, 0.928 and 1.000. That undercoverage is the documented shrinkage property of constrained nuisances, not an implementation error. The fitted-scale rows are not explained by it (finding 1).
+
+### S.4 Findings (no code change made)
+
+1. **High: the mode change is not scaled by the fitted source scale.** The code computes `predicted = scale*model + offsets + tensordot(pulls, drift)` at `optical_ctr_inference.py:479–481`, with $D_k$ at unit scale (`optical_ctr_systematics.py:133–152`). The exact model is $s(K+\sum a_kD_k)$. Profiling $a'=sa$ under a unit prior declares fractional 1σ $u_k/s$. The docstring (`optical_ctr_systematics.py:25–27`) and the physics page (`optical-wavefront-and-detectors.md:855`) call this "first order in $(s-1)u_k$". That holds only for $s\approx1$, and `fit_scale=True` (the default, `:573`) lets $s$ go to 0 at small $\sigma$. In seeded trial 26 (true pulls (−0.58, 1.77), $\sigma_{\rm true}=200$ fs), the code reports $\hat\sigma=49.2$ fs with CI $(41.2, 53.5)$ fs, excluding the truth. At 49.2 fs the code profile is $\chi^2=95.06$ with $s=0.079$ and $a=(0.69,-0.18)$, i.e. fractional pulls of about 9σ. My exact bilinear profile there is 132.96, against 100.01 at 200 fs, so it rejects 49 fs at $\Delta\chi^2\approx33$. Coverage with a fitted scale is 0.851–0.875 against 0.937–0.953 with a fixed scale and 0.990 with a scale prior. The mean is still exact, so with the scale fixed or tightly constrained the implementation is correct. *Divergent term:* $\sum_ka_kD_k$ must be $s\sum_ka_kD_k$ (or the pull prior $a_k'^2/s^2$). Either profile the bilinear model exactly, linear in $(\mathbf a,\mathbf o)$ for each $s$ with a one-dimensional search or Gauss–Newton in $s$, or refuse `systematics` with an unconstrained `fit_scale`. The reported pull equals $s\,a$, not $a$ (1.514 against a true 1.009 at $s=1.5$).
+2. **Medium: the pseudo-row conditioning failure falsely closes intervals.** `_nuisance_design` normalizes each column by its maximum and floors the norm at $10^{-300}$ (`optical_ctr_inference.py:410`). The pull pseudo-row entry is then $1/n_k$. `np.linalg.lstsq(..., rcond=None)` (`:428`) truncates every other singular value once $\max\lvert D_k\rvert/\delta y\lesssim10^{-13}$. In that case the scale, offsets and other pulls are zeroed: $\chi^2=2.1\times10^7$ instead of 140.19, and the drift already starts at $1.35\times10^{-13}$ (140.65). An exactly zero $D_k$ (a mode supported where $\Phi_{\rm pair,0}=0$) always triggers it. It occurs naturally in a $\sigma$ scan, because $F$ underflows at high $E$. With $u=-0.2(E/E_{\max})^8$ the code profile is 264772 against an exact 150334 at 2000 fs, and 2.1e7 against 150308 at 3000 fs. In a low-SNR scan ($\sigma_{\rm true}=1300$ fs, noise $3\times10^{-4}$ V) the no-mode fit is open on both sides. Adding this mode makes the code report $\hat\sigma=43.3$ fs with upper end 54.7 fs. The exact profile is admissible to the 3000 fs bound ($\Delta=3.53$), so the correct answer is open/multimodal. Fix: parametrize pulls directly, with column $D_k$ weighted by $1/\delta y$ and prior row 1 (no column normalization), or drop modes with negligible $\lvert D_k\rvert$.
+3. **Low: fixed-pull undercoverage should be stated.** The interval covers at the nominal rate when the declared 1σ is a true prior spread. A fixed systematic offset that is not orthogonal to $\partial K/\partial\sigma$ is shrunk, giving coverage 0.877 at noise $10^{-3}$ for pulls (1.5, −1). The physics page says only that "the interval includes the declared systematics".
+4. **Informational.** The Gaussian-likelihood marginal alternative would add $\ln\det(C+D(\sigma)D(\sigma)^{\mathsf T})$. The code's constrained-nuisance profile is a legitimate, different construction; its wording "equals the chi-square with covariance $C+\sum DD^{\mathsf T}$" is correct for the quadratic form at fixed $(s,\mathbf o)$. `from_shifted_density` silently sets $u=0$ where the nominal density is 0 and the shifted one is not (new support is dropped). Response modes may drive $\eta(1+au)$ outside $[0,1]$ for large pulls (linear model only). `fit_gaussian_ctr` recomputes `_profile_at_sigma` at the optimum only to recover pulls (`:666–679`); this is redundant but consistent.
+5. Tests: `test_optical_ctr_systematics.py` and `test_optical_ctr_inference.py` pass (17). The identity test uses `fit_scale=False` only. The degeneracy and nondegenerate-recovery tests use fixed scale, and the unperturbed test with `fit_scale=True` has $s\approx1$, so none exercises finding 1 or 2.
+
+### S.5 Verdict
+
+- **Claim**: `optical-instrument-observable` (systematic-mode extension) — `optical_ctr_systematics.py::{CTRSystematicMode, systematic_voltage_modes}`, `optical_ctr_inference.py::{_nuisance_design, _solve_with_priors, _profile_at_sigma, fit_gaussian_ctr}` — linear unit-Gaussian nuisances, Woodbury marginal $C+DD^{\mathsf T}$, Wilks $\Delta\chi^2=3.841$.
+- **Filters**: units pass; limits pass (zero pulls reduce to the plain fit; the degeneracy shift is exact); signs/conventions pass.
+- **Re-derivation**: `differs`. $D_k$, prior rows, clamp, reported $\chi^2$, d.o.f., degeneracy coefficient, `from_shifted_density` and refusals match. The mode/scale coupling diverges: the code uses $\sum a_kD_k$ where the model is $s\sum a_kD_k$, which is not first order when the scale is fitted. There is also a numerical conditioning failure for negligible $D_k$.
+- **Verdict**: `discrepancy` for `systematics` with `fit_scale=True` and no tight scale prior (coverage 0.85–0.88; false precise intervals) and for modes with vanishing voltage effect. `rederived` holds only for the fixed-scale path and the closed-form pieces (items 1, 2, 4, 5 of the scope).
+- **Suggested ledger change**: do not extend `rederived` to the systematic modes yet. Add to Notes: "2026-11-14 fresh-context review: systematic modes match at fixed scale (identity to 1e-9, degeneracy exact, coverage 0.94–0.95 with N(0,1) pulls); discrepancy with fitted scale (mode not multiplied by s; coverage 0.85) and lstsq pseudo-row conditioning for negligible modes." Keep the row `anchored` for the existing scope. Never `signed-off`.
+
+### S.6 Resolution re-check (2026-11-14, uncommitted working tree on `88994e94a`)
+
+This re-check covers the fixes for findings 1, 2 and 4. `_nuisance_design` now leaves the pull columns unnormalized, with prior row 1. A new `_bilinear_profile` profiles $s(K+\sum_ka_kD_k)+\mathbf o$: at fixed $s$ it is linear in $\mathbf a$ and $\mathbf o$, and $s$ is scanned on $[0,s_{\max}]$ with 33 points and refined by bounded Brent in the best cell. `from_shifted_density` now refuses new support, and the docstring and physics page were updated. The tests (systematics, inference and jitter) pass: 28 passed.
+
+**Finding 2 (conditioning): resolved.** Rerunning `syst_check_edge.py` gives $\chi^2=140.187$ for mode amplitudes from $10^{-2}$ down to $10^{-20}$, with pulls $\le6\times10^{-7}$. An exactly zero $D_k$ reproduces the mode-free fit ($s=1.389792$, $\chi^2=87029.9$). The low-SNR open-end scenario now matches the mode-free fit: at $\sigma_{\rm true}=1300$ fs the interval is (None, None) for no mode, the high-$E$ mode and the linear mode, and the 900 fs case agrees with the no-mode result.
+
+**Finding 1 (scale coupling): resolved in the model; the $s$ search is not global.** Re-fitting trial 26 now gives $\hat\sigma=202.3$ fs with CI (186.9, 218.5) fs, which contains 200 fs; the pulls are $(-0.76, 1.06)$ against true $(-0.58, 1.77)$. With the fitted scale near the true one, the code equals my brute-force exact bilinear profile. I also checked the negative-scale, $s_{\rm true}=0$, $10^{-3}$ and 0.02 cases, with and without offsets and with and without a prior (fitted $s$ from 0 to 0.72); all agree to the printed precision.
+
+Brute force (`syst_fix_ssearch.py`) used my own augmented solver for $\chi^2(s)$, a 3001-point $s$ grid up to $\ge50\max(\hat s,1)$, and Brent refinement. Mode sets were (`rip`, `r1`), plus a uniform both-port response mode `big` with $u=0.05$, 0.2 or 0.6, `hiE`, and (`rip`, port-0 slope). These were crossed with offsets on/off and priors none/0.1/0.5 at $\sigma\in\{25,80,200,600,2000\}$ fs. $\chi^2(s)$ has more than one grid local minimum in 1.5–4.6 % of profiles.
+
+- **Well-specified data** ($s_{\rm true}\in\{0.3,1,1.5,3\}$, no unmodelled offsets, modes including `big` $u=0.05$): 19 of 900 profiles miss the global minimum. All of them are at $\sigma=25$ or 2000 fs, far from the truth, and all are in sets containing the scale-like mode. Two mechanisms appear:
+  - The cap $s_{\max}=3\max(\hat s_{\rm lin})$ (`optical_ctr_inference.py:501`) excludes an optimum at large $s$. Example: code 252177 at $s=48.8$ against a global 251707 at $s=259$.
+  - With a scale prior, $s_{\max}\ge1+5f$ (`:503`) makes the 33-point linear grid (`:506`) too coarse near $s=0$, so a narrow minimum is skipped. Example: prior 0.1, code 711.2 at $s=0.98$ against a global 421.8 at $s=0.0042$.
+- **End-to-end effect** (replayed trial 46 of the $u_{\rm big}=0.2$ run: no unmodelled offsets, $s_{\rm true}=0.05$, $\sigma_{\rm true}=150$ fs, prior 0.5, modes `rip`, `r1`, `big`): `fit_gaussian_ctr` reports CI (64.9, None) fs. The brute-force profile is admissible from 33 fs. At 33 and 50 fs the code profile is 109.9 and 108.9, while the global values are 92.95 and 92.55 at $s\approx0.003$–0.005, a minimum the grid on $[0,3.5]$ never samples. The lower endpoint is falsely precise.
+- **Misspecified data** (unfitted offsets present; trial 31): the code closes the upper end at 133 fs where the exact profile is open. That global minimum, however, sits at $s\approx16$–24 with $1+0.2a_{\rm big}\approx0$, i.e. an unphysical zero efficiency, because response pulls are not clipped. With negative-scale data and a response mode, the exact profile likewise flips sign through large pulls ($s=0.71$ for $s_{\rm true}=-0.4$; code and brute force agree).
+
+*Divergent term:* the $s$ search returns a local, cap-limited minimum rather than $\min_{s\ge0}$. Suggested fix: seed the Brent refinement from every grid local minimum, the linear guesses $\hat s_{\rm lin}$ and a log-spaced grid near 0; extend $s_{\max}$ while the argmin sits at the upper edge; and document or bound the implied efficiency $1+a_ku_k\ge0$ for scale-like response modes.
+
+**Finding 4 and docs wording.** `from_shifted_density` refusal: resolved. Shrinkage, constrained-nuisance and unclipped-$\eta$ wording: resolved. One residual (low): `optical_ctr_systematics.py:23` and `optical-wavefront-and-detectors.md:852` still say the covariance at fixed scale is $C+\sum_kD_kD_k^{\mathsf T}$. Under the now-exact bilinear model it is $C+s^2\sum_kD_kD_k^{\mathsf T}$; the two coincide only at $s=1$ or with a fixed scale.
+
+**Verdict:** still differs, but narrowed. The model, prior bookkeeping, conditioning, refusals and wording match, as does the fixed-scale path. The fitted-scale path matches whenever the bilinear minimum lies in $[0,s_{\max}]$ and is sampled by the grid. That holds for every well-specified case near the true duration I tested, but not globally: a falsely precise endpoint was shown with a 0.5 scale prior and $s_{\rm true}=0.05$. **Recommended status:** `rederived` may be extended to the fixed-scale `systematics` path and to the fitted-scale path with $s$ near its prior. Keep the fitted-scale profile flagged in Notes ("$s$ search local/capped; fix pending") until the search is made global and re-verified. Never `signed-off`.
+
+### S.7 Final re-check (2026-11-14, commit `ba9474505`)
+
+This re-check covers the physical pull box with the bounded least squares, the global $s$ search, and the refusal of a uniform two-port response mode under a free, prior-less scale. The systematics, inference and jitter tests pass (30).
+
+**Box derivation: matches.** The constraint $1+a_ku_k(E)\ge0$ for all $E$ is linear in $a_k$. Where $u>0$ it binds at $a_k\ge-1/u_{\max}$, and where $u<0$ at $a_k\le-1/u_{\min}$, which is `_pull_bounds`. The bounds are transformed correctly to normalized coefficients (bound × norm, norm 1 for pulls), and the scale bound is $\ge0$. One informational point: the box is per mode. Several modes acting on the same quantity really require $1+\sum_ka_ku_k\ge0$; the per-mode box is neither necessary nor sufficient for that, though the difference only matters outside the Gaussian regime.
+
+**Bounded solve: exact.** `syst_final_qp.py` uses my own solver, which enumerates every free/lower/upper assignment of the bounded variables and keeps the best feasible equality-constrained solution. That is exact for this convex QP. Over 720 solves (bilinear branch at fixed $s$ including $s=0$; linear branch with $s\ge0$ fitted; fixed scale; offsets on/off; shapes up to $\lvert u\rvert=1.5$ so the box binds), the largest relative $\chi^2$ difference is $5.6\times10^{-14}$ and the largest projected-gradient KKT violation of the code's solution is $6\times10^{-11}$. A pull bound was active in 136 of 240 fixed-$s$ cases.
+
+**Replays.**
+- Trial 26: 202.3 fs, CI (186.9, 218.5) fs.
+- Trial 46 (prior 0.5): CI (None, None), which equals my bounded brute force (admissible over the full 20–3000 fs).
+- Trial 31 (prior 0.5): CI (None, 116.9) fs, against brute-force admissibility on [20, 115.5] fs over 41 grid points, i.e. consistent.
+- Both prior-less `big` cases are now refused.
+
+**Global $s$ search: matches for non-uniform modes; misses remain for nearly uniform two-port response modes.** `syst_final_global.py` profiles $\chi^2(s)$ with exact box QPs at each $s$ (explicit residual), on $\{0\}\cup$ 521 log points over $10^{-7}$–$10^{6}\times s_{\rm ref}$, with Brent at every local minimum. It covered 3 seeds × 2 scans × 4 durations × 3 offset/prior settings per mode set. Every miss was confirmed by evaluating the code's own `_linear_profile` at my $s$, which reproduced my value, so the evaluator is right and only the search misses.
+- `rip`+`r1`, `rip`+two-port slope ($u=0.1+0.15E/E_{\max}$), and uniform *transverse* modes with $c=0.05$, 0.3 and 0.6: 0 misses in 72 profiles each (the incoherent term breaks the transverse degeneracy).
+- `rip`+`r1`+ a two-port response $u=c[1+\delta\cos(7E/E_{\max})]$, which passes the $10^{-9}$ ptp test for every $\delta\ge3\times10^{-9}$, with a free prior-less scale (misses per 72 profiles):
+
+| $c$ \ $\delta$ | $3\times10^{-9}$ | $10^{-6}$ | $10^{-3}$ | $3\times10^{-2}$ |
+|---|---|---|---|---|
+| 0.05 | 12 | 14 | 2 | 2 |
+| 0.3 | 12 | 15 | 3 | 1 |
+| 0.6 | 16 | 20 | 3 | 1 |
+
+The mechanism is the one the refusal targets, but without exact uniformity. At $a\to-1/u_{\max}$ (the box edge) the efficiency becomes $\eta(1-u/u_{\max})$, a nearly zero, $\delta$-shaped remnant. A large $s$ rescales it at a fixed penalty $1/u_{\max}^2$, while the other pulls become cheap ($a_j\propto1/s$). The code grows $s_{\max}$ only while the argmin sits at the upper edge, so a deeper minimum at $s\sim10$–$10^6$ beyond an interior local minimum is never sampled.
+
+At $c=0.05$ the 400 penalty confines the misses to durations far from the truth, where $\chi^2\gtrsim600$. At $c\ge0.3$ they reach the admissible region. End to end, for $c=0.6$, $\delta=10^{-3}$, $\sigma_{\rm true}=1300$ fs, noise $3\times10^{-4}$ V, offsets present and fitted, and a free scale (`syst_final_interval.py`): `fit_gaussian_ctr` reports $\hat\sigma=58.5$ fs with CI (50.9, 63.6) fs, `is_identified_95=True` and not multimodal. At 1415 fs the code's profile is 75.49 ($s=0.95$), whereas the exact bounded profile is 65.86 at large $s$. The exact profile is admissible on 54–62 fs *and* 756–2335 fs, which contains the truth. The result is a falsely identified, falsely precise interval that excludes the true duration.
+
+**Refusal threshold.** Exact uniformity ($\mathrm{ptp}\le10^{-9}\max\lvert u\rvert$) is not the right criterion. The trade exists for any `port=None` response mode with a free, prior-less scale. Its cost is the finite penalty $1/u_{\max}^2$, and its reach grows as $\mathrm{ptp}(u)/u_{\max}$ shrinks. Misses persist at $\delta=3\times10^{-2}$ for every $c$ and are absent for the slope mode with $\mathrm{ptp}/u_{\max}=0.6$. Recommended approach, in order of robustness:
+1. Require `scale_prior_rms_fraction` (or a fixed scale) whenever a `port=None` response mode is declared.
+2. Otherwise refuse when $\mathrm{ptp}(u)/\max\lvert u\rvert$ is below an identifiability tolerance of order 0.1–0.3, or when $u_{\max}\gtrsim0.1$.
+3. Whatever is chosen, make `_bilinear_profile` scan $s$ up to the box-edge asymptote rather than stopping on interior argmins, and flag the fit as unidentified when the best $s$ sits at the search's upper edge.
+
+**Docs wording (low).** The page and module say "$\chi^2$ keeps falling toward $s\to\infty$ at $a_k\to-1/u_k$". For one uniform mode alone the asymptote carries the extra penalty $1/u^2$; the fall comes from the *other* pulls becoming cheap. "A uniform one … is refused" should state that nearly uniform modes behave the same. The covariance $C+s^2\sum_kD_kD_k^{\mathsf T}$ is now correct.
+
+**Verdict:** matches for the box derivation, the bounded solve (exact, KKT), the bilinear model, the conditioning, the refusals as implemented, the fixed-scale path, and the fitted-scale path with transverse modes, single-port response modes, clearly non-uniform two-port response modes, or a scale prior. It still differs for a fitted, prior-less scale combined with a nearly uniform two-port response mode: the global $s$ search misses the box-edge branch, producing falsely precise, wrongly identified intervals at $u_{\max}\ge0.3$.
+
+**Recommended status** for the `optical-instrument-observable` systematic-mode extension: `rederived`, scoped in Notes as "fixed scale, scale prior, or free scale without `port=None` response modes; nearly uniform two-port response modes with a free prior-less scale not covered (s search misses the box-edge branch; refusal threshold too narrow)". The existing `anchored` row stays for its earlier scope. Never `signed-off`.

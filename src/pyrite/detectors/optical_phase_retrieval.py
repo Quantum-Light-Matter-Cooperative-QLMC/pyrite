@@ -51,7 +51,7 @@ __all__ = [
 ]
 
 _HBAR_EV_FS = 0.6582119569509067
-_LOW_MODELS = ("gaussian-to-unity", "constant")
+_LOW_MODELS = ("gaussian-to-unity", "constant", "parabolic-intensity")
 AMBIGUITIES = (
     "time reversal: rho(-t) has the same |f|",
     "arrival time: a common time shift (linear phase) is not identified",
@@ -68,7 +68,15 @@ class MissingBandModel:
     ``low``: ``"gaussian-to-unity"`` continues ``ln|f| = ln|f(E_lo)| (E/E_lo)^2``
     so that ``|f(0)| = 1`` (normalized charge; requires ``|f(E_lo)| <= 1``);
     ``"constant"`` holds ``|f(E_lo)|`` down to ``E = 0`` (no normalization
-    assumed). Above the band ``|f| ∝ E^-p`` with ``p = high_power_exponent``,
+    assumed). ``"parabolic-intensity"`` is the continuation of Leissner,
+    Diploma thesis, RWTH Aachen PITHA 99/4 (1998), Eqs. (6.12)-(6.13): the
+    small-frequency expansion ``|f|^2 = A^2 - B E^2`` joined to the measured
+    intensity in value and slope at ``E_lo`` (slope from a second-order
+    one-sided difference of the first three nodes; it must be negative, i.e.
+    ``E_lo`` on the falling flank). The whole band is divided by ``A^2`` so
+    ``|f(0)| = 1``: the input intensity may be in arbitrary units. The choice
+    of ``E_lo`` is the caller's (Leissner: the steepest point of the falling
+    flank, chosen because it gives the longest bunch). Above the band ``|f| ∝ E^-p`` with ``p = high_power_exponent``,
     sampled on ``high_nodes`` log-spaced nodes up to
     ``high_extent_factor * E_hi`` and continued analytically in Eq. (6) beyond.
     The profile synthesis is truncated at that last node.
@@ -127,6 +135,15 @@ def _extend(e, log_f, model: MissingBandModel):
         if log_f[0] > 0:
             raise ValueError("gaussian-to-unity continuation needs |f(E_lo)| <= 1")
         l_low = log_f[0] * (e_low / lo) ** 2
+    elif model.low == "parabolic-intensity":
+        intensity = np.exp(2 * log_f[:3])
+        slope = float(np.gradient(intensity, e[:3], edge_order=2)[0])
+        if not slope < 0:
+            raise ValueError("parabolic-intensity continuation needs a falling |f|^2 at E_lo")
+        curvature = -slope / (2 * lo)
+        a2 = intensity[0] + curvature * lo * lo
+        log_f = log_f - 0.5 * np.log(a2)
+        l_low = 0.5 * np.log1p(-curvature * e_low**2 / a2)
     else:
         l_low = np.full_like(e_low, log_f[0])
     e_high = np.geomspace(hi, model.high_extent_factor * hi, model.high_nodes + 1)[1:]
@@ -265,7 +282,10 @@ class MinimalPhaseReconstruction:
     high-frequency truncation (``window_area``). ``rms_duration_fs`` and
     ``fwhm_fs`` are of the signed reconstructed profile on the window (NaN
     when its area or variance there is not positive, e.g. long negative
-    tails of a ``"constant"`` low continuation).
+    tails of a ``"constant"`` low continuation). ``lobe_rms_duration_fs`` is
+    the RMS of the contiguous positive lobe containing the peak (Leissner's
+    convention: the integration stops at the first negative value on either
+    side).
     ``negative_lobe_fraction`` (``-int min(rho,0) / int |rho|``) above a
     few percent signals data or continuation inconsistent with a
     nonnegative minimal-phase profile. ``spectral_minima_eV`` are deep
@@ -283,6 +303,7 @@ class MinimalPhaseReconstruction:
     window_area: float
     rms_duration_fs: float
     fwhm_fs: float | None
+    lobe_rms_duration_fs: float
     negative_lobe_fraction: float
     extrapolated_power_fraction: float
     truncated_magnitude_fraction: float
@@ -305,6 +326,16 @@ def _rms(t, rho):
     mean = _trapezoid(t * rho, t) / area
     var = _trapezoid((t - mean) ** 2 * rho, t) / area
     return float(np.sqrt(var)) if var > 0 else float("nan")
+
+
+def _lobe_rms(t, rho):
+    k = int(np.argmax(rho))
+    negative = np.flatnonzero(rho < 0)
+    lo = negative[negative < k]
+    hi = negative[negative > k]
+    a = int(lo[-1]) + 1 if lo.size else 0
+    b = int(hi[0]) if hi.size else rho.size
+    return _rms(t[a:b], rho[a:b]) if b - a >= 3 else float("nan")
 
 
 def _power_fractions(nodes, log_f, measured, p):
@@ -363,6 +394,7 @@ def reconstruct_minimal_phase_profile(
         window_area=_trapezoid(rho, t),
         rms_duration_fs=_rms(t, rho),
         fwhm_fs=_fwhm(t, rho),
+        lobe_rms_duration_fs=_lobe_rms(t, rho),
         negative_lobe_fraction=float(-_trapezoid(np.minimum(rho, 0), t) / absolute),
         extrapolated_power_fraction=extrapolated,
         truncated_magnitude_fraction=truncated,
@@ -374,6 +406,7 @@ def reconstruct_minimal_phase_profile(
             "source": "Leissner et al. PAC 1999 Eqs. (2),(6),(7); Lai & Sievers NIM A 397 (1997)",
             "convention": "f(omega) = int rho(t) exp(i omega t) dt; rho(t) = (1/pi) int |f| cos(psi - omega t)",
             "measured_band_eV": [float(e[0]), float(e[-1])],
+            "input_intensity_divided_by": float(f2[0] / np.exp(2 * log_f[measured][0])),
         },
     )
 

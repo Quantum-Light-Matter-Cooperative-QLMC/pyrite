@@ -832,12 +832,55 @@ voltage offsets. An optional Gaussian relative scale prior can represent
 *one common* charge/throughput calibration uncertainty, but is **not** a
 substitute for correlated source-, transverse-, and response-model covariance.
 
+Declared transverse-source and detector-response shapes enter through
+`fit_gaussian_ctr(systematics=...)` as `CTRSystematicMode`s
+(`pyrite.detectors.optical_ctr_systematics`). Each mode is a signed,
+dimensionless 1σ fractional change $u_k(E)$ on the template grid, fully
+correlated across energy: of the coherent pair envelope (`"transverse"`:
+transverse form factor or pair-term acceptance) or of one or both ports'
+spectral efficiency (`"response"`). With pulls $a_k\sim\mathcal N(0,1)$,
+
+$$
+V(\sigma_t,a)=s\Big[K(\sigma_t)+\sum_k a_k D_k(\sigma_t)\Big]+\text{offsets},
+\qquad
+\chi^2=\lVert (y-V)/\delta y\rVert^2+\sum_k a_k^2 ,
+$$
+
+where $D_k$ is the 1σ voltage change at unit source scale. With a fitted
+$s$ this bilinear model is profiled exactly ($a_k$, offsets linear at each
+$s$; $s\ge0$ searched), so $a_k$ keeps its declared prior. Profiling the
+$a_k$ equals the chi-square with covariance $C+s^2\sum_k D_kD_k^{\mathsf T}$ at
+fixed scale and offsets, so the Δχ² interval includes the declared
+systematics; pulls are reported in `metadata["systematic_pulls"]`.
+`CTRSystematicMode.from_shifted_density` builds a mode from templates or
+efficiencies regenerated at the 1σ-shifted transverse size, acceptance or
+calibration (new support where the nominal is zero is refused). The
+modes are linear in $u_k$; if the data resolve the second-order change of a
+1σ shift, refit the shifted templates instead. This is a constrained-nuisance
+profile, not a marginal likelihood: for *fixed* nonzero true pulls the prior
+shrinks the fitted pulls, and coverage of $\sigma_t$ falls below 95 % when
+the data constrain a pull more tightly than its prior. Pulls are confined to the physical box $1+a_ku_k(E)\ge0$ on the band, so
+at each $s$ the fit is a bounded linear least squares; declare shapes with
+$|u_k|\ll1$ where the template matters. A two-port (`port=None`) response mode
+partly duplicates a free source scale: at its box edge the efficiency keeps
+only a remnant for a fixed penalty, and a large $s$ rescales that remnant
+while other pulls become cheap, so $\chi^2(s)$ can have a deep branch far out
+in $s$. With a free scale and no scale prior such modes are refused; give the
+scale a prior or fix it. Single-port modes are allowed: the other port pins $s$.
+The scale search is global ($s=0$, a log grid from $10^{-6}$ of the
+linear-fit scale, a growing upper bound, Brent from every grid minimum),
+because $\chi^2(s)$ can have a narrow minimum near $s=0$ where a pull's
+voltage $s\,a_kD_k$ is cheap. A Gaussian transverse form-factor change
+$u=-A(E/E_0)^2$ is first-order **degenerate** with $\sigma_t$: it widens the
+duration interval by $A\hbar^2/(2\sigma_tE_0^2)$ per unit pull rather than
+being identified separately. Not combinable with `charge_jitter`.
+
 For independent Gaussian measurement uncertainties, the reported 95% interval
 uses the conditional one-parameter profile criterion
 $\chi^2(\sigma_t)-\chi^2_{\min}\le 3.841$. If it reaches a declared fit bound,
 that endpoint is **`None` (open)**, not a finite fitted uncertainty; multiple
-separated admissible regions are flagged. This interval excludes spectral
-calibration errors, fitting the instrument transfer, sampling uncertainty of
+separated admissible regions are flagged. Without declared `systematics`,
+this interval excludes spectral calibration errors, fitting the instrument transfer, sampling uncertainty of
 the self/pair templates, drifts and correlated noise. A model can have a small
 $\chi^2$ while its RMS duration remains **unidentified**. The returned
 `is_identified_95` flag refers only to this stated Gaussian/conditional model.
@@ -1171,6 +1214,7 @@ continuation and the result records it:
 |---|---|---|
 | `"gaussian-to-unity"` | $\ln\lvert f\rvert=\ln\lvert f(E_\mathrm{lo})\rvert\,(E/E_\mathrm{lo})^2$, $\lvert f(0)\rvert=1$ | area 1; needs $\lvert f(E_\mathrm{lo})\rvert\le1$ |
 | `"constant"` | $\lvert f(E_\mathrm{lo})\rvert$ held to 0 | no normalization; long signed tails |
+| `"parabolic-intensity"` | $\lvert f\rvert^2=A^2-BE^2$, value and slope joined at $E_\mathrm{lo}$; band divided by $A^2$ | Leissner thesis Eqs. (6.12)–(6.13); intensity in arbitrary units; needs falling $\lvert f\rvert^2$ at $E_\mathrm{lo}$ |
 | above $E_\mathrm{hi}$ | $\lvert f\rvert\propto E^{-p}$ | analytic in Eq. (6); synthesis truncated at $8E_\mathrm{hi}$ |
 
 The result changes with the continuation. For a 200 fs Gaussian whose band
