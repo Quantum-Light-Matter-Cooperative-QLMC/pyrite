@@ -206,3 +206,16 @@ its own derivation; it is not required for correctness.
 - FP64 rounding in phase formation, the $\operatorname{sinc}$ evaluation,
   block summation and `chebfit`/`chebval` is excluded, as the claim states.
   The observed errors near $10^{-13}$ are consistent with this.
+
+## Threshold scaling (#1173, 2026-11-14)
+
+The device default treats `broad_width_eV=1000.0` as a floor.
+`broad_width_for_axis` raises the threshold $W_0$ by factors of $2^{1/8}$
+until the bound above holds for the call's bin width $h$ and centre span.
+Raising $W_0$ only moves lines from the broad route to the exact Fourier
+route. The bound itself is unchanged and is still checked against the
+narrowest broad line. A fixed 1 keV threshold refused coarse axes, such as
+500 eV bins over 0.5–10 keV (bound about 0.2), and long fine axes, such as a
+31 keV span. Wherever the floor already meets the bound, the threshold and
+output are unchanged; this includes the 0.5–10 keV axis at 0.09375 eV.
+Regression: `test_bin_broad.py::test_coarse_bins_reduce_exactly_with_the_scaled_threshold`.

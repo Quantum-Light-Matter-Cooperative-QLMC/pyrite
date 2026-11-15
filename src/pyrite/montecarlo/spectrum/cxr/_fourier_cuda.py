@@ -15,7 +15,7 @@ from pathlib import Path
 
 import numpy as np
 
-from ._bin_broad import broad_bin_mean_reduce
+from ._bin_broad import broad_bin_mean_reduce, broad_width_for_axis
 from ._bin_fourier import (
     FOURIER_MIN_RESIDUAL_TOL,
     FOURIER_RESIDUAL_TOL,
@@ -237,6 +237,10 @@ def cuda_fourier_bin_mean_reduce(
     if not bool(finite & (a > 0.0).all()):
         raise ValueError("lines need finite E_res and weight and positive finite a_width")
     # ``None`` keeps every line on the Fourier route, as in the host reference.
+    # Otherwise ``broad_width_eV`` is a floor, raised until the broad bound
+    # holds on this axis (coarse bins, long spans).
+    if broad_width_eV is not None:
+        broad_width_eV = broad_width_for_axis(h, (n_bins - 1) * h, residual_tol, broad_width_eV)
     broad = a <= (0.0 if broad_width_eV is None else np.pi / broad_width_eV)
     if bool(broad.any()):
         sel = cp.flatnonzero(broad)

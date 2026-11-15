@@ -28,6 +28,27 @@ def broad_bin_mean_error_bound(width_min, h, centre_span):
     return interpolation + (2 * _BROAD_NODES - 1) * gauss
 
 
+def broad_width_for_axis(h, centre_span, tolerance, floor_eV=1000.0):
+    """Smallest broad-route threshold ``>= floor_eV`` [eV] meeting ``tolerance``.
+
+    :func:`broad_bin_mean_error_bound` falls as the threshold ``W0`` grows:
+    the Gauss term as ``(h / W0)**8``, the interpolation term as
+    ``(span / W0)**64``. A fixed ``W0`` refuses coarse bins (500 eV bins at
+    1 keV give ~0.2) and long axes (a 31 keV span at 1 keV gives > 1), so the
+    threshold scales up in steps of 2**(1/8) until the bound holds. Lines
+    narrower than it stay on the exact Fourier route. Returns ``floor_eV``
+    whenever that already meets the bound, so such axes are unchanged.
+
+    Validation: cxr-line-broad-interpolation
+    """
+    width = float(floor_eV)
+    for _ in range(512):
+        if broad_bin_mean_error_bound(width, h, centre_span) <= tolerance:
+            return width
+        width *= 2.0**0.125
+    raise ValueError("no broad-route threshold meets the tolerance on this axis")
+
+
 def broad_bin_mean_reduce(
     E_res, a_width, weight, c0, h, n_bins, *, tolerance, xp=np, block=_BROAD_BLOCK
 ):
