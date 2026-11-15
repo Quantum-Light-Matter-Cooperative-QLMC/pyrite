@@ -70,6 +70,13 @@ __all__ = [
 _DISTINCT = 1e-6
 
 
+def _check_rate(repetition_hz) -> float:
+    rate = float(repetition_hz)
+    if not np.isfinite(rate) or rate <= 0:
+        raise ValueError("repetition_hz must be positive and finite")
+    return rate
+
+
 def _exponential_sum(t, amplitudes, taus):
     xp = array_namespace(t)
     t = xp.asarray(t, dtype=float)
@@ -189,11 +196,19 @@ class DetectorTemporalResponse:
         return type(self)(lp_a, np.append(tau, tau_p), self.calibration_id)
 
     def with_low_pass(self, tau_s: float) -> DetectorTemporalResponse:
-        """Convolve with ``exp(-t/tau)/tau`` (amplifier/shaping rise); renormalized."""
+        """Convolve with ``exp(-t/tau)/tau`` (amplifier/shaping rise); renormalized.
+
+        The result is rescaled to unit peak, so the calibrated pulse gain must
+        have been measured at the shaped output; adding shaping to a gain
+        calibrated without it overstates voltages.
+        """
         return self._with_pole(tau_s, high_pass=False)
 
     def with_ac_coupling(self, tau_s: float) -> DetectorTemporalResponse:
-        """Apply a first-order high-pass ``delta(t) - exp(-t/tau)/tau``; renormalized."""
+        """Apply a first-order high-pass ``delta(t) - exp(-t/tau)/tau``; renormalized.
+
+        As for :meth:`with_low_pass`, the pulse gain refers to the coupled output.
+        """
         return self._with_pole(tau_s, high_pass=True)
 
     def impulse(self, t_s: Any) -> Any:
@@ -222,9 +237,10 @@ class DetectorTemporalResponse:
         ``n_pulses=None`` is the steady state (pulses since ``-inf``; ``t``
         taken modulo the period). Otherwise only ``k < n_pulses`` contribute.
         """
-        if not np.isfinite(repetition_hz) or repetition_hz <= 0:
-            raise ValueError("repetition_hz must be positive and finite")
-        if n_pulses is not None and (isinstance(n_pulses, bool) or int(n_pulses) < 1):
+        repetition_hz = _check_rate(repetition_hz)
+        if n_pulses is not None and (
+            isinstance(n_pulses, bool) or int(n_pulses) != n_pulses or n_pulses < 1
+        ):
             raise ValueError("n_pulses must be a positive integer or None")
         xp = array_namespace(t_s)
         t = xp.asarray(t_s, dtype=float)
@@ -251,7 +267,7 @@ class DetectorTemporalResponse:
         Extrema are over the closed interval ``0 <= s <= T`` since the latest
         pulse: ``s = T`` is the left limit just before the next pulse.
         """
-        period = 1.0 / float(repetition_hz)
+        period = 1.0 / _check_rate(repetition_hz)
         tau = self.time_constants_s
         weights = self.amplitudes / -np.expm1(-period / tau)
         grid = np.unique(
@@ -285,7 +301,8 @@ class PulseTrainReading:
 
     ``mean_v = dc_responsivity_v_per_w * average_absorbed_power_w``;
     ``fundamental_rms_v`` is what a lock-in at the repetition rate reads.
-    ``saturated`` compares the steady-state peak with ``saturation_v``.
+    ``saturated`` compares the larger steady-state swing (positive peak or
+    negative minimum of an AC-coupled train) with ``saturation_v``.
     """
 
     isolated_peak_v: float
@@ -312,6 +329,7 @@ def predict_pulse_train(
 
     Validation: optical-instrument-observable
     """
+    _check_rate(repetition_hz)
     energy = float(absorbed_joule_per_pulse)
     if not np.isfinite(energy) or energy < 0:
         raise ValueError("absorbed_joule_per_pulse must be finite and nonnegative")
@@ -329,7 +347,8 @@ def predict_pulse_train(
         pileup_ratio=shape.peak,
         dc_responsivity_v_per_w=gain * temporal.dc_integral_s,
         average_absorbed_power_w=energy * float(repetition_hz),
-        saturated=detector.saturation_v is not None and peak > detector.saturation_v,
+        saturated=detector.saturation_v is not None
+        and max(peak, -scale * shape.minimum) > detector.saturation_v,
         response_sha256=detector.response_sha256,
         temporal_sha256=temporal.response_sha256,
     )
@@ -338,6 +357,11 @@ def predict_pulse_train(
 @dataclass(frozen=True)
 class Digitizer:
     """Linear ADC ``N = offset_counts + counts_per_v * V`` clipped to ``[0, 2^bits - 1]``.
+
+    Expected counts assume a noise-dithered, round-to-nearest quantizer:
+    valid for analog noise of at least about 0.5 count. Below that the mean
+    is biased by up to 0.5 count and ``noise_rms_counts`` overstates the RMS.
+    Near the rails only the clip mask flags the reduced noise.
 
     Validation: optical-instrument-observable
     """

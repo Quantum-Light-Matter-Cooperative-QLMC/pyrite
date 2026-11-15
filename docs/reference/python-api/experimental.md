@@ -174,6 +174,10 @@ single-spectrum interface returning host scalars. Readings include collected pho
 response (`DetectorTemporalResponse`; time constants in s, transfer in s),
 steady-state pulse trains with DC V/W and lock-in readings
 (`predict_pulse_train`) and ADC counts (`Digitizer`), host NumPy.
+`pyrite.detectors.optical_detector_schema.OpticalDetectorCalibration` validates
+per-class (energy channel, pyroelectric, bolometer, Golay) calibration records and
+builds that pulse channel; V/W responsivities convert through `|H(2 pi f_m)|`;
+spectrometer and camera records are refused.
 Calibration remains explicit
 and bounded; these provisional operators supply no measured response by default.
 `OpticalSpectralCoherency`, calibrated Jones transfers and

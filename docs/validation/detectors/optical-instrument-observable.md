@@ -707,3 +707,292 @@ At $c=0.05$ the 400 penalty confines the misses to durations far from the truth,
 **Verdict:** matches for the box derivation, the bounded solve (exact, KKT), the bilinear model, the conditioning, the refusals as implemented, the fixed-scale path, and the fitted-scale path with transverse modes, single-port response modes, clearly non-uniform two-port response modes, or a scale prior. It still differs for a fitted, prior-less scale combined with a nearly uniform two-port response mode: the global $s$ search misses the box-edge branch, producing falsely precise, wrongly identified intervals at $u_{\max}\ge0.3$.
 
 **Recommended status** for the `optical-instrument-observable` systematic-mode extension: `rederived`, scoped in Notes as "fixed scale, scale prior, or free scale without `port=None` response modes; nearly uniform two-port response modes with a free prior-less scale not covered (s search misses the box-edge branch; refusal threshold too narrow)". The existing `anchored` row stays for its earlier scope. Never `signed-off`.
+
+## Temporal response, pulse trains and ADC (2026-11-15)
+
+Fresh-context review of commit `811152027` (#617). Scope: `src/pyrite/detectors/optical_temporal.py` (`DetectorTemporalResponse`, `predict_pulse_train`, `Digitizer`) and `incident_photons_per_pulse` in `src/pyrite/detectors/optical_energy.py`. The derivation below was written from the ledger row, the module docstring and the signatures before the bodies were read. Scratch scripts are in the worktree's ignored `scratch/` directory: `temporal_ode_oracle.py`, `temporal_expm_oracle.py`, `temporal_edges.py` and `temporal_extreme_grid.py`.
+
+### T.0 Independent derivation
+
+**Model.** The channel is linear and time-invariant. For absorbed energies $U_k$ arriving at times $t_k$, the output is $V(t)=G\sum_kU_k\,h(t-t_k)$. Here $G$ is the calibrated isolated-pulse gain in V/J, and the normalized impulse response $h$ is dimensionless, causal, and satisfies $\max_{t\ge0}h=1$. That normalization makes the isolated-pulse peak exactly $GU$, which is the calibration convention of `CalibratedPulseEnergyDetector`. The response is a sum of exponentials, $h(t)=\Theta(t)\sum_ja_je^{-t/\tau_j}$, so
+
+$$
+H(\omega)=\int_0^\infty h(t)e^{-i\omega t}\,dt=\sum_j\frac{a_j\tau_j}{1+i\omega\tau_j}\ [\mathrm{s}],\qquad H(0)=\sum_ja_j\tau_j .
+$$
+
+**First-order low-pass.** The kernel $k_p(t)=\Theta(t)e^{-t/\tau_p}/\tau_p$ has unit area. For $\tau_j\ne\tau_p$,
+
+$$
+\left(e^{-t/\tau_j}*k_p\right)(t)=\frac{1}{\tau_p}e^{-t/\tau_j}\int_0^te^{-u(1/\tau_p-1/\tau_j)}du=\frac{\tau_j}{\tau_j-\tau_p}\left(e^{-t/\tau_j}-e^{-t/\tau_p}\right).
+$$
+
+The amplitude on $\tau_j$ is therefore $a_j\tau_j/(\tau_j-\tau_p)$, and the new pole $\tau_p$ carries $\sum_ja_j\tau_j/(\tau_p-\tau_j)$. In the frequency domain this is $H\to H/(1+i\omega\tau_p)$. At equal poles the result becomes $te^{-t/\tau}/\tau^2$, which is not a sum of exponentials, so a degenerate pole must be refused.
+
+**First-order high-pass (AC coupling).** The kernel is $\delta-k_p$, i.e. $H\to H\,i\omega\tau_p/(1+i\omega\tau_p)$. The new amplitudes are $a_j-a_j\tau_j/(\tau_j-\tau_p)=a_j\tau_p/(\tau_p-\tau_j)$ on $\tau_j$, and $\sum_ja_j\tau_j/(\tau_j-\tau_p)$ on $\tau_p$. Then $H(0)=0$ identically, and $h(0^+)$ is unchanged because the $\delta$ passes the jump.
+
+**Voltage-mode pyroelectric (Porter 1981).** I start from the circuit rather than the closed form. The thermal node obeys $\dot T=-T/\tau_T+P/C_{\rm th}$, so an absorbed impulse gives $T\propto e^{-t/\tau_T}$. The pyroelectric current is $i=pA\,\dot T$, which includes a $\delta$ at $t=0$, and it drives a parallel $RC$ with $\tau_E=RC$. Then
+
+$$
+V\propto e^{-t/\tau_E}-\frac{1}{\tau_T}\int_0^te^{-u/\tau_T}e^{-(t-u)/\tau_E}du
+=\frac{\tau_Te^{-t/\tau_E}-\tau_Ee^{-t/\tau_T}}{\tau_T-\tau_E},
+$$
+
+$$
+H(\omega)=\frac{\tau_T}{1+i\omega\tau_T}\cdot\frac{i\omega\tau_E}{1+i\omega\tau_E}\ \propto\ \frac{i\omega}{(1+i\omega\tau_T)(1+i\omega\tau_E)} .
+$$
+
+This is symmetric in $\tau_T\leftrightarrow\tau_E$. It equals the thermal pole AC-coupled by $\tau_E$, which is the docstring's construction. Further properties: $h(0^+)=1$ and $\dot h(0^+)=-(\tau_T+\tau_E)/(\tau_T\tau_E)<0$, so the peak sits at $t=0$ with value 1. The undershoot has zero net area. As $\tau_E\to\infty$, $h\to e^{-t/\tau_T}-(\tau_T/\tau_E)e^{-t/\tau_E}$ and $\lvert H\rvert\to\tau_T/\lvert1+i\omega\tau_T\rvert$ for $\omega\tau_E\gg1$.
+
+**Trains.** Let the period be $T=1/f$. The steady state has pulses at $-kT$, $k\ge0$, observed at $s\in[0,T)$. The geometric sum gives
+
+$$
+v_\infty(s)=\sum_ja_je^{-s/\tau_j}\sum_{k\ge0}e^{-kT/\tau_j}=\sum_j\frac{a_je^{-s/\tau_j}}{1-e^{-T/\tau_j}} .
+$$
+
+With pulses at $kT$, $k=0,\dots,n-1$, and $m(t)=\min(\lfloor t/T\rfloor+1,n)$ pulses so far for $t\ge0$ (and $v=0$ for $t<0$), $s=t-(m-1)T$ and
+
+$$
+v_n(t)=\sum_ja_je^{-s/\tau_j}\frac{1-e^{-mT/\tau_j}}{1-e^{-T/\tau_j}} .
+$$
+
+After the last pulse, $m=n$ and $s>T$, which is a plain decay. The period mean is $\frac1T\int_0^Tv_\infty\,ds=f\sum_ja_j\tau_j=fH(0)$. The impulse comb $\sum_k\delta(t-kT)=f\sum_ne^{i2\pi nft}$ gives $v_\infty(t)=f\sum_nH(2\pi nf)e^{i2\pi nft}$, so the fundamental has peak amplitude $2f\lvert H(2\pi f)\rvert$ and RMS $\sqrt2\,f\lvert H(2\pi f)\rvert$. A lock-in reads the RMS.
+
+**Units.** The average absorbed power is $P=Uf$ [W], and the mean voltage is $GUfH(0)=(G\,H(0))P$. The DC responsivity is therefore $G\int h$ [V/J·s = V/W]. It vanishes for an AC-coupled channel and is not the isolated-pulse gain. The limits are as follows.
+- $f\to0$: $v_\infty\to h$, the peak tends to 1 and the mean to 0.
+- $f\tau\gg1$ for a single pole: $v_\infty\to f\tau$ with peak-to-peak exactly $h(0^+)=1$.
+- AC coupling: zero mean for every $f$.
+
+**ADC.** $N=N_0+gV$ in counts, with $g$ in counts/V (either sign), clipped to $[0,2^b-1]$. When the analog noise dithers the quantizer, a round-to-nearest quantizer has error $\sim U(-\tfrac12,\tfrac12)$, independent of the signal, with variance $1/12$ count². That gives $\sigma_N^2=g^2\sigma_V^2+1/12$, and the unrounded $N$ is the dithered mean. The model holds for $\sigma_{\rm counts}\gtrsim0.5$ (Widrow); a truncating ADC shifts the mean by $-1/2$.
+
+**Photon count.** $N_\gamma=\int(dN/dE)\,dE$ over the collected density, using the same trapezoid rule as the energy integral.
+
+### T.1 Comparison with the implementation
+
+| Quantity | Derivation | Code | Result |
+|---|---|---|---|
+| Low-pass amplitudes | $a_j\tau_j/(\tau_j-\tau_p)$; $\sum a_j\tau_j/(\tau_p-\tau_j)$ | `_with_pole` `lp_a` | matches |
+| High-pass | $\mathrm{append}(a,0)-\text{low-pass}$ | `high_pass` branch | matches |
+| Degenerate pole | must refuse | relative $10^{-6}$ refusal | matches |
+| Normalization | $\max_{t\ge0}h=1$ | grid $\{0\}\cup$ 4097 log points over $[10^{-4}\tau_{\min},60\tau_{\max}]$ + bounded Brent | matches |
+| Pyroelectric | $\tau_T$ pole AC-coupled by $\tau_E$ | `single_pole(thermal).with_ac_coupling(electrical)` | matches |
+| $H(\omega)$, $H(0)$ | $\sum a_j\tau_j/(1+i\omega\tau_j)$, $\sum a_j\tau_j$ | `transfer`, `dc_integral_s` | matches |
+| Steady train | $a_je^{-s/\tau_j}/(1-e^{-T/\tau_j})$, $s=t\bmod T$ | `train(n_pulses=None)` with `expm1` | matches |
+| $n$-pulse train | factor $(1-e^{-mT/\tau_j})$, $m=\mathrm{clip}(\lfloor t/T\rfloor+1,0,n)$; $0$ for $t<0$ | same | matches |
+| Mean, fundamental | $fH(0)$, $2f\lvert H(2\pi f)\rvert$ | `steady_state` | matches |
+| Extrema | closed $[0,T]$; minimum at $T^-$ for a decaying train | `linspace`+`geomspace`+peak time, refined | matches |
+| V, V/W, power | $GU$, $G\,H(0)$, $Uf$; lock-in RMS $=$ peak$/\sqrt2$ | `predict_pulse_train` | matches |
+| ADC | $N_0+gV$ clipped; $\sqrt{g^2\sigma_V^2+1/12}$ with $\lvert g\rvert$ | `Digitizer` | matches (validity: T.6) |
+| Photons | trapezoid of $dN/dE$ | `photon_count` | matches |
+
+### T.2 Numerical checks (independent oracles)
+
+- **ODE oracle** (`temporal_ode_oracle.py`). The channel is simulated as a circuit with thermal node, pyroelectric current into RC, amplifier low-pass and AC-coupling capacitor, integrated with DOP853 at rtol $10^{-12}$. Pulses are injected as state jumps, with no exponential-sum algebra. Five channels were run: pyro (fast and slow $\tau_E$), pyro+LP, bolometer+LP+AC and bolometer+LP. Results:
+  - normalized impulse response: worst $\lvert\Delta h\rvert=2.0\times10^{-9}$ (ODE tolerance);
+  - $\int h$ against the sampled trapezoid: within $3\times10^{-15}\sum\tau$ for AC channels; the bolometer+LP value $4.934819\times10^{-3}$ s agrees to $2\times10^{-9}$ relative;
+  - $n=4$ trains from $-T/2$ to $6.5T$, i.e. before $t=0$, across all pulses and after the last: agree to $\le2\times10^{-9}$ at every rate. The only exceptions are samples lying exactly on a pulse instant, where the oracle's half-open interval and the code's `floor` assign the floating-point boundary differently. That is not a physics difference.
+- **Exact state-transition oracle** (`temporal_expm_oracle.py`). The periodic orbit is solved as $x=(I-\Phi)^{-1}\Phi b$ with $\Phi=e^{AT}$. Mean and fundamental come from Van Loan block exponentials $\int_0^Te^{(A-i\omega I)s}ds$. Six channels were swept over 13 rates spanning $f\tau_{\max}=10^{-3}$ to $f\tau_{\min}=10^{3}$. Results:
+  - steady waveform, mean and fundamental agree to $\le10^{-11}$ of the isolated peak for $f\tau_{\max}\le10^4$, with the fundamental generally at $10^{-15}$;
+  - at $f\tau\sim10^5$ the residual grows to $1.2\times10^{-7}$. That is the oracle's ill-conditioned $(I-\Phi)^{-1}$: its mean deviates from the exact AC value 0 by the same amount, while the code's mean is $f\sum a_j\tau_j=O(10^{-11})$;
+  - code extrema are never inside the oracle's sampled range (signed check). Where they differ, the code's refined extremum is the more extreme value.
+- **Single-pole closed form**, $f=10^{-3}$–$10^{8}$ Hz with $\tau=2$ ms: peak $1/(1-r)$ and minimum $r/(1-r)$ with $r=e^{-T/\tau}$, relative error $\le2\times10^{-12}$; mean $f\tau$ exact; fundamental $2f\tau/\sqrt{1+(2\pi f\tau)^2}$ to $2\times10^{-16}$; peak-to-peak $=1$ to 12 digits at every rate. This covers the $f\to0$ and $f\tau\gg1$ limits.
+- **$\tau_E\to\infty$**: $\lvert H_{\rm pyro}\rvert/\lvert H_{\rm single}\rvert-1=-5\times10^{-6},-5\times10^{-10},-5\times10^{-14}$ for $\tau_E/\tau_T=10^2,10^4,10^6$ at 50 Hz, i.e. $\propto(2\pi f\tau_E)^{-2}$ as expected. $\max\lvert h-h_{\rm single}\rvert\approx\tau_T/\tau_E$ is as derived. $\int h=0$ throughout.
+- **AC zero mean**: every AC channel has $\lvert fH(0)\rvert\le4\times10^{-11}$ of the isolated peak up to 0.5 MHz. `predict_pulse_train` reports `mean_v` $=$ `dc_responsivity_v_per_w` × `average_absorbed_power_w` to $2\times10^{-37}$ V. Bolometer: V/W $=G\tau$ exactly.
+- **$n$-pulse edges** (`temporal_edges.py` §3) against brute superposition of shifted `impulse`:
+  - $\le1.6\times10^{-13}$ for $n=1,3,7$;
+  - exactly 0 for $t<0$;
+  - $n=400$ late equals the steady state to 0.0;
+  - the steady state is periodic for $t<0$.
+- **Closed interval**: the minimum equals $v(T^-)$ to $7\times10^{-16}$. For a low-passed train peaking mid-period, the code's peak and minimum match a $2\times10^5$-point dense scan to $10^{-12}$.
+- **Near-degenerate poles**: with $\tau_p=\tau(1+\epsilon)$ and $\epsilon=1.5\times10^{-6}$ the amplitudes reach $1.8\times10^6$. $h$ still matches a two-pole `expm` oracle to $3\times10^{-10}$, and after AC coupling $\lvert\int h\rvert/\sum\lvert a\rvert\tau=2\times10^{-17}$, far inside the $10^{-9}$ `is_ac_coupled` tolerance.
+- **Extreme separation**: for $\tau_T=1$ s, $\tau_p$ down to $10^{-12}$ s and $f$ down to 0.01 Hz (`temporal_extreme_grid.py`), the peak and minimum match an 800k-point log scan to $\le4\times10^{-14}$.
+- **Calibrated gain**: `isolated_peak_v` $=GU$ exactly. As $f\to0$, `steady_peak_v` $\to GU$; at $10^{-3}$ Hz it equals $GU$ to print precision.
+- **ADC**: Monte Carlo of a round-to-nearest quantizer gives the following (offset-averaged rms vs. model).
+
+| $\sigma$ (counts) | 0.05 | 0.2 | 0.3 | 0.5 | 1 | 3 |
+|---|---|---|---|---|---|---|
+| model rms | 0.293 | 0.351 | 0.416 | 0.577 | 1.041 | 3.014 |
+| MC rms | 0.167 | 0.337 | 0.414 | 0.577 | 1.038 | 3.011 |
+| MC fixed-point mean bias | 0.20 | 0.13 | 0.05 | 0.002 | 0.000 | 0.003 |
+
+  Negative `counts_per_v` maps and clips correctly, the noise uses $\lvert g\rvert$, and the clip mask is right.
+- **Photons**: a Gaussian density on a 3002-point random nonuniform grid gives $-2.9\times10^{-5}$ relative error, matching the trapezoid truncation of the energy integral. A flat 3/eV density over $[1,5]$ eV gives exactly 12. The batch is linear.
+- The repository's `tests/detectors/test_optical_temporal.py` and `test_optical_energy.py` pass (25).
+
+### T.3 Findings (no code change made)
+
+- **T.1 (low): `steady_state` and `predict_pulse_train` do not validate `repetition_hz`** (`optical_temporal.py:254`, `:318`). `train` rejects non-positive or non-finite rates, but these do not:
+  - `steady_state(-50)` silently returns a negative mean ($-0.05$) and a *negative* fundamental "amplitude" ($-0.095$);
+  - `nan` propagates silently;
+  - `0` raises `ZeroDivisionError`, and `inf` raises a NumPy `geomspace` error.
+
+  `predict_pulse_train` passes these through, so a negative rate produces a reading with negative average power. Suggested fix: apply the same check as `train`.
+- **T.2 (low): non-integer `n_pulses` is truncated silently** (`:227`, `:239`). `n_pulses=2.7` behaves as 2, while 0.5 is rejected. Require an integral value.
+- **T.3 (low, convention): renormalization after shaping.** `with_low_pass`/`with_ac_coupling` renormalize to unit peak (`:150`), so $G$ must have been calibrated *with* that shaping in place. Adding a shaping stage to a channel calibrated without it overstates every voltage by the lost peak factor, for example $1/0.850=+18\%$ for pyro($50$ ms, $2$ ms) + LP($100\,\mu$s). The pre-normalization peak is not exposed. The docstrings say "renormalized", but the module docstring should state the calibration consequence explicitly.
+- **T.4 (info): saturation is checked on the positive peak only** (`:332`). AC-coupled trains swing to $\approx-\tfrac12$ of the isolated peak at high rate, and negative excursions are not checked. Negative-polarity channels are refused ("no positive peak"), which is consistent, but inverting front ends must be modelled with a sign outside.
+- **T.5 (info): `peak_time_s` is indeterminate on a flat maximum.** At $\tau/\tau_p=10^{13}$ it is off by $9\times10^{-4}$ relative, although the peak *value* is exact to $10^{-15}$. Only the value is used downstream.
+- **T.6 (info): ADC model validity** (`:364`–`:375`).
+  - The $1/12$ term and the unrounded expected count assume a dithered round-to-nearest quantizer. At $\sigma\ge0.5$ count they hold to $<0.3\%$. At $0.3$ they are 0.5 % on average but biased by up to 0.13 count at fixed sub-LSB position. Below $0.2$ count they fail: rms is overstated and the mean is biased by up to $\pm0.5$. The module's "at least about one count" condition is adequate but not enforced or flagged.
+  - The rounding convention (nearest vs. truncation, a $-1/2$ offset) is not stated.
+  - Near the rails, `noise_rms_counts` does not shrink and $\mathrm{clip}(\langle N\rangle)\neq\langle\mathrm{clip}(N)\rangle$. Only the mask signals this.
+- **T.7 (info): `is_ac_coupled` tolerance.** The relative $10^{-9}$ threshold sits $10^{8}$ above the observed roundoff ($\le8\times10^{-17}$), so true AC channels are always flagged. A DC-coupled response whose net area is $\le5\times10^{-10}$ of its gross area is also called AC-coupled, which is physically harmless since V/W $\approx0$ either way. The property only labels the response; V/W uses the actual $H(0)$.
+
+### T.4 Verdict
+
+- **Claim**: `optical-instrument-observable` (temporal extension) — `src/pyrite/detectors/optical_temporal.py::{DetectorTemporalResponse, predict_pulse_train, Digitizer}`, `optical_energy.py` `incident_photons_per_pulse` — LTI sum-of-exponentials response; first-order low-pass/high-pass composition; Porter (Ferroelectrics 33, 193 (1981)) voltage-mode pyroelectric shape; geometric-sum trains; Fourier-series mean $fH(0)$ and fundamental $2f\lvert H(2\pi f)\rvert$; linear clipped ADC with $1/12$ quantization.
+- **Filters**: units pass (s, V/J, V/W, W, counts); limits pass ($f\to0$, $f\tau\gg1$, $\tau_E\to\infty$, AC zero mean, closed-interval extrema, $n\to\infty$); signs/conventions pass ($e^{-i\omega t}$ transfer, $\lvert g\rvert$ in noise, causal $t<0$).
+- **Re-derivation**: `matches`. Every amplitude, geometric factor, mean, fundamental and unit agrees symbolically. Numerically, the two independent oracles agree to $\le2\times10^{-9}$ (ODE) and to roundoff (state-transition) over $10^{-3}\le f\tau\le10^{5}$.
+- **Verdict**: `rederived` for this extension scope. T.1–T.2 are input-validation gaps outside the physics; T.3–T.7 are conventions and validity notes.
+- **Write-up**: `docs/validation/detectors/optical-instrument-observable.md` (this section).
+- **Suggested ledger change**: in the Notes field, add "Temporal/train/ADC extension (2026-11-15, `811152027`): `rederived` (fresh-context, ODE + exact state-transition oracles; T.1–T.7). Rate validation in `steady_state`/`predict_pulse_train` and integral `n_pulses` pending (T.1–T.2); $G$ must be calibrated with any added shaping (T.3); ADC model assumes dithered round-to-nearest, $\sigma\gtrsim0.5$ count." The existing `anchored` status stays for its earlier scope; the extension has no external anchor (synthetic calibration only). Never `signed-off`.
+
+- **Applied (task owner, 2026-11-15):** T.1 rate validation in `steady_state`/`predict_pulse_train`; T.2 non-integral `n_pulses` refused; T.4 saturation now checks the larger of the positive peak and AC negative swing; T.3 and T.6 conventions stated in the docstrings and user doc. Tests in `test_optical_temporal.py`.
+
+## Detector-class calibration schema (fresh-context review, 2026-11-15, `6b1bb88b3`)
+
+Scope: `src/pyrite/detectors/optical_detector_schema.py` (`pulse_gain_from_power_responsivity`,
+`OpticalDetectorCalibration`, NEP noise). The channel model
+$V(t)=G\sum_k U_k\,h(t-t_k)$ with peak-normalized $h$ (`optical_temporal.py`) is taken as given.
+Derivation written before reading the implementation bodies.
+
+### S2-D1. Response to sinusoidally modulated absorbed power
+
+For continuous absorbed power $P(t)$ the channel is $V=G\,(h*P)$, with $G$ in V/J, $h$
+dimensionless and $H(\omega)=\int_0^\infty h(t)\,e^{-i\omega t}\,dt$ in s. For
+$P(t)=P_0(1+\cos\omega t)$,
+
+$$
+V(t)=G P_0\left[H(0)+\operatorname{Re}\!\left(H(\omega)\,e^{i\omega t}\right)\right],
+$$
+
+so the voltage fundamental has amplitude $G P_0\lvert H(\omega)\rvert$ and the power
+fundamental has amplitude $P_0$. The sinusoidal responsivity is
+
+$$
+R(f_m)=G\,\lvert H(2\pi f_m)\rvert
+\quad\Rightarrow\quad
+\boxed{G=R(f_m)/\lvert H(2\pi f_m)\rvert},
+\qquad R(0)=G\,H(0)=G\!\int h\,dt .
+$$
+
+The ratio is the same for peak/peak and RMS/RMS of the two fundamentals. When
+$H(0)=0$ (AC coupling) a DC responsivity does not exist. Units: (V/W)/s = V/J.
+
+### S2-D2. Per-class closed forms
+
+- **Bolometer, Golay cell (single thermal pole):** $h=e^{-t/\tau}$, $H=\tau/(1+i\omega\tau)$,
+  so $G=R\sqrt{1+\omega_m^2\tau^2}/\tau$. Physical check: an energy $U$ absorbed in heat capacity
+  $C$ gives $\Delta T=U/C$ and $V_{\rm peak}=S_T U/C=R(0)\,G_{\rm th}U/C=R(0)U/\tau$. This matches.
+- **Pyroelectric (voltage mode):** $H_{\rm un}\propto i\omega\tau_T\tau_E/[(1+i\omega\tau_T)(1+i\omega\tau_E)]$
+  (Porter shape), with $h_{\rm un}=(\tau_T e^{-t/\tau_E}-\tau_E e^{-t/\tau_T})/(\tau_T-\tau_E)$ and
+  $\int h_{\rm un}\,dt=0$. Vendor energy responsivity (V/J, the peak voltage per pulse energy) maps
+  directly to $G$.
+- **Shaping low-pass:** $K_s=1/(1+i\omega\tau_s)$. With $h$ renormalized after shaping, $G$ is the
+  peak at the *shaped* output. If $R$ refers to the detector head (before shaping), the code's
+  $G$ is high by $1/\lvert K_s(\omega_m)\rvert=\sqrt{1+\omega_m^2\tau_s^2}$.
+
+### S2-D3. Chopped (square-wave) calibrations
+
+For a 50 % chop from $0$ to $P_{\rm on}$, the power fundamental has peak amplitude
+$2P_{\rm on}/\pi$. A datasheet "responsivity" equals the sinusoidal $R$ multiplied by:
+
+| Datasheet convention | Factor relative to $R$ |
+|---|---|
+| fundamental peak / $P_{\rm on}$ | $2/\pi=0.637$ |
+| lock-in RMS / $P_{\rm on}$ | $\sqrt2/\pi=0.450$ |
+| fundamental peak / ($P_{\rm on}/2$) | $4/\pi=1.273$ |
+| output peak-to-peak / $P_{\rm on}$, $f_m\tau\ll1$ | $\to R(0)/R(f_m)$ |
+
+The code and docs state the sinusoidal-fundamental convention explicitly. A
+chopped datasheet value entered unconverted biases $G$ by the inverse factor.
+
+### S2-D4. NEP and output noise
+
+$\mathrm{NEP}(f_m)=v_n(f_m)/R(f_m)$ in W/$\sqrt{\rm Hz}$. The output RMS noise
+$\sigma_V=R(f_m)\,\mathrm{NEP}\,\sqrt{\Delta f}$ requires two things:
+
+- the output-referred noise density is white at $v_n(f_m)$ over the declared band $\Delta f$;
+- NEP is quoted at the same $f_m$ as $R$.
+
+Thermal-fluctuation (phonon) noise is filtered by the thermal pole, giving
+$\sigma_V^2=\mathrm{NEP}^2G^2\int_0^{\Delta f}\lvert H\rvert^2df$. For a single pole with a
+brick-wall band this gives an effective band of $\arctan(2\pi\Delta f\tau)/(2\pi\tau)$.
+
+### Comparison with the implementation and independent numerics
+
+Script: `scratch/schema_check.py` (closed forms plus an ODE time-domain chain, not implementation helpers).
+
+| Check | Result |
+|---|---|
+| bolometer $G$ at $f_m=0,10,40,400$ Hz vs $R\sqrt{1+\omega^2\tau^2}/\tau$ | rel $\le1.1\times10^{-16}$ |
+| NEP noise $R\,\mathrm{NEP}\sqrt{\Delta f}$ | exact |
+| Golay + shaping $G$ vs closed-form two-pole peak $t^*=\frac{\tau\tau_s}{\tau-\tau_s}\ln\frac{\tau}{\tau_s}$ | rel $2\times10^{-16}$ |
+| ODE chain driven by $P_0(1+\cos\omega t)$, lock-in fundamental / $P_0$ | $R$ to $2.5\times10^{-11}$ |
+| ODE chain, square chop: three conventions | $2/\pi$, $\sqrt2/\pi$, $4/\pi$ to 6 digits |
+| pyroelectric $G$ at 5, 20, 160 Hz vs Porter closed form | rel $\le4.4\times10^{-16}$ |
+| `tests/detectors/test_optical_detector_schema.py` | 5 passed |
+
+Symbolic and dimensional agreement: `pulse_gain_from_power_responsivity` returns $R/\lvert H(2\pi f_m)\rvert$
+(L127). DC is refused when $\lvert H(0)\rvert\le10^{-9}\sum\lvert a_j\rvert\tau_j$, and any $f_m$
+where $\lvert H\rvert\le10^{-12}\sum\lvert a_j\rvert\tau_j$ is also refused (L121–126). Noise is
+$R\,\mathrm{NEP}\sqrt{\Delta f}$ (L230–231). The class temporal models match S2-D2 (L210–221).
+
+### Findings
+
+- **S2.1 (medium, convention; L10–12, physics doc L179–180).** $R$ and `pulse_gain_v_per_j`
+  are per **absorbed** power or energy, and `build()` multiplies by the absorptance table. Golay and
+  pyroelectric datasheet responsivities are normally per **incident** power or energy at a stated
+  wavelength or source, window included. Entering such a value with a non-unit absorptance table
+  double-counts absorption by $A(\lambda_{\rm cal})$. The record has no calibration
+  wavelength/source field and gives no warning. Bolometer *electrical* (load-curve) responsivity is
+  per absorbed power and is consistent. Suggest documenting $R_{\rm abs}=R_{\rm inc}/A(\lambda_{\rm cal})$,
+  or recording the calibration source.
+- **S2.2 (medium, documentation; L10–15, `pulse_gain_from_power_responsivity` docstring L108–109).**
+  The sinusoidal convention is stated, but the schema does not warn that chopped datasheet values
+  (e.g. Golay cells specified at a 20 Hz chop) need conversion. Unconverted, $G$ is silently biased
+  by $\pi/2$, $\pi/\sqrt2$ or $\pi/4$ (S2-D3). Suggest a conversion note. One example: a 50 % chop
+  read as lock-in RMS gives $R=\pi V_{\rm rms}/(\sqrt2 P_{\rm on})$.
+- **S2.3 (low, assumption; L17–18, L230–231).** $\sigma_V=R(f_m)\,\mathrm{NEP}\sqrt{\Delta f}$
+  assumes white output noise over the declared $\Delta f$, with NEP quoted at the responsivity's
+  $f_m$. There is no separate NEP-frequency field. For phonon-noise-limited thermal detectors the
+  result is conservative: 1.45× for $\tau=4$ ms with a 100 Hz brick-wall band (effective band
+  47.4 Hz; the pole's ENBW is $1/(4\tau)=62.5$ Hz). $\Delta f$ is not tied to the shaping filter's
+  ENBW $1/(4\tau_s)$. Suggest stating both assumptions.
+- **S2.4 (low, reference plane; L219–220, L229).** Shaping is included in $H$ before
+  $G=R/\lvert H\rvert$, and pulse-gain classes keep $G$ as the shaped-output peak. Both are correct
+  only if every calibration refers to the final shaped output. A detector-head calibration combined
+  with `shaping_time_constant_s` biases $G$ by $\sqrt{1+\omega_m^2\tau_s^2}$: 1.00003 in the test,
+  1.012 at $\tau_s=2$ ms, 1.074 at $\tau_s=5$ ms (with $f_m=12.5$ Hz). For pulse-gain classes the
+  bias is the shaped/unshaped peak ratio. `CalibratedPulseEnergyDetector` says "under its stated
+  electronics/shaping conditions", but the schema docs do not say this. Suggest a one-line
+  reference-plane statement.
+- **S2.5 (info; L187–192).** The energy/absorptance table is validated only in `build()`. A record
+  with a decreasing energy grid or absorptance $>1$ is constructed and hashed (probe: constructed,
+  then refused at build). Suggest validating at construction.
+- **S2.6 (info; L66).** `operating_temperature_k` is required but used only as hashed provenance.
+  This is acceptable; say so in the docs.
+- **S2.7 (info).** A `shaping_time_constant_s` equal to the detector $\tau$ is accepted by the
+  record and refused only at `build()` (degenerate double pole from `optical_temporal`). Harmless.
+- **S2.8 (info).** Single-pole Golay and bolometer models are approximations: Golay pneumatic and
+  readout dynamics are simplified, and a bolometer $\tau$ must be the electrothermal-feedback
+  effective value. The docs label these "single pole", which is adequate.
+
+### Verifier output
+
+- **Claim**: `optical-instrument-observable` (schema extension) —
+  `src/pyrite/detectors/optical_detector_schema.py::{pulse_gain_from_power_responsivity, OpticalDetectorCalibration}`
+  — LTI response to $P_0(1+\cos\omega t)$; NEP definition; Porter pyroelectric shape.
+- **Filters**: units pass; limits pass ($f_m\to0$ gives $G H(0)$; AC-coupled DC refused;
+  $\omega\tau\gg1$ gives $G\to R\omega$); signs/conventions pass with documentation findings
+  S2.1–S2.4.
+- **Re-derivation**: `matches`. $G=R(f_m)/\lvert H(2\pi f_m)\rvert$,
+  $\sigma_V=R\,\mathrm{NEP}\sqrt{\Delta f}$ and the class impulse responses agree to machine
+  precision. A time-domain ODE lock-in reproduces $R$ to $2.5\times10^{-11}$.
+- **Verdict**: `rederived` for this scope. No math discrepancy. S2.1 and S2.2 are convention or
+  documentation risks that can silently bias $G$ by $A(\lambda_{\rm cal})$ or 0.45–1.27× when
+  datasheet values are entered unconverted.
+- **Suggested ledger change**: append to Notes: "Detector-class schema `rederived` (fresh context
+  2026-11-15 at `6b1bb88b3`): sinusoidal-fundamental $G=R/\lvert H\rvert$, NEP noise and class
+  models match an ODE lock-in to 2.5e-11. Responsivities are per absorbed power at the shaped
+  output; chopped or incident-power datasheet values need conversion (S2.1–S2.4)." Never `signed-off`.
+
+- **Applied (task owner, 2026-11-15):** S2.1, S2.2 and S2.4 reference-plane conventions (absorbed power, sinusoidal fundamental with chopped conversion, shaped output) and the S2.3 noise assumption stated in the module docstring and user doc; S2.5/S2.7 records are validated eagerly at construction (absorptance table and shaping time constant).
