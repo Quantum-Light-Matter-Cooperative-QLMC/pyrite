@@ -268,12 +268,22 @@ def test_line_mesh_is_geometric_away_from_edges_and_1ev_near_them():
     assert np.all(spacing <= np.maximum(1.0, _LINE_TAB_RATIO * mesh[1:]) * (1 + 1e-12))
     assert mesh.size < 0.05 * (hi - lo)
     for edge in edges:
+        # Inside each edge window the mesh is exactly the former 1 eV mesh.
         half = _LINE_TAB_EDGE_WINDOW * edge
+        inside = mesh[(mesh > edge - half) & (mesh < edge + half)]
         uniform = lo + np.arange(np.ceil(edge - half - lo), np.floor(edge + half - lo) + 1.0)
-        assert np.all(np.isin(uniform, mesh))
-    # Nodes depend on lo, not hi: a smaller hi keeps a prefix.
-    short = _line_mesh(lo, 25_000.0, edges)
-    np.testing.assert_array_equal(short, mesh[: short.size])
+        np.testing.assert_array_equal(
+            inside, uniform[(uniform > edge - half) & (uniform < edge + half)]
+        )
+    # Nodes are fixed by lo and the edges: a smaller hi keeps a prefix,
+    # including non-integer lo just below the geometric switch (1 keV).
+    rng = np.random.default_rng(1201)
+    for start in (lo, 1.37, 412.6):
+        full = _line_mesh(start, hi, edges)
+        for stop in np.r_[999.2, 999.9, 1000.4, rng.uniform(start + 2.0, 60_000.0, 40)]:
+            short = _line_mesh(start, stop, edges)
+            assert short[-1] >= stop and (short.size == 1 or short[-2] < stop)
+            np.testing.assert_array_equal(short, full[: short.size])
 
 
 @pytest.mark.parametrize(

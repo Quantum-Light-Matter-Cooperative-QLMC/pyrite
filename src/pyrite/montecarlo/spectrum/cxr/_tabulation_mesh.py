@@ -39,9 +39,10 @@ def _epdl_mesh_nodes(element, lo, hi):
 
 # Relative node spacing of the line-table mesh away from absorption edges, and
 # the half-width (relative to the edge energy) of the 1 eV window kept around
-# every edge. Measured (#1201) against direct evaluation over 1 eV-300 keV for
-# Si, MoS2 and W: the excess interpolation error over the 1 eV mesh is <= 2e-4
-# of the local table scale for chi_g, <= 2e-5 for delta, <= 2e-6 for mu.
+# every edge. Inside a window the mesh is the former uniform 1 eV mesh. Away
+# from edges the excess interpolation error over that mesh is ~0.75 (h/E)**2
+# of the table (2.5 (h/E)**2 for f''-only terms); see the ledger row for the
+# measured cases (#1201).
 _LINE_TAB_RATIO = 1.0e-3
 _LINE_TAB_EDGE_WINDOW = 0.03
 
@@ -51,29 +52,34 @@ def _line_mesh(lo, hi, edges):
 
     The node spacing is ``max(1 eV, _LINE_TAB_RATIO * E)``: the 1 eV mesh
     ``lo + k`` up to ``1/_LINE_TAB_RATIO`` eV, then geometric. Within
-    ``_LINE_TAB_EDGE_WINDOW * E_edge`` of each edge in ``edges`` the 1 eV mesh
-    ``lo + k`` is kept, so there the grid contains every node of the uniform
-    mesh. Away from edges the tables (``chi_g ~ E**-2 F``, ``delta``,
+    ``_LINE_TAB_EDGE_WINDOW * E_edge`` of each edge in ``edges`` the mesh is
+    exactly the uniform 1 eV mesh ``lo + k`` (geometric nodes there are
+    dropped). Away from edges the tables (``chi_g ~ E**-2 F``, ``delta``,
     ``log mu``) are smooth and linear interpolation errs at second order,
-    ``~ (spacing/E)**2``. The last node is the first at or above ``hi``. Every
-    node depends on ``lo`` but not on ``hi``, so a smaller ``hi`` keeps a
-    prefix of the mesh.
+    ``~ (spacing/E)**2``. The last node is the first at or above ``hi``.
+    Every node is fixed by ``lo`` and ``edges`` alone, so a smaller ``hi``
+    keeps a prefix of the mesh.
 
     Validation: line-absorption-tabulation
     """
     switch = max(lo, 1.0 / _LINE_TAB_RATIO)
-    nodes = [np.arange(lo, min(hi, switch) + 1.0, 1.0)]
+    uniform = np.arange(lo, min(hi, switch) + 1.0, 1.0)
+    geometric = np.array([switch])
     if hi > switch:
         n_geom = int(np.ceil(np.log(hi / switch) / np.log1p(_LINE_TAB_RATIO)))
-        nodes.append(switch * (1.0 + _LINE_TAB_RATIO) ** np.arange(n_geom + 1))
-    top = min(node[node >= hi].min() for node in nodes if node[-1] >= hi)
+        geometric = switch * (1.0 + _LINE_TAB_RATIO) ** np.arange(n_geom + 1)
+    reach = max(uniform[-1], geometric[-1])  # >= hi, so >= the cut below
+    nodes = [uniform]
+    keep = np.ones(geometric.size, dtype=bool)
     for edge in edges:
-        start = max(lo, edge * (1.0 - _LINE_TAB_EDGE_WINDOW), switch)
-        stop = min(top, edge * (1.0 + _LINE_TAB_EDGE_WINDOW))
-        if start < stop:
-            nodes.append(lo + np.arange(np.floor(start - lo), np.ceil(stop - lo) + 1.0))
+        first = np.floor(max(lo, edge * (1.0 - _LINE_TAB_EDGE_WINDOW), switch) - lo)
+        last = np.ceil(edge * (1.0 + _LINE_TAB_EDGE_WINDOW) - lo)
+        if first < last and lo + first <= reach:
+            keep &= (geometric <= lo + first) | (geometric >= lo + last)
+            nodes.append(lo + np.arange(first, last + 1.0))
+    nodes.append(geometric[keep])
     mesh = np.unique(np.concatenate(nodes))
-    return mesh[mesh <= top]
+    return mesh[mesh <= mesh[mesh >= hi].min()]
 
 
 def _cxr_tabulation_grid(crystal_info, composition, lo, hi):
