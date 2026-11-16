@@ -47,7 +47,7 @@ ROOT = Path(__file__).resolve().parents[1]
 HBARC = 1973.269804
 MC2 = 510998.95
 H_RED = HBARC / MC2
-B_CAT = {"silicon": 0.4632, "hopg": 1.30, "hbn": 3.45}
+B_CAT = {"silicon": 0.4632, "hopg": 1.30, "hbn": 1.73}
 
 
 def _energy(p):
