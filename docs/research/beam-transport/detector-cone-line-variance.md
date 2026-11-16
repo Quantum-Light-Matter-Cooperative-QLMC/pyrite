@@ -35,4 +35,85 @@ Variance reduction for this population is studied under #203: a brute-force base
 (research-detector-cone-vr)=
 ### Study (#203)
 
-In progress; results are added here as they are measured.
+In progress; results are added here as they are measured. The estimator
+derivation and its validation status live in
+[`detector-cone-variance-reduction`](../../validation/beam-transport/detector-cone-variance-reduction.md).
+
+#### Pilot evidence (November 2026)
+
+Jobs 3701/3702 (NVIDIA, five seeds × 512 primaries per arm) ran the CPU
+prototype with a $1/\gamma$ cone and target copy weight $10^{-3}$. On 5 MeV
+h-BN the largest single primary still held 98 % (analog) and 84 % (split) of
+the line mass. The splitting arm made 6–53 copies per seed. At 15 and
+29.999 MeV (HOPG, 45°/180°) almost no copies were made and line statistics
+were unchanged.
+
+Replay job 3705 (seed 0, code `f88349b3b`) traced the dominant primary, 159,
+which holds 99.75 % of that seed's analog line mass. It never enters the
+$1/\gamma$ cone: its closest approach is $\theta = 0.144$ rad, and its heaviest
+lines sit at $\gamma\theta = 1.3$–$2.3$, measured at the local electron
+energy. Re-analysis of the replay's copy records, where $u=\gamma\theta$ is the
+launch angle of each copy measured from the detector direction:
+
+| Quantity | Value |
+|---|---|
+| Copies / parents | 45 / 8 (38 from primary 159) |
+| Unweighted copy line mass, median (range) | $2.4\times10^{-3}$ ($9\times10^{-5}$–$9.6\times10^{-2}$) |
+| Median analog primary line mass | $6.0\times10^{-9}$ |
+| Primary 159 line mass | $1.8\times10^{-3}$ |
+| Copy line mass vs launch $u\in[0.19, 0.92]$ | no trend (log–log correlation $-0.08$) |
+| Squared coefficient of variation of in-cone mass | 3.1 |
+| Estimated in-cone entry rate, $\sum_c w_c / N$ | $5\times10^{-5}$ per primary |
+
+Three conclusions follow. They are order-of-magnitude statements from one
+seed, and the copy records are conditioned on primary 159.
+
+1. **The $1/\gamma$ cone is the wrong importance region.** Copy line mass is
+   flat over $u\lesssim1$, and an analog history at $u\approx1.5$ carries a
+   comparable mass. Since the solid angle grows as $u^2$, histories outside
+   the cone contribute at least as much as those inside. Splitting only
+   inside $u\le1$ adds low-variance copies but leaves the dominant
+   out-of-cone primaries analog, so the pilot RSE did not improve.
+2. **The rare population does exist, and importance sampling reaches it.**
+   An in-cone history is about $4\times10^5$ times heavier than a median one.
+   With the in-cone class alone, analog sampling needs about $7.6\times10^6$
+   primaries for RSE 0.1: rate $5\times10^{-5}$, $\mathrm{CV}^2=3.1$, so
+   $N\approx(1+\mathrm{CV}^2)/(p\cdot0.01)$. The weighted copies reach the same
+   RSE for that class with about $2.5\times10^4$ primaries, at roughly 9 %
+   extra transport. At the pilot's ~0.1 s per primary, this is about nine
+   GPU-days of brute force against under an hour. This projection is
+   provisional, not the Plan's measured baseline.
+3. **Intra-class spread sets a floor.** In-cone copies vary over three
+   decades at fixed launch angle; their launch depth and energy matter more
+   than $u$. Angular importance alone cannot remove $\mathrm{CV}^2\approx3$.
+
+#### Method comparison
+
+| Criterion | Splitting + roulette at elastic events (prototype) | Biased large-angle elastic sampling |
+|---|---|---|
+| Weight bookkeeping | Analog primary keeps weight 1. Each copy carries $P_B h/\pi$ (or $/s$ after roulette), bounded by $\max(1,w_t)$; copies do not split again. | One scalar weight per history, multiplied by $p/q$ at every biased event. |
+| Weight-range growth at MeV | None: weights do not compound. | A primary has ~$10^4$ elastic segments (8104 traced for primary 159). Any per-event bias compounds. A defensive mixture $q=(1-\varepsilon)p+\varepsilon g$ caps out-of-region ratios at $1/(1-\varepsilon)$ but drifts by $(1-\varepsilon)^{-n}$, which forces $\varepsilon\lesssim1/n\sim10^{-4}$. |
+| Other tallies (brem, characteristic) | The primary stays analog; copies add small-weight terms. No variance penalty. | Every tally of every history carries the fluctuating weight, which inflates bremsstrahlung and characteristic variance. |
+| RNG for copies | Event key = splitmix(split key, flight). Copy transport keys re-hash it under a separate salt. No draw comes from the primary stream, so biasing off is bit-for-bit analog. | Mixture and branch draws need their own keyed stream to keep biasing-off bit-for-bit. No copies. |
+| Block invariance (#361) and CUDA seeding | Copies are a function of (primary key, flight) only, so they are independent of block layout. They launch through the existing secondary-generation pass, as secondaries do. | Trivial: one history per primary. |
+| Cost | Copy buffer and launch generation, already present for secondaries. Copy count is tuned by $w_t$. | No buffers. |
+| Derivation / ledger | `detector-cone-variance-reduction`; the derivation holds for any half-angle $<\pi/2$ (rederivation in draft #1237). | New claim and new verification. |
+
+**Choice: keep splitting with Russian roulette, and widen the importance
+region.** The rederived estimator is unbiased for any cone half-angle
+$\alpha<\pi/2$, so widening needs no new physics. Biased elastic sampling
+offers no better coverage at an equal draw rate. It compounds weights over
+~$10^4$ events and costs variance on the other tallies.
+
+The next measurement is the region's size. Proposed run: replay 5 MeV h-BN
+with half-angle $k/\gamma$ for $k\in\{1,2,3,4\}$, five seeds × 512 primaries,
+warmed and counterbalanced arms, recording copy mass against launch $u$,
+depth and energy. Choose $k$ and $w_t$ to minimize projected per-primary
+variance × time. Keep `max_copies_per_electron` above the expected copy
+count: primary 159 alone made 38 copies at $k=1$.
+
+**Pixel scorers (#212).** Bias toward one cone about the scorer's central
+direction, with half-angle equal to the scorer's angular radius plus
+$k/\gamma$. Leave biasing off when that exceeds $\pi/2$, the prototype's
+restriction. This keeps one transport per case, consistent with the
+one-detector-per-transport decision.
