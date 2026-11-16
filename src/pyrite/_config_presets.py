@@ -30,6 +30,7 @@ from ._numerics import (
     _emission_selection,
     validate_profile_numerics,
 )
+from ._off_settings import normalize_off_values
 from ._units import normalize_unit_input
 
 EMISSION_VALUES = ("incoherent", "coherent", "both")
@@ -81,10 +82,14 @@ _UNIT_FIELDS = {
 
 
 def normalize_field_units(values: Mapping[str, Any], *, field_prefix: str) -> dict[str, Any]:
-    """Normalize supported Physics/Numerics values from Python or catalog input."""
-    result = dict(values)
+    """Normalize supported Physics/Numerics values from Python or catalog input.
+
+    A stored ``"none"`` (or deprecated ``"off"``) becomes the field's off value
+    and stays present, so it overrides a preset that enables the field (#1242).
+    """
+    result = normalize_off_values(values)
     for key, (unit, expected) in _UNIT_FIELDS.items():
-        if key in result:
+        if result.get(key) is not None:
             result[key] = normalize_unit_input(
                 result[key], unit, field=f"{field_prefix}.{key}", expected=expected
             )

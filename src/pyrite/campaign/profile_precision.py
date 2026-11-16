@@ -9,6 +9,7 @@ import tomlkit
 
 from pyrite._cxr_vocabulary import catalog_key
 from pyrite._numerics import SAMPLING_KEYS, validate_profile_numerics
+from pyrite._off_settings import is_on, off_value
 from pyrite._precision import (
     DEFAULT_PRECISION,
     REQUIRED_FIELDS,
@@ -25,6 +26,12 @@ SAMPLING_FLAGS = {"n_electrons": "cxr-histories", "n_electrons_brem": "brem-hist
 
 
 _INITIAL_FIELDS = (*REQUIRED_FIELDS, "observables")
+#: Fields that enable particle cascades; a stored "none" keeps them off (#1242).
+_CASCADE_KEYS = ("secondary_threshold_eV", "pair_production_model")
+
+
+def _unwrap(value):
+    return value.unwrap() if hasattr(value, "unwrap") else value
 
 
 def profile_precision_values(profile):
@@ -65,8 +72,12 @@ def precision_resolution(profile):
     reason = default_precision_fallback(
         fixed_counts=any(key in profile for key in SAMPLING_KEYS),
         emission=profile.get("emission"),
-        secondary_threshold_eV=profile.get("secondary_threshold_eV"),
-        pair_production_model=profile.get("pair_production_model"),
+        secondary_threshold_eV=off_value(
+            "secondary_threshold_eV", _unwrap(profile.get("secondary_threshold_eV"))
+        ),
+        pair_production_model=off_value(
+            "pair_production_model", _unwrap(profile.get("pair_production_model"))
+        ),
         positron_transport=bool(profile.get("positron_transport", False)),
     )
     if reason is not None:
@@ -112,7 +123,7 @@ def precision_blockers(profile):
     emission = profile.get("emission")
     if emission in ("coherent", "both"):
         blockers.append(f"emission is {emission!r} (adaptive is incoherent-only)")
-    if "secondary_threshold_eV" in profile or "pair_production_model" in profile:
+    if any(is_on(key, _unwrap(profile.get(key))) for key in _CASCADE_KEYS):
         blockers.append("particle cascades (secondaries or pair production) are enabled")
     if profile.get("positron_transport"):
         blockers.append("positron transport is enabled")

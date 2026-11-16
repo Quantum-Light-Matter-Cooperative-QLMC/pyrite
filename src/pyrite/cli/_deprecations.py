@@ -74,7 +74,19 @@ SELF_WARNING: frozenset[str] = frozenset()
 #: ``numerics show NAME`` now shows a preset. Keyed by the documented form; the
 #: command calls `warn_form` when it takes the old route. `tests/cli/
 #: test_deprecations.py` invokes every form and checks the warning.
-DEPRECATED_FORMS: dict[str, Deprecation] = {}
+DEPRECATED_FORMS: dict[str, Deprecation] = {
+    # #1242: "none" turns an optional setting off; "off" stays a warned alias.
+    "--OPTION off": _entry(
+        "profile physics set PROFILE --OPTION off",
+        "--OPTION none",
+        since="0.36.0",
+        note=(
+            "also `physics create` and `physics set`; options `--channeling-model`, "
+            "`--transition-radiation`, `--pair-production-model`, "
+            "`--secondary-threshold-ev`"
+        ),
+    ),
+}
 
 
 def warn_form(form: str, replacement: str) -> None:
@@ -87,6 +99,16 @@ def warn_form(form: str, replacement: str) -> None:
     click.echo(
         f"warning: 'pyrite {entry.path}' is deprecated and will be removed in "
         f"{entry.remove_in}; use '{replacement}'",
+        err=True,
+    )
+
+
+def warn_off_value(flag: str) -> None:
+    """Warn on stderr that ``FLAG off`` is deprecated for ``FLAG none`` (#1242)."""
+    entry = DEPRECATED_FORMS["--OPTION off"]
+    click.echo(
+        f"warning: '{flag} off' is deprecated and will be removed in "
+        f"{entry.remove_in}; use '{flag} none'",
         err=True,
     )
 

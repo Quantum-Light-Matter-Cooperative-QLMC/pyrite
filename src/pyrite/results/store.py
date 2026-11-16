@@ -37,6 +37,7 @@ from .._numerics import (
     validate_shell_ionization_model,
     validate_transition_physics,
 )
+from .._off_settings import DEPRECATED_OFF, NONE, off_value
 from .._precision import Precision
 from .._spectral_components import LINE_COMPONENT_KEYS, cxr_spectrum
 from ..detectors import Detector, LegacyEDS
@@ -225,6 +226,11 @@ class Settings:
         self.__dict__.update({**HISTORICAL_SELECTOR_OMISSIONS, **state})
 
     def __post_init__(self) -> None:
+        # The stored record keeps "off" for these selectors (#1242), so a public
+        # "none" lowers to the historical bytes and identities do not move.
+        for name in ("transition_radiation", "channeling_model"):
+            if getattr(self, name) == NONE:
+                setattr(self, name, DEPRECATED_OFF)
         self.inelastic_cutoff_eV = default_inelastic_cutoff(
             self.inelastic_model, self.inelastic_cutoff_eV
         )
@@ -274,7 +280,9 @@ class Settings:
         if self.transition_radiation != "off" or self.transition_lattice_origin_ang is not None:
             validate_transition_physics(
                 Physics(
-                    transition_radiation=self.transition_radiation,
+                    transition_radiation=off_value(
+                        "transition_radiation", self.transition_radiation, warn=False
+                    ),
                     transition_lattice_origin_ang=self.transition_lattice_origin_ang,
                 ),
                 self.energy_model,

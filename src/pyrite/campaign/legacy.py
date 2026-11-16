@@ -13,6 +13,7 @@ from typing import Any
 import numpy as np
 
 from .._numerics import CHANNELING_KEYS, _emission_selection
+from .._off_settings import NONE, off_value
 from .._sampling import FixedSampling, SamplingPolicy, adaptive_sampling
 from ..quantum import Channeling
 from ..quantum._channeling import channeling_from_fields
@@ -123,7 +124,9 @@ def physics_from_legacy(settings: Any) -> Physics:
         pair_production_model=getattr(settings, "pair_production_model", None),
         positron_transport=getattr(settings, "positron_transport", False),
         atomic_electron_deflection=getattr(settings, "atomic_electron_deflection", "kawrakow"),
-        transition_radiation=getattr(settings, "transition_radiation", "off"),
+        transition_radiation=off_value(
+            "transition_radiation", getattr(settings, "transition_radiation", NONE), warn=False
+        ),
         transition_lattice_origin_ang=getattr(settings, "transition_lattice_origin_ang", None),
         shell_ionization_model=getattr(settings, "shell_ionization_model", "eedl"),
     )

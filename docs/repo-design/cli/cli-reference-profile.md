@@ -1159,10 +1159,12 @@ Options:
                                   shell-soft-hard or auto); must exceed each material's
                                   conduction-band resonance (Si 16.7, SiO2 22, MoS2 23
                                   eV).  [x>0.0]
-  --secondary-threshold-ev EV     Transport hard-collision secondaries above this energy
+  --secondary-threshold-ev none|EV
+                                  Transport hard-collision secondaries above this energy
                                   in eV (production cut and tracking cutoff; requires
-                                  shell-soft-hard and SBETHE coverage, >= 1000 eV).
-                                  [x>0.0]
+                                  shell-soft-hard and SBETHE coverage, >= 1000 eV). none
+                                  turns secondary transport off (needs --pair-
+                                  production-model none).
   --elastic-model [mott|elsepa]   Elastic scattering: elsepa (default) full differential
                                   cross sections (needs 'pyrite tables fetch elsepa';
                                   bypasses the transport LUT), or the historical mott
@@ -1184,12 +1186,13 @@ Options:
   --radiative-cutoff-ev EV        Hard-photon cutoff k_c in eV for bremslib-soft-hard or
                                   auto (default 1000); must not exceed the continuum
                                   electron cutoff (1000 eV by default).  [x>0.0]
-  --pair-production-model [penelope-2024]
+  --pair-production-model [none|penelope-2024]
                                   Convert coupled hard photons above 1.022 MeV to e-/e+
                                   pairs (opt-in). Requires --secondary-threshold-ev and
                                   coupled BremsLib transport; pair electrons are
                                   transported as secondaries, positrons are recorded
-                                  unless --positron-transport.
+                                  unless --positron-transport. none turns pair
+                                  production off.
   --positron-transport / --no-positron-transport
                                   Transport pair positrons above the secondary threshold
                                   (opt-in; requires --pair-production-model). Positrons
@@ -1220,6 +1223,12 @@ Options:
                                   subshell cross sections, or the opt-in bote-salvat
                                   K/L/M fit (needs 'pyrite tables fetch bote-salvat';
                                   EEDL for higher shells).
+  --transition-radiation [none|history|bunch|two-beam]
+                                  Transition-radiation component (default none): history
+                                  (per-history coherent sum), bunch (adds CTR cross-
+                                  history terms) or experimental two-beam PXR/DTR/CBS;
+                                  requires midpoint energy and no channeling. none turns
+                                  it off.
   --emission [incoherent|coherent|both]
                                   CXR modes; cross-model constraints are validated
                                   before saving.
@@ -1228,12 +1237,12 @@ Options:
   -h, --help                      Show this message and exit.
 
 Channeling options (profile [channeling] table):
-  --channeling-model [off|planar]
-                                  Planar quantum entrance zone (default off); requires
+  --channeling-model [none|planar]
+                                  Planar quantum entrance zone (default none); requires
                                   plane, midpoint, uncoupled radiation and incoherent
-                                  emission. Disable with profile physics reset PROFILE
-                                  channeling-model channeling-plane channeling-
-                                  admission.
+                                  emission. none turns it off (also reset --channeling-
+                                  plane with 'profile physics reset PROFILE channeling-
+                                  plane channeling-admission').
   --channeling-plane H K L        Nonzero Miller indices of the planar channeling
                                   family; requires planar.
   --channeling-admission [admitted|accept-inaccurate]

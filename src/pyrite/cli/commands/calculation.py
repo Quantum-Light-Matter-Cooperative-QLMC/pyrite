@@ -20,7 +20,7 @@ from ...console import json as cli_json
 from ...console.output import CLIError, emit_json_result, emit_result, output_option
 from .. import _catalog_io, _completion
 from .._groups import LazyGroup
-from . import _calculation_options, _calculation_view
+from . import _calculation_options, _calculation_view, _profile_shared
 from ._profile_shared import confirm_standard, write
 
 _EMISSION_CHOICE = click.Choice(("incoherent", "coherent", "both"))
@@ -110,9 +110,9 @@ def _show(name, json_output, *, physics):
     if physics:
         _calculation_view.emit_physics(fields)
     else:
-        _calculation_view.emit_numerics(
-            fields, adaptive=profile_summary.adaptive_resolution(document, target)
-        )
+        adaptive = profile_summary.adaptive_resolution(document, target)
+        _calculation_view.emit_numerics(fields, adaptive=adaptive)
+        _profile_shared.emit_adaptive_fix(name, adaptive["fixed_reason"], target)
     return 0
 
 
@@ -123,6 +123,16 @@ def _sampling_mode(document, name):
     if adaptive["effective"] is None:
         return f"sampling mode: fixed ({adaptive['fixed_reason']})"
     return f"sampling mode: adaptive ({adaptive['source']} policy)"
+
+
+def _setter(name):
+    return f"pyrite profile physics set {name}"
+
+
+def _setter_error(exc, name, physics):
+    """Coupled off-state refusals are usage errors naming the fix; others exit 1."""
+    coupled = _profile_shared.coupled_error(exc, _setter(name)) if physics else None
+    return coupled or CLIError(str(exc))
 
 
 def _set(name, yes, dry_run, *, physics, emission=None, **values):
@@ -140,12 +150,12 @@ def _set(name, yes, dry_run, *, physics, emission=None, **values):
         profile_numerics.set_numerics(document, name, updates)
         mode = _sampling_mode(document, name)
     except (OSError, ValueError, ParseError) as exc:
-        raise CLIError(str(exc)) from None
+        raise _setter_error(exc, name, physics) from None
     noun = _noun(physics)
     confirm_standard(name, f"set {noun} on", yes, dry_run)
     sampled = any(key in ("n_electrons", "n_electrons_brem") for key in updates)
     done = f"updated {noun} for profile {name}" + (f"; {mode}" if sampled else "")
-    return write(document, original, dry_run, done)
+    return write(document, original, dry_run, done, setter=_setter(name))
 
 
 def _reset(name, selected, yes, dry_run, *, physics):
@@ -165,9 +175,15 @@ def _reset(name, selected, yes, dry_run, *, physics):
         if keys:
             profile_numerics.reset_numerics(document, name, keys)
     except (OSError, ValueError, ParseError) as exc:
-        raise CLIError(str(exc)) from None
+        raise _setter_error(exc, name, physics) from None
     confirm_standard(name, f"reset {_noun(physics)} on", yes, dry_run)
-    return write(document, original, dry_run, f"reset {_noun(physics)} for profile {name}")
+    return write(
+        document,
+        original,
+        dry_run,
+        f"reset {_noun(physics)} for profile {name}",
+        setter=_setter(name),
+    )
 
 
 def _validate(name):

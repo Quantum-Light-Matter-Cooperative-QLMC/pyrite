@@ -88,7 +88,48 @@ Physics (`profile physics set`):
 | `radiative_model`, `radiative_cutoff_eV` | `--radiative-model`, `--radiative-cutoff-ev` | |
 | `pair_production_model`, `positron_transport` | `--pair-production-model`, `--positron-transport` | |
 | `atomic_electron_deflection` | `--atomic-electron-deflection` | |
+| `transition_radiation` | `--transition-radiation` | `none` (default), `history`, `bunch` or experimental `two-beam` |
+| `[channeling] model` | `--channeling-model` | `none` (default) or `planar` |
 | `transport_mode`, `mixed_c1`, `mixed_c2`, `mixed_max_step_um` | `--transport-mode`, `--mixed-c1`, `--mixed-c2`, `--mixed-maximum-step-um` | parameters apply only under `mixed`; runs that score CXR lines refuse `mixed` (#990) |
+
+### Turning a setting off
+
+Every optional setting turns off according to its type ("off follows type",
+#1242):
+
+| Setting type | On | Off |
+|---|---|---|
+| Boolean feature (`straggling`, `positron_transport`, `temporal_profile`, `gdf_shape_only`) | `--x` | `--no-x`; TOML `false` |
+| Non-boolean optional setting (`secondary_threshold_eV`, `pair_production_model`, `transition_radiation`, `[channeling] model`, `atomic_electron_deflection`) | a value | `none`; TOML `"none"` |
+| Any field | — | `reset FIELD` reverts to the attached preset or built-in default; it never means off |
+
+TOML has no null, so an explicit `none` is stored: it overrides a preset that
+enables the setting, whereas an absent key inherits the preset. `none`, the
+deprecated alias `off`, and an absent key with an off default resolve to the
+same case identity and digests. In Python, `Physics` takes `None` or `"none"`
+for `pair_production_model` and `secondary_threshold_eV`, `"none"` for
+`transition_radiation`, and `simulate(..., channeling=None)` for channeling.
+`off` still works in the CLI, TOML and `Physics` until 0.38.0 and warns
+([CLI deprecations](cli/cli-deprecations.md)).
+
+Coupled settings turn off together: pair production requires the secondary
+threshold, and positron transport requires pair production. Turning off one
+half alone is a usage error (exit 2) that names the corrected command.
+
+#### Turn off particle cascades
+
+Secondary and pair cascades keep a profile on fixed history counts; `pyrite
+profile numerics show PROFILE` names the command that restores adaptive
+sampling. To turn cascades off, including ones enabled by an attached physics
+preset:
+
+```console
+$ pyrite profile physics set PROFILE --pair-production-model none --secondary-threshold-ev none
+$ pyrite profile numerics show PROFILE
+...  mode  adaptive (default policy)
+```
+
+Add `--no-positron-transport` when positron transport is on.
 
 The built-in defaults are `bremsstrahlung_model="bremslib"` and
 `radiative_model="bremslib-soft-hard"` with `radiative_cutoff_eV=1000`. Run

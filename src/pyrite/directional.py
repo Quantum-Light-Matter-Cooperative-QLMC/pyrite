@@ -60,7 +60,7 @@ def _lowered_source(beam, target, grid, numerics, seed, *, transition=False):
     bins = EnergyBins(cxr=grid)
     radiation = controls.radiation and replace(controls.radiation, energy_bins=bins)
     controls = replace(controls, energy_bins=bins, radiation=radiation)
-    physics = Physics(transition_radiation="history" if transition else "off")
+    physics = Physics(transition_radiation="history" if transition else "none")
     scene = Scene(beam, target, detector=None)
     slab = scene.target_spec
     if getattr(slab, "entrance_face", None) is not None:

@@ -32,8 +32,9 @@ def campaign():
     assert created.exit_code == 0, created.output
 
 
-def test_no_argument_forms_remain_deprecated():
-    assert not DEPRECATED_FORMS
+def test_only_the_off_value_form_remains_deprecated():
+    # #1242: "--OPTION off" warns; tests/cli/test_off_convention.py invokes it.
+    assert set(DEPRECATED_FORMS) == {"--OPTION off"}
 
 
 @pytest.mark.parametrize("form", sorted(_INVOCATIONS))

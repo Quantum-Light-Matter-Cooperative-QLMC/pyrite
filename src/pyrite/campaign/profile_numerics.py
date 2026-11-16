@@ -8,6 +8,7 @@ from pyrite._numerics import (
     SAMPLING_KEYS,
     validate_profile_numerics,
 )
+from pyrite._off_settings import normalize_off_values
 from pyrite.quantum._channeling import CHANNELING_FIELD_TABLE_KEYS, channeling_table_values
 
 from ._profile_document import existing_profile, values_item
@@ -52,7 +53,7 @@ def profile_numerics_values(profile):
         elif hasattr(value, "unwrap"):
             value = value.unwrap()
         values[key] = value
-    return values
+    return normalize_off_values(values)
 
 
 def set_numerics(document, name, updates):

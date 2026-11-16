@@ -16,6 +16,10 @@ existing behavior unless a change is deliberate, documented, and tested.
   implementation.
 - Use lowercase hyphenated names and one term per concept. Help should expose
   units, domains, defaults, precedence, incompatibilities, and side effects.
+- Turning a feature off follows its type: booleans pair `--x/--no-x`;
+  non-boolean optional settings (model choice, enabling threshold) accept the
+  literal `none`, stored so it overrides a preset. `reset FIELD` reverts to the
+  preset/default and never means off. `off` is a deprecated alias of `none`.
 - Parse/validate at the boundary; name the invalid value, valid domain, and
   correction. Preserve meaningful zero; handle EOF/cancel without traceback.
 - Keep root/nested help imports lazy enough to avoid hardware/network/optional

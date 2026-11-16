@@ -27,6 +27,10 @@
 # naming the replacement). simulate(..., channeling=) and Scene.channeling replace
 # quantum=; profiles use a [channeling] table. Stored Settings/case identity keep
 # the flat channeling_* record, so case keys are unchanged.
+# #1242: "none" turns optional settings off. Physics.transition_radiation defaults
+# to "none"; pair_production_model and secondary_threshold_eV also take "none"
+# (-> None). "off" is a deprecated alias (FutureWarning, removed in 0.38.0);
+# stored Settings keep "off", so none/off/absent share case identity and digests.
 schema_version = 1
 canonical_facades = ["tools", "beams", "geometry", "config", "detectors", "observations", "transport", "radiation"]
 
