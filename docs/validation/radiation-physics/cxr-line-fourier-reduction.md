@@ -278,6 +278,17 @@ each target once, with no extra bin-width or electron normalization.
 Verdict: `rederived`; regression anchors retain `anchored`. Human sign-off
 and production qualification remain outstanding.
 
+The host scheduler refinement (`c1d4d1473`, #1230) batches small direct
+rectangles into one compiled call and caches up to eight immutable
+deconvolution arrays. Admission at at most $2^{20}$ float64 entries per
+array bounds retained factor-array payload to 64 MiB; temporary workspace
+and Python overhead are additional. Fresh-context re-verification found
+only floating-point summation reordering: coefficient differences from the
+previous scheduling were at most $4.48\times10^{-16}$ on the tested signed
+mixed direct/ES population. The analytic triangle-coefficient regression
+and 33 existing reducer tests pass. This improves measured host overhead;
+it does not establish a speedup at every line count.
+
 cuFINUFFT is part of the `nvidia` extra. Its 2.5.x wheels link CUDA 12 runtime and cuFFT, which `cufinufft_module` preloads from the `nvidia-*-cu12` wheels alongside the CUDA 13 CuPy.
 
 Measured on the layered MoS2-on-Si g30 frozen replay (job 12560, RTX 5080), on the first, middle and last of 79 reflection chunks:

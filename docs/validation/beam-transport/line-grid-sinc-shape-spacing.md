@@ -71,3 +71,22 @@ On the Fourier reduction ([`cxr-line-fourier-reduction`](../ledger-core-coherent
 - `test_measured_shape_grid_is_uniform_at_the_shape_step` and `test_measured_shape_grid_falls_back_to_resonance_local_above_budget`: the runner's route.
 
 Independent read-only verification (2026-11-16, implementation `c9da59b95`) rederived the isolated-line height factor, confirmed units, the first-zero convention, the proxy quantile, and the same-band budgeted fallback. Seven owning tests passed. Its discrepancy was the default FWHM table entry and overbroad overlap/FWHM wording; the corrections above address those findings. Production qualification on fixed tracks (#1230 Plan) and human sign-off remain outstanding.
+
+## Qualification limits
+
+The bounded ROCm pilot (`16afce359`, #1230, 2026-11-16) captured one primary
+per seed on three seeds per scene. On HOPG 300 keV, 1 mm, reported worst
+height/FWHM errors were 0.9062%/0.8431%; on h-BN 5 MeV, 1 mm, they were
+0.4281%/0.2588%. Their 100 eV mass-L1 errors were at most
+$3.47\times10^{-6}$. These are small fixed-population checks, not full
+production-scale qualification. The sparse HOPG 1 MeV, 1 µm scene still
+exposes weak-peak FWHM failures; window-edge maxima must be reported as
+unresolved rather than treated as measured peaks. The harness records
+unresolved peak and FWHM window counts, alongside windowed L1/L∞ metrics.
+
+Uniform scoring is not automatically faster. A 100-primary thin-demo pilot
+was slower on both CPU and ROCm despite its bounded band. Host scheduling
+improvements reduce the overhead, but the remaining small-population
+crossover, CUDA qualification and production-flush memory headroom are
+open acceptance work. The isolated-line anchor does not qualify these
+performance or blended-peak claims.
