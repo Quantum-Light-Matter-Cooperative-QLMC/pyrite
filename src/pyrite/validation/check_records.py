@@ -41,6 +41,7 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     "checks/line_crossover_286.py": (),
     "checks/continuum_grid_end_to_end.py": (),
     "checks/detector_cone_variance_reduction.py": (),
+    "checks/detector_cone_policy.py": (),
     # #879 fixed-population spectral/timing diagnostics, not a physics claim.
     "checks/line_roulette_spectral_gate_879.py": (),
     "checks/line_roulette_independent_879.py": (),

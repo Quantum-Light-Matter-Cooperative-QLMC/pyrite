@@ -159,7 +159,9 @@ def compare(args):
         record = tp["segs"].get("cone_split")
         copies = 0 if record is None else record["parent"].size
         if copies:
-            copy_values = case_measure(case, _settings(copies))(0, copies, record["copies"])
+            # The measurement derives its population from stop-start. Reuse
+            # the primary policy; a single copy is not an adaptive sample.
+            copy_values = measure(0, copies, record["copies"])
             for key in values:
                 values[key] = history_sums(
                     values[key],

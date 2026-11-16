@@ -117,3 +117,71 @@ direction, with half-angle equal to the scorer's angular radius plus
 $k/\gamma$. Leave biasing off when that exceeds $\pi/2$, the prototype's
 restriction. This keeps one transport per case, consistent with the
 one-detector-per-transport decision.
+
+#### Cone half-angle scan (job 13230, November 2026)
+
+`checks/detector_cone_policy.py` on AMD qlmc-ace, code `de5cd57cb`. Case:
+5 MeV h-BN, 1 mm, 10°/100°. Five seeds × 512 primaries per arm; target
+weight $10^{-3}$; half-angle $k/\gamma$ at 5 MeV; $k=0$ is the analog arm.
+Arms were warmed up, and their order alternated between seeds. $T$ is the
+transport plus monitor time, summed over seeds.
+
+| $k$ | Copies (seeds 0–4) | Line mean | Line RSE | Max share | ESS | $T$ (s) |
+|---:|---|---:|---:|---:|---:|---:|
+| 0 | 0 | $7.8\times10^{-7}$ | 0.98 | 0.98 | 1.0 | 246 |
+| 1 | 50, 50, 10, 6, 8 | $9.8\times10^{-7}$ | 0.85 | 0.85 | 1.4 | 257 |
+| 2 | 390, 130, 25, 27, 24 | $8.9\times10^{-7}$ | 0.71 | 0.70 | 2.0 | 280 |
+| 3 | 262, 233, 56, 64, 58 | $7.3\times10^{-7}$ | 0.51 | 0.50 | 3.9 | 318 |
+| 4 | 716, 355, 116, 109, 109 | $9.1\times10^{-7}$ | 0.49 | 0.49 | 4.2 | 419 |
+
+- **Per-seed means show what analog misses.** In seeds 1–4 the analog line
+  mean is about $10^{-8}$. At $k=3$–4 the weighted estimate is
+  $3$–$6\times10^{-7}$ in every one of those seeds, and copies carry 95–98 %
+  of it. Per seed of 512 primaries, ESS rises from about 1 (analog) to 9–19,
+  with no single history above 25 %. The analog RSE in those seeds is
+  therefore not a usable reference. Pooled FOM ratios of 1.3, 1.7, 2.9 and
+  2.4 (for $k=1$–4) understate the gain, but they are the only measured
+  ratios. The 10× target is not demonstrated.
+- **One precursor still dominates seed 0.** For $k\ge2$, primary 159 is
+  killed on cone entry and replaced by copies (625 at $k=4$). Its family still
+  holds 87 % of seed 0. The rare step is the earlier large-angle turn that
+  brings a ~4 MeV electron near the detector direction, and a single splitting
+  level only acts after it. Nested splitting, where copies split again at an
+  inner cone, or importance on that precursor turn would address it. Either
+  needs an extension to the derivation.
+- **Line mass falls roughly as $u^{-2}$, and the cone has not converged.** For
+  copies above 2 MeV, median line mass drops from $9.6\times10^{-3}$
+  ($u$ = 0.5–1) to $2.9\times10^{-4}$ ($u$ = 3.5–4). That is still about
+  $5\times10^4$ times a median analog primary. The outermost shell $u\in[3.5,4)$
+  carries the largest weighted share at $k=4$ (35 %), so the important region
+  extends beyond $4/\gamma$.
+- **Low-energy copies are wasted.** About 20 % of $k=4$ copies are below
+  2 MeV, and 276 of them (2–540 keV) come from one seed-1 primary (142).
+  Their median line mass is 0 and their median bremsstrahlung tally is about
+  $2\times10^{-5}$ of a high-energy copy's. A minimum-energy gate on splitting saves their cost
+  without bias, because the split decision depends only on the event state.
+- **The bremsstrahlung tally is also tail-dominated.** In-cone copies above
+  2 MeV score a median bremsstrahlung tally of $1.7\times10^{-2}$. The median
+  analog primary scores $4.4\times10^{-5}$, about 400 times less, and copies at
+  $u<1$ score $0.28$. Bremsstrahlung is beamed into the same cone. The paired
+  bremsstrahlung difference against the analog arm grows with $k$, up to
+  +19 % at $k=4$ (nominal $z=9.7$). Analog runs undersample the same
+  population, so their SE omits the unsampled tail. The excess is not
+  evidence of bias, and this case cannot test unbiasedness. Line-mass paired
+  differences are within $|z|<3$.
+- Line observer coverage of the 1–50 keV window is 0.96–0.99 for copies; the
+  remainder is Doppler-boosted lines above the window.
+
+**Status.** No $k$ is adopted. Splitting stays the method. The next design,
+before any production work:
+
+1. Gate splitting below a minimum energy, of order 2 MeV at 5 MeV.
+2. Scale roulette with direction. Make $s$ depend on the incoming angle
+   $\beta$ to the detector axis and on energy, both event-state quantities.
+   This bounds copy counts as the cone widens to $k\approx6$–8.
+3. Derive nested (two-level) splitting for the precursor turn.
+
+Test unbiasedness separately, on a case where analog sampling resolves the
+cone population (lower energy, so a wide $1/\gamma$ cone), for line,
+bremsstrahlung and characteristic yields. This instrument does not score
+characteristic yield.
