@@ -123,7 +123,7 @@ Generated browsing views of every claim in the [detailed validation ledger](phys
 
 | ID | Claim | Status |
 |---|---|---|
-| [`pdte2-debye-waller-001`](ledger-crystal-structure-provenance.md#pdte2-debye-waller-001) | 113(2) K 1T-PdTe2 common basal projection `B33=0.61 Å²` for pinned `(001)` | `unverified` |
+| [`pdte2-debye-waller-001`](ledger-crystal-structure-provenance.md#pdte2-debye-waller-001) | 113(2) K 1T-PdTe2 common basal projection `B33=0.61 Å²` for pinned `(001)` | `rederived` |
 | [`2h-tas2-debye-waller-002`](ledger-crystal-structure-provenance.md#2h-tas2-debye-waller-002) | 295 K 2H-TaS2 common basal projection `B33=0.53 Å²` for pinned `(002)` | `unverified` |
 | [`diamond-cif-migration`](ledger-crystal-structure-provenance.md#diamond-cif-migration) | bundled diamond CIF preserves the pre-CIF catalog's structure and derived physics | `unverified` |
 | [`silicon-cif-migration`](ledger-crystal-structure-provenance.md#silicon-cif-migration) | bundled silicon CIF preserves the pre-CIF catalog's structure and derived physics | `unverified` |
