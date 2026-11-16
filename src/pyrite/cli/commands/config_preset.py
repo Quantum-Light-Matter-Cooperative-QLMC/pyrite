@@ -22,7 +22,7 @@ from pyrite.console.output import (
 )
 from pyrite.console.tables import emit_table, object_origin
 
-from . import _calculation_options, _calculation_view, _profile_precision
+from . import _calculation_options, _calculation_view, _profile_precision, _profile_shared
 from ._profile_shared import confirm_standard, write
 
 _COMPLETE = {
@@ -240,6 +240,13 @@ def build(kind):
             _calculation_view.emit_numerics(payload["fields"])
         return 0
 
+    def _setter(name):
+        return f"pyrite {kind.table} set {name}" if kind is PHYSICS else None
+
+    def _error(exc, name):
+        setter = _setter(name)
+        return (setter and _profile_shared.coupled_error(exc, setter)) or CLIError(str(exc))
+
     def create(name, source, dry_run, emission=None, description=None, sampling=None, **values):
         changes = updates(values, emission)
         sampling = _sampling_changes(sampling, values, changes) if kind is NUMERICS else None
@@ -271,8 +278,8 @@ def build(kind):
                 document, kind, name, values=changes, description=description, sampling=sampling
             )
         except (OSError, ValueError, ParseError) as exc:
-            raise CLIError(str(exc)) from None
-        return write(document, original, dry_run, f"updated {noun} {name}")
+            raise _error(exc, name) from None
+        return write(document, original, dry_run, f"updated {noun} {name}", setter=_setter(name))
 
     group.add_command(
         click.Command(
@@ -320,8 +327,8 @@ def build(kind):
             original, document = _catalog_io.catalog_text()
             config_presets.reset_preset(document, kind, name, keys)
         except (OSError, ValueError, ParseError) as exc:
-            raise CLIError(str(exc)) from None
-        return write(document, original, dry_run, f"reset {noun} {name}")
+            raise _error(exc, name) from None
+        return write(document, original, dry_run, f"reset {noun} {name}", setter=_setter(name))
 
     @group.command("validate")
     @click.argument("name", shell_complete=complete)

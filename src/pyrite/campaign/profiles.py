@@ -37,6 +37,7 @@ from .._numerics import (
     validate_bremsstrahlung_model,
     validate_profile_numerics,
 )
+from .._off_settings import OFF_VALUES
 from .._precision import Precision, _brem_band_reduction_markers
 from ..materials.crystal import structure_factor_marker
 from ..materials.photon_cross_sections import ATTENUATION_MODEL
@@ -151,7 +152,7 @@ def resolve_numerics(
         "transition_lattice_origin_ang": physics.transition_lattice_origin_ang,
         "shell_ionization_model": physics.shell_ionization_model,
     }
-    effective.update(CHANNELING_OFF_FIELDS)
+    effective.update(CHANNELING_OFF_FIELDS, channeling_model=OFF_VALUES["channeling_model"])
     sources = {
         key: "default" if key in SAMPLING_KEYS else "built-in" for key in PROFILE_NUMERICS_KEYS
     }
@@ -502,7 +503,7 @@ def _channeling_identity(settings_payload: dict[str, Any]) -> dict[str, object]:
     channeling = {key: settings_payload.pop(key, None) for key in CHANNELING_KEYS}
     if channeling["channeling_admission"] in (None, "admitted"):
         channeling.pop("channeling_admission")
-    if channeling["channeling_model"] in (None, "off"):
+    if channeling["channeling_model"] in (None, "off", "none"):
         return {}
     if channeling["channeling_model"] == "axial":
         # Expand defaults before hashing; do not alias planar or v1.
@@ -561,7 +562,7 @@ def _identity_v1(
     # Transition radiation (#103) is opt-in on the same divergence-only rule.
     transition = settings_payload.pop("transition_radiation", "off")
     origin = settings_payload.pop("transition_lattice_origin_ang", None)
-    if transition != "off":
+    if transition not in ("off", "none"):
         resolved["transition_radiation"] = transition
         resolved["transition_model"] = TRANSITION_MODEL
         if transition == "two-beam":

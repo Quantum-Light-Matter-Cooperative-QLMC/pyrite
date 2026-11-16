@@ -146,7 +146,7 @@ def _numerics_group_rows(group, numerics_names, adaptive_active):
     """SETTING/VALUE/SOURCE rows for one group; channeling collapses to its model when off."""
     fields = group["fields"]
     if group["name"] == "channeling" and any(
-        row["key"] == "channeling_model" and row["effective"] == "off" for row in fields
+        row["key"] == "channeling_model" and row["effective"] in ("none", "off") for row in fields
     ):
         fields = [row for row in fields if row["key"] == "channeling_model"]
     return [

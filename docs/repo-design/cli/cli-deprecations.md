@@ -10,6 +10,14 @@ Per [ADR-0002](../../adr/0002-cli-surface-redesign.md), every renamed or retired
 
 No command spelling is currently deprecated. Every spelling the CLI accepts is canonical; anything else exits as an unknown command, except hard-break removals without a support window (`numerics precision`, #1007), which exit as usage errors naming their replacement.
 
+## Argument forms
+
+These spellings reach a current command with a deprecated argument shape; they still run, warn on stderr and keep their exit codes.
+
+| Deprecated form | Replacement | Deprecated in | Remove in | Note |
+| --- | --- | --- | --- | --- |
+| `pyrite profile physics set PROFILE --OPTION off` | `--OPTION none` | 0.36.0 | 0.38.0 | also `physics create` and `physics set`; options `--channeling-model`, `--transition-radiation`, `--pair-production-model`, `--secondary-threshold-ev` |
+
 ## Options
 
 No option spelling is currently deprecated. Every option the CLI accepts is canonical; anything else exits as a usage error. Hard-break removals without a support window (the `*-trials` and `*-electrons` Monte Carlo budget flags, #1007) name their `*-histories` replacement.

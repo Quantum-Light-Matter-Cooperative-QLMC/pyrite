@@ -37,8 +37,8 @@ def resolve_transport_mode(cases: list[Case], physics: Physics) -> list[Case]:
 
 
 def resolve_transition_radiation(cases: list[Case], physics: Physics) -> list[Case]:
-    """Attach the TR record to every case; ``"off"`` returns ``cases`` unchanged."""
-    if physics.transition_radiation == "off":
+    """Attach the TR record to every case; ``"none"`` returns ``cases`` unchanged."""
+    if physics.transition_radiation == "none":
         return cases
     record = transition_case_record(physics.transition_radiation)
     if physics.transition_radiation == "two-beam":

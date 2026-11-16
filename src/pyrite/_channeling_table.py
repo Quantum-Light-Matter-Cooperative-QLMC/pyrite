@@ -10,6 +10,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
+from ._off_settings import DEPRECATED_OFF, NONE, warn_off_spelling
+
 #: ``[channeling]`` profile-table key -> internal flat lowering field. The flat
 #: names are the stored case/identity spelling and never public constructor
 #: arguments.
@@ -63,7 +65,11 @@ def channeling_table_values(profile: Mapping[str, Any]) -> dict[str, object]:
             f"unknown [channeling] key: {unknown[0]}; "
             f"expected one of {', '.join(CHANNELING_TABLE_KEYS)}"
         )
-    return {
+    values = {
         CHANNELING_TABLE_KEYS[key]: value.unwrap() if hasattr(value, "unwrap") else value
         for key, value in table.items()
     }
+    if values.get("channeling_model") == DEPRECATED_OFF:  # #1242: "none" is canonical
+        warn_off_spelling("[channeling] model")
+        values["channeling_model"] = NONE
+    return values

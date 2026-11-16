@@ -51,7 +51,7 @@ def tr_run():
 
 
 def test_physics_selector_and_lowering():
-    assert pr.Physics().transition_radiation == "off"
+    assert pr.Physics().transition_radiation == "none"
     with pytest.raises(ValueError, match="transition_radiation must be one of"):
         pr.Physics(transition_radiation="crossing")
     from pyrite.quantum._channeling import validate_channeling_run

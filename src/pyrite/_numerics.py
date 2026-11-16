@@ -11,6 +11,7 @@ from ._cxr_vocabulary import catalog_key
 from ._energy_bins import EnergyBins
 from ._line_roulette import LineRoulette
 from ._mixed_elastic_policy import MIXED_URBAN_REFUSAL, validate_transport_mode
+from ._off_settings import DEPRECATED_OFF, NONE, off_value
 from ._photon_config import PhotonTransport
 from ._sampling import AdaptiveSampling, FixedSampling, SamplingPolicy
 from ._units import _length_vector, _quantity_spelling, _scalar_quantity, normalize_unit
@@ -149,11 +150,12 @@ TRANSPORT_PRECISIONS = ("auto", "fp64", "mixed")
 #: default) leaves every case, identity and RNG stream unchanged; ``"planar"``
 #: runs the planar density-matrix entrance zone with a one-way handoff.
 CHANNELING_MODELS = ("off", "planar", "axial")
-#: Transition-radiation component selectors (#103). ``"off"`` (the default)
+#: Transition-radiation component selectors (#103). ``"none"`` (the default;
+#: deprecated alias ``"off"``, #1242)
 #: leaves every case and identity unchanged; ``"history"`` sums each primary
 #: history's boundary crossings coherently; ``"bunch"`` also keeps the
 #: cross-history (CTR) terms with the physical bunch population.
-TRANSITION_RADIATION_MODES = ("off", "history", "bunch", "two-beam")
+TRANSITION_RADIATION_MODES = ("none", "history", "bunch", "two-beam")
 PROFILE_NUMERICS_KEYS = (*SAMPLING_KEYS, *CONVERGENCE_KEYS, *TRANSPORT_KEYS)
 
 
@@ -355,7 +357,9 @@ class Physics:
         (``"penelope-2024"``); requires ``secondary_threshold_eV`` and coupled
         radiative transport, and applies only to cases that resolve to it.
         Positrons are recorded, not transported, unless
-        ``positron_transport``. ``None`` (default) converts nothing.
+        ``positron_transport``. ``None`` or ``"none"`` (default) converts
+        nothing; ``secondary_threshold_eV`` likewise takes ``"none"`` for no
+        secondary transport (#1242).
     positron_transport
         Opt-in transport of pair positrons above the secondary threshold
         (issue #276; Bhabha, positron SBETHE/ELSEPA, ``F_p``-scaled BremsLib);
@@ -369,7 +373,8 @@ class Physics:
         shell soft/hard keeps elastic-only deflection, with a warning.
         ``"none"`` reproduces elastic-only transport bit for bit.
     transition_radiation
-        ``"off"`` (default), ``"history"`` or ``"bunch"``: score planar-stack
+        ``"none"`` (default; ``"off"`` is a deprecated alias), ``"history"`` or
+        ``"bunch"``: score planar-stack
         transition radiation from the transported boundary crossings as the
         separate ``spec_transition`` component (#103), per history or with
         coherent bunch (CTR) terms. Requires ``energy_model="midpoint"``;
@@ -417,7 +422,7 @@ class Physics:
     pair_production_model: Literal["penelope-2024"] | None = None
     positron_transport: bool = False
     atomic_electron_deflection: Literal["kawrakow", "none"] = "kawrakow"
-    transition_radiation: Literal["off", "history", "bunch", "two-beam"] = "off"
+    transition_radiation: Literal["none", "history", "bunch", "two-beam"] = "none"
     transition_lattice_origin_ang: tuple[float, float, float] | None = None
     shell_ionization_model: Literal["eedl", "bote-salvat"] = "eedl"
     photon_transport: PhotonTransport | None = None
@@ -441,7 +446,7 @@ class Physics:
         pair_production_model: Literal["penelope-2024"] | None = None,
         positron_transport: bool = False,
         atomic_electron_deflection: Literal["kawrakow", "none"] = "kawrakow",
-        transition_radiation: Literal["off", "history", "bunch", "two-beam"] = "off",
+        transition_radiation: Literal["none", "history", "bunch", "two-beam"] = "none",
         transition_lattice_origin_ang: tuple[float, float, float] | None | _Unset = UNSET,
         shell_ionization_model: Literal["eedl", "bote-salvat"] = "eedl",
         photon_transport: PhotonTransport | None = None,
@@ -460,6 +465,8 @@ class Physics:
             name: values.pop(name) for name in (*_PHYSICS_ENERGIES, "transition_lattice_origin")
         }
         del values["self"]
+        for name in ("secondary_threshold_eV", "pair_production_model", "transition_radiation"):
+            values[name] = off_value(name, values[name])
         quantity_defaults = {
             "inelastic_cutoff_eV": default_inelastic_cutoff(inelastic_model, None),
             "radiative_cutoff_eV": default_radiative_cutoff(radiative_model, None),
@@ -484,6 +491,8 @@ class Physics:
     def __setstate__(self, state: dict[str, Any]) -> None:
         """Restore historical selector omissions independently of constructor defaults."""
         restored = {**HISTORICAL_SELECTOR_OMISSIONS, **state}
+        if restored.get("transition_radiation") == DEPRECATED_OFF:  # pickles before #1242
+            restored["transition_radiation"] = NONE
         for name in CHANNELING_KEYS:  # removed fields (#1017); cases keep the record
             restored.pop(name, None)
         for name, value in restored.items():
@@ -960,7 +969,7 @@ def validate_transition_physics(physics: "Physics", energy_model: str) -> None:
         raise ValueError(
             f"transition_radiation must be one of {', '.join(TRANSITION_RADIATION_MODES)}"
         )
-    if mode == "off":
+    if mode == NONE:
         return
     if energy_model != "midpoint":
         raise ValueError("transition_radiation requires energy_model='midpoint'")

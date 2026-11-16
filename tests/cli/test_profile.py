@@ -1928,7 +1928,7 @@ def test_show_channeling_section_collapses_when_off_and_lists_all_when_on(tmp_pa
     off = invoke(profile.command, ["show", "sub_100keV"])
     assert_clean_result(off)
     off_section = _show_section(off.stdout, "Physics / channeling (quantum zone)")
-    assert_table_row(off_section, "channeling-model", "off default")
+    assert_table_row(off_section, "channeling-model", "none default")
     assert "channeling-plane" not in off_section
     assert "Numerics / channeling" not in off.stdout
     transport = _show_section(off.stdout, "Physics / transport")

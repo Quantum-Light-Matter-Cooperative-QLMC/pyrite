@@ -11,6 +11,7 @@ from pyrite.campaign.profile_cxr_grid import cxr_grid_sources
 from pyrite.campaign.profiles import DEFAULT_N_ELECTRONS, DEFAULT_N_ELECTRONS_BREM
 from pyrite.cli import _catalog_io
 from pyrite.cli import _completion as _cli_completion
+from pyrite.cli.commands import _profile_shared
 from pyrite.cli.commands._profile_shared import confirm_standard, write
 from pyrite.console import json as cli_json
 from pyrite.console import output as _output
@@ -317,6 +318,7 @@ def precision_show_command(name, json_output):
         )
     for blocker in blockers:
         emit_result(f"adaptive unsupported: {blocker}")
+    _profile_shared.emit_adaptive_fix(name, fixed_reason, profile)
     emit_result(
         "CXR grid: "
         + (

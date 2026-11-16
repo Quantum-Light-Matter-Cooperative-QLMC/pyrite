@@ -23,13 +23,43 @@ def confirm_standard(name, action, yes, dry_run):
         )
 
 
-def write(document, original, dry_run, done_message):
-    """Validate, then print a diff (dry-run) or atomically write the catalog."""
+#: Coupled-field refusal -> the options that turn the coupled pair off together
+#: (#1242): pair production needs the secondary threshold, positron transport
+#: needs pair production.
+_COUPLED_OFF = {
+    ("pair_production_model", "secondary_threshold_eV"): (
+        "--pair-production-model none --secondary-threshold-ev none"
+    ),
+    ("positron_transport", "pair_production_model"): (
+        "--no-positron-transport --pair-production-model none"
+    ),
+}
+
+
+def coupled_error(exc, setter):
+    """Usage error naming the corrected ``setter`` command for a coupled off state.
+
+    ``setter`` is the command prefix, e.g. ``pyrite profile physics set P``.
+    Returns ``None`` when ``exc`` is not a coupled-field refusal.
+    """
+    message = str(exc)
+    for (field, needed), flags in _COUPLED_OFF.items():
+        # Typed validation says "F requires N"; catalog validation "...F: requires N".
+        if f"{field} requires {needed}" in message or f"{field}: requires {needed}" in message:
+            return click.UsageError(f"{exc}; turn both off with: {setter} {flags}")
+    return None
+
+
+def write(document, original, dry_run, done_message, *, setter=None):
+    """Validate, then print a diff (dry-run) or atomically write the catalog.
+
+    ``setter`` names the command prefix a coupled-field refusal suggests.
+    """
     try:
         proposed = _catalog_io.render_catalog(document)
         _catalog_io.validate(_catalog_io.active_catalog_path(), proposed)
     except (OSError, ValueError, ParseError) as exc:
-        raise CLIError(str(exc)) from None
+        raise (setter and coupled_error(exc, setter)) or CLIError(str(exc)) from None
     if dry_run:
         emit_result(
             "".join(
@@ -79,3 +109,25 @@ def mixed_transport_options(function):
         ),
     )(function)
     return function
+
+
+#: Fixed-count reason prefix (``pyrite._precision.default_precision_fallback``)
+#: -> the edit that removes it; ``{name}`` is the profile.
+_ADAPTIVE_FIXES = {
+    "the profile sets fixed": "pyrite profile numerics adaptive-sampling enable {name}",
+    "emission is": "pyrite profile physics set {name} --emission incoherent",
+    "particle cascades": (
+        "pyrite profile physics set {name} --pair-production-model none "
+        "--secondary-threshold-ev none{positron}"
+    ),
+    "positron transport": "pyrite profile physics set {name} --no-positron-transport",
+}
+
+
+def emit_adaptive_fix(name, reason, profile):
+    """Print the command that clears fixed-count ``reason`` for profile ``name``, if any."""
+    positron = " --no-positron-transport" * bool(profile.get("positron_transport"))
+    for prefix, template in _ADAPTIVE_FIXES.items():
+        if reason and reason.startswith(prefix):
+            emit_result(f"adaptive sampling: {template.format(name=name, positron=positron)}")
+            return

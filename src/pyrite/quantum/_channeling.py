@@ -257,7 +257,7 @@ def channeling_from_fields(values: Mapping[str, object]) -> Channeling | None:
         **{k: v for k, v in values.items() if k in CHANNELING_OFF_FIELDS},
     }
     model = flat["channeling_model"]
-    if model in (None, "off"):
+    if model in (None, "off", "none"):
         for name in ("plane", "axial"):
             if flat[f"channeling_{name}"] is not None:
                 raise ValueError(f"[channeling] {name} requires model='planar' or 'axial'")
@@ -306,7 +306,7 @@ def validate_channeling_run(
         raise ValueError(f"{label} does not support secondary transport")
     if "coherent" in cast(tuple[str, ...], physics.emission):
         raise ValueError(f"{label} supports incoherent emission only")
-    if physics.transition_radiation != "off":
+    if physics.transition_radiation != "none":
         raise ValueError(f"transition_radiation does not support {label}")
 
 

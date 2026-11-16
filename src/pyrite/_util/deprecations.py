@@ -156,6 +156,9 @@ API_DEPRECATIONS: dict[str, ApiDeprecation] = {
     "pyrite.phases.TransportedScene": _api_entry(
         "pyrite.phases.TransportedScene", "pyrite.transport.Trajectories", since="0.35.0"
     ),
+    # #1242: "none" turns every optional non-boolean setting off (Physics
+    # fields, profile/preset TOML and CLI values); pyrite._off_settings warns.
+    '"off"': _api_entry('"off"', '"none"', since="0.36.0"),
 }
 
 

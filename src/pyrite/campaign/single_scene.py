@@ -208,8 +208,8 @@ def resolve_pixel_scene(
                 Literal["penelope-2024"] | None, transport.get("pair_production_model")
             ),
             transition_radiation=cast(
-                Literal["off", "history", "bunch", "two-beam"],
-                transport.get("transition_radiation", "off"),
+                Literal["none", "history", "bunch", "two-beam"],
+                transport.get("transition_radiation", "none"),
             ),
             transition_lattice_origin_ang=cast(
                 tuple[float, float, float] | None, transport.get("transition_lattice_origin_ang")

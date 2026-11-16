@@ -10,9 +10,11 @@ Numerics.
 from copy import copy
 
 import click
+from click.shell_completion import CompletionItem
 
 from pyrite._numerics import CHANNELING_KEYS, PHYSICS_KEYS
-from pyrite.cli._deprecations import canonical_option, removed_option
+from pyrite._off_settings import DEPRECATED_OFF, NONE
+from pyrite.cli._deprecations import canonical_option, removed_option, warn_off_value
 from pyrite.cli.commands import _profile_shared
 
 _ENERGY_MODEL_VALUES = ("frozen", "midpoint")
@@ -21,9 +23,46 @@ _ELASTIC_MODEL_VALUES = ("mott", "elsepa")
 _BREMSSTRAHLUNG_MODEL_VALUES = ("auto", "eedl", "bremslib")
 _RADIATIVE_MODEL_VALUES = ("auto", "uncoupled", "bremslib-soft-hard")
 _PAIR_PRODUCTION_MODEL_VALUES = ("penelope-2024",)
+_TRANSITION_RADIATION_VALUES = ("history", "bunch", "two-beam")
 _ATOMIC_ELECTRON_DEFLECTION_VALUES = ("kawrakow", "none")
 _SHELL_IONIZATION_MODEL_VALUES = ("eedl", "bote-salvat")
 _MOSAIC_ROUTE_VALUES = ("analytic", "mc", "mc-sampled")
+
+
+class NoneOr(click.ParamType):
+    """``none`` (turn the setting off) or a value of ``base`` (#1242).
+
+    Non-boolean optional settings follow the "off follows type" convention
+    (docs/repo-design/profile-settings.md): ``none`` is stored, so it overrides an
+    attached preset. ``off`` is a deprecated alias that warns on stderr.
+    """
+
+    def __init__(self, base: click.ParamType, metavar: str | None = None) -> None:
+        self.base = base
+        self.name = f"none|{base.name}"
+        self._metavar = metavar
+
+    def get_metavar(self, param: click.Parameter, ctx: click.Context) -> str | None:
+        if self._metavar is not None:
+            return f"none|{self._metavar}"
+        choices = getattr(self.base, "choices", None)
+        return None if choices is None else f"[none|{'|'.join(map(str, choices))}]"
+
+    def convert(self, value, param, ctx):
+        if value == NONE:
+            return NONE
+        if value == DEPRECATED_OFF:
+            warn_off_value(f"--{(param.name if param else '').replace('_', '-')}")
+            return NONE
+        try:
+            return self.base.convert(value, param, ctx)
+        except click.BadParameter as exc:
+            self.fail(f"{exc.message}; or 'none' to turn it off", param, ctx)
+
+    def shell_complete(self, ctx, param, incomplete):
+        items = [CompletionItem(NONE)] if NONE.startswith(incomplete) else []
+        return items + self.base.shell_complete(ctx, param, incomplete)
+
 
 #: Option spelling -> catalog/API field name.
 FIELD_NAMES = {
@@ -196,11 +235,11 @@ class ChannelingSectionCommand(click.Command):
 )
 @click.option(
     "--secondary-threshold-ev",
-    type=click.FloatRange(min=0.0, min_open=True),
-    metavar="EV",
+    type=NoneOr(click.FloatRange(min=0.0, min_open=True), "EV"),
     help=(
         "Transport hard-collision secondaries above this energy in eV (production cut and "
-        "tracking cutoff; requires shell-soft-hard and SBETHE coverage, >= 1000 eV)."
+        "tracking cutoff; requires shell-soft-hard and SBETHE coverage, >= 1000 eV). "
+        "none turns secondary transport off (needs --pair-production-model none)."
     ),
 )
 @click.option(
@@ -243,11 +282,12 @@ class ChannelingSectionCommand(click.Command):
 )
 @click.option(
     "--pair-production-model",
-    type=click.Choice(_PAIR_PRODUCTION_MODEL_VALUES),
+    type=NoneOr(click.Choice(_PAIR_PRODUCTION_MODEL_VALUES)),
     help=(
         "Convert coupled hard photons above 1.022 MeV to e-/e+ pairs (opt-in). Requires "
         "--secondary-threshold-ev and coupled BremsLib transport; pair electrons are "
-        "transported as secondaries, positrons are recorded unless --positron-transport."
+        "transported as secondaries, positrons are recorded unless --positron-transport. "
+        "none turns pair production off."
     ),
 )
 @click.option(
@@ -281,10 +321,17 @@ class ChannelingSectionCommand(click.Command):
 )
 @click.option(
     "--channeling-model",
-    type=click.Choice(("off", "planar")),
-    help="Planar quantum entrance zone (default off); requires plane, midpoint, uncoupled "
-    "radiation and incoherent emission. Disable with profile physics reset PROFILE "
-    "channeling-model channeling-plane channeling-admission.",
+    type=NoneOr(click.Choice(("planar",))),
+    help="Planar quantum entrance zone (default none); requires plane, midpoint, uncoupled "
+    "radiation and incoherent emission. none turns it off (also reset --channeling-plane "
+    "with 'profile physics reset PROFILE channeling-plane channeling-admission').",
+)
+@click.option(
+    "--transition-radiation",
+    type=NoneOr(click.Choice(_TRANSITION_RADIATION_VALUES)),
+    help="Transition-radiation component (default none): history (per-history coherent "
+    "sum), bunch (adds CTR cross-history terms) or experimental two-beam PXR/DTR/CBS; "
+    "requires midpoint energy and no channeling. none turns it off.",
 )
 @click.option(
     "--channeling-plane",
