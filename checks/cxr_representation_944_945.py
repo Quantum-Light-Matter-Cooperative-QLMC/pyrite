@@ -305,6 +305,10 @@ def peak_rows(grid, density, windows):
             continue
         g, d = grid[sel], density[sel]
         k = int(np.argmax(d))
+        if k == 0 or k == d.size - 1:
+            # A window-edge maximum is a truncated slope, not a resolved peak.
+            rows.append(None)
+            continue
         half = 0.5 * d[k]
         left = np.flatnonzero(d[:k] < half)
         right = np.flatnonzero(d[k:] < half)
@@ -364,7 +368,14 @@ def compare(candidate, reference, c_peaks, r_peaks):
         vals = [abs(p[key]) for p in peaks if p is not None and p[key] is not None]
         return max(vals) if vals else None
 
-    out.update(peaks=peaks, worst_height_rel=worst("height_rel"), worst_fwhm_rel=worst("fwhm_rel"))
+    out.update(
+        peaks=peaks,
+        matched_peaks=sum(p is not None for p in peaks),
+        unresolved_peak_windows=sum(p is None for p in peaks),
+        unresolved_fwhm_windows=sum(p is not None and p["fwhm_rel"] is None for p in peaks),
+        worst_height_rel=worst("height_rel"),
+        worst_fwhm_rel=worst("fwhm_rel"),
+    )
     return out
 
 
