@@ -8,6 +8,12 @@ Eqs. (2), (5)–(9), (13), (14), (16), Sections S3, S4, S6, S7,
 Fig. S5b and Table 4. The locally downloaded publisher PDF and extracted text were
 the source inspected; the web reader could not open the publisher URL.
 
+**Correction (2026-11-15, #1235).** The h-BN catalog $B_{33}$ quoted below as
+3.45 Å² double-counted Pease's tabulated $F^2$; the catalog now uses
+1.73 Å² ([`hbn-debye-waller-00l`](../materials/hbn-debye-waller-00l.md)).
+Numbers in this write-up that depend on 3.45 Å² are historical; current
+post-correction detected peaks are recorded in the ledger Notes.
+
 ## Independent source derivation
 
 The incident-electron-normalized angular photon density in Eq. (2) is
@@ -124,7 +130,8 @@ $$
 An isolated basal $(00l)$ intensity therefore changes as
 $\exp[-\Delta B_{33}l^2/(2c^2)]$ and is independent of $B_{11}$.
 For h-BN $c\simeq6.66$ Å, changing $B_{33}$ from 0.6 to 3.45 Å²
-predicts factors about 0.879 for $(002)$ and 0.598 for $(004)$.
+predicts factors about 0.879 for $(002)$ and 0.598 for $(004)$; the corrected
+1.73 Å² gives about 0.950 and 0.816.
 Off-basal reflections depend on both components; interference prevents assigning
 the same isolated-reflection factor to an entire mixed spectrum. The SI states
 the Debye–Waller factor but does not give these two h-BN parameter values.
@@ -180,7 +187,7 @@ The implemented EDS and aperture formulas match Eqs. (13), (14), (16) at that
 representative energy. The derivative's magnitude is appropriate for a width.
 
 The catalog contains only basal $(002)$ and $(004)$ families and scalar
-`B_ang2=3.45`. Since these reciprocal vectors are parallel to the crystal
+`B_ang2` (3.45 Å² when this was written; 1.73 Å² since #1235). Since these reciprocal vectors are parallel to the crystal
 $c$ axis, this scalar correctly represents $B_{33}$ for the retained families;
 $B_{11}$ cannot change these basal couplings. The scalar implementation would
 need a directional tensor contraction to represent off-basal reflections with
@@ -267,6 +274,8 @@ The controlled variants support narrower exclusions:
   derived isolated $(002)$ factor near 0.879; its endpoint variation is about
   0.17%. This correction mostly changes normalization and does not account
   for the residual energy trend. Basal-only $B_{11}$ remains irrelevant.
+  At the corrected 1.73 Å² the same-run ratio versus 0.6 Å² is 0.949–0.950
+  (2000 electrons, SLURM 13218), matching the isolated $(002)$ factor 0.950.
 - Removing escape opacity while retaining transport and real refractive
   kinematics raises the detected peaks. The baseline/no-opacity peak ratio is
   0.59637, 0.61969, 0.64420, 0.66630. Thus opacity materially changes modeled
