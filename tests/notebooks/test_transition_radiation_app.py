@@ -211,6 +211,6 @@ def test_reference_scene_is_independent_of_transition_model():
     scene = reference_scene(DemoConfig(), "history")
     assert scene == reference_scene(DemoConfig(), "bunch")
     assert set(scene.__dict__) == {"beam", "target", "detector", "filters"}
-    assert scene.physics.transition_radiation == "off"
+    assert scene.physics.transition_radiation == "none"
     assert reference_physics("history").transition_radiation == "history"
     assert reference_physics("bunch").transition_radiation == "bunch"
