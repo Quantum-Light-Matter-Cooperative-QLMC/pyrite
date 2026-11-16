@@ -1,0 +1,61 @@
+{
+  "schema": "photon-annihilation-escape-evidence.v1",
+  "issue": 341,
+  "run_date_utc": "2026-11-15",
+  "energy_keV": 510.99895,
+  "configs": {
+    "w_ext": "W 4 mm, pencil 1 nm upstream",
+    "w_int": "W 4 mm, pencil at mid-depth",
+    "si_ext": "Si 25 mm, pencil 1 nm upstream",
+    "si_int": "Si 25 mm, pencil at mid-depth"
+  },
+  "events_per_engine_and_config": 1000000,
+  "shards": 10,
+  "blocks_per_shard": 100,
+  "jobs": {
+    "13030": "Geant4 empenelope (pre-registered reference) + PyRITE, 80 tasks",
+    "13031": "Geant4 emlivermore (report-only), 40 tasks",
+    "12909/12910": "failed submission: Geant4/PyRITE paths expanded on the submitting host, every task exited 127 before running; outputs kept in results-failed-12909-12910 on the box"
+  },
+  "tested_commit": "7dcdc377ee37ba8238fc08985fd25e1d2c24531d",
+  "staging_root": "~/.local/opt/pyrite-341-511-7dcdc377",
+  "allocation": {
+    "node": "qlmc-queen",
+    "partition": "cpu",
+    "cpus_per_task": 1,
+    "memory_GiB_per_task": 2,
+    "max_rss_kB": 297372,
+    "max_wall": "0:58",
+    "nonzero_task_exits": 0
+  },
+  "geant4_version": "11.4.2 (geant4-11-04-patch-02) / EMLOW8.8",
+  "geant4_executable_sha256": "fe3fc52d65477c780e9b77c4eb1385c752b66c403b045b988855a5d48541cc4f",
+  "data_sha256": {
+    "eadl": "78ccf8a4e07c1c120a2e3d94ff051aab2180d151f35e8bc3406d52df5af5e88c",
+    "epdl": "fcc2f00c5bb969e99bc84cac16762f13e939f071d585c433a5c0f420913fcfc9",
+    "epdl_differential": "d36a50d1add5c6f0b3df80a108e83aa8db8a4822445ca192534f6bc0a55bb166"
+  },
+  "source_sha256_tested": {
+    "checks/photon_full_track/annihilation_escape.py": "608e3c0ebb92a13ce1e3dfe1f54e97117d0cad91002a7b907e4e9a49f7767491",
+    "checks/photon_full_track/run_annihilation_escape.sbatch": "beebb33f70420fa47adf10b89baaa7e70154f981476d5aadcd250ccf8bd107df",
+    "checks/photon_full_track/cases.py": "023953fe1997f7b9cbd968fedb47ac25b7219e5049644c298a52541ff3172fc5",
+    "checks/photon_full_track/compare.py": "e7cb036a70ba1d1ebbc3dbe56c0865b2d35493c178248b7f2bbab0adb2af6b41",
+    "src/pyrite/montecarlo/transport/photon_histories.py": "769c45a29ad3c8b266f0699becec358f4d33f3b47dea14a6e84b0eb466e4f445"
+  },
+  "committed_record_sha256": {
+    "si_ext_geant4.json.gz": "46eea516e8c89b4f3fd8634d29e406e05de90b346716b7073d1c35dee1efe8d9",
+    "si_ext_geant4_emlivermore.json.gz": "f9fdf7b30ef80bf0d2b930b6d3b7ea1b90ded058cd673ef00d4901e44c1a7800",
+    "si_ext_pyrite.json.gz": "63c563a134da45ce5e2e575b3b3ec91e46246fb48d8f9179e9ff243a58e8d4a8",
+    "si_int_geant4.json.gz": "a996490766b038de4672410bcb3c9f96239f9d1da1cb5318b3b6089e5c019270",
+    "si_int_geant4_emlivermore.json.gz": "494c0f89b3a8f005fefd20591e02e69a363b4b2ba09f19b2d695f17c1b6b6b02",
+    "si_int_pyrite.json.gz": "bf31935b625bd2bf6550df4d12b024b32499d211e40300a05657d5456386f5c0",
+    "w_ext_geant4.json.gz": "e12a0b45a2bf75e81a9c91a72bf7aec2c82095c10417b92b47a93e267d5ec766",
+    "w_ext_geant4_emlivermore.json.gz": "b0f81b7ef391b3c807e39dc6aa80a33bccf3ae260f920fd97ed92d9f6986a1c1",
+    "w_ext_pyrite.json.gz": "ab0acfe0b054adc3403594d31401a5e8eee34a0c67839b0c47b68592d306f559",
+    "w_int_geant4.json.gz": "c268fd20c595a2bf618e4abd6eb3d6d8acc04360ee038d9d33dcc64891721d23",
+    "w_int_geant4_emlivermore.json.gz": "9ae5df564f7d416c6aead8b38d6736a6e44d1c7f665c17e21d0fe0e2aeb0a2b5",
+    "w_int_pyrite.json.gz": "e7fdb7059628cefeb1c7f148807ad0424c67c56c957483dbf5281304ac9f37fa"
+  },
+  "raw_logs": "Geant4 GAM logs and per-shard records remain under the staging root's results/ on qlmc",
+  "post_run_merge_guard_note": "After the runs, merge() gained a duplicate-shard rejection (adjudication hardening). Reduction, tally and compare logic are unchanged; the committed records were merged from distinct shards."
+}

@@ -1,0 +1,109 @@
+{
+  "schema": "photon-alloy-fluorescence-evidence.v1",
+  "issue": 341,
+  "run_date_utc": "2026-11-15",
+  "target": "G4_GALLIUM_ARSENIDE, 5.31 g/cm3, Ga:As 1:1 atoms (verified in Geant4 log); 0.2 mm",
+  "events_per_engine_and_energy": 1000000,
+  "shards": 10,
+  "blocks_per_shard": 100,
+  "arms": {
+    "geant4_empenelope": {
+      "role": "pre-registered gated reference",
+      "job": 12771,
+      "tested_commit": "95b6d6b631f523f6ebcb053b8f89db0bef984242",
+      "staging_root": "~/.local/opt/pyrite-341-alloy-95b6d6b6",
+      "outcome": "2/7 gates pass; 5 Ga K failures",
+      "geant4_seed_base": 34120
+    },
+    "pyrite_cpu_photon_only": {
+      "job": 12771,
+      "tested_commit": "95b6d6b631f523f6ebcb053b8f89db0bef984242",
+      "seed": 34121,
+      "history_ids": "shard*100000 + [0, 100000)"
+    },
+    "geant4_emlivermore": {
+      "role": "report-only diagnostic added after the Penelope result; same gates",
+      "job": 12843,
+      "tested_commit": "6000a15950d7811acc8e86c4d63cceac454f45f7",
+      "staging_root": "~/.local/opt/pyrite-341-alloy-6000a159",
+      "outcome": "8/8 gates pass (one more window reaches 1000 reference counts)",
+      "geant4_seed_base": 34120
+    }
+  },
+  "allocation": {
+    "node": "qlmc-queen",
+    "partition": "cpu",
+    "cpus_per_task": 1,
+    "memory_GiB_per_task": 2,
+    "job_12771": {
+      "tasks": 60,
+      "state": "all completed, no errors in task logs",
+      "max_rss_kB": 292132,
+      "wall_range": "0:04-1:50"
+    },
+    "job_12843": {
+      "tasks": 30,
+      "state": "all completed, no errors in task logs",
+      "max_rss_kB": 94804,
+      "wall_range": "0:04-0:06"
+    }
+  },
+  "geant4_version": "11.4.2 (geant4-11-04-patch-02) / EMLOW8.8",
+  "geant4_executable_sha256": "fe3fc52d65477c780e9b77c4eb1385c752b66c403b045b988855a5d48541cc4f",
+  "data_sha256": {
+    "eadl": "78ccf8a4e07c1c120a2e3d94ff051aab2180d151f35e8bc3406d52df5af5e88c",
+    "epdl": "fcc2f00c5bb969e99bc84cac16762f13e939f071d585c433a5c0f420913fcfc9",
+    "epdl_differential": "d36a50d1add5c6f0b3df80a108e83aa8db8a4822445ca192534f6bc0a55bb166"
+  },
+  "source_sha256_tested": {
+    "95b6d6b6": {
+      "checks/photon_full_track/alloy_fluorescence.py": "6b765168698891488c2311cc3b7b5f89196a84bda7ab418878fcac9ad5c14d7c",
+      "checks/photon_full_track/run_alloy_fluorescence.sbatch": "59c41b954ac603cd1e4d2548bc058bcbe4f03562bd74c80de45d6a09d76cefae"
+    },
+    "6000a159": {
+      "checks/photon_full_track/alloy_fluorescence.py": "e0274f4d2ae627921c09bcb5e235054d6f878547b7079e768d55fe91e3b9b542",
+      "checks/photon_full_track/run_alloy_fluorescence.sbatch": "fa45b6ed95138458bea77e40243d2fcacad903743d7e9d06d150e038ffb6e91e"
+    },
+    "shared": {
+      "checks/photon_full_track/cases.py": "023953fe1997f7b9cbd968fedb47ac25b7219e5049644c298a52541ff3172fc5",
+      "checks/photon_full_track/compare.py": "e7cb036a70ba1d1ebbc3dbe56c0865b2d35493c178248b7f2bbab0adb2af6b41",
+      "src/pyrite/montecarlo/transport/photon_histories.py": "769c45a29ad3c8b266f0699becec358f4d33f3b47dea14a6e84b0eb466e4f445"
+    }
+  },
+  "committed_record_sha256": {
+    "gaas_11p5kev_geant4.json.gz": "bad1cd265de7cc9029e5c33268336c793211c7d8db09150f4350e944fb5598db",
+    "gaas_11p5kev_pyrite.json.gz": "910a548ec990c6858643095beefabff4fc689a403a0c62342d43fc70c8e1d899",
+    "gaas_15kev_geant4.json.gz": "6e29aab725abb34940ad4c5f43d748c817ea586eb313aa3cda0afcea40ac4b18",
+    "gaas_15kev_pyrite.json.gz": "bf989c4451fc0e2168a5d6020f9c93e19db57619ca226be56d70beabd5f2b82d",
+    "gaas_30kev_geant4.json.gz": "89a44283edf073b7fb595097cfca797404cb1ec796f4eec0cce2f30ae8260864",
+    "gaas_30kev_pyrite.json.gz": "9af8ea8982b3b7c69e04e43d7cae3743cd6d1d9f6f3e2ad2380fb7b2e500491e",
+    "gaas_11p5kev_geant4_emlivermore.json.gz": "0140c061d9fd7a1000b76aa65cd345a16234d54c2621e6f727c2826752e51526",
+    "gaas_15kev_geant4_emlivermore.json.gz": "e10f32538039c1837ecf45a3968a16b6ba1752a808c361e9d32ab33da8af6c2d",
+    "gaas_30kev_geant4_emlivermore.json.gz": "dc2102d0a1b0ed94a22cf1230719da3071b0dc26fa24dbd704cab28d3ffa508d"
+  },
+  "raw_logs": "Geant4 GAM logs and per-shard records remain under each staging root's results/ on qlmc",
+  "post_run_source_note": "After job 12843 only the alloy_fluorescence.py module docstring gained its `Validation:` ledger marker; executable code is unchanged from 6000a159.",
+  "rebased_commits": {
+    "95b6d6b631f523f6ebcb053b8f89db0bef984242": "38ca33daf",
+    "6000a15950d7811acc8e86c4d63cceac454f45f7": "45964ec47",
+    "note": "Rebased onto main 2026-11-15 without changes to checks/, tests/ or src/; the tested-commit SHAs above are the pre-rebase originals."
+  },
+  "edge_scan": {
+    "role": "report-only Geant4 Penelope/Livermore R-aperture K-alpha scan in pure Ga, Ge and As (0.2 mm, 1e5 photons per run, same seed for both constructors) plus PyRITE pure-Ga arm",
+    "job": 12873,
+    "pyrite_arm": "srun on qlmc-queen, same staging",
+    "tested_commit": "80710e7bb (scan script); sbatch from 686f553a",
+    "staging_root": "~/.local/opt/pyrite-341-edge-686f553a",
+    "script_sha256": "aea576ced7b59a489334e78674820481d29ae3b6a5f4cef8d2b0e040cbe12c58",
+    "sbatch_sha256": "450f6fbdc7008412d9b97b7079e1f21ce8237689f568351d3852e8c2f4a131b1",
+    "g4_nist_densities": {
+      "G4_Ga": 5.904
+    },
+    "outcome": "Penelope/Livermore 0.981-1.009 for all 18 element/energy points; PyRITE/Livermore 0.996 for Ga at 11.5 keV"
+  },
+  "committed_record_sha256_diagnostics": {
+    "edge-scan.json": "8079d9136090dce1c6d5ad48d24f78e97d8f1372189b13ab139fb279c675d121",
+    "edge-scan-pyrite.json": "7684a88229de6dd941954f6df532289523956253df0273e0674b35b3fa241725"
+  },
+  "post_run_merge_guard_note": "After the runs, merge() gained a duplicate-shard rejection (adjudication hardening). Reduction, tally and compare logic are unchanged; the committed records were merged from distinct shards."
+}

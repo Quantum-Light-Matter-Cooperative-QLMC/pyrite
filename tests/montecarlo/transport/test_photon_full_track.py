@@ -312,3 +312,329 @@ def test_complete_cascade_matrix_retains_all_100_gates(comparison, tmp_path):
         total += fresh["gated_count"]
     assert shards == manifest["shards"] == 49
     assert total == manifest["total_gated_count_including_prior_w"] == 100
+
+
+@pytest.fixture(scope="module")
+def alloy(comparison):
+    cases, reducer = ModuleType("cases"), ModuleType("compare")
+    cases.__dict__.update(runpy.run_path(str(BENCH / "cases.py")))
+    reducer.__dict__.update(comparison)
+    with patch.dict(sys.modules, {"cases": cases, "compare": reducer}):
+        return runpy.run_path(str(BENCH / "alloy_fluorescence.py"))
+
+
+def test_alloy_composition_matches_geant4_nist_gaas(alloy):
+    (ga, n_ga), (as_, n_as) = alloy["composition"]()
+    assert (ga, as_) == ("Ga", "As") and n_ga == n_as
+    # Back to mass density: 5.31 g/cm^3 for one Ga and one As atom per unit.
+    rho = n_ga * 1e24 * (69.723 + 74.9216) / 6.02214076e23
+    assert rho == pytest.approx(5.31, rel=1e-12)
+    text = alloy["macro"](11.5, 100, 7)
+    for line in (
+        "/testem/det/setAbsMat G4_GALLIUM_ARSENIDE",
+        "/testem/det/setAbsThick 0.2 mm",
+        "/process/em/auger true",
+        "/process/em/deexcitationIgnoreCut true",
+        "/gun/energy 11.5 keV",
+        "/gun/position -0.1000010 0 0 mm",
+        "/testem/stack/killSecondaries 3",
+    ):
+        assert line in text.splitlines()
+
+
+def test_alloy_line_windows_are_single_bins_on_both_sides_of_edges(alloy):
+    edges = alloy["EDGES_EV"]
+    for lo, hi in alloy["WINDOWS"].values():
+        assert lo in edges and hi in edges and hi - lo == 500
+    # As K-alpha/beta must sit above the Ga K edge for secondary excitation;
+    # 11.5 keV must stay below the As K edge (11.867 keV).
+    assert alloy["WINDOWS"]["As_Ka"][0] > alloy["GA_K_EDGE_EV"]
+    assert set(alloy["GATED"][11.5]) == {"Ga_Ka", "Ga_Kb"}
+
+
+def test_alloy_reduction_rejects_wrong_material_or_run(alloy):
+    verify = alloy["verify_geant4_log"]
+    good = " The run was 100 gamma of 15 keV through 200 um  of G4_GALLIUM_ARSENIDE\n"
+    verify(good, 15.0, 100)
+    with pytest.raises(ValueError, match="completed"):
+        verify("GAM 0 15000 1 0 0 1 0 0 primary 1\n", 15.0, 100)
+    with pytest.raises(ValueError, match="does not match"):
+        verify(good, 30.0, 100)
+    with pytest.raises(ValueError, match="does not match"):
+        verify(good, 15.0, 1000)
+    with pytest.raises(ValueError, match="G4_GALLIUM_ARSENIDE"):
+        verify(good.replace("G4_GALLIUM_ARSENIDE", "Tungsten"), 15.0, 100)
+
+
+def _alloy_record(alloy, rate, *, engine="x", energy=15.0, blocks=100, events=1_000_000):
+    """Fixed per-block Ga K-alpha counts on R with small block scatter."""
+    record = alloy["tally"](
+        np.array([0]), np.array([9200.0]), np.zeros((1, 3)), np.array([[0, 0, -1.0]]),
+        np.array([False]), 100,
+    )  # fmt: skip
+    size = events // blocks
+    counts = np.zeros((blocks, len(alloy["EDGES_EV"]) - 1), dtype=np.int64)
+    column = int(np.searchsorted(alloy["EDGES_EV"], 9200.0, side="right") - 1)
+    counts[:, column] = np.round(rate * size + np.tile([-3, 3], blocks // 2)).astype(int)
+    record["apertures"]["R"]["total"] = counts.tolist()
+    record.update(block_sizes=[size] * blocks, format="f", engine=engine, energy_keV=energy)
+    return record
+
+
+def test_alloy_gate_detects_missing_secondary_fluorescence(alloy):
+    g = _alloy_record(alloy, 0.01)
+    report = alloy["compare"](_alloy_record(alloy, 0.0102), g)
+    assert report["R"]["Ga_Ka"]["gated"] and report["R"]["Ga_Ka"]["pass_"]
+    # A 15% deficit, the scale of an omitted As->Ga contribution, must fail.
+    report = alloy["compare"](_alloy_record(alloy, 0.0085), g)
+    assert alloy["failures"](report) == ["R/Ga_Ka"]
+    # Windows with fewer than MIN_COUNTS Geant4 counts only report.
+    assert not report["T"]["Ga_Ka"]["gated"]
+    with pytest.raises(ValueError, match="energy"):
+        alloy["compare"](_alloy_record(alloy, 0.01, energy=30.0), g)
+
+
+def test_alloy_merge_concatenates_independent_shards(alloy):
+    a = _alloy_record(alloy, 0.01, engine="p")
+    b = _alloy_record(alloy, 0.01, engine="p")
+    a.update(seed=1, first_history=0, ga_k_excitation=dict(ga_above_k_edge=10, indirect=2))
+    b.update(seed=1, first_history=1_000_000, ga_k_excitation=dict(ga_above_k_edge=30, indirect=8))
+    merged = alloy["merge"]([a, b])
+    assert len(merged["block_sizes"]) == 200
+    assert len(merged["apertures"]["R"]["total"]) == 200
+    g = _alloy_record(alloy, 0.01)
+    assert alloy["compare"](merged, g)["indirect_ga_k_fraction"] == pytest.approx(0.25)
+    with pytest.raises(ValueError, match="disagree"):
+        alloy["merge"]([a, _alloy_record(alloy, 0.01, engine="other")])
+
+
+def test_alloy_livermore_arm_changes_only_physics_constructor(alloy):
+    penelope = alloy["macro"](15.0, 100, 7).splitlines()
+    livermore = alloy["macro"](15.0, 100, 7, "emlivermore").splitlines()
+    changed = [(a, b) for a, b in zip(penelope, livermore, strict=True) if a != b]
+    assert changed == [
+        ("/testem/phys/addPhysics empenelope", "/testem/phys/addPhysics emlivermore")
+    ]
+    with pytest.raises(ValueError, match="physics"):
+        alloy["macro"](15.0, 100, 7, "emstandard")
+
+
+ALLOY = BENCH / "alloy-results"
+#: Pre-registered Penelope reference: Ga K deficit near the Ga K edge
+PENELOPE_FAILURES = [
+    "gaas_11p5kev/R/Ga_Ka",
+    "gaas_11p5kev/R/Ga_Kb",
+    "gaas_15kev/R/Ga_Ka",
+    "gaas_30kev/R/Ga_Ka",
+    "gaas_30kev/T/Ga_Ka",
+]
+
+
+def test_alloy_evidence_checksums():
+    manifest = json.loads((ALLOY / "provenance.json").read_text())
+    assert len(manifest["committed_record_sha256"]) == 9
+    for path, digest in manifest["committed_record_sha256"].items():
+        assert hashlib.sha256((ALLOY / path).read_bytes()).hexdigest() == digest
+
+
+def _alloy_report(alloy, arm):
+    report = {}
+    for energy in alloy["ENERGIES_KEV"]:
+        stem = alloy["name"](energy)
+        p = alloy["_load"](ALLOY / f"{stem}_pyrite.json.gz")
+        g = alloy["_load"](ALLOY / f"{stem}_geant4{arm}.json.gz")
+        assert len(p["block_sizes"]) == len(g["block_sizes"]) == 1000
+        assert sum(p["block_sizes"]) == sum(g["block_sizes"]) == 1_000_000
+        report[stem] = alloy["compare"](p, g)
+    return report
+
+
+def test_alloy_penelope_reference_keeps_ga_k_deficit_visible(alloy):
+    report = _alloy_report(alloy, "")
+    failed = [f"{case}/{f}" for case, r in report.items() for f in alloy["failures"](r)]
+    assert failed == PENELOPE_FAILURES
+    gated = sum(e["gated"] for r in report.values() for a in ("R", "T") for e in r[a].values())
+    assert gated == 7
+    # The near-edge primary baseline carries the largest deficit.
+    assert report["gaas_11p5kev"]["R"]["Ga_Ka"]["ratio"] == pytest.approx(1.928, abs=1e-3)
+    assert report["gaas_15kev"]["R"]["As_Ka"]["pass_"]
+
+
+def test_alloy_livermore_arm_passes_every_preregistered_gate(alloy):
+    report = _alloy_report(alloy, "_emlivermore")
+    assert [f for r in report.values() for f in alloy["failures"](r)] == []
+    gated = [
+        (case, a, w)
+        for case, r in report.items()
+        for a in ("R", "T")
+        for w, e in r[a].items()
+        if e["gated"]
+    ]
+    # The Livermore reference holds 1000+ counts in one more window (8 gated).
+    assert len(gated) == 8
+    # Secondary fluorescence is a large share of Ga K excitation only once As K
+    # is excited, so the passing 15/30 keV Ga K gates are sensitive to it.
+    assert report["gaas_11p5kev"]["indirect_ga_k_fraction"] < 0.02
+    for case in ("gaas_15kev", "gaas_30kev"):
+        assert report[case]["indirect_ga_k_fraction"] > 0.3
+        assert report[case]["R"]["Ga_Ka"]["gated"] and report[case]["R"]["Ga_Ka"]["pass_"]
+
+
+@pytest.fixture(scope="module")
+def escape(comparison):
+    cases, reducer = ModuleType("cases"), ModuleType("compare")
+    cases.__dict__.update(runpy.run_path(str(BENCH / "cases.py")))
+    reducer.__dict__.update(comparison)
+    with patch.dict(sys.modules, {"cases": cases, "compare": reducer}):
+        return runpy.run_path(str(BENCH / "annihilation_escape.py"))
+
+
+def test_escape_macros_place_sources_in_testem5_frame(escape):
+    ext = escape["macro"]("w_ext", 100, 7).splitlines()
+    internal = escape["macro"]("si_int", 100, 7).splitlines()
+    assert "/gun/position -2.0000010 0 0 mm" in ext  # 1 nm before the -T/2 face
+    assert "/gun/position 0.0000000 0 0 mm" in internal  # slab centre
+    assert "/testem/det/setAbsMat Tungsten" in ext
+    assert "/testem/det/setAbsThick 25 mm" in internal
+    assert "/gun/energy 510.99895 keV" in ext
+    livermore = escape["macro"]("w_ext", 100, 7, "emlivermore").splitlines()
+    assert [(a, b) for a, b in zip(ext, livermore, strict=True) if a != b] == [
+        ("/testem/phys/addPhysics empenelope", "/testem/phys/addPhysics emlivermore")
+    ]
+
+
+def test_escape_observables_align_with_histogram_edges(escape):
+    edges = escape["EDGES_EV"]
+    assert np.all(np.diff(edges) > 0)
+    for _, _, lo, hi, _, _ in escape["OBSERVABLES"]:
+        assert lo in edges and hi in edges
+    # The 511 keV line sits strictly inside the direct window's last bins.
+    assert edges[-1] > escape["ENERGY_KEV"] * 1e3 > 504.0e3
+
+
+def _escape_record(escape, config, direct_rate, *, engine="x", events=1_000_000):
+    record = escape["tally"](
+        config, np.array([0]), np.array([511e3]), np.array([[0, 0, 1e9]]),
+        np.array([[0, 0, 1.0]]), np.array([True]), 100,
+    )  # fmt: skip
+    size = events // 100
+    counts = np.zeros((100, len(escape["EDGES_EV"]) - 1), dtype=np.int64)
+    column = int(np.searchsorted(escape["EDGES_EV"], 511e3, side="right") - 1)
+    counts[:, column] = np.round(direct_rate * size + np.tile([-5, 5], 50)).astype(int)
+    record["apertures"]["T"]["direct"] = counts.tolist()
+    record.update(block_sizes=[size] * 100, format="f", engine=engine)
+    return record
+
+
+def test_escape_direct_gate_tolerance(escape):
+    g = _escape_record(escape, "w_ext", 0.02)
+    ok = escape["compare"](_escape_record(escape, "w_ext", 0.0203), g)
+    assert ok["T"]["direct_511"]["gated"] and ok["T"]["direct_511"]["pass_"]
+    bad = escape["compare"](_escape_record(escape, "w_ext", 0.0206), g)
+    assert escape["failures"](bad) == ["T/direct_511"]
+    assert "W_Ka" in bad["R"]
+    assert (
+        "W_Ka"
+        not in escape["compare"](
+            _escape_record(escape, "si_ext", 0.02), _escape_record(escape, "si_ext", 0.02)
+        )["R"]
+    )
+    with pytest.raises(ValueError, match="configuration"):
+        escape["compare"](_escape_record(escape, "w_int", 0.02), g)
+
+
+def test_escape_reduction_rejects_wrong_run(escape):
+    verify = escape["verify_geant4_log"]
+    good = (
+        " The run was 100 gamma of 510.999 keV through 4 mm  of Tungsten (density: 19.3 g/cm3 )\n"
+    )
+    verify(good, "w_ext", 100)
+    with pytest.raises(ValueError, match="does not match"):
+        verify(good, "w_ext", 1000)
+    with pytest.raises(ValueError, match="Silicon"):
+        verify(good, "si_ext", 100)
+    with pytest.raises(ValueError, match="completed"):
+        verify("GAM 0 511000 0 0 0 1 0 0 primary 1\n", "w_ext", 100)
+
+
+def test_alloy_windows_hold_the_documented_eadl_lines(alloy):
+    # The adjacent single-bin windows split As K-alpha: Ka2 (K-L2, 10.46 keV)
+    # falls in the window labelled Ga_Kb, Ka1 (K-L3, 10.50 keV) only 0.7 eV
+    # above the 10.5 keV edge. Gate decisions stay like-for-like only while
+    # these placements hold, so pin them against the packaged EADL energies.
+    from pyrite.montecarlo.eadl_relaxation import load_eadl_relaxation
+
+    def window(energy):
+        hits = [n for n, (lo, hi) in alloy["WINDOWS"].items() if lo <= energy < hi]
+        return hits[0] if hits else None
+
+    def k_lines(element):
+        k = load_eadl_relaxation(element).subshells[0]
+        assert k.shell_designator == 1
+        return dict(zip(k.radiative_final.tolist(), k.radiative_energy_eV.tolist(), strict=True))
+
+    ga, as_ = k_lines("Ga"), k_lines("As")
+    assert window(ga[3]) == window(ga[4]) == "Ga_Ka"  # K-L2, K-L3
+    assert window(as_[3]) == "Ga_Kb"  # As Ka2 shares the Ga K-beta window
+    assert window(as_[4]) == "As_Ka" and as_[4] - 10500.0 < 5.0
+    assert window(ga[7]) == "Ga_Kb"  # K-M3
+
+
+ESCAPE = BENCH / "escape-results"
+
+
+def test_escape_evidence_checksums():
+    manifest = json.loads((ESCAPE / "provenance.json").read_text())
+    assert len(manifest["committed_record_sha256"]) == 12
+    for path, digest in manifest["committed_record_sha256"].items():
+        assert hashlib.sha256((ESCAPE / path).read_bytes()).hexdigest() == digest
+
+
+@pytest.mark.parametrize("arm", ["", "_emlivermore"])
+def test_escape_passes_every_gate_against_both_geant4_arms(escape, arm):
+    gated = 0
+    for config in escape["CONFIGS"]:
+        p = escape["_load"](ESCAPE / f"{config}_pyrite.json.gz")
+        g = escape["_load"](ESCAPE / f"{config}_geant4{arm}.json.gz")
+        assert sum(p["block_sizes"]) == sum(g["block_sizes"]) == 1_000_000
+        report = escape["compare"](p, g)
+        assert escape["failures"](report) == []
+        gated += sum(e["gated"] for a in report.values() for e in a.values())
+        # Narrow-beam 511 keV escape is the sharpest check: within 0.4%.
+        direct = report["T"]["direct_511"]
+        assert direct["gated"] and abs(direct["ratio"] - 1) < 0.004
+    assert gated == 14
+
+
+def test_escape_keeps_ungated_w_backscatter_deficit_visible(escape):
+    # Below the pre-registered 1000-count threshold, PyRITE under-predicts W
+    # backscatter: without Compton Doppler broadening its single-backscatter
+    # peak is narrow (w_int, escape-enhanced) and lacks the high-momentum
+    # K/L-shell tail that reaches 300-504 keV (w_ext).
+    rows = {}
+    for config in ("w_ext", "w_int"):
+        report = escape["compare"](
+            escape["_load"](ESCAPE / f"{config}_pyrite.json.gz"),
+            escape["_load"](ESCAPE / f"{config}_geant4.json.gz"),
+        )
+        rows[config] = report["R"]
+    assert not rows["w_ext"]["redist_300-504keV"]["gated"]
+    assert rows["w_ext"]["redist_300-504keV"]["ratio"] == pytest.approx(0.2)
+    assert not rows["w_int"]["redist_100-300keV"]["gated"]
+    assert rows["w_int"]["redist_100-300keV"]["ratio"] == pytest.approx(0.5125)
+
+
+def test_shard_merges_reject_duplicates(escape, alloy):
+    record = escape["tally"](
+        "w_ext", np.array([0]), np.array([511e3]), np.array([[0, 0, 1e9]]),
+        np.array([[0, 0, 1.0]]), np.array([True]), 100,
+    )  # fmt: skip
+    record.update(format="f", engine="p", seed=1, first_history=0)
+    with pytest.raises(ValueError, match="duplicate"):
+        escape["merge"]([record, dict(record)])
+    other = dict(record, first_history=100)
+    assert len(escape["merge"]([record, other])["block_sizes"]) == 200
+    g = _alloy_record(alloy, 0.01)
+    g.update(seed=1, first_history=0)
+    with pytest.raises(ValueError, match="duplicate"):
+        alloy["merge"]([g, dict(g)])
