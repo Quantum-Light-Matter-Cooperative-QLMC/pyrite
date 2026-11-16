@@ -4738,7 +4738,7 @@
         ]
       ],
       "config": {
-        "B_ang2": 3.45,
+        "B_ang2": 1.73,
         "formula": "BN",
         "full_name": "Hexagonal Boron Nitride",
         "phase": "2H",
@@ -4781,8 +4781,8 @@
         ],
         "g_mag": 1.8865591674462054,
         "structure_factor": [
-          16.092126764089308,
-          1.970717153311543e-15
+          16.72820146266946,
+          2.0486138376750227e-15
         ],
         "dominant_reflections": [
           [

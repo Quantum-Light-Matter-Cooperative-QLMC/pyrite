@@ -81,6 +81,12 @@ DATASET_IDENTITY_SCHEMA = "cxr.dataset-identity.v1"
 CASE_CONTENT_KEY_SCHEMA = "cxr.case-content-key.v1"
 CURRENT_IDENTITY_VERSION = 1
 
+# v2 (#1235): Pease's F² refit corrects basal B33 from 3.45 to 1.73 Å².
+# Dataset crystallography omits B_ang2; invalidate h-BN films and layers in
+# both cache identities while preserving every other material's generation.
+# Validation: hbn-debye-waller-00l
+_HBN_DEBYE_WALLER_MODEL = "hbn-basal-b33-v2"
+
 #: Built-in fixed history counts (line spectrum, bremsstrahlung) when no
 #: profile, preset or run override sets them.
 DEFAULT_N_ELECTRONS = 300
@@ -448,13 +454,15 @@ def _model_generation_markers(emission: str) -> dict[str, Any]:
 
 
 def _structure_factor_identity(crystals) -> dict[str, str]:
-    """Measured structure-factor marker; empty unless a crystal carries the data (#1177).
+    """Crystal-conditional structure-factor and basal thermal-factor generations.
 
-    Divergence-only: digests of crystals without measured structure factors
-    stay bit-for-bit.
+    Other crystals retain their historical identities.
     """
     marker = structure_factor_marker(crystals)
-    return {} if marker is None else {"structure_factor_model": marker}
+    payload = {} if marker is None else {"structure_factor_model": marker}
+    if "hbn" in crystals:
+        payload["hbn_debye_waller_model"] = _HBN_DEBYE_WALLER_MODEL
+    return payload
 
 
 def _target_crystals(target: Any, crystal: str) -> list[str]:
