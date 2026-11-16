@@ -17,7 +17,7 @@ The 37 repeated values span different elements, phases, bonding, and source temp
 
 Existing recoverable records:
 
-- h-BN: Pease room-temperature basal-reflection fit, `B33 = 3.45 Å²`; direction-specific approximation for pinned `(002)/(004)`, not `Biso`.
+- h-BN: Pease room-temperature basal-reflection fit, recorded here as `B33 = 3.45 Å²`; direction-specific approximation for pinned `(002)/(004)`, not `Biso`. Corrected to `1.73 Å²` in #1235: the original fit squared Pease's tabulated `F²` a second time ([hbn-debye-waller-00l](hbn-debye-waller-00l.md)).
 - GeP: composition-average `B = 0.35 Å²` from a 90 K refinement.
 - GeS: `B = 1.07 Å²` derived from reported Ge/S isotropic values.
 - GeSe: `B = 1.10 Å²` derived from Ueq values in the selected 250.72 K refinement.
@@ -69,7 +69,7 @@ Scope requested: HOPG, h-BN, MoS2, MoSe2, MoTe2 only. The rest of the catalog is
 | material | before | after | source status |
 |---|---:|---:|---|
 | HOPG | `0.8` (no provenance) | `1.30` | Trucano & Chen 1975 neutron refinement, COD 9011577 — the entry's own `cod_id`. Adopted; see [hopg-debye-waller-00l](hopg-debye-waller-00l.md) |
-| h-BN | `3.45` | `3.45` (unchanged) | Pease room-temperature basal fit, already recorded; no action |
+| h-BN | `3.45` | `3.45` (unchanged) | Pease room-temperature basal fit, already recorded; no action. Later corrected to `1.73` (#1235, [hbn-debye-waller-00l](hbn-debye-waller-00l.md)) |
 | MoS2 | `0.6` (placeholder) | `0.47` | Schoenfeld, Huang & Moss 1983, COD 9007661 (3R deposit of the same paper). Cross-polytype transfer, scoped in [mos2-debye-waller-00l](mos2-debye-waller-00l.md) |
 | MoSe2 | `0.6` (placeholder) | `0.6` (unchanged) | **not reported.** Only matching-phase deposit is James & Lavik 1963 (COD 2310945), zeroed `U_iso`. Bronsema, De Boer & Jellinek 1986 (*Z. Anorg. Allg. Chem.* **541**, 15–17, [doi:10.1002/zaac.19865400904](https://doi.org/10.1002/zaac.19865400904)) is the refinement the entry's cell matches (`a=3.289`, `c=12.927`) and is the correct target, but is paywalled and its ADP table was not retrieved |
 | MoTe2 | `0.6` (placeholder) | `0.6` (unchanged) | **not reported.** Puotinen & Newnham 1961 (COD 2310465) carries zeroed `U_iso`; Wyckoff 1963 (COD 9009147) is a secondary compilation with no ADPs |
