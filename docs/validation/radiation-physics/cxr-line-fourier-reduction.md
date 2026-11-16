@@ -254,12 +254,29 @@ These regression checks do not constitute independent validation.
 
 Large mode rectangles use a type-1 NUFFT. On CUDA this is cuFINUFFT. On ROCm, which has no cuFINUFFT, it is `_fourier_spread.es_mode_transform`, a portable CuPy transform using exponential-of-semicircle (ES) spreading, `cupy.fft` and kernel-transform deconvolution (Barnett, Magland and af Klinteberg, SIAM J. Sci. Comput. 41 (2019) C479). It uses FINUFFT's width rule $w=\lceil\log_{10}(1/\epsilon)\rceil+1$, $\beta=2.30w$ and upsampling 2, and is cross-checked on CUDA against direct sums and cuFINUFFT (`test_fourier_cuda.py`). Its tolerance $\epsilon=10^{-12}$ is relative to the summed strengths and is far below `residual_tol`.
 
-**Host route (#1230).** Since `CXR_BIN_REDUCTION_MODEL = "fourier-auto-v5"`, the NumPy backend reduces uniform unclamped axes through `_fourier_host.host_fourier_bin_mean_reduce`. It uses the same partition, period, broad route and image correction. Large rectangles use a serial numba port of the ES spreader with `scipy.fft`; smaller ones use a direct numba sum. Both are serial, so the result does not depend on thread count. `resolve_host_bin_reduction` picks the route. `bin_reduction_override("auto")` restores the exact dense host evaluator. The batched and per-hkl CPU scorers queue lines per target (`_bin_queue.HostBinLineQueues`) and flush every 4M lines. Anchors in `tests/montecarlo/spectrum/test_fourier_host.py`:
+**Host route (#1230).** Since `CXR_BIN_REDUCTION_MODEL = "fourier-auto-v5"`, the NumPy backend reduces uniform unclamped axes through `_fourier_host.host_fourier_bin_mean_reduce`. It uses the same partition, period, broad route and image correction. Large rectangles use a serial numba port of the ES spreader with `scipy.fft`; smaller ones use a direct numba sum. Both are serial, so the result does not depend on thread count. `resolve_host_bin_reduction` picks the route. `bin_reduction_override("auto")` restores the exact dense host evaluator. The batched and per-hkl CPU scorers queue lines per target (`_bin_queue.HostBinLineQueues`) and flush every 4M lines. Requested ES accuracy `eps` is not a rigorous coefficient or final-spectrum bound; its approximation and FP64 rounding are additional to the image and broad-interpolation bounds. Anchors in `tests/montecarlo/spectrum/test_fourier_host.py`:
 
 - the host ES transform matches direct mode sums to 1e-10;
 - the reduction matches exact bin means to 5e-6 of the peak, including broad lines, and the host reference to 1e-9.
 
 On the `_long_flights` fixture, the CPU spectrum differs from the exact dense route by at most 5.0e-6 of its peak, and yield by 4.4e-7. A 250k-line, 400k-bin synthetic flush takes 4.1 s on one laptop core; the dense evaluator would need 1e11 sinc evaluations.
+
+Fresh-context read-only verification of host port `5c301b0bf` (2026-11-16)
+independently recovered the triangle support, phase convention, ES
+shift/deconvolution, FFT normalization, mode folding and disjoint broad split
+before implementation inspection. Symbolic comparison matched; 33 reducer
+and 14 focused integration tests passed. Additional signed, narrow,
+outside-band and large-rectangle cases agreed with exact bin integration:
+maximum absolute error divided by $\sum_l|w_l|$ was $1.29\times10^{-7}$,
+$2.16\times10^{-8}$ and $2.54\times10^{-13}$ for narrow, mixed and broad-only
+sets. Host/reference differences were at most $3.02\times10^{-14}$.
+Odd/even shifted ES intervals, including negative modes and wrapped phases,
+gave coefficient errors of $3.4$–$5.8\times10^{-12}$ relative to the maximum
+coefficient with requested `eps=1e-12`. Thus the request is not a strict
+coefficient bound. Queue review found the original survivor weights reach
+each target once, with no extra bin-width or electron normalization.
+Verdict: `rederived`; regression anchors retain `anchored`. Human sign-off
+and production qualification remain outstanding.
 
 cuFINUFFT is part of the `nvidia` extra. Its 2.5.x wheels link CUDA 12 runtime and cuFFT, which `cufinufft_module` preloads from the `nvidia-*-cu12` wheels alongside the CUDA 13 CuPy.
 

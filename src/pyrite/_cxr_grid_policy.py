@@ -311,10 +311,10 @@ def shape_spacing_factor(shape_rtol: float) -> float:
     ``h / W = (3 / pi) sqrt(shape_rtol)``.
 
     Assumptions: the peak is one isolated line, and height is read as the
-    highest bin mean without interpolation. Overlapping or wider lines have
-    smaller curvature relative to their height, so their error is smaller. The
-    FWHM read by linear interpolation between bin means is no worse than the
-    height at every ``h / W <= 1/4`` (exact single-line scan, ledger write-up).
+    highest bin mean without interpolation. Wider isolated lines have a
+    smaller height bound. The FWHM read by linear interpolation between bin
+    means meets the tolerance at the tested spacings and offsets (single-line
+    scan, ledger write-up); overlapping peaks require separate qualification.
 
     Limiting case: ``shape_rtol -> 0`` gives ``h -> 0``, i.e. pointwise sampling of the line.
 

@@ -129,7 +129,7 @@ def host_fourier_bin_mean_reduce(
 
     Same contract and bounds as ``cuda_fourier_bin_mean_reduce``: broad lines
     on the 64-node route, the rest from exact-cutoff coefficients (ES NUFFT
-    to tolerance ``eps`` on large rectangles, direct sums otherwise), the bin
+    using requested kernel accuracy ``eps`` on large rectangles, direct sums otherwise), the bin
     multiplier, ``j mod N`` folding, one inverse FFT and the closed-form
     envelope-image correction.
 

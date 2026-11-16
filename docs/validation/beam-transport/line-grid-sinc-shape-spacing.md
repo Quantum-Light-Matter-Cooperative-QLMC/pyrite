@@ -1,6 +1,6 @@
 # `line-grid-sinc-shape-spacing`
 
-Ledger row: [`line-grid-sinc-shape-spacing`](../ledger-core-coherent-physics.md#line-grid-sinc-shape-spacing). Status: unverified. Validation: `line-grid-sinc-shape-spacing`. Issue #1230.
+Ledger row: [`line-grid-sinc-shape-spacing`](../ledger-core-coherent-physics.md#line-grid-sinc-shape-spacing). Status: anchored (isolated-line claim). Validation: `line-grid-sinc-shape-spacing`. Issue #1230.
 
 ## Claim
 
@@ -9,10 +9,10 @@ The opt-in `sinc-shape` resolution places the measured `resonance-population` li
 ```{math}
 :label: eq-line-grid-sinc-shape-step
 
-h = \frac{3}{\pi}\sqrt{\varepsilon_\mathrm{shape}}\; W_q ,
+h \le \frac{3}{\pi}\sqrt{\varepsilon_\mathrm{shape}}\; W_q ,
 ```
 
-where $W_q$ is the sinc-Nyquist feature width of the case (the first-zero width at the aliased-weight quantile of `sinc_feature_spacing`) and $\varepsilon_\mathrm{shape}$ is the shape tolerance (`DEFAULT_SHAPE_RTOL = 1e-2`, the #1143 shape margin). With `bin-mean` quadrature, an isolated line of first-zero width $W \ge W_q$ then has peak height (highest bin mean) and FWHM (linear interpolation between bin means) within $\varepsilon_\mathrm{shape}$ of the exact line. Integrated yield stays exact at any spacing, because bin means telescope ([`sinc-bin-integration`](../radiation-physics/sinc-bin-integration.md)). If the uniform axis would need more than `DEFAULT_SHAPE_MAX_POINTS` (1,000,000) coordinates, the policy falls back to `resonance-local` on the same measured band. The run record (`shape_axis`) states the route, the required count and the reason.
+where $W_q$ is the sinc-Nyquist feature width of the case (the positive first-zero offset at the aliased-weight quantile of `sinc_feature_spacing`) and $\varepsilon_\mathrm{shape}$ is the shape tolerance (`DEFAULT_SHAPE_RTOL = 1e-2`, the #1143 shape margin). The maximum-spacing cap and coordinate-count rounding can refine the step further. With `bin-mean` quadrature, an isolated line of first-zero width $W \ge W_q$ then has highest-bin peak height within $\varepsilon_\mathrm{shape}$ of the exact line. Interpolated FWHM meets that tolerance in the isolated-line scans below; this is numerical evidence, not a general FWHM theorem. Bin means times bin widths telescope to exact mass over identical represented outer edges ([`sinc-bin-integration`](../radiation-physics/sinc-bin-integration.md)); finite-band truncation and reducer error remain separate. If the uniform axis would need more than `DEFAULT_SHAPE_MAX_POINTS` (1,000,000) coordinates, the policy falls back to `resonance-local` on the same measured band. The run record (`shape_axis`) states the route, the required count and the reason.
 
 ## Derivation
 
@@ -34,22 +34,29 @@ $$
 \frac{\pi^2}{3}\left(\frac14+\frac1{12}\right)\frac{h^2}{W^2}=\frac{\pi^2}{9}\frac{h^2}{W^2}.
 $$
 
-The worst case is a resonance on a bin edge. Setting the bound equal to $\varepsilon_\mathrm{shape}$ gives {eq}`eq-line-grid-sinc-shape-step` for $W=W_q$. A wider line has a smaller error, since the bound falls as $W^{-2}$.
+This height bound is rigorous, rather than only a Taylor estimate: the triangular Fourier representation gives
 
-**FWHM.** The FWHM is read by linear interpolation of the bin means at half maximum. Its error comes from the curvature at $u\approx0.443W$ and from the height error, which moves the half-maximum level. No closed form is used. An exact single-line scan over 100 resonance offsets per step (antiderivative bin means) gives a worst relative FWHM error at or below the height bound for every $h/W\le1/4$:
+$$
+\operatorname{sinc}^2x=\int_{-1}^{1}(1-|t|)\cos(2\pi xt)\,dt,
+\qquad 1-\operatorname{sinc}^2x\le\frac{\pi^2x^2}{3},
+$$
+
+using $1-\cos z\le z^2/2$. Averaging this inequality over the nearest bin gives the same bound. Setting it equal to $\varepsilon_\mathrm{shape}$ gives {eq}`eq-line-grid-sinc-shape-step` for $W=W_q$. A wider isolated line has a smaller height bound, since it falls as $W^{-2}$.
+
+**FWHM.** The FWHM is read by linear interpolation of the bin means at half maximum. Its error comes from the curvature at $u\approx0.443W$ and from the height error, which moves the half-maximum level. No closed form is used. The original single-line scans used 100 resonance offsets at selected spacings. Independent verification at the default spacing used 2,001 offsets and antiderivative bin means: height deficit 0.992833%, FWHM error 0.792912%. These scans do not prove a bound at every spacing or offset.
 
 | $h/W$ | worst height | $\pi^2h^2/9W^2$ | worst FWHM |
 |---:|---:|---:|---:|
 | 1/4 | 6.53% | 6.85% | 6.10% |
 | 1/8 | 1.69% | 1.71% | 1.31% |
 | 1/10 | 1.09% | 1.10% | 0.77% |
-| $0.0955$ ($\varepsilon=10^{-2}$) | $\le$1.00% | 1.00% | $\le$0.77% |
+| $0.0955$ ($\varepsilon=10^{-2}$) | $\le$1.00% | 1.00% | 0.793% |
 | 1/16 | 0.43% | 0.43% | 0.33% |
 
 **Assumptions.**
 
-- Each peak is one line. Overlapping lines and lines wider than $W_q$ have less curvature relative to their height, so their error is smaller. #944 measured 0.65%/0.81% (height/FWHM) at $h=W_q/4$ on HOPG 300 keV, where the bound is 6.5%.
-- Lines narrower than $W_q$ carry at most the aliased-weight share of $t_L^2$ weight (`aliased_weight_limit`, the strictest `rtol`). This budget is already accepted by `sinc-nyquist`. Their own shape error can exceed $\varepsilon_\mathrm{shape}$.
+- Each peak is one isolated line. Blended peaks can have shallow or additional half-maximum crossings; no overlap FWHM guarantee follows. Production qualification reports local L1/L∞ alongside FWHM.
+- Lines narrower than $W_q$ carry at most the aliased-weight share of $t_L^2$ proxy weight (`aliased_weight_limit`, the strictest `rtol`). This is not a bound on photon yield or peak error. Their own shape error can exceed $\varepsilon_\mathrm{shape}$.
 - Peaks are read from the bin means without interpolation, as the #944 qualification harness reads them.
 
 **Limiting cases.** As $\varepsilon_\mathrm{shape}\to0$, $h\to0$: pointwise sampling of the lineshape. At $h=W$ the bound exceeds 100% and the axis no longer resolves the peak; there `sinc-nyquist` keeps only yield exact.
@@ -63,4 +70,4 @@ On the Fourier reduction ([`cxr-line-fourier-reduction`](../ledger-core-coherent
 - `tests/energy-grid/test_line_grid_shape_spacing.py::test_shape_step_bounds_single_line_height_and_fwhm`: the single-line bound at $\varepsilon=10^{-2}$ and $10^{-3}$ (tight to 2% at the worst offset).
 - `test_measured_shape_grid_is_uniform_at_the_shape_step` and `test_measured_shape_grid_falls_back_to_resonance_local_above_budget`: the runner's route.
 
-Production qualification on fixed tracks (#1230 Plan) is outstanding. Fresh-context verification and human sign-off are pending.
+Independent read-only verification (2026-11-16, implementation `c9da59b95`) rederived the isolated-line height factor, confirmed units, the first-zero convention, the proxy quantile, and the same-band budgeted fallback. Seven owning tests passed. Its discrepancy was the default FWHM table entry and overbroad overlap/FWHM wording; the corrections above address those findings. Production qualification on fixed tracks (#1230 Plan) and human sign-off remain outstanding.
