@@ -4,7 +4,13 @@ full_name = "Hexagonal Boron Nitride"
 formula = "BN"
 phase = "2H"
 cod_id = 9008997
-B_ang2 = 3.45
+# B33 from Pease, Acta Cryst. 5, 356 (1952) Table 1, which tabulates F^2 with a
+# static (no temperature factor) Fc^2: weighted fit of ln(Fo^2/Fc^2) vs l^2 over
+# 002-008 (c = 6.6612 Ang) gives slope -0.01944(417), so B33 = -2 c^2 slope =
+# 1.73(37) Ang^2, U33 = 0.0218(47) Ang^2; Pease's 410 K Debye temperature gives
+# ~1.70 Ang^2 independently. Direction-specific basal B33, not Biso: valid only
+# for the pinned (00l) families. See docs/validation/materials/hbn-debye-waller-00l.md
+B_ang2 = 1.73
 surface_hkl = [0, 0, 1]
 hkl_families = [[0, 0, 2], [0, 0, 4]]
 hkl_reason = "Layered h-BN is scanned with the c-axis normal; keep the basal (00l) family explicit to match the HOPG orientation model."

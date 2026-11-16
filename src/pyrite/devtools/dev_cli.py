@@ -76,7 +76,7 @@ TEST_SUITE_PATTERNS = {
         "checkpoint/test_slim.py",
     ),
     # Genuine cross-directory exceptions to TEST_SUITE_DIRECTORIES.
-    "transport": ("montecarlo/test_cone_split.py",),
+    "transport": ("montecarlo/test_cone_split.py", "montecarlo/test_cone_split_weights.py"),
     "quantum": ("montecarlo/channeling/test_channeling_bloch.py",),
     "channeling": ("materials/test_channeling_*.py",),
 }

@@ -612,7 +612,7 @@ def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
         (
             "hopg_hbn_gaussian_200fs",
             "hbn",
-            "a3166cdfcf417998cec609bfaaa8a0778e31638fe4a2630a37ef93adc48518e4",
+            "5285ebee6389205fea8e2a7f175d00dd0c724df21877e18265957d5dd8a5cc62",
         ),
         (
             "hopg_hbn_microtrain_200fs",
@@ -622,7 +622,7 @@ def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
         (
             "hopg_hbn_microtrain_200fs",
             "hbn",
-            "8d537883797db0d32ca15f7237136358ce45547f6b284964aeff264223a641c8",
+            "30bf4121922ffc5fac7511dde2bce63e7d909cbc0d547b876908da780ba18d85",
         ),
         (
             "hopg_hbn_compressed_microbunch",
@@ -632,7 +632,7 @@ def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
         (
             "hopg_hbn_compressed_microbunch",
             "hbn",
-            "b93fc5e0ad7659dc22d7f0795eee3abc2759d8de9dda27f930e0464c4e85ecdb",
+            "bf8be85ae5484be208e0795fa0e0856f5f1e8aec200bb851789e8c9a78619dac",
         ),
         (
             "hopg_emittance_demo",
@@ -709,6 +709,9 @@ def test_named_beam_migration_keeps_shipped_profile_digests_bit_for_bit(
 
     Issue #1173 re-minted every pin for ``measured-shell-cutoff-v2`` and
     the omitted-family-count automatic selection policy.
+
+    Issue #1235 re-minted only the three h-BN pins for
+    ``hbn-basal-b33-v2`` (Pease basal Debye–Waller correction).
 
     Issue #1200 re-minted every pin for ``measured-shell-cutoff-v3``
     (table-sized selection calls).
