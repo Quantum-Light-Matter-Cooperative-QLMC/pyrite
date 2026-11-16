@@ -94,16 +94,16 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 
 ## `detector-cone-variance-reduction`
 
-- **Claim:** the experimental CPU per-electron cone-splitting estimator preserves linear incoherent per-primary tallies by replacing analog in-cone futures with roulette-weighted copies; this intended contract has not been independently verified
+- **Claim:** the experimental CPU per-electron cone-splitting estimator preserves linear incoherent per-primary tallies by replacing analog in-cone futures with roulette-weighted copies; independently rederived for the event-level estimator through `history_sums` (not radiation-tally consumption)
 - **Code:** `montecarlo/transport/cone_split.py::{cone_split_event,history_sums,weighted_history_statistics,transport_cone_split}`; `montecarlo/transport/core_specializations.py::cone_split_core`
 - **Source:** the existing `elsepa-elastic-sampling` angular quantile law and elementary importance-sampling identity `E_q[(p/q) H] = integral p H`; [proposed estimator and validation gaps](beam-transport/detector-cone-variance-reduction.md)
 - **Equation:** `w = P_band * half_arc / pi`; roulette probability `s = min(1, U/target_weight)` and surviving weight `w/s`; primary-history tally `X_i = H_i + sum_c w_c H_c`, `SE(mean X) = sample_std(X)/sqrt(N)`
 - **Assumptions:** one detector cone, CPU per-electron ungrooved ELSEPA transport, linear incoherent scores, analog primary streams unchanged, copies launched once without further splitting; cascade, GDF and electron-block admission refused
 - **Limiting cases:** disabled splitting must reproduce analog output; zero proposal mass yields no copies; copy-buffer exhaustion raises; copies are correlated within a primary and never independent sample units
-- **Status:** unverified
+- **Status:** rederived
 - **Checks:** seeded analog-prefix and copy-prefix checks, per-primary weighted sums and three-seed geometric cone/path-length statistics; these are not the required five-seed radiation-yield or MeV FOM evidence
 - **Anchor:** `tests/montecarlo/test_cone_split.py`; remote-only `checks/detector_cone_variance_reduction.py`
-- **Notes:** Issue #203 prototype checkpoint. Independent source-to-code validation, competing-method comparison, analog cost baseline and radiation-yield/FOM measurements remain pending. No production weight support, GPU parity, validated unbiasedness or human sign-off is claimed.
+- **Notes:** Issue #203 prototype checkpoint. Independent source-to-code validation, competing-method comparison, analog cost baseline and radiation-yield/FOM measurements remain pending. No production weight support, GPU parity, validated unbiasedness or human sign-off is claimed. **2026-11-15 fresh-context validation:** `P_band` is the exact quantile preimage of `|theta-beta|<=alpha`; azimuth fraction `half_arc/pi` with `half_arc` the half-width of the in-cone arc `[-h,h]`; the analog primary is killed iff its own outgoing direction lies in the cone; roulette `s` uses the state bound `U>=w`; per-primary `sample_std(X)/sqrt(N)` with `ddof=1`. Numeric check against quadrature at six geometries, all `|z|<1.7`; roulette-active run agrees with analog MC within 1.8 sigma. Scope stops at `history_sums`; radiation-tally consumption of copy weights, coherent tallies and radiation-yield/FOM evidence remain pending. Minor non-physics notes: copies start a fresh `max_steps` budget; azimuth frame is arbitrary for `sin(beta)<=1e-12`. [Write-up](beam-transport/detector-cone-variance-reduction.md#independent-fresh-context-re-derivation-2026-11-15).
 
 ## `line-scoring-roulette`
 
