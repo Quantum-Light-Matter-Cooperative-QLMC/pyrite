@@ -7,10 +7,10 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Claim:** 113(2) K 1T-PdTe2 common basal projection `B33=0.61 Å²` for pinned `(001)`
 - **Code:** `data/catalog/crystals/pdte2.toml::B_ang2`
 - **Source:** Pell, Mironov & Ibers, *Acta Cryst. C* **52**, 1331–1332 (1996), doi:10.1107/S0108270195016246, COD 2004955
-- **Status:** unverified
+- **Status:** rederived
 - **Checks:** source gives Pd `U33=0.0074(4)` and Te `U33=0.0079(3) Å²`; multiplicity-weighted `B33=8π²(0.00773)=0.6106 Å²`; site agreement, unit occupancy, basal-only scope, and 10 keV intensity sensitivity checked
 - **Anchor:** catalog golden serialization
-- **Notes:** Direction-specific scalar, not `Biso`. New scalar changes `|F001|²` by −0.019% versus placeholder and −0.071% versus site-specific tensors at 10 keV.
+- **Notes:** Direction-specific scalar, not `Biso`. New scalar changes `|F001|²` by −0.019% versus placeholder and −0.071% versus site-specific tensors at 10 keV. **2026-11-15 (#1234):** fresh-context source-first re-derivation from COD 2004955 reproduces `B33=0.6106(19) Å²` and both `|F001|²` sensitivities (xraylib 4.3.0 form factors); the amplitude-exact `(001)` scalar is `0.5726 Å²` because Te enters with `cos 2πz=−0.102`, so multiplicity weighting is a disclosed approximation costing −0.071% in `|F001|²`; [write-up](materials/pdte2-debye-waller-001.md#independent-fresh-context-re-derivation-2026-11-15). Open findings: `pdte2.cif` header still calls `B_ang2=0.6` a placeholder; no catalog field names this id.
 
 ## `2h-tas2-debye-waller-002`
 
@@ -467,10 +467,10 @@ Part of the [physics validation ledger](physics-validation-ledger.md). See the [
 - **Claim:** room-temperature h-BN basal-reflection Debye–Waller coefficient `B33=3.45 Å²` (`U33=0.0437 Å²`) used for pinned `(002)/(004)`
 - **Code:** `data/catalog/crystals/hbn.toml::B_ang2`
 - **Source:** Pease, *Acta Cryst.* **5**, 356–361 (1952), Table 1 and Fig. 3; doi:10.1107/S0365110X52001064
-- **Status:** unverified
-- **Checks:** weighted fit of `ln[(Fobs/Fcalc)²]` vs `l²` for `002/004/006/008`: slope `−0.03888(834)`, then `B33=−2c²·slope=3.45(74) Å²`; `U33=B33/(8π²)=0.0437(94) Å²`; catalog golden pins chosen value
+- **Status:** discrepancy
+- **Checks:** Pease Table 1 tabulates `F²` (title "Observed and calculated F²hkl"; `Fc²` has no temperature factor; Fig. 3 axis `Log(Fo²/Fc²)`). Fresh-context weighted (`1/σy²`, `σy=σ(Fo²)/Fo²`) fit of `ln(Fo²/Fc²)` vs `l²` over `002/004/006/008` with `c=6.6612 Å` gives slope `−0.01944(417)`, `B33=1.73(37) Å²`, `U33=0.0218(47) Å²` (χ²=0.25/2 dof; unweighted 1.73; drop-002 1.66(40)), consistent with Pease's 410 K Debye temperature (zero-point Debye model gives 1.70 Å² at 293 K). The recorded slope `−0.03888(834)` and `B33=3.45(74) Å²` reproduce exactly only if the tabulated `F²` ratio is squared again.
 - **Anchor:** `tests/materials/test_material_catalog.py::test_packaged_catalog_matches_independent_serialized_golden`, `::test_catalog_matches_serialized_physics_for_every_crystal`
-- **Notes:** Pease reports room-temperature `00l` temperature-factor data and a 410 K directional Debye temperature, not atom-specific isotropic ADPs. h-BN motion is strongly anisotropic (`U33 ≫ U11`); scalar schema cannot represent its tensor. Value is deliberately a **direction-specific `B33` approximation**, valid here because catalog pins only basal `(002)/(004)` reflections; do not reuse as `Biso` or for non-basal h-BN reflections. Zotero key `MFWKLT5G`, citation key `peaseXrayStudyBoron1952`.
+- **Notes:** Pease reports room-temperature `00l` temperature-factor data and a 410 K directional Debye temperature, not atom-specific isotropic ADPs. h-BN motion is strongly anisotropic (`U33 ≫ U11`); scalar schema cannot represent its tensor. Value is deliberately a **direction-specific `B33` approximation**, valid here because catalog pins only basal `(002)/(004)` reflections; do not reuse as `Biso` or for non-basal h-BN reflections. Zotero key `MFWKLT5G`, citation key `peaseXrayStudyBoron1952`. **2026-11-15 (#1234) DISCREPANCY:** catalog `B_ang2=3.45` is 2× the source-supported `1.73(37) Å²` (factor-2 from double squaring; `B=−2c²·slope`, sign and `B=8π²U` conventions are otherwise correct). At `c=6.661 Å` the catalog value lowers `|F002|²` by 7.5% and `|F004|²` by 27% relative to the source value. Correction requires a separately authorized catalog change with golden regeneration and the corresponding tables/model identity bump; `zhai-hbn-921-detected` used this value (its #339 notes) and must be rechecked after any fix. [Write-up](materials/hbn-debye-waller-00l.md). Source PDF: Zotero `RV4Z2ZWJ` (duplicate of `MFWKLT5G`).
 
 ## `nbs2-2ha-structure`
 
