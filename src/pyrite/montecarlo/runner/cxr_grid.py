@@ -963,12 +963,14 @@ def check_cxr_truncation(case, audit):
     ceiling = float(case["line_grid_policy"]["bandwidth"]["stop_eV"])
     record["capped_at_ceiling"] = float(audit["stop_eV"]) >= ceiling
     if record["upper_fraction_bound"] > limit and record["capped_at_ceiling"]:
-        # The axis already reaches the closed-form kinematic ceiling that the
-        # automatic policy uses unaudited; no line resonates above it, so only
-        # sinc**2 tails cross the edge and this policy cut nothing.
+        # The axis already reaches the clamped ceiling the automatic policy
+        # stops at unaudited (#1243): the kinematic bound, the beam energy or
+        # the atomic data's end. No physical, finite-coefficient line resonates
+        # above it, so only sinc**2 tails cross the edge and this policy cut
+        # nothing the default axis keeps.
         warnings.warn(
             f"{case['name']} at {case['E0_keV']:g} keV: the line axis reaches the "
-            f"kinematic ceiling {ceiling:g} eV, yet line tails above it may hold "
+            f"line-axis ceiling {ceiling:g} eV, yet line tails above it may hold "
             f"{record['upper_fraction_bound']:.3g} of the line yield (bound), above "
             f"the {limit:g} share. The automatic bandwidth truncates the same tails.",
             CxrGridTruncationWarning,

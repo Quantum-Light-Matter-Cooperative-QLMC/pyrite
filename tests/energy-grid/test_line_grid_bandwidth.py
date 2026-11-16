@@ -232,7 +232,7 @@ def test_audit_at_the_kinematic_ceiling_warns_instead_of_refusing():
     _accumulate_edge_truncation(
         audit, xp.asarray([900.0]), xp.asarray([np.pi / 100.0]), xp.asarray([1.0])
     )
-    with pytest.warns(CxrGridTruncationWarning, match="kinematic ceiling"):
+    with pytest.warns(CxrGridTruncationWarning, match="line-axis ceiling"):
         record = check_cxr_truncation(case, audit)
     assert record["capped_at_ceiling"]
     assert record["upper_fraction_bound"] > 1e-4
