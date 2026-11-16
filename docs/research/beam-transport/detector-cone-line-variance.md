@@ -185,3 +185,46 @@ Test unbiasedness separately, on a case where analog sampling resolves the
 cone population (lower energy, so a wide $1/\gamma$ cone), for line,
 bremsstrahlung and characteristic yields. This instrument does not score
 characteristic yield.
+
+#### Energy gate and angle-scaled roulette (job 13240, November 2026)
+
+Same case, seeds and counts as job 13230, code `a4f9839e3`. Two splitting
+options were on in every split arm: splitting only at or above
+$E_{\min}=2$ MeV, and a second roulette against
+$w_t\max(1,u^2)$ with $u_{\rm ref}=1$, where $w_t=10^{-3}$. The analog arm is
+unchanged. $T$ is transport plus monitor time over the five seeds.
+
+| $k$ | Copies (seeds 0–4) | Line mean | Line RSE | Max share | ESS | Brem RSE | $T$ (s) |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 0 | 0 | $7.8\times10^{-7}$ | 0.98 | 0.98 | 1.0 | 0.21 | 246 |
+| 3 | 55, 3, 15, 13, 8 | $5.6\times10^{-7}$ | 0.58 | 0.57 | 3.0 | 0.18 | 260 |
+| 4 | 89, 5, 16, 17, 15 | $1.1\times10^{-6}$ | 0.60 | 0.59 | 2.8 | 0.22 | 270 |
+| 6 | 19, 9, 24, 14, 11 | $5.1\times10^{-7}$ | 0.25 | 0.17 | 16.1 | 0.042 | 262 |
+| 8 | 18, 12, 23, 28, 18 | $7.0\times10^{-7}$ | 0.19 | 0.087 | 26.5 | 0.044 | 266 |
+
+- **The precursor population is reached by widening the cone; nested
+  splitting is not needed for it.** Primary 159 has minimum $u=3.6$, measured
+  at 5 MeV. At $k\ge6$ it is killed on cone entry, and none of its
+  roulette-weighted copies survive, so its heavy analog future is represented
+  in expectation by rare weighted copies across the whole population. In seed
+  0 the largest share falls from 0.89 ($k=3$) to 0.17 ($k=6$).
+- **$k=8$ is converged in angle.** The weighted copy contribution sits at
+  $u<3$ (88 %); $u\in[3,10)$ carries 12 %.
+- **The options cut cost.** Copy counts fall from 1405 (plain $k=4$, job
+  13230) to 99 at $k=8$. Transport plus monitor time is within 10 % of analog
+  at every $k$, against 1.71× for plain $k=4$.
+- **Figure of merit.** At $k=8$ the line FOM is 0.101 against analog 0.0042,
+  a ratio of 24. Bremsstrahlung RSE falls from 0.21 to 0.044, a FOM ratio of
+  about 21. The analog RSE understates its own error because it misses the
+  tail (see above), so these ratios understate the true gain.
+- **Per-seed estimates are consistent.** At $k=8$ the line means range over
+  $3.2$–$10.6\times10^{-7}$ and bremsstrahlung over $5.6$–$7.4\times10^{-5}$
+  per seed, a spread consistent with a per-seed RSE of about 0.4. The analog seed 0 is the outlier, at
+  $3.9\times10^{-6}$ for lines and $1.1\times10^{-4}$ for bremsstrahlung.
+- At $k=8$ and line RSE 0.19 over 2560 primaries, RSE 0.1 needs about
+  $9\times10^3$ primaries: about 17 min on this AMD node. This is a single
+  small pilot, so the projection is uncertain.
+
+**Adopted for the prototype:** $k=8$, $E_{\min}=0.4E_0$, $u_{\rm ref}=1$,
+$w_t=10^{-3}$. This is pending the unbiasedness gate and fresh-context
+verification of the two options.
