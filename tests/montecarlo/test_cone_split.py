@@ -45,8 +45,18 @@ def _tallies(result, n):
     )
 
 
-def _split(seed, ne, target=0.05):
-    return simulate_trajectories(**_kw(seed, ne), _cone_split=ConeSplit(N_HAT, THETA_C, target))
+def _split(seed, ne, target=0.05, **options):
+    cone = ConeSplit(N_HAT, THETA_C, target, **options)
+    return simulate_trajectories(**_kw(seed, ne), _cone_split=cone)
+
+
+def test_energy_gate_above_the_beam_is_analog():
+    analog = simulate_trajectories(**_kw(3, 300))
+    gated = _split(3, 300, min_energy_keV=60.0)
+    record = gated["cone_split"]
+    assert record["parent"].size == 0 and not record["killed"].any()
+    for key in ("r_mid", "v_hat", "L_ang", "electron_id"):
+        np.testing.assert_array_equal(analog[key], gated[key])
 
 
 def test_primaries_follow_the_analog_streams_until_cone_entry():
@@ -74,13 +84,16 @@ def test_copy_records_are_prefix_stable_in_the_electron_count():
         np.testing.assert_array_equal(small[key], large[key][rows])
 
 
-def test_split_tallies_match_analog_within_statistical_error():
+# Efficiency options: elastic events below 30 keV stay analog; the angle
+# roulette (u_ref = 0.1 at gamma ~1.1) thins copies away from the axis.
+@pytest.mark.parametrize("options", [{}, {"min_energy_keV": 30.0, "angle_scale": 0.1}])
+def test_split_tallies_match_analog_within_statistical_error(options):
     means = {"analog": [], "split": []}
     variances = {"analog": [], "split": []}
     ne = 2000
     for seed in range(3):
         cone_a, length_a = _tallies(simulate_trajectories(**_kw(seed, ne)), ne)
-        result = _split(seed, ne)
+        result = _split(seed, ne, **options)
         record = result["cone_split"]
         cone_b, length_b = _tallies(result, ne)
         cone_c, length_c = _tallies(record["copies"], record["parent"].size)
@@ -125,3 +138,7 @@ def test_cone_split_validates_its_request():
         ConeSplit(N_HAT, 2.0, 0.05)
     with pytest.raises(ValueError):
         ConeSplit(N_HAT, THETA_C, 0.0)
+    with pytest.raises(ValueError):
+        ConeSplit(N_HAT, THETA_C, 0.05, min_energy_keV=-1.0)
+    with pytest.raises(ValueError):
+        ConeSplit(N_HAT, THETA_C, 0.05, angle_scale=0.0)

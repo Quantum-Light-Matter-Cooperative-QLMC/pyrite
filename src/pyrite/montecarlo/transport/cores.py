@@ -278,7 +278,7 @@ def make_cpu_transport_core(
                 sp_nz,
                 sp_cos_c,
                 sp_sin_c,
-                sp_target,
+                sp_policy,
                 sp_keys,
                 sp_cap,
                 sp_count,
@@ -1186,13 +1186,14 @@ def make_cpu_transport_core(
                     )
                 else:
                     cos_t = _sample_cos_theta_from_alpha(alpha, cos_u)
-                if cone_split and elastic_model_code == 2:
-                    # The in-cone copy of this event, from the incident
-                    # direction and the element already chosen; its draws use
-                    # the (electron, flight) split key, never this stream.
+                split_here = cone_split and elastic_model_code == 2 and E_keV[e] >= sp_policy[1]
+                if split_here:
+                    # The in-cone copy of this event (copy and kill share the
+                    # E_min gate), from the incident direction and chosen
+                    # element; its draws use the (electron, flight) split key.
                     made, ox, oy, oz, w_copy = cone_split_event(
                         dirs[e, 0], dirs[e, 1], dirs[e, 2], sp_nx, sp_ny, sp_nz,
-                        sp_cos_c, sp_sin_c, sp_target,
+                        sp_cos_c, sp_sin_c, sp_policy,
                         _event_key(sp_keys[e], flight_id[e] - 1),
                         E_keV[e], el_logE, el_cdf, el_pdf, el_mu, el_guide,
                         el_start[L, i_el], el_len[L, i_el],
@@ -1211,8 +1212,7 @@ def make_cpu_transport_core(
                     dirs[e, 0], dirs[e, 1], dirs[e, 2], cos_t, 2.0 * np.pi * phi_u
                 )
                 if (
-                    cone_split
-                    and elastic_model_code == 2
+                    split_here
                     and dirs[e, 0] * sp_nx + dirs[e, 1] * sp_ny + dirs[e, 2] * sp_nz >= sp_cos_c
                 ):
                     # The analog outcome lies in the cone, which the copies

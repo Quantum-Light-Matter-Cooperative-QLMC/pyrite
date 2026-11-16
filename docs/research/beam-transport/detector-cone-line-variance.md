@@ -35,4 +35,287 @@ Variance reduction for this population is studied under #203: a brute-force base
 (research-detector-cone-vr)=
 ### Study (#203)
 
-In progress; results are added here as they are measured.
+In progress; results are added here as they are measured. The estimator
+derivation and its validation status live in
+[`detector-cone-variance-reduction`](../../validation/beam-transport/detector-cone-variance-reduction.md).
+
+#### Pilot evidence (November 2026)
+
+Jobs 3701/3702 (NVIDIA, five seeds × 512 primaries per arm) ran the CPU
+prototype with a $1/\gamma$ cone and target copy weight $10^{-3}$. On 5 MeV
+h-BN the largest single primary still held 98 % (analog) and 84 % (split) of
+the line mass. The splitting arm made 6–53 copies per seed. At 15 and
+29.999 MeV (HOPG, 45°/180°) almost no copies were made and line statistics
+were unchanged.
+
+Replay job 3705 (seed 0, code `f88349b3b`) traced the dominant primary, 159,
+which holds 99.75 % of that seed's analog line mass. It never enters the
+$1/\gamma$ cone: its closest approach is $\theta = 0.144$ rad, and its heaviest
+lines sit at $\gamma\theta = 1.3$–$2.3$, measured at the local electron
+energy. Re-analysis of the replay's copy records, where $u=\gamma\theta$ is the
+launch angle of each copy measured from the detector direction:
+
+| Quantity | Value |
+|---|---|
+| Copies / parents | 45 / 8 (38 from primary 159) |
+| Unweighted copy line mass, median (range) | $2.4\times10^{-3}$ ($9\times10^{-5}$–$9.6\times10^{-2}$) |
+| Median analog primary line mass | $6.0\times10^{-9}$ |
+| Primary 159 line mass | $1.8\times10^{-3}$ |
+| Copy line mass vs launch $u\in[0.19, 0.92]$ | no trend (log–log correlation $-0.08$) |
+| Squared coefficient of variation of in-cone mass | 3.1 |
+| Estimated in-cone entry rate, $\sum_c w_c / N$ | $5\times10^{-5}$ per primary |
+
+Three conclusions follow. They are order-of-magnitude statements from one
+seed, and the copy records are conditioned on primary 159.
+
+1. **The $1/\gamma$ cone is the wrong importance region.** Copy line mass is
+   flat over $u\lesssim1$, and an analog history at $u\approx1.5$ carries a
+   comparable mass. Since the solid angle grows as $u^2$, histories outside
+   the cone contribute at least as much as those inside. Splitting only
+   inside $u\le1$ adds low-variance copies but leaves the dominant
+   out-of-cone primaries analog, so the pilot RSE did not improve.
+2. **The rare population does exist, and importance sampling reaches it.**
+   An in-cone history is about $4\times10^5$ times heavier than a median one.
+   With the in-cone class alone, analog sampling needs about $7.6\times10^6$
+   primaries for RSE 0.1: rate $5\times10^{-5}$, $\mathrm{CV}^2=3.1$, so
+   $N\approx(1+\mathrm{CV}^2)/(p\cdot0.01)$. The weighted copies reach the same
+   RSE for that class with about $2.5\times10^4$ primaries, at roughly 9 %
+   extra transport. At the pilot's ~0.1 s per primary, this is about nine
+   GPU-days of brute force against under an hour. This projection is
+   provisional, not the Plan's measured baseline.
+3. **Intra-class spread sets a floor.** In-cone copies vary over three
+   decades at fixed launch angle; their launch depth and energy matter more
+   than $u$. Angular importance alone cannot remove $\mathrm{CV}^2\approx3$.
+
+#### Method comparison
+
+| Criterion | Splitting + roulette at elastic events (prototype) | Biased large-angle elastic sampling |
+|---|---|---|
+| Weight bookkeeping | Analog primary keeps weight 1. Each copy carries $P_B h/\pi$ (or $/s$ after roulette), bounded by $\max(1,w_t)$; copies do not split again. | One scalar weight per history, multiplied by $p/q$ at every biased event. |
+| Weight-range growth at MeV | None: weights do not compound. | A primary has ~$10^4$ elastic segments (8104 traced for primary 159). Any per-event bias compounds. A defensive mixture $q=(1-\varepsilon)p+\varepsilon g$ caps out-of-region ratios at $1/(1-\varepsilon)$ but drifts by $(1-\varepsilon)^{-n}$, which forces $\varepsilon\lesssim1/n\sim10^{-4}$. |
+| Other tallies (brem, characteristic) | The primary stays analog; copies add small-weight terms. No variance penalty. | Every tally of every history carries the fluctuating weight, which inflates bremsstrahlung and characteristic variance. |
+| RNG for copies | Event key = splitmix(split key, flight). Copy transport keys re-hash it under a separate salt. No draw comes from the primary stream, so biasing off is bit-for-bit analog. | Mixture and branch draws need their own keyed stream to keep biasing-off bit-for-bit. No copies. |
+| Block invariance (#361) and CUDA seeding | Copies are a function of (primary key, flight) only, so they are independent of block layout. They launch through the existing secondary-generation pass, as secondaries do. | Trivial: one history per primary. |
+| Cost | Copy buffer and launch generation, already present for secondaries. Copy count is tuned by $w_t$. | No buffers. |
+| Derivation / ledger | `detector-cone-variance-reduction`; the derivation holds for any half-angle $<\pi/2$ (rederivation in draft #1237). | New claim and new verification. |
+
+**Choice: keep splitting with Russian roulette, and widen the importance
+region.** The rederived estimator is unbiased for any cone half-angle
+$\alpha<\pi/2$, so widening needs no new physics. Biased elastic sampling
+offers no better coverage at an equal draw rate. It compounds weights over
+~$10^4$ events and costs variance on the other tallies.
+
+The next measurement is the region's size. Proposed run: replay 5 MeV h-BN
+with half-angle $k/\gamma$ for $k\in\{1,2,3,4\}$, five seeds × 512 primaries,
+warmed and counterbalanced arms, recording copy mass against launch $u$,
+depth and energy. Choose $k$ and $w_t$ to minimize projected per-primary
+variance × time. Keep `max_copies_per_electron` above the expected copy
+count: primary 159 alone made 38 copies at $k=1$.
+
+**Pixel scorers (#212).** Bias toward one cone about the scorer's central
+direction, with half-angle equal to the scorer's angular radius plus
+$k/\gamma$. Leave biasing off when that exceeds $\pi/2$, the prototype's
+restriction. This keeps one transport per case, consistent with the
+one-detector-per-transport decision.
+
+#### Cone half-angle scan (job 13230, November 2026)
+
+`checks/detector_cone_policy.py` on AMD qlmc-ace, code `de5cd57cb`. Case:
+5 MeV h-BN, 1 mm, 10°/100°. Five seeds × 512 primaries per arm; target
+weight $10^{-3}$; half-angle $k/\gamma$ at 5 MeV; $k=0$ is the analog arm.
+Arms were warmed up, and their order alternated between seeds. $T$ is the
+transport plus monitor time, summed over seeds.
+
+| $k$ | Copies (seeds 0–4) | Line mean | Line RSE | Max share | ESS | $T$ (s) |
+|---:|---|---:|---:|---:|---:|---:|
+| 0 | 0 | $7.8\times10^{-7}$ | 0.98 | 0.98 | 1.0 | 246 |
+| 1 | 50, 50, 10, 6, 8 | $9.8\times10^{-7}$ | 0.85 | 0.85 | 1.4 | 257 |
+| 2 | 390, 130, 25, 27, 24 | $8.9\times10^{-7}$ | 0.71 | 0.70 | 2.0 | 280 |
+| 3 | 262, 233, 56, 64, 58 | $7.3\times10^{-7}$ | 0.51 | 0.50 | 3.9 | 318 |
+| 4 | 716, 355, 116, 109, 109 | $9.1\times10^{-7}$ | 0.49 | 0.49 | 4.2 | 419 |
+
+- **Per-seed means show what analog misses.** In seeds 1–4 the analog line
+  mean is about $10^{-8}$. At $k=3$–4 the weighted estimate is
+  $3$–$6\times10^{-7}$ in every one of those seeds, and copies carry 95–98 %
+  of it. Per seed of 512 primaries, ESS rises from about 1 (analog) to 9–19,
+  with no single history above 25 %. The analog RSE in those seeds is
+  therefore not a usable reference. Pooled FOM ratios of 1.3, 1.7, 2.9 and
+  2.4 (for $k=1$–4) understate the gain, but they are the only measured
+  ratios. The 10× target is not demonstrated.
+- **One precursor still dominates seed 0.** For $k\ge2$, primary 159 is
+  killed on cone entry and replaced by copies (625 at $k=4$). Its family still
+  holds 87 % of seed 0. The rare step is the earlier large-angle turn that
+  brings a ~4 MeV electron near the detector direction, and a single splitting
+  level only acts after it. Nested splitting, where copies split again at an
+  inner cone, or importance on that precursor turn would address it. Either
+  needs an extension to the derivation.
+- **Line mass falls roughly as $u^{-2}$, and the cone has not converged.** For
+  copies above 2 MeV, median line mass drops from $9.6\times10^{-3}$
+  ($u$ = 0.5–1) to $2.9\times10^{-4}$ ($u$ = 3.5–4). That is still about
+  $5\times10^4$ times a median analog primary. The outermost shell $u\in[3.5,4)$
+  carries the largest weighted share at $k=4$ (35 %), so the important region
+  extends beyond $4/\gamma$.
+- **Low-energy copies are wasted.** About 20 % of $k=4$ copies are below
+  2 MeV, and 276 of them (2–540 keV) come from one seed-1 primary (142).
+  Their median line mass is 0 and their median bremsstrahlung tally is about
+  $2\times10^{-5}$ of a high-energy copy's. A minimum-energy gate on splitting saves their cost
+  without bias, because the split decision depends only on the event state.
+- **The bremsstrahlung tally is also tail-dominated.** In-cone copies above
+  2 MeV score a median bremsstrahlung tally of $1.7\times10^{-2}$. The median
+  analog primary scores $4.4\times10^{-5}$, about 400 times less, and copies at
+  $u<1$ score $0.28$. Bremsstrahlung is beamed into the same cone. The paired
+  bremsstrahlung difference against the analog arm grows with $k$, up to
+  +19 % at $k=4$ (nominal $z=9.7$). Analog runs undersample the same
+  population, so their SE omits the unsampled tail. The excess is not
+  evidence of bias, and this case cannot test unbiasedness. Line-mass paired
+  differences are within $|z|<3$.
+- Line observer coverage of the 1–50 keV window is 0.96–0.99 for copies; the
+  remainder is Doppler-boosted lines above the window.
+
+**Status.** No $k$ is adopted. Splitting stays the method. The next design,
+before any production work:
+
+1. Gate splitting below a minimum energy, of order 2 MeV at 5 MeV.
+2. Scale roulette with direction. Make $s$ depend on the incoming angle
+   $\beta$ to the detector axis and on energy, both event-state quantities.
+   This bounds copy counts as the cone widens to $k\approx6$–8.
+3. Derive nested (two-level) splitting for the precursor turn.
+
+Test unbiasedness separately, on a case where analog sampling resolves the
+cone population (lower energy, so a wide $1/\gamma$ cone), for line,
+bremsstrahlung and characteristic yields. This instrument does not score
+characteristic yield.
+
+#### Energy gate and angle-scaled roulette (job 13240, November 2026)
+
+Same case, seeds and counts as job 13230, code `a4f9839e3`. Two splitting
+options were on in every split arm: splitting only at or above
+$E_{\min}=2$ MeV, and a second roulette against
+$w_t\max(1,u^2)$ with $u_{\rm ref}=1$, where $w_t=10^{-3}$. The analog arm is
+unchanged. $T$ is transport plus monitor time over the five seeds.
+
+| $k$ | Copies (seeds 0–4) | Line mean | Line RSE | Max share | ESS | Brem RSE | $T$ (s) |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 0 | 0 | $7.8\times10^{-7}$ | 0.98 | 0.98 | 1.0 | 0.21 | 246 |
+| 3 | 55, 3, 15, 13, 8 | $5.6\times10^{-7}$ | 0.58 | 0.57 | 3.0 | 0.18 | 260 |
+| 4 | 89, 5, 16, 17, 15 | $1.1\times10^{-6}$ | 0.60 | 0.59 | 2.8 | 0.22 | 270 |
+| 6 | 19, 9, 24, 14, 11 | $5.1\times10^{-7}$ | 0.25 | 0.17 | 16.1 | 0.042 | 262 |
+| 8 | 18, 12, 23, 28, 18 | $7.0\times10^{-7}$ | 0.19 | 0.087 | 26.5 | 0.044 | 266 |
+
+- **The precursor population is reached by widening the cone; nested
+  splitting is not needed for it.** Primary 159 has minimum $u=3.6$, measured
+  at 5 MeV. At $k\ge6$ it is killed on cone entry, and none of its
+  roulette-weighted copies survive, so its heavy analog future is represented
+  in expectation by rare weighted copies across the whole population. In seed
+  0 the largest share falls from 0.89 ($k=3$) to 0.17 ($k=6$).
+- **$k=8$ is converged in angle.** The weighted copy contribution sits at
+  $u<3$ (88 %); $u\in[3,10)$ carries 12 %.
+- **The options cut cost.** Copy counts fall from 1405 (plain $k=4$, job
+  13230) to 99 at $k=8$. Transport plus monitor time is within 10 % of analog
+  at every $k$, against 1.71× for plain $k=4$.
+- **Figure of merit.** At $k=8$ the line FOM is 0.101 against analog 0.0042,
+  a ratio of 24. Bremsstrahlung RSE falls from 0.21 to 0.044, a FOM ratio of
+  about 21. The analog RSE understates its own error because it misses the
+  tail (see above), so these ratios understate the true gain.
+- **Per-seed estimates are consistent.** At $k=8$ the line means range over
+  $3.2$–$10.6\times10^{-7}$ and bremsstrahlung over $5.6$–$7.4\times10^{-5}$
+  per seed, a spread consistent with a per-seed RSE of about 0.4. The analog seed 0 is the outlier, at
+  $3.9\times10^{-6}$ for lines and $1.1\times10^{-4}$ for bremsstrahlung.
+- At $k=8$ and line RSE 0.19 over 2560 primaries, RSE 0.1 needs about
+  $9\times10^3$ primaries: about 17 min on this AMD node. This is a single
+  small pilot, so the projection is uncertain.
+
+**Adopted for the prototype:** $k=8$, $E_{\min}=0.4E_0$, $u_{\rm ref}=1$,
+$w_t=10^{-3}$. This is pending the unbiasedness gate and fresh-context
+verification of the two options.
+
+#### Brute-force analog baseline (job 13250, November 2026)
+
+`detector_cone_variance_reduction.py brute` on AMD qlmc-ace (ROCm), code
+`79533f447`, using the production transport core (`auto`, which resolved to
+the device core). The run used 91 independent 2048-electron seed blocks in
+5.0 h, $N=186\,368$. Each block took 5.7 s of transport and 192 s of line
+and bremsstrahlung monitoring, so the monitor dominates; the cost is
+0.097 s per electron. The 2048-electron production timing gave 40 s
+transport, 197 s monitor and 167 s full spectrum (55 245 line-grid nodes up
+to 31.8 keV).
+
+| $N$ | Line mean | Line RSE | Max share | ESS | Brem mean | Brem RSE |
+|---:|---:|---:|---:|---:|---:|---:|
+| 2 048 | $9.8\times10^{-7}$ | 0.99 | 0.99 | 1.0 | $6.2\times10^{-5}$ | 0.25 |
+| 20 480 | $1.3\times10^{-6}$ | 0.90 | 0.89 | 1.2 | $6.7\times10^{-5}$ | 0.26 |
+| 81 920 | $6.6\times10^{-7}$ | 0.52 | 0.43 | 3.7 | $6.2\times10^{-5}$ | 0.091 |
+| 186 368 | $5.3\times10^{-7}$ | 0.32 | 0.23 | 9.6 | $6.0\times10^{-5}$ | 0.053 |
+
+- **The rare class is measured directly.** 15 electrons exceed $10^{-3}$ in
+  line mass, a rate of $8\times10^{-5}$ consistent with the copy-based estimate
+  of $5\times10^{-5}$. The top ten electrons hold 74 % of the line mass. Line
+  RSE falls only once several such electrons have been drawn.
+- **Analog cost for RSE 0.1.** The per-history $\mathrm{CV}^2$ is
+  $1.9\times10^4$ for lines and 525 for bremsstrahlung, so RSE 0.1 needs
+  $1.9\times10^6$ electrons for the line yield. That is **52 h** on this node.
+  Bremsstrahlung needs
+  $5\times10^4$ electrons, 1.4 h. The copy-based projection from job 13240
+  ($3\times10^6$ and $1.2\times10^5$) was within a factor of two. The line
+  $\mathrm{CV}^2$ is itself heavy-tailed, so the true count may be larger.
+- **Agreement with splitting at $k=8$** (job 13240, gate and angle roulette):
+  the line mean is $7.0\times10^{-7}$ against $5.3\times10^{-7}$ analog
+  ($z=0.76$), and bremsstrahlung is $6.37\times10^{-5}$ against
+  $6.04\times10^{-5}$ ($z=0.75$). This is the first agreement test on the
+  production case where analog sampling resolves the tail.
+- **Figure of merit.** $\mathrm{FOM}=1/(\mathrm{CV}^2 t_e)$, with $t_e$ the
+  time per primary: 0.097 s analog and 0.104 s split. Splitting at $k=8$
+  improves the line FOM by **≈190×** and the bremsstrahlung FOM by ≈98×.
+  Line RSE 0.1 then needs about $10^4$ primaries, ≈17 min, against 52 h.
+  The split $\mathrm{CV}^2$ comes from 2560 histories, so this ratio is
+  uncertain by at least a factor of two. The two arms also differ in core:
+  analog used the device transport core, the split prototype the CPU
+  per-electron core. The monitor dominates both, so the per-primary costs
+  are similar.
+
+**Verdict on brute force:** affordable for bremsstrahlung, not for the line
+yield. Two GPU-days per case at RSE 0.1 rules out scans. Variance reduction
+is worth building.
+
+#### Unbiasedness gate (jobs 13242, 13261, 13262, November 2026)
+
+`checks/detector_cone_unbiasedness.py` on AMD qlmc-ace, code `3206a23cb`.
+Jobs 13261/13262 ran `d5a2f179f`, which only relaxes the characteristic
+linearity tolerance. Case: h-BN, 1 mm, 10°/100° at 1 and 2 MeV, ten seeds ×
+1024 primaries per arm. Split parameters: $k=2$, $w_t=10^{-2}$,
+$E_{\min}=0.4E_0$, $u_{\rm ref}=1$. 1 MeV seeds 0–3 come from 13242, which
+stopped on the instrument tolerance at seed 4, and seeds 4–9 from 13261.
+Each tally is per history: full analytic CXR line mass, bremsstrahlung band
+and characteristic yield in 100–600 eV (B and N K lines). $z$ is
+(split − analog)/SE, with SE taken unpaired over histories, paired by
+history, or from the spread of the ten seed means.
+
+| $E_0$ | Tally | Analog (RSE, max share) | Split (RSE) | Ratio | $z$ unpaired / paired / seed | Copy share |
+|---|---|---|---|---:|---|---:|
+| 1 MeV | line | $5.14\times10^{-7}$ (0.047, 0.020) | $4.75\times10^{-7}$ (0.029) | 0.925 | −1.39 / −1.65 / −1.41 | 0.89 |
+| 1 MeV | brem | $9.17\times10^{-4}$ (0.018, 0.002) | $8.92\times10^{-4}$ (0.016) | 0.972 | −1.19 / −1.54 / −1.59 | 0.56 |
+| 1 MeV | char | $2.09\times10^{-7}$ (0.049, 0.047) | $1.99\times10^{-7}$ (0.006) | 0.950 | −1.03 / −1.05 / −1.06 | 0.04 |
+| 2 MeV | line | $1.14\times10^{-6}$ (0.184, 0.089) | $1.15\times10^{-6}$ (0.123) | 1.005 | +0.02 / +0.03 / +0.04 | 0.85 |
+| 2 MeV | brem | $2.96\times10^{-4}$ (0.058, 0.024) | $3.00\times10^{-4}$ (0.042) | 1.015 | +0.21 / +0.28 / +0.29 | 0.33 |
+| 2 MeV | char | $1.98\times10^{-7}$ (0.014, 0.004) | $2.02\times10^{-7}$ (0.015) | 1.021 | +1.02 / +1.40 / +1.30 | 0.07 |
+
+- **A valid test case.** At 1 MeV the copies carry 89 % of the line yield,
+  yet no analog history holds more than 2 % of it. Analog sampling therefore
+  resolves the population that splitting targets.
+- **All three tallies agree at both energies**, with $|z|\le1.65$ under
+  every SE. At 1 MeV all three ratios fall slightly below 1. The tallies
+  share histories, so these are not independent results, and one joint
+  fluctuation at 1.0–1.65σ is consistent with no bias. At 2 MeV the ratios
+  sit within 2.1 % of 1.
+- **Characteristic variance.** At 1 MeV the analog characteristic tally has
+  RSE 0.049 with one history at 4.7 %, against 0.006 for split. Escape
+  geometry ties the soft B/N K lines to direction, and the split arm
+  replaces such histories with weighted copies. Bremsstrahlung and the line
+  yield likewise have lower split RSE at both energies.
+- **Cost at these settings.** At 1 MeV the split arm makes about 6000
+  copies per seed and takes 5.3× the analog time; at 2 MeV, about 260
+  copies and 1.3×. These settings were chosen for gate power, not FOM.
+
+Together with the 5 MeV comparison against the brute-force baseline
+($z=0.76$ line, 0.75 brem), this meets the issue's unbiasedness acceptance
+for the CPU per-electron prototype.
