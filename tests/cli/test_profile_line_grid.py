@@ -43,9 +43,9 @@ def test_help_lists_selectors_defaults_combinations_and_identity():
     assert_clean_result(group)
     for text in (
         "kinematic-ceiling | resonance-population",
-        "sinc-nyquist | resonance-local",
+        "sinc-nyquist | resonance-local | sinc-shape",
         "node | bin-mean",
-        "resonance-local requires bandwidth resonance-population and quadrature",
+        "resonance-local and sinc-shape require bandwidth resonance-population and quadrature",
         "identity",
     ):
         assert text in " ".join(group.stdout.split())

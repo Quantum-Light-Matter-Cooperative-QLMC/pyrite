@@ -21,6 +21,7 @@ from ..._cxr_grid_policy import (
     DEFAULT_COHERENT_LEAK_LIMIT,
     LOCAL_RESOLUTION_POLICY,
     RESONANCE_BANDWIDTH_POLICY,
+    SHAPE_RESOLUTION_POLICY,
     CxrGridToleranceError,
     CxrGridTruncationWarning,
     CxrYieldStatisticsWarning,
@@ -29,6 +30,7 @@ from ..._cxr_grid_policy import (
     coordinate_cache_key,
     lineshape_precision_warning,
     resolved_coordinates,
+    shape_spacing_factor,
     store_coordinates,
     windowed_coordinates,
 )
@@ -451,6 +453,85 @@ class SegmentGridEvidence:
         )
 
 
+def _shape_axis(payload, start, stop, feature_width):
+    """Route of a ``sinc-shape`` axis over ``[start, stop]`` (#1230).
+
+    Uniform at ``shape_spacing_factor(shape_rtol)`` times the sinc-Nyquist
+    feature width when that fits ``shape_max_points``; otherwise the
+    ``resonance-local`` fallback, with the reason. A uniform route returns the
+    payload whose budget ``resolved_coordinates`` enforces under ``"payload"``.
+
+    Validation: line-grid-sinc-shape-spacing
+    """
+    resolution = payload["resolution"]
+    budget = int(resolution["shape_max_points"])
+    spacing = min(
+        shape_spacing_factor(float(resolution["shape_rtol"])) * float(feature_width),
+        float(resolution["max_spacing_eV"]),
+    )
+    num = resolution_num(start, stop, spacing)
+    shape = {
+        "feature_width_eV": float(feature_width),
+        "shape_rtol": float(resolution["shape_rtol"]),
+        "spacing_eV": float(spacing),
+        "required_points": int(num),
+        "max_points": budget,
+    }
+    if num <= budget:
+        uniform = {**payload, "resolution": {**resolution, "max_points": budget}}
+        return {**shape, "route": "uniform", "payload": uniform}
+    return {
+        **shape,
+        "route": LOCAL_RESOLUTION_POLICY,
+        "reason": (
+            f"a uniform {spacing:.4g} eV axis over [{start:g}, {stop:g}] eV needs {num} "
+            f"coordinates, above the {budget}-point sinc-shape budget"
+        ),
+    }
+
+
+def _local_spacing_grid(payload, direction_populations, start, stop, target_step, profile):
+    """``resonance-local`` axis over ``[start, stop]`` from every direction's population.
+
+    Validation: line-grid-resonance-local-spacing
+    """
+    resolution = payload["resolution"]
+    backbone = float(resolution["max_spacing_eV"])
+    stage_started = perf_counter() if profile is not None else 0.0
+    seeds = []
+    summaries = []
+    for populations in direction_populations:
+        direction_seeds, direction_summary = local_spacing_seeds(
+            populations,
+            start_eV=start,
+            stop_eV=stop,
+            floor_spacing_eV=min(float(target_step), backbone),
+            max_spacing_eV=backbone,
+            halo_limit=float(resolution["halo_limit"]),
+        )
+        seeds.extend(direction_seeds)
+        summaries.append(direction_summary)
+    if profile is not None:
+        _profile_stage(
+            profile,
+            local_spacing_wall_s=perf_counter() - stage_started,
+            local_spacing_seeds=len(seeds),
+            rss_after_local_spacing_mib=_resident_mib(),
+        )
+    stage_started = perf_counter() if profile is not None else 0.0
+    plan = build_window_plan(start, stop, backbone, seeds)
+    grid, record = windowed_coordinates(payload, plan, dtype=REAL, stop_eV=stop)
+    if profile is not None:
+        _profile_stage(
+            profile,
+            grid_build_wall_s=perf_counter() - stage_started,
+            rss_after_grid_build_mib=_resident_mib(),
+        )
+    record["feature_width_eV"] = float(target_step)
+    record["local_spacing"] = summaries[0] if len(summaries) == 1 else summaries
+    return grid, record
+
+
 def _measured_cxr_grid(
     payload, case, segments, n_hats, Ne, target_step, abs_layers, groove, *, evidence=None
 ):
@@ -462,9 +543,12 @@ def _measured_cxr_grid(
     edge; the grid ends at the largest edge and, under ``resonance-local``,
     refines the union of every direction's local-spacing seeds, so one
     direction reproduces the single-direction axis exactly.
+    Under ``sinc-shape`` it is uniform at the shape step when that fits the
+    budget, and otherwise the ``resonance-local`` axis (:func:`_shape_axis`).
     Returns ``(grid, record, bandwidth_record)``.
 
     Validation: line-grid-resonance-local-spacing
+    Validation: line-grid-sinc-shape-spacing
     """
     if evidence is None:
         evidence = SegmentGridEvidence(case, segments, Ne, abs_layers, groove)
@@ -502,51 +586,29 @@ def _measured_cxr_grid(
         bandwidth_record = bandwidth_records[0]
     else:
         bandwidth_record = {"stop_eV": stop, "directions": bandwidth_records}
-    if resolution["policy"] != LOCAL_RESOLUTION_POLICY:
+    shape = None
+    uniform = None if resolution["policy"] == LOCAL_RESOLUTION_POLICY else (payload, target_step)
+    if resolution["policy"] == SHAPE_RESOLUTION_POLICY:
+        shape = _shape_axis(payload, start, stop, target_step)
+        uniform = None
+        if shape["route"] == "uniform":
+            uniform = (shape.pop("payload"), shape["spacing_eV"])
+    if uniform is not None:
         stage_started = perf_counter() if profile_enabled else 0.0
-        grid, record = resolved_coordinates(payload, target_step, dtype=REAL, stop_eV=stop)
+        grid, record = resolved_coordinates(*uniform, dtype=REAL, stop_eV=stop)
         if profile_enabled:
             _profile_stage(
                 profile,
                 grid_build_wall_s=perf_counter() - stage_started,
                 rss_after_grid_build_mib=_resident_mib(),
             )
-            record["cxr_grid_profile"] = profile
-        return grid, record, bandwidth_record
-    backbone = float(resolution["max_spacing_eV"])
-    stage_started = perf_counter() if profile_enabled else 0.0
-    seeds = []
-    summaries = []
-    for populations in direction_populations:
-        direction_seeds, direction_summary = local_spacing_seeds(
-            populations,
-            start_eV=start,
-            stop_eV=stop,
-            floor_spacing_eV=min(float(target_step), backbone),
-            max_spacing_eV=backbone,
-            halo_limit=float(resolution["halo_limit"]),
+    else:
+        grid, record = _local_spacing_grid(
+            payload, direction_populations, start, stop, target_step, profile
         )
-        seeds.extend(direction_seeds)
-        summaries.append(direction_summary)
     del direction_populations
-    if profile_enabled:
-        _profile_stage(
-            profile,
-            local_spacing_wall_s=perf_counter() - stage_started,
-            local_spacing_seeds=len(seeds),
-            rss_after_local_spacing_mib=_resident_mib(),
-        )
-    stage_started = perf_counter() if profile_enabled else 0.0
-    plan = build_window_plan(start, stop, backbone, seeds)
-    grid, record = windowed_coordinates(payload, plan, dtype=REAL, stop_eV=stop)
-    if profile_enabled:
-        _profile_stage(
-            profile,
-            grid_build_wall_s=perf_counter() - stage_started,
-            rss_after_grid_build_mib=_resident_mib(),
-        )
-    record["feature_width_eV"] = float(target_step)
-    record["local_spacing"] = summaries[0] if len(summaries) == 1 else summaries
+    if shape is not None:
+        record["shape_axis"] = shape
     if profile_enabled:
         record["cxr_grid_profile"] = profile
     return grid, record, bandwidth_record

@@ -8,7 +8,7 @@ from typing import Any, Literal, cast
 
 import numpy as np
 
-from .._cxr_grid_policy import LOCAL_RESOLUTION_POLICY
+from .._cxr_grid_policy import LOCAL_RESOLUTION_POLICY, SHAPE_RESOLUTION_POLICY
 from ..quantum._admission import AxialAdmissionError as AxialAdmissionError
 from ..quantum._admission import refuse_axial_channeling as refuse_axial_channeling
 from ..quantum._admission import refuse_axial_channeling_cases as refuse_axial_channeling_cases
@@ -19,6 +19,8 @@ type MillerIndex = tuple[int, int, int]
 type EnergyGrid = tuple[float, float, float] | np.ndarray
 type AbsorberLayer = tuple[float, float, Composition]
 type Radiator = dict[str, object]
+
+_BIN_MEAN_RESOLUTION_POLICIES = (LOCAL_RESOLUTION_POLICY, SHAPE_RESOLUTION_POLICY)
 
 
 class _Absent:
@@ -519,10 +521,11 @@ class Case(Mapping[str, Any]):
             resolution = self.line_grid_policy.get("resolution")
             policy = resolution.get("policy") if isinstance(resolution, Mapping) else None
             # Validation: line-grid-resonance-local-spacing
-            if policy == LOCAL_RESOLUTION_POLICY and self.line_quadrature != "bin-mean":
+            # Validation: line-grid-sinc-shape-spacing
+            if policy in _BIN_MEAN_RESOLUTION_POLICIES and self.line_quadrature != "bin-mean":
                 raise ValueError(
-                    "the resonance-local line grid needs line_quadrature='bin-mean': node "
-                    "quadrature loses unbounded yield at its spacing joins (#192)"
+                    f"the {policy} line grid needs line_quadrature='bin-mean': node "
+                    "quadrature loses unbounded yield at resonance-local spacing joins (#192)"
                 )
         if self.channeling is not _ABSENT:
             self._validate_channeling()
