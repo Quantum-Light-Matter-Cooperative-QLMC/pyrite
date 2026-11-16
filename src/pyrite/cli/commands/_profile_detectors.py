@@ -199,9 +199,32 @@ def add_command(profile_name, identifier, reference, yes, dry_run):
     )
 
 
+def _check_set_target(document, profile_name, identifier, reference, create_physical):
+    """Refuse a missing or unknown IDENTIFIER, naming the IDs and a corrected command."""
+    ids = list(edit.profile_detector_entries(existing_profile(document, profile_name)))
+    if identifier in ids or (create_physical and identifier == "physical"):
+        return
+    named = identifier is not None and identifier in detector_rows(document)
+    target = reference or (identifier if named else None)
+    available = f"profile {profile_name!r} has detector ID(s): {', '.join(ids)}"
+    if identifier is None:
+        lead = "missing argument 'IDENTIFIER' (the profile's detector ID)"
+    elif named:
+        lead = f"{identifier!r} is a named detector, not a detector ID of profile {profile_name!r}"
+    else:
+        lead = f"unknown detector ID {identifier!r}"
+    if target is None:
+        raise ValueError(f"{lead}; {available}")
+    slot = ids[0] if len(ids) == 1 else "ID"
+    raise ValueError(
+        f"{lead}; {available}. To attach {target!r}, run:\n"
+        f"  pyrite profile detector set {profile_name} {slot} --detector {target}"
+    )
+
+
 @command.command("set")
 @click.argument("profile_name", shell_complete=completion.complete_profile)
-@click.argument("identifier", shell_complete=complete_id)
+@click.argument("identifier", required=False, metavar="IDENTIFIER", shell_complete=complete_id)
 @click.option(
     "--detector",
     "reference",
@@ -235,6 +258,10 @@ def set_command(
 
     Legacy 'physical' may be created with --distance-mm. A shared named object
     is never edited implicitly. Use --inline-copy for a profile-local copy.
+
+    \b
+    Example (replace the default ID's detector):
+      pyrite profile detector set lab-scan default --detector side-view
     """
     scalar = collect_detector_updates(
         observation_angle_deg, polar_acceptance_deg, solid_angle_sr, point=point
@@ -242,13 +269,15 @@ def set_command(
     pixel = pixel_changes(values)
     if reference is not None and (inline_copy or scalar or any(pixel)):
         raise click.UsageError("use --detector REF separately from inline edits")
-    if reference is None and not (inline_copy or scalar or any(pixel)):
-        raise click.UsageError("nothing to set; pass --detector or field options")
     try:
         original, document = _catalog_io.catalog_text()
         profile = existing_profile(document, profile_name)
+        create_physical = bool(pixel[0].get("distance_mm"))
+        _check_set_target(document, profile_name, identifier, reference, create_physical)
+        if reference is None and not (inline_copy or scalar or any(pixel)):
+            raise ValueError("nothing to set; pass --detector or field options")
         owner, key = edit.profile_detector_slot(
-            profile, identifier, create_physical=bool(pixel[0].get("distance_mm"))
+            profile, identifier, create_physical=create_physical
         )
         if reference is not None:
             _reference(document, reference)

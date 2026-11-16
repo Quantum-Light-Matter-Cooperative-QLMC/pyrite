@@ -315,6 +315,9 @@ Usage: pyrite profile detector set [OPTIONS] PROFILE_NAME IDENTIFIER
   Legacy 'physical' may be created with --distance-mm. A shared named object is never
   edited implicitly. Use --inline-copy for a profile-local copy.
 
+  Example (replace the default ID's detector):
+    pyrite profile detector set lab-scan default --detector side-view
+
 Options:
   --detector TEXT                 Replace this entry with a named detector reference.
   --inline-copy                   Copy the current named object into this profile before

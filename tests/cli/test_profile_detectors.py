@@ -179,6 +179,42 @@ def test_legacy_invalid_edits_write_nothing(catalog, args, message):
     assert catalog.read_text() == original
 
 
+@pytest.mark.parametrize(
+    "args, lead",
+    [
+        (["set", "standard", "reference"], "'reference' is a named detector, not a detector ID"),
+        (["set", "standard", "--detector", "reference"], "missing argument 'IDENTIFIER'"),
+        (
+            ["set", "standard", "reference", "--detector", "reference"],
+            "'reference' is a named detector, not a detector ID",
+        ),
+    ],
+)
+def test_set_detector_name_in_id_slot_suggests_the_command(catalog, args, lead):
+    original = catalog.read_text()
+    result = invoke(profile.command, ["detector", *args])
+    assert result.exit_code == 2
+    stderr = " ".join(result.stderr.split())
+    assert lead in stderr
+    assert "profile 'standard' has detector ID(s): default" in stderr
+    assert "pyrite profile detector set standard default --detector reference" in stderr
+    assert catalog.read_text() == original
+
+
+def test_set_unknown_id_lists_ids_without_a_command(catalog):
+    result = invoke(profile.command, ["detector", "set", "standard", "nope", "--roll-deg", "2"])
+    assert result.exit_code == 2
+    stderr = " ".join(result.stderr.split())
+    assert "unknown detector ID 'nope'; profile 'standard' has detector ID(s): default" in stderr
+    assert "--detector" not in stderr
+
+
+def test_set_correct_form_still_replaces_the_reference(catalog):
+    call("migrate", "standard", "-y")
+    call("set", "standard", "default", "--detector", "forward", "-y")
+    assert row(catalog)["detectors"]["default"] == "forward"
+
+
 def test_collection_validation_and_shortcut(catalog):
     call("migrate", "standard", "-y")
     assert_clean_result(
