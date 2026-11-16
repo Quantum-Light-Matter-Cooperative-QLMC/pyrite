@@ -43,6 +43,7 @@ from .kinematics import (
     _stream_uniform_scalar,
 )
 from .scattering import _elsepa_bracket, _elsepa_invert_row
+from .stopping import _MC2_KEV
 
 __all__ = [
     "EXIT_CONE_SPLIT",
@@ -70,12 +71,21 @@ class ConeSplit:
     efficiency only), ``target_weight`` the Russian-roulette target copy weight
     and ``max_copies_per_electron`` the copy buffer, which raises when full
     rather than dropping copies.
+
+    Efficiency options, both off by default and unbiased for any value because
+    they depend only on the event state: ``min_energy_keV`` leaves elastic
+    events below that kinetic energy fully analog (no copy and no kill), and a
+    finite ``angle_scale`` (``u_ref``) applies a second roulette after the copy
+    direction is drawn, against the target ``target_weight * max(1, (u/u_ref)^2)``
+    with ``u = gamma * angle(copy, n_hat)``.
     """
 
     n_hat: tuple[float, float, float]
     half_angle_rad: float
     target_weight: float
     max_copies_per_electron: int = 64
+    min_energy_keV: float = 0.0
+    angle_scale: float = math.inf
 
     def __post_init__(self) -> None:
         n = np.asarray(self.n_hat, dtype=float)
@@ -89,6 +99,15 @@ class ConeSplit:
             raise ValueError("target_weight must be positive and finite")
         if type(self.max_copies_per_electron) is not int or self.max_copies_per_electron < 1:
             raise ValueError("max_copies_per_electron must be a positive integer")
+        if not (math.isfinite(self.min_energy_keV) and self.min_energy_keV >= 0.0):
+            raise ValueError("min_energy_keV must be finite and non-negative")
+        if not self.angle_scale > 0.0:
+            raise ValueError("angle_scale must be positive (inf disables it)")
+
+    def policy(self):
+        """Core policy vector ``[target_weight, min_energy_keV, angle_scale or 0]``."""
+        scale = self.angle_scale if math.isfinite(self.angle_scale) else 0.0
+        return np.array([self.target_weight, self.min_energy_keV, scale], dtype=np.float64)
 
 
 def _mix(x):
@@ -169,7 +188,7 @@ def _arc_half_width(cos_t, sin_t, cos_dn, sin_dn, cos_c):
 
 @njit(cache=True)
 def cone_split_event(
-    dx, dy, dz, nx, ny, nz, cos_c, sin_c, target_weight, event_key,
+    dx, dy, dz, nx, ny, nz, cos_c, sin_c, policy, event_key,
     E_keV, logE_flat, cdf, pdf, mu, guide, start, length,
 ):  # fmt: skip
     """One elastic event's in-cone copy: ``(made, ox, oy, oz, weight)``.
@@ -179,11 +198,16 @@ def cone_split_event(
     theta_c`` and the azimuth uniformly on the arc inside the cone, so
     ``p/q = P_band * dphi(theta)/pi`` on ``C`` and ``q > 0`` on all of ``C``.
     Roulette: a copy is made with probability ``pi_s = min(1, U/w_t)``, ``U``
-    an upper bound of ``p/q``, and carries ``(p/q)/pi_s``. Draws come from the
-    event key, never from the electron's transport stream.
+    an upper bound of ``p/q``, and carries ``(p/q)/pi_s``. With
+    ``policy[2] = u_ref > 0`` a second roulette after the direction draw keeps
+    the copy with ``pi_u = min(1, w/t(u))``, ``t(u) = w_t max(1, (u/u_ref)^2)``,
+    and the survivor carries ``w/pi_u``. ``policy = [w_t, E_min, u_ref]``; the
+    caller applies ``E_min``. Draws come from the event key, never from the
+    electron's transport stream.
 
     Validation: detector-cone-variance-reduction
     """
+    target_weight = policy[0]
     cos_dn = dx * nx + dy * ny + dz * nz
     cos_dn = min(1.0, max(-1.0, cos_dn))
     sin_dn = np.sqrt(max(0.0, 1.0 - cos_dn * cos_dn))
@@ -264,8 +288,18 @@ def cone_split_event(
     oy = cos_t * dy + a * e1y + b * e2y
     oz = cos_t * dz + a * e1z + b * e2z
     norm = np.sqrt(ox * ox + oy * oy + oz * oz)
+    ox, oy, oz = ox / norm, oy / norm, oz / norm
     weight = p_band * half / np.pi / keep
-    return True, ox / norm, oy / norm, oz / norm, weight
+    u_ref = policy[2]
+    if u_ref > 0.0:
+        # Angle-scaled roulette: the copy's direction is event state, not its future.
+        cos_on = min(1.0, max(-1.0, ox * nx + oy * ny + oz * nz))
+        u = (1.0 + E_keV / _MC2_KEV) * np.arccos(cos_on) / u_ref
+        keep_u = min(1.0, weight / (target_weight * max(1.0, u * u)))
+        if _stream_uniform_scalar(event_key, np.uint64(3)) >= keep_u:
+            return False, 0.0, 0.0, 0.0, 0.0
+        weight = weight / keep_u
+    return True, ox, oy, oz, weight
 
 
 def history_sums(primary, copies, copy_parent, copy_weight, n_histories):
@@ -326,7 +360,7 @@ class _ConeSplitPass:
             float(nz),
             math.cos(theta_c),
             math.sin(theta_c),
-            float(self.cone.target_weight),
+            self.cone.policy(),
             split_stream_keys(stream_keys),
             cap,
             np.zeros(n_electrons, dtype=np.int64),

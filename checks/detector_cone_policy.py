@@ -138,7 +138,14 @@ def arm(case, args, factor):
     half_angle = factor / (1.0 + 5000 / 511.0)
     cone = None
     if factor:
-        cone = ConeSplit(tuple(n_hat), half_angle, args.target_weight, args.max_copies_per_electron)
+        cone = ConeSplit(
+            tuple(n_hat),
+            half_angle,
+            args.target_weight,
+            args.max_copies_per_electron,
+            min_energy_keV=args.min_energy_keV,
+            angle_scale=args.angle_scale,
+        )
     original = case_driver.simulate_trajectories
     collect = _ConeSplitPass.collect
 
@@ -321,6 +328,15 @@ def parse_args():
     parser.add_argument("--ordinary-share", type=float, default=0.01)
     parser.add_argument("--max-copies", type=int, default=8192)
     parser.add_argument("--max-copies-per-electron", type=int, default=1024)
+    parser.add_argument(
+        "--min-energy-keV", type=float, default=0.0, help="split only at or above this energy"
+    )
+    parser.add_argument(
+        "--angle-scale",
+        type=float,
+        default=float("inf"),
+        help="u_ref of the angle-scaled roulette (inf: off)",
+    )
     parser.add_argument("--max-rows", type=int, default=8000000)
     parser.add_argument("--out", required=True)
     args = parser.parse_args()

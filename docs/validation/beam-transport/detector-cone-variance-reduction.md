@@ -66,6 +66,44 @@ proposal support, polar-quantile interval, bound used by roulette, event and
 path partition, copy launch state and every supported radiation tally still
 need a fresh-context source-to-code check.
 
+## Efficiency options: energy gate and angle-scaled roulette
+
+Both options are off by default; off, the core takes the paths above
+unchanged. They are intended to preserve unbiasedness because each decision
+is a function of the event state (energy, incoming direction) and of the
+copy's own sampled direction, never of any future of the primary or the copy.
+Both still need fresh-context verification.
+
+- **Energy gate** (`ConeSplit.min_energy_keV`, $E_{\min}$). At an elastic
+  event with $E<E_{\min}$ the core makes no copy and does not apply the kill
+  test: the event is fully analog. The partition
+  $H^{\rm post}=H^{\rm post}\mathbf 1_{\bar C}+H^{\rm post}\mathbf 1_C$ is then
+  simply not applied at that event, so the event contributes its analog
+  future. Kill and copy use the same gate, so no in-cone future is counted
+  twice or dropped.
+- **Angle-scaled roulette** (`ConeSplit.angle_scale`, $u_{\rm ref}$). After
+  the copy direction $\hat{\mathbf o}$ is drawn with weight $w/s$, a second
+  roulette keeps it with probability
+
+  $$
+  s_u=\min\!\left(1,\frac{w/s}{w_t\,\max\!\left(1,(u/u_{\rm ref})^2\right)}\right),
+  \qquad u=\gamma\,\angle(\hat{\mathbf o},\hat{\mathbf a}),
+  $$
+
+  and a survivor carries $w/(s\,s_u)$. Conditional on $\hat{\mathbf o}$,
+  $\mathbb E[\text{survive}\cdot w/(s\,s_u)]=w/s$, so the event-level identity
+  holds unchanged. The uniform is counter 3 of the event key, independent of
+  counters 0–2. The $u^2$ target follows the line mass measured in job 13230,
+  roughly $\propto u^{-2}$ outside $1/\gamma$
+  ([research record](../../research/beam-transport/detector-cone-line-variance.md)),
+  so expected weighted copy contributions are roughly equal across the cone.
+
+`tests/montecarlo/test_cone_split_weights.py` checks the angle roulette
+against isotropic cap integrals; `tests/montecarlo/test_cone_split.py`
+checks that a gate above the beam energy reproduces analog arrays and that
+both options together keep cone and path-length tallies within statistical
+error of analog.
+
 ## Available evidence and remaining work
 
 `tests/montecarlo/test_cone_split.py` checks primary-stream prefixes, copy-prefix

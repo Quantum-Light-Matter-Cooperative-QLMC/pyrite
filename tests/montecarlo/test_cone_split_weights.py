@@ -11,7 +11,7 @@ from pyrite.montecarlo.transport.cone_split import _event_key, cone_split_event
 
 
 @njit(cache=True)
-def _isotropic_trials(direction, theta, target, count):
+def _isotropic_trials(direction, theta, policy, count):
     mu = np.array([0.0, 1.0])
     cdf = np.array([[0.0, 1.0], [0.0, 1.0]])
     pdf = np.ones((2, 2))
@@ -28,7 +28,7 @@ def _isotropic_trials(direction, theta, target, count):
             1.0,
             np.cos(theta),
             np.sin(theta),
-            target,
+            policy,
             _event_key(np.uint64(918273), i),
             5.0,
             energies,
@@ -52,9 +52,12 @@ def _isotropic_trials(direction, theta, target, count):
 
 @pytest.mark.parametrize("direction", [(0.0, 0.0, 1.0), (1.0, 0.0, 0.0), (0.0, 0.0, -1.0)])
 @pytest.mark.parametrize("target", [0.001, 0.2])
-def test_single_event_weights_preserve_isotropic_cap_integrals(direction, target):
+@pytest.mark.parametrize("angle_scale", [0.0, 0.05])
+def test_single_event_weights_preserve_isotropic_cap_integrals(direction, target, angle_scale):
     theta = 0.4
-    scores = _isotropic_trials(np.asarray(direction), theta, target, 8192)
+    # angle_scale 0 disables the angle roulette; 0.05 makes u/u_ref reach ~8.
+    policy = np.array([target, 0.0, angle_scale])
+    scores = _isotropic_trials(np.asarray(direction), theta, policy, 8192)
     # Integrals of 1, cos(theta_out), and a smaller cap under dOmega/(4*pi).
     expected = np.array(
         [

@@ -24,5 +24,5 @@ uv sync --locked --no-default-groups --extra amd
 OUT=${1:-cone203_policy_out}
 mkdir -p "$OUT"
 uv run --no-sync python checks/detector_cone_policy.py \
-  --ne 512 --seeds 0 1 2 3 4 --factors 0 1 2 3 4 --repeats 1 \
+  --ne 512 --seeds 0 1 2 3 4 --repeats 1 "${@:2}" \
   --out "$OUT/policy.json"
