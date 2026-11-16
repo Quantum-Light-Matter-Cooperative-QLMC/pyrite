@@ -52,6 +52,27 @@ def reject_renamed_arguments[T: type](cls: T) -> T:
     return cls
 
 
+def _check_block_multiples(block: int, **counts: int | None) -> None:
+    """Raise naming every count that is not a multiple of BLOCK, with its neighbours.
+
+    Every offending count is named with its value: a caller editing one field
+    (``profile numerics adaptive-sampling set``) sees the stored values of the
+    others here, not only the ones it supplied.
+    """
+    misaligned = []
+    for name, count in counts.items():
+        if count is None or not count % block:
+            continue
+        below = count // block * block
+        nearest = f"{below + block}" if below == 0 else f"{below} or {below + block}"
+        misaligned.append(f"{name}={count} (nearest: {nearest})")
+    if misaligned:
+        raise ValueError(
+            f"{'; '.join(misaligned)} with block_histories={block}: min_histories, "
+            "max_histories and pilot_histories must be multiples of block_histories"
+        )
+
+
 @reject_renamed_arguments
 @dataclass(frozen=True)
 class Precision:
@@ -150,14 +171,12 @@ class Precision:
         block = self.block_histories
         if not 2 <= self.min_histories <= self.max_histories:
             raise ValueError("need 2 <= min_histories <= max_histories")
-        counts = [self.min_histories, self.max_histories]
-        if self.pilot_histories is not None:
-            counts.append(self.pilot_histories)
-        if any(count % block for count in counts):
-            raise ValueError(
-                "min_histories, max_histories and pilot_histories must be multiples "
-                "of block_histories"
-            )
+        _check_block_multiples(
+            block,
+            min_histories=self.min_histories,
+            max_histories=self.max_histories,
+            pilot_histories=self.pilot_histories,
+        )
         if (
             not self.observables
             or not set(self.observables) <= set(OBSERVABLES)

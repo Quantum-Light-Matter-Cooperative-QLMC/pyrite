@@ -230,6 +230,10 @@ def test_precision_set_validates_at_the_boundary(tmp_path, monkeypatch):
     misaligned = invoke(numerics_command, ["adaptive-sampling", "set", "sub_100keV", *blocks])
     assert misaligned.exit_code == 1
     assert "multiples of block_histories" in misaligned.stderr
+    # Name every offending count, its value and the nearest valid ones.
+    assert "min_histories=200 (nearest: 180 or 210)" in misaligned.stderr
+    assert "max_histories=2000 (nearest: 1980 or 2010)" in misaligned.stderr
+    assert "with block_histories=30" in misaligned.stderr
 
     nothing = invoke(numerics_command, ["adaptive-sampling", "set", "sub_100keV"])
     assert nothing.exit_code == 2
