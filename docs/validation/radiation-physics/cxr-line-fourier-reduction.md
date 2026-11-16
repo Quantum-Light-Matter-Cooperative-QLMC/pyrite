@@ -250,9 +250,16 @@ These regression checks do not constitute independent validation.
 
 ## Production route
 
-`CXR_BIN_REDUCTION_MODEL = "fourier-auto-v4"` makes this the default bin-mean reduction on CUDA. `resolve_bin_reduction` picks it when the bin axis is uniform and unclamped (`fourier_bin_axis`) and cuFINUFFT loads (`fourier_backend_available`). Otherwise it falls back to the near/far kernel (`sinc-bin-far-envelope`, `sinc-bin-near-far`), with a single warning if cuFINUFFT fails to load. CPU and nonuniform axes keep their previous routes. Batched and layered per-hkl scorers queue lines and flush them through `cuda_fourier_bin_mean_reduce`. `bin_reduction_override("auto")` forces the old kernel for comparisons.
+`CXR_BIN_REDUCTION_MODEL = "fourier-auto-v4"` makes this the default bin-mean reduction on CUDA. `resolve_bin_reduction` picks it when the bin axis is uniform and unclamped (`fourier_bin_axis`) and cuFINUFFT loads (`fourier_backend_available`). Otherwise it falls back to the near/far kernel (`sinc-bin-far-envelope`, `sinc-bin-near-far`), with a single warning if cuFINUFFT fails to load. Nonuniform axes keep their previous routes; CPU takes the host route below. Batched and layered per-hkl scorers queue lines and flush them through `cuda_fourier_bin_mean_reduce`. `bin_reduction_override("auto")` forces the old kernel for comparisons.
 
 Large mode rectangles use a type-1 NUFFT. On CUDA this is cuFINUFFT. On ROCm, which has no cuFINUFFT, it is `_fourier_spread.es_mode_transform`, a portable CuPy transform using exponential-of-semicircle (ES) spreading, `cupy.fft` and kernel-transform deconvolution (Barnett, Magland and af Klinteberg, SIAM J. Sci. Comput. 41 (2019) C479). It uses FINUFFT's width rule $w=\lceil\log_{10}(1/\epsilon)\rceil+1$, $\beta=2.30w$ and upsampling 2, and is cross-checked on CUDA against direct sums and cuFINUFFT (`test_fourier_cuda.py`). Its tolerance $\epsilon=10^{-12}$ is relative to the summed strengths and is far below `residual_tol`.
+
+**Host route (#1230).** Since `CXR_BIN_REDUCTION_MODEL = "fourier-auto-v5"`, the NumPy backend reduces uniform unclamped axes through `_fourier_host.host_fourier_bin_mean_reduce`. It uses the same partition, period, broad route and image correction. Large rectangles use a serial numba port of the ES spreader with `scipy.fft`; smaller ones use a direct numba sum. Both are serial, so the result does not depend on thread count. `resolve_host_bin_reduction` picks the route. `bin_reduction_override("auto")` restores the exact dense host evaluator. The batched and per-hkl CPU scorers queue lines per target (`_bin_queue.HostBinLineQueues`) and flush every 4M lines. Anchors in `tests/montecarlo/spectrum/test_fourier_host.py`:
+
+- the host ES transform matches direct mode sums to 1e-10;
+- the reduction matches exact bin means to 5e-6 of the peak, including broad lines, and the host reference to 1e-9.
+
+On the `_long_flights` fixture, the CPU spectrum differs from the exact dense route by at most 5.0e-6 of its peak, and yield by 4.4e-7. A 250k-line, 400k-bin synthetic flush takes 4.1 s on one laptop core; the dense evaluator would need 1e11 sinc evaluations.
 
 cuFINUFFT is part of the `nvidia` extra. Its 2.5.x wheels link CUDA 12 runtime and cuFFT, which `cufinufft_module` preloads from the `nvidia-*-cu12` wheels alongside the CUDA 13 CuPy.
 

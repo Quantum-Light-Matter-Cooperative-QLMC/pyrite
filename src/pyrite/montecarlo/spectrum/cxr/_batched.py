@@ -23,6 +23,7 @@ from ._bin_quadrature import (
     run_bin_mean_reduction_kernel,
     sincsq_bin_lineshape,
 )
+from ._bin_queue import flush_bin_line_queues, open_host_bin_line_queues
 from ._cpu_reduce import accumulate_sincsq
 from ._cpu_reduce import numpy_backend as _numpy_backend
 from ._escape_mu import escape_mu, escape_mu_tables
@@ -905,6 +906,11 @@ def _batched_incoherent_block(st, bt, blk, cxr_batch):
             range(len(targets)),
         )
         targets = []
+    elif st.bin_line_queues is not None:  # Validation: cxr-line-fourier-reduction
+        st.bin_line_queues.add(
+            [(w.reshape(-1)[gm_idx], tgt) for w, tgt in targets], E_r_f, aw_f, slice(None)
+        )
+        targets = []
     elif st.bin_edges is None and _numpy_backend():
         accumulate_sincsq(
             E_r_f,
@@ -1200,6 +1206,7 @@ def _accumulate_batched(st):
         if _use_jit_cxr_reduction
         else None
     )
+    open_host_bin_line_queues(st)  # host Fourier route on uniform bin-mean axes
 
     step = _launch_rows(bt, cxr_batch, coherent, req.truncation_audit)
     for s0 in range(0, n_seg, step):
@@ -1219,6 +1226,7 @@ def _accumulate_batched(st):
     # Flush the residual line batch even when it never reached the target.
     if cxr_batch is not None:
         cxr_batch.flush()
+    flush_bin_line_queues(st)
 
     if coherent:
         _batched_coherent_finalize(

@@ -746,8 +746,10 @@ def sincsq_bin_lineshape(
 #: Numerical generation of device bin-mean reductions (case identity marker).
 #: v4 (#1192): CUDA flushes on a uniform ``c_k +- h/2`` axis use the exact
 #: Fourier-domain reduction (no far-field envelope); other axes and backends
-#: keep the near/far kernel.
-CXR_BIN_REDUCTION_MODEL = "fourier-auto-v4"
+#: keep the near/far kernel. v5 (#1230): the NumPy backend reduces uniform
+#: axes through the host Fourier route (``_fourier_host``) instead of the
+#: dense exact evaluator.
+CXR_BIN_REDUCTION_MODEL = "fourier-auto-v5"
 #: Lines per Fourier-route flush: amortises the per-call FFT and planning.
 FOURIER_FLUSH_LINES = 10_000_000
 
@@ -847,6 +849,29 @@ def resolve_bin_reduction(edges):
     if method == "fourier" and flush is None:
         flush = FOURIER_FLUSH_LINES
     return method, axis, flush
+
+
+def resolve_host_bin_reduction(edges):
+    """``(axis, flush_lines)`` for host (NumPy) bin-mean lines on ``edges``, or ``None``.
+
+    The host Fourier route (``_fourier_host``) applies to every uniform
+    ``c_k +- h/2`` axis unless :func:`bin_reduction_override` selects a
+    near/far method, which on host means the exact dense evaluator.
+
+    Validation: cxr-line-fourier-reduction
+    """
+    from ._fourier_host import HOST_FOURIER_FLUSH_LINES
+
+    override = _REDUCTION_OVERRIDE.get()
+    method, flush = override if override is not None else ("fourier", None)
+    if method != "fourier":
+        return None
+    axis = fourier_bin_axis(edges)
+    if axis is None:
+        if override is not None:
+            raise ValueError("Fourier reduction needs a uniform c_k +- h/2 bin axis")
+        return None
+    return axis, HOST_FOURIER_FLUSH_LINES if flush is None else flush
 
 
 def _bin_reduction_markers(resolved):

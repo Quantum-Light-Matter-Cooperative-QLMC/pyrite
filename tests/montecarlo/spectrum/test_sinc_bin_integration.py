@@ -27,6 +27,7 @@ from pyrite.montecarlo.spectrum.cxr import (
     _prepare_spectrum,
 )
 from pyrite.montecarlo.spectrum.cxr import _bin_quadrature as bq
+from pyrite.montecarlo.spectrum.cxr._cpu_reduce import numpy_backend
 from tests.helpers import host_backend_only, real_eps, scaled_rtol, to_device, to_host
 from tests.helpers.backend import IS_FLOAT32
 from tests.montecarlo.spectrum.test_spectrum_phases import B_ANG2, CRYSTAL, HKL, N_HAT, _segments
@@ -219,6 +220,8 @@ def _reduction_tolerance(reduction, grid, rtol):
     edges = _energy_bin_edges_and_widths(grid)[0]
     with bq.bin_reduction_override(reduction) if reduction else contextlib.nullcontext():
         fourier = bq.resolve_bin_reduction(edges)[0] == "fourier"
+        if numpy_backend():  # the host Fourier route (#1230)
+            fourier = bq.resolve_host_bin_reduction(edges) is not None
     return (
         (lambda ref: {"rtol": 0.0, "atol": 2.5e-5 * np.max(np.abs(ref))})
         if fourier
@@ -234,7 +237,10 @@ def test_fused_and_fallback_routes_agree(monkeypatch, reduction):
     with bq.bin_reduction_override(reduction) if reduction else contextlib.nullcontext():
         fused = to_host(mc_cxr_spectrum(_long_flights(), grid, line_quadrature="bin-mean", **_KW))
     monkeypatch.setattr(_policy, "_USE_JIT_CXR_REDUCTION", False)
-    fallback = to_host(mc_cxr_spectrum(_long_flights(), grid, line_quadrature="bin-mean", **_KW))
+    with bq.bin_reduction_override(reduction) if reduction else contextlib.nullcontext():
+        fallback = to_host(
+            mc_cxr_spectrum(_long_flights(), grid, line_quadrature="bin-mean", **_KW)
+        )
     np.testing.assert_allclose(fused, fallback, **tol(fallback))
 
 
