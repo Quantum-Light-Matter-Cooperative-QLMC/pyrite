@@ -822,10 +822,11 @@ def _electronic_edges(channels: ElectronicChannels) -> np.ndarray:
     ridge = np.sqrt(
         np.maximum(channels.distant_qmax_inv_ang**2 - channels.distant_qmin_inv_ang**2, 0.0)
     )
+    open_ = _open_close_ranges(channels)
     breaks = np.concatenate(
         [
             ridge,
-            channels.close_transfer(channels.close_lower_eV),
+            channels.close_transfer(channels.close_lower_eV[open_]),
             [channels.close_transfer(0.5 * channels.energy_eV)],
         ]
     )
@@ -881,12 +882,27 @@ def _out_of_plane_panels(edges: np.ndarray, eta_ang: float, order: int = 8):
     return q, w * np.cos(q * eta_ang)
 
 
+def _open_close_ranges(channels: ElectronicChannels) -> np.ndarray:
+    """Mask of shells with a non-empty close range.
+
+    A shell whose binding energy reaches the beam energy is closed. It keeps a
+    zero-width range at ``U_k > E``, where the free-electron transfer is
+    undefined, so it must not place nodes or edges.
+    """
+    return channels.close_upper_eV > channels.close_lower_eV
+
+
 def _close_loss_nodes(channels: ElectronicChannels):
-    """Loss nodes and weights over every close range, split at each shell's edges."""
-    lower = float(np.min(channels.close_lower_eV))
-    upper = float(np.max(channels.close_upper_eV))
+    """Loss nodes and weights over every open close range, split at each shell's edges."""
+    open_ = _open_close_ranges(channels)
+    lower_eV = channels.close_lower_eV[open_]
+    upper_eV = channels.close_upper_eV[open_]
+    if lower_eV.size == 0:
+        return np.zeros(0), np.zeros(0)
+    lower = float(np.min(lower_eV))
+    upper = float(np.max(upper_eV))
     count = max(2, int(4 * np.log(upper / lower)) + 2)
-    breaks = np.concatenate([channels.close_lower_eV, channels.close_upper_eV])
+    breaks = np.concatenate([lower_eV, upper_eV])
     return _breakpoint_panels(np.geomspace(lower, upper, count), breaks)
 
 

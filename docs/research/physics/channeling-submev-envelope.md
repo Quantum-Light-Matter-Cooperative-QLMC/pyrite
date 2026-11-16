@@ -676,6 +676,233 @@ What the record shows:
   static entry rate, not a yield: 2p depopulation, dechanneling and
   absorption are not included.
 
+(sec-submev-w001-occupation)=
+### W ⟨001⟩ occupation evolution
+
+`checks/channeling_submev_w001_occupation.py` follows the 1s and 2p
+populations into the crystal. It is a diagnostic: the TDS and electronic jump
+kernels are the MeV-calibrated ones, with no sub-MeV check.
+
+**Method.**
+
+- **Entry and propagation.** A plane wave enters a $4\times4$ supercell of
+  W⟨001⟩ strings, 25 grid points per cell. Its carrier tilt is drawn from the
+  same 2D Gaussian divergence $f\psi_c$ as the static entry audit.
+  {py:class}`~pyrite.montecarlo.channeling.axial_mcwf.AxialMCWF` propagates
+  each tilt with the TDS jumps of `axial_dissipator`, with or without the
+  electronic jumps. Each case runs 128 tilts × 16 histories to 1000 Å in
+  0.5 Å steps.
+- **Observable.** The state $e^{i\mathbf K\cdot\mathbf r}\phi$ is projected
+  exactly onto the Bloch bands at the $4^2$ crystal wavevectors
+  $\mathbf K+\mathbf g\,\mathbf r/4$ that it occupies. Band 0 counts as 1s and
+  bands 1–2 as 2p, if bound.
+- **Rate.** The 2p→1s rate at each $\mathbf k$ uses that band's vertical gap
+  and velocity-form dipole, and the doublet bands add incoherently. At entry
+  the omitted coherence is at most 0.26 %
+  ({ref}`sec-submev-w001-zone-line`).
+- **Photons per electron.** The running depth integral of that rate.
+
+A first run (array 13190) instead projected onto the $k=0$ orbitals cut to one
+string cell. That fails below 1 MeV: the 2p band disperses by 2.6 eV at
+30 keV, and a carrier tilt that does not fit the supercell is not periodic on
+it. Per tilt, the 2p population was wrong by up to a factor of 3, so that run
+is discarded.
+
+**Checks.**
+
+- **Entry.** At depth 0, every case reproduces the static 1s/2p populations
+  of the focused entrance-population audit above within 0.003. The
+  per-case standard error at entry is 0.001–0.004. Two examples:
+  0.080/0.165 against 0.080/0.166 (30 keV, $f=0.05$) and 0.045/0.071 against
+  0.044/0.071 (300 keV, $f=0.1$).
+- **Convergence at $f=0.1$** (TDS + electronic), against the 0.5 Å, 25-point,
+  $4\times4$ default:
+
+  | Change | 30 keV | 100 keV | 300 keV |
+  | --- | --- | --- | --- |
+  | 0.25 Å step | −1.0 % | −0.7 % | 0.0 % |
+  | 1.0 Å step | +4.5 % | +1.8 % | +0.8 % |
+  | 32-point grid | +4.0 % | +3.1 % | +1.5 % |
+  | $6\times6$ supercell | +0.3 % | | |
+
+  These are changes in photons per electron at 1000 Å; the statistical error
+  is about 3 %. The 1/e depths move by at most 4 %.
+- **Survival is not converged.** On the 32-point grid, the fraction still in
+  the simulation at 1000 Å rises from 0.25 to 0.42 at 30 keV, and the TDS
+  jump count from 3.1 to 4.4 per electron. Survival and jump counts are
+  therefore not reported. The cause is not established.
+
+**Results.** Photons per electron in the 2p→1s line, TDS + electronic, with
+the TDS-only value at 1000 Å for comparison. Standard errors at 1000 Å are
+about $2\times10^{-7}$. Record:
+`docs/validation/check-records/channeling-submev/w001-occupation-13219.json`.
+
+| T | $f$ | 1s 1/e (Å) | 2p 1/e (Å) | 100 Å | 300 Å | 1000 Å | 1000 Å, TDS only |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 30 keV | 0.05 | 7.1 | 79 | $4.6\times10^{-6}$ | $5.9\times10^{-6}$ | $6.4\times10^{-6}$ | $6.3\times10^{-6}$ |
+| 30 keV | 0.1 | 7.0 | 64 | $5.1\times10^{-6}$ | $6.2\times10^{-6}$ | $6.9\times10^{-6}$ | $7.1\times10^{-6}$ |
+| 30 keV | 0.25 | 7.3 | 60 | $2.4\times10^{-6}$ | $3.3\times10^{-6}$ | $4.1\times10^{-6}$ | $4.1\times10^{-6}$ |
+| 100 keV | 0.05 | 11.3 | 133 | $2.9\times10^{-6}$ | $4.6\times10^{-6}$ | $5.8\times10^{-6}$ | $5.2\times10^{-6}$ |
+| 100 keV | 0.1 | 10.9 | 104 | $3.9\times10^{-6}$ | $5.9\times10^{-6}$ | $7.3\times10^{-6}$ | $7.2\times10^{-6}$ |
+| 100 keV | 0.25 | 10.9 | 108 | $2.2\times10^{-6}$ | $3.6\times10^{-6}$ | $4.9\times10^{-6}$ | $4.9\times10^{-6}$ |
+| 300 keV | 0.05 | 16.7 | 249 | $1.4\times10^{-6}$ | $2.8\times10^{-6}$ | $4.4\times10^{-6}$ | $3.7\times10^{-6}$ |
+| 300 keV | 0.1 | 16.6 | 110 | $2.4\times10^{-6}$ | $4.1\times10^{-6}$ | $6.1\times10^{-6}$ | $5.5\times10^{-6}$ |
+| 300 keV | 0.25 | 17.7 | 122 | $1.9\times10^{-6}$ | $3.3\times10^{-6}$ | $5.4\times10^{-6}$ | $5.1\times10^{-6}$ |
+
+What the record shows, under the MeV-calibrated kernels:
+
+- **The yield is a few $\times10^{-6}$ photons per electron.** It is
+  4–7 × 10⁻⁶ by 1000 Å at every energy, highest near $f=0.1$. Dividing by the
+  initial rate gives an effective radiating length of about 75 Å at 30 keV,
+  135 Å at 100 keV and 195 Å at 300 keV (the last truncated at 1000 Å).
+- **1s empties within 7–18 Å, about ten times faster than 2p**
+  (60–250 Å). The 1s is the most string-localized state and takes the most
+  TDS.
+- **At 30 keV the line is a surface effect.** About 73 % of the photons
+  come from the first 100 Å. At 300 keV only 39 % do, and the yield is
+  still rising at 1000 Å.
+- **Electronic scattering matters only at 300 keV.** With electronic jumps,
+  the 1000 Å yield changes by ±2 % at 30 keV. At 100 keV it is +12 % at
+  $f=0.05$ and within ±2 % otherwise. At 300 keV it is +6 to +19 %, and the
+  2p 1/e depth at $f=0.05$ doubles (249 against 117 Å). Small electronic
+  kicks appear to return electrons to 2p. This is the term most exposed to
+  the unvalidated sub-MeV electronic kernel.
+- **Not included:** photon absorption and escape, capture from outside the
+  supercell, longitudinal harmonics and stopping. The record is not a
+  linewidth or a validated yield.
+
+(sec-submev-w001-linewidth)=
+### Scattering width of the W ⟨001⟩ line
+
+`checks/channeling_submev_w001_linewidth.py` estimates the line's scattering
+width (claim `cr-submev-axial-coherence-width`, unverified). It applies the
+secular equation of `cr-line-shape` to the axial jump operators in the
+flat-band limit. The radiating coherence $\langle 1s|\rho|2p\rangle$ decays
+at
+
+$$\kappa = \tfrac12(\Gamma_{2p} + \Gamma_{1s}) - J_\mathrm{TDS} - \mathrm{Re}\,J_\mathrm{el}.$$
+
+- $\Gamma_n$ is the full loss rate of level $n$, over its string orbital: the
+  in-grid TDS, the large-angle TDS sink and electronic excitation.
+- The gains $J$ are the coherence that a jump carries over to the same pair,
+  because it acts alike on ket and bra.
+
+The transverse Lorentzian half width is $\hbar v\kappa$. The forward photon
+width is that divided by $1-\beta$.
+
+**Checks.** Three limits are tested:
+
+- a spatially uniform phase jump gives no width;
+- a loss-only kernel gives the lifetime width $(\Gamma_{2p}+\Gamma_{1s})/2$;
+- a $q\to0$ electronic kick gives no width.
+
+On W ⟨001⟩, the displacement quadrature reproduces the dissipator's TDS rate
+to $6\times10^{-14}$, and the electronic nodes reproduce its electronic loss
+to $5\times10^{-4}$. Record:
+`docs/validation/check-records/channeling-submev/w001-linewidth.json`.
+
+| T | $\Gamma_{1s}$ (Å⁻¹) | $\Gamma_{2p}$ (Å⁻¹) | Transverse FWHM (eV) | Gap (eV) | FWHM / gap | Forward photon FWHM / line (eV) | Saturation estimate (eV) |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 30 keV | 0.350 | 0.036 | 239 | 226 | 1.05 | 356 / 337 | 158 (0.70 of gap) |
+| 100 keV | 0.136 | 0.017 | 157 | 235 | 0.67 | 347 / 519 | 132 (0.56) |
+| 300 keV | 0.079 | 0.014 | 135 | 250 | 0.54 | 604 / 1117 | 122 (0.49) |
+
+What the record shows, under the MeV-calibrated kernels:
+
+- **The 2p→1s line is not resolved at 30–300 keV.** Its scattering FWHM is
+  half to all of the transition energy. The photon is a broad band
+  hundreds of eV wide, not a line. The static dispersion width
+  ({ref}`sec-submev-w001-zone-line`) is 0.1–1.2 eV and negligible beside it.
+- **1s sets the width.** $\Gamma_{1s}$ is 85–91 % of
+  $\Gamma_{1s}+\Gamma_{2p}$, and about a third of it is large-angle TDS. The
+  1s population decay lengths, $1/(\Gamma_n - J_{nn})$, are 3.1, 8.0 and
+  13.9 Å. The occupation run's 1/e depths are longer (7–17 Å) because it
+  includes refilling.
+- **The gains do not narrow the line.** The TDS gain is zero within
+  $4\times10^{-4}$ Å⁻¹. The linear (dipolar) displacement term averages
+  to zero over each centrosymmetric density, which leaves only
+  $O(a^4)$. The electronic gain removes about 5 % of $\kappa$. Electronic
+  excitation alone would give a transverse FWHM of 5–11 eV.
+- **Kernel range.** The phase variance that one atom of its own string
+  imprints on 1s, in-grid and density-weighted, is 0.70 rad² at 30 keV,
+  0.27 at 100 keV and 0.15 at 300 keV. The jump operators expand
+  $e^{i\phi}$ to second order, so at 30 keV the kernel is near the edge of
+  its range. The full 1s TDS loss per atom (in-grid plus sink, all
+  strings), $V$, is 1.0, 0.40 and 0.23. Scaling each level's TDS loss by the
+  Gaussian phase-object saturation $(1-e^{-V})/V$ lowers FWHM/gap to 0.70, 0.56 and 0.49. That is a
+  sensitivity estimate, not a kernel. The conclusion does not depend on it.
+  The full phase object ({ref}`sec-submev-w001-tds-phase`) gives FWHM/gap
+  0.70, 0.55 and 0.49 with the sink, the gap shift and the electronic term.
+- **Not included:** the 2p dispersion (2.6 eV at 30 keV), transfer into other
+  band pairs (non-secular) and any sub-MeV validation of the TDS kernel. When
+  $\kappa\hbar v$ is comparable to the gap, the secular approximation itself
+  is marginal. The FWHM is then an order-of-magnitude statement, which is
+  enough to rule out a resolved line under these kernels.
+
+(sec-submev-w001-tds-phase)=
+### Strong-phase check of the TDS kernel
+
+The TDS jumps expand one displaced atom's transmission $e^{i\delta\phi_u}$ to
+second order in the phase fluctuation. At 30 keV the 1s orbital sees a
+per-atom phase variance near 1 rad², so `checks/channeling_submev_w001_tds_phase.py`
+(claim `cr-submev-tds-phase-object`, unverified) keeps the full phase object
+instead. It uses the same projected potential and Einstein displacements.
+
+**Method.** Per atom of string $s$, with
+$M_n(u)=\int|w_n|^2e^{i\delta\phi_u}$ and independent atoms:
+
+- the coherent-wave loss is $-2\sum_s\lambda_s\ln|\mathrm E_uM_n|$;
+- the population retained in $n$ decays at
+  $-\sum_s\lambda_s\ln\mathrm E_u|M_n|^2$;
+- the 2p→1s coherence decays at
+  $\kappa=-\sum_s\lambda_s\ln|\mathrm E_uM_{1s}M_{2p}^*|$.
+
+To second order these are the dissipator's rates. The phase is band-limited
+to the grid, so the record refines a $3\times3$ supercell until the
+large-angle sink is about 1 % of the 1s loss (128 points per cell). Changing
+the displacement quadrature from 24 to 48 nodes per axis then moves $\kappa$
+by 0.1 % or less. At 64 and 96 points the values are not converged. Record:
+`docs/validation/check-records/channeling-submev/w001-tds-phase.json`.
+
+**Checks.** Two analytic limits are tested:
+
+- a phase linear in $u$ is Gaussian, so exact and second order agree;
+- a uniform quadratic phase follows the χ² characteristic function and
+  saturates below the second-order value.
+
+| T | $\kappa_\mathrm{TDS}$, 2nd order (Å⁻¹) | $\kappa_\mathrm{TDS}$, phase object (Å⁻¹) | Ratio | 1s population loss, 2nd order / phase object (Å⁻¹) | TDS FWHM incl. sink (eV) | Gap shift (eV) | + electronic: FWHM / shifted gap |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 30 keV | 0.174 | 0.0975 | 0.56 | 0.317 / 0.166 | 129 | −28 | 140 / 199 eV = 0.70 |
+| 100 keV | 0.0685 | 0.0510 | 0.74 | 0.122 / 0.088 | 112 | −20 | 119 / 214 eV = 0.55 |
+| 300 keV | 0.0421 | 0.0359 | 0.85 | 0.071 / 0.059 | 112 | −14 | 116 / 236 eV = 0.49 |
+
+The TDS FWHM adds half the residual large-angle sink (1 % of the 1s loss
+at 128 points) as pure loss. The gap shift is the phase of
+$\mathrm E_u[M_{1s}M_{2p}^*]$: a non-Gaussian correction beyond the mean
+potential, $\hbar v\sum_s\lambda_s\arg\mathrm E_u[M_{1s}M_{2p}^*]$ with
+$\phi=-V/\hbar v$. The gap narrows by 12 %, 9 % and 6 %. The electronic part
+is that of {ref}`sec-submev-w001-linewidth`.
+
+What the record shows:
+
+- **The second-order kernel overstates the TDS width.** The overstatement is
+  1.8× at 30 keV, 1.3× at 100 keV and 1.2× at 300 keV. The 1s population
+  decay length at 30 keV becomes 6.0 Å instead of 3.2 Å. That is closer to
+  the occupation run's 7 Å, which also includes refilling.
+- **The line is still unresolved.** With the strong-phase TDS, the sink and
+  the electronic term, the transverse FWHM is 0.49–0.70 of the shifted gap.
+  The forward photon FWHM is about 210 eV on a 296 eV line at 30 keV, and
+  520 eV on a 1055 eV line at 300 keV (vacuum, before refraction).
+- **The production occupation and yield runs use the second-order kernel.**
+  At 30 keV they deplete 1s too fast. The 2p rates change less, because 2p
+  sees a per-atom variance below 0.1.
+- **Not tested.** The thin-screen (eikonal) assumption for each atom is not
+  tested; at 30 keV the Fresnel phase $q^2d/2k$ is about 0.8 rad for
+  $q=1/u_\mathrm{rms}$ (per axis) across a 0.3 Å core, and 0.4 rad for the
+  2D $u_\mathrm{rms}$, which needs multislice through
+  the 3D atomic potential. Also not tested: the projected Mott–Bethe
+  potential itself and the Einstein model.
+
 (sec-submev-support-matrix)=
 ## Draft support matrix
 
@@ -742,9 +969,15 @@ changes in eV:
 | Refraction (Chantler $n$) | −1.9 | −3.8 | −6.6 | correction; table error not bounded |
 | Zone-weighted mean − $k=0$ line ($f$ 0.05–0.25) | −1.7 to −2.4 | −1.1 to −1.5 | −0.13 to −0.20 | computable correction |
 | Static dispersion rms width ($f=0.1$) | 1.20 | 0.77 | 0.10 | line spread, not error |
+| Scattering FWHM, transverse (MeV-calibrated kernels) | 239 | 157 | 135 | larger than every other term; line unresolved |
+| Scattering FWHM, strong-phase TDS + electronic | 140 | 119 | 116 | 0.49–0.70 of the gap; eikonal not tested |
+| Strong-phase gap shift beyond mean field | −28 | −20 | −14 | computable correction; eikonal not tested |
 | Escape through 100 nm | $T=0.32$ | 0.46 | 0.78 | from tables |
+| Photons per electron to 1000 Å ($f=0.1$, before escape) | $6.9\times10^{-6}$ | $7.3\times10^{-6}$ | $6.1\times10^{-6}$ | diagnostic, MeV-calibrated kernels |
 
-Refraction and the zone weighting dominate the line position. The 2p
+Refraction and the zone weighting dominate the line position. The scattering width
+({ref}`sec-submev-w001-linewidth`) is 20–100 times every positional term, so
+under the current kernels the line is not resolved. The 2p
 dispersion dominates its static width at 30–100 keV
 ({ref}`sec-submev-w001-zone-line`). That dispersion is why
 `axial_line_catalog` admits the line only from 300 keV: its gate is a 0.1 eV
@@ -752,7 +985,9 @@ bandwidth, which is a numerical choice, not a physical floor. The 2p entry weigh
 0.07 of the beam (30, 100, 300 keV), near $\sigma=0.1\,\psi_c$.
 
 **Unbounded in every row.** TDS and electronic scattering at these energies,
-occupation evolution, coherence and linewidth, free→bound capture,
+occupation evolution and linewidth (W⟨001⟩ has diagnostic records with
+MeV-calibrated kernels, {ref}`sec-submev-w001-occupation` and
+{ref}`sec-submev-w001-linewidth`), coherence, free→bound capture,
 longitudinal lattice harmonics, surface and transition-radiation terms, and
 separation from coherent bremsstrahlung and PXR. These terms set yield and
 observability. A candidate row is a static line position, not a predicted
@@ -772,8 +1007,22 @@ Koehler.
      W⟨001⟩; production adoption waits on step 3;
   2. the medium line energy $\Delta\varepsilon/[1-\beta(1-\delta)]$;
   3. TDS and occupation evolution for the 2p and 1s bands, run on the
-     remote box;
-  4. a line width.
+     remote box. The diagnostic record for W⟨001⟩ is done
+     ({ref}`sec-submev-w001-occupation`). It uses the MeV-calibrated
+     kernels, so its yields are not validated;
+  4. a line width. The flat-band record for W⟨001⟩ is done
+     ({ref}`sec-submev-w001-linewidth`). Under the MeV-calibrated kernels
+     the FWHM is 0.5–1.05 of the gap, so the line is unresolved.
+
+  *Finding for review:* with the current kernels the W⟨001⟩ 2p→1s emission
+  below 300 keV is a broad band, not a line. Before any further W design
+  work, the go decision should be revisited. The gating item is now a
+  sub-MeV check of the TDS kernel beyond small-phase linearization: an
+  exact phase-object or multislice reference for one displaced W string.
+  The phase-object check is done ({ref}`sec-submev-w001-tds-phase`). It
+  narrows the width by up to 1.8×, but FWHM/gap stays at 0.49–0.70: the
+  emission is a broad peak, not a resolved line. Only the eikonal-per-atom
+  assumption (multislice) remains untested.
 - *No-go:* every light-element case below 750 keV. Each such row is none,
   inter-string or vacuum only.
 - *No-go until fixed:* W⟨001⟩ at 500 keV, which needs solid-state M₄-edge
@@ -797,9 +1046,11 @@ These items are open under #585 and none is settled by this screen:
   optical data at absorption edges. The [optics
   record](#sec-submev-optics) bounds escape and the refractive line shift
   only above $3\hbar\omega_p$ and away from edges, from isolated-atom tables;
-- axial occupation evolution, radiating weight and capture; the
-  [axial screen](#axial-screen) records zone-wide availability, and the
-  focused W ⟨001⟩ audit only static per-band entry overlaps;
+- validated axial occupation evolution and capture. The
+  [axial screen](#axial-screen) records zone-wide availability. The W ⟨001⟩
+  occupation record ({ref}`sec-submev-w001-occupation`) uses unvalidated
+  sub-MeV kernels, has no capture from outside the supercell, and its
+  survival fraction is not grid-converged;
 - a production rule for multi-string axes. The
   [classification](#multi-string-classification) shows that the flat-band
   catalog admits inter-string splittings. Since #1219, `axial_line_catalog`

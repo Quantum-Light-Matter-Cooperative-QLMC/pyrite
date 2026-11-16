@@ -93,8 +93,11 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     "checks/channeling_submev_multistring.py": (),
     "checks/channeling_submev_optics.py": ("cr-submev-refractive-doppler",),
     "checks/channeling_submev_w001_dispersion.py": (),
+    "checks/channeling_submev_w001_linewidth.py": ("cr-submev-axial-coherence-width",),
+    "checks/channeling_submev_w001_tds_phase.py": ("cr-submev-tds-phase-object",),
     "checks/channeling_submev_w001_entry.py": (),
     "checks/channeling_submev_w001_kinematics.py": (),
+    "checks/channeling_submev_w001_occupation.py": (),
     "checks/channeling_submev_w001_spin.py": ("cr-submev-dirac-spin-correction",),
     # Hardware performance evidence accompanies the CUDA backend validation;
     # it does not add a separate pass/fail ledger claim.
