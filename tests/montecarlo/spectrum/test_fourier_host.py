@@ -14,6 +14,7 @@ from pyrite.montecarlo.spectrum.cxr import _bin_quadrature as bq
 from pyrite.montecarlo.spectrum.cxr._bin_fourier import fourier_bin_mean_reduce
 from pyrite.montecarlo.spectrum.cxr._bin_queue import HostBinLineQueues
 from pyrite.montecarlo.spectrum.cxr._fourier_host import (
+    _positive_modes,
     host_es_mode_transform,
     host_fourier_bin_mean_reduce,
 )
@@ -34,6 +35,25 @@ def test_host_es_transform_matches_direct_modes():
     got = host_es_mode_transform(phase, strengths, 17, 17 + 300)
     want = direct_mode_transform(phase, strengths, 17, 17 + 300)
     assert np.abs(got - want).max() <= 1e-10 * np.abs(want).max()
+
+
+def test_batched_host_rectangles_match_analytic_triangle_coefficients():
+    """Small direct and large ES rectangles retain each line's exact support."""
+    rng = np.random.default_rng(1230)
+    period, c0 = 100.0, 20.0
+    E = rng.uniform(-100.0, 200.0, 300)
+    a = rng.uniform(0.1, 500.0, 300)
+    w = rng.normal(size=300)
+    positive = _positive_modes(E, a, w, c0, period, 1e-12)
+    j = np.array([1, 2, 17, 255, 2048, 8191, 8192, 12000])
+    t = 2 * np.pi / period * j
+    expected = np.sum(
+        (w * np.pi / a)[:, None]
+        * np.maximum(1.0 - t[None, :] / (2 * a[:, None]), 0.0)
+        * np.exp(-1j * (E - c0)[:, None] * t[None, :]),
+        axis=0,
+    )
+    np.testing.assert_allclose(positive[j], expected, rtol=1e-9, atol=1e-11)
 
 
 def test_host_reduction_matches_exact_bin_means_and_reference():

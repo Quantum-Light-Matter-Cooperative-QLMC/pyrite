@@ -17,6 +17,8 @@ mainly with lines, as on the device.
 Validation: cxr-line-fourier-reduction
 """
 
+from functools import lru_cache
+
 import numpy as np
 import scipy.fft as sf
 from numba import njit
@@ -28,7 +30,7 @@ from ._bin_fourier import (
     _envelope_image_correction,
     fourier_period,
 )
-from ._fourier_cutoffs import partitioned_positive_modes
+from ._fourier_cutoffs import cutoff_rectangle_array
 from ._fourier_spread import _BETA_PER_WIDTH, _deconvolution, _fine_size, es_width
 
 #: Lines queued per target before a host flush (three FP64 arrays each).
@@ -38,6 +40,14 @@ HOST_FOURIER_FLUSH_LINES = 4_000_000
 _NUFFT_MIN_WORK = 262_144
 _NUFFT_MIN_SOURCES = 64
 _NUFFT_MIN_MODES = 32
+
+
+@lru_cache(maxsize=8)
+def _cached_deconvolution(modes, n_fine, width):
+    """Immutable host factors; callers admit at most 1M entries (64 MiB cache)."""
+    factors = _deconvolution(np, modes, n_fine, width)
+    factors.flags.writeable = False
+    return factors
 
 
 @njit(cache=True)
@@ -61,22 +71,6 @@ def _es_spread(x, sources, n_fine, width, beta, grid):  # pragma: no cover - num
             grid[1, index] += phi * sources[1, k]
 
 
-@njit(cache=True)
-def _direct_modes(phase, strengths, j0, j1, out):  # pragma: no cover - numba
-    for j in range(j0, j1):
-        re0 = im0 = re1 = im1 = 0.0
-        for k in range(phase.shape[0]):
-            angle = -j * phase[k]
-            c = np.cos(angle)
-            s = np.sin(angle)
-            re0 += strengths[0, k] * c
-            im0 += strengths[0, k] * s
-            re1 += strengths[1, k] * c
-            im1 += strengths[1, k] * s
-        out[0, j - j0] = complex(re0, im0)
-        out[1, j - j0] = complex(re1, im1)
-
-
 def host_es_mode_transform(phase, strengths, j0, j1, *, eps=1e-12):
     """Two-row type-1 transform ``sum_k strengths[r, k] exp(-i j phase_k)``, ``j0 <= j < j1``.
 
@@ -95,24 +89,61 @@ def host_es_mode_transform(phase, strengths, j0, j1, *, eps=1e-12):
     _es_spread(phase, sources, n_fine, width, _BETA_PER_WIDTH * width, grid)
     spectrum = sf.fft(grid, axis=1)
     centred = np.arange(-(modes // 2), modes - modes // 2) % n_fine
-    return spectrum[:, centred] * _deconvolution(np, modes, n_fine, width)
+    factors = (
+        _cached_deconvolution(modes, n_fine, width)
+        if modes <= 1 << 20
+        else _deconvolution(np, modes, n_fine, width)
+    )
+    return spectrum[:, centred] * factors
 
 
-def _hybrid_transform(eps):
-    def transform(phase, strengths, j0, j1):
-        modes, sources = j1 - j0, phase.size
-        large = (
-            sources >= _NUFFT_MIN_SOURCES
-            and modes >= _NUFFT_MIN_MODES
-            and sources * modes >= _NUFFT_MIN_WORK
-        )
-        if large:
-            return host_es_mode_transform(phase, strengths, j0, j1, eps=eps)
-        out = np.empty((2, modes), dtype=np.complex128)
-        _direct_modes(np.ascontiguousarray(phase), np.ascontiguousarray(strengths), j0, j1, out)
-        return out
+@njit(cache=True)
+def _direct_rectangles(phase, constant, linear, rectangles, dt, out):  # pragma: no cover - numba
+    """Accumulate exact triangle moments without one Python callback per rectangle."""
+    for r in range(rectangles.shape[0]):
+        j0, j1, lo, hi = rectangles[r]
+        for j in range(j0, j1):
+            re0 = im0 = re1 = im1 = 0.0
+            for k in range(lo, hi):
+                angle = -j * phase[k]
+                c, s = np.cos(angle), np.sin(angle)
+                re0 += constant[k] * c
+                im0 += constant[k] * s
+                re1 += linear[k] * c
+                im1 += linear[k] * s
+            out[j] += complex(re0 - dt * j * re1, im0 - dt * j * im1)
 
-    return transform
+
+def _positive_modes(E, a, w, c0, period, eps):
+    """Host exact-cutoff partition with small rectangles accumulated in one call.
+
+    Same triangle moments as ``partitioned_positive_modes``; only their host
+    scheduling differs. Large rectangles retain the ES NUFFT.
+
+    Validation: cxr-line-fourier-reduction
+    """
+    dt = 2.0 * np.pi / period
+    counts = np.floor(2.0 * a / dt).astype(np.int64)
+    order = np.argsort(counts, kind="stable")
+    counts = counts[order]
+    positive = np.zeros(int(counts[-1]) + 1, dtype=np.complex128)
+    phase = np.ascontiguousarray((E[order] - c0) * dt)
+    constant = np.ascontiguousarray(w[order] * np.pi / a[order])
+    linear = np.ascontiguousarray(constant / (2.0 * a[order]))
+    rectangles = cutoff_rectangle_array(counts)
+    modes = rectangles[:, 1] - rectangles[:, 0]
+    sources = rectangles[:, 3] - rectangles[:, 2]
+    large = (
+        (sources >= _NUFFT_MIN_SOURCES)
+        & (modes >= _NUFFT_MIN_MODES)
+        & (sources * modes >= _NUFFT_MIN_WORK)
+    )
+    _direct_rectangles(phase, constant, linear, rectangles[~large], dt, positive)
+    for j0, j1, lo, hi in rectangles[large]:
+        strengths = np.stack((constant[lo:hi], linear[lo:hi]))
+        moments = host_es_mode_transform(phase[lo:hi], strengths, j0, j1, eps=eps)
+        positive[j0:j1] += moments[0] - dt * np.arange(j0, j1) * moments[1]
+    return positive
 
 
 def host_fourier_bin_mean_reduce(
@@ -164,7 +195,7 @@ def host_fourier_bin_mean_reduce(
     n_fft, P, _ = fourier_period(
         np.array([E.min(), E.max()]), np.array([a.min()]), c0, h, n_bins, residual_tol=residual_tol
     )
-    positive = partitioned_positive_modes(E, a, w, c0, P, _hybrid_transform(eps))
+    positive = _positive_modes(E, a, w, c0, P, eps)
     t = (2.0 * np.pi / P) * np.arange(positive.size, dtype=np.float64)
     positive *= np.sinc(t * (h / (2.0 * np.pi)))
     positive[0] = 0.0
