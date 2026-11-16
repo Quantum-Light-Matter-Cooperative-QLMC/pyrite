@@ -439,8 +439,8 @@ class CxrGridPolicy:
             payload["schema"] = QUADRATURE_CXR_GRID_POLICY_SCHEMA
             payload["quadrature"] = self.quadrature
         if self.bandwidth_policy == RESONANCE_BANDWIDTH_POLICY:
-            # stop_eV stays the closed-form ceiling: the cap the measured edge
-            # may not exceed, and the placeholder grid's extent.
+            # stop_eV stays the clamped closed-form ceiling: the cap the
+            # measured edge may not exceed, and the placeholder grid's extent.
             payload["schema"] = RESONANCE_CXR_GRID_POLICY_SCHEMA
             payload["bandwidth"] = {
                 **payload["bandwidth"],

@@ -170,7 +170,10 @@ def test_high_energy_hbn_builds_under_measured_bandwidth(monkeypatch):
     case = build_cases(sweep, n_electrons=2, n_electrons_brem=2)[0]
     bandwidth = case["line_grid_policy"]["bandwidth"]
     assert bandwidth["policy"] == RESONANCE_BANDWIDTH_POLICY
-    assert bandwidth["stop_eV"] == 1_720_800.0
+    # The ceiling is the clamped default stop (#1243): the 1720.8 keV kinematic
+    # bound passes the atomic data's end, so both policies stop below it.
+    assert bandwidth["stop_eV"] == 966_200.0
+    assert case["line_grid_policy"]["sources"]["stop_eV"] == "atomic data ceiling"
 
 
 def _audited_case(limit=1e-4):
@@ -229,7 +232,7 @@ def test_audit_at_the_kinematic_ceiling_warns_instead_of_refusing():
     _accumulate_edge_truncation(
         audit, xp.asarray([900.0]), xp.asarray([np.pi / 100.0]), xp.asarray([1.0])
     )
-    with pytest.warns(CxrGridTruncationWarning, match="kinematic ceiling"):
+    with pytest.warns(CxrGridTruncationWarning, match="line-axis ceiling"):
         record = check_cxr_truncation(case, audit)
     assert record["capped_at_ceiling"]
     assert record["upper_fraction_bound"] > 1e-4

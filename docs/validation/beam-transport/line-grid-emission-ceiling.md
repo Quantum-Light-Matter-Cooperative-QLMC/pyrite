@@ -799,3 +799,162 @@ Suggested ledger edit: change `discrepancy` to `rederived` for
 - add a batched-mask anchor.
 
 The task owner applies any change. This is not human sign-off.
+
+## Independent re-verification 3 (fresh-context 2026-11-16, measured-bandwidth ceiling, #1243)
+
+Scope: commit `f860f3945` (`git diff main...HEAD`). The change removes the
+early return in `campaign/sweep.py::_automatic_cxr_grid_policy` that handed a
+`resonance-population` policy back before the energy-conservation and
+atomic-data clamps. Claims covered: `line-grid-emission-ceiling` (primary)
+and the ceiling clause of `line-grid-resonance-bandwidth`. The verifier read
+the ledger rows first, then derived the expected ceiling and its
+consequences below, and only then read the consumers (`_measured_cxr_grid`,
+`case_cxr_stop_eV`, `resonance_population_stop_eV`, `check_cxr_truncation`,
+`_accumulate_edge_truncation`, `_line_tabulation_grid`).
+
+### Independent derivation
+
+Let $\Delta = 100$ eV, $E_{\rm up} = E_0(1+6f)$, and let $E_{\rm data}$ be the
+first NaN onset of the line tables. The three lattice limits are
+
+$$
+R_{\rm res} = \Delta\left\lceil \frac{\hbar c\,\beta_{\rm up}\lvert\mathbf g\rvert_{\max}}{\Delta(1-\beta_{\rm up})}\right\rceil,\qquad
+R_{\rm kin} = \Delta\left\lceil \frac{E_{\rm up}}{\Delta}\right\rceil,\qquad
+R_{\rm data} = \Delta\left(\left\lceil \frac{E_{\rm data}}{\Delta}\right\rceil - 1\right),
+$$
+
+and the ceiling is $C = \min(R_{\rm res}, R_{\rm kin}, R_{\rm data})$ when
+$E_{\rm start} < \min(R_{\rm kin}, R_{\rm data})$, else $C = R_{\rm res}$. The
+default `kinematic-ceiling` axis ends at $C$. Under a selection cap
+(`line_yield_tolerance` set), $\lvert\mathbf g\rvert_{\max}$ is the
+$F_0$-range bound $4\pi\cdot 6 = 75.398$ Å$^{-1}$.
+
+Required properties of the measured axis with ceiling $C$:
+
+1. **Stop at or below $C$.** The population search returns
+   $S \le C$, so the measured axis is a subset of the default axis
+   $[E_{\rm start}, C]$.
+2. **Capping the search at $C$ loses no line mass the default axis keeps.**
+   Both axes end at or below $C$, so no node above $C$ is dropped relative to
+   the default. Lines whose classical (no-recoil) resonance lies above
+   $E_{\rm up}$ cannot carry a physical photon. Lines above $E_{\rm data}$
+   have NaN factors and are already masked by every line route. Collecting
+   the population on $[E_{\rm start}, C]$ changes only the keep window
+   $[E_{\rm start} - p, C + p]$ with $p = 0.2(C - E_{\rm start})$. Lines beyond
+   $C + p$ drop out of the stop search's total and lost-mass sums. They fall
+   into the two empty classes above, and the default axis does not score
+   them either.
+3. **Truncation audit.** `capped_at_ceiling` is $S \ge C$, so a case whose
+   search runs out at $C$ warns rather than refuses. The warning's premise
+   is that the measured policy cut nothing the default keeps. With
+   $C = R_{\rm kin}$ or $R_{\rm data}$, that premise still holds because the
+   default axis ends at the same $C$.
+4. **Identity.** $C$ enters the hashed `line_grid_policy` payload as
+   `bandwidth.stop_eV`, with `sources["stop_eV"]` naming the binding clamp.
+   When neither clamp binds ($C = R_{\rm res}$), the code path returns the
+   unmodified policy, so the payload must not change.
+
+### Implementation comparison
+
+- `sweep.py`: the clamp block now runs for both bandwidth policies, using
+  the same `limits` dict, per-limit rounding, `start < cap < stop` guard and
+  `sources["stop_eV"]` label. This matches $C$ above.
+- `cxr_grid.py::_measured_cxr_grid` reads `ceiling = bandwidth["stop_eV"]`
+  (now $C$). It passes $C$ to `evidence.populations` (collection on
+  `[start, ceiling]`) and to `case_cxr_stop_eV`.
+- `cxr_seeds.py::case_cxr_stop_eV` and `resonance_population_stop_eV` both
+  return `min(ceiling_eV, ...)`, so $S \le C$ (property 1).
+- `cxr_grid.py::check_cxr_truncation` compares `audit["stop_eV"] >= ceiling`
+  against the same payload value. Because $S$ is produced by `min(C, ...)`,
+  a capped case is exactly equal and is flagged (property 3).
+- The streamed and adaptive grid paths (`streamed_line_grid.py:57`,
+  `adaptive.py:272`) and `energy_grid/bandwidth_check.py` read the band from
+  the same payload, so they inherit $C$ consistently.
+
+### Numerical evidence (CPU, project environment, no transport)
+
+The $R$, $K$ and $D$ columns are computed independently of the
+implementation helpers: $\hbar c = 1973.27$ eV Å, $m_ec^2 = 510998.95$ eV,
+with Å$^{-1}$ from the catalog lattice. Only $E_{\rm data}$ comes from
+`_cxr_emission_ceiling`. The measured and default columns come from
+`_automatic_cxr_grid_policy` on the branch; the last column is from a
+detached checkout of `main`.
+
+| Case | $R_{\rm res}$ | $R_{\rm kin}$ | $R_{\rm data}$ | $C$ | measured = default | label | `main` measured |
+|---|---|---|---|---|---|---|---|
+| MoS$_2$ 30 keV, tol $10^{-3}$ | 72.8 keV | 30.0 keV | 966.2 keV | 30.0 keV | 30.0 keV | energy conservation | 72.8 keV |
+| MoS$_2$ 60 keV, tol $10^{-3}$ | 119.9 keV | 60.0 keV | 966.2 keV | 60.0 keV | 60.0 keV | energy conservation | 119.9 keV |
+| MoS$_2$ 30 keV, $f=0.01$, tol $10^{-3}$ | 75.8 keV | 31.8 keV | 966.2 keV | 31.8 keV | 31.8 keV | energy conservation | 75.8 keV |
+| HOPG 5 MeV | 1708.0 keV | 5000 keV | 966.2 keV | 966.2 keV | 966.2 keV | atomic data ceiling | 1708.0 keV |
+| h-BN 5 MeV | 1720.8 keV | 5000 keV | 966.2 keV | 966.2 keV | 966.2 keV | atomic data ceiling | 1720.8 keV |
+| HOPG 50 MeV | 144.4 MeV | 50 MeV | 966.2 keV | 966.2 keV | 966.2 keV | atomic data ceiling | (not run) |
+| HOPG 30 keV, $f=0.01$ | 3.8 keV | 31.8 keV | 966.2 keV | 3.8 keV | 3.8 keV | none | 3.8 keV |
+| HOPG 300 keV | 25.7 keV | 300 keV | 966.2 keV | 25.7 keV | 25.7 keV | none | 25.7 keV |
+
+For the MoS$_2$ rows, $R_{\rm res}$ is taken at $\lvert\mathbf g\rvert = 75.398$
+Å$^{-1}$; the 72.8 and 119.9 keV `main` values reproduce the SLURM
+13257/13260 stops cited in the ledger. The independent $C$ equals the
+measured and the default stop in every row, and the payload `bandwidth.stop_eV`
+equals $C$.
+
+Identity: payload SHA-256 values (`json.dumps(sort_keys=True)`) were compared
+across `main` and the branch for 18 policies, covering the cases above plus
+HOPG and MoS$_2$ at 30 keV without a cap, each under measured and default
+bandwidth. Exactly the five measured policies whose clamp binds changed hash.
+Every default policy and every non-binding measured policy (HOPG 30 keV
+spread, HOPG 300 keV, HOPG 30 keV, MoS$_2$ 30 keV uncapped) is bit-identical.
+
+Anchors: `pyrite-dev test tests/energy-grid/test_line_grid_policy.py
+tests/energy-grid/test_line_grid_bandwidth.py` passes: 64 passed, rc 0.
+
+### Answer to the audit question (property 3)
+
+Yes, a measured case can now warn where it previously refused. Before the
+change, the ceiling was $R_{\rm res} > C$. A selection-capped MoS$_2$ case
+whose population could not meet $\varepsilon$ below some $S_{\rm old}$ with
+$C < S_{\rm old} < R_{\rm res}$ was scored on an axis past $E_0$. If its
+audited upper fraction exceeded $\varepsilon$, it was refused. Now the
+search stops at $S = C$, `capped_at_ceiling` is true, and the case warns
+(`CxrGridTruncationWarning`).
+
+This is sound under the stated contract: the measured policy never keeps
+less than the default axis, which ends at the same $C$. Above $R_{\rm kin}$
+the mass is classical no-recoil resonance that no photon can carry. Above
+$R_{\rm data}$ the kernels drop the lines as NaN. The warning is not an
+$\varepsilon$-accuracy certificate, and it was not one at $R_{\rm res}$
+either.
+
+### Filters
+
+| Filter | Result |
+|---|---|
+| Units | pass: eV throughout; keV $\to$ eV once in `limits` |
+| Limits | pass: an unbound clamp ($C = R_{\rm res}$) leaves the measured payload unchanged; $E_{\rm data} = \infty$ and $f = 0$ reduce as in re-verification 2 |
+| Ordering / signs | pass: $S \le C \le R_{\rm res}$; `capped_at_ceiling` uses exact equality from `min` |
+| Notation across ledger, code, docs | concern (minor, wording only), see below |
+
+### Minor findings (non-blocking)
+
+- **Stale "kinematic" wording.** The `check_cxr_truncation` warning text
+  says "reaches the kinematic ceiling", and its comment says "no line
+  resonates above it". With $C = R_{\rm kin}$, classical lines can resonate
+  above $C$, although no physical photon can. With $C = R_{\rm data}$, lines
+  above it are NaN-dropped. The docstring of `resonance_population_stop_eV`
+  still calls `ceiling_eV` "the closed-form bound of
+  `line-grid-kinematic-bandwidth`". Suggested wording: "the clamped
+  `line-grid-emission-ceiling` stop". The behaviour is correct.
+- **Guard edge (pre-existing, shared by both policies).** If
+  $\min(R_{\rm kin}, R_{\rm data}) \le E_{\rm start}$, the guard returns the
+  unclamped $R_{\rm res}$ for both policies. Both axes then agree, and no
+  catalog case was found in this regime.
+
+### Verdict
+
+- **Claim**: `line-grid-emission-ceiling` (`campaign/sweep.py::_automatic_cxr_grid_policy`, $C=\min(R_{\rm res},R_{\rm kin},R_{\rm data})$), and the ceiling clause of `line-grid-resonance-bandwidth` (`cxr_seeds.py::case_cxr_stop_eV`/`resonance_population_stop_eV`, `cxr_grid.py::check_cxr_truncation`).
+- **Filters**: units pass; limits pass; signs and conventions pass; notation has a minor concern (stale "kinematic ceiling" wording).
+- **Re-derivation**: `matches`. There is no divergent factor.
+- **Verdict**: `rederived` for `line-grid-emission-ceiling`, still conditional on `line-grid-kinematic-bandwidth` for $R_{\rm res}$. `rederived` for the ceiling clause of `line-grid-resonance-bandwidth`; the rest of that claim is not re-adjudicated here.
+- **Suggested ledger change**: none to Status from this pass beyond keeping
+  `rederived`. Optionally, update the stale "kinematic ceiling" wording in
+  `check_cxr_truncation` and the `resonance_population_stop_eV` docstring.
+  The task owner applies any change. This is not human sign-off.

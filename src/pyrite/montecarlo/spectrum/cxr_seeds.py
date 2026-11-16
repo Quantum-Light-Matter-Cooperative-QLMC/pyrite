@@ -244,8 +244,8 @@ def resonance_population_stop_eV(
     Assumptions: each line's coefficient is constant in energy, as in the
     production kernel. The spectrum phase measures the truncated fraction again
     and the runner refuses a case above its share. ``stop`` never exceeds
-    ``ceiling_eV``, the closed-form
-    bound of ``line-grid-kinematic-bandwidth``; a population that cannot meet
+    ``ceiling_eV``, the clamped ``line-grid-emission-ceiling`` stop (at most
+    the closed-form bound of ``line-grid-kinematic-bandwidth``); a population that cannot meet
     the limit below it returns the ceiling.
 
     Lines resonating above ``stop`` count wholly, so a population may leave its
