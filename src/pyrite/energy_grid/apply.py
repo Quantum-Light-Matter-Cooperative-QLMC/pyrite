@@ -328,8 +328,46 @@ def _nonuniform_summary(nodes, kind: str) -> str:
     return f"[{float(nodes[0]):g}, {float(nodes[-1]):g}] eV x {nodes.size} pts ({kind})"
 
 
+def automatic_brem(material: str) -> dict:
+    """The report for MATERIAL's undeclared continuum grid: automatic, per case (#278).
+
+    An undeclared ``E_grid_brem`` gives each case
+    :func:`pyrite._continuum_grid.automatic_continuum_grid`, refined geometric
+    from the medium floor to one log step past that case's beam energy, so
+    only the floor is a property of the material. A layered target raises it
+    to the highest floor of its stack (#1164); that floor needs the case's
+    target and is not reported here. ``floor_eV`` is ``None`` when the active
+    catalog cannot resolve the medium (a scratch catalog naming new materials).
+    """
+    from pyrite._continuum_grid import CONTINUUM_GRID_MODEL, CONTINUUM_LOG_STEP
+    from pyrite._photon_continuum_floor import photon_continuum_floor_eV
+
+    try:
+        floor: float | None = float(photon_continuum_floor_eV(material))
+    except (KeyError, ValueError):
+        floor = None
+    return {
+        "kind": "automatic",
+        "model": CONTINUUM_GRID_MODEL,
+        "log_step": CONTINUUM_LOG_STEP,
+        "floor_eV": floor,
+    }
+
+
+def automatic_brem_summary(log_step: float) -> str:
+    """One-line semantics of the automatic continuum grid, shared by every report."""
+    return (
+        f"automatic refined-geometric (dlnE = {log_step:g}); "
+        "start = material floor; stop = one step past case beam energy"
+    )
+
+
 def _band_summary(band: Mapping) -> str:
     """Render one resolved ``E_grid_brem`` band for the text report."""
+    if band.get("kind") == "automatic":
+        floor = band["floor_eV"]
+        floor_text = "floor unresolved" if floor is None else f"floor {floor:.4g} eV"
+        return f"automatic refined-geometric (dlnE = {band['log_step']:g}); {floor_text}"
     if band.get("kind") == "arange":
         return f"[{band['start']:g}, {band['stop']:g}] eV step {band['step']:g}"
     return _nonuniform_summary(band["nodes"], str(band["kind"]))
@@ -346,6 +384,28 @@ def _grid_summary(descriptor, field: str) -> str:
     return _nonuniform_summary(resolve_grid_descriptor(descriptor, field), kind)
 
 
+def _brem_profile_row(raw: dict, material: str, profile: str) -> dict:
+    """The profile row whose ``E_grid_brem`` applies to MATERIAL (membership fallback)."""
+    profiles = raw.get("profiles", {})
+    selected = profiles.get(profile, {})
+    members = selected.get("materials")
+    if members is not None and material not in members:
+        selected = profiles.get("standard", {})
+    return selected
+
+
+def brem_declared(raw: dict, material: str, profile: str = "standard") -> bool:
+    """Whether MATERIAL's profile or override declares ``E_grid_brem``.
+
+    Mirrors the catalog parser's ``E_grid_brem_declared``: an undeclared grid
+    resolves the automatic refined geometric grid per case (#278), not the
+    built-in uniform band :func:`effective_brem` falls back to.
+    """
+    selected = _brem_profile_row(raw, material, profile)
+    override = selected.get("overrides", {}).get(material, {})
+    return "E_grid_brem" in override or "E_grid_brem" in selected
+
+
 def effective_brem(raw: dict, material: str, profile: str = "standard"):
     """Effective ``E_grid_brem`` band for MATERIAL: its own
     profile override, else that profile's default or the built-in uniform grid.
@@ -355,11 +415,7 @@ def effective_brem(raw: dict, material: str, profile: str = "standard"):
     """
     from pyrite.materials._schema import DEFAULT_BREM_GRID
 
-    profiles = raw.get("profiles", {})
-    selected = profiles.get(profile, {})
-    members = selected.get("materials")
-    if members is not None and material not in members:
-        selected = profiles.get("standard", {})
+    selected = _brem_profile_row(raw, material, profile)
     override = selected.get("overrides", {}).get(material, {})
     start, stop, step = DEFAULT_BREM_GRID
     default = {"arange": {"start": start, "stop": stop, "step": step}}
@@ -912,12 +968,12 @@ def resolved_show_inputs(
 ) -> tuple[dict, dict, dict[str, dict | None], dict[str, str]]:
     """Resolve show payloads from explicit artifacts, then own legacy rows.
 
-    Bremsstrahlung ``start`` is reported as the band a case will actually be
-    evaluated over, not as the number the row happens to store: a declared
-    start below the medium's derived photon-continuum floor is raised, the same
-    way ``campaign/sweep.py::build_cases`` raises it. The built-in default
-    starts at ``0.0`` precisely because it names no medium, so showing it verbatim
-    would report a band no case ever gets.
+    An undeclared continuum grid is reported as :func:`automatic_brem`, the
+    refined geometric grid every case resolves (#278), never as the legacy
+    built-in uniform band. Bremsstrahlung ``start`` is reported as the band a
+    case will actually be evaluated over, not as the number the row happens to
+    store: a declared start below the medium's derived photon-continuum floor
+    is raised, the same way ``campaign/sweep.py::build_cases`` raises it.
     """
     path = Path(active_catalog_path() if catalog_path is None else catalog_path)
     raw = read_raw(path)
@@ -927,7 +983,12 @@ def resolved_show_inputs(
     materials = raw.get("materials", {})
     energy_grids = dict(raw.get("energy_grids", {}))
     refs = dict(profiles[profile].get("energy_grid_refs", {}))
-    brem_by_material = {key: effective_brem(raw, key, profile) for key in materials}
+    brem_by_material = {
+        key: effective_brem(raw, key, profile)
+        if brem_declared(raw, key, profile)
+        else automatic_brem(key)
+        for key in materials
+    }
     store_root = _artifact_store_root(path)
     for material, digest in refs.items():
         if material not in materials:
@@ -993,7 +1054,9 @@ def show_rows(
     """Configured energy grids as ``(material, [(setting, value, provenance)])``.
 
     ``band`` filters the rows: ``"line"`` only line grids, ``"brem"`` only
-    bremsstrahlung, ``None`` (default) both.
+    bremsstrahlung, ``None`` (default) both. Without ``material``, automatic
+    continuum grids differ only by floor, so they fold into one trailing
+    ``automatic brem`` block instead of repeating per material.
     """
     raw, energy_grids, brem_by_material, refs = resolved_show_inputs(
         profile=profile, catalog_path=catalog_path
@@ -1003,6 +1066,7 @@ def show_rows(
         raise ValueError(f"unknown material: {material}")
     keys = [material] if material else list(mats)
     blocks = []
+    automatic: dict[str, float | None] = {}
     for key in keys:
         rows = []
         if key in refs:
@@ -1022,11 +1086,31 @@ def show_rows(
                 )
         if band in (None, "brem"):
             brem = brem_by_material.get(key)
-            if brem:
+            if brem and brem.get("kind") == "automatic":
+                if material is None:
+                    automatic[key] = brem["floor_eV"]
+                else:
+                    rows.append(("brem grid", _band_summary(brem), "automatic (default)"))
+            elif brem:
                 rec = _provenance.get_brem(key, profile=profile)
                 rows.append(("brem grid", _band_summary(brem), rec["source"] if rec else "derived"))
-        blocks.append((key, rows))
+        if rows:
+            blocks.append((key, rows))
+    if automatic:
+        blocks.append(("automatic brem", _automatic_rows(automatic)))
     return blocks
+
+
+def _automatic_rows(floors: Mapping[str, float | None]) -> list[tuple[str, str, str]]:
+    """Summary rows for the materials whose continuum grid is automatic."""
+    from pyrite._continuum_grid import CONTINUUM_LOG_STEP
+
+    known = [floor for floor in floors.values() if floor is not None]
+    span = f"floors {min(known):.3g}-{max(known):.3g} eV" if known else "floors unresolved"
+    return [
+        ("brem grid", automatic_brem_summary(CONTINUUM_LOG_STEP), "automatic (default)"),
+        ("materials", f"{len(floors)} ({span}); name one for its floor", "-"),
+    ]
 
 
 def show(material=None, band=None, *, profile: str = "standard", catalog_path=None) -> str:

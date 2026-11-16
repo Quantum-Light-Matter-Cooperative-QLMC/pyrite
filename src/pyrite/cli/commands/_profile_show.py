@@ -1,13 +1,14 @@
 """Human profile summary, grouped by the CLI's settings owners."""
 
+from pyrite._continuum_grid import CONTINUUM_LOG_STEP
 from pyrite._energy_grid_encoding import encode_energy_grid
 from pyrite._numerics import PHYSICS_KEYS
 from pyrite.campaign import _profile_document, profile_cxr_grid, profile_detectors
 from pyrite.cli import _catalog_io
 from pyrite.console.output import emit_result
 from pyrite.console.tables import display, emit_settings, emit_table
+from pyrite.energy_grid.apply import automatic_brem_summary
 from pyrite.materials._catalog_decode import resolve_grid_descriptor
-from pyrite.materials._schema import DEFAULT_BREM_GRID
 
 
 def _display(value):
@@ -63,9 +64,7 @@ def energy_grid_rows(document, target):
     if "E_grid_brem" in target:
         brem = _grid_summary(target["E_grid_brem"], brem=True) + " (profile)"
     else:
-        start, stop, step = DEFAULT_BREM_GRID
-        brem = _grid_summary({"arange": {"start": start, "stop": stop, "step": step}}, brem=True)
-        brem += " (default)"
+        brem = automatic_brem_summary(CONTINUUM_LOG_STEP) + " (default)"
     rows.append(("brem default", brem))
     if policy and "E_grid_line" in target:
         rows.append(

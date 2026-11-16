@@ -1768,7 +1768,11 @@ def test_show_wraps_values_and_wide_keeps_them_on_one_line(tmp_path, monkeypatch
 @pytest.mark.parametrize(
     ("descriptor", "expected"),
     [
-        (None, "uniform 25 eV; start = material floor; stop = case beam energy + step (default)"),
+        (
+            None,
+            "automatic refined-geometric (dlnE = 0.0025); start = material floor; "
+            "stop = one step past case beam energy (default)",
+        ),
         (
             "{ arange = { start = 500.0, stop = 1000.0, step = 10.0 } }",
             "uniform 10 eV; start = max(500 eV, material floor); stop = case beam energy + step (profile)",

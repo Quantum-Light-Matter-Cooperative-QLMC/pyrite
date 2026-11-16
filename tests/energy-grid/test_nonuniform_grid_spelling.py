@@ -239,3 +239,60 @@ def test_effective_brem_uses_builtin_default_and_membership_fallback():
     assert (explicit["start"], explicit["step"]) == (100.0, 50.0)
     raw["profiles"]["standard"]["E_grid_brem"] = 0.0
     assert apply.effective_brem(raw, "mos2", "custom") is None  # explicit scalar is not omission
+
+
+UNDECLARED_BREM = "E_grid_brem = { arange = { start = 0.0, stop = 136500.0, step = 25.0 } }\n"
+
+
+@pytest.fixture
+def automatic_catalog(tmp_path):
+    """BASE_TOML with no ``E_grid_brem`` anywhere: hopg resolves the automatic grid."""
+    assert UNDECLARED_BREM in BASE_TOML
+    path = tmp_path / "materials.toml"
+    path.write_text(BASE_TOML.replace(UNDECLARED_BREM, ""))
+    return path
+
+
+def test_undeclared_brem_reports_automatic_grid_not_legacy_band(automatic_catalog):
+    """#278: an undeclared grid is the automatic refined geometric one, per case."""
+    from pyrite._continuum_grid import CONTINUUM_GRID_MODEL, automatic_continuum_grid
+
+    raw, _, brem_by_material, _ = apply.resolved_show_inputs(catalog_path=automatic_catalog)
+    assert not apply.brem_declared(raw, "hopg")
+    brem = brem_by_material["hopg"]
+    assert brem["kind"] == "automatic"
+    assert brem["model"] == CONTINUUM_GRID_MODEL
+    # The reported floor is the first node every case's grid actually starts at.
+    assert brem["floor_eV"] == pytest.approx(automatic_continuum_grid("hopg", 30e3)[0])
+    assert "step" not in brem
+
+
+def test_show_folds_automatic_brem_unless_material_named(automatic_catalog):
+    folded = apply.show(band="brem", catalog_path=automatic_catalog)
+    assert "=== hopg ===" not in folded
+    assert "=== automatic brem ===" in folded
+    assert "materials: 1 (floors " in folded
+    assert "step 25" not in folded
+
+    named = apply.show("hopg", "brem", catalog_path=automatic_catalog)
+    assert "brem grid: automatic refined-geometric (dlnE = 0.0025); floor " in named
+    assert "[automatic (default)]" in named
+
+
+def test_json_show_describes_automatic_brem(automatic_catalog):
+    raw, energy_grids, brem_by_material, refs = apply.resolved_show_inputs(
+        catalog_path=automatic_catalog
+    )
+    result = cli_json.cxr_grid_show(
+        raw["materials"],
+        energy_grids,
+        brem_by_material,
+        {"hopg": {"brem": {"source": "derived job ? (2026-07-22)"}}},
+        artifact_refs=refs,
+    )
+    brem = result.payload["materials"][0]["brem_grid"]
+    assert result.errors == ()
+    assert brem["kind"] == "automatic"
+    assert brem["floor_eV"] == pytest.approx(brem_by_material["hopg"]["floor_eV"])
+    # Legacy sidecar records describe the retired band, not this grid.
+    assert brem["provenance"] == {"source": "automatic", "note": None}

@@ -340,9 +340,9 @@ def cxr_grid_show(
     derived-grid store (``[energy_grids.*]``, decision 3,
     docs/adr/0005-energy-grid-schema-decisions.md) whose rows carry their own
     ``source`` inline; ``brem_by_material`` is each material's already-resolved
-    effective ``E_grid_brem`` arange (:func:`pyrite.energy_grid.apply.effective_brem`,
+    effective ``E_grid_brem`` band (:func:`pyrite.energy_grid.apply.effective_brem`,
     ``profiles.standard.overrides.MATERIAL`` or the ``profiles.standard``
-    default). ``provenance`` is the tool-owned sidecar, consulted only for
+    default), or the ``automatic`` report when neither declares one. ``provenance`` is the tool-owned sidecar, consulted only for
     optional line-grid notes and for bremsstrahlung's separate manual/derived
     tracking. ``band`` filters the emitted grids: ``"line"`` omits
     ``brem_grid``, ``"brem"`` omits ``cxr_grids``, ``None`` (default) keeps
@@ -389,10 +389,12 @@ def cxr_grid_show(
         try:
             brem = brem_by_material.get(material) if show_brem else None
             if brem is not None:
-                brem_output = {
-                    **_brem_grid_payload(brem),
-                    "provenance": _provenance_record(material_provenance.get("brem", {})),
-                }
+                record = (
+                    {"source": "automatic"}
+                    if brem.get("kind") == "automatic"
+                    else material_provenance.get("brem", {})
+                )
+                brem_output = {**_brem_grid_payload(brem), "provenance": _provenance_record(record)}
         except (KeyError, TypeError, ValueError) as exc:
             errors.append(_error("invalid_brem_grid", str(exc), item=material))
         output.append(
@@ -448,8 +450,20 @@ def _cxr_grid_payload(grid: object, energy: float) -> dict[str, object]:
 
 
 def _brem_grid_payload(brem: Mapping[str, Any]) -> dict[str, object]:
-    """One resolved brem band as JSON; ``arange`` keeps its legacy shape."""
+    """One resolved brem band as JSON; ``arange`` keeps its legacy shape.
+
+    ``automatic`` (no declared grid, #278) carries no nodes: they depend on each
+    case's beam energy, so only the model, log step and medium floor are given.
+    """
     kind = brem.get("kind", "arange")
+    if kind == "automatic":
+        floor = brem.get("floor_eV")
+        return {
+            "kind": "automatic",
+            "model": _text(brem["model"]),
+            "log_step": float(brem["log_step"]),
+            "floor_eV": None if floor is None else float(floor),
+        }
     if kind == "arange":
         return {
             "kind": "arange",

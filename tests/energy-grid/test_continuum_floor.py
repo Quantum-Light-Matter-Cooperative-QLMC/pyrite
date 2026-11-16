@@ -390,9 +390,11 @@ def test_derived_brem_band_is_not_written_as_a_uniform_override():
     assert "E_grid_brem" not in overrides.get("hopg", {})
 
 
-def test_diagnostic_band_and_installed_grid_agree_on_where_the_band_starts():
+def test_diagnostic_band_and_installed_grid_agree_on_where_the_band_starts(tmp_path):
     """The stop is measured on one grid and installed on another; both are floored."""
     diagnostic = wide_brem_grid("hopg")
-    _, _, brem_by_material, _ = resolved_show_inputs()
+    catalog = tmp_path / "materials.toml"
+    catalog.write_text(BASE_TOML)  # declares a uniform 25 eV band
+    _, _, brem_by_material, _ = resolved_show_inputs(catalog_path=catalog)
 
     assert float(diagnostic[0]) == float(brem_by_material["hopg"]["start"])
