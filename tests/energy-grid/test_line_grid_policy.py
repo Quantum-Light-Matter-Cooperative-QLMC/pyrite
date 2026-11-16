@@ -244,7 +244,9 @@ def test_high_energy_hbn_rejects_impossible_budget_before_transport(monkeypatch)
     assert "No transport was started" in message
 
 
-def _automatic_policy(material, energy_keV, per_call=None, energy_spread_frac=None):
+def _automatic_policy(
+    material, energy_keV, per_call=None, energy_spread_frac=None, line_yield_tolerance=None
+):
     from types import SimpleNamespace
 
     from pyrite.campaign.geometry import crystal_params
@@ -258,7 +260,7 @@ def _automatic_policy(material, energy_keV, per_call=None, energy_spread_frac=No
         beam=beam,
         target=target,
         n_families=4,
-        line_yield_tolerance=None,
+        line_yield_tolerance=line_yield_tolerance,
     )
     return _automatic_cxr_grid_policy(sweep, crystal_params(material), energy_keV)
 
@@ -305,19 +307,40 @@ def test_automatic_stop_is_capped_at_the_beam_kinetic_energy(monkeypatch):
     assert dict(policy.sources)["stop_eV"] == "energy conservation"
 
 
-def test_measured_bandwidth_keeps_the_kinematic_cap():
+_MEASURED = {
+    "bandwidth": "resonance-population",
+    "resolution": "resonance-local",
+    "quadrature": "bin-mean",
+}
+
+
+def test_measured_bandwidth_ceiling_is_the_clamped_default_stop():
     """Validation: line-grid-emission-ceiling"""
-    policy = _automatic_policy(
-        "hopg",
-        5000.0,
-        {
-            "bandwidth": "resonance-population",
-            "resolution": "resonance-local",
-            "quadrature": "bin-mean",
-        },
-    )
-    assert policy.stop_eV == _kinematic_stop("hopg", 5000.0)
-    assert "stop_eV" not in dict(policy.sources)
+    measured = _automatic_policy("hopg", 5000.0, _MEASURED)
+    default = _automatic_policy("hopg", 5000.0)
+    assert _kinematic_stop("hopg", 5000.0) > measured.stop_eV
+    assert measured.stop_eV == default.stop_eV
+    assert dict(measured.sources)["stop_eV"] == "atomic data ceiling"
+
+
+@pytest.mark.parametrize("energy_keV", [30.0, 60.0])
+def test_measured_selection_cap_ceiling_stays_below_the_beam_energy(energy_keV):
+    """A sub-100 keV selection-capped case cannot measure a stop above E0 (#1243).
+
+    The selection cap |g| = 75 1/A puts the kinematic bound far above the beam
+    energy; the measured bandwidth used to keep that unclamped bound as its
+    ceiling, so its population stop landed above E0 (72.8 keV at 30 keV MoS2).
+
+    Validation: line-grid-emission-ceiling
+    """
+    from pyrite.montecarlo.runner.reflection_cutoff import F0_RANGE_INVANG
+
+    measured = _automatic_policy("mos2", energy_keV, _MEASURED, line_yield_tolerance=1.0e-3)
+    default = _automatic_policy("mos2", energy_keV, line_yield_tolerance=1.0e-3)
+    assert kinematic_cxr_stop_eV([F0_RANGE_INVANG], energy_keV) > energy_keV * 1.0e3
+    assert measured.stop_eV == default.stop_eV == energy_keV * 1.0e3
+    assert dict(measured.sources)["stop_eV"] == "energy conservation"
+    assert measured.payload()["bandwidth"]["stop_eV"] == energy_keV * 1.0e3
 
 
 def test_stored_row_still_wins_over_automatic_resolution():

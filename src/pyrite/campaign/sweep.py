@@ -705,14 +705,12 @@ def _automatic_cxr_grid_policy(sweep: Sweep, cp: dict, energy_keV: float) -> Cxr
     if sweep.line_yield_tolerance is not None:
         sources = {**dict(policy.sources), "bandwidth_reflections": SELECTION_CAP_BANDWIDTH_MODEL}
         policy = replace(policy, sources=tuple(sorted(sources.items())))
-    if policy.bandwidth_policy != AUTOMATIC_BANDWIDTH_POLICY:
-        # The measured bandwidth keeps the closed-form bound as its cap; its
-        # axis already stops where the case's own lines do.
-        return policy
     # The classical resonance bound has no electron recoil and can exceed the
     # beam's kinetic energy, which no photon can; and no line is scored at or
     # above the atomic data's end, where its couplings or attenuation are NaN
     # and the line kernels drop it. The axis stops at the lowest of the three.
+    # The measured bandwidth takes the same clamped stop as its ceiling: its
+    # population stop may not pass a limit the default axis respects (#1243).
     # The data limit rounds DOWN, strictly below its NaN onset: the coherent
     # route evaluates refraction on the output axis itself, so an upward-
     # rounded node past the onset would read NaN. Energy conservation rounds up.
