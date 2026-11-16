@@ -76,9 +76,10 @@ def characteristic(case, segs, count, n_hat, grid, cache):
         sub = {**segs, **{k: v[select] for k, v in host.items()}}
         sub["elec_id"] = np.zeros(select.size, dtype=ids.dtype)
         values[i] = score(sub, 1)
-    # Linearity check: the population score is the mean of the history scores.
+    # Linearity check: the population score is the mean of the history scores
+    # (rtol covers reduced-precision accumulation in the scorer).
     total = score({**segs, **host}, count) * count
-    if not np.isclose(values.sum(), total, rtol=1e-6, atol=1e-300):
+    if not np.isclose(values.sum(), total, rtol=1e-5, atol=1e-300):
         raise AssertionError(f"per-history characteristic {values.sum()} != population {total}")
     return values
 

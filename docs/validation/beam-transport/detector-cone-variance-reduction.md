@@ -418,3 +418,243 @@ fell outside the cone. These cover the in-band, out-of-band-forward
 the kill-in-cone partition, roulette with surviving weight $w/s$, and the
 per-primary $s_X/\sqrt N$ all match the independent derivation. This is not a
 radiation-yield, FOM or human sign-off result.
+
+## Fresh-context verification of the efficiency options (2026-11-16)
+
+Verifier context: fresh, did not write the implementation. Scope: only the
+two opt-in options, the energy gate `ConeSplit.min_energy_keV` ($E_{\min}$)
+and the angle-scaled roulette `ConeSplit.angle_scale` ($u_{\rm ref}$). The
+base estimator (likelihood ratio $P_Bh/\pi$, kill-in-cone partition, first
+roulette $s=\min(1,U/w_t)$, per-history sums) is taken as established by the
+independent re-derivation of 2026-11-15 above and is not redone. Inputs read before the derivation: the ledger row, the
+section "Efficiency options: energy gate and angle-scaled roulette" above, and
+that base derivation. The implementation bodies were read only after the
+derivation below was written.
+
+### Cheap filters
+
+- **Units.** $E$ and $E_{\min}$ are kinetic energies in keV, so the gate
+  compares like quantities. $\gamma=1+E/(m_ec^2)$ is dimensionless and the
+  angle $\vartheta$ is in radians, so $u=\gamma\vartheta$ and $u_{\rm ref}$
+  share units and $u/u_{\rm ref}$ is dimensionless. $s_u$ is a ratio of
+  dimensionless weights. Pass.
+- **Ranges.** A made copy has $w/s>0$, and $\max(1,(u/u_{\rm ref})^2)\ge1$,
+  so $0<s_u\le1$ for any $u_{\rm ref}>0$. No positive-mass copy is ever given
+  survival probability zero. The copy lies in the cone, so
+  $\vartheta\le\alpha<\pi/2$ and $u\le\gamma\alpha$ is finite. Pass.
+- **Limits.** $E_{\min}=0$: the gate never fires. $E_{\min}>E_0$: electron
+  kinetic energy never increases in transport, so every elastic event is
+  gated and the run is analog. $u_{\rm ref}\to\infty$: the formula's limit is
+  not the base estimator; only the disabled path is (finding below). Pass
+  with that caveat.
+
+### Derivation: energy gate
+
+Let $g(\mathcal S)\in\{0,1\}$ be a gate evaluated on the pre-deflection event
+state $\mathcal S$ (here $g=\mathbf 1[E\ge E_{\min}]$). Allow separate gates,
+$g_k$ for the kill and $g_c$ for the copy:
+
+$$
+\hat H=H^{\rm pre}+H^{\rm post}\bigl(1-g_k\mathbf 1_C\bigr)+g_c\,w\,H_c .
+$$
+
+Conditional on the pre-event history, which fixes $\mathcal S$ and hence
+$g_k$ and $g_c$, the base identity
+$\mathbb E[wH_c\mid\mathcal S]=\mathbb E[H^{\rm post}\mathbf 1_C\mid\mathcal S]$
+gives
+
+$$
+\mathbb E[\hat H\mid\mathcal S]-\mathbb E[H\mid\mathcal S]
+=(g_c-g_k)\,\mathbb E\!\left[H^{\rm post}\mathbf 1_C\mid\mathcal S\right].
+$$
+
+The estimator is therefore unbiased for any gate **iff** $g_c=g_k$ at every
+event with nonzero in-cone mass. Mismatched gates bias in a definite
+direction. Kill without copy ($g_k=1$, $g_c=0$) drops the in-cone future
+(low bias). Copy without kill ($g_c=1$, $g_k=0$) counts it twice (high bias).
+With $g_c=g_k=0$ the event is fully analog; with $g_c=g_k=1$ it is the base
+event.
+
+The gate must be a function of $\mathcal S$ (energy, position, incoming
+direction, element) only. It must not depend on anything drawn at or after
+the event's analog deflection, or on any future. A gate that read the analog
+outgoing direction would correlate $g_k$ with $\mathbf 1_C$ and break the
+conditional identity. The gate must use the energy at the event. An elastic
+event leaves $E$ unchanged, so the kill test and the copy see the same $E$.
+The induction over events in the base derivation then goes through
+unchanged: a gated event contributes its analog future, which later
+(possibly ungated) events estimate unbiasedly. The gate need not be monotone
+in energy; any event-state gate is unbiased.
+
+For "a gate above the beam energy reproduces analog" to hold bit for bit,
+not just in law, the gate must not change the primary's stream consumption.
+Split decisions draw from a separate event key, so a gated event consumes the
+same primary draws as an ungated one.
+
+### Derivation: angle-scaled roulette
+
+After the first roulette survives and the direction $\hat{\mathbf o}$ is drawn
+from $q$, the copy carries $w_1=w/s$ with $w=P_Bh(\theta)/\pi$. A second
+roulette keeps it with probability $s_u(\hat{\mathbf o},\mathcal S)\in(0,1]$,
+using a uniform $V$, and a survivor carries $w_1/s_u$. Suppose $V$ is
+independent of $\hat{\mathbf o}$, of the first-roulette uniform and of the
+copy's future. Then, conditional on $(\mathcal S,\hat{\mathbf o})$,
+
+$$
+\mathbb E\!\left[\mathbf 1[V<s_u]\,\frac{w_1}{s_u}H_c\,\Big|\,\mathcal S,\hat{\mathbf o}\right]
+=s_u\cdot\frac{w_1}{s_u}\,\mathbb E[H_c\mid\mathcal S,\hat{\mathbf o}]
+=w_1\,\mathbb E[H_c\mid\mathcal S,\hat{\mathbf o}].
+$$
+
+Integrating over $\hat{\mathbf o}\sim q$ returns the base event identity. So
+$s_u$ may depend on the sampled direction: the compensating factor $1/s_u$ is
+evaluated at the same $\hat{\mathbf o}$, and the correction is exact
+pointwise. The requirements are only:
+
+1. $s_u>0$ wherever $w_1H_c$ can be nonzero. This holds: $s_u>0$ for every
+   made copy.
+2. $s_u$ is fixed before the copy's future is simulated. It uses only
+   $\mathcal S$, $w_1$ and $\hat{\mathbf o}$.
+3. $V$ is uniform and independent of the draws that produced
+   $\hat{\mathbf o}$ and of the first-roulette uniform. If $V$ reused the
+   polar or azimuth uniform, $\Pr(\text{survive}\mid\hat{\mathbf o})$ would be
+   $0$ or $1$ instead of $s_u$, and the estimator would be biased. The same
+   holds for the first-roulette uniform, which is no longer $U(0,1)$ once
+   conditioned on survival. Hence $V$ needs its own counter (counter 3) of
+   the event key, with counters 0–2 used by roulette 1, the polar quantile
+   and the azimuth.
+
+The choice of $\gamma$ (here at the event energy, which is also the copy's
+launch energy) and of the exponent $2$ affects efficiency only; any positive
+event-state function would be unbiased. Copies are not split again, so this
+roulette acts exactly once per copy and no weight nesting arises.
+
+Weight bound. The survivor weight is
+
+$$
+w_2=\frac{w_1}{s_u}=\max\!\bigl(w_1,\;w_t\,m(u)\bigr),\qquad
+m(u)=\max\!\left(1,\Bigl(\frac{u}{u_{\rm ref}}\Bigr)^2\right)
+\le\max\!\left(1,\Bigl(\frac{\gamma\alpha}{u_{\rm ref}}\Bigr)^2\right).
+$$
+
+With the base bound $w_1\le\max(1,w_t)$, this gives
+
+$$
+w_2\le\max\!\left(1,\;w_t,\;w_t\Bigl(\frac{\gamma_0\alpha}{u_{\rm ref}}\Bigr)^2\right),
+$$
+
+where $\gamma_0$ is taken at the beam energy. Weights stay bounded and the
+per-history variance stays finite, but the bound grows as $\gamma_0^2$. At
+MeV energies and small $u_{\rm ref}$, off-axis copies can carry weights
+$\gg1$. That is an efficiency concern, not a bias.
+
+### Limiting cases
+
+- $E_{\min}=0$, $u_{\rm ref}=\infty$ (disabled): this reproduces the base
+  estimator bit for bit only if the disabled angle path is skipped rather
+  than evaluated. At $u_{\rm ref}\to\infty$ the formula gives $m=1$ and
+  $s_u=\min(1,w_1/w_t)$. That is a nontrivial weight-window roulette
+  whenever $w_1<w_t$, for example when roulette 1 has $s=1$ (because
+  $U\ge w_t$) but the sampled $w<w_t$. The limit is unbiased, but it is not
+  the base estimator.
+- $E_{\min}>E_0$: every event is gated, with no copies and no kills, so the
+  arrays are analog.
+- $u\le u_{\rm ref}$ throughout the cone ($\gamma_0\alpha\le u_{\rm ref}$):
+  the second roulette reduces to the plain weight window against $w_t$.
+
+### Comparison with the implementation
+
+Read after the derivation above:
+`cone_split.py::{ConeSplit, ConeSplit.policy, cone_split_event,
+_ConeSplitPass.core_args}` and the cone-split branch of the per-electron
+ELSEPA elastic event in `cores.py` (`split_here`, `sp_policy`).
+
+| Derived term | Implementation | Agreement |
+|---|---|---|
+| Gate on event state; $E<E_{\min}$ is analog | `cores.py:1189` `split_here = cone_split and elastic_model_code == 2 and E_keV[e] >= sp_policy[1]`, computed after the analog `cos_t` sample but from `E_keV[e]` only (pre-event state); the analog draws `cos_u`, `phi_u` come first and do not depend on the gate | match |
+| $g_c=g_k$ | the same `split_here` guards the `cone_split_event` call (`cores.py:1190`) and the kill test (`cores.py:1214-1216`); `E_keV[e]` is not modified between them | match |
+| Gate leaves the primary stream alone | gated events skip only the event-key draws; primary `draws[e]` advance identically | match |
+| $E_{\min}=0$ disables the gate | `E_keV >= 0.0` is always true for physical energies; `ConeSplit` rejects negative or non-finite `min_energy_keV` | match |
+| Disabled angle path skipped, not evaluated | `policy()` maps `angle_scale = inf` to `policy[2] = 0.0` (`cone_split.py:107-110`); `cone_split_event` applies the second roulette only `if u_ref > 0.0` (`cone_split.py:293-301`); `angle_scale <= 0` is rejected | match |
+| $u=\gamma(E)\,\angle(\hat{\mathbf o},\hat{\mathbf a})$ | `(1.0 + E_keV / _MC2_KEV) * np.arccos(cos_on)`, with `cos_on` clipped, `_MC2_KEV = 510.99895` keV and `E_keV` the event energy (also the copy's launch energy) | match |
+| $s_u=\min\bigl(1,w_1/(w_t\max(1,(u/u_{\rm ref})^2))\bigr)$ | `u` is already divided by `u_ref`; `keep_u = min(1.0, weight / (target_weight * max(1.0, u * u)))`, with `weight` $=P_Bh/\pi/s$ | match |
+| $V$ independent of counters 0–2 | `_stream_uniform_scalar(event_key, np.uint64(3))`; counters 0, 1 and 2 are roulette 1 (`cone_split.py:236`), the polar quantile $\xi$ and the azimuth $\psi$ | match |
+| Survivor weight $w_1/s_u$ | `weight = weight / keep_u` | match |
+| Applied once per copy | copies run without `_cone_split`, so neither the gate nor either roulette acts on a copy | match |
+
+### Numeric checks
+
+Tests (2026-11-16, worktree HEAD `25856eece`):
+`tests/montecarlo/test_cone_split.py` and
+`tests/montecarlo/test_cone_split_weights.py`, 21 passed.
+
+Scratch check (not committed). The check calls `cone_split_event` directly
+with an isotropic two-node table (the law the weight test uses) and a cone of
+$\alpha=0.3$ rad about $\hat{\mathbf z}$. It compares against the exact
+analog integrals $P_C=(1-\cos\alpha)/2=2.233176\times10^{-2}$ and
+$\mathbb E_p[G\mathbf 1_C]=7.415928\times10^{-3}$. The score
+$G=(\vartheta/\alpha)^4$ is weighted toward the cone edge, where $u$ is
+largest and the angle roulette thins copies most. The sweep covers incident
+directions $\beta=0$, $0.2$ and $\pi/2$; $E=50$ keV ($\gamma=1.098$) and
+$5$ MeV ($\gamma=10.78$); $w_t\in\{10^{-3},0.2\}$; and
+$u_{\rm ref}\in\{\text{off},1,0.1,10^{300}\}$, with $2\times10^6$ events per
+case. All 48 cases fall within $|z|\le3.0$ for both tallies. The sweep reused
+event keys across cases, so its $z$ values are correlated. The worst group
+($5$ MeV, $u_{\rm ref}=0.1$, $w_t=10^{-3}$, $z$ down to $-3.0$) was rerun
+with independent keys and $10^7$ events per row:
+
+| $\beta$ | $w_t$ | $z(P_C)$ | $z(\mathbb E[G\mathbf 1_C])$ |
+|---|---|---|---|
+| $0$ | $10^{-3}$ | $+0.03$ | $+0.29$ |
+| $0$ | $0.2$ | $-0.78$ | $-0.54$ |
+| $0.2$ | $10^{-3}$ | $-1.68$ | $-1.49$ |
+| $0.2$ | $0.2$ | $-0.60$ | $-1.32$ |
+| $\pi/2$ | $10^{-3}$ | $+0.51$ | $+0.89$ |
+| $\pi/2$ | $0.2$ | $-0.05$ | $-0.25$ |
+
+In every active case the maximum survivor weight matched the derived bound
+$w_t\max(1,(\gamma\alpha/u_{\rm ref})^2)$: for example $2.169$ against
+$2.169$ ($50$ keV, $u_{\rm ref}=0.1$, $w_t=0.2$), and $209.3$ against
+$209.4$ ($5$ MeV, $u_{\rm ref}=0.1$, $w_t=0.2$). With
+$u_{\rm ref}=10^{300}$ the copy fraction differs from the disabled path, for
+example $0.1116$ against $0.3061$ at $\beta=0.2$, $w_t=0.2$. This confirms
+the limiting-case finding; the estimates remain unbiased.
+
+### Findings (no discrepancy)
+
+- **A large finite $u_{\rm ref}$ is not "off".** Only `angle_scale = inf`
+  (`policy[2] = 0`) disables the second roulette. Any finite value, however
+  large, still applies $s_u=\min(1,w_1/w_t)$, a weight window that removes
+  low-weight copies near the axis. This is unbiased, but the formula's
+  $u_{\rm ref}\to\infty$ limit does not join continuously onto the disabled
+  path. The ledger row and the `ConeSplit` docstring correctly say "inf
+  disables"; readers should not assume continuity.
+- **Weight growth at MeV energies.** Survivor weights reach
+  $w_t(\gamma_0\alpha/u_{\rm ref})^2$, about $209$ at $5$ MeV with
+  $\alpha=0.3$, $u_{\rm ref}=0.1$ and $w_t=0.2$. The weights stay bounded, so
+  the variance is finite, but rare heavy copies can dominate the per-history
+  variance. This is an efficiency question for the FOM study, not a bias.
+- **Gate placement.** `split_here` is computed after the analog `cos_t`
+  sample but depends only on `E_keV[e]`, so the gate is non-anticipating. A
+  future edit that let the gate read the post-rotation direction would break
+  unbiasedness: $g_k=g_c$ must be a function of pre-deflection state only.
+- **Counter independence.** The derivation needs $V$ to be independent of
+  counters 0–2. The implementation relies on the splitmix64 counter-based
+  hash for this, the same assumption every per-electron stream already makes,
+  so it adds no new assumption.
+
+### Verdict
+
+`rederived` for both efficiency options. The energy gate is a single
+event-state predicate shared by copy and kill, so each event either applies
+the full analog/copy partition or skips it entirely. The angle roulette is a
+direction-conditional Russian roulette with an independent uniform and an
+exactly compensating weight $w/(s\,s_u)$. The defaults
+`min_energy_keV = 0.0` and `angle_scale = inf` (`policy[2] = 0`) follow the
+base path exactly. This is not a radiation-yield, FOM or human sign-off
+result.
+
+Suggested ledger change: this section alone does not change the status; the
+task owner decides. Optionally add to the row's limiting cases: "only
+`angle_scale = inf` disables the angle roulette; a finite `u_ref` always
+applies the `w_t` weight window".

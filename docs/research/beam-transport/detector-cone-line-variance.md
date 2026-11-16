@@ -228,3 +228,94 @@ unchanged. $T$ is transport plus monitor time over the five seeds.
 **Adopted for the prototype:** $k=8$, $E_{\min}=0.4E_0$, $u_{\rm ref}=1$,
 $w_t=10^{-3}$. This is pending the unbiasedness gate and fresh-context
 verification of the two options.
+
+#### Brute-force analog baseline (job 13250, November 2026)
+
+`detector_cone_variance_reduction.py brute` on AMD qlmc-ace (ROCm), code
+`79533f447`, using the production transport core (`auto`, which resolved to
+the device core). The run used 91 independent 2048-electron seed blocks in
+5.0 h, $N=186\,368$. Each block took 5.7 s of transport and 192 s of line
+and bremsstrahlung monitoring, so the monitor dominates; the cost is
+0.097 s per electron. The 2048-electron production timing gave 40 s
+transport, 197 s monitor and 167 s full spectrum (55 245 line-grid nodes up
+to 31.8 keV).
+
+| $N$ | Line mean | Line RSE | Max share | ESS | Brem mean | Brem RSE |
+|---:|---:|---:|---:|---:|---:|---:|
+| 2 048 | $9.8\times10^{-7}$ | 0.99 | 0.99 | 1.0 | $6.2\times10^{-5}$ | 0.25 |
+| 20 480 | $1.3\times10^{-6}$ | 0.90 | 0.89 | 1.2 | $6.7\times10^{-5}$ | 0.26 |
+| 81 920 | $6.6\times10^{-7}$ | 0.52 | 0.43 | 3.7 | $6.2\times10^{-5}$ | 0.091 |
+| 186 368 | $5.3\times10^{-7}$ | 0.32 | 0.23 | 9.6 | $6.0\times10^{-5}$ | 0.053 |
+
+- **The rare class is measured directly.** 15 electrons exceed $10^{-3}$ in
+  line mass, a rate of $8\times10^{-5}$ consistent with the copy-based estimate
+  of $5\times10^{-5}$. The top ten electrons hold 74 % of the line mass. Line
+  RSE falls only once several such electrons have been drawn.
+- **Analog cost for RSE 0.1.** The per-history $\mathrm{CV}^2$ is
+  $1.9\times10^4$ for lines and 525 for bremsstrahlung, so RSE 0.1 needs
+  $1.9\times10^6$ electrons for the line yield. That is **52 h** on this node.
+  Bremsstrahlung needs
+  $5\times10^4$ electrons, 1.4 h. The copy-based projection from job 13240
+  ($3\times10^6$ and $1.2\times10^5$) was within a factor of two. The line
+  $\mathrm{CV}^2$ is itself heavy-tailed, so the true count may be larger.
+- **Agreement with splitting at $k=8$** (job 13240, gate and angle roulette):
+  the line mean is $7.0\times10^{-7}$ against $5.3\times10^{-7}$ analog
+  ($z=0.76$), and bremsstrahlung is $6.37\times10^{-5}$ against
+  $6.04\times10^{-5}$ ($z=0.75$). This is the first agreement test on the
+  production case where analog sampling resolves the tail.
+- **Figure of merit.** $\mathrm{FOM}=1/(\mathrm{CV}^2 t_e)$, with $t_e$ the
+  time per primary: 0.097 s analog and 0.104 s split. Splitting at $k=8$
+  improves the line FOM by **≈190×** and the bremsstrahlung FOM by ≈98×.
+  Line RSE 0.1 then needs about $10^4$ primaries, ≈17 min, against 52 h.
+  The split $\mathrm{CV}^2$ comes from 2560 histories, so this ratio is
+  uncertain by at least a factor of two. The two arms also differ in core:
+  analog used the device transport core, the split prototype the CPU
+  per-electron core. The monitor dominates both, so the per-primary costs
+  are similar.
+
+**Verdict on brute force:** affordable for bremsstrahlung, not for the line
+yield. Two GPU-days per case at RSE 0.1 rules out scans. Variance reduction
+is worth building.
+
+#### Unbiasedness gate (jobs 13242, 13261, 13262, November 2026)
+
+`checks/detector_cone_unbiasedness.py` on AMD qlmc-ace, code `3206a23cb`.
+Jobs 13261/13262 ran `d5a2f179f`, which only relaxes the characteristic
+linearity tolerance. Case: h-BN, 1 mm, 10°/100° at 1 and 2 MeV, ten seeds ×
+1024 primaries per arm. Split parameters: $k=2$, $w_t=10^{-2}$,
+$E_{\min}=0.4E_0$, $u_{\rm ref}=1$. 1 MeV seeds 0–3 come from 13242, which
+stopped on the instrument tolerance at seed 4, and seeds 4–9 from 13261.
+Each tally is per history: full analytic CXR line mass, bremsstrahlung band
+and characteristic yield in 100–600 eV (B and N K lines). $z$ is
+(split − analog)/SE, with SE taken unpaired over histories, paired by
+history, or from the spread of the ten seed means.
+
+| $E_0$ | Tally | Analog (RSE, max share) | Split (RSE) | Ratio | $z$ unpaired / paired / seed | Copy share |
+|---|---|---|---|---:|---|---:|
+| 1 MeV | line | $5.14\times10^{-7}$ (0.047, 0.020) | $4.75\times10^{-7}$ (0.029) | 0.925 | −1.39 / −1.65 / −1.41 | 0.89 |
+| 1 MeV | brem | $9.17\times10^{-4}$ (0.018, 0.002) | $8.92\times10^{-4}$ (0.016) | 0.972 | −1.19 / −1.54 / −1.59 | 0.56 |
+| 1 MeV | char | $2.09\times10^{-7}$ (0.049, 0.047) | $1.99\times10^{-7}$ (0.006) | 0.950 | −1.03 / −1.05 / −1.06 | 0.04 |
+| 2 MeV | line | $1.14\times10^{-6}$ (0.184, 0.089) | $1.15\times10^{-6}$ (0.123) | 1.005 | +0.02 / +0.03 / +0.04 | 0.85 |
+| 2 MeV | brem | $2.96\times10^{-4}$ (0.058, 0.024) | $3.00\times10^{-4}$ (0.042) | 1.015 | +0.21 / +0.28 / +0.29 | 0.33 |
+| 2 MeV | char | $1.98\times10^{-7}$ (0.014, 0.004) | $2.02\times10^{-7}$ (0.015) | 1.021 | +1.02 / +1.40 / +1.30 | 0.07 |
+
+- **A valid test case.** At 1 MeV the copies carry 89 % of the line yield,
+  yet no analog history holds more than 2 % of it. Analog sampling therefore
+  resolves the population that splitting targets.
+- **All three tallies agree at both energies**, with $|z|\le1.65$ under
+  every SE. At 1 MeV all three ratios fall slightly below 1. The tallies
+  share histories, so these are not independent results, and one joint
+  fluctuation at 1.0–1.65σ is consistent with no bias. At 2 MeV the ratios
+  sit within 2.1 % of 1.
+- **Characteristic variance.** At 1 MeV the analog characteristic tally has
+  RSE 0.049 with one history at 4.7 %, against 0.006 for split. Escape
+  geometry ties the soft B/N K lines to direction, and the split arm
+  replaces such histories with weighted copies. Bremsstrahlung and the line
+  yield likewise have lower split RSE at both energies.
+- **Cost at these settings.** At 1 MeV the split arm makes about 6000
+  copies per seed and takes 5.3× the analog time; at 2 MeV, about 260
+  copies and 1.3×. These settings were chosen for gate power, not FOM.
+
+Together with the 5 MeV comparison against the brute-force baseline
+($z=0.76$ line, 0.75 brem), this meets the issue's unbiasedness acceptance
+for the CPU per-electron prototype.

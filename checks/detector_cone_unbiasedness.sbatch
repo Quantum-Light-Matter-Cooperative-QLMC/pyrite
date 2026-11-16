@@ -23,7 +23,7 @@ echo "code $(cat CODE_SHA)"
 uv sync --locked --no-default-groups --extra amd
 OUT=${1:-cone203_unbiased_out}
 mkdir -p "$OUT"
-for E in 1000 2000; do
+for E in ${ENERGIES:-1000 2000}; do
   uv run --no-sync python checks/detector_cone_unbiasedness.py \
-    --energy-keV "$E" "${@:2}" --out "$OUT/unbiased-$E.json"
+    --energy-keV "$E" "${@:2}" --out "$OUT/unbiased-$E${TAG:-}.json"
 done

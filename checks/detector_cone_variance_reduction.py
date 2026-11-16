@@ -7,6 +7,9 @@ transport, the per-electron line-mass/brem monitor and the full spectrum phase,
 then the per-electron CPU core on a smaller count. It records per-electron line
 mass so the analog relative standard error (RSE) can be reported.
 
+``brute`` runs independent analog seed blocks on the production transport
+core (``auto``) within a wall-time budget and records RSE against N and cost.
+
 ``compare`` runs the per-electron CPU core analog and with detector-cone
 splitting on identical seeds, scores weighted per-history full line mass and
 bremsstrahlung band integral, and reports means, RSEs and wall times. These
@@ -113,6 +116,67 @@ def baseline(args):
         del tp
         BACKEND.release_memory()
     Path(args.out).write_text(json.dumps(report, indent=2, default=str))
+
+
+def brute(args):
+    """Bounded brute-force analog campaign on the production transport core.
+
+    Independent blocks (seed = ``--seed`` + block index) of ``--block``
+    electrons run until ``--budget-minutes`` of wall time is spent. Per-electron
+    line mass and brem band values are appended to ``<out>.npz``; the JSON
+    records, after every block, the cumulative count, wall time, mean, RSE, max
+    share and ESS, so RSE-versus-N and per-electron cost come from one run.
+    """
+    from pyrite._backend import BACKEND, REAL
+    from pyrite.montecarlo import runner
+    from pyrite.montecarlo.runner.adaptive import case_measure
+    from pyrite.montecarlo.transport.batching import resolve_transport_core
+
+    out = Path(args.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    report = {
+        "args": vars(args),
+        "real": np.dtype(REAL).name,
+        "device": BACKEND.device.name,
+        "blocks": [],
+    }
+    values = {"cxr": [], "brem": []}
+    started = time.perf_counter()
+    block = 0
+    while time.perf_counter() - started < 60.0 * args.budget_minutes:
+        seed = args.seed + block
+        case = build(
+            args.energy, args.thickness, args.tilt, args.azimuth, args.block, seed, args.material
+        )
+        t0 = time.perf_counter()
+        tp = runner._transport_case(case, transport_core="auto")
+        transport_s = time.perf_counter() - t0
+        t0 = time.perf_counter()
+        measured = case_measure(case, _settings(args.block))(0, args.block, tp["segs"])
+        measure_s = time.perf_counter() - t0
+        row = {
+            "block": block,
+            "seed": seed,
+            "core": resolve_transport_core("auto", args.block),
+            "n_segments": int(_host(tp["segs"]["L_ang"]).size),
+            "transport_s": transport_s,
+            "measure_s": measure_s,
+        }
+        del tp
+        BACKEND.release_memory()
+        for key in values:
+            values[key].append(_host(measured[key]).astype(float))
+        n = sum(v.size for v in values["cxr"])
+        row["n_cumulative"] = n
+        row["wall_s"] = time.perf_counter() - started
+        row["statistics"] = {k: _stats(np.concatenate(v)) for k, v in values.items()}
+        report["blocks"].append(row)
+        np.savez_compressed(
+            out.with_suffix(".npz"), **{k: np.concatenate(v) for k, v in values.items()}
+        )
+        out.write_text(json.dumps(report, indent=2, default=str))
+        print(json.dumps({k: v for k, v in row.items()}, default=str), flush=True)
+        block += 1
 
 
 def compare(args):
@@ -256,7 +320,8 @@ def main():
     sub_pull.add_argument("--dest", default=".")
     base = sub.add_parser("baseline")
     comparison = sub.add_parser("compare")
-    for p in (base, comparison):
+    campaign = sub.add_parser("brute", help="bounded analog campaign over seed blocks")
+    for p in (base, comparison, campaign):
         p.add_argument("--material", default=MATERIAL)
         p.add_argument("--energy", type=float, default=5000.0)
         p.add_argument("--thickness", type=float, default=1.0e7)
@@ -267,11 +332,14 @@ def main():
     base.add_argument("--ne", type=int, default=2000)
     base.add_argument("--ne-cpu", type=int, default=100)
     base.add_argument("--skip-spectrum", action="store_true")
+    campaign.add_argument("--block", type=int, default=4096)
+    campaign.add_argument("--budget-minutes", type=float, default=300.0)
     comparison.add_argument("--ne", type=int, default=2000)
     comparison.add_argument("--target-weight", type=float, default=0.001)
     comparison.add_argument("--cone-factor", type=float, default=1.0)
     args = parser.parse_args()
-    {"baseline": baseline, "compare": compare, "submit": submit, "pull": pull}[args.command](args)
+    commands = {"baseline": baseline, "compare": compare, "brute": brute}
+    {**commands, "submit": submit, "pull": pull}[args.command](args)
 
 
 if __name__ == "__main__":
