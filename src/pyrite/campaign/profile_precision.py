@@ -114,19 +114,15 @@ def describe_counts(counts):
 def precision_blockers(profile):
     """Why adaptive sampling cannot apply to this profile row, before any write.
 
-    Covers the profile-level routes a run refuses: coherent emission, particle
-    cascades, positron transport, physical-detector observation directions and
-    per-material count overrides. GDF beams and grooved targets are resolved per
+    Covers the profile-level routes a run refuses: coherent emission,
+    physical-detector observation directions and per-material count overrides.
+    Particle cascades run adaptive when selected explicitly (#1240). GDF beams and grooved targets are resolved per
     run.
     """
     blockers = []
     emission = profile.get("emission")
     if emission in ("coherent", "both"):
         blockers.append(f"emission is {emission!r} (adaptive is incoherent-only)")
-    if any(is_on(key, _unwrap(profile.get(key))) for key in _CASCADE_KEYS):
-        blockers.append("particle cascades (secondaries or pair production) are enabled")
-    if profile.get("positron_transport"):
-        blockers.append("positron transport is enabled")
     if "physical_detector" in profile:
         blockers.append("the physical detector scores observation directions")
     for material, row in sorted(profile_overrides(profile).items()):
@@ -180,16 +176,20 @@ def set_precision(document, name, updates):
 def enable_precision(document, name, updates):
     """Switch a profile to adaptive sampling atomically.
 
-    Removes fixed counts, then writes a policy only when ``updates`` are given
-    or one already exists (unspecified fields as in :func:`set_precision`);
-    otherwise :data:`DEFAULT_PRECISION` applies. Returns the removed counts;
-    nothing is staged on refusal.
+    Removes fixed counts, then writes a policy only when ``updates`` are given,
+    one already exists (unspecified fields as in :func:`set_precision`), or the
+    profile would otherwise keep fixed counts (particle cascades run adaptive
+    only from an explicit policy, #1240); otherwise
+    :data:`DEFAULT_PRECISION` applies. Returns the removed counts; nothing is
+    staged on refusal.
     """
     target = existing_profile(document, name)
     _check_adaptive(name, target)
     current = profile_precision_values(target)
     policy = None
-    if updates or current is not None:
+    cascade = any(is_on(key, _unwrap(target.get(key))) for key in _CASCADE_KEYS)
+    cascade = cascade or bool(_unwrap(target.get("positron_transport", False)))
+    if updates or current is not None or cascade:
         policy = merge_policy(current, updates)
     counts = fixed_counts(target)
     for key in counts:

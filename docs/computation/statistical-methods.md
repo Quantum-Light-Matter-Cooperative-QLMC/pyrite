@@ -218,6 +218,8 @@ So $r_n \le \varepsilon$ already implies $\mathrm{ESS}_n \gtrsim 1/\varepsilon^2
 
 **Coherent route excluded.** The coherent line sum {eq}`eq-statistics-coherent-conditioning` couples electrons, so a per-electron error does not bound it, and its scatter need not fall with $N_e$. Adaptive runs refuse `coherent_emission`, as they refuse the lockstep core and GDF beams. Coherent cases keep a fixed count.
 
+**Particle cascades.** With `secondary_threshold_eV` (and optionally pair production and positron transport) the sample is still one primary history: every descendant track carries its root primary's id, so its line mass and brem band integral add to that primary's value, and a primary whose cascade contributes nothing is still one sample. Cascade blocks are never joined. The stopping rule reads streamed blocks and keeps none; the realized count then runs once more as the fixed-count cascade, so the output is the fixed-$N$ run and the transport costs up to twice the realized work. With an independent brem stop, primaries past the brem prefix run to the line cutoff and their descendants stay outside the brem population. Pair electrons and transported positrons are descendants like any other track. Profiles without a policy keep fixed counts for cascades (#1240).
+
 **Per-bin errors.** Optionally, after the final reduction, each equal block of the realized run is reduced as one batch on the final grids. The per-bin batch-means standard error $s(\{\bar{S}_b\})/\sqrt{K}$ over $K$ batches is reported for `spec` and `brem_wide` in a requested band. It never drives the stop, because the line grid is unknown while transport runs.
 
 **Measured behaviour.** These are the regression tests in `tests/montecarlo/runner/test_adaptive_stopping.py`:

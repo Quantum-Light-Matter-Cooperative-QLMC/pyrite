@@ -60,7 +60,9 @@ Fixed counts apply when a profile or material override sets
 `cxr_histories`/`brem_histories`, or for unsupported adaptive routes: coherent or
 `both` emission, particle cascades (secondaries, pairs, positrons), GDF beams,
 grooved entrances, physical pixel detectors, or channeling. An explicit policy
-on an unsupported route is refused. Trajectory capture also needs fixed counts.
+on an unsupported route is refused. Particle cascades are the exception: they
+keep fixed counts by default, but run adaptive under an explicit policy;
+`adaptive-sampling enable` writes one. Trajectory capture also needs fixed counts.
 Bundled `trajectory_demo`, `coherent_demo`, and detector demos provide bounded
 fixed-count examples; clone a demo before editing it.
 

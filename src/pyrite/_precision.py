@@ -281,13 +281,8 @@ class Precision:
             raise ValueError(
                 "adaptive precision does not support coherent emission; use fixed counts"
             )
-        for key in (
-            "gdf_source",
-            "groove_spacing_ang",
-            "secondary_threshold_eV",
-            "pair_production_model",
-            "positron_transport",
-        ):
+        # Particle cascades stop on whole primary histories (#1240).
+        for key in ("gdf_source", "groove_spacing_ang"):
             if case.get(key) is not None and case.get(key) is not False:
                 raise ValueError(f"adaptive precision does not support {key}; use fixed counts")
 

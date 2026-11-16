@@ -116,6 +116,7 @@ The target $r_n\le\varepsilon$ therefore implies $\mathrm{ESS}_n\ge 1/(\varepsil
 
 - The per-electron values have finite variance. A heavy tail with infinite variance (Pareto index $\le 2$) breaks the CLT and every guard. The guards only act on sampled values.
 - The incoherent reduction is a sum over electrons. The coherent line sum couples electrons ([coherent versus incoherent statistics](../../computation/statistical-methods.md#coherent-versus-incoherent-statistics)), so adaptive runs refuse `coherent_emission`. They also refuse the lockstep core, whose shared generator is not prefix-stable, and GDF beams.
+- A sample is one primary history including every descendant track. Particle cascades (shell secondaries, pair electrons, transported positrons) satisfy prefix stability because their RNG is lineage-addressed (`CASCADE_RNG_MODEL`, #923): a primary's whole cascade is the same in any block, and the run-wide track cap decides identically at every block size (#1240).
 - Without `brem_target_rse`, all watched observables share one realized count, with `Ne == Ne_brem`. Per-electron cutoffs depend on the line/brem split, so a shared count keeps every block's transport equal to the fixed-$N$ run's.
 - The monitor band is fixed before transport: the case's policy bandwidth, else its line-grid ends. Under the `resonance-population` policy the final axis may end below the bandwidth ceiling, so the monitor counts tails the final axis truncates. That share is audited separately (`line-grid-resonance-bandwidth`).
 
@@ -143,6 +144,17 @@ measurements of the new gate. Current v2 evidence follows separately.
 - `test_energy_range_replay_rechecks_statistics_before_accepting_stop` pins the energy-spread replay: if the realized-range tables change the contributions enough to fail a guard, the count grows and statistics are recomputed before accepting the result. `test_environment_pinned_lockstep_is_rejected` covers the process-wide core pin.
 - `test_per_electron_brem_band_integrals_average_to_the_band_integral` and `test_batch_means_reconstruct_the_band_of_the_final_spectra` cover the brem band integral and batch means.
 - `test_band_weights_integrate_linear_density_at_off_grid_edges` pins partial trapezoid intervals against an analytic linear-density integral, including a band without interior nodes.
+
+## Cascade extension (#1240)
+
+**Sample unit.** Every row of a descendant track carries its root primary's `electron_id`. The line-mass and brem-band reductions bin rows by that id with `minlength = n`, so $m_i$ is the root-summed contribution of primary $i$ and its cascade, and a primary with no contribution enters as $m_i=0$. The estimator, rule and guards above are unchanged; they see $n$ i.i.d. primary histories.
+
+**Realized transport.** Cascade blocks are never joined (their track tables, cross-references and generation ordering would have to merge). The monitor reads streamed blocks over the population table range, each block drawing on a fresh run-wide track budget of $n_{\max}$ primaries, and keeps none. If the realized range differs (energy spread), streamed passes over $[0, n)$ re-measure on the realized range, growing by one block while the rule fails, exactly as the joined path. The realized $[0, n)$ then runs as one fixed-$n$ cascade call (`block_transport._fixed_cascade`): bunch, table range and track cap of $n$ primaries. Because streamed and joined cascades are the same lineage realization (#923), the returned output is the fixed-$N$ run at the realized count, and the statistics describe it up to summation order. The extra pass bounds the cost at twice the realized transport.
+
+**Independent brem stop.** Primaries past $N_{
+m brem}$ run to the line cutoff, as in the fixed case at the realized pair; their descendants keep the cascade threshold. Brem scoring excludes rows with `electron_id >= Ne_brem`, so a descendant belongs to its root's population.
+
+**Anchors.** `tests/montecarlo/transport/test_adaptive_cascades.py`: `test_adaptive_shell_cascade_is_the_fixed_run_at_its_count` (block sizes 1, 4 and 6, launched descendants, CPU fp64 `rtol = 1e-12` on `spec`, `spec_characteristic`, `brem_wide`, `brem`; `eta`, `hit_frac`, `n_segments` exact); `test_converged_shell_cascade_stop_is_the_fixed_run` (an early converged stop, with and without the energy-range replay, and same-seed replay); `test_independent_brem_stop_cascade_is_the_fixed_pair`; `test_monitor_samples_are_root_summed_primaries`; `test_track_cap_fails_iff_the_fixed_run_does`; `test_adaptive_pair_cascade_is_the_fixed_run_at_its_count` (3 MeV Si with boosted synthetic pair and BremsLib rates, launched pair electrons and, with positron transport, launched positrons; block sizes 1 and 3). Pending: CUDA and a fresh-context verification of this extension.
 
 ## Known limits
 
