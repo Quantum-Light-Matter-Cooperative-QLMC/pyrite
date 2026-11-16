@@ -94,7 +94,7 @@ The right side is a finite sum, because $\hat\rho(t_j)=0$ for $|t_j|\ge 2\max a_
 | oscillatory image remainder, pointwise | $\le w_lW_l^2(1+h^2/D^2)/(6D^2)$ | `residual_tol`, default $10^{-6}$ of each line's peak |
 | oscillatory image remainder, yield | $\le Y_lW_l^2/(4\pi D^2)$ | the same $D$; $\le 0.48\,\tau$ relative |
 | bin-centre envelope correction, yield | $\le Y_l\pi^2W_lh^2B/(270D^4)$ | $D\ge3U'\ge3B$: $\le 4.6\times10^{-4}\,W_lh^2/U'^3$ |
-| Chebyshev interpolation of $C$, 24 nodes | $\lesssim\rho^{-24}\max|C|$ | nearest pole $\ge D\ge3U'$ beyond a band of length $\le U'$, so the ellipse parameter is $\rho\ge 7+\sqrt{48}=13.9$, a ratio $<10^{-27}$ |
+| Chebyshev interpolation of $C$, 24 nodes | $\lesssim\rho^{-24}\max\lvert C\rvert$ | nearest pole $\ge D\ge3U'$ beyond a band of length $\le U'$, so the ellipse parameter is $\rho\ge 7+\sqrt{48}=13.9$, a ratio $<10^{-27}$ |
 | FFT and mode-sum rounding | $O(\varepsilon_{64}\log N)\sum_l w_l\pi/(a_lh)$ | FP64; `residual_tol` $\ge10^{-12}$ is enforced, because below it rounding exceeds the bound (verification finding 3) |
 
 ## Numeric checks (host)
