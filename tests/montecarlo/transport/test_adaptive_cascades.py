@@ -16,7 +16,12 @@ from pyrite._cxr_grid_policy import CxrYieldStatisticsWarning
 from pyrite._precision import Precision
 from pyrite.montecarlo import runner
 from pyrite.montecarlo import shell_configuration as config
-from pyrite.montecarlo.runner.adaptive import RunningMoments, case_measure, run_case_adaptive
+from pyrite.montecarlo.runner.adaptive import (
+    RunningMoments,
+    StoppingMonitor,
+    case_measure,
+    run_case_adaptive,
+)
 from tests.montecarlo.cascades.test_coupled_radiative_runner import (  # noqa: F401
     synthetic_si_tables,
 )
@@ -113,31 +118,45 @@ def test_independent_brem_stop_cascade_is_the_fixed_pair():
 
 
 def test_monitor_samples_are_root_summed_primaries():
-    """Descendant rows add to their root primary's value; each primary is one sample."""
+    """Descendant rows add to their root primary's value; each primary is one sample.
+
+    In this fixture descendants carry most of the line mass of some primaries,
+    so the share and ESS guards differ from a primaries-only measurement.
+    """
     case = _cascade_case(coupled=False, Ne=6, Ne_brem=6, threshold=1000.0, seed=5)
     transport, _ = _fixed(case, 6)
     segs = transport["segs"]
     assert _launched(transport) > 0
     settings = Precision(0.1, 6, 6, 6, **BAND)
-    measure = case_measure({**case, "E_grid": transport["E_grid"]}, settings)
-    whole = measure(0, 6, segs)
+    measure = case_measure(case, settings)
     generation = np.asarray(segs["generation"])
-    primary_rows = {
-        key: (
-            value[generation == 0] if getattr(value, "shape", ())[:1] == generation.shape else value
-        )
-        for key, value in segs.items()
-    }
-    primaries = measure(0, 6, primary_rows)
+    rows = generation.shape
+    primaries = measure(
+        0,
+        6,
+        {
+            k: (v[generation == 0] if getattr(v, "shape", ())[:1] == rows else v)
+            for k, v in segs.items()
+        },
+    )
+    monitor = StoppingMonitor(settings, measure)
+    monitor.on_block(0, 6, segs)
+    whole = measure(0, 6, segs)
     for name in ("cxr", "brem"):
         assert whole[name].shape == (6,)
         assert np.all(whole[name] >= primaries[name])
-    # Descendants carry measurable brem onto some root.
-    assert np.any(whole["brem"] > primaries["brem"])
-    moments = RunningMoments()
-    moments.add_block(whole["brem"])
-    assert moments.n == 6
-    assert moments.max_share() == pytest.approx(whole["brem"].max() / whole["brem"].sum())
+        status = monitor.observable_status(name)
+        assert status["n_electrons"] == 6
+        total = whole[name].sum()
+        assert status["max_electron_share"] == pytest.approx(whole[name].max() / total)
+        assert status["effective_sample_size"] == pytest.approx(total**2 / np.sum(whole[name] ** 2))
+    descendant_share = 1.0 - primaries["cxr"] / whole["cxr"]
+    assert np.count_nonzero(descendant_share > 0.5) >= 1, "descendants must dominate a primary"
+    primary_only = RunningMoments()
+    primary_only.add_block(primaries["cxr"])
+    assert monitor.observable_status("cxr")["effective_sample_size"] != pytest.approx(
+        primary_only.effective_sample_size()
+    )
 
 
 @pytest.mark.parametrize("positrons", [False, True])
@@ -191,3 +210,48 @@ def test_track_cap_fails_iff_the_fixed_run_does(monkeypatch):
     for block in (2, 3, 6):
         settings = Precision(1e-9, block, 6, block, **BAND, **_RULE_ONLY)
         assert _adaptive(case, settings)[1]["realized_electrons"] == 6
+
+
+def _gpu_available():
+    try:
+        import cupy
+
+        return cupy.cuda.runtime.getDeviceCount() > 0
+    except Exception:
+        return False
+
+
+#: GPU scoring regroups whole-electron fp32 sums: the #611 16-epsilon allowance.
+GPU_RTOL = 16 * np.finfo(np.float32).eps
+
+
+@pytest.mark.slow
+@pytest.mark.hardware
+@pytest.mark.skipif(not _gpu_available(), reason="no CUDA/ROCm device")
+@pytest.mark.parametrize("kind", ["shell", "pair", "positron"])
+@pytest.mark.parametrize(("block", "maximum"), [(1, 6), (4, 8)])
+def test_gpu_adaptive_cascade_is_the_fixed_run_at_its_count(monkeypatch, kind, block, maximum):
+    """GPU core: adaptive at its realized count against the fixed GPU run (#1240)."""
+    if kind == "shell":
+        case = _cascade_case(coupled=False, Ne=4, Ne_brem=4, threshold=1000.0, seed=5)
+        band = BAND
+    else:
+        if kind == "positron":
+            from tests.helpers.positron_tables import require_positron_tables
+
+            require_positron_tables()
+        case = _pair_case(monkeypatch, positrons=kind == "positron", Ne=4, Ne_brem=4)
+        band = dict(observables=("cxr", "brem"), band_eV=(1500.0, 2.5e6))
+    settings = Precision(1e-9, max(block, 2), maximum, block, **band, **_RULE_ONLY)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", UserWarning)
+        result, stats = run_case_adaptive(case, settings, transport_core="cuda")
+        fixed = {**case, "Ne": maximum, "Ne_brem": maximum}
+        transport = runner._transport_case(fixed, transport_core="cuda")
+        reference = runner._spectrum_case(fixed, transport)
+    assert stats["realized_electrons"] == maximum
+    assert _launched(transport) > 0, "need launched descendants"
+    for key in SPECTRA:
+        np.testing.assert_allclose(result[key], reference[key], rtol=GPU_RTOL, atol=0, err_msg=key)
+    for key in ("eta", "hit_frac", "n_segments"):
+        assert result[key] == reference[key], key
