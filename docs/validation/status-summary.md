@@ -25,8 +25,8 @@ Oldest current automated evidence: `2026-09-15T15:45:30.982686+00:00` (UTC times
 | `anchored` | 133 |
 | `rederived` | 134 |
 | `filtered` | 13 |
-| `unverified` | 75 |
-| `discrepancy` | 4 |
+| `unverified` | 74 |
+| `discrepancy` | 5 |
 | **Total** | **359** |
 
 Status meanings and promotion rules are defined in the [validation methodology](methodology.md).

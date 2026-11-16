@@ -169,7 +169,7 @@ Generated browsing views of every claim in the [detailed validation ledger](phys
 | [`hfte2-001-structure`](ledger-crystal-structure-provenance.md#hfte2-001-structure) | 1T-HfTe2 P-3m1 Materials Project relaxed lattice + explicit 1a/2d primitive basis, configured as a symmetric (001) cut | `unverified` |
 | [`sapphire-corundum-structure`](ledger-crystal-structure-provenance.md#sapphire-corundum-structure) | α-Al2O3/sapphire corundum lattice + explicit conventional-cell basis, B_ang2=0.25 | `unverified` |
 | [`hbn-structure`](ledger-crystal-structure-provenance.md#hbn-structure) | h-BN P6_3/mmc layered/eclipsed lattice + explicit four-atom conventional-cell basis | `rederived` |
-| [`hbn-debye-waller-00l`](ledger-crystal-structure-provenance.md#hbn-debye-waller-00l) | room-temperature h-BN basal-reflection Debye–Waller coefficient `B33=3.45 Å²` (`U33=0.0437 Å²`) used for pinned `(002)/(004)` | `unverified` |
+| [`hbn-debye-waller-00l`](ledger-crystal-structure-provenance.md#hbn-debye-waller-00l) | room-temperature h-BN basal-reflection Debye–Waller coefficient `B33=3.45 Å²` (`U33=0.0437 Å²`) used for pinned `(002)/(004)` | `discrepancy` |
 | [`nbs2-2ha-structure`](ledger-crystal-structure-provenance.md#nbs2-2ha-structure) | 2H-a NbS2 P6_3/mmc lattice + explicit 2b/4f conventional-cell basis | `unverified` |
 | [`nbse2-2ha-structure`](ledger-crystal-structure-provenance.md#nbse2-2ha-structure) | 2H-a NbSe2 P6_3/mmc lattice + explicit 2b/4f conventional-cell basis | `unverified` |
 | [`fes2-pyrite-structure`](ledger-crystal-structure-provenance.md#fes2-pyrite-structure) | cubic pyrite FeS2 Pa-3 lattice + explicit 4a(Fe)/8c(S) conventional-cell basis | `unverified` |
