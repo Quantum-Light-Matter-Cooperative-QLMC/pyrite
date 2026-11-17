@@ -180,6 +180,18 @@ passes this gate; zero signal still cannot converge. The record includes
 `min_effective_histories`; zero disables them. Brem retains its existing
 stopping guards. See the [derivation and limitations](../validation/beam-transport/adaptive-sample-size-stopping.md).
 
+**Variance reduction and this guard.** Transport-side
+[detector-cone splitting](../research/beam-transport/detector-cone-line-variance.md)
+targets rare trajectories; its production integration is tracked in #379.
+Its statistical sample must be the primary's score plus all weighted copy
+scores, combined before computing moments. Copies do not increase the
+independent history count. A measured gain in the h-BN 5 MeV scene does not
+establish a gain for the 1 MeV thin-target populations examined in #1254.
+[Line-scoring roulette](#line-scoring-roulette) instead saves spectrum-scoring
+work while adding conditional variance. Its adaptive monitor remains analog,
+so passing this gate does not establish the reweighted spectrum's precision.
+Neither method makes an entirely unseen tail detectable by this guard.
+
 Defaults are $c = 0.05$, $E_{\min} = 100$, $k = 3$ and $f = 0.5$. They are internal settings until the remote measurement in #361 sets profile values. At $n_{\max}$ the run stops regardless. It completes, records `statistics_limited`, and warns `CxrYieldStatisticsWarning`.
 
 The optional pilot projects $N = n_{\text{pilot}} \max_o (r_{o}/\varepsilon)^2$, rounded up to a block and clipped to $[n_{\text{pilot}}, n_{\max}]$. No check runs until $N$ is reached. The rule then resumes block by block.

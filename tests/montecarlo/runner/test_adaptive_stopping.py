@@ -305,6 +305,46 @@ def test_variance_tail_prevents_false_precision_on_nearly_constant_signal():
     assert record["realized_electrons"] == len(population)
 
 
+@pytest.mark.parametrize("observable, effective_floor", [("cxr", 0.0), ("brem", 100.0)])
+def test_variance_guard_preserves_disabled_and_brem_stops(observable, effective_floor):
+    """Neither explicit opt-out nor brem acquires the CXR-only floor."""
+    population = np.ones(6000)
+    population[500] = 1.5
+    settings = AdaptiveSettings(
+        0.001,
+        3000,
+        6000,
+        1000,
+        observables=(observable,),
+        min_effective_histories=effective_floor,
+    )
+    record = run_stopping_rule(
+        settings, lambda start, stop, _: {observable: population[start:stop]}
+    )
+    assert record["stop_reason"] == "converged"
+    assert record["realized_electrons"] == 4000
+
+
+def test_variance_tail_keeps_cxr_running_after_independent_brem_freezes():
+    """The same early scores pass brem but fail CXR's variance gate."""
+    population = np.ones(6000)
+    population[500] = 1.5
+    population[5000] = 20.0
+    settings = AdaptiveSettings(
+        0.001, 3000, 6000, 1000, observables=("cxr", "brem"), brem_target_rse=0.001
+    )
+    record = run_stopping_rule(
+        settings, lambda start, stop, _: dict.fromkeys(("cxr", "brem"), population[start:stop])
+    )
+    assert record["statistics_limited"]
+    assert record["stop_reason"] == "max_electrons"
+    assert record["realized_electrons"] == 6000
+    assert record["realized_electrons_brem"] == 4000
+    assert record["statistics"]["brem"]["stop_reason"] == "converged"
+    assert record["statistics"]["brem"]["mean"] == pytest.approx(1.0 + 0.5 / 4000)
+    assert not record["statistics"]["cxr"]["passes"]["variance_sampling"]
+
+
 def _heavy_population(rng, n, *, every=None, rate=None, heavy=400.0):
     """Exp(1) per electron plus rare ``heavy`` contributions (mean 1 + rate*heavy)."""
     values = rng.exponential(1.0, n)
