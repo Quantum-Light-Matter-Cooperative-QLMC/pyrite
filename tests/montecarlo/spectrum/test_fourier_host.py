@@ -18,6 +18,13 @@ from pyrite.montecarlo.spectrum.cxr._fourier_host import (
     host_es_mode_transform,
     host_fourier_bin_mean_reduce,
 )
+from pyrite.montecarlo.spectrum.cxr._fourier_spread import (
+    _BETA_PER_WIDTH,
+    _QUADRATURE_NODES,
+    _deconvolution,
+    _fine_size,
+    es_width,
+)
 from pyrite.montecarlo.spectrum.cxr._fourier_transform import direct_mode_transform
 
 
@@ -35,6 +42,23 @@ def test_host_es_transform_matches_direct_modes():
     got = host_es_mode_transform(phase, strengths, 17, 17 + 300)
     want = direct_mode_transform(phase, strengths, 17, 17 + 300)
     assert np.abs(got - want).max() <= 1e-10 * np.abs(want).max()
+
+
+@pytest.mark.parametrize("modes", [1, 2, 7, 32, 33, 300, 4097])
+def test_folded_deconvolution_matches_the_full_gauss_legendre_sum(modes):
+    """Even-mode/symmetric-rule folding changes only summation order.
+
+    Validation: cxr-line-fourier-reduction
+    """
+    width = es_width(1e-12)
+    n_fine = _fine_size(modes, width)
+    z, q = np.polynomial.legendre.leggauss(_QUADRATURE_NODES)
+    phi = q * np.exp(_BETA_PER_WIDTH * width * (np.sqrt(1.0 - z * z) - 1.0))
+    m = np.arange(-(modes // 2), modes - modes // 2)
+    full = 2.0 / (width * (np.cos(np.outer(m * np.pi * width / n_fine, z)) @ phi))
+    got = _deconvolution(np, modes, n_fine, width)
+    assert got.shape == full.shape
+    assert np.max(np.abs(got / full - 1.0)) <= 1e-13
 
 
 def test_batched_host_rectangles_match_analytic_triangle_coefficients():
