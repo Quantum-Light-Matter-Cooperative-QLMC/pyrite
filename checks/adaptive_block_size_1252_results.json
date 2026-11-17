@@ -1,0 +1,4656 @@
+{
+ "issue": 1252,
+ "note": "Summary of RTX 5080 arms (jobs 13478-13481, CODE_SHA 1f337db62) and CPU stopping captures (13492/13493, 00d62b0ce) replayed with checks/adaptive_block_size_1252.py @ 9e0ef8a2a. Raw outputs: qlmc:~/pyrite-1252-s{1,2}/out-*.",
+ "arms": [
+  {
+   "job_dir": "out-cpu-1000",
+   "material": "hbn",
+   "E0_keV": 1000.0,
+   "tilt_deg": 15.0,
+   "block": 48000,
+   "device": "cpu",
+   "profiled": false,
+   "wall_s": 4777.9,
+   "split_s": {
+    "transport.join": 0.055,
+    "transport.finalize": 0.05,
+    "transport": 1381.379,
+    "spectrum": 3396.513
+   },
+   "realized_electrons": 528000,
+   "stop_reason": "converged",
+   "blocks": 11,
+   "rows_per_electron": 2.73,
+   "median_block": {
+    "simulate_s": 0.20600945129990578,
+    "measure_s": 124.79761856049299,
+    "rows": 130981
+   },
+   "kernel": {
+    "launches": 0,
+    "kernel_s": null,
+    "population_max": null,
+    "population_time_weighted": null
+   },
+   "card_peak_MiB": null,
+   "pool_reserved_peak_MiB": null,
+   "pool_used_peak_MiB": null,
+   "card_peak_by_phase_MiB": null,
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.0007686090142432983,
+    "brem": 7.647278699608017e-05
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-cpu-1000",
+   "material": "hopg",
+   "E0_keV": 1000.0,
+   "tilt_deg": 15.0,
+   "block": 48000,
+   "device": "cpu",
+   "profiled": false,
+   "wall_s": 4475.77,
+   "split_s": {
+    "transport.join": 0.077,
+    "transport.finalize": 0.039,
+    "transport": 1075.234,
+    "spectrum": 3400.534
+   },
+   "realized_electrons": 1008000,
+   "stop_reason": "max_electrons",
+   "blocks": 21,
+   "rows_per_electron": 1.93,
+   "median_block": {
+    "simulate_s": 0.12349921278655529,
+    "measure_s": 50.62527864333242,
+    "rows": 92603
+   },
+   "kernel": {
+    "launches": 0,
+    "kernel_s": null,
+    "population_max": null,
+    "population_time_weighted": null
+   },
+   "card_peak_MiB": null,
+   "pool_reserved_peak_MiB": null,
+   "pool_used_peak_MiB": null,
+   "card_peak_by_phase_MiB": null,
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.0011558677676514575,
+    "brem": 7.327065188222402e-05
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-cpu-30000",
+   "material": "hbn",
+   "E0_keV": 30000.0,
+   "tilt_deg": 15.0,
+   "block": 48000,
+   "device": "cpu",
+   "profiled": false,
+   "wall_s": 1195.34,
+   "split_s": {
+    "transport.join": 0.013,
+    "transport.finalize": 0.016,
+    "transport": 365.171,
+    "spectrum": 830.172
+   },
+   "realized_electrons": 192000,
+   "stop_reason": "converged",
+   "blocks": 4,
+   "rows_per_electron": 2.55,
+   "median_block": {
+    "simulate_s": 0.17999521875754,
+    "measure_s": 87.31667809328064,
+    "rows": 122485.5
+   },
+   "kernel": {
+    "launches": 0,
+    "kernel_s": null,
+    "population_max": null,
+    "population_time_weighted": null
+   },
+   "card_peak_MiB": null,
+   "pool_reserved_peak_MiB": null,
+   "pool_used_peak_MiB": null,
+   "card_peak_by_phase_MiB": null,
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 9.365565912142761e-07,
+    "brem": 1.165608317513008e-05
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-cpu-30000",
+   "material": "hbn",
+   "E0_keV": 30000.0,
+   "tilt_deg": 60.0,
+   "block": 48000,
+   "device": "cpu",
+   "profiled": false,
+   "wall_s": 2797.36,
+   "split_s": {
+    "transport.join": 0.024,
+    "transport.finalize": 0.038,
+    "transport": 953.23,
+    "spectrum": 1844.133
+   },
+   "realized_electrons": 192000,
+   "stop_reason": "converged",
+   "blocks": 4,
+   "rows_per_electron": 4.0,
+   "median_block": {
+    "simulate_s": 0.3195053581148386,
+    "measure_s": 241.3125687232241,
+    "rows": 191830.5
+   },
+   "kernel": {
+    "launches": 0,
+    "kernel_s": null,
+    "population_max": null,
+    "population_time_weighted": null
+   },
+   "card_peak_MiB": null,
+   "pool_reserved_peak_MiB": null,
+   "pool_used_peak_MiB": null,
+   "card_peak_by_phase_MiB": null,
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.00013243974938949876,
+    "brem": 0.00013234000391450197
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-cpu-30000",
+   "material": "hopg",
+   "E0_keV": 30000.0,
+   "tilt_deg": 15.0,
+   "block": 48000,
+   "device": "cpu",
+   "profiled": false,
+   "wall_s": 1438.72,
+   "split_s": {
+    "transport.join": 0.011,
+    "transport.finalize": 0.01,
+    "transport": 355.901,
+    "spectrum": 1082.816
+   },
+   "realized_electrons": 192000,
+   "stop_reason": "converged",
+   "blocks": 4,
+   "rows_per_electron": 2.62,
+   "median_block": {
+    "simulate_s": 0.22549906093627214,
+    "measure_s": 90.15803533885628,
+    "rows": 125528.0
+   },
+   "kernel": {
+    "launches": 0,
+    "kernel_s": null,
+    "population_max": null,
+    "population_time_weighted": null
+   },
+   "card_peak_MiB": null,
+   "pool_reserved_peak_MiB": null,
+   "pool_used_peak_MiB": null,
+   "card_peak_by_phase_MiB": null,
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 1.1771926455788723e-06,
+    "brem": 1.3537258284080255e-05
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-cpu-30000",
+   "material": "hopg",
+   "E0_keV": 30000.0,
+   "tilt_deg": 60.0,
+   "block": 48000,
+   "device": "cpu",
+   "profiled": false,
+   "wall_s": 2062.17,
+   "split_s": {
+    "transport.join": 0.032,
+    "transport.finalize": 0.027,
+    "transport": 576.997,
+    "spectrum": 1485.174
+   },
+   "realized_electrons": 192000,
+   "stop_reason": "converged",
+   "blocks": 4,
+   "rows_per_electron": 4.11,
+   "median_block": {
+    "simulate_s": 0.22091234056279063,
+    "measure_s": 142.66752200992778,
+    "rows": 197163.5
+   },
+   "kernel": {
+    "launches": 0,
+    "kernel_s": null,
+    "population_max": null,
+    "population_time_weighted": null
+   },
+   "card_peak_MiB": null,
+   "pool_reserved_peak_MiB": null,
+   "pool_used_peak_MiB": null,
+   "card_peak_by_phase_MiB": null,
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.00013230221157571994,
+    "brem": 0.00013232191316669942
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-1000",
+   "material": "hbn",
+   "E0_keV": 1000.0,
+   "tilt_deg": 15.0,
+   "block": 1000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 2.11,
+   "split_s": {
+    "transport.join": 0.001,
+    "transport.finalize": 0.001,
+    "transport": 1.432,
+    "spectrum": 0.563
+   },
+   "realized_electrons": 4000,
+   "stop_reason": "converged",
+   "blocks": 4,
+   "rows_per_electron": 2.67,
+   "median_block": {
+    "simulate_s": 0.02502162044402212,
+    "measure_s": 0.035949145909398794,
+    "rows": 2673.5
+   },
+   "kernel": {
+    "launches": 4,
+    "kernel_s": 0.10353878295421601,
+    "population_max": 1000,
+    "population_time_weighted": 1000.0
+   },
+   "card_peak_MiB": 1559.5625,
+   "pool_reserved_peak_MiB": 108.4130859375,
+   "pool_used_peak_MiB": 54.0810546875,
+   "card_peak_by_phase_MiB": {
+    "setup": 1541.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 1505.5625,
+    "transport.measure": 1505.5625,
+    "spectrum": 1559.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.00014245896898421961,
+    "brem": 0.0003163446728902933
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-1000",
+   "material": "hbn",
+   "E0_keV": 1000.0,
+   "tilt_deg": 15.0,
+   "block": 12000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 2.44,
+   "split_s": {
+    "transport.join": 0.002,
+    "transport.finalize": 0.012,
+    "transport": 1.57,
+    "spectrum": 0.747
+   },
+   "realized_electrons": 48000,
+   "stop_reason": "converged",
+   "blocks": 4,
+   "rows_per_electron": 2.72,
+   "median_block": {
+    "simulate_s": 0.03676506085321307,
+    "measure_s": 0.04726944910362363,
+    "rows": 32683.0
+   },
+   "kernel": {
+    "launches": 8,
+    "kernel_s": 0.11006083381175995,
+    "population_max": 7131,
+    "population_time_weighted": 6993.507616348476
+   },
+   "card_peak_MiB": 1841.5625,
+   "pool_reserved_peak_MiB": 313.47265625,
+   "pool_used_peak_MiB": 263.75244140625,
+   "card_peak_by_phase_MiB": {
+    "setup": 1749.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 1739.5625,
+    "transport.measure": 1695.5625,
+    "transport.finalize": 1695.5625,
+    "spectrum": 1841.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.00020404235887389787,
+    "brem": 0.00012289046184128937
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-1000",
+   "material": "hbn",
+   "E0_keV": 1000.0,
+   "tilt_deg": 15.0,
+   "block": 24000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 2.78,
+   "split_s": {
+    "transport.join": 0.003,
+    "transport.finalize": 0.016,
+    "transport": 1.797,
+    "spectrum": 0.86
+   },
+   "realized_electrons": 96000,
+   "stop_reason": "converged",
+   "blocks": 4,
+   "rows_per_electron": 2.72,
+   "median_block": {
+    "simulate_s": 0.044110464048571885,
+    "measure_s": 0.06526135047897696,
+    "rows": 65312.0
+   },
+   "kernel": {
+    "launches": 16,
+    "kernel_s": 0.12426911842823028,
+    "population_max": 7131,
+    "population_time_weighted": 6895.867702875978
+   },
+   "card_peak_MiB": 1993.5625,
+   "pool_reserved_peak_MiB": 465.5380859375,
+   "pool_used_peak_MiB": 282.54736328125,
+   "card_peak_by_phase_MiB": {
+    "setup": 1903.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 1893.5625,
+    "transport.measure": 1721.5625,
+    "transport.join": 1721.5625,
+    "transport.finalize": 1721.5625,
+    "spectrum": 1993.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.00021796882297428068,
+    "brem": 8.432533892603744e-05
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-1000",
+   "material": "hbn",
+   "E0_keV": 1000.0,
+   "tilt_deg": 15.0,
+   "block": 3000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 2.22,
+   "split_s": {
+    "transport.join": 0.002,
+    "transport.finalize": 0.001,
+    "transport": 1.496,
+    "spectrum": 0.608
+   },
+   "realized_electrons": 15000,
+   "stop_reason": "converged",
+   "blocks": 5,
+   "rows_per_electron": 2.71,
+   "median_block": {
+    "simulate_s": 0.026027295971289277,
+    "measure_s": 0.03610447305254638,
+    "rows": 8148
+   },
+   "kernel": {
+    "launches": 5,
+    "kernel_s": 0.10590742671489715,
+    "population_max": 3000,
+    "population_time_weighted": 3000.0
+   },
+   "card_peak_MiB": 1595.5625,
+   "pool_reserved_peak_MiB": 134.244140625,
+   "pool_used_peak_MiB": 112.3251953125,
+   "card_peak_by_phase_MiB": {
+    "setup": 1567.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 1541.5625,
+    "transport.measure": 1541.5625,
+    "spectrum": 1595.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.00021654281293614382,
+    "brem": 0.00018734085968558865
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-1000",
+   "material": "hbn",
+   "E0_keV": 1000.0,
+   "tilt_deg": 15.0,
+   "block": 48000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 6.02,
+   "split_s": {
+    "transport.join": 0.012,
+    "transport.finalize": 0.058,
+    "transport": 3.879,
+    "spectrum": 2.019
+   },
+   "realized_electrons": 528000,
+   "stop_reason": "converged",
+   "blocks": 11,
+   "rows_per_electron": 2.73,
+   "median_block": {
+    "simulate_s": 0.05143599212169647,
+    "measure_s": 0.09075051383115351,
+    "rows": 130981
+   },
+   "kernel": {
+    "launches": 77,
+    "kernel_s": 0.23026822769641878,
+    "population_max": 7131,
+    "population_time_weighted": 6981.9638634931525
+   },
+   "card_peak_MiB": 8273.5625,
+   "pool_reserved_peak_MiB": 6713.677734375,
+   "pool_used_peak_MiB": 1328.18408203125,
+   "card_peak_by_phase_MiB": {
+    "setup": 8181.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 5399.5625,
+    "transport.measure": 1969.5625,
+    "transport.join": 1969.5625,
+    "transport.finalize": 1969.5625,
+    "spectrum": 8273.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.0007686074209450507,
+    "brem": 7.647281588564191e-05
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-1000",
+   "material": "hbn",
+   "E0_keV": 1000.0,
+   "tilt_deg": 15.0,
+   "block": 6000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 2.38,
+   "split_s": {
+    "transport.join": 0.002,
+    "transport.finalize": 0.01,
+    "transport": 1.506,
+    "spectrum": 0.747
+   },
+   "realized_electrons": 24000,
+   "stop_reason": "converged",
+   "blocks": 4,
+   "rows_per_electron": 2.71,
+   "median_block": {
+    "simulate_s": 0.03016577905509621,
+    "measure_s": 0.04328516498208046,
+    "rows": 16282.0
+   },
+   "kernel": {
+    "launches": 4,
+    "kernel_s": 0.1026686372756958,
+    "population_max": 6000,
+    "population_time_weighted": 6000.0
+   },
+   "card_peak_MiB": 1701.5625,
+   "pool_reserved_peak_MiB": 216.72509765625,
+   "pool_used_peak_MiB": 213.90234375,
+   "card_peak_by_phase_MiB": {
+    "setup": 1657.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 1647.5625,
+    "transport.measure": 1647.5625,
+    "transport.join": 1647.5625,
+    "transport.finalize": 1647.5625,
+    "spectrum": 1701.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.0001488437487988186,
+    "brem": 0.00015118871928688872
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-1000",
+   "material": "hbn",
+   "E0_keV": 1000.0,
+   "tilt_deg": 60.0,
+   "block": 1000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 66.4,
+   "split_s": {
+    "transport.join": 0.058,
+    "transport.finalize": 0.077,
+    "transport": 62.282,
+    "spectrum": 4.001
+   },
+   "realized_electrons": 1002000,
+   "stop_reason": "max_electrons",
+   "blocks": 1002,
+   "rows_per_electron": 4.33,
+   "median_block": {
+    "simulate_s": 0.022275474038906395,
+    "measure_s": 0.033551338012330234,
+    "rows": 4332.0
+   },
+   "kernel": {
+    "launches": 1002,
+    "kernel_s": 2.3721086331009866,
+    "population_max": 1000,
+    "population_time_weighted": 1000.0
+   },
+   "card_peak_MiB": 7763.5625,
+   "pool_reserved_peak_MiB": 6265.94873046875,
+   "pool_used_peak_MiB": 2945.7763671875,
+   "card_peak_by_phase_MiB": {
+    "setup": 7763.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 5963.5625,
+    "transport.measure": 2145.5625,
+    "transport.join": 2685.5625,
+    "transport.finalize": 2787.5625,
+    "spectrum": 7763.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.04224134667405487,
+    "brem": 0.0003572255930403743
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-1000",
+   "material": "hbn",
+   "E0_keV": 1000.0,
+   "tilt_deg": 60.0,
+   "block": 12000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 16.1,
+   "split_s": {
+    "transport.join": 0.044,
+    "transport.finalize": 0.073,
+    "transport": 12.093,
+    "spectrum": 3.891
+   },
+   "realized_electrons": 1008000,
+   "stop_reason": "max_electrons",
+   "blocks": 84,
+   "rows_per_electron": 4.33,
+   "median_block": {
+    "simulate_s": 0.029799424461089075,
+    "measure_s": 0.056203484069556,
+    "rows": 51967.5
+   },
+   "kernel": {
+    "launches": 168,
+    "kernel_s": 0.4711987797021866,
+    "population_max": 7131,
+    "population_time_weighted": 6333.920595778616
+   },
+   "card_peak_MiB": 7945.5625,
+   "pool_reserved_peak_MiB": 6415.13330078125,
+   "pool_used_peak_MiB": 2949.99560546875,
+   "card_peak_by_phase_MiB": {
+    "setup": 7945.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 6435.5625,
+    "transport.measure": 2385.5625,
+    "transport.join": 2721.5625,
+    "transport.finalize": 2959.5625,
+    "spectrum": 7945.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.04207079349698141,
+    "brem": 0.00035810877533882753
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-1000",
+   "material": "hbn",
+   "E0_keV": 1000.0,
+   "tilt_deg": 60.0,
+   "block": 24000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 10.83,
+   "split_s": {
+    "transport.join": 0.043,
+    "transport.finalize": 0.078,
+    "transport": 6.671,
+    "spectrum": 4.034
+   },
+   "realized_electrons": 1008000,
+   "stop_reason": "max_electrons",
+   "blocks": 42,
+   "rows_per_electron": 4.33,
+   "median_block": {
+    "simulate_s": 0.045910021988675,
+    "measure_s": 0.08292906440328807,
+    "rows": 103908.0
+   },
+   "kernel": {
+    "launches": 168,
+    "kernel_s": 0.4595345312356949,
+    "population_max": 7131,
+    "population_time_weighted": 6341.927824457275
+   },
+   "card_peak_MiB": 8435.5625,
+   "pool_reserved_peak_MiB": 6721.92041015625,
+   "pool_used_peak_MiB": 3107.24658203125,
+   "card_peak_by_phase_MiB": {
+    "setup": 8435.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 3115.5625,
+    "transport.measure": 2541.5625,
+    "transport.join": 3081.5625,
+    "transport.finalize": 3115.5625,
+    "spectrum": 8435.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.04207079349698141,
+    "brem": 0.00035810877533882726
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-1000",
+   "material": "hbn",
+   "E0_keV": 1000.0,
+   "tilt_deg": 60.0,
+   "block": 3000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 26.05,
+   "split_s": {
+    "transport.join": 0.048,
+    "transport.finalize": 0.079,
+    "transport": 21.942,
+    "spectrum": 3.985
+   },
+   "realized_electrons": 1002000,
+   "stop_reason": "max_electrons",
+   "blocks": 334,
+   "rows_per_electron": 4.33,
+   "median_block": {
+    "simulate_s": 0.02319740306120366,
+    "measure_s": 0.03740030399058014,
+    "rows": 12986.0
+   },
+   "kernel": {
+    "launches": 334,
+    "kernel_s": 0.9077125098705292,
+    "population_max": 3000,
+    "population_time_weighted": 3000.0
+   },
+   "card_peak_MiB": 8031.5625,
+   "pool_reserved_peak_MiB": 6361.72021484375,
+   "pool_used_peak_MiB": 2889.37744140625,
+   "card_peak_by_phase_MiB": {
+    "setup": 8031.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 2397.5625,
+    "transport.measure": 2397.5625,
+    "transport.join": 2971.5625,
+    "transport.finalize": 3039.5625,
+    "spectrum": 8031.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.04224134667405487,
+    "brem": 0.0003572255930403748
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-1000",
+   "material": "hbn",
+   "E0_keV": 1000.0,
+   "tilt_deg": 60.0,
+   "block": 48000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 9.36,
+   "split_s": {
+    "transport.join": 0.035,
+    "transport.finalize": 0.068,
+    "transport": 5.291,
+    "spectrum": 3.936
+   },
+   "realized_electrons": 1008000,
+   "stop_reason": "max_electrons",
+   "blocks": 21,
+   "rows_per_electron": 4.33,
+   "median_block": {
+    "simulate_s": 0.06101323198527098,
+    "measure_s": 0.13279942399822176,
+    "rows": 207846
+   },
+   "kernel": {
+    "launches": 147,
+    "kernel_s": 0.4062137589454651,
+    "population_max": 7131,
+    "population_time_weighted": 6935.426034807849
+   },
+   "card_peak_MiB": 7583.5625,
+   "pool_reserved_peak_MiB": 6095.6328125,
+   "pool_used_peak_MiB": 3340.15234375,
+   "card_peak_by_phase_MiB": {
+    "setup": 7583.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 2911.5625,
+    "transport.measure": 2707.5625,
+    "transport.join": 2775.5625,
+    "transport.finalize": 2911.5625,
+    "spectrum": 7583.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.04207079349698141,
+    "brem": 0.00035810877533882737
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-1000",
+   "material": "hbn",
+   "E0_keV": 1000.0,
+   "tilt_deg": 60.0,
+   "block": 6000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 17.1,
+   "split_s": {
+    "transport.join": 0.046,
+    "transport.finalize": 0.071,
+    "transport": 12.982,
+    "spectrum": 3.996
+   },
+   "realized_electrons": 1002000,
+   "stop_reason": "max_electrons",
+   "blocks": 167,
+   "rows_per_electron": 4.33,
+   "median_block": {
+    "simulate_s": 0.02417565113864839,
+    "measure_s": 0.0440173449460417,
+    "rows": 25993
+   },
+   "kernel": {
+    "launches": 167,
+    "kernel_s": 0.4987004780769348,
+    "population_max": 6000,
+    "population_time_weighted": 6000.0
+   },
+   "card_peak_MiB": 8073.5625,
+   "pool_reserved_peak_MiB": 6375.30859375,
+   "pool_used_peak_MiB": 2927.1171875,
+   "card_peak_by_phase_MiB": {
+    "setup": 8073.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 3081.5625,
+    "transport.measure": 2507.5625,
+    "transport.join": 2843.5625,
+    "transport.finalize": 3081.5625,
+    "spectrum": 8073.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.04224134667405487,
+    "brem": 0.00035722559304037464
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-1000",
+   "material": "hopg",
+   "E0_keV": 1000.0,
+   "tilt_deg": 15.0,
+   "block": 1000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 1.99,
+   "split_s": {
+    "transport.join": 0.001,
+    "transport.finalize": 0.0,
+    "transport": 1.326,
+    "spectrum": 0.533
+   },
+   "realized_electrons": 5000,
+   "stop_reason": "converged",
+   "blocks": 5,
+   "rows_per_electron": 1.92,
+   "median_block": {
+    "simulate_s": 0.02022342407144606,
+    "measure_s": 0.026634312933310866,
+    "rows": 1917
+   },
+   "kernel": {
+    "launches": 5,
+    "kernel_s": 0.10565033495426178,
+    "population_max": 1000,
+    "population_time_weighted": 1000.0
+   },
+   "card_peak_MiB": 1541.5625,
+   "pool_reserved_peak_MiB": 89.2783203125,
+   "pool_used_peak_MiB": 38.7822265625,
+   "card_peak_by_phase_MiB": {
+    "setup": 1521.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 1487.5625,
+    "transport.measure": 1487.5625,
+    "spectrum": 1541.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.00018728864818247417,
+    "brem": 0.0002807785993689216
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-1000",
+   "material": "hopg",
+   "E0_keV": 1000.0,
+   "tilt_deg": 15.0,
+   "block": 12000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 9.62,
+   "split_s": {
+    "transport.join": 0.041,
+    "transport.finalize": 0.093,
+    "transport": 7.599,
+    "spectrum": 1.893
+   },
+   "realized_electrons": 1008000,
+   "stop_reason": "max_electrons",
+   "blocks": 84,
+   "rows_per_electron": 1.93,
+   "median_block": {
+    "simulate_s": 0.023733132053166628,
+    "measure_s": 0.033206871477887034,
+    "rows": 23152.5
+   },
+   "kernel": {
+    "launches": 168,
+    "kernel_s": 0.3875703389644623,
+    "population_max": 7131,
+    "population_time_weighted": 6384.525454115068
+   },
+   "card_peak_MiB": 7183.5625,
+   "pool_reserved_peak_MiB": 5525.166015625,
+   "pool_used_peak_MiB": 1740.10302734375,
+   "card_peak_by_phase_MiB": {
+    "setup": 7059.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 7049.5625,
+    "transport.measure": 2003.5625,
+    "transport.join": 2207.5625,
+    "transport.finalize": 2255.5625,
+    "spectrum": 7183.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.0011558624572398709,
+    "brem": 7.327065111074583e-05
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-1000",
+   "material": "hopg",
+   "E0_keV": 1000.0,
+   "tilt_deg": 15.0,
+   "block": 24000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 6.36,
+   "split_s": {
+    "transport.join": 0.041,
+    "transport.finalize": 0.081,
+    "transport": 4.231,
+    "spectrum": 2.006
+   },
+   "realized_electrons": 1008000,
+   "stop_reason": "max_electrons",
+   "blocks": 42,
+   "rows_per_electron": 1.93,
+   "median_block": {
+    "simulate_s": 0.03028466657269746,
+    "measure_s": 0.04074832599144429,
+    "rows": 46321.5
+   },
+   "kernel": {
+    "launches": 168,
+    "kernel_s": 0.36706163311004636,
+    "population_max": 7131,
+    "population_time_weighted": 6374.529236318096
+   },
+   "card_peak_MiB": 7295.5625,
+   "pool_reserved_peak_MiB": 5633.39208984375,
+   "pool_used_peak_MiB": 1727.23193359375,
+   "card_peak_by_phase_MiB": {
+    "setup": 7171.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 1999.5625,
+    "transport.measure": 2003.5625,
+    "transport.join": 2143.5625,
+    "transport.finalize": 2255.5625,
+    "spectrum": 7295.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.0011558624572398709,
+    "brem": 7.327065111074584e-05
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-1000",
+   "material": "hopg",
+   "E0_keV": 1000.0,
+   "tilt_deg": 15.0,
+   "block": 3000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 2.05,
+   "split_s": {
+    "transport.join": 0.001,
+    "transport.finalize": 0.001,
+    "transport": 1.348,
+    "spectrum": 0.566
+   },
+   "realized_electrons": 12000,
+   "stop_reason": "converged",
+   "blocks": 4,
+   "rows_per_electron": 1.93,
+   "median_block": {
+    "simulate_s": 0.023659811937250197,
+    "measure_s": 0.033837321563623846,
+    "rows": 5790.0
+   },
+   "kernel": {
+    "launches": 4,
+    "kernel_s": 0.10572764658927918,
+    "population_max": 3000,
+    "population_time_weighted": 3000.0
+   },
+   "card_peak_MiB": 1583.5625,
+   "pool_reserved_peak_MiB": 107.1318359375,
+   "pool_used_peak_MiB": 103.93701171875,
+   "card_peak_by_phase_MiB": {
+    "setup": 1539.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 1529.5625,
+    "transport.measure": 1529.5625,
+    "spectrum": 1583.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.00013782439889656952,
+    "brem": 0.00020650895311778662
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-1000",
+   "material": "hopg",
+   "E0_keV": 1000.0,
+   "tilt_deg": 15.0,
+   "block": 48000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 5.53,
+   "split_s": {
+    "transport.join": 0.039,
+    "transport.finalize": 0.084,
+    "transport": 3.359,
+    "spectrum": 2.045
+   },
+   "realized_electrons": 1008000,
+   "stop_reason": "max_electrons",
+   "blocks": 21,
+   "rows_per_electron": 1.93,
+   "median_block": {
+    "simulate_s": 0.05095344106666744,
+    "measure_s": 0.05712836002930999,
+    "rows": 92603
+   },
+   "kernel": {
+    "launches": 147,
+    "kernel_s": 0.33629644513130186,
+    "population_max": 7131,
+    "population_time_weighted": 6942.723367556592
+   },
+   "card_peak_MiB": 7393.5625,
+   "pool_reserved_peak_MiB": 5635.09521484375,
+   "pool_used_peak_MiB": 1739.138671875,
+   "card_peak_by_phase_MiB": {
+    "setup": 7271.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 2355.5625,
+    "transport.measure": 2103.5625,
+    "transport.join": 2291.5625,
+    "transport.finalize": 2355.5625,
+    "spectrum": 7393.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.0011558624572398715,
+    "brem": 7.327065111074587e-05
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-1000",
+   "material": "hopg",
+   "E0_keV": 1000.0,
+   "tilt_deg": 15.0,
+   "block": 6000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 2.08,
+   "split_s": {
+    "transport.join": 0.002,
+    "transport.finalize": 0.008,
+    "transport": 1.327,
+    "spectrum": 0.618
+   },
+   "realized_electrons": 24000,
+   "stop_reason": "converged",
+   "blocks": 4,
+   "rows_per_electron": 1.93,
+   "median_block": {
+    "simulate_s": 0.0263074025278911,
+    "measure_s": 0.03371386998333037,
+    "rows": 11561.5
+   },
+   "kernel": {
+    "launches": 4,
+    "kernel_s": 0.10405107462406159,
+    "population_max": 6000,
+    "population_time_weighted": 6000.0
+   },
+   "card_peak_MiB": 1695.5625,
+   "pool_reserved_peak_MiB": 210.740234375,
+   "pool_used_peak_MiB": 209.6923828125,
+   "card_peak_by_phase_MiB": {
+    "setup": 1651.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 1641.5625,
+    "transport.measure": 1641.5625,
+    "transport.join": 1641.5625,
+    "transport.finalize": 1641.5625,
+    "spectrum": 1695.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.00010430304875730197,
+    "brem": 0.0001550110480362678
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-1000",
+   "material": "hopg",
+   "E0_keV": 1000.0,
+   "tilt_deg": 60.0,
+   "block": 1000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 54.11,
+   "split_s": {
+    "transport.join": 0.08,
+    "transport.finalize": 0.067,
+    "transport": 51.4,
+    "spectrum": 2.581
+   },
+   "realized_electrons": 1002000,
+   "stop_reason": "max_electrons",
+   "blocks": 1002,
+   "rows_per_electron": 2.79,
+   "median_block": {
+    "simulate_s": 0.019340246566571295,
+    "measure_s": 0.0278657820308581,
+    "rows": 2791.0
+   },
+   "kernel": {
+    "launches": 1002,
+    "kernel_s": 2.057215515255928,
+    "population_max": 1000,
+    "population_time_weighted": 1000.0
+   },
+   "card_peak_MiB": 5651.5625,
+   "pool_reserved_peak_MiB": 4131.91943359375,
+   "pool_used_peak_MiB": 2119.859375,
+   "card_peak_by_phase_MiB": {
+    "setup": 5651.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 4475.5625,
+    "transport.measure": 1903.5625,
+    "transport.join": 2299.5625,
+    "transport.finalize": 2321.5625,
+    "spectrum": 5651.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.05840275409883477,
+    "brem": 0.0005254899241567068
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-1000",
+   "material": "hopg",
+   "E0_keV": 1000.0,
+   "tilt_deg": 60.0,
+   "block": 12000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 11.42,
+   "split_s": {
+    "transport.join": 0.044,
+    "transport.finalize": 0.061,
+    "transport": 8.608,
+    "spectrum": 2.691
+   },
+   "realized_electrons": 1008000,
+   "stop_reason": "max_electrons",
+   "blocks": 84,
+   "rows_per_electron": 2.79,
+   "median_block": {
+    "simulate_s": 0.02473738056141883,
+    "measure_s": 0.03733220649883151,
+    "rows": 33487.0
+   },
+   "kernel": {
+    "launches": 168,
+    "kernel_s": 0.43597325110435486,
+    "population_max": 7131,
+    "population_time_weighted": 6343.858549843842
+   },
+   "card_peak_MiB": 5593.5625,
+   "pool_reserved_peak_MiB": 4036.02587890625,
+   "pool_used_peak_MiB": 2134.333984375,
+   "card_peak_by_phase_MiB": {
+    "setup": 5593.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 4483.5625,
+    "transport.measure": 2147.5625,
+    "transport.join": 2455.5625,
+    "transport.finalize": 2521.5625,
+    "spectrum": 5593.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.05815669080265571,
+    "brem": 0.0005223908725002565
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-1000",
+   "material": "hopg",
+   "E0_keV": 1000.0,
+   "tilt_deg": 60.0,
+   "block": 24000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 7.67,
+   "split_s": {
+    "transport.join": 0.042,
+    "transport.finalize": 0.069,
+    "transport": 4.846,
+    "spectrum": 2.705
+   },
+   "realized_electrons": 1008000,
+   "stop_reason": "max_electrons",
+   "blocks": 42,
+   "rows_per_electron": 2.79,
+   "median_block": {
+    "simulate_s": 0.0405142669333145,
+    "measure_s": 0.05027223448269069,
+    "rows": 67017.5
+   },
+   "kernel": {
+    "launches": 168,
+    "kernel_s": 0.4201375640630722,
+    "population_max": 7131,
+    "population_time_weighted": 6341.607019941747
+   },
+   "card_peak_MiB": 5665.5625,
+   "pool_reserved_peak_MiB": 4052.4482421875,
+   "pool_used_peak_MiB": 2153.025390625,
+   "card_peak_by_phase_MiB": {
+    "setup": 5665.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 2175.5625,
+    "transport.measure": 2183.5625,
+    "transport.join": 2381.5625,
+    "transport.finalize": 2557.5625,
+    "spectrum": 5665.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.058156690802655696,
+    "brem": 0.0005223908725002564
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-1000",
+   "material": "hopg",
+   "E0_keV": 1000.0,
+   "tilt_deg": 60.0,
+   "block": 3000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 20.33,
+   "split_s": {
+    "transport.join": 0.048,
+    "transport.finalize": 0.064,
+    "transport": 17.405,
+    "spectrum": 2.802
+   },
+   "realized_electrons": 1002000,
+   "stop_reason": "max_electrons",
+   "blocks": 334,
+   "rows_per_electron": 2.79,
+   "median_block": {
+    "simulate_s": 0.01992324599996209,
+    "measure_s": 0.027666569920256734,
+    "rows": 8370.0
+   },
+   "kernel": {
+    "launches": 334,
+    "kernel_s": 0.7899637101888657,
+    "population_max": 3000,
+    "population_time_weighted": 3000.0
+   },
+   "card_peak_MiB": 5809.5625,
+   "pool_reserved_peak_MiB": 4175.92431640625,
+   "pool_used_peak_MiB": 2050.7841796875,
+   "card_peak_by_phase_MiB": {
+    "setup": 5809.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 2431.5625,
+    "transport.measure": 2035.5625,
+    "transport.join": 2343.5625,
+    "transport.finalize": 2453.5625,
+    "spectrum": 5809.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.05840275409883475,
+    "brem": 0.0005254899241567079
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-1000",
+   "material": "hopg",
+   "E0_keV": 1000.0,
+   "tilt_deg": 60.0,
+   "block": 48000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 6.51,
+   "split_s": {
+    "transport.join": 0.038,
+    "transport.finalize": 0.046,
+    "transport": 3.747,
+    "spectrum": 2.645
+   },
+   "realized_electrons": 1008000,
+   "stop_reason": "max_electrons",
+   "blocks": 21,
+   "rows_per_electron": 2.79,
+   "median_block": {
+    "simulate_s": 0.0505256790202111,
+    "measure_s": 0.07483344804495573,
+    "rows": 134012
+   },
+   "kernel": {
+    "launches": 147,
+    "kernel_s": 0.37527660953998565,
+    "population_max": 7131,
+    "population_time_weighted": 6937.844913337797
+   },
+   "card_peak_MiB": 5367.5625,
+   "pool_reserved_peak_MiB": 3854.68017578125,
+   "pool_used_peak_MiB": 2052.22314453125,
+   "card_peak_by_phase_MiB": {
+    "setup": 5367.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 2219.5625,
+    "transport.measure": 2219.5625,
+    "transport.join": 2439.5625,
+    "transport.finalize": 2483.5625,
+    "spectrum": 5367.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.058156690802655696,
+    "brem": 0.0005223908725002563
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-1000",
+   "material": "hopg",
+   "E0_keV": 1000.0,
+   "tilt_deg": 60.0,
+   "block": 6000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 12.9,
+   "split_s": {
+    "transport.join": 0.042,
+    "transport.finalize": 0.063,
+    "transport": 10.081,
+    "spectrum": 2.698
+   },
+   "realized_electrons": 1002000,
+   "stop_reason": "max_electrons",
+   "blocks": 167,
+   "rows_per_electron": 2.79,
+   "median_block": {
+    "simulate_s": 0.02069418504834175,
+    "measure_s": 0.031013720901682973,
+    "rows": 16737
+   },
+   "kernel": {
+    "launches": 167,
+    "kernel_s": 0.46888844698667526,
+    "population_max": 6000,
+    "population_time_weighted": 6000.0
+   },
+   "card_peak_MiB": 5891.5625,
+   "pool_reserved_peak_MiB": 4247.79345703125,
+   "pool_used_peak_MiB": 2119.5751953125,
+   "card_peak_by_phase_MiB": {
+    "setup": 5891.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 2153.5625,
+    "transport.measure": 2153.5625,
+    "transport.join": 2483.5625,
+    "transport.finalize": 2527.5625,
+    "spectrum": 5891.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.05840275409883476,
+    "brem": 0.0005254899241567083
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-30",
+   "material": "hbn",
+   "E0_keV": 30.0,
+   "tilt_deg": 15.0,
+   "block": 1000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 23.59,
+   "split_s": {
+    "transport.join": 0.018,
+    "transport.finalize": 0.043,
+    "transport": 20.913,
+    "spectrum": 2.559
+   },
+   "realized_electrons": 258000,
+   "stop_reason": "converged",
+   "blocks": 258,
+   "rows_per_electron": 16.14,
+   "median_block": {
+    "simulate_s": 0.025581437861546874,
+    "measure_s": 0.05121802294161171,
+    "rows": 16139.0
+   },
+   "kernel": {
+    "launches": 274,
+    "kernel_s": 1.5757094398736953,
+    "population_max": 1000,
+    "population_time_weighted": 978.4474554579797
+   },
+   "card_peak_MiB": 8079.5625,
+   "pool_reserved_peak_MiB": 6604.525390625,
+   "pool_used_peak_MiB": 2871.28076171875,
+   "card_peak_by_phase_MiB": {
+    "setup": 8079.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 2131.5625,
+    "transport.measure": 2131.5625,
+    "transport.join": 2707.5625,
+    "transport.finalize": 2739.5625,
+    "spectrum": 8079.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.0009991434693485124,
+    "brem": 0.0007304243982161388
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-30",
+   "material": "hbn",
+   "E0_keV": 30.0,
+   "tilt_deg": 15.0,
+   "block": 12000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 11.53,
+   "split_s": {
+    "transport.join": 0.012,
+    "transport.finalize": 0.032,
+    "transport": 8.995,
+    "spectrum": 2.409
+   },
+   "realized_electrons": 264000,
+   "stop_reason": "converged",
+   "blocks": 22,
+   "rows_per_electron": 16.14,
+   "median_block": {
+    "simulate_s": 0.038798763416707516,
+    "measure_s": 0.27445326652377844,
+    "rows": 193745.5
+   },
+   "kernel": {
+    "launches": 46,
+    "kernel_s": 0.4149166125059128,
+    "population_max": 7131,
+    "population_time_weighted": 6223.450893423702
+   },
+   "card_peak_MiB": 7813.5625,
+   "pool_reserved_peak_MiB": 6302.57568359375,
+   "pool_used_peak_MiB": 2736.6435546875,
+   "card_peak_by_phase_MiB": {
+    "setup": 7813.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 5157.5625,
+    "transport.measure": 2481.5625,
+    "transport.join": 2847.5625,
+    "transport.finalize": 2915.5625,
+    "spectrum": 7813.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.0009862387352537415,
+    "brem": 0.0007200732989945144
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-30",
+   "material": "hbn",
+   "E0_keV": 30.0,
+   "tilt_deg": 15.0,
+   "block": 24000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 9.92,
+   "split_s": {
+    "transport.join": 0.004,
+    "transport.finalize": 0.033,
+    "transport": 7.26,
+    "spectrum": 2.534
+   },
+   "realized_electrons": 264000,
+   "stop_reason": "converged",
+   "blocks": 11,
+   "rows_per_electron": 16.14,
+   "median_block": {
+    "simulate_s": 0.06065930100157857,
+    "measure_s": 0.5179598869290203,
+    "rows": 387094
+   },
+   "kernel": {
+    "launches": 44,
+    "kernel_s": 0.40438873767852784,
+    "population_max": 7131,
+    "population_time_weighted": 6396.063770198416
+   },
+   "card_peak_MiB": 6841.5625,
+   "pool_reserved_peak_MiB": 5348.8623046875,
+   "pool_used_peak_MiB": 2801.09375,
+   "card_peak_by_phase_MiB": {
+    "setup": 6841.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 3291.5625,
+    "transport.measure": 3291.5625,
+    "transport.join": 3291.5625,
+    "transport.finalize": 3291.5625,
+    "spectrum": 6841.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.0009862387352537415,
+    "brem": 0.0007200732989945147
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-30",
+   "material": "hbn",
+   "E0_keV": 30.0,
+   "tilt_deg": 15.0,
+   "block": 3000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 14.09,
+   "split_s": {
+    "transport.join": 0.015,
+    "transport.finalize": 0.042,
+    "transport": 11.392,
+    "spectrum": 2.565
+   },
+   "realized_electrons": 258000,
+   "stop_reason": "converged",
+   "blocks": 86,
+   "rows_per_electron": 16.14,
+   "median_block": {
+    "simulate_s": 0.029134103446267545,
+    "measure_s": 0.09150995744857937,
+    "rows": 48368.0
+   },
+   "kernel": {
+    "launches": 98,
+    "kernel_s": 0.6968735344409943,
+    "population_max": 3000,
+    "population_time_weighted": 2874.4966912590885
+   },
+   "card_peak_MiB": 8261.5625,
+   "pool_reserved_peak_MiB": 6729.423828125,
+   "pool_used_peak_MiB": 2839.5107421875,
+   "card_peak_by_phase_MiB": {
+    "setup": 8261.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 2225.5625,
+    "transport.measure": 2225.5625,
+    "transport.join": 2673.5625,
+    "transport.finalize": 2849.5625,
+    "spectrum": 8261.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.0009991434693485117,
+    "brem": 0.0007304243982161392
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-30",
+   "material": "hbn",
+   "E0_keV": 30.0,
+   "tilt_deg": 15.0,
+   "block": 48000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 20.28,
+   "split_s": {
+    "transport.join": 0.006,
+    "transport.finalize": 0.031,
+    "transport": 15.623,
+    "spectrum": 4.533
+   },
+   "realized_electrons": 528000,
+   "stop_reason": "converged",
+   "blocks": 11,
+   "rows_per_electron": 16.13,
+   "median_block": {
+    "simulate_s": 0.095280742039904,
+    "measure_s": 1.010070794960484,
+    "rows": 773933
+   },
+   "kernel": {
+    "launches": 80,
+    "kernel_s": 0.6616240619421005,
+    "population_max": 7131,
+    "population_time_weighted": 6838.7215249850005
+   },
+   "card_peak_MiB": 10057.5625,
+   "pool_reserved_peak_MiB": 8591.17822265625,
+   "pool_used_peak_MiB": 6380.7451171875,
+   "card_peak_by_phase_MiB": {
+    "setup": 10057.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 8549.5625,
+    "transport.measure": 8093.5625,
+    "transport.join": 8093.5625,
+    "transport.finalize": 8093.5625,
+    "spectrum": 10057.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.0006928987693599749,
+    "brem": 0.0005069330376151867
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-30",
+   "material": "hbn",
+   "E0_keV": 30.0,
+   "tilt_deg": 15.0,
+   "block": 6000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 13.87,
+   "split_s": {
+    "transport.join": 0.015,
+    "transport.finalize": 0.041,
+    "transport": 11.119,
+    "spectrum": 2.628
+   },
+   "realized_electrons": 288000,
+   "stop_reason": "converged",
+   "blocks": 48,
+   "rows_per_electron": 16.14,
+   "median_block": {
+    "simulate_s": 0.032180277863517404,
+    "measure_s": 0.15289980650413781,
+    "rows": 96847.0
+   },
+   "kernel": {
+    "launches": 60,
+    "kernel_s": 0.47399177753925326,
+    "population_max": 6000,
+    "population_time_weighted": 5629.716701223495
+   },
+   "card_peak_MiB": 9409.5625,
+   "pool_reserved_peak_MiB": 7527.27783203125,
+   "pool_used_peak_MiB": 3309.4345703125,
+   "card_peak_by_phase_MiB": {
+    "setup": 9409.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 6185.5625,
+    "transport.measure": 2685.5625,
+    "transport.join": 3261.5625,
+    "transport.finalize": 3369.5625,
+    "spectrum": 9409.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.000943737188673173,
+    "brem": 0.0006878884877412569
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-30",
+   "material": "hbn",
+   "E0_keV": 30.0,
+   "tilt_deg": 60.0,
+   "block": 1000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 92.51,
+   "split_s": {
+    "transport.join": 0.061,
+    "transport.finalize": 0.079,
+    "transport": 81.015,
+    "spectrum": 11.371
+   },
+   "realized_electrons": 594000,
+   "stop_reason": "converged",
+   "blocks": 594,
+   "rows_per_electron": 37.68,
+   "median_block": {
+    "simulate_s": 0.03492490446660668,
+    "measure_s": 0.08721468551084399,
+    "rows": 37736.5
+   },
+   "kernel": {
+    "launches": 1063,
+    "kernel_s": 7.852696165561676,
+    "population_max": 1000,
+    "population_time_weighted": 831.5280052933898
+   },
+   "card_peak_MiB": 15465.5625,
+   "pool_reserved_peak_MiB": 13831.55224609375,
+   "pool_used_peak_MiB": 8881.6142578125,
+   "card_peak_by_phase_MiB": {
+    "setup": 12327.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 15357.5625,
+    "transport.measure": 4915.5625,
+    "transport.join": 7729.5625,
+    "transport.finalize": 8333.5625,
+    "spectrum": 15465.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.0004487244040001326,
+    "brem": 0.0009996564680331264
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-30",
+   "material": "hbn",
+   "E0_keV": 30.0,
+   "tilt_deg": 60.0,
+   "block": 12000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 59.18,
+   "split_s": {
+    "transport.join": 0.038,
+    "transport.finalize": 0.072,
+    "transport": 47.271,
+    "spectrum": 11.777
+   },
+   "realized_electrons": 612000,
+   "stop_reason": "converged",
+   "blocks": 51,
+   "rows_per_electron": 37.68,
+   "median_block": {
+    "simulate_s": 0.0640756101347506,
+    "measure_s": 0.7037800799589604,
+    "rows": 452328
+   },
+   "kernel": {
+    "launches": 154,
+    "kernel_s": 1.6126336938142776,
+    "population_max": 7131,
+    "population_time_weighted": 5144.587281249449
+   },
+   "card_peak_MiB": 12797.5625,
+   "pool_reserved_peak_MiB": 11247.666015625,
+   "pool_used_peak_MiB": 9060.07373046875,
+   "card_peak_by_phase_MiB": {
+    "setup": 12703.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 12689.5625,
+    "transport.measure": 6441.5625,
+    "transport.join": 8729.5625,
+    "transport.finalize": 8729.5625,
+    "spectrum": 12797.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.0004416902102390037,
+    "brem": 0.0009839823919248528
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-30",
+   "material": "hbn",
+   "E0_keV": 30.0,
+   "tilt_deg": 60.0,
+   "block": 24000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 59.55,
+   "split_s": {
+    "transport.join": 0.013,
+    "transport.finalize": 0.059,
+    "transport": 47.064,
+    "spectrum": 12.369
+   },
+   "realized_electrons": 624000,
+   "stop_reason": "converged",
+   "blocks": 26,
+   "rows_per_electron": 37.68,
+   "median_block": {
+    "simulate_s": 0.0948631044011563,
+    "measure_s": 1.3873180920490995,
+    "rows": 904416.5
+   },
+   "kernel": {
+    "launches": 130,
+    "kernel_s": 1.4791821777820586,
+    "population_max": 7131,
+    "population_time_weighted": 5774.78387808134
+   },
+   "card_peak_MiB": 11099.5625,
+   "pool_reserved_peak_MiB": 9456.4501953125,
+   "pool_used_peak_MiB": 7757.9375,
+   "card_peak_by_phase_MiB": {
+    "setup": 11001.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 10991.5625,
+    "transport.measure": 10991.5625,
+    "transport.join": 10991.5625,
+    "transport.finalize": 10991.5625,
+    "spectrum": 11099.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.00043758694914930446,
+    "brem": 0.000974715020308859
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-30",
+   "material": "hbn",
+   "E0_keV": 30.0,
+   "tilt_deg": 60.0,
+   "block": 3000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 59.93,
+   "split_s": {
+    "transport.join": 0.06,
+    "transport.finalize": 0.067,
+    "transport": 48.358,
+    "spectrum": 11.449
+   },
+   "realized_electrons": 594000,
+   "stop_reason": "converged",
+   "blocks": 198,
+   "rows_per_electron": 37.68,
+   "median_block": {
+    "simulate_s": 0.039353810949251056,
+    "measure_s": 0.19872824905905873,
+    "rows": 112946.5
+   },
+   "kernel": {
+    "launches": 399,
+    "kernel_s": 3.2179726411104204,
+    "population_max": 3000,
+    "population_time_weighted": 2221.5987240214226
+   },
+   "card_peak_MiB": 12859.5625,
+   "pool_reserved_peak_MiB": 11306.3203125,
+   "pool_used_peak_MiB": 7635.3857421875,
+   "card_peak_by_phase_MiB": {
+    "setup": 12803.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 4923.5625,
+    "transport.measure": 4923.5625,
+    "transport.join": 7931.5625,
+    "transport.finalize": 8319.5625,
+    "spectrum": 12859.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.00044872440400013284,
+    "brem": 0.0009996564680331266
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-30",
+   "material": "hbn",
+   "E0_keV": 30.0,
+   "tilt_deg": 60.0,
+   "block": 48000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 166.82,
+   "split_s": {
+    "transport.join": 0.02,
+    "transport.finalize": 0.072,
+    "transport": 51.14,
+    "spectrum": 115.561
+   },
+   "realized_electrons": 672000,
+   "stop_reason": "converged",
+   "blocks": 14,
+   "rows_per_electron": 37.7,
+   "median_block": {
+    "simulate_s": 0.1466782990610227,
+    "measure_s": 2.7596284300088882,
+    "rows": 1810652.5
+   },
+   "kernel": {
+    "launches": 112,
+    "kernel_s": 1.3978828463554382,
+    "population_max": 7131,
+    "population_time_weighted": 6547.054970585965
+   },
+   "card_peak_MiB": 16302.5625,
+   "pool_reserved_peak_MiB": 22474.7001953125,
+   "pool_used_peak_MiB": 8781.78857421875,
+   "card_peak_by_phase_MiB": {
+    "setup": 16302.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 16302.5625,
+    "transport.measure": 16302.5625,
+    "transport.join": 16302.5625,
+    "transport.finalize": 16302.5625,
+    "spectrum": 16302.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.0004222273952395228,
+    "brem": 0.0009396506344074025
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-30",
+   "material": "hbn",
+   "E0_keV": 30.0,
+   "tilt_deg": 60.0,
+   "block": 6000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 54.3,
+   "split_s": {
+    "transport.join": 0.055,
+    "transport.finalize": 0.063,
+    "transport": 42.452,
+    "spectrum": 11.726
+   },
+   "realized_electrons": 594000,
+   "stop_reason": "converged",
+   "blocks": 99,
+   "rows_per_electron": 37.68,
+   "median_block": {
+    "simulate_s": 0.04809009796008468,
+    "measure_s": 0.37054381100460887,
+    "rows": 226023
+   },
+   "kernel": {
+    "launches": 203,
+    "kernel_s": 1.9589257280826569,
+    "population_max": 6000,
+    "population_time_weighted": 4115.141965582028
+   },
+   "card_peak_MiB": 12893.5625,
+   "pool_reserved_peak_MiB": 11373.54638671875,
+   "pool_used_peak_MiB": 7429.904296875,
+   "card_peak_by_phase_MiB": {
+    "setup": 12657.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 5457.5625,
+    "transport.measure": 5457.5625,
+    "transport.join": 8377.5625,
+    "transport.finalize": 8721.5625,
+    "spectrum": 12893.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.0004487244040001333,
+    "brem": 0.0009996564680331264
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-30",
+   "material": "hopg",
+   "E0_keV": 30.0,
+   "tilt_deg": 15.0,
+   "block": 1000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 20.78,
+   "split_s": {
+    "transport.join": 0.02,
+    "transport.finalize": 0.039,
+    "transport": 18.531,
+    "spectrum": 2.126
+   },
+   "realized_electrons": 314000,
+   "stop_reason": "converged",
+   "blocks": 314,
+   "rows_per_electron": 9.04,
+   "median_block": {
+    "simulate_s": 0.02106053801253438,
+    "measure_s": 0.032342163496650755,
+    "rows": 9029.5
+   },
+   "kernel": {
+    "launches": 314,
+    "kernel_s": 1.3914505257606506,
+    "population_max": 1000,
+    "population_time_weighted": 1000.0
+   },
+   "card_peak_MiB": 5995.5625,
+   "pool_reserved_peak_MiB": 4500.86328125,
+   "pool_used_peak_MiB": 2129.82568359375,
+   "card_peak_by_phase_MiB": {
+    "setup": 5995.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 4061.5625,
+    "transport.measure": 1889.5625,
+    "transport.join": 2263.5625,
+    "transport.finalize": 2307.5625,
+    "spectrum": 5995.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.0009978318664586785,
+    "brem": 0.0006552080806865086
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-30",
+   "material": "hopg",
+   "E0_keV": 30.0,
+   "tilt_deg": 15.0,
+   "block": 12000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 8.12,
+   "split_s": {
+    "transport.join": 0.013,
+    "transport.finalize": 0.037,
+    "transport": 5.999,
+    "spectrum": 2.003
+   },
+   "realized_electrons": 324000,
+   "stop_reason": "converged",
+   "blocks": 27,
+   "rows_per_electron": 9.05,
+   "median_block": {
+    "simulate_s": 0.0354123511351645,
+    "measure_s": 0.12661776109598577,
+    "rows": 108413
+   },
+   "kernel": {
+    "launches": 54,
+    "kernel_s": 0.3789822688102722,
+    "population_max": 7131,
+    "population_time_weighted": 6335.931897843571
+   },
+   "card_peak_MiB": 6211.5625,
+   "pool_reserved_peak_MiB": 4563.771484375,
+   "pool_used_peak_MiB": 2069.376953125,
+   "card_peak_by_phase_MiB": {
+    "setup": 6211.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 4479.5625,
+    "transport.measure": 2251.5625,
+    "transport.join": 2507.5625,
+    "transport.finalize": 2651.5625,
+    "spectrum": 6211.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.0009857087680896581,
+    "brem": 0.0006480648286220633
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-30",
+   "material": "hopg",
+   "E0_keV": 30.0,
+   "tilt_deg": 15.0,
+   "block": 24000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 7.6,
+   "split_s": {
+    "transport.join": 0.005,
+    "transport.finalize": 0.033,
+    "transport": 5.487,
+    "spectrum": 1.99
+   },
+   "realized_electrons": 336000,
+   "stop_reason": "converged",
+   "blocks": 14,
+   "rows_per_electron": 9.05,
+   "median_block": {
+    "simulate_s": 0.05100885999854654,
+    "measure_s": 0.22981018049176782,
+    "rows": 216940.0
+   },
+   "kernel": {
+    "launches": 56,
+    "kernel_s": 0.386397855758667,
+    "population_max": 7131,
+    "population_time_weighted": 6398.597974458061
+   },
+   "card_peak_MiB": 5761.5625,
+   "pool_reserved_peak_MiB": 4291.78076171875,
+   "pool_used_peak_MiB": 2195.1640625,
+   "card_peak_by_phase_MiB": {
+    "setup": 5761.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 4071.5625,
+    "transport.measure": 2557.5625,
+    "transport.join": 2557.5625,
+    "transport.finalize": 2557.5625,
+    "spectrum": 5761.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.0009715365455229005,
+    "brem": 0.000638741733870806
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-30",
+   "material": "hopg",
+   "E0_keV": 30.0,
+   "tilt_deg": 15.0,
+   "block": 3000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 11.66,
+   "split_s": {
+    "transport.join": 0.015,
+    "transport.finalize": 0.04,
+    "transport": 9.469,
+    "spectrum": 2.069
+   },
+   "realized_electrons": 315000,
+   "stop_reason": "converged",
+   "blocks": 105,
+   "rows_per_electron": 9.04,
+   "median_block": {
+    "simulate_s": 0.023988210130482912,
+    "measure_s": 0.05044122505933046,
+    "rows": 27128
+   },
+   "kernel": {
+    "launches": 105,
+    "kernel_s": 0.6115219187736511,
+    "population_max": 3000,
+    "population_time_weighted": 3000.0
+   },
+   "card_peak_MiB": 6191.5625,
+   "pool_reserved_peak_MiB": 4671.404296875,
+   "pool_used_peak_MiB": 2072.5888671875,
+   "card_peak_by_phase_MiB": {
+    "setup": 6191.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 4277.5625,
+    "transport.measure": 1975.5625,
+    "transport.join": 2283.5625,
+    "transport.finalize": 2393.5625,
+    "spectrum": 6191.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.0009953771482046465,
+    "brem": 0.0006535405065159799
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-30",
+   "material": "hopg",
+   "E0_keV": 30.0,
+   "tilt_deg": 15.0,
+   "block": 48000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 11.28,
+   "split_s": {
+    "transport.join": 0.008,
+    "transport.finalize": 0.053,
+    "transport": 8.439,
+    "spectrum": 2.718
+   },
+   "realized_electrons": 576000,
+   "stop_reason": "converged",
+   "blocks": 12,
+   "rows_per_electron": 9.04,
+   "median_block": {
+    "simulate_s": 0.07590187806636095,
+    "measure_s": 0.4338931974489242,
+    "rows": 433913.5
+   },
+   "kernel": {
+    "launches": 84,
+    "kernel_s": 0.5417840659618378,
+    "population_max": 7131,
+    "population_time_weighted": 6926.373357211537
+   },
+   "card_peak_MiB": 8339.5625,
+   "pool_reserved_peak_MiB": 6869.591796875,
+   "pool_used_peak_MiB": 3787.18896484375,
+   "card_peak_by_phase_MiB": {
+    "setup": 8339.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 5937.5625,
+    "transport.measure": 3697.5625,
+    "transport.join": 3697.5625,
+    "transport.finalize": 3697.5625,
+    "spectrum": 8339.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.0007279490594557687,
+    "brem": 0.0004787533817708761
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-30",
+   "material": "hopg",
+   "E0_keV": 30.0,
+   "tilt_deg": 15.0,
+   "block": 6000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 9.23,
+   "split_s": {
+    "transport.join": 0.015,
+    "transport.finalize": 0.04,
+    "transport": 6.998,
+    "spectrum": 2.104
+   },
+   "realized_electrons": 318000,
+   "stop_reason": "converged",
+   "blocks": 53,
+   "rows_per_electron": 9.04,
+   "median_block": {
+    "simulate_s": 0.026036177994683385,
+    "measure_s": 0.07554730703122914,
+    "rows": 54278
+   },
+   "kernel": {
+    "launches": 53,
+    "kernel_s": 0.383600314617157,
+    "population_max": 6000,
+    "population_time_weighted": 6000.0
+   },
+   "card_peak_MiB": 6139.5625,
+   "pool_reserved_peak_MiB": 4591.822265625,
+   "pool_used_peak_MiB": 2047.216796875,
+   "card_peak_by_phase_MiB": {
+    "setup": 6139.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 4281.5625,
+    "transport.measure": 2137.5625,
+    "transport.join": 2445.5625,
+    "transport.finalize": 2511.5625,
+    "spectrum": 6139.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.000992260122681982,
+    "brem": 0.0006511396325464841
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-30",
+   "material": "hopg",
+   "E0_keV": 30.0,
+   "tilt_deg": 60.0,
+   "block": 1000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 58.19,
+   "split_s": {
+    "transport.join": 0.048,
+    "transport.finalize": 0.072,
+    "transport": 51.137,
+    "spectrum": 6.932
+   },
+   "realized_electrons": 611000,
+   "stop_reason": "converged",
+   "blocks": 611,
+   "rows_per_electron": 20.47,
+   "median_block": {
+    "simulate_s": 0.02594187785871327,
+    "measure_s": 0.048994326032698154,
+    "rows": 20477
+   },
+   "kernel": {
+    "launches": 633,
+    "kernel_s": 5.25150668334961,
+    "population_max": 1000,
+    "population_time_weighted": 993.8182332025526
+   },
+   "card_peak_MiB": 13649.5625,
+   "pool_reserved_peak_MiB": 12022.9375,
+   "pool_used_peak_MiB": 8107.68505859375,
+   "card_peak_by_phase_MiB": {
+    "setup": 10751.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 13477.5625,
+    "transport.measure": 3363.5625,
+    "transport.join": 4923.5625,
+    "transport.finalize": 5259.5625,
+    "spectrum": 13649.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.0005394308162216498,
+    "brem": 0.0009994771167715184
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-30",
+   "material": "hopg",
+   "E0_keV": 30.0,
+   "tilt_deg": 60.0,
+   "block": 12000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 27.23,
+   "split_s": {
+    "transport.join": 0.033,
+    "transport.finalize": 0.047,
+    "transport": 19.9,
+    "spectrum": 7.202
+   },
+   "realized_electrons": 624000,
+   "stop_reason": "converged",
+   "blocks": 52,
+   "rows_per_electron": 20.48,
+   "median_block": {
+    "simulate_s": 0.04772718355525285,
+    "measure_s": 0.319664710550569,
+    "rows": 245662.0
+   },
+   "kernel": {
+    "launches": 109,
+    "kernel_s": 1.161644766330719,
+    "population_max": 7131,
+    "population_time_weighted": 6100.870007437918
+   },
+   "card_peak_MiB": 12895.5625,
+   "pool_reserved_peak_MiB": 11353.384765625,
+   "pool_used_peak_MiB": 5957.95703125,
+   "card_peak_by_phase_MiB": {
+    "setup": 10857.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 4149.5625,
+    "transport.measure": 4303.5625,
+    "transport.join": 5577.5625,
+    "transport.finalize": 5675.5625,
+    "spectrum": 12895.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.0005340239146633407,
+    "brem": 0.0009894276425533625
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-30",
+   "material": "hopg",
+   "E0_keV": 30.0,
+   "tilt_deg": 60.0,
+   "block": 24000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 26.03,
+   "split_s": {
+    "transport.join": 0.019,
+    "transport.finalize": 0.051,
+    "transport": 18.727,
+    "spectrum": 7.181
+   },
+   "realized_electrons": 624000,
+   "stop_reason": "converged",
+   "blocks": 26,
+   "rows_per_electron": 20.48,
+   "median_block": {
+    "simulate_s": 0.07172990695107728,
+    "measure_s": 0.6160695931175724,
+    "rows": 491322.5
+   },
+   "kernel": {
+    "launches": 106,
+    "kernel_s": 1.1409089617729187,
+    "population_max": 7131,
+    "population_time_weighted": 6170.8461185700235
+   },
+   "card_peak_MiB": 12813.5625,
+   "pool_reserved_peak_MiB": 11255.62255859375,
+   "pool_used_peak_MiB": 5750.56689453125,
+   "card_peak_by_phase_MiB": {
+    "setup": 10635.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 4887.5625,
+    "transport.measure": 4887.5625,
+    "transport.join": 5377.5625,
+    "transport.finalize": 5475.5625,
+    "spectrum": 12813.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.000534023914663341,
+    "brem": 0.0009894276425533627
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-30",
+   "material": "hopg",
+   "E0_keV": 30.0,
+   "tilt_deg": 60.0,
+   "block": 3000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 38.19,
+   "split_s": {
+    "transport.join": 0.042,
+    "transport.finalize": 0.058,
+    "transport": 31.11,
+    "spectrum": 6.96
+   },
+   "realized_electrons": 612000,
+   "stop_reason": "converged",
+   "blocks": 204,
+   "rows_per_electron": 20.47,
+   "median_block": {
+    "simulate_s": 0.03024827945046127,
+    "measure_s": 0.097814402426593,
+    "rows": 61518.5
+   },
+   "kernel": {
+    "launches": 224,
+    "kernel_s": 2.028018107533455,
+    "population_max": 3000,
+    "population_time_weighted": 2954.9540961565617
+   },
+   "card_peak_MiB": 14215.5625,
+   "pool_reserved_peak_MiB": 12451.77392578125,
+   "pool_used_peak_MiB": 8037.47900390625,
+   "card_peak_by_phase_MiB": {
+    "setup": 9431.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 14043.5625,
+    "transport.measure": 3465.5625,
+    "transport.join": 5265.5625,
+    "transport.finalize": 5361.5625,
+    "spectrum": 14215.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.0005389069083336269,
+    "brem": 0.000998516984271571
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-30",
+   "material": "hopg",
+   "E0_keV": 30.0,
+   "tilt_deg": 60.0,
+   "block": 48000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 30.99,
+   "split_s": {
+    "transport.join": 0.009,
+    "transport.finalize": 0.051,
+    "transport": 23.827,
+    "spectrum": 7.047
+   },
+   "realized_electrons": 672000,
+   "stop_reason": "converged",
+   "blocks": 14,
+   "rows_per_electron": 20.47,
+   "median_block": {
+    "simulate_s": 0.1108563964953646,
+    "measure_s": 1.2153637894662097,
+    "rows": 981137.5
+   },
+   "kernel": {
+    "launches": 98,
+    "kernel_s": 1.091589412212372,
+    "population_max": 7131,
+    "population_time_weighted": 6895.975674229197
+   },
+   "card_peak_MiB": 10091.5625,
+   "pool_reserved_peak_MiB": 8409.98681640625,
+   "pool_used_peak_MiB": 6248.0166015625,
+   "card_peak_by_phase_MiB": {
+    "setup": 9929.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 9919.5625,
+    "transport.measure": 9919.5625,
+    "transport.join": 9919.5625,
+    "transport.finalize": 9919.5625,
+    "spectrum": 10091.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.0005142377676144682,
+    "brem": 0.0009526771112233038
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-30",
+   "material": "hopg",
+   "E0_keV": 30.0,
+   "tilt_deg": 60.0,
+   "block": 6000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 33.2,
+   "split_s": {
+    "transport.join": 0.041,
+    "transport.finalize": 0.062,
+    "transport": 26.14,
+    "spectrum": 6.941
+   },
+   "realized_electrons": 624000,
+   "stop_reason": "converged",
+   "blocks": 104,
+   "rows_per_electron": 20.48,
+   "median_block": {
+    "simulate_s": 0.03441664902493358,
+    "measure_s": 0.17210324993357062,
+    "rows": 122859.5
+   },
+   "kernel": {
+    "launches": 121,
+    "kernel_s": 1.190550813794136,
+    "population_max": 6000,
+    "population_time_weighted": 5865.011392629012
+   },
+   "card_peak_MiB": 14269.5625,
+   "pool_reserved_peak_MiB": 12535.89208984375,
+   "pool_used_peak_MiB": 8196.013671875,
+   "card_peak_by_phase_MiB": {
+    "setup": 11119.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 14097.5625,
+    "transport.measure": 3651.5625,
+    "transport.join": 5317.5625,
+    "transport.finalize": 5513.5625,
+    "spectrum": 14269.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.000534023914663341,
+    "brem": 0.000989427642553363
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-30000",
+   "material": "hbn",
+   "E0_keV": 30000.0,
+   "tilt_deg": 15.0,
+   "block": 1000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 2.51,
+   "split_s": {
+    "transport.join": 0.12,
+    "transport.finalize": 0.001,
+    "transport": 1.839,
+    "spectrum": 0.542
+   },
+   "realized_electrons": 4000,
+   "stop_reason": "converged",
+   "blocks": 4,
+   "rows_per_electron": 2.54,
+   "median_block": {
+    "simulate_s": 0.02400564355775714,
+    "measure_s": 0.03629329812247306,
+    "rows": 2536.0
+   },
+   "kernel": {
+    "launches": 4,
+    "kernel_s": 0.10322729969024658,
+    "population_max": 1000,
+    "population_time_weighted": 1000.0
+   },
+   "card_peak_MiB": 1559.5625,
+   "pool_reserved_peak_MiB": 120.21484375,
+   "pool_used_peak_MiB": 55.6708984375,
+   "card_peak_by_phase_MiB": {
+    "setup": 1555.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 1505.5625,
+    "transport.measure": 1505.5625,
+    "transport.join": 1505.5625,
+    "spectrum": 1559.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 4.723750093000322e-06,
+    "brem": 2.206322294711524e-05
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-30000",
+   "material": "hbn",
+   "E0_keV": 30000.0,
+   "tilt_deg": 15.0,
+   "block": 12000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 2.71,
+   "split_s": {
+    "transport.join": 0.002,
+    "transport.finalize": 0.009,
+    "transport": 1.815,
+    "spectrum": 0.762
+   },
+   "realized_electrons": 48000,
+   "stop_reason": "converged",
+   "blocks": 4,
+   "rows_per_electron": 2.55,
+   "median_block": {
+    "simulate_s": 0.03170056897215545,
+    "measure_s": 0.04775943350978196,
+    "rows": 30545.5
+   },
+   "kernel": {
+    "launches": 8,
+    "kernel_s": 0.1111862725019455,
+    "population_max": 7131,
+    "population_time_weighted": 6994.3511721647155
+   },
+   "card_peak_MiB": 1745.5625,
+   "pool_reserved_peak_MiB": 267.2158203125,
+   "pool_used_peak_MiB": 260.75830078125,
+   "card_peak_by_phase_MiB": {
+    "setup": 1703.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 1693.5625,
+    "transport.measure": 1693.5625,
+    "transport.join": 1693.5625,
+    "transport.finalize": 1693.5625,
+    "spectrum": 1745.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 1.545742594149837e-06,
+    "brem": 7.971357789997239e-06
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-30000",
+   "material": "hbn",
+   "E0_keV": 30000.0,
+   "tilt_deg": 15.0,
+   "block": 24000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 3.04,
+   "split_s": {
+    "transport.join": 0.002,
+    "transport.finalize": 0.015,
+    "transport": 2.058,
+    "spectrum": 0.856
+   },
+   "realized_electrons": 96000,
+   "stop_reason": "converged",
+   "blocks": 4,
+   "rows_per_electron": 2.55,
+   "median_block": {
+    "simulate_s": 0.0497720914427191,
+    "measure_s": 0.056904572527855635,
+    "rows": 61253.0
+   },
+   "kernel": {
+    "launches": 16,
+    "kernel_s": 0.12547330951690674,
+    "population_max": 7131,
+    "population_time_weighted": 6904.196627734822
+   },
+   "card_peak_MiB": 1921.5625,
+   "pool_reserved_peak_MiB": 440.54345703125,
+   "pool_used_peak_MiB": 278.8583984375,
+   "card_peak_by_phase_MiB": {
+    "setup": 1877.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 1867.5625,
+    "transport.measure": 1717.5625,
+    "transport.join": 1717.5625,
+    "transport.finalize": 1717.5625,
+    "spectrum": 1921.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 1.4789458177884128e-06,
+    "brem": 2.2531005080628475e-05
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-30000",
+   "material": "hbn",
+   "E0_keV": 30000.0,
+   "tilt_deg": 15.0,
+   "block": 3000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 2.41,
+   "split_s": {
+    "transport.join": 0.001,
+    "transport.finalize": 0.0,
+    "transport": 1.678,
+    "spectrum": 0.609
+   },
+   "realized_electrons": 12000,
+   "stop_reason": "converged",
+   "blocks": 4,
+   "rows_per_electron": 2.54,
+   "median_block": {
+    "simulate_s": 0.02348408254329115,
+    "measure_s": 0.037107642041519284,
+    "rows": 7627.0
+   },
+   "kernel": {
+    "launches": 4,
+    "kernel_s": 0.10467378985881805,
+    "population_max": 3000,
+    "population_time_weighted": 3000.0
+   },
+   "card_peak_MiB": 1591.5625,
+   "pool_reserved_peak_MiB": 151.21240234375,
+   "pool_used_peak_MiB": 110.794921875,
+   "card_peak_by_phase_MiB": {
+    "setup": 1587.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 1537.5625,
+    "transport.measure": 1537.5625,
+    "spectrum": 1591.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 3.1637453133057177e-06,
+    "brem": 1.544670185497043e-05
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-30000",
+   "material": "hbn",
+   "E0_keV": 30000.0,
+   "tilt_deg": 15.0,
+   "block": 48000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 3.6,
+   "split_s": {
+    "transport.join": 0.002,
+    "transport.finalize": 0.02,
+    "transport": 2.339,
+    "spectrum": 1.139
+   },
+   "realized_electrons": 192000,
+   "stop_reason": "converged",
+   "blocks": 4,
+   "rows_per_electron": 2.55,
+   "median_block": {
+    "simulate_s": 0.05853520939126611,
+    "measure_s": 0.08265197393484414,
+    "rows": 122485.5
+   },
+   "kernel": {
+    "launches": 28,
+    "kernel_s": 0.1438429787158966,
+    "population_max": 7131,
+    "population_time_weighted": 7045.094163999689
+   },
+   "card_peak_MiB": 2561.5625,
+   "pool_reserved_peak_MiB": 1059.67138671875,
+   "pool_used_peak_MiB": 440.9716796875,
+   "card_peak_by_phase_MiB": {
+    "setup": 2517.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 2507.5625,
+    "transport.measure": 1779.5625,
+    "transport.join": 1779.5625,
+    "transport.finalize": 1779.5625,
+    "spectrum": 2561.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 9.365392761806032e-07,
+    "brem": 1.1656098999232709e-05
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-30000",
+   "material": "hbn",
+   "E0_keV": 30000.0,
+   "tilt_deg": 15.0,
+   "block": 6000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 2.52,
+   "split_s": {
+    "transport.join": 0.001,
+    "transport.finalize": 0.001,
+    "transport": 1.745,
+    "spectrum": 0.652
+   },
+   "realized_electrons": 24000,
+   "stop_reason": "converged",
+   "blocks": 4,
+   "rows_per_electron": 2.54,
+   "median_block": {
+    "simulate_s": 0.02555665443651378,
+    "measure_s": 0.04284647048916668,
+    "rows": 15238.5
+   },
+   "kernel": {
+    "launches": 4,
+    "kernel_s": 0.10328143692016602,
+    "population_max": 6000,
+    "population_time_weighted": 6000.0
+   },
+   "card_peak_MiB": 1701.5625,
+   "pool_reserved_peak_MiB": 216.35302734375,
+   "pool_used_peak_MiB": 215.77783203125,
+   "card_peak_by_phase_MiB": {
+    "setup": 1657.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 1647.5625,
+    "transport.measure": 1647.5625,
+    "spectrum": 1701.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 2.207566369579974e-06,
+    "brem": 1.042532117314801e-05
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-30000",
+   "material": "hbn",
+   "E0_keV": 30000.0,
+   "tilt_deg": 60.0,
+   "block": 1000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 2.65,
+   "split_s": {
+    "transport.join": 0.002,
+    "transport.finalize": 0.008,
+    "transport": 1.916,
+    "spectrum": 0.606
+   },
+   "realized_electrons": 7000,
+   "stop_reason": "converged",
+   "blocks": 7,
+   "rows_per_electron": 4.0,
+   "median_block": {
+    "simulate_s": 0.023403821978718042,
+    "measure_s": 0.03360280580818653,
+    "rows": 3998
+   },
+   "kernel": {
+    "launches": 7,
+    "kernel_s": 0.11139273595809937,
+    "population_max": 1000,
+    "population_time_weighted": 1000.0
+   },
+   "card_peak_MiB": 1607.5625,
+   "pool_reserved_peak_MiB": 100.18701171875,
+   "pool_used_peak_MiB": 61.68408203125,
+   "card_peak_by_phase_MiB": {
+    "setup": 1531.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 1505.5625,
+    "transport.measure": 1505.5625,
+    "transport.finalize": 1505.5625,
+    "spectrum": 1607.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.0006576711099603694,
+    "brem": 0.0006564554642525213
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-30000",
+   "material": "hbn",
+   "E0_keV": 30000.0,
+   "tilt_deg": 60.0,
+   "block": 12000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 2.89,
+   "split_s": {
+    "transport.join": 0.001,
+    "transport.finalize": 0.011,
+    "transport": 1.944,
+    "spectrum": 0.817
+   },
+   "realized_electrons": 48000,
+   "stop_reason": "converged",
+   "blocks": 4,
+   "rows_per_electron": 4.01,
+   "median_block": {
+    "simulate_s": 0.03435476857703179,
+    "measure_s": 0.05625771661289036,
+    "rows": 48072.0
+   },
+   "kernel": {
+    "launches": 8,
+    "kernel_s": 0.113350940823555,
+    "population_max": 7131,
+    "population_time_weighted": 6975.667842292928
+   },
+   "card_peak_MiB": 1993.5625,
+   "pool_reserved_peak_MiB": 463.41162109375,
+   "pool_used_peak_MiB": 269.6376953125,
+   "card_peak_by_phase_MiB": {
+    "setup": 1903.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 1893.5625,
+    "transport.measure": 1705.5625,
+    "transport.finalize": 1705.5625,
+    "spectrum": 1993.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.0002611515362090152,
+    "brem": 0.0002626904931169081
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-30000",
+   "material": "hbn",
+   "E0_keV": 30000.0,
+   "tilt_deg": 60.0,
+   "block": 24000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 3.69,
+   "split_s": {
+    "transport.join": 0.002,
+    "transport.finalize": 0.018,
+    "transport": 2.401,
+    "spectrum": 1.158
+   },
+   "realized_electrons": 120000,
+   "stop_reason": "converged",
+   "blocks": 5,
+   "rows_per_electron": 4.0,
+   "median_block": {
+    "simulate_s": 0.044231337029486895,
+    "measure_s": 0.07627461408264935,
+    "rows": 96053
+   },
+   "kernel": {
+    "launches": 20,
+    "kernel_s": 0.13805004930496215,
+    "population_max": 7131,
+    "population_time_weighted": 6817.594433696874
+   },
+   "card_peak_MiB": 3159.5625,
+   "pool_reserved_peak_MiB": 1594.58251953125,
+   "pool_used_peak_MiB": 441.2939453125,
+   "card_peak_by_phase_MiB": {
+    "setup": 3067.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 3057.5625,
+    "transport.measure": 1781.5625,
+    "transport.finalize": 1781.5625,
+    "spectrum": 3159.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.00016728399849025736,
+    "brem": 0.00016740143186019354
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-30000",
+   "material": "hbn",
+   "E0_keV": 30000.0,
+   "tilt_deg": 60.0,
+   "block": 3000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 2.52,
+   "split_s": {
+    "transport.join": 0.001,
+    "transport.finalize": 0.008,
+    "transport": 1.763,
+    "spectrum": 0.634
+   },
+   "realized_electrons": 12000,
+   "stop_reason": "converged",
+   "blocks": 4,
+   "rows_per_electron": 4.01,
+   "median_block": {
+    "simulate_s": 0.028285435982979834,
+    "measure_s": 0.0408966870745644,
+    "rows": 12000.5
+   },
+   "kernel": {
+    "launches": 4,
+    "kernel_s": 0.10393894243240356,
+    "population_max": 3000,
+    "population_time_weighted": 3000.0
+   },
+   "card_peak_MiB": 1639.5625,
+   "pool_reserved_peak_MiB": 130.94482421875,
+   "pool_used_peak_MiB": 112.7578125,
+   "card_peak_by_phase_MiB": {
+    "setup": 1563.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 1537.5625,
+    "transport.measure": 1537.5625,
+    "transport.finalize": 1537.5625,
+    "spectrum": 1639.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.0004992052205219462,
+    "brem": 0.0005186481277831425
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-30000",
+   "material": "hbn",
+   "E0_keV": 30000.0,
+   "tilt_deg": 60.0,
+   "block": 48000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 4.26,
+   "split_s": {
+    "transport.join": 0.002,
+    "transport.finalize": 0.031,
+    "transport": 2.747,
+    "spectrum": 1.39
+   },
+   "realized_electrons": 192000,
+   "stop_reason": "converged",
+   "blocks": 4,
+   "rows_per_electron": 4.0,
+   "median_block": {
+    "simulate_s": 0.061886755865998566,
+    "measure_s": 0.1239609889453277,
+    "rows": 191830.5
+   },
+   "kernel": {
+    "launches": 28,
+    "kernel_s": 0.15057372629642488,
+    "population_max": 7131,
+    "population_time_weighted": 7035.32047640354
+   },
+   "card_peak_MiB": 5075.5625,
+   "pool_reserved_peak_MiB": 3535.6728515625,
+   "pool_used_peak_MiB": 692.48876953125,
+   "card_peak_by_phase_MiB": {
+    "setup": 4985.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 4975.5625,
+    "transport.measure": 1915.5625,
+    "transport.finalize": 1915.5625,
+    "spectrum": 5075.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.00013243974201007156,
+    "brem": 0.0001323400049461997
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-30000",
+   "material": "hbn",
+   "E0_keV": 30000.0,
+   "tilt_deg": 60.0,
+   "block": 6000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 2.66,
+   "split_s": {
+    "transport.join": 0.001,
+    "transport.finalize": 0.008,
+    "transport": 1.807,
+    "spectrum": 0.729
+   },
+   "realized_electrons": 24000,
+   "stop_reason": "converged",
+   "blocks": 4,
+   "rows_per_electron": 4.01,
+   "median_block": {
+    "simulate_s": 0.03236980049405247,
+    "measure_s": 0.043258575489744544,
+    "rows": 24030.5
+   },
+   "kernel": {
+    "launches": 4,
+    "kernel_s": 0.10591622304916382,
+    "population_max": 6000,
+    "population_time_weighted": 6000.0
+   },
+   "card_peak_MiB": 1755.5625,
+   "pool_reserved_peak_MiB": 221.267578125,
+   "pool_used_peak_MiB": 217.35107421875,
+   "card_peak_by_phase_MiB": {
+    "setup": 1663.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 1653.5625,
+    "transport.measure": 1653.5625,
+    "transport.finalize": 1653.5625,
+    "spectrum": 1755.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.000348068484696701,
+    "brem": 0.0003543685260651469
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-30000",
+   "material": "hopg",
+   "E0_keV": 30000.0,
+   "tilt_deg": 15.0,
+   "block": 1000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 2.19,
+   "split_s": {
+    "transport.join": 0.001,
+    "transport.finalize": 0.0,
+    "transport": 1.539,
+    "spectrum": 0.529
+   },
+   "realized_electrons": 4000,
+   "stop_reason": "converged",
+   "blocks": 4,
+   "rows_per_electron": 2.6,
+   "median_block": {
+    "simulate_s": 0.021141997538506985,
+    "measure_s": 0.02942442148923874,
+    "rows": 2588.0
+   },
+   "kernel": {
+    "launches": 4,
+    "kernel_s": 0.10236070084571838,
+    "population_max": 1000,
+    "population_time_weighted": 1000.0
+   },
+   "card_peak_MiB": 1541.5625,
+   "pool_reserved_peak_MiB": 102.919921875,
+   "pool_used_peak_MiB": 39.19140625,
+   "card_peak_by_phase_MiB": {
+    "setup": 1537.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 1487.5625,
+    "transport.measure": 1487.5625,
+    "spectrum": 1541.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 1.501370398556032e-05,
+    "brem": 6.165959837558433e-05
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-30000",
+   "material": "hopg",
+   "E0_keV": 30000.0,
+   "tilt_deg": 15.0,
+   "block": 12000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 2.49,
+   "split_s": {
+    "transport.join": 0.001,
+    "transport.finalize": 0.012,
+    "transport": 1.642,
+    "spectrum": 0.723
+   },
+   "realized_electrons": 48000,
+   "stop_reason": "converged",
+   "blocks": 4,
+   "rows_per_electron": 2.61,
+   "median_block": {
+    "simulate_s": 0.030806950409896672,
+    "measure_s": 0.0406621164875105,
+    "rows": 31334.0
+   },
+   "kernel": {
+    "launches": 8,
+    "kernel_s": 0.11053404450416565,
+    "population_max": 7131,
+    "population_time_weighted": 6993.944963793485
+   },
+   "card_peak_MiB": 1741.5625,
+   "pool_reserved_peak_MiB": 262.453125,
+   "pool_used_peak_MiB": 258.853515625,
+   "card_peak_by_phase_MiB": {
+    "setup": 1697.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 1687.5625,
+    "transport.measure": 1687.5625,
+    "transport.finalize": 1687.5625,
+    "spectrum": 1741.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 2.1627469195468115e-06,
+    "brem": 1.019011517959429e-05
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-30000",
+   "material": "hopg",
+   "E0_keV": 30000.0,
+   "tilt_deg": 15.0,
+   "block": 24000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 2.82,
+   "split_s": {
+    "transport.join": 0.002,
+    "transport.finalize": 0.016,
+    "transport": 1.878,
+    "spectrum": 0.82
+   },
+   "realized_electrons": 96000,
+   "stop_reason": "converged",
+   "blocks": 4,
+   "rows_per_electron": 2.61,
+   "median_block": {
+    "simulate_s": 0.0471475844969973,
+    "measure_s": 0.04636078258045018,
+    "rows": 62631.5
+   },
+   "kernel": {
+    "launches": 16,
+    "kernel_s": 0.12515868735313415,
+    "population_max": 7131,
+    "population_time_weighted": 6905.910926781883
+   },
+   "card_peak_MiB": 1925.5625,
+   "pool_reserved_peak_MiB": 444.36279296875,
+   "pool_used_peak_MiB": 278.0927734375,
+   "card_peak_by_phase_MiB": {
+    "setup": 1881.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 1871.5625,
+    "transport.measure": 1713.5625,
+    "transport.join": 1713.5625,
+    "transport.finalize": 1713.5625,
+    "spectrum": 1925.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 1.860459968485123e-06,
+    "brem": 2.617282608816595e-05
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-30000",
+   "material": "hopg",
+   "E0_keV": 30000.0,
+   "tilt_deg": 15.0,
+   "block": 3000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 2.25,
+   "split_s": {
+    "transport.join": 0.001,
+    "transport.finalize": 0.001,
+    "transport": 1.543,
+    "spectrum": 0.578
+   },
+   "realized_electrons": 12000,
+   "stop_reason": "converged",
+   "blocks": 4,
+   "rows_per_electron": 2.6,
+   "median_block": {
+    "simulate_s": 0.02200916549190879,
+    "measure_s": 0.03174878447316587,
+    "rows": 7781.5
+   },
+   "kernel": {
+    "launches": 4,
+    "kernel_s": 0.10219206058979034,
+    "population_max": 3000,
+    "population_time_weighted": 3000.0
+   },
+   "card_peak_MiB": 1585.5625,
+   "pool_reserved_peak_MiB": 128.58154296875,
+   "pool_used_peak_MiB": 108.1943359375,
+   "card_peak_by_phase_MiB": {
+    "setup": 1565.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 1531.5625,
+    "transport.measure": 1531.5625,
+    "spectrum": 1585.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 6.177167161227316e-06,
+    "brem": 2.7029996123063834e-05
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-30000",
+   "material": "hopg",
+   "E0_keV": 30000.0,
+   "tilt_deg": 15.0,
+   "block": 48000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 3.34,
+   "split_s": {
+    "transport.join": 0.002,
+    "transport.finalize": 0.02,
+    "transport": 2.162,
+    "spectrum": 1.058
+   },
+   "realized_electrons": 192000,
+   "stop_reason": "converged",
+   "blocks": 4,
+   "rows_per_electron": 2.62,
+   "median_block": {
+    "simulate_s": 0.06244662858080119,
+    "measure_s": 0.07147376297507435,
+    "rows": 125528.0
+   },
+   "kernel": {
+    "launches": 28,
+    "kernel_s": 0.1453060179948807,
+    "population_max": 7131,
+    "population_time_weighted": 7044.35360547244
+   },
+   "card_peak_MiB": 2591.5625,
+   "pool_reserved_peak_MiB": 1095.39111328125,
+   "pool_used_peak_MiB": 455.59033203125,
+   "card_peak_by_phase_MiB": {
+    "setup": 2547.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 2537.5625,
+    "transport.measure": 1775.5625,
+    "transport.finalize": 1775.5625,
+    "spectrum": 2591.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 1.1772539927937367e-06,
+    "brem": 1.3537262582857136e-05
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-30000",
+   "material": "hopg",
+   "E0_keV": 30000.0,
+   "tilt_deg": 15.0,
+   "block": 6000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 2.28,
+   "split_s": {
+    "transport.join": 0.001,
+    "transport.finalize": 0.001,
+    "transport": 1.54,
+    "spectrum": 0.616
+   },
+   "realized_electrons": 24000,
+   "stop_reason": "converged",
+   "blocks": 4,
+   "rows_per_electron": 2.61,
+   "median_block": {
+    "simulate_s": 0.02233182347845286,
+    "measure_s": 0.0348832025192678,
+    "rows": 15637.0
+   },
+   "kernel": {
+    "launches": 4,
+    "kernel_s": 0.10228307139873505,
+    "population_max": 6000,
+    "population_time_weighted": 6000.0
+   },
+   "card_peak_MiB": 1697.5625,
+   "pool_reserved_peak_MiB": 212.55029296875,
+   "pool_used_peak_MiB": 209.8369140625,
+   "card_peak_by_phase_MiB": {
+    "setup": 1653.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 1643.5625,
+    "transport.measure": 1643.5625,
+    "transport.finalize": 1643.5625,
+    "spectrum": 1697.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 3.446949952418531e-06,
+    "brem": 1.5269894990139632e-05
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-30000",
+   "material": "hopg",
+   "E0_keV": 30000.0,
+   "tilt_deg": 60.0,
+   "block": 1000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 2.42,
+   "split_s": {
+    "transport.join": 0.002,
+    "transport.finalize": 0.008,
+    "transport": 1.71,
+    "spectrum": 0.589
+   },
+   "realized_electrons": 7000,
+   "stop_reason": "converged",
+   "blocks": 7,
+   "rows_per_electron": 4.1,
+   "median_block": {
+    "simulate_s": 0.021347166039049625,
+    "measure_s": 0.027338410960510373,
+    "rows": 4112
+   },
+   "kernel": {
+    "launches": 7,
+    "kernel_s": 0.11037826931476594,
+    "population_max": 1000,
+    "population_time_weighted": 1000.0
+   },
+   "card_peak_MiB": 1589.5625,
+   "pool_reserved_peak_MiB": 90.23974609375,
+   "pool_used_peak_MiB": 62.04541015625,
+   "card_peak_by_phase_MiB": {
+    "setup": 1521.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 1487.5625,
+    "transport.measure": 1487.5625,
+    "transport.join": 1487.5625,
+    "transport.finalize": 1487.5625,
+    "spectrum": 1589.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.0006598745233410742,
+    "brem": 0.0006575385233607605
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-30000",
+   "material": "hopg",
+   "E0_keV": 30000.0,
+   "tilt_deg": 60.0,
+   "block": 12000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 2.68,
+   "split_s": {
+    "transport.join": 0.002,
+    "transport.finalize": 0.013,
+    "transport": 1.768,
+    "spectrum": 0.791
+   },
+   "realized_electrons": 48000,
+   "stop_reason": "converged",
+   "blocks": 4,
+   "rows_per_electron": 4.1,
+   "median_block": {
+    "simulate_s": 0.03911336453165859,
+    "measure_s": 0.045978097594343126,
+    "rows": 49211.0
+   },
+   "kernel": {
+    "launches": 8,
+    "kernel_s": 0.11076886093616485,
+    "population_max": 7131,
+    "population_time_weighted": 6970.635472571539
+   },
+   "card_peak_MiB": 1999.5625,
+   "pool_reserved_peak_MiB": 470.07275390625,
+   "pool_used_peak_MiB": 266.474609375,
+   "card_peak_by_phase_MiB": {
+    "setup": 1907.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 1897.5625,
+    "transport.measure": 1701.5625,
+    "transport.finalize": 1701.5625,
+    "spectrum": 1999.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.0002598714695313218,
+    "brem": 0.000259135048842828
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-30000",
+   "material": "hopg",
+   "E0_keV": 30000.0,
+   "tilt_deg": 60.0,
+   "block": 24000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 3.42,
+   "split_s": {
+    "transport.join": 0.002,
+    "transport.finalize": 0.02,
+    "transport": 2.235,
+    "spectrum": 1.071
+   },
+   "realized_electrons": 120000,
+   "stop_reason": "converged",
+   "blocks": 5,
+   "rows_per_electron": 4.11,
+   "median_block": {
+    "simulate_s": 0.04629250010475516,
+    "measure_s": 0.06589479208923876,
+    "rows": 98788
+   },
+   "kernel": {
+    "launches": 20,
+    "kernel_s": 0.13538178932666778,
+    "population_max": 7131,
+    "population_time_weighted": 6825.783938557023
+   },
+   "card_peak_MiB": 3223.5625,
+   "pool_reserved_peak_MiB": 1660.10400390625,
+   "pool_used_peak_MiB": 443.09521484375,
+   "card_peak_by_phase_MiB": {
+    "setup": 3133.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 3123.5625,
+    "transport.measure": 1779.5625,
+    "transport.finalize": 1779.5625,
+    "spectrum": 3223.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.0001671978920666102,
+    "brem": 0.00016744083277151636
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-30000",
+   "material": "hopg",
+   "E0_keV": 30000.0,
+   "tilt_deg": 60.0,
+   "block": 3000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 2.31,
+   "split_s": {
+    "transport.join": 0.001,
+    "transport.finalize": 0.007,
+    "transport": 1.568,
+    "spectrum": 0.612
+   },
+   "realized_electrons": 12000,
+   "stop_reason": "converged",
+   "blocks": 4,
+   "rows_per_electron": 4.12,
+   "median_block": {
+    "simulate_s": 0.02528692048508674,
+    "measure_s": 0.03373488294892013,
+    "rows": 12370.5
+   },
+   "kernel": {
+    "launches": 4,
+    "kernel_s": 0.10523350620269775,
+    "population_max": 3000,
+    "population_time_weighted": 3000.0
+   },
+   "card_peak_MiB": 1635.5625,
+   "pool_reserved_peak_MiB": 111.103515625,
+   "pool_used_peak_MiB": 109.02685546875,
+   "card_peak_by_phase_MiB": {
+    "setup": 1543.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 1533.5625,
+    "transport.measure": 1533.5625,
+    "transport.join": 1533.5625,
+    "transport.finalize": 1533.5625,
+    "spectrum": 1635.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.0004891807034843441,
+    "brem": 0.000487710093434082
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-30000",
+   "material": "hopg",
+   "E0_keV": 30000.0,
+   "tilt_deg": 60.0,
+   "block": 48000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 3.95,
+   "split_s": {
+    "transport.join": 0.002,
+    "transport.finalize": 0.026,
+    "transport": 2.577,
+    "spectrum": 1.253
+   },
+   "realized_electrons": 192000,
+   "stop_reason": "converged",
+   "blocks": 4,
+   "rows_per_electron": 4.11,
+   "median_block": {
+    "simulate_s": 0.06079661601688713,
+    "measure_s": 0.10747292602900416,
+    "rows": 197163.5
+   },
+   "kernel": {
+    "launches": 28,
+    "kernel_s": 0.1519224020242691,
+    "population_max": 7131,
+    "population_time_weighted": 7039.422754271441
+   },
+   "card_peak_MiB": 5259.5625,
+   "pool_reserved_peak_MiB": 3719.34521484375,
+   "pool_used_peak_MiB": 725.7646484375,
+   "card_peak_by_phase_MiB": {
+    "setup": 5167.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 5157.5625,
+    "transport.measure": 2121.5625,
+    "transport.finalize": 2121.5625,
+    "spectrum": 5259.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.00013230223851415688,
+    "brem": 0.00013232191753221267
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-30000",
+   "material": "hopg",
+   "E0_keV": 30000.0,
+   "tilt_deg": 60.0,
+   "block": 6000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": false,
+   "wall_s": 2.42,
+   "split_s": {
+    "transport.join": 0.001,
+    "transport.finalize": 0.008,
+    "transport": 1.608,
+    "spectrum": 0.685
+   },
+   "realized_electrons": 24000,
+   "stop_reason": "converged",
+   "blocks": 4,
+   "rows_per_electron": 4.11,
+   "median_block": {
+    "simulate_s": 0.03277088142931461,
+    "measure_s": 0.03479332535061985,
+    "rows": 24578.5
+   },
+   "kernel": {
+    "launches": 4,
+    "kernel_s": 0.10486326074600219,
+    "population_max": 6000,
+    "population_time_weighted": 6000.0
+   },
+   "card_peak_MiB": 1751.5625,
+   "pool_reserved_peak_MiB": 217.87451171875,
+   "pool_used_peak_MiB": 213.75537109375,
+   "card_peak_by_phase_MiB": {
+    "setup": 1659.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 1649.5625,
+    "transport.measure": 1649.5625,
+    "transport.finalize": 1649.5625,
+    "spectrum": 1751.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.00034447906033318226,
+    "brem": 0.0003438175236026851
+   },
+   "error": null
+  },
+  {
+   "job_dir": "out-nv-prof",
+   "material": "hbn",
+   "E0_keV": 30.0,
+   "tilt_deg": 15.0,
+   "block": 3000,
+   "device": "NVIDIA GeForce RTX 5080",
+   "profiled": true,
+   "wall_s": 49.67,
+   "split_s": {
+    "transport.join": 0.253,
+    "transport.finalize": 0.084,
+    "transport": 40.886,
+    "spectrum": 8.675
+   },
+   "realized_electrons": 258000,
+   "stop_reason": "converged",
+   "blocks": 86,
+   "rows_per_electron": 16.14,
+   "median_block": {
+    "simulate_s": 0.0365225444547832,
+    "measure_s": 0.09462967957369983,
+    "rows": 48368.0
+   },
+   "kernel": {
+    "launches": 98,
+    "kernel_s": 4.554413126468658,
+    "population_max": 3000,
+    "population_time_weighted": 2969.2182357798056
+   },
+   "card_peak_MiB": 8219.5625,
+   "pool_reserved_peak_MiB": 6685.4873046875,
+   "pool_used_peak_MiB": 2747.32177734375,
+   "card_peak_by_phase_MiB": {
+    "setup": 8219.5625,
+    "transport": 1349.5625,
+    "transport.simulate": 5521.5625,
+    "transport.measure": 2223.5625,
+    "transport.join": 2735.5625,
+    "transport.finalize": 2847.5625,
+    "spectrum": 8219.5625
+   },
+   "host_rss_peak_mib": null,
+   "relative_se": {
+    "cxr": 0.0009991434693485117,
+    "brem": 0.0007304243982161392
+   },
+   "error": null
+  }
+ ],
+ "replays": [
+  {
+   "source": "hbn-1000-15-b48000",
+   "source_block": 48000,
+   "source_realized": 528000,
+   "captured_electrons": 528000,
+   "replayed_transport": false,
+   "rows": [
+    {
+     "block": 1000,
+     "min": 3000,
+     "pilot": 3000,
+     "max": 1002000,
+     "realized": 4000,
+     "stop_reason": "converged",
+     "checks": 2,
+     "projected": 3000,
+     "relative_se": {
+      "cxr": 0.00014245798400728895,
+      "brem": 0.0003163444587763948
+     }
+    },
+    {
+     "block": 2000,
+     "min": 4000,
+     "pilot": 4000,
+     "max": 1002000,
+     "realized": 12000,
+     "stop_reason": "converged",
+     "checks": 5,
+     "projected": 4000,
+     "relative_se": {
+      "cxr": 0.00026521833610966897,
+      "brem": 0.00020697492872387793
+     }
+    },
+    {
+     "block": 3000,
+     "min": 3000,
+     "pilot": 3000,
+     "max": 1002000,
+     "realized": 15000,
+     "stop_reason": "converged",
+     "checks": 5,
+     "projected": 3000,
+     "relative_se": {
+      "cxr": 0.00021654283170632505,
+      "brem": 0.0001873407339814595
+     }
+    },
+    {
+     "block": 6000,
+     "min": 6000,
+     "pilot": 6000,
+     "max": 1002000,
+     "realized": 24000,
+     "stop_reason": "converged",
+     "checks": 4,
+     "projected": 6000,
+     "relative_se": {
+      "cxr": 0.00014884373973791088,
+      "brem": 0.00015118862159616253
+     }
+    },
+    {
+     "block": 12000,
+     "min": 12000,
+     "pilot": 12000,
+     "max": 1008000,
+     "realized": 48000,
+     "stop_reason": "converged",
+     "checks": 4,
+     "projected": 12000,
+     "relative_se": {
+      "cxr": 0.00020404262059403721,
+      "brem": 0.00012289035196440525
+     }
+    },
+    {
+     "block": 24000,
+     "min": 24000,
+     "pilot": 24000,
+     "max": 1008000,
+     "realized": 96000,
+     "stop_reason": "converged",
+     "checks": 4,
+     "projected": 24000,
+     "relative_se": {
+      "cxr": 0.00021796910729235904,
+      "brem": 8.432527515158598e-05
+     }
+    },
+    {
+     "block": 48000,
+     "min": 48000,
+     "pilot": 48000,
+     "max": 1008000,
+     "realized": 528000,
+     "stop_reason": "converged",
+     "checks": 11,
+     "projected": 48000,
+     "relative_se": {
+      "cxr": 0.0007686090142432983,
+      "brem": 7.647278699608017e-05
+     }
+    }
+   ]
+  },
+  {
+   "source": "hbn-1000-60-b48000",
+   "source_block": 48000,
+   "source_realized": null,
+   "captured_electrons": 1008000,
+   "replayed_transport": null,
+   "rows": [
+    {
+     "block": 1000,
+     "min": 3000,
+     "pilot": 3000,
+     "max": 1002000,
+     "realized": 1002000,
+     "stop_reason": "max_electrons",
+     "checks": 1,
+     "projected": 1002000,
+     "relative_se": {
+      "cxr": 0.04224142436168096,
+      "brem": 0.0003572259777370374
+     }
+    },
+    {
+     "block": 2000,
+     "min": 4000,
+     "pilot": 4000,
+     "max": 1002000,
+     "realized": 1002000,
+     "stop_reason": "max_electrons",
+     "checks": 1,
+     "projected": 1002000,
+     "relative_se": {
+      "cxr": 0.0422414243616809,
+      "brem": 0.0003572259777370382
+     }
+    },
+    {
+     "block": 3000,
+     "min": 3000,
+     "pilot": 3000,
+     "max": 1002000,
+     "realized": 1002000,
+     "stop_reason": "max_electrons",
+     "checks": 1,
+     "projected": 1002000,
+     "relative_se": {
+      "cxr": 0.04224142436168093,
+      "brem": 0.00035722597773703773
+     }
+    },
+    {
+     "block": 6000,
+     "min": 6000,
+     "pilot": 6000,
+     "max": 1002000,
+     "realized": 1002000,
+     "stop_reason": "max_electrons",
+     "checks": 1,
+     "projected": 1002000,
+     "relative_se": {
+      "cxr": 0.04224142436168095,
+      "brem": 0.00035722597773703773
+     }
+    },
+    {
+     "block": 12000,
+     "min": 12000,
+     "pilot": 12000,
+     "max": 1008000,
+     "realized": 1008000,
+     "stop_reason": "max_electrons",
+     "checks": 1,
+     "projected": 1008000,
+     "relative_se": {
+      "cxr": 0.04207086911296554,
+      "brem": 0.0003581091501632185
+     }
+    },
+    {
+     "block": 24000,
+     "min": 24000,
+     "pilot": 24000,
+     "max": 1008000,
+     "realized": 1008000,
+     "stop_reason": "max_electrons",
+     "checks": 1,
+     "projected": 1008000,
+     "relative_se": {
+      "cxr": 0.042070869112965543,
+      "brem": 0.0003581091501632184
+     }
+    },
+    {
+     "block": 48000,
+     "min": 48000,
+     "pilot": 48000,
+     "max": 1008000,
+     "realized": 1008000,
+     "stop_reason": "max_electrons",
+     "checks": 1,
+     "projected": 1008000,
+     "relative_se": {
+      "cxr": 0.042070869112965543,
+      "brem": 0.0003581091501632184
+     }
+    }
+   ]
+  },
+  {
+   "source": "hopg-1000-15-b48000",
+   "source_block": 48000,
+   "source_realized": 1008000,
+   "captured_electrons": 1008000,
+   "replayed_transport": false,
+   "rows": [
+    {
+     "block": 1000,
+     "min": 3000,
+     "pilot": 3000,
+     "max": 1002000,
+     "realized": 5000,
+     "stop_reason": "converged",
+     "checks": 3,
+     "projected": 3000,
+     "relative_se": {
+      "cxr": 0.00018728862838637684,
+      "brem": 0.0002807784991748428
+     }
+    },
+    {
+     "block": 2000,
+     "min": 4000,
+     "pilot": 4000,
+     "max": 1002000,
+     "realized": 10000,
+     "stop_reason": "converged",
+     "checks": 4,
+     "projected": 4000,
+     "relative_se": {
+      "cxr": 0.00015777142389288465,
+      "brem": 0.0002201047983870232
+     }
+    },
+    {
+     "block": 3000,
+     "min": 3000,
+     "pilot": 3000,
+     "max": 1002000,
+     "realized": 12000,
+     "stop_reason": "converged",
+     "checks": 4,
+     "projected": 3000,
+     "relative_se": {
+      "cxr": 0.0001378244316453915,
+      "brem": 0.00020650889101794245
+     }
+    },
+    {
+     "block": 6000,
+     "min": 6000,
+     "pilot": 6000,
+     "max": 1002000,
+     "realized": 24000,
+     "stop_reason": "converged",
+     "checks": 4,
+     "projected": 6000,
+     "relative_se": {
+      "cxr": 0.0001043030141859751,
+      "brem": 0.00015501100592907262
+     }
+    },
+    {
+     "block": 12000,
+     "min": 12000,
+     "pilot": 12000,
+     "max": 1008000,
+     "realized": 1008000,
+     "stop_reason": "max_electrons",
+     "checks": 84,
+     "projected": 12000,
+     "relative_se": {
+      "cxr": 0.0011558677676514575,
+      "brem": 7.327065188222404e-05
+     }
+    },
+    {
+     "block": 24000,
+     "min": 24000,
+     "pilot": 24000,
+     "max": 1008000,
+     "realized": 1008000,
+     "stop_reason": "max_electrons",
+     "checks": 42,
+     "projected": 24000,
+     "relative_se": {
+      "cxr": 0.0011558677676514573,
+      "brem": 7.327065188222404e-05
+     }
+    },
+    {
+     "block": 48000,
+     "min": 48000,
+     "pilot": 48000,
+     "max": 1008000,
+     "realized": 1008000,
+     "stop_reason": "max_electrons",
+     "checks": 1,
+     "projected": 1008000,
+     "relative_se": {
+      "cxr": 0.0011558677676514575,
+      "brem": 7.327065188222402e-05
+     }
+    }
+   ]
+  },
+  {
+   "source": "hopg-1000-60-b48000",
+   "source_block": 48000,
+   "source_realized": null,
+   "captured_electrons": 1008000,
+   "replayed_transport": null,
+   "rows": [
+    {
+     "block": 1000,
+     "min": 3000,
+     "pilot": 3000,
+     "max": 1002000,
+     "realized": 1002000,
+     "stop_reason": "max_electrons",
+     "checks": 1,
+     "projected": 1002000,
+     "relative_se": {
+      "cxr": 0.05840295071706433,
+      "brem": 0.0005254902399079361
+     }
+    },
+    {
+     "block": 2000,
+     "min": 4000,
+     "pilot": 4000,
+     "max": 1002000,
+     "realized": 1002000,
+     "stop_reason": "max_electrons",
+     "checks": 1,
+     "projected": 1002000,
+     "relative_se": {
+      "cxr": 0.05840295071706426,
+      "brem": 0.0005254902399079366
+     }
+    },
+    {
+     "block": 3000,
+     "min": 3000,
+     "pilot": 3000,
+     "max": 1002000,
+     "realized": 1002000,
+     "stop_reason": "max_electrons",
+     "checks": 1,
+     "projected": 1002000,
+     "relative_se": {
+      "cxr": 0.058402950717064236,
+      "brem": 0.0005254902399079366
+     }
+    },
+    {
+     "block": 6000,
+     "min": 6000,
+     "pilot": 6000,
+     "max": 1002000,
+     "realized": 1002000,
+     "stop_reason": "max_electrons",
+     "checks": 1,
+     "projected": 1002000,
+     "relative_se": {
+      "cxr": 0.05840295071706428,
+      "brem": 0.0005254902399079364
+     }
+    },
+    {
+     "block": 12000,
+     "min": 12000,
+     "pilot": 12000,
+     "max": 1008000,
+     "realized": 1008000,
+     "stop_reason": "max_electrons",
+     "checks": 1,
+     "projected": 1008000,
+     "relative_se": {
+      "cxr": 0.05815688649191581,
+      "brem": 0.0005223911863586762
+     }
+    },
+    {
+     "block": 24000,
+     "min": 24000,
+     "pilot": 24000,
+     "max": 1008000,
+     "realized": 1008000,
+     "stop_reason": "max_electrons",
+     "checks": 1,
+     "projected": 1008000,
+     "relative_se": {
+      "cxr": 0.058156886491915825,
+      "brem": 0.0005223911863586762
+     }
+    },
+    {
+     "block": 48000,
+     "min": 48000,
+     "pilot": 48000,
+     "max": 1008000,
+     "realized": 1008000,
+     "stop_reason": "max_electrons",
+     "checks": 1,
+     "projected": 1008000,
+     "relative_se": {
+      "cxr": 0.05815688649191583,
+      "brem": 0.0005223911863586763
+     }
+    }
+   ]
+  },
+  {
+   "source": "hbn-30000-15-b48000",
+   "source_block": 48000,
+   "source_realized": 192000,
+   "captured_electrons": 192000,
+   "replayed_transport": false,
+   "rows": [
+    {
+     "block": 1000,
+     "min": 3000,
+     "pilot": 3000,
+     "max": 1002000,
+     "realized": 4000,
+     "stop_reason": "converged",
+     "checks": 2,
+     "projected": 3000,
+     "relative_se": {
+      "cxr": 4.7240073876318356e-06,
+      "brem": 2.2063214173875255e-05
+     }
+    },
+    {
+     "block": 2000,
+     "min": 4000,
+     "pilot": 4000,
+     "max": 1002000,
+     "realized": 8000,
+     "stop_reason": "converged",
+     "checks": 3,
+     "projected": 4000,
+     "relative_se": {
+      "cxr": 3.872813485760283e-06,
+      "brem": 1.8151094017959494e-05
+     }
+    },
+    {
+     "block": 3000,
+     "min": 3000,
+     "pilot": 3000,
+     "max": 1002000,
+     "realized": 12000,
+     "stop_reason": "converged",
+     "checks": 4,
+     "projected": 3000,
+     "relative_se": {
+      "cxr": 3.1638427812106166e-06,
+      "brem": 1.544667001502565e-05
+     }
+    },
+    {
+     "block": 6000,
+     "min": 6000,
+     "pilot": 6000,
+     "max": 1002000,
+     "realized": 24000,
+     "stop_reason": "converged",
+     "checks": 4,
+     "projected": 6000,
+     "relative_se": {
+      "cxr": 2.2076394491733077e-06,
+      "brem": 1.0425294076786815e-05
+     }
+    },
+    {
+     "block": 12000,
+     "min": 12000,
+     "pilot": 12000,
+     "max": 1008000,
+     "realized": 48000,
+     "stop_reason": "converged",
+     "checks": 4,
+     "projected": 12000,
+     "relative_se": {
+      "cxr": 1.5457927203645864e-06,
+      "brem": 7.971348002687521e-06
+     }
+    },
+    {
+     "block": 24000,
+     "min": 24000,
+     "pilot": 24000,
+     "max": 1008000,
+     "realized": 96000,
+     "stop_reason": "converged",
+     "checks": 4,
+     "projected": 24000,
+     "relative_se": {
+      "cxr": 1.4789681105144043e-06,
+      "brem": 2.25309742689465e-05
+     }
+    },
+    {
+     "block": 48000,
+     "min": 48000,
+     "pilot": 48000,
+     "max": 1008000,
+     "realized": 192000,
+     "stop_reason": "converged",
+     "checks": 4,
+     "projected": 48000,
+     "relative_se": {
+      "cxr": 9.365565912142761e-07,
+      "brem": 1.165608317513008e-05
+     }
+    }
+   ]
+  },
+  {
+   "source": "hbn-30000-60-b48000",
+   "source_block": 48000,
+   "source_realized": 192000,
+   "captured_electrons": 192000,
+   "replayed_transport": false,
+   "rows": [
+    {
+     "block": 1000,
+     "min": 3000,
+     "pilot": 3000,
+     "max": 1002000,
+     "realized": 7000,
+     "stop_reason": "converged",
+     "checks": 5,
+     "projected": 3000,
+     "relative_se": {
+      "cxr": 0.0006576711646204758,
+      "brem": 0.0006564554608961464
+     }
+    },
+    {
+     "block": 2000,
+     "min": 4000,
+     "pilot": 4000,
+     "max": 1002000,
+     "realized": 8000,
+     "stop_reason": "converged",
+     "checks": 3,
+     "projected": 4000,
+     "relative_se": {
+      "cxr": 0.0006404385207979314,
+      "brem": 0.000639212604603349
+     }
+    },
+    {
+     "block": 3000,
+     "min": 3000,
+     "pilot": 3000,
+     "max": 1002000,
+     "realized": 12000,
+     "stop_reason": "converged",
+     "checks": 4,
+     "projected": 3000,
+     "relative_se": {
+      "cxr": 0.0004992052822979649,
+      "brem": 0.0005186480647501073
+     }
+    },
+    {
+     "block": 6000,
+     "min": 6000,
+     "pilot": 6000,
+     "max": 1002000,
+     "realized": 24000,
+     "stop_reason": "converged",
+     "checks": 4,
+     "projected": 6000,
+     "relative_se": {
+      "cxr": 0.00034806850246984236,
+      "brem": 0.0003543685040273929
+     }
+    },
+    {
+     "block": 12000,
+     "min": 12000,
+     "pilot": 12000,
+     "max": 1008000,
+     "realized": 48000,
+     "stop_reason": "converged",
+     "checks": 4,
+     "projected": 12000,
+     "relative_se": {
+      "cxr": 0.00026115155318002354,
+      "brem": 0.00026269048518743455
+     }
+    },
+    {
+     "block": 24000,
+     "min": 24000,
+     "pilot": 24000,
+     "max": 1008000,
+     "realized": 120000,
+     "stop_reason": "converged",
+     "checks": 5,
+     "projected": 24000,
+     "relative_se": {
+      "cxr": 0.0001672840080291651,
+      "brem": 0.0001674014298691219
+     }
+    },
+    {
+     "block": 48000,
+     "min": 48000,
+     "pilot": 48000,
+     "max": 1008000,
+     "realized": 192000,
+     "stop_reason": "converged",
+     "checks": 4,
+     "projected": 48000,
+     "relative_se": {
+      "cxr": 0.00013243974938949876,
+      "brem": 0.00013234000391450197
+     }
+    }
+   ]
+  },
+  {
+   "source": "hopg-30000-15-b48000",
+   "source_block": 48000,
+   "source_realized": 192000,
+   "captured_electrons": 192000,
+   "replayed_transport": false,
+   "rows": [
+    {
+     "block": 1000,
+     "min": 3000,
+     "pilot": 3000,
+     "max": 1002000,
+     "realized": 4000,
+     "stop_reason": "converged",
+     "checks": 2,
+     "projected": 3000,
+     "relative_se": {
+      "cxr": 1.5013563162324239e-05,
+      "brem": 6.165965304620466e-05
+     }
+    },
+    {
+     "block": 2000,
+     "min": 4000,
+     "pilot": 4000,
+     "max": 1002000,
+     "realized": 8000,
+     "stop_reason": "converged",
+     "checks": 3,
+     "projected": 4000,
+     "relative_se": {
+      "cxr": 7.905132518740049e-06,
+      "brem": 3.300445704351193e-05
+     }
+    },
+    {
+     "block": 3000,
+     "min": 3000,
+     "pilot": 3000,
+     "max": 1002000,
+     "realized": 12000,
+     "stop_reason": "converged",
+     "checks": 4,
+     "projected": 3000,
+     "relative_se": {
+      "cxr": 6.176982753515092e-06,
+      "brem": 2.7029970421836023e-05
+     }
+    },
+    {
+     "block": 6000,
+     "min": 6000,
+     "pilot": 6000,
+     "max": 1002000,
+     "realized": 24000,
+     "stop_reason": "converged",
+     "checks": 4,
+     "projected": 6000,
+     "relative_se": {
+      "cxr": 3.4467732187396044e-06,
+      "brem": 1.5269871202039698e-05
+     }
+    },
+    {
+     "block": 12000,
+     "min": 12000,
+     "pilot": 12000,
+     "max": 1008000,
+     "realized": 48000,
+     "stop_reason": "converged",
+     "checks": 4,
+     "projected": 12000,
+     "relative_se": {
+      "cxr": 2.1626102553471042e-06,
+      "brem": 1.0190097717977463e-05
+     }
+    },
+    {
+     "block": 24000,
+     "min": 24000,
+     "pilot": 24000,
+     "max": 1008000,
+     "realized": 96000,
+     "stop_reason": "converged",
+     "checks": 4,
+     "projected": 24000,
+     "relative_se": {
+      "cxr": 1.8603824602064254e-06,
+      "brem": 2.617282106095949e-05
+     }
+    },
+    {
+     "block": 48000,
+     "min": 48000,
+     "pilot": 48000,
+     "max": 1008000,
+     "realized": 192000,
+     "stop_reason": "converged",
+     "checks": 4,
+     "projected": 48000,
+     "relative_se": {
+      "cxr": 1.1771926455788723e-06,
+      "brem": 1.3537258284080255e-05
+     }
+    }
+   ]
+  },
+  {
+   "source": "hopg-30000-60-b48000",
+   "source_block": 48000,
+   "source_realized": 192000,
+   "captured_electrons": 192000,
+   "replayed_transport": false,
+   "rows": [
+    {
+     "block": 1000,
+     "min": 3000,
+     "pilot": 3000,
+     "max": 1002000,
+     "realized": 7000,
+     "stop_reason": "converged",
+     "checks": 5,
+     "projected": 3000,
+     "relative_se": {
+      "cxr": 0.0006598743897400983,
+      "brem": 0.000657538519650757
+     }
+    },
+    {
+     "block": 2000,
+     "min": 4000,
+     "pilot": 4000,
+     "max": 1002000,
+     "realized": 8000,
+     "stop_reason": "converged",
+     "checks": 3,
+     "projected": 4000,
+     "relative_se": {
+      "cxr": 0.0006419136015962719,
+      "brem": 0.0006399718570977971
+     }
+    },
+    {
+     "block": 3000,
+     "min": 3000,
+     "pilot": 3000,
+     "max": 1002000,
+     "realized": 12000,
+     "stop_reason": "converged",
+     "checks": 4,
+     "projected": 3000,
+     "relative_se": {
+      "cxr": 0.0004891805925639592,
+      "brem": 0.00048771009181713997
+     }
+    },
+    {
+     "block": 6000,
+     "min": 6000,
+     "pilot": 6000,
+     "max": 1002000,
+     "realized": 24000,
+     "stop_reason": "converged",
+     "checks": 4,
+     "projected": 6000,
+     "relative_se": {
+      "cxr": 0.0003444789803803992,
+      "brem": 0.0003438175105442562
+     }
+    },
+    {
+     "block": 12000,
+     "min": 12000,
+     "pilot": 12000,
+     "max": 1008000,
+     "realized": 48000,
+     "stop_reason": "converged",
+     "checks": 4,
+     "projected": 12000,
+     "relative_se": {
+      "cxr": 0.00025987141563867035,
+      "brem": 0.0002591350443498662
+     }
+    },
+    {
+     "block": 24000,
+     "min": 24000,
+     "pilot": 24000,
+     "max": 1008000,
+     "realized": 120000,
+     "stop_reason": "converged",
+     "checks": 5,
+     "projected": 24000,
+     "relative_se": {
+      "cxr": 0.00016719786023213873,
+      "brem": 0.0001674408242324818
+     }
+    },
+    {
+     "block": 48000,
+     "min": 48000,
+     "pilot": 48000,
+     "max": 1008000,
+     "realized": 192000,
+     "stop_reason": "converged",
+     "checks": 4,
+     "projected": 48000,
+     "relative_se": {
+      "cxr": 0.00013230221157571994,
+      "brem": 0.00013232191316669942
+     }
+    }
+   ]
+  }
+ ]
+}

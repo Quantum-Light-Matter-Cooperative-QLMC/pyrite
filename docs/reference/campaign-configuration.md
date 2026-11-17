@@ -93,6 +93,33 @@ Default guards are maximum electron share 0.05, minimum effective electrons
 selects the monitor band (default: case line band); `--batch-means-band-ev`
 adds reported bin errors without controlling stopping.
 
+**Choosing `--block-histories`.** The block size changes three things: GPU
+transport chunk size, how often the rule is checked, and the earliest possible
+stop. It does not change transport: a case at its final count is the fixed-count
+run bit for bit. The rule needs `stability blocks + 1` block ends, so no case
+stops before about 4 blocks, and the pilot projection rounds up to a whole
+block. Measured on an RTX 5080 for `cleo_sub`-like cases (hBN/HOPG, 5000 Å,
+30 keV–30 MeV; issue #1252):
+
+- Each block costs a fixed ~50 ms, from transport launch and the stopping check.
+  One GPU launch holds at most ~7k histories, so blocks below that also
+  under-fill the device. With 1000-history blocks, a case that runs to its
+  maximum spends 5–10× longer than with 24k blocks.
+- Wall time stops improving at about 12k–24k histories per block. Blocks of
+  48k overshoot (e.g. 528k instead of 264k electrons) and, at ~38 rows per
+  electron, fill a 16 GB card during the stopping check.
+- Cases that converge in the pilot stop at about 4 blocks whatever the target,
+  so a large block buys electrons the target did not ask for.
+- A small block is not automatically cheaper: with blocks of 6k or fewer,
+  1 MeV cases have stopped after a few thousand electrons, before any rare
+  heavy-weight electron was drawn, and reported an error 10–100× too small
+  (#1254). Treat early stops from small blocks with suspicion. For heavy-tailed
+  scenes a larger `--min-histories` is the reliable remedy; a larger
+  `--min-effective-histories` helps only once the tail has been drawn.
+
+Interim recommendation for GPU campaigns (the shipped defaults are unchanged):
+12k histories per block, with min/pilot counts as multiples of it. Decoupling the check cadence from the transport chunk is #1253.
+
 For independent brem stopping, keep both observables and set
 `--brem-target-rse`, `--brem-min-electrons`, and `--brem-max-electrons`.
 Brem bounds default to shared bounds and must be block multiples; its maximum
