@@ -323,13 +323,21 @@ def peak_rows(grid, density, windows):
 
 
 def peak_windows(grid, density, n_peaks, half_width_eV):
-    """Windows around the highest separated local maxima of a survey spectrum."""
+    """Windows around the highest separated dominant maxima of a survey spectrum.
+
+    A centre must be the maximum of its own window; a local bump on a stronger
+    neighbour's tail would leave the window maximum on the edge (unresolved).
+    """
     interior = np.flatnonzero((density[1:-1] > density[:-2]) & (density[1:-1] >= density[2:])) + 1
     interior = interior[np.argsort(density[interior])[::-1]]
+    lo = np.searchsorted(grid, grid[interior] - half_width_eV, side="left")
+    hi = np.searchsorted(grid, grid[interior] + half_width_eV, side="right")
     centres = []
-    for idx in interior:
+    for idx, i, j in zip(interior, lo, hi, strict=True):
         if len(centres) >= n_peaks:
             break
+        if density[idx] < density[i:j].max():
+            continue
         if all(abs(grid[idx] - c) > 2 * half_width_eV for c in centres):
             centres.append(float(grid[idx]))
     return [(c - half_width_eV, c + half_width_eV) for c in sorted(centres)]
