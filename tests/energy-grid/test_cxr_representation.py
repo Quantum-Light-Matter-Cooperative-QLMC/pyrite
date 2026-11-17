@@ -12,6 +12,13 @@ def test_peak_windows_skip_bumps_on_a_stronger_neighbours_tail():
     assert peak_windows(grid, density, 8, 3.0) == [(-1.0, 5.0), (6.0, 12.0)]
 
 
+def test_peak_windows_skip_far_tail_maxima_below_the_floor():
+    grid = np.arange(12.0)
+    density = np.array([0, 1, 9, 1, 0, 0, 0, 0, 0, 1e-5, 0, 0], float)
+    assert peak_windows(grid, density, 8, 3.0) == [(-1.0, 5.0)]
+    assert len(peak_windows(grid, density, 8, 3.0, min_rel_height=0.0)) == 2
+
+
 def test_peak_window_requires_an_interior_maximum():
     grid = np.arange(5.0)
     assert peak_rows(grid, grid, [(0.0, 4.0)]) == [None]

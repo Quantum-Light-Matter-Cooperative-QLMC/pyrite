@@ -39,6 +39,7 @@ OVERLAP_WIDTHS = (1.0, 4.0, 64.0)
 LADDER_EV = (0.5, 1.0, 2.0, 3.0, 6.0, 12.0)
 #: Peaks reported per spectrum, by reference height.
 N_PEAKS = 8
+PEAK_FLOOR = 1e-3  # peak windows: minimum maximum relative to the survey maximum
 
 
 def load_line_sets(capture_dirs):
@@ -322,13 +323,16 @@ def peak_rows(grid, density, windows):
     return rows
 
 
-def peak_windows(grid, density, n_peaks, half_width_eV):
+def peak_windows(grid, density, n_peaks, half_width_eV, min_rel_height=PEAK_FLOOR):
     """Windows around the highest separated dominant maxima of a survey spectrum.
 
     A centre must be the maximum of its own window; a local bump on a stronger
     neighbour's tail would leave the window maximum on the edge (unresolved).
+    Maxima below ``min_rel_height`` of the survey maximum are far sinc² tails
+    of other lines, not features; band masses still score them.
     """
     interior = np.flatnonzero((density[1:-1] > density[:-2]) & (density[1:-1] >= density[2:])) + 1
+    interior = interior[density[interior] >= min_rel_height * density.max()]
     interior = interior[np.argsort(density[interior])[::-1]]
     lo = np.searchsorted(grid, grid[interior] - half_width_eV, side="left")
     hi = np.searchsorted(grid, grid[interior] + half_width_eV, side="right")
