@@ -15,7 +15,8 @@ stopped, from every realized electron, before the single spectrum reduction.
 The stop is the first block boundary ``n`` at which, for every chosen
 observable, the relative standard error of the mean is at most
 ``target_rse`` and the heavy-tail guards hold (largest single-electron share,
-effective sample size, stability of the running mean over the last blocks),
+effective sample size, CXR variance sampling, stability of the running mean
+over the last blocks),
 subject to ``min_electrons``; at ``max_electrons`` the case completes flagged
 ``statistics_limited``. The realized case is the fixed-N case at the realized
 count, bit for bit, so the stop changes how many electrons run, never how
@@ -37,8 +38,8 @@ import numpy as np
 
 from ..._backend import _to_cpu
 from ..._cxr_grid_policy import CxrYieldStatisticsWarning
+from ..._precision import ADAPTIVE_SAMPLING_MODEL, Precision
 from ..._precision import OBSERVABLES as OBSERVABLES
-from ..._precision import Precision
 from ..spectrum.cxr._kernels import _SEG_ARRAYS
 from .artifacts import _case_geometry
 from .block_transport import electron_blocks
@@ -56,7 +57,8 @@ class RunningMoments:
     """Exact running moments of one non-negative per-electron observable.
 
     Each block is reduced where its values live (device or host) to its count,
-    sum, centred second moment, sum of squares and maximum; blocks merge by
+    sum, centred moments through fourth order, sum of squares and maximum;
+    blocks merge by
     Chan et al.'s pairwise update, so the mean and variance equal a one-pass
     Welford over the concatenated values up to rounding.
 
@@ -67,6 +69,8 @@ class RunningMoments:
         self.n = 0
         self.mean = 0.0
         self.m2 = 0.0
+        self.m3 = 0.0
+        self.m4 = 0.0
         self.total = 0.0
         self.total_sq = 0.0
         self.largest = 0.0
@@ -78,11 +82,29 @@ class RunningMoments:
         nb = int(values.size)
         block_sum = float(values.sum())
         block_mean = block_sum / nb
-        block_m2 = float(((values - block_mean) ** 2).sum())
+        centered = values - block_mean
+        squared = centered * centered
+        block_m2 = float(squared.sum())
+        block_m3 = float((squared * centered).sum())
+        block_m4 = float((squared * squared).sum())
         block_sq = float((values * values).sum())
         block_max = float(values.max())
         n = self.n + nb
         delta = block_mean - self.mean
+        na = self.n
+        # Expand (x - combined_mean)^p in each block, p = 3, 4.
+        # Use the old M2/M3 throughout; updating either first corrupts M4.
+        self.m4 += (
+            block_m4
+            + delta**4 * na * nb * (na * na - na * nb + nb * nb) / n**3
+            + 6 * delta**2 * (na * na * block_m2 + nb * nb * self.m2) / n**2
+            + 4 * delta * (na * block_m3 - nb * self.m3) / n
+        )
+        self.m3 += (
+            block_m3
+            + delta**3 * na * nb * (na - nb) / n**2
+            + 3 * delta * (na * block_m2 - nb * self.m2) / n
+        )
         self.mean += delta * nb / n
         self.m2 += block_m2 + delta * delta * self.n * nb / n
         self.n = n
@@ -101,6 +123,23 @@ class RunningMoments:
 
     def effective_sample_size(self) -> float:
         return self.total**2 / self.total_sq if self.total_sq > 0.0 else 0.0
+
+    def variance_of_variance(self) -> float | None:
+        """Geant4/MCNP diagnostic ``M4/M2**2 - 1/n`` (dimensionless).
+
+        For independent histories with finite fourth moment, its square root
+        is an asymptotic plug-in estimate of relative variance uncertainty.
+        A constant signal returns
+        zero; fewer than two samples has no estimate. This cannot expose an
+        entirely unsampled population.
+
+        Validation: adaptive-sample-size-stopping
+        """
+        if self.n < 2:
+            return None
+        if self.m2 == 0.0:
+            return 0.0
+        return max(0.0, (math.sqrt(self.m4) / self.m2) ** 2 - 1.0 / self.n)
 
 
 class StoppingMonitor:
@@ -159,10 +198,26 @@ class StoppingMonitor:
         m = self.moments[name]
         rse, share, ess = m.relative_se(), m.max_share(), m.effective_sample_size()
         stability = self._stability(name)
+        vov = m.variance_of_variance()
+        cv = None if rse is None else rse * math.sqrt(m.n)
+        # Reuse the policy's effective-history floor for squared deviations:
+        # M2**2/M4 >= E_min, equivalently VOV + 1/n <= 1/E_min.
+        # The near-constant policy exception uses EMPIRICAL CV <= target,
+        # not a bound on population variability or any unseen tail.
+        variance_passes = (
+            name != "cxr"
+            or vov is not None
+            and (
+                (cv is not None and cv <= s.target_rse)
+                or s.min_effective_histories == 0.0
+                or vov + 1.0 / m.n <= 1.0 / s.min_effective_histories
+            )
+        )
         passes = {
             "relative_se": rse is not None and rse <= s.target_rse,
             "max_electron_share": share is not None and share <= s.max_history_share,
             "effective_sample_size": ess >= s.min_effective_histories,
+            "variance_sampling": variance_passes,
             "stability": stability is not None and stability <= s.stability_fraction * s.target_rse,
         }
         return {
@@ -171,6 +226,8 @@ class StoppingMonitor:
             "relative_se": rse,
             "max_electron_share": share,
             "effective_sample_size": ess,
+            "variance_of_variance": vov,
+            "coefficient_of_variation": cv,
             "stability": stability,
             "passes": passes,
             "converged": all(passes.values()),
@@ -225,6 +282,7 @@ class StoppingMonitor:
             "max_electrons": s.max_histories,
             "block_electrons": s.block_histories,
             "observables": list(s.observables),
+            "sampling_model": ADAPTIVE_SAMPLING_MODEL,
             "guards": {
                 "max_electron_share": s.max_history_share,
                 "min_effective_electrons": s.min_effective_histories,

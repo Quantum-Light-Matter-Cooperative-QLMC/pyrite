@@ -43,7 +43,7 @@ def resolved_physics_view(
     Descriptor requirements do not certify energy coverage or physical validity.
     """
     from ._numerics import Physics
-    from ._precision import _brem_band_reduction_markers
+    from ._precision import _adaptive_sampling_markers, _brem_band_reduction_markers
     from .materials.photon_cross_sections import ATTENUATION_MODEL
     from .montecarlo.spectrum import (
         BREMSSTRAHLUNG_MODEL,
@@ -127,6 +127,7 @@ def resolved_physics_view(
     }
     from .montecarlo.spectrum.cxr._bin_quadrature import _bin_reduction_markers
 
+    markers.update(_adaptive_sampling_markers(resolved.get("adaptive_precision")))
     markers.update(_bin_reduction_markers(resolved))
     markers.update(
         _brem_band_reduction_markers(

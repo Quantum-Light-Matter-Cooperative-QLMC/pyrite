@@ -625,37 +625,37 @@ def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
         (
             "hopg_hbn_gaussian_200fs",
             "hopg",
-            "5eb54f9a43dba32bfd641c60582f1982df1aa49166d5086ba9105cdf5c47350c",
+            "d99cb2f1ea461414ad9fed98b9f629a997cd0bd0c16289058bddf2e0edc4048e",
         ),
         (
             "hopg_hbn_gaussian_200fs",
             "hbn",
-            "5285ebee6389205fea8e2a7f175d00dd0c724df21877e18265957d5dd8a5cc62",
+            "946d70b9b00e0327df5798b013cbea4864a74f276c7e38a0502720cdb871b1b5",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hopg",
-            "9c668ad8e201bf5e62b8de77098412052131d3534bbaa17eaf1227f725bc74ca",
+            "4a59996c30e5957bab7752a643ce3c03b5a903bd1eb1be0f9e0533c5a48d9c85",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hbn",
-            "30bf4121922ffc5fac7511dde2bce63e7d909cbc0d547b876908da780ba18d85",
+            "366e841c89fbdc5693f4cefc563c42b2a743485ae3326dd1c451f8b83a21bc66",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hopg",
-            "464e868eea93f31c2229fd22521657251ee3dee31c91c6d35a4ac1707e766b75",
+            "0a8add9d7bdab4190ccb3b1a06b0a2e97f1e504b390d103988c972141e2c56c9",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hbn",
-            "bf8be85ae5484be208e0795fa0e0856f5f1e8aec200bb851789e8c9a78619dac",
+            "3a514d56d321cd7b10e735cff88118eac3a9b6217c5f6f3399f8be90e20a09dd",
         ),
         (
             "hopg_emittance_demo",
             "hopg",
-            "4208418491e826f18d109d7a6c12b44682c3ccd12db1907d5fca256d3e5219ce",
+            "d7c48a53db7cb475707d00f82136197f4b76646d104569b5d55979f9c1779f79",
         ),
         (
             "promising_low_ne",
@@ -710,6 +710,9 @@ def test_named_beam_migration_keeps_shipped_profile_digests_bit_for_bit(
 
     Issue #1201 re-minted every pin for the
     ``segment-mean-v9-edge-geometric-tables`` line-escape marker.
+
+    Issue #1254 re-minted adaptive pins for the variance-contributors-v2
+    stopping generation; fixed-count identities hold.
 
     Issue #938 re-minted adaptive BremsLib/brem pins for the conditional
     ``brem_band_reduction_model`` generation; fixed-count identities hold.
@@ -957,8 +960,8 @@ def test_retired_survey_stems_resolve_only_from_their_sidecar(tmp_path, stem):
 @pytest.mark.parametrize(
     ("profile", "material", "stem"),
     [
-        ("standard", "hopg", "hopg@full-64de02e7ea75"),
-        ("standard", "mose2", "mose2@full-5a6b23fe6bbe"),
+        ("standard", "hopg", "hopg@full-cc0bf70500ee"),
+        ("standard", "mose2", "mose2@full-efdae7e93bc9"),
     ],
 )
 def test_named_profile_stems_are_pinned(profile, material, stem):
@@ -1348,6 +1351,37 @@ def test_declared_brem_keeps_declared_grid_and_drops_builtin_default():
     assert declared_brem(scan) is None
     declared = replace(scan, E_grid_brem_declared=True)
     np.testing.assert_array_equal(declared_brem(declared), scan.E_grid_brem)
+
+
+def test_sampling_generation_forks_adaptive_dataset_case_and_provenance(monkeypatch):
+    from pyrite import _precision
+    from pyrite._precision import Precision
+    from pyrite.campaign.physics_view import resolved_physics_view
+
+    sweep = material_sweep("hopg")
+    fixed = default_settings()
+    adaptive = replace(fixed, precision=Precision(0.05, 100, 200, 100))
+    before = [dataset_identity("hopg", s, sweep) for s in (fixed, adaptive)]
+    fixed_case = dict(build_cases(sweep)[0])
+    case = {**fixed_case, "adaptive_precision": adaptive.precision.to_dict()}
+    keys = [case_content_key(c) for c in (fixed_case, case)]
+    assert (
+        dict(resolved_physics_view(case, table_markers={}).model_markers)["adaptive_sampling_model"]
+        == _precision.ADAPTIVE_SAMPLING_MODEL
+    )
+    monkeypatch.setattr(_precision, "ADAPTIVE_SAMPLING_MODEL", "test-next-generation")
+    after = [dataset_identity("hopg", s, sweep) for s in (fixed, adaptive)]
+    assert [
+        a["parameter_sha256"] != b["parameter_sha256"] for a, b in zip(before, after, strict=True)
+    ] == [False, True]
+    assert [case_content_key(c) != k for c, k in zip((fixed_case, case), keys, strict=True)] == [
+        False,
+        True,
+    ]
+    assert (
+        dict(resolved_physics_view(case, table_markers={}).model_markers)["adaptive_sampling_model"]
+        == "test-next-generation"
+    )
 
 
 def test_brem_band_reduction_generation_forks_only_adaptive_bremslib(monkeypatch):

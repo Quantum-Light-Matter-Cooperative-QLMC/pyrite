@@ -38,7 +38,7 @@ from .._numerics import (
     validate_profile_numerics,
 )
 from .._off_settings import OFF_VALUES
-from .._precision import Precision, _brem_band_reduction_markers
+from .._precision import Precision, _adaptive_sampling_markers, _brem_band_reduction_markers
 from ..materials.crystal import structure_factor_marker
 from ..materials.photon_cross_sections import ATTENUATION_MODEL
 from ..montecarlo.case import Case
@@ -611,6 +611,7 @@ def _identity_v1(
     validate_bremsstrahlung_model(requested)
     resolved_brem_model = resolve_bremsstrahlung_model(requested, _target_elements(sweep.target))
     resolved["bremsstrahlung_model"] = _bremsstrahlung_identity_marker(resolved_brem_model)
+    resolved.update(_adaptive_sampling_markers(precision_payload))
     resolved.update(_brem_band_reduction_markers(precision_payload, resolved_brem_model))
     radiative = radiative_numerics_payload(options, resolved_brem_model, grooved=grooved)
     if radiative:
@@ -750,6 +751,7 @@ def case_content_key(
             {key: value for key, value in case.items() if key not in _CONTENT_KEY_DENYLIST}
         ),
     }
+    payload.update(_adaptive_sampling_markers(case.get("adaptive_precision")))
     payload.update(_bin_reduction_markers(case))
     payload.update(_structure_factor_identity(_case_crystals(case)))
     payload.update(

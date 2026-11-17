@@ -203,6 +203,7 @@ def test_channeling_demo_and_off_profile_identities_are_unchanged():
     ``measured-shell-cutoff-v3`` (table-sized selection calls), and #1201 for
     ``segment-mean-v9-edge-geometric-tables`` (line-table mesh). #642 re-mints
     the shell-transport pins for default restricted soft-loss straggling.
+    #1254 re-mints the adaptive standard-profile pin for variance-contributors-v2.
     """
     sweep, settings, cases = _profile_cases("silicon", "channeling_demo")
     assert cases[0].line_quadrature == "bin-mean"
@@ -219,6 +220,6 @@ def test_channeling_demo_and_off_profile_identities_are_unchanged():
     sweep = material_sweep("hopg", catalog_profile="standard")
     settings = profiles.profile_run_settings(default_settings(), "standard", sweep=sweep)
     assert profiles.dataset_identity("hopg", settings, sweep)["parameter_sha256"] == (
-        "64de02e7ea75d3cbd6811aa7a0c36b63abc281195076e2343767d75942acbea3"
+        "cc0bf70500ee624b8445ff60282da7d7b8b66a27e0c46c6791aea27a44d5edd9"
     )
-    assert profiles.named_profile_stem("hopg") == "hopg@full-64de02e7ea75"
+    assert profiles.named_profile_stem("hopg") == "hopg@full-cc0bf70500ee"

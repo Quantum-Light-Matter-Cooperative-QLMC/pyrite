@@ -4,7 +4,7 @@ Ledger row: [`adaptive-sample-size-stopping`](../ledger-transport-background.md#
 
 ## Claim
 
-For a case transported in equal electron blocks of size $B$ on the counter-addressed per-electron or CUDA cores, the run stops at the first block end $n \ge n_{\min}$ that meets four conditions for every watched observable $o$:
+For a case transported in equal electron blocks of size $B$ on the counter-addressed per-electron or CUDA cores, the run stops at the first block end $n \ge n_{\min}$ that meets the following conditions for every watched observable $o$, plus the CXR variance-sampling gate below:
 
 ```{math}
 :label: eq-adaptive-stop-rule
@@ -24,7 +24,51 @@ Otherwise it stops at $n_{\max}$, flagged `statistics_limited`. The terms are:
 - $\bar m_{o,n}$ and $s_{o,n}$ are the sample mean and Bessel-corrected standard deviation of $m_{o,i}$.
 - $r_{o,n}$ is the relative standard error of the mean.
 
-The realized result is the fixed-$N$ result at $N=n$, bit for bit. Under the assumptions below, $\bar m_{o,N}\pm z\,r_{o,N}\bar m_{o,N}$ has coverage tending to the nominal $2\Phi(z)-1$ as $\varepsilon\to0$, and the stopping bias $E[\bar m_{o,N}]-\mu_o$ is $o(\varepsilon\mu_o)$.
+The realized result is the fixed-$N$ result at $N=n$, bit for bit. The cited sequential-interval theory concerns the asymptotic regime as the requested width tends to zero, with its regularity and stopping assumptions; it does not certify finite-sample coverage of this guarded implementation. The empirical studies below measure coverage and stopping bias in their stated populations only.
+
+
+### CXR variance sampling (v2, #1254)
+
+Define central sums $M_j=\sum_i(m_i-\bar m)^j$. For CXR the additional gate is
+
+$$
+\frac{s_n}{|\bar m_n|}\le\varepsilon
+\quad\text{or}\quad
+E_{\mathrm{var}}=\frac{M_2^2}{M_4}\ge E_{\min}.
+$$
+
+The first branch is a deliberate **empirical near-constant policy exception**;
+it is not a population-variance bound. The second counts effective contributors
+to the observed squared deviations. At zero variance the gate passes by
+convention. Zero signal still fails the ordinary RSE guard. Setting
+`min_effective_histories=0` disables both ESS floors. The brem stopping policy
+is unchanged. Both observables record the dimensionless diagnostic
+
+$$
+\mathrm{VOV}=\frac{M_4}{M_2^2}-\frac1n
+=\frac1{E_{\mathrm{var}}}-\frac1n.
+$$
+
+This is the Geant4/MCNP convention. With independent histories and finite fourth
+moment, its square root is an asymptotic plug-in estimate of relative variance
+uncertainty. It is not the exact finite-$n$ variance of the unbiased sample
+variance. The exact population expression is
+$\operatorname{Var}(s^2)=[\mu_4-\frac{n-3}{n-1}\sigma^4]/n$.
+The default $E_{\min}=100$ limits observed variance concentration to about
+10 percent relative uncertainty; this threshold and the CV exception are
+PyRITE policy, not prescriptions from either reference.
+
+Neither branch sees an entirely unsampled class, certifies population moments,
+or provides finite-sample or simultaneous sequential coverage. With a true
+constant positive signal, CV and VOV vanish, so the original minimum/stability
+stop is retained. A constant sampled prefix can also conceal an unseen class.
+For a regular variable population with finite fourth moment,
+$E_{\mathrm{var}}\simeq n/\kappa$ with kurtosis $\kappa$, so the gate eventually
+passes without a floor in transport units.
+
+The stopping generation `adaptive_sampling_model="variance-contributors-v2"`
+participates in adaptive dataset identities, case content keys, and runtime
+provenance. Fixed-count identities retain their generation.
 
 ## Sources
 
@@ -32,6 +76,9 @@ The realized result is the fixed-$N$ result at $N=n$, bit for bit. Under the ass
 - Sequential stopping in simulation output analysis: P. W. Glynn and W. Whitt, "The asymptotic validity of sequential stopping rules for stochastic simulations," *Ann. Appl. Probab.* **2**, 180–198 (1992). This covers relative-precision rules and batch means.
 - Running moments: B. P. Welford, *Technometrics* **4**, 419–420 (1962); T. F. Chan, G. H. Golub and R. J. LeVeque, "Algorithms for computing the sample variance: analysis and recommendations," *Amer. Statist.* **37**, 242–247 (1983), pairwise merge.
 - Effective sample size: L. Kish, *Survey Sampling* (Wiley, 1965), $(\sum w)^2/\sum w^2$, applied here to the contributions $m_i$.
+
+- Geant4 [B1Con documentation](https://geant4-userdoc.web.cern.ch/Doxygen/examples_doc/html/ExampleB1Con.html) and [`G4ConvergenceTester`](https://github.com/Geant4/geant4/blob/master/source/global/HEPNumerics/src/G4ConvergenceTester.cc), inspected 2026-11-17: small relative error and many histories do not establish convergence. Diagnostics include VOV, RSE/VOV trends, largest-score repetition, FOM stability, and a fitted upper-tail density slope (passing threshold 3). The implementation tests VOV against $1/N$ despite a printed label saying $1/\sqrt N$. These are diagnostic checks, not a proof of coverage or the PyRITE stopping policy.
+- F. Salvat, *PENELOPE-2024*, NEA/MBDAV/R(2024)1, §§1.3 and 1.5: pp. 24–25, Eqs. (1.89)–(1.90), gives the heuristic skewness condition $|\mu_3|/(\sigma^3\sqrt N)\ll1$ and recommends examining the estimator distribution; the text then explicitly adopts asymptotic error reporting in routine use. Pages 37–39, Eqs. (1.136)–(1.143), accumulate whole-shower scores and their squares, including all particles of each shower before squaring. PENELOPE uses the plug-in $N$ denominator; PyRITE uses Bessel correction. Chapter 7, p. 291 and pp. 317–318, describes fixed shower/time budgets, periodic output, inspection and manual stopping; no analogous automatic tail test is specified there. [NEA report](https://www.oecd-nea.org/jcms/pl_108003/penlope-2024-a-code-system-for-monte-carlo-simulation-of-electron-and-photon-transport); examined the user's Zotero PDF, item `2UVQNJ2B`, attachment `CQ6Q2F87`.
 
 ## Derivation
 
@@ -73,6 +120,10 @@ The target $r_n\le\varepsilon$ therefore implies $\mathrm{ESS}_n\ge 1/(\varepsil
 - The monitor band is fixed before transport: the case's policy bandwidth, else its line-grid ends. Under the `resonance-population` policy the final axis may end below the bandwidth ceiling, so the monitor counts tails the final axis truncates. That share is audited separately (`line-grid-resonance-bandwidth`).
 
 ## Limiting cases
+
+The numerical coverage/count measurements in this section and the original
+anchor descriptions below predate v2. They are historical evidence, not
+measurements of the new gate. Current v2 evidence follows separately.
 
 - **Fixed-$N$ limit.** $n_{\min}=n_{\max}=N$ is the fixed-$N$ run. No check precedes $N$, nothing is replayed, and the output is identical (`test_min_equal_max_is_the_fixed_n_run`). For any stop, the output equals the fixed-$N$ run at the realized count, including energy-spread replay and the bunch centroid (`test_adaptive_run_is_the_fixed_n_run_at_its_realized_count`).
 - **Gaussian population.** $\mathcal N(1,0.5^2)$, $\varepsilon=5\,\%$, $B=10$, $n_{\min}=50$, 1000 seeds. Coverage of $\pm1.96\,r_N$ is 0.934 with the guards off and 0.943 with the defaults, against 0.95 nominal. The stopping bias is $(+5.4\pm1.6)\times10^{-3}$ and $(+1.3\pm1.4)\times10^{-3}$, at most $0.11\varepsilon$ (`test_gaussian_population_has_near_nominal_coverage`). The small undercoverage and positive bias are the finite-$N\approx100$ sequential effect: $r_n$ falls when $\bar m_n$ is high.
@@ -345,3 +396,94 @@ and state the cutoff-observable equivalence assumption. The earlier shared-rule
 coverage evidence remains scoped to its original populations and policy.
 
 Implementation anchors after verification: the equal-minimum hopg case at line target 0.035 and brem target 0.1 stops at 60 and 40 electrons, with RSEs 0.03052 and 0.03132. CPU and CUDA realized-pair tests compare every transport array and final component spectra bit-for-bit with fixed runs, using unequal cutoffs. Seed 8 places the maximum initial energy beyond the realized population and explicitly forces table-range replay. Both CUDA cases passed on the lab RTX 5080 (SLURM job 1588, 2026-10-18). Batch-summary reconstruction uses the reduction precision: float64 on CPU and float32 on CUDA, including brem outputs widened after reduction.
+
+
+## Independent v2 extension verification (2026-11-17)
+
+A fresh read-only context derived the following identities before inspecting
+implementation. For sets $A,B$ with sizes $a,b$, $n=a+b$, and
+$\delta=\bar m_B-\bar m_A$, shift the centered values in $A$ by
+$-b\delta/n$ and those in $B$ by $+a\delta/n$. Binomial expansion gives
+
+$$
+M_3=A_3+B_3+\delta^3\frac{ab(a-b)}{n^2}
++3\delta\frac{aB_2-bA_2}{n},
+$$
+
+$$
+M_4=A_4+B_4+\delta^4\frac{ab(a^2-ab+b^2)}{n^3}
++6\delta^2\frac{a^2B_2+b^2A_2}{n^2}
++4\delta\frac{aB_3-bA_3}{n}.
+$$
+
+The implementation matches and uses the old $M_2,M_3$ before updating them.
+Moment units are score to the corresponding power; CV, VOV and both ESSs are
+dimensionless and invariant under uniform rescaling. For
+$z_i=(m_i-\bar m)^2$, the empirical expression
+$\widehat{\operatorname{Var}}_n(z)/(n\bar z^2)$ equals VOV, with denominator $n$ in the empirical variance. Cauchy–Schwarz gives
+$M_4/M_2^2\ge1/n$, so VOV is non-negative apart from rounding.
+
+**Verdict: rederived**, limited to algebra, diagnostics and implementation of
+the declared empirical policy. Units, constant/zero/sparse-tail limits and
+signs/normalization pass. This does not establish coverage. The verifier
+independently matched centered NumPy moments for every retrieved capture and
+recorded CV/VOV/gate outcomes for 134 realized replay rows. Twelve focused
+new regression/diagnostic cases passed. No human sign-off is implied.
+
+### Finite-capture evidence
+
+`checks/adaptive_tail_1254.py` selects the longest saved population for each
+material/energy/tilt, records capture SHA-256 and available producer revision,
+and replays both policies at 1k, 3k, 6k, 12k, 24k and 48k. The checked-in
+`checks/adaptive_tail_1254_results.json` is the numeric record. A timeout stub
+for hBN 1 MeV 60° has no producer revision; its byte digest is recorded and
+the missing revision is explicit. Capture exhaustion never means convergence
+or completion at the requested cap. The reference
+$\mathrm{CV}_{\rm full}/\sqrt n$ is a finite-capture proxy, not truth.
+
+The 1 MeV 15° CXR distributions have a near-unit baseline (normalized by their
+full mean), but maxima about 285 (hBN) and 664 (HOPG). In HOPG, the large
+scores at zero-based primary IDs 40211 and 53961 arrive after every former
+small-block stop; the largest score arrives at 893438. The new guard refuses
+all former early stops. On 1k prefix checkpoints, the first counts after which
+every later CV remains within 20 percent of the full-capture CV are 343k
+(hBN) and 344k (HOPG); the ten largest squared deviations contribute 97.3
+and 97.7 percent of the captured variance respectively. This is retrospective
+finite-reference stability, not a stopping criterion. HOPG reaches the requested cap; hBN's capture ends
+at 528k with the gate still failing, so its later outcome is unmeasured.
+
+At 30 MeV 15°, every tested block retains its previous stopping count. At
+60°, small-block stops rise from 7k–24k to 31k–48k and larger-block stops
+retain their order of magnitude. At 30 keV the captured longer populations
+retain their established convergence scale. Across converged replays the
+reported/reference CXR RSE ratio must be at least 0.5; capture exhaustion is
+reported separately.
+
+### Exact primary attribution
+
+The scalar captures alone contain no energy/depth/line attribution.
+`checks/adaptive_tail_attribution_1254.py` closes that gap with eight individual
+primary replays on the original capture checkout, revision
+`00d62b0ceead5a9cb21829848719400f8fc15481`, with its original catalog overlay,
+workspace and CPU environment. Simulation source is unchanged; the added
+diagnostic's SHA-256 is recorded in
+`checks/adaptive_tail_attribution_1254_results.json`. Every replayed line mass
+matches its saved value exactly, including the baseline primary 0 in each
+material. Segments and the five largest contributing lines are retained.
+
+For HOPG IDs 40211, 53961 and 893438, the segments hosting the largest
+individual lines have energies
+997.84–999.21 keV, midpoint depths 3176–4527 Å, and slab-normal direction
+cosines 0.061–0.155. Their largest deflections are about 70°, 91° and 71°.
+For hBN IDs 150453, 261777 and 270761, the corresponding segment energies are
+999.80–1000.00 keV, midpoint depths 1259–4161 Å; the first has a negative
+normal direction cosine (back toward the entrance). Their largest turns are
+about 97°, 76° and 36°. Each largest turn follows a row tagged `EVENT_ELASTIC` (0). These sampled
+outliers arise after substantial elastic scattering at nearly the incident energy; they are not a slowed-to-low-energy
+population. No channeling model is selected in these cases.
+
+The largest individual CXR lines carry 21–41 percent of each selected outlier's
+mass, with leading-line resonances from 183 eV to 28.35 keV. Thus the large primary scores
+are attributable to multiple incoherent line contributions, rather than one
+unidentified channel. This is measured attribution for these six outliers,
+not a claim that every member of the distribution has the same mechanism.
