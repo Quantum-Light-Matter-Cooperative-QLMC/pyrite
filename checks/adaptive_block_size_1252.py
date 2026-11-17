@@ -22,7 +22,8 @@ kernel; CuPy pool reserved/used peaks and whole-card used memory (``memGetInfo``
 5 ms sampling, by phase); rows per electron; realized electrons; stop reason;
 final relative standard errors; and any OOM/recovery fields of the output. The
 per-electron stopping values (one per electron and observable, exactly what the
-monitor saw) are saved to ``OUT_PREFIX.values.npz``.
+monitor saw) are saved to ``OUT_PREFIX.values.npz`` (after every block with
+``PROBE_CAPTURE_EVERY=1``, so a timed-out capture keeps its prefix).
 
 ``replay`` runs the stopping rule (``adaptive.run_stopping_rule``) on saved
 per-electron values for other block sizes. Block size does not change
@@ -258,8 +259,19 @@ class Memory:
         }
 
 
-def instrument(timers, values):
-    """Patch the adaptive block seams with timers and a per-electron value capture."""
+def save_values(out_prefix, values, block):
+    """Write the captured per-electron values atomically (the replay input)."""
+    tmp = f"{out_prefix}.values.tmp.npz"
+    np.savez_compressed(tmp, **{k: np.concatenate(v) for k, v in values.items()}, block=block)
+    os.replace(tmp, f"{out_prefix}.values.npz")
+
+
+def instrument(timers, values, on_values=None):
+    """Patch the adaptive block seams with timers and a per-electron value capture.
+
+    ``on_values`` (optional) is called after every captured block, so a
+    long capture that later times out still leaves its prefix.
+    """
     from pyrite.montecarlo import runner
     from pyrite.montecarlo.runner import adaptive, block_transport
 
@@ -273,6 +285,8 @@ def instrument(timers, values):
             for name, array in out.items():
                 host = array.get() if hasattr(array, "get") else np.asarray(array)
                 values.setdefault(name, []).append(np.asarray(host, dtype=np.float64))
+            if on_values is not None:
+                on_values()
             return out
 
         real_init(self, settings, captured)
@@ -337,7 +351,28 @@ def run(material, e0_kev, tilt_deg, block, out_prefix):
     memory = Memory()
     timers = Timers(memory)
     values: dict[str, list] = {}
-    instrument(timers, values)
+    incremental = os.environ.get("PROBE_CAPTURE_EVERY") == "1"
+    # A stub record first, so ``replay`` can read a capture whose run timed out.
+    Path(f"{out_prefix}.json").write_text(
+        json.dumps(
+            {
+                "issue": 1252,
+                "stub": True,
+                "material": material,
+                "E0_keV": float(e0_kev),
+                "tilt_deg": float(tilt_deg),
+                "block": int(block),
+                "precision": precision.to_dict(),
+                "realized_electrons": None,
+            },
+            default=_json_default,
+        )
+    )
+    instrument(
+        timers,
+        values,
+        (lambda: save_values(out_prefix, values, np.int64(block))) if incremental else None,
+    )
     launches = Launches()
     launches.install()
     timings = []
@@ -395,11 +430,7 @@ def run(material, e0_kev, tilt_deg, block, out_prefix):
         "output_meta": {} if out is None else _scalar_meta(out),
     }
     if values:
-        np.savez_compressed(
-            f"{out_prefix}.values.npz",
-            **{k: np.concatenate(v) for k, v in values.items()},
-            block=np.int64(block),
-        )
+        save_values(out_prefix, values, np.int64(block))
     Path(f"{out_prefix}.json").write_text(json.dumps(record, default=_json_default))
     summary = {k: v for k, v in record.items() if k not in ("per_block", "runner_timing")}
     print(json.dumps(summary, default=_json_default))

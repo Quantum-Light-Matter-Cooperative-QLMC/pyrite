@@ -11,10 +11,22 @@
 # user config under .xdg-config/pyrite):
 #   sbatch [-p gpu-amd --gres=gpu:1] -J ab1252-<sha> checks/adaptive_block_size_1252.sbatch \
 #       OUT_DIR "MATERIAL:E0_KEV:TILT ..." "BLOCK ..." [ARM_TIMEOUT_S]
+# CPU stopping capture (any CPU node; PROBE_CAPTURE_EVERY keeps a timed-out prefix):
+#   sbatch -p cpu -w qlmc-queen --gres=none -c 12 --export=ALL,PROBE_CPU=1,PROBE_CAPTURE_EVERY=1 ...
 set -uo pipefail
 cd "$SLURM_SUBMIT_DIR"
 SHIPPED_XDG="$PWD/.xdg-config"
-. checks/rocm/env.sh
+if [ "${PROBE_CPU:-0}" = 1 ]; then
+    # CPU stopping captures (no GPU): per-electron core, numba threads = CPUs.
+    export PATH="$HOME/.local/bin:$PATH" PYRITE_HOME="$PWD" PYRITE_CATALOG="$PWD/src/pyrite/data/catalog"
+    export PYRITE_USER_CATALOG="$PWD/user-catalog" PYRITE_MC_BACKEND=cpu UV_CACHE_DIR="$HOME/.cache/uv"
+    export UV_PROJECT_ENVIRONMENT="$PWD/.venv-cpu" NUMBA_NUM_THREADS="${SLURM_CPUS_PER_TASK:-8}"
+    mkdir -p "$PYRITE_USER_CATALOG"
+    pyrite_gpu_sync() { uv sync --locked "$@"; }
+    pyrite_gpu_info() { lscpu | head -20; }
+else
+    . checks/rocm/env.sh
+fi
 export XDG_CONFIG_HOME="$SHIPPED_XDG"
 export PROBE_SHA=$(cat CODE_SHA)
 OUT=$1; CASES=$2; BLOCKS=$3; ARM_TIMEOUT=${4:-2700}
