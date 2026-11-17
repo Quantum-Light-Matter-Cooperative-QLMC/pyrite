@@ -85,7 +85,10 @@ __all__ = [
     "DEFAULT_COHERENT_FLAT_OMISSION_LIMIT",
     "DEFAULT_COHERENT_LEAK_LIMIT",
     "DEFAULT_LOCAL_HALO_LIMIT",
+    "DEFAULT_SHAPE_MAX_POINTS",
+    "DEFAULT_SHAPE_RTOL",
     "LOCAL_RESOLUTION_POLICY",
+    "SHAPE_RESOLUTION_POLICY",
     "RESOLUTION_POLICIES",
     "COVERAGE_BANDWIDTH_POLICY",
     "DEFAULT_BANDWIDTH_COVERAGE",
@@ -114,6 +117,7 @@ __all__ = [
     "cxr_start_eV",
     "resolve_cxr_grid_policy",
     "resolved_coordinates",
+    "shape_spacing_factor",
     "store_coordinates",
     "windowed_coordinates",
 ]
@@ -188,7 +192,25 @@ AUTOMATIC_RESOLUTION_POLICY = "sinc-nyquist"
 #: Opt-in, and only under the ``resonance-population`` bandwidth that measures
 #: that population.
 LOCAL_RESOLUTION_POLICY = "resonance-local"
-RESOLUTION_POLICIES = (AUTOMATIC_RESOLUTION_POLICY, LOCAL_RESOLUTION_POLICY)
+#: Uniform bin-mean axis fine enough to resolve intrinsic line shape (#1230):
+#: the sinc-Nyquist step scaled by :func:`shape_spacing_factor`. Opt-in, under
+#: the ``resonance-population`` bandwidth and ``bin-mean`` quadrature, so the
+#: axis is bounded by the measured band and reduced through the Fourier route.
+SHAPE_RESOLUTION_POLICY = "sinc-shape"
+RESOLUTION_POLICIES = (
+    AUTOMATIC_RESOLUTION_POLICY,
+    LOCAL_RESOLUTION_POLICY,
+    SHAPE_RESOLUTION_POLICY,
+)
+#: Relative error allowed in an isolated line's peak height and FWHM on the
+#: ``sinc-shape`` axis: the #1143 shape margin, and the harness ``SHAPE_RTOL``
+#: of ``line-grid-sinc-convergence``.
+DEFAULT_SHAPE_RTOL = 1.0e-2
+#: Coordinate budget of the ``sinc-shape`` axis. Above it the policy falls back
+#: to ``resonance-local``. The Fourier reduction is nearly flat in bin count
+#: (#944: 43k to 865k bins within +60% on CUDA and ROCm); 1M bins is the
+#: largest measured axis, rounded.
+DEFAULT_SHAPE_MAX_POINTS = 1_000_000
 #: Per-line, per-side tail share outside the fine halo of ``resonance-local``
 #: (at most twice this in total), charged with the bandwidth share to the
 #: feature-window row of ``tbl-line-budget-allocation``, which measured-bandwidth
@@ -275,6 +297,33 @@ ENVIRONMENT_NAMES = (
 def environment_overrides_present() -> bool:
     """True when any ``PYRITE_ENERGY_GRID_*`` policy value is set."""
     return any(env_value(name) is not None for name in ENVIRONMENT_NAMES)
+
+
+def shape_spacing_factor(shape_rtol: float) -> float:
+    """Ratio ``h / W`` of the ``sinc-shape`` step to a line's first-zero width.
+
+    A line ``sinc^2((E - E_res) / W)`` (``np.sinc`` convention) has
+    ``f = 1 - (pi^2 / 3) (u / W)^2 + O(u^4)`` near its peak. The mean of a bin
+    of width ``h`` centred ``delta`` from the resonance is
+    ``1 - (pi^2 / 3 W^2) (delta^2 + h^2 / 12)``. The highest bin has
+    ``|delta| <= h / 2``, so its relative height error is at most
+    ``(pi^2 / 9) (h / W)^2``. Setting this equal to ``shape_rtol`` gives
+    ``h / W = (3 / pi) sqrt(shape_rtol)``.
+
+    Assumptions: the peak is one isolated line, and height is read as the
+    highest bin mean without interpolation. Wider isolated lines have a
+    smaller height bound. The FWHM read by linear interpolation between bin
+    means meets the tolerance at the tested spacings and offsets (single-line
+    scan, ledger write-up); overlapping peaks require separate qualification.
+
+    Limiting case: ``shape_rtol -> 0`` gives ``h -> 0``, i.e. pointwise sampling of the line.
+
+    Validation: line-grid-sinc-shape-spacing
+    """
+    shape_rtol = float(shape_rtol)
+    if not 0.0 < shape_rtol < 1.0:
+        raise ValueError(f"shape_rtol must lie in (0, 1), got {shape_rtol!r}")
+    return 3.0 / math.pi * math.sqrt(shape_rtol)
 
 
 def cxr_start_eV(energy_keV: float) -> float:
@@ -448,6 +497,13 @@ class CxrGridPolicy:
             }
         if self.resolution_policy == LOCAL_RESOLUTION_POLICY:
             payload["resolution"] = {**payload["resolution"], "halo_limit": self.halo_limit}
+        if self.resolution_policy == SHAPE_RESOLUTION_POLICY:
+            payload["resolution"] = {
+                **payload["resolution"],
+                "halo_limit": self.halo_limit,
+                "shape_rtol": DEFAULT_SHAPE_RTOL,
+                "shape_max_points": DEFAULT_SHAPE_MAX_POINTS,
+            }
         return payload
 
 
@@ -557,11 +613,12 @@ def check_selector_combination(
     stored policy fails before it is written rather than when a case resolves.
 
     Validation: line-grid-resonance-local-spacing
+    Validation: line-grid-sinc-shape-spacing
     """
-    if resolution == LOCAL_RESOLUTION_POLICY:
+    if resolution in (LOCAL_RESOLUTION_POLICY, SHAPE_RESOLUTION_POLICY):
         if bandwidth != RESONANCE_BANDWIDTH_POLICY:
             raise ValueError(
-                "the resonance-local resolution reads the measured resonance population "
+                f"the {resolution} resolution reads the measured resonance population "
                 "and needs the resonance-population bandwidth"
             )
         # Node quadrature on a piecewise axis loses up to ~(h/w)**2 of a line's
@@ -569,8 +626,9 @@ def check_selector_combination(
         # bin means telescope to the exact integral at any spacing (#192).
         if quadrature != "bin-mean":
             raise ValueError(
-                "the resonance-local resolution needs bin-mean quadrature: node "
-                "quadrature loses unbounded yield at its spacing joins"
+                f"the {resolution} resolution needs bin-mean quadrature: node "
+                "quadrature loses unbounded yield at resonance-local spacing joins, "
+                "and sinc-shape falls back to resonance-local above its budget"
             )
     if bandwidth == RESONANCE_BANDWIDTH_POLICY and windows:
         raise ValueError(
@@ -600,6 +658,7 @@ def resolve_cxr_grid_policy(
 
     Validation: line-grid-resonance-bandwidth
     Validation: line-grid-resonance-local-spacing
+    Validation: line-grid-sinc-shape-spacing
     Validation: sinc-bin-integration
     """
     per_call = dict(per_call or {})
@@ -749,7 +808,7 @@ def resolve_cxr_grid_policy(
         windows=windows is not None,
     )
     halo_limit = None
-    if resolution_policy == LOCAL_RESOLUTION_POLICY:
+    if resolution_policy in (LOCAL_RESOLUTION_POLICY, SHAPE_RESOLUTION_POLICY):
         halo_limit = DEFAULT_LOCAL_HALO_LIMIT
     truncation = None
     if bandwidth_policy == RESONANCE_BANDWIDTH_POLICY:
@@ -861,13 +920,14 @@ def windowed_coordinates(
     plan is never coarsened. Precision is judged interval by interval, so a fine
     window low on the axis is held to the ulp at its own energy.
 
-    A ``resonance-local`` resolution plans its own pieces without a windows
-    block, and ``stop_eV`` then replaces the payload's measured-bandwidth cap.
+    A ``resonance-local`` resolution (or the over-budget ``sinc-shape``
+    fallback to it) plans its own pieces without a windows block, and
+    ``stop_eV`` then replaces the payload's measured-bandwidth cap.
     """
     bandwidth = payload["bandwidth"]
     resolution = payload["resolution"]
     windows = payload.get("windows")
-    local = resolution["policy"] == LOCAL_RESOLUTION_POLICY
+    local = resolution["policy"] in (LOCAL_RESOLUTION_POLICY, SHAPE_RESOLUTION_POLICY)
     if windows is None and not local:
         raise ValueError("line-grid policy payload carries no windows block")
     start = float(bandwidth["start_eV"])

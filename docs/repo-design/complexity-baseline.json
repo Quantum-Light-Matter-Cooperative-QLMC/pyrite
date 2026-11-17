@@ -19,7 +19,7 @@
     {
       "path": "src/pyrite/_precision.py",
       "name": "Precision.__post_init__",
-      "cc": 39
+      "cc": 36
     },
     {
       "path": "src/pyrite/apps/axial_channeling.py",
@@ -54,7 +54,7 @@
     {
       "path": "src/pyrite/campaign/single_scene.py",
       "name": "resolve_pixel_scene",
-      "cc": 29
+      "cc": 28
     },
     {
       "path": "src/pyrite/campaign/sweep.py",

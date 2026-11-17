@@ -235,6 +235,24 @@ def test_high_energy_profile_selects_the_measured_line_grid():
     assert material_sweep("hbn").cxr_grid_policy is None
 
 
+def test_high_energy_demo_selects_shape_spacing_with_a_distinct_identity():
+    """The demo opts into shape spacing; the historical adaptive case stays distinct."""
+    sweep = material_sweep("hopg", catalog_profile="high_energy_demo")
+    assert sweep.cxr_grid_policy == {
+        "bandwidth": "resonance-population",
+        "resolution": "sinc-shape",
+        "quadrature": "bin-mean",
+    }
+    case = build_cases(sweep, n_electrons=10, n_electrons_brem=10)[0]
+    assert case["line_grid_policy"]["resolution"]["policy"] == "sinc-shape"
+    assert case["line_quadrature"] == "bin-mean"
+    historical = replace(
+        sweep, cxr_grid_policy={**sweep.cxr_grid_policy, "resolution": "resonance-local"}
+    )
+    previous = build_cases(historical, n_electrons=10, n_electrons_brem=10)[0]
+    assert case_content_key(case) != case_content_key(previous)
+
+
 def test_hopg_short_keeps_finite_footprint_and_attosecond_bunch():
     sweep = material_sweep("hopg", catalog_profile="hopg_short")
     case = build_cases(sweep, n_electrons=300, n_electrons_brem=150)[0]

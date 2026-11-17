@@ -24,7 +24,8 @@ import numpy as np
 _SIGMA = 2
 #: ES shape parameter per kernel width, FINUFFT's choice for sigma = 2.
 _BETA_PER_WIDTH = 2.30
-#: Gauss-Legendre nodes for the kernel transform on [-1, 1].
+#: Gauss-Legendre nodes for the kernel transform on [-1, 1]; even, so no node
+#: sits at 0 and the rule folds onto its positive half.
 _QUADRATURE_NODES = 128
 
 
@@ -39,15 +40,29 @@ def _fine_size(modes, width):
     return max(_SIGMA * modes, 2 * width)
 
 
-def _deconvolution(cp, modes, n_fine, width):
-    """``2 / (width * I(m))`` for centred modes ``m``, ``I`` the ES transform."""
-    beta = _BETA_PER_WIDTH * width
+@lru_cache(maxsize=1)
+def _half_rule():
+    """Positive Gauss-Legendre nodes and doubled weights (the rule is symmetric)."""
     z, q = np.polynomial.legendre.leggauss(_QUADRATURE_NODES)
+    half = z > 0.0
+    return z[half], 2.0 * q[half]
+
+
+def _deconvolution(cp, modes, n_fine, width):
+    """``2 / (width * I(m))`` for centred modes ``m``, ``I`` the ES transform.
+
+    ``I`` is even in ``m`` and the Gauss-Legendre rule is symmetric, so only
+    ``m >= 0`` and the positive nodes are evaluated (4x fewer cosines, the
+    dominant cold-start cost); the result is mirrored onto the centred modes.
+    """
+    beta = _BETA_PER_WIDTH * width
+    z, q = _half_rule()
     phi = q * np.exp(beta * (np.sqrt(1.0 - z * z) - 1.0))
-    m = cp.arange(-(modes // 2), modes - modes // 2, dtype=cp.float64)
     scale = np.pi * width / n_fine
+    m = cp.arange(modes // 2 + 1, dtype=cp.float64)  # 0 .. max |centred m|
     kernel_ft = cp.cos(cp.outer(m * scale, cp.asarray(z))) @ cp.asarray(phi)
-    return 2.0 / (width * kernel_ft)
+    centred = cp.abs(cp.arange(-(modes // 2), modes - modes // 2))
+    return 2.0 / (width * kernel_ft[centred])
 
 
 @lru_cache(maxsize=1)

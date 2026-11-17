@@ -1011,20 +1011,22 @@ Usage: pyrite profile numerics cxr-grid [OPTIONS] COMMAND [ARGS]...
     bandwidth   kinematic-ceiling | resonance-population
                 closed-form kinematic bound (no simulation), or the case's
                 measured resonance population capped by that bound
-    resolution  sinc-nyquist | resonance-local
-                uniform measured sinc spacing, or spacing refined locally
-                around measured resonances (3 eV backbone)
+    resolution  sinc-nyquist | resonance-local | sinc-shape
+                uniform measured sinc spacing, spacing refined locally
+                around measured resonances (3 eV backbone), or a uniform
+                axis fine enough for 1% line peak height/FWHM, falling back
+                to resonance-local above 1000000 points
     quadrature  node | bin-mean
                 point samples of the sinc^2 line profile, or bin means that
                 keep integrated line yield exact but smooth peak height/width
 
-  resonance-local requires bandwidth resonance-population and quadrature bin-mean. Any
-  stored selector, even one equal to its default, makes every case of the profile
-  resolve its line grid automatically from its own trajectories, ahead of explicit
-  E_grid_line and stored energy-grid rows; automatic resolution does not support
-  coherent emission (#117), and bin-mean does not support a positive max_dE_frac. The
-  table joins the case and dataset identity: editing it gives new checkpoints, and
-  earlier results stay under their old identity.
+  resonance-local and sinc-shape require bandwidth resonance-population and quadrature
+  bin-mean. Any stored selector, even one equal to its default, makes every case of the
+  profile resolve its line grid automatically from its own trajectories, ahead of
+  explicit E_grid_line and stored energy-grid rows; automatic resolution does not
+  support coherent emission (#117), and bin-mean does not support a positive
+  max_dE_frac. The table joins the case and dataset identity: editing it gives new
+  checkpoints, and earlier results stay under their old identity.
 
   Tolerances, maximum spacing (3 eV), the point budget (600000) and backend ULPs are not
   profile keys: set them per call (API) or with PYRITE_ENERGY_GRID_* environment
@@ -1078,10 +1080,10 @@ Options:
   --bandwidth [kinematic-ceiling|resonance-population]
                                   Line-axis upper edge policy. Default kinematic-
                                   ceiling.
-  --resolution [sinc-nyquist|resonance-local]
-                                  Line-axis spacing policy; resonance-local needs
-                                  resonance-population and bin-mean. Default sinc-
-                                  nyquist.
+  --resolution [sinc-nyquist|resonance-local|sinc-shape]
+                                  Line-axis spacing policy; resonance-local and sinc-
+                                  shape need resonance-population and bin-mean. Default
+                                  sinc-nyquist.
   --quadrature [node|bin-mean]    sinc^2 line-profile evaluation on the axis. Default
                                   node.
   -y, --yes                       Skip the 'standard' confirmation prompt.

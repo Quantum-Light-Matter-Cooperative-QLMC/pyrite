@@ -195,9 +195,9 @@ def test_channeling_demo_and_off_profile_identities_are_unchanged():
     pin, channeling-off included, follows ``DIFFRACTED_BREM_MODEL`` (#1166 DBR). The
     silicon pins carry the crystal-conditional ``structure_factor_model`` marker
     (#1177 measured bonding charge); hopg, which has no measured table, is unchanged.
-    The bin-mean demo key follows ``CXR_BIN_REDUCTION_MODEL`` ``fourier-auto-v4``
-    (#1192), as do the silicon stem and parameter hash; restoring
-    ``line-major-auto-v3-series`` reproduces the prior pins.
+    The bin-mean demo key follows ``CXR_BIN_REDUCTION_MODEL`` ``fourier-auto-v5``
+    (#1230 host Fourier route; v4 #1192), as do the silicon stem and parameter
+    hash; restoring ``fourier-auto-v4`` reproduces the prior pins.
     #1173 re-mints every pin for ``measured-shell-cutoff-v2``; unsupported
     channeling routes retain four-family scoring. #1200 re-mints them for
     ``measured-shell-cutoff-v3`` (table-sized selection calls), and #1201 for
@@ -207,14 +207,14 @@ def test_channeling_demo_and_off_profile_identities_are_unchanged():
     sweep, settings, cases = _profile_cases("silicon", "channeling_demo")
     assert cases[0].line_quadrature == "bin-mean"
     assert [profiles.case_content_key(case) for case in cases] == [
-        "bc0d1ca7d4b04ee2d3d32189b16a4d6bb8838237dba38abaca154d29f508f785"
+        "a55ff5a55eb691c7c3a0f26a84609f320400ef0fa66763745f52087c2948e875"
     ]
     assert profiles.named_profile_stem("silicon", catalog_profile="channeling_demo") == (
-        "silicon@channeling_demo-95b7bbfa87bb"
+        "silicon@channeling_demo-99169ca3ea61"
     )
     identity = profiles.dataset_identity("silicon", settings, sweep)
     assert identity["parameter_sha256"] == (
-        "d070f7918aa843c1683fe6ba5158f34953e958d9c80255001da6288cd5ca775b"
+        "36be6820362e15e08650eeafbcc7705afe849b051f2f26732518bc2cf25ea58e"
     )
     sweep = material_sweep("hopg", catalog_profile="standard")
     settings = profiles.profile_run_settings(default_settings(), "standard", sweep=sweep)

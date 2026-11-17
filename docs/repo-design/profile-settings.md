@@ -157,12 +157,26 @@ resolving a new run does not reinterpret stored `auto` or absent fields.
 | TOML key | Values (default first) | Flag |
 |---|---|---|
 | `bandwidth` | `kinematic-ceiling`, `resonance-population` | `--bandwidth` |
-| `resolution` | `sinc-nyquist`, `resonance-local` | `--resolution` |
+| `resolution` | `sinc-nyquist`, `resonance-local`, `sinc-shape` | `--resolution` |
 | `quadrature` | `node`, `bin-mean` | `--quadrature` |
 | `windows` | `false`, `true` | TOML; selector edits keep it |
 | `max_points` | integer >= 2 (600000) | TOML; selector edits keep it |
 
-`resonance-local` requires `resonance-population` and `bin-mean`. The editor
+`resonance-local` and `sinc-shape` require `resonance-population` and
+`bin-mean`. `high_energy_demo` selects `sinc-shape`: uniform spacing at
+$(3/\pi)\sqrt{0.01}$ times the measured sinc feature width, capped by
+`max_spacing_eV`. This targets the intrinsic height of isolated lines;
+overlapping peaks require measured shape convergence. Uniform axes use the
+Fourier reducer on CPU and supported GPU backends. Above 1,000,000
+coordinates, the policy falls back to `resonance-local` on the same band;
+the resolved grid's `shape_axis` records the route, count and reason. The
+fallback retains its own coordinate budget and can refuse an oversized axis.
+`resonance-local` remains selectable; other profiles and the default
+resolution remain unchanged. See the
+[spacing derivation](../validation/beam-transport/line-grid-sinc-shape-spacing.md)
+for assumptions and qualification status.
+
+The editor
 also refuses a policy without `windows = true` on `coherent`/`both` emission,
 and `bin-mean` with a positive `max_dE_frac`. `coverage-0.95` labels stored energy-grid artifacts and
 is not a profile value.

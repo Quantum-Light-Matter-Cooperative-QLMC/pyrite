@@ -7,6 +7,7 @@ from pyrite._cxr_grid_policy import (
     LOCAL_RESOLUTION_POLICY,
     PROFILE_CXR_GRID_SELECTORS,
     RESONANCE_BANDWIDTH_POLICY,
+    SHAPE_RESOLUTION_POLICY,
 )
 from pyrite.campaign import profile_cxr_grid as _profile_edit
 from pyrite.campaign._profile_document import existing_profile
@@ -22,7 +23,7 @@ _SCHEMA = "cxr.profile.line-grid.show"
 
 def _hint(policy):
     """Corrective flags for a refused merged POLICY, or an empty string."""
-    if policy.get("resolution") != LOCAL_RESOLUTION_POLICY:
+    if policy.get("resolution") not in (LOCAL_RESOLUTION_POLICY, SHAPE_RESOLUTION_POLICY):
         return ""
     flags = []
     if policy.get("bandwidth") != RESONANCE_BANDWIDTH_POLICY:
@@ -64,15 +65,17 @@ def command():
       bandwidth   kinematic-ceiling | resonance-population
                   closed-form kinematic bound (no simulation), or the case's
                   measured resonance population capped by that bound
-      resolution  sinc-nyquist | resonance-local
-                  uniform measured sinc spacing, or spacing refined locally
-                  around measured resonances (3 eV backbone)
+      resolution  sinc-nyquist | resonance-local | sinc-shape
+                  uniform measured sinc spacing, spacing refined locally
+                  around measured resonances (3 eV backbone), or a uniform
+                  axis fine enough for 1% line peak height/FWHM, falling back
+                  to resonance-local above 1000000 points
       quadrature  node | bin-mean
                   point samples of the sinc^2 line profile, or bin means that
                   keep integrated line yield exact but smooth peak height/width
 
-    resonance-local requires bandwidth resonance-population and quadrature
-    bin-mean. Any stored selector, even one equal to its default, makes every
+    resonance-local and sinc-shape require bandwidth resonance-population and
+    quadrature bin-mean. Any stored selector, even one equal to its default, makes every
     case of the profile resolve its line grid automatically from its own
     trajectories, ahead of explicit E_grid_line and stored energy-grid rows;
     automatic resolution does not support coherent emission (#117), and
@@ -145,7 +148,8 @@ def _selector_option(key, help_text):
 @_selector_option("bandwidth", "Line-axis upper edge policy.")
 @_selector_option(
     "resolution",
-    "Line-axis spacing policy; resonance-local needs resonance-population and bin-mean.",
+    "Line-axis spacing policy; resonance-local and sinc-shape need resonance-population "
+    "and bin-mean.",
 )
 @_selector_option("quadrature", "sinc^2 line-profile evaluation on the axis.")
 @click.option("-y", "--yes", is_flag=True, help="Skip the 'standard' confirmation prompt.")

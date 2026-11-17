@@ -82,6 +82,7 @@ line-grid-kinematic-bandwidth
 line-grid-emission-ceiling
 line-grid-resonance-bandwidth
 line-grid-resonance-local-spacing
+line-grid-sinc-shape-spacing
 line-spectrum-error-budget
 line-window-seeding
 legacy-stopping-comparison

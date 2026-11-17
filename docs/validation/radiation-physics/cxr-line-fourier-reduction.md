@@ -94,7 +94,7 @@ The right side is a finite sum, because $\hat\rho(t_j)=0$ for $|t_j|\ge 2\max a_
 | oscillatory image remainder, pointwise | $\le w_lW_l^2(1+h^2/D^2)/(6D^2)$ | `residual_tol`, default $10^{-6}$ of each line's peak |
 | oscillatory image remainder, yield | $\le Y_lW_l^2/(4\pi D^2)$ | the same $D$; $\le 0.48\,\tau$ relative |
 | bin-centre envelope correction, yield | $\le Y_l\pi^2W_lh^2B/(270D^4)$ | $D\ge3U'\ge3B$: $\le 4.6\times10^{-4}\,W_lh^2/U'^3$ |
-| Chebyshev interpolation of $C$, 24 nodes | $\lesssim\rho^{-24}\max|C|$ | nearest pole $\ge D\ge3U'$ beyond a band of length $\le U'$, so the ellipse parameter is $\rho\ge 7+\sqrt{48}=13.9$, a ratio $<10^{-27}$ |
+| Chebyshev interpolation of $C$, 24 nodes | $\lesssim\rho^{-24}\max\lvert C\rvert$ | nearest pole $\ge D\ge3U'$ beyond a band of length $\le U'$, so the ellipse parameter is $\rho\ge 7+\sqrt{48}=13.9$, a ratio $<10^{-27}$ |
 | FFT and mode-sum rounding | $O(\varepsilon_{64}\log N)\sum_l w_l\pi/(a_lh)$ | FP64; `residual_tol` $\ge10^{-12}$ is enforced, because below it rounding exceeds the bound (verification finding 3) |
 
 ## Numeric checks (host)
@@ -250,11 +250,46 @@ These regression checks do not constitute independent validation.
 
 ## Production route
 
-`CXR_BIN_REDUCTION_MODEL = "fourier-auto-v4"` makes this the default bin-mean reduction on CUDA. `resolve_bin_reduction` picks it when the bin axis is uniform and unclamped (`fourier_bin_axis`) and cuFINUFFT loads (`fourier_backend_available`). Otherwise it falls back to the near/far kernel (`sinc-bin-far-envelope`, `sinc-bin-near-far`), with a single warning if cuFINUFFT fails to load. CPU and nonuniform axes keep their previous routes. Batched and layered per-hkl scorers queue lines and flush them through `cuda_fourier_bin_mean_reduce`. `bin_reduction_override("auto")` forces the old kernel for comparisons.
+`CXR_BIN_REDUCTION_MODEL = "fourier-auto-v4"` made this the default bin-mean reduction on CUDA. `resolve_bin_reduction` picks it when the bin axis is uniform and unclamped (`fourier_bin_axis`) on a CuPy backend (`fourier_backend_available`). Otherwise it falls back to the near/far kernel (`sinc-bin-far-envelope`, `sinc-bin-near-far`). Nonuniform axes keep their previous routes; CPU takes the host route below. Batched and layered per-hkl scorers queue lines and flush them through `cuda_fourier_bin_mean_reduce`. `bin_reduction_override("auto")` forces the old kernel for comparisons.
 
-Large mode rectangles use a type-1 NUFFT. On CUDA this is cuFINUFFT. On ROCm, which has no cuFINUFFT, it is `_fourier_spread.es_mode_transform`, a portable CuPy transform using exponential-of-semicircle (ES) spreading, `cupy.fft` and kernel-transform deconvolution (Barnett, Magland and af Klinteberg, SIAM J. Sci. Comput. 41 (2019) C479). It uses FINUFFT's width rule $w=\lceil\log_{10}(1/\epsilon)\rceil+1$, $\beta=2.30w$ and upsampling 2, and is cross-checked on CUDA against direct sums and cuFINUFFT (`test_fourier_cuda.py`). Its tolerance $\epsilon=10^{-12}$ is relative to the summed strengths and is far below `residual_tol`.
+Large mode rectangles use a type-1 NUFFT. Since `fourier-auto-v5` (#1230) this is `_fourier_spread.es_mode_transform` on CUDA and ROCm alike, a portable CuPy transform using exponential-of-semicircle (ES) spreading, `cupy.fft` and kernel-transform deconvolution (Barnett, Magland and af Klinteberg, SIAM J. Sci. Comput. 41 (2019) C479). It uses FINUFFT's width rule $w=\lceil\log_{10}(1/\epsilon)\rceil+1$, $\beta=2.30w$ and upsampling 2, and is cross-checked on CUDA against direct sums and cuFINUFFT (`test_fourier_cuda.py`). Under v4, CUDA used cuFINUFFT, which stays selectable with `nufft="cufinufft"`. On an RTX 5080 (job 13454), ES was 1.7–2.1× faster than cuFINUFFT on the #944 production flushes (HOPG 300 keV with 4.4M lines, h-BN 5 MeV with 6.1M, MoS₂-on-Si with 11.6M) at 0.2, 0.05 and 0.025 eV spacing, up to 2.5M bins. The two agreed to at most $1.2\times10^{-11}$ of the spectrum maximum. ES also avoids cuFINUFFT's one-time first-plan start-up of about 0.3 s per process, which its separate CUDA 12 runtime and cuFFT incur. Its tolerance $\epsilon=10^{-12}$ is relative to the summed strengths and is far below `residual_tol`.
 
-cuFINUFFT is part of the `nvidia` extra. Its 2.5.x wheels link CUDA 12 runtime and cuFFT, which `cufinufft_module` preloads from the `nvidia-*-cu12` wheels alongside the CUDA 13 CuPy.
+**Host route (#1230).** Since `CXR_BIN_REDUCTION_MODEL = "fourier-auto-v5"`, the NumPy backend reduces uniform unclamped axes through `_fourier_host.host_fourier_bin_mean_reduce`. It uses the same partition, period, broad route and image correction. Large rectangles use a serial numba port of the ES spreader with `scipy.fft`; smaller ones use a direct numba sum. Both are serial, so the result does not depend on thread count. `resolve_host_bin_reduction` picks the route. `bin_reduction_override("auto")` restores the exact dense host evaluator. The batched and per-hkl CPU scorers queue lines per target (`_bin_queue.HostBinLineQueues`) and flush every 4M lines. Requested ES accuracy `eps` is not a rigorous coefficient or final-spectrum bound; its approximation and FP64 rounding are additional to the image and broad-interpolation bounds. Anchors in `tests/montecarlo/spectrum/test_fourier_host.py`:
+
+- the host ES transform matches direct mode sums to 1e-10;
+- the reduction matches exact bin means to 5e-6 of the peak, including broad lines, and the host reference to 1e-9.
+
+On the `_long_flights` fixture, the CPU spectrum differs from the exact dense route by at most 5.0e-6 of its peak, and yield by 4.4e-7. A 250k-line, 400k-bin synthetic flush takes 4.1 s on one laptop core; the dense evaluator would need 1e11 sinc evaluations.
+
+Fresh-context read-only verification of host port `5c301b0bf` (2026-11-16)
+independently recovered the triangle support, phase convention, ES
+shift/deconvolution, FFT normalization, mode folding and disjoint broad split
+before implementation inspection. Symbolic comparison matched; 33 reducer
+and 14 focused integration tests passed. Additional signed, narrow,
+outside-band and large-rectangle cases agreed with exact bin integration:
+maximum absolute error divided by $\sum_l|w_l|$ was $1.29\times10^{-7}$,
+$2.16\times10^{-8}$ and $2.54\times10^{-13}$ for narrow, mixed and broad-only
+sets. Host/reference differences were at most $3.02\times10^{-14}$.
+Odd/even shifted ES intervals, including negative modes and wrapped phases,
+gave coefficient errors of $3.4$–$5.8\times10^{-12}$ relative to the maximum
+coefficient with requested `eps=1e-12`. Thus the request is not a strict
+coefficient bound. Queue review found the original survivor weights reach
+each target once, with no extra bin-width or electron normalization.
+Verdict: `rederived`; regression anchors retain `anchored`. Human sign-off
+and production qualification remain outstanding.
+
+The host scheduler refinement (`c1d4d1473`, #1230) batches small direct
+rectangles into one compiled call and caches up to eight immutable
+deconvolution arrays. Admission at at most $2^{20}$ float64 entries per
+array bounds retained factor-array payload to 64 MiB; temporary workspace
+and Python overhead are additional. Fresh-context re-verification found
+only floating-point summation reordering: coefficient differences from the
+previous scheduling were at most $4.48\times10^{-16}$ on the tested signed
+mixed direct/ES population. The analytic triangle-coefficient regression
+and 33 existing reducer tests pass. This improves measured host overhead;
+it does not establish a speedup at every line count.
+
+cuFINUFFT (optional, `nufft="cufinufft"`) is part of the `nvidia` extra. Its 2.5.x wheels link CUDA 12 runtime and cuFFT, which `cufinufft_module` preloads from the `nvidia-*-cu12` wheels alongside the CUDA 13 CuPy.
 
 Measured on the layered MoS2-on-Si g30 frozen replay (job 12560, RTX 5080), on the first, middle and last of 79 reflection chunks:
 

@@ -746,8 +746,12 @@ def sincsq_bin_lineshape(
 #: Numerical generation of device bin-mean reductions (case identity marker).
 #: v4 (#1192): CUDA flushes on a uniform ``c_k +- h/2`` axis use the exact
 #: Fourier-domain reduction (no far-field envelope); other axes and backends
-#: keep the near/far kernel.
-CXR_BIN_REDUCTION_MODEL = "fourier-auto-v4"
+#: keep the near/far kernel. v5 (#1230): the NumPy backend reduces uniform
+#: axes through the host Fourier route (``_fourier_host``) instead of the
+#: dense exact evaluator, and CUDA device flushes use the ES NUFFT
+#: (``_fourier_spread``) as ROCm does, instead of cuFINUFFT (agreement
+#: <= 1.2e-11) and without the cuFINUFFT requirement.
+CXR_BIN_REDUCTION_MODEL = "fourier-auto-v5"
 #: Lines per Fourier-route flush: amortises the per-call FFT and planning.
 FOURIER_FLUSH_LINES = 10_000_000
 
@@ -757,7 +761,6 @@ _REDUCTION_OVERRIDE: ContextVar[tuple[str, int | None] | None] = ContextVar(
     "pyrite_bin_reduction_override", default=None
 )
 _REDUCTION_METHODS = ("auto", "pairs", "tree", "sparse", "fourier")
-_FALLBACK_WARNED: list[str] = []
 
 
 @contextmanager
@@ -796,35 +799,11 @@ def fourier_bin_axis(edges):
 def fourier_backend_available() -> bool:
     """Whether this process can run the device Fourier reduction.
 
-    Needs the CuPy backend. ROCm uses the portable ES transform
-    (``_fourier_spread``); CUDA needs an importable cuFINUFFT (preloaded by
-    ``_fourier_cuda.cufinufft_module``). A CUDA process without it warns
-    once and keeps the near/far kernel.
+    Needs only the CuPy backend: the default NUFFT is the portable ES
+    transform (``_fourier_spread``) on CUDA and ROCm alike (#1230), so
+    cuFINUFFT is no longer required.
     """
-    if not _cupy_backend():
-        return False
-    import cupy
-
-    if cupy.cuda.runtime.is_hip:
-        return True
-    from ._fourier_cuda import cufinufft_module
-
-    try:
-        cufinufft_module()
-    except (ImportError, OSError) as exc:
-        if not _FALLBACK_WARNED:
-            _FALLBACK_WARNED.append(str(exc))
-            import warnings
-
-            warnings.warn(
-                "cuFINUFFT is unavailable, so bin-mean lines use the near/far "
-                f"kernel instead of the Fourier reduction ({exc}); install "
-                "pyrite-mc[nvidia]",
-                RuntimeWarning,
-                stacklevel=2,
-            )
-        return False
-    return True
+    return _cupy_backend()
 
 
 def resolve_bin_reduction(edges):
@@ -847,6 +826,29 @@ def resolve_bin_reduction(edges):
     if method == "fourier" and flush is None:
         flush = FOURIER_FLUSH_LINES
     return method, axis, flush
+
+
+def resolve_host_bin_reduction(edges):
+    """``(axis, flush_lines)`` for host (NumPy) bin-mean lines on ``edges``, or ``None``.
+
+    The host Fourier route (``_fourier_host``) applies to every uniform
+    ``c_k +- h/2`` axis unless :func:`bin_reduction_override` selects a
+    near/far method, which on host means the exact dense evaluator.
+
+    Validation: cxr-line-fourier-reduction
+    """
+    from ._fourier_host import HOST_FOURIER_FLUSH_LINES
+
+    override = _REDUCTION_OVERRIDE.get()
+    method, flush = override if override is not None else ("fourier", None)
+    if method != "fourier":
+        return None
+    axis = fourier_bin_axis(edges)
+    if axis is None:
+        if override is not None:
+            raise ValueError("Fourier reduction needs a uniform c_k +- h/2 bin axis")
+        return None
+    return axis, HOST_FOURIER_FLUSH_LINES if flush is None else flush
 
 
 def _bin_reduction_markers(resolved):
