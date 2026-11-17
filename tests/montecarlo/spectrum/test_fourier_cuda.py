@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from pyrite.montecarlo.spectrum.cxr._fourier_cuda import (
+    _direct_tiles,
     cuda_positive_modes,
     cufinufft_mode_transform,
 )
@@ -24,6 +25,29 @@ def _require_cufinufft():
         return cufinufft_module()
     except (ImportError, OSError) as exc:
         pytest.skip(f"cuFINUFFT unavailable: {exc}")
+
+
+def test_direct_tiles_partition_each_rectangle_exactly():
+    """Host-only: tiles are disjoint, cover every (mode, line) pair once, and stay small."""
+    rects = np.array(
+        [
+            [1, 300, 0, 9000],
+            [300, 301, 9000, 9001],
+            [301, 429, 9001, 13097],
+            [429, 430, 13097, 13097],
+        ]
+    )
+    tiles = _direct_tiles(rects)
+    assert np.all(tiles[:, 1] - tiles[:, 0] <= 128) and np.all(tiles[:, 3] - tiles[:, 2] <= 4096)
+    for j0, j1, l0, l1 in rects:
+        inside = tiles[
+            (tiles[:, 0] >= j0) & (tiles[:, 1] <= j1) & (tiles[:, 2] >= l0) & (tiles[:, 3] <= l1)
+        ]
+        hit = np.zeros((j1 - j0, max(l1 - l0, 0)), dtype=int)
+        for a, b, c, d in inside:
+            hit[a - j0 : b - j0, c - l0 : d - l0] += 1
+        assert np.all(hit == 1)
+    assert _direct_tiles(np.empty((0, 4), dtype=np.int64)).shape == (0, 4)
 
 
 @pytest.fixture
@@ -138,8 +162,6 @@ def test_device_reduction_matches_host_reference_and_exact_bins(cp, monkeypatch,
 
 
 def test_default_resolution_routes_uniform_axes_through_fourier(cp, monkeypatch):
-    if not cp.cuda.runtime.is_hip:
-        _require_cufinufft()
     from pyrite.montecarlo.spectrum.cxr import _bin_quadrature
     from pyrite.montecarlo.spectrum.cxr._bin_quadrature import (
         _host_bin_mean,

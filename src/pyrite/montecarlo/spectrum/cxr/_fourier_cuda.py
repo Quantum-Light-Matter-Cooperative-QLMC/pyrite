@@ -1,9 +1,12 @@
-"""Device Fourier-domain bin-mean line reduction (#1192); CuPy, cuFINUFFT or ES.
+"""Device Fourier-domain bin-mean line reduction (#1192); CuPy, ES or cuFINUFFT.
 
 The default device bin-mean reduction on uniform axes (``_bin_quadrature.
-resolve_bin_reduction``). Planning runs on the device; outputs stay on the
-current stream/device. cuFINUFFT is imported lazily through
-:func:`cufinufft_module`.
+resolve_bin_reduction``). Outputs stay on the current stream/device. The
+default NUFFT is the portable ES spreader (``_fourier_spread``) on CUDA and
+ROCm alike (#1230): on an RTX 5080 it was about 2x faster than cuFINUFFT on
+4.4M-11.6M-line production flushes, matched it to <= 1.2e-11, and avoids
+cuFINUFFT's ~0.3 s first-plan start-up. cuFINUFFT stays selectable with
+``nufft="cufinufft"`` and is imported lazily through :func:`cufinufft_module`.
 Validation: cxr-line-fourier-reduction
 """
 
@@ -104,6 +107,13 @@ def _plan(cp, modes, eps):
     )
 
 
+#: A rectangle needs at least this many (source, mode) pairs for the NUFFT;
+#: smaller ones share the one direct launch.
+_NUFFT_MIN_WORK = 1 << 22
+#: Flushes with at most this many lines plan cutoff rectangles on the host.
+_HOST_PLAN_MAX_LINES = 1 << 20
+
+
 @lru_cache(maxsize=1)
 def _direct_kernel():
     """One block per small rectangle; no line-by-mode workspace allocation."""
@@ -134,26 +144,50 @@ extern "C" __global__ void rectangles(
     )
 
 
+#: Direct-kernel tile: at most one block of modes by this many lines, so a
+#: few large direct rectangles still fill the device.
+_TILE_MODES = 128
+_TILE_LINES = 4096
+
+
+def _direct_tiles(rects):
+    """Split ``(j0, j1, l0, l1)`` rectangles into at most 128-mode x 4096-line tiles.
+
+    Tiles partition each rectangle exactly; the kernel's atomic accumulation
+    makes the split a summation reordering only.
+    """
+    rects = np.asarray(rects, dtype=np.int64).reshape(-1, 4)
+    n_j = -(-(rects[:, 1] - rects[:, 0]) // _TILE_MODES)
+    n_l = -(-(rects[:, 3] - rects[:, 2]) // _TILE_LINES)
+    per = n_j * n_l
+    row = np.repeat(np.arange(rects.shape[0]), per)
+    t = np.arange(int(per.sum())) - np.repeat(np.cumsum(per) - per, per)
+    j0 = rects[row, 0] + (t % n_j[row]) * _TILE_MODES
+    l0 = rects[row, 2] + (t // n_j[row]) * _TILE_LINES
+    j1 = np.minimum(j0 + _TILE_MODES, rects[row, 1])
+    l1 = np.minimum(l0 + _TILE_LINES, rects[row, 3])
+    return np.stack((j0, j1, l0, l1), axis=1)
+
+
 def cuda_positive_modes(
-    E_res, a_width, weight, c0, period, *, eps=1e-12, use_nufft=True, nufft=None
+    E_res, a_width, weight, c0, period, *, eps=1e-12, use_nufft=True, nufft="es"
 ):
     """Exact-support hybrid coefficients from validated scalar line arrays.
 
     Mirrors ``partitioned_positive_modes`` (no zero mode or bin multiplier).
-    Large rectangles use a two-row type-1 NUFFT: cuFINUFFT on CUDA, the
-    portable ES spreader (``_fourier_spread``) on ROCm or with
-    ``nufft="es"``. All others share one direct launch with FP64 atomic
-    accumulation. Summation order can vary between
+    Large rectangles use a two-row type-1 NUFFT: the portable ES spreader
+    (``_fourier_spread``) by default, or cuFINUFFT with
+    ``nufft="cufinufft"`` (CUDA only). All others share one direct launch with FP64 atomic
+    accumulation over 128-mode x 4096-line tiles. Summation order can vary between
     executions. ``use_nufft=False`` is an equal-workload GPU direct baseline.
-    Thresholds are provisional CPU-audit thresholds, not tuned GPU crossovers.
+    ``_NUFFT_MIN_WORK`` was measured on an RTX 5080 (#1230); the source and
+    mode floors are the CPU-audit values.
     Input contract is the host planner's finite arrays/positive widths/period;
     host or CuPy arrays, planned and evaluated on the device.
 
     Validation: cxr-line-fourier-reduction
     """
     cp = import_module("cupy")
-    if nufft is None:
-        nufft = "es" if cp.cuda.runtime.is_hip else "cufinufft"
     if nufft not in ("es", "cufinufft"):
         raise ValueError("nufft must be 'es' or 'cufinufft'")
     transform = es_mode_transform if nufft == "es" else cufinufft_mode_transform
@@ -168,9 +202,14 @@ def cuda_positive_modes(
     constant = weight[order] * np.pi / a
     linear = constant / (2.0 * a)
     out = cp.zeros(last + 1, dtype=cp.complex128)
-    rects = cp.asnumpy(cutoff_rectangle_array(counts, xp=cp))
+    # Integer planning: one copy and host passes beat a synchronizing device
+    # pass per bit unless the flush is large. Same rectangles either way.
+    if counts.size <= _HOST_PLAN_MAX_LINES:
+        rects = cutoff_rectangle_array(cp.asnumpy(counts))
+    else:
+        rects = cp.asnumpy(cutoff_rectangle_array(counts, xp=cp))
     modes, sources = rects[:, 1] - rects[:, 0], rects[:, 3] - rects[:, 2]
-    large = (sources >= 64) & (modes >= 32) & (sources * modes >= 262144)
+    large = (sources >= 64) & (modes >= 32) & (sources * modes >= _NUFFT_MIN_WORK)
     if not use_nufft:
         large[:] = False
     plans = {}
@@ -182,7 +221,7 @@ def cuda_positive_modes(
     if plans and nufft == "cufinufft":
         cp.cuda.get_current_stream().synchronize()
         plans.clear()
-    direct = rects[~large]
+    direct = _direct_tiles(rects[~large])
     if direct.size:
         _direct_kernel()(
             (len(direct),),
@@ -214,7 +253,7 @@ def cuda_fourier_bin_mean_reduce(
     broad lines on the 64-node route, the rest from exact-cutoff hybrid
     coefficients, the bin multiplier, ``j mod N`` folding, one cuFFT inverse
     and the closed-form envelope-image correction. Same bounds as the host
-    reference, plus the cuFINUFFT tolerance ``eps``. Planning, period choice
+    reference, plus the NUFFT tolerance ``eps``. Planning, period choice
     and the small Chebyshev fits run on host.
 
     Validation: cxr-line-fourier-reduction, cxr-line-broad-interpolation

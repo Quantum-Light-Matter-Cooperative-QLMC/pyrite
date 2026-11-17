@@ -33,6 +33,8 @@ Validation: cxr-line-fourier-reduction
 import numpy as np
 import scipy.fft as sf
 
+from pyrite._backend import _to_cpu
+
 #: Minimum image clearance ``P - U`` as a multiple of the span ``U`` of band
 #: plus resonances. It keeps the Chebyshev ellipse parameter >= 13.9.
 FOURIER_SPAN_PAD = 3.0
@@ -45,6 +47,8 @@ FOURIER_MIN_RESIDUAL_TOL = 1.0e-12
 _CHEB_NODES = 24
 #: Host block size in (line, mode) elements.
 _HOST_BLOCK_MODES = 1 << 22
+#: Lines per envelope-image block: (24, block) FP64 temporaries, 32 MiB each.
+_IMAGE_BLOCK_LINES = 1 << 17
 #: Relative tolerance for accepting an axis as uniform.
 _UNIFORM_RTOL = 1.0e-9
 
@@ -183,11 +187,14 @@ def _envelope_image_correction(E_res, a_width, w, c0, h, n_bins, P, xp=np):
     k = np.arange(_CHEB_NODES)
     xn = np.cos(np.pi * (k + 0.5) / _CHEB_NODES)
     cn = 0.5 * (lo + hi) + 0.5 * (hi - lo) * xn
-    vals = np.empty(_CHEB_NODES)
-    scale = (np.pi / P) ** 2
-    for i, c in enumerate(cn):
-        image = _inv_sin_sq_minus_inv_sq(np.pi * (float(c) - E_res) / P, xp)
-        vals[i] = scale * float(xp.dot(q, image))
+    # All nodes at once over line blocks: one host transfer, not one per node.
+    nodes = xp.asarray(cn)[:, None]
+    sums = xp.zeros(_CHEB_NODES, dtype=xp.float64)
+    for lo_l in range(0, E_res.size, _IMAGE_BLOCK_LINES):
+        block = slice(lo_l, lo_l + _IMAGE_BLOCK_LINES)
+        image = _inv_sin_sq_minus_inv_sq(np.pi * (nodes - E_res[None, block]) / P, xp)
+        sums += image @ q[block]
+    vals = (np.pi / P) ** 2 * _to_cpu(sums)
     coef = np.polynomial.chebyshev.chebfit(xn, vals, _CHEB_NODES - 1)
     c = c0 + h * np.arange(n_bins)
     xc = (2.0 * c - (lo + hi)) / (hi - lo)

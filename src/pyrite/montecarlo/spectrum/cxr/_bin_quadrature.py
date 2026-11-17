@@ -748,7 +748,9 @@ def sincsq_bin_lineshape(
 #: Fourier-domain reduction (no far-field envelope); other axes and backends
 #: keep the near/far kernel. v5 (#1230): the NumPy backend reduces uniform
 #: axes through the host Fourier route (``_fourier_host``) instead of the
-#: dense exact evaluator.
+#: dense exact evaluator, and CUDA device flushes use the ES NUFFT
+#: (``_fourier_spread``) as ROCm does, instead of cuFINUFFT (agreement
+#: <= 1.2e-11) and without the cuFINUFFT requirement.
 CXR_BIN_REDUCTION_MODEL = "fourier-auto-v5"
 #: Lines per Fourier-route flush: amortises the per-call FFT and planning.
 FOURIER_FLUSH_LINES = 10_000_000
@@ -759,7 +761,6 @@ _REDUCTION_OVERRIDE: ContextVar[tuple[str, int | None] | None] = ContextVar(
     "pyrite_bin_reduction_override", default=None
 )
 _REDUCTION_METHODS = ("auto", "pairs", "tree", "sparse", "fourier")
-_FALLBACK_WARNED: list[str] = []
 
 
 @contextmanager
@@ -798,35 +799,11 @@ def fourier_bin_axis(edges):
 def fourier_backend_available() -> bool:
     """Whether this process can run the device Fourier reduction.
 
-    Needs the CuPy backend. ROCm uses the portable ES transform
-    (``_fourier_spread``); CUDA needs an importable cuFINUFFT (preloaded by
-    ``_fourier_cuda.cufinufft_module``). A CUDA process without it warns
-    once and keeps the near/far kernel.
+    Needs only the CuPy backend: the default NUFFT is the portable ES
+    transform (``_fourier_spread``) on CUDA and ROCm alike (#1230), so
+    cuFINUFFT is no longer required.
     """
-    if not _cupy_backend():
-        return False
-    import cupy
-
-    if cupy.cuda.runtime.is_hip:
-        return True
-    from ._fourier_cuda import cufinufft_module
-
-    try:
-        cufinufft_module()
-    except (ImportError, OSError) as exc:
-        if not _FALLBACK_WARNED:
-            _FALLBACK_WARNED.append(str(exc))
-            import warnings
-
-            warnings.warn(
-                "cuFINUFFT is unavailable, so bin-mean lines use the near/far "
-                f"kernel instead of the Fourier reduction ({exc}); install "
-                "pyrite-mc[nvidia]",
-                RuntimeWarning,
-                stacklevel=2,
-            )
-        return False
-    return True
+    return _cupy_backend()
 
 
 def resolve_bin_reduction(edges):
