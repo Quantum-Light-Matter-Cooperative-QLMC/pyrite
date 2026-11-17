@@ -88,13 +88,18 @@ def rescaled(precision, block):
     )
 
 
-def profile_case(material, e0_kev, tilt_deg, block):
-    """One profile case, resolved like ``pyrite run``, with block ``block``."""
+def _profile_run(material):
     from pyrite.runs import scan
 
     scan._load_runtime()
     args = SimpleNamespace(catalog_profile=PROFILE, checkpoint_dir="/nonexistent")
     settings, sweep, _identity, _stem = scan._resolved_run(args, material)
+    return scan, settings, sweep
+
+
+def profile_case(material, e0_kev, tilt_deg, block):
+    """One profile case, resolved like ``pyrite run``, with block ``block``."""
+    scan, settings, sweep = _profile_run(material)
     precision = rescaled(settings.precision, block)
     settings = replace(settings, precision=precision)
     cases = [
@@ -104,7 +109,7 @@ def profile_case(material, e0_kev, tilt_deg, block):
     ]
     if len(cases) != 1:
         raise SystemExit(f"{len(cases)} cases match {material} {e0_kev} keV {tilt_deg} deg")
-    return cases[0], precision
+    return cases[0], precision, settings.precision
 
 
 class Timers:
@@ -347,7 +352,9 @@ def _scalar_meta(out):
 def run(material, e0_kev, tilt_deg, block, out_prefix):
     from pyrite.montecarlo.runner.scheduling import run_cases
 
-    case, precision = profile_case(material, float(e0_kev), float(tilt_deg), int(block))
+    case, precision, profile_precision = profile_case(
+        material, float(e0_kev), float(tilt_deg), int(block)
+    )
     memory = Memory()
     timers = Timers(memory)
     values: dict[str, list] = {}
@@ -363,6 +370,7 @@ def run(material, e0_kev, tilt_deg, block, out_prefix):
                 "tilt_deg": float(tilt_deg),
                 "block": int(block),
                 "precision": precision.to_dict(),
+                "profile_precision": profile_precision.to_dict(),
                 "realized_electrons": None,
             },
             default=_json_default,
@@ -399,6 +407,7 @@ def run(material, e0_kev, tilt_deg, block, out_prefix):
         "tilt_deg": float(tilt_deg),
         "block": int(block),
         "precision": precision.to_dict(),
+        "profile_precision": profile_precision.to_dict(),
         "backend": os.environ.get("PYRITE_MC_BACKEND"),
         "device": None
         if CUPY is None
@@ -456,7 +465,12 @@ def replay(values_npz, out_json, *blocks):
     names = [k for k in data.files if k != "block"]
     population = {k: data[k] for k in names}
     captured = min(v.size for v in population.values())
-    base = Precision.from_dict(source["precision"])
+    # Rescale from the profile's own settings, never from the capture's
+    # (already rounded up to the capture block).
+    if "profile_precision" in source:
+        base = Precision.from_dict(source["profile_precision"])
+    else:
+        base = _profile_run(source["material"])[1].precision
     rows = []
     for block in (int(b) for b in blocks):
         settings = rescaled(base, block)
