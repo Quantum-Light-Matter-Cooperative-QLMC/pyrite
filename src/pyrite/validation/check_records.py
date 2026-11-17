@@ -121,6 +121,8 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     "checks/characteristic_budget_1006.py": (),
     # Streamed-block sizing sweep (#907): engineering evidence.
     "checks/streamed_block_sizing.py": (),
+    # Adaptive block size: wall, memory and stopping cost (#1252): engineering evidence.
+    "checks/adaptive_block_size_1252.py": (),
     # Characteristic scoring setup/accumulate split (#1005): engineering evidence.
     "checks/characteristic_scoring_1005.py": (),
     "checks/characteristic_nsys_1005.py": (),
