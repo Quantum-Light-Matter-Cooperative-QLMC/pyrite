@@ -27,7 +27,10 @@ if [ "${PROBE_CPU:-0}" = 1 ]; then
 else
     . checks/rocm/env.sh
 fi
-export XDG_CONFIG_HOME="$SHIPPED_XDG"
+# The profile, beam and detector are user-catalog overlays (default: the config dir).
+export XDG_CONFIG_HOME="$SHIPPED_XDG" PYRITE_USER_CATALOG="$SHIPPED_XDG/pyrite"
+# Generated xsgen tables are content-addressed in the box's default workspace.
+export PYRITE_HOME="${PROBE_WORKSPACE:-$HOME/.pyrite/workspace}"
 export PROBE_SHA=$(cat CODE_SHA)
 OUT=$1; CASES=$2; BLOCKS=$3; ARM_TIMEOUT=${4:-2700}
 mkdir -p "$OUT"
