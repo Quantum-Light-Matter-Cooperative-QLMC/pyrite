@@ -296,6 +296,7 @@ def transport_monitored_blocks(
     bremslib_tables=None,
     recheck: bool = False,
     consume: Callable[[dict[str, Any]], None] | None = None,
+    recovery=None,
 ) -> dict[str, Any]:
     """Transport ``[0, n)`` in chunks under a stopping monitor; return the fixed-``n`` join.
 
@@ -312,14 +313,24 @@ def transport_monitored_blocks(
     ``consume`` each kept chunk is streamed and only the additive counts are
     returned, as in :func:`transport_electron_blocks`.
 
+    ``recovery`` (optional, :class:`.recovery.ResidentBlockRecovery`) runs
+    each chunk and the join, so a resident allocator OOM moves the kept chunks
+    to the host and reruns only the failed chunk (#1269).
+
     Validation: adaptive-sample-size-stopping
     """
     blocks: list[dict[str, Any]] = []
+
+    def simulate(start, stop):
+        if recovery is None:
+            return simulate_block(start, stop)
+        return recovery.simulate(start, stop, blocks)
+
     counts: dict[str, Any] = dict.fromkeys(_ADDITIVE_COUNTS, 0)
     start = 0
     while start < limit:
         stop = plan.next_stop(start, monitor.next_point(), limit)
-        block = simulate_block(start, stop)
+        block = simulate(start, stop)
         plan.observe(start, stop, block)
         monitor.on_block(start, stop, block)
         stopped = monitor.should_stop(stop, limit if recheck else None)
@@ -327,7 +338,7 @@ def transport_monitored_blocks(
         if cut is not None and cut < stop:
             monitor.truncate(cut)
             del block
-            block = simulate_block(start, cut)
+            block = simulate(start, cut)
             stop = cut
         block = _globalize(block, start)
         if consume is not None:
@@ -344,7 +355,10 @@ def transport_monitored_blocks(
             break
     if consume is not None:
         return counts
-    merged = merge_electron_blocks(blocks)
+    if recovery is None:
+        merged = merge_electron_blocks(blocks)
+    else:
+        merged = recovery.join(merge_electron_blocks, blocks, start)
     blocks.clear()
     return finalize_population_fields(
         merged, seed=seed, bunch=bunch, bremslib_tables=bremslib_tables
@@ -471,6 +485,7 @@ def transport_case_blocks(
             replay_block=partial(simulate_block, keep=False) if keep and consume else None,
         )
 
+    from .recovery import ResidentBlockRecovery
     from .stream_sizing import AdaptiveChunkPlan
 
     plan = (
@@ -478,6 +493,10 @@ def transport_case_blocks(
         if isinstance(block_electrons, AdaptiveChunkPlan)
         else AdaptiveChunkPlan(int(block_electrons))
     )
+
+    # Kept chunks fail over to host rows per chunk, never as a whole-case replay;
+    # a cascade keeps no chunks.
+    recovery = ResidentBlockRecovery(simulate_block, keep)
 
     def monitored(n, recheck=False):
         consume = None
@@ -495,6 +514,7 @@ def transport_case_blocks(
             bremslib_tables=_case_radiative_kwargs(case).get("bremslib_tables"),
             recheck=recheck,
             consume=consume,
+            recovery=None if cascade else recovery,
         )
 
     result = monitored(n_electrons)
@@ -511,7 +531,8 @@ def transport_case_blocks(
                 break
             realized = min(monitor.next_point() or n_electrons, n_electrons)
     if cascade:
-        result = _fixed_cascade(simulate, keep, monitor, realized, E_cut_by_electrons, case)
+        return _fixed_cascade(simulate, keep, monitor, realized, E_cut_by_electrons, case)
+    result.update(recovery.metrics())
     return result
 
 

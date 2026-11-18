@@ -832,3 +832,102 @@ def test_energy_range_replay_rechecks_statistics_before_accepting_stop(monkeypat
     assert record["statistics"]["cxr"]["n_electrons"] == grow
     assert record["statistics"]["cxr"]["mean"] == 1.0
     assert record["stop_reason"] == "converged"
+
+
+# ---- resident OOM recovery (#1269) ----------------------------------------------
+
+
+class _AllocationError(Exception):
+    pass
+
+
+def _resident_adaptive(monkeypatch, fail_at=None):
+    """Adaptive transport as a resident CUDA run: blocks with ``start >= fail_at``
+    raise an allocator OOM while resident; host blocks run the per-electron core."""
+    from pyrite.montecarlo.runner import case_driver, pool
+    from pyrite.montecarlo.runner.adaptive import transport_case_adaptive
+
+    real = case_driver.simulate_trajectories
+    calls, events = [], []
+
+    def simulate(*args, keep_segments_on_device, **kwargs):
+        start = kwargs.get("_electron_start", 0)
+        calls.append((start, start + args[1], keep_segments_on_device))
+        if keep_segments_on_device and fail_at is not None and start >= fail_at:
+            raise _AllocationError("out of memory allocating block")
+        return real(*args, keep_segments_on_device=False, **kwargs)
+
+    monkeypatch.setattr(case_driver, "simulate_trajectories", simulate)
+    monkeypatch.setattr(case_driver, "_resident_transport", lambda *_: True)
+    monkeypatch.setattr(runner._RESOURCE_POLICY, "gpu_oom", (_AllocationError,))
+    monkeypatch.setattr(runner.BACKEND, "release_memory", lambda: events.append("release"))
+    monkeypatch.setattr(pool, "_admit_host_segments", lambda: events.append("admit"))
+    settings = replace(_SETTINGS, min_effective_histories=0.0, max_variance_of_variance=1.0)
+    tp = transport_case_adaptive(
+        _case(), settings, transport_core="per-electron", keep_segments_on_device=True
+    )
+    return tp, calls, events
+
+
+def test_late_resident_oom_reruns_only_the_failed_block(monkeypatch):
+    """#1269 acceptance: a late-block OOM in a monitored resident run moves the
+    kept blocks to the host and reruns only the failed block; no completed
+    block is transported again and the join is the no-OOM transport."""
+    ref, ref_calls, _ = _resident_adaptive(monkeypatch)
+    spans = [(start, stop) for start, stop, _keep in ref_calls]
+    assert len(spans) >= 3 and all(keep for *_, keep in ref_calls)
+    fail_at = spans[-1][0]
+
+    tp, calls, events = _resident_adaptive(monkeypatch, fail_at=fail_at)
+
+    # The first resident call at fail_at fails and reruns on the host; every
+    # later call (a stop's re-transported prefix included) stays on the host.
+    failed = next(i for i, (start, _stop) in enumerate(spans) if start >= fail_at)
+    assert calls == [
+        *ref_calls[:failed],
+        (*spans[failed], True),
+        *((start, stop, False) for start, stop in spans[failed:]),
+    ]
+    assert events[events.index("admit") - 1] == "release"
+    assert tp["segs"]["Ne"] == ref["segs"]["Ne"]
+    assert tp["adaptive_sampling"] == ref["adaptive_sampling"]
+    _assert_identical(tp["segs"], ref["segs"])
+    assert tp["_transport_gpu_oom_retries"] == 1
+    assert tp["_recovery_path"] == "host_segments"
+    assert tp["_recovery_events"] == [
+        {
+            "phase": "transport",
+            "mitigation": "host_segments",
+            "stage": "block",
+            "block_start": fail_at,
+        }
+    ]
+
+
+def test_resident_join_oom_merges_host_copies(monkeypatch):
+    from pyrite.montecarlo.runner import pool
+    from pyrite.montecarlo.runner.block_transport import merge_electron_blocks
+    from pyrite.montecarlo.runner.recovery import ResidentBlockRecovery
+
+    monkeypatch.setattr(runner._RESOURCE_POLICY, "gpu_oom", (_AllocationError,))
+    monkeypatch.setattr(runner.BACKEND, "release_memory", lambda: None)
+    monkeypatch.setattr(pool, "_admit_host_segments", lambda: None)
+    shared = np.arange(3)
+    kept = [
+        {"Ne": 3, "electron_id": shared, "elec_id": shared},
+        {"Ne": 1, "electron_id": np.arange(3, 4)},
+    ]
+    kept[1]["elec_id"] = kept[1]["electron_id"]
+    recovery = ResidentBlockRecovery(lambda *_a, **_kw: None, resident=True)
+    tries = []
+
+    def merge(blocks):
+        tries.append(len(blocks))
+        if len(tries) == 1:
+            raise _AllocationError("join")
+        return merge_electron_blocks(blocks)
+
+    merged = recovery.join(merge, kept, 4)
+    assert tries == [2, 2] and not recovery.resident
+    assert merged["Ne"] == 4 and merged["electron_id"] is merged["elec_id"]
+    assert recovery.metrics()["_recovery_events"][0]["stage"] == "join"
