@@ -14,7 +14,7 @@
     {
       "path": "src/pyrite/_cxr_grid_policy.py",
       "name": "resolve_cxr_grid_policy",
-      "cc": 29
+      "cc": 26
     },
     {
       "path": "src/pyrite/_precision.py",

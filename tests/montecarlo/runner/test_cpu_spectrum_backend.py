@@ -57,7 +57,7 @@ def test_backend_binding_inventory_and_module_scope():
 
 @pytest.mark.hardware
 @pytest.mark.slow
-def test_cuda_oom_recovers_without_device_allocations(monkeypatch, tmp_path):
+def test_cuda_oom_recovers_without_device_allocations(monkeypatch, tmp_path, pytestconfig):
     import os
     import pickle
     import subprocess
@@ -71,6 +71,10 @@ def test_cuda_oom_recovers_without_device_allocations(monkeypatch, tmp_path):
         pytest.skip("requires CUDA backend")
     import cupy as cp
 
+    # conftest deliberately clears the ambient workspace. This hardware test
+    # uses the pinned datasets/tables shipped to its isolated checkout, and
+    # gives the independent NumPy subprocess the same data root.
+    monkeypatch.setenv("PYRITE_HOME", str(pytestconfig.rootpath))
     case = build_cases(
         Sweep(
             material="hopg",
