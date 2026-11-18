@@ -694,3 +694,214 @@ The anchors in `test_adaptive_stopping.py` (`vov_threshold`,
 `test_vov_threshold_is_compared_to_m4_over_m2_squared` pin the predicate to
 an independently computed $M_4/M_2^2$, which supports `anchored` for the
 extension. Human sign-off is still pending.
+
+## Independent v4 extension verification (2026-11-17, #1253)
+
+A fresh-context verifier derived the v4 decision-point rule from the claim,
+the #1253 issue and the sources before reading the bodies of
+`decision_points`, `StoppingMonitor`, `transport_monitored_blocks`,
+`IndependentStoppingMonitor`, `AdaptiveChunkPlan` and `_batch_summary`, then
+compared them at commit `73a79ed4a` (rebased onto #1262's v3 gate).
+
+- **Claim**: `adaptive-sample-size-stopping` (v4 extension) —
+  `montecarlo/runner/adaptive.py::{decision_points, StoppingMonitor, batch_spans, _batch_summary}`,
+  `block_transport.py::transport_monitored_blocks`,
+  `independent.py::IndependentStoppingMonitor`,
+  `stream_sizing.py::AdaptiveChunkPlan` — Chow–Robbins (1965) and
+  Glynn–Whitt (1992) sequential stopping and batch means; Chan–Golub–LeVeque
+  merge; {eq}`eq-adaptive-decision-points` and {eq}`eq-adaptive-stop-rule`.
+- **Filters**: units pass (every guard is dimensionless: ratios of means,
+  shares, counts); limits pass ($\delta\to0$, $k=0$, $n_{\min}=n_{\max}$,
+  single dominant electron), with the $f=0$ exception below; signs and
+  conventions pass, with the floating-point ceiling note below.
+- **Re-derivation**: `matches` for the grid, overshoot, check count, drift
+  variance, tolerance, earliest stop, dominant-electron refusal, CXR gate and
+  batch means. `differs` for chunk independence of the brem statistics at
+  the last ulp, described below.
+- **Verdict**: `discrepancy` (implementation/test level, not in the
+  statistical equations). The anchor test
+  `test_adaptive_output_does_not_depend_on_chunk_size` fails at HEAD.
+- **Write-up**: `docs/validation/beam-transport/adaptive-sample-size-stopping.md`
+  (this section).
+- **Suggested ledger change**: given to the task owner; claim status
+  unchanged, never `signed-off`.
+
+### Source-first derivation
+
+**Grid.** For integer $d\ge1$ and $\delta>0$, $d(1+\delta)>d$ gives
+$\lceil d(1+\delta)\rceil\ge d+1$. The $\max(d_j+1,\cdot)$ therefore binds
+only at $\delta=0$, which the validator rejects ($\delta$ must be positive
+and finite). For $d<1/\delta$, $\lceil d\delta\rceil=1$, so the steps are $+1$.
+Let $d_{J-1}$ be the last refused point. Then
+$d_J-d_{J-1}\le\lceil d_{J-1}\delta\rceil<d_{J-1}\delta+1$, so the
+overshoot past the last refused count is below $\delta$ relative plus one
+electron. Points added for the pilot and its projection only shorten gaps.
+The $+1$ phase has at most $1/\delta$ steps. Above it, each step multiplies
+by at least $1+\delta$, so the grid has at most
+$\log(n_{\max}/n_{\min})/\log(1+\delta)+1/\delta+1$ points, plus 2 for the
+pilot and projection. This is $O(\log(n_{\max}/n_{\min})/\delta)$. As
+$\delta\to0$, the $+1$ phase covers every count up to $\min(n_{\max},1/\delta)$.
+The grid then tends to every electron.
+
+**Drift variance.** Let the $m_i$ be i.i.d. with mean $\mu$ and variance
+$\sigma^2$. Write $\bar m_n=[d\,\bar m_d+(n-d)\,\bar m_{(d,n]}]/n$. Then
+$\bar m_d-\bar m_n=\frac{n-d}{n}(\bar m_d-\bar m_{(d,n]})$, with independent
+terms, so
+
+$$
+\operatorname{Var}(\bar m_d-\bar m_n)
+=\Big(\frac{n-d}{n}\Big)^2\Big(\frac{\sigma^2}{d}+\frac{\sigma^2}{n-d}\Big)
+=\sigma^2\frac{n-d}{nd},
+\qquad
+\frac{\operatorname{Var}(\bar m_d-\bar m_n)}{\mu^2}=r_n^2\Big(\frac nd-1\Big),
+$$
+
+where $r_n^2=\sigma^2/(n\mu^2)$. This matches the record. On the geometric
+grid, $n/d_{J-j}-1\approx(1+\delta)^j-1\approx j\delta$. The tolerance
+$z\,r_n\sqrt{(n/d-1)/\delta}$ is therefore a test of $z/\sqrt\delta$ drift
+standard deviations at every lag: $2.85$ at $z=0.9$, $\delta=0.1$. The
+two-sided Gaussian tail is $0.44\,\%$ per comparison, or at most $1.3\,\%$
+over $k=3$ correlated lags. The plain floor $f\varepsilon$ binds only when
+$r_n\ll\varepsilon$. As $\delta\to0$ at fixed lag, $z/\sqrt\delta\to\infty$,
+so the guard becomes vacuous and the RSE and share tests remain. At $k=0$ the
+guard is off and the earliest stop is $n_{\min}$.
+
+**Earliest stop.** The guard needs $k$ points before $n$, so the earliest
+stop is $d_k\approx n_{\min}(1+\delta)^k$. This depends on the policy alone
+and has no block or chunk term.
+
+**Single dominant electron.** Add one electron of share
+$\sigma=h/(S_1+h)$ in $(d_{J-1},n]$, over light electrons whose
+contribution to $r_n^2$ is $L^2\approx(1-\sigma)^2\mathrm{CV}^2_{\rm light}/n$.
+From {eq}`eq-adaptive-ess-identity`, $r_n^2\approx\sigma^2+L^2$. The move
+over the arrival segment is $\sigma-O(1/n)$, and the allowance is
+$\approx z\,r_n\sqrt{(n/d_{J-1}-1)/\delta}\le z(1+\tfrac{1}{2\delta d})r_n$.
+The arrival check is refused when $\sigma>f\varepsilon$ and
+$\sigma>z\sqrt{\sigma^2+L^2}$, that is, when $L/\sigma<\sqrt{1/z^2-1}=0.48$
+at $z=0.9$. In other words, the heavy electron must hold more than about
+81 % of the variance. Otherwise the stop may proceed, but then
+$r_n\ge\sigma\sqrt{1+L^2/\sigma^2}>\sigma$, so the reported error covers the
+jump. Any $z<1$ keeps the refusal. $z=0.9$ leaves an 11 % margin
+($1/z=1.11$), while admitting i.i.d. drift at $2.85\sigma$. The share cap $c$
+refuses $\sigma>c$ regardless. The CXR variance gate refuses while the
+electron dominates $M_2$, since $M_4/M_2^2\to1>V_{\max}$. The record's
+statement holds with the qualifier "while the electron dominates $S_2$",
+which it states.
+
+**Batch means with unequal batches.** Let
+$\bar S_b=n_b^{-1}\sum_{i\in b}S_i$. Then $S=n^{-1}\sum_iS_i=\sum_b(n_b/n)\bar S_b$
+exactly. The weighted ANOVA identity
+$\sum_bn_b(\bar S_b-S)^2=\sum_bn_b(\bar S_b-\mu)^2-n(S-\mu)^2$ has expectation
+$K\sigma^2-\sigma^2$. Hence $\hat\sigma^2=\sum_bn_b(\bar S_b-S)^2/(K-1)$ is
+unbiased, $\widehat{\operatorname{Var}}S=\hat\sigma^2/n$, and equal batches give
+$s(\{\bar S_b\})^2/K$. At $K=1$ there is no estimate. These match the record.
+
+### Implementation comparison
+
+| Item | Code | Result |
+|---|---|---|
+| Grid | `decision_points` (`adaptive.py:175`) | matches, up to the floating ceiling (below) |
+| Pilot and projection | `_with_point`, `decide`, `_project` | match; pilot in $[n_{\min},n_{\max}]$ is validated; projection is unrounded and inserted |
+| Stability window and tolerance | `_stability` (`adaptive.py:309`), `STABILITY_DRIFT = 0.9` | matches; history includes every folded point, so it needs $k+1$ points; $k=0$ returns `(0, f eps)` |
+| CXR gate | `observable_status` | unchanged from v3: `vov + 1/n <= max_variance_of_variance`, CV branch, $V_{\max}\ge1$ disables |
+| `vov_trend_slope` | `_fold` appends `(point, VOV)` per decision point | consistent with v4; the record text still says "block ends" |
+| Prefix re-transport | `transport_monitored_blocks` | a stop or `cut_at` at $d<$ `stop` truncates the monitor and transports `[start, d)` again; kept chunks join as before |
+| Energy-range replay | `transport_case_blocks` | rechecks at `realized` only; on failure it grows to `monitor.next_point()`, a decision point |
+| Independent brem | `IndependentStoppingMonitor.should_stop` | both grids are visited in electron order; a freeze at $d<n$ sets `cut_at` |
+| Batch means | `batch_spans` (bounds $\lfloor bn/K\rfloor$), `_batch_summary`, `batch_means` (scale $n/n_b$) | match the weighted estimator |
+| Chunk plan | `AdaptiveChunkPlan.next_stop` | output-neutral; `size = max(floor, fits)` lets the floor exceed the memory cap (the docstring says "never exceeds") |
+
+### Numeric checks
+
+These are independent probes, outside the repository tests:
+
+- **Grid.** 3,000 random $(n_{\min},n_{\max},\delta)$ with $\delta$ from
+  $10^{-3}$ to 1 (2.39M steps). Every step satisfies
+  $d_{j+1}-d_j\le\delta d_j+1$ (worst excess $1.4\times10^{-18}$), and every
+  grid length is within $\log(n_{\max}/n_{\min})/\log(1+\delta)+1/\delta+1$.
+  At $\delta=10^{-6}$ the grid from 2 to 50 is every integer.
+- **Drift variance.** 20,000 exponential replicates at $n=1000$, $d=750$
+  give $\operatorname{Var}=3.339\times10^{-4}$, against
+  $\sigma^2(n-d)/(nd)=3.333\times10^{-4}$.
+- **Stability false refusals.** Over 200 i.i.d. lognormal($\sigma=1$)
+  populations at $\varepsilon=0.02$ with the other guards off, 44 of 3,561
+  RSE-passing checks are refused by stability (1.2 %). This matches the
+  $\le1.3\,\%$ estimate.
+- **Dominant electron.** The monitor status at the arrival point gives
+  move/limit $=1.107$–$1.111$ (refused) with no light variance. It stays
+  above 1 at $L/\sigma\le0.24$ and falls to $0.89$ at $L/\sigma=0.59$, with
+  $r_n=0.058>\sigma=0.05$. This matches the threshold
+  $L/\sigma\approx0.48$.
+- **Batch means.** At $n\in\{23,47,101,1003\}$ (batch sizes $\{1,2\}$ to
+  $\{50,51\}$, 4,000 replicates), the weighted mean reproduces the full mean
+  to $10^{-13}$, and $n\,\mathbb E[\mathrm{se}^2]/\sigma^2=0.98$–$1.01$.
+- **#1252 replay.** `checks/adaptive_decision_cadence_1253.py`, re-run on
+  the 12 local captures with SHA-256 values equal to the report's, reproduces
+  `adaptive_decision_cadence_1253_results.json` exactly except
+  `sampling_model` (`decision-points-v3` then, `decision-points-v4` now).
+  The default $V_{\max}=0.01$ is the old $1/E_{\min}$ at $E_{\min}=100$, so
+  the default decisions are unchanged by the rebase, as claimed. The 30 MeV
+  stops at 3,996 are $d_3$ of the grid from 3,000, the earliest stop. This
+  replay feeds saved per-electron values, so it does not exercise the brem
+  reducer.
+
+### Findings
+
+1. **Anchor test red at HEAD (merge).** At
+   `tests/montecarlo/runner/test_adaptive_stopping.py:667`, the slow
+   `test_adaptive_output_does_not_depend_on_chunk_size` disables only
+   `min_effective_histories`. Under v2 that also disabled the VOV gate; under
+   v3/v4 the default $V_{\max}=0.01$ stays active. The case runs to
+   `max_electrons` at 200, and line 673 fails (`'max_electrons' ==
+   'converged'`). Run with `max_variance_of_variance=1.0` (as
+   `test_adaptive_run_is_the_fixed_n_run_at_its_realized_count` does), the
+   same case converges at 54 electrons. It replays the realized range, cuts
+   inside the 64-electron chunk, and matches across floors 1, 7 and 64 and
+   the fixed-54 run bit for bit. The acceptance claim holds in that
+   configuration, but its anchor is red.
+2. **Brem statistics are not bit-identical across chunkings.** At the
+   failing test's settings (default $V_{\max}$, realized 200), floors 1 and
+   64 give identical output arrays and CXR values. Yet 32 of 200 per-electron
+   brem band integrals differ by up to $4.6\times10^{-16}$ relative. The brem
+   `max_electron_share`, `variance_of_variance` and `vov_trend_slope` differ
+   in the last digits. The probable cause is in the per-electron path of
+   `mc_brem_spectrum` (`spectrum/brem.py:1043`, row loop at `:1158`):
+   `density @ band_q` and the `bincount` accumulate over row chunks whose
+   boundaries depend on the transport chunk's row count. The record's
+   "every moment, guard value and decision is bit-identical under any
+   chunking" therefore holds for CXR but only up to rounding for brem. A
+   brem guard within an ulp of its threshold could flip a decision. This is
+   measure-zero in practice, but it is not the stated guarantee. The CUDA
+   fused per-electron reduction was not examined.
+3. **$f=0$ crashes.** The validator accepts `stability_fraction = 0`
+   ("finite and non-negative"). With $k\ge1$, `_stability` starts from
+   `worst = (0.0, floor) = (0.0, 0.0)`, so `worst[0] / worst[1]` raises
+   `ZeroDivisionError` at the first evaluated check (`adaptive.py:338`). This
+   was reproduced with `run_stopping_rule`. In v3, $f=0$ meant a zero-move
+   requirement.
+4. **Floating ceiling.** `math.ceil(point * (1.0 + growth))` rounds up when
+   $d\delta$ is an integer and $1+\delta$ is inexact. The grid from 200 at
+   $\delta=0.1$ is 200, 221, 244, 269, not 200, 220, 242, 267 (10,605
+   mismatches in 2.39M steps). The bounds above still hold
+   ($\le\delta d+1$). It is deterministic and policy-only, so decisions stay
+   chunk-independent. However, {eq}`eq-adaptive-decision-points` and the
+   test's float-computed bound do not describe it exactly.
+5. **Stale text.** The ledger Claim says "sequential block-wise stopping",
+   "first block end" and "last `k` block ends" with tolerance `f*target`.
+   The VOV trend section above and `statistical-methods.md` (lines 138 and
+   194: "equal electron blocks", "after each block", "over block ends") are
+   also stale. The #1254 slope values were computed per block end, not per
+   decision point.
+
+### Verdict
+
+The v4 statistical design rederives: the grid, overshoot $\le\delta$ (plus
+one), $O(\log n/\delta)$ checks, the drift variance $r_n^2(n/d-1)$, the
+$z=0.9$ tolerance, the earliest stop $n_{\min}(1+\delta)^k$, the preserved
+dominant-electron refusal (when it dominates $S_2$), the unchanged CXR gate,
+and unbiased unequal-batch means. The verdict is still `discrepancy`,
+because the #1253 chunk-independence anchor fails at HEAD and the brem
+statistics are chunk-independent only to rounding. Fix finding 1, then
+either make the brem per-electron reduction chunk-invariant or state "CXR
+bit-identical, brem to rounding". After that, the extension can return to
+`rederived`. Human sign-off is pending.

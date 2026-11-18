@@ -664,7 +664,9 @@ def test_adaptive_output_does_not_depend_on_chunk_size():
     stop inside a chunk and its re-transported prefix) change neither the
     realized count, the statistics nor the output."""
     case = _case(energy_spread_frac=1e-3)
-    settings = replace(_SETTINGS, block_histories=None, min_effective_histories=0.0)
+    settings = replace(
+        _SETTINGS, block_histories=None, min_effective_histories=0.0, max_variance_of_variance=1.0
+    )
     runs = []
     for floor in (1, 7, 64):
         chunked = replace(settings, block_histories=floor)
