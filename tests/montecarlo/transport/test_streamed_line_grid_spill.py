@@ -206,3 +206,43 @@ def test_stale_directories_of_dead_processes_are_pruned(tmp_path):
         path.mkdir()
     assert prune_stale_spill_dirs(tmp_path) == [stale]
     assert alive.exists() and other_host.exists() and store.root.exists()
+
+
+def test_a_block_that_fails_mid_spill_is_not_counted_twice(monkeypatch, tmp_path):
+    """A consumer failure leaves no partial block, so the replay counts it once."""
+    spill_dir = _spill_everything(monkeypatch, tmp_path)
+    case = _case(_measured_policy(_case()))
+    _clear_grid_cache()
+    kwargs = dict(transport_core="per-electron", n_hat=_n_hat(case), groove=None)
+    held, _, held_pass = resolve_streamed_line_grid(
+        case, 4, spill=GridSpillPolicy(threshold_bytes=None), **kwargs
+    )
+    _clear_grid_cache()
+    real_add, failures = BlockGridEvidence.add, []
+
+    def add_failing_once(self, segs):
+        if len(failures) < 2 and self._seen[0] in (0, 8):  # first spill, later block
+            spill = line_grid_spill.spill_population
+
+            def broken(store, population):
+                spill(store, population)  # leaves files, then fails like an OOM
+                raise MemoryError("injected")
+
+            monkeypatch.setattr(line_grid_spill, "spill_population", broken)
+            try:
+                real_add(self, segs)
+            except MemoryError:
+                failures.append(self._seen[0])
+            finally:
+                monkeypatch.setattr(line_grid_spill, "spill_population", spill)
+        real_add(self, segs)  # the replay
+
+    monkeypatch.setattr(BlockGridEvidence, "add", add_failing_once)
+    grid, _, grid_pass = resolve_streamed_line_grid(
+        case, 4, spill=line_grid_spill.GridSpillPolicy(), **kwargs
+    )
+    assert failures == [0, 8]
+    assert grid_pass["spilled"]
+    assert grid_pass["evidence_bytes"] == held_pass["evidence_bytes"]
+    np.testing.assert_array_equal(grid, held)
+    assert list(spill_dir.iterdir()) == []
