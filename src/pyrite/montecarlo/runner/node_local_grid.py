@@ -20,8 +20,8 @@ enough that the joins its union leaves cost each line at most
 :data:`DEFAULT_NODE_JOIN_LIMIT` of its mass per side. The bound and its
 derivation are in
 ``docs/validation/beam-transport/line-grid-node-local-refinement.md``. Bin means
-telescope to the exact integral at any join (#192), so under ``bin-mean`` the
-same halos are conservative.
+telescope over contiguous edges (#192; to within the ``sinc-bin-far-envelope``
+term), so under ``bin-mean`` the same halos are conservative.
 
 Validation: line-grid-node-local-refinement
 """

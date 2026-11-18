@@ -95,6 +95,34 @@ Measured axes (author probe, 2026-11-17, CPU float64):
 | Si 1 MeV kinematic ceiling (20 histories, 196 lines at 5.6–6.8 keV) | 2,576,401 | 338,152 | 1 (6.9 keV) |
 | Si 1 MeV measured band, `CxrReflections(n_families=4)`, 40 histories (482k lines, 33 eV–17.7 keV, band to 57.6 keV, $W_q=0.472$ eV) | 974,696 | 399,418 | 1 (22.9 keV) |
 
+## Bin-mean quadrature (#1265)
+
+Since #1265 the route also serves `bin-mean` `sinc-oversampled` axes. The window
+step is `h_f = min(W_q, h_b) / K` with `K = 1/shape_spacing_factor(1e-2) = 10π/3
+≈ 10.47` (`_cxr_grid_policy.py::uniform_step_divisor`), and lines narrower than
+`K h_b ≈ 31.4 eV` get windows. Node-quadrature axes keep `K = 8` and are
+unchanged.
+
+Mass. Bin-mean bins on any node axis have contiguous midpoint edges
+(`_grid_semantics.node_bin_edges_and_widths`). The exact bin mean times width is
+`π{F(x_{i+1}) − F(x_i)}/a`, so the sum over bins telescopes to the outer-edge
+mass. That makes the join error zero, and the node halos above are not needed
+for mass, though they do no harm. Production scoring replaces the exact mean
+with the averaged envelope beyond 64 first-zero widths
+(`sinc-bin-far-envelope`). That term is at most about 1.2e-5 per side for any
+contiguous edges, so the grid dependence is at most about 2.4e-5 per line,
+below `2 eta`.
+
+Shape. Lines left on the backbone have `h_b <= w/K`. Window lines with
+`w >= W_q` have `h_f <= w/K`. So no peak bin is wider than
+`shape_spacing_factor · w`, including at a join, and the isolated-line peak
+bound of `line-grid-sinc-shape-spacing` holds on the local axis too.
+
+Fresh-context verification of this section (2026-11-18): `rederived`. Probe:
+exact bin masses over the local axis equal the outer-edge mass to 6.7e-16 for
+50 lines. Anchor:
+`tests/energy-grid/test_line_grid_node_local.py::test_bin_mean_axis_over_budget_takes_the_node_local_route_at_the_shape_step`.
+
 ## Open
 
 - Shape (peak, FWHM, mass L1) and timing against a same-transport node 0.046875 eV reference: the remote qualification arm (#1257 Plan).

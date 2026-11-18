@@ -1067,12 +1067,12 @@ def uniform_step_divisor(payload: Mapping[str, Any]) -> float:
     """Node steps per sinc-Nyquist step: ``oversampling`` (node) or ``shape_rtol`` (bin-mean).
 
     Validation: line-grid-sinc-shape-spacing
+    Validation: line-grid-resonance-bandwidth
     """
     resolution = payload["resolution"]
-    if resolution["policy"] == SHAPE_RESOLUTION_POLICY:
-        raise ValueError("sinc-shape line-grid payloads were retired by #1265; re-resolve")
-    if resolution["policy"] == LOCAL_RESOLUTION_POLICY:  # e.g. a pre-#1265 fallback
-        raise ValueError("a resonance-local payload has no uniform line axis; re-resolve")
+    # sinc-shape is retired; resonance-local reaches here only as a pre-#1265 fallback.
+    if (policy := resolution["policy"]) in (SHAPE_RESOLUTION_POLICY, LOCAL_RESOLUTION_POLICY):
+        raise ValueError(f"a {policy} payload has no uniform line axis; re-resolve (#1265)")
     if resolution["policy"] != OVERSAMPLED_RESOLUTION_POLICY:
         return 1
     if "shape_rtol" in resolution:
