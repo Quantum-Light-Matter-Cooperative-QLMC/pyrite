@@ -23,6 +23,7 @@ from pyrite.config import FixedSampling
 from pyrite.detectors import EnergyBins
 from pyrite.montecarlo import runner
 from pyrite.montecarlo.runner import case_driver
+from pyrite.montecarlo.runner.lattice_share import layer_emission_tables
 from pyrite.montecarlo.spectrum.brem import mc_brem_spectrum
 from pyrite.montecarlo.spectrum.brem_bremslib import prepare_bremslib_table
 from pyrite.montecarlo.spectrum.brem_events import mc_coupled_brem_spectrum, mc_soft_brem_spectrum
@@ -256,12 +257,17 @@ def test_runner_transport_and_scoring_use_the_coupled_mode(synthetic_si_tables, 
         segments, E_brem, case, tp["n_hat"], case.get("abs_layers"), Ne=case["Ne_brem"]
     )
     assert brem.shape == E_brem.shape and np.all(np.isfinite(brem)) and np.any(brem > 0.0)
-    # Production scores the coupled tracks by expected value, not by photon histogram.
+    # Production scores the coupled tracks by expected value, not by photon
+    # histogram, from emission tables with the scored lattice share removed.
+    emission_tables, record = layer_emission_tables(
+        case, None, case["composition"], runner._case_bremslib_tables(case)
+    )
+    assert record["corrected"] and record["reflections"] > 0
     expected = mc_coupled_brem_spectrum(
         segments,
         E_brem,
         cutoff_eV=1000.0,
-        bremslib_tables=runner._case_bremslib_tables(case),
+        bremslib_tables=emission_tables,
         composition=case["composition"],
         n_hat=tp["n_hat"],
         electron_limit=case["Ne_brem"],

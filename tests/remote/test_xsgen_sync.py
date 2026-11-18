@@ -390,6 +390,9 @@ def test_local_datasets_map_arcnames_to_verified_files(monkeypatch, tmp_path):
         "datasets/epdl-differential/epdl2025_differential.npz": (
             tmp_path / "epdl-differential" / "epdl2025_differential.npz"
         ),
+        "datasets/brem-lattice-share/brem_lattice_share_kernel.npz": (
+            tmp_path / "brem-lattice-share" / "brem_lattice_share_kernel.npz"
+        ),
         "datasets/bote-salvat/xione.jl": tmp_path / "bote-salvat" / "xione.jl",
     }
 

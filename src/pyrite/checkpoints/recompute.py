@@ -481,7 +481,11 @@ def _repair_brem_record(r, E_brem, _brem_for_case):
     """Score one brem record through the live runner and release GPU scratch."""
     import numpy as np
 
-    brem_wide = _brem_for_case(r["case"], E_brem)
+    from ..montecarlo.runner.lattice_share import continuum_case
+
+    # A measured reflection selection is recorded beside the case; the
+    # continuum removes the lattice share of exactly that scored set.
+    brem_wide = _brem_for_case(continuum_case(r["case"], r.get("reflection_selection")), E_brem)
     r["brem_wide"] = brem_wide
     r["E_grid_brem"] = E_brem
     r["brem"] = np.interp(np.asarray(r["E_grid"], float), E_brem, brem_wide)

@@ -83,7 +83,10 @@ def _uncoupled_brem_from_segments(
     model_kwargs,
     electron_band_weights=None,
 ):
-    """Existing per-layer reduction with one selected/prepared continuum model."""
+    """Existing per-layer reduction with one selected/prepared continuum model.
+
+    Validation: brem-lattice-coherent-fraction
+    """
     from .. import runner
 
     n_lay = int(segs_b.get("n_layers", 1))
@@ -94,6 +97,18 @@ def _uncoupled_brem_from_segments(
 
     def photon_block(composition):
         return runner._brem_photon_block(E_brem.size, composition, model, n_layers=n_lay)
+
+    from .lattice_share import layer_emission_tables, warn_if_eedl_double_counts
+
+    if "bremslib_tables" not in model_kwargs:
+        warn_if_eedl_double_counts(case)
+
+    def layer_kwargs(layer, composition):
+        if "bremslib_tables" not in model_kwargs:
+            return model_kwargs
+
+        tables, _ = layer_emission_tables(case, layer, composition, model_kwargs["bremslib_tables"])
+        return {**model_kwargs, "bremslib_tables": tables}
 
     if n_lay == 1:
         return runner.mc_brem_spectrum(
@@ -107,7 +122,7 @@ def _uncoupled_brem_from_segments(
             groove=groove,
             electron_limit=Ne,
             E_cut_keV=case.get("E_cut_brem_keV", 1.0),
-            **model_kwargs,
+            **layer_kwargs(None, case["composition"]),
         )
     shape = (
         E_brem.shape if electron_band_weights is None else int(segs_b["Ne"] if Ne is None else Ne)
@@ -128,7 +143,7 @@ def _uncoupled_brem_from_segments(
             groove=groove,
             electron_limit=Ne,
             E_cut_keV=case.get("E_cut_brem_keV", 1.0),
-            **model_kwargs,
+            **layer_kwargs(L, abs_layers[L][2]),
         )
     return brem_wide
 
@@ -146,6 +161,8 @@ def _coupled_brem_from_segments(
     it not to exceed the line cutoff), so no reclipping is requested.
 
     Validation: bremslib-coupled-expected-spectrum
+
+    Validation: brem-lattice-coherent-fraction
     """
     from .. import runner
     from ..spectrum.brem_events import mc_coupled_brem_spectrum
@@ -158,20 +175,24 @@ def _coupled_brem_from_segments(
     cutoff_eV = float(case["radiative_cutoff_eV"])
     n_lay = int(segs_b.get("n_layers", 1))
     layer_views = (
-        [(segs_b, case["composition"])]
+        [(None, segs_b, case["composition"])]
         if n_lay == 1
         else [
-            (runner._segments_in_layer(segs_b, index), abs_layers[index][2])
+            (index, runner._segments_in_layer(segs_b, index), abs_layers[index][2])
             for index in range(n_lay)
         ]
     )
+    from .lattice_share import layer_emission_tables
+
     per_electron = (
         {} if electron_band_weights is None else {"electron_band_weights": electron_band_weights}
     )
     brem_wide = np.zeros(E_brem.shape if electron_band_weights is None else int(Ne), dtype=float)
-    for segments, composition in layer_views:
+    for layer, segments, composition in layer_views:
         if segments["L_ang"].size == 0:
             continue
+        # Emission only: transport radiated from the full tables.
+        layer_tables, _ = layer_emission_tables(case, layer, composition, tables)
         # A layer view can omit scalar transport metadata; restore the
         # original coupled partition record for its scorer consistency check.
         if "radiative" not in segments and "radiative" in segs_b:
@@ -188,7 +209,7 @@ def _coupled_brem_from_segments(
             layers=abs_layers,
             electron_limit=Ne,
             cutoff_eV=cutoff_eV,
-            bremslib_tables=tables,
+            bremslib_tables=layer_tables,
             **per_electron,
         )
     return brem_wide

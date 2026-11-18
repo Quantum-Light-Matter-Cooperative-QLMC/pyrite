@@ -186,6 +186,17 @@ def source_git_state() -> tuple[str | None, bool | None]:
     return sha, bool(status)
 
 
+def _lattice_share_provenance(case) -> dict[str, str]:
+    from .montecarlo.runner.lattice_share import lattice_share_applies
+    from .montecarlo.spectrum.brem_lattice_share import BREM_LATTICE_SHARE_MODEL
+
+    return (
+        {"brem_lattice_share_model": BREM_LATTICE_SHARE_MODEL}
+        if lattice_share_applies(case)
+        else {}
+    )
+
+
 def run_provenance(
     case: Case | Mapping[str, Any],
     xsgen_tables: Mapping[str, str] | None,
@@ -214,6 +225,7 @@ def run_provenance(
         "characteristic_model": case_characteristic_marker(case),
         "attenuation_model": ATTENUATION_MODEL,
         "bremsstrahlung_model": case_bremsstrahlung_marker(case),
+        **_lattice_share_provenance(case),
         "backend": BACKEND.name,
         "device": BACKEND.device,
         "transport_precision": precision_provenance(

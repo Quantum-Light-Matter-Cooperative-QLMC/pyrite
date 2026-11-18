@@ -615,7 +615,7 @@ def _fetch_cxr(payload: dict) -> str:
     default=None,
     help=(
         "Install CODE from a local copy of the pinned archive (for eedl, eadl, "
-        "epdl, epdl-differential and bote-salvat, of the pinned file itself) instead of "
+        "epdl, epdl-differential, brem-lattice-share and bote-salvat, of the pinned file itself) instead of "
         "downloading it. Needs CODE."
     ),
 )
@@ -655,6 +655,10 @@ def fetch_command(
     bremslib       BremsLib-derived bremsstrahlung tables for every element a
                    catalogue material may contain, so no BremsLib checkout is
                    needed for them.
+    brem-lattice-share
+                   PyRITE-computed lattice-coherent bremsstrahlung share kernel
+                   (59 MB), which crystalline BremsLib runs read to remove the
+                   continuum share their coherent-bremsstrahlung lines score.
     bote-salvat    NIST's public-domain Bote-Salvat K/L/M shell-ionization
                    parameters, read only when a run selects the opt-in
                    Bote-Salvat ionization model.
@@ -671,7 +675,7 @@ def fetch_command(
     network access.
 
     PyRITE's own archives (epdl, epdl-differential, sbethe-tables, elsepa,
-    bremslib, and the eedl
+    bremslib, brem-lattice-share, and the eedl
     and eadl mirrors) are on public GitHub Releases; downloading them needs no
     GitHub token.
     """
@@ -744,11 +748,12 @@ def fetch_command(
 @click.option(
     "--require",
     "require",
-    default="bremslib,elsepa,sbethe-tables,eedl,eadl,epdl,sbethe",
+    default="bremslib,brem-lattice-share,elsepa,sbethe-tables,eedl,eadl,epdl,sbethe",
     show_default=True,
     help=(
         "Comma-separated codes whose pinned tables or datasets must be present "
-        "(bremslib, elsepa, sbethe-tables, eedl, eadl, epdl, epdl-differential, sbethe)."
+        "(bremslib, brem-lattice-share, elsepa, sbethe-tables, eedl, eadl, epdl, "
+        "epdl-differential, sbethe)."
     ),
 )
 @output_option

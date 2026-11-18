@@ -126,6 +126,9 @@ and release assets are public, so downloads need no GitHub token.
 * - `tables-epdl-differential-1`
   - `epdl2025_differential.npz` (10,799,061 B, derived EPDL2025 subshell and scattering-function table)
   - `pyrite.datasets.EPDL_DIFFERENTIAL`
+* - `tables-brem-lattice-share-1`
+  - `brem_lattice_share_kernel.npz` (58,667,115 B, PyRITE-computed lattice-coherent bremsstrahlung share kernel, #1250)
+  - `pyrite.datasets.BREM_LATTICE_SHARE`
 * - `mirror-eedl2025-1`
   - `EEDL.endf` (fallback after LLNL)
   - `pyrite.datasets.EEDL`
@@ -162,7 +165,8 @@ To cut or refresh a release (maintainer):
 1. Build the archive and index from the stored tables, for example
    `uv run python scripts/release_elsepa_tables.py --out build/xsgen-release`
    (likewise `release_bremslib_tables.py`, `release_sbethe_tables.py`;
-   `release_epdl_table.py` writes the EPDL npz)
+   `release_epdl_table.py` writes the EPDL npz; `release_brem_lattice_share_table.py`
+   builds the share kernel in `part`/`merge` steps on the remote box)
    (add `--generate` for missing tables). The archive is deterministic: an
    unchanged table set reproduces the pinned SHA-256.
 2. If the digest differs from the pin, use a new tag (`tables-elsepa-<n+1>`);

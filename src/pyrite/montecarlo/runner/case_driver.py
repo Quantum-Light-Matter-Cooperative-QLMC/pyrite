@@ -1131,10 +1131,16 @@ def _spectrum_case_impl(case, tp, record_timing=False):
     # over layers (a single layer is exactly the old single-material brem).
     # Factored into _brem_wide_from_segments so run.repair_brem_wide reuses this
     # SAME path (via _brem_for_case) and can't drift back to single-slab brem.
+    # A measured selection scored a set the case does not list; the continuum
+    # removes the lattice share of exactly that set (brem-lattice-coherent-fraction).
+    from .lattice_share import continuum_case
+
+    brem_case = continuum_case(case, reflection_selection)
     with _pkg._nsys_range("pyrite.brem"):
         try:
             brem_wide = emission.continuum.evaluate(
-                batch_replace(batch, energy_eV=E_brem, electron_limit=Ne_brem), "brem_wide"
+                batch_replace(batch, case=brem_case, energy_eV=E_brem, electron_limit=Ne_brem),
+                "brem_wide",
             ).values
         except Exception as error:
             if not _pkg._is_gpu_oom(error):
