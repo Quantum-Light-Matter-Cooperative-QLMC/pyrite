@@ -242,19 +242,20 @@ class BlockSpectrumScorer:
         self.n_segments += rows
 
     def _lines(self, batch):
-        """The block's incoherent lines; a selected set scores in admitted chunks."""
+        """The block's incoherent lines; a selected set scores in admitted chunks.
+
+        Both routes return host arrays, like the other block totals: the
+        result adds host diffracted spectra to them (#1281, CUDA job 13652).
+        """
         if self.selection is None:
             return self.emission.cxr.evaluate(batch, "spec").values
-        from ..._backend import xp
         from .reflection_cutoff import _selected_spectrum
 
         evaluate = self.emission.cxr.evaluate
-        return xp.asarray(
-            _selected_spectrum(
-                self.line_case,
-                lambda pilot: evaluate(replace(batch, case=pilot, table_cache={}), "spec").values,
-                self.E_grid,
-            )
+        return _selected_spectrum(
+            self.line_case,
+            lambda pilot: evaluate(replace(batch, case=pilot, table_cache={}), "spec").values,
+            self.E_grid,
         )
 
     def _transition(self, segs):
