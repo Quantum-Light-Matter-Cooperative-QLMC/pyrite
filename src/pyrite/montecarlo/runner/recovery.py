@@ -57,9 +57,11 @@ def transport_with_recovery(transport, resident, *, blockwise=False):
 
     if blockwise:
         counts = transport(resident)
-        return counts, {key: counts.pop(key) for key in RECOVERY_KEYS if key in counts}
+        return counts, _pop_recovery(counts)
     try:
-        return transport(resident), {}
+        # A monitored block run recovers its own blocks (#1269) and reports here.
+        out = transport(resident)
+        return out, _pop_recovery(out)
     except Exception as error:
         if not runner._is_gpu_oom(error):
             raise
@@ -84,6 +86,109 @@ def transport_with_recovery(transport, resident, *, blockwise=False):
         "_recovery_path": "host_segments",
         "_recovery_events": [{"phase": "transport", "mitigation": "host_segments"}],
     }
+
+
+def _pop_recovery(out):
+    if not isinstance(out, dict):
+        return {}
+    return {key: out.pop(key) for key in RECOVERY_KEYS if key in out}
+
+
+class ResidentBlockRecovery:
+    """Per-block host fallback for kept (monitored) resident block transport (#1269).
+
+    ``simulate_block(start, stop, keep=)`` transports one block. While resident,
+    an allocator OOM in a block downloads the blocks already kept to admitted
+    host memory, releases the pool, and reruns only the failed block with host
+    rows; every later block, and any later pass, stays on the host. Blocks are
+    counter-addressed, so the join equals the whole-case host replay of #609
+    bit for bit, without re-transporting committed blocks. A failed block
+    raises before the stopping monitor sees it, so its state needs no reset.
+    """
+
+    def __init__(self, simulate_block, resident):
+        self._simulate = simulate_block
+        self.resident = bool(resident)
+        self.events: list[dict] = []
+
+    def simulate(self, start, stop, kept):
+        """Transport ``[start, stop)``; on a resident OOM move ``kept`` to host first."""
+        if self.resident:
+            try:
+                return self._simulate(start, stop, keep=True)
+            except Exception as error:
+                self._fail_over(error, kept, start, "block")
+        return self._host_call(self._simulate, start, stop, keep=False)
+
+    def join(self, merge, kept, at):
+        """``merge(kept)``; a resident OOM in the join merges host copies instead."""
+        if self.resident:
+            try:
+                return merge(kept)
+            except Exception as error:
+                self._fail_over(error, kept, at, "join")
+        return self._host_call(merge, kept)
+
+    def metrics(self):
+        if not self.events:
+            return {}
+        return {
+            "_transport_gpu_oom_retries": len(self.events),
+            "_recovery_path": "host_segments",
+            "_recovery_events": list(self.events),
+        }
+
+    def _fail_over(self, error, kept, start, stage):
+        from .. import runner
+        from .oom import _drop_traceback_locals
+        from .pool import _admit_host_segments
+
+        if not runner._is_gpu_oom(error):
+            raise error
+        error.add_note(
+            f"CUDA resident block transport failed at electron {start}; "
+            "keeping completed blocks on host and continuing with host segments"
+        )
+        # Tracebacks pin the failed block's device scratch.
+        _drop_traceback_locals(error)
+        error.__traceback__ = None
+        runner.BACKEND.release_memory()
+        _admit_host_segments()
+        kept[:] = [_host_block(block) for block in kept]
+        runner.BACKEND.release_memory()
+        self.resident = False
+        self.events.append(
+            {
+                "phase": "transport",
+                "mitigation": "host_segments",
+                "stage": stage,
+                "block_start": int(start),
+            }
+        )
+
+    @staticmethod
+    def _host_call(call, *args, **kwargs):
+        from .. import runner
+        from .oom import _drop_traceback_locals
+
+        try:
+            return call(*args, **kwargs)
+        except Exception as error:
+            if runner._is_gpu_oom(error):
+                _drop_traceback_locals(error)
+                runner.BACKEND.release_memory()
+            raise
+
+
+def _host_block(block):
+    """Download one block's arrays, keeping fields that alias one array aliased."""
+    copies: dict[int, object] = {}
+    out = {}
+    for key, value in block.items():
+        if id(value) not in copies:
+            copies[id(value)] = _host_arrays(value)
+        out[key] = copies[id(value)]
+    return out
 
 
 def _retry_metrics(counts, events, initial, work, tp):
