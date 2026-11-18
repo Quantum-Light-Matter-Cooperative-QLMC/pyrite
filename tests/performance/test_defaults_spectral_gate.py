@@ -396,3 +396,98 @@ def test_frozen_integration_is_inadmissible_under_pinned_physics():
         Physics(
             inelastic_model="shell-soft-hard", radiative_model="bremslib-soft-hard"
         ).validate_transport("frozen")
+
+
+def test_bin_mean_continuum_averages_each_cell_exactly_for_linear_brem():
+    gate = _gate()
+    grid = gate["axis"](500.0, 1000.0, 100.0, "bin-mean")
+    ladder = type("L", (), {"continuum": staticmethod(lambda e: 2.0 + 0.01 * np.asarray(e))})()
+    cells = gate["bin_mean_continuum"](ladder, grid, fine_eV=7.0)
+    np.testing.assert_allclose(cells, 2.0 + 0.01 * grid, rtol=1e-12)
+
+
+def test_component_metrics_keep_signed_terms_relative_to_brem():
+    gate = _gate()
+    grid = gate["axis"](500.0, 900.0, 100.0, "bin-mean")
+    brem = np.full(grid.size, 2.0)
+    out = gate["component_metrics"](grid, dict(cbs=np.ones(grid.size), x=-np.ones(grid.size)), brem)
+    assert out["cbs"]["fraction_of_brem"] == pytest.approx(0.5)
+    assert out["x"]["fraction_of_brem"] == pytest.approx(-0.5)
+    assert out["cbs"]["centroid_eV"] == pytest.approx(700.0)
+    assert out["cbs"]["bin_masses"] == pytest.approx([100.0] * 4)
+
+
+def test_chunked_components_split_every_production_call_and_restore(monkeypatch):
+    from pyrite.montecarlo.runner import case_driver
+
+    gate = _gate()
+    grid = np.linspace(500.0, 600.0, 5)
+    original = case_driver.mc_cxr_spectrum
+
+    def fake(*args, components=False, **kwargs):
+        assert components
+        return 3.0 * grid, grid, np.ones_like(grid)
+
+    monkeypatch.setattr(case_driver, "mc_cxr_spectrum", fake)
+
+    class Scorer:
+        case = "whole"
+
+        def lines(self, g):
+            return case_driver.mc_cxr_spectrum() + case_driver.mc_cxr_spectrum()
+
+    total, pxr, cbs = gate["chunked_components"](Scorer(), ["a", "b"], grid)
+    np.testing.assert_allclose(total, 12.0 * grid)
+    np.testing.assert_allclose(pxr, 4.0 * grid)
+    np.testing.assert_allclose(cbs, 4.0)
+    assert case_driver.mc_cxr_spectrum is fake
+    monkeypatch.setattr(case_driver, "mc_cxr_spectrum", original)
+
+
+def test_chunked_components_refuse_a_total_they_did_not_accumulate(monkeypatch):
+    from pyrite.montecarlo.runner import case_driver
+
+    gate = _gate()
+    grid = np.linspace(500.0, 600.0, 3)
+    monkeypatch.setattr(
+        case_driver, "mc_cxr_spectrum", lambda *a, components=False, **k: (grid, grid, grid)
+    )
+    scorer = type("S", (), {"case": None, "lines": lambda self, g: 2.0 * grid})()
+    with pytest.raises(RuntimeError, match="disagrees"):
+        gate["chunked_components"](scorer, ["a"], grid)
+
+
+def test_score_families_components_record_terms_and_brem_on_one_axis(monkeypatch):
+    import pyrite.energy_grid.convergence_case as convergence_case
+
+    gate = _gate()
+    module = gate["score_families"].__globals__
+
+    def chunked_components(scorer, chunks, grid):
+        n = len(scorer.case["hkl_list"])
+        return 3.0 * n * np.ones(grid.size), n * np.ones(grid.size), n * np.ones(grid.size)
+
+    class Ladder:
+        def __init__(self, case, transport=None):
+            self.case = case
+
+    monkeypatch.setitem(
+        module,
+        "families_case",
+        lambda case, sweep, n: (dict(case, hkl_list=[(1, 1, 1)] * n), (500.0, 1e4), (500.0, 1e4)),
+    )
+    monkeypatch.setitem(module, "chunked_components", chunked_components)
+    monkeypatch.setattr(convergence_case, "CaseLadder", Ladder)
+    ladder = type("L", (), {"transport": None, "continuum": staticmethod(np.ones_like)})()
+    args = ({"crystal": "silicon"}, None, ladder, [1, 2], 100.0, 0.0, lambda: None, 512)
+    record = gate["score_families"](*args, quadrature="bin-mean", components=True)
+    assert record["brem"]["fraction_of_brem"] == pytest.approx(1.0)
+    terms = record["families"][1]["components"]
+    assert terms["cbs"]["fraction_of_brem"] == pytest.approx(2.0)
+    assert terms["interference"]["fraction_of_brem"] == pytest.approx(2.0)
+    with pytest.raises(ValueError, match="bin-mean"):
+        gate["score_families"](*args, components=True)
+    with pytest.raises(ValueError, match="fixed ladder"):
+        gate["score_families"](
+            *args[:3], [1, "tol1e-3"], *args[4:], quadrature="bin-mean", components=True
+        )

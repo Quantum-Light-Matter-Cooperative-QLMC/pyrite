@@ -8,6 +8,13 @@ transport. The non-forbidden reflections are grouped into shells
 production line kernels, and the shell sequence stops once the estimated
 in-band yield beyond ``G`` is at most ``tolerance`` of the yield kept.
 
+Where the radiator's continuum is corrected for its lattice-coherent share
+(#1250, ``brem-lattice-coherent-fraction``), the stop quantity is each shell's
+net yield, its lines less the continuum share they replace, as a fraction of
+the consistent total (net lines plus that layer's continuum). Above
+``|g| ~ 16`` the line increment is mostly CBS, which the corrected continuum
+gives back, so the line yield alone overstates what a cutoff omits.
+
 The scorer is a callable, so this module holds no runner state. The caller
 (the #642 gate, and later the case driver) evaluates the incoherent line
 spectrum of one shell on a ``bin-mean`` axis spanning the band, where the
@@ -34,6 +41,7 @@ __all__ = [
     "ReflectionCutoff",
     "band_bin_grid",
     "geometric_tail_fraction",
+    "axis_band_eV",
     "axis_yield_weights",
     "iter_reflection_shells",
     "reflection_selection_record",
@@ -146,7 +154,9 @@ def iter_reflection_shells(
             yield float(upper), members
 
 
-def geometric_tail_fraction(shell_yields: Sequence[float]) -> float:
+def geometric_tail_fraction(
+    shell_yields: Sequence[float], background: float | None = None
+) -> float:
     """Estimated yield beyond the last shell, as a fraction of the shells so far.
 
     A geometric continuation from the last shell ``s_k`` with ratio ``r`` leaves
@@ -160,18 +170,32 @@ def geometric_tail_fraction(shell_yields: Sequence[float]) -> float:
     Returns ``inf`` until three shells exist and both ratios lie in ``(0, 1)``.
     A zero shell never counts as converged.
 
+    ``background`` selects the net form (#1250): shells are net yields
+    ``s_k = line_k - S_k`` that may take either sign, the continuation runs on
+    ``|s_k|`` (bounding the magnitude of the omitted net yield), and the
+    denominator is the consistent total ``sum_j s_j + background``. A
+    non-positive denominator gives ``inf``.
+
     Limiting case: an exactly geometric sequence ``s_k = r^k`` returns its exact
-    remaining sum over its partial sum.
+    remaining sum over its partial sum (plus ``background``).
 
     Validation: reflection-yield-tolerance-selector
     """
     yields = np.asarray(shell_yields, dtype=float)
-    if yields.size < 3 or not np.all(np.isfinite(yields)) or np.any(yields <= 0.0):
+    if yields.size < 3 or not np.all(np.isfinite(yields)):
         return float("inf")
-    ratio = max(float(yields[-1] / yields[-2]), float(yields[-2] / yields[-3]))
+    if background is None:
+        if np.any(yields <= 0.0):
+            return float("inf")
+        size, total = yields, float(yields.sum())
+    else:
+        size, total = np.abs(yields), float(yields.sum()) + float(background)
+        if np.any(size == 0.0) or not total > 0.0:
+            return float("inf")
+    ratio = max(float(size[-1] / size[-2]), float(size[-2] / size[-3]))
     if not ratio < 1.0:
         return float("inf")
-    return float(yields[-1]) * ratio / (1.0 - ratio) / float(yields.sum())
+    return float(size[-1]) * ratio / (1.0 - ratio) / total
 
 
 @dataclass(frozen=True)
@@ -190,12 +214,19 @@ class ReflectionCutoff:
     tail_fraction: float
     converged: bool
     shells: tuple
+    #: Net metric only (#1250): each kept shell's lattice-share yield ``S_k``
+    #: and the radiator layer's in-band continuum; empty/``None`` for lines.
+    shares: tuple = ()
+    background: float | None = None
 
 
 def select_reflection_cutoff(
     in_band_yield: Callable[[list], float],
     shells: Iterable[tuple[float, list]],
     tolerance: float,
+    *,
+    share_yield: Callable[[list], float] | None = None,
+    background: float = 0.0,
 ) -> ReflectionCutoff:
     """Smallest shell cutoff whose estimated in-band tail is at most ``tolerance``.
 
@@ -207,12 +238,26 @@ def select_reflection_cutoff(
     runs out first, the result keeps every shell and reports
     ``converged=False``.
 
+    With ``share_yield`` (#1250 net metric), the stop quantity is each shell's
+    net yield ``line_k - share_yield(hkls)``: the lines less the lattice-coherent
+    continuum share the corrected continuum removes for those reflections.
+    Decay is judged on its magnitude, and the tail is a fraction of the
+    consistent total, the kept net yield plus ``background`` (the radiator
+    layer's uncorrected in-band continuum).
+
     Validation: reflection-yield-tolerance-selector
     """
     tol = float(tolerance)
     if not 0.0 < tol < 1.0:
         raise ValueError("tolerance must lie in (0, 1)")
+    net = share_yield is not None
+    base: float | None = None
+    if net:
+        base = float(background)
+        if not (np.isfinite(base) and base >= 0.0):
+            raise ValueError("background must be finite and non-negative")
     yields: list[float] = []
+    shares: list[float] = []
     table = []
     kept: list = []
     decaying = 0
@@ -221,16 +266,26 @@ def select_reflection_cutoff(
         value = float(in_band_yield(list(members)))
         if not np.isfinite(value) or value < 0.0:
             raise ValueError(f"shell |g| <= {upper:g} gave a nonfinite or negative yield")
-        decaying = decaying + 1 if yields and value < yields[-1] else 0
-        yields.append(value)
+        if net:
+            share = float(share_yield(list(members)))
+            if not np.isfinite(share) or share < 0.0:
+                raise ValueError(f"shell |g| <= {upper:g} gave a nonfinite or negative share")
+            shares.append(share)
+            metric = value - share
+        else:
+            metric = value
+        decaying = decaying + 1 if yields and abs(metric) < abs(yields[-1]) else 0
+        yields.append(metric)
         kept.extend(members)
-        tail = geometric_tail_fraction(yields)
+        tail = geometric_tail_fraction(yields, base)
         table.append((float(upper), len(members), value, tail))
         if decaying >= _MIN_DECAYING_SHELLS and tail <= tol:
-            return ReflectionCutoff(float(upper), kept, tol, tail, True, tuple(table))
+            return ReflectionCutoff(
+                float(upper), kept, tol, tail, True, tuple(table), tuple(shares), base
+            )
     if not table:
         raise ValueError("no reflection shells to select from")
-    return ReflectionCutoff(table[-1][0], kept, tol, tail, False, tuple(table))
+    return ReflectionCutoff(table[-1][0], kept, tol, tail, False, tuple(table), tuple(shares), base)
 
 
 def _pilot_case(case: dict, layer: int | None, hkls: list, quadrature: str | None) -> dict:
@@ -280,6 +335,7 @@ def select_case_reflections(
     g_max_invang: float = F0_RANGE_INVANG,
     width_invang: float = DEFAULT_SHELL_WIDTH_INVANG,
     max_reflections: int | Callable[[int | None, dict], int] = 512,
+    continuum=None,
 ) -> tuple[dict, list[ReflectionCutoff], np.ndarray]:
     """Cut each radiator at its measured cutoff and keep the scored spectrum.
 
@@ -299,6 +355,12 @@ def select_case_reflections(
     transported segments. A layered case's ``hkl_list`` mirrors its first
     radiator. Returns the pruned case, the per-radiator outcomes in radiator
     order, and the spectrum.
+
+    ``continuum`` (a :class:`~pyrite.montecarlo.runner.lattice_share.SelectionContinuum`,
+    #1250) switches every radiator whose continuum is corrected to the net
+    metric of :func:`select_reflection_cutoff`: shell yield less its
+    lattice-share continuum yield, against that layer's net lines plus its
+    uncorrected continuum. Radiators it does not correct keep the line metric.
 
     Validation: reflection-yield-tolerance-selector
     """
@@ -331,7 +393,16 @@ def select_case_reflections(
         shells = iter_reflection_shells(
             radiator["crystal"], float(radiator["B_ang2"]), g_max_invang, width_invang
         )
-        result = select_reflection_cutoff(shell_yield, shells, tolerance)
+        if continuum is not None and continuum.applies(layer):
+            result = select_reflection_cutoff(
+                shell_yield,
+                shells,
+                tolerance,
+                share_yield=lambda hkls, layer=layer: continuum.share(layer, hkls),
+                background=continuum.background(layer),
+            )
+        else:
+            result = select_reflection_cutoff(shell_yield, shells, tolerance)
         outcomes.append(result)
         if layer is None:
             out["hkl_list"] = result.hkl_list
@@ -412,8 +483,24 @@ def selection_call_sizes(case: dict, grid: np.ndarray) -> dict:
     return sizes
 
 
+def axis_band_eV(grid: np.ndarray, quadrature: str) -> tuple[float, float]:
+    """Energy interval ``grid``'s yield weights integrate over [eV].
+
+    ``bin-mean``: outer edges of the production bins. ``node``: first and last node.
+
+    Validation: reflection-yield-tolerance-selector
+    """
+    grid = np.asarray(grid, dtype=float)
+    if quadrature == "bin-mean":
+        from ..spectrum.characteristic import _energy_bin_edges_and_widths
+
+        edges = np.asarray(_energy_bin_edges_and_widths(grid)[0], dtype=float)
+        return float(edges[0]), float(edges[-1])
+    return float(grid[0]), float(grid[-1])
+
+
 def selected_line_spectrum(
-    case: dict, evaluate: Callable[[dict], object], grid: np.ndarray
+    case: dict, evaluate: Callable[[dict], object], grid: np.ndarray, continuum=None
 ) -> tuple[np.ndarray, dict]:
     """Incoherent line spectrum of ``case`` under its ``reflection_selection``.
 
@@ -423,7 +510,10 @@ def selected_line_spectrum(
     selection costs about one shell beyond its stop rather than a second pass.
     Returns the host spectrum and the selection record: model, tolerance,
     and per radiator its cutoff, reflection count, tail estimate, convergence
-    and shell table.
+    and shell table. ``continuum(band_eV)`` builds the net metric's
+    :class:`~pyrite.montecarlo.runner.lattice_share.SelectionContinuum` on the
+    axis band; a radiator scored with it records ``metric="net"``, its
+    ``background_yield`` and each shell's ``share``.
 
     Validation: reflection-yield-tolerance-selector
     """
@@ -441,6 +531,7 @@ def selected_line_spectrum(
         g_max_invang=float(selection["g_max_invang"]),
         width_invang=float(selection["shell_width_invang"]),
         max_reflections=lambda layer, _radiator: per_call[layer],
+        continuum=None if continuum is None else continuum(axis_band_eV(grid, quadrature)),
     )
     layered = case.get("layer_radiators") is not None
     radiators = [
@@ -461,17 +552,27 @@ def selected_line_spectrum(
                 reflections_per_call=per_call[layer],
                 tail_fraction=outcome.tail_fraction if np.isfinite(outcome.tail_fraction) else None,
                 converged=outcome.converged,
-                shells=[
-                    dict(
-                        upper_invang=u, reflections=n, yield_=y, tail=t if np.isfinite(t) else None
-                    )
-                    for u, n, y, t in outcome.shells
-                ],
+                **_metric_record(outcome),
             )
             for (layer, radiator), outcome in zip(radiators, outcomes, strict=True)
         ],
     )
     return spectrum, record
+
+
+def _metric_record(outcome: ReflectionCutoff) -> dict:
+    """The metric, continuum and shell table of one radiator's selection record."""
+    net = outcome.background is not None
+    shells = []
+    for index, (u, n, y, t) in enumerate(outcome.shells):
+        shell = dict(upper_invang=u, reflections=n, yield_=y, tail=t if np.isfinite(t) else None)
+        if net:
+            shell["share"] = outcome.shares[index]
+        shells.append(shell)
+    out: dict[str, object] = dict(metric="net" if net else "lines", shells=shells)
+    if net:
+        out["background_yield"] = outcome.background
+    return out
 
 
 _SELECTION_KEYS = frozenset({"model", "tolerance", "g_max_invang", "shell_width_invang"})

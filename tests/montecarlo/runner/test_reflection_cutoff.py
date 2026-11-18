@@ -225,3 +225,43 @@ def test_selection_keeps_the_spectrum_of_the_selected_set_on_the_axis():
     assert bins.sum() == pytest.approx(9500.0 + (grid[1] - grid[0]))
     with pytest.raises(ValueError):
         axis_yield_weights(grid, "simpson")
+
+
+def test_net_tail_runs_on_magnitudes_against_the_consistent_total():
+    # Net shells may change sign; the continuation uses |s_k| and the
+    # denominator is the kept net yield plus the layer continuum.
+    net = [8.0, 4.0, 2.0, -1.0]
+    assert geometric_tail_fraction(net, background=87.0) == pytest.approx(1.0 / 100.0)
+    assert geometric_tail_fraction([8.0, 4.0, 0.0], background=1.0) == math.inf
+    assert geometric_tail_fraction([1.0, -2.0, 0.5], background=-10.0) == math.inf
+    # background=None keeps the line form (a negative shell never converges).
+    assert geometric_tail_fraction(net) == math.inf
+
+
+def test_net_metric_stops_once_the_net_tail_is_small():
+    # Shell lines decay slowly (r = 0.7) but their continuum share cancels
+    # all but a fast-decaying net part: the net metric stops much earlier.
+    lines = [0.7**k for k in range(30)]
+    net_part = [0.4**k for k in range(30)]
+    shells = [(2.0 * (k + 1), [(k, 0, 0)]) for k in range(30)]
+    index = {(k, 0, 0): k for k in range(30)}
+
+    def line(members):
+        return lines[index[members[0]]]
+
+    def share(members):
+        k = index[members[0]]
+        return lines[k] - net_part[k]
+
+    by_lines = select_reflection_cutoff(line, shells, 1e-3)
+    by_net = select_reflection_cutoff(line, shells, 1e-3, share_yield=share, background=10.0)
+    assert by_net.converged and by_net.cutoff_invang < by_lines.cutoff_invang
+    assert by_net.background == 10.0 and by_lines.background is None
+    assert by_net.shares == pytest.approx(
+        [lines[k] - net_part[k] for k in range(len(by_net.shares))]
+    )
+    kept = len(by_net.shares)
+    tail = net_part[kept - 1] * 0.4 / 0.6 / (sum(net_part[:kept]) + 10.0)
+    assert by_net.tail_fraction == pytest.approx(tail, rel=1e-12)
+    with pytest.raises(ValueError, match="negative share"):
+        select_reflection_cutoff(line, shells, 1e-3, share_yield=lambda m: -1.0)

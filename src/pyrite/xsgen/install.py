@@ -11,9 +11,17 @@ FETCH_CODES = (
     "sbethe-tables",
     "elsepa",
     "bremslib",
+    "brem-lattice-share",
     "bote-salvat",
 )
-DATASET_FETCH_CODES = ("eedl", "eadl", "epdl", "epdl-differential", "bote-salvat")
+DATASET_FETCH_CODES = (
+    "eedl",
+    "eadl",
+    "epdl",
+    "epdl-differential",
+    "brem-lattice-share",
+    "bote-salvat",
+)
 #: Opt-in codes a bare fetch skips; ``pyrite tables fetch CODE`` installs them.
 OPTIONAL_FETCH_CODES = ("bote-salvat",)
 _POSITRON_FETCH_CODES = ("sbethe-tables", "elsepa")

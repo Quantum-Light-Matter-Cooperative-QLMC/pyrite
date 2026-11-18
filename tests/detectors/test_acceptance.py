@@ -211,7 +211,7 @@ def test_equal_acceptance_preserves_lowered_case_and_both_identities():
     # #642: default shell soft-loss straggling (straggling=False keeps 0ea5469b...).
     assert (
         case_content_key(cases[1])
-        == "0cc250cdad4f6e14cec55d6cb9cdc61576b4869466be8cb79ab5ac425f3089e4"
+        == "9ae00ed896e89fb9f2bbdc7a072428d59fb2bd30ea1e82f7bf2cafbf6f7aa2c5"
     )
     sweeps = [
         LegacySweep(material="hopg", beam=beam.to_spec(), target=target, detector=d)
@@ -221,7 +221,7 @@ def test_equal_acceptance_preserves_lowered_case_and_both_identities():
     assert identities[0] == identities[1]
     assert (
         identities[1]["parameter_sha256"]
-        == "2b5735942647d06052617fb8c3102e0de0ba52a53e5302a3096983b588f0726f"
+        == "5532b5a731ed0b4856f82f9617f609aa10e26868ee819a293afb321953b128bd"
     )
     # Pin to the pre-object payload vocabulary; no acceptance metadata enters identity.
     assert "detector" not in identities[0]["resolved_parameters"]["sweep"]

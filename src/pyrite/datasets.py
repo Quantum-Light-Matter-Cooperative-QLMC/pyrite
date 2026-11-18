@@ -119,6 +119,17 @@ EPDL_DIFFERENTIAL = Dataset(
         "EPDL2025 subshell photoionization and scattering functions, knot-thinned by PyRITE (11 MB)"
     ),
 )
+#: PyRITE-computed universal lattice-coherent bremsstrahlung share kernel
+#: (``release_brem_lattice_share_table.py``, #1250): crystalline BremsLib
+#: continua subtract the CBS share their lines score. Derived data, so
+#: PyRITE's release is the only location.
+BREM_LATTICE_SHARE = Dataset(
+    name="brem-lattice-share",
+    filename="brem_lattice_share_kernel.npz",
+    urls=(f"{_RELEASES}/tables-brem-lattice-share-1/brem_lattice_share_kernel.npz",),
+    sha256="c3e47b70d9260c9181e9ca496554f3630e0bd2aba4938356e986ef47082d6aa4",
+    description="Lattice-coherent bremsstrahlung share kernel, computed by PyRITE (59 MB)",
+)
 #: NIST BoteSalvatICX.jl K/L/M shell-ionization parameters (public domain), the
 #: opt-in Bote--Salvat backend of #92. Optional: no default run reads it, so it
 #: is not in :data:`DATASETS`; bare fetch and ``tables verify`` skip it, and
@@ -142,7 +153,7 @@ PDATCONF_SHA256 = "cd239554bb6e823692ea4611d443df8684b4cace06006fc271a4168cb78c6
 
 #: Every fetched dataset, in report order.
 DATASETS: dict[str, Dataset] = {
-    dataset.name: dataset for dataset in (EEDL, EADL, EPDL, EPDL_DIFFERENTIAL)
+    dataset.name: dataset for dataset in (EEDL, EADL, EPDL, EPDL_DIFFERENTIAL, BREM_LATTICE_SHARE)
 }
 
 #: Opt-in datasets that only explicitly selected models read; fetched by name.

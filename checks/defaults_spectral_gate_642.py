@@ -142,6 +142,8 @@ MARGINS = dict(
     mass_l1=1e-2,
 )
 BAND = (500.0, 10000.0)
+#: ``--selection-g-max``: shell cap of ``sel<x>`` points (``None``: production cap).
+SELECTION_G_MAX = None
 #: Warm timings whose relative spread (max - min) / median exceeds this are
 #: reported unresolved: no point estimate is claimed from them (#1143 Plan 5).
 TIMING_SPREAD_LIMIT = 0.2
@@ -440,6 +442,88 @@ def chunked_lines(scorer, chunks, grid):
         scorer.case = whole
 
 
+def chunked_components(scorer, chunks, grid):
+    """``(total, pxr, cbs)`` line densities summed over reflection chunks (#1250 P1).
+
+    Every production ``mc_cxr_spectrum`` call under ``scorer.lines`` runs with
+    ``components=True``; the PXR- and CBS-diagonal parts accumulate across
+    layers, electron blocks and chunks, and interference is the remainder.
+    A block-OOM retry would re-add discarded blocks, so the accumulated total
+    must reproduce the returned one or the call raises.
+    """
+    from pyrite.montecarlo.runner import case_driver
+
+    original = case_driver.mc_cxr_spectrum
+    parts = dict(total=0.0, pxr=0.0, cbs=0.0)
+
+    def split(*args, **kwargs):
+        total, pxr, cbs = original(*args, components=True, **kwargs)
+        for key, value in zip(parts, (total, pxr, cbs), strict=True):
+            parts[key] = parts[key] + np.asarray(value, dtype=float)
+        return total
+
+    case_driver.mc_cxr_spectrum = split
+    try:
+        total = chunked_lines(scorer, chunks, grid)
+    finally:
+        case_driver.mc_cxr_spectrum = original
+    if not np.allclose(parts["total"], total, rtol=1e-10, atol=0.0):
+        raise RuntimeError("component accumulation disagrees with the line total (block retry?)")
+    return (
+        total,
+        np.broadcast_to(parts["pxr"], grid.shape),
+        np.broadcast_to(parts["cbs"], grid.shape),
+    )
+
+
+def bin_mean_continuum(ladder, grid, fine_eV=1.0):
+    """Production brem averaged over each ``bin-mean`` cell of ``grid`` (#1250 P1).
+
+    The continuum is evaluated on nodes ``fine_eV`` apart inside every cell and
+    integrated with the trapezoid rule, so CXR and brem share one bin axis.
+    """
+    from pyrite.montecarlo.spectrum.characteristic import _energy_bin_edges_and_widths
+
+    edges, widths = _energy_bin_edges_and_widths(grid)
+    per_cell = max(2, int(np.ceil(widths.max() / fine_eV)) + 1)
+    nodes = np.concatenate(
+        [np.linspace(lo, hi, per_cell)[:-1] for lo, hi in zip(edges[:-1], edges[1:], strict=True)]
+        + [edges[-1:]]
+    )
+    density = ladder.continuum(nodes)
+    cells = np.add.reduceat(
+        0.5 * (density[:-1] + density[1:]) * np.diff(nodes),
+        np.arange(0, nodes.size - 1, per_cell - 1),
+    )
+    return cells / widths
+
+
+def component_metrics(grid, terms, brem):
+    """Yield, centroid and per-bin mass of each line term, also relative to brem.
+
+    ``terms`` maps names to ``bin-mean`` densities on ``grid``; signed terms
+    (interference) are allowed, so no positivity is required.
+    """
+    from pyrite.montecarlo.spectrum.characteristic import _energy_bin_edges_and_widths
+
+    edges, widths = _energy_bin_edges_and_widths(grid)
+    centres = 0.5 * (edges[:-1] + edges[1:])
+    brem_mass = np.asarray(brem) * widths
+    brem_yield = float(brem_mass.sum())
+    out = {}
+    for name, density in terms.items():
+        mass = np.asarray(density, dtype=float) * widths
+        total = float(mass.sum())
+        out[name] = dict(
+            yield_per_primary=total,
+            centroid_eV=float(np.sum(mass * centres) / total) if total != 0 else None,
+            fraction_of_brem=total / brem_yield,
+            bin_masses=mass.tolist(),
+            bin_fraction_of_brem=(mass / brem_mass).tolist(),
+        )
+    return out
+
+
 def tolerance_cutoff(case, scorer, tol, max_reflections, g_max=40.0):
     """Measured reciprocal cutoff for in-band tolerance ``tol`` (#1173 P3).
 
@@ -511,12 +595,43 @@ def tolerance_cutoff(case, scorer, tol, max_reflections, g_max=40.0):
     return f"g{cutoff:g}", record
 
 
+def _timed_continuum(case, scorer, transport, grid, quadrature, sync, share_s):
+    """The production net-metric continuum, with its share time added to ``share_s[0]``."""
+    from pyrite.montecarlo.runner.lattice_share import SelectionContinuum
+    from pyrite.montecarlo.runner.reflection_cutoff import axis_band_eV
+
+    continuum = SelectionContinuum(
+        case,
+        scorer._segments_device,
+        transport["n_hat"],
+        case.get("abs_layers"),
+        axis_band_eV(grid, quadrature),
+        groove=transport.get("groove"),
+        Ne=transport["Ne_brem"],
+    )
+    share = continuum.share
+
+    def timed_share(layer, hkls):
+        sync()
+        start = time.perf_counter()
+        value = share(layer, hkls)
+        sync()
+        share_s[0] += time.perf_counter() - start
+        return value
+
+    continuum.share = timed_share
+    return continuum
+
+
 def selected_row(case, transport, label, grid, quadrature, max_reflections, sync):
     """Production incremental selection (#1173 P4) at ``sel<x>``, timed on ``grid``.
 
     Runs :func:`select_case_reflections` with the band axis as production
     axis: each shell is scored once and the kept shells' sum is the spectrum,
     so ``band.first_s`` is the whole selection cost (no separate pilot).
+    Radiators with a corrected continuum use the production net metric
+    (#1250 P5c), on the ladder's continuum electrons; ``share_s`` is the part
+    of the cost spent on the continuum share.
     """
     from pyrite.energy_grid.convergence_case import CaseLadder
     from pyrite.montecarlo.runner.reflection_cutoff import (
@@ -525,6 +640,11 @@ def selected_row(case, transport, label, grid, quadrature, max_reflections, sync
     )
 
     scorer = CaseLadder(case, transport=transport)
+    share_s = [0.0]
+    if case.get("bremsstrahlung_model") != "bremslib":
+        continuum = None  # no corrected continuum: every radiator keeps the line metric
+    else:
+        continuum = _timed_continuum(case, scorer, transport, grid, quadrature, sync, share_s)
 
     def line_density(pilot, axis_grid):
         scorer.case = pilot
@@ -540,6 +660,8 @@ def selected_row(case, transport, label, grid, quadrature, max_reflections, sync
         axis_yield_weights(grid, quadrature),
         quadrature=None if quadrature == "node" else quadrature,
         max_reflections=max_reflections,
+        continuum=continuum,
+        **({} if SELECTION_G_MAX is None else {"g_max_invang": SELECTION_G_MAX}),
     )
     sync()
     elapsed = time.perf_counter() - begin
@@ -554,13 +676,21 @@ def selected_row(case, transport, label, grid, quadrature, max_reflections, sync
                     reflections=len(o.hkl_list),
                     tail_fraction=o.tail_fraction if np.isfinite(o.tail_fraction) else None,
                     converged=o.converged,
+                    background=o.background,
                     shells=[
-                        dict(upper=u, n=k, yield_=y, tail=t if np.isfinite(t) else None)
-                        for u, k, y, t in o.shells
+                        dict(
+                            upper=u,
+                            n=k,
+                            yield_=y,
+                            share=o.shares[i] if o.shares else None,
+                            tail=t if np.isfinite(t) else None,
+                        )
+                        for i, (u, k, y, t) in enumerate(o.shells)
                     ],
                 )
                 for o in outcomes
-            ]
+            ],
+            share_s=share_s[0],
         ),
         reflections=len(pruned["hkl_list"]),
         layer_reflections=None
@@ -585,6 +715,7 @@ def score_families(
     max_reflections,
     on_row=None,
     quadrature="node",
+    components=False,
 ):
     """Score each reflection set on the saved transport against the largest.
 
@@ -599,11 +730,21 @@ def score_families(
     a timeout keeps the finished points. ``quadrature="bin-mean"`` scores the
     band on ``reference_spacing`` bins instead of nodes (the #1192 device
     Fourier reduction); it needs ``wide_spacing <= 0``.
+
+    ``components=True`` (#1250 P1) also splits each band spectrum into PXR,
+    CBS and interference and records the production brem on the same bins
+    (``record["brem"]``), each term also as a fraction of brem. It needs the
+    bin-mean band and fixed ladder points.
     """
     from pyrite.energy_grid.convergence_case import CaseLadder
 
     if quadrature != "node" and wide_spacing > 0:
         raise ValueError("the wide full-support axis is node-only; pass wide_spacing <= 0")
+    if components and (
+        quadrature != "bin-mean"
+        or any(isinstance(n, str) and n.startswith(("tol", "sel")) for n in ns)
+    ):
+        raise ValueError("components need the bin-mean band and fixed ladder points")
 
     tp = ladder.transport
     pilots = {}
@@ -647,6 +788,10 @@ def score_families(
         margins=MARGINS,
         families=[],
     )
+    brem = None
+    if components:
+        brem = bin_mean_continuum(ladder, axes[0][1])
+        record["brem"] = component_metrics(axes[0][1], dict(brem=brem), brem)["brem"]
     rows = record["families"]
     scored = {}
     for label_n, n in zip(labels, ns, strict=True):
@@ -680,7 +825,15 @@ def score_families(
         for label, grid, edges in axes:
             sync()
             begin = time.perf_counter()
-            density = chunked_lines(scorer, chunks, grid)
+            if brem is None or label != "band":
+                density = chunked_lines(scorer, chunks, grid)
+            else:
+                density, pxr, cbs = chunked_components(scorer, chunks, grid)
+                row["components"] = component_metrics(
+                    grid,
+                    dict(total=density, pxr=pxr, cbs=cbs, interference=density - pxr - cbs),
+                    brem,
+                )
             sync()
             row[label] = dict(
                 nodes=int(grid.size),
@@ -1018,7 +1171,7 @@ ARM_OVERRIDES = {
 
 
 def main():
-    global BAND
+    global BAND, SELECTION_G_MAX
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("material", choices=["hopg", "silicon", "mos2-on-si"])
     parser.add_argument("output", type=Path)
@@ -1148,12 +1301,26 @@ def main():
         default=1024,
         help="reflections per radiator per line call for --families (bounds device tables)",
     )
+    parser.add_argument(
+        "--selection-g-max",
+        type=float,
+        default=None,
+        help="shell cap (1/angstrom) of sel<x> points; a tiny tolerance then records every "
+        "shell to the cap for offline replay (#1250 P5c)",
+    )
+    parser.add_argument(
+        "--families-components",
+        action="store_true",
+        help="split --families band spectra into PXR, CBS and interference and score the "
+        "production brem on the same bin-mean axis (#1250; needs --families-quadrature bin-mean)",
+    )
     args = parser.parse_args()
     if not (
         np.isfinite(args.families_band).all() and 0 < args.families_band[0] < args.families_band[1]
     ):
         parser.error("--families-band requires finite 0 < START_EV < STOP_EV")
     BAND = tuple(args.families_band)
+    SELECTION_G_MAX = args.selection_g_max
     if len(set(args.families)) != len(args.families):
         parser.error("--families points must be distinct")
     if len(args.continuum_reference_divisors) != 3:
@@ -1347,6 +1514,7 @@ def main():
                 json.dumps(dict(report, family_arms=partial), indent=2, allow_nan=False) + "\n"
             ),
             quadrature=args.families_quadrature,
+            components=args.families_components,
         )
         assert segment_fingerprint(ladder.segments) == ladder.fingerprint
         report["host_peak_rss_kib"] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss

@@ -16,9 +16,10 @@ Reusable Python implementations invoked by `pyrite-dev` live in
   schematics in `docs/_static/figures/`; `pyrite_logo.py` generates the
   physics-derived SVG/PNG wordmark.
 - `release_elsepa_tables.py`, `release_sbethe_tables.py`,
-  `release_bremslib_tables.py`, `release_epdl_table.py` and
-  `release_epdl_differential.sh` are maintainer-only hosted-table release
-  builders (see `docs/repo-design/data-distribution-and-repository-size.md`).
+  `release_bremslib_tables.py`, `release_epdl_table.py`,
+  `release_brem_lattice_share_table.py` (the universal lattice-coherent
+  bremsstrahlung share kernel, #1250) and `release_epdl_differential.sh` are
+  maintainer-only hosted-table release builders (see `docs/repo-design/data-distribution-and-repository-size.md`).
 - `__init__.py` makes the directory importable for wrapper tests.
 - `hooks/sync-skills.sh` is the pre-commit hook that regenerates
   `.claude/skills` from `.agents/skills`; `user_scripts/` contains example

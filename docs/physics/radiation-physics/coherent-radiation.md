@@ -176,7 +176,8 @@ The default `incoherent` policy sums intensities over flights and electrons unde
 - a single fixed far-field observation direction per evaluation; the finite detector face is handled by summing directions, not by parallax within one;
 - Beer–Lambert attenuation handles escape, with no feedback on emission;
 - the analytic finite-time profile has a known integral, but numerical spectra still have finite-window, grid, and segment-quadrature errors. Peak height also depends on the physical flight-length distribution;
-- detector response is downstream and must not be folded into source physics.
+- detector response is downstream and must not be folded into source physics;
+- the CBS lines are the lattice-coherent (Debye–Waller) part of the screened-nucleus bremsstrahlung that an amorphous continuum table also contains. With a BremsLib continuum, each crystalline layer's continuum has the share of exactly the scored reflections removed, from electrons above the line cutoff `E_cut_lines_keV`, so lines plus continuum count it once ([lattice-coherent share](bremsstrahlung.md#lattice-coherent-share-in-crystals)). PXR and the PXR×CBS interference have no amorphous counterpart in the continuum and are never subtracted. The measured [reflection selection](../materials/reflection-selection.md#default-measured-selection) therefore converges each shell's lines less that share. The isotropic EEDL continuum is not corrected and still double counts the share.
 
 ## Validation
 

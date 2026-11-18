@@ -482,3 +482,359 @@ and frozen transport; evidence is archived at
 These jobs used pre-rebase source `80c03a680`; the later upstream #1196
 repair affects the nonuniform ROCm near/far route, which these node and
 uniform Fourier measurements do not use.
+
+## Net-yield metric (#1250 P5c)
+
+Owner's statement for fresh-context re-verification; not yet independently
+verified. `CXR_REFLECTION_SELECTION_MODEL` is `measured-shell-cutoff-v4`.
+
+**Why the metric changed.** A crystalline BremsLib continuum now has the
+lattice-coherent share $S$ of the scored reflections removed
+(`brem-lattice-coherent-fraction`). The spectrum a run reports is therefore
+the consistent sum $\sum_{k\le K}L_k+C-\sum_{k\le K}S_k$, where $L_k$ is shell
+$k$'s in-band line yield, $S_k$ the in-band continuum share its reflections
+remove and $C$ the uncorrected continuum. Raising the cutoff by one shell
+changes that total by $s_k=L_k-S_k$, not by $L_k$. On the frozen #642
+transports, about 82 % of the g16 → g30 line increment is CBS, which $S_k$
+cancels to within 0.1–0.8 % (Si 300 keV) and 4–5 % (MoS₂/Si 30 keV, before
+the line-cutoff floor). A tail of $L_k$ measures omitted line yield, most of
+which the corrected continuum already restores. That forced G30.
+
+**Claim.** For a radiator whose layer continuum is corrected:
+
+- $s_k=L_k-S_k$, with $S_k$ the in-band yield of the production continuum
+  scorer evaluated with tables holding only shell $k$'s share
+  ($\text{base}-\text{corrected}$ for exactly those reflections, same
+  line-cutoff floor), on the case's continuum electrons, segments, layer
+  view and estimator (coupled or uncoupled).
+- The scorer is linear in the table, so the $S_k$ add to the share of the
+  union, up to DDCS nodes clamped at zero.
+- $S_k$ and $C$ are integrated by the trapezoid rule on 96 log-spaced nodes
+  per decade across the line band (the bin edges for `bin-mean`, first and
+  last node for `node`); $L_k$ keeps the production line weights.
+- Ratios and the decay count use $|s_k|$. The tail is
+  $\tau_k=|s_k|\,r_k/[(1-r_k)(\sum_{j\le k}s_j+C_r)]$, with $C_r$ the
+  radiator layer's own uncorrected in-band continuum; a zero $|s_k|$ or a
+  non-positive denominator gives $\infty$. The stop rule (three shells, two
+  consecutive decreases, $\tau_k\le\mathrm{tol}$) is unchanged.
+- Per-radiator denominators partition the layered case: summed over
+  radiators, the estimated omission is at most tol of
+  $\sum_r(\text{net}_r+C_r)$, which is no larger than the case's consistent
+  total (amorphous layers' continua are not assigned).
+- Radiators without a corrected continuum keep the v3 line metric.
+
+**Not claimed.** $|s_k|$ extrapolation bounds the omitted *net* magnitude
+only under the same unobserved-ratio assumption as v3, and a zero crossing
+of $s_k$ (where the share approaches the line yield at large $G$) can stop
+the search early. $S_k$ uses the continuum histories and $L_k$ the line
+histories; these overlap (identical when $N_e=N_e^{\rm brem}$) and the share
+is floored at the line cutoff, so common fluctuations largely cancel. The
+remaining noise on non-shared histories is amplified by $L_k/s_k$, so
+low-history runs pick a noisier $G$. The coarse continuum grid integrates absorption-edge
+steps with a trapezoid error far below tol.
+
+**Local probes** (2 histories, 0.5–10 keV, 100 eV bin-mean, tol 1e-3,
+`scratch/p5c/sel_probe.py` at `9140efe58`):
+
+| Scene | Radiator | Selected | Reflections | $s_k/L_k$ at stop | Tail |
+|---|---|---|---|---|---|
+| Si 300 keV / 10 µm | slab | G20 | 4,016 | 0.21 | 6.8e-4 |
+| MoS₂ 2000 Å / Si 30 keV | MoS₂ film | G22 | 15,930 | 0.15 | 3.4e-4 |
+| | Si substrate | G22 | 5,408 | 0.16 | 6.6e-4 |
+
+**Remote selection and total-spectrum margins** (64 histories, seeds
+642501–642503, qlmc jobs 13552–13555 and 13556–13558). Remote runs select the
+same arms as the local probes: Si G20 (estimated net tail 4.2–5.0e-4) and
+MoS₂/Si G22 on both radiators. The G20 total spectrum, lines through
+$|g|\le20$ plus the continuum corrected for that set, was compared with G30
+under the #1143 margins, on the same transports and 100 eV bins (worst of
+three seeds):
+
+| Arm | Reflections | Yield | Centroid | Peak | Dominant FWHM | Mass L1 |
+|---|---|---|---|---|---|---|
+| G20 | 4,016 | 4.4e-4 | 1.8e-4 | 4.3e-4 | 7.7e-5 | 3.5e-4 |
+| G22 | 5,408 | 1.8e-4 | 8.4e-5 | 2.6e-4 | 4.9e-5 | 1.7e-4 |
+| margin | | 1e-3 | 1e-3 | 1e-2 | 1e-2 | 1e-2 |
+
+G20 passes every margin. Its measured yield gap (4.4e-4) agrees with the
+selector's own tail estimate, so the default tolerance stays at 1e-3. The
+uncorrected continuum at G20 misses the yield margin (2.7e-3), which is the
+double count the correction removes.
+
+The share pass cost 4.6 s (Si) and 18 s (MoS₂/Si) against 11 s and 28 s of
+line scoring at 2 histories. It is dominated by the per-shell table builds,
+which do not grow with the history count.
+
+**Tests.** `tests/montecarlo/runner/test_reflection_cutoff.py`
+(`::test_net_tail_runs_on_magnitudes_against_the_consistent_total`,
+`::test_net_metric_stops_once_the_net_tail_is_small`),
+`tests/montecarlo/runner/test_lattice_share.py::test_share_only_tables_hold_what_the_correction_removes`,
+`tests/montecarlo/runner/test_reflection_selection_spectrum.py::test_selected_spectrum_is_the_spectrum_of_the_selected_set`
+(production record: `metric="net"`, background, $0<S_k<L_k$, selected
+spectrum still equals the single-call spectrum of the selected set).
+
+## Net-metric re-verification (2026-11-17)
+
+Fresh-context verification of the v4 net metric (`measured-shell-cutoff-v4`).
+Sections 1–5 were written from the ledger rows
+`reflection-yield-tolerance-selector` and `brem-lattice-coherent-fraction`
+and the owner's statement above. They were written before the bodies of
+`reflection_cutoff.py`, `lattice_share.py` and `brem_lattice_share.py` were
+read. The code comparison follows.
+
+### 1. What the cutoff changes
+
+Fix one radiator $r$, its transport, observer direction, absorption stack and
+line band $[E_a,E_b]$. Write $\Lambda_g(E)$ for the incoherent line density of
+reflection $g$ and $b(E)$ for the uncorrected continuum density of the layer.
+Write $\sigma_g(E)$ for the continuum density that reflection $g$'s
+lattice-coherent share contributes. The correction removes that share for
+exactly the scored set $\mathcal G$. For a cutoff $G$, with
+$\mathcal G(G)=\{g:\lvert g\rvert\le G\}$, the reported in-band yield is
+
+$$
+Y(G)=\int_{E_a}^{E_b}\Bigl[\sum_{g\in\mathcal G(G)}\Lambda_g
++b-\Sigma_{\mathcal G(G)}\Bigr]\,\mathrm dE ,
+$$
+
+where $\Sigma_{\mathcal G}$ is the continuum density the corrected table
+removes. If the correction is linear in the reflection set,
+$\Sigma_{\mathcal G}=\sum_{g\in\mathcal G}\sigma_g$ (section 3), then with
+shells $\mathcal G_k$,
+
+$$
+Y(G_K)=\sum_{k\le K}\underbrace{\bigl(L_k-S_k\bigr)}_{s_k}+C_r,\qquad
+L_k=\int\sum_{g\in\mathcal G_k}\Lambda_g,\quad
+S_k=\int\sum_{g\in\mathcal G_k}\sigma_g,\quad C_r=\int b .
+$$
+
+So $s_k$ is additive over shells because both $L_k$ and $S_k$ are, and
+$Y(G_{K+1})-Y(G_K)=s_{K+1}$ exactly. The omitted part of the converged answer
+is $Y(\infty)-Y(G_K)=\sum_{k>K}s_k$. The consistent relative omission is
+therefore
+
+$$
+\frac{\sum_{k>K}s_k}{\sum_{k\le K}s_k+C_r}.
+$$
+
+The denominator is the line plus corrected continuum yield of the kept
+spectrum in the band. Using $L_k$ instead, as v3 did, measures omitted *line*
+yield. Most of that yield is CBS that the uncorrected part of the continuum
+already contains, so v3 over-states the omission whenever the continuum is
+corrected. $s_k$ is the correct stop quantity for a corrected radiator. For
+an uncorrected radiator $\sigma_g\equiv0$, so the reported spectrum is
+$\sum L_k+C_r$ and the increment is $L_k$. The v3 line metric with the
+line-only denominator remains the stated v3 quantity; including $C_r$ there
+would be a different, looser choice and is not claimed.
+
+**Units and normalization.** $L_k$, $S_k$ and $C_r$ must be integrals of
+densities in the same convention: photons per incident electron per sr per eV,
+integrated over the same band in eV, at the same observer direction, and after
+the same self-absorption. They must also use the same per-incident-electron
+normalization, so a per-history average over two different populations is
+legitimate only when both divide by their own number of primaries. The
+quadratures may differ, for example production line weights for $L_k$ and a
+log-node trapezoid for $S_k$ and $C_r$. Both still approximate the same
+integral, and the difference is quadrature error. The trapezoid error on an
+absorption-edge step is bounded by the step height times the node spacing:
+at 96 nodes per decade, $\Delta E/E=10^{1/96}-1=2.4\%$. The edge error is
+therefore at most about $\tfrac12\times2.4\%$ of the local continuum density
+times one interval, a few $10^{-4}$ of $C_r$ per edge in a 0.5–10 keV band.
+This error enters $C_r$ and the denominator, not the shell ratios, so it moves
+$\tau$ by a relative amount of that size.
+
+### 2. Geometric tail on a signed sequence
+
+For a corrected radiator, $s_k\approx\mathrm{PXR}_k+I_k+\delta_k$, where
+$I_k$ is the PXR×CBS interference and $\delta_k$ is the model mismatch between
+the line route's CBS and the share. The ledger quotes $\delta$ as 0.1–0.8 % of
+CBS for Si 300 keV and 4–5 % for MoS₂/Si before the floor. Each term can have
+either sign in principle, although $\mathrm{PXR}_k\ge0$. If
+$\lvert s_{k+j}\rvert\le\lvert s_k\rvert r_k^{\,j}$ for every $j\ge1$, then
+
+$$
+\Bigl\lvert\sum_{j\ge1}s_{k+j}\Bigr\rvert\le\sum_{j\ge1}\lvert s_{k+j}\rvert
+\le\frac{\lvert s_k\rvert r_k}{1-r_k}.
+$$
+
+The magnitude extrapolation therefore bounds the signed remainder under the
+same sufficient condition as v3. Sign changes in the tail only make it more
+conservative, by the triangle inequality. The new failure mode is a
+**zero crossing in the observed shells**. If $s_k$ passes through zero at shell
+$k$ while the later $\lvert s_{k+j}\rvert$ grow again with the opposite sign,
+the sequence $\lvert s_{k-2}\rvert>\lvert s_{k-1}\rvert>\lvert s_k\rvert\approx0$
+satisfies the two-decrease guard, and $\tau_k\approx0$ stops the search.
+The max-of-two ratio does not prevent this, because $\tau_k$ is proportional
+to $\lvert s_k\rvert$. All terms carry the same Debye–Waller envelope
+$e^{-2W}$, so a crossing needs $\mathrm{PXR}_k+I_k\approx-\delta_k$, an
+accidental cancellation rather than a trend. It cannot be excluded in
+general. It is plausible when the net fraction $s_k/L_k$ is comparable to the
+relative mismatch $\delta_k/L_k$, which is not the case in the owner's probes
+($s_k/L_k=0.15$–$0.21$ against $\delta/L\lesssim0.05$). This must be stated
+as a limit of the claim.
+
+A non-positive denominator $\sum_{j\le k}s_j+C_r\le0$ would mean the kept
+spectrum has non-positive in-band yield, so no relative tolerance is defined.
+Returning $\infty$ there, and for $\lvert s_k\rvert=0$, is the correct refusal.
+
+### 3. Additivity of share-only tables
+
+Let the continuum scorer map a DDCS table $\chi$ to an in-band yield
+$\mathcal S[\chi]$. If $\mathcal S$ is linear in $\chi$, meaning that the
+per-node values enter only through interpolation weights that do not depend on
+$\chi$ and through a sum over segments, then
+
+$$
+\mathcal S[\chi_{\rm base}-\chi_{\rm corr}(\mathcal G)]
+=\sum_k\mathcal S[\chi_{\rm base}-\chi_{\rm corr}(\mathcal G_k)]
+$$
+
+holds whenever $\chi_{\rm base}-\chi_{\rm corr}(\mathcal G)=\sum_k
+(\chi_{\rm base}-\chi_{\rm corr}(\mathcal G_k))$ node by node. The
+correction removes $kS_{\mathcal G}/(nZ^2)$ per node with
+$S_{\mathcal G}=\sum_{g\in\mathcal G}\lvert U_g\rvert^2H$, which is linear in
+the set. The identity fails only at nodes clamped at zero, where
+$\chi_{\rm corr}=\max(\chi_{\rm base}-\Delta_{\mathcal G},0)$ makes the removed
+amount $\min(\Delta_{\mathcal G},\chi_{\rm base})$, which is sub-additive. There,
+$\sum_kS_k\ge S_{\mathcal G}$, so the net sum slightly under-states the kept
+total. Linearity also requires conditions that must be checked in the code:
+
+- interpolation linear in the table value (log-interpolation in $\chi$ would
+  break it);
+- the photon-energy sampling and the transport do not depend on the
+  correction (transport keeps the full tables per the sibling row);
+- the share-only pass uses the same line-cutoff floor and node set as the
+  production correction.
+
+### 4. Different electron populations
+
+$L_k$ is scored on the line histories and $S_k$, $C_r$ on the continuum
+histories. (The code comparison below finds that the two sets share histories
+$[0,\min(N_e,N_e^{\rm brem}))$, which reduces the effect estimated here.)
+Each is an unbiased per-primary estimator, so
+$\mathbb E[s_k]=\mathbb E[L_k]-\mathbb E[S_k]$. The stop decision is not
+linear in $s_k$, however. Within a population, all shells share the same
+histories, so the dominant fluctuation is a common, nearly shell-independent
+scale: $L_k\to L_k(1+\epsilon_L)$ and $S_k\to S_k(1+\epsilon_S)$. Then
+
+$$
+s_k\to s_k+\epsilon_LL_k-\epsilon_SS_k,\qquad
+\frac{\delta s_k}{s_k}\approx\frac{\epsilon_L-(1-f)\epsilon_S}{f},\quad
+f=s_k/L_k .
+$$
+
+With $f\approx0.2$ the relative noise of $\epsilon$ is amplified by about
+$5\times$. If $L_k/S_k$ is nearly constant across neighbouring shells, the
+error is again roughly proportional to $s_k$, so the ratios $r_k$ are
+preserved. The relative change of $\tau_k$ is then about
+$\delta s_k/s_k$ in the numerator, diluted by $C_r$ in the denominator. That
+is a multiplicative error on $\tau$, not an offset on tol. Averaged over
+fluctuations, $\mathbb E\lvert s_k\rvert\ge\lvert\mathbb E s_k\rvert$ biases
+the magnitude, and so $\tau$, upward when $s_k$ is near its noise floor.
+That is a conservative bias (a later stop). Shell-to-shell decorrelated noise
+(different histories populating different shells) can instead fake a
+decrease and stop early. This is the v3 risk, magnified by $1/f$. Low-history
+runs (the owner's 2-history probes) therefore select a noisy $G$. This is a
+statistical, not a systematic, defect, and it vanishes as the history count
+grows.
+
+### 5. Limits
+
+- No reflections, or no corrected continuum: every $S_k=0$ and $C_r$ plays no
+  role, so the metric must reduce exactly to v3 ($s_k=L_k$, denominator
+  $\sum L_j$).
+- $B\to\infty$ or $G\to0$: the share vanishes, the same reduction.
+- Multiple radiators: each $\tau^{(r)}\le\mathrm{tol}$ against
+  $\sum s^{(r)}+C_r$, so the summed estimated omission is at most
+  $\mathrm{tol}\sum_r(\text{net}_r+C_r)$. That is at most tol of the case
+  total if every per-radiator denominator is positive, because the remaining
+  amorphous continua are non-negative.
+
+### 6. Comparison with the implementation (head `9c72bd04c`)
+
+| Derived requirement | Implementation | Result |
+|---|---|---|
+| Increment $s_k=L_k-S_k$; decay and ratios on $\lvert s_k\rvert$ | `select_reflection_cutoff`: `metric = value - share`; `decaying` compares `abs(metric)` | Match |
+| $\tau_k=\lvert s_k\rvert r_k/[(1-r_k)(\sum_{j\le k}s_j+C_r)]$, $r_k$ max of two | `geometric_tail_fraction(..., background)` | Match |
+| Refuse zero $\lvert s_k\rvert$ and a non-positive total | `np.any(size == 0.0) or not total > 0.0` gives `inf` | Match (any zero shell, not only the last: stricter, consistent with v3) |
+| $S_k$ from tables holding $\chi_{\rm base}-\chi_{\rm corr}(\mathcal G_k)$ with the production floor | `share_only_tables` calls the production `_corrected_tables` with `_line_cutoff_keV(case)` and subtracts DDCS and SDCS | Match |
+| Scorer linear in the table | `_evaluate`: linear in $\theta$, $k/T$ and $\ln T$ fractions, with weights independent of table values. `lattice_share_density`: `einsum` over $\lvert U_g\rvert^2$ weights. SDCS: $\chi^{\rm corr}_{\rm SDCS}=\chi^{\rm base}_{\rm SDCS}\cdot\mathrm{new}/\mathrm{old}$, a per-node constant times the corrected angular integral | Linear except at clamps |
+| Clamp exception | `ddcs = np.maximum(ddcs, 0.0)`, so the share-only node is $\min(\chi_{\rm base},\Delta)$, which is sub-additive: $\sum_kS_k\ge S_{\mathcal G}$ | Match; the direction is a small under-statement of the kept total |
+| Same estimator, layer view, composition, normalization | `_layer_brem_from_segments` uses `mc_brem_spectrum` (uncoupled; same `cross_section_model`, `bremslib_tables`, `groove`, `E_cut_brem_keV`, `electron_limit=Ne_brem`) or `mc_coupled_brem_spectrum` (coupled), on the same layer composition as `_uncoupled_brem_from_segments`/`_coupled_brem_from_segments` | Match |
+| $C_r$ is the uncorrected in-band continuum of the layer | `background` scores the base tables with `tabled_only=False`, so untabled elements keep their EEDL fallback as in production | Match |
+| Share omits untabled elements | `tabled_only=True` drops them; `share_only_tables` passes them through unchanged | Match |
+| Band equals the line band | `axis_band_eV`: `bin-mean` outer edges, `node` end nodes; 96 log nodes per decade, trapezoid | Match |
+| Correction set equals the selected set | `continuum_case` → `scored_reflections` rebuilds the shells to the cutoff and refuses a count mismatch | Match |
+| Uncorrected radiator → v3 | `SelectionContinuum.applies` is `_uncorrected_reason(...) is None`; otherwise `select_reflection_cutoff` is called without `share_yield` (`background=None`, line form) | Match |
+| Units | $L_k$: line density at the production weights; $S_k$, $C_r$: continuum density at trapezoid weights; both are photons per primary per sr per eV integrated over eV, at the same `n_hat` and absorption stack (`abs_layers`) | Match |
+
+**Electron populations.** `electron_cutoffs` shows that the line histories are
+$[0,N_e)$ and the continuum histories $[0,N_e^{\rm brem})$. They share
+$[0,\min)$ and are identical when $N_e=N_e^{\rm brem}$. The continuum scorer
+runs continuum histories down to `E_cut_brem_keV`, but the share is zero below
+`E_cut_lines_keV` (the floor), which is exactly where the line route stops. So
+$L_k$ and $S_k$ are estimated mostly on the same histories over the same
+electron-energy range, and the common-scale fluctuations of section 4 largely
+cancel. The owner's "Not claimed" wording ("different electron populations")
+is conservative. They are distinct only when $N_e\ne N_e^{\rm brem}$, and then
+only for the surplus histories. No systematic bias of the stop follows. The
+residual statistical effect is the $1/f$ amplification of section 4 on
+non-shared histories plus any history-level CBS-versus-share mismatch.
+
+**Zero-crossing probe** (independent synthetic sequence, the production
+`select_reflection_cutoff`). Take $\mathrm{CBS}_k=100\cdot0.8^k$,
+$\mathrm{PXR}_k=60\cdot0.7^k$, $L_k=\mathrm{CBS}_k+\mathrm{PXR}_k$,
+$S_k=1.3\,\mathrm{CBS}_k$ and $C_r=500$. The net yield falls through zero at
+$k=5$ (0.254, then −0.805). The selector stops at $K=5$ with estimate
+$3.2\times10^{-4}$, but the true omission is $2.9\times10^{-2}$ of the kept
+total, 29× tol. The 30 % mismatch is exaggerated for illustration, but the
+mechanism is generic. PXR and interference fall with $f_0(s)$ faster than CBS
+falls with $(Z-f_0)$, so $s_k/L_k\to1-S/\mathrm{CBS}$ at large $G$. The ledger
+gives $S/\mathrm{CBS}_{\rm MC}=0.999$–$1.008$ (Si 300 keV) and $1.04$–$1.05$
+(MoS₂/Si 30 keV), so the net sequence can cross zero once $s_k/L_k$ reaches
+the mismatch level. The owner's probes stop at $s_k/L_k=0.15$–$0.21$, well
+before such a crossing, so these selections are unaffected. Tighter
+tolerances or larger $G$ approach the crossing. This is a scope limit, not an
+implementation fault. The existing "not a bound" disclaimer formally covers
+it, because a crossing violates the future-ratio condition, but it is not named.
+
+**Wording and notation findings (no code fault).**
+
+1. The ledger row's net bullet calls the background $B$, which collides with
+   the Debye–Waller $B$ used in the same row. The derivation page uses $C_r$;
+   use $C_r$ in the ledger.
+2. Name the zero-crossing limit in the ledger "Not a bound" bullet and in the
+   page's "Not claimed". Asymptotically $s_k/L_k\to1-S/\mathrm{CBS}$, so a
+   crossing of $s_k$ through zero can stop the search early. The magnitude tail
+   is trustworthy only while $\lvert s_k\rvert/L_k$ is well above the
+   share/CBS mismatch.
+3. "Different electron populations" should read: the line and continuum
+   histories overlap, $[0,\min(N_e,N_e^{\rm brem}))$, and the share is
+   floored at the line cutoff.
+4. `SELECTION_NODES_PER_DECADE`'s comment gives "~2.4 %" as the trapezoid
+   error. 2.4 % is the node spacing $\Delta E/E$. The edge-step error is of
+   order half a step times one interval, a few $10^{-4}$ of $C_r$ per edge.
+   The conclusion (far below tol) is unchanged.
+
+### 7. Tests run
+
+`uv run pyrite-dev test tests/montecarlo/runner/test_reflection_cutoff.py
+tests/montecarlo/runner/test_reflection_selection_spectrum.py
+tests/montecarlo/runner/test_lattice_share.py` under an 8 GiB memory cap:
+34 passed (16.7 s). Independent synthetic probe above:
+`select_reflection_cutoff` with a sign-changing net sequence.
+
+### 8. Verdict
+
+| Filter | Result |
+|---|---|
+| Units / normalization | Pass: same per-primary, per-sr, in-band convention and observer |
+| Limits | Pass: uncorrected radiator → v3 line form; $B\to\infty$, $G\to0$, empty set → zero share |
+| Signs / conventions | Pass: $s_k=L_k-S_k$; magnitude extrapolation; refusal of a non-positive total |
+| Additivity | Exact for share-only tables except clamped DDCS nodes (sub-additive, $\sum S_k\ge S_{\mathcal G}$) |
+| Scope limit | Zero crossing of $s_k$ can stop early (shown); unnamed in the claim |
+
+Re-derivation **matches** the implementation term for term. Verdict
+**`rederived`** for the v4 net metric, conditional on wording edits 1–3 above
+being applied to the ledger row (no code change required). Human sign-off is
+not granted.

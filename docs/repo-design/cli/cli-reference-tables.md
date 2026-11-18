@@ -49,7 +49,7 @@ Commands:
 
 ```text
 Usage: pyrite tables fetch [OPTIONS] [eedl|eadl|epdl|epdl-differential|sbethe|sbethe-
-                           tables|elsepa|bremslib|bote-salvat]
+                           tables|elsepa|bremslib|brem-lattice-share|bote-salvat]
 
   Fetch pinned data into your user data directory; without CODE, all of it.
 
@@ -75,6 +75,10 @@ Usage: pyrite tables fetch [OPTIONS] [eedl|eadl|epdl|epdl-differential|sbethe|sb
   bremslib       BremsLib-derived bremsstrahlung tables for every element a
                  catalogue material may contain, so no BremsLib checkout is
                  needed for them.
+  brem-lattice-share
+                 PyRITE-computed lattice-coherent bremsstrahlung share kernel
+                 (59 MB), which crystalline BremsLib runs read to remove the
+                 continuum share their coherent-bremsstrahlung lines score.
   bote-salvat    NIST's public-domain Bote-Salvat K/L/M shell-ionization
                  parameters, read only when a run selects the opt-in
                  Bote-Salvat ionization model.
@@ -88,15 +92,15 @@ Usage: pyrite tables fetch [OPTIONS] [eedl|eadl|epdl|epdl-differential|sbethe|sb
   --archive. Download locations are tried in order (upstream, then PyRITE's mirror). A
   complete existing install returns successfully without network access.
 
-  PyRITE's own archives (epdl, epdl-differential, sbethe-tables, elsepa, bremslib, and
-  the eedl and eadl mirrors) are on public GitHub Releases; downloading them needs no
-  GitHub token.
+  PyRITE's own archives (epdl, epdl-differential, sbethe-tables, elsepa, bremslib, brem-
+  lattice-share, and the eedl and eadl mirrors) are on public GitHub Releases;
+  downloading them needs no GitHub token.
 
 Options:
   --archive FILE                  Install CODE from a local copy of the pinned archive
-                                  (for eedl, eadl, epdl, epdl-differential and bote-
-                                  salvat, of the pinned file itself) instead of
-                                  downloading it. Needs CODE.
+                                  (for eedl, eadl, epdl, epdl-differential, brem-
+                                  lattice-share and bote-salvat, of the pinned file
+                                  itself) instead of downloading it. Needs CODE.
   --projectile [electron|positron]
                                   Table species. Positron requires CODE elsepa or
                                   sbethe-tables; other data are species-independent.
@@ -294,9 +298,10 @@ Usage: pyrite tables verify [OPTIONS]
 
 Options:
   --require TEXT             Comma-separated codes whose pinned tables or datasets must
-                             be present (bremslib, elsepa, sbethe-tables, eedl, eadl,
-                             epdl, epdl-differential, sbethe).  [default:
-                             bremslib,elsepa,sbethe-tables,eedl,eadl,epdl,sbethe]
+                             be present (bremslib, brem-lattice-share, elsepa, sbethe-
+                             tables, eedl, eadl, epdl, epdl-differential, sbethe).
+                             [default: bremslib,brem-lattice-share,elsepa,sbethe-
+                             tables,eedl,eadl,epdl,sbethe]
   -o, --output [table|json]  Output format; only json is a stable automation contract.
                              [default: table]
   -h, --help                 Show this message and exit.

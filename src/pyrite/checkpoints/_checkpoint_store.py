@@ -28,7 +28,7 @@ COMPONENTS = ("line", "brem", "characteristic", "channeling", "transition", "pho
 OPTIONAL_COMPONENTS = frozenset({"channeling", "transition", "photon"})
 _HDF5_SUFFIX = ".h5"
 _LEGACY_SUFFIX = ".pkl"
-_BREM_KEYS = frozenset({"brem", "E_grid_brem", "brem_wide"})
+_BREM_KEYS = frozenset({"brem", "E_grid_brem", "brem_wide", "brem_lattice_share"})
 _BREM_CASE_KEYS = frozenset({"Ne_brem", "E_grid_brem", "brem_chunk", "brem_file"})
 #: Companion payload keys; the photon aperture retains its own histogram grid.
 _LINE_COMPONENT_KEY = {

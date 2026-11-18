@@ -136,6 +136,64 @@ with {math}`k`, {math}`a` and {math}`\hbar\omega_p` in eV and {math}`\gamma` fro
 
 Limits: {math}`\hbar\omega_p=0` or {math}`k\gg a` gives {math}`F\to1` and the original partition exactly; {math}`k\ll a` gives {math}`F\approx k^2/a^2`, which makes the infrared rate finite. Suppression is on for every coupled run (`hard_radiative.radiative_core_args`), so the model has no step in beam energy. At low {math}`\gamma` it reaches only {math}`k\sim\hbar\omega_p`: with {math}`k_c=1` keV it lowers Si soft radiative stopping by about 5 % and total radiative stopping by 0.2--0.7 % at 10--40 keV, where the leading high-{math}`\gamma` form is itself only indicative. Transport records `dielectric_model = "ter-mikaelian-v1"` and the layer plasma energies, and `BREMSSTRAHLUNG_BREMSLIB_MODEL` carries `tm-coupled-v2`. The fused float32 CUDA continuum reducer applies the same factor per segment (`brem_jit_kernel._bremslib_or_fallback_weighted_scalar`). Omitted: LPM suppression, interfaces and transition radiation, optical dispersion, and the dielectric change of the angular law. For uncoupled or post-hoc estimates, `spectrum.dielectric_suppression.dielectric_omission_bound` bounds the fractional yield overestimate above {math}`k_{\min}` for fixed trajectories. Validation: `dielectric-suppression`.
 
+## Lattice-coherent share in crystals
+
+BremsLib tabulates isolated-atom bremsstrahlung. In a crystal, the Debye--Waller part {math}`e^{-2W}` of the same emission is lattice-coherent: the CXR route scores it as coherent-bremsstrahlung (CBS) lines at the reciprocal vectors it keeps. Orientation-averaging the screened-potential sum gives
+
+```{math}
+\Big\langle\Big|\sum_j u(\mathbf q)e^{i\mathbf q\cdot\mathbf R_j}\Big|^2\Big\rangle
+= N|u|^2\big(1-e^{-2W}\big)+e^{-2W}|u|^2\Big|\sum_j e^{i\mathbf q\cdot\mathbf R_j}\Big|^2 ,
+```
+
+and the second term is the line sum. Adding the CBS lines to the full amorphous continuum therefore counts that share twice: about 8 % of the total 0.5--10 keV yield on the #642 Si (300 keV) and MoS{sub}`2`/Si (30 keV) scenes at {math}`|\mathbf g|\le30` Å{sup}`-1`.
+
+Each crystalline layer's continuum is therefore scored with the share of exactly the reflections its line route scores removed. The share is the orientation-averaged Born--Debye--Waller CBS-only line yield {math}`S_j(T,\theta,k)` per unit path, from the production CBS amplitude with exact recoil in vacuum kinematics. It is subtracted from element {math}`j`'s scaled DDCS at every table node as {math}`k\,S_j/(n_jZ^2)`, clamped at zero, and the node's SDCS follows the new DDCS's solid-angle integral. Because the orientation average of one reflection depends only on {math}`|\mathbf g|`,
+
+```{math}
+S_j=\sum_{\mathbf g\ \rm scored}|U_{\mathbf g}|^2\,\frac{n_j|u_j(g)|^2}{\sum_i n_i|u_i(g)|^2}\,H(|\mathbf g|;T,\theta,x),\qquad
+x=\frac{\hbar\omega(1-\beta\cos\theta)}{\hbar c\,|\mathbf g|\,\beta},
+```
+
+where {math}`x` is {math}`\hat{\mathbf g}\cdot\hat{\mathbf v}` at the classical resonance. The kernel {math}`H` depends on no crystal. It is one released table (`pyrite tables fetch brem-lattice-share`, built by `scripts/release_brem_lattice_share_table.py`) on these nodes:
+
+- {math}`|\mathbf g|`: 69 log nodes over 0.25--75.4 Å{sup}`-1`;
+- {math}`T`: 36 log nodes over 1 keV--1.06 MeV;
+- {math}`\theta`: 5° steps;
+- {math}`x`: 210 bins.
+
+It is interpolated linearly in {math}`\ln|\mathbf g|` and {math}`\theta` at fixed {math}`x`. Between {math}`T` nodes the total is interpolated in {math}`\ln T` and the normalized shape linearly. Interpolation error:
+
+- Si-scene probes at these spacings: {math}`|\mathbf g|` at most 1 % per bin, {math}`\theta` at most 0.7 % per bin (2.7 % at 10°), {math}`T` at most 0.4 % in total.
+- Over the whole released grid, dropping one node (twice the spacing) misplaces 4.9 % ({math}`|\mathbf g|`), 1.2 % ({math}`\theta`) and 4.6 % ({math}`T`) of the mass, mass-weighted. The worst nodes are at the recoil edge in {math}`|\mathbf g|` and at 1--4 keV, where the share is small.
+- End to end (Si 30 keV, 45°, {math}`G=30`), the share is 1.003 of the direct quadrature, 0.98--1.03 per bin.
+
+Reflections outside the kernel's {math}`|\mathbf g|` range (0.25--75.4 Å{sup}`-1`) contribute no share. Only very large cells reach the lower edge.
+
+Measured selections subtract the share of the set they select. The streamed route, which keeps the build-time families, subtracts that set's share. The measured selector itself stops on each shell's lines less this share; see [reflection selection](../materials/reflection-selection.md#default-measured-selection).
+
+Table nodes with {math}`T` below the line route's electron cutoff `E_cut_lines_keV` (5 keV by default) keep the full DDCS: the line route scores no CBS from those electrons, so nothing would replace the removed share. On a 16-history MoS{sub}`2`/Si transport, the share below the cutoff was 2.8 % of the share and 0.23 % of the continuum, with 95 % of it at 0.5--2 keV. Segments between the two table nodes that bracket the cutoff receive an interpolated partial correction. This is a slight over-subtraction: about 3e-3 of the share at Si 30 keV, a few 1e-4 of the continuum.
+
+Each corrected run records `brem_lattice_share` in its output and provenance: the correction model and, for each layer, whether it was corrected (with the line cutoff, scored reflection count and each element's removed fraction) or the reason it was not.
+
+Only emission changes. Transport keeps the full tables, because the electron loses that energy to the CBS lines instead. Corrected tables keep their parent's key and digest, which the coupled partition check compares. The correction carries its own identity marker.
+
+Validated on frozen transports of the two #642 scenes (#1250):
+
+- **Si 300 keV:** the share matches the Monte Carlo CBS within 0.999--1.008 for {math}`G\ge12` Å{sup}`-1`.
+- **Si 300 keV, temperature check:** the match holds within 0.2--0.7 % while CBS changes 2.6× with {math}`B` between 0.23 and 0.92 Å{sup}`2`.
+- **MoS{sub}`2`/Si 30 keV:** before the line-cutoff floor, the share was 4.5 % above the Monte Carlo CBS (0.4 % of the continuum), concentrated at 0.5--2 keV. The beam stops in this scene, and the share removed from electrons below `E_cut_lines_keV` (2.8 % of the share, 95 % of it at 0.5--2 keV, measured on a 16-history transport) accounts for most of that excess. The remainder is partly explained by the share's floor at {math}`T=1`--2 keV.
+
+Not corrected, and stated as such:
+
+- the isotropic EEDL continuum, which warns with `LatticeShareUncorrectedWarning`;
+- elements without a BremsLib table;
+- channeling cases;
+- incident energies above 1.06 MeV.
+
+Grazing photon exit is also uncovered: refraction suppresses the production lines there, while the share uses vacuum kinematics. Validation: `brem-lattice-coherent-fraction`.
+
+**Migration.** Default crystalline BremsLib spectra lose the double-counted share: 3--4 % of the total 0.5--10 keV yield on the #642 scenes at {math}`G=8` Å{sup}`-1` and about 8 % at {math}`G=30` Å{sup}`-1`, and the total spectrum's dominant peak falls by 9--12 % at {math}`G=30`. Line spectra are unchanged at a fixed reflection set. Crystalline BremsLib checkpoints written before the correction do not resume: their identity lacks the `brem_lattice_share_model` marker. Pass the private case key `_brem_lattice_share=False` only to reproduce the old double-counting sum in validation harnesses.
+
 ## Per-segment yield
 
 For the EEDL and Bethe--Heitler backends emission is taken **isotropic**. For a segment of length {math}`L` traversed in an element of number density {math}`n_Z`, the contribution to the observed spectrum is
@@ -147,7 +205,7 @@ For the EEDL and Bethe--Heitler backends emission is taken **isotropic**. For a 
 
 with {math}`T_{\rm abs}` the Beer--Lambert escape transmission from the segment midpoint along the observation direction. Contributions are summed over segments and electrons and divided by the electron count, so the returned quantity is **photons per eV per steradian per incident electron** — the same units as the line spectrum.
 
-Isotropy approximates a scattering-randomized electron population in the intended weakly relativistic regime; it does not resolve directional emission from an individual electron. The BremsLib backend does: each segment's {math}`\frac{1}{4\pi}\frac{d\sigma}{dk}` is replaced by {math}`\frac{d^2\sigma}{dk\,d\Omega}(T,k,\theta)` with {math}`\cos\theta=\hat v\cdot\hat n`, the straight-flight electron direction against the observation direction. The small coherent fraction of the continuum — which is what forms the CBS lines — is **not** subtracted here, so adding the line and continuum spectra slightly double counts that fraction.
+Isotropy approximates a scattering-randomized electron population in the intended weakly relativistic regime; it does not resolve directional emission from an individual electron. The BremsLib backend does: each segment's {math}`\frac{1}{4\pi}\frac{d\sigma}{dk}` is replaced by {math}`\frac{d^2\sigma}{dk\,d\Omega}(T,k,\theta)` with {math}`\cos\theta=\hat v\cdot\hat n`, the straight-flight electron direction against the observation direction. In a crystal, its lattice-coherent fraction, which forms the CBS lines, is removed for the scored reflections ([above](#lattice-coherent-share-in-crystals)). The isotropic EEDL continuum keeps that fraction, so adding it to the line spectrum double counts it.
 
 Compound targets sum each element's cross section at its own number density. The analytic backend carries explicit {math}`Z^2` scaling; EEDL supplies an evaluated cross section for each element. Self-absorption uses the summed attenuation of the whole composition. In a layered stack each layer's segments radiate with that layer's composition and every photon is attenuated across the whole stack.
 
@@ -212,12 +270,12 @@ partials and FP32 primary sums without changing the source-table model identity.
 - EEDL is elemental atomic data; molecular bonding, density-dependent emission effects, and interactions below the configured transport cutoff are outside this model;
 - the optional/fallback Bethe--Heitler form is unscreened and approximate, especially for high {math}`Z`; its Elwert factor is not a substitute for an evaluated relativistic cross section;
 - segment contributions and incident electrons are summed incoherently, with no phase and therefore no coherent-emission counterpart;
-- the coherent (CBS) fraction of the continuum is not subtracted;
+- in crystals, the lattice-coherent (CBS) share of the BremsLib continuum is removed for the scored reflections (above); the EEDL continuum keeps it;
 - self-absorption uses the same layered escape model as line radiation, with no feedback on emission; see [Multilayer materials](../materials/multilayer-materials.md).
 
 ## Validation
 
-Ledger rows: `bremslib-angular-model` for the default direction-resolved backend, `bremslib-radiative-partition` and `bremslib-radiative-event-spectrum` for the coupled mode, `dielectric-suppression` for its Ter--Mikaelian factor, `bremslib-electron-electron` for the electron--electron term, `brem-spectrum` for EEDL parsing, interpolation, normalization, fallback selection, and per-segment assembly, `external-brem-subtraction` for the weighted scale-only sideband fit that consumes a loaded external background, `substep-radiation-invariance` for the representative-energy evaluation, `radiation-error-estimators` for the opt-in quadrature estimator, and `finite-transverse-crystal` / `blazed-groove-geometry` for the escape variants. The full derivation, dimensional analysis, limits, and numeric comparison are in [Bremsstrahlung spectrum validation](../../validation/radiation-physics/brem-spectrum.md), with the literature comparison in [external bremsstrahlung comparison](../../validation/literature-ref/external-bremsstrahlung-comparison.md). Implementation owner: `pyrite.montecarlo.spectrum.brem.mc_brem_spectrum`.
+Ledger rows: `bremslib-angular-model` for the default direction-resolved backend, `bremslib-radiative-partition` and `bremslib-radiative-event-spectrum` for the coupled mode, `dielectric-suppression` for its Ter--Mikaelian factor, `bremslib-electron-electron` for the electron--electron term, `brem-lattice-coherent-fraction` for the crystalline lattice-share subtraction, `brem-spectrum` for EEDL parsing, interpolation, normalization, fallback selection, and per-segment assembly, `external-brem-subtraction` for the weighted scale-only sideband fit that consumes a loaded external background, `substep-radiation-invariance` for the representative-energy evaluation, `radiation-error-estimators` for the opt-in quadrature estimator, and `finite-transverse-crystal` / `blazed-groove-geometry` for the escape variants. The full derivation, dimensional analysis, limits, and numeric comparison are in [Bremsstrahlung spectrum validation](../../validation/radiation-physics/brem-spectrum.md), with the literature comparison in [external bremsstrahlung comparison](../../validation/literature-ref/external-bremsstrahlung-comparison.md). Implementation owner: `pyrite.montecarlo.spectrum.brem.mc_brem_spectrum`.
 
 ## Channeling zone weights
 
