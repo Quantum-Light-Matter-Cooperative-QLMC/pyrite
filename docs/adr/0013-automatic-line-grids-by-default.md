@@ -53,3 +53,17 @@ Bin-mean cases on the measured bandwidth default to `sinc-shape` instead
 (2026-11-17): its spacing bounds an isolated line's bin-mean peak to 1 %, where
 bin means at the ÷8 step are bounded only to 1.7 %. Their kinematic fallback
 takes `sinc-oversampled`.
+
+## Amendment (2026-11-17, #1257)
+
+An over-budget `sinc-oversampled` axis no longer refuses. It is refined
+locally: the ÷8 step inside merged windows around every measured line narrower
+than eight maximum spacings (24 eV), and the 3 eV maximum spacing elsewhere. Each
+window carries a halo, and a wider line's halo is refined whole wherever it
+meets a window, so no spacing join falls inside any line's halo. Node
+quadrature then misplaces at most 1e-4 of a line's mass per side
+(`line-grid-node-local-refinement`). The Si 1 MeV kinematic axis drops from
+2.58 M uniform nodes to 338 k; the measured four-family axis drops from 975 k
+to 399 k. Where the uniform axis fits, nothing changes. Only a local axis that
+also exceeds the budget refuses. Whether the local axis should become the
+default everywhere is left open, pending the #1257 shape qualification.

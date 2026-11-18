@@ -175,8 +175,14 @@ for assumptions and qualification status.
 
 `sinc-oversampled` divides the measured sinc-Nyquist step by 8 (#1214); its
 axis is 8x denser than `sinc-nyquist`, which keeps line area but not node peak
-height or FWHM. An oversampled axis over `max_points` refuses and names
-`--resolution sinc-nyquist` as the opt-out; nothing coarsens automatically.
+height or FWHM. An oversampled axis over `max_points` is refined locally
+instead (#1257): the ÷8 step around every measured line narrower than eight
+`max_spacing_eV` steps, `max_spacing_eV` elsewhere, with every spacing join
+outside each line's halo so node-quadrature yield stays within 2e-4 per line.
+The grid record's `local_axis` gives the route, the uniform count and the
+reason. Only a local axis that also exceeds `max_points` refuses, naming
+`--resolution sinc-nyquist` as the opt-out; nothing coarsens automatically. See
+the [join derivation](../validation/beam-transport/line-grid-node-local-refinement.md).
 With `windows = true` an unset resolution is `sinc-nyquist` and an explicit
 `sinc-oversampled` is refused: the windows place their own nodes. With
 `bin-mean` on the `resonance-population` bandwidth an unset resolution is

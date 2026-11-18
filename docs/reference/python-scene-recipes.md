@@ -255,8 +255,11 @@ transition radiation and pixel detectors are refused. See
 
 The automatic CXR line axis defaults to `"sinc-oversampled"`: the measured
 sinc-Nyquist step divided by 8, which converges line peak height and FWHM.
-When that axis exceeds the point budget, the run refuses before transport and
-names the coarser opt-out, which keeps line area but not line shape:
+When that axis exceeds the point budget, the resolver keeps the ÷8 step only
+around the scored lines and the 3 eV maximum spacing elsewhere; the resolved
+grid record's `local_axis` says so. If even that axis exceeds the budget, the
+run refuses before scoring and names the coarser opt-out, which keeps line area
+but not line shape:
 
 ```python
 area_only = pr.Numerics(line_resolution="sinc-nyquist")
