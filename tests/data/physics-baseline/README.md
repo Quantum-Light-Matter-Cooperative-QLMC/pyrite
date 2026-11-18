@@ -427,3 +427,24 @@ selection line calls from the tabulation length. Only the identity pins in
 `resolved.json` and `channeling.json` advance, and payload equality is
 asserted before re-pinning. The `eedl-fallback` entry stays historical. No
 output arrays or numerical tolerances are regenerated.
+
+## Net-yield reflection selection (#1250)
+
+`CXR_REFLECTION_SELECTION_MODEL=measured-shell-cutoff-v4` stops radiators
+with a lattice-share-corrected continuum on the shell net yield. Only the
+identity pins in `resolved.json` and `channeling.json` advance, and payload
+equality is asserted before re-pinning. The fixtures run without BremsLib,
+so no corrected continuum or recorded output changes. The `eedl-fallback`
+entry stays historical.
+
+
+## Lattice-share continuum (#1250)
+
+The coupled fixture is a crystalline BremsLib case (synthetic Si/O tables,
+four families), so its continuum now loses the lattice-coherent CBS share of
+its scored reflections above `E_cut_lines_keV`
+(`BREM_LATTICE_SHARE_MODEL=born-dw-cbs-share-v2`). Only `coupled.brem_wide`
+was regenerated, at the PR head on CPU/NumPy fp64; its transport signature is
+asserted unchanged before re-pinning. Six of 71 bins move (at most a few
+parts in 1e7); every other output and tolerance is unchanged.
+

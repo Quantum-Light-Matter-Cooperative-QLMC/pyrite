@@ -15,8 +15,11 @@ Grid (P5a measurements on #1250): ``|g|`` log-spaced 0.25--75.4 1/Angstrom
 (69 nodes; the Waasmaier--Kirfel cap of the reflection selector), ``T`` from
 1 keV by factors of 1.22 to above 1 MeV (36 nodes), ``theta`` every 5 degrees,
 ``x`` in 210 bins on ``[0, 1.05]``. Leave-one-out interpolation on these
-spacings: ``|g|`` per-bin <= 1 %, ``theta`` <= 0.7 % (2.7 % at 10 degrees),
-``T`` total <= 0.4 % with log-total + linear-shape interpolation.
+spacings on Si-scene probes: ``|g|`` per-bin <= 1 %, ``theta`` <= 0.7 % (2.7 %
+at 10 degrees), ``T`` total <= 0.4 % with log-total + linear-shape
+interpolation. Over the whole released grid, drop-one-node at doubled spacing
+misplaces 4.9 % / 1.2 % / 4.6 % of the mass (mass-weighted), worst at the
+recoil edge in ``|g|`` and at 1--4 keV.
 """
 
 from __future__ import annotations

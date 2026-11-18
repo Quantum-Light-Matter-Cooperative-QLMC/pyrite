@@ -99,6 +99,10 @@ class Provenance(Mapping[str, Any]):
     """Measured reflection-selection runs only (#1173): ``model``,
     ``tolerance``, ``quadrature``, and per radiator its ``cutoff_invang``,
     reflection count, tail estimate, convergence and shell yields."""
+    brem_lattice_share: Mapping[str, Any] | None = None
+    """Crystalline BremsLib runs only (#1250): the continuum correction's
+    ``model`` and, per layer, whether its lattice-coherent share was removed
+    (each element's removed fraction) or why not."""
     line_grid_policy: Mapping[str, Any] | None = None
     """Automatic CXR-grid runs only: the grid policy and tolerances."""
     line_grid_resolved: Mapping[str, Any] | None = None

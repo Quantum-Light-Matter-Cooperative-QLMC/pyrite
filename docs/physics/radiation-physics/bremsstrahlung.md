@@ -161,13 +161,19 @@ where {math}`x` is {math}`\hat{\mathbf g}\cdot\hat{\mathbf v}` at the classical 
 - {math}`\theta`: 5° steps;
 - {math}`x`: 210 bins.
 
-It is interpolated linearly in {math}`\ln|\mathbf g|` and {math}`\theta` at fixed {math}`x`. Between {math}`T` nodes the total is interpolated in {math}`\ln T` and the normalized shape linearly. Drop-one-node errors are:
+It is interpolated linearly in {math}`\ln|\mathbf g|` and {math}`\theta` at fixed {math}`x`. Between {math}`T` nodes the total is interpolated in {math}`\ln T` and the normalized shape linearly. Interpolation error:
 
-- {math}`|\mathbf g|`: at most 1 % per bin;
-- {math}`\theta`: at most 0.7 % per bin, and 2.7 % at 10°;
-- {math}`T`: at most 0.4 % in total.
+- Si-scene probes at these spacings: {math}`|\mathbf g|` at most 1 % per bin, {math}`\theta` at most 0.7 % per bin (2.7 % at 10°), {math}`T` at most 0.4 % in total.
+- Over the whole released grid, dropping one node (twice the spacing) misplaces 4.9 % ({math}`|\mathbf g|`), 1.2 % ({math}`\theta`) and 4.6 % ({math}`T`) of the mass, mass-weighted. The worst nodes are at the recoil edge in {math}`|\mathbf g|` and at 1--4 keV, where the share is small.
+- End to end (Si 30 keV, 45°, {math}`G=30`), the share is 1.003 of the direct quadrature, 0.98--1.03 per bin.
 
-Measured selections subtract the share of the set they select. The streamed route, which keeps the build-time families, subtracts that set's share.
+Reflections outside the kernel's {math}`|\mathbf g|` range (0.25--75.4 Å{sup}`-1`) contribute no share. Only very large cells reach the lower edge.
+
+Measured selections subtract the share of the set they select. The streamed route, which keeps the build-time families, subtracts that set's share. The measured selector itself stops on each shell's lines less this share; see [reflection selection](../materials/reflection-selection.md#default-measured-selection).
+
+Table nodes with {math}`T` below the line route's electron cutoff `E_cut_lines_keV` (5 keV by default) keep the full DDCS: the line route scores no CBS from those electrons, so nothing would replace the removed share. On a 16-history MoS{sub}`2`/Si transport, the share below the cutoff was 2.8 % of the share and 0.23 % of the continuum, with 95 % of it at 0.5--2 keV. Segments between the two table nodes that bracket the cutoff receive an interpolated partial correction. This is a slight over-subtraction: about 3e-3 of the share at Si 30 keV, a few 1e-4 of the continuum.
+
+Each corrected run records `brem_lattice_share` in its output and provenance: the correction model and, for each layer, whether it was corrected (with the line cutoff, scored reflection count and each element's removed fraction) or the reason it was not.
 
 Only emission changes. Transport keeps the full tables, because the electron loses that energy to the CBS lines instead. Corrected tables keep their parent's key and digest, which the coupled partition check compares. The correction carries its own identity marker.
 
@@ -175,7 +181,7 @@ Validated on frozen transports of the two #642 scenes (#1250):
 
 - **Si 300 keV:** the share matches the Monte Carlo CBS within 0.999--1.008 for {math}`G\ge12` Å{sup}`-1`.
 - **Si 300 keV, temperature check:** the match holds within 0.2--0.7 % while CBS changes 2.6× with {math}`B` between 0.23 and 0.92 Å{sup}`2`.
-- **MoS{sub}`2`/Si 30 keV:** the share is 4.5 % above the Monte Carlo CBS (0.4 % of the continuum). It is concentrated at 0.5--2 keV and is partly explained by the share's floor at {math}`T=1`--2 keV.
+- **MoS{sub}`2`/Si 30 keV:** before the line-cutoff floor, the share was 4.5 % above the Monte Carlo CBS (0.4 % of the continuum), concentrated at 0.5--2 keV. The beam stops in this scene, and the share removed from electrons below `E_cut_lines_keV` (2.8 % of the share, 95 % of it at 0.5--2 keV, measured on a 16-history transport) accounts for most of that excess. The remainder is partly explained by the share's floor at {math}`T=1`--2 keV.
 
 Not corrected, and stated as such:
 
@@ -185,6 +191,8 @@ Not corrected, and stated as such:
 - incident energies above 1.06 MeV.
 
 Grazing photon exit is also uncovered: refraction suppresses the production lines there, while the share uses vacuum kinematics. Validation: `brem-lattice-coherent-fraction`.
+
+**Migration.** Default crystalline BremsLib spectra lose the double-counted share: 3--4 % of the total 0.5--10 keV yield on the #642 scenes at {math}`G=8` Å{sup}`-1` and about 8 % at {math}`G=30` Å{sup}`-1`, and the total spectrum's dominant peak falls by 9--12 % at {math}`G=30`. Line spectra are unchanged at a fixed reflection set. Crystalline BremsLib checkpoints written before the correction do not resume: their identity lacks the `brem_lattice_share_model` marker. Pass the private case key `_brem_lattice_share=False` only to reproduce the old double-counting sum in validation harnesses.
 
 ## Per-segment yield
 
@@ -197,7 +205,7 @@ For the EEDL and Bethe--Heitler backends emission is taken **isotropic**. For a 
 
 with {math}`T_{\rm abs}` the Beer--Lambert escape transmission from the segment midpoint along the observation direction. Contributions are summed over segments and electrons and divided by the electron count, so the returned quantity is **photons per eV per steradian per incident electron** — the same units as the line spectrum.
 
-Isotropy approximates a scattering-randomized electron population in the intended weakly relativistic regime; it does not resolve directional emission from an individual electron. The BremsLib backend does: each segment's {math}`\frac{1}{4\pi}\frac{d\sigma}{dk}` is replaced by {math}`\frac{d^2\sigma}{dk\,d\Omega}(T,k,\theta)` with {math}`\cos\theta=\hat v\cdot\hat n`, the straight-flight electron direction against the observation direction. The small coherent fraction of the continuum — which is what forms the CBS lines — is **not** subtracted here, so adding the line and continuum spectra slightly double counts that fraction.
+Isotropy approximates a scattering-randomized electron population in the intended weakly relativistic regime; it does not resolve directional emission from an individual electron. The BremsLib backend does: each segment's {math}`\frac{1}{4\pi}\frac{d\sigma}{dk}` is replaced by {math}`\frac{d^2\sigma}{dk\,d\Omega}(T,k,\theta)` with {math}`\cos\theta=\hat v\cdot\hat n`, the straight-flight electron direction against the observation direction. In a crystal, its lattice-coherent fraction, which forms the CBS lines, is removed for the scored reflections ([above](#lattice-coherent-share-in-crystals)). The isotropic EEDL continuum keeps that fraction, so adding it to the line spectrum double counts it.
 
 Compound targets sum each element's cross section at its own number density. The analytic backend carries explicit {math}`Z^2` scaling; EEDL supplies an evaluated cross section for each element. Self-absorption uses the summed attenuation of the whole composition. In a layered stack each layer's segments radiate with that layer's composition and every photon is attenuated across the whole stack.
 

@@ -73,7 +73,58 @@ def test_uncorrected_layers_pass_their_tables_through():
     assert record == dict(layer=None, corrected=False, reason="no scored reflections")
 
 
-def test_selected_case_without_its_record_refuses_rather_than_skips():
-    case = _case(hkl_list=None, reflection_selection=dict(shell_width_invang=1.0))
-    with pytest.raises(RuntimeError, match="without its selection record"):
-        ls.scored_reflections(case, None)
+def test_selection_case_without_its_record_subtracts_the_scored_families():
+    # Streamed and directional routes never run the selector; their lines are
+    # the build-time families, and so is the subtracted set.
+    case = _case(reflection_selection=dict(shell_width_invang=1.0, automatic=True))
+    assert ls.scored_reflections(case, None) == SI["hkl_list"]
+    assert ls.scored_reflections(dict(case, hkl_list=None), None) == []
+
+
+def test_share_only_tables_hold_what_the_correction_removes(monkeypatch):
+    # The selector's S_k: base - corrected for exactly those reflections, and
+    # shells add (the scorer is linear in the table; no node clamps here).
+    import numpy as np
+
+    from pyrite.xsgen.bremslib.tables import load_bremsstrahlung_tables
+
+    tables = load_bremsstrahlung_tables(["Si"])
+    composition = [("Si", 0.05)]
+    first, second = [(1, 1, 1), (-1, -1, -1)], [(2, 2, 0), (-2, -2, 0)]
+    case = _case(hkl_list=first + second, E_cut_lines_keV=5.0)
+    corrected, record = ls.layer_emission_tables(case, None, composition, tables)
+    assert record["corrected"] and record["line_cutoff_keV"] == 5.0
+    parts = [ls.share_only_tables(case, None, composition, tables, h) for h in (first, second)]
+    whole = tables["Si"].scaled_ddcs_mb_sr - corrected["Si"].scaled_ddcs_mb_sr
+    np.testing.assert_allclose(
+        parts[0]["Si"].scaled_ddcs_mb_sr + parts[1]["Si"].scaled_ddcs_mb_sr,
+        whole,
+        rtol=1e-9,
+        atol=1e-12 * np.abs(whole).max(),
+    )
+    assert (
+        ls.share_only_tables(
+            dict(SI, bremsstrahlung_model="eedl"), None, composition, tables, first
+        )
+        is None
+    )
+    assert ls.share_only_tables(case, None, composition, tables, []) is None
+
+
+def test_layer_tables_keep_every_node_below_the_line_cutoff():
+    # No CBS line is scored for electrons below E_cut_lines_keV, so the
+    # continuum keeps its full DDCS there (v2 floor); above it, it loses share.
+    import numpy as np
+
+    from pyrite.xsgen.bremslib.tables import load_bremsstrahlung_tables
+
+    tables = load_bremsstrahlung_tables(["Si"])
+    cutoff = 20.0
+    case = _case(E_cut_lines_keV=cutoff)
+    corrected, record = ls.layer_emission_tables(case, None, [("Si", 0.05)], tables)
+    assert record["line_cutoff_keV"] == cutoff
+    T = np.asarray(tables["Si"].incident_energy_keV)
+    base, new = tables["Si"].scaled_ddcs_mb_sr, corrected["Si"].scaled_ddcs_mb_sr
+    np.testing.assert_array_equal(new[T < cutoff], base[T < cutoff])
+    above = (T >= cutoff) & (T <= 1000.0)
+    assert np.all((base[above] - new[above]).reshape(above.sum(), -1).sum(axis=1) > 0)

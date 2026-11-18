@@ -56,7 +56,10 @@ def _emission_selection(value: object) -> tuple[EmissionMode, ...]:
 SAMPLING_KEYS = ("n_electrons", "n_electrons_brem")
 # v3 (#1200): selection line calls are sized from the tabulation length,
 # not a fixed 512 reflections; only the float summation order moves.
-CXR_REFLECTION_SELECTION_MODEL = "measured-shell-cutoff-v3"
+# v4 (#1250): radiators with a lattice-share-corrected continuum stop on the
+# shell net yield (lines less their continuum share) against the consistent
+# total, not on the line yield alone.
+CXR_REFLECTION_SELECTION_MODEL = "measured-shell-cutoff-v4"
 
 CONVERGENCE_KEYS = (
     "n_families",

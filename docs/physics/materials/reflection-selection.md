@@ -5,13 +5,40 @@ Line emission is a sum over reciprocal-lattice vectors, and that sum has to be t
 ## Default measured selection
 
 With neither `n_families`, `max_reflections` nor `line_yield_tolerance` set,
-the spectrum phase scores reciprocal shells until the estimated omitted yield
-is at most 1e-3 of the kept yield on the requested line axis. Shell spectra
-are retained and summed. The automatic axis bounds the candidate cap before
-selection, so it may be substantially wider than the four-family axis.
-The estimator is qualified on the Si and MoS₂/Si scenes in
+the spectrum phase scores reciprocal shells $|\mathbf g|\in(G-2,G]$ Å⁻¹ until
+the estimated omitted yield is at most 1e-3 of the kept total on the
+requested line axis. Shell spectra are retained and summed. The automatic
+axis bounds the candidate cap before selection, so it may be substantially
+wider than the four-family axis. The estimator is qualified on the Si and
+MoS₂/Si scenes in
 [the selector evidence](../../validation/radiation-physics/reflection-yield-tolerance-selector.md);
 it is not a rigorous error bound for arbitrary scenes.
+
+What counts as omitted depends on the continuum. A crystalline BremsLib
+continuum has the lattice-coherent share of the scored reflections removed
+([bremsstrahlung](../radiation-physics/bremsstrahlung.md#lattice-coherent-share-in-crystals)),
+so a shell's CBS lines largely replace continuum the correction took out.
+For such a radiator, each shell's stop quantity is its **net yield**
+
+$$
+s_k=L_k-S_k,
+$$
+
+the shell's in-band line yield $L_k$ less the in-band continuum share $S_k$
+the correction removes for those reflections. Above $|\mathbf g|\approx16$
+Å⁻¹ about 80 % of the line increment is CBS, so $s_k$ is mostly PXR and
+PXR×CBS interference. The geometric tail runs on $|s_k|$, as a fraction of
+the consistent total: the kept net yield plus the radiator layer's
+uncorrected in-band continuum. $S_k$ is the production continuum scorer run
+with tables holding only that shell's share, on the case's continuum
+electrons, at 96 log nodes per decade across the line band. The scored line
+spectrum and the selection record are unchanged in kind. The record adds
+`metric` (`"net"` or `"lines"`), `background_yield` and each shell's `share`.
+
+Radiators whose continuum is not corrected (EEDL continuum, channeling,
+correction disabled) keep the line-yield metric, a tail fraction of the kept
+line yield. `CXR_REFLECTION_SELECTION_MODEL` is `measured-shell-cutoff-v4`
+since #1250, so measured-selection checkpoints written under v3 do not resume.
 
 An explicit `CxrReflections(n_families=4)` or `--n-families 4` restores the
 four-family policy. Explicit counts take precedence over automatic selection.

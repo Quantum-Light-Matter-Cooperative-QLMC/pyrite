@@ -55,6 +55,11 @@ def test_selected_spectrum_is_the_spectrum_of_the_selected_set(monkeypatch):
     assert cutoff < SELECTION["g_max_invang"]
     yields = [shell["yield_"] for shell in radiator["shells"]]
     assert all(y > 0 for y in yields) and yields[-1] < yields[0]
+    # A corrected (crystalline BremsLib) continuum selects on the net yield (#1250).
+    assert case["bremsstrahlung_model"] == "bremslib" and radiator["metric"] == "net"
+    assert radiator["background_yield"] > 0
+    shares = [shell["share"] for shell in radiator["shells"]]
+    assert all(0 < s < y for s, y in zip(shares, yields, strict=True))
     selected = dominant_reflections(
         "silicon", n_families=10**9, B_ang2=case["B_ang2"], g_max_invang=cutoff
     )
@@ -113,6 +118,20 @@ def test_simulate_reports_the_selection_in_provenance():
     assert record["radiators"][0]["converged"]
     plain = pr.simulate(scene, numerics=numerics(n_families=4)).provenance
     assert plain.reflection_selection is None and "reflection_selection" not in plain
+    # The continuum correction reports itself per layer (#1250), selected or not.
+    from pyrite.montecarlo.spectrum.brem_lattice_share import BREM_LATTICE_SHARE_MODEL
+
+    for provenance in (result.provenance, plain):
+        share = provenance.brem_lattice_share
+        assert share["model"] == BREM_LATTICE_SHARE_MODEL
+        (layer,) = share["layers"]
+        assert layer["corrected"] and layer["line_cutoff_keV"] == 5.0
+        (element,) = layer["elements"]
+        assert element["element"] == "Si" and 0.0 < element["removed_fraction"] < 0.3
+    assert (
+        result.provenance.brem_lattice_share["layers"][0]["reflections"]
+        == record["radiators"][0]["reflections"]
+    )
 
 
 def test_call_size_follows_tabulation_length_not_device():

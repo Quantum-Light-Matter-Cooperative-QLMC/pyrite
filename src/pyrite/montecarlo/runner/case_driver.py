@@ -926,11 +926,14 @@ def _line_phase(
     temporal_profiles,
     truncation_audit,
     coherent_audit,
+    Ne_brem=None,
 ):
     """Score the line spectra and run their audits; tag an allocator OOM by phase.
 
     A case with ``reflection_selection`` scores its incoherent lines shell by
-    shell on ``E_grid`` and returns the selection record.
+    shell on ``E_grid`` and returns the selection record. Its net metric
+    scores the continuum share on the ``Ne_brem`` continuum electrons, as the
+    corrected continuum removes it.
 
     Validation: reflection-yield-tolerance-selector
     """
@@ -944,6 +947,7 @@ def _line_phase(
                 "reflection_selection scores incoherent lines only; it refuses coherent "
                 "emission, line roulette and temporal profiles"
             )
+        from .lattice_share import selection_continuum
         from .reflection_cutoff import selected_line_spectrum
     with _pkg._nsys_range("pyrite.lines"), collect_line_data_coverage() as line_coverage:
         try:
@@ -958,6 +962,7 @@ def _line_phase(
                         ).values
                     ),
                     E_grid,
+                    continuum=selection_continuum(case, batch, Ne_brem),
                 )
 
             if want_coherent:
@@ -1103,6 +1108,7 @@ def _spectrum_case_impl(case, tp, record_timing=False):
             (temporal, temporal_coherent),
             truncation_audit,
             coherent_audit,
+            Ne_brem,
         ),
     )
     _spectrum_stage_done("lines")
@@ -1133,7 +1139,7 @@ def _spectrum_case_impl(case, tp, record_timing=False):
     # SAME path (via _brem_for_case) and can't drift back to single-slab brem.
     # A measured selection scored a set the case does not list; the continuum
     # removes the lattice share of exactly that set (brem-lattice-coherent-fraction).
-    from .lattice_share import continuum_case
+    from .lattice_share import continuum_case, lattice_share_outputs
 
     brem_case = continuum_case(case, reflection_selection)
     with _pkg._nsys_range("pyrite.brem"):
@@ -1220,6 +1226,7 @@ def _spectrum_case_impl(case, tp, record_timing=False):
         out["line_roulette"] = line_screen.record()
     if reflection_selection is not None:
         out["reflection_selection"] = reflection_selection
+    out.update(lattice_share_outputs(brem_case, int(segs.get("n_layers", 1))))
     out.update(optional_line_components(case, tp))
     if coherent_yield_record is not None:
         out["line_grid_coherent_yield_audit"] = coherent_yield_record

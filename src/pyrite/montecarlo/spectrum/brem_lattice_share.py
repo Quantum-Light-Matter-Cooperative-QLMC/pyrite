@@ -62,7 +62,8 @@ KERNEL_SCHEMA = "pyrite.brem-lattice-share-kernel.v1"
 
 #: Identity marker of crystalline BremsLib continua scored with the share
 #: removed (#1250); bump with the kernel release tag or the subtraction rule.
-BREM_LATTICE_SHARE_MODEL = "born-dw-cbs-share-v1/tables-brem-lattice-share-1/scored-set"
+#: v2: no subtraction below the line route's electron cutoff ``E_cut_lines_keV``.
+BREM_LATTICE_SHARE_MODEL = "born-dw-cbs-share-v2/tables-brem-lattice-share-1/scored-set"
 
 _ALPHA = 1.0 / 137.035999084
 _H_ANG = HBARC_EV_ANG / M_E_EV  # hbar c / m c^2 [Angstrom]
@@ -336,14 +337,18 @@ class LatticeShare:
     uncorrected_T_keV: tuple[float, float] | None
 
 
-def lattice_share_table(table, kernel, element, n_atoms_per_ang3, g, weights):
+def lattice_share_table(
+    table, kernel, element, n_atoms_per_ang3, g, weights, *, T_floor_keV: float = 0.0
+):
     """BremsLib table with the lattice-coherent share subtracted from its DDCS.
 
     At every table node ``(T1, k/T1, theta)`` the scaled DDCS loses
     ``k S_j / (n_j Z^2)`` (``S_j`` from :func:`lattice_share_density`, in mb/sr),
     clamped at zero; the SDCS follows the node's linear-in-``theta`` solid-angle
     integral so the table stays self-consistent. Incident energies outside the
-    kernel's range keep their values (reported). The returned table keeps its
+    kernel's range, or below ``T_floor_keV`` (the line route's electron cutoff:
+    no CBS line is scored there, so nothing would replace the removed share),
+    keep their values (reported). The returned table keeps its
     parent's ``key``/``digest``: they name the BremsLib source, which coupled
     transport checks; the correction is recorded separately by the caller.
 
@@ -357,7 +362,7 @@ def lattice_share_table(table, kernel, element, n_atoms_per_ang3, g, weights):
     base = np.asarray(table.scaled_ddcs_mb_sr, dtype=float)
     ddcs = base.copy()
     z2 = float(table.atomic_number) ** 2
-    lo, hi = float(kernel.T_keV[0]), float(kernel.T_keV[-1])
+    lo, hi = max(float(kernel.T_keV[0]), float(T_floor_keV)), float(kernel.T_keV[-1])
     for i, Ti in enumerate(T):
         if not lo <= Ti <= hi:
             continue

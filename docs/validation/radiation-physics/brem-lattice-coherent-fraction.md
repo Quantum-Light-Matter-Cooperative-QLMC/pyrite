@@ -1,7 +1,9 @@
 # `brem-lattice-coherent-fraction`
 
-Fresh-context independent verification for issue #1250 (proposal; no
-production estimator yet).
+Fresh-context independent verification for issue #1250. The sections through
+"Suggested ledger change" verified the proposal; the
+[production verification](#production-verification-2026-11-17) at the end
+checks the production estimator against it.
 
 ## Claim and scope
 
@@ -400,3 +402,207 @@ denominator" to Assumptions. Resolve the denominator note in favour of
 absolute Born-DW subtraction of the CBS-only component; $R(G)$, if used,
 multiplies BremsLib/(1+η/Z). Link this write-up and add it to the
 `radiation-physics/index.md` toctree.
+
+## Production verification (2026-11-17)
+
+Fresh context, branch `issue-1250-cbs-brem-double-count` at `9c72bd04c`
+(`BREM_LATTICE_SHARE_MODEL = born-dw-cbs-share-v2/tables-brem-lattice-share-1/scored-set`).
+The production estimator was derived below from the proposal above and from the
+BremsLib table convention (`bremslib-angular-model`) before the bodies of
+`montecarlo/spectrum/brem_lattice_share.py` and `montecarlo/runner/lattice_share.py`
+were read.
+
+### Expected production form
+
+**Share density.** From §§1–3, the orientation-averaged CBS-only yield of the
+scored set per unit path is
+
+$$
+S(T,\theta,k)=\sum_{\mathbf g\in\mathcal G}\lvert U_{\mathbf g}\rvert^2\,
+h(\lvert\mathbf g\rvert;T,\theta,k)
+\qquad[\text{photons}/(\text{eV sr Å})],
+$$
+
+with $h$ per unit $\lvert U_{\mathbf g}\rvert^2$ (eV$^{-2}$, $U_{\mathbf g}$ in eV).
+Because $h$ depends on $\mathbf g$ only through $\lvert\mathbf g\rvert$, $S$ is an exact
+shell sum for any scored set $\mathcal G$, complete star or not. In the
+resonance variable
+
+$$
+x=\frac{k\,(1-\beta\cos\theta)}{\hbar c\,g\,\beta},
+\qquad \frac{dx}{dk}=\frac{1-\beta\cos\theta}{\hbar c\,g\,\beta},
+$$
+
+which equals $\mu=\hat{\mathbf g}\cdot\hat{\mathbf v}$ on the classical root, a kernel
+stored as a mass $M_i$ per $x$ bin of width $\Delta x_i$ gives
+$h(k)=(M_i/\Delta x_i)\,dx/dk$. Interpolation must act on the density per unit
+$x$, followed by the Jacobian at the actual $g$.
+
+**Element split.** The continuum is scored as $\sum_j n_j\,d\sigma_j$, so any split
+$S=\sum_j S_j$ removes exactly $S$ in total. The incoherent weights
+$S_j\propto n_j\lvert u_j(g)\rvert^2/\sum_i n_i\lvert u_i(g)\rvert^2$ per shell are a
+convention. They become load-bearing only where a node clamps.
+
+**Table subtraction.** BremsLib stores
+$\chi=(k/Z^2)\,d^2\sigma/dk\,d\Omega$ in mb/sr, and the scorer returns
+$d^2\sigma/dk\,d\Omega=\chi Z^2/k$ with $k$ in eV. Removing $S_j$ from
+$n_j\,d^2\sigma_j/dk\,d\Omega$ (with $n_j$ in atoms/Å$^3$) requires
+
+$$
+\Delta\!\left(\frac{d^2\sigma_j}{dk\,d\Omega}\right)=\frac{S_j}{n_j}
+\;[\text{Å}^2/(\text{eV sr})],
+\qquad
+\Delta\chi_j=\frac{k\,S_j}{n_j Z_j^2}\times10^{11}\;\text{mb/sr},
+$$
+
+since 1 Å$^2$ = $10^{-16}$ cm$^2$ = $10^{11}$ mb. Here $k=\kappa T$ at each node,
+including the node's actual top $\kappa$. The SDCS must follow from the same
+solid-angle rule the scorer uses on the DDCS.
+
+**Line-electron floor.** Let $\Lambda(T)$ be the expected track length per primary
+at energy $T$ that the continuum scorer weights, and $\Lambda_\ell(T)$ the same
+for the line scorer. The expected double count is
+$\int dT\,\Lambda_\ell(T)\,\overline{S}(T)$, where $\overline S$ is the in-band,
+angle-resolved share. The continuum removes
+$\int dT\,\Lambda(T)\,\sum_j n_j\,\Delta\sigma_j(T)$. These are equal for every
+scene only if
+
+$$
+\sum_j n_j\,\Delta\sigma_j(T)=\overline S(T)\,\frac{\Lambda_\ell(T)}{\Lambda(T)} .
+$$
+
+In production, both scorers share one transport. The line route keeps
+segments with $E\ge E_{\rm cut,lines}$ and clips them at the cutoff
+(`_clip_segments_to_cutoff`), and the continuum keeps segments down to
+$E_{\rm cut,brem}\le E_{\rm cut,lines}$. Per primary,
+$\Lambda_\ell/\Lambda=\Theta(T-E_{\rm cut,lines})$, so the exact condition is
+$\Delta\sigma_j(T)=(S_j/n_j)\,\Theta(T-E_{\rm cut,lines})$. **The v2 rule is the
+correct consistency condition.** The v1 rule ($\Theta\equiv1$ down to the
+kernel floor) over-subtracted the share of every electron below the line
+cutoff. The selector's `share_only_tables` must use the same floor, so its
+$S_k$ is the yield the correction actually removes. If
+$E_{\rm cut,brem}>E_{\rm cut,lines}$ (allowed uncoupled), the continuum has no
+track below $E_{\rm cut,brem}$ and nothing is removed there, which is also
+consistent.
+
+### Implementation comparison
+
+| Item | Code | Result |
+|---|---|---|
+| Line weight per unit path and $\lvert U\rvert^2$ | `brem_lattice_share.py:123` $\alpha\omega\lvert f\rvert^2/[(mc^2)^2\,2\pi\,\kappa D\,\beta]$ | **matches** §1 boxed (per path $L=\beta t_L$) |
+| Orientation average | `:157–165`, $\mu\in(0,1]$ Gauss–Legendre, weight $\tfrac12 w\cdot\tfrac{2\pi}{n_\phi}/4\pi$ | **matches**; $\mu\le0$ cannot resonate ($\mathbf v\cdot\mathbf g>\hbar c g^2/2E>0$) |
+| $x$ | `kernel_x`, `:172–182` | **matches** |
+| Jacobian | `:312` density $=M/\Delta x$; `:315` scale $=\hbar c g\beta/(1-\beta\cos\theta)=dk/dx$; `:327` divides by it | **matches** |
+| $\lvert g\rvert$, $\theta$, $T$ interpolation | density linear in $\ln g$ at fixed $x$ (`:307–326`); $\theta$ at kernel nodes then linear to table $\theta$ (`:375`); $T$: log total, linear shape (`:272–288`) | **matches** the stated scheme |
+| Shell weights | `reflection_shell_weights`, `:247–269`: production `U_g` (static Mott–Bethe, DW, bonding charge; no $f'$, $f''$), split by $n_j\lvert u_j\rvert^2$ | **matches**; $\sum_j$ weights $=\lvert U_{\mathbf g}\rvert^2$ |
+| Subtraction | `:373` `1e11 * k * S / (n * Z**2)`, $k=\kappa T\cdot10^3$ eV with top $\kappa$ (`:369–371`) | **matches** $\Delta\chi_j$ above |
+| Clamp, SDCS | `:377–383`: clamp $\ge0$; SDCS × ratio of `solid_angle_integral` (linear in $\theta$, the scorer's rule) | **matches**; table stays self-consistent |
+| Floor | `:365` `lo = max(kernel T0, T_floor_keV)`; nodes with $T<$ `lo` untouched | **matches** at nodes (see finding 1) |
+| Emission only | `emission.py:110`, `:195`: corrected tables passed to the scorers only; coupled transport reads `runner._case_bremslib_tables` | **matches** |
+| Scored set | `scored_reflections`, `runner/lattice_share.py:68–105`: explicit `hkl_list`, or rebuilt with `iter_reflection_shells` from the selection record's cutoff and shell width, with a count guard; without a record (streamed and directional routes, which never run the selector and score `hkl_list`) it subtracts `hkl_list`'s share. *(Owner note after verification: the earlier refusal of a selection case without its record was replaced by this rule once CI showed the directional route reaching it; `rebrem` now passes the record.)* | **matches** |
+| Per layer | `_radiator`, `:58–65`; layer composition `abs_layers[L][2]`; amorphous layers skipped | **matches** |
+| Exclusions | `_uncorrected_reason`, `:126–136`: disabled, EEDL (warned, `:170–190`), channeling, amorphous; elements without a table (`:209`) | **matches** the ledger |
+| Floor value | `_line_cutoff_keV`, `:193–195`, `E_cut_lines_keV` default 5 keV, the same default as `case_driver.py:303` | **matches** |
+
+### Numerical checks run for this verification
+
+All checks were run locally under `systemd-run --user --scope -p MemoryMax=8G`,
+one at a time, against the released kernel (`require_verified("brem-lattice-share")`).
+
+1. **Absolute units and Jacobian, independent classical limit.** I computed a
+   direct Liénard–Wiechert line yield with no recoil. For one reflection with
+   $\lvert U\rvert^2=1$ eV$^2$,
+   $dN/d\Omega\,dL=\alpha\lvert\hat{\mathbf n}\times[(\hat{\mathbf n}-\boldsymbol\beta)\times\mathbf G]\rvert^2/[2\pi\,\omega\,(\gamma mc^2)^2D_0^5\,\beta]$,
+   with $\mathbf G=(\mathbb 1-\boldsymbol\beta\boldsymbol\beta)\cdot\mathbf g$. I averaged it over
+   $4\times10^6$ uniform $\hat{\mathbf g}$ and histogrammed it in $E=\hbar c\,\mathbf g\cdot\mathbf v/D_0$
+   ($\theta=45°$, 0.5–10 keV, 500 eV bins). The ratio of `lattice_share_density`
+   to this yield was:
+
+   | $T$, $\lvert g\rvert$ | band total | per bin |
+   |---|---|---|
+   | 300 keV, 3.0 Å$^{-1}$ (off-node) | 0.9988 | 0.987–1.009 |
+   | 300 keV, 8.0 Å$^{-1}$ | 1.0018 | 0.987–1.013 |
+   | 30 keV, 3.0 Å$^{-1}$ | 0.9871 | 1.003–1.005, then 0.945 and 0 in the last two bins, at the classical endpoint $x\to1$ where recoil lowers the line |
+
+   The absolute normalization, the $dk/dx$ Jacobian and the off-node $\lvert g\rvert$
+   interpolation are confirmed independently of the author's quadrature. The
+   30 keV deficit is the expected recoil shift.
+2. **Cited evidence** (`pyrite-output/validation/issue-1250/2026-11-17-p5a/units-released-kernel.log`):
+   released-kernel $S$/P3 1.0030 (per bin 0.979–1.030), and the production
+   brem drop with the corrected table $/S$ is 0.990 (per keV 0.969–1.02).
+   These reproduce the ledger figures. Every cited artifact exists.
+3. **Cutoff-bracket size.** For Si, $G=8$ Å$^{-1}$ (238 reflections), $\theta=45°$,
+   I weighted the in-band share by a CSDA (Bethe) track length. The share
+   removed by the ramp in finding 1 is $3.5\times10^{-3}$ of the share removed
+   above 5 keV. The full 1–5 keV share that v1 removed is $7.2\times10^{-2}$ in
+   the same model (measured: 2.8 % on the MoS₂/Si transport). v2 therefore
+   removes about 95 % of the v1 inconsistency.
+
+### Findings
+
+1. **Floor edge is a ramp, not a step (minor; systematic, not a discrepancy).**
+   `lattice_share_table` floors at nodes (`brem_lattice_share.py:365–367`), but
+   the scorer interpolates the DDCS linearly in $\ln T$ between staged nodes
+   (`brem_bremslib.py`, `_incident_bracket`). The staged 5 keV node is
+   `5.000000000000002`, so it is corrected. Continuum segments with
+   $T\in(4.729,5)$ keV, which score no lines, therefore lose a fraction
+   $w=\ln(T/4.729)/\ln(5/4.729)$ of $S(5\,\text{keV})$. This over-subtraction is
+   about $3\times10^{-3}$ of $S$ (check 3), or a few $10^{-4}$ of brem. For a
+   cutoff off the staged grid, the ramp spans the bracketing interval instead
+   and splits between under- and over-subtraction. Making it exact needs a
+   per-segment indicator at evaluation, or a duplicated node at
+   $E_{\rm cut,lines}$. Recommendation: record it as a systematic in the ledger;
+   no code change is needed for `anchored`.
+2. **Interpolation figures not reproduced by the cited artifact (provenance).**
+   The ledger Checks and the release-builder docstring
+   (`scripts/release_brem_lattice_share_table.py:17–19`) state "drop-one-node
+   interpolation: $\lvert g\rvert\le1$ % per bin, $\theta\le0.7$ % (2.7 % at
+   10°), $T\le0.4$ % total". The P5a logs on the released grid
+   (`loo.log`, `loo-weighted.log`) report mass-weighted L1 0.049 ($\lvert g\rvert$),
+   0.012 ($\theta$) and 0.046 ($T$), p95 per bin 5–7 %, and a $T$-total maximum
+   of 0.99 at the 1.49 and 4.02 keV nodes. Leave-one-out doubles the spacing, so
+   these overstate the error at the released spacing by about 4×, but they do
+   not match the quoted figures either. The scene-level checks (item 2;
+   check 1 per bin $\le1.3$ %) bound the actual error at a few percent per bin
+   and 0.3 % in the band total. Recommendation: cite the logs' metric, or the
+   probe that produced the quoted numbers, with its path.
+3. **Silent $\lvert g\rvert$ range drop (minor scope).** `lattice_share_density`
+   drops reflections with $\lvert g\rvert<0.25$ Å$^{-1}$ ($d>25$ Å) or above
+   75.4 Å$^{-1}$ (`:303`) without recording it. The selector caps at 75.4, so
+   only very large-cell crystals reach the lower edge. There, the continuum
+   would keep that share, and the run record would not say so.
+4. **Test gaps (minor).** `test_no_share_is_removed_below_the_line_electron_cutoff`
+   checks the node rule with a 30 keV floor, which is correct as far as it
+   goes. The runner test asserts only `record["line_cutoff_keV"] == 5.0`, not
+   that `layer_emission_tables` leaves $T<E_{\rm cut,lines}$ nodes intact. No
+   test pins the bracket ramp of finding 1.
+
+### Is `anchored` justified?
+
+The anchor pins the released dataset at one scene: $S$ to $10^{-6}$, within
+0.5 % of the independent P3 quadrature (measured 0.30 %), and the production
+drop/brem and drop/$S$. The $B\to\infty$ and $G\to0$ limits and the exact
+$k S/(nZ^2)$ subtraction are pinned too. All 16 tests in the two modules pass
+locally. The production equations match the re-derivation term for term, and
+check 1 confirms the absolute scale independently. **`anchored` is justified
+once the anchor tests are green in CI**, which the methodology requires and the
+ledger records as pending.
+
+### Production verdict
+
+- **Claim**: `brem-lattice-coherent-fraction` —
+  `montecarlo/spectrum/brem_lattice_share.py::{shell_kernel_x,kernel_x,reflection_shell_weights,lattice_share_density,lattice_share_table}`
+  plus the runner wiring — production line weight (`coherent-line-spectrum`,
+  `cbs-amplitude`) with the Ter-Mikaelian $e^{-2W}$ split.
+- **Filters**: units pass (photons/(eV sr Å) → Å$^2$/(eV sr) → mb/sr with
+  $10^{11}$); limits pass ($B\to\infty$, $G\to0$, floor); signs and conventions pass
+  ($\chi=k\,d^2\sigma/Z^2$, no $\beta^2$).
+- **Re-derivation**: `matches`. The v2 floor is the exact consistency
+  condition at table nodes; the residual is the $\ln T$ ramp of finding 1.
+- **Verdict**: `rederived` for the production form. The anchor supports
+  `anchored` once CI is green.
+- **Suggested ledger change**: keep `anchored` (CI green required). Add to
+  Notes: "floor applied at staged `T` nodes; the `ln T` interpolation ramps it
+  over one staged interval below `E_cut_lines_keV` (≈3e-3 of `S` at Si 30 keV,
+  over-subtraction)". Replace the drop-one-node clause with the P5a
+  `loo-weighted.log` figures, or cite the probe that produced the quoted ones.

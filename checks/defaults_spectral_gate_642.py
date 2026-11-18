@@ -142,6 +142,8 @@ MARGINS = dict(
     mass_l1=1e-2,
 )
 BAND = (500.0, 10000.0)
+#: ``--selection-g-max``: shell cap of ``sel<x>`` points (``None``: production cap).
+SELECTION_G_MAX = None
 #: Warm timings whose relative spread (max - min) / median exceeds this are
 #: reported unresolved: no point estimate is claimed from them (#1143 Plan 5).
 TIMING_SPREAD_LIMIT = 0.2
@@ -593,12 +595,43 @@ def tolerance_cutoff(case, scorer, tol, max_reflections, g_max=40.0):
     return f"g{cutoff:g}", record
 
 
+def _timed_continuum(case, scorer, transport, grid, quadrature, sync, share_s):
+    """The production net-metric continuum, with its share time added to ``share_s[0]``."""
+    from pyrite.montecarlo.runner.lattice_share import SelectionContinuum
+    from pyrite.montecarlo.runner.reflection_cutoff import axis_band_eV
+
+    continuum = SelectionContinuum(
+        case,
+        scorer._segments_device,
+        transport["n_hat"],
+        case.get("abs_layers"),
+        axis_band_eV(grid, quadrature),
+        groove=transport.get("groove"),
+        Ne=transport["Ne_brem"],
+    )
+    share = continuum.share
+
+    def timed_share(layer, hkls):
+        sync()
+        start = time.perf_counter()
+        value = share(layer, hkls)
+        sync()
+        share_s[0] += time.perf_counter() - start
+        return value
+
+    continuum.share = timed_share
+    return continuum
+
+
 def selected_row(case, transport, label, grid, quadrature, max_reflections, sync):
     """Production incremental selection (#1173 P4) at ``sel<x>``, timed on ``grid``.
 
     Runs :func:`select_case_reflections` with the band axis as production
     axis: each shell is scored once and the kept shells' sum is the spectrum,
     so ``band.first_s`` is the whole selection cost (no separate pilot).
+    Radiators with a corrected continuum use the production net metric
+    (#1250 P5c), on the ladder's continuum electrons; ``share_s`` is the part
+    of the cost spent on the continuum share.
     """
     from pyrite.energy_grid.convergence_case import CaseLadder
     from pyrite.montecarlo.runner.reflection_cutoff import (
@@ -607,6 +640,11 @@ def selected_row(case, transport, label, grid, quadrature, max_reflections, sync
     )
 
     scorer = CaseLadder(case, transport=transport)
+    share_s = [0.0]
+    if case.get("bremsstrahlung_model") != "bremslib":
+        continuum = None  # no corrected continuum: every radiator keeps the line metric
+    else:
+        continuum = _timed_continuum(case, scorer, transport, grid, quadrature, sync, share_s)
 
     def line_density(pilot, axis_grid):
         scorer.case = pilot
@@ -622,6 +660,8 @@ def selected_row(case, transport, label, grid, quadrature, max_reflections, sync
         axis_yield_weights(grid, quadrature),
         quadrature=None if quadrature == "node" else quadrature,
         max_reflections=max_reflections,
+        continuum=continuum,
+        **({} if SELECTION_G_MAX is None else {"g_max_invang": SELECTION_G_MAX}),
     )
     sync()
     elapsed = time.perf_counter() - begin
@@ -636,13 +676,21 @@ def selected_row(case, transport, label, grid, quadrature, max_reflections, sync
                     reflections=len(o.hkl_list),
                     tail_fraction=o.tail_fraction if np.isfinite(o.tail_fraction) else None,
                     converged=o.converged,
+                    background=o.background,
                     shells=[
-                        dict(upper=u, n=k, yield_=y, tail=t if np.isfinite(t) else None)
-                        for u, k, y, t in o.shells
+                        dict(
+                            upper=u,
+                            n=k,
+                            yield_=y,
+                            share=o.shares[i] if o.shares else None,
+                            tail=t if np.isfinite(t) else None,
+                        )
+                        for i, (u, k, y, t) in enumerate(o.shells)
                     ],
                 )
                 for o in outcomes
-            ]
+            ],
+            share_s=share_s[0],
         ),
         reflections=len(pruned["hkl_list"]),
         layer_reflections=None
@@ -1123,7 +1171,7 @@ ARM_OVERRIDES = {
 
 
 def main():
-    global BAND
+    global BAND, SELECTION_G_MAX
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("material", choices=["hopg", "silicon", "mos2-on-si"])
     parser.add_argument("output", type=Path)
@@ -1254,6 +1302,13 @@ def main():
         help="reflections per radiator per line call for --families (bounds device tables)",
     )
     parser.add_argument(
+        "--selection-g-max",
+        type=float,
+        default=None,
+        help="shell cap (1/angstrom) of sel<x> points; a tiny tolerance then records every "
+        "shell to the cap for offline replay (#1250 P5c)",
+    )
+    parser.add_argument(
         "--families-components",
         action="store_true",
         help="split --families band spectra into PXR, CBS and interference and score the "
@@ -1265,6 +1320,7 @@ def main():
     ):
         parser.error("--families-band requires finite 0 < START_EV < STOP_EV")
     BAND = tuple(args.families_band)
+    SELECTION_G_MAX = args.selection_g_max
     if len(set(args.families)) != len(args.families):
         parser.error("--families points must be distinct")
     if len(args.continuum_reference_divisors) != 3:

@@ -215,6 +215,91 @@ def _coupled_brem_from_segments(
     return brem_wide
 
 
+def _layer_brem_from_segments(
+    segs_b,
+    E_brem,
+    case,
+    n_hat,
+    abs_layers,
+    *,
+    layer,
+    tables,
+    tabled_only=False,
+    groove=None,
+    Ne=None,
+):
+    """One radiator layer's BremsLib continuum on ``E_brem`` with explicit ``tables``.
+
+    ``layer`` follows the reflection selection's radiator index (``None``: a
+    single slab). The layer view, chunking, electron blocks and coupled or
+    uncoupled estimator are those of :func:`_brem_wide_from_segments`; only
+    the tables differ. ``tabled_only`` drops elements without a table instead
+    of letting them fall back to EEDL (a share-only table set has no EEDL
+    counterpart). Used by the reflection selector's net-yield metric (#1250).
+
+    Validation: brem-lattice-coherent-fraction
+
+    Validation: reflection-yield-tolerance-selector
+    """
+    from .. import runner
+    from ..spectrum.brem_events import mc_coupled_brem_spectrum
+
+    n_lay = int(segs_b.get("n_layers", 1))
+    if n_lay == 1:
+        view, composition = segs_b, case["composition"]
+    else:
+        view, composition = runner._segments_in_layer(segs_b, layer), abs_layers[layer][2]
+        if "radiative" not in view and "radiative" in segs_b:
+            view = {**view, "radiative": segs_b["radiative"]}
+    if tabled_only:
+        composition = [(el, n) for el, n in composition if el in tables]
+    if view["L_ang"].size == 0 or not composition:
+        return np.zeros(np.shape(E_brem), dtype=float)
+    chunk = runner._admit_chunk(
+        case.get("brem_chunk")
+        or runner._RESOURCE_POLICY.brem_chunk
+        or runner._adaptive_chunk(E_brem.size, intermediates=runner._EEDL_BREM_DENSE_INTERMEDIATES),
+        E_brem.size,
+        intermediates=runner._EEDL_BREM_DENSE_INTERMEDIATES,
+    )
+    block = runner._brem_photon_block(E_brem.size, composition, "bremslib", n_layers=n_lay)
+    if case.get("radiative_model") is not None:
+
+        def score(segments):
+            return mc_coupled_brem_spectrum(
+                segments,
+                E_brem,
+                cutoff_eV=float(case["radiative_cutoff_eV"]),
+                composition=composition,
+                n_hat=n_hat,
+                chunk=chunk,
+                photon_block=block,
+                layers=abs_layers,
+                electron_limit=Ne,
+                bremslib_tables=tables,
+            )
+
+    else:
+
+        def score(segments):
+            return runner.mc_brem_spectrum(
+                segments,
+                E_brem,
+                composition=composition,
+                n_hat=n_hat,
+                chunk=chunk,
+                photon_block=block,
+                layers=abs_layers,
+                groove=groove,
+                electron_limit=Ne,
+                E_cut_keV=case.get("E_cut_brem_keV", 1.0),
+                cross_section_model="bremslib",
+                bremslib_tables=tables,
+            )
+
+    return score_in_electron_blocks(score, view)
+
+
 def _characteristic_from_segments(
     segs,
     E_grid,

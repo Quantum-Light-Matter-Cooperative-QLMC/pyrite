@@ -118,6 +118,7 @@ class BlockSpectrumScorer:
         self.diffracted = DiffractedDepthAccumulator(case, self.E_grid, self.n_hat)
         self.totals: tuple | None = None
         self.n_segments = 0
+        self.n_layers = 1
 
     @measure_block_fallbacks
     def add(self, segs: Mapping[str, Any]) -> None:
@@ -132,6 +133,7 @@ class BlockSpectrumScorer:
         rows = int(segs["L_ang"].shape[0])
         if rows == 0:
             return
+        self.n_layers = int(segs.get("n_layers", 1))
         case = self.case
         block = _segments_on_device(segs)
         batch = EmissionBatch(
@@ -273,6 +275,9 @@ class BlockSpectrumScorer:
                 )
         if self.line_screen is not None:
             out["line_roulette"] = self.line_screen.record()
+        from .lattice_share import lattice_share_outputs
+
+        out.update(lattice_share_outputs(case, self.n_layers))
         if events := self.fallbacks.events():
             out["physics_fallbacks"] = events
         return out

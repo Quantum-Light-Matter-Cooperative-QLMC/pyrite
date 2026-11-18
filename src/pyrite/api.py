@@ -483,6 +483,11 @@ def _case_result(
                 if "reflection_selection" in output
                 else {}
             ),
+            **(
+                {"brem_lattice_share": output["brem_lattice_share"]}
+                if "brem_lattice_share" in output
+                else {}
+            ),
             # Allocation retries ran smaller chunks than requested; absent when none.
             **(
                 {"spectrum_recovery": {k: output[k] for k in _RECOVERY_KEYS if k in output}}
