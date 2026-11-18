@@ -253,7 +253,7 @@ def _scan(runs, rows):
         if width.size:
             lowest = min(lowest, width.min())
             highest = max(highest, width.max())
-            sample.append(width[::stride])
+            sample.append(width[::stride].copy())  # a view would pin the chunk
     return lowest, highest, np.sort(np.concatenate(sample))
 
 

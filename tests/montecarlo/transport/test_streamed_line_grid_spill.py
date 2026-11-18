@@ -278,3 +278,30 @@ def test_spilled_lines_share_one_descriptor_and_keep_their_bits(tmp_path):
     assert store.bytes == lines.size
     lines.close()
     store.close()
+
+
+def test_the_pivot_scan_releases_each_chunk(tmp_path, monkeypatch):
+    """The pivot sample must not pin chunks: that held 8 B/row (job 13619)."""
+    import gc
+    import weakref
+
+    store = SpillStore(tmp_path)
+    rng = np.random.default_rng(3)
+    runs = [write_run(store, rng.random(50), rng.random(50)) for _ in range(6)]
+    alive = []
+    real = line_grid_spill.iter_run_chunks
+
+    def tracked(runs_, chunk_rows=None):
+        for width, weight in real(runs_, chunk_rows):
+            gc.collect()
+            alive.append(sum(ref() is not None for ref in refs))
+            refs.append(weakref.ref(width))
+            yield width, weight
+            del width, weight
+
+    refs = []
+    monkeypatch.setattr(line_grid_spill, "iter_run_chunks", tracked)
+    monkeypatch.setattr(line_grid_spill, "SAMPLE_ROWS", 16)
+    lowest, highest, sample = line_grid_spill._scan(runs, 300)
+    assert max(alive) <= 1  # only the loop variable's previous chunk
+    assert lowest <= sample.min() and sample.max() <= highest
