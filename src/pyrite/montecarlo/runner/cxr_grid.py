@@ -1149,10 +1149,12 @@ def check_cxr_truncation(case, audit):
         stats["statistics_limited"] = limited
         if limited:
             warnings.warn(
-                f"{case['name']} at {case['E0_keV']:g} keV: the incoherent line yield "
-                f"has relative standard error {rse:.3g} over {stats['n_electrons']} "
+                f"{case['name']} at {case['E0_keV']:g} keV: post-scoring line-yield "
+                f"check: the incoherent line yield on the measured bandwidth has "
+                f"relative standard error {rse:.3g} over {stats['n_electrons']} "
                 f"electrons (one electron carries {stats['max_electron_share']:.3g} of "
-                f"it), above {CXR_YIELD_RELATIVE_SE_LIMIT:g}. Rare electrons scattered "
+                f"it), above this check's {CXR_YIELD_RELATIVE_SE_LIMIT:g} limit. It is "
+                "not the adaptive stopping estimator or target. Rare electrons scattered "
                 "toward the detector dominate this yield and its measured bandwidth; "
                 "treat the line yield as statistics-limited or run more electrons.",
                 CxrYieldStatisticsWarning,
@@ -1167,10 +1169,12 @@ def check_cxr_truncation(case, audit):
         # above it, so only sinc**2 tails cross the edge and this policy cut
         # nothing the default axis keeps.
         warnings.warn(
-            f"{case['name']} at {case['E0_keV']:g} keV: the line axis reaches the "
-            f"line-axis ceiling {ceiling:g} eV, yet line tails above it may hold "
-            f"{record['upper_fraction_bound']:.3g} of the line yield (bound), above "
-            f"the {limit:g} share. The automatic bandwidth truncates the same tails.",
+            f"{case['name']} at {case['E0_keV']:g} keV: grid-ceiling tail bound: the "
+            f"line axis reaches the line-axis ceiling {ceiling:g} eV; line tails above "
+            f"it hold at most {record['upper_fraction_bound']:.3g} of the line yield "
+            f"(an upper bound, not a measured loss), above the {limit:g} budget. The "
+            "automatic ceiling loses the same tails; this is a grid diagnostic, not a "
+            "sampling failure.",
             CxrGridTruncationWarning,
             stacklevel=2,
         )

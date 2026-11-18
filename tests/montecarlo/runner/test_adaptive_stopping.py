@@ -738,8 +738,10 @@ def test_unconverged_run_completes_statistics_limited():
     settings = AdaptiveSettings(
         target_rse=1e-4, min_histories=20, max_histories=40, block_histories=20
     )
-    with pytest.warns(CxrYieldStatisticsWarning, match="max_histories=40"):
+    with pytest.warns(CxrYieldStatisticsWarning, match="max_histories=40") as caught:
         result, stats = run_case_adaptive(_case(), settings, transport_core="per-electron")
+    (limit,) = [str(w.message) for w in caught if "adaptive stopping" in str(w.message)]
+    assert "CXR at 40/40 electrons: RSE" in limit and "> target 0.0001 (missed)" in limit
     assert stats["statistics_limited"] and stats["stop_reason"] == "max_electrons"
     assert stats["realized_electrons"] == 40
     assert result["spec"].size == result["E_grid"].size

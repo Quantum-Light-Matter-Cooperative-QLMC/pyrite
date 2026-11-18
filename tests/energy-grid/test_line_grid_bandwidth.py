@@ -240,10 +240,15 @@ def test_audit_at_the_kinematic_ceiling_warns_instead_of_refusing():
     _accumulate_edge_truncation(
         audit, xp.asarray([900.0]), xp.asarray([np.pi / 100.0]), xp.asarray([1.0])
     )
-    with pytest.warns(CxrGridTruncationWarning, match="line-axis ceiling"):
+    with pytest.warns(CxrGridTruncationWarning, match="line-axis ceiling") as caught:
         record = check_cxr_truncation(case, audit)
     assert record["capped_at_ceiling"]
     assert record["upper_fraction_bound"] > 1e-4
+    message = str(caught[0].message)
+    assert message.split(" keV: ")[1].startswith("grid-ceiling tail bound: ")
+    assert f"at most {record['upper_fraction_bound']:.3g}" in message
+    assert "an upper bound" in message and "0.0001 budget" in message
+    assert "loses the same tails" in message and "not a sampling failure" in message
 
 
 def test_audit_sums_line_mass_per_electron_when_counted():
@@ -284,7 +289,7 @@ def test_audit_warns_when_a_rare_electron_carries_the_line_yield():
     assert not stats["statistics_limited"]
     weights = xp.asarray(np.r_[1.0e3, np.ones(399)])
     _accumulate_edge_truncation(rare, E_r, a_width, weights, ids)
-    with pytest.warns(CxrYieldStatisticsWarning, match="relative standard error"):
+    with pytest.warns(CxrYieldStatisticsWarning, match="post-scoring line-yield check"):
         record = check_cxr_truncation(case, rare)
     stats = record["cxr_yield_statistics"]
     assert stats["statistics_limited"]

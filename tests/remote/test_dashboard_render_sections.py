@@ -169,3 +169,57 @@ def test_time_estimate_unavailable_and_failed_samples_remain_unavailable():
         "remaining": None,
         "total": None,
     }
+
+
+def test_recent_log_compacts_known_statistics_and_grid_warnings():
+    """#1267: tagged, attributable one-liners; unrelated warnings and errors stay whole."""
+    path = "/home/u/pyrite/src/pyrite/montecarlo/runner"
+    log = "\n".join(
+        [
+            f"{path}/scheduling.py:210: CxrYieldStatisticsWarning: cleo_sub at 30 keV: "
+            "adaptive stopping reached max_histories=1002000 without converging. "
+            "CXR at 1002000/1002000 electrons: RSE 0.0548 > target 0.001 (missed). "
+            "Treat the result as statistics-limited; the full per-observable record "
+            "is in adaptive_sampling.",
+            "  transport = transport_case_adaptive(",
+            f"{path}/spectrum.py:88: CxrYieldStatisticsWarning: cleo_sub at 30 keV: "
+            "post-scoring line-yield check: the incoherent line yield on the measured "
+            "bandwidth has relative standard error 0.12 over 1002000 electrons (one "
+            "electron carries 0.3 of it), above this check's 0.1 limit. It is not the "
+            "adaptive stopping estimator or target. Rare electrons scattered toward "
+            "the detector dominate this yield.",
+            "  record = check_cxr_truncation(case, audit)",
+            f"{path}/spectrum.py:88: CxrGridTruncationWarning: cleo_sub at 60 keV: "
+            "grid-ceiling tail bound: the line axis reaches the line-axis ceiling "
+            "3700 eV; line tails above it hold at most 0.000192 of the line yield (an "
+            "upper bound, not a measured loss), above the 0.0001 budget. The automatic "
+            "ceiling loses the same tails; this is a grid diagnostic, not a sampling "
+            "failure.",
+            "  record = check_cxr_truncation(case, audit)",
+            "/x/numpy/core.py:5: RuntimeWarning: overflow encountered in exp",
+            "  y = np.exp(x)",
+            "Traceback (most recent call last):",
+            '  File "run.py", line 3, in <module>',
+            "ValueError: boom",
+        ]
+    )
+    lines = render._clean_recent_log(log, limit=20).splitlines()
+    assert lines[:3] == [
+        "[adaptive limit] cleo_sub at 30 keV: reached max_histories=1002000 without "
+        "converging. CXR at 1002000/1002000 electrons: RSE 0.0548 > target 0.001 (missed).",
+        "[line-yield check] cleo_sub at 30 keV: the incoherent line yield on the measured "
+        "bandwidth has relative standard error 0.12 over 1002000 electrons (one electron "
+        "carries 0.3 of it), above this check's 0.1 limit.",
+        "[grid ceiling] cleo_sub at 60 keV: the line axis reaches the line-axis ceiling "
+        "3700 eV; line tails above it hold at most 0.000192 of the line yield (an upper "
+        "bound, not a measured loss), above the 0.0001 budget. The automatic ceiling "
+        "loses the same tails; this is a grid diagnostic, not a sampling failure.",
+    ]
+    assert lines[3:] == [
+        "/x/numpy/core.py:5: RuntimeWarning: overflow encountered in exp",
+        "y = np.exp(x)",
+        "Traceback (most recent call last):",
+        'File "run.py", line 3, in <module>',
+        "ValueError: boom",
+    ]
+    assert not any(".py:" in line and "Cxr" in line for line in lines)

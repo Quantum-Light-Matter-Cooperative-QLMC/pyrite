@@ -46,6 +46,7 @@ from ..._cxr_grid_policy import CxrYieldStatisticsWarning
 from ..._precision import ADAPTIVE_SAMPLING_MODEL, Precision
 from ..._precision import OBSERVABLES as OBSERVABLES
 from ..spectrum.cxr._kernels import _SEG_ARRAYS
+from .adaptive_report import limit_summary
 from .artifacts import _case_geometry
 from .electron_blocks import _take
 from .stream_sizing import AdaptiveChunkPlan
@@ -784,25 +785,26 @@ def transport_case_adaptive(
     transport["adaptive_sampling"] = statistics
     transport["_adaptive_precision"] = settings.to_dict()
     if statistics["statistics_limited"]:
-        worst = {name: status["relative_se"] for name, status in statistics["statistics"].items()}
-        limit = (
-            f"reached max_histories={settings.max_histories} without meeting "
-            f"target_rse={settings.target_rse:g} and its guards"
-        )
-        if settings.brem_target_rse is not None:
-            limit = (
-                f"stopped at Ne={statistics['realized_electrons']}, "
-                f"Ne_brem={statistics['realized_electrons_brem']} without meeting "
-                "every population's target and guards"
-            )
-        warnings.warn(
-            f"{case.get('name', 'case')} at {case['E0_keV']:g} keV: the adaptive run "
-            f"{limit} (relative SE {worst}); "
-            "treat the result as statistics-limited.",
-            CxrYieldStatisticsWarning,
-            stacklevel=2,
-        )
+        warn_statistics_limited(case, settings, statistics)
     return transport
+
+
+def warn_statistics_limited(case, settings: Precision, statistics: Mapping[str, Any]) -> None:
+    """Warn that an adaptive case stopped without meeting its rule, and why (#1267)."""
+    if settings.brem_target_rse is None:
+        stop = f"reached max_histories={settings.max_histories}"
+    else:
+        stop = (
+            f"stopped at Ne={statistics['realized_electrons']}, "
+            f"Ne_brem={statistics['realized_electrons_brem']}"
+        )
+    warnings.warn(
+        f"{case.get('name', 'case')} at {case['E0_keV']:g} keV: adaptive stopping {stop} "
+        f"without converging. {limit_summary(statistics)}. Treat the result as "
+        "statistics-limited; the full per-observable record is in adaptive_sampling.",
+        CxrYieldStatisticsWarning,
+        stacklevel=3,
+    )
 
 
 def run_case_adaptive(

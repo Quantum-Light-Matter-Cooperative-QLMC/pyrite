@@ -220,7 +220,7 @@ work while adding conditional variance. Its adaptive monitor remains analog,
 so passing this gate does not establish the reweighted spectrum's precision.
 Neither method makes an entirely unseen tail detectable by this guard.
 
-Defaults are $c = 0.05$, $E_{\min} = 100$, $V_{\max} = 0.01$, $k = 3$ (`stability_checks`), $f = 0.5$ and $\delta = 0.1$. At $n_{\max}$ the run stops regardless. It completes, records `statistics_limited`, and warns `CxrYieldStatisticsWarning`.
+Defaults are $c = 0.05$, $E_{\min} = 100$, $V_{\max} = 0.01$, $k = 3$ (`stability_checks`), $f = 0.5$ and $\delta = 0.1$. At $n_{\max}$ the run stops regardless. It completes, records `statistics_limited`, and warns `CxrYieldStatisticsWarning`. The warning names, for each population, its realized count and cap, the RSE against its target, and only the failed guards with their measured values and thresholds. The variance-sampling guard is reported as the gated quantity $\mathrm{VOV} + 1/n$ against $V_{\max}$; a VOV-only refusal states that the RSE target was met, since a looser target would not lift it. The full per-observable record stays in `adaptive_sampling["statistics"]`. The post-scoring line-yield check and the grid-ceiling tail bound warn separately; neither is this stopping rule.
 
 The optional pilot projects $N = n_{\text{pilot}} \max_o (r_{o}/\varepsilon)^2$, clipped to $[n_{\text{pilot}}, n_{\max}]$, and adds $N$ to the decision points. No check runs until $N$ is reached. The rule then resumes at the decision points.
 
