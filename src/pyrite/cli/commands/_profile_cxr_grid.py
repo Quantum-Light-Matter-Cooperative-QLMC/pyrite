@@ -92,8 +92,9 @@ def command():
     stay under their old identity.
 
     A sinc-oversampled axis over the point budget keeps its step only around
-    measured lines (3 eV elsewhere) and refuses only if that is still over;
-    --resolution sinc-nyquist is the explicit opt-out to the coarser axis.
+    measured lines (3 eV elsewhere, graded up to 10 eV far from every line) and
+    refuses only if that is still over; --resolution sinc-nyquist is the
+    explicit opt-out to the coarser axis.
 
     Tolerances, maximum spacing (3 eV), the point budget (600000 node, 1000000
     bin-mean) and backend ULPs are not profile keys: set them per call (API)

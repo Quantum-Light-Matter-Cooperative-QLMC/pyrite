@@ -1,8 +1,10 @@
-"""Node-local refinement of an over-budget ``sinc-oversampled`` axis (issue #1257).
+"""Node-local refinement of an over-budget ``sinc-oversampled`` axis (#1257, #1271).
 
 Pins the per-line join-mass bound of ``node_join_halo_eV`` under node
-(trapezoid) quadrature, and the resolver route: the uniform axis wherever it
-fits, the local axis above the budget, a refusal only when that also exceeds it.
+(trapezoid) quadrature, its graded-backbone extension ``node_graded_halos_eV``,
+and the resolver route: the uniform axis wherever it fits, the local axis above
+the budget (graded only where that saves nodes), a refusal only when that also
+exceeds it.
 
 Validation: line-grid-node-local-refinement
 """
@@ -23,7 +25,13 @@ from pyrite._cxr_windows import build_window_plan
 from pyrite.montecarlo.runner import cxr_grid
 from pyrite.montecarlo.runner.node_local_grid import (
     DEFAULT_NODE_JOIN_LIMIT,
+    NODE_LOCAL_FAR_SHARE,
+    NODE_LOCAL_GRADED_CAP_EV,
+    NODE_LOCAL_GROWTH,
     NODE_LOCAL_ROUTE,
+    _graded_gap,
+    graded_coordinates,
+    node_graded_halos_eV,
     node_join_halo_eV,
     node_local_seeds,
 )
@@ -187,10 +195,15 @@ def test_kinematic_axis_over_budget_takes_the_node_local_route():
     assert "above the 600000-point budget" in local["reason"]
     assert record["resolution_policy"] == OVERSAMPLED_RESOLUTION_POLICY
     steps = np.diff(grid)
-    assert steps.max() <= _BACKBONE * (1 + 1e-12)
     inside = (grid[:-1] >= 5600.0 - 100.0) & (grid[1:] <= 6800.0 + 100.0)
     assert steps[inside].max() <= _FINE * (1 + 1e-12)
     assert grid[0] == 50.0 and grid[-1] == 966_200.0
+    # The graded backbone (#1271) beats the ungraded one on this 1 MeV band.
+    grading = local["grading"]
+    assert grading["cap_eV"] == NODE_LOCAL_GRADED_CAP_EV and grading["growth"] == NODE_LOCAL_GROWTH
+    assert grid.size < local["ungraded_points"]
+    assert _BACKBONE < steps.max() <= NODE_LOCAL_GRADED_CAP_EV + 1e-9
+    assert np.array_equal(cxr_grid._cached_grid(record), grid)
 
 
 def test_mixed_transport_local_axis_is_the_backbone():
@@ -255,3 +268,115 @@ def test_bin_mean_axis_over_budget_takes_the_node_local_route_at_the_shape_step(
     inside = (grid[:-1] >= 5600.0 - 100.0) & (grid[1:] <= 6800.0 + 100.0)
     assert np.diff(grid)[inside].max() <= fine * (1 + 1e-12)
     assert record["target_spacing_eV"] == pytest.approx(fine)
+
+
+def _graded_join_error(centre, width, *, far=True, span=200_000.0):
+    """Relative node mass error of one line on its graded local axis (#1271)."""
+    start, stop = centre - span, centre + span
+    seeds, summary = node_local_seeds(
+        [_line(centre, width)],
+        start_eV=start,
+        stop_eV=stop,
+        fine_eV=_FINE,
+        backbone_eV=_BACKBONE,
+        oversampling=LINE_NYQUIST_OVERSAMPLING,
+        growth=NODE_LOCAL_GROWTH,
+        cap_eV=NODE_LOCAL_GRADED_CAP_EV,
+    )
+    grading = {
+        "growth": NODE_LOCAL_GROWTH,
+        "cap_eV": NODE_LOCAL_GRADED_CAP_EV,
+        "protected_eV": summary["protected_eV"] if far else [],
+    }
+    grid = graded_coordinates(build_window_plan(start, stop, _BACKBONE, seeds), grading)
+    assert np.diff(grid).max() <= NODE_LOCAL_GRADED_CAP_EV + 1e-9
+    density = np.sinc((grid - centre) / width) ** 2
+    exact = sincsq_bin_masses(np.pi / width, centre, grid[[0, -1]]).sum()
+    return abs(np.trapezoid(density, grid) / exact - 1.0)
+
+
+@pytest.mark.parametrize("width", [0.4, 1.0, 3.0, 6.0, 11.6, 23.0, 40.0, 130.0, 600.0, 2000.0])
+def test_graded_halos_bound_single_line_node_mass(width):
+    """A graded backbone beyond ``D`` keeps both sides within twice the join limit.
+
+    Validation: line-grid-node-local-refinement
+    """
+    rng = np.random.default_rng(1271)
+    worst = max(_graded_join_error(100_000.0 + rng.uniform(0.0, 100.0), width) for _ in range(8))
+    assert worst <= 2.0 * DEFAULT_NODE_JOIN_LIMIT
+
+
+def test_graded_backbone_needs_the_grading_free_distance():
+    """Grading right after the join breaks the bound for a Peano-halo line (D matters)."""
+    rng = np.random.default_rng(11)
+    loose = max(
+        _graded_join_error(100_000.0 + rng.uniform(0.0, 100.0), 40.0, far=False) for _ in range(8)
+    )
+    assert loose > 2.0 * DEFAULT_NODE_JOIN_LIMIT
+
+
+def test_graded_halo_limiting_cases():
+    eta, rho, cap = DEFAULT_NODE_JOIN_LIMIT, NODE_LOCAL_GROWTH, NODE_LOCAL_GRADED_CAP_EV
+    # Narrow line: tail option, d = D, the ungraded tail halo times (1 + rho / 2).
+    d, far = node_graded_halos_eV(0.1, _FINE, _BACKBONE, eta, rho, cap)
+    assert d == far == pytest.approx((1 + rho / 2) * 0.1 / (np.pi**2 * eta) + _BACKBONE / 2)
+    # Peano line: d is the ungraded halo at (1 - share) eta; D bounds the cap's excess.
+    d, far = node_graded_halos_eV(40.0, _BACKBONE, _BACKBONE, eta, rho, cap)
+    assert d == pytest.approx(node_join_halo_eV(40.0, _BACKBONE, _BACKBONE, 0.5 * eta))
+    target = 8 * 40.0**2 * NODE_LOCAL_FAR_SHARE * eta / (np.pi * (cap**2 - _BACKBONE**2))
+    assert far == pytest.approx(3 * 40.0 / (np.pi * target)) and far > d
+    # No cap above the backbone: no grading-free distance beyond the join.
+    d, far = node_graded_halos_eV(40.0, _BACKBONE, _BACKBONE, eta, rho, _BACKBONE)
+    assert far == d
+
+
+def test_graded_gap_steps_grow_from_both_ends_up_to_the_cap():
+    lo, hi = 1000.0, 9000.0
+    nodes = np.r_[lo, _graded_gap(lo, hi, _BACKBONE, 0.1, 10.0), hi]
+    steps = np.diff(nodes)
+    assert steps[0] == pytest.approx(_BACKBONE) and steps[-1] == pytest.approx(_BACKBONE)
+    near = np.minimum(nodes[:-1] - lo, hi - nodes[1:])
+    assert np.all(steps <= np.minimum(10.0, _BACKBONE + 0.1 * near) + 1e-9)
+    assert steps.max() == pytest.approx(10.0)
+    short = np.diff(np.r_[0.0, _graded_gap(0.0, 5.0, _BACKBONE, 0.1, 10.0), 5.0])
+    assert short.max() <= _BACKBONE and short.min() >= 0.5 * _BACKBONE
+
+
+def test_protected_runs_keep_the_backbone():
+    """DBR/Kossel spans and line halos passed as protected runs are never graded."""
+    plan = build_window_plan(0.0, 100_000.0, _BACKBONE)
+    grading = {"growth": 0.1, "cap_eV": 10.0, "protected_eV": [[40_000.0, 41_500.0]]}
+    grid = graded_coordinates(plan, grading)
+    inside = (grid[:-1] >= 40_000.0) & (grid[1:] <= 41_500.0)
+    assert np.diff(grid)[inside].max() <= _BACKBONE + 1e-9
+    assert np.diff(grid).max() == pytest.approx(10.0)
+    assert np.array_equal(graded_coordinates(plan, None), plan.coordinates())
+
+
+def test_graded_axis_kept_only_where_it_saves_nodes():
+    """On a narrow band the graded halos cost more than they save: the #1257 axis stays."""
+    payload = _payload(KINEMATIC_BANDWIDTH_POLICY, 25_000, stop=12_000.0)
+    grid, record = cxr_grid._kinematic_cxr_grid(payload, _CASE, (None,), 11.6, _Evidence(_LINES))
+    local = record["local_axis"]
+    assert local["grading"] is None and grid.size == local["ungraded_points"]
+    assert np.diff(grid).max() <= _BACKBONE * (1 + 1e-12)
+
+
+@pytest.mark.parametrize("extra", [{"channeling": {}}, {"transition_radiation": {}}])
+def test_unmeasured_spectra_keep_the_ungraded_backbone(extra):
+    """Channeling and TR spectra on the line axis lie outside the join bound (#1271)."""
+    payload = _payload(KINEMATIC_BANDWIDTH_POLICY, 600_000)
+    case = {**_CASE, **extra}
+    grid, record = cxr_grid._kinematic_cxr_grid(payload, case, (None,), 11.6, _Evidence(_LINES))
+    assert record["local_axis"]["grading"] is None
+    assert np.diff(grid).max() <= _BACKBONE * (1 + 1e-12)
+
+
+def test_cache_key_separates_graded_and_ungraded_cases():
+    """A channeling twin must not reuse a line-only case's graded axis (#1271)."""
+    payload = _payload(KINEMATIC_BANDWIDTH_POLICY, 600_000)
+    plain, _ = cxr_grid._policy_cache_key(payload, _CASE, (None,), observation=False)
+    channeling, _ = cxr_grid._policy_cache_key(
+        payload, {**_CASE, "channeling": {}}, (None,), observation=False
+    )
+    assert plain != channeling
