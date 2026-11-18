@@ -52,7 +52,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from ...._backend import _to_cpu, xp
+from ...._backend import _to_cpu, array_namespace, xp
 from ....materials.crystal import HBARC_EV_ANG
 from ...transport import beta_from_keV
 from ...transport.kinematics import C_ANG_PER_FS
@@ -125,13 +125,15 @@ class TemporalProfile:
         }
 
 
-def segment_arrival_times(segments, n_hat, *, xp=xp):
+def segment_arrival_times(segments, n_hat, *, xp=None):
     """Float64 ``(d, t_L)``: retarded midpoint arrival ``t_abs - n_hat.r`` and flight time.
 
     Matches the coherent route's ``d_all`` (start age plus half the
     constant-velocity flight, plus the bunch offset ``t0``) in float64.
     """
     E_field = "E_repr_keV" if segments.get("E_repr_keV") is not None else "E_keV"
+    if xp is None:
+        xp = array_namespace(segments[E_field], segments["r_mid"])
     E = xp.asarray(segments[E_field], dtype=np.float64)
     n_rows = int(E.shape[0])
     beta = beta_from_keV(E)

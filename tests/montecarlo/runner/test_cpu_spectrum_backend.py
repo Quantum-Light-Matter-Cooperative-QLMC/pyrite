@@ -36,6 +36,13 @@ def test_backend_binding_inventory_and_module_scope():
     for path in root.rglob("*.py"):
         tree = ast.parse(path.read_text())
         for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                for default in (*node.args.defaults, *node.args.kw_defaults):
+                    if default is not None:
+                        assert not any(
+                            isinstance(name, ast.Name) and name.id in {"xp", "REAL", "BACKEND"}
+                            for name in ast.walk(default)
+                        ), f"resolve backend defaults at call time: {path}:{node.name}"
             if not isinstance(node, ast.ImportFrom) or not (node.module or "").endswith("_backend"):
                 continue
             bindings = [a for a in node.names if a.name in {"xp", "REAL", "BACKEND"}]
