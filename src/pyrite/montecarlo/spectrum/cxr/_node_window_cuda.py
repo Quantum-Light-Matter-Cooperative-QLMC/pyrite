@@ -98,7 +98,10 @@ extern "C" __global__ void window_flights(
 def _kernel(name):
     import cupy as cp
 
-    return cp.RawKernel(_SOURCE, name, options=("--std=c++11", "--fmad=false"))
+    from ...._backend import exact_rawkernel_options
+
+    # hipRTC rejects NVRTC's ``--fmad=false``; share the vendor spelling.
+    return cp.RawKernel(_SOURCE, name, options=exact_rawkernel_options(cp))
 
 
 def _host(a):

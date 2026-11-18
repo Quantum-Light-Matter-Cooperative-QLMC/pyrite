@@ -14,9 +14,13 @@ from pyrite._cxr_grid_policy import (
     DEFAULT_LOCAL_HALO_LIMIT,
     DEFAULT_SHAPE_MAX_POINTS,
     DEFAULT_SHAPE_RTOL,
+    KINEMATIC_BANDWIDTH_POLICY,
     LOCAL_RESOLUTION_POLICY,
+    NYQUIST_RESOLUTION_POLICY,
+    OVERSAMPLED_RESOLUTION_POLICY,
     RESONANCE_BANDWIDTH_POLICY,
     SHAPE_RESOLUTION_POLICY,
+    default_resolution_policy,
     resolve_cxr_grid_policy,
     shape_spacing_factor,
 )
@@ -87,6 +91,38 @@ def test_shape_policy_payload_carries_its_tolerance_budget_and_fallback_halo():
     assert resolution["shape_rtol"] == DEFAULT_SHAPE_RTOL
     assert resolution["shape_max_points"] == DEFAULT_SHAPE_MAX_POINTS
     assert resolution["halo_limit"] == DEFAULT_LOCAL_HALO_LIMIT
+
+
+@pytest.mark.parametrize(
+    ("bandwidth", "quadrature", "windows", "expected"),
+    [
+        (RESONANCE_BANDWIDTH_POLICY, "bin-mean", False, SHAPE_RESOLUTION_POLICY),
+        (RESONANCE_BANDWIDTH_POLICY, "node", False, OVERSAMPLED_RESOLUTION_POLICY),
+        (KINEMATIC_BANDWIDTH_POLICY, "bin-mean", False, OVERSAMPLED_RESOLUTION_POLICY),
+        (KINEMATIC_BANDWIDTH_POLICY, "node", True, NYQUIST_RESOLUTION_POLICY),
+    ],
+)
+def test_unset_resolution_follows_bandwidth_quadrature_and_windows(
+    bandwidth, quadrature, windows, expected
+):
+    """Bin-mean on the measured band defaults to sinc-shape, else sinc-oversampled (#1214).
+
+    Bin means at W/8 bound an isolated peak only to (pi^2/9)/64 = 1.7e-2.
+    """
+    assert (
+        default_resolution_policy(bandwidth=bandwidth, quadrature=quadrature, windows=windows)
+        == expected
+    )
+    if windows:
+        return
+    payload = resolve_cxr_grid_policy(
+        start_eV=50.0,
+        stop_eV=1000.0,
+        per_call={"bandwidth": bandwidth, "quadrature": quadrature},
+    ).payload()
+    assert payload["resolution"]["policy"] == expected
+    assert "resolution" not in payload["sources"]
+    assert (math.pi**2 / 9) * (1 / 8) ** 2 > DEFAULT_SHAPE_RTOL
 
 
 def test_shape_resolution_needs_measured_bandwidth_and_bin_mean():

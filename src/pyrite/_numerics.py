@@ -9,6 +9,7 @@ import numpy as np
 
 from ._cxr_vocabulary import catalog_key
 from ._energy_bins import EnergyBins
+from ._line_resolution import validate_line_resolution
 from ._line_roulette import LineRoulette
 from ._mixed_elastic_policy import MIXED_URBAN_REFUSAL, validate_transport_mode
 from ._off_settings import DEPRECATED_OFF, NONE, off_value
@@ -711,6 +712,11 @@ class Numerics:
     ``line_roulette`` opts an incoherent scalar-detector run into
     inverse-probability scoring of its CXR lines; ``None`` is analog scoring
     and adds nothing to case identity.
+    ``line_resolution`` picks the automatic CXR line-axis step: the default
+    ``"sinc-oversampled"`` (sinc-Nyquist step / 8; converges peak height and FWHM)
+    or ``"sinc-nyquist"`` (8x fewer nodes, line area only; the opt-out an
+    over-budget axis names). ``None`` adds nothing to case identity; a value
+    joins it. It cannot be combined with an explicit ``energy_bins.cxr`` grid.
     Select ``PYRITE_MC_BACKEND`` before import; models belong to :class:`Physics`.
     """
 
@@ -727,6 +733,8 @@ class Numerics:
     temporal_profile: bool = False
     # Opt-in estimator; None must not add a key to a Case identity.
     line_roulette: LineRoulette | None = None
+    # Opt-in line-axis step (#1214); None must not add a key to a Case identity.
+    line_resolution: Literal["sinc-oversampled", "sinc-nyquist"] | None = None
     transport: "TransportNumerics | None" = None
     radiation: "RadiationNumerics | None" = None
     execution: "ExecutionConfig | None" = None
@@ -765,6 +773,8 @@ class Numerics:
             raise TypeError("cxr_reflections must be a CxrReflections")
         if self.energy_bins is not None and not isinstance(self.energy_bins, EnergyBins):
             raise TypeError("energy_bins must be an EnergyBins or None")
+        # A typed radiation group was mirrored into energy_bins above.
+        validate_line_resolution(self.line_resolution, self.energy_bins)
 
     def _resolve_typed_groups(self) -> None:
         """Lower opt-in grouped sections through the existing flat API.
@@ -902,6 +912,11 @@ class Numerics:
                     **(
                         {"line_roulette": self.line_roulette.to_dict()}
                         if self.line_roulette is not None
+                        else {}
+                    ),
+                    **(
+                        {"line_resolution": self.line_resolution}
+                        if self.line_resolution is not None
                         else {}
                     ),
                 },

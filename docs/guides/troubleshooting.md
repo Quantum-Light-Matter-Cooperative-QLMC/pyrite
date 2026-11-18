@@ -18,7 +18,8 @@ pyrite profile numerics cxr-grid show PROFILE
 ```
 
 Automatic grids stop at the case's measured resonance population, under its
-kinematic bandwidth, and resolve the spacing from sampled trajectories; neither
+kinematic bandwidth, and resolve the spacing from sampled trajectories (the
+sinc-Nyquist step divided by 8, so node peak heights and FWHM converge); neither
 is a measured emission spectrum. A measured stop that would leave more than its
 1e-4 share of line yield above the axis is rescored on the kinematic axis
 after transport, with a warning; an explicitly chosen `resonance-population`

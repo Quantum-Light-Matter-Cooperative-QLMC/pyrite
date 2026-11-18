@@ -108,4 +108,4 @@ def test_line_grid_for_energy_resolves_automatically_on_missing():
     case = build_cases(forced)[0]
     policy = case["line_grid_policy"]
     assert policy["bandwidth"]["policy"] == "resonance-population"
-    assert policy["resolution"]["policy"] == "sinc-nyquist"
+    assert policy["resolution"]["policy"] == "sinc-oversampled"

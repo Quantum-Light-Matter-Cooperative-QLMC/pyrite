@@ -38,3 +38,18 @@ higher-order reflections above it; a defaulted axis that then fails the audit
 is rescored on `kinematic-ceiling` from the same trajectories rather than
 refused. Automatic cases otherwise change identity once through their policy
 payload.
+
+## Amendment (2026-11-16, #1214)
+
+The automatic resolution is now `sinc-oversampled`: the sinc-Nyquist step
+divided by 8. The Nyquist step keeps a line's area but undersamples its node
+peak and FWHM (HOPG 1 MeV: peak −31 %, FWHM +78 % at production population);
+eight nodes per step keep both inside 1 % on every #1143 scene, and six or
+seven do not at 1 MeV. Under the #1243 measured axis the finer step fits the
+600 000-point budget on every measured scene. An axis over the budget refuses;
+`sinc-nyquist` is the explicit opt-out. Feature-window policies keep
+`sinc-nyquist`, whose backbone they refine themselves.
+Bin-mean cases on the measured bandwidth default to `sinc-shape` instead
+(2026-11-17): its spacing bounds an isolated line's bin-mean peak to 1 %, where
+bin means at the ÷8 step are bounded only to 1.7 %. Their kinematic fallback
+takes `sinc-oversampled`.

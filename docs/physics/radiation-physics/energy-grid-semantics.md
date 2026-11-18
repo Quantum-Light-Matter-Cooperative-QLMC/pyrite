@@ -133,7 +133,7 @@ Numerics. $F$ is evaluated through its tail complement $R(x) = F(x) - \tfrac12\o
 
 The line-grid policy's `quadrature` field accepts `node` or `bin-mean`. It resolves from the per-call value, then stored configuration, then the `node` default; there is no environment override. The case's `line_quadrature` key preserves the choice when recomputation pins explicit coordinates and drops the policy.
 
-A `bin-mean` policy uses payload schema 3 and participates in case, checkpoint, and cache identity. Selecting it does not change the automatic `sinc-nyquist` resolution policy, which still targets node-sampled shape observables.
+A `bin-mean` policy uses payload schema 3 and participates in case, checkpoint, and cache identity. Selecting it does not change the automatic `sinc-oversampled` resolution policy (the sinc-Nyquist step divided by 8, #1214), which still targets node-sampled shape observables.
 
 (spectral-support-integration)=
 

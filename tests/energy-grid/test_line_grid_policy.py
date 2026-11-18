@@ -14,7 +14,10 @@ import pytest
 from pyrite._cxr_grid_policy import (
     AUTOMATIC_BANDWIDTH_POLICY,
     DEFAULT_RTOL,
+    LINE_NYQUIST_OVERSAMPLING,
+    NYQUIST_RESOLUTION_POLICY,
     OBSERVABLE_CLASSES,
+    UNIFORM_RESOLUTION_POLICIES,
     CxrGridToleranceError,
     coordinate_cache_key,
     cxr_start_eV,
@@ -468,7 +471,7 @@ def test_backend_precision_shortfall_reports_the_unmet_tolerance():
         # A narrow, high-energy window: the point budget is satisfied, but one
         # float32 ULP at 10 keV is ~1e-3 eV, so 1e-5 eV spacing is unreachable.
         resolved_coordinates(
-            _payload(start_eV=10_000.0, stop_eV=10_001.0, max_spacing_eV=1.0e-5),
+            _payload(start_eV=10_000.0, stop_eV=10_001.0, max_spacing_eV=1.0e-5, oversampling=1),
             1.0e-5,
             dtype=np.float32,
         )
@@ -479,9 +482,14 @@ def test_backend_precision_shortfall_reports_the_unmet_tolerance():
 
 def test_resolution_never_exceeds_the_declared_maximum_spacing():
     grid, record = resolved_coordinates(_payload(), 12.0)
-    assert record["target_spacing_eV"] == 3.0
-    assert float(np.diff(grid).max()) <= 3.0 + 1e-9
+    # The default divides the capped Nyquist step (#1214).
+    assert record["target_spacing_eV"] == 3.0 / LINE_NYQUIST_OVERSAMPLING
+    assert record["nyquist_spacing_eV"] == 3.0
+    assert float(np.diff(grid).max()) <= 3.0 / LINE_NYQUIST_OVERSAMPLING + 1e-9
     assert record["governing_observable"] == "intrinsic_source"
+    grid, record = resolved_coordinates(_payload(policy=NYQUIST_RESOLUTION_POLICY), 12.0)
+    assert record["target_spacing_eV"] == 3.0
+    assert "oversampling" not in record
 
 
 # ---- content-addressed cache ------------------------------------------------
@@ -528,3 +536,93 @@ def test_kinetic_cap_just_below_the_data_onset_stays_below_it(monkeypatch, energ
     assert 966200.0 < energy_keV * 1e3 < ceiling
     policy = _automatic_policy("hopg", energy_keV)
     assert policy.stop_eV == 966200.0 < ceiling
+
+
+def test_default_resolution_oversamples_the_nyquist_step():
+    """The default divides the sinc-Nyquist step by K; sinc-nyquist opts out (#1214)."""
+    payload = resolve_cxr_grid_policy(start_eV=10.0, stop_eV=10_000.0).payload()
+    assert payload["resolution"]["policy"] == "sinc-oversampled"
+    assert payload["resolution"]["oversampling"] == LINE_NYQUIST_OVERSAMPLING
+    assert "resolution" not in payload["sources"]
+    _, record = resolved_coordinates(payload, 0.5)
+    assert record["target_spacing_eV"] == 0.5 / LINE_NYQUIST_OVERSAMPLING
+    assert record["oversampling"] == LINE_NYQUIST_OVERSAMPLING
+
+    coarse = resolve_cxr_grid_policy(
+        start_eV=10.0, stop_eV=10_000.0, per_call={"resolution": NYQUIST_RESOLUTION_POLICY}
+    ).payload()
+    assert "oversampling" not in coarse["resolution"]
+    assert coarse["sources"]["resolution"] == "per-call"
+    _, record = resolved_coordinates(coarse, 0.5)
+    assert record["target_spacing_eV"] == 0.5
+
+
+def test_windows_keep_the_nyquist_backbone_and_refuse_oversampling():
+    windowed = resolve_cxr_grid_policy(
+        start_eV=10.0, stop_eV=10_000.0, per_call={"windows": True}
+    ).payload()
+    assert windowed["resolution"]["policy"] == NYQUIST_RESOLUTION_POLICY
+    assert "oversampling" not in windowed["resolution"]
+    with pytest.raises(ValueError, match="feature windows"):
+        resolve_cxr_grid_policy(
+            start_eV=10.0,
+            stop_eV=10_000.0,
+            per_call={"windows": True, "resolution": "sinc-oversampled"},
+        )
+
+
+def test_oversampled_budget_refusal_names_the_sinc_nyquist_opt_out():
+    with pytest.raises(CxrGridToleranceError) as caught:
+        resolved_coordinates(_payload(max_points=1000), 1.0)
+    message = str(caught.value)
+    assert "--resolution sinc-nyquist" in message
+    assert "not coarsened automatically" in message
+    with pytest.raises(CxrGridToleranceError) as caught:
+        resolved_coordinates(_payload(max_points=100, policy=NYQUIST_RESOLUTION_POLICY), 1.0)
+    assert "sinc-nyquist resolution" not in str(caught.value)
+
+
+def test_public_line_resolution_names_the_uniform_policies():
+    from pyrite._line_resolution import LINE_RESOLUTIONS
+
+    assert LINE_RESOLUTIONS == UNIFORM_RESOLUTION_POLICIES
+
+
+def test_numerics_line_resolution_lowers_to_the_case_policy():
+    """``Numerics(line_resolution=...)`` is the Python opt-out a refusal names (#1214)."""
+    import pyrite as pr
+    from pyrite import api
+    from pyrite.beams import Beam, PointBunch, Spot
+    from pyrite.config import FixedSampling
+    from pyrite.geometry import Footprint, Slab
+
+    scene = pr.Scene(
+        Beam(30.0, transverse=Spot(), longitudinal=PointBunch()),
+        Slab("hopg", 1000.0, tilt_deg=30.0, footprint=Footprint(5.0, 5.0)),
+    )
+    sampling = FixedSampling(cxr_histories=2, brem_histories=2)
+    default = api.build_case(scene, pr.Numerics(sampling=sampling))
+    coarse = api.build_case(
+        scene, pr.Numerics(sampling=sampling, line_resolution=NYQUIST_RESOLUTION_POLICY)
+    )
+    assert default.line_grid_policy["resolution"]["policy"] == "sinc-oversampled"
+    assert "resolution" not in default.line_grid_policy["sources"]
+    assert coarse.line_grid_policy["resolution"]["policy"] == NYQUIST_RESOLUTION_POLICY
+    assert coarse.line_grid_policy["sources"]["resolution"] == "per-call"
+    assert case_content_key(coarse) != case_content_key(default)
+    explicit = api.build_case(scene, pr.Numerics(sampling=sampling, line_resolution=None))
+    assert case_content_key(explicit) == case_content_key(default)
+
+
+def test_numerics_line_resolution_validates_its_value_and_grid():
+    import pyrite as pr
+    from pyrite.detectors import EnergyBins
+
+    with pytest.raises(ValueError, match="line_resolution must be one of"):
+        pr.Numerics(line_resolution="resonance-local")
+    with pytest.raises(ValueError, match="explicit energy_bins.cxr"):
+        pr.Numerics(
+            line_resolution="sinc-nyquist", energy_bins=EnergyBins(cxr=np.linspace(10, 100, 5))
+        )
+    described = pr.Numerics(line_resolution="sinc-nyquist").describe_numerics()
+    assert described["radiation"]["effective"]["line_resolution"] == "sinc-nyquist"

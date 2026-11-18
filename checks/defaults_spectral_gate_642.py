@@ -130,13 +130,26 @@ POLICY_ARMS = {
         "quadrature": "bin-mean",
     },
     "measured": {"bandwidth": "resonance-population"},
+    # Production default for bin-mean on the measured band: sinc-shape (#1214).
     "measured-bin": {"bandwidth": "resonance-population", "quadrature": "bin-mean"},
+    # Bin means at the node default's W/8 step, the comparison arm (#1214).
+    "measured-bin-x8": {
+        "bandwidth": "resonance-population",
+        "resolution": "sinc-oversampled",
+        "quadrature": "bin-mean",
+    },
     "measured-local": {
         "bandwidth": "resonance-population",
         "resolution": "resonance-local",
         "quadrature": "bin-mean",
     },
+    # #1214 shape candidates: the production sinc-Nyquist support and step,
+    # with every interval split into K equal node steps (harness-side only).
+    # They inherit the default bandwidth (measured since #1243).
+    **{f"sinc-x{k}": {"resolution": "sinc-nyquist"} for k in (4, 5, 6, 7, 8, 10, 16)},
 }
+#: Node subdivisions of the resolved sinc-Nyquist step per candidate arm (#1214).
+OVERSAMPLED_ARMS = {f"sinc-x{k}": k for k in (4, 5, 6, 7, 8, 10, 16)}
 #: Predeclared same-track numerical margins (#1143); ``mass_l1`` is the L1
 #: distance of the two normalized 100 eV source-band mass vectors.
 MARGINS = dict(
@@ -228,10 +241,13 @@ def policy_case(case, sweep, selectors):
 
     from pyrite.campaign.sweep import build_cases
 
+    # The arm's energy-loss cap selects the default bandwidth (#1243), so it
+    # must reach the rebuild as it reaches production ``build_cases``.
     built = build_cases(
         replace(sweep, cxr_grid_policy=dict(selectors)),
         n_electrons=int(case["Ne"]),
         n_electrons_brem=int(case["Ne"]),
+        max_dE_frac=float(case.get("max_dE_frac", 0.0) or 0.0),
     )[0]
     return dict(
         case,
@@ -304,6 +320,16 @@ def score_policies(case, sweep, ladder, names, reference_spacing, sync, repeats=
             rows.append(dict(row, refused=f"{type(exc).__name__}: {exc}"))
             continue
         grid = np.asarray(grid, dtype=float)
+        if name in OVERSAMPLED_ARMS:
+            k = OVERSAMPLED_ARMS[name]
+            grid = np.linspace(grid[0], grid[-1], (grid.size - 1) * k + 1)
+            record = dict(
+                record,
+                oversampling=k,
+                num=int(grid.size),
+                target_spacing_eV=float(record["target_spacing_eV"]) / k,
+                actual_spacing_eV=float(record["actual_spacing_eV"]) / k,
+            )
         row["record"] = json.loads(json.dumps(record, default=_jsonable))
         sync()
         begin = time.perf_counter()
