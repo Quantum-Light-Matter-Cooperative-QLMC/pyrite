@@ -138,6 +138,9 @@ def _accumulate_edge_truncation(audit, E_r, a_width, weight, electron=None):
     electron id) also sums the line mass per electron into ``electron_mass``,
     the sample the runner's line-yield standard error is taken over (#201).
 
+    With ``extension_stops_eV`` in the audit, the upper bound is also summed at
+    each of those candidate stops into ``mass_above_extension`` (#1243).
+
     Validation: line-grid-resonance-bandwidth
     """
     if audit is None or E_r.size == 0:
@@ -171,6 +174,17 @@ def _accumulate_edge_truncation(audit, E_r, a_width, weight, electron=None):
         ("mass_below", mass * beyond[1]),
     ):
         audit[key] = audit.get(key, 0.0) + value.sum(dtype=xp.float64)
+    stops = audit.get("extension_stops_eV")
+    if stops is not None:
+        # The same upper bound at each candidate stop above the axis, so a
+        # refused default can extend to the first stop under its share (#1243).
+        sums = []
+        for stop in stops:
+            distance = float(stop) - E_r
+            tail = 1.0 / (xp.pi * a_width * xp.maximum(distance, tiny))
+            share = xp.where(distance > 0.0, xp.minimum(tail, 1.0), 1.0)
+            sums.append((mass * share).sum(dtype=xp.float64))
+        audit["mass_above_extension"] = audit.get("mass_above_extension", 0.0) + xp.stack(sums)
 
 
 def _cxr_amp_sq_core(

@@ -644,8 +644,9 @@ def kinematic_fallback_payload(payload: dict[str, Any]) -> dict[str, Any] | None
     """The ``kinematic-ceiling`` payload a defaulted measured bandwidth falls back to.
 
     ``None`` unless the bandwidth is ``resonance-population`` chosen by default
-    (no recorded source) and the resolution is not ``resonance-local``, which
-    needs the measured bandwidth. The result is the payload an explicit
+    (no recorded source) and the resolution is neither ``resonance-local`` nor
+    ``sinc-shape``, which need the measured bandwidth (a kinematic fallback
+    would rescore at another step). The result is the payload an explicit
     ``kinematic-ceiling`` would carry: same ceiling, start and resolution (#1243).
 
     Validation: line-grid-resonance-bandwidth
@@ -654,7 +655,8 @@ def kinematic_fallback_payload(payload: dict[str, Any]) -> dict[str, Any] | None
     if (
         bandwidth["policy"] != RESONANCE_BANDWIDTH_POLICY
         or "bandwidth" in payload.get("sources", {})
-        or payload["resolution"]["policy"] == LOCAL_RESOLUTION_POLICY
+        or payload.get("resolution", {}).get("policy")
+        in (LOCAL_RESOLUTION_POLICY, SHAPE_RESOLUTION_POLICY)
         or payload.get("windows") is not None
     ):
         return None

@@ -179,8 +179,10 @@ With `windows = true`, for cases built with coherent emission or a positive
 cases, an unset bandwidth resolves to `kinematic-ceiling`: the measured
 bandwidth's truncation audit does not cover those routes (#1243); an explicit
 `resonance-population` refuses on the last three. An unset
-bandwidth whose measured axis fails that audit after transport is rescored on
-the `kinematic-ceiling` axis with the same trajectories, with a warning.
+bandwidth whose measured axis fails that audit after transport is rescored
+with the same trajectories, with a warning, on an axis extended to the first
+candidate stop whose audited upper share is within the limit (at most the
+`kinematic-ceiling` stop).
 An explicit `resonance-population` with `windows = true` is refused. The editor
 also refuses a policy without `windows = true` on `coherent`/`both` emission,
 and `bin-mean` with a positive `max_dE_frac`. `coverage-0.95` labels stored energy-grid artifacts and

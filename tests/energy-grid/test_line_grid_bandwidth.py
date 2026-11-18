@@ -28,6 +28,7 @@ from pyrite._cxr_grid_policy import (
 from pyrite.campaign.config import material_sweep
 from pyrite.campaign.sweep import build_cases
 from pyrite.energy_grid.bandwidth_check import reference_axis, shape_and_counts
+from pyrite.montecarlo.runner.bandwidth_fallback import extension_stop_ladder
 from pyrite.montecarlo.runner.cxr_grid import (
     CXR_YIELD_RELATIVE_SE_LIMIT,
     _measured_cxr_grid,
@@ -199,7 +200,9 @@ def test_audit_is_only_built_for_the_measured_bandwidth():
     default = {"line_grid_policy": {"bandwidth": {"policy": KINEMATIC_BANDWIDTH_POLICY}}}
     assert cxr_truncation_audit(default, np.arange(10.0)) is None
     audit = cxr_truncation_audit(_audited_case(), np.linspace(50.0, 1000.0, 5))
+    ladder = audit.pop("extension_stops_eV")
     assert audit == {"start_eV": 50.0, "stop_eV": 1000.0, "ceiling_eV": 1e6}
+    np.testing.assert_array_equal(ladder, extension_stop_ladder(1000.0, 1e6))
 
 
 def test_audit_accumulates_and_gates_the_upper_edge():
@@ -531,9 +534,356 @@ def test_defaulted_refusal_rescores_on_the_ceiling_and_explicit_refusal_raises(m
     assert result["E_grid"][-1] == pytest.approx(ceiling)
     fallback = result["line_grid_resolved"]["bandwidth_fallback"]
     assert fallback["refused"]["stop_eV"] < ceiling
-    assert "truncation_audit" not in result["line_grid_resolved"]
+    # The rescore is audited too; at the ceiling it warns instead of refusing.
+    assert result["line_grid_resolved"]["truncation_audit"]["capped_at_ceiling"]
+    assert len(fallback["refusals"]) == 1
     with pytest.raises(CxrGridToleranceError, match="bandwidth share"):
         case_driver.run_case(_hbn_case(1000.0, _RESONANCE), transport_core="lockstep")
+
+
+def test_extension_ladder_bounds_match_the_edge_bound_at_each_stop():
+    """Each rung's sum is the audit's own upper bound with that stop (#1243).
+
+    Validation: line-grid-resonance-bandwidth
+    """
+    ladder = extension_stop_ladder(1000.0, 5000.0)
+    assert ladder[-1] == 5000.0 and np.all(np.diff(ladder) > 0.0) and ladder[0] > 1000.0
+    assert (ladder[0] - 1000.0) / 4000.0 == pytest.approx(2.0**-10)
+    E_r = xp.asarray([500.0, 900.0, 1200.0, 3000.0])
+    a_width = xp.asarray([np.pi, np.pi / 100.0, np.pi / 10.0, np.pi / 50.0])
+    weight = xp.asarray([1.0, 1.0, 0.5, 0.2])
+    audit = {"start_eV": 50.0, "stop_eV": 1000.0, "extension_stops_eV": ladder}
+    _accumulate_edge_truncation(audit, E_r, a_width, weight)
+    sums = np.asarray(_to_cpu(audit["mass_above_extension"]))
+    assert sums.shape == ladder.shape and np.all(np.diff(sums) <= 0.0)
+    for stop, value in zip(ladder, sums, strict=True):
+        direct = {"start_eV": 50.0, "stop_eV": float(stop)}
+        _accumulate_edge_truncation(direct, E_r, a_width, weight)
+        assert value == pytest.approx(float(direct["mass_above"]), rel=1e-12)
+
+
+def test_refusal_records_the_smallest_rung_within_the_share():
+    """A refused default names the first ladder stop under its share (#1243).
+
+    Validation: line-grid-resonance-bandwidth
+    """
+    case = _audited_case()
+    case["line_grid_policy"]["bandwidth"]["stop_eV"] = 5000.0
+    audit = cxr_truncation_audit(case, np.linspace(50.0, 1000.0, 5))
+    ladder = audit["extension_stops_eV"]
+    # A strong narrow line just past the measured stop, as automatic selection's
+    # higher-|g| reflections produce.
+    _accumulate_edge_truncation(
+        audit,
+        xp.asarray([500.0, 1200.0]),
+        xp.asarray([np.pi, np.pi / 1e-3]),
+        xp.asarray([1.0, 1e-4]),
+    )
+    with pytest.raises(CxrGridToleranceError) as refused:
+        check_cxr_truncation(case, audit)
+    record = refused.value.truncation_record
+    total = float(audit["line_mass"])
+    shares = np.asarray(_to_cpu(audit["mass_above_extension"])) / total
+    index = int(np.flatnonzero(shares <= 1e-4)[0])
+    assert record["extension_stop_eV"] == pytest.approx(ladder[index])
+    assert 1200.0 < record["extension_stop_eV"] < 5000.0
+    assert index == 0 or shares[index - 1] > 1e-4
+    assert record["extension_fraction_bound"] <= 1e-4
+    chosen = _audited_case()
+    chosen["line_grid_policy"]["sources"] = {"bandwidth": "profile"}
+    assert "extension_stops_eV" not in cxr_truncation_audit(chosen, np.linspace(50.0, 1000.0, 5))
+
+
+def test_defaulted_refusal_rescores_on_the_extended_stop(monkeypatch):
+    """A refused default extends its axis only as far as its audit requires (#1243).
+
+    molab P3 (MoS2 78 deg, 1 MeV): the ceiling fallback rescored on 322051 nodes
+    for a 3.67e-4 share above a 110 keV stop.
+
+    Validation: line-grid-resonance-bandwidth
+    """
+    import pyrite.montecarlo.runner.case_driver as case_driver
+
+    check = case_driver.check_cxr_truncation
+    seen = {}
+
+    def strict(case, audit):
+        # Half the measured upper share: refused, but met by a higher rung.
+        total = float(_to_cpu(audit["line_mass"]))
+        share = float(_to_cpu(audit["mass_above"])) / total
+        if "extension_stops_eV" not in audit or seen:
+            return check(case, audit)
+        seen["limit"] = limit = 0.5 * share
+        payload = case["line_grid_policy"]
+        bandwidth = {**payload["bandwidth"], "truncation_limit": limit}
+        return check({**case, "line_grid_policy": {**payload, "bandwidth": bandwidth}}, audit)
+
+    monkeypatch.setattr(case_driver, "check_cxr_truncation", strict)
+    case = _hbn_case(1000.0)
+    ceiling = case["line_grid_policy"]["bandwidth"]["stop_eV"]
+    with pytest.warns(CxrGridTruncationWarning, match="rescoring on an extended axis"):
+        result = case_driver.run_case(case, transport_core="lockstep")
+    fallback = result["line_grid_resolved"]["bandwidth_fallback"]
+    refused = fallback["refused"]
+    assert refused["stop_eV"] < fallback["stop_eV"] < ceiling
+    assert fallback["stop_eV"] == refused["extension_stop_eV"]
+    assert refused["extension_fraction_bound"] <= seen["limit"]
+    assert result["E_grid"][-1] == pytest.approx(fallback["stop_eV"])
+    assert result["E_grid"][0] == pytest.approx(refused["start_eV"])
+
+
+def test_a_refused_rescore_extends_again(monkeypatch):
+    """The rescore is audited on its own line set and may extend again (#1243).
+
+    Fresh-context re-verification: automatic selection reran on the wider
+    axis (hBN 100 keV: 2044 audited vs 478 rescored reflections), so the
+    refused pass's certificate did not cover the rescored spectrum.
+
+    Validation: line-grid-resonance-bandwidth
+    """
+    import pyrite.montecarlo.runner.case_driver as case_driver
+
+    check = case_driver.check_cxr_truncation
+    calls = []
+
+    def strict(case, audit):
+        # Refuse the measured pass and the first rescore at half their share.
+        total = float(_to_cpu(audit["line_mass"]))
+        share = float(_to_cpu(audit["mass_above"])) / total
+        calls.append(float(audit["stop_eV"]))
+        if len(calls) > 2 or "extension_stops_eV" not in audit:
+            return check(case, audit)
+        payload = case["line_grid_policy"]
+        bandwidth = {**payload["bandwidth"], "truncation_limit": 0.5 * share}
+        return check({**case, "line_grid_policy": {**payload, "bandwidth": bandwidth}}, audit)
+
+    monkeypatch.setattr(case_driver, "check_cxr_truncation", strict)
+    case = _hbn_case(1000.0)
+    ceiling = case["line_grid_policy"]["bandwidth"]["stop_eV"]
+    with pytest.warns(CxrGridTruncationWarning, match="rescoring on"):
+        result = case_driver.run_case(case, transport_core="lockstep")
+    fallback = result["line_grid_resolved"]["bandwidth_fallback"]
+    stops = [r["stop_eV"] for r in fallback["refusals"]]
+    assert len(stops) == 2 and stops[0] < stops[1] == pytest.approx(calls[1])
+    assert calls[0] < calls[1] < calls[2] <= ceiling
+    assert result["E_grid"][-1] == pytest.approx(fallback["stop_eV"]) == pytest.approx(calls[2])
+    assert "truncation_audit" in result["line_grid_resolved"]
+
+
+def test_fallback_loop_refuses_a_stop_that_does_not_rise(monkeypatch):
+    """Validation: line-grid-resonance-bandwidth"""
+    from pyrite.montecarlo.runner import bandwidth_fallback
+
+    refusal = CxrGridToleranceError("refused")
+    monkeypatch.setattr(
+        bandwidth_fallback, "measured_bandwidth_fallback", lambda case, tp, error: (case, tp)
+    )
+
+    def score(case, tp):
+        raise refusal
+
+    with pytest.raises(CxrGridToleranceError) as raised:
+        bandwidth_fallback.spectrum_with_bandwidth_fallback(score, {}, {"E_grid": [1.0, 2.0]})
+    assert raised.value is refusal
+    final = bandwidth_fallback.spectrum_with_bandwidth_fallback(
+        lambda case, tp: "out", {"k": 1}, {"E_grid": [1.0]}
+    )
+    assert final == ("out", {"k": 1}, {"E_grid": [1.0]})
+
+
+def test_observation_directions_extend_one_joint_axis(monkeypatch):
+    """A refusal in one direction rescores every direction on one axis (#1243).
+
+    Fresh-context re-verification: per-direction fallbacks raised on stacking
+    when only one direction refused, and kept the joint measured record when
+    all did.
+
+    Validation: line-grid-resonance-bandwidth
+    """
+    import pyrite.montecarlo.runner.case_driver as case_driver
+    from pyrite.montecarlo.runner.artifacts import _case_geometry
+
+    case = _hbn_case(1000.0)
+    n0 = np.asarray(_case_geometry(case)[3], dtype=float)
+    c, s = np.cos(0.05), np.sin(0.05)
+    n1 = np.array([c * n0[0] - s * n0[1], s * n0[0] + c * n0[1], n0[2]])
+    directions = np.stack([n0, n1 / np.linalg.norm(n1)])
+    check = case_driver.check_cxr_truncation
+    calls = []
+
+    def strict(case, audit):
+        # Refuse only the second direction's first audit, at half its share.
+        calls.append(float(audit["stop_eV"]))
+        if len(calls) != 2 or "extension_stops_eV" not in audit:
+            return check(case, audit)
+        share = float(_to_cpu(audit["mass_above"])) / float(_to_cpu(audit["line_mass"]))
+        payload = case["line_grid_policy"]
+        bandwidth = {**payload["bandwidth"], "truncation_limit": 0.5 * share}
+        return check({**case, "line_grid_policy": {**payload, "bandwidth": bandwidth}}, audit)
+
+    monkeypatch.setattr(case_driver, "check_cxr_truncation", strict)
+    with pytest.warns(CxrGridTruncationWarning, match="rescoring on"):
+        result = case_driver.run_case(
+            case, transport_core="lockstep", observation_directions=directions
+        )
+    directional = result["directional"]
+    resolved = directional["line_grid_resolved"]
+    fallback = resolved["bandwidth_fallback"]
+    E_grid = np.asarray(directional["E_grid"])
+    assert calls[0] == calls[1] < fallback["stop_eV"] == pytest.approx(E_grid[-1])
+    assert calls[2:] == [pytest.approx(E_grid[-1])] * 2  # both directions re-audited
+    assert np.shape(directional["spec_by_direction"]) == (2, E_grid.size)
+    assert resolved["bandwidth_policy"] == RESONANCE_BANDWIDTH_POLICY
+    assert len(resolved["truncation_audits"]) == 2
+    assert "line_grid_diagnostic" not in directional
+
+
+def test_extensions_are_capped_before_the_ceiling(monkeypatch):
+    """Validation: line-grid-resonance-bandwidth"""
+    from pyrite.montecarlo.runner.bandwidth_fallback import MAX_EXTENSIONS, fallback_axis_payload
+
+    case = _hbn_case(1000.0)
+    ceiling = case["line_grid_policy"]["bandwidth"]["stop_eV"]
+    refusal = CxrGridToleranceError("refused")
+    refusal.truncation_record = {
+        "start_eV": 50.0,
+        "stop_eV": 1000.0,
+        "upper_fraction_bound": 1.0,
+        "truncation_limit": 1e-4,
+        "extension_stop_eV": 2000.0,
+    }
+    earlier = {"refusals": [{}] * (MAX_EXTENSIONS - 1)}
+    with pytest.warns(CxrGridTruncationWarning, match="extended axis"):
+        assert fallback_axis_payload(case, refusal, earlier)[1] == 2000.0
+    earlier = {"refusals": [{}] * MAX_EXTENSIONS}
+    with pytest.warns(CxrGridTruncationWarning, match="kinematic-ceiling axis"):
+        _, stop, _, refusals = fallback_axis_payload(case, refusal, earlier)
+    assert stop == ceiling and len(refusals) == MAX_EXTENSIONS + 1
+
+
+def test_sinc_shape_default_has_no_kinematic_fallback():
+    """A ``sinc-shape`` axis is refused, not rescored at the Nyquist step (#1243).
+
+    The fresh-context check rescored hBN 1 MeV from a 1.11 eV shape step to a
+    3.0 eV kinematic one.
+
+    Validation: line-grid-resonance-bandwidth
+    """
+    from pyrite._cxr_grid_policy import SHAPE_RESOLUTION_POLICY
+
+    payload = resolve_cxr_grid_policy(
+        start_eV=50.0,
+        stop_eV=100_000.0,
+        per_call={"resolution": SHAPE_RESOLUTION_POLICY, "quadrature": "bin-mean"},
+    ).payload()
+    assert payload["bandwidth"]["policy"] == RESONANCE_BANDWIDTH_POLICY
+    assert "bandwidth" not in payload.get("sources", {})
+    assert kinematic_fallback_payload(payload) is None
+
+
+def test_fallback_rescore_survives_an_allocation_retry(monkeypatch):
+    """An OOM after the rescore retries on the rescored axis's own phases (#1243).
+
+    The fresh-context check reused the cached rescored lines on the measured
+    transport (broadcast error) and the refused axis's roulette screen.
+
+    Validation: line-grid-resonance-bandwidth
+    """
+    import pyrite.montecarlo.runner.case_driver as case_driver
+    from pyrite.montecarlo import runner
+    from pyrite.montecarlo.runner.oom import _SpectrumPhaseOOM
+
+    check = case_driver.check_cxr_truncation
+
+    def strict(case, audit):
+        payload = case["line_grid_policy"]
+        bandwidth = {**payload["bandwidth"], "truncation_limit": 1e-300}
+        return check({**case, "line_grid_policy": {**payload, "bandwidth": bandwidth}}, audit)
+
+    characteristic = case_driver._characteristic_phase
+    raised = []
+
+    class DummyOOM(MemoryError):
+        pass
+
+    def flaky(emission, batch, Ne_brem):
+        if float(batch.energy_eV[-1]) >= ceiling - 1.0:  # the rescored axis
+            if not raised:
+                raised.append(True)
+                raise _SpectrumPhaseOOM("characteristic", DummyOOM())
+        return characteristic(emission, batch, Ne_brem)
+
+    monkeypatch.setattr(case_driver, "check_cxr_truncation", strict)
+    monkeypatch.setattr(case_driver, "_characteristic_phase", flaky)
+    monkeypatch.setattr(runner._RESOURCE_POLICY, "gpu_oom", (DummyOOM,))
+    # Route through the allocation-retry driver the GPU path uses.
+    monkeypatch.setattr(runner._RESOURCE_POLICY, "gpu", True)
+    monkeypatch.setattr(runner, "_ensure_pool_limit", lambda: None)
+    case = _hbn_case(1000.0)
+    ceiling = case["line_grid_policy"]["bandwidth"]["stop_eV"]
+    with pytest.warns(CxrGridTruncationWarning, match="rescoring on the kinematic-ceiling"):
+        result = case_driver.run_case(case, transport_core="lockstep")
+    assert raised
+    assert result["E_grid"][-1] == pytest.approx(ceiling)
+    assert np.shape(result["spec"])[-1] == np.size(result["E_grid"])
+
+
+def test_fallback_case_gets_its_own_phase_cache(monkeypatch):
+    """Validation: line-grid-resonance-bandwidth"""
+    from pyrite.montecarlo.runner import bandwidth_fallback
+
+    monkeypatch.setattr(
+        "pyrite.montecarlo.runner.cxr_grid.resolve_cxr_grid",
+        lambda case, *a: (np.linspace(50.0, 100.0, 3), {}),
+    )
+    parent = {"line_screen": object(), "lines": object()}
+    case = {**_hbn_case(1000.0), "_spectrum_phase_cache": parent}
+    refusal = CxrGridToleranceError("refused")
+    refusal.truncation_record = {
+        "start_eV": 50.0,
+        "stop_eV": 80.0,
+        "upper_fraction_bound": 1.0,
+        "truncation_limit": 1e-4,
+    }
+    tp = {"segs": None, "n_hat": None, "Ne_lines": 2, "E_grid": None, "groove": None}
+    with pytest.warns(CxrGridTruncationWarning):
+        rescored, _ = bandwidth_fallback.measured_bandwidth_fallback(case, tp, refusal)
+    nested = rescored["_spectrum_phase_cache"]
+    assert nested == {} and nested is parent["bandwidth_fallback"]
+    with pytest.warns(CxrGridTruncationWarning):
+        again, _ = bandwidth_fallback.measured_bandwidth_fallback(case, tp, refusal)
+    assert again["_spectrum_phase_cache"] is nested
+
+
+def test_roulette_screen_shares_the_ceiling_and_extension_ladder(monkeypatch):
+    """Screened lines are charged to the ceiling's window and every rung (#1243).
+
+    Validation: line-grid-resonance-bandwidth
+    """
+    from pyrite.montecarlo import runner
+    from pyrite.montecarlo.runner.line_roulette import LineScreen
+
+    seen = []
+    monkeypatch.setattr(
+        runner,
+        "_cxr_for_segments",
+        lambda *a, truncation_audit=None, **k: seen.append(truncation_audit),
+    )
+    screen = LineScreen.__new__(LineScreen)
+    screen.n, screen._grid, screen._tables = 2, None, {}
+    batch = type(
+        "B", (), {"segments": {}, "case": {}, "n_hat": None, "abs_layers": None, "groove": None}
+    )
+    ladder = extension_stop_ladder(1000.0, 5000.0)
+    caller = {
+        "start_eV": 50.0,
+        "stop_eV": 1000.0,
+        "ceiling_eV": 5000.0,
+        "extension_stops_eV": ladder,
+    }
+    screen._screen(batch, (50.0, 1000.0), caller)
+    assert seen[-1]["ceiling_eV"] == 5000.0 and seen[-1]["extension_stops_eV"] is ladder
+    assert seen[-1]["mass_only"]
 
 
 def test_audited_keep_window_reaches_the_kinematic_window():

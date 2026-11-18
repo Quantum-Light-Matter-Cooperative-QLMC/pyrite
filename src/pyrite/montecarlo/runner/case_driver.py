@@ -27,7 +27,6 @@ from typing import Any
 import numpy as np
 
 from ..._backend import BACKEND
-from ..._cxr_grid_policy import CxrGridToleranceError
 from ..._physics_fallback import collect_physics_fallbacks
 from ..case import (
     AxialAdmissionError,
@@ -46,6 +45,7 @@ from ..transport import _simulate_trajectories as simulate_trajectories
 from . import _SPECTRUM_PROGRESS, _TRANSPORT_PROGRESS, SPECTRUM_STAGES
 from . import adaptive as _adaptive
 from .artifacts import _case_geometry
+from .bandwidth_fallback import spectrum_with_bandwidth_fallback
 from .block_transport import transport_case_blocks
 from .case_tables import (
     _case_elastic_kwargs,
@@ -54,12 +54,7 @@ from .case_tables import (
     _case_stopping_tables,
 )
 from .chunking import _RESOURCE_POLICY, _adaptive_chunk, _admit_chunk
-from .cxr_grid import (
-    check_cxr_truncation,
-    cxr_truncation_audit,
-    measured_bandwidth_fallback,
-    resolve_cxr_grid,
-)
+from .cxr_grid import check_cxr_truncation, cxr_truncation_audit, resolve_cxr_grid
 from .cxr_grid import coherent_flat_omission_limit as _coherent_flat_omission_limit
 from .cxr_grid import longitudinal_rms_fs as _longitudinal_rms_fs
 from .directions import directional_outputs, validated_directions
@@ -897,11 +892,9 @@ def _spectrum_case(case, tp, record_timing=False):
         spectrum_fallbacks(case, tp) as fallbacks,
         _pkg._nsys_range(f"pyrite.spectrum_case:{case.get('name', 'case')}"),
     ):
-        try:
-            out = _spectrum_case_impl(case, tp, record_timing)
-        except CxrGridToleranceError as refusal:
-            case, tp = measured_bandwidth_fallback(case, tp, refusal)
-            out = _spectrum_case_impl(case, tp, record_timing)
+        out, case, tp = spectrum_with_bandwidth_fallback(
+            lambda case, tp: _spectrum_case_impl(case, tp, record_timing), case, tp
+        )
     if events := fallbacks.events():
         out["physics_fallbacks"] = events
     if timed:
