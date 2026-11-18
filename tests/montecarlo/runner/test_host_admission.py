@@ -51,3 +51,21 @@ def test_resident_recovery_admits_before_downloading(monkeypatch):
     with pytest.raises(host_memory.HostMemoryResourceError):
         recover.simulate(4, 8, kept, admit_host=lambda: admission.check(kept, 4, force=True))
     assert recover.resident and not recover.events
+
+
+def test_streamed_route_switches_before_refusing_device_rows(monkeypatch):
+    """#1280: projected kept bytes over headroom switch route, device rows included."""
+    import pickle
+
+    from pyrite.montecarlo.runner.host_admission import StreamedAdaptiveRoute
+
+    class DeviceRows:
+        nbytes = 1024
+
+    blocks = [{"L_ang": DeviceRows()}]
+    monkeypatch.setattr(host_memory, "host_headroom_bytes", lambda: 0)
+    with pytest.raises(StreamedAdaptiveRoute) as caught:
+        AdaptiveHostAdmission(20_000_000, stream=True).check(blocks, 4)
+    route = pickle.loads(pickle.dumps(caught.value))  # crosses the transport pool
+    assert route.block_electrons == 2 * 1024**3 // 256
+    assert route.required == 3 * 1024 * 5_000_000 and route.available == 0

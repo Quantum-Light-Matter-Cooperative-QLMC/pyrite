@@ -99,13 +99,17 @@ Streaming runs on the per-electron or CUDA transport core, in-process, through
 incoherent CXR line spectrum, characteristic lines, and the EEDL or BremsLib
 continuum, including coupled BremsLib radiative transport and secondary,
 pair or positron cascades (#923), whose histories run whole inside each block.
+Adaptive sampling streams too (#1280): a measure-only pass finds the realized
+electron counts, then those counts stream. Scans switch an adaptive case to
+this route on their own when its retained rows would not fit in memory
+(`PYRITE_STREAMED_ADAPTIVE=off` disables that).
 
 These raise `ValueError` before any transport:
 
 - coherent emission, temporal profiles, photon transport and transition
   radiation;
-- channeling, adaptive precision, windowed automatic line grids, and GDF
-  beams;
+- channeling, windowed automatic line grids, and GDF beams;
+- adaptive sampling with reflection selection or batch means;
 - the lockstep transport core;
 - a `PlanarDetector`, `pyrite.transport.simulate_trajectories`, directional
   source scans, and batch executors.

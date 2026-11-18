@@ -7,7 +7,6 @@ records must match.
 """
 
 import shutil
-from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -160,44 +159,53 @@ def test_drain_joins_blocks_in_order_and_releases_them():
     assert _drain([]).size == 0
 
 
-@pytest.mark.parametrize("block", [5, 24, 1000])
-@pytest.mark.parametrize("quadrature", ["node", "bin-mean"])
-def test_oversampled_policy_is_refused_before_transport(monkeypatch, block, quadrature):
-    case = _case()
+def _oversampled(case, stop_eV=None, **per_call):
     band = case["line_grid_policy"]["bandwidth"]
-    case["line_grid_policy"] = resolve_cxr_grid_policy(
-        start_eV=band["start_eV"],
-        stop_eV=band["stop_eV"],
-        per_call={"resolution": "sinc-oversampled", "quadrature": quadrature, "max_points": 1000},
-    ).payload()
-    assert "whole-population line evidence" in streaming_refusal(case, live=True)
-    assert streaming_refusal(case) is None
-    monkeypatch.setattr(runner, "_transport_case", None)
-    with pytest.raises(ValueError, match="sinc-oversampled.*use joined scoring"):
-        run_case_streamed(case, block, transport_core="per-electron")
+    return {
+        **case,
+        "line_grid_policy": resolve_cxr_grid_policy(
+            start_eV=band["start_eV"],
+            stop_eV=band["stop_eV"] if stop_eV is None else stop_eV,
+            per_call={"resolution": "sinc-oversampled", **per_call},
+        ).payload(),
+    }
 
 
-def test_over_budget_kinematic_evidence_gap_against_joined_resolver():
-    from pyrite.montecarlo.runner.cxr_grid import _kinematic_cxr_grid
+#: ``(bandwidth, stop_eV, max_points, local axis)``. Up to 25 keV the uniform
+#: axis is over a 150k budget while the refinement around the lines fits.
+OVERSAMPLED_CASES = [
+    ("kinematic-ceiling", 25_000.0, 150_000, True),
+    ("kinematic-ceiling", None, None, False),
+    ("resonance-population", None, None, False),
+]
+
+
+@pytest.mark.parametrize("block", [5, 1000])
+@pytest.mark.parametrize("quadrature", ["node", "bin-mean"])
+@pytest.mark.parametrize(("bandwidth", "stop_eV", "max_points", "local"), OVERSAMPLED_CASES)
+def test_streamed_oversampled_grid_matches_the_joined_path(
+    block, quadrature, bandwidth, stop_eV, max_points, local
+):
+    """The over-budget node-local axis (#1257) refines around streamed lines (#1280)."""
+    per_call = {"quadrature": quadrature, "bandwidth": bandwidth}
+    if max_points is not None:
+        per_call["max_points"] = max_points
+    case = _oversampled(_case(), stop_eV, **per_call)
+    assert streaming_refusal(case, live=True) is None
+    _clear_grid_cache()
+    reference = _joined(case)
+    assert ("local_axis" in reference["line_grid_resolved"]) is local
+    _clear_grid_cache()
+    streamed = run_case_streamed(case, block, transport_core="per-electron")
+    _assert_matches(streamed, reference)
+
+
+@pytest.mark.parametrize(("mode", "keeps"), [(None, True), ("mixed", False)])
+def test_oversampled_evidence_keeps_lines_unless_transport_is_mixed(mode, keeps):
     from pyrite.montecarlo.runner.streamed_line_grid import BlockGridEvidence
-    from pyrite.montecarlo.spectrum.cxr_seeds import ResonancePopulation
 
-    payload = resolve_cxr_grid_policy(
-        start_eV=50.0,
-        stop_eV=1000.0,
-        per_call={
-            "resolution": "sinc-oversampled",
-            "quadrature": "node",
-            "max_points": 1200,
-            "bandwidth": "kinematic-ceiling",
-        },
-    ).payload()
-    case, direction = {"name": "line-grid probe", "E0_keV": 30.0}, np.array([0.0, 0.0, 1.0])
-    population = ResonancePopulation("line", np.array([500.0]), np.ones(1), np.array([0.01]))
-    joined = SimpleNamespace(populations=lambda *_: [population])
-    grid, record = _kinematic_cxr_grid(payload, case, [direction], 1.0, joined)
-    assert record["local_axis"]["uniform_points"] > 1200 >= grid.size
-    streamed = BlockGridEvidence(case, payload, direction, 1)
-    # This was the late failure after the streamed grid transport pass.
-    with pytest.raises(ValueError, match="holds no lines for this band"):
-        _kinematic_cxr_grid(payload, case, [direction], 1.0, streamed)
+    case = _oversampled(_case(), bandwidth="kinematic-ceiling")
+    if mode is not None:
+        case["transport_mode"] = mode
+    evidence = BlockGridEvidence(case, case["line_grid_policy"], np.array([0.0, 0.0, 1.0]), 1)
+    assert evidence.keeps_lines is keeps

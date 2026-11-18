@@ -18,6 +18,11 @@ sums may differ in the last ulp from the joined path's; the stop is rounded up
 to a whole 100 eV step, so the grid differs only if a tail ratio lands within
 rounding of the truncation limit.
 
+A ``sinc-oversampled`` axis over its point budget refines node-locally around
+every production line (#1257). The first pass therefore keeps the lines for
+that resolution too, under any bandwidth; the joined resolver then builds the
+same axis from them.
+
 Windowed policies read whole-population seed providers and are refused.
 """
 
@@ -39,12 +44,6 @@ def policy_streaming_refusal(case) -> str | None:
     payload = case.get("line_grid_policy")
     if payload is not None and payload.get("windows") is not None:
         return WINDOWED_POLICY_REFUSAL
-    if payload is not None and payload["resolution"]["policy"] == OVERSAMPLED_RESOLUTION_POLICY:
-        return (
-            "sinc-oversampled line_grid_policy is not supported by live streamed scoring: "
-            "over-budget node-local refinement needs whole-population line evidence; "
-            "use joined scoring or select sinc-nyquist"
-        )
     return None
 
 
@@ -54,9 +53,12 @@ class BlockGridEvidence:
     Serves the two quantities :class:`.cxr_grid.SegmentGridEvidence` reads from
     a joined population, for the case's single direction ``n_hat``: the sinc
     ``(width, weight)`` samples of every valid line row, and -- for the
-    measured ``resonance-population`` bandwidth -- every production line's
-    ``(energy, width, weight)``. Evidence is 16 bytes per valid line row plus,
-    when measured, three backend reals per production line.
+    measured ``resonance-population`` bandwidth or a ``sinc-oversampled``
+    resolution, whose over-budget axis refines around each line (#1257) --
+    every production line's ``(energy, width, weight)``. Evidence is 16 bytes
+    per valid line row plus, when lines are kept, three backend reals per
+    production line. Whether a ``sinc-oversampled`` axis exceeds its budget
+    is known only from the final sinc spacing, so its lines are always kept.
 
     Under ``spill`` (:class:`.line_grid_spill.GridSpillPolicy`), once the
     evidence held, or projected over the run from the blocks so far, exceeds
@@ -74,6 +76,9 @@ class BlockGridEvidence:
         bandwidth = payload["bandwidth"]
         self.band = (float(bandwidth["start_eV"]), float(bandwidth["stop_eV"]))
         self.measured = bandwidth["policy"] == RESONANCE_BANDWIDTH_POLICY
+        # Mixed transport scores no lines; its local axis is the backbone alone.
+        oversampled = payload["resolution"]["policy"] == OVERSAMPLED_RESOLUTION_POLICY
+        self.keeps_lines = self.measured or (oversampled and case.get("transport_mode") != "mixed")
         self.policy = GridSpillPolicy(threshold_bytes=None) if spill is None else spill
         self._electrons = max(int(Ne), int(case.get("Ne_brem") or 0), 1)
         self._width: list[np.ndarray] | None = []
@@ -93,7 +98,7 @@ class BlockGridEvidence:
 
         width, weight = sinc_feature_samples(segs, self.n_hat, electron_limit=self.Ne)
         populations = []
-        if self.measured and int(segs["L_ang"].shape[0]):
+        if self.keeps_lines and int(segs["L_ang"].shape[0]):
             populations = _direction_populations(
                 self.case,
                 segs,
@@ -241,7 +246,7 @@ class BlockGridEvidence:
         """Every accumulated production line over the policy band."""
         del profile  # stage profiling covers the joined resolver only
         self._check_direction(n_hat)
-        if not self.measured or (float(start), float(ceiling)) != self.band:
+        if not self.keeps_lines or (float(start), float(ceiling)) != self.band:
             raise ValueError("streamed line-grid evidence holds no lines for this band")
         if self._lines is not None:
             return self._lines.populations(self._populations)

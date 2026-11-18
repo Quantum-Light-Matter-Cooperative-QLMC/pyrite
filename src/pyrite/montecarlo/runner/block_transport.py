@@ -297,6 +297,7 @@ def transport_monitored_blocks(
     recheck: bool = False,
     consume: Callable[[dict[str, Any]], None] | None = None,
     recovery=None,
+    stream_route: bool = False,
 ) -> dict[str, Any]:
     """Transport ``[0, n)`` in chunks under a stopping monitor; return the fixed-``n`` join.
 
@@ -317,11 +318,15 @@ def transport_monitored_blocks(
     each chunk and the join, so a resident allocator OOM moves the kept chunks
     to the host and reruns only the failed chunk (#1269).
 
+    ``stream_route`` (#1280): when the kept-bytes projection exceeds host
+    headroom, raise :class:`.host_admission.StreamedAdaptiveRoute` instead of
+    refusing.
+
     Validation: adaptive-sample-size-stopping
     """
     from .host_admission import AdaptiveHostAdmission
 
-    admission = AdaptiveHostAdmission(limit)
+    admission = AdaptiveHostAdmission(limit, stream=stream_route and consume is None)
     blocks: list[dict[str, Any]] = []
 
     def simulate(start, stop):
@@ -437,8 +442,11 @@ def transport_case_blocks(
     grow to the next decision point and replay again until convergence or
     the maximum.
 
-    ``consume`` (optional, no ``monitor``) streams blocks without joining them;
-    see :func:`transport_electron_blocks`.
+    ``consume`` (optional) streams blocks without joining them; see
+    :func:`transport_electron_blocks`. With a ``monitor`` every monitored pass
+    is measure-only (#1280): kept chunks go to ``consume`` and are released,
+    and only the realized additive counts return. An energy-range replay
+    restarts at electron 0, so ``consume`` must not keep state across passes.
 
     A cascade (#1240) never joins blocks: the monitor reads streamed blocks
     (each primary's whole lineage-addressed cascade, descendants keyed to their
@@ -449,6 +457,8 @@ def transport_case_blocks(
     """
     n_electrons = int(E_cut_by_electrons.size)
     cascade = case.get("secondary_threshold_eV") is not None
+    # Only a retained (kept-chunk) monitored run may switch route (#1280).
+    stream_route = consume is None and getattr(monitor, "stream_route", False)
     if cascade and consume is None and monitor is None:
         # A joined block cascade would need nested metadata, cross-references
         # and generation ordering merged across blocks; only streaming exists.
@@ -516,12 +526,14 @@ def transport_case_blocks(
     # a cascade keeps no chunks.
     recovery = ResidentBlockRecovery(simulate_block, keep)
 
+    measure_only = consume is not None
+
     def monitored(n, recheck=False):
-        consume = None
+        sink = consume
         if cascade:
             # Measure-only streamed pass on a fresh run-wide track budget (#1240).
             budgets.append(_TrackBudget(n_electrons))
-            consume = budgets[-1].wrap(_discard)
+            sink = budgets[-1].wrap(consume or _discard)
         return transport_monitored_blocks(
             simulate_block,
             plan,
@@ -531,8 +543,9 @@ def transport_case_blocks(
             bunch={k: beam_kw[k] for k in BUNCH_KWARGS},
             bremslib_tables=_case_radiative_kwargs(case).get("bremslib_tables"),
             recheck=recheck,
-            consume=consume,
+            consume=sink,
             recovery=None if cascade else recovery,
+            stream_route=stream_route,
         )
 
     result = monitored(n_electrons)
@@ -548,7 +561,7 @@ def transport_case_blocks(
             if monitor.realized == realized:
                 break
             realized = min(monitor.next_point() or n_electrons, n_electrons)
-    if cascade:
+    if cascade and not measure_only:
         return _fixed_cascade(simulate, keep, monitor, realized, E_cut_by_electrons, case)
     result.update(recovery.metrics())
     return result

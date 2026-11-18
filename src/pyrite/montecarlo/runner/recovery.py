@@ -333,8 +333,11 @@ def _spectrum_with_recovery(
 ):
     """Apply the same retry/admitted CPU policy in every execution topology."""
     from .. import runner
+    from .adaptive import STREAMED_ROUTE_KEY
     from .oom import _drop_traceback_locals
 
+    if (route := tp.get(STREAMED_ROUTE_KEY)) is not None:
+        return _streamed_adaptive(case, route, tp["transport_core"])
     if not runner._RESOURCE_POLICY.gpu:
         return runner._spectrum_case(case, tp, record_timing)
     timed = runner._TIMING or record_timing
@@ -384,4 +387,26 @@ def _spectrum_with_recovery(
         *metrics.get("_recovery_events", tp.get("_recovery_events", [])),
         {"phase": "admission" if admission else "spectrum", "mitigation": "cpu_spectrum"},
     ]
+    return out
+
+
+def _streamed_adaptive(case, route, transport_core):
+    """Score an adaptive case whose retained rows would not fit, streamed (#1280).
+
+    The retained transport stopped at its first over-headroom projection and
+    kept nothing; :func:`.streamed_scoring.run_case_streamed` reruns the case
+    as a measure-only monitored pass plus the fixed streamed case at the
+    realized pair, in blocks sized from the observed bytes per history.
+    """
+    from .streamed_scoring import run_case_streamed
+
+    warnings.warn(
+        f"{case.get('name', 'case')} at {case['E0_keV']:g} keV: {route}; "
+        "scoring with streamed adaptive transport (set PYRITE_STREAMED_ADAPTIVE=off "
+        "to keep the retained route)",
+        RuntimeWarning,
+        stacklevel=3,
+    )
+    out = run_case_streamed(case, route.block_electrons, transport_core=transport_core)
+    out["_adaptive_route"] = {"route": "streamed", "reason": str(route)}
     return out

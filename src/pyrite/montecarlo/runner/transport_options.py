@@ -207,8 +207,10 @@ def _check_opt_in_transport(
     if block_electrons is not None:
         refuse_channeling(case, "electron-block transport")
         refuse_transition_radiation(case, "electron-block transport")
-    if block_consumer is not None and (block_electrons is None or block_monitor is not None):
-        raise ValueError("a block consumer needs electron blocks and no block monitor")
+    # An adaptive case owns its chunking; with a consumer it is measure-only (#1280).
+    adaptive = case.get("adaptive_precision") is not None
+    if block_consumer is not None and block_electrons is None and not adaptive:
+        raise ValueError("a block consumer needs electron blocks")
 
 
 @contextmanager

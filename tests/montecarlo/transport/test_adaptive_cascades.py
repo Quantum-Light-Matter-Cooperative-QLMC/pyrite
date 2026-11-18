@@ -279,3 +279,18 @@ def test_gpu_adaptive_cascade_is_the_fixed_run_at_its_count(monkeypatch, kind, b
         np.testing.assert_allclose(result[key], reference[key], rtol=GPU_RTOL, atol=0, err_msg=key)
     for key in ("eta", "hit_frac", "n_segments"):
         assert result[key] == reference[key], key
+
+
+def test_streamed_adaptive_shell_cascade_matches_retained():
+    """Streamed adaptive (#1280): a measure-only pass, then the fixed streamed cascade."""
+    from pyrite.montecarlo.runner.streamed_scoring import run_case_streamed
+
+    case = _cascade_case(coupled=False, Ne=4, Ne_brem=4, threshold=1000.0, seed=5)
+    settings = Precision(1e-9, 4, 8, 4, **BAND, **_RULE_ONLY)
+    reference, stats = _adaptive(case, settings)
+    requested = {**case, "Ne": 8, "Ne_brem": 8, "adaptive_precision": settings.to_dict()}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", CxrYieldStatisticsWarning)
+        streamed = run_case_streamed(requested, 3, transport_core="per-electron")
+    assert streamed["adaptive_sampling"] == stats
+    _assert_matches(streamed, reference)

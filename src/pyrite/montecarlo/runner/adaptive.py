@@ -754,12 +754,18 @@ def transport_case_adaptive(
     transport_core: str = "auto",
     record_timing: bool = False,
     keep_segments_on_device: bool = False,
+    block_consumer: Callable[[dict[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
     """Transport an adaptive case and retain its realized sampling provenance.
 
     The requested case remains the identity input. Returned segments, grids,
     counts, and statistics describe the realized population. Both serial and
     split transport/spectrum scheduling use this seam.
+
+    ``block_consumer`` makes the run measure-only (#1280): the monitor reads
+    each chunk, no chunk is kept, and ``segs`` holds only the realized
+    additive counts. Streamed adaptive scoring then runs the fixed case at
+    the realized pair (:func:`.streamed_scoring.run_case_streamed`).
 
     Validation: adaptive-sample-size-stopping
     """
@@ -769,6 +775,8 @@ def transport_case_adaptive(
     refuse_channeling(case, "adaptive precision")
     refuse_transition_radiation(case, "adaptive precision")
     settings.validate_case(case)
+    if block_consumer is not None and settings.batch_means_band_eV is not None:
+        raise ValueError("batch means need the retained adaptive transport")
     if settings.batch_means_band_eV is not None:
         from .emission_adapters import select_emission
 
@@ -779,14 +787,22 @@ def transport_case_adaptive(
     from .independent import case_stopping_monitor
 
     monitor = case_stopping_monitor(loop_case, settings)
-    transport = runner._transport_case(
-        loop_case,
-        record_timing,
-        transport_core=core,
-        keep_segments_on_device=keep_segments_on_device,
-        block_electrons=AdaptiveChunkPlan.for_core(core, settings.block_histories),
-        block_monitor=monitor,
-    )
+    from .host_admission import StreamedAdaptiveRoute, streamed_route_enabled
+
+    monitor.stream_route = block_consumer is None and streamed_route_enabled(case)
+    try:
+        transport = runner._transport_case(
+            loop_case,
+            record_timing,
+            transport_core=core,
+            keep_segments_on_device=keep_segments_on_device,
+            block_electrons=AdaptiveChunkPlan.for_core(core, settings.block_histories),
+            block_monitor=monitor,
+            block_consumer=block_consumer,
+        )
+    except StreamedAdaptiveRoute as route:
+        # The spectrum phase reruns the case streamed (runner.recovery).
+        return {STREAMED_ROUTE_KEY: route, "transport_core": core}
     statistics = monitor.record()
     statistics["transport_core"] = core
     transport["adaptive_sampling"] = statistics
@@ -794,6 +810,10 @@ def transport_case_adaptive(
     if statistics["statistics_limited"]:
         warn_statistics_limited(case, settings, statistics)
     return transport
+
+
+#: Transport key marking a retained adaptive run that must stream instead (#1280).
+STREAMED_ROUTE_KEY = "_streamed_adaptive_route"
 
 
 def warn_statistics_limited(case, settings: Precision, statistics: Mapping[str, Any]) -> None:

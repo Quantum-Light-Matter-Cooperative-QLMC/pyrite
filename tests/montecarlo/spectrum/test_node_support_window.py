@@ -394,3 +394,29 @@ def test_node_window_kernel_spells_contraction_off_for_each_vendor(monkeypatch, 
     finally:
         _node_window_cuda._kernel.cache_clear()
     assert seen["options"] == options
+
+
+def test_cpu_window_reductions_do_not_depend_on_the_thread_count():
+    """Fixed partial-sum chunks: a pool worker's one-thread pin is bit-identical (#1291)."""
+    import numba
+
+    rng = np.random.default_rng(1291)
+    n = 600
+    rows = (rng.uniform(-3000.0, 15000.0, n), np.pi / rng.uniform(1.0, 60.0, n))
+    weights = [rng.uniform(0.5, 1.0, n) for _ in range(2)]
+    flights = _contiguous_flights(rng, 60)
+    grids = _grids(E_BAND)
+    threads = numba.get_num_threads()
+    results = []
+    for count in sorted({1, threads}):
+        numba.set_num_threads(count)
+        try:
+            results.append(
+                (_rows(E_BAND, 100.0, *rows, weights)[1], _grouped(flights, grids, 100.0)[1])
+            )
+        finally:
+            numba.set_num_threads(threads)
+    for got in results[1:]:
+        for a, b in zip(results[0][0], got[0], strict=True):
+            np.testing.assert_array_equal(a, b)
+        np.testing.assert_array_equal(results[0][1], got[1])
