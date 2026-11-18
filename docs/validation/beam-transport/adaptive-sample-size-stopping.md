@@ -34,15 +34,17 @@ Define central sums $M_j=\sum_i(m_i-\bar m)^j$. For CXR the additional gate is
 $$
 \frac{s_n}{|\bar m_n|}\le\varepsilon
 \quad\text{or}\quad
-E_{\mathrm{var}}=\frac{M_2^2}{M_4}\ge E_{\min}.
+\frac{M_4}{M_2^2}=\frac1{E_{\mathrm{var}}}\le V_{\max}.
 $$
 
 The first branch is a deliberate **empirical near-constant policy exception**;
 it is not a population-variance bound. The second counts effective contributors
 to the observed squared deviations. At zero variance the gate passes by
-convention. Zero signal still fails the ordinary RSE guard. Setting
-`min_effective_histories=0` disables both ESS floors. The brem stopping policy
-is unchanged. Both observables record the dimensionless diagnostic
+convention. Zero signal still fails the ordinary RSE guard. $V_{\max}$ is
+`max_variance_of_variance`; v2 tied it to $1/E_{\min}$, and v3 (#1262) makes
+it a separate policy field. Cauchy–Schwarz gives $1/n\le M_4/M_2^2\le1$, so
+$V_{\max}=1$ disables the gate, and `min_effective_histories=0` disables only
+the contribution ESS floor. The brem stopping policy is unchanged. Both observables record the dimensionless diagnostic
 
 $$
 \mathrm{VOV}=\frac{M_4}{M_2^2}-\frac1n
@@ -54,19 +56,22 @@ moment, its square root is an asymptotic plug-in estimate of relative variance
 uncertainty. It is not the exact finite-$n$ variance of the unbiased sample
 variance. The exact population expression is
 $\operatorname{Var}(s^2)=[\mu_4-\frac{n-3}{n-1}\sigma^4]/n$.
-The default $E_{\min}=100$ limits observed variance concentration to about
-10 percent relative uncertainty; this threshold and the CV exception are
-PyRITE policy, not prescriptions from either reference.
+The default $V_{\max}=0.01$ (the v2 value at $E_{\min}=100$) limits observed
+variance concentration to about 10 percent relative uncertainty, and so the
+RSE to about 5 percent. The Geant4/MCNP pass value 0.1 corresponds to about
+30 percent. Both thresholds and the CV exception are PyRITE policy, not
+prescriptions from either reference; the evidence for the default is under
+[threshold selection](#vov-threshold-selection-1262).
 
 Neither branch sees an entirely unsampled class, certifies population moments,
 or provides finite-sample or simultaneous sequential coverage. With a true
 constant positive signal, CV and VOV vanish, so the original minimum/stability
 stop is retained. A constant sampled prefix can also conceal an unseen class.
 For a regular variable population with finite fourth moment,
-$E_{\mathrm{var}}\simeq n/\kappa$ with kurtosis $\kappa$, so the gate eventually
-passes without a floor in transport units.
+$E_{\mathrm{var}}\simeq n/\kappa$ with kurtosis $\kappa$, so the gate passes
+near $n\simeq\kappa/V_{\max}$ without a floor in transport units.
 
-The stopping generation `adaptive_sampling_model="variance-contributors-v2"`
+The stopping generation `adaptive_sampling_model="variance-threshold-v3"`
 participates in adaptive dataset identities, case content keys, and runtime
 provenance. Fixed-count identities retain their generation.
 
@@ -500,3 +505,52 @@ mass, with leading-line resonances from 183 eV to 28.35 keV. Thus the large prim
 are attributable to multiple incoherent line contributions, rather than one
 unidentified channel. This is measured attribution for these six outliers,
 not a claim that every member of the distribution has the same mechanism.
+
+(vov-threshold-selection-1262)=
+### VOV threshold selection (v3, #1262)
+
+v2 applied $M_4/M_2^2\le1/E_{\min}$. At the default $E_{\min}=100$ the
+heavy-tail case was held to $n\gtrsim E_{\min}\kappa$ whatever its RSE
+target. On the #1243 P3 MoS₂ 500 nm 15° 100 keV workload, the gate bound at
+30,700 electrons (VOV 0.009916, RSE 0.0024 against target 0.01, ESS 26k). v3
+keeps the ESS floor $E_{\min}$ and adds a separate CXR threshold $V_{\max}$
+(`max_variance_of_variance`). The default $V_{\max}=0.01$ is the same IEEE
+double as `1.0/100.0`, so default-policy stops are unchanged. The P3 workload
+therefore still stops at 30,700 electrons, by construction rather than by a
+new transport run.
+
+On 2026-11-17, `checks/adaptive_tail_1254.py` was rerun under v3 on the same
+captures, copied from qlmc `~/pyrite-1252-s{1,2}`. CPU directories were listed
+first, matching the recorded SHA-256 values. All twelve captures carry
+$E_{\min}=100$. The report equals `adaptive_tail_1254_results.json` except
+for `sampling_model`.
+
+The same replays were then repeated with only $V_{\max}$ changed.
+The table lists the 1 MeV 15° rows that v1 stopped early:
+
+| Case | Block | v1 stop | $V_{\max}=0.01$ | $0.03$ | $0.1$ |
+|---|---|---|---|---|---|
+| hBN | 1k | 4k | capture exhausted | **4k** | **4k** |
+| hBN | 3k–48k | 15k–528k | capture exhausted | capture exhausted | capture exhausted |
+| HOPG | 1k | 5k | 1.000M (max) | 1.000M (max) | **18k** |
+| HOPG | 3k | 12k | 1.002M (max) | 1.002M (max) | **18k** |
+| HOPG | 6k | 24k | 1.002M (max) | 1.002M (max) | **24k** |
+
+Bold marks a v3 stop that v1 also took early. The ten largest squared
+deviations hold about 97 percent of the captured variance (see finite-capture
+evidence above), so those stops precede the scores that set the variance.
+At 1 MeV 60° and 30 keV, every threshold gives the same stops. At 30 MeV 15°,
+the CV branch decides, so every threshold gives the same stops. At 30 MeV 60°,
+blocks of 1k–6k stop at 31k/33k/48k under 0.01, at 12k/12k/24k under 0.03,
+and at 7k/12k/24k under 0.1. Blocks of 12k and larger are unchanged.
+
+The default is therefore 0.01. It is the only tested value that refuses every
+former 1 MeV early stop. The MCNP/Geant4 pass value 0.1 remains an opt-in for
+exploratory runs. $V_{\max}=1$ disables the gate. Since v2 fixed
+$V_{\max}=1/E_{\min}$, a profile with an explicit non-default
+`min_effective_histories` now changes its stopping rule. The
+`variance-threshold-v3` marker re-keys every adaptive identity for this
+reason. Anchors: `test_vov_threshold_and_ess_floor_gate_independently`
+(each threshold binds alone, `guards` carries both),
+`test_vov_threshold_is_compared_to_m4_over_m2_squared`, and
+`test_settings_are_validated`.

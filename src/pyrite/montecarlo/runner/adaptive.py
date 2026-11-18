@@ -200,8 +200,8 @@ class StoppingMonitor:
         stability = self._stability(name)
         vov = m.variance_of_variance()
         cv = None if rse is None else rse * math.sqrt(m.n)
-        # Reuse the policy's effective-history floor for squared deviations:
-        # M2**2/M4 >= E_min, equivalently VOV + 1/n <= 1/E_min.
+        # VOV + 1/n = M4/M2**2 <= threshold; M4/M2**2 <= 1, so 1 disables
+        # (checked first: rounding may put the ratio an ulp above 1).
         # The near-constant policy exception uses EMPIRICAL CV <= target,
         # not a bound on population variability or any unseen tail.
         variance_passes = (
@@ -209,8 +209,8 @@ class StoppingMonitor:
             or vov is not None
             and (
                 (cv is not None and cv <= s.target_rse)
-                or s.min_effective_histories == 0.0
-                or vov + 1.0 / m.n <= 1.0 / s.min_effective_histories
+                or s.max_variance_of_variance >= 1.0
+                or vov + 1.0 / m.n <= s.max_variance_of_variance
             )
         )
         passes = {
@@ -286,6 +286,7 @@ class StoppingMonitor:
             "guards": {
                 "max_electron_share": s.max_history_share,
                 "min_effective_electrons": s.min_effective_histories,
+                "max_variance_of_variance": s.max_variance_of_variance,
                 "stability_blocks": s.stability_blocks,
                 "stability_fraction": s.stability_fraction,
             },

@@ -100,9 +100,13 @@ class Precision:
         of the observable's sum.
     min_effective_histories
         Guard: the effective sample size ``(sum m)**2 / sum m**2`` must reach
-        this floor. For CXR, the same floor also applies to squared centered
-        contributions ``M2**2/M4``, unless empirical ``s/abs(mean)`` is at
-        most ``target_rse``. Zero disables both effective-size floors.
+        this floor; zero disables it.
+    max_variance_of_variance
+        CXR guard: ``VOV + 1/n = M4/M2**2`` (central sums) must be at most
+        this value, unless empirical ``s/abs(mean)`` is at most
+        ``target_rse``. The default 0.01 knows the variance to about 10 %
+        (the RSE to about 5 %); 0.1 is the looser MCNP/Geant4 convention.
+        ``M4/M2**2 <= 1`` always, so 1 disables the guard.
     stability_blocks, stability_fraction
         Guard: the running mean at each of the last ``k`` block ends must lie
         within ``stability_fraction * target_rse`` (relative) of the current
@@ -136,6 +140,7 @@ class Precision:
     observables: tuple[str, ...] = ("cxr",)
     max_history_share: float = 0.05
     min_effective_histories: float = 100.0
+    max_variance_of_variance: float = 0.01
     stability_blocks: int = 3
     stability_fraction: float = 0.5
     pilot_histories: int | None = None
@@ -185,8 +190,7 @@ class Precision:
             or len(set(self.observables)) != len(self.observables)
         ):
             raise ValueError(f"observables must be a non-empty subset of {OBSERVABLES}")
-        if isinstance(self.max_history_share, bool) or not 0.0 < self.max_history_share <= 1.0:
-            raise ValueError("max_history_share must lie in (0, 1]")
+        self._validate_unit_fractions()
         for name in ("min_effective_histories", "stability_fraction"):
             value = getattr(self, name)
             if isinstance(value, bool) or not math.isfinite(value) or value < 0.0:
@@ -206,6 +210,12 @@ class Precision:
             ):
                 raise ValueError(f"{name} must contain two positive finite increasing energies")
         self._validate_brem_policy()
+
+    def _validate_unit_fractions(self) -> None:
+        for name in ("max_history_share", "max_variance_of_variance"):
+            value = getattr(self, name)
+            if isinstance(value, bool) or not 0.0 < value <= 1.0:
+                raise ValueError(f"{name} must lie in (0, 1]")
 
     def _validate_brem_policy(self) -> None:
         if self.brem_target_rse is None:
@@ -287,8 +297,10 @@ class Precision:
                 raise ValueError(f"adaptive precision does not support {key}; use fixed counts")
 
 
-# Sampling identity generation: v1 was the unmarked mean-only guards.
-ADAPTIVE_SAMPLING_MODEL = "variance-contributors-v2"
+# Sampling identity generation: v1 was the unmarked mean-only guards; v2 tied
+# the CXR variance gate to ``1/min_effective_histories``; v3 gives it its own
+# ``max_variance_of_variance`` threshold (#1262).
+ADAPTIVE_SAMPLING_MODEL = "variance-threshold-v3"
 
 
 def _adaptive_sampling_markers(policy) -> dict[str, str]:

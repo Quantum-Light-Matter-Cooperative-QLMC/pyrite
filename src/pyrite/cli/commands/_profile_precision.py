@@ -32,6 +32,7 @@ _PRECISION_FIELD_NAMES = {
     "observable": "observables",
     "max-history-share": "max_history_share",
     "min-effective-histories": "min_effective_histories",
+    "max-variance-of-variance": "max_variance_of_variance",
     "stability-blocks": "stability_blocks",
     "stability-fraction": "stability_fraction",
     "pilot-histories": "pilot_histories",
@@ -137,6 +138,15 @@ def _policy_options(function):
             type=click.FloatRange(min=0.0),
             metavar="N",
             help="Guard: effective sample size floor (sum m)^2 / sum m^2 (default 100).",
+        ),
+        click.option(
+            "--max-variance-of-variance",
+            type=click.FloatRange(min=0.0, max=1.0, min_open=True),
+            metavar="VOV",
+            help=(
+                "CXR guard: largest VOV + 1/n = M4/M2^2 (default 0.01; 0.1 is the "
+                "MCNP/Geant4 convention; 1 disables)."
+            ),
         ),
         click.option(
             "--stability-blocks",

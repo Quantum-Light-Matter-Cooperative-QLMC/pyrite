@@ -625,37 +625,37 @@ def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
         (
             "hopg_hbn_gaussian_200fs",
             "hopg",
-            "bdf068fd522a0dc09f7d4d2729dc819dce535ab653f32d86fb8d2cadee6a99d7",
+            "a19682a8a202d42cb72726ab9a16be4ba042f65479affc362cb4b5fb7dbc7f9d",
         ),
         (
             "hopg_hbn_gaussian_200fs",
             "hbn",
-            "e184e4561781121b36486d0aed521afcf266dee139e32cfae7b53ba4a9a9726f",
+            "b91f985aa17593419676c584138967b59ae2d25796f9ee8a5f0939182391bec4",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hopg",
-            "200a394b9ef96a61ac150e0c29e3acb6c77ee26b91101b099818c246b0a04ca2",
+            "2aad1ec0caf089ab09828597434f7e4e496a391c0f2a8fb128802b03ac4c6733",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hbn",
-            "21b1b2c4b384f4e156872da68f77eca099ada173511405a00b3d1171ce4c3bb5",
+            "4a63c03f517c9c62f4e7e980aba84b74eda7f9002813b0eee561848a8e9da07c",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hopg",
-            "2c00d9f1e2b56df4ad897578774609de1e23fa85312ff568fb60f510d102f77c",
+            "567ba88eb9248b4e967dd195d8f0266bc42f2811474d4c2bb82215963317492c",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hbn",
-            "fb0cae3ad9bf9a1b3efd32457307536de0a9f687abbfd3941568110fe43ac54a",
+            "19374ddf760e8444d46ddf6e23b42a04ae119ec8b3a67f0da70c5b25d5c1f729",
         ),
         (
             "hopg_emittance_demo",
             "hopg",
-            "ece261e80c5a82419b04b8da4996c91f0a47a11c331f4e04e23a54e7a018d7b8",
+            "971f35eddf0aea1601b2e9f86076e6855679364f1ac582a190f1e0254a80e567",
         ),
         (
             "promising_low_ne",
@@ -713,6 +713,9 @@ def test_named_beam_migration_keeps_shipped_profile_digests_bit_for_bit(
 
     Issue #1254 re-minted adaptive pins for the variance-contributors-v2
     stopping generation; fixed-count identities hold.
+
+    Issue #1262 re-minted adaptive pins for the variance-threshold-v3
+    stopping generation (separate VOV threshold); fixed-count identities hold.
 
     Issue #938 re-minted adaptive BremsLib/brem pins for the conditional
     ``brem_band_reduction_model`` generation; fixed-count identities hold.
@@ -960,8 +963,8 @@ def test_retired_survey_stems_resolve_only_from_their_sidecar(tmp_path, stem):
 @pytest.mark.parametrize(
     ("profile", "material", "stem"),
     [
-        ("standard", "hopg", "hopg@full-588601d9451b"),
-        ("standard", "mose2", "mose2@full-5debf736fd51"),
+        ("standard", "hopg", "hopg@full-050a823bd3e7"),
+        ("standard", "mose2", "mose2@full-f2b3e44d70ca"),
     ],
 )
 def test_named_profile_stems_are_pinned(profile, material, stem):

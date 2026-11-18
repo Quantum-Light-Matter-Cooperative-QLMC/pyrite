@@ -897,6 +897,9 @@ Options:
                                   (default 0.05).  [0.0<x<=1.0]
   --min-effective-histories N     Guard: effective sample size floor (sum m)^2 / sum m^2
                                   (default 100).  [x>=0.0]
+  --max-variance-of-variance VOV  CXR guard: largest VOV + 1/n = M4/M2^2 (default 0.01;
+                                  0.1 is the MCNP/Geant4 convention; 1 disables).
+                                  [0.0<x<=1.0]
   --stability-blocks K            Guard: block ends whose running mean must agree; 0
                                   disables (default 3).  [x>=0]
   --stability-fraction FRACTION   Guard: allowed relative mean drift as a fraction of
@@ -921,7 +924,8 @@ Usage: pyrite profile numerics adaptive-sampling reset [OPTIONS] NAME [target-rs
                                                        histories|max-histories|block-
                                                        histories|observable|max-history-
                                                        share|min-effective-
-                                                       histories|stability-
+                                                       histories|max-variance-of-
+                                                       variance|stability-
                                                        blocks|stability-fraction|pilot-
                                                        histories|band-ev|batch-means-
                                                        band-ev]...
@@ -971,6 +975,9 @@ Options:
                                   (default 0.05).  [0.0<x<=1.0]
   --min-effective-histories N     Guard: effective sample size floor (sum m)^2 / sum m^2
                                   (default 100).  [x>=0.0]
+  --max-variance-of-variance VOV  CXR guard: largest VOV + 1/n = M4/M2^2 (default 0.01;
+                                  0.1 is the MCNP/Geant4 convention; 1 disables).
+                                  [0.0<x<=1.0]
   --stability-blocks K            Guard: block ends whose running mean must agree; 0
                                   disables (default 3).  [x>=0]
   --stability-fraction FRACTION   Guard: allowed relative mean drift as a fraction of

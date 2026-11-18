@@ -171,14 +171,24 @@ r_n \le \varepsilon,
 
 **CXR variance sampling.** A high baseline can make contribution ESS large
 while a few rare electrons determine almost all of the variance. With centered
-sums $M_j=\sum_i(m_i-\bar m)^j$, require $M_2^2/M_4\ge E_{\min}$ for CXR,
-or empirical CV $s/|\bar m|\le\varepsilon$. The CV branch is a deliberate
-near-constant policy exception, not a bound on unseen tails. Zero variance
-passes this gate; zero signal still cannot converge. The record includes
-`variance_of_variance` ($M_4/M_2^2-1/n$), `coefficient_of_variation`, and the
-`variance_sampling` pass flag. Both effective-size floors use
-`min_effective_histories`; zero disables them. Brem retains its existing
-stopping guards. See the [derivation and limitations](../validation/beam-transport/adaptive-sample-size-stopping.md).
+sums $M_j=\sum_i(m_i-\bar m)^j$, require
+$\mathrm{VOV}+1/n = M_4/M_2^2\le V_{\max}$ for CXR, or empirical CV
+$s/|\bar m|\le\varepsilon$. The CV branch is a deliberate near-constant
+policy exception, not a bound on unseen tails. Zero variance passes this gate;
+zero signal still cannot converge. The record includes `variance_of_variance`
+($M_4/M_2^2-1/n$), `coefficient_of_variation`, and the `variance_sampling`
+pass flag; `guards` records both `min_effective_electrons` and
+`max_variance_of_variance`.
+
+$V_{\max}$ is `max_variance_of_variance`, separate from the ESS floor
+`min_effective_histories` (#1262). The default $V_{\max}=0.01$ estimates the
+variance to about 10 % and the RSE to about 5 %. It is the only value tested
+that refused every former early stop at 1 MeV, 15° in the #1254 replays.
+The MCNP/Geant4 convention $V_{\max}=0.1$ (variance about 30 %) is looser.
+It admitted four of those stops: hBN at 4k and HOPG at 18k–24k histories.
+Use it only for exploratory runs. Since $M_4/M_2^2\le1$, $V_{\max}=1$ disables
+the gate. Setting `min_effective_histories=0` disables only the ESS floor.
+Brem retains its existing stopping guards. See the [derivation and limitations](../validation/beam-transport/adaptive-sample-size-stopping.md).
 
 **Variance reduction and this guard.** Transport-side
 [detector-cone splitting](../research/beam-transport/detector-cone-line-variance.md)
@@ -192,7 +202,7 @@ work while adding conditional variance. Its adaptive monitor remains analog,
 so passing this gate does not establish the reweighted spectrum's precision.
 Neither method makes an entirely unseen tail detectable by this guard.
 
-Defaults are $c = 0.05$, $E_{\min} = 100$, $k = 3$ and $f = 0.5$. They are internal settings until the remote measurement in #361 sets profile values. At $n_{\max}$ the run stops regardless. It completes, records `statistics_limited`, and warns `CxrYieldStatisticsWarning`.
+Defaults are $c = 0.05$, $E_{\min} = 100$, $V_{\max} = 0.01$, $k = 3$ and $f = 0.5$. They are internal settings until the remote measurement in #361 sets profile values. At $n_{\max}$ the run stops regardless. It completes, records `statistics_limited`, and warns `CxrYieldStatisticsWarning`.
 
 The optional pilot projects $N = n_{\text{pilot}} \max_o (r_{o}/\varepsilon)^2$, rounded up to a block and clipped to $[n_{\text{pilot}}, n_{\max}]$. No check runs until $N$ is reached. The rule then resumes block by block.
 

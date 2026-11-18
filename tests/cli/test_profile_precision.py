@@ -241,6 +241,38 @@ def test_precision_set_validates_at_the_boundary(tmp_path, monkeypatch):
     assert catalog.read_text() == _CATALOG
 
 
+def test_variance_threshold_is_its_own_profile_field(tmp_path, monkeypatch):
+    """#1262: --max-variance-of-variance is stored, shown and reset apart from the ESS floor."""
+    catalog = _catalog(tmp_path, monkeypatch)
+    shown = invoke(numerics_command, ["adaptive-sampling", "show", "sub_100keV"])
+    assert_row(shown.stdout, "max-variance-of-variance", "0.01", "default")
+
+    for bad in ("0", "1.5"):
+        refused = invoke(
+            numerics_command,
+            ["adaptive-sampling", "set", "sub_100keV", *_POLICY, "--max-variance-of-variance", bad],
+        )
+        assert refused.exit_code == 2
+    assert catalog.read_text() == _CATALOG
+
+    written = invoke(
+        numerics_command,
+        ["adaptive-sampling", "set", "sub_100keV", *_POLICY, "--max-variance-of-variance", "0.1"],
+    )
+    assert_clean_result(written)
+    assert _precision(catalog)["max_variance_of_variance"] == 0.1
+    assert "min_effective_histories" not in _precision(catalog)
+    shown = invoke(numerics_command, ["adaptive-sampling", "show", "sub_100keV"])
+    assert_row(shown.stdout, "max-variance-of-variance", "0.1", "profile")
+    assert_row(shown.stdout, "min-effective-histories", "100", "default")
+
+    reset = invoke(
+        numerics_command, ["adaptive-sampling", "reset", "sub_100keV", "max-variance-of-variance"]
+    )
+    assert_clean_result(reset)
+    assert "max_variance_of_variance" not in _precision(catalog)
+
+
 def test_precision_set_refuses_fixed_counts_and_coherent_profiles(tmp_path, monkeypatch):
     fixed = _CATALOG.replace(
         "[profiles.sub_100keV]\n", "[profiles.sub_100keV]\ncxr_histories = { values = [450] }\n"
