@@ -8,7 +8,8 @@
   "13646": "variants",
   "13647": "variants2",
   "13650": "v6 capture, v6-vs-v5 bench timing, margins",
-  "13640": "gpu-amd: hipErrorNoDevice, no result"
+  "13640": "gpu-amd: hipErrorNoDevice, no result",
+  "13651": "v6 prologue split: PROBE_PROFILE=timers then cprofile"
  },
  "work_counts": {
   "spread_points": 494175448,
@@ -2176,5 +2177,65 @@
    "v5_s": 0.503,
    "max_abs_over_peak": 8.25e-11
   }
- ]
+ ],
+ "prologue_job_13651": {
+  "code_sha": "2648738bd3abe4ac4c1eb14a924a95d794a02ab1",
+  "gpu": "NVIDIA GeForce RTX 5080",
+  "case": "mos2 30 keV 15 deg N=1024",
+  "note": "synchronized inclusive timers (timers mode; perturb overlap). cProfile estimates are host-attributed and GPU waits land on sync points.",
+  "spectrum_s": 53.89,
+  "reduce_s": 34.98,
+  "split_timers": {
+   "_batched._batched_reflection_tables": {
+    "s": 0.76,
+    "calls": 13
+   },
+   "_batched._batched_tables": {
+    "s": 0.769,
+    "calls": 13
+   },
+   "_batched._launch_rows": {
+    "s": 0.002,
+    "calls": 13
+   },
+   "_batched._batched_block": {
+    "s": 1.119,
+    "calls": 276
+   },
+   "_batched._polarization_terms": {
+    "s": 0.129,
+    "calls": 552
+   },
+   "_batched._escape_weights": {
+    "s": 0.145,
+    "calls": 276
+   },
+   "_batched._queue_unit_lines": {
+    "s": 32.957,
+    "calls": 276
+   },
+   "_batched._batched_incoherent_block": {
+    "s": 33.899,
+    "calls": 276
+   },
+   "_batched._CxrBatch.flush": {
+    "s": 35.067,
+    "calls": 102
+   },
+   "reflection_cutoff.select_case_reflections": {
+    "s": 30.967,
+    "calls": 1
+   },
+   "reflection_cutoff._selected_spectrum": {
+    "s": 18.323,
+    "calls": 1
+   }
+  },
+  "cprofile_estimates_s": {
+   "brem_lattice_share._corrected_tables (cumulative)": 14.9,
+   "brem_lattice_share.lattice_share_table (cumulative, 24 calls)": 13.5,
+   "cxr line prologue: _batched_block + tables + escape + polarization (timers)": 2.2
+  },
+  "conclusion": "line prologue ~2-3 s (~5%) of 54 s; reduction 35 s (65%); brem lattice-share table ~13-15 s (~25%, host NumPy) is the next cost and is outside the line route"
+ }
 }
