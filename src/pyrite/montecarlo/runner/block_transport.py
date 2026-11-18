@@ -319,17 +319,27 @@ def transport_monitored_blocks(
 
     Validation: adaptive-sample-size-stopping
     """
+    from .host_admission import AdaptiveHostAdmission
+
+    admission = AdaptiveHostAdmission(limit)
     blocks: list[dict[str, Any]] = []
 
     def simulate(start, stop):
         if recovery is None:
             return simulate_block(start, stop)
-        return recovery.simulate(start, stop, blocks)
+        return recovery.simulate(
+            start,
+            stop,
+            blocks,
+            admit_host=lambda: admission.check(blocks, start, force=True, phase="download"),
+        )
 
     counts: dict[str, Any] = dict.fromkeys(_ADDITIVE_COUNTS, 0)
     start = 0
     while start < limit:
         stop = plan.next_stop(start, monitor.next_point(), limit)
+        if consume is None:
+            admission.check(blocks, start)
         block = simulate(start, stop)
         plan.observe(start, stop, block)
         monitor.on_block(start, stop, block)
@@ -348,6 +358,7 @@ def transport_monitored_blocks(
         else:
             if "hard_radiative_k_eV" in block:
                 block.update(dict.fromkeys(_RECOMPLETED_FIELDS))
+            admission.check([*blocks, block], stop)
             blocks.append(block)
         del block
         start = stop
@@ -355,10 +366,16 @@ def transport_monitored_blocks(
             break
     if consume is not None:
         return counts
+    admission.check(blocks, start, phase="join")
     if recovery is None:
         merged = merge_electron_blocks(blocks)
     else:
-        merged = recovery.join(merge_electron_blocks, blocks, start)
+        merged = recovery.join(
+            merge_electron_blocks,
+            blocks,
+            start,
+            admit_host=lambda: admission.check(blocks, start, force=True, phase="download/join"),
+        )
     blocks.clear()
     return finalize_population_fields(
         merged, seed=seed, bunch=bunch, bremslib_tables=bremslib_tables

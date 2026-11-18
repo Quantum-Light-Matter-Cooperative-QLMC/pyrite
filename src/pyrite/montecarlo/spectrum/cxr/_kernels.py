@@ -664,7 +664,7 @@ if hasattr(xp, "fuse"):
 _RESONANCE_ROOT_RTOL = 1e-3
 
 
-def _vacuum_doppler(E_keV, beta, v_hat, n_hat, *, xp=xp):
+def _vacuum_doppler(E_keV, beta, v_hat, n_hat, *, xp=None):
     """``(gamma, 1 - beta v_hat.n_hat)`` per row, free of cancellation.
 
     ``gamma = 1 + T/(m c^2)`` straight from the kinetic energy, and
@@ -678,6 +678,8 @@ def _vacuum_doppler(E_keV, beta, v_hat, n_hat, *, xp=xp):
 
     Validation: line-kinematics-precision
     """
+    if xp is None:
+        xp = array_namespace(E_keV, beta, v_hat, n_hat)
     dtype = beta.dtype
     gamma = 1.0 + E_keV / dtype.type(M_E_EV / 1e3)
     one_minus_beta = 1.0 / (gamma * gamma * (1.0 + beta))

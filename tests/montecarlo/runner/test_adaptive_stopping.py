@@ -931,3 +931,50 @@ def test_resident_join_oom_merges_host_copies(monkeypatch):
     assert tries == [2, 2] and not recovery.resident
     assert merged["Ne"] == 4 and merged["electron_id"] is merged["elec_id"]
     assert recovery.metrics()["_recovery_events"][0]["stage"] == "join"
+
+
+def test_adaptive_host_admission_refuses_before_kept_growth(monkeypatch):
+    from pyrite.montecarlo.runner.adaptive import transport_case_adaptive
+    from pyrite.montecarlo.transport import host_memory
+
+    calls = []
+    real = runner.case_driver.simulate_trajectories
+
+    def simulate(*args, **kwargs):
+        calls.append(kwargs.get("_electron_start", 0))
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(runner.case_driver, "simulate_trajectories", simulate)
+    original_admit = host_memory.admit_host_allocation
+
+    def admit(required, phase):
+        if phase.startswith("adaptive kept blocks"):
+            raise host_memory.HostMemoryResourceError(phase, required, 0)
+        original_admit(required, phase)
+
+    monkeypatch.setattr(host_memory, "admit_host_allocation", admit)
+    with pytest.raises(host_memory.HostMemoryResourceError, match="lower max_histories.*#1280"):
+        transport_case_adaptive(_case(), _SETTINGS, transport_core="per-electron")
+    assert calls == [0]
+
+
+def test_adaptive_host_admission_feasible_transport_is_identical(monkeypatch):
+    from pyrite.montecarlo.runner.adaptive import transport_case_adaptive
+    from pyrite.montecarlo.transport import host_memory
+
+    settings = replace(_SETTINGS, min_effective_histories=0.0, max_variance_of_variance=1.0)
+    reference = transport_case_adaptive(_case(), settings, transport_core="per-electron")
+    admitted = []
+    monkeypatch.setattr(host_memory, "host_headroom_bytes", lambda: 10**12)
+    real = host_memory.admit_host_allocation
+
+    def admit(required, phase):
+        if phase.startswith("adaptive kept blocks"):
+            admitted.append((required, phase))
+        real(required, phase)
+
+    monkeypatch.setattr(host_memory, "admit_host_allocation", admit)
+    candidate = transport_case_adaptive(_case(), settings, transport_core="per-electron")
+    assert any("join" in phase for _, phase in admitted)
+    _assert_identical(candidate["segs"], reference["segs"])
+    assert candidate["adaptive_sampling"] == reference["adaptive_sampling"]

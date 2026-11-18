@@ -31,6 +31,7 @@ from dataclasses import dataclass
 import numpy as np
 from scipy.special import ndtri
 
+from ...._backend import REAL, xp
 from ...transport.kinematics import child_stream_root, counter_uniforms
 
 #: ``SeedSequence(seed).spawn(MOSAIC_CHILD[0])[MOSAIC_CHILD[1]]`` owns the draws.
@@ -190,7 +191,6 @@ def accumulate_sampled_mosaic(st, tables, accumulate_reflection, mu_tables=None)
     per-layer (or groove) escape tables the GH loop passes too.
     Validation: mosaic-mc-sampled
     """
-    from ...._backend import REAL, xp
     from ....materials.crystal import reciprocal_g_vector
     from ._kernels import _matvec3, _rowdot3
 

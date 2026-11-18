@@ -111,22 +111,22 @@ class ResidentBlockRecovery:
         self.resident = bool(resident)
         self.events: list[dict] = []
 
-    def simulate(self, start, stop, kept):
+    def simulate(self, start, stop, kept, *, admit_host=None):
         """Transport ``[start, stop)``; on a resident OOM move ``kept`` to host first."""
         if self.resident:
             try:
                 return self._simulate(start, stop, keep=True)
             except Exception as error:
-                self._fail_over(error, kept, start, "block")
+                self._fail_over(error, kept, start, "block", admit_host)
         return self._host_call(self._simulate, start, stop, keep=False)
 
-    def join(self, merge, kept, at):
+    def join(self, merge, kept, at, *, admit_host=None):
         """``merge(kept)``; a resident OOM in the join merges host copies instead."""
         if self.resident:
             try:
                 return merge(kept)
             except Exception as error:
-                self._fail_over(error, kept, at, "join")
+                self._fail_over(error, kept, at, "join", admit_host)
         return self._host_call(merge, kept)
 
     def metrics(self):
@@ -138,7 +138,7 @@ class ResidentBlockRecovery:
             "_recovery_events": list(self.events),
         }
 
-    def _fail_over(self, error, kept, start, stage):
+    def _fail_over(self, error, kept, start, stage, admit_host=None):
         from .. import runner
         from .oom import _drop_traceback_locals
         from .pool import _admit_host_segments
@@ -153,6 +153,8 @@ class ResidentBlockRecovery:
         _drop_traceback_locals(error)
         error.__traceback__ = None
         runner.BACKEND.release_memory()
+        if admit_host is not None:
+            admit_host()
         _admit_host_segments()
         kept[:] = [_host_block(block) for block in kept]
         runner.BACKEND.release_memory()
