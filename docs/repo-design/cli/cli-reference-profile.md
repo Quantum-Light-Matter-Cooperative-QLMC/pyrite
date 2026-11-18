@@ -819,9 +819,9 @@ Usage: pyrite profile numerics adaptive-sampling [OPTIONS] COMMAND [ARGS]...
   bremsstrahlung) yield meets the target and its heavy-tail guards pass, or at the
   maximum count flagged statistics-limited. By default one count serves both
   populations. --brem-target-rse enables independent brem-prefix stopping; line
-  transport continues until brem finishes. Coherent emission, cascades, physical
-  detectors, GDF beams, grooves and fixed history counts keep fixed counts. A history is
-  one transported primary electron.
+  transport continues until brem finishes. Coherent emission, physical detectors, GDF
+  beams, grooves and fixed history counts keep fixed counts. A history is one
+  transported primary electron with all its secondaries, pairs and positrons.
 
     enable   switch to adaptive: drop fixed counts, optionally customize
     set      customize fields of an adaptive policy
@@ -872,9 +872,9 @@ Usage: pyrite profile numerics adaptive-sampling enable [OPTIONS] NAME
   Removes the profile's fixed cxr-histories/brem-histories. Without options the default
   policy applies (no table is written); options write a policy whose unspecified fields
   come from the existing policy, else the default. Refuses, writing nothing, when the
-  profile cannot run adaptive (coherent emission, cascades, positrons, a physical
-  detector, or per-material count overrides). Emission, cascades, beam, geometry and
-  line-grid selectors are never changed.
+  profile cannot run adaptive (coherent emission, a physical detector, or per-material
+  count overrides). Emission, cascades, beam, geometry and line-grid selectors are never
+  changed.
 
 Options:
   --brem-target-rse FRACTION      Stop brem independently at this RSE; requires both cxr

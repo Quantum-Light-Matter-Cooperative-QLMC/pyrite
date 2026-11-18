@@ -281,13 +281,8 @@ class Precision:
             raise ValueError(
                 "adaptive precision does not support coherent emission; use fixed counts"
             )
-        for key in (
-            "gdf_source",
-            "groove_spacing_ang",
-            "secondary_threshold_eV",
-            "pair_production_model",
-            "positron_transport",
-        ):
+        # Particle cascades stop on whole primary histories (#1240).
+        for key in ("gdf_source", "groove_spacing_ang"):
             if case.get(key) is not None and case.get(key) is not False:
                 raise ValueError(f"adaptive precision does not support {key}; use fixed counts")
 
@@ -335,9 +330,6 @@ def default_precision_fallback(
     *,
     fixed_counts: bool,
     emission: str | None,
-    secondary_threshold_eV: float | None = None,
-    pair_production_model: str | None = None,
-    positron_transport: bool = False,
     gdf_beam: bool = False,
     grooved: bool = False,
 ) -> str | None:
@@ -345,15 +337,13 @@ def default_precision_fallback(
 
     ``None`` means :data:`DEFAULT_PRECISION` applies. The reasons mirror the
     routes :meth:`Precision.validate_case` refuses, plus an explicit count.
+    Particle cascades run the default too (#1240): their sample is the whole
+    primary history and the realized run is the fixed run at its count.
     """
     if fixed_counts:
         return "the profile sets fixed history counts"
     if emission in ("coherent", "both"):
         return f"emission is {emission!r} (adaptive is incoherent-only)"
-    if secondary_threshold_eV is not None or pair_production_model is not None:
-        return "particle cascades (secondaries or pair production) are enabled"
-    if positron_transport:
-        return "positron transport is enabled"
     if gdf_beam:
         return "the beam is a GDF particle file"
     if grooved:

@@ -116,18 +116,12 @@ def mixed_transport_options(function):
 _ADAPTIVE_FIXES = {
     "the profile sets fixed": "pyrite profile numerics adaptive-sampling enable {name}",
     "emission is": "pyrite profile physics set {name} --emission incoherent",
-    "particle cascades": (
-        "pyrite profile physics set {name} --pair-production-model none "
-        "--secondary-threshold-ev none{positron}"
-    ),
-    "positron transport": "pyrite profile physics set {name} --no-positron-transport",
 }
 
 
-def emit_adaptive_fix(name, reason, profile):
+def emit_adaptive_fix(name, reason):
     """Print the command that clears fixed-count ``reason`` for profile ``name``, if any."""
-    positron = " --no-positron-transport" * bool(profile.get("positron_transport"))
     for prefix, template in _ADAPTIVE_FIXES.items():
         if reason and reason.startswith(prefix):
-            emit_result(f"adaptive sampling: {template.format(name=name, positron=positron)}")
+            emit_result(f"adaptive sampling: {template.format(name=name)}")
             return

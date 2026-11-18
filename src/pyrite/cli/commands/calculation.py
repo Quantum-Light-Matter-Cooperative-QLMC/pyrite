@@ -112,7 +112,7 @@ def _show(name, json_output, *, physics):
     else:
         adaptive = profile_summary.adaptive_resolution(document, target)
         _calculation_view.emit_numerics(fields, adaptive=adaptive)
-        _profile_shared.emit_adaptive_fix(name, adaptive["fixed_reason"], target)
+        _profile_shared.emit_adaptive_fix(name, adaptive["fixed_reason"])
     return 0
 
 

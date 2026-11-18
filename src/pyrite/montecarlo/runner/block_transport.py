@@ -340,15 +340,23 @@ def transport_case_blocks(
     ``consume`` (optional, no ``monitor``) streams blocks without joining them;
     see :func:`transport_electron_blocks`.
 
+    A cascade (#1240) never joins blocks: the monitor reads streamed blocks
+    (each primary's whole lineage-addressed cascade, descendants keyed to their
+    root primary) and keeps none, and the realized ``[0, n)`` then runs as the
+    fixed-``n`` transport, a single call (:func:`_fixed_cascade`).
+
     Validation: adaptive-sample-size-stopping
     """
     n_electrons = int(E_cut_by_electrons.size)
     cascade = case.get("secondary_threshold_eV") is not None
-    if cascade and consume is None:
+    if cascade and consume is None and monitor is None:
         # A joined block cascade would need nested metadata, cross-references
         # and generation ordering merged across blocks; only streaming exists.
         raise ValueError("secondary cascades run in electron blocks only for live streamed scoring")
     budget = _TrackBudget(n_electrons) if cascade else None
+    # The budget the current streamed pass draws on; a cascade monitor pass
+    # pushes a fresh one per pass (#1240).
+    budgets = [] if budget is None else [budget]
     no_bunch = {"bunch_length_fs": None, "long_shape": "gaussian"}
     no_bunch |= {"long_offsets_fs": None, "longitudinal_distribution": None}
     energies = initial_energies_keV(
@@ -367,8 +375,8 @@ def transport_case_blocks(
             # Streamed estimators never read completed photon directions (#864);
             # pair conversion inside a cascade does.
             block_kw["_complete_hard_photons"] = False
-        if budget is not None:
-            block_kw["max_secondary_tracks"] = budget.remaining
+        if budgets:
+            block_kw["max_secondary_tracks"] = budgets[-1].remaining
         if progress is not None:
 
             def block_progress(done, _n, start=start):
@@ -385,7 +393,7 @@ def transport_case_blocks(
         bunch={k: beam_kw[k] for k in BUNCH_KWARGS},
         bremslib_tables=_case_radiative_kwargs(case).get("bremslib_tables"),
     )
-    if budget is not None:
+    if budget is not None and monitor is None:
         consume = budget.wrap(consume)
     if monitor is None:
         return run(
@@ -393,7 +401,17 @@ def transport_case_blocks(
             consume=consume,
             replay_block=partial(simulate_block, keep=False) if keep and consume else None,
         )
-    result = run(n_electrons, on_block=monitor.on_block, should_stop=monitor.should_stop)
+
+    def monitored(n, on_block, should_stop=None):
+        if not cascade:
+            return run(n, on_block=on_block, should_stop=should_stop)
+        # Measure-only streamed pass on a fresh run-wide track budget (#1240).
+        budgets.append(_TrackBudget(n_electrons))
+        return run(
+            n, on_block=on_block, should_stop=should_stop, consume=budgets[-1].wrap(_discard)
+        )
+
+    result = monitored(n_electrons, monitor.on_block, monitor.should_stop)
     realized = int(result["Ne"])
 
     def replay_block(start, stop, block):
@@ -410,8 +428,33 @@ def transport_case_blocks(
             # Replay changes interpolation tables and hence the measured
             # contributions. Recompute the moments and guards from the exact
             # transport we return; a stale pre-replay decision is insufficient.
-            result = run(realized, on_block=replay_block)
+            result = monitored(realized, replay_block)
             if monitor.should_stop(realized):
                 break
             realized = min(realized + block_electrons, n_electrons)
+    if cascade:
+        result = _fixed_cascade(simulate, keep, monitor, realized, E_cut_by_electrons, case)
     return result
+
+
+def _discard(_block) -> None:
+    """A streamed pass that only measures keeps no block."""
+
+
+def _fixed_cascade(simulate, keep, monitor, realized, E_cut_by_electrons, case):
+    """The fixed-count cascade at the realized primaries, as one call (#1240).
+
+    Blocks never join a cascade, so the monitor's streamed passes keep no rows;
+    the returned transport is the fixed-``n`` run itself: bunch, table range
+    and run-wide track cap of ``n`` primaries. Under an independent brem stop
+    primaries past the brem prefix run to the line cutoff, as in the fixed
+    case at the realized pair; their descendants keep the cascade threshold
+    and, carrying their root primary's id, stay out of the brem population.
+
+    Validation: adaptive-sample-size-stopping
+    """
+    cut = np.array(E_cut_by_electrons[:realized], dtype=np.float64)
+    brem = getattr(monitor, "brem_count", None)
+    if brem is not None:
+        cut[brem:] = case.get("E_cut_lines_keV", 5.0)
+    return retry_step_budget(simulate, keep, start=0, stop=realized, cut=cut)

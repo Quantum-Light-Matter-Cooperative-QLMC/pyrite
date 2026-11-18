@@ -342,11 +342,7 @@ def test_enable_without_options_selects_the_default_policy(tmp_path, monkeypatch
 
 
 def test_enable_refuses_unsupported_profiles_without_writing(tmp_path, monkeypatch):
-    for extra, reason in (
-        ('emission = "coherent"\n', "adaptive is incoherent-only"),
-        ("secondary_threshold_eV = 1000.0\n", "particle cascades"),
-        ("positron_transport = true\n", "positron transport"),
-    ):
+    for extra, reason in (('emission = "coherent"\n', "adaptive is incoherent-only"),):
         text = _fixed(f"cxr_histories = {{ values = [500] }}\n{extra}")
         catalog = _catalog(tmp_path, monkeypatch, text)
         refused = invoke(numerics_command, ["adaptive-sampling", "enable", "sub_100keV"])
@@ -577,3 +573,24 @@ def test_removed_budget_catalog_key_is_a_clear_runtime_error(tmp_path, monkeypat
     assert result.exit_code == 1
     assert "cxr_trials: catalog key was removed; rename it to 'cxr_histories'" in result.stderr
     assert "Traceback" not in result.stderr
+
+
+@pytest.mark.parametrize(
+    "cascade",
+    [
+        "secondary_threshold_eV = 1000.0\n",
+        'secondary_threshold_eV = 1.0e5\npair_production_model = "penelope-2024"\n'
+        "positron_transport = true\n",
+    ],
+)
+def test_enable_on_cascades_selects_the_default_policy(tmp_path, monkeypatch, cascade):
+    """Cascades run the default policy (#1240): enabling writes no table."""
+    text = _fixed(f"cxr_histories = {{ values = [500] }}\n{cascade}")
+    catalog = _catalog(tmp_path, monkeypatch, text)
+    enabled = invoke(numerics_command, ["adaptive-sampling", "enable", "sub_100keV"])
+    assert_clean_result(enabled)
+    profile = _profile(catalog)
+    assert "adaptive_sampling" not in profile and "cxr_histories" not in profile
+    shown = invoke(numerics_command, ["adaptive-sampling", "show", "sub_100keV"])
+    assert "adaptive (default policy)" in shown.stdout
+    assert "unsupported" not in shown.stdout

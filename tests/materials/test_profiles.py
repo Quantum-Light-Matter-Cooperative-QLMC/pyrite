@@ -1104,6 +1104,39 @@ def test_secondary_threshold_forks_identity_and_case_payload_only_when_set():
         )
 
 
+def test_cascade_default_policy_forks_only_count_free_cascade_identities():
+    """#1240: cascade profiles without counts or a policy move to the default
+    policy, which re-keys them; fixed-count cascades keep their identity.
+
+    Noncascade profile identities are pinned by
+    ``test_named_profile_stems_are_pinned``.
+    """
+    from pyrite._precision import DEFAULT_PRECISION
+    from pyrite.campaign.profiles import profile_precision_source
+
+    shell = replace(
+        default_settings(),
+        energy_model="midpoint",
+        inelastic_model="shell-soft-hard",
+        inelastic_cutoff_eV=50.0,
+    )
+    cascade = replace(shell, secondary_threshold_eV=1000.0)
+    sweep = material_sweep("silicon")
+    counted = replace(sweep, n_electrons=450)
+    for settings in (shell, cascade):
+        assert profile_precision_source(settings, "standard", sweep=sweep)[0] == (DEFAULT_PRECISION)
+        precision, source = profile_precision_source(settings, "standard", sweep=counted)
+        assert precision is None and source.startswith("fixed: ")
+    # Before #1240 a count-free cascade ran fixed counts: precision None.
+    legacy = dataset_identity("silicon", cascade, sweep)["parameter_sha256"]
+    default = replace(cascade, precision=DEFAULT_PRECISION)
+    assert dataset_identity("silicon", default, sweep)["parameter_sha256"] != legacy
+    # A fixed-count cascade still resolves to precision None, as before #1240,
+    # so its identity inputs are unchanged; the policy alone would re-key it.
+    fixed = dataset_identity("silicon", cascade, counted)["parameter_sha256"]
+    assert fixed != dataset_identity("silicon", default, counted)["parameter_sha256"]
+
+
 def test_default_elsepa_model_forks_identity_and_case_payload_from_mott():
     """ELSEPA is the default; the historical Mott model keeps its old payload."""
     settings = default_settings()

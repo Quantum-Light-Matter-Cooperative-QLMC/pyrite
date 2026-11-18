@@ -118,15 +118,13 @@ half alone is a usage error (exit 2) that names the corrected command.
 
 #### Turn off particle cascades
 
-Secondary and pair cascades keep a profile on fixed history counts; `pyrite
-profile numerics show PROFILE` names the command that restores adaptive
-sampling. To turn cascades off, including ones enabled by an attached physics
-preset:
+Secondary and pair cascades run under the profile's history-count mode like
+any incoherent case; adaptive sampling counts each primary with all its
+descendants. To turn cascades off, including ones enabled by an attached
+physics preset:
 
 ```console
 $ pyrite profile physics set PROFILE --pair-production-model none --secondary-threshold-ev none
-$ pyrite profile numerics show PROFILE
-...  mode  adaptive (default policy)
 ```
 
 Add `--no-positron-transport` when positron transport is on.

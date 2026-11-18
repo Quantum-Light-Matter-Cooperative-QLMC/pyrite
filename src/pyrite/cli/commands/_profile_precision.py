@@ -244,8 +244,9 @@ def command():
     By default one count serves both populations. --brem-target-rse enables
     independent brem-prefix stopping; line transport continues until brem finishes.
     Coherent emission,
-    cascades, physical detectors, GDF beams, grooves and fixed history counts
-    keep fixed counts. A history is one transported primary electron.
+    physical detectors, GDF beams, grooves and fixed history counts keep fixed
+    counts. A history is one transported primary electron with all its
+    secondaries, pairs and positrons.
 
     \b
       enable   switch to adaptive: drop fixed counts, optionally customize
@@ -318,7 +319,7 @@ def precision_show_command(name, json_output):
         )
     for blocker in blockers:
         emit_result(f"adaptive unsupported: {blocker}")
-    _profile_shared.emit_adaptive_fix(name, fixed_reason, profile)
+    _profile_shared.emit_adaptive_fix(name, fixed_reason)
     emit_result(
         "CXR grid: "
         + (
@@ -351,8 +352,7 @@ def precision_enable_command(name, yes, dry_run, **values):
     default policy applies (no table is written); options write a policy whose
     unspecified fields come from the existing policy, else the default.
     Refuses, writing nothing, when the profile cannot run adaptive (coherent
-    emission, cascades, positrons, a physical detector, or per-material count
-    overrides). Emission, cascades, beam, geometry and line-grid selectors are
+    emission, a physical detector, or per-material count overrides). Emission, cascades, beam, geometry and line-grid selectors are
     never changed.
     """
     try:

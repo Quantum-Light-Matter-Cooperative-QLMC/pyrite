@@ -9,7 +9,6 @@ import tomlkit
 
 from pyrite._cxr_vocabulary import catalog_key
 from pyrite._numerics import SAMPLING_KEYS, validate_profile_numerics
-from pyrite._off_settings import is_on, off_value
 from pyrite._precision import (
     DEFAULT_PRECISION,
     REQUIRED_FIELDS,
@@ -26,12 +25,6 @@ SAMPLING_FLAGS = {"n_electrons": "cxr-histories", "n_electrons_brem": "brem-hist
 
 
 _INITIAL_FIELDS = (*REQUIRED_FIELDS, "observables")
-#: Fields that enable particle cascades; a stored "none" keeps them off (#1242).
-_CASCADE_KEYS = ("secondary_threshold_eV", "pair_production_model")
-
-
-def _unwrap(value):
-    return value.unwrap() if hasattr(value, "unwrap") else value
 
 
 def profile_precision_values(profile):
@@ -72,13 +65,6 @@ def precision_resolution(profile):
     reason = default_precision_fallback(
         fixed_counts=any(key in profile for key in SAMPLING_KEYS),
         emission=profile.get("emission"),
-        secondary_threshold_eV=off_value(
-            "secondary_threshold_eV", _unwrap(profile.get("secondary_threshold_eV"))
-        ),
-        pair_production_model=off_value(
-            "pair_production_model", _unwrap(profile.get("pair_production_model"))
-        ),
-        positron_transport=bool(profile.get("positron_transport", False)),
     )
     if reason is not None:
         return None, None, "fixed", reason
@@ -114,19 +100,15 @@ def describe_counts(counts):
 def precision_blockers(profile):
     """Why adaptive sampling cannot apply to this profile row, before any write.
 
-    Covers the profile-level routes a run refuses: coherent emission, particle
-    cascades, positron transport, physical-detector observation directions and
-    per-material count overrides. GDF beams and grooved targets are resolved per
-    run.
+    Covers the profile-level routes a run refuses: coherent emission,
+    physical-detector observation directions and per-material count overrides.
+    Particle cascades run adaptive (#1240). GDF beams and grooved targets are
+    resolved per run.
     """
     blockers = []
     emission = profile.get("emission")
     if emission in ("coherent", "both"):
         blockers.append(f"emission is {emission!r} (adaptive is incoherent-only)")
-    if any(is_on(key, _unwrap(profile.get(key))) for key in _CASCADE_KEYS):
-        blockers.append("particle cascades (secondaries or pair production) are enabled")
-    if profile.get("positron_transport"):
-        blockers.append("positron transport is enabled")
     if "physical_detector" in profile:
         blockers.append("the physical detector scores observation directions")
     for material, row in sorted(profile_overrides(profile).items()):

@@ -912,9 +912,6 @@ def profile_precision_source(
     reason = default_precision_fallback(
         fixed_counts=fixed_counts,
         emission=settings.emission,
-        secondary_threshold_eV=settings.secondary_threshold_eV,
-        pair_production_model=settings.pair_production_model,
-        positron_transport=settings.positron_transport,
         gdf_beam=gdf_beam,
         grooved=grooved,
     )

@@ -319,9 +319,6 @@ def test_pre_precision_case_pickle_state_keeps_manual_controls(scene):
     [
         ("gdf_source", {}),
         ("groove_spacing_ang", 100.0),
-        ("secondary_threshold_eV", 50.0),
-        ("pair_production_model", "penelope-2024"),
-        ("positron_transport", True),
     ],
 )
 def test_unsupported_block_routes_are_rejected_at_case_boundary(scene, numerics, route, value):

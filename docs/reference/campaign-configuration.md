@@ -58,9 +58,10 @@ blockers and line-grid source.
 
 Fixed counts apply when a profile or material override sets
 `cxr_histories`/`brem_histories`, or for unsupported adaptive routes: coherent or
-`both` emission, particle cascades (secondaries, pairs, positrons), GDF beams,
-grooved entrances, physical pixel detectors, or channeling. An explicit policy
-on an unsupported route is refused. Trajectory capture also needs fixed counts.
+`both` emission, GDF beams, grooved entrances, physical pixel detectors, or
+channeling. An explicit policy on an unsupported route is refused. Particle
+cascades (secondaries, pairs, positrons) run adaptive; each sample is one
+primary with all its descendants (#1240). Trajectory capture also needs fixed counts.
 Bundled `trajectory_demo`, `coherent_demo`, and detector demos provide bounded
 fixed-count examples; clone a demo before editing it.
 
