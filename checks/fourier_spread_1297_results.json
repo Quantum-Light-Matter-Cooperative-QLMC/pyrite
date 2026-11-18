@@ -346,5 +346,27 @@
    0.375,
    3.0
   ]
+ },
+ "capture_v7": {
+  "code_sha": "61da81648b97e5619fd5321fccb0db5203d0bd80",
+  "gpu": "NVIDIA GeForce RTX 5080",
+  "case": "mos2 30 keV 15 deg N=1024",
+  "reduce_calls": 101,
+  "reduce_lines": 975439294,
+  "reduce_s": 24.07,
+  "ns_per_line": 24.7,
+  "transport_s": 13.93,
+  "spectrum_s": 44.13,
+  "note": "first run in a fresh venv (cold kernel caches); transport is unaffected by #1297"
+ },
+ "capture_v6_reference": {
+  "source": "checks/fourier_reduction_phases_1296_results.json capture_v6 (job 13650)",
+  "reduce_s": 35.49,
+  "ns_per_line": 36.4,
+  "spectrum_s": 54.13
+ },
+ "end_to_end": {
+  "reduce_speedup": 1.47,
+  "spectrum_phase_change": -0.185
  }
 }
