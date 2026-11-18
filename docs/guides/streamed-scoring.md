@@ -43,9 +43,19 @@ first pass keeps only the compact per-segment data the grid needs and resolves
 the same grid as the default run, and a second pass scores on it. The extra
 pass costs one transport, plus one line evaluation on a two-point axis under
 the `resonance-population` bandwidth. A grid already in the line-grid cache
-skips it. Memory for that pass still grows with the electron count, at
-about 16 bytes per line segment, plus about 12 bytes per production line under
-the `resonance-population` bandwidth (24 with `PYRITE_FP64=1`).
+skips it. That pass's data grows with the electron count, at about 16 bytes
+per line segment, plus about 12 bytes per production line under the
+`resonance-population` bandwidth (24 with `PYRITE_FP64=1`).
+
+Once that data passes 2 GiB, or is projected to over the run, it moves to
+disk, so host memory stays bounded and the grid is unchanged. It goes under
+`pyrite-output/cache/line-grid-spill/` in the workspace and is deleted when the
+pass ends, however it ends. Peak disk use is about twice the line-segment data
+plus the production lines: roughly 170 kB per electron for h-BN at 5 MeV, 1 mm,
+so 10^6 primaries need about 170 GB free. If the projection does not fit, the
+run stops at the first block with a `LineGridSpillError` naming the space
+needed; free space there or move the workspace to a larger disk. Explicit
+`energy_bins` or a cached grid need neither the memory nor the disk.
 
 ## Choose the block size
 

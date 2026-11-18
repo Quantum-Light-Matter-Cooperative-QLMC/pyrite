@@ -84,8 +84,8 @@ to lockstep at small electron counts).
 A `line_grid_policy` grid is resolved from the whole line population before
 any line is scored, so a streamed policy case runs two transport passes over
 the same electron blocks (#1001). Primary streams are addressed by
-`(seed, electron, draw)`, so both passes see the same histories; no disk is
-used.
+`(seed, electron, draw)`, so both passes see the same histories. Large
+grid-pass evidence spills to disk (below).
 
 1. **Grid pass.** `runner/streamed_line_grid.py::BlockGridEvidence` keeps,
    per block, only what policy resolution reads along the case direction: the
@@ -113,8 +113,42 @@ limit. The truncation audit and `line_grid_resolved` record match the joined
 path to summation order.
 
 Memory: segment rows still follow the block size, but the grid-pass evidence
-grows with the electron count. Windowed policies are refused because their
-seed providers read the whole population.
+grows with the electron count. Above `GridSpillPolicy.threshold_bytes`
+(default 2 GiB of evidence held, or projected over the run from the blocks
+so far), `runner/line_grid_spill.py` moves it to a per-run scratch directory
+under the output `cache/line-grid-spill/`, and later blocks are written there
+as they arrive (#1141). Host memory is then bounded independent of N; disk is
+not.
+
+- **Blocks.** Each block's sinc samples are two raw arrays, written before the
+  block commits, so a block replayed after an allocator OOM is never counted
+  twice. Production lines are appended to one raw file (`LineFile`, truncated
+  back on a failed block) and served after transport as views of a single
+  read-only memory map, in the in-memory block layout. One map per array ran
+  out of file descriptors at 64 h-BN blocks (job 13610).
+- **Exact quantile.** `external_stable_sort` distributes rows into value
+  buckets at sampled pivots, each bucket in row order, and sorts every bucket
+  that fits `SORT_ROWS` with the same stable argsort; larger buckets recurse.
+  Equal widths share a bucket, so the result is the global stable order
+  whatever the pivots, and pivots inside `(min, max]` make every bucket a
+  strict subset. `sorted_sinc_spacing` then reads the sorted rows chunkwise,
+  carrying the running sum into each chunk's first element, so the cumulative
+  sum, quantile and aliased weight are the in-memory reduction's bit for bit
+  (`tests/montecarlo/transport/test_streamed_line_grid_spill.py`, including
+  ties and single-valued populations).
+- **Disk.** Peak is about twice the sinc evidence (raw blocks, then buckets
+  and sorted output) plus the lines. Each spilled block re-projects that peak
+  over the run and raises `LineGridSpillError` when the file system cannot
+  hold it; the projection starts at the first block, so a short disk refuses
+  before the bulk of the transport.
+- **Cleanup.** `resolve_streamed_line_grid` removes the directory in a
+  `finally`, so success, errors and `KeyboardInterrupt` leave nothing. A
+  killed process cannot, so each new store prunes this host's directories
+  whose process is gone.
+
+Windowed policies are refused because their seed providers read the whole
+population. The `sinc-oversampled` node-local axis still builds its per-line
+intervals in memory.
 
 ### Cascades
 
@@ -593,4 +627,34 @@ evaluation. Its used peak rose at N = 8,192, probably from one heavy block, but
 this was not resolved. The measured h-BN stop also moves with N (288 keV at
 2,048 and the 966 keV ceiling at 8,192, which needs 368,084 points), as it does
 on the joined path.
+
+### Spilled grid pass (#1141)
+
+`checks/streamed_line_grid_spill_1141.sbatch` (job 13622, code `676364694`,
+RTX 5080) ran the h-BN case above in `grid-pass` mode at block 512, spilled
+(`STREAM_SPILL_MIB=0`) and held (`none`) at each N. Anon is the sampled
+`RssAnon` peak above its pre-run level. `ru_maxrss` also counts the spilled
+files' mapped pages, which the kernel can reclaim, so it is not the bound.
+
+| N | Evidence (MB) | Anon, spilled / held (MiB) | Spill disk peak (GB) | Wall, spilled / held (s) |
+|---|---|---|---|---|
+| 2,048 | 250 | 468 / 678 | 0.25 | 6.1 / 5.7 |
+| 8,192 | 1,001 | 476 / 2,249 | 1.41 | 20.9 / 19.1 |
+| 32,768 | 4,005 | 573 / 7,779 | 5.63 | 80.2 / 72.0 |
+
+Spilled and held grids are bitwise equal at every N, and the scratch
+directory is empty after every arm. Across a 16x range of N, held memory
+grows with the evidence (about 1.9x it), while spilled memory rises
+105 MiB, 2.6% of the added evidence. Disk peak matches the projection:
+twice the sinc evidence plus the lines. Spilling costs 7 to 11% wall.
+
+Two earlier runs found defects that are now fixed:
+
+- **Job 13610:** one memory map per spilled line array exhausted file
+  descriptors at 64 blocks. Lines now go to one `LineFile`.
+- **Job 13619:** the pivot sample held strided views that pinned every
+  scanned chunk, 8 bytes per sinc row: spilled anon grew 516 to 993 MiB from
+  N = 8,192 to 32,768. The sample is now copied. A synthetic probe of the
+  out-of-core sort alone is flat at 363, 392 and 402 MiB for 25M, 100M and
+  200M rows.
 
