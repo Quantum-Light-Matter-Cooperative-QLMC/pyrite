@@ -30,7 +30,12 @@ from tests.montecarlo.transport.test_streamed_cascades import _cascade_case, _pa
 SPECTRA = ("spec", "spec_characteristic", "brem_wide", "brem")
 RTOL, ATOL = 1e-12, 1e-300
 #: Guards disabled: the bare relative-standard-error rule.
-_RULE_ONLY = dict(max_history_share=1.0, min_effective_histories=0.0, stability_blocks=0)
+_RULE_ONLY = dict(
+    max_history_share=1.0,
+    min_effective_histories=0.0,
+    max_variance_of_variance=1.0,
+    stability_blocks=0,
+)
 #: One monitor band over the line grid and the continuum grid, so both observables score.
 BAND = dict(observables=("cxr", "brem"), band_eV=(1500.0, 150000.0))
 

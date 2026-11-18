@@ -40,12 +40,18 @@ from pyrite.montecarlo.runner.adaptive import (
     case_measure,
     run_case_adaptive,
     run_stopping_rule,
+    vov_trend_slope,
 )
 from pyrite.montecarlo.spectrum.brem import mc_brem_spectrum
 from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 
 #: Guards disabled: the bare relative-standard-error rule.
-_RULE_ONLY = dict(max_history_share=1.0, min_effective_histories=0.0, stability_blocks=0)
+_RULE_ONLY = dict(
+    max_history_share=1.0,
+    min_effective_histories=0.0,
+    max_variance_of_variance=1.0,
+    stability_blocks=0,
+)
 
 
 def _population_measure(population):
@@ -108,6 +114,53 @@ def test_variance_guard_retains_small_stop_for_nearly_constant_signal():
     assert record["statistics"]["cxr"]["variance_of_variance"] > 0.9
 
 
+def test_vov_trend_slope_limits():
+    """Exact 1/n decay gives -1; only the last half and positive VOV enter."""
+    decay = [(n, 7.0 / n) for n in range(100, 1001, 100)]
+    assert vov_trend_slope(decay) == pytest.approx(-1.0, abs=1e-12)
+    # Points before n_last/2 = 500 are ignored, whatever their trend.
+    early = [(n, 1e3 * n) for n in range(100, 500, 100)]
+    assert vov_trend_slope(early + decay[4:]) == pytest.approx(-1.0, abs=1e-12)
+    assert vov_trend_slope([(n, 3.0 * n**0.5) for n in (600, 800, 1000)]) == pytest.approx(0.5)
+    assert vov_trend_slope([(600, 0.1), (800, 0.0), (900, None), (1000, 0.05)]) is None
+    assert vov_trend_slope([]) is None
+
+
+def _prefix_vov(values, n):
+    centered = values[:n] - values[:n].mean()
+    m2 = np.sum(centered**2)
+    return np.sum(centered**4) / m2**2 - 1.0 / n
+
+
+@pytest.mark.parametrize("late_heavy", [False, True])
+def test_vov_trend_slope_is_recorded_and_never_gates(late_heavy):
+    """The record's slope is the fit to prefix VOVs over the last half.
+
+    A well-sampled exponential population falls about as 1/n; one heavy score
+    in the last half makes the trend positive. Neither changes the stop.
+    """
+    population = np.random.default_rng(11).exponential(1.0, 4000)
+    if late_heavy:
+        population[3500] += 500.0
+    settings = AdaptiveSettings(0.5, 4000, 4000, 100, observables=("cxr", "brem"))
+    record = run_stopping_rule(
+        settings, lambda start, stop, _: dict.fromkeys(("cxr", "brem"), population[start:stop])
+    )
+    ends = range(2000, 4001, 100)
+    x = np.log(np.array(ends, dtype=float))
+    y = np.log([_prefix_vov(population, n) for n in ends])
+    expected = np.polyfit(x, y, 1)[0]
+    for name in ("cxr", "brem"):
+        status = record["statistics"][name]
+        assert status["vov_trend_slope"] == pytest.approx(expected, rel=1e-9)
+        assert "vov_trend_slope" not in status["passes"]
+    if late_heavy:
+        assert expected > 0.0
+    else:
+        assert -1.5 < expected < -0.5
+    assert record["realized_electrons"] == 4000
+
+
 def test_degenerate_moments_report_no_error():
     moments = RunningMoments()
     moments.add_block(np.zeros(10))
@@ -135,6 +188,10 @@ def test_degenerate_moments_report_no_error():
         dict(stability_blocks=1.5),
         dict(stability_fraction=float("nan")),
         dict(min_effective_histories=float("inf")),
+        dict(max_variance_of_variance=0.0),
+        dict(max_variance_of_variance=1.5),
+        dict(max_variance_of_variance=float("nan")),
+        dict(max_variance_of_variance=True),
         dict(observables=("cxr", "cxr")),
         dict(band_eV=(2000.0, 1000.0)),
         dict(band_eV=(0.0, 1000.0)),
@@ -305,9 +362,9 @@ def test_variance_tail_prevents_false_precision_on_nearly_constant_signal():
     assert record["realized_electrons"] == len(population)
 
 
-@pytest.mark.parametrize("observable, effective_floor", [("cxr", 0.0), ("brem", 100.0)])
-def test_variance_guard_preserves_disabled_and_brem_stops(observable, effective_floor):
-    """Neither explicit opt-out nor brem acquires the CXR-only floor."""
+@pytest.mark.parametrize("observable, vov_limit", [("cxr", 1.0), ("brem", 0.01)])
+def test_variance_guard_preserves_disabled_and_brem_stops(observable, vov_limit):
+    """Neither explicit opt-out nor brem acquires the CXR-only variance gate."""
     population = np.ones(6000)
     population[500] = 1.5
     settings = AdaptiveSettings(
@@ -316,13 +373,53 @@ def test_variance_guard_preserves_disabled_and_brem_stops(observable, effective_
         6000,
         1000,
         observables=(observable,),
-        min_effective_histories=effective_floor,
+        max_variance_of_variance=vov_limit,
     )
     record = run_stopping_rule(
         settings, lambda start, stop, _: {observable: population[start:stop]}
     )
     assert record["stop_reason"] == "converged"
     assert record["realized_electrons"] == 4000
+
+
+@pytest.mark.parametrize(
+    "guards, realized",
+    [
+        ({}, None),  # defaults: one deviation holds all variance, VOV + 1/n ~ 1
+        ({"min_effective_histories": 0.0}, None),  # the ESS floor no longer frees VOV
+        ({"max_variance_of_variance": 1.0}, 4000),  # VOV off; ESS ~ n passes 100
+        ({"max_variance_of_variance": 1.0, "min_effective_histories": 4500.0}, 5000),
+    ],
+    ids=["defaults", "ess-off", "vov-off", "ess-binds"],
+)
+def test_vov_threshold_and_ess_floor_gate_independently(guards, realized):
+    """#1262: each threshold binds on its own; the record carries both."""
+    population = np.ones(6000)
+    population[500] = 1.5
+    settings = AdaptiveSettings(0.001, 3000, 6000, 1000, **guards)
+    record = run_stopping_rule(settings, _population_measure(population))
+    status = record["statistics"]["cxr"]
+    assert record["realized_electrons"] == (realized or 6000)
+    assert record["stop_reason"] == ("converged" if realized else "max_electrons")
+    if realized is None:
+        assert not status["passes"]["variance_sampling"]
+        assert status["passes"]["effective_sample_size"]
+    assert record["guards"]["min_effective_electrons"] == settings.min_effective_histories
+    assert record["guards"]["max_variance_of_variance"] == settings.max_variance_of_variance
+
+
+def test_vov_threshold_is_compared_to_m4_over_m2_squared():
+    """The gate passes exactly when ``VOV + 1/n = M4/M2**2`` meets the threshold."""
+    population = np.random.default_rng(3).lognormal(0.0, 1.0, 4000)
+    centered = population - population.mean()
+    ratio = float(np.sum(centered**4) / np.sum(centered**2) ** 2)
+    base = dict(target_rse=1e-6, min_histories=4000, max_histories=4000, block_histories=4000)
+    for limit, expected in ((ratio * (1 + 1e-9), True), (ratio * (1 - 1e-9), False)):
+        record = run_stopping_rule(
+            AdaptiveSettings(**base, max_variance_of_variance=limit),
+            _population_measure(population),
+        )
+        assert record["statistics"]["cxr"]["passes"]["variance_sampling"] is expected
 
 
 def test_variance_tail_keeps_cxr_running_after_independent_brem_freezes():
@@ -415,6 +512,7 @@ def test_stability_guard_waits_out_a_late_heavy_electron():
         block_histories=20,
         max_history_share=1.0,
         min_effective_histories=0.0,
+        max_variance_of_variance=1.0,
         stability_blocks=3,
         stability_fraction=0.5,
     )
@@ -511,7 +609,7 @@ def test_adaptive_run_is_the_fixed_n_run_at_its_realized_count():
     centroid are its own, so the run replays transport when they differ."""
     case = _case(energy_spread_frac=1e-3, bunch_length_fs=5.0)
     # Exercise an early realized-range replay independently of the ESS floors.
-    settings = replace(_SETTINGS, min_effective_histories=0.0)
+    settings = replace(_SETTINGS, min_effective_histories=0.0, max_variance_of_variance=1.0)
     result, stats = run_case_adaptive(case, settings, transport_core="per-electron")
     n = stats["realized_electrons"]
     assert stats["stop_reason"] == "converged" and 40 <= n < 200 and n % 20 == 0

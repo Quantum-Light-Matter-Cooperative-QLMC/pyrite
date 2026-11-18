@@ -185,6 +185,7 @@ def test_early_stop_preserves_requested_case_and_matches_realized_fixed_n(scene,
         observables=("cxr", "brem"),
         max_history_share=1.0,
         min_effective_histories=0.0,
+        max_variance_of_variance=1.0,
         stability_blocks=0,
     )
     case = api.build_case(scene, pr.Numerics(sampling=adaptive_sampling(precision)))
@@ -339,7 +340,14 @@ def test_physical_detector_is_rejected_at_lowering(scene, numerics):
 def test_mixed_cpu_pool_preserves_fixed_case_and_adaptive_provenance(scene, monkeypatch):
     monkeypatch.delenv("PYRITE_MC_TRANSPORT_CORE", raising=False)
     precision = pr.config.AdaptiveSampling(
-        1.0, 40, 200, 20, max_history_share=1.0, min_effective_histories=0.0, stability_blocks=0
+        1.0,
+        40,
+        200,
+        20,
+        max_history_share=1.0,
+        min_effective_histories=0.0,
+        max_variance_of_variance=1.0,
+        stability_blocks=0,
     )
     adaptive = api.build_case(scene, pr.Numerics(sampling=adaptive_sampling(precision)))
     fixed = api.build_case(

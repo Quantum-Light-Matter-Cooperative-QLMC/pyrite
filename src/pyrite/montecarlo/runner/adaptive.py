@@ -142,6 +142,32 @@ class RunningMoments:
         return max(0.0, (math.sqrt(self.m4) / self.m2) ** 2 - 1.0 / self.n)
 
 
+def vov_trend_slope(points) -> float | None:
+    """Least-squares slope of ``ln VOV`` against ``ln n`` over the last half.
+
+    ``points`` are ``(n, VOV)`` at successive block ends. Only ends with
+    ``n >= n_last / 2`` and ``VOV > 0`` enter; fewer than three such
+    ends, or a single distinct ``n``, gives ``None``. A population whose
+    fourth moment the run has sampled has ``VOV ~ (kappa - 1)/n``, so the slope
+    tends to -1 (MCNP checks VOV falls as ``1/N``); a heavy score drawn late
+    makes it shallower or positive. Reported only; it never gates a stop.
+
+    Validation: adaptive-sample-size-stopping
+    """
+    if not points:
+        return None
+    half = points[-1][0] / 2.0
+    kept = [(math.log(n), math.log(v)) for n, v in points if n >= half and v is not None and v > 0]
+    if len(kept) < 3:
+        return None
+    mx = sum(x for x, _ in kept) / len(kept)
+    my = sum(y for _, y in kept) / len(kept)
+    sxx = sum((x - mx) ** 2 for x, _ in kept)
+    if sxx == 0.0:
+        return None
+    return sum((x - mx) * (y - my) for x, y in kept) / sxx
+
+
 class StoppingMonitor:
     """Block hooks for :func:`.block_transport.transport_electron_blocks`.
 
@@ -163,6 +189,9 @@ class StoppingMonitor:
     def _reset(self):
         self.moments = {name: RunningMoments() for name in self.settings.observables}
         self.history: list[tuple[int, dict[str, float]]] = []
+        self.vov_history: dict[str, list[tuple[int, float | None]]] = {
+            name: [] for name in self.moments
+        }
         self.checks = 0
         self.pilot: dict[str, Any] | None = None
         self.projected: int | None = None
@@ -178,6 +207,8 @@ class StoppingMonitor:
                 raise ValueError(f"{name} must contain one value per electron in the block")
             moments.add_block(values[name])
         self.history.append((stop, {name: m.mean for name, m in self.moments.items()}))
+        for name, m in self.moments.items():
+            self.vov_history[name].append((stop, m.variance_of_variance()))
 
     def _stability(self, name: str) -> float | None:
         """Largest relative move of the running mean over the last k block ends."""
@@ -200,8 +231,8 @@ class StoppingMonitor:
         stability = self._stability(name)
         vov = m.variance_of_variance()
         cv = None if rse is None else rse * math.sqrt(m.n)
-        # Reuse the policy's effective-history floor for squared deviations:
-        # M2**2/M4 >= E_min, equivalently VOV + 1/n <= 1/E_min.
+        # VOV + 1/n = M4/M2**2 <= threshold; M4/M2**2 <= 1, so 1 disables
+        # (checked first: rounding may put the ratio an ulp above 1).
         # The near-constant policy exception uses EMPIRICAL CV <= target,
         # not a bound on population variability or any unseen tail.
         variance_passes = (
@@ -209,8 +240,8 @@ class StoppingMonitor:
             or vov is not None
             and (
                 (cv is not None and cv <= s.target_rse)
-                or s.min_effective_histories == 0.0
-                or vov + 1.0 / m.n <= 1.0 / s.min_effective_histories
+                or s.max_variance_of_variance >= 1.0
+                or vov + 1.0 / m.n <= s.max_variance_of_variance
             )
         )
         passes = {
@@ -227,6 +258,7 @@ class StoppingMonitor:
             "max_electron_share": share,
             "effective_sample_size": ess,
             "variance_of_variance": vov,
+            "vov_trend_slope": vov_trend_slope(self.vov_history[name]),
             "coefficient_of_variation": cv,
             "stability": stability,
             "passes": passes,
@@ -286,6 +318,7 @@ class StoppingMonitor:
             "guards": {
                 "max_electron_share": s.max_history_share,
                 "min_effective_electrons": s.min_effective_histories,
+                "max_variance_of_variance": s.max_variance_of_variance,
                 "stability_blocks": s.stability_blocks,
                 "stability_fraction": s.stability_fraction,
             },

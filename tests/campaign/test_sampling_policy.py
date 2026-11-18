@@ -147,7 +147,8 @@ def test_serialized_policy_keeps_the_stored_electron_vocabulary():
     payload = policy.to_dict()
     assert list(payload) == [
         "target_rse", "min_electrons", "max_electrons", "block_electrons", "observables",
-        "max_electron_share", "min_effective_electrons", "stability_blocks",
+        "max_electron_share", "min_effective_electrons", "max_variance_of_variance",
+        "stability_blocks",
         "stability_fraction", "pilot_electrons", "band_eV", "batch_means_band_eV",
         "brem_target_rse", "brem_min_electrons", "brem_max_electrons",
     ]  # fmt: skip

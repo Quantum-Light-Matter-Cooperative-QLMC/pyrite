@@ -34,15 +34,18 @@ Define central sums $M_j=\sum_i(m_i-\bar m)^j$. For CXR the additional gate is
 $$
 \frac{s_n}{|\bar m_n|}\le\varepsilon
 \quad\text{or}\quad
-E_{\mathrm{var}}=\frac{M_2^2}{M_4}\ge E_{\min}.
+\frac{M_4}{M_2^2}=\frac1{E_{\mathrm{var}}}\le V_{\max}.
 $$
 
 The first branch is a deliberate **empirical near-constant policy exception**;
 it is not a population-variance bound. The second counts effective contributors
-to the observed squared deviations. At zero variance the gate passes by
-convention. Zero signal still fails the ordinary RSE guard. Setting
-`min_effective_histories=0` disables both ESS floors. The brem stopping policy
-is unchanged. Both observables record the dimensionless diagnostic
+to the observed squared deviations. A constant positive signal passes this gate (CV = 0); zero signal still
+fails the ordinary RSE guard. $V_{\max}$ is
+`max_variance_of_variance`; v2 tied it to $1/E_{\min}$, and v3 (#1262) makes
+it a separate policy field. Cauchy–Schwarz gives $M_4/M_2^2\ge1/n$, and
+non-negative cross terms give $M_4\le M_2^2$, so
+$V_{\max}=1$ disables the gate, and `min_effective_histories=0` disables only
+the contribution ESS floor. The brem stopping policy is unchanged. Both observables record the dimensionless diagnostic
 
 $$
 \mathrm{VOV}=\frac{M_4}{M_2^2}-\frac1n
@@ -54,19 +57,22 @@ moment, its square root is an asymptotic plug-in estimate of relative variance
 uncertainty. It is not the exact finite-$n$ variance of the unbiased sample
 variance. The exact population expression is
 $\operatorname{Var}(s^2)=[\mu_4-\frac{n-3}{n-1}\sigma^4]/n$.
-The default $E_{\min}=100$ limits observed variance concentration to about
-10 percent relative uncertainty; this threshold and the CV exception are
-PyRITE policy, not prescriptions from either reference.
+The default $V_{\max}=0.01$ (the v2 value at $E_{\min}=100$) limits observed
+variance concentration to about 10 percent relative uncertainty, and so the
+RSE to about 5 percent. The Geant4/MCNP pass value 0.1 corresponds to about
+30 percent. Both thresholds and the CV exception are PyRITE policy, not
+prescriptions from either reference; the evidence for the default is under
+[threshold selection](#vov-threshold-selection-v3-1262).
 
 Neither branch sees an entirely unsampled class, certifies population moments,
 or provides finite-sample or simultaneous sequential coverage. With a true
 constant positive signal, CV and VOV vanish, so the original minimum/stability
 stop is retained. A constant sampled prefix can also conceal an unseen class.
 For a regular variable population with finite fourth moment,
-$E_{\mathrm{var}}\simeq n/\kappa$ with kurtosis $\kappa$, so the gate eventually
-passes without a floor in transport units.
+$E_{\mathrm{var}}\simeq n/\kappa$ with kurtosis $\kappa$, so the gate passes
+near $n\simeq\kappa/V_{\max}$ without a floor in transport units.
 
-The stopping generation `adaptive_sampling_model="variance-contributors-v2"`
+The stopping generation `adaptive_sampling_model="variance-threshold-v3"`
 participates in adaptive dataset identities, case content keys, and runtime
 provenance. Fixed-count identities retain their generation.
 
@@ -500,3 +506,146 @@ mass, with leading-line resonances from 183 eV to 28.35 keV. Thus the large prim
 are attributable to multiple incoherent line contributions, rather than one
 unidentified channel. This is measured attribution for these six outliers,
 not a claim that every member of the distribution has the same mechanism.
+
+### VOV threshold selection (v3, #1262)
+
+v2 applied $M_4/M_2^2\le1/E_{\min}$. At the default $E_{\min}=100$ the
+heavy-tail case was held to $n\gtrsim E_{\min}\kappa$ whatever its RSE
+target. On the #1243 P3 MoS₂ 500 nm 15° 100 keV workload, the gate bound at
+30,700 electrons (VOV 0.009916, RSE 0.0024 against target 0.01, ESS 26k). v3
+keeps the ESS floor $E_{\min}$ and adds a separate CXR threshold $V_{\max}$
+(`max_variance_of_variance`). The default $V_{\max}=0.01$ is the same IEEE
+double as `1.0/100.0`, so default-policy stops are unchanged. The P3 workload
+therefore still stops at 30,700 electrons, by construction rather than by a
+new transport run.
+
+On 2026-11-17, `checks/adaptive_tail_1254.py` was rerun under v3 on the same
+captures, copied from qlmc `~/pyrite-1252-s{1,2}`. CPU directories were listed
+first, matching the recorded SHA-256 values. All twelve captures carry
+$E_{\min}=100$. The report equals `adaptive_tail_1254_results.json` except
+for `sampling_model`.
+
+The same replays were then repeated with only $V_{\max}$ changed.
+The table lists the 1 MeV 15° rows that v1 stopped early:
+
+| Case | Block | v1 stop | $V_{\max}=0.01$ | $0.03$ | $0.1$ |
+|---|---|---|---|---|---|
+| hBN | 1k | 4k | capture exhausted | **4k** | **4k** |
+| hBN | 3k–48k | 15k–528k | capture exhausted | capture exhausted | capture exhausted |
+| HOPG | 1k | 5k | 1.000M (max) | 1.000M (max) | **18k** |
+| HOPG | 3k | 12k | 1.002M (max) | 1.002M (max) | **18k** |
+| HOPG | 6k | 24k | 1.002M (max) | 1.002M (max) | **24k** |
+
+Bold marks a v3 stop that v1 also took early. The ten largest squared
+deviations hold about 97 percent of the captured variance (see finite-capture
+evidence above), so those stops precede the scores that set the variance.
+At 1 MeV 60° and 30 keV, every threshold gives the same stops. At 30 MeV 15°,
+the CV branch decides, so every threshold gives the same stops. At 30 MeV 60°,
+blocks of 1k–6k stop at 31k/33k/48k under 0.01, at 12k/12k/24k under 0.03,
+and at 7k/12k/24k under 0.1. Blocks of 12k and larger are unchanged.
+
+The default is therefore 0.01. It is the only tested value that refuses every
+former 1 MeV early stop. The MCNP/Geant4 pass value 0.1 remains an opt-in for
+exploratory runs. $V_{\max}=1$ disables the gate. Since v2 fixed
+$V_{\max}=1/E_{\min}$, a profile with an explicit non-default
+`min_effective_histories` now changes its stopping rule. The
+`variance-threshold-v3` marker re-keys every adaptive identity for this
+reason. Anchors: `test_vov_threshold_and_ess_floor_gate_independently`
+(each threshold binds alone, `guards` carries both),
+`test_vov_threshold_is_compared_to_m4_over_m2_squared`, and
+`test_settings_are_validated`.
+
+### VOV trend diagnostic (#1262)
+
+`vov_trend_slope(points)` is recorded for every observable. It fits the
+least-squares slope of $\ln\mathrm{VOV}_n$ against $\ln n$ over block ends
+with $n\ge n_{\rm last}/2$ and $\mathrm{VOV}>0$, and is `None` below three
+such ends. For independent histories with a sampled fourth moment,
+$\mathrm{VOV}_n\simeq(\kappa-1)/n$, so the slope tends to $-1$; this is
+the trend MCNP checks over the last half of a run. A score that dominates
+$M_4$ and arrives late raises VOV and flattens or reverses the slope. The
+slope is recorded but never gates a stop. Anchors:
+`test_vov_trend_slope_limits` (exact $1/n$ gives $-1$, early and non-positive
+points are excluded) and `test_vov_trend_slope_is_recorded_and_never_gates`
+(equals an independent NumPy fit to prefix VOVs; a late heavy score gives a
+positive slope; the stop is unchanged).
+
+Applied to the #1254 captures at their recorded stops, the slope does not
+separate the false 1 MeV 15° stops. HOPG at 5k, 12k and 24k gives $-0.97$,
+$-0.90$ and $-1.01$, because VOV decays normally until a heavy electron is
+drawn. hBN gives $-0.15$ to $+0.38$. Several converged 30 MeV 15° stops give
+positive slopes ($+5.43$ for hBN and $+1.18$ for HOPG at 24k blocks), and
+30 keV stops give $-0.6$ to $-1.2$. The slope therefore stays a diagnostic.
+Like VOV itself, it cannot detect a population class that has not yet been
+sampled.
+
+## Independent v3 extension verification (2026-11-17, #1262)
+
+A fresh-context verifier derived the v3 gate from the claim before reading
+`StoppingMonitor.observable_status`, then compared it with commit `39603e682`.
+
+**Bounds.** Let $d_i=m_i-\bar m$, so $M_2=\sum_i d_i^2$, $M_4=\sum_i d_i^4$
+and $\sum_i d_i=0$. Cauchy–Schwarz on $(1,\dots,1)$ and $(d_i^2)$ gives
+$M_2^2\le nM_4$, so $M_4/M_2^2\ge1/n$, with equality for two-point symmetric
+samples. Since the $d_i^2$ are non-negative,
+$M_2^2=M_4+\sum_{i\ne j}d_i^2d_j^2\ge M_4$, so $M_4/M_2^2\le1$. For $M_2>0$
+the zero-sum constraint forces at least two non-zero $d_i$, so the upper bound
+is strict. A single spike in $n$ zeros gives $(n^2-3n+3)/[n(n-1)]\to1$. Thus
+$\mathrm{VOV}=M_4/M_2^2-1/n\ge0$ in exact arithmetic. The clip at zero only
+removes rounding, and $\max(0,\mathrm{VOV})+1/n=\max(1/n,M_4/M_2^2)$.
+$V_{\max}\ge1$ therefore admits every sample with $M_2>0$; the explicit
+short-circuit guards an ulp of rounding.
+
+**Gate.** For CXR the gate passes iff $s/|\bar m|\le\varepsilon$, or
+$V_{\max}\ge1$, or $\mathrm{VOV}+1/n\le V_{\max}$. The contribution floor
+$(\sum m)^2/\sum m^2\ge E_{\min}$ is a separate guard. Under v2 the right-hand
+side was `1.0 / min_effective_histories`. At $E_{\min}=100$ this is the double
+`0x1.47ae147ae147bp-7`, identical to the literal `0.01`. The v2 disable branch
+$E_{\min}=0$ is not reached at the default. Default-policy decisions are
+therefore bit-identical.
+
+**Interpretation.** For independent histories with finite fourth moment,
+$\operatorname{Var}(s^2)/\sigma^4\simeq(\kappa-1)/n$. The plug-in kurtosis
+$\hat\kappa=nM_4/M_2^2$ gives $(\hat\kappa-1)/n=\mathrm{VOV}$. The delta method
+halves the relative uncertainty for $s$, and hence for the RSE. At
+$\mathrm{VOV}=0.01$: $\sqrt{0.01}=0.10$ (variance) and $0.05$ (RSE). At
+$0.1$: $0.316$ and $0.158$. The gate passes near $n\simeq\hat\kappa/V_{\max}$.
+
+**Code comparison.** `RunningMoments.variance_of_variance` returns
+$\max(0,(\sqrt{M_4}/M_2)^2-1/n)$, $0$ at $M_2=0$ and `None` for $n<2$. The
+expression $(\sqrt{M_4}/M_2)^2$ equals $M_4/M_2^2$ up to rounding and avoids
+overflow. `cv = rse * sqrt(n)` equals $s/|\bar m|$ with $s^2=M_2/(n-1)$. The
+predicate, `guards` keys and `_validate_unit_fractions` all match the claim.
+The validator range is $(0,1]$; it rejects `True`, NaN and $\pm\infty$.
+
+**Numeric reproduction.** An independent NumPy probe outside the repository
+ran three checks:
+
+- 20,000 random samples (normal, lognormal, Pareto and sparse spikes,
+  $2\le n<400$) give $\min(M_4/M_2^2-1/n)=-1.1\times10^{-16}$ (rounding) and
+  $\max(M_4/M_2^2)<1$.
+- In 1,260 `run_stopping_rule` decisions, on 60 lognormal populations (some
+  with injected $10^3\times$ tails), $V_{\max}\in\{10^{-3},0.005,0.01,0.03,0.1,0.5,1\}$
+  and $E_{\min}\in\{0,100,1000\}$, the `variance_sampling`,
+  `effective_sample_size`, VOV and `guards` values matched the formulas
+  recomputed from the realized prefix, with 0 mismatches.
+- `1.0/100.0 == 0.01` holds.
+
+The anchors in `test_adaptive_stopping.py` (`vov_threshold`,
+`settings_are_validated`, `variance_guard`; 33 passed) and the
+`test_profile_precision.py` `variance_threshold` test (1 passed) are green.
+
+**Findings.** Both are minor and do not change the verdict:
+
+- The claim text attributes both bounds to Cauchy–Schwarz. Only the lower
+  bound comes from it; the upper bound follows from non-negative cross terms.
+- "Zero variance passes this gate" holds for a constant positive signal
+  through CV. For a constant zero signal with $n<1/V_{\max}$, the code fails
+  the gate ($1/n>V_{\max}$, CV undefined). This was already true in v2. It is
+  immaterial because the RSE guard fails zero signal anyway.
+
+**Verdict.** The extension matches and is `rederived`. The anchors
+`test_vov_threshold_and_ess_floor_gate_independently` and
+`test_vov_threshold_is_compared_to_m4_over_m2_squared` pin the predicate to
+an independently computed $M_4/M_2^2$, which supports `anchored` for the
+extension. Human sign-off is still pending.

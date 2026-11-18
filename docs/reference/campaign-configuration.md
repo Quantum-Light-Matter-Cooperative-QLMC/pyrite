@@ -117,6 +117,12 @@ block. Measured on an RTX 5080 for `cleo_sub`-like cases (hBN/HOPG, 5000 Å,
   (#1254). Treat early stops from small blocks with suspicion. For heavy-tailed
   scenes a larger `--min-histories` is the reliable remedy; a larger
   `--min-effective-histories` helps only once the tail has been drawn.
+- The CXR variance gate has its own threshold, `--max-variance-of-variance`
+  (default 0.01; #1262). It is separate from the ESS floor
+  `--min-effective-histories`. Raising it to 0.1, the MCNP/Geant4
+  convention, stops heavy-tailed scenes sooner. In the #1254 replays, 0.1
+  admitted early stops at 1 MeV, so keep 0.01 for final runs; 1 disables
+  the gate.
 
 Interim recommendation for GPU campaigns (the shipped defaults are unchanged):
 12k histories per block, with min/pilot counts as multiples of it. Decoupling the check cadence from the transport chunk is #1253.
