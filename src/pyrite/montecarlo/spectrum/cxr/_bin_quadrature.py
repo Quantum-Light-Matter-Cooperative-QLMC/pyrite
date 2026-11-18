@@ -750,8 +750,12 @@ def sincsq_bin_lineshape(
 #: axes through the host Fourier route (``_fourier_host``) instead of the
 #: dense exact evaluator, and CUDA device flushes use the ES NUFFT
 #: (``_fourier_spread``) as ROCm does, instead of cuFINUFFT (agreement
-#: <= 1.2e-11) and without the cuFINUFFT requirement.
-CXR_BIN_REDUCTION_MODEL = "fourier-auto-v5"
+#: <= 1.2e-11) and without the cuFINUFFT requirement. v6 (#1296): device
+#: flushes evaluate direct-rectangle phase factors with FP32 ``sincosf`` after
+#: FP64 range reduction, request ES accuracy 1e-9 (was 1e-12), move the
+#: NUFFT crossover to 2^24 pairs and fuse the envelope-image pass; <= 8e-11
+#: of the peak from v5 on the mos2 30 keV flushes. Host flushes are unchanged.
+CXR_BIN_REDUCTION_MODEL = "fourier-auto-v6"
 #: Lines per Fourier-route flush: amortises the per-call FFT and planning.
 FOURIER_FLUSH_LINES = 10_000_000
 

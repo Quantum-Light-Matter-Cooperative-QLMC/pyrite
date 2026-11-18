@@ -1276,7 +1276,8 @@ def test_scan_performance_profile_records_resolved_beam(monkeypatch, tmp_path):
     context = observed["context"]()
     assert context["current"]["configuration"]
     assert context["active_case"]["configuration"]
-    assert context["phase"] == "computing"
+    # The spectrum phase is reported as itself since ef0272869 (transport progress flush).
+    assert context["phase"] == "spectrum"
     assert context["transport_seconds_total"] == 2.0
     assert context["spectrum_seconds_total"] == 3.0
     assert context["gpu_feed_wait_fraction"] == 0.5 / 3.5

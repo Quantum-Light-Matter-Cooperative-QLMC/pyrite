@@ -122,9 +122,68 @@ def _line_set(rng, n):
     return e, np.pi / width, w
 
 
+def test_fp32_direct_phase_factors_stay_inside_their_bound(cp):
+    """FP32 ``sincosf`` direct sums: per-mode error within the stated bound (#1296)."""
+    from pyrite.montecarlo.spectrum.cxr._fourier_cuda import DIRECT_FP32_PHASE_ERROR
+
+    rng = np.random.default_rng(1296)
+    # Remote resonances make |j * phase| ~ 1e6 rad: the FP64 range reduction matters.
+    e = np.r_[rng.uniform(-2e5, 3e5, 512), rng.uniform(400.0, 600.0, 512)]
+    a = np.pi / rng.uniform(0.5, 6.0, e.size)
+    w = rng.uniform(-1.0, 1.0, e.size)
+    c0, period = 500.0, 4096.0
+    args = (e, a, w, c0, period)
+    fp64 = cp.asnumpy(cuda_positive_modes(*args, use_nufft=False, direct_precision="fp64"))
+    fp32 = cp.asnumpy(cuda_positive_modes(*args, use_nufft=False, direct_precision="fp32"))
+    t = 2 * np.pi / period * np.arange(fp64.size)
+    mass = np.abs(w * np.pi / a)[:, None] * np.clip(1 - t[None, :] / (2 * a[:, None]), 0, None)
+    bound = np.sqrt(2) * DIRECT_FP32_PHASE_ERROR * mass.sum(axis=0) + 1e-12 * mass.sum()
+    assert np.all(abs(fp32 - fp64) <= bound)
+    # Not a cancellation-free identity: the FP32 path does differ from FP64.
+    assert np.max(abs(fp32 - fp64)) > 0
+    with pytest.raises(ValueError, match="direct_precision"):
+        cuda_positive_modes(*args, direct_precision="fp16")
+
+
+def test_device_envelope_kernel_matches_host_node_sums(cp):
+    """Fused FP64 envelope pass == the blocked CuPy/NumPy reference (#1296)."""
+    from pyrite.montecarlo.spectrum.cxr._bin_fourier import (
+        _envelope_image_correction,
+        _envelope_node_sums,
+    )
+    from pyrite.montecarlo.spectrum.cxr._fourier_cuda import _device_envelope_node_sums
+
+    rng = np.random.default_rng(1296)
+    # Resonances inside and far outside the band: both branches of g(x).
+    e = np.r_[rng.uniform(450.0, 1100.0, 70_000), rng.uniform(-4e3, 6e3, 1000)]
+    q = rng.uniform(-1.0, 1.0, e.size)
+    nodes = np.linspace(500.0, 1000.0, 24)
+    P = 3.2e4
+    host = _envelope_node_sums(e, q, nodes, P)
+    device = _device_envelope_node_sums(cp.asarray(e), cp.asarray(q), nodes, P)
+    assert np.all(abs(device - host) <= 1e-12 * np.abs(host).max())
+    a = np.full(e.size, 0.3)
+    ref = _envelope_image_correction(e, a, q, 500.0, 0.25, 2001, P)
+    dev = _envelope_image_correction(
+        cp.asarray(e),
+        cp.asarray(a),
+        cp.asarray(q),
+        500.0,
+        0.25,
+        2001,
+        P,
+        cp,
+        node_sums=_device_envelope_node_sums,
+    )
+    np.testing.assert_allclose(dev, ref, rtol=1e-12, atol=1e-14 * np.abs(ref).max())
+
+
+@pytest.mark.parametrize("precision", ["fp32", "fp64"])
 @pytest.mark.parametrize("broad", [1000.0, None])
 @pytest.mark.parametrize("nufft", [None, "cufinufft", "es"])
-def test_device_reduction_matches_host_reference_and_exact_bins(cp, monkeypatch, nufft, broad):
+def test_device_reduction_matches_host_reference_and_exact_bins(
+    cp, monkeypatch, nufft, broad, precision
+):
     from pyrite.montecarlo.spectrum.cxr import _fourier_cuda
     from pyrite.montecarlo.spectrum.cxr._bin_fourier import (
         fourier_bin_mean_reduce,
@@ -154,10 +213,14 @@ def test_device_reduction_matches_host_reference_and_exact_bins(cp, monkeypatch,
             cp.asarray(w),
             uniform_bin_axis(grid),
             broad_width_eV=broad,
+            # fp64 is the fourier-auto-v5 route; fp32 the default since v6 (#1296).
+            **({"eps": 1e-12, "direct_precision": "fp64"} if precision == "fp64" else {}),
         )
     )
     scale = np.abs(w).sum()
-    assert np.max(abs(device - host)) < 1e-10 * scale
+    # Default route: the stated FP32 bound sqrt(2) * 5e-7 * sum |w| is worst case;
+    # random phases cancel, so pin the regression well inside it.
+    assert np.max(abs(device - host)) < (1e-10 if precision == "fp64" else 1e-9) * scale
     assert np.max(abs(device - exact)) < 1e-7 * scale
 
 

@@ -210,18 +210,20 @@ def test_channeling_demo_and_off_profile_identities_are_unchanged():
     #1253 re-mints it for decision-points-v4.
     #1265 re-mints it for the bin-mean shape step on the kinematic axis
     (``sinc-oversampled`` + ``shape_rtol``) and ``line_resolution_model`` v2.
+    #1296 re-mints the silicon pins for ``CXR_BIN_REDUCTION_MODEL``
+    ``fourier-auto-v6`` (FP32 direct phase factors on the device route).
     """
     sweep, settings, cases = _profile_cases("silicon", "channeling_demo")
     assert cases[0].line_quadrature == "bin-mean"
     assert [profiles.case_content_key(case) for case in cases] == [
-        "b478eea0ccbc05de629529ca91bf2745d5ff3674f92c35b71dfce180fcc991f4"
+        "c56170418f910430776e4e42ade9d1079b71748014c6e3496011277e18a1baa0"
     ]
     assert profiles.named_profile_stem("silicon", catalog_profile="channeling_demo") == (
-        "silicon@channeling_demo-9df0438df935"
+        "silicon@channeling_demo-4549592e73e8"
     )
     identity = profiles.dataset_identity("silicon", settings, sweep)
     assert identity["parameter_sha256"] == (
-        "f33f744ec65ad2fff6d26bc11ce5cba5ac18748527bee645c027851ded367539"
+        "c8680473212df4a62a1a904fd65d2af4d334450188512b5ad51e2521562a7f65"
     )
     sweep = material_sweep("hopg", catalog_profile="standard")
     settings = profiles.profile_run_settings(default_settings(), "standard", sweep=sweep)

@@ -78,7 +78,7 @@ The right side is a finite sum, because $\hat\rho(t_j)=0$ for $|t_j|\ge 2\max a_
 - The incoherent finite-time $\operatorname{sinc}^2$ profile and bin convention of `sinc-bin-integration`. Each line weight is constant across the line.
 - The bins are uniform, and the low edge $c_0-h/2>0$ is not clamped. Nonuniform or clamped axes are refused (`uniform_bin_axis`). Production line grids that are nonuniform (resonance-local, windowed) need a separate decision.
 - The resonances lie inside the span $U$ that sets $P$. There is no out-of-window treatment: lines far above the band enlarge $U$, and with it $N$.
-- FP64 throughout. Phases $|(E_l-c_0)t_j|\le 2a_lU$ are formed in FP64. The host reference sums modes directly ($O(\sum_l 2a_lP/2\pi)$). A NUFFT spreader (Plan item 4) replaces only how $G_j$ is computed.
+- FP64 throughout, except the device route's direct-rectangle phase factors since `fourier-auto-v6` ([FP32 direct phase factors](#fp32-direct-phase-factors)). Phases $|(E_l-c_0)t_j|\le 2a_lU$ are formed in FP64. The host reference sums modes directly ($O(\sum_l 2a_lP/2\pi)$). A NUFFT spreader (Plan item 4) replaces only how $G_j$ is computed.
 
 ## Limiting cases
 
@@ -96,6 +96,7 @@ The right side is a finite sum, because $\hat\rho(t_j)=0$ for $|t_j|\ge 2\max a_
 | bin-centre envelope correction, yield | $\le Y_l\pi^2W_lh^2B/(270D^4)$ | $D\ge3U'\ge3B$: $\le 4.6\times10^{-4}\,W_lh^2/U'^3$ |
 | Chebyshev interpolation of $C$, 24 nodes | $\lesssim\rho^{-24}\max\lvert C\rvert$ | nearest pole $\ge D\ge3U'$ beyond a band of length $\le U'$, so the ellipse parameter is $\rho\ge 7+\sqrt{48}=13.9$, a ratio $<10^{-27}$ |
 | FFT and mode-sum rounding | $O(\varepsilon_{64}\log N)\sum_l w_l\pi/(a_lh)$ | FP64; `residual_tol` $\ge10^{-12}$ is enforced, because below it rounding exceeds the bound (verification finding 3) |
+| device direct rectangles, FP32 phase factors (v6) | $\le\sqrt2\,\delta\sum_l\lvert w_l\rvert$ pointwise, $\delta=5\times10^{-7}$ | worst case over aligned rounding; `direct_precision="fp64"` removes it ([below](#fp32-direct-phase-factors)) |
 
 ## Numeric checks (host)
 
@@ -252,7 +253,37 @@ These regression checks do not constitute independent validation.
 
 `CXR_BIN_REDUCTION_MODEL = "fourier-auto-v4"` made this the default bin-mean reduction on CUDA. `resolve_bin_reduction` picks it when the bin axis is uniform and unclamped (`fourier_bin_axis`) on a CuPy backend (`fourier_backend_available`). Otherwise it falls back to the near/far kernel (`sinc-bin-far-envelope`, `sinc-bin-near-far`). Nonuniform axes keep their previous routes; CPU takes the host route below. Batched and layered per-hkl scorers queue lines and flush them through `cuda_fourier_bin_mean_reduce`. `bin_reduction_override("auto")` forces the old kernel for comparisons.
 
-Large mode rectangles use a type-1 NUFFT. Since `fourier-auto-v5` (#1230) this is `_fourier_spread.es_mode_transform` on CUDA and ROCm alike, a portable CuPy transform using exponential-of-semicircle (ES) spreading, `cupy.fft` and kernel-transform deconvolution (Barnett, Magland and af Klinteberg, SIAM J. Sci. Comput. 41 (2019) C479). It uses FINUFFT's width rule $w=\lceil\log_{10}(1/\epsilon)\rceil+1$, $\beta=2.30w$ and upsampling 2, and is cross-checked on CUDA against direct sums and cuFINUFFT (`test_fourier_cuda.py`). Under v4, CUDA used cuFINUFFT, which stays selectable with `nufft="cufinufft"`. On an RTX 5080 (job 13454), ES was 1.7–2.1× faster than cuFINUFFT on the #944 production flushes (HOPG 300 keV with 4.4M lines, h-BN 5 MeV with 6.1M, MoS₂-on-Si with 11.6M) at 0.2, 0.05 and 0.025 eV spacing, up to 2.5M bins. The two agreed to at most $1.2\times10^{-11}$ of the spectrum maximum. ES also avoids cuFINUFFT's one-time first-plan start-up of about 0.3 s per process, which its separate CUDA 12 runtime and cuFFT incur. Its tolerance $\epsilon=10^{-12}$ is relative to the summed strengths and is far below `residual_tol`.
+Large mode rectangles use a type-1 NUFFT. Since `fourier-auto-v5` (#1230) this is `_fourier_spread.es_mode_transform` on CUDA and ROCm alike, a portable CuPy transform using exponential-of-semicircle (ES) spreading, `cupy.fft` and kernel-transform deconvolution (Barnett, Magland and af Klinteberg, SIAM J. Sci. Comput. 41 (2019) C479). It uses FINUFFT's width rule $w=\lceil\log_{10}(1/\epsilon)\rceil+1$, $\beta=2.30w$ and upsampling 2, and is cross-checked on CUDA against direct sums and cuFINUFFT (`test_fourier_cuda.py`). Under v4, CUDA used cuFINUFFT, which stays selectable with `nufft="cufinufft"`. On an RTX 5080 (job 13454), ES was 1.7–2.1× faster than cuFINUFFT on the #944 production flushes (HOPG 300 keV with 4.4M lines, h-BN 5 MeV with 6.1M, MoS₂-on-Si with 11.6M) at 0.2, 0.05 and 0.025 eV spacing, up to 2.5M bins. The two agreed to at most $1.2\times10^{-11}$ of the spectrum maximum. ES also avoids cuFINUFFT's one-time first-plan start-up of about 0.3 s per process, which its separate CUDA 12 runtime and cuFFT incur. Its tolerance, $\epsilon=10^{-12}$ through v5 and $10^{-9}$ on the device since v6 ([FP32 direct phase factors](#fp32-direct-phase-factors)), is relative to the summed strengths and is far below `residual_tol`.
+
+### FP32 direct phase factors
+
+Validation: `cxr-line-fourier-reduction`. Since `CXR_BIN_REDUCTION_MODEL = "fourier-auto-v6"` (#1296) the device direct rectangles (`_fourier_cuda.py`, `direct_precision="fp32"`, the default) evaluate $e^{-ij\phi_l}$ in single precision. The kernel forms $\theta=j\phi_l$ in FP64, reduces it to $\theta'=\theta-2\hat\pi\,\mathrm{rint}(\theta/2\hat\pi)$ with one FP64 FMA ($2\hat\pi$ the FP64 value of $2\pi$), rounds $\theta'$ to FP32 and calls `sincosf`. Weights $c_l(j)=\frac{\pi w_l}{a_l}(1-t_j/2a_l)$ and the accumulation stay FP64. `direct_precision="fp64"` keeps the FP64 `sincos` route.
+
+*Per factor.* $|\theta'|\le\pi+O(|\theta|\,2^{-52})<4$ (`rint` of the FP64 quotient can round the wrong way near half-integers), so rounding to FP32 moves it by at most $\pi\,2^{-24}=1.87\times10^{-7}$; cosine and sine are 1-Lipschitz. CUDA documents `sinf`/`cosf` (and so `sincosf`) to 2 ulp without fast math, at most $2^{-22}=2.38\times10^{-7}$ for results in $[-1,1]$; the kernel is compiled without `--use_fast_math`. The same source runs on ROCm through hiprtc; its single-precision accuracy there is not separately documented here and is covered by the CUDA/ROCm regression only. The FP64 reduction adds $(|\theta|/2\pi+1)\,|2\hat\pi-2\pi|\le(|\theta|/2\pi+1)\,2.5\times10^{-16}$, below $10^{-9}$ for $|\theta|<10^{7}$. Each of cosine and sine is therefore within $\delta=5\times10^{-7}$ (`DIRECT_FP32_PHASE_ERROR`) of its FP64 value, the complex factor within $\sqrt2\,\delta$. The margin $5\times10^{-7}-4.25\times10^{-7}$ absorbs the representation term up to $|j\phi_l|\le2a_l\max_l|E_l-c_0|\approx2\times10^{9}$ rad (no runtime guard; production widths $\gtrsim10^{-2}$ eV stay near or below $10^{8}$ rad, and beyond $2\times10^9$ rad the shared FP64 argument error already exceeds $\delta$); the FP64 route's own argument rounding, $|\theta|\,2^{-53}$, is common to both.
+
+*Per mode.* $|\Delta G_j|\le\sqrt2\,\delta\sum_{l\in\text{direct}(j)}|c_l(j)|$, summed over the direct rectangles that hold mode $j$ (the regression pins exactly this inequality).
+
+*Per bin.* In {eq}`eq-clfr-synthesis` $|\operatorname{sinc}|\le1$, and folding only adds terms, so $|\Delta\bar\rho_k|\le\frac2P\sum_{j\ge1}|\Delta G_j|\le\frac{2\sqrt2\,\delta}{P}\sum_l\sum_{j=1}^{J_l}|c_l(j)|$ with $J_l=\lfloor2a_l/\Delta t\rfloor$, $\Delta t=2\pi/P$. From $J_l\Delta t\le2a_l<(J_l+1)\Delta t$,
+
+$$
+\sum_{j=1}^{J_l}\Bigl(1-\frac{j\Delta t}{2a_l}\Bigr)<J_l-\frac{J_l(J_l+1)}{2(J_l+1)}=\frac{J_l}{2}\le\frac{a_lP}{2\pi},
+$$
+
+so $\sum_j|c_l(j)|\le P|w_l|/2$ and
+
+```{math}
+:label: eq-clfr-fp32-direct
+
+|\Delta\bar\rho_k|\le\sqrt2\,\delta\sum_{l}|w_l|\approx7.1\times10^{-7}\sum_l|w_l| ,
+```
+
+the sum running over lines with at least one direct mode. This is a worst case for aligned rounding errors, of the order of the image bound at the default `residual_tol` ($\le2\tau$ of each line peak). Rounding errors of random sign cancel: on the mos2 30 keV / 15° production flushes (#1296, RTX 5080, job 13647) the FP32 direct route differed from FP64 by $4\times10^{-14}$–$4\times10^{-12}$ of the spectrum peak.
+
+Fresh-context read-only verification (2026-11-18, `61e7636b7`) rederived the per-factor, per-mode and per-bin bounds and the triangle-sum inequality. A CPU emulation (float32 `sin`/`cos` as a proxy for `sincosf`, mpmath reference) gave per-factor errors $1.4$–$1.7\times10^{-7}$ up to $10^9$ rad, a largest per-mode error of 0.20 of the bound (median 0.007; $8.6\times10^4$ of it without range reduction), and a largest per-bin error of $2\times10^{-4}$ of $\sqrt2\,\delta\sum|w|$. Not run on device hardware. Because rounding signs are random, the regression catches a missing range reduction (by $10^4$–$10^5$) but not an underestimate of $\delta$ by less than about 5×. Verdict: `rederived`; the regression keeps `anchored`.
+
+*Limits.* $\delta\to0$ recovers the FP64 route. A rectangle with no direct modes (all NUFFT) is unaffected. The bound does not depend on $N$, $P$ or the number of rectangles a line occupies.
+
+The same model also requests ES accuracy $\epsilon=10^{-9}$ (width 10, was 13 at $10^{-12}$), still three orders below the default `residual_tol`; as above, the request is not a strict coefficient bound. On the same flushes the v6 route (FP32 direct, $\epsilon=10^{-9}$, NUFFT crossover $2^{24}$ instead of $2^{22}$ pairs, fused FP64 envelope pass) differed from v5 by at most $8\times10^{-11}$ of the peak.
 
 **Host route (#1230).** Since `CXR_BIN_REDUCTION_MODEL = "fourier-auto-v5"`, the NumPy backend reduces uniform unclamped axes through `_fourier_host.host_fourier_bin_mean_reduce`. It uses the same partition, period, broad route and image correction. Large rectangles use a serial numba port of the ES spreader with `scipy.fft`; smaller ones use a direct numba sum. Both are serial, so the result does not depend on thread count. `resolve_host_bin_reduction` picks the route. `bin_reduction_override("auto")` restores the exact dense host evaluator. The batched and per-hkl CPU scorers queue lines per target (`_bin_queue.HostBinLineQueues`) and flush every 4M lines. Requested ES accuracy `eps` is not a rigorous coefficient or final-spectrum bound; its approximation and FP64 rounding are additional to the image and broad-interpolation bounds. Anchors in `tests/montecarlo/spectrum/test_fourier_host.py`:
 
