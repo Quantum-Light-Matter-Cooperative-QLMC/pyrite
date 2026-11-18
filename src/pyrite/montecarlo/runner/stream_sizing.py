@@ -119,9 +119,12 @@ CUDA_FILL_HISTORIES = 7_168
 #: Smallest host chunk for adaptive transport: occupies the CPU workers while
 #: keeping work past a stop small.
 HOST_MIN_CHUNK = 1_024
-#: Device or host bytes per transported row while an adaptive chunk is measured
-#: (#1252: 7--12 KiB per row in the large-chunk arms).
-MEASURE_BYTES_PER_ROW = 10 * 1024
+#: Device or host bytes per transported row while an adaptive chunk is measured.
+#: #1253 job 13569 (RTX 5080, per-chunk pool window): 0.8--1.6 KiB per row on
+#: 160k--410k-row chunks; 4 KiB keeps a 2.5x margin and caps the densest
+#: cleo_sub scene (37.7 rows/electron) near 1M rows, half the 1.8M-row #1252
+#: block that filled the card. (#1252's 7--12 KiB included retained phases.)
+MEASURE_BYTES_PER_ROW = 4 * 1024
 #: Memory one adaptive chunk's rows may take while measured (#1253).
 ADAPTIVE_CHUNK_BUDGET_BYTES = 4 * 1024**3
 
