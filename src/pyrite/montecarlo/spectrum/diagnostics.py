@@ -28,7 +28,9 @@ when the p99 of its primary metric exceeds the threshold.
 Validation: radiation-error-estimators
 """
 
+import os
 import warnings
+from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
 
@@ -114,7 +116,7 @@ def sinc_feature_samples(segments, n_hat, *, electron_limit=None):
     beta = beta_from_keV(energy)
     t_L = length / beta
     denominator = 1.0 - beta * (direction @ np.asarray(n_hat, dtype=float))
-    if keys is not None:
+    if keys is not None and not _strictly_ordered(*keys):
         # Invalid kinematics drop row by row, as without grouping, before any
         # flight sums them.
         row = np.isfinite(t_L) & np.isfinite(denominator) & (t_L > 0.0) & (denominator > 0.0)
@@ -132,6 +134,17 @@ def sinc_feature_samples(segments, n_hat, *, electron_limit=None):
         & (denominator > 0.0)
     )
     return width[valid], weight[valid]
+
+
+def _strictly_ordered(owner, flight):
+    """Whether rows run in strictly increasing ``(owner, flight)`` order.
+
+    Then every flight is one row, in every row subset too, so
+    :func:`_flight_sums` would return None (#1270).
+    """
+    later = owner[1:] > owner[:-1]
+    later |= (owner[1:] == owner[:-1]) & (flight[1:] > flight[:-1])
+    return bool(later.all())
 
 
 def _flight_sums(owner, flight, phase, t_L):
@@ -199,8 +212,48 @@ def sinc_spacing_from_samples(samples, *, aliased_weight_limit=0.01):
     return step, aliased, int(width.size)
 
 
+#: Below this many values one thread sorts; above, value buckets sort in parallel.
+_PARALLEL_SORT_MIN = 1 << 22
+
+
+def _sort_threads():
+    count = getattr(os, "process_cpu_count", os.cpu_count)() or 1
+    return max(1, min(8, count))
+
+
 def _stable_argsort(values):
     """``np.argsort(values, kind="stable")`` of a 1-D array without NaNs (#1270).
+
+    Large arrays split at sampled value pivots into buckets, each holding its
+    members in index order (a stable radix grouping of the bucket ids); the
+    buckets, in value order, are sorted on threads by
+    :func:`_serial_stable_argsort`. Equal values share a bucket, so the
+    concatenation is the stable order.
+    """
+    threads = _sort_threads()
+    if values.size < _PARALLEL_SORT_MIN or threads < 2:
+        return _serial_stable_argsort(values)
+    sample = np.sort(values[:: max(1, values.size // 200_000)])
+    cuts = np.linspace(0, sample.size - 1, 4 * threads + 1)[1:-1].astype(np.intp)
+    pivots = np.unique(sample[cuts])
+    bucket = np.searchsorted(pivots, values, side="right").astype(np.uint8)
+    grouped = np.argsort(bucket, kind="stable")
+    bounds = np.concatenate(([0], np.cumsum(np.bincount(bucket, minlength=pivots.size + 1))))
+    del bucket
+    order = np.empty(values.size, dtype=np.intp)
+
+    def sort_bucket(index):
+        start, stop = int(bounds[index]), int(bounds[index + 1])
+        members = grouped[start:stop]
+        order[start:stop] = members[_serial_stable_argsort(values[members])]
+
+    with ThreadPoolExecutor(threads) as pool:
+        list(pool.map(sort_bucket, range(pivots.size + 1)))
+    return order
+
+
+def _serial_stable_argsort(values):
+    """``np.argsort(values, kind="stable")`` of a 1-D array without NaNs.
 
     The default (vectorised, unstable) argsort is several times faster on large
     populations. It differs from the stable order only inside runs of equal

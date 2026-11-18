@@ -8,6 +8,10 @@ products in one pass. Each product uses the operations, operand dtypes and
 order of the NumPy expression, so the values are bit-identical, and the caller
 keeps NumPy's pairwise ``sum`` over the compacted products, so block sums are
 unchanged too.
+
+:func:`block_tail_sums` evaluates the blocks on threads (the kernel releases
+the GIL) and returns their sums in block order, so the caller's running total
+adds them in the same order as before.
 """
 
 import numpy as np
@@ -16,7 +20,7 @@ from numba import njit
 _FLOATS = (np.dtype(np.float32), np.dtype(np.float64))
 
 
-@njit(cache=True)
+@njit(cache=True, nogil=True)
 def _tail_products_kernel(energy, weight, width, stop, out):
     pi_squared = np.pi**2
     count = 0
@@ -62,3 +66,21 @@ def tail_products(energy, weight, width, stop, out):
     if any(array.dtype not in _FLOATS for array in arrays):
         return _tail_products_numpy(energy, weight, width, stop, out)
     return int(_tail_products_kernel(energy, weight, width, energy.dtype.type(stop), out))
+
+
+def block_tail_sums(blocks, stop, pool=None):
+    """Per-block ``sum(mass * tail bound)`` at ``stop``, in block order.
+
+    ``blocks`` are ``(energy, weight, width)`` triples; ``pool`` (an executor)
+    maps them concurrently. Each sum is NumPy's pairwise sum of the block's
+    compacted products, zero for a block without kept lines.
+
+    Validation: line-grid-resonance-bandwidth
+    """
+
+    def one(block):
+        out = np.empty(block[0].size)
+        count = tail_products(*block, stop, out)
+        return float(out[:count].sum()) if count else 0.0
+
+    return list(map(one, blocks) if pool is None else pool.map(one, blocks))

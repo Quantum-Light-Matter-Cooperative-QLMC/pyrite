@@ -124,19 +124,19 @@ def test_stop_search_passes_scale_with_the_lattice(monkeypatch):
     rng = np.random.default_rng(11)
     populations = [_population(rng, 5000, np.float32)]
     calls = []
-    original = cxr_seeds.tail_products
+    original = cxr_seeds.block_tail_sums
 
-    def counted(*args):
-        calls.append(args[3])
-        return original(*args)
+    def counted(blocks, stop, pool=None):
+        calls.append(stop)
+        return original(blocks, stop, pool)
 
-    monkeypatch.setattr(cxr_seeds, "tail_products", counted)
+    monkeypatch.setattr(cxr_seeds, "block_tail_sums", counted)
     ceiling = 4.0e5
     stop, _ = resonance_population_stop_eV(populations, ceiling_eV=ceiling, truncation_limit=1e-2)
     assert stop < ceiling
     steps = ceiling / 100.0 + 2
-    # One block: one call per distinct trial stop, ceiling included, and the
-    # summary's fraction reuses the final stop's value.
+    # One pass per distinct trial stop, ceiling included; the summary's
+    # fraction reuses the final stop's value.
     assert len(calls) == len(set(calls)) <= math.ceil(math.log2(steps)) + 1
 
 
@@ -203,3 +203,26 @@ def test_flight_order_matches_lexsort(layout):
     else:
         np.testing.assert_array_equal(order, expected)
     assert (order is None) == (layout == "ordered")
+
+
+def test_bucketed_parallel_argsort_is_the_stable_order(monkeypatch):
+    from pyrite.montecarlo.spectrum import diagnostics
+
+    monkeypatch.setattr(diagnostics, "_PARALLEL_SORT_MIN", 1)
+    monkeypatch.setattr(diagnostics, "_sort_threads", lambda: 4)
+    rng = np.random.default_rng(23)
+    for values in (
+        np.round(rng.lognormal(3.0, 1.0, 300_000), 1),
+        rng.lognormal(3.0, 1.0, 300_000),
+        np.full(5000, 2.5),
+    ):
+        np.testing.assert_array_equal(_stable_argsort(values), np.argsort(values, kind="stable"))
+
+
+def test_unique_flight_keys_skip_grouping():
+    from pyrite.montecarlo.spectrum.diagnostics import _strictly_ordered
+
+    owner = np.array([0, 0, 1, 2, 2], dtype=np.int64)
+    assert _strictly_ordered(owner, np.array([0, 1, 0, 0, 1]))
+    assert not _strictly_ordered(owner, np.array([0, 0, 0, 0, 1]))
+    assert not _strictly_ordered(owner[::-1], np.array([1, 0, 0, 1, 0]))
