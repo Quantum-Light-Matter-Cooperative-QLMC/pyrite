@@ -1140,3 +1140,90 @@ argument) are accurate. Two statements are too strong by the one-row
 BremsLib case: the host-brem sentence above, and the Notes' "now a
 fixed-order layer sum … bit-identical". Either compute `seg_cos_theta`
 elementwise, or state the exception.
+
+
+## Independent one-row closure verification (2026-11-17, #1253)
+
+This fresh context did not implement the change. Its remaining scope is the
+one-row BremsLib cosine fix `6ddf3c5e9`, checked at `3cacb89dd`; the earlier
+v4 derivations above are not repeated.
+
+**Independent expression, before implementation inspection.** The source for
+this closure is the geometric definition of the angle between unit vectors,
+used by the BremsLib angular differential cross section. For a row direction
+$\hat{\mathbf v}_r$ and the observation direction $\hat{\mathbf n}$,
+
+$$
+c_r=\cos\theta_r=\hat{\mathbf v}_r\cdot\hat{\mathbf n}
+=(v_{rx}n_x+v_{ry}n_y)+v_{rz}n_z.
+$$
+
+The signature consumes row directions and a common observation direction;
+the output has one dimensionless cosine per row. Unit vectors give
+$-1\le c_r\le1$, parallel directions give $1$, antiparallel directions give
+$-1$, and perpendicular directions give $0$. No row count or neighboring
+row enters this expression. To preserve it bit for bit under a one-row call,
+all calls must perform the same three multiplications and the same two
+ordered additions; a row-count-dependent matrix/vector implementation is
+not sufficient. The band integral then retains its existing photons per sr
+per primary normalization. This is a floating-point ordering claim, not a
+new cross-section approximation or an external BremsLib accuracy validation.
+
+
+**Comparison and numeric anchors.** The implementation forms the three
+component products elementwise and adds them left to right, exactly the
+expression above. A new independent probe with 4,096 normalized random row
+directions (seed 1253) gave identical full-call and one-row cosines in every
+case; comparison with exact rational products and sums of the binary64
+inputs gave maximum absolute error $1.773\times10^{-16}$. Parallel and
+antiparallel limits passed within three binary64 epsilons. The exact equality
+criterion for slicing follows from the operation order; this epsilon bound
+is only a check on ordinary dot-product rounding, not a fitted tolerance.
+
+The previous final verifier's 4,032-comparison host band probe was rerun
+unmodified, without its optional cosine patch, against `3cacb89dd`: **0
+mismatches**, maximum relative difference **0**. It covers all four source
+routes (including partial BremsLib fallback), single-slab/two-/three-layer
+geometry, sorted/interleaved primary ids, both photon grids and observation
+angles, photon blocking, row slices, prefix head/tail splits, and one-row
+single-electron calls. Thus this independent run closes the specific
+one-row discrepancy in the preceding verification. The committed
+`test_band_primary_value_of_a_one_row_call` and all four
+`test_band_primary_values_do_not_depend_on_row_slicing` cases pass.
+The synthetic table is an ordering test input, not transcribed reference
+cross-section data; no new external-code or hardware parity claim is made.
+
+**Preserved v3 policy and v4 identity.** The CXR predicate still compares
+$\mathrm{VOV}+1/n=M_4/M_2^2$ with the separate
+`max_variance_of_variance` field, while the contribution ESS uses
+`min_effective_histories`. The slope remains a recorded diagnostic outside
+`passes`. Focused threshold/ESS, trend, grid, zero-stability, one-row,
+documentation and ledger checks pass (45 tests). The marker remains
+`decision-points-v4`; dataset and case identity assembly both call the
+adaptive marker helper, which omits the marker for fixed counts. Identity,
+provenance and fixed-count regression selection passes (34 tests; one
+unrelated slow test skipped). The marker-fork and legacy policy migration
+checks pass (3 tests); named-profile stem pins (2) and shipped-profile digest
+migration pins (8) pass. The chunk hint remains outside the identity policy,
+and `stability_blocks` still migrates to `stability_checks`. No old adaptive
+result is silently relabeled as a v4 result. Existing v2/v3 statements in
+this record describe their historical generations.
+
+- **Claim**: `adaptive-sample-size-stopping` (remaining v4 closure) —
+  `montecarlo/spectrum/brem.py::mc_brem_spectrum`, host band values —
+  unit-vector cosine and fixed-order per-primary band reduction.
+- **Filters**: units `pass`; limits `pass`; signs/conventions `pass`;
+  notation/normalization `pass`; reference-data transcription `not applicable`
+  (synthetic inputs); tolerances `pass` (bit equality for the claim);
+  evidence `pass` for existing commits and host regression anchors.
+- **Re-derivation**: `matches` — the cosine has the same ordered scalar
+  operations for one-row and larger calls; the previous 4,032 comparisons
+  are now all bit-identical in a fresh context.
+- **Verdict**: `rederived`; the owning task may retain `anchored` using the
+  named committed regression tests. Never `signed-off`.
+- **Write-up**: this section.
+- **Suggested ledger change**: replace the pending fresh-context confirmation
+  of the one-row fix with this result, and include the host band tests in
+  `Anchor`; retain the CUDA atomic-reduction caveat. Measured GPU chunk
+  memory from the older 10 KiB/row policy does not validate HEAD's 4 KiB/row
+  sizing; that performance question is outside this closure.
