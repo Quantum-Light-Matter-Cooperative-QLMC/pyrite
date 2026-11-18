@@ -369,6 +369,10 @@ def test_slice_overrun_retires_only_material_and_continues_next_slice(monkeypatc
     jobdir = tmp_path / "jobs" / "j"
     jobdir.mkdir(parents=True)
     (jobdir / "meta").write_text("slurm_job_id: 100\n")
+    (jobdir / "progress").mkdir()
+    (jobdir / "progress" / "hopg.json").write_text(
+        '{"sample_compute_seconds":1440,"sample_new_cases":2,"completed_new_cases":2}'
+    )
     (jobdir / ".no_progress_slices").write_text("2\n")
     calls = tmp_path / "calls"
     fake_uv = tmp_path / "uv"
@@ -399,7 +403,9 @@ def test_slice_overrun_retires_only_material_and_continues_next_slice(monkeypatc
     assert first.returncode == 0, first.stderr
     assert marker.read_text().splitlines() == ["called"]
     assert (jobdir / "state").read_text().startswith("queued slice 2")
-    assert "--chunk-minutes 0" in (jobdir / "failures" / "hopg").read_text()
+    reason = (jobdir / "failures" / "hopg").read_text()
+    assert "--chunk-minutes 0" in reason
+    assert "estimated completed-case cost 12.00 min" in reason
     second = subprocess.run([bash, "-c", script], capture_output=True, text=True, env=env)
     assert second.returncode == 0, second.stderr
     log = (jobdir / "log").read_text()

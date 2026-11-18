@@ -24,6 +24,25 @@ for path in glob.glob(sys.argv[1] + "/*.json"):
 print(count)
 PY
 }
+case_minutes() {
+  python3 - "$JOBDIR/progress/$1.json" <<'PY_CASE'
+import json
+import math
+import sys
+
+try:
+    with open(sys.argv[1], encoding="utf-8") as record_file:
+        record = json.load(record_file)
+    seconds = float(record.get("sample_compute_seconds", 0))
+    cases = int(record.get("sample_new_cases", 0))
+    if cases > 0 and math.isfinite(seconds) and seconds > 0:
+        print(f"{seconds / cases / 60:.2f} min")
+    else:
+        print("unavailable (no completed-case timing)")
+except (OSError, ValueError, TypeError, AttributeError, OverflowError):
+    print("unavailable (no completed-case timing)")
+PY_CASE
+}
 slice_finished_before=$(grep -Ec "^(completed|failed): " "$JOBDIR/log" 2>/dev/null || true)
 slice_finished_before=${slice_finished_before:-0}
 slice_progress_before=$(progress_count) || exit 1
@@ -48,7 +67,8 @@ def _chunked_timeout_result() -> str:
       echo "resumable timeout at $m [$n/$total] $(date -Is)" > "$JOBDIR/state"
       break
     fi
-    reason="case exceeded slice without checkpoint progress (budget ${remaining_min} min of $((chunk_seconds / 60)) min slice; case cost unavailable until a case completes); use --chunk-minutes 0 or a larger --chunk-minutes, or lower max_histories"
+    estimate=$(case_minutes "$m") || exit 1
+    reason="case exceeded slice without checkpoint progress (estimated completed-case cost $estimate; budget ${remaining_min} min of $((chunk_seconds / 60)) min slice); use --chunk-minutes 0 or a larger --chunk-minutes, or lower max_histories"
     echo "WARNING: $m: $reason; continuing remaining materials in the next slice" >> "$JOBDIR/log"
     mkdir -p "$JOBDIR/failures" || exit 1
     printf '%s\n' "$reason" > "$JOBDIR/failures/$m"
