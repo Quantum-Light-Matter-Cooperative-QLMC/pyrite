@@ -137,6 +137,16 @@ def test_scan_progress_tracks_electron_batches_and_clears_on_transition(monkeypa
             snapshots.append(json.loads(progress.read_text()))
             for key in ("transport_electrons_done", "transport_electrons_total"):
                 assert job_records["hopg"][key] == snapshots[-1][key]
+        kwargs["on_activity"]({"phase": "spectrum", "case": case})
+        spectrum = json.loads(progress.read_text())
+        assert spectrum["activity"] == job_records["hopg"]["activity"] == "spectrum"
+        assert spectrum["current"]
+        assert "transport_electrons_done" not in spectrum
+        from pyrite.console.dashboard import parse_progress_records
+        from pyrite.console.dashboard.render import _format_case_progress
+
+        status = _format_case_progress(parse_progress_records(progress.read_text()), ["hopg"])
+        assert "spectrum" in status and "histories" not in status
         kwargs["on_activity"]({"phase": "saving", "case": None})
         snapshots.append(json.loads(progress.read_text()))
         assert "transport_electrons_done" not in job_records["hopg"]

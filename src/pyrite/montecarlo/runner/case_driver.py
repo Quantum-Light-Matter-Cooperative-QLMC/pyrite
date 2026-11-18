@@ -73,7 +73,12 @@ from .planar_zone_lines import planar_zone_line_parts
 from .recovery import _spectrum_with_recovery, transport_with_recovery
 from .stage_chunks import _stage_counters
 from .step_budget import retry_step_budget
-from .transport_options import _beam_kwargs, _check_opt_in_transport, tuned_transport_kwargs
+from .transport_options import (
+    _beam_kwargs,
+    _check_opt_in_transport,
+    report_transport_finished,
+    tuned_transport_kwargs,
+)
 
 # Late-bound owner of process-wide state shared with sibling runner modules.
 from .. import runner as _pkg  # noqa: E402  isort: skip
@@ -417,6 +422,8 @@ def _transport_case(
         case = {**case, "Ne": Ne, "Ne_brem": Ne_brem}
         E_cut_by_electrons = E_cut_by_electrons[:Ne_transport]
         E_cut_by_electrons[Ne_brem:] = E_cut_lines
+
+    report_transport_finished(transport_progress, Ne_transport)
 
     # Line resolution needs the transport distribution, so it is chosen after
     # the case's own trajectories exist and before the spectrum phase. No second

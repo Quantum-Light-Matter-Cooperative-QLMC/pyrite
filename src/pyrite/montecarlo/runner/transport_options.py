@@ -237,3 +237,9 @@ def run_progress(progress):
     finally:
         _SPECTRUM_PROGRESS.reset(tokens[1])
         _TRANSPORT_PROGRESS.reset(tokens[0])
+
+
+def report_transport_finished(progress, realized):
+    """Flush realized transport progress before population-wide spectrum preparation."""
+    if progress is not None:
+        getattr(progress, "finish_transport", progress)(realized, realized)

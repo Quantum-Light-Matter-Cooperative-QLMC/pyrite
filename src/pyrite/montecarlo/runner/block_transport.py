@@ -480,7 +480,8 @@ def transport_case_blocks(
         if progress is not None:
 
             def block_progress(done, _n, start=start):
-                progress(start + done, n_electrons)
+                report = getattr(progress, "boundary", progress) if done >= _n else progress
+                report(start + done, n_electrons)
 
             block_kw["transport_progress"] = block_progress
         return retry_step_budget(simulate, keep, start=start, stop=stop, block_kw=block_kw)
