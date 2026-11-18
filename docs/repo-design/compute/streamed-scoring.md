@@ -628,3 +628,33 @@ this was not resolved. The measured h-BN stop also moves with N (288 keV at
 2,048 and the 966 keV ceiling at 8,192, which needs 368,084 points), as it does
 on the joined path.
 
+### Spilled grid pass (#1141)
+
+`checks/streamed_line_grid_spill_1141.sbatch` (job 13622, code `676364694`,
+RTX 5080) ran the h-BN case above in `grid-pass` mode at block 512, spilled
+(`STREAM_SPILL_MIB=0`) and held (`none`) at each N. Anon is the sampled
+`RssAnon` peak above its pre-run level. `ru_maxrss` also counts the spilled
+files' mapped pages, which the kernel can reclaim, so it is not the bound.
+
+| N | Evidence (MB) | Anon, spilled / held (MiB) | Spill disk peak (GB) | Wall, spilled / held (s) |
+|---|---|---|---|---|
+| 2,048 | 250 | 468 / 678 | 0.25 | 6.1 / 5.7 |
+| 8,192 | 1,001 | 476 / 2,249 | 1.41 | 20.9 / 19.1 |
+| 32,768 | 4,005 | 573 / 7,779 | 5.63 | 80.2 / 72.0 |
+
+Spilled and held grids are bitwise equal at every N, and the scratch
+directory is empty after every arm. Across a 16x range of N, held memory
+grows with the evidence (about 1.9x it), while spilled memory rises
+105 MiB, 2.6% of the added evidence. Disk peak matches the projection:
+twice the sinc evidence plus the lines. Spilling costs 7 to 11% wall.
+
+Two earlier runs found defects that are now fixed:
+
+- **Job 13610:** one memory map per spilled line array exhausted file
+  descriptors at 64 blocks. Lines now go to one `LineFile`.
+- **Job 13619:** the pivot sample held strided views that pinned every
+  scanned chunk, 8 bytes per sinc row: spilled anon grew 516 to 993 MiB from
+  N = 8,192 to 32,768. The sample is now copied. A synthetic probe of the
+  out-of-core sort alone is flat at 363, 392 and 402 MiB for 25M, 100M and
+  200M rows.
+
