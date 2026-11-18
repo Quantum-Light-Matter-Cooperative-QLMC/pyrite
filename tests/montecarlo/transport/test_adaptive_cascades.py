@@ -78,6 +78,24 @@ def test_adaptive_shell_cascade_is_the_fixed_run_at_its_count(block, maximum):
     transport, reference = _fixed(case, maximum)
     assert _launched(transport) > 0, "need launched descendants"
     _assert_matches(result, reference)
+    _assert_monitor_saw_the_fixed_run(case, settings, transport, stats, maximum)
+
+
+def _assert_monitor_saw_the_fixed_run(case, settings, transport, stats, n):
+    """The streamed-block monitor's moments are those of the fixed run's
+    root-summed per-primary values, so the stop decision is the fixed run's."""
+    values = case_measure(case, settings)(0, n, transport["segs"])
+    for name in ("cxr", "brem"):
+        m = np.asarray(values[name], dtype=float)
+        assert m.size == n and m.sum() > 0, name
+        status = stats["statistics"][name]
+        mean = m.mean()
+        np.testing.assert_allclose(status["mean"], mean, rtol=1e-12, err_msg=name)
+        rse = m.std(ddof=1) / (np.sqrt(n) * abs(mean))
+        np.testing.assert_allclose(status["relative_se"], rse, rtol=1e-10, err_msg=name)
+        share, ess = m.max() / m.sum(), m.sum() ** 2 / np.sum(m**2)
+        np.testing.assert_allclose(status["max_electron_share"], share, rtol=1e-12)
+        np.testing.assert_allclose(status["effective_sample_size"], ess, rtol=1e-12)
 
 
 @pytest.mark.parametrize("spread", [None, 0.08])
