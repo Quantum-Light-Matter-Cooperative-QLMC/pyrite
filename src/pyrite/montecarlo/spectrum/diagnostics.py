@@ -138,15 +138,37 @@ def _flight_sums(owner, flight, phase, t_L):
     """Per-flight ``(sum phase, sum t_L)``, or None when every flight is one row."""
     if flight.size == 0:
         return None
-    order = np.lexsort((flight, owner))
-    owner, flight = owner[order], flight[order]
+    order = _flight_order(owner, flight)
+    if order is not None:
+        owner, flight = owner[order], flight[order]
+        phase, t_L = phase[order], t_L[order]
     first = np.empty(flight.size, dtype=bool)
     first[0] = True
     first[1:] = (flight[1:] != flight[:-1]) | (owner[1:] != owner[:-1])
     if first.all():
         return None
     starts = np.flatnonzero(first)
-    return np.add.reduceat(phase[order], starts), np.add.reduceat(t_L[order], starts)
+    return np.add.reduceat(phase, starts), np.add.reduceat(t_L, starts)
+
+
+def _flight_order(owner, flight):
+    """``np.lexsort((flight, owner))``, or None when that is the identity (#1270).
+
+    Rows already in ``(owner, flight)`` order need no sort: the stable lexsort
+    keeps them in place. Otherwise non-negative integer keys pack into one
+    int64 key whose stable argsort is the same order.
+    """
+    later = owner[1:] > owner[:-1]
+    later |= (owner[1:] == owner[:-1]) & (flight[1:] >= flight[:-1])
+    if later.all():
+        return None
+    del later
+    integral = owner.dtype.kind in "iu" and flight.dtype.kind in "iu"
+    if integral and int(owner.min()) >= 0 and int(flight.min()) >= 0:
+        span = int(flight.max()) + 1
+        if (int(owner.max()) + 1) * span < 2**63:
+            return _stable_argsort(owner.astype(np.int64) * span + flight)
+    return np.lexsort((flight, owner))
 
 
 def sinc_spacing_from_samples(samples, *, aliased_weight_limit=0.01):

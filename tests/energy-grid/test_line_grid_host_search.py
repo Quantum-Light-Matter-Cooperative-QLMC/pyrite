@@ -19,7 +19,11 @@ from pyrite.montecarlo.spectrum.cxr_seeds import (
     resonance_population_stop_eV,
     sincsq_upper_tail_bound,
 )
-from pyrite.montecarlo.spectrum.diagnostics import _stable_argsort, sinc_spacing_from_samples
+from pyrite.montecarlo.spectrum.diagnostics import (
+    _flight_order,
+    _stable_argsort,
+    sinc_spacing_from_samples,
+)
 
 
 def _blocks(populations):
@@ -179,3 +183,23 @@ def test_ten_million_line_sizing_smoke():
     # ~2 s on a desktop CPU; pre-#1270 the stop search alone took ~13 s.
     assert stop < 2.5e5
     assert time.perf_counter() - started < 20.0
+
+
+@pytest.mark.parametrize("layout", ["ordered", "shuffled", "negative"])
+def test_flight_order_matches_lexsort(layout):
+    rng = np.random.default_rng(17)
+    owner = np.repeat(np.arange(4000, dtype=np.int32), 3)
+    flight = rng.integers(0, 3, owner.size).astype(np.int32)
+    flight = np.sort(flight.reshape(-1, 3), axis=1).ravel()
+    if layout != "ordered":
+        permutation = rng.permutation(owner.size)
+        owner, flight = owner[permutation], flight[permutation]
+    if layout == "negative":
+        owner = owner.astype(np.int64) - 5
+    order = _flight_order(owner, flight)
+    expected = np.lexsort((flight, owner))
+    if order is None:
+        np.testing.assert_array_equal(expected, np.arange(owner.size))
+    else:
+        np.testing.assert_array_equal(order, expected)
+    assert (order is None) == (layout == "ordered")
