@@ -34,7 +34,7 @@ _RULE_ONLY = dict(
     max_history_share=1.0,
     min_effective_histories=0.0,
     max_variance_of_variance=1.0,
-    stability_blocks=0,
+    stability_checks=0,
 )
 #: One monitor band over the line grid and the continuum grid, so both observables score.
 BAND = dict(observables=("cxr", "brem"), band_eV=(1500.0, 150000.0))
@@ -164,6 +164,7 @@ def test_monitor_samples_are_root_summed_primaries():
     )
     monitor = StoppingMonitor(settings, measure)
     monitor.on_block(0, 6, segs)
+    monitor.should_stop(6)  # fold the values at the only decision point
     whole = measure(0, 6, segs)
     for name in ("cxr", "brem"):
         assert whole[name].shape == (6,)

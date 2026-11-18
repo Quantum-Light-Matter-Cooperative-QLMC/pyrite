@@ -132,3 +132,64 @@ def test_band_escape_splitting_cutoff_and_tiny_endpoint(monkeypatch, table, geom
     monkeypatch.setattr(brem, "_USE_JIT_BREM_REDUCTION", True)
     candidate = brem.mc_brem_spectrum(segments, grid, **kwargs)
     np.testing.assert_allclose(candidate, reference, rtol=_RTOL)
+
+
+@pytest.mark.parametrize("model", ["bremslib", "eedl"])
+@pytest.mark.parametrize("layered", [False, True])
+def test_band_primary_values_do_not_depend_on_row_slicing(monkeypatch, table, model, layered):
+    """#1253: an electron's band value is bit-identical whatever row chunk the
+    reduction uses and whatever electron prefix the transport chunk holds.
+
+    Chunk 1 with two absorbing layers is the case where a BLAS product would
+    take its one-row (gemv) path and round differently from the many-row one.
+    """
+    n, n_electrons = 300, 25
+    segments = _segments(n=n, n_electrons=n_electrons, seed=507)
+    segments["E_repr_keV"] = segments["E_keV"] * 0.995
+    order = np.argsort(segments["elec_id"], kind="stable")  # electron-major rows
+    segments = {k: v[order] if isinstance(v, np.ndarray) else v for k, v in segments.items()}
+    grid = np.geomspace(1000.0, 190000.0, 500)
+    kwargs = dict(
+        composition=[("C", 0.1), ("N", 0.05)],
+        cross_section_model=model,
+        bremslib_tables={"C": table, "N": table} if model == "bremslib" else None,
+        electron_band_weights=np.where(np.arange(grid.size) % 5, np.gradient(grid), 0.0),
+        layers=_LAYERS if layered else None,
+        photon_block=40,
+        electron_limit=n_electrons,
+    )
+    monkeypatch.setattr(brem, "_USE_JIT_BREM_REDUCTION", False)
+    reference = brem.mc_brem_spectrum(segments, grid, chunk=n, **kwargs)
+    assert np.count_nonzero(reference) > n_electrons // 2
+    for chunk in (1, 4, 13):
+        sliced = brem.mc_brem_spectrum(segments, grid, chunk=chunk, **kwargs)
+        np.testing.assert_array_equal(sliced, reference)
+    cut = int(np.searchsorted(segments["elec_id"], 4))  # electrons 0-3 | 4-24
+    head = {k: v[:cut] if isinstance(v, np.ndarray) else v for k, v in segments.items()}
+    prefix = brem.mc_brem_spectrum(head, grid, chunk=7, **kwargs)
+    np.testing.assert_array_equal(prefix[:4], reference[:4])
+
+
+@pytest.mark.parametrize("layered", [False, True])
+def test_band_primary_value_of_a_one_row_call(monkeypatch, table, layered):
+    """#1253: a call holding one emitting row (a one-electron chunk, or one
+    layer of it) gives that row's band value bit for bit as a larger call."""
+    segments = _segments(n=200, n_electrons=40, seed=11)
+    grid = np.geomspace(1000.0, 190000.0, 400)
+    kwargs = dict(
+        composition=[("C", 0.1)],
+        cross_section_model="bremslib",
+        bremslib_tables={"C": table},
+        electron_band_weights=np.gradient(grid),
+        layers=_LAYERS if layered else None,
+        electron_limit=40,
+    )
+    monkeypatch.setattr(brem, "_USE_JIT_BREM_REDUCTION", False)
+    ids = segments["elec_id"]
+    for row in range(40):
+        partner = int(np.flatnonzero(ids != ids[row])[0])
+        values = []
+        for rows in ([row], [row, partner]):
+            subset = {k: v[rows] if isinstance(v, np.ndarray) else v for k, v in segments.items()}
+            values.append(brem.mc_brem_spectrum(subset, grid, **kwargs)[ids[row]])
+        assert values[0] == values[1]

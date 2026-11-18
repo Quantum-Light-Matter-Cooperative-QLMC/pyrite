@@ -86,6 +86,8 @@ Removal dates live in `pyrite._util.deprecations`.
 
 | Removed | Replacement | Notes |
 | --- | --- | --- |
+| `AdaptiveSampling(block_histories=N)`, catalog `block_histories`, `--block-histories` (deprecated in 0.36.0, removed in 0.38.0) | omit it; transport chunks are sized automatically | #1253: checks fall on decision points (`decision_growth`); the value only overrides the transport chunk floor and leaves decisions, counts, output and identity unchanged. Counts need no longer be multiples of it. |
+| `AdaptiveSampling(stability_blocks=k)`, catalog `stability_blocks`, `--stability-blocks` (deprecated in 0.36.0, removed in 0.38.0) | `stability_checks=k`, `--stability-checks` | The window now spans the last `k` decision points. Stored `stability_blocks` keys load as `stability_checks`. |
 | `pyrite.beams.BunchLength(rms_fs=σ, shape=s)` (removed in 0.27.0) | `LongitudinalDistribution("gaussian", σ, shape=s)` | `shape="uniform"` is the flat top of the same RMS. `rms_duration=` keeps its meaning. Sampled offsets and case keys are unchanged; pickled `Beam` objects holding a `BunchLength` no longer load. |
 
 (electron-budget-migration)=

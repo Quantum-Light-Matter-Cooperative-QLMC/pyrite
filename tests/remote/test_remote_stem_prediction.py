@@ -72,9 +72,7 @@ def test_fixed_count_standard_profile_keeps_the_bare_canonical_stem(monkeypatch)
     [
         (
             "profile_precisions",
-            AdaptiveSampling(
-                target_rse=0.1, min_histories=20, max_histories=60, block_histories=20
-            ).to_dict(),
+            AdaptiveSampling(target_rse=0.1, min_histories=20, max_histories=60).to_dict(),
         ),
         ("profile_emissions", "both"),
         ("profile_transport_numerics", {"straggling": True}),

@@ -35,7 +35,6 @@ def test_default_policy_matches_the_recorded_decision():
         target_rse=0.05,
         min_histories=200,
         max_histories=20_000,
-        block_histories=100,
         observables=("cxr", "brem"),
     )
 
@@ -47,9 +46,7 @@ def test_a_plain_profile_runs_the_default_policy():
 
 
 def test_an_explicit_table_wins(monkeypatch):
-    policy = AdaptiveSampling(
-        target_rse=0.1, min_histories=20, max_histories=60, block_histories=20
-    )
+    policy = AdaptiveSampling(target_rse=0.1, min_histories=20, max_histories=60)
     _with_standard(monkeypatch, "profile_precisions", policy.to_dict())
     precision, source = profile_precision_source(default_settings(), "standard")
     assert (precision, source) == (policy, "profile")

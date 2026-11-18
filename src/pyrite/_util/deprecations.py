@@ -159,6 +159,18 @@ API_DEPRECATIONS: dict[str, ApiDeprecation] = {
     # #1242: "none" turns every optional non-boolean setting off (Physics
     # fields, profile/preset TOML and CLI values); pyrite._off_settings warns.
     '"off"': _api_entry('"off"', '"none"', since="0.36.0"),
+    # #1253: adaptive decisions fall on geometric decision points; transport
+    # chunks are sized automatically and never change the stop.
+    "AdaptiveSampling(block_histories=...)": _api_entry(
+        "AdaptiveSampling(block_histories=...)",
+        "automatic transport chunks (omit block_histories)",
+        since="0.36.0",
+    ),
+    "AdaptiveSampling(stability_blocks=...)": _api_entry(
+        "AdaptiveSampling(stability_blocks=...)",
+        "AdaptiveSampling(stability_checks=...)",
+        since="0.36.0",
+    ),
 }
 
 

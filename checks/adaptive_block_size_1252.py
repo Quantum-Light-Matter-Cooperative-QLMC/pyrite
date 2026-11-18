@@ -37,6 +37,10 @@ not change decisions.
 cumulative/self tables). ``table`` summarizes ``*.json`` arm records under ``OUT_DIR``.
 
 Engineering evidence; no physics-validation claim.
+
+Since #1253 the monitor decides at policy decision points, not at block ends;
+``replay`` therefore reproduces the v2 block rule only at the revision its
+results name. ``adaptive_decision_cadence_1253.py`` replays v3.
 """
 
 import json
@@ -74,7 +78,18 @@ def _sync():
 
 
 def rescaled(precision, block):
-    """``precision`` with ``block`` electrons per block; counts rounded up to multiples."""
+    """``precision`` with ``block`` electrons per block; counts rounded up to multiples.
+
+    Since #1253 (``AdaptiveChunkPlan`` present) ``block`` is only the deprecated
+    chunk-floor hint and the policy's counts are kept, so every arm runs the
+    same stopping rule; ``"auto"`` drops the hint (device fill and memory).
+    """
+    try:
+        from pyrite.montecarlo.runner.stream_sizing import AdaptiveChunkPlan  # noqa: F401
+    except ImportError:
+        pass
+    else:
+        return replace(precision, block_histories=None if block == "auto" else int(block))
 
     def up(n):
         return None if n is None else int(math.ceil(n / block) * block)
@@ -223,14 +238,31 @@ class Memory:
         free, self.total = CUPY.cuda.runtime.memGetInfo()
         self.card_base = self.card_peak = self.total - free
         self.reserved_peak = self.used_peak = 0
+        self.window_used_peak = 0
 
     def _sample(self):
         free, _ = CUPY.cuda.runtime.memGetInfo()
         card = self.total - free
         self.card_peak = max(self.card_peak, card)
         self.reserved_peak = max(self.reserved_peak, self.pool.total_bytes())
-        self.used_peak = max(self.used_peak, self.pool.used_bytes())
+        used = self.pool.used_bytes()
+        self.used_peak = max(self.used_peak, used)
+        self.window_used_peak = max(self.window_used_peak, used)
         self.by_phase[self.phase] = max(self.by_phase.get(self.phase, 0), card)
+
+    def window_start(self) -> int:
+        """Pool bytes in use now; the window peak restarts from them (#1253)."""
+        if self.pool is None:
+            return 0
+        used = self.pool.used_bytes()
+        self.window_used_peak = used
+        return used
+
+    def window_peak(self) -> int:
+        if self.pool is None:
+            return 0
+        self.window_used_peak = max(self.window_used_peak, self.pool.used_bytes())
+        return self.window_used_peak
 
     def _run(self):
         while not self._stop.wait(0.005):
@@ -328,6 +360,52 @@ def instrument(timers, values, on_values=None):
         )
 
     block_transport.transport_electron_blocks = transport_electron_blocks
+
+    real_monitored = getattr(block_transport, "transport_monitored_blocks", None)
+    if real_monitored is not None:  # #1253 chunked driver: same per-chunk records
+
+        def transport_monitored_blocks(simulate_block, plan, monitor, *args, **kwargs):
+            def simulate(start, stop):
+                _sync()
+                used0 = timers.memory.window_start()
+                t0 = time.perf_counter()
+                timers.memory.phase = "transport.simulate"
+                block = simulate_block(start, stop)
+                _sync()
+                ids = block.get("electron_id")
+                rows = -1 if ids is None else int(ids.shape[0])
+                timers.blocks.append(
+                    {
+                        "start": start,
+                        "stop": stop,
+                        "simulate_s": time.perf_counter() - t0,
+                        "rows": rows,
+                        # Pool bytes this chunk adds over what earlier kept
+                        # chunks already hold (5 ms sampling plus end points).
+                        "pool_used_before_B": used0,
+                        "pool_simulate_peak_B": timers.memory.window_peak() - used0,
+                    }
+                )
+                return block
+
+            real_on_block = monitor.on_block
+
+            def on_block(start, stop, block):
+                timers.memory.phase = "transport.measure"
+                t0 = time.perf_counter()
+                real_on_block(start, stop, block)
+                _sync()
+                record = timers.blocks[-1]
+                record["measure_s"] = time.perf_counter() - t0
+                record["pool_chunk_peak_B"] = (
+                    timers.memory.window_peak() - record["pool_used_before_B"]
+                )
+                timers.memory.phase = "transport.simulate"
+
+            monitor.on_block = on_block
+            return real_monitored(simulate, plan, monitor, *args, **kwargs)
+
+        block_transport.transport_monitored_blocks = transport_monitored_blocks
     block_transport.merge_electron_blocks = timers.wrap(
         "transport.join", block_transport.merge_electron_blocks, "transport.join"
     )
@@ -349,11 +427,19 @@ def _scalar_meta(out):
     }
 
 
+def _block_arg(block):
+    return "auto" if block == "auto" else int(block)
+
+
+def _block_int(block):
+    return 0 if block == "auto" else int(block)
+
+
 def run(material, e0_kev, tilt_deg, block, out_prefix):
     from pyrite.montecarlo.runner.scheduling import run_cases
 
     case, precision, profile_precision = profile_case(
-        material, float(e0_kev), float(tilt_deg), int(block)
+        material, float(e0_kev), float(tilt_deg), _block_arg(block)
     )
     memory = Memory()
     timers = Timers(memory)
@@ -368,7 +454,7 @@ def run(material, e0_kev, tilt_deg, block, out_prefix):
                 "material": material,
                 "E0_keV": float(e0_kev),
                 "tilt_deg": float(tilt_deg),
-                "block": int(block),
+                "block": _block_arg(block),
                 "precision": precision.to_dict(),
                 "profile_precision": profile_precision.to_dict(),
                 "realized_electrons": None,
@@ -379,7 +465,9 @@ def run(material, e0_kev, tilt_deg, block, out_prefix):
     instrument(
         timers,
         values,
-        (lambda: save_values(out_prefix, values, np.int64(block))) if incremental else None,
+        (lambda: save_values(out_prefix, values, np.int64(_block_int(block))))
+        if incremental
+        else None,
     )
     launches = Launches()
     launches.install()
@@ -405,7 +493,7 @@ def run(material, e0_kev, tilt_deg, block, out_prefix):
         "material": material,
         "E0_keV": float(e0_kev),
         "tilt_deg": float(tilt_deg),
-        "block": int(block),
+        "block": _block_arg(block),
         "precision": precision.to_dict(),
         "profile_precision": profile_precision.to_dict(),
         "backend": os.environ.get("PYRITE_MC_BACKEND"),
@@ -439,7 +527,7 @@ def run(material, e0_kev, tilt_deg, block, out_prefix):
         "output_meta": {} if out is None else _scalar_meta(out),
     }
     if values:
-        save_values(out_prefix, values, np.int64(block))
+        save_values(out_prefix, values, np.int64(_block_int(block)))
     Path(f"{out_prefix}.json").write_text(json.dumps(record, default=_json_default))
     summary = {k: v for k, v in record.items() if k not in ("per_block", "runner_timing")}
     print(json.dumps(summary, default=_json_default))

@@ -216,7 +216,6 @@ adaptive = pr.Numerics(
         target_rse=0.05,
         min_histories=200,
         max_histories=20_000,
-        block_histories=100,
         observables=("cxr", "brem"),
     ),
 )

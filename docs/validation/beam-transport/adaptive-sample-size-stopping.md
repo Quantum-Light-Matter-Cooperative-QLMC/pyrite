@@ -4,7 +4,7 @@ Ledger row: [`adaptive-sample-size-stopping`](../ledger-transport-background.md#
 
 ## Claim
 
-For a case transported in equal electron blocks of size $B$ on the counter-addressed per-electron or CUDA cores, the run stops at the first block end $n \ge n_{\min}$ that meets the following conditions for every watched observable $o$, plus the CXR variance-sampling gate below:
+For a case transported on the counter-addressed per-electron or CUDA cores, the run stops at the first decision point $n = d_J$ ({eq}`eq-adaptive-decision-points`, v4, #1253) that meets the following conditions for every watched observable $o$, plus the CXR variance-sampling gate below. Here $d_{J-j}$, $j = 1..k$, are the $k$ preceding points; the decisions and the realized count do not depend on how electrons are grouped for transport:
 
 ```{math}
 :label: eq-adaptive-stop-rule
@@ -15,7 +15,7 @@ r_{o,n} = \frac{s_{o,n}}{\sqrt{n}\,\lvert\bar m_{o,n}\rvert} \le \varepsilon,
 \quad
 \frac{(\sum_{i\le n} m_{o,i})^2}{\sum_{i\le n} m_{o,i}^2} \ge E_{\min},
 \quad
-\max_{1\le j\le k}\frac{\lvert\bar m_{o,n-jB}-\bar m_{o,n}\rvert}{\lvert\bar m_{o,n}\rvert} \le f\varepsilon .
+\frac{\lvert\bar m_{o,d_{J-j}}-\bar m_{o,n}\rvert}{\lvert\bar m_{o,n}\rvert} \le \max\!\Big(f\varepsilon,\ z\,r_{o,n}\sqrt{\tfrac{n/d_{J-j}-1}{\delta}}\Big)\ (1\le j\le k),\quad z=0.9 .
 ```
 
 Otherwise it stops at $n_{\max}$, flagged `statistics_limited`. The terms are:
@@ -26,6 +26,39 @@ Otherwise it stops at $n_{\max}$, flagged `statistics_limited`. The terms are:
 
 The realized result is the fixed-$N$ result at $N=n$, bit for bit. The cited sequential-interval theory concerns the asymptotic regime as the requested width tends to zero, with its regularity and stopping assumptions; it does not certify finite-sample coverage of this guarded implementation. The empirical studies below measure coverage and stopping bias in their stated populations only.
 
+
+### Decision points and transport chunks (v4, #1253)
+
+The rule is evaluated only at
+
+```{math}
+:label: eq-adaptive-decision-points
+
+d_0=n_{\min},\qquad d_{j+1}=\min\big(n_{\max},\ \max(d_j+1,\ \lceil d_j(1+\delta)\rceil)\big),
+```
+
+ending at $n_{\max}$, with the pilot count and its projection $N$ added as points of their own; $\delta$ is `decision_growth` (default 0.1), read as the decimal it is written as, so the ceiling is exact integer arithmetic (0.1 is $1/10$, not the binary double). The values $m_{o,i}$ for $d_{j-1}\le i<d_j$ are merged into the moments as one segment, whatever transport chunks delivered them. Transport chunks are sized for device fill and memory only. A stop (or an independent brem freeze) at a point $d$ inside a chunk $[a,b)$ discards the chunk and transports $[a,d)$ again. The realized result is the fixed-$N$ result at $N=d$, bit for bit.
+
+**Chunk independence.** $m_{o,i}$ is a function of (seed, $i$) and the run's table range alone (prefix stability, below), and the per-electron reductions are bincounts over that electron's rows, so a chunk boundary does not change any $m_{o,i}$. On the host brem path each row's band value is a per-row reduction added in a fixed element order, its layered optical depth is summed layer by layer in a fixed order, the BremsLib emission cosine is formed elementwise (not by a gemv that rounds a one-row call differently), and the electron sum is one bincount in row order, so neither the transport chunk nor the reducer's row slicing changes it (before the v4 verification fixes, BLAS `gemv`/`gemm` choice by row count and slice-dependent addition order moved brem values by up to $5\times10^{-16}$ relative, single-slab and layered). The CUDA brem band reductions (fused kernel and CuPy `bincount`) accumulate atomically and are not covered by this argument. The grid depends only on the policy and, through the pilot projection, on $m_{o,1..n_p}$. Each segment's moments are reduced from the same values in the same order and merged by the same Chan update in the same sequence, so every moment, guard value and decision is bit-identical under any chunking. Re-transporting $[a,d)$ reproduces the same electrons, by counter addressing, and the existing join contract makes the kept chunks the fixed-$d$ transport.
+
+**Overshoot and cost.** Let $d_{J-1}$ be the last refused point. Then $d_J\le\lceil d_{J-1}(1+\delta)\rceil$, so the stop exceeds the last refused count by at most $\delta$ relative (plus one electron). The block rule's absolute overshoot was up to $B-1$, and its pilot projection rounded up to a block. The run makes at most $\log(n_{\max}/n_{\min})/\log(1+\delta)+1/\delta+3$ checks, since steps of $+1$ occur only while $d_j<1/\delta$. As $\delta\to0$ the grid tends to every electron $\ge n_{\min}$.
+
+**Stability window.** The window $[d_{J-k}, n]$ is a fixed share $1-(1+\delta)^{-k}$ of the sample (25 % at $k=3$, $\delta=0.1$), where the block rule's $kB$ was 75 % of a 12k sample and 1 % of a 1M one. For i.i.d. values,
+
+$$
+\bar m_d-\bar m_n=\frac{n-d}{n}\big(\bar m_{[1,d]}-\bar m_{(d,n]}\big),\qquad
+\operatorname{Var}\frac{\bar m_d-\bar m_n}{\mu}=\frac{\sigma^2}{\mu^2}\,\frac{n-d}{nd}=r_n^2\Big(\frac nd-1\Big),
+$$
+
+so a plain tolerance $f\varepsilon$ over a fixed share refuses at random once $r_n\approx\varepsilon$: at $k=3$, $\delta=0.1$ the drift SD at $d_{J-3}$ is $0.57\,r_n$. The #1252 replays showed this: hBN 30 keV 15° stopped at 321k against 258k for the block rule. The tolerance therefore admits $z$ drift standard deviations scaled by $1/\sqrt\delta$. At $j=1$, $n/d_{J-1}-1\approx\delta$, and the term is $\approx z\,r_n$.
+
+**Single dominant electron under v4.** Let one electron of value $h$ arrive in $(d_{J-1},n]$ among light electrons with mean $a$, share $\sigma=h/(S_1+h)$. The mean moves by $(h-a)/(S_1+h)\approx\sigma$ relative between $d_{J-1}$ and $n$, and $r_n\approx\sigma$ when that electron dominates $S_2$ (to leading order $r^2\approx\sigma^2+(1-\sigma)^2\mathrm{CV}_{\rm light}^2/n$). With $z<1$ the allowance at $j=1$ is $\approx z\,r_n<\sigma$, so the check on which the electron arrives is refused when $\sigma>f\varepsilon$. At later checks the guard may pass. A stop there satisfies $r_n\le\varepsilon$ with $r_n\gtrsim\sigma$, so the reported error covers that electron's effect. For CXR the variance gate additionally refuses while the electron dominates $M_2$ ($M_4/M_2^2\approx1>V_{\max}$). The share cap is unchanged. With $\delta\to0$, $z/\sqrt\delta$ grows and the stability guard reduces to the RSE and share tests, which the decision cadence then supplies.
+
+**Limits of the reparametrisation.** No guard sees an unsampled class. On the #1252 1 MeV 15° captures, $k\le2$ with $\delta=0.1$ stops hBN at 3.3k with every guard passing (VOV 0.008 on the sampled prefix); the 25 % window at $k=3$ refuses it because the first heavy electrons arrive before 4k. That refusal is evidence on these captures, not a guarantee. The earliest stop is $d_k\approx n_{\min}(1+\delta)^k$, a statistical floor set by the policy, not by a transport quantity.
+
+**Batch means.** The realized $n$ electrons are split into $K=\min(20,n)$ contiguous batches of $n_b\in\{\lfloor n/K\rfloor,\lceil n/K\rceil\}$ electrons, independent of the chunks. With batch spectra $\bar S_b$, $S=\sum_b(n_b/n)\bar S_b$ holds exactly by linearity, and $\operatorname{Var}\bar S_b=\sigma^2/n_b$ gives the unbiased estimate $\hat\sigma^2=\sum_b n_b(\bar S_b-S)^2/(K-1)$ and $\widehat{\operatorname{Var}}S=\hat\sigma^2/n$. For equal batches this is $s(\{\bar S_b\})^2/K$. Brem batches partition $[0,N_{\rm brem})$ separately.
+
+The stopping generation `adaptive_sampling_model="decision-points-v4"` re-keys adaptive dataset identities, case content keys and provenance. The deprecated `block_histories` (a chunk-floor hint) is excluded from both identities.
 
 ### CXR variance sampling (v2, #1254)
 
@@ -72,9 +105,9 @@ For a regular variable population with finite fourth moment,
 $E_{\mathrm{var}}\simeq n/\kappa$ with kurtosis $\kappa$, so the gate passes
 near $n\simeq\kappa/V_{\max}$ without a floor in transport units.
 
-The stopping generation `adaptive_sampling_model="variance-threshold-v3"`
-participates in adaptive dataset identities, case content keys, and runtime
-provenance. Fixed-count identities retain their generation.
+The v3 stopping generation was `adaptive_sampling_model="variance-threshold-v3"`
+(#1262) and v2 was `"variance-contributors-v2"` (#1254); v4 (above)
+supersedes both. Fixed-count identities retain their generation.
 
 ## Sources
 
@@ -114,9 +147,9 @@ The target $r_n\le\varepsilon$ therefore implies $\mathrm{ESS}_n\ge 1/(\varepsil
 
 **Single dominant electron.** Add one value $h\gg\bar m$ to $n$ light electrons. The share is $h/(S_1+h)$. The running mean jumps by $\Delta\bar m\approx h/n$, so $\Delta\bar m/\bar m\approx h/(S_1+h)$. Also $r_n\approx h/(S_1+h)$ to leading order, because $S_2\approx h^2$ dominates. All three are the same quantity, so with a cap $c<\varepsilon$ and stability tolerance $f\varepsilon$ with $f<1$, a stop on a single dominant electron, or on the block it just arrived in, is refused. The run continues until more of its class are drawn or until $n_{\max}$.
 
-**Pilot projection.** For i.i.d. values $r_n\propto n^{-1/2}$, so the count reaching $\varepsilon$ from a pilot at $n_p$ is $N\approx n_p(r_{n_p}/\varepsilon)^2$. The projection only skips checks. The rule is re-applied at every block end from $N$ on, so the projection cannot stop a run that does not meet the rule.
+**Pilot projection.** For i.i.d. values $r_n\propto n^{-1/2}$, so the count reaching $\varepsilon$ from a pilot at $n_p$ is $N\approx n_p(r_{n_p}/\varepsilon)^2$. The projection only skips checks and adds $N$ to the decision points. The rule is re-applied at $N$ and every later point, so the projection cannot stop a run that does not meet the rule.
 
-**Per-bin batch means.** With the realized run split into $K$ equal batches $b$ of $B$ electrons, each batch spectrum $\bar S_b$ is an i.i.d. mean of $B$ electron spectra. So $s(\{\bar S_b\})/\sqrt K$ estimates the standard error of the run's mean spectrum per bin, which is the Glynn–Whitt batch-means estimator with independent batches. With normalization by the full count $n$, the batches satisfy $\sum_b (B/n)\bar S_b = S$, the run's spectrum, by linearity of the incoherent reduction.
+**Per-bin batch means.** (v4 partition and weighting: see the decision-point section above.) With the realized run split into $K$ equal batches $b$ of $B$ electrons, each batch spectrum $\bar S_b$ is an i.i.d. mean of $B$ electron spectra. So $s(\{\bar S_b\})/\sqrt K$ estimates the standard error of the run's mean spectrum per bin, which is the Glynn–Whitt batch-means estimator with independent batches. With normalization by the full count $n$, the batches satisfy $\sum_b (B/n)\bar S_b = S$, the run's spectrum, by linearity of the incoherent reduction.
 
 ## Assumptions
 
@@ -137,6 +170,18 @@ measurements of the new gate. Current v2 evidence follows separately.
 - **Zero signal.** A band with no lines gives $\bar m=0$, $r$ undefined. The rule never converges and the run ends `statistics_limited` at $n_{\max}$.
 
 ## Anchors
+
+v4 decision points (#1253):
+
+- `test_records_do_not_depend_on_chunk_size` (rule on a heavy-tailed population at chunks 1, 7, 100, 1000, 6000 and one per point: identical records) and the slow `test_adaptive_output_does_not_depend_on_chunk_size` (live hopg transport with energy spread at chunk floors 1, 7 and 64, including a stop cut inside a 64-electron chunk: identical realized count, statistics and output).
+- `test_decision_points_overshoot_at_most_their_growth` pins {eq}`eq-adaptive-decision-points`: end points, spacing $\le\lceil d(1+\delta)\rceil$, and the check-count bound.
+- `test_stability_guard_refuses_the_check_a_heavy_electron_arrives_at`: a single electron moving the mean by about 20 % at a 20 % target is refused at its arrival check and allowed at the next; without the guard the run stops at the arrival check.
+- `test_pilot_projection_skips_checks_until_the_projected_count`: the pilot count and the unrounded projection are decision points.
+- `test_energy_range_replay_rechecks_statistics_before_accepting_stop`: a failed realized-range recheck grows to the next decision point.
+- `tests/montecarlo/transport/test_independent_stopping.py` and `test_adaptive_cascades.py` cover the brem freeze (prefix re-transport) and cascades under chunked monitoring.
+- `checks/adaptive_decision_cadence_1253.py` (`adaptive_decision_cadence_1253_results.json`) replays the 12 #1252 captures: records are identical at five chunkings. Converged stops lie within $-0.6\,\%$ to $+7.3\,\%$ of a dense $\delta=0.01$ grid with the same window share, i.e. within $\delta$. The 30 MeV 15° stops fall from 12k–192k (block rule, $B=3$k–$48$k) to 3 993 (60°: 32 541 against 31k–192k), against 4 000 at $B=1$k. The 30 keV stops are 265k/625k (hBN 15°/60°) and 321k/625k (HOPG) against 258k–336k and 594k–672k for the block rule. The 1 MeV cases still run to the end of the capture or to $n_{\max}$.
+
+Earlier anchors (block rule, still valid where they do not name block ends):
 
 `tests/montecarlo/runner/test_adaptive_stopping.py`:
 
@@ -558,9 +603,9 @@ reason. Anchors: `test_vov_threshold_and_ess_floor_gate_independently`
 ### VOV trend diagnostic (#1262)
 
 `vov_trend_slope(points)` is recorded for every observable. It fits the
-least-squares slope of $\ln\mathrm{VOV}_n$ against $\ln n$ over block ends
-with $n\ge n_{\rm last}/2$ and $\mathrm{VOV}>0$, and is `None` below three
-such ends. For independent histories with a sampled fourth moment,
+least-squares slope of $\ln\mathrm{VOV}_n$ against $\ln n$ over decision points
+(block ends before v4) with $n\ge n_{\rm last}/2$ and $\mathrm{VOV}>0$, and is
+`None` below three such points. The #1254 slope values below were computed per block end. For independent histories with a sampled fourth moment,
 $\mathrm{VOV}_n\simeq(\kappa-1)/n$, so the slope tends to $-1$; this is
 the trend MCNP checks over the last half of a run. A score that dominates
 $M_4$ and arrives late raises VOV and flattens or reverses the slope. The
@@ -649,3 +694,536 @@ The anchors in `test_adaptive_stopping.py` (`vov_threshold`,
 `test_vov_threshold_is_compared_to_m4_over_m2_squared` pin the predicate to
 an independently computed $M_4/M_2^2$, which supports `anchored` for the
 extension. Human sign-off is still pending.
+
+## Independent v4 extension verification (2026-11-17, #1253)
+
+A fresh-context verifier derived the v4 decision-point rule from the claim,
+the #1253 issue and the sources before reading the bodies of
+`decision_points`, `StoppingMonitor`, `transport_monitored_blocks`,
+`IndependentStoppingMonitor`, `AdaptiveChunkPlan` and `_batch_summary`, then
+compared them at commit `73a79ed4a` (rebased onto #1262's v3 gate).
+
+- **Claim**: `adaptive-sample-size-stopping` (v4 extension) —
+  `montecarlo/runner/adaptive.py::{decision_points, StoppingMonitor, batch_spans, _batch_summary}`,
+  `block_transport.py::transport_monitored_blocks`,
+  `independent.py::IndependentStoppingMonitor`,
+  `stream_sizing.py::AdaptiveChunkPlan` — Chow–Robbins (1965) and
+  Glynn–Whitt (1992) sequential stopping and batch means; Chan–Golub–LeVeque
+  merge; {eq}`eq-adaptive-decision-points` and {eq}`eq-adaptive-stop-rule`.
+- **Filters**: units pass (every guard is dimensionless: ratios of means,
+  shares, counts); limits pass ($\delta\to0$, $k=0$, $n_{\min}=n_{\max}$,
+  single dominant electron), with the $f=0$ exception below; signs and
+  conventions pass, with the floating-point ceiling note below.
+- **Re-derivation**: `matches` for the grid, overshoot, check count, drift
+  variance, tolerance, earliest stop, dominant-electron refusal, CXR gate and
+  batch means. `differs` for chunk independence of the brem statistics at
+  the last ulp, described below.
+- **Verdict**: `discrepancy` (implementation/test level, not in the
+  statistical equations). The anchor test
+  `test_adaptive_output_does_not_depend_on_chunk_size` fails at HEAD.
+- **Write-up**: `docs/validation/beam-transport/adaptive-sample-size-stopping.md`
+  (this section).
+- **Suggested ledger change**: given to the task owner; claim status
+  unchanged, never `signed-off`.
+
+### Source-first derivation
+
+**Grid.** For integer $d\ge1$ and $\delta>0$, $d(1+\delta)>d$ gives
+$\lceil d(1+\delta)\rceil\ge d+1$. The $\max(d_j+1,\cdot)$ therefore binds
+only at $\delta=0$, which the validator rejects ($\delta$ must be positive
+and finite). For $d<1/\delta$, $\lceil d\delta\rceil=1$, so the steps are $+1$.
+Let $d_{J-1}$ be the last refused point. Then
+$d_J-d_{J-1}\le\lceil d_{J-1}\delta\rceil<d_{J-1}\delta+1$, so the
+overshoot past the last refused count is below $\delta$ relative plus one
+electron. Points added for the pilot and its projection only shorten gaps.
+The $+1$ phase has at most $1/\delta$ steps. Above it, each step multiplies
+by at least $1+\delta$, so the grid has at most
+$\log(n_{\max}/n_{\min})/\log(1+\delta)+1/\delta+1$ points, plus 2 for the
+pilot and projection. This is $O(\log(n_{\max}/n_{\min})/\delta)$. As
+$\delta\to0$, the $+1$ phase covers every count up to $\min(n_{\max},1/\delta)$.
+The grid then tends to every electron.
+
+**Drift variance.** Let the $m_i$ be i.i.d. with mean $\mu$ and variance
+$\sigma^2$. Write $\bar m_n=[d\,\bar m_d+(n-d)\,\bar m_{(d,n]}]/n$. Then
+$\bar m_d-\bar m_n=\frac{n-d}{n}(\bar m_d-\bar m_{(d,n]})$, with independent
+terms, so
+
+$$
+\operatorname{Var}(\bar m_d-\bar m_n)
+=\Big(\frac{n-d}{n}\Big)^2\Big(\frac{\sigma^2}{d}+\frac{\sigma^2}{n-d}\Big)
+=\sigma^2\frac{n-d}{nd},
+\qquad
+\frac{\operatorname{Var}(\bar m_d-\bar m_n)}{\mu^2}=r_n^2\Big(\frac nd-1\Big),
+$$
+
+where $r_n^2=\sigma^2/(n\mu^2)$. This matches the record. On the geometric
+grid, $n/d_{J-j}-1\approx(1+\delta)^j-1\approx j\delta$. The tolerance
+$z\,r_n\sqrt{(n/d-1)/\delta}$ is therefore a test of $z/\sqrt\delta$ drift
+standard deviations at every lag: $2.85$ at $z=0.9$, $\delta=0.1$. The
+two-sided Gaussian tail is $0.44\,\%$ per comparison, or at most $1.3\,\%$
+over $k=3$ correlated lags. The plain floor $f\varepsilon$ binds only when
+$r_n\ll\varepsilon$. As $\delta\to0$ at fixed lag, $z/\sqrt\delta\to\infty$,
+so the guard becomes vacuous and the RSE and share tests remain. At $k=0$ the
+guard is off and the earliest stop is $n_{\min}$.
+
+**Earliest stop.** The guard needs $k$ points before $n$, so the earliest
+stop is $d_k\approx n_{\min}(1+\delta)^k$. This depends on the policy alone
+and has no block or chunk term.
+
+**Single dominant electron.** Add one electron of share
+$\sigma=h/(S_1+h)$ in $(d_{J-1},n]$, over light electrons whose
+contribution to $r_n^2$ is $L^2\approx(1-\sigma)^2\mathrm{CV}^2_{\rm light}/n$.
+From {eq}`eq-adaptive-ess-identity`, $r_n^2\approx\sigma^2+L^2$. The move
+over the arrival segment is $\sigma-O(1/n)$, and the allowance is
+$\approx z\,r_n\sqrt{(n/d_{J-1}-1)/\delta}\le z(1+\tfrac{1}{2\delta d})r_n$.
+The arrival check is refused when $\sigma>f\varepsilon$ and
+$\sigma>z\sqrt{\sigma^2+L^2}$, that is, when $L/\sigma<\sqrt{1/z^2-1}=0.48$
+at $z=0.9$. In other words, the heavy electron must hold more than about
+81 % of the variance. Otherwise the stop may proceed, but then
+$r_n\ge\sigma\sqrt{1+L^2/\sigma^2}>\sigma$, so the reported error covers the
+jump. Any $z<1$ keeps the refusal. $z=0.9$ leaves an 11 % margin
+($1/z=1.11$), while admitting i.i.d. drift at $2.85\sigma$. The share cap $c$
+refuses $\sigma>c$ regardless. The CXR variance gate refuses while the
+electron dominates $M_2$, since $M_4/M_2^2\to1>V_{\max}$. The record's
+statement holds with the qualifier "while the electron dominates $S_2$",
+which it states.
+
+**Batch means with unequal batches.** Let
+$\bar S_b=n_b^{-1}\sum_{i\in b}S_i$. Then $S=n^{-1}\sum_iS_i=\sum_b(n_b/n)\bar S_b$
+exactly. The weighted ANOVA identity
+$\sum_bn_b(\bar S_b-S)^2=\sum_bn_b(\bar S_b-\mu)^2-n(S-\mu)^2$ has expectation
+$K\sigma^2-\sigma^2$. Hence $\hat\sigma^2=\sum_bn_b(\bar S_b-S)^2/(K-1)$ is
+unbiased, $\widehat{\operatorname{Var}}S=\hat\sigma^2/n$, and equal batches give
+$s(\{\bar S_b\})^2/K$. At $K=1$ there is no estimate. These match the record.
+
+### Implementation comparison
+
+| Item | Code | Result |
+|---|---|---|
+| Grid | `decision_points` (`adaptive.py:175`) | matches, up to the floating ceiling (below) |
+| Pilot and projection | `_with_point`, `decide`, `_project` | match; pilot in $[n_{\min},n_{\max}]$ is validated; projection is unrounded and inserted |
+| Stability window and tolerance | `_stability` (`adaptive.py:309`), `STABILITY_DRIFT = 0.9` | matches; history includes every folded point, so it needs $k+1$ points; $k=0$ returns `(0, f eps)` |
+| CXR gate | `observable_status` | unchanged from v3: `vov + 1/n <= max_variance_of_variance`, CV branch, $V_{\max}\ge1$ disables |
+| `vov_trend_slope` | `_fold` appends `(point, VOV)` per decision point | consistent with v4; the record text still says "block ends" |
+| Prefix re-transport | `transport_monitored_blocks` | a stop or `cut_at` at $d<$ `stop` truncates the monitor and transports `[start, d)` again; kept chunks join as before |
+| Energy-range replay | `transport_case_blocks` | rechecks at `realized` only; on failure it grows to `monitor.next_point()`, a decision point |
+| Independent brem | `IndependentStoppingMonitor.should_stop` | both grids are visited in electron order; a freeze at $d<n$ sets `cut_at` |
+| Batch means | `batch_spans` (bounds $\lfloor bn/K\rfloor$), `_batch_summary`, `batch_means` (scale $n/n_b$) | match the weighted estimator |
+| Chunk plan | `AdaptiveChunkPlan.next_stop` | output-neutral; `size = max(floor, fits)` lets the floor exceed the memory cap (the docstring says "never exceeds") |
+
+### Numeric checks
+
+These are independent probes, outside the repository tests:
+
+- **Grid.** 3,000 random $(n_{\min},n_{\max},\delta)$ with $\delta$ from
+  $10^{-3}$ to 1 (2.39M steps). Every step satisfies
+  $d_{j+1}-d_j\le\delta d_j+1$ (worst excess $1.4\times10^{-18}$), and every
+  grid length is within $\log(n_{\max}/n_{\min})/\log(1+\delta)+1/\delta+1$.
+  At $\delta=10^{-6}$ the grid from 2 to 50 is every integer.
+- **Drift variance.** 20,000 exponential replicates at $n=1000$, $d=750$
+  give $\operatorname{Var}=3.339\times10^{-4}$, against
+  $\sigma^2(n-d)/(nd)=3.333\times10^{-4}$.
+- **Stability false refusals.** Over 200 i.i.d. lognormal($\sigma=1$)
+  populations at $\varepsilon=0.02$ with the other guards off, 44 of 3,561
+  RSE-passing checks are refused by stability (1.2 %). This matches the
+  $\le1.3\,\%$ estimate.
+- **Dominant electron.** The monitor status at the arrival point gives
+  move/limit $=1.107$–$1.111$ (refused) with no light variance. It stays
+  above 1 at $L/\sigma\le0.24$ and falls to $0.89$ at $L/\sigma=0.59$, with
+  $r_n=0.058>\sigma=0.05$. This matches the threshold
+  $L/\sigma\approx0.48$.
+- **Batch means.** At $n\in\{23,47,101,1003\}$ (batch sizes $\{1,2\}$ to
+  $\{50,51\}$, 4,000 replicates), the weighted mean reproduces the full mean
+  to $10^{-13}$, and $n\,\mathbb E[\mathrm{se}^2]/\sigma^2=0.98$–$1.01$.
+- **#1252 replay.** `checks/adaptive_decision_cadence_1253.py`, re-run on
+  the 12 local captures with SHA-256 values equal to the report's, reproduces
+  `adaptive_decision_cadence_1253_results.json` exactly except
+  `sampling_model` (`decision-points-v3` then, `decision-points-v4` now).
+  The default $V_{\max}=0.01$ is the old $1/E_{\min}$ at $E_{\min}=100$, so
+  the default decisions are unchanged by the rebase, as claimed. The 30 MeV
+  stops at 3,996 are $d_3$ of the grid from 3,000, the earliest stop. This
+  replay feeds saved per-electron values, so it does not exercise the brem
+  reducer.
+
+### Findings
+
+1. **Anchor test red at HEAD (merge).** At
+   `tests/montecarlo/runner/test_adaptive_stopping.py:667`, the slow
+   `test_adaptive_output_does_not_depend_on_chunk_size` disables only
+   `min_effective_histories`. Under v2 that also disabled the VOV gate; under
+   v3/v4 the default $V_{\max}=0.01$ stays active. The case runs to
+   `max_electrons` at 200, and line 673 fails (`'max_electrons' ==
+   'converged'`). Run with `max_variance_of_variance=1.0` (as
+   `test_adaptive_run_is_the_fixed_n_run_at_its_realized_count` does), the
+   same case converges at 54 electrons. It replays the realized range, cuts
+   inside the 64-electron chunk, and matches across floors 1, 7 and 64 and
+   the fixed-54 run bit for bit. The acceptance claim holds in that
+   configuration, but its anchor is red.
+2. **Brem statistics are not bit-identical across chunkings.** At the
+   failing test's settings (default $V_{\max}$, realized 200), floors 1 and
+   64 give identical output arrays and CXR values. Yet 32 of 200 per-electron
+   brem band integrals differ by up to $4.6\times10^{-16}$ relative. The brem
+   `max_electron_share`, `variance_of_variance` and `vov_trend_slope` differ
+   in the last digits. The probable cause is in the per-electron path of
+   `mc_brem_spectrum` (`spectrum/brem.py:1043`, row loop at `:1158`):
+   `density @ band_q` and the `bincount` accumulate over row chunks whose
+   boundaries depend on the transport chunk's row count. The record's
+   "every moment, guard value and decision is bit-identical under any
+   chunking" therefore holds for CXR but only up to rounding for brem. A
+   brem guard within an ulp of its threshold could flip a decision. This is
+   measure-zero in practice, but it is not the stated guarantee. The CUDA
+   fused per-electron reduction was not examined.
+3. **$f=0$ crashes.** The validator accepts `stability_fraction = 0`
+   ("finite and non-negative"). With $k\ge1$, `_stability` starts from
+   `worst = (0.0, floor) = (0.0, 0.0)`, so `worst[0] / worst[1]` raises
+   `ZeroDivisionError` at the first evaluated check (`adaptive.py:338`). This
+   was reproduced with `run_stopping_rule`. In v3, $f=0$ meant a zero-move
+   requirement.
+4. **Floating ceiling.** `math.ceil(point * (1.0 + growth))` rounds up when
+   $d\delta$ is an integer and $1+\delta$ is inexact. The grid from 200 at
+   $\delta=0.1$ is 200, 221, 244, 269, not 200, 220, 242, 267 (10,605
+   mismatches in 2.39M steps). The bounds above still hold
+   ($\le\delta d+1$). It is deterministic and policy-only, so decisions stay
+   chunk-independent. However, {eq}`eq-adaptive-decision-points` and the
+   test's float-computed bound do not describe it exactly.
+5. **Stale text.** The ledger Claim says "sequential block-wise stopping",
+   "first block end" and "last `k` block ends" with tolerance `f*target`.
+   The VOV trend section above and `statistical-methods.md` (lines 138 and
+   194: "equal electron blocks", "after each block", "over block ends") are
+   also stale. The #1254 slope values were computed per block end, not per
+   decision point.
+
+### Verdict
+
+The v4 statistical design rederives: the grid, overshoot $\le\delta$ (plus
+one), $O(\log n/\delta)$ checks, the drift variance $r_n^2(n/d-1)$, the
+$z=0.9$ tolerance, the earliest stop $n_{\min}(1+\delta)^k$, the preserved
+dominant-electron refusal (when it dominates $S_2$), the unchanged CXR gate,
+and unbiased unequal-batch means. The verdict is still `discrepancy`,
+because the #1253 chunk-independence anchor fails at HEAD and the brem
+statistics are chunk-independent only to rounding. Fix finding 1, then
+either make the brem per-electron reduction chunk-invariant or state "CXR
+bit-identical, brem to rounding". After that, the extension can return to
+`rederived`. Human sign-off is pending.
+
+## Independent v4 fix verification (2026-11-17, #1253)
+
+A fresh-context verifier checked the five v4 findings against the fixes in
+`76eba7d25` and `35cbd04e1`. The source tree is unchanged at `96ada34fa`,
+which adds only GPU evidence. The expected behaviour was stated before the
+diffs were read.
+
+- **Claim**: `adaptive-sample-size-stopping` (v4 fixes) —
+  `adaptive.py::{decision_points, _excess, StoppingMonitor._stability}`,
+  `spectrum/brem.py::mc_brem_spectrum` (`electron_band_weights`).
+- **Filters**: units, limits and signs pass; nothing new is dimensional.
+- **Re-derivation**: `matches` for items 1, 3 and 4. `differs` for item 2 at
+  one remaining site, the layered transmission product.
+- **Verdict**: `discrepancy`. The scope is narrow: the residual is
+  $\le2.2\times10^{-16}$ relative and occurs only for absorbers of two or more
+  layers. The statistical design stays rederived.
+- **Write-up**: this section.
+- **Suggested ledger change**: given to the task owner. Status is unchanged
+  and never `signed-off`.
+
+**1. Chunk-independence anchor.** The expected behaviour: at every floor
+the realized count, statistics and output must match. At floor 64 the stop
+must fall inside the first chunk, and $[0,d)$ must be transported again.
+The slow test is green (92 passed with
+`test_brem_primary_band.py`). An instrumented copy logged each
+`simulate_block` call. At floor 64 the calls were `(0, 64)`, then the prefix
+`(0, 54)`, then the realized-range replay `(0, 54)`. Floors 1 and 7 reach 54
+through the points 40, 44, 49 and 54. All three floors stop at 54
+(`converged`), and floor 64 equals the fixed 54-electron run bit for bit.
+The test checks only `realized % 64`. It does not assert that the prefix was
+re-transported or compare with the fixed run; the fixed-run comparison is in
+`test_adaptive_run_is_the_fixed_n_run_at_its_realized_count`.
+
+**2. Host brem band integrals.** Write electron $e$'s value as
+$B_e=\sum_{r\in e}w_r\sum_k\rho_{rk}q_k$. It is chunk-invariant only if
+three conditions hold:
+
+- every per-row factor ($T_{\rm abs}$, $\mathrm d\sigma$, the row sum) is
+  computed from that row alone;
+- the element contributions are added in a fixed order;
+- the rows of $e$ are summed sequentially in row order.
+
+The new `_accumulate`/`_electron_band` (`brem.py:1043-1052`) meets the last
+two conditions: a per-row `sum(axis=1)` and one `bincount` in row order. An
+independent probe ran 2,816 comparisons. It used the eedl, Bethe–Heitler,
+BremsLib and partial-BremsLib models, single-slab and `_LAYERS` absorbers,
+sorted and interleaved electron ids, 97 and 500 nodes, one and two
+elements, and `photon_block` set to `None` or 40. Each case was compared at
+row chunks 1–299 and on electron-prefix subsets $c\in\{1,4,11,24\}$. The
+results:
+
+- Every single-slab case is bit-identical.
+- The pre-fix `brem.py` from `76eba7d25` fails 505 of 704 single-slab
+  comparisons, so the probe detects the original defect.
+- 42 layered comparisons still differ, by up to $2.2\times10^{-16}$
+  relative, and all of them at row chunk 1.
+
+The cause is `brem.py:1170`, `path_start[sl] @ mu_by_layer`. With two or more
+layers, a one-row slice takes NumPy's vector–matrix BLAS path, while a
+multi-row slice takes `gemm`. In a direct NumPy check, (1, 2) @ (2, 500)
+differs from the same row of an (M, 2) product in 17 % of cells; M from 2 to
+64 agrees. A singleton slice occurs whenever a call's row count is
+$\equiv1\pmod{\texttt{chunk}}$. Production scoring calls `mc_brem_spectrum`
+per emitting layer with every absorbing layer included (`emission.py:131`).
+The row count therefore depends on the transport chunk, and film-on-substrate
+cases are exposed. The new test passes with chunk 1 only because of its data.
+The fix should compute $\tau=\sum_\ell p_\ell\mu_\ell$ in a fixed elementwise
+order. The alternative is to scope the claim to single-slab absorbers.
+
+The non-per-electron spectrum path (`spec += row_weight @ density`,
+`:1046`) is unchanged by the diff, and $\sum_eB_e$ equals
+$N_e\,S\cdot q$ to $10^{-12}$ in every probe case. The fused CUDA band
+reduction offers no chunk-invariance argument: it splits rows at 65,536 and
+accumulates with `jit.atomic_add` (`brem_band_jit.py:132`). A CuPy
+weighted `bincount` on the unfused device path is presumably also atomic.
+Neither was run.
+
+**3. `stability_fraction = 0`.** The expected behaviour: the limit is
+$\max(0,zr_n\sqrt{(n/d-1)/\delta})$, which is zero only at $r_n=0$, so any
+move must then be refused. In exact arithmetic a zero-variance sample has
+zero moves, so a constant population must still stop. `_excess`
+(`adaptive.py:176`) maps a zero move to 0 and a positive move over a zero
+limit to $\infty$. The pass test stays `move <= limit` (`:380`). The probe
+results:
+
+- Constants 1, 0.1, 1/3, $\pi$ and $7.77\times10^{-5}$ converge at
+  $d_3=134$ from 100.
+- 600 lognormal runs with $f\in\{0,0.5\}$ and $k=0..4$ raise no exceptions.
+- `_excess(1e-300, 0)` returns `inf`.
+
+The anchor's second half (`test_adaptive_stopping.py:577`) asserts only that
+a limit is reported, not that a refusal occurs. A positive move with a zero
+limit cannot be built from real data, so `_excess` is pinned only
+indirectly.
+
+**4. Exact ceiling.** Since $d\delta>0$,
+$d+\max(1,\lceil d\,p/q\rceil)=\lceil d(1+p/q)\rceil$ for $d\ge1$, and
+`-(-a // b)` is $\lceil a/b\rceil$ for $b>0$. Here
+`Fraction(repr(float(g)))` is the shortest round-trip decimal. Reading
+$\delta$ as the binary double would not fix the finding: $0.1_{\rm bin}>1/10$
+still gives 221. The probe compared 3,312 grids (8.97M steps) against an
+independent `Decimal`-based reference. The grids used $\delta$ from
+$10^{-4}$ to 10 plus 0.1, 0.3, 0.7, $1/3$, $10^{-6}$, $10^3$, $10^{300}$ and
+$5\times10^{-324}$. The results:
+
+- No mismatches.
+- No step exceeds $\delta_{\rm bin}d+1$.
+- The check-count bound is never exceeded.
+- Example grids: 200, 220, 242, 267, 294 and 3000, 3300, 3630, 3993.
+  At $10^{-6}$ the steps are $+1$; at $10^{300}$ the grid is
+  $[n_{\min},n_{\max}]$; a `np.float64` input works.
+
+The test's floating bound `ceil(d*(1+growth))` fails only for
+$\delta<2^{-53}$, where $1+\delta=1$. This is a limit of that check, not of
+the code.
+
+**5. Text and replay.** Rerunning `checks/adaptive_decision_cadence_1253.py`
+on `scratch/1253-captures/out-{nv-30,cpu-1000,cpu-30000}` reproduces
+`adaptive_decision_cadence_1253_results.json` byte for byte. It reports no
+failures, chunk independence for all 12 cases, overshoot from $-0.62\,\%$
+to $+7.33\,\%$, and 30 MeV 15° stops at 3,993 $=d_3$ from 3,000. The ledger
+Claim, Code and Notes and the v4 Claim text match the code, with three
+exceptions:
+
+- "every moment … bit-identical under any chunking" and the host-brem
+  sentence overstate item 2 for layered absorbers.
+- "The 30 MeV stops fall … to 3 993" and the Notes' "30 MeV 3 993" omit the
+  60° stops, which are at 32,541 against 31k–192k for the block rule.
+- The Claim's "exact rational ceiling" omits that $\delta$ is read as its
+  decimal; the derivation page states it.
+
+## Independent v4 final verification (2026-11-17, #1253)
+
+A fresh-context verifier checked `246197896`, which replaces
+`path_start[sl] @ mu_by_layer` with `_layer_depth`. The order argument was
+written before the probes were run.
+
+- **Claim**: `adaptive-sample-size-stopping` (v4) —
+  `spectrum/brem.py::mc_brem_spectrum` (`electron_band_weights`, host path),
+  `runner/adaptive.py::{decision_points, StoppingMonitor}`.
+- **Filters**: units, limits and signs pass. $\tau$ stays
+  Å times Å$^{-1}$, dimensionless, with shape $(M,K)$, and one layer reduces to
+  the outer product.
+- **Re-derivation**: `matches` for the layer sum, the spectrum path, the grid,
+  $f=0$ and the chunk anchor. `differs` at one remaining site: the BremsLib
+  direction cosine of a one-row call.
+- **Verdict**: `discrepancy`. The scope is narrow: the residual is
+  $\le3.6\times10^{-16}$ relative, appears only for BremsLib, and only when a
+  `mc_brem_spectrum` call holds exactly one emitting row.
+- **Write-up**: this section.
+- **Suggested ledger change**: given to the task owner. Status is unchanged
+  and never `signed-off`.
+
+**Order argument.** Electron $e$'s value is
+$B_e=\frac1{4\pi}\sum_{r\in e}\sum_{\rm el}w_{r,\rm el}\sum_k
+\mathrm d\sigma_{rk}T_{rk}q_k$. It is invariant under slicing if three
+conditions hold:
+
+- every factor of row $r$ is an elementwise function of that row's own
+  inputs;
+- the $k$ sum (`sum(axis=1)`) and the element sum run in a fixed order;
+- the rows of $e$ are added in row order (one `bincount`).
+
+The escape pieces (`segment_escape.py`) are elementwise per row, with
+per-row `sort`, and `nonzero` keeps the row order. `mean_transmission` is
+elementwise. `_layer_depth` (`brem.py:818`) forms
+$\tau_{rk}=(\cdots(p_{r1}\mu_{1k}+p_{r2}\mu_{2k})+\cdots)$ layer by layer for
+each cell, independently of $M$. Photon blocks add per-block totals in block
+order. One input is not elementwise: `seg_cos_theta = v_hat @ n_hat`
+(`brem.py:1016`, BremsLib only) is a BLAS `gemv` over the call's $M$ rows.
+In a direct NumPy check, an $M=1$ product differs from the same row of a
+larger product in 24–36 % of rows. For $M$ from 2 to 69, at offsets 0 to 39, the results agree.
+
+**1. Probe.** The probe (4,032 comparisons) covered:
+
+- the eedl, Bethe–Heitler, BremsLib and partial-BremsLib models;
+- no layers, 2 layers and 3 layers;
+- sorted and interleaved ids;
+- 97 and 400 nodes;
+- `photon_block` `None` and 37;
+- two observation angles;
+- row chunks 1–239;
+- electron-prefix head and tail splits at 1, 2, 5 and 13;
+- single-electron calls, with three electrons that own exactly one row.
+
+The results:
+
+- Every row-chunk comparison and every prefix split is bit-identical.
+- 10 comparisons differ, by up to $3.6\times10^{-16}$ relative. All are
+  full BremsLib, single-slab or layered, and all are one-row single-electron
+  calls.
+- The residual disappears (0 of 4,032) when only that line is replaced, in
+  memory and in scratch, by
+  $\sum_{i}v_{ri}n_i$ summed in fixed order.
+
+In production, `measure` scores each transport chunk, and layered cases
+score each emitting layer separately (`emission.py:131`). A one-row call
+therefore occurs when a chunk, or one layer of it, holds a single emitting
+row. A one-electron chunk crossing a thin film is an example. The claim's
+"neither the transport chunk nor the reducer's row slicing changes it"
+holds for row slicing, and for chunking except in this case.
+
+**2. Layer sum and spectrum.** `_layer_depth` equals an independent loop
+over layers bit for bit. It differs from `p @ mu` by at most
+$5.3\times10^{-16}$ relative for $K\in\{2,3,5\}$, and for $K=1$ it equals
+`np.outer` and the old product exactly. The non-per-electron path
+(`spec += row_weight @ density`) is unchanged. Probe results for fixed-$N$
+spectra, `_layer_depth` against the old matmul:
+
+- Single slab is bit-identical in every model and chunk.
+- Layered spectra move by at most $4.6\times10^{-16}$ relative (3-layer
+  eedl, chunk 7). The 2-layer maximum is $4.2\times10^{-16}$.
+
+The commit's $\le3.5\times10^{-16}$ is therefore a case maximum, not a
+bound. The change is rounding-level either way. Not bumping
+`BREMSSTRAHLUNG_MODEL` is the project's decision and is not judged here.
+
+**3. Earlier items.** All pass with `--slow`:
+
+- `test_adaptive_output_does_not_depend_on_chunk_size`;
+- `test_zero_stability_fraction_admits_only_a_still_mean`;
+- both `decision_points` tests;
+- `test_records_do_not_depend_on_chunk_size`;
+- the four `test_band_primary_values_do_not_depend_on_row_slicing` cases.
+
+An independent `Fraction` reference reproduces 3,000 random grids with no
+mismatch, for example 200, 220, 242, 267, 294 and 3000, 3300, 3630, 3993.
+
+**4. Text.** The ledger Code and Claim match the code. Both the ledger and
+the CUDA caveat on this page (atomic accumulation, no chunk-independence
+argument) are accurate. Two statements are too strong by the one-row
+BremsLib case: the host-brem sentence above, and the Notes' "now a
+fixed-order layer sum … bit-identical". Either compute `seg_cos_theta`
+elementwise, or state the exception.
+
+
+## Independent one-row closure verification (2026-11-17, #1253)
+
+This fresh context did not implement the change. Its remaining scope is the
+one-row BremsLib cosine fix `6ddf3c5e9`, checked at `3cacb89dd`; the earlier
+v4 derivations above are not repeated.
+
+**Independent expression, before implementation inspection.** The source for
+this closure is the geometric definition of the angle between unit vectors,
+used by the BremsLib angular differential cross section. For a row direction
+$\hat{\mathbf v}_r$ and the observation direction $\hat{\mathbf n}$,
+
+$$
+c_r=\cos\theta_r=\hat{\mathbf v}_r\cdot\hat{\mathbf n}
+=(v_{rx}n_x+v_{ry}n_y)+v_{rz}n_z.
+$$
+
+The signature consumes row directions and a common observation direction;
+the output has one dimensionless cosine per row. Unit vectors give
+$-1\le c_r\le1$, parallel directions give $1$, antiparallel directions give
+$-1$, and perpendicular directions give $0$. No row count or neighboring
+row enters this expression. To preserve it bit for bit under a one-row call,
+all calls must perform the same three multiplications and the same two
+ordered additions; a row-count-dependent matrix/vector implementation is
+not sufficient. The band integral then retains its existing photons per sr
+per primary normalization. This is a floating-point ordering claim, not a
+new cross-section approximation or an external BremsLib accuracy validation.
+
+
+**Comparison and numeric anchors.** The implementation forms the three
+component products elementwise and adds them left to right, exactly the
+expression above. A new independent probe with 4,096 normalized random row
+directions (seed 1253) gave identical full-call and one-row cosines in every
+case; comparison with exact rational products and sums of the binary64
+inputs gave maximum absolute error $1.773\times10^{-16}$. Parallel and
+antiparallel limits passed within three binary64 epsilons. The exact equality
+criterion for slicing follows from the operation order; this epsilon bound
+is only a check on ordinary dot-product rounding, not a fitted tolerance.
+
+The previous final verifier's 4,032-comparison host band probe was rerun
+unmodified, without its optional cosine patch, against `3cacb89dd`: **0
+mismatches**, maximum relative difference **0**. It covers all four source
+routes (including partial BremsLib fallback), single-slab/two-/three-layer
+geometry, sorted/interleaved primary ids, both photon grids and observation
+angles, photon blocking, row slices, prefix head/tail splits, and one-row
+single-electron calls. Thus this independent run closes the specific
+one-row discrepancy in the preceding verification. The committed
+`test_band_primary_value_of_a_one_row_call` and all four
+`test_band_primary_values_do_not_depend_on_row_slicing` cases pass.
+The synthetic table is an ordering test input, not transcribed reference
+cross-section data; no new external-code or hardware parity claim is made.
+
+**Preserved v3 policy and v4 identity.** The CXR predicate still compares
+$\mathrm{VOV}+1/n=M_4/M_2^2$ with the separate
+`max_variance_of_variance` field, while the contribution ESS uses
+`min_effective_histories`. The slope remains a recorded diagnostic outside
+`passes`. Focused threshold/ESS, trend, grid, zero-stability, one-row,
+documentation and ledger checks pass (45 tests). The marker remains
+`decision-points-v4`; dataset and case identity assembly both call the
+adaptive marker helper, which omits the marker for fixed counts. Identity,
+provenance and fixed-count regression selection passes (34 tests; one
+unrelated slow test skipped). The marker-fork and legacy policy migration
+checks pass (3 tests); named-profile stem pins (2) and shipped-profile digest
+migration pins (8) pass. The chunk hint remains outside the identity policy,
+and `stability_blocks` still migrates to `stability_checks`. No old adaptive
+result is silently relabeled as a v4 result. Existing v2/v3 statements in
+this record describe their historical generations.
+
+- **Claim**: `adaptive-sample-size-stopping` (remaining v4 closure) —
+  `montecarlo/spectrum/brem.py::mc_brem_spectrum`, host band values —
+  unit-vector cosine and fixed-order per-primary band reduction.
+- **Filters**: units `pass`; limits `pass`; signs/conventions `pass`;
+  notation/normalization `pass`; reference-data transcription `not applicable`
+  (synthetic inputs); tolerances `pass` (bit equality for the claim);
+  evidence `pass` for existing commits and host regression anchors.
+- **Re-derivation**: `matches` — the cosine has the same ordered scalar
+  operations for one-row and larger calls; the previous 4,032 comparisons
+  are now all bit-identical in a fresh context.
+- **Verdict**: `rederived`; the owning task may retain `anchored` using the
+  named committed regression tests. Never `signed-off`.
+- **Write-up**: this section.
+- **Suggested ledger change**: replace the pending fresh-context confirmation
+  of the one-row fix with this result, and include the host band tests in
+  `Anchor`; retain the CUDA atomic-reduction caveat. Measured GPU chunk
+  memory from the older 10 KiB/row policy does not validate HEAD's 4 KiB/row
+  sizing; that performance question is outside this closure.

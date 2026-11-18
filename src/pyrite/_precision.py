@@ -26,51 +26,62 @@ STORED_KEYS = {
 _FIELD_NAMES = {stored: name for name, stored in STORED_KEYS.items()}
 
 #: Required keys of a serialized policy (stored vocabulary).
-REQUIRED_FIELDS = ("target_rse", "min_electrons", "max_electrons", "block_electrons")
+REQUIRED_FIELDS = ("target_rse", "max_electrons")
+
+#: Serialized keys renamed by #1253, read from stored payloads under their new name.
+LEGACY_STORED_KEYS = {"stability_blocks": "stability_checks"}
+
+#: Keyword arguments renamed by #1253: accepted with a deprecation warning.
+DEPRECATED_ARGUMENTS = {"stability_blocks": "stability_checks"}
+
+#: Default ``min_histories`` when omitted (capped at ``max_histories``).
+DEFAULT_MIN_HISTORIES = 100
 
 #: Default for the counts that follow the now-optional ``min_histories``; keeps
 #: the positional field order while still refusing an omitted count.
 _REQUIRED: Any = object()
-#: Omitted ``min_histories``: resolves to one block in ``__post_init__``.
-_ONE_BLOCK: Any = None
+#: Omitted ``min_histories``: resolves in ``__post_init__``.
+_DEFAULT_MIN: Any = None
 
 
 def reject_renamed_arguments[T: type](cls: T) -> T:
-    """Make ``cls(<old>_electrons=...)`` name its ``*_histories`` field (#1007)."""
+    """Make ``cls(<old>_electrons=...)`` name its ``*_histories`` field (#1007).
+
+    Arguments renamed later (:data:`DEPRECATED_ARGUMENTS`, #1253) still work,
+    with a deprecation warning naming the replacement.
+    """
     init = cls.__init__
 
     @wraps(init)
     def __init__(self, *args, **kwargs):
-        for name in kwargs:
+        for name in list(kwargs):
             if name in _FIELD_NAMES:
                 raise TypeError(
                     f"{type(self).__name__}({name}=...) was removed; use {_FIELD_NAMES[name]}="
                 )
+            if name in DEPRECATED_ARGUMENTS:
+                from ._util.deprecations import warn_api
+
+                warn_api(f"AdaptiveSampling({name}=...)")
+                kwargs[DEPRECATED_ARGUMENTS[name]] = kwargs.pop(name)
         init(self, *args, **kwargs)
 
     cls.__init__ = __init__  # ty: ignore[invalid-assignment]
     return cls
 
 
-def _check_block_multiples(block: int, **counts: int | None) -> None:
-    """Raise naming every count that is not a multiple of BLOCK, with its neighbours.
+def _default_minimum(maximum: object) -> int:
+    """``DEFAULT_MIN_HISTORIES``, lowered to a valid ``max_histories``."""
+    if type(maximum) is int and maximum >= 2:
+        return min(DEFAULT_MIN_HISTORIES, maximum)
+    return DEFAULT_MIN_HISTORIES
 
-    Every offending count is named with its value: a caller editing one field
-    (``profile numerics adaptive-sampling set``) sees the stored values of the
-    others here, not only the ones it supplied.
-    """
-    misaligned = []
-    for name, count in counts.items():
-        if count is None or not count % block:
-            continue
-        below = count // block * block
-        nearest = f"{below + block}" if below == 0 else f"{below} or {below + block}"
-        misaligned.append(f"{name}={count} (nearest: {nearest})")
-    if misaligned:
-        raise ValueError(
-            f"{'; '.join(misaligned)} with block_histories={block}: min_histories, "
-            "max_histories and pilot_histories must be multiples of block_histories"
-        )
+
+def _require_positive_finite(name: str, value: object) -> None:
+    if isinstance(value, bool) or not (
+        isinstance(value, (int, float)) and math.isfinite(value) and value > 0.0
+    ):
+        raise ValueError(f"{name} must be a positive finite number")
 
 
 @reject_renamed_arguments
@@ -78,20 +89,23 @@ def _check_block_multiples(block: int, **counts: int | None) -> None:
 class Precision:
     """Stopping-rule settings for one adaptive case.
 
-    ``min_histories``, ``max_histories`` and ``pilot_histories`` are multiples
-    of ``block_histories``, so every realized count is a whole number of equal
-    blocks (the batch-means estimator needs equal batches).
+    The rule is checked at decision points ``d_0 = min_histories``,
+    ``d_{j+1} = ceil(d_j (1 + decision_growth))``, ending at ``max_histories``.
+    They depend on the policy alone, so the realized count and output do not
+    depend on how electrons are grouped for transport (#1253).
 
     Parameters
     ----------
     target_rse
         Target relative standard error of each observable's mean.
     min_histories, max_histories
-        Smallest count at which the rule may stop (default: one block,
-        ``block_histories``), and the count at which it stops regardless,
+        Smallest count at which the rule may stop (default: 100, at most
+        ``max_histories``), and the count at which it stops regardless,
         flagged ``statistics_limited``.
     block_histories
-        Electrons per transport block; the rule is checked at block ends.
+        Deprecated (#1253): an optional transport-chunk size hint. It never
+        changes decisions, realized counts, output or identity; ``None``
+        sizes chunks from device fill and memory.
     observables
         Non-empty subset of ``('cxr', 'brem')`` that must all converge; a single
         name such as ``"cxr"`` is accepted.
@@ -107,15 +121,17 @@ class Precision:
         ``target_rse``. The default 0.01 estimates the variance to about 10 %
         (the RSE to about 5 %); 0.1 is the looser MCNP/Geant4 convention.
         ``M4/M2**2 <= 1`` always, so 1 disables the guard.
-    stability_blocks, stability_fraction
-        Guard: the running mean at each of the last ``k`` block ends must lie
-        within ``stability_fraction * target_rse`` (relative) of the current
-        mean, so a run does not stop on the block a rare heavy electron just
+    stability_checks, stability_fraction
+        Guard: the running mean at each of the last ``k`` decision points
+        ``d_j`` must lie within ``max(stability_fraction * target_rse,
+        0.9 r_n sqrt((n / d_j - 1) / decision_growth))`` (relative) of the
+        current mean: a fixed share of the sample, tolerant of i.i.d. drift,
+        so a run does not stop on the segment a rare heavy electron just
         moved; ``k = 0`` disables.
     pilot_histories
         Optional pilot count. At the pilot the run projects
-        ``N = N_pilot * max(rse / target)**2`` (rounded up to a block) and
-        skips the checks until it gets there.
+        ``N = N_pilot * max(rse / target)**2``, adds ``N`` to the decision
+        points and skips the checks until it gets there.
     band_eV
         Monitor band ``(start, stop)`` in eV; ``None`` takes the case's line
         band (its policy bandwidth, else its line-grid end points).
@@ -128,20 +144,24 @@ class Precision:
         observables. ``target_rse`` then governs CXR; line transport continues
         until brem finishes, so ``Ne_brem <= Ne``. Omit for the shared rule.
     brem_min_histories, brem_max_histories
-        Optional brem bounds, defaulting to the shared bounds; block multiples.
-        The brem maximum cannot exceed ``max_histories``. Guards and block size
+        Optional brem bounds, defaulting to the shared bounds. The brem
+        maximum cannot exceed ``max_histories``. Guards and decision growth
         are shared; the brem pilot is clipped to its own bounds.
+    decision_growth
+        Relative spacing ``delta`` of the decision points: the stop overshoots
+        the last refused point by at most ``delta`` relative, with
+        ``O(log(max / min) / delta)`` checks.
     """
 
     target_rse: float
-    min_histories: int = _ONE_BLOCK
+    min_histories: int = _DEFAULT_MIN
     max_histories: int = _REQUIRED
-    block_histories: int = _REQUIRED
+    block_histories: int | None = None
     observables: tuple[str, ...] = ("cxr",)
     max_history_share: float = 0.05
     min_effective_histories: float = 100.0
     max_variance_of_variance: float = 0.01
-    stability_blocks: int = 3
+    stability_checks: int = 3
     stability_fraction: float = 0.5
     pilot_histories: int | None = None
     band_eV: tuple[float, float] | None = None
@@ -149,13 +169,13 @@ class Precision:
     brem_target_rse: float | None = None
     brem_min_histories: int | None = None
     brem_max_histories: int | None = None
+    decision_growth: float = 0.1
 
     def __post_init__(self) -> None:
-        for name in ("max_histories", "block_histories"):
-            if getattr(self, name) is _REQUIRED:
-                raise TypeError(f"{type(self).__name__} requires {name}")
+        if self.max_histories is _REQUIRED:
+            raise TypeError(f"{type(self).__name__} requires max_histories")
         if self.min_histories is None:
-            object.__setattr__(self, "min_histories", self.block_histories)
+            object.__setattr__(self, "min_histories", _default_minimum(self.max_histories))
         # Freeze caller-owned sequences as well as the dataclass itself. A bare
         # name is one observable, not its characters.
         raw = self.observables
@@ -165,25 +185,16 @@ class Precision:
             band = getattr(self, name)
             if band is not None:
                 object.__setattr__(self, name, tuple(band))
-        if isinstance(self.target_rse, bool) or not (
-            math.isfinite(self.target_rse) and self.target_rse > 0.0
-        ):
-            raise ValueError("target_rse must be a positive finite number")
+        for name in ("target_rse", "decision_growth"):
+            _require_positive_finite(name, getattr(self, name))
         for name in ("block_histories", "min_histories", "max_histories", "pilot_histories"):
             value = getattr(self, name)
-            if name == "pilot_histories" and value is None:
+            if name in ("block_histories", "pilot_histories") and value is None:
                 continue
             if type(value) is not int or value < 1:
                 raise ValueError(f"{name} must be a positive integer")
-        block = self.block_histories
         if not 2 <= self.min_histories <= self.max_histories:
             raise ValueError("need 2 <= min_histories <= max_histories")
-        _check_block_multiples(
-            block,
-            min_histories=self.min_histories,
-            max_histories=self.max_histories,
-            pilot_histories=self.pilot_histories,
-        )
         if (
             not self.observables
             or not set(self.observables) <= set(OBSERVABLES)
@@ -195,8 +206,8 @@ class Precision:
             value = getattr(self, name)
             if isinstance(value, bool) or not math.isfinite(value) or value < 0.0:
                 raise ValueError(f"{name} must be finite and non-negative")
-        if type(self.stability_blocks) is not int or self.stability_blocks < 0:
-            raise ValueError("stability_blocks must be a non-negative integer")
+        if type(self.stability_checks) is not int or self.stability_checks < 0:
+            raise ValueError("stability_checks must be a non-negative integer")
         if self.pilot_histories is not None and not (
             self.min_histories <= self.pilot_histories <= self.max_histories
         ):
@@ -229,7 +240,7 @@ class Precision:
             raise ValueError("brem_max_histories must not exceed max_histories (brem is a prefix)")
 
     def brem_policy(self) -> Precision:
-        """Scalar brem rule for independent stopping; shares block size and guards."""
+        """Scalar brem rule for independent stopping; shares decision growth and guards."""
         minimum = self.min_histories if self.brem_min_histories is None else self.brem_min_histories
         maximum = self.max_histories if self.brem_max_histories is None else self.brem_max_histories
         pilot = self.pilot_histories
@@ -253,8 +264,13 @@ class Precision:
         # Persisted requested-policy and identity payloads retain their historical
         # vocabulary. Public in-memory observables are canonical CXR names.
         values = {STORED_KEYS.get(name, name): value for name, value in asdict(self).items()}
-        # Absent independent settings must not change existing policy identities.
-        for key in ("brem_target_rse", "brem_min_electrons", "brem_max_electrons"):
+        # Absent optional settings must not change existing policy identities.
+        for key in (
+            "brem_target_rse",
+            "brem_min_electrons",
+            "brem_max_electrons",
+            "block_electrons",
+        ):
             if values[key] is None:
                 del values[key]
         values["observables"] = tuple(
@@ -268,6 +284,9 @@ class Precision:
         if not isinstance(payload, Mapping):
             raise TypeError("adaptive_precision must be a mapping")
         values = dict(payload)
+        for legacy, key in LEGACY_STORED_KEYS.items():
+            if legacy in values:
+                values.setdefault(key, values.pop(legacy))
         stored = [STORED_KEYS.get(name, name) for name in cls.__dataclass_fields__]
         names = list(cls.__dataclass_fields__)
         unknown = sorted(_FIELD_NAMES.get(key, key) for key in set(values) - set(stored))
@@ -298,9 +317,22 @@ class Precision:
 
 
 # Sampling identity generation: v1 was the unmarked mean-only guards; v2 tied
-# the CXR variance gate to ``1/min_effective_histories``; v3 gives it its own
-# ``max_variance_of_variance`` threshold (#1262).
-ADAPTIVE_SAMPLING_MODEL = "variance-threshold-v3"
+# the CXR variance gate to ``1/min_effective_histories`` (#1254); v3 gave it its
+# own ``max_variance_of_variance`` threshold (#1262); v4 checks at geometric
+# decision points with a drift-tolerant stability window, independent of
+# transport chunks (#1253).
+ADAPTIVE_SAMPLING_MODEL = "decision-points-v4"
+
+
+def identity_policy(payload: Mapping[str, Any] | None) -> Mapping[str, Any] | None:
+    """A stored policy without its transport-only chunk hint (``block_electrons``).
+
+    The hint never changes decisions or output (#1253), so it stays out of
+    dataset identities and case content keys.
+    """
+    if not isinstance(payload, Mapping) or "block_electrons" not in payload:
+        return payload
+    return {key: value for key, value in payload.items() if key != "block_electrons"}
 
 
 def _adaptive_sampling_markers(policy) -> dict[str, str]:
@@ -333,7 +365,6 @@ DEFAULT_PRECISION = Precision(
     target_rse=0.05,
     min_histories=200,
     max_histories=20_000,
-    block_histories=100,
     observables=("cxr", "brem"),
 )
 

@@ -141,16 +141,16 @@ def test_public_precision_is_removed_naming_adaptive_sampling():
 def test_serialized_policy_keeps_the_stored_electron_vocabulary():
     """Stored ``adaptive_precision`` payloads and identities keep historical keys."""
     policy = AdaptiveSampling(
-        0.1, 40, 80, 20, observables=("cxr", "brem"), pilot_histories=40,
+        0.1, 40, 80, observables=("cxr", "brem"), pilot_histories=40,
         brem_target_rse=0.2, brem_min_histories=20, brem_max_histories=60,
     )  # fmt: skip
     payload = policy.to_dict()
     assert list(payload) == [
-        "target_rse", "min_electrons", "max_electrons", "block_electrons", "observables",
+        "target_rse", "min_electrons", "max_electrons", "observables",
         "max_electron_share", "min_effective_electrons", "max_variance_of_variance",
-        "stability_blocks",
+        "stability_checks",
         "stability_fraction", "pilot_electrons", "band_eV", "batch_means_band_eV",
-        "brem_target_rse", "brem_min_electrons", "brem_max_electrons",
+        "brem_target_rse", "brem_min_electrons", "brem_max_electrons", "decision_growth",
     ]  # fmt: skip
     assert payload["observables"] == ("line", "brem")
     assert AdaptiveSampling.from_dict(payload) == policy

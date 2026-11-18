@@ -1,0 +1,618 @@
+{
+ "sampling_model": "decision-points-v4",
+ "chunks": [
+  "per-decision-point",
+  1,
+  1000,
+  7168,
+  48000
+ ],
+ "dense_grid": {
+  "decision_growth": 0.01,
+  "stability_checks": 29
+ },
+ "maximum": 1000000,
+ "cases": [
+  {
+   "source": "hbn-30-15-b48000.values.npz",
+   "sha256": "96181965ce443feb5ed0fefbc06a5a516905f864c49a94a44008013754df4c41",
+   "capture_code_sha": "1f337db6254c7a6c94904b76b33c1c07c5242d01",
+   "material": "hbn",
+   "energy_keV": 30.0,
+   "tilt_deg": 15.0,
+   "captured": 528000,
+   "chunk_independent": true,
+   "decision_points": {
+    "realized": 264929,
+    "reason": "converged",
+    "checks": 6,
+    "cxr_relative_se": 0.0009839458944089232
+   },
+   "dense_grid": {
+    "realized": 257903,
+    "reason": "converged",
+    "checks": 37,
+    "cxr_relative_se": 0.0009994803057234258
+   },
+   "overshoot_vs_dense": 0.027242800587817806,
+   "reported_to_reference_rse": 1.005887049515339,
+   "block_rule_v2": {
+    "1000": [
+     258000,
+     "converged"
+    ],
+    "3000": [
+     258000,
+     "converged"
+    ],
+    "6000": [
+     288000,
+     "converged"
+    ],
+    "12000": [
+     264000,
+     "converged"
+    ],
+    "24000": [
+     264000,
+     "converged"
+    ],
+    "48000": [
+     528000,
+     "converged"
+    ]
+   }
+  },
+  {
+   "source": "hbn-30-60-b48000.values.npz",
+   "sha256": "520513daba57f6e8838c755a8dc6caeb3b02367fba303139ace449a3095c1c53",
+   "capture_code_sha": "1f337db6254c7a6c94904b76b33c1c07c5242d01",
+   "material": "hbn",
+   "energy_keV": 30.0,
+   "tilt_deg": 60.0,
+   "captured": 672000,
+   "chunk_independent": true,
+   "decision_points": {
+    "realized": 624696,
+    "reason": "converged",
+    "checks": 2,
+    "cxr_relative_se": 0.00043732374088490804
+   },
+   "dense_grid": {
+    "realized": 594978,
+    "reason": "converged",
+    "checks": 4,
+    "cxr_relative_se": 0.00044833665517849053
+   },
+   "overshoot_vs_dense": 0.04994806530661644,
+   "reported_to_reference_rse": 0.9986340556504778,
+   "block_rule_v2": {
+    "1000": [
+     594000,
+     "converged"
+    ],
+    "3000": [
+     594000,
+     "converged"
+    ],
+    "6000": [
+     594000,
+     "converged"
+    ],
+    "12000": [
+     612000,
+     "converged"
+    ],
+    "24000": [
+     624000,
+     "converged"
+    ],
+    "48000": [
+     672000,
+     "converged"
+    ]
+   }
+  },
+  {
+   "source": "hbn-1000-15-b48000.values.npz",
+   "sha256": "dab75e1412a8eb8edafce579119369cd65d912968b24e6c1b657d4166afba5e0",
+   "capture_code_sha": "00d62b0ceead5a9cb21829848719400f8fc15481",
+   "material": "hbn",
+   "energy_keV": 1000.0,
+   "tilt_deg": 15.0,
+   "captured": 528000,
+   "chunk_independent": true,
+   "decision_points": {
+    "realized": 528000,
+    "reason": "capture_exhausted",
+    "checks": 56,
+    "cxr_relative_se": 0.0007686090142432984
+   },
+   "dense_grid": {
+    "realized": 528000,
+    "reason": "capture_exhausted",
+    "checks": 519,
+    "cxr_relative_se": 0.0007686090142432981
+   },
+   "overshoot_vs_dense": null,
+   "reported_to_reference_rse": null,
+   "block_rule_v2": {
+    "1000": [
+     null,
+     "capture_exhausted"
+    ],
+    "3000": [
+     null,
+     "capture_exhausted"
+    ],
+    "6000": [
+     null,
+     "capture_exhausted"
+    ],
+    "12000": [
+     null,
+     "capture_exhausted"
+    ],
+    "24000": [
+     null,
+     "capture_exhausted"
+    ],
+    "48000": [
+     null,
+     "capture_exhausted"
+    ]
+   }
+  },
+  {
+   "source": "hbn-1000-60-b48000.values.npz",
+   "sha256": "04b43938ad64431b6c5cb4057997eca6cbe275e3e425a9df3e1e541369225824",
+   "capture_code_sha": null,
+   "material": "hbn",
+   "energy_keV": 1000.0,
+   "tilt_deg": 60.0,
+   "captured": 1008000,
+   "chunk_independent": true,
+   "decision_points": {
+    "realized": 1000000,
+    "reason": "max_electrons",
+    "checks": 1,
+    "cxr_relative_se": 0.042309242183954834
+   },
+   "dense_grid": {
+    "realized": 1000000,
+    "reason": "max_electrons",
+    "checks": 1,
+    "cxr_relative_se": 0.042309242183954855
+   },
+   "overshoot_vs_dense": null,
+   "reported_to_reference_rse": null,
+   "block_rule_v2": {
+    "1000": [
+     1000000,
+     "max_electrons"
+    ],
+    "3000": [
+     1002000,
+     "max_electrons"
+    ],
+    "6000": [
+     1002000,
+     "max_electrons"
+    ],
+    "12000": [
+     1008000,
+     "max_electrons"
+    ],
+    "24000": [
+     1008000,
+     "max_electrons"
+    ],
+    "48000": [
+     1008000,
+     "max_electrons"
+    ]
+   }
+  },
+  {
+   "source": "hbn-30000-15-b48000.values.npz",
+   "sha256": "4f9b30bdf1020dce74c242eda0de597c9c04a5a9032235f684634b92702289d5",
+   "capture_code_sha": "00d62b0ceead5a9cb21829848719400f8fc15481",
+   "material": "hbn",
+   "energy_keV": 30000.0,
+   "tilt_deg": 15.0,
+   "captured": 192000,
+   "chunk_independent": true,
+   "decision_points": {
+    "realized": 3993,
+    "reason": "converged",
+    "checks": 4,
+    "cxr_relative_se": 4.730829441925886e-06
+   },
+   "dense_grid": {
+    "realized": 4018,
+    "reason": "converged",
+    "checks": 30,
+    "cxr_relative_se": 4.708902818167792e-06
+   },
+   "overshoot_vs_dense": -0.006222000995520172,
+   "reported_to_reference_rse": 0.7284542929470691,
+   "block_rule_v2": {
+    "1000": [
+     4000,
+     "converged"
+    ],
+    "3000": [
+     12000,
+     "converged"
+    ],
+    "6000": [
+     24000,
+     "converged"
+    ],
+    "12000": [
+     48000,
+     "converged"
+    ],
+    "24000": [
+     96000,
+     "converged"
+    ],
+    "48000": [
+     192000,
+     "converged"
+    ]
+   }
+  },
+  {
+   "source": "hbn-30000-60-b48000.values.npz",
+   "sha256": "d7a3799b270daeb75da1b4ce687b8589c470f9e72ff20709e3bca167762c0aaa",
+   "capture_code_sha": "00d62b0ceead5a9cb21829848719400f8fc15481",
+   "material": "hbn",
+   "energy_keV": 30000.0,
+   "tilt_deg": 60.0,
+   "captured": 192000,
+   "chunk_independent": true,
+   "decision_points": {
+    "realized": 32541,
+    "reason": "converged",
+    "checks": 26,
+    "cxr_relative_se": 0.00031700196041397873
+   },
+   "dense_grid": {
+    "realized": 30320,
+    "reason": "converged",
+    "checks": 232,
+    "cxr_relative_se": 0.0003298915675586499
+   },
+   "overshoot_vs_dense": 0.07325197889182067,
+   "reported_to_reference_rse": 0.985390635719798,
+   "block_rule_v2": {
+    "1000": [
+     31000,
+     "converged"
+    ],
+    "3000": [
+     33000,
+     "converged"
+    ],
+    "6000": [
+     48000,
+     "converged"
+    ],
+    "12000": [
+     48000,
+     "converged"
+    ],
+    "24000": [
+     120000,
+     "converged"
+    ],
+    "48000": [
+     192000,
+     "converged"
+    ]
+   }
+  },
+  {
+   "source": "hopg-30-15-b48000.values.npz",
+   "sha256": "5b882e467d425b0f598200d85fc7ef33ebfd9d21c17cab4ff4462ab0e8c41c58",
+   "capture_code_sha": "1f337db6254c7a6c94904b76b33c1c07c5242d01",
+   "material": "hopg",
+   "energy_keV": 30.0,
+   "tilt_deg": 15.0,
+   "captured": 576000,
+   "chunk_independent": true,
+   "decision_points": {
+    "realized": 320565,
+    "reason": "converged",
+    "checks": 6,
+    "cxr_relative_se": 0.0009872748598430678
+   },
+   "dense_grid": {
+    "realized": 314701,
+    "reason": "converged",
+    "checks": 40,
+    "cxr_relative_se": 0.000996153549955016
+   },
+   "overshoot_vs_dense": 0.018633560109437175,
+   "reported_to_reference_rse": 1.0117748945255098,
+   "block_rule_v2": {
+    "1000": [
+     314000,
+     "converged"
+    ],
+    "3000": [
+     315000,
+     "converged"
+    ],
+    "6000": [
+     318000,
+     "converged"
+    ],
+    "12000": [
+     324000,
+     "converged"
+    ],
+    "24000": [
+     336000,
+     "converged"
+    ],
+    "48000": [
+     576000,
+     "converged"
+    ]
+   }
+  },
+  {
+   "source": "hopg-30-60-b48000.values.npz",
+   "sha256": "e4a188be7ce08bd7b6cde6cff2da10590c7d90bc51c4969973a45089561ac21c",
+   "capture_code_sha": "1f337db6254c7a6c94904b76b33c1c07c5242d01",
+   "material": "hopg",
+   "energy_keV": 30.0,
+   "tilt_deg": 60.0,
+   "captured": 672000,
+   "chunk_independent": true,
+   "decision_points": {
+    "realized": 624696,
+    "reason": "converged",
+    "checks": 2,
+    "cxr_relative_se": 0.0005337864789178138
+   },
+   "dense_grid": {
+    "realized": 613008,
+    "reason": "converged",
+    "checks": 3,
+    "cxr_relative_se": 0.0005384554733379063
+   },
+   "overshoot_vs_dense": 0.019066635345705185,
+   "reported_to_reference_rse": 1.0008138918515195,
+   "block_rule_v2": {
+    "1000": [
+     611000,
+     "converged"
+    ],
+    "3000": [
+     612000,
+     "converged"
+    ],
+    "6000": [
+     624000,
+     "converged"
+    ],
+    "12000": [
+     624000,
+     "converged"
+    ],
+    "24000": [
+     624000,
+     "converged"
+    ],
+    "48000": [
+     672000,
+     "converged"
+    ]
+   }
+  },
+  {
+   "source": "hopg-1000-15-b48000.values.npz",
+   "sha256": "230ac9c5a3dd078ecec59487481d710c707ed087404bf7b61ffcd4618ee75b1b",
+   "capture_code_sha": "00d62b0ceead5a9cb21829848719400f8fc15481",
+   "material": "hopg",
+   "energy_keV": 1000.0,
+   "tilt_deg": 15.0,
+   "captured": 1008000,
+   "chunk_independent": true,
+   "decision_points": {
+    "realized": 1000000,
+    "reason": "max_electrons",
+    "checks": 62,
+    "cxr_relative_se": 0.0011650769415478823
+   },
+   "dense_grid": {
+    "realized": 1000000,
+    "reason": "max_electrons",
+    "checks": 584,
+    "cxr_relative_se": 0.001165076941547883
+   },
+   "overshoot_vs_dense": null,
+   "reported_to_reference_rse": null,
+   "block_rule_v2": {
+    "1000": [
+     1000000,
+     "max_electrons"
+    ],
+    "3000": [
+     1002000,
+     "max_electrons"
+    ],
+    "6000": [
+     1002000,
+     "max_electrons"
+    ],
+    "12000": [
+     1008000,
+     "max_electrons"
+    ],
+    "24000": [
+     1008000,
+     "max_electrons"
+    ],
+    "48000": [
+     1008000,
+     "max_electrons"
+    ]
+   }
+  },
+  {
+   "source": "hopg-1000-60-b48000.values.npz",
+   "sha256": "b8d97f8d7182ddfdf82fa2da73cb720c850603ed0ecc3e8907b2e84dfdbb96b1",
+   "capture_code_sha": "00d62b0ceead5a9cb21829848719400f8fc15481",
+   "material": "hopg",
+   "energy_keV": 1000.0,
+   "tilt_deg": 60.0,
+   "captured": 1008000,
+   "chunk_independent": true,
+   "decision_points": {
+    "realized": 1000000,
+    "reason": "max_electrons",
+    "checks": 1,
+    "cxr_relative_se": 0.05848887839376839
+   },
+   "dense_grid": {
+    "realized": 1000000,
+    "reason": "max_electrons",
+    "checks": 1,
+    "cxr_relative_se": 0.05848887839376838
+   },
+   "overshoot_vs_dense": null,
+   "reported_to_reference_rse": null,
+   "block_rule_v2": {
+    "1000": [
+     1000000,
+     "max_electrons"
+    ],
+    "3000": [
+     1002000,
+     "max_electrons"
+    ],
+    "6000": [
+     1002000,
+     "max_electrons"
+    ],
+    "12000": [
+     1008000,
+     "max_electrons"
+    ],
+    "24000": [
+     1008000,
+     "max_electrons"
+    ],
+    "48000": [
+     1008000,
+     "max_electrons"
+    ]
+   }
+  },
+  {
+   "source": "hopg-30000-15-b48000.values.npz",
+   "sha256": "3ff09d9b47a68027739436fb240a06061a9d144739337e147a2d988903331fed",
+   "capture_code_sha": "00d62b0ceead5a9cb21829848719400f8fc15481",
+   "material": "hopg",
+   "energy_keV": 30000.0,
+   "tilt_deg": 15.0,
+   "captured": 192000,
+   "chunk_independent": true,
+   "decision_points": {
+    "realized": 3993,
+    "reason": "converged",
+    "checks": 4,
+    "cxr_relative_se": 1.5039650661296206e-05
+   },
+   "dense_grid": {
+    "realized": 4018,
+    "reason": "converged",
+    "checks": 30,
+    "cxr_relative_se": 1.4953863850936678e-05
+   },
+   "overshoot_vs_dense": -0.006222000995520172,
+   "reported_to_reference_rse": 1.8424225869928512,
+   "block_rule_v2": {
+    "1000": [
+     4000,
+     "converged"
+    ],
+    "3000": [
+     12000,
+     "converged"
+    ],
+    "6000": [
+     24000,
+     "converged"
+    ],
+    "12000": [
+     48000,
+     "converged"
+    ],
+    "24000": [
+     96000,
+     "converged"
+    ],
+    "48000": [
+     192000,
+     "converged"
+    ]
+   }
+  },
+  {
+   "source": "hopg-30000-60-b48000.values.npz",
+   "sha256": "6910c9c8f683ff7f93d4a1b486575e643d8eea62c2c2bc6df964114f1e45a344",
+   "capture_code_sha": "00d62b0ceead5a9cb21829848719400f8fc15481",
+   "material": "hopg",
+   "energy_keV": 30000.0,
+   "tilt_deg": 60.0,
+   "captured": 192000,
+   "chunk_independent": true,
+   "decision_points": {
+    "realized": 32541,
+    "reason": "converged",
+    "checks": 26,
+    "cxr_relative_se": 0.0003149139031640196
+   },
+   "dense_grid": {
+    "realized": 30320,
+    "reason": "converged",
+    "checks": 232,
+    "cxr_relative_se": 0.0003275810728327533
+   },
+   "overshoot_vs_dense": 0.07325197889182067,
+   "reported_to_reference_rse": 0.9799176133863272,
+   "block_rule_v2": {
+    "1000": [
+     31000,
+     "converged"
+    ],
+    "3000": [
+     33000,
+     "converged"
+    ],
+    "6000": [
+     48000,
+     "converged"
+    ],
+    "12000": [
+     48000,
+     "converged"
+    ],
+    "24000": [
+     120000,
+     "converged"
+    ],
+    "48000": [
+     192000,
+     "converged"
+    ]
+   }
+  }
+ ],
+ "failures": []
+}

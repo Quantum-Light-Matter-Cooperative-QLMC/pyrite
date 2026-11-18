@@ -11,6 +11,7 @@ from pyrite._cxr_vocabulary import catalog_key
 from pyrite._numerics import SAMPLING_KEYS, validate_profile_numerics
 from pyrite._precision import (
     DEFAULT_PRECISION,
+    LEGACY_STORED_KEYS,
     REQUIRED_FIELDS,
     STORED_KEYS,
     Precision,
@@ -24,7 +25,8 @@ from .profile_numerics import profile_numerics_values
 SAMPLING_FLAGS = {"n_electrons": "cxr-histories", "n_electrons_brem": "brem-histories"}
 
 
-_INITIAL_FIELDS = (*REQUIRED_FIELDS, "observables")
+#: Fields a first partial edit copies from the default policy.
+_INITIAL_FIELDS = (*REQUIRED_FIELDS, "min_electrons", "observables")
 
 
 def profile_precision_values(profile):
@@ -34,7 +36,12 @@ def profile_precision_values(profile):
         return None
     if not isinstance(table, dict):
         raise ValueError("adaptive_sampling must be a table")
-    return dict(table.unwrap() if hasattr(table, "unwrap") else table)
+    values = dict(table.unwrap() if hasattr(table, "unwrap") else table)
+    # Keys renamed in #1253 (``stability_blocks``) are read under their new name.
+    for legacy, key in LEGACY_STORED_KEYS.items():
+        if legacy in values:
+            values.setdefault(key, values.pop(legacy))
+    return values
 
 
 def policy_view(values):

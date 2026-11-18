@@ -111,3 +111,63 @@ class MemoryBlockSizer:
             yield
         finally:
             BACKEND.set_memory_limit_bytes(previous)
+
+
+#: Histories one CUDA transport launch holds (#1252, RTX 5080: scratch-limited
+#: fill of 7 131, #889); smaller adaptive chunks add launches without adding fill.
+CUDA_FILL_HISTORIES = 7_168
+#: Smallest host chunk for adaptive transport: occupies the CPU workers while
+#: keeping work past a stop small.
+HOST_MIN_CHUNK = 1_024
+#: Device or host bytes per transported row while an adaptive chunk is measured.
+#: #1253 job 13569 (RTX 5080, per-chunk pool window): 0.8--1.6 KiB per row on
+#: 160k--410k-row chunks; 4 KiB keeps a 2.5x margin and caps the densest
+#: cleo_sub scene (37.7 rows/electron) near 1M rows, half the 1.8M-row #1252
+#: block that filled the card. (#1252's 7--12 KiB included retained phases.)
+MEASURE_BYTES_PER_ROW = 4 * 1024
+#: Memory one adaptive chunk's rows may take while measured (#1253).
+ADAPTIVE_CHUNK_BUDGET_BYTES = 4 * 1024**3
+
+
+class AdaptiveChunkPlan:
+    """Transport chunks for an adaptive run: fill, memory and decision points (#1253).
+
+    A chunk reaches the next decision point when that is at least ``floor``
+    electrons away, else it takes ``floor`` electrons, which may span several
+    points. Above the floor it never exceeds ``budget / (rows per electron x
+    bytes per row)``, with rows per electron the largest rate seen so far (the
+    first chunk is ``floor``); the floor wins when the cap is smaller. Chunk boundaries never change decisions, counts or output;
+    the stopping monitor folds values at decision points and the driver keeps
+    exactly the realized prefix.
+    """
+
+    def __init__(self, floor: int, budget_bytes: int = ADAPTIVE_CHUNK_BUDGET_BYTES):
+        if type(floor) is not int or floor < 1:
+            raise ValueError("chunk floor must be a positive integer")
+        self.floor = floor
+        self.budget_bytes = int(budget_bytes)
+        self.rows_per_electron = 0.0
+
+    @classmethod
+    def for_core(cls, core: str, hint: int | None = None) -> "AdaptiveChunkPlan":
+        """The plan for a transport core; ``hint`` (deprecated ``block_histories``) sets the floor."""
+        if hint is not None:
+            return cls(hint)
+        return cls(CUDA_FILL_HISTORIES if core == "cuda" else HOST_MIN_CHUNK)
+
+    def next_stop(self, start: int, next_point: int | None, limit: int) -> int:
+        """End of the chunk starting at ``start``, within ``(start, limit]``."""
+        size = self.floor
+        if self.rows_per_electron > 0.0:
+            fits = int(self.budget_bytes / (self.rows_per_electron * MEASURE_BYTES_PER_ROW))
+            size = max(self.floor, fits)
+        target = start + self.floor
+        if next_point is not None and next_point - start >= self.floor:
+            target = next_point
+        return max(start + 1, min(target, start + size, limit))
+
+    def observe(self, start: int, stop: int, block: Mapping[str, Any]) -> None:
+        """Keep the largest rows per electron seen."""
+        ids = block.get("electron_id")
+        rows = 0 if ids is None else int(ids.shape[0])
+        self.rows_per_electron = max(self.rows_per_electron, rows / max(stop - start, 1))

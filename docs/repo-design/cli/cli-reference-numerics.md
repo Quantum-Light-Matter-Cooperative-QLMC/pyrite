@@ -96,12 +96,14 @@ Options:
                                   Requires --brem-target-rse.  [x>=2]
   --target-rse FRACTION           Target relative standard error of each watched yield
                                   (0.05 = 5%).  [x>0.0]
-  --min-histories N               Smallest count at which the run may stop; a multiple
-                                  of --block-histories.  [x>=2]
+  --min-histories N               Smallest count at which the run may stop (default
+                                  100).  [x>=2]
   --max-histories N               Count at which the run stops regardless, flagged
                                   statistics-limited.  [x>=2]
-  --block-histories N             Histories per transport block; the rule is checked at
-                                  block ends.  [x>=1]
+  --block-histories N             Deprecated: transport chunk size hint; never changes
+                                  the stop or output.  [x>=1]
+  --decision-growth FRACTION      Relative spacing of the stopping-rule checks (default
+                                  0.1).  [x>0.0]
   --observable [cxr|brem|line]    Yield that must converge; repeat for both. Replaces
                                   the watched set (a new policy watches line and brem).
   --max-history-share FRACTION    Guard: largest share of a yield one history may hold
@@ -111,10 +113,11 @@ Options:
   --max-variance-of-variance VOV  CXR guard: largest VOV + 1/n = M4/M2^2 (default 0.01;
                                   0.1 is the MCNP/Geant4 convention; 1 disables).
                                   [0.0<x<=1.0]
-  --stability-blocks K            Guard: block ends whose running mean must agree; 0
+  --stability-checks K            Guard: last checks whose running mean must agree; 0
                                   disables (default 3).  [x>=0]
   --stability-fraction FRACTION   Guard: allowed relative mean drift as a fraction of
-                                  the target (default 0.5).  [x>=0.0]
+                                  the target, beyond the expected statistical drift
+                                  (default 0.5).  [x>=0.0]
   --pilot-histories N             Pilot count that projects the stopping count and skips
                                   checks until it.  [x>=1]
   --band-ev START,STOP            Monitor band in eV (default: the case's line band).
@@ -217,12 +220,14 @@ Options:
                                   Requires --brem-target-rse.  [x>=2]
   --target-rse FRACTION           Target relative standard error of each watched yield
                                   (0.05 = 5%).  [x>0.0]
-  --min-histories N               Smallest count at which the run may stop; a multiple
-                                  of --block-histories.  [x>=2]
+  --min-histories N               Smallest count at which the run may stop (default
+                                  100).  [x>=2]
   --max-histories N               Count at which the run stops regardless, flagged
                                   statistics-limited.  [x>=2]
-  --block-histories N             Histories per transport block; the rule is checked at
-                                  block ends.  [x>=1]
+  --block-histories N             Deprecated: transport chunk size hint; never changes
+                                  the stop or output.  [x>=1]
+  --decision-growth FRACTION      Relative spacing of the stopping-rule checks (default
+                                  0.1).  [x>0.0]
   --observable [cxr|brem|line]    Yield that must converge; repeat for both. Replaces
                                   the watched set (a new policy watches line and brem).
   --max-history-share FRACTION    Guard: largest share of a yield one history may hold
@@ -232,10 +237,11 @@ Options:
   --max-variance-of-variance VOV  CXR guard: largest VOV + 1/n = M4/M2^2 (default 0.01;
                                   0.1 is the MCNP/Geant4 convention; 1 disables).
                                   [0.0<x<=1.0]
-  --stability-blocks K            Guard: block ends whose running mean must agree; 0
+  --stability-checks K            Guard: last checks whose running mean must agree; 0
                                   disables (default 3).  [x>=0]
   --stability-fraction FRACTION   Guard: allowed relative mean drift as a fraction of
-                                  the target (default 0.5).  [x>=0.0]
+                                  the target, beyond the expected statistical drift
+                                  (default 0.5).  [x>=0.0]
   --pilot-histories N             Pilot count that projects the stopping count and skips
                                   checks until it.  [x>=1]
   --band-ev START,STOP            Monitor band in eV (default: the case's line band).

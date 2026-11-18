@@ -16,8 +16,6 @@ _POLICY = [
     "200",
     "--max-histories",
     "2000",
-    "--block-histories",
-    "20",
 ]
 
 
@@ -159,7 +157,6 @@ def test_precision_set_show_and_reset_round_trip(tmp_path, monkeypatch):
         "target_rse": 0.1,
         "min_histories": 200,
         "max_histories": 2000,
-        "block_histories": 20,
         "observables": ["cxr", "brem"],
         "band_eV": [100.0, 900.0],
     }
@@ -182,8 +179,8 @@ def test_precision_set_show_and_reset_round_trip(tmp_path, monkeypatch):
         invoke(numerics_command, ["adaptive-sampling", "show", "sub_100keV", "-o", "json"]).stdout
     )
     assert machine["payload"]["mode"] == "adaptive"
-    assert machine["payload"]["effective"]["stability_blocks"] == 3
-    assert "stability_blocks" not in machine["payload"]["explicit"]
+    assert machine["payload"]["effective"]["stability_checks"] == 3
+    assert "stability_checks" not in machine["payload"]["explicit"]
     summary = invoke(profile.command, ["show", "sub_100keV"])
     assert_table_row(summary.stdout, "mode", "adaptive (profile policy)")
     assert_table_row(summary.stdout, "target-rse", "0.1")
@@ -226,14 +223,10 @@ def test_precision_set_validates_at_the_boundary(tmp_path, monkeypatch):
     assert band.exit_code == 2
     assert "START,STOP" in band.stderr
 
-    blocks = [*_POLICY[:-1], "30"]
-    misaligned = invoke(numerics_command, ["adaptive-sampling", "set", "sub_100keV", *blocks])
-    assert misaligned.exit_code == 1
-    assert "multiples of block_histories" in misaligned.stderr
-    # Name every offending count, its value and the nearest valid ones.
-    assert "min_histories=200 (nearest: 180 or 210)" in misaligned.stderr
-    assert "max_histories=2000 (nearest: 1980 or 2010)" in misaligned.stderr
-    assert "with block_histories=30" in misaligned.stderr
+    inverted = [*_POLICY[:3], "3000", *_POLICY[4:]]
+    rejected = invoke(numerics_command, ["adaptive-sampling", "set", "sub_100keV", *inverted])
+    assert rejected.exit_code == 1
+    assert "min_histories <= max_histories" in rejected.stderr
 
     nothing = invoke(numerics_command, ["adaptive-sampling", "set", "sub_100keV"])
     assert nothing.exit_code == 2
@@ -324,7 +317,6 @@ def test_first_partial_set_starts_from_the_default_policy(tmp_path, monkeypatch)
         "target_rse": 0.05,
         "min_histories": 200,
         "max_histories": 20000,
-        "block_histories": 100,
         "observables": ["cxr"],
     }
 
@@ -626,3 +618,27 @@ def test_enable_on_cascades_selects_the_default_policy(tmp_path, monkeypatch, ca
     shown = invoke(numerics_command, ["adaptive-sampling", "show", "sub_100keV"])
     assert "adaptive (default policy)" in shown.stdout
     assert "unsupported" not in shown.stdout
+
+
+def test_block_histories_is_a_deprecated_chunk_hint(tmp_path, monkeypatch):
+    """#1253: any count is accepted (no multiple rule) and the flag warns."""
+    catalog = _catalog(tmp_path, monkeypatch)
+    hinted = invoke(
+        numerics_command,
+        ["adaptive-sampling", "set", "sub_100keV", *_POLICY, "--block-histories", "30"],
+    )
+    assert hinted.exit_code == 0, hinted.stderr
+    assert "'--block-histories' is deprecated" in hinted.stderr
+    assert _precision(catalog)["block_histories"] == 30
+
+
+def test_stability_blocks_is_the_retired_spelling_of_stability_checks(tmp_path, monkeypatch):
+    catalog = _catalog(tmp_path, monkeypatch)
+    retired = invoke(
+        numerics_command,
+        ["adaptive-sampling", "set", "sub_100keV", *_POLICY, "--stability-blocks", "2"],
+    )
+    assert retired.exit_code == 0, retired.stderr
+    assert "'--stability-blocks' is deprecated" in retired.stderr
+    assert "--stability-checks" in retired.stderr
+    assert _precision(catalog)["stability_checks"] == 2
