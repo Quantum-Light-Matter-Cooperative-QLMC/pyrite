@@ -43,9 +43,10 @@ def test_help_lists_selectors_defaults_combinations_and_identity():
     assert_clean_result(group)
     for text in (
         "resonance-population | kinematic-ceiling",
-        "sinc-oversampled | sinc-nyquist | resonance-local | sinc-shape",
+        "sinc-oversampled | sinc-nyquist | resonance-local",
         "node | bin-mean",
-        "resonance-local and sinc-shape require bandwidth resonance-population (the default) and",
+        "sinc-shape is a deprecated alias of sinc-oversampled with bin-mean",
+        "an explicit one never moves, and the resolution and quadrature never change",
         "identity",
     ):
         assert text in " ".join(group.stdout.split())
@@ -267,15 +268,15 @@ def test_emission_and_numerics_edits_respect_an_existing_policy(catalog):
     assert _profile_file(catalog, "high_energy") == before
 
 
-def test_effective_resolution_follows_quadrature_and_bandwidth():
-    """The editor's effective resolution is the resolver's default (#1214)."""
+def test_effective_resolution_follows_windows_only():
+    """The editor's effective resolution is the resolver's default (#1265)."""
     from pyrite.campaign.profile_cxr_grid import cxr_grid_fields
 
     def effective(policy):
         return {row["key"]: row["effective"] for row in cxr_grid_fields(policy)}["resolution"]
 
     assert effective({}) == "sinc-oversampled"
-    assert effective({"quadrature": "bin-mean"}) == "sinc-shape"
+    assert effective({"quadrature": "bin-mean"}) == "sinc-oversampled"
     assert effective({"quadrature": "bin-mean", "bandwidth": "kinematic-ceiling"}) == (
         "sinc-oversampled"
     )

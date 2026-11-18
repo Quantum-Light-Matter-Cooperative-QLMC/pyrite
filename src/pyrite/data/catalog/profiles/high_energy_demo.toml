@@ -1,7 +1,7 @@
 # Demo: 1 MeV beam with the measured line-grid policy (resonance-population
-# bandwidth, uniform sinc-shape spacing, bin-mean quadrature). Above the
-# uniform coordinate budget, spacing falls back to resonance-local and the
-# resolved grid provenance records the reason. The line grid is
+# bandwidth, uniform sinc-oversampled spacing at the bin-mean shape step,
+# bin-mean quadrature). An axis above the coordinate budget refuses and names
+# sinc-nyquist or resonance-local as the opt-outs. The line grid is
 # resolved automatically, independently of electron sampling, which uses the
 # default adaptive policy (pyrite profile numerics adaptive-sampling show high_energy_demo).
 #   pyrite run high_energy_demo
@@ -16,5 +16,5 @@ detector = "reference"
 
 [cxr_grid_policy]
 bandwidth = "resonance-population"
-resolution = "sinc-shape"
+resolution = "sinc-oversampled"
 quadrature = "bin-mean"

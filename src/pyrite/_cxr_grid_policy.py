@@ -22,10 +22,15 @@ bandwidth
     coherent-line intensity. None is an accuracy statement.
 
 resolution
-    How finely that interval is sampled. Owned by the sinc Nyquist estimator
+    How finely that interval is sampled, from the sinc Nyquist estimator
     (:func:`pyrite.montecarlo.spectrum.diagnostics.sinc_feature_spacing`) under a
-    per-observable relative tolerance. Never silently coarsened: a spacing that
-    cannot be met inside the point budget or the backend ULP floor raises.
+    per-observable relative tolerance; a function of quadrature, never of
+    bandwidth (#1265). Never silently coarsened: a spacing that cannot be met
+    inside the point budget or the backend ULP floor raises.
+
+fallback
+    One rule (#1265): only a defaulted bandwidth (no recorded source) may
+    widen; resolution, quadrature and budget carry over unchanged.
 
 windows
     Optional piecewise refinement (``feature-windows``): a backbone at the
@@ -60,6 +65,7 @@ import json
 import math
 import os
 import tempfile
+import warnings
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
@@ -92,9 +98,10 @@ __all__ = [
     "DEFAULT_COHERENT_DECOHERENCE_LIMIT",
     "DEFAULT_COHERENT_FLAT_OMISSION_LIMIT",
     "DEFAULT_COHERENT_LEAK_LIMIT",
+    "DEFAULT_BIN_MEAN_MAX_POINTS",
     "DEFAULT_LOCAL_HALO_LIMIT",
-    "DEFAULT_SHAPE_MAX_POINTS",
     "DEFAULT_SHAPE_RTOL",
+    "DEPRECATED_RESOLUTION_ALIASES",
     "LOCAL_RESOLUTION_POLICY",
     "SHAPE_RESOLUTION_POLICY",
     "RESOLUTION_POLICIES",
@@ -117,6 +124,8 @@ __all__ = [
     "CxrGridTruncationWarning",
     "CxrYieldStatisticsWarning",
     "cached_coordinates",
+    "canonical_resolution",
+    "uniform_step_divisor",
     "check_selector_combination",
     "default_resolution_policy",
     "coordinate_cache_key",
@@ -222,20 +231,18 @@ AUTOMATIC_RESOLUTION_POLICY = OVERSAMPLED_RESOLUTION_POLICY
 #: Opt-in, and only under the ``resonance-population`` bandwidth that measures
 #: that population.
 LOCAL_RESOLUTION_POLICY = "resonance-local"
-#: Uniform bin-mean axis fine enough to resolve intrinsic line shape (#1230):
-#: the sinc-Nyquist step scaled by :func:`shape_spacing_factor`. Opt-in, under
-#: the ``resonance-population`` bandwidth and ``bin-mean`` quadrature, so the
-#: axis is bounded by the measured band and reduced through the Fourier route.
+#: Deprecated for one release (#1265): ``sinc-oversampled`` under ``bin-mean``.
 SHAPE_RESOLUTION_POLICY = "sinc-shape"
+DEPRECATED_RESOLUTION_ALIASES = {SHAPE_RESOLUTION_POLICY: OVERSAMPLED_RESOLUTION_POLICY}
 RESOLUTION_POLICIES = (
     OVERSAMPLED_RESOLUTION_POLICY,
     NYQUIST_RESOLUTION_POLICY,
     LOCAL_RESOLUTION_POLICY,
-    SHAPE_RESOLUTION_POLICY,
 )
 #: Uniform-node resolutions and their step divisor.
 UNIFORM_RESOLUTION_POLICIES = (OVERSAMPLED_RESOLUTION_POLICY, NYQUIST_RESOLUTION_POLICY)
-#: Nodes per sinc-Nyquist step under ``sinc-oversampled`` (#1214). Node
+#: Nodes per sinc-Nyquist step under ``sinc-oversampled`` with ``node``
+#: quadrature (#1214; ``bin-mean`` takes ``1 / shape_spacing_factor``). Node
 #: quadrature reads a line's peak at its nodes and its FWHM by linear
 #: interpolation, so both converge with the step, not with Nyquist. Measured
 #: on the #1143 scenes (30 keV, 300 keV, 1 MeV, layered, mosaic) and at 300
@@ -243,17 +250,17 @@ UNIFORM_RESOLUTION_POLICIES = (OVERSAMPLED_RESOLUTION_POLICY, NYQUIST_RESOLUTION
 #: Numerical convergence evidence, not a general certificate.
 LINE_NYQUIST_OVERSAMPLING = 8
 #: Default-resolution marker for incoherent dataset digests (#1214), so results
-#: scored on the coarser sinc-Nyquist default re-key instead of resuming.
-LINE_RESOLUTION_DEFAULT_MODEL = f"sinc-oversampled-x{LINE_NYQUIST_OVERSAMPLING}-v1"
-#: Relative error allowed in an isolated line's peak height and FWHM on the
-#: ``sinc-shape`` axis: the #1143 shape margin, and the harness ``SHAPE_RTOL``
-#: of ``line-grid-sinc-convergence``.
+#: scored on an earlier default re-key instead of resuming. v2 (#1265): bin-mean
+#: takes the shape step on every bandwidth, without a resonance-local overflow.
+LINE_RESOLUTION_DEFAULT_MODEL = f"sinc-oversampled-x{LINE_NYQUIST_OVERSAMPLING}-v2"
+#: Relative error allowed in an isolated line's peak height and FWHM on a
+#: ``bin-mean`` ``sinc-oversampled`` axis: the #1143 shape margin, and the
+#: harness ``SHAPE_RTOL`` of ``line-grid-sinc-convergence``.
 DEFAULT_SHAPE_RTOL = 1.0e-2
-#: Coordinate budget of the ``sinc-shape`` axis. Above it the policy falls back
-#: to ``resonance-local``. The Fourier reduction is nearly flat in bin count
-#: (#944: 43k to 865k bins within +60% on CUDA and ROCm); 1M bins is the
-#: largest measured axis, rounded.
-DEFAULT_SHAPE_MAX_POINTS = 1_000_000
+#: Default coordinate budget under ``bin-mean`` quadrature. The Fourier
+#: reduction is nearly flat in bin count (#944: 43k to 865k bins within +60%
+#: on CUDA and ROCm); 1M bins is the largest measured axis, rounded.
+DEFAULT_BIN_MEAN_MAX_POINTS = 1_000_000
 #: Per-line, per-side tail share outside the fine halo of ``resonance-local``
 #: (at most twice this in total), charged with the bandwidth share to the
 #: feature-window row of ``tbl-line-budget-allocation``, which measured-bandwidth
@@ -343,7 +350,7 @@ def environment_overrides_present() -> bool:
 
 
 def shape_spacing_factor(shape_rtol: float) -> float:
-    """Ratio ``h / W`` of the ``sinc-shape`` step to a line's first-zero width.
+    """Ratio ``h / W`` of the bin-mean shape step to a line's first-zero width.
 
     A line ``sinc^2((E - E_res) / W)`` (``np.sinc`` convention) has
     ``f = 1 - (pi^2 / 3) (u / W)^2 + O(u^4)`` near its peak. The mean of a bin
@@ -543,18 +550,13 @@ class CxrGridPolicy:
             }
         if self.resolution_policy == LOCAL_RESOLUTION_POLICY:
             payload["resolution"] = {**payload["resolution"], "halo_limit": self.halo_limit}
-        if self.resolution_policy == SHAPE_RESOLUTION_POLICY:
-            payload["resolution"] = {
-                **payload["resolution"],
-                "halo_limit": self.halo_limit,
-                "shape_rtol": DEFAULT_SHAPE_RTOL,
-                "shape_max_points": DEFAULT_SHAPE_MAX_POINTS,
-            }
         if self.resolution_policy == OVERSAMPLED_RESOLUTION_POLICY:
-            payload["resolution"] = {
-                **payload["resolution"],
-                "oversampling": LINE_NYQUIST_OVERSAMPLING,
-            }
+            step = (
+                {"shape_rtol": DEFAULT_SHAPE_RTOL}
+                if self.quadrature == "bin-mean"
+                else {"oversampling": LINE_NYQUIST_OVERSAMPLING}
+            )
+            payload["resolution"] = {**payload["resolution"], **step}
         return payload
 
 
@@ -675,22 +677,16 @@ def default_bandwidth_policy(coherent_emission: object = False, max_dE_frac: flo
 def kinematic_fallback_payload(payload: dict[str, Any]) -> dict[str, Any] | None:
     """The ``kinematic-ceiling`` payload a defaulted measured bandwidth falls back to.
 
-    ``None`` unless the bandwidth is ``resonance-population`` chosen by default
-    (no recorded source) and the resolution is not ``resonance-local``, which
-    needs the measured bandwidth. The result is the payload an explicit
-    ``kinematic-ceiling`` would carry: same ceiling, start and resolution (#1243).
-    A ``sinc-shape`` resolution, which also needs the measured bandwidth, becomes
-    the ``sinc-oversampled`` resolution the kinematic default takes, explicit or
-    defaulted, rather than the coarser ``sinc-nyquist`` step (#1214).
+    One rule (#1265): ``None`` unless the bandwidth is ``resonance-population``
+    with no recorded source (``resonance-local`` records its implied one). The
+    result is the payload an explicit ``kinematic-ceiling`` would carry, with
+    resolution, quadrature and budget unchanged (#1243).
 
     Validation: line-grid-resonance-bandwidth
     """
     bandwidth = payload["bandwidth"]
-    if (
-        bandwidth["policy"] != RESONANCE_BANDWIDTH_POLICY
-        or "bandwidth" in payload.get("sources", {})
-        or payload.get("resolution", {}).get("policy") == LOCAL_RESOLUTION_POLICY
-        or payload.get("windows") is not None
+    if bandwidth["policy"] != RESONANCE_BANDWIDTH_POLICY or "bandwidth" in payload.get(
+        "sources", {}
     ):
         return None
     fallback = dict(payload)
@@ -702,35 +698,45 @@ def kinematic_fallback_payload(payload: dict[str, Any]) -> dict[str, Any] | None
     fallback["schema"] = (
         QUADRATURE_CXR_GRID_POLICY_SCHEMA if "quadrature" in payload else CXR_GRID_POLICY_SCHEMA
     )
-    if payload.get("resolution", {}).get("policy") == SHAPE_RESOLUTION_POLICY:
-        shape_only = ("halo_limit", "shape_rtol", "shape_max_points")
-        resolution = {k: v for k, v in payload["resolution"].items() if k not in shape_only}
-        fallback["resolution"] = {
-            **resolution,
-            "policy": OVERSAMPLED_RESOLUTION_POLICY,
-            "oversampling": LINE_NYQUIST_OVERSAMPLING,
-        }
     return fallback
 
 
-def default_resolution_policy(*, bandwidth: str, quadrature: str, windows: bool = False) -> str:
-    """Resolution an unset selector takes beside the other resolved selectors.
+def default_resolution_policy(*, windows: bool = False) -> str:
+    """Resolution an unset selector takes: ``sinc-nyquist`` with windows, else ``sinc-oversampled``.
 
-    Feature windows place their own nodes and keep ``sinc-nyquist``. Bin-mean
-    quadrature on the measured bandwidth takes ``sinc-shape``: its bin-mean
-    peak bound is 1e-2 by construction, while bin means at the
-    ``sinc-oversampled`` step ``W/8`` are bounded only by
-    ``(pi^2/9)/64 = 1.7e-2``. Everything else takes ``sinc-oversampled``, the
-    node-quadrature step measured on the #1143 scenes (#1214).
+    ``sinc-oversampled`` is the shape-resolving step of the case's quadrature,
+    never of its bandwidth (#1265): ``W / 8`` under ``node`` (measured, #1214);
+    ``shape_spacing_factor(DEFAULT_SHAPE_RTOL) * W`` ~ ``W / 10.5`` under
+    ``bin-mean``, bounding an isolated line's peak bin mean to 1e-2 (``W / 8``
+    gives only ``(pi^2/9)/64 = 1.7e-2``).
 
     Validation: line-grid-sinc-shape-spacing
     Validation: line-grid-sinc-convergence
     """
-    if windows:
-        return NYQUIST_RESOLUTION_POLICY
-    if quadrature == "bin-mean" and bandwidth == RESONANCE_BANDWIDTH_POLICY:
-        return SHAPE_RESOLUTION_POLICY
-    return AUTOMATIC_RESOLUTION_POLICY
+    return NYQUIST_RESOLUTION_POLICY if windows else AUTOMATIC_RESOLUTION_POLICY
+
+
+def canonical_resolution(value: object, *, quadrature: str, label: str) -> str:
+    """A resolution selector with ``sinc-shape`` (bin-mean only) mapped to its replacement."""
+    chosen = str(value)
+    if chosen in DEPRECATED_RESOLUTION_ALIASES:
+        if quadrature != "bin-mean":
+            raise ValueError(f"the deprecated {chosen} resolution needs bin-mean quadrature")
+        replacement = DEPRECATED_RESOLUTION_ALIASES[chosen]
+        warnings.warn(
+            f"line-grid resolution {chosen!r} is deprecated (#1265) and will be removed in "
+            f"the next release; {replacement!r} now takes the same step under bin-mean "
+            "quadrature on any bandwidth",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+        return replacement
+    if chosen not in RESOLUTION_POLICIES:
+        raise ValueError(
+            f"{label} line-grid resolution must be one of {list(RESOLUTION_POLICIES)}, "
+            f"got {chosen!r}"
+        )
+    return chosen
 
 
 def check_selector_combination(
@@ -740,14 +746,14 @@ def check_selector_combination(
 
     Shared by :func:`resolve_cxr_grid_policy` and the profile editor, so a
     stored policy fails before it is written rather than when a case resolves.
+    ``resolution`` is canonical (:func:`canonical_resolution`).
 
     Validation: line-grid-resonance-local-spacing
-    Validation: line-grid-sinc-shape-spacing
     """
-    if resolution in (LOCAL_RESOLUTION_POLICY, SHAPE_RESOLUTION_POLICY):
+    if resolution == LOCAL_RESOLUTION_POLICY:
         if bandwidth != RESONANCE_BANDWIDTH_POLICY:
             raise ValueError(
-                f"the {resolution} resolution reads the measured resonance population "
+                "the resonance-local resolution reads the measured resonance population "
                 "and needs the resonance-population bandwidth"
             )
         # Node quadrature on a piecewise axis loses up to ~(h/w)**2 of a line's
@@ -755,14 +761,13 @@ def check_selector_combination(
         # bin means telescope to the exact integral at any spacing (#192).
         if quadrature != "bin-mean":
             raise ValueError(
-                f"the {resolution} resolution needs bin-mean quadrature: node "
-                "quadrature loses unbounded yield at resonance-local spacing joins, "
-                "and sinc-shape falls back to resonance-local above its budget"
+                "the resonance-local resolution needs bin-mean quadrature: node "
+                "quadrature loses unbounded yield at its spacing joins"
             )
-    if resolution == OVERSAMPLED_RESOLUTION_POLICY and windows:
+    if windows and resolution != NYQUIST_RESOLUTION_POLICY:
         raise ValueError(
-            "the sinc-oversampled resolution divides a uniform axis; feature windows "
-            "place their own nodes per feature and keep the sinc-nyquist backbone"
+            f"the {resolution} resolution cannot be combined with feature windows, which "
+            "place their own nodes per feature on the sinc-nyquist backbone"
         )
     if bandwidth == RESONANCE_BANDWIDTH_POLICY and windows:
         raise ValueError(
@@ -771,29 +776,44 @@ def check_selector_combination(
         )
 
 
-def _resolve_bandwidth(per_call, stored, default, *, windowed, sources):
-    """Bandwidth by per-call > stored > ``default``, with no environment layer.
+def _layered(per_call, stored, key):
+    """A structural selector's first set value by per-call > stored, and its source.
 
-    Like windows and quadrature. The source is recorded only for a measured
-    choice, as before the default moved (#1243), so an explicit
-    ``kinematic-ceiling`` keeps its historical payload bit-for-bit. Windows
-    spend the bandwidth's budget share (``tbl-line-budget-allocation``), so an
-    unset bandwidth beside them stays ``kinematic-ceiling``; an explicit
-    measured choice is refused by :func:`check_selector_combination`.
+    No environment layer: the PYRITE_ENERGY_GRID_* names would otherwise
+    outrank stored rows for a structural choice.
+    """
+    for layer, label in ((per_call, "per-call"), (stored, "stored configuration")):
+        if layer.get(key) is not None:
+            return layer[key], label
+    return None, None
+
+
+def _resolve_bandwidth(per_call, stored, default, *, windowed, local, sources):
+    """Bandwidth by per-call > stored > implied > ``default`` (:func:`_layered`).
+
+    The source is recorded only for a measured choice (#1243), so an explicit
+    ``kinematic-ceiling`` keeps its historical payload bit-for-bit. Beside
+    ``resonance-local`` (``local``) an unset bandwidth is the measured one it
+    reads, recorded as implied so it never falls back (#1265). Windows spend
+    the bandwidth's budget share (``tbl-line-budget-allocation``), so beside
+    them an unset bandwidth stays ``kinematic-ceiling``.
 
     Validation: line-grid-resonance-bandwidth
     """
-    for layer, label in ((per_call, "per-call"), (stored, "stored configuration")):
-        if layer.get("bandwidth") is not None:
-            chosen = str(layer["bandwidth"])
-            if chosen not in BANDWIDTH_POLICIES:
-                raise ValueError(
-                    f"{label} line-grid bandwidth must be one of {list(BANDWIDTH_POLICIES)}, "
-                    f"got {chosen!r}"
-                )
-            if chosen != KINEMATIC_BANDWIDTH_POLICY:
-                sources["bandwidth"] = label
-            return chosen
+    raw, label = _layered(per_call, stored, "bandwidth")
+    if raw is not None:
+        chosen = str(raw)
+        if chosen not in BANDWIDTH_POLICIES:
+            raise ValueError(
+                f"{label} line-grid bandwidth must be one of {list(BANDWIDTH_POLICIES)}, "
+                f"got {chosen!r}"
+            )
+        if chosen != KINEMATIC_BANDWIDTH_POLICY:
+            sources["bandwidth"] = label
+        return chosen
+    if local:
+        sources["bandwidth"] = f"implied by {LOCAL_RESOLUTION_POLICY}"
+        return RESONANCE_BANDWIDTH_POLICY
     return KINEMATIC_BANDWIDTH_POLICY if windowed else default
 
 
@@ -818,7 +838,6 @@ def resolve_cxr_grid_policy(
 
     Validation: line-grid-resonance-bandwidth
     Validation: line-grid-resonance-local-spacing
-    Validation: line-grid-sinc-shape-spacing
     Validation: sinc-bin-integration
     """
     per_call = dict(per_call or {})
@@ -855,12 +874,20 @@ def resolve_cxr_grid_policy(
             DEFAULT_BACKEND_SAFETY_ULPS,
         )
     )
+    # Structural selectors (:func:`_layered`) record a source only for a
+    # non-default choice, keeping historical payloads unchanged. Quadrature
+    # comes first: the default point budget and resolution step follow it.
+    # Validation: sinc-bin-integration
+    raw, label = _layered(per_call, stored, "quadrature")
+    quadrature = DEFAULT_CXR_QUADRATURE if raw is None else _quadrature(raw, label)
+    if quadrature != DEFAULT_CXR_QUADRATURE:
+        sources["quadrature"] = label
     max_points = int(
         _resolve(
             "max_points",
             _ENV_MAX_POINTS,
             lambda name: _int_env(name, minimum=2),
-            DEFAULT_MAX_POINTS,
+            DEFAULT_BIN_MEAN_MAX_POINTS if quadrature == "bin-mean" else DEFAULT_MAX_POINTS,
         )
     )
 
@@ -905,52 +932,28 @@ def resolve_cxr_grid_policy(
     strictest = min(rtol.values())
     sources["aliased_weight_limit"] = "derived from rtol"
 
-    # Windows follow per-call > stored > built-in (off). No environment layer:
-    # the PYRITE_ENERGY_GRID_* names would otherwise outrank stored rows for a
-    # structural choice. A per-call False disables stored windows. The source
-    # is recorded only when windows are on, keeping window-free payloads
-    # unchanged.
-    windows = None
-    for layer, label in ((per_call, "per-call"), (stored, "stored configuration")):
-        if layer.get("windows") is not None:
-            windows = _window_block(layer["windows"], label)
-            if windows is not None:
-                sources["windows"] = label
-            break
+    # Windows default off; a per-call False disables stored windows.
+    raw, label = _layered(per_call, stored, "windows")
+    windows = None if raw is None else _window_block(raw, label)
+    if windows is not None:
+        sources["windows"] = label
 
-    # Quadrature follows the same per-call > stored > built-in order as windows,
-    # and for the same reason has no environment layer. The source is recorded
-    # only for a non-default choice, keeping ``node`` payloads unchanged.
-    # Validation: sinc-bin-integration
-    quadrature = DEFAULT_CXR_QUADRATURE
-    for layer, label in ((per_call, "per-call"), (stored, "stored configuration")):
-        if layer.get("quadrature") is not None:
-            quadrature = _quadrature(layer["quadrature"], label)
-            if quadrature != DEFAULT_CXR_QUADRATURE:
-                sources["quadrature"] = label
-            break
-
+    # The resolution default depends on windows alone (default_resolution_policy).
+    resolution_policy = default_resolution_policy(windows=windows is not None)
+    raw, label = _layered(per_call, stored, "resolution")
+    if raw is not None:
+        chosen = canonical_resolution(raw, quadrature=quadrature, label=label)
+        if chosen != resolution_policy:
+            sources["resolution"] = label
+        resolution_policy = chosen
     bandwidth_policy = _resolve_bandwidth(
-        per_call, stored, str(bandwidth_policy), windowed=windows is not None, sources=sources
+        per_call,
+        stored,
+        str(bandwidth_policy),
+        windowed=windows is not None,
+        local=resolution_policy == LOCAL_RESOLUTION_POLICY,
+        sources=sources,
     )
-    # Resolution follows the same per-call > stored order, with no environment
-    # layer; the source is recorded only for a non-default choice. The default
-    # depends on windows, bandwidth and quadrature (default_resolution_policy).
-    resolution_policy = default_resolution_policy(
-        bandwidth=bandwidth_policy, quadrature=quadrature, windows=windows is not None
-    )
-    for layer, label in ((per_call, "per-call"), (stored, "stored configuration")):
-        if layer.get("resolution") is not None:
-            chosen = str(layer["resolution"])
-            if chosen not in RESOLUTION_POLICIES:
-                raise ValueError(
-                    f"{label} line-grid resolution must be one of {list(RESOLUTION_POLICIES)}, "
-                    f"got {chosen!r}"
-                )
-            if chosen != resolution_policy:
-                sources["resolution"] = label
-            resolution_policy = chosen
-            break
     check_selector_combination(
         bandwidth=bandwidth_policy,
         resolution=resolution_policy,
@@ -958,7 +961,7 @@ def resolve_cxr_grid_policy(
         windows=windows is not None,
     )
     halo_limit = None
-    if resolution_policy in (LOCAL_RESOLUTION_POLICY, SHAPE_RESOLUTION_POLICY):
+    if resolution_policy == LOCAL_RESOLUTION_POLICY:
         halo_limit = DEFAULT_LOCAL_HALO_LIMIT
     truncation = None
     if bandwidth_policy == RESONANCE_BANDWIDTH_POLICY:
@@ -1015,7 +1018,7 @@ def resolved_coordinates(
     rtol = dict(payload["rtol"])
     governing = min(rtol, key=lambda name: rtol[name])
 
-    oversampling = _oversampling(resolution)
+    oversampling = uniform_step_divisor(payload)
     target = min(float(target_spacing_eV), maximum_spacing) / oversampling
     if not math.isfinite(target) or target <= 0.0:
         raise CxrGridToleranceError(
@@ -1030,7 +1033,7 @@ def resolved_coordinates(
             f"[{start:g}, {stop:g}] eV, above the {max_points}-point budget. Raise the "
             "budget with PYRITE_ENERGY_GRID_MAX_POINTS, relax the tolerance with "
             f"PYRITE_ENERGY_GRID_RTOL_{governing.upper()}, narrow the bandwidth, or "
-            f"supply an explicit grid.{_coarser_resolution_hint(oversampling)} The grid "
+            f"supply an explicit grid.{_coarser_resolution_hint(oversampling, payload)} The grid "
             "is not coarsened automatically."
         )
     try:
@@ -1060,10 +1063,20 @@ def resolved_coordinates(
     return grid, record
 
 
-def _oversampling(resolution: Mapping[str, Any]) -> int:
-    """Node steps per sinc-Nyquist step a payload's uniform resolution takes (#1214)."""
+def uniform_step_divisor(payload: Mapping[str, Any]) -> float:
+    """Node steps per sinc-Nyquist step: ``oversampling`` (node) or ``shape_rtol`` (bin-mean).
+
+    Validation: line-grid-sinc-shape-spacing
+    """
+    resolution = payload["resolution"]
+    if resolution["policy"] == SHAPE_RESOLUTION_POLICY:
+        raise ValueError("sinc-shape line-grid payloads were retired by #1265; re-resolve")
+    if resolution["policy"] == LOCAL_RESOLUTION_POLICY:  # e.g. a pre-#1265 fallback
+        raise ValueError("a resonance-local payload has no uniform line axis; re-resolve")
     if resolution["policy"] != OVERSAMPLED_RESOLUTION_POLICY:
         return 1
+    if "shape_rtol" in resolution:
+        return 1.0 / shape_spacing_factor(float(resolution["shape_rtol"]))
     value = resolution.get("oversampling")
     if type(value) is not int or value < 1:
         raise ValueError(
@@ -1072,15 +1085,17 @@ def _oversampling(resolution: Mapping[str, Any]) -> int:
     return value
 
 
-def _coarser_resolution_hint(oversampling: int) -> str:
-    """The over-budget opt-out an oversampled refusal names (#1214)."""
+def _coarser_resolution_hint(oversampling: float, payload: Mapping[str, Any]) -> str:
+    """The over-budget opt-outs an oversampled refusal names (#1214, #1265)."""
     if oversampling == 1:
         return ""
+    measured = payload["bandwidth"]["policy"] == RESONANCE_BANDWIDTH_POLICY
+    local = " Or, with bin-mean, resonance-local refines only near resonances."
     return (
-        f" Or select the {oversampling}x coarser sinc-nyquist resolution, which keeps "
+        f" Or select the {oversampling:.3g}x coarser sinc-nyquist resolution, which keeps "
         "line area but not peak height or FWHM: in Python, "
         "Numerics(line_resolution='sinc-nyquist'); in a profile, `pyrite profile "
-        "numerics cxr-grid set NAME --resolution sinc-nyquist`."
+        "numerics cxr-grid set NAME --resolution sinc-nyquist`." + (local if measured else "")
     )
 
 
@@ -1099,14 +1114,13 @@ def windowed_coordinates(
     plan is never coarsened. Precision is judged interval by interval, so a fine
     window low on the axis is held to the ulp at its own energy.
 
-    A ``resonance-local`` resolution (or the over-budget ``sinc-shape``
-    fallback to it) plans its own pieces without a windows block, and
-    ``stop_eV`` then replaces the payload's measured-bandwidth cap.
+    A ``resonance-local`` resolution plans its own pieces without a windows
+    block, and ``stop_eV`` then replaces the payload's measured-bandwidth cap.
     """
     bandwidth = payload["bandwidth"]
     resolution = payload["resolution"]
     windows = payload.get("windows")
-    local = resolution["policy"] in (LOCAL_RESOLUTION_POLICY, SHAPE_RESOLUTION_POLICY)
+    local = resolution["policy"] == LOCAL_RESOLUTION_POLICY
     if windows is None and not local:
         raise ValueError("line-grid policy payload carries no windows block")
     start = float(bandwidth["start_eV"])

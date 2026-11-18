@@ -456,3 +456,10 @@ was regenerated, at the PR head on CPU/NumPy fp64; its transport signature is
 asserted unchanged before re-pinning. Six of 71 bins move (at most a few
 parts in 1e7); every other output and tolerance is unchanged.
 
+## Quadrature-only line resolution (#1265)
+
+`LINE_RESOLUTION_DEFAULT_MODEL=sinc-oversampled-x8-v2` takes the bin-mean
+shape step on every bandwidth. Only the `parameter_sha256` identity pins in
+`resolved.json` advance; every resolved case payload and `case_content_key`
+is unchanged (the fixtures use node quadrature), and output arrays and
+tolerances are retained.

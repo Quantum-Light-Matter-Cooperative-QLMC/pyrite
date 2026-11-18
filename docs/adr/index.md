@@ -55,6 +55,7 @@ In other words:
 0020-photon-transport-source-and-scoring
 0021-named-physics-numerics-presets
 0022-named-target-filter-presets
+0023-line-grid-selector-rules
 ```
 
 | ADR                                                 | Title                               | Status                                 |
@@ -70,7 +71,7 @@ In other words:
 | [0009](0009-result-persistence-format.md)           | Result persistence format           | Accepted                               |
 | [0010](0010-reduce-cli-noun-surface.md)             | Reduce the CLI noun surface          | Accepted                               |
 | [0012](0012-backlog-in-github-issues.md)            | Backlog in GitHub Issues, not TODO.md | Accepted                               |
-| [0013](0013-automatic-line-grids-by-default.md)     | Automatic line grids by default      | Accepted                               |
+| [0013](0013-automatic-line-grids-by-default.md)     | Automatic line grids by default      | Accepted; selector rules in ADR-0023   |
 | [0014](0014-packaged-data-layout.md)                | Packaged data layout                 | Accepted                               |
 | [0015](0015-xraydb-atomic-scattering-data.md)       | xraydb as the atomic scattering data source | Accepted                         |
 | [0016](0016-target-filter-body-components.md)      | Share descriptions across target and filter roles | Accepted                    |
@@ -80,3 +81,4 @@ In other words:
 | [0020](0020-photon-transport-source-and-scoring.md) | Photon transport source and scoring | Accepted |
 | [0021](0021-named-physics-numerics-presets.md) | Named Physics and Numerics presets | Accepted |
 | [0022](0022-named-target-filter-presets.md) | Named target and downstream filter presets | Proposed |
+| [0023](0023-line-grid-selector-rules.md) | Line-grid selector rules | Accepted |
