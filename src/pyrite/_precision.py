@@ -100,7 +100,9 @@ class Precision:
         of the observable's sum.
     min_effective_histories
         Guard: the effective sample size ``(sum m)**2 / sum m**2`` must reach
-        this floor.
+        this floor. For CXR, the same floor also applies to squared centered
+        contributions ``M2**2/M4``, unless empirical ``s/abs(mean)`` is at
+        most ``target_rse``. Zero disables both effective-size floors.
     stability_blocks, stability_fraction
         Guard: the running mean at each of the last ``k`` block ends must lie
         within ``stability_fraction * target_rse`` (relative) of the current
@@ -288,6 +290,15 @@ class Precision:
         ):
             if case.get(key) is not None and case.get(key) is not False:
                 raise ValueError(f"adaptive precision does not support {key}; use fixed counts")
+
+
+# Sampling identity generation: v1 was the unmarked mean-only guards.
+ADAPTIVE_SAMPLING_MODEL = "variance-contributors-v2"
+
+
+def _adaptive_sampling_markers(policy) -> dict[str, str]:
+    """Re-key adaptive results when the stopping rule changes; fixed N is stable."""
+    return {"adaptive_sampling_model": ADAPTIVE_SAMPLING_MODEL} if policy is not None else {}
 
 
 _BREM_BAND_REDUCTION_MODEL = "cuda-fused-fp32-row-fp64-primary-band-v2"

@@ -24,6 +24,7 @@ Validation: adaptive-sample-size-stopping
 
 import math
 import warnings
+from dataclasses import replace
 
 import numpy as np
 import pytest
@@ -72,6 +73,39 @@ def test_running_moments_equal_direct_formulas():
     # RSE^2 = n/(n-1) * (1/ESS - 1/n).
     identity = n / (n - 1) * (1.0 / ess - 1.0 / n)
     assert math.isclose(moments.relative_se() ** 2, identity, rel_tol=1e-9)
+
+
+@pytest.mark.parametrize("scale", [1e-20, 1.0, 1e20])
+@pytest.mark.parametrize("block", [1, 37, 997])
+def test_variance_diagnostic_matches_centered_population(scale, block):
+    values = scale * np.random.default_rng(75).lognormal(0.0, 1.5, 997)
+    moments = RunningMoments()
+    for start in range(0, len(values), block):
+        moments.add_block(values[start : start + block])
+    centered = values - values.mean()
+    m2 = np.sum(centered**2)
+    m4 = np.sum(centered**4)
+    assert moments.m3 == pytest.approx(np.sum(centered**3), rel=1e-12, abs=0)
+    assert moments.m4 == pytest.approx(m4, rel=1e-12, abs=0)
+    assert moments.variance_of_variance() == pytest.approx(m4 / m2**2 - 1 / len(values), rel=1e-12)
+
+
+def test_constant_signal_passes_variance_guard_and_zero_signal_does_not_converge():
+    settings = AdaptiveSettings(0.001, 3000, 6000, 1000)
+    for value, expected in [(1.0, "converged"), (0.0, "max_electrons")]:
+        record = run_stopping_rule(settings, _population_measure(np.full(6000, value)))
+        assert record["stop_reason"] == expected
+        assert record["statistics"]["cxr"]["variance_of_variance"] == 0.0
+
+
+def test_variance_guard_retains_small_stop_for_nearly_constant_signal():
+    population = np.ones(6000)
+    population[50] += 0.01
+    settings = AdaptiveSettings(0.001, 3000, 6000, 1000)
+    record = run_stopping_rule(settings, _population_measure(population))
+    assert record["stop_reason"] == "converged"
+    assert record["realized_electrons"] == 4000
+    assert record["statistics"]["cxr"]["variance_of_variance"] > 0.9
 
 
 def test_degenerate_moments_report_no_error():
@@ -193,7 +227,16 @@ def test_light_case_meets_its_target_over_20_seeds(light_line_masses):
     )
     truth = np.concatenate(populations).mean()
     records = [run_stopping_rule(settings, _population_measure(p)) for p in populations]
-    assert all(r["stop_reason"] == "converged" for r in records)
+    # The variance gate may require more than the captured 800 histories.
+    # A capped run remains useful for this accuracy study, but must report
+    # that its convergence diagnostics did not pass.
+    for record in records:
+        if record["stop_reason"] == "max_electrons":
+            assert record["statistics_limited"]
+            assert record["realized_electrons"] == _LIGHT_N
+        else:
+            assert record["stop_reason"] == "converged"
+            assert record["statistics"]["cxr"]["converged"]
     means = np.array([r["statistics"]["cxr"]["mean"] for r in records])
     reported = np.array([r["statistics"]["cxr"]["relative_se"] for r in records])
     assert np.all(reported <= target)
@@ -237,6 +280,69 @@ def test_pilot_projection_skips_checks_until_the_projected_count():
 
 
 # ---- heavy tails --------------------------------------------------------------
+
+
+def test_variance_tail_prevents_false_precision_on_nearly_constant_signal():
+    """A large baseline hides rare variance carriers from contribution ESS.
+
+    The first 4000 histories have one moderate outlier; the rare class starts
+    at 5000. Its eventual RSE exceeds the requested 0.1 percent. No random
+    seed or fitted tolerance: the finite population defines the reference.
+    """
+    population = np.ones(20_000)
+    population[500] = 1.5
+    population[5000::1000] = 20.0
+    settings = AdaptiveSettings(
+        target_rse=0.001,
+        min_histories=3000,
+        max_histories=20_000,
+        block_histories=1000,
+        pilot_histories=3000,
+    )
+    record = run_stopping_rule(settings, _population_measure(population))
+    assert record["stop_reason"] == "max_electrons"
+    assert record["statistics_limited"]
+    assert record["realized_electrons"] == len(population)
+
+
+@pytest.mark.parametrize("observable, effective_floor", [("cxr", 0.0), ("brem", 100.0)])
+def test_variance_guard_preserves_disabled_and_brem_stops(observable, effective_floor):
+    """Neither explicit opt-out nor brem acquires the CXR-only floor."""
+    population = np.ones(6000)
+    population[500] = 1.5
+    settings = AdaptiveSettings(
+        0.001,
+        3000,
+        6000,
+        1000,
+        observables=(observable,),
+        min_effective_histories=effective_floor,
+    )
+    record = run_stopping_rule(
+        settings, lambda start, stop, _: {observable: population[start:stop]}
+    )
+    assert record["stop_reason"] == "converged"
+    assert record["realized_electrons"] == 4000
+
+
+def test_variance_tail_keeps_cxr_running_after_independent_brem_freezes():
+    """The same early scores pass brem but fail CXR's variance gate."""
+    population = np.ones(6000)
+    population[500] = 1.5
+    population[5000] = 20.0
+    settings = AdaptiveSettings(
+        0.001, 3000, 6000, 1000, observables=("cxr", "brem"), brem_target_rse=0.001
+    )
+    record = run_stopping_rule(
+        settings, lambda start, stop, _: dict.fromkeys(("cxr", "brem"), population[start:stop])
+    )
+    assert record["statistics_limited"]
+    assert record["stop_reason"] == "max_electrons"
+    assert record["realized_electrons"] == 6000
+    assert record["realized_electrons_brem"] == 4000
+    assert record["statistics"]["brem"]["stop_reason"] == "converged"
+    assert record["statistics"]["brem"]["mean"] == pytest.approx(1.0 + 0.5 / 4000)
+    assert not record["statistics"]["cxr"]["passes"]["variance_sampling"]
 
 
 def _heavy_population(rng, n, *, every=None, rate=None, heavy=400.0):
@@ -404,7 +510,9 @@ def test_adaptive_run_is_the_fixed_n_run_at_its_realized_count():
     """Energy spread and a bunch: the realized population's table range and
     centroid are its own, so the run replays transport when they differ."""
     case = _case(energy_spread_frac=1e-3, bunch_length_fs=5.0)
-    result, stats = run_case_adaptive(case, _SETTINGS, transport_core="per-electron")
+    # Exercise an early realized-range replay independently of the ESS floors.
+    settings = replace(_SETTINGS, min_effective_histories=0.0)
+    result, stats = run_case_adaptive(case, settings, transport_core="per-electron")
     n = stats["realized_electrons"]
     assert stats["stop_reason"] == "converged" and 40 <= n < 200 and n % 20 == 0
     _assert_identical(result, _fixed(case, n))
