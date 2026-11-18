@@ -1,0 +1,2180 @@
+{
+ "issue": 1296,
+ "schema": "pyrite.fourier-reduction-phases-1296.v1",
+ "qualification": "engineering evidence; no physics-validation claim",
+ "remote_checkout": "qlmc:~/pyrite-1296 (out-nv, out-nv-v6)",
+ "jobs": {
+  "13641": "capture + bench (v5)",
+  "13646": "variants",
+  "13647": "variants2",
+  "13650": "v6 capture, v6-vs-v5 bench timing, margins",
+  "13640": "gpu-amd: hipErrorNoDevice, no result"
+ },
+ "work_counts": {
+  "spread_points": 494175448,
+  "fine_grid": 3195904,
+  "lines": 10422507,
+  "broad_lines": 109847,
+  "n_fft": 3960,
+  "rects": 288398,
+  "nufft_rects": 435,
+  "nufft_sources": 38013496,
+  "nufft_pairs": 429310876032,
+  "direct_pairs": 2036720730,
+  "max_mode": 396580
+ },
+ "capture_v5": {
+  "code_sha": "bddf782fe637943d024254f00d68ecfe4d984101",
+  "gpu": "NVIDIA GeForce RTX 5080",
+  "case": "mos2 30 keV 15 deg N=1024",
+  "reduce_calls": 101,
+  "reduce_lines": 975439294,
+  "reduce_s": 63.98,
+  "ns_per_line": 65.6,
+  "transport_s": 24.86,
+  "spectrum_s": 88.35
+ },
+ "capture_v6": {
+  "code_sha": "9206a865fa855198f1f91e1031401d1e4e0d1580",
+  "gpu": "NVIDIA GeForce RTX 5080",
+  "case": "mos2 30 keV 15 deg N=1024",
+  "reduce_calls": 101,
+  "reduce_lines": 975439294,
+  "reduce_s": 35.49,
+  "ns_per_line": 36.4,
+  "transport_s": 2.04,
+  "spectrum_s": 54.13
+ },
+ "bench": {
+  "code_sha": "9206a865fa855198f1f91e1031401d1e4e0d1580",
+  "gpu": "NVIDIA GeForce RTX 5080",
+  "repeats": 3,
+  "flushes": [
+   {
+    "flush": "flush-0.npz",
+    "lines": 10422507,
+    "axis": [
+     259.91666666666663,
+     499.8333333333333,
+     60
+    ],
+    "v5_wall_s": 0.587,
+    "v6_wall_s": 0.386,
+    "v6_error": {
+     "max_abs_over_peak": 1.84125671569401e-11,
+     "rel_total": 6.634485743986006e-12,
+     "rel_l1": 1.5570019766892205e-11
+    },
+    "arms": [
+     {
+      "arm": "fp64_eps1e-12",
+      "opts": {},
+      "wall_s": 0.668,
+      "phases_s": {
+       "prologue": 0.0018,
+       "broad": 0.0057,
+       "period": 0.0006,
+       "plan": 0.0333,
+       "nufft_modulate": 0.0304,
+       "nufft_plan_grid": 0.0067,
+       "nufft_spread": 0.2954,
+       "nufft_fft_deconv": 0.0179,
+       "nufft_combine": 0.0106,
+       "direct": 0.1795,
+       "fold_ifft": 0.0017,
+       "envelope": 0.082
+      },
+      "max_abs_over_peak": 1.8937758545811825e-16,
+      "rel_total": 7.650777533051702e-17
+     },
+     {
+      "arm": "fp64_eps1e-9",
+      "opts": {
+       "eps": 1e-09
+      },
+      "wall_s": 0.611,
+      "phases_s": {
+       "prologue": 0.0018,
+       "broad": 0.0057,
+       "period": 0.0005,
+       "plan": 0.0339,
+       "nufft_modulate": 0.0314,
+       "nufft_plan_grid": 0.0066,
+       "nufft_spread": 0.2352,
+       "nufft_fft_deconv": 0.018,
+       "nufft_combine": 0.0098,
+       "direct": 0.1825,
+       "fold_ifft": 0.0017,
+       "envelope": 0.0824
+      },
+      "max_abs_over_peak": 1.861605337251485e-11,
+      "rel_total": 6.777546705933692e-12
+     },
+     {
+      "arm": "fp64_eps1e-6",
+      "opts": {
+       "eps": 1e-06
+      },
+      "wall_s": 0.551,
+      "phases_s": {
+       "prologue": 0.0018,
+       "broad": 0.0056,
+       "period": 0.0004,
+       "plan": 0.0341,
+       "nufft_modulate": 0.032,
+       "nufft_plan_grid": 0.0065,
+       "nufft_spread": 0.1698,
+       "nufft_fft_deconv": 0.018,
+       "nufft_combine": 0.0135,
+       "direct": 0.1864,
+       "fold_ifft": 0.0017,
+       "envelope": 0.082
+      },
+      "max_abs_over_peak": 8.517202554611842e-09,
+      "rel_total": 1.4141818464429668e-09
+     },
+     {
+      "arm": "fp32spread_eps1e-12",
+      "opts": {
+       "spread": "fp32"
+      },
+      "wall_s": 0.663,
+      "phases_s": {
+       "prologue": 0.0018,
+       "broad": 0.0056,
+       "period": 0.0004,
+       "plan": 0.0333,
+       "nufft_modulate": 0.0305,
+       "nufft_plan_grid": 0.0065,
+       "nufft_spread": 0.2911,
+       "nufft_fft_deconv": 0.0179,
+       "nufft_combine": 0.0117,
+       "direct": 0.1789,
+       "fold_ifft": 0.0017,
+       "envelope": 0.0821
+      },
+      "max_abs_over_peak": 7.030520768403296e-08,
+      "rel_total": 7.350780560374673e-08
+     },
+     {
+      "arm": "fp32spread_eps1e-9",
+      "opts": {
+       "spread": "fp32",
+       "eps": 1e-09
+      },
+      "wall_s": 0.612,
+      "phases_s": {
+       "prologue": 0.0018,
+       "broad": 0.0057,
+       "period": 0.0004,
+       "plan": 0.0333,
+       "nufft_modulate": 0.0312,
+       "nufft_plan_grid": 0.0064,
+       "nufft_spread": 0.2345,
+       "nufft_fft_deconv": 0.0179,
+       "nufft_combine": 0.0123,
+       "direct": 0.183,
+       "fold_ifft": 0.0016,
+       "envelope": 0.082
+      },
+      "max_abs_over_peak": 5.007016097775219e-08,
+      "rel_total": 5.0815927725587815e-08
+     },
+     {
+      "arm": "fp32spread_eps1e-6",
+      "opts": {
+       "spread": "fp32",
+       "eps": 1e-06
+      },
+      "wall_s": 0.549,
+      "phases_s": {
+       "prologue": 0.0018,
+       "broad": 0.0056,
+       "period": 0.0004,
+       "plan": 0.0333,
+       "nufft_modulate": 0.0314,
+       "nufft_plan_grid": 0.0065,
+       "nufft_spread": 0.1681,
+       "nufft_fft_deconv": 0.0178,
+       "nufft_combine": 0.0142,
+       "direct": 0.1867,
+       "fold_ifft": 0.0017,
+       "envelope": 0.082
+      },
+      "max_abs_over_peak": 1.105358409042637e-08,
+      "rel_total": 2.9713225451792688e-09
+     }
+    ]
+   },
+   {
+    "flush": "flush-1.npz",
+    "lines": 10169809,
+    "axis": [
+     259.91666666666663,
+     499.8333333333333,
+     60
+    ],
+    "v5_wall_s": 0.551,
+    "v6_wall_s": 0.368,
+    "v6_error": {
+     "max_abs_over_peak": 2.3607075746989344e-11,
+     "rel_total": 1.009766802734689e-11,
+     "rel_l1": 2.0844876005418446e-11
+    },
+    "arms": [
+     {
+      "arm": "fp64_eps1e-12",
+      "opts": {},
+      "wall_s": 0.629,
+      "phases_s": {
+       "prologue": 0.0018,
+       "broad": 0.0054,
+       "period": 0.0004,
+       "plan": 0.0333,
+       "nufft_modulate": 0.0318,
+       "nufft_plan_grid": 0.0064,
+       "nufft_spread": 0.2579,
+       "nufft_fft_deconv": 0.0184,
+       "nufft_combine": 0.0142,
+       "direct": 0.1751,
+       "fold_ifft": 0.0016,
+       "envelope": 0.0801
+      },
+      "max_abs_over_peak": 2.1097148044173968e-16,
+      "rel_total": 1.3752683867159888e-16
+     },
+     {
+      "arm": "fp64_eps1e-9",
+      "opts": {
+       "eps": 1e-09
+      },
+      "wall_s": 0.591,
+      "phases_s": {
+       "prologue": 0.0018,
+       "broad": 0.0054,
+       "period": 0.0004,
+       "plan": 0.0334,
+       "nufft_modulate": 0.0328,
+       "nufft_plan_grid": 0.0066,
+       "nufft_spread": 0.2052,
+       "nufft_fft_deconv": 0.0186,
+       "nufft_combine": 0.0124,
+       "direct": 0.1867,
+       "fold_ifft": 0.0022,
+       "envelope": 0.0801
+      },
+      "max_abs_over_peak": 2.3697266054878188e-11,
+      "rel_total": 9.96590484911201e-12
+     },
+     {
+      "arm": "fp64_eps1e-6",
+      "opts": {
+       "eps": 1e-06
+      },
+      "wall_s": 0.525,
+      "phases_s": {
+       "prologue": 0.0018,
+       "broad": 0.0054,
+       "period": 0.0006,
+       "plan": 0.0343,
+       "nufft_modulate": 0.0327,
+       "nufft_plan_grid": 0.0068,
+       "nufft_spread": 0.149,
+       "nufft_fft_deconv": 0.0186,
+       "nufft_combine": 0.0132,
+       "direct": 0.1844,
+       "fold_ifft": 0.0017,
+       "envelope": 0.0801
+      },
+      "max_abs_over_peak": 1.1879187921465731e-08,
+      "rel_total": 7.603676673963683e-10
+     },
+     {
+      "arm": "fp32spread_eps1e-12",
+      "opts": {
+       "spread": "fp32"
+      },
+      "wall_s": 0.628,
+      "phases_s": {
+       "prologue": 0.0018,
+       "broad": 0.0054,
+       "period": 0.0004,
+       "plan": 0.0346,
+       "nufft_modulate": 0.0326,
+       "nufft_plan_grid": 0.0065,
+       "nufft_spread": 0.2552,
+       "nufft_fft_deconv": 0.0185,
+       "nufft_combine": 0.0132,
+       "direct": 0.1762,
+       "fold_ifft": 0.0016,
+       "envelope": 0.0801
+      },
+      "max_abs_over_peak": 7.554494303436013e-08,
+      "rel_total": 7.189593614088649e-08
+     },
+     {
+      "arm": "fp32spread_eps1e-9",
+      "opts": {
+       "spread": "fp32",
+       "eps": 1e-09
+      },
+      "wall_s": 0.574,
+      "phases_s": {
+       "prologue": 0.0018,
+       "broad": 0.0054,
+       "period": 0.0004,
+       "plan": 0.0346,
+       "nufft_modulate": 0.0325,
+       "nufft_plan_grid": 0.0067,
+       "nufft_spread": 0.2026,
+       "nufft_fft_deconv": 0.0185,
+       "nufft_combine": 0.0132,
+       "direct": 0.1818,
+       "fold_ifft": 0.0016,
+       "envelope": 0.0801
+      },
+      "max_abs_over_peak": 4.8492674108664346e-08,
+      "rel_total": 5.039601692980975e-08
+     },
+     {
+      "arm": "fp32spread_eps1e-6",
+      "opts": {
+       "spread": "fp32",
+       "eps": 1e-06
+      },
+      "wall_s": 0.528,
+      "phases_s": {
+       "prologue": 0.0018,
+       "broad": 0.0054,
+       "period": 0.0004,
+       "plan": 0.0341,
+       "nufft_modulate": 0.0305,
+       "nufft_plan_grid": 0.0066,
+       "nufft_spread": 0.1468,
+       "nufft_fft_deconv": 0.019,
+       "nufft_combine": 0.0101,
+       "direct": 0.1878,
+       "fold_ifft": 0.0016,
+       "envelope": 0.0801
+      },
+      "max_abs_over_peak": 1.0294802651922288e-08,
+      "rel_total": 8.720360620482845e-10
+     }
+    ]
+   },
+   {
+    "flush": "flush-2.npz",
+    "lines": 10072958,
+    "axis": [
+     10.0,
+     2.9998999699909974,
+     9998
+    ],
+    "v5_wall_s": 0.503,
+    "v6_wall_s": 0.328,
+    "v6_error": {
+     "max_abs_over_peak": 8.247991937373907e-11,
+     "rel_total": 2.3101715320971414e-11,
+     "rel_l1": 4.314347959264265e-11
+    },
+    "arms": [
+     {
+      "arm": "fp64_eps1e-12",
+      "opts": {},
+      "wall_s": 0.574,
+      "phases_s": {
+       "prologue": 0.0018,
+       "broad": 0.0075,
+       "period": 0.0004,
+       "plan": 0.0303,
+       "nufft_modulate": 0.0242,
+       "nufft_plan_grid": 0.0048,
+       "nufft_spread": 0.2684,
+       "nufft_fft_deconv": 0.0124,
+       "nufft_combine": 0.0119,
+       "direct": 0.1316,
+       "fold_ifft": 0.001,
+       "envelope": 0.0791
+      },
+      "max_abs_over_peak": 9.057037707880967e-16,
+      "rel_total": 5.945531649961587e-17
+     },
+     {
+      "arm": "fp64_eps1e-9",
+      "opts": {
+       "eps": 1e-09
+      },
+      "wall_s": 0.522,
+      "phases_s": {
+       "prologue": 0.0018,
+       "broad": 0.0074,
+       "period": 0.0004,
+       "plan": 0.0309,
+       "nufft_modulate": 0.0244,
+       "nufft_plan_grid": 0.0049,
+       "nufft_spread": 0.2154,
+       "nufft_fft_deconv": 0.0125,
+       "nufft_combine": 0.0111,
+       "direct": 0.1316,
+       "fold_ifft": 0.001,
+       "envelope": 0.079
+      },
+      "max_abs_over_peak": 8.186261756082049e-11,
+      "rel_total": 2.2792316766171963e-11
+     },
+     {
+      "arm": "fp64_eps1e-6",
+      "opts": {
+       "eps": 1e-06
+      },
+      "wall_s": 0.461,
+      "phases_s": {
+       "prologue": 0.0018,
+       "broad": 0.0075,
+       "period": 0.0004,
+       "plan": 0.0308,
+       "nufft_modulate": 0.0243,
+       "nufft_plan_grid": 0.0049,
+       "nufft_spread": 0.1551,
+       "nufft_fft_deconv": 0.0125,
+       "nufft_combine": 0.011,
+       "direct": 0.1316,
+       "fold_ifft": 0.0011,
+       "envelope": 0.0789
+      },
+      "max_abs_over_peak": 8.116366965823545e-08,
+      "rel_total": 8.200774177884212e-10
+     },
+     {
+      "arm": "fp32spread_eps1e-12",
+      "opts": {
+       "spread": "fp32"
+      },
+      "wall_s": 0.57,
+      "phases_s": {
+       "prologue": 0.0017,
+       "broad": 0.0074,
+       "period": 0.0004,
+       "plan": 0.031,
+       "nufft_modulate": 0.0232,
+       "nufft_plan_grid": 0.0048,
+       "nufft_spread": 0.2665,
+       "nufft_fft_deconv": 0.0127,
+       "nufft_combine": 0.0093,
+       "direct": 0.1316,
+       "fold_ifft": 0.001,
+       "envelope": 0.0788
+      },
+      "max_abs_over_peak": 1.0861697665794412e-07,
+      "rel_total": 7.006269128215888e-08
+     },
+     {
+      "arm": "fp32spread_eps1e-9",
+      "opts": {
+       "spread": "fp32",
+       "eps": 1e-09
+      },
+      "wall_s": 0.52,
+      "phases_s": {
+       "prologue": 0.0017,
+       "broad": 0.0074,
+       "period": 0.0004,
+       "plan": 0.0309,
+       "nufft_modulate": 0.0242,
+       "nufft_plan_grid": 0.0048,
+       "nufft_spread": 0.214,
+       "nufft_fft_deconv": 0.0127,
+       "nufft_combine": 0.0101,
+       "direct": 0.1316,
+       "fold_ifft": 0.001,
+       "envelope": 0.0791
+      },
+      "max_abs_over_peak": 1.0433641348980857e-07,
+      "rel_total": 5.348707389289841e-08
+     },
+     {
+      "arm": "fp32spread_eps1e-6",
+      "opts": {
+       "spread": "fp32",
+       "eps": 1e-06
+      },
+      "wall_s": 0.455,
+      "phases_s": {
+       "prologue": 0.0017,
+       "broad": 0.0074,
+       "period": 0.0004,
+       "plan": 0.0304,
+       "nufft_modulate": 0.0224,
+       "nufft_plan_grid": 0.0052,
+       "nufft_spread": 0.1536,
+       "nufft_fft_deconv": 0.0129,
+       "nufft_combine": 0.0079,
+       "direct": 0.1315,
+       "fold_ifft": 0.001,
+       "envelope": 0.0789
+      },
+      "max_abs_over_peak": 7.37499499291101e-08,
+      "rel_total": 1.3364049562282945e-09
+     }
+    ]
+   }
+  ]
+ },
+ "variants": {
+  "code_sha": "61d28ac7791ab5cf730bed572d57e06b3f97acf8",
+  "gpu": "NVIDIA GeForce RTX 5080",
+  "repeats": 3,
+  "flushes": [
+   {
+    "flush": "flush-0.npz",
+    "lines": 10422507,
+    "axis": [
+     259.91666666666663,
+     499.8333333333333,
+     60
+    ],
+    "v5_wall_s": 0.661,
+    "arms": [
+     {
+      "arm": "base",
+      "opts": {},
+      "wall_s": 0.671,
+      "phases_s": {
+       "prologue": 0.0018,
+       "broad": 0.0056,
+       "period": 0.0004,
+       "plan": 0.0343,
+       "nufft_modulate": 0.031,
+       "nufft_plan_grid": 0.0064,
+       "nufft_spread": 0.2957,
+       "nufft_fft_deconv": 0.0175,
+       "nufft_combine": 0.0146,
+       "direct": 0.18,
+       "fold_ifft": 0.0018,
+       "envelope": 0.0813
+      },
+      "max_abs_over_peak": 1.8937758545811832e-16,
+      "rel_total": 6.182083621618848e-17
+     },
+     {
+      "arm": "spread_noatomic_diagnostic",
+      "opts": {
+       "spread": "noatomic"
+      },
+      "wall_s": 0.582,
+      "phases_s": {
+       "prologue": 0.0018,
+       "broad": 0.0057,
+       "period": 0.0005,
+       "plan": 0.0341,
+       "nufft_modulate": 0.0296,
+       "nufft_plan_grid": 0.0067,
+       "nufft_spread": 0.1933,
+       "nufft_fft_deconv": 0.0186,
+       "nufft_combine": 0.0109,
+       "direct": 0.1995,
+       "fold_ifft": 0.0016,
+       "envelope": 0.0814
+      },
+      "max_abs_over_peak": 0.9906670314270634,
+      "rel_total": 0.9775033232484158
+     },
+     {
+      "arm": "spread_sorted",
+      "opts": {
+       "spread": "sorted"
+      },
+      "wall_s": 1.134,
+      "phases_s": {
+       "prologue": 0.0018,
+       "broad": 0.0056,
+       "period": 0.0004,
+       "plan": 0.034,
+       "nufft_modulate": 0.0297,
+       "nufft_plan_grid": 0.0063,
+       "nufft_sort": 0.0884,
+       "nufft_spread": 0.6659,
+       "nufft_fft_deconv": 0.0178,
+       "nufft_combine": 0.0145,
+       "direct": 0.1819,
+       "fold_ifft": 0.0016,
+       "envelope": 0.0813
+      },
+      "max_abs_over_peak": 2.6512861964136565e-15,
+      "rel_total": 1.4660921354252879e-15
+     },
+     {
+      "arm": "direct_f32",
+      "opts": {
+       "direct": "f32"
+      },
+      "wall_s": 0.564,
+      "phases_s": {
+       "prologue": 0.0018,
+       "broad": 0.0057,
+       "period": 0.0004,
+       "plan": 0.0347,
+       "nufft_modulate": 0.0311,
+       "nufft_plan_grid": 0.007,
+       "nufft_spread": 0.2966,
+       "nufft_fft_deconv": 0.0174,
+       "nufft_combine": 0.0131,
+       "direct": 0.0721,
+       "fold_ifft": 0.0016,
+       "envelope": 0.0813
+      },
+      "max_abs_over_peak": 4.2420579142618504e-14,
+      "rel_total": 6.61866522169513e-15
+     },
+     {
+      "arm": "envelope_fused",
+      "opts": {
+       "envelope": "fused"
+      },
+      "wall_s": 0.599,
+      "phases_s": {
+       "prologue": 0.0018,
+       "broad": 0.0056,
+       "period": 0.0004,
+       "plan": 0.0339,
+       "nufft_modulate": 0.0309,
+       "nufft_plan_grid": 0.007,
+       "nufft_spread": 0.2948,
+       "nufft_fft_deconv": 0.0174,
+       "nufft_combine": 0.014,
+       "direct": 0.1802,
+       "fold_ifft": 0.0017,
+       "envelope": 0.0085
+      },
+      "max_abs_over_peak": 1.8937758545811832e-16,
+      "rel_total": 2.4254533337571217e-17
+     },
+     {
+      "arm": "min_work_2^20",
+      "opts": {
+       "min_work": 1048576
+      },
+      "wall_s": 0.749,
+      "phases_s": {
+       "prologue": 0.0018,
+       "broad": 0.0056,
+       "period": 0.0005,
+       "plan": 0.0339,
+       "nufft_modulate": 0.05,
+       "nufft_plan_grid": 0.0096,
+       "nufft_spread": 0.3884,
+       "nufft_fft_deconv": 0.0295,
+       "nufft_combine": 0.0312,
+       "direct": 0.1144,
+       "fold_ifft": 0.0016,
+       "envelope": 0.0814
+      },
+      "max_abs_over_peak": 1.8937758545811832e-16,
+      "rel_total": 2.5255733629923803e-17
+     },
+     {
+      "arm": "min_work_2^24",
+      "opts": {
+       "min_work": 16777216
+      },
+      "wall_s": 0.705,
+      "phases_s": {
+       "prologue": 0.0018,
+       "broad": 0.0057,
+       "period": 0.0004,
+       "plan": 0.0343,
+       "nufft_modulate": 0.0207,
+       "nufft_plan_grid": 0.0047,
+       "nufft_spread": 0.2263,
+       "nufft_fft_deconv": 0.0107,
+       "nufft_combine": 0.0052,
+       "direct": 0.3107,
+       "fold_ifft": 0.0018,
+       "envelope": 0.0813
+      },
+      "max_abs_over_peak": 3.7875517091623665e-16,
+      "rel_total": 1.0070595713260564e-17
+     },
+     {
+      "arm": "direct_f32_min_work_2^24",
+      "opts": {
+       "direct": "f32",
+       "min_work": 16777216
+      },
+      "wall_s": 0.515,
+      "phases_s": {
+       "prologue": 0.0018,
+       "broad": 0.0056,
+       "period": 0.0004,
+       "plan": 0.034,
+       "nufft_modulate": 0.0201,
+       "nufft_plan_grid": 0.0048,
+       "nufft_spread": 0.2262,
+       "nufft_fft_deconv": 0.0108,
+       "nufft_combine": 0.0054,
+       "direct": 0.1221,
+       "fold_ifft": 0.0017,
+       "envelope": 0.0813
+      },
+      "max_abs_over_peak": 2.541447196847948e-13,
+      "rel_total": 1.445936372644336e-13
+     }
+    ]
+   },
+   {
+    "flush": "flush-1.npz",
+    "lines": 10169809,
+    "axis": [
+     259.91666666666663,
+     499.8333333333333,
+     60
+    ],
+    "v5_wall_s": 0.632,
+    "arms": [
+     {
+      "arm": "base",
+      "opts": {},
+      "wall_s": 0.635,
+      "phases_s": {
+       "prologue": 0.0018,
+       "broad": 0.0054,
+       "period": 0.0004,
+       "plan": 0.0335,
+       "nufft_modulate": 0.0324,
+       "nufft_plan_grid": 0.0065,
+       "nufft_spread": 0.2655,
+       "nufft_fft_deconv": 0.0183,
+       "nufft_combine": 0.0148,
+       "direct": 0.1804,
+       "fold_ifft": 0.0017,
+       "envelope": 0.0794
+      },
+      "max_abs_over_peak": 3.1645722066260946e-16,
+      "rel_total": 5.796721696759451e-19
+     },
+     {
+      "arm": "spread_noatomic_diagnostic",
+      "opts": {
+       "spread": "noatomic"
+      },
+      "wall_s": 0.563,
+      "phases_s": {
+       "prologue": 0.0018,
+       "broad": 0.007,
+       "period": 0.0005,
+       "plan": 0.0335,
+       "nufft_modulate": 0.0311,
+       "nufft_plan_grid": 0.0072,
+       "nufft_spread": 0.1793,
+       "nufft_fft_deconv": 0.019,
+       "nufft_combine": 0.011,
+       "direct": 0.1974,
+       "fold_ifft": 0.0017,
+       "envelope": 0.0794
+      },
+      "max_abs_over_peak": 0.9906572967599802,
+      "rel_total": 0.9766444085256183
+     },
+     {
+      "arm": "spread_sorted",
+      "opts": {
+       "spread": "sorted"
+      },
+      "wall_s": 1.116,
+      "phases_s": {
+       "prologue": 0.0018,
+       "broad": 0.0054,
+       "period": 0.0004,
+       "plan": 0.0338,
+       "nufft_modulate": 0.0312,
+       "nufft_plan_grid": 0.0063,
+       "nufft_sort": 0.0945,
+       "nufft_spread": 0.6309,
+       "nufft_fft_deconv": 0.0186,
+       "nufft_combine": 0.0154,
+       "direct": 0.1901,
+       "fold_ifft": 0.0017,
+       "envelope": 0.0794
+      },
+      "max_abs_over_peak": 2.5316577653008757e-15,
+      "rel_total": 1.57716277186441e-15
+     },
+     {
+      "arm": "direct_f32",
+      "opts": {
+       "direct": "f32"
+      },
+      "wall_s": 0.538,
+      "phases_s": {
+       "prologue": 0.0018,
+       "broad": 0.0054,
+       "period": 0.0004,
+       "plan": 0.0335,
+       "nufft_modulate": 0.0319,
+       "nufft_plan_grid": 0.0067,
+       "nufft_spread": 0.2649,
+       "nufft_fft_deconv": 0.0182,
+       "nufft_combine": 0.0151,
+       "direct": 0.074,
+       "fold_ifft": 0.0016,
+       "envelope": 0.0795
+      },
+      "max_abs_over_peak": 4.3460124970998363e-14,
+      "rel_total": 5.749522757243471e-15
+     },
+     {
+      "arm": "envelope_fused",
+      "opts": {
+       "envelope": "fused"
+      },
+      "wall_s": 0.568,
+      "phases_s": {
+       "prologue": 0.0018,
+       "broad": 0.0054,
+       "period": 0.0004,
+       "plan": 0.0337,
+       "nufft_modulate": 0.0306,
+       "nufft_plan_grid": 0.0065,
+       "nufft_spread": 0.2651,
+       "nufft_fft_deconv": 0.0185,
+       "nufft_combine": 0.0124,
+       "direct": 0.1811,
+       "fold_ifft": 0.0018,
+       "envelope": 0.0082
+      },
+      "max_abs_over_peak": 2.1097148044173963e-16,
+      "rel_total": 2.269835418030191e-17
+     },
+     {
+      "arm": "min_work_2^20",
+      "opts": {
+       "min_work": 1048576
+      },
+      "wall_s": 0.73,
+      "phases_s": {
+       "prologue": 0.0018,
+       "broad": 0.0054,
+       "period": 0.0004,
+       "plan": 0.0339,
+       "nufft_modulate": 0.051,
+       "nufft_plan_grid": 0.0099,
+       "nufft_spread": 0.3576,
+       "nufft_fft_deconv": 0.0303,
+       "nufft_combine": 0.0318,
+       "direct": 0.1224,
+       "fold_ifft": 0.0016,
+       "envelope": 0.0794
+      },
+      "max_abs_over_peak": 2.1097148044173963e-16,
+      "rel_total": 7.508733890842087e-18
+     },
+     {
+      "arm": "min_work_2^24",
+      "opts": {
+       "min_work": 16777216
+      },
+      "wall_s": 0.668,
+      "phases_s": {
+       "prologue": 0.0018,
+       "broad": 0.0054,
+       "period": 0.0004,
+       "plan": 0.0342,
+       "nufft_modulate": 0.0201,
+       "nufft_plan_grid": 0.0045,
+       "nufft_spread": 0.1938,
+       "nufft_fft_deconv": 0.0111,
+       "nufft_combine": 0.0056,
+       "direct": 0.3078,
+       "fold_ifft": 0.0018,
+       "envelope": 0.0794
+      },
+      "max_abs_over_peak": 2.1097148044173963e-16,
+      "rel_total": 1.7680461475939256e-17
+     },
+     {
+      "arm": "direct_f32_min_work_2^24",
+      "opts": {
+       "direct": "f32",
+       "min_work": 16777216
+      },
+      "wall_s": 0.483,
+      "phases_s": {
+       "prologue": 0.0018,
+       "broad": 0.0054,
+       "period": 0.0004,
+       "plan": 0.0335,
+       "nufft_modulate": 0.0201,
+       "nufft_plan_grid": 0.0045,
+       "nufft_spread": 0.1971,
+       "nufft_fft_deconv": 0.0111,
+       "nufft_combine": 0.0056,
+       "direct": 0.1213,
+       "fold_ifft": 0.0016,
+       "envelope": 0.0794
+      },
+      "max_abs_over_peak": 2.737882387432676e-13,
+      "rel_total": 1.332562793361249e-13
+     }
+    ]
+   },
+   {
+    "flush": "flush-2.npz",
+    "lines": 10072958,
+    "axis": [
+     10.0,
+     2.9998999699909974,
+     9998
+    ],
+    "v5_wall_s": 0.566,
+    "arms": [
+     {
+      "arm": "base",
+      "opts": {},
+      "wall_s": 0.576,
+      "phases_s": {
+       "prologue": 0.0017,
+       "broad": 0.0075,
+       "period": 0.0004,
+       "plan": 0.0304,
+       "nufft_modulate": 0.0236,
+       "nufft_plan_grid": 0.0047,
+       "nufft_spread": 0.274,
+       "nufft_fft_deconv": 0.0125,
+       "nufft_combine": 0.0115,
+       "direct": 0.1315,
+       "fold_ifft": 0.001,
+       "envelope": 0.0791
+      },
+      "max_abs_over_peak": 1.1644762767275525e-15,
+      "rel_total": 7.000950534089325e-17
+     },
+     {
+      "arm": "spread_noatomic_diagnostic",
+      "opts": {
+       "spread": "noatomic"
+      },
+      "wall_s": 0.482,
+      "phases_s": {
+       "prologue": 0.0017,
+       "broad": 0.0075,
+       "period": 0.0004,
+       "plan": 0.0312,
+       "nufft_modulate": 0.0238,
+       "nufft_plan_grid": 0.0056,
+       "nufft_spread": 0.175,
+       "nufft_fft_deconv": 0.0131,
+       "nufft_combine": 0.0113,
+       "direct": 0.1316,
+       "fold_ifft": 0.001,
+       "envelope": 0.0791
+      },
+      "max_abs_over_peak": 0.9941716702037962,
+      "rel_total": 0.9658406409140573
+     },
+     {
+      "arm": "spread_sorted",
+      "opts": {
+       "spread": "sorted"
+      },
+      "wall_s": 0.979,
+      "phases_s": {
+       "prologue": 0.0017,
+       "broad": 0.0078,
+       "period": 0.0004,
+       "plan": 0.031,
+       "nufft_modulate": 0.0233,
+       "nufft_plan_grid": 0.0046,
+       "nufft_sort": 0.0732,
+       "nufft_spread": 0.5991,
+       "nufft_fft_deconv": 0.0127,
+       "nufft_combine": 0.012,
+       "direct": 0.1315,
+       "fold_ifft": 0.001,
+       "envelope": 0.079
+      },
+      "max_abs_over_peak": 7.24563016630477e-15,
+      "rel_total": 3.609623326026456e-15
+     },
+     {
+      "arm": "direct_f32",
+      "opts": {
+       "direct": "f32"
+      },
+      "wall_s": 0.495,
+      "phases_s": {
+       "prologue": 0.0017,
+       "broad": 0.0075,
+       "period": 0.0004,
+       "plan": 0.031,
+       "nufft_modulate": 0.024,
+       "nufft_plan_grid": 0.0047,
+       "nufft_spread": 0.2679,
+       "nufft_fft_deconv": 0.0256,
+       "nufft_combine": 0.0113,
+       "direct": 0.052,
+       "fold_ifft": 0.001,
+       "envelope": 0.0789
+      },
+      "max_abs_over_peak": 3.565666792543819e-12,
+      "rel_total": 2.817907596705832e-15
+     },
+     {
+      "arm": "envelope_fused",
+      "opts": {
+       "envelope": "fused"
+      },
+      "wall_s": 0.504,
+      "phases_s": {
+       "prologue": 0.0018,
+       "broad": 0.0075,
+       "period": 0.0004,
+       "plan": 0.0306,
+       "nufft_modulate": 0.0236,
+       "nufft_plan_grid": 0.0047,
+       "nufft_spread": 0.2689,
+       "nufft_fft_deconv": 0.0124,
+       "nufft_combine": 0.0111,
+       "direct": 0.1316,
+       "fold_ifft": 0.001,
+       "envelope": 0.0083
+      },
+      "max_abs_over_peak": 1.0350900237578245e-15,
+      "rel_total": 9.575206124255432e-18
+     },
+     {
+      "arm": "min_work_2^20",
+      "opts": {
+       "min_work": 1048576
+      },
+      "wall_s": 0.651,
+      "phases_s": {
+       "prologue": 0.0018,
+       "broad": 0.0075,
+       "period": 0.0004,
+       "plan": 0.0305,
+       "nufft_modulate": 0.0368,
+       "nufft_plan_grid": 0.0073,
+       "nufft_spread": 0.3535,
+       "nufft_fft_deconv": 0.0208,
+       "nufft_combine": 0.0228,
+       "direct": 0.0873,
+       "fold_ifft": 0.001,
+       "envelope": 0.079
+      },
+      "max_abs_over_peak": 1.1644762767275525e-15,
+      "rel_total": 6.394683096484846e-17
+     },
+     {
+      "arm": "min_work_2^24",
+      "opts": {
+       "min_work": 16777216
+      },
+      "wall_s": 0.574,
+      "phases_s": {
+       "prologue": 0.0018,
+       "broad": 0.0075,
+       "period": 0.0004,
+       "plan": 0.0311,
+       "nufft_modulate": 0.015,
+       "nufft_plan_grid": 0.0035,
+       "nufft_spread": 0.1992,
+       "nufft_fft_deconv": 0.0075,
+       "nufft_combine": 0.0039,
+       "direct": 0.2233,
+       "fold_ifft": 0.001,
+       "envelope": 0.0792
+      },
+      "max_abs_over_peak": 1.0350900237578245e-15,
+      "rel_total": 7.573729281762883e-17
+     },
+     {
+      "arm": "direct_f32_min_work_2^24",
+      "opts": {
+       "direct": "f32",
+       "min_work": 16777216
+      },
+      "wall_s": 0.442,
+      "phases_s": {
+       "prologue": 0.0017,
+       "broad": 0.0075,
+       "period": 0.0004,
+       "plan": 0.0305,
+       "nufft_modulate": 0.0151,
+       "nufft_plan_grid": 0.0035,
+       "nufft_spread": 0.2015,
+       "nufft_fft_deconv": 0.0075,
+       "nufft_combine": 0.0046,
+       "direct": 0.0879,
+       "fold_ifft": 0.001,
+       "envelope": 0.0791
+      },
+      "max_abs_over_peak": 1.5133929937750992e-11,
+      "rel_total": 3.165782565712079e-13
+     }
+    ]
+   }
+  ]
+ },
+ "variants2": {
+  "code_sha": "5f05eec7ba07e9d9baa0928c8c338c5c7eaf6ccd",
+  "gpu": "NVIDIA GeForce RTX 5080",
+  "repeats": 3,
+  "flushes": [
+   {
+    "flush": "flush-0.npz",
+    "lines": 10422507,
+    "axis": [
+     259.91666666666663,
+     499.8333333333333,
+     60
+    ],
+    "v5_wall_s": 0.659,
+    "arms": [
+     {
+      "arm": "base",
+      "opts": {},
+      "wall_s": 0.674,
+      "phases_s": {
+       "prologue": 0.0018,
+       "broad": 0.0056,
+       "period": 0.0004,
+       "plan": 0.035,
+       "nufft_modulate": 0.0307,
+       "nufft_plan_grid": 0.0066,
+       "nufft_spread": 0.2956,
+       "nufft_fft_deconv": 0.0178,
+       "nufft_combine": 0.011,
+       "direct": 0.1816,
+       "fold_ifft": 0.0017,
+       "envelope": 0.0823
+      },
+      "max_abs_over_peak": 1.8937758545811825e-16,
+      "rel_total": 2.038452760246867e-17
+     },
+     {
+      "arm": "spread_f32_noatomic_diagnostic",
+      "opts": {
+       "spread": "f32_noatomic"
+      },
+      "wall_s": 0.578,
+      "phases_s": {
+       "prologue": 0.0018,
+       "broad": 0.0056,
+       "period": 0.0004,
+       "plan": 0.0339,
+       "nufft_modulate": 0.0312,
+       "nufft_plan_grid": 0.0092,
+       "nufft_spread": 0.1823,
+       "nufft_fft_deconv": 0.0192,
+       "nufft_combine": 0.0141,
+       "direct": 0.1949,
+       "fold_ifft": 0.0016,
+       "envelope": 0.0822
+      },
+      "max_abs_over_peak": 0.9918650649920976,
+      "rel_total": 0.9779984650852156
+     },
+     {
+      "arm": "spread_f32_grid",
+      "opts": {
+       "spread": "f32_grid"
+      },
+      "wall_s": 0.615,
+      "phases_s": {
+       "prologue": 0.0018,
+       "broad": 0.0057,
+       "period": 0.0004,
+       "plan": 0.0335,
+       "nufft_modulate": 0.0327,
+       "nufft_plan_grid": 0.0068,
+       "nufft_spread": 0.2385,
+       "nufft_fft_deconv": 0.0176,
+       "nufft_combine": 0.0134,
+       "direct": 0.179,
+       "fold_ifft": 0.0016,
+       "envelope": 0.0821
+      },
+      "max_abs_over_peak": 2.5007211673552445e-05,
+      "rel_total": 2.3227723526434305e-05
+     },
+     {
+      "arm": "spread_f32_grid_eps1e-9",
+      "opts": {
+       "spread": "f32_grid",
+       "eps": 1e-09
+      },
+      "wall_s": 0.57,
+      "phases_s": {
+       "prologue": 0.0018,
+       "broad": 0.0056,
+       "period": 0.0004,
+       "plan": 0.0351,
+       "nufft_modulate": 0.0317,
+       "nufft_plan_grid": 0.0067,
+       "nufft_spread": 0.1922,
+       "nufft_fft_deconv": 0.0177,
+       "nufft_combine": 0.0114,
+       "direct": 0.1802,
+       "fold_ifft": 0.0017,
+       "envelope": 0.0822
+      },
+      "max_abs_over_peak": 2.5186647767520364e-05,
+      "rel_total": 2.516032078274814e-05
+     },
+     {
+      "arm": "direct_f32_env_fused_min_work_2^22",
+      "opts": {
+       "direct": "f32",
+       "envelope": "fused",
+       "min_work": 4194304
+      },
+      "wall_s": 0.488,
+      "phases_s": {
+       "prologue": 0.0018,
+       "broad": 0.0056,
+       "period": 0.0004,
+       "plan": 0.0335,
+       "nufft_modulate": 0.0314,
+       "nufft_plan_grid": 0.0067,
+       "nufft_spread": 0.2945,
+       "nufft_fft_deconv": 0.0176,
+       "nufft_combine": 0.0139,
+       "direct": 0.0706,
+       "fold_ifft": 0.0016,
+       "envelope": 0.0085
+      },
+      "max_abs_over_peak": 4.242057914261849e-14,
+      "rel_total": 6.643009085023608e-15
+     },
+     {
+      "arm": "direct_f32_env_fused_min_work_2^24",
+      "opts": {
+       "direct": "f32",
+       "envelope": "fused",
+       "min_work": 16777216
+      },
+      "wall_s": 0.439,
+      "phases_s": {
+       "prologue": 0.0018,
+       "broad": 0.0056,
+       "period": 0.0004,
+       "plan": 0.0334,
+       "nufft_modulate": 0.0199,
+       "nufft_plan_grid": 0.0047,
+       "nufft_spread": 0.2226,
+       "nufft_fft_deconv": 0.0108,
+       "nufft_combine": 0.0061,
+       "direct": 0.1221,
+       "fold_ifft": 0.0017,
+       "envelope": 0.0085
+      },
+      "max_abs_over_peak": 2.5376596451387847e-13,
+      "rel_total": 1.4460462229188174e-13
+     },
+     {
+      "arm": "direct_f32_env_fused_min_work_2^25",
+      "opts": {
+       "direct": "f32",
+       "envelope": "fused",
+       "min_work": 33554432
+      },
+      "wall_s": 0.442,
+      "phases_s": {
+       "prologue": 0.0018,
+       "broad": 0.0057,
+       "period": 0.0004,
+       "plan": 0.0342,
+       "nufft_modulate": 0.016,
+       "nufft_plan_grid": 0.0039,
+       "nufft_spread": 0.1993,
+       "nufft_fft_deconv": 0.0087,
+       "nufft_combine": 0.0034,
+       "direct": 0.1579,
+       "fold_ifft": 0.0017,
+       "envelope": 0.0085
+      },
+      "max_abs_over_peak": 3.0409305784937337e-13,
+      "rel_total": 1.5003749559994226e-13
+     },
+     {
+      "arm": "direct_f32_env_fused_min_work_2^26",
+      "opts": {
+       "direct": "f32",
+       "envelope": "fused",
+       "min_work": 67108864
+      },
+      "wall_s": 0.464,
+      "phases_s": {
+       "prologue": 0.0018,
+       "broad": 0.0057,
+       "period": 0.0005,
+       "plan": 0.034,
+       "nufft_modulate": 0.0125,
+       "nufft_plan_grid": 0.0037,
+       "nufft_spread": 0.1612,
+       "nufft_fft_deconv": 0.0066,
+       "nufft_combine": 0.0021,
+       "direct": 0.2255,
+       "fold_ifft": 0.0017,
+       "envelope": 0.0085
+      },
+      "max_abs_over_peak": 1.6604626692967808e-12,
+      "rel_total": 1.2734705829880256e-12
+     },
+     {
+      "arm": "fast_2^24_eps1e-9",
+      "opts": {
+       "direct": "f32",
+       "envelope": "fused",
+       "min_work": 16777216,
+       "eps": 1e-09
+      },
+      "wall_s": 0.392,
+      "phases_s": {
+       "prologue": 0.0018,
+       "broad": 0.0056,
+       "period": 0.0004,
+       "plan": 0.0335,
+       "nufft_modulate": 0.0199,
+       "nufft_plan_grid": 0.0051,
+       "nufft_spread": 0.1762,
+       "nufft_fft_deconv": 0.0109,
+       "nufft_combine": 0.0054,
+       "direct": 0.1221,
+       "fold_ifft": 0.0016,
+       "envelope": 0.0085
+      },
+      "max_abs_over_peak": 1.8412472468147372e-11,
+      "rel_total": 6.634496416838755e-12
+     },
+     {
+      "arm": "fast_2^24_spread_f32_grid",
+      "opts": {
+       "direct": "f32",
+       "envelope": "fused",
+       "min_work": 16777216,
+       "spread": "f32_grid"
+      },
+      "wall_s": 0.387,
+      "phases_s": {
+       "prologue": 0.0018,
+       "broad": 0.0056,
+       "period": 0.0004,
+       "plan": 0.0337,
+       "nufft_modulate": 0.0186,
+       "nufft_plan_grid": 0.0052,
+       "nufft_spread": 0.1733,
+       "nufft_fft_deconv": 0.0106,
+       "nufft_combine": 0.0045,
+       "direct": 0.1221,
+       "fold_ifft": 0.0016,
+       "envelope": 0.0085
+      },
+      "max_abs_over_peak": 2.5034736553614928e-05,
+      "rel_total": 2.3231066804598283e-05
+     }
+    ]
+   },
+   {
+    "flush": "flush-1.npz",
+    "lines": 10169809,
+    "axis": [
+     259.91666666666663,
+     499.8333333333333,
+     60
+    ],
+    "v5_wall_s": 0.626,
+    "arms": [
+     {
+      "arm": "base",
+      "opts": {},
+      "wall_s": 0.646,
+      "phases_s": {
+       "prologue": 0.0018,
+       "broad": 0.0055,
+       "period": 0.0004,
+       "plan": 0.0334,
+       "nufft_modulate": 0.0323,
+       "nufft_plan_grid": 0.0067,
+       "nufft_spread": 0.2612,
+       "nufft_fft_deconv": 0.0184,
+       "nufft_combine": 0.0142,
+       "direct": 0.1805,
+       "fold_ifft": 0.0017,
+       "envelope": 0.0875
+      },
+      "max_abs_over_peak": 2.1097148044173963e-16,
+      "rel_total": 5.3341500564367826e-17
+     },
+     {
+      "arm": "spread_f32_noatomic_diagnostic",
+      "opts": {
+       "spread": "f32_noatomic"
+      },
+      "wall_s": 0.551,
+      "phases_s": {
+       "prologue": 0.0018,
+       "broad": 0.0055,
+       "period": 0.0004,
+       "plan": 0.0344,
+       "nufft_modulate": 0.032,
+       "nufft_plan_grid": 0.0075,
+       "nufft_spread": 0.1612,
+       "nufft_fft_deconv": 0.0204,
+       "nufft_combine": 0.0141,
+       "direct": 0.1968,
+       "fold_ifft": 0.0016,
+       "envelope": 0.0803
+      },
+      "max_abs_over_peak": 0.9871364163458521,
+      "rel_total": 0.9767054624882238
+     },
+     {
+      "arm": "spread_f32_grid",
+      "opts": {
+       "spread": "f32_grid"
+      },
+      "wall_s": 0.586,
+      "phases_s": {
+       "prologue": 0.0018,
+       "broad": 0.0054,
+       "period": 0.0004,
+       "plan": 0.0339,
+       "nufft_modulate": 0.0335,
+       "nufft_plan_grid": 0.0073,
+       "nufft_spread": 0.2139,
+       "nufft_fft_deconv": 0.0184,
+       "nufft_combine": 0.0136,
+       "direct": 0.1817,
+       "fold_ifft": 0.0016,
+       "envelope": 0.0802
+      },
+      "max_abs_over_peak": 1.8407670317345798e-05,
+      "rel_total": 1.7114208167159883e-05
+     },
+     {
+      "arm": "spread_f32_grid_eps1e-9",
+      "opts": {
+       "spread": "f32_grid",
+       "eps": 1e-09
+      },
+      "wall_s": 0.546,
+      "phases_s": {
+       "prologue": 0.0018,
+       "broad": 0.0055,
+       "period": 0.0004,
+       "plan": 0.0335,
+       "nufft_modulate": 0.0335,
+       "nufft_plan_grid": 0.0078,
+       "nufft_spread": 0.1708,
+       "nufft_fft_deconv": 0.0184,
+       "nufft_combine": 0.014,
+       "direct": 0.1828,
+       "fold_ifft": 0.0017,
+       "envelope": 0.0802
+      },
+      "max_abs_over_peak": 2.052724034940727e-05,
+      "rel_total": 2.0039880965023596e-05
+     },
+     {
+      "arm": "direct_f32_env_fused_min_work_2^22",
+      "opts": {
+       "direct": "f32",
+       "envelope": "fused",
+       "min_work": 4194304
+      },
+      "wall_s": 0.451,
+      "phases_s": {
+       "prologue": 0.0018,
+       "broad": 0.0054,
+       "period": 0.0004,
+       "plan": 0.0329,
+       "nufft_modulate": 0.0323,
+       "nufft_plan_grid": 0.0069,
+       "nufft_spread": 0.2583,
+       "nufft_fft_deconv": 0.0184,
+       "nufft_combine": 0.0144,
+       "direct": 0.0734,
+       "fold_ifft": 0.0015,
+       "envelope": 0.0082
+      },
+      "max_abs_over_peak": 4.3354639230777494e-14,
+      "rel_total": 5.62626831275484e-15
+     },
+     {
+      "arm": "direct_f32_env_fused_min_work_2^24",
+      "opts": {
+       "direct": "f32",
+       "envelope": "fused",
+       "min_work": 16777216
+      },
+      "wall_s": 0.414,
+      "phases_s": {
+       "prologue": 0.0018,
+       "broad": 0.0054,
+       "period": 0.0004,
+       "plan": 0.0342,
+       "nufft_modulate": 0.0199,
+       "nufft_plan_grid": 0.0048,
+       "nufft_spread": 0.1983,
+       "nufft_fft_deconv": 0.0111,
+       "nufft_combine": 0.0056,
+       "direct": 0.1212,
+       "fold_ifft": 0.0016,
+       "envelope": 0.0082
+      },
+      "max_abs_over_peak": 2.738937244834885e-13,
+      "rel_total": 1.3320517950056818e-13
+     },
+     {
+      "arm": "direct_f32_env_fused_min_work_2^25",
+      "opts": {
+       "direct": "f32",
+       "envelope": "fused",
+       "min_work": 33554432
+      },
+      "wall_s": 0.417,
+      "phases_s": {
+       "prologue": 0.0018,
+       "broad": 0.0054,
+       "period": 0.0004,
+       "plan": 0.0335,
+       "nufft_modulate": 0.0158,
+       "nufft_plan_grid": 0.004,
+       "nufft_spread": 0.1699,
+       "nufft_fft_deconv": 0.0089,
+       "nufft_combine": 0.0035,
+       "direct": 0.1614,
+       "fold_ifft": 0.0016,
+       "envelope": 0.0082
+      },
+      "max_abs_over_peak": 2.887144709845207e-13,
+      "rel_total": 1.338803542712511e-13
+     },
+     {
+      "arm": "direct_f32_env_fused_min_work_2^26",
+      "opts": {
+       "direct": "f32",
+       "envelope": "fused",
+       "min_work": 67108864
+      },
+      "wall_s": 0.441,
+      "phases_s": {
+       "prologue": 0.0017,
+       "broad": 0.0054,
+       "period": 0.0004,
+       "plan": 0.033,
+       "nufft_modulate": 0.0126,
+       "nufft_plan_grid": 0.0036,
+       "nufft_spread": 0.14,
+       "nufft_fft_deconv": 0.0068,
+       "nufft_combine": 0.0025,
+       "direct": 0.2255,
+       "fold_ifft": 0.0016,
+       "envelope": 0.0082
+      },
+      "max_abs_over_peak": 1.5693641001359907e-12,
+      "rel_total": 1.1819213410507037e-12
+     },
+     {
+      "arm": "fast_2^24_eps1e-9",
+      "opts": {
+       "direct": "f32",
+       "envelope": "fused",
+       "min_work": 16777216,
+       "eps": 1e-09
+      },
+      "wall_s": 0.371,
+      "phases_s": {
+       "prologue": 0.0018,
+       "broad": 0.0054,
+       "period": 0.0004,
+       "plan": 0.033,
+       "nufft_modulate": 0.02,
+       "nufft_plan_grid": 0.0046,
+       "nufft_spread": 0.1556,
+       "nufft_fft_deconv": 0.0112,
+       "nufft_combine": 0.006,
+       "direct": 0.1211,
+       "fold_ifft": 0.0016,
+       "envelope": 0.0082
+      },
+      "max_abs_over_peak": 2.3607392204210004e-11,
+      "rel_total": 1.0097462348368375e-11
+     },
+     {
+      "arm": "fast_2^24_spread_f32_grid",
+      "opts": {
+       "direct": "f32",
+       "envelope": "fused",
+       "min_work": 16777216,
+       "spread": "f32_grid"
+      },
+      "wall_s": 0.373,
+      "phases_s": {
+       "prologue": 0.0017,
+       "broad": 0.0054,
+       "period": 0.0004,
+       "plan": 0.0329,
+       "nufft_modulate": 0.0201,
+       "nufft_plan_grid": 0.0052,
+       "nufft_spread": 0.1575,
+       "nufft_fft_deconv": 0.0109,
+       "nufft_combine": 0.0053,
+       "direct": 0.1238,
+       "fold_ifft": 0.0017,
+       "envelope": 0.0082
+      },
+      "max_abs_over_peak": 1.8409999245864454e-05,
+      "rel_total": 1.712339733892683e-05
+     }
+    ]
+   },
+   {
+    "flush": "flush-2.npz",
+    "lines": 10072958,
+    "axis": [
+     10.0,
+     2.9998999699909974,
+     9998
+    ],
+    "v5_wall_s": 0.574,
+    "arms": [
+     {
+      "arm": "base",
+      "opts": {},
+      "wall_s": 0.572,
+      "phases_s": {
+       "prologue": 0.0017,
+       "broad": 0.0075,
+       "period": 0.0004,
+       "plan": 0.0308,
+       "nufft_modulate": 0.0242,
+       "nufft_plan_grid": 0.005,
+       "nufft_spread": 0.2709,
+       "nufft_fft_deconv": 0.0125,
+       "nufft_combine": 0.0108,
+       "direct": 0.1315,
+       "fold_ifft": 0.001,
+       "envelope": 0.0793
+      },
+      "max_abs_over_peak": 1.2938625296972806e-15,
+      "rel_total": 1.2228356531629416e-16
+     },
+     {
+      "arm": "spread_f32_noatomic_diagnostic",
+      "opts": {
+       "spread": "f32_noatomic"
+      },
+      "wall_s": 0.477,
+      "phases_s": {
+       "prologue": 0.0017,
+       "broad": 0.0075,
+       "period": 0.0004,
+       "plan": 0.0308,
+       "nufft_modulate": 0.0237,
+       "nufft_plan_grid": 0.0049,
+       "nufft_spread": 0.1677,
+       "nufft_fft_deconv": 0.0134,
+       "nufft_combine": 0.0088,
+       "direct": 0.1357,
+       "fold_ifft": 0.001,
+       "envelope": 0.0794
+      },
+      "max_abs_over_peak": 0.9939259284256433,
+      "rel_total": 0.9667225260050152
+     },
+     {
+      "arm": "spread_f32_grid",
+      "opts": {
+       "spread": "f32_grid"
+      },
+      "wall_s": 0.533,
+      "phases_s": {
+       "prologue": 0.0017,
+       "broad": 0.0075,
+       "period": 0.0004,
+       "plan": 0.0309,
+       "nufft_modulate": 0.0245,
+       "nufft_plan_grid": 0.0051,
+       "nufft_spread": 0.2265,
+       "nufft_fft_deconv": 0.0124,
+       "nufft_combine": 0.01,
+       "direct": 0.1316,
+       "fold_ifft": 0.001,
+       "envelope": 0.0794
+      },
+      "max_abs_over_peak": 2.65444650444098e-05,
+      "rel_total": 2.599454401292584e-05
+     },
+     {
+      "arm": "spread_f32_grid_eps1e-9",
+      "opts": {
+       "spread": "f32_grid",
+       "eps": 1e-09
+      },
+      "wall_s": 0.492,
+      "phases_s": {
+       "prologue": 0.0017,
+       "broad": 0.0075,
+       "period": 0.0004,
+       "plan": 0.0303,
+       "nufft_modulate": 0.0244,
+       "nufft_plan_grid": 0.005,
+       "nufft_spread": 0.1834,
+       "nufft_fft_deconv": 0.0125,
+       "nufft_combine": 0.0102,
+       "direct": 0.1316,
+       "fold_ifft": 0.001,
+       "envelope": 0.0794
+      },
+      "max_abs_over_peak": 1.971180171401071e-05,
+      "rel_total": 1.942859562601669e-05
+     },
+     {
+      "arm": "direct_f32_env_fused_min_work_2^22",
+      "opts": {
+       "direct": "f32",
+       "envelope": "fused",
+       "min_work": 4194304
+      },
+      "wall_s": 0.423,
+      "phases_s": {
+       "prologue": 0.0017,
+       "broad": 0.0075,
+       "period": 0.0004,
+       "plan": 0.0309,
+       "nufft_modulate": 0.024,
+       "nufft_plan_grid": 0.005,
+       "nufft_spread": 0.2678,
+       "nufft_fft_deconv": 0.0125,
+       "nufft_combine": 0.0114,
+       "direct": 0.052,
+       "fold_ifft": 0.001,
+       "envelope": 0.0082
+      },
+      "max_abs_over_peak": 3.5657153123886824e-12,
+      "rel_total": 2.7188247619093083e-15
+     },
+     {
+      "arm": "direct_f32_env_fused_min_work_2^24",
+      "opts": {
+       "direct": "f32",
+       "envelope": "fused",
+       "min_work": 16777216
+      },
+      "wall_s": 0.371,
+      "phases_s": {
+       "prologue": 0.0017,
+       "broad": 0.0075,
+       "period": 0.0004,
+       "plan": 0.031,
+       "nufft_modulate": 0.0157,
+       "nufft_plan_grid": 0.0035,
+       "nufft_spread": 0.2012,
+       "nufft_fft_deconv": 0.0075,
+       "nufft_combine": 0.005,
+       "direct": 0.0879,
+       "fold_ifft": 0.001,
+       "envelope": 0.0082
+      },
+      "max_abs_over_peak": 1.5133938024391804e-11,
+      "rel_total": 3.165766459671319e-13
+     },
+     {
+      "arm": "direct_f32_env_fused_min_work_2^25",
+      "opts": {
+       "direct": "f32",
+       "envelope": "fused",
+       "min_work": 33554432
+      },
+      "wall_s": 0.36,
+      "phases_s": {
+       "prologue": 0.0017,
+       "broad": 0.0075,
+       "period": 0.0004,
+       "plan": 0.0305,
+       "nufft_modulate": 0.012,
+       "nufft_plan_grid": 0.003,
+       "nufft_spread": 0.1631,
+       "nufft_fft_deconv": 0.0056,
+       "nufft_combine": 0.0032,
+       "direct": 0.1237,
+       "fold_ifft": 0.001,
+       "envelope": 0.0082
+      },
+      "max_abs_over_peak": 3.456533531484259e-11,
+      "rel_total": 3.472832176771658e-13
+     },
+     {
+      "arm": "direct_f32_env_fused_min_work_2^26",
+      "opts": {
+       "direct": "f32",
+       "envelope": "fused",
+       "min_work": 67108864
+      },
+      "wall_s": 0.369,
+      "phases_s": {
+       "prologue": 0.0017,
+       "broad": 0.0075,
+       "period": 0.0004,
+       "plan": 0.0306,
+       "nufft_modulate": 0.0102,
+       "nufft_plan_grid": 0.0027,
+       "nufft_spread": 0.1435,
+       "nufft_fft_deconv": 0.0046,
+       "nufft_combine": 0.0023,
+       "direct": 0.1556,
+       "fold_ifft": 0.001,
+       "envelope": 0.0082
+      },
+      "max_abs_over_peak": 6.045048655686016e-11,
+      "rel_total": 3.674967753296299e-13
+     },
+     {
+      "arm": "fast_2^24_eps1e-9",
+      "opts": {
+       "direct": "f32",
+       "envelope": "fused",
+       "min_work": 16777216,
+       "eps": 1e-09
+      },
+      "wall_s": 0.33,
+      "phases_s": {
+       "prologue": 0.0017,
+       "broad": 0.0075,
+       "period": 0.0004,
+       "plan": 0.0309,
+       "nufft_modulate": 0.0156,
+       "nufft_plan_grid": 0.0036,
+       "nufft_spread": 0.1598,
+       "nufft_fft_deconv": 0.0075,
+       "nufft_combine": 0.0049,
+       "direct": 0.0879,
+       "fold_ifft": 0.001,
+       "envelope": 0.0082
+      },
+      "max_abs_over_peak": 8.247946652185364e-11,
+      "rel_total": 2.3101599629530008e-11
+     },
+     {
+      "arm": "fast_2^24_spread_f32_grid",
+      "opts": {
+       "direct": "f32",
+       "envelope": "fused",
+       "min_work": 16777216,
+       "spread": "f32_grid"
+      },
+      "wall_s": 0.335,
+      "phases_s": {
+       "prologue": 0.0018,
+       "broad": 0.0075,
+       "period": 0.0004,
+       "plan": 0.0305,
+       "nufft_modulate": 0.0162,
+       "nufft_plan_grid": 0.0036,
+       "nufft_spread": 0.1648,
+       "nufft_fft_deconv": 0.0074,
+       "nufft_combine": 0.0045,
+       "direct": 0.0879,
+       "fold_ifft": 0.001,
+       "envelope": 0.0082
+      },
+      "max_abs_over_peak": 2.6619176221244276e-05,
+      "rel_total": 2.59405165514816e-05
+     }
+    ]
+   }
+  ]
+ },
+ "margins": {
+  "code_sha": "9206a865fa855198f1f91e1031401d1e4e0d1580",
+  "gpu": "NVIDIA GeForce RTX 5080",
+  "histories": 64,
+  "seed": 642501,
+  "band_eV": [
+   500.0,
+   10000.0
+  ],
+  "margins": {
+   "yield_per_primary": 0.001,
+   "centroid_eV": 0.001,
+   "peak_density_per_eV": 0.01,
+   "dominant_fwhm_eV": 0.01,
+   "mass_l1": 0.01
+  },
+  "reference": "fourier-auto-v5 route (eps 1e-12, FP64 direct) on the same transport",
+  "scenes": [
+   {
+    "scene": "hopg",
+    "spec": [
+     "hopg",
+     30.0,
+     45.0,
+     20000.0,
+     null
+    ],
+    "arms": [
+     {
+      "spacing_eV": 0.375,
+      "bins": 25334,
+      "max_abs_over_peak": 2.1601928136260814e-08,
+      "versus": {
+       "yield_per_primary": -3.313131436447215e-10,
+       "centroid_eV": -1.1378568235573991e-09,
+       "peak_density_per_eV": 0.0,
+       "dominant_fwhm_eV": 0.0,
+       "mass_l1": 1.0282985852148747e-09,
+       "within_margin": {
+        "yield_per_primary": true,
+        "centroid_eV": true,
+        "peak_density_per_eV": true,
+        "dominant_fwhm_eV": true,
+        "mass_l1": true
+       }
+      }
+     },
+     {
+      "spacing_eV": 3.0,
+      "bins": 3167,
+      "max_abs_over_peak": 1.496262515787066e-08,
+      "versus": {
+       "yield_per_primary": 7.08192495117849e-10,
+       "centroid_eV": 2.685220062568156e-10,
+       "peak_density_per_eV": 0.0,
+       "dominant_fwhm_eV": 0.0,
+       "mass_l1": 1.4358800129667793e-09,
+       "within_margin": {
+        "yield_per_primary": true,
+        "centroid_eV": true,
+        "peak_density_per_eV": true,
+        "dominant_fwhm_eV": true,
+        "mass_l1": true
+       }
+      }
+     }
+    ]
+   },
+   {
+    "scene": "silicon",
+    "spec": [
+     "silicon",
+     300.0,
+     45.0,
+     100000.0,
+     null
+    ],
+    "arms": [
+     {
+      "spacing_eV": 0.375,
+      "bins": 25334,
+      "max_abs_over_peak": 2.4254508573580708e-08,
+      "versus": {
+       "yield_per_primary": 1.7056182987942156e-10,
+       "centroid_eV": -4.119839552926515e-11,
+       "peak_density_per_eV": 0.0,
+       "dominant_fwhm_eV": 0.0,
+       "mass_l1": 3.602289071233351e-10,
+       "within_margin": {
+        "yield_per_primary": true,
+        "centroid_eV": true,
+        "peak_density_per_eV": true,
+        "dominant_fwhm_eV": true,
+        "mass_l1": true
+       }
+      }
+     },
+     {
+      "spacing_eV": 3.0,
+      "bins": 3167,
+      "max_abs_over_peak": 7.451578154834256e-08,
+      "versus": {
+       "yield_per_primary": 3.4711704094718806e-10,
+       "centroid_eV": -1.8485797893657156e-10,
+       "peak_density_per_eV": 7.451578154834256e-08,
+       "dominant_fwhm_eV": -5.4473871457891106e-08,
+       "mass_l1": 8.015583048361406e-10,
+       "within_margin": {
+        "yield_per_primary": true,
+        "centroid_eV": true,
+        "peak_density_per_eV": true,
+        "dominant_fwhm_eV": true,
+        "mass_l1": true
+       }
+      }
+     }
+    ]
+   },
+   {
+    "scene": "mos2-on-si",
+    "spec": [
+     "mos2-on-si",
+     30.0,
+     45.0,
+     null,
+     null
+    ],
+    "arms": [
+     {
+      "spacing_eV": 0.375,
+      "bins": 25334,
+      "max_abs_over_peak": 7.125763962061578e-08,
+      "versus": {
+       "yield_per_primary": 4.1560200487462914e-11,
+       "centroid_eV": -2.27626646659275e-10,
+       "peak_density_per_eV": 0.0,
+       "dominant_fwhm_eV": 0.0,
+       "mass_l1": 3.096265878787708e-10,
+       "within_margin": {
+        "yield_per_primary": true,
+        "centroid_eV": true,
+        "peak_density_per_eV": true,
+        "dominant_fwhm_eV": true,
+        "mass_l1": true
+       }
+      }
+     },
+     {
+      "spacing_eV": 3.0,
+      "bins": 3167,
+      "max_abs_over_peak": 1.862316102570188e-08,
+      "versus": {
+       "yield_per_primary": 1.714282116355044e-10,
+       "centroid_eV": -1.1038594557147225e-10,
+       "peak_density_per_eV": 0.0,
+       "dominant_fwhm_eV": 0.0,
+       "mass_l1": 3.75703291071104e-10,
+       "within_margin": {
+        "yield_per_primary": true,
+        "centroid_eV": true,
+        "peak_density_per_eV": true,
+        "dominant_fwhm_eV": true,
+        "mass_l1": true
+       }
+      }
+     }
+    ]
+   },
+   {
+    "scene": "hopg-mosaic",
+    "spec": [
+     "hopg",
+     30.0,
+     45.0,
+     20000.0,
+     4
+    ],
+    "arms": [
+     {
+      "spacing_eV": 0.375,
+      "bins": 25334,
+      "max_abs_over_peak": 3.636308628931286e-08,
+      "versus": {
+       "yield_per_primary": -1.3964928792075073e-10,
+       "centroid_eV": -4.463244224828662e-11,
+       "peak_density_per_eV": 0.0,
+       "dominant_fwhm_eV": 0.0,
+       "mass_l1": 3.537482384927309e-10,
+       "within_margin": {
+        "yield_per_primary": true,
+        "centroid_eV": true,
+        "peak_density_per_eV": true,
+        "dominant_fwhm_eV": true,
+        "mass_l1": true
+       }
+      }
+     },
+     {
+      "spacing_eV": 3.0,
+      "bins": 3167,
+      "max_abs_over_peak": 5.502728970734919e-12,
+      "versus": {
+       "yield_per_primary": 3.6980969768527777e-11,
+       "centroid_eV": 1.7990698715773275e-10,
+       "peak_density_per_eV": 0.0,
+       "dominant_fwhm_eV": 0.0,
+       "mass_l1": 7.45090183435288e-11,
+       "within_margin": {
+        "yield_per_primary": true,
+        "centroid_eV": true,
+        "peak_density_per_eV": true,
+        "dominant_fwhm_eV": true,
+        "mass_l1": true
+       }
+      }
+     }
+    ]
+   },
+   {
+    "scene": "mos2-15deg",
+    "spec": [
+     "mos2",
+     30.0,
+     15.0,
+     5000.0,
+     null
+    ],
+    "arms": [
+     {
+      "spacing_eV": 0.375,
+      "bins": 25334,
+      "max_abs_over_peak": 1.326012612183319e-08,
+      "versus": {
+       "yield_per_primary": 2.6620431509009565e-10,
+       "centroid_eV": -4.590083237720016e-10,
+       "peak_density_per_eV": 0.0,
+       "dominant_fwhm_eV": 0.0,
+       "mass_l1": 6.755757929298484e-10,
+       "within_margin": {
+        "yield_per_primary": true,
+        "centroid_eV": true,
+        "peak_density_per_eV": true,
+        "dominant_fwhm_eV": true,
+        "mass_l1": true
+       }
+      }
+     },
+     {
+      "spacing_eV": 3.0,
+      "bins": 3167,
+      "max_abs_over_peak": 6.714496802717771e-09,
+      "versus": {
+       "yield_per_primary": 3.766063027921625e-10,
+       "centroid_eV": -4.4451256808796387e-10,
+       "peak_density_per_eV": 0.0,
+       "dominant_fwhm_eV": 0.0,
+       "mass_l1": 1.2568551439741864e-09,
+       "within_margin": {
+        "yield_per_primary": true,
+        "centroid_eV": true,
+        "peak_density_per_eV": true,
+        "dominant_fwhm_eV": true,
+        "mass_l1": true
+       }
+      }
+     }
+    ]
+   }
+  ]
+ },
+ "v6_flush_timing_job_13650": [
+  {
+   "flush": "flush-0.npz",
+   "v6_s": 0.386,
+   "v5_s": 0.587,
+   "max_abs_over_peak": 1.84e-11
+  },
+  {
+   "flush": "flush-1.npz",
+   "v6_s": 0.368,
+   "v5_s": 0.551,
+   "max_abs_over_peak": 2.36e-11
+  },
+  {
+   "flush": "flush-2.npz",
+   "v6_s": 0.328,
+   "v5_s": 0.503,
+   "max_abs_over_peak": 8.25e-11
+  }
+ ]
+}
