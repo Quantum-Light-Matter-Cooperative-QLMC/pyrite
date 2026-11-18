@@ -535,10 +535,88 @@ extern "C" __global__ void es_sm(
         atomicAdd(grid + 2*(n_fine + idx), c[2]); atomicAdd(grid + 2*(n_fine + idx) + 1, c[3]);
     }
 }
+extern "C" __global__ void es_gather_items(
+    const double* u, const long long* l0, const long long* key, const double* src,
+    const long long* item, const long long n_items, const long long* off, const int nrect,
+    const int width, const double beta, double* grid) {
+    // Balanced gather: one warp per (fine point, <= C sorted sources) item; the
+    // sources of an item all key into that point's window l-w+1 .. l.
+    const long long it = ((long long)blockIdx.x * blockDim.x + threadIdx.x) >> 5;
+    const int lane = threadIdx.x & 31;
+    if (it >= n_items) return;
+    const long long g = item[3*it], s_lo = item[3*it+1], s_hi = item[3*it+2];
+    int lo = 0, hi = nrect;
+    while (hi - lo > 1) { const int mid = (lo + hi) >> 1; if (off[mid] <= g) lo = mid; else hi = mid; }
+    const long long base = off[lo], n_fine = off[lo + 1] - base, l = g - base;
+    const double half = 0.5 * double(width);
+    double ar = 0.0, ai = 0.0, br = 0.0, bi = 0.0;
+    for (long long s = s_lo + lane; s < s_hi; s += 32) {
+        long long p = l - (key[s] - base);
+        if (p < 0) p += n_fine;
+        const double z = (double(l0[s] + p) - u[s]) / half;
+        const double arg = 1.0 - z * z;
+        if (arg <= 0.0) continue;
+        const double phi = exp(beta * (sqrt(arg) - 1.0));
+        ar += phi * src[4*s]; ai += phi * src[4*s+1];
+        br += phi * src[4*s+2]; bi += phi * src[4*s+3];
+    }
+    for (int o = 16; o > 0; o >>= 1) {
+        ar += __shfl_down_sync(0xffffffffu, ar, o); ai += __shfl_down_sync(0xffffffffu, ai, o);
+        br += __shfl_down_sync(0xffffffffu, br, o); bi += __shfl_down_sync(0xffffffffu, bi, o);
+    }
+    if (lane == 0) {
+        double* g0 = grid + 2 * (2 * base + l);
+        double* g1 = grid + 2 * (2 * base + n_fine + l);
+        atomicAdd(g0, ar); atomicAdd(g0 + 1, ai); atomicAdd(g1, br); atomicAdd(g1 + 1, bi);
+    }
+}
+
+extern "C" __global__ void es_priv(
+    const double* x, const double* src, const long long n,
+    const long long n_fine, const int width, const double beta, double* grid) {
+    // Whole fine grid privatized in shared memory per block (small grids, no
+    // sort); production arithmetic per pair, one global atomic per point per block.
+    extern __shared__ double sg[];
+    for (long long i = threadIdx.x; i < 4 * n_fine; i += blockDim.x) sg[i] = 0.0;
+    __syncthreads();
+    const double two_pi = 6.283185307179586;
+    const double h = two_pi / double(n_fine);
+    const double half = 0.5 * double(width);
+    const long long stride = (long long)gridDim.x * blockDim.x;
+    for (long long k = (long long)blockIdx.x * blockDim.x + threadIdx.x; k < n; k += stride) {
+        double xk = fmod(x[k], two_pi);
+        if (xk < 0.0) xk += two_pi;
+        const double uk = xk / h;
+        const long long l0 = (long long)ceil(uk - half);
+        const double a_re = src[4*k], a_im = src[4*k+1], b_re = src[4*k+2], b_im = src[4*k+3];
+        for (int p = 0; p < width; ++p) {
+            const long long l = l0 + p;
+            const double z = (double(l) - uk) / half;
+            const double arg = 1.0 - z * z;
+            if (arg <= 0.0) continue;
+            const double phi = exp(beta * (sqrt(arg) - 1.0));
+            long long idx = l % n_fine;
+            if (idx < 0) idx += n_fine;
+            double* c = sg + 4 * idx;
+            atomicAdd(c, phi * a_re); atomicAdd(c + 1, phi * a_im);
+            atomicAdd(c + 2, phi * b_re); atomicAdd(c + 3, phi * b_im);
+        }
+    }
+    __syncthreads();
+    for (long long i = threadIdx.x; i < n_fine; i += blockDim.x) {
+        const double* c = sg + 4 * i;
+        if (c[0] == 0.0 && c[1] == 0.0 && c[2] == 0.0 && c[3] == 0.0) continue;
+        atomicAdd(grid + 2*i, c[0]); atomicAdd(grid + 2*i + 1, c[1]);
+        atomicAdd(grid + 2*(n_fine + i), c[2]); atomicAdd(grid + 2*(n_fine + i) + 1, c[3]);
+    }
+}
 """
 #: SM tile (fine points) and maximum sources per subproblem.
 SM_TILE = int(os.environ.get("SM_TILE", "256"))
 SM_MAX_SOURCES = int(os.environ.get("SM_MAX_SOURCES", "1024"))
+#: Balanced-gather chunk (sources per warp item); largest privatized grid.
+ITEM_SOURCES = int(os.environ.get("ITEM_SOURCES", "256"))
+PRIV_MAX_FINE = int(os.environ.get("PRIV_MAX_FINE", "1536"))
 
 
 def _sm_kernel(name):
@@ -565,6 +643,27 @@ def _sorted_sources(phase, packed, rid, off, width):
 def _spread_exact(kind, phase, packed, n_fine, width, beta, clock, work):
     """Per-rectangle ``gather`` or ``sm`` spread into a ``(2, n_fine)`` grid."""
     cp = _cp()
+    if kind == "priv":
+        from pyrite.montecarlo.spectrum.cxr import _fourier_spread as fs
+
+        grid = cp.zeros((2, n_fine), dtype=cp.complex128)
+        n = phase.size
+        if n_fine <= PRIV_MAX_FINE:
+            blocks = int(min(1024, max(1, n // 4096)))
+            _sm_kernel("es_priv")(
+                (blocks,),
+                (256,),
+                (phase, packed, np.int64(n), np.int64(n_fine), np.int32(width), beta, grid),
+                shared_mem=32 * n_fine,
+            )
+            work["priv_sources"] = work.get("priv_sources", 0) + n
+        else:
+            fs._spread_kernel()(
+                ((n + 255) // 256,),
+                (256,),
+                (phase, packed, np.int64(n), np.int64(n_fine), np.int32(width), beta, grid),
+            )
+        return grid
     off = cp.asarray([0, n_fine], dtype=cp.int64)
     u, l0, src, key = _sorted_sources(phase, packed, None, off, width)
     clock.mark("nufft_sort")
@@ -606,7 +705,34 @@ def _spread_exact(kind, phase, packed, n_fine, width, beta, clock, work):
     return grid
 
 
-def _batched_nufft(rects, phase, constant, linear, dt, out, *, eps, clock, work):
+def _gather_items(key, start, off_h, n_fine, width):
+    """(point, s_lo, s_hi) warp items: each point's window, split into chunks."""
+    cp = _cp()
+    G = int(off_h[-1])
+    g = cp.arange(G, dtype=cp.int64)
+    base = cp.asarray(np.repeat(off_h[:-1], n_fine))
+    nf = cp.asarray(np.repeat(n_fine, n_fine))
+    pt = g - base
+    main_lo = start[base + cp.maximum(pt - width + 1, 0)]
+    main_hi = start[g + 1]
+    wrap = pt < width - 1
+    w_first = cp.where(wrap, base + nf + pt - width + 1, base + nf)
+    wrap_lo = start[w_first]
+    wrap_hi = start[base + nf]
+    seg_g = cp.concatenate((g, g))
+    seg_lo = cp.concatenate((main_lo, wrap_lo))
+    seg_hi = cp.concatenate((main_hi, cp.where(wrap, wrap_hi, wrap_lo)))
+    chunks = (seg_hi - seg_lo + ITEM_SOURCES - 1) // ITEM_SOURCES
+    ends = cp.cumsum(chunks)
+    total = int(ends[-1])
+    t = cp.arange(total, dtype=cp.int64)
+    seg = cp.searchsorted(ends, t, side="right")
+    lo = seg_lo[seg] + (t - (ends - chunks)[seg]) * ITEM_SOURCES
+    hi = cp.minimum(lo + ITEM_SOURCES, seg_hi[seg])
+    return cp.ascontiguousarray(cp.stack((seg_g[seg], lo, hi), axis=1))
+
+
+def _batched_nufft(rects, phase, constant, linear, dt, out, *, eps, clock, work, items=False):
     """All NUFFT rectangles of a flush: one key sort, one gather, per-rectangle FFT."""
     from pyrite.montecarlo.spectrum.cxr import _fourier_spread as fs
 
@@ -632,26 +758,30 @@ def _batched_nufft(rects, phase, constant, linear, dt, out, *, eps, clock, work)
     del ph, packed, rid
     G = int(off_h[-1])
     start = cp.searchsorted(key, cp.arange(G + 1, dtype=cp.int64))
-    del key
-    clock.mark("nufft_sort")
-    grid = cp.empty(2 * G, dtype=cp.complex128)
-    _sm_kernel("es_gather")(
-        ((G + 127) // 128,),
-        (128,),
-        (
-            u,
-            l0,
-            src,
-            start,
-            off,
-            np.int32(len(rects)),
-            np.int64(G),
-            np.int32(width),
-            np.float64(fs._BETA_PER_WIDTH * width),
-            grid,
-        ),
-    )
+    beta = np.float64(fs._BETA_PER_WIDTH * width)
+    nrect = np.int32(len(rects))
     work["max_bin_sources"] = int(cp.diff(start).max())
+    if items:
+        item = _gather_items(key, start, off_h, n_fine, width)
+        n_items = item.shape[0]
+        work["items"] = int(n_items)
+        clock.mark("nufft_sort")
+        grid = cp.zeros(2 * G, dtype=cp.complex128)
+        _sm_kernel("es_gather_items")(
+            ((n_items + 3) // 4,),
+            (128,),
+            (u, l0, key, src, item, np.int64(n_items), off, nrect, np.int32(width), beta, grid),
+        )
+        del item
+    else:
+        clock.mark("nufft_sort")
+        grid = cp.empty(2 * G, dtype=cp.complex128)
+        _sm_kernel("es_gather")(
+            ((G + 127) // 128,),
+            (128,),
+            (u, l0, src, start, off, nrect, np.int64(G), np.int32(width), beta, grid),
+        )
+    del key
     del u, l0, src, start
     clock.mark("nufft_spread")
     plans = {}
@@ -737,7 +867,7 @@ def _es_transform(phase, strengths, j0, j1, *, eps, plans, clock, opts, work):
     n = phase.size
     beta = fs._BETA_PER_WIDTH * width
     spread = opts.get("spread", "fp64")
-    if spread in ("gather", "sm"):
+    if spread in ("gather", "sm", "priv"):
         grid = _spread_exact(spread, phase, packed, n_fine, width, np.float64(beta), clock, work)
         clock.mark("nufft_spread")
         spectrum = cp.fft.fft(grid, axis=1)
@@ -816,7 +946,16 @@ def _positive(E_res, a_width, weight, c0, period, *, eps, opts, clock, work):
     plans = {}
     if opts.get("batch") and large.any():
         _batched_nufft(
-            rects[large], phase, constant, linear, dt, out, eps=eps, clock=clock, work=work
+            rects[large],
+            phase,
+            constant,
+            linear,
+            dt,
+            out,
+            eps=eps,
+            clock=clock,
+            work=work,
+            items=opts["batch"] == "items",
         )
         large_rects = []
     else:
@@ -956,6 +1095,17 @@ ARM_SETS = {
         ),
         ("fast_2^24_eps1e-9", {**_FAST, "min_work": 1 << 24, "eps": 1e-9}),
         ("fast_2^24_spread_f32_grid", {**_FAST, "min_work": 1 << 24, "spread": "f32_grid"}),
+    ),
+    # #1297 round 2: balanced warp gather and privatized small grids.
+    "sm2": tuple(
+        (f"v6_{name}_2^{b}", {**_V6, "min_work": 1 << b, **extra})
+        for b in (24, 22)
+        for name, extra in (
+            ("atomic", {}),
+            ("priv", {"spread": "priv"}),
+            ("items_batched", {"batch": "items"}),
+            ("gather_batched", {"batch": True}),
+        )
     ),
     # #1297: exact-pair spreaders on the fourier-auto-v6 settings.
     "sm": tuple(
