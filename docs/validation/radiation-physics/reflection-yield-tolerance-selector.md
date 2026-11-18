@@ -542,6 +542,25 @@ steps with a trapezoid error far below tol.
 | MoS₂ 2000 Å / Si 30 keV | MoS₂ film | G22 | 15,930 | 0.15 | 3.4e-4 |
 | | Si substrate | G22 | 5,408 | 0.16 | 6.6e-4 |
 
+**Remote selection and total-spectrum margins** (64 histories, seeds
+642501–642503, qlmc jobs 13552–13555 and 13556–13558). Remote runs select the
+same arms as the local probes: Si G20 (estimated net tail 4.2–5.0e-4) and
+MoS₂/Si G22 on both radiators. The G20 total spectrum, lines through
+$|g|\le20$ plus the continuum corrected for that set, was compared with G30
+under the #1143 margins, on the same transports and 100 eV bins (worst of
+three seeds):
+
+| Arm | Reflections | Yield | Centroid | Peak | Dominant FWHM | Mass L1 |
+|---|---|---|---|---|---|---|
+| G20 | 4,016 | 4.4e-4 | 1.8e-4 | 4.3e-4 | 7.7e-5 | 3.5e-4 |
+| G22 | 5,408 | 1.8e-4 | 8.4e-5 | 2.6e-4 | 4.9e-5 | 1.7e-4 |
+| margin | | 1e-3 | 1e-3 | 1e-2 | 1e-2 | 1e-2 |
+
+G20 passes every margin. Its measured yield gap (4.4e-4) agrees with the
+selector's own tail estimate, so the default tolerance stays at 1e-3. The
+uncorrected continuum at G20 misses the yield margin (2.7e-3), which is the
+double count the correction removes.
+
 The share pass cost 4.6 s (Si) and 18 s (MoS₂/Si) against 11 s and 28 s of
 line scoring at 2 histories. It is dominated by the per-shell table builds,
 which do not grow with the history count.
