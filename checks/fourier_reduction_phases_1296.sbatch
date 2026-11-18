@@ -10,6 +10,7 @@
 # user config under .xdg-config/pyrite):
 #   sbatch [-p gpu-amd] -J fr1296-<sha> checks/fourier_reduction_phases_1296.sbatch \
 #       OUT_DIR MATERIAL E0_KEV TILT HISTORIES [REPEATS]
+# ARMSET=variants replays saved flushes through the candidate-fix arms instead of bench.
 set -uo pipefail
 cd "$SLURM_SUBMIT_DIR"
 . checks/rocm/env.sh
@@ -27,6 +28,6 @@ if ! ls "$OUT"/flush-*.npz > /dev/null 2>&1; then
     uv run --no-sync python -u $H capture "$MATERIAL" "$E0" "$TILT" "$HISTORIES" "$OUT"
     echo "capture rc=$?"
 fi
-uv run --no-sync python -u $H bench "$OUT" "$REPEATS"
+uv run --no-sync python -u $H "${ARMSET:-bench}" "$OUT" "$REPEATS"
 echo "bench rc=$?"
 sha256sum "$OUT"/*.json > "$OUT/SHA256SUMS" 2>/dev/null
