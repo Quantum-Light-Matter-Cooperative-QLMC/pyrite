@@ -222,19 +222,20 @@ def test_a_block_that_fails_mid_spill_is_not_counted_twice(monkeypatch, tmp_path
 
     def add_failing_once(self, segs):
         if len(failures) < 2 and self._seen[0] in (0, 8):  # first spill, later block
-            spill = line_grid_spill.spill_population
+            append = line_grid_spill.LineFile.append
 
-            def broken(store, population):
-                spill(store, population)  # leaves files, then fails like an OOM
+            def broken(lines, populations):
+                with lines.path.open("ab") as stream:
+                    stream.write(b"partial block")  # a write cut short, as by an OOM
                 raise MemoryError("injected")
 
-            monkeypatch.setattr(line_grid_spill, "spill_population", broken)
+            monkeypatch.setattr(line_grid_spill.LineFile, "append", broken)
             try:
                 real_add(self, segs)
             except MemoryError:
                 failures.append(self._seen[0])
             finally:
-                monkeypatch.setattr(line_grid_spill, "spill_population", spill)
+                monkeypatch.setattr(line_grid_spill.LineFile, "append", append)
         real_add(self, segs)  # the replay
 
     monkeypatch.setattr(BlockGridEvidence, "add", add_failing_once)
@@ -246,3 +247,34 @@ def test_a_block_that_fails_mid_spill_is_not_counted_twice(monkeypatch, tmp_path
     assert grid_pass["evidence_bytes"] == held_pass["evidence_bytes"]
     np.testing.assert_array_equal(grid, held)
     assert list(spill_dir.iterdir()) == []
+
+
+def test_spilled_lines_share_one_descriptor_and_keep_their_bits(tmp_path):
+    from pyrite.montecarlo.spectrum.cxr_seeds import ResonancePopulation
+
+    rng = np.random.default_rng(7)
+    store = SpillStore(tmp_path)
+    lines = line_grid_spill.LineFile(store)
+    blocks, records = [], []
+    for index in range(1500):  # beyond a 1024-descriptor limit as per-array maps
+        size = int(rng.integers(0, 5))
+        dtype = np.float32 if index % 2 else np.float64
+        population = ResonancePopulation(
+            f"r{index % 3}",
+            *(rng.random(size).astype(dtype) for _ in range(3)),
+        )
+        blocks.append(population)
+        records += lines.append([population])
+    descriptors = len(os.listdir("/proc/self/fd"))
+    served = lines.populations(records)
+    assert len(os.listdir("/proc/self/fd")) <= descriptors + 1
+    for got, want in zip(served, blocks, strict=True):
+        assert got.label == want.label
+        for field in ("energy_eV", "weight", "width_eV"):
+            array = getattr(got, field)
+            assert array.dtype == getattr(want, field).dtype
+            np.testing.assert_array_equal(array, getattr(want, field))
+            assert array.size == 0 or array.ctypes.data % 64 == 0
+    assert store.bytes == lines.size
+    lines.close()
+    store.close()

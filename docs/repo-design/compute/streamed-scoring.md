@@ -122,8 +122,10 @@ not.
 
 - **Blocks.** Each block's sinc samples are two raw arrays, written before the
   block commits, so a block replayed after an allocator OOM is never counted
-  twice. Production lines are one `.npy` per array, served back as read-only
-  memory maps with the in-memory block layout.
+  twice. Production lines are appended to one raw file (`LineFile`, truncated
+  back on a failed block) and served after transport as views of a single
+  read-only memory map, in the in-memory block layout. One map per array ran
+  out of file descriptors at 64 h-BN blocks (job 13610).
 - **Exact quantile.** `external_stable_sort` distributes rows into value
   buckets at sampled pivots, each bucket in row order, and sorts every bucket
   that fits `SORT_ROWS` with the same stable argsort; larger buckets recurse.

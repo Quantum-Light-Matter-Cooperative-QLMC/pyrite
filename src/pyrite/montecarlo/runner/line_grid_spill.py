@@ -14,11 +14,12 @@ the same stable argsort. Equal widths share a bucket, so the concatenated
 buckets are the global stable order whatever the pivots. :func:`sorted_sinc_spacing`
 then reads the sorted rows chunkwise; carrying the running sum into each
 chunk's first element keeps the sequential float cumulative sum unchanged, so
-the spacing is bitwise the in-memory one. Production lines are stored one
-``.npy`` per array and served as read-only memory maps holding the same bits
-in the same block layout, so the population consumers read identical arrays.
+the spacing is bitwise the in-memory one. Production lines are appended to
+one raw file (:class:`LineFile`) and served as views of a single read-only
+memory map, holding the same bits in the same block layout, so the population
+consumers read identical arrays.
 
-Files are raw native-endian arrays; ``.npy`` for populations. The scratch
+Files are raw native-endian arrays. The scratch
 directory lives under the output ``cache/`` (always safe to delete) and is
 removed on success, error and interrupt; directories of dead processes on the
 same host are pruned when a new one starts.
@@ -353,26 +354,78 @@ def _first_reaching(weight, target) -> int:
     return int(weight.size)
 
 
-def spill_population(store: SpillStore, population):
-    """Paths of one population's arrays, written as ``.npy`` (uncommitted)."""
-    fields = (population.energy_eV, population.weight, population.width_eV)
-    paths = [store.path(f"line-{name}.npy") for name in ("energy", "weight", "width")]
-    for path, array in zip(paths, fields, strict=True):
-        with path.open("wb") as stream:
-            np.save(stream, np.asarray(array), allow_pickle=False)
-    return paths
+#: Byte alignment of each spilled line array, as NumPy aligns its own buffers.
+_LINE_ALIGN = 64
 
 
-def load_population(store: SpillStore, label, paths):
-    """The spilled population as read-only memory maps (empty arrays in memory)."""
-    from ..spectrum.cxr_seeds import ResonancePopulation
+class LineFile:
+    """Production lines of every spilled block, appended to one raw file.
 
-    arrays = []
-    for path in paths:
-        store.account(path)
-        array = np.load(path, mmap_mode="r", allow_pickle=False)
-        arrays.append(np.array(array) if array.size == 0 else array)
-    return ResonancePopulation(label, *arrays)
+    One file, mapped once after transport, keeps a single descriptor however
+    many blocks and reflections spill (per-array maps exhausted the process's
+    descriptors at 64 h-BN blocks, job 13610). Each population is kept as
+    ``(label, ((offset, dtype, size), ...))`` and served as views of that map,
+    so consumers read the same arrays in the same block layout.
+    """
+
+    def __init__(self, store: SpillStore):
+        self.store = store
+        self.path = store.path("lines.raw")
+        self.path.touch()
+        self.size = 0
+        self._map: np.memmap | None = None
+
+    def append(self, populations) -> list:
+        """Append one block's populations; on failure the file is as before."""
+        if self._map is not None:
+            raise RuntimeError("spilled lines were already mapped")
+        records, offset = [], self.size
+        try:
+            with self.path.open("r+b") as stream:
+                stream.truncate(self.size)  # drop a failed attempt's bytes
+                stream.seek(self.size)
+                for population in populations:
+                    fields = []
+                    for array in (population.energy_eV, population.weight, population.width_eV):
+                        array = np.ascontiguousarray(array)
+                        pad = -offset % _LINE_ALIGN
+                        stream.write(b"\0" * pad)
+                        offset += pad
+                        array.tofile(stream)
+                        fields.append((offset, array.dtype.str, int(array.size)))
+                        offset += array.nbytes
+                    records.append((population.label, tuple(fields)))
+        except BaseException:
+            with self.path.open("r+b") as stream:
+                stream.truncate(self.size)
+            raise
+        self.store.bytes += offset - self.size
+        self.store.peak_bytes = max(self.store.peak_bytes, self.store.bytes)
+        self.size = offset
+        return records
+
+    def populations(self, records) -> list:
+        """The recorded populations as read-only views of the file."""
+        from ..spectrum.cxr_seeds import ResonancePopulation
+
+        if self._map is None and self.size:
+            self._map = np.memmap(self.path, dtype=np.uint8, mode="r", shape=(self.size,))
+        out = []
+        for label, fields in records:
+            arrays = []
+            for offset, dtype, size in fields:
+                dtype = np.dtype(dtype)
+                if size == 0 or self._map is None:
+                    arrays.append(np.empty(size, dtype=dtype))
+                    continue
+                stop = offset + size * dtype.itemsize
+                arrays.append(self._map[offset:stop].view(dtype))
+            out.append(ResonancePopulation(label, *arrays))
+        return out
+
+    def close(self) -> None:
+        """Release the map."""
+        self._map = None
 
 
 def projected_disk_bytes(sinc_bytes: float, line_bytes: float) -> float:

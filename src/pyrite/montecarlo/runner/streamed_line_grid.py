@@ -28,7 +28,7 @@ import numpy as np
 from ..._cxr_grid_policy import RESONANCE_BANDWIDTH_POLICY
 
 if TYPE_CHECKING:
-    from .line_grid_spill import SpillStore
+    from .line_grid_spill import LineFile, SpillStore
 
 #: Line-grid policy features live streaming cannot resolve from block evidence.
 WINDOWED_POLICY_REFUSAL = "windowed line_grid_policy is not supported by live streamed scoring"
@@ -76,6 +76,7 @@ class BlockGridEvidence:
         self._dtypes = None
         self._seen = [0, 0, 0]  # transported electrons, sinc bytes, line bytes
         self._store: SpillStore | None = None
+        self._lines: LineFile | None = None
         self._runs: list = []
         self.spill_peak_bytes = 0
 
@@ -145,7 +146,7 @@ class BlockGridEvidence:
 
     def _start_spill(self, seen) -> None:
         """Move the held blocks to a new store; on failure keep them in memory."""
-        from .line_grid_spill import SpillStore
+        from .line_grid_spill import LineFile, SpillStore
 
         store = SpillStore(self.policy.parent())
         self._store = store
@@ -154,19 +155,20 @@ class BlockGridEvidence:
             runs, populations = self._runs, []
             for width, weight in zip(self._width or (), self._weight or (), strict=True):
                 runs.append(_write_run(store, width, weight))
-            for population in self._populations:
-                populations.extend(self._spill_populations(store, [population]))
+            self._lines = LineFile(store)
+            populations = self._lines.append(self._populations)
         except BaseException:
             store.close()
-            self._store, self._runs = None, []
+            self._store, self._lines, self._runs = None, None, []
             raise
         self._width, self._weight, self._populations = [], [], populations
         self._track_peak()
 
     def _spill_block(self, store, width, weight, populations) -> None:
+        assert self._lines is not None
         run = _write_run(store, width, weight)
         try:
-            spilled = self._spill_populations(store, populations)
+            spilled = self._lines.append(populations)
         except BaseException:
             store.unlink(run.width)
             store.unlink(run.weight)
@@ -174,21 +176,6 @@ class BlockGridEvidence:
         self._runs.append(run)
         self._populations.extend(spilled)
         self._track_peak()
-
-    @staticmethod
-    def _spill_populations(store, populations) -> list:
-        from .line_grid_spill import load_population, spill_population
-
-        written = []
-        try:
-            for population in populations:
-                written.append((population.label, spill_population(store, population)))
-        except BaseException:
-            for _, paths in written:
-                for path in paths:
-                    path.unlink(missing_ok=True)
-            raise
-        return [load_population(store, label, paths) for label, paths in written]
 
     def _track_peak(self) -> None:
         if self._store is not None:
@@ -206,6 +193,8 @@ class BlockGridEvidence:
 
     def close(self) -> None:
         """Remove any spilled evidence."""
+        if self._lines is not None:
+            self._lines.close()
         if self._store is not None:
             self._track_peak()
             self._store.close()
@@ -248,6 +237,8 @@ class BlockGridEvidence:
         self._check_direction(n_hat)
         if not self.measured or (float(start), float(ceiling)) != self.band:
             raise ValueError("streamed line-grid evidence holds no lines for this band")
+        if self._lines is not None:
+            return self._lines.populations(self._populations)
         return list(self._populations)
 
 
