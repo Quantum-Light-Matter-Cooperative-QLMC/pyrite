@@ -20,6 +20,7 @@ from ..._cxr_grid_policy import (
     DEFAULT_COHERENT_FLAT_OMISSION_LIMIT,
     DEFAULT_COHERENT_LEAK_LIMIT,
     LOCAL_RESOLUTION_POLICY,
+    OVERSAMPLED_RESOLUTION_POLICY,
     RESONANCE_BANDWIDTH_POLICY,
     SHAPE_RESOLUTION_POLICY,
     CxrGridToleranceError,
@@ -48,6 +49,7 @@ from ..spectrum.cxr_seeds import (
 )
 from ..spectrum.diagnostics import coherent_fringe_spacing, sinc_feature_spacing
 from .bandwidth_fallback import extension_stop, extension_stop_ladder
+from .node_local_grid import NODE_LOCAL_REVISION, node_local_axis, uniform_over_budget
 
 
 def _resident_mib():
@@ -582,10 +584,12 @@ def _measured_cxr_grid(
     direction reproduces the single-direction axis exactly.
     Under ``sinc-shape`` it is uniform at the shape step when that fits the
     budget, and otherwise the ``resonance-local`` axis (:func:`_shape_axis`).
-    Returns ``(grid, record, bandwidth_record)``.
+    An over-budget ``sinc-oversampled`` axis takes the node-local refinement
+    of the same population (#1257). Returns ``(grid, record, bandwidth_record)``.
 
     Validation: line-grid-resonance-local-spacing
     Validation: line-grid-sinc-shape-spacing
+    Validation: line-grid-node-local-refinement
     """
     if evidence is None:
         evidence = SegmentGridEvidence(case, segments, Ne, abs_layers, groove)
@@ -633,7 +637,12 @@ def _measured_cxr_grid(
         uniform = None
         if shape["route"] == "uniform":
             uniform = (shape.pop("payload"), shape["spacing_eV"])
-    if uniform is not None:
+    over_budget = uniform_over_budget(payload, start, stop, target_step) if uniform else None
+    if over_budget is not None:
+        grid, record = node_local_axis(
+            payload, start, stop, target_step, direction_populations, over_budget
+        )
+    elif uniform is not None:
         stage_started = perf_counter() if profile_enabled else 0.0
         grid, record = resolved_coordinates(*uniform, dtype=REAL, stop_eV=stop)
         if profile_enabled:
@@ -652,6 +661,25 @@ def _measured_cxr_grid(
     if profile_enabled:
         record["cxr_grid_profile"] = profile
     return grid, record, bandwidth_record
+
+
+def _kinematic_cxr_grid(payload, case, n_hats, target_step, evidence):
+    """Uniform kinematic axis, or its node-local refinement over budget (#1257).
+
+    The line populations are collected only when the uniform ``sinc-oversampled``
+    axis exceeds the point budget. Mixed transport scores no lines (#990), so its
+    local axis is the sinc-Nyquist backbone alone.
+
+    Validation: line-grid-node-local-refinement
+    """
+    start = float(payload["bandwidth"]["start_eV"])
+    stop = float(payload["bandwidth"]["stop_eV"])
+    over_budget = uniform_over_budget(payload, start, stop, target_step)
+    if over_budget is None:
+        return resolved_coordinates(payload, target_step, dtype=REAL)
+    lines = case.get("transport_mode") != "mixed"
+    populations = [evidence.populations(n, start, stop, None) if lines else [] for n in n_hats]
+    return node_local_axis(payload, start, stop, target_step, populations, over_budget)
 
 
 def _refuse_coherent_resolution(case, segments, n_hat, Ne, payload):
@@ -721,10 +749,12 @@ def _policy_cache_key(payload, case, n_hats, *, observation):
     """
     windowed = payload.get("windows") is not None
     measured = payload["bandwidth"]["policy"] == RESONANCE_BANDWIDTH_POLICY
+    # An over-budget oversampled axis refines around the measured lines (#1257).
+    local = not windowed and payload["resolution"]["policy"] == OVERSAMPLED_RESOLUTION_POLICY
     keys = (
         _RESOLUTION_INPUT_KEYS
-        + (_WINDOW_INPUT_KEYS if windowed or measured else ())
-        + (_WEIGHT_INPUT_KEYS if measured else ())
+        + (_WINDOW_INPUT_KEYS if windowed or measured or local else ())
+        + (_WEIGHT_INPUT_KEYS if measured or local else ())
     )
     inputs = {key: case[key] for key in keys if case.get(key, None) is not None}
     inputs["backend_dtype"] = np.dtype(REAL).name
@@ -733,6 +763,8 @@ def _policy_cache_key(payload, case, n_hats, *, observation):
         inputs["seeding_revision"] = SEEDING_REVISION
     if measured:
         inputs["measured_coverage_revision"] = MEASURED_COVERAGE_REVISION
+    if local:
+        inputs["node_local_revision"] = NODE_LOCAL_REVISION
     if observation:
         inputs["observation_directions"] = np.asarray(n_hats, dtype=float).tolist()
     if bool(case.get("coherent_emission", False)):
@@ -857,7 +889,7 @@ def _resolve_policy_grid(
                 evidence=evidence,
             )
         else:
-            grid, record = resolved_coordinates(payload, target_step, dtype=REAL)
+            grid, record = _kinematic_cxr_grid(payload, case, n_hats, target_step, evidence)
     except CxrGridToleranceError as exc:
         raise CxrGridToleranceError(
             f"{case['name']} at {case['E0_keV']:g} keV (backend {np.dtype(REAL).name}): {exc}"

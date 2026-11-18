@@ -658,14 +658,13 @@ def test_public_mixed_physics_cuts_rows():
     from pyrite.campaign.trajectories import simulate_trajectories
 
     scene = _mixed_scene()
-    # Si 1 MeV kinematic fallback axes need 0.98-2.5M sinc-oversampled nodes,
-    # over the 600k budget (#1214); this test counts transport rows, so it takes
-    # the public sinc-nyquist opt-out.
+    # Si 1 MeV kinematic fallback axes need 0.98-2.5M uniform sinc-oversampled
+    # nodes, over the 600k budget (#1214); the default resolves them on the
+    # node-local refinement instead of refusing (#1257).
     numerics = pr.Numerics(
         sampling=FixedSampling(cxr_histories=40, brem_histories=40),
         seed=7,
         cxr_reflections=pr.config.CxrReflections(n_families=4),
-        line_resolution="sinc-nyquist",
     )
     rows = [
         simulate_trajectories(scene.beam, scene.target, physics=physics, numerics=numerics)[

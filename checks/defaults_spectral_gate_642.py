@@ -6,6 +6,7 @@ Our own pickle is retained for trusted, same-source replay only.
 """
 
 import argparse
+import contextlib
 import hashlib
 import json
 import os
@@ -147,7 +148,13 @@ POLICY_ARMS = {
     # with every interval split into K equal node steps (harness-side only).
     # They inherit the default bandwidth (measured since #1243).
     **{f"sinc-x{k}": {"resolution": "sinc-nyquist"} for k in (4, 5, 6, 7, 8, 10, 16)},
+    # #1257 node-local refinement of the sinc-oversampled default, forced even
+    # where the uniform W/8 axis fits (harness-side), on each bandwidth.
+    "node-local": {"bandwidth": "resonance-population", "resolution": "sinc-oversampled"},
+    "node-local-kinematic": {"bandwidth": "kinematic-ceiling", "resolution": "sinc-oversampled"},
 }
+#: Arms whose resolution takes the node-local route regardless of the budget.
+FORCED_LOCAL_ARMS = ("node-local", "node-local-kinematic")
 #: Node subdivisions of the resolved sinc-Nyquist step per candidate arm (#1214).
 OVERSAMPLED_ARMS = {f"sinc-x{k}": k for k in (4, 5, 6, 7, 8, 10, 16)}
 #: Predeclared same-track numerical margins (#1143); ``mass_l1`` is the L1
@@ -265,6 +272,7 @@ def matched_grid(grid, record, quadrature, backbone_eV):
     band top at the policy's backbone spacing (what it would place there).
     """
     lo, hi = BAND
+    backbone_eV = float(record.get("backbone_spacing_eV", backbone_eV))
     if record.get("resolution_policy") == "resonance-local" or "actual_spacing_eV" not in record:
         inner = grid[(grid > lo) & (grid < hi)]
         if grid[-1] < hi:
@@ -272,6 +280,39 @@ def matched_grid(grid, record, quadrature, backbone_eV):
             inner = np.r_[inner, tail[tail > inner[-1]]]
         return np.r_[lo, inner, hi]
     return axis(lo, hi, float(record["actual_spacing_eV"]), quadrature)
+
+
+@contextlib.contextmanager
+def forced_local(enabled):
+    """Route every sinc-oversampled resolution to the node-local axis (#1257).
+
+    Production takes it only above the point budget; forcing it on scenes where
+    the uniform W/8 axis fits compares the two on identical transports. The
+    speed cache is bypassed, since its key does not record the forcing.
+    """
+    if not enabled:
+        yield
+        return
+    from pyrite._grid_semantics import resolution_num
+    from pyrite.montecarlo.runner import cxr_grid
+
+    def always(payload, start, stop, target_step):
+        resolution = payload["resolution"]
+        if resolution["policy"] != "sinc-oversampled" or payload.get("windows") is not None:
+            return None
+        step = min(float(target_step), float(resolution["max_spacing_eV"]))
+        return resolution_num(start, stop, step / int(resolution["oversampling"]))
+
+    saved = (cxr_grid.uniform_over_budget, cxr_grid._cached_policy_grid, cxr_grid.store_coordinates)
+    cxr_grid.uniform_over_budget = always
+    cxr_grid._cached_policy_grid = lambda key: None
+    cxr_grid.store_coordinates = lambda key, record: None
+    try:
+        yield
+    finally:
+        cxr_grid.uniform_over_budget, cxr_grid._cached_policy_grid, cxr_grid.store_coordinates = (
+            saved
+        )
 
 
 def score_policies(case, sweep, ladder, names, reference_spacing, sync, repeats=1, probe=None):
@@ -306,15 +347,16 @@ def score_policies(case, sweep, ladder, names, reference_spacing, sync, repeats=
         try:
             sync()
             begin = time.perf_counter()
-            grid, record = resolve_cxr_grid(
-                pcase,
-                tp["segs"],
-                tp["n_hat"],
-                int(tp["Ne_lines"]),
-                np.asarray(tp["E_grid"], dtype=float),
-                case.get("abs_layers"),
-                tp.get("groove"),
-            )
+            with forced_local(name in FORCED_LOCAL_ARMS):
+                grid, record = resolve_cxr_grid(
+                    pcase,
+                    tp["segs"],
+                    tp["n_hat"],
+                    int(tp["Ne_lines"]),
+                    np.asarray(tp["E_grid"], dtype=float),
+                    case.get("abs_layers"),
+                    tp.get("groove"),
+                )
             row["resolution_s"] = time.perf_counter() - begin
         except ValueError as exc:  # CxrGridToleranceError and admission refusals
             rows.append(dict(row, refused=f"{type(exc).__name__}: {exc}"))

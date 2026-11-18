@@ -19,6 +19,7 @@ from pyrite._cxr_grid_policy import (
     DEFAULT_WINDOW_SAMPLES_PER_FEATURE,
     DEFAULT_WINDOW_TAIL_WIDTHS,
     KINEMATIC_BANDWIDTH_POLICY,
+    NYQUIST_RESOLUTION_POLICY,
     RESONANCE_BANDWIDTH_POLICY,
     WINDOWED_CXR_GRID_POLICY_SCHEMA,
     CxrGridToleranceError,
@@ -221,7 +222,9 @@ def test_runner_warns_on_a_binade_window_from_a_cold_and_a_warm_cache(monkeypatc
 
 
 def test_runner_budget_refusal_identifies_case_and_precision():
-    case, segments, n_hat = _case_and_segments()
+    # The uniform refusal: an over-budget sinc-oversampled axis first tries the
+    # node-local refinement (#1257), which reads layer columns these lack.
+    case, segments, n_hat = _case_and_segments(resolution=NYQUIST_RESOLUTION_POLICY)
     policy = case["line_grid_policy"]
     case = replace(
         case,

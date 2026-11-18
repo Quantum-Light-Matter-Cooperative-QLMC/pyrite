@@ -83,6 +83,7 @@ line-grid-emission-ceiling
 line-grid-resonance-bandwidth
 line-grid-resonance-local-spacing
 line-grid-sinc-shape-spacing
+line-grid-node-local-refinement
 line-spectrum-error-budget
 line-window-seeding
 legacy-stopping-comparison
