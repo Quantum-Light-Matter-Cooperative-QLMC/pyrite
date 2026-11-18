@@ -22,6 +22,7 @@ import numpy as np
 
 from ..._cxr_windows import FeatureSeed
 from ...materials.crystal import CRYSTALS, HBARC_EV_ANG
+from ._population_tail import tail_products
 from .reflection_rows import MIN_RESONANCE_EV, ReflectionRows, reflection_rows
 
 __all__ = [
@@ -285,36 +286,38 @@ def resonance_population_stop_eV(
         summary.update(max_resonance_eV=None, proxy_truncated_fraction=0.0, capped=False)
         return None, {**summary, "stop_eV": None}
 
+    out = np.empty(_POPULATION_BLOCK_SIZE)
+    evaluated: dict[float, float] = {}
+
     def lost(stop):
-        numerator = 0.0
-        for energy_block, weight_block, width_block in _population_blocks(populations):
-            mass = weight_block * width_block
-            keep = np.isfinite(mass) & (mass > 0.0)
-            if keep.any():
-                numerator += float(
-                    (
-                        mass[keep]
-                        * sincsq_upper_tail_bound(width_block[keep], stop - energy_block[keep])
-                    ).sum()
-                )
-        return numerator / total
+        # Fused per-block products, summed by NumPy as the array expression
+        # was (_population_tail), so each value is unchanged (#1270).
+        if stop not in evaluated:
+            numerator = 0.0
+            for energy_block, weight_block, width_block in _population_blocks(populations):
+                count = tail_products(energy_block, weight_block, width_block, stop, out)
+                if count:
+                    numerator += float(out[:count].sum())
+            evaluated[stop] = numerator / total
+        return evaluated[stop]
 
     # Lines above a trial edge count wholly, so the search may start below the
     # whole population: a rare hard-scattered line spends the share instead of
-    # forcing the axis out to its resonance.
-    low = min_energy
+    # forcing the axis out to its resonance. The tail sum falls monotonically
+    # in stop, so bisecting the rounding lattice finds the smallest rounded
+    # stop that meets the limit in log2(steps) passes; at and below the
+    # lowest resonance every line counts wholly, so lost is one there.
     stop = ceiling
-    if low < ceiling and lost(ceiling) <= limit:
-        high = ceiling
-        # The tail sum falls monotonically in stop; 60 halvings reach float64
-        # resolution of any band this axis can carry.
-        for _ in range(60):
-            middle = 0.5 * (low + high)
-            if lost(middle) > limit:
-                low = middle
+    if min_energy < ceiling and lost(ceiling) <= limit:
+        lowest = int(np.floor(min_energy / round_to_eV)) - 1
+        highest = int(np.ceil(ceiling / round_to_eV))
+        while highest - lowest > 1:
+            middle = (lowest + highest) // 2
+            if lost(min(ceiling, float(middle * round_to_eV))) > limit:
+                lowest = middle
             else:
-                high = middle
-        stop = min(ceiling, float(np.ceil(high / round_to_eV) * round_to_eV))
+                highest = middle
+        stop = min(ceiling, float(highest * round_to_eV))
     summary.update(
         max_resonance_eV=max_energy,
         proxy_truncated_fraction=lost(stop),

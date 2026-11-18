@@ -163,7 +163,7 @@ def sinc_spacing_from_samples(samples, *, aliased_weight_limit=0.01):
     if width.size == 0:
         raise ValueError("cannot derive sinc spacing: diagnostic transport has no valid segments")
 
-    order = np.argsort(width, kind="stable")
+    order = _stable_argsort(width)
     width = width[order]
     weight = weight[order]
     del order
@@ -171,8 +171,42 @@ def sinc_spacing_from_samples(samples, *, aliased_weight_limit=0.01):
     total = float(cumulative[-1])
     index = int(np.searchsorted(cumulative, float(aliased_weight_limit) * total, side="left"))
     step = float(width[min(index, width.size - 1)])
-    aliased = float(weight[width < step].sum() / total)
+    # ``width`` is sorted, so ``width < step`` is the prefix before ``step``.
+    below = int(np.searchsorted(width, step, side="left"))
+    aliased = float(weight[:below].sum() / total)
     return step, aliased, int(width.size)
+
+
+def _stable_argsort(values):
+    """``np.argsort(values, kind="stable")`` of a 1-D array without NaNs (#1270).
+
+    The default (vectorised, unstable) argsort is several times faster on large
+    populations. It differs from the stable order only inside runs of equal
+    values, which the stable sort leaves in index order; each such run's
+    indices are sorted back here with one integer sort of unique
+    ``(run, index)`` keys.
+    """
+    order = np.argsort(values)
+    tied = values[order]
+    tied = tied[1:] == tied[:-1]
+    if not tied.any():
+        return order
+    # Positions inside a run of equal values: each tie joins i and i + 1.
+    member = np.zeros(order.size, dtype=bool)
+    member[:-1] = tied
+    member[1:] |= tied
+    positions = np.flatnonzero(member)
+    del member
+    # Runs start where a member does not continue a tie from its predecessor.
+    starts = np.ones(positions.size, dtype=bool)
+    starts[1:] = ~tied[positions[1:] - 1]
+    del tied
+    run = np.cumsum(starts, dtype=np.int64) - 1
+    del starts
+    size = np.int64(order.size)
+    keys = np.sort(run * size + order[positions])
+    order[positions] = keys % size
+    return order
 
 
 def coherent_retardation(segments, n_hat, *, electron_limit=None, physical_electrons=None):

@@ -14,12 +14,12 @@
     {
       "path": "src/pyrite/_cxr_grid_policy.py",
       "name": "resolve_cxr_grid_policy",
-      "cc": 33
+      "cc": 29
     },
     {
       "path": "src/pyrite/_precision.py",
       "name": "Precision.__post_init__",
-      "cc": 33
+      "cc": 31
     },
     {
       "path": "src/pyrite/apps/axial_channeling.py",
