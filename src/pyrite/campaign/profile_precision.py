@@ -9,7 +9,6 @@ import tomlkit
 
 from pyrite._cxr_vocabulary import catalog_key
 from pyrite._numerics import SAMPLING_KEYS, validate_profile_numerics
-from pyrite._off_settings import is_on, off_value
 from pyrite._precision import (
     DEFAULT_PRECISION,
     REQUIRED_FIELDS,
@@ -26,12 +25,6 @@ SAMPLING_FLAGS = {"n_electrons": "cxr-histories", "n_electrons_brem": "brem-hist
 
 
 _INITIAL_FIELDS = (*REQUIRED_FIELDS, "observables")
-#: Fields that enable particle cascades; a stored "none" keeps them off (#1242).
-_CASCADE_KEYS = ("secondary_threshold_eV", "pair_production_model")
-
-
-def _unwrap(value):
-    return value.unwrap() if hasattr(value, "unwrap") else value
 
 
 def profile_precision_values(profile):
@@ -72,13 +65,6 @@ def precision_resolution(profile):
     reason = default_precision_fallback(
         fixed_counts=any(key in profile for key in SAMPLING_KEYS),
         emission=profile.get("emission"),
-        secondary_threshold_eV=off_value(
-            "secondary_threshold_eV", _unwrap(profile.get("secondary_threshold_eV"))
-        ),
-        pair_production_model=off_value(
-            "pair_production_model", _unwrap(profile.get("pair_production_model"))
-        ),
-        positron_transport=bool(profile.get("positron_transport", False)),
     )
     if reason is not None:
         return None, None, "fixed", reason
@@ -116,8 +102,8 @@ def precision_blockers(profile):
 
     Covers the profile-level routes a run refuses: coherent emission,
     physical-detector observation directions and per-material count overrides.
-    Particle cascades run adaptive when selected explicitly (#1240). GDF beams and grooved targets are resolved per
-    run.
+    Particle cascades run adaptive (#1240). GDF beams and grooved targets are
+    resolved per run.
     """
     blockers = []
     emission = profile.get("emission")
@@ -176,20 +162,16 @@ def set_precision(document, name, updates):
 def enable_precision(document, name, updates):
     """Switch a profile to adaptive sampling atomically.
 
-    Removes fixed counts, then writes a policy only when ``updates`` are given,
-    one already exists (unspecified fields as in :func:`set_precision`), or the
-    profile would otherwise keep fixed counts (particle cascades run adaptive
-    only from an explicit policy, #1240); otherwise
-    :data:`DEFAULT_PRECISION` applies. Returns the removed counts; nothing is
-    staged on refusal.
+    Removes fixed counts, then writes a policy only when ``updates`` are given
+    or one already exists (unspecified fields as in :func:`set_precision`);
+    otherwise :data:`DEFAULT_PRECISION` applies. Returns the removed counts;
+    nothing is staged on refusal.
     """
     target = existing_profile(document, name)
     _check_adaptive(name, target)
     current = profile_precision_values(target)
     policy = None
-    cascade = any(is_on(key, _unwrap(target.get(key))) for key in _CASCADE_KEYS)
-    cascade = cascade or bool(_unwrap(target.get("positron_transport", False)))
-    if updates or current is not None or cascade:
+    if updates or current is not None:
         policy = merge_policy(current, updates)
     counts = fixed_counts(target)
     for key in counts:

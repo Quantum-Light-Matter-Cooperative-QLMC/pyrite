@@ -96,13 +96,11 @@ def test_off_is_a_deprecated_alias_of_none(option):
     assert '"none"' in _catalog_text()
 
 
-def test_none_overrides_a_preset_and_restores_adaptive_sampling(cascades):
+def test_none_overrides_a_preset_and_keeps_adaptive_sampling(cascades):
+    # Cascades run the default policy (#1240); turning them off changes no count mode.
     shown = _run("profile", "numerics", "show", "campaign")
-    fix = (
-        "pyrite profile physics set campaign --pair-production-model none "
-        "--secondary-threshold-ev none"
-    )
-    assert f"adaptive sampling: {fix}" in shown.stdout
+    assert "adaptive (default policy)" in shown.stdout
+    assert "adaptive sampling:" not in shown.stdout
     off = _run(
         "profile",
         "physics",

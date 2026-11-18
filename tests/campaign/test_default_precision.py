@@ -84,13 +84,29 @@ def test_profile_settings_keep_fixed_counts(monkeypatch, field, value, reason):
     assert reason in profile_precision_source(settings, "standard", sweep=_sweep())[1]
 
 
-def test_cascades_keep_fixed_counts():
+@pytest.mark.parametrize(
+    "cascade",
+    [
+        {"secondary_threshold_eV": 1000.0},
+        {"secondary_threshold_eV": 1.0e5, "pair_production_model": "penelope-2024"},
+        {
+            "secondary_threshold_eV": 1.0e5,
+            "pair_production_model": "penelope-2024",
+            "positron_transport": True,
+        },
+    ],
+)
+def test_cascades_run_the_default_policy(cascade):
+    """Cascades sample whole primary histories, so they take the default (#1240)."""
     # Only the fields the resolver reads; a valid cascade Settings needs shell tables.
-    settings = SimpleNamespace(
-        emission="incoherent",
-        secondary_threshold_eV=1000.0,
-        pair_production_model=None,
-        positron_transport=False,
+    fields = {
+        "emission": "incoherent",
+        "secondary_threshold_eV": None,
+        "pair_production_model": None,
+        "positron_transport": False,
+    }
+    settings = SimpleNamespace(**{**fields, **cascade})
+    assert profile_precision_source(settings, "standard", sweep=_sweep()) == (
+        DEFAULT_PRECISION,
+        "default",
     )
-    precision, source = profile_precision_source(settings, "standard", sweep=_sweep())
-    assert precision is None and "cascades" in source

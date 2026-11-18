@@ -820,8 +820,8 @@ Usage: pyrite profile numerics adaptive-sampling [OPTIONS] COMMAND [ARGS]...
   maximum count flagged statistics-limited. By default one count serves both
   populations. --brem-target-rse enables independent brem-prefix stopping; line
   transport continues until brem finishes. Coherent emission, physical detectors, GDF
-  beams, grooves and fixed history counts keep fixed counts; particle cascades run
-  adaptive only once enabled here. A history is one transported primary electron.
+  beams, grooves and fixed history counts keep fixed counts. A history is one
+  transported primary electron with all its secondaries, pairs and positrons.
 
     enable   switch to adaptive: drop fixed counts, optionally customize
     set      customize fields of an adaptive policy

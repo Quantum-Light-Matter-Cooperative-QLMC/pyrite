@@ -245,7 +245,8 @@ def command():
     independent brem-prefix stopping; line transport continues until brem finishes.
     Coherent emission,
     physical detectors, GDF beams, grooves and fixed history counts keep fixed
-    counts; particle cascades run adaptive only once enabled here. A history is one transported primary electron.
+    counts. A history is one transported primary electron with all its
+    secondaries, pairs and positrons.
 
     \b
       enable   switch to adaptive: drop fixed counts, optionally customize
@@ -318,7 +319,7 @@ def precision_show_command(name, json_output):
         )
     for blocker in blockers:
         emit_result(f"adaptive unsupported: {blocker}")
-    _profile_shared.emit_adaptive_fix(name, fixed_reason, profile)
+    _profile_shared.emit_adaptive_fix(name, fixed_reason)
     emit_result(
         "CXR grid: "
         + (

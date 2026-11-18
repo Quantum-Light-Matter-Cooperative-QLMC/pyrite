@@ -583,13 +583,14 @@ def test_removed_budget_catalog_key_is_a_clear_runtime_error(tmp_path, monkeypat
         "positron_transport = true\n",
     ],
 )
-def test_enable_writes_an_explicit_policy_for_cascades(tmp_path, monkeypatch, cascade):
-    """Cascades keep fixed counts by default, so enabling them writes the policy (#1240)."""
+def test_enable_on_cascades_selects_the_default_policy(tmp_path, monkeypatch, cascade):
+    """Cascades run the default policy (#1240): enabling writes no table."""
     text = _fixed(f"cxr_histories = {{ values = [500] }}\n{cascade}")
     catalog = _catalog(tmp_path, monkeypatch, text)
     enabled = invoke(numerics_command, ["adaptive-sampling", "enable", "sub_100keV"])
     assert_clean_result(enabled)
-    policy = _profile(catalog)["adaptive_sampling"]
-    assert policy["target_rse"] == 0.05 and policy["max_histories"] == 20_000
+    profile = _profile(catalog)
+    assert "adaptive_sampling" not in profile and "cxr_histories" not in profile
     shown = invoke(numerics_command, ["adaptive-sampling", "show", "sub_100keV"])
-    assert "adaptive" in shown.stdout and "unsupported" not in shown.stdout
+    assert "adaptive (default policy)" in shown.stdout
+    assert "unsupported" not in shown.stdout
