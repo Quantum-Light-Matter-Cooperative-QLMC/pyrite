@@ -11,7 +11,6 @@ Validation: adaptive-sample-size-stopping
 import numpy as np
 import pytest
 
-from pyrite._cxr_grid_policy import resolve_cxr_grid_policy
 from pyrite.montecarlo import runner
 from pyrite.montecarlo.runner import block_transport
 from pyrite.montecarlo.runner.streamed_scoring import run_case_streamed, streaming_refusal
@@ -21,20 +20,9 @@ from tests.montecarlo.transport.test_independent_stopping import _policy
 SPECTRA = ("spec", "spec_characteristic", "brem_wide", "brem")
 
 
-def _streamable(case):
-    """The default ``sinc-oversampled`` grid refuses live streaming (#1290); use Nyquist."""
-    bandwidth = case["line_grid_policy"]["bandwidth"]
-    policy = resolve_cxr_grid_policy(
-        start_eV=bandwidth["start_eV"],
-        stop_eV=bandwidth["stop_eV"],
-        per_call={"resolution": "sinc-nyquist"},
-    ).payload()
-    return {**case, "line_grid_policy": policy}
-
-
 def _requested(spread=None, **policy):
     case = {
-        **_streamable(_case(energy_spread_frac=spread)),
+        **_case(energy_spread_frac=spread),
         # Seed 8 puts the maximum initial energy past the realized population,
         # forcing the energy-range replay (see test_independent_stopping).
         "seed": 8 if spread is not None else 1,
@@ -110,7 +98,10 @@ def test_population_wide_adaptive_outputs_are_refused(monkeypatch, extra, policy
 
 
 def test_plain_adaptive_case_is_live_streamable():
-    assert streaming_refusal(_requested(), live=True) is None
+    case = _requested()
+    # The default sinc-oversampled line grid streams since #1280.
+    assert case["line_grid_policy"]["resolution"]["policy"] == "sinc-oversampled"
+    assert streaming_refusal(case, live=True) is None
 
 
 def _no_headroom(monkeypatch):

@@ -71,7 +71,6 @@ supported non-windowed `line_grid_policy` (see [Resolved line grids](#resolved-l
 |---|---|
 | `coherent_emission`, `temporal_profile`, `photon_transport`, bunch `transition_radiation` | Need every segment or history at once (shared with artifact streaming). |
 | windowed `line_grid_policy`, `_diagnostic_line_grid` | Window seed providers and the diagnostic derivation read the whole transported population. |
-| `sinc-oversampled` `line_grid_policy` | Over-budget node-local refinement needs whole-population line evidence; use joined scoring or select `sinc-nyquist`. Refused even when the uniform grid might fit or a grid cache exists, because eligibility is checked before transport-dependent spacing is known. |
 | `adaptive_precision` with `reflection_selection` or `batch_means_band_eV` | Automatic reflection selection and per-bin batch means read every realized segment (`adaptive_refusal`; prefix selection waits on #1281). Plain adaptive cases stream; see [Adaptive cases](#adaptive-cases). |
 | `transition_radiation` | Electron-block transport refuses it; artifact replay still streams per-history TR. |
 | `channeling`, `gdf_source` | Refused by electron-block transport. |
@@ -148,10 +147,13 @@ not.
   whose process is gone.
 
 Windowed policies are refused because their seed providers read the whole
-population. `sinc-oversampled` is also refused up front: its over-budget
-local axis needs production lines that the kinematic grid pass does not
-collect, and its interval union retains per-line arrays. The joined resolver
-and its numerical grid are unchanged.
+population. A `sinc-oversampled` axis over its point budget refines
+node-locally around every production line (#1257). Whether it is over budget
+is known only from the final sinc spacing, so under that resolution the grid
+pass always keeps the production lines (three reals each, spilled with the
+sinc samples), whatever the bandwidth (#1280). The joined resolver then builds
+the same axis from them; the interval union still holds per-line arrays in
+memory, as on the joined path. Mixed transport scores no lines and keeps none.
 
 ### Transport activity
 
@@ -186,9 +188,7 @@ copies exceed host headroom it raises `StreamedAdaptiveRoute` instead of
 refusing, and `_spectrum_with_recovery` reruns the case streamed in blocks of
 about 2 GiB of rows, with a `RuntimeWarning`. Cases `streaming_refusal`
 refuses keep the retained route and its admission refusal, and so does
-`PYRITE_STREAMED_ADAPTIVE=off`. The default `sinc-oversampled` line grid is
-one of those refusals. Select `sinc-nyquist` for a high-cap adaptive case
-that should stream.
+`PYRITE_STREAMED_ADAPTIVE=off`.
 
 ### Cascades
 

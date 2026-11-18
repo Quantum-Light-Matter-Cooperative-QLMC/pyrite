@@ -108,8 +108,7 @@ These raise `ValueError` before any transport:
 
 - coherent emission, temporal profiles, photon transport and transition
   radiation;
-- channeling, windowed or `sinc-oversampled` automatic line grids, and GDF
-  beams;
+- channeling, windowed automatic line grids, and GDF beams;
 - adaptive sampling with reflection selection or batch means;
 - the lockstep transport core;
 - a `PlanarDetector`, `pyrite.transport.simulate_trajectories`, directional
