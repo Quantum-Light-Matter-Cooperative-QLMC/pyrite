@@ -194,7 +194,10 @@ class _TransportProgress:
     Host-side bookkeeping only; nothing here touches transport state.
     """
 
-    def __init__(self, show_bar, report, *, interval=_TRANSPORT_ACTIVITY_INTERVAL_S):
+    def __init__(
+        self, show_bar, report, *, interval=_TRANSPORT_ACTIVITY_INTERVAL_S, on_complete=None
+    ):
+        self._on_complete = on_complete
         self._show_bar = show_bar
         self._report = report
         self._interval = interval
@@ -203,7 +206,7 @@ class _TransportProgress:
         self._total = None
         self._last_report = None
 
-    def __call__(self, done, total):
+    def __call__(self, done, total, *, force=False):
         done, total = int(done), int(total)
         new_pass = done < self._done or total != self._total
         self._done, self._total = done, total
@@ -223,13 +226,26 @@ class _TransportProgress:
         if self._report is not None:
             now = perf_counter()
             if (
-                new_pass
+                force
+                or new_pass
                 or done >= total
                 or self._last_report is None
                 or now - self._last_report >= self._interval
             ):
                 self._last_report = now
                 self._report(done, total)
+
+    def boundary(self, done, total):
+        """Report a completed block even when its last batch was throttled."""
+        self(done, total, force=True)
+
+    def finish_transport(self, done, total):
+        """Publish the realized population before population-wide spectrum work."""
+        if (self._done, self._total) != (done, total) or done < total:
+            self.boundary(done, total)
+        self.close()
+        if self._on_complete is not None:
+            self._on_complete()
 
     def close(self):
         if self._bar is not None:
@@ -282,7 +298,9 @@ def run_cases(
         Optional callback receiving driver phase-transition mappings. While a
         case is transported in this process, throttled ``serial_case`` updates
         also carry ``transport_electrons_done``/``transport_electrons_total``
-        for the current transport pass.
+        for the current transport pass. Chunk boundaries bypass the throttle;
+        completion reports the realized population, then ``spectrum`` marks
+        the handoff before grid resolution.
     transport_only
         Run transport without spectrum calculation; output slots are ``None``.
     trajectory_capture
@@ -637,7 +655,13 @@ class _CaseRun:
                 transport_electrons_total=total,
             )
 
-        sink = _TransportProgress(self.show_bars, _report if self.on_activity is not None else None)
+        sink = _TransportProgress(
+            self.show_bars,
+            _report if self.on_activity is not None else None,
+            on_complete=None
+            if self.transport_only
+            else lambda: self.activity("spectrum", i, in_flight_case_count=1),
+        )
         token = _TRANSPORT_PROGRESS.set(sink)
         try:
             yield

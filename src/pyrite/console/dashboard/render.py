@@ -482,6 +482,8 @@ def _format_now_testing(current):
 
 def _format_electron_progress(record):
     """Within-case transport electron progress of the active case, or ""."""
+    if record.get("activity") == "spectrum":
+        return "spectrum"
     done = record.get("transport_electrons_done")
     total = record.get("transport_electrons_total")
     if not isinstance(done, int) or not isinstance(total, int) or total <= 0:
@@ -518,7 +520,7 @@ def _format_case_progress(records, materials=()):
         track = _progress_track(completed, total)
         accent = paint(f"{glyph} {track}", _progress_group(state))
         activity = record.get("activity")
-        computing = state == "running" and activity == "computing"
+        computing = state == "running" and activity in {"computing", "spectrum"}
         now = _format_now_testing(record.get("current")) if computing else ""
         electrons = _format_electron_progress(record) if computing else ""
         if electrons:

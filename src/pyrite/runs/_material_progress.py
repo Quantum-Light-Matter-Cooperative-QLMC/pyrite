@@ -230,12 +230,12 @@ class MaterialProgress:
         active = info.pop("case", None)
         active_case = _case_summary(active) if active is not None else None
         raw_phase = info.get("phase")
-        phase = raw_phase if raw_phase in _NON_COMPUTING_PHASES else "computing"
+        phase = raw_phase if raw_phase in _NON_COMPUTING_PHASES | {"spectrum"} else "computing"
         with self.lock:
             self.activity_info.clear()
             self.activity_info.update(info, phase=phase, active_case=active_case)
             self.latest_case.clear()
-            if active_case is not None and phase == "computing":
+            if active_case is not None and phase in {"computing", "spectrum"}:
                 self.latest_case.update(active_case)
         self.record_progress(
             self.latest_progress["completed_new_cases"],

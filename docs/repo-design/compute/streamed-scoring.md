@@ -63,7 +63,7 @@ spectra) remains the default and the reference.
 Supported: incoherent line `spec`, characteristic lines and the EEDL or BremsLib
 continuum, including coupled BremsLib radiative transport, on the per-electron
 or CUDA core, with a fixed electron count and either a final line grid or a
-non-windowed `line_grid_policy` (see [Resolved line grids](#resolved-line-grids)).
+supported non-windowed `line_grid_policy` (see [Resolved line grids](#resolved-line-grids)).
 
 `streaming_refusal(case, live=True)` refuses the following before any transport:
 
@@ -71,6 +71,7 @@ non-windowed `line_grid_policy` (see [Resolved line grids](#resolved-line-grids)
 |---|---|
 | `coherent_emission`, `temporal_profile`, `photon_transport`, bunch `transition_radiation` | Need every segment or history at once (shared with artifact streaming). |
 | windowed `line_grid_policy`, `_diagnostic_line_grid` | Window seed providers and the diagnostic derivation read the whole transported population. |
+| `sinc-oversampled` `line_grid_policy` | Over-budget node-local refinement needs whole-population line evidence; use joined scoring or select `sinc-nyquist`. Refused even when the uniform grid might fit or a grid cache exists, because eligibility is checked before transport-dependent spacing is known. |
 | `adaptive_precision` | The electron count, and hence the normalization, is decided during the run. |
 | `transition_radiation` | Electron-block transport refuses it; artifact replay still streams per-history TR. |
 | `channeling`, `gdf_source` | Refused by electron-block transport. |
@@ -147,8 +148,20 @@ not.
   whose process is gone.
 
 Windowed policies are refused because their seed providers read the whole
-population. The `sinc-oversampled` node-local axis still builds its per-line
-intervals in memory.
+population. `sinc-oversampled` is also refused up front: its over-budget
+local axis needs production lines that the kinematic grid pass does not
+collect, and its interval union retains per-line arrays. The joined resolver
+and its numerical grid are unchanged.
+
+### Transport activity
+
+In-process transport keeps throttled activity reports within each chunk, but
+completed chunk boundaries bypass the throttle. On an adaptive stop, the final
+transport report uses the realized population, including a stop inside a chunk.
+Before population-wide grid resolution and reflection selection, the activity
+changes to `spectrum`. The progress JSON and `pyrite remote job status` show
+that phase and clear the transport history counter; spectrum work can continue
+without appearing to be stalled transport.
 
 ### Cascades
 

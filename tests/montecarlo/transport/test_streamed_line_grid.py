@@ -7,6 +7,7 @@ records must match.
 """
 
 import shutil
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -31,8 +32,15 @@ def _case(policy=None):
         n_electrons_brem=8,
     )
     case = {**build_cases(sweep)[0], "Ne": 24, "Ne_brem": 30}
-    if policy is not None:
-        case["line_grid_policy"] = policy
+    bandwidth = case["line_grid_policy"]["bandwidth"]
+    case["line_grid_policy"] = (
+        policy
+        or resolve_cxr_grid_policy(
+            start_eV=bandwidth["start_eV"],
+            stop_eV=bandwidth["stop_eV"],
+            per_call={"resolution": "sinc-nyquist"},
+        ).payload()
+    )
     assert case["line_grid_policy"]["bandwidth"]["policy"]
     return case
 
@@ -150,3 +158,46 @@ def test_drain_joins_blocks_in_order_and_releases_them():
     np.testing.assert_array_equal(joined, expected)
     assert joined.dtype == expected.dtype and blocks == []
     assert _drain([]).size == 0
+
+
+@pytest.mark.parametrize("block", [5, 24, 1000])
+@pytest.mark.parametrize("quadrature", ["node", "bin-mean"])
+def test_oversampled_policy_is_refused_before_transport(monkeypatch, block, quadrature):
+    case = _case()
+    band = case["line_grid_policy"]["bandwidth"]
+    case["line_grid_policy"] = resolve_cxr_grid_policy(
+        start_eV=band["start_eV"],
+        stop_eV=band["stop_eV"],
+        per_call={"resolution": "sinc-oversampled", "quadrature": quadrature, "max_points": 1000},
+    ).payload()
+    assert "whole-population line evidence" in streaming_refusal(case, live=True)
+    assert streaming_refusal(case) is None
+    monkeypatch.setattr(runner, "_transport_case", None)
+    with pytest.raises(ValueError, match="sinc-oversampled.*use joined scoring"):
+        run_case_streamed(case, block, transport_core="per-electron")
+
+
+def test_over_budget_kinematic_evidence_gap_against_joined_resolver():
+    from pyrite.montecarlo.runner.cxr_grid import _kinematic_cxr_grid
+    from pyrite.montecarlo.runner.streamed_line_grid import BlockGridEvidence
+    from pyrite.montecarlo.spectrum.cxr_seeds import ResonancePopulation
+
+    payload = resolve_cxr_grid_policy(
+        start_eV=50.0,
+        stop_eV=1000.0,
+        per_call={
+            "resolution": "sinc-oversampled",
+            "quadrature": "node",
+            "max_points": 1200,
+            "bandwidth": "kinematic-ceiling",
+        },
+    ).payload()
+    case, direction = {"name": "line-grid probe", "E0_keV": 30.0}, np.array([0.0, 0.0, 1.0])
+    population = ResonancePopulation("line", np.array([500.0]), np.ones(1), np.array([0.01]))
+    joined = SimpleNamespace(populations=lambda *_: [population])
+    grid, record = _kinematic_cxr_grid(payload, case, [direction], 1.0, joined)
+    assert record["local_axis"]["uniform_points"] > 1200 >= grid.size
+    streamed = BlockGridEvidence(case, payload, direction, 1)
+    # This was the late failure after the streamed grid transport pass.
+    with pytest.raises(ValueError, match="holds no lines for this band"):
+        _kinematic_cxr_grid(payload, case, [direction], 1.0, streamed)

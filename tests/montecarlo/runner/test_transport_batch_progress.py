@@ -276,3 +276,91 @@ def test_each_multibatch_pass_gets_a_bar_but_single_batch_passes_do_not(monkeypa
     for done, total in [(2, 6), (6, 6), (1, 1), (1, 3), (3, 3)]:
         sink(done, total)
     assert [(bar.total, bar.n, bar.closed) for bar in bars] == [(6, 6, True), (3, 3, True)]
+
+
+def test_fast_chunk_boundaries_and_realized_stop_bypass_throttle(monkeypatch):
+    monkeypatch.setattr(scheduling, "perf_counter", lambda: 0.0)
+    events = []
+    sink = scheduling._TransportProgress(
+        False,
+        lambda done, total: events.append((done, total)),
+        on_complete=lambda: events.append("spectrum"),
+    )
+    sink(2, 100)
+    sink(4, 100)
+    sink.boundary(6, 100)
+    sink(8, 100)
+    sink.boundary(12, 100)
+    # The stopping rule retained a prefix of the last chunk.
+    sink.finish_transport(11, 11)
+    assert events == [(2, 100), (6, 100), (12, 100), (11, 11), "spectrum"]
+
+
+def test_block_boundaries_report_and_spectrum_starts_before_grid_resolution(monkeypatch, case):
+    monkeypatch.setattr(scheduling, "perf_counter", lambda: 0.0)
+    monkeypatch.setattr(runner._RESOURCE_POLICY, "gpu", False)
+    activity = []
+    real_transport = runner._transport_case
+    real_inputs = runner.case_driver.case_spectrum_inputs
+
+    def blocked(case, *args, **kwargs):
+        kwargs.update(block_electrons=5, transport_core="per-electron")
+        return real_transport(case, *args, **kwargs)
+
+    def inputs(*args, **kwargs):
+        assert activity[-1]["phase"] == "spectrum"
+        assert "transport_electrons_done" not in activity[-1]
+        return real_inputs(*args, **kwargs)
+
+    monkeypatch.setattr(scheduling, "_transport_case", blocked)
+    monkeypatch.setattr(runner.case_driver, "case_spectrum_inputs", inputs)
+    # The regular serial CPU route uses run_case, whose transport dispatch is
+    # late-bound through runner, rather than scheduling's transport-only seam.
+    monkeypatch.setattr(runner, "_transport_case", blocked)
+    runner.run_cases([case], max_workers=0, progress=False, on_activity=activity.append)
+    done = [e["transport_electrons_done"] for e in activity if "transport_electrons_done" in e]
+    assert all(boundary in done for boundary in (5, 10, 12))
+    assert done[-1] == 12
+
+
+def test_adaptive_stop_reports_realized_count_before_spectrum(monkeypatch, case):
+    from pyrite.montecarlo.runner import independent
+    from pyrite.montecarlo.runner.adaptive import AdaptiveSettings, StoppingMonitor
+
+    settings = AdaptiveSettings(
+        target_rse=0.1,
+        min_histories=8,
+        max_histories=30,
+        block_histories=7,
+        observables=("cxr",),
+        min_effective_histories=0.0,
+        max_history_share=1.0,
+        max_variance_of_variance=1.0,
+        stability_checks=0,
+    )
+    # A constant monitor signal gives a deterministic stop inside chunk [7, 14).
+    monkeypatch.setattr(
+        independent,
+        "case_stopping_monitor",
+        lambda _case, policy: StoppingMonitor(
+            policy, lambda start, stop, _block: {"cxr": np.ones(stop - start)}
+        ),
+    )
+    monkeypatch.setattr(scheduling, "perf_counter", lambda: 0.0)
+    monkeypatch.setattr(runner._RESOURCE_POLICY, "gpu", False)
+    activity = []
+    outputs = runner.run_cases(
+        [{**case, "adaptive_precision": settings.to_dict()}],
+        max_workers=0,
+        progress=False,
+        on_activity=activity.append,
+    )
+    assert outputs[0]["adaptive_sampling"]["realized_electrons"] == 8
+    counts = [
+        (e["transport_electrons_done"], e["transport_electrons_total"])
+        for e in activity
+        if "transport_electrons_done" in e
+    ]
+    assert (7, 30) in counts
+    assert counts[-1] == (8, 8)
+    assert activity[-2]["phase"] == "spectrum"

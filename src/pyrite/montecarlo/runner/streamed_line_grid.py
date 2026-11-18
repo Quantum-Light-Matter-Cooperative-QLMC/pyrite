@@ -25,7 +25,7 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from ..._cxr_grid_policy import RESONANCE_BANDWIDTH_POLICY
+from ..._cxr_grid_policy import OVERSAMPLED_RESOLUTION_POLICY, RESONANCE_BANDWIDTH_POLICY
 
 if TYPE_CHECKING:
     from .line_grid_spill import LineFile, SpillStore
@@ -39,6 +39,12 @@ def policy_streaming_refusal(case) -> str | None:
     payload = case.get("line_grid_policy")
     if payload is not None and payload.get("windows") is not None:
         return WINDOWED_POLICY_REFUSAL
+    if payload is not None and payload["resolution"]["policy"] == OVERSAMPLED_RESOLUTION_POLICY:
+        return (
+            "sinc-oversampled line_grid_policy is not supported by live streamed scoring: "
+            "over-budget node-local refinement needs whole-population line evidence; "
+            "use joined scoring or select sinc-nyquist"
+        )
     return None
 
 
