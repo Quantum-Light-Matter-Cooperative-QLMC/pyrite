@@ -174,8 +174,8 @@ while a few rare electrons determine almost all of the variance. With centered
 sums $M_j=\sum_i(m_i-\bar m)^j$, require
 $\mathrm{VOV}+1/n = M_4/M_2^2\le V_{\max}$ for CXR, or empirical CV
 $s/|\bar m|\le\varepsilon$. The CV branch is a deliberate near-constant
-policy exception, not a bound on unseen tails. Zero variance passes this gate;
-zero signal still cannot converge. The record includes `variance_of_variance`
+policy exception, not a bound on unseen tails. A constant positive signal
+passes this gate (CV = 0); zero signal still cannot converge. The record includes `variance_of_variance`
 ($M_4/M_2^2-1/n$), `coefficient_of_variation`, and the `variance_sampling`
 pass flag; `guards` records both `min_effective_electrons` and
 `max_variance_of_variance`.

@@ -39,10 +39,11 @@ $$
 
 The first branch is a deliberate **empirical near-constant policy exception**;
 it is not a population-variance bound. The second counts effective contributors
-to the observed squared deviations. At zero variance the gate passes by
-convention. Zero signal still fails the ordinary RSE guard. $V_{\max}$ is
+to the observed squared deviations. A constant positive signal passes this gate (CV = 0); zero signal still
+fails the ordinary RSE guard. $V_{\max}$ is
 `max_variance_of_variance`; v2 tied it to $1/E_{\min}$, and v3 (#1262) makes
-it a separate policy field. Cauchy–Schwarz gives $1/n\le M_4/M_2^2\le1$, so
+it a separate policy field. Cauchy–Schwarz gives $M_4/M_2^2\ge1/n$, and
+non-negative cross terms give $M_4\le M_2^2$, so
 $V_{\max}=1$ disables the gate, and `min_effective_histories=0` disables only
 the contribution ESS floor. The brem stopping policy is unchanged. Both observables record the dimensionless diagnostic
 
@@ -554,3 +555,74 @@ reason. Anchors: `test_vov_threshold_and_ess_floor_gate_independently`
 (each threshold binds alone, `guards` carries both),
 `test_vov_threshold_is_compared_to_m4_over_m2_squared`, and
 `test_settings_are_validated`.
+
+## Independent v3 extension verification (2026-11-17, #1262)
+
+A fresh-context verifier derived the v3 gate from the claim before reading
+`StoppingMonitor.observable_status`, then compared it with commit `39603e682`.
+
+**Bounds.** Let $d_i=m_i-\bar m$, so $M_2=\sum_i d_i^2$, $M_4=\sum_i d_i^4$
+and $\sum_i d_i=0$. Cauchy–Schwarz on $(1,\dots,1)$ and $(d_i^2)$ gives
+$M_2^2\le nM_4$, so $M_4/M_2^2\ge1/n$, with equality for two-point symmetric
+samples. Since the $d_i^2$ are non-negative,
+$M_2^2=M_4+\sum_{i\ne j}d_i^2d_j^2\ge M_4$, so $M_4/M_2^2\le1$. For $M_2>0$
+the zero-sum constraint forces at least two non-zero $d_i$, so the upper bound
+is strict. A single spike in $n$ zeros gives $(n^2-3n+3)/[n(n-1)]\to1$. Thus
+$\mathrm{VOV}=M_4/M_2^2-1/n\ge0$ in exact arithmetic. The clip at zero only
+removes rounding, and $\max(0,\mathrm{VOV})+1/n=\max(1/n,M_4/M_2^2)$.
+$V_{\max}\ge1$ therefore admits every sample with $M_2>0$; the explicit
+short-circuit guards an ulp of rounding.
+
+**Gate.** For CXR the gate passes iff $s/|\bar m|\le\varepsilon$, or
+$V_{\max}\ge1$, or $\mathrm{VOV}+1/n\le V_{\max}$. The contribution floor
+$(\sum m)^2/\sum m^2\ge E_{\min}$ is a separate guard. Under v2 the right-hand
+side was `1.0 / min_effective_histories`. At $E_{\min}=100$ this is the double
+`0x1.47ae147ae147bp-7`, identical to the literal `0.01`. The v2 disable branch
+$E_{\min}=0$ is not reached at the default. Default-policy decisions are
+therefore bit-identical.
+
+**Interpretation.** For independent histories with finite fourth moment,
+$\operatorname{Var}(s^2)/\sigma^4\simeq(\kappa-1)/n$. The plug-in kurtosis
+$\hat\kappa=nM_4/M_2^2$ gives $(\hat\kappa-1)/n=\mathrm{VOV}$. The delta method
+halves the relative uncertainty for $s$, and hence for the RSE. At
+$\mathrm{VOV}=0.01$: $\sqrt{0.01}=0.10$ (variance) and $0.05$ (RSE). At
+$0.1$: $0.316$ and $0.158$. The gate passes near $n\simeq\hat\kappa/V_{\max}$.
+
+**Code comparison.** `RunningMoments.variance_of_variance` returns
+$\max(0,(\sqrt{M_4}/M_2)^2-1/n)$, $0$ at $M_2=0$ and `None` for $n<2$. The
+expression $(\sqrt{M_4}/M_2)^2$ equals $M_4/M_2^2$ up to rounding and avoids
+overflow. `cv = rse * sqrt(n)` equals $s/|\bar m|$ with $s^2=M_2/(n-1)$. The
+predicate, `guards` keys and `_validate_unit_fractions` all match the claim.
+The validator range is $(0,1]$; it rejects `True`, NaN and $\pm\infty$.
+
+**Numeric reproduction.** An independent NumPy probe outside the repository
+ran three checks:
+
+- 20,000 random samples (normal, lognormal, Pareto and sparse spikes,
+  $2\le n<400$) give $\min(M_4/M_2^2-1/n)=-1.1\times10^{-16}$ (rounding) and
+  $\max(M_4/M_2^2)<1$.
+- In 1,260 `run_stopping_rule` decisions, on 60 lognormal populations (some
+  with injected $10^3\times$ tails), $V_{\max}\in\{10^{-3},0.005,0.01,0.03,0.1,0.5,1\}$
+  and $E_{\min}\in\{0,100,1000\}$, the `variance_sampling`,
+  `effective_sample_size`, VOV and `guards` values matched the formulas
+  recomputed from the realized prefix, with 0 mismatches.
+- `1.0/100.0 == 0.01` holds.
+
+The anchors in `test_adaptive_stopping.py` (`vov_threshold`,
+`settings_are_validated`, `variance_guard`; 33 passed) and the
+`test_profile_precision.py` `variance_threshold` test (1 passed) are green.
+
+**Findings.** Both are minor and do not change the verdict:
+
+- The claim text attributes both bounds to Cauchy–Schwarz. Only the lower
+  bound comes from it; the upper bound follows from non-negative cross terms.
+- "Zero variance passes this gate" holds for a constant positive signal
+  through CV. For a constant zero signal with $n<1/V_{\max}$, the code fails
+  the gate ($1/n>V_{\max}$, CV undefined). This was already true in v2. It is
+  immaterial because the RSE guard fails zero signal anyway.
+
+**Verdict.** The extension matches and is `rederived`. The anchors
+`test_vov_threshold_and_ess_floor_gate_independently` and
+`test_vov_threshold_is_compared_to_m4_over_m2_squared` pin the predicate to
+an independently computed $M_4/M_2^2$, which supports `anchored` for the
+extension. Human sign-off is still pending.

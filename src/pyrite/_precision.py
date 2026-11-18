@@ -104,7 +104,7 @@ class Precision:
     max_variance_of_variance
         CXR guard: ``VOV + 1/n = M4/M2**2`` (central sums) must be at most
         this value, unless empirical ``s/abs(mean)`` is at most
-        ``target_rse``. The default 0.01 knows the variance to about 10 %
+        ``target_rse``. The default 0.01 estimates the variance to about 10 %
         (the RSE to about 5 %); 0.1 is the looser MCNP/Geant4 convention.
         ``M4/M2**2 <= 1`` always, so 1 disables the guard.
     stability_blocks, stability_fraction
