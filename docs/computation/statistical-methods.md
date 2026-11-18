@@ -152,9 +152,19 @@ Both are grid-independent. The monitor band is the case's line-policy bandwidth,
 r_n = \frac{s_n}{\sqrt{n}\,\lvert\bar{m}_n\rvert} .
 ```
 
-Each block is reduced on its own device to a count, sum, centred moments through fourth order, sum of squares and maximum. Blocks merge on the host with the Chan–Golub–LeVeque pairwise update, which is algebraically a one-pass Welford over the concatenated values.
+Transport runs in chunks sized for the device (below). Each chunk's per-electron values are kept on the host. At each decision point the values since the previous point are folded in as one segment: reduced to a count, sum, centred moments through fourth order, sum of squares and maximum, and merged with the Chan–Golub–LeVeque pairwise update, which is algebraically a one-pass Welford over the concatenated values. The moments, and so every decision, depend on the values and the policy only, never on the chunking (#1253).
 
-**Stopping rule.** Let $n$ run over block ends $\{B, 2B, \dots\}$, with $n_{\min}$, $n_{\max}$ and the pilot count multiples of $B$. Stop at the first $n \ge n_{\min}$ at which, for every watched observable, the error target and the guards below hold, together with the CXR variance-sampling gate:
+**Decision points.** The rule is checked at
+
+```{math}
+:label: eq-statistics-adaptive-points
+
+d_0 = n_{\min},\qquad d_{j+1} = \min\!\left(n_{\max},\ \max\!\left(d_j + 1,\ \lceil d_j(1+\delta)\rceil\right)\right),
+```
+
+ending at $n_{\max}$, plus the pilot count and its projection when a pilot is set. The default growth is $\delta = 0.1$ (`decision_growth`). A stop overshoots the last refused point by at most $\delta$ relative, and a run makes $O(\log(n_{\max}/n_{\min})/\delta)$ checks.
+
+**Stopping rule.** Stop at the first decision point $n$ at which, for every watched observable, the error target and the guards below hold, together with the CXR variance-sampling gate. Here $d_{J-j}$, $j = 1..k$, are the $k$ points before $n = d_J$:
 
 ```{math}
 :label: eq-statistics-adaptive-stop
@@ -165,8 +175,10 @@ r_n \le \varepsilon,
 \qquad
 \mathrm{ESS}_n = \frac{\left(\sum_{i \le n} m_i\right)^2}{\sum_{i \le n} m_i^2} \ge E_{\min},
 \qquad
-\max_{j=1..k} \frac{\lvert \bar{m}_{n-jB} - \bar{m}_n\rvert}{\lvert\bar{m}_n\rvert} \le f\varepsilon .
+\frac{\lvert \bar{m}_{d_{J-j}} - \bar{m}_n\rvert}{\lvert\bar{m}_n\rvert} \le \max\!\left(f\varepsilon,\ z\, r_n \sqrt{\frac{n/d_{J-j} - 1}{\delta}}\right)\ \ (j = 1..k),\quad z = 0.9 .
 ```
+
+The stability window spans a fixed share $1-(1+\delta)^{-k}$ of the sample, about 25 % at the defaults. For independent electrons the relative change of the running mean between $d$ and $n$ has standard deviation $r_n\sqrt{n/d - 1}$, so the second term keeps the guard from refusing at random near the target. Over one segment it is about $0.9\,r_n$, below the jump $\approx r_n$ a single dominant electron causes, so the check on which such an electron arrives is still refused. Early in a run, where $r_n \ll \varepsilon$, $f\varepsilon$ binds and the guard refuses any move of the mean above it.
 
 
 **CXR variance sampling.** A high baseline can make contribution ESS large
@@ -208,13 +220,15 @@ work while adding conditional variance. Its adaptive monitor remains analog,
 so passing this gate does not establish the reweighted spectrum's precision.
 Neither method makes an entirely unseen tail detectable by this guard.
 
-Defaults are $c = 0.05$, $E_{\min} = 100$, $V_{\max} = 0.01$, $k = 3$ and $f = 0.5$. They are internal settings until the remote measurement in #361 sets profile values. At $n_{\max}$ the run stops regardless. It completes, records `statistics_limited`, and warns `CxrYieldStatisticsWarning`.
+Defaults are $c = 0.05$, $E_{\min} = 100$, $V_{\max} = 0.01$, $k = 3$ (`stability_checks`), $f = 0.5$ and $\delta = 0.1$. At $n_{\max}$ the run stops regardless. It completes, records `statistics_limited`, and warns `CxrYieldStatisticsWarning`.
 
-The optional pilot projects $N = n_{\text{pilot}} \max_o (r_{o}/\varepsilon)^2$, rounded up to a block and clipped to $[n_{\text{pilot}}, n_{\max}]$. No check runs until $N$ is reached. The rule then resumes block by block.
+The optional pilot projects $N = n_{\text{pilot}} \max_o (r_{o}/\varepsilon)^2$, clipped to $[n_{\text{pilot}}, n_{\max}]$, and adds $N$ to the decision points. No check runs until $N$ is reached. The rule then resumes at the decision points.
 
-**Independent populations.** Set `AdaptiveSampling(..., observables=("cxr", "brem"), brem_target_rse=...)` to apply the same scalar rule separately. Brem freezes at its first passing block end, or its own maximum, and later blocks skip its monitor reduction. CXR is rechecked on every eligible block until brem has finished; it can therefore use more electrons than its first apparent convergence required. `brem_min_histories` and `brem_max_histories` default to the shared bounds, are block multiples, and the brem maximum cannot exceed the transport maximum. The guards are shared; an optional pilot is applied separately, clipped to each population's bounds. A failed brem target still marks the result statistics-limited when CXR succeeds.
+**Transport chunks.** Chunks never change the stop or the output. On CUDA a chunk holds at least the ~7k histories one transport launch fills (#1252), and on CPU at least 1024. It reaches the next decision point when that is farther, and it is capped so that its rows fit a 4 GiB measurement budget at about 10 KiB per row, using the largest rows per electron seen so far. When the rule stops at a point $d$ inside a chunk $[a, b)$, the chunk is discarded and $[a, d)$ is transported again. The streams are counter-addressed, so these are the same electrons and the result is the fixed-$N$ run at $d$. The deprecated `block_histories` only overrides the chunk floor.
 
-The prefix constraint is $N_{\rm brem}\le N_{\rm CXR}$. Electrons below $N_{\rm brem}$ use the minimum of both transport cutoffs; later electrons use only the line cutoff. Every block's interpolation tables span the entire transport population's energy range, including line-only electrons. Energy-spread replay recomputes both stopping decisions and the cutoff transition on the replay's tables. Spectra and optional batch means use their own population's denominator and rows; brem excludes `electron_id >= Ne_brem`. The provenance records each population's count, target, RSE, guards, pilot and stop reason. Identity contains the requested policy and the adaptive stopping-model generation. Omitting the brem target preserves the original shared-count policy and identity. Equal targets alone do not force equal counts; equal fixed bounds do. Joint cost/variance allocation is not implemented.
+**Independent populations.** Set `AdaptiveSampling(..., observables=("cxr", "brem"), brem_target_rse=...)` to apply the same scalar rule separately. Brem freezes at its first passing decision point, or its own maximum, and later chunks skip its monitor reduction. A freeze inside a chunk keeps the brem prefix and transports the rest again with the line cutoff. CXR is rechecked at each of its decision points until brem has finished; it can therefore use more electrons than its first apparent convergence required. `brem_min_histories` and `brem_max_histories` default to the shared bounds, and the brem maximum cannot exceed the transport maximum. The guards are shared; an optional pilot is applied separately, clipped to each population's bounds. A failed brem target still marks the result statistics-limited when CXR succeeds.
+
+The prefix constraint is $N_{\rm brem}\le N_{\rm CXR}$. Electrons below $N_{\rm brem}$ use the minimum of both transport cutoffs; later electrons use only the line cutoff. Every chunk's interpolation tables span the entire transport population's energy range, including line-only electrons. Energy-spread replay recomputes both stopping decisions and the cutoff transition on the replay's tables. Spectra and optional batch means use their own population's denominator and rows; brem excludes `electron_id >= Ne_brem`. The provenance records each population's count, target, RSE, guards, pilot and stop reason. Identity contains the requested policy and the adaptive stopping-model generation. Omitting the brem target preserves the original shared-count policy and identity. Equal targets alone do not force equal counts; equal fixed bounds do. Joint cost/variance allocation is not implemented.
 
 Independent-population RSEs and batch errors are estimated precision diagnostics. The scalar coverage studies below do not establish coverage for the coupled stopping rule. Interpreting all CXR contributions as one physical observable also assumes that its post-transport cutoff reconstruction removes dependence on whether an electron belonged to the deeper brem prefix; fixed-pair equality alone does not validate that assumption for every transport model.
 
@@ -226,7 +240,7 @@ Independent-population RSEs and batch errors are estimated precision diagnostics
 r_n^2 = \frac{n}{n-1}\left(\frac{1}{\mathrm{ESS}_n} - \frac{1}{n}\right).
 ```
 
-So $r_n \le \varepsilon$ already implies $\mathrm{ESS}_n \gtrsim 1/\varepsilon^2$ at large $n$. An ESS floor binds only above $1/\varepsilon^2$. What it adds is a minimum *effective* sample that does not depend on the target: enough electrons for a rare heavy class to have been drawn at all. With a single dominant electron, $r_n$ and the share are of the same order, as is the jump that electron causes in the running mean. The share cap $c < \varepsilon$ and the stability tolerance $f\varepsilon$ therefore bind in that regime.
+So $r_n \le \varepsilon$ already implies $\mathrm{ESS}_n \gtrsim 1/\varepsilon^2$ at large $n$. An ESS floor binds only above $1/\varepsilon^2$. What it adds is a minimum *effective* sample that does not depend on the target: enough electrons for a rare heavy class to have been drawn at all. With a single dominant electron, $r_n$ and the share are of the same order, as is the jump that electron causes in the running mean. The share cap $c < \varepsilon$ and the stability guard at the arrival check therefore bind in that regime; for CXR, the variance-sampling gate also refuses a sample whose variance one electron dominates.
 
 **What no guard can see.** Every quantity in {eq}`eq-statistics-adaptive-stop` describes only the electrons drawn so far. If a heavy class with rate $p$ has not appeared in $n$ electrons (probability $e^{-pn}$), the run reports a small error around a biased mean. Only a large enough $n_{\min}$ or ESS floor guards against that. The rate-$p$ class is drawn with probability $1 - e^{-pE_{\min}}$ by the time the light electrons alone reach the floor. Variance reduction for such classes is #203.
 
@@ -236,7 +250,7 @@ So $r_n \le \varepsilon$ already implies $\mathrm{ESS}_n \gtrsim 1/\varepsilon^2
 
 **Particle cascades.** With `secondary_threshold_eV` (and optionally pair production and positron transport) the sample is still one primary history: every descendant track carries its root primary's id, so its line mass and brem band integral add to that primary's value, and a primary whose cascade contributes nothing is still one sample. Cascade blocks are never joined. The stopping rule reads streamed blocks and keeps none; the realized count then runs once more as the fixed-count cascade, so the output is the fixed-$N$ run and the transport costs up to twice the realized work. With an independent brem stop, primaries past the brem prefix run to the line cutoff and their descendants stay outside the brem population. Pair electrons and transported positrons are descendants like any other track. Profiles without fixed counts or a policy run cascades under the default policy, as any incoherent case (#1240).
 
-**Per-bin errors.** Optionally, after the final reduction, each equal block of the realized run is reduced as one batch on the final grids. The per-bin batch-means standard error $s(\{\bar{S}_b\})/\sqrt{K}$ over $K$ batches is reported for `spec` and `brem_wide` in a requested band. It never drives the stop, because the line grid is unknown while transport runs.
+**Per-bin errors.** Optionally, after the final reduction, the realized $n$ electrons are split into $K = \min(20, n)$ contiguous batches of $\lfloor n/K\rfloor$ or $\lceil n/K\rceil$ electrons, independent of the transport chunks, and each is reduced on the final grids. With batch means $\bar S_b$ over $n_b$ electrons and $S = \sum_b (n_b/n)\bar S_b$, the per-bin standard error $\big[\sum_b n_b(\bar S_b - S)^2/((K-1)\,n)\big]^{1/2}$, which is $s(\{\bar{S}_b\})/\sqrt{K}$ for equal batches, is reported for `spec` and `brem_wide` in a requested band. It never drives the stop, because the line grid is unknown while transport runs.
 
 **Measured behaviour.** These are the regression tests in `tests/montecarlo/runner/test_adaptive_stopping.py`:
 

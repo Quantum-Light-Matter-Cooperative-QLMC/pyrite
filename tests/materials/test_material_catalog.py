@@ -2474,7 +2474,7 @@ def test_profile_precision_parses_and_rejects_incompatible_profiles(tmp_path):
 
     policy = (
         "adaptive_sampling = { target_rse = 0.1, min_histories = 200, max_histories = 2000, "
-        'block_histories = 20, observables = ["line", "brem"], band_eV = [100.0, 900.0] }\n'
+        'observables = ["line", "brem"], band_eV = [100.0, 900.0] }\n'
     )
 
     def catalog(extra: str) -> str:
@@ -2489,14 +2489,15 @@ def test_profile_precision_parses_and_rejects_incompatible_profiles(tmp_path):
         target_rse=0.1,
         min_histories=200,
         max_histories=2000,
-        block_histories=20,
         observables=("cxr", "brem"),
         band_eV=(100.0, 900.0),
     )
     for extra, match in (
-        ("adaptive_sampling = { target_rse = 0.1 }\n", "requires min_histories"),
-        (policy.replace("block_histories = 20", "block_histories = 30"), "multiples"),
-        (policy.replace("block_histories", "block_electrons"), "rename it to 'block_histories'"),
+        ("adaptive_sampling = { target_rse = 0.1 }\n", "requires max_histories"),
+        (
+            policy.replace("observables", "block_electrons = 20, observables"),
+            "rename it to 'block_histories'",
+        ),
         ("precision = { target_rse = 0.1 }\n", "rename it to 'adaptive_sampling'"),
         (policy.replace("target_rse = 0.1,", "target_rse = 0.1, spare = 1,"), "unknown"),
         (policy + "cxr_histories = { values = [450] }\n", "cxr_histories"),

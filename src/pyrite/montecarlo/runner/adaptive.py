@@ -1,10 +1,10 @@
-"""Adaptive electron counts: sequential block-wise stopping on a target error (#361).
+"""Adaptive electron counts: sequential stopping on a target error (#361, #1253).
 
 ``Numerics(sampling=AdaptiveSampling(...))`` selects this path through the public runner.
 :func:`run_case_adaptive` retains the internal compatibility interface. Both
-transport electron blocks
-``[kB, (k+1)B)`` through :mod:`.block_transport` and, after each block, folds
-grid-independent per-electron scalars into running moments:
+transport electron chunks through :mod:`.block_transport`, sized for the device
+by :class:`.stream_sizing.AdaptiveChunkPlan`, and buffer grid-independent
+per-electron scalars:
 
 * ``"line"`` -- the per-electron line mass ``sum w pi / a_w`` over the lines a
   fixed monitor band keeps, the quantity of the #201 line-yield audit;
@@ -12,15 +12,18 @@ grid-independent per-electron scalars into running moments:
 
 Neither depends on the line grid, which is resolved only once transport has
 stopped, from every realized electron, before the single spectrum reduction.
-The stop is the first block boundary ``n`` at which, for every chosen
-observable, the relative standard error of the mean is at most
+The rule is checked at geometric decision points ``d_{j+1} = ceil(d_j (1 +
+decision_growth))`` from ``min_electrons`` to ``max_electrons``; the values of
+each segment between points are folded into the moments at once, so decisions
+do not depend on the chunks. The stop is the first point ``n`` at which, for
+every chosen observable, the relative standard error of the mean is at most
 ``target_rse`` and the heavy-tail guards hold (largest single-electron share,
 effective sample size, CXR variance sampling, stability of the running mean
-over the last blocks),
-subject to ``min_electrons``; at ``max_electrons`` the case completes flagged
-``statistics_limited``. The realized case is the fixed-N case at the realized
-count, bit for bit, so the stop changes how many electrons run, never how
-they run.
+over the last decision points); at ``max_electrons`` the case completes
+flagged ``statistics_limited``. A stop inside a chunk keeps the prefix by
+transporting it again, so the realized case is the fixed-N case at the
+realized count, bit for bit: the stop changes how many electrons run, never
+how they run.
 
 Estimator, rule, guards and their limiting cases are derived in
 ``docs/validation/beam-transport/adaptive-sample-size-stopping.md``; the user
@@ -31,7 +34,8 @@ Validation: adaptive-sample-size-stopping
 
 import math
 import warnings
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterator, Mapping
+from itertools import chain
 from typing import Any
 
 import numpy as np
@@ -42,8 +46,8 @@ from ..._precision import ADAPTIVE_SAMPLING_MODEL, Precision
 from ..._precision import OBSERVABLES as OBSERVABLES
 from ..spectrum.cxr._kernels import _SEG_ARRAYS
 from .artifacts import _case_geometry
-from .block_transport import electron_blocks
 from .electron_blocks import _take
+from .stream_sizing import AdaptiveChunkPlan
 
 #: ``measure(start, stop, block) -> {observable: per-electron values}``.
 Measure = Callable[[int, int, Mapping[str, Any]], Mapping[str, Any]]
@@ -145,9 +149,9 @@ class RunningMoments:
 def vov_trend_slope(points) -> float | None:
     """Least-squares slope of ``ln VOV`` against ``ln n`` over the last half.
 
-    ``points`` are ``(n, VOV)`` at successive block ends. Only ends with
+    ``points`` are ``(n, VOV)`` at successive decision points. Only points with
     ``n >= n_last / 2`` and ``VOV > 0`` enter; fewer than three such
-    ends, or a single distinct ``n``, gives ``None``. A population whose
+    points, or a single distinct ``n``, gives ``None``. A population whose
     fourth moment the run has sampled has ``VOV ~ (kappa - 1)/n``, so the slope
     tends to -1 (MCNP checks VOV falls as ``1/N``); a heavy score drawn late
     makes it shallower or positive. Reported only; it never gates a stop.
@@ -168,14 +172,58 @@ def vov_trend_slope(points) -> float | None:
     return sum((x - mx) * (y - my) for x, y in kept) / sxx
 
 
-class StoppingMonitor:
-    """Block hooks for :func:`.block_transport.transport_electron_blocks`.
+def decision_points(minimum: int, maximum: int, growth: float) -> Iterator[int]:
+    """Electron counts at which the stopping rule is checked: a geometric grid.
 
-    ``on_block`` measures each block and folds it into the moments;
-    ``should_stop`` applies the stopping rule at the block's end. A block at
+    ``d_0 = minimum`` and ``d_{j+1} = min(maximum, max(d_j + 1, ceil(d_j (1 + growth))))``,
+    ending at ``maximum``. The monitor adds the pilot count and the pilot's
+    projection as points of their own. The grid depends on the policy only, never on how
+    electrons are transported, and holds ``O(log(maximum / minimum) / growth)``
+    points.
+
+    Validation: adaptive-sample-size-stopping
+    """
+    point = int(minimum)
+    while point < maximum:
+        yield point
+        # Integer form of ceil(point * (1 + growth)) with a floating growth.
+        point = min(int(maximum), max(point + 1, math.ceil(point * (1.0 + growth))))
+    yield int(maximum)
+
+
+def _with_point(points: Iterator[int], extra: int) -> Iterator[int]:
+    """The increasing stream ``points`` with ``extra`` merged in once."""
+    added = False
+    for point in points:
+        if not added and extra <= point:
+            added = True
+            if extra < point:
+                yield extra
+        yield point
+
+
+#: Standard deviations of i.i.d. running-mean drift per ``sqrt(decision_growth)``
+#: the stability guard admits. Below one, a single electron's jump (about
+#: ``r_n`` over one decision segment) stays refused at the point it arrives.
+STABILITY_DRIFT = 0.9
+
+
+class StoppingMonitor:
+    """The stopping rule at policy decision points, fed by transport chunks.
+
+    ``on_block(start, stop, block)`` measures one transport chunk and buffers
+    its per-electron values; chunks are contiguous from zero, and a chunk at
     ``start == 0`` resets the state, so a restarted transport (an OOM retry)
-    is measured once. Decisions depend only on the measured values, so the
-    same seed and settings give the same realized count.
+    is measured once. ``should_stop(n)`` then visits every decision point
+    ``d <= n`` not yet visited: it folds the values ``[d_prev, d)`` into the
+    moments as one segment and applies the rule at ``d``. A stop sets
+    ``realized = d``, which may lie inside the last chunk; the driver keeps
+    only the prefix ``[0, d)``.
+
+    Folding one decision segment at a time makes the moments, and so every
+    decision, a function of the per-electron values and the policy alone:
+    the same seed and settings give the same realized count under any chunk
+    sizes.
 
     Validation: adaptive-sample-size-stopping
     """
@@ -187,7 +235,8 @@ class StoppingMonitor:
         self._reset()
 
     def _reset(self):
-        self.moments = {name: RunningMoments() for name in self.settings.observables}
+        s = self.settings
+        self.moments = {name: RunningMoments() for name in s.observables}
         self.history: list[tuple[int, dict[str, float]]] = []
         self.vov_history: dict[str, list[tuple[int, float | None]]] = {
             name: [] for name in self.moments
@@ -197,38 +246,105 @@ class StoppingMonitor:
         self.projected: int | None = None
         self.stop_reason: str | None = None
         self.realized: int | None = None
+        self._points = decision_points(s.min_histories, s.max_histories, s.decision_growth)
+        if s.pilot_histories is not None and s.pilot_histories < s.max_histories:
+            self._points = _with_point(self._points, s.pilot_histories)
+        self._next: int | None = next(self._points)
+        self._values: dict[str, list[np.ndarray]] = {name: [] for name in s.observables}
+        self._measured = 0
+        #: A count inside the last chunk past which its transport is invalid
+        #: (set only by the independent brem freeze); ``None`` otherwise.
+        self.cut_at: int | None = None
+
+    @property
+    def measured(self) -> int:
+        """Electrons whose values are buffered or folded."""
+        return self._measured
 
     def on_block(self, start: int, stop: int, block) -> None:
         if start == 0:
             self._reset()
+        if start != self._measured:
+            raise ValueError(f"chunk starts at {start}, expected {self._measured}")
         values = self.measure(start, stop, block)
-        for name, moments in self.moments.items():
-            if values[name].ndim != 1 or values[name].size != stop - start:
+        for name in self.moments:
+            value = values[name]
+            if value.ndim != 1 or value.size != stop - start:
                 raise ValueError(f"{name} must contain one value per electron in the block")
-            moments.add_block(values[name])
-        self.history.append((stop, {name: m.mean for name, m in self.moments.items()}))
-        for name, m in self.moments.items():
-            self.vov_history[name].append((stop, m.variance_of_variance()))
+            self._values[name].append(np.asarray(_to_cpu(value), dtype=np.float64))
+        self._measured = stop
 
-    def _stability(self, name: str) -> float | None:
-        """Largest relative move of the running mean over the last k block ends."""
-        k = self.settings.stability_blocks
+    def truncate(self, n: int) -> None:
+        """Forget buffered values of electrons ``>= n``; ``n`` must not precede a fold."""
+        folded = self.moments[next(iter(self.moments))].n
+        if not folded <= n <= self._measured:
+            raise ValueError(f"cannot truncate to {n}: {folded} folded, {self._measured} measured")
+        keep = n - folded
+        for name, parts in self._values.items():
+            joined = np.concatenate(parts) if parts else np.empty(0)
+            self._values[name] = [joined[:keep]]
+        self._measured = n
+
+    def _fold(self, point: int) -> None:
+        """Fold buffered values ``[n, point)`` as one segment; record the means at ``point``."""
+        for name, moments in self.moments.items():
+            parts = self._values[name]
+            joined = np.concatenate(parts) if len(parts) > 1 else parts[0]
+            take = point - moments.n
+            moments.add_block(joined[:take])
+            self._values[name] = [joined[take:]]
+        self.history.append((point, {name: m.mean for name, m in self.moments.items()}))
+        for name, m in self.moments.items():
+            self.vov_history[name].append((point, m.variance_of_variance()))
+
+    def pending(self, n: int) -> Iterator[int]:
+        """Fold and yield each unvisited decision point ``<= min(n, measured)``."""
+        limit = min(n, self._measured)
+        while self._next is not None and self._next <= limit:
+            point = self._next
+            self._next = next(self._points, None)
+            self._fold(point)
+            yield point
+
+    def _stability(self, name: str) -> tuple[float, float] | None:
+        """Largest move of the running mean over the last k decision points, and its limit.
+
+        Returns ``(move, limit)`` at the binding point: the move
+        ``|mean(d_j) - mean(n)| / |mean(n)|`` and the tolerance
+        ``max(f eps, z r_n sqrt((n / d_j - 1) / delta))`` with ``z = 0.9``; the
+        second term admits the i.i.d. drift of a running mean over a fixed
+        fraction of the sample. ``None`` before ``k + 1`` points or at zero
+        mean; ``(0, f eps)`` when ``k = 0``.
+
+        Validation: adaptive-sample-size-stopping
+        """
+        s = self.settings
+        k = s.stability_checks
+        floor = s.stability_fraction * s.target_rse
         if k == 0:
-            return 0.0
+            return 0.0, floor
         if len(self.history) < k + 1:
             return None
-        current = self.history[-1][1][name]
+        n, latest = self.history[-1]
+        current = latest[name]
         if current == 0.0:
             return None
-        return max(abs(means[name] - current) for _, means in self.history[-k - 1 : -1]) / abs(
-            current
-        )
+        rse = self.moments[name].relative_se() or 0.0
+        worst = (0.0, floor)
+        for point, means in self.history[-k - 1 : -1]:
+            move = abs(means[name] - current) / abs(current)
+            drift = STABILITY_DRIFT * rse * math.sqrt((n / point - 1.0) / s.decision_growth)
+            limit = max(floor, drift)
+            if move / limit > worst[0] / worst[1]:
+                worst = (move, limit)
+        return worst
 
     def observable_status(self, name: str) -> dict[str, Any]:
         s = self.settings
         m = self.moments[name]
         rse, share, ess = m.relative_se(), m.max_share(), m.effective_sample_size()
         stability = self._stability(name)
+        move, limit = (None, None) if stability is None else stability
         vov = m.variance_of_variance()
         cv = None if rse is None else rse * math.sqrt(m.n)
         # VOV + 1/n = M4/M2**2 <= threshold; M4/M2**2 <= 1, so 1 disables
@@ -249,7 +365,7 @@ class StoppingMonitor:
             "max_electron_share": share is not None and share <= s.max_history_share,
             "effective_sample_size": ess >= s.min_effective_histories,
             "variance_sampling": variance_passes,
-            "stability": stability is not None and stability <= s.stability_fraction * s.target_rse,
+            "stability": stability is not None and stability[0] <= stability[1],
         }
         return {
             "n_electrons": m.n,
@@ -260,12 +376,14 @@ class StoppingMonitor:
             "variance_of_variance": vov,
             "vov_trend_slope": vov_trend_slope(self.vov_history[name]),
             "coefficient_of_variation": cv,
-            "stability": stability,
+            "stability": move,
+            "stability_limit": limit,
             "passes": passes,
             "converged": all(passes.values()),
         }
 
     def _project(self, n: int) -> int:
+        """``N = n (rse / target)**2`` for the worst observable, within ``[n, max]``."""
         s = self.settings
         worst = 0.0
         for moments in self.moments.values():
@@ -273,15 +391,12 @@ class StoppingMonitor:
             worst = max(worst, math.inf if rse is None else (rse / s.target_rse) ** 2)
         if not math.isfinite(worst):
             return s.max_histories
-        block = s.block_histories
-        projected = math.ceil(n * worst / block) * block
-        return min(max(projected, n), s.max_histories)
+        return min(max(math.ceil(n * worst), n), s.max_histories)
 
-    def should_stop(self, n: int) -> bool:
+    def decide(self, n: int) -> bool:
+        """Apply the rule at the folded decision point ``n``; ``True`` stops there."""
         s = self.settings
         at_max = n >= s.max_histories
-        if n < s.min_histories and not at_max:
-            return False
         if s.pilot_histories is not None and not at_max:
             if n < s.pilot_histories:
                 return False
@@ -292,6 +407,11 @@ class StoppingMonitor:
                     "relative_se": {k: m.relative_se() for k, m in self.moments.items()},
                     "projected_electrons": self.projected,
                 }
+                if self._next is not None and n < self.projected < s.max_histories:
+                    # Add N to the grid: the first check after the pilot falls
+                    # on N itself, not on the grid point above it.
+                    self._points = _with_point(chain((self._next,), self._points), self.projected)
+                    self._next = next(self._points)
             if self.projected is not None and n < self.projected:
                 return False
         self.checks += 1
@@ -303,6 +423,21 @@ class StoppingMonitor:
             return True
         return False
 
+    def should_stop(self, n: int, recheck_at: int | None = None) -> bool:
+        """Visit the decision points up to ``n``; ``True`` once one stops (``realized``).
+
+        With ``recheck_at`` (realized-range replay) the points before it are
+        only folded, and the rule is applied at ``recheck_at`` alone.
+        """
+        for point in self.pending(n):
+            if (recheck_at is None or point == recheck_at) and self.decide(point):
+                return True
+        return False
+
+    def next_point(self) -> int | None:
+        """The next unvisited decision point, or ``None`` after the maximum."""
+        return self._next
+
     def record(self) -> dict[str, Any]:
         """The case's statistics record (settings, guards, stop, per observable)."""
         s = self.settings
@@ -312,14 +447,14 @@ class StoppingMonitor:
             "target_rse": s.target_rse,
             "min_electrons": s.min_histories,
             "max_electrons": s.max_histories,
-            "block_electrons": s.block_histories,
+            "decision_growth": s.decision_growth,
             "observables": list(s.observables),
             "sampling_model": ADAPTIVE_SAMPLING_MODEL,
             "guards": {
                 "max_electron_share": s.max_history_share,
                 "min_effective_electrons": s.min_effective_histories,
                 "max_variance_of_variance": s.max_variance_of_variance,
-                "stability_blocks": s.stability_blocks,
+                "stability_checks": s.stability_checks,
                 "stability_fraction": s.stability_fraction,
             },
             "band_eV": None if s.band_eV is None else list(s.band_eV),
@@ -334,12 +469,15 @@ class StoppingMonitor:
         }
 
 
-def run_stopping_rule(settings: AdaptiveSettings, measure: Measure) -> dict[str, Any]:
+def run_stopping_rule(
+    settings: AdaptiveSettings, measure: Measure, chunk: int | None = None
+) -> dict[str, Any]:
     """Apply the stopping rule to ``measure`` without transport.
 
-    The same block loop and monitor the runner uses, over a supplied
-    per-electron population; ``block`` is ``None``. For tests and studies of
-    the rule itself.
+    The monitor the runner uses, over a supplied per-electron population in
+    chunks of ``chunk`` electrons (default: one chunk per decision point);
+    ``block`` is ``None``. The record does not depend on ``chunk``. For tests
+    and studies of the rule itself.
     """
     from .independent import IndependentStoppingMonitor
 
@@ -348,10 +486,16 @@ def run_stopping_rule(settings: AdaptiveSettings, measure: Measure) -> dict[str,
         if settings.brem_target_rse is None
         else IndependentStoppingMonitor(settings, measure)
     )
-    for start, stop in electron_blocks(settings.max_histories, settings.block_histories):
+    start = 0
+    while (point := monitor.next_point()) is not None:
+        stop = point if chunk is None else min(start + chunk, settings.max_histories)
         monitor.on_block(start, stop, None)
+        start = stop
         if monitor.should_stop(stop):
             break
+        if monitor.cut_at is not None:
+            monitor.truncate(monitor.cut_at)
+            start = monitor.cut_at
     return monitor.record()
 
 
@@ -463,19 +607,58 @@ def _electron_rows(segments, start: int, stop: int):
     return view
 
 
-def batch_means(case, transport, settings: AdaptiveSettings) -> dict[str, Any]:
-    """Per-bin batch-means standard errors of ``spec`` and ``brem_wide`` in a band.
+#: Batches of the realized run for per-bin batch means (#1253).
+BATCH_MEANS_BATCHES = 20
 
-    Each equal block of the realized run is one batch: its own line and brem
-    spectra on the final grids, normalized per electron. The batch means'
-    sample standard deviation over ``sqrt(k)`` estimates the standard error of
-    the run's spectrum in each bin. Reported after the final reduction; never
-    used to stop, since the line grid is unknown while transport runs.
+
+def batch_spans(n: int, batches: int = BATCH_MEANS_BATCHES) -> list[tuple[int, int]]:
+    """``min(batches, n)`` contiguous electron ranges of sizes ``floor`` or ``ceil(n / K)``."""
+    k = min(int(batches), int(n))
+    bounds = [b * n // k for b in range(k + 1)] if k else [0]
+    return list(zip(bounds[:-1], bounds[1:], strict=True))
+
+
+def _batch_summary(energies, batches, sizes):
+    """Weighted batch means: ``S = sum (n_b / n) S_b``, ``se^2 = sum n_b (S_b - S)^2 / ((K - 1) n)``.
+
+    Equal ``n_b = n / K`` gives the textbook ``s(S_b) / sqrt(K)``.
 
     Validation: adaptive-sample-size-stopping
     """
-    from dataclasses import replace
+    values = np.asarray(batches, dtype=float)
+    weights = np.asarray(sizes, dtype=float)
+    n, k = float(weights.sum()), len(sizes)
+    mean = (weights[:, None] * values).sum(axis=0) / n
+    if k >= 2:
+        spread = (weights[:, None] * (values - mean) ** 2).sum(axis=0) / (k - 1)
+        se = np.sqrt(spread / n)
+    else:
+        se = np.full(mean.shape, np.nan)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        rel = np.where(mean > 0.0, se / np.abs(mean), np.nan)
+    finite = rel[np.isfinite(rel)]
+    return {
+        "E_eV": energies,
+        "mean": mean,
+        "standard_error": se,
+        "relative_se": rel,
+        "max_relative_se": float(finite.max()) if finite.size else None,
+    }
 
+
+def batch_means(case, transport, settings: AdaptiveSettings) -> dict[str, Any]:
+    """Per-bin batch-means standard errors of ``spec`` and ``brem_wide`` in a band.
+
+    The realized ``Ne`` (and, separately, ``Ne_brem``) electrons are split into
+    :data:`BATCH_MEANS_BATCHES` contiguous batches of near-equal size,
+    independent of how they were transported. Each batch's own line and brem
+    spectra on the final grids, normalized per electron, give a weighted
+    batch-means standard error of the run's spectrum in each bin. Reported
+    after the final reduction; never used to stop, since the line grid is
+    unknown while transport runs.
+
+    Validation: adaptive-sample-size-stopping
+    """
     from .emission_adapters import EmissionBatch, select_emission
 
     emission = select_emission(case)
@@ -486,57 +669,39 @@ def batch_means(case, transport, settings: AdaptiveSettings) -> dict[str, Any]:
     segs = transport["segs"]
     n = int(segs["Ne"])
     n_brem = int(transport["Ne_brem"])
-    blocks = electron_blocks(n, settings.block_histories)
     E_grid, E_brem = np.asarray(transport["E_grid"]), np.asarray(transport["E_brem"])
     cxr_bins = (E_grid >= start_eV) & (E_grid <= stop_eV)
     brem_bins = (E_brem >= start_eV) & (E_brem <= stop_eV)
     abs_layers = case.get("abs_layers")
-    cxr_batches, brem_batches = [], []
-    for start, stop in blocks:
-        rows = _electron_rows(segs, start, stop)
-        scale = n / (stop - start)  # Ne = n normalization -> this batch's own mean
-        batch = EmissionBatch(
-            rows,
-            E_grid,
+
+    def batch(start, stop, energies, limit):
+        return EmissionBatch(
+            _electron_rows(segs, start, stop),
+            energies,
             case,
             transport["n_hat"],
             abs_layers,
             transport.get("groove"),
-            electron_limit=n,
+            electron_limit=limit,
         )
-        line = emission.cxr.evaluate(batch, "spec").values
-        cxr_batches.append(np.asarray(_to_cpu(line))[cxr_bins] * scale)
-        if start < n_brem:
-            brem = emission.continuum.evaluate(
-                replace(batch, energy_eV=E_brem, electron_limit=n_brem), "brem_wide"
-            ).values
-            brem_scale = n_brem / (stop - start)
-            brem_batches.append(np.asarray(_to_cpu(brem))[brem_bins] * brem_scale)
-    k = len(blocks)
 
-    def summary(energies, batches):
-        k = len(batches)
-        values = np.asarray(batches, dtype=float)
-        mean = values.mean(axis=0)
-        se = values.std(axis=0, ddof=1) / math.sqrt(k) if k >= 2 else np.full(mean.shape, np.nan)
-        with np.errstate(divide="ignore", invalid="ignore"):
-            rel = np.where(mean > 0.0, se / np.abs(mean), np.nan)
-        finite = rel[np.isfinite(rel)]
-        return {
-            "E_eV": energies,
-            "mean": mean,
-            "standard_error": se,
-            "relative_se": rel,
-            "max_relative_se": float(finite.max()) if finite.size else None,
-        }
-
+    cxr_spans, brem_spans = batch_spans(n), batch_spans(n_brem)
+    cxr_batches, brem_batches = [], []
+    for start, stop in cxr_spans:
+        # Normalized by n; n / n_b turns it into this batch's own mean.
+        line = emission.cxr.evaluate(batch(start, stop, E_grid, n), "spec").values
+        cxr_batches.append(np.asarray(_to_cpu(line))[cxr_bins] * n / (stop - start))
+    for start, stop in brem_spans:
+        brem = emission.continuum.evaluate(batch(start, stop, E_brem, n_brem), "brem_wide").values
+        brem_batches.append(np.asarray(_to_cpu(brem))[brem_bins] * n_brem / (stop - start))
     return {
         "band_eV": [float(start_eV), float(stop_eV)],
-        "n_batches": k,
-        **({"n_batches_brem": len(brem_batches)} if settings.brem_target_rse is not None else {}),
-        "batch_electrons": settings.block_histories,
-        "spec": summary(E_grid[cxr_bins], cxr_batches),
-        "brem_wide": summary(E_brem[brem_bins], brem_batches),
+        "n_batches": len(cxr_spans),
+        **({"n_batches_brem": len(brem_spans)} if settings.brem_target_rse is not None else {}),
+        "spec": _batch_summary(E_grid[cxr_bins], cxr_batches, [b - a for a, b in cxr_spans]),
+        "brem_wide": _batch_summary(
+            E_brem[brem_bins], brem_batches, [b - a for a, b in brem_spans]
+        ),
     }
 
 
@@ -599,7 +764,7 @@ def transport_case_adaptive(
         record_timing,
         transport_core=core,
         keep_segments_on_device=keep_segments_on_device,
-        block_electrons=settings.block_histories,
+        block_electrons=AdaptiveChunkPlan.for_core(core, settings.block_histories),
         block_monitor=monitor,
     )
     statistics = monitor.record()

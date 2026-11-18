@@ -717,6 +717,8 @@ def test_named_beam_migration_keeps_shipped_profile_digests_bit_for_bit(
 
     Issue #1262 re-minted adaptive pins for the variance-threshold-v3
     stopping generation (separate VOV threshold); fixed-count identities hold.
+    Issue #1253 re-minted adaptive pins for the decision-points-v4 stopping
+    generation (block size left identity); fixed-count identities hold.
 
     Issue #938 re-minted adaptive BremsLib/brem pins for the conditional
     ``brem_band_reduction_model`` generation; fixed-count identities hold.

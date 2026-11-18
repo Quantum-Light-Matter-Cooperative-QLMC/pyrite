@@ -267,7 +267,50 @@ def _flag(
 #: `--fidelity` cohort (deprecated in 0.4.0, issue #215) at 0.6.0 (issue #387).
 #: `RetiredOption` and `canonical_option` (renamed spellings) and
 #: `DeprecatedOption` (whole options) stay as the substrate ADR-0002 requires.
-DEPRECATED_FLAGS: dict[tuple[str, str], DeprecatedFlag] = {}
+#: #1253: adaptive checks fall on decision points, not transport blocks.
+DEPRECATED_FLAGS: dict[tuple[str, str], DeprecatedFlag] = {
+    entry.key: entry
+    for entry in (
+        _flag("numerics create", "--stability-blocks", "--stability-checks", since="0.36.0"),
+        _flag(
+            "numerics create",
+            "--block-histories",
+            "transport chunks are sized automatically; omit it",
+            since="0.36.0",
+        ),
+        _flag("numerics set", "--stability-blocks", "--stability-checks", since="0.36.0"),
+        _flag(
+            "numerics set",
+            "--block-histories",
+            "transport chunks are sized automatically; omit it",
+            since="0.36.0",
+        ),
+        _flag(
+            "profile numerics adaptive-sampling enable",
+            "--stability-blocks",
+            "--stability-checks",
+            since="0.36.0",
+        ),
+        _flag(
+            "profile numerics adaptive-sampling enable",
+            "--block-histories",
+            "transport chunks are sized automatically; omit it",
+            since="0.36.0",
+        ),
+        _flag(
+            "profile numerics adaptive-sampling set",
+            "--stability-blocks",
+            "--stability-checks",
+            since="0.36.0",
+        ),
+        _flag(
+            "profile numerics adaptive-sampling set",
+            "--block-histories",
+            "transport chunks are sized automatically; omit it",
+            since="0.36.0",
+        ),
+    )
+}
 
 
 def flag_message(command: str, flag: str, replacement: str) -> str:

@@ -65,7 +65,16 @@ class AdaptiveSampling(Precision):
     ``to_dict()``/``from_dict()`` use the stored vocabulary (``min_electrons``,
     ``'line'``, ...) so stored ``adaptive_precision`` records and identity
     digests are unchanged by the ``*_histories`` field names.
+
+    ``block_histories`` is deprecated (#1253): it only caps transport chunks.
     """
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        if self.block_histories is not None:
+            from ._util.deprecations import warn_api
+
+            warn_api("AdaptiveSampling(block_histories=...)", stacklevel=4)
 
 
 SamplingPolicy = FixedSampling | AdaptiveSampling

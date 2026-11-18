@@ -50,7 +50,7 @@ to obtain frozen configurations. See [named presets ADR](../adr/0021-named-physi
 
 Eligible profiles without fixed counts or an `adaptive_sampling` table use adaptive
 sampling: target relative standard error 0.05 on line and bremsstrahlung yields,
-200–20,000 histories in blocks of 100, with heavy-tail guards. A case stops when
+200–20,000 histories, checked at decision points 10 % apart, with heavy-tail guards. A case stops when
 watched yields meet targets and guards pass, or at the maximum with a
 statistics-limited flag. Both components use one transported population.
 `pyrite profile numerics adaptive-sampling show PROFILE` reports the policy, fixed counts,
@@ -88,47 +88,42 @@ use the workload defaults (300 line, 150 brem). Setting counts with
 `profile numerics set` while a policy exists is refused; use
 `adaptive-sampling disable`. All adaptive-sampling commands support `--dry-run`.
 
-The minimum, maximum and optional pilot count must be block-size multiples.
 Default guards are maximum electron share 0.05, minimum effective electrons
-100, stability blocks 3 and stability fraction 0.5. `--band-ev START,STOP`
+100, maximum variance of variance 0.01, stability checks 3 and stability
+fraction 0.5. `--band-ev START,STOP`
 selects the monitor band (default: case line band); `--batch-means-band-ev`
 adds reported bin errors without controlling stopping.
 
-**Choosing `--block-histories`.** The block size changes three things: GPU
-transport chunk size, how often the rule is checked, and the earliest possible
-stop. It does not change transport: a case at its final count is the fixed-count
-run bit for bit. The rule needs `stability blocks + 1` block ends, so no case
-stops before about 4 blocks, and the pilot projection rounds up to a whole
-block. Measured on an RTX 5080 for `cleo_sub`-like cases (hBN/HOPG, 5000 Å,
-30 keV–30 MeV; issue #1252):
+**Decision points and transport chunks.** The rule is checked at
+`--min-histories` and then at counts `--decision-growth` (default 0.1) apart,
+relative, up to `--max-histories`; the pilot count and its projection are
+checks of their own. A case at its final count is the fixed-count run bit for
+bit, and the count does not depend on the device or on how electrons are
+grouped for transport (#1253). The earliest stop is about
+`min × 1.1³ ≈ 1.33 × min`, since the stability guard needs three earlier checks.
 
-- Each block costs a fixed ~50 ms, from transport launch and the stopping check.
-  One GPU launch holds at most ~7k histories, so blocks below that also
-  under-fill the device. With 1000-history blocks, a case that runs to its
-  maximum spends 5–10× longer than with 24k blocks.
-- Wall time stops improving at about 12k–24k histories per block. Blocks of
-  48k overshoot (e.g. 528k instead of 264k electrons) and, at ~38 rows per
-  electron, fill a 16 GB card during the stopping check.
-- Cases that converge in the pilot stop at about 4 blocks whatever the target,
-  so a large block buys electrons the target did not ask for.
-- A small block is not automatically cheaper: with blocks of 6k or fewer,
-  1 MeV cases have stopped after a few thousand electrons, before any rare
-  heavy-weight electron was drawn, and reported an error 10–100× too small
-  (#1254). Treat early stops from small blocks with suspicion. For heavy-tailed
-  scenes a larger `--min-histories` is the reliable remedy; a larger
-  `--min-effective-histories` helps only once the tail has been drawn.
-- The CXR variance gate has its own threshold, `--max-variance-of-variance`
-  (default 0.01; #1262). It is separate from the ESS floor
-  `--min-effective-histories`. Raising it to 0.1, the MCNP/Geant4
-  convention, stops heavy-tailed scenes sooner. In the #1254 replays, 0.1
-  admitted early stops at 1 MeV, so keep 0.01 for final runs; 1 disables
-  the gate.
+Transport chunks are sized automatically: at least one CUDA launch's fill
+(~7k histories, #1252) or 1024 on CPU, reaching the next check when that is
+farther, and capped so the stopping check stays within about 4 GiB at the
+scene's measured rows per electron. A stop inside a chunk transports that
+chunk's prefix again, so a chunk never adds electrons to the result.
+`--block-histories` is deprecated: it only overrides the chunk floor.
 
-Interim recommendation for GPU campaigns (the shipped defaults are unchanged):
-12k histories per block, with min/pilot counts as multiples of it. Decoupling the check cadence from the transport chunk is #1253.
+The CXR variance gate has its own threshold, `--max-variance-of-variance`
+(default 0.01; #1262), separate from the ESS floor `--min-effective-histories`.
+Raising it to 0.1, the MCNP/Geant4 convention, stops heavy-tailed scenes
+sooner. In the #1254 replays, 0.1 admitted early stops at 1 MeV, so keep 0.01
+for final runs; 1 disables the gate.
+
+The rule cannot see a heavy class it has not sampled. With a small
+`--min-histories`, 1 MeV thin-target cases have stopped after a few thousand
+electrons and reported an error 10–100× too small (#1254); the stability window
+of three checks (about a quarter of the sample) refuses those in the measured
+`cleo_sub` cases, but for heavy-tailed scenes a larger `--min-histories` remains
+the reliable remedy.
 
 For independent brem stopping, keep both observables and set
-`--brem-target-rse`, `--brem-min-electrons`, and `--brem-max-electrons`.
+`--brem-target-rse`, `--brem-min-histories`, and `--brem-max-histories`.
 Brem bounds default to shared bounds and must be block multiples; its maximum
 cannot exceed the transport maximum. Brem uses a prefix of shared transport,
 freezes when its target/guards pass or its maximum is reached, and line work

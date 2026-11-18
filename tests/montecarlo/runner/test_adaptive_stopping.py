@@ -38,10 +38,12 @@ from pyrite.montecarlo.runner.adaptive import (
     StoppingMonitor,
     band_weights,
     case_measure,
+    decision_points,
     run_case_adaptive,
     run_stopping_rule,
     vov_trend_slope,
 )
+from pyrite.montecarlo.runner.stream_sizing import AdaptiveChunkPlan
 from pyrite.montecarlo.spectrum.brem import mc_brem_spectrum
 from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
 
@@ -50,8 +52,12 @@ _RULE_ONLY = dict(
     max_history_share=1.0,
     min_effective_histories=0.0,
     max_variance_of_variance=1.0,
-    stability_blocks=0,
+    stability_checks=0,
 )
+
+
+def _grid(minimum, maximum, growth=0.1):
+    return list(decision_points(minimum, maximum, growth))
 
 
 def _population_measure(population):
@@ -110,7 +116,8 @@ def test_variance_guard_retains_small_stop_for_nearly_constant_signal():
     settings = AdaptiveSettings(0.001, 3000, 6000, 1000)
     record = run_stopping_rule(settings, _population_measure(population))
     assert record["stop_reason"] == "converged"
-    assert record["realized_electrons"] == 4000
+    # The first point with k = 3 earlier points for the stability window.
+    assert record["realized_electrons"] == _grid(3000, 6000)[3]
     assert record["statistics"]["cxr"]["variance_of_variance"] > 0.9
 
 
@@ -142,11 +149,11 @@ def test_vov_trend_slope_is_recorded_and_never_gates(late_heavy):
     population = np.random.default_rng(11).exponential(1.0, 4000)
     if late_heavy:
         population[3500] += 500.0
-    settings = AdaptiveSettings(0.5, 4000, 4000, 100, observables=("cxr", "brem"))
+    settings = AdaptiveSettings(1e-6, 2000, 4000, observables=("cxr", "brem"))
     record = run_stopping_rule(
         settings, lambda start, stop, _: dict.fromkeys(("cxr", "brem"), population[start:stop])
     )
-    ends = range(2000, 4001, 100)
+    ends = _grid(2000, 4000)  # every decision point lies in the last half
     x = np.log(np.array(ends, dtype=float))
     y = np.log([_prefix_vov(population, n) for n in ends])
     expected = np.polyfit(x, y, 1)[0]
@@ -175,8 +182,8 @@ def test_degenerate_moments_report_no_error():
         dict(target_rse=0.0),
         dict(min_histories=1),
         dict(max_histories=30),
-        dict(min_histories=45),
-        dict(pilot_histories=50),
+        dict(decision_growth=0.0),
+        dict(decision_growth=float("inf")),
         dict(observables=("spec",)),
         dict(max_history_share=0.0),
         dict(block_histories=20.5),
@@ -185,7 +192,7 @@ def test_degenerate_moments_report_no_error():
         dict(max_histories=200.5),
         dict(pilot_histories=20),
         dict(pilot_histories=220),
-        dict(stability_blocks=1.5),
+        dict(stability_checks=1.5),
         dict(stability_fraction=float("nan")),
         dict(min_effective_histories=float("inf")),
         dict(max_variance_of_variance=0.0),
@@ -330,7 +337,10 @@ def test_pilot_projection_skips_checks_until_the_projected_count():
     )
     pilot = piloted["pilot"]
     rse = pilot["relative_se"]["cxr"]
-    assert pilot["projected_electrons"] == 10 * math.ceil(100 * (rse / 0.02) ** 2 / 10)
+    # The projection is a decision point itself: no rounding to a transport unit.
+    # The pilot count is a decision point of its own.
+    assert pilot["n_electrons"] == 100
+    assert pilot["projected_electrons"] == math.ceil(pilot["n_electrons"] * (rse / 0.02) ** 2)
     assert piloted["realized_electrons"] >= pilot["projected_electrons"]
     assert piloted["checks"] < plain["checks"]
     assert piloted["stop_reason"] == "converged"
@@ -379,7 +389,7 @@ def test_variance_guard_preserves_disabled_and_brem_stops(observable, vov_limit)
         settings, lambda start, stop, _: {observable: population[start:stop]}
     )
     assert record["stop_reason"] == "converged"
-    assert record["realized_electrons"] == 4000
+    assert record["realized_electrons"] == _grid(3000, 6000)[3]
 
 
 @pytest.mark.parametrize(
@@ -387,8 +397,13 @@ def test_variance_guard_preserves_disabled_and_brem_stops(observable, vov_limit)
     [
         ({}, None),  # defaults: one deviation holds all variance, VOV + 1/n ~ 1
         ({"min_effective_histories": 0.0}, None),  # the ESS floor no longer frees VOV
-        ({"max_variance_of_variance": 1.0}, 4000),  # VOV off; ESS ~ n passes 100
-        ({"max_variance_of_variance": 1.0, "min_effective_histories": 4500.0}, 5000),
+        # VOV off; ESS ~ n passes 100 at the first point with k earlier checks
+        ({"max_variance_of_variance": 1.0}, _grid(3000, 6000)[3]),
+        # ESS ~ n first reaches 4500 at the grid point above it
+        (
+            {"max_variance_of_variance": 1.0, "min_effective_histories": 4500.0},
+            _grid(3000, 6000)[5],
+        ),
     ],
     ids=["defaults", "ess-off", "vov-off", "ess-binds"],
 )
@@ -436,9 +451,10 @@ def test_variance_tail_keeps_cxr_running_after_independent_brem_freezes():
     assert record["statistics_limited"]
     assert record["stop_reason"] == "max_electrons"
     assert record["realized_electrons"] == 6000
-    assert record["realized_electrons_brem"] == 4000
+    brem_stop = _grid(3000, 6000)[3]
+    assert record["realized_electrons_brem"] == brem_stop
     assert record["statistics"]["brem"]["stop_reason"] == "converged"
-    assert record["statistics"]["brem"]["mean"] == pytest.approx(1.0 + 0.5 / 4000)
+    assert record["statistics"]["brem"]["mean"] == pytest.approx(1.0 + 0.5 / brem_stop)
     assert not record["statistics"]["cxr"]["passes"]["variance_sampling"]
 
 
@@ -498,27 +514,53 @@ def test_guards_suppress_false_stops_across_seeds():
     assert false_stops["guarded"] <= 1
 
 
-def test_stability_guard_waits_out_a_late_heavy_electron():
-    """A heavy electron moves the running mean by ~17 %: the RSE (~17 %) meets
-    the 20 % target at once, but the mean must hold within 10 % over three
-    block ends, so the stop waits until the jump leaves that window."""
+def test_stability_guard_refuses_the_check_a_heavy_electron_arrives_at():
+    """A heavy electron moves the running mean by ~20 %: the RSE (~17 %) meets
+    the 20 % target at once, but the move exceeds both 0.5 eps and the i.i.d.
+    drift allowance 0.9 r sqrt((n / d - 1) / delta) at the arrival check, so the
+    stop waits for the next point, where the RSE still covers the jump."""
     population = np.ones(400)
     population[::2] = 0.5  # RSE is tiny from the start
-    population[255] = 40.0  # block [240, 260)
+    population[255] = 40.0
+    grid = _grid(200, 400)
+    arrival = next(point for point in grid if point > 255)
     settings = AdaptiveSettings(
         target_rse=0.2,
-        min_histories=260,
+        min_histories=200,
         max_histories=400,
-        block_histories=20,
         max_history_share=1.0,
         min_effective_histories=0.0,
         max_variance_of_variance=1.0,
-        stability_blocks=3,
+        stability_checks=3,
         stability_fraction=0.5,
     )
     record = run_stopping_rule(settings, _population_measure(population))
-    assert record["realized_electrons"] == 320
+    assert record["realized_electrons"] == grid[grid.index(arrival) + 1]
     assert record["stop_reason"] == "converged"
+    # Without the stability guard the run stops on the arrival check itself.
+    bare = run_stopping_rule(replace(settings, stability_checks=0), _population_measure(population))
+    assert bare["realized_electrons"] <= arrival
+
+
+def test_records_do_not_depend_on_chunk_size():
+    """Decisions fold values at decision points, so any chunking gives one record."""
+    population = _heavy_population(np.random.default_rng(7), 6000, rate=2e-3)
+    settings = AdaptiveSettings(target_rse=0.03, min_histories=150, max_histories=6000)
+    records = [
+        run_stopping_rule(settings, _population_measure(population), chunk=chunk)
+        for chunk in (None, 1, 7, 100, 1000, 6000)
+    ]
+    assert all(record == records[0] for record in records[1:])
+
+
+def test_decision_points_overshoot_at_most_their_growth():
+    for minimum, maximum, growth in [(2, 10**6, 0.1), (200, 20_000, 0.05), (3000, 10**6, 0.3)]:
+        grid = _grid(minimum, maximum, growth)
+        assert grid[0] == minimum and grid[-1] == maximum
+        steps = np.diff(grid)
+        assert np.all(steps >= 1)
+        assert np.all(np.array(grid[1:-1]) <= np.ceil(np.array(grid[:-2]) * (1 + growth)))
+        assert len(grid) <= math.log(maximum / minimum) / math.log1p(growth) + 1 / growth + 2
 
 
 # ---- per-electron observables ---------------------------------------------------
@@ -612,8 +654,28 @@ def test_adaptive_run_is_the_fixed_n_run_at_its_realized_count():
     settings = replace(_SETTINGS, min_effective_histories=0.0, max_variance_of_variance=1.0)
     result, stats = run_case_adaptive(case, settings, transport_core="per-electron")
     n = stats["realized_electrons"]
-    assert stats["stop_reason"] == "converged" and 40 <= n < 200 and n % 20 == 0
+    assert stats["stop_reason"] == "converged" and 40 <= n < 200 and n in _grid(40, 200)
     _assert_identical(result, _fixed(case, n))
+
+
+@pytest.mark.slow
+def test_adaptive_output_does_not_depend_on_chunk_size():
+    """#1253 acceptance: chunk sizes (here 1, 7 and 64 electrons, including a
+    stop inside a chunk and its re-transported prefix) change neither the
+    realized count, the statistics nor the output."""
+    case = _case(energy_spread_frac=1e-3)
+    settings = replace(_SETTINGS, block_histories=None, min_effective_histories=0.0)
+    runs = []
+    for floor in (1, 7, 64):
+        chunked = replace(settings, block_histories=floor)
+        runs.append(run_case_adaptive(case, chunked, transport_core="per-electron"))
+    (ref, ref_stats), *others = runs
+    assert ref_stats["stop_reason"] == "converged"
+    assert ref_stats["realized_electrons"] % 64  # the 64-electron chunk was cut
+    for result, stats in others:
+        assert stats["realized_electrons"] == ref_stats["realized_electrons"]
+        assert stats["statistics"] == ref_stats["statistics"]
+        _assert_identical(result, ref)
 
 
 def test_same_seed_and_target_replay_the_same_count_and_output():
@@ -659,7 +721,7 @@ def test_batch_means_reconstruct_the_band_of_the_final_spectra():
         warnings.simplefilter("ignore", CxrYieldStatisticsWarning)
         result, stats = run_case_adaptive(_case(), settings, transport_core="per-electron")
     batch = stats["batch_means"]
-    assert batch["n_batches"] == 3
+    assert batch["n_batches"] == 20
     for key, grid in (("spec", "E_grid"), ("brem_wide", "E_grid_brem")):
         energies = result[grid]
         band = (energies >= 1000.0) & (energies <= 3000.0)
@@ -692,24 +754,26 @@ def test_environment_pinned_lockstep_is_rejected(monkeypatch):
 def test_energy_range_replay_rechecks_statistics_before_accepting_stop(monkeypatch):
     from pyrite.montecarlo.runner import block_transport
 
-    settings = AdaptiveSettings(0.1, 40, 80, 20, **_RULE_ONLY)
+    settings = AdaptiveSettings(0.1, 40, 80, **_RULE_ONLY)
     monitor = StoppingMonitor(settings, lambda _start, _stop, block: {"cxr": block})
     calls = []
 
-    def run_blocks(_simulate, n, *, block_electrons, on_block=None, should_stop=None, **_kw):
+    def run_chunks(_simulate, plan, monitor, n, *, recheck=False, **_kw):
         calls.append(n)
-        for start, stop in block_transport.electron_blocks(n, block_electrons):
+        start = 0
+        while start < n:
+            stop = plan.next_stop(start, monitor.next_point(), n)
             values = np.ones(stop - start)
             # The first replay invalidates the apparent convergence at 40.
             if len(calls) == 2 and start == 20:
-                values = np.arange(1.0, 21.0)
-            if on_block is not None:
-                on_block(start, stop, values)
-            if should_stop is not None and should_stop(stop):
-                break
-        return {"Ne": stop}
+                values = np.arange(1.0, stop - start + 1.0)
+            monitor.on_block(start, stop, values)
+            if monitor.should_stop(stop, n if recheck else None):
+                return {"Ne": monitor.realized}
+            start = stop
+        return {"Ne": n}
 
-    monkeypatch.setattr(block_transport, "transport_electron_blocks", run_blocks)
+    monkeypatch.setattr(block_transport, "transport_monitored_blocks", run_chunks)
     monkeypatch.setattr(block_transport, "initial_energies_keV", lambda *_: np.arange(1.0, 81.0))
     monkeypatch.setattr(runner, "_case_radiative_kwargs", lambda _case: {})
     result = block_transport.transport_case_blocks(
@@ -717,15 +781,16 @@ def test_energy_range_replay_rechecks_statistics_before_accepting_stop(monkeypat
         simulate=None,
         case={"seed": 1, "E0_keV": 30.0},
         E_cut_by_electrons=np.ones(80),
-        block_electrons=20,
+        block_electrons=AdaptiveChunkPlan(20),
         beam_kw={key: None for key in block_transport.BUNCH_KWARGS},
         monitor=monitor,
     )
-    assert calls == [80, 40, 60]
-    assert result["Ne"] == 60
+    grow = _grid(40, 80)[1]
+    assert calls == [80, 40, grow]
+    assert result["Ne"] == grow
     record = monitor.record()
     assert record["replayed_transport"]
-    assert record["realized_electrons"] == 60
-    assert record["statistics"]["cxr"]["n_electrons"] == 60
+    assert record["realized_electrons"] == grow
+    assert record["statistics"]["cxr"]["n_electrons"] == grow
     assert record["statistics"]["cxr"]["mean"] == 1.0
     assert record["stop_reason"] == "converged"

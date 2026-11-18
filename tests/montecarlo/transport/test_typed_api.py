@@ -103,11 +103,7 @@ def test_removed_flat_arguments_fail():
     "kwargs, message",
     [
         (
-            {
-                "numerics": Numerics(
-                    sampling=AdaptiveSampling(target_rse=0.1, max_histories=100, block_histories=10)
-                )
-            },
+            {"numerics": Numerics(sampling=AdaptiveSampling(target_rse=0.1, max_histories=100))},
             "fixed sampling",
         ),
         (

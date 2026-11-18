@@ -285,6 +285,72 @@ def transport_electron_blocks(
     )
 
 
+def transport_monitored_blocks(
+    simulate_block: Callable[[int, int], dict[str, Any]],
+    plan,
+    monitor,
+    limit: int,
+    *,
+    seed: int,
+    bunch: Mapping[str, Any],
+    bremslib_tables=None,
+    recheck: bool = False,
+    consume: Callable[[dict[str, Any]], None] | None = None,
+) -> dict[str, Any]:
+    """Transport ``[0, n)`` in chunks under a stopping monitor; return the fixed-``n`` join.
+
+    ``plan`` (:class:`.stream_sizing.AdaptiveChunkPlan`) sizes each chunk from
+    the monitor's next decision point. After each chunk the monitor visits
+    its decision points; when it stops at ``d`` inside the chunk, or freezes
+    the brem prefix there (``cut_at``), the chunk is discarded and ``[start,
+    d)`` transported again. Streams are counter-addressed, so that prefix is
+    the same electrons the chunk held, and the join over the kept chunks is
+    the fixed-``n`` result bit for bit, whatever the chunk sizes.
+
+    With ``recheck`` (realized-range replay) the run covers all of
+    ``[0, limit)`` and the rule is applied at ``limit`` only. With
+    ``consume`` each kept chunk is streamed and only the additive counts are
+    returned, as in :func:`transport_electron_blocks`.
+
+    Validation: adaptive-sample-size-stopping
+    """
+    blocks: list[dict[str, Any]] = []
+    counts: dict[str, Any] = dict.fromkeys(_ADDITIVE_COUNTS, 0)
+    start = 0
+    while start < limit:
+        stop = plan.next_stop(start, monitor.next_point(), limit)
+        block = simulate_block(start, stop)
+        plan.observe(start, stop, block)
+        monitor.on_block(start, stop, block)
+        stopped = monitor.should_stop(stop, limit if recheck else None)
+        cut = monitor.realized if stopped else monitor.cut_at
+        if cut is not None and cut < stop:
+            monitor.truncate(cut)
+            del block
+            block = simulate_block(start, cut)
+            stop = cut
+        block = _globalize(block, start)
+        if consume is not None:
+            consume(block)
+            for key in counts:
+                counts[key] += int(block.get(key, 0))
+        else:
+            if "hard_radiative_k_eV" in block:
+                block.update(dict.fromkeys(_RECOMPLETED_FIELDS))
+            blocks.append(block)
+        del block
+        start = stop
+        if stopped:
+            break
+    if consume is not None:
+        return counts
+    merged = merge_electron_blocks(blocks)
+    blocks.clear()
+    return finalize_population_fields(
+        merged, seed=seed, bunch=bunch, bremslib_tables=bremslib_tables
+    )
+
+
 class _TrackBudget:
     """Run-wide secondary-track budget over committed primary blocks (#923).
 
@@ -327,15 +393,18 @@ def transport_case_blocks(
     retry, without bunch arguments, and over the population's table energy
     range, so the joined result equals the single-call transport bit for bit.
 
-    ``monitor`` (optional) supplies ``on_block`` and ``should_stop`` hooks
-    (:class:`.adaptive.StoppingMonitor`). The blocks then run over the table
+    ``monitor`` (optional, :class:`.adaptive.StoppingMonitor`) runs the
+    chunks of ``block_electrons``, then an
+    :class:`.stream_sizing.AdaptiveChunkPlan`, through
+    :func:`transport_monitored_blocks`. The chunks run over the table
     energy range of all ``E_cut_by_electrons.size`` electrons, the most the
     run may transport. When that range differs from the range of the realized
     population (an energy spread whose largest draw lies past the stop), the
     realized ``[0, n)`` is replayed over its own range -- the streams are
     counter-addressed, so the replay is the fixed-``n`` transport -- and the
     monitor recomputes its statistics. If the replay fails the stopping rule,
-    grow by one block and replay again until convergence or the maximum.
+    grow to the next decision point and replay again until convergence or
+    the maximum.
 
     ``consume`` (optional, no ``monitor``) streams blocks without joining them;
     see :func:`transport_electron_blocks`.
@@ -402,25 +471,34 @@ def transport_case_blocks(
             replay_block=partial(simulate_block, keep=False) if keep and consume else None,
         )
 
-    def monitored(n, on_block, should_stop=None):
-        if not cascade:
-            return run(n, on_block=on_block, should_stop=should_stop)
-        # Measure-only streamed pass on a fresh run-wide track budget (#1240).
-        budgets.append(_TrackBudget(n_electrons))
-        return run(
-            n, on_block=on_block, should_stop=should_stop, consume=budgets[-1].wrap(_discard)
+    from .stream_sizing import AdaptiveChunkPlan
+
+    plan = (
+        block_electrons
+        if isinstance(block_electrons, AdaptiveChunkPlan)
+        else AdaptiveChunkPlan(int(block_electrons))
+    )
+
+    def monitored(n, recheck=False):
+        consume = None
+        if cascade:
+            # Measure-only streamed pass on a fresh run-wide track budget (#1240).
+            budgets.append(_TrackBudget(n_electrons))
+            consume = budgets[-1].wrap(_discard)
+        return transport_monitored_blocks(
+            simulate_block,
+            plan,
+            monitor,
+            n,
+            seed=case["seed"],
+            bunch={k: beam_kw[k] for k in BUNCH_KWARGS},
+            bremslib_tables=_case_radiative_kwargs(case).get("bremslib_tables"),
+            recheck=recheck,
+            consume=consume,
         )
 
-    result = monitored(n_electrons, monitor.on_block, monitor.should_stop)
+    result = monitored(n_electrons)
     realized = int(result["Ne"])
-
-    def replay_block(start, stop, block):
-        monitor.on_block(start, stop, block)
-        # Independent brem stopping must be re-decided on the replay's tables
-        # before transporting the next (line-only) block.
-        if hasattr(monitor, "brem_count") and stop < realized:
-            monitor.should_stop(stop)
-
     if energy_range_of(realized) != energy_range:
         monitor.replayed_transport = True
         while True:
@@ -428,10 +506,10 @@ def transport_case_blocks(
             # Replay changes interpolation tables and hence the measured
             # contributions. Recompute the moments and guards from the exact
             # transport we return; a stale pre-replay decision is insufficient.
-            result = monitored(realized, replay_block)
-            if monitor.should_stop(realized):
+            result = monitored(realized, recheck=True)
+            if monitor.realized == realized:
                 break
-            realized = min(realized + block_electrons, n_electrons)
+            realized = min(monitor.next_point() or n_electrons, n_electrons)
     if cascade:
         result = _fixed_cascade(simulate, keep, monitor, realized, E_cut_by_electrons, case)
     return result

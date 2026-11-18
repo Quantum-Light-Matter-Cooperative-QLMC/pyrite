@@ -18,7 +18,7 @@ from pyrite.console import output as _output
 from pyrite.console.output import CLIError, emit_json_result, emit_result, output_option
 from pyrite.console.tables import emit_settings, value_source
 
-from .._deprecations import canonical_option, removed_option
+from .._deprecations import DeprecatedOption, canonical_option, removed_option
 
 #: Option/FIELD spelling -> catalog ``adaptive_sampling`` field name.
 _PRECISION_FIELD_NAMES = {
@@ -33,7 +33,8 @@ _PRECISION_FIELD_NAMES = {
     "max-history-share": "max_history_share",
     "min-effective-histories": "min_effective_histories",
     "max-variance-of-variance": "max_variance_of_variance",
-    "stability-blocks": "stability_blocks",
+    "stability-checks": "stability_checks",
+    "decision-growth": "decision_growth",
     "stability-fraction": "stability_fraction",
     "pilot-histories": "pilot_histories",
     "band-ev": "band_eV",
@@ -104,7 +105,7 @@ def _policy_options(function):
             "--min-histories",
             type=click.IntRange(min=2),
             metavar="N",
-            help="Smallest count at which the run may stop; a multiple of --block-histories.",
+            help="Smallest count at which the run may stop (default 100).",
         ),
         click.option(
             "--max-histories",
@@ -114,9 +115,16 @@ def _policy_options(function):
         ),
         click.option(
             "--block-histories",
+            cls=DeprecatedOption,
             type=click.IntRange(min=1),
             metavar="N",
-            help="Histories per transport block; the rule is checked at block ends.",
+            help="Deprecated: transport chunk size hint; never changes the stop or output.",
+        ),
+        click.option(
+            "--decision-growth",
+            type=click.FloatRange(min=0.0, min_open=True),
+            metavar="FRACTION",
+            help="Relative spacing of the stopping-rule checks (default 0.1).",
         ),
         click.option(
             "--observable",
@@ -148,17 +156,21 @@ def _policy_options(function):
                 "MCNP/Geant4 convention; 1 disables)."
             ),
         ),
-        click.option(
-            "--stability-blocks",
+        canonical_option(
+            "--stability-checks",
+            retired=("--stability-blocks",),
             type=click.IntRange(min=0),
             metavar="K",
-            help="Guard: block ends whose running mean must agree; 0 disables (default 3).",
+            help="Guard: last checks whose running mean must agree; 0 disables (default 3).",
         ),
         click.option(
             "--stability-fraction",
             type=click.FloatRange(min=0.0),
             metavar="FRACTION",
-            help="Guard: allowed relative mean drift as a fraction of the target (default 0.5).",
+            help=(
+                "Guard: allowed relative mean drift as a fraction of the target, beyond "
+                "the expected statistical drift (default 0.5)."
+            ),
         ),
         click.option(
             "--pilot-histories",
@@ -247,8 +259,7 @@ def command():
     """Inspect and edit PROFILE's history-count mode: adaptive policy or fixed counts.
 
     Profiles without fixed history counts or a policy run adaptive by default
-    (target RSE 0.05, 200-20000 histories, blocks of 100, line and
-    bremsstrahlung). Each incoherent case stops when the relative standard error
+    (target RSE 0.05, 200-20000 histories, line and bremsstrahlung). Each incoherent case stops when the relative standard error
     of its line (and optionally bremsstrahlung) yield meets the target and its
     heavy-tail guards pass, or at the maximum count flagged statistics-limited.
     By default one count serves both populations. --brem-target-rse enables
@@ -391,7 +402,7 @@ def precision_set_command(name, yes, dry_run, **values):
     """Create or update PROFILE's adaptive policy.
 
     Fields left unspecified keep the existing policy's values; a new policy takes
-    them from the default (target RSE 0.05, 200-20000 histories, blocks of 100,
+    them from the default (target RSE 0.05, 200-20000 histories,
     line and brem). A profile with fixed counts is refused; switch it with
     'pyrite profile numerics adaptive-sampling enable'.
     """

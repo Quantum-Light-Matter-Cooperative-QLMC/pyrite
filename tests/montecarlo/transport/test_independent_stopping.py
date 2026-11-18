@@ -21,7 +21,6 @@ def _policy(**kw):
             target_rse=0.1,
             min_histories=40,
             max_histories=200,
-            block_histories=20,
             observables=("cxr", "brem"),
             brem_target_rse=0.2,
             **_RULE_ONLY,
@@ -42,8 +41,9 @@ def test_brem_freezes_and_line_is_rechecked_until_brem_finishes():
     assert record["realized_electrons"] == record["realized_electrons_brem"] == 60
     assert record["stop_reason"] == "converged"
     assert record["statistics"]["cxr"]["n_electrons"] == 60
-    # Six calls: one per population per block, no full-population reductions.
-    assert measured == [0, 0, 20, 20, 40, 40]
+    # One call per population per chunk, no full-population reductions.
+    assert measured[::2] == measured[1::2]
+    assert measured[::2] == sorted(set(measured))
 
 
 def test_frozen_brem_does_not_observe_later_blocks_and_resets_on_retry():
@@ -142,7 +142,6 @@ def test_light_case_brem_converges_first_with_equal_minima():
         {"brem_target_rse": float("nan")},
         {"brem_target_rse": 0},
         {"brem_max_histories": 220},
-        {"brem_min_histories": 30},
         {"brem_min_histories": True},
         {"brem_min_histories": 80, "brem_max_histories": 60},
         {"observables": ("cxr",)},
@@ -206,7 +205,7 @@ def test_realized_pair_matches_fixed_transport_and_spectra(spread, core):
     for key in ("spec", "spec_characteristic", "brem", "brem_wide", "E_grid"):
         np.testing.assert_array_equal(output[key], reference[key], err_msg=key)
     batches = record["batch_means"]
-    assert batches["n_batches_brem"] == nb // settings.block_histories
+    assert batches["n_batches_brem"] == min(20, nb)
     for key, axis in (("spec", "E_grid"), ("brem_wide", "E_grid_brem")):
         energies = np.asarray(output[axis])
         mask = (energies >= 1000) & (energies <= 10000)

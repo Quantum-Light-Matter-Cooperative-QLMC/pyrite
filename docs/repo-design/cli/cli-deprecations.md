@@ -20,7 +20,16 @@ These spellings reach a current command with a deprecated argument shape; they s
 
 ## Options
 
-No option spelling is currently deprecated. Every option the CLI accepts is canonical; anything else exits as a usage error. Hard-break removals without a support window (the `*-trials` and `*-electrons` Monte Carlo budget flags, #1007) name their `*-histories` replacement.
+| Command | Deprecated option | Replacement | Deprecated in | Remove in | Note |
+| --- | --- | --- | --- | --- | --- |
+| `pyrite numerics create` | `--block-histories` | transport chunks are sized automatically; omit it | 0.36.0 | 0.38.0 |  |
+| `pyrite numerics create` | `--stability-blocks` | `--stability-checks` | 0.36.0 | 0.38.0 |  |
+| `pyrite numerics set` | `--block-histories` | transport chunks are sized automatically; omit it | 0.36.0 | 0.38.0 |  |
+| `pyrite numerics set` | `--stability-blocks` | `--stability-checks` | 0.36.0 | 0.38.0 |  |
+| `pyrite profile numerics adaptive-sampling enable` | `--block-histories` | transport chunks are sized automatically; omit it | 0.36.0 | 0.38.0 |  |
+| `pyrite profile numerics adaptive-sampling enable` | `--stability-blocks` | `--stability-checks` | 0.36.0 | 0.38.0 |  |
+| `pyrite profile numerics adaptive-sampling set` | `--block-histories` | transport chunks are sized automatically; omit it | 0.36.0 | 0.38.0 |  |
+| `pyrite profile numerics adaptive-sampling set` | `--stability-blocks` | `--stability-checks` | 0.36.0 | 0.38.0 |  |
 
 ## Implicit defaults
 

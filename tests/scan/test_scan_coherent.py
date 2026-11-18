@@ -211,9 +211,7 @@ def test_catalog_profile_precision_reaches_run_settings_identity_and_cases(monke
     from pyrite.config import AdaptiveSampling
 
     _s, _sw, id_fixed, _stem = _resolved_run(monkeypatch, [])
-    policy = AdaptiveSampling(
-        target_rse=0.1, min_histories=20, max_histories=60, block_histories=20
-    )
+    policy = AdaptiveSampling(target_rse=0.1, min_histories=20, max_histories=60)
     catalog = materials.CATALOG
     monkeypatch.setattr(
         materials,

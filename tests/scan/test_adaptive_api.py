@@ -34,7 +34,7 @@ def scene():
 
 @pytest.fixture
 def precision():
-    return pr.config.AdaptiveSampling(0.1, 40, 60, 20, observables=("cxr", "brem"))
+    return pr.config.AdaptiveSampling(0.1, 40, 60, observables=("cxr", "brem"))
 
 
 @pytest.fixture
@@ -188,7 +188,7 @@ def test_early_stop_preserves_requested_case_and_matches_realized_fixed_n(scene,
         max_history_share=1.0,
         min_effective_histories=0.0,
         max_variance_of_variance=1.0,
-        stability_blocks=0,
+        stability_checks=0,
     )
     case = api.build_case(scene, pr.Numerics(sampling=adaptive_sampling(precision)))
     key = case_content_key(case)
@@ -220,7 +220,7 @@ def test_public_batch_means_survive_checkpoint_storage(scene, numerics, tmp_path
     _checkpoint_store.save("batch", tmp_path, results)
     record = _checkpoint_store.load("batch", tmp_path)[case.name][case.E0_keV]
     batch = record["adaptive_sampling"]["batch_means"]
-    assert batch["n_batches"] == 3
+    assert batch["n_batches"] == 20
     for component in ("spec", "brem_wide"):
         np.testing.assert_array_equal(
             batch[component]["standard_error"],
@@ -349,7 +349,7 @@ def test_mixed_cpu_pool_preserves_fixed_case_and_adaptive_provenance(scene, monk
         max_history_share=1.0,
         min_effective_histories=0.0,
         max_variance_of_variance=1.0,
-        stability_blocks=0,
+        stability_checks=0,
     )
     adaptive = api.build_case(scene, pr.Numerics(sampling=adaptive_sampling(precision)))
     fixed = api.build_case(
@@ -404,22 +404,40 @@ def test_precision_accepts_a_bare_observable_name():
         target_rse=0.1,
         min_histories=10,
         max_histories=20,
-        block_histories=10,
         observables="brem",
     )
     assert precision.observables == ("brem",)
 
 
-def test_precision_min_electrons_defaults_to_one_block():
-    """Issue #443: an omitted minimum is one block, the smallest legal stop."""
-    precision = pr.config.AdaptiveSampling(target_rse=0.1, max_histories=60, block_histories=20)
-    assert precision.min_histories == 20
+def test_precision_min_histories_defaults_to_100_within_the_maximum():
+    """An omitted minimum is 100 histories, capped at the maximum (#1253)."""
+    precision = pr.config.AdaptiveSampling(target_rse=0.1, max_histories=60)
+    assert precision.min_histories == 60
+    assert pr.config.AdaptiveSampling(target_rse=0.1, max_histories=600).min_histories == 100
     assert pr.config.AdaptiveSampling.from_dict(precision.to_dict()) == precision
 
 
-@pytest.mark.parametrize("missing", ["max_histories", "block_histories"])
-def test_precision_still_requires_max_and_block_counts(missing):
-    values = {"target_rse": 0.1, "max_histories": 60, "block_histories": 20}
-    del values[missing]
-    with pytest.raises(TypeError, match=f"requires {missing}"):
-        pr.config.AdaptiveSampling(**values)
+def test_precision_requires_only_target_and_maximum():
+    with pytest.raises(TypeError, match="requires max_histories"):
+        pr.config.AdaptiveSampling(target_rse=0.1)
+
+
+def test_block_histories_is_a_deprecated_chunk_hint_outside_identity():
+    """#1253: block_histories never changes decisions; it stays out of identity."""
+    from pyrite._precision import identity_policy
+
+    plain = pr.config.AdaptiveSampling(target_rse=0.1, max_histories=60)
+    with pytest.warns(DeprecationWarning, match="block_histories"):
+        hinted = pr.config.AdaptiveSampling(target_rse=0.1, max_histories=60, block_histories=20)
+    assert hinted.to_dict()["block_electrons"] == 20
+    assert "block_electrons" not in plain.to_dict()
+    assert identity_policy(hinted.to_dict()) == plain.to_dict()
+
+
+def test_stability_blocks_is_a_deprecated_alias():
+    with pytest.warns(DeprecationWarning, match="stability_checks"):
+        policy = pr.config.AdaptiveSampling(target_rse=0.1, max_histories=60, stability_blocks=2)
+    assert policy.stability_checks == 2
+    stored = {**policy.to_dict(), "stability_blocks": 1}
+    del stored["stability_checks"]
+    assert pr.config.AdaptiveSampling.from_dict(stored).stability_checks == 1

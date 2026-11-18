@@ -4,7 +4,7 @@ Ledger row: [`adaptive-sample-size-stopping`](../ledger-transport-background.md#
 
 ## Claim
 
-For a case transported in equal electron blocks of size $B$ on the counter-addressed per-electron or CUDA cores, the run stops at the first block end $n \ge n_{\min}$ that meets the following conditions for every watched observable $o$, plus the CXR variance-sampling gate below:
+For a case transported on the counter-addressed per-electron or CUDA cores, the run stops at the first decision point $n = d_J$ ({eq}`eq-adaptive-decision-points`, v4, #1253) that meets the following conditions for every watched observable $o$, plus the CXR variance-sampling gate below. Here $d_{J-j}$, $j = 1..k$, are the $k$ preceding points; the decisions and the realized count do not depend on how electrons are grouped for transport:
 
 ```{math}
 :label: eq-adaptive-stop-rule
@@ -15,7 +15,7 @@ r_{o,n} = \frac{s_{o,n}}{\sqrt{n}\,\lvert\bar m_{o,n}\rvert} \le \varepsilon,
 \quad
 \frac{(\sum_{i\le n} m_{o,i})^2}{\sum_{i\le n} m_{o,i}^2} \ge E_{\min},
 \quad
-\max_{1\le j\le k}\frac{\lvert\bar m_{o,n-jB}-\bar m_{o,n}\rvert}{\lvert\bar m_{o,n}\rvert} \le f\varepsilon .
+\frac{\lvert\bar m_{o,d_{J-j}}-\bar m_{o,n}\rvert}{\lvert\bar m_{o,n}\rvert} \le \max\!\Big(f\varepsilon,\ z\,r_{o,n}\sqrt{\tfrac{n/d_{J-j}-1}{\delta}}\Big)\ (1\le j\le k),\quad z=0.9 .
 ```
 
 Otherwise it stops at $n_{\max}$, flagged `statistics_limited`. The terms are:
@@ -26,6 +26,39 @@ Otherwise it stops at $n_{\max}$, flagged `statistics_limited`. The terms are:
 
 The realized result is the fixed-$N$ result at $N=n$, bit for bit. The cited sequential-interval theory concerns the asymptotic regime as the requested width tends to zero, with its regularity and stopping assumptions; it does not certify finite-sample coverage of this guarded implementation. The empirical studies below measure coverage and stopping bias in their stated populations only.
 
+
+### Decision points and transport chunks (v4, #1253)
+
+The rule is evaluated only at
+
+```{math}
+:label: eq-adaptive-decision-points
+
+d_0=n_{\min},\qquad d_{j+1}=\min\big(n_{\max},\ \max(d_j+1,\ \lceil d_j(1+\delta)\rceil)\big),
+```
+
+ending at $n_{\max}$, with the pilot count and its projection $N$ added as points of their own; $\delta$ is `decision_growth` (default 0.1). The values $m_{o,i}$ for $d_{j-1}\le i<d_j$ are merged into the moments as one segment, whatever transport chunks delivered them. Transport chunks are sized for device fill and memory only. A stop (or an independent brem freeze) at a point $d$ inside a chunk $[a,b)$ discards the chunk and transports $[a,d)$ again. The realized result is the fixed-$N$ result at $N=d$, bit for bit.
+
+**Chunk independence.** $m_{o,i}$ is a function of (seed, $i$) and the run's table range alone (prefix stability, below), and the per-electron reductions are bincounts over that electron's rows, so a chunk boundary does not change any $m_{o,i}$. The grid depends only on the policy and, through the pilot projection, on $m_{o,1..n_p}$. Each segment's moments are reduced from the same values in the same order and merged by the same Chan update in the same sequence, so every moment, guard value and decision is bit-identical under any chunking. Re-transporting $[a,d)$ reproduces the same electrons, by counter addressing, and the existing join contract makes the kept chunks the fixed-$d$ transport.
+
+**Overshoot and cost.** Let $d_{J-1}$ be the last refused point. Then $d_J\le\lceil d_{J-1}(1+\delta)\rceil$, so the stop exceeds the last refused count by at most $\delta$ relative (plus one electron). The block rule's absolute overshoot was up to $B-1$, and its pilot projection rounded up to a block. The run makes at most $\log(n_{\max}/n_{\min})/\log(1+\delta)+1/\delta+3$ checks, since steps of $+1$ occur only while $d_j<1/\delta$. As $\delta\to0$ the grid tends to every electron $\ge n_{\min}$.
+
+**Stability window.** The window $[d_{J-k}, n]$ is a fixed share $1-(1+\delta)^{-k}$ of the sample (25 % at $k=3$, $\delta=0.1$), where the block rule's $kB$ was 75 % of a 12k sample and 1 % of a 1M one. For i.i.d. values,
+
+$$
+\bar m_d-\bar m_n=\frac{n-d}{n}\big(\bar m_{[1,d]}-\bar m_{(d,n]}\big),\qquad
+\operatorname{Var}\frac{\bar m_d-\bar m_n}{\mu}=\frac{\sigma^2}{\mu^2}\,\frac{n-d}{nd}=r_n^2\Big(\frac nd-1\Big),
+$$
+
+so a plain tolerance $f\varepsilon$ over a fixed share refuses at random once $r_n\approx\varepsilon$: at $k=3$, $\delta=0.1$ the drift SD at $d_{J-3}$ is $0.57\,r_n$. The #1252 replays showed this: hBN 30 keV 15° stopped at 321k against 258k for the block rule. The tolerance therefore admits $z$ drift standard deviations scaled by $1/\sqrt\delta$. At $j=1$, $n/d_{J-1}-1\approx\delta$, and the term is $\approx z\,r_n$.
+
+**Single dominant electron under v4.** Let one electron of value $h$ arrive in $(d_{J-1},n]$ among light electrons with mean $a$, share $\sigma=h/(S_1+h)$. The mean moves by $(h-a)/(S_1+h)\approx\sigma$ relative between $d_{J-1}$ and $n$, and $r_n\approx\sigma$ when that electron dominates $S_2$ (to leading order $r^2\approx\sigma^2+(1-\sigma)^2\mathrm{CV}_{\rm light}^2/n$). With $z<1$ the allowance at $j=1$ is $\approx z\,r_n<\sigma$, so the check on which the electron arrives is refused when $\sigma>f\varepsilon$. At later checks the guard may pass. A stop there satisfies $r_n\le\varepsilon$ with $r_n\gtrsim\sigma$, so the reported error covers that electron's effect. For CXR the variance gate additionally refuses while the electron dominates $M_2$ ($M_4/M_2^2\approx1>V_{\max}$). The share cap is unchanged. With $\delta\to0$, $z/\sqrt\delta$ grows and the stability guard reduces to the RSE and share tests, which the decision cadence then supplies.
+
+**Limits of the reparametrisation.** No guard sees an unsampled class. On the #1252 1 MeV 15° captures, $k\le2$ with $\delta=0.1$ stops hBN at 3.3k with every guard passing (VOV 0.008 on the sampled prefix); the 25 % window at $k=3$ refuses it because the first heavy electrons arrive before 4k. That refusal is evidence on these captures, not a guarantee. The earliest stop is $d_k\approx n_{\min}(1+\delta)^k$, a statistical floor set by the policy, not by a transport quantity.
+
+**Batch means.** The realized $n$ electrons are split into $K=\min(20,n)$ contiguous batches of $n_b\in\{\lfloor n/K\rfloor,\lceil n/K\rceil\}$ electrons, independent of the chunks. With batch spectra $\bar S_b$, $S=\sum_b(n_b/n)\bar S_b$ holds exactly by linearity, and $\operatorname{Var}\bar S_b=\sigma^2/n_b$ gives the unbiased estimate $\hat\sigma^2=\sum_b n_b(\bar S_b-S)^2/(K-1)$ and $\widehat{\operatorname{Var}}S=\hat\sigma^2/n$. For equal batches this is $s(\{\bar S_b\})^2/K$. Brem batches partition $[0,N_{\rm brem})$ separately.
+
+The stopping generation `adaptive_sampling_model="decision-points-v4"` re-keys adaptive dataset identities, case content keys and provenance. The deprecated `block_histories` (a chunk-floor hint) is excluded from both identities.
 
 ### CXR variance sampling (v2, #1254)
 
@@ -72,9 +105,9 @@ For a regular variable population with finite fourth moment,
 $E_{\mathrm{var}}\simeq n/\kappa$ with kurtosis $\kappa$, so the gate passes
 near $n\simeq\kappa/V_{\max}$ without a floor in transport units.
 
-The stopping generation `adaptive_sampling_model="variance-threshold-v3"`
-participates in adaptive dataset identities, case content keys, and runtime
-provenance. Fixed-count identities retain their generation.
+The v3 stopping generation was `adaptive_sampling_model="variance-threshold-v3"`
+(#1262) and v2 was `"variance-contributors-v2"` (#1254); v4 (above)
+supersedes both. Fixed-count identities retain their generation.
 
 ## Sources
 
@@ -114,9 +147,9 @@ The target $r_n\le\varepsilon$ therefore implies $\mathrm{ESS}_n\ge 1/(\varepsil
 
 **Single dominant electron.** Add one value $h\gg\bar m$ to $n$ light electrons. The share is $h/(S_1+h)$. The running mean jumps by $\Delta\bar m\approx h/n$, so $\Delta\bar m/\bar m\approx h/(S_1+h)$. Also $r_n\approx h/(S_1+h)$ to leading order, because $S_2\approx h^2$ dominates. All three are the same quantity, so with a cap $c<\varepsilon$ and stability tolerance $f\varepsilon$ with $f<1$, a stop on a single dominant electron, or on the block it just arrived in, is refused. The run continues until more of its class are drawn or until $n_{\max}$.
 
-**Pilot projection.** For i.i.d. values $r_n\propto n^{-1/2}$, so the count reaching $\varepsilon$ from a pilot at $n_p$ is $N\approx n_p(r_{n_p}/\varepsilon)^2$. The projection only skips checks. The rule is re-applied at every block end from $N$ on, so the projection cannot stop a run that does not meet the rule.
+**Pilot projection.** For i.i.d. values $r_n\propto n^{-1/2}$, so the count reaching $\varepsilon$ from a pilot at $n_p$ is $N\approx n_p(r_{n_p}/\varepsilon)^2$. The projection only skips checks and adds $N$ to the decision points. The rule is re-applied at $N$ and every later point, so the projection cannot stop a run that does not meet the rule.
 
-**Per-bin batch means.** With the realized run split into $K$ equal batches $b$ of $B$ electrons, each batch spectrum $\bar S_b$ is an i.i.d. mean of $B$ electron spectra. So $s(\{\bar S_b\})/\sqrt K$ estimates the standard error of the run's mean spectrum per bin, which is the Glynn–Whitt batch-means estimator with independent batches. With normalization by the full count $n$, the batches satisfy $\sum_b (B/n)\bar S_b = S$, the run's spectrum, by linearity of the incoherent reduction.
+**Per-bin batch means.** (v4 partition and weighting: see the decision-point section above.) With the realized run split into $K$ equal batches $b$ of $B$ electrons, each batch spectrum $\bar S_b$ is an i.i.d. mean of $B$ electron spectra. So $s(\{\bar S_b\})/\sqrt K$ estimates the standard error of the run's mean spectrum per bin, which is the Glynn–Whitt batch-means estimator with independent batches. With normalization by the full count $n$, the batches satisfy $\sum_b (B/n)\bar S_b = S$, the run's spectrum, by linearity of the incoherent reduction.
 
 ## Assumptions
 
@@ -137,6 +170,18 @@ measurements of the new gate. Current v2 evidence follows separately.
 - **Zero signal.** A band with no lines gives $\bar m=0$, $r$ undefined. The rule never converges and the run ends `statistics_limited` at $n_{\max}$.
 
 ## Anchors
+
+v4 decision points (#1253):
+
+- `test_records_do_not_depend_on_chunk_size` (rule on a heavy-tailed population at chunks 1, 7, 100, 1000, 6000 and one per point: identical records) and the slow `test_adaptive_output_does_not_depend_on_chunk_size` (live hopg transport with energy spread at chunk floors 1, 7 and 64, including a stop cut inside a 64-electron chunk: identical realized count, statistics and output).
+- `test_decision_points_overshoot_at_most_their_growth` pins {eq}`eq-adaptive-decision-points`: end points, spacing $\le\lceil d(1+\delta)\rceil$, and the check-count bound.
+- `test_stability_guard_refuses_the_check_a_heavy_electron_arrives_at`: a single electron moving the mean by about 20 % at a 20 % target is refused at its arrival check and allowed at the next; without the guard the run stops at the arrival check.
+- `test_pilot_projection_skips_checks_until_the_projected_count`: the pilot count and the unrounded projection are decision points.
+- `test_energy_range_replay_rechecks_statistics_before_accepting_stop`: a failed realized-range recheck grows to the next decision point.
+- `tests/montecarlo/transport/test_independent_stopping.py` and `test_adaptive_cascades.py` cover the brem freeze (prefix re-transport) and cascades under chunked monitoring.
+- `checks/adaptive_decision_cadence_1253.py` (`adaptive_decision_cadence_1253_results.json`) replays the 12 #1252 captures: records are identical at five chunkings. Converged stops lie within $-0.5\,\%$ to $+7.4\,\%$ of a dense $\delta=0.01$ grid with the same window share, i.e. within $\delta$. The 30 MeV stops fall from 12k–192k (block rule, $B=3$k–$48$k) to 3 996, against 4 000 at $B=1$k. The 30 keV stops are 265k/625k (hBN 15°/60°) and 321k/625k (HOPG) against 258k–336k and 594k–672k for the block rule. The 1 MeV cases still run to the end of the capture or to $n_{\max}$.
+
+Earlier anchors (block rule, still valid where they do not name block ends):
 
 `tests/montecarlo/runner/test_adaptive_stopping.py`:
 

@@ -814,14 +814,14 @@ Usage: pyrite profile numerics adaptive-sampling [OPTIONS] COMMAND [ARGS]...
   Inspect and edit PROFILE's history-count mode: adaptive policy or fixed counts.
 
   Profiles without fixed history counts or a policy run adaptive by default (target RSE
-  0.05, 200-20000 histories, blocks of 100, line and bremsstrahlung). Each incoherent
-  case stops when the relative standard error of its line (and optionally
-  bremsstrahlung) yield meets the target and its heavy-tail guards pass, or at the
-  maximum count flagged statistics-limited. By default one count serves both
-  populations. --brem-target-rse enables independent brem-prefix stopping; line
-  transport continues until brem finishes. Coherent emission, physical detectors, GDF
-  beams, grooves and fixed history counts keep fixed counts. A history is one
-  transported primary electron with all its secondaries, pairs and positrons.
+  0.05, 200-20000 histories, line and bremsstrahlung). Each incoherent case stops when
+  the relative standard error of its line (and optionally bremsstrahlung) yield meets
+  the target and its heavy-tail guards pass, or at the maximum count flagged statistics-
+  limited. By default one count serves both populations. --brem-target-rse enables
+  independent brem-prefix stopping; line transport continues until brem finishes.
+  Coherent emission, physical detectors, GDF beams, grooves and fixed history counts
+  keep fixed counts. A history is one transported primary electron with all its
+  secondaries, pairs and positrons.
 
     enable   switch to adaptive: drop fixed counts, optionally customize
     set      customize fields of an adaptive policy
@@ -885,12 +885,14 @@ Options:
                                   Requires --brem-target-rse.  [x>=2]
   --target-rse FRACTION           Target relative standard error of each watched yield
                                   (0.05 = 5%).  [x>0.0]
-  --min-histories N               Smallest count at which the run may stop; a multiple
-                                  of --block-histories.  [x>=2]
+  --min-histories N               Smallest count at which the run may stop (default
+                                  100).  [x>=2]
   --max-histories N               Count at which the run stops regardless, flagged
                                   statistics-limited.  [x>=2]
-  --block-histories N             Histories per transport block; the rule is checked at
-                                  block ends.  [x>=1]
+  --block-histories N             Deprecated: transport chunk size hint; never changes
+                                  the stop or output.  [x>=1]
+  --decision-growth FRACTION      Relative spacing of the stopping-rule checks (default
+                                  0.1).  [x>0.0]
   --observable [cxr|brem|line]    Yield that must converge; repeat for both. Replaces
                                   the watched set (a new policy watches line and brem).
   --max-history-share FRACTION    Guard: largest share of a yield one history may hold
@@ -900,10 +902,11 @@ Options:
   --max-variance-of-variance VOV  CXR guard: largest VOV + 1/n = M4/M2^2 (default 0.01;
                                   0.1 is the MCNP/Geant4 convention; 1 disables).
                                   [0.0<x<=1.0]
-  --stability-blocks K            Guard: block ends whose running mean must agree; 0
+  --stability-checks K            Guard: last checks whose running mean must agree; 0
                                   disables (default 3).  [x>=0]
   --stability-fraction FRACTION   Guard: allowed relative mean drift as a fraction of
-                                  the target (default 0.5).  [x>=0.0]
+                                  the target, beyond the expected statistical drift
+                                  (default 0.5).  [x>=0.0]
   --pilot-histories N             Pilot count that projects the stopping count and skips
                                   checks until it.  [x>=1]
   --band-ev START,STOP            Monitor band in eV (default: the case's line band).
@@ -926,9 +929,9 @@ Usage: pyrite profile numerics adaptive-sampling reset [OPTIONS] NAME [target-rs
                                                        share|min-effective-
                                                        histories|max-variance-of-
                                                        variance|stability-
-                                                       blocks|stability-fraction|pilot-
-                                                       histories|band-ev|batch-means-
-                                                       band-ev]...
+                                                       checks|decision-growth|stability-
+                                                       fraction|pilot-histories|band-
+                                                       ev|batch-means-band-ev]...
 
   Reset optional FIELDs to defaults, or remove the policy when none are named.
 
@@ -950,9 +953,9 @@ Usage: pyrite profile numerics adaptive-sampling set [OPTIONS] NAME
   Create or update PROFILE's adaptive policy.
 
   Fields left unspecified keep the existing policy's values; a new policy takes them
-  from the default (target RSE 0.05, 200-20000 histories, blocks of 100, line and brem).
-  A profile with fixed counts is refused; switch it with 'pyrite profile numerics
-  adaptive-sampling enable'.
+  from the default (target RSE 0.05, 200-20000 histories, line and brem). A profile with
+  fixed counts is refused; switch it with 'pyrite profile numerics adaptive-sampling
+  enable'.
 
 Options:
   --brem-target-rse FRACTION      Stop brem independently at this RSE; requires both cxr
@@ -963,12 +966,14 @@ Options:
                                   Requires --brem-target-rse.  [x>=2]
   --target-rse FRACTION           Target relative standard error of each watched yield
                                   (0.05 = 5%).  [x>0.0]
-  --min-histories N               Smallest count at which the run may stop; a multiple
-                                  of --block-histories.  [x>=2]
+  --min-histories N               Smallest count at which the run may stop (default
+                                  100).  [x>=2]
   --max-histories N               Count at which the run stops regardless, flagged
                                   statistics-limited.  [x>=2]
-  --block-histories N             Histories per transport block; the rule is checked at
-                                  block ends.  [x>=1]
+  --block-histories N             Deprecated: transport chunk size hint; never changes
+                                  the stop or output.  [x>=1]
+  --decision-growth FRACTION      Relative spacing of the stopping-rule checks (default
+                                  0.1).  [x>0.0]
   --observable [cxr|brem|line]    Yield that must converge; repeat for both. Replaces
                                   the watched set (a new policy watches line and brem).
   --max-history-share FRACTION    Guard: largest share of a yield one history may hold
@@ -978,10 +983,11 @@ Options:
   --max-variance-of-variance VOV  CXR guard: largest VOV + 1/n = M4/M2^2 (default 0.01;
                                   0.1 is the MCNP/Geant4 convention; 1 disables).
                                   [0.0<x<=1.0]
-  --stability-blocks K            Guard: block ends whose running mean must agree; 0
+  --stability-checks K            Guard: last checks whose running mean must agree; 0
                                   disables (default 3).  [x>=0]
   --stability-fraction FRACTION   Guard: allowed relative mean drift as a fraction of
-                                  the target (default 0.5).  [x>=0.0]
+                                  the target, beyond the expected statistical drift
+                                  (default 0.5).  [x>=0.0]
   --pilot-histories N             Pilot count that projects the stopping count and skips
                                   checks until it.  [x>=1]
   --band-ev START,STOP            Monitor band in eV (default: the case's line band).

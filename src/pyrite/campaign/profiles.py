@@ -38,7 +38,12 @@ from .._numerics import (
     validate_profile_numerics,
 )
 from .._off_settings import OFF_VALUES
-from .._precision import Precision, _adaptive_sampling_markers, _brem_band_reduction_markers
+from .._precision import (
+    Precision,
+    _adaptive_sampling_markers,
+    _brem_band_reduction_markers,
+    identity_policy,
+)
 from ..materials.crystal import structure_factor_marker
 from ..materials.photon_cross_sections import ATTENUATION_MODEL
 from ..montecarlo.case import Case
@@ -587,7 +592,7 @@ def _identity_v1(
     # realized count do not participate in dataset identity.
     precision_payload = settings_payload.pop("precision", None)
     if precision_payload is not None:
-        resolved["adaptive_precision"] = precision_payload
+        resolved["adaptive_precision"] = identity_policy(precision_payload)
         settings_payload.pop("n_electrons", None)
         settings_payload.pop("n_electrons_brem", None)
     options = pop_identity_options(settings_payload)
@@ -761,7 +766,11 @@ def case_content_key(
             else _bremsstrahlung_identity_marker(bremsstrahlung_model)
         ),
         "case": _jsonable(
-            {key: value for key, value in case.items() if key not in _CONTENT_KEY_DENYLIST}
+            {
+                key: identity_policy(value) if key == "adaptive_precision" else value
+                for key, value in case.items()
+                if key not in _CONTENT_KEY_DENYLIST
+            }
         ),
     }
     payload.update(_adaptive_sampling_markers(case.get("adaptive_precision")))

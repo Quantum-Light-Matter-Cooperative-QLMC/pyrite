@@ -8,6 +8,10 @@ A capture ending before a decision is reported as exhausted, never as a
 converged or maximum-budget result. Full-capture CV is a finite-reference
 proxy, not the population truth. No transport runs here.
 
+Since #1253 the monitor decides at policy decision points, not at block ends;
+``adaptive_tail_1254_results.json`` records the v2 block rule and reproduces only at the
+revision it names. ``adaptive_decision_cadence_1253.py`` replays v3.
+
 Validation: adaptive-sample-size-stopping
 """
 

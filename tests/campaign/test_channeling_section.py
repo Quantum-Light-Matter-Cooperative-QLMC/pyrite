@@ -207,6 +207,7 @@ def test_channeling_demo_and_off_profile_identities_are_unchanged():
     #1262 re-mints it for variance-threshold-v3 (separate VOV threshold).
     #1243 re-mints them for the ``resonance-population`` default bandwidth
     (case payload) and its ``line_bandwidth_model`` digest marker.
+    #1253 re-mints it for decision-points-v4.
     """
     sweep, settings, cases = _profile_cases("silicon", "channeling_demo")
     assert cases[0].line_quadrature == "bin-mean"

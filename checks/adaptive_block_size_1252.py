@@ -37,6 +37,10 @@ not change decisions.
 cumulative/self tables). ``table`` summarizes ``*.json`` arm records under ``OUT_DIR``.
 
 Engineering evidence; no physics-validation claim.
+
+Since #1253 the monitor decides at policy decision points, not at block ends;
+``replay`` therefore reproduces the v2 block rule only at the revision its
+results name. ``adaptive_decision_cadence_1253.py`` replays v3.
 """
 
 import json
