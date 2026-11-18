@@ -99,3 +99,48 @@ def test_population_wide_adaptive_outputs_are_refused(monkeypatch, extra, policy
 
 def test_plain_adaptive_case_is_live_streamable():
     assert streaming_refusal(_requested(), live=True) is None
+
+
+def _no_headroom(monkeypatch):
+    """No headroom for adaptive kept rows only; transport batches still fit."""
+    from types import SimpleNamespace
+
+    from pyrite.montecarlo.runner import host_admission
+    from pyrite.montecarlo.transport.host_memory import HostMemoryResourceError
+
+    def refuse(required, phase):
+        if required > 0:
+            raise HostMemoryResourceError(phase, required, 0)
+
+    fake = SimpleNamespace(host_headroom_bytes=lambda: 0, admit_host_allocation=refuse)
+    monkeypatch.setattr(host_admission, "host_memory", fake)
+
+
+@pytest.mark.slow
+def test_run_case_switches_to_streamed_when_retained_rows_exceed_headroom(monkeypatch):
+    """Scans (``run_case``/``run_cases``) stream adaptive cases that would not fit (#1280)."""
+    case = _requested()
+    reference = _retained(case)
+    _no_headroom(monkeypatch)
+    with pytest.warns(RuntimeWarning, match="streamed adaptive"):
+        out = runner.run_case(case, transport_core="per-electron")
+    assert out["_adaptive_route"]["route"] == "streamed"
+    assert out["adaptive_sampling"] == reference["adaptive_sampling"]
+    for key in SPECTRA:
+        scale = np.abs(reference[key]).max()
+        np.testing.assert_allclose(
+            out[key], reference[key], rtol=1e-12, atol=1e-14 * scale, err_msg=key
+        )
+
+
+@pytest.mark.parametrize(
+    ("env", "policy"),
+    [("off", {}), ("auto", {"batch_means_band_eV": (1000.0, 10000.0)})],
+)
+def test_route_switch_off_or_refused_keeps_the_admission_refusal(monkeypatch, env, policy):
+    from pyrite.montecarlo.transport.host_memory import HostMemoryResourceError
+
+    monkeypatch.setenv("PYRITE_STREAMED_ADAPTIVE", env)
+    _no_headroom(monkeypatch)
+    with pytest.raises(HostMemoryResourceError):
+        runner.run_case(_requested(**policy), transport_core="per-electron")

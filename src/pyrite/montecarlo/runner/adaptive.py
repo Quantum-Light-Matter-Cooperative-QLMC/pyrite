@@ -787,15 +787,22 @@ def transport_case_adaptive(
     from .independent import case_stopping_monitor
 
     monitor = case_stopping_monitor(loop_case, settings)
-    transport = runner._transport_case(
-        loop_case,
-        record_timing,
-        transport_core=core,
-        keep_segments_on_device=keep_segments_on_device,
-        block_electrons=AdaptiveChunkPlan.for_core(core, settings.block_histories),
-        block_monitor=monitor,
-        block_consumer=block_consumer,
-    )
+    from .host_admission import StreamedAdaptiveRoute, streamed_route_enabled
+
+    monitor.stream_route = block_consumer is None and streamed_route_enabled(case)
+    try:
+        transport = runner._transport_case(
+            loop_case,
+            record_timing,
+            transport_core=core,
+            keep_segments_on_device=keep_segments_on_device,
+            block_electrons=AdaptiveChunkPlan.for_core(core, settings.block_histories),
+            block_monitor=monitor,
+            block_consumer=block_consumer,
+        )
+    except StreamedAdaptiveRoute as route:
+        # The spectrum phase reruns the case streamed (runner.recovery).
+        return {STREAMED_ROUTE_KEY: route, "transport_core": core}
     statistics = monitor.record()
     statistics["transport_core"] = core
     transport["adaptive_sampling"] = statistics
@@ -803,6 +810,10 @@ def transport_case_adaptive(
     if statistics["statistics_limited"]:
         warn_statistics_limited(case, settings, statistics)
     return transport
+
+
+#: Transport key marking a retained adaptive run that must stream instead (#1280).
+STREAMED_ROUTE_KEY = "_streamed_adaptive_route"
 
 
 def warn_statistics_limited(case, settings: Precision, statistics: Mapping[str, Any]) -> None:

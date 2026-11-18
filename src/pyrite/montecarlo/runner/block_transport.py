@@ -297,6 +297,7 @@ def transport_monitored_blocks(
     recheck: bool = False,
     consume: Callable[[dict[str, Any]], None] | None = None,
     recovery=None,
+    stream_route: bool = False,
 ) -> dict[str, Any]:
     """Transport ``[0, n)`` in chunks under a stopping monitor; return the fixed-``n`` join.
 
@@ -317,11 +318,15 @@ def transport_monitored_blocks(
     each chunk and the join, so a resident allocator OOM moves the kept chunks
     to the host and reruns only the failed chunk (#1269).
 
+    ``stream_route`` (#1280): when the kept-bytes projection exceeds host
+    headroom, raise :class:`.host_admission.StreamedAdaptiveRoute` instead of
+    refusing.
+
     Validation: adaptive-sample-size-stopping
     """
     from .host_admission import AdaptiveHostAdmission
 
-    admission = AdaptiveHostAdmission(limit)
+    admission = AdaptiveHostAdmission(limit, stream=stream_route and consume is None)
     blocks: list[dict[str, Any]] = []
 
     def simulate(start, stop):
@@ -452,6 +457,8 @@ def transport_case_blocks(
     """
     n_electrons = int(E_cut_by_electrons.size)
     cascade = case.get("secondary_threshold_eV") is not None
+    # Only a retained (kept-chunk) monitored run may switch route (#1280).
+    stream_route = consume is None and getattr(monitor, "stream_route", False)
     if cascade and consume is None and monitor is None:
         # A joined block cascade would need nested metadata, cross-references
         # and generation ordering merged across blocks; only streaming exists.
@@ -538,6 +545,7 @@ def transport_case_blocks(
             recheck=recheck,
             consume=sink,
             recovery=None if cascade else recovery,
+            stream_route=stream_route,
         )
 
     result = monitored(n_electrons)
