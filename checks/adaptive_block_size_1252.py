@@ -238,14 +238,31 @@ class Memory:
         free, self.total = CUPY.cuda.runtime.memGetInfo()
         self.card_base = self.card_peak = self.total - free
         self.reserved_peak = self.used_peak = 0
+        self.window_used_peak = 0
 
     def _sample(self):
         free, _ = CUPY.cuda.runtime.memGetInfo()
         card = self.total - free
         self.card_peak = max(self.card_peak, card)
         self.reserved_peak = max(self.reserved_peak, self.pool.total_bytes())
-        self.used_peak = max(self.used_peak, self.pool.used_bytes())
+        used = self.pool.used_bytes()
+        self.used_peak = max(self.used_peak, used)
+        self.window_used_peak = max(self.window_used_peak, used)
         self.by_phase[self.phase] = max(self.by_phase.get(self.phase, 0), card)
+
+    def window_start(self) -> int:
+        """Pool bytes in use now; the window peak restarts from them (#1253)."""
+        if self.pool is None:
+            return 0
+        used = self.pool.used_bytes()
+        self.window_used_peak = used
+        return used
+
+    def window_peak(self) -> int:
+        if self.pool is None:
+            return 0
+        self.window_used_peak = max(self.window_used_peak, self.pool.used_bytes())
+        return self.window_used_peak
 
     def _run(self):
         while not self._stop.wait(0.005):
@@ -350,6 +367,7 @@ def instrument(timers, values, on_values=None):
         def transport_monitored_blocks(simulate_block, plan, monitor, *args, **kwargs):
             def simulate(start, stop):
                 _sync()
+                used0 = timers.memory.window_start()
                 t0 = time.perf_counter()
                 timers.memory.phase = "transport.simulate"
                 block = simulate_block(start, stop)
@@ -362,6 +380,10 @@ def instrument(timers, values, on_values=None):
                         "stop": stop,
                         "simulate_s": time.perf_counter() - t0,
                         "rows": rows,
+                        # Pool bytes this chunk adds over what earlier kept
+                        # chunks already hold (5 ms sampling plus end points).
+                        "pool_used_before_B": used0,
+                        "pool_simulate_peak_B": timers.memory.window_peak() - used0,
                     }
                 )
                 return block
@@ -373,7 +395,11 @@ def instrument(timers, values, on_values=None):
                 t0 = time.perf_counter()
                 real_on_block(start, stop, block)
                 _sync()
-                timers.blocks[-1]["measure_s"] = time.perf_counter() - t0
+                record = timers.blocks[-1]
+                record["measure_s"] = time.perf_counter() - t0
+                record["pool_chunk_peak_B"] = (
+                    timers.memory.window_peak() - record["pool_used_before_B"]
+                )
                 timers.memory.phase = "transport.simulate"
 
             monitor.on_block = on_block
