@@ -94,8 +94,12 @@ def test_matched_grid_keeps_policy_spacing_on_the_fixed_band():
     np.testing.assert_array_equal(filled[1 : 1 + (short > 500).sum()], short[short > 500])
 
 
-@pytest.mark.parametrize("name", ["sinc", "sinc-bin", "measured", "measured-bin", "measured-local"])
+@pytest.mark.parametrize(
+    "name", ["sinc", "sinc-bin", "measured", "measured-bin", "measured-bin-x8", "measured-local"]
+)
 def test_policy_case_attaches_the_production_payload(name):
+    from pyrite._cxr_grid_policy import default_resolution_policy
+
     gate = _gate()
     sweep = gate["scene_sweep"]("hopg", 30.0, 20000.0)
     frozen = {"Ne": 8, "seed": 642501, "crystal": "hopg"}
@@ -103,9 +107,25 @@ def test_policy_case_attaches_the_production_payload(name):
     payload = case["line_grid_policy"]
     selectors = gate["POLICY_ARMS"][name]
     assert payload["bandwidth"]["policy"] == selectors.get("bandwidth", "kinematic-ceiling")
-    assert payload["resolution"]["policy"] == selectors.get("resolution", "sinc-nyquist")
+    expected = default_resolution_policy(
+        bandwidth=payload["bandwidth"]["policy"], quadrature=selectors.get("quadrature", "node")
+    )
+    assert payload["resolution"]["policy"] == selectors.get("resolution", expected)
     assert case["line_quadrature"] == selectors.get("quadrature", "node")
     assert case["seed"] == 642501 and case["Ne"] == 8
+
+
+def test_policy_case_passes_the_energy_loss_cap_to_the_default_bandwidth():
+    """A capped arm keeps kinematic-ceiling, as production ``build_cases`` does (#1214)."""
+    gate = _gate()
+    sweep = gate["scene_sweep"]("hopg", 30.0, 20000.0)
+    selectors = gate["POLICY_ARMS"]["sinc-x8"]
+    capped = {"Ne": 8, "seed": 642501, "crystal": "hopg", "max_dE_frac": 2.5e-4}
+    uncapped = {key: value for key, value in capped.items() if key != "max_dE_frac"}
+    policy = gate["policy_case"](capped, sweep, selectors)["line_grid_policy"]
+    assert policy["bandwidth"]["policy"] == "kinematic-ceiling"
+    policy = gate["policy_case"](uncapped, sweep, selectors)["line_grid_policy"]
+    assert policy["bandwidth"]["policy"] == "resonance-population"
 
 
 def test_window_mass_integrates_the_node_interpolant_exactly():
@@ -491,3 +511,49 @@ def test_score_families_components_record_terms_and_brem_on_one_axis(monkeypatch
         gate["score_families"](
             *args[:3], [1, "tol1e-3"], *args[4:], quadrature="bin-mean", components=True
         )
+
+
+def test_oversampled_sinc_arm_splits_every_resolved_step(monkeypatch):
+    """``sinc-xK`` keeps the production support and divides its step by K (#1214)."""
+    import pyrite.energy_grid.bandwidth_check as bandwidth_check
+    import pyrite.energy_grid.convergence_case as convergence_case
+    import pyrite.montecarlo.runner.cxr_grid as cxr_grid
+
+    gate = _gate()
+    module = gate["score_policies"].__globals__
+    resolved = np.linspace(50.0, 12050.0, 16001)  # 0.75 eV production step
+
+    def line(grid):
+        return np.exp(-(((np.asarray(grid) - 3000.0) / 2.0) ** 2))
+
+    class Ladder:
+        def __init__(self, case, transport=None):
+            self.case = case
+
+        def lines(self, grid):
+            return line(grid)
+
+    record = {"resolution_policy": "sinc-nyquist", "target_spacing_eV": 0.75}
+    record["actual_spacing_eV"] = 0.75
+    monkeypatch.setattr(cxr_grid, "resolve_cxr_grid", lambda *a: (resolved, dict(record)))
+    monkeypatch.setattr(convergence_case, "CaseLadder", Ladder)
+    monkeypatch.setattr(bandwidth_check, "_piecewise", lambda lines, grid: lines(grid))
+    payload = {
+        "line_grid_policy": {"resolution": {"max_spacing_eV": 3.0}},
+        "line_quadrature": "node",
+    }
+    monkeypatch.setitem(module, "policy_case", lambda case, sweep, sel: dict(case, **payload))
+    tp = {"segs": None, "n_hat": None, "Ne_lines": 1, "E_grid": [0.0]}
+    out = gate["score_policies"](
+        {}, None, type("L", (), {"transport": tp})(), ["sinc", "sinc-x8"], 0.046875, lambda: None
+    )
+    base, fine = out["policies"]
+    assert base["native"]["nodes"] == resolved.size
+    assert fine["native"]["nodes"] == (resolved.size - 1) * 8 + 1
+    assert fine["native"]["support_eV"] == base["native"]["support_eV"]
+    assert fine["record"]["actual_spacing_eV"] == pytest.approx(0.75 / 8)
+    assert fine["record"]["oversampling"] == 8
+    np.testing.assert_allclose(fine["matched"]["max_spacing_eV"], 0.75 / 8, rtol=1e-4)
+    # Finer step moves the measured shape toward the reference, not away.
+    err = [abs(r["native"]["versus_reference"]["dominant_fwhm_eV"]) for r in (base, fine)]
+    assert err[1] < err[0]

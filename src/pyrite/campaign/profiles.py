@@ -449,9 +449,11 @@ def _model_generation_markers(emission: str) -> dict[str, Any]:
     else:
         # The automatic line bandwidth became resonance-population (#1243);
         # coherent runs keep kinematic-ceiling and their digests.
-        from .._cxr_grid_policy import LINE_BANDWIDTH_DEFAULT_MODEL
+        from .._cxr_grid_policy import LINE_BANDWIDTH_DEFAULT_MODEL, LINE_RESOLUTION_DEFAULT_MODEL
 
         markers["line_bandwidth_model"] = LINE_BANDWIDTH_DEFAULT_MODEL
+        # The automatic line step became sinc-oversampled (#1214).
+        markers["line_resolution_model"] = LINE_RESOLUTION_DEFAULT_MODEL
     # Every photon-escape factor reads the narrow-beam mu, sourced from
     # EPDL2025 since issue #274 (was Chantler f2 + Elam).
     markers["attenuation_model"] = ATTENUATION_MODEL

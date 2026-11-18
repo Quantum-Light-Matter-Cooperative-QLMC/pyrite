@@ -43,7 +43,7 @@ def test_help_lists_selectors_defaults_combinations_and_identity():
     assert_clean_result(group)
     for text in (
         "resonance-population | kinematic-ceiling",
-        "sinc-nyquist | resonance-local | sinc-shape",
+        "sinc-oversampled | sinc-nyquist | resonance-local | sinc-shape",
         "node | bin-mean",
         "resonance-local and sinc-shape require bandwidth resonance-population (the default) and",
         "identity",
@@ -53,7 +53,7 @@ def test_help_lists_selectors_defaults_combinations_and_identity():
     setting = invoke(root_command, ["profile", "numerics", "cxr-grid", "set", "--help"])
     assert_clean_result(setting)
     flat = " ".join(setting.stdout.split())
-    for default in ("resonance-population", "sinc-nyquist", "node"):
+    for default in ("resonance-population", "sinc-oversampled", "node"):
         assert f"Default {default}." in flat
 
     root = invoke(root_command, ["profile", "--help"])
@@ -76,7 +76,7 @@ def test_show_reports_explicit_effective_and_grid_source(catalog):
     assert payload["explicit"] is None
     assert {row["key"]: (row["effective"], row["source"]) for row in payload["fields"]} == {
         "bandwidth": ("resonance-population", "built-in default"),
-        "resolution": ("sinc-nyquist", "built-in default"),
+        "resolution": ("sinc-oversampled", "built-in default"),
         "quadrature": ("node", "built-in default"),
     }
     assert payload["grid_source"]["automatic_for_every_case"] is False
@@ -265,3 +265,18 @@ def test_emission_and_numerics_edits_respect_an_existing_policy(catalog):
     assert substeps.exit_code == 1
     assert "bin-mean quadrature is incompatible with a positive max_dE_frac" in substeps.stderr
     assert _profile_file(catalog, "high_energy") == before
+
+
+def test_effective_resolution_follows_quadrature_and_bandwidth():
+    """The editor's effective resolution is the resolver's default (#1214)."""
+    from pyrite.campaign.profile_cxr_grid import cxr_grid_fields
+
+    def effective(policy):
+        return {row["key"]: row["effective"] for row in cxr_grid_fields(policy)}["resolution"]
+
+    assert effective({}) == "sinc-oversampled"
+    assert effective({"quadrature": "bin-mean"}) == "sinc-shape"
+    assert effective({"quadrature": "bin-mean", "bandwidth": "kinematic-ceiling"}) == (
+        "sinc-oversampled"
+    )
+    assert effective({"windows": True}) == "sinc-nyquist"

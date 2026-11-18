@@ -141,7 +141,8 @@ Ordinary runs need no preparation batch. Automatic line grids stop where the
 case's own resonance population leaves at most 1e-4 of the line yield above
 the axis (`resonance-population`, the default since #1243), never above the
 closed-form kinematic bandwidth capped by kinetic energy and the Chantler
-coupling-data limit (about 966 keV); spacing is the measured sinc spacing.
+coupling-data limit (about 966 keV); spacing is the measured sinc-Nyquist step
+divided by 8 (`sinc-oversampled`, the default since #1214).
 Cases with feature windows, coherent emission, channeling, transition
 radiation, mixed transport or a positive `max_dE_frac`, and
 cases whose measured axis fails its post-transport truncation audit (rescored

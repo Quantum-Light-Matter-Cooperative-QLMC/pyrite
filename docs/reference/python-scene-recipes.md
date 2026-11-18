@@ -252,6 +252,22 @@ it. Coherent emission, temporal profiles, channeling, `max_dE_frac > 0`, two-bea
 transition radiation and pixel detectors are refused. See
 [Line-scoring roulette](../computation/statistical-methods.md#line-scoring-roulette).
 
+## Line-axis resolution
+
+The automatic CXR line axis defaults to `"sinc-oversampled"`: the measured
+sinc-Nyquist step divided by 8, which converges line peak height and FWHM.
+When that axis exceeds the point budget, the run refuses before transport and
+names the coarser opt-out, which keeps line area but not line shape:
+
+```python
+area_only = pr.Numerics(line_resolution="sinc-nyquist")
+```
+
+`None` (the default) keeps `"sinc-oversampled"` and leaves case identity
+unchanged; an explicit value enters it. `line_resolution` cannot be combined
+with an explicit `EnergyBins(cxr=...)` grid. See
+[Energy-grid semantics](../physics/radiation-physics/energy-grid-semantics.md).
+
 ## Scalar detector acceptance
 
 Use angular spans for a central-direction detector, or physical size and

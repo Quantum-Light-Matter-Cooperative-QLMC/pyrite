@@ -956,8 +956,7 @@ def _auditable_policy(case, payload):
             f"{case['name']}: the resonance-population bandwidth cannot measure "
             "channeling, transition-radiation or mixed-transport cases, whose "
             "spectra its truncation audit does not see; use kinematic-ceiling "
-            "(with sinc-nyquist resolution: resonance-local and sinc-shape need "
-            "the measured bandwidth)"
+            "(resonance-local resolution needs the measured bandwidth)"
         )
     return payload
 

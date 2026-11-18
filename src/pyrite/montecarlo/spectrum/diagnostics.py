@@ -81,23 +81,47 @@ def sinc_feature_spacing(
 
 
 def sinc_feature_samples(segments, n_hat, *, electron_limit=None):
-    """Valid per-row ``(first-zero width [eV], t_L**2 weight)`` of :func:`sinc_feature_spacing`.
+    """Valid ``(first-zero width [eV], t_L**2 weight)`` of :func:`sinc_feature_spacing`.
 
-    Elementwise in the rows, in row order, so the samples of consecutive
-    whole-electron blocks concatenate to those of the joined population
-    (#1001).
+    One sample per scored line: per row, or per physical flight where rows
+    share an ``(owner, flight_id)`` key. The flight-grouped reduction adds a
+    flight's substep fields coherently (``cxr/_setup.py::_flight_groups``), so
+    its line is one ``sinc^2`` whose phase rate is the sum of the substeps':
+    first-zero width ``2 pi hbar c / sum_i kappa_i t_i`` and weight
+    ``(sum_i t_i)**2`` (#1214). Substep widths would instead read the
+    energy-loss cap's step length, not the line. One-row flights reduce to the
+    per-row samples exactly. Flights never span whole-electron blocks, so the
+    samples of consecutive blocks still concatenate to those of the joined
+    population (#1001); within a block they are in row or flight order.
     """
     energy_field = "E_repr_keV" if segments.get("E_repr_keV") is not None else "E_keV"
     energy = _host(segments[energy_field]).astype(float, copy=False)
     length = _host(segments["L_ang"]).astype(float, copy=False)
     direction = _host(segments["v_hat"]).astype(float, copy=False)
+    keys = None
+    if segments.get("flight_id") is not None:
+        track = segments.get("track_id")
+        keys = (
+            _host(segments["elec_id"] if track is None else track),
+            _host(segments["flight_id"]),
+        )
     if electron_limit is not None:
         line = _host(segments["elec_id"]) < int(electron_limit)
         energy, length, direction = energy[line], length[line], direction[line]
+        if keys is not None:
+            keys = (keys[0][line], keys[1][line])
 
     beta = beta_from_keV(energy)
     t_L = length / beta
     denominator = 1.0 - beta * (direction @ np.asarray(n_hat, dtype=float))
+    if keys is not None:
+        # Invalid kinematics drop row by row, as without grouping, before any
+        # flight sums them.
+        row = np.isfinite(t_L) & np.isfinite(denominator) & (t_L > 0.0) & (denominator > 0.0)
+        grouped = _flight_sums(keys[0][row], keys[1][row], (denominator * t_L)[row], t_L[row])
+        if grouped is not None:
+            phase, t_L = grouped
+            denominator = phase / t_L
     width = 2.0 * np.pi * HBARC_EV_ANG / (denominator * t_L)
     weight = t_L * t_L
     valid = (
@@ -108,6 +132,21 @@ def sinc_feature_samples(segments, n_hat, *, electron_limit=None):
         & (denominator > 0.0)
     )
     return width[valid], weight[valid]
+
+
+def _flight_sums(owner, flight, phase, t_L):
+    """Per-flight ``(sum phase, sum t_L)``, or None when every flight is one row."""
+    if flight.size == 0:
+        return None
+    order = np.lexsort((flight, owner))
+    owner, flight = owner[order], flight[order]
+    first = np.empty(flight.size, dtype=bool)
+    first[0] = True
+    first[1:] = (flight[1:] != flight[:-1]) | (owner[1:] != owner[:-1])
+    if first.all():
+        return None
+    starts = np.flatnonzero(first)
+    return np.add.reduceat(phase[order], starts), np.add.reduceat(t_L[order], starts)
 
 
 def sinc_spacing_from_samples(samples, *, aliased_weight_limit=0.01):

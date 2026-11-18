@@ -31,7 +31,7 @@ from dataclasses import asdict, dataclass
 
 import numpy as np
 
-from pyrite._cxr_grid_policy import AUTOMATIC_RESOLUTION_POLICY, COVERAGE_BANDWIDTH_POLICY
+from pyrite._cxr_grid_policy import COVERAGE_BANDWIDTH_POLICY, NYQUIST_RESOLUTION_POLICY
 from pyrite._util.io import atomic_write_json
 from pyrite.campaign.config import material_sweep
 from pyrite.campaign.sweep import _unique_angles, build_cases
@@ -511,7 +511,8 @@ def derive_bounds(
                 "raw_eV": driver.coverage_energy_eV,
             },
             resolution={
-                "policy": AUTOMATIC_RESOLUTION_POLICY,
+                # Catalog grids are derived at the sinc-Nyquist step.
+                "policy": NYQUIST_RESOLUTION_POLICY,
                 "num": num,
                 "target_spacing_eV": resolution_driver.target_spacing_eV,
                 "aliased_weight_limit": ALIASED_WEIGHT_LIMIT,
