@@ -17,6 +17,8 @@ Validation: line-hkl-batch
 import numpy as np
 from numba import njit, prange
 
+from ...._backend import xp
+
 _PI = np.pi
 
 
@@ -47,8 +49,6 @@ def _sincsq_reduce(E_r, a_width, weights, E_grid, out):  # pragma: no cover - nu
 
 def numpy_backend() -> bool:
     """True when the spectrum array namespace is NumPy (CPU scoring)."""
-    from ...._backend import xp
-
     return getattr(xp, "__name__", "") == "numpy"
 
 

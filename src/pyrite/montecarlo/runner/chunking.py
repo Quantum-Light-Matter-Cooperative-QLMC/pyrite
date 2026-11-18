@@ -3,11 +3,12 @@
 from collections.abc import Callable
 from contextlib import contextmanager
 from dataclasses import dataclass
+from importlib import import_module
 
 import numpy as np
 import psutil
 
-from ..._backend import _GPU, BACKEND
+from ..._backend import _GPU, BACKEND, NumPyBackend
 from ..._util.env import env_value
 from .. import spectrum as _spectrum_mod
 from .._resources import admitted_chunk, resolve_resource_policy
@@ -196,15 +197,67 @@ def _real_itemsize() -> int:
     return np.dtype(_spectrum_mod.REAL).itemsize
 
 
+_SPECTRUM_BACKEND_MODULES = (
+    "_characteristic_fused",
+    "brem",
+    "brem_bremslib",
+    "brem_events",
+    "brem_fallbacks",
+    "brem_prepared",
+    "channeling_flux",
+    "characteristic",
+    "coherent_population",
+    "cxr",
+    "cxr._attribution",
+    "cxr._batched",
+    "cxr._batched_finalize",
+    "cxr._bin_quadrature",
+    "cxr._coverage",
+    "cxr._cpu_reduce",
+    "cxr._escape_mu",
+    "cxr._formation",
+    "cxr._fused",
+    "cxr._grouped",
+    "cxr._kernels",
+    "cxr._line_tables",
+    "cxr._mosaic_sampled",
+    "cxr._per_hkl",
+    "cxr._position_twins",
+    "cxr._recoil",
+    "cxr._setup",
+    "cxr._spectrum",
+    "cxr._temporal",
+    "diffracted_brem",
+    "diffracted_characteristic",
+    "optical_finite_screen",
+    "segment_escape",
+)
+
+
 @contextmanager
 def _cpu_spectrum_backend():
-    """Temporarily execute spectrum helpers with NumPy in the driver."""
+    """Switch every spectrum binding, including lazy modules, in the serial driver.
 
-    previous = (_RESOURCE_POLICY.gpu, _spectrum_mod.xp, _spectrum_mod.REAL)
-    _RESOURCE_POLICY.gpu = False
-    _spectrum_mod.xp = np
-    _spectrum_mod.REAL = np.float64
+    The static import guard keeps this list complete as modules are added.
+    Kernels remain lazy; CPU dispatch never
+    enters their device caches. Transport keeps its original backend.
+    """
+    modules = [_spectrum_mod]
+    modules.extend(
+        import_module(_spectrum_mod.__name__ + "." + name) for name in _SPECTRUM_BACKEND_MODULES
+    )
+    replacements = {"xp": np, "REAL": np.float64, "BACKEND": NumPyBackend()}
+    previous = []
+    gpu = _RESOURCE_POLICY.gpu
     try:
+        _RESOURCE_POLICY.gpu = False
+        for module in modules:
+            for name, value in replacements.items():
+                if name in vars(module):
+                    previous.append((module, name, getattr(module, name)))
+                    setattr(module, name, value)
         yield
     finally:
-        _RESOURCE_POLICY.gpu, _spectrum_mod.xp, _spectrum_mod.REAL = previous
+        for module, name, value in reversed(previous):
+            setattr(module, name, value)
+        _RESOURCE_POLICY.gpu = gpu
