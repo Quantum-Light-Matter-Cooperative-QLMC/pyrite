@@ -4,6 +4,7 @@ Usage:
   fourier_reduction_phases_1296.py capture MATERIAL E0_KEV TILT_DEG HISTORIES OUT_DIR
   fourier_reduction_phases_1296.py bench OUT_DIR [REPEATS]
   fourier_reduction_phases_1296.py variants|variants2 OUT_DIR [REPEATS]
+  fourier_reduction_phases_1296.py margins OUT_JSON [SCENES [HISTORIES [SEED [SPACINGS]]]]
 
 ``capture`` resolves one case of the ``PROFILE`` catalog profile (default
 ``cleo_sub_1281``; profile, beam and detector come from the user config
@@ -33,6 +34,15 @@ thresholds) replays the same flushes for candidate fixes (record
 racy non-atomic spreading (a diagnostic cost bound, its error is meaningless);
 direct rectangles with FP64 range reduction and FP32 ``sincosf``; a fused
 envelope-image kernel; and NUFFT/direct thresholds of 2^20 and 2^24 pairs.
+
+``margins`` transports each #1143 frozen scene (``defaults_spectral_gate_642``
+case pins: HOPG 30 keV/2 um, silicon 300 keV/10 um, MoS2-on-Si, HOPG with
+the exact MC mosaic at 4 nodes) plus a mos2 30 keV/15 deg slab once, then
+scores bin-mean line spectra on uniform 0.5-10 keV axes through the current
+device route and the ``fourier-auto-v5`` route (``eps=1e-12``, FP64 direct)
+on that same transport, and compares them on the #1143 margins (yield,
+centroid, peak, FWHM, 100 eV band mass) with the gate's own ``metrics`` and
+``versus``.
 
 Remote only (GPU). Engineering evidence for ``cxr-line-fourier-reduction``;
 no accuracy verdict against the #1143 margins (those need full spectra).
@@ -453,7 +463,7 @@ def _positive(E_res, a_width, weight, c0, period, *, eps, opts, clock, work):
     else:
         rects = cp.asnumpy(cutoff_rectangle_array(counts, xp=cp))
     modes, sources = rects[:, 1] - rects[:, 0], rects[:, 3] - rects[:, 2]
-    min_work = opts.get("min_work", fc._NUFFT_MIN_WORK)
+    min_work = opts.get("min_work", fc._NUFFT_MIN_WORK["fp64"])
     large = (sources >= 64) & (modes >= 32) & (sources * modes >= min_work)
     clock.mark("plan")
     work.update(
@@ -624,13 +634,28 @@ def bench(out_dir, repeats=3, arm_set="bench"):
         E, a, w = (cp.asarray(z[k]) for k in ("E_res", "a_width", "weight"))
         c0, h, n_bins = z["axis"].tolist()
         axis = (c0, h, int(n_bins))
-        ref = cp.asnumpy(cuda_fourier_bin_mean_reduce(E, a, w, axis))  # warm + reference
+        v5 = {"eps": 1e-12, "direct_precision": "fp64"}  # the fourier-auto-v5 reference
+        ref = cp.asnumpy(cuda_fourier_bin_mean_reduce(E, a, w, axis, **v5))  # warm + reference
+        _sync()
+        t0 = time.perf_counter()
+        for _ in range(repeats):
+            cuda_fourier_bin_mean_reduce(E, a, w, axis, **v5)
+        _sync()
+        production_s = (time.perf_counter() - t0) / repeats
+        current = cp.asnumpy(cuda_fourier_bin_mean_reduce(E, a, w, axis))  # warm current default
         _sync()
         t0 = time.perf_counter()
         for _ in range(repeats):
             cuda_fourier_bin_mean_reduce(E, a, w, axis)
         _sync()
-        production_s = (time.perf_counter() - t0) / repeats
+        current_s = (time.perf_counter() - t0) / repeats
+        print(
+            "current_default",
+            path.name,
+            f"{current_s:.3f}s vs v5 {production_s:.3f}s",
+            _errors(current, ref),
+            flush=True,
+        )
         arms = []
         for name, opts in ARM_SETS[arm_set]:
             eps = opts.get("eps", 1e-12)
@@ -660,6 +685,8 @@ def bench(out_dir, repeats=3, arm_set="bench"):
                 lines=int(E.size),
                 axis=list(axis),
                 production_wall_s=production_s,
+                current_default_wall_s=current_s,
+                current_default_error=_errors(current, ref),
                 production_ns_per_line=1e9 * production_s / int(E.size),
                 arms=arms,
             )
@@ -676,10 +703,132 @@ def bench(out_dir, repeats=3, arm_set="bench"):
         )
 
 
+# --------------------------------------------------------------------- margins
+
+#: #1143 frozen scenes (``defaults_spectral_gate_642.py``) plus mos2 30 keV/15 deg.
+SCENES = {
+    "hopg": ("hopg", 30.0, 45.0, 20000.0, None),
+    "silicon": ("silicon", 300.0, 45.0, 100000.0, None),
+    "mos2-on-si": ("mos2-on-si", 30.0, 45.0, None, None),
+    "hopg-mosaic": ("hopg", 30.0, 45.0, 20000.0, 4),
+    "mos2-15deg": ("mos2", 30.0, 15.0, 5000.0, None),
+}
+
+
+def _scene_case(gate, name, histories, seed):
+    from pyrite._energy_grid_encoding import encode_energy_grid
+    from pyrite.energy_grid.convergence_case import build_ladder_case
+
+    material, energy, tilt, thickness, _ = SCENES[name]
+    if material == "mos2-on-si":
+        case = gate["layered_case"](histories, seed)
+    else:
+        case = build_ladder_case(
+            material, energy, tilt, 180, thickness_ang=thickness, n_electrons=histories, seed=seed
+        )
+    case.pop("line_grid_policy", None)
+    carrier = encode_energy_grid(gate["axis"](500, 10000, 3, "node"))
+    case.update(
+        E_grid=carrier,
+        E_grid_line=carrier,
+        line_quadrature="node",
+        emission="incoherent",
+        transport_mode="single-scattering",
+        transport_precision="fp64",
+        max_dE_frac=0.0,
+        inelastic_model="shell-soft-hard",
+        inelastic_cutoff_eV=50.0,
+        straggling=False,
+        elastic_model="elsepa",
+        bremsstrahlung_model="bremslib",
+        radiative_model="bremslib-soft-hard",
+        radiative_cutoff_eV=1000.0,
+        atomic_electron_deflection="kawrakow",
+    )
+    return case
+
+
+def margins(out_json, scenes="all", histories=64, seed=642501, spacings="0.375,3"):
+    """v6 default vs the v5 route on one transport per scene, #1143 margins."""
+    import functools
+
+    from pyrite.energy_grid.convergence_case import CaseLadder
+    from pyrite.montecarlo.spectrum.cxr import _fourier_cuda as fc
+
+    os.environ["PYRITE_MC_TRANSPORT_PRECISION"] = "fp64"
+    gate = runpy.run_path(str(Path(__file__).with_name("defaults_spectral_gate_642.py")))
+    real = fc.cuda_fourier_bin_mean_reduce
+    v5 = functools.partial(real, eps=1e-12, direct_precision="fp64")
+    names = list(SCENES) if scenes == "all" else scenes.split(",")
+    rows = []
+    record = dict(
+        issue=1296,
+        code_sha=os.environ.get("PROBE_SHA"),
+        gpu=_gpu(),
+        histories=int(histories),
+        seed=int(seed),
+        band_eV=list(gate["BAND"]),
+        margins=gate["MARGINS"],
+        reference="fourier-auto-v5 route (eps 1e-12, FP64 direct) on the same transport",
+        scenes=rows,
+    )
+    for name in names:
+        case = _scene_case(gate, name, int(histories), int(seed))
+        t0 = time.perf_counter()
+        ladder = CaseLadder(case, transport_core="cuda")
+        _sync()
+        row = dict(scene=name, spec=SCENES[name], transport_s=time.perf_counter() - t0, arms=[])
+        nodes = SCENES[name][4]
+        if nodes is not None:
+            case = gate["mosaic_mc_case"](case, nodes)
+        for spacing in (float(x) for x in spacings.split(",")):
+            scorer = CaseLadder(dict(case, line_quadrature="bin-mean"), transport=ladder.transport)
+            grid = gate["axis"](500, 10000, spacing, "bin-mean")
+            out = {}
+            for route, fn in (("v5", v5), ("v6", real)):
+                fc.cuda_fourier_bin_mean_reduce = fn
+                try:
+                    scorer.lines(grid)  # warm
+                    _sync()
+                    t0 = time.perf_counter()
+                    density = np.asarray(scorer.lines(grid), dtype=float)
+                    _sync()
+                    wall = time.perf_counter() - t0
+                finally:
+                    fc.cuda_fourier_bin_mean_reduce = real
+                out[route] = (density, wall, gate["metrics"](grid, density, "bin-mean"))
+            (d5, w5, m5), (d6, w6, m6) = out["v5"], out["v6"]
+            row["arms"].append(
+                dict(
+                    spacing_eV=spacing,
+                    bins=int(grid.size),
+                    v5_lines_s=w5,
+                    v6_lines_s=w6,
+                    max_abs_over_peak=float(np.abs(d6 - d5).max() / np.abs(d5).max()),
+                    v5=m5,
+                    v6=m6,
+                    versus=gate["versus"](m6, m5),
+                )
+            )
+            a = row["arms"][-1]
+            print(
+                name,
+                spacing,
+                f"v5 {w5:.2f}s v6 {w6:.2f}s",
+                a["max_abs_over_peak"],
+                a["versus"]["within_margin"],
+                flush=True,
+            )
+        rows.append(row)
+        _write(out_json, record)
+
+
 if __name__ == "__main__":
     cmd, *rest = sys.argv[1:]
     if cmd == "capture":
         capture(*rest)
+    elif cmd == "margins":
+        margins(*rest)
     elif cmd in ARM_SETS:
         bench(rest[0], int(rest[1]) if len(rest) > 1 else 3, arm_set=cmd)
     else:
