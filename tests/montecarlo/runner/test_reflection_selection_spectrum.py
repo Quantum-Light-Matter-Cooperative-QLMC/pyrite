@@ -273,3 +273,49 @@ def test_selection_records_call_size_and_refuses_before_scoring(monkeypatch):
     with pytest.raises(BackendResourceError, match="line tables"):
         reflection_cutoff.selected_line_spectrum(selected, calls.append, grid)
     assert calls == []
+
+
+def test_selection_scores_an_electron_prefix_then_every_history(monkeypatch):
+    """The stop is decided on the first histories, the spectrum on all (#1281)."""
+    import pyrite.montecarlo.runner.diffracted_brem as dbr
+    from pyrite.montecarlo.runner import reflection_cutoff
+    from pyrite.montecarlo.runner.electron_blocks import electron_prefix
+
+    monkeypatch.setattr(
+        dbr, "case_diffracted_brem", lambda _case, _segs, grid, *_: np.zeros(np.shape(grid))
+    )
+    case, tp = _transported()
+    selected = dict(case, reflection_selection=SELECTION)
+    monkeypatch.setattr(reflection_cutoff, "SELECTION_HISTORIES", 2)
+    out = runner._spectrum_case(selected, tp)
+    record = out["reflection_selection"]
+    assert record["selection_histories"] == {"lines": 2, "continuum": 2}
+    # The selection equals a full selection on the two-history population alone.
+    alone_tp = {**tp, "segs": electron_prefix(tp["segs"], 2), "Ne_lines": 2, "Ne_brem": 2}
+    alone = runner._spectrum_case(dict(selected, Ne=2, Ne_brem=2), alone_tp)
+    assert "selection_histories" not in alone["reflection_selection"]
+    (sub,), (ref,) = record["radiators"], alone["reflection_selection"]["radiators"]
+    assert sub["cutoff_invang"] == ref["cutoff_invang"]
+    assert sub["reflections"] == ref["reflections"]
+    for a, b in zip(sub["shells"], ref["shells"], strict=True):
+        assert a["yield_"] == pytest.approx(b["yield_"], rel=1e-9)
+        assert a["share"] == pytest.approx(b["share"], rel=1e-9)
+    # The returned spectrum is the selected set on every history.
+    hkls = dominant_reflections(
+        "silicon", n_families=10**9, B_ang2=case["B_ang2"], g_max_invang=sub["cutoff_invang"]
+    )
+    full = runner._spectrum_case(dict(case, hkl_list=hkls), tp)
+    np.testing.assert_allclose(out["spec"], full["spec"], rtol=1e-9, atol=0)
+    assert np.sum(full["spec"]) > 0
+
+
+def test_electron_prefix_keeps_whole_histories():
+    from pyrite.montecarlo.runner.electron_blocks import electron_prefix
+
+    segs = {"elec_id": np.array([2, 0, 1, 0, 2]), "L_ang": np.arange(5.0), "Ne": 3}
+    prefix = electron_prefix(segs, 2)
+    assert prefix["Ne"] == 2
+    np.testing.assert_array_equal(prefix["elec_id"], [0, 1, 0])
+    np.testing.assert_array_equal(prefix["L_ang"], [1.0, 2.0, 3.0])
+    ordered = electron_prefix({"elec_id": np.array([0, 0, 1, 2]), "L_ang": np.arange(4.0)}, 1)
+    np.testing.assert_array_equal(ordered["L_ang"], [0.0, 1.0])

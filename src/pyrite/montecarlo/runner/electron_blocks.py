@@ -94,6 +94,28 @@ def iter_electron_blocks(segments, n_blocks):
         yield block
 
 
+def electron_prefix(segments, n_electrons):
+    """Rows of the electrons ``elec_id < n_electrons``, with ``Ne = n_electrons``.
+
+    The prefix of the counter-addressed population (#1281). Every flight and
+    secondary of a kept electron stays, and scalar fields are shared, so a
+    per-electron incoherent sum over the prefix is the same estimator on fewer
+    histories. Electron-sorted rows give a zero-copy slice.
+    """
+    ids = _electron_ids(segments)
+    n = int(n_electrons)
+    if np.all(ids[1:] >= ids[:-1]):
+        rows = slice(0, int(np.searchsorted(ids, n, side="left")))
+    else:
+        rows = np.flatnonzero(ids < n)
+    block = dict(segments)
+    for key in _SEG_ARRAYS:
+        if key in block:
+            block[key] = _take(block[key], rows)
+    block["Ne"] = n
+    return block
+
+
 def score_in_electron_blocks(score, segments):
     """Sum an additive per-row ``score(segments)`` over electron-aligned blocks.
 
