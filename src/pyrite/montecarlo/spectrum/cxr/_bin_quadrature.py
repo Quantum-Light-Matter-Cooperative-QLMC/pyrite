@@ -755,7 +755,10 @@ def sincsq_bin_lineshape(
 #: FP64 range reduction, request ES accuracy 1e-9 (was 1e-12), move the
 #: NUFFT crossover to 2^24 pairs and fuse the envelope-image pass; <= 8e-11
 #: of the peak from v5 on the mos2 30 keV flushes. Host flushes are unchanged.
-CXR_BIN_REDUCTION_MODEL = "fourier-auto-v6"
+#: v7 (#1297): device ES spreading sums each fine point's window by sorted,
+#: batched warp gathers instead of per-source FP64 atomics (same terms, FP64
+#: summation order only).
+CXR_BIN_REDUCTION_MODEL = "fourier-auto-v7"
 #: Lines per Fourier-route flush: amortises the per-call FFT and planning.
 FOURIER_FLUSH_LINES = 10_000_000
 

@@ -214,18 +214,20 @@ def test_channeling_demo_and_off_profile_identities_are_unchanged():
     ``fourier-auto-v6`` (FP32 direct phase factors on the device route).
     #1281 re-mints every pin for ``measured-shell-cutoff-v6`` (electron-prefix
     selection).
+    #1297 re-mints the silicon pins for ``fourier-auto-v7`` (sorted warp-gather
+    ES spreading).
     """
     sweep, settings, cases = _profile_cases("silicon", "channeling_demo")
     assert cases[0].line_quadrature == "bin-mean"
     assert [profiles.case_content_key(case) for case in cases] == [
-        "1689dd49d7f7e3558707c8766b00f2ba4382e875376ce77129ab3d4a041cb56a"
+        "145f0fe4f1156529d360858b94d609afa01e90b2b4962474713462194665733b"
     ]
     assert profiles.named_profile_stem("silicon", catalog_profile="channeling_demo") == (
-        "silicon@channeling_demo-aa4069f0e470"
+        "silicon@channeling_demo-e68db413c2ec"
     )
     identity = profiles.dataset_identity("silicon", settings, sweep)
     assert identity["parameter_sha256"] == (
-        "91d59fcfec15c38ec4d5e8f6eff0a33af95d7fc88a80fbfee1810434e22e0c06"
+        "239276864bc6144a2bf14d65f54533bd2ca3690e4bc09f05a6562c267155e22b"
     )
     sweep = material_sweep("hopg", catalog_profile="standard")
     settings = profiles.profile_run_settings(default_settings(), "standard", sweep=sweep)

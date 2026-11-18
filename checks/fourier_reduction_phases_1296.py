@@ -1288,7 +1288,13 @@ def margins(out_json, scenes="all", histories=64, seed=642501, spacings="0.375,3
     os.environ["PYRITE_MC_TRANSPORT_PRECISION"] = "fp64"
     gate = runpy.run_path(str(Path(__file__).with_name("defaults_spectral_gate_642.py")))
     real = fc.cuda_fourier_bin_mean_reduce
-    v5 = functools.partial(real, eps=1e-12, direct_precision="fp64")
+    # MARGIN_REF=v6 (#1297): reference is the v6 route (atomic ES spreader).
+    ref_name = os.environ.get("MARGIN_REF", "v5")
+    v5 = (
+        functools.partial(real, spread="atomic")
+        if ref_name == "v6"
+        else functools.partial(real, eps=1e-12, direct_precision="fp64", spread="atomic")
+    )
     names = list(SCENES) if scenes == "all" else scenes.split(",")
     rows = []
     record = dict(
@@ -1299,7 +1305,11 @@ def margins(out_json, scenes="all", histories=64, seed=642501, spacings="0.375,3
         seed=int(seed),
         band_eV=list(gate["BAND"]),
         margins=gate["MARGINS"],
-        reference="fourier-auto-v5 route (eps 1e-12, FP64 direct) on the same transport",
+        reference=(
+            "fourier-auto-v6 route (atomic ES spreader) on the same transport"
+            if ref_name == "v6"
+            else "fourier-auto-v5 route (eps 1e-12, FP64 direct) on the same transport"
+        ),
         scenes=rows,
     )
     for name in names:
@@ -1353,10 +1363,66 @@ def margins(out_json, scenes="all", histories=64, seed=642501, spacings="0.375,3
         _write(out_json, record)
 
 
+def spread_bench(out_dir, repeats=5):
+    """#1297: production ``cuda_fourier_bin_mean_reduce`` per spreader on the saved flushes.
+
+    Wall (synchronized, median of ``repeats`` after a warm call) of the
+    default (``spread="gather"``) and ``spread="atomic"`` (v6) routes, the
+    gather's error against v6 and against v5, and a repeat of the gather for
+    run-to-run spread. Record: ``spread_bench.json``.
+    """
+    from pyrite.montecarlo.spectrum.cxr._fourier_cuda import cuda_fourier_bin_mean_reduce as f
+
+    cp = _cp()
+    out = Path(out_dir)
+    rows = []
+    for path in sorted(out.glob("flush-*.npz")):
+        z = np.load(path)
+        E, a, w = (cp.asarray(z[k]) for k in ("E_res", "a_width", "weight"))
+        c0, h, n_bins = z["axis"].tolist()
+        axis = (c0, h, int(n_bins))
+        arms = {
+            "gather": {},
+            "atomic": {"spread": "atomic"},
+            "v5": {"eps": 1e-12, "direct_precision": "fp64", "spread": "atomic"},
+        }
+        res, walls = {}, {}
+        for name, kw in arms.items():
+            res[name] = cp.asnumpy(f(E, a, w, axis, **kw))
+            times = []
+            for _ in range(repeats):
+                _sync()
+                t0 = time.perf_counter()
+                f(E, a, w, axis, **kw)
+                _sync()
+                times.append(time.perf_counter() - t0)
+            walls[name] = float(np.median(times))
+        again = cp.asnumpy(f(E, a, w, axis))
+        rows.append(
+            dict(
+                flush=path.name,
+                lines=int(E.size),
+                wall_s=walls,
+                speedup_vs_v6=walls["atomic"] / walls["gather"],
+                gather_vs_v6=_errors(res["gather"], res["atomic"]),
+                gather_vs_v5=_errors(res["gather"], res["v5"]),
+                v6_vs_v5=_errors(res["atomic"], res["v5"]),
+                gather_repeat=_errors(again, res["gather"]),
+            )
+        )
+        print(path.name, walls, rows[-1]["gather_vs_v6"], flush=True)
+        _write(
+            out / "spread_bench.json",
+            dict(issue=1297, code_sha=os.environ.get("PROBE_SHA"), gpu=_gpu(), rows=rows),
+        )
+
+
 if __name__ == "__main__":
     cmd, *rest = sys.argv[1:]
     if cmd == "capture":
         capture(*rest)
+    elif cmd == "spread":
+        spread_bench(rest[0], int(rest[1]) if len(rest) > 1 else 5)
     elif cmd == "margins":
         margins(*rest)
     elif cmd in ARM_SETS:

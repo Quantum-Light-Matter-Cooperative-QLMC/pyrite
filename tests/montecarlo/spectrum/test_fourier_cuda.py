@@ -1,5 +1,7 @@
 """Real-device FP64 conventions and exact-cutoff parity for #1192 (CUDA and ROCm)."""
 
+from functools import partial
+
 import numpy as np
 import pytest
 
@@ -62,12 +64,15 @@ def cp():
     return cp
 
 
-@pytest.mark.parametrize("nufft", ["cufinufft", "es"])
+@pytest.mark.parametrize("nufft", ["cufinufft", "es", "es-atomic"])
 @pytest.mark.parametrize("j0,count", [(1, 1), (11, 32), (29, 33), (2048, 128), (7, 4096)])
 def test_nufft_sign_shift_batch_and_stream(cp, j0, count, nufft):
     if nufft == "cufinufft":
         _require_cufinufft()
-    transform = cufinufft_mode_transform if nufft == "cufinufft" else es_mode_transform
+        transform = cufinufft_mode_transform
+    else:
+        spread = "atomic" if nufft == "es-atomic" else "gather"
+        transform = partial(es_mode_transform, spread=spread)
     rng = np.random.default_rng(1192)
     phase = rng.uniform(-4 * np.pi, 4 * np.pi, 97)
     strengths = rng.normal(size=(2, phase.size))
@@ -80,10 +85,12 @@ def test_nufft_sign_shift_batch_and_stream(cp, j0, count, nufft):
     assert np.all(abs(actual - expected) <= 2e-11 * abs(strengths).sum(axis=1)[:, None])
 
 
-@pytest.mark.parametrize("nufft", [None, "cufinufft", "es"])
+@pytest.mark.parametrize("nufft", [None, "cufinufft", "es", "es-atomic"])
 def test_cuda_partition_preserves_signed_remote_and_narrow_lines(cp, nufft):
     if nufft == "cufinufft":
         _require_cufinufft()
+    spread = "atomic" if nufft == "es-atomic" else "gather"
+    nufft = "es" if nufft == "es-atomic" else nufft
     rng = np.random.default_rng(1192)
     e = rng.uniform(-2e5, 3e5, 1024)
     a = np.pi / rng.uniform(3.0, 6.0, e.size)
@@ -91,7 +98,14 @@ def test_cuda_partition_preserves_signed_remote_and_narrow_lines(cp, nufft):
     expected = partitioned_positive_modes(e, a, w, 500.0, 4096.0, direct_mode_transform)
     with cp.cuda.Stream(non_blocking=True) as stream:
         out = cuda_positive_modes(
-            e, a, w, 500.0, 4096.0, use_nufft=nufft is not None, nufft=nufft or "es"
+            e,
+            a,
+            w,
+            500.0,
+            4096.0,
+            use_nufft=nufft is not None,
+            nufft=nufft or "es",
+            spread=spread,
         )
         stream.synchronize()
         actual = cp.asnumpy(out)
@@ -282,3 +296,50 @@ def test_es_width_follows_tolerance():
     assert [es_width(e) for e in (1e-1, 1e-6, 1e-12, 1e-15)] == [2, 7, 13, 16]
     with pytest.raises(ValueError, match="eps"):
         es_width(0.0)
+
+
+def test_gather_spreader_matches_atomic_across_batches_and_wrap(cp, monkeypatch):
+    """Batched warp gather (#1297) = atomic spread up to FP64 summation order.
+
+    Phases sit on and next to multiples of 2 pi (the fine-grid wrap) and in a
+    dense cluster (many copies per fine point, several warp items); a tiny
+    batch cap forces several batches, one rectangle each or shared.
+    """
+    from pyrite.montecarlo.spectrum.cxr import _fourier_spread
+
+    rng = np.random.default_rng(1297)
+    edge = 2 * np.pi * rng.integers(-3, 4, 300) + rng.normal(scale=1e-3, size=300)
+    phase = np.r_[edge, 2 * np.pi * np.arange(-2, 3), rng.normal(1.0, 1e-4, 3000)]
+    phase = np.r_[phase, rng.uniform(-30.0, 30.0, 4000)]
+    rows = rng.normal(size=(2, phase.size))
+    rects = [(1, 40, 0, phase.size), (40, 300, 1000, 6000), (300, 5000, 5500, phase.size)]
+    monkeypatch.setattr(_fourier_spread, "_BATCH_SOURCES", 5000)
+    assert list(_fourier_spread._batches([phase.size, 5000, phase.size - 5500])) == [
+        (0, 1),
+        (1, 2),
+        (2, 3),
+    ]
+    d_phase, d_rows = cp.asarray(phase), cp.asarray(rows)
+    got = list(_fourier_spread.es_gather_moments(d_phase, d_rows, rects, eps=1e-9))
+    for (j0, j1, lo, hi), (g0, g1, moments) in zip(rects, got, strict=True):
+        assert (g0, g1) == (j0, j1)
+        atomic = es_mode_transform(
+            d_phase[lo:hi], d_rows[:, lo:hi], j0, j1, eps=1e-9, spread="atomic"
+        )
+        scale = abs(rows[:, lo:hi]).sum(axis=1)[:, None]
+        assert np.all(abs(cp.asnumpy(moments - atomic)) <= 1e-13 * scale)
+        exact = direct_mode_transform(phase[lo:hi], rows[:, lo:hi], j0, j1)
+        assert np.all(abs(cp.asnumpy(moments) - exact) <= 2e-8 * scale)
+    monkeypatch.setattr(_fourier_spread, "_BATCH_SOURCES", 1 << 23)
+    together = list(_fourier_spread.es_gather_moments(d_phase, d_rows, rects, eps=1e-9))
+    for (_, _, a), (_, _, b) in zip(got, together, strict=True):
+        np.testing.assert_allclose(
+            cp.asnumpy(a), cp.asnumpy(b), rtol=0, atol=1e-12 * abs(rows).sum()
+        )
+
+
+def test_unknown_spreader_is_refused(cp):
+    with pytest.raises(ValueError, match="spread"):
+        es_mode_transform(cp.zeros(3), cp.zeros((2, 3)), 1, 4, spread="tiles")
+    with pytest.raises(ValueError, match="spread"):
+        cuda_positive_modes(np.ones(1), np.ones(1), np.ones(1), 0.0, 1.0, spread="tiles")
