@@ -575,8 +575,9 @@ def test_decision_points_ceiling_is_exact_on_integer_steps():
 
 
 def test_zero_stability_fraction_admits_only_a_still_mean():
-    """``stability_fraction = 0`` is valid: a constant population stops, and a
-    moving mean with no drift allowance is refused rather than dividing by 0."""
+    """``stability_fraction = 0`` is valid: a constant population (zero move,
+    zero limit) stops instead of dividing by 0, and a moving mean is judged
+    against the drift allowance alone."""
     base = dict(
         max_history_share=1.0,
         min_effective_histories=0.0,
@@ -592,7 +593,8 @@ def test_zero_stability_fraction_admits_only_a_still_mean():
     settings = AdaptiveSettings(0.05, 100, 400, **base)
     record = run_stopping_rule(settings, _population_measure(moving))
     status = record["statistics"]["cxr"]
-    assert status["stability"] is not None and status["stability_limit"] >= 0.0
+    assert status["stability"] > 0.0 and status["stability_limit"] > 0.0
+    assert status["passes"]["stability"] == (status["stability"] <= status["stability_limit"])
 
 
 # ---- per-electron observables ---------------------------------------------------

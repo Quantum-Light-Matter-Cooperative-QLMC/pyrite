@@ -815,6 +815,15 @@ def _bremslib_cells(staged, T_keV, cos_theta, E_grid, plasma_eV, unit_cm2):
     return state, dsig
 
 
+def _layer_depth(path, mu_by_layer):
+    """``path @ mu_by_layer`` summed in a fixed layer order: BLAS gemv (one row)
+    and gemm round differently, so a row must not depend on its slice (#1253)."""
+    depth = path[:, 0, None] * mu_by_layer[0][None, :]
+    for layer in range(1, mu_by_layer.shape[0]):
+        depth = depth + path[:, layer, None] * mu_by_layer[layer][None, :]
+    return depth
+
+
 def mc_brem_spectrum(
     segments,
     E_grid_eV,
@@ -1034,11 +1043,8 @@ def mc_brem_spectrum(
         row_electron = seg_elec_id[brem_idx][owner]
         row_band = xp.zeros(row_electron.size, dtype=xp.float64)
     electron_sum = xp.zeros(int(Ne) if per_electron else 0, dtype=_BAND_PRIMARY_DTYPE)
-    # ``row_band``: per-row band values, summed per electron once at the end.
-    # Each row's value is a per-row reduction (not BLAS gemv, whose blocking
-    # follows the row count) added in a fixed element order, and the final
-    # bincount runs in row order, so an electron's value does not depend on
-    # how its rows are sliced or chunked for transport (#1253).
+    # ``row_band``: per-row reductions (not row-count-blocked gemv) in element
+    # order, one row-order bincount at the end: slicing-independent (#1253).
 
     def _accumulate(row_weight, density, rows):
         nonlocal spec
@@ -1167,7 +1173,11 @@ def mc_brem_spectrum(
     for j0 in range(0, M, chunk):
         sl = slice(j0, min(j0 + chunk, M))
         mu_by_layer = mu[None, :] if layers is None else xp.stack(layer_mu, axis=0)
-        T_abs = mean_transmission(path_start[sl] @ mu_by_layer, path_end[sl] @ mu_by_layer, xp=xp)
+        T_abs = mean_transmission(
+            _layer_depth(path_start[sl], mu_by_layer),
+            _layer_depth(path_end[sl], mu_by_layer),
+            xp=xp,
+        )
         path_cm = seg_L[sl] * 1e-8
         for el_i, n_i in comp:
             context = eedl_contexts.get(el_i)
