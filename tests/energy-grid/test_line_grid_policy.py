@@ -234,6 +234,11 @@ def test_high_energy_hbn_rejects_impossible_budget_before_transport(monkeypatch)
     monkeypatch.setenv("PYRITE_ENERGY_GRID_MAX_POINTS", "200000")
     sweep = material_sweep("hbn")
     sweep = replace(sweep, beam=replace(sweep.beam, energy_keV=5000.0))
+    # The measured default's stop is unknown before transport, so it defers the
+    # budget to the runner (#1243); the closed-form axis still refuses up front.
+    case = build_cases(sweep, n_electrons=2, n_electrons_brem=2)[0]
+    assert case["line_grid_policy"]["bandwidth"]["policy"] == "resonance-population"
+    sweep = replace(sweep, cxr_grid_policy={"bandwidth": "kinematic-ceiling"})
 
     with pytest.raises(CxrGridToleranceError) as caught:
         build_cases(sweep, n_electrons=2, n_electrons_brem=2)

@@ -107,5 +107,5 @@ def test_line_grid_for_energy_resolves_automatically_on_missing():
     forced = replace(lacking, beam=beam_replace(lacking.beam, energy_keV=[50]))
     case = build_cases(forced)[0]
     policy = case["line_grid_policy"]
-    assert policy["bandwidth"]["policy"] == "kinematic-ceiling"
+    assert policy["bandwidth"]["policy"] == "resonance-population"
     assert policy["resolution"]["policy"] == "sinc-nyquist"

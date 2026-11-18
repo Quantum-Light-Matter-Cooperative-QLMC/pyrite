@@ -39,6 +39,7 @@ from ._kernels import (
     _interp_elemental_mu,
     _interp_gather1d,
     _interp_index,
+    _line_keep_window,
     _log_interp_fraction,
     _matvec3,
     _polarization_pair,
@@ -869,14 +870,13 @@ def _accumulate_reflection(
     omega_res = (v_dot_g - r_num) / denom
     E_res = HBARC_EV_ANG * omega_res  # -> eV
 
-    # -- 2. drop segments whose line misses the spectral window -------------
-    # (pad by 20% so sinc tails that reach into the window still count)
-    pad = 0.2 * (E_grid[-1] - E_grid[0])
+    # -- 2. drop segments whose line misses the (padded) window -------------
+    lo_keep, hi_keep = _line_keep_window(E_grid, st.request.truncation_audit)
     keep = (
         cxr_electron
-        & (E_res > float(E_grid[0] - pad))
+        & (E_res > lo_keep)
         & (E_res > 10.0)
-        & (E_res < E_grid[-1] + pad)
+        & (E_res < hi_keep)
         & _recoil_line_allowed(denom, omega_res, inv_E, gamma_all)
     )
     if not keep.any():

@@ -42,10 +42,10 @@ def test_help_lists_selectors_defaults_combinations_and_identity():
     group = invoke(root_command, ["profile", "numerics", "cxr-grid", "--help"])
     assert_clean_result(group)
     for text in (
-        "kinematic-ceiling | resonance-population",
+        "resonance-population | kinematic-ceiling",
         "sinc-nyquist | resonance-local | sinc-shape",
         "node | bin-mean",
-        "resonance-local and sinc-shape require bandwidth resonance-population and quadrature",
+        "resonance-local and sinc-shape require bandwidth resonance-population (the default) and",
         "identity",
     ):
         assert text in " ".join(group.stdout.split())
@@ -53,7 +53,7 @@ def test_help_lists_selectors_defaults_combinations_and_identity():
     setting = invoke(root_command, ["profile", "numerics", "cxr-grid", "set", "--help"])
     assert_clean_result(setting)
     flat = " ".join(setting.stdout.split())
-    for default in ("kinematic-ceiling", "sinc-nyquist", "node"):
+    for default in ("resonance-population", "sinc-nyquist", "node"):
         assert f"Default {default}." in flat
 
     root = invoke(root_command, ["profile", "--help"])
@@ -75,7 +75,7 @@ def test_show_reports_explicit_effective_and_grid_source(catalog):
     payload = envelope["payload"]
     assert payload["explicit"] is None
     assert {row["key"]: (row["effective"], row["source"]) for row in payload["fields"]} == {
-        "bandwidth": ("kinematic-ceiling", "built-in default"),
+        "bandwidth": ("resonance-population", "built-in default"),
         "resolution": ("sinc-nyquist", "built-in default"),
         "quadrature": ("node", "built-in default"),
     }
@@ -122,8 +122,23 @@ def test_invalid_combinations_are_usage_errors_before_writing(catalog):
 
     local = _line_grid("set", "sub_100keV", "--resolution", "resonance-local")
     assert local.exit_code == 2
-    assert "needs the resonance-population bandwidth" in local.stderr
-    assert "--bandwidth resonance-population --quadrature bin-mean" in local.stderr
+    # The measured bandwidth is the default (#1243); only the quadrature is missing.
+    assert "needs bin-mean quadrature" in local.stderr
+    assert "add --quadrature bin-mean or" in local.stderr
+
+    kinematic = _line_grid(
+        "set",
+        "sub_100keV",
+        "--bandwidth",
+        "kinematic-ceiling",
+        "--resolution",
+        "resonance-local",
+        "--quadrature",
+        "bin-mean",
+    )
+    assert kinematic.exit_code == 2
+    assert "needs the resonance-population bandwidth" in kinematic.stderr
+    assert "--bandwidth resonance-population" in kinematic.stderr
 
     node = _line_grid(
         "set",
@@ -167,7 +182,7 @@ def test_coherent_profile_accepts_a_windowed_policy(catalog):
 
 
 def test_reset_partial_conflict_named_and_whole(catalog):
-    conflict = _line_grid("reset", "high_energy", "bandwidth", "-y")
+    conflict = _line_grid("reset", "high_energy", "quadrature", "-y")
     assert conflict.exit_code == 2
     assert "reset resolution too" in conflict.stderr
 

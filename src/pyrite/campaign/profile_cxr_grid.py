@@ -3,7 +3,11 @@
 import tomlkit
 
 from pyrite._cxr_grid_policy import ENVIRONMENT_NAMES as CXR_GRID_ENVIRONMENT_NAMES
-from pyrite._cxr_grid_policy import PROFILE_CXR_GRID_SELECTORS, check_selector_combination
+from pyrite._cxr_grid_policy import (
+    KINEMATIC_BANDWIDTH_POLICY,
+    PROFILE_CXR_GRID_SELECTORS,
+    check_selector_combination,
+)
 from pyrite._util.env import env_value
 
 from ._profile_document import energy_grid_refs, existing_profile, profile_overrides
@@ -24,13 +28,20 @@ def profile_cxr_grid_values(profile):
 
 
 def cxr_grid_fields(explicit):
-    """Explicit, effective and source rows for each profile line-grid selector."""
+    """Explicit, effective and source rows for each profile line-grid selector.
+
+    Feature windows keep the default bandwidth at ``kinematic-ceiling``, as
+    :func:`~pyrite._cxr_grid_policy.resolve_cxr_grid_policy` does (#1243).
+    """
     explicit = explicit or {}
+    defaults = {key: choices[0] for key, choices in PROFILE_CXR_GRID_SELECTORS.items()}
+    if explicit.get("windows") is True:
+        defaults["bandwidth"] = KINEMATIC_BANDWIDTH_POLICY
     return [
         {
             "key": key,
             "explicit": explicit.get(key),
-            "effective": explicit.get(key, choices[0]),
+            "effective": explicit.get(key, defaults[key]),
             "source": "profile" if key in explicit else "built-in default",
             "choices": list(choices),
         }

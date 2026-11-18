@@ -26,7 +26,8 @@ def _hint(policy):
     if policy.get("resolution") not in (LOCAL_RESOLUTION_POLICY, SHAPE_RESOLUTION_POLICY):
         return ""
     flags = []
-    if policy.get("bandwidth") != RESONANCE_BANDWIDTH_POLICY:
+    # An unset bandwidth is already the measured default (#1243).
+    if policy.get("bandwidth", RESONANCE_BANDWIDTH_POLICY) != RESONANCE_BANDWIDTH_POLICY:
         flags.append(f"--bandwidth {RESONANCE_BANDWIDTH_POLICY}")
     if policy.get("quadrature") != "bin-mean":
         flags.append("--quadrature bin-mean")
@@ -62,9 +63,11 @@ def command():
     Three selectors, each defaulting to the first value listed:
 
     \b
-      bandwidth   kinematic-ceiling | resonance-population
-                  closed-form kinematic bound (no simulation), or the case's
-                  measured resonance population capped by that bound
+      bandwidth   resonance-population | kinematic-ceiling
+                  the case's measured resonance population capped by the
+                  closed-form kinematic bound, or that bound alone (no
+                  simulation); with feature windows the default is
+                  kinematic-ceiling
       resolution  sinc-nyquist | resonance-local | sinc-shape
                   uniform measured sinc spacing, spacing refined locally
                   around measured resonances (3 eV backbone), or a uniform
@@ -74,9 +77,9 @@ def command():
                   point samples of the sinc^2 line profile, or bin means that
                   keep integrated line yield exact but smooth peak height/width
 
-    resonance-local and sinc-shape require bandwidth resonance-population and
-    quadrature bin-mean. Any stored selector, even one equal to its default, makes every
-    case of the profile resolve its line grid automatically from its own
+    resonance-local and sinc-shape require bandwidth resonance-population (the
+    default) and quadrature bin-mean. Any stored selector, even one equal to its
+    default, makes every case of the profile resolve its line grid automatically from its own
     trajectories, ahead of explicit E_grid_line and stored energy-grid rows;
     automatic resolution does not support coherent emission (#117), and
     bin-mean does not support a positive max_dE_frac. The table joins the case

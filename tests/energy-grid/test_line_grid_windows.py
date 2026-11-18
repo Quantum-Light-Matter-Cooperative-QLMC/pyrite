@@ -18,6 +18,8 @@ from pyrite._cxr_grid_policy import (
     DEFAULT_WINDOW_PROVIDERS,
     DEFAULT_WINDOW_SAMPLES_PER_FEATURE,
     DEFAULT_WINDOW_TAIL_WIDTHS,
+    KINEMATIC_BANDWIDTH_POLICY,
+    RESONANCE_BANDWIDTH_POLICY,
     WINDOWED_CXR_GRID_POLICY_SCHEMA,
     CxrGridToleranceError,
     LineShapePrecisionWarning,
@@ -71,16 +73,33 @@ def test_window_defaults_match_the_seed_module():
 
 
 def test_policy_without_windows_keeps_the_historical_payload():
-    default = resolve_cxr_grid_policy(start_eV=10.0, stop_eV=10_000.0).payload()
+    default = resolve_cxr_grid_policy(
+        start_eV=10.0, stop_eV=10_000.0, bandwidth_policy=KINEMATIC_BANDWIDTH_POLICY
+    ).payload()
     assert default["schema"] == CXR_GRID_POLICY_SCHEMA
     assert "windows" not in default and "windows" not in default["sources"]
     disabled = resolve_cxr_grid_policy(
         start_eV=10.0,
         stop_eV=10_000.0,
+        bandwidth_policy=KINEMATIC_BANDWIDTH_POLICY,
         per_call={"windows": False},
         stored={"windows": True},
     ).payload()
     assert disabled == default
+
+
+def test_windows_keep_the_default_bandwidth_kinematic():
+    """Windows spend the measured bandwidth's budget share (#1243)."""
+    windowed = resolve_cxr_grid_policy(start_eV=10.0, stop_eV=10_000.0, per_call={"windows": True})
+    assert windowed.bandwidth_policy == KINEMATIC_BANDWIDTH_POLICY
+    assert "bandwidth" not in dict(windowed.sources)
+    assert windowed.payload()["schema"] == WINDOWED_CXR_GRID_POLICY_SCHEMA
+    with pytest.raises(ValueError, match="cannot be combined with windows"):
+        resolve_cxr_grid_policy(
+            start_eV=10.0,
+            stop_eV=10_000.0,
+            per_call={"windows": True, "bandwidth": RESONANCE_BANDWIDTH_POLICY},
+        )
 
 
 def test_windows_take_defaults_bump_the_schema_and_record_their_source():
@@ -231,6 +250,8 @@ def test_windowed_coordinates_refuse_a_plan_for_another_bandwidth():
 
 # ---- runner ------------------------------------------------------------------
 def _case_and_segments(**policy):
+    # These synthetic segments carry no layer column: pin the closed-form axis.
+    policy = {"bandwidth": KINEMATIC_BANDWIDTH_POLICY, **policy}
     case = build_cases(_uncovered_energy_sweep(**policy), n_electrons=2, n_electrons_brem=2)[0]
     beam, n_hat = tilted_geometry(
         case["theta_obs_rad"],

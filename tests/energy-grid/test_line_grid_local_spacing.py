@@ -155,7 +155,9 @@ def test_local_policy_payload_carries_its_halo_share():
 def test_local_resolution_needs_the_measured_bandwidth():
     with pytest.raises(ValueError, match="needs the resonance-population bandwidth"):
         resolve_cxr_grid_policy(
-            start_eV=50.0, stop_eV=1000.0, per_call={"resolution": LOCAL_RESOLUTION_POLICY}
+            start_eV=50.0,
+            stop_eV=1000.0,
+            per_call={"resolution": LOCAL_RESOLUTION_POLICY, "bandwidth": "kinematic-ceiling"},
         )
 
 
