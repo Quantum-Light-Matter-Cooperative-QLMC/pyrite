@@ -8,6 +8,7 @@ import textwrap
 
 from ...console import output as _cli_core
 from . import state as _state
+from .warning_lines import compact_warning_lines
 
 # ``@`` is permitted so ``<material>@<label>-<digest>`` checkpoint @-stems pass
 # the token check: it carries no shell meaning as a bare word (array expansion
@@ -677,11 +678,8 @@ def _legacy_progress(log, state):
 
 
 def _clean_recent_log(log, *, limit=12):
-    diagnostics = [
-        line.strip()
-        for line in log.splitlines()
-        if line.strip() and _TQDM_FRAME_RE.match(line) is None
-    ]
+    lines = [line for line in log.splitlines() if _TQDM_FRAME_RE.match(line) is None]
+    diagnostics = [line.strip() for line in compact_warning_lines(lines) if line.strip()]
     if not diagnostics:
         return "  (no recent diagnostic messages)"
     return sanitize_terminal("\n".join(diagnostics[-limit:]), multiline=True)
