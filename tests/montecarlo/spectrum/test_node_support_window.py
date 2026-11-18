@@ -369,3 +369,28 @@ def test_automatic_policy_keeps_unsupported_routes_on_reference(extra):
     )
     _refuse_node_support_cutoff(request)
     assert _node_tail(request, E) is None
+
+
+@pytest.mark.parametrize(
+    ("is_hip", "options"),
+    [(False, ("--std=c++17", "--fmad=false")), (True, ("-std=c++17", "-ffp-contract=off"))],
+)
+def test_node_window_kernel_spells_contraction_off_for_each_vendor(monkeypatch, is_hip, options):
+    """hipRTC rejects ``--fmad=false``; the grouped/capped kernel must compile on ROCm (#1214)."""
+    import sys
+    import types
+
+    from pyrite.montecarlo.spectrum.cxr import _node_window_cuda
+
+    seen = {}
+    fake = types.SimpleNamespace(
+        cuda=types.SimpleNamespace(runtime=types.SimpleNamespace(is_hip=is_hip)),
+        RawKernel=lambda source, name, options: seen.setdefault("options", options),
+    )
+    monkeypatch.setitem(sys.modules, "cupy", fake)
+    _node_window_cuda._kernel.cache_clear()
+    try:
+        _node_window_cuda._kernel("probe")
+    finally:
+        _node_window_cuda._kernel.cache_clear()
+    assert seen["options"] == options

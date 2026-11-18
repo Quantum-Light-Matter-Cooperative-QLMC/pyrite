@@ -155,7 +155,7 @@ resolving a new run does not reinterpret stored `auto` or absent fields.
 | TOML key | Values (default first) | Flag |
 |---|---|---|
 | `bandwidth` | `resonance-population`, `kinematic-ceiling` | `--bandwidth` |
-| `resolution` | `sinc-nyquist`, `resonance-local`, `sinc-shape` | `--resolution` |
+| `resolution` | `sinc-oversampled`, `sinc-nyquist`, `resonance-local`, `sinc-shape` | `--resolution` |
 | `quadrature` | `node`, `bin-mean` | `--quadrature` |
 | `windows` | `false`, `true` | TOML; selector edits keep it |
 | `max_points` | integer >= 2 (600000) | TOML; selector edits keep it |
@@ -169,11 +169,20 @@ Fourier reducer on CPU and supported GPU backends. Above 1,000,000
 coordinates, the policy falls back to `resonance-local` on the same band;
 the resolved grid's `shape_axis` records the route, count and reason. The
 fallback retains its own coordinate budget and can refuse an oversized axis.
-`resonance-local` remains selectable; other profiles and the default
-resolution remain unchanged. See the
+`resonance-local` remains selectable. See the
 [spacing derivation](../validation/beam-transport/line-grid-sinc-shape-spacing.md)
 for assumptions and qualification status.
 
+`sinc-oversampled` divides the measured sinc-Nyquist step by 8 (#1214); its
+axis is 8x denser than `sinc-nyquist`, which keeps line area but not node peak
+height or FWHM. An oversampled axis over `max_points` refuses and names
+`--resolution sinc-nyquist` as the opt-out; nothing coarsens automatically.
+With `windows = true` an unset resolution is `sinc-nyquist` and an explicit
+`sinc-oversampled` is refused: the windows place their own nodes. With
+`bin-mean` on the `resonance-population` bandwidth an unset resolution is
+`sinc-shape`: bin means at the `sinc-oversampled` step bound an isolated peak
+only to 1.7%. A case whose measured bandwidth falls back to
+`kinematic-ceiling` takes `sinc-oversampled` there.
 With `windows = true`, for cases built with coherent emission or a positive
 `max_dE_frac`, and for channeling, transition-radiation or mixed-transport
 cases, an unset bandwidth resolves to `kinematic-ceiling`: the measured

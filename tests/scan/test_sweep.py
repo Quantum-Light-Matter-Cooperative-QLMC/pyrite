@@ -242,7 +242,7 @@ def test_bundled_catalog_resolves_automatic_grid_for_each_standard_beam_energy()
         policy = case["line_grid_policy"]
         grid = decode_energy_grid(case["E_grid_line"])
         assert policy["bandwidth"]["policy"] == "resonance-population"
-        assert policy["resolution"]["policy"] == "sinc-nyquist"
+        assert policy["resolution"]["policy"] == "sinc-oversampled"
         assert grid[0] == policy["bandwidth"]["start_eV"]
         assert grid[-1] == policy["bandwidth"]["stop_eV"]
 
@@ -322,7 +322,7 @@ def test_empty_per_beam_line_grid_resolves_automatically():
             energy_bins=_bins(cxr_by_energy={}),
         )
     )[0]
-    assert case["line_grid_policy"]["resolution"]["policy"] == "sinc-nyquist"
+    assert case["line_grid_policy"]["resolution"]["policy"] == "sinc-oversampled"
 
 
 def test_automatic_brem_grid_starts_at_the_medium_floor_for_every_beam_energy():

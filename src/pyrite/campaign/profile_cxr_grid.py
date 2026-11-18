@@ -7,6 +7,7 @@ from pyrite._cxr_grid_policy import (
     KINEMATIC_BANDWIDTH_POLICY,
     PROFILE_CXR_GRID_SELECTORS,
     check_selector_combination,
+    default_resolution_policy,
 )
 from pyrite._util.env import env_value
 
@@ -30,13 +31,21 @@ def profile_cxr_grid_values(profile):
 def cxr_grid_fields(explicit):
     """Explicit, effective and source rows for each profile line-grid selector.
 
-    Feature windows keep the default bandwidth at ``kinematic-ceiling``, as
-    :func:`~pyrite._cxr_grid_policy.resolve_cxr_grid_policy` does (#1243).
+    Feature windows keep the default bandwidth at ``kinematic-ceiling`` (#1243).
+    The default resolution follows the effective bandwidth, quadrature and
+    windows (:func:`~pyrite._cxr_grid_policy.default_resolution_policy`), as
+    :func:`~pyrite._cxr_grid_policy.resolve_cxr_grid_policy` does (#1214).
     """
     explicit = explicit or {}
     defaults = {key: choices[0] for key, choices in PROFILE_CXR_GRID_SELECTORS.items()}
-    if explicit.get("windows") is True:
+    windows = explicit.get("windows") is True
+    if windows:
         defaults["bandwidth"] = KINEMATIC_BANDWIDTH_POLICY
+    defaults["resolution"] = default_resolution_policy(
+        bandwidth=explicit.get("bandwidth", defaults["bandwidth"]),
+        quadrature=explicit.get("quadrature", defaults["quadrature"]),
+        windows=windows,
+    )
     return [
         {
             "key": key,

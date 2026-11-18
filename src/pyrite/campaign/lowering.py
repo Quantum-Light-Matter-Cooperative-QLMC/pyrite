@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
@@ -77,6 +77,7 @@ def lower_simulation(request: ResolvedSimulation) -> Case:
         target=target,
         detector=scalar_detector,
         energy_bins=numerics.energy_bins or EnergyBins(),
+        cxr_grid_policy=_with_line_resolution(None, numerics),
         n_families=convergence.n_families,
         max_reflections=convergence.max_reflections,
         line_yield_tolerance=convergence.line_yield_tolerance,
@@ -123,6 +124,18 @@ def lower_simulation(request: ResolvedSimulation) -> Case:
     from .photon_cases import resolve_photon_transport
 
     return resolve_photon_transport(scene, case, numerics)
+
+
+def _with_line_resolution(
+    policy: dict[str, Any] | None, numerics: Numerics
+) -> dict[str, Any] | None:
+    """``policy`` with ``Numerics.line_resolution`` as its per-call resolution (#1214).
+
+    ``None`` leaves the policy untouched, so the default adds no identity key.
+    """
+    if numerics.line_resolution is None:
+        return policy
+    return {**(policy or {}), "resolution": numerics.line_resolution}
 
 
 def _with_run_options(cases: list[Case], numerics: Numerics) -> list[Case]:
@@ -206,6 +219,10 @@ def build_sweep_cases(
                 spec_chunk=resolved_numerics.cxr_chunk,
                 brem_chunk=resolved_numerics.brem_chunk,
             )
+        old_sweep = replace(
+            old_sweep,
+            cxr_grid_policy=_with_line_resolution(old_sweep.cxr_grid_policy, resolved_numerics),
+        )
         n_electrons, n_electrons_brem, precision = case_budget(resolved_numerics.sampling)
         cases = build_cases(
             old_sweep,

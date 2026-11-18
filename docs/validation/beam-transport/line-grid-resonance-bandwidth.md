@@ -1308,7 +1308,7 @@ Focused tests: `tests/energy-grid/test_line_grid_bandwidth.py`, 44 passed, 1 slo
 
 ### Remediation (implementation context, 2026-11-17, #1243)
 
-(A) `kinematic_fallback_payload` also excludes `sinc-shape`, so a defaulted shape axis refuses rather than rescoring at another step. (B, C) `measured_bandwidth_fallback` gives the rescored case its own nested phase cache (`_spectrum_phase_cache["bandwidth_fallback"]`), so the refused axis's line-roulette screen and the rescored lines phase never cross axes on an allocation retry. Anchors: `tests/energy-grid/test_line_grid_bandwidth.py::test_sinc_shape_default_has_no_kinematic_fallback`, `::test_fallback_rescore_survives_an_allocation_retry` (without the fix it reproduces `operands could not be broadcast together with shapes (39651,) (13851,)`), `::test_fallback_case_gets_its_own_phase_cache`. Awaiting fresh-context re-verification.
+(A) `kinematic_fallback_payload` also excludes `sinc-shape`, so a defaulted shape axis refuses rather than rescoring at another step. (B, C) `measured_bandwidth_fallback` gives the rescored case its own nested phase cache (`_spectrum_phase_cache["bandwidth_fallback"]`), so the refused axis's line-roulette screen and the rescored lines phase never cross axes on an allocation retry. Anchors: `tests/energy-grid/test_line_grid_bandwidth.py::test_sinc_shape_default_has_no_kinematic_fallback` (renamed under #1214, below), `::test_fallback_rescore_survives_an_allocation_retry` (without the fix it reproduces `operands could not be broadcast together with shapes (39651,) (13851,)`), `::test_fallback_case_gets_its_own_phase_cache`. Awaiting fresh-context re-verification.
 
 ## Independent re-verification (fresh context, 2026-11-17, #1243, commit 688394d03)
 
@@ -1389,3 +1389,7 @@ For directions $D$ the returned axis $A=[s,X]$ has step $h=\min_{d\in D} h_d$ an
 Minor: the "rescoring" warning precedes a re-raise at the ceiling; an extension can exceed the temporal sample cap (`ValueError`); a joint extension uses only the refusing direction's ladder, which is conservative and costs passes, not correctness.
 
 The task owner applied `rederived` to the ledger row from this verdict.
+
+### Remediation (A) replaced (implementation context, 2026-11-17, #1214)
+
+#1214 makes `sinc-shape` the default resolution for bin-mean quadrature on the measured bandwidth and gives the kinematic default `sinc-oversampled` (`W/8`). Refusing every `sinc-shape` fallback would leave defaulted bin-mean cases without the refusal rescore. `kinematic_fallback_payload` therefore excludes only `resonance-local` again; a `sinc-shape` payload, defaulted or chosen, falls back to `kinematic-ceiling` + `sinc-oversampled` with the shape-only keys dropped. The rescore never takes the `sinc-nyquist` step that (A) caught (hBN 1 MeV: 1.11 → 3.0 eV). The bin-mean bound at `W/8` is `(π²/9)/64 = 1.7e-2`, against 1e-2 by construction for `sinc-shape`, so a refused bin-mean axis rescores under a looser bin-mean bound; the rescore's own truncation audit is unchanged. Channeling, transition-radiation and mixed-transport cases with a defaulted `sinc-shape` now resolve to the same fallback instead of raising. Anchor: `::test_sinc_shape_falls_back_to_the_oversampled_step_not_the_nyquist_one` (replaces `::test_sinc_shape_default_has_no_kinematic_fallback`). Awaiting fresh-context verification.

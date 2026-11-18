@@ -16,8 +16,10 @@ from pyrite._cxr_grid_policy import (
     CXR_GRID_POLICY_SCHEMA,
     DEFAULT_BANDWIDTH_TRUNCATION,
     KINEMATIC_BANDWIDTH_POLICY,
+    OVERSAMPLED_RESOLUTION_POLICY,
     RESONANCE_BANDWIDTH_POLICY,
     RESONANCE_CXR_GRID_POLICY_SCHEMA,
+    SHAPE_RESOLUTION_POLICY,
     CxrGridToleranceError,
     CxrGridTruncationWarning,
     CxrYieldStatisticsWarning,
@@ -310,7 +312,8 @@ def test_measured_grid_uses_collected_production_weights(monkeypatch):
     policy = resolve_cxr_grid_policy(
         start_eV=50.0,
         stop_eV=100_000.0,
-        per_call={"bandwidth": RESONANCE_BANDWIDTH_POLICY},
+        # The coarser step keeps the synthetic 1 eV width inside the budget.
+        per_call={"bandwidth": RESONANCE_BANDWIDTH_POLICY, "resolution": "sinc-nyquist"},
     ).payload()
     case = {"composition": [("B", 0.5), ("N", 0.5)]}
     collected = (
@@ -506,6 +509,18 @@ def test_defaulted_measured_bandwidth_falls_back_to_the_explicit_kinematic_paylo
     chosen = _hbn_case(1000.0, _RESONANCE)["line_grid_policy"]
     assert kinematic_fallback_payload(chosen) is None
     assert kinematic_fallback_payload(explicit) is None
+
+
+def test_defaulted_bin_mean_shape_axis_falls_back_to_the_kinematic_oversampled_payload():
+    """A defaulted bin-mean case takes ``sinc-shape``; its fallback is the kinematic default (#1214)."""
+    default = _hbn_case(1000.0, {"quadrature": "bin-mean"})["line_grid_policy"]
+    assert default["resolution"]["policy"] == SHAPE_RESOLUTION_POLICY
+    assert "resolution" not in default["sources"]
+    explicit = _hbn_case(
+        1000.0, {"quadrature": "bin-mean", "bandwidth": KINEMATIC_BANDWIDTH_POLICY}
+    )["line_grid_policy"]
+    assert explicit["resolution"]["policy"] == OVERSAMPLED_RESOLUTION_POLICY
+    assert kinematic_fallback_payload(default) == explicit
 
 
 def test_defaulted_refusal_rescores_on_the_ceiling_and_explicit_refusal_raises(monkeypatch):
@@ -761,15 +776,20 @@ def test_extensions_are_capped_before_the_ceiling(monkeypatch):
     assert stop == ceiling and len(refusals) == MAX_EXTENSIONS + 1
 
 
-def test_sinc_shape_default_has_no_kinematic_fallback():
-    """A ``sinc-shape`` axis is refused, not rescored at the Nyquist step (#1243).
+def test_sinc_shape_falls_back_to_the_oversampled_step_not_the_nyquist_one():
+    """A ``sinc-shape`` axis rescores at ``sinc-oversampled``, never ``sinc-nyquist`` (#1243, #1214).
 
-    The fresh-context check rescored hBN 1 MeV from a 1.11 eV shape step to a
-    3.0 eV kinematic one.
+    The #1243 fresh-context check rescored hBN 1 MeV from a 1.11 eV shape step to
+    a 3.0 eV kinematic one; the fallback now takes the kinematic default's
+    ``W/8`` step whether ``sinc-shape`` was chosen or defaulted.
 
     Validation: line-grid-resonance-bandwidth
     """
-    from pyrite._cxr_grid_policy import SHAPE_RESOLUTION_POLICY
+    from pyrite._cxr_grid_policy import (
+        LINE_NYQUIST_OVERSAMPLING,
+        OVERSAMPLED_RESOLUTION_POLICY,
+        SHAPE_RESOLUTION_POLICY,
+    )
 
     payload = resolve_cxr_grid_policy(
         start_eV=50.0,
@@ -778,7 +798,11 @@ def test_sinc_shape_default_has_no_kinematic_fallback():
     ).payload()
     assert payload["bandwidth"]["policy"] == RESONANCE_BANDWIDTH_POLICY
     assert "bandwidth" not in payload.get("sources", {})
-    assert kinematic_fallback_payload(payload) is None
+    fallback = kinematic_fallback_payload(payload)
+    assert fallback["bandwidth"]["policy"] == KINEMATIC_BANDWIDTH_POLICY
+    assert fallback["resolution"]["policy"] == OVERSAMPLED_RESOLUTION_POLICY
+    assert fallback["resolution"]["oversampling"] == LINE_NYQUIST_OVERSAMPLING
+    assert not {"halo_limit", "shape_rtol", "shape_max_points"} & set(fallback["resolution"])
 
 
 def test_fallback_rescore_survives_an_allocation_retry(monkeypatch):

@@ -439,7 +439,7 @@ def test_missing_material_rows_reach_automatic_case_policy(tmp_path, monkeypatch
                 decode_energy_grid(case["E_grid"]), np.linspace(10.0, 58.0, 17)
             )
         else:
-            assert case["line_grid_policy"]["resolution"]["policy"] == "sinc-nyquist"
+            assert case["line_grid_policy"]["resolution"]["policy"] == "sinc-oversampled"
             assert case["line_grid_policy"]["bandwidth"]["policy"] == "resonance-population"
 
     # Family-derived cached rows cannot bound the new selector's candidate set.

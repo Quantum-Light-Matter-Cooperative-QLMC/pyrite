@@ -638,9 +638,101 @@ Three materials still had bundled 3 eV rows. Against the 0.09375 eV reference, h
 
 The audit supports [ADR-0013](../../adr/0013-automatic-line-grids-by-default.md): remove every bundled stored row and artifact reference, and route all bundled profiles through the existing `kinematic-ceiling` plus `sinc-nyquist` policy. The artifact schema remains available as an opt-in performance mechanism.
 
+(shape-oversampling-issue-1214)=
+
+## Shape oversampling (issue #1214)
+
+The trapezoid bound $h \le \pi/a_w$ makes line *area* exact; it says nothing about the node-sampled peak or the linearly interpolated FWHM, whose errors fall with the step rather than vanishing at Nyquist. Since #1214 the automatic resolution is `sinc-oversampled`: $h = \min(w_q, h_\mathrm{max}) / K$ with $w_q$ the `sinc_feature_spacing` quantile, $h_\mathrm{max}$ = `DEFAULT_MAX_SPACING_EV` and $K$ = `LINE_NYQUIST_OVERSAMPLING` $= 8$. This is grid policy measured on the scenes below, not a derived bound. `sinc-nyquist` ($K = 1$) remains selectable.
+
+**Flight-grouped substeps.** Under `max_dE_frac > 0` the reducer sums a flight's substep fields (`cxr/_setup.py::_flight_groups`), so the scored line has phase $\sum_i \kappa_i t_i$ and, taking a constant phase rate and ignoring the resonance drift between substeps (which only fills the minima), first zero $2\pi\hbar c / \sum_i \kappa_i t_i$, with $\kappa_i = 1 - \beta_i \hat v\cdot\hat n$. `sinc_feature_samples` now takes one sample per $(\mathrm{owner}, \texttt{flight\_id})$ group with that width and weight $(\sum_i t_i)^2$. Per-substep widths had read the cap's step length instead: on HOPG 30 keV half-cap the quantile saturated at the 3 eV maximum and even $K = 8$ missed FWHM by up to +2.0 % (job 13339). With grouped widths the target is 0.60–0.69 eV and $K = 8$ keeps FWHM within +0.075 % and peak within −0.05 % on all three seeds (job 13380, 43–49 k nodes, 0.65 s warm scoring). One-row flights reproduce the per-row samples exactly (`tests/energy-grid/test_sinc_spacing.py`).
+
+**Margins.** Yield and centroid $10^{-3}$; peak density and dominant-line FWHM $10^{-2}$, against each seed's own node reference at 0.046875 eV on the same support (`checks/defaults_spectral_gate_642.py`, `sinc-xK` arms that split every resolved step into $K$). Intrinsic source spectra only.
+
+```{list-table} Worst-seed dominant-line FWHM error by $K$ (#1214 K sweep, RTX 5080, measured #1243 axis). Frozen: #1143 s12 transports, 64 histories, seeds 642501–3. Production: fresh transport, 300 histories, seeds 1214301–3.
+:header-rows: 1
+:name: tbl-sinc-shape-oversampling
+
+* - scene
+  - $K=1$
+  - 4
+  - 5
+  - 6
+  - 7
+  - 8
+  - 10
+* - HOPG 30 keV (production)
+  - +5.2 %
+  - +0.38 %
+  - +0.10 %
+  - +0.05 %
+  - +0.13 %
+  - +0.06 %
+  - +0.04 %
+* - Si 300 keV (production)
+  - +2.3 %
+  - +0.31 %
+  - +0.24 %
+  - +0.19 %
+  - +0.15 %
+  - +0.09 %
+  - +0.02 %
+* - MoS₂/Si layered (production)
+  - +0.55 %
+  - +0.02 %
+  - +0.02 %
+  - 0.00 %
+  - +0.01 %
+  - +0.01 %
+  - 0.00 %
+* - HOPG mosaic, 17 nodes (frozen)
+  - —
+  - —
+  - +0.19 %
+  - +0.08 %
+  - +0.08 %
+  - +0.09 %
+  - +0.05 %
+* - HOPG 1 MeV (frozen)
+  - —
+  - —
+  - **+1.77 %**
+  - +0.55 %
+  - **+1.05 %**
+  - +0.53 %
+  - +0.38 %
+* - HOPG 1 MeV (production)
+  - **+71 %**
+  - **+1.92 %**
+  - **+1.95 %**
+  - **+1.02 %**
+  - +0.89 %
+  - +0.73 %
+  - +0.57 %
+```
+
+$K = 8$ is the smallest value inside the peak and FWHM margins on every scene and seed (mosaic seed 642502 has no reference FWHM on the native support, so that row rests on two seeds); the 1 MeV error is not monotone in $K$ (node phase against the narrow lines), so six and seven each fail one population. At $K = 8$ the worst peak error is −0.42 % (1 MeV); yield and centroid move by at most about 2e-4 with $K$ above 4 (Si 300 keV frozen centroid 2.0e-4, layered yield 1.2e-4). The layered centroid carries a constant 1.7e-3 offset at every $K$, including $K = 16$ on frozen s12: a reference-support difference, not grid resolution, still open in #1214.
+
+**Cost.** Warm scoring per call at 300 histories, RTX 5080 / AMD qlmc-ace: HOPG 30 keV 0.017 / 0.020 s, Si 300 keV 0.31–0.50 / 1.2–1.9 s (213–336 k nodes), layered 1.0–1.1 / 3.8–4.3 s (185–206 k), HOPG 1 MeV 0.013 / 0.008 s (81 k); transport takes 0.03–0.16 s warm on the RTX 5080 (0.023–0.18 s on AMD). That is 1–8× the `sinc-nyquist` scoring time on the same axis. Every measured scene stays under the 600 000-point budget; on the closed-form `kinematic-ceiling` axis (Si 300 keV at 590–604 k nodes even at $K = 1$) it does not, which is why #1214 lands after the #1243 measured default.
+
+Evidence: `pyrite-output/validation/issue-1214/{r1214,r1214b}/<job>-<label>/` (jobs 13330–13380; 13357 and 13362–13365 hold no reports, lost to an AMD device failure), each with `SHA256SUMS`, `SOURCE_SHA` and the harness copy; issue #1214 records the job table.
+
+**Bin-mean default and quadrature comparison (2026-11-17).** An unset resolution follows `default_resolution_policy`. Bin-mean quadrature on the `resonance-population` bandwidth takes `sinc-shape` ([line-grid-sinc-shape-spacing](line-grid-sinc-shape-spacing.md)). The reason is the isolated-line height bound $(\pi^2/9)(h/W)^2$ for bin means: at $h = W/8$ it is 1.7 %, outside the 1 % peak margin, whereas $h = 0.0955\,W$ meets it by construction. The corresponding node bound, $(\pi^2/12)(h/W)^2$, is 1.3 % at $K = 8$. Measured node errors are smaller because real lines are blended populations, not single sinc² lines.
+
+Jobs 13528–13531 and replicates 13536–13539 (RTX 5080, source `b6604e5ef`, the Plan 2 production scenes at 3 × 300 histories) score the same transports with node ÷8, bin-mean `sinc-shape` and bin-mean ÷8. Every arm stays inside every margin on every scene and seed, native and matched. The one exception is the layered native centroid offset, which is constant across arms and $K$. The worst FWHM errors all occur at HOPG 1 MeV:
+
+| arm | native | matched |
+|---|---|---|
+| node ÷8 | +0.41 % | +0.95 % |
+| bin-mean `sinc-shape` | +0.41 % | +0.65 % |
+| bin-mean ÷8 | +0.76 % | +0.76 % |
+
+Node ÷8's matched-band FWHM headroom at 1 MeV is therefore only 1.05×. Because the 1 MeV error is not monotone in $K$ (see the table above), it is recorded as thin rather than answered with a larger $K$. Narrow-line refinement belongs to #1257. Bin-mean ÷8, which a bin-mean case gets on `kinematic-ceiling` routes (channeling, transition radiation, mixed transport, and the #1243 fallback), passed every scene with a worst case of 0.76 %. Its 1.7 % isolated-line bound is not reached on these line populations, but no kinematic-route scene was qualified directly.
+
+On cost, node ÷8 is the fastest or tied on every scene and the only arm with stable warm timings. Bin-mean arms use 285–1412 MiB of device memory, against 4–824 MiB for node. Issue #1214 records the per-scene table.
+
 ## What this row does not claim
 
-- No default changes. `DEFAULT_RTOL`, `DEFAULT_MAX_SPACING_EV`, and `DEFAULT_BACKEND_SAFETY_ULPS` are unchanged.
+- No tolerance changes. `DEFAULT_RTOL`, `DEFAULT_MAX_SPACING_EV`, and `DEFAULT_BACKEND_SAFETY_ULPS` are unchanged; the resolution default changed in #1214 ([shape oversampling](#shape-oversampling-issue-1214)).
 - It does not claim the line spectra are physically correct, only how they respond to grid refinement and to backend precision.
 - It does not claim that opt-in stored grids are intrinsically invalid; they require explicit ownership and revalidation when relevant physics changes.
 
@@ -655,3 +747,83 @@ The issue #126 fresh-context audit found that the implementation matches the mea
 - **Historical stored-number audit: retired.** No ladder checkpoint JSON, precision JSON/NPZ/pickle, or issue #125 audit artifact is tracked in the repository or present in the validation worktree. The write-up names remote jobs and the remote output `line_grid_precision_109.json`, but does not retain the source rungs alongside the ledger. Consequently the case tables, six-versus-eight acceptances, catalog-grid errors, resource timings, float32 deviation bounds and slopes, 20 keV search, and issue #125 material percentages cannot be recomputed independently from repository evidence. Their internal summaries are not a substitute for artifact comparison. Those values are therefore retained only as non-validating provenance and excluded from this row's claim.
 
 **Verdict: anchored.** The code-level instrument, governing equations, and Nyquist-as-sufficient acceptance semantics match focused regression anchors. Retired remote measurements make no validated quantitative claim. Human sign-off remains pending.
+
+(verification-issue-1214)=
+
+### Fresh-context verification of the #1214 change (2026-11-16)
+
+Scope: the flight-grouped `diagnostics.py::sinc_feature_samples` width, the `sinc-oversampled` resolution in `_cxr_grid_policy.py`, and the [shape oversampling](#shape-oversampling-issue-1214) numbers. The verifier derived the grouped width before reading the reducer body.
+
+**Independent derivation.** Take one numerical substep $i$ of a straight flight, with speed $\beta_i c$, unit direction $\hat{\mathbf v}$, length $L_i$ and $t_i = L_i/\beta_i$ (time multiplied by $c$). Its line amplitude at photon energy $E$, about the Doppler resonance $E_r$, is
+
+$$
+A_i(E) \propto \int_0^{t_i} e^{i\kappa_i (E-E_r)\tau/\hbar c}\,d\tau,
+\qquad \kappa_i = 1-\beta_i\,\hat{\mathbf v}\cdot\hat{\mathbf n},
+$$
+
+so $\lvert A_i\rvert^2 \propto t_i^2\operatorname{sinc}^2[\kappa_i t_i (E-E_r)/2\hbar c]$, with first zero at $\Delta E_i = 2\pi\hbar c/(\kappa_i t_i)$. A flight-grouped reduction adds the substep amplitudes with continuous phase before squaring. If $E_r$ is common to all substeps and every $\kappa_i$ is equal, the sum is the single integral over $\sum_i t_i$:
+
+$$
+\Bigl\lvert \sum_i A_i \Bigr\rvert^2 \propto \Bigl(\sum_i t_i\Bigr)^2
+\operatorname{sinc}^2\!\Bigl[\frac{(E-E_r)\sum_i \kappa_i t_i}{2\hbar c}\Bigr],
+\qquad
+\Delta E = \frac{2\pi\hbar c}{\sum_i \kappa_i t_i}.
+$$
+
+When the $\kappa_i$ differ, or $E_r$ drifts as $\beta_i$ falls, this is the constant-rate approximation. The total duration still bounds the narrowest feature, so the grouped width is the conservative grid scale. N equal substeps reproduce the uncapped row exactly, and a one-row flight reproduces the per-row sample.
+
+**Comparison with the implementation.**
+
+- `sinc_feature_samples` sums `denominator * t_L` and `t_L` per $(\mathrm{owner}, \texttt{flight\_id})$ group, with owner = `track_id`, else `elec_id`. It returns width $2\pi\hbar c/\sum_i\kappa_i t_i$ and weight $(\sum_i t_i)^2$. This matches the derivation term by term. The key and the energy field (`E_repr_keV`, else `E_keV`) are the same ones `cxr/_setup.py::_flight_groups` and the reducer read.
+- The reducer's per-row argument is $v = a_\mathrm{vac}(E-E_\mathrm{vac})$, with $a_\mathrm{vac} = (1-\mathbf v\cdot\hat{\mathbf n})T/2\hbar c$ and the vacuum $\kappa$ (`_formation.py`). `_cpu_reduce._grouped_formation_reduce` sums $T F$ times the phase factor within each flight before squaring. The direction convention therefore agrees. Refraction ($\delta$) only shifts the line, and absorption ($q$) fills the zeros; the diagnostic ignores both.
+- Rows with invalid kinematics are dropped before the sums. All-singleton flights take the unchanged per-row path.
+
+**Numerical probes.** These used CPU FP64 and the grouped reducer through `mc_cxr_spectrum`, on the longest flight of a 25 keV carbon transport (2086 Å, 17.9 keV), HOPG (002).
+
+| case | predicted $\Delta E$ | measured first minima |
+|---|---|---|
+| uncapped row, $\theta = 119^\circ$ | 1.8267 eV | $\pm 1.831$ eV (probe step 0.0046 eV) |
+| 34 equal substeps, $\theta = 60^\circ$ | 1.9791 eV | $-1.975$ / $+1.979$ eV |
+| 34 equal substeps, $\theta = 150^\circ$ | 1.6111 eV | $-1.621$ / $+1.618$ eV |
+| `subdivide_flights`, 17 and 68 substeps, $\theta = 150^\circ$ | 1.6111 eV | $\pm 1.62$ eV, minima filled to 0.26 of peak by resonance drift |
+
+- **Equal-substep limit.** The 34 equal substeps give the same grouped spectrum as the one-row coherent field to $7\times10^{-9}$. The diagnostic returns the uncapped sample bit for bit, while the per-row width would be 34 times larger.
+- **Pre-fix per-row widths.** On the capped flights the per-row widths were 27–125 eV, the cap's step length, against the 1.61 eV line.
+- **Near the C K edge** ($\theta = 119^\circ$, 283 eV) the grouped line is asymmetric because the couplings vary across it. It is not a sinc test point.
+
+**Policy.** These were checked directly, with the payload shown in each case:
+
+- Default payload: `{"policy": "sinc-oversampled", ..., "oversampling": 8}`. Steps are $0.5 \to 0.0625$ eV, and $7 \to 0.375$ eV (cap 3 eV divided by 8).
+- `sinc-nyquist`: no `oversampling` key. An explicit choice records `sources.resolution`, so its digest differs from the pre-#1214 default payload.
+- Windows: an unset resolution becomes `sinc-nyquist`. An explicit `sinc-oversampled` with windows is refused.
+- A payload missing `oversampling` is refused.
+- The over-budget refusal names `--resolution sinc-nyquist` and never coarsens.
+- `kinematic_fallback_payload` carries the resolution unchanged.
+- The speed-cache key hashes the payload, and `campaign/profiles.py` adds `line_resolution_model` to every incoherent identity.
+- `resonance-local` keeps its sinc-Nyquist floor, and `energy_grid/derive.py` labels catalog grids `sinc-nyquist`.
+
+Streamed blocks are whole primary histories. A track, and therefore a flight, cannot span blocks; joined block cascades are refused. Per-block grouped samples therefore concatenate to the joined set. The only possible difference is the order of equal-width ties under secondaries, where `track_id` is block-local. That ordering already existed for per-row samples, and the weighted quantile does not depend on it beyond floating-point rounding.
+
+The focused tests pass: 92 passed across `test_sinc_spacing.py`, `test_line_grid_policy.py`, `test_defaults_spectral_gate.py`, `test_streamed_line_grid.py` and `test_profile_line_grid.py`.
+
+**Evidence recomputation.** Every `report.json` under `r1214b/` was recomputed on the native (measured) support against its seed's reference at 0.046875 eV. Each table cell reproduces to the stated rounding, including:
+
+- the 1 MeV non-monotonicity: production $K = 6$ gives +1.02 %, frozen $K = 7$ +1.05 %, and $K = 8$ +0.73 % / +0.53 %;
+- the worst $K = 8$ peak error, −0.42 %;
+- $K = 1$ at 1 MeV: peak −23…−31 %, FWHM +63…+78 % (`13348`/`13361`);
+- half-cap before the fix (`r1214/13339`, sinc target 3.0 eV): $K = 8$ FWHM +0.61 / +1.96 / +1.49 %;
+- half-cap after the fix (`r1214b/13380`, target 0.60–0.69 eV): $K = 8$ FWHM +0.031 / +0.075 / +0.038 %.
+
+`SHA256SUMS` verify for every job that has one. Job 13380 ran from `01b2bdd4+wip-228ce41492ce`; its `diagnostics.py` hunk differs from the reviewed tree only by a variable rename.
+
+**Wording findings** (no physics discrepancy):
+
+1. "$K = 8$ is the smallest value passing every scene and seed" holds only for the shape margins. The layered centroid fails $10^{-3}$ at every $K$, as the next sentence says. Mosaic seed 642502 has no reference FWHM on the native support, so the mosaic FWHM row rests on two seeds.
+2. "Yield and centroid do not depend on $K$ above 4" overstates the result. They stay within $2\times10^{-4}$ (worst: Si 300 keV frozen centroid $2.0\times10^{-4}$, layered yield $1.2\times10^{-4}$), apart from the layered centroid, and still move slightly with $K$. The ledger row's $K = 1$ peak range "−27…−31 %" should read −23…−31 %: `13361` seed 1214303 gives −23.1 %.
+3. "Transport takes 0.03–0.16 s warm" is the RTX 5080 range. AMD gives 0.023–0.179 s.
+4. The evidence pointer "jobs 13330–13376" omits 13378/13380, which hold the post-fix half-cap evidence. That evidence is not stated in the section, and jobs 13357 and 13362–13365 hold no reports.
+5. The section calls $2\pi\hbar c/\sum_i\kappa_i t_i$ the line's "first zero" without the constant-rate assumption that the ledger row states.
+
+All five wording findings and the ledger peak range were corrected in the section above and the ledger row after this verification (implementation context, 2026-11-16).
+
+**Verdict for the #1214 additions: rederived.** The grouped width, the oversampled-resolution plumbing and the measured K-sweep match. $K = 8$ is measured grid policy, which the section states, not a derived bound. Row status stays `anchored`, and human sign-off remains pending.
