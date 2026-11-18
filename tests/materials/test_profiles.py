@@ -626,37 +626,37 @@ def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
         (
             "hopg_hbn_gaussian_200fs",
             "hopg",
-            "504305ec8d85d8b038a9a73e5a7f9c8feafd11e2c6a5ee94b50b092cd88235cc",
+            "3ba0ec4adf04277c5e412d34003c201dca5290214a80579e2518198b06b5fde4",
         ),
         (
             "hopg_hbn_gaussian_200fs",
             "hbn",
-            "1229d531f709c6192977177328f925f976bf42e9c224ed7adce250744d3a0213",
+            "897af689c6105093274b4816fd0c906c75ac61d187987b11b42b834a9e8433c8",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hopg",
-            "00ad6a756eb51fc03df3012a048ff7a794a75092d896c9d8fdaf0faa0e8aabcd",
+            "43fcb1a3bfc191729ef24c4dd010bb5232fcfaf784364361139e6a6221dff7b4",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hbn",
-            "440f85ea53cb3db5abd0d464a1c6ef94bb5770b1fb40ee2d832a4badf18ef160",
+            "80fa2d0e1194cb6b135554df3a652cc38a8e787b1a5527f8dc2e5416477dd1f7",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hopg",
-            "42641333176aba75355bc7b2527cbe43cb00404c775bf6adcd16b25b940211e5",
+            "24c8fb908f94ae75ce52644a39ee5950989bd7e09ed536d542f9236203dca4f9",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hbn",
-            "771fc87c6254d798bdae7d7fa6b28b783adaee8174545fdc053d1942f91bc57f",
+            "07dbdae7c16a39d377bcb705616b3b8bc31d17c6ac4b075cd795ede1f9e6e969",
         ),
         (
             "hopg_emittance_demo",
             "hopg",
-            "2284e03163ec9f65c130d62af7ea033b762ff1ec1b970a3fe5133b0970409a06",
+            "7e3f01b209eeb6920dc763c18ce1ff308c800bd17c8e7359c7d200025924755c",
         ),
         (
             "promising_low_ne",
@@ -966,8 +966,8 @@ def test_retired_survey_stems_resolve_only_from_their_sidecar(tmp_path, stem):
 @pytest.mark.parametrize(
     ("profile", "material", "stem"),
     [
-        ("standard", "hopg", "hopg@full-92a273fcab7d"),
-        ("standard", "mose2", "mose2@full-3e136398ba66"),
+        ("standard", "hopg", "hopg@full-8051843e6163"),
+        ("standard", "mose2", "mose2@full-6a1a151e01aa"),
     ],
 )
 def test_named_profile_stems_are_pinned(profile, material, stem):

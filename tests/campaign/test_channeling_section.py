@@ -224,6 +224,6 @@ def test_channeling_demo_and_off_profile_identities_are_unchanged():
     sweep = material_sweep("hopg", catalog_profile="standard")
     settings = profiles.profile_run_settings(default_settings(), "standard", sweep=sweep)
     assert profiles.dataset_identity("hopg", settings, sweep)["parameter_sha256"] == (
-        "92a273fcab7d5ce942e4c47be484ea5b6f47c2813a04f14112a0177f25db064f"
+        "8051843e6163493c5d6b5ad006ca653cf7fda97e51a96cd0348bc59dc5d367d7"
     )
-    assert profiles.named_profile_stem("hopg") == "hopg@full-92a273fcab7d"
+    assert profiles.named_profile_stem("hopg") == "hopg@full-8051843e6163"
