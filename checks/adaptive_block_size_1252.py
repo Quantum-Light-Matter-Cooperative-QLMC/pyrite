@@ -78,7 +78,18 @@ def _sync():
 
 
 def rescaled(precision, block):
-    """``precision`` with ``block`` electrons per block; counts rounded up to multiples."""
+    """``precision`` with ``block`` electrons per block; counts rounded up to multiples.
+
+    Since #1253 (``AdaptiveChunkPlan`` present) ``block`` is only the deprecated
+    chunk-floor hint and the policy's counts are kept, so every arm runs the
+    same stopping rule; ``"auto"`` drops the hint (device fill and memory).
+    """
+    try:
+        from pyrite.montecarlo.runner.stream_sizing import AdaptiveChunkPlan  # noqa: F401
+    except ImportError:
+        pass
+    else:
+        return replace(precision, block_histories=None if block == "auto" else int(block))
 
     def up(n):
         return None if n is None else int(math.ceil(n / block) * block)
@@ -332,6 +343,43 @@ def instrument(timers, values, on_values=None):
         )
 
     block_transport.transport_electron_blocks = transport_electron_blocks
+
+    real_monitored = getattr(block_transport, "transport_monitored_blocks", None)
+    if real_monitored is not None:  # #1253 chunked driver: same per-chunk records
+
+        def transport_monitored_blocks(simulate_block, plan, monitor, *args, **kwargs):
+            def simulate(start, stop):
+                _sync()
+                t0 = time.perf_counter()
+                timers.memory.phase = "transport.simulate"
+                block = simulate_block(start, stop)
+                _sync()
+                ids = block.get("electron_id")
+                rows = -1 if ids is None else int(ids.shape[0])
+                timers.blocks.append(
+                    {
+                        "start": start,
+                        "stop": stop,
+                        "simulate_s": time.perf_counter() - t0,
+                        "rows": rows,
+                    }
+                )
+                return block
+
+            real_on_block = monitor.on_block
+
+            def on_block(start, stop, block):
+                timers.memory.phase = "transport.measure"
+                t0 = time.perf_counter()
+                real_on_block(start, stop, block)
+                _sync()
+                timers.blocks[-1]["measure_s"] = time.perf_counter() - t0
+                timers.memory.phase = "transport.simulate"
+
+            monitor.on_block = on_block
+            return real_monitored(simulate, plan, monitor, *args, **kwargs)
+
+        block_transport.transport_monitored_blocks = transport_monitored_blocks
     block_transport.merge_electron_blocks = timers.wrap(
         "transport.join", block_transport.merge_electron_blocks, "transport.join"
     )
@@ -353,11 +401,19 @@ def _scalar_meta(out):
     }
 
 
+def _block_arg(block):
+    return "auto" if block == "auto" else int(block)
+
+
+def _block_int(block):
+    return 0 if block == "auto" else int(block)
+
+
 def run(material, e0_kev, tilt_deg, block, out_prefix):
     from pyrite.montecarlo.runner.scheduling import run_cases
 
     case, precision, profile_precision = profile_case(
-        material, float(e0_kev), float(tilt_deg), int(block)
+        material, float(e0_kev), float(tilt_deg), _block_arg(block)
     )
     memory = Memory()
     timers = Timers(memory)
@@ -372,7 +428,7 @@ def run(material, e0_kev, tilt_deg, block, out_prefix):
                 "material": material,
                 "E0_keV": float(e0_kev),
                 "tilt_deg": float(tilt_deg),
-                "block": int(block),
+                "block": _block_arg(block),
                 "precision": precision.to_dict(),
                 "profile_precision": profile_precision.to_dict(),
                 "realized_electrons": None,
@@ -383,7 +439,9 @@ def run(material, e0_kev, tilt_deg, block, out_prefix):
     instrument(
         timers,
         values,
-        (lambda: save_values(out_prefix, values, np.int64(block))) if incremental else None,
+        (lambda: save_values(out_prefix, values, np.int64(_block_int(block))))
+        if incremental
+        else None,
     )
     launches = Launches()
     launches.install()
@@ -409,7 +467,7 @@ def run(material, e0_kev, tilt_deg, block, out_prefix):
         "material": material,
         "E0_keV": float(e0_kev),
         "tilt_deg": float(tilt_deg),
-        "block": int(block),
+        "block": _block_arg(block),
         "precision": precision.to_dict(),
         "profile_precision": profile_precision.to_dict(),
         "backend": os.environ.get("PYRITE_MC_BACKEND"),
@@ -443,7 +501,7 @@ def run(material, e0_kev, tilt_deg, block, out_prefix):
         "output_meta": {} if out is None else _scalar_meta(out),
     }
     if values:
-        save_values(out_prefix, values, np.int64(block))
+        save_values(out_prefix, values, np.int64(_block_int(block)))
     Path(f"{out_prefix}.json").write_text(json.dumps(record, default=_json_default))
     summary = {k: v for k, v in record.items() if k not in ("per_block", "runner_timing")}
     print(json.dumps(summary, default=_json_default))
