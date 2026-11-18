@@ -32,7 +32,7 @@ Validation: node-support-window-tail
 """
 
 import numpy as np
-from numba import get_num_threads, njit, prange
+from numba import njit, prange
 
 from ....materials.crystal import HBARC_EV_ANG
 
@@ -199,7 +199,13 @@ def _window_layout(tail, node, R):
     return lo.astype(np.int64), hi.astype(np.int64), mode.astype(np.int64)
 
 
-def _chunk_bounds(work, n_chunks):
+#: Partial sums of the CPU window reductions. Fixed, never the thread count,
+#: so a spectrum does not depend on the host's cores or a pool worker's
+#: one-thread pin (#1291); ``prange`` spreads the chunks over the threads.
+REDUCTION_CHUNKS = 32
+
+
+def _chunk_bounds(work, n_chunks=REDUCTION_CHUNKS):
     """Contiguous item ranges of about equal ``work``."""
     if work.size == 0:
         return np.zeros(2, dtype=np.int64)
@@ -504,7 +510,7 @@ def accumulate_sincsq_windowed(E_r, a_width, weights, E_grid, targets, tail, tar
     w = np.ascontiguousarray(np.stack([np.asarray(r, dtype=np.float64) for r in weights]))
     node, lo, hi, mode, mu2, mu3, mu4 = row_window_plan(tail, E_r, a_width)
     work = np.maximum(hi - lo + 1, 0) + np.where(mode == _MODE_DIRECT, tail.n, 0)
-    bounds = _chunk_bounds(work.astype(np.float64), get_num_threads())
+    bounds = _chunk_bounds(work.astype(np.float64))
     out = np.zeros((bounds.size - 1, w.shape[0], tail.n))
     E_grid = np.ascontiguousarray(E_grid, dtype=np.float64)
     mu = np.ascontiguousarray(np.stack((mu2, mu3, mu4)))
@@ -598,7 +604,7 @@ def accumulate_grouped_windowed(lines, d, g_phase, L_esc, coefs, starts, grids, 
     )
     rows = np.diff(starts)
     work = rows * (np.maximum(hi - lo + 1, 0) + np.where(mode == _MODE_DIRECT, tail.n, 0))
-    bounds = _chunk_bounds(work.astype(np.float64), get_num_threads())
+    bounds = _chunk_bounds(work.astype(np.float64))
     acc = np.zeros((bounds.size - 1, tail.n))
     mom = np.ascontiguousarray(np.stack((m2, m3, m4)))
     _grouped_window_reduce(
