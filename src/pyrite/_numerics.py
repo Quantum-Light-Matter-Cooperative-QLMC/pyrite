@@ -712,11 +712,10 @@ class Numerics:
     ``line_roulette`` opts an incoherent scalar-detector run into
     inverse-probability scoring of its CXR lines; ``None`` is analog scoring
     and adds nothing to case identity.
-    ``line_resolution`` picks the automatic CXR line-axis step: the default
-    ``"sinc-oversampled"`` (sinc-Nyquist step / 8; converges peak height and FWHM)
-    or ``"sinc-nyquist"`` (8x fewer nodes, line area only; the opt-out an
-    over-budget axis names). ``None`` adds nothing to case identity; a value
-    joins it. It cannot be combined with an explicit ``energy_bins.cxr`` grid.
+    ``line_resolution`` selects ``"sinc-oversampled"`` (default, sinc-Nyquist
+    step / 8; converges peak/FWHM) or ``"sinc-nyquist"`` (8x fewer nodes, area
+    only; over-budget opt-out). ``None`` adds no identity key; explicit values
+    do, and cannot be combined with an explicit ``energy_bins.cxr`` grid.
     Select ``PYRITE_MC_BACKEND`` before import; models belong to :class:`Physics`.
     """
 
@@ -733,7 +732,6 @@ class Numerics:
     temporal_profile: bool = False
     # Opt-in estimator; None must not add a key to a Case identity.
     line_roulette: LineRoulette | None = None
-    # Opt-in line-axis step (#1214); None must not add a key to a Case identity.
     line_resolution: Literal["sinc-oversampled", "sinc-nyquist"] | None = None
     transport: "TransportNumerics | None" = None
     radiation: "RadiationNumerics | None" = None
