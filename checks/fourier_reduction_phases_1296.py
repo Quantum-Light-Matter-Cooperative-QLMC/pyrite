@@ -900,7 +900,14 @@ def _es_transform(phase, strengths, j0, j1, *, eps, plans, clock, opts, work):
     else:
         kernel = fs._spread_kernel()
         args = (phase, packed, np.int64(n), np.int64(n_fine), np.int32(width), np.float64(beta))
-    kernel(((n + 255) // 256,), (256,), (*args, grid))
+    if opts.get("rect_profile"):
+        ev0, ev1 = cp.cuda.Event(), cp.cuda.Event()
+        ev0.record()
+        kernel(((n + 255) // 256,), (256,), (*args, grid))
+        ev1.record()
+        work.setdefault("_ev", []).append((modes, n, n_fine, ev0, ev1))
+    else:
+        kernel(((n + 255) // 256,), (256,), (*args, grid))
     grid = grid.astype(cp.complex128, copy=False)
     clock.mark("nufft_spread")
     spectrum = cp.fft.fft(grid, axis=1)
@@ -933,7 +940,8 @@ def _positive(E_res, a_width, weight, c0, period, *, eps, opts, clock, work):
         rects = cp.asnumpy(cutoff_rectangle_array(counts, xp=cp))
     modes, sources = rects[:, 1] - rects[:, 0], rects[:, 3] - rects[:, 2]
     min_work = opts.get("min_work", fc._NUFFT_MIN_WORK["fp64"])
-    large = (sources >= 64) & (modes >= 32) & (sources * modes >= min_work)
+    min_modes = opts.get("min_modes", 32)
+    large = (sources >= 64) & (modes >= min_modes) & (sources * modes >= min_work)
     clock.mark("plan")
     work.update(
         rects=len(rects),
@@ -1059,7 +1067,13 @@ def instrumented_reduce(E_res, a_width, weight, axis, *, eps=1e-12, opts=None):
     else:
         out -= cp.asarray(_envelope_image_correction(E, a, w, c0, h, n_bins, P, cp))
     clock.mark("envelope")
-    return out, clock.totals(), work
+    totals = clock.totals()
+    profile = work.pop("_ev", None)
+    if profile:
+        work["rect_profile"] = [
+            (m, n, nf, cp.cuda.get_elapsed_time(a, b) / 1e3) for m, n, nf, a, b in profile
+        ]
+    return out, totals, work
 
 
 _FAST = {"direct": "f32", "envelope": "fused"}
@@ -1097,7 +1111,14 @@ ARM_SETS = {
         ("fast_2^24_spread_f32_grid", {**_FAST, "min_work": 1 << 24, "spread": "f32_grid"}),
     ),
     # #1297 round 2: balanced warp gather and privatized small grids.
-    "sm2": tuple(
+    "sm2": (
+        ("v6_atomic_profile_2^24", {**_V6, "min_work": 1 << 24, "rect_profile": True}),
+        *(
+            (f"v6_atomic_min_modes_{m}_2^24", {**_V6, "min_work": 1 << 24, "min_modes": m})
+            for m in (64, 128, 256, 512)
+        ),
+    )
+    + tuple(
         (f"v6_{name}_2^{b}", {**_V6, "min_work": 1 << b, **extra})
         for b in (24, 22)
         for name, extra in (
