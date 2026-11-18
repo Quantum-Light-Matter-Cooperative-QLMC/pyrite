@@ -28,7 +28,9 @@ when the p99 of its primary metric exceeds the threshold.
 Validation: radiation-error-estimators
 """
 
+import os
 import warnings
+from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
 
@@ -114,7 +116,7 @@ def sinc_feature_samples(segments, n_hat, *, electron_limit=None):
     beta = beta_from_keV(energy)
     t_L = length / beta
     denominator = 1.0 - beta * (direction @ np.asarray(n_hat, dtype=float))
-    if keys is not None:
+    if keys is not None and not _strictly_ordered(*keys):
         # Invalid kinematics drop row by row, as without grouping, before any
         # flight sums them.
         row = np.isfinite(t_L) & np.isfinite(denominator) & (t_L > 0.0) & (denominator > 0.0)
@@ -134,19 +136,52 @@ def sinc_feature_samples(segments, n_hat, *, electron_limit=None):
     return width[valid], weight[valid]
 
 
+def _strictly_ordered(owner, flight):
+    """Whether rows run in strictly increasing ``(owner, flight)`` order.
+
+    Then every flight is one row, in every row subset too, so
+    :func:`_flight_sums` would return None (#1270).
+    """
+    later = owner[1:] > owner[:-1]
+    later |= (owner[1:] == owner[:-1]) & (flight[1:] > flight[:-1])
+    return bool(later.all())
+
+
 def _flight_sums(owner, flight, phase, t_L):
     """Per-flight ``(sum phase, sum t_L)``, or None when every flight is one row."""
     if flight.size == 0:
         return None
-    order = np.lexsort((flight, owner))
-    owner, flight = owner[order], flight[order]
+    order = _flight_order(owner, flight)
+    if order is not None:
+        owner, flight = owner[order], flight[order]
+        phase, t_L = phase[order], t_L[order]
     first = np.empty(flight.size, dtype=bool)
     first[0] = True
     first[1:] = (flight[1:] != flight[:-1]) | (owner[1:] != owner[:-1])
     if first.all():
         return None
     starts = np.flatnonzero(first)
-    return np.add.reduceat(phase[order], starts), np.add.reduceat(t_L[order], starts)
+    return np.add.reduceat(phase, starts), np.add.reduceat(t_L, starts)
+
+
+def _flight_order(owner, flight):
+    """``np.lexsort((flight, owner))``, or None when that is the identity (#1270).
+
+    Rows already in ``(owner, flight)`` order need no sort: the stable lexsort
+    keeps them in place. Otherwise non-negative integer keys pack into one
+    int64 key whose stable argsort is the same order.
+    """
+    later = owner[1:] > owner[:-1]
+    later |= (owner[1:] == owner[:-1]) & (flight[1:] >= flight[:-1])
+    if later.all():
+        return None
+    del later
+    integral = owner.dtype.kind in "iu" and flight.dtype.kind in "iu"
+    if integral and int(owner.min()) >= 0 and int(flight.min()) >= 0:
+        span = int(flight.max()) + 1
+        if (int(owner.max()) + 1) * span < 2**63:
+            return _stable_argsort(owner.astype(np.int64) * span + flight)
+    return np.lexsort((flight, owner))
 
 
 def sinc_spacing_from_samples(samples, *, aliased_weight_limit=0.01):
@@ -163,7 +198,7 @@ def sinc_spacing_from_samples(samples, *, aliased_weight_limit=0.01):
     if width.size == 0:
         raise ValueError("cannot derive sinc spacing: diagnostic transport has no valid segments")
 
-    order = np.argsort(width, kind="stable")
+    order = _stable_argsort(width)
     width = width[order]
     weight = weight[order]
     del order
@@ -171,8 +206,82 @@ def sinc_spacing_from_samples(samples, *, aliased_weight_limit=0.01):
     total = float(cumulative[-1])
     index = int(np.searchsorted(cumulative, float(aliased_weight_limit) * total, side="left"))
     step = float(width[min(index, width.size - 1)])
-    aliased = float(weight[width < step].sum() / total)
+    # ``width`` is sorted, so ``width < step`` is the prefix before ``step``.
+    below = int(np.searchsorted(width, step, side="left"))
+    aliased = float(weight[:below].sum() / total)
     return step, aliased, int(width.size)
+
+
+#: Below this many values one thread sorts; above, value buckets sort in parallel.
+_PARALLEL_SORT_MIN = 1 << 22
+
+
+def _sort_threads():
+    count = getattr(os, "process_cpu_count", os.cpu_count)() or 1
+    return max(1, min(8, count))
+
+
+def _stable_argsort(values):
+    """``np.argsort(values, kind="stable")`` of a 1-D array without NaNs (#1270).
+
+    Large arrays split at sampled value pivots into buckets, each holding its
+    members in index order (a stable radix grouping of the bucket ids); the
+    buckets, in value order, are sorted on threads by
+    :func:`_serial_stable_argsort`. Equal values share a bucket, so the
+    concatenation is the stable order.
+    """
+    threads = _sort_threads()
+    if values.size < _PARALLEL_SORT_MIN or threads < 2:
+        return _serial_stable_argsort(values)
+    sample = np.sort(values[:: max(1, values.size // 200_000)])
+    cuts = np.linspace(0, sample.size - 1, 4 * threads + 1)[1:-1].astype(np.intp)
+    pivots = np.unique(sample[cuts])
+    bucket = np.searchsorted(pivots, values, side="right").astype(np.uint8)
+    grouped = np.argsort(bucket, kind="stable")
+    bounds = np.concatenate(([0], np.cumsum(np.bincount(bucket, minlength=pivots.size + 1))))
+    del bucket
+    order = np.empty(values.size, dtype=np.intp)
+
+    def sort_bucket(index):
+        start, stop = int(bounds[index]), int(bounds[index + 1])
+        members = grouped[start:stop]
+        order[start:stop] = members[_serial_stable_argsort(values[members])]
+
+    with ThreadPoolExecutor(threads) as pool:
+        list(pool.map(sort_bucket, range(pivots.size + 1)))
+    return order
+
+
+def _serial_stable_argsort(values):
+    """``np.argsort(values, kind="stable")`` of a 1-D array without NaNs.
+
+    The default (vectorised, unstable) argsort is several times faster on large
+    populations. It differs from the stable order only inside runs of equal
+    values, which the stable sort leaves in index order; each such run's
+    indices are sorted back here with one integer sort of unique
+    ``(run, index)`` keys.
+    """
+    order = np.argsort(values)
+    tied = values[order]
+    tied = tied[1:] == tied[:-1]
+    if not tied.any():
+        return order
+    # Positions inside a run of equal values: each tie joins i and i + 1.
+    member = np.zeros(order.size, dtype=bool)
+    member[:-1] = tied
+    member[1:] |= tied
+    positions = np.flatnonzero(member)
+    del member
+    # Runs start where a member does not continue a tie from its predecessor.
+    starts = np.ones(positions.size, dtype=bool)
+    starts[1:] = ~tied[positions[1:] - 1]
+    del tied
+    run = np.cumsum(starts, dtype=np.int64) - 1
+    del starts
+    size = np.int64(order.size)
+    keys = np.sort(run * size + order[positions])
+    order[positions] = keys % size
+    return order
 
 
 def coherent_retardation(segments, n_hat, *, electron_limit=None, physical_electrons=None):

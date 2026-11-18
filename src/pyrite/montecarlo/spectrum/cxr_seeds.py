@@ -14,7 +14,9 @@ Window extent and spacing are grid policy, not radiation physics. A windowed
 spectrum is accepted through the refinement ladder, not through these rules.
 """
 
+import os
 from collections.abc import Callable, Iterable, Mapping, Sequence
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Any
 
@@ -22,6 +24,7 @@ import numpy as np
 
 from ..._cxr_windows import FeatureSeed
 from ...materials.crystal import CRYSTALS, HBARC_EV_ANG
+from ._population_tail import block_tail_sums
 from .reflection_rows import MIN_RESONANCE_EV, ReflectionRows, reflection_rows
 
 __all__ = [
@@ -285,39 +288,47 @@ def resonance_population_stop_eV(
         summary.update(max_resonance_eV=None, proxy_truncated_fraction=0.0, capped=False)
         return None, {**summary, "stop_eV": None}
 
+    blocks = list(_population_blocks(populations))
+    threads = max(1, min(8, getattr(os, "process_cpu_count", os.cpu_count)() or 1))
+    pool = ThreadPoolExecutor(threads) if len(blocks) > 1 and threads > 1 else None
+    evaluated: dict[float, float] = {}
+
     def lost(stop):
-        numerator = 0.0
-        for energy_block, weight_block, width_block in _population_blocks(populations):
-            mass = weight_block * width_block
-            keep = np.isfinite(mass) & (mass > 0.0)
-            if keep.any():
-                numerator += float(
-                    (
-                        mass[keep]
-                        * sincsq_upper_tail_bound(width_block[keep], stop - energy_block[keep])
-                    ).sum()
-                )
-        return numerator / total
+        # Fused per-block products, summed by NumPy as the array expression
+        # was and added in block order (_population_tail), so each value is
+        # unchanged (#1270).
+        if stop not in evaluated:
+            numerator = 0.0
+            for block_sum in block_tail_sums(blocks, stop, pool):
+                numerator += block_sum
+            evaluated[stop] = numerator / total
+        return evaluated[stop]
 
     # Lines above a trial edge count wholly, so the search may start below the
     # whole population: a rare hard-scattered line spends the share instead of
-    # forcing the axis out to its resonance.
-    low = min_energy
-    stop = ceiling
-    if low < ceiling and lost(ceiling) <= limit:
-        high = ceiling
-        # The tail sum falls monotonically in stop; 60 halvings reach float64
-        # resolution of any band this axis can carry.
-        for _ in range(60):
-            middle = 0.5 * (low + high)
-            if lost(middle) > limit:
-                low = middle
-            else:
-                high = middle
-        stop = min(ceiling, float(np.ceil(high / round_to_eV) * round_to_eV))
+    # forcing the axis out to its resonance. The tail sum falls monotonically
+    # in stop, so bisecting the rounding lattice finds the smallest rounded
+    # stop that meets the limit in log2(steps) passes; at and below the
+    # lowest resonance every line counts wholly, so lost is one there.
+    try:
+        stop = ceiling
+        if min_energy < ceiling and lost(ceiling) <= limit:
+            lowest = int(np.floor(min_energy / round_to_eV)) - 1
+            highest = int(np.ceil(ceiling / round_to_eV))
+            while highest - lowest > 1:
+                middle = (lowest + highest) // 2
+                if lost(min(ceiling, float(middle * round_to_eV))) > limit:
+                    lowest = middle
+                else:
+                    highest = middle
+            stop = min(ceiling, float(highest * round_to_eV))
+        fraction = lost(stop)
+    finally:
+        if pool is not None:
+            pool.shutdown()
     summary.update(
         max_resonance_eV=max_energy,
-        proxy_truncated_fraction=lost(stop),
+        proxy_truncated_fraction=fraction,
         capped=stop >= ceiling,
         stop_eV=stop,
     )
