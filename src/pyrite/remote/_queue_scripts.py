@@ -578,7 +578,9 @@ def _chunked_queue_tail() -> str:
     ``mats``, ``total``, and ``JOBDIR``.
     """
     return f"""slice_progress_after=$(progress_count) || exit 1
-if [ "$slice_progress_after" -gt "$slice_progress_before" ]; then
+slice_finished_after=$(grep -Ec "^(completed|failed): " "$JOBDIR/log" 2>/dev/null || true)
+slice_finished_after=${{slice_finished_after:-0}}
+if [ "$slice_progress_after" -gt "$slice_progress_before" ] || [ "$slice_finished_after" -gt "$slice_finished_before" ]; then
   stalled=0
   echo 0 > "$JOBDIR/.no_progress_slices"
 else
@@ -597,7 +599,11 @@ if [ "$unresolved" -eq 0 ]; then
   if [ "$failures" -gt 0 ]; then
     # Chain-terminal: the FAILED state is the signal; exit 0 keeps the resubmit
     # chain's own exit status out of it.
-    echo "FAILED ($failures of $total material(s) failed) $(date -Is)" > "$JOBDIR/state"
+    failure_detail=""
+    if compgen -G "$JOBDIR/failures/*" >/dev/null; then
+      failure_detail="; case exceeded slice: increase --chunk-minutes or lower max_histories"
+    fi
+    echo "FAILED ($failures of $total material(s) failed$failure_detail) $(date -Is)" > "$JOBDIR/state"
     exit 0
   fi
   echo "done [$total/$total] $(date -Is)" > "$JOBDIR/state"

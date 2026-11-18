@@ -24,6 +24,8 @@ for path in glob.glob(sys.argv[1] + "/*.json"):
 print(count)
 PY
 }
+slice_finished_before=$(grep -Ec "^(completed|failed): " "$JOBDIR/log" 2>/dev/null || true)
+slice_finished_before=${slice_finished_before:-0}
 slice_progress_before=$(progress_count) || exit 1
 """
 
@@ -46,10 +48,13 @@ def _chunked_timeout_result() -> str:
       echo "resumable timeout at $m [$n/$total] $(date -Is)" > "$JOBDIR/state"
       break
     fi
-    echo "WARNING: slice timed out without checkpoint progress for $m; will not retry" >> "$JOBDIR/log"
+    reason="case exceeded slice without checkpoint progress (budget ${remaining_min} min of $((chunk_seconds / 60)) min slice; case cost unavailable until a case completes); use --chunk-minutes 0 or a larger --chunk-minutes, or lower max_histories"
+    echo "WARNING: $m: $reason; continuing remaining materials in the next slice" >> "$JOBDIR/log"
+    mkdir -p "$JOBDIR/failures" || exit 1
+    printf '%s\n' "$reason" > "$JOBDIR/failures/$m"
     echo "failed: $m" >> "$JOBDIR/log"
-    echo "FAILED (slice timeout without progress) $(date -Is)" > "$JOBDIR/state"
-    exit 1
+    echo "warning at $m [$n/$total] (case exceeded slice; see failures/$m) $(date -Is)" > "$JOBDIR/state"
+    break
 """
 
 

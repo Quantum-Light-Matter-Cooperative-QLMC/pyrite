@@ -323,8 +323,12 @@ def test_chunked_prelimit_signal_resumes_only_143_with_checkpoint_progress(
         assert (jobdir / "state").read_text().startswith("queued slice 2")
         assert (jobdir / "timeouts").read_text().startswith("resumable timeout: hopg")
     elif rc == 143 and prelimit:
-        assert result.returncode != 0
-        assert (jobdir / "state").read_text().startswith("FAILED (slice timeout without progress)")
+        assert result.returncode == 0
+        assert (jobdir / "state").read_text().startswith("FAILED (1 of")
+        reason = (jobdir / "failures" / "hopg").read_text()
+        assert "case exceeded slice" in reason
+        assert "--chunk-minutes 0" in reason
+        assert "max_histories" in reason
     else:
         assert "failed: hopg" in log
 
@@ -357,3 +361,49 @@ def test_chunked_no_progress_slices_stop_after_three(monkeypatch, tmp_path):
     assert (
         (jobdir / "state").read_text().startswith("FAILED (3 slices without checkpoint progress)")
     )
+
+
+@pytest.mark.parametrize("mode", ["scan", "brem", "cxr"])
+def test_slice_overrun_retires_only_material_and_continues_next_slice(monkeypatch, tmp_path, mode):
+    bash = _bash_or_skip(tmp_path)
+    jobdir = tmp_path / "jobs" / "j"
+    jobdir.mkdir(parents=True)
+    (jobdir / "meta").write_text("slurm_job_id: 100\n")
+    (jobdir / ".no_progress_slices").write_text("2\n")
+    calls = tmp_path / "calls"
+    fake_uv = tmp_path / "uv"
+    fake_uv.write_text(
+        '#!/bin/sh\nif [ "$1" = sync ]; then exit 0; fi\n'
+        'case "$*" in *"tables verify"*) exit 0 ;; esac\n'
+        f'echo "$*" >> "{calls}"\n'
+        'case "$*" in *hopg*) kill -USR1 "$(ps -o ppid= -p "$PPID")"; exit 143 ;; esac\n'
+        "exit 0\n"
+    )
+    fake_uv.chmod(0o755)
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    marker = tmp_path / "submissions"
+    (bin_dir / "sbatch").write_text(f'#!/bin/sh\necho called >> "{marker}"\necho 4242\n')
+    (bin_dir / "sbatch").chmod(0o755)
+    monkeypatch.setattr(config, "REMOTE_DIR", str(tmp_path))
+    monkeypatch.setattr(config, "REMOTE_UV", str(fake_uv))
+    mats = ["hopg", "hbn"]
+    if mode == "scan":
+        script = scripts._chunked_queue_script("j", mats, False, None, 10)
+    elif mode == "brem":
+        script = scripts._rebrem_chunked_queue_script("j", mats, None, None, False, 10)
+    else:
+        script = scripts._recxr_chunked_queue_script("j", mats, None, None, False, 10)
+    env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}"}
+    first = subprocess.run([bash, "-c", script], capture_output=True, text=True, env=env)
+    assert first.returncode == 0, first.stderr
+    assert marker.read_text().splitlines() == ["called"]
+    assert (jobdir / "state").read_text().startswith("queued slice 2")
+    assert "--chunk-minutes 0" in (jobdir / "failures" / "hopg").read_text()
+    second = subprocess.run([bash, "-c", script], capture_output=True, text=True, env=env)
+    assert second.returncode == 0, second.stderr
+    log = (jobdir / "log").read_text()
+    assert "failed: hopg" in log and "completed: hbn" in log
+    assert len(calls.read_text().splitlines()) == 2
+    assert marker.read_text().splitlines() == ["called"]
+    assert (jobdir / "state").read_text().startswith("FAILED (1 of 2")
