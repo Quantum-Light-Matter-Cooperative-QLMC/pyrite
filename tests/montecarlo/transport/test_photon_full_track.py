@@ -284,7 +284,46 @@ def test_committed_comparison_keeps_known_discrepancy_visible(comparison, case):
     assert failures == expected
 
 
-def test_complete_cascade_matrix_retains_all_100_gates(comparison, tmp_path):
+def _assert_report_matches(actual, expected):
+    """Keep report structure/verdicts exact; permit binary64 arithmetic rounding."""
+    assert type(actual) is type(expected)
+    if isinstance(expected, dict):
+        assert actual.keys() == expected.keys()
+        for key in expected:
+            _assert_report_matches(actual[key], expected[key])
+    elif isinstance(expected, list):
+        assert len(actual) == len(expected)
+        for value, pinned in zip(actual, expected, strict=True):
+            _assert_report_matches(value, pinned)
+    elif isinstance(expected, float):
+        # One ULP in hypot can propagate through the 3*sigma limit. Four ULPs
+        # cover the two rounded operations without a physical/absolute tolerance.
+        np.testing.assert_array_max_ulp(actual, expected, maxulp=4)
+    else:
+        assert actual == expected
+
+
+@pytest.mark.parametrize("changed", [{"pass_": False}, {"gated": False}, {"sigma": 0.1}])
+def test_report_comparison_rejects_changed_gates_and_numerics(comparison, changed):
+    gate = comparison["_gate"]((1.0, 0.01), (1.0, 0.01), 0.1)
+    with pytest.raises(AssertionError):
+        _assert_report_matches({**gate, **changed}, gate)
+
+
+@pytest.mark.parametrize(
+    "round_toward", [None, -np.inf, np.inf], ids=["native", "down-ulp", "up-ulp"]
+)
+def test_complete_cascade_matrix_retains_all_100_gates(
+    comparison, tmp_path, monkeypatch, round_toward
+):
+    # libm/SIMD hypot can round one ULP differently across supported platforms.
+    if round_toward is not None:
+        hypot = comparison["np"].hypot
+        monkeypatch.setattr(
+            comparison["np"],
+            "hypot",
+            lambda *args, **kwargs: np.nextafter(hypot(*args, **kwargs), round_toward),
+        )
     directory = BENCH / "cascade-matrix-results"
     manifest = json.loads((directory / "provenance.json").read_text())
     for name, digest in manifest["committed_sha256"].items():
@@ -306,7 +345,7 @@ def test_complete_cascade_matrix_retains_all_100_gates(comparison, tmp_path):
         )
         fresh = json.loads(output.read_text())
         stored = json.loads((directory / f"{case}-report.json").read_text())
-        assert fresh == stored
+        _assert_report_matches(fresh, stored)
         assert fresh["failures"] == fresh["missing_gates"] == []
         assert fresh["gated_count"] == expected["gated_count"]
         total += fresh["gated_count"]
