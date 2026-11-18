@@ -37,9 +37,9 @@ The rule is evaluated only at
 d_0=n_{\min},\qquad d_{j+1}=\min\big(n_{\max},\ \max(d_j+1,\ \lceil d_j(1+\delta)\rceil)\big),
 ```
 
-ending at $n_{\max}$, with the pilot count and its projection $N$ added as points of their own; $\delta$ is `decision_growth` (default 0.1). The values $m_{o,i}$ for $d_{j-1}\le i<d_j$ are merged into the moments as one segment, whatever transport chunks delivered them. Transport chunks are sized for device fill and memory only. A stop (or an independent brem freeze) at a point $d$ inside a chunk $[a,b)$ discards the chunk and transports $[a,d)$ again. The realized result is the fixed-$N$ result at $N=d$, bit for bit.
+ending at $n_{\max}$, with the pilot count and its projection $N$ added as points of their own; $\delta$ is `decision_growth` (default 0.1), read as the decimal it is written as, so the ceiling is exact integer arithmetic (0.1 is $1/10$, not the binary double). The values $m_{o,i}$ for $d_{j-1}\le i<d_j$ are merged into the moments as one segment, whatever transport chunks delivered them. Transport chunks are sized for device fill and memory only. A stop (or an independent brem freeze) at a point $d$ inside a chunk $[a,b)$ discards the chunk and transports $[a,d)$ again. The realized result is the fixed-$N$ result at $N=d$, bit for bit.
 
-**Chunk independence.** $m_{o,i}$ is a function of (seed, $i$) and the run's table range alone (prefix stability, below), and the per-electron reductions are bincounts over that electron's rows, so a chunk boundary does not change any $m_{o,i}$. The grid depends only on the policy and, through the pilot projection, on $m_{o,1..n_p}$. Each segment's moments are reduced from the same values in the same order and merged by the same Chan update in the same sequence, so every moment, guard value and decision is bit-identical under any chunking. Re-transporting $[a,d)$ reproduces the same electrons, by counter addressing, and the existing join contract makes the kept chunks the fixed-$d$ transport.
+**Chunk independence.** $m_{o,i}$ is a function of (seed, $i$) and the run's table range alone (prefix stability, below), and the per-electron reductions are bincounts over that electron's rows, so a chunk boundary does not change any $m_{o,i}$. On the host brem path each row's band value is a per-row reduction added in a fixed element order and the electron sum is one bincount in row order, so neither the transport chunk nor the reducer's row slicing changes it (before the v4 verification fix, BLAS `gemv` blocking and slice-dependent addition order moved brem values by up to $5\times10^{-16}$ relative). The fused CUDA brem reduction is not covered by this argument. The grid depends only on the policy and, through the pilot projection, on $m_{o,1..n_p}$. Each segment's moments are reduced from the same values in the same order and merged by the same Chan update in the same sequence, so every moment, guard value and decision is bit-identical under any chunking. Re-transporting $[a,d)$ reproduces the same electrons, by counter addressing, and the existing join contract makes the kept chunks the fixed-$d$ transport.
 
 **Overshoot and cost.** Let $d_{J-1}$ be the last refused point. Then $d_J\le\lceil d_{J-1}(1+\delta)\rceil$, so the stop exceeds the last refused count by at most $\delta$ relative (plus one electron). The block rule's absolute overshoot was up to $B-1$, and its pilot projection rounded up to a block. The run makes at most $\log(n_{\max}/n_{\min})/\log(1+\delta)+1/\delta+3$ checks, since steps of $+1$ occur only while $d_j<1/\delta$. As $\delta\to0$ the grid tends to every electron $\ge n_{\min}$.
 
@@ -179,7 +179,7 @@ v4 decision points (#1253):
 - `test_pilot_projection_skips_checks_until_the_projected_count`: the pilot count and the unrounded projection are decision points.
 - `test_energy_range_replay_rechecks_statistics_before_accepting_stop`: a failed realized-range recheck grows to the next decision point.
 - `tests/montecarlo/transport/test_independent_stopping.py` and `test_adaptive_cascades.py` cover the brem freeze (prefix re-transport) and cascades under chunked monitoring.
-- `checks/adaptive_decision_cadence_1253.py` (`adaptive_decision_cadence_1253_results.json`) replays the 12 #1252 captures: records are identical at five chunkings. Converged stops lie within $-0.5\,\%$ to $+7.4\,\%$ of a dense $\delta=0.01$ grid with the same window share, i.e. within $\delta$. The 30 MeV stops fall from 12k–192k (block rule, $B=3$k–$48$k) to 3 996, against 4 000 at $B=1$k. The 30 keV stops are 265k/625k (hBN 15°/60°) and 321k/625k (HOPG) against 258k–336k and 594k–672k for the block rule. The 1 MeV cases still run to the end of the capture or to $n_{\max}$.
+- `checks/adaptive_decision_cadence_1253.py` (`adaptive_decision_cadence_1253_results.json`) replays the 12 #1252 captures: records are identical at five chunkings. Converged stops lie within $-0.6\,\%$ to $+7.3\,\%$ of a dense $\delta=0.01$ grid with the same window share, i.e. within $\delta$. The 30 MeV stops fall from 12k–192k (block rule, $B=3$k–$48$k) to 3 993, against 4 000 at $B=1$k. The 30 keV stops are 265k/625k (hBN 15°/60°) and 321k/625k (HOPG) against 258k–336k and 594k–672k for the block rule. The 1 MeV cases still run to the end of the capture or to $n_{\max}$.
 
 Earlier anchors (block rule, still valid where they do not name block ends):
 
@@ -603,9 +603,9 @@ reason. Anchors: `test_vov_threshold_and_ess_floor_gate_independently`
 ### VOV trend diagnostic (#1262)
 
 `vov_trend_slope(points)` is recorded for every observable. It fits the
-least-squares slope of $\ln\mathrm{VOV}_n$ against $\ln n$ over block ends
-with $n\ge n_{\rm last}/2$ and $\mathrm{VOV}>0$, and is `None` below three
-such ends. For independent histories with a sampled fourth moment,
+least-squares slope of $\ln\mathrm{VOV}_n$ against $\ln n$ over decision points
+(block ends before v4) with $n\ge n_{\rm last}/2$ and $\mathrm{VOV}>0$, and is
+`None` below three such points. The #1254 slope values below were computed per block end. For independent histories with a sampled fourth moment,
 $\mathrm{VOV}_n\simeq(\kappa-1)/n$, so the slope tends to $-1$; this is
 the trend MCNP checks over the last half of a run. A score that dominates
 $M_4$ and arrives late raises VOV and flattens or reverses the slope. The

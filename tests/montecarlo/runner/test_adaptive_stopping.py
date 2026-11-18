@@ -25,6 +25,7 @@ Validation: adaptive-sample-size-stopping
 import math
 import warnings
 from dataclasses import replace
+from fractions import Fraction
 
 import numpy as np
 import pytest
@@ -561,6 +562,37 @@ def test_decision_points_overshoot_at_most_their_growth():
         assert np.all(steps >= 1)
         assert np.all(np.array(grid[1:-1]) <= np.ceil(np.array(grid[:-2]) * (1 + growth)))
         assert len(grid) <= math.log(maximum / minimum) / math.log1p(growth) + 1 / growth + 2
+        # Exact rational ceiling of d (1 + growth), growth read as its decimal.
+        ratio = Fraction(repr(growth))
+        exact = [min(maximum, d + max(1, math.ceil(d * ratio))) for d in grid[:-1]]
+        assert grid[1:] == exact
+
+
+def test_decision_points_ceiling_is_exact_on_integer_steps():
+    """``d delta`` integral: no binary-rounding step past ``d (1 + delta)``."""
+    assert _grid(200, 300) == [200, 220, 242, 267, 294, 300]
+    assert _grid(3000, 4000) == [3000, 3300, 3630, 3993, 4000]
+
+
+def test_zero_stability_fraction_admits_only_a_still_mean():
+    """``stability_fraction = 0`` is valid: a constant population stops, and a
+    moving mean with no drift allowance is refused rather than dividing by 0."""
+    base = dict(
+        max_history_share=1.0,
+        min_effective_histories=0.0,
+        max_variance_of_variance=1.0,
+        stability_fraction=0.0,
+    )
+    constant = AdaptiveSettings(0.05, 100, 400, **base)
+    record = run_stopping_rule(constant, _population_measure(np.ones(400)))
+    assert record["stop_reason"] == "converged"
+    assert record["realized_electrons"] == _grid(100, 400)[3]
+    moving = np.ones(400)
+    moving[::2] = 1.001  # nonzero but tiny RSE; drift term well below the move
+    settings = AdaptiveSettings(0.05, 100, 400, **base)
+    record = run_stopping_rule(settings, _population_measure(moving))
+    status = record["statistics"]["cxr"]
+    assert status["stability"] is not None and status["stability_limit"] >= 0.0
 
 
 # ---- per-electron observables ---------------------------------------------------

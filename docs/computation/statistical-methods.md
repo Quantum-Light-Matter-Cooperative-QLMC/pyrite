@@ -135,7 +135,7 @@ The phase-sensitive straggling checks and their scope are recorded under `energy
 
 An adaptive case chooses its own electron count from a target relative standard error instead of a fixed `Ne`. Catalog profiles that set no fixed counts run it by default (target 0.05, 200–20,000 electrons; see [adaptive campaign sampling](../reference/campaign-configuration.md#adaptive-electron-counts)). Select it with `Numerics(sampling=AdaptiveSampling(...))` in the [Python API](../reference/python-api/config.md), or with `pyrite profile numerics adaptive-sampling set` on a catalog profile ([adaptive campaign sampling](../reference/campaign-configuration.md#adaptive-electron-counts)). `run_case` and both phases of `run_cases` retain the policy and report realized statistics under `adaptive_sampling`. The implementation is ledgered as `adaptive-sample-size-stopping`.
 
-**What is watched.** Transport runs in equal electron blocks $[kB, (k+1)B)$ (`montecarlo/runner/block_transport.py`). After each block, the runner folds a per-electron scalar $m_i$ into running moments for each watched observable:
+**What is watched.** Transport runs in chunks (`montecarlo/runner/block_transport.py`), and at each decision point (below) the runner folds a per-electron scalar $m_i$ into running moments for each watched observable:
 
 * `"line"` — the electron's line mass $m_i = \sum_{\ell \in i} w_\ell \pi / a_\ell$ over the lines the kernel keeps for a fixed monitor band. This is the quantity of the #201 line-yield audit. Its mean is the band's line yield per electron.
 * `"brem"` — the electron's bremsstrahlung integral over the same band, $m_i = \sum_E q_E\, \mathrm{d}N_i/\mathrm{d}E\,\mathrm{d}\Omega$, with trapezoid weights $q_E$ on the fixed bremsstrahlung grid. Band edges between nodes use linear interpolation; the integral includes the partial intervals at both edges and assumes no density outside the grid.
@@ -191,8 +191,8 @@ passes this gate (CV = 0); zero signal still cannot converge. The record include
 ($M_4/M_2^2-1/n$), `coefficient_of_variation`, and the `variance_sampling`
 pass flag; `guards` records both `min_effective_electrons` and
 `max_variance_of_variance`. `vov_trend_slope` is the least-squares slope of
-$\ln\mathrm{VOV}$ against $\ln n$ over block ends in the last half of the run.
-It needs at least three ends with positive VOV, otherwise it is `null`. A
+$\ln\mathrm{VOV}$ against $\ln n$ over decision points in the last half of the run.
+It needs at least three points with positive VOV, otherwise it is `null`. A
 sampled fourth moment gives about $-1$ (MCNP's $1/N$ check), while a late heavy
 score gives a shallower or positive slope. The slope is reported only and never
 stops a run. In the #1254 captures, the false 1 MeV stops still show about

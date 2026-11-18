@@ -1026,21 +1026,30 @@ def mc_brem_spectrum(
     )
     _use_bremslib_jit = _use_jit and cross_section_model == "bremslib"
     per_electron = electron_band_weights is not None
-    band_q = row_electron = None
+    band_q = row_electron = row_band = None
     if per_electron:
         band_q = xp.asarray(electron_band_weights, dtype=REAL)
         if band_q.shape != E_grid.shape:
             raise ValueError("electron_band_weights must match E_grid_eV")
         row_electron = seg_elec_id[brem_idx][owner]
+        row_band = xp.zeros(row_electron.size, dtype=xp.float64)
     electron_sum = xp.zeros(int(Ne) if per_electron else 0, dtype=_BAND_PRIMARY_DTYPE)
+    # ``row_band``: per-row band values, summed per electron once at the end.
+    # Each row's value is a per-row reduction (not BLAS gemv, whose blocking
+    # follows the row count) added in a fixed element order, and the final
+    # bincount runs in row order, so an electron's value does not depend on
+    # how its rows are sliced or chunked for transport (#1253).
 
     def _accumulate(row_weight, density, rows):
-        nonlocal spec, electron_sum
-        if band_q is None or row_electron is None:
+        nonlocal spec
+        if band_q is None or row_band is None:
             spec += row_weight @ density
             return
-        contribution = (row_weight * (density @ band_q)).astype(xp.float64)
-        electron_sum += xp.bincount(row_electron[rows], weights=contribution, minlength=int(Ne))
+        row_band[rows] += (row_weight * (density * band_q[None, :]).sum(axis=1)).astype(xp.float64)
+
+    def _electron_band():
+        totals = xp.bincount(row_electron, weights=row_band, minlength=int(Ne))
+        return _to_cpu(totals.astype(_BAND_PRIMARY_DTYPE) / (4.0 * np.pi))
 
     # Missing elemental tables retain the portable fallback. Per-row missing
     # energy coverage uses the same EEDL/BH device scalar as the spectrum path.
@@ -1194,7 +1203,7 @@ def mc_brem_spectrum(
                 dsig = xp.where(bremslib_state.available[:, None], directional, dsig / REAL(unit))
             _accumulate(n_i * 1e24 * unit * path_cm, dsig * T_abs, sl)
     if per_electron:
-        return _to_cpu(electron_sum / (4.0 * np.pi))
+        return _electron_band()
     return _to_cpu(spec / (4.0 * xp.pi) / Ne)
 
 

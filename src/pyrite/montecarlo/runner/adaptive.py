@@ -35,6 +35,7 @@ Validation: adaptive-sample-size-stopping
 import math
 import warnings
 from collections.abc import Callable, Iterator, Mapping
+from fractions import Fraction
 from itertools import chain
 from typing import Any
 
@@ -172,6 +173,14 @@ def vov_trend_slope(points) -> float | None:
     return sum((x - mx) * (y - my) for x, y in kept) / sxx
 
 
+def _excess(move: float, limit: float) -> float:
+    """``move / limit``, with a zero limit (``stability_fraction = 0`` and no
+    drift allowance) admitting only a zero move."""
+    if move == 0.0:
+        return 0.0
+    return math.inf if limit == 0.0 else move / limit
+
+
 def decision_points(minimum: int, maximum: int, growth: float) -> Iterator[int]:
     """Electron counts at which the stopping rule is checked: a geometric grid.
 
@@ -183,11 +192,14 @@ def decision_points(minimum: int, maximum: int, growth: float) -> Iterator[int]:
 
     Validation: adaptive-sample-size-stopping
     """
+    # ``growth`` as the decimal it was written as (0.1 is exactly 1/10, not
+    # the binary double), so the ceiling is exact integer arithmetic.
+    ratio = Fraction(repr(float(growth)))
+    num, den = ratio.numerator, ratio.denominator
     point = int(minimum)
     while point < maximum:
         yield point
-        # Integer form of ceil(point * (1 + growth)) with a floating growth.
-        point = min(int(maximum), max(point + 1, math.ceil(point * (1.0 + growth))))
+        point = min(int(maximum), point + max(1, -(-point * num // den)))
     yield int(maximum)
 
 
@@ -335,7 +347,7 @@ class StoppingMonitor:
             move = abs(means[name] - current) / abs(current)
             drift = STABILITY_DRIFT * rse * math.sqrt((n / point - 1.0) / s.decision_growth)
             limit = max(floor, drift)
-            if move / limit > worst[0] / worst[1]:
+            if _excess(move, limit) > _excess(*worst):
                 worst = (move, limit)
         return worst
 

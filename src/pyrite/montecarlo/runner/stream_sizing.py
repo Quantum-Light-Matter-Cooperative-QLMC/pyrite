@@ -131,9 +131,9 @@ class AdaptiveChunkPlan:
 
     A chunk reaches the next decision point when that is at least ``floor``
     electrons away, else it takes ``floor`` electrons, which may span several
-    points. It never exceeds ``budget / (rows per electron x bytes per row)``,
-    with rows per electron the largest rate seen so far (the first chunk is
-    ``floor``). Chunk boundaries never change decisions, counts or output;
+    points. Above the floor it never exceeds ``budget / (rows per electron x
+    bytes per row)``, with rows per electron the largest rate seen so far (the
+    first chunk is ``floor``); the floor wins when the cap is smaller. Chunk boundaries never change decisions, counts or output;
     the stopping monitor folds values at decision points and the driver keeps
     exactly the realized prefix.
     """
