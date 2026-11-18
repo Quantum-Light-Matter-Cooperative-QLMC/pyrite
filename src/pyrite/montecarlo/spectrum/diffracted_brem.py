@@ -250,6 +250,14 @@ def bragg_window(thickness, n_hat, g, s_hat, E_B, chi_g_abs, chi_0, max_step=np.
 
     Validation: diffracted-bremsstrahlung, diffracted-characteristic-radiation
     """
+    centre, span, step = _bragg_window_parts(
+        thickness, n_hat, g, s_hat, E_B, chi_g_abs, chi_0, max_step
+    )
+    return centre + np.arange(-span, span + step, step)
+
+
+def _bragg_window_parts(thickness, n_hat, g, s_hat, E_B, chi_g_abs, chi_0, max_step=np.inf):
+    """``(centre, span, step)`` of :func:`bragg_window` [eV]."""
     k = E_B / _HBARC_EV_ANG
     Qs = float((k * n_hat + g) @ s_hat)
     dE_dq = _HBARC_EV_ANG * Qs / abs(float(n_hat @ g))
@@ -261,7 +269,22 @@ def bragg_window(thickness, n_hat, g, s_hat, E_B, chi_g_abs, chi_0, max_step=np.
     step = max(step, 2.0 * span / _MAX_NODES)
     # Resonance q = Re(kappa_0 - kappa_h): the refraction shift of the line.
     shift = float(np.real(chi_0)) * (k / (2.0 * float(n_hat @ s_hat)) - k**2 / (2.0 * Qs)) * dE_dq
-    return E_B + shift + np.arange(-span, span + step, step)
+    return E_B + shift, span, step
+
+
+def bragg_window_upper_eV(thickness, n_hat, g, s_hat, E_B, chi_g_abs, chi_0):
+    """Upper bound on the last :func:`bragg_window` node of one reflection [eV].
+
+    ``centre + span + step`` at the default (largest) step: ``arange`` ends
+    below ``span + step``, and a smaller ``max_step`` (Kossel) can only lower
+    both the step and the endpoint. Rounded up by a relative ``1e-12`` so no
+    floating-point endpoint exceeds it.
+
+    Validation: line-grid-resonance-bandwidth
+    """
+    centre, span, step = _bragg_window_parts(thickness, n_hat, g, s_hat, E_B, chi_g_abs, chi_0)
+    upper = centre + span + step
+    return upper + 1e-12 * abs(upper)
 
 
 def reflection_line(depth_weight, edges, energy_grid, n_hat, g, s_hat, E_B, chi_g_abs, chi_0):

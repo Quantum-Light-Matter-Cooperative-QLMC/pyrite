@@ -27,6 +27,35 @@ def _in_claim(case, segments) -> bool:
     )
 
 
+def bragg_support_stop_eV(case, n_hats, start_eV, ceiling_eV) -> float | None:
+    """Highest DBR/Kossel deposition node a ceiling-wide axis could see [eV].
+
+    The reflections are those :func:`bragg_reflections` admits on the
+    ``[start_eV, ceiling_eV]`` reference axis toward any of ``n_hats``; each
+    contributes its :func:`bragg_window_upper_eV`. Both corrections deposit
+    only inside their window, so a line axis whose stop reaches this value
+    loses none of either (#1243). ``None`` outside the DBR claim or when no
+    reflection qualifies. Segment directions are assumed present.
+
+    Validation: line-grid-resonance-bandwidth
+    """
+    from ..spectrum.diffracted_brem import _bragg_energy, bragg_reflections, bragg_window_upper_eV
+
+    if not _in_claim(case, {"v_hat": True}):
+        return None
+    thickness = float(case["thickness_ang"])
+    s_hat = np.array([0.0, 0.0, 1.0])
+    reference = np.array([float(start_eV), float(ceiling_eV)])
+    tops = []
+    for n_hat in n_hats:
+        n = np.asarray(n_hat, dtype=float)
+        n = n / np.linalg.norm(n)
+        for g, chi_g_abs, chi_0 in bragg_reflections(case, n, reference):
+            E_B = _bragg_energy(g, n)
+            tops.append(bragg_window_upper_eV(thickness, n, g, s_hat, E_B, chi_g_abs, chi_0))
+    return max(tops) if tops else None
+
+
 def _dbr_options(case) -> dict:
     """The case's continuum model, tables and brem cutoff for DBR sources."""
     from .. import runner

@@ -17,8 +17,12 @@ resolved policy before changing physical settings:
 pyrite profile numerics cxr-grid show PROFILE
 ```
 
-Automatic grids bound the case's kinematic bandwidth and resolve the spacing
-from sampled trajectories; a bound is not a measured emission spectrum.
+Automatic grids stop at the case's measured resonance population, under its
+kinematic bandwidth, and resolve the spacing from sampled trajectories; neither
+is a measured emission spectrum. A measured stop that would leave more than its
+1e-4 share of line yield above the axis is rescored on the kinematic axis
+after transport, with a warning; an explicitly chosen `resonance-population`
+raises instead.
 The result records `line_grid_policy` and `line_grid_resolved` in provenance,
 and changing the policy changes checkpoint identity. A request that exceeds
 the point budget or coordinate precision **raises**, rather than silently

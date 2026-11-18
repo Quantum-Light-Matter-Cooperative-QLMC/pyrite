@@ -184,6 +184,7 @@ def _target_cxr_grid(
     the same lookup build_cases uses. Else the record's existing grid."""
     eg = np.asarray(r["E_grid"], float)
     if from_config and sweep is not None:
+        from .._cxr_grid_policy import default_bandwidth_policy
         from ..campaign.reflection_selection import resolve_reflection_sweep
         from ..campaign.sweep import _cxr_grid_for_energy, sweep_crystal_params
 
@@ -194,8 +195,12 @@ def _target_cxr_grid(
         # Coordinates only: a returned policy payload describes a resolution the
         # runner would refine from its own trajectories, and reline pins the
         # explicit coordinates instead (it drops `case["line_grid_policy"]`).
+        bandwidth = default_bandwidth_policy(
+            coherent_emission=bool(r["case"].get("coherent_emission")),
+            max_dE_frac=float(r["case"].get("max_dE_frac") or 0.0),
+        )
         coordinates, _policy = _cxr_grid_for_energy(
-            sweep, sweep_crystal_params(sweep), float(r["case"]["E0_keV"])
+            sweep, sweep_crystal_params(sweep), float(r["case"]["E0_keV"]), bandwidth
         )
         base = np.asarray(coordinates, float)
     else:

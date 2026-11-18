@@ -17,6 +17,7 @@ from pyrite import _cxr_grid_policy
 from pyrite._cxr_grid_policy import (
     CXR_GRID_POLICY_SCHEMA,
     CXR_QUADRATURES,
+    KINEMATIC_BANDWIDTH_POLICY,
     QUADRATURE_CXR_GRID_POLICY_SCHEMA,
     WINDOWED_CXR_GRID_POLICY_SCHEMA,
     cached_coordinates,
@@ -49,7 +50,13 @@ def _sweep(energy_keV=77.0, **policy):
 
 
 def _policy(**per_call):
-    return resolve_cxr_grid_policy(start_eV=10.0, stop_eV=10_000.0, per_call=per_call or None)
+    # The kinematic payload: the measured default (#1243) carries its own schema.
+    return resolve_cxr_grid_policy(
+        start_eV=10.0,
+        stop_eV=10_000.0,
+        bandwidth_policy=KINEMATIC_BANDWIDTH_POLICY,
+        per_call=per_call or None,
+    )
 
 
 # ---- policy field -------------------------------------------------------------
@@ -82,12 +89,16 @@ def test_bin_mean_bumps_the_schema_and_records_its_source(windows):
 
 def test_quadrature_precedence_is_per_call_then_stored():
     stored = resolve_cxr_grid_policy(
-        start_eV=10.0, stop_eV=10_000.0, stored={"quadrature": "bin-mean"}
+        start_eV=10.0,
+        stop_eV=10_000.0,
+        bandwidth_policy=KINEMATIC_BANDWIDTH_POLICY,
+        stored={"quadrature": "bin-mean"},
     ).payload()
     assert stored["sources"]["quadrature"] == "stored configuration"
     overridden = resolve_cxr_grid_policy(
         start_eV=10.0,
         stop_eV=10_000.0,
+        bandwidth_policy=KINEMATIC_BANDWIDTH_POLICY,
         per_call={"quadrature": "node"},
         stored={"quadrature": "bin-mean"},
     ).payload()

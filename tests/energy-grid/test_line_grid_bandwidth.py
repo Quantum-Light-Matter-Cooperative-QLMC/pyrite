@@ -13,14 +13,15 @@ import pytest
 
 from pyrite._backend import _to_cpu, xp
 from pyrite._cxr_grid_policy import (
-    AUTOMATIC_BANDWIDTH_POLICY,
     CXR_GRID_POLICY_SCHEMA,
     DEFAULT_BANDWIDTH_TRUNCATION,
+    KINEMATIC_BANDWIDTH_POLICY,
     RESONANCE_BANDWIDTH_POLICY,
     RESONANCE_CXR_GRID_POLICY_SCHEMA,
     CxrGridToleranceError,
     CxrGridTruncationWarning,
     CxrYieldStatisticsWarning,
+    kinematic_fallback_payload,
     resolve_cxr_grid_policy,
     resolved_coordinates,
 )
@@ -126,12 +127,14 @@ def test_characteristic_stop_bounds_each_lorentzian_tail():
     assert stop > 17_000.0
 
 
-def test_default_policy_payload_is_unchanged():
-    policy = resolve_cxr_grid_policy(start_eV=50.0, stop_eV=1000.0)
+def test_kinematic_policy_payload_is_unchanged():
+    policy = resolve_cxr_grid_policy(
+        start_eV=50.0, stop_eV=1000.0, per_call={"bandwidth": KINEMATIC_BANDWIDTH_POLICY}
+    )
     payload = policy.payload()
     assert payload["schema"] == CXR_GRID_POLICY_SCHEMA
     assert payload["bandwidth"] == {
-        "policy": AUTOMATIC_BANDWIDTH_POLICY,
+        "policy": KINEMATIC_BANDWIDTH_POLICY,
         "start_eV": 50.0,
         "stop_eV": 1000.0,
     }
@@ -193,10 +196,10 @@ def _audited_case(limit=1e-4):
 
 def test_audit_is_only_built_for_the_measured_bandwidth():
     assert cxr_truncation_audit({"line_grid_policy": None}, np.arange(10.0)) is None
-    default = {"line_grid_policy": {"bandwidth": {"policy": AUTOMATIC_BANDWIDTH_POLICY}}}
+    default = {"line_grid_policy": {"bandwidth": {"policy": KINEMATIC_BANDWIDTH_POLICY}}}
     assert cxr_truncation_audit(default, np.arange(10.0)) is None
     audit = cxr_truncation_audit(_audited_case(), np.linspace(50.0, 1000.0, 5))
-    assert audit == {"start_eV": 50.0, "stop_eV": 1000.0}
+    assert audit == {"start_eV": 50.0, "stop_eV": 1000.0, "ceiling_eV": 1e6}
 
 
 def test_audit_accumulates_and_gates_the_upper_edge():
@@ -437,3 +440,317 @@ def test_dominant_fwhm_matches_a_gaussian():
     assert _dominant_fwhm_eV(E, density) == pytest.approx(
         2.0 * np.sqrt(2.0 * np.log(2.0)) * 2.0, rel=1e-6
     )
+
+
+@pytest.mark.slow
+def test_selected_reflections_feed_the_measured_bandwidth_audit(monkeypatch):
+    """Selected lines outside the measured population are still audited (#1243).
+
+    Under a measured reflection selection, the resonance population that sets
+    the stop is collected over the case's built ``hkl_list`` (4 for h-BN), not
+    over the thousands of selected reflections. The spectrum-phase truncation
+    audit must therefore see every selection pilot: its line mass then carries
+    the whole scored spectrum, ``int S dE * N_e / mass = 1 - (edge shares)``.
+    Were the pilots unaudited, the audit would hold no selected line mass and
+    the ratio would sit far above one. Selected lines beyond the axis's own
+    keep window are scored or charged up to the ceiling's window (#1243), so
+    they enter both sides of the ratio.
+
+    Validation: line-grid-resonance-bandwidth
+    """
+    import pyrite.montecarlo.runner.case_driver as case_driver
+
+    sweep = material_sweep("hbn")
+    sweep = replace(
+        sweep,
+        beam=replace(sweep.beam, energy_keV=100.0),
+        cxr_grid_policy=_RESONANCE,
+        line_yield_tolerance=1e-3,
+    )
+    case = build_cases(sweep, n_electrons=2, n_electrons_brem=2)[0]
+    seen = {}
+    check = case_driver.check_cxr_truncation
+
+    def spy(case, audit):
+        seen.update(audit)
+        return check(case, audit)
+
+    monkeypatch.setattr(case_driver, "check_cxr_truncation", spy)
+    result = case_driver.run_case(case, transport_core="lockstep")
+    selected = result["reflection_selection"]["radiators"][0]["reflections"]
+    assert selected > 100 * len(case["hkl_list"])
+    record = result["line_grid_resolved"]["truncation_audit"]
+    scored = float(np.trapezoid(result["spec"], result["E_grid"])) * 2  # n_electrons
+    ratio = scored / float(seen["line_mass"])
+    edges = record["upper_fraction_bound"] + record["lower_fraction_bound"]
+    assert 1.0 - edges <= ratio <= 1.0 + 1e-3
+
+
+def _hbn_case(energy_keV, cxr_grid_policy=None):
+    sweep = material_sweep("hbn")
+    sweep = replace(sweep, beam=replace(sweep.beam, energy_keV=energy_keV))
+    if cxr_grid_policy is not None:
+        sweep = replace(sweep, cxr_grid_policy=cxr_grid_policy)
+    return build_cases(sweep, n_electrons=2, n_electrons_brem=2)[0]
+
+
+def test_defaulted_measured_bandwidth_falls_back_to_the_explicit_kinematic_payload():
+    """The fallback axis is exactly what ``kinematic-ceiling`` would build (#1243)."""
+    default = _hbn_case(1000.0)["line_grid_policy"]
+    assert default["bandwidth"]["policy"] == RESONANCE_BANDWIDTH_POLICY
+    explicit = _hbn_case(1000.0, {"bandwidth": KINEMATIC_BANDWIDTH_POLICY})["line_grid_policy"]
+    assert kinematic_fallback_payload(default) == explicit
+    chosen = _hbn_case(1000.0, _RESONANCE)["line_grid_policy"]
+    assert kinematic_fallback_payload(chosen) is None
+    assert kinematic_fallback_payload(explicit) is None
+
+
+def test_defaulted_refusal_rescores_on_the_ceiling_and_explicit_refusal_raises(monkeypatch):
+    """A refused default stop keeps its transport and rescores to the ceiling (#1243).
+
+    P3 on qlmc: automatic selection scored higher-|g| reflections above stops
+    measured over the built ``hkl_list`` (Si 1 MeV: 3.8e-3 above the edge). A
+    vanishing share at the spectrum-phase gate forces that refusal here.
+
+    Validation: line-grid-resonance-bandwidth
+    """
+    import pyrite.montecarlo.runner.case_driver as case_driver
+
+    check = case_driver.check_cxr_truncation
+
+    def strict(case, audit):
+        payload = case["line_grid_policy"]
+        bandwidth = {**payload["bandwidth"], "truncation_limit": 1e-300}
+        return check({**case, "line_grid_policy": {**payload, "bandwidth": bandwidth}}, audit)
+
+    monkeypatch.setattr(case_driver, "check_cxr_truncation", strict)
+    case = _hbn_case(1000.0)
+    ceiling = case["line_grid_policy"]["bandwidth"]["stop_eV"]
+    with pytest.warns(CxrGridTruncationWarning, match="rescoring on the kinematic-ceiling"):
+        result = case_driver.run_case(case, transport_core="lockstep")
+    assert result["E_grid"][-1] == pytest.approx(ceiling)
+    fallback = result["line_grid_resolved"]["bandwidth_fallback"]
+    assert fallback["refused"]["stop_eV"] < ceiling
+    assert "truncation_audit" not in result["line_grid_resolved"]
+    with pytest.raises(CxrGridToleranceError, match="bandwidth share"):
+        case_driver.run_case(_hbn_case(1000.0, _RESONANCE), transport_core="lockstep")
+
+
+def test_audited_keep_window_reaches_the_kinematic_window():
+    """Lines up to the ceiling's window are scored or charged, never skipped (#1243).
+
+    The fresh-context check found selected MoS2 lines between the measured
+    axis's 20% pad and the ceiling counted by neither population nor audit.
+
+    Validation: line-grid-resonance-bandwidth
+    """
+    from pyrite.montecarlo.spectrum.cxr._kernels import _line_keep_window
+
+    grid = np.linspace(100.0, 1100.0, 11)
+    assert _line_keep_window(grid) == pytest.approx((-100.0, 1300.0))
+    assert _line_keep_window(grid, {"start_eV": 100.0}) == pytest.approx((-100.0, 1300.0))
+    audit = {"start_eV": 100.0, "stop_eV": 1100.0, "ceiling_eV": 5100.0}
+    # The kinematic axis [100, 5100] keeps resonances below 5100 + 0.2 * 5000.
+    assert _line_keep_window(grid, audit) == pytest.approx((-100.0, 6100.0))
+    audit["ceiling_eV"] = 1100.0  # at the ceiling: unchanged
+    assert _line_keep_window(grid, audit) == pytest.approx((-100.0, 1300.0))
+    beyond = {"start_eV": 100.0, "stop_eV": 1100.0, "ceiling_eV": 5100.0}
+    _accumulate_edge_truncation(
+        beyond, xp.asarray([5500.0]), xp.asarray([np.pi / 10.0]), xp.asarray([1.0])
+    )
+    assert float(beyond["mass_above"]) == pytest.approx(float(beyond["line_mass"]))
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        {"channeling": {"plane_hkl": (1, -1, 0)}},
+        {"transition_radiation": {"coherence": "off"}},
+        {"transport_mode": "mixed"},
+    ],
+)
+def test_unmeasured_line_axis_routes_resolve_the_kinematic_payload(monkeypatch, extra):
+    """Spectra the measured stop cannot see keep the kinematic axis (#1243).
+
+    Planar channeling under the default stopped at 2.7 keV (Si (1-10), 17 MeV)
+    with 0.99 of the channeling-radiation peak above the axis and a passing,
+    empty audit.
+
+    Validation: line-grid-resonance-bandwidth
+    """
+    from pyrite.montecarlo.runner import cxr_grid
+
+    seen = []
+    monkeypatch.setattr(
+        cxr_grid, "_resolve_policy_cxr_grid", lambda payload, *a: seen.append(payload) or (None, {})
+    )
+    case = {**_hbn_case(1000.0), **extra}
+    cxr_grid.resolve_cxr_grid(case, None, None, 2, None)
+    assert seen[-1] == kinematic_fallback_payload(case["line_grid_policy"])
+    chosen = {**_hbn_case(1000.0, _RESONANCE), **extra}
+    with pytest.raises(ValueError, match="cannot measure"):
+        cxr_grid.resolve_cxr_grid(chosen, None, None, 2, None)
+
+
+_FORWARD = np.array([np.sin(0.6), 0.0, np.cos(0.6)])  # Laue DBR toward the exit face
+
+
+def _silicon_case(energy_keV, cxr_grid_policy=None):
+    sweep = material_sweep("silicon")
+    sweep = replace(sweep, beam=replace(sweep.beam, energy_keV=energy_keV))
+    if cxr_grid_policy is not None:
+        sweep = replace(sweep, cxr_grid_policy=cxr_grid_policy)
+    return build_cases(sweep, n_electrons=2, n_electrons_brem=2)[0]
+
+
+def test_bragg_support_bounds_every_dbr_and_kossel_window_node():
+    """The measured stop covers each finite DBR/Kossel deposition window (#1243).
+
+    Both corrections are added after the native truncation audit and are
+    exactly zero beyond their ``bragg_window``; a stop at or above the highest
+    node therefore adds no unaudited upper loss of either.
+
+    Validation: line-grid-resonance-bandwidth
+    """
+    from pyrite.montecarlo.runner.diffracted_brem import bragg_support_stop_eV
+    from pyrite.montecarlo.spectrum.diffracted_brem import (
+        _bragg_energy,
+        bragg_reflections,
+        bragg_window,
+    )
+
+    case = _silicon_case(1000.0)
+    bandwidth = case["line_grid_policy"]["bandwidth"]
+    start, ceiling = bandwidth["start_eV"], bandwidth["stop_eV"]
+    support = bragg_support_stop_eV(case, (_FORWARD,), start, ceiling)
+    reflections = bragg_reflections(case, _FORWARD, [start, ceiling])
+    assert reflections and support is not None
+    s_hat = np.array([0.0, 0.0, 1.0])
+    thickness = float(case["thickness_ang"])
+    top = 0.0
+    for g, chi_g_abs, chi_0 in reflections:
+        E_B = _bragg_energy(g, _FORWARD)
+        for max_step in (np.inf, 0.05):  # DBR default; a narrow-line Kossel step
+            window = bragg_window(thickness, _FORWARD, g, s_hat, E_B, chi_g_abs, chi_0, max_step)
+            top = max(top, float(window[-1]))
+    assert top <= support <= top + 3.1  # within one default step (<= 1.5 eV) and rounding
+    # Outside the Laue geometry (side-on, toward the entrance face) nothing to cover.
+    side = np.array([1.0, 0.0, -0.0076])
+    assert bragg_support_stop_eV(case, (side,), start, ceiling) is None
+
+
+def test_measured_stop_rises_to_the_bragg_support_under_the_ceiling():
+    """Validation: line-grid-resonance-bandwidth"""
+    from pyrite.montecarlo.runner.cxr_grid import _cover_bragg_support
+    from pyrite.montecarlo.runner.diffracted_brem import bragg_support_stop_eV
+
+    case = _silicon_case(1000.0)
+    bandwidth = case["line_grid_policy"]["bandwidth"]
+    start, ceiling = bandwidth["start_eV"], bandwidth["stop_eV"]
+    support = bragg_support_stop_eV(case, (_FORWARD,), start, ceiling)
+    stop, record = _cover_bragg_support(
+        case, (_FORWARD,), start, ceiling, 2000.0, {"stop_eV": 2000.0}
+    )
+    assert stop == pytest.approx(min(support, ceiling))
+    assert record["native_stop_eV"] == 2000.0 and record["stop_eV"] == stop
+    unchanged = _cover_bragg_support(
+        case, (_FORWARD,), start, ceiling, ceiling, {"stop_eV": ceiling}
+    )
+    assert unchanged == (ceiling, {"stop_eV": ceiling})
+    capped, _ = _cover_bragg_support(case, (_FORWARD,), start, support - 1.0, 2000.0, {})
+    assert capped == support - 1.0
+
+
+def test_measured_grid_cache_key_carries_the_coverage_revision():
+    """Old measured grids (no Bragg coverage) are never served from the cache."""
+    from pyrite.montecarlo.runner import cxr_grid
+
+    measured = _silicon_case(1000.0)
+    key, _ = cxr_grid._policy_cache_key(
+        measured["line_grid_policy"], measured, (), observation=False
+    )
+    kinematic = _silicon_case(1000.0, {"bandwidth": KINEMATIC_BANDWIDTH_POLICY})
+    reference, _ = cxr_grid._policy_cache_key(
+        kinematic["line_grid_policy"], kinematic, (), observation=False
+    )
+    assert cxr_grid.MEASURED_COVERAGE_REVISION >= 1 and key != reference
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        {"channeling": {"plane_hkl": (1, -1, 0)}},
+        {"transition_radiation": {"coherence": "off"}},
+        {"transport_mode": "mixed"},
+    ],
+)
+def test_observation_resolution_shares_the_unmeasured_axis_fallback(monkeypatch, extra):
+    """Multi-direction scoring keeps the kinematic axis too (#1243).
+
+    The fresh-context check found ``resolve_observation_cxr_grid`` bypassing
+    the scalar guard and re-measuring channeling/TR on every direction.
+
+    Validation: line-grid-resonance-bandwidth
+    """
+    from pyrite.montecarlo.runner import cxr_grid
+
+    seen = []
+    monkeypatch.setattr(
+        cxr_grid,
+        "_resolve_policy_grid",
+        lambda payload, *a, **k: seen.append(payload) or (None, {}),
+    )
+    case = {**_hbn_case(1000.0), **extra}
+    cxr_grid.resolve_observation_cxr_grid(case, None, (_FORWARD,), 2, None)
+    assert seen[-1] == kinematic_fallback_payload(case["line_grid_policy"])
+    chosen = {**_hbn_case(1000.0, _RESONANCE), **extra}
+    with pytest.raises(ValueError, match="cannot measure"):
+        cxr_grid.resolve_observation_cxr_grid(chosen, None, (_FORWARD,), 2, None)
+
+
+def test_replay_refuses_a_recorded_axis_short_of_todays_requirement():
+    """Artifact replay validates its stored line axis before scoring (#1243).
+
+    Validation: line-grid-resonance-bandwidth
+    """
+    from pyrite.montecarlo.runner.cxr_grid import check_recorded_line_axis
+    from pyrite.montecarlo.runner.diffracted_brem import bragg_support_stop_eV
+
+    channeling = {**_hbn_case(1000.0), "channeling": {"plane_hkl": (1, -1, 0)}}
+    bandwidth = channeling["line_grid_policy"]["bandwidth"]
+    start, ceiling = bandwidth["start_eV"], bandwidth["stop_eV"]
+    with pytest.raises(ValueError, match="recorded line axis"):
+        check_recorded_line_axis(channeling, np.linspace(start, 0.5 * ceiling, 5), _FORWARD)
+    check_recorded_line_axis(channeling, np.linspace(start, ceiling, 5), _FORWARD)
+
+    case = _silicon_case(1000.0)
+    bandwidth = case["line_grid_policy"]["bandwidth"]
+    start, ceiling = bandwidth["start_eV"], bandwidth["stop_eV"]
+    support = bragg_support_stop_eV(case, (_FORWARD,), start, ceiling)
+    assert support < ceiling
+    with pytest.raises(ValueError, match="recorded line axis"):
+        check_recorded_line_axis(case, np.linspace(start, support - 10.0, 5), _FORWARD)
+    check_recorded_line_axis(case, np.linspace(start, support, 5), _FORWARD)
+    side = np.array([1.0, 0.0, -0.0076])  # no Laue DBR: a short measured axis replays
+    check_recorded_line_axis(case, np.linspace(start, 2000.0, 5), side)
+    check_recorded_line_axis({"name": "fixed"}, np.linspace(1.0, 2.0, 3), side)
+
+
+def test_measured_cache_key_separates_mosaic_from_perfect_crystals():
+    """A mosaic case's uncovered stop is never served to a perfect crystal (#1243).
+
+    Fresh re-verification 3: ``mosaic_fwhm_rad`` gates the DBR claim, so the
+    Bragg-support stop depends on it; Si 100 keV hit a mosaic-first entry at
+    84800 eV instead of the 96860 eV support.
+
+    Validation: line-grid-resonance-bandwidth
+    """
+    from pyrite.montecarlo.runner import cxr_grid
+
+    perfect = _silicon_case(100.0)
+    mosaic = {**perfect, "mosaic_fwhm_rad": 1e-3}
+    keys = [
+        cxr_grid._policy_cache_key(case["line_grid_policy"], case, (), observation=False)[0]
+        for case in (perfect, mosaic)
+    ]
+    assert keys[0] != keys[1]

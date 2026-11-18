@@ -148,12 +148,12 @@ def resolve_streamed_line_grid(
     first pass (``transported``, ``evidence_bytes``).
     """
     from . import _transport_case
-    from .cxr_grid import _resolve_policy_grid, cached_policy_cxr_grid
+    from .cxr_grid import _auditable_policy, _resolve_policy_grid, cached_policy_cxr_grid
 
     hit = cached_policy_cxr_grid(case)
     if hit is not None:
         return *hit, {"transported": False, "evidence_bytes": 0}
-    payload = case["line_grid_policy"]
+    payload = _auditable_policy(case, case["line_grid_policy"])
     abs_layers = case.get("abs_layers")
     evidence = BlockGridEvidence(case, payload, n_hat, case["Ne"], abs_layers, groove)
     _transport_case(

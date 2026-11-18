@@ -156,7 +156,7 @@ resolving a new run does not reinterpret stored `auto` or absent fields.
 
 | TOML key | Values (default first) | Flag |
 |---|---|---|
-| `bandwidth` | `kinematic-ceiling`, `resonance-population` | `--bandwidth` |
+| `bandwidth` | `resonance-population`, `kinematic-ceiling` | `--bandwidth` |
 | `resolution` | `sinc-nyquist`, `resonance-local`, `sinc-shape` | `--resolution` |
 | `quadrature` | `node`, `bin-mean` | `--quadrature` |
 | `windows` | `false`, `true` | TOML; selector edits keep it |
@@ -176,7 +176,14 @@ resolution remain unchanged. See the
 [spacing derivation](../validation/beam-transport/line-grid-sinc-shape-spacing.md)
 for assumptions and qualification status.
 
-The editor
+With `windows = true`, for cases built with coherent emission or a positive
+`max_dE_frac`, and for channeling, transition-radiation or mixed-transport
+cases, an unset bandwidth resolves to `kinematic-ceiling`: the measured
+bandwidth's truncation audit does not cover those routes (#1243); an explicit
+`resonance-population` refuses on the last three. An unset
+bandwidth whose measured axis fails that audit after transport is rescored on
+the `kinematic-ceiling` axis with the same trajectories, with a warning.
+An explicit `resonance-population` with `windows = true` is refused. The editor
 also refuses a policy without `windows = true` on `coherent`/`both` emission,
 and `bin-mean` with a positive `max_dE_frac`. `coverage-0.95` labels stored energy-grid artifacts and
 is not a profile value.

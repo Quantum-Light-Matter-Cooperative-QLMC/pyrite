@@ -137,11 +137,18 @@ for normalization, rare-electron limits and replay semantics.
 
 ## Photon grids
 
-Ordinary runs need no preparation batch. Automatic line grids use the case's
-kinematic bandwidth at measured sinc spacing, capped by kinetic energy and the
-Chantler coupling-data limit (about 966 keV). MeV beams can require millions of
-nodes. Measured bandwidth/local-resolution selectors provide a bounded
-alternative; their allowed combinations and tolerances belong to
+Ordinary runs need no preparation batch. Automatic line grids stop where the
+case's own resonance population leaves at most 1e-4 of the line yield above
+the axis (`resonance-population`, the default since #1243), never above the
+closed-form kinematic bandwidth capped by kinetic energy and the Chantler
+coupling-data limit (about 966 keV); spacing is the measured sinc spacing.
+Cases with feature windows, coherent emission, channeling, transition
+radiation, mixed transport or a positive `max_dE_frac`, and
+cases whose measured axis fails its post-transport truncation audit (rescored
+with the same trajectories, with a warning), use that closed-form
+`kinematic-ceiling` axis, which at MeV
+energies can need hundreds of thousands of nodes. The selector combinations and
+tolerances belong to
 [profile settings](../repo-design/profile-settings.md#line-grid-policy).
 
 Per-case line-grid precedence, highest first:

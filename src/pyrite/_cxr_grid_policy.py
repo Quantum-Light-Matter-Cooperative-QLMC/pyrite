@@ -9,15 +9,17 @@ Carlo job.
 Two policies are deliberately separate (issue #101):
 
 bandwidth
-    Where the line grid starts and stops. The automatic default is the
-    ``kinematic-ceiling`` bound below -- closed form, no simulation. The stored
-    catalog artifacts instead carry ``coverage-0.95``, a *bandwidth* policy
-    measured by ``energy_grid.derive``: 95% of integrated coherent-line
-    intensity. Neither is an accuracy statement. ``resonance-population``
-    (#192, opt-in) keeps the ceiling as a cap but stops where the case's own
+    Where the line grid starts and stops. The automatic default (#1243) is
+    ``resonance-population`` (#192): under the clamped ``kinematic-ceiling``
+    bound below -- closed form, no simulation -- it stops where the case's own
     resonance population and characteristic lines leave at most
-    :data:`DEFAULT_BANDWIDTH_TRUNCATION` of their mass above the axis; the
-    spectrum phase audits that share with the production weights.
+    :data:`DEFAULT_BANDWIDTH_TRUNCATION` of their mass above the axis, and the
+    spectrum phase audits that share with the production weights. Where that
+    audit is unavailable (feature windows, coherent emission, temporal
+    profiles, flight-grouped substeps) the default stays ``kinematic-ceiling``.
+    The stored catalog artifacts instead carry ``coverage-0.95``, a
+    *bandwidth* policy measured by ``energy_grid.derive``: 95% of integrated
+    coherent-line intensity. None is an accuracy statement.
 
 resolution
     How finely that interval is sampled. Owned by the sinc Nyquist estimator
@@ -75,6 +77,8 @@ from .console.outputs import output_dir
 
 __all__ = [
     "AUTOMATIC_BANDWIDTH_POLICY",
+    "KINEMATIC_BANDWIDTH_POLICY",
+    "LINE_BANDWIDTH_DEFAULT_MODEL",
     "BANDWIDTH_POLICIES",
     "BANDWIDTH_PROXY_SAFETY",
     "AUTOMATIC_RESOLUTION_POLICY",
@@ -112,6 +116,8 @@ __all__ = [
     "coordinate_cache_key",
     "environment_overrides_present",
     "cxr_quadrature_from_payload",
+    "default_bandwidth_policy",
+    "kinematic_fallback_payload",
     "kinematic_cxr_stop_eV",
     "lineshape_precision_warning",
     "cxr_start_eV",
@@ -175,10 +181,20 @@ DEFAULT_RTOL: Mapping[str, float] = {"intrinsic_source": 1.0e-3, "detected_count
 #: how much spectrum is covered, NOT how accurately it is sampled.
 DEFAULT_BANDWIDTH_COVERAGE = 0.95
 COVERAGE_BANDWIDTH_POLICY = "coverage-0.95"
-AUTOMATIC_BANDWIDTH_POLICY = "kinematic-ceiling"
-#: Trajectory-measured bandwidth under the ceiling cap (#192). Opt-in only.
+#: Closed-form bandwidth: the clamped kinematic ceiling, read from no trajectory.
+KINEMATIC_BANDWIDTH_POLICY = "kinematic-ceiling"
+#: Trajectory-measured bandwidth under that ceiling (#192).
 RESONANCE_BANDWIDTH_POLICY = "resonance-population"
-BANDWIDTH_POLICIES = (AUTOMATIC_BANDWIDTH_POLICY, RESONANCE_BANDWIDTH_POLICY)
+#: The automatic default (#1243): the measured axis, at most the kinematic one.
+#: :func:`resolve_cxr_grid_policy` keeps ``kinematic-ceiling`` where the measured
+#: bandwidth is refused (feature windows); case builders pass it for other
+#: unaudited routes (:func:`default_bandwidth_policy`).
+AUTOMATIC_BANDWIDTH_POLICY = RESONANCE_BANDWIDTH_POLICY
+#: Dataset-identity generation of that default (#1243): incoherent digests carry
+#: it so checkpoints scored on the former ``kinematic-ceiling`` default re-key.
+LINE_BANDWIDTH_DEFAULT_MODEL = "resonance-population-default-v1"
+#: Bandwidth selectors, default first.
+BANDWIDTH_POLICIES = (RESONANCE_BANDWIDTH_POLICY, KINEMATIC_BANDWIDTH_POLICY)
 #: Upper-edge truncation share of ``resonance-population``: the bandwidth row of
 #: ``tbl-line-budget-allocation``, a fraction of integrated incoherent line
 #: yield. The spectrum phase gates the production-weight truncation on it; the
@@ -401,6 +417,9 @@ _ELECTRON_REST_EV = 510998.95
 class CxrGridToleranceError(ValueError):
     """A requested tolerance cannot be met within the declared budget."""
 
+    #: The spectrum-phase audit record of a truncation refusal, else ``None``.
+    truncation_record: dict[str, Any] | None = None
+
 
 class LineShapePrecisionWarning(UserWarning):
     """A float32 line window reaches the binade where lineshape exceeds its share."""
@@ -604,6 +623,53 @@ def cxr_quadrature_from_payload(payload: Mapping[str, Any] | None) -> str:
     return _quadrature(payload.get("quadrature", DEFAULT_CXR_QUADRATURE), "policy payload")
 
 
+def default_bandwidth_policy(coherent_emission: object = False, max_dE_frac: float = 0.0) -> str:
+    """The automatic line-axis bandwidth for cases built with these options (#1243).
+
+    ``resonance-population`` wherever its spectrum-phase truncation audit sees
+    the scored lines; ``kinematic-ceiling`` where it does not: coherent sums
+    return before the audit (and need feature windows), and flight-grouped
+    substeps (``max_dE_frac > 0``) are refused by every audit. Incoherent lines
+    feed the audit on both the batched and the per-reflection route, temporal
+    profiles included. A per-call or stored bandwidth still wins.
+
+    Validation: line-grid-resonance-bandwidth
+    """
+    if bool(coherent_emission) or float(max_dE_frac or 0.0) > 0.0:
+        return KINEMATIC_BANDWIDTH_POLICY
+    return AUTOMATIC_BANDWIDTH_POLICY
+
+
+def kinematic_fallback_payload(payload: dict[str, Any]) -> dict[str, Any] | None:
+    """The ``kinematic-ceiling`` payload a defaulted measured bandwidth falls back to.
+
+    ``None`` unless the bandwidth is ``resonance-population`` chosen by default
+    (no recorded source) and the resolution is not ``resonance-local``, which
+    needs the measured bandwidth. The result is the payload an explicit
+    ``kinematic-ceiling`` would carry: same ceiling, start and resolution (#1243).
+
+    Validation: line-grid-resonance-bandwidth
+    """
+    bandwidth = payload["bandwidth"]
+    if (
+        bandwidth["policy"] != RESONANCE_BANDWIDTH_POLICY
+        or "bandwidth" in payload.get("sources", {})
+        or payload["resolution"]["policy"] == LOCAL_RESOLUTION_POLICY
+        or payload.get("windows") is not None
+    ):
+        return None
+    fallback = dict(payload)
+    fallback["bandwidth"] = {
+        "policy": KINEMATIC_BANDWIDTH_POLICY,
+        "start_eV": bandwidth["start_eV"],
+        "stop_eV": bandwidth["stop_eV"],
+    }
+    fallback["schema"] = (
+        QUADRATURE_CXR_GRID_POLICY_SCHEMA if "quadrature" in payload else CXR_GRID_POLICY_SCHEMA
+    )
+    return fallback
+
+
 def check_selector_combination(
     *, bandwidth: str, resolution: str, quadrature: str, windows: bool = False
 ) -> None:
@@ -635,6 +701,32 @@ def check_selector_combination(
             "the resonance-population bandwidth takes its budget share from the "
             "feature-window row and cannot be combined with windows"
         )
+
+
+def _resolve_bandwidth(per_call, stored, default, *, windowed, sources):
+    """Bandwidth by per-call > stored > ``default``, with no environment layer.
+
+    Like windows and quadrature. The source is recorded only for a measured
+    choice, as before the default moved (#1243), so an explicit
+    ``kinematic-ceiling`` keeps its historical payload bit-for-bit. Windows
+    spend the bandwidth's budget share (``tbl-line-budget-allocation``), so an
+    unset bandwidth beside them stays ``kinematic-ceiling``; an explicit
+    measured choice is refused by :func:`check_selector_combination`.
+
+    Validation: line-grid-resonance-bandwidth
+    """
+    for layer, label in ((per_call, "per-call"), (stored, "stored configuration")):
+        if layer.get("bandwidth") is not None:
+            chosen = str(layer["bandwidth"])
+            if chosen not in BANDWIDTH_POLICIES:
+                raise ValueError(
+                    f"{label} line-grid bandwidth must be one of {list(BANDWIDTH_POLICIES)}, "
+                    f"got {chosen!r}"
+                )
+            if chosen != KINEMATIC_BANDWIDTH_POLICY:
+                sources["bandwidth"] = label
+            return chosen
+    return KINEMATIC_BANDWIDTH_POLICY if windowed else default
 
 
 def resolve_cxr_grid_policy(
@@ -770,22 +862,9 @@ def resolve_cxr_grid_policy(
                 sources["quadrature"] = label
             break
 
-    # Bandwidth follows per-call > stored > the caller's argument, with no
-    # environment layer, like windows and quadrature. The source is recorded
-    # only for a non-default choice, keeping historical payloads unchanged.
-    bandwidth_policy = str(bandwidth_policy)
-    for layer, label in ((per_call, "per-call"), (stored, "stored configuration")):
-        if layer.get("bandwidth") is not None:
-            chosen = str(layer["bandwidth"])
-            if chosen not in BANDWIDTH_POLICIES:
-                raise ValueError(
-                    f"{label} line-grid bandwidth must be one of {list(BANDWIDTH_POLICIES)}, "
-                    f"got {chosen!r}"
-                )
-            if chosen != bandwidth_policy:
-                sources["bandwidth"] = label
-            bandwidth_policy = chosen
-            break
+    bandwidth_policy = _resolve_bandwidth(
+        per_call, stored, str(bandwidth_policy), windowed=windows is not None, sources=sources
+    )
     # Resolution follows the same per-call > stored order, with no environment
     # layer; the source is recorded only for a non-default choice.
     resolution_policy = AUTOMATIC_RESOLUTION_POLICY

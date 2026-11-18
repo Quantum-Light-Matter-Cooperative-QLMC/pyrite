@@ -186,6 +186,15 @@ def _checked_case_and_inputs(artifact, case):
                 f"trajectory artifact {artifact.path} spectrum input {key!r} disagrees with "
                 "its case; it was written by an incompatible PyRITE version"
             )
+    if "E_grid" not in expected and inputs.get("E_grid") is not None:
+        from .cxr_grid import check_recorded_line_axis
+
+        try:
+            check_recorded_line_axis(case, inputs["E_grid"], inputs.get("n_hat", n_hat))
+        except ValueError as error:
+            raise TrajectoryArtifactError(
+                f"trajectory artifact {artifact.path}: {error}"
+            ) from error
     return case, inputs
 
 
