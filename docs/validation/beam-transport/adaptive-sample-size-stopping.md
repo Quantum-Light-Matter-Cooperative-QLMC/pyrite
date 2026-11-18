@@ -39,7 +39,7 @@ d_0=n_{\min},\qquad d_{j+1}=\min\big(n_{\max},\ \max(d_j+1,\ \lceil d_j(1+\delta
 
 ending at $n_{\max}$, with the pilot count and its projection $N$ added as points of their own; $\delta$ is `decision_growth` (default 0.1), read as the decimal it is written as, so the ceiling is exact integer arithmetic (0.1 is $1/10$, not the binary double). The values $m_{o,i}$ for $d_{j-1}\le i<d_j$ are merged into the moments as one segment, whatever transport chunks delivered them. Transport chunks are sized for device fill and memory only. A stop (or an independent brem freeze) at a point $d$ inside a chunk $[a,b)$ discards the chunk and transports $[a,d)$ again. The realized result is the fixed-$N$ result at $N=d$, bit for bit.
 
-**Chunk independence.** $m_{o,i}$ is a function of (seed, $i$) and the run's table range alone (prefix stability, below), and the per-electron reductions are bincounts over that electron's rows, so a chunk boundary does not change any $m_{o,i}$. On the host brem path each row's band value is a per-row reduction added in a fixed element order, its layered optical depth is summed layer by layer in a fixed order, and the electron sum is one bincount in row order, so neither the transport chunk nor the reducer's row slicing changes it (before the v4 verification fixes, BLAS `gemv`/`gemm` choice by row count and slice-dependent addition order moved brem values by up to $5\times10^{-16}$ relative, single-slab and layered). The CUDA brem band reductions (fused kernel and CuPy `bincount`) accumulate atomically and are not covered by this argument. The grid depends only on the policy and, through the pilot projection, on $m_{o,1..n_p}$. Each segment's moments are reduced from the same values in the same order and merged by the same Chan update in the same sequence, so every moment, guard value and decision is bit-identical under any chunking. Re-transporting $[a,d)$ reproduces the same electrons, by counter addressing, and the existing join contract makes the kept chunks the fixed-$d$ transport.
+**Chunk independence.** $m_{o,i}$ is a function of (seed, $i$) and the run's table range alone (prefix stability, below), and the per-electron reductions are bincounts over that electron's rows, so a chunk boundary does not change any $m_{o,i}$. On the host brem path each row's band value is a per-row reduction added in a fixed element order, its layered optical depth is summed layer by layer in a fixed order, the BremsLib emission cosine is formed elementwise (not by a gemv that rounds a one-row call differently), and the electron sum is one bincount in row order, so neither the transport chunk nor the reducer's row slicing changes it (before the v4 verification fixes, BLAS `gemv`/`gemm` choice by row count and slice-dependent addition order moved brem values by up to $5\times10^{-16}$ relative, single-slab and layered). The CUDA brem band reductions (fused kernel and CuPy `bincount`) accumulate atomically and are not covered by this argument. The grid depends only on the policy and, through the pilot projection, on $m_{o,1..n_p}$. Each segment's moments are reduced from the same values in the same order and merged by the same Chan update in the same sequence, so every moment, guard value and decision is bit-identical under any chunking. Re-transporting $[a,d)$ reproduces the same electrons, by counter addressing, and the existing join contract makes the kept chunks the fixed-$d$ transport.
 
 **Overshoot and cost.** Let $d_{J-1}$ be the last refused point. Then $d_J\le\lceil d_{J-1}(1+\delta)\rceil$, so the stop exceeds the last refused count by at most $\delta$ relative (plus one electron). The block rule's absolute overshoot was up to $B-1$, and its pilot projection rounded up to a block. The run makes at most $\log(n_{\max}/n_{\min})/\log(1+\delta)+1/\delta+3$ checks, since steps of $+1$ occur only while $d_j<1/\delta$. As $\delta\to0$ the grid tends to every electron $\ge n_{\min}$.
 
@@ -1036,3 +1036,107 @@ exceptions:
   60° stops, which are at 32,541 against 31k–192k for the block rule.
 - The Claim's "exact rational ceiling" omits that $\delta$ is read as its
   decimal; the derivation page states it.
+
+## Independent v4 final verification (2026-11-17, #1253)
+
+A fresh-context verifier checked `246197896`, which replaces
+`path_start[sl] @ mu_by_layer` with `_layer_depth`. The order argument was
+written before the probes were run.
+
+- **Claim**: `adaptive-sample-size-stopping` (v4) —
+  `spectrum/brem.py::mc_brem_spectrum` (`electron_band_weights`, host path),
+  `runner/adaptive.py::{decision_points, StoppingMonitor}`.
+- **Filters**: units, limits and signs pass. $\tau$ stays
+  Å times Å$^{-1}$, dimensionless, with shape $(M,K)$, and one layer reduces to
+  the outer product.
+- **Re-derivation**: `matches` for the layer sum, the spectrum path, the grid,
+  $f=0$ and the chunk anchor. `differs` at one remaining site: the BremsLib
+  direction cosine of a one-row call.
+- **Verdict**: `discrepancy`. The scope is narrow: the residual is
+  $\le3.6\times10^{-16}$ relative, appears only for BremsLib, and only when a
+  `mc_brem_spectrum` call holds exactly one emitting row.
+- **Write-up**: this section.
+- **Suggested ledger change**: given to the task owner. Status is unchanged
+  and never `signed-off`.
+
+**Order argument.** Electron $e$'s value is
+$B_e=\frac1{4\pi}\sum_{r\in e}\sum_{\rm el}w_{r,\rm el}\sum_k
+\mathrm d\sigma_{rk}T_{rk}q_k$. It is invariant under slicing if three
+conditions hold:
+
+- every factor of row $r$ is an elementwise function of that row's own
+  inputs;
+- the $k$ sum (`sum(axis=1)`) and the element sum run in a fixed order;
+- the rows of $e$ are added in row order (one `bincount`).
+
+The escape pieces (`segment_escape.py`) are elementwise per row, with
+per-row `sort`, and `nonzero` keeps the row order. `mean_transmission` is
+elementwise. `_layer_depth` (`brem.py:818`) forms
+$\tau_{rk}=(\cdots(p_{r1}\mu_{1k}+p_{r2}\mu_{2k})+\cdots)$ layer by layer for
+each cell, independently of $M$. Photon blocks add per-block totals in block
+order. One input is not elementwise: `seg_cos_theta = v_hat @ n_hat`
+(`brem.py:1016`, BremsLib only) is a BLAS `gemv` over the call's $M$ rows.
+In a direct NumPy check, an $M=1$ product differs from the same row of a
+larger product in 24–36 % of rows. For $M$ from 2 to 69, at offsets 0 to 39, the results agree.
+
+**1. Probe.** The probe (4,032 comparisons) covered:
+
+- the eedl, Bethe–Heitler, BremsLib and partial-BremsLib models;
+- no layers, 2 layers and 3 layers;
+- sorted and interleaved ids;
+- 97 and 400 nodes;
+- `photon_block` `None` and 37;
+- two observation angles;
+- row chunks 1–239;
+- electron-prefix head and tail splits at 1, 2, 5 and 13;
+- single-electron calls, with three electrons that own exactly one row.
+
+The results:
+
+- Every row-chunk comparison and every prefix split is bit-identical.
+- 10 comparisons differ, by up to $3.6\times10^{-16}$ relative. All are
+  full BremsLib, single-slab or layered, and all are one-row single-electron
+  calls.
+- The residual disappears (0 of 4,032) when only that line is replaced, in
+  memory and in scratch, by
+  $\sum_{i}v_{ri}n_i$ summed in fixed order.
+
+In production, `measure` scores each transport chunk, and layered cases
+score each emitting layer separately (`emission.py:131`). A one-row call
+therefore occurs when a chunk, or one layer of it, holds a single emitting
+row. A one-electron chunk crossing a thin film is an example. The claim's
+"neither the transport chunk nor the reducer's row slicing changes it"
+holds for row slicing, and for chunking except in this case.
+
+**2. Layer sum and spectrum.** `_layer_depth` equals an independent loop
+over layers bit for bit. It differs from `p @ mu` by at most
+$5.3\times10^{-16}$ relative for $K\in\{2,3,5\}$, and for $K=1$ it equals
+`np.outer` and the old product exactly. The non-per-electron path
+(`spec += row_weight @ density`) is unchanged. Probe results for fixed-$N$
+spectra, `_layer_depth` against the old matmul:
+
+- Single slab is bit-identical in every model and chunk.
+- Layered spectra move by at most $4.6\times10^{-16}$ relative (3-layer
+  eedl, chunk 7). The 2-layer maximum is $4.2\times10^{-16}$.
+
+The commit's $\le3.5\times10^{-16}$ is therefore a case maximum, not a
+bound. The change is rounding-level either way. Not bumping
+`BREMSSTRAHLUNG_MODEL` is the project's decision and is not judged here.
+
+**3. Earlier items.** All pass with `--slow`:
+
+- `test_adaptive_output_does_not_depend_on_chunk_size`;
+- `test_zero_stability_fraction_admits_only_a_still_mean`;
+- both `decision_points` tests;
+- `test_records_do_not_depend_on_chunk_size`;
+- the four `test_band_primary_values_do_not_depend_on_row_slicing` cases.
+
+An independent `Fraction` reference reproduces 3,000 random grids with no
+mismatch, for example 200, 220, 242, 267, 294 and 3000, 3300, 3630, 3993.
+
+**4. Text.** The ledger Code and Claim match the code. Both the ledger and
+the CUDA caveat on this page (atomic accumulation, no chunk-independence
+argument) are accurate. Two statements are too strong by the one-row
+BremsLib case: the host-brem sentence above, and the Notes' "now a
+fixed-order layer sum … bit-identical". Either compute `seg_cos_theta`
+elementwise, or state the exception.

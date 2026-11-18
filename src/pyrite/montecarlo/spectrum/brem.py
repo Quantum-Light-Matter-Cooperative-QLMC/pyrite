@@ -1013,7 +1013,8 @@ def mc_brem_spectrum(
             comp, supplied_bremslib, seg_E, strict=bool(plasma_eV)
         )
         v_hat = xp.asarray(segments["v_hat"], dtype=xp.float64)[brem_idx][owner]
-        seg_cos_theta = v_hat @ xp.asarray(n_hat, dtype=xp.float64)
+        nx, ny, nz = np.asarray(n_hat, dtype=np.float64).tolist()  # not gemv: #1253
+        seg_cos_theta = v_hat[:, 0] * nx + v_hat[:, 1] * ny + v_hat[:, 2] * nz
 
     eedl_contexts = (
         _prepare_mc_eedl_contexts(comp, seg_E, E_grid, supplied_bremslib)

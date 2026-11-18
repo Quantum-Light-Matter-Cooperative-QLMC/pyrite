@@ -1538,5 +1538,3620 @@
    "host_peak_MiB": 1303.19921875,
    "error": null
   }
- ]
+ ],
+ "chunk_memory": {
+  "note": "Job 13569 at d325b2e98 (exact-ceiling grid, harness per-chunk pool window): pool_chunk_peak_B is the sampled (5 ms plus end points) CuPy pool bytes in use above those held before the chunk, through its simulate and stopping measure, so it isolates the chunk's own allocation from chunks kept for the final spectrum. Max over all chunks and cases 0.44 GiB against the 4 GiB ADAPTIVE_CHUNK_BUDGET_BYTES; 0.8-1.6 KiB/row on large chunks against the 10 KiB/row MEASURE_BYTES_PER_ROW sizing estimate. Realized counts equal the CPU replay on the exact grid (checks/adaptive_decision_cadence_1253_results.json).",
+  "arms": [
+   {
+    "code": "v4-exact-grid",
+    "code_sha": "d325b2e981d926d9368134e799fd22e5cf8ca046",
+    "job": 13569,
+    "device": "NVIDIA GeForce RTX 5080",
+    "material": "hbn",
+    "E0_keV": 1000.0,
+    "tilt_deg": 15.0,
+    "block": "auto",
+    "wall_s": 7.899576964089647,
+    "realized_electrons": 1002000,
+    "stop_reason": "max_electrons",
+    "chunks": 38,
+    "max_chunk": 87380,
+    "rows_per_electron": 2.729246506986028,
+    "card_peak_MiB": 5257.5625,
+    "pool_reserved_peak_MiB": 3725.33447265625,
+    "per_chunk": [
+     {
+      "start": 0,
+      "stop": 7168,
+      "rows": 19336,
+      "simulate_s": 0.8483924590982497,
+      "measure_s": 1.3749366300180554,
+      "pool_used_before_B": 0,
+      "pool_simulate_peak_B": 252809728,
+      "pool_chunk_peak_B": 252809728
+     },
+     {
+      "start": 7168,
+      "stop": 14336,
+      "rows": 19549,
+      "simulate_s": 0.028645619051530957,
+      "measure_s": 0.04154468304477632,
+      "pool_used_before_B": 4909056,
+      "pool_simulate_peak_B": 252846080,
+      "pool_chunk_peak_B": 252846080
+     },
+     {
+      "start": 14336,
+      "stop": 21504,
+      "rows": 19362,
+      "simulate_s": 0.03516629198566079,
+      "measure_s": 0.03957736096344888,
+      "pool_used_before_B": 9848832,
+      "pool_simulate_peak_B": 252815872,
+      "pool_chunk_peak_B": 252815872
+     },
+     {
+      "start": 21504,
+      "stop": 28672,
+      "rows": 19659,
+      "simulate_s": 0.026409964077174664,
+      "measure_s": 0.0414980030618608,
+      "pool_used_before_B": 14758912,
+      "pool_simulate_peak_B": 252866560,
+      "pool_chunk_peak_B": 252866560
+     },
+     {
+      "start": 28672,
+      "stop": 35840,
+      "rows": 19545,
+      "simulate_s": 0.026659376919269562,
+      "measure_s": 0.041123130824416876,
+      "pool_used_before_B": 19715072,
+      "pool_simulate_peak_B": 250869760,
+      "pool_chunk_peak_B": 250869760
+     },
+     {
+      "start": 35840,
+      "stop": 43008,
+      "rows": 19727,
+      "simulate_s": 0.02650675387121737,
+      "measure_s": 0.04114984208717942,
+      "pool_used_before_B": 22672384,
+      "pool_simulate_peak_B": 248265216,
+      "pool_chunk_peak_B": 248265216
+     },
+     {
+      "start": 43008,
+      "stop": 50176,
+      "rows": 19566,
+      "simulate_s": 0.035721465945243835,
+      "measure_s": 0.040368607034906745,
+      "pool_used_before_B": 25657856,
+      "pool_simulate_peak_B": 251228672,
+      "pool_chunk_peak_B": 251228672
+     },
+     {
+      "start": 50176,
+      "stop": 57344,
+      "rows": 19492,
+      "simulate_s": 0.025321846827864647,
+      "measure_s": 0.040983408922329545,
+      "pool_used_before_B": 28616192,
+      "pool_simulate_peak_B": 250844672,
+      "pool_chunk_peak_B": 250844672
+     },
+     {
+      "start": 57344,
+      "stop": 64512,
+      "rows": 19459,
+      "simulate_s": 0.025931481970474124,
+      "measure_s": 0.041025999933481216,
+      "pool_used_before_B": 31564288,
+      "pool_simulate_peak_B": 250860544,
+      "pool_chunk_peak_B": 250860544
+     },
+     {
+      "start": 64512,
+      "stop": 71680,
+      "rows": 19481,
+      "simulate_s": 0.02576036984100938,
+      "measure_s": 0.040127885062247515,
+      "pool_used_before_B": 34511360,
+      "pool_simulate_peak_B": 250890240,
+      "pool_chunk_peak_B": 250890240
+     },
+     {
+      "start": 71680,
+      "stop": 78848,
+      "rows": 19432,
+      "simulate_s": 0.026564565021544695,
+      "measure_s": 0.04247064096853137,
+      "pool_used_before_B": 37459456,
+      "pool_simulate_peak_B": 251074560,
+      "pool_chunk_peak_B": 251074560
+     },
+     {
+      "start": 78848,
+      "stop": 86016,
+      "rows": 19511,
+      "simulate_s": 0.0333819598890841,
+      "measure_s": 0.04092309018597007,
+      "pool_used_before_B": 40396288,
+      "pool_simulate_peak_B": 251537408,
+      "pool_chunk_peak_B": 251537408
+     },
+     {
+      "start": 86016,
+      "stop": 93184,
+      "rows": 19672,
+      "simulate_s": 0.03391844290308654,
+      "measure_s": 0.04030691599473357,
+      "pool_used_before_B": 43345408,
+      "pool_simulate_peak_B": 250871296,
+      "pool_chunk_peak_B": 250871296
+     },
+     {
+      "start": 93184,
+      "stop": 102140,
+      "rows": 24502,
+      "simulate_s": 0.026025312021374702,
+      "measure_s": 0.04192944592796266,
+      "pool_used_before_B": 46321152,
+      "pool_simulate_peak_B": 248563200,
+      "pool_chunk_peak_B": 248563200
+     },
+     {
+      "start": 102140,
+      "stop": 112354,
+      "rows": 27872,
+      "simulate_s": 0.026676956098526716,
+      "measure_s": 0.044965517008677125,
+      "pool_used_before_B": 50022912,
+      "pool_simulate_peak_B": 252626944,
+      "pool_chunk_peak_B": 252626944
+     },
+     {
+      "start": 112354,
+      "stop": 123590,
+      "rows": 30339,
+      "simulate_s": 0.02793942391872406,
+      "measure_s": 0.045714971143752337,
+      "pool_used_before_B": 54235648,
+      "pool_simulate_peak_B": 253003776,
+      "pool_chunk_peak_B": 253003776
+     },
+     {
+      "start": 123590,
+      "stop": 135949,
+      "rows": 33745,
+      "simulate_s": 0.027272609993815422,
+      "measure_s": 0.04581133206374943,
+      "pool_used_before_B": 58824704,
+      "pool_simulate_peak_B": 253479424,
+      "pool_chunk_peak_B": 253479424
+     },
+     {
+      "start": 135949,
+      "stop": 149544,
+      "rows": 37351,
+      "simulate_s": 0.027528880862519145,
+      "measure_s": 0.04999106121249497,
+      "pool_used_before_B": 63925248,
+      "pool_simulate_peak_B": 251984896,
+      "pool_chunk_peak_B": 251984896
+     },
+     {
+      "start": 149544,
+      "stop": 164499,
+      "rows": 40731,
+      "simulate_s": 0.03900033701211214,
+      "measure_s": 0.04943332588300109,
+      "pool_used_before_B": 69568000,
+      "pool_simulate_peak_B": 255017984,
+      "pool_chunk_peak_B": 255017984
+     },
+     {
+      "start": 164499,
+      "stop": 180949,
+      "rows": 44643,
+      "simulate_s": 0.029954538913443685,
+      "measure_s": 0.052787677850574255,
+      "pool_used_before_B": 75723776,
+      "pool_simulate_peak_B": 256256512,
+      "pool_chunk_peak_B": 256256512
+     },
+     {
+      "start": 180949,
+      "stop": 199044,
+      "rows": 49435,
+      "simulate_s": 0.030356331961229444,
+      "measure_s": 0.05372724402695894,
+      "pool_used_before_B": 82468864,
+      "pool_simulate_peak_B": 256333824,
+      "pool_chunk_peak_B": 256333824
+     },
+     {
+      "start": 199044,
+      "stop": 218949,
+      "rows": 54544,
+      "simulate_s": 0.03167371917515993,
+      "measure_s": 0.05717403697781265,
+      "pool_used_before_B": 89052672,
+      "pool_simulate_peak_B": 255665664,
+      "pool_chunk_peak_B": 255665664
+     },
+     {
+      "start": 218949,
+      "stop": 240844,
+      "rows": 59512,
+      "simulate_s": 0.03418743587099016,
+      "measure_s": 0.05908029107376933,
+      "pool_used_before_B": 97295360,
+      "pool_simulate_peak_B": 258910720,
+      "pool_chunk_peak_B": 258910720
+     },
+     {
+      "start": 240844,
+      "stop": 264929,
+      "rows": 65693,
+      "simulate_s": 0.04623808618634939,
+      "measure_s": 0.06315115606412292,
+      "pool_used_before_B": 105397248,
+      "pool_simulate_peak_B": 261095424,
+      "pool_chunk_peak_B": 261095424
+     },
+     {
+      "start": 264929,
+      "stop": 291422,
+      "rows": 72687,
+      "simulate_s": 0.043461557012051344,
+      "measure_s": 0.06318931793794036,
+      "pool_used_before_B": 115315200,
+      "pool_simulate_peak_B": 261978112,
+      "pool_chunk_peak_B": 261978112
+     },
+     {
+      "start": 291422,
+      "stop": 320565,
+      "rows": 79666,
+      "simulate_s": 0.036711543099954724,
+      "measure_s": 0.07016126299276948,
+      "pool_used_before_B": 126291456,
+      "pool_simulate_peak_B": 263439360,
+      "pool_chunk_peak_B": 263439360
+     },
+     {
+      "start": 320565,
+      "stop": 352622,
+      "rows": 87682,
+      "simulate_s": 0.050834206165745854,
+      "measure_s": 0.06886601401492953,
+      "pool_used_before_B": 138322432,
+      "pool_simulate_peak_B": 265784320,
+      "pool_chunk_peak_B": 265784320
+     },
+     {
+      "start": 352622,
+      "stop": 387885,
+      "rows": 96736,
+      "simulate_s": 0.03991478402167559,
+      "measure_s": 0.07676563691347837,
+      "pool_used_before_B": 151568384,
+      "pool_simulate_peak_B": 267696640,
+      "pool_chunk_peak_B": 267696640
+     },
+     {
+      "start": 387885,
+      "stop": 426674,
+      "rows": 105878,
+      "simulate_s": 0.05290471017360687,
+      "measure_s": 0.080426782136783,
+      "pool_used_before_B": 166179328,
+      "pool_simulate_peak_B": 269691392,
+      "pool_chunk_peak_B": 269691392
+     },
+     {
+      "start": 426674,
+      "stop": 469342,
+      "rows": 116474,
+      "simulate_s": 0.04348054714500904,
+      "measure_s": 0.08585914806462824,
+      "pool_used_before_B": 182166528,
+      "pool_simulate_peak_B": 271027712,
+      "pool_chunk_peak_B": 271027712
+     },
+     {
+      "start": 469342,
+      "stop": 516277,
+      "rows": 128035,
+      "simulate_s": 0.048402810003608465,
+      "measure_s": 0.09026111592538655,
+      "pool_used_before_B": 199755264,
+      "pool_simulate_peak_B": 273290240,
+      "pool_chunk_peak_B": 273290240
+     },
+     {
+      "start": 516277,
+      "stop": 567905,
+      "rows": 140424,
+      "simulate_s": 0.05048217508010566,
+      "measure_s": 0.09714286192320287,
+      "pool_used_before_B": 218968576,
+      "pool_simulate_peak_B": 275949568,
+      "pool_chunk_peak_B": 275949568
+     },
+     {
+      "start": 567905,
+      "stop": 624696,
+      "rows": 154874,
+      "simulate_s": 0.046024044044315815,
+      "measure_s": 0.10489932307973504,
+      "pool_used_before_B": 240132096,
+      "pool_simulate_peak_B": 277364736,
+      "pool_chunk_peak_B": 277364736
+     },
+     {
+      "start": 624696,
+      "stop": 687166,
+      "rows": 170808,
+      "simulate_s": 0.06182935810647905,
+      "measure_s": 0.10739031084813178,
+      "pool_used_before_B": 263519232,
+      "pool_simulate_peak_B": 280440320,
+      "pool_chunk_peak_B": 280440320
+     },
+     {
+      "start": 687166,
+      "stop": 755883,
+      "rows": 187884,
+      "simulate_s": 0.06477642804384232,
+      "measure_s": 0.11549587384797633,
+      "pool_used_before_B": 289313792,
+      "pool_simulate_peak_B": 283798016,
+      "pool_chunk_peak_B": 283798016
+     },
+     {
+      "start": 755883,
+      "stop": 831472,
+      "rows": 206445,
+      "simulate_s": 0.055667048087343574,
+      "measure_s": 0.12865802203305066,
+      "pool_used_before_B": 317687296,
+      "pool_simulate_peak_B": 287393792,
+      "pool_chunk_peak_B": 287393792
+     },
+     {
+      "start": 831472,
+      "stop": 914620,
+      "rows": 226927,
+      "simulate_s": 0.07278644293546677,
+      "measure_s": 0.1316450701560825,
+      "pool_used_before_B": 348864000,
+      "pool_simulate_peak_B": 290556928,
+      "pool_chunk_peak_B": 290556928
+     },
+     {
+      "start": 914620,
+      "stop": 1002000,
+      "rows": 238027,
+      "simulate_s": 0.07447114307433367,
+      "measure_s": 0.1367713250219822,
+      "pool_used_before_B": 382246400,
+      "pool_simulate_peak_B": 292756480,
+      "pool_chunk_peak_B": 292756480
+     }
+    ]
+   },
+   {
+    "code": "v4-exact-grid",
+    "code_sha": "d325b2e981d926d9368134e799fd22e5cf8ca046",
+    "job": 13569,
+    "device": "NVIDIA GeForce RTX 5080",
+    "material": "hbn",
+    "E0_keV": 1000.0,
+    "tilt_deg": 60.0,
+    "block": "auto",
+    "wall_s": 9.589544993126765,
+    "realized_electrons": 1002000,
+    "stop_reason": "max_electrons",
+    "chunks": 38,
+    "max_chunk": 87380,
+    "rows_per_electron": 4.329651696606787,
+    "card_peak_MiB": 6477.5625,
+    "pool_reserved_peak_MiB": 4983.681640625,
+    "per_chunk": [
+     {
+      "start": 0,
+      "stop": 7168,
+      "rows": 31067,
+      "simulate_s": 0.8521511158905923,
+      "measure_s": 1.3921543010510504,
+      "pool_used_before_B": 0,
+      "pool_simulate_peak_B": 254390272,
+      "pool_chunk_peak_B": 254390272
+     },
+     {
+      "start": 7168,
+      "stop": 14336,
+      "rows": 30585,
+      "simulate_s": 0.03024895186536014,
+      "measure_s": 0.04730292898602784,
+      "pool_used_before_B": 6679040,
+      "pool_simulate_peak_B": 254320128,
+      "pool_chunk_peak_B": 254320128
+     },
+     {
+      "start": 14336,
+      "stop": 21504,
+      "rows": 30967,
+      "simulate_s": 0.02844762010499835,
+      "measure_s": 0.04620912205427885,
+      "pool_used_before_B": 13281792,
+      "pool_simulate_peak_B": 254397440,
+      "pool_chunk_peak_B": 254397440
+     },
+     {
+      "start": 21504,
+      "stop": 28672,
+      "rows": 31251,
+      "simulate_s": 0.026939751114696264,
+      "measure_s": 0.04670893494039774,
+      "pool_used_before_B": 19941888,
+      "pool_simulate_peak_B": 254407680,
+      "pool_chunk_peak_B": 254407680
+     },
+     {
+      "start": 28672,
+      "stop": 35840,
+      "rows": 31187,
+      "simulate_s": 0.026700998889282346,
+      "measure_s": 0.04694429808296263,
+      "pool_used_before_B": 26648576,
+      "pool_simulate_peak_B": 252426240,
+      "pool_chunk_peak_B": 252426240
+     },
+     {
+      "start": 35840,
+      "stop": 43008,
+      "rows": 31029,
+      "simulate_s": 0.03530375403352082,
+      "measure_s": 0.045070374850183725,
+      "pool_used_before_B": 31362560,
+      "pool_simulate_peak_B": 248283136,
+      "pool_chunk_peak_B": 248283136
+     },
+     {
+      "start": 43008,
+      "stop": 50176,
+      "rows": 31279,
+      "simulate_s": 0.03682981408201158,
+      "measure_s": 0.04627342405728996,
+      "pool_used_before_B": 36050944,
+      "pool_simulate_peak_B": 252426240,
+      "pool_chunk_peak_B": 252426240
+     },
+     {
+      "start": 50176,
+      "stop": 57344,
+      "rows": 31098,
+      "simulate_s": 0.026847329922020435,
+      "measure_s": 0.04664357588626444,
+      "pool_used_before_B": 40778240,
+      "pool_simulate_peak_B": 252878336,
+      "pool_chunk_peak_B": 252878336
+     },
+     {
+      "start": 57344,
+      "stop": 64512,
+      "rows": 30994,
+      "simulate_s": 0.026668790029361844,
+      "measure_s": 0.0466341651044786,
+      "pool_used_before_B": 45475840,
+      "pool_simulate_peak_B": 252865536,
+      "pool_chunk_peak_B": 252865536
+     },
+     {
+      "start": 64512,
+      "stop": 71680,
+      "rows": 30751,
+      "simulate_s": 0.025611723074689507,
+      "measure_s": 0.0454665080178529,
+      "pool_used_before_B": 50162176,
+      "pool_simulate_peak_B": 252382208,
+      "pool_chunk_peak_B": 252382208
+     },
+     {
+      "start": 71680,
+      "stop": 78848,
+      "rows": 31164,
+      "simulate_s": 0.027761196019127965,
+      "measure_s": 0.046683077001944184,
+      "pool_used_before_B": 54811136,
+      "pool_simulate_peak_B": 252668928,
+      "pool_chunk_peak_B": 252668928
+     },
+     {
+      "start": 78848,
+      "stop": 86016,
+      "rows": 31337,
+      "simulate_s": 0.026998559944331646,
+      "measure_s": 0.04778163298033178,
+      "pool_used_before_B": 59517952,
+      "pool_simulate_peak_B": 252660224,
+      "pool_chunk_peak_B": 252660224
+     },
+     {
+      "start": 86016,
+      "stop": 93184,
+      "rows": 31030,
+      "simulate_s": 0.02687398111447692,
+      "measure_s": 0.04603926092386246,
+      "pool_used_before_B": 64253440,
+      "pool_simulate_peak_B": 252399104,
+      "pool_chunk_peak_B": 252399104
+     },
+     {
+      "start": 93184,
+      "stop": 102140,
+      "rows": 38918,
+      "simulate_s": 0.027728206012398005,
+      "measure_s": 0.05163887911476195,
+      "pool_used_before_B": 68941824,
+      "pool_simulate_peak_B": 252741120,
+      "pool_chunk_peak_B": 252741120
+     },
+     {
+      "start": 102140,
+      "stop": 112354,
+      "rows": 44138,
+      "simulate_s": 0.028208297910168767,
+      "measure_s": 0.05187519919127226,
+      "pool_used_before_B": 74826752,
+      "pool_simulate_peak_B": 254692352,
+      "pool_chunk_peak_B": 254692352
+     },
+     {
+      "start": 112354,
+      "stop": 123590,
+      "rows": 48872,
+      "simulate_s": 0.038141192169860005,
+      "measure_s": 0.05454282509163022,
+      "pool_used_before_B": 81495040,
+      "pool_simulate_peak_B": 253104128,
+      "pool_chunk_peak_B": 253104128
+     },
+     {
+      "start": 123590,
+      "stop": 135949,
+      "rows": 53439,
+      "simulate_s": 0.027844796888530254,
+      "measure_s": 0.05684357089921832,
+      "pool_used_before_B": 88877568,
+      "pool_simulate_peak_B": 257939456,
+      "pool_chunk_peak_B": 257939456
+     },
+     {
+      "start": 135949,
+      "stop": 149544,
+      "rows": 58828,
+      "simulate_s": 0.02843335992656648,
+      "measure_s": 0.059832870960235596,
+      "pool_used_before_B": 96947712,
+      "pool_simulate_peak_B": 253505536,
+      "pool_chunk_peak_B": 253505536
+     },
+     {
+      "start": 149544,
+      "stop": 164499,
+      "rows": 64871,
+      "simulate_s": 0.047558731865137815,
+      "measure_s": 0.061110907001420856,
+      "pool_used_before_B": 105836544,
+      "pool_simulate_peak_B": 258705408,
+      "pool_chunk_peak_B": 258705408
+     },
+     {
+      "start": 164499,
+      "stop": 180949,
+      "rows": 71110,
+      "simulate_s": 0.03162922104820609,
+      "measure_s": 0.0692535899579525,
+      "pool_used_before_B": 115635200,
+      "pool_simulate_peak_B": 259832320,
+      "pool_chunk_peak_B": 259832320
+     },
+     {
+      "start": 180949,
+      "stop": 199044,
+      "rows": 78077,
+      "simulate_s": 0.04230695893056691,
+      "measure_s": 0.06754428800195456,
+      "pool_used_before_B": 126379008,
+      "pool_simulate_peak_B": 257494528,
+      "pool_chunk_peak_B": 257494528
+     },
+     {
+      "start": 199044,
+      "stop": 218949,
+      "rows": 86465,
+      "simulate_s": 0.042782150907441974,
+      "measure_s": 0.0724944700486958,
+      "pool_used_before_B": 137282560,
+      "pool_simulate_peak_B": 262569472,
+      "pool_chunk_peak_B": 262569472
+     },
+     {
+      "start": 218949,
+      "stop": 240844,
+      "rows": 94585,
+      "simulate_s": 0.055223540868610144,
+      "measure_s": 0.0778810738120228,
+      "pool_used_before_B": 150346240,
+      "pool_simulate_peak_B": 263166976,
+      "pool_chunk_peak_B": 263166976
+     },
+     {
+      "start": 240844,
+      "stop": 264929,
+      "rows": 104465,
+      "simulate_s": 0.03698556497693062,
+      "measure_s": 0.08278224500827491,
+      "pool_used_before_B": 163743744,
+      "pool_simulate_peak_B": 265806848,
+      "pool_chunk_peak_B": 265806848
+     },
+     {
+      "start": 264929,
+      "stop": 291422,
+      "rows": 114831,
+      "simulate_s": 0.04780401405878365,
+      "measure_s": 0.08590147504583001,
+      "pool_used_before_B": 179517952,
+      "pool_simulate_peak_B": 266920448,
+      "pool_chunk_peak_B": 266920448
+     },
+     {
+      "start": 291422,
+      "stop": 320565,
+      "rows": 126144,
+      "simulate_s": 0.05558471288532019,
+      "measure_s": 0.09200934413820505,
+      "pool_used_before_B": 196861440,
+      "pool_simulate_peak_B": 268535808,
+      "pool_chunk_peak_B": 268535808
+     },
+     {
+      "start": 320565,
+      "stop": 352622,
+      "rows": 138975,
+      "simulate_s": 0.05220672208815813,
+      "measure_s": 0.09973911382257938,
+      "pool_used_before_B": 215907840,
+      "pool_simulate_peak_B": 272006656,
+      "pool_chunk_peak_B": 272006656
+     },
+     {
+      "start": 352622,
+      "stop": 387885,
+      "rows": 152753,
+      "simulate_s": 0.05556831415742636,
+      "measure_s": 0.10828708205372095,
+      "pool_used_before_B": 236895232,
+      "pool_simulate_peak_B": 275703808,
+      "pool_chunk_peak_B": 275703808
+     },
+     {
+      "start": 387885,
+      "stop": 426674,
+      "rows": 168606,
+      "simulate_s": 0.05432783695869148,
+      "measure_s": 0.11866328702308238,
+      "pool_used_before_B": 259963904,
+      "pool_simulate_peak_B": 274627072,
+      "pool_chunk_peak_B": 274627072
+     },
+     {
+      "start": 426674,
+      "stop": 469342,
+      "rows": 185159,
+      "simulate_s": 0.05348654300905764,
+      "measure_s": 0.12630636687390506,
+      "pool_used_before_B": 285422080,
+      "pool_simulate_peak_B": 275073536,
+      "pool_chunk_peak_B": 275073536
+     },
+     {
+      "start": 469342,
+      "stop": 516277,
+      "rows": 203218,
+      "simulate_s": 0.06341637996956706,
+      "measure_s": 0.13248174986802042,
+      "pool_used_before_B": 313388544,
+      "pool_simulate_peak_B": 279767040,
+      "pool_chunk_peak_B": 279767040
+     },
+     {
+      "start": 516277,
+      "stop": 567905,
+      "rows": 223265,
+      "simulate_s": 0.06076450110413134,
+      "measure_s": 0.144525843905285,
+      "pool_used_before_B": 343954432,
+      "pool_simulate_peak_B": 284674048,
+      "pool_chunk_peak_B": 284674048
+     },
+     {
+      "start": 567905,
+      "stop": 624696,
+      "rows": 245300,
+      "simulate_s": 0.06595970899797976,
+      "measure_s": 0.15105132898315787,
+      "pool_used_before_B": 377625088,
+      "pool_simulate_peak_B": 293116928,
+      "pool_chunk_peak_B": 293116928
+     },
+     {
+      "start": 624696,
+      "stop": 687166,
+      "rows": 269896,
+      "simulate_s": 0.07084996509365737,
+      "measure_s": 0.16936874599196017,
+      "pool_used_before_B": 414668800,
+      "pool_simulate_peak_B": 290666496,
+      "pool_chunk_peak_B": 290666496
+     },
+     {
+      "start": 687166,
+      "stop": 755883,
+      "rows": 297639,
+      "simulate_s": 0.0676030870527029,
+      "measure_s": 0.17896149586886168,
+      "pool_used_before_B": 455430656,
+      "pool_simulate_peak_B": 307671552,
+      "pool_chunk_peak_B": 307671552
+     },
+     {
+      "start": 755883,
+      "stop": 831472,
+      "rows": 327783,
+      "simulate_s": 0.08011974394321442,
+      "measure_s": 0.19912948412820697,
+      "pool_used_before_B": 500377600,
+      "pool_simulate_peak_B": 313798144,
+      "pool_chunk_peak_B": 313798144
+     },
+     {
+      "start": 831472,
+      "stop": 914620,
+      "rows": 359558,
+      "simulate_s": 0.08337109186686575,
+      "measure_s": 0.21505676885135472,
+      "pool_used_before_B": 549876224,
+      "pool_simulate_peak_B": 309464576,
+      "pool_chunk_peak_B": 477133824
+     },
+     {
+      "start": 914620,
+      "stop": 1002000,
+      "rows": 377677,
+      "simulate_s": 0.08837682893499732,
+      "measure_s": 0.22531693312339485,
+      "pool_used_before_B": 603289600,
+      "pool_simulate_peak_B": 311562240,
+      "pool_chunk_peak_B": 325309440
+     }
+    ]
+   },
+   {
+    "code": "v4-exact-grid",
+    "code_sha": "d325b2e981d926d9368134e799fd22e5cf8ca046",
+    "job": 13569,
+    "device": "NVIDIA GeForce RTX 5080",
+    "material": "hbn",
+    "E0_keV": 30.0,
+    "tilt_deg": 15.0,
+    "block": "auto",
+    "wall_s": 41.11003881506622,
+    "realized_electrons": 264929,
+    "stop_reason": "converged",
+    "chunks": 25,
+    "max_chunk": 24085,
+    "rows_per_electron": 16.139082546644573,
+    "card_peak_MiB": 6757.5625,
+    "pool_reserved_peak_MiB": 5221.84375,
+    "per_chunk": [
+     {
+      "start": 0,
+      "stop": 7168,
+      "rows": 115461,
+      "simulate_s": 8.222358216997236,
+      "measure_s": 16.835113821085542,
+      "pool_used_before_B": 0,
+      "pool_simulate_peak_B": 268750336,
+      "pool_chunk_peak_B": 268750336
+     },
+     {
+      "start": 7168,
+      "stop": 14336,
+      "rows": 115793,
+      "simulate_s": 0.041936488123610616,
+      "measure_s": 0.1949713840149343,
+      "pool_used_before_B": 19406848,
+      "pool_simulate_peak_B": 266021888,
+      "pool_chunk_peak_B": 266021888
+     },
+     {
+      "start": 14336,
+      "stop": 21504,
+      "rows": 116268,
+      "simulate_s": 0.03834917605854571,
+      "measure_s": 0.17712493403814733,
+      "pool_used_before_B": 38861824,
+      "pool_simulate_peak_B": 265820672,
+      "pool_chunk_peak_B": 265820672
+     },
+     {
+      "start": 21504,
+      "stop": 28672,
+      "rows": 116085,
+      "simulate_s": 0.03661208413541317,
+      "measure_s": 0.17498112190514803,
+      "pool_used_before_B": 58386944,
+      "pool_simulate_peak_B": 265777664,
+      "pool_chunk_peak_B": 265777664
+     },
+     {
+      "start": 28672,
+      "stop": 35840,
+      "rows": 115279,
+      "simulate_s": 0.04137186496518552,
+      "measure_s": 0.17556266603060067,
+      "pool_used_before_B": 77881344,
+      "pool_simulate_peak_B": 263994880,
+      "pool_chunk_peak_B": 263994880
+     },
+     {
+      "start": 35840,
+      "stop": 43008,
+      "rows": 115609,
+      "simulate_s": 0.03596816910430789,
+      "measure_s": 0.17537089600227773,
+      "pool_used_before_B": 95294976,
+      "pool_simulate_peak_B": 263831552,
+      "pool_chunk_peak_B": 263831552
+     },
+     {
+      "start": 43008,
+      "stop": 50176,
+      "rows": 114186,
+      "simulate_s": 0.034864612156525254,
+      "measure_s": 0.171311778947711,
+      "pool_used_before_B": 112757248,
+      "pool_simulate_peak_B": 266583552,
+      "pool_chunk_peak_B": 266583552
+     },
+     {
+      "start": 50176,
+      "stop": 57344,
+      "rows": 115296,
+      "simulate_s": 0.03294161893427372,
+      "measure_s": 0.17550728702917695,
+      "pool_used_before_B": 130007040,
+      "pool_simulate_peak_B": 263699968,
+      "pool_chunk_peak_B": 263699968
+     },
+     {
+      "start": 57344,
+      "stop": 64512,
+      "rows": 115045,
+      "simulate_s": 0.035382615169510245,
+      "measure_s": 0.17422368889674544,
+      "pool_used_before_B": 147421696,
+      "pool_simulate_peak_B": 263674368,
+      "pool_chunk_peak_B": 263674368
+     },
+     {
+      "start": 64512,
+      "stop": 71680,
+      "rows": 115185,
+      "simulate_s": 0.035292614018544555,
+      "measure_s": 0.1749398100655526,
+      "pool_used_before_B": 164797440,
+      "pool_simulate_peak_B": 264898560,
+      "pool_chunk_peak_B": 264898560
+     },
+     {
+      "start": 71680,
+      "stop": 78848,
+      "rows": 117486,
+      "simulate_s": 0.040010361932218075,
+      "measure_s": 0.1768628798890859,
+      "pool_used_before_B": 182192640,
+      "pool_simulate_peak_B": 263969280,
+      "pool_chunk_peak_B": 263969280
+     },
+     {
+      "start": 78848,
+      "stop": 86016,
+      "rows": 116382,
+      "simulate_s": 0.03394267288967967,
+      "measure_s": 0.17650290811434388,
+      "pool_used_before_B": 199936000,
+      "pool_simulate_peak_B": 263849472,
+      "pool_chunk_peak_B": 263849472
+     },
+     {
+      "start": 86016,
+      "stop": 93184,
+      "rows": 114656,
+      "simulate_s": 0.03606339590623975,
+      "measure_s": 0.17382311006076634,
+      "pool_used_before_B": 217514496,
+      "pool_simulate_peak_B": 263614464,
+      "pool_chunk_peak_B": 263614464
+     },
+     {
+      "start": 93184,
+      "stop": 102140,
+      "rows": 143860,
+      "simulate_s": 0.038830074947327375,
+      "measure_s": 0.2167332621756941,
+      "pool_used_before_B": 234831360,
+      "pool_simulate_peak_B": 268475392,
+      "pool_chunk_peak_B": 268475392
+     },
+     {
+      "start": 102140,
+      "stop": 112354,
+      "rows": 165083,
+      "simulate_s": 0.037994938902556896,
+      "measure_s": 0.2405119810719043,
+      "pool_used_before_B": 256556032,
+      "pool_simulate_peak_B": 271465472,
+      "pool_chunk_peak_B": 271465472
+     },
+     {
+      "start": 112354,
+      "stop": 123590,
+      "rows": 181483,
+      "simulate_s": 0.04470781399868429,
+      "measure_s": 0.26044040103442967,
+      "pool_used_before_B": 281488384,
+      "pool_simulate_peak_B": 264459264,
+      "pool_chunk_peak_B": 264459264
+     },
+     {
+      "start": 123590,
+      "stop": 135949,
+      "rows": 200698,
+      "simulate_s": 0.03786579007282853,
+      "measure_s": 0.288366483990103,
+      "pool_used_before_B": 308895744,
+      "pool_simulate_peak_B": 264794112,
+      "pool_chunk_peak_B": 264794112
+     },
+     {
+      "start": 135949,
+      "stop": 149544,
+      "rows": 218064,
+      "simulate_s": 0.03491342905908823,
+      "measure_s": 0.30635158717632294,
+      "pool_used_before_B": 339202048,
+      "pool_simulate_peak_B": 265664000,
+      "pool_chunk_peak_B": 265664000
+     },
+     {
+      "start": 149544,
+      "stop": 164499,
+      "rows": 241435,
+      "simulate_s": 0.053504992043599486,
+      "measure_s": 0.3339642679784447,
+      "pool_used_before_B": 372134912,
+      "pool_simulate_peak_B": 280553472,
+      "pool_chunk_peak_B": 280553472
+     },
+     {
+      "start": 164499,
+      "stop": 180829,
+      "rows": 262841,
+      "simulate_s": 0.05385419400408864,
+      "measure_s": 0.39419353613629937,
+      "pool_used_before_B": 408596992,
+      "pool_simulate_peak_B": 280723968,
+      "pool_chunk_peak_B": 280723968
+     },
+     {
+      "start": 180829,
+      "stop": 187997,
+      "rows": 116239,
+      "simulate_s": 0.03698745393194258,
+      "measure_s": 0.17616601008921862,
+      "pool_used_before_B": 448287232,
+      "pool_simulate_peak_B": 263916032,
+      "pool_chunk_peak_B": 263916032
+     },
+     {
+      "start": 187997,
+      "stop": 199044,
+      "rows": 178386,
+      "simulate_s": 0.04038554709404707,
+      "measure_s": 0.2554644928313792,
+      "pool_used_before_B": 465846272,
+      "pool_simulate_peak_B": 272946176,
+      "pool_chunk_peak_B": 272946176
+     },
+     {
+      "start": 199044,
+      "stop": 218949,
+      "rows": 323061,
+      "simulate_s": 0.05113270692527294,
+      "measure_s": 0.4413772120606154,
+      "pool_used_before_B": 492787712,
+      "pool_simulate_peak_B": 293308416,
+      "pool_chunk_peak_B": 293308416
+     },
+     {
+      "start": 218949,
+      "stop": 240844,
+      "rows": 353762,
+      "simulate_s": 0.06351018883287907,
+      "measure_s": 0.4801023399922997,
+      "pool_used_before_B": 540684800,
+      "pool_simulate_peak_B": 297520128,
+      "pool_chunk_peak_B": 298659328
+     },
+     {
+      "start": 240844,
+      "stop": 264929,
+      "rows": 388068,
+      "simulate_s": 0.05873702699318528,
+      "measure_s": 0.5203276579268277,
+      "pool_used_before_B": 593212928,
+      "pool_simulate_peak_B": 303403520,
+      "pool_chunk_peak_B": 329863168
+     }
+    ]
+   },
+   {
+    "code": "v4-exact-grid",
+    "code_sha": "d325b2e981d926d9368134e799fd22e5cf8ca046",
+    "job": 13569,
+    "device": "NVIDIA GeForce RTX 5080",
+    "material": "hbn",
+    "E0_keV": 30.0,
+    "tilt_deg": 60.0,
+    "block": "auto",
+    "wall_s": 59.12105272291228,
+    "realized_electrons": 624696,
+    "stop_reason": "converged",
+    "chunks": 68,
+    "max_chunk": 10915,
+    "rows_per_electron": 37.68408473881696,
+    "card_peak_MiB": 12715.5625,
+    "pool_reserved_peak_MiB": 11207.1875,
+    "per_chunk": [
+     {
+      "start": 0,
+      "stop": 7168,
+      "rows": 269189,
+      "simulate_s": 0.606360032921657,
+      "measure_s": 1.7291084711905569,
+      "pool_used_before_B": 0,
+      "pool_simulate_peak_B": 286557184,
+      "pool_chunk_peak_B": 286557184
+     },
+     {
+      "start": 7168,
+      "stop": 14336,
+      "rows": 272596,
+      "simulate_s": 0.05206763604655862,
+      "measure_s": 0.44283027900382876,
+      "pool_used_before_B": 42618880,
+      "pool_simulate_peak_B": 287733248,
+      "pool_chunk_peak_B": 287733248
+     },
+     {
+      "start": 14336,
+      "stop": 21504,
+      "rows": 268974,
+      "simulate_s": 0.05325756408274174,
+      "measure_s": 0.4343253020197153,
+      "pool_used_before_B": 85749760,
+      "pool_simulate_peak_B": 286257152,
+      "pool_chunk_peak_B": 286257152
+     },
+     {
+      "start": 21504,
+      "stop": 28672,
+      "rows": 275420,
+      "simulate_s": 0.05795948603190482,
+      "measure_s": 0.44661010801792145,
+      "pool_used_before_B": 128332288,
+      "pool_simulate_peak_B": 287366656,
+      "pool_chunk_peak_B": 287366656
+     },
+     {
+      "start": 28672,
+      "stop": 35840,
+      "rows": 269699,
+      "simulate_s": 0.051549263997003436,
+      "measure_s": 0.43341975985094905,
+      "pool_used_before_B": 171888128,
+      "pool_simulate_peak_B": 284633600,
+      "pool_chunk_peak_B": 284633600
+     },
+     {
+      "start": 35840,
+      "stop": 43008,
+      "rows": 267854,
+      "simulate_s": 0.05163285485468805,
+      "measure_s": 0.43419392919167876,
+      "pool_used_before_B": 212620288,
+      "pool_simulate_peak_B": 284161024,
+      "pool_chunk_peak_B": 284161024
+     },
+     {
+      "start": 43008,
+      "stop": 50176,
+      "rows": 267749,
+      "simulate_s": 0.05379003915004432,
+      "measure_s": 0.4319176930002868,
+      "pool_used_before_B": 253072896,
+      "pool_simulate_peak_B": 284135936,
+      "pool_chunk_peak_B": 284135936
+     },
+     {
+      "start": 50176,
+      "stop": 57344,
+      "rows": 270358,
+      "simulate_s": 0.059921359876170754,
+      "measure_s": 0.43415422993712127,
+      "pool_used_before_B": 293506048,
+      "pool_simulate_peak_B": 284427776,
+      "pool_chunk_peak_B": 284427776
+     },
+     {
+      "start": 57344,
+      "stop": 64512,
+      "rows": 273484,
+      "simulate_s": 0.04578517680056393,
+      "measure_s": 0.4399958630092442,
+      "pool_used_before_B": 334337024,
+      "pool_simulate_peak_B": 284869120,
+      "pool_chunk_peak_B": 284869120
+     },
+     {
+      "start": 64512,
+      "stop": 71680,
+      "rows": 271911,
+      "simulate_s": 0.0557339140214026,
+      "measure_s": 0.438029465964064,
+      "pool_used_before_B": 375640064,
+      "pool_simulate_peak_B": 284929536,
+      "pool_chunk_peak_B": 284929536
+     },
+     {
+      "start": 71680,
+      "stop": 78848,
+      "rows": 270062,
+      "simulate_s": 0.057467264123260975,
+      "measure_s": 0.4350673691369593,
+      "pool_used_before_B": 416702976,
+      "pool_simulate_peak_B": 284678656,
+      "pool_chunk_peak_B": 284678656
+     },
+     {
+      "start": 78848,
+      "stop": 86016,
+      "rows": 274170,
+      "simulate_s": 0.05908727319911122,
+      "measure_s": 0.4385939638596028,
+      "pool_used_before_B": 457485312,
+      "pool_simulate_peak_B": 285231616,
+      "pool_chunk_peak_B": 285231616
+     },
+     {
+      "start": 86016,
+      "stop": 93184,
+      "rows": 273105,
+      "simulate_s": 0.052228473825380206,
+      "measure_s": 0.4388009151443839,
+      "pool_used_before_B": 498886144,
+      "pool_simulate_peak_B": 285026304,
+      "pool_chunk_peak_B": 285026304
+     },
+     {
+      "start": 93184,
+      "stop": 102140,
+      "rows": 331190,
+      "simulate_s": 0.06427763402462006,
+      "measure_s": 0.5327543269377202,
+      "pool_used_before_B": 540130304,
+      "pool_simulate_peak_B": 293238784,
+      "pool_chunk_peak_B": 293238784
+     },
+     {
+      "start": 102140,
+      "stop": 112354,
+      "rows": 384188,
+      "simulate_s": 0.06006045010872185,
+      "measure_s": 0.6117179789580405,
+      "pool_used_before_B": 590141440,
+      "pool_simulate_peak_B": 300579840,
+      "pool_chunk_peak_B": 324278272
+     },
+     {
+      "start": 112354,
+      "stop": 123269,
+      "rows": 405891,
+      "simulate_s": 0.061169927939772606,
+      "measure_s": 0.6448466968722641,
+      "pool_used_before_B": 648154624,
+      "pool_simulate_peak_B": 302753792,
+      "pool_chunk_peak_B": 342494720
+     },
+     {
+      "start": 123269,
+      "stop": 130437,
+      "rows": 272267,
+      "simulate_s": 0.04567282693460584,
+      "measure_s": 0.43524018581956625,
+      "pool_used_before_B": 708564992,
+      "pool_simulate_peak_B": 285556736,
+      "pool_chunk_peak_B": 285556736
+     },
+     {
+      "start": 130437,
+      "stop": 137605,
+      "rows": 268787,
+      "simulate_s": 0.04539256589487195,
+      "measure_s": 0.434927674010396,
+      "pool_used_before_B": 750570496,
+      "pool_simulate_peak_B": 284221952,
+      "pool_chunk_peak_B": 284221952
+     },
+     {
+      "start": 137605,
+      "stop": 148520,
+      "rows": 409791,
+      "simulate_s": 0.06499388115480542,
+      "measure_s": 0.6518452500458807,
+      "pool_used_before_B": 791159808,
+      "pool_simulate_peak_B": 307757568,
+      "pool_chunk_peak_B": 346662400
+     },
+     {
+      "start": 148520,
+      "stop": 155688,
+      "rows": 265766,
+      "simulate_s": 0.04134067194536328,
+      "measure_s": 0.4289898010902107,
+      "pool_used_before_B": 853039104,
+      "pool_simulate_peak_B": 283919360,
+      "pool_chunk_peak_B": 283919360
+     },
+     {
+      "start": 155688,
+      "stop": 164499,
+      "rows": 329064,
+      "simulate_s": 0.0606437970418483,
+      "measure_s": 0.5253719291649759,
+      "pool_used_before_B": 893174272,
+      "pool_simulate_peak_B": 292875776,
+      "pool_chunk_peak_B": 292875776
+     },
+     {
+      "start": 164499,
+      "stop": 175414,
+      "rows": 415566,
+      "simulate_s": 0.05544088315218687,
+      "measure_s": 0.6555762118659914,
+      "pool_used_before_B": 942865920,
+      "pool_simulate_peak_B": 304862208,
+      "pool_chunk_peak_B": 351610880
+     },
+     {
+      "start": 175414,
+      "stop": 182582,
+      "rows": 267722,
+      "simulate_s": 0.05696673993952572,
+      "measure_s": 0.4305123670492321,
+      "pool_used_before_B": 1005622784,
+      "pool_simulate_peak_B": 284072960,
+      "pool_chunk_peak_B": 284072960
+     },
+     {
+      "start": 182582,
+      "stop": 193497,
+      "rows": 419139,
+      "simulate_s": 0.050670922035351396,
+      "measure_s": 0.6599022790323943,
+      "pool_used_before_B": 1045168128,
+      "pool_simulate_peak_B": 305404416,
+      "pool_chunk_peak_B": 355007488
+     },
+     {
+      "start": 193497,
+      "stop": 200665,
+      "rows": 272872,
+      "simulate_s": 0.04855044209398329,
+      "measure_s": 0.4397365541663021,
+      "pool_used_before_B": 1108466176,
+      "pool_simulate_peak_B": 292702208,
+      "pool_chunk_peak_B": 292702208
+     },
+     {
+      "start": 200665,
+      "stop": 211580,
+      "rows": 405978,
+      "simulate_s": 0.06891723698936403,
+      "measure_s": 0.6398316738195717,
+      "pool_used_before_B": 1150559232,
+      "pool_simulate_peak_B": 303618560,
+      "pool_chunk_peak_B": 343749632
+     },
+     {
+      "start": 211580,
+      "stop": 218949,
+      "rows": 277243,
+      "simulate_s": 0.04829483199864626,
+      "measure_s": 0.44472089200280607,
+      "pool_used_before_B": 1211866624,
+      "pool_simulate_peak_B": 285571072,
+      "pool_chunk_peak_B": 285571072
+     },
+     {
+      "start": 218949,
+      "stop": 229864,
+      "rows": 411564,
+      "simulate_s": 0.06900303694419563,
+      "measure_s": 0.6461181801278144,
+      "pool_used_before_B": 1253731328,
+      "pool_simulate_peak_B": 304237568,
+      "pool_chunk_peak_B": 347293184
+     },
+     {
+      "start": 229864,
+      "stop": 240779,
+      "rows": 413608,
+      "simulate_s": 0.053048173896968365,
+      "measure_s": 0.6480619551148266,
+      "pool_used_before_B": 1314994176,
+      "pool_simulate_peak_B": 304641536,
+      "pool_chunk_peak_B": 350204928
+     },
+     {
+      "start": 240779,
+      "stop": 247947,
+      "rows": 269943,
+      "simulate_s": 0.05188200902193785,
+      "measure_s": 0.4365061449352652,
+      "pool_used_before_B": 1377452032,
+      "pool_simulate_peak_B": 285326336,
+      "pool_chunk_peak_B": 285326336
+     },
+     {
+      "start": 247947,
+      "stop": 258862,
+      "rows": 411254,
+      "simulate_s": 0.060336373979225755,
+      "measure_s": 0.6493884089868516,
+      "pool_used_before_B": 1419102720,
+      "pool_simulate_peak_B": 304341504,
+      "pool_chunk_peak_B": 348364288
+     },
+     {
+      "start": 258862,
+      "stop": 266030,
+      "rows": 275938,
+      "simulate_s": 0.05585989402607083,
+      "measure_s": 0.4430781211704016,
+      "pool_used_before_B": 1481204736,
+      "pool_simulate_peak_B": 285172224,
+      "pool_chunk_peak_B": 285172224
+     },
+     {
+      "start": 266030,
+      "stop": 276925,
+      "rows": 413284,
+      "simulate_s": 0.058817974058911204,
+      "measure_s": 0.6464519151486456,
+      "pool_used_before_B": 1522875392,
+      "pool_simulate_peak_B": 304625152,
+      "pool_chunk_peak_B": 349992448
+     },
+     {
+      "start": 276925,
+      "stop": 287820,
+      "rows": 409379,
+      "simulate_s": 0.06035242509096861,
+      "measure_s": 0.6422245518770069,
+      "pool_used_before_B": 1585285120,
+      "pool_simulate_peak_B": 304107008,
+      "pool_chunk_peak_B": 346441728
+     },
+     {
+      "start": 287820,
+      "stop": 294988,
+      "rows": 268577,
+      "simulate_s": 0.04590027895756066,
+      "measure_s": 0.43339142692275345,
+      "pool_used_before_B": 1647106048,
+      "pool_simulate_peak_B": 284480000,
+      "pool_chunk_peak_B": 284480000
+     },
+     {
+      "start": 294988,
+      "stop": 305883,
+      "rows": 411956,
+      "simulate_s": 0.0627702649217099,
+      "measure_s": 0.6472729200031608,
+      "pool_used_before_B": 1687666176,
+      "pool_simulate_peak_B": 304397824,
+      "pool_chunk_peak_B": 353135104
+     },
+     {
+      "start": 305883,
+      "stop": 316778,
+      "rows": 410648,
+      "simulate_s": 0.0676237668376416,
+      "measure_s": 0.6431009981315583,
+      "pool_used_before_B": 1749874688,
+      "pool_simulate_peak_B": 307870720,
+      "pool_chunk_peak_B": 347466240
+     },
+     {
+      "start": 316778,
+      "stop": 323946,
+      "rows": 267677,
+      "simulate_s": 0.052323356037959456,
+      "measure_s": 0.43289713910780847,
+      "pool_used_before_B": 1811889152,
+      "pool_simulate_peak_B": 284115968,
+      "pool_chunk_peak_B": 284115968
+     },
+     {
+      "start": 323946,
+      "stop": 334841,
+      "rows": 414297,
+      "simulate_s": 0.06136000691913068,
+      "measure_s": 0.6491589248180389,
+      "pool_used_before_B": 1852313088,
+      "pool_simulate_peak_B": 304753664,
+      "pool_chunk_peak_B": 350699520
+     },
+     {
+      "start": 334841,
+      "stop": 345736,
+      "rows": 412607,
+      "simulate_s": 0.06630580010823905,
+      "measure_s": 0.6459669079631567,
+      "pool_used_before_B": 1914877952,
+      "pool_simulate_peak_B": 304468992,
+      "pool_chunk_peak_B": 348321280
+     },
+     {
+      "start": 345736,
+      "stop": 352904,
+      "rows": 274969,
+      "simulate_s": 0.053309572860598564,
+      "measure_s": 0.44060499710030854,
+      "pool_used_before_B": 1976295424,
+      "pool_simulate_peak_B": 285034496,
+      "pool_chunk_peak_B": 285034496
+     },
+     {
+      "start": 352904,
+      "stop": 363799,
+      "rows": 410930,
+      "simulate_s": 0.07022216590121388,
+      "measure_s": 0.6448636678978801,
+      "pool_used_before_B": 2017822208,
+      "pool_simulate_peak_B": 304320512,
+      "pool_chunk_peak_B": 352415232
+     },
+     {
+      "start": 363799,
+      "stop": 374694,
+      "rows": 410444,
+      "simulate_s": 0.06121888803318143,
+      "measure_s": 0.642197024077177,
+      "pool_used_before_B": 2079876096,
+      "pool_simulate_peak_B": 305115648,
+      "pool_chunk_peak_B": 348312576
+     },
+     {
+      "start": 374694,
+      "stop": 385589,
+      "rows": 410531,
+      "simulate_s": 0.051480183843523264,
+      "measure_s": 0.6435452960431576,
+      "pool_used_before_B": 2142746624,
+      "pool_simulate_peak_B": 303349248,
+      "pool_chunk_peak_B": 346536448
+     },
+     {
+      "start": 385589,
+      "stop": 392757,
+      "rows": 269624,
+      "simulate_s": 0.053584547014907,
+      "measure_s": 0.4332121489569545,
+      "pool_used_before_B": 2203853824,
+      "pool_simulate_peak_B": 285161984,
+      "pool_chunk_peak_B": 285161984
+     },
+     {
+      "start": 392757,
+      "stop": 403652,
+      "rows": 409145,
+      "simulate_s": 0.06700163707137108,
+      "measure_s": 0.6435778741724789,
+      "pool_used_before_B": 2245456384,
+      "pool_simulate_peak_B": 304079872,
+      "pool_chunk_peak_B": 351308800
+     },
+     {
+      "start": 403652,
+      "stop": 414547,
+      "rows": 408780,
+      "simulate_s": 0.07414359599351883,
+      "measure_s": 0.6439948291517794,
+      "pool_used_before_B": 2307239936,
+      "pool_simulate_peak_B": 303942144,
+      "pool_chunk_peak_B": 344938496
+     },
+     {
+      "start": 414547,
+      "stop": 425442,
+      "rows": 411865,
+      "simulate_s": 0.06367858801968396,
+      "measure_s": 0.6427813959307969,
+      "pool_used_before_B": 2368084992,
+      "pool_simulate_peak_B": 313753088,
+      "pool_chunk_peak_B": 347825152
+     },
+     {
+      "start": 425442,
+      "stop": 432610,
+      "rows": 269142,
+      "simulate_s": 0.04978523380123079,
+      "measure_s": 0.43197392602451146,
+      "pool_used_before_B": 2429394944,
+      "pool_simulate_peak_B": 285170688,
+      "pool_chunk_peak_B": 285170688
+     },
+     {
+      "start": 432610,
+      "stop": 443505,
+      "rows": 411959,
+      "simulate_s": 0.07154255593195558,
+      "measure_s": 0.6456660910043865,
+      "pool_used_before_B": 2470928384,
+      "pool_simulate_peak_B": 305252352,
+      "pool_chunk_peak_B": 349251584
+     },
+     {
+      "start": 443505,
+      "stop": 454400,
+      "rows": 414828,
+      "simulate_s": 0.06131683988496661,
+      "measure_s": 0.6476868900936097,
+      "pool_used_before_B": 2534023680,
+      "pool_simulate_peak_B": 304842240,
+      "pool_chunk_peak_B": 351014912
+     },
+     {
+      "start": 454400,
+      "stop": 465295,
+      "rows": 409912,
+      "simulate_s": 0.05904790502972901,
+      "measure_s": 0.643150222953409,
+      "pool_used_before_B": 2596666880,
+      "pool_simulate_peak_B": 306879488,
+      "pool_chunk_peak_B": 346116096
+     },
+     {
+      "start": 465295,
+      "stop": 472463,
+      "rows": 268535,
+      "simulate_s": 0.05122998612932861,
+      "measure_s": 0.43436824111267924,
+      "pool_used_before_B": 2657679360,
+      "pool_simulate_peak_B": 285107200,
+      "pool_chunk_peak_B": 285107200
+     },
+     {
+      "start": 472463,
+      "stop": 483358,
+      "rows": 411294,
+      "simulate_s": 0.06843126798048615,
+      "measure_s": 0.6438180450350046,
+      "pool_used_before_B": 2699116544,
+      "pool_simulate_peak_B": 304314368,
+      "pool_chunk_peak_B": 347992576
+     },
+     {
+      "start": 483358,
+      "stop": 494253,
+      "rows": 409470,
+      "simulate_s": 0.07207634299993515,
+      "measure_s": 0.6492917540017515,
+      "pool_used_before_B": 2761226752,
+      "pool_simulate_peak_B": 304018944,
+      "pool_chunk_peak_B": 346580480
+     },
+     {
+      "start": 494253,
+      "stop": 505148,
+      "rows": 411733,
+      "simulate_s": 0.061840795911848545,
+      "measure_s": 0.6525705901440233,
+      "pool_used_before_B": 2823057920,
+      "pool_simulate_peak_B": 303515648,
+      "pool_chunk_peak_B": 352134656
+     },
+     {
+      "start": 505148,
+      "stop": 516043,
+      "rows": 410257,
+      "simulate_s": 0.0683950090315193,
+      "measure_s": 0.6449362551793456,
+      "pool_used_before_B": 2884348416,
+      "pool_simulate_peak_B": 304209408,
+      "pool_chunk_peak_B": 347183616
+     },
+     {
+      "start": 516043,
+      "stop": 523211,
+      "rows": 268256,
+      "simulate_s": 0.05718137579970062,
+      "measure_s": 0.4329790649935603,
+      "pool_used_before_B": 2946302976,
+      "pool_simulate_peak_B": 287671808,
+      "pool_chunk_peak_B": 287671808
+     },
+     {
+      "start": 523211,
+      "stop": 534106,
+      "rows": 406399,
+      "simulate_s": 0.0705922138877213,
+      "measure_s": 0.6412711481098086,
+      "pool_used_before_B": 2987700224,
+      "pool_simulate_peak_B": 303652864,
+      "pool_chunk_peak_B": 343456768
+     },
+     {
+      "start": 534106,
+      "stop": 545001,
+      "rows": 406136,
+      "simulate_s": 0.06150130508467555,
+      "measure_s": 0.6383085811976343,
+      "pool_used_before_B": 3049067520,
+      "pool_simulate_peak_B": 303892992,
+      "pool_chunk_peak_B": 343561728
+     },
+     {
+      "start": 545001,
+      "stop": 555896,
+      "rows": 413966,
+      "simulate_s": 0.053761188173666596,
+      "measure_s": 0.6550934079568833,
+      "pool_used_before_B": 3110396416,
+      "pool_simulate_peak_B": 303772160,
+      "pool_chunk_peak_B": 349644288
+     },
+     {
+      "start": 555896,
+      "stop": 566791,
+      "rows": 409978,
+      "simulate_s": 0.05916584306396544,
+      "measure_s": 0.6453060400672257,
+      "pool_used_before_B": 3172025344,
+      "pool_simulate_peak_B": 304172544,
+      "pool_chunk_peak_B": 355275776
+     },
+     {
+      "start": 566791,
+      "stop": 573959,
+      "rows": 263952,
+      "simulate_s": 0.05013742600567639,
+      "measure_s": 0.42870237096212804,
+      "pool_used_before_B": 3233933824,
+      "pool_simulate_peak_B": 284519936,
+      "pool_chunk_peak_B": 284519936
+     },
+     {
+      "start": 573959,
+      "stop": 582434,
+      "rows": 320560,
+      "simulate_s": 0.051466363947838545,
+      "measure_s": 0.509087546961382,
+      "pool_used_before_B": 3274683904,
+      "pool_simulate_peak_B": 299660800,
+      "pool_chunk_peak_B": 299660800
+     },
+     {
+      "start": 582434,
+      "stop": 593329,
+      "rows": 405689,
+      "simulate_s": 0.051312553929165006,
+      "measure_s": 0.642003889894113,
+      "pool_used_before_B": 3323092480,
+      "pool_simulate_peak_B": 303581184,
+      "pool_chunk_peak_B": 343319040
+     },
+     {
+      "start": 593329,
+      "stop": 604224,
+      "rows": 406297,
+      "simulate_s": 0.060450921999290586,
+      "measure_s": 0.6387852549087256,
+      "pool_used_before_B": 3384353280,
+      "pool_simulate_peak_B": 302813696,
+      "pool_chunk_peak_B": 342968320
+     },
+     {
+      "start": 604224,
+      "stop": 615119,
+      "rows": 410262,
+      "simulate_s": 0.06105970498174429,
+      "measure_s": 0.6448337661568075,
+      "pool_used_before_B": 3444823552,
+      "pool_simulate_peak_B": 304218112,
+      "pool_chunk_peak_B": 347412480
+     },
+     {
+      "start": 615119,
+      "stop": 624696,
+      "rows": 365417,
+      "simulate_s": 0.0494745927862823,
+      "measure_s": 0.5761412039864808,
+      "pool_used_before_B": 3506779136,
+      "pool_simulate_peak_B": 294443520,
+      "pool_chunk_peak_B": 307900416
+     }
+    ]
+   },
+   {
+    "code": "v4-exact-grid",
+    "code_sha": "d325b2e981d926d9368134e799fd22e5cf8ca046",
+    "job": 13569,
+    "device": "NVIDIA GeForce RTX 5080",
+    "material": "hbn",
+    "E0_keV": 30000.0,
+    "tilt_deg": 15.0,
+    "block": "auto",
+    "wall_s": 2.9408261969219893,
+    "realized_electrons": 3993,
+    "stop_reason": "converged",
+    "chunks": 2,
+    "max_chunk": 7168,
+    "rows_per_electron": 2.5396944653143,
+    "card_peak_MiB": 1673.5625,
+    "pool_reserved_peak_MiB": 242.912109375,
+    "per_chunk": [
+     {
+      "start": 0,
+      "stop": 7168,
+      "rows": 18244,
+      "simulate_s": 1.1053796538617462,
+      "measure_s": 1.3678410649299622,
+      "pool_used_before_B": 0,
+      "pool_simulate_peak_B": 252711936,
+      "pool_chunk_peak_B": 252711936
+     },
+     {
+      "start": 0,
+      "stop": 3993,
+      "rows": 10141,
+      "simulate_s": 0.02475398895330727,
+      "measure_s": null,
+      "pool_used_before_B": 2008576,
+      "pool_simulate_peak_B": 142615552,
+      "pool_chunk_peak_B": null
+     }
+    ]
+   },
+   {
+    "code": "v4-exact-grid",
+    "code_sha": "d325b2e981d926d9368134e799fd22e5cf8ca046",
+    "job": 13569,
+    "device": "NVIDIA GeForce RTX 5080",
+    "material": "hbn",
+    "E0_keV": 30000.0,
+    "tilt_deg": 60.0,
+    "block": "auto",
+    "wall_s": 3.314703725045547,
+    "realized_electrons": 32541,
+    "stop_reason": "converged",
+    "chunks": 6,
+    "max_chunk": 7168,
+    "rows_per_electron": 4.000430226483513,
+    "card_peak_MiB": 1969.5625,
+    "pool_reserved_peak_MiB": 528.5341796875,
+    "per_chunk": [
+     {
+      "start": 0,
+      "stop": 7168,
+      "rows": 28714,
+      "simulate_s": 1.1196124770212919,
+      "measure_s": 1.3776691721286625,
+      "pool_used_before_B": 0,
+      "pool_simulate_peak_B": 254101504,
+      "pool_chunk_peak_B": 254101504
+     },
+     {
+      "start": 7168,
+      "stop": 14336,
+      "rows": 28719,
+      "simulate_s": 0.038517619017511606,
+      "measure_s": 0.04417550517246127,
+      "pool_used_before_B": 6348288,
+      "pool_simulate_peak_B": 254100992,
+      "pool_chunk_peak_B": 254100992
+     },
+     {
+      "start": 14336,
+      "stop": 21504,
+      "rows": 28727,
+      "simulate_s": 0.026206379057839513,
+      "measure_s": 0.044419166166335344,
+      "pool_used_before_B": 12697600,
+      "pool_simulate_peak_B": 254121472,
+      "pool_chunk_peak_B": 254121472
+     },
+     {
+      "start": 21504,
+      "stop": 28672,
+      "rows": 28403,
+      "simulate_s": 0.027794050984084606,
+      "measure_s": 0.045561983017250896,
+      "pool_used_before_B": 19046912,
+      "pool_simulate_peak_B": 250749440,
+      "pool_chunk_peak_B": 250749440
+     },
+     {
+      "start": 28672,
+      "stop": 35840,
+      "rows": 28732,
+      "simulate_s": 0.027116575045511127,
+      "measure_s": 0.044100404949858785,
+      "pool_used_before_B": 25345536,
+      "pool_simulate_peak_B": 248747008,
+      "pool_chunk_peak_B": 248747008
+     },
+     {
+      "start": 28672,
+      "stop": 32541,
+      "rows": 15615,
+      "simulate_s": 0.023340990068390965,
+      "measure_s": null,
+      "pool_used_before_B": 25345536,
+      "pool_simulate_peak_B": 137035776,
+      "pool_chunk_peak_B": null
+     }
+    ]
+   },
+   {
+    "code": "v4-exact-grid",
+    "code_sha": "d325b2e981d926d9368134e799fd22e5cf8ca046",
+    "job": 13569,
+    "device": "NVIDIA GeForce RTX 5080",
+    "material": "hopg",
+    "E0_keV": 1000.0,
+    "tilt_deg": 15.0,
+    "block": "auto",
+    "wall_s": 5.858082213904709,
+    "realized_electrons": 1002000,
+    "stop_reason": "max_electrons",
+    "chunks": 38,
+    "max_chunk": 87380,
+    "rows_per_electron": 1.929874251497006,
+    "card_peak_MiB": 7115.5625,
+    "pool_reserved_peak_MiB": 5568.7353515625,
+    "per_chunk": [
+     {
+      "start": 0,
+      "stop": 7168,
+      "rows": 13755,
+      "simulate_s": 0.7582199128810316,
+      "measure_s": 1.005688311997801,
+      "pool_used_before_B": 0,
+      "pool_simulate_peak_B": 250851840,
+      "pool_chunk_peak_B": 250851840
+     },
+     {
+      "start": 7168,
+      "stop": 14336,
+      "rows": 13895,
+      "simulate_s": 0.026184034999459982,
+      "measure_s": 0.03208166896365583,
+      "pool_used_before_B": 3105792,
+      "pool_simulate_peak_B": 249037312,
+      "pool_chunk_peak_B": 249037312
+     },
+     {
+      "start": 14336,
+      "stop": 21504,
+      "rows": 13773,
+      "simulate_s": 0.03290532203391194,
+      "measure_s": 0.02975469594821334,
+      "pool_used_before_B": 6239232,
+      "pool_simulate_peak_B": 250093568,
+      "pool_chunk_peak_B": 250093568
+     },
+     {
+      "start": 21504,
+      "stop": 28672,
+      "rows": 13954,
+      "simulate_s": 0.023711662041023374,
+      "measure_s": 0.02962702512741089,
+      "pool_used_before_B": 9352192,
+      "pool_simulate_peak_B": 250880512,
+      "pool_chunk_peak_B": 250880512
+     },
+     {
+      "start": 28672,
+      "stop": 35840,
+      "rows": 13817,
+      "simulate_s": 0.02344914013519883,
+      "measure_s": 0.029461434110999107,
+      "pool_used_before_B": 12493824,
+      "pool_simulate_peak_B": 248010752,
+      "pool_chunk_peak_B": 248010752
+     },
+     {
+      "start": 35840,
+      "stop": 43008,
+      "rows": 13947,
+      "simulate_s": 0.023590480908751488,
+      "measure_s": 0.03029471798799932,
+      "pool_used_before_B": 14581248,
+      "pool_simulate_peak_B": 249856000,
+      "pool_chunk_peak_B": 249856000
+     },
+     {
+      "start": 43008,
+      "stop": 50176,
+      "rows": 13864,
+      "simulate_s": 0.02330673998221755,
+      "measure_s": 0.030865991953760386,
+      "pool_used_before_B": 16689152,
+      "pool_simulate_peak_B": 249847808,
+      "pool_chunk_peak_B": 249847808
+     },
+     {
+      "start": 50176,
+      "stop": 57344,
+      "rows": 13856,
+      "simulate_s": 0.0222014628816396,
+      "measure_s": 0.03007585695013404,
+      "pool_used_before_B": 18786816,
+      "pool_simulate_peak_B": 249837568,
+      "pool_chunk_peak_B": 249837568
+     },
+     {
+      "start": 57344,
+      "stop": 64512,
+      "rows": 13758,
+      "simulate_s": 0.022534686839208007,
+      "measure_s": 0.02932316204532981,
+      "pool_used_before_B": 20884480,
+      "pool_simulate_peak_B": 248028672,
+      "pool_chunk_peak_B": 248028672
+     },
+     {
+      "start": 64512,
+      "stop": 71680,
+      "rows": 13904,
+      "simulate_s": 0.022100463043898344,
+      "measure_s": 0.02928116312250495,
+      "pool_used_before_B": 22962688,
+      "pool_simulate_peak_B": 248028672,
+      "pool_chunk_peak_B": 248028672
+     },
+     {
+      "start": 71680,
+      "stop": 78848,
+      "rows": 13754,
+      "simulate_s": 0.023156738840043545,
+      "measure_s": 0.031161884078755975,
+      "pool_used_before_B": 25068544,
+      "pool_simulate_peak_B": 248010752,
+      "pool_chunk_peak_B": 248010752
+     },
+     {
+      "start": 78848,
+      "stop": 86016,
+      "rows": 13765,
+      "simulate_s": 0.030364298028871417,
+      "measure_s": 0.02933822409249842,
+      "pool_used_before_B": 27146752,
+      "pool_simulate_peak_B": 249837568,
+      "pool_chunk_peak_B": 249837568
+     },
+     {
+      "start": 86016,
+      "stop": 93184,
+      "rows": 13875,
+      "simulate_s": 0.023008947959169745,
+      "measure_s": 0.02958550490438938,
+      "pool_used_before_B": 29232128,
+      "pool_simulate_peak_B": 248010752,
+      "pool_chunk_peak_B": 248010752
+     },
+     {
+      "start": 93184,
+      "stop": 102140,
+      "rows": 17224,
+      "simulate_s": 0.025583373149856925,
+      "measure_s": 0.03146898583509028,
+      "pool_used_before_B": 31330816,
+      "pool_simulate_peak_B": 250139648,
+      "pool_chunk_peak_B": 250139648
+     },
+     {
+      "start": 102140,
+      "stop": 112354,
+      "rows": 19832,
+      "simulate_s": 0.02493203803896904,
+      "measure_s": 0.03180637792684138,
+      "pool_used_before_B": 33938944,
+      "pool_simulate_peak_B": 251161600,
+      "pool_chunk_peak_B": 251161600
+     },
+     {
+      "start": 112354,
+      "stop": 123590,
+      "rows": 21457,
+      "simulate_s": 0.022709061158820987,
+      "measure_s": 0.03272066707722843,
+      "pool_used_before_B": 36935680,
+      "pool_simulate_peak_B": 248688640,
+      "pool_chunk_peak_B": 248688640
+     },
+     {
+      "start": 123590,
+      "stop": 135949,
+      "rows": 23817,
+      "simulate_s": 0.02320557995699346,
+      "measure_s": 0.03340246598236263,
+      "pool_used_before_B": 40180736,
+      "pool_simulate_peak_B": 250691072,
+      "pool_chunk_peak_B": 250691072
+     },
+     {
+      "start": 135949,
+      "stop": 149544,
+      "rows": 26249,
+      "simulate_s": 0.024029663065448403,
+      "measure_s": 0.03455835301429033,
+      "pool_used_before_B": 43784704,
+      "pool_simulate_peak_B": 249424896,
+      "pool_chunk_peak_B": 249424896
+     },
+     {
+      "start": 149544,
+      "stop": 164499,
+      "rows": 28781,
+      "simulate_s": 0.036073911003768444,
+      "measure_s": 0.035018855007365346,
+      "pool_used_before_B": 47755264,
+      "pool_simulate_peak_B": 252996096,
+      "pool_chunk_peak_B": 252996096
+     },
+     {
+      "start": 164499,
+      "stop": 180949,
+      "rows": 31578,
+      "simulate_s": 0.02700732508674264,
+      "measure_s": 0.0372281929012388,
+      "pool_used_before_B": 52105216,
+      "pool_simulate_peak_B": 253856256,
+      "pool_chunk_peak_B": 253856256
+     },
+     {
+      "start": 180949,
+      "stop": 199044,
+      "rows": 34748,
+      "simulate_s": 0.028061936143785715,
+      "measure_s": 0.038742246106266975,
+      "pool_used_before_B": 56879104,
+      "pool_simulate_peak_B": 253483520,
+      "pool_chunk_peak_B": 253483520
+     },
+     {
+      "start": 199044,
+      "stop": 218949,
+      "rows": 38451,
+      "simulate_s": 0.037544548977166414,
+      "measure_s": 0.0387111259624362,
+      "pool_used_before_B": 61684224,
+      "pool_simulate_peak_B": 254289920,
+      "pool_chunk_peak_B": 254289920
+     },
+     {
+      "start": 218949,
+      "stop": 240844,
+      "rows": 42225,
+      "simulate_s": 0.030953062931075692,
+      "measure_s": 0.040093261981382966,
+      "pool_used_before_B": 67493888,
+      "pool_simulate_peak_B": 254510592,
+      "pool_chunk_peak_B": 254510592
+     },
+     {
+      "start": 240844,
+      "stop": 264929,
+      "rows": 46198,
+      "simulate_s": 0.040583445923402905,
+      "measure_s": 0.0399483828805387,
+      "pool_used_before_B": 73429504,
+      "pool_simulate_peak_B": 256412672,
+      "pool_chunk_peak_B": 256412672
+     },
+     {
+      "start": 264929,
+      "stop": 291422,
+      "rows": 51306,
+      "simulate_s": 0.03118328400887549,
+      "measure_s": 0.04258360806852579,
+      "pool_used_before_B": 80401408,
+      "pool_simulate_peak_B": 258884608,
+      "pool_chunk_peak_B": 258884608
+     },
+     {
+      "start": 291422,
+      "stop": 320565,
+      "rows": 56291,
+      "simulate_s": 0.03445600112900138,
+      "measure_s": 0.045581904938444495,
+      "pool_used_before_B": 88150016,
+      "pool_simulate_peak_B": 259202048,
+      "pool_chunk_peak_B": 259202048
+     },
+     {
+      "start": 320565,
+      "stop": 352622,
+      "rows": 61882,
+      "simulate_s": 0.0448532800655812,
+      "measure_s": 0.04506545187905431,
+      "pool_used_before_B": 96651264,
+      "pool_simulate_peak_B": 259545600,
+      "pool_chunk_peak_B": 259545600
+     },
+     {
+      "start": 352622,
+      "stop": 387885,
+      "rows": 68316,
+      "simulate_s": 0.044858639826998115,
+      "measure_s": 0.04795773793011904,
+      "pool_used_before_B": 105994752,
+      "pool_simulate_peak_B": 260154880,
+      "pool_chunk_peak_B": 260154880
+     },
+     {
+      "start": 387885,
+      "stop": 426674,
+      "rows": 75027,
+      "simulate_s": 0.049511736957356334,
+      "measure_s": 0.05073074297979474,
+      "pool_used_before_B": 116315136,
+      "pool_simulate_peak_B": 265031680,
+      "pool_chunk_peak_B": 265031680
+     },
+     {
+      "start": 426674,
+      "stop": 469342,
+      "rows": 82248,
+      "simulate_s": 0.05074661294929683,
+      "measure_s": 0.05398382083512843,
+      "pool_used_before_B": 127647232,
+      "pool_simulate_peak_B": 264958464,
+      "pool_chunk_peak_B": 264958464
+     },
+     {
+      "start": 469342,
+      "stop": 516277,
+      "rows": 90311,
+      "simulate_s": 0.045696845976635814,
+      "measure_s": 0.05674167606048286,
+      "pool_used_before_B": 140073984,
+      "pool_simulate_peak_B": 268717568,
+      "pool_chunk_peak_B": 268717568
+     },
+     {
+      "start": 516277,
+      "stop": 567905,
+      "rows": 99817,
+      "simulate_s": 0.045301521895453334,
+      "measure_s": 0.06086384993977845,
+      "pool_used_before_B": 153655808,
+      "pool_simulate_peak_B": 268771840,
+      "pool_chunk_peak_B": 268771840
+     },
+     {
+      "start": 567905,
+      "stop": 624696,
+      "rows": 109696,
+      "simulate_s": 0.056345544988289475,
+      "measure_s": 0.06162854307331145,
+      "pool_used_before_B": 168683008,
+      "pool_simulate_peak_B": 272587264,
+      "pool_chunk_peak_B": 272587264
+     },
+     {
+      "start": 624696,
+      "stop": 687166,
+      "rows": 120760,
+      "simulate_s": 0.06179234501905739,
+      "measure_s": 0.06459545996040106,
+      "pool_used_before_B": 185248256,
+      "pool_simulate_peak_B": 278084608,
+      "pool_chunk_peak_B": 278084608
+     },
+     {
+      "start": 687166,
+      "stop": 755883,
+      "rows": 132615,
+      "simulate_s": 0.06607230985537171,
+      "measure_s": 0.06997155002318323,
+      "pool_used_before_B": 203484672,
+      "pool_simulate_peak_B": 277993472,
+      "pool_chunk_peak_B": 277993472
+     },
+     {
+      "start": 755883,
+      "stop": 831472,
+      "rows": 146064,
+      "simulate_s": 0.053444188786670566,
+      "measure_s": 0.07710131979547441,
+      "pool_used_before_B": 223517696,
+      "pool_simulate_peak_B": 278152192,
+      "pool_chunk_peak_B": 278152192
+     },
+     {
+      "start": 831472,
+      "stop": 914620,
+      "rows": 160430,
+      "simulate_s": 0.055000677006319165,
+      "measure_s": 0.0852768870536238,
+      "pool_used_before_B": 245579264,
+      "pool_simulate_peak_B": 281730560,
+      "pool_chunk_peak_B": 281730560
+     },
+     {
+      "start": 914620,
+      "stop": 1002000,
+      "rows": 168494,
+      "simulate_s": 0.0725644149351865,
+      "measure_s": 0.08175056707113981,
+      "pool_used_before_B": 269364736,
+      "pool_simulate_peak_B": 283077120,
+      "pool_chunk_peak_B": 283077120
+     }
+    ]
+   },
+   {
+    "code": "v4-exact-grid",
+    "code_sha": "d325b2e981d926d9368134e799fd22e5cf8ca046",
+    "job": 13569,
+    "device": "NVIDIA GeForce RTX 5080",
+    "material": "hopg",
+    "E0_keV": 1000.0,
+    "tilt_deg": 60.0,
+    "block": "auto",
+    "wall_s": 6.5285132399294525,
+    "realized_electrons": 1002000,
+    "stop_reason": "max_electrons",
+    "chunks": 38,
+    "max_chunk": 87380,
+    "rows_per_electron": 2.7915319361277446,
+    "card_peak_MiB": 5293.5625,
+    "pool_reserved_peak_MiB": 3776.02099609375,
+    "per_chunk": [
+     {
+      "start": 0,
+      "stop": 7168,
+      "rows": 20139,
+      "simulate_s": 0.7536219670437276,
+      "measure_s": 1.019924480933696,
+      "pool_used_before_B": 0,
+      "pool_simulate_peak_B": 251871744,
+      "pool_chunk_peak_B": 251871744
+     },
+     {
+      "start": 7168,
+      "stop": 14336,
+      "rows": 20076,
+      "simulate_s": 0.026301876176148653,
+      "measure_s": 0.03529149712994695,
+      "pool_used_before_B": 4072448,
+      "pool_simulate_peak_B": 251701760,
+      "pool_chunk_peak_B": 251701760
+     },
+     {
+      "start": 14336,
+      "stop": 21504,
+      "rows": 20143,
+      "simulate_s": 0.024709135992452502,
+      "measure_s": 0.032334237126633525,
+      "pool_used_before_B": 8135680,
+      "pool_simulate_peak_B": 252085248,
+      "pool_chunk_peak_B": 252085248
+     },
+     {
+      "start": 21504,
+      "stop": 28672,
+      "rows": 20227,
+      "simulate_s": 0.024485083995386958,
+      "measure_s": 0.032139756018295884,
+      "pool_used_before_B": 12208128,
+      "pool_simulate_peak_B": 251736064,
+      "pool_chunk_peak_B": 251736064
+     },
+     {
+      "start": 28672,
+      "stop": 35840,
+      "rows": 19968,
+      "simulate_s": 0.02270690305158496,
+      "measure_s": 0.031240958953276277,
+      "pool_used_before_B": 16297472,
+      "pool_simulate_peak_B": 250657792,
+      "pool_chunk_peak_B": 250657792
+     },
+     {
+      "start": 35840,
+      "stop": 43008,
+      "rows": 19994,
+      "simulate_s": 0.031183149199932814,
+      "measure_s": 0.03142834105528891,
+      "pool_used_before_B": 19312640,
+      "pool_simulate_peak_B": 248010752,
+      "pool_chunk_peak_B": 248010752
+     },
+     {
+      "start": 43008,
+      "stop": 50176,
+      "rows": 19987,
+      "simulate_s": 0.023503869073465466,
+      "measure_s": 0.031160459155216813,
+      "pool_used_before_B": 22338048,
+      "pool_simulate_peak_B": 251357184,
+      "pool_chunk_peak_B": 251357184
+     },
+     {
+      "start": 50176,
+      "stop": 57344,
+      "rows": 19869,
+      "simulate_s": 0.023081795079633594,
+      "measure_s": 0.031056219013407826,
+      "pool_used_before_B": 25362432,
+      "pool_simulate_peak_B": 250642432,
+      "pool_chunk_peak_B": 250642432
+     },
+     {
+      "start": 57344,
+      "stop": 64512,
+      "rows": 19962,
+      "simulate_s": 0.02277826308272779,
+      "measure_s": 0.032921300968155265,
+      "pool_used_before_B": 28367360,
+      "pool_simulate_peak_B": 250667008,
+      "pool_chunk_peak_B": 250667008
+     },
+     {
+      "start": 64512,
+      "stop": 71680,
+      "rows": 19840,
+      "simulate_s": 0.02317561605013907,
+      "measure_s": 0.03169713309034705,
+      "pool_used_before_B": 31382528,
+      "pool_simulate_peak_B": 248028672,
+      "pool_chunk_peak_B": 248028672
+     },
+     {
+      "start": 71680,
+      "stop": 78848,
+      "rows": 20116,
+      "simulate_s": 0.030686546815559268,
+      "measure_s": 0.03127902001142502,
+      "pool_used_before_B": 34379264,
+      "pool_simulate_peak_B": 250676736,
+      "pool_chunk_peak_B": 250676736
+     },
+     {
+      "start": 78848,
+      "stop": 86016,
+      "rows": 20117,
+      "simulate_s": 0.022597381845116615,
+      "measure_s": 0.0327885108999908,
+      "pool_used_before_B": 37422080,
+      "pool_simulate_peak_B": 250723328,
+      "pool_chunk_peak_B": 250723328
+     },
+     {
+      "start": 86016,
+      "stop": 93184,
+      "rows": 19992,
+      "simulate_s": 0.022534572053700686,
+      "measure_s": 0.031047118129208684,
+      "pool_used_before_B": 40464896,
+      "pool_simulate_peak_B": 248028672,
+      "pool_chunk_peak_B": 248028672
+     },
+     {
+      "start": 93184,
+      "stop": 102140,
+      "rows": 24776,
+      "simulate_s": 0.0243848639074713,
+      "measure_s": 0.035381937166675925,
+      "pool_used_before_B": 43490304,
+      "pool_simulate_peak_B": 250956800,
+      "pool_chunk_peak_B": 250956800
+     },
+     {
+      "start": 102140,
+      "stop": 112354,
+      "rows": 28296,
+      "simulate_s": 0.02360966010019183,
+      "measure_s": 0.03584894095547497,
+      "pool_used_before_B": 47238144,
+      "pool_simulate_peak_B": 248533504,
+      "pool_chunk_peak_B": 248533504
+     },
+     {
+      "start": 112354,
+      "stop": 123590,
+      "rows": 31621,
+      "simulate_s": 0.03271495993249118,
+      "measure_s": 0.04146891902200878,
+      "pool_used_before_B": 51517952,
+      "pool_simulate_peak_B": 251388928,
+      "pool_chunk_peak_B": 251388928
+     },
+     {
+      "start": 123590,
+      "stop": 135949,
+      "rows": 34594,
+      "simulate_s": 0.03325398382730782,
+      "measure_s": 0.0381147270090878,
+      "pool_used_before_B": 56300032,
+      "pool_simulate_peak_B": 253507584,
+      "pool_chunk_peak_B": 253507584
+     },
+     {
+      "start": 135949,
+      "stop": 149544,
+      "rows": 37720,
+      "simulate_s": 0.02576829306781292,
+      "measure_s": 0.03942027594894171,
+      "pool_used_before_B": 61528576,
+      "pool_simulate_peak_B": 251764736,
+      "pool_chunk_peak_B": 251764736
+     },
+     {
+      "start": 149544,
+      "stop": 164499,
+      "rows": 41897,
+      "simulate_s": 0.03584367106668651,
+      "measure_s": 0.040773103944957256,
+      "pool_used_before_B": 67230208,
+      "pool_simulate_peak_B": 254689792,
+      "pool_chunk_peak_B": 254689792
+     },
+     {
+      "start": 164499,
+      "stop": 180949,
+      "rows": 45655,
+      "simulate_s": 0.027963588014245033,
+      "measure_s": 0.04212343390099704,
+      "pool_used_before_B": 73559552,
+      "pool_simulate_peak_B": 255727104,
+      "pool_chunk_peak_B": 255727104
+     },
+     {
+      "start": 180949,
+      "stop": 199044,
+      "rows": 50496,
+      "simulate_s": 0.03795876493677497,
+      "measure_s": 0.043596692848950624,
+      "pool_used_before_B": 80459776,
+      "pool_simulate_peak_B": 257069056,
+      "pool_chunk_peak_B": 257069056
+     },
+     {
+      "start": 199044,
+      "stop": 218949,
+      "rows": 55878,
+      "simulate_s": 0.037970145931467414,
+      "measure_s": 0.04645312181673944,
+      "pool_used_before_B": 87643136,
+      "pool_simulate_peak_B": 255990784,
+      "pool_chunk_peak_B": 255990784
+     },
+     {
+      "start": 218949,
+      "stop": 240844,
+      "rows": 61122,
+      "simulate_s": 0.033009852981194854,
+      "measure_s": 0.04845257615670562,
+      "pool_used_before_B": 96088576,
+      "pool_simulate_peak_B": 258055680,
+      "pool_chunk_peak_B": 258055680
+     },
+     {
+      "start": 240844,
+      "stop": 264929,
+      "rows": 67560,
+      "simulate_s": 0.03135761106386781,
+      "measure_s": 0.051350835012272,
+      "pool_used_before_B": 104882688,
+      "pool_simulate_peak_B": 260562432,
+      "pool_chunk_peak_B": 260562432
+     },
+     {
+      "start": 264929,
+      "stop": 291422,
+      "rows": 73981,
+      "simulate_s": 0.04278452810831368,
+      "measure_s": 0.05249197315424681,
+      "pool_used_before_B": 115080192,
+      "pool_simulate_peak_B": 261477888,
+      "pool_chunk_peak_B": 261477888
+     },
+     {
+      "start": 291422,
+      "stop": 320565,
+      "rows": 81377,
+      "simulate_s": 0.045633107190951705,
+      "measure_s": 0.053943383041769266,
+      "pool_used_before_B": 126249984,
+      "pool_simulate_peak_B": 263409664,
+      "pool_chunk_peak_B": 263409664
+     },
+     {
+      "start": 320565,
+      "stop": 352622,
+      "rows": 89639,
+      "simulate_s": 0.046826174948364496,
+      "measure_s": 0.05743256607092917,
+      "pool_used_before_B": 138539520,
+      "pool_simulate_peak_B": 265085440,
+      "pool_chunk_peak_B": 265085440
+     },
+     {
+      "start": 352622,
+      "stop": 387885,
+      "rows": 98532,
+      "simulate_s": 0.05032576899975538,
+      "measure_s": 0.06317775510251522,
+      "pool_used_before_B": 152077312,
+      "pool_simulate_peak_B": 267099648,
+      "pool_chunk_peak_B": 267099648
+     },
+     {
+      "start": 387885,
+      "stop": 426674,
+      "rows": 108542,
+      "simulate_s": 0.04969777399674058,
+      "measure_s": 0.06386508094146848,
+      "pool_used_before_B": 166959104,
+      "pool_simulate_peak_B": 269800960,
+      "pool_chunk_peak_B": 269800960
+     },
+     {
+      "start": 426674,
+      "stop": 469342,
+      "rows": 119016,
+      "simulate_s": 0.05047687981277704,
+      "measure_s": 0.06686436012387276,
+      "pool_used_before_B": 183346176,
+      "pool_simulate_peak_B": 269902336,
+      "pool_chunk_peak_B": 269902336
+     },
+     {
+      "start": 469342,
+      "stop": 516277,
+      "rows": 130552,
+      "simulate_s": 0.05526733282022178,
+      "measure_s": 0.07378196716308594,
+      "pool_used_before_B": 201320448,
+      "pool_simulate_peak_B": 273429504,
+      "pool_chunk_peak_B": 273429504
+     },
+     {
+      "start": 516277,
+      "stop": 567905,
+      "rows": 144436,
+      "simulate_s": 0.057482008123770356,
+      "measure_s": 0.08045656210742891,
+      "pool_used_before_B": 220973056,
+      "pool_simulate_peak_B": 274792960,
+      "pool_chunk_peak_B": 274792960
+     },
+     {
+      "start": 567905,
+      "stop": 624696,
+      "rows": 158613,
+      "simulate_s": 0.05702709499746561,
+      "measure_s": 0.08314194716513157,
+      "pool_used_before_B": 242738688,
+      "pool_simulate_peak_B": 277580800,
+      "pool_chunk_peak_B": 277580800
+     },
+     {
+      "start": 624696,
+      "stop": 687166,
+      "rows": 173864,
+      "simulate_s": 0.06135749910026789,
+      "measure_s": 0.09069107403047383,
+      "pool_used_before_B": 266694144,
+      "pool_simulate_peak_B": 278658560,
+      "pool_chunk_peak_B": 278658560
+     },
+     {
+      "start": 687166,
+      "stop": 755883,
+      "rows": 192044,
+      "simulate_s": 0.06626336998306215,
+      "measure_s": 0.09571844292804599,
+      "pool_used_before_B": 292951552,
+      "pool_simulate_peak_B": 282459136,
+      "pool_chunk_peak_B": 282459136
+     },
+     {
+      "start": 755883,
+      "stop": 831472,
+      "rows": 211048,
+      "simulate_s": 0.0664353109896183,
+      "measure_s": 0.10435623000375926,
+      "pool_used_before_B": 321954816,
+      "pool_simulate_peak_B": 287760896,
+      "pool_chunk_peak_B": 287760896
+     },
+     {
+      "start": 831472,
+      "stop": 914620,
+      "rows": 231742,
+      "simulate_s": 0.0706007091794163,
+      "measure_s": 0.11425062199123204,
+      "pool_used_before_B": 353826816,
+      "pool_simulate_peak_B": 290051072,
+      "pool_chunk_peak_B": 290051072
+     },
+     {
+      "start": 914620,
+      "stop": 1002000,
+      "rows": 243684,
+      "simulate_s": 0.07501399680040777,
+      "measure_s": 0.11679659388028085,
+      "pool_used_before_B": 388378624,
+      "pool_simulate_peak_B": 293659648,
+      "pool_chunk_peak_B": 293659648
+     }
+    ]
+   },
+   {
+    "code": "v4-exact-grid",
+    "code_sha": "d325b2e981d926d9368134e799fd22e5cf8ca046",
+    "job": 13569,
+    "device": "NVIDIA GeForce RTX 5080",
+    "material": "hopg",
+    "E0_keV": 30.0,
+    "tilt_deg": 15.0,
+    "block": "auto",
+    "wall_s": 7.645256510935724,
+    "realized_electrons": 320565,
+    "stop_reason": "converged",
+    "chunks": 27,
+    "max_chunk": 29143,
+    "rows_per_electron": 9.043782072278633,
+    "card_peak_MiB": 6025.5625,
+    "pool_reserved_peak_MiB": 4482.22216796875,
+    "per_chunk": [
+     {
+      "start": 0,
+      "stop": 7168,
+      "rows": 64385,
+      "simulate_s": 0.511921782977879,
+      "measure_s": 1.0136065550614148,
+      "pool_used_before_B": 0,
+      "pool_simulate_peak_B": 258392064,
+      "pool_chunk_peak_B": 258392064
+     },
+     {
+      "start": 7168,
+      "stop": 14336,
+      "rows": 64301,
+      "simulate_s": 0.03154044598340988,
+      "measure_s": 0.08655839809216559,
+      "pool_used_before_B": 10739200,
+      "pool_simulate_peak_B": 257634304,
+      "pool_chunk_peak_B": 257634304
+     },
+     {
+      "start": 14336,
+      "stop": 21504,
+      "rows": 65231,
+      "simulate_s": 0.03193282010033727,
+      "measure_s": 0.08885420300066471,
+      "pool_used_before_B": 21462016,
+      "pool_simulate_peak_B": 257737216,
+      "pool_chunk_peak_B": 257737216
+     },
+     {
+      "start": 21504,
+      "stop": 28672,
+      "rows": 65354,
+      "simulate_s": 0.030002387007698417,
+      "measure_s": 0.08624511607922614,
+      "pool_used_before_B": 32326656,
+      "pool_simulate_peak_B": 257744384,
+      "pool_chunk_peak_B": 257744384
+     },
+     {
+      "start": 28672,
+      "stop": 35840,
+      "rows": 64703,
+      "simulate_s": 0.029370032949373126,
+      "measure_s": 0.08451536484062672,
+      "pool_used_before_B": 43210240,
+      "pool_simulate_peak_B": 256668160,
+      "pool_chunk_peak_B": 256668160
+     },
+     {
+      "start": 35840,
+      "stop": 43008,
+      "rows": 65030,
+      "simulate_s": 0.029791076900437474,
+      "measure_s": 0.08487525722011924,
+      "pool_used_before_B": 52981248,
+      "pool_simulate_peak_B": 256752128,
+      "pool_chunk_peak_B": 256752128
+     },
+     {
+      "start": 43008,
+      "stop": 50176,
+      "rows": 65057,
+      "simulate_s": 0.028250085888430476,
+      "measure_s": 0.08650445798411965,
+      "pool_used_before_B": 62809088,
+      "pool_simulate_peak_B": 256720896,
+      "pool_chunk_peak_B": 256720896
+     },
+     {
+      "start": 50176,
+      "stop": 57344,
+      "rows": 65020,
+      "simulate_s": 0.02890410996042192,
+      "measure_s": 0.08498219796456397,
+      "pool_used_before_B": 72637952,
+      "pool_simulate_peak_B": 256743936,
+      "pool_chunk_peak_B": 256743936
+     },
+     {
+      "start": 57344,
+      "stop": 64512,
+      "rows": 65089,
+      "simulate_s": 0.030112368054687977,
+      "measure_s": 0.08576274290680885,
+      "pool_used_before_B": 82456576,
+      "pool_simulate_peak_B": 256962560,
+      "pool_chunk_peak_B": 256962560
+     },
+     {
+      "start": 64512,
+      "stop": 71680,
+      "rows": 64708,
+      "simulate_s": 0.02842106786556542,
+      "measure_s": 0.08564313198439777,
+      "pool_used_before_B": 92293632,
+      "pool_simulate_peak_B": 256709120,
+      "pool_chunk_peak_B": 256709120
+     },
+     {
+      "start": 71680,
+      "stop": 78848,
+      "rows": 64818,
+      "simulate_s": 0.036999372066929936,
+      "measure_s": 0.08617452601902187,
+      "pool_used_before_B": 102071808,
+      "pool_simulate_peak_B": 256674304,
+      "pool_chunk_peak_B": 256674304
+     },
+     {
+      "start": 78848,
+      "stop": 86016,
+      "rows": 64668,
+      "simulate_s": 0.033198578050360084,
+      "measure_s": 0.08890676381997764,
+      "pool_used_before_B": 111862784,
+      "pool_simulate_peak_B": 256650752,
+      "pool_chunk_peak_B": 256650752
+     },
+     {
+      "start": 86016,
+      "stop": 93184,
+      "rows": 64753,
+      "simulate_s": 0.029162510996684432,
+      "measure_s": 0.08855885197408497,
+      "pool_used_before_B": 121632768,
+      "pool_simulate_peak_B": 256673280,
+      "pool_chunk_peak_B": 256673280
+     },
+     {
+      "start": 93184,
+      "stop": 102140,
+      "rows": 80598,
+      "simulate_s": 0.04125821101479232,
+      "measure_s": 0.10347150103189051,
+      "pool_used_before_B": 131412992,
+      "pool_simulate_peak_B": 256926720,
+      "pool_chunk_peak_B": 256926720
+     },
+     {
+      "start": 102140,
+      "stop": 112354,
+      "rows": 91936,
+      "simulate_s": 0.03147996193729341,
+      "measure_s": 0.11402588407509029,
+      "pool_used_before_B": 143588864,
+      "pool_simulate_peak_B": 263380480,
+      "pool_chunk_peak_B": 263380480
+     },
+     {
+      "start": 112354,
+      "stop": 123590,
+      "rows": 101686,
+      "simulate_s": 0.040662388084456325,
+      "measure_s": 0.12088789511471987,
+      "pool_used_before_B": 157476352,
+      "pool_simulate_peak_B": 265133056,
+      "pool_chunk_peak_B": 265133056
+     },
+     {
+      "start": 123590,
+      "stop": 135949,
+      "rows": 112049,
+      "simulate_s": 0.033468808978796005,
+      "measure_s": 0.12986629479564726,
+      "pool_used_before_B": 172833792,
+      "pool_simulate_peak_B": 264306176,
+      "pool_chunk_peak_B": 264306176
+     },
+     {
+      "start": 135949,
+      "stop": 149544,
+      "rows": 123132,
+      "simulate_s": 0.034254065016284585,
+      "measure_s": 0.14187486306764185,
+      "pool_used_before_B": 189755904,
+      "pool_simulate_peak_B": 265825280,
+      "pool_chunk_peak_B": 265825280
+     },
+     {
+      "start": 149544,
+      "stop": 164499,
+      "rows": 135762,
+      "simulate_s": 0.04885369096882641,
+      "measure_s": 0.15305903716944158,
+      "pool_used_before_B": 208349696,
+      "pool_simulate_peak_B": 269093888,
+      "pool_chunk_peak_B": 269093888
+     },
+     {
+      "start": 164499,
+      "stop": 180949,
+      "rows": 148219,
+      "simulate_s": 0.04756729397922754,
+      "measure_s": 0.16451174300163984,
+      "pool_used_before_B": 228855808,
+      "pool_simulate_peak_B": 270278144,
+      "pool_chunk_peak_B": 270278144
+     },
+     {
+      "start": 180949,
+      "stop": 199044,
+      "rows": 162819,
+      "simulate_s": 0.0453860389534384,
+      "measure_s": 0.18016542494297028,
+      "pool_used_before_B": 251237888,
+      "pool_simulate_peak_B": 266691072,
+      "pool_chunk_peak_B": 266691072
+     },
+     {
+      "start": 199044,
+      "stop": 213986,
+      "rows": 135040,
+      "simulate_s": 0.03715020511299372,
+      "measure_s": 0.15083257295191288,
+      "pool_used_before_B": 275389440,
+      "pool_simulate_peak_B": 266677248,
+      "pool_chunk_peak_B": 266677248
+     },
+     {
+      "start": 213986,
+      "stop": 221154,
+      "rows": 64554,
+      "simulate_s": 0.034463746938854456,
+      "measure_s": 0.08545344299636781,
+      "pool_used_before_B": 295781376,
+      "pool_simulate_peak_B": 250008064,
+      "pool_chunk_peak_B": 250008064
+     },
+     {
+      "start": 221154,
+      "stop": 240844,
+      "rows": 178170,
+      "simulate_s": 0.04706507106311619,
+      "measure_s": 0.19221587502397597,
+      "pool_used_before_B": 305975808,
+      "pool_simulate_peak_B": 274087424,
+      "pool_chunk_peak_B": 274087424
+     },
+     {
+      "start": 240844,
+      "stop": 264929,
+      "rows": 218900,
+      "simulate_s": 0.04855909012258053,
+      "measure_s": 0.23596228589303792,
+      "pool_used_before_B": 332880384,
+      "pool_simulate_peak_B": 276577792,
+      "pool_chunk_peak_B": 276577792
+     },
+     {
+      "start": 264929,
+      "stop": 291422,
+      "rows": 240721,
+      "simulate_s": 0.05480301100760698,
+      "measure_s": 0.2541931050363928,
+      "pool_used_before_B": 365497344,
+      "pool_simulate_peak_B": 277036032,
+      "pool_chunk_peak_B": 277036032
+     },
+     {
+      "start": 291422,
+      "stop": 320565,
+      "rows": 262417,
+      "simulate_s": 0.049392056884244084,
+      "measure_s": 0.2760602589696646,
+      "pool_used_before_B": 401402880,
+      "pool_simulate_peak_B": 286298624,
+      "pool_chunk_peak_B": 286298624
+     }
+    ]
+   },
+   {
+    "code": "v4-exact-grid",
+    "code_sha": "d325b2e981d926d9368134e799fd22e5cf8ca046",
+    "job": 13569,
+    "device": "NVIDIA GeForce RTX 5080",
+    "material": "hopg",
+    "E0_keV": 30.0,
+    "tilt_deg": 60.0,
+    "block": "auto",
+    "wall_s": 28.47763150301762,
+    "realized_electrons": 624696,
+    "stop_reason": "converged",
+    "chunks": 49,
+    "max_chunk": 20168,
+    "rows_per_electron": 20.476867148180876,
+    "card_peak_MiB": 13319.5625,
+    "pool_reserved_peak_MiB": 11816.35595703125,
+    "per_chunk": [
+     {
+      "start": 0,
+      "stop": 7168,
+      "rows": 146044,
+      "simulate_s": 0.5213196480181068,
+      "measure_s": 1.1583444431889802,
+      "pool_used_before_B": 0,
+      "pool_simulate_peak_B": 270065152,
+      "pool_chunk_peak_B": 270065152
+     },
+     {
+      "start": 7168,
+      "stop": 14336,
+      "rows": 147416,
+      "simulate_s": 0.0512236759532243,
+      "measure_s": 0.2042666431516409,
+      "pool_used_before_B": 23063552,
+      "pool_simulate_peak_B": 268795904,
+      "pool_chunk_peak_B": 268795904
+     },
+     {
+      "start": 14336,
+      "stop": 21504,
+      "rows": 144268,
+      "simulate_s": 0.04394192900508642,
+      "measure_s": 0.19787933910265565,
+      "pool_used_before_B": 46337536,
+      "pool_simulate_peak_B": 268456448,
+      "pool_chunk_peak_B": 268456448
+     },
+     {
+      "start": 21504,
+      "stop": 28672,
+      "rows": 148690,
+      "simulate_s": 0.04549018503166735,
+      "measure_s": 0.20443518785759807,
+      "pool_used_before_B": 69137408,
+      "pool_simulate_peak_B": 268905472,
+      "pool_chunk_peak_B": 268905472
+     },
+     {
+      "start": 28672,
+      "stop": 35840,
+      "rows": 144987,
+      "simulate_s": 0.04043240495957434,
+      "measure_s": 0.1988203260116279,
+      "pool_used_before_B": 92602880,
+      "pool_simulate_peak_B": 267549184,
+      "pool_chunk_peak_B": 267549184
+     },
+     {
+      "start": 35840,
+      "stop": 43008,
+      "rows": 146614,
+      "simulate_s": 0.04390344605781138,
+      "measure_s": 0.20177308493293822,
+      "pool_used_before_B": 114501632,
+      "pool_simulate_peak_B": 267760640,
+      "pool_chunk_peak_B": 267760640
+     },
+     {
+      "start": 43008,
+      "stop": 50176,
+      "rows": 146877,
+      "simulate_s": 0.04077239497564733,
+      "measure_s": 0.20210234797559679,
+      "pool_used_before_B": 136642560,
+      "pool_simulate_peak_B": 267709952,
+      "pool_chunk_peak_B": 267709952
+     },
+     {
+      "start": 50176,
+      "stop": 57344,
+      "rows": 147020,
+      "simulate_s": 0.043680174043402076,
+      "measure_s": 0.20030634687282145,
+      "pool_used_before_B": 158821888,
+      "pool_simulate_peak_B": 267736064,
+      "pool_chunk_peak_B": 267736064
+     },
+     {
+      "start": 57344,
+      "stop": 64512,
+      "rows": 146516,
+      "simulate_s": 0.04395480593666434,
+      "measure_s": 0.20123862312175333,
+      "pool_used_before_B": 181028864,
+      "pool_simulate_peak_B": 267660288,
+      "pool_chunk_peak_B": 267660288
+     },
+     {
+      "start": 64512,
+      "stop": 71680,
+      "rows": 148053,
+      "simulate_s": 0.03505114000290632,
+      "measure_s": 0.20486247586086392,
+      "pool_used_before_B": 203158528,
+      "pool_simulate_peak_B": 267855360,
+      "pool_chunk_peak_B": 267855360
+     },
+     {
+      "start": 71680,
+      "stop": 78848,
+      "rows": 149066,
+      "simulate_s": 0.04588695918209851,
+      "measure_s": 0.20721886097453535,
+      "pool_used_before_B": 225520128,
+      "pool_simulate_peak_B": 267987456,
+      "pool_chunk_peak_B": 267987456
+     },
+     {
+      "start": 78848,
+      "stop": 86016,
+      "rows": 148192,
+      "simulate_s": 0.03420643485151231,
+      "measure_s": 0.2011529440060258,
+      "pool_used_before_B": 248036352,
+      "pool_simulate_peak_B": 267883008,
+      "pool_chunk_peak_B": 267883008
+     },
+     {
+      "start": 86016,
+      "stop": 93184,
+      "rows": 145902,
+      "simulate_s": 0.04063199507072568,
+      "measure_s": 0.2027362750377506,
+      "pool_used_before_B": 270417408,
+      "pool_simulate_peak_B": 269039104,
+      "pool_chunk_peak_B": 269039104
+     },
+     {
+      "start": 93184,
+      "stop": 102140,
+      "rows": 182499,
+      "simulate_s": 0.047208947129547596,
+      "measure_s": 0.24323637899942696,
+      "pool_used_before_B": 292451328,
+      "pool_simulate_peak_B": 272903680,
+      "pool_chunk_peak_B": 272903680
+     },
+     {
+      "start": 102140,
+      "stop": 112354,
+      "rows": 207903,
+      "simulate_s": 0.048180562909692526,
+      "measure_s": 0.2778389868326485,
+      "pool_used_before_B": 320012288,
+      "pool_simulate_peak_B": 276542464,
+      "pool_chunk_peak_B": 276542464
+     },
+     {
+      "start": 112354,
+      "stop": 123590,
+      "rows": 230772,
+      "simulate_s": 0.048751856898888946,
+      "measure_s": 0.3048063979949802,
+      "pool_used_before_B": 351411200,
+      "pool_simulate_peak_B": 268509184,
+      "pool_chunk_peak_B": 268509184
+     },
+     {
+      "start": 123590,
+      "stop": 135949,
+      "rows": 254421,
+      "simulate_s": 0.05120297311805189,
+      "measure_s": 0.33471666695550084,
+      "pool_used_before_B": 386260480,
+      "pool_simulate_peak_B": 268715008,
+      "pool_chunk_peak_B": 268715008
+     },
+     {
+      "start": 135949,
+      "stop": 149544,
+      "rows": 274879,
+      "simulate_s": 0.04997446411289275,
+      "measure_s": 0.3616918879561126,
+      "pool_used_before_B": 424682496,
+      "pool_simulate_peak_B": 268523008,
+      "pool_chunk_peak_B": 268523008
+     },
+     {
+      "start": 149544,
+      "stop": 164499,
+      "rows": 307030,
+      "simulate_s": 0.049003749154508114,
+      "measure_s": 0.3979381879325956,
+      "pool_used_before_B": 466189824,
+      "pool_simulate_peak_B": 288883200,
+      "pool_chunk_peak_B": 288883200
+     },
+     {
+      "start": 164499,
+      "stop": 180949,
+      "rows": 335570,
+      "simulate_s": 0.05993518698960543,
+      "measure_s": 0.43363070394843817,
+      "pool_used_before_B": 512557568,
+      "pool_simulate_peak_B": 288704000,
+      "pool_chunk_peak_B": 288704000
+     },
+     {
+      "start": 180949,
+      "stop": 199044,
+      "rows": 371420,
+      "simulate_s": 0.05268155294470489,
+      "measure_s": 0.47963805706240237,
+      "pool_used_before_B": 563233792,
+      "pool_simulate_peak_B": 299165696,
+      "pool_chunk_peak_B": 312643072
+     },
+     {
+      "start": 199044,
+      "stop": 218949,
+      "rows": 405607,
+      "simulate_s": 0.05108079197816551,
+      "measure_s": 0.5217354351188987,
+      "pool_used_before_B": 618880000,
+      "pool_simulate_peak_B": 304833536,
+      "pool_chunk_peak_B": 343230976
+     },
+     {
+      "start": 218949,
+      "stop": 239117,
+      "rows": 411804,
+      "simulate_s": 0.0632988908328116,
+      "measure_s": 0.5277001338545233,
+      "pool_used_before_B": 680130560,
+      "pool_simulate_peak_B": 289421312,
+      "pool_chunk_peak_B": 348692992
+     },
+     {
+      "start": 239117,
+      "stop": 246285,
+      "rows": 145921,
+      "simulate_s": 0.03583851782605052,
+      "measure_s": 0.2002242950256914,
+      "pool_used_before_B": 742318080,
+      "pool_simulate_peak_B": 268004864,
+      "pool_chunk_peak_B": 268004864
+     },
+     {
+      "start": 246285,
+      "stop": 264929,
+      "rows": 381954,
+      "simulate_s": 0.05728800198994577,
+      "measure_s": 0.4830597371328622,
+      "pool_used_before_B": 764804096,
+      "pool_simulate_peak_B": 301012992,
+      "pool_chunk_peak_B": 321995776
+     },
+     {
+      "start": 264929,
+      "stop": 285097,
+      "rows": 413998,
+      "simulate_s": 0.06354753207415342,
+      "measure_s": 0.5292353408876806,
+      "pool_used_before_B": 822045184,
+      "pool_simulate_peak_B": 307404288,
+      "pool_chunk_peak_B": 350337536
+     },
+     {
+      "start": 285097,
+      "stop": 292265,
+      "rows": 148700,
+      "simulate_s": 0.03679966297931969,
+      "measure_s": 0.20330671779811382,
+      "pool_used_before_B": 884562944,
+      "pool_simulate_peak_B": 268396032,
+      "pool_chunk_peak_B": 268396032
+     },
+     {
+      "start": 292265,
+      "stop": 312433,
+      "rows": 415396,
+      "simulate_s": 0.062067955965176225,
+      "measure_s": 0.5337221829686314,
+      "pool_used_before_B": 907021312,
+      "pool_simulate_peak_B": 290274816,
+      "pool_chunk_peak_B": 352119296
+     },
+     {
+      "start": 312433,
+      "stop": 320565,
+      "rows": 167656,
+      "simulate_s": 0.04584183683618903,
+      "measure_s": 0.22603039513342083,
+      "pool_used_before_B": 970192896,
+      "pool_simulate_peak_B": 267941376,
+      "pool_chunk_peak_B": 267941376
+     },
+     {
+      "start": 320565,
+      "stop": 340733,
+      "rows": 414503,
+      "simulate_s": 0.06585775199346244,
+      "measure_s": 0.5252576000057161,
+      "pool_used_before_B": 995511808,
+      "pool_simulate_peak_B": 289796096,
+      "pool_chunk_peak_B": 350354944
+     },
+     {
+      "start": 340733,
+      "stop": 352622,
+      "rows": 244162,
+      "simulate_s": 0.050288316095247865,
+      "measure_s": 0.318439015885815,
+      "pool_used_before_B": 1057662976,
+      "pool_simulate_peak_B": 268925952,
+      "pool_chunk_peak_B": 268925952
+     },
+     {
+      "start": 352622,
+      "stop": 372790,
+      "rows": 411778,
+      "simulate_s": 0.05998024088330567,
+      "measure_s": 0.5223542251624167,
+      "pool_used_before_B": 1094981632,
+      "pool_simulate_peak_B": 289048576,
+      "pool_chunk_peak_B": 352986112
+     },
+     {
+      "start": 372790,
+      "stop": 387885,
+      "rows": 307604,
+      "simulate_s": 0.059695490868762136,
+      "measure_s": 0.39269717689603567,
+      "pool_used_before_B": 1156725248,
+      "pool_simulate_peak_B": 288984064,
+      "pool_chunk_peak_B": 288984064
+     },
+     {
+      "start": 387885,
+      "stop": 408053,
+      "rows": 411361,
+      "simulate_s": 0.062065497040748596,
+      "measure_s": 0.5200526129920036,
+      "pool_used_before_B": 1203621376,
+      "pool_simulate_peak_B": 288996864,
+      "pool_chunk_peak_B": 357120512
+     },
+     {
+      "start": 408053,
+      "stop": 426674,
+      "rows": 378788,
+      "simulate_s": 0.05733666499145329,
+      "measure_s": 0.48215509206056595,
+      "pool_used_before_B": 1265297920,
+      "pool_simulate_peak_B": 289055232,
+      "pool_chunk_peak_B": 319720448
+     },
+     {
+      "start": 426674,
+      "stop": 446842,
+      "rows": 412311,
+      "simulate_s": 0.06262037088163197,
+      "measure_s": 0.522907956968993,
+      "pool_used_before_B": 1322498560,
+      "pool_simulate_peak_B": 305782784,
+      "pool_chunk_peak_B": 349142016
+     },
+     {
+      "start": 446842,
+      "stop": 467010,
+      "rows": 415709,
+      "simulate_s": 0.0618463649880141,
+      "measure_s": 0.5325068661477417,
+      "pool_used_before_B": 1384763392,
+      "pool_simulate_peak_B": 306495488,
+      "pool_chunk_peak_B": 351861760
+     },
+     {
+      "start": 467010,
+      "stop": 474178,
+      "rows": 143581,
+      "simulate_s": 0.04575210786424577,
+      "measure_s": 0.19782668305560946,
+      "pool_used_before_B": 1447539712,
+      "pool_simulate_peak_B": 267675136,
+      "pool_chunk_peak_B": 267675136
+     },
+     {
+      "start": 474178,
+      "stop": 494346,
+      "rows": 415751,
+      "simulate_s": 0.06171879614703357,
+      "measure_s": 0.5267616398632526,
+      "pool_used_before_B": 1469667840,
+      "pool_simulate_peak_B": 289992704,
+      "pool_chunk_peak_B": 351768064
+     },
+     {
+      "start": 494346,
+      "stop": 514514,
+      "rows": 410295,
+      "simulate_s": 0.05994025501422584,
+      "measure_s": 0.5201586368493736,
+      "pool_used_before_B": 1532454400,
+      "pool_simulate_peak_B": 305513472,
+      "pool_chunk_peak_B": 347507712
+     },
+     {
+      "start": 514514,
+      "stop": 521682,
+      "rows": 146525,
+      "simulate_s": 0.04216337390244007,
+      "measure_s": 0.20099279703572392,
+      "pool_used_before_B": 1594411008,
+      "pool_simulate_peak_B": 267648000,
+      "pool_chunk_peak_B": 267648000
+     },
+     {
+      "start": 521682,
+      "stop": 541850,
+      "rows": 414249,
+      "simulate_s": 0.06069437996484339,
+      "measure_s": 0.5243549898732454,
+      "pool_used_before_B": 1616541696,
+      "pool_simulate_peak_B": 307437056,
+      "pool_chunk_peak_B": 350670848
+     },
+     {
+      "start": 541850,
+      "stop": 562018,
+      "rows": 411662,
+      "simulate_s": 0.05992801510728896,
+      "measure_s": 0.5231844389345497,
+      "pool_used_before_B": 1679097344,
+      "pool_simulate_peak_B": 305704448,
+      "pool_chunk_peak_B": 348482560
+     },
+     {
+      "start": 562018,
+      "stop": 569186,
+      "rows": 147866,
+      "simulate_s": 0.044180301018059254,
+      "measure_s": 0.20236682007089257,
+      "pool_used_before_B": 1741265408,
+      "pool_simulate_peak_B": 267932672,
+      "pool_chunk_peak_B": 267932672
+     },
+     {
+      "start": 569186,
+      "stop": 589354,
+      "rows": 415194,
+      "simulate_s": 0.06521473196335137,
+      "measure_s": 0.5219525629654527,
+      "pool_used_before_B": 1763598336,
+      "pool_simulate_peak_B": 289752576,
+      "pool_chunk_peak_B": 355795968
+     },
+     {
+      "start": 589354,
+      "stop": 601266,
+      "rows": 243517,
+      "simulate_s": 0.040805744007229805,
+      "measure_s": 0.3179529558401555,
+      "pool_used_before_B": 1825854464,
+      "pool_simulate_peak_B": 269176320,
+      "pool_chunk_peak_B": 269176320
+     },
+     {
+      "start": 601266,
+      "stop": 621434,
+      "rows": 414106,
+      "simulate_s": 0.05250363610684872,
+      "measure_s": 0.5247215609997511,
+      "pool_used_before_B": 1863070208,
+      "pool_simulate_peak_B": 289230336,
+      "pool_chunk_peak_B": 350191104
+     },
+     {
+      "start": 621434,
+      "stop": 628602,
+      "rows": 147974,
+      "simulate_s": 0.03595858789049089,
+      "measure_s": 0.20073099504224956,
+      "pool_used_before_B": 1925162496,
+      "pool_simulate_peak_B": 268478464,
+      "pool_chunk_peak_B": 268478464
+     },
+     {
+      "start": 621434,
+      "stop": 624696,
+      "rows": 67680,
+      "simulate_s": 0.027564714895561337,
+      "measure_s": null,
+      "pool_used_before_B": 1925605376,
+      "pool_simulate_peak_B": 113600512,
+      "pool_chunk_peak_B": null
+     }
+    ]
+   },
+   {
+    "code": "v4-exact-grid",
+    "code_sha": "d325b2e981d926d9368134e799fd22e5cf8ca046",
+    "job": 13569,
+    "device": "NVIDIA GeForce RTX 5080",
+    "material": "hopg",
+    "E0_keV": 30000.0,
+    "tilt_deg": 15.0,
+    "block": "auto",
+    "wall_s": 2.3273316209670156,
+    "realized_electrons": 3993,
+    "stop_reason": "converged",
+    "chunks": 2,
+    "max_chunk": 7168,
+    "rows_per_electron": 2.600550964187328,
+    "card_peak_MiB": 1673.5625,
+    "pool_reserved_peak_MiB": 241.8251953125,
+    "per_chunk": [
+     {
+      "start": 0,
+      "stop": 7168,
+      "rows": 18630,
+      "simulate_s": 0.9800302679650486,
+      "measure_s": 1.0170619147829711,
+      "pool_used_before_B": 0,
+      "pool_simulate_peak_B": 251541504,
+      "pool_chunk_peak_B": 251541504
+     },
+     {
+      "start": 0,
+      "stop": 3993,
+      "rows": 10384,
+      "simulate_s": 0.022656735964119434,
+      "measure_s": null,
+      "pool_used_before_B": 1053696,
+      "pool_simulate_peak_B": 141437440,
+      "pool_chunk_peak_B": null
+     }
+    ]
+   },
+   {
+    "code": "v4-exact-grid",
+    "code_sha": "d325b2e981d926d9368134e799fd22e5cf8ca046",
+    "job": 13569,
+    "device": "NVIDIA GeForce RTX 5080",
+    "material": "hopg",
+    "E0_keV": 30000.0,
+    "tilt_deg": 60.0,
+    "block": "auto",
+    "wall_s": 2.780535571044311,
+    "realized_electrons": 32541,
+    "stop_reason": "converged",
+    "chunks": 6,
+    "max_chunk": 7168,
+    "rows_per_electron": 4.102885590485848,
+    "card_peak_MiB": 1969.5625,
+    "pool_reserved_peak_MiB": 529.642578125,
+    "per_chunk": [
+     {
+      "start": 0,
+      "stop": 7168,
+      "rows": 29457,
+      "simulate_s": 0.9978640279732645,
+      "measure_s": 1.0012245019897819,
+      "pool_used_before_B": 0,
+      "pool_simulate_peak_B": 252986368,
+      "pool_chunk_peak_B": 252986368
+     },
+     {
+      "start": 7168,
+      "stop": 14336,
+      "rows": 29554,
+      "simulate_s": 0.037421777145937085,
+      "measure_s": 0.036983425030484796,
+      "pool_used_before_B": 5508096,
+      "pool_simulate_peak_B": 253021184,
+      "pool_chunk_peak_B": 253021184
+     },
+     {
+      "start": 14336,
+      "stop": 21504,
+      "rows": 29341,
+      "simulate_s": 0.03386947303079069,
+      "measure_s": 0.03537529497407377,
+      "pool_used_before_B": 11027456,
+      "pool_simulate_peak_B": 252994048,
+      "pool_chunk_peak_B": 252994048
+     },
+     {
+      "start": 21504,
+      "stop": 28672,
+      "rows": 29050,
+      "simulate_s": 0.024958904832601547,
+      "measure_s": 0.03619307489134371,
+      "pool_used_before_B": 16516608,
+      "pool_simulate_peak_B": 252584960,
+      "pool_chunk_peak_B": 252584960
+     },
+     {
+      "start": 28672,
+      "stop": 35840,
+      "rows": 29514,
+      "simulate_s": 0.03072646795772016,
+      "measure_s": 0.03729550703428686,
+      "pool_used_before_B": 21957632,
+      "pool_simulate_peak_B": 251941888,
+      "pool_chunk_peak_B": 251941888
+     },
+     {
+      "start": 28672,
+      "stop": 32541,
+      "rows": 16110,
+      "simulate_s": 0.02718748920597136,
+      "measure_s": null,
+      "pool_used_before_B": 21957632,
+      "pool_simulate_peak_B": 135369728,
+      "pool_chunk_peak_B": null
+     }
+    ]
+   }
+  ]
+ }
 }
