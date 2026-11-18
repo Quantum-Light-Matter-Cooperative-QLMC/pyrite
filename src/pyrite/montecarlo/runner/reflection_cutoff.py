@@ -499,8 +499,54 @@ def axis_band_eV(grid: np.ndarray, quadrature: str) -> tuple[float, float]:
     return float(grid[0]), float(grid[-1])
 
 
+def _selection_reference_grid(case: dict) -> np.ndarray | None:
+    """One ceiling band for automatic bandwidths; fixed bands keep their own axis.
+
+    Grouped flights and truncated sinc profiles cannot use exact bin masses.
+    Validation: reflection-yield-tolerance-selector
+    """
+    payload = case.get("line_grid_policy")
+    if (
+        payload is None
+        or case.get("max_dE_frac", 0.0)
+        or case.get("sinc_cutoff") is not None
+        or case.get("node_support_cutoff", "auto") not in (None, "auto")
+    ):
+        return None
+    band = payload["bandwidth"]
+    if band["policy"] not in {"kinematic-ceiling", "resonance-population"}:
+        return None
+    return band_bin_grid(float(band["start_eV"]), float(band["stop_eV"]))
+
+
+def _selected_spectrum(case, evaluate, grid):
+    """Score a selected set in admitted chunks, auditing only this production pass."""
+    from ..._backend import _to_cpu
+
+    per_call = selection_call_sizes(case, grid)
+    radiators = (
+        enumerate(case["layer_radiators"])
+        if case.get("layer_radiators") is not None
+        else [(None, case)]
+    )
+    total = np.zeros(np.shape(grid), dtype=float)
+    for layer, radiator in radiators:
+        if radiator is None:
+            continue
+        hkls = radiator["hkl_list"]
+        for i in range(0, len(hkls), per_call[layer]):
+            pilot = _pilot_case(case, layer, hkls[i : i + per_call[layer]], None)
+            total += np.asarray(_to_cpu(evaluate(pilot)), dtype=float)
+    return total
+
+
 def selected_line_spectrum(
-    case: dict, evaluate: Callable[[dict], object], grid: np.ndarray, continuum=None
+    case: dict,
+    evaluate: Callable[[dict], object],
+    grid: np.ndarray,
+    continuum=None,
+    *,
+    reference_evaluate: Callable[[dict, np.ndarray], object] | None = None,
 ) -> tuple[np.ndarray, dict]:
     """Incoherent line spectrum of ``case`` under its ``reflection_selection``.
 
@@ -508,6 +554,13 @@ def selected_line_spectrum(
     (the case radiating one shell chunk) on ``grid``. Shells are scored on the
     production axis in the case's own ``line_quadrature`` and summed, so the
     selection costs about one shell beyond its stop rather than a second pass.
+    For automatic ceiling/measured bandwidths, ``reference_evaluate(pilot, axis)``
+    selects on exact bin masses across the shared clamped ceiling band, then
+    ``evaluate`` scores the selected set on the production axis. The reference
+    evaluator must not accumulate the production truncation audit. Line,
+    continuum-share and background yields all use the reference band, so a
+    changed production stop cannot change the selected set.
+
     Returns the host spectrum and the selection record: model, tolerance,
     and per radiator its cutoff, reflection count, tail estimate, convergence
     and shell table. ``continuum(band_eV)`` builds the net metric's
@@ -521,17 +574,30 @@ def selected_line_spectrum(
 
     selection = case["reflection_selection"]
     quadrature = case.get("line_quadrature", "node")
-    per_call = selection_call_sizes(case, grid)
-    _, outcomes, spectrum = select_case_reflections(
+    reference = None if reference_evaluate is None else _selection_reference_grid(case)
+    selection_grid = grid if reference is None else reference
+    selection_quadrature = quadrature if reference is None else "bin-mean"
+    per_call = selection_call_sizes(case, selection_grid)
+    pruned, outcomes, spectrum = select_case_reflections(
         case,
-        lambda pilot, _grid: np.asarray(_to_cpu(evaluate(pilot)), dtype=float),
+        lambda pilot, axis: np.asarray(
+            _to_cpu(
+                evaluate(pilot)
+                if reference is None or reference_evaluate is None
+                else reference_evaluate(pilot, axis)
+            ),
+            dtype=float,
+        ),
         float(selection["tolerance"]),
-        grid,
-        axis_yield_weights(grid, quadrature),
+        selection_grid,
+        axis_yield_weights(selection_grid, selection_quadrature),
+        quadrature=selection_quadrature,
         g_max_invang=float(selection["g_max_invang"]),
         width_invang=float(selection["shell_width_invang"]),
         max_reflections=lambda layer, _radiator: per_call[layer],
-        continuum=None if continuum is None else continuum(axis_band_eV(grid, quadrature)),
+        continuum=None
+        if continuum is None
+        else continuum(axis_band_eV(selection_grid, selection_quadrature)),
     )
     layered = case.get("layer_radiators") is not None
     radiators = [
@@ -557,7 +623,36 @@ def selected_line_spectrum(
             for (layer, radiator), outcome in zip(radiators, outcomes, strict=True)
         ],
     )
+    if reference is not None:
+        record["reference_band_eV"] = list(axis_band_eV(reference, "bin-mean"))
+        record["reference_quadrature"] = "bin-mean"
+        spectrum = _selected_spectrum(pruned, evaluate, grid)
     return spectrum, record
+
+
+def selected_batch_spectrum(emission, batch, Ne_brem):
+    """Select on a reference batch, then audit and score the production batch.
+
+    Validation: reflection-yield-tolerance-selector
+    """
+    from dataclasses import replace
+
+    from .lattice_share import selection_continuum
+
+    return selected_line_spectrum(
+        batch.case,
+        lambda pilot: (
+            emission.cxr.evaluate(replace(batch, case=pilot, table_cache={}), "spec").values
+        ),
+        batch.energy_eV,
+        continuum=selection_continuum(batch.case, batch, Ne_brem),
+        reference_evaluate=lambda pilot, axis: (
+            emission.cxr.evaluate(
+                replace(batch, case=pilot, energy_eV=axis, truncation_audit=None, table_cache={}),
+                "spec",
+            ).values
+        ),
+    )
 
 
 def _metric_record(outcome: ReflectionCutoff) -> dict:

@@ -7,8 +7,18 @@ Line emission is a sum over reciprocal-lattice vectors, and that sum has to be t
 With neither `n_families`, `max_reflections` nor `line_yield_tolerance` set,
 the spectrum phase scores reciprocal shells $|\mathbf g|\in(G-2,G]$ Å⁻¹ until
 the estimated omitted yield is at most 1e-3 of the kept total on the
-requested line axis. Shell spectra are retained and summed. The automatic
-axis bounds the candidate cap before selection, so it may be substantially
+selection band. For automatic `kinematic-ceiling` and `resonance-population`
+axes, this is the shared clamped ceiling band: coarse 500 eV bins integrate
+each line profile exactly, independently of the production stop and spacing.
+The selected reflections are then scored on the production axis, whose tail
+audit excludes the reference pass. Extending a refused measured stop keeps
+the same selection band. Explicit fixed axes retain their own band and sum
+the shell spectra directly. Grouped flights (`max_dE_frac`) and truncated
+sinc profiles and explicit numeric node-support windows retain that direct
+route because the reference bin-mass route does not apply. Bin integration
+inherits the reducer's existing approximation limits; it introduces no
+center-sampling approximation to the represented line profiles.
+The automatic axis bounds the candidate cap before selection, so it may be substantially
 wider than the four-family axis. The estimator is qualified on the Si and
 MoS₂/Si scenes in
 [the selector evidence](../../validation/radiation-physics/reflection-yield-tolerance-selector.md);
@@ -37,8 +47,8 @@ spectrum and the selection record are unchanged in kind. The record adds
 
 Radiators whose continuum is not corrected (EEDL continuum, channeling,
 correction disabled) keep the line-yield metric, a tail fraction of the kept
-line yield. `CXR_REFLECTION_SELECTION_MODEL` is `measured-shell-cutoff-v4`
-since #1250, so measured-selection checkpoints written under v3 do not resume.
+line yield. `CXR_REFLECTION_SELECTION_MODEL` is `measured-shell-cutoff-v5`
+since #1243, so older measured-selection checkpoints do not resume.
 
 An explicit `CxrReflections(n_families=4)` or `--n-families 4` restores the
 four-family policy. Explicit counts take precedence over automatic selection.

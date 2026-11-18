@@ -438,6 +438,14 @@ so no corrected continuum or recorded output changes. The `eedl-fallback`
 entry stays historical.
 
 
+## Common automatic selection band (#1243)
+
+`CXR_REFLECTION_SELECTION_MODEL=measured-shell-cutoff-v5` selects automatic
+bandwidths on a common ceiling reference before production scoring. Identity
+pins advance together; each resolved case payload was checked unchanged
+between the v4 and v5 markers before re-pinning. Historical `eedl-fallback`
+identity stays unchanged. Output arrays and numerical tolerances are retained.
+
 ## Lattice-share continuum (#1250)
 
 The coupled fixture is a crystalline BremsLib case (synthetic Si/O tables,

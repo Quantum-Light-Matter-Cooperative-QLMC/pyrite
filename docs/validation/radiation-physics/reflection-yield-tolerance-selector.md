@@ -291,7 +291,7 @@ No test exercises production kernels.
 
 ## Production scoring (#1173 P4)
 
-The spectrum phase applies the selector on the production line axis rather
+For explicit fixed bands, the spectrum phase applies the selector on the production line axis rather
 than a separate coarse pilot. Each shell's incoherent density is evaluated
 with the case's own line quadrature and integrated against the axis weights:
 trapezoid weights for `node`, bin widths for `bin-mean`. By additivity
@@ -299,6 +299,54 @@ trapezoid weights for `node`, bin widths for `bin-mean`. By additivity
 set on that axis. The selection therefore costs about one shell beyond its
 stop. A pilot followed by a second scoring pass would cost about twice as
 much.
+
+### Shared automatic selection band (#1243, v5)
+
+Implementation-context change, independently rederived below. Automatic
+`kinematic-ceiling` and `resonance-population` payloads carry the same start
+and clamped ceiling even when their realized production stops differ. The
+selector now integrates shell lines on 500 eV `bin-mean` bins tiling that
+common band. The existing closed-form sinc-bin mass supplies the integral;
+the bins do not approximate the line shape at their centers. Continuum share
+and background use the same band's endpoints, with the existing logarithmic
+continuum quadrature. Thus all three terms of the net metric refer to one
+band, and the selected set no longer depends on the measured stop or its
+fallback extension.
+
+The selected set is then evaluated in admitted reflection chunks on the
+production axis. Only this pass contributes to its truncation audit; reference
+evaluation has no production audit accumulator. The returned spectrum and
+audit therefore refer to the same reflections. The selection record adds
+`reference_band_eV` and `reference_quadrature`; its shell integrals describe
+the reference band, while `quadrature` still names production scoring.
+Explicit fixed axes and routes with grouped flights, a truncated sinc
+profile or explicit numeric node-support windows retain direct shell scoring.
+The bin reducer's route-specific approximations still apply; exact integration
+of a represented line is not a new accuracy guarantee. No new transport or
+random draws occur.
+
+Regression: `test_automatic_bandwidths_select_the_same_reflections` uses one
+six-history Si transport. Before the change, production stops of 2 and 8 keV
+selected 238 and 944 reflections; afterward their reference shell records
+are identical. This pins band independence, not a universal tail bound.
+The automatic-axis generation is `measured-shell-cutoff-v5`; historical
+qualification of earlier generations below does not certify this change.
+
+Fresh-context read-only review (2026-11-18): **rederived**, conditional on the
+existing line-kernel, ceiling and tail-bound claims. The verifier derived
+$L_k(B)=\sum_i\Delta E_i\bar\rho_{ki}$ and $s_k=L_k(B)-S_k(B)$ with common
+$C_r(B)$ before inspecting the implementation. Shared transport, material
+support, quadrature and $B=[a,C]$ give the same shell sequence for either
+production stop. Reference bins tile $B$ within roundoff (observed endpoint
+deviation at most $5.7\times10^{-14}$ eV); their padded keep window contains
+the entire band. A layered in-memory probe confirmed one active radiator per
+pilot, separate admitted chunk sizes and exactly one production evaluation
+per selected reflection. Reference evaluations clear the audit accumulator;
+production retains its own ceiling window and audit. The review found that
+explicit numeric `node_support_cutoff` cannot run bin-mean pilots; its new
+exclusion and three compatibility anchors close that regression. Four focused
+physics/selection anchors and the three compatibility anchors passed in the
+review. New-anchor CI is unobserved; no human sign-off is inferred.
 
 Checked on CPU: splitting one call into halves, or into the selector's shells,
 reproduces the single-call spectrum to $3\times10^{-15}$ of peak. The

@@ -204,24 +204,25 @@ def test_channeling_demo_and_off_profile_identities_are_unchanged():
     ``segment-mean-v9-edge-geometric-tables`` (line-table mesh). #642 re-mints
     the shell-transport pins for default restricted soft-loss straggling.
     #1254 re-mints the adaptive standard-profile pin for variance-contributors-v2.
+    #1262 re-mints it for variance-threshold-v3 (separate VOV threshold).
     #1243 re-mints them for the ``resonance-population`` default bandwidth
     (case payload) and its ``line_bandwidth_model`` digest marker.
     """
     sweep, settings, cases = _profile_cases("silicon", "channeling_demo")
     assert cases[0].line_quadrature == "bin-mean"
     assert [profiles.case_content_key(case) for case in cases] == [
-        "4719062c11a00fbb7238642650055bf28e1fce87176c1432c6e9273cf04c6344"
+        "064f8066c0f41cbfbd849893688a45cdffe64a1494c3aaf6b6f315d0e4026511"
     ]
     assert profiles.named_profile_stem("silicon", catalog_profile="channeling_demo") == (
-        "silicon@channeling_demo-584ccd103a87"
+        "silicon@channeling_demo-9d3f18f908cb"
     )
     identity = profiles.dataset_identity("silicon", settings, sweep)
     assert identity["parameter_sha256"] == (
-        "88aff462dce48c8248a3642214d3985676f4fe249aeeb3b21d85c631319ae973"
+        "1ff63edd472a4bedd3c5e49c69827906daebe9c354048b73b4f110f559e41298"
     )
     sweep = material_sweep("hopg", catalog_profile="standard")
     settings = profiles.profile_run_settings(default_settings(), "standard", sweep=sweep)
     assert profiles.dataset_identity("hopg", settings, sweep)["parameter_sha256"] == (
-        "e6bc8a79d424ff8ef5d32a2e133d1c47e6a6bdad6aa75e809a4a974f68c5d96a"
+        "e7512fd54b60d9e2bdaf940df96bb7405fcbd7a15b9e1ba3c04896fda0cd5344"
     )
-    assert profiles.named_profile_stem("hopg") == "hopg@full-e6bc8a79d424"
+    assert profiles.named_profile_stem("hopg") == "hopg@full-e7512fd54b60"
