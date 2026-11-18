@@ -84,8 +84,8 @@ to lockstep at small electron counts).
 A `line_grid_policy` grid is resolved from the whole line population before
 any line is scored, so a streamed policy case runs two transport passes over
 the same electron blocks (#1001). Primary streams are addressed by
-`(seed, electron, draw)`, so both passes see the same histories; no disk is
-used.
+`(seed, electron, draw)`, so both passes see the same histories. Large
+grid-pass evidence spills to disk (below).
 
 1. **Grid pass.** `runner/streamed_line_grid.py::BlockGridEvidence` keeps,
    per block, only what policy resolution reads along the case direction: the
@@ -113,8 +113,40 @@ limit. The truncation audit and `line_grid_resolved` record match the joined
 path to summation order.
 
 Memory: segment rows still follow the block size, but the grid-pass evidence
-grows with the electron count. Windowed policies are refused because their
-seed providers read the whole population.
+grows with the electron count. Above `GridSpillPolicy.threshold_bytes`
+(default 2 GiB of evidence held, or projected over the run from the blocks
+so far), `runner/line_grid_spill.py` moves it to a per-run scratch directory
+under the output `cache/line-grid-spill/`, and later blocks are written there
+as they arrive (#1141). Host memory is then bounded independent of N; disk is
+not.
+
+- **Blocks.** Each block's sinc samples are two raw arrays, written before the
+  block commits, so a block replayed after an allocator OOM is never counted
+  twice. Production lines are one `.npy` per array, served back as read-only
+  memory maps with the in-memory block layout.
+- **Exact quantile.** `external_stable_sort` distributes rows into value
+  buckets at sampled pivots, each bucket in row order, and sorts every bucket
+  that fits `SORT_ROWS` with the same stable argsort; larger buckets recurse.
+  Equal widths share a bucket, so the result is the global stable order
+  whatever the pivots, and pivots inside `(min, max]` make every bucket a
+  strict subset. `sorted_sinc_spacing` then reads the sorted rows chunkwise,
+  carrying the running sum into each chunk's first element, so the cumulative
+  sum, quantile and aliased weight are the in-memory reduction's bit for bit
+  (`tests/montecarlo/transport/test_streamed_line_grid_spill.py`, including
+  ties and single-valued populations).
+- **Disk.** Peak is about twice the sinc evidence (raw blocks, then buckets
+  and sorted output) plus the lines. Each spilled block re-projects that peak
+  over the run and raises `LineGridSpillError` when the file system cannot
+  hold it; the projection starts at the first block, so a short disk refuses
+  before the bulk of the transport.
+- **Cleanup.** `resolve_streamed_line_grid` removes the directory in a
+  `finally`, so success, errors and `KeyboardInterrupt` leave nothing. A
+  killed process cannot, so each new store prunes this host's directories
+  whose process is gone.
+
+Windowed policies are refused because their seed providers read the whole
+population. The `sinc-oversampled` node-local axis still builds its per-line
+intervals in memory.
 
 ### Cascades
 

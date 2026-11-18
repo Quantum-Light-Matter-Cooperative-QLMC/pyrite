@@ -40,6 +40,12 @@ its pool releases are ``grid_pass.release``), and record the resolved grid,
 the evidence bytes of the streamed grid pass, and its resolution record.
 MODE ``grid-pass`` runs only the streamed grid pass (no scoring), for its
 memory and wall against NE. ``compare`` requires bitwise-equal ``E_grid``.
+
+``STREAM_SPILL_MIB`` (#1141) sets the grid pass's spill threshold in MiB
+(``0`` always spills, ``none`` never; unset keeps the default) and ``STREAM_SPILL_DIR`` its
+scratch parent. Every arm also records ``host_anon_peak_MiB``, the sampled
+peak of ``RssAnon``: spilled evidence is read through file-backed memory maps,
+which ``ru_maxrss`` counts although the kernel can reclaim them.
 """
 
 import json
@@ -152,6 +158,52 @@ class _Phases:
                 self.calls[key] = self.calls.get(key, 0) + 1
 
         return timed
+
+
+def _configure_spill():
+    """Apply ``STREAM_SPILL_MIB``/``STREAM_SPILL_DIR`` to the grid pass (#1141)."""
+    mib, directory = os.environ.get("STREAM_SPILL_MIB"), os.environ.get("STREAM_SPILL_DIR")
+    if mib is None and directory is None:
+        return
+    from functools import partial
+
+    from pyrite.montecarlo.runner import line_grid_spill
+
+    kwargs = {"directory": directory}
+    if mib is not None:
+        kwargs["threshold_bytes"] = None if mib == "none" else int(float(mib) * 2**20)
+    line_grid_spill.GridSpillPolicy = partial(line_grid_spill.GridSpillPolicy, **kwargs)
+
+
+class _AnonPeak:
+    """Sampled peak ``RssAnon`` of this process [bytes]."""
+
+    def __init__(self, interval=0.05):
+        self.interval, self.peak = interval, 0
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._run, daemon=True)
+
+    @staticmethod
+    def sample():
+        with open("/proc/self/status") as status:
+            for line in status:
+                if line.startswith("RssAnon:"):
+                    return int(line.split()[1]) * 1024
+        return 0
+
+    def _run(self):
+        while not self._stop.is_set():
+            self.peak = max(self.peak, self.sample())
+            self._stop.wait(self.interval)
+
+    def __enter__(self):
+        self._thread.start()
+        return self
+
+    def __exit__(self, *exc):
+        self._stop.set()
+        self._thread.join()
+        self.peak = max(self.peak, self.sample())
 
 
 def _instrument(mode, phases):
@@ -292,8 +344,10 @@ def run(
     phases = _Phases()
     _instrument(mode, phases)
     rss_before = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    _configure_spill()
+    anon_before = _AnonPeak.sample()
     t0 = time.perf_counter()
-    with _PoolPeak() as pool:
+    with _PoolPeak() as pool, _AnonPeak() as anon:
         if mode == "joined":
             out = runner.run_case(case, transport_core=core)
         elif mode == "joined-device":
@@ -350,6 +404,8 @@ def run(
         "wall_s": wall,
         "host_peak_MiB": rss_peak / 1024,
         "host_peak_before_run_MiB": rss_before / 1024,
+        "host_anon_peak_MiB": anon.peak / 2**20,
+        "host_anon_before_run_MiB": anon_before / 2**20,
         "device_pool_peak_above_base_MiB": pool.above_base / 2**20,
         "device_used_peak_above_base_MiB": (pool.used_peak - pool.used_base) / 2**20,
         "fp64": os.environ.get("PYRITE_FP64") == "1",
@@ -402,7 +458,8 @@ def compare(ref_path, *others):
         if other.get("E_grid") != ref.get("E_grid"):
             print(f"{path} E_grid differs from {ref_path}")
             return 1
-        assert other["n_segments"] == ref["n_segments"] and other["eta"] == ref["eta"], path
+        same_eta = np.array_equal(other["eta"], ref["eta"], equal_nan=True)  # grid-pass: NaN
+        assert other["n_segments"] == ref["n_segments"] and same_eta, path
         for key in SPECTRA:
             a, b = np.asarray(other[key]), np.asarray(ref[key])
             scale = np.maximum(np.abs(b), np.finfo(float).tiny)

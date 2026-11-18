@@ -123,7 +123,12 @@ def test_a_cached_grid_skips_the_grid_pass(monkeypatch):
     monkeypatch.setattr(runner, "_transport_case", counted)
     streamed = run_case_streamed(case, 10, transport_core="per-electron")
     assert len(calls) == 1
-    assert streamed["_streamed_line_grid_pass"] == {"transported": False, "evidence_bytes": 0}
+    assert streamed["_streamed_line_grid_pass"] == {
+        "transported": False,
+        "evidence_bytes": 0,
+        "spilled": False,
+        "spill_peak_bytes": 0,
+    }
     assert streamed["line_grid_resolved"]["cache"] == "hit"
     _assert_matches(streamed, reference)
 

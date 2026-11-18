@@ -21,11 +21,14 @@ rounding of the truncation limit.
 Windowed policies read whole-population seed providers and are refused.
 """
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
 from ..._cxr_grid_policy import RESONANCE_BANDWIDTH_POLICY
+
+if TYPE_CHECKING:
+    from .line_grid_spill import SpillStore
 
 #: Line-grid policy features live streaming cannot resolve from block evidence.
 WINDOWED_POLICY_REFUSAL = "windowed line_grid_policy is not supported by live streamed scoring"
@@ -46,19 +49,35 @@ class BlockGridEvidence:
     a joined population, for the case's single direction ``n_hat``: the sinc
     ``(width, weight)`` samples of every valid line row, and -- for the
     measured ``resonance-population`` bandwidth -- every production line's
-    ``(energy, width, weight)``. Memory is 16 bytes per valid line row plus,
+    ``(energy, width, weight)``. Evidence is 16 bytes per valid line row plus,
     when measured, three backend reals per production line.
+
+    Under ``spill`` (:class:`.line_grid_spill.GridSpillPolicy`), once the
+    evidence held, or projected over the run from the blocks so far, exceeds
+    the threshold, it moves to a scratch directory and later blocks are written
+    there as they arrive (#1141); :meth:`close` removes it. A projected spill
+    the scratch disk cannot hold raises
+    :class:`.line_grid_spill.LineGridSpillError` at that block.
     """
 
-    def __init__(self, case, payload, n_hat, Ne, abs_layers=None, groove=None):
+    def __init__(self, case, payload, n_hat, Ne, abs_layers=None, groove=None, spill=None):
+        from .line_grid_spill import GridSpillPolicy
+
         self.case, self.n_hat, self.Ne = case, np.asarray(n_hat, dtype=float), int(Ne)
         self.abs_layers, self.groove = abs_layers, groove
         bandwidth = payload["bandwidth"]
         self.band = (float(bandwidth["start_eV"]), float(bandwidth["stop_eV"]))
         self.measured = bandwidth["policy"] == RESONANCE_BANDWIDTH_POLICY
+        self.policy = GridSpillPolicy(threshold_bytes=None) if spill is None else spill
+        self._electrons = max(int(Ne), int(case.get("Ne_brem") or 0), 1)
         self._width: list[np.ndarray] | None = []
         self._weight: list[np.ndarray] | None = []
         self._populations: list = []
+        self._dtypes = None
+        self._seen = [0, 0, 0]  # transported electrons, sinc bytes, line bytes
+        self._store: SpillStore | None = None
+        self._runs: list = []
+        self.spill_peak_bytes = 0
 
     def add(self, segs) -> None:
         """Record one block; commits only after every block quantity succeeded."""
@@ -80,20 +99,116 @@ class BlockGridEvidence:
             )
         if self._width is None or self._weight is None:
             raise RuntimeError("streamed sinc evidence was already reduced")
-        self._width.append(width)
-        self._weight.append(weight)
-        self._populations.extend(populations)
+        if self._dtypes is None:
+            self._dtypes = (width.dtype, weight.dtype)
+        # The joined samples take the first block's dtypes (_drain).
+        width = width.astype(self._dtypes[0], copy=False)
+        weight = weight.astype(self._dtypes[1], copy=False)
+        seen = [
+            self._seen[0] + int(segs.get("Ne", 0)),
+            self._seen[1] + width.nbytes + weight.nbytes,
+            self._seen[2] + _population_bytes(populations),
+        ]
+        if self._store is None and self._should_spill(seen):
+            self._start_spill(seen)
+        elif self._store is not None:
+            self._check_disk(self._store, seen)
+        if self._store is not None:
+            self._spill_block(self._store, width, weight, populations)
+        else:
+            self._width.append(width)
+            self._weight.append(weight)
+            self._populations.extend(populations)
+        self._seen = seen
+
+    def _projected(self, seen) -> tuple[float, float]:
+        scale = self._electrons / max(seen[0], 1)
+        return seen[1] * scale, seen[2] * scale
+
+    def _should_spill(self, seen) -> bool:
+        threshold = self.policy.threshold_bytes
+        if threshold is None:
+            return False
+        return max(sum(self._projected(seen)), seen[1] + seen[2]) > threshold
+
+    def _check_disk(self, store, seen) -> None:
+        from .line_grid_spill import LineGridSpillError, projected_disk_bytes
+
+        need = projected_disk_bytes(*self._projected(seen)) - store.bytes
+        free = store.free_bytes()
+        if need > free:
+            raise LineGridSpillError(
+                f"streamed line-grid evidence needs about {need / 1024**3:.1f} GiB more "
+                f"scratch disk in {store.root}, but only {free / 1024**3:.1f} GiB is free; "
+                "free space or point the spill directory at a larger file system"
+            )
+
+    def _start_spill(self, seen) -> None:
+        """Move the held blocks to a new store; on failure keep them in memory."""
+        from .line_grid_spill import SpillStore
+
+        store = SpillStore(self.policy.parent())
+        self._store = store
+        try:
+            self._check_disk(store, seen)
+            runs, populations = self._runs, []
+            for width, weight in zip(self._width or (), self._weight or (), strict=True):
+                runs.append(_write_run(store, width, weight))
+            for population in self._populations:
+                populations.extend(self._spill_populations(store, [population]))
+        except BaseException:
+            store.close()
+            self._store, self._runs = None, []
+            raise
+        self._width, self._weight, self._populations = [], [], populations
+        self._track_peak()
+
+    def _spill_block(self, store, width, weight, populations) -> None:
+        run = _write_run(store, width, weight)
+        try:
+            spilled = self._spill_populations(store, populations)
+        except BaseException:
+            store.unlink(run.width)
+            store.unlink(run.weight)
+            raise
+        self._runs.append(run)
+        self._populations.extend(spilled)
+        self._track_peak()
+
+    @staticmethod
+    def _spill_populations(store, populations) -> list:
+        from .line_grid_spill import load_population, spill_population
+
+        written = []
+        try:
+            for population in populations:
+                written.append((population.label, spill_population(store, population)))
+        except BaseException:
+            for _, paths in written:
+                for path in paths:
+                    path.unlink(missing_ok=True)
+            raise
+        return [load_population(store, label, paths) for label, paths in written]
+
+    def _track_peak(self) -> None:
+        if self._store is not None:
+            self.spill_peak_bytes = max(self.spill_peak_bytes, self._store.peak_bytes)
+
+    @property
+    def spilled(self) -> bool:
+        """Whether the evidence lives on disk."""
+        return self._store is not None
 
     @property
     def nbytes(self) -> int:
-        """Host bytes the evidence holds."""
-        arrays = [*(self._width or ()), *(self._weight or ())]
-        arrays += [
-            array
-            for population in self._populations
-            for array in (population.energy_eV, population.weight, population.width_eV)
-        ]
-        return sum(array.nbytes for array in arrays)
+        """Evidence bytes collected, held in memory or spilled."""
+        return int(self._seen[1] + self._seen[2])
+
+    def close(self) -> None:
+        """Remove any spilled evidence."""
+        if self._store is not None:
+            self._track_peak()
+            self._store.close()
 
     def _check_direction(self, n_hat) -> None:
         if not np.array_equal(np.asarray(n_hat, dtype=float), self.n_hat):
@@ -107,10 +222,25 @@ class BlockGridEvidence:
         width, weight = self._width, self._weight
         if width is None or weight is None:
             raise RuntimeError("streamed sinc evidence was already reduced")
+        self._width = self._weight = None
+        if self._store is not None:
+            return self._spilled_sinc_spacing(self._store, aliased_weight_limit)
         samples = [_drain(width), _drain(weight)]
         del width, weight
-        self._width = self._weight = None
         return sinc_spacing_from_samples(samples, aliased_weight_limit=aliased_weight_limit)
+
+    def _spilled_sinc_spacing(self, store, aliased_weight_limit):
+        from .line_grid_spill import external_stable_sort, sorted_sinc_spacing
+
+        runs = self._runs
+        self._runs = []
+        ordered = external_stable_sort(store, runs, self._dtypes or (np.dtype(float),) * 2)
+        self._track_peak()
+        try:
+            return sorted_sinc_spacing(ordered, aliased_weight_limit=aliased_weight_limit)
+        finally:
+            store.unlink(ordered.width)
+            store.unlink(ordered.weight)
 
     def populations(self, n_hat, start, ceiling, profile):
         """Every accumulated production line over the policy band."""
@@ -119,6 +249,20 @@ class BlockGridEvidence:
         if not self.measured or (float(start), float(ceiling)) != self.band:
             raise ValueError("streamed line-grid evidence holds no lines for this band")
         return list(self._populations)
+
+
+def _population_bytes(populations) -> int:
+    return sum(
+        array.nbytes
+        for population in populations
+        for array in (population.energy_eV, population.weight, population.width_eV)
+    )
+
+
+def _write_run(store, width, weight):
+    from .line_grid_spill import write_run
+
+    return write_run(store, width, weight)
 
 
 def _drain(blocks: list[np.ndarray]) -> np.ndarray:
@@ -139,40 +283,62 @@ def _drain(blocks: list[np.ndarray]) -> np.ndarray:
 
 
 def resolve_streamed_line_grid(
-    case, block_electrons, *, transport_core, n_hat, groove
+    case, block_electrons, *, transport_core, n_hat, groove, spill=None
 ) -> tuple[np.ndarray, dict[str, Any], dict[str, Any]]:
     """The case's policy line grid, from the speed cache or a transport pass.
 
     Returns ``(E_grid, record, grid_pass)``; ``record`` equals the joined
     :func:`.cxr_grid.resolve_cxr_grid` record and ``grid_pass`` describes the
-    first pass (``transported``, ``evidence_bytes``).
+    first pass (``transported``, ``evidence_bytes``, ``spilled``,
+    ``spill_peak_bytes``). ``spill`` is a
+    :class:`.line_grid_spill.GridSpillPolicy` (default: spill above
+    ``DEFAULT_SPILL_THRESHOLD_BYTES`` under the output cache); spilled files
+    are removed however the pass ends.
     """
     from . import _transport_case
     from .cxr_grid import _auditable_policy, _resolve_policy_grid, cached_policy_cxr_grid
+    from .line_grid_spill import GridSpillPolicy
 
     hit = cached_policy_cxr_grid(case)
     if hit is not None:
-        return *hit, {"transported": False, "evidence_bytes": 0}
+        return *hit, {
+            "transported": False,
+            "evidence_bytes": 0,
+            "spilled": False,
+            "spill_peak_bytes": 0,
+        }
     payload = _auditable_policy(case, case["line_grid_policy"])
     abs_layers = case.get("abs_layers")
-    evidence = BlockGridEvidence(case, payload, n_hat, case["Ne"], abs_layers, groove)
-    _transport_case(
-        case,
-        transport_core=transport_core,
-        block_electrons=block_electrons,
-        block_consumer=evidence.add,
-        keep_segments_on_device=True,
+    spill = GridSpillPolicy() if spill is None else spill
+    evidence = BlockGridEvidence(case, payload, n_hat, case["Ne"], abs_layers, groove, spill=spill)
+    try:
+        _transport_case(
+            case,
+            transport_core=transport_core,
+            block_electrons=block_electrons,
+            block_consumer=evidence.add,
+            keep_segments_on_device=True,
+        )
+        grid, record = _resolve_policy_grid(
+            payload,
+            case,
+            None,
+            (n_hat,),
+            case["Ne"],
+            abs_layers,
+            groove,
+            observation=False,
+            evidence=evidence,
+        )
+    finally:
+        evidence.close()
+    return (
+        grid,
+        record,
+        {
+            "transported": True,
+            "evidence_bytes": evidence.nbytes,
+            "spilled": evidence.spilled,
+            "spill_peak_bytes": evidence.spill_peak_bytes,
+        },
     )
-    evidence_bytes = evidence.nbytes
-    grid, record = _resolve_policy_grid(
-        payload,
-        case,
-        None,
-        (n_hat,),
-        case["Ne"],
-        abs_layers,
-        groove,
-        observation=False,
-        evidence=evidence,
-    )
-    return grid, record, {"transported": True, "evidence_bytes": evidence_bytes}
