@@ -18,6 +18,13 @@ the ``CAPTURE`` (default 3) most common line count, evenly spaced over the run,
 are saved as ``flush-<i>.npz`` (``E_res``, ``a_width``, ``weight``, ``axis``)
 for ``bench``. Record: ``capture.json``.
 
+``PROBE_PROFILE=timers`` adds synchronized inclusive timers around the
+batched CXR route (selection vs production pass, tables, per-block
+kinematics/escape/polarization, the incoherent line prologue, flushes;
+``split_timers`` in the record); ``PROBE_PROFILE=cprofile`` records
+cProfile tables (``capture.prof``). Both perturb wall time; neither saves
+flushes when ``CAPTURE=0``.
+
 ``bench`` replays the saved flushes with CUDA-event timing of every phase of
 an instrumented copy of ``cuda_fourier_bin_mean_reduce`` (prologue/broad,
 period, planning, NUFFT modulation, ES spread, FFT/deconvolution, direct
@@ -133,14 +140,25 @@ def capture(material, e0_kev, tilt_deg, histories, out_dir):
         return res
 
     fc.cuda_fourier_bin_mean_reduce = timed
+    mode = os.environ.get("PROBE_PROFILE", "")
+    splits = _install_split_timers() if mode == "timers" else None
     timings = []
     t0 = time.perf_counter()
     error = None
+    profiler = None
+    if mode == "cprofile":
+        import cProfile
+
+        profiler = cProfile.Profile()
+        profiler.enable()
     try:
         run_cases([case], max_workers=0, progress=False, on_timing=timings.append)
     except Exception as exc:  # record failure as evidence
         error = f"{type(exc).__name__}: {exc}"
     wall = time.perf_counter() - t0
+    profile_tables = None
+    if profiler is not None:
+        profile_tables = _profile_tables(profiler, out / "capture.prof")
     lines = sum(c[0] for c in calls)
     reduce_s = sum(c[1] for c in calls)
     record = dict(
@@ -161,9 +179,91 @@ def capture(material, e0_kev, tilt_deg, histories, out_dir):
         calls=calls,
         saved=saved,
         timings=timings,
+        profile_mode=mode or None,
+        split_timers=None if splits is None else splits.totals(),
+        profile_tables=profile_tables,
     )
     _write(out / "capture.json", record)
     print(json.dumps({k: v for k, v in record.items() if k not in ("calls", "timings")}))
+
+
+#: Synchronized inclusive timers around the batched CXR route (``timers``
+#: mode): selection vs production pass, table builds, per-block kinematics,
+#: escape and polarization, the incoherent line prologue, and line flushes.
+_SPLIT_TARGETS = (
+    ("pyrite.montecarlo.runner.reflection_cutoff", "select_case_reflections"),
+    ("pyrite.montecarlo.runner.reflection_cutoff", "_selected_spectrum"),
+    ("pyrite.montecarlo.spectrum.cxr._batched", "_accumulate_batched"),
+    ("pyrite.montecarlo.spectrum.cxr._batched", "_batched_reflection_tables"),
+    ("pyrite.montecarlo.spectrum.cxr._batched", "_batched_tables"),
+    ("pyrite.montecarlo.spectrum.cxr._batched", "_batched_block"),
+    ("pyrite.montecarlo.spectrum.cxr._batched", "_escape_weights"),
+    ("pyrite.montecarlo.spectrum.cxr._batched", "_polarization_terms"),
+    ("pyrite.montecarlo.spectrum.cxr._batched", "_batched_incoherent_block"),
+    ("pyrite.montecarlo.spectrum.cxr._batched", "_queue_unit_lines"),
+    ("pyrite.montecarlo.spectrum.cxr._batched", "_launch_rows"),
+)
+
+
+class _Splits:
+    def __init__(self):
+        self.seconds, self.calls = {}, {}
+
+    def wrap(self, name, fn):
+        depth = [0]
+
+        def timed(*args, **kwargs):
+            if depth[0]:
+                return fn(*args, **kwargs)
+            depth[0] += 1
+            _sync()
+            t0 = time.perf_counter()
+            try:
+                return fn(*args, **kwargs)
+            finally:
+                _sync()
+                depth[0] -= 1
+                self.seconds[name] = self.seconds.get(name, 0.0) + time.perf_counter() - t0
+                self.calls[name] = self.calls.get(name, 0) + 1
+
+        return timed
+
+    def totals(self):
+        return {k: dict(s=round(v, 3), calls=self.calls[k]) for k, v in self.seconds.items()}
+
+
+def _install_split_timers():
+    import importlib
+
+    splits = _Splits()
+    for module_name, name in _SPLIT_TARGETS:
+        module = importlib.import_module(module_name)
+        if hasattr(module, name):
+            setattr(
+                module,
+                name,
+                splits.wrap(f"{module_name.rsplit('.', 1)[-1]}.{name}", getattr(module, name)),
+            )
+    from pyrite.montecarlo.spectrum.cxr import _batched
+
+    batch = _batched._CxrBatch
+    batch.flush = splits.wrap("_batched._CxrBatch.flush", batch.flush)
+    return splits
+
+
+def _profile_tables(profiler, path, top=40):
+    import io
+    import pstats
+
+    profiler.disable()
+    profiler.dump_stats(path)
+    tables = {}
+    for key in ("cumulative", "tottime"):
+        buf = io.StringIO()
+        pstats.Stats(profiler, stream=buf).sort_stats(key).print_stats(top)
+        tables[key] = buf.getvalue()
+        print(tables[key][-6000:], flush=True)
+    return tables
 
 
 # ----------------------------------------------------------------------- bench
