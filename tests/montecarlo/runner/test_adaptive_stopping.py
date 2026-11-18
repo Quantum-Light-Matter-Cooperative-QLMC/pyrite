@@ -40,6 +40,7 @@ from pyrite.montecarlo.runner.adaptive import (
     case_measure,
     run_case_adaptive,
     run_stopping_rule,
+    vov_trend_slope,
 )
 from pyrite.montecarlo.spectrum.brem import mc_brem_spectrum
 from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
@@ -111,6 +112,53 @@ def test_variance_guard_retains_small_stop_for_nearly_constant_signal():
     assert record["stop_reason"] == "converged"
     assert record["realized_electrons"] == 4000
     assert record["statistics"]["cxr"]["variance_of_variance"] > 0.9
+
+
+def test_vov_trend_slope_limits():
+    """Exact 1/n decay gives -1; only the last half and positive VOV enter."""
+    decay = [(n, 7.0 / n) for n in range(100, 1001, 100)]
+    assert vov_trend_slope(decay) == pytest.approx(-1.0, abs=1e-12)
+    # Points before n_last/2 = 500 are ignored, whatever their trend.
+    early = [(n, 1e3 * n) for n in range(100, 500, 100)]
+    assert vov_trend_slope(early + decay[4:]) == pytest.approx(-1.0, abs=1e-12)
+    assert vov_trend_slope([(n, 3.0 * n**0.5) for n in (600, 800, 1000)]) == pytest.approx(0.5)
+    assert vov_trend_slope([(600, 0.1), (800, 0.0), (900, None), (1000, 0.05)]) is None
+    assert vov_trend_slope([]) is None
+
+
+def _prefix_vov(values, n):
+    centered = values[:n] - values[:n].mean()
+    m2 = np.sum(centered**2)
+    return np.sum(centered**4) / m2**2 - 1.0 / n
+
+
+@pytest.mark.parametrize("late_heavy", [False, True])
+def test_vov_trend_slope_is_recorded_and_never_gates(late_heavy):
+    """The record's slope is the fit to prefix VOVs over the last half.
+
+    A well-sampled exponential population falls about as 1/n; one heavy score
+    in the last half makes the trend positive. Neither changes the stop.
+    """
+    population = np.random.default_rng(11).exponential(1.0, 4000)
+    if late_heavy:
+        population[3500] += 500.0
+    settings = AdaptiveSettings(0.5, 4000, 4000, 100, observables=("cxr", "brem"))
+    record = run_stopping_rule(
+        settings, lambda start, stop, _: dict.fromkeys(("cxr", "brem"), population[start:stop])
+    )
+    ends = range(2000, 4001, 100)
+    x = np.log(np.array(ends, dtype=float))
+    y = np.log([_prefix_vov(population, n) for n in ends])
+    expected = np.polyfit(x, y, 1)[0]
+    for name in ("cxr", "brem"):
+        status = record["statistics"][name]
+        assert status["vov_trend_slope"] == pytest.approx(expected, rel=1e-9)
+        assert "vov_trend_slope" not in status["passes"]
+    if late_heavy:
+        assert expected > 0.0
+    else:
+        assert -1.5 < expected < -0.5
+    assert record["realized_electrons"] == 4000
 
 
 def test_degenerate_moments_report_no_error():

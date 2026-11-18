@@ -178,7 +178,13 @@ policy exception, not a bound on unseen tails. A constant positive signal
 passes this gate (CV = 0); zero signal still cannot converge. The record includes `variance_of_variance`
 ($M_4/M_2^2-1/n$), `coefficient_of_variation`, and the `variance_sampling`
 pass flag; `guards` records both `min_effective_electrons` and
-`max_variance_of_variance`.
+`max_variance_of_variance`. `vov_trend_slope` is the least-squares slope of
+$\ln\mathrm{VOV}$ against $\ln n$ over block ends in the last half of the run.
+It needs at least three ends with positive VOV, otherwise it is `null`. A
+sampled fourth moment gives about $-1$ (MCNP's $1/N$ check), while a late heavy
+score gives a shallower or positive slope. The slope is reported only and never
+stops a run. In the #1254 captures, the false 1 MeV stops still show about
+$-1$, because the heavy electrons had not yet been drawn.
 
 $V_{\max}$ is `max_variance_of_variance`, separate from the ESS floor
 `min_effective_histories` (#1262). The default $V_{\max}=0.01$ estimates the

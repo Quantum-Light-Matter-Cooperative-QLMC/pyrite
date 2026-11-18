@@ -555,6 +555,30 @@ reason. Anchors: `test_vov_threshold_and_ess_floor_gate_independently`
 `test_vov_threshold_is_compared_to_m4_over_m2_squared`, and
 `test_settings_are_validated`.
 
+### VOV trend diagnostic (#1262)
+
+`vov_trend_slope(points)` is recorded for every observable. It fits the
+least-squares slope of $\ln\mathrm{VOV}_n$ against $\ln n$ over block ends
+with $n\ge n_{\rm last}/2$ and $\mathrm{VOV}>0$, and is `None` below three
+such ends. For independent histories with a sampled fourth moment,
+$\mathrm{VOV}_n\simeq(\kappa-1)/n$, so the slope tends to $-1$; this is
+the trend MCNP checks over the last half of a run. A score that dominates
+$M_4$ and arrives late raises VOV and flattens or reverses the slope. The
+slope is recorded but never gates a stop. Anchors:
+`test_vov_trend_slope_limits` (exact $1/n$ gives $-1$, early and non-positive
+points are excluded) and `test_vov_trend_slope_is_recorded_and_never_gates`
+(equals an independent NumPy fit to prefix VOVs; a late heavy score gives a
+positive slope; the stop is unchanged).
+
+Applied to the #1254 captures at their recorded stops, the slope does not
+separate the false 1 MeV 15° stops. HOPG at 5k, 12k and 24k gives $-0.97$,
+$-0.90$ and $-1.01$, because VOV decays normally until a heavy electron is
+drawn. hBN gives $-0.15$ to $+0.38$. Several converged 30 MeV 15° stops give
+positive slopes ($+5.43$ for hBN and $+1.18$ for HOPG at 24k blocks), and
+30 keV stops give $-0.6$ to $-1.2$. The slope therefore stays a diagnostic.
+Like VOV itself, it cannot detect a population class that has not yet been
+sampled.
+
 ## Independent v3 extension verification (2026-11-17, #1262)
 
 A fresh-context verifier derived the v3 gate from the claim before reading
