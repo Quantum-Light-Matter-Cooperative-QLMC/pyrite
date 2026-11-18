@@ -62,7 +62,7 @@ variance concentration to about 10 percent relative uncertainty, and so the
 RSE to about 5 percent. The Geant4/MCNP pass value 0.1 corresponds to about
 30 percent. Both thresholds and the CV exception are PyRITE policy, not
 prescriptions from either reference; the evidence for the default is under
-[threshold selection](#vov-threshold-selection-1262).
+[threshold selection](#vov-threshold-selection-v3-1262).
 
 Neither branch sees an entirely unsampled class, certifies population moments,
 or provides finite-sample or simultaneous sequential coverage. With a true
@@ -507,7 +507,6 @@ are attributable to multiple incoherent line contributions, rather than one
 unidentified channel. This is measured attribution for these six outliers,
 not a claim that every member of the distribution has the same mechanism.
 
-(vov-threshold-selection-1262)=
 ### VOV threshold selection (v3, #1262)
 
 v2 applied $M_4/M_2^2\le1/E_{\min}$. At the default $E_{\min}=100$ the
