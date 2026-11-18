@@ -3,7 +3,7 @@
 Usage:
   fourier_reduction_phases_1296.py capture MATERIAL E0_KEV TILT_DEG HISTORIES OUT_DIR
   fourier_reduction_phases_1296.py bench OUT_DIR [REPEATS]
-  fourier_reduction_phases_1296.py variants OUT_DIR [REPEATS]
+  fourier_reduction_phases_1296.py variants|variants2 OUT_DIR [REPEATS]
 
 ``capture`` resolves one case of the ``PROFILE`` catalog profile (default
 ``cleo_sub_1281``; profile, beam and detector come from the user config
@@ -27,7 +27,8 @@ reduction and accumulation) at the same widths. Each arm records wall and its
 spectrum error against the production function at ``eps=1e-12``: max
 abs/peak, relative total and L1. Record: ``bench.json``.
 
-``variants`` replays the same flushes for candidate fixes (record
+``variants`` (and ``variants2``: FP32-grid spreading, combined arms, more
+thresholds) replays the same flushes for candidate fixes (record
 ``variants.json``): spreading with sources sorted by fine-grid position;
 racy non-atomic spreading (a diagnostic cost bound, its error is meaningless);
 direct rectangles with FP64 range reduction and FP32 ``sincosf``; a fused
@@ -220,6 +221,55 @@ extern "C" __global__ void es_spread_noatomic(
     }
 }
 
+template <bool ATOMIC, typename T>
+__device__ void spread_f32_body(
+    const double* x, const T* src, const long long n,
+    const long long n_fine, const int width, const float beta, T* grid) {
+    const long long k = (long long)blockIdx.x * blockDim.x + threadIdx.x;
+    if (k >= n) return;
+    const double two_pi = 6.283185307179586;
+    double xk = fmod(x[k], two_pi);
+    if (xk < 0.0) xk += two_pi;
+    const double u = xk * (double(n_fine) / two_pi);
+    const float half = 0.5f * float(width);
+    const long long l0 = (long long)ceil(u - double(half));
+    const float frac = float(double(l0) - u);
+    const T a_re = src[4*k], a_im = src[4*k+1];
+    const T b_re = src[4*k+2], b_im = src[4*k+3];
+    const float inv_half = 1.0f / half;
+    for (int p = 0; p < width; ++p) {
+        const float z = (frac + float(p)) * inv_half;
+        const float arg = 1.0f - z * z;
+        if (arg <= 0.0f) continue;
+        const T phi = (T)__expf(beta * (sqrtf(arg) - 1.0f));
+        long long idx = (l0 + p) % n_fine;
+        if (idx < 0) idx += n_fine;
+        T* g0 = grid + 2*idx;
+        T* g1 = grid + 2*(n_fine + idx);
+        if (ATOMIC) {
+            atomicAdd(g0, phi * a_re); atomicAdd(g0 + 1, phi * a_im);
+            atomicAdd(g1, phi * b_re); atomicAdd(g1 + 1, phi * b_im);
+        } else {
+            g0[0] += phi * a_re; g0[1] += phi * a_im;
+            g1[0] += phi * b_re; g1[1] += phi * b_im;
+        }
+    }
+}
+
+extern "C" __global__ void es_spread_f32_noatomic(
+    const double* x, const double* src, const long long n,
+    const long long n_fine, const int width, const float beta, double* grid) {
+    // Diagnostic only (racy): FP32 kernel without atomics, the ALU-side bound.
+    spread_f32_body<false, double>(x, src, n, n_fine, width, beta, grid);
+}
+
+extern "C" __global__ void es_spread_f32_grid(
+    const double* x, const float* src, const long long n,
+    const long long n_fine, const int width, const float beta, float* grid) {
+    // FP32 kernel, FP32 strengths and FP32 atomics into an FP32 grid.
+    spread_f32_body<true, float>(x, src, n, n_fine, width, beta, grid);
+}
+
 extern "C" __global__ void rectangles_f32(
     const double* phase, const double* constant, const double* linear,
     const long long* rect, const double dt, double* out) {
@@ -352,7 +402,15 @@ def _es_transform(phase, strengths, j0, j1, *, eps, plans, clock, opts, work):
         o = cp.argsort(cp.mod(phase, 2.0 * np.pi))
         phase, packed = phase[o], packed[o]
         clock.mark("nufft_sort")
-    if spread == "noatomic":
+    if spread == "f32_noatomic":
+        kernel = _variant_kernel("es_spread_f32_noatomic")
+        args = (phase, packed, np.int64(n), np.int64(n_fine), np.int32(width), np.float32(beta))
+    elif spread == "f32_grid":
+        kernel = _variant_kernel("es_spread_f32_grid")
+        packed = packed.astype(cp.complex64)
+        grid = cp.zeros((2, n_fine), dtype=cp.complex64)
+        args = (phase, packed, np.int64(n), np.int64(n_fine), np.int32(width), np.float32(beta))
+    elif spread == "noatomic":
         kernel = _variant_kernel("es_spread_noatomic")
         args = (phase, packed, np.int64(n), np.int64(n_fine), np.int32(width), np.float64(beta))
     elif spread == "fp32":
@@ -364,6 +422,7 @@ def _es_transform(phase, strengths, j0, j1, *, eps, plans, clock, opts, work):
         kernel = fs._spread_kernel()
         args = (phase, packed, np.int64(n), np.int64(n_fine), np.int32(width), np.float64(beta))
     kernel(((n + 255) // 256,), (256,), (*args, grid))
+    grid = grid.astype(cp.complex128, copy=False)
     clock.mark("nufft_spread")
     spectrum = cp.fft.fft(grid, axis=1)
     centred = cp.arange(-(modes // 2), modes - modes // 2) % n_fine
@@ -508,6 +567,8 @@ def instrumented_reduce(E_res, a_width, weight, axis, *, eps=1e-12, opts=None):
     return out, clock.totals(), work
 
 
+_FAST = {"direct": "f32", "envelope": "fused"}
+
 ARM_SETS = {
     "bench": (
         ("fp64_eps1e-12", {}),
@@ -526,6 +587,18 @@ ARM_SETS = {
         ("min_work_2^20", {"min_work": 1 << 20}),
         ("min_work_2^24", {"min_work": 1 << 24}),
         ("direct_f32_min_work_2^24", {"direct": "f32", "min_work": 1 << 24}),
+    ),
+    "variants2": (
+        ("base", {}),
+        ("spread_f32_noatomic_diagnostic", {"spread": "f32_noatomic"}),
+        ("spread_f32_grid", {"spread": "f32_grid"}),
+        ("spread_f32_grid_eps1e-9", {"spread": "f32_grid", "eps": 1e-9}),
+        *(
+            (f"direct_f32_env_fused_min_work_2^{b}", {**_FAST, "min_work": 1 << b})
+            for b in (22, 24, 25, 26)
+        ),
+        ("fast_2^24_eps1e-9", {**_FAST, "min_work": 1 << 24, "eps": 1e-9}),
+        ("fast_2^24_spread_f32_grid", {**_FAST, "min_work": 1 << 24, "spread": "f32_grid"}),
     ),
 }
 
