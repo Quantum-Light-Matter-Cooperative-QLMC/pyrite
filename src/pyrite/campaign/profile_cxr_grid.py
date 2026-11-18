@@ -5,7 +5,10 @@ import tomlkit
 from pyrite._cxr_grid_policy import ENVIRONMENT_NAMES as CXR_GRID_ENVIRONMENT_NAMES
 from pyrite._cxr_grid_policy import (
     KINEMATIC_BANDWIDTH_POLICY,
+    LOCAL_RESOLUTION_POLICY,
     PROFILE_CXR_GRID_SELECTORS,
+    RESONANCE_BANDWIDTH_POLICY,
+    canonical_resolution,
     check_selector_combination,
     default_resolution_policy,
 )
@@ -31,21 +34,26 @@ def profile_cxr_grid_values(profile):
 def cxr_grid_fields(explicit):
     """Explicit, effective and source rows for each profile line-grid selector.
 
-    Feature windows keep the default bandwidth at ``kinematic-ceiling`` (#1243).
-    The default resolution follows the effective bandwidth, quadrature and
-    windows (:func:`~pyrite._cxr_grid_policy.default_resolution_policy`), as
-    :func:`~pyrite._cxr_grid_policy.resolve_cxr_grid_policy` does (#1214).
+    As :func:`~pyrite._cxr_grid_policy.resolve_cxr_grid_policy` does (#1265):
+    an unset resolution is ``sinc-nyquist`` with feature windows, else
+    ``sinc-oversampled``; an unset bandwidth is ``resonance-population`` beside
+    ``resonance-local``, else ``kinematic-ceiling`` with windows, else the
+    measured default. A deprecated resolution alias shows its replacement.
     """
-    explicit = explicit or {}
+    explicit = dict(explicit or {})
     defaults = {key: choices[0] for key, choices in PROFILE_CXR_GRID_SELECTORS.items()}
+    if explicit.get("resolution") is not None:
+        explicit["resolution"] = canonical_resolution(
+            explicit["resolution"],
+            quadrature=explicit.get("quadrature", defaults["quadrature"]),
+            label="profile",
+        )
     windows = explicit.get("windows") is True
-    if windows:
+    if explicit.get("resolution") == LOCAL_RESOLUTION_POLICY:
+        defaults["bandwidth"] = RESONANCE_BANDWIDTH_POLICY
+    elif windows:
         defaults["bandwidth"] = KINEMATIC_BANDWIDTH_POLICY
-    defaults["resolution"] = default_resolution_policy(
-        bandwidth=explicit.get("bandwidth", defaults["bandwidth"]),
-        quadrature=explicit.get("quadrature", defaults["quadrature"]),
-        windows=windows,
-    )
+    defaults["resolution"] = default_resolution_policy(windows=windows)
     return [
         {
             "key": key,
@@ -62,8 +70,8 @@ def _check_cxr_grid_policy(profile, policy):
     """Refuse a non-empty POLICY that no case of PROFILE could resolve."""
     if not policy:
         return
-    effective = {row["key"]: row["effective"] for row in cxr_grid_fields(policy)}
     try:
+        effective = {row["key"]: row["effective"] for row in cxr_grid_fields(policy)}
         check_selector_combination(**effective)
     except ValueError as exc:
         raise CxrGridPolicyConflict(str(exc)) from None
@@ -90,6 +98,14 @@ def set_cxr_grid_policy(document, name, updates):
     current = profile_cxr_grid_values(target) or {}
     merged = {**current, **updates}
     _check_cxr_grid_policy(target, merged)
+    if updates.get("resolution") is not None:
+        # Store the replacement of a deprecated alias, never the alias (#1265).
+        updates = {
+            **updates,
+            "resolution": canonical_resolution(
+                updates["resolution"], quadrature=merged.get("quadrature", "node"), label="profile"
+            ),
+        }
     # Edit in place: TOML-only keys (`windows`, `max_points`) stay as written.
     table = target.get("line_grid_policy")
     if table is None:

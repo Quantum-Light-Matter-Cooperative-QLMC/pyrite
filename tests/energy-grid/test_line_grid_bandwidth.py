@@ -19,7 +19,6 @@ from pyrite._cxr_grid_policy import (
     OVERSAMPLED_RESOLUTION_POLICY,
     RESONANCE_BANDWIDTH_POLICY,
     RESONANCE_CXR_GRID_POLICY_SCHEMA,
-    SHAPE_RESOLUTION_POLICY,
     CxrGridToleranceError,
     CxrGridTruncationWarning,
     CxrYieldStatisticsWarning,
@@ -516,16 +515,18 @@ def test_defaulted_measured_bandwidth_falls_back_to_the_explicit_kinematic_paylo
     assert kinematic_fallback_payload(explicit) is None
 
 
-def test_defaulted_bin_mean_shape_axis_falls_back_to_the_kinematic_oversampled_payload():
-    """A defaulted bin-mean case takes ``sinc-shape``; its fallback is the kinematic default (#1214)."""
+def test_defaulted_bin_mean_axis_falls_back_with_its_resolution_unchanged():
+    """A defaulted bin-mean case falls back to the explicit kinematic payload (#1265).
+
+    Validation: line-grid-resonance-bandwidth
+    """
     default = _hbn_case(1000.0, {"quadrature": "bin-mean"})["line_grid_policy"]
-    assert default["resolution"]["policy"] == SHAPE_RESOLUTION_POLICY
-    assert "resolution" not in default["sources"]
+    assert default["resolution"]["policy"] == OVERSAMPLED_RESOLUTION_POLICY
     explicit = _hbn_case(
         1000.0, {"quadrature": "bin-mean", "bandwidth": KINEMATIC_BANDWIDTH_POLICY}
     )["line_grid_policy"]
-    assert explicit["resolution"]["policy"] == OVERSAMPLED_RESOLUTION_POLICY
     assert kinematic_fallback_payload(default) == explicit
+    assert kinematic_fallback_payload(default)["resolution"] == default["resolution"]
 
 
 def test_defaulted_refusal_rescores_on_the_ceiling_and_explicit_refusal_raises(monkeypatch):
@@ -781,33 +782,28 @@ def test_extensions_are_capped_before_the_ceiling(monkeypatch):
     assert stop == ceiling and len(refusals) == MAX_EXTENSIONS + 1
 
 
-def test_sinc_shape_falls_back_to_the_oversampled_step_not_the_nyquist_one():
-    """A ``sinc-shape`` axis rescores at ``sinc-oversampled``, never ``sinc-nyquist`` (#1243, #1214).
-
-    The #1243 fresh-context check rescored hBN 1 MeV from a 1.11 eV shape step to
-    a 3.0 eV kinematic one; the fallback now takes the kinematic default's
-    ``W/8`` step whether ``sinc-shape`` was chosen or defaulted.
+def test_resonance_local_implies_its_bandwidth_and_never_falls_back():
+    """An unset bandwidth beside ``resonance-local`` is recorded as implied (#1265).
 
     Validation: line-grid-resonance-bandwidth
     """
-    from pyrite._cxr_grid_policy import (
-        LINE_NYQUIST_OVERSAMPLING,
-        OVERSAMPLED_RESOLUTION_POLICY,
-        SHAPE_RESOLUTION_POLICY,
-    )
+    from pyrite._cxr_grid_policy import LOCAL_RESOLUTION_POLICY
 
     payload = resolve_cxr_grid_policy(
         start_eV=50.0,
         stop_eV=100_000.0,
-        per_call={"resolution": SHAPE_RESOLUTION_POLICY, "quadrature": "bin-mean"},
+        bandwidth_policy=KINEMATIC_BANDWIDTH_POLICY,
+        per_call={"resolution": LOCAL_RESOLUTION_POLICY, "quadrature": "bin-mean"},
     ).payload()
     assert payload["bandwidth"]["policy"] == RESONANCE_BANDWIDTH_POLICY
-    assert "bandwidth" not in payload.get("sources", {})
-    fallback = kinematic_fallback_payload(payload)
-    assert fallback["bandwidth"]["policy"] == KINEMATIC_BANDWIDTH_POLICY
-    assert fallback["resolution"]["policy"] == OVERSAMPLED_RESOLUTION_POLICY
-    assert fallback["resolution"]["oversampling"] == LINE_NYQUIST_OVERSAMPLING
-    assert not {"halo_limit", "shape_rtol", "shape_max_points"} & set(fallback["resolution"])
+    assert payload["sources"]["bandwidth"] == "implied by resonance-local"
+    assert kinematic_fallback_payload(payload) is None
+    # A pre-#1265 payload recorded no implied source; its fallback must not
+    # rescore on a uniform sinc-Nyquist axis (fresh-context finding).
+    legacy = {**payload, "sources": {"quadrature": "per-call"}}
+    fallback = kinematic_fallback_payload(legacy)
+    with pytest.raises(ValueError, match="resonance-local payload has no uniform"):
+        resolved_coordinates(fallback, 1.0)
 
 
 def test_fallback_rescore_survives_an_allocation_retry(monkeypatch):

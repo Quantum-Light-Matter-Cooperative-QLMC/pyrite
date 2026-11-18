@@ -107,10 +107,12 @@ def test_policy_case_attaches_the_production_payload(name):
     payload = case["line_grid_policy"]
     selectors = gate["POLICY_ARMS"][name]
     assert payload["bandwidth"]["policy"] == selectors.get("bandwidth", "kinematic-ceiling")
-    expected = default_resolution_policy(
-        bandwidth=payload["bandwidth"]["policy"], quadrature=selectors.get("quadrature", "node")
-    )
+    expected = default_resolution_policy()
     assert payload["resolution"]["policy"] == selectors.get("resolution", expected)
+    if payload["resolution"]["policy"] == "sinc-oversampled":
+        # The quadrature's shape step, on any bandwidth (#1265).
+        step = "shape_rtol" if case["line_quadrature"] == "bin-mean" else "oversampling"
+        assert step in payload["resolution"]
     assert case["line_quadrature"] == selectors.get("quadrature", "node")
     assert case["seed"] == 642501 and case["Ne"] == 8
 

@@ -208,22 +208,24 @@ def test_channeling_demo_and_off_profile_identities_are_unchanged():
     #1243 re-mints them for the ``resonance-population`` default bandwidth
     (case payload) and its ``line_bandwidth_model`` digest marker.
     #1253 re-mints it for decision-points-v4.
+    #1265 re-mints it for the bin-mean shape step on the kinematic axis
+    (``sinc-oversampled`` + ``shape_rtol``) and ``line_resolution_model`` v2.
     """
     sweep, settings, cases = _profile_cases("silicon", "channeling_demo")
     assert cases[0].line_quadrature == "bin-mean"
     assert [profiles.case_content_key(case) for case in cases] == [
-        "459fd59ec1054f9bfcd97c34eac8c9fef60e96da3899bf186948df2c78a230ba"
+        "b478eea0ccbc05de629529ca91bf2745d5ff3674f92c35b71dfce180fcc991f4"
     ]
     assert profiles.named_profile_stem("silicon", catalog_profile="channeling_demo") == (
-        "silicon@channeling_demo-a47111cc6154"
+        "silicon@channeling_demo-9df0438df935"
     )
     identity = profiles.dataset_identity("silicon", settings, sweep)
     assert identity["parameter_sha256"] == (
-        "b44bbe797052f67486a66f3c6cff87715dec914f4d3a05d9498ef4c1ea04ebf8"
+        "f33f744ec65ad2fff6d26bc11ce5cba5ac18748527bee645c027851ded367539"
     )
     sweep = material_sweep("hopg", catalog_profile="standard")
     settings = profiles.profile_run_settings(default_settings(), "standard", sweep=sweep)
     assert profiles.dataset_identity("hopg", settings, sweep)["parameter_sha256"] == (
-        "8051843e6163493c5d6b5ad006ca653cf7fda97e51a96cd0348bc59dc5d367d7"
+        "8193ecf13d4bb263d03d835d41f3fb3b362258dbef5992a5a2fdd0752e6695cf"
     )
-    assert profiles.named_profile_stem("hopg") == "hopg@full-8051843e6163"
+    assert profiles.named_profile_stem("hopg") == "hopg@full-8193ecf13d4b"

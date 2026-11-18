@@ -155,53 +155,82 @@ resolving a new run does not reinterpret stored `auto` or absent fields.
 | TOML key | Values (default first) | Flag |
 |---|---|---|
 | `bandwidth` | `resonance-population`, `kinematic-ceiling` | `--bandwidth` |
-| `resolution` | `sinc-oversampled`, `sinc-nyquist`, `resonance-local`, `sinc-shape` | `--resolution` |
+| `resolution` | `sinc-oversampled`, `sinc-nyquist`, `resonance-local` | `--resolution` |
 | `quadrature` | `node`, `bin-mean` | `--quadrature` |
 | `windows` | `false`, `true` | TOML; selector edits keep it |
-| `max_points` | integer >= 2 (600000) | TOML; selector edits keep it |
+| `max_points` | integer >= 2 (600000 `node`, 1000000 `bin-mean`) | TOML; selector edits keep it |
 
-`resonance-local` and `sinc-shape` require `resonance-population` and
-`bin-mean`. `high_energy_demo` selects `sinc-shape`: uniform spacing at
-$(3/\pi)\sqrt{0.01}$ times the measured sinc feature width, capped by
-`max_spacing_eV`. This targets the intrinsic height of isolated lines;
-overlapping peaks require measured shape convergence. Uniform axes use the
-Fourier reducer on CPU and supported GPU backends. Above 1,000,000
-coordinates, the policy falls back to `resonance-local` on the same band;
-the resolved grid's `shape_axis` records the route, count and reason. The
-fallback retains its own coordinate budget and can refuse an oversized axis.
-`resonance-local` remains selectable. See the
-[spacing derivation](../validation/beam-transport/line-grid-sinc-shape-spacing.md)
-for assumptions and qualification status.
+Any stored selector makes every case resolve its line grid from its own
+trajectories, ahead of explicit `E_grid_line` and stored energy-grid rows.
 
-`sinc-oversampled` divides the measured sinc-Nyquist step by 8 (#1214); its
-axis is 8x denser than `sinc-nyquist`, which keeps line area but not node peak
-height or FWHM. An oversampled axis over `max_points` is refined locally
-instead (#1257): the ÷8 step around every measured line narrower than eight
-`max_spacing_eV` steps, `max_spacing_eV` elsewhere, with every spacing join
-outside each line's halo so node-quadrature yield stays within 2e-4 per line.
-The grid record's `local_axis` gives the route, the uniform count and the
-reason. Only a local axis that also exceeds `max_points` refuses, naming
-`--resolution sinc-nyquist` as the opt-out; nothing coarsens automatically. See
-the [join derivation](../validation/beam-transport/line-grid-node-local-refinement.md).
-With `windows = true` an unset resolution is `sinc-nyquist` and an explicit
-`sinc-oversampled` is refused: the windows place their own nodes. With
-`bin-mean` on the `resonance-population` bandwidth an unset resolution is
-`sinc-shape`: bin means at the `sinc-oversampled` step bound an isolated peak
-only to 1.7%. A case whose measured bandwidth falls back to
-`kinematic-ceiling` takes `sinc-oversampled` there.
-With `windows = true`, for cases built with coherent emission or a positive
-`max_dE_frac`, and for channeling, transition-radiation or mixed-transport
-cases, an unset bandwidth resolves to `kinematic-ceiling`: the measured
-bandwidth's truncation audit does not cover those routes (#1243); an explicit
-`resonance-population` refuses on the last three. An unset
-bandwidth whose measured axis fails that audit after transport is rescored
-with the same trajectories, with a warning, on an axis extended to the first
-candidate stop whose audited upper share is within the limit (at most the
-`kinematic-ceiling` stop).
-An explicit `resonance-population` with `windows = true` is refused. The editor
-also refuses a policy without `windows = true` on `coherent`/`both` emission,
-and `bin-mean` with a positive `max_dE_frac`. `coverage-0.95` labels stored energy-grid artifacts and
-is not a profile value.
+### When to pick what
+
+- **Bandwidth** sets the cost. `resonance-population` stops where the case's
+  own lines leave at most 1e-4 of their yield above the axis, and audits that
+  after transport. `kinematic-ceiling` is the closed-form upper bound: always
+  safe, no audit, but far wider at high beam energy.
+- **Resolution** sets which observable the axis resolves. `W` is the measured
+  sinc-Nyquist step (first-zero width of the narrow lines), capped at 3 eV.
+
+  | `resolution` | Step | Resolves |
+  |---|---|---|
+  | `sinc-oversampled` | `W/8` (`node`); $(3/\pi)\sqrt{0.01}\,W \approx W/10.5$ (`bin-mean`) | peak height and FWHM of isolated lines to ~1% |
+  | `sinc-nyquist` | `W` | line area only; 8-10x fewer points |
+  | `resonance-local` | fine near measured resonances, 3 eV elsewhere | yield on axes too wide for a uniform fine step |
+
+- **Quadrature** sets what each point means. `node` samples the line profile
+  (spectral density); a step coarser than a line can alias its yield. `bin-mean`
+  stores the exact mean over each bin: yield is exact at any step, but peaks
+  are lowered and widened, as in a binned detector. It is incoherent-only and
+  refuses a positive `max_dE_frac`.
+- **Windows** (`windows = true`) refine fine windows around kinematic lines,
+  absorption edges and characteristic lines on a `sinc-nyquist` backbone. They
+  are the only automatic route for coherent emission.
+
+### Resolution and fallback rules
+
+The table is pinned by `tests/energy-grid/test_line_grid_selector_table.py`.
+
+| `bandwidth` | `resolution` | `quadrature` | `windows` | Axis | Fallback³ |
+|---|---|---|---|---|---|
+| unset, `kinematic-ceiling` | unset, `sinc-nyquist` | any | on | `kinematic-ceiling` / `sinc-nyquist` | none (already `kinematic-ceiling`) |
+| unset, `resonance-population` | `resonance-local` | `bin-mean` | off | `resonance-population` / `resonance-local` | refuses |
+| unset | unset, `sinc-oversampled`, `sinc-nyquist` | any | off | default¹ / as chosen² | widens toward `kinematic-ceiling` |
+| `resonance-population` | unset, `sinc-oversampled`, `sinc-nyquist` | any | off | `resonance-population` / as chosen² | refuses |
+| `kinematic-ceiling` | unset, `sinc-oversampled`, `sinc-nyquist` | any | off | `kinematic-ceiling` / as chosen² | none (already `kinematic-ceiling`) |
+
+Every other combination is refused: windows with `resonance-population`,
+`sinc-oversampled` or `resonance-local`; `resonance-local` with `node` or
+`kinematic-ceiling`.
+
+1. The default bandwidth is `resonance-population`, or `kinematic-ceiling` for
+   coherent emission or a positive `max_dE_frac`, where its audit cannot run.
+2. Unset resolution is `sinc-oversampled`. It never depends on the bandwidth.
+3. Fallback has one rule: only a defaulted bandwidth moves. If the measured axis
+   cannot be audited (channeling, transition-radiation and mixed-transport
+   cases), the case uses `kinematic-ceiling`. If the audit refuses after
+   transport, the same trajectories are rescored, with a warning, on the first
+   wider stop within the share (at most `kinematic-ceiling`). An explicit
+   bandwidth, including the one `resonance-local` implies, refuses instead.
+   Resolution, quadrature and budget never change.
+
+A `sinc-oversampled` axis over `max_points` is refined locally instead (#1257):
+its step around every measured line narrower than 8 `max_spacing_eV`,
+`max_spacing_eV` elsewhere, with every spacing join outside each line's halo
+(yield within 2e-4 per line under `node`; exact under `bin-mean`). The grid
+record's `local_axis` gives the route, uniform count and reason. Only a local
+axis that also exceeds `max_points` refuses, naming `--resolution sinc-nyquist`
+(and, on `resonance-population`, `resonance-local`) as opt-outs; nothing
+coarsens automatically. See the
+[join derivation](../validation/beam-transport/line-grid-node-local-refinement.md).
+`sinc-shape` (#1230) is a
+deprecated alias of `sinc-oversampled` with `bin-mean` for one release. The
+editor also refuses a policy without `windows = true` on `coherent`/`both`
+emission. `coverage-0.95` labels stored energy-grid artifacts and is not a
+profile value. Derivations: [shape step](../validation/beam-transport/line-grid-sinc-shape-spacing.md),
+[`W/8` convergence](../validation/beam-transport/line-grid-sinc-convergence.md),
+[measured bandwidth](../validation/beam-transport/line-grid-resonance-bandwidth.md);
+decision record: [ADR 0023](../adr/0023-line-grid-selector-rules.md).
 
 Not profile keys (per-call `Sweep.line_grid_policy` in the API, or
 environment): per-observable `rtol` (`PYRITE_ENERGY_GRID_RTOL`,

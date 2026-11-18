@@ -67,3 +67,11 @@ quadrature then misplaces at most 1e-4 of a line's mass per side
 to 399 k. Where the uniform axis fits, nothing changes. Only a local axis that
 also exceeds the budget refuses. Whether the local axis should become the
 default everywhere is left open, pending the #1257 shape qualification.
+
+## Amendment (2026-11-17, #1265)
+
+The selector rules above are replaced by [ADR-0023](0023-line-grid-selector-rules.md):
+resolution follows quadrature, not bandwidth (bin-mean takes the `W/10.5`
+shape step on every axis); `sinc-shape` is a deprecated alias; and only a
+defaulted bandwidth falls back. The #1257 local refinement above serves
+both quadratures, at each one's `sinc-oversampled` step.

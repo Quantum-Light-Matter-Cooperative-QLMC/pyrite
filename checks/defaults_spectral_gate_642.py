@@ -131,9 +131,10 @@ POLICY_ARMS = {
         "quadrature": "bin-mean",
     },
     "measured": {"bandwidth": "resonance-population"},
-    # Production default for bin-mean on the measured band: sinc-shape (#1214).
+    # Production default for bin-mean: sinc-oversampled at the shape step (#1265).
     "measured-bin": {"bandwidth": "resonance-population", "quadrature": "bin-mean"},
-    # Bin means at the node default's W/8 step, the comparison arm (#1214).
+    # Explicit sinc-oversampled + bin-mean: the same shape step since #1265
+    # (was the node default's W/8 comparison arm, #1214).
     "measured-bin-x8": {
         "bandwidth": "resonance-population",
         "resolution": "sinc-oversampled",

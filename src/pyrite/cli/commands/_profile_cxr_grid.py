@@ -4,10 +4,10 @@ import click
 from tomlkit.exceptions import ParseError
 
 from pyrite._cxr_grid_policy import (
+    DEPRECATED_RESOLUTION_ALIASES,
     LOCAL_RESOLUTION_POLICY,
     PROFILE_CXR_GRID_SELECTORS,
     RESONANCE_BANDWIDTH_POLICY,
-    SHAPE_RESOLUTION_POLICY,
 )
 from pyrite.campaign import profile_cxr_grid as _profile_edit
 from pyrite.campaign._profile_document import existing_profile
@@ -23,10 +23,10 @@ _SCHEMA = "cxr.profile.line-grid.show"
 
 def _hint(policy):
     """Corrective flags for a refused merged POLICY, or an empty string."""
-    if policy.get("resolution") not in (LOCAL_RESOLUTION_POLICY, SHAPE_RESOLUTION_POLICY):
+    if policy.get("resolution") != LOCAL_RESOLUTION_POLICY:
         return ""
     flags = []
-    # An unset bandwidth is already the measured default (#1243).
+    # An unset bandwidth beside resonance-local is implied measured (#1265).
     if policy.get("bandwidth", RESONANCE_BANDWIDTH_POLICY) != RESONANCE_BANDWIDTH_POLICY:
         flags.append(f"--bandwidth {RESONANCE_BANDWIDTH_POLICY}")
     if policy.get("quadrature") != "bin-mean":
@@ -68,21 +68,22 @@ def command():
                   closed-form kinematic bound, or that bound alone (no
                   simulation); with feature windows the default is
                   kinematic-ceiling
-      resolution  sinc-oversampled | sinc-nyquist | resonance-local | sinc-shape
-                  the measured sinc-Nyquist step divided by 8, which converges
-                  line peak height and FWHM; that step itself (8x fewer nodes,
-                  line area only); spacing refined locally around measured
-                  resonances (3 eV backbone); or a uniform bin-mean axis fine
-                  enough for 1% isolated-line peak height/FWHM, falling back to
-                  resonance-local above 1000000 points; with feature windows
-                  the default is sinc-nyquist, and with bin-mean on the
-                  measured bandwidth it is sinc-shape
+      resolution  sinc-oversampled | sinc-nyquist | resonance-local
+                  a uniform step that resolves line peak height and FWHM
+                  (the measured sinc-Nyquist step W divided by 8 for node,
+                  about W/10.5 for bin-mean, on any bandwidth); W itself
+                  (line area only, ~8-10x fewer nodes); or spacing refined
+                  only around measured resonances on a 3 eV backbone (implies
+                  resonance-population, needs bin-mean); with feature windows
+                  the default is sinc-nyquist. sinc-shape is a deprecated
+                  alias of sinc-oversampled with bin-mean
       quadrature  node | bin-mean
                   point samples of the sinc^2 line profile, or bin means that
                   keep integrated line yield exact but smooth peak height/width
 
-    resonance-local and sinc-shape require bandwidth resonance-population (the
-    default) and quadrature bin-mean. Any stored selector, even one equal to its
+    A defaulted bandwidth may widen to kinematic-ceiling where the measured
+    one cannot be audited; an explicit one never moves, and the resolution
+    and quadrature never change. Any stored selector, even one equal to its
     default, makes every case of the profile resolve its line grid automatically from its own
     trajectories, ahead of explicit E_grid_line and stored energy-grid rows;
     automatic resolution does not support coherent emission (#117), and
@@ -90,12 +91,13 @@ def command():
     and dataset identity: editing it gives new checkpoints, and earlier results
     stay under their old identity.
 
-    A sinc-oversampled axis over the point budget refuses; --resolution
-    sinc-nyquist is the explicit opt-out to the coarser axis.
+    A sinc-oversampled axis over the point budget keeps its step only around
+    measured lines (3 eV elsewhere) and refuses only if that is still over;
+    --resolution sinc-nyquist is the explicit opt-out to the coarser axis.
 
-    Tolerances, maximum spacing (3 eV), the point budget (600000) and backend
-    ULPs are not profile keys: set them per call (API) or with
-    PYRITE_ENERGY_GRID_* environment variables.
+    Tolerances, maximum spacing (3 eV), the point budget (600000 node, 1000000
+    bin-mean) and backend ULPs are not profile keys: set them per call (API)
+    or with PYRITE_ENERGY_GRID_* environment variables.
 
     \b
     Examples:
@@ -146,9 +148,11 @@ def cxr_grid_show_command(name, json_output):
 
 def _selector_option(key, help_text):
     choices = PROFILE_CXR_GRID_SELECTORS[key]
+    # Deprecated names stay accepted for one release (#1265).
+    accepted = (*choices, *DEPRECATED_RESOLUTION_ALIASES) if key == "resolution" else choices
     return click.option(
         f"--{key}",
-        type=click.Choice(choices),
+        type=click.Choice(accepted),
         help=f"{help_text} Default {choices[0]}.",
     )
 
@@ -158,8 +162,7 @@ def _selector_option(key, help_text):
 @_selector_option("bandwidth", "Line-axis upper edge policy.")
 @_selector_option(
     "resolution",
-    "Line-axis spacing policy; resonance-local and sinc-shape need resonance-population "
-    "and bin-mean.",
+    "Line-axis spacing policy; resonance-local needs bin-mean; sinc-shape is deprecated.",
 )
 @_selector_option("quadrature", "sinc^2 line-profile evaluation on the axis.")
 @click.option("-y", "--yes", is_flag=True, help="Skip the 'standard' confirmation prompt.")

@@ -1,7 +1,9 @@
-"""Node-quadrature local refinement of an over-budget ``sinc-oversampled`` axis (#1257).
+"""Local refinement of an over-budget ``sinc-oversampled`` axis (#1257).
 
 The ``sinc-oversampled`` default places nodes ``W / K`` apart over the whole
-bandwidth (``W`` the sinc-Nyquist step, ``K =`` :data:`LINE_NYQUIST_OVERSAMPLING`).
+bandwidth (``W`` the sinc-Nyquist step, ``K`` the quadrature's step divisor,
+:func:`~pyrite._cxr_grid_policy.uniform_step_divisor`: 8 under ``node``,
+about 10.5 under ``bin-mean`` since #1265).
 On wide axes whose lines occupy a small part of the band -- the Si 1 MeV
 kinematic fallback spans 50 eV to 966 keV with every scored line between 5.6
 and 6.8 keV -- that uniform axis exceeds the point budget. This module builds
@@ -17,7 +19,9 @@ window therefore extends a halo :func:`node_join_halo_eV` beyond its line, far
 enough that the joins its union leaves cost each line at most
 :data:`DEFAULT_NODE_JOIN_LIMIT` of its mass per side. The bound and its
 derivation are in
-``docs/validation/beam-transport/line-grid-node-local-refinement.md``.
+``docs/validation/beam-transport/line-grid-node-local-refinement.md``. Bin means
+telescope over contiguous edges (#192; to within the ``sinc-bin-far-envelope``
+term), so under ``bin-mean`` the same halos are conservative.
 
 Validation: line-grid-node-local-refinement
 """
@@ -25,7 +29,12 @@ Validation: line-grid-node-local-refinement
 import numpy as np
 
 from ..._backend import REAL
-from ..._cxr_grid_policy import OVERSAMPLED_RESOLUTION_POLICY, CxrGridToleranceError
+from ..._cxr_grid_policy import (
+    OVERSAMPLED_RESOLUTION_POLICY,
+    RESONANCE_BANDWIDTH_POLICY,
+    CxrGridToleranceError,
+    uniform_step_divisor,
+)
 from ..._cxr_windows import FeatureSeed, build_window_plan
 from ..._grid_semantics import resolution_num, validate_backend_coordinates
 
@@ -42,7 +51,7 @@ __all__ = [
     "uniform_over_budget",
 ]
 
-#: Grid-record route of the local axis, beside ``sinc-shape``'s ``shape_axis``.
+#: Grid-record route of the local axis.
 NODE_LOCAL_ROUTE = "node-local"
 NODE_LOCAL_SOURCE = "pxr-node-local"
 #: Largest share of one line's mass the joins on one side of it may misplace
@@ -56,7 +65,9 @@ DEFAULT_NODE_JOIN_LIMIT = 1.0e-4
 NODE_LOCAL_BIN_EV = 100.0
 #: Bumped whenever the same population would give a different local axis; it
 #: keys the speed cache of ``sinc-oversampled`` grids.
-NODE_LOCAL_REVISION = 2
+NODE_LOCAL_REVISION = 3
+#: The extra opt-out an over-budget refusal names on the measured bandwidth (#1265).
+_LOCAL_HINT = "Or, with bin-mean, resonance-local refines only near resonances. "
 
 
 #: Upper bound on ``int_0^inf |g''(u)| du`` for ``g(u) = sin(u)**2 / u**2``
@@ -159,7 +170,7 @@ def node_local_seeds(
     stop_eV: float,
     fine_eV: float,
     backbone_eV: float,
-    oversampling: int,
+    oversampling: float,
     join_limit: float = DEFAULT_NODE_JOIN_LIMIT,
     bin_eV: float = NODE_LOCAL_BIN_EV,
 ):
@@ -180,7 +191,7 @@ def node_local_seeds(
         raise ValueError("node-local spacing needs 0 < fine_eV <= backbone_eV")
     if not 0.0 < float(join_limit) < 1.0:
         raise ValueError("join_limit must lie in (0, 1)")
-    narrow_below = int(oversampling) * backbone
+    narrow_below = float(oversampling) * backbone
     lows, highs, fines, lines = [], [], [], 0
     for populations in direction_populations:
         lo, hi, narrow, count = _line_intervals(
@@ -229,7 +240,7 @@ def node_local_axis(payload, start, stop, target_step, direction_populations, un
     Validation: line-grid-node-local-refinement
     """
     resolution = payload["resolution"]
-    oversampling = int(resolution["oversampling"])
+    oversampling = uniform_step_divisor(payload)
     backbone = float(resolution["max_spacing_eV"])
     nyquist = min(float(target_step), backbone)
     fine = nyquist / oversampling
@@ -245,6 +256,7 @@ def node_local_axis(payload, start, stop, target_step, direction_populations, un
     plan = build_window_plan(start, stop, backbone, seeds)
     rtol = dict(payload["rtol"])
     governing = min(rtol, key=lambda name: rtol[name])
+    measured = payload["bandwidth"]["policy"] == RESONANCE_BANDWIDTH_POLICY
     reason = (
         f"a uniform {fine:.4g} eV axis over [{start:g}, {stop:g}] eV needs {uniform_num} "
         f"coordinates, above the {max_points}-point budget"
@@ -256,10 +268,10 @@ def node_local_axis(payload, start, stop, target_step, direction_populations, un
             f"windows, {summary['window_span_eV']:g} eV at {fine:.4g} eV on a {backbone:.4g} eV "
             f"backbone) needs {plan.num}. Raise the budget with PYRITE_ENERGY_GRID_MAX_POINTS, "
             "narrow the bandwidth, or supply an explicit grid. Or select the "
-            f"{oversampling}x coarser sinc-nyquist resolution, which keeps line area but not "
+            f"{oversampling:.3g}x coarser sinc-nyquist resolution, which keeps line area but not "
             "peak height or FWHM: in Python, Numerics(line_resolution='sinc-nyquist'); in a "
             "profile, `pyrite profile numerics cxr-grid set NAME --resolution sinc-nyquist`. "
-            "The grid is not coarsened automatically."
+            f"{_LOCAL_HINT if measured else ''}The grid is not coarsened automatically."
         )
     grid = plan.coordinates()
     try:
@@ -310,7 +322,7 @@ def uniform_over_budget(payload, start, stop, target_step) -> int | None:
     if resolution["policy"] != OVERSAMPLED_RESOLUTION_POLICY or payload.get("windows") is not None:
         return None
     step = min(float(target_step), float(resolution["max_spacing_eV"]))
-    target = step / int(resolution["oversampling"])
+    target = step / uniform_step_divisor(payload)
     if not np.isfinite(target) or target <= 0.0:
         return None
     num = resolution_num(float(start), float(stop), target)

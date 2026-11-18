@@ -1,10 +1,10 @@
 # `line-grid-sinc-shape-spacing`
 
-Ledger row: [`line-grid-sinc-shape-spacing`](../ledger-core-coherent-physics.md#line-grid-sinc-shape-spacing). Status: anchored (isolated-line claim). Validation: `line-grid-sinc-shape-spacing`. Issue #1230.
+Ledger row: [`line-grid-sinc-shape-spacing`](../ledger-core-coherent-physics.md#line-grid-sinc-shape-spacing). Status: anchored (isolated-line claim). Validation: `line-grid-sinc-shape-spacing`. Issues #1230, #1265.
 
 ## Claim
 
-The opt-in `sinc-shape` resolution places the measured `resonance-population` line axis on uniform bins of width
+Under `bin-mean` quadrature, the `sinc-oversampled` resolution (the default on every bandwidth since #1265; `sinc-shape` is its deprecated alias) places the line axis on uniform bins of width
 
 ```{math}
 :label: eq-line-grid-sinc-shape-step
@@ -12,7 +12,7 @@ The opt-in `sinc-shape` resolution places the measured `resonance-population` li
 h \le \frac{3}{\pi}\sqrt{\varepsilon_\mathrm{shape}}\; W_q ,
 ```
 
-where $W_q$ is the sinc-Nyquist feature width of the case (the positive first-zero offset at the aliased-weight quantile of `sinc_feature_spacing`) and $\varepsilon_\mathrm{shape}$ is the shape tolerance (`DEFAULT_SHAPE_RTOL = 1e-2`, the #1143 shape margin). The maximum-spacing cap and coordinate-count rounding can refine the step further. With `bin-mean` quadrature, an isolated line of first-zero width $W \ge W_q$ then has highest-bin peak height within $\varepsilon_\mathrm{shape}$ of the exact line. Interpolated FWHM meets that tolerance in the isolated-line scans below; this is numerical evidence, not a general FWHM theorem. Bin means times bin widths telescope to exact mass over identical represented outer edges ([`sinc-bin-integration`](../radiation-physics/sinc-bin-integration.md)); finite-band truncation and reducer error remain separate. If the uniform axis would need more than `DEFAULT_SHAPE_MAX_POINTS` (1,000,000) coordinates, the policy falls back to `resonance-local` on the same measured band. The run record (`shape_axis`) states the route, the required count and the reason.
+where $W_q$ is the sinc-Nyquist feature width of the case (the positive first-zero offset at the aliased-weight quantile of `sinc_feature_spacing`, capped at `max_spacing_eV`) and $\varepsilon_\mathrm{shape}$ is the shape tolerance (`DEFAULT_SHAPE_RTOL = 1e-2`, the #1143 shape margin). The maximum-spacing cap and coordinate-count rounding can refine the step further. With `bin-mean` quadrature, an isolated line of first-zero width $W \ge W_q$ then has highest-bin peak height within $\varepsilon_\mathrm{shape}$ of the exact line. Interpolated FWHM meets that tolerance in the isolated-line scans below; this is numerical evidence, not a general FWHM theorem. Bin means times bin widths telescope to exact mass over identical represented outer edges ([`sinc-bin-integration`](../radiation-physics/sinc-bin-integration.md)); finite-band truncation and reducer error remain separate. If the uniform axis would need more than its point budget (`DEFAULT_BIN_MEAN_MAX_POINTS`, 1,000,000), resolution refuses and names `sinc-nyquist`; it never reroutes.
 
 ## Derivation
 
@@ -61,14 +61,16 @@ using $1-\cos z\le z^2/2$. Averaging this inequality over the nearest bin gives 
 
 **Limiting cases.** As $\varepsilon_\mathrm{shape}\to0$, $h\to0$: pointwise sampling of the lineshape. At $h=W$ the bound exceeds 100% and the axis no longer resolves the peak; there `sinc-nyquist` keeps only yield exact.
 
-## Budget and fallback
+## Budget
 
-On the Fourier reduction ([`cxr-line-fourier-reduction`](../ledger-core-coherent-physics.md#cxr-line-fourier-reduction)), cost is nearly flat in bin count. #944 measured 43k→865k bins within +60% on CUDA and ROCm. `DEFAULT_SHAPE_MAX_POINTS` is that largest measured axis, rounded. Above it (MeV-wide measured bands) the policy keeps `resonance-local` instead of over-allocating. That route's own budget and refusals still apply.
+On the Fourier reduction ([`cxr-line-fourier-reduction`](../ledger-core-coherent-physics.md#cxr-line-fourier-reduction)), cost is nearly flat in bin count. #944 measured 43k→865k bins within +60% on CUDA and ROCm. `DEFAULT_BIN_MEAN_MAX_POINTS` is that largest measured axis, rounded, and is the default budget of every `bin-mean` axis. Above it the axis refuses; `resonance-local` is an explicit choice for MeV-wide measured bands. Before #1265 the `sinc-shape` selector rerouted to `resonance-local` there and recorded `shape_axis`.
 
 ## Anchors
 
 - `tests/energy-grid/test_line_grid_shape_spacing.py::test_shape_step_bounds_single_line_height_and_fwhm`: the single-line bound at $\varepsilon=10^{-2}$ and $10^{-3}$ (tight to 2% at the worst offset).
-- `test_measured_shape_grid_is_uniform_at_the_shape_step` and `test_measured_shape_grid_falls_back_to_resonance_local_above_budget`: the runner's route.
+- `test_bin_mean_oversampled_payload_carries_the_shape_tolerance_on_any_bandwidth`, `test_bin_mean_oversampled_axis_takes_the_shape_step_and_refuses_over_budget`: the payload and step on measured and kinematic axes.
+- `test_measured_bin_mean_grid_is_uniform_at_the_shape_step` and `test_measured_bin_mean_grid_refuses_above_budget_instead_of_rerouting`: the runner's route.
+- `tests/energy-grid/test_line_grid_selector_table.py::test_deprecated_sinc_shape_is_the_bin_mean_oversampled_step`: the alias.
 
 Independent read-only verification (2026-11-16, implementation `c9da59b95`) rederived the isolated-line height factor, confirmed units, the first-zero convention, the proxy quantile, and the same-band budgeted fallback. Seven owning tests passed. Its discrepancy was the default FWHM table entry and overbroad overlap/FWHM wording; the corrections above address those findings. Production qualification on fixed tracks (#1230 Plan) and human sign-off remain outstanding.
 

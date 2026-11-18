@@ -22,7 +22,6 @@ from ..._cxr_grid_policy import (
     LOCAL_RESOLUTION_POLICY,
     OVERSAMPLED_RESOLUTION_POLICY,
     RESONANCE_BANDWIDTH_POLICY,
-    SHAPE_RESOLUTION_POLICY,
     CxrGridToleranceError,
     CxrGridTruncationWarning,
     CxrYieldStatisticsWarning,
@@ -32,7 +31,6 @@ from ..._cxr_grid_policy import (
     kinematic_fallback_payload,
     lineshape_precision_warning,
     resolved_coordinates,
-    shape_spacing_factor,
     store_coordinates,
     windowed_coordinates,
 )
@@ -466,43 +464,6 @@ class SegmentGridEvidence:
         )
 
 
-def _shape_axis(payload, start, stop, feature_width):
-    """Route of a ``sinc-shape`` axis over ``[start, stop]`` (#1230).
-
-    Uniform at ``shape_spacing_factor(shape_rtol)`` times the sinc-Nyquist
-    feature width when that fits ``shape_max_points``; otherwise the
-    ``resonance-local`` fallback, with the reason. A uniform route returns the
-    payload whose budget ``resolved_coordinates`` enforces under ``"payload"``.
-
-    Validation: line-grid-sinc-shape-spacing
-    """
-    resolution = payload["resolution"]
-    budget = int(resolution["shape_max_points"])
-    spacing = min(
-        shape_spacing_factor(float(resolution["shape_rtol"])) * float(feature_width),
-        float(resolution["max_spacing_eV"]),
-    )
-    num = resolution_num(start, stop, spacing)
-    shape = {
-        "feature_width_eV": float(feature_width),
-        "shape_rtol": float(resolution["shape_rtol"]),
-        "spacing_eV": float(spacing),
-        "required_points": int(num),
-        "max_points": budget,
-    }
-    if num <= budget:
-        uniform = {**payload, "resolution": {**resolution, "max_points": budget}}
-        return {**shape, "route": "uniform", "payload": uniform}
-    return {
-        **shape,
-        "route": LOCAL_RESOLUTION_POLICY,
-        "reason": (
-            f"a uniform {spacing:.4g} eV axis over [{start:g}, {stop:g}] eV needs {num} "
-            f"coordinates, above the {budget}-point sinc-shape budget"
-        ),
-    }
-
-
 def _local_spacing_grid(payload, direction_populations, start, stop, target_step, profile):
     """``resonance-local`` axis over ``[start, stop]`` from every direction's population.
 
@@ -582,13 +543,11 @@ def _measured_cxr_grid(
     edge; the grid ends at the largest edge and, under ``resonance-local``,
     refines the union of every direction's local-spacing seeds, so one
     direction reproduces the single-direction axis exactly.
-    Under ``sinc-shape`` it is uniform at the shape step when that fits the
-    budget, and otherwise the ``resonance-local`` axis (:func:`_shape_axis`).
-    An over-budget ``sinc-oversampled`` axis takes the node-local refinement
-    of the same population (#1257). Returns ``(grid, record, bandwidth_record)``.
+    An over-budget ``sinc-oversampled`` axis, under either quadrature, takes
+    the node-local refinement of the same population (#1257, #1265).
+    Returns ``(grid, record, bandwidth_record)``.
 
     Validation: line-grid-resonance-local-spacing
-    Validation: line-grid-sinc-shape-spacing
     Validation: line-grid-node-local-refinement
     """
     if evidence is None:
@@ -630,21 +589,15 @@ def _measured_cxr_grid(
     stop, bandwidth_record = _cover_bragg_support(
         case, n_hats, start, ceiling, stop, bandwidth_record
     )
-    shape = None
-    uniform = None if resolution["policy"] == LOCAL_RESOLUTION_POLICY else (payload, target_step)
-    if resolution["policy"] == SHAPE_RESOLUTION_POLICY:
-        shape = _shape_axis(payload, start, stop, target_step)
-        uniform = None
-        if shape["route"] == "uniform":
-            uniform = (shape.pop("payload"), shape["spacing_eV"])
-    over_budget = uniform_over_budget(payload, start, stop, target_step) if uniform else None
+    local = resolution["policy"] == LOCAL_RESOLUTION_POLICY
+    over_budget = None if local else uniform_over_budget(payload, start, stop, target_step)
     if over_budget is not None:
         grid, record = node_local_axis(
             payload, start, stop, target_step, direction_populations, over_budget
         )
-    elif uniform is not None:
+    elif not local:
         stage_started = perf_counter() if profile_enabled else 0.0
-        grid, record = resolved_coordinates(*uniform, dtype=REAL, stop_eV=stop)
+        grid, record = resolved_coordinates(payload, target_step, dtype=REAL, stop_eV=stop)
         if profile_enabled:
             _profile_stage(
                 profile,
@@ -656,8 +609,6 @@ def _measured_cxr_grid(
             payload, direction_populations, start, stop, target_step, profile
         )
     del direction_populations
-    if shape is not None:
-        record["shape_axis"] = shape
     if profile_enabled:
         record["cxr_grid_profile"] = profile
     return grid, record, bandwidth_record
