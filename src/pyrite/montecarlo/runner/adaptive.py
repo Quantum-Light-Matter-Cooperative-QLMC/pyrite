@@ -567,7 +567,14 @@ def case_measure(case, settings: AdaptiveSettings) -> Measure:
         n = stop - start
         values = {}
         if "cxr" in settings.observables:
-            audit: dict[str, Any] = {"start_eV": start_eV, "stop_eV": stop_eV, "n_electrons": n}
+            # Only ``electron_mass`` is read: skip the grid reduction, which was
+            # ~85% of the measure on the GPU (#1286); the line masses are unchanged.
+            audit: dict[str, Any] = {
+                "start_eV": start_eV,
+                "stop_eV": stop_eV,
+                "n_electrons": n,
+                "mass_only": True,
+            }
             with np.errstate(over="ignore", divide="ignore"):
                 emission.cxr.evaluate(
                     EmissionBatch(

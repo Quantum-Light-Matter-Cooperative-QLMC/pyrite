@@ -978,3 +978,45 @@ def test_adaptive_host_admission_feasible_transport_is_identical(monkeypatch):
     assert any("join" in phase for _, phase in admitted)
     _assert_identical(candidate["segs"], reference["segs"])
     assert candidate["adaptive_sampling"] == reference["adaptive_sampling"]
+
+
+def test_measure_skips_the_grid_reduction_with_identical_line_masses(monkeypatch):
+    """#1286: the measure reads only ``electron_mass``; skipping the reduction leaves it unchanged.
+
+    Bitwise on NumPy; CuPy's ``bincount`` adds with atomics in unspecified order.
+    """
+    from pyrite._backend import BACKEND, _to_cpu
+    from pyrite.montecarlo.spectrum.cxr import _batched, _per_hkl
+
+    sweep = Sweep(
+        material="hopg",
+        thickness_ang=1e4,
+        beam=BeamSpec(energy_keV=30.0),
+        tilt_deg=30.0,
+        n_electrons=8,
+        n_electrons_brem=8,
+    )
+    case = {**dict(build_cases(sweep)[0]), "seed": 3, "Ne": 40, "Ne_brem": 40}
+    tp = runner._transport_case(case, transport_core="per-electron")
+    settings = AdaptiveSettings(
+        target_rse=1.0, min_histories=40, max_histories=40, block_histories=40
+    )
+    seen = []
+    for module in (_batched, _per_hkl):
+        real = module._audit_skips_reduction
+        monkeypatch.setattr(
+            module, "_audit_skips_reduction", lambda a, real=real: seen.append(a) or real(a)
+        )
+    skipped = case_measure(case, settings)(0, 40, tp["segs"])["cxr"]
+    assert seen and all(a["mass_only"] for a in seen)
+    for module in (_batched, _per_hkl):
+        monkeypatch.setattr(
+            module, "_audit_skips_reduction", lambda a: a is not None and "collect" in a
+        )
+    reduced = case_measure(case, settings)(0, 40, tp["segs"])["cxr"]
+    skipped, reduced = _to_cpu(skipped), _to_cpu(reduced)
+    assert skipped.sum() > 0.0
+    if BACKEND.name == "cpu":
+        np.testing.assert_array_equal(skipped, reduced)
+    else:
+        np.testing.assert_allclose(skipped, reduced, rtol=1e-12, atol=0.0)
