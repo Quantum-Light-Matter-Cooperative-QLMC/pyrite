@@ -12,8 +12,10 @@ directory, so remote jobs set ``XDG_CONFIG_HOME`` to a shipped copy) as
 ``run_cases`` (production serial path). Transport runs once. At the spectrum
 phase every comma-separated budget in ``BUDGETS`` (``0`` = the whole
 population) runs the measured selection on that electron prefix. Only the
-first arm also runs the production pass on every history; later arms stop
-after selecting, since their production pass would repeat the first.
+first arm also runs the production pass on every history (unless
+``PROBE_PRODUCTION=0``); later arms stop after selecting, since their
+production pass would repeat the first. The record is rewritten after every
+arm, so a timed-out or cancelled case keeps its finished arms.
 
 Recorded per arm: synchronized reference-selection and production-pass wall
 time, per-radiator cutoff, reflection count, tail, convergence and shell
@@ -37,6 +39,7 @@ from pathlib import Path
 import numpy as np
 
 PROFILE = os.environ.get("PROFILE", "cleo_sub_1281")
+PRODUCTION = os.environ.get("PROBE_PRODUCTION", "1") != "0"
 os.environ["PROFILE"] = PROFILE
 HELPER = runpy.run_path(str(Path(__file__).with_name("adaptive_block_size_1252.py")))
 
@@ -68,7 +71,7 @@ def fixed_case(material, e0_kev, tilt_deg, histories, seed):
     return case, changes, int(histories)
 
 
-def instrument(budgets, arms):
+def instrument(budgets, arms, flush=lambda: None):
     """Run every budget at the spectrum phase's selection call."""
     from pyrite.montecarlo.runner import reflection_cutoff as rc
 
@@ -90,7 +93,7 @@ def instrument(budgets, arms):
             return out
 
         def timed_production(case, evaluate, grid):
-            if not first:
+            if not (first and PRODUCTION):
                 return np.zeros(np.shape(grid))
             _sync()
             t0 = time.perf_counter()
@@ -113,9 +116,12 @@ def instrument(budgets, arms):
                 **timing,
                 record=record,
                 digests=[_digest(o.hkl_list) for o in outcomes],
-                spec_sum=float(np.sum(np.asarray(spec, dtype=float))) if first else None,
+                spec_sum=(
+                    float(np.sum(np.asarray(spec, dtype=float))) if first and PRODUCTION else None
+                ),
             )
         )
+        flush()
         return spec, record
 
     def wrapped(emission, batch, Ne_brem, histories=None):
@@ -146,15 +152,8 @@ def run(material, e0_kev, tilt_deg, histories, seed, budgets, out_json):
     precision_override(int(histories))
     spec, changes, n = fixed_case(material, float(e0_kev), float(tilt_deg), histories, seed)
     arms: list[dict] = []
-    instrument(budget_list, arms)
-    case = dataclasses.replace(spec, **changes) if changes else spec
     timings: list = []
-    error = None
     t0 = time.perf_counter()
-    try:
-        out = run_cases([case], max_workers=0, progress=False, on_timing=timings.append)[0]
-    except Exception as exc:  # record failure as evidence
-        out, error = None, f"{type(exc).__name__}: {exc}"
     record = dict(
         issue=1281,
         code_sha=os.environ.get("PROBE_SHA"),
@@ -165,14 +164,30 @@ def run(material, e0_kev, tilt_deg, histories, seed, budgets, out_json):
         histories=n,
         seed_offset=int(seed),
         budgets=budget_list,
-        error=error,
-        wall_s=time.perf_counter() - t0,
-        realized_electrons=((out or {}).get("adaptive_sampling") or {}).get("realized_electrons"),
-        n_segments=None if out is None else out.get("n_segments"),
+        production=PRODUCTION,
+        complete=False,
+        error=None,
         timings=timings,
         arms=arms,
     )
-    Path(out_json).write_text(json.dumps(record, indent=1, default=_json_default))
+
+    def flush():
+        record["wall_s"] = time.perf_counter() - t0
+        Path(out_json).write_text(json.dumps(record, indent=1, default=_json_default))
+
+    instrument(budget_list, arms, flush)
+    case = dataclasses.replace(spec, **changes) if changes else spec
+    out = None
+    try:
+        out = run_cases([case], max_workers=0, progress=False, on_timing=timings.append)[0]
+    except Exception as exc:  # record failure as evidence
+        record["error"] = f"{type(exc).__name__}: {exc}"
+    record.update(
+        complete=record["error"] is None,
+        realized_electrons=((out or {}).get("adaptive_sampling") or {}).get("realized_electrons"),
+        n_segments=None if out is None else out.get("n_segments"),
+    )
+    flush()
     print(json.dumps(summary(record), default=_json_default))
 
 
@@ -210,7 +225,7 @@ def summary(record):
     return dict(
         case=f"{record['material']} {record['E0_keV']:g} keV {record['tilt_deg']:g} deg "
         f"N={record['histories']} seed+{record['seed_offset']}",
-        error=record["error"],
+        error=record["error"] or (None if record.get("complete", True) else "incomplete"),
         arms=rows,
     )
 
