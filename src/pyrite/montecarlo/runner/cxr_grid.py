@@ -47,7 +47,12 @@ from ..spectrum.cxr_seeds import (
 )
 from ..spectrum.diagnostics import coherent_fringe_spacing, sinc_feature_spacing
 from .bandwidth_fallback import extension_stop, extension_stop_ladder
-from .node_local_grid import NODE_LOCAL_REVISION, node_local_axis, uniform_over_budget
+from .node_local_grid import (
+    NODE_LOCAL_REVISION,
+    graded_coordinates,
+    node_local_axis,
+    uniform_over_budget,
+)
 
 
 def _resident_mib():
@@ -166,12 +171,18 @@ COHERENT_WINDOW_REVISION = 11
 
 
 def _cached_grid(cached):
-    """Coordinates of a cache record, or ``None`` when its plan is stale."""
+    """Coordinates of a cache record, or ``None`` when its plan is stale.
+
+    A node-local record rebuilds its graded backbone from ``local_axis.grading``.
+
+    Validation: line-grid-node-local-refinement
+    """
     plan_payload = cached.get("window_plan")
     if plan_payload is None:
         return np.linspace(cached["start_eV"], cached["stop_eV"], int(cached["num"]))
     try:
-        return window_plan_from_payload(plan_payload).coordinates()
+        plan = window_plan_from_payload(plan_payload)
+        return graded_coordinates(plan, cached.get("local_axis", {}).get("grading"))
     except (KeyError, TypeError, ValueError):
         return None
 
@@ -593,7 +604,13 @@ def _measured_cxr_grid(
     over_budget = None if local else uniform_over_budget(payload, start, stop, target_step)
     if over_budget is not None:
         grid, record = node_local_axis(
-            payload, start, stop, target_step, direction_populations, over_budget
+            payload,
+            start,
+            stop,
+            target_step,
+            direction_populations,
+            over_budget,
+            protected_eV=_bragg_windows(case, n_hats, start, ceiling),
         )
     elif not local:
         stage_started = perf_counter() if profile_enabled else 0.0
@@ -630,7 +647,27 @@ def _kinematic_cxr_grid(payload, case, n_hats, target_step, evidence):
         return resolved_coordinates(payload, target_step, dtype=REAL)
     lines = case.get("transport_mode") != "mixed"
     populations = [evidence.populations(n, start, stop, None) if lines else [] for n in n_hats]
-    return node_local_axis(payload, start, stop, target_step, populations, over_budget)
+    # Channeling, TR and mixed spectra lie outside the join bound: no grading.
+    graded = not _unmeasured_line_axis(case)
+    return node_local_axis(
+        payload,
+        start,
+        stop,
+        target_step,
+        populations,
+        over_budget,
+        graded=graded,
+        protected_eV=_bragg_windows(case, n_hats, start, stop) if graded else (),
+    )
+
+
+def _bragg_windows(case, n_hats, start, ceiling):
+    """DBR/Kossel deposition spans a graded backbone must leave ungraded (#1271)."""
+    from .diffracted_brem import bragg_support_windows_eV
+
+    if any(n_hat is None for n_hat in n_hats):
+        return []
+    return bragg_support_windows_eV(case, n_hats, start, ceiling)
 
 
 def _refuse_coherent_resolution(case, segments, n_hat, Ne, payload):
@@ -716,6 +753,8 @@ def _policy_cache_key(payload, case, n_hats, *, observation):
         inputs["measured_coverage_revision"] = MEASURED_COVERAGE_REVISION
     if local:
         inputs["node_local_revision"] = NODE_LOCAL_REVISION
+        # Channeling/TR/mixed axes never grade their backbone (#1271).
+        inputs["node_local_graded"] = not _unmeasured_line_axis(case)
     if observation:
         inputs["observation_directions"] = np.asarray(n_hats, dtype=float).tolist()
     if bool(case.get("coherent_emission", False)):

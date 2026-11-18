@@ -68,6 +68,20 @@ to 399 k. Where the uniform axis fits, nothing changes. Only a local axis that
 also exceeds the budget refuses. Whether the local axis should become the
 default everywhere is left open, pending the #1257 shape qualification.
 
+## Amendment (2026-11-18, #1271)
+
+Outside every line's halo, the node-local backbone may now be graded. Steps
+grow by 10 % of the distance from the nearest protected edge, up to 10 eV,
+which is above `max_spacing_eV`. Fine windows, each line's grading-free zone and
+DBR/Kossel deposition spans stay at their own spacing. The join bound keeps
+the same 1e-4 per side: narrow lines widen their tail halo by 5 %, and lines
+bounded by the Peano bound split the limit between the join and a 3 eV
+grading-free zone. The resolver keeps the graded axis only where it has fewer
+nodes than the ungraded one. Channeling, transition-radiation and
+mixed-transport cases never grade. On the #1257 Si 10 µm 1 MeV kinematic
+transports, all three seeds now fit the budget (381–506 k nodes; two of them
+were refused at 627–660 k).
+
 ## Amendment (2026-11-17, #1265)
 
 The selector rules above are replaced by [ADR-0023](0023-line-grid-selector-rules.md):

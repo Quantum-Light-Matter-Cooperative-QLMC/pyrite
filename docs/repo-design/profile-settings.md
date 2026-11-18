@@ -218,7 +218,12 @@ A `sinc-oversampled` axis over `max_points` is refined locally instead (#1257):
 its step around every measured line narrower than 8 `max_spacing_eV`,
 `max_spacing_eV` elsewhere, with every spacing join outside each line's halo
 (yield within 2e-4 per line under `node`; exact under `bin-mean`). The grid
-record's `local_axis` gives the route, uniform count and reason. Only a local
+record's `local_axis` gives the route, uniform count and reason. Beyond every
+line's halo the backbone may be graded up to 10 eV, which is above
+`max_spacing_eV` (#1271): steps grow by 10 % of the distance from the nearest
+protected edge. This applies only where it saves nodes, and never on channeling,
+transition-radiation or mixed-transport cases. `local_axis.grading` records it.
+Only a local
 axis that also exceeds `max_points` refuses, naming `--resolution sinc-nyquist`
 (and, on `resonance-population`, `resonance-local`) as opt-outs; nothing
 coarsens automatically. See the
