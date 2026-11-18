@@ -228,3 +228,30 @@ def test_measured_axis_over_budget_takes_the_node_local_route(monkeypatch):
     assert grid[-1] == bandwidth["stop_eV"] and grid.size <= 80_000 < local["uniform_points"]
     assert record["backbone_spacing_eV"] == 3.0 and record["nyquist_spacing_eV"] == 0.5
     assert np.diff(grid).min() == pytest.approx(0.5 / LINE_NYQUIST_OVERSAMPLING)
+
+
+def test_bin_mean_axis_over_budget_takes_the_node_local_route_at_the_shape_step():
+    """Bin-mean ``sinc-oversampled`` refines locally at its own step (#1265 on #1257).
+
+    Validation: line-grid-node-local-refinement
+    """
+    from pyrite._cxr_grid_policy import DEFAULT_SHAPE_RTOL, shape_spacing_factor
+
+    payload = resolve_cxr_grid_policy(
+        start_eV=50.0,
+        stop_eV=966_200.0,
+        per_call={
+            "bandwidth": KINEMATIC_BANDWIDTH_POLICY,
+            "quadrature": "bin-mean",
+            "max_points": 600_000,
+        },
+    ).payload()
+    assert "oversampling" not in payload["resolution"]
+    grid, record = cxr_grid._kinematic_cxr_grid(payload, _CASE, (None,), 11.6, _Evidence(_LINES))
+    local = record["local_axis"]
+    fine = shape_spacing_factor(DEFAULT_SHAPE_RTOL) * min(11.6, _BACKBONE)
+    assert local["route"] == NODE_LOCAL_ROUTE and grid.size <= 600_000
+    assert local["narrow_below_eV"] == pytest.approx(_BACKBONE / shape_spacing_factor(0.01))
+    inside = (grid[:-1] >= 5600.0 - 100.0) & (grid[1:] <= 6800.0 + 100.0)
+    assert np.diff(grid)[inside].max() <= fine * (1 + 1e-12)
+    assert record["target_spacing_eV"] == pytest.approx(fine)

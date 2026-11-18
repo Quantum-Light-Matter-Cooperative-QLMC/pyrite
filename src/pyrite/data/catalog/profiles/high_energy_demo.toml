@@ -1,7 +1,7 @@
 # Demo: 1 MeV beam with the measured line-grid policy (resonance-population
 # bandwidth, uniform sinc-oversampled spacing at the bin-mean shape step,
-# bin-mean quadrature). An axis above the coordinate budget refuses and names
-# sinc-nyquist or resonance-local as the opt-outs. The line grid is
+# bin-mean quadrature). An axis above the coordinate budget is refined only
+# around measured lines (#1257), recorded in the grid record. The line grid is
 # resolved automatically, independently of electron sampling, which uses the
 # default adaptive policy (pyrite profile numerics adaptive-sampling show high_energy_demo).
 #   pyrite run high_energy_demo

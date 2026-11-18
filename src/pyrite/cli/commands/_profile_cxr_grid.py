@@ -91,13 +91,13 @@ def command():
     and dataset identity: editing it gives new checkpoints, and earlier results
     stay under their old identity.
 
-    A uniform axis over the point budget refuses; --resolution sinc-nyquist is
-    the explicit opt-out to the coarser axis.
+    A sinc-oversampled axis over the point budget keeps its step only around
+    measured lines (3 eV elsewhere) and refuses only if that is still over;
+    --resolution sinc-nyquist is the explicit opt-out to the coarser axis.
 
     Tolerances, maximum spacing (3 eV), the point budget (600000 node, 1000000
-    bin-mean) and backend
-    ULPs are not profile keys: set them per call (API) or with
-    PYRITE_ENERGY_GRID_* environment variables.
+    bin-mean) and backend ULPs are not profile keys: set them per call (API)
+    or with PYRITE_ENERGY_GRID_* environment variables.
 
     \b
     Examples:
