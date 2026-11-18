@@ -255,10 +255,11 @@ def _transport_case(
     freeze brem at a prefix (:mod:`.independent`); the case then continues as
     the fixed-count case at the realized pair, including cutoffs and grids.
 
-    block_consumer: internal (#611), with ``block_electrons`` and no monitor.
-    Each globalized block goes to ``block_consumer(block)`` and is released;
-    ``segs`` then holds only the additive transport counts. Used by
-    :func:`.streamed_scoring.run_case_streamed`.
+    block_consumer: internal (#611), with ``block_electrons``. Each globalized
+    block goes to ``block_consumer(block)`` and is released; ``segs`` then
+    holds only the additive transport counts. Used by
+    :func:`.streamed_scoring.run_case_streamed`. With a monitor (or an
+    adaptive case, which owns its blocks) the run is measure-only (#1280).
 
     engine_options: internal (#1162). Read-only engine keywords that consume no
     random draws (``collect_diagnostics``), forwarded to every transport call.
@@ -291,6 +292,7 @@ def _transport_case(
                 trajectory_capture=trajectory_capture,
                 block_electrons=block_electrons,
                 block_monitor=block_monitor,
+                block_consumer=block_consumer,
             )
     timed = _pkg._TIMING or record_timing
     t0 = perf_counter() if timed else 0.0

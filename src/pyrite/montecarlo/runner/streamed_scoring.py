@@ -41,17 +41,34 @@ STREAM_REFUSED_KEYS = (
 )
 
 #: Further case keys live streaming refuses (#611): the diagnostic line-grid
-#: derivation, adaptive electron counts, the channeling zone join, GDF beams,
-#: and transition radiation (electron-block transport refuses it; artifact
-#: replay still streams it). Cascades stream since #923; non-windowed
-#: ``line_grid_policy`` grids since #1001.
+#: derivation, the channeling zone join, GDF beams, and transition radiation
+#: (electron-block transport refuses it; artifact replay still streams it).
+#: Cascades stream since #923; non-windowed ``line_grid_policy`` grids since
+#: #1001; adaptive electron counts since #1280 (:func:`adaptive_refusal`).
 LIVE_STREAM_REFUSED_KEYS = (
     "transition_radiation",
     "_diagnostic_line_grid",
-    "adaptive_precision",
     "channeling",
     "gdf_source",
 )
+
+
+def adaptive_refusal(case: Mapping[str, Any]) -> str | None:
+    """Why an adaptive ``case`` keeps the retained route, or ``None`` (#1280).
+
+    Streamed adaptive scoring is the fixed case at the realized pair. Two
+    retained-route outputs read every realized segment: automatic reflection
+    selection (streamed fixed runs score the build-time family set instead;
+    prefix selection waits on #1281) and per-bin batch means.
+    """
+    precision = case.get("adaptive_precision")
+    if precision is None:
+        return None
+    if case.get("reflection_selection"):
+        return "reflection_selection under adaptive precision needs every segment at once"
+    if precision.get("batch_means_band_eV") is not None:
+        return "adaptive batch means need every segment at once"
+    return None
 
 
 def _streaming_case(case: Mapping[str, Any]) -> Mapping[str, Any]:
@@ -75,6 +92,8 @@ def streaming_refusal(case: Mapping[str, Any], *, live: bool = False) -> str | N
         for key in LIVE_STREAM_REFUSED_KEYS:
             if case.get(key) is not None:
                 return f"{key} is not supported by live streamed scoring"
+        if (reason := adaptive_refusal(case)) is not None:
+            return reason
         from .streamed_line_grid import policy_streaming_refusal
 
         return policy_streaming_refusal(case)
@@ -301,16 +320,26 @@ def run_case_streamed(
     floating-point summation order; transport counts are exact. Cases outside
     :func:`streaming_refusal` (``live=True``) raise ``ValueError`` before any
     transport.
+
+    An adaptive case (#1280) first runs a measure-only monitored transport
+    that keeps no chunk, then the fixed case at the realized ``(Ne, Ne_brem)``
+    as above. Counter-addressed streams make that the population the retained
+    adaptive route scores; ``adaptive_sampling`` is the monitor's record.
+
+    Validation: adaptive-sample-size-stopping
     """
     from ..spectrum.cxr._coverage import collect_line_data_coverage
     from . import _transport_case
     from .artifacts import _case_geometry
     from .oom import _ensure_pool_limit
 
-    case = _streaming_case(case)
     reason = streaming_refusal(case, live=True)
     if reason is not None:
         raise ValueError(f"cannot stream this case's spectra: {reason}")
+    case = _streaming_case(case)
+    sampling = None
+    if case.get("adaptive_precision") is not None:
+        case, sampling, transport_core = _measure_adaptive_case(case, transport_core)
     E_grid, E_brem, _, n_hat, groove = _case_geometry(case)
     grid_record = grid_pass = None
     # Same allocator cap as the joined spectrum phase.
@@ -355,4 +384,29 @@ def run_case_streamed(
     from .recovery import RECOVERY_KEYS
 
     out.update({key: tp[key] for key in RECOVERY_KEYS if key in tp})
+    if sampling is not None:
+        out["adaptive_sampling"] = sampling
     return out
+
+
+def _measure_adaptive_case(case, transport_core):
+    """The realized fixed case, sampling record and core of an adaptive ``case`` (#1280).
+
+    Runs the monitored adaptive transport measure-only: the monitor reads each
+    chunk and no chunk is kept, so memory follows the chunk size.
+
+    Validation: adaptive-sample-size-stopping
+    """
+    from . import _transport_case
+    from .block_transport import _discard
+
+    tp = _transport_case(
+        case,
+        transport_core=transport_core,
+        keep_segments_on_device=True,
+        block_consumer=_discard,
+    )
+    sampling = dict(tp["adaptive_sampling"])
+    fixed = {key: value for key, value in case.items() if key != "adaptive_precision"}
+    fixed.update(Ne=int(tp["Ne_lines"]), Ne_brem=int(tp["Ne_brem"]))
+    return fixed, sampling, sampling["transport_core"]
