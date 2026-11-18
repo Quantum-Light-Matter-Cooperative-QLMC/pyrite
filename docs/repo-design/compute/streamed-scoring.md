@@ -72,7 +72,7 @@ supported non-windowed `line_grid_policy` (see [Resolved line grids](#resolved-l
 | `coherent_emission`, `temporal_profile`, `photon_transport`, bunch `transition_radiation` | Need every segment or history at once (shared with artifact streaming). |
 | windowed `line_grid_policy`, `_diagnostic_line_grid` | Window seed providers and the diagnostic derivation read the whole transported population. |
 | `sinc-oversampled` `line_grid_policy` | Over-budget node-local refinement needs whole-population line evidence; use joined scoring or select `sinc-nyquist`. Refused even when the uniform grid might fit or a grid cache exists, because eligibility is checked before transport-dependent spacing is known. |
-| `adaptive_precision` | The electron count, and hence the normalization, is decided during the run. |
+| `adaptive_precision` with `reflection_selection` or `batch_means_band_eV` | Automatic reflection selection and per-bin batch means read every realized segment (`adaptive_refusal`; prefix selection waits on #1281). Plain adaptive cases stream; see [Adaptive cases](#adaptive-cases). |
 | `transition_radiation` | Electron-block transport refuses it; artifact replay still streams per-history TR. |
 | `channeling`, `gdf_source` | Refused by electron-block transport. |
 
@@ -162,6 +162,33 @@ Before population-wide grid resolution and reflection selection, the activity
 changes to `spectrum`. The progress JSON and `pyrite remote job status` show
 that phase and clear the transport history counter; spectrum work can continue
 without appearing to be stalled transport.
+
+### Adaptive cases
+
+Adaptive cases stream since #1280, with memory bounded by the chunk size
+instead of `max_histories`. `run_case_streamed` first runs the monitored
+adaptive transport measure-only (`block_consumer=_discard`, the #1240
+cascade pattern). The stopping monitor reads each chunk, the driver's
+stop-inside-a-chunk and brem-freeze replays (`[start, cut)`) and the
+energy-range replay run as on the retained route, and no chunk is kept. The
+realized `(Ne, Ne_brem)` then runs as the fixed case through the streamed
+route above, including the #1001 grid pass. Counter-addressed streams make
+that the population the retained route scores, so the result equals retained
+adaptive within streamed-vs-joined summation order and `adaptive_sampling` is
+the same record (`tests/montecarlo/transport/test_streamed_adaptive.py`,
+`test_adaptive_cascades.py`). The cost is one extra transport. On the #1280
+mos2 30 keV probe, transport was 16.5 s of a 256 s monitored pass.
+
+Scans (`run_case`, `run_cases`, `pyrite run`) select this route
+automatically. A retained adaptive transport projects its kept bytes at
+`max_histories` after every chunk (#1279, device rows included). When three
+copies exceed host headroom it raises `StreamedAdaptiveRoute` instead of
+refusing, and `_spectrum_with_recovery` reruns the case streamed in blocks of
+about 2 GiB of rows, with a `RuntimeWarning`. Cases `streaming_refusal`
+refuses keep the retained route and its admission refusal, and so does
+`PYRITE_STREAMED_ADAPTIVE=off`. The default `sinc-oversampled` line grid is
+one of those refusals. Select `sinc-nyquist` for a high-cap adaptive case
+that should stream.
 
 ### Cascades
 
