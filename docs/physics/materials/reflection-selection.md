@@ -47,8 +47,14 @@ spectrum and the selection record are unchanged in kind. The record adds
 
 Radiators whose continuum is not corrected (EEDL continuum, channeling,
 correction disabled) keep the line-yield metric, a tail fraction of the kept
-line yield. `CXR_REFLECTION_SELECTION_MODEL` is `measured-shell-cutoff-v5`
-since #1243, so older measured-selection checkpoints do not resume.
+line yield.
+
+The selection scores the first `SELECTION_HISTORIES` (4096) line and
+continuum electrons of the counter-addressed population (#1281), so its cost
+does not grow with the history count; the selected set is then scored on
+every history. Smaller populations select on every history.
+`CXR_REFLECTION_SELECTION_MODEL` is `measured-shell-cutoff-v6` since #1281,
+so older measured-selection checkpoints do not resume.
 
 An explicit `CxrReflections(n_families=4)` or `--n-families 4` restores the
 four-family policy. Explicit counts take precedence over automatic selection.

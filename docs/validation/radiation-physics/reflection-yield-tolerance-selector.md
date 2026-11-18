@@ -370,6 +370,57 @@ add over reflections, so this moves only the float summation order (at most
 and tail estimates). It does not alter the shell estimator or upgrade this
 claim's validation status.
 
+### Electron-prefix selection (#1281, v6)
+
+Implementation-context change; fresh-context review pending. Every shell
+quantity the stop reads is an incoherent sum over histories: the line yield
+$L_k=\frac1N\sum_{i<N}\ell_{ki}$, the continuum share $S_k$ and the
+background $C_r$ (per primary, same band $B$). The stop is a deterministic
+function of the sequence of ratios $L_{k+1}/L_k$ (or $s_{k+1}/s_k$) and of
+$\sum_j s_j/C_r$, so it is invariant to a common normalization of the three
+terms. v6 evaluates all three on the prefix $i<n$, $n=\min(N,
+\texttt{SELECTION\_HISTORIES})$, of the line population (and $\min(N_e^{\rm
+brem},\texttt{SELECTION\_HISTORIES})$ of the continuum population), with
+the matching per-primary normalization. Because streams are counter-addressed
+per electron, the prefix is the same set of independent histories for every
+$N\ge n$, so the selected set is identical for every $N\ge n$ at fixed seed.
+The production spectrum then sums the selected reflections over all $N$
+histories, so conditional on the selected set it is the same estimator as v5.
+
+Consequences:
+
+- **Cost.** Selection costs $O(n)$ line evaluations per scored shell, not
+  $O(N)$; the production pass is unchanged and remains $O(N)$ (#1295, #1296).
+- **Noise.** The cutoff inherits the sampling noise of $n$ histories, which no
+  longer shrinks as $N$ grows. The tail estimate was already an extrapolation,
+  not a bound; with a prefix it is also a finite-sample estimate. A cutoff
+  near the tolerance can therefore differ from the full-population cutoff;
+  this is a documented difference, not a bias of the scored spectrum.
+- **Limit.** $N\le n$ reproduces v5 exactly (no prefix is taken).
+
+Regression: `tests/montecarlo/runner/test_reflection_selection_spectrum.py::test_selection_scores_an_electron_prefix_then_every_history`
+pins that a prefix selection equals the full selection on the prefix
+population, and that the returned spectrum is the selected set scored on
+every history.
+
+Evidence (`qlmc:~/pyrite-1281/out-cal`, `out-stab`; RTX 5080, code
+`e52bd7465`, profile `cleo_sub_1281`, intrinsic spectra):
+
+| Case | N | Seeds | Prefix arms | Cutoff / reflections | Same as full |
+|---|---|---|---|---|---|
+| MoS₂ 30 keV, 15° | 8192 | 0 | 1024, 4096 | G20 / 11,924 | yes |
+| MoS₂ 30 keV, 15° | 4096 | 0, 1 | 1024 | G20 / 11,924 | yes |
+| MoS₂ 100 keV, 57° | 4096 | 0, 1 | 1024 | G22 / 15,930 | yes |
+| MoS₂ 1000 keV, 15° | 4096 | 0, 1 | 1024 | G20 / 11,924 | yes |
+| WS₂ 30 keV, 15° | 4096 | 0, 1 | 1024 | G16 / 6,018 | yes |
+| WS₂ 100 keV, 57° | 4096 | 0, 1 | 1024 | G16 / 6,018 | yes |
+
+Tail estimates agree within about 3 % between arms. HOPG and h-BN pin
+catalog (00l) sets and never run the selector. Measured cost on MoS₂ 30 keV
+(709,999 segments at N = 8192): selection ≈ 12 s + 31 ms per scored history;
+production ≈ 28 ms per history. The automatic-axis generation is
+`measured-shell-cutoff-v6`.
+
 ## Historical adjudication (2026-11-13)
 
 - Formula, guards (except $r=0$), shell partition, band tiling and additivity
