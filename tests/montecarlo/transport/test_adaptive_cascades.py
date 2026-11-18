@@ -160,7 +160,7 @@ def test_monitor_samples_are_root_summed_primaries():
 
 
 @pytest.mark.parametrize("positrons", [False, True])
-@pytest.mark.parametrize(("block", "maximum"), [(1, 4), (3, 6)])
+@pytest.mark.parametrize(("block", "maximum"), [(1, 4), (3, 6), (6, 6)])
 def test_adaptive_pair_cascade_is_the_fixed_run_at_its_count(
     monkeypatch, positrons, block, maximum
 ):
