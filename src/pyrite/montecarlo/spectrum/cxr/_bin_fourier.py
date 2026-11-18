@@ -177,24 +177,37 @@ def _folded_modes(E_res, a_width, w, c0, h, n_fft):
     return g0, folded_re + 1j * folded_im
 
 
-def _envelope_image_correction(E_res, a_width, w, c0, h, n_bins, P, xp=np):
+def _envelope_node_sums(E_res, q, nodes, P, xp=np):
+    """``sum_l q_l g(pi (c_i - E_l) / P)`` at each node ``c_i`` (``g`` as above).
+
+    All nodes at once over line blocks: one host transfer, not one per node.
+    """
+    nodes = xp.asarray(nodes)[:, None]
+    sums = xp.zeros(nodes.shape[0], dtype=xp.float64)
+    for lo_l in range(0, E_res.size, _IMAGE_BLOCK_LINES):
+        block = slice(lo_l, lo_l + _IMAGE_BLOCK_LINES)
+        image = _inv_sin_sq_minus_inv_sq(np.pi * (nodes - E_res[None, block]) / P, xp)
+        sums += image @ q[block]
+    return _to_cpu(sums)
+
+
+def _envelope_image_correction(E_res, a_width, w, c0, h, n_bins, P, xp=np, node_sums=None):
     """Band values of ``sum_l (w_l / 2 a_l^2) sum_{n != 0} 1/(c - E_l + n P)^2``.
 
     Line arrays live on ``xp``; the 24-node fit and the result are host FP64.
+    ``node_sums(E_res, q, nodes, P)`` replaces :func:`_envelope_node_sums`
+    (the device route passes a fused kernel with the same arithmetic).
     """
     q = w / (2.0 * a_width * a_width)
     lo, hi = c0, c0 + (n_bins - 1) * h
     k = np.arange(_CHEB_NODES)
     xn = np.cos(np.pi * (k + 0.5) / _CHEB_NODES)
     cn = 0.5 * (lo + hi) + 0.5 * (hi - lo) * xn
-    # All nodes at once over line blocks: one host transfer, not one per node.
-    nodes = xp.asarray(cn)[:, None]
-    sums = xp.zeros(_CHEB_NODES, dtype=xp.float64)
-    for lo_l in range(0, E_res.size, _IMAGE_BLOCK_LINES):
-        block = slice(lo_l, lo_l + _IMAGE_BLOCK_LINES)
-        image = _inv_sin_sq_minus_inv_sq(np.pi * (nodes - E_res[None, block]) / P, xp)
-        sums += image @ q[block]
-    vals = (np.pi / P) ** 2 * _to_cpu(sums)
+    if node_sums is None:
+        sums = _envelope_node_sums(E_res, q, cn, P, xp)
+    else:
+        sums = node_sums(E_res, q, cn, P)
+    vals = (np.pi / P) ** 2 * np.asarray(sums, dtype=np.float64)
     coef = np.polynomial.chebyshev.chebfit(xn, vals, _CHEB_NODES - 1)
     c = c0 + h * np.arange(n_bins)
     xc = (2.0 * c - (lo + hi)) / (hi - lo)

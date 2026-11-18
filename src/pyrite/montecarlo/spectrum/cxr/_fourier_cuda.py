@@ -20,6 +20,7 @@ import numpy as np
 
 from ._bin_broad import broad_bin_mean_reduce, broad_width_for_axis
 from ._bin_fourier import (
+    _CHEB_NODES,
     FOURIER_MIN_RESIDUAL_TOL,
     FOURIER_RESIDUAL_TOL,
     _envelope_image_correction,
@@ -108,18 +109,25 @@ def _plan(cp, modes, eps):
 
 
 #: A rectangle needs at least this many (source, mode) pairs for the NUFFT;
-#: smaller ones share the one direct launch.
-_NUFFT_MIN_WORK = 1 << 22
+#: smaller ones share the one direct launch. By direct precision: the FP32
+#: phase factors make direct sums cheaper, so the crossover moves up (RTX
+#: 5080, #1230 for FP64, #1296 job 13647 for FP32).
+_NUFFT_MIN_WORK = {"fp64": 1 << 22, "fp32": 1 << 24}
 #: Flushes with at most this many lines plan cutoff rectangles on the host.
 _HOST_PLAN_MAX_LINES = 1 << 20
 
 
-@lru_cache(maxsize=1)
-def _direct_kernel():
-    """One block per small rectangle; no line-by-mode workspace allocation."""
-    cp = import_module("cupy")
-    return cp.RawKernel(
-        r"""
+#: Direct-rectangle phase factors: ``"fp32"`` (default since
+#: ``fourier-auto-v6``, #1296) reduces ``j * phase`` modulo 2 pi in FP64 and
+#: evaluates ``sincosf``; ``"fp64"`` keeps FP64 ``sincos``. Both accumulate
+#: in FP64.
+DIRECT_PRECISIONS = ("fp32", "fp64")
+#: Bound on the absolute error of each FP32 cosine/sine factor: rounding the
+#: reduced phase (<= pi 2^-24) plus ``sincosf`` (<= 2 ulp of 1, CUDA math
+#: API), rounded up. Gives ``|dG_j| <= sqrt(2) * this * sum_l |c_l(j)|``.
+DIRECT_FP32_PHASE_ERROR = 5e-7
+
+_DIRECT_SOURCE = r"""
 extern "C" __global__ void rectangles(
     const double* phase, const double* constant, const double* linear,
     const long long* rect, const double dt, double* out) {
@@ -128,10 +136,21 @@ extern "C" __global__ void rectangles(
     const long long lo = rect[r+2], hi = rect[r+3];
     for (long long j = j0 + threadIdx.x; j < j1; j += blockDim.x) {
         double re = 0.0, im = 0.0;
+        const double jd = double(j);
         for (long long l = lo; l < hi; ++l) {
+#if DIRECT_FP32
+            // FP64 reduction to [-pi, pi]; FP32 rounding of the reduced phase
+            // and sincosf are the only single-precision steps (#1296).
+            double th = jd * phase[l];
+            th = fma(-6.283185307179586, rint(th * 0.15915494309189535), th);
+            float sf, cf;
+            sincosf(-(float)th, &sf, &cf);
+            const double s = sf, c = cf;
+#else
             double s, c;
-            sincos(-double(j) * phase[l], &s, &c);
-            const double w = constant[l] - (dt * double(j)) * linear[l];
+            sincos(-jd * phase[l], &s, &c);
+#endif
+            const double w = constant[l] - (dt * jd) * linear[l];
             re += w * c;
             im += w * s;
         }
@@ -139,9 +158,91 @@ extern "C" __global__ void rectangles(
         atomicAdd(out + 2*j+1, im);
     }
 }
+"""
+
+
+@lru_cache(maxsize=2)
+def _direct_kernel(precision="fp64"):
+    """One block per small rectangle; no line-by-mode workspace allocation."""
+    cp = import_module("cupy")
+    flag = "1" if precision == "fp32" else "0"
+    return cp.RawKernel(_DIRECT_SOURCE, "rectangles", options=(f"-DDIRECT_FP32={flag}",))
+
+
+#: Threads per envelope-image block; a power of two for the tree reduction.
+_ENVELOPE_THREADS = 256
+
+
+@lru_cache(maxsize=1)
+def _envelope_kernel():
+    """Per-block partial sums of ``q_l g(pi (c_i - E_l) / P)`` at 24 nodes, FP64.
+
+    Same series/direct split and arithmetic as ``_bin_fourier.
+    _inv_sin_sq_minus_inv_sq``; one pass over the lines instead of (24, block)
+    temporaries. Partials go to a ``(blocks, 24)`` array, so the final sum
+    does not depend on atomic ordering.
+    """
+    cp = import_module("cupy")
+    return cp.RawKernel(
+        r"""
+#define NODES 24
+#define THREADS 256
+extern "C" __global__ void envelope_nodes(
+    const double* E, const double* q, const long long n, const double* nodes,
+    const double P, double* partial) {
+    __shared__ double red[THREADS];
+    double acc[NODES];
+    double c[NODES];
+    for (int i = 0; i < NODES; ++i) { acc[i] = 0.0; c[i] = nodes[i]; }
+    const double pi = 3.141592653589793;
+    const long long stride = (long long)gridDim.x * blockDim.x;
+    for (long long l = (long long)blockIdx.x * blockDim.x + threadIdx.x; l < n; l += stride) {
+        const double e = E[l], ql = q[l];
+        for (int i = 0; i < NODES; ++i) {
+            const double x = pi * (c[i] - e) / P;
+            const double y = x * x;
+            double g;
+            if (fabs(x) < 0.2) {
+                const double tail = 2.0 / 10395 + y * (1382.0 / 58046625 + y * (4.0 / 1403325));
+                g = 1.0 / 3 + y * (1.0 / 15 + y * (2.0 / 189 + y * (1.0 / 675 + y * tail)));
+            } else {
+                const double sx = sin(x);
+                g = 1.0 / (sx * sx) - 1.0 / y;
+            }
+            acc[i] += g * ql;
+        }
+    }
+    for (int i = 0; i < NODES; ++i) {
+        red[threadIdx.x] = acc[i];
+        __syncthreads();
+        for (int s = THREADS / 2; s > 0; s >>= 1) {
+            if (threadIdx.x < s) red[threadIdx.x] += red[threadIdx.x + s];
+            __syncthreads();
+        }
+        if (threadIdx.x == 0) partial[(long long)blockIdx.x * NODES + i] = red[0];
+        __syncthreads();
+    }
+}
 """,
-        "rectangles",
+        "envelope_nodes",
     )
+
+
+def _device_envelope_node_sums(E_res, q, nodes, P):
+    """Device ``_bin_fourier._envelope_node_sums``: one fused pass, host result."""
+    cp = import_module("cupy")
+    if len(nodes) != _CHEB_NODES or _CHEB_NODES != 24:
+        raise ValueError("envelope kernel is compiled for 24 nodes")
+    E = cp.ascontiguousarray(E_res, dtype=cp.float64)
+    q = cp.ascontiguousarray(q, dtype=cp.float64)
+    blocks = int(min(1024, max(1, -(-E.size // _ENVELOPE_THREADS))))
+    partial = cp.empty((blocks, _CHEB_NODES), dtype=cp.float64)
+    _envelope_kernel()(
+        (blocks,),
+        (_ENVELOPE_THREADS,),
+        (E, q, np.int64(E.size), cp.asarray(nodes, dtype=cp.float64), np.float64(P), partial),
+    )
+    return cp.asnumpy(partial.sum(axis=0))
 
 
 #: Direct-kernel tile: at most one block of modes by this many lines, so a
@@ -170,7 +271,16 @@ def _direct_tiles(rects):
 
 
 def cuda_positive_modes(
-    E_res, a_width, weight, c0, period, *, eps=1e-12, use_nufft=True, nufft="es"
+    E_res,
+    a_width,
+    weight,
+    c0,
+    period,
+    *,
+    eps=1e-12,
+    use_nufft=True,
+    nufft="es",
+    direct_precision="fp64",
 ):
     """Exact-support hybrid coefficients from validated scalar line arrays.
 
@@ -178,9 +288,11 @@ def cuda_positive_modes(
     Large rectangles use a two-row type-1 NUFFT: the portable ES spreader
     (``_fourier_spread``) by default, or cuFINUFFT with
     ``nufft="cufinufft"`` (CUDA only). All others share one direct launch with FP64 atomic
-    accumulation over 128-mode x 4096-line tiles. Summation order can vary between
+    accumulation over 128-mode x 4096-line tiles; ``direct_precision="fp32"``
+    evaluates their phase factors with ``sincosf`` after FP64 range reduction
+    (:data:`DIRECT_PRECISIONS`). Summation order can vary between
     executions. ``use_nufft=False`` is an equal-workload GPU direct baseline.
-    ``_NUFFT_MIN_WORK`` was measured on an RTX 5080 (#1230); the source and
+    ``_NUFFT_MIN_WORK`` was measured on an RTX 5080 (#1230, #1296); the source and
     mode floors are the CPU-audit values.
     Input contract is the host planner's finite arrays/positive widths/period;
     host or CuPy arrays, planned and evaluated on the device.
@@ -190,6 +302,8 @@ def cuda_positive_modes(
     cp = import_module("cupy")
     if nufft not in ("es", "cufinufft"):
         raise ValueError("nufft must be 'es' or 'cufinufft'")
+    if direct_precision not in DIRECT_PRECISIONS:
+        raise ValueError(f"direct_precision must be one of {DIRECT_PRECISIONS}")
     transform = es_mode_transform if nufft == "es" else cufinufft_mode_transform
     dt = 2.0 * np.pi / period
     E_res, a_width, weight = (cp.asarray(x, dtype=cp.float64) for x in (E_res, a_width, weight))
@@ -209,7 +323,8 @@ def cuda_positive_modes(
     else:
         rects = cp.asnumpy(cutoff_rectangle_array(counts, xp=cp))
     modes, sources = rects[:, 1] - rects[:, 0], rects[:, 3] - rects[:, 2]
-    large = (sources >= 64) & (modes >= 32) & (sources * modes >= _NUFFT_MIN_WORK)
+    min_work = _NUFFT_MIN_WORK[direct_precision]
+    large = (sources >= 64) & (modes >= 32) & (sources * modes >= min_work)
     if not use_nufft:
         large[:] = False
     plans = {}
@@ -223,13 +338,17 @@ def cuda_positive_modes(
         plans.clear()
     direct = _direct_tiles(rects[~large])
     if direct.size:
-        _direct_kernel()(
+        _direct_kernel(direct_precision)(
             (len(direct),),
             (128,),
             (phase, constant, linear, cp.asarray(direct), np.float64(dt), out),
         )
     return out
 
+
+#: Requested ES/NUFFT accuracy of the production device route (#1296): width
+#: 10 instead of 13 at 1e-12; still three orders below ``residual_tol``.
+DEVICE_NUFFT_EPS = 1e-9
 
 #: Lines per broad-route block on the device ((block, 64) FP64 temporaries).
 _DEVICE_BROAD_BLOCK = 1 << 16
@@ -243,7 +362,8 @@ def cuda_fourier_bin_mean_reduce(
     *,
     residual_tol=FOURIER_RESIDUAL_TOL,
     broad_width_eV=1000.0,
-    eps=1e-12,
+    eps=DEVICE_NUFFT_EPS,
+    direct_precision="fp32",
 ):
     """Device counterpart of ``fourier_bin_mean_reduce(..., broad_width_eV=...)``.
 
@@ -252,9 +372,13 @@ def cuda_fourier_bin_mean_reduce(
     Returns the ``(n_bins,)`` FP64 device spectrum ``sum_l w_l mean_k(l)``:
     broad lines on the 64-node route, the rest from exact-cutoff hybrid
     coefficients, the bin multiplier, ``j mod N`` folding, one cuFFT inverse
-    and the closed-form envelope-image correction. Same bounds as the host
-    reference, plus the NUFFT tolerance ``eps``. Planning, period choice
-    and the small Chebyshev fits run on host.
+    and the closed-form envelope-image correction (one fused FP64 pass over the
+    lines). Same bounds as the host reference, plus the NUFFT tolerance ``eps``
+    and, with ``direct_precision="fp32"`` (default since ``fourier-auto-v6``),
+    the single-precision phase factors of the direct rectangles.
+    ``eps=1e-12, direct_precision="fp64"`` is the ``fourier-auto-v5`` route
+    up to the envelope kernel's FP64 summation order.
+    Planning, period choice and the small Chebyshev fits run on host.
 
     Validation: cxr-line-fourier-reduction, cxr-line-broad-interpolation
     """
@@ -302,7 +426,7 @@ def cuda_fourier_bin_mean_reduce(
     # The period depends only on the resonance extrema and the widest line.
     extrema = cp.asnumpy(cp.stack((E.min(), E.max(), a.min())))
     n_fft, P, _ = fourier_period(extrema[:2], extrema[2:], c0, h, n_bins, residual_tol=residual_tol)
-    positive = cuda_positive_modes(E, a, w, c0, P, eps=eps)
+    positive = cuda_positive_modes(E, a, w, c0, P, eps=eps, direct_precision=direct_precision)
     t = (2.0 * np.pi / P) * cp.arange(positive.size, dtype=cp.float64)
     positive *= cp.sinc(t * (h / (2.0 * np.pi)))
     positive[0] = 0.0
@@ -316,5 +440,9 @@ def cuda_fourier_bin_mean_reduce(
         )
     g0 = float(cp.sum(w * np.pi / a))
     out += (g0 + 2.0 * (n_fft * cp.fft.ifft(folded)).real[:n_bins]) / P
-    out -= cp.asarray(_envelope_image_correction(E, a, w, c0, h, n_bins, P, cp))
+    out -= cp.asarray(
+        _envelope_image_correction(
+            E, a, w, c0, h, n_bins, P, cp, node_sums=_device_envelope_node_sums
+        )
+    )
     return out
