@@ -111,7 +111,10 @@ def test_run_case_accepts_typed_case_and_legacy_mapping(monkeypatch):
     case = Case(**_legacy_case())
     seen = []
     monkeypatch.setattr(
-        runner, "_transport_case", lambda payload, *args, **kwargs: seen.append(payload)
+        # A transport result is a mapping (the streamed-route key is read from it, #1280).
+        runner,
+        "_transport_case",
+        lambda payload, *args, **kwargs: seen.append(payload) or {},
     )
     monkeypatch.setattr(
         runner, "_spectrum_case", lambda payload, *args, **kwargs: {"case": payload}
