@@ -76,8 +76,8 @@ def scored_reflections(case: Mapping[str, Any], layer: int | None) -> list:
     cutoffs = case.get(SCORED_CUTOFFS_CASE_KEY)
     if cutoffs is None:
         # Without a selection record the line route scores ``hkl_list``: the
-        # build-time families of an automatic selection on the streamed and
-        # directional routes, which never run the selector.
+        # build-time families of an automatic selection on routes that never
+        # run the selector (directional; streamed before #1281).
         return list(radiator.get("hkl_list") or [])
     from .reflection_cutoff import iter_reflection_shells
 

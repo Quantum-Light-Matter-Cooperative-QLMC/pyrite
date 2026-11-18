@@ -47,6 +47,7 @@ __all__ = [
     "reflection_selection_record",
     "prune_case_reflections",
     "reflection_shells",
+    "select_batch_reflections",
     "select_case_reflections",
     "select_reflection_cutoff",
     "SELECTION_HISTORIES",
@@ -584,6 +585,16 @@ def selected_line_spectrum(
 
     Validation: reflection-yield-tolerance-selector
     """
+    pruned, record, spectrum, separate = _line_selection(
+        case, evaluate, grid, continuum, reference_evaluate, histories
+    )
+    if separate:
+        spectrum = _selected_spectrum(pruned, evaluate, grid)
+    return spectrum, record
+
+
+def _line_selection(case, evaluate, grid, continuum, reference_evaluate, histories):
+    """Pruned case, record, shell-summed spectrum and whether production rescoring is due."""
     from ..._backend import _to_cpu
 
     selection = case["reflection_selection"]
@@ -643,9 +654,7 @@ def selected_line_spectrum(
     if reference is not None:
         record["reference_band_eV"] = list(axis_band_eV(reference, "bin-mean"))
         record["reference_quadrature"] = "bin-mean"
-    if separate:
-        spectrum = _selected_spectrum(pruned, evaluate, grid)
-    return spectrum, record
+    return pruned, record, spectrum, separate
 
 
 def selected_batch_spectrum(emission, batch, Ne_brem, histories: int | None = None):
@@ -657,6 +666,31 @@ def selected_batch_spectrum(emission, batch, Ne_brem, histories: int | None = No
 
     Validation: reflection-yield-tolerance-selector
     """
+    return selected_line_spectrum(**_batch_selection(emission, batch, Ne_brem, histories))
+
+
+def select_batch_reflections(emission, batch, Ne_brem, histories: int | None = None):
+    """The pruned case and record :func:`selected_batch_spectrum` would select.
+
+    For streamed scoring (#1281): ``batch`` needs only the rows of the selection
+    prefix, and no production pass runs.
+
+    Validation: reflection-yield-tolerance-selector
+    """
+    args = _batch_selection(emission, batch, Ne_brem, histories)
+    pruned, record, _, _ = _line_selection(
+        args["case"],
+        args["evaluate"],
+        args["grid"],
+        args["continuum"],
+        args["reference_evaluate"],
+        args["histories"],
+    )
+    return pruned, record
+
+
+def _batch_selection(emission, batch, Ne_brem, histories):
+    """:func:`selected_line_spectrum` arguments for an emission batch (#1281 prefix)."""
     from dataclasses import replace
 
     from .electron_blocks import electron_prefix
@@ -676,12 +710,12 @@ def selected_batch_spectrum(emission, batch, Ne_brem, histories: int | None = No
             electron_limit=n_lines,
         )
         record = dict(lines=n_lines, continuum=n_brem)
-    return selected_line_spectrum(
-        batch.case,
-        lambda pilot: (
+    return dict(
+        case=batch.case,
+        evaluate=lambda pilot: (
             emission.cxr.evaluate(replace(batch, case=pilot, table_cache={}), "spec").values
         ),
-        batch.energy_eV,
+        grid=batch.energy_eV,
         continuum=selection_continuum(batch.case, sample, n_brem if record else Ne_brem),
         reference_evaluate=lambda pilot, axis: (
             emission.cxr.evaluate(

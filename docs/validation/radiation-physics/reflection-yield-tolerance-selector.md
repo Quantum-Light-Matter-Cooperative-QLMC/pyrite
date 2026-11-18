@@ -372,7 +372,7 @@ claim's validation status.
 
 ### Electron-prefix selection (#1281, v6)
 
-Implementation-context change; fresh-context review pending. Every shell
+Implementation-context change; fresh-context review below (`rederived`). Every shell
 quantity the stop reads is an incoherent sum over histories: the line yield
 $L_k=\frac1N\sum_{i<N}\ell_{ki}$, the continuum share $S_k$ and the
 background $C_r$ (per primary, same band $B$). The stop is a deterministic
@@ -381,9 +381,13 @@ $\sum_j s_j/C_r$, so it is invariant to a common normalization of the three
 terms. v6 evaluates all three on the prefix $i<n$, $n=\min(N,
 \texttt{SELECTION\_HISTORIES})$, of the line population (and $\min(N_e^{\rm
 brem},\texttt{SELECTION\_HISTORIES})$ of the continuum population), with
-the matching per-primary normalization. Because streams are counter-addressed
-per electron, the prefix is the same set of independent histories for every
-$N\ge n$, so the selected set is identical for every $N\ge n$ at fixed seed.
+the matching per-primary normalization. On counter-addressed transport cores
+(per-electron, CUDA) the prefix is the same set of independent histories for
+every $N\ge n$, so the selected set is identical for every $N\ge n$ at fixed
+seed and fixed $\min(N_e^{\rm brem},n)$. An energy spread builds transport
+tables over an $N$-dependent range, so there the agreement is only to
+interpolation round-off. The lockstep core (CPU default, grooved runs) shares
+one step-major generator, so its prefix histories depend on $N$.
 The production spectrum then sums the selected reflections over all $N$
 histories, so conditional on the selected set it is the same estimator as v5.
 
@@ -396,12 +400,27 @@ Consequences:
   not a bound; with a prefix it is also a finite-sample estimate. A cutoff
   near the tolerance can therefore differ from the full-population cutoff;
   this is a documented difference, not a bias of the scored spectrum.
-- **Limit.** $N\le n$ reproduces v5 exactly (no prefix is taken).
+- **Limit.** Exactly v5 when both $N_e$ and $N_e^{\rm brem}$ are within the
+  budget (no prefix is taken); otherwise only the over-budget population is
+  restricted.
 
 Regression: `tests/montecarlo/runner/test_reflection_selection_spectrum.py::test_selection_scores_an_electron_prefix_then_every_history`
 pins that a prefix selection equals the full selection on the prefix
 population, and that the returned spectrum is the selected set scored on
-every history.
+every history. It pins the `elec_id` cut, the normalization and the
+full-history rescoring on one transport, not cross-$N$ invariance or unequal
+line/continuum prefixes.
+
+Streamed runs (live blocks and artifact replay, `streamed_selection.py`) hold
+the leading whole-electron blocks until a row of an electron at or past the
+prefix arrives, select on those rows through the same
+`select_batch_reflections`, then score every block with the selected set and
+remove its lattice share from the continuum, as the retained route does.
+Live streaming refuses the lockstep core, so its prefix is always
+counter-addressed. `tests/montecarlo/transport/test_streamed_selection.py`
+pins the streamed record equal to the retained one and spectra within
+summation order for blocks of 1, 3 and 1000 electrons, and a replayed held
+block committing once.
 
 Evidence (`qlmc:~/pyrite-1281/out-cal`, `out-stab`; RTX 5080, code
 `e52bd7465`, profile `cleo_sub_1281`, intrinsic spectra):
@@ -937,3 +956,175 @@ Re-derivation **matches** the implementation term for term. Verdict
 **`rederived`** for the v4 net metric, conditional on wording edits 1–3 above
 being applied to the ledger row (no code change required). Human sign-off is
 not granted.
+
+## Electron-prefix re-verification (v6, #1281, 2026-11-18)
+
+Fresh-context review of the v6 electron-prefix change only; v3–v5 are taken
+as given. Sections 1–3 were written from the ledger row and the v6 owner's
+statement before the bodies of `reflection_cutoff.py`, `electron_blocks.py`
+and `lattice_share.py` were read.
+
+### 1. Normalization the stop can and cannot absorb
+
+Write the per-primary prefix estimators
+
+$$
+\hat L_k=\frac{1}{n_L}\sum_{i<n_L}\ell_{ki},\qquad
+\hat S_k=\frac{1}{n_B}\sum_{i<n_B}\sigma_{ki},\qquad
+\hat C_r=\frac{1}{n_B}\sum_{i<n_B}c_{i},
+$$
+
+with $n_L=\min(N_e,n_{\max})$ and $n_B=\min(N_e^{\rm brem},n_{\max})$.
+The line metric uses only ratios $\hat L_k/\hat L_{k-1}$ and
+$\hat L_k/\sum_j\hat L_j$, so any common factor cancels; the normalization
+of $\hat L$ is irrelevant there. The net metric is not invariant to separate
+factors: if $\hat L\to a\hat L$ and $(\hat S,\hat C)\to b(\hat S,\hat C)$,
+then $s_k\to a L_k-bS_k$, which changes both the ratios and the zero
+crossing unless $a=b$. Consistency therefore requires each population to be
+divided by its *own* prefix count ($n_L$ for lines, $n_B$ for continuum),
+exactly as production divides lines by $N_e$ and continuum by
+$N_e^{\rm brem}$. Dividing both by one count, or summing $n_B$ continuum
+histories but dividing by $n_L$, biases $S_k$ by $n_L/n_B$ and is a
+discrepancy. With the correct per-primary counts the two prefixes need not
+be equal: both estimate the same per-primary expectations.
+
+### 2. N-independence of the prefix
+
+The selected set is a deterministic function of the prefix data. It is
+identical for all $N\ge n_{\max}$ at fixed seed if and only if:
+
+1. history $i$'s trajectory (primary and every secondary it produces) is a
+   function of $(\text{seed},i)$ only — counter-addressed streams;
+2. its transport settings do not depend on $N$. In particular, if electrons
+   with $i\ge N_e^{\rm brem}$ are transported with a different cutoff
+   (`E_cut_lines`), then $N_e^{\rm brem}$ must be $N$-independent, or at
+   least $\ge n_{\max}$, for the prefix histories to keep the same settings;
+3. $n_B$ itself is $N$-independent: $N_e^{\rm brem}$ fixed or
+   $\ge n_{\max}$. If $N_e^{\rm brem}$ is a function of $N$ below
+   $n_{\max}$, the continuum prefix grows with $N$ and (a) fails;
+4. the prefix is selected by an electron-id mask on segment rows (or by an
+   electron-sorted offset), so row order cannot change membership;
+5. secondaries carry the primary's id (then they belong with their
+   primary's history), or are excluded consistently in both the selection
+   and the normalization.
+
+### 3. Limits and consequences expected
+
+- $N_e\le n_{\max}$ and $N_e^{\rm brem}\le n_{\max}$: no restriction, so v5
+  exactly. If only one population exceeds $n_{\max}$, only that population is
+  restricted; v5 is reproduced only when both are within budget.
+- Conditional on the selected set, the production pass is the v5 estimator
+  scored on all histories: unbiased with the same normalization.
+- The cutoff is a random variable of $n_{\max}$ histories; its distribution
+  does not narrow with $N$. That is a difference in which set is chosen, not
+  a bias of the spectrum of a given set.
+
+### 4. Comparison with the implementation (head `eab6be482`)
+
+- **Prefix construction.** `electron_blocks.py::electron_prefix` keeps the rows
+  with `elec_id < n` (a leading slice when rows are electron-sorted, an index
+  mask otherwise) and sets `Ne = n`. Secondaries carry their primary's
+  `electron_id` (`transport/secondaries.py`, `tracks["electron_id"]`), so
+  whole histories are kept. Condition 2.4 and 2.5 hold.
+- **Counts.** `reflection_cutoff.py::_batch_selection` (refactored from
+  `selected_batch_spectrum`) takes $N_e$ from `batch.electron_limit` (the
+  production batch always sets it to `Ne_lines`) and $N_e^{\rm brem}$ from the
+  spectrum phase, falling back to $N_e$ when `Ne_brem` is `None`. It forms
+  $n_L=\min(N_e,n_{\max})$, $n_B=\min(N_e^{\rm brem},n_{\max})$, slices the
+  rows to $\max(n_L,n_B)$, and passes `electron_limit=n_L` to the line
+  evaluation and `Ne=n_B` to `lattice_share.py::selection_continuum`.
+- **Normalization.** The line kernel masks `elec_id < Ne` and divides by
+  `Ne = electron_limit` (`cxr/_setup.py`). `mc_brem_spectrum` masks
+  `elec_id < Ne` and divides by `Ne = electron_limit` (`spectrum/brem.py`).
+  Each population is therefore divided by its own prefix count, as §1
+  requires. This holds for $n_B<n_L$, $n_B>n_L$ and layered radiators, because
+  the layer view of `_segments_in_layer` keeps the scalar `Ne` and the mask.
+- **Limit.** The prefix is skipped iff $(n_L,n_B)=(N_e,N_e^{\rm brem})$. The
+  unchanged batch and `Ne_brem` then reach exactly the v5 call. When only one
+  population exceeds $n_{\max}$, only that one is restricted, and the result is
+  not v5.
+- **Production pass.** With a prefix, `separate` is true even without a
+  reference band. `_selected_spectrum` then rescores the pruned set with
+  `evaluate`, which closes over the unrestricted `batch`. This is the v5
+  estimator conditional on the selected set.
+- **Row fields.** `_SEG_ARRAYS` does not list `hard_radiative_k_eV`, `_Z`,
+  `_direction` and `_target_momentum_eV_c`. The prefix leaves those arrays at
+  full length. The current consumers (line kernel, expected-value coupled
+  continuum) do not read them, and a probe matched a fully sliced prefix
+  exactly. They remain a latent misalignment for any future prefix consumer of
+  hard-event rows. `iter_electron_blocks` and `_segments_in_layer` have the same
+  latent misalignment.
+
+**N-independence (condition 2.1), the first divergent convention.** The
+derivation's step "because streams are counter-addressed per electron, the
+prefix is the same set of histories for every $N\ge n$" holds only on the
+`per-electron` and `cuda` transport cores. `resolve_transport_core("auto")`
+returns `lockstep` on any host without CUDA and for every grooved run. That
+core draws from "one shared Generator in step-major order"
+(`transport/api.py`), so history $i$'s trajectory depends on $N$. Two further
+points:
+
+- With a beam energy spread, `block_transport.py` builds the shell, radiative
+  and LUT tables over `table_energy_range`, which spans
+  $[\min E_{\rm cut},\max_{i<N}E_{0,i}]$. That range grows with $N$, so even
+  the counter-addressed cores agree only to the level of table-interpolation
+  round-off, not bit for bit.
+- $n_B$ is fixed only when $N_e^{\rm brem}$ is held fixed, or is at least
+  $n_{\max}$. `cxr_histories` and `brem_histories` are independent settings,
+  and adaptive runs realize $N_e^{\rm brem}$ separately.
+
+### 5. Probes (CPU, Si 30 keV fixture of the anchor test, `scratchpad` scripts)
+
+| Probe | Core | Result |
+|---|---|---|
+| A: $N_e=6$, $N_e^{\rm brem}=3$, budget 4 ($n_L=4\ne n_B=3$) vs an unrestricted selection on the population (4, 3) | lockstep | identical cutoff; shell $L_k$, $S_k$ and $C_r$ equal to 0 relative |
+| B: transport $N_e=6$ vs $N_e=10$ (fixed $N_e^{\rm brem}=3$), budget 4 | lockstep | same cutoff, but shell yields differ up to 43 % and $C_r$ 5.45e-5 vs 4.00e-5; electron 0 has 252 vs 227 rows |
+| B on `PYRITE_MC_TRANSPORT_CORE=per-electron` | per-electron | shells and $C_r$ bit-identical |
+| C: $N_e^{\rm brem}=2$ vs 3 at budget 4 | per-electron | $n_B$ follows $N_e^{\rm brem}$; $C_r$ changes (3.91e-5 vs 3.97e-5) |
+| Unsorted rows, coupled radiative continuum | lockstep | prefix and fully sliced background agree |
+
+Tests: `uv run pyrite-dev test
+tests/montecarlo/runner/test_reflection_selection_spectrum.py
+tests/montecarlo/runner/test_reflection_cutoff.py` under an 8 GiB cap: 33
+passed, 2 slow tests skipped.
+
+**Anchor coverage.**
+`test_selection_scores_an_electron_prefix_then_every_history` pins the
+mask, the normalization and the production rescoring on *one* transport. Its
+"alone" reference reuses `electron_prefix(tp["segs"], 2)`, so it does not
+test N-independence of transport. With $n_L=n_B=2$, it also does not
+exercise unequal prefixes. Probe A covers unequal prefixes and probe B
+covers N-independence; the owner may promote either to the test module.
+
+### 6. Verdict (v6)
+
+| Filter | Result |
+|---|---|
+| Units / normalization | Pass: lines on $n_L$ divided by $n_L$; continuum on $n_B$ divided by $n_B$; consistent per-primary $s_k=L_k-S_k$ and $\sum s_j+C_r$ |
+| Limits | Pass: both populations within budget gives exactly v5. Only one within budget restricts only the other (the claim needs this wording) |
+| N-independence | Holds on counter-addressed cores (per-electron, CUDA) with a monoenergetic beam and fixed $\min(N_e^{\rm brem},n_{\max})$. **Fails** on lockstep (CPU default, all grooved runs). Only to round-off with an energy spread |
+| Line vs continuum prefixes | Pass, including $n_B<n_L$, $n_B>n_L$, `Ne_brem=None` and layered radiators |
+| Scope limits | The noise floor of $n_{\max}$ histories is documented. On lockstep, the cutoff also varies with $N$ through the realized prefix, still with $n_{\max}$-history noise |
+
+The estimator re-derivation **matches**. Consequences (b), (c) and (d) hold.
+Consequence (a) diverges at the stated mechanism: "counter-addressed streams".
+That is a property of the per-electron and CUDA cores, not of lockstep.
+Overall verdict: **`rederived`** for v6, conditional on these wording edits
+(no code change required):
+
+1. The derivation and ledger should state that the selected set is identical
+   for every $N\ge n_{\max}$ at fixed seed only on counter-addressed transport
+   cores (per-electron, CUDA), for a fixed $\min(N_e^{\rm brem},n_{\max})$.
+   They should add that an energy spread rebuilds the transport tables over
+   an $N$-dependent range, so agreement there is only to round-off. On
+   lockstep (CPU default, grooved runs) the prefix histories depend on $N$,
+   and the cutoff remains an $n_{\max}$-history estimate of a different
+   realization.
+2. Replace "$N\le n$ reproduces v5 exactly" with: "v5 exactly when both
+   $N_e\le n_{\max}$ and $N_e^{\rm brem}\le n_{\max}$. Otherwise only the
+   over-budget population is restricted."
+3. The regression sentence should say the anchor pins the mask, the
+   normalization and the full-history rescoring on one transport. It does not
+   pin cross-$N$ invariance or unequal line/continuum prefixes.
+
+Human sign-off is not granted.

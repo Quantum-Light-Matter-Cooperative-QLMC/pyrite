@@ -15,7 +15,8 @@ if TYPE_CHECKING:
 def reflection_controls(numerics: Numerics, physics: Physics, channeling: object) -> CxrReflections:
     """Fall back to four families only for an unsupported automatic selection."""
     controls = numerics.cxr_reflections
-    execution = numerics.resolved_execution
+    # Streamed scoring selects on the electron prefix since #1281, so it no
+    # longer falls back.
     if (
         controls.n_families is None
         and controls.line_yield_tolerance is None
@@ -25,8 +26,6 @@ def reflection_controls(numerics: Numerics, physics: Physics, channeling: object
             or numerics.line_roulette is not None
             or channeling is not None
             or physics.transition_radiation == "two-beam"
-            or execution.stream_block_electrons is not None
-            or execution.stream_memory_mib is not None
         )
     ):
         return replace(controls, n_families=4)

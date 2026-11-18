@@ -52,7 +52,9 @@ line yield.
 The selection scores the first `SELECTION_HISTORIES` (4096) line and
 continuum electrons of the counter-addressed population (#1281), so its cost
 does not grow with the history count; the selected set is then scored on
-every history. Smaller populations select on every history.
+every history. Smaller populations select on every history. Streamed
+runs hold the leading blocks until the prefix is complete and select on them,
+so streamed and retained runs score the same set.
 `CXR_REFLECTION_SELECTION_MODEL` is `measured-shell-cutoff-v6` since #1281,
 so older measured-selection checkpoints do not resume.
 
@@ -60,8 +62,8 @@ An explicit `CxrReflections(n_families=4)` or `--n-families 4` restores the
 four-family policy. Explicit counts take precedence over automatic selection.
 An explicit `line_yield_tolerance` requests selection and retains its
 incompatibility errors. Automatic selection falls back to four families for
-coherent emission, line roulette, temporal profiles, channeling, two-beam
-transition radiation and streamed scoring. Catalog-pinned lists remain pinned.
+coherent emission, line roulette, temporal profiles, channeling and two-beam
+transition radiation. Streamed scoring selects on the prefix (#1281). Catalog-pinned lists remain pinned.
 Diffracted bremsstrahlung and Kossel terms keep the build-time reflection set.
 
 The accuracy gain has a measured cost. On qlmc-ace (ROCm), the 64-history,
