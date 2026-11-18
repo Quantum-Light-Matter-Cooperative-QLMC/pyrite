@@ -241,7 +241,7 @@ def test_bundled_catalog_resolves_automatic_grid_for_each_standard_beam_energy()
     for case in cases:
         policy = case["line_grid_policy"]
         grid = decode_energy_grid(case["E_grid_line"])
-        assert policy["bandwidth"]["policy"] == "kinematic-ceiling"
+        assert policy["bandwidth"]["policy"] == "resonance-population"
         assert policy["resolution"]["policy"] == "sinc-nyquist"
         assert grid[0] == policy["bandwidth"]["start_eV"]
         assert grid[-1] == policy["bandwidth"]["stop_eV"]
@@ -309,7 +309,7 @@ def test_missing_per_beam_line_grid_resolves_automatically(monkeypatch):
     assert by_energy[30.0].get("line_grid_policy") is None
     np.testing.assert_array_equal(by_energy[30.0]["E_grid_line"], [10.0])
     policy = by_energy[50.0]["line_grid_policy"]
-    assert policy["bandwidth"]["policy"] == "kinematic-ceiling"
+    assert policy["bandwidth"]["policy"] == "resonance-population"
     assert policy["bandwidth"]["start_eV"] == 10.0
     assert policy["bandwidth"]["stop_eV"] > policy["bandwidth"]["start_eV"]
 

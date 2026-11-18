@@ -440,7 +440,7 @@ def test_missing_material_rows_reach_automatic_case_policy(tmp_path, monkeypatch
             )
         else:
             assert case["line_grid_policy"]["resolution"]["policy"] == "sinc-nyquist"
-            assert case["line_grid_policy"]["bandwidth"]["policy"] == "kinematic-ceiling"
+            assert case["line_grid_policy"]["bandwidth"]["policy"] == "resonance-population"
 
     # Family-derived cached rows cannot bound the new selector's candidate set.
     selected = build_cases(config.material_sweep("sample"))

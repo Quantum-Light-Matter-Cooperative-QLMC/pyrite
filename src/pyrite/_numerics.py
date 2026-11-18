@@ -59,7 +59,9 @@ SAMPLING_KEYS = ("n_electrons", "n_electrons_brem")
 # v4 (#1250): radiators with a lattice-share-corrected continuum stop on the
 # shell net yield (lines less their continuum share) against the consistent
 # total, not on the line yield alone.
-CXR_REFLECTION_SELECTION_MODEL = "measured-shell-cutoff-v4"
+# v5 (#1243): automatic axes select on exact bin masses in their common
+# clamped ceiling band, independently of the production bandwidth/resolution.
+CXR_REFLECTION_SELECTION_MODEL = "measured-shell-cutoff-v5"
 
 CONVERGENCE_KEYS = (
     "n_families",

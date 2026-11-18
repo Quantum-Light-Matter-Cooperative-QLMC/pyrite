@@ -46,6 +46,7 @@ from .._cxr_grid_policy import (
     CxrGridToleranceError,
     cxr_quadrature_from_payload,
     cxr_start_eV,
+    default_bandwidth_policy,
     environment_overrides_present,
     kinematic_cxr_stop_eV,
     resolve_cxr_grid_policy,
@@ -656,7 +657,9 @@ def sweep_crystal_params(sweep: Sweep) -> dict[str, Any]:
     return cp
 
 
-def _automatic_cxr_grid_policy(sweep: Sweep, cp: dict, energy_keV: float) -> CxrGridPolicy:
+def _automatic_cxr_grid_policy(
+    sweep: Sweep, cp: dict, energy_keV: float, bandwidth_policy: str = AUTOMATIC_BANDWIDTH_POLICY
+) -> CxrGridPolicy:
     """Resolve the automatic case-local line-grid policy for one beam energy.
 
     Bandwidth is closed form (:func:`kinematic_cxr_stop_eV`) and costs a dot
@@ -696,7 +699,7 @@ def _automatic_cxr_grid_policy(sweep: Sweep, cp: dict, energy_keV: float) -> Cxr
     policy = resolve_cxr_grid_policy(
         start_eV=start,
         stop_eV=stop,
-        bandwidth_policy=AUTOMATIC_BANDWIDTH_POLICY,
+        bandwidth_policy=bandwidth_policy,
         per_call=sweep.cxr_grid_policy,
     )
     if len(radiators) > 1:
@@ -774,7 +777,7 @@ BARE_SWEEP_GRID_MODEL = "automatic-v1"
 
 
 def _cxr_grid_for_energy(
-    sweep: Sweep, cp: dict, energy_keV: float
+    sweep: Sweep, cp: dict, energy_keV: float, bandwidth_policy: str = AUTOMATIC_BANDWIDTH_POLICY
 ) -> tuple[np.ndarray, dict | None]:
     """Select this beam energy's line grid, and any automatic policy behind it.
 
@@ -816,7 +819,7 @@ def _cxr_grid_for_energy(
         stored = (bins.cxr_by_energy or {}).get(float(energy_keV))
         if stored is not None:
             return np.asarray(stored, dtype=float), None
-    policy = _automatic_cxr_grid_policy(sweep, cp, float(energy_keV))
+    policy = _automatic_cxr_grid_policy(sweep, cp, float(energy_keV), bandwidth_policy)
     num = resolution_num(policy.start_eV, policy.stop_eV, policy.max_spacing_eV)
     if policy.bandwidth_policy == RESONANCE_BANDWIDTH_POLICY:
         # The ceiling only caps a measured edge, so it proves nothing about
@@ -1129,7 +1132,8 @@ def build_cases(
     # line grid: fine + narrow (per-material default or detector mapping/fixed
     # binning). brem grid: coarse + wide -- each case spans up to that case's
     # beam energy because brem cuts off at the particle energy.
-    resolved_cxr = tuple(_cxr_grid_for_energy(sweep, cp, float(energy)) for energy in energies)
+    bw = default_bandwidth_policy(coherent_emission, max_dE_frac)
+    resolved_cxr = tuple(_cxr_grid_for_energy(sweep, cp, float(e), bw) for e in energies)
     brem_grid = _brem_grid(sweep, energies, tuple(grid for grid, _ in resolved_cxr))
     dtheta, domega = _detector_acceptance(sweep.detector)
     orientation = _sweep_orientation(sweep, cp)

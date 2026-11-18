@@ -40,6 +40,7 @@ from ._kernels import (
     _in_medium_kinematics,
     _interp_gather_cxr_tables,
     _interp_index,
+    _line_keep_window,
     _log_interp_fraction,
     _matvec3,
     _reflection_tables,
@@ -353,10 +354,7 @@ def _batched_tables(st):
     t_L_all = st.t_L_all
     finite_footprint = st.finite_footprint
 
-    e_lo = float(_to_cpu(E_grid[0]))
-    e_hi = float(_to_cpu(E_grid[-1]))
-    pad = 0.2 * (e_hi - e_lo)  # keep sinc tails that reach into the window
-    lo_keep, hi_keep = e_lo - pad, e_hi + pad
+    lo_keep, hi_keep = _line_keep_window(E_grid, req.truncation_audit)
 
     (
         G,

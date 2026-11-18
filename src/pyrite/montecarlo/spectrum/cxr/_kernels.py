@@ -103,6 +103,26 @@ def _audit_skips_reduction(audit):
     return audit is not None and ("collect" in audit or audit.get("mass_only", False))
 
 
+def _line_keep_window(E_grid, audit=None):
+    """Resonance window ``(lo, hi)`` of the lines a reduction onto ``E_grid`` scores.
+
+    The axis padded by 20% of its span, so sinc tails reaching into it count. A
+    measured-bandwidth audit carrying ``ceiling_eV`` widens the upper edge to
+    the window the ``kinematic-ceiling`` axis would keep, so every line that
+    axis scores is either scored here or charged to the audit (#1243).
+
+    Validation: line-grid-resonance-bandwidth
+    """
+    e_lo = float(_to_cpu(E_grid[0]))
+    e_hi = float(_to_cpu(E_grid[-1]))
+    pad = 0.2 * (e_hi - e_lo)
+    hi = e_hi + pad
+    ceiling = None if audit is None else audit.get("ceiling_eV")
+    if ceiling is not None and float(ceiling) > e_hi:
+        hi = max(hi, float(ceiling) + 0.2 * (float(ceiling) - e_lo))
+    return e_lo - pad, hi
+
+
 def _accumulate_edge_truncation(audit, E_r, a_width, weight, electron=None):
     """Add these lines' whole and out-of-axis ``sinc**2`` mass to ``audit``.
 
@@ -117,6 +137,9 @@ def _accumulate_edge_truncation(audit, E_r, a_width, weight, electron=None):
     With ``n_electrons`` in the audit, ``electron`` (each line's emitting
     electron id) also sums the line mass per electron into ``electron_mass``,
     the sample the runner's line-yield standard error is taken over (#201).
+
+    With ``extension_stops_eV`` in the audit, the upper bound is also summed at
+    each of those candidate stops into ``mass_above_extension`` (#1243).
 
     Validation: line-grid-resonance-bandwidth
     """
@@ -151,6 +174,17 @@ def _accumulate_edge_truncation(audit, E_r, a_width, weight, electron=None):
         ("mass_below", mass * beyond[1]),
     ):
         audit[key] = audit.get(key, 0.0) + value.sum(dtype=xp.float64)
+    stops = audit.get("extension_stops_eV")
+    if stops is not None:
+        # The same upper bound at each candidate stop above the axis, so a
+        # refused default can extend to the first stop under its share (#1243).
+        sums = []
+        for stop in stops:
+            distance = float(stop) - E_r
+            tail = 1.0 / (xp.pi * a_width * xp.maximum(distance, tiny))
+            share = xp.where(distance > 0.0, xp.minimum(tail, 1.0), 1.0)
+            sums.append((mass * share).sum(dtype=xp.float64))
+        audit["mass_above_extension"] = audit.get("mass_above_extension", 0.0) + xp.stack(sums)
 
 
 def _cxr_amp_sq_core(

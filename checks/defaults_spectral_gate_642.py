@@ -122,8 +122,13 @@ def mosaic_mc_case(case, nodes, sampling="quadrature", mosaic_seed=None):
 #: ``sinc-*`` keep the kinematic-ceiling bandwidth; ``measured*`` use the
 #: ``resonance-population`` edge; ``measured-local`` adds ``resonance-local``.
 POLICY_ARMS = {
-    "sinc": {"resolution": "sinc-nyquist"},
-    "sinc-bin": {"resolution": "sinc-nyquist", "quadrature": "bin-mean"},
+    # Explicit closed-form arms: the measured bandwidth is the default since #1243.
+    "sinc": {"bandwidth": "kinematic-ceiling", "resolution": "sinc-nyquist"},
+    "sinc-bin": {
+        "bandwidth": "kinematic-ceiling",
+        "resolution": "sinc-nyquist",
+        "quadrature": "bin-mean",
+    },
     "measured": {"bandwidth": "resonance-population"},
     "measured-bin": {"bandwidth": "resonance-population", "quadrature": "bin-mean"},
     "measured-local": {

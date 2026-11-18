@@ -1,6 +1,6 @@
 # `line-grid-resonance-bandwidth`
 
-Ledger row: [`line-grid-resonance-bandwidth`](../ledger-core-coherent-physics.md#line-grid-resonance-bandwidth). Status: discrepancy. Validation: `line-grid-resonance-bandwidth`.
+Ledger row: [`line-grid-resonance-bandwidth`](../ledger-core-coherent-physics.md#line-grid-resonance-bandwidth). Status: rederived. Validation: `line-grid-resonance-bandwidth`.
 
 ## Source equation and selector
 
@@ -15,7 +15,7 @@ q_i(S)\leq\begin{cases}
 \end{cases}
 $$
 
-The selector finds the smallest $S$ with $\sum_i M_iq_i(S)/\sum_iM_i\leq\epsilon/2$, rounds it up to 100 eV, and caps it at the closed-form kinematic ceiling. Here $\epsilon=10^{-4}$ is the assigned upper-edge share. Characteristic lines supply a separate Lorentzian edge; the larger edge wins. A later spectrum audit applies the same bound with $\epsilon$ to the lines inside the spectrum pass's keep window, $E_i<S+0.2(S-\text{start})$, and refuses a case that exceeds it. Lines resonating beyond that window never reach the audit; the selector already counts them as wholly lost with the same production weights, so the end-to-end loss stays within $\epsilon/2$ from the selector alone. When $S$ is already the kinematic ceiling, no line resonates above the edge and the automatic bandwidth drops the same tails, so the audit records `capped_at_ceiling` and raises `CxrGridTruncationWarning` instead.
+The selector finds the smallest $S$ with $\sum_i M_iq_i(S)/\sum_iM_i\leq\epsilon/2$, rounds it up to 100 eV, and caps it at the closed-form kinematic ceiling. Here $\epsilon=10^{-4}$ is the assigned upper-edge share. Characteristic lines supply a separate Lorentzian edge; the larger edge wins. A later spectrum audit applies the same bound with $\epsilon$ to the lines inside the ceiling's keep window, $E_i<C+0.2(C-\text{start})$ for ceiling $C$, charges lines at or above $S$ wholly, and refuses a case that exceeds it. The stop is then raised, still under $C$, over every diffracted-bremsstrahlung and Kossel Bragg window the ceiling axis admits; both corrections are exactly zero outside that finite window, so they lose nothing above the axis (#1243). When $S$ is already the kinematic ceiling, no line resonates above the edge and the automatic bandwidth drops the same tails, so the audit records `capped_at_ceiling` and raises `CxrGridTruncationWarning` instead.
 
 The two-node collection pass uses the same in-medium roots, line filters, amplitude, and escape transmission as the spectrum pass. It selects the edge after electron transport and before allocating the final line axis. The closed-form ceiling remains the hard maximum.
 
@@ -526,3 +526,866 @@ substepped transport. That is a scope limit and should be stated in the
 ledger Claim. The result is conditional on the ceiling input from
 `line-grid-kinematic-bandwidth`, which has its own open discrepancy.
 Not `signed-off`.
+
+## Independent verification (fresh-context 2026-11-16, default flip, #1243)
+
+This is a fresh-context verifier at branch head `97fae5d33` (`issue-1243-respop-default`).
+It started at `29e1ed4f1` and re-read `git diff main...HEAD` after the
+post-transport fallback commits landed. The scope is the default selection in
+`_cxr_grid_policy.py::default_bandwidth_policy`, `::_resolve_bandwidth` and
+`::kinematic_fallback_payload`, plus
+`runner/cxr_grid.py::measured_bandwidth_fallback`. The tail bounds and the
+selector were rederived in the previous sections and are not repeated. CPU
+probes ran under `systemd-run MemoryMax=8G` with 2 to 20 electrons. The probe
+scripts are scratch files and are not committed.
+
+### Coverage requirement (derived before reading the routing code)
+
+Let $\mathcal{L}$ be every term the case deposits on the line axis
+$[E_{\rm start},S]$. The terms have mass $M_j$ and upper-tail fraction
+$q_j(S)$. The default may hand $S$ to a measured stop only if the end-to-end
+loss satisfies
+
+$$
+\frac{\sum_{j\in\mathcal{L}}M_j\,q_j(S)}{\sum_{j\in\mathcal{L}}M_j}\le\varepsilon .
+$$
+
+The selector bounds this sum over its collected population
+$\mathcal{P}\subseteq\mathcal{L}$. The spectrum audit bounds it over the
+lines inside its keep window,
+$\mathcal{A}=\{j: E_j<S+0.2(S-E_{\rm start})\}$. The guarantee therefore
+holds only when every $j\in\mathcal{L}$ is in $\mathcal{P}$ or in
+$\mathcal{A}$. A term in neither is lost with no bound. If $\mathcal{A}$ is
+empty, `check_cxr_truncation` maps $\sum M_j=0$ to a zero fraction and passes
+silently. A route is covered when it either keeps `kinematic-ceiling`, or
+satisfies this condition, or refuses loudly. The new fallback only converts a
+loud refusal into a rescore, so it cannot repair a silent pass.
+
+### Route table
+
+| Route reachable from a default build | $\mathcal{P}$ / $\mathcal{A}$ coverage | Result |
+|---|---|---|
+| Incoherent single slab, batched route | same rows in collection and audit | covered |
+| Per-reflection incoherent route (temporal profile, history mosaic `mosaic_route="mc-sampled"`, layered or grooved with the batch flag off) | step 7 of `_per_hkl.py` calls `_accumulate_edge_truncation` before `add_boxes`/reduction. A forced per-hkl route reproduces the batched audit exactly (h-BN 100 keV, 4 e: line mass $3.429965\times10^{-9}$ on both routes, $\int S\,dE\,N_e/M=0.99977$ on both) | covered; dropping `temporal_profile` from the fallback set is justified |
+| Coherent / `"both"` | `default_bandwidth_policy` keeps `kinematic-ceiling` | covered |
+| `max_dE_frac>0` | kept `kinematic-ceiling`; grouped rows refuse every audit | covered |
+| Feature windows | `_resolve_bandwidth` keeps `kinematic-ceiling` when `windowed` | covered |
+| Two-beam DTR | `validate_dtr_case` refuses any `line_grid_policy`; `_cxr_for_segments` would pass no audit to `case_dtr_spectrum` | unreachable (loud) |
+| Axial fibre | `_validate_axial_channeling` refuses `line_grid_policy` | unreachable (loud) |
+| Mixed transport | `resolve_cxr_grid` swaps a defaulted payload to kinematic; `refuse_mixed_cxr` refuses every line call | no line mass exists |
+| Layered stacks | collection and audit go through `_cxr_for_segments_once` over `layer_radiators`, and the ceiling is taken over every radiator | covered |
+| Groove | incoherent rows are batched with audit; DBR is disabled for grooves | covered |
+| GDF beam | incoherent, flat face only; collection uses the realized trajectories | covered |
+| Line roulette | `mass_only` screen sums are forwarded into the caller audit | covered (see latent note) |
+| Adaptive per-electron | the `case_measure` band is the policy ceiling; `realized_case` precedes the fallback | covered |
+| Streamed scoring | audit fed per block; refusal raises (no fallback) | loud |
+| **Planar channeling** (`Channeling("planar")`) | see Finding 1 | **uncovered, silent** |
+| **Automatic reflection selection** | selected lines beyond the keep window lie in neither $\mathcal{P}$ nor $\mathcal{A}$ (Finding 2) | **partially uncovered** |
+| Diffracted brem (default for perfect single slabs), planar-stack TR | scored on the line axis, never in $\mathcal{P}$ or $\mathcal{A}$ (Finding 3) | uncovered, unaudited |
+
+### Finding 1 (discrepancy): planar channeling truncates its source spectra silently
+
+`_resolve_planar` neither refuses nor replaces `line_grid_policy`, and
+`default_bandwidth_policy` does not look at channeling. A default planar case
+therefore gets `resonance-population`. On zone rows,
+`planar_zone_line_parts` removes the plane's own reciprocal row and the
+source-owned reflections from native scoring. The channeling source
+`spec_channeling` (CR plus the zone PXR/DCR of `case_zone_pxr_spectrum`) owns
+their emission. That source is scored on the line axis
+(`channeling_emission.case_channeling_spectrum`,
+`np.asarray(transport["E_grid"])`), but it is neither collected nor audited.
+
+The probe used the anchor geometry of
+`tests/montecarlo/channeling/test_planar_zone_lines.py`: Si, plane
+$(1\bar10)$, 17 MeV, 2 µm, a 3° tilt at 46° azimuth, the default bins and
+4 electrons. Building the case gives `resonance-population` with ceiling
+966200 eV. The collected population is empty (`n_lines = 0`), so the stop
+falls to the Si K$\beta_3$ characteristic edge: the axis is $[50, 2700]$ eV.
+The native spectrum is zero, and the audit records
+`upper_fraction_bound = 0.0`, which passes. Rescoring the same CR source on
+$[50, 2\times10^5]$ eV puts its peak at 10352 eV. **0.9917** of its integral
+lies above the 2700 eV stop. All 15 Laue DBR reflections in the wide band are
+dropped as well, because `bragg_reflections` keeps a reflection only within
+1500 eV of the grid. The result is unchanged at `97fae5d33`: nothing refuses,
+so the new fallback never fires. On `main` the same case keeps the
+kinematic-ceiling axis.
+
+The first divergent factor is the audit denominator. `check_cxr_truncation`
+reads $\sum_{j\in\mathcal{A}}M_j=0$ for a case whose line axis carries the
+nonzero `spec_channeling`, and maps it to a zero truncation fraction. The
+fallback set in `default_bandwidth_policy` omits `channeling`.
+
+### Finding 2: selected reflections beyond the audit keep window are unbounded
+
+Under automatic selection (the default for catalog crystals with no pinned
+`hkl_list`, e.g. silicon, diamond, MoS₂), $\mathcal{P}$ is collected over the
+built `n_families=4` set. The pilots feed $\mathcal{A}$, but only for lines
+with $E_j<S+0.2(S-E_{\rm start})$. A selected higher-|g| line beyond that
+window is in neither set. Its mass is neither scored nor audited. The
+shell-yield selection is also measured on the truncated axis, so such
+shells add no in-band yield there.
+
+MoS₂ at 100 keV with 2 electrons shows the size of the effect. The default
+measured axis $[50, 31400]$ eV was refused (audit bound
+$1.88\times10^{-4}$), which now triggers the fallback. On the
+kinematic-ceiling axis ($[50,10^5]$ eV, 342618 selected reflections), the
+scored yield fraction above 31400 eV is $9.29\times10^{-5}$. Of that,
+$4.17\times10^{-5}$ lies above the 37670 eV keep edge, which no audit could
+see. That unaudited share is 0.42 of $\varepsilon$. A case whose in-window
+share stays under $\varepsilon$ while its beyond-window share does not would
+pass silently. The fallback covers only refusals.
+
+Two fixes would close this. The selector could collect $\mathcal{P}$ over the
+selected set (or bound it by the selection cap). Alternatively, the audit
+could be fed lines resonating beyond the keep window as wholly lost, as the
+selector already does for its own population.
+
+### Finding 3: other line-axis components outside the audit
+
+Default diffracted bremsstrahlung (`case_diffracted_brem`, added to `spec`)
+and planar-stack transition radiation (`spec_transition`, scored on
+`E_grid`) are neither collected nor audited. A measured stop drops any DBR
+reflection more than 1500 eV above the axis, and any TR above $S$. In the
+non-channeling Si 17 MeV probe, DBR was $4\times10^{-9}$ against a native
+$2.9\times10^{-2}$ (negligible), and the axis reached the ceiling. In the
+channeling probe, all of the DBR was lost (Finding 1). TR was not
+quantified.
+
+### Fallback, identity and budget checks
+
+- **Fallback payload.** `kinematic_fallback_payload(default)` equals the
+  explicit per-call `kinematic-ceiling` payload for h-BN (1000 and 100 keV),
+  MoS₂, silicon, HOPG (25, 333, 1000 keV), 2H-TaS₂ and diamond (5 MeV). It
+  differs for a bare sweep without stored energy rows
+  (`cxr_by_energy=None`, catalog orientation, no selection). There the
+  default carries `grid_model = "automatic-v1"` and the explicit per-call
+  payload does not, because `_cxr_grid_for_energy` sets it only when
+  `not override`. Both HOPG and h-BN at 25 keV show this. The coordinates
+  are the same, since `grid_model` is read nowhere else. The policy cache key
+  differs, however, and the anchor only exercises the stored-row h-BN case.
+  This is a minor issue: the docstring claim "the payload an explicit
+  `kinematic-ceiling` would carry" fails on this path.
+- **Phase state on fallback.**
+  - The first attempt raises inside `_line_phase`, so the `"lines"` phase is
+    never cached.
+  - The audit, the temporal accumulators and `CoherentGridAudit` are rebuilt
+    per `_spectrum_case_impl` call. `realized_case` runs once, before the
+    `try`.
+  - A budget refusal of the kinematic axis raises from the `except` block and
+    is not re-caught.
+  - The `tp` key `groove` is always present (`_transport_case`, artifact
+    replay).
+  - Latent: under `_spectrum_case_retry` (GPU), `phase_cache.setdefault
+    ("line_screen", ...)` returns the first attempt's `LineScreen`. Its
+    `_grid` is fixed to the refused two-node band, so the retry screen keeps
+    the old keep window, and primaries whose lines all lie above it read
+    zero mass and are not kept. This path is unreachable today: line roulette
+    disables automatic selection, and with $\mathcal{A}\subseteq\mathcal{P}$
+    the audit sees at most the selector's $\varepsilon/2$. A CPU probe (MoS₂,
+    100 keV, roulette, forced refusal) gave identical cached and uncached
+    results but carried no line mass.
+- **Identity.** SHA-256 of the case `line_grid_policy` and of the whole case
+  payload were compared between `main` (`38e07316c`) and HEAD. The cases
+  were: explicit `kinematic-ceiling` (h-BN, Si 1 MeV), default + coherent,
+  default + `max_dE_frac`, default + windows, and explicit
+  `resonance-population`. All are bit-for-bit identical. The default h-BN
+  1 MeV case and its temporal variant move (`kinematic-ceiling` to
+  `resonance-population`). `line_bandwidth_model` is added exactly when
+  `emission == "incoherent"`. That matches `coherent_emission = "coherent" in
+  emission` in `default_bandwidth_policy`, and it over-keys (safely)
+  incoherent cases that keep kinematic (`max_dE_frac`, windows, explicit,
+  stored rows).
+- **Budget.** Under the measured default, `_cxr_grid_for_energy` clips only
+  the declared coarse grid (`min(num, max_points)`) and does not refuse.
+  `resolved_coordinates` and `windowed_coordinates` raise
+  `CxrGridToleranceError` when the target-spacing count exceeds
+  `max_points` on the measured stop or on the fallback ceiling. No silent
+  clipping was found.
+
+### Anchor discrimination (`test_selected_reflections_feed_the_measured_bandwidth_audit`)
+
+The test passes (with `--slow`, 9 s). Its ratio
+$\int S\,dE\cdot N_e/M_{\mathcal{A}}\in[1-\text{edges},\,1+10^{-3}]$ does
+discriminate wiring:
+
+- Unaudited pilots leave no `line_mass` (the base set is replaced, not
+  audited; the docstring's "only the base reflections" is inaccurate), so the
+  test fails.
+- Double-audited pilots push the ratio below $1-\text{edges}$, so the test
+  fails.
+- A missed in-axis shell is detected only above $10^{-3}$ of the mass, which
+  is 10 times $\varepsilon$.
+
+The test is structurally blind to Finding 2: a line outside the keep window
+contributes to neither the numerator nor the denominator.
+
+`pyrite-dev test tests/energy-grid/test_line_grid_bandwidth.py
+tests/energy-grid/test_line_grid_windows.py
+tests/energy-grid/test_line_grid_policy.py`: 97 passed, 1 skipped.
+
+### Filter table
+
+| Filter | Result |
+|---|---|
+| Units: fractions dimensionless, $M$ in the same photons/sr units in audit and spectrum | pass |
+| Limits: an empty $\mathcal{A}$ must not certify a nonzero line-axis spectrum | **fail** (planar channeling) |
+| Conventions: default ⇔ no `sources["bandwidth"]`; fallback only for defaulted, non-local, non-windowed | pass |
+| Fallback payload equals explicit `kinematic-ceiling` | pass on stored-row/selection/reoriented builds; minor fail (`grid_model`) on bare sweeps |
+| Identity of explicit and fallback-set cases vs `main` | pass (bit-for-bit) |
+| Budget refusal after transport, no clipping | pass |
+
+### Verdict
+
+**`discrepancy`.** The default flip reaches planar channeling, where the line
+axis carries `spec_channeling` (CR and zone PXR/DCR) and DBR. These are
+outside both the collected population and the audit, so a 17 MeV Si case
+loses 99.2 % of its CR above a 2700 eV stop with a passing zero-mass audit.
+The first divergent factor is the audit's zero line-mass denominator, caused
+by `default_bandwidth_policy` omitting `channeling`.
+
+Also uncovered:
+
+- Selected reflections beyond the audit keep window under automatic
+  selection (unbounded; $0.42\,\varepsilon$ measured on MoS₂ 100 keV).
+- Default DBR and planar-stack TR on the line axis (unaudited).
+
+The temporal removal, coherent/`max_dE_frac`/windows fallbacks, identity
+preservation, budget refusal and fallback mechanics verify.
+
+Suggested ledger change: keep the claim at `discrepancy` until planar
+channeling falls back to `kinematic-ceiling` (or its source spectra enter
+$\mathcal{P}$ and $\mathcal{A}$), and until beyond-keep selected lines are
+bounded. The minor `grid_model` and stale-`LineScreen` items go in the Notes.
+Not `signed-off`.
+
+## Independent re-verification (fresh context, 2026-11-16, #1243 remediation)
+
+Verifier scope: remediation at `ac37b4d97577bb3ab5b4148419a53114398a127d`,
+read-only implementation review plus this append-only write-up. The verifier
+read the ledger, source statements and signatures/docstrings before inspecting
+implementation bodies. The earlier independent tail derivations above are
+accepted; this pass derives the routing and population-coverage requirement.
+
+### Independent coverage derivation before implementation inspection
+
+The cited source remains `finite-time-lineshape` and its elementary integral,
+plus the Lorentzian source `characteristic-radiation`; no new physical law is
+introduced. For an incoherent positive mixture with first-zero width $w_i$,
+$M_i=W_iw_i$ is the whole-line mass, and the upper lost mass obeys
+
+$$
+L(S)\leq\sum_i M_i\min\left(1,\frac{w_i}{\pi^2(S-E_i)}\right),
+$$
+
+where the summand's fraction is defined as one for $E_i\geq S$.
+Mass and integrated spectral yield have the same units (photons per steradian
+per incident electron after the shared electron normalization); $w_i$ and
+$S-E_i$ are in eV. Every mass and bound is nonnegative. Moving $S$ upward
+cannot increase this bound. An empty native population can certify zero
+native radiation only, never an additional nonzero source on the same axis.
+
+Let $C$ be the existing ceiling, $A$ the lower edge, and
+$K_C=C+0.2(C-A)$ its upper keep edge. To bound every native line scored by
+the ceiling reference, the measured reduction must audit the same physical
+population up to $K_C$, including centres beyond its own former keep edge
+$S+0.2(S-A)$. Centres above $S$ must contribute their whole mass to the
+upper bound. Merely collecting the original built reflection set does not
+cover additional automatically selected reflections. For any extra component
+$X$ (channeling, TR or DBR), the required total fraction is
+
+$$
+f_{\rm total}(S)=\frac{L_{\rm native}(S)+L_X(S)}{M_{\rm native}+M_X}.
+$$
+
+Auditing native radiation alone instead produces
+$f_{\rm native}=L_{\rm native}/M_{\rm native}$. Their exact difference is
+
+$$
+f_{\rm total}-f_{\rm native}
+=\frac{L_X-f_{\rm native}M_X}{M_{\rm native}+M_X}.
+$$
+
+Thus an unaudited component needs its own bound, or a kinematic fallback or
+refusal, before the full line-axis tolerance can be certified. Smallness at
+one probe point does not bound that term for all supported cases. The
+one-line limiting case remains $S=E_i+2w_i/(\pi^2\varepsilon)$ before
+rounding/capping. These are the criteria used below.
+
+### Comparison against remediation
+
+`_unmeasured_line_axis` tests non-`None` channeling/TR and mixed transport.
+`resolve_cxr_grid` replaces a defaulted measured payload with
+`kinematic_fallback_payload` before cache lookup, collection or allocation;
+an explicit measured payload raises `ValueError`. This closes the earlier
+planar-channeling zero-native-mass failure on that entry point, including an
+empty channeling dictionary. The guard has no DBR clause.
+
+`cxr_truncation_audit` now passes the ceiling to both native reduction
+routes. `_line_keep_window` sets the upper keep edge to
+$\max\{S+0.2(S-A),C+0.2(C-A)\}$ when $C>S$.
+Both `_batched_tables` and `_accumulate_reflection` use this helper before
+their resonance keep masks. `_accumulate_edge_truncation` charges
+$E_i\geq S$ with $M_i$ in both `mass_above` and `line_mass`, exactly as
+derived. The earlier selected-line gap above the measured upper keep window
+is therefore closed for these routes. The lower keep edge remains that of
+the measured axis; lower-edge certification is explicitly outside this
+claim. The ceiling value itself remains a separate ledger claim.
+
+| Route | Independent result |
+|---|---|
+| Joined `run_case` | `case_spectrum_inputs` calls the guarded resolver; channeling/TR/mixed default fallback and explicit refusal match the derivation |
+| Public `score_spectra` of kept trajectories | `_scoring_transport` calls the same `case_spectrum_inputs`; same protection |
+| Batched and per-reflection native reductions | Both use the widened ceiling upper keep window and the same audited mass; selected pilot calls carry the audit |
+| Live streaming | Channeling/TR are already refused by `streaming_refusal(..., live=True)`; native reductions carry the ceiling audit. Its resolver calls `_resolve_policy_grid` directly, so this review does not infer the joined guard applies to every streaming case |
+| Full artifact replay | `spectrum_from_artifact` reuses recorded spectrum inputs and calls `_spectrum_case` directly; it does **not** call the new guard. Fresh artifacts captured through the guarded joined path retain the ceiling grid. A previously captured measured channeling/TR artifact is not repaired or refused by this routing change alone |
+| Streamed artifact replay | Also reuses recorded inputs; channeling and per-electron TR can be replayed (`live=False`). The new guard is bypassed, so the same historical-axis limitation applies |
+| DBR on a perfect single slab | Still unaudited on both ordinary and replay scoring; see discrepancy below |
+
+Artifact identity checks compare the stored case and optional physics
+provenance, but `_checked_case_and_inputs` deliberately omits the expected
+`E_grid` comparison for any case carrying `line_grid_policy`. Thus source
+inspection supplies no blanket refusal guarantee for old short-axis
+artifacts. This is a route-coverage concern, not a measured claim that such
+an artifact exists in the user's store. Existing channeling replay anchors
+use explicit line coordinates; they cannot prove the new automatic-policy
+fallback on replay. No replay transport/spectrum probe was run in this pass.
+
+### Remaining exact discrepancy: unaudited DBR term
+
+`case_driver._line_phase` calls `check_cxr_truncation` before DBR runs.
+Later `_spectrum_case_impl` adds `case_diffracted_brem(...)` directly to
+`spec`; the DBR signature has no truncation-audit parameter.
+`runner/diffracted_brem.py::_in_claim` admits perfect single slabs with
+reflections and directions, independently of measured bandwidth.
+`bragg_reflections` additionally keeps a DBR reflection only when its Bragg
+centre is within 1500 eV of the supplied grid. Hence a centre satisfying
+$S+1500\ \mathrm{eV}<E_B\leq C+1500\ \mathrm{eV}$ can be present on the
+ceiling reference and wholly absent from measured scoring and its audit.
+Widening the native resonance keep window cannot recover this term.
+
+In the independent expression above set $X=\mathrm{DBR}$. The first exact
+divergence is omission of $L_{\rm DBR}$ from the loss numerator and
+$M_{\rm DBR}$ from the normalization denominator. The implemented native
+fraction and the full line-axis fraction differ by
+
+$$
+\boxed{\frac{L_{\rm DBR}-f_{\rm native}M_{\rm DBR}}
+{M_{\rm native}+M_{\rm DBR}}}.
+$$
+
+No inequality bounding this quantity by the remaining tolerance share is
+implemented or supplied. The earlier Si probe's small DBR yield is evidence
+at one point, not a uniform bound. This pass neither independently repeats
+that value nor treats it as an anchor. The same structural question applies
+to the separately added diffracted-characteristic correction; its source
+model and signed direct-beam depletion require their own coverage argument
+before claiming a bound on every line-axis component.
+
+This does **not** invalidate the independently rederived native sinc bound.
+It prevents upgrading the complete default line-axis guarantee to
+`rederived` while unaudited DBR is admitted. Remedies: bound the extra
+component, preserve/refuse the measured axis where it contributes, or
+explicitly restrict the ledger claim and user-visible certificate to native
+PXR/CBS plus the separately bounded direct characteristic model. Such a
+restriction would not certify total line-axis truncation.
+
+### Checks and filters
+
+Tested source commit: `ac37b4d97577bb3ab5b4148419a53114398a127d`.
+Only this write-up is modified. Commands used the project runner:
+
+```text
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test tests/energy-grid/test_line_grid_bandwidth.py tests/dev/test_docs.py
+41 passed, 1 skipped (the selected-reflection slow anchor), 26 existing physics warnings.
+
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test --slow tests/energy-grid/test_line_grid_bandwidth.py::test_selected_reflections_feed_the_measured_bandwidth_audit
+1 passed; one overflow warning in the tail division for nonpositive distances, subsequently selected as whole mass by the distance branch.
+```
+
+The slow anchor now runs with the widened window and passes, but the direct
+keep-window anchor supplies only an algebraic helper check. No new full
+MoS2 transport probe, DBR tolerance bound, GPU job or external comparison was
+performed. No source table values were transcribed; reference-data filters
+are therefore not applicable. The prescribed docs build and positive HTML
+math inspection are delegated to the task owner under the explicit
+instruction not to build docs in this verifier. Only static docs tests were
+run here; rendering is not yet certified by this pass.
+
+| Filter | Result |
+|---|---|
+| Units and normalization of native mass and edge fractions | pass |
+| Native one-line, nonnegative-mass and monotone-upper-edge limits | pass |
+| Channeling/TR/mixed joined default fallback and explicit refusal | pass |
+| Upper keep-window coverage of selected native lines in both reductions | pass |
+| Total line-axis limit with nonzero unaudited DBR | **fail**: missing numerator and denominator terms given above |
+| Ledger/page/code notation agreement | concern: the Claim and opening source summary still describe the old measured-axis keep edge; owner should update them to the ceiling keep edge |
+| Replay of a previously captured short measured source axis | concern: stored-axis replay bypasses the new resolver guard |
+| Existing source values/evidence artifacts | no new values or artifact-based parity claim; prior probe numbers not re-certified |
+| Tolerances | native $\varepsilon/2$ and audit $\varepsilon$ unchanged; no justified DBR tolerance supplied |
+
+### Verdict after remediation
+
+**`discrepancy` for the full default line-axis claim.** The channeling/TR/mixed
+joined routing and native selected-line upper-window fixes match the
+independent derivation. Native coverage can be described as `rederived`
+within that explicit scope. DBR remains outside the collected population
+and audit, so the full-axis guarantee does not follow. Replay protection is
+conditional on the recorded axis already being safe.
+
+Suggested ledger change, for the owner: retain `Status: discrepancy`; record
+that the two previous native/joined-route findings are resolved at
+`ac37b4d97`, replace the stale keep-window description with the ceiling upper
+keep edge, and retain DBR coverage plus historical recorded-axis replay as
+open limitations. Never `signed-off`.
+
+### Prospective compact-support fallback criterion (derived before inspecting window bodies)
+
+For an extra numerically deposited profile with support
+$[E_{-,r},E_{+,r}]$, retaining the full support inside $[A,S]$ makes its
+additional upper loss exactly zero, even if the correction has either sign.
+The sufficient guard is $S\geq\max_r E_{+,r}$ over all reflections visible
+on the ceiling reference, with the same deposition convention. The physical
+Laue field is not compact; this statement concerns the existing production
+window truncation, not an independent bound on physical tails. A nominal
+$E_B+1500\ \mathrm{eV}$ guard is sufficient only if that quantity really
+bounds the window's absolute upper endpoint. A refractive shift of the window
+centre must be included. Shared window/deposition functions would permit the
+same guard to cover DBR and the signed Kossel correction, avoiding any new
+positive-mixture argument for the latter.
+
+### Observation bypass and production-support assessment
+
+`directions.directional_outputs` calls `resolve_observation_cxr_grid` and
+then overwrites each directional transport's `E_grid` with its result.
+That resolver calls `_resolve_policy_grid` directly, without
+`_unmeasured_line_axis`. The scalar fallback only replaces its local
+`policy_payload`; the original case remains measured. Therefore a safe
+scalar fallback does not protect multi-direction scoring: channeling/TR can
+again receive an unaudited measured axis. `refuse_axial_directions` excludes
+axial channeling only; it is not the planar/TR coverage guard. This is an
+additional routing discrepancy at the reviewed commit.
+
+The shared window inspection confirms that a plain
+$E_B+1500\ \mathrm{eV}\leq S$ test is insufficient. With
+$k=E_B/(\hbar c)$, $n_s=\hat{\mathbf n}\cdot\hat{\mathbf s}$ and
+$Q_s=(k\hat{\mathbf n}+\mathbf g)\cdot\hat{\mathbf s}$, the numerical
+window centre is $E_B+\delta E$, where
+
+$$
+\delta E=\operatorname{Re}\chi_0
+\left(\frac{k}{2n_s}-\frac{k^2}{2Q_s}\right)
+\frac{\hbar c Q_s}{|\hat{\mathbf n}\cdot\mathbf g|}.
+$$
+
+This shift can be positive. Also `np.arange(-span, span + step, step)`
+can put the last node above `span` by up to one step. Here
+$\mathrm{span}\leq1500\ \mathrm{eV}$ and the default step is at most
+$1.5\ \mathrm{eV}$. Kossel uses the same window with an additional
+`max_step`; its endpoint can differ from DBR's. A conservative common bound
+is $E_B+\delta E+\mathrm{span}+\mathrm{step}_{\rm default}$, or the
+looser $E_B+\max(0,\delta E)+1501.5\ \mathrm{eV}$. A floating-point
+implementation should round its conservative endpoint upward.
+
+Both corrections call `deposit`: node interpolation is exactly zero outside
+the fine window, and bin-mean deposition integrates a cumulative profile
+constant beyond the endpoints. Kossel's 100-FWHM line-reach test selects
+source lines but does not enlarge the deposited window. Containing that
+whole window below $S$ therefore prevents additional upper loss for both
+production corrections. For bin means, a final-centre test is conservative
+because the final bin edge is above $S$; any more permissive test must use
+the actual bin edge. This certifies the existing numerically truncated
+profiles only, not the physical infinite tails.
+
+Recommended insertion seams for the owner:
+
+- Share channeling/TR/mixed policy fallback/refusal between scalar and
+  observation resolution, before cache acceptance. Observation must apply
+  the condition across all `n_hats`.
+- For DBR/Kossel, inspect production-eligible reflections on the ceiling
+  reference, not the already narrowed grid. A shared post-resolution guard
+  in `_resolve_policy_grid` must run on cache hits as well as fresh grids.
+  Missing support containment should force the default to kinematic or
+  refuse an explicit measured choice. The simplest still more conservative
+  alternative is fallback/refusal whenever any ceiling-visible eligible
+  Bragg reflection exists.
+- Full and streamed artifact replay share
+  `artifacts._checked_case_and_inputs`. Validate the recorded grid there,
+  before handing it to `_spectrum_case` or `BlockSpectrumScorer`. An unsafe
+  recorded source axis should be refused clearly, or re-resolved using
+  transport evidence where available. A guard only in `resolve_cxr_grid`
+  cannot protect replay. Public `score_spectra` already re-resolves through
+  `case_spectrum_inputs`.
+
+Even perfect support containment does not alone justify an
+$\varepsilon$-of-total-*signed*-yield interpretation: a negative Kossel
+correction can reduce the total denominator while native omitted mass stays
+fixed. A native PXR/CBS certificate should say so explicitly; a total-yield
+certificate needs that denominator treated or a conservative fallback for
+these cases. No source changes are proposed as verifier edits.
+
+## Remediation 2 (implementation context, 2026-11-16, #1243)
+
+Not a verification. Responds to each open item of the re-verification above.
+
+| Finding | Change | Anchor |
+|---|---|---|
+| Observation resolution bypasses the channeling/TR/mixed fallback | `runner/cxr_grid.py::_auditable_policy` is applied by `resolve_cxr_grid`, `resolve_observation_cxr_grid`, `cached_policy_cxr_grid` and `streamed_line_grid.resolve_streamed_line_grid`, before cache lookup | `test_observation_resolution_shares_the_unmeasured_axis_fallback` |
+| DBR (and Kossel) outside population and audit | Compact-support criterion above: `_cover_bragg_support` raises $S$ to $\min(C,\max_r E_{+,r})$, with $E_{+,r}=E_B+\delta E+\mathrm{span}+\mathrm{step}_{\rm default}$ rounded up by $10^{-12}$ relative, over every reflection `bragg_reflections` admits on $[A,C]$ toward each direction. A Kossel `max_step` only lowers step and endpoint. Uses the case's built `hkl_list`, which is what DBR/Kossel score | `test_bragg_support_bounds_every_dbr_and_kossel_window_node`, `test_measured_stop_rises_to_the_bragg_support_under_the_ceiling` |
+| Cache hits from pre-coverage resolutions | `MEASURED_COVERAGE_REVISION` enters measured cache keys only | `test_measured_grid_cache_key_carries_the_coverage_revision` |
+| Stored-axis replay bypasses the guards | `artifacts._checked_case_and_inputs` calls `check_recorded_line_axis`: the recorded axis must reach the ceiling under a kinematic or fallback payload, and the Bragg support under a measured one; otherwise `TrajectoryArtifactError` | `test_replay_refuses_a_recorded_axis_short_of_todays_requirement` |
+| Signed Kossel denominator | Not treated: the certificate is stated for native PXR/CBS plus characteristic lines; DBR/Kossel are covered by window containment only (Claim) | — |
+
+Where the stop is raised up to $C$ by a Bragg window at $C$, the result is the kinematic axis. With the default side-on observation, no Laue reflection qualifies and stops are unchanged; for a forward direction (Si 1 MeV, $\hat n=(\sin0.6,0,\cos0.6)$) the support reaches 412 keV. Status stays `discrepancy` pending fresh-context re-verification.
+
+
+## Independent re-verification 3 (fresh context, 2026-11-16, #1243 remediation 2)
+
+Verifier scope: commit `5b6239611`, read-only implementation review, CPU
+probes, and this append-only section. The criteria below were written from
+the ledger Claim, the docstrings and the open items of the previous pass
+before the bodies of `_cover_bragg_support`, `bragg_support_stop_eV`,
+`bragg_window_upper_eV`, `_auditable_policy` and `check_recorded_line_axis`
+were read. The native tail bounds rederived earlier are accepted unchanged.
+
+### Coverage criteria (derived before reading the new bodies)
+
+Let $A$ be the lower edge, $C$ the ceiling and $S$ the measured stop. Reflection
+$r$ deposits on fine nodes $E_{r,j}=c_r+o_j$, where $c_r=E_{B,r}+\delta E_r$ and
+$o_j=-s_r+j\,h_r$ for $j=0,\dots,n_r-1$. Here $\delta E_r$ is the refraction
+shift and $s_r$ the half-span. The step is $h_r$, with $h_r^{\rm K}$ for Kossel.
+Both `np.interp(..., right=0)` and the cumulative bin-mean integral vanish
+above the last node. Therefore the correction adds zero upper loss on an axis
+whose last node is at least
+
+$$
+E_{+,r}\geq c_r+o_{n_r-1}.
+$$
+
+The `arange` endpoint satisfies $o_{n-1}<s+h$; floating rounding of the
+length can reach $o_{n-1}=s+h$ only to rounding error. The required
+conditions are therefore:
+
+1. Use $E_{+,r}=c_r+s_r+\max(h_r,h_r^{\rm K})$, rounded up, with the signed
+   shift $\delta E_r$ included.
+2. Include every reflection admitted at runtime on any axis $[A,S']$ with
+   $S'\leq C$. `bragg_reflections` admits $E_B\in[A-1500,\,S'+1500]$, so
+   the $[A,C]$ set is a superset. Use the same `hkl_list`, orientation,
+   $\chi_0$, $|\chi_g|$, thickness and $\hat{\mathbf s}$.
+3. Take the maximum over every direction that will score DBR on that axis.
+4. If $E_{+,r}>C$, the kinematic reference loses the same tail. The stop
+   $\min(\max_r E_{+,r},C)$ then adds zero upper loss relative to that
+   reference.
+5. Every route that returns a measured axis, including cache hits, must
+   satisfy item 1. A cache key must therefore contain every input on which
+   $\max_r E_{+,r}$ depends. For `bragg_support_stop_eV` these are the
+   `_in_claim` switches (`hkl_list`, `abs_layers`, `layer_radiators`,
+   `groove_spacing_ang`, `mosaic_fwhm_rad`, `mosaic_mc_fwhm_rad`), the
+   orientation keys, `crystal`, `thickness_ang`, `B_ang2` and the direction.
+6. Replay must refuse a stored axis that is short of the item-4 value under a
+   measured payload, or short of $C$ under a kinematic/fallback payload. It
+   must pass fixed, diagnostic and at-ceiling axes.
+
+### Comparison
+
+| Item | Implementation | Result |
+|---|---|---|
+| Endpoint bound | `bragg_window_upper_eV` returns $c+s+h_{\rm default}$ plus a relative $10^{-12}$. With $h^{\rm K}=\max(\min(a,b,m),f)\leq\max(\min(a,b),f)=h_{\rm default}$, Kossel's `max_step` cannot raise the endpoint. The shift is included through `_bragg_window_parts`, which is shared with `bragg_window` | pass |
+| Reflection set | `bragg_support_stop_eV` calls `bragg_reflections(case, n, [A, C])` with default `margin_eV=1500`, the same `_bragg_energy`, thickness and `s_hat=(0,0,1)` as `case_diffracted_brem`, `_kossel_reflections` and `DiffractedDepthAccumulator`. DBR/Kossel score the built `hkl_list`; `selected_line_spectrum` discards the pruned case (`case_driver.py` passes the outer `case` to both corrections) | pass |
+| Kossel line reach | The 100-FWHM reach filters source lines and does not widen the window. The window thickness is `edges[-1]` = slab thickness | pass |
+| Directions | `_measured_cxr_grid` passes its full `n_hats` (scalar `(n_hat,)`, observation all directions); the maximum is taken over all | pass |
+| Stop raise | `covered = min(support, ceiling)`. `resolved_coordinates` builds `linspace(start, stop, num)` with an exact last node; the local-resolution plan uses the same `stop`. A cache hit rebuilds `linspace(start_eV, stop_eV, num)` from the record | pass |
+| Ceiling case | support above $C$ gives the kinematic end node | pass (zero extra loss relative to the reference) |
+| `_auditable_policy` routes | scalar `resolve_cxr_grid`, `resolve_observation_cxr_grid`, `cached_policy_cxr_grid` and `resolve_streamed_line_grid` apply it before key construction. `rg` finds no other caller of `_resolve_policy_grid`/`_measured_cxr_grid`/`resolved_coordinates`; `energy_grid/bandwidth_check.py` calls the guarded `resolve_cxr_grid` | pass |
+| `MEASURED_COVERAGE_REVISION` | enters only measured keys (scalar and observation share `_policy_cache_key`); pre-revision entries hash differently and miss; kinematic keys unchanged | pass for pre-coverage entries |
+| Cache-key completeness (item 5) | `_policy_cache_key` keys `_RESOLUTION_INPUT_KEYS + _WINDOW_INPUT_KEYS + _WEIGHT_INPUT_KEYS`; `mosaic_fwhm_rad` is in none of them, but `_in_claim` reads it | **fail**, see below |
+| Replay guard | `_checked_case_and_inputs` calls `check_recorded_line_axis` whenever the case has a policy or diagnostic grid and a recorded `E_grid`. It is shared by `spectrum_from_artifact` and `stream_spectrum_from_artifact`. Diagnostic grids return early; fixed grids keep the exact `E_grid` equality check. A kinematic or fallback payload requires $C$, and a measured payload requires $\min(\text{support},C)$ with the recorded `n_hat`. An explicit measured payload on channeling/TR/mixed raises through `_auditable_policy` | pass |
+| Signed Kossel denominator | The Claim now restricts the $\varepsilon$ certificate to native PXR/CBS and characteristic lines. DBR/Kossel are covered by window containment only | consistent; no denominator claim to check |
+
+### Exact discrepancy: Bragg support is not in the measured cache key
+
+The measured stop now depends on
+`montecarlo/runner/diffracted_brem.py:24` (`case.get("mosaic_fwhm_rad")`
+inside `_in_claim`). A nonzero analytic mosaic gives `support = None`, so no
+raise occurs. `runner/cxr_grid.py:663` builds the key from
+`_RESOLUTION_INPUT_KEYS` (line 92), `_WINDOW_INPUT_KEYS` (line 139) and
+`_WEIGHT_INPUT_KEYS` (line 148). None contains `mosaic_fwhm_rad`.
+Before this commit that omission was harmless, because native resolution
+reads `mosaic_mc_fwhm_rad` only. After it, a perfect crystal and the same case
+with `mosaic_fwhm_rad > 0` share one measured key. If the mosaic case
+resolves first, `_resolve_policy_grid` (`cxr_grid.py:751`) returns its
+native stop to the perfect case on a cache hit. That stop never passes
+through `_cover_bragg_support`. The first exact divergence is in item 1,
+because the served stop satisfies
+
+$$
+S_{\rm hit}=S_{\rm native}<\min\!\left(\max_r E_{+,r},\,C\right).
+$$
+
+DBR/Kossel then lose their window mass above $S_{\rm hit}$, which neither the
+native audit nor any other guard sees. The reverse order is harmless: the
+mosaic case then receives a longer axis.
+
+The CPU reproduction used Si at 100 keV, $\theta_{\rm obs}=0.9$, no tilt,
+$N_e=2$, and an isolated cache directory:
+
+| Run | Stop [eV] | Cache | DBR $\int S\,dE$ |
+|---|---|---|---|
+| Perfect crystal, cold cache | 96860.20 (= Bragg support; native 84800) | miss | 5.840507e-12 |
+| `mosaic_fwhm_rad=1e-3` first, then the perfect crystal | 84800.0 | hit | 5.824139e-12 |
+
+The cold run's DBR mass above 84800 eV on its own axis is 9.39e-15. The
+audit passed on both runs (`resonance-population` kept), and the total line
+yield differs by 2.97e-6 relative. The magnitude is small at this point, but
+the window-containment guarantee is violated exactly. An artifact captured
+from the cache-hit run is refused by its own replay through both
+`spectrum_from_artifact` and `stream_spectrum_from_artifact` ("stops at
+84800 eV, below the 96860.2 eV"). The cold-run artifact replays on both
+routes, so the replay guard behaves as derived. The live run, however, has
+already scored the unsafe axis.
+
+Possible remedies for the owner: add `mosaic_fwhm_rad` to the measured key
+inputs, or key on the `_in_claim` result or on the Bragg support itself. In
+either case bump `MEASURED_COVERAGE_REVISION`, because poisoned entries
+already sit under the perfect-crystal key. Adding a `None`-valued field
+leaves that key unchanged. Alternatively, re-apply `_cover_bragg_support` to
+a cache hit. No other `_in_claim` or `bragg_reflections` input is missing:
+`hkl_list`, `crystal`, `thickness_ang`, `abs_layers`, `groove_spacing_ang`
+and the observation angles are resolution keys. `layer_radiators`, the
+orientation keys, `mosaic_mc_fwhm_rad` and `B_ang2` are measured-only keys.
+The catalog susceptibility tables were already outside the key before this
+change.
+
+### Checks run
+
+```text
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test tests/energy-grid/test_line_grid_bandwidth.py tests/energy-grid/test_line_grid_windows.py::test_windows_keep_the_default_bandwidth_kinematic
+40 passed, 1 skipped (selected-reflection slow anchor, not re-run; unchanged by this commit's native path)
+
+UV_CACHE_DIR=/tmp/pyrite-uv-cache uv run pyrite-dev test tests/montecarlo/runner/test_trajectory_capture.py tests/montecarlo/channeling/test_channeling_replay.py tests/campaign/test_score_spectra.py tests/montecarlo/spectrum/test_transition_radiation_production.py
+104 passed, 18 skipped (slow)
+```
+
+The probes were CPU-only, run under `systemd-run` with an 8 GiB cap. Their
+scripts stayed in the session scratch directory.
+
+- **Window endpoint:** 13452 reflections were tested: Si at 100 and
+  1000 keV; thicknesses of $10^3$ Å (the case value), $10^5$ Å and
+  $3\times10^6$ Å; 105 forward directions; and `max_step` values of
+  $\infty$, 10, 1, 0.05 and $10^{-3}$ eV. The maximum of
+  (last node − `bragg_window_upper_eV`) was $-2.0\times10^{-9}$ eV, and in
+  every direction the window top was at most `bragg_support_stop_eV`. 7481
+  windows had a positive refraction shift, so including the shift is
+  load-bearing.
+- **Raise below the ceiling:** with Si at 1 MeV, $\theta=0.6$ and no tilt,
+  the cold run measured native 170800 eV, raised the stop to the support
+  412011.63 eV ($<C=966200$) and passed the audit.
+- **Cache collision:** the two cases give equal scalar and observation keys.
+  The end-to-end results are tabulated above.
+- **Replay:** the cold artifact replays on both routes and the cache-hit
+  artifact is refused on both.
+
+The docs build and the HTML math check were not run, per the task
+instruction; the task owner must run them. No source values were
+transcribed. No GPU or external comparison was run.
+
+### Filter table
+
+| Filter | Result |
+|---|---|
+| Units (eV endpoints, mass per sr per electron) | pass |
+| Window endpoint bound, including signed shift, `arange` overshoot and Kossel `max_step` | pass (derived and probed) |
+| Node and bin-mean `deposit` beyond the last node | pass: exactly zero / constant cumulative |
+| Reflection set (built `hkl_list`; the $[A,C]$ superset; margin 1500 eV) | pass |
+| Multiple directions | pass |
+| `min(support, C)` adds zero extra upper loss vs the kinematic reference | pass on fresh resolution |
+| `_auditable_policy` before cache lookup on every resolution route | pass; no bypassing route found |
+| `MEASURED_COVERAGE_REVISION` vs pre-coverage entries | pass |
+| Cache key complete for the new stop dependence | **fail**: `mosaic_fwhm_rad` omitted (`cxr_grid.py:92-148`, `:663`; read at `diffracted_brem.py:24`) |
+| Replay guard refuses unsafe / admits safe axes (full and streamed) | pass |
+| Ledger/page/code notation | pass: the Claim now states the ceiling keep window, Bragg-window raise and DBR/Kossel scope. Minor: the raised stop is not rounded to 100 eV, and the Claim does not say otherwise |
+| Signed Kossel denominator | outside the restricted certificate, as stated in the Claim |
+
+### Verdict
+
+**`discrepancy`.** Window containment, the route guard, the coverage
+revision and the replay guard rederive. The only remaining exact divergence
+is the speed-cache key: it omits `mosaic_fwhm_rad`, which the Bragg-support
+raise now reads. A cache hit can therefore serve a perfect-crystal case the
+unraised native stop and drop DBR/Kossel window mass above it. This was
+reproduced as 9.4e-15 of 5.84e-12 DBR, with the audit passing.
+
+Suggested ledger change for the owner: keep `Status: discrepancy` and record
+that remediation 2 closes the observation bypass, DBR/Kossel window coverage
+on fresh resolution and stored-axis replay. List the open item as
+"measured cache key omits `mosaic_fwhm_rad` (Bragg-support dependence)".
+After the key fix, revision bump and an anchor test (perfect vs
+analytic-mosaic keys differ, or a hit re-checks the support), the remaining
+criteria above support `rederived`. Never `signed-off`.
+
+### Confirmation (re-verification 3 follow-up)
+
+Tested commit `2f9f2980e`. The fix adds `mosaic_fwhm_rad` to
+`_WEIGHT_INPUT_KEYS`, which only measured keys read, and sets
+`MEASURED_COVERAGE_REVISION = 2`. Because the revision changed, an entry that
+a mosaic case wrote under the perfect-crystal key before the fix now misses.
+
+- **Key inputs:** every field read by `_in_claim`, by `bragg_reflections` and
+  by `bragg_support_stop_eV` is now in the measured key. These are
+  `hkl_list`, `abs_layers`, `layer_radiators`, `groove_spacing_ang`,
+  `mosaic_fwhm_rad`, `mosaic_mc_fwhm_rad`, `crystal`, `beam_uvw`,
+  `azimuth_rad`, `recip_miscut_rad`, `surface_hkl`, `B_ang2`,
+  `thickness_ang`, and the observation angles `theta_obs_rad`, `tilt_deg`
+  and `tilt_azim_deg`. This was checked programmatically against
+  `_RESOLUTION_INPUT_KEYS`, `_WINDOW_INPUT_KEYS` and `_WEIGHT_INPUT_KEYS`.
+  Nothing is missing. The catalog susceptibility tables were already outside
+  the key before this change.
+- **Collision probe (p2):** a perfect case and an analytic-mosaic case now
+  give different scalar and observation keys.
+- **Cache-hit probe (p6; Si 100 keV, $\theta_{\rm obs}=0.9$):**
+  - Mosaic first, then the perfect crystal: the perfect case misses the
+    cache and gets stop 96860.20 eV, equal to its Bragg support.
+  - Its DBR integral, 5.840507e-12, is identical to the cold run.
+  - DBR mass lost above the stop is 0, and the line yields agree exactly.
+- **Replay probe (p7):** the artifact from the formerly poisoned ordering now
+  replays on both the full and streamed routes.
+- **Anchors:** `tests/energy-grid/test_line_grid_bandwidth.py` gives 40
+  passed and 1 skipped (slow). This includes the new
+  `::test_measured_cache_key_separates_mosaic_from_perfect_crystals`.
+
+A nonzero `mosaic_fwhm_rad` of `0.0` is now keyed separately from `None`,
+although both are inside the DBR claim and give the same stop. This costs
+cache efficiency only and does not affect correctness.
+
+**Verdict: `rederived`.** It covers the following, within the Claim's stated
+scope:
+
+- the native PXR/CBS and characteristic certificate;
+- DBR/Kossel coverage by window containment (signed-Kossel denominator
+  excluded);
+- the channeling/TR/mixed fallback on every resolution route;
+- the coverage-revisioned cache;
+- the replay guard.
+
+It rests on the separate `line-grid-emission-ceiling` and
+`line-grid-kinematic-bandwidth` claims. Suggested ledger status for the
+owner: `rederived`. Never `signed-off`. The docs build and the HTML math check
+remain for the task owner.
+
+## Independent verification (fresh context, 2026-11-17, #1243): P4 stop extension (`line-grid-resonance-bandwidth`, #1243, commit 10ee52f87)
+
+Verdict for the P4 clause: **discrepancy**. The bound, ladder and rung choice rederive. Three things diverge: the resolution of the rescored axis, and two allocation-retry (phase-cache) routes.
+
+### Independent expression (derived before reading the bodies)
+
+Line $i$ has mass $m_i = w_i \pi / a_i$ and resonance $E_i$. The `finite-time-lineshape` tail bound gives the share of that mass at or above a stop $X$:
+
+$$
+b_i(X) = m_i \begin{cases} 1, & E_i \ge X \\ \min\!\left(1, \dfrac{1}{\pi a_i (X - E_i)}\right), & E_i < X \end{cases}
+$$
+
+For a fixed set of lines, $U(X) = \sum_i b_i(X)$ cannot increase as $X$ increases, because every term is non-increasing and the step at $X = E_i$ goes down from $1$ to at most $1$. The ladder is $X_k = S + (C - S) 2^{-k/3}$ for $k = 0, \dots, 30$, with $X_0 = C$. Sorted in ascending order, the set of rungs that pass is a contiguous run ending at $C$. The first rung that passes, $U(X)/M \le \varepsilon$ with $M = \sum_i m_i$, is therefore the smallest stop that passes. On an axis $[s, X]$ the yield lost above $X$ from scored lines is at most $U(X)$. Lines outside the scoring keep window lie above $X$ and are counted whole. The certificate holds only when the rescored line set equals the audited set and the axis keeps its resolution.
+
+### Checks
+
+1. **Rung sums.** `_accumulate_edge_truncation` computes the same expression at each `extension_stops_eV`. The code agrees with an independent numpy evaluation to $2.2\times10^{-16}$ relative. Against the closed-form exact tail ($\pi/2 - [-\sin^2 u/u + \mathrm{Si}(2u)]$), the bound/exact ratio is at least $1.0057$ over 400 random lines and 31 rungs. The batched, per-hkl, `cxr_batch` queued (`_queue_unit_lines`), selection-pilot and screen routes all call the one accumulator, so every route that adds `mass_above` also adds `mass_above_extension`. The line set is the same as for `mass_above` (the ceiling keep window). Each accumulation builds a new array, so `snapshot_audit`/`restore_audit` restore it exactly (checked: both a fresh-key removal and a restore to the prior value). The roulette `_AUDIT_SUMS` merges the vector. The screen's scoring passes run without an audit, so nothing is counted twice.
+2. **Loss above $S_\mathrm{ext}$.** The rescored grid is `linspace(start, S_ext, num)`, so it ends exactly at $S_\mathrm{ext}$. Lines between the $S_\mathrm{ext}$ keep window and the ceiling window lie above $S_\mathrm{ext}$ and are counted whole in the rung sum. The denominator `line_mass` covers the ceiling window. The ladder check is correct. **Divergence A:** "same resolution" does not hold under `sinc-shape`.
+3. $S_\mathrm{ext} > S = $ `grid[-1]`, which is already at least `min(bragg_support, C)`, so the windows stay contained. Channeling, TR and mixed cases resolve kinematic before measurement, and their audit sits at the ceiling (warn only, no ladder). Coherent, windows and `max_dE_frac` cases default to kinematic. An explicit measured bandwidth gets no ladder and the refusal is re-raised. Replay re-audits the recorded measured axis and repeats the same extension. Streaming builds the ladder but refuses instead of rescoring, which is safe.
+4. The ladder is strictly increasing with first rung $S + 2^{-10}(C - S)$. `extension_stop` selects the first rung that passes, or $C$ when none does. The independent check matched at three limits.
+
+### Divergences
+
+- **A, resolution.** `_cxr_grid_policy.py::kinematic_fallback_payload` excludes only `LOCAL_RESOLUTION_POLICY`. A defaulted bandwidth with `sinc-shape` resolution falls back to a kinematic + `sinc-shape` payload, a combination that `check_selector_combination` refuses. The non-measured branch of `_resolve_policy_grid` then builds it at the sinc-Nyquist step. Probe (hBN 1 MeV, per-call `sinc-shape`/`bin-mean`, forced refusal): measured axis $[50, 41600]$ eV at 1.110 eV, rescored axis $[50, 80300]$ eV at 3.0 eV.
+- **B, stale line screen (GPU retry wrapper).** `_spectrum_case_retry` sets `_spectrum_phase_cache`, and `line_screen_for` keeps the screen from the refused pass. On the rescore the screen still scores on `self._grid = (start, S)` with no `ceiling_eV`, because the rescore has no audit. Its keep window therefore ends at $S + 0.2(S - s)$ (50150 eV) instead of $S_\mathrm{ext} + 0.2(S_\mathrm{ext} - s)$ (96470 eV). A primary whose lines all fall in that gap gets mass 0, so `kept=False`: it is neither scored nor charged. The hBN probe confirms the stale grid; that probe had no lines in the gap, so the size of the loss was not measured.
+- **C, cached lines phase after a fallback.** If a later phase hits OOM after the fallback rescore, the retry reruns the original measured `tp`, and `_finished_or_run` returns the cached rescored lines. This raises `ValueError: operands could not be broadcast together with shapes (26751,) (13851,)`. It fails loudly.
+
+A, B and C were already present in the P3 ceiling fallback.
+
+### Residual (not demonstrated)
+
+On the rescore, reflection selection reruns on the new axis, and its yield weights depend on the axis. A larger selected set would not be audited. MoS₂ 5° 1 MeV, natural refusal at 1.98e-3 above 31400 eV, extended to 49802.7 eV with bound 9.15e-5 (ceiling 966200 eV): both passes selected the same 342618 reflections at cutoff 64 Å⁻¹.
+
+Focused tests: `tests/energy-grid/test_line_grid_bandwidth.py`, 44 passed, 1 slow test skipped.
+
+### Remediation (implementation context, 2026-11-17, #1243)
+
+(A) `kinematic_fallback_payload` also excludes `sinc-shape`, so a defaulted shape axis refuses rather than rescoring at another step. (B, C) `measured_bandwidth_fallback` gives the rescored case its own nested phase cache (`_spectrum_phase_cache["bandwidth_fallback"]`), so the refused axis's line-roulette screen and the rescored lines phase never cross axes on an allocation retry. Anchors: `tests/energy-grid/test_line_grid_bandwidth.py::test_sinc_shape_default_has_no_kinematic_fallback`, `::test_fallback_rescore_survives_an_allocation_retry` (without the fix it reproduces `operands could not be broadcast together with shapes (39651,) (13851,)`), `::test_fallback_case_gets_its_own_phase_cache`. Awaiting fresh-context re-verification.
+
+## Independent re-verification (fresh context, 2026-11-17, #1243, commit 688394d03)
+
+**(A) resolution: closed.** `kinematic_fallback_payload` returns `None` for `resonance-local` and `sinc-shape`, so only `sinc-nyquist` reaches the fallback. Its grid `resolved_coordinates(payload, target_step)` takes `target_step` from `sinc_feature_spacing(segments, ...)`, which does not depend on the stop, so the rescored step equals the measured one. A wider axis over the point budget raises `CxrGridToleranceError`; it is never coarsened. hBN 1 MeV, forced refusal: 3.0 eV on both passes, with node and with bin-mean quadrature. A defaulted `sinc-shape` + bin-mean case is refused. On channeling/TR/mixed transport a defaulted `sinc-shape` raises `ValueError` after transport, and its message suggested `kinematic-ceiling`, which `sinc-shape` refuses.
+
+**(B, C) phase cache: closed.** On the measured pass `check_cxr_truncation` raises inside the `lines` phase, so `lines` and every later phase are never cached; only the roulette `line_screen` is, and only the measured pass reuses it. The rescore gets `phase_cache.setdefault("bandwidth_fallback", {})`, the same dict on every attempt. `_spectrum_case_retry` probe, hBN 1 MeV, 6 electrons, limit u/2 (interior rung 41800 → 80400 eV, bound 2.37e-5 ≤ 2.5e-5), with and without roulette. Injected 1–3 OOMs: late line, fallback characteristic ×3, early measured line then fallback characteristic, and mixed. Every run gave an identical grid, identical `spec`/`spec_characteristic` (difference 0.0), an identical refusal record and extension, and an identical roulette record.
+
+**Earlier items:** unchanged code; 69 focused tests pass (bandwidth + GPU OOM retry).
+
+**Divergence: reflection selection reruns on the rescored axis.** `selected_line_spectrum` chooses shells by in-band yield on the production axis, and the rescore reran it on [start, S_ext]. hBN 100 keV, 4 electrons, `line_yield_tolerance=1.9e-4`, forced refusal:
+
+| pass | stop (eV) | reflections | cutoff | selector tail estimate |
+|---|---:|---:|---:|---:|
+| refused (audited) | 24300 | 2044 | 16 Å⁻¹ | 1.07e-6 |
+| rescored, interior rung | 43225 | 478 | 10 Å⁻¹ | 1.79e-4 |
+| rescored, ceiling | 100000 | 478 | 10 Å⁻¹ | — |
+
+So the rescored line set was a strict subset of the audited one. Its share bound is $\varepsilon\,M_\mathrm{aud}/M_\mathrm{resc}$, here ×1.112. Measured on the same transport, the 478-reflection set had share 2.902e-5 against the forced 2.94e-5: it passes by chance, not by construction. A superset would be unbounded. With `tol=1e-2` both passes chose 478. Missing term: an audit of the rescored line set.
+
+Outside this claim: the selection-scored yield fell about 10% on the wider axis (4.529e-9 → 4.075e-9, 4 electrons; owner `reflection-yield-tolerance-selector`). Adaptive `batch_means` ran on the refused axis after a fallback (diagnostic only). The extension stop could in principle move at ULP level between chunkings; no probe showed it.
+
+Verdict: `discrepancy` (reflection-selection rescore only); A, B, C and all previously passing items rederive.
+
+### Remediation 2 (implementation context, 2026-11-17, #1243)
+
+The rescore now keeps the measured payload, so its own spectrum-phase audit covers exactly the lines it scores, under its own selection. Only the axis comes from the kinematic-shaped payload at $S_\mathrm{ext}$, with the same start and resolution. A refused rescore extends again from its own stop. Stops strictly increase and the ceiling only warns, so `spectrum_with_bandwidth_fallback` terminates, and a stop that does not rise re-raises the refusal. `bandwidth_fallback.refusals` records each refusal. `_spectrum_case` now passes the scored case and transport to adaptive `batch_means`. The channeling/TR/mixed refusal now names `sinc-nyquist`. Anchors: `tests/energy-grid/test_line_grid_bandwidth.py::test_a_refused_rescore_extends_again`, `::test_fallback_loop_refuses_a_stop_that_does_not_rise`, and the ceiling-fallback anchor now requires the rescore's `capped_at_ceiling` audit record. Awaiting fresh-context re-verification.
+
+## Independent re-verification (fresh context, 2026-11-17, #1243, commit 30261ca4d)
+
+Verdict for the P4 clause: **discrepancy**, limited to the observation-direction route. The item left open by the previous re-verification (the rescore's line set was not the one audited) is closed.
+
+### Expression (derived before reading the new bodies)
+
+Pass $n$ scores line set $L_n$ on $[s, X_n]$. Its certificate needs $U_n(X_n)/M_n \le \varepsilon$, where $U_n(X)=\sum_{i\in L_n} b_i(X)$ and $M_n=\sum_{i\in L_n} m_i$, both over the ceiling keep window, and $b_i(X)=m_i$ for $E_i\ge X$, else $m_i\min\{1, 1/(\pi a_i (X-E_i))\}$. A refusal at $X_n<C$ moves to the first passing rung of $X_n + (C-X_n)2^{-k/3}$, or to $C$, where the audit only warns. Then $X_{n+1} \ge X_n + 2^{-10}(C-X_n)$.
+
+### Checks
+
+1. **Own audit.** The rescored case keeps its measured payload, so `cxr_truncation_audit` builds an audit with `ceiling_eV` $=C$ and a ladder from the rescored `grid[-1]`. Scoring never reads the payload. Selection pilots, roulette screens and the batched, per-hkl and queued routes feed that audit, and the selected spectrum is the sum of the audited pilots. hBN 100 keV, 4 electrons, `line_yield_tolerance=1.9e-4`, one forced limit $2.941\times10^{-5}$ for every pass:
+
+| pass | stop (eV) | reflections | audit share | result |
+|---|---:|---:|---:|---|
+| measured | 24300 | 2044 | $5.883\times10^{-5}$ | refused, extension 43225 |
+| rescore | 43225 | 478 | $2.902\times10^{-5}$ | pass, not capped |
+
+   On the rescore, $\int S\,dE\,N_e/M = 0.99987 \in [1-\text{edges}, 1+10^{-3}]$. With limit $1.18\times10^{-5}$, the rescore takes the capped path at 100000 eV and is audited there (share $1.17\times10^{-5}$).
+2. **Termination.** `np.linspace` ends exactly on the chosen rung, so only a rung equal to $C$ reaches `capped_at_ceiling`. A stop that does not rise (only possible when $C-X_n$ is within about $10^3$ ULP) re-raises. `_line_keep_window` on an interior-rung axis keeps the ceiling window. Termination holds through float granularity: no cap bounds the number of refusals, each of which shrinks $C-X_n$ by at least $1-2^{-10}$.
+3. **Side effects.** Point budget, replay `check_recorded_line_axis`, adaptive `batch_means` (now on the scored axis), Kossel/DBR containment, and the exclusion of coherent, windowed, `max_dE_frac`, channeling, TR and mixed cases are unchanged or correct. `line_grid_resolved` mixes kinematic-shaped axis fields (`bandwidth_policy="kinematic-ceiling"`, `schema=1`, stop $<C$) with a measured `truncation_audit`. It is not identity-bearing, but its policy label is misleading.
+4. **Phase cache.** Nesting depth equals the refusal count. hBN 1 MeV, refusals $41800\to80400\to119000$ eV: five OOM plans gave spectra bit-identical to the no-OOM run, with the same refusal list.
+
+### Exact discrepancy: observation directions
+
+`directions.py::directional_outputs` runs `_spectrum_case` once per direction on the joint axis, and each direction's refusal rescores on that direction's own scalar axis. hBN 1 MeV, two directions:
+
+- A refusal in only one direction raises `ValueError: all input arrays must have the same shape`.
+- When both refuse, `E_grid` and `spec_by_direction` span $[50, 119000]$ eV with 39651 nodes, but `line_grid_resolved` still reports the joint measured axis ($[50, 41600]$ eV, 13851 nodes) with no `bandwidth_fallback` and no `truncation_audit`.
+
+Missing: one joint fallback per case that rescores every direction on one extended observation axis and records it, or a refusal. Predates P4 (P3 ceiling fallback). Focused tests: 77 passed, 1 slow skipped.
+
+### Remediation 3 (implementation context, 2026-11-17, #1243)
+
+`directions.py::_joint_directional_spectra` scores every direction with the per-direction fallback disabled (`_joint_bandwidth_fallback`). On any direction's refusal it rebuilds one axis for all directions with `resolve_observation_cxr_grid` on the kinematic-shaped payload at the extended stop. It then rescores and re-audits every direction, repeating until none refuses. `line_grid_resolved` carries the scored axis's record, `bandwidth_fallback`, and per-direction `truncation_audits`. `runner/bandwidth_fallback.py::fallback_axis_payload` chooses the stop on both routes. After `MAX_EXTENSIONS = 2` refusals it goes straight to the ceiling, which bounds the passes independent of float granularity. Rescored records name the audited policy in `bandwidth_policy` and the axis-building one in `axis_policy`. Anchors: `tests/energy-grid/test_line_grid_bandwidth.py::test_observation_directions_extend_one_joint_axis` (without the fix it raises the stacking `ValueError`) and `::test_extensions_are_capped_before_the_ceiling`. Awaiting fresh-context re-verification.
+
+## Independent re-verification (fresh context, 2026-11-17, #1243, commit 20ca9b11c)
+
+Verdict for the P4 clause: **rederived**. The observation-direction discrepancy is closed; the scalar route is unchanged.
+
+### Expression (derived before reading the new bodies)
+
+For directions $D$ the returned axis $A=[s,X]$ has step $h=\min_{d\in D} h_d$ and $X \ge \max_d X^{\mathrm{Bragg}}_d$. Each direction's spectrum is certified when its own audit on $A$ gives $U_d(X)/M_d \le \varepsilon$ over the line set $L_d(A)$ it scores, or $X = C$, where the audit warns. With $n$ refusals the stop is a ladder rung for $n \le 2$ and $C$ for $n = 3$, so there are at most four passes.
+
+### Checks
+
+1. **Joint axis.** hBN 1 MeV, directions $n_0$ and $\pm 0.05$ rad, forced refusal at half the share. A refusal in direction 0, 1 or 2 rebuilt one axis from 41800 eV (13918 nodes) to 80400 eV (26785 nodes). All three directions were re-audited with audit `stop_eV` equal to `E_grid[-1]`, and the record's target step was 3.0 eV on every pass. The extension lies above the joint measured stop, so above the Bragg support over all directions. Outputs are rebuilt on each pass. The recovery wrappers re-raise the refusal and pass the flag through. The temporal grid is rebuilt (n = 6941533 → 13359332). The flag never reaches the scalar call, the case or the result keys.
+2. **Termination.** With refusal at 0.9 × share everywhere, the directions route ran 41800 → 46625 → 51148 → $C$ = 119000 eV, where the third refusal's own rung (56491 eV) was overridden by the cap; the audits there are `capped_at_ceiling`. The scalar route ran 41600 → 46437.5 → 50972.7 → 119000 eV. The rise guard re-raises a refusal at the ceiling.
+3. **Record.** `line_grid_resolved` carries `bandwidth_fallback`, per-direction `truncation_audits`, `bandwidth_policy = resonance-population` and `axis_policy = kinematic-ceiling`. Checkpoints, the result store and provenance copy it; the replay check reads only `E_grid`; `derive` reads only the scalar `line_grid_diagnostic`, which directional results never carried before or after.
+4. **Tests.** The five focused modules: 120 passed, 4 slow tests skipped.
+
+Minor: the "rescoring" warning precedes a re-raise at the ceiling; an extension can exceed the temporal sample cap (`ValueError`); a joint extension uses only the refusing direction's ladder, which is conservative and costs passes, not correctness.
+
+The task owner applied `rederived` to the ledger row from this verdict.

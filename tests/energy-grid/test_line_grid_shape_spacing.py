@@ -92,7 +92,9 @@ def test_shape_policy_payload_carries_its_tolerance_budget_and_fallback_halo():
 def test_shape_resolution_needs_measured_bandwidth_and_bin_mean():
     with pytest.raises(ValueError, match="needs the resonance-population bandwidth"):
         resolve_cxr_grid_policy(
-            start_eV=50.0, stop_eV=1000.0, per_call={"resolution": SHAPE_RESOLUTION_POLICY}
+            start_eV=50.0,
+            stop_eV=1000.0,
+            per_call={"resolution": SHAPE_RESOLUTION_POLICY, "bandwidth": "kinematic-ceiling"},
         )
     with pytest.raises(ValueError, match="needs bin-mean quadrature"):
         _shape_policy(quadrature="node")

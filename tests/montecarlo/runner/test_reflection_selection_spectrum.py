@@ -79,6 +79,94 @@ def test_selection_refuses_coherent_emission():
         runner._spectrum_case(coherent, tp)
 
 
+@pytest.mark.slow
+@pytest.mark.parametrize("bandwidth", ["kinematic-ceiling", "resonance-population"])
+def test_automatic_bandwidths_select_the_same_reflections(bandwidth, monkeypatch):
+    """A shorter production axis must not change the net selector's band (#1243)."""
+    from pyrite._cxr_grid_policy import resolve_cxr_grid_policy
+    from pyrite.montecarlo.runner import case_driver, diffracted_brem
+
+    # DBR has its own build-time reflection set, outside the selected native-line audit.
+    monkeypatch.setattr(
+        diffracted_brem, "case_diffracted_brem", lambda _case, _segs, grid, *_: np.zeros(grid.shape)
+    )
+
+    masses = []
+    check = case_driver.check_cxr_truncation
+
+    def capture_audit(case, audit):
+        masses.append(float(audit["line_mass"]))
+        return check(case, audit)
+
+    monkeypatch.setattr(case_driver, "check_cxr_truncation", capture_audit)
+
+    case, tp = _transported()
+    policy = resolve_cxr_grid_policy(
+        start_eV=500.0,
+        stop_eV=30000.0,
+        bandwidth_policy=bandwidth,
+    ).payload()
+    if bandwidth == "resonance-population":
+        # This anchor tests selection on deliberately short axes, not tail acceptance.
+        policy["bandwidth"]["truncation_limit"] = 0.99
+    selected = dict(case, reflection_selection=SELECTION, line_grid_policy=policy)
+    records = []
+    for stop in (2000.0, 8000.0):
+        grid = np.arange(500.0, stop + 1.0, 25.0)
+        out = runner._spectrum_case(selected, {**tp, "E_grid": grid})
+        records.append(out["reflection_selection"])
+        assert out["spec"].shape == grid.shape
+        if bandwidth == "resonance-population":
+            # The reference pass must not add mass to the production audit.
+            cutoff = records[-1]["radiators"][0]["cutoff_invang"]
+            hkls = dominant_reflections(
+                "silicon", n_families=10**9, B_ang2=case["B_ang2"], g_max_invang=cutoff
+            )
+            plain = runner._spectrum_case(
+                dict(case, hkl_list=hkls, line_grid_policy=policy), {**tp, "E_grid": grid}
+            )
+            np.testing.assert_allclose(out["spec"], plain["spec"], rtol=1e-10)
+            assert masses[-2] == pytest.approx(masses[-1], rel=1e-12)
+    assert records[0]["radiators"] == records[1]["radiators"]
+    assert records[0]["reference_band_eV"] == [500.0, 30000.0]
+
+
+@pytest.mark.parametrize(
+    "unsupported", [{"max_dE_frac": 1e-3}, {"sinc_cutoff": 10.0}, {"node_support_cutoff": 10.0}]
+)
+def test_selection_keeps_node_only_routes_on_the_production_axis(unsupported):
+    from pyrite.montecarlo.runner.reflection_cutoff import _selection_reference_grid
+
+    case = {
+        "line_grid_policy": {
+            "bandwidth": {"policy": "kinematic-ceiling", "start_eV": 50.0, "stop_eV": 30000.0}
+        },
+        **unsupported,
+    }
+    assert _selection_reference_grid(case) is None
+
+
+def test_selected_layered_union_is_scored_once_in_admitted_chunks(monkeypatch):
+    from pyrite.montecarlo.runner import reflection_cutoff
+
+    members = [[(1, 0, 0), (2, 0, 0), (3, 0, 0)], [(0, 1, 0), (0, 2, 0)]]
+    case = {"layer_radiators": [{"hkl_list": h} for h in members] + [None]}
+    monkeypatch.setattr(reflection_cutoff, "selection_call_sizes", lambda *_: {0: 2, 1: 1})
+    seen = []
+
+    def evaluate(pilot):
+        active = [(i, r) for i, r in enumerate(pilot["layer_radiators"]) if r is not None]
+        assert len(active) == 1
+        layer, radiator = active[0]
+        assert len(radiator["hkl_list"]) <= (2 if layer == 0 else 1)
+        seen.extend((layer, hkl) for hkl in radiator["hkl_list"])
+        return np.full(4, len(radiator["hkl_list"]))
+
+    spectrum = reflection_cutoff._selected_spectrum(case, evaluate, np.arange(4.0))
+    assert sorted(seen) == sorted((i, hkl) for i, hkls in enumerate(members) for hkl in hkls)
+    np.testing.assert_array_equal(spectrum, np.full(4, 5.0))
+
+
 def test_streamed_block_scoring_refuses_selection():
     from pyrite.montecarlo.runner.streamed_scoring import streaming_refusal
 

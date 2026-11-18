@@ -76,7 +76,7 @@ def calculation_defaults(kind: str) -> dict[str, Any]:
 
         suggestions["precision"] = DEFAULT_PRECISION.to_dict()
         suggestions["line_grid_policy"] = {
-            "bandwidth": "kinematic-ceiling",
+            "bandwidth": "resonance-population",
             "resolution": "sinc-nyquist",
             "quadrature": "node",
             "windows": False,

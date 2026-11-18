@@ -28,6 +28,7 @@ from ..._cxr_grid_policy import (
     LineShapePrecisionWarning,
     cached_coordinates,
     coordinate_cache_key,
+    kinematic_fallback_payload,
     lineshape_precision_warning,
     resolved_coordinates,
     shape_spacing_factor,
@@ -46,6 +47,7 @@ from ..spectrum.cxr_seeds import (
     local_spacing_seeds,
 )
 from ..spectrum.diagnostics import coherent_fringe_spacing, sinc_feature_spacing
+from .bandwidth_fallback import extension_stop, extension_stop_ladder
 
 
 def _resident_mib():
@@ -146,7 +148,16 @@ _WINDOW_INPUT_KEYS = (
     "mosaic_mc_nodes",
     "layer_radiators",
 )
-_WEIGHT_INPUT_KEYS = ("B_ang2",)
+# The measured stop also reads the DBR claim (``diffracted_brem._in_claim``):
+# a mosaic spread drops the Bragg-window coverage (#1243).
+_WEIGHT_INPUT_KEYS = ("B_ang2", "mosaic_fwhm_rad")
+
+
+#: Bumped whenever the same inputs would give a different measured stop; it
+#: keys the speed cache of ``resonance-population`` grids only. 1: the stop
+#: covers every DBR/Kossel Bragg window (#1243); 2: the key reads
+#: ``mosaic_fwhm_rad``, which the coverage depends on.
+MEASURED_COVERAGE_REVISION = 2
 
 
 #: Bumped whenever the same inputs would seed different coherent windows; it
@@ -532,6 +543,32 @@ def _local_spacing_grid(payload, direction_populations, start, stop, target_step
     return grid, record
 
 
+def _cover_bragg_support(case, n_hats, start, ceiling, stop, bandwidth_record):
+    """Raise a measured ``stop`` over every DBR/Kossel window the ceiling axis sees.
+
+    Diffracted bremsstrahlung and the Kossel correction are deposited on the
+    line axis after the truncation audit, which sees native lines only. Each
+    is exactly zero outside its finite Bragg window, so a stop at or above the
+    highest window node (capped at the ceiling, where the kinematic reference
+    ends too) adds no unaudited upper loss of either (#1243). Returns
+    ``(stop, bandwidth_record)``; the record keeps the native stop.
+
+    Validation: line-grid-resonance-bandwidth
+    """
+    from .diffracted_brem import bragg_support_stop_eV
+
+    support = bragg_support_stop_eV(case, n_hats, start, ceiling)
+    if support is None or support <= stop:
+        return stop, bandwidth_record
+    covered = min(float(support), ceiling)
+    return covered, {
+        **bandwidth_record,
+        "stop_eV": covered,
+        "native_stop_eV": stop,
+        "bragg_support_stop_eV": float(support),
+    }
+
+
 def _measured_cxr_grid(
     payload, case, segments, n_hats, Ne, target_step, abs_layers, groove, *, evidence=None
 ):
@@ -586,6 +623,9 @@ def _measured_cxr_grid(
         bandwidth_record = bandwidth_records[0]
     else:
         bandwidth_record = {"stop_eV": stop, "directions": bandwidth_records}
+    stop, bandwidth_record = _cover_bragg_support(
+        case, n_hats, start, ceiling, stop, bandwidth_record
+    )
     shape = None
     uniform = None if resolution["policy"] == LOCAL_RESOLUTION_POLICY else (payload, target_step)
     if resolution["policy"] == SHAPE_RESOLUTION_POLICY:
@@ -691,6 +731,8 @@ def _policy_cache_key(payload, case, n_hats, *, observation):
     dispersion_law = None
     if windowed or measured:
         inputs["seeding_revision"] = SEEDING_REVISION
+    if measured:
+        inputs["measured_coverage_revision"] = MEASURED_COVERAGE_REVISION
     if observation:
         inputs["observation_directions"] = np.asarray(n_hats, dtype=float).tolist()
     if bool(case.get("coherent_emission", False)):
@@ -744,7 +786,8 @@ def cached_policy_cxr_grid(case):
     streaming uses it to skip its grid transport pass (#1001).
     """
     # The scalar key never reads the direction.
-    key, _ = _policy_cache_key(case["line_grid_policy"], case, (), observation=False)
+    payload = _auditable_policy(case, case["line_grid_policy"])
+    key, _ = _policy_cache_key(payload, case, (), observation=False)
     return _cached_policy_grid(key)
 
 
@@ -870,9 +913,92 @@ def resolve_observation_cxr_grid(case, segments, n_hats, Ne, E_grid, abs_layers=
     policy_payload = case.get("line_grid_policy")
     if policy_payload is None or case.get("_diagnostic_line_grid") is not None:
         return E_grid, None
+    policy_payload = _auditable_policy(case, policy_payload)
     return _resolve_policy_grid(
         policy_payload, case, segments, n_hats, Ne, abs_layers, groove, observation=True
     )
+
+
+def _unmeasured_line_axis(case) -> bool:
+    """Whether ``case`` puts spectra on the line axis the measured stop cannot see.
+
+    Mixed transport scores no lines (#990); channeling and transition radiation
+    score source spectra on the line axis that neither the resonance population
+    nor the truncation audit covers. A defaulted bandwidth keeps the kinematic
+    axis for them (#1243).
+
+    Validation: line-grid-resonance-bandwidth
+    """
+    return (
+        case.get("transport_mode") == "mixed"
+        or case.get("channeling") is not None
+        or case.get("transition_radiation") is not None
+    )
+
+
+def _auditable_policy(case, payload):
+    """``payload``, or its kinematic fallback where the measured axis is unaudited.
+
+    Shared by scalar and observation resolution, before any cache lookup: a
+    defaulted ``resonance-population`` bandwidth on a case
+    :func:`_unmeasured_line_axis` flags becomes ``kinematic-ceiling``; an
+    explicit one is refused (#1243).
+
+    Validation: line-grid-resonance-bandwidth
+    """
+    if not _unmeasured_line_axis(case):
+        return payload
+    fallback = kinematic_fallback_payload(payload)
+    if fallback is not None:
+        return fallback
+    if payload["bandwidth"]["policy"] == RESONANCE_BANDWIDTH_POLICY:
+        raise ValueError(
+            f"{case['name']}: the resonance-population bandwidth cannot measure "
+            "channeling, transition-radiation or mixed-transport cases, whose "
+            "spectra its truncation audit does not see; use kinematic-ceiling "
+            "(with sinc-nyquist resolution: resonance-local and sinc-shape need "
+            "the measured bandwidth)"
+        )
+    return payload
+
+
+def check_recorded_line_axis(case, E_grid, n_hat) -> None:
+    """Refuse a recorded policy line axis that today's resolver would not accept.
+
+    Replay reuses an artifact's stored axis instead of resolving it. Under a
+    ``line_grid_policy`` the stored axis must reach what
+    :func:`_auditable_policy` now requires: the ceiling for a kinematic (or
+    fallback) bandwidth, and every DBR/Kossel window the ceiling sees for a
+    measured one (#1243). Raises ``ValueError``; a case without a policy, or
+    whose axis already reaches the ceiling, passes.
+
+    Validation: line-grid-resonance-bandwidth
+    """
+    from .diffracted_brem import bragg_support_stop_eV
+
+    payload = case.get("line_grid_policy")
+    if payload is None or case.get("_diagnostic_line_grid") is not None:
+        return
+    payload = _auditable_policy(case, payload)
+    ceiling = float(payload["bandwidth"]["stop_eV"])
+    recorded = float(np.asarray(E_grid, dtype=float)[-1])
+    slack = 1e-9 * abs(ceiling)
+    if recorded >= ceiling - slack:
+        return
+    if payload["bandwidth"]["policy"] != RESONANCE_BANDWIDTH_POLICY:
+        required = ceiling
+    else:
+        start = float(payload["bandwidth"]["start_eV"])
+        support = bragg_support_stop_eV(case, (n_hat,), start, ceiling)
+        if support is None:
+            return
+        required = min(float(support), ceiling)
+    if recorded < required - slack:
+        raise ValueError(
+            f"{case['name']}: the recorded line axis stops at {recorded:g} eV, below the "
+            f"{required:g} eV its bandwidth policy now requires; re-run the transport "
+            "or score its kept trajectories with score_spectra"
+        )
 
 
 def resolve_cxr_grid(case, segments, n_hat, Ne, E_grid, abs_layers=None, groove=None):
@@ -900,6 +1026,7 @@ def resolve_cxr_grid(case, segments, n_hat, Ne, E_grid, abs_layers=None, groove=
             "diagnostic derivation and automatic resolution are exclusive"
         )
     if policy_payload is not None:
+        policy_payload = _auditable_policy(case, policy_payload)
         return _resolve_policy_cxr_grid(
             policy_payload, case, segments, n_hat, Ne, abs_layers, groove
         )
@@ -949,13 +1076,23 @@ def cxr_truncation_audit(case, E_grid, n_electrons=None):
     """Empty edge-truncation audit for a ``resonance-population`` case, else ``None``.
 
     With ``n_electrons`` the audit also sums line mass per line electron, so
-    :func:`check_cxr_truncation` can report the line yield's standard error.
+    :func:`check_cxr_truncation` can report the line yield's standard error. A
+    defaulted bandwidth below its ceiling also bounds the upper share at each
+    :func:`extension_stop_ladder` stop, which a refusal extends to (#1243).
     """
     payload = case.get("line_grid_policy")
     if payload is None or payload["bandwidth"]["policy"] != RESONANCE_BANDWIDTH_POLICY:
         return None
     grid = np.asarray(E_grid, dtype=float)
-    audit = {"start_eV": float(grid[0]), "stop_eV": float(grid[-1])}
+    ceiling = float(payload["bandwidth"]["stop_eV"])
+    audit = {
+        "start_eV": float(grid[0]),
+        "stop_eV": float(grid[-1]),
+        # Lines up to the clamped ceiling are scored or charged (#1243).
+        "ceiling_eV": ceiling,
+    }
+    if float(grid[-1]) < ceiling and kinematic_fallback_payload(payload) is not None:
+        audit["extension_stops_eV"] = extension_stop_ladder(grid[-1], ceiling)
     if n_electrons is not None:
         audit["n_electrons"] = int(n_electrons)
     return audit
@@ -1039,11 +1176,16 @@ def check_cxr_truncation(case, audit):
             stacklevel=2,
         )
     elif record["upper_fraction_bound"] > limit:
-        raise CxrGridToleranceError(
+        extension = extension_stop(audit, total, limit)
+        if extension is not None:
+            record["extension_stop_eV"], record["extension_fraction_bound"] = extension
+        error = CxrGridToleranceError(
             f"{case['name']} at {case['E0_keV']:g} keV: the measured line bandwidth "
             f"[{audit['start_eV']:g}, {audit['stop_eV']:g}] eV may truncate "
             f"{record['upper_fraction_bound']:.3g} of the line yield above its edge "
             f"with production weights, above the {limit:g} bandwidth share. Use the "
             "kinematic-ceiling bandwidth or supply an explicit grid."
         )
+        error.truncation_record = record
+        raise error
     return record

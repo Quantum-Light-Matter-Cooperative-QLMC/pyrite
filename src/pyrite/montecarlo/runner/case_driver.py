@@ -45,6 +45,7 @@ from ..transport import _simulate_trajectories as simulate_trajectories
 from . import _SPECTRUM_PROGRESS, _TRANSPORT_PROGRESS, SPECTRUM_STAGES
 from . import adaptive as _adaptive
 from .artifacts import _case_geometry
+from .bandwidth_fallback import spectrum_with_bandwidth_fallback
 from .block_transport import transport_case_blocks
 from .case_tables import (
     _case_elastic_kwargs,
@@ -891,7 +892,9 @@ def _spectrum_case(case, tp, record_timing=False):
         spectrum_fallbacks(case, tp) as fallbacks,
         _pkg._nsys_range(f"pyrite.spectrum_case:{case.get('name', 'case')}"),
     ):
-        out = _spectrum_case_impl(case, tp, record_timing)
+        out, case, tp = spectrum_with_bandwidth_fallback(
+            lambda case, tp: _spectrum_case_impl(case, tp, record_timing), case, tp
+        )
     if events := fallbacks.events():
         out["physics_fallbacks"] = events
     if timed:
@@ -947,23 +950,13 @@ def _line_phase(
                 "reflection_selection scores incoherent lines only; it refuses coherent "
                 "emission, line roulette and temporal profiles"
             )
-        from .lattice_share import selection_continuum
-        from .reflection_cutoff import selected_line_spectrum
+        from .reflection_cutoff import selected_batch_spectrum
     with _pkg._nsys_range("pyrite.lines"), collect_line_data_coverage() as line_coverage:
         try:
             if case.get("reflection_selection") is None:
                 spec = emission.cxr.evaluate(batch, "spec").values
             else:
-                spec, selection = selected_line_spectrum(
-                    case,
-                    lambda pilot: (
-                        emission.cxr.evaluate(
-                            batch_replace(batch, case=pilot, table_cache={}), "spec"
-                        ).values
-                    ),
-                    E_grid,
-                    continuum=selection_continuum(case, batch, Ne_brem),
-                )
+                spec, selection = selected_batch_spectrum(emission, batch, Ne_brem)
 
             if want_coherent:
                 spec_coherent = emission.cxr.evaluate(

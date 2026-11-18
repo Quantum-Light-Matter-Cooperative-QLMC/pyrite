@@ -195,9 +195,9 @@ def test_channeling_demo_and_off_profile_identities_are_unchanged():
     pin, channeling-off included, follows ``DIFFRACTED_BREM_MODEL`` (#1166 DBR). The
     silicon pins carry the crystal-conditional ``structure_factor_model`` marker
     (#1177 measured bonding charge); hopg, which has no measured table, is unchanged.
-    The bin-mean demo key follows ``CXR_BIN_REDUCTION_MODEL`` ``fourier-auto-v5``
-    (#1230 host Fourier route; v4 #1192), as do the silicon stem and parameter
-    hash; restoring ``fourier-auto-v4`` reproduces the prior pins.
+    The bin-mean demo key follows ``CXR_BIN_REDUCTION_MODEL`` ``fourier-auto-v4``
+    (#1192), as do the silicon stem and parameter hash; restoring
+    ``line-major-auto-v3-series`` reproduces the prior pins.
     #1173 re-mints every pin for ``measured-shell-cutoff-v2``; unsupported
     channeling routes retain four-family scoring. #1200 re-mints them for
     ``measured-shell-cutoff-v3`` (table-sized selection calls), and #1201 for
@@ -205,22 +205,24 @@ def test_channeling_demo_and_off_profile_identities_are_unchanged():
     the shell-transport pins for default restricted soft-loss straggling.
     #1254 re-mints the adaptive standard-profile pin for variance-contributors-v2.
     #1262 re-mints it for variance-threshold-v3 (separate VOV threshold).
+    #1243 re-mints them for the ``resonance-population`` default bandwidth
+    (case payload) and its ``line_bandwidth_model`` digest marker.
     """
     sweep, settings, cases = _profile_cases("silicon", "channeling_demo")
     assert cases[0].line_quadrature == "bin-mean"
     assert [profiles.case_content_key(case) for case in cases] == [
-        "61db7483252b38be9c9abf40b8d66cb63eadf569396a3237f14a98c866d498fb"
+        "064f8066c0f41cbfbd849893688a45cdffe64a1494c3aaf6b6f315d0e4026511"
     ]
     assert profiles.named_profile_stem("silicon", catalog_profile="channeling_demo") == (
-        "silicon@channeling_demo-5936b627aa28"
+        "silicon@channeling_demo-9d3f18f908cb"
     )
     identity = profiles.dataset_identity("silicon", settings, sweep)
     assert identity["parameter_sha256"] == (
-        "24e65cc0bbbe8dafdb53e6d66d12e5281e814ff407d3b13a0eb0f29063912820"
+        "1ff63edd472a4bedd3c5e49c69827906daebe9c354048b73b4f110f559e41298"
     )
     sweep = material_sweep("hopg", catalog_profile="standard")
     settings = profiles.profile_run_settings(default_settings(), "standard", sweep=sweep)
     assert profiles.dataset_identity("hopg", settings, sweep)["parameter_sha256"] == (
-        "050a823bd3e759ad9231c4e89d74f67819b7bc37152a4c5935660bc0e7e008bd"
+        "e7512fd54b60d9e2bdaf940df96bb7405fcbd7a15b9e1ba3c04896fda0cd5344"
     )
-    assert profiles.named_profile_stem("hopg") == "hopg@full-050a823bd3e7"
+    assert profiles.named_profile_stem("hopg") == "hopg@full-e7512fd54b60"
