@@ -47,6 +47,7 @@ from ..spectrum.cxr_seeds import (
     local_spacing_seeds,
 )
 from ..spectrum.diagnostics import coherent_fringe_spacing, sinc_feature_spacing
+from .bandwidth_fallback import extension_stop, extension_stop_ladder
 
 
 def _resident_mib():
@@ -954,7 +955,9 @@ def _auditable_policy(case, payload):
         raise ValueError(
             f"{case['name']}: the resonance-population bandwidth cannot measure "
             "channeling, transition-radiation or mixed-transport cases, whose "
-            "spectra its truncation audit does not see; use kinematic-ceiling"
+            "spectra its truncation audit does not see; use kinematic-ceiling "
+            "(with sinc-nyquist resolution: resonance-local and sinc-shape need "
+            "the measured bandwidth)"
         )
     return payload
 
@@ -1073,18 +1076,23 @@ def cxr_truncation_audit(case, E_grid, n_electrons=None):
     """Empty edge-truncation audit for a ``resonance-population`` case, else ``None``.
 
     With ``n_electrons`` the audit also sums line mass per line electron, so
-    :func:`check_cxr_truncation` can report the line yield's standard error.
+    :func:`check_cxr_truncation` can report the line yield's standard error. A
+    defaulted bandwidth below its ceiling also bounds the upper share at each
+    :func:`extension_stop_ladder` stop, which a refusal extends to (#1243).
     """
     payload = case.get("line_grid_policy")
     if payload is None or payload["bandwidth"]["policy"] != RESONANCE_BANDWIDTH_POLICY:
         return None
     grid = np.asarray(E_grid, dtype=float)
+    ceiling = float(payload["bandwidth"]["stop_eV"])
     audit = {
         "start_eV": float(grid[0]),
         "stop_eV": float(grid[-1]),
         # Lines up to the clamped ceiling are scored or charged (#1243).
-        "ceiling_eV": float(payload["bandwidth"]["stop_eV"]),
+        "ceiling_eV": ceiling,
     }
+    if float(grid[-1]) < ceiling and kinematic_fallback_payload(payload) is not None:
+        audit["extension_stops_eV"] = extension_stop_ladder(grid[-1], ceiling)
     if n_electrons is not None:
         audit["n_electrons"] = int(n_electrons)
     return audit
@@ -1168,6 +1176,9 @@ def check_cxr_truncation(case, audit):
             stacklevel=2,
         )
     elif record["upper_fraction_bound"] > limit:
+        extension = extension_stop(audit, total, limit)
+        if extension is not None:
+            record["extension_stop_eV"], record["extension_fraction_bound"] = extension
         error = CxrGridToleranceError(
             f"{case['name']} at {case['E0_keV']:g} keV: the measured line bandwidth "
             f"[{audit['start_eV']:g}, {audit['stop_eV']:g}] eV may truncate "
@@ -1178,44 +1189,3 @@ def check_cxr_truncation(case, audit):
         error.truncation_record = record
         raise error
     return record
-
-
-def measured_bandwidth_fallback(case, tp, refusal):
-    """``(case, tp)`` rescored on ``kinematic-ceiling`` after a defaulted refusal.
-
-    A defaulted ``resonance-population`` stop is measured on the case's built
-    reflections; automatic selection may score higher-|g| lines above it, which
-    the audit sees and refuses (#1243). The transport is kept and only the line
-    axis is rebuilt, on the clamped ceiling the default would otherwise have
-    used. An explicitly chosen measured bandwidth re-raises ``refusal``.
-
-    Validation: line-grid-resonance-bandwidth
-    """
-    record = refusal.truncation_record
-    payload = case.get("line_grid_policy")
-    fallback = None if record is None or payload is None else kinematic_fallback_payload(payload)
-    if fallback is None:
-        raise refusal
-    warnings.warn(
-        f"{case['name']} at {case['E0_keV']:g} keV: the default measured line axis "
-        f"[{record['start_eV']:g}, {record['stop_eV']:g}] eV may truncate "
-        f"{record['upper_fraction_bound']:.3g} of the line yield, above the "
-        f"{record['truncation_limit']:g} share; rescoring on the kinematic-ceiling "
-        f"axis to {fallback['bandwidth']['stop_eV']:g} eV.",
-        CxrGridTruncationWarning,
-        stacklevel=2,
-    )
-    case = {**case, "line_grid_policy": fallback}
-    E_grid, resolved = resolve_cxr_grid(
-        case,
-        tp["segs"],
-        tp["n_hat"],
-        tp["Ne_lines"],
-        tp["E_grid"],
-        case.get("abs_layers"),
-        tp["groove"],
-    )
-    if resolved is None:  # unreachable: a policy payload always yields a record
-        raise refusal
-    resolved = {**resolved, "bandwidth_fallback": {"from": payload["bandwidth"], "refused": record}}
-    return case, {**tp, "E_grid": E_grid, "diagnostic_grid": resolved}

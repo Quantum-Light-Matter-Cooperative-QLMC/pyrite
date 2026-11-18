@@ -1270,3 +1270,122 @@ It rests on the separate `line-grid-emission-ceiling` and
 `line-grid-kinematic-bandwidth` claims. Suggested ledger status for the
 owner: `rederived`. Never `signed-off`. The docs build and the HTML math check
 remain for the task owner.
+
+## Independent verification (fresh context, 2026-11-17, #1243): P4 stop extension (`line-grid-resonance-bandwidth`, #1243, commit 10ee52f87)
+
+Verdict for the P4 clause: **discrepancy**. The bound, ladder and rung choice rederive. Three things diverge: the resolution of the rescored axis, and two allocation-retry (phase-cache) routes.
+
+### Independent expression (derived before reading the bodies)
+
+Line $i$ has mass $m_i = w_i \pi / a_i$ and resonance $E_i$. The `finite-time-lineshape` tail bound gives the share of that mass at or above a stop $X$:
+
+$$
+b_i(X) = m_i \begin{cases} 1, & E_i \ge X \\ \min\!\left(1, \dfrac{1}{\pi a_i (X - E_i)}\right), & E_i < X \end{cases}
+$$
+
+For a fixed set of lines, $U(X) = \sum_i b_i(X)$ cannot increase as $X$ increases, because every term is non-increasing and the step at $X = E_i$ goes down from $1$ to at most $1$. The ladder is $X_k = S + (C - S) 2^{-k/3}$ for $k = 0, \dots, 30$, with $X_0 = C$. Sorted in ascending order, the set of rungs that pass is a contiguous run ending at $C$. The first rung that passes, $U(X)/M \le \varepsilon$ with $M = \sum_i m_i$, is therefore the smallest stop that passes. On an axis $[s, X]$ the yield lost above $X$ from scored lines is at most $U(X)$. Lines outside the scoring keep window lie above $X$ and are counted whole. The certificate holds only when the rescored line set equals the audited set and the axis keeps its resolution.
+
+### Checks
+
+1. **Rung sums.** `_accumulate_edge_truncation` computes the same expression at each `extension_stops_eV`. The code agrees with an independent numpy evaluation to $2.2\times10^{-16}$ relative. Against the closed-form exact tail ($\pi/2 - [-\sin^2 u/u + \mathrm{Si}(2u)]$), the bound/exact ratio is at least $1.0057$ over 400 random lines and 31 rungs. The batched, per-hkl, `cxr_batch` queued (`_queue_unit_lines`), selection-pilot and screen routes all call the one accumulator, so every route that adds `mass_above` also adds `mass_above_extension`. The line set is the same as for `mass_above` (the ceiling keep window). Each accumulation builds a new array, so `snapshot_audit`/`restore_audit` restore it exactly (checked: both a fresh-key removal and a restore to the prior value). The roulette `_AUDIT_SUMS` merges the vector. The screen's scoring passes run without an audit, so nothing is counted twice.
+2. **Loss above $S_\mathrm{ext}$.** The rescored grid is `linspace(start, S_ext, num)`, so it ends exactly at $S_\mathrm{ext}$. Lines between the $S_\mathrm{ext}$ keep window and the ceiling window lie above $S_\mathrm{ext}$ and are counted whole in the rung sum. The denominator `line_mass` covers the ceiling window. The ladder check is correct. **Divergence A:** "same resolution" does not hold under `sinc-shape`.
+3. $S_\mathrm{ext} > S = $ `grid[-1]`, which is already at least `min(bragg_support, C)`, so the windows stay contained. Channeling, TR and mixed cases resolve kinematic before measurement, and their audit sits at the ceiling (warn only, no ladder). Coherent, windows and `max_dE_frac` cases default to kinematic. An explicit measured bandwidth gets no ladder and the refusal is re-raised. Replay re-audits the recorded measured axis and repeats the same extension. Streaming builds the ladder but refuses instead of rescoring, which is safe.
+4. The ladder is strictly increasing with first rung $S + 2^{-10}(C - S)$. `extension_stop` selects the first rung that passes, or $C$ when none does. The independent check matched at three limits.
+
+### Divergences
+
+- **A, resolution.** `_cxr_grid_policy.py::kinematic_fallback_payload` excludes only `LOCAL_RESOLUTION_POLICY`. A defaulted bandwidth with `sinc-shape` resolution falls back to a kinematic + `sinc-shape` payload, a combination that `check_selector_combination` refuses. The non-measured branch of `_resolve_policy_grid` then builds it at the sinc-Nyquist step. Probe (hBN 1 MeV, per-call `sinc-shape`/`bin-mean`, forced refusal): measured axis $[50, 41600]$ eV at 1.110 eV, rescored axis $[50, 80300]$ eV at 3.0 eV.
+- **B, stale line screen (GPU retry wrapper).** `_spectrum_case_retry` sets `_spectrum_phase_cache`, and `line_screen_for` keeps the screen from the refused pass. On the rescore the screen still scores on `self._grid = (start, S)` with no `ceiling_eV`, because the rescore has no audit. Its keep window therefore ends at $S + 0.2(S - s)$ (50150 eV) instead of $S_\mathrm{ext} + 0.2(S_\mathrm{ext} - s)$ (96470 eV). A primary whose lines all fall in that gap gets mass 0, so `kept=False`: it is neither scored nor charged. The hBN probe confirms the stale grid; that probe had no lines in the gap, so the size of the loss was not measured.
+- **C, cached lines phase after a fallback.** If a later phase hits OOM after the fallback rescore, the retry reruns the original measured `tp`, and `_finished_or_run` returns the cached rescored lines. This raises `ValueError: operands could not be broadcast together with shapes (26751,) (13851,)`. It fails loudly.
+
+A, B and C were already present in the P3 ceiling fallback.
+
+### Residual (not demonstrated)
+
+On the rescore, reflection selection reruns on the new axis, and its yield weights depend on the axis. A larger selected set would not be audited. MoS₂ 5° 1 MeV, natural refusal at 1.98e-3 above 31400 eV, extended to 49802.7 eV with bound 9.15e-5 (ceiling 966200 eV): both passes selected the same 342618 reflections at cutoff 64 Å⁻¹.
+
+Focused tests: `tests/energy-grid/test_line_grid_bandwidth.py`, 44 passed, 1 slow test skipped.
+
+### Remediation (implementation context, 2026-11-17, #1243)
+
+(A) `kinematic_fallback_payload` also excludes `sinc-shape`, so a defaulted shape axis refuses rather than rescoring at another step. (B, C) `measured_bandwidth_fallback` gives the rescored case its own nested phase cache (`_spectrum_phase_cache["bandwidth_fallback"]`), so the refused axis's line-roulette screen and the rescored lines phase never cross axes on an allocation retry. Anchors: `tests/energy-grid/test_line_grid_bandwidth.py::test_sinc_shape_default_has_no_kinematic_fallback`, `::test_fallback_rescore_survives_an_allocation_retry` (without the fix it reproduces `operands could not be broadcast together with shapes (39651,) (13851,)`), `::test_fallback_case_gets_its_own_phase_cache`. Awaiting fresh-context re-verification.
+
+## Independent re-verification (fresh context, 2026-11-17, #1243, commit 688394d03)
+
+**(A) resolution: closed.** `kinematic_fallback_payload` returns `None` for `resonance-local` and `sinc-shape`, so only `sinc-nyquist` reaches the fallback. Its grid `resolved_coordinates(payload, target_step)` takes `target_step` from `sinc_feature_spacing(segments, ...)`, which does not depend on the stop, so the rescored step equals the measured one. A wider axis over the point budget raises `CxrGridToleranceError`; it is never coarsened. hBN 1 MeV, forced refusal: 3.0 eV on both passes, with node and with bin-mean quadrature. A defaulted `sinc-shape` + bin-mean case is refused. On channeling/TR/mixed transport a defaulted `sinc-shape` raises `ValueError` after transport, and its message suggested `kinematic-ceiling`, which `sinc-shape` refuses.
+
+**(B, C) phase cache: closed.** On the measured pass `check_cxr_truncation` raises inside the `lines` phase, so `lines` and every later phase are never cached; only the roulette `line_screen` is, and only the measured pass reuses it. The rescore gets `phase_cache.setdefault("bandwidth_fallback", {})`, the same dict on every attempt. `_spectrum_case_retry` probe, hBN 1 MeV, 6 electrons, limit u/2 (interior rung 41800 → 80400 eV, bound 2.37e-5 ≤ 2.5e-5), with and without roulette. Injected 1–3 OOMs: late line, fallback characteristic ×3, early measured line then fallback characteristic, and mixed. Every run gave an identical grid, identical `spec`/`spec_characteristic` (difference 0.0), an identical refusal record and extension, and an identical roulette record.
+
+**Earlier items:** unchanged code; 69 focused tests pass (bandwidth + GPU OOM retry).
+
+**Divergence: reflection selection reruns on the rescored axis.** `selected_line_spectrum` chooses shells by in-band yield on the production axis, and the rescore reran it on [start, S_ext]. hBN 100 keV, 4 electrons, `line_yield_tolerance=1.9e-4`, forced refusal:
+
+| pass | stop (eV) | reflections | cutoff | selector tail estimate |
+|---|---:|---:|---:|---:|
+| refused (audited) | 24300 | 2044 | 16 Å⁻¹ | 1.07e-6 |
+| rescored, interior rung | 43225 | 478 | 10 Å⁻¹ | 1.79e-4 |
+| rescored, ceiling | 100000 | 478 | 10 Å⁻¹ | — |
+
+So the rescored line set was a strict subset of the audited one. Its share bound is $\varepsilon\,M_\mathrm{aud}/M_\mathrm{resc}$, here ×1.112. Measured on the same transport, the 478-reflection set had share 2.902e-5 against the forced 2.94e-5: it passes by chance, not by construction. A superset would be unbounded. With `tol=1e-2` both passes chose 478. Missing term: an audit of the rescored line set.
+
+Outside this claim: the selection-scored yield fell about 10% on the wider axis (4.529e-9 → 4.075e-9, 4 electrons; owner `reflection-yield-tolerance-selector`). Adaptive `batch_means` ran on the refused axis after a fallback (diagnostic only). The extension stop could in principle move at ULP level between chunkings; no probe showed it.
+
+Verdict: `discrepancy` (reflection-selection rescore only); A, B, C and all previously passing items rederive.
+
+### Remediation 2 (implementation context, 2026-11-17, #1243)
+
+The rescore now keeps the measured payload, so its own spectrum-phase audit covers exactly the lines it scores, under its own selection. Only the axis comes from the kinematic-shaped payload at $S_\mathrm{ext}$, with the same start and resolution. A refused rescore extends again from its own stop. Stops strictly increase and the ceiling only warns, so `spectrum_with_bandwidth_fallback` terminates, and a stop that does not rise re-raises the refusal. `bandwidth_fallback.refusals` records each refusal. `_spectrum_case` now passes the scored case and transport to adaptive `batch_means`. The channeling/TR/mixed refusal now names `sinc-nyquist`. Anchors: `tests/energy-grid/test_line_grid_bandwidth.py::test_a_refused_rescore_extends_again`, `::test_fallback_loop_refuses_a_stop_that_does_not_rise`, and the ceiling-fallback anchor now requires the rescore's `capped_at_ceiling` audit record. Awaiting fresh-context re-verification.
+
+## Independent re-verification (fresh context, 2026-11-17, #1243, commit 30261ca4d)
+
+Verdict for the P4 clause: **discrepancy**, limited to the observation-direction route. The item left open by the previous re-verification (the rescore's line set was not the one audited) is closed.
+
+### Expression (derived before reading the new bodies)
+
+Pass $n$ scores line set $L_n$ on $[s, X_n]$. Its certificate needs $U_n(X_n)/M_n \le \varepsilon$, where $U_n(X)=\sum_{i\in L_n} b_i(X)$ and $M_n=\sum_{i\in L_n} m_i$, both over the ceiling keep window, and $b_i(X)=m_i$ for $E_i\ge X$, else $m_i\min\{1, 1/(\pi a_i (X-E_i))\}$. A refusal at $X_n<C$ moves to the first passing rung of $X_n + (C-X_n)2^{-k/3}$, or to $C$, where the audit only warns. Then $X_{n+1} \ge X_n + 2^{-10}(C-X_n)$.
+
+### Checks
+
+1. **Own audit.** The rescored case keeps its measured payload, so `cxr_truncation_audit` builds an audit with `ceiling_eV` $=C$ and a ladder from the rescored `grid[-1]`. Scoring never reads the payload. Selection pilots, roulette screens and the batched, per-hkl and queued routes feed that audit, and the selected spectrum is the sum of the audited pilots. hBN 100 keV, 4 electrons, `line_yield_tolerance=1.9e-4`, one forced limit $2.941\times10^{-5}$ for every pass:
+
+| pass | stop (eV) | reflections | audit share | result |
+|---|---:|---:|---:|---|
+| measured | 24300 | 2044 | $5.883\times10^{-5}$ | refused, extension 43225 |
+| rescore | 43225 | 478 | $2.902\times10^{-5}$ | pass, not capped |
+
+   On the rescore, $\int S\,dE\,N_e/M = 0.99987 \in [1-\text{edges}, 1+10^{-3}]$. With limit $1.18\times10^{-5}$, the rescore takes the capped path at 100000 eV and is audited there (share $1.17\times10^{-5}$).
+2. **Termination.** `np.linspace` ends exactly on the chosen rung, so only a rung equal to $C$ reaches `capped_at_ceiling`. A stop that does not rise (only possible when $C-X_n$ is within about $10^3$ ULP) re-raises. `_line_keep_window` on an interior-rung axis keeps the ceiling window. Termination holds through float granularity: no cap bounds the number of refusals, each of which shrinks $C-X_n$ by at least $1-2^{-10}$.
+3. **Side effects.** Point budget, replay `check_recorded_line_axis`, adaptive `batch_means` (now on the scored axis), Kossel/DBR containment, and the exclusion of coherent, windowed, `max_dE_frac`, channeling, TR and mixed cases are unchanged or correct. `line_grid_resolved` mixes kinematic-shaped axis fields (`bandwidth_policy="kinematic-ceiling"`, `schema=1`, stop $<C$) with a measured `truncation_audit`. It is not identity-bearing, but its policy label is misleading.
+4. **Phase cache.** Nesting depth equals the refusal count. hBN 1 MeV, refusals $41800\to80400\to119000$ eV: five OOM plans gave spectra bit-identical to the no-OOM run, with the same refusal list.
+
+### Exact discrepancy: observation directions
+
+`directions.py::directional_outputs` runs `_spectrum_case` once per direction on the joint axis, and each direction's refusal rescores on that direction's own scalar axis. hBN 1 MeV, two directions:
+
+- A refusal in only one direction raises `ValueError: all input arrays must have the same shape`.
+- When both refuse, `E_grid` and `spec_by_direction` span $[50, 119000]$ eV with 39651 nodes, but `line_grid_resolved` still reports the joint measured axis ($[50, 41600]$ eV, 13851 nodes) with no `bandwidth_fallback` and no `truncation_audit`.
+
+Missing: one joint fallback per case that rescores every direction on one extended observation axis and records it, or a refusal. Predates P4 (P3 ceiling fallback). Focused tests: 77 passed, 1 slow skipped.
+
+### Remediation 3 (implementation context, 2026-11-17, #1243)
+
+`directions.py::_joint_directional_spectra` scores every direction with the per-direction fallback disabled (`_joint_bandwidth_fallback`). On any direction's refusal it rebuilds one axis for all directions with `resolve_observation_cxr_grid` on the kinematic-shaped payload at the extended stop. It then rescores and re-audits every direction, repeating until none refuses. `line_grid_resolved` carries the scored axis's record, `bandwidth_fallback`, and per-direction `truncation_audits`. `runner/bandwidth_fallback.py::fallback_axis_payload` chooses the stop on both routes. After `MAX_EXTENSIONS = 2` refusals it goes straight to the ceiling, which bounds the passes independent of float granularity. Rescored records name the audited policy in `bandwidth_policy` and the axis-building one in `axis_policy`. Anchors: `tests/energy-grid/test_line_grid_bandwidth.py::test_observation_directions_extend_one_joint_axis` (without the fix it raises the stacking `ValueError`) and `::test_extensions_are_capped_before_the_ceiling`. Awaiting fresh-context re-verification.
+
+## Independent re-verification (fresh context, 2026-11-17, #1243, commit 20ca9b11c)
+
+Verdict for the P4 clause: **rederived**. The observation-direction discrepancy is closed; the scalar route is unchanged.
+
+### Expression (derived before reading the new bodies)
+
+For directions $D$ the returned axis $A=[s,X]$ has step $h=\min_{d\in D} h_d$ and $X \ge \max_d X^{\mathrm{Bragg}}_d$. Each direction's spectrum is certified when its own audit on $A$ gives $U_d(X)/M_d \le \varepsilon$ over the line set $L_d(A)$ it scores, or $X = C$, where the audit warns. With $n$ refusals the stop is a ladder rung for $n \le 2$ and $C$ for $n = 3$, so there are at most four passes.
+
+### Checks
+
+1. **Joint axis.** hBN 1 MeV, directions $n_0$ and $\pm 0.05$ rad, forced refusal at half the share. A refusal in direction 0, 1 or 2 rebuilt one axis from 41800 eV (13918 nodes) to 80400 eV (26785 nodes). All three directions were re-audited with audit `stop_eV` equal to `E_grid[-1]`, and the record's target step was 3.0 eV on every pass. The extension lies above the joint measured stop, so above the Bragg support over all directions. Outputs are rebuilt on each pass. The recovery wrappers re-raise the refusal and pass the flag through. The temporal grid is rebuilt (n = 6941533 → 13359332). The flag never reaches the scalar call, the case or the result keys.
+2. **Termination.** With refusal at 0.9 × share everywhere, the directions route ran 41800 → 46625 → 51148 → $C$ = 119000 eV, where the third refusal's own rung (56491 eV) was overridden by the cap; the audits there are `capped_at_ceiling`. The scalar route ran 41600 → 46437.5 → 50972.7 → 119000 eV. The rise guard re-raises a refusal at the ceiling.
+3. **Record.** `line_grid_resolved` carries `bandwidth_fallback`, per-direction `truncation_audits`, `bandwidth_policy = resonance-population` and `axis_policy = kinematic-ceiling`. Checkpoints, the result store and provenance copy it; the replay check reads only `E_grid`; `derive` reads only the scalar `line_grid_diagnostic`, which directional results never carried before or after.
+4. **Tests.** The five focused modules: 120 passed, 4 slow tests skipped.
+
+Minor: the "rescoring" warning precedes a re-raise at the ceiling; an extension can exceed the temporal sample cap (`ValueError`); a joint extension uses only the refusing direction's ladder, which is conservative and costs passes, not correctness.
+
+The task owner applied `rederived` to the ledger row from this verdict.

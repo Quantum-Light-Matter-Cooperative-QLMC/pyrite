@@ -26,7 +26,10 @@ _GOLDEN = np.uint64(0x9E3779B97F4A7C15)
 _MIX1 = np.uint64(0xBF58476D1CE4E5B9)
 _MIX2 = np.uint64(0x94D049BB133111EB)
 #: Audit sums a screen pass adds to the caller's truncation audit.
-_AUDIT_SUMS = ("line_mass", "mass_above", "mass_below", "electron_mass")
+_AUDIT_SUMS = ("line_mass", "mass_above", "mass_below", "electron_mass", "mass_above_extension")
+#: Caller audit settings a screen pass shares: lines up to the ceiling are
+#: charged, and the extension ladder is summed (#1243).
+_AUDIT_SETTINGS = ("ceiling_eV", "extension_stops_eV")
 
 
 def roulette_uniforms(seed: int, primaries) -> np.ndarray:
@@ -76,7 +79,7 @@ class LineScreen:
         self._grid = None
         self._tables: dict = {}
 
-    def _screen(self, batch, audit_band) -> dict[str, Any]:
+    def _screen(self, batch, audit_band, caller=None) -> dict[str, Any]:
         from .. import runner
 
         if self._grid is None:
@@ -88,6 +91,8 @@ class LineScreen:
             "n_electrons": self.n,
             "mass_only": True,
         }
+        if caller is not None:
+            audit.update({key: caller[key] for key in _AUDIT_SETTINGS if key in caller})
         with np.errstate(over="ignore", divide="ignore"):
             runner._cxr_for_segments(
                 batch.segments,
@@ -132,7 +137,7 @@ class LineScreen:
             if caller is not None
             else (float(grid[0]), float(grid[-1]))
         )
-        audit = self._screen(batch, band)
+        audit = self._screen(batch, band, caller)
         ids = np.asarray(_electron_ids(batch.segments))
         in_population = ids < self.n
         primaries, counts = np.unique(ids[in_population], return_counts=True)
