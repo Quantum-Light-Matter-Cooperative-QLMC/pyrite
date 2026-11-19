@@ -56,6 +56,7 @@ BremsstrahlungModel = Literal["eedl", "bethe-heitler", "bremslib"]
 BREMSSTRAHLUNG_MODEL = (
     f"eedl-2025-{BREMSSTRAHLUNG_EEDL_SHA256[:12]}/"
     f"endf-parserpy-{BREM_ENDF_PARSERPY_VERSION}-mf23-527-mf26-527-v3-unit-base-segment-escape"
+    "/fp64-segment-sum-v1"
 )
 
 R_E_CM2 = 7.9407877e-26  # classical electron radius squared [cm^2]

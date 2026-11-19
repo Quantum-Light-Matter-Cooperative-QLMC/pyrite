@@ -489,6 +489,15 @@ resolved case payload was checked unchanged before re-pinning. No fixture
 uses a fiber crystal under automatic selection, so no output arrays or
 tolerances change. The `eedl-fallback` entry stays historical.
 
+## FP64 brem segment sums (#1305)
+
+The CUDA brem reducers now sum FP32 cells in FP64 (per-thread, shared tree and
+output), so `BREMSSTRAHLUNG_BREMSLIB_MODEL` and `BREMSSTRAHLUNG_MODEL` both
+gain `/fp64-segment-sum-v1`. Re-pinned: the generation-dependent
+`case_content_key` and `parameter_sha256` hashes in `resolved.json` and
+`channeling.json`. These fixtures are CPU/NumPy fp64, whose brem reduction
+was already binary64, so every recorded output keeps its expectation.
+
 ## Device line-axis sizing (#1275)
 
 `LINE_BANDWIDTH_DEFAULT_MODEL=resonance-population-default-v2` and
