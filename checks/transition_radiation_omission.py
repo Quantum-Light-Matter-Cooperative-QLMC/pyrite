@@ -110,7 +110,8 @@ def _simulate(scene: Scene, grid: np.ndarray, trials: int):
     # budget from 3 MeV.
     # Reproduce the pre-971df7c69 "auto" default the evidence was taken with:
     # shell soft/hard where every layer has conduction-band shell data,
-    # continuous stopping otherwise (sapphire has none) (#1065).
+    # continuous stopping otherwise (sapphire has none) (#1065). That legacy
+    # default kept continuous stopping deterministic (straggling off).
     covered = covered_shell_materials()
     shell = all(material in covered for material, _ in scene.layers)
     inelastic = "shell-soft-hard" if shell else "continuous"
@@ -118,7 +119,11 @@ def _simulate(scene: Scene, grid: np.ndarray, trials: int):
         beam,
         target,
         pr.Detector(scene.theta_obs_deg),
-        physics=pr.Physics(inelastic_model=inelastic, cxr_source="none"),
+        physics=pr.Physics(
+            inelastic_model=inelastic,
+            straggling=None if shell else False,
+            cxr_source="none",
+        ),
         numerics=pr.Numerics(
             sampling=FixedSampling(cxr_histories=trials, brem_histories=trials),
             energy_bins=pr.detectors.EnergyBins(brem=grid),

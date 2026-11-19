@@ -1573,6 +1573,27 @@ def test_remove_bare_no_op_error_mentions_beam(tmp_path, monkeypatch):
     assert "provide a range, membership, beam, preset, or emission option" in result.stderr
 
 
+def test_physics_set_cxr_source_round_trips_and_resets(tmp_path, monkeypatch):
+    """The #1327 line opt-out is a profile physics key that lowers to ``Physics``."""
+    from pyrite.campaign.legacy import physics_from_legacy
+    from pyrite.results.store import Settings
+
+    catalog = _catalog(tmp_path, monkeypatch)
+    written = invoke(profile.command, ["physics", "set", "sub_100keV", "--cxr-source", "none"])
+    assert_clean_result(written, stdout="updated physics for profile sub_100keV\n")
+    assert 'cxr_source = "none"' in catalog.read_text()
+    assert_table_row(
+        invoke(profile.command, ["show", "sub_100keV"]).stdout, "cxr-source", "none profile"
+    )
+    assert physics_from_legacy(Settings(cxr_source="none")).cxr_source == "none"
+    assert physics_from_legacy(Settings()).cxr_source == "mc"
+    bad = invoke(profile.command, ["physics", "set", "sub_100keV", "--cxr-source", "external"])
+    assert bad.exit_code == 2
+    reset = invoke(profile.command, ["physics", "reset", "sub_100keV", "cxr-source", "--yes"])
+    assert reset.exit_code == 0
+    assert "cxr_source" not in catalog.read_text()
+
+
 def test_numerics_set_shell_inelastic_mode_validates_and_resets(tmp_path, monkeypatch):
     catalog = _catalog(tmp_path, monkeypatch)
 
