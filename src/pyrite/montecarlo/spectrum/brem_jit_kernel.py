@@ -3,7 +3,9 @@
 One CUDA block owns one or more photon-energy bins. Threads stride over
 transport segments, evaluate either staged EEDL interpolation or
 Bethe-Heitler + Elwert and Beer-Lambert attenuation directly, then reduce the
-segment sum in shared memory.
+segment sum in shared memory. Cells are FP32; per-thread sums, the shared tree
+and the output spectrum are FP64, so a segment split changes the result only
+at FP64 summation order (#1305).
 
 The kernel consumes per-segment absorber path lengths for each layer rather
 than a dense (segment, energy) attenuation matrix, so peak scratch memory is
@@ -19,6 +21,7 @@ from ..._bremslib_table import STAGED_RATIO_COUNT
 from .._cupy_jit import jit
 
 F32_ZERO = np.float32(0.0)
+F64_ZERO = np.float64(0.0)
 F32_ONE = np.float32(1.0)
 F32_1E_M3 = np.float32(1.0e-3)
 F32_1E_M6 = np.float32(1.0e-6)
@@ -41,6 +44,22 @@ U32_THREE = np.uint32(3)
 U32_FOUR = np.uint32(4)
 U32_LAST_INNER_NODE = np.uint32(STAGED_RATIO_COUNT - 2)
 U32_RATIO_COUNT = np.uint32(STAGED_RATIO_COUNT)
+
+
+#: Segment sums, shared-memory trees and the output spectrum are FP64 (#1305):
+#: cells stay FP32, but an FP32 serial sum over ``n_segments / n_threads`` cells
+#: made the result depend on how the caller split its segments (2.4e-5 of peak
+#: between the retained and streamed routes at 47M segments).
+SPECTRUM_DTYPE = np.float64
+
+
+def _spectrum_out(out, n_energies):
+    """``out``, or a new zero spectrum; refuse a narrower accumulator (#1305)."""
+    if out is None:
+        return xp.zeros(n_energies, dtype=SPECTRUM_DTYPE)
+    if out.dtype != SPECTRUM_DTYPE:
+        raise TypeError(f"brem reduction output must be float64, got {out.dtype}")
+    return out
 
 
 @dataclass(frozen=True)
@@ -280,7 +299,7 @@ def _eedl_kernel_1e(
     thread_idx = jit.threadIdx.x
     n_threads = jit.blockDim.x
     photon_eV = energies_eV[energy_index]
-    spectrum_sum = F32_ZERO
+    spectrum_sum = F64_ZERO
 
     line_id = thread_idx
     while line_id < n_segments:
@@ -304,7 +323,7 @@ def _eedl_kernel_1e(
         spectrum_sum += weighted_cross_section * transmission
         line_id += n_threads
 
-    shared = jit.shared_memory(xp.float32, None)
+    shared = jit.shared_memory(xp.float64, None)
     shared[thread_idx] = spectrum_sum
     jit.syncthreads()
     stride = n_threads // U32_TWO
@@ -353,7 +372,7 @@ def _bremslib_kernel_1e(
     thread_idx = jit.threadIdx.x
     n_threads = jit.blockDim.x
     photon_eV = energies_eV[energy_index]
-    spectrum_sum = F32_ZERO
+    spectrum_sum = F64_ZERO
 
     line_id = thread_idx
     while line_id < n_segments:
@@ -387,7 +406,7 @@ def _bremslib_kernel_1e(
         spectrum_sum += weighted_cross_section * transmission
         line_id += n_threads
 
-    shared = jit.shared_memory(xp.float32, None)
+    shared = jit.shared_memory(xp.float64, None)
     shared[thread_idx] = spectrum_sum
     jit.syncthreads()
     stride = n_threads // U32_TWO
@@ -418,7 +437,7 @@ def _kernel_1e(
     thread_idx = jit.threadIdx.x
     n_threads = jit.blockDim.x
     photon0_eV = energies_eV[energy_index0]
-    spectrum_sum_0 = F32_ZERO
+    spectrum_sum_0 = F64_ZERO
 
     line_id = thread_idx
     while line_id < n_segments:
@@ -435,7 +454,7 @@ def _kernel_1e(
         spectrum_sum_0 += ds0 * transmission_0
         line_id += n_threads
 
-    shared = jit.shared_memory(xp.float32, None)
+    shared = jit.shared_memory(xp.float64, None)
     shared[thread_idx] = spectrum_sum_0
     jit.syncthreads()
     stride = n_threads // U32_TWO
@@ -472,8 +491,8 @@ def _kernel_2e(
     photon1_eV = F32_ZERO
     if has_energy_1:
         photon1_eV = energies_eV[energy_index1]
-    spectrum_sum_0 = F32_ZERO
-    spectrum_sum_1 = F32_ZERO
+    spectrum_sum_0 = F64_ZERO
+    spectrum_sum_1 = F64_ZERO
 
     line_id = thread_idx
     while line_id < n_segments:
@@ -506,7 +525,7 @@ def _kernel_2e(
             )
         line_id += n_threads
 
-    shared = jit.shared_memory(xp.float32, None)
+    shared = jit.shared_memory(xp.float64, None)
     offset0 = U32_ZERO
     offset1 = n_threads
     shared[offset0 + thread_idx] = spectrum_sum_0
@@ -554,9 +573,9 @@ def _kernel_3e(
         photon1_eV = energies_eV[energy_index1]
     if has_energy_2:
         photon2_eV = energies_eV[energy_index2]
-    spectrum_sum_0 = F32_ZERO
-    spectrum_sum_1 = F32_ZERO
-    spectrum_sum_2 = F32_ZERO
+    spectrum_sum_0 = F64_ZERO
+    spectrum_sum_1 = F64_ZERO
+    spectrum_sum_2 = F64_ZERO
 
     line_id = thread_idx
     while line_id < n_segments:
@@ -603,7 +622,7 @@ def _kernel_3e(
             )
         line_id += n_threads
 
-    shared = jit.shared_memory(xp.float32, None)
+    shared = jit.shared_memory(xp.float64, None)
     offset0 = U32_ZERO
     offset1 = n_threads
     offset2 = U32_TWO * n_threads
@@ -661,10 +680,10 @@ def _kernel_4e(
         photon2_eV = energies_eV[energy_index2]
     if has_energy_3:
         photon3_eV = energies_eV[energy_index3]
-    spectrum_sum_0 = F32_ZERO
-    spectrum_sum_1 = F32_ZERO
-    spectrum_sum_2 = F32_ZERO
-    spectrum_sum_3 = F32_ZERO
+    spectrum_sum_0 = F64_ZERO
+    spectrum_sum_1 = F64_ZERO
+    spectrum_sum_2 = F64_ZERO
+    spectrum_sum_3 = F64_ZERO
 
     line_id = thread_idx
     while line_id < n_segments:
@@ -725,7 +744,7 @@ def _kernel_4e(
             )
         line_id += n_threads
 
-    shared = jit.shared_memory(xp.float32, None)
+    shared = jit.shared_memory(xp.float64, None)
     offset0 = U32_ZERO
     offset1 = n_threads
     offset2 = U32_TWO * n_threads
@@ -795,8 +814,7 @@ def run_brem_reduction_kernel(
         raise ValueError(f"energies_per_block must be one of {tuple(_REDUCTION_KERNELS)}") from None
 
     n_energies = int(E_grid.size)
-    if out is None:
-        out = xp.zeros(n_energies, dtype=xp.float32)
+    out = _spectrum_out(out, n_energies)
     if n_energies == 0 or T_keV.size == 0:
         return out
 
@@ -824,7 +842,7 @@ def run_brem_reduction_kernel(
         incident_prefactor = xp.ascontiguousarray(incident_prefactor, dtype=xp.float32)
 
     n_blocks = (n_energies + energies_per_block - 1) // energies_per_block
-    shared_memory_bytes = energies_per_block * n_threads * np.dtype(np.float32).itemsize
+    shared_memory_bytes = energies_per_block * n_threads * np.dtype(np.float64).itemsize
     kernel(
         (n_blocks,),
         (n_threads,),
@@ -880,8 +898,7 @@ def run_eedl_brem_reduction_kernel(
     if n_threads not in (32, 64, 128, 256, 512, 1024):
         raise ValueError("nthreads must be one of 32, 64, 128, 256, 512, 1024")
     n_energies = int(E_grid.size)
-    if out is None:
-        out = xp.zeros(n_energies, dtype=xp.float32)
+    out = _spectrum_out(out, n_energies)
     if n_energies == 0 or T_keV.size == 0:
         return out
 
@@ -906,7 +923,7 @@ def run_eedl_brem_reduction_kernel(
             np.uint32(n_energies),
             np.uint32(n_layers),
         ),
-        shared_mem=n_threads * np.dtype(np.float32).itemsize,
+        shared_mem=n_threads * np.dtype(np.float64).itemsize,
     )
     return out
 
@@ -956,8 +973,9 @@ def run_bremslib_brem_reduction_kernel(
     if n_threads not in (32, 64, 128, 256, 512, 1024):
         raise ValueError("nthreads must be one of 32, 64, 128, 256, 512, 1024")
     n_energies = int(E_grid.size)
-    if out is None:
-        out = xp.zeros(n_energies, dtype=xp.float32)
+    # Band scoring keeps its own (primary, band) buffer and dtype contract.
+    if band_weights is None or out is None:
+        out = _spectrum_out(out, n_energies)
     if n_energies == 0 or T_keV.size == 0:
         return out
 
@@ -996,7 +1014,7 @@ def run_bremslib_brem_reduction_kernel(
         (n_energies,),
         (n_threads,),
         arguments,
-        shared_mem=n_threads * np.dtype(np.float32).itemsize,
+        shared_mem=n_threads * np.dtype(np.float64).itemsize,
     )
     return out
 

@@ -54,8 +54,8 @@ _BREMSLIB_CHUNK_CELLS = 1 << 21
 
 BremsstrahlungModel = Literal["eedl", "bethe-heitler", "bremslib"]
 BREMSSTRAHLUNG_MODEL = (
-    f"eedl-2025-{BREMSSTRAHLUNG_EEDL_SHA256[:12]}/"
-    f"endf-parserpy-{BREM_ENDF_PARSERPY_VERSION}-mf23-527-mf26-527-v3-unit-base-segment-escape"
+    f"eedl-2025-{BREMSSTRAHLUNG_EEDL_SHA256[:12]}/endf-parserpy-{BREM_ENDF_PARSERPY_VERSION}-"
+    "mf23-527-mf26-527-v3-unit-base-segment-escape/fp64-segment-sum-v1"
 )
 
 R_E_CM2 = 7.9407877e-26  # classical electron radius squared [cm^2]
@@ -1022,7 +1022,7 @@ def mc_brem_spectrum(
         else {}
     )
 
-    spec = xp.zeros(E_grid.size, dtype=REAL)
+    spec = xp.zeros(E_grid.size, dtype=xp.float64)  # split-independent FP64 sum (#1305)
 
     # GPU float32 fast paths fuse cross-section evaluation, absorption, and the
     # segment reduction. Instead of dense ``(segment, energy)`` matrices, they

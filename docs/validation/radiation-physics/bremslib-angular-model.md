@@ -89,6 +89,12 @@ This is a numerical correction within the existing derivation, not new
 independent physics validation. The later `fp32-cell-mb-v1` suffix (#1019)
 records the millibarn FP32 cells above. Default CUDA FP32 hard-photon angle
 sampling changes at the rounding level; binary64 output is unchanged.
+The `fp64-segment-sum-v1` suffix (#1305, also on `BREMSSTRAHLUNG_MODEL`)
+records that the fused CUDA reducers sum their FP32 cells in FP64 (per
+thread, shared tree and output spectrum). FP32 sums made the continuum depend
+on how segments were split between calls: retained and streamed adaptive
+scoring of hopg 300 keV/20M differed by 2.4e-5 of peak. Binary64 output is
+unchanged.
 
 `mc_brem_spectrum` evaluates the angle per segment, preserves EEDL as the warned isotropic fallback for a missing element table or uncovered incident energy, applies attenuation, and divides by the incident-electron count. The portable path and the fused CUDA mirror use the same staged rows, interpolation fractions, tip rule, unit conversion, fallback state, and $4\pi$ cancellation. This derivation is a static source-to-code comparison. Separately, the hardware-gated CUDA comparison passed on an RTX 5080 on 2026-09-22; the full neighboring CUDA spectrum regression file passed (7 tests, SLURM job 1796).
 

@@ -204,6 +204,7 @@ def test_equal_acceptance_preserves_lowered_case_and_both_identities(identity_pi
     # and #788's versioned default radiative-moment approximation.
     # #278: refined geometric grid and BremsLib angle-f64-v1 identity.
     # #1019: BremsLib fp32-cell-mb-v1 identity.
+    # #1305: fp64-segment-sum-v1 brem markers (FP64 CUDA segment sums).
     # #1166: the two-beam-laue-dbr-v1 diffracted-brem marker.
     # #1176: two-beam-laue-dbr-kossel-v2 (Kossel lines).
     # #1191: segment-mean-v8-node-support-tail escape marker.
