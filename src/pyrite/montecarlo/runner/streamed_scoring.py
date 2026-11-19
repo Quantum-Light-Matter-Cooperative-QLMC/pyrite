@@ -56,23 +56,21 @@ LIVE_STREAM_REFUSED_KEYS = (
 def adaptive_refusal(case: Mapping[str, Any]) -> str | None:
     """Why an adaptive ``case`` keeps the retained route, or ``None`` (#1280).
 
-    Streamed adaptive scoring is the fixed case at the realized pair. Two
-    retained-route outputs read every realized segment: automatic reflection
-    selection (streamed fixed runs score the build-time family set instead;
-    prefix selection waits on #1281) and per-bin batch means.
+    Streamed adaptive scoring is the fixed case at the realized pair. Automatic
+    reflection selection streams on the electron prefix (#1281,
+    :mod:`.streamed_selection`); per-bin batch means read every realized
+    segment and keep the retained route.
     """
     precision = case.get("adaptive_precision")
     if precision is None:
         return None
-    if case.get("reflection_selection"):
-        return "reflection_selection under adaptive precision needs every segment at once"
     if precision.get("batch_means_band_eV") is not None:
         return "adaptive batch means need every segment at once"
     return None
 
 
 def _streaming_case(case: Mapping[str, Any]) -> Mapping[str, Any]:
-    """Use the build-time family set for automatic selection in streamed runs."""
+    """``case`` without its automatic selection, which the streamed scorer applies."""
     if (case.get("reflection_selection") or {}).get("automatic"):
         return {key: value for key, value in case.items() if key != "reflection_selection"}
     return case
@@ -108,15 +106,29 @@ class BlockSpectrumScorer:
     :meth:`add` must hold complete electrons with global electron indices;
     rows of electrons at or past an estimator's population are ignored by that
     estimator, exactly as in the joined scoring.
+
+    ``selection`` (``(pruned_case, record)``, #1281) scores the lines of an
+    automatic selection's set in admitted reflection chunks, and the continuum
+    with that set's lattice share removed, as the retained route does.
     """
 
-    def __init__(self, case: Mapping[str, Any], inputs: Mapping[str, Any]):
+    def __init__(
+        self,
+        case: Mapping[str, Any],
+        inputs: Mapping[str, Any],
+        selection: tuple[Mapping[str, Any], dict] | None = None,
+    ):
         from .cxr_grid import cxr_truncation_audit
         from .emission_adapters import select_emission
+        from .lattice_share import continuum_case
         from .line_roulette import line_screen_for
         from .streamed_recovery import EscapeScoringRecovery, RowScoringRecovery
 
         self.case = _streaming_case(case)
+        self.selection = None if selection is None else selection[1]
+        self.line_case = self.case if selection is None else _streaming_case(selection[0])
+        # The continuum removes the selected set's lattice share, as retained does.
+        self.brem_case = self.case if selection is None else continuum_case(case, self.selection)
         case = self.case
         self.fallbacks = FallbackAudit(
             case.get("allow_physics_fallback", False), case.get("physics_fallbacks", ())
@@ -168,7 +180,7 @@ class BlockSpectrumScorer:
             line_screen=self.line_screen,
         )
         brem_batch = replace(batch, electron_limit=self.Ne_brem)
-        spec = self.emission.cxr.evaluate(batch, "spec").values
+        spec = self._lines(batch)
         # Diffracted brem (#1166) and Kossel lines (#1176) are track-length sums
         # over a fixed electron count: blocks add their depth weights, and the
         # two-beam mode is solved once in :meth:`result`.
@@ -186,6 +198,7 @@ class BlockSpectrumScorer:
                 brem = self.emission.continuum.evaluate(
                     replace(
                         brem_batch,
+                        case=self.brem_case,
                         energy_eV=self.E_brem,
                         segments={**block, "_stream_escape_recovery": self.escape_recovery},
                     ),
@@ -211,7 +224,7 @@ class BlockSpectrumScorer:
                     "_stream_escape_recovery": self.escape_recovery,
                 },
                 self.E_brem,
-                case,
+                self.brem_case,
                 self.n_hat,
                 case.get("abs_layers"),
                 self.groove,
@@ -227,6 +240,23 @@ class BlockSpectrumScorer:
             )
 
         self.n_segments += rows
+
+    def _lines(self, batch):
+        """The block's incoherent lines; a selected set scores in admitted chunks.
+
+        Both routes return host arrays, like the other block totals: the
+        result adds host diffracted spectra to them (#1281, CUDA job 13652).
+        """
+        if self.selection is None:
+            return self.emission.cxr.evaluate(batch, "spec").values
+        from .reflection_cutoff import _selected_spectrum
+
+        evaluate = self.emission.cxr.evaluate
+        return _selected_spectrum(
+            self.line_case,
+            lambda pilot: evaluate(replace(batch, case=pilot, table_cache={}), "spec").values,
+            self.E_grid,
+        )
 
     def _transition(self, segs):
         """Per-history TR of one block, normalized by ``Ne_brem``; zeros when off."""
@@ -296,7 +326,9 @@ class BlockSpectrumScorer:
             out["line_roulette"] = self.line_screen.record()
         from .lattice_share import lattice_share_outputs
 
-        out.update(lattice_share_outputs(case, self.n_layers))
+        out.update(lattice_share_outputs(self.brem_case, self.n_layers))
+        if self.selection is not None:
+            out["reflection_selection"] = self.selection
         if events := self.fallbacks.events():
             out["physics_fallbacks"] = events
         return out
@@ -332,11 +364,11 @@ def run_case_streamed(
     from . import _transport_case
     from .artifacts import _case_geometry
     from .oom import _ensure_pool_limit
+    from .streamed_selection import block_scorer
 
     reason = streaming_refusal(case, live=True)
     if reason is not None:
         raise ValueError(f"cannot stream this case's spectra: {reason}")
-    case = _streaming_case(case)
     sampling = None
     if case.get("adaptive_precision") is not None:
         case, sampling, transport_core = _measure_adaptive_case(case, transport_core)
@@ -362,7 +394,7 @@ def run_case_streamed(
             Ne_lines=case["Ne"],
             Ne_brem=case["Ne_brem"],
         )
-        scorer = BlockSpectrumScorer(case, inputs)
+        scorer = block_scorer(case, inputs)
         with collect_line_data_coverage() as line_coverage:
             tp = _transport_case(
                 case,

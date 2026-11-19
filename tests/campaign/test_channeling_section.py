@@ -212,22 +212,24 @@ def test_channeling_demo_and_off_profile_identities_are_unchanged():
     (``sinc-oversampled`` + ``shape_rtol``) and ``line_resolution_model`` v2.
     #1296 re-mints the silicon pins for ``CXR_BIN_REDUCTION_MODEL``
     ``fourier-auto-v6`` (FP32 direct phase factors on the device route).
+    #1281 re-mints every pin for ``measured-shell-cutoff-v6`` (electron-prefix
+    selection).
     """
     sweep, settings, cases = _profile_cases("silicon", "channeling_demo")
     assert cases[0].line_quadrature == "bin-mean"
     assert [profiles.case_content_key(case) for case in cases] == [
-        "c56170418f910430776e4e42ade9d1079b71748014c6e3496011277e18a1baa0"
+        "1689dd49d7f7e3558707c8766b00f2ba4382e875376ce77129ab3d4a041cb56a"
     ]
     assert profiles.named_profile_stem("silicon", catalog_profile="channeling_demo") == (
-        "silicon@channeling_demo-4549592e73e8"
+        "silicon@channeling_demo-aa4069f0e470"
     )
     identity = profiles.dataset_identity("silicon", settings, sweep)
     assert identity["parameter_sha256"] == (
-        "c8680473212df4a62a1a904fd65d2af4d334450188512b5ad51e2521562a7f65"
+        "91d59fcfec15c38ec4d5e8f6eff0a33af95d7fc88a80fbfee1810434e22e0c06"
     )
     sweep = material_sweep("hopg", catalog_profile="standard")
     settings = profiles.profile_run_settings(default_settings(), "standard", sweep=sweep)
     assert profiles.dataset_identity("hopg", settings, sweep)["parameter_sha256"] == (
-        "8193ecf13d4bb263d03d835d41f3fb3b362258dbef5992a5a2fdd0752e6695cf"
+        "ac0bbcc74db416ac35cdfb5c678f2380fcad9c6d0b6fab6c9a77c8f6ca782872"
     )
-    assert profiles.named_profile_stem("hopg") == "hopg@full-8193ecf13d4b"
+    assert profiles.named_profile_stem("hopg") == "hopg@full-ac0bbcc74db4"

@@ -47,8 +47,10 @@ __all__ = [
     "reflection_selection_record",
     "prune_case_reflections",
     "reflection_shells",
+    "select_batch_reflections",
     "select_case_reflections",
     "select_reflection_cutoff",
+    "SELECTION_HISTORIES",
     "selected_line_spectrum",
     "selection_call_sizes",
     "validate_reflection_selection",
@@ -64,6 +66,12 @@ F0_RANGE_INVANG = 4.0 * np.pi * 6.0
 #: Identity of the measured shell-cutoff selection; bump on any change that
 #: moves a selected set or its spectrum.
 REFLECTION_SELECTION_MODEL = CXR_REFLECTION_SELECTION_MODEL
+
+#: Electrons the selection pass scores (#1281): the prefix ``elec_id <
+#: SELECTION_HISTORIES`` of the line (and continuum) population. Shell yields
+#: enter the stop only as ratios, so the decision needs far fewer histories
+#: than the spectrum; the selected set is then scored on every history.
+SELECTION_HISTORIES = 4096
 
 #: Shells after the first decaying pair before the tail estimate may stop.
 _MIN_DECAYING_SHELLS = 2
@@ -547,6 +555,7 @@ def selected_line_spectrum(
     continuum=None,
     *,
     reference_evaluate: Callable[[dict, np.ndarray], object] | None = None,
+    histories: dict | None = None,
 ) -> tuple[np.ndarray, dict]:
     """Incoherent line spectrum of ``case`` under its ``reflection_selection``.
 
@@ -561,6 +570,12 @@ def selected_line_spectrum(
     continuum-share and background yields all use the reference band, so a
     changed production stop cannot change the selected set.
 
+    ``histories`` (``{"lines": n, "continuum": m}``, #1281) records that
+    ``reference_evaluate`` and ``continuum`` score an electron prefix. The
+    selection then always runs through ``reference_evaluate``, on the reference
+    band or else the production axis, and ``evaluate`` rescores the selected
+    set on the full population.
+
     Returns the host spectrum and the selection record: model, tolerance,
     and per radiator its cutoff, reflection count, tail estimate, convergence
     and shell table. ``continuum(band_eV)`` builds the net metric's
@@ -570,11 +585,22 @@ def selected_line_spectrum(
 
     Validation: reflection-yield-tolerance-selector
     """
+    pruned, record, spectrum, separate = _line_selection(
+        case, evaluate, grid, continuum, reference_evaluate, histories
+    )
+    if separate:
+        spectrum = _selected_spectrum(pruned, evaluate, grid)
+    return spectrum, record
+
+
+def _line_selection(case, evaluate, grid, continuum, reference_evaluate, histories):
+    """Pruned case, record, shell-summed spectrum and whether production rescoring is due."""
     from ..._backend import _to_cpu
 
     selection = case["reflection_selection"]
     quadrature = case.get("line_quadrature", "node")
     reference = None if reference_evaluate is None else _selection_reference_grid(case)
+    separate = reference is not None or (histories is not None and reference_evaluate is not None)
     selection_grid = grid if reference is None else reference
     selection_quadrature = quadrature if reference is None else "bin-mean"
     per_call = selection_call_sizes(case, selection_grid)
@@ -582,9 +608,9 @@ def selected_line_spectrum(
         case,
         lambda pilot, axis: np.asarray(
             _to_cpu(
-                evaluate(pilot)
-                if reference is None or reference_evaluate is None
-                else reference_evaluate(pilot, axis)
+                reference_evaluate(pilot, axis)
+                if separate and reference_evaluate is not None
+                else evaluate(pilot)
             ),
             dtype=float,
         ),
@@ -623,35 +649,81 @@ def selected_line_spectrum(
             for (layer, radiator), outcome in zip(radiators, outcomes, strict=True)
         ],
     )
+    if histories is not None:
+        record["selection_histories"] = dict(histories)
     if reference is not None:
         record["reference_band_eV"] = list(axis_band_eV(reference, "bin-mean"))
         record["reference_quadrature"] = "bin-mean"
-        spectrum = _selected_spectrum(pruned, evaluate, grid)
-    return spectrum, record
+    return pruned, record, spectrum, separate
 
 
-def selected_batch_spectrum(emission, batch, Ne_brem):
+def selected_batch_spectrum(emission, batch, Ne_brem, histories: int | None = None):
     """Select on a reference batch, then audit and score the production batch.
+
+    The selection scores the first ``histories`` (default
+    :data:`SELECTION_HISTORIES`) line and continuum electrons (#1281); a
+    population no larger selects on every history, as before.
 
     Validation: reflection-yield-tolerance-selector
     """
+    return selected_line_spectrum(**_batch_selection(emission, batch, Ne_brem, histories))
+
+
+def select_batch_reflections(emission, batch, Ne_brem, histories: int | None = None):
+    """The pruned case and record :func:`selected_batch_spectrum` would select.
+
+    For streamed scoring (#1281): ``batch`` needs only the rows of the selection
+    prefix, and no production pass runs.
+
+    Validation: reflection-yield-tolerance-selector
+    """
+    args = _batch_selection(emission, batch, Ne_brem, histories)
+    pruned, record, _, _ = _line_selection(
+        args["case"],
+        args["evaluate"],
+        args["grid"],
+        args["continuum"],
+        args["reference_evaluate"],
+        args["histories"],
+    )
+    return pruned, record
+
+
+def _batch_selection(emission, batch, Ne_brem, histories):
+    """:func:`selected_line_spectrum` arguments for an emission batch (#1281 prefix)."""
     from dataclasses import replace
 
+    from .electron_blocks import electron_prefix
     from .lattice_share import selection_continuum
 
-    return selected_line_spectrum(
-        batch.case,
-        lambda pilot: (
+    lines = int(batch.segments["Ne"] if batch.electron_limit is None else batch.electron_limit)
+    brem = lines if Ne_brem is None else int(Ne_brem)
+    budget = int(SELECTION_HISTORIES if histories is None else histories)
+    if budget < 1:
+        raise ValueError("selection histories must be positive")
+    n_lines, n_brem = min(lines, budget), min(brem, budget)
+    sample, record = batch, None
+    if (n_lines, n_brem) != (lines, brem):
+        sample = replace(
+            batch,
+            segments=electron_prefix(batch.segments, max(n_lines, n_brem)),
+            electron_limit=n_lines,
+        )
+        record = dict(lines=n_lines, continuum=n_brem)
+    return dict(
+        case=batch.case,
+        evaluate=lambda pilot: (
             emission.cxr.evaluate(replace(batch, case=pilot, table_cache={}), "spec").values
         ),
-        batch.energy_eV,
-        continuum=selection_continuum(batch.case, batch, Ne_brem),
+        grid=batch.energy_eV,
+        continuum=selection_continuum(batch.case, sample, n_brem if record else Ne_brem),
         reference_evaluate=lambda pilot, axis: (
             emission.cxr.evaluate(
-                replace(batch, case=pilot, energy_eV=axis, truncation_audit=None, table_cache={}),
+                replace(sample, case=pilot, energy_eV=axis, truncation_audit=None, table_cache={}),
                 "spec",
             ).values
         ),
+        histories=record,
     )
 
 

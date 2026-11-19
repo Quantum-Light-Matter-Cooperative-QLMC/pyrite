@@ -80,12 +80,11 @@ def test_streamed_adaptive_matches_retained(monkeypatch, spread):
 @pytest.mark.parametrize(
     ("extra", "policy", "match"),
     [
-        ({"reflection_selection": {"automatic": True}}, {}, "reflection_selection"),
         ({}, {"batch_means_band_eV": (1000.0, 10000.0)}, "batch means"),
     ],
 )
 def test_population_wide_adaptive_outputs_are_refused(monkeypatch, extra, policy, match):
-    """Automatic selection (#1281) and batch means keep the retained route."""
+    """Batch means keep the retained route; automatic selection streams (#1281)."""
     case = {**_requested(**policy), **extra}
     assert streaming_refusal(case, live=True) is not None
 

@@ -446,6 +446,16 @@ pins advance together; each resolved case payload was checked unchanged
 between the v4 and v5 markers before re-pinning. Historical `eedl-fallback`
 identity stays unchanged. Output arrays and numerical tolerances are retained.
 
+## Electron-prefix reflection selection (#1281)
+
+`CXR_REFLECTION_SELECTION_MODEL=measured-shell-cutoff-v6` selects automatic
+reflections on the electron prefix `elec_id < SELECTION_HISTORIES`. Only
+identity pins advance (`resolved.json`, `channeling.json`, and the digests
+and stems in the profile/channeling/adaptive identity tests); every resolved
+case payload is unchanged. The fixtures pin four families, so no selection
+runs and no output arrays or tolerances change. The `eedl-fallback` entry
+stays historical.
+
 ## Lattice-share continuum (#1250)
 
 The coupled fixture is a crystalline BremsLib case (synthetic Si/O tables,

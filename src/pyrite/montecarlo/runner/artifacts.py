@@ -24,7 +24,8 @@ from ..trajectories import (
     read_trajectory_artifact,
 )
 from .streamed_scoring import STREAM_REFUSED_KEYS as STREAM_REFUSED_KEYS
-from .streamed_scoring import BlockSpectrumScorer, streaming_refusal
+from .streamed_scoring import streaming_refusal
+from .streamed_selection import block_scorer
 
 #: Default segment rows one streamed block holds. Measured on CPU for a 7.1 M
 #: segment hopg shell + coupled-radiative artifact (#186): peak host memory
@@ -134,7 +135,7 @@ def stream_spectrum_from_artifact(
     case, inputs = _checked_case_and_inputs(artifact, case)
     _check_streamable(case, artifact.path)
     try:
-        scorer = BlockSpectrumScorer(case, inputs)
+        scorer = block_scorer(case, inputs)
     except ValueError as error:
         raise TrajectoryArtifactError(str(error)) from error
     segs = {}

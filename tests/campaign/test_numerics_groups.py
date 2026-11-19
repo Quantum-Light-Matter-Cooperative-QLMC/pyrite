@@ -202,9 +202,7 @@ def test_default_selection_and_explicit_family_precedence():
     assert "reflection_selection" not in build_case(_scene()).to_dict()
 
 
-@pytest.mark.parametrize(
-    "mode", ["coherent", "temporal", "roulette", "blocks", "memory", "two-beam", "channeling"]
-)
+@pytest.mark.parametrize("mode", ["coherent", "temporal", "roulette", "two-beam", "channeling"])
 def test_automatic_selection_falls_back_on_unsupported_routes(mode):
     physics = (
         replace(_scene().physics, emission=("incoherent", "coherent"))
@@ -231,10 +229,6 @@ def test_automatic_selection_falls_back_on_unsupported_routes(mode):
         options["temporal_profile"] = True
     elif mode == "roulette":
         options["line_roulette"] = pr.config.LineRoulette(floor=0.1)
-    elif mode in {"blocks", "memory"}:
-        options["execution"] = pr.ExecutionConfig(
-            **{"stream_block_electrons" if mode == "blocks" else "stream_memory_mib": 5}
-        )
     scene = _scene("silicon")
     case = build_case(
         scene,
@@ -252,12 +246,23 @@ def test_automatic_selection_falls_back_on_unsupported_routes(mode):
     _same_case(case, fixed)
 
 
-def test_streamed_artifact_selection_falls_back_without_mutating_the_case():
+@pytest.mark.parametrize("mode", ["blocks", "memory"])
+def test_streamed_numerics_keep_automatic_selection(mode):
+    """Streamed scoring selects on the electron prefix (#1281); no fallback."""
+    execution = pr.ExecutionConfig(
+        **{"stream_block_electrons" if mode == "blocks" else "stream_memory_mib": 5}
+    )
+    case = build_case(_scene("silicon"), pr.Numerics(execution=execution)).to_dict()
+    assert case["reflection_selection"]["automatic"] is True
+
+
+def test_streamed_scorer_applies_selection_without_mutating_the_case():
     from pyrite.montecarlo.runner.streamed_scoring import _streaming_case, streaming_refusal
+    from pyrite.montecarlo.runner.streamed_selection import automatic_selection
 
     case = build_case(_scene("silicon")).to_dict()
     streamed = _streaming_case(case)
     assert "reflection_selection" not in streamed
     assert streamed["hkl_list"] == case["hkl_list"]
-    assert streaming_refusal(case) is None
+    assert streaming_refusal(case) is None and automatic_selection(case)
     assert case["reflection_selection"]["automatic"]
