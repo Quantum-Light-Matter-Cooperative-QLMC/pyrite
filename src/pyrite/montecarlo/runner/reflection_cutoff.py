@@ -548,8 +548,9 @@ def _axis_covers_band(grid, quadrature: str, band_eV: tuple[float, float]) -> bo
     """Whether the production axis spans ``band_eV`` (#1326).
 
     Then the production line window (axis padded by 20 %) and tabulation hold
-    every line that reaches the reference band, so the band mass read off the
-    production lines is the reference band's.
+    every line the reference pass keeps, so the band mass read off the
+    production lines is the reference band's, up to the in-band tails of lines
+    resonant in the wider production window's strip (a keep-window bound).
 
     Validation: reflection-yield-tolerance-selector
     """
@@ -695,6 +696,8 @@ def _pilot_scorer(mode, mass, band, evaluate, reference_evaluate, band_evaluate,
     ``band_mass`` on the reference axis, lines never reduced. ``reference``:
     the bin-mean reduction on the reference axis. ``production``: ``evaluate``.
     The two band-mass modes add each pilot's mass to ``mass[0]``.
+
+    Validation: reflection-yield-tolerance-selector
     """
     from ..._backend import _to_cpu
 
@@ -717,6 +720,8 @@ def _selection_mode(case, grid, histories, reference_evaluate, band_evaluate, ba
 
     A reference axis exists for automatic bandwidths. ``single`` needs a
     prefix covering the population and a production axis spanning the band.
+
+    Validation: reflection-yield-tolerance-selector
     """
     reference = None if reference_evaluate is None else _selection_reference_grid(case)
     if reference is None:
@@ -877,8 +882,8 @@ def _batch_selection(emission, batch, Ne_brem, histories, parts=None):
             selected,
         ),
         histories=record,
-        band_evaluate=_band_evaluator(emission, batch, lines),
-        band_mass=_band_evaluator(emission, sample, n_lines, reference=True),
+        band_evaluate=_band_evaluator(emission, batch, lines, parts=population),
+        band_mass=_band_evaluator(emission, sample, n_lines, reference=True, parts=selected),
     )
 
 
@@ -921,7 +926,7 @@ def _summed_parts(score, batch, parts):
     return total
 
 
-def _band_evaluator(emission, source, norm, *, reference=False):
+def _band_evaluator(emission, source, norm, *, reference=False, parts=None):
     """Band-mass scorers of :func:`selected_line_spectrum` for an emission batch (#1326).
 
     The pilot's lines add their exact in-band mass to a truncation audit as
@@ -936,12 +941,28 @@ def _band_evaluator(emission, source, norm, *, reference=False):
     ``reference=True``: ``(pilot, axis, band) -> (spectrum, mass)`` on the
     selection sample and ``axis``, in a ``mass_only`` audit, so the lines are
     generated and measured but never reduced onto bins.
+
+    With ``parts`` (streamed prefix selection, #1281), each staged block is
+    scored in turn and the spectra and masses are summed; the mass is a sum
+    over lines, so the per-block sum is exact.
+
+    Validation: reflection-yield-tolerance-selector
     """
     from dataclasses import replace
 
     from ..._backend import _to_cpu
 
     def score(pilot, axis, band):
+        if parts is None:
+            return score_one(source, pilot, axis, band)
+        values, mass = None, 0.0
+        for segments in parts():
+            v, m = score_one(replace(source, segments=segments), pilot, axis, band)
+            values = v if values is None else values + v
+            mass += m
+        return values, mass
+
+    def score_one(source, pilot, axis, band):
         if reference:
             audit = {"band_eV": tuple(map(float, band)), "mass_only": True}
             batch = replace(

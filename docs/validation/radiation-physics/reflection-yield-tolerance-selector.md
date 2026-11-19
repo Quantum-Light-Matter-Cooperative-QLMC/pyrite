@@ -1320,9 +1320,8 @@ Human sign-off is not granted.
 
 ## Exact band-mass decision yield and single pass (v8, #1326)
 
-This section is the implementer's derivation and regression record. It has not
-had fresh-context verification, so it does not change the row's `rederived`
-status.
+This section is the implementer's derivation and regression record, with the
+corrections from its fresh-context review (end of section).
 
 **Claim.** A shell's decision yield may be taken as the closed-form in-band
 mass of its line arrays,
@@ -1333,7 +1332,8 @@ Y_{\rm band}=\sum_{\ell}w_\ell\,\frac{\pi}{a_\ell}\Bigl[R(x^{\rm hi}_\ell)-R(x^{
 $$
 
 with $R=F-s/2$ the tail complement of the $\mathrm{sinc}^2$ antiderivative
-(`sinc-bin-integration`). Bins that tile $[E_{\rm lo},E_{\rm hi}]$ telescope, so
+(`sinc-bin-integration`), $s(x)=+1$ for $x\ge0$ and $-1$ otherwise (so
+$R(0)=-1/2$; host and device both use this convention). Bins that tile $[E_{\rm lo},E_{\rm hi}]$ telescope, so
 $h\sum_i\bar\rho_i$ over the exact bin means equals $Y_{\rm band}$ to
 rounding. The previous selector measured the same quantity through bin means
 carrying the production far-envelope replacement, whose per-line difference is
@@ -1344,14 +1344,27 @@ whose yield sits within that allowance of a stop decision can flip.
 **Single pass.** The selector keeps every shell it scores up to the stop, so
 no scored shell is rejected. With a prefix that covers the population
 ($N\le n_{\max}$) and a production axis spanning the reference band, the line
-keep window and tabulation of the production pass contain every line that
-reaches the band. The production spectrum of each shell and $Y_{\rm band}$ come
+keep window and tabulation of the production pass contain every line the
+reference pass keeps (its keep window is a superset of the reference one). The production spectrum of each shell and $Y_{\rm band}$ come
 from the same line arrays, the spectrum of the selected set is the sum of the
 scored shells, and nothing is rescored. A production axis short of the band
 cannot supply the band's lines, and a prefix smaller than the population scores
 different electrons; both keep the reference pass, which now generates the lines on the
 reference band and measures them with a `mass_only` audit, with no bin
 reduction. The decision is on the reference band alone, as in v5.
+
+**Keep-window strip.** The two modes measure the same band but not exactly the
+same lines. `_line_keep_window` pads an axis by 20 % of its own span; the
+production nodes span the band edge to edge while the reference nodes are bin
+centres inset by $h/2$, so the production window is wider by about $0.7h$ at
+each padded edge (more when the production axis extends past the band).
+Single-mode $Y_{\rm band}$ then also holds the in-band tails of lines resonant
+in that strip, each at most $1/(2\pi a_\ell d_\ell)$ of its mass with
+$d_\ell\ge0.2(S-h)$ its distance from the band ($S$ the band width). The
+selected set is therefore independent of the production stop up to this
+shared keep-window approximation (the same class as the keep window's dropped
+tails). It is non-zero only when lines resonate beyond the padded reference
+window; none do in the anchor fixtures.
 
 **Normalization.** Audit sums are un-normalized; $Y_{\rm band}$ is divided by the
 number of electrons the spectrum is divided by, so it is in the units of
@@ -1368,3 +1381,16 @@ pins the device reduction against the host;
 pin the selected set, shell yields ($10^{-9}$) and spectrum against the
 bin-mean reference route, that no `_selected_spectrum` pass runs on the spanning
 axis, and `tests/montecarlo/runner/test_reflection_cutoff.py::test_shell_mass_is_the_decision_yield_and_density_is_the_spectrum`.
+
+**Fresh-context review (2026-11-19).** Verdict `rederived`. Units, limits
+(whole line, zero width, edge-centred half mass, far tails) and the $s(0)$
+convention checked; the telescoping rederived independently. An mpmath
+closed-form probe matches `sincsq_band_mass` to $8.8\times10^{-17}$ of a
+line's mass. On the Si 30 keV fixture, band $[500,10000]$ eV and production
+stops 30000/10000 eV (single) and 8000 eV (mass) select the same set with
+bit-identical shell yields, $6.6\times10^{-13}$ from the legacy bin-mean
+route. The review added the keep-window strip bound and the $s$ convention
+above. Device inputs are cast to `REAL` as the production line reduction
+already does, so straddling lines carry the same FP32 resonance rounding as
+the production spectrum. Untested: mass mode with a prefix smaller than the
+population (`norm = n_lines`).

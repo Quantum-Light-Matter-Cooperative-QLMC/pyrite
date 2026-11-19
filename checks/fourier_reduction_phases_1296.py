@@ -20,14 +20,19 @@ for ``bench``. Record: ``capture.json``.
 
 ``selections`` in the record keeps each reflection selection's mode
 (``reference_quadrature``: ``band-mass`` or ``bin-mean``; ``rescored``), band,
-cutoff, selected-set digest and shell yields (#1326).
+cutoff, selected-set digest and shell yields (#1326). ``PROBE_SELECTION=mass``
+disables the single pass, so an automatic bandwidth selects on the mass-only
+reference pass and rescores the kept set (the arm the single pass is measured
+against).
 
 ``PROBE_PROFILE=timers`` adds synchronized inclusive timers around the
 batched CXR route (selection vs production pass, tables, per-block
 kinematics/escape/polarization, the incoherent line prologue, flushes;
-``split_timers`` in the record); ``PROBE_PROFILE=cprofile`` records
-cProfile tables (``capture.prof``). Both perturb wall time; neither saves
-flushes when ``CAPTURE=0``.
+``split_timers`` in the record) and rewrites ``partial.json`` every
+``PROBE_DUMP_S`` (default 300) seconds with the totals so far, open calls'
+elapsed time as ``open_s``, so a run killed at its limit keeps evidence.
+``PROBE_PROFILE=cprofile`` records cProfile tables (``capture.prof``). Both
+perturb wall time; neither saves flushes when ``CAPTURE=0``.
 
 ``bench`` replays the saved flushes with CUDA-event timing of every phase of
 an instrumented copy of ``cuda_fourier_bin_mean_reduce`` (prologue/broad,
@@ -145,10 +150,17 @@ def capture(material, e0_kev, tilt_deg, histories, out_dir):
 
     fc.cuda_fourier_bin_mean_reduce = timed
     selections = _record_selections()
+    if os.environ.get("PROBE_SELECTION") == "mass":
+        from pyrite.montecarlo.runner import reflection_cutoff as rc
+
+        rc._axis_covers_band = lambda *_args, **_kwargs: False
     mode = os.environ.get("PROBE_PROFILE", "")
     splits = _install_split_timers() if mode == "timers" else None
     timings = []
     t0 = time.perf_counter()
+    if splits is not None:
+        every = float(os.environ.get("PROBE_DUMP_S", "300"))
+        _dump_partial(out / "partial.json", splits, calls, t0, every, selections)
     error = None
     profiler = None
     if mode == "cprofile":
@@ -205,6 +217,7 @@ def _record_selections():
         record, separate = out[1], out[3]
         records.append(
             dict(
+                mode=os.environ.get("PROBE_SELECTION") or "default",
                 reference_quadrature=record.get("reference_quadrature"),
                 reference_band_eV=record.get("reference_band_eV"),
                 selection_histories=record.get("selection_histories"),
@@ -248,7 +261,7 @@ _SPLIT_TARGETS = (
 
 class _Splits:
     def __init__(self):
-        self.seconds, self.calls = {}, {}
+        self.seconds, self.calls, self.open = {}, {}, {}
 
     def wrap(self, name, fn):
         depth = [0]
@@ -259,11 +272,13 @@ class _Splits:
             depth[0] += 1
             _sync()
             t0 = time.perf_counter()
+            self.open[name] = t0
             try:
                 return fn(*args, **kwargs)
             finally:
                 _sync()
                 depth[0] -= 1
+                self.open.pop(name, None)
                 self.seconds[name] = self.seconds.get(name, 0.0) + time.perf_counter() - t0
                 self.calls[name] = self.calls.get(name, 0) + 1
 
@@ -271,6 +286,41 @@ class _Splits:
 
     def totals(self):
         return {k: dict(s=round(v, 3), calls=self.calls[k]) for k, v in self.seconds.items()}
+
+    def snapshot(self):
+        """Closed totals plus the elapsed time of calls still open (``open_s``)."""
+        now = time.perf_counter()
+        out = {k: dict(v) for k, v in self.totals().items()}
+        for k, t0 in list(self.open.items()):
+            out.setdefault(k, dict(s=0.0, calls=0))["open_s"] = round(now - t0, 3)
+        return out
+
+
+def _dump_partial(path, splits, calls, t0, every_s, selections=()):
+    """Write ``partial.json`` every ``every_s`` seconds from a daemon thread.
+
+    A run killed at its time limit then still records where its time went
+    (#1326 thick case: one inclusive call can outlive the allocation).
+    """
+    import threading
+
+    def loop():
+        while True:
+            time.sleep(every_s)
+            lines = sum(c[0] for c in list(calls))
+            _write(
+                path,
+                dict(
+                    elapsed_s=round(time.perf_counter() - t0, 1),
+                    reduce_calls=len(calls),
+                    reduce_lines=lines,
+                    reduce_s=round(sum(c[1] for c in list(calls)), 3),
+                    split_timers=splits.snapshot(),
+                    selections=list(selections),
+                ),
+            )
+
+    threading.Thread(target=loop, daemon=True, name="partial-dump").start()
 
 
 def _install_split_timers():

@@ -377,9 +377,14 @@ def test_sparse_near_keeps_every_job_past_a_uint32_thread_grid():
     np.testing.assert_allclose(mean[bins], host, rtol=1e-5, atol=1e-6 * np.abs(host).max())
 
 
-def test_band_mass_kernel_matches_the_host_closed_form():
+def test_band_mass_kernel_matches_the_host_closed_form(monkeypatch):
     """The device ``sincsq_band_mass`` reduction equals the FP64 host evaluator (#1326)."""
+    from pyrite.montecarlo.spectrum.cxr import _band_mass
     from pyrite.montecarlo.spectrum.cxr._band_mass import sincsq_band_mass
+
+    # Pytest runs the NumPy backend unless PYRITE_TEST_BACKEND=cuda; bind CuPy here.
+    monkeypatch.setattr(_band_mass, "xp", cp)
+    monkeypatch.setattr(_band_mass, "REAL", cp.float32)
 
     rng = np.random.default_rng(1326)
     count = 5000
