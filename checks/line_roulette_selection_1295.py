@@ -35,6 +35,7 @@ import os
 import runpy
 import sys
 import time
+import traceback
 from dataclasses import replace
 from pathlib import Path
 
@@ -228,6 +229,8 @@ def run(material, e0_kev, tilt_deg, histories, seed, out_stem):
         out = run_cases([case], max_workers=0, progress=False, on_timing=timings.append)[0]
     except Exception as exc:  # record failure as evidence
         record["error"] = f"{type(exc).__name__}: {exc}"
+        record["traceback"] = traceback.format_exc()
+        print(record["traceback"], file=sys.stderr)
     record["wall_s"] = time.perf_counter() - t0
     record["timings"] = timings
     record["reflection_selection"] = (out or {}).get("reflection_selection")
