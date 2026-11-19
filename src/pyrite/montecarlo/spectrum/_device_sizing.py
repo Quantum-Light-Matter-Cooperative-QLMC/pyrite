@@ -172,7 +172,8 @@ def device_sinc_spacing(width, weight, *, aliased_weight_limit):
     The same stable width order (CuPy's sort is stable), the first index whose
     cumulative weight reaches ``aliased_weight_limit`` of the total, and the
     weight share strictly below the selected width. The cumulative and share
-    sums are device scans/reductions (module docstring).
+    sums are device scans/reductions (module docstring) in a fixed order, so
+    repeated runs agree bitwise.
 
     Validation: line-grid-resonance-bandwidth
     """
@@ -183,7 +184,7 @@ def device_sinc_spacing(width, weight, *, aliased_weight_limit):
     width = width[order]
     weight = weight[order]
     del order
-    cumulative = cp.cumsum(weight)
+    cumulative = _fixed_order_cumsum(cp, weight)
     total = float(cumulative[-1])
     target = cp.asarray([float(aliased_weight_limit) * total])
     index = int(cp.searchsorted(cumulative, target, side="left")[0])
@@ -192,6 +193,27 @@ def device_sinc_spacing(width, weight, *, aliased_weight_limit):
     below = int(cp.searchsorted(width, cp.asarray([step]), side="left")[0])
     aliased = float(weight[:below].sum()) / total
     return step, aliased, int(width.size)
+
+
+def _fixed_order_cumsum(cp, values):
+    """Inclusive float64 ``cumsum`` whose summation order does not vary run to run.
+
+    CuPy's 1-D ``cumsum`` takes CUB's decoupled look-back scan, whose float
+    order varies between runs (qlmc job 13705: 5 distinct totals in 6 repeats
+    of 39M weights). Rows of :data:`_ROW_LINES` are scanned along their axis,
+    and the row offsets are summed sequentially on the host.
+    """
+    if cp is np:
+        return np.cumsum(values)
+    size = values.size
+    rows = -(-size // _ROW_LINES)
+    grid = cp.zeros(rows * _ROW_LINES, dtype=cp.float64)
+    grid[:size] = values
+    grid = cp.cumsum(grid.reshape(rows, _ROW_LINES), axis=1)
+    totals = cp.asnumpy(grid[:, -1])
+    offsets = np.concatenate(([0.0], np.cumsum(totals)[:-1]))
+    grid += cp.asarray(offsets)[:, None]
+    return grid.reshape(-1)[:size]
 
 
 _TAIL_PREAMBLE = """

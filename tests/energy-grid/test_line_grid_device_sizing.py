@@ -214,3 +214,18 @@ def test_cuda_staged_upload_is_exact(monkeypatch):
         np.testing.assert_array_equal(cupy.asnumpy(got), array)
     strided = rng.random((5000, 4))[:, 1:]
     np.testing.assert_array_equal(cupy.asnumpy(_device_sizing.upload(cupy, strided)), strided)
+
+
+@pytest.mark.hardware
+def test_cuda_spacing_repeats_bitwise():
+    cupy = _cupy()
+    rng = np.random.default_rng(14)
+    width = cupy.asarray(rng.lognormal(3.0, 1.0, 5_000_003))
+    weight = rng.lognormal(0.0, 2.0, width.size)
+    cumulative = _device_sizing._fixed_order_cumsum(cupy, cupy.asarray(weight))
+    np.testing.assert_allclose(cupy.asnumpy(cumulative), np.cumsum(weight), rtol=1e-12)
+    results = {
+        _device_sizing.device_sinc_spacing(width, cupy.asarray(weight), aliased_weight_limit=0.01)
+        for _ in range(4)
+    }
+    assert len(results) == 1
