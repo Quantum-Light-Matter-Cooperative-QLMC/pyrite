@@ -30,27 +30,50 @@ Validation: line-grid-resonance-bandwidth
 import numpy as np
 
 from ..._backend import REAL, _to_cpu, array_namespace, exact_rawkernel_options, is_device_array, xp
+from ..._backend import cp as cp_backend
 from ...materials.crystal import HBARC_EV_ANG
 
-#: Share of free device memory a resident population may take; beyond it the
-#: collector moves the population to the host and the host route sizes it.
-DEVICE_POPULATION_SHARE = 1.0 / 3.0
+#: Share of free device memory a resident population may take (its join
+#: briefly needs a third more); beyond it the collector moves the population
+#: to the host and the host route sizes it.
+DEVICE_POPULATION_SHARE = 0.25
 
 
 def device_resident(*arrays) -> bool:
-    """Whether every array lives on the selected accelerator."""
-    return bool(arrays) and all(is_device_array(array) for array in arrays)
+    """Whether every array is a CuPy (device) array."""
+    return bool(arrays) and all(_is_cupy(array) for array in arrays)
+
+
+def _is_cupy(array) -> bool:
+    return type(array).__module__.split(".")[0] == "cupy"
 
 
 def _module(array):
-    """The array's module: CuPy on the device; NumPy runs the same route in tests."""
+    """The array's own module: CuPy on the device; NumPy runs the same route in tests."""
+    if _is_cupy(array):
+        import cupy
+
+        return cupy
     return array_namespace(array)
 
 
-def device_sinc_samples(segments, n_hat, *, electron_limit=None):
+def sizing_module(array):
+    """CuPy when ``array`` is a CuPy array or a CuPy backend is selected, else ``None``.
+
+    The device route then sizes the case, uploading host segment fields: at
+    20M histories the joined segments reach sizing on the host, and their
+    upload costs far less than the host passes (#1275).
+    """
+    if _is_cupy(array):
+        return _module(array)
+    return cp_backend
+
+
+def device_sinc_samples(segments, n_hat, *, electron_limit=None, module=None):
     """Device :func:`.diagnostics.sinc_feature_samples`, or ``None`` for the host route.
 
-    Returns float64 ``(width, weight)`` device arrays of the valid lines. Rows
+    Returns float64 ``(width, weight)`` arrays of ``module`` (default: the
+    segments' own) for the valid lines; host fields are uploaded. Rows
     sharing an ``(owner, flight_id)`` key are flight-grouped on the host
     route; any row out of strict key order returns ``None`` so that route,
     and its exact reduction, sizes the case.
@@ -58,16 +81,20 @@ def device_sinc_samples(segments, n_hat, *, electron_limit=None):
     Validation: line-grid-resonance-bandwidth
     """
     energy_field = "E_repr_keV" if segments.get("E_repr_keV") is not None else "E_keV"
-    cp = _module(segments["L_ang"])
-    energy = segments[energy_field].astype(cp.float64, copy=False)
-    length = segments["L_ang"].astype(cp.float64, copy=False)
-    direction = segments["v_hat"].astype(cp.float64, copy=False)
+    cp = _module(segments["L_ang"]) if module is None else module
+
+    def field(name):
+        return cp.asarray(segments[name])
+
+    energy = field(energy_field).astype(cp.float64, copy=False)
+    length = field("L_ang").astype(cp.float64, copy=False)
+    direction = field("v_hat").astype(cp.float64, copy=False)
     keys = None
     if segments.get("flight_id") is not None:
-        track = segments.get("track_id")
-        keys = (segments["elec_id"] if track is None else track, segments["flight_id"])
+        track = "elec_id" if segments.get("track_id") is None else "track_id"
+        keys = (field(track), field("flight_id"))
     if electron_limit is not None:
-        line = segments["elec_id"] < int(electron_limit)
+        line = field("elec_id") < int(electron_limit)
         energy, length, direction = energy[line], length[line], direction[line]
         if keys is not None:
             keys = (keys[0][line], keys[1][line])
@@ -252,15 +279,16 @@ class DeviceTail:
 def resident_population_budget(array) -> int | None:
     """Device bytes a population collected beside ``array`` may hold, or ``None``.
 
-    ``None`` (host collection) unless ``array`` is device-resident on CUDA:
+    ``None`` (host collection) unless :func:`sizing_module` names CuPy:
     :data:`DEVICE_POPULATION_SHARE` of the free device memory, counting the
     pool's cache within its limit. A population over it is sized on the host.
     """
-    if not device_resident(array):
+    module = sizing_module(array)
+    if module is None:
         return None
     from ..transport.continuation import _free_device_bytes
 
-    free = _free_device_bytes(_module(array))
+    free = _free_device_bytes(module)
     return None if free is None else int(free * DEVICE_POPULATION_SHARE)
 
 
@@ -287,3 +315,23 @@ def collect_lines(audit, lines):
         audit["device_bytes"] = None
         collected[:] = [tuple(np.asarray(_to_cpu(a)) for a in old) for old in collected]
     collected.append(tuple(np.asarray(_to_cpu(array), dtype=REAL) for array in lines))
+
+
+def join_resident_chunks(chunks):
+    """One chunk per field of resident collected chunks, in collection order.
+
+    The stop search then runs one reduction per trial instead of one launch
+    and sync per collected chunk. Fields join one at a time and each chunk
+    field is released once copied, so the peak is the population plus one
+    field. Host chunks are returned unchanged.
+    """
+    if len(chunks) < 2 or not device_resident(chunks[0][0]):
+        return chunks
+    cp = _module(chunks[0][0])
+    columns = [list(column) for column in zip(*chunks, strict=True)]
+    chunks.clear()
+    joined = []
+    for column in columns:
+        joined.append(cp.concatenate(column))
+        column.clear()
+    return [tuple(joined)]

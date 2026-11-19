@@ -36,7 +36,7 @@ from ..._cxr_grid_policy import (
 )
 from ..._cxr_windows import build_window_plan, window_plan_from_payload
 from ..._grid_semantics import resolution_num, validate_backend_spacing
-from ..spectrum._device_sizing import resident_population_budget
+from ..spectrum._device_sizing import join_resident_chunks, resident_population_budget
 from ..spectrum.coherent_population import physical_bunch_electrons
 from ..spectrum.cxr_seeds import (
     SEEDING_REVISION,
@@ -434,6 +434,8 @@ def _direction_populations(
             rss_after_population_collect_mib=_resident_mib(),
         )
     stage_started = perf_counter() if profile is not None else 0.0
+    if budget is not None:
+        chunks = join_resident_chunks(chunks)
     populations = [
         ResonancePopulation("production lines", energy, weight, width)
         for energy, width, weight in chunks

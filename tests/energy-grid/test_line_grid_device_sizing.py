@@ -183,3 +183,21 @@ def test_cuda_sizing_matches_the_host_route(dtype):
     device_stop = resonance_population_stop_eV(resident, ceiling_eV=1.0e5, truncation_limit=1e-2)
     assert device_stop[0] == host_stop[0]
     assert device_stop[1]["n_lines"] == host_stop[1]["n_lines"]
+
+
+def test_host_chunks_are_not_joined():
+    chunks = [tuple(np.arange(3.0) for _ in range(3)) for _ in range(2)]
+    assert _device_sizing.join_resident_chunks(chunks) is chunks
+
+
+@pytest.mark.hardware
+def test_cuda_chunks_join_in_collection_order():
+    cupy = _cupy()
+    rng = np.random.default_rng(12)
+    host = [tuple(rng.random(int(n)) for _ in range(3)) for n in rng.integers(1, 50, 7)]
+    joined = _device_sizing.join_resident_chunks(
+        [tuple(cupy.asarray(a) for a in chunk) for chunk in host]
+    )
+    assert len(joined) == 1
+    for got, want in zip(joined[0], zip(*host, strict=True), strict=True):
+        np.testing.assert_array_equal(cupy.asnumpy(got), np.concatenate(want))
