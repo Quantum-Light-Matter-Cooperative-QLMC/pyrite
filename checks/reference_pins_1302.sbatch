@@ -10,10 +10,18 @@
 # user config under .xdg-config/pyrite):
 #   sbatch -J rp1302-<sha> checks/reference_pins_1302.sbatch \
 #       OUT_DIR "MATERIAL:E0_KEV:TILT:H,K,L ..." HISTORIES [CASE_TIMEOUT_S]
+# CPU node (qlmc-queen): sbatch -p cpu -w qlmc-queen --gres=none --export=ALL,PROBE_CPU=1 ...
 set -uo pipefail
 cd "$SLURM_SUBMIT_DIR"
 export PATH="$HOME/.local/bin:$PATH"
-. checks/rocm/env.sh
+if [ "${PROBE_CPU:-0}" = 1 ]; then
+    export PYRITE_MC_BACKEND=cpu UV_CACHE_DIR="$HOME/.cache/uv-cpu"
+    export UV_PROJECT_ENVIRONMENT="$PWD/.venv-cpu" NUMBA_NUM_THREADS="${SLURM_CPUS_PER_TASK:-8}"
+    pyrite_gpu_sync() { uv sync --locked "$@"; }
+    pyrite_gpu_info() { nproc; free -g; }
+else
+    . checks/rocm/env.sh
+fi
 export XDG_CONFIG_HOME="$PWD/.xdg-config" PYRITE_USER_CATALOG="$PWD/.xdg-config/pyrite"
 export PYRITE_CATALOG="$PWD/src/pyrite/data/catalog"
 export PYRITE_HOME="${PROBE_WORKSPACE:-$HOME/.pyrite/workspace}"
