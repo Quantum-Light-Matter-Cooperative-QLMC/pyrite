@@ -95,7 +95,7 @@ def characteristic_model_marker(
         f"eadl-2025-{CHARACTERISTIC_EADL_SHA256[:12]}/"
         f"endf-parserpy-{CHARACTERISTIC_ENDF_PARSERPY_VERSION}/"
         f"xraydb-{CHARACTERISTIC_XRAYDB_VERSION}-eadl-cascade-{fluorescence_yields}-yields-"
-        "lorentzian-segment-escape-v7"
+        "lorentzian-segment-escape-v7/fp64-line-sum-v1"
         f"{ionization}"
     )
 
@@ -814,7 +814,8 @@ def _accumulate_line_yields(
     Validation: cr-zone-incoherent-flux-weight
     """
     n_lines = int(response.shape[1])
-    line_yields = xp.zeros(n_lines, dtype=REAL)
+    # FP64 across chunks, so the chunk split changes only FP64 order (#1313).
+    line_yields = xp.zeros(n_lines, dtype=xp.float64)
     for start in range(0, int(seg_E.size), chunk):
         sl = slice(start, min(start + chunk, int(seg_E.size)))
         rows = int(sl.stop - sl.start)
@@ -1083,7 +1084,7 @@ def mc_characteristic_spectrum(
 
     edges, bin_widths = _energy_bin_edges_and_widths(E_grid_eV)
     E_grid = xp.asarray(E_grid_eV, dtype=REAL)
-    spec = xp.zeros(E_grid.size, dtype=REAL)
+    spec = xp.zeros(E_grid.size, dtype=xp.float64)  # split-independent FP64 sum (#1313)
     n_hat = _observation_direction(theta_obs_rad, n_hat)
     if groove is not None:
         if layers is not None:

@@ -236,7 +236,7 @@ def _arm(name, inputs, tile_pairs, nodes=None):
         )
 
         def run_node(out):
-            sampled = cp.zeros(out.size, dtype=cp.float32)
+            sampled = cp.zeros(out.size, dtype=cp.float64)
             run_reduction_kernel(
                 *inputs[:3], nodes, out=sampled, config=DEFAULT_SPECTRUM_KERNEL_CONFIG
             )

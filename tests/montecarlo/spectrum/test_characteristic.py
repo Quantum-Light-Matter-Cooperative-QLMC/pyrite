@@ -568,7 +568,7 @@ def test_characteristic_model_marker_records_the_eadl_cascade():
     marker = characteristic.CHARACTERISTIC_MODEL
 
     assert f"eadl-2025-{characteristic.CHARACTERISTIC_EADL_SHA256[:12]}" in marker
-    assert marker.endswith("eadl-cascade-eadl-yields-lorentzian-segment-escape-v7")
+    assert marker.endswith("eadl-cascade-eadl-yields-lorentzian-segment-escape-v7/fp64-line-sum-v1")
     assert characteristic.characteristic_model_marker("elam") != marker
 
 
@@ -777,3 +777,41 @@ def test_layered_w_si_spectrum_matches_a_per_line_reference(element, density, la
     np.testing.assert_allclose(
         spectrum, expected, rtol=scaled_rtol(1.0e-13, eps_multiple=energy.size), atol=0.0
     )
+
+
+def test_characteristic_spectrum_adds_over_electron_blocks(monkeypatch):
+    """Streamed blocks sum to the joined population within FP64 order (#1313).
+
+    On CUDA the line yields were FP32 across segment chunks and the spectrum
+    FP32 across elements, so retained and streamed adaptive scoring differed
+    at FP32 summation level; both accumulators are now FP64.
+    """
+    monkeypatch.setattr(characteristic, "_mu_total_inv_ang", _zero_mu)
+    rng = np.random.default_rng(1313)
+    n_electrons, per_electron = 4_000, 8
+    n = n_electrons * per_electron
+    v = rng.normal(size=(n, 3))
+    segments = {
+        "r_mid": np.column_stack((np.zeros(n), np.zeros(n), rng.uniform(1.0, 99.0, n))),
+        "v_hat": v / np.linalg.norm(v, axis=1, keepdims=True),
+        "L_ang": rng.uniform(0.5, 50.0, n),
+        "E_keV": rng.uniform(12.0, 190.0, n),
+        "elec_id": np.repeat(np.arange(n_electrons), per_electron),
+        "layer": np.zeros(n, dtype=int),
+        "Ne": n_electrons,
+        "thickness_ang": 1000.0,
+    }
+    energy = np.linspace(1.0e3, 1.2e4, 200)
+    kwargs = dict(composition=[("W", 0.063)], layers=_W_ON_SI, chunk=3_001)
+    whole = characteristic.mc_characteristic_spectrum(segments, energy, **kwargs)
+    blocks = np.zeros_like(whole)
+    for first, stop in ((0, 7), (7, 1_000), (1_000, 2_345), (2_345, n_electrons)):
+        rows = slice(first * per_electron, stop * per_electron)
+        block = {
+            key: value[rows] if isinstance(value, np.ndarray) else value
+            for key, value in segments.items()
+        }
+        blocks += characteristic.mc_characteristic_spectrum(block, energy, **kwargs)
+    assert whole.dtype == np.float64
+    assert whole.max() > 0.0
+    np.testing.assert_allclose(blocks, whole, rtol=0.0, atol=1.0e-10 * whole.max())

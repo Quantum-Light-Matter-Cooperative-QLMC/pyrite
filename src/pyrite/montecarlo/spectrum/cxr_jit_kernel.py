@@ -4,6 +4,7 @@ import numpy as np
 from .._cupy_jit import jit
 
 F32_ZERO = np.float32(0.0)
+F64_ZERO = np.float64(0.0)
 F32_TINY = np.float32(1.0e-20)
 
 U32_ZERO = np.uint32(0)
@@ -47,6 +48,7 @@ def _kernel_1e(
 
     # One private accumulator per energy.
     spectrum_sum_0 = F32_ZERO
+    compensation_0 = F32_ZERO
 
     # Each thread gets:
     # thread_idx, thread_idx+n_threads, thread_idx+2*n_threads, ...
@@ -64,14 +66,20 @@ def _kernel_1e(
                 sinc_argument_0 = F32_TINY
 
             sinc_value_0 = xp.sin(sinc_argument_0) / sinc_argument_0
-            spectrum_sum_0 += line_weight * sinc_value_0 * sinc_value_0
+            term_0 = line_weight * sinc_value_0 * sinc_value_0 - compensation_0
+            running_0 = spectrum_sum_0 + term_0
+            compensation_0 = (running_0 - spectrum_sum_0) - term_0
+            spectrum_sum_0 = running_0
 
         line_id += n_threads
 
-    shared = jit.shared_memory(xp.float32, None)
+    shared = jit.shared_memory(xp.float64, None)
 
     offset0 = U32_ZERO
-    shared[offset0 + thread_idx] = spectrum_sum_0
+    thread_sum_0 = F64_ZERO
+    thread_sum_0 += spectrum_sum_0
+    thread_sum_0 -= compensation_0
+    shared[offset0 + thread_idx] = thread_sum_0
 
     jit.syncthreads()
 
@@ -119,7 +127,9 @@ def _kernel_2e(
 
     # One private accumulator per energy.
     spectrum_sum_0 = F32_ZERO
+    compensation_0 = F32_ZERO
     spectrum_sum_1 = F32_ZERO
+    compensation_1 = F32_ZERO
 
     # Each thread gets:
     # thread_idx, thread_idx+n_threads, thread_idx+2*n_threads, ...
@@ -139,7 +149,10 @@ def _kernel_2e(
                 sinc_argument_0 = F32_TINY
 
             sinc_value_0 = xp.sin(sinc_argument_0) / sinc_argument_0
-            spectrum_sum_0 += line_weight * sinc_value_0 * sinc_value_0
+            term_0 = line_weight * sinc_value_0 * sinc_value_0 - compensation_0
+            running_0 = spectrum_sum_0 + term_0
+            compensation_0 = (running_0 - spectrum_sum_0) - term_0
+            spectrum_sum_0 = running_0
 
             # Energy 1
             if has_energy_1:
@@ -148,7 +161,10 @@ def _kernel_2e(
                     sinc_argument_1 = F32_TINY
 
                 sinc_value_1 = xp.sin(sinc_argument_1) / sinc_argument_1
-                spectrum_sum_1 += line_weight * sinc_value_1 * sinc_value_1
+                term_1 = line_weight * sinc_value_1 * sinc_value_1 - compensation_1
+                running_1 = spectrum_sum_1 + term_1
+                compensation_1 = (running_1 - spectrum_sum_1) - term_1
+                spectrum_sum_1 = running_1
 
         line_id += n_threads
 
@@ -156,13 +172,22 @@ def _kernel_2e(
     #
     # [ spectrum_sum_0 partials ]
     # [ spectrum_sum_1 partials ]
-    shared = jit.shared_memory(xp.float32, None)
+    shared = jit.shared_memory(xp.float64, None)
 
     offset0 = U32_ZERO
     offset1 = n_threads
 
-    shared[offset0 + thread_idx] = spectrum_sum_0
-    shared[offset1 + thread_idx] = spectrum_sum_1
+    thread_sum_0 = F64_ZERO
+
+    thread_sum_0 += spectrum_sum_0
+
+    thread_sum_0 -= compensation_0
+
+    shared[offset0 + thread_idx] = thread_sum_0
+    thread_sum_1 = F64_ZERO
+    thread_sum_1 += spectrum_sum_1
+    thread_sum_1 -= compensation_1
+    shared[offset1 + thread_idx] = thread_sum_1
 
     jit.syncthreads()
 
@@ -222,8 +247,11 @@ def _kernel_3e(
 
     # One private accumulator per energy.
     spectrum_sum_0 = F32_ZERO
+    compensation_0 = F32_ZERO
     spectrum_sum_1 = F32_ZERO
+    compensation_1 = F32_ZERO
     spectrum_sum_2 = F32_ZERO
+    compensation_2 = F32_ZERO
 
     # Each thread gets:
     # thread_idx, thread_idx+n_threads, thread_idx+2*n_threads, ...
@@ -242,7 +270,10 @@ def _kernel_3e(
                 sinc_argument_0 = F32_TINY
 
             sinc_value_0 = xp.sin(sinc_argument_0) / sinc_argument_0
-            spectrum_sum_0 += line_weight * sinc_value_0 * sinc_value_0
+            term_0 = line_weight * sinc_value_0 * sinc_value_0 - compensation_0
+            running_0 = spectrum_sum_0 + term_0
+            compensation_0 = (running_0 - spectrum_sum_0) - term_0
+            spectrum_sum_0 = running_0
 
             # Energy 1
             if has_energy_1:
@@ -251,7 +282,10 @@ def _kernel_3e(
                     sinc_argument_1 = F32_TINY
 
                 sinc_value_1 = xp.sin(sinc_argument_1) / sinc_argument_1
-                spectrum_sum_1 += line_weight * sinc_value_1 * sinc_value_1
+                term_1 = line_weight * sinc_value_1 * sinc_value_1 - compensation_1
+                running_1 = spectrum_sum_1 + term_1
+                compensation_1 = (running_1 - spectrum_sum_1) - term_1
+                spectrum_sum_1 = running_1
 
             # Energy 2
             if has_energy_2:
@@ -260,7 +294,10 @@ def _kernel_3e(
                     sinc_argument_2 = F32_TINY
 
                 sinc_value_2 = xp.sin(sinc_argument_2) / sinc_argument_2
-                spectrum_sum_2 += line_weight * sinc_value_2 * sinc_value_2
+                term_2 = line_weight * sinc_value_2 * sinc_value_2 - compensation_2
+                running_2 = spectrum_sum_2 + term_2
+                compensation_2 = (running_2 - spectrum_sum_2) - term_2
+                spectrum_sum_2 = running_2
 
         line_id += n_threads
 
@@ -269,15 +306,27 @@ def _kernel_3e(
     # [ spectrum_sum_0 partials ]
     # [ spectrum_sum_1 partials ]
     # [ spectrum_sum_2 partials ]
-    shared = jit.shared_memory(xp.float32, None)
+    shared = jit.shared_memory(xp.float64, None)
 
     offset0 = U32_ZERO
     offset1 = n_threads
     offset2 = U32_TWO * n_threads
 
-    shared[offset0 + thread_idx] = spectrum_sum_0
-    shared[offset1 + thread_idx] = spectrum_sum_1
-    shared[offset2 + thread_idx] = spectrum_sum_2
+    thread_sum_0 = F64_ZERO
+
+    thread_sum_0 += spectrum_sum_0
+
+    thread_sum_0 -= compensation_0
+
+    shared[offset0 + thread_idx] = thread_sum_0
+    thread_sum_1 = F64_ZERO
+    thread_sum_1 += spectrum_sum_1
+    thread_sum_1 -= compensation_1
+    shared[offset1 + thread_idx] = thread_sum_1
+    thread_sum_2 = F64_ZERO
+    thread_sum_2 += spectrum_sum_2
+    thread_sum_2 -= compensation_2
+    shared[offset2 + thread_idx] = thread_sum_2
 
     jit.syncthreads()
 
@@ -347,9 +396,13 @@ def _kernel_4e(
 
     # One private accumulator per energy.
     spectrum_sum_0 = F32_ZERO
+    compensation_0 = F32_ZERO
     spectrum_sum_1 = F32_ZERO
+    compensation_1 = F32_ZERO
     spectrum_sum_2 = F32_ZERO
+    compensation_2 = F32_ZERO
     spectrum_sum_3 = F32_ZERO
+    compensation_3 = F32_ZERO
 
     # Each thread gets:
     # thread_idx, thread_idx+n_threads, thread_idx+2*n_threads, ...
@@ -368,7 +421,10 @@ def _kernel_4e(
                 sinc_argument_0 = F32_TINY
 
             sinc_value_0 = xp.sin(sinc_argument_0) / sinc_argument_0
-            spectrum_sum_0 += line_weight * sinc_value_0 * sinc_value_0
+            term_0 = line_weight * sinc_value_0 * sinc_value_0 - compensation_0
+            running_0 = spectrum_sum_0 + term_0
+            compensation_0 = (running_0 - spectrum_sum_0) - term_0
+            spectrum_sum_0 = running_0
 
             # Energy 1
             if has_energy_1:
@@ -377,7 +433,10 @@ def _kernel_4e(
                     sinc_argument_1 = F32_TINY
 
                 sinc_value_1 = xp.sin(sinc_argument_1) / sinc_argument_1
-                spectrum_sum_1 += line_weight * sinc_value_1 * sinc_value_1
+                term_1 = line_weight * sinc_value_1 * sinc_value_1 - compensation_1
+                running_1 = spectrum_sum_1 + term_1
+                compensation_1 = (running_1 - spectrum_sum_1) - term_1
+                spectrum_sum_1 = running_1
 
             # Energy 2
             if has_energy_2:
@@ -386,7 +445,10 @@ def _kernel_4e(
                     sinc_argument_2 = F32_TINY
 
                 sinc_value_2 = xp.sin(sinc_argument_2) / sinc_argument_2
-                spectrum_sum_2 += line_weight * sinc_value_2 * sinc_value_2
+                term_2 = line_weight * sinc_value_2 * sinc_value_2 - compensation_2
+                running_2 = spectrum_sum_2 + term_2
+                compensation_2 = (running_2 - spectrum_sum_2) - term_2
+                spectrum_sum_2 = running_2
 
             # Energy 3
             if has_energy_3:
@@ -395,24 +457,42 @@ def _kernel_4e(
                     sinc_argument_3 = F32_TINY
 
                 sinc_value_3 = xp.sin(sinc_argument_3) / sinc_argument_3
-                spectrum_sum_3 += line_weight * sinc_value_3 * sinc_value_3
+                term_3 = line_weight * sinc_value_3 * sinc_value_3 - compensation_3
+                running_3 = spectrum_sum_3 + term_3
+                compensation_3 = (running_3 - spectrum_sum_3) - term_3
+                spectrum_sum_3 = running_3
 
         line_id += n_threads
 
     # ---------------------------------------------------------
     # BLOCK REDUCTION
     # ---------------------------------------------------------
-    shared = jit.shared_memory(xp.float32, None)
+    shared = jit.shared_memory(xp.float64, None)
 
     offset0 = U32_ZERO
     offset1 = n_threads
     offset2 = U32_TWO * n_threads
     offset3 = U32_THREE * n_threads
 
-    shared[offset0 + thread_idx] = spectrum_sum_0
-    shared[offset1 + thread_idx] = spectrum_sum_1
-    shared[offset2 + thread_idx] = spectrum_sum_2
-    shared[offset3 + thread_idx] = spectrum_sum_3
+    thread_sum_0 = F64_ZERO
+
+    thread_sum_0 += spectrum_sum_0
+
+    thread_sum_0 -= compensation_0
+
+    shared[offset0 + thread_idx] = thread_sum_0
+    thread_sum_1 = F64_ZERO
+    thread_sum_1 += spectrum_sum_1
+    thread_sum_1 -= compensation_1
+    shared[offset1 + thread_idx] = thread_sum_1
+    thread_sum_2 = F64_ZERO
+    thread_sum_2 += spectrum_sum_2
+    thread_sum_2 -= compensation_2
+    shared[offset2 + thread_idx] = thread_sum_2
+    thread_sum_3 = F64_ZERO
+    thread_sum_3 += spectrum_sum_3
+    thread_sum_3 -= compensation_3
+    shared[offset3 + thread_idx] = thread_sum_3
 
     jit.syncthreads()
 
@@ -445,6 +525,24 @@ def _kernel_4e(
 
         if has_energy_3:
             spectrum[energy_index3] += shared[offset3]
+
+
+#: Split-independent line sums (#1313). A plain FP32 serial sum over
+#: ``n_lines / n_threads`` cells made the result depend on how the caller split
+#: its lines between calls. Each thread keeps a compensated (Kahan) FP32 sum,
+#: rather than an FP64 add per cell, which consumer GPUs run at 1/64 rate; the
+#: sum and its compensation join in FP64, and the shared tree and output
+#: spectrum are FP64. Cells stay FP32.
+SPECTRUM_DTYPE = np.float64
+
+
+def _spectrum_out(out, n_energies):
+    """``out``, or a new zero spectrum; refuse a narrower accumulator (#1313)."""
+    if out is None:
+        return xp.zeros(n_energies, dtype=SPECTRUM_DTYPE)
+    if out.dtype != SPECTRUM_DTYPE:
+        raise TypeError(f"line reduction output must be float64, got {out.dtype}")
+    return out
 
 
 # * ---------------------------------------------------------
@@ -484,8 +582,7 @@ def run_reduction_kernel(
     # Kernels accumulate so callers can stream deterministic fixed-order
     # prologue blocks directly into the final spectrum without a CuPy add
     # launch.  A fresh call retains the old return-new-array contract.
-    if out is None:
-        out = xp.zeros(n_energies, dtype=xp.float32)
+    out = _spectrum_out(out, n_energies)
     if n_energies == 0:
         return out
 
@@ -495,7 +592,7 @@ def run_reduction_kernel(
     grid = (n_blocks,)
     block = (int(n_threads),)
 
-    shared_memory_bytes = energies_per_block * n_threads * np.dtype(np.float32).itemsize
+    shared_memory_bytes = energies_per_block * n_threads * np.dtype(SPECTRUM_DTYPE).itemsize
 
     kernel(
         grid,

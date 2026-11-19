@@ -177,7 +177,7 @@ def _accumulate_dense_rows(E_r, a_width, weights, E_grid, tail, target_ids):
 
     config = replace(DEFAULT_SPECTRUM_KERNEL_CONFIG, **spectrum_launch_overrides())
     for t, slot in enumerate(target_ids):
-        result = cp.zeros(E_grid.size, dtype=cp.float32)
+        result = cp.zeros(E_grid.size, dtype=cp.float64)
         run_reduction_kernel(
             _device(E_r, np.float32),
             _device(a_width, np.float32),
