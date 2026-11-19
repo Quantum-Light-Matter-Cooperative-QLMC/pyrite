@@ -71,8 +71,9 @@ class LongitudinalDistribution:
         ``eta`` in ``(0, 1]``: intensity form factor retained at the target
         photon frequency by one microbunch (targeted kinds only).
     target_reflection
-        Miller triple of the basal reflection to target; default is the first
-        catalog-pinned positive basal reflection parallel to the surface normal.
+        Miller triple of the basal reflection to target; default is the
+        catalog primary reflection of the surface cut (``reference_hkl`` or
+        the first non-extinct harmonic), parallel to the surface normal.
     spacing_periods
         Positive integer number of optical periods between microbunch slots.
     modulation_depth
@@ -309,6 +310,7 @@ def resolve_longitudinal_distribution(
     energy_keV: float,
     theta_obs_deg: float,
     tilt_deg: float,
+    reference_hkl: tuple[int, int, int] | None = None,
 ) -> ResolvedLongitudinalDistribution:
     """Resolve target-line timing for one material/energy/geometry case.
 
@@ -322,8 +324,10 @@ def resolve_longitudinal_distribution(
     ``sigma_t = sqrt(-ln(eta))/Omega``.
 
     Assumptions: target ``g`` is parallel to the catalog surface normal,
-    detector polar angle is measured from the lab beam, and the catalog's
-    pinned reflection order defines dominance. Limiting cases:
+    detector polar angle is measured from the lab beam, and the
+    default target is ``reference_hkl``, the catalog primary reflection of
+    the case's surface cut (``structure-factor``), falling back to the first
+    positive basal reflection of ``hkl_list``. Limiting cases:
     ``eta -> 1`` gives zero microbunch width; one spacing period gives
     ``Omega*T = 2*pi``.
 
@@ -361,7 +365,11 @@ def resolve_longitudinal_distribution(
     else:
         raise ValueError("targeted longitudinal modes require catalog orientation provenance")
 
-    hkl = policy.target_reflection or _dominant_basal_reflection(hkl_list, surface_axis, lattice)
+    hkl = (
+        policy.target_reflection
+        or reference_hkl
+        or _dominant_basal_reflection(hkl_list, surface_axis, lattice)
+    )
     g_vec, g_norm = reciprocal_g_vector(hkl, lattice)
     surface_norm = float(np.linalg.norm(surface_axis))
     alignment = abs(float(g_vec @ surface_axis / (g_norm * surface_norm)))

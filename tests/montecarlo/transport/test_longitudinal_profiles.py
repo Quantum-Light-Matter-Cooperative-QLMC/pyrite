@@ -60,6 +60,31 @@ def test_target_timing_uses_pinned_basal_reflection_and_h_over_e(
     assert "catalog-pinned" in resolved["provenance"]
 
 
+@pytest.mark.parametrize(
+    ("material", "reflection"), [("tis2", (0, 0, 3)), ("ges", (2, 0, 0)), ("tite2", (0, 0, 1))]
+)
+def test_unpinned_crystals_target_their_catalog_primary_reflection(material, reflection):
+    # #1302: these crystals lost reference-only pins; the default target is the
+    # catalog primary reflection, not the first basal member of the automatic list.
+    policy = LongitudinalDistribution("microtrain", envelope_rms_fs=200.0)
+    sweep = Sweep(
+        material=material,
+        beam=BeamSpec(
+            energy_keV=30.0,
+            transverse_fwhm_x_mm=0.1,
+            transverse_fwhm_y_mm=0.1,
+            bunch_charge_pc=1.0,
+            rep_rate_hz=5000.0,
+            longitudinal=policy,
+        ),
+        thickness_ang=1000.0,
+        tilt_deg=45.0,
+        tilt_azim_deg=180.0,
+    )
+    case = build_cases(sweep, inelastic_model="continuous", straggling=False)[0]
+    assert case["longitudinal_distribution"]["target_reflection"] == reflection
+
+
 def test_three_campaign_policies_have_16_cases_and_only_longitudinal_differences():
     policies = (
         LongitudinalDistribution("gaussian", envelope_rms_fs=200.0),

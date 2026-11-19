@@ -7,6 +7,7 @@ import pytest
 
 from pyrite.materials import CATALOG
 from pyrite.materials.crystal import CRYSTALS, U_g, chi_g, structure_factor
+from pyrite.materials.emission import _primary_hkl
 
 
 @pytest.mark.parametrize(
@@ -66,10 +67,10 @@ def test_nb_ti_v_basal_surface_couplings_are_finite_and_nonzero(key):
 
     assert spec.surface_hkl == reflection
     assert spec.beam_uvw is None
-    assert spec.hkl_families == (reflection,)
-    assert spec.hkl_list == (reflection, (0, 0, -1))
+    # Reference role is separate from emission pins (#1302).
+    assert _primary_hkl(spec) == reflection
+    assert spec.hkl_families == ()
     assert spec.B_ang2 == pytest.approx(0.6)
-    assert spec.hkl_reason
 
     structure, g = structure_factor(key, reflection, 1500.0, B_ang2=spec.B_ang2)
     susceptibility = chi_g(key, reflection, 1500.0, B_ang2=spec.B_ang2)

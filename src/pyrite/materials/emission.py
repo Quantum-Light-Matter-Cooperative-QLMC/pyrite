@@ -35,11 +35,14 @@ def _indices(value: Sequence[int], name: str) -> tuple[int, int, int]:
     return int(indices[0]), int(indices[1]), int(indices[2])
 
 
-def _primary_hkl(crystal: CrystalSpec) -> tuple[int, int, int]:
+def _primary_hkl(crystal: CrystalSpec, cut: Sequence[int] | None = None) -> tuple[int, int, int]:
     """Select the catalogue's primary reflection parallel to its cleavage cut.
 
-    Pinned parallel families are authoritative. Otherwise test harmonics 1--32
-    of the primitive reciprocal cut. Source: the standard crystallographic
+    ``cut`` overrides the catalogue ``surface_hkl``. An explicit catalogue
+    ``reference_hkl`` parallel to the cut is authoritative. Otherwise test
+    harmonics 1--32 of the primitive reciprocal cut. Pinned emission families
+    (``hkl_families``) never enter: the reference role is separate (#1302).
+    Source: the standard crystallographic
     basis sum ``S_el(hkl) = sum_j exp(2*pi*i*hkl.r_j)`` over each element.
     A systematic extinction cancels every element's sum; unlike an accidental
     cancellation between elements this is independent of photon energy.
@@ -49,16 +52,19 @@ def _primary_hkl(crystal: CrystalSpec) -> tuple[int, int, int]:
 
     Validation: structure-factor
     """
-    cut = crystal.surface_hkl
+    if cut is None:
+        cut = crystal.surface_hkl
     if cut is None:
         raise ValueError(f"{crystal.key!r} has no reciprocal surface cut; provide hkl explicitly")
     primitive = np.asarray(cut, dtype=int)
     primitive = primitive // np.gcd.reduce(np.abs(primitive))
-    parallel = [
-        family for family in crystal.hkl_families if not np.any(np.cross(primitive, family))
-    ]
-    if parallel:
-        return min(parallel, key=lambda family: sum(index**2 for index in family))
+    reference = crystal.reference_hkl
+    if (
+        reference is not None
+        and not np.any(np.cross(primitive, reference))
+        and int(np.dot(primitive, reference)) > 0
+    ):
+        return reference
 
     sites: dict[str, list[NDArray[np.float64]]] = {}
     for element, site in crystal.basis:
@@ -109,8 +115,8 @@ def photon_energies(
     hkl
         Optional Miller triple shared by all materials, or a mapping of material
         keys to triples. Missing mapping entries use the default. Defaults choose
-        the lowest pinned family parallel to the catalogue surface normal, or
-        the first non-extinct harmonic (1--32) of its primitive cut. This gives
+        the catalogue ``reference_hkl`` when declared, otherwise the first
+        non-extinct harmonic (1--32) of the primitive surface cut. This gives
         basal/c-axis reflections for the usual layered materials, and the
         catalogue cleavage analogue for other cells. Ambiguous cuts require an
         override. Explicit triples compute kinematics even for extinct planes;

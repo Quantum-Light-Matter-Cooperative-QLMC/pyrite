@@ -5,5 +5,8 @@ formula = "V2O5"
 cod_id = 2020756
 B_ang2 = 0.6
 surface_hkl = [0, 0, 1]
-hkl_families = [[0, 0, 1]]
-hkl_reason = "Use standard-Pmmn (001), equivalent to the historical V2O5(010) layered cut, so the reciprocal vector remains parallel to the slab normal; standard-Pmmn (010) is a different extinct direction."
+# Orientation reference, not an emission set (#1302): former pin [[0, 0, 1]]. Use
+# standard-Pmmn (001), equivalent to the historical V2O5(010) layered cut, so the
+# reciprocal vector remains parallel to the slab normal; standard-Pmmn (010) is a
+# different extinct direction. The harmonic search over surface_hkl resolves the same
+# primary reflection.

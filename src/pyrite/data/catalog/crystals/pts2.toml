@@ -7,5 +7,7 @@ cod_id = 1537200
 mp_id = "mp-762"
 B_ang2 = 0.6
 surface_hkl = [0, 0, 1]
-hkl_families = [[0, 0, 1]]
-hkl_reason = "Pin the allowed basal 1T-PtS2(001) symmetric cut parallel to the c-axis-normal cleavage surface; geometry follows the COD 1537200 experimental redetermination."
+# Orientation reference, not an emission set (#1302): former pin [[0, 0, 1]]. Pin the
+# allowed basal 1T-PtS2(001) symmetric cut parallel to the c-axis-normal cleavage
+# surface; geometry follows the COD 1537200 experimental redetermination. The harmonic
+# search over surface_hkl resolves the same primary reflection.

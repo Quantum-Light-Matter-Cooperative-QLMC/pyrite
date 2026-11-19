@@ -7,6 +7,7 @@ import pytest
 
 from pyrite.materials import CATALOG
 from pyrite.materials.crystal import CRYSTALS, U_g, chi_g, structure_factor
+from pyrite.materials.emission import _primary_hkl
 
 
 @pytest.mark.parametrize(
@@ -135,10 +136,15 @@ def test_pd_pt_basal_surface_contracts_have_usable_couplings(key, surface_hkl, r
 
     assert spec.surface_hkl == surface_hkl
     assert spec.beam_uvw is None
-    assert spec.hkl_families == (reflection,)
-    assert spec.hkl_list == (reflection, tuple(-index for index in reflection))
+    # Reference role is separate from emission pins (#1302); only basal-B33
+    # crystals keep an emission pin.
+    assert _primary_hkl(spec) == reflection
+    if key == "pdte2":
+        assert spec.hkl_families == (reflection,)
+        assert "B33" in spec.hkl_reason
+    else:
+        assert spec.hkl_families == ()
     assert spec.B_ang2 == pytest.approx(B_ang2)
-    assert spec.hkl_reason
 
     structure, g = structure_factor(key, reflection, 1500.0, B_ang2=spec.B_ang2)
     susceptibility = chi_g(key, reflection, 1500.0, B_ang2=spec.B_ang2)

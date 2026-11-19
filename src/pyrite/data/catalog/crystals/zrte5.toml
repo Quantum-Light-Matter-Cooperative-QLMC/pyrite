@@ -4,5 +4,7 @@ full_name = "Zirconium Pentatelluride"
 formula = "ZrTe5"
 B_ang2 = 0.6
 surface_hkl = [0, 1, 0]
-hkl_families = [[0, 2, 0]]
-hkl_reason = "Room-temperature Cmcm ZrTe5 layers lie in the a-c plane and cleave on (010); C centering extinguishes (010), so pin the first allowed parallel (020) family."
+# Orientation reference, not an emission set (#1302): former pin [[0, 2, 0]]. Room-
+# temperature Cmcm ZrTe5 layers lie in the a-c plane and cleave on (010); C centering
+# extinguishes (010), so pin the first allowed parallel (020) family. The harmonic
+# search over surface_hkl resolves the same primary reflection.

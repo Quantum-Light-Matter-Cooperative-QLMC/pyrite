@@ -58,14 +58,68 @@ def test_unpinned_cut_uses_first_nonextinct_harmonic(catalog):
     # Diamond's catalogue (400) cut reduces to (100), but 100,200,300 cancel.
     expected = photon_energies("diamond", 100_000, hkl=(4, 0, 0), catalog=catalog)
     np.testing.assert_allclose(photon_energies("diamond", 100_000, catalog=catalog), expected)
-    # Removing HOPG's authoritative pins still finds 002 from the basis.
+    # Emission pins never select the reference: pinning only (004) keeps 002.
     crystals = dict(catalog.crystals)
-    crystals["hopg"] = replace(crystals["hopg"], hkl_families=())
+    crystals["hopg"] = replace(crystals["hopg"], hkl_families=((0, 0, 4),))
     custom = replace(catalog, crystals=crystals)
     np.testing.assert_allclose(
         photon_energies("hopg", 30_000, catalog=custom),
         photon_energies("hopg", 30_000, hkl=(0, 0, 2), catalog=custom),
     )
+
+
+# Primary reflections before #1302 separated the reference role from the
+# emission pins; unpinning must not move any of them.
+_PRIMARY_BEFORE_1302 = {
+    "2h_tas2": (0, 0, 2),
+    "2h_tase2": (0, 0, 2),
+    "4h_sic": (0, 0, 4),
+    "6h_sic": (0, 0, 6),
+    "black_phosphorus": (0, 2, 0),
+    "fete": (0, 0, 1),
+    "gep": (2, 0, -2),
+    "ges": (2, 0, 0),
+    "gese": (2, 0, 0),
+    "gese2": (0, 0, 2),
+    "hbn": (0, 0, 2),
+    "hfte2": (0, 0, 1),
+    "hopg": (0, 0, 2),
+    "nbte2": (0, 0, 1),
+    "pds2": (0, 0, 2),
+    "pdte2": (0, 0, 1),
+    "ptbi2": (0, 0, 1),
+    "pts2": (0, 0, 1),
+    "ptte2": (0, 0, 1),
+    "res2": (0, 0, 2),
+    "rese2": (0, 0, 1),
+    "tate2": (0, 0, 1),
+    "tis2": (0, 0, 3),
+    "tise2": (0, 0, 1),
+    "tite2": (0, 0, 1),
+    "v2o5": (0, 0, 1),
+    "vse2": (0, 0, 1),
+    "vte2": (0, 0, 1),
+    "wte2": (0, 0, 2),
+    "zrte3": (0, 0, 1),
+    "zrte5": (0, 2, 0),
+}
+
+
+@pytest.mark.parametrize("key", sorted(_PRIMARY_BEFORE_1302))
+def test_formerly_pinned_primary_reflection_unchanged(key, catalog):
+    from pyrite.materials.emission import _primary_hkl
+
+    assert _primary_hkl(catalog.crystal(key)) == _PRIMARY_BEFORE_1302[key]
+
+
+def test_reference_hkl_overrides_harmonic_search(catalog):
+    from pyrite.materials.emission import _primary_hkl
+
+    spec = catalog.crystal("6h_sic")
+    assert spec.reference_hkl == (0, 0, 6)
+    assert _primary_hkl(replace(spec, reference_hkl=None)) == (0, 0, 2)
+    # A cut the reference is not parallel to falls back to the harmonic search.
+    assert _primary_hkl(spec, (1, 0, 0)) != (0, 0, 6)
 
 
 def test_full_catalogue_comparison_defaults_resolve(catalog):
@@ -311,14 +365,9 @@ def test_external_catalog_path_and_environment(tmp_path, monkeypatch, catalog):
     from tests.helpers.user_catalog import copy_full_catalog
 
     path = copy_full_catalog(tmp_path / "catalog")
-    # Reflection pins change only in this catalogue; catch stale CRYSTALS use.
+    # The reference reflection changes only in this catalogue; catch stale CRYSTALS use.
     crystal_file = path / "crystals" / "hopg.toml"
-    crystal_file.write_text(
-        crystal_file.read_text().replace(
-            "[[0, 0, 2], [0, 0, 4]]",
-            "[[0, 0, 4]]",
-        )
-    )
+    crystal_file.write_text(crystal_file.read_text() + "reference_hkl = [0, 0, 4]\n")
     expected = photon_energies("hopg", 30_000, catalog=catalog, recoil=False) * 2
     np.testing.assert_allclose(
         photon_energies("hopg", 30_000, catalog=path, recoil=False), expected

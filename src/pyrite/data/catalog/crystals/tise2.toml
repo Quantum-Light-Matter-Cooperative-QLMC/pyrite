@@ -6,5 +6,7 @@ phase = "1T"
 cod_id = 1537860
 B_ang2 = 0.6
 surface_hkl = [0, 0, 1]
-hkl_families = [[0, 0, 1]]
-hkl_reason = "Pin the basal 1T-TiSe2(001) symmetric cut so the reciprocal vector remains parallel to the c-axis-normal layered slab."
+# Orientation reference, not an emission set (#1302): former pin [[0, 0, 1]]. Pin the
+# basal 1T-TiSe2(001) symmetric cut so the reciprocal vector remains parallel to the
+# c-axis-normal layered slab. The harmonic search over surface_hkl resolves the same
+# primary reflection.

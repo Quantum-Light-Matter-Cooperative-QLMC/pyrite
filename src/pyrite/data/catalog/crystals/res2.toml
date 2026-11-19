@@ -6,5 +6,10 @@ phase = "1T'"
 mp_id = "mp-572758"
 B_ang2 = 0.6
 surface_hkl = [0, 0, 1]
-hkl_families = [[0, 0, 2]]
-hkl_reason = "The license-clean MP mp-572758 distorted-1T ReS2 fallback carries a doubled c-axis, so odd 00l are near-extinct supercell harmonics (|S(001)|~=3); pin the first strong allowed parallel (002) family, the true single-layer basal reflection, and orient by the reciprocal (001) cleavage surface normal."
+# Orientation reference, not an emission set (#1302): former pin [[0, 0, 2]]. The
+# license-clean MP mp-572758 distorted-1T ReS2 fallback carries a doubled c-axis, so odd
+# 00l are near-extinct supercell harmonics (|S(001)|~=3); pin the first strong allowed
+# parallel (002) family, the true single-layer basal reflection, and orient by the
+# reciprocal (001) cleavage surface normal. reference_hkl keeps [0, 0, 2] as the
+# catalogue primary reflection.
+reference_hkl = [0, 0, 2]

@@ -6,5 +6,7 @@ phase = "1T'"
 cod_id = 1535594
 B_ang2 = 0.6
 surface_hkl = [0, 0, 1]
-hkl_families = [[0, 0, 1]]
-hkl_reason = "In the preserved COD 1535594 C2/m setting, ambient distorted VTe2 cleaves on (001); C centering permits 001 and the idealized stoichiometric basis gives a finite coupling."
+# Orientation reference, not an emission set (#1302): former pin [[0, 0, 1]]. In the
+# preserved COD 1535594 C2/m setting, ambient distorted VTe2 cleaves on (001); C
+# centering permits 001 and the idealized stoichiometric basis gives a finite coupling.
+# The harmonic search over surface_hkl resolves the same primary reflection.

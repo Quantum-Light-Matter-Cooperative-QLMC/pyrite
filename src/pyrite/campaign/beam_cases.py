@@ -151,8 +151,21 @@ def beam_distribution_keys(
                 energy_keV=energy_keV,
                 theta_obs_deg=float(sweep.detector.observation_angle_deg),
                 tilt_deg=geometry.tilt_deg,
+                reference_hkl=_reference_reflection(crystal_spec, orientation.surface_hkl),
             )
         )
     if resolved_transverse is not None:
         keys["transverse_distribution"] = resolved_transverse
     return keys
+
+
+def _reference_reflection(crystal_spec, surface_hkl) -> tuple[int, int, int] | None:
+    """Catalog primary reflection of a reciprocal surface cut, or ``None``."""
+    from ..materials.emission import _primary_hkl
+
+    if surface_hkl is None:
+        return None
+    try:
+        return _primary_hkl(crystal_spec, surface_hkl)
+    except ValueError:
+        return None

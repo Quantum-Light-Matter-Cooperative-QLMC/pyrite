@@ -6,5 +6,7 @@ phase = "2H"
 cod_id = 2310532
 B_ang2 = 0.6
 surface_hkl = [0, 0, 1]
-hkl_families = [[0, 0, 2]]
-hkl_reason = "Room-temperature 2H-TaSe2 cleaves on (001), but P63/mmc stacking extinguishes odd 00l; pin the first allowed parallel (002) family."
+# Orientation reference, not an emission set (#1302): former pin [[0, 0, 2]]. Room-
+# temperature 2H-TaSe2 cleaves on (001), but P63/mmc stacking extinguishes odd 00l; pin
+# the first allowed parallel (002) family. The harmonic search over surface_hkl resolves
+# the same primary reflection.

@@ -6,5 +6,7 @@ phase = "1T"
 cod_id = 2107137
 B_ang2 = 0.6
 surface_hkl = [0, 0, 1]
-hkl_families = [[0, 0, 1]]
-hkl_reason = "Pin the allowed basal ambient 1T-VSe2(001) symmetric cut parallel to the c-axis-normal cleavage surface."
+# Orientation reference, not an emission set (#1302): former pin [[0, 0, 1]]. Pin the
+# allowed basal ambient 1T-VSe2(001) symmetric cut parallel to the c-axis-normal
+# cleavage surface. The harmonic search over surface_hkl resolves the same primary
+# reflection.
