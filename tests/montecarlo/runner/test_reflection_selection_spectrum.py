@@ -319,3 +319,60 @@ def test_electron_prefix_keeps_whole_histories():
     np.testing.assert_array_equal(prefix["L_ang"], [1.0, 2.0, 3.0])
     ordered = electron_prefix({"elec_id": np.array([0, 0, 1, 2]), "L_ang": np.arange(4.0)}, 1)
     np.testing.assert_array_equal(ordered["L_ang"], [0.0, 1.0])
+
+
+@pytest.mark.parametrize(("material", "automatic"), [("wte2", True), ("pdte2", False)])
+def test_reference_only_pins_no_longer_block_automatic_selection(material, automatic):
+    """#1302: an unpinned single crystal resolves automatic; B33-pinned stays fixed."""
+    from pyrite.campaign.reflection_selection import resolve_reflection_sweep
+
+    sweep = Sweep(material=material, beam=BeamSpec(energy_keV=30.0), thickness_ang=1000.0)
+    resolved, is_automatic = resolve_reflection_sweep(sweep, False, None)
+    assert is_automatic is automatic
+    assert resolved.line_yield_tolerance == (1e-3 if automatic else None)
+
+
+@pytest.mark.slow
+def test_formerly_pinned_wte2_selects_beyond_its_old_basal_pin(monkeypatch):
+    """#1302: WTe2 lost its reference-only (002) pin; pin its selected set.
+
+    Frozen in-process transport: 4 histories, deterministic soft loss, fixed
+    seed. Selection is shell-closed (all reflections up to the cutoff), so the
+    digest follows the stop decision, whose tail (~0.08) sits far from 0.3.
+    """
+    import hashlib
+    import json
+
+    import pyrite.montecarlo.runner.diffracted_brem as dbr
+
+    monkeypatch.setattr(
+        dbr, "case_diffracted_brem", lambda case, segments, E_grid, n_hat, Ne: np.zeros(len(E_grid))
+    )
+    sweep = Sweep(
+        material="wte2",
+        n_families=4,
+        beam=BeamSpec(energy_keV=30.0),
+        thickness_ang=1000.0,
+        tilt_deg=15.0,
+        energy_bins=EnergyBins(
+            cxr=np.arange(500.0, 8000.0, 25.0), brem=np.array([5000.0, 10000.0, 15000.0])
+        ),
+    )
+    case = build_cases(
+        sweep, n_electrons=4, n_electrons_brem=2, inelastic_model="continuous", straggling=False
+    )[0]
+    out = runner._spectrum_case(
+        dict(case, reflection_selection=SELECTION), runner._transport_case(case)
+    )
+    (radiator,) = out["reflection_selection"]["radiators"]
+    assert radiator["converged"] and radiator["metric"] == "net"
+    assert radiator["cutoff_invang"] == 8.0
+    selected = dominant_reflections(
+        "wte2", n_families=10**9, B_ang2=case["B_ang2"], g_max_invang=radiator["cutoff_invang"]
+    )
+    assert radiator["reflections"] == len(selected) == 2554
+    hkls = {tuple(int(i) for i in hkl) for hkl in selected}
+    assert {(0, 0, 2), (0, 0, -2)} <= hkls
+    assert any(h or k for h, k, _ in hkls)  # in-plane/oblique reflections now radiate
+    digest = hashlib.sha256(json.dumps(sorted(hkls), separators=(",", ":")).encode()).hexdigest()
+    assert digest[:16] == "1770ab10da0a3545"
