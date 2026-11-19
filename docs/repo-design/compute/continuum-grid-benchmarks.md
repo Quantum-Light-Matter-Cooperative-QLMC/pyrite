@@ -92,11 +92,11 @@ These reference tallies are not yet a matched comparison with the point-directio
 attenuated continuum plots above. Geometry, angular acceptance, photon transport
 and normalization must be reconciled before adding a Geant4 overlay.
 
-The requested 32-CPU submission was rejected: the CPU partition currently limits
+The requested 32-CPU submission was rejected: the CPU partition limited
 allocations to 16 CPUs per node, despite the target node exposing 32 logical CPUs.
-No Geant4 reference matrix job is running. The staged
-`checks/continuum_geant4_queen.sbatch` requests 32 CPUs and must be submitted after
-the scheduler limit is raised. No 16-thread result is substituted.
+The Geant4 reference matrix was not run, and no 16-thread result was substituted.
+The #278 benchmark harnesses were retired in #1306; recover them from git
+history if this matrix is revisited.
 
 ## Statistical comparison target
 

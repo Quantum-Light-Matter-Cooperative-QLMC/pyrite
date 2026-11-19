@@ -26,20 +26,11 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     # #278 / #286 measurement diagnostics: they record grid error, accuracy vs electron
     # count and per-flush cost as study evidence, not as an independent physics claim.
     # Continuum benchmark diagnostics: engineering evidence, no physics verdict.
-    "checks/continuum_backend_parity.py": (),
-    "checks/continuum_benchmark_report.py": (),
-    "checks/continuum_geant4_precision.py": (),
-    "checks/continuum_primary_tail.py": (),
-    "checks/continuum_pyrite_precision.py": (),
-    "checks/continuum_spectral_statistics.py": (),
     "checks/continuum_grid_convergence.py": (),
-    "checks/electron_count_accuracy.py": (),
     "checks/line_cost_286.py": (),
     "checks/line_grid_candidates_286.py": (),
     "checks/line_policy_286.py": (),
     "checks/line_setup_support_286.py": ("line-tabulation-nan-ceiling",),
-    "checks/line_crossover_286.py": (),
-    "checks/continuum_grid_end_to_end.py": (),
     "checks/detector_cone_variance_reduction.py": (),
     "checks/detector_cone_policy.py": (),
     "checks/detector_cone_unbiasedness.py": (),
@@ -49,17 +40,13 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     "checks/roulette879_analysis.py": (),
     "checks/line_roulette_fom_879.py": (),
     "checks/line_roulette_blocks_879.py": (),
-    "checks/line_roulette_core_bench_879.py": (),
     "checks/line_roulette_mass_jitter_879.py": (),
-    "checks/line_roulette_off_hashes_879.py": (),
     "checks/line_roulette_tail_879.py": (),
     # #875 launch-shape timing diagnostic: bitwise-identity and timing, no physics claim.
     "checks/launch_retune_875.py": (),
     "checks/brem_source_comparison.py": ("brem-source-comparison",),
     # Fused band scoring diagnostics (#938): performance/parity evidence only.
     "checks/brem_primary_band_benchmark.py": (),
-    "checks/brem_band_request_confirmation.py": (),
-    "checks/brem_band_kernel_diagnostic.py": (),
     "checks/sb85_eta_small_kappa_fit.py": ("bremslib-electron-electron",),
     "checks/coherent_flat_omission.py": ("coherent-flat-term-omission",),
     "checks/coherent_physical_population_remote.py": ("coherent-physical-bunch-population",),
@@ -120,7 +107,6 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     "checks/cxr_representation_944_945.py": (),
     "checks/line_sparse_near_286.py": (),
     # Characteristic vs continuum budget evaluation (#1006): engineering evidence.
-    "checks/characteristic_budget_1006.py": (),
     # Streamed-block sizing sweep (#907): engineering evidence.
     "checks/streamed_block_sizing.py": (),
     # Adaptive block size: wall, memory and stopping cost (#1252): engineering evidence.
@@ -137,7 +123,6 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     "checks/characteristic_scoring_1005.py": (),
     "checks/characteristic_nsys_1005.py": (),
     "checks/axial_mcwf_precision_cuda.py": (),
-    "checks/axial_recording_performance.py": (),
     "checks/axial_split_step_precision_cuda.py": (),
     "checks/axial_mcwf_return_flux.py": (),
     "checks/quantum_decoherence_budget.py": ("quantum-decoherence-budget",),
@@ -189,7 +174,6 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     # anchor, so it emits no records.
     "checks/pair_conversion_yield.py": (),
     # Native-output/parser inventory (#276), not a transport-physics anchor.
-    "checks/positron_table_inventory.py": (),
     # Dispatch/runtime evidence (#485), not a transport-physics anchor.
     "checks/physics_adapter_overhead.py": (),
     # Unit-boundary conversion timing, without a physics-validation claim.
