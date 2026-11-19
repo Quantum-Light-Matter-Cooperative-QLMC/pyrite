@@ -84,7 +84,7 @@ def device_sinc_samples(segments, n_hat, *, electron_limit=None, module=None):
     cp = _module(segments["L_ang"]) if module is None else module
 
     def field(name):
-        return cp.asarray(segments[name])
+        return upload(cp, segments[name])
 
     energy = field(energy_field).astype(cp.float64, copy=False)
     length = field("L_ang").astype(cp.float64, copy=False)
@@ -123,6 +123,41 @@ def device_sinc_samples(segments, n_hat, *, electron_limit=None, module=None):
     )
     keep = cp.flatnonzero(valid)
     return width[keep], weight[keep]
+
+
+#: Pinned staging buffer of :func:`upload`; arrays below it copy directly.
+_STAGE_BYTES = 64 << 20
+
+
+def upload(cp, array):
+    """``array`` as a ``cp`` array, staged through pinned host buffers when large.
+
+    A pageable host-to-device copy runs at about 1 GB/s on the WSL2 qlmc box
+    (qlmc job 13701: 1.6 s for the 20M segment fields); two alternating pinned
+    buffers let the host fill one while the other transfers.
+    """
+    if cp is np or _is_cupy(array) or array.nbytes <= _STAGE_BYTES:
+        return cp.asarray(array)
+    flat = np.ascontiguousarray(array).reshape(-1)
+    out = cp.empty(flat.shape, dtype=flat.dtype)
+    step = _STAGE_BYTES // flat.itemsize
+    stream = cp.cuda.Stream(non_blocking=True)
+    buffers = [
+        np.frombuffer(cp.cuda.alloc_pinned_memory(step * flat.itemsize), flat.dtype, step)
+        for _ in range(2)
+    ]
+    done: dict = {}
+    for chunk, start in enumerate(range(0, flat.size, step)):
+        stop = min(start + step, flat.size)
+        slot = chunk % 2
+        if slot in done:
+            done[slot].synchronize()
+        staged = buffers[slot][: stop - start]
+        np.copyto(staged, flat[start:stop])
+        out[start:stop].set(staged, stream=stream)
+        done[slot] = stream.record()
+    stream.synchronize()
+    return out.reshape(array.shape)
 
 
 def _strictly_ordered(owner, flight) -> bool:
@@ -239,8 +274,9 @@ class DeviceTail:
 
     Per line the products of :func:`._population_tail.tail_products` (``mass``
     and ``stop - energy`` in the arrays' dtype, ``stop`` cast to it, bound and
-    product in float64), summed per population array by one fused device
-    reduction and added on the host in population order.
+    product in float64), summed per population array by a fused device
+    reduction over rows of :data:`_ROW_LINES` lines and added on the host in
+    population order.
 
     Validation: line-grid-resonance-bandwidth
     """
@@ -262,7 +298,7 @@ class DeviceTail:
             count = int(cp.count_nonzero(keep))
             if not count:
                 continue
-            self.total += float(mass_sum(energy, weight, width))
+            self.total += _row_sum(cp, mass_sum, (energy, weight, width))
             self.n_lines += count
             self.min_energy = min(self.min_energy, float(cp.where(keep, energy, cp.inf).min()))
             self.max_energy = max(self.max_energy, float(cp.where(keep, energy, -cp.inf).max()))
@@ -271,9 +307,31 @@ class DeviceTail:
         """``sum(mass * sincsq_upper_tail_bound(width, stop - energy))`` over kept lines."""
         _, tail_sum = _kernels(self._cp)
         numerator = 0.0
-        for energy, weight, width in self.arrays:
-            numerator += float(tail_sum(energy, weight, width, energy.dtype.type(stop)))
+        for arrays in self.arrays:
+            numerator += _row_sum(self._cp, tail_sum, arrays, arrays[0].dtype.type(stop))
         return numerator
+
+
+#: Lines per reduction row. A full CuPy ``ReductionKernel`` reduction runs in
+#: one block (0.24 s per stop-search trial on 78M lines, qlmc job 13701); rows
+#: spread it over the device and CuPy sums the row partials.
+_ROW_LINES = 1 << 12
+
+
+def _row_sum(cp, kernel, arrays, *scalars) -> float:
+    """``kernel`` summed over 1-D ``arrays``: row partials, then their sum."""
+    if cp is np:
+        return float(kernel(*arrays, *scalars))
+    size = arrays[0].size
+    rows = size // _ROW_LINES
+    split = rows * _ROW_LINES
+    parts = []
+    if rows:
+        grid = [array[:split].reshape(rows, _ROW_LINES) for array in arrays]
+        parts.append(kernel(*grid, *scalars, axis=1).sum())
+    if split < size:
+        parts.append(kernel(*(array[split:] for array in arrays), *scalars))
+    return float(sum(parts))
 
 
 def resident_population_budget(array) -> int | None:

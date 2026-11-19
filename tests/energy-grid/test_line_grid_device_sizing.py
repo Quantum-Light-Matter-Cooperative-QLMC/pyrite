@@ -201,3 +201,16 @@ def test_cuda_chunks_join_in_collection_order():
     assert len(joined) == 1
     for got, want in zip(joined[0], zip(*host, strict=True), strict=True):
         np.testing.assert_array_equal(cupy.asnumpy(got), np.concatenate(want))
+
+
+@pytest.mark.hardware
+def test_cuda_staged_upload_is_exact(monkeypatch):
+    cupy = _cupy()
+    monkeypatch.setattr(_device_sizing, "_STAGE_BYTES", 4096)
+    rng = np.random.default_rng(13)
+    for array in (rng.random((10_001, 3)), rng.integers(0, 9, 7_777).astype(np.int32)):
+        got = _device_sizing.upload(cupy, array)
+        assert got.shape == array.shape and got.dtype == array.dtype
+        np.testing.assert_array_equal(cupy.asnumpy(got), array)
+    strided = rng.random((5000, 4))[:, 1:]
+    np.testing.assert_array_equal(cupy.asnumpy(_device_sizing.upload(cupy, strided)), strided)
