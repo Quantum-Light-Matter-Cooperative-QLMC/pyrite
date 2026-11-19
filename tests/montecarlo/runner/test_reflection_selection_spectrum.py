@@ -12,8 +12,14 @@ from pyrite.campaign.sweep import BeamSpec, Sweep, build_cases
 from pyrite.detectors import EnergyBins
 from pyrite.materials.crystal import dominant_reflections
 from pyrite.montecarlo import runner
+from tests.helpers import scaled_rtol
 
 SELECTION = dict(tolerance=0.3, g_max_invang=16.0, shell_width_invang=2.0)
+
+#: The selected set is scored in reflection chunks (``selection_call_sizes``),
+#: the reference in one call: the same positive per-bin contributions in other
+#: batch shapes, so device FP32 cells round apart by a few eps per bin.
+SELECTED_RTOL = scaled_rtol(1e-9, eps_multiple=4.0)
 
 
 @cache
@@ -66,9 +72,9 @@ def test_selected_spectrum_is_the_spectrum_of_the_selected_set(monkeypatch):
     assert radiator["reflections"] == len(selected)
     reference = runner._spectrum_case(dict(case, hkl_list=selected), tp)
     assert np.sum(reference["spec"]) > 0
-    np.testing.assert_allclose(out["spec"], reference["spec"], rtol=1e-9, atol=0)
+    np.testing.assert_allclose(out["spec"], reference["spec"], rtol=SELECTED_RTOL, atol=0)
     grid = np.asarray(tp["E_grid"])
-    assert sum(yields) == pytest.approx(np.trapezoid(reference["spec"], grid), rel=1e-9)
+    assert sum(yields) == pytest.approx(np.trapezoid(reference["spec"], grid), rel=SELECTED_RTOL)
     assert "reflection_selection" not in reference
 
 
@@ -305,7 +311,7 @@ def test_selection_scores_an_electron_prefix_then_every_history(monkeypatch):
         "silicon", n_families=10**9, B_ang2=case["B_ang2"], g_max_invang=sub["cutoff_invang"]
     )
     full = runner._spectrum_case(dict(case, hkl_list=hkls), tp)
-    np.testing.assert_allclose(out["spec"], full["spec"], rtol=1e-9, atol=0)
+    np.testing.assert_allclose(out["spec"], full["spec"], rtol=SELECTED_RTOL, atol=0)
     assert np.sum(full["spec"]) > 0
 
 
