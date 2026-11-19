@@ -535,6 +535,12 @@
       "exception": "Numerical transport kernel: a split or rewrite needs RNG-stream, event-order, CPU/GPU parity and performance evidence (#567, #344); never refactor for the metric alone."
     },
     {
+      "path": "src/pyrite/montecarlo/transport/_jit_shell_device.py",
+      "name": "_sample_hard_transfer_eV",
+      "cc": 23,
+      "exception": "Device twin of the host hard-loss sampler: three loss laws (Bhabha, Moller, distant) and the Newton bracket safeguards branch inherently; #916 replaced the 60-step bisection by safeguarded Newton (job 13823: 1.61x kernel time, transport counts identical, determinism and host/device parity tests pass); a split needs the same digest and timing evidence."
+    },
+    {
       "path": "src/pyrite/montecarlo/transport/cores.py",
       "name": "make_cpu_transport_core.body",
       "cc": 284,

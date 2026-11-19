@@ -43,6 +43,11 @@ _HARD_STREAM_SALT = np.uint64(0x3C6EF372FE94F82B)
 # Gaussian truncated at three standard deviations.
 _TRUNCATED_GAUSSIAN_WIDTH = 1.015387
 _BISECTION_STEPS = 200
+#: Safeguarded Newton inversion of the hard loss CDF (#916): step cap (each
+#: step at worst halves the bracket, like the bisection) and relative step
+#: size at which the iterate is at round-off.
+_NEWTON_STEPS = 200
+_NEWTON_RTOL = 2.0**-50
 #: Added to a channel's branch (0 distant longitudinal, 1 distant transverse,
 #: 2 close) in positron tables (#276): branches 3-5 select the Bhabha close
 #: DCS and the largest loss ``E``. Electron tables keep 0-2 unchanged.
@@ -188,8 +193,111 @@ def _hard_loss_bounds(energy_eV, ionization_eV, resonance_eV, branch, cutoff_eV)
 
 
 @njit(cache=True)
+def _hard_cdf_density(kind, energy_eV, prime_eV, peak_end, lower, w):
+    """``(J(w), J'(w))`` of a hard loss law (#916).
+
+    ``kind`` 0: distant triangle, ``J = peak_end ln(w/lower) - (w - lower)``
+    (:func:`_triangle_cdf`, zero at ``lower``), ``J' = peak_end/w - 1``;
+    1: Moller ``J_0^(-)``, ``J' = F^(-)(E', W)/W^2``; 2: Bhabha ``J_0^(+)``,
+    ``J' = F^(+)(E, W)/W^2`` (PENELOPE-2024 Eqs. 3.87, 3.92, 3.96, 3.104).
+    Validation: penelope-shell-hard-loss-sampling, bhabha-close
+    """
+    if kind == 1:
+        a = (energy_eV / (energy_eV + _MC2_EV)) ** 2
+        rest = prime_eV - w
+        c1 = (1.0 - a) / prime_eV
+        value = -1.0 / w + 1.0 / rest + c1 * np.log(rest / w) + a * w / prime_eV**2
+        density = 1.0 / (w * w) + 1.0 / (rest * rest) - c1 * (1.0 / rest + 1.0 / w)
+        return value, density + a / prime_eV**2
+    if kind == 2:
+        gamma = 1.0 + energy_eV / _MC2_EV
+        g = ((gamma - 1.0) / gamma) ** 2
+        gp1 = gamma + 1.0
+        b1 = (gamma - 1.0) / (gamma * gamma * gp1) * (2.0 * gp1 * gp1 - 1.0)
+        b2 = g * (3.0 * gp1 * gp1 + 1.0) / (gp1 * gp1)
+        b3 = g * 2.0 * gamma * (gamma - 1.0) / (gp1 * gp1)
+        b4 = g * (gamma - 1.0) ** 2 / (gp1 * gp1)
+        x = w / energy_eV
+        series = -b1 * np.log(w) + b2 * x - b3 * x * x / 2.0 + b4 * x**3 / 3.0
+        slope = -b1 / w + (b2 - b3 * x + b4 * x * x) / energy_eV
+        return -1.0 / w + series / energy_eV, 1.0 / (w * w) + slope / energy_eV
+    return peak_end * np.log(w / lower) - (w - lower), peak_end / w - 1.0
+
+
+@njit(cache=True)
 def _sample_hard_transfer_eV(energy_eV, ionization_eV, resonance_eV, branch, cutoff_eV, u):
     """Invert one channel's restricted hard loss CDF at uniform ``u`` [eV].
+
+    Source: PENELOPE-2024 Eqs. 3.76, 3.87, 3.94, 3.96 and 3.104, restricted
+    to ``W > W_c`` as in Eq. 3.124: bound distant losses have density
+    ``p_dis(W)/W`` (the adopted convention of ``shell_sampling``); close
+    losses ``F^(-)(E+U, W)/W^2``, or Bhabha ``F^(+)(E, W)/W^2`` (Eq. 3.92) for
+    a positron-tagged branch; a conduction-band distant loss is a delta at
+    ``W_cb``. Safeguarded Newton iteration on ``J(W) - J(lower) = u [J(upper)
+    - J(lower)]`` (#916): a step that leaves the bracket the residual signs
+    maintain is replaced by bisection, and iteration stops once a step is
+    below ``_NEWTON_RTOL`` of ``W`` or the bracket closes. It reaches the
+    root of the pre-#916 bisection (:func:`_sample_hard_transfer_eV_bisection`)
+    to round-off in a few steps instead of about 60.
+
+    Limits: ``u = 0`` returns the lower bound; a degenerate interval (only
+    reachable where an interpolated rate straddles a channel threshold)
+    returns its lower bound. Validation: penelope-shell-hard-loss-sampling, bhabha-close
+
+    Validation: shell-soft-hard-transport
+    """
+    lower, upper, peak_end = _hard_loss_bounds(
+        energy_eV, ionization_eV, resonance_eV, branch, cutoff_eV
+    )
+    branch, positron = _split_branch(branch)
+    if branch != 2 and ionization_eV == 0.0:
+        return resonance_eV
+    if not upper > lower:
+        return lower
+    prime = energy_eV + ionization_eV
+    kind = 0
+    if branch == 2:
+        kind = 2 if positron else 1
+    base, base_density = _hard_cdf_density(kind, energy_eV, prime, peak_end, lower, lower)
+    top, _ = _hard_cdf_density(kind, energy_eV, prime, peak_end, lower, upper)
+    target = u * (top - base)
+    if not target > 0.0:
+        return lower
+    # Initial guess: the leading -1/W term for close losses, one Newton step
+    # from the lower bound for distant ones.
+    w = lower + target / base_density
+    if kind != 0:
+        inverse = 1.0 / lower - target
+        w = 1.0 / inverse if inverse > 0.0 else upper
+    lo, hi = lower, upper
+    if not (w > lo and w < hi):
+        w = 0.5 * (lo + hi)
+    for _ in range(_NEWTON_STEPS):
+        value, density = _hard_cdf_density(kind, energy_eV, prime, peak_end, lower, w)
+        residual = value - base - target
+        if residual == 0.0:
+            return w
+        if residual < 0.0:
+            lo = w
+        else:
+            hi = w
+        w_next = w - residual / density
+        if not (w_next > lo and w_next < hi):
+            w_next = 0.5 * (lo + hi)
+        if abs(w_next - w) <= _NEWTON_RTOL * w or not (w_next > lo and w_next < hi):
+            return w_next
+        w = w_next
+    return w
+
+
+@njit(cache=True)
+def _sample_hard_transfer_eV_bisection(
+    energy_eV, ionization_eV, resonance_eV, branch, cutoff_eV, u
+):
+    """Pre-#916 bisection inversion of one channel's restricted hard loss CDF [eV].
+
+    Kept as the reference oracle of :func:`_sample_hard_transfer_eV`, which
+    reaches the same root by safeguarded Newton iteration.
 
     Source: PENELOPE-2024 Eqs. 3.76, 3.87, 3.94, 3.96 and 3.104, restricted
     to ``W > W_c`` as in Eq. 3.124: bound distant losses have density

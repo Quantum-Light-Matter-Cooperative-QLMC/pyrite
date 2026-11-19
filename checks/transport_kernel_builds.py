@@ -6,7 +6,8 @@ Compares the production kernel (the #827 specialized variant compiled by
 :class:`~pyrite.montecarlo.transport._jit_rawmodule.KernelBuild`: a register
 cap (``--maxrregcount``), ``__launch_bounds__`` and/or ``__ldg`` loads of the
 arrays the kernel never writes. Builds are named on the command line, e.g.
-``raw``, ``ro``, ``r168``, ``ro+r128``, ``lb128x2``.
+``raw``, ``ro``, ``r168``, ``ro+r128``, ``lb128x2``, ``li`` (line info only,
+#916).
 
 ``attributes``
     Runs the #821 benchmark physics once per build on a small population and
@@ -61,7 +62,7 @@ SCENES = {
     "w-1MeV-100um": ("W", "W", 0.06322199557658834, 1000.0, 100.0, 1_250),
     "si-3MeV-1mm": ("Si", "silicon", 0.049942993373787194, 3000.0, 1000.0, 1_000),
 }
-_BUILD = re.compile(r"raw|ro|r(\d+)|lb(\d+)x(\d+)")
+_BUILD = re.compile(r"raw|ro|li|r(\d+)|lb(\d+)x(\d+)")
 
 
 def parse_build(name):
@@ -77,6 +78,8 @@ def parse_build(name):
             raise ValueError(f"unknown build component {part!r}")
         if part == "ro":
             fields["readonly"] = TRANSPORT_READONLY
+        elif part == "li":
+            fields["lineinfo"] = True
         elif match[1]:
             fields["maxrregcount"] = int(match[1])
         elif match[2]:
