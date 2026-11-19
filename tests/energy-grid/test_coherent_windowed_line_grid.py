@@ -821,11 +821,31 @@ def test_the_analytic_bunch_factor_switches_to_the_grouped_step_above_its_energy
 
 
 # ---- runner policy ------------------------------------------------------------
+def _basal_pair_case(thickness_ang, n_electrons):
+    """HOPG at 30 keV, 5 deg / 45 deg, built on the historical (002)/(004) pair.
+
+    Fiber HOPG selects automatically since #1301, which coherent emission
+    refuses and whose wider bandwidth four basal rows would exceed; the window
+    probes keep the fixed pair, built as ``build_ladder_case`` does.
+    """
+    from dataclasses import replace
+
+    from pyrite.campaign.config import material_sweep
+    from pyrite.campaign.sweep import build_cases
+
+    sweep = material_sweep(
+        "hopg", thickness_ang=thickness_ang, energy_keV=30.0, tilt_deg=5.0, tilt_azim_deg=45.0
+    )
+    sweep = replace(sweep, n_families=2)
+    case = dict(build_cases(sweep, n_electrons=n_electrons, n_electrons_brem=n_electrons)[0])
+    case["seed"] = 0
+    return case
+
+
 @pytest.fixture(scope="module")
 def tiny():
     """Ne=3 through 1 um of HOPG at 30 keV, a 100 fs bunch on a finite footprint."""
-    case = cc.build_ladder_case("hopg", 30.0, 5.0, 45.0, thickness_ang=1.0e4, n_electrons=3, seed=0)
-    case = dict(case)
+    case = _basal_pair_case(1.0e4, 3)
     case["bunch_length_fs"] = 100.0
     ladder = cc.CaseLadder(case, transport_core="lockstep")
     return case, ladder
@@ -1008,9 +1028,7 @@ def test_automatic_full_axis_yield_audit_uses_the_production_capture():
     """One short physical track exercises the full automatic axis and runner."""
     from pyrite.montecarlo import runner
 
-    case = dict(
-        cc.build_ladder_case("hopg", 30.0, 5.0, 45.0, thickness_ang=1.0, n_electrons=1, seed=0)
-    )
+    case = _basal_pair_case(1.0, 1)
     from scipy.constants import elementary_charge
 
     case.update(

@@ -198,7 +198,8 @@ class CrystalSpec:
     cod_id, mp_id
         Optional Crystallography Open Database and Materials Project identifiers.
     B_ang2
-        Isotropic Debye--Waller ``B`` factor in square angstroms.
+        Debye--Waller ``B`` in square angstroms: isotropic for a single
+        crystal, axial projection (B33 for basal fibers) for fiber texture.
     beam_uvw
         Optional default crystal direction parallel to the incident beam.
     hkl_families
@@ -217,6 +218,10 @@ class CrystalSpec:
         Optional Miller indices of the surface normal.
     measured_structure_factors
         Optional measured low-order structure factors (bonding charge, #1177).
+    texture
+        ``"single-crystal"`` (default), or ``"fiber"`` with random grain
+        azimuths about the reciprocal ``surface_hkl`` axis. Fiber candidates
+        are parallel to that axis; basal ``B_ang2`` then denotes B33.
     """
 
     key: str
@@ -235,14 +240,22 @@ class CrystalSpec:
     info: CrystalInfo
     surface_hkl: tuple[int, int, int] | None
     measured_structure_factors: MeasuredStructureFactors | None = None
+    texture: Literal["single-crystal", "fiber"] = "single-crystal"
     reference_hkl: tuple[int, int, int] | None = None
 
     def __post_init__(self) -> None:
         reject_quantity(self.B_ang2, field="CrystalSpec.B_ang2", unit="angstrom**2")
+        if self.texture not in ("single-crystal", "fiber"):
+            raise ValueError("texture must be 'single-crystal' or 'fiber'")
+        if self.texture == "fiber":
+            if self.surface_hkl is None or not any(self.surface_hkl):
+                raise ValueError("fiber texture requires a nonzero surface_hkl")
+            if any(np.any(np.cross(hkl, self.surface_hkl)) for hkl in self.hkl_families):
+                raise ValueError("fiber hkl_families must be parallel to surface_hkl")
 
     @property
     def b_factor(self):
-        """Isotropic Debye-Waller B as a fresh area quantity."""
+        """Debye-Waller B (isotropic or the fiber-axis projection), as an area."""
         from ..units import Q_
 
         return Q_(self.B_ang2, "angstrom**2")

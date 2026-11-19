@@ -735,7 +735,8 @@ def _production_case(kind, tmp_path, monkeypatch):
         return case
     else:  # an uncovered energy resolves its line grid from the trajectories
         monkeypatch.setattr(_cxr_grid_policy, "output_dir", lambda _kind: tmp_path / "grid-cache")
-        sweep = material_sweep("hopg")
+        # Fixed families: grid resolution, not selection, is under test (#1301).
+        sweep = replace(material_sweep("hopg"), n_families=2)
         sweep = replace(sweep, beam=replace(sweep.beam, energy_keV=77.0))
     options = (
         {"inelastic_model": "continuous", "straggling": False, "radiative_model": "uncoupled"}
@@ -944,6 +945,17 @@ def test_streamed_blocks_partition_rows_into_whole_electrons(tmp_path, max_rows)
         )
 
 
+def _same_record(got, ref):
+    """Recursive equality with floats compared to rel 1e-12 (summation order)."""
+    if isinstance(ref, dict):
+        return set(got) == set(ref) and all(_same_record(got[k], ref[k]) for k in ref)
+    if isinstance(ref, (list, tuple)):
+        return len(got) == len(ref) and all(map(_same_record, got, ref))
+    if isinstance(ref, float) and not isinstance(ref, bool):
+        return got == pytest.approx(ref, rel=1e-12)
+    return got == ref
+
+
 @pytest.mark.parametrize("kind", ["flat", "grooved", "multilayer", "secondaries", "auto-line-grid"])
 def test_streamed_spectrum_matches_the_live_spectrum(tmp_path, monkeypatch, kind):
     case = _production_case(kind, tmp_path, monkeypatch)
@@ -972,6 +984,10 @@ def test_streamed_spectrum_matches_the_live_spectrum(tmp_path, monkeypatch, kind
 
             assert counts(streamed[key]) == counts(value)
             assert {r["schema"] for r in streamed[key]} == {r["schema"] for r in value}
+        elif key == "reflection_selection" and value is not None:
+            # Same selected set; measured shell yields differ only by block
+            # summation order (fiber HOPG selects automatically since #1301).
+            assert _same_record(streamed[key], value), key
         elif not key.startswith("_"):
             assert streamed[key] == value, key
 

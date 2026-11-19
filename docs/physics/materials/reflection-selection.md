@@ -1,6 +1,6 @@
 # Reflection selection
 
-Line emission is a sum over reciprocal-lattice vectors, and that sum has to be truncated. Which reflections enter affects both yield and scoring cost. PyRITE uses measured line-yield selection for supported incoherent runs, a family count for other routes or explicit requests, and catalog pins for textured crystals.
+Line emission is a sum over reciprocal-lattice vectors, and that sum has to be truncated. Which reflections enter affects both yield and scoring cost. PyRITE uses measured line-yield selection for supported incoherent runs, a family count for other routes or explicit requests, and explicit catalog pins where declared. Crystal texture restricts the candidate domain before selection.
 
 ## Default measured selection
 
@@ -55,8 +55,54 @@ does not grow with the history count; the selected set is then scored on
 every history. Smaller populations select on every history. Streamed
 runs hold the leading blocks until the prefix is complete and select on them,
 so streamed and retained runs score the same set.
-`CXR_REFLECTION_SELECTION_MODEL` is `measured-shell-cutoff-v6` since #1281,
+`CXR_REFLECTION_SELECTION_MODEL` is `measured-shell-cutoff-v7` since #1301,
 so older measured-selection checkpoints do not resume.
+
+## Fiber texture
+
+The catalog's HOPG and pyrolytic h-BN use an axial coherent-line model:
+grains have random in-plane azimuths, and retained reciprocal vectors are
+parallel to the declared fiber axis `surface_hkl`. For the basal axis this
+means `(00l)`, with systematic extinctions still removed by the structure factor.
+At the default 2 Å⁻¹ shell width the retired `(002)/(004)` pins are the first
+two shells, rather than a hard limit. Fixed-count routes rank the same domain:
+`n_families=4` gives `(002)`–`(008)` for HOPG/h-BN. The existing tolerance determines the last shell.
+
+Let $A$ be the nonsingular reciprocal basis and $a$ the primitive integer
+surface normal. Collinearity is preserved by an invertible basis:
+
+$$
+hA=\lambda aA\quad\Longleftrightarrow\quad h=\lambda a.
+$$
+
+Since $a$ is primitive, integer Miller vectors on that line are exactly
+$h=na$, $n\in\mathbb Z\setminus\{0\}$. Enumeration generates these multiples
+up to the same form-factor cap **before** applying the Debye–Waller factor.
+The metric floor, shells, tail estimate and reconstructed continuum-share
+set all use this domain. Both axis signs describe the same set; a general
+nonorthogonal cell needs no Cartesian-angle tolerance.
+
+This is the catalog's axial model, rather than a claim that textured specimens
+have no diffuse or powder-ring radiation. For basal HOPG/h-BN, it keeps the
+directional B33 thermal factor on its valid reciprocal axis. Ordered h-BN flakes
+require in-plane displacement data and are outside this default. The mosaic
+FWHM is unchanged.
+
+Dataset/case identities include the texture and primitive axis. Each selection
+record includes `texture`, `texture_axis_hkl` and `selected_set_sha256`; the
+digest includes the sorted selected Miller vectors and their texture domain.
+Frozen pre-change HOPG transport measurements and shell shares are recorded in
+[#1301](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/1301)
+and anchored by `tests/data/reflection_selection_fiber_1301.json`. The paired
+4096-history cleo_sub measurements omit 0.758% (30 keV) and 0.102% (1 MeV) of
+the full basal line yield with the retired pins, inside the [10, 3700] eV
+reference band. On the full production axes (job 13696, same transports),
+automatic selection raises the 30 keV HOPG and h-BN line yield by 3.8 % and
+3.3 %, mostly from (006) lines near 5–6 keV, and the 1 MeV yield by 0.1 %; the
+lattice-share continuum falls by at most 0.15 %. These are scene-specific
+measurements, not a universal omitted-yield guarantee.
+
+## Explicit controls and qualification
 
 An explicit `CxrReflections(n_families=4)` or `--n-families 4` restores the
 four-family policy. Explicit counts take precedence over automatic selection.

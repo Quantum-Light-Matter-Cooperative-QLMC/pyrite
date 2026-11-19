@@ -798,7 +798,9 @@ def test_material_registry_projects_scan_and_crystal_views():
     assert material_registry.LayerSpec is LayerSpec
 
 
-@pytest.mark.parametrize("material", ["hopg", "hbn"])
+# HOPG/h-BN are fiber-textured and select automatically (#1301); the
+# remaining pins restrict Debye-Waller validity (#1302).
+@pytest.mark.parametrize("material", ["pdte2", "2h_tas2"])
 def test_pinned_hkl_materials_carry_reason(material):
     spec = CATALOG.crystal(material)
 

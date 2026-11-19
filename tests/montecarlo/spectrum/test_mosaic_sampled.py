@@ -253,7 +253,8 @@ def test_route_mc_sampled_lowers_to_the_exact_route_with_history_draws():
 def test_sampled_case_refuses_coherent_emission():
     from pyrite.montecarlo.case import Case
 
-    case = _sweep_case(mosaic_route="mc-sampled")
+    # Fixed families: a measured selection would refuse coherent first (#1301).
+    case = _sweep_case(mosaic_route="mc-sampled", n_families=2)
     with pytest.raises(ValueError, match="incoherent-only"):
         Case(**dict(case, coherent_emission=True))
 

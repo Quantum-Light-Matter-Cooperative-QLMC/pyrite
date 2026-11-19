@@ -80,7 +80,8 @@ def test_audit_restore_truncates_appended_attribution():
 @pytest.fixture(scope="module")
 def small_transport():
     sweep = material_sweep("hbn")
-    sweep = replace(sweep, beam=replace(sweep.beam, energy_keV=100.0))
+    # Fixed families: block additivity, not selection, is under test (#1301).
+    sweep = replace(sweep, beam=replace(sweep.beam, energy_keV=100.0), n_families=2)
     case = build_cases(sweep, n_electrons=6, n_electrons_brem=6)[0]
     return case, runner._transport_case(case, transport_core="lockstep")
 

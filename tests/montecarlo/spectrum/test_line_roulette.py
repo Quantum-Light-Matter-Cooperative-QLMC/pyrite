@@ -32,6 +32,8 @@ PINNED_DRAWS = [0.47716136674061527, 0.6692201585934083, 0.42749804493215904]
 def case():
     sweep = Sweep(
         material="hopg",
+        # Roulette refuses measured selection; fiber HOPG selects by default (#1301).
+        n_families=2,
         thickness_ang=1e4,
         beam=BeamSpec(energy_keV=30.0),
         tilt_deg=30.0,

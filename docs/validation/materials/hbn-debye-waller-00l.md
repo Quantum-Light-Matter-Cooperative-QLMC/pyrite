@@ -118,3 +118,17 @@ Inspected after the derivation above was written.
 The catalog now stores `B_ang2 = 1.73`, the fitted $B_{33}$ above, and the ledger row is `rederived`. The regenerated golden `(002)` structure-factor amplitude at 10 keV moves from 16.0921 to 16.7282. That ratio, 1.03953, equals $\exp(1.72\,s^2)$ with $s=1/c$, so only the Debye–Waller factor changed. The value stays a direction-specific basal $B_{33}$, not $B_{\rm iso}$.
 
 The identity generation is `hbn-basal-b33-v2` (`campaign/profiles.py::_HBN_DEBYE_WALLER_MODEL`). Resolved case keys already hash `B_ang2`, but dataset crystallography omits it. The conditional marker invalidates both caches for h-BN films and radiating layers, preserving other materials’ identities.
+
+## Current texture scope (#1301)
+
+The catalog default represents **pyrolytic/fiber-textured BN**, by user decision,
+with random in-plane grain azimuths and reciprocal `surface_hkl = [0, 0, 1]`.
+`texture = "fiber"` replaces the fixed `(002)/(004)` pair: automatic selection
+can retain higher allowed basal orders. Every candidate still has $g\parallel c$,
+so the current `B_ang2 = 1.73` remains B33 and is never applied to an in-plane
+vector by this selector. No mosaic broadening parameter changes.
+
+An ordered single-crystal h-BN flake is a different orientation model. Its
+in-plane reflections require independently sourced B11 data, which this catalog
+entry does not supply. See
+[the candidate-domain model](../../physics/materials/reflection-selection.md#fiber-texture).

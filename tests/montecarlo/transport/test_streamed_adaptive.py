@@ -22,7 +22,8 @@ SPECTRA = ("spec", "spec_characteristic", "brem_wide", "brem")
 
 def _requested(spread=None, **policy):
     case = {
-        **_case(energy_spread_frac=spread),
+        # Fixed families: streaming, not measured selection, is under test (#1301).
+        **_case(n_families=2, energy_spread_frac=spread),
         # Seed 8 puts the maximum initial energy past the realized population,
         # forcing the energy-range replay (see test_independent_stopping).
         "seed": 8 if spread is not None else 1,

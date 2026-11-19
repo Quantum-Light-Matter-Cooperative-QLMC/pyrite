@@ -221,6 +221,7 @@
           ]
         ],
         "hkl_reason": "Emission set restricted by Debye-Waller validity: B_ang2 is the basal B33 projection, valid only for g parallel to c, so only the basal 2H-TaS2 (002) family may radiate until per-site displacement tensors are supplied (#1302).",
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -394,6 +395,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -543,6 +545,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -704,6 +707,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": [
           0,
           0,
@@ -801,6 +805,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -938,6 +943,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -1155,6 +1161,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -1232,6 +1239,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -1345,6 +1353,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -1566,6 +1575,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -1751,6 +1761,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -1932,6 +1943,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -2187,6 +2199,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -2298,6 +2311,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -2471,6 +2485,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -2656,6 +2671,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -2907,6 +2923,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -3064,6 +3081,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -3233,6 +3251,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -3448,6 +3467,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -3795,6 +3815,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -3934,6 +3955,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -4083,6 +4105,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -4572,6 +4595,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -4677,29 +4701,9 @@
           0,
           1
         ],
-        "hkl_list": [
-          [
-            0,
-            0,
-            2
-          ],
-          [
-            0,
-            0,
-            -2
-          ],
-          [
-            0,
-            0,
-            4
-          ],
-          [
-            0,
-            0,
-            -4
-          ]
-        ],
-        "hkl_reason": "Layered h-BN is scanned with the c-axis normal; keep the basal (00l) family explicit to match the HOPG orientation model.",
+        "hkl_list": [],
+        "hkl_reason": null,
+        "texture": "fiber",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -4726,34 +4730,14 @@
             2
           ],
           [
-            -1,
             0,
-            0
-          ],
-          [
-            -1,
-            1,
-            0
+            0,
+            -4
           ],
           [
             0,
-            -1,
-            0
-          ],
-          [
             0,
-            1,
-            0
-          ],
-          [
-            1,
-            -1,
-            0
-          ],
-          [
-            1,
-            0,
-            0
+            4
           ]
         ]
       }
@@ -4819,6 +4803,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -4938,6 +4923,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -5057,6 +5043,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -5168,29 +5155,9 @@
           0,
           1
         ],
-        "hkl_list": [
-          [
-            0,
-            0,
-            2
-          ],
-          [
-            0,
-            0,
-            -2
-          ],
-          [
-            0,
-            0,
-            4
-          ],
-          [
-            0,
-            0,
-            -4
-          ]
-        ],
-        "hkl_reason": "HOPG is fiber-textured, so only the basal (00l) c-axis reflections are coherent; skip the automatic dominant-reflections search.",
+        "hkl_list": [],
+        "hkl_reason": null,
+        "texture": "fiber",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -5330,6 +5297,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -5503,6 +5471,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": 2
       },
@@ -5646,6 +5615,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -5789,6 +5759,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -5912,6 +5883,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": 2
       },
@@ -6051,6 +6023,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -6224,6 +6197,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -6397,6 +6371,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -6666,6 +6641,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -6779,6 +6755,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -6932,6 +6909,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -7253,6 +7231,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -7454,6 +7433,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -7655,6 +7635,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -7765,6 +7746,7 @@
           ]
         ],
         "hkl_reason": "Emission set restricted by Debye-Waller validity: B_ang2 is the basal B33 projection, valid only for g parallel to c, so only the basal 1T-PdTe2 (001) family may radiate until per-site displacement tensors are supplied (#1302).",
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -7922,6 +7904,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -8011,6 +7994,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -8130,6 +8114,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -8249,6 +8234,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -8526,6 +8512,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": [
           0,
           0,
@@ -8701,6 +8688,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -9016,6 +9004,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -9191,6 +9180,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -9490,6 +9480,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -9599,6 +9590,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": [
           0,
           0,
@@ -9722,6 +9714,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -9841,6 +9834,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -9948,6 +9942,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -10205,6 +10200,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -10304,6 +10300,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -10543,6 +10540,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -10676,6 +10674,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -10799,6 +10798,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -11020,6 +11020,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -11109,6 +11110,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -11268,6 +11270,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },
@@ -11545,6 +11548,7 @@
         ],
         "hkl_list": [],
         "hkl_reason": null,
+        "texture": "single-crystal",
         "reference_hkl": null,
         "layers_per_cell": null
       },

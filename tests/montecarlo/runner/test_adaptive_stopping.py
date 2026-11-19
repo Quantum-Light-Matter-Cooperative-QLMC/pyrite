@@ -643,9 +643,10 @@ def test_per_electron_brem_band_integrals_average_to_the_band_integral():
 # ---- runner ---------------------------------------------------------------------
 
 
-def _case(**beam):
+def _case(n_families=None, **beam):
     sweep = Sweep(
         material="hopg",
+        n_families=n_families,
         thickness_ang=1e4,
         beam=BeamSpec(energy_keV=30.0, **beam),
         tilt_deg=30.0,

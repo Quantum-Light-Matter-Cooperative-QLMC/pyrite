@@ -44,7 +44,7 @@ from .._precision import (
     _brem_band_reduction_markers,
     identity_policy,
 )
-from ..materials.crystal import structure_factor_marker
+from ..materials.crystal import CRYSTALS, structure_factor_marker
 from ..materials.photon_cross_sections import ATTENUATION_MODEL
 from ..montecarlo.case import Case
 from ..montecarlo.channeling.handoff import CHANNELING_MODEL
@@ -468,13 +468,20 @@ def _model_generation_markers(emission: str) -> dict[str, Any]:
     return markers
 
 
-def _structure_factor_identity(crystals) -> dict[str, str]:
+def _structure_factor_identity(crystals) -> dict[str, Any]:
     """Crystal-conditional structure-factor and basal thermal-factor generations.
 
     Other crystals retain their historical identities.
     """
     marker = structure_factor_marker(crystals)
     payload = {} if marker is None else {"structure_factor_model": marker}
+    textures = {
+        key: dict(texture="fiber", axis_hkl=list(CRYSTALS[key]["texture_axis_hkl"]))
+        for key in sorted(set(crystals))
+        if CRYSTALS[key].get("texture") == "fiber"
+    }
+    if textures:
+        payload["crystal_texture"] = textures
     if "hbn" in crystals:
         payload["hbn_debye_waller_model"] = _HBN_DEBYE_WALLER_MODEL
     return payload

@@ -62,7 +62,7 @@ SAMPLING_KEYS = ("n_electrons", "n_electrons_brem")
 # total, not on the line yield alone.
 # v5 (#1243): automatic axes select on bin masses in the common ceiling band.
 # v6 (#1281): select on the electron prefix ``elec_id < SELECTION_HISTORIES``.
-CXR_REFLECTION_SELECTION_MODEL = "measured-shell-cutoff-v6"
+CXR_REFLECTION_SELECTION_MODEL = "measured-shell-cutoff-v7"
 
 CONVERGENCE_KEYS = (
     "n_families",

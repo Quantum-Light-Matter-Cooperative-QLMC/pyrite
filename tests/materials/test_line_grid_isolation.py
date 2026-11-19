@@ -1,6 +1,7 @@
 """Per-material catalog rows and immutable artifacts cannot couple materials."""
 
 import json
+from dataclasses import replace
 
 import numpy as np
 import pytest
@@ -144,15 +145,15 @@ def test_changing_hopg_legacy_rows_only_changes_hopg(catalog_path, monkeypatch):
 
     def identity(catalog, material):
         monkeypatch.setattr(config, "_catalog", lambda catalog_profile="standard": catalog)
-        case = build_cases(
-            config.material_sweep(
-                material,
-                energy_keV=30.0,
-                thickness_ang=1000.0,
-                tilt_deg=15.0,
-                tilt_azim_deg=180.0,
-            )
-        )[0]
+        # Fixed families keep the stored-row route (fiber HOPG selects, #1301).
+        sweep = config.material_sweep(
+            material,
+            energy_keV=30.0,
+            thickness_ang=1000.0,
+            tilt_deg=15.0,
+            tilt_azim_deg=180.0,
+        )
+        case = build_cases(replace(sweep, n_families=2))[0]
         return case_content_key(case)
 
     assert identity(before, "hopg") != identity(after, "hopg")

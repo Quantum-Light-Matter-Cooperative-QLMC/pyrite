@@ -61,8 +61,12 @@ def _uncovered_energy_sweep(energy_keV=77.0):
 
 
 def _stored_energy_sweep():
-    """An explicit stored-row fixture independent of bundled catalog defaults."""
-    sweep = material_sweep("hopg")
+    """An explicit stored-row fixture independent of bundled catalog defaults.
+
+    Two explicit families keep the fixed-set route: an automatic selection
+    (fiber HOPG since #1301) always resolves its grid automatically.
+    """
+    sweep = replace(material_sweep("hopg"), n_families=2)
     stored = np.linspace(10.0, 2600.0, 864)
     return (
         replace(
@@ -253,7 +257,12 @@ def test_high_energy_hbn_rejects_impossible_budget_before_transport(monkeypatch)
 
 
 def _automatic_policy(
-    material, energy_keV, per_call=None, energy_spread_frac=None, line_yield_tolerance=None
+    material,
+    energy_keV,
+    per_call=None,
+    energy_spread_frac=None,
+    line_yield_tolerance=None,
+    n_families=4,
 ):
     from types import SimpleNamespace
 
@@ -267,16 +276,16 @@ def _automatic_policy(
         cxr_grid_policy=per_call,
         beam=beam,
         target=target,
-        n_families=4,
+        n_families=n_families,
         line_yield_tolerance=line_yield_tolerance,
     )
-    return _automatic_cxr_grid_policy(sweep, crystal_params(material), energy_keV)
+    return _automatic_cxr_grid_policy(sweep, crystal_params(material, n_families), energy_keV)
 
 
-def _kinematic_stop(material, energy_keV):
+def _kinematic_stop(material, energy_keV, n_families=4):
     from pyrite.campaign.geometry import crystal_params
 
-    cp = crystal_params(material)
+    cp = crystal_params(material, n_families)
     lattice = CRYSTALS[cp["crystal"]]["lattice"]
     return kinematic_cxr_stop_eV(
         [reciprocal_g_vector(hkl, lattice)[1] for hkl in cp["hkl_list"]], energy_keV
@@ -510,9 +519,10 @@ def test_spread_beam_bounds_use_the_declared_upper_incident_energy():
     HOPG-like (004) at 300 keV, f = 0.01: the +3 sigma resonance the
     nominal-energy bound missed (26534 eV) is now inside the stop.
     """
-    nominal = _automatic_policy("hopg", 300.0)
-    spread = _automatic_policy("hopg", 300.0, energy_spread_frac=0.01)
-    assert spread.stop_eV == _kinematic_stop("hopg", 300.0 * 1.06)
+    # Two families keep (004) the highest order (fiber HOPG ranks (00l), #1301).
+    nominal = _automatic_policy("hopg", 300.0, n_families=2)
+    spread = _automatic_policy("hopg", 300.0, energy_spread_frac=0.01, n_families=2)
+    assert spread.stop_eV == _kinematic_stop("hopg", 300.0 * 1.06, n_families=2)
     assert spread.stop_eV > 26534.0 > nominal.stop_eV
     capped = _automatic_policy("hopg", 3000.0, energy_spread_frac=0.0)
     assert capped.stop_eV == _automatic_policy("hopg", 3000.0).stop_eV

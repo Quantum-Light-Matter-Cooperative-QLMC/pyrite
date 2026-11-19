@@ -179,7 +179,7 @@ def test_line_yield_tolerance_lowers_to_a_selection_record_and_leaves_default_id
     record = selected.to_dict()["reflection_selection"]
     assert record["model"] == REFLECTION_SELECTION_MODEL and record["tolerance"] == 1e-3
     plain = _case(pr.Numerics())
-    assert "reflection_selection" not in plain.to_dict()
+    assert plain.to_dict()["reflection_selection"]["automatic"] is True
     _same_case(plain, _case(pr.Numerics(cxr_reflections=pr.config.CxrReflections())))
     assert case_content_key(selected) != case_content_key(plain)
     for bad in (0.0, 1.0, -1e-3, True):
@@ -198,8 +198,20 @@ def test_default_selection_and_explicit_family_precedence():
     assert "reflection_selection" not in fixed.to_dict()
     assert automatic.hkl_list == fixed.hkl_list
     assert case_content_key(automatic) != case_content_key(fixed)
-    # Pinned texture reflections remain authoritative.
-    assert "reflection_selection" not in build_case(_scene()).to_dict()
+    # Single-crystal symmetric-cut pins remain authoritative.
+    from pyrite.campaign.reflection_selection import resolve_reflection_sweep
+    from pyrite.campaign.sweep import Sweep
+
+    _, automatic = resolve_reflection_sweep(Sweep(material="pdte2"), False, False)
+    assert not automatic
+
+
+@pytest.mark.parametrize("material", ["hopg", "hbn"])
+def test_fiber_crystals_request_automatic_selection(material):
+    case = build_case(_scene(material)).to_dict()
+    assert case["reflection_selection"]["automatic"] is True
+    assert case["reflection_selection"]["tolerance"] == 1e-3
+    assert all(h == k == 0 for h, k, _ in case["hkl_list"])
 
 
 @pytest.mark.parametrize("mode", ["coherent", "temporal", "roulette", "two-beam", "channeling"])

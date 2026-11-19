@@ -81,6 +81,7 @@ MaterialCatalog = { target = "pyrite.materials.catalog:MaterialCatalog", status 
 MaterialConfigError = { target = "pyrite.materials.catalog:MaterialConfigError", status = "advanced-stable" }
 MaterialIdentity = { target = "pyrite.materials._identity:MaterialIdentity", status = "advanced-stable" }
 CrystalInfo = { target = "pyrite.materials.catalog:CrystalInfo", status = "advanced-stable" }
+# CrystalSpec.texture defaults to single-crystal; fiber uses its reciprocal surface axis.
 CrystalSpec = { target = "pyrite.materials.catalog:CrystalSpec", status = "advanced-stable" }
 MediumSpec = { target = "pyrite.materials.catalog:MediumSpec", status = "advanced-stable" }
 MaterialSpec = { target = "pyrite.materials.catalog:MaterialSpec", status = "advanced-stable" }

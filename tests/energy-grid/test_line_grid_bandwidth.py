@@ -457,8 +457,9 @@ def test_selected_reflections_feed_the_measured_bandwidth_audit(monkeypatch):
     """Selected lines outside the measured population are still audited (#1243).
 
     Under a measured reflection selection, the resonance population that sets
-    the stop is collected over the case's built ``hkl_list`` (4 for h-BN), not
-    over the thousands of selected reflections. The spectrum-phase truncation
+    the stop is collected over the case's built ``hkl_list``, not
+    over the thousands of selected reflections. MoS2 stands in since #1301:
+    fiber h-BN selects only a few basal orders. The spectrum-phase truncation
     audit must therefore see every selection pilot: its line mass then carries
     the whole scored spectrum, ``int S dE * N_e / mass = 1 - (edge shares)``.
     Were the pilots unaudited, the audit would hold no selected line mass and
@@ -470,7 +471,7 @@ def test_selected_reflections_feed_the_measured_bandwidth_audit(monkeypatch):
     """
     import pyrite.montecarlo.runner.case_driver as case_driver
 
-    sweep = material_sweep("hbn")
+    sweep = material_sweep("mos2")
     sweep = replace(
         sweep,
         beam=replace(sweep.beam, energy_keV=100.0),
