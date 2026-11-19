@@ -45,6 +45,9 @@ os.environ.setdefault("PROFILE", "cleo_sub_1281")
 os.environ["PROBE_PRODUCTION"] = "1"
 SUB = runpy.run_path(str(Path(__file__).with_name("reflection_selection_subsample_1281.py")))
 ARM = tuple(float(v) for v in os.environ.get("ARM", "0.1:0.1").split(":"))
+#: Forced device bin-mean reduction (``bin_reduction_override``), e.g. ``auto``
+#: for near/far when the Fourier route cannot fit a case; empty keeps the default.
+REDUCTION = os.environ.get("PROBE_REDUCTION", "")
 PILOT = 128
 DEFAULT_ARMS = [f"{k}:{f}" for k in (0.02, 0.05, 0.1, 0.25) for f in (0.05, 0.1, 0.25, 0.5)]
 
@@ -201,6 +204,14 @@ def instrument(state):
     rc._batch_selection, rc._selected_spectrum = captured, measured
 
 
+def _reduction_scope():
+    from contextlib import nullcontext
+
+    from pyrite.montecarlo.spectrum.cxr._bin_quadrature import bin_reduction_override
+
+    return bin_reduction_override(REDUCTION) if REDUCTION else nullcontext()
+
+
 def run(material, e0_kev, tilt_deg, histories, seed, out_stem):
     from pyrite.montecarlo.runner.scheduling import run_cases
 
@@ -220,13 +231,15 @@ def run(material, e0_kev, tilt_deg, histories, seed, out_stem):
         histories=n,
         seed_offset=int(seed),
         arm=list(ARM),
+        reduction_override=REDUCTION or None,
         error=None,
     )
     case = replace(spec, **changes) if changes else spec
     t0 = time.perf_counter()
     out = None
     try:
-        out = run_cases([case], max_workers=0, progress=False, on_timing=timings.append)[0]
+        with _reduction_scope():
+            out = run_cases([case], max_workers=0, progress=False, on_timing=timings.append)[0]
     except Exception as exc:  # record failure as evidence
         record["error"] = f"{type(exc).__name__}: {exc}"
         record["traceback"] = traceback.format_exc()
