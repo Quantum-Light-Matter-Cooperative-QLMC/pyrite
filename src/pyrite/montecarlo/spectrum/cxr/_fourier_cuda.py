@@ -375,6 +375,25 @@ DEVICE_NUFFT_EPS = 1e-9
 #: Lines per broad-route block on the device ((block, 64) FP64 temporaries).
 _DEVICE_BROAD_BLOCK = 1 << 16
 
+#: Lines with more positive modes ``floor(P / W_l)`` than this leave the
+#: Fourier route for the near/far bin-mean kernel (#1320). Fourier work and
+#: memory grow with the largest mode count (the FFT, fine grid and output
+#: span it), so one line far narrower than ``P`` -- itself set by the widest
+#: Fourier line -- used to request a 4 GiB workspace. 2^22 modes bound the
+#: largest rectangle's grid, FFT and output to about 0.6 GiB.
+FOURIER_MAX_LINE_MODES = 1 << 22
+
+
+def _near_far_lines(E, a, w, axis):
+    """Near/far bin means of the over-cap lines on the reconstructed ``axis`` bins."""
+    from ._bin_quadrature import run_bin_mean_reduction_kernel
+
+    cp = import_module("cupy")
+    c0, h, n_bins = axis
+    edges = c0 + (cp.arange(n_bins + 1, dtype=cp.float64) - 0.5) * h
+    out = cp.zeros(n_bins, dtype=cp.float64)
+    return run_bin_mean_reduction_kernel(E, a, w, edges, cp.full(n_bins, 1.0 / h), out=out)
+
 
 def cuda_fourier_bin_mean_reduce(
     E_res,
@@ -387,6 +406,7 @@ def cuda_fourier_bin_mean_reduce(
     eps=DEVICE_NUFFT_EPS,
     direct_precision="fp32",
     spread="gather",
+    max_line_modes=FOURIER_MAX_LINE_MODES,
 ):
     """Device counterpart of ``fourier_bin_mean_reduce(..., broad_width_eV=...)``.
 
@@ -398,7 +418,10 @@ def cuda_fourier_bin_mean_reduce(
     and the closed-form envelope-image correction (one fused FP64 pass over the
     lines). Same bounds as the host reference, plus the NUFFT tolerance ``eps``
     and, with ``direct_precision="fp32"`` (default since ``fourier-auto-v6``),
-    the single-precision phase factors of the direct rectangles.
+    the single-precision phase factors of the direct rectangles. Lines whose
+    mode count ``floor(P a_l / pi)`` exceeds ``max_line_modes`` (default
+    :data:`FOURIER_MAX_LINE_MODES`, ``fourier-auto-v8``, #1320) take the
+    near/far kernel on the same bins, with its own bounds.
     ``eps=1e-12, direct_precision="fp64", spread="atomic"`` is the
     ``fourier-auto-v5`` route up to the envelope kernel's FP64 summation
     order; ``spread="atomic"`` alone is ``fourier-auto-v6`` up to the ES
@@ -451,6 +474,16 @@ def cuda_fourier_bin_mean_reduce(
     # The period depends only on the resonance extrema and the widest line.
     extrema = cp.asnumpy(cp.stack((E.min(), E.max(), a.min())))
     n_fft, P, _ = fourier_period(extrema[:2], extrema[2:], c0, h, n_bins, residual_tol=residual_tol)
+    # Removing lines only shrinks the span, so P keeps its image bounds.
+    # Same count as ``cuda_positive_modes``.
+    over = cp.floor(2.0 * a / (2.0 * np.pi / P)) > max_line_modes
+    if bool(over.any()):
+        sel = cp.flatnonzero(over)
+        out += _near_far_lines(E[sel], a[sel], w[sel], (c0, h, n_bins))
+        rest = cp.flatnonzero(~over)
+        E, a, w = E[rest], a[rest], w[rest]
+        if E.size == 0:
+            return out
     positive = cuda_positive_modes(
         E, a, w, c0, P, eps=eps, direct_precision=direct_precision, spread=spread
     )

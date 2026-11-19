@@ -17,8 +17,10 @@ over 2^20 / 2^22) and whether the widest or the narrowest lines drive them.
 ``2^22`` modes: they are saved as ``flush-<i>.npz`` (``E_res``, ``a_width``,
 ``weight``, ``axis``; up to ``CAPTURE``, default 3, largest kept) and reduced
 by the near/far kernel so the run finishes. ``CENSUS_ONLY=0`` runs the
-production function on every flush (the #1320 acceptance run). Record:
-``capture.json``.
+production function on every flush (the #1320 acceptance run); ``COMPARE=1``
+also reduces each such flush by near/far (``auto``) on the same lines and
+records peak, max abs difference, totals and their difference. Record:
+``capture.json``; numeric arrays of the case result: ``spectrum.npz``.
 
 ``replay`` reduces every saved flush through the production device route and
 the near/far ``auto`` kernel, records wall, CuPy pool peak and the difference
@@ -40,6 +42,8 @@ import numpy as np
 PROFILE = os.environ.get("PROFILE", "thick_hiE_1295_45deg")
 CAPTURE = int(os.environ.get("CAPTURE", "3"))
 CENSUS_ONLY = os.environ.get("CENSUS_ONLY", "1") == "1"
+#: ``COMPARE=1``: also reduce every Fourier-route flush by near/far and record the difference.
+COMPARE = os.environ.get("COMPARE", "0") == "1"
 os.environ["PROFILE"] = PROFILE
 #: Flushes above this many modes skip the Fourier route in census mode.
 _SKIP_MODES = 1 << 22
@@ -151,6 +155,15 @@ def capture(material, e0_kev, tilt_deg, histories, out_dir):
         res = (_near_far if skip else real)(E_res, a_width, weight, axis, **kwargs)
         _sync()
         rec.update(route="near-far" if skip else "fourier", wall_s=time.perf_counter() - t0)
+        if COMPARE and not skip:
+            ref = cp.asnumpy(_near_far(E_res, a_width, weight, axis))
+            got = cp.asnumpy(res)
+            rec.update(
+                ref_peak=float(np.abs(ref).max()),
+                max_abs_diff=float(np.abs(got - ref).max()),
+                ref_total=float(ref.sum()),
+                total_diff=float(got.sum() - ref.sum()),
+            )
         rec["pool_total_GiB"] = pool.total_bytes() / 2**30
         calls.append(rec)
         if skip and len(saved) < CAPTURE:
@@ -197,15 +210,13 @@ def capture(material, e0_kev, tilt_deg, histories, out_dir):
 
 
 def _spectrum_arrays(result):
-    """Plain arrays of a case result, for comparing two capture runs."""
+    """Numeric array entries of a case result dict, on the host."""
     arrays = {}
-    for key in ("E_grid", "spectrum", "cxr", "cxr_incoherent", "total"):
-        value = getattr(result, key, None) if not isinstance(result, dict) else result.get(key)
-        if value is not None:
-            try:
-                arrays[key] = np.asarray(_cp().asnumpy(value) if hasattr(value, "get") else value)
-            except Exception:  # noqa: BLE001 - optional evidence only
-                pass
+    for key, value in dict(result).items():
+        if hasattr(value, "__cuda_array_interface__"):
+            value = _cp().asnumpy(value)
+        if isinstance(value, np.ndarray) and value.dtype.kind in "fiuc":
+            arrays[key] = value
     return arrays
 
 

@@ -343,3 +343,52 @@ def test_unknown_spreader_is_refused(cp):
         es_mode_transform(cp.zeros(3), cp.zeros((2, 3)), 1, 4, spread="tiles")
     with pytest.raises(ValueError, match="spread"):
         cuda_positive_modes(np.ones(1), np.ones(1), np.ones(1), 0.0, 1.0, spread="tiles")
+
+
+def test_gather_batches_respect_the_fine_grid_cap(monkeypatch):
+    """Host-only: a batch closes before its shared fine grid passes ``_BATCH_FINE`` (#1320)."""
+    from pyrite.montecarlo.spectrum.cxr import _fourier_spread
+
+    monkeypatch.setattr(_fourier_spread, "_BATCH_FINE", 100)
+    batches = list(_fourier_spread._batches([5, 5, 5, 5], [60, 30, 20, 200]))
+    assert batches == [(0, 2), (2, 3), (3, 4)]
+    assert list(_fourier_spread._batches([5, 5])) == [(0, 2)]
+
+
+def _mixed_width_lines():
+    """A broad Fourier line (P ~ 6e5 eV) next to lines far narrower than a bin."""
+    rng = np.random.default_rng(1320)
+    e = np.r_[rng.uniform(600.0, 1100.0, 200), 820.0, 640.0, 1010.0, 900.0]
+    width = np.r_[rng.uniform(0.5, 40.0, 200), 900.0, 0.002, 0.01, 0.05]
+    w = np.r_[rng.uniform(-1.0, 1.0, 200), 1.0, 3.0, -2.0, 1.5]
+    return e, np.pi / width, w
+
+
+@pytest.mark.parametrize("cap", [None, 1 << 12])
+def test_over_cap_lines_take_near_far_without_huge_workspaces(cp, cap):
+    """Lines of ~3e8 modes leave the Fourier route; the spectrum matches exact bins (#1320).
+
+    Before #1320 the 0.002 eV line asked for ~3e8 modes (a 75 GiB kernel-transform
+    workspace). The default cap sends the three narrowest lines to near/far; a
+    small cap also moves part of the random set, exercising both routes together.
+    """
+    from pyrite.montecarlo.spectrum.cxr import _fourier_cuda
+    from pyrite.montecarlo.spectrum.cxr._bin_fourier import uniform_bin_axis
+    from pyrite.montecarlo.spectrum.cxr._bin_quadrature import _host_bin_mean
+
+    e, a, w = _mixed_width_lines()
+    grid = 500.0 + 0.25 * np.arange(2401)
+    edges = np.r_[grid - 0.125, grid[-1] + 0.125]
+    exact = w @ _host_bin_mean(a, e, edges, 1 / np.diff(edges), exact_widths=None)
+    pool = cp.get_default_memory_pool()
+    pool.free_all_blocks()
+    kwargs = {} if cap is None else {"max_line_modes": cap}
+    device = cp.asnumpy(
+        _fourier_cuda.cuda_fourier_bin_mean_reduce(
+            cp.asarray(e), cp.asarray(a), cp.asarray(w), uniform_bin_axis(grid), **kwargs
+        )
+    )
+    assert pool.total_bytes() < 2 << 30
+    # Near/far takes float32 line inputs and the far envelope (sinc-bin-near-far).
+    assert np.max(abs(device - exact)) < 1e-5 * np.abs(exact).max()
+    assert abs(device.sum() - exact.sum()) < 1e-6 * np.abs(w * np.pi / a).sum()

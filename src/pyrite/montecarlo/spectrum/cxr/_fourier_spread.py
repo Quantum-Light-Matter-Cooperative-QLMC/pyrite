@@ -32,6 +32,9 @@ _BETA_PER_WIDTH = 2.30
 #: Gauss-Legendre nodes for the kernel transform on [-1, 1]; even, so no node
 #: sits at 0 and the rule folds onto its positive half.
 _QUADRATURE_NODES = 128
+#: Modes per block of the kernel-transform evaluation: a 32 MiB
+#: (block, 64) FP64 cosine workspace whatever the mode count (#1320).
+_DECONV_BLOCK = 1 << 16
 
 
 def es_width(eps):
@@ -62,10 +65,15 @@ def _deconvolution(cp, modes, n_fine, width):
     """
     beta = _BETA_PER_WIDTH * width
     z, q = _half_rule()
-    phi = q * np.exp(beta * (np.sqrt(1.0 - z * z) - 1.0))
+    phi = cp.asarray(q * np.exp(beta * (np.sqrt(1.0 - z * z) - 1.0)))
+    z = cp.asarray(z)
     scale = np.pi * width / n_fine
-    m = cp.arange(modes // 2 + 1, dtype=cp.float64)  # 0 .. max |centred m|
-    kernel_ft = cp.cos(cp.outer(m * scale, cp.asarray(z))) @ cp.asarray(phi)
+    n_pos = modes // 2 + 1  # 0 .. max |centred m|
+    kernel_ft = cp.empty(n_pos, dtype=cp.float64)
+    # Mode blocks bound the (block, nodes) cosine workspace (#1320).
+    for lo in range(0, n_pos, _DECONV_BLOCK):
+        m = cp.arange(lo, min(lo + _DECONV_BLOCK, n_pos), dtype=cp.float64)
+        kernel_ft[lo : lo + m.size] = cp.cos(cp.outer(m * scale, z)) @ phi
     centred = cp.abs(cp.arange(-(modes // 2), modes - modes // 2))
     return 2.0 / (width * kernel_ft[centred])
 
@@ -117,6 +125,8 @@ extern "C" __global__ void es_spread(
 SPREADERS = ("gather", "atomic")
 #: Source copies per gather batch: bounds its ~80 B/source device workspace.
 _BATCH_SOURCES = 1 << 23
+#: Fine-grid points per gather batch: bounds its shared 32 B/point grid (#1320).
+_BATCH_FINE = 1 << 24
 #: Sorted sources per warp work item of the gather.
 _ITEM_SOURCES = 256
 
@@ -264,14 +274,20 @@ def _gather_items(cp, sorted_key, off, width):
     return cp.ascontiguousarray(cp.stack((seg_g[seg], s_lo, s_hi), axis=1))
 
 
-def _batches(lens):
-    """Consecutive rectangle groups of at most ``_BATCH_SOURCES`` copies (or one)."""
-    start, total = 0, 0
-    for k, n in enumerate(lens):
-        if k > start and total + n > _BATCH_SOURCES:
+def _batches(lens, fine=None):
+    """Consecutive rectangle groups (or single rectangles) within the batch caps.
+
+    A group holds at most ``_BATCH_SOURCES`` source copies and, when per-rectangle
+    fine-grid sizes ``fine`` are given, at most ``_BATCH_FINE`` fine points.
+    """
+    fine = [0] * len(lens) if fine is None else fine
+    start, total, points = 0, 0, 0
+    for k, (n, f) in enumerate(zip(lens, fine, strict=True)):
+        if k > start and (total + n > _BATCH_SOURCES or points + f > _BATCH_FINE):
             yield start, k
-            start, total = k, 0
+            start, total, points = k, 0, 0
         total += n
+        points += f
     if start < len(lens):
         yield start, len(lens)
 
@@ -297,10 +313,11 @@ def es_gather_moments(phase, rows, rects, *, eps=1e-12, plans=None):
     c0, c1 = (cp.ascontiguousarray(row, dtype=cp.float64) for row in rows)
     rects = np.asarray(rects, dtype=np.int64).reshape(-1, 4)
     lens = rects[:, 3] - rects[:, 2]
-    for a, b in _batches(lens.tolist()):
+    fine = [_fine_size(int(m), width) for m in (rects[:, 1] - rects[:, 0]).tolist()]
+    for a, b in _batches(lens.tolist(), fine):
         group = rects[a:b]
         modes = group[:, 1] - group[:, 0]
-        n_fine = np.array([_fine_size(int(m), width) for m in modes], dtype=np.int64)
+        n_fine = np.array(fine[a:b], dtype=np.int64)
         off = np.concatenate(([0], np.cumsum(n_fine)))
         first = np.concatenate(([0], np.cumsum(lens[a:b])))
         n, nrect = int(first[-1]), np.int32(b - a)
