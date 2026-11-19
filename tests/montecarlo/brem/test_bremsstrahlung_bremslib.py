@@ -402,6 +402,44 @@ def test_bremslib_spectrum_is_chunk_invariant(monkeypatch, carbon_table, nonunif
     np.testing.assert_allclose(pieces, whole, rtol=scaled_rtol(1.0e-12, eps_multiple=64.0))
 
 
+def test_bremslib_spectrum_adds_over_electron_blocks(monkeypatch, carbon_table):
+    """Streamed blocks sum to the joined population within summation order (#1305).
+
+    On CUDA the cells are FP32; an FP32 per-thread segment sum made the joined
+    call and the block sum differ by ~1e-6 of peak at this size (2.4e-5 at the
+    47M segments of hopg 300 keV), far above the FP64 accumulation tolerance.
+    """
+    monkeypatch.setattr(brem, "_mu_total_inv_ang", _zero_mu)
+    rng = np.random.default_rng(1305)
+    n_electrons, per_electron = 20_000, 4
+    n = n_electrons * per_electron
+    v = rng.normal(size=(n, 3))
+    v /= np.linalg.norm(v, axis=1, keepdims=True)
+    segments = _segments(60.0, v)
+    segments["E_keV"] = rng.uniform(12.0, 190.0, n)
+    segments["L_ang"] = rng.uniform(10.0, 200.0, n)
+    segments["elec_id"] = np.repeat(np.arange(n_electrons), per_electron)
+    segments["Ne"] = n_electrons
+    photon_eV = np.linspace(0.5e3, 150.0e3, 23)
+    kwargs = dict(
+        composition=[("C", 0.1)],
+        cross_section_model="bremslib",
+        bremslib_tables={"C": carbon_table},
+        electron_limit=n_electrons,
+    )
+    whole = to_host(brem.mc_brem_spectrum(segments, photon_eV, **kwargs))
+    blocks = np.zeros_like(whole)
+    for first, stop in ((0, 7), (7, 3_000), (3_000, 12_345), (12_345, n_electrons)):
+        rows = slice(first * per_electron, stop * per_electron)
+        block = {key: value[rows] if key in _ROW_KEYS else value for key, value in segments.items()}
+        blocks += to_host(brem.mc_brem_spectrum(block, photon_eV, **kwargs))
+    assert whole.dtype == np.float64
+    np.testing.assert_allclose(blocks, whole, rtol=0.0, atol=1.0e-10 * np.abs(whole).max())
+
+
+_ROW_KEYS = ("r_mid", "v_hat", "L_ang", "E_keV", "elec_id")
+
+
 def test_angle_integrated_selector_returns_the_bremslib_sdcs(carbon_table):
     T_keV = np.array([30.0, 150.0])
     photon_eV = np.array([1.0e3, 25.0e3])

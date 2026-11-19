@@ -1022,7 +1022,9 @@ def mc_brem_spectrum(
         else {}
     )
 
-    spec = xp.zeros(E_grid.size, dtype=REAL)
+    # FP64 accumulator on every backend: FP32 cells sum without a dependence
+    # on how the caller splits segments (#1305). Binary64 CPU is unchanged.
+    spec = xp.zeros(E_grid.size, dtype=xp.float64)
 
     # GPU float32 fast paths fuse cross-section evaluation, absorption, and the
     # segment reduction. Instead of dense ``(segment, energy)`` matrices, they
