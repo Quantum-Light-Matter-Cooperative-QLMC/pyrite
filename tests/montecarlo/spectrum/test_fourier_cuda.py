@@ -227,6 +227,9 @@ def test_device_reduction_matches_host_reference_and_exact_bins(
             cp.asarray(w),
             uniform_bin_axis(grid),
             broad_width_eV=broad,
+            # The remote resonances stretch P past the narrow lines' cap; keep
+            # them on the Fourier route to compare with the uncapped host (#1320).
+            max_line_modes=None,
             # fp64 is the fourier-auto-v5 route; fp32 the default since v6 (#1296).
             **({"eps": 1e-12, "direct_precision": "fp64"} if precision == "fp64" else {}),
         )

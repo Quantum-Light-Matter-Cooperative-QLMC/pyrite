@@ -421,7 +421,8 @@ def cuda_fourier_bin_mean_reduce(
     the single-precision phase factors of the direct rectangles. Lines whose
     mode count ``floor(P a_l / pi)`` exceeds ``max_line_modes`` (default
     :data:`FOURIER_MAX_LINE_MODES`, ``fourier-auto-v8``, #1320) take the
-    near/far kernel on the same bins, with its own bounds.
+    near/far kernel on the same bins, with its own bounds; ``None`` keeps
+    every line on the Fourier route (the host reference's behaviour).
     ``eps=1e-12, direct_precision="fp64", spread="atomic"`` is the
     ``fourier-auto-v5`` route up to the envelope kernel's FP64 summation
     order; ``spread="atomic"`` alone is ``fourier-auto-v6`` up to the ES
@@ -476,7 +477,9 @@ def cuda_fourier_bin_mean_reduce(
     n_fft, P, _ = fourier_period(extrema[:2], extrema[2:], c0, h, n_bins, residual_tol=residual_tol)
     # Removing lines only shrinks the span, so P keeps its image bounds.
     # Same count as ``cuda_positive_modes``.
-    over = cp.floor(2.0 * a / (2.0 * np.pi / P)) > max_line_modes
+    over = cp.floor(2.0 * a / (2.0 * np.pi / P)) > (
+        np.inf if max_line_modes is None else max_line_modes
+    )
     if bool(over.any()):
         sel = cp.flatnonzero(over)
         out += _near_far_lines(E[sel], a[sel], w[sel], (c0, h, n_bins))

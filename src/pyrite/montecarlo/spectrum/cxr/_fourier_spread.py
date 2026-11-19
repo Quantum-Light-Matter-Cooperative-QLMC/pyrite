@@ -313,11 +313,11 @@ def es_gather_moments(phase, rows, rects, *, eps=1e-12, plans=None):
     c0, c1 = (cp.ascontiguousarray(row, dtype=cp.float64) for row in rows)
     rects = np.asarray(rects, dtype=np.int64).reshape(-1, 4)
     lens = rects[:, 3] - rects[:, 2]
-    fine = [_fine_size(int(m), width) for m in (rects[:, 1] - rects[:, 0]).tolist()]
-    for a, b in _batches(lens.tolist(), fine):
+    sizes = [_fine_size(int(m), width) for m in (rects[:, 1] - rects[:, 0]).tolist()]
+    for a, b in _batches(lens.tolist(), sizes):
         group = rects[a:b]
         modes = group[:, 1] - group[:, 0]
-        n_fine = np.array(fine[a:b], dtype=np.int64)
+        n_fine = np.array(sizes[a:b], dtype=np.int64)
         off = np.concatenate(([0], np.cumsum(n_fine)))
         first = np.concatenate(([0], np.cumsum(lens[a:b])))
         n, nrect = int(first[-1]), np.int32(b - a)

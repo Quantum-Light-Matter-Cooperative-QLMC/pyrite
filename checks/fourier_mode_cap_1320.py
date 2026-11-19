@@ -35,6 +35,7 @@ import os
 import runpy
 import sys
 import time
+import traceback
 from pathlib import Path
 
 import numpy as np
@@ -188,6 +189,7 @@ def capture(material, e0_kev, tilt_deg, histories, out_dir):
         result = run_cases([case], max_workers=0, progress=False, on_timing=timings.append)[0]
     except Exception as exc:  # record failure as evidence
         error = f"{type(exc).__name__}: {exc}"
+        traceback.print_exc()
     record = dict(
         issue=1320,
         code_sha=os.environ.get("PROBE_SHA"),
