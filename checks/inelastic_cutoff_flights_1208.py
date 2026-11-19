@@ -28,7 +28,7 @@ import numpy as np
 ARMS = {"cut35": 35.0, "baseline": 50.0, "cut100": 100.0}
 
 
-def build_case(arm, seed, histories, energy_keV, thickness_ang, straggling=False):
+def build_case(arm, seed, histories, energy_keV, thickness_ang, straggling=False, aed="kawrakow"):
     """The #1142 HOPG t2 case with the arm's inelastic cutoff."""
     from pyrite.energy_grid.convergence_case import build_ladder_case
 
@@ -56,7 +56,7 @@ def build_case(arm, seed, histories, energy_keV, thickness_ang, straggling=False
         bremsstrahlung_model="bremslib",
         radiative_model="bremslib-soft-hard",
         radiative_cutoff_eV=1000.0,
-        atomic_electron_deflection="kawrakow",
+        atomic_electron_deflection=None if aed == "none" else aed,
     )
     return case
 
@@ -131,7 +131,34 @@ def flight_stats(segments, n_lines):
         hard_inelastic_per_um=1e4 * closers.get("HARD_INELASTIC", 0) / total,
         elastic_per_um=1e4 * closers.get("ELASTIC", 0) / total,
         path_weighted_abs_cos_z=quant,
+        deflections_per_um=deflection_rates(owner, flight, segments, keep, kind, v, total),
     )
+
+
+#: Deflection-angle thresholds [deg] of the per-event rate table.
+THRESHOLDS_DEG = (0.03, 0.1, 0.3, 1.0, 3.0, 10.0)
+
+
+def deflection_rates(owner, flight, segments, keep, kind, v, total):
+    """Events per micrometre deflecting the track by more than each threshold.
+
+    Pairs consecutive rows of one owner; the angle between them is charged to
+    the event that ends the first row.
+    """
+    from pyrite.montecarlo.transport.events import SegmentEvent
+
+    sub = np.asarray(segments["substep_id"])[keep] if "substep_id" in segments else 0 * flight
+    order = np.lexsort((sub, flight, owner))
+    a, b = order[:-1], order[1:]
+    same = owner[a] == owner[b]
+    a, b = a[same], b[same]
+    angle = np.degrees(np.arccos(np.clip(np.sum(v[a] * v[b], axis=1), -1.0, 1.0)))
+    out = {}
+    for k in (SegmentEvent.ELASTIC, SegmentEvent.HARD_INELASTIC, SegmentEvent.HARD_RADIATIVE):
+        mine = angle[kind[a] == int(k)]
+        out[k.name] = {f">{t}": 1e4 * float((mine > t).sum()) / total for t in THRESHOLDS_DEG}
+    out["ALL"] = {f">{t}": 1e4 * float((angle > t).sum()) / total for t in THRESHOLDS_DEG}
+    return out
 
 
 def line_metrics(grid, density):
@@ -174,6 +201,7 @@ def main():
     parser.add_argument("--transport-core", default="auto")
     parser.add_argument("--window-eV", type=float, default=60.0)
     parser.add_argument("--spacing-eV", type=float, default=0.1875)
+    parser.add_argument("--aed", choices=["kawrakow", "none"], default="kawrakow")
     parser.add_argument(
         "--straggling", action="store_true", help="restricted soft-loss straggling (#642 default)"
     )
@@ -181,9 +209,15 @@ def main():
     from pyrite.montecarlo import runner
 
     args.output.mkdir(parents=True, exist_ok=True)
-    tag = f"{args.arm}{'-strag' if args.straggling else ''}-s{args.seed}"
+    tag = f"{args.arm}{'-strag' if args.straggling else ''}-aed{args.aed}-s{args.seed}"
     case = build_case(
-        args.arm, args.seed, args.histories, args.energy_keV, args.thickness_ang, args.straggling
+        args.arm,
+        args.seed,
+        args.histories,
+        args.energy_keV,
+        args.thickness_ang,
+        args.straggling,
+        args.aed,
     )
     started = time.perf_counter()
     transport = runner._transport_case(case, transport_core=args.transport_core)
@@ -195,6 +229,7 @@ def main():
         arm=args.arm,
         inelastic_cutoff_eV=ARMS[args.arm],
         straggling=args.straggling,
+        atomic_electron_deflection=args.aed,
         seed=args.seed,
         histories=args.histories,
         transport_s=transport_s,
