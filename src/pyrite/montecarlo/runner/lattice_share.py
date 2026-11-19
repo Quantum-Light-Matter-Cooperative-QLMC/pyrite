@@ -121,7 +121,6 @@ def continuum_case(case: Mapping[str, Any], reflection_selection: Mapping | None
     }
 
 
-
 def selected_case(case: Mapping[str, Any], reflection_selection: Mapping | None):
     """``case`` scoring exactly the selected reflections, in lines and continuum.
 
@@ -141,6 +140,7 @@ def selected_case(case: Mapping[str, Any], reflection_selection: Mapping | None)
     out["layer_radiators"] = layers
     out["hkl_list"] = next(r for r in layers if r is not None)["hkl_list"]
     return out
+
 
 def _uncorrected_reason(case: Mapping[str, Any], layer: int | None) -> str | None:
     """:func:`skip_reason` before the scored set is known (a selection in progress)."""
