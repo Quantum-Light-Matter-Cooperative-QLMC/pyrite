@@ -11,7 +11,7 @@ import pytest
 from pyrite._backend import BACKEND, CUPY_BACKENDS
 from pyrite.materials.crystal import HBARC_EV_ANG
 from pyrite.montecarlo.spectrum import segment_escape
-from pyrite.montecarlo.spectrum.cxr import _fused, _kernels
+from pyrite.montecarlo.spectrum.cxr import _fused, _kernels, _line_amplitude
 
 cp = pytest.importorskip("cupy")
 
@@ -142,3 +142,63 @@ def test_piece_transmission_matches_chain(n_pieces):
     )
     expected *= piece_fraction
     _assert_bitwise(fused, expected)
+
+
+def _block_inputs():
+    """Row (nb, 1) and reflection (n_g,) operands of one segment block."""
+    row = lambda lo, hi: _spiky((_N, 1), lo, hi)  # noqa: E731
+    col = lambda lo, hi: _spiky((_NG,), lo, hi)  # noqa: E731
+    return {
+        "vx": row(-1.0, 1.0),
+        "vy": row(-1.0, 1.0),
+        "vz": row(-1.0, 1.0),
+        "gx": col(-3.0, 3.0),
+        "gy": col(-3.0, 3.0),
+        "gz": col(-3.0, 3.0),
+        "g2": col(0.0, 20.0),
+        "n_dot_g": col(-3.0, 3.0),
+        "denom_row": row(1e-4, 1.0),
+        "inv_E": row(0.0, 1e-3),
+    }
+
+
+def test_recoil_pair_terms_match_chain():
+    a = _block_inputs()
+    fused = _fused.recoil_pair_terms(*a.values())
+    r_num = 0.5 * a["g2"] * a["inv_E"]
+    r_den = a["n_dot_g"] * a["inv_E"]
+    v_dot_g = (a["vx"] * a["gx"] + a["vy"] * a["gy"] + a["vz"] * a["gz"]) - r_num
+    for actual, want in zip(fused, (r_num, r_den, a["denom_row"] + r_den, v_dot_g), strict=True):
+        _assert_bitwise(actual, want)
+
+
+def test_block_n_dot_g_matches_chain():
+    a = _block_inputs()
+    g0, g1, g2 = (_spiky((_N, 1), -2.0, 2.0) for _ in range(3))
+    delta = _spiky((_N, _NG), -1e-4, 1e-4)
+    fused = _fused.block_n_dot_g(g0, g1, g2, a["gx"], a["gy"], a["gz"], delta, a["n_dot_g"])
+    want = a["n_dot_g"] + delta * (g0 * a["gx"] + g1 * a["gy"] + g2 * a["gz"])
+    _assert_bitwise(fused, want)
+
+
+def test_recoil_slope_keep_matches_chain():
+    from pyrite.montecarlo.spectrum.cxr._recoil import _recoil_line_allowed, _recoil_slope_factor
+
+    denom = _spiky((_N, _NG), -0.5, 1.0)
+    omega = _spiky((_N, _NG), 0.0, 2.0)
+    inv_E = _spiky((_N, 1), 0.0, 1e-3)
+    gamma = _spiky((_N, 1), 1.0, 60.0)
+    keep = cp.asarray(_RNG.random((_N, _NG)) > 0.3)
+    slope, kept = _fused.recoil_slope_keep(denom, omega, inv_E, gamma, keep)
+    _assert_bitwise(slope, denom * _recoil_slope_factor(omega, inv_E))
+    _assert_bitwise(kept, keep & _recoil_line_allowed(denom, omega, inv_E, gamma))
+
+
+def test_amplitude_only_kernel_matches_full_kernel():
+    """``|A|^2`` alone equals the full kernel's first output bit for bit (#862)."""
+    names = "chi_re chi_im u_re u_im g2 g_dot_e om v_dot_e vdg k_dot_g k_dot_v gamma".split()
+    args = [_spiky((_N, _NG), 0.1, 3.0) for _ in names]
+    args += [_spiky((_N, _NG), -1.0, 1.0), _spiky((_N, _NG), -1.0, 1.0), np.float32(3.86e-3)]
+    alone = _line_amplitude._cxr_amp_sq_total_core(*args)
+    full = _kernels._cxr_amp_sq_core(*args)
+    _assert_bitwise(alone, full[0])
