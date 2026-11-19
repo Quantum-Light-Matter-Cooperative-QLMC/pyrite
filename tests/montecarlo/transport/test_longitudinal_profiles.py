@@ -57,7 +57,7 @@ def test_target_timing_uses_pinned_basal_reflection_and_h_over_e(
     omega = 2.0 * np.pi / resolved["target_period_fs"]
     assert np.exp(-((omega * resolved["microbunch_rms_fs"]) ** 2)) == pytest.approx(0.9)
     assert resolved["spacing_fs"] == pytest.approx(resolved["target_period_fs"])
-    assert "catalog-pinned" in resolved["provenance"]
+    assert resolved["provenance"].startswith("catalog primary basal reflection;")
 
 
 @pytest.mark.parametrize(

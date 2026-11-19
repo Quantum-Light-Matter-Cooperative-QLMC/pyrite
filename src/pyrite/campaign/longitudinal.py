@@ -365,11 +365,13 @@ def resolve_longitudinal_distribution(
     else:
         raise ValueError("targeted longitudinal modes require catalog orientation provenance")
 
-    hkl = (
-        policy.target_reflection
-        or reference_hkl
-        or _dominant_basal_reflection(hkl_list, surface_axis, lattice)
-    )
+    if policy.target_reflection is not None:
+        hkl, target_provenance = policy.target_reflection, "explicit target reflection"
+    elif reference_hkl is not None:
+        hkl, target_provenance = reference_hkl, "catalog primary basal reflection"
+    else:
+        hkl = _dominant_basal_reflection(hkl_list, surface_axis, lattice)
+        target_provenance = "first positive basal reflection of the case list"
     g_vec, g_norm = reciprocal_g_vector(hkl, lattice)
     surface_norm = float(np.linalg.norm(surface_axis))
     alignment = abs(float(g_vec @ surface_axis / (g_norm * surface_norm)))
@@ -410,5 +412,5 @@ def resolve_longitudinal_distribution(
         target_energy_eV=target_energy_eV,
         target_wavelength_ang=float(HC_EV_ANG / target_energy_eV),
         target_period_fs=period_fs,
-        provenance=(f"catalog-pinned dominant positive basal reflection; {orientation_provenance}"),
+        provenance=f"{target_provenance}; {orientation_provenance}",
     )
