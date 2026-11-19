@@ -159,6 +159,7 @@ def _parse_crystals(raw: object, errors: _Errors, *, source: Path) -> dict[str, 
         "mosaic_fwhm_deg",
         "hkl_families",
         "hkl_reason",
+        "reference_hkl",
         "layers_per_cell",
         "measured_structure_factors",
     }
@@ -238,6 +239,7 @@ def _parse_crystals(raw: object, errors: _Errors, *, source: Path) -> dict[str, 
                 errors.add(f"{path}.hkl_reason", "is required when hkl_families is pinned")
         elif reason_raw is not None:
             errors.add(f"{path}.hkl_reason", "requires hkl_families")
+        reference = _reference_hkl(row, surface, path, errors)
         layers_raw = row.get("layers_per_cell")
         layers = None
         if layers_raw is not None:
@@ -275,8 +277,37 @@ def _parse_crystals(raw: object, errors: _Errors, *, source: Path) -> dict[str, 
                 layers_per_cell=layers,
                 info=info,
                 measured_structure_factors=measured,
+                reference_hkl=reference,
             )
     return out
+
+
+def _reference_hkl(
+    row: Mapping[str, object],
+    surface: tuple[int, int, int] | None,
+    path: str,
+    errors: _Errors,
+) -> tuple[int, int, int] | None:
+    """Optional reference reflection: a positive multiple of ``surface_hkl``."""
+    if "reference_hkl" not in row:
+        return None
+    hkl = _direction(row["reference_hkl"], f"{path}.reference_hkl", errors)
+    if hkl is None:
+        return None
+    if surface is None:
+        errors.add(f"{path}.reference_hkl", "requires surface_hkl")
+        return None
+    if (
+        _cross(hkl, surface) != (0, 0, 0)
+        or sum(a * b for a, b in zip(hkl, surface, strict=True)) <= 0
+    ):
+        errors.add(f"{path}.reference_hkl", "must be a positive multiple of surface_hkl")
+        return None
+    return hkl
+
+
+def _cross(a: tuple[int, int, int], b: tuple[int, int, int]) -> tuple[int, int, int]:
+    return (a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0])
 
 
 def _parse_media(raw: object, errors: _Errors) -> dict[str, MediumSpec]:

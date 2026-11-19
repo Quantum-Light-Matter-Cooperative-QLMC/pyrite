@@ -9,4 +9,4 @@ cod_id = 2004955
 B_ang2 = 0.61
 surface_hkl = [0, 0, 1]
 hkl_families = [[0, 0, 1]]
-hkl_reason = "Pin the allowed basal 1T-PdTe2(001) symmetric cut parallel to the c-axis-normal cleavage surface."
+hkl_reason = "Emission set restricted by Debye-Waller validity: B_ang2 is the basal B33 projection, valid only for g parallel to c, so only the basal 1T-PdTe2 (001) family may radiate until per-site displacement tensors are supplied (#1302)."

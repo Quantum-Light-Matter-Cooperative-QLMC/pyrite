@@ -205,6 +205,10 @@ class CrystalSpec:
         Pinned representative Miller-index families.
     hkl_reason
         Optional provenance for the pinned reflection selection.
+    reference_hkl
+        Optional primary (reference) reflection parallel to the surface cut,
+        used only where the lowest allowed harmonic is not the conventional
+        reference. It never restricts the emitting set.
     layers_per_cell
         Optional layer-count conversion for thickness grids.
     info
@@ -231,6 +235,7 @@ class CrystalSpec:
     info: CrystalInfo
     surface_hkl: tuple[int, int, int] | None
     measured_structure_factors: MeasuredStructureFactors | None = None
+    reference_hkl: tuple[int, int, int] | None = None
 
     def __post_init__(self) -> None:
         reject_quantity(self.B_ang2, field="CrystalSpec.B_ang2", unit="angstrom**2")

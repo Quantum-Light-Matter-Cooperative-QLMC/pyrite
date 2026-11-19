@@ -37,6 +37,7 @@ from pyrite.materials import (
     CATALOG,
     LayerSpec,
 )
+from pyrite.materials.emission import _primary_hkl
 from pyrite.montecarlo import runner
 
 ALL = [
@@ -755,8 +756,12 @@ def test_oriented_materials_are_registered_as_symmetric_cuts(
     params = crystal_params(material, n_families=999)
     composition = dict(params["composition"])
     assert params["surface_hkl"] == surface_hkl
-    assert params["hkl_list"] == hkl_list
-    assert CATALOG.crystal(material).hkl_reason
+    # Reference-only pins were removed (#1302): the reference reflection is the
+    # catalogue primary, and the emitting set is selected automatically.
+    spec = CATALOG.crystal(material)
+    assert spec.hkl_families == ()
+    assert _primary_hkl(spec) == hkl_list[0]
+    assert set(hkl_list) <= {tuple(hkl) for hkl in params["hkl_list"]}
     for element, count in ratio.items():
         assert composition[element] / min(composition.values()) == pytest.approx(count)
 
@@ -781,7 +786,7 @@ def test_oriented_materials_are_registered_as_symmetric_cuts(
     )[0]
     assert case["crystal"] == material
     assert case["surface_hkl"] == surface_hkl
-    assert case["hkl_list"] == hkl_list
+    assert case["hkl_list"] == crystal_params(material)["hkl_list"]
 
 
 def test_material_registry_projects_scan_and_crystal_views():

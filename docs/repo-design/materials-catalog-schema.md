@@ -78,6 +78,8 @@ beam_uvw = [0, 0, 1]
 B_ang2 = 0.3
 ```
 
+`hkl_families` is an emission set and requires `hkl_reason`; pin only when the sample is not equivalent to a single crystal or its `B_ang2` is valid only along the pinned direction. Do not pin to record the cut: `surface_hkl` does that, and its first non-extinct harmonic is the catalog primary reflection. Set `reference_hkl` (a positive multiple of `surface_hkl`) only when the conventional primary reflection is a higher harmonic; it never restricts emission.
+
 An amorphous medium supplies element number densities in atoms/Å³:
 
 ```toml

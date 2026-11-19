@@ -7,6 +7,7 @@ import pytest
 
 from pyrite.materials import CATALOG
 from pyrite.materials.crystal import CRYSTALS, U_g, chi_g, structure_factor
+from pyrite.materials.emission import _primary_hkl
 
 
 def _wte2_sites():
@@ -160,10 +161,10 @@ def test_fe_w_zr_surface_contracts_have_finite_nonzero_couplings(key, surface_hk
     spec = CATALOG.crystal(key)
     assert spec.surface_hkl == surface_hkl
     assert spec.beam_uvw is None
-    assert spec.hkl_families == (reflection,)
-    assert spec.hkl_list == (reflection, tuple(-index for index in reflection))
+    # Reference role is separate from emission pins (#1302).
+    assert _primary_hkl(spec) == reflection
+    assert spec.hkl_families == ()
     assert spec.B_ang2 == pytest.approx(0.6)
-    assert spec.hkl_reason
 
     structure, g = structure_factor(key, reflection, 1500.0, B_ang2=spec.B_ang2)
     susceptibility = chi_g(key, reflection, 1500.0, B_ang2=spec.B_ang2)
@@ -193,7 +194,13 @@ def test_first_parallel_reflection_is_selected_after_extinction(key, extinct, al
 
 def test_fete_catalog_documents_the_supported_stoichiometric_idealization():
     """Do not silently present the Fe1.095Te refinement as exact FeTe."""
-    reason = CATALOG.crystal("fete").hkl_reason
+    from pyrite import DATA_DIR
+
+    reason = " ".join(
+        line.removeprefix("# ")
+        for line in (DATA_DIR / "catalog" / "crystals" / "fete.toml").read_text().splitlines()
+        if line.startswith("# ")
+    )
     assert "Fe1.095Te" in reason
     assert "9.5%-occupied interstitial Fe" in reason
     assert "omitted" in reason

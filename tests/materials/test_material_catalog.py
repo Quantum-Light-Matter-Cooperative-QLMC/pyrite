@@ -2052,6 +2052,30 @@ display_name = "MoS2"
     assert "crystals.mos2.hkl_reason" in str(caught.value)
 
 
+def test_reference_hkl_must_be_a_positive_multiple_of_the_surface_cut(tmp_path):
+    from pyrite.materials import MaterialConfigError, load_material_catalog
+
+    base = _minimal_catalog(
+        material_rows="""
+[materials.mos2]
+display_name = "MoS2"
+""",
+    )
+    valid = base.replace("beam_uvw = [0, 0, 2]", "surface_hkl = [0, 0, 1]").replace(
+        "layers_per_cell = 2", "layers_per_cell = 2\nreference_hkl = [0, 0, 4]"
+    )
+    catalog = load_material_catalog(_write_catalog(tmp_path, valid))
+    assert catalog.crystal("mos2").reference_hkl == (0, 0, 4)
+    assert catalog.crystal("mos2").hkl_list == ()
+
+    for bad in ("[0, 0, -2]", "[1, 0, 2]"):
+        invalid = valid.replace("[0, 0, 4]", bad)
+        with pytest.raises(MaterialConfigError) as caught:
+            load_material_catalog(_write_catalog(tmp_path, invalid))
+        assert "crystals.mos2.reference_hkl" in str(caught.value)
+        assert "positive multiple of surface_hkl" in str(caught.value)
+
+
 def test_semantic_errors_accumulate_with_paths(tmp_path):
     from pyrite.materials import MaterialConfigError, load_material_catalog
 
@@ -2239,6 +2263,8 @@ def test_packaged_catalog_matches_independent_serialized_golden(serialized_catal
         assert surface_hkl == config["surface_hkl"]
         assert list(map(list, actual.hkl_list)) == config["hkl_list"]
         assert actual.hkl_reason == config["hkl_reason"]
+        reference = list(actual.reference_hkl) if actual.reference_hkl is not None else None
+        assert reference == config["reference_hkl"]
         assert actual.layers_per_cell == config["layers_per_cell"]
 
     assert [element for element, _ in CATALOG.media["sio2"].composition] == [

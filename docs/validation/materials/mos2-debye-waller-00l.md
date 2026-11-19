@@ -2,48 +2,40 @@
 
 ## Claim and source
 
-- Claim: the catalog's scalar `B_ang2 = 0.47` is a common basal projection for 2H-MoS2 `(00l)`, transferred from the 3R deposit of the same refinement, not an isotropic displacement parameter.
+- Claim: the catalog's scalar `B_ang2 = 0.47` is the common basal (`c`-axis) projection for 2H-MoS2, from the 2H row of the source refinement. It is not an isotropic displacement parameter.
 - Code: `data/catalog/crystals/mos2.toml::B_ang2`.
-- Source: Schoenfeld, Huang & Moss, "Anisotropic mean-square displacements (MSD) in single crystals of 2H- and 3R-MoS2", *Acta Cryst. B* **39**, 404--407 (1983), doi:10.1107/S0108768183002645; COD 9007660 (2H, the structure this entry cites) and COD 9007661 (3R, same paper).
+- Source: Schoenfeld, Huang & Moss, "Anisotropic mean-square displacements (MSD) in single crystals of 2H- and 3R-MoS2", *Acta Cryst. B* **39**, 404--407 (1983), doi:10.1107/S0108768183002645, Table 3 (2H-MoS2, synthetic crystal, X-ray, room temperature). COD 9007660 (2H, the structure this entry cites) omits the ADP loop, but the paper prints the 2H values. Zotero `MUKTID3R`.
 - Intended quantity and units: one amplitude Debye--Waller coefficient in square angstroms for the reciprocal `c*` direction.
 
-This replaces the shared `0.6 Ang^2` placeholder. The earlier audit pass recorded "no usable ADP" for MoS2 after checking COD 1010993 (Dickinson & Pauling 1923) and COD 1531960 (Petkov 2002, a PDF study); it did not check COD 9007660, which is the record `crystals.mos2.cod_id` already cites and which comes from a paper whose entire subject is the anisotropic MSDs of this material. That deposit omits the ADP loop, but the 3R deposit from the same paper carries it.
+This replaces the shared `0.6 Ang^2` placeholder.
 
-## Cross-polytype transfer, and why it is admitted here
+**Revised 2026-11-18 (#1302).** An earlier version derived the value from the 3R row (COD 9007661) on the belief that 2H data were unpublished. Table 3 of the same paper reports 2H directly, so no polytype transfer is needed. The stored value is unchanged.
 
-The audit rejects substituting data across compounds, and rejected 1T-NbS2 ADPs for the 2H-NbS2 entry. That rejection turns on a coordination change: 1T is octahedral, 2H trigonal-prismatic, so the layers themselves differ and their phonons differ with them.
-
-2H- and 3R-MoS2 are not related that way. Both are built from identical trigonal-prismatic S-Mo-S layers with the same intralayer bonding and the same layer thickness; they differ only in the stacking sequence of those layers (two-layer versus three-layer repeat). The mean-square displacement of an atom within its layer is therefore the same quantity in both, which is why the source paper measures and reports them together. The transfer is recorded here as an explicit scope caveat, not as a silent substitution.
-
-If this is judged too permissive, the fallback is to revert to `0.6 Ang^2` and record "not reported"; the sensitivity table below shows the choice is worth under 1% at the pinned reflections either way.
+**Superseded preliminary source.** J.-J. Huang's 1981 MS thesis (Univ. of Houston, hdl:10657/17304, Zotero `5PINURE8`) fitted nine `(00l)` reflections of a synthetic 2H crystal. It reported `B_Mo = 1.06`, `B_S = 0.64 Ang^2` along `c` (R = 3.7%) and an initial in-plane estimate of `0.5 Ang^2` for both atoms from limited transmission data on a natural sample. The 1983 paper, by the same group, re-measured `00.6`--`00.34` with absorption, Lorentz--polarization and TDS corrections (R = 1.9%) and cites the thesis only for odd-`l` contamination in natural samples. The thesis values are about 1.7x larger and are not used.
 
 ## Independent derivation
 
-The 3R deposit gives unit-occupancy sites with
+Table 3, 2H-MoS2:
+
+| | `B_perp` (along `c`) [Ang^2] | `<u^2>_perp` [1e-3 Ang^2] | `B_par` (in-plane) [Ang^2] | `<u^2>_par` [1e-3 Ang^2] |
+|---|---:|---:|---:|---:|
+| Mo | 0.61 (TDS-corrected 0.62) | 7.7 | 0.38 (0.40) | 4.8 |
+| S | 0.39 (0.40) | 4.9 | 0.30 (0.32) | 3.8 |
+
+The 2H cell has `Z = 2`, hence 2 Mo and 4 S per cell. The multiplicity-weighted basal projection is
 
 $$
-U_{33,\mathrm{Mo}}=0.00750\ {\rm \AA^2},\qquad
-U_{33,\mathrm{S1}}=U_{33,\mathrm{S2}}=0.00510\ {\rm \AA^2}.
+\bar B_{33}=\frac{2B^{\perp}_{\mathrm{Mo}}+4B^{\perp}_{\mathrm{S}}}{6}
+=\frac{2(0.62)+4(0.40)}{6}=0.473\ {\rm \AA^2}
 $$
 
-The 2H cell has `Z = 2`, hence 2 Mo and 4 S per cell, so the multiplicity-weighted basal projection is
+from the TDS-corrected values, rounded to `0.47 Ang^2`. The uncorrected values give `0.463`, and the earlier 3R route gave `0.466`. The source states that the TDS correction does not change `<u^2>` within error, and it quotes no uncertainties.
 
-$$
-\bar U_{33}=\frac{2U_{33,\mathrm{Mo}}+4U_{33,\mathrm{S}}}{6}
-           =\frac{2(0.00750)+4(0.00510)}{6}=0.00590\ {\rm \AA^2}.
-$$
+The Mo and S projections differ by 0.22 Ang^2, 47% of the weighted mean. This is admissible only because the `(00l)` reflections are weakly attenuated: at `|g| = 1.02 1/Ang` the amplitude exponent is `B g^2 / 16 pi^2 = 0.0031`.
 
-Using `B = 8 pi^2 U`,
+In-layer anisotropy is `B_perp / B_par = 1.6` for Mo and 1.3 for S, as the source reports. The in-plane weighted mean is `(2(0.38)+4(0.30))/6 = 0.33 Ang^2`. The scalar is direction-specific: valid for `(00l)` only.
 
-$$
-B_{33}=8\pi^2\bar U_{33}=0.46585\ {\rm \AA^2},
-$$
-
-which rounds to `0.47 Ang^2`. The source quotes no uncertainties.
-
-The Mo and S projections differ by `0.0024 Ang^2`, 41% of the weighted mean, which is a larger site-to-site spread than PdTe2 or 2H-TaS2 tolerated. It is admissible here only because the pinned reflections are weakly attenuated: at `|g| = 1.02 1/Ang` the amplitude exponent is `B g^2 / 16 pi^2 = 0.0031`, so even a 41% error in one site's `B` perturbs its amplitude by about 0.1%. A material with a shorter `c` axis would not get this pass.
-
-In-layer anisotropy is `U33 / U11 = 1.56` for Mo and `1.34` for S -- much weaker than graphite's 5.3, as expected for the more strongly bound Mo-S layers. The scalar remains direction-specific: `(00l)` only.
+**Scope warning.** MoS2 is not pinned, so automatic selection applies this `c`-axis scalar to every reflection. For in-plane reflections it over-damps intensity relative to `B_par ~= 0.33` by about 3% at `(110)` (`|g| ~= 4 1/Ang`), 19% at `|g| = 10 1/Ang`, and 2x at `|g| = 20 1/Ang`, where MoS2 selection stops. The per-site uniaxial values above are already transcribed for channeling (`data/channeling_thermal.toml`, `cr-uniaxial-thermal-projection`). Catalog PXR/CBS scalars have no tensor path yet; that is tracked in #6.
 
 For a basal `(00l)` reflection with `g = 2 pi l / c`, the amplitude factor is
 
@@ -73,5 +65,5 @@ The change is a provenance improvement, not a numerical one. MoS2's long `c = 12
 
 - **Filters:** units pass; limits pass; signs/conventions pass.
 - **Re-derivation:** matches; no divergent factor, sign, unit, or convention.
-- **Verdict:** `rederived`, conditional on the cross-polytype transfer scoped above being accepted.
+- **Verdict:** `rederived` for `(00l)`; the scalar is not valid for in-plane or oblique `g` (scope warning above).
 - **Suggested ledger change:** record under `debye-waller-catalog-provenance`; human applies any status change and `signed-off` requires human certification.

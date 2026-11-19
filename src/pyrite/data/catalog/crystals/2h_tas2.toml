@@ -9,4 +9,4 @@ cod_id = 9007815
 B_ang2 = 0.53
 surface_hkl = [0, 0, 1]
 hkl_families = [[0, 0, 2]]
-hkl_reason = "Room-temperature 2H-TaS2 cleaves on (001), but P63/mmc stacking extinguishes odd 00l; pin the first allowed parallel (002) family."
+hkl_reason = "Emission set restricted by Debye-Waller validity: B_ang2 is the basal B33 projection, valid only for g parallel to c, so only the basal 2H-TaS2 (002) family may radiate until per-site displacement tensors are supplied (#1302)."

@@ -127,6 +127,8 @@ A catalog crystal may instead pin its reflection families outright. When it does
 
 The motivating case is fiber texture. HOPG is a fiber-textured aggregate: its $c$ axes are aligned but its in-plane orientations are random across grains, so in-plane reflections are incoherent across the illuminated volume and must not be summed as if they were a single crystal. Only the basal $(00l)$ reflections survive, and HOPG pins $(002)$ and $(004)$ with exactly that reason recorded.
 
+A pin is an **emission set**: it restricts which reflections radiate. It is not an orientation reference. A symmetric-cut single crystal radiates through in-plane and oblique reflections as well, so its cut does not justify a pin (#1302). The cut is `surface_hkl`, and the catalog primary reflection used for allowed-geometry estimates and targeted longitudinal timing is the first non-extinct harmonic of that cut, or an explicit `reference_hkl` where the conventional reference differs (6H-SiC (0006), the doubled-cell ReS₂ (002), 1T-TiS₂ (003)). Besides texture, the remaining reason for a pin is Debye–Waller validity: PdTe₂ and 2H-TaS₂ store the basal $B_{33}$ projection, valid only for $\mathbf g\parallel c$, so they keep their basal family until per-site displacement tensors are supplied.
+
 This is the general caveat about the automatic ranking, stated as a rule: {eq}`eq-reflection-selection-metric` ranks the **crystal structure only**. Texture, preferred orientation, and the sample's actual grain statistics are not inputs to it. A material whose grains are not equivalent to a single crystal needs its families pinned by hand.
 
 ## What the ranking does not account for
@@ -152,4 +154,4 @@ The physics the metric is built from is separately covered — `structure-factor
 
 See the [validation ledger](../../validation/physics-validation-ledger.md).
 
-Implementation owners: `pyrite.materials.crystal.dominant_reflections`; pinned families in `pyrite.materials.catalog` (`CrystalSpec.hkl_families`, `CrystalSpec.hkl_list`); resolution at `pyrite.campaign.geometry.crystal_params`.
+Implementation owners: `pyrite.materials.crystal.dominant_reflections`; pinned families in `pyrite.materials.catalog` (`CrystalSpec.hkl_families`, `CrystalSpec.hkl_list`); catalog primary reflection in `pyrite.materials.emission._primary_hkl` (`CrystalSpec.reference_hkl`); resolution at `pyrite.campaign.geometry.crystal_params`.

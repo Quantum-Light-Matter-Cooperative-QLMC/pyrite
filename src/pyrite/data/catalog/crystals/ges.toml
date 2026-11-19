@@ -5,5 +5,7 @@ formula = "GeS"
 cod_id = 8104282
 B_ang2 = 1.07
 surface_hkl = [1, 0, 0]
-hkl_families = [[2, 0, 0]]
-hkl_reason = "In standard Pnma GeS the long a axis is the layer normal and (100) is the cleavage plane; odd h00 are extinct, so pin the first allowed parallel (200) family."
+# Orientation reference, not an emission set (#1302): former pin [[2, 0, 0]]. In
+# standard Pnma GeS the long a axis is the layer normal and (100) is the cleavage plane;
+# odd h00 are extinct, so pin the first allowed parallel (200) family. The harmonic
+# search over surface_hkl resolves the same primary reflection.

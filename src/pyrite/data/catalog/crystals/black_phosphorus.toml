@@ -5,5 +5,7 @@ formula = "P"
 cod_id = 9012486
 B_ang2 = 0.6
 surface_hkl = [0, 1, 0]
-hkl_families = [[0, 2, 0]]
-hkl_reason = "Pin the allowed black-phosphorus (020) symmetric cut so the reciprocal vector remains parallel to the b-axis-normal layered slab."
+# Orientation reference, not an emission set (#1302): former pin [[0, 2, 0]]. Pin the
+# allowed black-phosphorus (020) symmetric cut so the reciprocal vector remains parallel
+# to the b-axis-normal layered slab. The harmonic search over surface_hkl resolves the
+# same primary reflection.

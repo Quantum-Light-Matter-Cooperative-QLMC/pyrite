@@ -5,5 +5,7 @@ formula = "PdS2"
 cod_id = 2310589
 B_ang2 = 0.6
 surface_hkl = [0, 0, 1]
-hkl_families = [[0, 0, 2]]
-hkl_reason = "Ambient Pbca PdS2 cleaves on (001), but odd 00l are extinct; pin the first allowed parallel (002) family and orient by the reciprocal surface normal."
+# Orientation reference, not an emission set (#1302): former pin [[0, 0, 2]]. Ambient
+# Pbca PdS2 cleaves on (001), but odd 00l are extinct; pin the first allowed parallel
+# (002) family and orient by the reciprocal surface normal. The harmonic search over
+# surface_hkl resolves the same primary reflection.

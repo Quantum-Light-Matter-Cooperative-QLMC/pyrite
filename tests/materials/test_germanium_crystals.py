@@ -7,6 +7,7 @@ import pytest
 
 from pyrite.materials import CATALOG
 from pyrite.materials.crystal import CRYSTALS, U_g, chi_g, structure_factor
+from pyrite.materials.emission import _primary_hkl
 
 
 @pytest.mark.parametrize(
@@ -74,10 +75,10 @@ def test_germanium_family_structures_and_surface_couplings(
     assert len(info["basis"]) == sum(counts.values())
     assert spec.surface_hkl == surface_hkl
     assert spec.beam_uvw is None
-    assert spec.hkl_families == (reflection,)
-    assert spec.hkl_list == (reflection, tuple(-index for index in reflection))
+    # Reference role is separate from emission pins (#1302).
+    assert _primary_hkl(spec) == reflection
+    assert spec.hkl_families == ()
     assert spec.B_ang2 == pytest.approx(B_ang2)
-    assert spec.hkl_reason
 
     structure, g = structure_factor(key, reflection, 1500.0, B_ang2=B_ang2)
     susceptibility = chi_g(key, reflection, 1500.0, B_ang2=B_ang2)

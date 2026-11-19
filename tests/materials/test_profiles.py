@@ -637,22 +637,22 @@ def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
         (
             "hopg_hbn_microtrain_200fs",
             "hopg",
-            "3cfd1ef7a765c0d3858edaf4a90c158f04f5ec327c64b4544afb194e93369452",
+            "05c7649bc86137889723fcadd2049ac51c01216123a147db1cc19aba24e911d4",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hbn",
-            "fa950a8fa9c6fb5ce4ce9e182de01e27fc8f85a43cb8c088f0f89151a69f3c3f",
+            "6d8965352343c10b7c7ac6e7a689a299b93d3708afd69e696f95e5fd0db79a97",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hopg",
-            "3cfea9f0379b013225d888525b2465973e26b1ec1a3c15ee56ebc415c7378fc0",
+            "ed6a915921f1b987484b467e3f73986a63fa3891ff13ea086b47d842151f2fc4",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hbn",
-            "941d5c21c7c38b666e7d3756a791f229343a09d62a835b2c8802f5a4de4ff8cd",
+            "862e9c9f8ae5154a0b79bd5fe4cb9f9a5b3c0f6e0f0874ff87a34c46fac51cc8",
         ),
         (
             "hopg_emittance_demo",
@@ -749,6 +749,11 @@ def test_named_beam_migration_keeps_shipped_profile_digests_bit_for_bit(
 
     Issue #1019 re-minted BremsLib pins for ``fp32-cell-mb-v1``: FP32 cells
     are formed in millibarn; binary64 output is unchanged.
+
+    Issue #1302 re-minted the four targeted-longitudinal (microtrain and
+    compressed-microbunch) pins: their provenance now names the target
+    reflection's source (catalog primary basal reflection) instead of
+    "catalog-pinned"; the resolved reflection and timing are unchanged.
 
     Issue #100's derived photon-continuum floor deliberately did NOT move these:
     it raises a brem grid's ``start`` where the band meets the material, in

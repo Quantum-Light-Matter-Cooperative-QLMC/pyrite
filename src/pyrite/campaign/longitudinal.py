@@ -71,8 +71,9 @@ class LongitudinalDistribution:
         ``eta`` in ``(0, 1]``: intensity form factor retained at the target
         photon frequency by one microbunch (targeted kinds only).
     target_reflection
-        Miller triple of the basal reflection to target; default is the first
-        catalog-pinned positive basal reflection parallel to the surface normal.
+        Miller triple of the basal reflection to target; default is the
+        catalog primary reflection of the surface cut (``reference_hkl`` or
+        the first non-extinct harmonic), parallel to the surface normal.
     spacing_periods
         Positive integer number of optical periods between microbunch slots.
     modulation_depth
@@ -309,6 +310,7 @@ def resolve_longitudinal_distribution(
     energy_keV: float,
     theta_obs_deg: float,
     tilt_deg: float,
+    reference_hkl: tuple[int, int, int] | None = None,
 ) -> ResolvedLongitudinalDistribution:
     """Resolve target-line timing for one material/energy/geometry case.
 
@@ -322,8 +324,10 @@ def resolve_longitudinal_distribution(
     ``sigma_t = sqrt(-ln(eta))/Omega``.
 
     Assumptions: target ``g`` is parallel to the catalog surface normal,
-    detector polar angle is measured from the lab beam, and the catalog's
-    pinned reflection order defines dominance. Limiting cases:
+    detector polar angle is measured from the lab beam, and the
+    default target is ``reference_hkl``, the catalog primary reflection of
+    the case's surface cut (``structure-factor``), falling back to the first
+    positive basal reflection of ``hkl_list``. Limiting cases:
     ``eta -> 1`` gives zero microbunch width; one spacing period gives
     ``Omega*T = 2*pi``.
 
@@ -361,7 +365,13 @@ def resolve_longitudinal_distribution(
     else:
         raise ValueError("targeted longitudinal modes require catalog orientation provenance")
 
-    hkl = policy.target_reflection or _dominant_basal_reflection(hkl_list, surface_axis, lattice)
+    if policy.target_reflection is not None:
+        hkl, target_provenance = policy.target_reflection, "explicit target reflection"
+    elif reference_hkl is not None:
+        hkl, target_provenance = reference_hkl, "catalog primary basal reflection"
+    else:
+        hkl = _dominant_basal_reflection(hkl_list, surface_axis, lattice)
+        target_provenance = "first positive basal reflection of the case list"
     g_vec, g_norm = reciprocal_g_vector(hkl, lattice)
     surface_norm = float(np.linalg.norm(surface_axis))
     alignment = abs(float(g_vec @ surface_axis / (g_norm * surface_norm)))
@@ -402,5 +412,5 @@ def resolve_longitudinal_distribution(
         target_energy_eV=target_energy_eV,
         target_wavelength_ang=float(HC_EV_ANG / target_energy_eV),
         target_period_fs=period_fs,
-        provenance=(f"catalog-pinned dominant positive basal reflection; {orientation_provenance}"),
+        provenance=f"{target_provenance}; {orientation_provenance}",
     )

@@ -94,6 +94,7 @@ def _serialize_crystal(spec) -> dict:
             "surface_hkl": list(spec.surface_hkl) if spec.surface_hkl is not None else None,
             "hkl_list": _hkl_list(spec.hkl_list),
             "hkl_reason": spec.hkl_reason,
+            "reference_hkl": list(spec.reference_hkl) if spec.reference_hkl is not None else None,
             "layers_per_cell": spec.layers_per_cell,
         },
         "physics": {
