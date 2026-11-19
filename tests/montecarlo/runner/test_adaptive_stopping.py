@@ -30,6 +30,7 @@ from fractions import Fraction
 import numpy as np
 import pytest
 
+from pyrite._backend import REAL
 from pyrite._cxr_grid_policy import CxrYieldStatisticsWarning
 from pyrite.campaign.sweep import BeamSpec, Sweep, build_cases
 from pyrite.montecarlo import runner
@@ -47,6 +48,10 @@ from pyrite.montecarlo.runner.adaptive import (
 from pyrite.montecarlo.runner.stream_sizing import AdaptiveChunkPlan
 from pyrite.montecarlo.spectrum.brem import mc_brem_spectrum
 from pyrite.montecarlo.transport import _simulate_trajectories as simulate_trajectories
+
+# Device spectra accumulate in float32 by default, so two summation orders of
+# one spectrum agree to float32 rounding there, not float64.
+_FP32 = np.dtype(REAL) == np.float32
 
 #: Guards disabled: the bare relative-standard-error rule.
 _RULE_ONLY = dict(
@@ -637,7 +642,7 @@ def test_per_electron_brem_band_integrals_average_to_the_band_integral():
     per_electron = mc_brem_spectrum(segments, E_grid, electron_band_weights=q, **common)
     assert per_electron.shape == (24,)
     assert np.all(per_electron >= 0.0)
-    assert math.isclose(per_electron.mean(), q @ spectrum, rel_tol=1e-10)
+    assert math.isclose(per_electron.mean(), q @ spectrum, rel_tol=1e-5 if _FP32 else 1e-10)
 
 
 # ---- runner ---------------------------------------------------------------------
@@ -764,7 +769,9 @@ def test_batch_means_reconstruct_the_band_of_the_final_spectra():
     for key, grid in (("spec", "E_grid"), ("brem_wide", "E_grid_brem")):
         energies = result[grid]
         band = (energies >= 1000.0) & (energies <= 3000.0)
-        np.testing.assert_allclose(batch[key]["mean"], result[key][band], rtol=1e-9, atol=0.0)
+        np.testing.assert_allclose(
+            batch[key]["mean"], result[key][band], rtol=1e-5 if _FP32 else 1e-9, atol=0.0
+        )
         assert np.all(batch[key]["standard_error"] >= 0.0)
 
 

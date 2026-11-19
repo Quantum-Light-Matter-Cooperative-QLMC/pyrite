@@ -25,6 +25,7 @@ from ...transport import (
 )
 from ...transport._continuation_join import _copy_bytes
 from .._device_sizing import collect_lines
+from .._ordered_bincount import ordered_bincount
 from . import _fused
 from ._line_tables import fill_tables_in_batches
 from ._position_twins import shorten_position_twin, stage_row, with_position_twins
@@ -157,9 +158,9 @@ def _accumulate_edge_truncation(audit, E_r, a_width, weight, electron=None):
         beyond.append(xp.where(distance > 0.0, xp.minimum(tail, 1.0), 1.0))
     n_electrons = audit.get("n_electrons")
     if n_electrons is not None and electron is not None:
-        per_electron = xp.bincount(
-            electron, weights=mass.astype(xp.float64), minlength=int(n_electrons)
-        )
+        # Fixed-order sum: atomic device bincount would jitter in the last ulp
+        # and break same-seed adaptive replay (#1292).
+        per_electron = ordered_bincount(electron, mass, minlength=int(n_electrons))
         if per_electron.size != int(n_electrons):
             raise ValueError(f"line electron id outside the {n_electrons} line electrons")
         audit["electron_mass"] = audit.get("electron_mass", 0.0) + per_electron
