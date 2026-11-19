@@ -21,6 +21,7 @@ from ...materials.attenuation import (
 from ...materials.crystal import ALPHA_FS
 from ..eedl_ionization import eedl_path
 from ..transport import TRANSPORT_ELEMENTS
+from ._ordered_bincount import ordered_bincount
 from .brem_bremslib import (
     _FP32_CELL_UNIT_CM2,
     BremsLibBremsstrahlungTable,
@@ -1055,7 +1056,7 @@ def mc_brem_spectrum(
         row_band[rows] += (row_weight * (density * band_q[None, :]).sum(axis=1)).astype(xp.float64)
 
     def _electron_band():
-        totals = xp.bincount(row_electron, weights=row_band, minlength=int(Ne))
+        totals = ordered_bincount(row_electron, row_band, minlength=int(Ne))
         return _to_cpu(totals.astype(_BAND_PRIMARY_DTYPE) / (4.0 * np.pi))
 
     # Missing elemental tables retain the portable fallback. Per-row missing
