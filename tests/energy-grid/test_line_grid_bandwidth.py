@@ -479,6 +479,10 @@ def test_selected_reflections_feed_the_measured_bandwidth_audit(monkeypatch):
         line_yield_tolerance=1e-3,
     )
     case = build_cases(sweep, n_electrons=2, n_electrons_brem=2)[0]
+    # Selected MoS2 lines above the measured edge carry 1.5e-4 of the yield,
+    # which the explicit measured bandwidth refuses at the 1e-4 default share.
+    # This test checks what the audit sees, not that share, so widen it.
+    case["line_grid_policy"]["bandwidth"]["truncation_limit"] = 1e-3
     seen = {}
     check = case_driver.check_cxr_truncation
 

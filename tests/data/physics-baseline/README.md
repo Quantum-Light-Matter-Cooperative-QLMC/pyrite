@@ -483,3 +483,13 @@ Only identity pins advance (`resolved.json`, `channeling.json`); every
 resolved case payload was checked unchanged before re-pinning. No fixture
 uses a fiber crystal under automatic selection, so no output arrays or
 tolerances change. The `eedl-fallback` entry stays historical.
+
+## Device line-axis sizing (#1275)
+
+`LINE_BANDWIDTH_DEFAULT_MODEL=resonance-population-default-v2` and
+`LINE_RESOLUTION_DEFAULT_MODEL=sinc-oversampled-x8-v3` re-key CuPy runs, whose
+measured sizing now runs on the device. Only the `parameter_sha256` identity
+pins in `resolved.json` advance (legacy, elsepa, coupled, multilayer,
+cascade); resolved case payloads, `case_content_key`, output arrays and
+tolerances are unchanged. The fixtures run on CPU/NumPy, which keeps the host
+route.

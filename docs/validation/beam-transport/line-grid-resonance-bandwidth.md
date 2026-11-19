@@ -1397,3 +1397,49 @@ The task owner applied `rederived` to the ledger row from this verdict.
 ### One fallback rule (implementation context, 2026-11-17, #1265)
 
 The #1214 rewrite above is retired. Resolution no longer depends on the bandwidth: `sinc-oversampled` takes `W/8` under `node` and the [`line-grid-sinc-shape-spacing`](line-grid-sinc-shape-spacing.md) step under `bin-mean`, on every axis. `kinematic_fallback_payload` therefore applies one rule: a `resonance-population` bandwidth with no `sources["bandwidth"]` becomes `kinematic-ceiling` with resolution, quadrature and budget unchanged. `resonance-local` with an unset bandwidth records `"implied by resonance-local"` there and refuses instead of falling back. The open bin-mean 1.7e-2 clause is closed because the fallback axis keeps the 1e-2 step. Anchors: `tests/energy-grid/test_line_grid_selector_table.py` (every combination against the resolver, fallback and `_auditable_policy`), `::test_defaulted_bin_mean_axis_falls_back_with_its_resolution_unchanged`, `::test_resonance_local_implies_its_bandwidth_and_never_falls_back`. Awaiting fresh-context verification.
+
+## Independent verification (fresh context, 2026-11-18, #1275 device route, commit 0e6deb675)
+
+Scope: the clause "2026-11-18 (#1275), device route". The claim, bound, selector and lattice are unchanged. The device route therefore preserves `rederived` exactly when it feeds `_lattice_stop` and the spacing quantile the same per-line quantities as the host route on `main`, over the same line set, and differs only in reduction order and precision. The branch was reviewed at `0e6deb675` (`git show`), because a rebase onto `7fc85c5a9` was in progress in the worktree.
+
+### Equivalence criteria (written before reading `_device_sizing.py`)
+
+From the selector above and the host route (`_population_tail.py::_tail_products_kernel`, `diagnostics.py::sinc_feature_samples`, `::sinc_spacing_from_samples`):
+
+1. Per line $i$, in the array dtype $T$: $m_i=W_iw_i$ and $d_i=S_T-E_i$ with $S_T=T(S)$. A line is kept iff $m_i$ is finite and $m_i>0$. In float64, $q_i=1$ for $d_i\le0$, else $q_i=\min\{1,w_i/(\pi^2d_i)\}$, and the product is $m_iq_i$. The numerator is $\sum_im_iq_i$ over kept lines and the denominator $\sum_im_i$. The count is the number of kept lines, and the resonance range is $\min_iE_i$, $\max_iE_i$ over kept lines. Any summation order in at least the host's precision realises the same bound. A different per-line value or line set does not.
+2. `_lattice_stop` is a pure function of `(total, n_lines, min_energy, max_energy, numerator(·))`. Criterion 1 therefore makes the stop identical unless the summed share straddles the limit at a lattice point.
+3. Sinc samples per row: $\beta(E)$, $t_L=L/\beta$, $\kappa=1-\beta\,\hat v\cdot\hat n$, $w=2\pi\hbar c/(\kappa t_L)$, weight $t_L^2$. A sample is valid iff $w$ and $t_L^2$ are finite and positive and $\kappa>0$. `electron_limit` keeps rows with `elec_id < limit` before anything else. Grouped flights must reach the host route; these are any filtered rows not in strictly increasing `(owner, flight)` order.
+4. Quantile: stable sort by $w$. The index is `searchsorted(cumsum, limit·total, "left")`, clipped to the last sample. The step is $w$ at that index. The aliased share is the weight with $w<\text{step}$ over the total.
+5. The population is the same multiset of `(E, w, W)` triples in the same order, whether resident or spilled to the host.
+
+### Comparison
+
+| Check | Result | Evidence |
+|---|---|---|
+| Tail products (`_TAIL_PREAMBLE`) | match | `mass = weight*width` and `(T)(stop - energy)` in $T$; `stop` cast by `arrays[0].dtype.type(stop)`; `distance > 0` test, bound `(double)width/(PI_SQUARED*distance)` capped at 1, product `(double)mass*bound`. `PI_SQUARED` is `repr(np.pi**2)`, which round-trips to the host's float64 constant. The kernel is compiled `--fmad=false` / `-ffp-contract=off`, and double division is IEEE on both vendors. An element-by-element emulation of the preamble in $T$ equals `tail_products` bitwise (float32 and float64, 3920 kept lines, two stops). |
+| Kept filter, count, range | match | `count_nonzero(isfinite(mass) & (mass > 0))` and `where(keep, E, ±inf)` min/max. Probe (362 606 kept lines, inf/zero/negative weights mixed in): `n_lines`, min and max equal for both dtypes. |
+| Numerator | order only | Worst relative difference $2.1\times10^{-16}$ over five stops (both dtypes). |
+| Total mass | order (float64); precision (float32) | float64: $3\times10^{-16}$. float32: the host sums each block's float32 masses in float32 (error $2.0\times10^{-8}$ against `math.fsum`); the device sums them in float64 (`fsum` to 0 in the probe). |
+| `_lattice_stop` | unchanged | The diff against `main` only replaces locals with `tail.*` and moves the pool into `_HostTail`. Bisection bounds, `lost == 1` at and below the lowest resonance (single-line probe: 1.0 at 4000, 5000 and 5000 + 1e-9 eV), the ceiling cap and the summary keys are unchanged. Stops are identical at limits 5e-5, 1e-3 and 0.3; the limiting case gives 11100 eV against a closed form of 11079.27 eV. |
+| Sinc samples | match | $\beta$ is `sqrt(1 - 1/(g*g))`, which NumPy's `** 0.5` also computes. Then $t_L$, $\kappa$, width, weight and the validity mask follow the host's operation order, and `electron_limit` filters before the order test. Probe (200k rows, isotropic and near-forward, with and without `electron_limit`): weights bitwise; widths bitwise on NumPy, which has no BLAS reordering here; and both match an independent einsum expression. |
+| Dot product | order only | Left-to-right on the device versus `direction @ n_hat` on the host. The relative width difference is about $u\beta/\kappa$, so the clause's "≤ 1e-13" is the measured value at hopg 1000 keV, not a bound. The test docstring states the $\epsilon/\kappa$ scaling. |
+| Grouped flights | host route | A duplicate or decreasing key returns `None`, and the host route runs (probe: both cases). |
+| Quantile | match | Same `searchsorted` sides, clip and strict-below share. `_fixed_order_cumsum` is monotone, since rounding is monotone and the offsets are the row totals. Under ties, an unstable permutation-then-sort gives the same step and share (probe), so the result does not depend on CuPy's sort stability. |
+| Population coverage | identical | `collect_lines` casts to `REAL` on either side, so the same values are kept. On an over-budget chunk it moves every earlier chunk to the host and ends device collection. `join_resident_chunks` concatenates in collection order. `node_local_grid._line_intervals` and `local_spacing_seeds` read `_population_blocks` (host copies). Both are per-line operations followed by concatenation, integer `add.at` or a stable sort, so block boundaries do not change their result. |
+| Routing | host where required | CPU backend: `NumPyBackend` has no `cp`, so `sizing_module` returns `None` and the population is not resident. CPU recovery: `_device_sizing` is in `_SPECTRUM_BACKEND_MODULES`, and `BACKEND` is rebound and read at call time; recovery first moves `segs` to the host (`recovery.py`). The `force_cpu` serial path has CPU transport. Streamed evidence calls `sinc_feature_samples` and `_direction_populations(resident=False)`, so it collects on the host. |
+
+Focused tests: `tests/energy-grid/test_line_grid_device_sizing.py` and `tests/energy-grid/test_line_grid_host_search.py`, 32 passed and 5 skipped (`hardware`).
+
+### Adjudication of the float32 total
+
+The claim bounds $\sum_im_iq_i/\sum_im_i$ for the exact masses. The host's float32 block sum is a rounding of that denominator, with a relative error of about $10^{-8}$ and at most about $\log_2(2^{18})\,u_{32}\approx10^{-6}$. The device's float64 sum is closer to the exact value. Both lie far inside the bound's factor-2 conservatism ($\sin^2$ averages $\tfrac12$). They can select different stops only when the share is within that rounding of the limit at a lattice point, and either stop then satisfies the claim. The departure is therefore valid. It also explains the recorded `proxy_truncated_fraction` shift of $1.3\times10^{-9}$ relative, since the numerator differs only at $10^{-16}$.
+
+### Evidence citation
+
+The issue #1275 progress log records these numbers under acceptance job 13706 (`4a0b6cc`): `E_grid` identical at 2M (16285 nodes) and 20M (17118 nodes), stops identical, `proxy_truncated_fraction` 1.3e-9 relative, and `aliased_weight_fraction` 9e-13. The ledger clause cites job 13703 and rounds the second value to 1e-12. Commit `0e6deb675` changes only CPU-recovery routing and identity pins, not the arithmetic. The GPU numbers were not rerun.
+
+### Verdict
+
+`rederived`. The device route feeds the unchanged bound, selector and lattice the host's per-line values over the same line set. It differs only in summation order, in the device-side dot product, and in float64 rather than float32 accumulation of a float32 population's total mass, which is a valid departure. Non-status-bearing corrections: cite job 13706 rather than 13703; quote 9e-13; mark "≤ 1e-13" as measured, scaling as $u/\kappa$; state the float32 total-mass precision change. No test anchors the call-time `BACKEND` read under CPU recovery; `test_cpu_spectrum_backend.py` checks only that the module list is complete.
+
+The four corrections were applied to the ledger clause when the branch was rebased onto `7fc85c5a9` (commit `0cae0eb53`).

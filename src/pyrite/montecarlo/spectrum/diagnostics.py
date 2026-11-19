@@ -43,6 +43,7 @@ from ..transport import (
     beta_from_keV,
     spliced_stopping_keV_per_ang,
 )
+from ._device_sizing import device_sinc_samples, device_sinc_spacing, sizing_module
 from .brem import BremsstrahlungModel, _bremsstrahlung_dsigma_dk
 from .cxr import _SEG_ARRAYS, _observation_direction
 
@@ -75,9 +76,20 @@ def sinc_feature_spacing(
 
     Returns ``(step_eV, aliased_weight_fraction, n_segments)``. Invalid
     kinematics are ignored; an empty valid population fails closed.
+
+    Under a CuPy backend, or on CuPy segments, the device route sizes it
+    (:mod:`._device_sizing`, #1275) unless flights are grouped; CPU runs keep
+    the exact host route.
     """
     if not 0.0 <= float(aliased_weight_limit) < 1.0:
         raise ValueError("aliased_weight_limit must be in [0, 1)")
+    module = sizing_module(segments["L_ang"])
+    if module is not None:
+        resident = device_sinc_samples(
+            segments, n_hat, electron_limit=electron_limit, module=module
+        )
+        if resident is not None:
+            return device_sinc_spacing(*resident, aliased_weight_limit=aliased_weight_limit)
     samples = list(sinc_feature_samples(segments, n_hat, electron_limit=electron_limit))
     return sinc_spacing_from_samples(samples, aliased_weight_limit=aliased_weight_limit)
 
