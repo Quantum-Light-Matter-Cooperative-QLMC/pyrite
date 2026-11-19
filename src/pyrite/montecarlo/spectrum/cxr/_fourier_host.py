@@ -25,11 +25,13 @@ from numba import njit
 
 from ._bin_broad import broad_bin_mean_reduce, broad_width_for_axis
 from ._bin_fourier import (
+    FOURIER_MAX_LINE_MODES,
     FOURIER_MIN_RESIDUAL_TOL,
     FOURIER_RESIDUAL_TOL,
     _envelope_image_correction,
     fourier_period,
 )
+from ._bin_mean_jit import host_near_far_bin_mean_reduce
 from ._fourier_cutoffs import cutoff_rectangle_array
 from ._fourier_spread import _BETA_PER_WIDTH, _deconvolution, _fine_size, es_width
 
@@ -155,6 +157,7 @@ def host_fourier_bin_mean_reduce(
     residual_tol=FOURIER_RESIDUAL_TOL,
     broad_width_eV=1000.0,
     eps=1e-12,
+    max_line_modes=FOURIER_MAX_LINE_MODES,
 ):
     """``sum_l w_l mean_k(line l)`` on uniform bins ``axis = (c0, h, n_bins)``, host FP64.
 
@@ -162,7 +165,11 @@ def host_fourier_bin_mean_reduce(
     on the 64-node route, the rest from exact-cutoff coefficients (ES NUFFT
     using requested kernel accuracy ``eps`` on large rectangles, direct sums otherwise), the bin
     multiplier, ``j mod N`` folding, one inverse FFT and the closed-form
-    envelope-image correction.
+    envelope-image correction. Lines with more than ``max_line_modes``
+    positive modes (default :data:`FOURIER_MAX_LINE_MODES`, #1320) take the
+    numba near/far evaluator (``_bin_mean_jit``) on the same bins, as the
+    device route sends them to its near/far kernel; ``None`` keeps every line
+    on the Fourier route.
 
     Validation: cxr-line-fourier-reduction, cxr-line-broad-interpolation
     """
@@ -195,6 +202,15 @@ def host_fourier_bin_mean_reduce(
     n_fft, P, _ = fourier_period(
         np.array([E.min(), E.max()]), np.array([a.min()]), c0, h, n_bins, residual_tol=residual_tol
     )
+    # Same count as ``_positive_modes``; removing lines only shrinks the span,
+    # so P keeps its image bounds.
+    if max_line_modes is not None:
+        over = np.floor(2.0 * a / (2.0 * np.pi / P)) > max_line_modes
+        if over.any():
+            out += host_near_far_bin_mean_reduce(E[over], a[over], w[over], (c0, h, n_bins))
+            E, a, w = E[~over], a[~over], w[~over]
+            if E.size == 0:
+                return out
     positive = _positive_modes(E, a, w, c0, P, eps)
     t = (2.0 * np.pi / P) * np.arange(positive.size, dtype=np.float64)
     positive *= np.sinc(t * (h / (2.0 * np.pi)))

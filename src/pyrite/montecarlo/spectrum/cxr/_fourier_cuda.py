@@ -21,6 +21,7 @@ import numpy as np
 from ._bin_broad import broad_bin_mean_reduce, broad_width_for_axis
 from ._bin_fourier import (
     _CHEB_NODES,
+    FOURIER_MAX_LINE_MODES,
     FOURIER_MIN_RESIDUAL_TOL,
     FOURIER_RESIDUAL_TOL,
     _envelope_image_correction,
@@ -374,14 +375,6 @@ DEVICE_NUFFT_EPS = 1e-9
 
 #: Lines per broad-route block on the device ((block, 64) FP64 temporaries).
 _DEVICE_BROAD_BLOCK = 1 << 16
-
-#: Lines with more positive modes ``floor(P / W_l)`` than this leave the
-#: Fourier route for the near/far bin-mean kernel (#1320). Fourier work and
-#: memory grow with the largest mode count (the FFT, fine grid and output
-#: span it), so one line far narrower than ``P`` -- itself set by the widest
-#: Fourier line -- used to request a 4 GiB workspace. 2^22 modes bound the
-#: largest rectangle's grid, FFT and output to about 0.6 GiB.
-FOURIER_MAX_LINE_MODES = 1 << 22
 
 
 def _near_far_lines(E, a, w, axis):

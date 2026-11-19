@@ -128,3 +128,68 @@ def test_host_route_follows_axis_and_override(override, uniform, routed):
     assert (host is not None) == routed
     if routed:
         assert host[0] == pytest.approx((1000.0, 10.0, 101))
+
+
+@pytest.mark.parametrize("exact_widths", [None, np.inf, 2.0])
+def test_jit_near_far_matches_the_numpy_bin_mean(exact_widths):
+    """Numba near/far = ``_host_bin_mean`` at FP64 rounding (#1320).
+
+    Lines straddle bin edges, sit off-band and far off-band (float32
+    classification and envelope), cover the series/continued-fraction/asymptotic
+    ``Si`` partitions and carry signed weights.
+
+    Validation: sinc-bin-integration, sinc-bin-far-envelope
+    """
+    from pyrite.montecarlo.spectrum.cxr._bin_mean_jit import host_near_far_bin_mean_reduce
+
+    rng = np.random.default_rng(1320)
+    c0, h, n = 600.0, 0.25, 900
+    E = np.r_[rng.uniform(590.0, 840.0, 400), c0 + 0.5 * h * np.arange(-3, 4), 1e4, -50.0]
+    width = np.r_[np.exp(rng.uniform(np.log(1e-3), np.log(80.0), E.size - 2)), 5.0, 30.0]
+    a, w = np.pi / width, rng.uniform(-1.0, 1.0, E.size)
+    edges = c0 + (np.arange(n + 1) - 0.5) * h
+    widths = bq.BIN_MEAN_EXACT_WIDTHS if exact_widths is None else exact_widths
+    reference = w @ bq._host_bin_mean(
+        a, E, edges, 1.0 / np.diff(edges), None if widths == np.inf else widths
+    )
+    got = host_near_far_bin_mean_reduce(E, a, w, (c0, h, n), exact_widths=exact_widths)
+    assert np.abs(got - reference).max() <= 1e-12 * np.abs(reference).max()
+
+
+def _mixed_width_lines():
+    """A 900 eV Fourier line (P ~ 4e5 eV) beside lines far narrower than a bin."""
+    rng = np.random.default_rng(1320)
+    E = np.r_[rng.uniform(600.0, 1100.0, 200), 820.0, 640.0, 1010.0, 900.0]
+    width = np.r_[rng.uniform(0.5, 40.0, 200), 900.0, 0.002, 0.01, 0.05]
+    w = np.r_[rng.uniform(-1.0, 1.0, 200), 1.0, 3.0, -2.0, 1.5]
+    return E, np.pi / width, w
+
+
+@pytest.mark.parametrize("cap", [None, 1 << 12])
+def test_host_over_cap_lines_take_near_far(monkeypatch, cap):
+    """Lines of ~2e8 modes leave the host Fourier route (#1320).
+
+    Uncapped, the 0.002 eV line would size a ~3 GiB positive-mode array and a
+    multi-GiB ES grid. The default cap moves the three narrowest lines; a
+    small cap also moves part of the random set, so both routes add.
+
+    Validation: cxr-line-fourier-reduction
+    """
+    from pyrite.montecarlo.spectrum.cxr import _fourier_host
+
+    E, a, w = _mixed_width_lines()
+    c0, h, n = 500.0, 0.25, 2401
+    seen = []
+    original = _fourier_host._positive_modes
+
+    def recorded(E, a, w, c0, period, eps):
+        seen.append(float(np.floor(a.max() * period / np.pi)))
+        return original(E, a, w, c0, period, eps)
+
+    monkeypatch.setattr(_fourier_host, "_positive_modes", recorded)
+    kwargs = {} if cap is None else {"max_line_modes": cap}
+    got = host_fourier_bin_mean_reduce(E, a, w, (c0, h, n), **kwargs)
+    assert seen and seen[0] <= (_fourier_host.FOURIER_MAX_LINE_MODES if cap is None else cap)
+    exact = _exact(E, a, w, c0, h, n)
+    assert np.abs(got - exact).max() <= 1e-5 * np.abs(exact).max()
+    assert abs(got.sum() - exact.sum()) <= 1e-6 * np.abs(w * np.pi / a).sum()
