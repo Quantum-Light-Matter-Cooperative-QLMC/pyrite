@@ -319,8 +319,9 @@ def transport_monitored_blocks(
     to the host and reruns only the failed chunk (#1269).
 
     ``stream_route`` (#1280): when the kept-bytes projection exceeds host
-    headroom, raise :class:`.host_admission.StreamedAdaptiveRoute` instead of
-    refusing.
+    headroom, or resident rows would overflow device headroom at the join or
+    spectrum staging (#1274), raise
+    :class:`.host_admission.StreamedAdaptiveRoute` instead of refusing.
 
     Validation: adaptive-sample-size-stopping
     """
