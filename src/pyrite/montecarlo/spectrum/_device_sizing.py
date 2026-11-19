@@ -29,8 +29,15 @@ Validation: line-grid-resonance-bandwidth
 
 import numpy as np
 
-from ..._backend import REAL, _to_cpu, array_namespace, exact_rawkernel_options, is_device_array, xp
-from ..._backend import cp as cp_backend
+from ..._backend import (
+    BACKEND,
+    REAL,
+    _to_cpu,
+    array_namespace,
+    exact_rawkernel_options,
+    is_device_array,
+    xp,
+)
 from ...materials.crystal import HBARC_EV_ANG
 
 #: Share of free device memory a resident population may take (its join
@@ -66,7 +73,8 @@ def sizing_module(array):
     """
     if _is_cupy(array):
         return _module(array)
-    return cp_backend
+    # Read at call time: CPU recovery rebinds BACKEND (runner/chunking.py).
+    return getattr(BACKEND, "cp", None)
 
 
 def device_sinc_samples(segments, n_hat, *, electron_limit=None, module=None):
