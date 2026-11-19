@@ -45,6 +45,7 @@ NUMERICS_GROUPS = (
             ("atomic_electron_deflection", "atomic-electron deflection"),
             ("transition_radiation", "transition radiation"),
             ("shell_ionization_model", "shell-ionization model"),
+            ("cxr_source", "characteristic-line source"),
         ),
     ),
     (

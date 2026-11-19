@@ -207,6 +207,18 @@ def _cxr(batch: EmissionBatch) -> EmissionOutput:
     return EmissionOutput("spec_coherent" if batch.coherent else "spec", values)
 
 
+def _no_cxr(batch: EmissionBatch) -> EmissionOutput:
+    """Zero line spectrum of a ``cxr_source="none"`` case (#1327); scores nothing."""
+    import numpy as np
+
+    shape = batch.energy_eV.shape
+    if batch.electron_band_weights is not None:
+        shape = (
+            int(batch.segments["Ne"] if batch.electron_limit is None else batch.electron_limit),
+        )
+    return EmissionOutput("spec_coherent" if batch.coherent else "spec", np.zeros(shape))
+
+
 def _characteristic(batch: EmissionBatch) -> EmissionOutput:
     from .. import runner
 
@@ -338,8 +350,11 @@ def select_emission(
 
     Validation: bote-salvat-ionization-backend
     """
+    cxr = catalog.get("emission.cxr/cxr")
+    if case.get("cxr_source") == "none":
+        cxr = EmissionAdapter(cxr.descriptor, _no_cxr)
     return EmissionSelection(
-        catalog.get("emission.cxr/cxr"),
+        cxr,
         catalog.get(
             "emission.characteristic/"
             + ("bote-salvat" if case.get("shell_ionization_model") else "characteristic")

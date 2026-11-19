@@ -109,6 +109,7 @@ def physics_from_legacy(settings: Any) -> Physics:
     return Physics(
         emission=_emission_selection(getattr(settings, "emission", "incoherent")),
         brem_source=getattr(settings, "brem_source", "mc"),
+        cxr_source=getattr(settings, "cxr_source", "mc"),
         straggling=getattr(settings, "straggling", False),
         inelastic_model=getattr(settings, "inelastic_model", "auto"),
         inelastic_cutoff_eV=getattr(settings, "inelastic_cutoff_eV", None),

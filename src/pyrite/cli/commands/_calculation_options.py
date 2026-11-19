@@ -26,6 +26,7 @@ _PAIR_PRODUCTION_MODEL_VALUES = ("penelope-2024",)
 _TRANSITION_RADIATION_VALUES = ("history", "bunch", "two-beam")
 _ATOMIC_ELECTRON_DEFLECTION_VALUES = ("kawrakow", "none")
 _SHELL_IONIZATION_MODEL_VALUES = ("eedl", "bote-salvat")
+_CXR_SOURCE_VALUES = ("mc", "none")
 _MOSAIC_ROUTE_VALUES = ("analytic", "mc", "mc-sampled")
 
 
@@ -95,6 +96,7 @@ FIELD_NAMES = {
     "channeling-admission": "channeling_admission",
     "transition-radiation": "transition_radiation",
     "shell-ionization-model": "shell_ionization_model",
+    "cxr-source": "cxr_source",
     "channeling-plane": "channeling_plane",
     "channeling-basis-size": "channeling_basis_size",
     "channeling-bloch-cells": "channeling_bloch_cells",
@@ -317,6 +319,16 @@ class ChannelingSectionCommand(click.Command):
         "Characteristic-line primary vacancies: eedl (default) subshell cross sections, or "
         "the opt-in bote-salvat K/L/M fit (needs 'pyrite tables fetch bote-salvat'; EEDL "
         "for higher shells)."
+    ),
+)
+@click.option(
+    "--cxr-source",
+    type=click.Choice(_CXR_SOURCE_VALUES),
+    help=(
+        "Characteristic-line (CXR) scoring: mc (default) or none, which skips reflection "
+        "selection, the line grid and every line pass for continuum-only studies. none "
+        "refuses coherent emission, temporal profiles, line roulette, channeling and "
+        "transition radiation."
     ),
 )
 @click.option(

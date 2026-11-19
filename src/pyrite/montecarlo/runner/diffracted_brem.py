@@ -17,7 +17,8 @@ import numpy as np
 def _in_claim(case, segments) -> bool:
     """Perfect single-slab crystal with reflections and segment directions."""
     return not (
-        not case.get("hkl_list")
+        case.get("cxr_source") == "none"
+        or not case.get("hkl_list")
         or case.get("abs_layers") is not None
         or case.get("layer_radiators") is not None
         or case.get("groove_spacing_ang") is not None

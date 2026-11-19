@@ -90,6 +90,7 @@ Physics (`profile physics set`):
 | `atomic_electron_deflection` | `--atomic-electron-deflection` | |
 | `transition_radiation` | `--transition-radiation` | `none` (default), `history`, `bunch` or experimental `two-beam` |
 | `[channeling] model` | `--channeling-model` | `none` (default) or `planar` |
+| `cxr_source` | `--cxr-source` | `mc` (default) or `none`: skip characteristic-line scoring (reflection selection, line grid, line passes) for continuum-only runs; refuses coherent emission, temporal profiles, line roulette, channeling and transition radiation (#1327). Digests change only when `none` |
 | `transport_mode`, `mixed_c1`, `mixed_c2`, `mixed_max_step_um` | `--transport-mode`, `--mixed-c1`, `--mixed-c2`, `--mixed-maximum-step-um` | parameters apply only under `mixed`; runs that score CXR lines refuse `mixed` (#990) |
 
 ### Turning a setting off

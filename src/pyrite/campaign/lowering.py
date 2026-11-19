@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 
@@ -107,6 +107,7 @@ def lower_simulation(request: ResolvedSimulation) -> Case:
         positron_transport=physics.positron_transport,
         atomic_electron_deflection=physics.atomic_electron_deflection,
         precision=precision,
+        cxr_source=cast(str, physics.cxr_source),
     )
     if len(cases) != 1:  # Scene rejects every implicit multi-value field.
         raise RuntimeError(f"one Scene lowered to {len(cases)} cases")
@@ -245,6 +246,7 @@ def build_sweep_cases(
             atomic_electron_deflection=physics.atomic_electron_deflection,
             precision=precision,
             check_kinematic_validity=check_kinematic_validity,
+            cxr_source=cast(str, physics.cxr_source),
         )
         cases = resolve_shell_ionization(resolve_transition_radiation(cases, physics), physics)
         cases = resolve_transport_mode(cases, physics)
