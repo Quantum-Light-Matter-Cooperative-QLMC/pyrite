@@ -9,7 +9,8 @@
   "13658": "probe sm arms (e7d5f88): exact-pair gather, SM tiles, batched gather at 2^24/2^22/2^20",
   "13665": "probe sm2 arms (7b1fa29): per-rectangle profile, NUFFT mode floors, privatized grids, balanced warp gather",
   "13668": "production (61da816): device tests, spread bench, margins vs v6",
-  "13670": "production (61da816): end-to-end capture"
+  "13670": "production (61da816): end-to-end capture",
+  "13674": "production (006eb52, shuffle-free shared-memory group reduction): 40 device tests pass, spread bench"
  },
  "conclusions": [
   "cuFINUFFT-style shared-memory subproblems and privatized shared grids are slower than global FP64 atomics on the RTX 5080 (FP64 shared atomics no cheaper).",
@@ -368,5 +369,38 @@
  "end_to_end": {
   "reduce_speedup": 1.47,
   "spectrum_phase_change": -0.185
- }
+ },
+ "production_bench_shuffle_free": [
+  {
+   "flush": "flush-0.npz",
+   "wall_s": {
+    "gather": 0.279,
+    "atomic": 0.393,
+    "v5": 0.596
+   },
+   "speedup_vs_v6": 1.41,
+   "gather_vs_v6_max_abs_over_peak": 1.2e-15
+  },
+  {
+   "flush": "flush-1.npz",
+   "wall_s": {
+    "gather": 0.276,
+    "atomic": 0.364,
+    "v5": 0.556
+   },
+   "speedup_vs_v6": 1.32,
+   "gather_vs_v6_max_abs_over_peak": 6.3e-16
+  },
+  {
+   "flush": "flush-2.npz",
+   "wall_s": {
+    "gather": 0.218,
+    "atomic": 0.336,
+    "v5": 0.512
+   },
+   "speedup_vs_v6": 1.55,
+   "gather_vs_v6_max_abs_over_peak": 4.7e-15
+  }
+ ],
+ "verification": "fresh-context read-only physics-validator (2026-11-18, 52796a913): rederived; CPU emulation reproduced the atomic term multiset exactly"
 }
