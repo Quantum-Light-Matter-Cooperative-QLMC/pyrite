@@ -354,6 +354,25 @@ def test_executor_failure_ends_idle_and_keeps_finished_configs(tmp_path):
     assert executor.calls == [["b"]]
 
 
+@pytest.mark.parametrize("interrupt", [SystemExit(143), KeyboardInterrupt()])
+def test_interrupt_publishes_finished_cases_of_a_partial_config(tmp_path, interrupt):
+    path = _path(tmp_path)
+    cases = [_fake_case("a", 20.0), _fake_case("a", 30.0), _fake_case("b", 20.0, tilt_deg=1.0)]
+
+    class Cancelled(Executor):
+        def execute(self, cases, *, callback, **_options):
+            callback(0, cases[0], fake_out(cases[0]))
+            raise interrupt
+
+    with pytest.raises(type(interrupt)):
+        run_sweep(cases, {}, checkpoint_path=path, executor=Cancelled())
+    assert (tmp_path / "hopg" / "hopg" / "meta.json").is_file()
+    assert set(_checkpoint_load(path)["a"]) == {20.0}
+    executor = Executor()
+    assert run_sweep(cases, {}, checkpoint_path=path, executor=executor)
+    assert executor.calls == [["a", "b"]]
+
+
 def test_callback_failure_after_persistence_loses_nothing(tmp_path):
     path = _path(tmp_path)
     activity = []

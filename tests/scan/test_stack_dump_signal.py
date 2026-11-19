@@ -41,6 +41,24 @@ def test_handler_is_visible_in_the_caught_signal_mask():
     assert result.stdout.strip() == "1", result.stderr
 
 
+def test_sigterm_unwinds_through_finally_and_exits_143():
+    code = (
+        "import os, signal\n"
+        "from pyrite._entry.scan import enable_graceful_termination\n"
+        "enable_graceful_termination()\n"
+        "try:\n"
+        "    os.kill(os.getpid(), signal.SIGTERM)\n"
+        "    signal.pause()\n"
+        "finally:\n"
+        "    print('published')\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", code], capture_output=True, text=True, timeout=120
+    )
+    assert result.returncode == 143, result.stderr
+    assert result.stdout.strip() == "published"
+
+
 def test_py_spy_status_wrapper_records_and_returns_the_child_status(tmp_path):
     from pyrite.perf import py_spy
 

@@ -517,6 +517,8 @@ run_material() {{
 rm -rf "$JOBDIR/.material-ok"
 mkdir -p "$JOBDIR/.material-ok"
 for m in "${{mats[@]}}"; do
+  # A stop request ends the queue; never start the next material.
+  [ -f "$JOBDIR/STOP" ] && break
   n=$((n + 1))
   {{ run_material "$n" "$m" && : > "$JOBDIR/.material-ok/$n"; }} &
   active=$((active + 1))

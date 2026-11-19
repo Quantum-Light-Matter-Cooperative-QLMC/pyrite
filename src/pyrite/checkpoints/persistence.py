@@ -562,6 +562,8 @@ class _SweepCheckpoint:
         self.on_activity = on_activity
         self.incremental_manifest = None
         self.sharded = Path(checkpoint_path).suffix != ".pkl"
+        # Configs holding finished records that no save or shard publishes yet.
+        self.unpublished = set()
 
     def load(self):
         return _checkpoint_load(self.checkpoint_path)
@@ -585,12 +587,29 @@ class _SweepCheckpoint:
 
     def record_finished(self, case):
         """Default mode retains the record until config-level publication."""
+        self.unpublished.add(case["name"])
 
     def config_finished(self, name):
         if self.sharded:
             self.save_part(name)
+            self.unpublished.discard(name)
         else:
             self.timed_save()
+
+    def interrupted(self):
+        """Publish finished records a cancel or Ctrl-C would strand in memory.
+
+        Config-level publication otherwise drops every finished case of a
+        partly run config; shard (or save) them so pull and resume see them.
+        """
+        if not self.unpublished:
+            return
+        if self.sharded:
+            for name in sorted(self.unpublished):
+                self.save_part(name)
+        else:
+            self.timed_save()
+        self.unpublished.clear()
 
     def finish(self, complete):
         if self.sharded:
@@ -615,6 +634,7 @@ class _SweepCheckpoint:
         subset = self.material_subset()
         _checkpoint_components_save(self.checkpoint_path, subset)
         _manifest_save(self.checkpoint_path, subset, self.dataset_identity)
+        self.unpublished.clear()
 
     def timed_save(self):
         started = time.perf_counter()

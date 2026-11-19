@@ -38,9 +38,27 @@ def enable_stack_dump_signal():
         faulthandler.register(signal.SIGUSR1, all_threads=True, chain=False)
 
 
+def enable_graceful_termination():
+    """Turn ``SIGTERM`` into ``SystemExit(143)`` so a cancelled scan unwinds.
+
+    ``pyrite remote stop`` scancels the job; without a handler the scan dies
+    before publishing finished cases of a partly run config (see
+    ``run_sweep``). The exit status stays 143, which the job script reads as a
+    cancellation; a second ``SIGTERM`` falls back to the default kill.
+    """
+    import signal
+
+    def terminate(signum, _frame):
+        signal.signal(signal.SIGTERM, signal.SIG_DFL)
+        raise SystemExit(128 + signum)
+
+    signal.signal(signal.SIGTERM, terminate)
+
+
 def main(argv=None):
     """Run the scan command under the pyrite exit contract."""
     enable_stack_dump_signal()
+    enable_graceful_termination()
     return run(command, argv, prog_name="pyrite run")
 
 

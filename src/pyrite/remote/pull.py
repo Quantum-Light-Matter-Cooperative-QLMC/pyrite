@@ -111,6 +111,20 @@ def _profile_pull_candidates(material):
     return candidates
 
 
+def _no_match_detail(found, unpublished):
+    """What the box holds when no candidate matches a profile selector."""
+    available = sorted(
+        {f"{profile}/{tier}:{digest[:12]}" for _, profile, tier, digest, *_ in found}
+    )
+    detail = f"; found on the box: {', '.join(available)}" if available else "; none found"
+    if unpublished:
+        detail += (
+            f" (no meta.json yet in {', '.join(unpublished)}: the run published no "
+            "finished config; resume it to publish cases from the shared store)"
+        )
+    return detail
+
+
 def resolve_profile_stem(material, catalog_profile, *, hash_prefix=None, detector_id=None):
     """Resolve a ``MATERIAL@PROFILE`` pull selector to one exact on-disk
     checkpoint stem.
@@ -128,9 +142,13 @@ def resolve_profile_stem(material, catalog_profile, *, hash_prefix=None, detecto
 
     candidates = _profile_pull_candidates(material)
     found = []
+    unpublished = []
     for stem in candidates:
         fetched = _remote_meta_json(stem)
         if fetched is None:
+            # The bare material directory doubles as the shared case store.
+            if stem != material:
+                unpublished.append(stem)
             continue
         mtime, meta = fetched
         identity = meta.get("dataset_identity") or {}
@@ -156,16 +174,14 @@ def resolve_profile_stem(material, catalog_profile, *, hash_prefix=None, detecto
     if hash_prefix is not None:
         matches = [item for item in matches if item[3].startswith(hash_prefix)]
     if not matches:
-        available = sorted(
-            {f"{profile}/{tier}:{digest[:12]}" for _, profile, tier, digest, _, _ in found}
-        )
-        detail = f"; found on the box: {', '.join(available)}" if available else "; none found"
         selector = f"{material}@{catalog_profile}"
         if detector_id is not None:
             selector += f" detector {detector_id}"
         if hash_prefix is not None:
             selector += f" --hash {hash_prefix}"
-        raise SystemExit(f"no remote checkpoint matches {selector}{detail}")
+        raise SystemExit(
+            f"no remote checkpoint matches {selector}{_no_match_detail(found, unpublished)}"
+        )
     matches.sort(key=lambda item: item[4], reverse=True)
     if len(matches) > 1 and hash_prefix is None:
         alternates = ", ".join(item[3][:12] for item in matches[1:])

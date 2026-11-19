@@ -195,6 +195,16 @@ def _case_callback(
     return callback
 
 
+def _dispatch_publishing_interrupts(dispatch, todo, callback, checkpoint, run_options):
+    """Run ``dispatch``; on a remote cancel (SIGTERM -> SystemExit) or Ctrl-C,
+    publish the finished cases of partly run configs before exiting."""
+    try:
+        dispatch(todo, callback=callback, **run_options)
+    except (KeyboardInterrupt, SystemExit):
+        checkpoint.interrupted()
+        raise
+
+
 def run_sweep(
     cases,
     results,
@@ -545,7 +555,7 @@ def run_sweep(
         # historical run_cases([]) call when no executor was explicitly supplied.
         if todo or executor is None:
             dispatch = run_cases if executor is None else executor.execute
-            dispatch(todo, callback=callback, **run_options)
+            _dispatch_publishing_interrupts(dispatch, todo, callback, checkpoint, run_options)
         print(f"{len(todo)} cases in {time.perf_counter() - t0:.0f} s")
         # Publication follows what is stored; transport-only execution stores nothing.
         checkpoint.finish(work.stored_complete())
