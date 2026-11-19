@@ -15,6 +15,7 @@ Verdict = Literal["pass", "fail", "skip"]
 CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     "checks/axial_source_performance.py": (),  # #1154 research measurements only
     "checks/defaults_spectral_gate_642.py": (),
+    "checks/inelastic_cutoff_flights_1208.py": (),  # #1208 diagnostic, no physics claim
     "checks/cxr_selection_profile_1200.py": (),  # #1200 performance profile, no physics claim
     "checks/cxr_tab_grid_1201.py": (),  # #1201 table-mesh comparison, no physics claim
     "checks/node_support_window_1191.py": (),  # frozen replay qualification, not independent validation
