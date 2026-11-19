@@ -1045,8 +1045,7 @@ def mc_brem_spectrum(
         row_electron = seg_elec_id[brem_idx][owner]
         row_band = xp.zeros(row_electron.size, dtype=xp.float64)
     electron_sum = xp.zeros(int(Ne) if per_electron else 0, dtype=_BAND_PRIMARY_DTYPE)
-    # ``row_band``: per-row reductions (not row-count-blocked gemv) in element
-    # order, one row-order bincount at the end: slicing-independent (#1253).
+    # ``row_band``: per-row reductions in element order, one ordered bincount (#1253, #1292).
 
     def _accumulate(row_weight, density, rows):
         nonlocal spec
