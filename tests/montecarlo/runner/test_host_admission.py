@@ -69,3 +69,60 @@ def test_streamed_route_switches_before_refusing_device_rows(monkeypatch):
     route = pickle.loads(pickle.dumps(caught.value))  # crosses the transport pool
     assert route.block_electrons == 2 * 1024**3 // 256
     assert route.required == 3 * 1024 * 5_000_000 and route.available == 0
+
+
+class _DeviceRows:
+    nbytes = 1024
+
+
+def _device_route(monkeypatch, headroom, *, spec_budget_mb=0):
+    from pyrite.montecarlo.runner import chunking, electron_blocks
+
+    monkeypatch.setattr(host_memory, "host_headroom_bytes", lambda: 1 << 60)
+    monkeypatch.setattr(electron_blocks, "device_headroom_bytes", lambda: headroom)
+    monkeypatch.setattr(chunking._RESOURCE_POLICY, "spec_budget_mb", spec_budget_mb)
+    # 1024 device bytes at 4 histories project to 10 * 256 = 2560 at the cap.
+    return AdaptiveHostAdmission(10, stream=True)
+
+
+def test_streamed_route_switches_on_device_projection(monkeypatch):
+    """#1274: resident rows whose join would overflow the device stream, host fitting."""
+    import pickle
+
+    from pyrite.montecarlo.runner.host_admission import StreamedAdaptiveRoute
+
+    admission = _device_route(monkeypatch, 2 * 2560 - 1024 - 1)
+    with pytest.raises(StreamedAdaptiveRoute) as caught:
+        admission.check([{"L_ang": _DeviceRows()}], 4)
+    route = pickle.loads(pickle.dumps(caught.value))
+    assert route.resource == "device" and "device headroom" in str(route)
+    assert route.required == 2 * 2560 - 1024 and route.available == 2 * 2560 - 1025
+    assert route.block_electrons == 2 * 1024**3 // 256
+
+
+def test_device_projection_charges_spectrum_reserve(monkeypatch):
+    from pyrite.montecarlo.runner.host_admission import StreamedAdaptiveRoute
+
+    blocks = [{"L_ang": _DeviceRows()}]
+    reserve = 1 << 20
+    _device_route(monkeypatch, 2 * 2560 - 1024, spec_budget_mb=0).check(blocks, 4)
+    with pytest.raises(StreamedAdaptiveRoute) as caught:
+        _device_route(monkeypatch, 2 * 2560 - 1024, spec_budget_mb=1).check(blocks, 4)
+    assert caught.value.required == 2560 + reserve - 1024
+
+
+@pytest.mark.parametrize(
+    ("blocks", "headroom"),
+    [
+        ([{"L_ang": _DeviceRows()}], 2 * 2560 - 1024),  # fits: stays resident
+        ([{"L_ang": np.ones(128)}], 0),  # host-kept rows never use the device
+        ([{"L_ang": _DeviceRows()}], None),  # no CUDA device
+    ],
+)
+def test_device_projection_keeps_fitting_or_host_runs_retained(monkeypatch, blocks, headroom):
+    _device_route(monkeypatch, headroom).check(blocks, 4)
+
+
+def test_device_projection_needs_stream_route(monkeypatch):
+    admission = _device_route(monkeypatch, 0)
+    AdaptiveHostAdmission(admission.limit).check([{"L_ang": _DeviceRows()}], 4)

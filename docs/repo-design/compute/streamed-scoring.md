@@ -186,7 +186,12 @@ automatically. A retained adaptive transport projects its kept bytes at
 `max_histories` after every chunk (#1279, device rows included). When three
 copies exceed host headroom it raises `StreamedAdaptiveRoute` instead of
 refusing, and `_spectrum_with_recovery` reruns the case streamed in blocks of
-about 2 GiB of rows, with a `RuntimeWarning`. Cases `streaming_refusal`
+about 2 GiB of rows, with a `RuntimeWarning`. Resident (device) rows also
+project their device peak (#1274): the join's two copies, or the joined rows
+plus the spectrum chunk budget (`spec_budget_mb`), whichever is larger. When
+that growth exceeds `device_headroom_bytes()` the case streams too, before
+the device runs out of memory. Rows already on the host (`keep=False`, or
+after #1269 per-block recovery) skip the device check. Cases `streaming_refusal`
 refuses keep the retained route and its admission refusal, and so does
 `PYRITE_STREAMED_ADAPTIVE=off`.
 

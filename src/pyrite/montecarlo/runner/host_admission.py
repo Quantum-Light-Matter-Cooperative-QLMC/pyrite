@@ -10,24 +10,26 @@ STREAMED_BLOCK_BYTES = 2 * 1024**3
 
 
 class StreamedAdaptiveRoute(Exception):
-    """The retained adaptive rows would not fit host headroom; stream instead (#1280).
+    """The retained adaptive rows would not fit; stream instead (#1280, #1274).
 
     Raised by a retained adaptive transport whose kept-bytes projection at
-    ``max_histories`` exceeds headroom, before it is refused. The spectrum
-    phase then runs the case through streamed adaptive scoring in blocks of
-    ``block_electrons``.
+    ``max_histories`` exceeds host headroom (``resource="host"``) or, for
+    resident rows, device headroom (``resource="device"``), before it is
+    refused or runs out of device memory. The spectrum phase then runs the
+    case through streamed adaptive scoring in blocks of ``block_electrons``.
     """
 
-    def __init__(self, block_electrons: int, required: int, available: int):
-        super().__init__(block_electrons, required, available)
+    def __init__(self, block_electrons: int, required: int, available: int, resource: str = "host"):
+        super().__init__(block_electrons, required, available, resource)
         self.block_electrons = int(block_electrons)
         self.required, self.available = int(required), int(available)
+        self.resource = resource
 
     def __str__(self) -> str:
         gib = 1024**3
         return (
             f"retained adaptive rows project to {self.required / gib:.1f} GiB, above "
-            f"{self.available / gib:.1f} GiB host headroom"
+            f"{self.available / gib:.1f} GiB {self.resource} headroom"
         )
 
 
@@ -87,12 +89,13 @@ class AdaptiveHostAdmission:
         required = max(0, 3 * max(total, projected) - host)
         if self.stream:
             # Device rows count too: at the cap they download for the join.
+            block = max(1, STREAMED_BLOCK_BYTES // max(1, total // histories))
             available = host_memory.host_headroom_bytes()
             if required > available:
-                per_history = max(1, total // histories)
-                raise StreamedAdaptiveRoute(
-                    max(1, STREAMED_BLOCK_BYTES // per_history), required, available
-                )
+                raise StreamedAdaptiveRoute(block, required, available)
+            device = self._device_shortfall(total - host, histories)
+            if device is not None:
+                raise StreamedAdaptiveRoute(block, *device, resource="device")
         if not force and not host_rows:
             return
         host_memory.admit_host_allocation(
@@ -100,3 +103,27 @@ class AdaptiveHostAdmission:
             f"adaptive kept blocks {phase}; max_histories={self.limit}; "
             "lower max_histories or use streamed adaptive scoring (#1280)",
         )
+
+    def _device_shortfall(self, device, histories):
+        """``(required, available)`` device bytes when resident rows would not fit (#1274).
+
+        The resident join holds the kept chunks and their concatenation, then
+        the spectrum phase stages its chunks (``spec_budget_mb``) beside the
+        joined rows. Both peaks are projected at ``max_histories``; kept
+        device bytes already count as used pool memory, so only the growth is
+        charged against :func:`.electron_blocks.device_headroom_bytes`.
+        Returns ``None`` when the rows are on the host, off a CUDA device, or
+        the projection fits.
+        """
+        if device <= 0:
+            return None
+        from .chunking import _RESOURCE_POLICY
+        from .electron_blocks import device_headroom_bytes
+
+        headroom = device_headroom_bytes()
+        if headroom is None:
+            return None
+        projected = (device * self.limit + histories - 1) // histories
+        reserve = int(_RESOURCE_POLICY.spec_budget_mb) << 20
+        required = max(2 * projected, projected + reserve) - device
+        return (required, headroom) if required > headroom else None
