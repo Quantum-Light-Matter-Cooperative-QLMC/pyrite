@@ -27,7 +27,7 @@ from ._bin_fourier import (
     fourier_period,
 )
 from ._fourier_cutoffs import cutoff_rectangle_array
-from ._fourier_spread import es_mode_transform
+from ._fourier_spread import SPREADERS, es_gather_moments, es_mode_transform
 
 
 def cufinufft_mode_transform(phase, strengths, j0, j1, *, eps=1e-12, plans=None):
@@ -281,6 +281,7 @@ def cuda_positive_modes(
     use_nufft=True,
     nufft="es",
     direct_precision="fp64",
+    spread="gather",
 ):
     """Exact-support hybrid coefficients from validated scalar line arrays.
 
@@ -290,7 +291,10 @@ def cuda_positive_modes(
     ``nufft="cufinufft"`` (CUDA only). All others share one direct launch with FP64 atomic
     accumulation over 128-mode x 4096-line tiles; ``direct_precision="fp32"``
     evaluates their phase factors with ``sincosf`` after FP64 range reduction
-    (:data:`DIRECT_PRECISIONS`). Summation order can vary between
+    (:data:`DIRECT_PRECISIONS`). ``spread`` picks the ES spreader
+    (:data:`_fourier_spread.SPREADERS`): the default ``"gather"`` transforms
+    all NUFFT rectangles in sorted, batched warp gathers; ``"atomic"`` runs
+    one atomic spread per rectangle. Summation order can vary between
     executions. ``use_nufft=False`` is an equal-workload GPU direct baseline.
     ``_NUFFT_MIN_WORK`` was measured on an RTX 5080 (#1230, #1296); the source and
     mode floors are the CPU-audit values.
@@ -304,6 +308,8 @@ def cuda_positive_modes(
         raise ValueError("nufft must be 'es' or 'cufinufft'")
     if direct_precision not in DIRECT_PRECISIONS:
         raise ValueError(f"direct_precision must be one of {DIRECT_PRECISIONS}")
+    if spread not in SPREADERS:
+        raise ValueError(f"spread must be one of {SPREADERS}")
     transform = es_mode_transform if nufft == "es" else cufinufft_mode_transform
     dt = 2.0 * np.pi / period
     E_res, a_width, weight = (cp.asarray(x, dtype=cp.float64) for x in (E_res, a_width, weight))
@@ -328,11 +334,27 @@ def cuda_positive_modes(
     if not use_nufft:
         large[:] = False
     plans = {}
-    for j0, j1, lo, hi in rects[large].tolist():
-        strengths = cp.stack((constant[lo:hi], linear[lo:hi]))
-        moments = transform(phase[lo:hi], strengths, j0, j1, eps=eps, plans=plans)
+    if nufft == "es" and spread == "gather":
+        moments = es_gather_moments(phase, (constant, linear), rects[large], eps=eps, plans=plans)
+    else:
+        moments = (
+            (
+                j0,
+                j1,
+                transform(
+                    phase[lo:hi],
+                    cp.stack((constant[lo:hi], linear[lo:hi])),
+                    j0,
+                    j1,
+                    eps=eps,
+                    plans=plans,
+                ),
+            )
+            for j0, j1, lo, hi in rects[large].tolist()
+        )
+    for j0, j1, m in moments:
         t = dt * cp.arange(j0, j1, dtype=cp.float64)
-        out[j0:j1] += moments[0] - t * moments[1]
+        out[j0:j1] += m[0] - t * m[1]
     if plans and nufft == "cufinufft":
         cp.cuda.get_current_stream().synchronize()
         plans.clear()
@@ -364,6 +386,7 @@ def cuda_fourier_bin_mean_reduce(
     broad_width_eV=1000.0,
     eps=DEVICE_NUFFT_EPS,
     direct_precision="fp32",
+    spread="gather",
 ):
     """Device counterpart of ``fourier_bin_mean_reduce(..., broad_width_eV=...)``.
 
@@ -376,8 +399,10 @@ def cuda_fourier_bin_mean_reduce(
     lines). Same bounds as the host reference, plus the NUFFT tolerance ``eps``
     and, with ``direct_precision="fp32"`` (default since ``fourier-auto-v6``),
     the single-precision phase factors of the direct rectangles.
-    ``eps=1e-12, direct_precision="fp64"`` is the ``fourier-auto-v5`` route
-    up to the envelope kernel's FP64 summation order.
+    ``eps=1e-12, direct_precision="fp64", spread="atomic"`` is the
+    ``fourier-auto-v5`` route up to the envelope kernel's FP64 summation
+    order; ``spread="atomic"`` alone is ``fourier-auto-v6`` up to the ES
+    spreading's.
     Planning, period choice and the small Chebyshev fits run on host.
 
     Validation: cxr-line-fourier-reduction, cxr-line-broad-interpolation
@@ -426,7 +451,9 @@ def cuda_fourier_bin_mean_reduce(
     # The period depends only on the resonance extrema and the widest line.
     extrema = cp.asnumpy(cp.stack((E.min(), E.max(), a.min())))
     n_fft, P, _ = fourier_period(extrema[:2], extrema[2:], c0, h, n_bins, residual_tol=residual_tol)
-    positive = cuda_positive_modes(E, a, w, c0, P, eps=eps, direct_precision=direct_precision)
+    positive = cuda_positive_modes(
+        E, a, w, c0, P, eps=eps, direct_precision=direct_precision, spread=spread
+    )
     t = (2.0 * np.pi / P) * cp.arange(positive.size, dtype=cp.float64)
     positive *= cp.sinc(t * (h / (2.0 * np.pi)))
     positive[0] = 0.0

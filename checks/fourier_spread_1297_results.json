@@ -1,0 +1,406 @@
+{
+ "issue": 1297,
+ "schema": "pyrite.fourier-spread-1297.v1",
+ "qualification": "engineering evidence; no physics-validation claim",
+ "remote_checkout": "qlmc:~/pyrite-1297 (flushes from ~/pyrite-1296/out-nv; out-v7)",
+ "gpu": "NVIDIA GeForce RTX 5080",
+ "case": "mos2 30 keV 15 deg N=1024, cleo_sub_1281 (saved #1296 flushes, ~1e7 lines each)",
+ "jobs": {
+  "13658": "probe sm arms (e7d5f88): exact-pair gather, SM tiles, batched gather at 2^24/2^22/2^20",
+  "13665": "probe sm2 arms (7b1fa29): per-rectangle profile, NUFFT mode floors, privatized grids, balanced warp gather",
+  "13668": "production (61da816): device tests, spread bench, margins vs v6",
+  "13670": "production (61da816): end-to-end capture",
+  "13674": "production (006eb52, shuffle-free shared-memory group reduction): 40 device tests pass, spread bench"
+ },
+ "conclusions": [
+  "cuFINUFFT-style shared-memory subproblems and privatized shared grids are slower than global FP64 atomics on the RTX 5080 (FP64 shared atomics no cheaper).",
+  "One thread per fine point (exact-pair gather) is occupancy- and imbalance-bound: up to 2.9e4 copies per point.",
+  "Spread time is spread over many mid-size rectangles (512-4096 modes ~2/3), not a few dense ones; raising the NUFFT mode floor to 64-512 changes nothing.",
+  "Balanced warp gather over sorted, batched copies cuts the spread phase 4-6x; fused key/modulation kernels keep most of it at flush level."
+ ],
+ "probe_round1": {
+  "flush-0.npz": {
+   "v6_atomic_2^24": {
+    "wall_s": 0.392,
+    "spread_s": 0.175,
+    "sort_s": 0,
+    "modulate_s": 0.019,
+    "max_abs_over_peak_vs_v6": 2.8e-16
+   },
+   "v6_gather_2^24": {
+    "wall_s": 14.011,
+    "spread_s": 13.649,
+    "sort_s": 0.077,
+    "modulate_s": 0.025,
+    "max_abs_over_peak_vs_v6": 2.1e-15
+   },
+   "v6_sm_2^24": {
+    "wall_s": 0.546,
+    "spread_s": 0.251,
+    "sort_s": 0.056,
+    "modulate_s": 0.018,
+    "max_abs_over_peak_vs_v6": 1.2e-15
+   },
+   "v6_gather_batched_2^24": {
+    "wall_s": 0.692,
+    "spread_s": 0.347,
+    "sort_s": 0.021,
+    "modulate_s": 0.119,
+    "max_abs_over_peak_vs_v6": 2.1e-15
+   }
+  },
+  "flush-1.npz": {
+   "v6_atomic_2^24": {
+    "wall_s": 0.371,
+    "spread_s": 0.154,
+    "sort_s": 0,
+    "modulate_s": 0.02,
+    "max_abs_over_peak_vs_v6": 3.2e-16
+   },
+   "v6_gather_2^24": {
+    "wall_s": 11.334,
+    "spread_s": 10.967,
+    "sort_s": 0.075,
+    "modulate_s": 0.027,
+    "max_abs_over_peak_vs_v6": 1.4e-15
+   },
+   "v6_sm_2^24": {
+    "wall_s": 0.549,
+    "spread_s": 0.256,
+    "sort_s": 0.061,
+    "modulate_s": 0.019,
+    "max_abs_over_peak_vs_v6": 6.3e-16
+   },
+   "v6_gather_batched_2^24": {
+    "wall_s": 0.665,
+    "spread_s": 0.298,
+    "sort_s": 0.02,
+    "modulate_s": 0.118,
+    "max_abs_over_peak_vs_v6": 1.4e-15
+   }
+  },
+  "flush-2.npz": {
+   "v6_atomic_2^24": {
+    "wall_s": 0.33,
+    "spread_s": 0.161,
+    "sort_s": 0,
+    "modulate_s": 0.016,
+    "max_abs_over_peak_vs_v6": 7.8e-16
+   },
+   "v6_gather_2^24": {
+    "wall_s": 12.912,
+    "spread_s": 12.645,
+    "sort_s": 0.058,
+    "modulate_s": 0.021,
+    "max_abs_over_peak_vs_v6": 6.7e-15
+   },
+   "v6_sm_2^24": {
+    "wall_s": 0.429,
+    "spread_s": 0.213,
+    "sort_s": 0.045,
+    "modulate_s": 0.013,
+    "max_abs_over_peak_vs_v6": 4.8e-15
+   },
+   "v6_gather_batched_2^24": {
+    "wall_s": 0.602,
+    "spread_s": 0.346,
+    "sort_s": 0.019,
+    "modulate_s": 0.077,
+    "max_abs_over_peak_vs_v6": 6.7e-15
+   }
+  }
+ },
+ "probe_round2": {
+  "flush-0.npz": {
+   "v6_atomic_profile_2^24": {
+    "wall_s": 0.389,
+    "spread_s": 0.173,
+    "sort_s": 0,
+    "modulate_s": 0.02,
+    "max_abs_over_peak_vs_v6": 3.8e-16
+   },
+   "v6_atomic_2^24": {
+    "wall_s": 0.388,
+    "spread_s": 0.173,
+    "sort_s": 0,
+    "modulate_s": 0.02,
+    "max_abs_over_peak_vs_v6": 3.8e-16
+   },
+   "v6_priv_2^24": {
+    "wall_s": 0.397,
+    "spread_s": 0.182,
+    "sort_s": 0,
+    "modulate_s": 0.02,
+    "max_abs_over_peak_vs_v6": 3.8e-16
+   },
+   "v6_items_batched_2^24": {
+    "wall_s": 0.367,
+    "spread_s": 0.034,
+    "sort_s": 0.027,
+    "modulate_s": 0.117,
+    "max_abs_over_peak_vs_v6": 1.3e-15
+   },
+   "v6_gather_batched_2^24": {
+    "wall_s": 0.652,
+    "spread_s": 0.313,
+    "sort_s": 0.021,
+    "modulate_s": 0.118,
+    "max_abs_over_peak_vs_v6": 2.1e-15
+   }
+  },
+  "flush-1.npz": {
+   "v6_atomic_profile_2^24": {
+    "wall_s": 0.365,
+    "spread_s": 0.151,
+    "sort_s": 0,
+    "modulate_s": 0.02,
+    "max_abs_over_peak_vs_v6": 1.1e-16
+   },
+   "v6_atomic_2^24": {
+    "wall_s": 0.366,
+    "spread_s": 0.15,
+    "sort_s": 0,
+    "modulate_s": 0.019,
+    "max_abs_over_peak_vs_v6": 1.1e-16
+   },
+   "v6_priv_2^24": {
+    "wall_s": 0.378,
+    "spread_s": 0.164,
+    "sort_s": 0,
+    "modulate_s": 0.02,
+    "max_abs_over_peak_vs_v6": 1.1e-16
+   },
+   "v6_items_batched_2^24": {
+    "wall_s": 0.351,
+    "spread_s": 0.034,
+    "sort_s": 0.028,
+    "modulate_s": 0.084,
+    "max_abs_over_peak_vs_v6": 7.4e-16
+   },
+   "v6_gather_batched_2^24": {
+    "wall_s": 0.568,
+    "spread_s": 0.254,
+    "sort_s": 0.02,
+    "modulate_s": 0.094,
+    "max_abs_over_peak_vs_v6": 1.5e-15
+   }
+  },
+  "flush-2.npz": {
+   "v6_atomic_profile_2^24": {
+    "wall_s": 0.332,
+    "spread_s": 0.16,
+    "sort_s": 0,
+    "modulate_s": 0.016,
+    "max_abs_over_peak_vs_v6": 1.4e-15
+   },
+   "v6_atomic_2^24": {
+    "wall_s": 0.324,
+    "spread_s": 0.155,
+    "sort_s": 0,
+    "modulate_s": 0.016,
+    "max_abs_over_peak_vs_v6": 9.1e-16
+   },
+   "v6_priv_2^24": {
+    "wall_s": 0.319,
+    "spread_s": 0.152,
+    "sort_s": 0,
+    "modulate_s": 0.015,
+    "max_abs_over_peak_vs_v6": 1.4e-15
+   },
+   "v6_items_batched_2^24": {
+    "wall_s": 0.287,
+    "spread_s": 0.031,
+    "sort_s": 0.022,
+    "modulate_s": 0.077,
+    "max_abs_over_peak_vs_v6": 4.1e-15
+   },
+   "v6_gather_batched_2^24": {
+    "wall_s": 0.588,
+    "spread_s": 0.353,
+    "sort_s": 0.019,
+    "modulate_s": 0.108,
+    "max_abs_over_peak_vs_v6": 6.9e-15
+   }
+  }
+ },
+ "spread_profile_flush0_by_modes": {
+  "256": {
+   "rects": 3,
+   "spread_ms": 2.5,
+   "sources": 199236
+  },
+  "512": {
+   "rects": 50,
+   "spread_ms": 35.1,
+   "sources": 3705169
+  },
+  "1024": {
+   "rects": 56,
+   "spread_ms": 41.8,
+   "sources": 4821732
+  },
+  "2048": {
+   "rects": 41,
+   "spread_ms": 34.4,
+   "sources": 5026275
+  },
+  "4096": {
+   "rects": 28,
+   "spread_ms": 23.8,
+   "sources": 4954321
+  },
+  "8192": {
+   "rects": 18,
+   "spread_ms": 14.9,
+   "sources": 4657797
+  },
+  "16384": {
+   "rects": 12,
+   "spread_ms": 9.1,
+   "sources": 4152258
+  },
+  "32768": {
+   "rects": 6,
+   "spread_ms": 6.5,
+   "sources": 3193563
+  },
+  "65536": {
+   "rects": 3,
+   "spread_ms": 2.8,
+   "sources": 1741386
+  },
+  "131072": {
+   "rects": 1,
+   "spread_ms": 0.5,
+   "sources": 444967
+  },
+  "262144": {
+   "rects": 1,
+   "spread_ms": 0.0,
+   "sources": 25031
+  }
+ },
+ "production_bench": [
+  {
+   "flush": "flush-0.npz",
+   "wall_s": {
+    "gather": 0.278,
+    "atomic": 0.391,
+    "v5": 0.593
+   },
+   "speedup_vs_v6": 1.41,
+   "gather_vs_v6_max_abs_over_peak": 1.3e-15,
+   "gather_vs_v5_max_abs_over_peak": 1.8e-11,
+   "gather_repeat_max_abs_over_peak": 9.5e-17
+  },
+  {
+   "flush": "flush-1.npz",
+   "wall_s": {
+    "gather": 0.276,
+    "atomic": 0.362,
+    "v5": 0.554
+   },
+   "speedup_vs_v6": 1.31,
+   "gather_vs_v6_max_abs_over_peak": 6.3e-16,
+   "gather_vs_v5_max_abs_over_peak": 2.4e-11,
+   "gather_repeat_max_abs_over_peak": 1.1e-16
+  },
+  {
+   "flush": "flush-2.npz",
+   "wall_s": {
+    "gather": 0.215,
+    "atomic": 0.33,
+    "v5": 0.51
+   },
+   "speedup_vs_v6": 1.54,
+   "gather_vs_v6_max_abs_over_peak": 4.7e-15,
+   "gather_vs_v5_max_abs_over_peak": 8.2e-11,
+   "gather_repeat_max_abs_over_peak": 5.2e-16
+  }
+ ],
+ "margins": {
+  "reference": "fourier-auto-v6 route (atomic ES spreader) on the same transport",
+  "margins": {
+   "yield_per_primary": 0.001,
+   "centroid_eV": 0.001,
+   "peak_density_per_eV": 0.01,
+   "dominant_fwhm_eV": 0.01,
+   "mass_l1": 0.01
+  },
+  "all_within_margin": true,
+  "worst": {
+   "yield_rel": 2.3e-15,
+   "centroid_eV": 1.5e-11,
+   "peak_rel": 0.0,
+   "fwhm_rel": 0.0,
+   "band_mass_over_total": 2.3e-15,
+   "max_abs_over_peak": 8.1e-13
+  },
+  "scenes": [
+   "hopg",
+   "silicon",
+   "mos2-on-si",
+   "hopg-mosaic",
+   "mos2-15deg"
+  ],
+  "spacings_eV": [
+   0.375,
+   3.0
+  ]
+ },
+ "capture_v7": {
+  "code_sha": "61da81648b97e5619fd5321fccb0db5203d0bd80",
+  "gpu": "NVIDIA GeForce RTX 5080",
+  "case": "mos2 30 keV 15 deg N=1024",
+  "reduce_calls": 101,
+  "reduce_lines": 975439294,
+  "reduce_s": 24.07,
+  "ns_per_line": 24.7,
+  "transport_s": 13.93,
+  "spectrum_s": 44.13,
+  "note": "first run in a fresh venv (cold kernel caches); transport is unaffected by #1297"
+ },
+ "capture_v6_reference": {
+  "source": "checks/fourier_reduction_phases_1296_results.json capture_v6 (job 13650)",
+  "reduce_s": 35.49,
+  "ns_per_line": 36.4,
+  "spectrum_s": 54.13
+ },
+ "end_to_end": {
+  "reduce_speedup": 1.47,
+  "spectrum_phase_change": -0.185
+ },
+ "production_bench_shuffle_free": [
+  {
+   "flush": "flush-0.npz",
+   "wall_s": {
+    "gather": 0.279,
+    "atomic": 0.393,
+    "v5": 0.596
+   },
+   "speedup_vs_v6": 1.41,
+   "gather_vs_v6_max_abs_over_peak": 1.2e-15
+  },
+  {
+   "flush": "flush-1.npz",
+   "wall_s": {
+    "gather": 0.276,
+    "atomic": 0.364,
+    "v5": 0.556
+   },
+   "speedup_vs_v6": 1.32,
+   "gather_vs_v6_max_abs_over_peak": 6.3e-16
+  },
+  {
+   "flush": "flush-2.npz",
+   "wall_s": {
+    "gather": 0.218,
+    "atomic": 0.336,
+    "v5": 0.512
+   },
+   "speedup_vs_v6": 1.55,
+   "gather_vs_v6_max_abs_over_peak": 4.7e-15
+  }
+ ],
+ "verification": "fresh-context read-only physics-validator (2026-11-18, 52796a913): rederived; CPU emulation reproduced the atomic term multiset exactly"
+}

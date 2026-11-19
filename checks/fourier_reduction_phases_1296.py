@@ -442,6 +442,365 @@ extern "C" __global__ void envelope24(
 """
 
 
+#: #1297 exact-pair spreaders. Sources are keyed by the wrapped first grid
+#: point ``l0 = ceil(u - w/2) mod n_fine`` of the production kernel, so a fine
+#: point ``l`` receives exactly the sources keyed ``l - p`` (``p < w``) at the
+#: production's unwrapped point ``l0 + p``: same pairs, same ``phi``, only the
+#: FP64 summation order differs. Grids of several rectangles may be
+#: concatenated: rectangle ``r`` owns points ``off[r] .. off[r+1]`` and complex
+#: words ``2 off[r] .. 2 off[r+1]`` (its two rows).
+_SM_SRC = r"""
+extern "C" __global__ void es_keys(
+    const double* x, const long long n, const int* rid, const long long* off,
+    const int width, double* u_out, long long* l0_out, long long* key_out) {
+    const long long k = (long long)blockIdx.x * blockDim.x + threadIdx.x;
+    if (k >= n) return;
+    const int r = rid ? rid[k] : 0;
+    const long long base = off[r], n_fine = off[r + 1] - base;
+    const double two_pi = 6.283185307179586;
+    const double h = two_pi / double(n_fine);
+    double xk = fmod(x[k], two_pi);
+    if (xk < 0.0) xk += two_pi;
+    const double u = xk / h;
+    const long long l0 = (long long)ceil(u - 0.5 * double(width));
+    long long lw = l0 % n_fine;
+    if (lw < 0) lw += n_fine;
+    u_out[k] = u; l0_out[k] = l0; key_out[k] = base + lw;
+}
+
+extern "C" __global__ void es_gather(
+    const double* u, const long long* l0, const double* src, const long long* start,
+    const long long* off, const int nrect, const long long total,
+    const int width, const double beta, double* grid) {
+    // One thread per fine point; registers only, deterministic, no atomics.
+    const long long g = (long long)blockIdx.x * blockDim.x + threadIdx.x;
+    if (g >= total) return;
+    int lo = 0, hi = nrect;
+    while (hi - lo > 1) { const int mid = (lo + hi) >> 1; if (off[mid] <= g) lo = mid; else hi = mid; }
+    const long long base = off[lo], n_fine = off[lo + 1] - base, l = g - base;
+    const double half = 0.5 * double(width);
+    double ar = 0.0, ai = 0.0, br = 0.0, bi = 0.0;
+    for (int p = 0; p < width; ++p) {
+        long long b = l - p;
+        if (b < 0) b += n_fine;
+        const long long s1 = start[base + b + 1];
+        for (long long s = start[base + b]; s < s1; ++s) {
+            const double z = (double(l0[s] + p) - u[s]) / half;
+            const double arg = 1.0 - z * z;
+            if (arg <= 0.0) continue;
+            const double phi = exp(beta * (sqrt(arg) - 1.0));
+            ar += phi * src[4*s]; ai += phi * src[4*s+1];
+            br += phi * src[4*s+2]; bi += phi * src[4*s+3];
+        }
+    }
+    double* g0 = grid + 2 * (2 * base + l);
+    double* g1 = grid + 2 * (2 * base + n_fine + l);
+    g0[0] = ar; g0[1] = ai; g1[0] = br; g1[1] = bi;
+}
+
+extern "C" __global__ void es_sm(
+    const double* u, const long long* l0, const double* src, const long long* sub,
+    const long long n_fine, const int width, const double beta, double* grid) {
+    // cuFINUFFT-style subproblem: one block per (tile, <= M sources) chunk,
+    // shared-memory tile + halo, one global atomic per touched point.
+    extern __shared__ double tile[];
+    const long long t0 = sub[3*blockIdx.x], s_lo = sub[3*blockIdx.x+1], s_hi = sub[3*blockIdx.x+2];
+    const int span = SM_TILE + width - 1;
+    for (int i = threadIdx.x; i < 4 * span; i += blockDim.x) tile[i] = 0.0;
+    __syncthreads();
+    const double half = 0.5 * double(width);
+    for (long long s = s_lo + threadIdx.x; s < s_hi; s += blockDim.x) {
+        const double us = u[s];
+        const long long ls = l0[s];
+        long long lw = ls % n_fine;
+        if (lw < 0) lw += n_fine;
+        const int local = int(lw - t0);
+        const double a_re = src[4*s], a_im = src[4*s+1], b_re = src[4*s+2], b_im = src[4*s+3];
+        for (int p = 0; p < width; ++p) {
+            const double z = (double(ls + p) - us) / half;
+            const double arg = 1.0 - z * z;
+            if (arg <= 0.0) continue;
+            const double phi = exp(beta * (sqrt(arg) - 1.0));
+            double* c = tile + 4 * (local + p);
+            atomicAdd(c, phi * a_re); atomicAdd(c + 1, phi * a_im);
+            atomicAdd(c + 2, phi * b_re); atomicAdd(c + 3, phi * b_im);
+        }
+    }
+    __syncthreads();
+    for (int i = threadIdx.x; i < span; i += blockDim.x) {
+        const double* c = tile + 4 * i;
+        if (c[0] == 0.0 && c[1] == 0.0 && c[2] == 0.0 && c[3] == 0.0) continue;
+        const long long idx = (t0 + i) % n_fine;
+        atomicAdd(grid + 2*idx, c[0]); atomicAdd(grid + 2*idx + 1, c[1]);
+        atomicAdd(grid + 2*(n_fine + idx), c[2]); atomicAdd(grid + 2*(n_fine + idx) + 1, c[3]);
+    }
+}
+extern "C" __global__ void es_gather_items(
+    const double* u, const long long* l0, const long long* key, const double* src,
+    const long long* item, const long long n_items, const long long* off, const int nrect,
+    const int width, const double beta, double* grid) {
+    // Balanced gather: one warp per (fine point, <= C sorted sources) item; the
+    // sources of an item all key into that point's window l-w+1 .. l.
+    const long long it = ((long long)blockIdx.x * blockDim.x + threadIdx.x) >> 5;
+    const int lane = threadIdx.x & 31;
+    if (it >= n_items) return;
+    const long long g = item[3*it], s_lo = item[3*it+1], s_hi = item[3*it+2];
+    int lo = 0, hi = nrect;
+    while (hi - lo > 1) { const int mid = (lo + hi) >> 1; if (off[mid] <= g) lo = mid; else hi = mid; }
+    const long long base = off[lo], n_fine = off[lo + 1] - base, l = g - base;
+    const double half = 0.5 * double(width);
+    double ar = 0.0, ai = 0.0, br = 0.0, bi = 0.0;
+    for (long long s = s_lo + lane; s < s_hi; s += 32) {
+        long long p = l - (key[s] - base);
+        if (p < 0) p += n_fine;
+        const double z = (double(l0[s] + p) - u[s]) / half;
+        const double arg = 1.0 - z * z;
+        if (arg <= 0.0) continue;
+        const double phi = exp(beta * (sqrt(arg) - 1.0));
+        ar += phi * src[4*s]; ai += phi * src[4*s+1];
+        br += phi * src[4*s+2]; bi += phi * src[4*s+3];
+    }
+    for (int o = 16; o > 0; o >>= 1) {
+        ar += __shfl_down_sync(0xffffffffu, ar, o); ai += __shfl_down_sync(0xffffffffu, ai, o);
+        br += __shfl_down_sync(0xffffffffu, br, o); bi += __shfl_down_sync(0xffffffffu, bi, o);
+    }
+    if (lane == 0) {
+        double* g0 = grid + 2 * (2 * base + l);
+        double* g1 = grid + 2 * (2 * base + n_fine + l);
+        atomicAdd(g0, ar); atomicAdd(g0 + 1, ai); atomicAdd(g1, br); atomicAdd(g1 + 1, bi);
+    }
+}
+
+extern "C" __global__ void es_priv(
+    const double* x, const double* src, const long long n,
+    const long long n_fine, const int width, const double beta, double* grid) {
+    // Whole fine grid privatized in shared memory per block (small grids, no
+    // sort); production arithmetic per pair, one global atomic per point per block.
+    extern __shared__ double sg[];
+    for (long long i = threadIdx.x; i < 4 * n_fine; i += blockDim.x) sg[i] = 0.0;
+    __syncthreads();
+    const double two_pi = 6.283185307179586;
+    const double h = two_pi / double(n_fine);
+    const double half = 0.5 * double(width);
+    const long long stride = (long long)gridDim.x * blockDim.x;
+    for (long long k = (long long)blockIdx.x * blockDim.x + threadIdx.x; k < n; k += stride) {
+        double xk = fmod(x[k], two_pi);
+        if (xk < 0.0) xk += two_pi;
+        const double uk = xk / h;
+        const long long l0 = (long long)ceil(uk - half);
+        const double a_re = src[4*k], a_im = src[4*k+1], b_re = src[4*k+2], b_im = src[4*k+3];
+        for (int p = 0; p < width; ++p) {
+            const long long l = l0 + p;
+            const double z = (double(l) - uk) / half;
+            const double arg = 1.0 - z * z;
+            if (arg <= 0.0) continue;
+            const double phi = exp(beta * (sqrt(arg) - 1.0));
+            long long idx = l % n_fine;
+            if (idx < 0) idx += n_fine;
+            double* c = sg + 4 * idx;
+            atomicAdd(c, phi * a_re); atomicAdd(c + 1, phi * a_im);
+            atomicAdd(c + 2, phi * b_re); atomicAdd(c + 3, phi * b_im);
+        }
+    }
+    __syncthreads();
+    for (long long i = threadIdx.x; i < n_fine; i += blockDim.x) {
+        const double* c = sg + 4 * i;
+        if (c[0] == 0.0 && c[1] == 0.0 && c[2] == 0.0 && c[3] == 0.0) continue;
+        atomicAdd(grid + 2*i, c[0]); atomicAdd(grid + 2*i + 1, c[1]);
+        atomicAdd(grid + 2*(n_fine + i), c[2]); atomicAdd(grid + 2*(n_fine + i) + 1, c[3]);
+    }
+}
+"""
+#: SM tile (fine points) and maximum sources per subproblem.
+SM_TILE = int(os.environ.get("SM_TILE", "256"))
+SM_MAX_SOURCES = int(os.environ.get("SM_MAX_SOURCES", "1024"))
+#: Balanced-gather chunk (sources per warp item); largest privatized grid.
+ITEM_SOURCES = int(os.environ.get("ITEM_SOURCES", "256"))
+PRIV_MAX_FINE = int(os.environ.get("PRIV_MAX_FINE", "1536"))
+
+
+def _sm_kernel(name):
+    cache = _sm_kernel.__dict__.setdefault("cache", {})
+    if name not in cache:
+        cache[name] = _cp().RawKernel(_SM_SRC, name, options=(f"-DSM_TILE={SM_TILE}",))
+    return cache[name]
+
+
+def _sorted_sources(phase, packed, rid, off, width):
+    """Key by wrapped ``l0`` and sort: ``(u, l0, src, key)`` in key order."""
+    cp = _cp()
+    n = phase.size
+    u = cp.empty(n, dtype=cp.float64)
+    l0 = cp.empty(n, dtype=cp.int64)
+    key = cp.empty(n, dtype=cp.int64)
+    _sm_kernel("es_keys")(
+        ((n + 255) // 256,), (256,), (phase, np.int64(n), rid, off, np.int32(width), u, l0, key)
+    )
+    order = cp.argsort(key)
+    return u[order], l0[order], packed[order], key[order]
+
+
+def _spread_exact(kind, phase, packed, n_fine, width, beta, clock, work):
+    """Per-rectangle ``gather`` or ``sm`` spread into a ``(2, n_fine)`` grid."""
+    cp = _cp()
+    if kind == "priv":
+        from pyrite.montecarlo.spectrum.cxr import _fourier_spread as fs
+
+        grid = cp.zeros((2, n_fine), dtype=cp.complex128)
+        n = phase.size
+        if n_fine <= PRIV_MAX_FINE:
+            blocks = int(min(1024, max(1, n // 4096)))
+            _sm_kernel("es_priv")(
+                (blocks,),
+                (256,),
+                (phase, packed, np.int64(n), np.int64(n_fine), np.int32(width), beta, grid),
+                shared_mem=32 * n_fine,
+            )
+            work["priv_sources"] = work.get("priv_sources", 0) + n
+        else:
+            fs._spread_kernel()(
+                ((n + 255) // 256,),
+                (256,),
+                (phase, packed, np.int64(n), np.int64(n_fine), np.int32(width), beta, grid),
+            )
+        return grid
+    off = cp.asarray([0, n_fine], dtype=cp.int64)
+    u, l0, src, key = _sorted_sources(phase, packed, None, off, width)
+    clock.mark("nufft_sort")
+    if kind == "gather":
+        start = cp.searchsorted(key, cp.arange(n_fine + 1, dtype=cp.int64))
+        grid = cp.empty((2, n_fine), dtype=cp.complex128)
+        _sm_kernel("es_gather")(
+            ((n_fine + 127) // 128,),
+            (128,),
+            (u, l0, src, start, off, np.int32(1), np.int64(n_fine), np.int32(width), beta, grid),
+        )
+        counts = cp.diff(start)
+        work["max_bin_sources"] = max(work.get("max_bin_sources", 0), int(counts.max()))
+        return grid
+    edges = cp.asnumpy(cp.searchsorted(key, cp.arange(0, n_fine + SM_TILE, SM_TILE)))
+    subs = []
+    for t, (a, b) in enumerate(zip(edges[:-1], edges[1:], strict=False)):
+        subs.extend(
+            (t * SM_TILE, s, min(b, s + SM_MAX_SOURCES)) for s in range(a, b, SM_MAX_SOURCES)
+        )
+    grid = cp.zeros((2, n_fine), dtype=cp.complex128)
+    if subs:
+        _sm_kernel("es_sm")(
+            (len(subs),),
+            (256,),
+            (
+                u,
+                l0,
+                src,
+                cp.asarray(subs, dtype=cp.int64),
+                np.int64(n_fine),
+                np.int32(width),
+                beta,
+                grid,
+            ),
+            shared_mem=32 * (SM_TILE + width - 1),
+        )
+    work["subproblems"] = work.get("subproblems", 0) + len(subs)
+    return grid
+
+
+def _gather_items(key, start, off_h, n_fine, width):
+    """(point, s_lo, s_hi) warp items: each point's window, split into chunks."""
+    cp = _cp()
+    G = int(off_h[-1])
+    g = cp.arange(G, dtype=cp.int64)
+    base = cp.asarray(np.repeat(off_h[:-1], n_fine))
+    nf = cp.asarray(np.repeat(n_fine, n_fine))
+    pt = g - base
+    main_lo = start[base + cp.maximum(pt - width + 1, 0)]
+    main_hi = start[g + 1]
+    wrap = pt < width - 1
+    w_first = cp.where(wrap, base + nf + pt - width + 1, base + nf)
+    wrap_lo = start[w_first]
+    wrap_hi = start[base + nf]
+    seg_g = cp.concatenate((g, g))
+    seg_lo = cp.concatenate((main_lo, wrap_lo))
+    seg_hi = cp.concatenate((main_hi, cp.where(wrap, wrap_hi, wrap_lo)))
+    chunks = (seg_hi - seg_lo + ITEM_SOURCES - 1) // ITEM_SOURCES
+    ends = cp.cumsum(chunks)
+    total = int(ends[-1])
+    t = cp.arange(total, dtype=cp.int64)
+    seg = cp.searchsorted(ends, t, side="right")
+    lo = seg_lo[seg] + (t - (ends - chunks)[seg]) * ITEM_SOURCES
+    hi = cp.minimum(lo + ITEM_SOURCES, seg_hi[seg])
+    return cp.ascontiguousarray(cp.stack((seg_g[seg], lo, hi), axis=1))
+
+
+def _batched_nufft(rects, phase, constant, linear, dt, out, *, eps, clock, work, items=False):
+    """All NUFFT rectangles of a flush: one key sort, one gather, per-rectangle FFT."""
+    from pyrite.montecarlo.spectrum.cxr import _fourier_spread as fs
+
+    cp = _cp()
+    width = fs.es_width(eps)
+    rects = np.asarray(rects, dtype=np.int64).reshape(-1, 4)
+    modes = rects[:, 1] - rects[:, 0]
+    lens = rects[:, 3] - rects[:, 2]
+    n_fine = np.maximum(fs._SIGMA * modes, 2 * width)
+    off_h = np.concatenate(([0], np.cumsum(n_fine)))
+    first = np.concatenate(([0], np.cumsum(lens)))[:-1]
+    total_src = int(lens.sum())
+    rid = cp.asarray(np.repeat(np.arange(len(rects), dtype=np.int32), lens))
+    idx = cp.arange(total_src, dtype=cp.int64) + cp.asarray(np.repeat(rects[:, 2] - first, lens))
+    ph = phase[idx]
+    shift = cp.asarray((rects[:, 0] + modes // 2).astype(np.float64))[rid]
+    mod = cp.exp(-1j * shift * ph)
+    packed = cp.stack((constant[idx] * mod, linear[idx] * mod), axis=1)
+    del mod, shift, idx
+    clock.mark("nufft_modulate")
+    off = cp.asarray(off_h)
+    u, l0, src, key = _sorted_sources(ph, packed, rid, off, width)
+    del ph, packed, rid
+    G = int(off_h[-1])
+    start = cp.searchsorted(key, cp.arange(G + 1, dtype=cp.int64))
+    beta = np.float64(fs._BETA_PER_WIDTH * width)
+    nrect = np.int32(len(rects))
+    work["max_bin_sources"] = int(cp.diff(start).max())
+    if items:
+        item = _gather_items(key, start, off_h, n_fine, width)
+        n_items = item.shape[0]
+        work["items"] = int(n_items)
+        clock.mark("nufft_sort")
+        grid = cp.zeros(2 * G, dtype=cp.complex128)
+        _sm_kernel("es_gather_items")(
+            ((n_items + 3) // 4,),
+            (128,),
+            (u, l0, key, src, item, np.int64(n_items), off, nrect, np.int32(width), beta, grid),
+        )
+        del item
+    else:
+        clock.mark("nufft_sort")
+        grid = cp.empty(2 * G, dtype=cp.complex128)
+        _sm_kernel("es_gather")(
+            ((G + 127) // 128,),
+            (128,),
+            (u, l0, src, start, off, nrect, np.int64(G), np.int32(width), beta, grid),
+        )
+    del key
+    del u, l0, src, start
+    clock.mark("nufft_spread")
+    plans = {}
+    for r, (j0, j1, _, _) in enumerate(rects.tolist()):
+        m, nf, base = j1 - j0, int(n_fine[r]), int(off_h[r])
+        deconv = plans.get(m)
+        if deconv is None:
+            deconv = plans[m] = fs._deconvolution(cp, m, nf, width)
+        g = grid[2 * base : 2 * base + 2 * nf].reshape(2, nf)
+        spectrum = cp.fft.fft(g, axis=1)
+        centred = cp.arange(-(m // 2), m - m // 2) % nf
+        moments = spectrum[:, centred] * deconv
+        t = dt * cp.arange(j0, j1, dtype=cp.float64)
+        out[j0:j1] += moments[0] - t * moments[1]
+    clock.mark("nufft_fft_deconv")
+    work["spread_points"] += total_src * width
+    work["fine_grid"] += G
+
+
 def _variant_kernel(name):
     cache = _variant_kernel.__dict__.setdefault("cache", {})
     if name not in cache:
@@ -508,6 +867,16 @@ def _es_transform(phase, strengths, j0, j1, *, eps, plans, clock, opts, work):
     n = phase.size
     beta = fs._BETA_PER_WIDTH * width
     spread = opts.get("spread", "fp64")
+    if spread in ("gather", "sm", "priv"):
+        grid = _spread_exact(spread, phase, packed, n_fine, width, np.float64(beta), clock, work)
+        clock.mark("nufft_spread")
+        spectrum = cp.fft.fft(grid, axis=1)
+        centred = cp.arange(-(modes // 2), modes - modes // 2) % n_fine
+        res = spectrum[:, centred] * deconv
+        clock.mark("nufft_fft_deconv")
+        work["spread_points"] += n * width
+        work["fine_grid"] += n_fine
+        return res
     if spread == "sorted":
         o = cp.argsort(cp.mod(phase, 2.0 * np.pi))
         phase, packed = phase[o], packed[o]
@@ -531,7 +900,14 @@ def _es_transform(phase, strengths, j0, j1, *, eps, plans, clock, opts, work):
     else:
         kernel = fs._spread_kernel()
         args = (phase, packed, np.int64(n), np.int64(n_fine), np.int32(width), np.float64(beta))
-    kernel(((n + 255) // 256,), (256,), (*args, grid))
+    if opts.get("rect_profile"):
+        ev0, ev1 = cp.cuda.Event(), cp.cuda.Event()
+        ev0.record()
+        kernel(((n + 255) // 256,), (256,), (*args, grid))
+        ev1.record()
+        work.setdefault("_ev", []).append((modes, n, n_fine, ev0, ev1))
+    else:
+        kernel(((n + 255) // 256,), (256,), (*args, grid))
     grid = grid.astype(cp.complex128, copy=False)
     clock.mark("nufft_spread")
     spectrum = cp.fft.fft(grid, axis=1)
@@ -564,7 +940,8 @@ def _positive(E_res, a_width, weight, c0, period, *, eps, opts, clock, work):
         rects = cp.asnumpy(cutoff_rectangle_array(counts, xp=cp))
     modes, sources = rects[:, 1] - rects[:, 0], rects[:, 3] - rects[:, 2]
     min_work = opts.get("min_work", fc._NUFFT_MIN_WORK["fp64"])
-    large = (sources >= 64) & (modes >= 32) & (sources * modes >= min_work)
+    min_modes = opts.get("min_modes", 32)
+    large = (sources >= 64) & (modes >= min_modes) & (sources * modes >= min_work)
     clock.mark("plan")
     work.update(
         rects=len(rects),
@@ -575,7 +952,23 @@ def _positive(E_res, a_width, weight, c0, period, *, eps, opts, clock, work):
         max_mode=last,
     )
     plans = {}
-    for j0, j1, lo, hi in rects[large].tolist():
+    if opts.get("batch") and large.any():
+        _batched_nufft(
+            rects[large],
+            phase,
+            constant,
+            linear,
+            dt,
+            out,
+            eps=eps,
+            clock=clock,
+            work=work,
+            items=opts["batch"] == "items",
+        )
+        large_rects = []
+    else:
+        large_rects = rects[large].tolist()
+    for j0, j1, lo, hi in large_rects:
         strengths = cp.stack((constant[lo:hi], linear[lo:hi]))
         moments = _es_transform(
             phase[lo:hi], strengths, j0, j1, eps=eps, plans=plans, clock=clock, opts=opts, work=work
@@ -674,10 +1067,17 @@ def instrumented_reduce(E_res, a_width, weight, axis, *, eps=1e-12, opts=None):
     else:
         out -= cp.asarray(_envelope_image_correction(E, a, w, c0, h, n_bins, P, cp))
     clock.mark("envelope")
-    return out, clock.totals(), work
+    totals = clock.totals()
+    profile = work.pop("_ev", None)
+    if profile:
+        work["rect_profile"] = [
+            (m, n, nf, cp.cuda.get_elapsed_time(a, b) / 1e3) for m, n, nf, a, b in profile
+        ]
+    return out, totals, work
 
 
 _FAST = {"direct": "f32", "envelope": "fused"}
+_V6 = {**_FAST, "eps": 1e-9}
 
 ARM_SETS = {
     "bench": (
@@ -709,6 +1109,35 @@ ARM_SETS = {
         ),
         ("fast_2^24_eps1e-9", {**_FAST, "min_work": 1 << 24, "eps": 1e-9}),
         ("fast_2^24_spread_f32_grid", {**_FAST, "min_work": 1 << 24, "spread": "f32_grid"}),
+    ),
+    # #1297 round 2: balanced warp gather and privatized small grids.
+    "sm2": (
+        ("v6_atomic_profile_2^24", {**_V6, "min_work": 1 << 24, "rect_profile": True}),
+        *(
+            (f"v6_atomic_min_modes_{m}_2^24", {**_V6, "min_work": 1 << 24, "min_modes": m})
+            for m in (64, 128, 256, 512)
+        ),
+    )
+    + tuple(
+        (f"v6_{name}_2^{b}", {**_V6, "min_work": 1 << b, **extra})
+        for b in (24, 22)
+        for name, extra in (
+            ("atomic", {}),
+            ("priv", {"spread": "priv"}),
+            ("items_batched", {"batch": "items"}),
+            ("gather_batched", {"batch": True}),
+        )
+    ),
+    # #1297: exact-pair spreaders on the fourier-auto-v6 settings.
+    "sm": tuple(
+        (f"v6_{name}_2^{b}", {**_V6, "min_work": 1 << b, **extra})
+        for b in (24, 22, 20)
+        for name, extra in (
+            ("atomic", {}),
+            ("gather", {"spread": "gather"}),
+            ("sm", {"spread": "sm"}),
+            ("gather_batched", {"batch": True}),
+        )
     ),
 }
 
@@ -776,6 +1205,7 @@ def bench(out_dir, repeats=3, arm_set="bench"):
                     phases_s=phases,
                     work=work,
                     error=_errors(cp.asnumpy(res), ref),
+                    error_vs_current=_errors(cp.asnumpy(res), current),
                 )
             )
             print(name, path.name, f"{arms[-1]['wall_s']:.3f}s", arms[-1]["error"], flush=True)
@@ -858,7 +1288,13 @@ def margins(out_json, scenes="all", histories=64, seed=642501, spacings="0.375,3
     os.environ["PYRITE_MC_TRANSPORT_PRECISION"] = "fp64"
     gate = runpy.run_path(str(Path(__file__).with_name("defaults_spectral_gate_642.py")))
     real = fc.cuda_fourier_bin_mean_reduce
-    v5 = functools.partial(real, eps=1e-12, direct_precision="fp64")
+    # MARGIN_REF=v6 (#1297): reference is the v6 route (atomic ES spreader).
+    ref_name = os.environ.get("MARGIN_REF", "v5")
+    v5 = (
+        functools.partial(real, spread="atomic")
+        if ref_name == "v6"
+        else functools.partial(real, eps=1e-12, direct_precision="fp64", spread="atomic")
+    )
     names = list(SCENES) if scenes == "all" else scenes.split(",")
     rows = []
     record = dict(
@@ -869,7 +1305,11 @@ def margins(out_json, scenes="all", histories=64, seed=642501, spacings="0.375,3
         seed=int(seed),
         band_eV=list(gate["BAND"]),
         margins=gate["MARGINS"],
-        reference="fourier-auto-v5 route (eps 1e-12, FP64 direct) on the same transport",
+        reference=(
+            "fourier-auto-v6 route (atomic ES spreader) on the same transport"
+            if ref_name == "v6"
+            else "fourier-auto-v5 route (eps 1e-12, FP64 direct) on the same transport"
+        ),
         scenes=rows,
     )
     for name in names:
@@ -923,10 +1363,66 @@ def margins(out_json, scenes="all", histories=64, seed=642501, spacings="0.375,3
         _write(out_json, record)
 
 
+def spread_bench(out_dir, repeats=5):
+    """#1297: production ``cuda_fourier_bin_mean_reduce`` per spreader on the saved flushes.
+
+    Wall (synchronized, median of ``repeats`` after a warm call) of the
+    default (``spread="gather"``) and ``spread="atomic"`` (v6) routes, the
+    gather's error against v6 and against v5, and a repeat of the gather for
+    run-to-run spread. Record: ``spread_bench.json``.
+    """
+    from pyrite.montecarlo.spectrum.cxr._fourier_cuda import cuda_fourier_bin_mean_reduce as f
+
+    cp = _cp()
+    out = Path(out_dir)
+    rows = []
+    for path in sorted(out.glob("flush-*.npz")):
+        z = np.load(path)
+        E, a, w = (cp.asarray(z[k]) for k in ("E_res", "a_width", "weight"))
+        c0, h, n_bins = z["axis"].tolist()
+        axis = (c0, h, int(n_bins))
+        arms = {
+            "gather": {},
+            "atomic": {"spread": "atomic"},
+            "v5": {"eps": 1e-12, "direct_precision": "fp64", "spread": "atomic"},
+        }
+        res, walls = {}, {}
+        for name, kw in arms.items():
+            res[name] = cp.asnumpy(f(E, a, w, axis, **kw))
+            times = []
+            for _ in range(repeats):
+                _sync()
+                t0 = time.perf_counter()
+                f(E, a, w, axis, **kw)
+                _sync()
+                times.append(time.perf_counter() - t0)
+            walls[name] = float(np.median(times))
+        again = cp.asnumpy(f(E, a, w, axis))
+        rows.append(
+            dict(
+                flush=path.name,
+                lines=int(E.size),
+                wall_s=walls,
+                speedup_vs_v6=walls["atomic"] / walls["gather"],
+                gather_vs_v6=_errors(res["gather"], res["atomic"]),
+                gather_vs_v5=_errors(res["gather"], res["v5"]),
+                v6_vs_v5=_errors(res["atomic"], res["v5"]),
+                gather_repeat=_errors(again, res["gather"]),
+            )
+        )
+        print(path.name, walls, rows[-1]["gather_vs_v6"], flush=True)
+        _write(
+            out / "spread_bench.json",
+            dict(issue=1297, code_sha=os.environ.get("PROBE_SHA"), gpu=_gpu(), rows=rows),
+        )
+
+
 if __name__ == "__main__":
     cmd, *rest = sys.argv[1:]
     if cmd == "capture":
         capture(*rest)
+    elif cmd == "spread":
+        spread_bench(rest[0], int(rest[1]) if len(rest) > 1 else 5)
     elif cmd == "margins":
         margins(*rest)
     elif cmd in ARM_SETS:
