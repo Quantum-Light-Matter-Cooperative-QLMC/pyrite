@@ -481,8 +481,8 @@ _RUNNER_SCRIPT = textwrap.dedent(
 )
 
 
-# Line spectra reduce on the device with float32 atomics in unspecified order:
-# two full-history runs of one case already differ in the last bits (#1225).
+# Device line reductions are not bitwise repeatable: two full-history runs of
+# one case already differ in the last bits (#1225; FP64 sums since #1313).
 # Brem and the grids stay bitwise, which pins the trajectories themselves.
 _DEVICE_ORDER_SPECTRA = frozenset({"spec", "spec_characteristic", "spec_pxr", "spec_cbs"})
 
