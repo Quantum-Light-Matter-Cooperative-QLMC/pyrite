@@ -147,7 +147,7 @@ def test_case_refuses_resonance_local_without_bin_mean():
 @pytest.mark.parametrize(
     "kind", ["legacy", "elsepa", "eedl-fallback", "coupled", "multilayer", "coherent", "cascade"]
 )
-def test_pre_adapter_case_and_identity_baseline(monkeypatch, kind):
+def test_pre_adapter_case_and_identity_baseline(monkeypatch, identity_pin, kind):
     """Freeze resolved payloads and both cache keys at #485's parent commit."""
     import json
     from pathlib import Path
@@ -167,15 +167,18 @@ def test_pre_adapter_case_and_identity_baseline(monkeypatch, kind):
         return
     else:
         actual = resolved_baseline(kind)
-    expected = json.loads(
-        (Path(__file__).parents[2] / "data/physics-baseline/resolved.json").read_text()
-    )[kind]
+    path = Path(__file__).parents[2] / "data/physics-baseline/resolved.json"
+    expected = json.loads(path.read_text())[kind]
     # JSON conversion preserves field omission while normalizing tuples/arrays.
     actual = json.loads(json.dumps(actual, default=lambda array: array.tolist()))
-    assert actual == expected
+    assert actual.keys() == expected.keys()
+    # The payload is a compatibility fixture: `--update-pins` never rewrites it.
+    assert actual["case"] == expected["case"]
+    for field in ("case_content_key", "parameter_sha256"):
+        identity_pin.in_file(path, (kind, field), actual[field])
 
 
-def test_channeling_case_and_identity_baseline():
+def test_channeling_case_and_identity_baseline(identity_pin):
     """Freeze the planar channeling family's resolved payload and content key (#506)."""
     import json
     import warnings
@@ -190,10 +193,12 @@ def test_channeling_case_and_identity_baseline():
         # ...and the #1148 node-sampling advisory: the frozen payload keeps node lines.
         warnings.filterwarnings("ignore", "planar channeling with off-own-row", UserWarning)
         actual = resolved_channeling_baseline()
-    expected = json.loads(
-        (Path(__file__).parents[2] / "data/physics-baseline/channeling.json").read_text()
-    )
-    assert json.loads(json.dumps(actual, default=lambda array: array.tolist())) == expected
+    path = Path(__file__).parents[2] / "data/physics-baseline/channeling.json"
+    expected = json.loads(path.read_text())
+    actual = json.loads(json.dumps(actual, default=lambda array: array.tolist()))
+    assert actual.keys() == expected.keys()
+    assert actual["case"] == expected["case"]
+    identity_pin.in_file(path, ("case_content_key",), actual["case_content_key"])
 
 
 def test_node_support_cutoff_restores_old_slots_and_round_trips_new_key():

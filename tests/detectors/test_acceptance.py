@@ -185,7 +185,7 @@ def test_flat_acceptance_keywords_and_positionals_are_removed():
     assert pr.Detector().polar_acceptance_deg is None
 
 
-def test_equal_acceptance_preserves_lowered_case_and_both_identities():
+def test_equal_acceptance_preserves_lowered_case_and_both_identities(identity_pin):
     angular = pr.detectors.AngularAcceptance(polar_deg=2, solid_angle_sr=0.001)
     modern = pr.Detector(135, acceptance=angular)
     legacy = pr.Detector(135, _legacy_acceptance=(2, 0.001))
@@ -211,19 +211,15 @@ def test_equal_acceptance_preserves_lowered_case_and_both_identities():
     # #642: default shell soft-loss straggling (straggling=False keeps 0ea5469b...).
     # #1281: measured-shell-cutoff-v6 reflection-selection marker.
     # #1301: measured-shell-cutoff-v7 (fiber-texture domain).
-    assert (
-        case_content_key(cases[1])
-        == "eafc3305af6b784db738ec989bc6bcd5e742ad001679976da6f208d6a7e6eb01"
-    )
+    identity_pin("case/hopg/30keV-1000A-acceptance/case_content_key", case_content_key(cases[1]))
     sweeps = [
         LegacySweep(material="hopg", beam=beam.to_spec(), target=target, detector=d)
         for d in (legacy, modern)
     ]
     identities = [dataset_identity("hopg", Settings(), s) for s in sweeps]
     assert identities[0] == identities[1]
-    assert (
-        identities[1]["parameter_sha256"]
-        == "9ad0be0292105e75a0909439e68579c651c990cb56b8d5ee5e763d6ae1d72c6d"
+    identity_pin(
+        "dataset/hopg/legacy-sweep-detector/parameter_sha256", identities[1]["parameter_sha256"]
     )
     # Pin to the pre-object payload vocabulary; no acceptance metadata enters identity.
     assert "detector" not in identities[0]["resolved_parameters"]["sweep"]

@@ -92,7 +92,7 @@ def test_lowering_uses_policy_maximum(scene, numerics):
     assert Case(**first.to_dict()).adaptive_precision == first.adaptive_precision
 
 
-def test_fixed_n_identity_matches_the_pre_precision_baseline():
+def test_fixed_n_identity_matches_the_pre_precision_baseline(identity_pin):
     sweep = LegacySweep(
         material="hopg", beam=BeamSpec(energy_keV=30), thickness_ang=1e4, tilt_deg=30
     )
@@ -106,10 +106,7 @@ def test_fixed_n_identity_matches_the_pre_precision_baseline():
     # payload); the dataset identity, which hashes no case policy, did not.
     # #1301 adds the fiber-texture domain to hopg's dataset crystallography.
     identity = dataset_identity("hopg", Settings(), sweep, bremsstrahlung_model="eedl")
-    assert (
-        identity["parameter_sha256"]
-        == "22c2dd763c7a7c55dbabe9d5ce5d3e6443ff3333bfbe600416e1c6fd425e5f61"
-    )
+    identity_pin("dataset/hopg/30keV-fixed-n-eedl/parameter_sha256", identity["parameter_sha256"])
     case = build_cases(
         sweep,
         n_electrons=60,
@@ -118,9 +115,7 @@ def test_fixed_n_identity_matches_the_pre_precision_baseline():
         radiative_model="uncoupled",
     )[0]
     assert "adaptive_precision" not in case
-    assert (
-        case_content_key(case) == "794b025c75a25d8a8675a47dd944f5c05af23295ae81cde9efff0d2d317d0c5d"
-    )
+    identity_pin("case/hopg/30keV-fixed-n-eedl/case_content_key", case_content_key(case))
 
 
 def test_adaptive_dataset_identity_hashes_policy_not_unused_fixed_counts(scene, precision):

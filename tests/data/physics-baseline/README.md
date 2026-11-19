@@ -5,6 +5,11 @@ Captured from unmodified runtime at commit
 on CPU/NumPy fp64, Python 3.14.4. These are compatibility fixtures, not independent
 physics references. Do not regenerate merely to make a refactor pass.
 
+The identity fields (`case_content_key`, `parameter_sha256`) of `resolved.json`
+and `channeling.json` are identity pins (#1316): after a deliberate generation
+change, `pyrite-dev test-suite identity-pins --update-pins` rewrites them while
+still asserting every case payload unchanged. Record the generation below.
+
 ## CBS v4 generation (#513)
 
 The deliberate static `Z - f0(g)` CBS potential correction in `e7c66c6f`

@@ -541,9 +541,39 @@ def test_test_suite_uses_memory_bounded_workers(dev_module, monkeypatch, suite) 
         str(path.relative_to(dev_module.ROOT)) for path in dev_module.test_files_for_suite(suite)
     ]
     blas = dict.fromkeys(dev_module.BLAS_THREAD_VARS, "1")
+    marker = dev_module.SUITE_MARKERS.get(suite)
+    marks = ("-m", marker) if marker else ()
     assert calls == [
-        (("-m", "pytest", "-n", "3", "--dist", "worksteal", *paths), {"extra_env": blas})
+        (("-m", "pytest", "-n", "3", "--dist", "worksteal", *marks, *paths), {"extra_env": blas})
     ]
+
+
+def test_identity_pin_suite_owns_every_identity_pin_module(dev_module) -> None:
+    """A module requesting the ``identity_pin`` fixture must be in the suite (#1316)."""
+    import re
+
+    tests_dir = dev_module.ROOT / "tests"
+    users = {
+        path.relative_to(tests_dir).as_posix()
+        for path in tests_dir.rglob("test_*.py")
+        if any(
+            re.search(r"\bidentity_pin\b", params)
+            for params in re.findall(r"def test_\w+\(([^)]*)\)", path.read_text(encoding="utf-8"))
+        )
+    }
+    assert users == set(dev_module.IDENTITY_PIN_TESTS)
+
+
+def test_identity_pin_suite_selects_pins_and_forwards_update(dev_module, monkeypatch) -> None:
+    calls = []
+    monkeypatch.setenv("PYRITE_TEST_WORKERS", "1")
+    monkeypatch.setattr(dev_module, "run", lambda *args: calls.append(args))
+
+    args = dev_module.build_parser().parse_args(["test-suite", "identity-pins", "--update-pins"])
+    args.func(args)
+
+    paths = [f"tests/{name}" for name in dev_module.IDENTITY_PIN_TESTS]
+    assert calls == [("-m", "pytest", "-m", "identity_pin", "--update-pins", *paths)]
 
 
 @pytest.mark.parametrize("pytest_args", [["-n", "2"], ["-p", "no:xdist"]])

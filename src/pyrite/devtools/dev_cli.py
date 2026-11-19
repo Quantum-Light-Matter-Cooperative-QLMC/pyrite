@@ -127,7 +127,20 @@ PRIMARY_TEST_SUITE_NAMES = (
     "materials",
     "xsgen",
 )
-TEST_SUITE_NAMES = (*PRIMARY_TEST_SUITE_NAMES, "integration")
+# Modules holding ``identity_pin`` tests (#1316); the ``identity-pins`` suite runs
+# only those tests (``-m identity_pin``). ``--update-pins`` re-mints every pin.
+IDENTITY_PIN_TESTS = (
+    "campaign/test_channeling_section.py",
+    "detectors/test_acceptance.py",
+    "materials/test_profiles.py",
+    "montecarlo/runner/test_case.py",
+    "scan/test_adaptive_api.py",
+)
+#: Cross-domain samples: they overlap the primary partition.
+SAMPLED_TEST_SUITES = {"integration": INTEGRATION_TESTS, "identity-pins": IDENTITY_PIN_TESTS}
+#: Marker expressions that narrow a sampled suite to its owned tests.
+SUITE_MARKERS = {"identity-pins": "identity_pin"}
+TEST_SUITE_NAMES = (*PRIMARY_TEST_SUITE_NAMES, *SAMPLED_TEST_SUITES)
 
 
 class AgentToolingError(RuntimeError):
@@ -408,16 +421,17 @@ def test_files_for_suite(name: str, root: Path = ROOT) -> list[Path]:
 
     Primary domain suites partition every ``tests/**/test_*.py`` module once.
     ``core`` owns shared infrastructure and modules outside the named domains.
-    ``integration`` intentionally samples public boundaries across domains; the
-    full ``pyrite-dev test`` gate remains unchanged.
+    ``integration`` intentionally samples public boundaries across domains, and
+    ``identity-pins`` the modules holding identity pins; the full
+    ``pyrite-dev test`` gate remains unchanged.
     """
     tests_dir = root / "tests"
     files = sorted(tests_dir.rglob("test_*.py"))
-    if name == "integration":
-        selected = [tests_dir / filename for filename in INTEGRATION_TESTS]
+    if name in SAMPLED_TEST_SUITES:
+        selected = [tests_dir / filename for filename in SAMPLED_TEST_SUITES[name]]
         missing = [path.name for path in selected if not path.is_file()]
         if missing:
-            raise AgentToolingError("missing integration tests: " + ", ".join(missing))
+            raise AgentToolingError(f"missing {name} tests: " + ", ".join(missing))
         return selected
     if name not in PRIMARY_TEST_SUITE_NAMES:
         raise AgentToolingError(f"unknown test suite {name!r}")
@@ -450,6 +464,8 @@ def cmd_test_suite(args: argparse.Namespace) -> None:
     if pytest_args[:1] == ["--slow"]:
         args.slow = True
         pytest_args = pytest_args[1:]
+    if (marker := SUITE_MARKERS.get(args.suite)) is not None:
+        pytest_args = ["-m", marker, *pytest_args]
     _run_pytest(args, *parallel_pytest_args(pytest_args), *paths)
 
 
@@ -983,7 +999,8 @@ def build_parser(prog_name: str = "pyrite-dev") -> argparse.ArgumentParser:
         help="run one focused domain suite",
         description=(
             "Run one domain partition; core contains shared/residual tests. "
-            "integration is an overlapping public-boundary sample. "
+            "integration is an overlapping public-boundary sample; identity-pins "
+            "runs only identity-pin tests (add --update-pins to re-mint them). "
             "Use test for the full suite."
         ),
     )

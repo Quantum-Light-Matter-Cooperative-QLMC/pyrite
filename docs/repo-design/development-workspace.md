@@ -79,6 +79,10 @@ pyrite-dev precommit
 # Cross-boundary sample only when those public boundaries are affected.
 pyrite-dev test-suite integration
 
+# Identity pins only; after a *_MODEL / tables-*-N bump, re-mint them in one pass.
+pyrite-dev test-suite identity-pins
+pyrite-dev test-suite identity-pins --update-pins
+
 # Validate and render committed tutorial captures alongside repository checks.
 pyrite-dev verify
 
@@ -108,7 +112,7 @@ Use the project runner rather than bare `pytest` or an environment-specific Pyth
 See [CPU startup latency](compute/startup-latency.md) for benchmark cache policies,
 profiling, and the recorded baseline.
 
-Suite ownership is structural (`pyrite.devtools.dev_cli`). Monte Carlo tests live in suite directories under `tests/montecarlo/` (`transport/`, `collisions/`, `cascades/`, `runner/`, `spectrum/`, `coherent/`, `brem/`, `channeling/`, `quantum/`), and `tests/energy-grid/`, `tests/materials/` and `tests/xsgen/` own their suites, so a new module joins its directory's suite with no routing edit. A short explicit list of cross-directory exceptions (the public-boundary `cli`, `apps` and `packaging` selections, plus channeling tests under `tests/materials/`) takes precedence; `core` owns the remainder. Only listed exceptions may sit directly in `tests/montecarlo/`. Regression tests require all primary suites to partition every test module exactly once and require CI's matrix to match that inventory. Empty selections fail rather than accidentally invoking the full suite. The `integration` suite intentionally overlaps primary suites; it samples public imports/data, exports, CLI contract, remote, sweep/run, and a headless app path.
+Suite ownership is structural (`pyrite.devtools.dev_cli`). Monte Carlo tests live in suite directories under `tests/montecarlo/` (`transport/`, `collisions/`, `cascades/`, `runner/`, `spectrum/`, `coherent/`, `brem/`, `channeling/`, `quantum/`), and `tests/energy-grid/`, `tests/materials/` and `tests/xsgen/` own their suites, so a new module joins its directory's suite with no routing edit. A short explicit list of cross-directory exceptions (the public-boundary `cli`, `apps` and `packaging` selections, plus channeling tests under `tests/materials/`) takes precedence; `core` owns the remainder. Only listed exceptions may sit directly in `tests/montecarlo/`. Regression tests require all primary suites to partition every test module exactly once and require CI's matrix to match that inventory. Empty selections fail rather than accidentally invoking the full suite. The `integration` suite intentionally overlaps primary suites; it samples public imports/data, exports, CLI contract, remote, sweep/run, and a headless app path. The `identity-pins` suite also overlaps: it runs only tests marked `identity_pin` (auto-applied to users of the `identity_pin` fixture, `tests/helpers/identity_pins.py`) in the modules listed in `IDENTITY_PIN_TESTS`. Pinned dataset/case digests and named stems live in `tests/data/identity-pins.json`; the physics-baseline identity fields stay in `tests/data/physics-baseline/resolved.json` and `channeling.json`. `--update-pins` rewrites every moved pin in one run instead of failing (case payloads are still asserted), so a deliberate identity generation change is re-minted by one command and reviewed as a JSON diff. A regression test requires every module that requests the fixture to be listed.
 
 | Suite | Ownership |
 |---|---|

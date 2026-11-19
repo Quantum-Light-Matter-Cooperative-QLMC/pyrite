@@ -55,11 +55,23 @@ from pyrite.console import config as _config  # noqa: E402
 
 _config.CONFIG_PATH = Path(tempfile.gettempdir()) / "pyrite-tests-absent-store" / "config.toml"
 
-# Opt-in ``slow`` tier (#381): pytest finds the hooks by name in this namespace.
-from tests.helpers.slow_marker import (  # noqa: E402, F401
-    pytest_collection_modifyitems,
-    pytest_terminal_summary,
+# Pytest finds hooks and fixtures by name in this namespace: the opt-in ``slow``
+# tier (#381) and the identity-pin registry (#1316: ``--update-pins`` and the
+# ``identity_pin`` fixture).
+from tests.helpers import slow_marker as _slow_marker  # noqa: E402
+from tests.helpers.identity_pins import (  # noqa: E402, F401
+    identity_pin,
+    mark_identity_pin_tests,
+    pytest_addoption,
 )
+from tests.helpers.slow_marker import pytest_terminal_summary  # noqa: E402, F401
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_collection_modifyitems(config, items):
+    # Mark before pytest's own ``-m`` deselection sees the items.
+    mark_identity_pin_tests(items)
+    _slow_marker.pytest_collection_modifyitems(config, items)
 
 
 def pytest_configure(config):

@@ -151,8 +151,10 @@ Do not add separate tutorial provenance manifests or HTML/session exports.
   `docs/repo-design/complexity.md`.
 - New tests >5 s wall or with large peak RSS get `@pytest.mark.slow`
   (default runs skip them; CI runs them). Check with `--durations=0`.
-- When a `*_MODEL` marker or `tables-*-N` tag changes, `rg` every identity
-  digest/pin derived from it and re-pin all in one pass before committing.
+- When a `*_MODEL` marker or `tables-*-N` tag changes, re-mint identity pins in
+  one pass: `pyrite-dev test-suite identity-pins --update-pins`, review the
+  `tests/data/identity-pins.json` / physics-baseline diff, then `rg` for any
+  other derived digest outside that registry.
 
 ## Shell, runs, and shipping
 

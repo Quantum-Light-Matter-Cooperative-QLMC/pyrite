@@ -100,7 +100,7 @@ def test_case_content_key_matches_across_profiles_for_shared_cases():
     assert any(E0 > 100.0 for _, E0 in standard) and not any(E0 > 100.0 for _, E0 in sub)
 
 
-def test_typed_case_content_key_matches_pre_case_golden():
+def test_typed_case_content_key_matches_pre_case_golden(identity_pin):
     case = build_cases(material_sweep("hopg"), n_electrons=300, n_electrons_brem=150)[0]
 
     assert case_content_key(case) == case_content_key(case.to_dict())
@@ -142,20 +142,16 @@ def test_typed_case_content_key_matches_pre_case_golden():
     # #1243: the default line bandwidth is resonance-population (policy payload).
     # #642: shell transport defaults to restricted soft-loss straggling.
     # #1301: measured-shell-cutoff-v7; fiber HOPG selects automatically.
-    assert case_content_key(case) == (
-        "e48ae235bbd562c0000f1040c78d90b43cf7b585076f1d10ade7e90b7ff9e8ed"
-    )
+    identity_pin("case/hopg/default-300x150/case_content_key", case_content_key(case))
 
 
-def test_dataset_identity_dispatches_through_recorded_v1():
+def test_dataset_identity_dispatches_through_recorded_v1(identity_pin):
     sweep = material_sweep("hopg")
     identity = dataset_identity("hopg", default_settings(), sweep)
 
     assert set(IDENTITY_MIGRATIONS) == {1}
     assert identity["identity_version"] == 1
-    assert identity["parameter_sha256"] == (
-        "0517d46172b4b26fd6ba76b3f86394b661d96690ba33c5bffc5a2f19eacbe213"
-    )
+    identity_pin("dataset/hopg/default/parameter_sha256", identity["parameter_sha256"])
     with pytest.raises(ValueError, match="unsupported dataset identity version"):
         dataset_identity("hopg", default_settings(), sweep, identity_version=2)
 
@@ -609,13 +605,11 @@ def test_case_content_key_separates_bremsstrahlung_models():
     assert bethe_heitler_era != current
 
 
-def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
+def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit(identity_pin):
     identity = dataset_identity("hopg", default_settings(), material_sweep("hopg"))
     sweep_payload = identity["resolved_parameters"]["sweep"]
 
-    assert identity["parameter_sha256"] == (
-        "0517d46172b4b26fd6ba76b3f86394b661d96690ba33c5bffc5a2f19eacbe213"
-    )
+    identity_pin("dataset/hopg/default/parameter_sha256", identity["parameter_sha256"])
     assert "detector" not in sweep_payload
     assert sweep_payload["theta_obs_deg"] == 90.0
     assert sweep_payload["dtheta_obs_deg"] is None
@@ -623,53 +617,20 @@ def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
 
 
 @pytest.mark.parametrize(
-    ("catalog_profile", "material", "digest"),
+    ("catalog_profile", "material"),
     [
-        (
-            "hopg_hbn_gaussian_200fs",
-            "hopg",
-            "cc6fd88d598d32f8c6bf33fedf62871561d03b89bc9d0d410054fa502abca8dd",
-        ),
-        (
-            "hopg_hbn_gaussian_200fs",
-            "hbn",
-            "644a97d89e87e768ae78d0c0e5f114e623b87b6bfca1b5da4191f072385a57d2",
-        ),
-        (
-            "hopg_hbn_microtrain_200fs",
-            "hopg",
-            "b0584903adcbfbbd680c197c27f7dae4bf1c251bf666720fbef47d8540978634",
-        ),
-        (
-            "hopg_hbn_microtrain_200fs",
-            "hbn",
-            "1e43ea4407570accd53f25cd1dfb32688f0caf8170f47c22f07180e7c2199eb6",
-        ),
-        (
-            "hopg_hbn_compressed_microbunch",
-            "hopg",
-            "137450a921309209b36ec7df37f9074cada0c94441d92a51a06bb1dcc4f92421",
-        ),
-        (
-            "hopg_hbn_compressed_microbunch",
-            "hbn",
-            "65f601a5eeaf066fe291ef9d0f33a340781873b4d8d3dcbded0d3559ae44851c",
-        ),
-        (
-            "hopg_emittance_demo",
-            "hopg",
-            "fa9bc3fef26f510ab9e97566f9939853d44fd6ba711327aa5d3485595f8ede42",
-        ),
-        (
-            "promising_low_ne",
-            "hopg",
-            # #465: coherent operator identity advanced to physical-distinct-pairs-v4.
-            "45a920a8a65b99d07164b5e530c893bb4859eff31df6551bbf53a090a3a6d5d5",
-        ),
+        ("hopg_hbn_gaussian_200fs", "hopg"),
+        ("hopg_hbn_gaussian_200fs", "hbn"),
+        ("hopg_hbn_microtrain_200fs", "hopg"),
+        ("hopg_hbn_microtrain_200fs", "hbn"),
+        ("hopg_hbn_compressed_microbunch", "hopg"),
+        ("hopg_hbn_compressed_microbunch", "hbn"),
+        ("hopg_emittance_demo", "hopg"),
+        ("promising_low_ne", "hopg"),
     ],
 )
 def test_named_beam_migration_keeps_shipped_profile_digests_bit_for_bit(
-    lab_catalog, catalog_profile, material, digest
+    lab_catalog, identity_pin, catalog_profile, material
 ):
     """Every shipped profile that carried an inline ``[profiles.NAME.beam]`` block
     now carries ``beam = "NAME"`` instead. The reference resolves to values before
@@ -770,7 +731,9 @@ def test_named_beam_migration_keeps_shipped_profile_digests_bit_for_bit(
     :func:`test_typed_case_content_key_matches_pre_case_golden`."""
     identity = named_profile_identity(material, catalog_profile=catalog_profile)
 
-    assert identity["parameter_sha256"] == digest
+    identity_pin(
+        f"dataset/{material}/{catalog_profile}/parameter_sha256", identity["parameter_sha256"]
+    )
 
 
 def test_nondefault_detector_round_trips_cases_identity_and_stem():
@@ -883,7 +846,7 @@ def test_emission_mode_resolves_through_profile_to_settings(emission, coherent):
     assert resolved.coherent_emission is coherent
 
 
-def test_emission_modes_yield_three_distinct_digests_incoherent_unchanged():
+def test_emission_modes_yield_three_distinct_digests_incoherent_unchanged(identity_pin):
     """dataset_identity emits a distinct digest per emission mode, and the
     incoherent path still adds no key of its own to the hashed payload."""
     sweep = material_sweep("hopg")
@@ -917,9 +880,7 @@ def test_emission_modes_yield_three_distinct_digests_incoherent_unchanged():
     # issue #256's dropped uniform E_grid_brem override, which the sweep-level
     # payload hashes although no case grid changed, and again for #642's
     # default restricted soft-loss straggling) must stay bit-for-bit.
-    assert incoherent["parameter_sha256"] == (
-        "0517d46172b4b26fd6ba76b3f86394b661d96690ba33c5bffc5a2f19eacbe213"
-    )
+    identity_pin("dataset/hopg/default/parameter_sha256", incoherent["parameter_sha256"])
 
 
 def test_identity_from_stem_resolves_non_standard_catalog_profile():
@@ -977,15 +938,11 @@ def test_retired_survey_stems_resolve_only_from_their_sidecar(tmp_path, stem):
 
 # Golden pins (#1079): retiring the fidelity machinery must leave every named
 # stem byte-identical. Re-pin together with the digests above on a *_MODEL bump.
-@pytest.mark.parametrize(
-    ("profile", "material", "stem"),
-    [
-        ("standard", "hopg", "hopg@full-0f35815448da"),
-        ("standard", "mose2", "mose2@full-00331579b646"),
-    ],
-)
-def test_named_profile_stems_are_pinned(profile, material, stem):
-    assert named_profile_stem(material, catalog_profile=profile) == stem
+@pytest.mark.parametrize(("profile", "material"), [("standard", "hopg"), ("standard", "mose2")])
+def test_named_profile_stems_are_pinned(identity_pin, profile, material):
+    identity_pin(
+        f"stem/{material}/{profile}", named_profile_stem(material, catalog_profile=profile)
+    )
 
 
 def test_identity_from_stem_reads_sidecar_when_profile_edited_after_run(tmp_path):
@@ -1206,7 +1163,7 @@ def test_mixed_transport_forks_identity_by_parameter():
     assert len(digests) == 4
 
 
-def test_atomic_electron_deflection_forks_identity_and_none_restores_it():
+def test_atomic_electron_deflection_forks_identity_and_none_restores_it(identity_pin):
     """#317 is on by default; "none" omits its key; pins include #187’s Snell line marker."""
     settings = default_settings()
     sweep = material_sweep("hopg")
@@ -1216,8 +1173,9 @@ def test_atomic_electron_deflection_forks_identity_and_none_restores_it():
     assert settings.atomic_electron_deflection == "kawrakow"
     # The pre-#317 pins of test_dataset_identity_dispatches_through_recorded_v1
     # and test_typed_case_content_key_matches_pre_case_golden.
-    assert dataset_identity("hopg", off, sweep)["parameter_sha256"] == (
-        "b3af0e993920ef159430c7b54dcf7568e2838cc84ec482a58d5f299b0515813f"
+    identity_pin(
+        "dataset/hopg/default-no-deflection-no-straggling/parameter_sha256",
+        dataset_identity("hopg", off, sweep)["parameter_sha256"],
     )
     case = build_cases(
         sweep,
@@ -1228,8 +1186,9 @@ def test_atomic_electron_deflection_forks_identity_and_none_restores_it():
     )[0]
     assert "atomic_electron_deflection" not in case
     # #1243: the measured default line bandwidth moves the case key only.
-    assert case_content_key(case) == (
-        "acb40eb214795b055f5cf7432a4d63e8f5996c22755e1fccbba69cfa536c90e6"
+    identity_pin(
+        "case/hopg/default-300x150-no-deflection-no-straggling/case_content_key",
+        case_content_key(case),
     )
     with pytest.raises(ValueError, match="atomic_electron_deflection"):
         build_cases(sweep, 4, 4, atomic_electron_deflection="z1")
@@ -1254,37 +1213,44 @@ _PACKAGED_PROFILES = sorted(
 )
 
 
-@pytest.mark.parametrize("catalog_profile", _PACKAGED_PROFILES)
-def test_undeclared_case_brem_grid_is_automatic_refined_geometric(catalog_profile):
+# Every material on ``standard``; one of its own materials on each other packaged
+# profile. The grid is per medium and endpoint, so the full cross product (13
+# profiles x every material, ~100 s) repeated the same media (#1316).
+_BREM_GRID_CASES = [("standard", material) for material in CATALOG.material_keys] + [
+    (profile, (CATALOG.profile_materials(profile) or ("hopg",))[0])
+    for profile in _PACKAGED_PROFILES
+    if profile != "standard"
+]
+
+
+@pytest.mark.parametrize(("catalog_profile", "material"), _BREM_GRID_CASES)
+def test_undeclared_case_brem_grid_is_automatic_refined_geometric(catalog_profile, material):
     """Issue #278: a profile that declares no ``E_grid_brem`` resolves the
     automatic refined geometric continuum grid per case (medium floor to just
     past E0, ``dlnE = CONTINUUM_LOG_STEP`` plus edge/endpoint anchors) instead
     of the historical uniform 25 eV band."""
-    for material in CATALOG.material_keys:
-        sweep = material_sweep(
-            material,
-            catalog_profile=catalog_profile,
-            thickness_ang=1e4,
-            tilt_deg=45.0,
-            tilt_azim_deg=135.0,
+    sweep = material_sweep(
+        material,
+        catalog_profile=catalog_profile,
+        thickness_ang=1e4,
+        tilt_deg=45.0,
+        tilt_azim_deg=135.0,
+    )
+    assert sweep.energy_bins.brem is None, (catalog_profile, material)
+    medium = continuum_medium_key(sweep.material)
+    # A catalog stack's grid also spans its layers' media (#1164).
+    stack_media = automatic_continuum_stack_media(sweep)
+    for case in build_cases(sweep, n_electrons=300, n_electrons_brem=150, inelastic_model="auto"):
+        endpoint = case["E0_keV"] * 1e3
+        grid = np.asarray(case["E_grid_brem"], dtype=float)
+        np.testing.assert_array_equal(
+            grid, automatic_continuum_grid(medium, endpoint, stack_media=stack_media)
         )
-        assert sweep.energy_bins.brem is None, (catalog_profile, material)
-        medium = continuum_medium_key(sweep.material)
-        # A catalog stack's grid also spans its layers' media (#1164).
-        stack_media = automatic_continuum_stack_media(sweep)
-        for case in build_cases(
-            sweep, n_electrons=300, n_electrons_brem=150, inelastic_model="auto"
-        ):
-            endpoint = case["E0_keV"] * 1e3
-            grid = np.asarray(case["E_grid_brem"], dtype=float)
-            np.testing.assert_array_equal(
-                grid, automatic_continuum_grid(medium, endpoint, stack_media=stack_media)
-            )
-            assert np.all(np.diff(grid) > 0.0)
-            assert grid[-1] > endpoint
-            # Anchor merging drops samples near an anchor, widening a neighbour
-            # interval by a fraction of a step; it never doubles one.
-            assert np.max(np.diff(np.log(grid))) < 2.0 * CONTINUUM_LOG_STEP
+        assert np.all(np.diff(grid) > 0.0)
+        assert grid[-1] > endpoint
+        # Anchor merging drops samples near an anchor, widening a neighbour
+        # interval by a fraction of a step; it never doubles one.
+        assert np.max(np.diff(np.log(grid))) < 2.0 * CONTINUUM_LOG_STEP
 
 
 @pytest.mark.parametrize("catalog_profile", _PACKAGED_PROFILES)

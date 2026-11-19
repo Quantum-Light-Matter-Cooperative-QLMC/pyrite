@@ -185,7 +185,7 @@ def _profile_cases(material, profile):
     return sweep, settings, cases
 
 
-def test_channeling_demo_and_off_profile_identities_are_unchanged():
+def test_channeling_demo_and_off_profile_identities_are_unchanged(identity_pin):
     """The #1017 spelling migration preserves identity within a model generation.
 
     Pins refreshed for #1191's ``segment-mean-v8-node-support-tail`` marker;
@@ -221,19 +221,20 @@ def test_channeling_demo_and_off_profile_identities_are_unchanged():
     """
     sweep, settings, cases = _profile_cases("silicon", "channeling_demo")
     assert cases[0].line_quadrature == "bin-mean"
-    assert [profiles.case_content_key(case) for case in cases] == [
-        "c90218be9be87e5174bfb195c396260c3a6c00a39a2c0e5474a81766d18dc58b"
-    ]
-    assert profiles.named_profile_stem("silicon", catalog_profile="channeling_demo") == (
-        "silicon@channeling_demo-09efb458e836"
+    assert len(cases) == 1
+    identity_pin(
+        "case/silicon/channeling_demo/case_content_key", profiles.case_content_key(cases[0])
+    )
+    identity_pin(
+        "stem/silicon/channeling_demo",
+        profiles.named_profile_stem("silicon", catalog_profile="channeling_demo"),
     )
     identity = profiles.dataset_identity("silicon", settings, sweep)
-    assert identity["parameter_sha256"] == (
-        "09aae3d10b5990521277399b1301e03e8cabeb3ff963910fa21dca8cf8a955c5"
-    )
+    identity_pin("dataset/silicon/channeling_demo/parameter_sha256", identity["parameter_sha256"])
     sweep = material_sweep("hopg", catalog_profile="standard")
     settings = profiles.profile_run_settings(default_settings(), "standard", sweep=sweep)
-    assert profiles.dataset_identity("hopg", settings, sweep)["parameter_sha256"] == (
-        "0f35815448da11d50cf0b1582654a310ffbde0eef69da78e9fc57ea4c04994fd"
+    identity_pin(
+        "dataset/hopg/standard/parameter_sha256",
+        profiles.dataset_identity("hopg", settings, sweep)["parameter_sha256"],
     )
-    assert profiles.named_profile_stem("hopg") == "hopg@full-0f35815448da"
+    identity_pin("stem/hopg/standard", profiles.named_profile_stem("hopg"))
