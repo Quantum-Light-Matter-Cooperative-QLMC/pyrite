@@ -223,7 +223,7 @@ def test_equal_acceptance_preserves_lowered_case_and_both_identities():
     assert identities[0] == identities[1]
     assert (
         identities[1]["parameter_sha256"]
-        == "9b2e3d9c3ca11b8ae3b4745e76abafcb0932c797a4422485bc73b8258d65ad24"
+        == "9ad0be0292105e75a0909439e68579c651c990cb56b8d5ee5e763d6ae1d72c6d"
     )
     # Pin to the pre-object payload vocabulary; no acceptance metadata enters identity.
     assert "detector" not in identities[0]["resolved_parameters"]["sweep"]

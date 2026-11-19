@@ -225,15 +225,15 @@ def test_channeling_demo_and_off_profile_identities_are_unchanged():
         "c90218be9be87e5174bfb195c396260c3a6c00a39a2c0e5474a81766d18dc58b"
     ]
     assert profiles.named_profile_stem("silicon", catalog_profile="channeling_demo") == (
-        "silicon@channeling_demo-1e1ca671e28f"
+        "silicon@channeling_demo-09efb458e836"
     )
     identity = profiles.dataset_identity("silicon", settings, sweep)
     assert identity["parameter_sha256"] == (
-        "9b9084aa6a51f3babc6a77b21d960b9b923cd935b60403bc8fe3f7d98f9b12e0"
+        "09aae3d10b5990521277399b1301e03e8cabeb3ff963910fa21dca8cf8a955c5"
     )
     sweep = material_sweep("hopg", catalog_profile="standard")
     settings = profiles.profile_run_settings(default_settings(), "standard", sweep=sweep)
     assert profiles.dataset_identity("hopg", settings, sweep)["parameter_sha256"] == (
-        "fee957185ea0f6d2436df5f80334d217a5f934b0a1b5e7a2b647cfe13b9f05de"
+        "0f35815448da11d50cf0b1582654a310ffbde0eef69da78e9fc57ea4c04994fd"
     )
-    assert profiles.named_profile_stem("hopg") == "hopg@full-fee957185ea0"
+    assert profiles.named_profile_stem("hopg") == "hopg@full-0f35815448da"

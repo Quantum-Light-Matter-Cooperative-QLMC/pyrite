@@ -205,9 +205,9 @@ RESONANCE_BANDWIDTH_POLICY = "resonance-population"
 #: bandwidth is refused (feature windows); case builders pass it for other
 #: unaudited routes (:func:`default_bandwidth_policy`).
 AUTOMATIC_BANDWIDTH_POLICY = RESONANCE_BANDWIDTH_POLICY
-#: Dataset-identity generation of that default (#1243): incoherent digests carry
-#: it so checkpoints scored on the former ``kinematic-ceiling`` default re-key.
-LINE_BANDWIDTH_DEFAULT_MODEL = "resonance-population-default-v1"
+#: Dataset-identity generation of that default (#1243): incoherent digests carry it
+#: so checkpoints scored on an earlier default re-key. v2 (#1275): CuPy stop search.
+LINE_BANDWIDTH_DEFAULT_MODEL = "resonance-population-default-v2"
 #: Bandwidth selectors, default first.
 BANDWIDTH_POLICIES = (RESONANCE_BANDWIDTH_POLICY, KINEMATIC_BANDWIDTH_POLICY)
 #: Upper-edge truncation share of ``resonance-population``: the bandwidth row of
@@ -251,8 +251,8 @@ UNIFORM_RESOLUTION_POLICIES = (OVERSAMPLED_RESOLUTION_POLICY, NYQUIST_RESOLUTION
 LINE_NYQUIST_OVERSAMPLING = 8
 #: Default-resolution marker for incoherent dataset digests (#1214), so results
 #: scored on an earlier default re-key instead of resuming. v2 (#1265): bin-mean
-#: takes the shape step on every bandwidth, without a resonance-local overflow.
-LINE_RESOLUTION_DEFAULT_MODEL = f"sinc-oversampled-x{LINE_NYQUIST_OVERSAMPLING}-v2"
+#: takes the shape step on every bandwidth; v3 (#1275): CuPy spacing quantile.
+LINE_RESOLUTION_DEFAULT_MODEL = f"sinc-oversampled-x{LINE_NYQUIST_OVERSAMPLING}-v3"
 #: Relative error allowed in an isolated line's peak height and FWHM on a
 #: ``bin-mean`` ``sinc-oversampled`` axis: the #1143 shape margin, and the
 #: harness ``SHAPE_RTOL`` of ``line-grid-sinc-convergence``.

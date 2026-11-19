@@ -154,7 +154,7 @@ def test_dataset_identity_dispatches_through_recorded_v1():
     assert set(IDENTITY_MIGRATIONS) == {1}
     assert identity["identity_version"] == 1
     assert identity["parameter_sha256"] == (
-        "335bba2e7f002a103851166fe7b05eadd45e18a31c1ee2eda49151a2dc7c1846"
+        "0517d46172b4b26fd6ba76b3f86394b661d96690ba33c5bffc5a2f19eacbe213"
     )
     with pytest.raises(ValueError, match="unsupported dataset identity version"):
         dataset_identity("hopg", default_settings(), sweep, identity_version=2)
@@ -614,7 +614,7 @@ def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
     sweep_payload = identity["resolved_parameters"]["sweep"]
 
     assert identity["parameter_sha256"] == (
-        "335bba2e7f002a103851166fe7b05eadd45e18a31c1ee2eda49151a2dc7c1846"
+        "0517d46172b4b26fd6ba76b3f86394b661d96690ba33c5bffc5a2f19eacbe213"
     )
     assert "detector" not in sweep_payload
     assert sweep_payload["theta_obs_deg"] == 90.0
@@ -628,37 +628,37 @@ def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
         (
             "hopg_hbn_gaussian_200fs",
             "hopg",
-            "646ea2f5601e35116711bba782a770c20dcc234df2fbfb44bfad25abe20be705",
+            "cc6fd88d598d32f8c6bf33fedf62871561d03b89bc9d0d410054fa502abca8dd",
         ),
         (
             "hopg_hbn_gaussian_200fs",
             "hbn",
-            "b60f3e354f3167999ba190035d92a4746c56f19a2d882542685d2e3cb59c6721",
+            "644a97d89e87e768ae78d0c0e5f114e623b87b6bfca1b5da4191f072385a57d2",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hopg",
-            "0919ebd50bff7dbd11ff41235963c2b11b5723be948e717070d3e73403ffe499",
+            "b0584903adcbfbbd680c197c27f7dae4bf1c251bf666720fbef47d8540978634",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hbn",
-            "489bbad90b48e4e4498d67c2550c2047afeda325680d75f0949783fae7fa8cb4",
+            "1e43ea4407570accd53f25cd1dfb32688f0caf8170f47c22f07180e7c2199eb6",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hopg",
-            "2e91350dee0df3f9884dbdba4a92ee5a00e87d779a6465dbccfd000cb5313fc3",
+            "137450a921309209b36ec7df37f9074cada0c94441d92a51a06bb1dcc4f92421",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hbn",
-            "fd03cc3d29b17f9a5a52f3333692a56614443136a413aa800080921feb069f04",
+            "65f601a5eeaf066fe291ef9d0f33a340781873b4d8d3dcbded0d3559ae44851c",
         ),
         (
             "hopg_emittance_demo",
             "hopg",
-            "52cd9ca672db78c9487cbb1889a53aa63e6a880b3b55e57ccefec81b4a7eb328",
+            "fa9bc3fef26f510ab9e97566f9939853d44fd6ba711327aa5d3485595f8ede42",
         ),
         (
             "promising_low_ne",
@@ -918,7 +918,7 @@ def test_emission_modes_yield_three_distinct_digests_incoherent_unchanged():
     # payload hashes although no case grid changed, and again for #642's
     # default restricted soft-loss straggling) must stay bit-for-bit.
     assert incoherent["parameter_sha256"] == (
-        "335bba2e7f002a103851166fe7b05eadd45e18a31c1ee2eda49151a2dc7c1846"
+        "0517d46172b4b26fd6ba76b3f86394b661d96690ba33c5bffc5a2f19eacbe213"
     )
 
 
@@ -980,8 +980,8 @@ def test_retired_survey_stems_resolve_only_from_their_sidecar(tmp_path, stem):
 @pytest.mark.parametrize(
     ("profile", "material", "stem"),
     [
-        ("standard", "hopg", "hopg@full-fee957185ea0"),
-        ("standard", "mose2", "mose2@full-38495501110c"),
+        ("standard", "hopg", "hopg@full-0f35815448da"),
+        ("standard", "mose2", "mose2@full-00331579b646"),
     ],
 )
 def test_named_profile_stems_are_pinned(profile, material, stem):
@@ -1217,7 +1217,7 @@ def test_atomic_electron_deflection_forks_identity_and_none_restores_it():
     # The pre-#317 pins of test_dataset_identity_dispatches_through_recorded_v1
     # and test_typed_case_content_key_matches_pre_case_golden.
     assert dataset_identity("hopg", off, sweep)["parameter_sha256"] == (
-        "8f787d79a7079d87a01d474c43275bc402e8c474fdd0d637a700427cdbb67920"
+        "b3af0e993920ef159430c7b54dcf7568e2838cc84ec482a58d5f299b0515813f"
     )
     case = build_cases(
         sweep,
