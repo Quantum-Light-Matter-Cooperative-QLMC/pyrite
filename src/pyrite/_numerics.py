@@ -60,12 +60,12 @@ def _emission_selection(value: object) -> tuple[EmissionMode, ...]:
 SAMPLING_KEYS = ("n_electrons", "n_electrons_brem")
 # v3 (#1200): selection line calls are sized from the tabulation length,
 # not a fixed 512 reflections; only the float summation order moves.
-# v4 (#1250): radiators with a lattice-share-corrected continuum stop on the
-# shell net yield (lines less their continuum share) against the consistent
-# total, not on the line yield alone.
+# v4 (#1250): radiators with a lattice-share-corrected continuum stop on the shell net
+# yield (lines less their continuum share) against the consistent total.
 # v5 (#1243): automatic axes select on bin masses in the common ceiling band.
 # v6 (#1281): select on the electron prefix ``elec_id < SELECTION_HISTORIES``.
-CXR_REFLECTION_SELECTION_MODEL = "measured-shell-cutoff-v7"
+# v8 (#1326): exact band-mass decision yield; a prefix-covered population is scored once.
+CXR_REFLECTION_SELECTION_MODEL = "measured-shell-cutoff-v8"
 
 CONVERGENCE_KEYS = (
     "n_families",

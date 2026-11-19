@@ -143,6 +143,7 @@ def test_typed_case_content_key_matches_pre_case_golden(identity_pin):
     # #1243: the default line bandwidth is resonance-population (policy payload).
     # #642: shell transport defaults to restricted soft-loss straggling.
     # #1301: measured-shell-cutoff-v7; fiber HOPG selects automatically.
+    # #1326: measured-shell-cutoff-v8; exact band-mass decision yield, single pass.
     identity_pin("case/hopg/default-300x150/case_content_key", case_content_key(case))
 
 
@@ -714,6 +715,10 @@ def test_named_beam_migration_keeps_shipped_profile_digests_bit_for_bit(
     Issue #1301 re-minted every pin for ``measured-shell-cutoff-v7``; the HOPG
     and h-BN payloads also move, since fiber texture replaces their (00l) pins
     with automatic selection.
+
+    Issue #1326 re-minted every pin for ``measured-shell-cutoff-v8`` (exact
+    band-mass decision yield; one scoring pass when the prefix covers the
+    population).
 
     Issue #278 re-minted BremsLib pins for ``angle-f64-v1``: direction cosines
     retain binary64 precision through inverse cosine on every backend.
