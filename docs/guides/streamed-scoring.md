@@ -54,8 +54,25 @@ pass ends, however it ends. Peak disk use is about twice the line-segment data
 plus the production lines: roughly 170 kB per electron for h-BN at 5 MeV, 1 mm,
 so 10^6 primaries need about 170 GB free. If the projection does not fit, the
 run stops at the first block with a `LineGridSpillError` naming the space
-needed; free space there or move the workspace to a larger disk. Explicit
+needed; free space there or point the spill at a larger disk. Explicit
 `energy_bins` or a cached grid need neither the memory nor the disk.
+
+To spill to a large scratch file system, or at a different size, set
+`KernelTuning.stream_spill_dir` (a path) and `stream_spill_mib` (MiB of held
+or projected evidence; `0` always spills; default 2048) next to the streaming
+option:
+
+<!-- verify: skip (illustrative; runs a full simulation) -->
+```python
+numerics = numerics.with_kernel_tuning(
+    KernelTuning(stream_memory_mib=32_768, stream_spill_dir="/scratch/pyrite", stream_spill_mib=0)
+)
+```
+
+Both require `stream_block_electrons` or `stream_memory_mib`. `pyrite.simulate`
+creates the directory and refuses an unwritable one before transport. Each run
+uses its own subdirectory, removed when the pass ends. The grid, case identity
+and line-grid cache are unchanged.
 
 ## Choose the block size
 

@@ -68,6 +68,11 @@ case identity.
 `None`) opts `pyrite.simulate` into live streamed scoring in whole-electron
 blocks; see [Stream spectra in electron blocks](../../guides/streamed-scoring.md).
 It never enters case identity; spectra agree with the default path to rounding.
+`KernelTuning.stream_spill_dir` (path or `None`) and
+`KernelTuning.stream_spill_mib` (non-negative integer MiB or `None` for 2048;
+`0` always spills), both experimental, set where and above what evidence size
+the streamed automatic line-grid pass spills to disk. They require a streaming
+control, leave the grid bitwise unchanged and never enter case identity.
 
 ```{eval-rst}
 .. autosummary::

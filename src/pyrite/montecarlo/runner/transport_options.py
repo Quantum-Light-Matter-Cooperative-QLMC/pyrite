@@ -83,6 +83,24 @@ def stream_memory_mib(numerics) -> int | None:
     return None if execution is None else execution.stream_memory_mib
 
 
+def stream_spill_policy(numerics):
+    """``numerics``' streamed line-grid :class:`.line_grid_spill.GridSpillPolicy` (#1283).
+
+    ``None`` when neither ``KernelTuning.stream_spill_dir`` nor
+    ``stream_spill_mib`` is set, so the grid pass keeps its default policy.
+    """
+    execution = getattr(numerics, "resolved_execution", None)
+    if execution is None or (
+        execution.stream_spill_dir is None and execution.stream_spill_mib is None
+    ):
+        return None
+    from .line_grid_spill import DEFAULT_SPILL_THRESHOLD_BYTES, GridSpillPolicy
+
+    mib = execution.stream_spill_mib
+    threshold = DEFAULT_SPILL_THRESHOLD_BYTES if mib is None else mib * 1024**2
+    return GridSpillPolicy(threshold_bytes=threshold, directory=execution.stream_spill_dir)
+
+
 STREAMING_ENTRY_ERROR = (
     "KernelTuning streamed scoring is supported only by pyrite.simulate "
     "with a scalar detector and no executor"
