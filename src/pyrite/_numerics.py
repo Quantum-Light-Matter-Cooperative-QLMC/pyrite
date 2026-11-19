@@ -7,12 +7,15 @@ from typing import TYPE_CHECKING, Any, Literal, Self, cast
 
 import numpy as np
 
+from ._cxr_source import validate_cxr_source
 from ._cxr_vocabulary import catalog_key
 from ._energy_bins import EnergyBins
 from ._line_resolution import validate_line_resolution
 from ._line_roulette import LineRoulette
 from ._mixed_elastic_policy import MIXED_URBAN_REFUSAL, validate_transport_mode
 from ._off_settings import DEPRECATED_OFF, NONE, off_value
+from ._pair_production_policy import PAIR_PRODUCTION_MODELS as PAIR_PRODUCTION_MODELS
+from ._pair_production_policy import validate_pair_production_numerics
 from ._photon_config import PhotonTransport
 from ._sampling import AdaptiveSampling, FixedSampling, SamplingPolicy
 from ._units import _length_vector, _quantity_spelling, _scalar_quantity, normalize_unit
@@ -103,6 +106,7 @@ TRANSPORT_KEYS = (
     "transition_radiation",
     "transition_lattice_origin_ang",
     "shell_ionization_model",
+    "cxr_source",
 )
 #: Collision-loss schemes a run may select: legacy ``"auto"`` plus the
 #: ``simulate_trajectories`` schemes of
@@ -120,10 +124,6 @@ ELASTIC_MODELS = ("mott", "elsepa")
 #: ``"auto"``, which requires BremsLib for every layer element unless a run
 #: opts into fallback. A case records only the resolved choice.
 BREMSSTRAHLUNG_MODELS = ("auto", "eedl", "bremslib")
-#: Opt-in pair conversion of coupled hard photons (issue #275); mirrors
-#: ``montecarlo.transport.pair_production.PAIR_PRODUCTION_MODELS`` (a test
-#: keeps the two in step) without importing the transport package here.
-PAIR_PRODUCTION_MODELS = ("penelope-2024",)
 #: Atomic-electron angular deflection (issue #317): ``"kawrakow"`` (the
 #: default) folds it into the elastic rate as ``Z(Z + xi)``; ``"none"`` keeps
 #: elastic-only deflection. Mirrors
@@ -148,6 +148,7 @@ HISTORICAL_SELECTOR_OMISSIONS: dict[str, object] = {
     "radiative_model": "auto",
     "radiative_cutoff_eV": None,
     "straggling": False,
+    "cxr_source": "mc",
 }
 #: Exact CUDA transport kernel precisions (#838). ``auto`` resolves through
 #: ``montecarlo.transport.precision.resolve_transport_precision``.
@@ -305,6 +306,11 @@ class Physics:
         ``"mc"``, ``"external"``, or ``None`` continuum policy. ``None``
         disables continuum scoring and is stored as ``"none"`` for case and
         checkpoint compatibility; the string ``"none"`` is also accepted.
+    cxr_source
+        ``"mc"`` (default) or ``None``/``"none"``: ``"none"`` opts out of
+        characteristic-line scoring entirely (no reflection selection, line
+        grid or line pass; ``Result.cxr`` is zero) for continuum-only studies,
+        symmetric with ``brem_source``. See :mod:`pyrite._cxr_source`.
     straggling
         Stochastic soft energy-loss straggling. ``None`` (default) selects the
         model default: on (restricted soft-loss fluctuations) for
@@ -436,6 +442,7 @@ class Physics:
     mixed_c1: float | None = None
     mixed_c2: float | None = None
     mixed_max_step_um: float | None = None
+    cxr_source: Literal["mc", "none"] | None = "mc"
 
     def __init__(
         self,
@@ -460,6 +467,7 @@ class Physics:
         mixed_c1: float | None = None,
         mixed_c2: float | None = None,
         mixed_max_step_um: float | None = None,
+        cxr_source: Literal["mc", "none"] | None = "mc",
         *,
         inelastic_cutoff: object = UNSET,
         secondary_threshold: object = UNSET,
@@ -578,6 +586,7 @@ class Physics:
             object.__setattr__(self, "brem_source", "none")
         if self.brem_source not in {"mc", "external", "none"}:
             raise ValueError("brem_source must be 'mc', 'external', None, or 'none'")
+        validate_cxr_source(self)
         self.validate_transport("midpoint")
 
     @property
@@ -1008,33 +1017,6 @@ def validate_shell_ionization_model(model: object) -> None:
         raise ValueError(
             "shell_ionization_model must be one of " + ", ".join(SHELL_IONIZATION_MODELS)
         )
-
-
-def validate_pair_production_numerics(
-    model: object,
-    secondary_threshold_eV: object,
-    radiative_model: object,
-    bremsstrahlung_model: object,
-    positron_transport: object = False,
-) -> None:
-    """Validate opt-in pair conversion: it needs secondaries and coupled photons.
-
-    ``positron_transport`` (#276) needs pair conversion.
-    """
-    if not isinstance(positron_transport, bool):
-        raise TypeError("positron_transport must be a bool")
-    if positron_transport and model is None:
-        raise ValueError("positron_transport requires pair_production_model")
-    if model is None:
-        return
-    if model not in PAIR_PRODUCTION_MODELS:
-        raise ValueError(
-            f"pair_production_model must be one of {', '.join(PAIR_PRODUCTION_MODELS)} or None"
-        )
-    if secondary_threshold_eV is None:
-        raise ValueError("pair_production_model requires secondary_threshold_eV")
-    if radiative_model == "uncoupled" or bremsstrahlung_model == "eedl":
-        raise ValueError("pair_production_model requires coupled BremsLib radiative transport")
 
 
 def validate_elastic_model(model: object) -> None:

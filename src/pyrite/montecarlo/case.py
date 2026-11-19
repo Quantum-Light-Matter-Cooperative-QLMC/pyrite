@@ -151,6 +151,7 @@ _CASE_KEY_ORDER = (
     "physics_fallbacks",
     "node_support_cutoff",
     "reflection_selection",
+    "cxr_source",
 )
 
 
@@ -294,6 +295,13 @@ class Case(Mapping[str, Any]):
         tail is at most ``tolerance``; ``hkl_list`` then only feeds the
         diffracted-brem and Kossel terms. Absent scores ``hkl_list``.
         Validation: reflection-yield-tolerance-selector
+    cxr_source
+        ``"none"`` (#1327) opts out of characteristic-line scoring: the
+        runner selects no reflections, resolves no line grid and runs no line,
+        diffracted-brem or Kossel pass, and ``spec`` is zero on the case's
+        line grid. Absent scores lines. Refuses every line-only setting
+        (coherent emission, temporal profile, roulette, channeling, transition
+        radiation, reflection selection, line-grid policy).
     """
 
     # Producer-required fields. Their declaration order need not match the
@@ -405,6 +413,8 @@ class Case(Mapping[str, Any]):
     node_support_cutoff: float | Literal["auto"] | None | _Absent = _ABSENT
     # Opt-in measured reflection selection (#1173), appended for pickle offsets.
     reflection_selection: dict[str, object] | _Absent = _ABSENT
+    # Opt-out of line scoring (#1327), appended for pickle offsets.
+    cxr_source: Literal["none"] | _Absent = _ABSENT
 
     def __setstate__(self, state: list[Any]) -> None:
         """Restore frozen-slot pickles, filling newly appended optional fields."""
@@ -535,6 +545,7 @@ class Case(Mapping[str, Any]):
         self._validate_line_roulette()
         self._validate_node_support_cutoff()
         self._validate_reflection_selection()
+        self._validate_cxr_source()
         if self.coherent_flat_omission_limit is not _ABSENT:
             _positive(
                 "coherent_flat_omission_limit", self.coherent_flat_omission_limit, allow_zero=True
@@ -742,6 +753,31 @@ class Case(Mapping[str, Any]):
                 raise ValueError("node_support_cutoff and sinc_cutoff are exclusive")
             if self.get("line_quadrature", "node") != "node":
                 raise ValueError("node_support_cutoff needs line_quadrature='node'")
+
+    def _validate_cxr_source(self) -> None:
+        if isinstance(self.cxr_source, _Absent):
+            return
+        if self.cxr_source != "none":
+            raise ValueError("cxr_source must be absent or 'none'")
+        scored = (
+            "coherent_emission",
+            "temporal_profile",
+            "line_roulette",
+            "channeling",
+            "transition_radiation",
+            "reflection_selection",
+            "line_grid_policy",
+            "adaptive_precision",
+        )
+        for name in scored:
+            value = getattr(self, name)
+            if name == "adaptive_precision" and not isinstance(value, _Absent):
+                from .._precision import Precision
+
+                if set(Precision.from_dict(value).observables) - {"brem"}:
+                    raise ValueError("cxr_source='none' admits only brem precision observables")
+            elif name != "adaptive_precision" and not isinstance(value, _Absent):
+                raise ValueError(f"cxr_source='none' scores no lines; it refuses {name}")
 
     def _validate_reflection_selection(self) -> None:
         if isinstance(self.reflection_selection, _Absent):

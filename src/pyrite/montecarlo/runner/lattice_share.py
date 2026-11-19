@@ -36,6 +36,16 @@ LATTICE_SHARE_CASE_KEY = "_brem_lattice_share"
 SCORED_CUTOFFS_CASE_KEY = "_scored_reflection_cutoffs"
 
 
+def lines_off(case: Mapping[str, Any]) -> bool:
+    """Whether ``case`` scores no CXR lines (``cxr_source="none"``, #1327).
+
+    Nothing then scores the lattice-coherent share, so the continuum is the
+    standard full BremsLib one: the correction is switched off, not skipped
+    for want of reflections.
+    """
+    return case.get("cxr_source") == "none"
+
+
 class LatticeShareUncorrectedWarning(UserWarning):
     """A crystalline continuum still carries the lattice share its CBS lines score."""
 
@@ -146,6 +156,8 @@ def _uncorrected_reason(case: Mapping[str, Any], layer: int | None) -> str | Non
     """:func:`skip_reason` before the scored set is known (a selection in progress)."""
     if case.get(LATTICE_SHARE_CASE_KEY, True) is False:
         return "disabled"
+    if lines_off(case):
+        return "lines off (cxr_source='none')"
     if case.get("bremsstrahlung_model") != "bremslib":
         return "no BremsLib tables (EEDL continuum)"
     if case.get("channeling") not in (None, "off"):
@@ -171,7 +183,7 @@ def lattice_share_applies(case: Mapping[str, Any]) -> bool:
 
     Validation: brem-lattice-coherent-fraction
     """
-    if case.get(LATTICE_SHARE_CASE_KEY, True) is False:
+    if case.get(LATTICE_SHARE_CASE_KEY, True) is False or lines_off(case):
         return False
     if case.get("bremsstrahlung_model") != "bremslib":
         return False
@@ -195,7 +207,7 @@ def warn_if_eedl_double_counts(case: Mapping[str, Any]) -> None:
 
     Validation: brem-lattice-coherent-fraction
     """
-    if case.get(LATTICE_SHARE_CASE_KEY, True) is False:
+    if case.get(LATTICE_SHARE_CASE_KEY, True) is False or lines_off(case):
         return
     eedl = dict(case, bremsstrahlung_model="bremslib")
     if case.get("bremsstrahlung_model") != "bremslib" and lattice_share_applies(eedl):

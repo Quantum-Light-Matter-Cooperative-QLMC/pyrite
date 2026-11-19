@@ -104,9 +104,10 @@ def _simulate(scene: Scene, grid: np.ndarray, trials: int):
             tilt_deg=scene.tilt_deg,
             footprint=footprint,
         )
-    # The study reads only the continuum; from 3 MeV the automatic line grid
-    # exceeds its point budget, so give the lines a fixed coarse grid there.
-    cxr = np.linspace(1e3, 20e3, 2000) if scene.kinetic_keV >= 3e3 else None
+    # The study reads only the continuum: score no lines at all (#1327). That
+    # skips the measured reflection selection (about 17 min per Si 30 keV scene
+    # on CPU since #1173) and the automatic line grid, which exceeds its point
+    # budget from 3 MeV.
     # Reproduce the pre-971df7c69 "auto" default the evidence was taken with:
     # shell soft/hard where every layer has conduction-band shell data,
     # continuous stopping otherwise (sapphire has none) (#1065).
@@ -117,10 +118,10 @@ def _simulate(scene: Scene, grid: np.ndarray, trials: int):
         beam,
         target,
         pr.Detector(scene.theta_obs_deg),
-        physics=pr.Physics(inelastic_model=inelastic),
+        physics=pr.Physics(inelastic_model=inelastic, cxr_source="none"),
         numerics=pr.Numerics(
             sampling=FixedSampling(cxr_histories=trials, brem_histories=trials),
-            energy_bins=pr.detectors.EnergyBins(cxr=cxr, brem=grid),
+            energy_bins=pr.detectors.EnergyBins(brem=grid),
         ),
     )
     return result.brem.photon_energy_eV, result.brem.density

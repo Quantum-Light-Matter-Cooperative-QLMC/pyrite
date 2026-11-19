@@ -18,6 +18,7 @@ PHYSICS_FIELD_OWNERS = MappingProxyType(
     {
         "emission": PHYSICAL_MODEL,
         "brem_source": PHYSICAL_MODEL,
+        "cxr_source": PHYSICAL_MODEL,
         "straggling": PHYSICAL_MODEL,
         "inelastic_model": PHYSICAL_MODEL,
         "inelastic_cutoff_eV": PHYSICAL_MODEL,

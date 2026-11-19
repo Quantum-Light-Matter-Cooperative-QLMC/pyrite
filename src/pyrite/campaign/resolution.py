@@ -79,9 +79,24 @@ def resolve_models(scene: Scene, numerics: Numerics) -> tuple[Physics, Numerics]
         scene.detector, PlanarDetector
     ):
         raise ValueError("adaptive precision does not support physical detectors; use fixed counts")
+    if physics.cxr_source == "none":
+        _validate_cxr_off(numerics, channeling)
     if numerics.line_roulette is not None and isinstance(scene.detector, PlanarDetector):
         raise ValueError("line_roulette currently requires a scalar Detector")
     return physics, numerics
+
+
+def _validate_cxr_off(numerics: Numerics, channeling: Channeling | None) -> None:
+    """Refuse run settings that need the lines ``Physics(cxr_source="none")`` skips (#1327)."""
+    if channeling is not None:
+        raise ValueError("cxr_source='none' scores no lines; it refuses channeling")
+    if numerics.temporal_profile or numerics.line_roulette is not None:
+        raise ValueError(
+            "cxr_source='none' scores no lines; it refuses temporal_profile/line_roulette"
+        )
+    sampling = numerics.sampling
+    if isinstance(sampling, AdaptiveSampling) and set(sampling.observables) - {"brem"}:
+        raise ValueError("cxr_source='none' admits only brem adaptive-precision observables")
 
 
 def _bind_scene_observation(

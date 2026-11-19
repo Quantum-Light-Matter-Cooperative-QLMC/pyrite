@@ -32,7 +32,6 @@ import math
 import warnings
 from collections.abc import Sequence
 from dataclasses import InitVar, dataclass, field, replace
-from itertools import product
 from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
@@ -1080,6 +1079,7 @@ def build_cases(
     positron_transport=False,
     precision: Precision | None = None,
     check_kinematic_validity: bool = True,
+    cxr_source: str = "mc",
 ):
     """Expand a :class:`Sweep` into a list of :class:`montecarlo.Case` records (the Cartesian
     product over the swept thickness / tilt / azimuth / footprint, each
@@ -1102,10 +1102,10 @@ def build_cases(
 
     Validation: inelastic-angular-deflection
     """
-    from .reflection_selection import resolve_reflection_sweep
+    from .cxr_off import cxr_source_cases, cxr_source_grids, cxr_source_pairs, cxr_source_sweep
 
-    sweep, automatic_selection = resolve_reflection_sweep(
-        sweep, coherent_emission, temporal_profile
+    sweep, automatic_selection = cxr_source_sweep(
+        cxr_source, sweep, coherent_emission, temporal_profile
     )
     assert sweep.target is not None  # Sweep.__post_init__ always resolves one
     assert sweep.detector is not None
@@ -1133,7 +1133,7 @@ def build_cases(
     # binning). brem grid: coarse + wide -- each case spans up to that case's
     # beam energy because brem cuts off at the particle energy.
     bw = default_bandwidth_policy(coherent_emission, max_dE_frac)
-    resolved_cxr = tuple(_cxr_grid_for_energy(sweep, cp, float(e), bw) for e in energies)
+    resolved_cxr = cxr_source_grids(cxr_source, sweep, cp, energies, bw)
     brem_grid = _brem_grid(sweep, energies, tuple(grid for grid, _ in resolved_cxr))
     dtheta, domega = _detector_acceptance(sweep.detector)
     orientation = _sweep_orientation(sweep, cp)
@@ -1147,11 +1147,10 @@ def build_cases(
     name_stem = material_spec.key if material_spec is not None else target.material
     brem_case_grid = floored_brem_case_grid(sweep, brem_grid)
     case_brem = case_brem_resolver(sweep, brem_case_grid)
-    ne_pairs = list(
-        product(
-            _history_counts(sweep.n_electrons, n_electrons, "cxr_histories"),
-            _history_counts(sweep.n_electrons_brem, n_electrons_brem, "brem_histories"),
-        )
+    ne_pairs = cxr_source_pairs(
+        cxr_source,
+        _history_counts(sweep.n_electrons, n_electrons, "cxr_histories"),
+        _history_counts(sweep.n_electrons_brem, n_electrons_brem, "brem_histories"),
     )
     # Explicit grids suffix the persisted case name with ``ne=<line>/<brem>``.
     ne_suffix = sweep.n_electrons is not None or sweep.n_electrons_brem is not None
@@ -1238,7 +1237,7 @@ def build_cases(
                     )
                 )
     return _resolve_case_models(
-        cases,
+        cxr_source_cases(cxr_source, cases),
         inelastic_model=inelastic_model,
         inelastic_cutoff_eV=inelastic_cutoff_eV,
         energy_model=energy_model,

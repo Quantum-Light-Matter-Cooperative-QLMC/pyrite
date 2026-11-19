@@ -1250,6 +1250,11 @@ Options:
                                   subshell cross sections, or the opt-in bote-salvat
                                   K/L/M fit (needs 'pyrite tables fetch bote-salvat';
                                   EEDL for higher shells).
+  --cxr-source [mc|none]          Characteristic-line (CXR) scoring: mc (default) or
+                                  none, which skips reflection selection, the line grid
+                                  and every line pass for continuum-only studies. none
+                                  refuses coherent emission, temporal profiles, line
+                                  roulette, channeling and transition radiation.
   --transition-radiation [none|history|bunch|two-beam]
                                   Transition-radiation component (default none): history
                                   (per-history coherent sum), bunch (adds CTR cross-

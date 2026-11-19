@@ -106,6 +106,9 @@ class Settings:
         Convolve read-time spectra with the stored detector FWHM.
     brem_source
         ``"mc"``, ``"external"``, or ``"none"`` background selection.
+    cxr_source
+        ``"mc"`` or ``"none"``: ``"none"`` skips characteristic-line scoring
+        (reflection selection, line grid and line passes) at run time.
     allow_fallback
         ``False`` (default) refuses missing-data substitutions in campaign
         preflight and workers. ``True`` permits measured surrogate events;
@@ -179,6 +182,7 @@ class Settings:
     apply_detector_qe: bool = False
     convolve_with_det: bool = False  # Gaussian EDS-resolution convolution
     brem_source: str = "mc"  # "mc" | "external" | "none"
+    cxr_source: str = "mc"  # "mc" | "none"
     n_electrons: int = 450  # transport electrons for the lines
     n_electrons_brem: int = 100  # transport electrons for the background
     straggling: bool | None = None  # None: on for shell soft/hard, off for legacy auto

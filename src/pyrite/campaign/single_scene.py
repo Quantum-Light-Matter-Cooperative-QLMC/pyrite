@@ -223,6 +223,7 @@ def resolve_pixel_scene(
                 Literal["eedl", "bote-salvat"],
                 transport.get("shell_ionization_model", "eedl"),
             ),
+            cxr_source=cast(Literal["mc", "none"], transport.get("cxr_source", "mc")),
         ),
         detector_id,
         channeling_from_fields(transport),

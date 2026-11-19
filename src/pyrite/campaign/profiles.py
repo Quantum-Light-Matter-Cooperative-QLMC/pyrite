@@ -157,6 +157,7 @@ def resolve_numerics(
         "transition_radiation": physics.transition_radiation,
         "transition_lattice_origin_ang": physics.transition_lattice_origin_ang,
         "shell_ionization_model": physics.shell_ionization_model,
+        "cxr_source": physics.cxr_source,
     }
     effective.update(CHANNELING_OFF_FIELDS, channeling_model=OFF_VALUES["channeling_model"])
     sources = {
@@ -536,6 +537,11 @@ def _channeling_identity(settings_payload: dict[str, Any]) -> dict[str, object]:
     return {"channeling": channeling, "channeling_model": model_marker}
 
 
+def _cxr_source_identity(cxr_source: str) -> dict[str, str]:
+    """Line opt-out (#1327) is divergence-only: lines on keeps every digest."""
+    return {} if cxr_source == "mc" else {"cxr_source": cxr_source}
+
+
 def _identity_v1(
     material: str,
     settings: Settings,
@@ -591,6 +597,7 @@ def _identity_v1(
 
             resolved["transition_model"] = DTR_MODEL
             resolved["transition_lattice_origin_ang"] = origin or (0.0, 0.0, 0.0)
+    resolved.update(_cxr_source_identity(settings_payload.pop("cxr_source", "mc")))
     shell_ionization = _shell_ionization_identity(
         settings_payload.pop("shell_ionization_model", "eedl")
     )
