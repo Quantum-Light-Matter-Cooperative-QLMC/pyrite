@@ -28,7 +28,7 @@ import numpy as np
 ARMS = {"cut35": 35.0, "baseline": 50.0, "cut100": 100.0}
 
 
-def build_case(arm, seed, histories, energy_keV, thickness_ang):
+def build_case(arm, seed, histories, energy_keV, thickness_ang, straggling=False):
     """The #1142 HOPG t2 case with the arm's inelastic cutoff."""
     from pyrite.energy_grid.convergence_case import build_ladder_case
 
@@ -51,7 +51,7 @@ def build_case(arm, seed, histories, energy_keV, thickness_ang):
         max_dE_frac=0.0,
         inelastic_model="shell-soft-hard",
         inelastic_cutoff_eV=ARMS[arm],
-        straggling=False,
+        straggling=straggling,
         elastic_model="elsepa",
         bremsstrahlung_model="bremslib",
         radiative_model="bremslib-soft-hard",
@@ -174,12 +174,17 @@ def main():
     parser.add_argument("--transport-core", default="auto")
     parser.add_argument("--window-eV", type=float, default=60.0)
     parser.add_argument("--spacing-eV", type=float, default=0.1875)
+    parser.add_argument(
+        "--straggling", action="store_true", help="restricted soft-loss straggling (#642 default)"
+    )
     args = parser.parse_args()
     from pyrite.montecarlo import runner
 
     args.output.mkdir(parents=True, exist_ok=True)
-    tag = f"{args.arm}-s{args.seed}"
-    case = build_case(args.arm, args.seed, args.histories, args.energy_keV, args.thickness_ang)
+    tag = f"{args.arm}{'-strag' if args.straggling else ''}-s{args.seed}"
+    case = build_case(
+        args.arm, args.seed, args.histories, args.energy_keV, args.thickness_ang, args.straggling
+    )
     started = time.perf_counter()
     transport = runner._transport_case(case, transport_core=args.transport_core)
     transport_s = time.perf_counter() - started
@@ -189,6 +194,7 @@ def main():
     record = dict(
         arm=args.arm,
         inelastic_cutoff_eV=ARMS[args.arm],
+        straggling=args.straggling,
         seed=args.seed,
         histories=args.histories,
         transport_s=transport_s,
