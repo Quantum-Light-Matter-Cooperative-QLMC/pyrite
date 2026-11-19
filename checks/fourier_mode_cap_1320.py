@@ -19,7 +19,8 @@ over 2^20 / 2^22) and whether the widest or the narrowest lines drive them.
 by the near/far kernel so the run finishes. ``CENSUS_ONLY=0`` runs the
 production function on every flush (the #1320 acceptance run); ``COMPARE=1``
 also reduces each such flush by near/far (``auto``) on the same lines and
-records peak, max abs difference, totals and their difference. Record:
+records peak, max abs difference, totals and their difference
+(``COMPARE_EVERY=k``: every k-th flush only). Record:
 ``capture.json``; numeric arrays of the case result: ``spectrum.npz``.
 
 ``replay`` reduces every saved flush through the production device route and
@@ -45,6 +46,8 @@ CAPTURE = int(os.environ.get("CAPTURE", "3"))
 CENSUS_ONLY = os.environ.get("CENSUS_ONLY", "1") == "1"
 #: ``COMPARE=1``: also reduce every Fourier-route flush by near/far and record the difference.
 COMPARE = os.environ.get("COMPARE", "0") == "1"
+#: Compare only every ``COMPARE_EVERY``-th flush (the near/far reference dominates wall).
+COMPARE_EVERY = int(os.environ.get("COMPARE_EVERY", "1"))
 os.environ["PROFILE"] = PROFILE
 #: Flushes above this many modes skip the Fourier route in census mode.
 _SKIP_MODES = 1 << 22
@@ -156,7 +159,7 @@ def capture(material, e0_kev, tilt_deg, histories, out_dir):
         res = (_near_far if skip else real)(E_res, a_width, weight, axis, **kwargs)
         _sync()
         rec.update(route="near-far" if skip else "fourier", wall_s=time.perf_counter() - t0)
-        if COMPARE and not skip:
+        if COMPARE and not skip and len(calls) % COMPARE_EVERY == 0:
             ref = cp.asnumpy(_near_far(E_res, a_width, weight, axis))
             got = cp.asnumpy(res)
             rec.update(
