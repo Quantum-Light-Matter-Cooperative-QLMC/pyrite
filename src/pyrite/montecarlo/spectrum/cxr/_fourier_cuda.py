@@ -378,14 +378,21 @@ _DEVICE_BROAD_BLOCK = 1 << 16
 
 
 def _near_far_lines(E, a, w, axis):
-    """Near/far bin means of the over-cap lines on the reconstructed ``axis`` bins."""
+    """Near/far bin means of the over-cap lines on the reconstructed ``axis`` bins.
+
+    The kernel takes float32 line positions. A bin mean depends only on
+    ``E - edge``, so positions and edges are shifted by ``c0`` (FP64) first:
+    the float32 position error is then ``2**-24 |E - c0|``, at most
+    ``2**-24`` of the band, not ``2**-24 E`` (3e-2 eV at 1 MeV, many times the
+    width of the narrow lines that take this route).
+    """
     from ._bin_quadrature import run_bin_mean_reduction_kernel
 
     cp = import_module("cupy")
     c0, h, n_bins = axis
-    edges = c0 + (cp.arange(n_bins + 1, dtype=cp.float64) - 0.5) * h
+    edges = (cp.arange(n_bins + 1, dtype=cp.float64) - 0.5) * h
     out = cp.zeros(n_bins, dtype=cp.float64)
-    return run_bin_mean_reduction_kernel(E, a, w, edges, cp.full(n_bins, 1.0 / h), out=out)
+    return run_bin_mean_reduction_kernel(E - c0, a, w, edges, cp.full(n_bins, 1.0 / h), out=out)
 
 
 def cuda_fourier_bin_mean_reduce(

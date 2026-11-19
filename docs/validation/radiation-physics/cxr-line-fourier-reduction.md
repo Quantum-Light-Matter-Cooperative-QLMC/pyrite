@@ -482,3 +482,71 @@ The task owner applied fix (a) on 2026-11-14:
 - The Laurent branch now runs through $x^{12}$, with the coefficients from the re-check (checked against `sympy.series`). A test pins it to $10^{-15}$ against 40-digit mpmath (finding 2).
 - `fourier_period` refuses `residual_tol` below $10^{-12}$ (finding 3).
 - Finding 4 (loose constants) is kept as stated margin. Finding 6 is covered analytically: an FP64 FFT comparison cannot resolve the term.
+
+## Independent verification: near/far over-cap route (#1320)
+
+Fresh-context verifier, 2026-11-19, worktree HEAD `cc7a915bb`. Scope: `FOURIER_MAX_LINE_MODES`$=2^{22}$ routing, `_bin_mean_jit.host_near_far_bin_mean_reduce`, the device `_near_far_lines`, the blocked kernel-transform and the fine-grid gather batching. The near/far expressions below were derived from the ledger row and the `sinc-bin-integration` profile before `_bin_mean_jit.py` was opened. The verifier changed only this section; scratch scripts are outside the repository.
+
+### Independent derivation
+
+Let $S(x)=\operatorname{sinc}^2x=\sin^2(\pi x)/(\pi x)^2$ with $x=(E-E_l)/W_l$, $W_l=\pi/a_l$, so the line has peak $w_l$ and mass $w_lW_l$. With $y=\pi s$, $\int_0^xS\,\mathrm ds=\frac1\pi\int_0^{\pi x}\sin^2y\,y^{-2}\,\mathrm dy=\frac1\pi\bigl[\operatorname{Si}(2\pi x)-\sin^2(\pi x)/(\pi x)\bigr]\equiv F(x)$ (odd, $F(\infty)=\tfrac12$). The exact bin mean on $[L,H]$ is
+
+$$
+\bar\rho_k^{\rm near}=\frac{w_lW_l}{H-L}\bigl[F(x_H)-F(x_L)\bigr],\qquad x_{L,H}=\frac{L,H-E_l}{W_l}.
+$$
+
+Writing $F=R+\tfrac12\operatorname{sgn}x$, the difference is $R(x_H)-R(x_L)+\mathbf 1[x_L<0\le x_H]$, which is the form `sinc-bin-integration` uses. Beyond $K$ widths on one side ($x_L\ge K$ or $x_H\le-K$) the envelope $1/(2\pi^2x^2)$ has the exact bin mean $1/(2\pi^2x_Lx_H)$ (the Jacobian cancels; positive on both sides). The oscillatory remainder per line is bounded by `sinc-bin-far-envelope`: yield $\le1/(\pi^3K^2)$ rigorous ($1/(2\pi^3K^2)=3.9\times10^{-6}$ sharp at $K=64$), pointwise $\le1/(2\pi^2K^2)=1.2\times10^{-5}$ of the line peak. For a bin of width $h$ this pointwise term also carries a factor $\min(1,W_l/(\pi h))$, from one more integration by parts of $\cos2\pi x/x^2$ over $\Delta x=h/W_l$: the far-bin error is $\lesssim(W_l/h)/(2\pi^3K^2)=3.9\times10^{-6}\,W_l/h$.
+
+**Routing.** The positive-mode count of line $l$ is $J_l=\lfloor2a_l/\Delta t\rfloor=\lfloor P/W_l\rfloor$, $\Delta t=2\pi/P$. The bin mean is linear in the lines, so $\sum_l=\sum_{J_l\le J_{\max}}+\sum_{J_l>J_{\max}}$ holds exactly, and the two sums can use different evaluators. The Fourier sum is evaluated with the $P$ computed from the full set. Removing lines can only shrink $U'$ and $W_{\max}$. So $D'=P-U'_{\rm rest}\ge D$ and every remaining line keeps $D'\ge W_{\max}/\sqrt{6\tau}$, hence the image bounds {eq}`eq-clfr-bounds` hold on the remaining set (looser than needed, never tighter). $G_0$ and $C$ must use only the remaining lines. A smaller $P'$ would also keep every remaining line under the cap, because $J_l\propto P$. Over-cap lines do not enter the periodised sum, so they carry no image error. Their error is the near/far one above. If every line is over cap the Fourier part is skipped.
+
+### Comparison with the implementation
+
+| item | derived | code | result |
+| --- | --- | --- | --- |
+| near mean | $w_lW_l[F(x_H)-F(x_L)]/(H-L)$ | `mass*((pi/a)*inv_width)`, `mass = R(x_hi)-R(x_lo)+1[x_lo<0<=x_hi]`, $R=F-\tfrac12\operatorname{sgn}$ | match. $R=(\operatorname{Si}(2\pi u)-\pi/2)/\pi-us^2$ for $t=2\pi u<48$ |
+| far mean | $w_l/(2\pi^2x_Lx_H)$ | `1/(2pi^2 * x_lo32*x_hi32)` in float32, $x=(a/\pi)(\epsilon-E)$ from head/carry splits of edge and resonance | match, sign positive both sides |
+| far test | $x_L\ge K$ or $x_H\le-K$ | `x_lo32 >= limit or x_hi32 <= -limit` | match |
+| bin edges | $c_0+(k\mp\tfrac12)h$ | `edges = c0+(arange(n+1)-0.5)*h`, device likewise | match |
+| mode count | $\lfloor2a_l/\Delta t\rfloor$ | host `floor(2a/(2pi/P))`, device the same, equal to `_positive_modes` (`floor(2a/dt)`) | match |
+| remaining set | $G_0$, $C$, modes from rest | `E,a,w` reassigned before `_positive_modes`, `g0`, `_envelope_image_correction` | match |
+| `_deconvolution` blocks | row-independent $\cos(m s z_i)\cdot\phi$ | `_DECONV_BLOCK` slices of `m`, same expression | rounding only (below) |
+| gather batches | rectangles independent | `_batches(lens, fine)` splits groups only | same term set |
+
+### Numeric checks
+
+Scratch scripts, `numba` host function, FP64.
+
+- **Exact branch against 30-digit `mpmath`.** `exact_widths=inf`, six lines (signed weights, $W=0.01$–$7$ eV, resonance on a bin edge, straddling, off-band) on 40 bins of 0.5 eV: max absolute error $4.2\times10^{-15}$ against a spectrum peak of 1.3.
+- **Test fixture against `_host_bin_mean`.** For `exact_widths` $\in\{$default, $\infty$, 2$\}$: $4.3\times10^{-14}$, $4.2\times10^{-14}$, $4.1\times10^{-14}$ of the reference peak. The ledger says $1.2\times10^{-14}$, which I did not reproduce under this normalisation (the test bound is $10^{-12}$). The result is bitwise equal for 1 and 4 threads.
+- **Near/far against its own exact branch**, one line, uniform axis $h=0.5$ eV, 6000 bins, resonance at random band positions, $K=64$:
+
+  | $W$ eV | pointwise / peak | yield / mass |
+  | --- | --- | --- | 
+  | 0.02 | $3.0\times10^{-8}$ | $5.2\times10^{-7}$ |
+  | 0.1 | $4.9\times10^{-8}$ | $8.0\times10^{-8}$ |
+  | 1 | $7.1\times10^{-6}$ | $3.6\times10^{-6}$ |
+  | 2 | $1.1\times10^{-5}$ | $2.8\times10^{-6}$ |
+  | 5 | $1.2\times10^{-5}$ | $1.9\times10^{-6}$ |
+
+  This reproduces the $W_l/h$ suppression derived above and saturates the $1.2\times10^{-5}$ pointwise and $3.9\times10^{-6}$ yield bounds for $W_l\gtrsim h$. The $W=0.5$ eV case sits at $h/W=1$ and averages $\cos2\pi x$ to zero exactly, so it is not representative.
+- **Routing.** The test scene with a 0.002 eV line (3 lines over the default cap, $P=3.7\times10^5$ eV, up to $1.8\times10^8$ modes) matches exact bins to $9.6\times10^{-8}$ of the peak. For those three lines alone, near/far differs from exact by $1.6\times10^{-10}$ of the line peak and $1.1\times10^{-8}$ of the mass ($W/h=0.008$–$0.2$). With lowered caps ($2^{14}$, $2^{11}$, $2^{8}$, 10) wider lines also move to near/far and the max error rises to $1.5\times10^{-6}$ then $8.4\times10^{-6}$ of the peak, against $4.6\times10^{-7}$ uncapped. That is the near/far allowance, not the image bound, as expected. The uncapped route on this scene was not run to completion (it is the multi-GiB case).
+- **Blocked kernel transform.** The old unblocked `_deconvolution` (from `origin/main`) against the new one with `_DECONV_BLOCK=4096`, run with NumPy as the array module, modes 100001, 196615, 200000, widths 10 and 13: max relative difference $\le5.1\times10^{-16}$.
+- **Tests.** `test_fourier_host.py`, `test_fourier_cuda.py`, `test_bin_fourier.py`, `test_electron_blocks.py`: 54 passed, 40 skipped (device-only). No device was available, so the device over-cap route and the gather batching rest on code reading.
+
+### Findings
+
+1. **Medium (tolerance, device only): the device over-cap route evaluates float32 line inputs, so the claim's tolerance is not preserved there.** `_fourier_cuda._near_far_lines` calls `run_bin_mean_reduction_kernel`, which casts `E_r`, `aw` and `w` to float32 before the launch. The line position then moves by up to half an ulp, $2^{-24}E_l$ ($6\times10^{-5}$ eV at 2 keV, $3.9\times10^{-3}$ eV at 100 keV, $3.1\times10^{-2}$ eV at 1 MeV). Over-cap lines are exactly the narrow ones for which this is a large fraction of a bin: with $W=10^{-3}$–$5\times10^{-3}$ eV and $h=0.025$ eV, one line moved by the float32 rounding differs from its FP64 position by $1.9\times10^{-3}$ (2 keV) to $0.19$ (1 MeV) of its own peak, pointwise, against the Fourier image tolerance of at most $2\tau=2\times10^{-6}$ (host emulation: FP64 vs `float32`-rounded $E$ through `host_near_far_bin_mean_reduce`). The host route does not have this loss, because `_near_far_bins` splits $E$ into float32 head and carry. The existing device regression uses $E\le1100$ eV, so it cannot see it. The ledger sentence "No claim or bound changed" is therefore not supported for device lines. Both statements need qualifying. Suggested fix (verifier does not edit code): pass the kernel $E-c_0$ and edges $-c_0$ (the bin mean depends only on $E-\epsilon$, so this is exact up to FP64 rounding) so that the float32 position error becomes $2^{-24}|E_l-c_0|\le2^{-24}U$, or state the $2^{-24}E_l$ condition in the row.
+2. **Low (tolerance statement): over-cap lines carry the near/far allowance, not $\tau$.** Pointwise $\le1.2\times10^{-5}$ of the line peak (sharp) and yield $\le3.9\times10^{-6}$ of the line mass (sharp), against $2\tau$ and $0.48\tau$ for the Fourier route. For $W_l/h\lesssim0.5$ the pointwise term is suppressed by $W_l/h$ and sits within $2\tau$, and over-cap lines usually have $W_l/h\ll1$ (default scene $\le0.2$). A corner exists at $n_{\rm bins}\to10^6$ with large $P/B$, where $W_l<P/2^{22}$ reaches $\gtrsim h$. The yield term is not suppressed, so it can exceed the Fourier yield bound by up to $8\times$ for the affected lines (measured $5\times10^{-7}$ at $W=0.02$ eV, about the Fourier $4.8\times10^{-7}$; up to $3.6\times10^{-6}$ at $W\ge h$). Should be stated in the ledger notes.
+3. **Low (documentation): the claimed $1.2\times10^{-14}$ agreement of `host_near_far_bin_mean_reduce` with `_host_bin_mean(..., exact_widths=64)` is $4.3\times10^{-14}$ of peak on the test fixture** (test bound $10^{-12}$). The conclusion is unaffected, because it is FP64 rounding in both cases.
+4. **Info: the cap uses the global $P$.** $P$ is set by the extrema of all non-broad resonances, including far out-of-band lines, and by $W_{\max}$. A far line therefore raises $P$ and sends more lines to near/far, whose cost is lines $\times$ bins. This does not change the accuracy statement above, only which allowance applies and the host/device cost.
+5. **Info: batching and blocking.** `_batches(lens, fine)` only changes which rectangles share a launch, since every rectangle has its own fine grid and FFT. The blocked `_deconvolution` evaluates the same row-independent expression. Both are rounding-only.
+
+### Verdict
+
+`rederived` for the near/far bin mean (exact near, envelope far, units, signs, support, limits), the linearity-based routing, the image-bound inheritance, and the blocking and batching. Narrow `discrepancy` for the ledger sentence "No claim or bound changed": finding 1 (device float32 line inputs) and finding 2 (near/far allowance) are not stated. The status stays `anchored`; it is not `signed-off`.
+
+### Resolution (task owner, 2026-11-19)
+
+- Finding 1: `_fourier_cuda._near_far_lines` now passes the kernel $E_l-c_0$ and edges $-c_0$, so the float32 position error is $2^{-24}|E_l-c_0|\le2^{-24}U$. Regression `test_fourier_cuda.py::test_over_cap_near_far_keeps_fp64_positions_at_high_energy` (lines 1 meV from bin edges at $E\approx10^5$ eV; device-only).
+- Findings 2 and 3: the ledger note states the near/far allowance for over-cap lines and the corrected $\approx4\times10^{-14}$ agreement.
+- Findings 4 and 5: informational, no change.

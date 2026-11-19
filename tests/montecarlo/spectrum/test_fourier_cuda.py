@@ -395,3 +395,31 @@ def test_over_cap_lines_take_near_far_without_huge_workspaces(cp, cap):
     # Near/far takes float32 line inputs and the far envelope (sinc-bin-near-far).
     assert np.max(abs(device - exact)) < 1e-5 * np.abs(exact).max()
     assert abs(device.sum() - exact.sum()) < 1e-6 * np.abs(w * np.pi / a).sum()
+
+
+def test_over_cap_near_far_keeps_fp64_positions_at_high_energy(cp):
+    """Over-cap lines at E ~ 1e5 eV are placed to FP64, not float32 ``E`` (#1320).
+
+    The near/far kernel takes float32 positions: half an ulp of 1e5 eV is
+    4e-3 eV, above the 0.002 eV line width. Lines sitting 1e-3 eV from a bin
+    edge move whole bins' worth of mass if ``E`` is rounded un-shifted.
+    """
+    from pyrite.montecarlo.spectrum.cxr import _fourier_cuda
+    from pyrite.montecarlo.spectrum.cxr._bin_fourier import uniform_bin_axis
+    from pyrite.montecarlo.spectrum.cxr._bin_quadrature import _host_bin_mean
+
+    e, a, w = _mixed_width_lines()
+    shift = 99_000.0
+    grid = 99_500.0 + 0.25 * np.arange(2401)
+    edges = np.r_[grid - 0.125, grid[-1] + 0.125]
+    e = e + shift
+    # The three narrow lines (last three): FP64-exact offsets of 1e-3 eV from edges.
+    e[-3:] = edges[[800, 1200, 1600]] + 1e-3
+    exact = w @ _host_bin_mean(a, e, edges, 1 / np.diff(edges), exact_widths=None)
+    device = cp.asnumpy(
+        _fourier_cuda.cuda_fourier_bin_mean_reduce(
+            cp.asarray(e), cp.asarray(a), cp.asarray(w), uniform_bin_axis(grid)
+        )
+    )
+    assert np.max(abs(device - exact)) < 1e-5 * np.abs(exact).max()
+    assert abs(device.sum() - exact.sum()) < 1e-6 * np.abs(w * np.pi / a).sum()
