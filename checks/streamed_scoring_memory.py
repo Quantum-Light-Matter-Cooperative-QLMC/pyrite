@@ -3,6 +3,7 @@
 Usage:
   streamed_scoring_memory.py run MODE NE BLOCK OUT_JSON [MATERIAL [E0_KEV [CORE [THICKNESS_ANG [SEED [TILT_DEG [AZIM_DEG]]]]]]]
   streamed_scoring_memory.py compare REF_JSON OTHER_JSON...
+  streamed_scoring_memory.py gpu-busy REPORT.sqlite
 
 MODE: ``joined`` (``run_case``: full trajectory downloaded, then spectra;
 BLOCK ignored), ``joined-device`` (the same with ``keep_segments_on_device``,
@@ -46,8 +47,23 @@ memory and wall against NE. ``compare`` requires bitwise-equal ``E_grid``.
 scratch parent. Every arm also records ``host_anon_peak_MiB``, the sampled
 peak of ``RssAnon``: spilled evidence is read through file-backed memory maps,
 which ``ru_maxrss`` counts although the kernel can reclaim them.
+
+``STREAM_NVTX=1`` (#862) also opens an NVTX range ``phase.<name>`` around each
+timed call and ``phase.run`` around the arm. ``gpu-busy`` reads an
+``nsys export --type sqlite`` of such a run and prints, per phase, its wall
+time and the union of GPU kernel, copy and memset intervals inside it (any
+stream), and the top kernels by GPU time. ``transport`` is ``run`` less the
+top-level ``score``, ``select``, ``release`` and ``grid_pass`` ranges
+(``select`` is the automatic reflection selection on the held prefix, #1281).
+Idle GPU time inside ``transport`` bounds what a transport/scoring overlap
+could hide on the device. ``STREAM_PHASES=0`` skips
+every phase wrapper (no synchronizations) and records only the production
+wall time. ``STREAM_CPROFILE=PATH`` profiles the arm with ``cProfile`` and
+writes its stats to ``PATH`` (``python -m pstats PATH``) for host-cost
+attribution by function.
 """
 
+import contextlib
 import json
 import os
 import resource
@@ -62,6 +78,7 @@ from pyrite.config import FixedSampling
 
 SPECTRA = ("spec", "spec_characteristic", "brem_wide")
 GRID = os.environ.get("STREAM_GRID", "final")
+NVTX = os.environ.get("STREAM_NVTX") == "1"
 
 
 def _case(material, ne, e0_kev, thickness_ang=1.0e4, seed=None, tilt_deg=30.0, azim_deg=0.0):
@@ -115,6 +132,21 @@ def _case(material, ne, e0_kev, thickness_ang=1.0e4, seed=None, tilt_deg=30.0, a
     return case if seed is None else replace(case, seed=int(seed))
 
 
+@contextlib.contextmanager
+def _nvtx(name):
+    """An NVTX range ``phase.<name>`` when ``STREAM_NVTX=1`` (#862)."""
+    if not NVTX:
+        yield
+        return
+    from cupy.cuda import nvtx
+
+    nvtx.RangePush(f"phase.{name}")
+    try:
+        yield
+    finally:
+        nvtx.RangePop()
+
+
 def _sync():
     try:
         import cupy
@@ -147,7 +179,9 @@ class _Phases:
             _sync()
             t0 = time.perf_counter()
             try:
-                out = fn(*args, **kwargs)
+                with _nvtx(self.prefix + name):
+                    out = fn(*args, **kwargs)
+                    _sync()
                 if result_segs:
                     self._count(out["segs"])
                 return out
@@ -277,6 +311,13 @@ def _instrument(mode, phases):
         EmissionAdapter.evaluate = evaluate
         backend = _backend.BACKEND
         backend.release_memory = phases.wrap("release", backend.release_memory)
+        # Automatic reflection selection on the held prefix (#1281, #862): its own
+        # top-level phase, otherwise charged to transport.
+        from pyrite.montecarlo.runner import streamed_selection
+
+        streamed_selection._select_on_blocks = phases.wrap(
+            "select", streamed_selection._select_on_blocks
+        )
 
 
 class _PoolPeak:
@@ -342,12 +383,24 @@ def run(
         float(azim_deg),
     )
     phases = _Phases()
-    _instrument(mode, phases)
+    if os.environ.get("STREAM_PHASES", "1") != "0":
+        _instrument(mode, phases)
     rss_before = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     _configure_spill()
     anon_before = _AnonPeak.sample()
+    profile_path = os.environ.get("STREAM_CPROFILE")
+    profiler = None
+    if profile_path:
+        import cProfile
+
+        profiler = cProfile.Profile()
     t0 = time.perf_counter()
-    with _PoolPeak() as pool, _AnonPeak() as anon:
+    with (
+        _PoolPeak() as pool,
+        _AnonPeak() as anon,
+        _nvtx("run"),
+        profiler if profiler is not None else contextlib.nullcontext(),
+    ):
         if mode == "joined":
             out = runner.run_case(case, transport_core=core)
         elif mode == "joined-device":
@@ -381,9 +434,12 @@ def run(
         else:
             raise SystemExit(f"unknown mode {mode!r}")
     wall = time.perf_counter() - t0
+    if profiler is not None:
+        profiler.dump_stats(profile_path)
     if mode.startswith("streamed"):
         accounted = (
             phases.seconds.get("score", 0.0)
+            + phases.seconds.get("select", 0.0)
             + phases.seconds.get("release", 0.0)
             + phases.seconds.get("grid_pass", 0.0)
         )
@@ -470,10 +526,93 @@ def compare(ref_path, *others):
     return 0 if worst <= 1e-12 else 1
 
 
+def _union(intervals):
+    """Sorted disjoint union of ``(start, end)`` intervals."""
+    out = []
+    for start, end in sorted(intervals):
+        if out and start <= out[-1][1]:
+            out[-1][1] = max(out[-1][1], end)
+        else:
+            out.append([start, end])
+    return out
+
+
+def _covered(union, start, end):
+    """Length of ``[start, end)`` covered by a disjoint sorted ``union``."""
+    import bisect
+
+    i = max(bisect.bisect_right([u[0] for u in union], start) - 1, 0)
+    total = 0
+    for lo, hi in union[i:]:
+        if lo >= end:
+            break
+        total += max(0, min(hi, end) - max(lo, start))
+    return total
+
+
+def gpu_busy(path):
+    """Per-phase wall and GPU-busy seconds from an Nsight sqlite export (#862)."""
+    import sqlite3
+
+    db = sqlite3.connect(path)
+    tables = {row[0] for row in db.execute("SELECT name FROM sqlite_master")}
+    has_ids = "StringIds" in tables
+    text = "COALESCE(e.text, s.value)" if has_ids else "e.text"
+    join = "LEFT JOIN StringIds s ON e.textId = s.id" if has_ids else ""
+    ranges = {}
+    for name, start, end in db.execute(
+        f"SELECT {text}, e.start, e.end FROM NVTX_EVENTS e {join} WHERE e.end IS NOT NULL"
+    ):
+        if name and name.startswith("phase."):
+            ranges.setdefault(name[6:], []).append((start, end))
+    activity = []
+    kinds = ("KERNEL", "MEMCPY", "MEMSET")
+    for kind in kinds:
+        table = f"CUPTI_ACTIVITY_KIND_{kind}"
+        if table in tables:
+            activity += db.execute(f"SELECT start, end FROM {table}").fetchall()
+    union = _union(activity)
+    streams = (
+        db.execute("SELECT COUNT(DISTINCT streamId) FROM CUPTI_ACTIVITY_KIND_KERNEL").fetchone()[0]
+        if "CUPTI_ACTIVITY_KIND_KERNEL" in tables
+        else 0
+    )
+    out = {"kernel_streams": streams}
+    if "CUPTI_ACTIVITY_KIND_KERNEL" in tables:
+        names = dict(db.execute("SELECT id, value FROM StringIds")) if has_ids else {}
+        kernels = {}
+        for name, start, end in db.execute(
+            "SELECT shortName, start, end FROM CUPTI_ACTIVITY_KIND_KERNEL"
+        ):
+            calls, total = kernels.get(name, (0, 0))
+            kernels[name] = (calls + 1, total + end - start)
+        ranked = sorted(kernels.items(), key=lambda item: -item[1][1])[:15]
+        out["top_kernels"] = [
+            {"name": str(names.get(n, n)), "calls": c, "gpu_s": t / 1e9} for n, (c, t) in ranked
+        ]
+    for name, spans in sorted(ranges.items()):
+        wall = sum(end - start for start, end in spans)
+        busy = sum(_covered(union, start, end) for start, end in spans)
+        out[name] = {"calls": len(spans), "wall_s": wall / 1e9, "gpu_busy_s": busy / 1e9}
+    (run_start, run_end), *_ = ranges.get("run", [(0, 0)])
+    top = _union(
+        span for key in ("score", "select", "release", "grid_pass") for span in ranges.get(key, ())
+    )
+    wall = (run_end - run_start) - sum(hi - lo for lo, hi in top)
+    busy = _covered(union, run_start, run_end) - sum(_covered(union, lo, hi) for lo, hi in top)
+    out["transport"] = {"wall_s": wall / 1e9, "gpu_busy_s": busy / 1e9}
+    for record in out.values():
+        if isinstance(record, dict) and record.get("wall_s", 0) > 0:
+            record["gpu_busy_frac"] = record["gpu_busy_s"] / record["wall_s"]
+    return out
+
+
 if __name__ == "__main__":
     if sys.argv[1] == "run":
         run(*sys.argv[2:])
     elif sys.argv[1] == "compare":
         sys.exit(compare(*sys.argv[2:]))
+    elif sys.argv[1] == "gpu-busy":
+        print(json.dumps(gpu_busy(sys.argv[2]), indent=1))
     else:
         raise SystemExit(__doc__)

@@ -307,3 +307,83 @@ def line_weights(denom, t_L, pref, A2, WM, keep, *, two_hbarc):
     if kernel is None:
         return None
     return kernel(denom, t_L, pref, A2, WM, keep, np.float32(two_hbarc))
+
+
+# ``_batched._batched_block`` before the in-medium root (#862): the exact-recoil
+# terms ``r_num = 0.5 g^2 hbarc/E`` and ``r_den = n.g hbarc/E``, the vacuum
+# denominator shifted by ``r_den`` and the Doppler product ``v.g - r_num``.
+_RECOIL_PAIR_BODY = r"""
+const float rn = __fmul_rn(__fmul_rn(0.5f, g2), inv_E);
+const float rd = __fmul_rn(n_dot_g, inv_E);
+r_num = rn;
+r_den = rd;
+denom_vac = __fadd_rn(denom_row, rd);
+v_dot_g = __fsub_rn(
+    __fadd_rn(__fadd_rn(__fmul_rn(vx, gx), __fmul_rn(vy, gy)), __fmul_rn(vz, gz)), rn);
+"""
+
+
+def recoil_pair_terms(vx, vy, vz, gx, gy, gz, g2, n_dot_g, denom_row, inv_E):
+    """Fused ``(r_num, r_den, denom_vac, v_dot_g)`` of a segment block, or ``None``."""
+    if not _float32_cupy(vx, vy, vz, gx, gy, gz, g2, n_dot_g, denom_row, inv_E):
+        return None
+    kernel = _kernel(
+        "recoil_pair",
+        "float32 vx, float32 vy, float32 vz, float32 gx, float32 gy, float32 gz, "
+        "float32 g2, float32 n_dot_g, float32 denom_row, float32 inv_E",
+        "float32 r_num, float32 r_den, float32 denom_vac, float32 v_dot_g",
+        _RECOIL_PAIR_BODY,
+    )
+    if kernel is None:
+        return None
+    return kernel(vx, vy, vz, gx, gy, gz, g2, n_dot_g, denom_row, inv_E)
+
+
+# ``_batched._batched_block`` after the in-medium root: ``n.g`` shifted by the
+# refractive term ``delta grad L . g``.
+_BLOCK_N_DOT_G_BODY = r"""
+const float grad_dot_g = __fadd_rn(
+    __fadd_rn(__fmul_rn(g0, gx), __fmul_rn(g1, gy)), __fmul_rn(g2, gz));
+out = __fadd_rn(n_dot_g, __fmul_rn(delta, grad_dot_g));
+"""
+
+
+def block_n_dot_g(g0, g1, g2, gx, gy, gz, delta, n_dot_g):
+    """Fused ``n_dot_g + delta * (grad L . g)`` over the block, or ``None``."""
+    if not _float32_cupy(g0, g1, g2, gx, gy, gz, delta, n_dot_g):
+        return None
+    kernel = _kernel(
+        "block_n_dot_g",
+        "float32 g0, float32 g1, float32 g2, float32 gx, float32 gy, float32 gz, "
+        "float32 delta, float32 n_dot_g",
+        "float32 out",
+        _BLOCK_N_DOT_G_BODY,
+    )
+    if kernel is None:
+        return None
+    return kernel(g0, g1, g2, gx, gy, gz, delta, n_dot_g)
+
+
+# ``_batched._batched_block`` after ``_line_bracket``: the exact-slope factor
+# ``kappa = 1 / (1 - omega hbarc/E)``, the sinc slope ``denom kappa`` and the
+# positive-mass-shell guard folded into ``keep`` (``_recoil_line_allowed``).
+_RECOIL_SLOPE_KEEP_BODY = r"""
+const float oe = __fmul_rn(omega, inv_E);
+slope = __fmul_rn(denom, __fdiv_rn(1.0f, __fsub_rn(1.0f, oe)));
+keep_out = keep & ((denom > 0.0f) & (oe <= __fsub_rn(1.0f, __fdiv_rn(1.0f, gamma))));
+"""
+
+
+def recoil_slope_keep(denom, omega, inv_E, gamma, keep):
+    """Fused ``(slope, keep & allowed)`` of a segment block, or ``None``."""
+    if not _float32_cupy(denom, omega, inv_E, gamma) or keep.dtype != np.bool_:
+        return None
+    kernel = _kernel(
+        "recoil_slope_keep",
+        "float32 denom, float32 omega, float32 inv_E, float32 gamma, bool keep",
+        "float32 slope, bool keep_out",
+        _RECOIL_SLOPE_KEEP_BODY,
+    )
+    if kernel is None:
+        return None
+    return kernel(denom, omega, inv_E, gamma, keep)
