@@ -46,6 +46,8 @@ def _scene(component="brem", feedback=False):
         elastic_model="elsepa",
         inelastic_model="shell-soft-hard" if event or feedback else "continuous",
         inelastic_cutoff_eV=50.0 if event or feedback else None,
+        # Continuous stopping must choose; False is its pre-#642 meaning.
+        straggling=None if event or feedback else False,
         atomic_electron_deflection="none",
         secondary_threshold_eV=1000 if event else None,
         bremsstrahlung_model="bremslib",

@@ -468,36 +468,60 @@ _RUNNER_SCRIPT = textwrap.dedent(
 
     case = build_cases(Sweep(material=sys.argv[1], thickness_ang=2.0e4,
         beam=BeamSpec(energy_keV=60.0, energy_spread_frac=1e-3, bunch_length_fs=5.0),
-        tilt_deg=30.0, n_electrons=96, n_electrons_brem=64))[0]
+        tilt_deg=30.0, n_electrons=96, n_electrons_brem=64), **json.loads(sys.argv[2]))[0]
     out = runner.run_case(case, transport_core="cuda")
-    digest = {}
+    digest, values = {}, {}
     for key in sorted(out):
         value = out[key]
         if isinstance(value, np.ndarray) and value.dtype != object:
             digest[key] = hashlib.sha256(np.ascontiguousarray(value).tobytes()).hexdigest()
-    print(json.dumps(digest))
+            values[key] = np.asarray(value, dtype=float).tolist()
+    print(json.dumps(dict(digest=digest, values=values)))
     """
 )
 
 
-def _runner_digest(material, schedule):
+# Device line reductions are not bitwise repeatable: two full-history runs of
+# one case already differ in the last bits (#1225; FP64 sums since #1313).
+# Brem and the grids stay bitwise, which pins the trajectories themselves.
+_DEVICE_ORDER_SPECTRA = frozenset({"spec", "spec_characteristic", "spec_pxr", "spec_cbs"})
+
+
+def _runner_digest(material, schedule, models):
     env = os.environ | {"PYRITE_MC_TRANSPORT_SCHEDULE": schedule}
     done = subprocess.run(
-        [sys.executable, "-c", _RUNNER_SCRIPT, material], env=env, capture_output=True, text=True
+        [sys.executable, "-c", _RUNNER_SCRIPT, material, json.dumps(models)],
+        env=env,
+        capture_output=True,
+        text=True,
     )
     assert done.returncode == 0, done.stderr[-4000:]
     return json.loads(done.stdout.strip().splitlines()[-1])
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize("material", ["pbwo4", "silicon"])
-def test_runner_production_defaults_identical_under_env_continuation(material):
-    """Production defaults (ELSEPA, coupled BremsLib, ``auto`` inelastic:
-    continuous for pbwo4, shell soft/hard for silicon) reach continuation
-    through the process environment and return identical spectra."""
-    reference = _runner_digest(material, "full-history")
-    assert reference
-    assert _runner_digest(material, "continuation") == reference
+@pytest.mark.parametrize(
+    "material,models",
+    # pbwo4 has no conduction-band shell data, so the shell-soft-hard default
+    # refuses it; legacy ``auto`` resolves it to continuous stopping (#1225).
+    [("pbwo4", {"inelastic_model": "auto"}), ("silicon", {})],
+)
+def test_runner_production_defaults_identical_under_env_continuation(material, models):
+    """Production models (ELSEPA, coupled BremsLib; shell soft/hard for
+    silicon, continuous for pbwo4) reach continuation through the process
+    environment and return identical spectra."""
+    reference = _runner_digest(material, "full-history", models)
+    candidate = _runner_digest(material, "continuation", models)
+    assert reference["digest"].keys() == candidate["digest"].keys()
+    assert {"spec", "brem"} <= reference["digest"].keys()
+    for key, digest in reference["digest"].items():
+        if key in _DEVICE_ORDER_SPECTRA:
+            expected = np.asarray(reference["values"][key])
+            np.testing.assert_allclose(
+                candidate["values"][key], expected, rtol=1e-5, atol=1e-6 * np.abs(expected).max()
+            )
+        else:
+            assert candidate["digest"][key] == digest, key
 
 
 @pytest.mark.slow
@@ -519,14 +543,26 @@ def test_runner_retry_and_block_monitor_match_full_history(monkeypatch):
     real_simulate = runner.simulate_trajectories
 
     class Monitor:
+        """The block-monitor protocol of ``transport_monitored_blocks``."""
+
+        realized = cut_at = None
+
         def __init__(self):
             self.blocks = []
+
+        def next_point(self):
+            return None  # no decision point: the plan's 20-electron floor sets blocks
 
         def on_block(self, start, stop, block):
             self.blocks.append((start, stop, block["electron_id"].size))
 
-        def should_stop(self, stop):
-            return stop >= 40
+        def should_stop(self, stop, recheck_at=None):
+            if stop >= 40:
+                self.realized = 40
+            return self.realized is not None
+
+        def truncate(self, cut):
+            raise AssertionError(f"unexpected truncation at {cut}")
 
     def run(config):
         budgets = []
