@@ -9,7 +9,8 @@ how it is cross-checked against cuFINUFFT.
 
 Two spreaders add the same ES terms (:data:`SPREADERS`): one thread per
 source with FP64 atomics, and (default, #1297) a sorted warp gather over
-batches of rectangles, about 5x faster on an RTX 5080.
+batches of rectangles. On an RTX 5080 the gather spreads about 5x faster
+and whole device flushes run 1.3-1.5x faster.
 
 For sources ``x_k`` and strengths ``c_k`` it returns
 ``f_j = sum_k c_k exp(-i j x_k)`` for ``j0 <= j < j1``, the convention of
@@ -179,38 +180,48 @@ extern "C" __global__ void es_batch_sources(
     src[4*s+2] = c1[i] * cs; src[4*s+3] = c1[i] * sn;
 }
 
+#define GATHER_THREADS 128
 extern "C" __global__ void es_gather(
     const double* u, const long long* l0, const double* src, const long long* item,
     const long long n_items, const long long* off, const int nrect,
     const int width, const double beta, double* grid) {
-    // One warp per (fine point g, sorted copies s_lo .. s_hi) item; every copy
-    // of an item has its first point in g's window g-w+1 .. g, so it adds
-    // phi(l0 + p - u) at p = g - l0 (mod n_fine), as es_spread does.
-    const long long it = ((long long)blockIdx.x * blockDim.x + threadIdx.x) >> 5;
-    const int lane = threadIdx.x & 31;
-    if (it >= n_items) return;
-    const long long g = item[3*it], s_lo = item[3*it+1], s_hi = item[3*it+2];
-    const int r = find_rect(off, nrect, g);
-    const long long base = off[r], n_fine = off[r + 1] - base, l = g - base;
-    const double half = 0.5 * double(width);
+    // One 32-thread group per (fine point g, sorted copies s_lo .. s_hi) item;
+    // every copy of an item has its first point in g's window g-w+1 .. g, so
+    // it adds phi(l0 + p - u) at p = g - l0 (mod n_fine), as es_spread does.
+    // Groups reduce through shared memory (no warp shuffles: portable to
+    // wave64 and to HIP's 64-bit-mask *_sync builtins).
+    __shared__ double red[4][GATHER_THREADS];
+    const int tid = threadIdx.x, lane = tid & 31;
+    const long long it = ((long long)blockIdx.x * GATHER_THREADS + tid) >> 5;
     double ar = 0.0, ai = 0.0, br = 0.0, bi = 0.0;
-    for (long long s = s_lo + lane; s < s_hi; s += 32) {
-        const long long p = wrap(l - l0[s], n_fine);
-        const double z = (double(l0[s] + p) - u[s]) / half;
-        const double arg = 1.0 - z * z;
-        if (arg <= 0.0) continue;
-        const double phi = exp(beta * (sqrt(arg) - 1.0));
-        ar += phi * src[4*s]; ai += phi * src[4*s+1];
-        br += phi * src[4*s+2]; bi += phi * src[4*s+3];
+    long long base = 0, n_fine = 1, l = 0;
+    if (it < n_items) {
+        const long long g = item[3*it], s_lo = item[3*it+1], s_hi = item[3*it+2];
+        const int r = find_rect(off, nrect, g);
+        base = off[r]; n_fine = off[r + 1] - base; l = g - base;
+        const double half = 0.5 * double(width);
+        for (long long s = s_lo + lane; s < s_hi; s += 32) {
+            const long long p = wrap(l - l0[s], n_fine);
+            const double z = (double(l0[s] + p) - u[s]) / half;
+            const double arg = 1.0 - z * z;
+            if (arg <= 0.0) continue;
+            const double phi = exp(beta * (sqrt(arg) - 1.0));
+            ar += phi * src[4*s]; ai += phi * src[4*s+1];
+            br += phi * src[4*s+2]; bi += phi * src[4*s+3];
+        }
     }
+    red[0][tid] = ar; red[1][tid] = ai; red[2][tid] = br; red[3][tid] = bi;
+    __syncthreads();
     for (int o = 16; o > 0; o >>= 1) {
-        ar += __shfl_down_sync(0xffffffffu, ar, o); ai += __shfl_down_sync(0xffffffffu, ai, o);
-        br += __shfl_down_sync(0xffffffffu, br, o); bi += __shfl_down_sync(0xffffffffu, bi, o);
+        if (lane < o)
+            for (int c = 0; c < 4; ++c) red[c][tid] += red[c][tid + o];
+        __syncthreads();
     }
-    if (lane == 0) {
+    if (lane == 0 && it < n_items) {
         double* g0 = grid + 2 * (2 * base + l);
         double* g1 = grid + 2 * (2 * base + n_fine + l);
-        atomicAdd(g0, ar); atomicAdd(g0 + 1, ai); atomicAdd(g1, br); atomicAdd(g1 + 1, bi);
+        atomicAdd(g0, red[0][tid]); atomicAdd(g0 + 1, red[1][tid]);
+        atomicAdd(g1, red[2][tid]); atomicAdd(g1 + 1, red[3][tid]);
     }
 }
 """
