@@ -67,17 +67,16 @@ def _host_band_mass(a_width, E_res, weight, start_eV, stop_eV) -> float:
 
 
 def _device_kernel(cp):
+    # Elementwise per-line masses then the backend ``sum``: a scalar-output
+    # ``ReductionKernel`` runs one thread block, which made the band audit
+    # several times the line generation it measures (#1326 qlmc timers).
     kernel = _KERNEL.get(id(cp))
     if kernel is None:
-        kernel = _KERNEL[id(cp)] = cp.ReductionKernel(
+        kernel = _KERNEL[id(cp)] = cp.ElementwiseKernel(
             "T e_r, T w, T a, float64 lo, float64 hi",
-            "float64 total",
-            "pyrite_band_line_mass((double)e_r, (double)w, (double)a, lo, hi)",
-            "a + b",
-            "total = a",
-            "0",
-            "pyrite_band_mass_sum",
-            reduce_type="double",
+            "float64 mass",
+            "mass = pyrite_band_line_mass((double)e_r, (double)w, (double)a, lo, hi)",
+            "pyrite_band_line_mass_kernel",
             preamble=SINCSQ_BIN_PREAMBLE + _BAND_MASS_PREAMBLE,
             options=exact_rawkernel_options(cp),
         )
@@ -90,16 +89,17 @@ def sincsq_band_mass(a_width, E_res, weight, start_eV: float, stop_eV: float):
     ``weight * (pi / a_width) [F(x_hi) - F(x_lo)]`` per line, summed in FP64.
     Lines whose whole mass ``weight * pi / a_width`` is not finite and
     positive add nothing. On a device array the sum stays on the device (a
-    0-d FP64 array, fixed reduction order); on the host it is a ``float``.
+    0-d FP64 array, the backend's deterministic ``sum``); on the host a ``float``.
 
     Validation: sinc-bin-integration
     """
     if not 0.0 <= float(start_eV) < float(stop_eV):
         raise ValueError("band must satisfy 0 <= start < stop")
-    if getattr(xp, "__name__", "") == "cupy" and hasattr(a_width, "device"):
+    if getattr(xp, "__name__", "") == "cupy" and isinstance(a_width, xp.ndarray):
         if a_width.size == 0:
             return xp.zeros((), dtype=xp.float64)
         e, w, a = (xp.asarray(x, dtype=REAL) for x in (E_res, weight, a_width))
-        return _device_kernel(xp)(e, w, a, float(start_eV), float(stop_eV))
+        masses = _device_kernel(xp)(e, w, a, float(start_eV), float(stop_eV))
+        return masses.sum(dtype=xp.float64)
     a, e, w = (np.asarray(_to_cpu(x)).reshape(-1) for x in (a_width, E_res, weight))
     return _host_band_mass(a, e, w, float(start_eV), float(stop_eV))
