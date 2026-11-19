@@ -227,6 +227,41 @@ def resolve_job_stems(jobid, materials):
     return sorted(written), sorted(unwritten)
 
 
+def _resolve_selectors(stems, hash_prefix, skip_unmatched):
+    """Resolve ``MATERIAL@PROFILE`` selectors to exact stems; plain stems pass.
+
+    Selectors split and resolve here, before the shell-token check -- '@' is
+    not a safe interpolation token, and only the resolved stem ever reaches a
+    remote command. With ``skip_unmatched`` a selector with no checkpoint on
+    the box is warned about and dropped; none resolving still fails.
+    """
+    selectors = [_split_profile_selector(stem) for stem in stems]
+    if hash_prefix is not None and sum(s is not None for s in selectors) != 1:
+        raise SystemExit("--hash requires exactly one MATERIAL@PROFILE selector to pull")
+    if all(selector is None for selector in selectors):
+        return stems
+    resolved, skipped = [], []
+    for stem, selector in zip(stems, selectors, strict=True):
+        if selector is None:
+            resolved.append(stem)
+            continue
+        material, profile = selector
+        transport._check_shell_tokens([material])
+        if hash_prefix is not None:
+            resolved.append(resolve_profile_stem(material, profile, hash_prefix=hash_prefix))
+            continue
+        try:
+            resolved.extend(resolve_profile_stems(material, profile))
+        except SystemExit as exc:
+            if not skip_unmatched:
+                raise
+            skipped.append(stem)
+            report(f"skipping {stem}: {exc}", file=sys.stderr)
+    if not resolved:
+        raise SystemExit(f"no remote checkpoint matches any of: {', '.join(skipped)}")
+    return resolved
+
+
 def _pull_selection(stems, dataset, expand_surveys):
     """Component merges and job handles use exact stems; ordinary pulls expand surveys."""
     if dataset is None and expand_surveys:
@@ -246,6 +281,7 @@ def pull(
     force=False,
     summary=None,
     hash_prefix=None,
+    skip_unmatched=False,
     _expand_surveys=True,
 ):
     """Fetch checkpoints/<stem>.pkl back from the box for each stem (stem =
@@ -256,6 +292,11 @@ def pull(
     :func:`_resolve_survey_stems`) -- skipped for a ``dataset`` merge pull
     (``--brem-only``/``--cxr-only``), since those require an existing local
     checkpoint to merge into and a freshly discovered stem would not have one.
+
+    ``skip_unmatched`` (set when a profile's default membership expands into
+    ``MATERIAL@PROFILE`` selectors) warns about and skips members with no
+    matching checkpoint on the box instead of aborting the whole pull; the pull
+    still fails when no selector matches.
 
     Every pull runs the transfer through ``pyrite checkpoint slim`` on the box, which encodes
     straight to that ssh session's stdout (``-o -``) -- the box's compress pass
@@ -273,28 +314,7 @@ def pull(
     stems = list(stems)
     if not stems:
         raise ValueError("stems must contain at least one checkpoint stem")
-    # MATERIAL@PROFILE selectors split and resolve to an exact stem here,
-    # before the shell-token check below -- '@' is not a safe interpolation
-    # token, and only the resolved stem ever reaches a remote command.
-    selectors = [_split_profile_selector(stem) for stem in stems]
-    qualified = [selector for selector in selectors if selector is not None]
-    if hash_prefix is not None and len(qualified) != 1:
-        raise SystemExit("--hash requires exactly one MATERIAL@PROFILE selector to pull")
-    if qualified:
-        resolved_stems = []
-        for stem, selector in zip(stems, selectors, strict=True):
-            if selector is None:
-                resolved_stems.append(stem)
-                continue
-            material, profile = selector
-            transport._check_shell_tokens([material])
-            if hash_prefix is not None:
-                resolved_stems.append(
-                    resolve_profile_stem(material, profile, hash_prefix=hash_prefix)
-                )
-                continue
-            resolved_stems.extend(resolve_profile_stems(material, profile))
-        stems = resolved_stems
+    stems = _resolve_selectors(stems, hash_prefix, skip_unmatched)
     transport._check_shell_tokens(stems)
     stems = _pull_selection(stems, dataset, _expand_surveys)
     dest = output_dir("checkpoints")

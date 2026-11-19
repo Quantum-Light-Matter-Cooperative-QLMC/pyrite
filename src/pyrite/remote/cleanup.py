@@ -144,7 +144,8 @@ def _clear_exact_remote_stems(stems, label):
 
 
 def _profile_checkpoint_stems(catalog_profile, *, current_stems=()):
-    """Return exact remote stems owned by a named catalog profile.
+    """Return exact remote stems owned by a named catalog profile (or by any
+    profile of a collection of names, discovered in one pass).
 
     Current predicted stems remain candidates even before they have a manifest.
     Identity-qualified stems are accepted only when their remote manifest
@@ -153,6 +154,7 @@ def _profile_checkpoint_stems(catalog_profile, *, current_stems=()):
     """
     from ..campaign.profiles import _VARIANT_STEM_RE
 
+    profiles = {catalog_profile} if isinstance(catalog_profile, str) else set(catalog_profile)
     stems = set(current_stems)
     names = transport._ssh_capture(scripts._list_checkpoint_dirs_command()).split()
     for name in names:
@@ -163,14 +165,15 @@ def _profile_checkpoint_stems(catalog_profile, *, current_stems=()):
         if remote_meta is None:
             continue
         identity = remote_meta[1].get("dataset_identity")
-        if isinstance(identity, dict) and identity.get("catalog_profile") == catalog_profile:
+        if isinstance(identity, dict) and identity.get("catalog_profile") in profiles:
             stems.add(name)
     return sorted(stems)
 
 
 def clear_all_remote(yes=False):
-    """Empty the box's ``pyrite-output/checkpoints/`` directory: delete every ``*.pkl`` file
-    under it (recursively, so per-reproduction subdirs are included too).
+    """Empty the box's ``pyrite-output/checkpoints/`` directory: delete every
+    entry under it -- checkpoint directories with their manifests, the
+    content-addressed case stores, and legacy ``*.pkl`` files.
 
     Refuses (before touching anything) if any live job is running or any
     checkpoint reservation is held: both signal an in-flight sweep whose output
@@ -200,27 +203,33 @@ def clear_all_remote(yes=False):
             "wait for submission to resolve, reap orphans (pyrite remote reap), or stop the "
             "recorded job before clearing."
         )
-    # list first (dry preview), then delete only under --yes. `|| true` keeps a
-    # missing checkpoints/ dir or a find failure from becoming ssh's exit status.
+    # List first (dry preview), then delete only under --yes. Checkpoints are
+    # directories (meta.json/cases.json manifests over content-addressed .h5
+    # blobs), so remove every top-level entry: deleting only data files leaves
+    # hollow manifests that `pull MATERIAL@PROFILE` still resolves. `|| true`
+    # keeps a missing checkpoints/ dir or a find failure from failing ssh.
+    checkpoints = config.shell_word(config.remote_output_path("checkpoints"))
     listing = (
-        f"cd {config.shell_word(config.remote_output_path('checkpoints'))} 2>/dev/null || exit 0; "
-        r'find . -type f \( -name "*.h5" -o -name "*.pkl" \) 2>/dev/null | sed "s|^\./||" | sort || true'
+        f"cd {checkpoints} 2>/dev/null || exit 0; "
+        r"find . -mindepth 1 -maxdepth 1 \( -type d -printf '%f/\n' -o -printf '%f\n' \) "
+        "2>/dev/null | sort || true"
     )
     existing = transport._ssh_capture(listing).split()
     if not existing:
-        print("(nothing to clear: pyrite-output/checkpoints/ holds no .h5 or .pkl files)")
+        print("(nothing to clear: pyrite-output/checkpoints/ is empty)")
         return
-    print(f"would delete on the box -- {len(existing)} file(s):")
+    print(f"would delete on the box -- {len(existing)} entr{'y' if len(existing) == 1 else 'ies'}:")
     for f in existing:
         print(f"  pyrite-output/checkpoints/{f}")
-    if not _cli_core.confirm_destructive(yes, "Delete all remote checkpoint files?"):
+    if not _cli_core.confirm_destructive(yes, "Delete all remote checkpoints?"):
         return
     transport._ssh_capture(
-        f"cd {config.shell_word(config.remote_output_path('checkpoints'))} 2>/dev/null || exit 0; "
-        r'find . -type f \( -name "*.h5" -o -name "*.pkl" \) -delete'
+        f"cd {checkpoints} 2>/dev/null || exit 0; "
+        "find . -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +"
     )
     print(
-        f"cleared on the box: {len(existing)} checkpoint file(s) under pyrite-output/checkpoints/"
+        f"cleared on the box: {len(existing)} entr{'y' if len(existing) == 1 else 'ies'} "
+        "under pyrite-output/checkpoints/"
     )
 
 
@@ -236,9 +245,17 @@ def prune_remote(
     targets = _targets(all_profiles, catalog_profile)
     current_stems = [target.stem for target in targets]
     obsolete_stems = []
-    if catalog_profile is not None and catalog_profile != "standard":
+    if all_profiles:
+        from ..materials import CATALOG
+
+        named_profiles = tuple(p for p in CATALOG.profile_names if p != "standard")
+    elif catalog_profile is not None and catalog_profile != "standard":
+        named_profiles = (catalog_profile,)
+    else:
+        named_profiles = ()
+    if named_profiles:
         profile_stems = _profile_checkpoint_stems(
-            catalog_profile,
+            named_profiles,
             current_stems=current_stems,
         )
         obsolete_stems = sorted(set(profile_stems).difference(current_stems))

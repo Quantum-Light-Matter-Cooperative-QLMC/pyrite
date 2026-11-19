@@ -337,3 +337,32 @@ def test_prune_jobs_cli_rejects_bad_selectors(monkeypatch):
 
     assert _remote_main(["prune-jobs"]) == 2
     assert _remote_main(["prune-jobs", "--all", "--profile", "sub_100keV"]) == 2
+
+
+def test_prune_remote_all_profiles_reclaims_obsolete_generations_of_every_profile(monkeypatch):
+    from pyrite.materials import CATALOG
+
+    named = tuple(p for p in CATALOG.profile_names if p != "standard")
+    if not named:
+        pytest.skip("catalog has no named profiles")
+    current = type("Target", (), {"stem": "hopg@p-aaaaaaaaaaaa"})()
+    old = "hopg@p-111111111111"
+    seen = []
+    commands = []
+    monkeypatch.setattr("pyrite.checkpoints.checkpoint_cleanup._targets", lambda *_args: [current])
+    monkeypatch.setattr(
+        lifecycle_cleanup,
+        "_profile_checkpoint_stems",
+        lambda profiles, **_kwargs: seen.append(tuple(profiles)) or [current.stem, old],
+    )
+    monkeypatch.setattr(state, "_live_jobs", lambda: [])
+    monkeypatch.setattr(state, "_reservation_holders", lambda stems: [])
+    monkeypatch.setattr(
+        transport, "_ssh_capture", lambda command: commands.append(command) or "nothing"
+    )
+
+    lifecycle.prune_remote(all_profiles=True)
+
+    assert seen == [named]
+    assert "pyrite checkpoint gc --all" in commands[0]
+    assert "would delete obsolete profile checkpoint" in commands[0] and old in commands[0]

@@ -581,6 +581,8 @@ def test_pull_profile_expands_membership_to_qualified_selectors(monkeypatch):
 
     assert_clean_result(result)
     assert calls[0][0] == ["hopg@sub_100keV", "mose2@sub_100keV"]
+    # Default membership tolerates members the box has no checkpoint for.
+    assert calls[0][1]["skip_unmatched"] is True
 
 
 def test_pull_positional_profile_expands_membership(monkeypatch):
@@ -627,6 +629,7 @@ def test_pull_profile_qualifies_explicit_materials(monkeypatch):
 
     assert_clean_result(result)
     assert calls[0][0] == ["hopg@sub_100keV"]
+    assert calls[0][1]["skip_unmatched"] is False
 
     with_all = invoke(remote_cli.command, ["pull", "--all", "--profile", "sub_100keV"])
     assert with_all.exit_code == 0

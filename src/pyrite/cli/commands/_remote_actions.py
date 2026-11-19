@@ -247,6 +247,7 @@ def _cli_pull(
     cxr_only,
     force,
     hash_prefix,
+    skip_unmatched=False,
 ):
     dataset = "brem" if brem_only else ("line" if cxr_only else None)
     lifecycle.pull(
@@ -259,6 +260,7 @@ def _cli_pull(
         dataset=dataset,
         force=force,
         hash_prefix=hash_prefix,
+        skip_unmatched=skip_unmatched,
     )
 
 
@@ -276,6 +278,7 @@ def _cli_pull_json(
     cxr_only,
     force,
     hash_prefix,
+    skip_unmatched=False,
 ):
     materials = _selected_materials(remote_command, all_, material)
     dataset = "brem" if brem_only else ("line" if cxr_only else None)
@@ -295,6 +298,7 @@ def _cli_pull_json(
                 force=force,
                 summary=summary,
                 hash_prefix=hash_prefix,
+                skip_unmatched=skip_unmatched,
             )
     except (Exception, SystemExit) as exc:
         caught = exc

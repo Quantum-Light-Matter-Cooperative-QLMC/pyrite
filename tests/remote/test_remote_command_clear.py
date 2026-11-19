@@ -228,29 +228,32 @@ def test_clear_all_dry_preview_lists_but_does_not_delete(monkeypatch, capsys):
     monkeypatch.setattr(
         transport,
         "_ssh_capture",
-        lambda command: commands.append(command) or "hopg.pkl\nzhai_reproduction/a.pkl\n",
+        lambda command: commands.append(command) or "hopg.pkl\nhopg@p-aaaaaaaaaaaa/\n",
     )
     remote.clear_all_remote(yes=False)
     out = capsys.readouterr().out
-    assert "would delete" in out and "hopg.pkl" in out and "zhai_reproduction/a.pkl" in out
+    assert "would delete" in out and "hopg.pkl" in out and "hopg@p-aaaaaaaaaaaa/" in out
     assert len(commands) == 1  # listing only; no delete
-    assert "-delete" not in commands[0]
+    assert "rm -rf" not in commands[0]
 
 
-def test_clear_all_yes_deletes_every_pkl(monkeypatch, capsys):
+def test_clear_all_yes_removes_checkpoint_directories_not_only_data_files(monkeypatch, capsys):
+    """Deleting only *.h5/*.pkl left meta.json manifests that pull still resolved."""
     _no_live_jobs(monkeypatch)
     monkeypatch.setattr(state, "_reservation_ledger", lambda: (1000, []))
     commands = []
 
     def capture(command):
         commands.append(command)
-        return "" if "-delete" in command else "hopg.pkl\nhopg_quick.pkl\n"
+        return "" if "rm -rf" in command else "hopg/\nhopg@p-aaaaaaaaaaaa/\n"
 
     monkeypatch.setattr(transport, "_ssh_capture", capture)
     remote.clear_all_remote(yes=True)
     out = capsys.readouterr().out
-    assert "cleared on the box: 2 checkpoint file(s)" in out
-    assert any("-delete" in c for c in commands)
+    assert "cleared on the box: 2 entries" in out
+    delete = next(c for c in commands if "rm -rf" in c)
+    assert "-mindepth 1 -maxdepth 1" in delete
+    assert "-name" not in delete
 
 
 def test_clear_all_reports_nothing_when_empty(monkeypatch, capsys):

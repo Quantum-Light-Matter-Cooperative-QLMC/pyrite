@@ -876,6 +876,7 @@ def pull_command(
             catalog_profile = materials.pop(0)
         elif narrowed:
             catalog_profile = "standard"
+    skip_unmatched = False
     if catalog_profile is not None:
         if all_:
             emit_diagnostic("warning: pull profile already selects its materials; ignoring --all")
@@ -889,6 +890,7 @@ def pull_command(
             raise click.UsageError(
                 "PROFILE qualifies bare material names; drop the @PROFILE selector"
             )
+        skip_unmatched = not materials
         selected = _profile_selected_materials(catalog_profile, materials)
         materials = [f"{m}@{catalog_profile}" for m in selected]
     elif narrowed:
@@ -904,6 +906,7 @@ def pull_command(
         material=materials,
         all_=all_,
         hash_prefix=hash_prefix,
+        skip_unmatched=skip_unmatched,
         full=full_,
         drop_wide_brem=drop_wide_brem,
         downcast=downcast,

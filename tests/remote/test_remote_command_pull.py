@@ -373,3 +373,48 @@ def test_pull_rejects_invalid_public_dataset_before_side_effects(monkeypatch, tm
         lifecycle.pull(["mos2"], dataset=dataset)
 
     assert not lifecycle.config.LOCAL_ROOT.exists()
+
+
+def _fake_profile_resolution(monkeypatch, present):
+    def fake_resolve_stems(material, profile):
+        if material not in present:
+            raise SystemExit(f"no remote checkpoint matches {material}@{profile}; none found")
+        return [f"{material}@{profile}-{'a' * 12}"]
+
+    monkeypatch.setattr(lifecycle_pull, "resolve_profile_stems", fake_resolve_stems)
+
+
+def test_pull_profile_membership_skips_members_missing_on_the_box(monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr(config, "LOCAL_ROOT", tmp_path)
+    _fake_profile_resolution(monkeypatch, {"hbn"})
+    downloads = []
+
+    def fake_download(command, _destination, **_kwargs):
+        downloads.append(command)
+        raise RuntimeError("stop after selection")
+
+    monkeypatch.setattr(transport, "_ssh_download", fake_download)
+    monkeypatch.setattr(transport, "_ssh_capture", lambda _command: "")
+
+    with pytest.raises(SystemExit, match="failed for 1 of 1"):
+        remote.pull(["hbn@p", "mose2@p"], no_sync=True, skip_unmatched=True)
+
+    assert len(downloads) == 1 and f"hbn@p-{'a' * 12}" in downloads[0]
+    assert "skipping mose2@p: no remote checkpoint matches" in capsys.readouterr().err
+
+
+def test_pull_explicit_selectors_still_fail_on_a_missing_member(monkeypatch, tmp_path):
+    monkeypatch.setattr(config, "LOCAL_ROOT", tmp_path)
+    _fake_profile_resolution(monkeypatch, {"hbn"})
+    monkeypatch.setattr(transport, "_ssh_download", lambda *_a, **_k: pytest.fail("no transfer"))
+
+    with pytest.raises(SystemExit, match="no remote checkpoint matches mose2@p"):
+        remote.pull(["hbn@p", "mose2@p"], no_sync=True)
+
+
+def test_pull_profile_membership_fails_when_no_member_matches(monkeypatch, tmp_path):
+    monkeypatch.setattr(config, "LOCAL_ROOT", tmp_path)
+    _fake_profile_resolution(monkeypatch, set())
+
+    with pytest.raises(SystemExit, match="matches any of: hbn@p, mose2@p"):
+        remote.pull(["hbn@p", "mose2@p"], no_sync=True, skip_unmatched=True)
