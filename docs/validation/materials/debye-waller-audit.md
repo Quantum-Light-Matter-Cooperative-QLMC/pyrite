@@ -70,7 +70,7 @@ Scope requested: HOPG, h-BN, MoS2, MoSe2, MoTe2 only. The rest of the catalog is
 |---|---:|---:|---|
 | HOPG | `0.8` (no provenance) | `1.30` | Trucano & Chen 1975 neutron refinement, COD 9011577 — the entry's own `cod_id`. Adopted; see [hopg-debye-waller-00l](hopg-debye-waller-00l.md) |
 | h-BN | `3.45` | `3.45` (unchanged) | Pease room-temperature basal fit, already recorded; no action. Later corrected to `1.73` (#1235, [hbn-debye-waller-00l](hbn-debye-waller-00l.md)) |
-| MoS2 | `0.6` (placeholder) | `0.47` | Schoenfeld, Huang & Moss 1983, COD 9007661 (3R deposit of the same paper). Cross-polytype transfer, scoped in [mos2-debye-waller-00l](mos2-debye-waller-00l.md) |
+| MoS2 | `0.6` (placeholder) | `0.47` | Schoenfeld, Huang & Moss 1983, Table 3 2H row (COD 9007660 omits the ADP loop; the paper prints it). Basal `B33`; in-plane `B` is smaller (0.38/0.30 Ang^2 for Mo/S). See [mos2-debye-waller-00l](mos2-debye-waller-00l.md) |
 | MoSe2 | `0.6` (placeholder) | `0.6` (unchanged) | **not reported.** Only matching-phase deposit is James & Lavik 1963 (COD 2310945), zeroed `U_iso`. Bronsema, De Boer & Jellinek 1986 (*Z. Anorg. Allg. Chem.* **541**, 15–17, [doi:10.1002/zaac.19865400904](https://doi.org/10.1002/zaac.19865400904)) is the refinement the entry's cell matches (`a=3.289`, `c=12.927`) and is the correct target, but is paywalled and its ADP table was not retrieved |
 | MoTe2 | `0.6` (placeholder) | `0.6` (unchanged) | **not reported.** Puotinen & Newnham 1961 (COD 2310465) carries zeroed `U_iso`; Wyckoff 1963 (COD 9009147) is a secondary compilation with no ADPs |
 
