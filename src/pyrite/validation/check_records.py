@@ -126,6 +126,8 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     # Adaptive block size: wall, memory and stopping cost (#1252): engineering evidence.
     "checks/adaptive_block_size_1252.py": (),
     "checks/reflection_selection_subsample_1281.py": ("reflection-yield-tolerance-selector",),
+    # Formerly pinned family share of the automatic selection (#1302).
+    "checks/reference_pins_1302.py": ("reflection-yield-tolerance-selector",),
     # Streamed vs retained adaptive memory/wall/parity A/B (#1281): engineering evidence.
     "checks/streamed_adaptive_ab_1281.py": (),
     # Device Fourier bin-mean reduction phase split (#1296): engineering evidence.
