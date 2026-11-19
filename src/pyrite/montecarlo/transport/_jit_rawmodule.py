@@ -39,16 +39,19 @@ class KernelBuild(NamedTuple):
     ``launch_bounds`` ``(max_threads, min_blocks)`` emits ``__launch_bounds__``
     on the kernel (``(0, 0)``: none); ``readonly`` names array parameters the
     kernel never writes, whose loads are then emitted as ``__ldg``
-    (``ld.global.nc``).
+    (``ld.global.nc``); ``lineinfo`` adds ``--generate-line-info`` so a
+    profiler can map SASS to lines of the generated source (#916).
     """
 
     maxrregcount: int = 0
     launch_bounds: tuple[int, int] = (0, 0)
     readonly: frozenset[str] = frozenset()
+    lineinfo: bool = False
 
     def options(self):
         """NVRTC options this build adds to the JIT's."""
-        return (f"--maxrregcount={self.maxrregcount}",) if self.maxrregcount else ()
+        options = (f"--maxrregcount={self.maxrregcount}",) if self.maxrregcount else ()
+        return options + (("--generate-line-info",) if self.lineinfo else ())
 
 
 # Array parameters of `_jit_kernel._transport_kernel` that hold tables or

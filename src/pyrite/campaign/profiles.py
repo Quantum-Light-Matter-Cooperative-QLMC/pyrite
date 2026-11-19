@@ -21,6 +21,7 @@ import numpy as np
 
 from .._continuum_grid import CONTINUUM_GRID_MODEL, STACK_CONTINUUM_GRID_MODEL
 from .._energy_grid_encoding import encode_energy_grid
+from .._hard_loss_policy import hard_loss_markers
 from .._numerics import (
     CHANNELING_KEYS,
     DEFAULT_RADIATIVE_CUTOFF_EV,
@@ -788,6 +789,7 @@ def case_content_key(
         ),
     }
     payload.update(_adaptive_sampling_markers(case.get("adaptive_precision")))
+    payload.update(hard_loss_markers(case.get("inelastic_model")))  # #916
     payload.update(_bin_reduction_markers(case))
     payload.update(_structure_factor_identity(_case_crystals(case)))
     payload.update(

@@ -34,8 +34,9 @@ from ._jit_device import (
     _stream_uniform,
 )
 from .hard_inelastic import (
-    _BISECTION_STEPS,
     _MC2_EV,
+    _NEWTON_RTOL,
+    _NEWTON_STEPS,
     _TRUNCATED_GAUSSIAN_WIDTH,
     POSITRON_BRANCH_OFFSET,
 )
@@ -46,7 +47,8 @@ F64_THREE = np.float64(3.0)
 F64_NINE = np.float64(9.0)
 F64_SQRT3 = np.float64(np.sqrt(3.0))
 F64_GAUSS_WIDTH = np.float64(_TRUNCATED_GAUSSIAN_WIDTH)
-I32_BISECTION_STEPS = np.int32(_BISECTION_STEPS)
+I32_NEWTON_STEPS = np.int32(_NEWTON_STEPS)
+F64_NEWTON_RTOL = np.float64(_NEWTON_RTOL)
 I32_POSITRON_BRANCH = np.int32(POSITRON_BRANCH_OFFSET)
 # ``hard_channel`` of a row without a hard collision.
 I16_NO_CHANNEL = np.int16(-1)
@@ -82,44 +84,59 @@ def _log_grid_fraction(log_grid, row, n, log_e, lo):
 
 
 @jit.rawkernel(device=True)
-def _triangle_cdf(peak_end, lower, w):
-    """Unnormalized ``int_lower^w p_dis(W)/W dW``; host ``_triangle_cdf``."""
+def _hard_cdf_value(kind, energy_eV, prime_eV, peak_end, lower, w):
+    """``J(w)`` of a hard loss law; host ``_hard_cdf_density`` (first value).
+
+    ``kind`` 0 distant triangle (zero at ``lower``), 1 Moller, 2 Bhabha.
+    Validation: penelope-shell-hard-loss-sampling, bhabha-close
+    """
+    if kind == I32_ONE:
+        ratio = energy_eV / (energy_eV + F64_MC2_EV)
+        a = ratio * ratio
+        rest = prime_eV - w
+        c1 = (F64_ONE - a) / prime_eV
+        return -F64_ONE / w + F64_ONE / rest + c1 * xp.log(rest / w) + a * w / (prime_eV * prime_eV)
+    if kind == I32_TWO:
+        gamma = F64_ONE + energy_eV / F64_MC2_EV
+        ratio = (gamma - F64_ONE) / gamma
+        g = ratio * ratio
+        gp1 = gamma + F64_ONE
+        b1 = (gamma - F64_ONE) / (gamma * gamma * gp1) * (F64_TWO * gp1 * gp1 - F64_ONE)
+        b2 = g * (F64_THREE * gp1 * gp1 + F64_ONE) / (gp1 * gp1)
+        b3 = g * F64_TWO * gamma * (gamma - F64_ONE) / (gp1 * gp1)
+        b4 = g * (gamma - F64_ONE) * (gamma - F64_ONE) / (gp1 * gp1)
+        x = w / energy_eV
+        series = -b1 * xp.log(w) + b2 * x - b3 * x * x / F64_TWO + b4 * x * x * x / F64_THREE
+        return -F64_ONE / w + series / energy_eV
     return peak_end * xp.log(w / lower) - (w - lower)
 
 
 @jit.rawkernel(device=True)
-def _moller_j0(energy_eV, prime_eV, w):
-    """``J_0^(-)`` antiderivative of ``F^(-)(E', W)/W^2``; host ``_moller_j0``."""
-    ratio = energy_eV / (energy_eV + F64_MC2_EV)
-    a = ratio * ratio
-    rest = prime_eV - w
-    return (
-        -F64_ONE / w
-        + F64_ONE / rest
-        + (F64_ONE - a) / prime_eV * xp.log(rest / w)
-        + a * w / (prime_eV * prime_eV)
-    )
+def _hard_cdf_slope(kind, energy_eV, prime_eV, peak_end, w):
+    """``J'(w)`` of a hard loss law; host ``_hard_cdf_density`` (second value).
 
-
-@jit.rawkernel(device=True)
-def _bhabha_j0(energy_eV, w):
-    """``J_0^(+)`` antiderivative of ``F^(+)(E, W)/W^2``; host ``_bhabha_j0``.
-
-    Validation: bhabha-close
+    Validation: penelope-shell-hard-loss-sampling, bhabha-close
     """
-    gamma = F64_ONE + energy_eV / F64_MC2_EV
-    ratio = (gamma - F64_ONE) / gamma
-    g = ratio * ratio
-    gp1 = gamma + F64_ONE
-    b1 = (gamma - F64_ONE) / (gamma * gamma * gp1) * (F64_TWO * gp1 * gp1 - F64_ONE)
-    b2 = g * (F64_THREE * gp1 * gp1 + F64_ONE) / (gp1 * gp1)
-    b3 = g * F64_TWO * gamma * (gamma - F64_ONE) / (gp1 * gp1)
-    b4 = g * (gamma - F64_ONE) * (gamma - F64_ONE) / (gp1 * gp1)
-    x = w / energy_eV
-    return (
-        -F64_ONE / w
-        + (-b1 * xp.log(w) + b2 * x - b3 * x * x / F64_TWO + b4 * x * x * x / F64_THREE) / energy_eV
-    )
+    if kind == I32_ONE:
+        ratio = energy_eV / (energy_eV + F64_MC2_EV)
+        a = ratio * ratio
+        rest = prime_eV - w
+        c1 = (F64_ONE - a) / prime_eV
+        density = F64_ONE / (w * w) + F64_ONE / (rest * rest) - c1 * (F64_ONE / rest + F64_ONE / w)
+        return density + a / (prime_eV * prime_eV)
+    if kind == I32_TWO:
+        gamma = F64_ONE + energy_eV / F64_MC2_EV
+        ratio = (gamma - F64_ONE) / gamma
+        g = ratio * ratio
+        gp1 = gamma + F64_ONE
+        b1 = (gamma - F64_ONE) / (gamma * gamma * gp1) * (F64_TWO * gp1 * gp1 - F64_ONE)
+        b2 = g * (F64_THREE * gp1 * gp1 + F64_ONE) / (gp1 * gp1)
+        b3 = g * F64_TWO * gamma * (gamma - F64_ONE) / (gp1 * gp1)
+        b4 = g * (gamma - F64_ONE) * (gamma - F64_ONE) / (gp1 * gp1)
+        x = w / energy_eV
+        slope = -b1 / w + (b2 - b3 * x + b4 * x * x) / energy_eV
+        return F64_ONE / (w * w) + slope / energy_eV
+    return peak_end / w - F64_ONE
 
 
 @jit.rawkernel(device=True)
@@ -127,7 +144,8 @@ def _sample_hard_transfer_eV(energy_eV, ionization_eV, resonance_eV, branch, cut
     """Invert one channel's restricted hard loss CDF; host ``_sample_hard_transfer_eV``.
 
     ``_hard_loss_bounds`` and ``_split_branch`` are inlined: a positron-tagged
-    branch takes ``W_max = E`` and the Bhabha close CDF (#276).
+    branch takes ``W_max = E`` and the Bhabha close CDF (#276). Safeguarded
+    Newton iteration in the host twin's operation order (#916).
     Validation: penelope-shell-hard-loss-sampling, bhabha-close
     """
     positron = branch >= I32_POSITRON_BRANCH
@@ -154,34 +172,44 @@ def _sample_hard_transfer_eV(energy_eV, ionization_eV, resonance_eV, branch, cut
     if not upper > lower:
         return lower
     prime = energy_eV + ionization_eV
-    base_j = F64_ZERO
-    if branch == I32_TWO and positron:
-        base_j = _bhabha_j0(energy_eV, lower)
-        target = u * (_bhabha_j0(energy_eV, upper) - base_j)
-    elif branch == I32_TWO:
-        base_j = _moller_j0(energy_eV, prime, lower)
-        target = u * (_moller_j0(energy_eV, prime, upper) - base_j)
-    else:
-        target = u * _triangle_cdf(peak_end, lower, upper)
+    kind = I32_ZERO
+    if branch == I32_TWO:
+        kind = I32_ONE
+        if positron:
+            kind = I32_TWO
+    base_j = _hard_cdf_value(kind, energy_eV, prime, peak_end, lower, lower)
+    target = u * (_hard_cdf_value(kind, energy_eV, prime, peak_end, lower, upper) - base_j)
+    if not target > F64_ZERO:
+        return lower
+    w = lower + target / _hard_cdf_slope(kind, energy_eV, prime, peak_end, lower)
+    if kind != I32_ZERO:
+        inverse = F64_ONE / lower - target
+        w = upper
+        if inverse > F64_ZERO:
+            w = F64_ONE / inverse
     lower_transfer_eV = lower
     upper_transfer_eV = upper
+    if not (w > lower_transfer_eV and w < upper_transfer_eV):
+        w = F64_HALF * (lower_transfer_eV + upper_transfer_eV)
     step = I32_ZERO
-    while step < I32_BISECTION_STEPS:
+    while step < I32_NEWTON_STEPS:
         step += I32_ONE
-        mid_transfer_eV = F64_HALF * (lower_transfer_eV + upper_transfer_eV)
-        if mid_transfer_eV <= lower_transfer_eV or mid_transfer_eV >= upper_transfer_eV:
-            break
-        if branch == I32_TWO and positron:
-            value = _bhabha_j0(energy_eV, mid_transfer_eV) - base_j
-        elif branch == I32_TWO:
-            value = _moller_j0(energy_eV, prime, mid_transfer_eV) - base_j
+        residual = _hard_cdf_value(kind, energy_eV, prime, peak_end, lower, w) - base_j - target
+        if residual == F64_ZERO:
+            return w
+        if residual < F64_ZERO:
+            lower_transfer_eV = w
         else:
-            value = _triangle_cdf(peak_end, lower, mid_transfer_eV)
-        if value < target:
-            lower_transfer_eV = mid_transfer_eV
-        else:
-            upper_transfer_eV = mid_transfer_eV
-    return F64_HALF * (lower_transfer_eV + upper_transfer_eV)
+            upper_transfer_eV = w
+        w_next = w - residual / _hard_cdf_slope(kind, energy_eV, prime, peak_end, w)
+        if not (w_next > lower_transfer_eV and w_next < upper_transfer_eV):
+            w_next = F64_HALF * (lower_transfer_eV + upper_transfer_eV)
+        if xp.abs(w_next - w) <= F64_NEWTON_RTOL * w or not (
+            w_next > lower_transfer_eV and w_next < upper_transfer_eV
+        ):
+            return w_next
+        w = w_next
+    return w
 
 
 @jit.rawkernel(device=True)

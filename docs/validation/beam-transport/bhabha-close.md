@@ -98,7 +98,7 @@ $W\le E$.
 
 | Item | Derivation | Code | Result |
 | --- | --- | --- | --- |
-| $b_1..b_4$ | Eq. 3.90 | `shell_gos.py::bhabha_coefficients`; Numba and CUDA `_bhabha_j0` repeat it | match (relative difference $\le5\times10^{-9}$, from my rounded $m_ec^2$) |
+| $b_1..b_4$ | Eq. 3.90 | `shell_gos.py::bhabha_coefficients`; Numba `_bhabha_j0`/`_hard_cdf_density` and CUDA `_hard_cdf_value`/`_hard_cdf_slope` repeat it | match (relative difference $\le5\times10^{-9}$, from my rounded $m_ec^2$) |
 | $J^{(+)}_{0,1,2}$ | above | `shell_gos.py::_bhabha_integrals` | match, term by term |
 | $W_{\max}$ | $E$ | `max_energy_loss_eV`; Numba `_hard_loss_bounds`; CUDA inline | match, close and distant bounds |
 | $F^{(+)}$ argument | $E$, no $E+U_k$ | `_bhabha_integrals(energy_eV, w)` | match |

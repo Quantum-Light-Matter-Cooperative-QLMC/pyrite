@@ -11,6 +11,7 @@ from collections.abc import Mapping
 from pathlib import PurePath
 from typing import TYPE_CHECKING, Any
 
+from ._hard_loss_policy import hard_loss_markers
 from ._mixed_elastic_policy import mixed_provenance_markers
 from ._physics_contract import (
     BUILTIN_DESCRIPTORS,
@@ -135,6 +136,7 @@ def resolved_physics_view(
         )
     )
     markers.update(mixed_provenance_markers(resolved))
+    markers.update(hard_loss_markers(selections["transport.inelastic"]))  # #916
     markers.update(_structure_factor_markers(resolved))
     if resolved.get("photon_transport") is not None:
         markers["photon_transport_model"] = resolved["photon_transport"]["model"]

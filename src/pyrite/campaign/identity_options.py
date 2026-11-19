@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, cast
 
 from .._cascade_rng_policy import CASCADE_RNG_MODEL
+from .._hard_loss_policy import hard_loss_markers
 from .._mixed_elastic_policy import mixed_case_keys
 from .._numerics import DEFAULT_INELASTIC_CUTOFF_EV, DEFAULT_RADIATIVE_CUTOFF_EV
 from .._radiative_moment_policy import RADIATIVE_MOMENT_MODEL
@@ -150,6 +151,7 @@ def transport_numerics_payload(
     if inelastic_model == "shell-soft-hard":
         numerics["inelastic_model"] = inelastic_model
         numerics["inelastic_cutoff_eV"] = float(cast(float, inelastic_cutoff_eV))
+        numerics.update(hard_loss_markers(inelastic_model))  # #916
     if options.secondary_threshold_eV is not None:  # divergence-only (#94)
         numerics["secondary_threshold_eV"] = float(options.secondary_threshold_eV)
         numerics["cascade_rng_model"] = CASCADE_RNG_MODEL  # #923

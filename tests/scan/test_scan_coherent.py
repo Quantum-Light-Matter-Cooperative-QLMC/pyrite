@@ -95,6 +95,7 @@ def test_catalog_profile_transport_numerics_reach_run_identity(monkeypatch):
         "max_dE_frac": 0.02,
         "inelastic_model": "shell-soft-hard",
         "inelastic_cutoff_eV": 50.0,
+        "hard_loss_sampling_model": "safeguarded-newton-v1",
         "elastic_model": "elsepa",
         "atomic_electron_deflection": "kawrakow",
         "radiative_model": "bremslib-soft-hard",

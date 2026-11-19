@@ -45,6 +45,8 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     "checks/line_roulette_tail_879.py": (),
     # #875 launch-shape timing diagnostic: bitwise-identity and timing, no physics claim.
     "checks/launch_retune_875.py": (),
+    # #916 FP64-pipe profile: ncu source counters and line-info identity, no physics claim.
+    "checks/fp64_pipe_916.py": (),
     "checks/brem_source_comparison.py": ("brem-source-comparison",),
     # Fused band scoring diagnostics (#938): performance/parity evidence only.
     "checks/brem_primary_band_benchmark.py": (),

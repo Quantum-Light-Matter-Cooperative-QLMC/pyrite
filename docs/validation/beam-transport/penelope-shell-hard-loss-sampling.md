@@ -62,3 +62,58 @@ Units, support limits, branch normalization, and energy signs **pass** against t
 ## Adjudication
 
 On 2026-09-25 the owner chose $p_{\rm dis}(W)/W$ (Eqs. 3.94–3.95 and 3.104) as the reference distant law for this PENELOPE-like model. It keeps sampling, moments and closed hard rates on one DCS. The model therefore intentionally differs from PENELOPE's Eq. 3.125 sampler. Adopting Eq. 3.125 later would require changing the moments, rates and sampler together. Under this choice, the checks above pass. The ledger status is `rederived`; only a human can mark it `signed-off`.
+
+## Independent verification of the safeguarded Newton inversion (#916, fresh context 2026-11-19)
+
+Scope: only the root finder of the transport twins (`hard_inelastic.py::_hard_cdf_density`, `_sample_hard_transfer_eV`; CUDA `_jit_shell_device.py::_hard_cdf_value`, `_hard_cdf_slope`, `_sample_hard_transfer_eV`). The distribution (Eqs. 3.76, 3.87, 3.92, 3.94, 3.96, 3.104; adjudicated $p_{\rm dis}(W)/W$ law) is unchanged by #916. Disclosure: the verifier was handed the diff with the task, so the code was seen before this derivation; the $J$ and $J'$ expressions below were derived from the source DCS shapes and checked against arbitrary-precision references that use no implementation helper.
+
+### Derivation
+
+The hard loss $W$ on $[L,R]$ solves $J(W)-J(L)=u\,[J(R)-J(L)]\equiv T$ with $J'(W)=g(W)>0$ the unnormalized density. Define the residual $r(W)=J(W)-J(L)-T$. Because $g>0$, $r$ is strictly increasing, $r(L)=-T<0$ for $u>0$ and $r(R)=(1-u)[J(R)-J(L)]\ge0$, so a unique root lies in $(L,R]$.
+
+**Distant triangle.** $g=(D-W)/W$ gives $J=D\ln W-W$ and $J'=D/W-1$. $J$ is concave, $J'>0$ for $W<D$, and $J'(D)=0$. The code's $J=D\ln(w/L)-(w-L)$ differs from mine by the constant $D\ln L-L$ only.
+
+**Møller.** The standard close DCS is
+
+$$
+\frac{F^{(-)}}{W^2}=\frac1{W^2}+\frac1{(E'-W)^2}-\frac{1-a}{W(E'-W)}+\frac{a}{E'^2},\qquad a=\Big(\frac{E}{E+m_ec^2}\Big)^2,\ E'=E+U,
+$$
+
+(the $a$ built from $E$ and the $W$, $E'-W$ terms from $E'$ is the convention of the rederived `penelope-shell-soft-hard-partition`; #916 does not touch it). Partial fractions $1/[W(E'-W)]=(1/E')(1/W+1/(E'-W))$ give
+
+$$
+J^{(-)}_0=-\frac1W+\frac1{E'-W}+\frac{1-a}{E'}\ln\frac{E'-W}{W}+\frac{aW}{E'^2}.
+$$
+
+**Bhabha.** Integrating $F^{(+)}/W^2$ (Eq. 3.91, $x=W/E$) term by term gives $J^{(+)}_0=-1/W-(b_1/E)\ln W+b_2W/E^2-b_3W^2/(2E^3)+b_4W^3/(3E^4)$ and
+
+$$
+J^{(+)\prime}_0=\frac1{W^2}-\frac{b_1}{EW}+\frac{b_2-b_3x+b_4x^2}{E^2}.
+$$
+
+The code's `slope` is $-b_1/W+(b_2-b_3x+b_4x^2)/E$, and it returns $1/W^2+\text{slope}/E$, which is the same. Every sign, power and $1/E$ factor matches.
+
+**Safeguarded Newton.** The iterate is $W\leftarrow W-r(W)/J'(W)$, which needs $J'>0$. $F^{(-)}>0$ and $\min F^{(+)}=0.267$ (see `bhabha-close`) make that true on the interior. The triangle has $J'>0$ for $W<D$, and the interior satisfies $W<R\le D$. Bracket invariant: $[\text{lo},\text{hi}]$ starts as $[L,R]$ with $r(\text{lo})<0\le r(\text{hi})$. Each evaluation sets $\text{lo}=W$ if $r<0$ and $\text{hi}=W$ if $r>0$, which preserves the sign change because $r$ is monotone. A Newton step outside the open bracket is replaced by the midpoint, so the bracket shrinks at least as fast as bisection. Termination: the cap of 200 steps equals the old bisection cap, and each step either halves the bracket or is a Newton step into it. A step with $|\Delta W|\le2^{-50}W$ (about 4 ulp) returns, and so does a collapsed bracket (midpoint equal to an endpoint, which is still inside $[\text{lo},\text{hi}]$).
+
+**Limits.**
+
+- $u=0$ gives $T=0$, so `not target > 0` returns $L$ exactly.
+- $u\to1$ gives $T\to J(R)-J(L)$ and the iterate converges to $R$ (or to its round-off root).
+- A degenerate interval $R\le L$ returns $L$ before any evaluation.
+- Conduction-band distant ($U=0$, branch $\ne2$) returns $W_{cb}$ before any evaluation.
+- The initial guess for close losses, $1/W=1/L-T$ from the leading $-1/W$ term, falls back to $R$ if $1/L-T\le0$. It is only a starting point because the bracket test guards it.
+
+### Numerical evidence (scratch scripts, not committed)
+
+- $J,J'$ against SymPy antiderivatives evaluated at 60 digits (mpmath) from my own $F^{(-)}$ and $F^{(+)}$: 825 points over $E=2\,{\rm keV}$–$10\,{\rm MeV}$, $U\in\{0,99,1839,69525\}$ eV, all six branches, $W_c\in\{50,1000\}$ eV. The largest $|J-J_{\rm ref}|/\text{range}$ is $2.2\times10^{-14}$ and the largest $|J'-F/W^2|/|F/W^2|$ is $1.5\times10^{-14}$.
+- Roots against 220-step 60-digit bisection of my own $J$: 1925 cases, $u\in\{10^{-12},10^{-6},0.1,0.5,0.9,1-10^{-6},1-10^{-12}\}$. The worst Newton relative error is $3.7\times10^{-10}$, at the distant law's flat top ($u=1-10^{-12}$). The old bisection is $1.3\times10^{-9}$ for the same case. So Newton is at least as accurate as the retained oracle.
+- 60 000 random cases from 30 eV to 10 GeV with $u$ down to $10^{-16}$ and up to nextafter(1, 0): zero out-of-bracket or non-finite results. The largest Newton–bisection difference is $2\times10^{-7}$ relative (Bhabha, $E\sim10^{10}$ eV, $1-u\sim10^{-16}$); there Newton is $6.7\times10^{-8}$ from the 80-digit root and bisection $1.4\times10^{-7}$, so both are limited by FP64 conditioning of $J$, not by the algorithm.
+- Repository tests `test_hard_loss_newton.py` and `test_shell_partition.py`: 103 passed (1.8 s).
+
+### Device twin (read only; CUDA not runnable here)
+
+The device sampler follows the host line for line: the same bounds inlining, kind selection (0 triangle, 1 Møller, 2 Bhabha, from branch and positron tag), $J(L)$, $T$, `not target > 0` return, initial guess, bracket test, loop body, residual-zero return, bracket update, Newton step with midpoint fallback, termination test and 200-step cap (`_NEWTON_STEPS`, `_NEWTON_RTOL` are imported, not duplicated). `_hard_cdf_value` and `_hard_cdf_slope` repeat the host expressions term by term and in the same order. There are two benign rounding-order differences, so the twins are not bitwise identical: host `b4 * x**3 / 3` against device `b4*x*x*x/3`, and host `** 2` against explicit products (which are equal). Both are at the ulp level. The device `peak_end` is zero for close branches and is unused there, as on the host. Not checked: CuPy JIT compilation and run-time behavior (early `return` inside `while`, variable scoping of `inverse`) and CUDA agreement of the sampled $W$. The existing hardware parity checks must cover that.
+
+### Verdict
+
+$J$, $J'$, bracket maintenance, termination and the $u=0$, $u\to1$, degenerate-interval limits match the independent derivation. The distribution is unchanged, so the earlier `rederived` verdict carries over. Suggested ledger edit: keep `rederived` and replace the pending-verification sentence with a reference to this section. Open: CUDA execution of the twin. Only a human may mark `signed-off`.

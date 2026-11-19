@@ -178,6 +178,63 @@ Divergence is computed exactly rather than sampled. Thread `i` owns electron `e_
 
 The ranking that followed was: keep segments on the device, which attacks the D2H, most of the host remainder, and the spectrum phase's re-upload at once. That is done — see the handoff section. Pinned host memory was *not* the cheap partial it looked like, and is now moot.
 
+(fp64-pipe-attribution)=
+## FP64 pipe attribution (#916)
+
+[#907](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/907) found the saturated kernel FP64-pipe bound on the RTX 5080. [#916](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/916) attributes that load to source lines. `checks/fp64_pipe_916.py` rebuilds the transport variant through `_jit_rawmodule` with `KernelBuild(lineinfo=True)` (`--generate-line-info`). It then joins Nsight Compute's per-SASS counters with `nvdisasm -gi` line info for the generated source. The line-info build is bitwise identical to the `cupyx.jit` kernel: every segment array of the #907 scene at 2,048 and 4,096 histories, and every array of the #831 W 1 MeV anchor in both precisions (job 13788). Both builds use 176 registers.
+
+**Workload.** The #907 scene: W 1 MeV, 10 µm slab at 45°, default physics (shell soft/hard inelastic), `mixed` precision, 32 threads per block, 16,384 histories, CUDA 13.2 `ncu --set full` (job 13761, code `49717c009`). The two full-population launches (grid 512, 67.5 and 67.8 ms) give the same picture; launch 10 is quoted.
+
+| quantity | value |
+| --- | --- |
+| FP64 pipe, % of peak (active SMs) | 86.8% |
+| registers per thread / achieved warps per SM | 176 / 5.8 (12.1% of peak) |
+| threads active per warp instruction | 8.1 of 32 |
+| FP64 share of executed warp instructions | 39.8% (772 M of 1,943 M) |
+| short-scoreboard share of warp-stall samples | 89% |
+
+**One sampler holds the FP64 load.** By generated-source line:
+
+| source (kernel body call site) | FP64 warp instructions | stall samples | threads active |
+| --- | --- | --- | --- |
+| `_sample_hard_transfer_eV` (hard-inelastic energy loss) | 84.5% | 80.9% | 2.5 |
+| `_hard_primary_cosine` | 3.6% | 3.6% | 2.9 |
+| step epilogue (line 1758) | 1.7% | 1.7% | 25.8 |
+| hard-event uniforms | 1.5% | 1.5% | 4.1 |
+| straggling `_soft_loss_sample_keV` | 1.0% | 1.0% | 27.2 |
+| every other line | ≤ 0.6% each | | |
+
+`_sample_hard_transfer_eV` inverts one channel's restricted loss CDF by bisection to adjacent doubles. Each iteration evaluates an FP64 `log` and up to four FP64 divisions: the Møller antiderivative for close losses, the triangle CDF for distant ones. The launch enters it 129,298 times per warp, with 4.1 lanes each. The loop then runs 60 iterations per entry on average (7.74 M warp iterations). Only lanes that drew a hard collision on this step enter, hence 2.5 active threads per instruction. When a warp's requests mix close and distant channels, both loop bodies execute every iteration: 11.57 M body executions for 7.74 M iterations. These are shell paths that #838 keeps in FP64, so `mixed` precision leaves them untouched. The rest of the kernel body (position, direction, boundaries, free paths, rotation) is FP64 at about 31 active threads, and no line of it exceeds 0.6% of the FP64 load.
+
+**A partially active warp costs the pipe a full warp.** A dependent DFMA chain at 1, 2, 4, 8, 16 and 32 active lanes per warp runs in the same 33.8 ms: 12.7 warp DFMA per ns throughout (job 13788, `fp64_pipe_916.py pipe`). On this card the FP64 cost is therefore the count of warp instructions, not of thread operations. The sampler pays for 32 lanes while 2.5 do work. Divergence is as large a lever as the FP64 instruction count, as #1003 found for the CXR line reduction.
+
+**Ranking.** Relief is in FP64 warp instructions, from the counts above.
+
+| candidate | projected FP64 warp-instruction relief | numerical identity |
+| --- | --- | --- |
+| Warp-cooperative bisection: idle lanes evaluate the next levels of the same bisection tree for each requesting lane | sampler about 3× fewer at 4 requests per warp (20 instead of 60 rounds), up to about 2× on the kernel combined with the next row | bitwise by construction (same midpoints, same CDF evaluations, same comparisons); FMA contraction to be tested |
+| One `log` per iteration shared by the close and distant branches (adopted, below) | about 15% of kernel FP64 (11.57 M → 7.74 M log evaluations); measured 1.10× kernel | bitwise (measured) |
+| Newton or tolerance-stopped inversion instead of 60 bisection steps | sampler about 10× fewer | changes output at rounding scale; #838 qualification and a model bump |
+| FP32 sampler | larger | outside #838's accuracy budget (shell paths stay FP64) |
+| Register reduction or occupancy | none: #796 showed occupancy alone buys nothing, and the pipe is saturated | |
+
+**Adopted: one `log` per bisection step.** `_sample_hard_transfer_eV` now selects the branch's `log` argument (`(E + U - W)/W` close, `W/lower` distant, `W` Bhabha) and evaluates one `log` per step. `_moller_j0_log`, `_triangle_cdf_log` and `_bhabha_j0_log` take that value, and `_moller_j0`, `_triangle_cdf` and `_bhabha_j0` call them with their own `log`, so every expression keeps its operation order. Job 13793 (`fp64_pipe_916_ab.sbatch`, base `bc8df4a3`, new `55425322`) checked it on the #907 scene:
+
+- The segment digests at 2,048 and 4,096 histories are identical to the base checkout's, and to the job 13788 digests.
+- The 16,384-history transport-only kernel time fell from 0.891–0.893 s to 0.813–0.814 s over three rounds in alternating order: 1.10×.
+- The shell soft/hard, shell secondary, positron and kernel-variant CUDA tests pass: 47 tests.
+
+The gain is below the projected 15% of FP64 instructions because the step's divisions still execute per branch.
+
+**Adopted: safeguarded Newton inversion (user-approved 2026-11-19).** The bisection ran about 60 iterations to adjacent doubles, so Newton on the same CDF removes most of the sampler's FP64 work. The host and device samplers (`hard_inelastic.py::_sample_hard_transfer_eV`, `_jit_shell_device.py::_sample_hard_transfer_eV`) now iterate Newton on `J(W) - J(lower) = u [J(upper) - J(lower)]`. `J'` is the analytic density (`_hard_cdf_density` on the host, `_hard_cdf_value`/`_hard_cdf_slope` on the device). A step that leaves the residual-sign bracket falls back to bisection. Iteration stops when a step is below 2⁻⁵⁰ of `W` or the bracket closes. The bisection is kept as the host oracle `_sample_hard_transfer_eV_bisection`.
+
+- **Agreement with the oracle.** Over 17 energies, four shells, six branches, two cutoffs and seven draws (`tests/montecarlo/collisions/test_hard_loss_newton.py`), the median disagreement is at most 4 ulp. The worst is 1e-8 relative, at the distant law's flat top, where round-off in `J` sets the root of the bisection as well.
+- **Timing.** Transport-only, 16,384 histories on the #907 scene, three alternating rounds (job 13823, RTX 5080): 0.813 s (shared-log bisection) to 0.505 s, 1.61×, or 1.77× against the original 0.892 s. The CUDA tests (50) pass, including run-to-run determinism and device/host parity.
+- **Transport counts.** At 2k, 4k and 16k histories the backscatter, transmitted, row and hard-event counts equal the bisection run's. Array means differ by at most 3e-13 relative.
+- **Identity.** The result is not bitwise identical to the bisection's, so shell cases carry `hard_loss_sampling_model = safeguarded-newton-v1` (`_hard_loss_policy.py`) in their dataset identity and provenance; continuous-stopping cases do not, so their digests stay put. The identity pins are re-minted.
+
+**Not pursued: warp-cooperative bisection.** It was the remaining bitwise lever, but it would accelerate a loop that Newton removes. `cupyx.jit` also exposes no `ballot`, `activemask` or `any_sync`, so it needs a source rewrite through `_jit_rawmodule`.
+
 ## Launch shape and compile options retune (#875)
 
 Harness `checks/launch_retune_875.py`, RTX 5080 (CuPy 14.2.0). Arms alternate in rotating order per seed after an untimed warmup; wall is warm `simulate_trajectories`, kernel is the sum of CUDA-event times of the transport launches; every returned array is hashed against the same-precision `kernel_threads=128` arm. Schedules are explicit `full-history` and `continuation`. Jobs 3036 (attributes), 3040 (sweep, seeds 1-3), 3580 (continuation repeat, seeds 11-17), 3579 (caps, seeds 1-3).
