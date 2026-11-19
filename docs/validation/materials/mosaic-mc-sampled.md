@@ -166,7 +166,7 @@ The [study record](../check-records/mosaic-mc-sampled-1185-study.json) holds per
 | straggling | $(+1.4\pm1.1)\times10^{-4}$ | $(+0.6\pm0.5)\times10^{-4}$ | −0.08 % ± 0.06 % | +0.74 % ± 0.52 % |
 
 - Baseline mosaic FWHM is 36.1–38.9 eV.
-- The inelastic cutoff moves the mosaic line shape far beyond margin, with a consistent sign on every seed. The peak shifts match the perfect-crystal #1142 line/background shifts (−2.5 % and +3.0 %). This dependence is a transport question, tracked in #1208, not a property of this estimator.
+- The inelastic cutoff moves the mosaic line shape far beyond margin, with a consistent sign on every seed. The peak shifts match the perfect-crystal #1142 line/background shifts (−2.5 % and +3.0 %). This dependence comes from transport, not from this estimator. See [cutoff sensitivity of narrow line features](../../physics/beam-transport/shell-soft-hard-transport.md#cutoff-sensitivity-of-narrow-line-features).
 - Straggling is within every margin.
 - The cut arms re-simulate transport, so their yield deltas are transport noise ($1$–$4\times10^{-3}$ per seed).
 - **At production populations the estimator noise is negligible.** Single-shift 1σ scatter at $K=256$ is $9\times10^{-5}$ in peak, $9\times10^{-4}$ in FWHM and $10^{-6}$ in yield. The baseline seed-to-seed spread is 0.7 % in peak and 3.3 % in FWHM. One shift is enough here, so the several-shift requirement above applies only to small populations.

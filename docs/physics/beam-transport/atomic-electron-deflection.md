@@ -86,7 +86,7 @@ T and R are the transmitted and backscattered primary fractions; z is the differ
 
 ## Assumptions
 
-- Atomic-electron deflection follows the nuclear angular law of the active elastic model; only its rate is added. This is the Bethe/EGSnrc single-parameter treatment. Fano's separate inelastic screening logarithm{cite:p}`fano1954` is not used.
+- Atomic-electron deflection follows the nuclear angular law of the active elastic model; only its rate is added. This is the Bethe/EGSnrc single-parameter treatment. It matches angular moments, not the number of discrete deflections, so observables that resolve single ~1° turns still depend on $W_c$ ([cutoff sensitivity of narrow line features](shell-soft-hard-transport.md#cutoff-sensitivity-of-narrow-line-features)). Fano's separate inelastic screening logarithm{cite:p}`fano1954` is not used.
 - The hard share uses free-electron Møller kinematics for every atomic electron, ignoring binding; the transported particles are electrons, so no Bhabha form is needed.
 - $\xi$ is a property of the layer, through $\eta$; each element's factor $1 + \xi/Z_i$ then follows from its own electron count.
 

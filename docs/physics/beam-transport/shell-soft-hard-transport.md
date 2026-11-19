@@ -33,6 +33,36 @@ $S_s$ (keV Å$^{-1}$) is interpolated log-log like the full table; the hard rate
 - Each hard row records its transfer `hard_W_keV` and channel `hard_channel` ($3\times$oscillator + branch). `shell_transport.hard_event_energy_accounting` splits $W$ into local deposit, emitted secondary energy and reserved inner-shell binding, following the host sampler's rules. Without `secondary_threshold_eV` secondaries are not transported: the primary's energy balance closes exactly, and the secondary's energy leaves the primary without being deposited or radiated further. With it, secondaries above the threshold are transported as described in [Secondary electron transport](#secondary-electron-transport). Vacancies are never transported (#91).
 - It runs on the lockstep and per-electron CPU cores (exact and LUT) and on the exact CUDA core. The CUDA LUT core and grooved transport raise; production runs on CUDA disable the LUT to reach the exact kernel.
 
+### Cutoff sensitivity of narrow line features
+
+Narrow CXR line structure is not converged in $W_c$. Moving $W_c$ in either direction from the 50 eV default changes the narrow peak of the line while leaving yield and transport moments unchanged.
+
+**Measured.** The scene is HOPG (perfect crystal) at 30 keV, 2 µm thick and tilted 45°. The dominant line is at 848 eV. Each arm uses 4 seeds × 8192 histories, with restricted straggling on. Relative to $W_c=50$ eV:
+
+| $W_c$ | Peak density | FWHM | Yield |
+|---|---|---|---|
+| 35 eV | −4.3 % ± 0.2 % | +1.4 % ± 0.5 % | +0.2 % |
+| 100 eV | +3.4 % ± 0.9 % | +0.9 % ± 1.0 % | +0.2 % |
+
+The mosaic HOPG line shows the same sign with a larger FWHM response ([sampled mosaic study](../../validation/materials/mosaic-mc-sampled.md#transport-arms-on-the-sampled-route-job-12666)). Evidence: `checks/inelastic_cutoff_flights_1208.py` and `checks/inelastic_cutoff_flights_1208_results.json`.
+
+**Cause.** A hard collision deflects the primary by its GOS or Møller recoil angle. At $W_c=35$–100 eV in carbon, about 98 % of hard collisions turn it by more than 1°. A collision below $W_c$ has no discrete deflection. Its angular effect enters only through the moment-matched rate scale of [atomic-electron deflection](atomic-electron-deflection.md), which is zero for HOPG at 30 keV when $W_c \lesssim 35$ eV.
+
+At this geometry, a 1° turn moves the resonance energy by more than the ~4 eV line width. The narrow peak therefore counts track length before the first such turn, and that rate is not invariant under the soft/hard split even though the angular moments are. The measured rate of deflections larger than 1° is 17.0, 18.1 and 19.2 per µm at 100, 50 and 35 eV; path length per primary and the angular quantiles do not change.
+
+Three other explanations were tested and ruled out:
+- Flight segmentation. Summing amplitudes coherently across hard collisions moves the peak by less than 0.2 %.
+- Soft-loss straggling. It shifts the baseline line but not the cutoff dependence.
+- Mean stopping. Path length per primary and yield are unchanged across the arms.
+
+**Other codes.** Moment-level treatment of soft deflection is standard in condensed-history codes:
+- PENELOPE folds the deflection of soft inelastic collisions into its random-hinge event through the soft transport mean free paths {cite:p}`asai2021penelope,salvat2024penelope`.
+- EGSnrc and Geant4's Goudsmit–Saunderson model add the deflection by sub-threshold delta rays to multiple scattering as a scattering-power correction {cite:p}`kawrakow2021egsnrc,novak2024geant4gs`.
+
+These treatments preserve angular diffusion. They do not make an observable that resolves single deflections independent of the cutoff. The convergent limit is detailed simulation: PENELOPE becomes purely detailed for elastic and inelastic collisions with $C_1=C_2=W_{cc}=0$ {cite:p}`asai2021penelope`. PyRITE cannot reach that limit, because $W_c$ must exceed $W_{cb}$ (see the first item above).
+
+**Use.** Compare narrow-line peak heights and widths only at one stated $W_c$. Carry the cutoff dependence above as a model systematic of those features. Yields, centroids and broad spectral shapes are not affected at this level.
+
 ## Secondary electron transport
 
 `simulate_trajectories(..., physics=Physics(secondary_threshold_eV=T_s, ...))` transports the electrons that hard collisions emit. It needs `inelastic_model="shell-soft-hard"`, the only mode with hard collisions, and is rejected otherwise. The default `None` transports no secondaries, and the run is then bit-for-bit the primary-only transport: no launch field is allocated and no random number is drawn.
