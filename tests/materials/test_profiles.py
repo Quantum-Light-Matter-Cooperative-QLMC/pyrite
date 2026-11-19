@@ -638,22 +638,22 @@ def test_standard_detector_keeps_current_payload_and_digest_bit_for_bit():
         (
             "hopg_hbn_microtrain_200fs",
             "hopg",
-            "c64a63931a5920c9cdb3d74c3c6d16fbf7b3f72259be04c5e70f877244af34bc",
+            "0919ebd50bff7dbd11ff41235963c2b11b5723be948e717070d3e73403ffe499",
         ),
         (
             "hopg_hbn_microtrain_200fs",
             "hbn",
-            "d009b53acc6072ed3d243c2d0b0daa01a43c7705ca2d221205aaa17be6fbcd01",
+            "489bbad90b48e4e4498d67c2550c2047afeda325680d75f0949783fae7fa8cb4",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hopg",
-            "20909bd400974ad85534326f7349552327af796cfcc348764877b47854f90dad",
+            "2e91350dee0df3f9884dbdba4a92ee5a00e87d779a6465dbccfd000cb5313fc3",
         ),
         (
             "hopg_hbn_compressed_microbunch",
             "hbn",
-            "28023d76d11132662e20b5c81d2a76579942e69a8d16653ae5713f7f975bce7e",
+            "fd03cc3d29b17f9a5a52f3333692a56614443136a413aa800080921feb069f04",
         ),
         (
             "hopg_emittance_demo",
@@ -759,6 +759,9 @@ def test_named_beam_migration_keeps_shipped_profile_digests_bit_for_bit(
     compressed-microbunch) pins: their provenance now names the target
     reflection's source (catalog primary basal reflection) instead of
     "catalog-pinned"; the resolved reflection and timing are unchanged.
+
+    Issue #1301 re-minted the hopg/hbn pins again: fiber texture replaces
+    their (00l) catalog pins with automatic reflection selection.
 
     Issue #100's derived photon-continuum floor deliberately did NOT move these:
     it raises a brem grid's ``start`` where the band meets the material, in

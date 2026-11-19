@@ -119,7 +119,7 @@ def test_fixed_n_identity_matches_the_pre_precision_baseline():
     )[0]
     assert "adaptive_precision" not in case
     assert (
-        case_content_key(case) == "a135c851f567a3dea3c88253d853d02cbb3a5be579ce7dcf687c4284da8e9b55"
+        case_content_key(case) == "794b025c75a25d8a8675a47dd944f5c05af23295ae81cde9efff0d2d317d0c5d"
     )
 
 
