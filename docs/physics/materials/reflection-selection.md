@@ -95,7 +95,11 @@ Frozen pre-change HOPG transport measurements and shell shares are recorded in
 [#1301](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/1301)
 and anchored by `tests/data/reflection_selection_fiber_1301.json`. The paired
 4096-history cleo_sub measurements omit 0.758% (30 keV) and 0.102% (1 MeV) of
-the full basal line yield with the retired pins. These are scene-specific
+the full basal line yield with the retired pins, inside the [10, 3700] eV
+reference band. On the full production axes (job 13696, same transports),
+automatic selection raises the 30 keV HOPG and h-BN line yield by 3.8 % and
+3.3 %, mostly from (006) lines near 5–6 keV, and the 1 MeV yield by 0.1 %; the
+lattice-share continuum falls by at most 0.15 %. These are scene-specific
 measurements, not a universal omitted-yield guarantee.
 
 ## Explicit controls and qualification
