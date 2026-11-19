@@ -104,10 +104,11 @@ def test_fixed_n_identity_matches_the_pre_precision_baseline():
     # shell soft-loss straggling (straggling=False reproduces the prior pins). The
     # case key then moved with #1243's measured default line bandwidth (its policy
     # payload); the dataset identity, which hashes no case policy, did not.
+    # #1301 adds the fiber-texture domain to hopg's dataset crystallography.
     identity = dataset_identity("hopg", Settings(), sweep, bremsstrahlung_model="eedl")
     assert (
         identity["parameter_sha256"]
-        == "518a9ef6432ccb7c340678b1ec77480a72f3439b44febb6343fce992af50a868"
+        == "24447f900e62812bfe737133922ba5b43aef2f8b2207ccfb52589da7f731fcb1"
     )
     case = build_cases(
         sweep,
@@ -301,9 +302,13 @@ def test_adaptive_case_rejects_count_mismatch(scene, numerics):
 
 
 def test_pre_precision_case_pickle_state_keeps_manual_controls(scene):
-    case = api.build_case(
-        scene, pr.Numerics(sampling=FixedSampling(cxr_histories=8, brem_histories=4))
+    # Fixed families keep the trailing measured-selection field empty, so the
+    # prefix below models a pre-precision state (fiber HOPG selects, #1301).
+    numerics = pr.Numerics(
+        sampling=FixedSampling(cxr_histories=8, brem_histories=4),
+        cxr_reflections=pr.config.CxrReflections(n_families=2),
     )
+    case = api.build_case(scene, numerics)
     case = replace(case, E_cut_lines_keV=7.0, E_cut_brem_keV=2.0, brem_step_eV=100.0)
     # Frozen/slotted dataclasses pickle a positional list of field values.
     # Precision was appended after all existing fields, so old state is a prefix.
