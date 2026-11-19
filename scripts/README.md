@@ -10,8 +10,6 @@ Reusable Python implementations invoked by `pyrite-dev` live in
   `export_docs_demo.py` (browser demo data and README preview) maintain
   checked-in repository artifacts. `release_bremslib_tables.py` builds the BremsLib-derived
   table release from a local BremsLib checkout and pins its index in the package.
-- `cuda_test_profiler.py` is a developer diagnostic, not a test or validation
-  owner. GPU profiling must run through the remote workflow.
 - `docs_figures.py` regenerates the dependency-free documentation SVG
   schematics in `docs/_static/figures/`; `pyrite_logo.py` generates the
   physics-derived SVG/PNG wordmark.
@@ -22,8 +20,7 @@ Reusable Python implementations invoked by `pyrite-dev` live in
   maintainer-only hosted-table release builders (see `docs/repo-design/data-distribution-and-repository-size.md`).
 - `__init__.py` makes the directory importable for wrapper tests.
 - `hooks/sync-skills.sh` is the pre-commit hook that regenerates
-  `.claude/skills` from `.agents/skills`; `user_scripts/` contains example
-  operator wrappers, not supported `pyrite` command implementations.
+  `.claude/skills` from `.agents/skills`.
 - One-off benchmarks and evidence scripts belong in `checks/`, not here.
 
 Prefer the canonical `pyrite-dev ...` commands listed in `AGENTS.md`.
