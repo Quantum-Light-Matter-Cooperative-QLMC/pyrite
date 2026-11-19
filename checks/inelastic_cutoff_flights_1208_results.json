@@ -1,0 +1,3434 @@
+{
+ "issue": 1208,
+ "scene": "HOPG perfect crystal, 30 keV, 2 um, tilt 45/180, ELSEPA, shell-soft-hard, BremsLib soft-hard rad cut 1 keV, fp64 transport, CUDA RTX 5080; node grid 0.1875 eV +-60 eV about the dominant line (848 eV); 4 seeds x 8192 histories per arm",
+ "jobs": {
+  "13729": {
+   "sha": "564b2042f",
+   "straggling": false,
+   "aed": "kawrakow"
+  },
+  "13737": {
+   "sha": "(13729 + --straggling)",
+   "straggling": true,
+   "aed": "kawrakow"
+  },
+  "13741": {
+   "sha": "(--aed)",
+   "straggling": true,
+   "aed": [
+    "kawrakow",
+    "none"
+   ]
+  }
+ },
+ "runs": [
+  {
+   "job": "13729",
+   "arm": "baseline",
+   "inelastic_cutoff_eV": 50.0,
+   "seed": 1208001,
+   "straggling": false,
+   "atomic_electron_deflection": "kawrakow",
+   "default": {
+    "yield_per_primary": 5.017884599708977e-07,
+    "centroid_eV": 848.5988815095656,
+    "peak_density_per_eV": 2.0093406050136764e-08,
+    "peak_eV": 848.2607785849652,
+    "dominant_fwhm_eV": 3.420068091457665,
+    "score_s": 0.0572926290333271
+   },
+   "merged": {
+    "yield_per_primary": 5.02451138258142e-07,
+    "centroid_eV": 848.5978613236065,
+    "peak_density_per_eV": 2.019109501816274e-08,
+    "peak_eV": 848.2607785849652,
+    "dominant_fwhm_eV": 3.406311884196498,
+    "score_s": 2.5247561919968575
+   },
+   "stats": {
+    "rows": 604741,
+    "flights": 604741,
+    "path_ang_total": 313696307.249836,
+    "flight_path_ang_mean": 518.7283601572177,
+    "flight_path_ang_quantiles": {
+     "q10": 41.4777877605514,
+     "q50": 329.1624367880204,
+     "q90": 1245.5029846681953,
+     "q99": 2642.3964283341015
+    },
+    "flight_path_ang_weighted_mean": 1147.5453887265676,
+    "rows_per_flight_mean": 1.0,
+    "hard_inelastic_per_um": 3.398222979880351,
+    "elastic_per_um": 15.618513469136673,
+    "path_weighted_abs_cos_z": {
+     "q10": 0.14622285641775037,
+     "q50": 0.6027172433545847,
+     "q90": 0.8520134843851365
+    },
+    "closing_events": {
+     "ELASTIC": 489947,
+     "EXIT_TOP": 965,
+     "EXIT_BOTTOM": 6580,
+     "CUTOFF": 646,
+     "HARD_INELASTIC": 106601,
+     "HARD_RADIATIVE": 2
+    }
+   },
+   "sha256": "8f239fc846b98a9e2a9c9d8c5204f786c30c8fa4b252e1a056e92553c0f1350e"
+  },
+  {
+   "job": "13729",
+   "arm": "baseline",
+   "inelastic_cutoff_eV": 50.0,
+   "seed": 1208002,
+   "straggling": false,
+   "atomic_electron_deflection": "kawrakow",
+   "default": {
+    "yield_per_primary": 5.066082886945322e-07,
+    "centroid_eV": 848.6448037113217,
+    "peak_density_per_eV": 2.025658751847459e-08,
+    "peak_eV": 848.2607785849652,
+    "dominant_fwhm_eV": 3.5519813829528175,
+    "score_s": 0.055374338990077376
+   },
+   "merged": {
+    "yield_per_primary": 5.072782125817299e-07,
+    "centroid_eV": 848.6443795051958,
+    "peak_density_per_eV": 2.0329524730300363e-08,
+    "peak_eV": 848.2607785849652,
+    "dominant_fwhm_eV": 3.550102612984915,
+    "score_s": 2.364349365932867
+   },
+   "stats": {
+    "rows": 604910,
+    "flights": 604910,
+    "path_ang_total": 313873576.1739671,
+    "flight_path_ang_mean": 518.8764876989422,
+    "flight_path_ang_quantiles": {
+     "q10": 41.80789624137439,
+     "q50": 330.31338787378695,
+     "q90": 1245.5401190265643,
+     "q99": 2639.1958556632558
+    },
+    "flight_path_ang_weighted_mean": 1146.4297626686032,
+    "rows_per_flight_mean": 1.0,
+    "hard_inelastic_per_um": 3.409175162317313,
+    "elastic_per_um": 15.602141663832638,
+    "path_weighted_abs_cos_z": {
+     "q10": 0.14658021185689787,
+     "q50": 0.6040472422305769,
+     "q90": 0.8524586687260518
+    },
+    "closing_events": {
+     "ELASTIC": 489710,
+     "EXIT_TOP": 1040,
+     "EXIT_BOTTOM": 6526,
+     "CUTOFF": 626,
+     "HARD_INELASTIC": 107005,
+     "HARD_RADIATIVE": 3
+    }
+   },
+   "sha256": "34ed44b159a2fec26f43a39c7abe3db02c6e5530992addc4c84a9aa444e6fbd5"
+  },
+  {
+   "job": "13729",
+   "arm": "baseline",
+   "inelastic_cutoff_eV": 50.0,
+   "seed": 1208003,
+   "straggling": false,
+   "atomic_electron_deflection": "kawrakow",
+   "default": {
+    "yield_per_primary": 5.033658400516172e-07,
+    "centroid_eV": 848.2498113567057,
+    "peak_density_per_eV": 2.0394809396862e-08,
+    "peak_eV": 848.2607785849652,
+    "dominant_fwhm_eV": 3.409983513127372,
+    "score_s": 0.054517050040885806
+   },
+   "merged": {
+    "yield_per_primary": 5.040231959921315e-07,
+    "centroid_eV": 848.2419273956938,
+    "peak_density_per_eV": 2.048213332273008e-08,
+    "peak_eV": 848.2607785849652,
+    "dominant_fwhm_eV": 3.4032557634053546,
+    "score_s": 2.401896156836301
+   },
+   "stats": {
+    "rows": 604418,
+    "flights": 604418,
+    "path_ang_total": 313955514.85762024,
+    "flight_path_ang_mean": 519.4344226307295,
+    "flight_path_ang_quantiles": {
+     "q10": 41.53845145044843,
+     "q50": 329.7942757716238,
+     "q90": 1250.2571806562905,
+     "q99": 2660.055316760651
+    },
+    "flight_path_ang_weighted_mean": 1149.6759735332068,
+    "rows_per_flight_mean": 1.0,
+    "hard_inelastic_per_um": 3.4112157592953514,
+    "elastic_per_um": 15.579500179247386,
+    "path_weighted_abs_cos_z": {
+     "q10": 0.14642029069694956,
+     "q50": 0.6013443353715424,
+     "q90": 0.8520226839046784
+    },
+    "closing_events": {
+     "ELASTIC": 489127,
+     "EXIT_TOP": 1065,
+     "EXIT_BOTTOM": 6501,
+     "CUTOFF": 626,
+     "HARD_INELASTIC": 107097,
+     "HARD_RADIATIVE": 2
+    }
+   },
+   "sha256": "a7655db23fc47f0cde37dcd32b65b5f981538c7c4ce0d1f388accc36562df661"
+  },
+  {
+   "job": "13729",
+   "arm": "baseline",
+   "inelastic_cutoff_eV": 50.0,
+   "seed": 1208004,
+   "straggling": false,
+   "atomic_electron_deflection": "kawrakow",
+   "default": {
+    "yield_per_primary": 5.03876640078893e-07,
+    "centroid_eV": 848.2108931032244,
+    "peak_density_per_eV": 1.9901676751032937e-08,
+    "peak_eV": 848.2607785849652,
+    "dominant_fwhm_eV": 3.5482854622946434,
+    "score_s": 0.05345514486543834
+   },
+   "merged": {
+    "yield_per_primary": 5.045167728381927e-07,
+    "centroid_eV": 848.2041538911595,
+    "peak_density_per_eV": 2.0005582967996816e-08,
+    "peak_eV": 848.2607785849652,
+    "dominant_fwhm_eV": 3.5384755493622606,
+    "score_s": 2.290754180168733
+   },
+   "stats": {
+    "rows": 605101,
+    "flights": 605101,
+    "path_ang_total": 314133219.5094825,
+    "flight_path_ang_mean": 519.1417953523172,
+    "flight_path_ang_quantiles": {
+     "q10": 42.01020952855472,
+     "q50": 330.5389127563012,
+     "q90": 1244.832878285353,
+     "q99": 2640.5788046891084
+    },
+    "flight_path_ang_weighted_mean": 1145.5328727851377,
+    "rows_per_flight_mean": 1.0,
+    "hard_inelastic_per_um": 3.4141247515136666,
+    "elastic_per_um": 15.587495036806164,
+    "path_weighted_abs_cos_z": {
+     "q10": 0.147335557213535,
+     "q50": 0.6018653514518802,
+     "q90": 0.8498177760564262
+    },
+    "closing_events": {
+     "ELASTIC": 489655,
+     "EXIT_TOP": 1026,
+     "EXIT_BOTTOM": 6552,
+     "CUTOFF": 613,
+     "HARD_INELASTIC": 107249,
+     "HARD_RADIATIVE": 6
+    }
+   },
+   "sha256": "3144f34a94d5c01b542aea71892ed0fbd4d2c94176cf01feed91d8f689cf31bd"
+  },
+  {
+   "job": "13729",
+   "arm": "cut100",
+   "inelastic_cutoff_eV": 100.0,
+   "seed": 1208001,
+   "straggling": false,
+   "atomic_electron_deflection": "kawrakow",
+   "default": {
+    "yield_per_primary": 5.043875934418462e-07,
+    "centroid_eV": 848.6001868203371,
+    "peak_density_per_eV": 2.1205989853001483e-08,
+    "peak_eV": 848.0732785849652,
+    "dominant_fwhm_eV": 3.4404390395714017,
+    "score_s": 0.05114311189390719
+   },
+   "merged": {
+    "yield_per_primary": 5.046893686716514e-07,
+    "centroid_eV": 848.5999455464437,
+    "peak_density_per_eV": 2.129355536339972e-08,
+    "peak_eV": 848.0732785849652,
+    "dominant_fwhm_eV": 3.429784963732118,
+    "score_s": 2.207282159011811
+   },
+   "stats": {
+    "rows": 577641,
+    "flights": 577641,
+    "path_ang_total": 316086788.877947,
+    "flight_path_ang_mean": 547.202828189043,
+    "flight_path_ang_quantiles": {
+     "q10": 44.04397586911278,
+     "q50": 347.73779094305934,
+     "q90": 1310.601821304522,
+     "q99": 2799.555981454183
+    },
+    "flight_path_ang_weighted_mean": 1210.4661120406756,
+    "rows_per_flight_mean": 1.0,
+    "hard_inelastic_per_um": 2.0557328647193427,
+    "elastic_per_um": 15.959762247285626,
+    "path_weighted_abs_cos_z": {
+     "q10": 0.14458760807744048,
+     "q50": 0.5979735147523766,
+     "q90": 0.8518973842296185
+    },
+    "closing_events": {
+     "ELASTIC": 504467,
+     "EXIT_TOP": 999,
+     "EXIT_BOTTOM": 6568,
+     "CUTOFF": 624,
+     "HARD_INELASTIC": 64979,
+     "HARD_RADIATIVE": 4
+    }
+   },
+   "sha256": "838d18aa5b9c928c8bca9d0cd5e4ada303208da20d89a65cbbad18436a7d5a20"
+  },
+  {
+   "job": "13729",
+   "arm": "cut100",
+   "inelastic_cutoff_eV": 100.0,
+   "seed": 1208002,
+   "straggling": false,
+   "atomic_electron_deflection": "kawrakow",
+   "default": {
+    "yield_per_primary": 5.059152659719901e-07,
+    "centroid_eV": 848.5625458796771,
+    "peak_density_per_eV": 2.116350117375987e-08,
+    "peak_eV": 848.0732785849652,
+    "dominant_fwhm_eV": 3.5186194259470085,
+    "score_s": 0.05153248901478946
+   },
+   "merged": {
+    "yield_per_primary": 5.061977331882739e-07,
+    "centroid_eV": 848.5610310101436,
+    "peak_density_per_eV": 2.120940756356049e-08,
+    "peak_eV": 848.0732785849652,
+    "dominant_fwhm_eV": 3.518998837610411,
+    "score_s": 2.1611665841192007
+   },
+   "stats": {
+    "rows": 573026,
+    "flights": 573026,
+    "path_ang_total": 314060481.22067815,
+    "flight_path_ang_mean": 548.0737021019607,
+    "flight_path_ang_quantiles": {
+     "q10": 43.879991040871005,
+     "q50": 348.3348384010951,
+     "q90": 1316.9816151227217,
+     "q99": 2795.695412316582
+    },
+    "flight_path_ang_weighted_mean": 1212.1614583365167,
+    "rows_per_flight_mean": 1.0,
+    "hard_inelastic_per_um": 2.0480450055352275,
+    "elastic_per_um": 15.936707415547508,
+    "path_weighted_abs_cos_z": {
+     "q10": 0.14452078398766513,
+     "q50": 0.6020772935328773,
+     "q90": 0.8521185194144806
+    },
+    "closing_events": {
+     "ELASTIC": 500509,
+     "EXIT_TOP": 1038,
+     "EXIT_BOTTOM": 6540,
+     "CUTOFF": 614,
+     "HARD_INELASTIC": 64321,
+     "HARD_RADIATIVE": 4
+    }
+   },
+   "sha256": "028f47b791b396795abd1bdaa1acd87b1851adf6da3b1f7323e7265bc45e55da"
+  },
+  {
+   "job": "13729",
+   "arm": "cut100",
+   "inelastic_cutoff_eV": 100.0,
+   "seed": 1208003,
+   "straggling": false,
+   "atomic_electron_deflection": "kawrakow",
+   "default": {
+    "yield_per_primary": 5.032759567008549e-07,
+    "centroid_eV": 848.5014555959049,
+    "peak_density_per_eV": 2.124423836846745e-08,
+    "peak_eV": 848.0732785849652,
+    "dominant_fwhm_eV": 3.33895679506702,
+    "score_s": 0.05072264885529876
+   },
+   "merged": {
+    "yield_per_primary": 5.035380972184811e-07,
+    "centroid_eV": 848.5011823881413,
+    "peak_density_per_eV": 2.1310873066227032e-08,
+    "peak_eV": 848.0732785849652,
+    "dominant_fwhm_eV": 3.3340059927029415,
+    "score_s": 2.2716831581201404
+   },
+   "stats": {
+    "rows": 568766,
+    "flights": 568766,
+    "path_ang_total": 314448957.4156519,
+    "flight_path_ang_mean": 552.861734730367,
+    "flight_path_ang_quantiles": {
+     "q10": 44.77679617723047,
+     "q50": 352.5799047245796,
+     "q90": 1325.7104320308908,
+     "q99": 2817.297500231157
+    },
+    "flight_path_ang_weighted_mean": 1216.8600691347947,
+    "rows_per_flight_mean": 1.0,
+    "hard_inelastic_per_um": 2.0310132533077714,
+    "elastic_per_um": 15.796013575056497,
+    "path_weighted_abs_cos_z": {
+     "q10": 0.1479880137807514,
+     "q50": 0.6012262478936365,
+     "q90": 0.8512977000917828
+    },
+    "closing_events": {
+     "ELASTIC": 496704,
+     "EXIT_TOP": 1030,
+     "EXIT_BOTTOM": 6583,
+     "CUTOFF": 579,
+     "HARD_INELASTIC": 63865,
+     "HARD_RADIATIVE": 5
+    }
+   },
+   "sha256": "8ee580e1282b8cf2ca22da26192df7bb7de7a60f8eed67d9c72a519d2cac399a"
+  },
+  {
+   "job": "13729",
+   "arm": "cut100",
+   "inelastic_cutoff_eV": 100.0,
+   "seed": 1208004,
+   "straggling": false,
+   "atomic_electron_deflection": "kawrakow",
+   "default": {
+    "yield_per_primary": 5.054618821206946e-07,
+    "centroid_eV": 848.4172521746406,
+    "peak_density_per_eV": 2.0733601502342935e-08,
+    "peak_eV": 848.0732785849652,
+    "dominant_fwhm_eV": 3.5105570920707123,
+    "score_s": 0.05091190105304122
+   },
+   "merged": {
+    "yield_per_primary": 5.057284695811348e-07,
+    "centroid_eV": 848.4124545273567,
+    "peak_density_per_eV": 2.078651206716131e-08,
+    "peak_eV": 848.0732785849652,
+    "dominant_fwhm_eV": 3.506481062633611,
+    "score_s": 2.262723668012768
+   },
+   "stats": {
+    "rows": 576422,
+    "flights": 576422,
+    "path_ang_total": 315273368.1727933,
+    "flight_path_ang_mean": 546.9488815013884,
+    "flight_path_ang_quantiles": {
+     "q10": 44.10127510924036,
+     "q50": 347.91660963147393,
+     "q90": 1311.7889789938006,
+     "q99": 2791.0995262733827
+    },
+    "flight_path_ang_weighted_mean": 1208.2676417703833,
+    "rows_per_flight_mean": 1.0,
+    "hard_inelastic_per_um": 2.048920286999821,
+    "elastic_per_um": 15.974454262307754,
+    "path_weighted_abs_cos_z": {
+     "q10": 0.14294574582468883,
+     "q50": 0.6010605326231261,
+     "q90": 0.8521971856349773
+    },
+    "closing_events": {
+     "ELASTIC": 503632,
+     "EXIT_TOP": 1027,
+     "EXIT_BOTTOM": 6529,
+     "CUTOFF": 635,
+     "HARD_INELASTIC": 64597,
+     "HARD_RADIATIVE": 2
+    }
+   },
+   "sha256": "b3e6c5bd64311aa16305764bf5e60147c1c1838d5328eac08d7a77c85b7368d0"
+  },
+  {
+   "job": "13729",
+   "arm": "cut35",
+   "inelastic_cutoff_eV": 35.0,
+   "seed": 1208001,
+   "straggling": false,
+   "atomic_electron_deflection": "kawrakow",
+   "default": {
+    "yield_per_primary": 5.035132836089806e-07,
+    "centroid_eV": 848.6358235111766,
+    "peak_density_per_eV": 1.9161928932476258e-08,
+    "peak_eV": 848.2607785849652,
+    "dominant_fwhm_eV": 3.5142048643302815,
+    "score_s": 0.05591023503802717
+   },
+   "merged": {
+    "yield_per_primary": 5.04512825287573e-07,
+    "centroid_eV": 848.6286358850766,
+    "peak_density_per_eV": 1.9268149742401874e-08,
+    "peak_eV": 848.2607785849652,
+    "dominant_fwhm_eV": 3.506352960924005,
+    "score_s": 2.53489772696048
+   },
+   "stats": {
+    "rows": 640069,
+    "flights": 640069,
+    "path_ang_total": 314024016.53157985,
+    "flight_path_ang_mean": 490.6096319796457,
+    "flight_path_ang_quantiles": {
+     "q10": 39.37970708290104,
+     "q50": 311.98751474651795,
+     "q90": 1178.5425640397534,
+     "q99": 2506.8377720343738
+    },
+    "flight_path_ang_weighted_mean": 1085.528129646068,
+    "rows_per_flight_mean": 1.0,
+    "hard_inelastic_per_um": 4.583725843323346,
+    "elastic_per_um": 15.538206452783543,
+    "path_weighted_abs_cos_z": {
+     "q10": 0.14403216574240466,
+     "q50": 0.6024923972744682,
+     "q90": 0.8511247037755626
+    },
+    "closing_events": {
+     "ELASTIC": 487937,
+     "EXIT_TOP": 1009,
+     "EXIT_BOTTOM": 6551,
+     "CUTOFF": 631,
+     "HARD_INELASTIC": 143940,
+     "HARD_RADIATIVE": 1
+    }
+   },
+   "sha256": "219358d388a230decd10cc47f8cbd5cb8e0ed4798e70c9131ee6f0a4e6f9b339"
+  },
+  {
+   "job": "13729",
+   "arm": "cut35",
+   "inelastic_cutoff_eV": 35.0,
+   "seed": 1208002,
+   "straggling": false,
+   "atomic_electron_deflection": "kawrakow",
+   "default": {
+    "yield_per_primary": 5.076026345710027e-07,
+    "centroid_eV": 848.8660052358982,
+    "peak_density_per_eV": 1.9146416008197775e-08,
+    "peak_eV": 848.2607785849652,
+    "dominant_fwhm_eV": 3.6085160099304403,
+    "score_s": 0.05605947715230286
+   },
+   "merged": {
+    "yield_per_primary": 5.086112091906569e-07,
+    "centroid_eV": 848.8636508548217,
+    "peak_density_per_eV": 1.922023606937273e-08,
+    "peak_eV": 848.2607785849652,
+    "dominant_fwhm_eV": 3.6136968093073847,
+    "score_s": 2.4784555002115667
+   },
+   "stats": {
+    "rows": 640436,
+    "flights": 640436,
+    "path_ang_total": 315175782.793486,
+    "flight_path_ang_mean": 492.12689916476586,
+    "flight_path_ang_quantiles": {
+     "q10": 39.54708803099053,
+     "q50": 313.0109462503326,
+     "q90": 1180.2024625819715,
+     "q99": 2515.4560730072903
+    },
+    "flight_path_ang_weighted_mean": 1088.4523142088262,
+    "rows_per_flight_mean": 1.0,
+    "hard_inelastic_per_um": 4.574209310188779,
+    "elastic_per_um": 15.485739280920647,
+    "path_weighted_abs_cos_z": {
+     "q10": 0.14180858863659365,
+     "q50": 0.6013463351686983,
+     "q90": 0.8517878872505545
+    },
+    "closing_events": {
+     "ELASTIC": 488073,
+     "EXIT_TOP": 1016,
+     "EXIT_BOTTOM": 6560,
+     "CUTOFF": 616,
+     "HARD_INELASTIC": 144168,
+     "HARD_RADIATIVE": 3
+    }
+   },
+   "sha256": "9b1152728600ff69dcd5a0c4e9554cca6e1619a21413659543f194413909ca4f"
+  },
+  {
+   "job": "13729",
+   "arm": "cut35",
+   "inelastic_cutoff_eV": 35.0,
+   "seed": 1208003,
+   "straggling": false,
+   "atomic_electron_deflection": "kawrakow",
+   "default": {
+    "yield_per_primary": 5.028710838989037e-07,
+    "centroid_eV": 848.4563027798307,
+    "peak_density_per_eV": 1.9445584698019047e-08,
+    "peak_eV": 848.2607785849652,
+    "dominant_fwhm_eV": 3.423990327667525,
+    "score_s": 0.05883794301189482
+   },
+   "merged": {
+    "yield_per_primary": 5.038737087154077e-07,
+    "centroid_eV": 848.4486144466305,
+    "peak_density_per_eV": 1.9501216641515384e-08,
+    "peak_eV": 848.2607785849652,
+    "dominant_fwhm_eV": 3.435676208381892,
+    "score_s": 2.432576382998377
+   },
+   "stats": {
+    "rows": 637508,
+    "flights": 637508,
+    "path_ang_total": 314608252.2142817,
+    "flight_path_ang_mean": 493.4969478254103,
+    "flight_path_ang_quantiles": {
+     "q10": 39.93017767918106,
+     "q50": 313.8552883735314,
+     "q90": 1185.107101444509,
+     "q99": 2512.8139564496696
+    },
+    "flight_path_ang_weighted_mean": 1089.4701153578158,
+    "rows_per_flight_mean": 1.0,
+    "hard_inelastic_per_um": 4.567839495262812,
+    "elastic_per_um": 15.435259456234819,
+    "path_weighted_abs_cos_z": {
+     "q10": 0.14172115317545955,
+     "q50": 0.6014790884681086,
+     "q90": 0.8510889506798418
+    },
+    "closing_events": {
+     "ELASTIC": 485606,
+     "EXIT_TOP": 1032,
+     "EXIT_BOTTOM": 6540,
+     "CUTOFF": 620,
+     "HARD_INELASTIC": 143708,
+     "HARD_RADIATIVE": 2
+    }
+   },
+   "sha256": "95744a87978aa5e21968f91e45a65b39e0240b082131c6a678aac44c92b2fdd7"
+  },
+  {
+   "job": "13729",
+   "arm": "cut35",
+   "inelastic_cutoff_eV": 35.0,
+   "seed": 1208004,
+   "straggling": false,
+   "atomic_electron_deflection": "kawrakow",
+   "default": {
+    "yield_per_primary": 5.05807955727966e-07,
+    "centroid_eV": 848.4824989175405,
+    "peak_density_per_eV": 1.9028295383805016e-08,
+    "peak_eV": 848.2607785849652,
+    "dominant_fwhm_eV": 3.5941899440733778,
+    "score_s": 0.055642199935391545
+   },
+   "merged": {
+    "yield_per_primary": 5.067847093226385e-07,
+    "centroid_eV": 848.4741385987966,
+    "peak_density_per_eV": 1.9159628550369234e-08,
+    "peak_eV": 848.2607785849652,
+    "dominant_fwhm_eV": 3.583270222007968,
+    "score_s": 2.5649839639663696
+   },
+   "stats": {
+    "rows": 641481,
+    "flights": 641481,
+    "path_ang_total": 315325660.36629325,
+    "flight_path_ang_mean": 491.558846429268,
+    "flight_path_ang_quantiles": {
+     "q10": 39.73508654469598,
+     "q50": 312.7472862148432,
+     "q90": 1179.7340182075905,
+     "q99": 2511.9518201122073
+    },
+    "flight_path_ang_weighted_mean": 1086.2327151602103,
+    "rows_per_flight_mean": 1.0,
+    "hard_inelastic_per_um": 4.583166489911468,
+    "elastic_per_um": 15.500451166334797,
+    "path_weighted_abs_cos_z": {
+     "q10": 0.14446378043747893,
+     "q50": 0.6023655078266519,
+     "q90": 0.8490189101837813
+    },
+    "closing_events": {
+     "ELASTIC": 488769,
+     "EXIT_TOP": 1037,
+     "EXIT_BOTTOM": 6547,
+     "CUTOFF": 607,
+     "HARD_INELASTIC": 144519,
+     "HARD_RADIATIVE": 2
+    }
+   },
+   "sha256": "ed05e23953449bfa8a72e4edf7abee424731e28a7675021dc352ec59f00cd019"
+  },
+  {
+   "job": "13737",
+   "arm": "baseline",
+   "inelastic_cutoff_eV": 50.0,
+   "seed": 1208001,
+   "straggling": true,
+   "atomic_electron_deflection": "kawrakow",
+   "default": {
+    "yield_per_primary": 5.01666671537393e-07,
+    "centroid_eV": 848.6189747052824,
+    "peak_density_per_eV": 1.9146121132962435e-08,
+    "peak_eV": 848.2607785849652,
+    "dominant_fwhm_eV": 3.78166328385862,
+    "score_s": 0.053398363990709186
+   },
+   "merged": {
+    "yield_per_primary": 5.023090391340079e-07,
+    "centroid_eV": 848.6182657311048,
+    "peak_density_per_eV": 1.926099635340961e-08,
+    "peak_eV": 848.2607785849652,
+    "dominant_fwhm_eV": 3.766833335675301,
+    "score_s": 2.276257761986926
+   },
+   "stats": {
+    "rows": 606009,
+    "flights": 606009,
+    "path_ang_total": 314109152.16683567,
+    "flight_path_ang_mean": 518.3242363840069,
+    "flight_path_ang_quantiles": {
+     "q10": 41.429178712634155,
+     "q50": 328.7222502465947,
+     "q90": 1244.6505753729743,
+     "q99": 2640.5213796815315
+    },
+    "flight_path_ang_weighted_mean": 1147.1121514358251,
+    "rows_per_flight_mean": 1.0,
+    "hard_inelastic_per_um": 3.402065787094335,
+    "elastic_per_um": 15.630044416510191,
+    "path_weighted_abs_cos_z": {
+     "q10": 0.14569526990438325,
+     "q50": 0.6025708840937078,
+     "q90": 0.8519468181683117
+    },
+    "closing_events": {
+     "ELASTIC": 490954,
+     "EXIT_TOP": 967,
+     "EXIT_BOTTOM": 6575,
+     "CUTOFF": 649,
+     "HARD_INELASTIC": 106862,
+     "HARD_RADIATIVE": 2
+    }
+   },
+   "sha256": "3f58fcdc9b917fa3286ab41839e529fe8f4c4e4cc367c4dddc2a4e291b9a03e8"
+  },
+  {
+   "job": "13737",
+   "arm": "baseline",
+   "inelastic_cutoff_eV": 50.0,
+   "seed": 1208002,
+   "straggling": true,
+   "atomic_electron_deflection": "kawrakow",
+   "default": {
+    "yield_per_primary": 5.066249207860696e-07,
+    "centroid_eV": 848.6420597397688,
+    "peak_density_per_eV": 1.8923540068271905e-08,
+    "peak_eV": 848.4482785849652,
+    "dominant_fwhm_eV": 3.999125796515841,
+    "score_s": 0.0536033739335835
+   },
+   "merged": {
+    "yield_per_primary": 5.073028856578121e-07,
+    "centroid_eV": 848.6431358116157,
+    "peak_density_per_eV": 1.89874747036356e-08,
+    "peak_eV": 848.4482785849652,
+    "dominant_fwhm_eV": 3.995978387443415,
+    "score_s": 2.357797803822905
+   },
+   "stats": {
+    "rows": 605715,
+    "flights": 605715,
+    "path_ang_total": 313961157.4810453,
+    "flight_path_ang_mean": 518.3314883749706,
+    "flight_path_ang_quantiles": {
+     "q10": 41.539962011104386,
+     "q50": 329.74902332809506,
+     "q90": 1244.8532131532447,
+     "q99": 2638.745531693278
+    },
+    "flight_path_ang_weighted_mean": 1146.2556363323952,
+    "rows_per_flight_mean": 1.0,
+    "hard_inelastic_per_um": 3.4132884736376914,
+    "elastic_per_um": 15.618365148548802,
+    "path_weighted_abs_cos_z": {
+     "q10": 0.1462075642707883,
+     "q50": 0.6040602184345079,
+     "q90": 0.8525267367758282
+    },
+    "closing_events": {
+     "ELASTIC": 490356,
+     "EXIT_TOP": 1044,
+     "EXIT_BOTTOM": 6515,
+     "CUTOFF": 633,
+     "HARD_INELASTIC": 107164,
+     "HARD_RADIATIVE": 3
+    }
+   },
+   "sha256": "cccb206b4b2a7c6681873dd2697e92d3c7ff4083776936b231f196378b9c9ea1"
+  },
+  {
+   "job": "13737",
+   "arm": "baseline",
+   "inelastic_cutoff_eV": 50.0,
+   "seed": 1208003,
+   "straggling": true,
+   "atomic_electron_deflection": "kawrakow",
+   "default": {
+    "yield_per_primary": 5.028287013847388e-07,
+    "centroid_eV": 848.2565908117863,
+    "peak_density_per_eV": 1.936397531210332e-08,
+    "peak_eV": 848.2607785849652,
+    "dominant_fwhm_eV": 3.749503927168348,
+    "score_s": 0.05217602988705039
+   },
+   "merged": {
+    "yield_per_primary": 5.034879167337136e-07,
+    "centroid_eV": 848.2477874320324,
+    "peak_density_per_eV": 1.9402284223701827e-08,
+    "peak_eV": 848.2607785849652,
+    "dominant_fwhm_eV": 3.7541334305573173,
+    "score_s": 2.3765338859520853
+   },
+   "stats": {
+    "rows": 604586,
+    "flights": 604586,
+    "path_ang_total": 314103439.58176535,
+    "flight_path_ang_mean": 519.5347553230895,
+    "flight_path_ang_quantiles": {
+     "q10": 41.61538787562615,
+     "q50": 330.14226200475497,
+     "q90": 1250.39586549672,
+     "q99": 2658.6745096229724
+    },
+    "flight_path_ang_weighted_mean": 1149.5205609884615,
+    "rows_per_flight_mean": 1.0,
+    "hard_inelastic_per_um": 3.408781519316282,
+    "elastic_per_um": 15.57833943657351,
+    "path_weighted_abs_cos_z": {
+     "q10": 0.14630809339822473,
+     "q50": 0.6013013501074427,
+     "q90": 0.8520563984907337
+    },
+    "closing_events": {
+     "ELASTIC": 489321,
+     "EXIT_TOP": 1070,
+     "EXIT_BOTTOM": 6505,
+     "CUTOFF": 617,
+     "HARD_INELASTIC": 107071,
+     "HARD_RADIATIVE": 2
+    }
+   },
+   "sha256": "33517285737ba81449a751eee50394ca7056c3d4a4de65eef429264611258629"
+  },
+  {
+   "job": "13737",
+   "arm": "baseline",
+   "inelastic_cutoff_eV": 50.0,
+   "seed": 1208004,
+   "straggling": true,
+   "atomic_electron_deflection": "kawrakow",
+   "default": {
+    "yield_per_primary": 5.039961675917803e-07,
+    "centroid_eV": 848.2343251263378,
+    "peak_density_per_eV": 1.8799489964749228e-08,
+    "peak_eV": 848.4482785849652,
+    "dominant_fwhm_eV": 3.944754650441382,
+    "score_s": 0.05355591792613268
+   },
+   "merged": {
+    "yield_per_primary": 5.04648005217323e-07,
+    "centroid_eV": 848.2271775207986,
+    "peak_density_per_eV": 1.8876111340659918e-08,
+    "peak_eV": 848.4482785849652,
+    "dominant_fwhm_eV": 3.941517175031322,
+    "score_s": 2.2732875598594546
+   },
+   "stats": {
+    "rows": 605126,
+    "flights": 605126,
+    "path_ang_total": 313961165.8007395,
+    "flight_path_ang_mean": 518.8360205985853,
+    "flight_path_ang_quantiles": {
+     "q10": 41.87531108398399,
+     "q50": 330.0689766465034,
+     "q90": 1244.5476505914578,
+     "q99": 2641.638644846521
+    },
+    "flight_path_ang_weighted_mean": 1145.6310975058698,
+    "rows_per_flight_mean": 1.0,
+    "hard_inelastic_per_um": 3.4165690437039182,
+    "elastic_per_um": 15.596291941111355,
+    "path_weighted_abs_cos_z": {
+     "q10": 0.1478303801664725,
+     "q50": 0.6020656151204499,
+     "q90": 0.8500028005948231
+    },
+    "closing_events": {
+     "ELASTIC": 489663,
+     "EXIT_TOP": 1019,
+     "EXIT_BOTTOM": 6553,
+     "CUTOFF": 619,
+     "HARD_INELASTIC": 107267,
+     "HARD_RADIATIVE": 5
+    }
+   },
+   "sha256": "751af6d5f0c95b4043ee8b0f937148556f1bd8aca715d1ab1f701b213fd8dc4b"
+  },
+  {
+   "job": "13737",
+   "arm": "cut100",
+   "inelastic_cutoff_eV": 100.0,
+   "seed": 1208001,
+   "straggling": true,
+   "atomic_electron_deflection": "kawrakow",
+   "default": {
+    "yield_per_primary": 5.044251199445848e-07,
+    "centroid_eV": 848.5663664160974,
+    "peak_density_per_eV": 2.0105526132851992e-08,
+    "peak_eV": 848.2607785849652,
+    "dominant_fwhm_eV": 3.7670465107157725,
+    "score_s": 0.05105211213231087
+   },
+   "merged": {
+    "yield_per_primary": 5.047252807366398e-07,
+    "centroid_eV": 848.5669089549729,
+    "peak_density_per_eV": 2.017936751030902e-08,
+    "peak_eV": 848.2607785849652,
+    "dominant_fwhm_eV": 3.755528828745355,
+    "score_s": 2.200800094055012
+   },
+   "stats": {
+    "rows": 578830,
+    "flights": 578830,
+    "path_ang_total": 316443933.6257746,
+    "flight_path_ang_mean": 546.6958064125471,
+    "flight_path_ang_quantiles": {
+     "q10": 43.88317822053975,
+     "q50": 347.09257117587225,
+     "q90": 1309.535514038659,
+     "q99": 2798.537184822516
+    },
+    "flight_path_ang_weighted_mean": 1210.0828637439627,
+    "rows_per_flight_mean": 1.0,
+    "hard_inelastic_per_um": 2.0551823906003563,
+    "elastic_per_um": 15.977553881564392,
+    "path_weighted_abs_cos_z": {
+     "q10": 0.1443135232287003,
+     "q50": 0.5976157364555659,
+     "q90": 0.8519092965326646
+    },
+    "closing_events": {
+     "ELASTIC": 505600,
+     "EXIT_TOP": 1006,
+     "EXIT_BOTTOM": 6566,
+     "CUTOFF": 619,
+     "HARD_INELASTIC": 65035,
+     "HARD_RADIATIVE": 4
+    }
+   },
+   "sha256": "e237e66f6a9909724e57e60c139ef6fa282613e5f78ed3b245a91654586820d2"
+  },
+  {
+   "job": "13737",
+   "arm": "cut100",
+   "inelastic_cutoff_eV": 100.0,
+   "seed": 1208002,
+   "straggling": true,
+   "atomic_electron_deflection": "kawrakow",
+   "default": {
+    "yield_per_primary": 5.064155705197804e-07,
+    "centroid_eV": 848.5638412943106,
+    "peak_density_per_eV": 1.9827556485552122e-08,
+    "peak_eV": 848.2607785849652,
+    "dominant_fwhm_eV": 3.9592884608456416,
+    "score_s": 0.05078974412754178
+   },
+   "merged": {
+    "yield_per_primary": 5.067011892359585e-07,
+    "centroid_eV": 848.5607318174308,
+    "peak_density_per_eV": 1.9865616707193112e-08,
+    "peak_eV": 848.2607785849652,
+    "dominant_fwhm_eV": 3.9589210795237477,
+    "score_s": 2.222956829937175
+   },
+   "stats": {
+    "rows": 574373,
+    "flights": 574373,
+    "path_ang_total": 314516366.4889356,
+    "flight_path_ang_mean": 547.5820877529682,
+    "flight_path_ang_quantiles": {
+     "q10": 43.87553570060241,
+     "q50": 347.8423994370236,
+     "q90": 1316.2620491153423,
+     "q99": 2794.4720151499
+    },
+    "flight_path_ang_weighted_mean": 1211.862703421323,
+    "rows_per_flight_mean": 1.0,
+    "hard_inelastic_per_um": 2.0494005040042182,
+    "elastic_per_um": 15.9521110332314,
+    "path_weighted_abs_cos_z": {
+     "q10": 0.14356567048833987,
+     "q50": 0.6018203470798265,
+     "q90": 0.852104701771237
+    },
+    "closing_events": {
+     "ELASTIC": 501720,
+     "EXIT_TOP": 1054,
+     "EXIT_BOTTOM": 6518,
+     "CUTOFF": 620,
+     "HARD_INELASTIC": 64457,
+     "HARD_RADIATIVE": 4
+    }
+   },
+   "sha256": "5da3baf8e8309ec3612126db4b84ab254e6c9cb417f7ad9774a17800d91ae96a"
+  },
+  {
+   "job": "13737",
+   "arm": "cut100",
+   "inelastic_cutoff_eV": 100.0,
+   "seed": 1208003,
+   "straggling": true,
+   "atomic_electron_deflection": "kawrakow",
+   "default": {
+    "yield_per_primary": 5.035797087243887e-07,
+    "centroid_eV": 848.5112087161729,
+    "peak_density_per_eV": 1.9807385953640733e-08,
+    "peak_eV": 848.2607785849652,
+    "dominant_fwhm_eV": 3.8157003228343456,
+    "score_s": 0.050065789837390184
+   },
+   "merged": {
+    "yield_per_primary": 5.038448025462827e-07,
+    "centroid_eV": 848.510056938427,
+    "peak_density_per_eV": 1.9855152189052205e-08,
+    "peak_eV": 848.2607785849652,
+    "dominant_fwhm_eV": 3.811229099825482,
+    "score_s": 2.1305628910195082
+   },
+   "stats": {
+    "rows": 568222,
+    "flights": 568222,
+    "path_ang_total": 314384181.7031832,
+    "flight_path_ang_mean": 553.2770320458961,
+    "flight_path_ang_quantiles": {
+     "q10": 44.88276774033084,
+     "q50": 352.7267936928682,
+     "q90": 1326.4132604386925,
+     "q99": 2818.7507894596024
+    },
+    "flight_path_ang_weighted_mean": 1217.435406469527,
+    "rows_per_flight_mean": 1.0,
+    "hard_inelastic_per_um": 2.0296822713632707,
+    "elastic_per_um": 15.783745776003709,
+    "path_weighted_abs_cos_z": {
+     "q10": 0.14817782648982833,
+     "q50": 0.6017755159587235,
+     "q90": 0.8515259075091479
+    },
+    "closing_events": {
+     "ELASTIC": 496216,
+     "EXIT_TOP": 1050,
+     "EXIT_BOTTOM": 6578,
+     "CUTOFF": 564,
+     "HARD_INELASTIC": 63810,
+     "HARD_RADIATIVE": 4
+    }
+   },
+   "sha256": "aad5928f9b521e3f906597e32a8ff1df34941195948d110e74bb33e680b8ac9e"
+  },
+  {
+   "job": "13737",
+   "arm": "cut100",
+   "inelastic_cutoff_eV": 100.0,
+   "seed": 1208004,
+   "straggling": true,
+   "atomic_electron_deflection": "kawrakow",
+   "default": {
+    "yield_per_primary": 5.050049089322384e-07,
+    "centroid_eV": 848.414813276185,
+    "peak_density_per_eV": 1.907863378391994e-08,
+    "peak_eV": 848.2607785849652,
+    "dominant_fwhm_eV": 4.071092235833589,
+    "score_s": 0.05063604493625462
+   },
+   "merged": {
+    "yield_per_primary": 5.05271634490545e-07,
+    "centroid_eV": 848.410431104939,
+    "peak_density_per_eV": 1.9109901217007064e-08,
+    "peak_eV": 848.2607785849652,
+    "dominant_fwhm_eV": 4.072590054938814,
+    "score_s": 2.3010389690753073
+   },
+   "stats": {
+    "rows": 576408,
+    "flights": 576408,
+    "path_ang_total": 315194923.3531481,
+    "flight_path_ang_mean": 546.8260734638452,
+    "flight_path_ang_quantiles": {
+     "q10": 43.97389991918392,
+     "q50": 347.54631250844426,
+     "q90": 1311.8512519826604,
+     "q99": 2790.163029959532
+    },
+    "flight_path_ang_weighted_mean": 1208.8976433430978,
+    "rows_per_flight_mean": 1.0,
+    "hard_inelastic_per_um": 2.0473680005213026,
+    "elastic_per_um": 15.980047985597396,
+    "path_weighted_abs_cos_z": {
+     "q10": 0.14293179517743831,
+     "q50": 0.6009606431967904,
+     "q90": 0.8521894855210681
+    },
+    "closing_events": {
+     "ELASTIC": 503683,
+     "EXIT_TOP": 1014,
+     "EXIT_BOTTOM": 6544,
+     "CUTOFF": 633,
+     "HARD_INELASTIC": 64532,
+     "HARD_RADIATIVE": 2
+    }
+   },
+   "sha256": "9a6bf63c548bc2d1334788f1c95a12687affa49b27862d485d14591605c17fbb"
+  },
+  {
+   "job": "13737",
+   "arm": "cut35",
+   "inelastic_cutoff_eV": 35.0,
+   "seed": 1208001,
+   "straggling": true,
+   "atomic_electron_deflection": "kawrakow",
+   "default": {
+    "yield_per_primary": 5.03228645754028e-07,
+    "centroid_eV": 848.6447153192927,
+    "peak_density_per_eV": 1.8456216110962487e-08,
+    "peak_eV": 848.4482785849652,
+    "dominant_fwhm_eV": 3.8165120176734035,
+    "score_s": 0.05539892497472465
+   },
+   "merged": {
+    "yield_per_primary": 5.04198994305538e-07,
+    "centroid_eV": 848.6354702564506,
+    "peak_density_per_eV": 1.8549911828813492e-08,
+    "peak_eV": 848.4482785849652,
+    "dominant_fwhm_eV": 3.8074120363774,
+    "score_s": 2.566963736899197
+   },
+   "stats": {
+    "rows": 639959,
+    "flights": 639959,
+    "path_ang_total": 314010002.1472126,
+    "flight_path_ang_mean": 490.67206203399377,
+    "flight_path_ang_quantiles": {
+     "q10": 39.40141515464557,
+     "q50": 311.93469723686314,
+     "q90": 1178.4965633181553,
+     "q99": 2508.3213864140384
+    },
+    "flight_path_ang_weighted_mean": 1085.7702772382252,
+    "rows_per_flight_mean": 1.0,
+    "hard_inelastic_per_um": 4.582019649569853,
+    "elastic_per_um": 15.5373076228085,
+    "path_weighted_abs_cos_z": {
+     "q10": 0.14417967376481766,
+     "q50": 0.6023446418911188,
+     "q90": 0.8509746637704049
+    },
+    "closing_events": {
+     "ELASTIC": 487887,
+     "EXIT_TOP": 1016,
+     "EXIT_BOTTOM": 6555,
+     "CUTOFF": 620,
+     "HARD_INELASTIC": 143880,
+     "HARD_RADIATIVE": 1
+    }
+   },
+   "sha256": "3e41a4a3dbfa541904449b57edcb87544db08673006cf8454abbb5c6d10ea9f2"
+  },
+  {
+   "job": "13737",
+   "arm": "cut35",
+   "inelastic_cutoff_eV": 35.0,
+   "seed": 1208002,
+   "straggling": true,
+   "atomic_electron_deflection": "kawrakow",
+   "default": {
+    "yield_per_primary": 5.077356765859076e-07,
+    "centroid_eV": 848.8390295441073,
+    "peak_density_per_eV": 1.8075592578270516e-08,
+    "peak_eV": 848.4482785849652,
+    "dominant_fwhm_eV": 4.0151160914425645,
+    "score_s": 0.058385520009323955
+   },
+   "merged": {
+    "yield_per_primary": 5.087494975922202e-07,
+    "centroid_eV": 848.8364022881435,
+    "peak_density_per_eV": 1.8196876894194247e-08,
+    "peak_eV": 848.4482785849652,
+    "dominant_fwhm_eV": 4.002553707474817,
+    "score_s": 2.422992143081501
+   },
+   "stats": {
+    "rows": 640861,
+    "flights": 640861,
+    "path_ang_total": 315196750.71619,
+    "flight_path_ang_mean": 491.8332535701033,
+    "flight_path_ang_quantiles": {
+     "q10": 39.42261538550054,
+     "q50": 312.50174499457717,
+     "q90": 1179.7132173869918,
+     "q99": 2515.6803376362514
+    },
+    "flight_path_ang_weighted_mean": 1088.446458262487,
+    "rows_per_flight_mean": 1.0,
+    "hard_inelastic_per_um": 4.5738098401213945,
+    "elastic_per_um": 15.49828793888351,
+    "path_weighted_abs_cos_z": {
+     "q10": 0.14210674552071273,
+     "q50": 0.6015899776148218,
+     "q90": 0.8518711919092048
+    },
+    "closing_events": {
+     "ELASTIC": 488501,
+     "EXIT_TOP": 1014,
+     "EXIT_BOTTOM": 6560,
+     "CUTOFF": 618,
+     "HARD_INELASTIC": 144165,
+     "HARD_RADIATIVE": 3
+    }
+   },
+   "sha256": "08d13d5cd3e4b95dbbe9b5b598c1cdd2cecd5851a7bd63ce925426f1589e9c32"
+  },
+  {
+   "job": "13737",
+   "arm": "cut35",
+   "inelastic_cutoff_eV": 35.0,
+   "seed": 1208003,
+   "straggling": true,
+   "atomic_electron_deflection": "kawrakow",
+   "default": {
+    "yield_per_primary": 5.027880206551205e-07,
+    "centroid_eV": 848.487562535779,
+    "peak_density_per_eV": 1.8505289745007758e-08,
+    "peak_eV": 848.4482785849652,
+    "dominant_fwhm_eV": 3.815940747998411,
+    "score_s": 0.05625662999227643
+   },
+   "merged": {
+    "yield_per_primary": 5.03786948657936e-07,
+    "centroid_eV": 848.4800056109389,
+    "peak_density_per_eV": 1.8561271630801457e-08,
+    "peak_eV": 848.4482785849652,
+    "dominant_fwhm_eV": 3.829673507075995,
+    "score_s": 2.448579187039286
+   },
+   "stats": {
+    "rows": 638133,
+    "flights": 638133,
+    "path_ang_total": 314752167.6732796,
+    "flight_path_ang_mean": 493.2391330228645,
+    "flight_path_ang_quantiles": {
+     "q10": 39.77284053035807,
+     "q50": 313.5320921785045,
+     "q90": 1184.5082806958583,
+     "q99": 2512.9292238164235
+    },
+    "flight_path_ang_weighted_mean": 1089.4873921846256,
+    "rows_per_flight_mean": 1.0,
+    "hard_inelastic_per_um": 4.5707707452339585,
+    "elastic_per_um": 15.443038997734739,
+    "path_weighted_abs_cos_z": {
+     "q10": 0.14164258644540714,
+     "q50": 0.601290688457679,
+     "q90": 0.8513078820533487
+    },
+    "closing_events": {
+     "ELASTIC": 486073,
+     "EXIT_TOP": 1031,
+     "EXIT_BOTTOM": 6544,
+     "CUTOFF": 617,
+     "HARD_INELASTIC": 143866,
+     "HARD_RADIATIVE": 2
+    }
+   },
+   "sha256": "070545e351793c253ce1340bb99b17e1be97678999b221c8f62966eaaa3fd617"
+  },
+  {
+   "job": "13737",
+   "arm": "cut35",
+   "inelastic_cutoff_eV": 35.0,
+   "seed": 1208004,
+   "straggling": true,
+   "atomic_electron_deflection": "kawrakow",
+   "default": {
+    "yield_per_primary": 5.050596474792668e-07,
+    "centroid_eV": 848.4427270555271,
+    "peak_density_per_eV": 1.7936441665256098e-08,
+    "peak_eV": 848.4482785849652,
+    "dominant_fwhm_eV": 4.042159765498013,
+    "score_s": 0.059523486997932196
+   },
+   "merged": {
+    "yield_per_primary": 5.060285320143687e-07,
+    "centroid_eV": 848.4342415437911,
+    "peak_density_per_eV": 1.8082918273876203e-08,
+    "peak_eV": 848.4482785849652,
+    "dominant_fwhm_eV": 4.0093682248135565,
+    "score_s": 2.4970068279653788
+   },
+   "stats": {
+    "rows": 641806,
+    "flights": 641806,
+    "path_ang_total": 315334510.5339856,
+    "flight_path_ang_mean": 491.32371859095366,
+    "flight_path_ang_quantiles": {
+     "q10": 39.54029534994928,
+     "q50": 312.3922495839771,
+     "q90": 1179.3703297652253,
+     "q99": 2513.1198774090417
+    },
+    "flight_path_ang_weighted_mean": 1086.4958718958565,
+    "rows_per_flight_mean": 1.0,
+    "hard_inelastic_per_um": 4.586938478603693,
+    "elastic_per_um": 15.506422026944636,
+    "path_weighted_abs_cos_z": {
+     "q10": 0.1444156400207323,
+     "q50": 0.6023071895915902,
+     "q90": 0.8489933109238824
+    },
+    "closing_events": {
+     "ELASTIC": 488971,
+     "EXIT_TOP": 1017,
+     "EXIT_BOTTOM": 6553,
+     "CUTOFF": 621,
+     "HARD_INELASTIC": 144642,
+     "HARD_RADIATIVE": 2
+    }
+   },
+   "sha256": "17230adfcd6bddec6e56ee00fca20408d8ce396e2574888cfa73cf5ea4281345"
+  },
+  {
+   "job": "13741",
+   "arm": "baseline",
+   "inelastic_cutoff_eV": 50.0,
+   "seed": 1208001,
+   "straggling": true,
+   "atomic_electron_deflection": "kawrakow",
+   "default": {
+    "yield_per_primary": 5.01666671537393e-07,
+    "centroid_eV": 848.6189747052824,
+    "peak_density_per_eV": 1.9146121132962435e-08,
+    "peak_eV": 848.2607785849652,
+    "dominant_fwhm_eV": 3.78166328385862,
+    "score_s": 0.05616678996011615
+   },
+   "merged": {
+    "yield_per_primary": 5.023090391340079e-07,
+    "centroid_eV": 848.6182657311048,
+    "peak_density_per_eV": 1.926099635340961e-08,
+    "peak_eV": 848.2607785849652,
+    "dominant_fwhm_eV": 3.766833335675301,
+    "score_s": 2.3918451049830765
+   },
+   "stats": {
+    "rows": 606009,
+    "flights": 606009,
+    "path_ang_total": 314109152.16683567,
+    "flight_path_ang_mean": 518.3242363840069,
+    "flight_path_ang_quantiles": {
+     "q10": 41.429178712634155,
+     "q50": 328.7222502465947,
+     "q90": 1244.6505753729743,
+     "q99": 2640.5213796815315
+    },
+    "flight_path_ang_weighted_mean": 1147.1121514358251,
+    "rows_per_flight_mean": 1.0,
+    "hard_inelastic_per_um": 3.402065787094335,
+    "elastic_per_um": 15.630044416510191,
+    "path_weighted_abs_cos_z": {
+     "q10": 0.14569526990438325,
+     "q50": 0.6025708840937078,
+     "q90": 0.8519468181683117
+    },
+    "deflections_per_um": {
+     "ELASTIC": {
+      ">0.03": 15.629184842702369,
+      ">0.1": 15.621607858766748,
+      ">0.3": 15.55392438041745,
+      ">1.0": 14.801701790371737,
+      ">3.0": 10.004261188578589,
+      ">10.0": 1.9752369382426018
+     },
+     "HARD_INELASTIC": {
+      ">0.03": 3.401651918223902,
+      ">0.1": 3.400314803411733,
+      ">0.3": 3.3900635898517737,
+      ">1.0": 3.307130635430364,
+      ">3.0": 2.4825765012597203,
+      ">10.0": 0.3723546391220017
+     },
+     "HARD_RADIATIVE": {
+      ">0.03": 0.0,
+      ">0.1": 0.0,
+      ">0.3": 0.0,
+      ">1.0": 0.0,
+      ">3.0": 0.0,
+      ">10.0": 0.0
+     },
+     "ALL": {
+      ">0.03": 19.03083676092627,
+      ">0.1": 19.02192266217848,
+      ">0.3": 18.943987970269223,
+      ">1.0": 18.108832425802103,
+      ">3.0": 12.486837689838309,
+      ">10.0": 2.3475915773646037
+     }
+    },
+    "closing_events": {
+     "ELASTIC": 490954,
+     "EXIT_TOP": 967,
+     "EXIT_BOTTOM": 6575,
+     "CUTOFF": 649,
+     "HARD_INELASTIC": 106862,
+     "HARD_RADIATIVE": 2
+    }
+   },
+   "sha256": "0ad828a11264810265d0d1e3df36370598ae969bd17af9ad4526b5c9507ebdce"
+  },
+  {
+   "job": "13741",
+   "arm": "baseline",
+   "inelastic_cutoff_eV": 50.0,
+   "seed": 1208002,
+   "straggling": true,
+   "atomic_electron_deflection": "kawrakow",
+   "default": {
+    "yield_per_primary": 5.066249207860696e-07,
+    "centroid_eV": 848.6420597397688,
+    "peak_density_per_eV": 1.8923540068271905e-08,
+    "peak_eV": 848.4482785849652,
+    "dominant_fwhm_eV": 3.999125796515841,
+    "score_s": 0.05437634186819196
+   },
+   "merged": {
+    "yield_per_primary": 5.073028856578121e-07,
+    "centroid_eV": 848.6431358202636,
+    "peak_density_per_eV": 1.89874747036356e-08,
+    "peak_eV": 848.4482785849652,
+    "dominant_fwhm_eV": 3.995978387443415,
+    "score_s": 2.4001693308819085
+   },
+   "stats": {
+    "rows": 605715,
+    "flights": 605715,
+    "path_ang_total": 313961157.4810453,
+    "flight_path_ang_mean": 518.3314883749706,
+    "flight_path_ang_quantiles": {
+     "q10": 41.539962011104386,
+     "q50": 329.74902332809506,
+     "q90": 1244.8532131532447,
+     "q99": 2638.745531693278
+    },
+    "flight_path_ang_weighted_mean": 1146.2556363323952,
+    "rows_per_flight_mean": 1.0,
+    "hard_inelastic_per_um": 3.4132884736376914,
+    "elastic_per_um": 15.618365148548802,
+    "path_weighted_abs_cos_z": {
+     "q10": 0.1462075642707883,
+     "q50": 0.6040602184345079,
+     "q90": 0.8525267367758282
+    },
+    "deflections_per_um": {
+     "ELASTIC": {
+      ">0.03": 15.617759978146436,
+      ">0.1": 15.610625337613284,
+      ">0.3": 15.542336635367388,
+      ">1.0": 14.793931954083888,
+      ">3.0": 9.973494890650747,
+      ">10.0": 1.9835893235856679
+     },
+     "HARD_INELASTIC": {
+      ">0.03": 3.4131929204162654,
+      ">0.1": 3.411982579611534,
+      ">0.3": 3.4006435973356295,
+      ">1.0": 3.3147731023473197,
+      ">3.0": 2.4889066095610137,
+      ">10.0": 0.37249830819298274
+     },
+     "HARD_RADIATIVE": {
+      ">0.03": 0.0,
+      ">0.1": 0.0,
+      ">0.3": 0.0,
+      ">1.0": 0.0,
+      ">3.0": 0.0,
+      ">10.0": 0.0
+     },
+     "ALL": {
+      ">0.03": 19.030952898562703,
+      ">0.1": 19.022607917224818,
+      ">0.3": 18.942980232703018,
+      ">1.0": 18.10870505643121,
+      ">3.0": 12.462401500211762,
+      ">10.0": 2.3560876317786508
+     }
+    },
+    "closing_events": {
+     "ELASTIC": 490356,
+     "EXIT_TOP": 1044,
+     "EXIT_BOTTOM": 6515,
+     "CUTOFF": 633,
+     "HARD_INELASTIC": 107164,
+     "HARD_RADIATIVE": 3
+    }
+   },
+   "sha256": "2ad7c5291a17d71da26373e8a0d26ca5eae84cf38ce413a0ca169685b0543ce2"
+  },
+  {
+   "job": "13741",
+   "arm": "baseline",
+   "inelastic_cutoff_eV": 50.0,
+   "seed": 1208003,
+   "straggling": true,
+   "atomic_electron_deflection": "kawrakow",
+   "default": {
+    "yield_per_primary": 5.028287013847388e-07,
+    "centroid_eV": 848.2565908117863,
+    "peak_density_per_eV": 1.936397531210332e-08,
+    "peak_eV": 848.2607785849652,
+    "dominant_fwhm_eV": 3.749503927168348,
+    "score_s": 0.05250997911207378
+   },
+   "merged": {
+    "yield_per_primary": 5.034879167337136e-07,
+    "centroid_eV": 848.2477874320324,
+    "peak_density_per_eV": 1.9402284223701827e-08,
+    "peak_eV": 848.2607785849652,
+    "dominant_fwhm_eV": 3.7541334305573173,
+    "score_s": 2.3720237768720835
+   },
+   "stats": {
+    "rows": 604586,
+    "flights": 604586,
+    "path_ang_total": 314103439.58176535,
+    "flight_path_ang_mean": 519.5347553230895,
+    "flight_path_ang_quantiles": {
+     "q10": 41.61538787562615,
+     "q50": 330.14226200475497,
+     "q90": 1250.39586549672,
+     "q99": 2658.6745096229724
+    },
+    "flight_path_ang_weighted_mean": 1149.5205609884615,
+    "rows_per_flight_mean": 1.0,
+    "hard_inelastic_per_um": 3.408781519316282,
+    "elastic_per_um": 15.57833943657351,
+    "path_weighted_abs_cos_z": {
+     "q10": 0.14630809339822473,
+     "q50": 0.6013013501074427,
+     "q90": 0.8520563984907337
+    },
+    "deflections_per_um": {
+     "ELASTIC": {
+      ">0.03": 15.57783005023819,
+      ">0.1": 15.570061908624558,
+      ">0.3": 15.503013932238048,
+      ">1.0": 14.759914778943866,
+      ">3.0": 9.943857998367882,
+      ">10.0": 1.951363540673505
+     },
+     "HARD_INELASTIC": {
+      ">0.03": 3.4083676429188343,
+      ">0.1": 3.4069668304967036,
+      ">0.3": 3.3967791037903012,
+      ">1.0": 3.315245453493125,
+      ">3.0": 2.4827171617043047,
+      ">10.0": 0.3634153136049477
+     },
+     "HARD_RADIATIVE": {
+      ">0.03": 0.0,
+      ">0.1": 0.0,
+      ">0.3": 0.0,
+      ">1.0": 0.0,
+      ">3.0": 0.0,
+      ">10.0": 0.0
+     },
+     "ALL": {
+      ">0.03": 18.986197693157024,
+      ">0.1": 18.977028739121263,
+      ">0.3": 18.89979303602835,
+      ">1.0": 18.07516023243699,
+      ">3.0": 12.426575160072186,
+      ">10.0": 2.314778854278453
+     }
+    },
+    "closing_events": {
+     "ELASTIC": 489321,
+     "EXIT_TOP": 1070,
+     "EXIT_BOTTOM": 6505,
+     "CUTOFF": 617,
+     "HARD_INELASTIC": 107071,
+     "HARD_RADIATIVE": 2
+    }
+   },
+   "sha256": "28917fc7c1c2648aafdfa20d6b2975758d8aeb72e89de788ed1c7198b82362a8"
+  },
+  {
+   "job": "13741",
+   "arm": "baseline",
+   "inelastic_cutoff_eV": 50.0,
+   "seed": 1208004,
+   "straggling": true,
+   "atomic_electron_deflection": "kawrakow",
+   "default": {
+    "yield_per_primary": 5.039961675917803e-07,
+    "centroid_eV": 848.2343251263378,
+    "peak_density_per_eV": 1.8799489964749228e-08,
+    "peak_eV": 848.4482785849652,
+    "dominant_fwhm_eV": 3.944754650441382,
+    "score_s": 0.05628445907495916
+   },
+   "merged": {
+    "yield_per_primary": 5.04648005217323e-07,
+    "centroid_eV": 848.2271775207986,
+    "peak_density_per_eV": 1.8876111340659918e-08,
+    "peak_eV": 848.4482785849652,
+    "dominant_fwhm_eV": 3.941517175031322,
+    "score_s": 2.410568319959566
+   },
+   "stats": {
+    "rows": 605126,
+    "flights": 605126,
+    "path_ang_total": 313961165.8007395,
+    "flight_path_ang_mean": 518.8360205985853,
+    "flight_path_ang_quantiles": {
+     "q10": 41.87531108398399,
+     "q50": 330.0689766465034,
+     "q90": 1244.5476505914578,
+     "q99": 2641.638644846521
+    },
+    "flight_path_ang_weighted_mean": 1145.6310975058698,
+    "rows_per_flight_mean": 1.0,
+    "hard_inelastic_per_um": 3.4165690437039182,
+    "elastic_per_um": 15.596291941111355,
+    "path_weighted_abs_cos_z": {
+     "q10": 0.1478303801664725,
+     "q50": 0.6020656151204499,
+     "q90": 0.8500028005948231
+    },
+    "deflections_per_um": {
+     "ELASTIC": {
+      ">0.03": 15.59565491965206,
+      ">0.1": 15.589093598621334,
+      ">0.3": 15.51809755698303,
+      ">1.0": 14.772081726003949,
+      ">3.0": 9.961391218635338,
+      ">10.0": 1.9683644581451747
+     },
+     "HARD_INELASTIC": {
+      ">0.03": 3.416186830828342,
+      ">0.1": 3.4147853836178954,
+      ">0.3": 3.4042108273936167,
+      ">1.0": 3.320506207642399,
+      ">3.0": 2.4914546294443576,
+      ">10.0": 0.3665739987506726
+     },
+     "HARD_RADIATIVE": {
+      ">0.03": 0.0,
+      ">0.1": 0.0,
+      ">0.3": 0.0,
+      ">1.0": 0.0,
+      ">3.0": 0.0,
+      ">10.0": 0.0
+     },
+     "ALL": {
+      ">0.03": 19.011841750480404,
+      ">0.1": 19.00387898223923,
+      ">0.3": 18.922308384376645,
+      ">1.0": 18.092587933646346,
+      ">3.0": 12.452845848079695,
+      ">10.0": 2.334938456895847
+     }
+    },
+    "closing_events": {
+     "ELASTIC": 489663,
+     "EXIT_TOP": 1019,
+     "EXIT_BOTTOM": 6553,
+     "CUTOFF": 619,
+     "HARD_INELASTIC": 107267,
+     "HARD_RADIATIVE": 5
+    }
+   },
+   "sha256": "e1bd17862ef30ed1673df85bcfde3d6c03809dba0f224f5863745b820eeaf665"
+  },
+  {
+   "job": "13741",
+   "arm": "baseline",
+   "inelastic_cutoff_eV": 50.0,
+   "seed": 1208001,
+   "straggling": true,
+   "atomic_electron_deflection": "none",
+   "default": {
+    "yield_per_primary": 5.021820153883194e-07,
+    "centroid_eV": 848.5834882441964,
+    "peak_density_per_eV": 1.9247682558898305e-08,
+    "peak_eV": 848.2607785849652,
+    "dominant_fwhm_eV": 3.770939083102121,
+    "score_s": 0.05365666886791587
+   },
+   "merged": {
+    "yield_per_primary": 5.028182223920652e-07,
+    "centroid_eV": 848.5830229119322,
+    "peak_density_per_eV": 1.9362609293693822e-08,
+    "peak_eV": 848.2607785849652,
+    "dominant_fwhm_eV": 3.755154600649462,
+    "score_s": 2.328124410007149
+   },
+   "stats": {
+    "rows": 599710,
+    "flights": 599710,
+    "path_ang_total": 313157367.79828095,
+    "flight_path_ang_mean": 522.181333975223,
+    "flight_path_ang_quantiles": {
+     "q10": 41.996541185392786,
+     "q50": 331.6801028431943,
+     "q90": 1253.449979535004,
+     "q99": 2656.84037812916
+    },
+    "flight_path_ang_weighted_mean": 1153.8546185873074,
+    "rows_per_flight_mean": 1.0,
+    "hard_inelastic_per_um": 3.397269581999086,
+    "elastic_per_um": 15.491540352724318,
+    "path_weighted_abs_cos_z": {
+     "q10": 0.1466259817083606,
+     "q50": 0.6034856349472317,
+     "q90": 0.8523705440199626
+    },
+    "deflections_per_um": {
+     "ELASTIC": {
+      ">0.03": 15.490710099226442,
+      ">0.1": 15.483110086438197,
+      ">0.3": 15.415636023322394,
+      ">1.0": 14.668375942407623,
+      ">3.0": 9.90773431841648,
+      ">10.0": 1.9488923549553165
+     },
+     "HARD_INELASTIC": {
+      ">0.03": 3.3968544552501485,
+      ">0.1": 3.3954813436959697,
+      ">0.3": 3.3850712421456848,
+      ">1.0": 3.3019181610507715,
+      ">3.0": 2.475911729145196,
+      ">10.0": 0.36815356065409127
+     },
+     "HARD_RADIATIVE": {
+      ">0.03": 0.0,
+      ">0.1": 0.0,
+      ">0.3": 0.0,
+      ">1.0": 0.0,
+      ">3.0": 0.0,
+      ">10.0": 0.0
+     },
+     "ALL": {
+      ">0.03": 18.88756455447659,
+      ">0.1": 18.878591430134165,
+      ">0.3": 18.800707265468077,
+      ">1.0": 17.970294103458393,
+      ">3.0": 12.383646047561676,
+      ">10.0": 2.317045915609408
+     }
+    },
+    "closing_events": {
+     "ELASTIC": 485129,
+     "EXIT_TOP": 955,
+     "EXIT_BOTTOM": 6602,
+     "CUTOFF": 634,
+     "HARD_INELASTIC": 106388,
+     "HARD_RADIATIVE": 2
+    }
+   },
+   "sha256": "c3837d674c4006229040a9c26452fa741b96ee19a834f4ca29e75dccdd34c453"
+  },
+  {
+   "job": "13741",
+   "arm": "baseline",
+   "inelastic_cutoff_eV": 50.0,
+   "seed": 1208002,
+   "straggling": true,
+   "atomic_electron_deflection": "none",
+   "default": {
+    "yield_per_primary": 5.077307590403701e-07,
+    "centroid_eV": 848.6615630553111,
+    "peak_density_per_eV": 1.9071297430173217e-08,
+    "peak_eV": 848.4482785849652,
+    "dominant_fwhm_eV": 3.980995743814674,
+    "score_s": 0.05392758804373443
+   },
+   "merged": {
+    "yield_per_primary": 5.084124145016133e-07,
+    "centroid_eV": 848.6622318573577,
+    "peak_density_per_eV": 1.9137772255817254e-08,
+    "peak_eV": 848.4482785849652,
+    "dominant_fwhm_eV": 3.9776608669690177,
+    "score_s": 2.271404867991805
+   },
+   "stats": {
+    "rows": 599922,
+    "flights": 599922,
+    "path_ang_total": 313180998.7546791,
+    "flight_path_ang_mean": 522.0361959632737,
+    "flight_path_ang_quantiles": {
+     "q10": 42.04746270651817,
+     "q50": 332.2208887920633,
+     "q90": 1253.3504105714117,
+     "q99": 2654.903874813463
+    },
+    "flight_path_ang_weighted_mean": 1153.0141241190208,
+    "rows_per_flight_mean": 1.0,
+    "hard_inelastic_per_um": 3.41134999967503,
+    "elastic_per_um": 15.482740074528722,
+    "path_weighted_abs_cos_z": {
+     "q10": 0.14643235876133154,
+     "q50": 0.604754271586078,
+     "q90": 0.8521896215964767
+    },
+    "deflections_per_um": {
+     "ELASTIC": {
+      ">0.03": 15.482101466181488,
+      ">0.1": 15.474853261440376,
+      ">0.3": 15.40674568120781,
+      ">1.0": 14.663022400018418,
+      ">3.0": 9.878249358363345,
+      ">10.0": 1.9575261667781516
+     },
+     "HARD_INELASTIC": {
+      ">0.03": 3.4112542084229447,
+      ">0.1": 3.410040852563199,
+      ">0.3": 3.3986097631477,
+      ">1.0": 3.31310010545299,
+      ">3.0": 2.4863258087057436,
+      ">10.0": 0.37182971017733296
+     },
+     "HARD_RADIATIVE": {
+      ">0.03": 0.0,
+      ">0.1": 0.0,
+      ">0.3": 0.0,
+      ">1.0": 0.0,
+      ">3.0": 0.0,
+      ">10.0": 0.0
+     },
+     "ALL": {
+      ">0.03": 18.893355674604432,
+      ">0.1": 18.884894114003576,
+      ">0.3": 18.80535544435551,
+      ">1.0": 17.97612250547141,
+      ">3.0": 12.364575167069088,
+      ">10.0": 2.3293558769554843
+     }
+    },
+    "closing_events": {
+     "ELASTIC": 484890,
+     "EXIT_TOP": 1034,
+     "EXIT_BOTTOM": 6533,
+     "CUTOFF": 625,
+     "HARD_INELASTIC": 106837,
+     "HARD_RADIATIVE": 3
+    }
+   },
+   "sha256": "e75647c3e86b084e0f39aef127f773402782313af901868d1c60bdf5f9422ba9"
+  },
+  {
+   "job": "13741",
+   "arm": "baseline",
+   "inelastic_cutoff_eV": 50.0,
+   "seed": 1208003,
+   "straggling": true,
+   "atomic_electron_deflection": "none",
+   "default": {
+    "yield_per_primary": 5.042066612351292e-07,
+    "centroid_eV": 848.2323602262212,
+    "peak_density_per_eV": 1.9481923629882658e-08,
+    "peak_eV": 848.2607785849652,
+    "dominant_fwhm_eV": 3.7457378195358615,
+    "score_s": 0.05371109279803932
+   },
+   "merged": {
+    "yield_per_primary": 5.048715555830419e-07,
+    "centroid_eV": 848.2237142520135,
+    "peak_density_per_eV": 1.9517512939160042e-08,
+    "peak_eV": 848.2607785849652,
+    "dominant_fwhm_eV": 3.7513183264231884,
+    "score_s": 2.38644110201858
+   },
+   "stats": {
+    "rows": 602878,
+    "flights": 602878,
+    "path_ang_total": 314385478.0945618,
+    "flight_path_ang_mean": 521.474457675619,
+    "flight_path_ang_quantiles": {
+     "q10": 41.87671226056401,
+     "q50": 331.31079543416206,
+     "q90": 1254.7141574783532,
+     "q99": 2671.719333513221
+    },
+    "flight_path_ang_weighted_mean": 1154.2835137572606,
+    "rows_per_flight_mean": 1.0,
+    "hard_inelastic_per_um": 3.416760871114107,
+    "elastic_per_um": 15.498998330114938,
+    "path_weighted_abs_cos_z": {
+     "q10": 0.14582306839226042,
+     "q50": 0.6018622633776163,
+     "q90": 0.851725401438382
+    },
+    "deflections_per_um": {
+     "ELASTIC": {
+      ">0.03": 15.498521208840415,
+      ">0.1": 15.491046308872887,
+      ">0.3": 15.424440178949478,
+      ">1.0": 14.686428991517301,
+      ">3.0": 9.899980173587535,
+      ">10.0": 1.9477362749427585
+     },
+     "HARD_INELASTIC": {
+      ">0.03": 3.4163791740944887,
+      ">0.1": 3.4149160021859513,
+      ">0.3": 3.4047692230810953,
+      ">1.0": 3.3228634042879803,
+      ">3.0": 2.4907002853499325,
+      ">10.0": 0.36572936096436354
+     },
+     "HARD_RADIATIVE": {
+      ">0.03": 0.0,
+      ">0.1": 0.0,
+      ">0.3": 0.0,
+      ">1.0": 0.0,
+      ">3.0": 0.0,
+      ">10.0": 0.0
+     },
+     "ALL": {
+      ">0.03": 18.914900382934903,
+      ">0.1": 18.90596231105884,
+      ">0.3": 18.82920940203057,
+      ">1.0": 18.009292395805282,
+      ">3.0": 12.390680458937467,
+      ">10.0": 2.313465635907122
+     }
+    },
+    "closing_events": {
+     "ELASTIC": 487266,
+     "EXIT_TOP": 1059,
+     "EXIT_BOTTOM": 6513,
+     "CUTOFF": 620,
+     "HARD_INELASTIC": 107418,
+     "HARD_RADIATIVE": 2
+    }
+   },
+   "sha256": "bfa6530fa3f31f7fe17a023bebc87f13cd4dae2c38aeb995269467e04d08204f"
+  },
+  {
+   "job": "13741",
+   "arm": "baseline",
+   "inelastic_cutoff_eV": 50.0,
+   "seed": 1208004,
+   "straggling": true,
+   "atomic_electron_deflection": "none",
+   "default": {
+    "yield_per_primary": 5.044344505017451e-07,
+    "centroid_eV": 848.2476394679443,
+    "peak_density_per_eV": 1.890983725161277e-08,
+    "peak_eV": 848.4482785849652,
+    "dominant_fwhm_eV": 3.9286460533365926,
+    "score_s": 0.05471718101762235
+   },
+   "merged": {
+    "yield_per_primary": 5.050862176836368e-07,
+    "centroid_eV": 848.240710183141,
+    "peak_density_per_eV": 1.899150170459052e-08,
+    "peak_eV": 848.4482785849652,
+    "dominant_fwhm_eV": 3.9247214973106566,
+    "score_s": 2.2599706889595836
+   },
+   "stats": {
+    "rows": 601574,
+    "flights": 601574,
+    "path_ang_total": 313627329.2222708,
+    "flight_path_ang_mean": 521.3445548216359,
+    "flight_path_ang_quantiles": {
+     "q10": 42.13618891735022,
+     "q50": 331.5644743192147,
+     "q90": 1251.2878186331777,
+     "q99": 2656.013098308716
+    },
+    "flight_path_ang_weighted_mean": 1151.6110479219205,
+    "rows_per_flight_mean": 1.0,
+    "hard_inelastic_per_um": 3.4191216774990587,
+    "elastic_per_um": 15.500753751452047,
+    "path_weighted_abs_cos_z": {
+     "q10": 0.1486364303025776,
+     "q50": 0.6029166343100174,
+     "q90": 0.8498557817946879
+    },
+    "deflections_per_um": {
+     "ELASTIC": {
+      ">0.03": 15.50008416694702,
+      ">0.1": 15.493643401708196,
+      ">0.3": 15.422731214128273,
+      ">1.0": 14.681979441710657,
+      ">3.0": 9.902038855163244,
+      ">10.0": 1.9570679682860195
+     },
+     "HARD_INELASTIC": {
+      ">0.03": 3.4187709427583304,
+      ">0.1": 3.417399888771848,
+      ">0.3": 3.4068459615735773,
+      ">1.0": 3.3226377388224186,
+      ">3.0": 2.4932457319298993,
+      ">10.0": 0.36852655757587793
+     },
+     "HARD_RADIATIVE": {
+      ">0.03": 0.0,
+      ">0.1": 0.0,
+      ">0.3": 0.0,
+      ">1.0": 0.0,
+      ">3.0": 0.0,
+      ">10.0": 0.0
+     },
+     "ALL": {
+      ">0.03": 18.91885510970535,
+      ">0.1": 18.911043290480045,
+      ">0.3": 18.82957717570185,
+      ">1.0": 18.004617180533078,
+      ">3.0": 12.395284587093142,
+      ">10.0": 2.3255945258618973
+     }
+    },
+    "closing_events": {
+     "ELASTIC": 486146,
+     "EXIT_TOP": 1016,
+     "EXIT_BOTTOM": 6558,
+     "CUTOFF": 617,
+     "HARD_INELASTIC": 107233,
+     "HARD_RADIATIVE": 4
+    }
+   },
+   "sha256": "97b8b82945e24d8dc8005694c66704528c7eccbbd52557d92cafa1cebbef4674"
+  },
+  {
+   "job": "13741",
+   "arm": "cut100",
+   "inelastic_cutoff_eV": 100.0,
+   "seed": 1208001,
+   "straggling": true,
+   "atomic_electron_deflection": "kawrakow",
+   "default": {
+    "yield_per_primary": 5.044251199445848e-07,
+    "centroid_eV": 848.5663664160974,
+    "peak_density_per_eV": 2.0105526132851992e-08,
+    "peak_eV": 848.2607785849652,
+    "dominant_fwhm_eV": 3.7670465107157725,
+    "score_s": 0.051120810909196734
+   },
+   "merged": {
+    "yield_per_primary": 5.047252807366398e-07,
+    "centroid_eV": 848.5669089549729,
+    "peak_density_per_eV": 2.017936751030902e-08,
+    "peak_eV": 848.2607785849652,
+    "dominant_fwhm_eV": 3.755528828745355,
+    "score_s": 2.1914340211078525
+   },
+   "stats": {
+    "rows": 578830,
+    "flights": 578830,
+    "path_ang_total": 316443933.6257746,
+    "flight_path_ang_mean": 546.6958064125471,
+    "flight_path_ang_quantiles": {
+     "q10": 43.88317822053975,
+     "q50": 347.09257117587225,
+     "q90": 1309.535514038659,
+     "q99": 2798.537184822516
+    },
+    "flight_path_ang_weighted_mean": 1210.0828637439627,
+    "rows_per_flight_mean": 1.0,
+    "hard_inelastic_per_um": 2.0551823906003563,
+    "elastic_per_um": 15.977553881564392,
+    "path_weighted_abs_cos_z": {
+     "q10": 0.1443135232287003,
+     "q50": 0.5976157364555659,
+     "q90": 0.8519092965326646
+    },
+    "deflections_per_um": {
+     "ELASTIC": {
+      ">0.03": 15.97682705454842,
+      ">0.1": 15.968610749150463,
+      ">0.3": 15.899846593204488,
+      ">1.0": 15.12994717624137,
+      ">3.0": 10.213088817882022,
+      ">10.0": 2.019441462119246
+     },
+     "HARD_INELASTIC": {
+      ">0.03": 2.0548031765050663,
+      ">0.1": 2.053539129520765,
+      ">0.3": 2.0433003489479273,
+      ">1.0": 1.9612953008414011,
+      ">3.0": 1.7659684405922922,
+      ">10.0": 0.3483081465241351
+     },
+     "HARD_RADIATIVE": {
+      ">0.03": 0.0,
+      ">0.1": 0.0,
+      ">0.3": 0.0,
+      ">1.0": 0.0,
+      ">3.0": 0.0,
+      ">10.0": 0.0
+     },
+     "ALL": {
+      ">0.03": 18.031630231053484,
+      ">0.1": 18.02214987867123,
+      ">0.3": 17.943146942152417,
+      ">1.0": 17.09124247708277,
+      ">3.0": 11.979057258474315,
+      ">10.0": 2.3677496086433814
+     }
+    },
+    "closing_events": {
+     "ELASTIC": 505600,
+     "EXIT_TOP": 1006,
+     "EXIT_BOTTOM": 6566,
+     "CUTOFF": 619,
+     "HARD_INELASTIC": 65035,
+     "HARD_RADIATIVE": 4
+    }
+   },
+   "sha256": "93bf3c8fb64913cfbc4befd7ac7280a5e6e3820042de946691385eb7f64f5f6a"
+  },
+  {
+   "job": "13741",
+   "arm": "cut100",
+   "inelastic_cutoff_eV": 100.0,
+   "seed": 1208002,
+   "straggling": true,
+   "atomic_electron_deflection": "kawrakow",
+   "default": {
+    "yield_per_primary": 5.064155705197804e-07,
+    "centroid_eV": 848.5638412943106,
+    "peak_density_per_eV": 1.9827556485552122e-08,
+    "peak_eV": 848.2607785849652,
+    "dominant_fwhm_eV": 3.9592884608456416,
+    "score_s": 0.055148134008049965
+   },
+   "merged": {
+    "yield_per_primary": 5.067011892359585e-07,
+    "centroid_eV": 848.5607318174308,
+    "peak_density_per_eV": 1.9865616707193112e-08,
+    "peak_eV": 848.2607785849652,
+    "dominant_fwhm_eV": 3.9589210795237477,
+    "score_s": 2.259750158060342
+   },
+   "stats": {
+    "rows": 574373,
+    "flights": 574373,
+    "path_ang_total": 314516366.4889356,
+    "flight_path_ang_mean": 547.5820877529682,
+    "flight_path_ang_quantiles": {
+     "q10": 43.87553570060241,
+     "q50": 347.8423994370236,
+     "q90": 1316.2620491153423,
+     "q99": 2794.4720151499
+    },
+    "flight_path_ang_weighted_mean": 1211.862703421323,
+    "rows_per_flight_mean": 1.0,
+    "hard_inelastic_per_um": 2.0494005040042182,
+    "elastic_per_um": 15.9521110332314,
+    "path_weighted_abs_cos_z": {
+     "q10": 0.14356567048833987,
+     "q50": 0.6018203470798265,
+     "q90": 0.852104701771237
+    },
+    "deflections_per_um": {
+     "ELASTIC": {
+      ">0.03": 15.951220777493278,
+      ">0.1": 15.943717193414823,
+      ">0.3": 15.872846477690768,
+      ">1.0": 15.101821418781693,
+      ">3.0": 10.188754358869692,
+      ">10.0": 2.008194381268294
+     },
+     "HARD_INELASTIC": {
+      ">0.03": 2.049114350374108,
+      ">0.1": 2.0475246079846046,
+      ">0.3": 2.0349020534119484,
+      ">1.0": 1.9549062163721451,
+      ">3.0": 1.756156622836449,
+      ">10.0": 0.34640486667275794
+     },
+     "HARD_RADIATIVE": {
+      ">0.03": 0.0,
+      ">0.1": 0.0,
+      ">0.3": 0.0,
+      ">1.0": 0.0,
+      ">3.0": 0.0,
+      ">10.0": 0.0
+     },
+     "ALL": {
+      ">0.03": 18.000335127867388,
+      ">0.1": 17.991241801399426,
+      ">0.3": 17.907748531102715,
+      ">1.0": 17.056727635153837,
+      ">3.0": 11.94491098170614,
+      ">10.0": 2.354599247941052
+     }
+    },
+    "closing_events": {
+     "ELASTIC": 501720,
+     "EXIT_TOP": 1054,
+     "EXIT_BOTTOM": 6518,
+     "CUTOFF": 620,
+     "HARD_INELASTIC": 64457,
+     "HARD_RADIATIVE": 4
+    }
+   },
+   "sha256": "db894d7893559ad1bfaca72d00db4e3b4531f445b41a06a34583bb25b31f0526"
+  },
+  {
+   "job": "13741",
+   "arm": "cut100",
+   "inelastic_cutoff_eV": 100.0,
+   "seed": 1208003,
+   "straggling": true,
+   "atomic_electron_deflection": "kawrakow",
+   "default": {
+    "yield_per_primary": 5.035797087243887e-07,
+    "centroid_eV": 848.5112087161729,
+    "peak_density_per_eV": 1.9807385953640733e-08,
+    "peak_eV": 848.2607785849652,
+    "dominant_fwhm_eV": 3.8157003228343456,
+    "score_s": 0.04955070209689438
+   },
+   "merged": {
+    "yield_per_primary": 5.038448025462827e-07,
+    "centroid_eV": 848.510056938427,
+    "peak_density_per_eV": 1.9855152189052205e-08,
+    "peak_eV": 848.2607785849652,
+    "dominant_fwhm_eV": 3.811229099825482,
+    "score_s": 2.273952000075951
+   },
+   "stats": {
+    "rows": 568222,
+    "flights": 568222,
+    "path_ang_total": 314384181.7031832,
+    "flight_path_ang_mean": 553.2770320458961,
+    "flight_path_ang_quantiles": {
+     "q10": 44.88276774033084,
+     "q50": 352.7267936928682,
+     "q90": 1326.4132604386925,
+     "q99": 2818.7507894596024
+    },
+    "flight_path_ang_weighted_mean": 1217.435406469527,
+    "rows_per_flight_mean": 1.0,
+    "hard_inelastic_per_um": 2.0296822713632707,
+    "elastic_per_um": 15.783745776003709,
+    "path_weighted_abs_cos_z": {
+     "q10": 0.14817782648982833,
+     "q50": 0.6017755159587235,
+     "q90": 0.8515259075091479
+    },
+    "deflections_per_um": {
+     "ELASTIC": {
+      ">0.03": 15.783141419897207,
+      ">0.1": 15.775634680890128,
+      ">0.3": 15.70613372864238,
+      ">1.0": 14.947285116388603,
+      ">3.0": 10.049233338917738,
+      ">10.0": 1.9508615117889376
+     },
+     "HARD_INELASTIC": {
+      ">0.03": 2.029427805634217,
+      ">0.1": 2.027964627692159,
+      ">0.3": 2.0181040806913346,
+      ">1.0": 1.9380109924717341,
+      ">3.0": 1.7416906825069307,
+      ">10.0": 0.33284117360202575
+     },
+     "HARD_RADIATIVE": {
+      ">0.03": 0.0,
+      ">0.1": 0.0,
+      ">0.3": 0.0,
+      ">1.0": 0.0,
+      ">3.0": 0.0,
+      ">10.0": 0.0
+     },
+     "ALL": {
+      ">0.03": 17.812569225531423,
+      ">0.1": 17.803599308582285,
+      ">0.3": 17.724237809333715,
+      ">1.0": 16.885296108860338,
+      ">3.0": 11.790924021424667,
+      ">10.0": 2.2837026853909634
+     }
+    },
+    "closing_events": {
+     "ELASTIC": 496216,
+     "EXIT_TOP": 1050,
+     "EXIT_BOTTOM": 6578,
+     "CUTOFF": 564,
+     "HARD_INELASTIC": 63810,
+     "HARD_RADIATIVE": 4
+    }
+   },
+   "sha256": "f26ab0ab2f43160a75a4afe3c0115c306e92fdc55a78bd4e668fe9b205a2fc19"
+  },
+  {
+   "job": "13741",
+   "arm": "cut100",
+   "inelastic_cutoff_eV": 100.0,
+   "seed": 1208004,
+   "straggling": true,
+   "atomic_electron_deflection": "kawrakow",
+   "default": {
+    "yield_per_primary": 5.050049089322384e-07,
+    "centroid_eV": 848.414813276185,
+    "peak_density_per_eV": 1.907863378391994e-08,
+    "peak_eV": 848.2607785849652,
+    "dominant_fwhm_eV": 4.071092235833589,
+    "score_s": 0.05354711995460093
+   },
+   "merged": {
+    "yield_per_primary": 5.05271634490545e-07,
+    "centroid_eV": 848.410431104939,
+    "peak_density_per_eV": 1.9109901217007064e-08,
+    "peak_eV": 848.2607785849652,
+    "dominant_fwhm_eV": 4.072590054938814,
+    "score_s": 2.225569976028055
+   },
+   "stats": {
+    "rows": 576408,
+    "flights": 576408,
+    "path_ang_total": 315194923.3531481,
+    "flight_path_ang_mean": 546.8260734638452,
+    "flight_path_ang_quantiles": {
+     "q10": 43.97389991918392,
+     "q50": 347.54631250844426,
+     "q90": 1311.8512519826604,
+     "q99": 2790.163029959532
+    },
+    "flight_path_ang_weighted_mean": 1208.8976433430978,
+    "rows_per_flight_mean": 1.0,
+    "hard_inelastic_per_um": 2.0473680005213026,
+    "elastic_per_um": 15.980047985597396,
+    "path_weighted_abs_cos_z": {
+     "q10": 0.14293179517743831,
+     "q50": 0.6009606431967904,
+     "q90": 0.8521894855210681
+    },
+    "deflections_per_um": {
+     "ELASTIC": {
+      ">0.03": 15.979476910409748,
+      ">0.1": 15.972401923362758,
+      ">0.3": 15.901334788899737,
+      ">1.0": 15.140979902944032,
+      ">3.0": 10.209840836790427,
+      ">10.0": 2.0173231003710876
+     },
+     "HARD_INELASTIC": {
+      ">0.03": 2.0469872837295364,
+      ">0.1": 2.045845133354238,
+      ">0.3": 2.034867799191646,
+      ">1.0": 1.955869064900162,
+      ">3.0": 1.7575790691886057,
+      ">10.0": 0.3463571013092893
+     },
+     "HARD_RADIATIVE": {
+      ">0.03": 0.0,
+      ">0.1": 0.0,
+      ">0.3": 0.0,
+      ">1.0": 0.0,
+      ">3.0": 0.0,
+      ">10.0": 0.0
+     },
+     "ALL": {
+      ">0.03": 18.026464194139283,
+      ">0.1": 18.018247056716998,
+      ">0.3": 17.936202588091383,
+      ">1.0": 17.096848967844195,
+      ">3.0": 11.967419905979032,
+      ">10.0": 2.363680201680377
+     }
+    },
+    "closing_events": {
+     "ELASTIC": 503683,
+     "EXIT_TOP": 1014,
+     "EXIT_BOTTOM": 6544,
+     "CUTOFF": 633,
+     "HARD_INELASTIC": 64532,
+     "HARD_RADIATIVE": 2
+    }
+   },
+   "sha256": "bcd6cffb8975d36ae468c3a9c73478a4c711b11abb5491fb1e7c1dafabfcd630"
+  },
+  {
+   "job": "13741",
+   "arm": "cut100",
+   "inelastic_cutoff_eV": 100.0,
+   "seed": 1208001,
+   "straggling": true,
+   "atomic_electron_deflection": "none",
+   "default": {
+    "yield_per_primary": 5.08018804648569e-07,
+    "centroid_eV": 848.5542798089036,
+    "peak_density_per_eV": 2.066067139594452e-08,
+    "peak_eV": 848.2607785849652,
+    "dominant_fwhm_eV": 3.7285975193749437,
+    "score_s": 0.05064419307745993
+   },
+   "merged": {
+    "yield_per_primary": 5.083188792803783e-07,
+    "centroid_eV": 848.5541850500017,
+    "peak_density_per_eV": 2.073261207158339e-08,
+    "peak_eV": 848.2607785849652,
+    "dominant_fwhm_eV": 3.717636855927026,
+    "score_s": 2.1278481821063906
+   },
+   "stats": {
+    "rows": 559453,
+    "flights": 559453,
+    "path_ang_total": 314964541.628008,
+    "flight_path_ang_mean": 562.9865987455747,
+    "flight_path_ang_quantiles": {
+     "q10": 45.825600414545896,
+     "q50": 359.0789240712498,
+     "q90": 1347.0548890455907,
+     "q99": 2871.9613654125433
+    },
+    "flight_path_ang_weighted_mean": 1241.3952041302766,
+    "rows_per_flight_mean": 1.0,
+    "hard_inelastic_per_um": 2.048071813626139,
+    "elastic_per_um": 15.454184064150411,
+    "path_weighted_abs_cos_z": {
+     "q10": 0.14661644374770388,
+     "q50": 0.5992136358089387,
+     "q90": 0.8505310087080069
+    },
+    "deflections_per_um": {
+     "ELASTIC": {
+      ">0.03": 15.453485572825441,
+      ">0.1": 15.445929166673505,
+      ">0.3": 15.378112008940152,
+      ">1.0": 14.629234059756346,
+      ">3.0": 9.852505885138822,
+      ">10.0": 1.9270740663781007
+     },
+     "HARD_INELASTIC": {
+      ">0.03": 2.0478495663863763,
+      ">0.1": 2.0465160829477993,
+      ">0.3": 2.036387958735749,
+      ">1.0": 1.954410476868933,
+      ">3.0": 1.7592139011457788,
+      ">10.0": 0.34549920901421005
+     },
+     "HARD_RADIATIVE": {
+      ">0.03": 0.0,
+      ">0.1": 0.0,
+      ">0.3": 0.0,
+      ">1.0": 0.0,
+      ">3.0": 0.0,
+      ">10.0": 0.0
+     },
+     "ALL": {
+      ">0.03": 17.501335139211818,
+      ">0.1": 17.492445249621305,
+      ">0.3": 17.4144999676759,
+      ">1.0": 16.58364453662528,
+      ">3.0": 11.611719786284599,
+      ">10.0": 2.2725732753923107
+     }
+    },
+    "closing_events": {
+     "ELASTIC": 486752,
+     "EXIT_TOP": 986,
+     "EXIT_BOTTOM": 6596,
+     "CUTOFF": 609,
+     "HARD_INELASTIC": 64507,
+     "HARD_RADIATIVE": 3
+    }
+   },
+   "sha256": "f3e4c73412c39b47471c40540a3791f419a65e6112241acc3aed67d3b5d68129"
+  },
+  {
+   "job": "13741",
+   "arm": "cut100",
+   "inelastic_cutoff_eV": 100.0,
+   "seed": 1208002,
+   "straggling": true,
+   "atomic_electron_deflection": "none",
+   "default": {
+    "yield_per_primary": 5.09010147364819e-07,
+    "centroid_eV": 848.5325070428286,
+    "peak_density_per_eV": 2.0349542495523565e-08,
+    "peak_eV": 848.2607785849652,
+    "dominant_fwhm_eV": 3.9080128928851536,
+    "score_s": 0.050421966006979346
+   },
+   "merged": {
+    "yield_per_primary": 5.09305509870106e-07,
+    "centroid_eV": 848.5303286228531,
+    "peak_density_per_eV": 2.0385916954523964e-08,
+    "peak_eV": 848.2607785849652,
+    "dominant_fwhm_eV": 3.9078905868321954,
+    "score_s": 2.106206144904718
+   },
+   "stats": {
+    "rows": 556255,
+    "flights": 556255,
+    "path_ang_total": 313069376.7300985,
+    "flight_path_ang_mean": 562.8162924020431,
+    "flight_path_ang_quantiles": {
+     "q10": 45.40569785682842,
+     "q50": 357.8114108762916,
+     "q90": 1351.3720036574903,
+     "q99": 2867.0536097943013
+    },
+    "flight_path_ang_weighted_mean": 1242.9595404822583,
+    "rows_per_flight_mean": 1.0,
+    "hard_inelastic_per_um": 2.0520371769029584,
+    "elastic_per_um": 15.453954808780438,
+    "path_weighted_abs_cos_z": {
+     "q10": 0.14435070677513362,
+     "q50": 0.6042630764547434,
+     "q90": 0.8513802411262019
+    },
+    "deflections_per_um": {
+     "ELASTIC": {
+      ">0.03": 15.453060438328354,
+      ">0.1": 15.445617998494933,
+      ">0.3": 15.37745419332533,
+      ">1.0": 14.625735828348066,
+      ">3.0": 9.853023736203193,
+      ">10.0": 1.9421893203058307
+     },
+     "HARD_INELASTIC": {
+      ">0.03": 2.0517497006862166,
+      ">0.1": 2.0501206687913482,
+      ">0.3": 2.037791133273322,
+      ">1.0": 1.9565950729447676,
+      ">3.0": 1.7579809489782252,
+      ">10.0": 0.3458658305419304
+     },
+     "HARD_RADIATIVE": {
+      ">0.03": 0.0,
+      ">0.1": 0.0,
+      ">0.3": 0.0,
+      ">1.0": 0.0,
+      ">3.0": 0.0,
+      ">10.0": 0.0
+     },
+     "ALL": {
+      ">0.03": 17.50481013901457,
+      ">0.1": 17.495738667286282,
+      ">0.3": 17.41524532659865,
+      ">1.0": 16.582330901292835,
+      ">3.0": 11.611004685181419,
+      ">10.0": 2.288055150847761
+     }
+    },
+    "closing_events": {
+     "ELASTIC": 483816,
+     "EXIT_TOP": 992,
+     "EXIT_BOTTOM": 6576,
+     "CUTOFF": 624,
+     "HARD_INELASTIC": 64243,
+     "HARD_RADIATIVE": 4
+    }
+   },
+   "sha256": "1624b234d9bb9d469ecec3ca601570ba12e6447dc8140278bb5c1488303d746d"
+  },
+  {
+   "job": "13741",
+   "arm": "cut100",
+   "inelastic_cutoff_eV": 100.0,
+   "seed": 1208003,
+   "straggling": true,
+   "atomic_electron_deflection": "none",
+   "default": {
+    "yield_per_primary": 5.068530825463879e-07,
+    "centroid_eV": 848.4979323309959,
+    "peak_density_per_eV": 2.0207590267773412e-08,
+    "peak_eV": 848.2607785849652,
+    "dominant_fwhm_eV": 3.7947798843010787,
+    "score_s": 0.0514415439683944
+   },
+   "merged": {
+    "yield_per_primary": 5.071234446540895e-07,
+    "centroid_eV": 848.4976875204585,
+    "peak_density_per_eV": 2.0257933996958855e-08,
+    "peak_eV": 848.2607785849652,
+    "dominant_fwhm_eV": 3.7902215302857485,
+    "score_s": 2.217364403186366
+   },
+   "stats": {
+    "rows": 555459,
+    "flights": 555459,
+    "path_ang_total": 314646902.12663007,
+    "flight_path_ang_mean": 566.4628750756223,
+    "flight_path_ang_quantiles": {
+     "q10": 45.9754183030338,
+     "q50": 361.23564080043445,
+     "q90": 1358.9512249608304,
+     "q99": 2886.4986351408443
+    },
+    "flight_path_ang_weighted_mean": 1246.9059441478882,
+    "rows_per_flight_mean": 1.0,
+    "hard_inelastic_per_um": 2.0308161169908407,
+    "elastic_per_um": 15.3621407594685,
+    "path_weighted_abs_cos_z": {
+     "q10": 0.14800654020634876,
+     "q50": 0.6020397322862414,
+     "q90": 0.8501617730611678
+    },
+    "deflections_per_um": {
+     "ELASTIC": {
+      ">0.03": 15.361568689637895,
+      ">0.1": 15.35413178184003,
+      ">0.3": 15.286373288570582,
+      ">1.0": 14.551454246186566,
+      ">3.0": 9.797649298829972,
+      ">10.0": 1.9100458194186536
+     },
+     "HARD_INELASTIC": {
+      ">0.03": 2.03059364539005,
+      ">0.1": 2.029227034128049,
+      ">0.3": 2.019342938721483,
+      ">1.0": 1.9391895991222576,
+      ">3.0": 1.7426518306521508,
+      ">10.0": 0.33605924382323904
+     },
+     "HARD_RADIATIVE": {
+      ">0.03": 0.0,
+      ">0.1": 0.0,
+      ">0.3": 0.0,
+      ">1.0": 0.0,
+      ">3.0": 0.0,
+      ">10.0": 0.0
+     },
+     "ALL": {
+      ">0.03": 17.392162335027948,
+      ">0.1": 17.38335881596808,
+      ">0.3": 17.305716227292066,
+      ">1.0": 16.490643845308824,
+      ">3.0": 11.540301129482122,
+      ">10.0": 2.2461050632418926
+     }
+    },
+    "closing_events": {
+     "ELASTIC": 483365,
+     "EXIT_TOP": 999,
+     "EXIT_BOTTOM": 6597,
+     "CUTOFF": 596,
+     "HARD_INELASTIC": 63899,
+     "HARD_RADIATIVE": 3
+    }
+   },
+   "sha256": "07d115831c3981a00a0c4146b26b025fae0dedbe889f5b313c959d22482adf54"
+  },
+  {
+   "job": "13741",
+   "arm": "cut100",
+   "inelastic_cutoff_eV": 100.0,
+   "seed": 1208004,
+   "straggling": true,
+   "atomic_electron_deflection": "none",
+   "default": {
+    "yield_per_primary": 5.088117604537534e-07,
+    "centroid_eV": 848.3386431580982,
+    "peak_density_per_eV": 1.963492834988756e-08,
+    "peak_eV": 848.2607785849652,
+    "dominant_fwhm_eV": 4.0018552295150585,
+    "score_s": 0.05019457102753222
+   },
+   "merged": {
+    "yield_per_primary": 5.090818024008903e-07,
+    "centroid_eV": 848.3351528526438,
+    "peak_density_per_eV": 1.9664728512225338e-08,
+    "peak_eV": 848.2607785849652,
+    "dominant_fwhm_eV": 4.003004535444006,
+    "score_s": 2.172193526988849
+   },
+   "stats": {
+    "rows": 558324,
+    "flights": 558324,
+    "path_ang_total": 313844474.3380408,
+    "flight_path_ang_mean": 562.1189028915842,
+    "flight_path_ang_quantiles": {
+     "q10": 45.79162732946302,
+     "q50": 358.0104843254737,
+     "q90": 1347.93179162793,
+     "q99": 2861.250546274141
+    },
+    "flight_path_ang_weighted_mean": 1239.8044222846797,
+    "rows_per_flight_mean": 1.0,
+    "hard_inelastic_per_um": 2.046204577456729,
+    "elastic_per_um": 15.482573049115588,
+    "path_weighted_abs_cos_z": {
+     "q10": 0.14568648599504858,
+     "q50": 0.6028828956987384,
+     "q90": 0.8507053346220331
+    },
+    "deflections_per_um": {
+     "ELASTIC": {
+      ">0.03": 15.481999516634637,
+      ">0.1": 15.475403893103696,
+      ">0.3": 15.406325092064655,
+      ">1.0": 14.669463305704475,
+      ">3.0": 9.874763627865969,
+      ">10.0": 1.947684442395513
+     },
+     "HARD_INELASTIC": {
+      ">0.03": 2.045885948300645,
+      ">0.1": 2.04477074625435,
+      ">0.3": 2.0340329436943145,
+      ">1.0": 1.9538658480235456,
+      ">3.0": 1.7551368433738683,
+      ">10.0": 0.3474013688785362
+     },
+     "HARD_RADIATIVE": {
+      ">0.03": 0.0,
+      ">0.1": 0.0,
+      ">0.3": 0.0,
+      ">1.0": 0.0,
+      ">3.0": 0.0,
+      ">10.0": 0.0
+     },
+     "ALL": {
+      ">0.03": 17.52788546493528,
+      ">0.1": 17.520174639358046,
+      ">0.3": 17.44035803575897,
+      ">1.0": 16.623329153728022,
+      ">3.0": 11.629900471239838,
+      ">10.0": 2.2950858112740495
+     }
+    },
+    "closing_events": {
+     "ELASTIC": 485912,
+     "EXIT_TOP": 989,
+     "EXIT_BOTTOM": 6585,
+     "CUTOFF": 617,
+     "HARD_INELASTIC": 64219,
+     "HARD_RADIATIVE": 2
+    }
+   },
+   "sha256": "cbab26f9947dada552319e9ed392586b30559609aa964a64170720c4851d5171"
+  },
+  {
+   "job": "13741",
+   "arm": "cut35",
+   "inelastic_cutoff_eV": 35.0,
+   "seed": 1208001,
+   "straggling": true,
+   "atomic_electron_deflection": "kawrakow",
+   "default": {
+    "yield_per_primary": 5.03228645754028e-07,
+    "centroid_eV": 848.6447153192927,
+    "peak_density_per_eV": 1.8456216110962487e-08,
+    "peak_eV": 848.4482785849652,
+    "dominant_fwhm_eV": 3.8165120176734035,
+    "score_s": 0.054993740981444716
+   },
+   "merged": {
+    "yield_per_primary": 5.04198994305538e-07,
+    "centroid_eV": 848.6354702564506,
+    "peak_density_per_eV": 1.8549911828813492e-08,
+    "peak_eV": 848.4482785849652,
+    "dominant_fwhm_eV": 3.8074120363774,
+    "score_s": 2.4062021819408983
+   },
+   "stats": {
+    "rows": 639959,
+    "flights": 639959,
+    "path_ang_total": 314010002.1472126,
+    "flight_path_ang_mean": 490.67206203399377,
+    "flight_path_ang_quantiles": {
+     "q10": 39.40141515464557,
+     "q50": 311.93469723686314,
+     "q90": 1178.4965633181553,
+     "q99": 2508.3213864140384
+    },
+    "flight_path_ang_weighted_mean": 1085.7702772382252,
+    "rows_per_flight_mean": 1.0,
+    "hard_inelastic_per_um": 4.582019649569853,
+    "elastic_per_um": 15.5373076228085,
+    "path_weighted_abs_cos_z": {
+     "q10": 0.14417967376481766,
+     "q50": 0.6023446418911188,
+     "q90": 0.8509746637704049
+    },
+    "deflections_per_um": {
+     "ELASTIC": {
+      ">0.03": 15.536543315944519,
+      ">0.1": 15.528581786111376,
+      ">0.3": 15.461768627751649,
+      ">1.0": 14.712779747168987,
+      ">3.0": 9.925798473574728,
+      ">10.0": 1.9538549594110315
+     },
+     "HARD_INELASTIC": {
+      ">0.03": 4.5817011883765275,
+      ">0.1": 4.580586574199888,
+      ">0.3": 4.569313047956158,
+      ">1.0": 4.485462215753508,
+      ">3.0": 2.702461686561702,
+      ">10.0": 0.37342759529368985
+     },
+     "HARD_RADIATIVE": {
+      ">0.03": 0.0,
+      ">0.1": 0.0,
+      ">0.3": 0.0,
+      ">1.0": 0.0,
+      ">3.0": 0.0,
+      ">10.0": 0.0
+     },
+     "ALL": {
+      ">0.03": 20.118244504321044,
+      ">0.1": 20.109168360311262,
+      ">0.3": 20.031081675707807,
+      ">1.0": 19.198241962922495,
+      ">3.0": 12.62826016013643,
+      ">10.0": 2.327282554704721
+     }
+    },
+    "closing_events": {
+     "ELASTIC": 487887,
+     "EXIT_TOP": 1016,
+     "EXIT_BOTTOM": 6555,
+     "CUTOFF": 620,
+     "HARD_INELASTIC": 143880,
+     "HARD_RADIATIVE": 1
+    }
+   },
+   "sha256": "318b7c02c5990a2d8a3c33b3de5ba4a21ae2de193b920e90e207b5cad53cf28e"
+  },
+  {
+   "job": "13741",
+   "arm": "cut35",
+   "inelastic_cutoff_eV": 35.0,
+   "seed": 1208002,
+   "straggling": true,
+   "atomic_electron_deflection": "kawrakow",
+   "default": {
+    "yield_per_primary": 5.077356765859076e-07,
+    "centroid_eV": 848.8390295441073,
+    "peak_density_per_eV": 1.8075592578270516e-08,
+    "peak_eV": 848.4482785849652,
+    "dominant_fwhm_eV": 4.0151160914425645,
+    "score_s": 0.057569634867832065
+   },
+   "merged": {
+    "yield_per_primary": 5.087494975922202e-07,
+    "centroid_eV": 848.8364022881435,
+    "peak_density_per_eV": 1.8196876894194247e-08,
+    "peak_eV": 848.4482785849652,
+    "dominant_fwhm_eV": 4.002553707474817,
+    "score_s": 2.47991786012426
+   },
+   "stats": {
+    "rows": 640861,
+    "flights": 640861,
+    "path_ang_total": 315196750.71619,
+    "flight_path_ang_mean": 491.8332535701033,
+    "flight_path_ang_quantiles": {
+     "q10": 39.42261538550054,
+     "q50": 312.50174499457717,
+     "q90": 1179.7132173869918,
+     "q99": 2515.6803376362514
+    },
+    "flight_path_ang_weighted_mean": 1088.446458262487,
+    "rows_per_flight_mean": 1.0,
+    "hard_inelastic_per_um": 4.5738098401213945,
+    "elastic_per_um": 15.49828793888351,
+    "path_weighted_abs_cos_z": {
+     "q10": 0.14210674552071273,
+     "q50": 0.6015899776148218,
+     "q90": 0.8518711919092048
+    },
+    "deflections_per_um": {
+     "ELASTIC": {
+      ">0.03": 15.497494783499036,
+      ">0.1": 15.48994394423882,
+      ">0.3": 15.422716093850603,
+      ">1.0": 14.6779431878273,
+      ">3.0": 9.907018371555838,
+      ">10.0": 1.9532561760268705
+     },
+     "HARD_INELASTIC": {
+      ">0.03": 4.573492577967604,
+      ">0.1": 4.5721600769216835,
+      ">0.3": 4.560992449108257,
+      ">1.0": 4.479963695030151,
+      ">3.0": 2.701772775464904,
+      ">10.0": 0.3821422642407117
+     },
+     "HARD_RADIATIVE": {
+      ">0.03": 0.0,
+      ">0.1": 0.0,
+      ">0.3": 0.0,
+      ">1.0": 0.0,
+      ">3.0": 0.0,
+      ">10.0": 0.0
+     },
+     "ALL": {
+      ">0.03": 20.07098736146664,
+      ">0.1": 20.062104021160504,
+      ">0.3": 19.983708542958862,
+      ">1.0": 19.15790688285745,
+      ">3.0": 12.608791147020742,
+      ">10.0": 2.335398440267582
+     }
+    },
+    "closing_events": {
+     "ELASTIC": 488501,
+     "EXIT_TOP": 1014,
+     "EXIT_BOTTOM": 6560,
+     "CUTOFF": 618,
+     "HARD_INELASTIC": 144165,
+     "HARD_RADIATIVE": 3
+    }
+   },
+   "sha256": "c5c4f977d8b6e14922aaad26631154faf64b78c6e41c683cbba33016ed9c8c1b"
+  },
+  {
+   "job": "13741",
+   "arm": "cut35",
+   "inelastic_cutoff_eV": 35.0,
+   "seed": 1208003,
+   "straggling": true,
+   "atomic_electron_deflection": "kawrakow",
+   "default": {
+    "yield_per_primary": 5.027880206551205e-07,
+    "centroid_eV": 848.487562535779,
+    "peak_density_per_eV": 1.8505289745007758e-08,
+    "peak_eV": 848.4482785849652,
+    "dominant_fwhm_eV": 3.815940747998411,
+    "score_s": 0.056422990979626775
+   },
+   "merged": {
+    "yield_per_primary": 5.03786948657936e-07,
+    "centroid_eV": 848.4800056109389,
+    "peak_density_per_eV": 1.8561271630801457e-08,
+    "peak_eV": 848.4482785849652,
+    "dominant_fwhm_eV": 3.829673507075995,
+    "score_s": 2.516355383908376
+   },
+   "stats": {
+    "rows": 638133,
+    "flights": 638133,
+    "path_ang_total": 314752167.6732796,
+    "flight_path_ang_mean": 493.2391330228645,
+    "flight_path_ang_quantiles": {
+     "q10": 39.77284053035807,
+     "q50": 313.5320921785045,
+     "q90": 1184.5082806958583,
+     "q99": 2512.9292238164235
+    },
+    "flight_path_ang_weighted_mean": 1089.4873921846256,
+    "rows_per_flight_mean": 1.0,
+    "hard_inelastic_per_um": 4.5707707452339585,
+    "elastic_per_um": 15.443038997734739,
+    "path_weighted_abs_cos_z": {
+     "q10": 0.14164258644540714,
+     "q50": 0.601290688457679,
+     "q90": 0.8513078820533487
+    },
+    "deflections_per_um": {
+     "ELASTIC": {
+      ">0.03": 15.442498890255077,
+      ">0.1": 15.435032698624463,
+      ">0.3": 15.369806777698287,
+      ">1.0": 14.630907974493178,
+      ">3.0": 9.864078214142104,
+      ">10.0": 1.943116085652683
+     },
+     "HARD_INELASTIC": {
+      ">0.03": 4.570389492895374,
+      ">0.1": 4.569023338682112,
+      ">0.3": 4.558888380681406,
+      ">1.0": 4.478317053127201,
+      ">3.0": 2.687956071134068,
+      ">10.0": 0.3707361282452773
+     },
+     "HARD_RADIATIVE": {
+      ">0.03": 0.0,
+      ">0.1": 0.0,
+      ">0.3": 0.0,
+      ">1.0": 0.0,
+      ">3.0": 0.0,
+      ">10.0": 0.0
+     },
+     "ALL": {
+      ">0.03": 20.01288838315045,
+      ">0.1": 20.004056037306576,
+      ">0.3": 19.928695158379693,
+      ">1.0": 19.10922502762038,
+      ">3.0": 12.552034285276173,
+      ">10.0": 2.3138522138979605
+     }
+    },
+    "closing_events": {
+     "ELASTIC": 486073,
+     "EXIT_TOP": 1031,
+     "EXIT_BOTTOM": 6544,
+     "CUTOFF": 617,
+     "HARD_INELASTIC": 143866,
+     "HARD_RADIATIVE": 2
+    }
+   },
+   "sha256": "0bf5663a8c3dfe0756643824e535fbdcbcd7609479715459d0b0e050dc3146b5"
+  },
+  {
+   "job": "13741",
+   "arm": "cut35",
+   "inelastic_cutoff_eV": 35.0,
+   "seed": 1208004,
+   "straggling": true,
+   "atomic_electron_deflection": "kawrakow",
+   "default": {
+    "yield_per_primary": 5.050596474792668e-07,
+    "centroid_eV": 848.4427270555271,
+    "peak_density_per_eV": 1.7936441665256098e-08,
+    "peak_eV": 848.4482785849652,
+    "dominant_fwhm_eV": 4.042159765498013,
+    "score_s": 0.056781230960041285
+   },
+   "merged": {
+    "yield_per_primary": 5.060285320143687e-07,
+    "centroid_eV": 848.4342415437911,
+    "peak_density_per_eV": 1.8082918273876203e-08,
+    "peak_eV": 848.4482785849652,
+    "dominant_fwhm_eV": 4.0093682248135565,
+    "score_s": 2.549273350974545
+   },
+   "stats": {
+    "rows": 641806,
+    "flights": 641806,
+    "path_ang_total": 315334510.5339856,
+    "flight_path_ang_mean": 491.32371859095366,
+    "flight_path_ang_quantiles": {
+     "q10": 39.54029534994928,
+     "q50": 312.3922495839771,
+     "q90": 1179.3703297652253,
+     "q99": 2513.1198774090417
+    },
+    "flight_path_ang_weighted_mean": 1086.4958718958565,
+    "rows_per_flight_mean": 1.0,
+    "hard_inelastic_per_um": 4.586938478603693,
+    "elastic_per_um": 15.506422026944636,
+    "path_weighted_abs_cos_z": {
+     "q10": 0.1444156400207323,
+     "q50": 0.6023071895915902,
+     "q90": 0.8489933109238824
+    },
+    "deflections_per_um": {
+     "ELASTIC": {
+      ">0.03": 15.505882916906499,
+      ">0.1": 15.499223322317743,
+      ">0.3": 15.430566073343192,
+      ">1.0": 14.690875388663562,
+      ">3.0": 9.882679807937263,
+      ">10.0": 1.940637575518542
+     },
+     "HARD_INELASTIC": {
+      ">0.03": 4.586589642696662,
+      ">0.1": 4.585130874358173,
+      ">0.3": 4.573841275912473,
+      ">1.0": 4.494052990268146,
+      ">3.0": 2.7076325980120703,
+      ">10.0": 0.3760133954232103
+     },
+     "HARD_RADIATIVE": {
+      ">0.03": 0.0,
+      ">0.1": 0.0,
+      ">0.3": 0.0,
+      ">1.0": 0.0,
+      ">3.0": 0.0,
+      ">10.0": 0.0
+     },
+     "ALL": {
+      ">0.03": 20.092472559603163,
+      ">0.1": 20.084354196675918,
+      ">0.3": 20.004407349255665,
+      ">1.0": 19.18492837893171,
+      ">3.0": 12.590312405949334,
+      ">10.0": 2.3166509709417524
+     }
+    },
+    "closing_events": {
+     "ELASTIC": 488971,
+     "EXIT_TOP": 1017,
+     "EXIT_BOTTOM": 6553,
+     "CUTOFF": 621,
+     "HARD_INELASTIC": 144642,
+     "HARD_RADIATIVE": 2
+    }
+   },
+   "sha256": "8721e128b4e79e66b5d778b65b7ef0a8383b9b1f77178dfb65b00f185b4b11eb"
+  },
+  {
+   "job": "13741",
+   "arm": "cut35",
+   "inelastic_cutoff_eV": 35.0,
+   "seed": 1208001,
+   "straggling": true,
+   "atomic_electron_deflection": "none",
+   "default": {
+    "yield_per_primary": 5.03228645754028e-07,
+    "centroid_eV": 848.6447153192927,
+    "peak_density_per_eV": 1.8456216110962487e-08,
+    "peak_eV": 848.4482785849652,
+    "dominant_fwhm_eV": 3.8165120176734035,
+    "score_s": 0.05753358290530741
+   },
+   "merged": {
+    "yield_per_primary": 5.04198994305538e-07,
+    "centroid_eV": 848.6354702564506,
+    "peak_density_per_eV": 1.8549911828813492e-08,
+    "peak_eV": 848.4482785849652,
+    "dominant_fwhm_eV": 3.8074120363774,
+    "score_s": 2.4847424488980323
+   },
+   "stats": {
+    "rows": 639959,
+    "flights": 639959,
+    "path_ang_total": 314010002.1472126,
+    "flight_path_ang_mean": 490.67206203399377,
+    "flight_path_ang_quantiles": {
+     "q10": 39.40141515464557,
+     "q50": 311.93469723686314,
+     "q90": 1178.4965633181553,
+     "q99": 2508.3213864140384
+    },
+    "flight_path_ang_weighted_mean": 1085.7702772382252,
+    "rows_per_flight_mean": 1.0,
+    "hard_inelastic_per_um": 4.582019649569853,
+    "elastic_per_um": 15.5373076228085,
+    "path_weighted_abs_cos_z": {
+     "q10": 0.14417967376481766,
+     "q50": 0.6023446418911188,
+     "q90": 0.8509746637704049
+    },
+    "deflections_per_um": {
+     "ELASTIC": {
+      ">0.03": 15.536543315944519,
+      ">0.1": 15.528581786111376,
+      ">0.3": 15.461768627751649,
+      ">1.0": 14.712779747168987,
+      ">3.0": 9.925798473574728,
+      ">10.0": 1.9538549594110315
+     },
+     "HARD_INELASTIC": {
+      ">0.03": 4.5817011883765275,
+      ">0.1": 4.580586574199888,
+      ">0.3": 4.569313047956158,
+      ">1.0": 4.485462215753508,
+      ">3.0": 2.702461686561702,
+      ">10.0": 0.37342759529368985
+     },
+     "HARD_RADIATIVE": {
+      ">0.03": 0.0,
+      ">0.1": 0.0,
+      ">0.3": 0.0,
+      ">1.0": 0.0,
+      ">3.0": 0.0,
+      ">10.0": 0.0
+     },
+     "ALL": {
+      ">0.03": 20.118244504321044,
+      ">0.1": 20.109168360311262,
+      ">0.3": 20.031081675707807,
+      ">1.0": 19.198241962922495,
+      ">3.0": 12.62826016013643,
+      ">10.0": 2.327282554704721
+     }
+    },
+    "closing_events": {
+     "ELASTIC": 487887,
+     "EXIT_TOP": 1016,
+     "EXIT_BOTTOM": 6555,
+     "CUTOFF": 620,
+     "HARD_INELASTIC": 143880,
+     "HARD_RADIATIVE": 1
+    }
+   },
+   "sha256": "d395c77dd360150ba46bc9ba52b520118bb3ed7e46f6c60d84852311f194fdec"
+  },
+  {
+   "job": "13741",
+   "arm": "cut35",
+   "inelastic_cutoff_eV": 35.0,
+   "seed": 1208002,
+   "straggling": true,
+   "atomic_electron_deflection": "none",
+   "default": {
+    "yield_per_primary": 5.077356765859076e-07,
+    "centroid_eV": 848.8390295441073,
+    "peak_density_per_eV": 1.8075592578270516e-08,
+    "peak_eV": 848.4482785849652,
+    "dominant_fwhm_eV": 4.0151160914425645,
+    "score_s": 0.05637238593772054
+   },
+   "merged": {
+    "yield_per_primary": 5.087494975922202e-07,
+    "centroid_eV": 848.8364022881435,
+    "peak_density_per_eV": 1.8196876894194247e-08,
+    "peak_eV": 848.4482785849652,
+    "dominant_fwhm_eV": 4.002553707474817,
+    "score_s": 2.54065984999761
+   },
+   "stats": {
+    "rows": 640861,
+    "flights": 640861,
+    "path_ang_total": 315196750.71619,
+    "flight_path_ang_mean": 491.8332535701033,
+    "flight_path_ang_quantiles": {
+     "q10": 39.42261538550054,
+     "q50": 312.50174499457717,
+     "q90": 1179.7132173869918,
+     "q99": 2515.6803376362514
+    },
+    "flight_path_ang_weighted_mean": 1088.446458262487,
+    "rows_per_flight_mean": 1.0,
+    "hard_inelastic_per_um": 4.5738098401213945,
+    "elastic_per_um": 15.49828793888351,
+    "path_weighted_abs_cos_z": {
+     "q10": 0.14210674552071273,
+     "q50": 0.6015899776148218,
+     "q90": 0.8518711919092048
+    },
+    "deflections_per_um": {
+     "ELASTIC": {
+      ">0.03": 15.497494783499036,
+      ">0.1": 15.48994394423882,
+      ">0.3": 15.422716093850603,
+      ">1.0": 14.6779431878273,
+      ">3.0": 9.907018371555838,
+      ">10.0": 1.9532561760268705
+     },
+     "HARD_INELASTIC": {
+      ">0.03": 4.573492577967604,
+      ">0.1": 4.5721600769216835,
+      ">0.3": 4.560992449108257,
+      ">1.0": 4.479963695030151,
+      ">3.0": 2.701772775464904,
+      ">10.0": 0.3821422642407117
+     },
+     "HARD_RADIATIVE": {
+      ">0.03": 0.0,
+      ">0.1": 0.0,
+      ">0.3": 0.0,
+      ">1.0": 0.0,
+      ">3.0": 0.0,
+      ">10.0": 0.0
+     },
+     "ALL": {
+      ">0.03": 20.07098736146664,
+      ">0.1": 20.062104021160504,
+      ">0.3": 19.983708542958862,
+      ">1.0": 19.15790688285745,
+      ">3.0": 12.608791147020742,
+      ">10.0": 2.335398440267582
+     }
+    },
+    "closing_events": {
+     "ELASTIC": 488501,
+     "EXIT_TOP": 1014,
+     "EXIT_BOTTOM": 6560,
+     "CUTOFF": 618,
+     "HARD_INELASTIC": 144165,
+     "HARD_RADIATIVE": 3
+    }
+   },
+   "sha256": "1309a8189ecba033a21964445efd9761cc6ba0628499960b9b19e2313db3eb36"
+  },
+  {
+   "job": "13741",
+   "arm": "cut35",
+   "inelastic_cutoff_eV": 35.0,
+   "seed": 1208003,
+   "straggling": true,
+   "atomic_electron_deflection": "none",
+   "default": {
+    "yield_per_primary": 5.027880206551205e-07,
+    "centroid_eV": 848.487562535779,
+    "peak_density_per_eV": 1.8505289745007758e-08,
+    "peak_eV": 848.4482785849652,
+    "dominant_fwhm_eV": 3.815940747998411,
+    "score_s": 0.058507053880020976
+   },
+   "merged": {
+    "yield_per_primary": 5.03786948657936e-07,
+    "centroid_eV": 848.4800056109389,
+    "peak_density_per_eV": 1.8561271630801457e-08,
+    "peak_eV": 848.4482785849652,
+    "dominant_fwhm_eV": 3.829673507075995,
+    "score_s": 2.4035098520107567
+   },
+   "stats": {
+    "rows": 638133,
+    "flights": 638133,
+    "path_ang_total": 314752167.6732796,
+    "flight_path_ang_mean": 493.2391330228645,
+    "flight_path_ang_quantiles": {
+     "q10": 39.77284053035807,
+     "q50": 313.5320921785045,
+     "q90": 1184.5082806958583,
+     "q99": 2512.9292238164235
+    },
+    "flight_path_ang_weighted_mean": 1089.4873921846256,
+    "rows_per_flight_mean": 1.0,
+    "hard_inelastic_per_um": 4.5707707452339585,
+    "elastic_per_um": 15.443038997734739,
+    "path_weighted_abs_cos_z": {
+     "q10": 0.14164258644540714,
+     "q50": 0.601290688457679,
+     "q90": 0.8513078820533487
+    },
+    "deflections_per_um": {
+     "ELASTIC": {
+      ">0.03": 15.442498890255077,
+      ">0.1": 15.435032698624463,
+      ">0.3": 15.369806777698287,
+      ">1.0": 14.630907974493178,
+      ">3.0": 9.864078214142104,
+      ">10.0": 1.943116085652683
+     },
+     "HARD_INELASTIC": {
+      ">0.03": 4.570389492895374,
+      ">0.1": 4.569023338682112,
+      ">0.3": 4.558888380681406,
+      ">1.0": 4.478317053127201,
+      ">3.0": 2.687956071134068,
+      ">10.0": 0.3707361282452773
+     },
+     "HARD_RADIATIVE": {
+      ">0.03": 0.0,
+      ">0.1": 0.0,
+      ">0.3": 0.0,
+      ">1.0": 0.0,
+      ">3.0": 0.0,
+      ">10.0": 0.0
+     },
+     "ALL": {
+      ">0.03": 20.01288838315045,
+      ">0.1": 20.004056037306576,
+      ">0.3": 19.928695158379693,
+      ">1.0": 19.10922502762038,
+      ">3.0": 12.552034285276173,
+      ">10.0": 2.3138522138979605
+     }
+    },
+    "closing_events": {
+     "ELASTIC": 486073,
+     "EXIT_TOP": 1031,
+     "EXIT_BOTTOM": 6544,
+     "CUTOFF": 617,
+     "HARD_INELASTIC": 143866,
+     "HARD_RADIATIVE": 2
+    }
+   },
+   "sha256": "9b1c30d1ba28314e68fa118ffb3aea89caa59903bd71728234ff5eac191d8bb1"
+  },
+  {
+   "job": "13741",
+   "arm": "cut35",
+   "inelastic_cutoff_eV": 35.0,
+   "seed": 1208004,
+   "straggling": true,
+   "atomic_electron_deflection": "none",
+   "default": {
+    "yield_per_primary": 5.050596474792668e-07,
+    "centroid_eV": 848.4427270555271,
+    "peak_density_per_eV": 1.7936441665256098e-08,
+    "peak_eV": 848.4482785849652,
+    "dominant_fwhm_eV": 4.042159765498013,
+    "score_s": 0.05467979400418699
+   },
+   "merged": {
+    "yield_per_primary": 5.060285320143687e-07,
+    "centroid_eV": 848.4342415437911,
+    "peak_density_per_eV": 1.8082918273876203e-08,
+    "peak_eV": 848.4482785849652,
+    "dominant_fwhm_eV": 4.0093682248135565,
+    "score_s": 2.3842757099773735
+   },
+   "stats": {
+    "rows": 641806,
+    "flights": 641806,
+    "path_ang_total": 315334510.5339856,
+    "flight_path_ang_mean": 491.32371859095366,
+    "flight_path_ang_quantiles": {
+     "q10": 39.54029534994928,
+     "q50": 312.3922495839771,
+     "q90": 1179.3703297652253,
+     "q99": 2513.1198774090417
+    },
+    "flight_path_ang_weighted_mean": 1086.4958718958565,
+    "rows_per_flight_mean": 1.0,
+    "hard_inelastic_per_um": 4.586938478603693,
+    "elastic_per_um": 15.506422026944636,
+    "path_weighted_abs_cos_z": {
+     "q10": 0.1444156400207323,
+     "q50": 0.6023071895915902,
+     "q90": 0.8489933109238824
+    },
+    "deflections_per_um": {
+     "ELASTIC": {
+      ">0.03": 15.505882916906499,
+      ">0.1": 15.499223322317743,
+      ">0.3": 15.430566073343192,
+      ">1.0": 14.690875388663562,
+      ">3.0": 9.882679807937263,
+      ">10.0": 1.940637575518542
+     },
+     "HARD_INELASTIC": {
+      ">0.03": 4.586589642696662,
+      ">0.1": 4.585130874358173,
+      ">0.3": 4.573841275912473,
+      ">1.0": 4.494052990268146,
+      ">3.0": 2.7076325980120703,
+      ">10.0": 0.3760133954232103
+     },
+     "HARD_RADIATIVE": {
+      ">0.03": 0.0,
+      ">0.1": 0.0,
+      ">0.3": 0.0,
+      ">1.0": 0.0,
+      ">3.0": 0.0,
+      ">10.0": 0.0
+     },
+     "ALL": {
+      ">0.03": 20.092472559603163,
+      ">0.1": 20.084354196675918,
+      ">0.3": 20.004407349255665,
+      ">1.0": 19.18492837893171,
+      ">3.0": 12.590312405949334,
+      ">10.0": 2.3166509709417524
+     }
+    },
+    "closing_events": {
+     "ELASTIC": 488971,
+     "EXIT_TOP": 1017,
+     "EXIT_BOTTOM": 6553,
+     "CUTOFF": 621,
+     "HARD_INELASTIC": 144642,
+     "HARD_RADIATIVE": 2
+    }
+   },
+   "sha256": "ca8c55b243b1828140dc07bb9439adc848fae82496593d87f5f3b85f13b6008d"
+  }
+ ]
+}
