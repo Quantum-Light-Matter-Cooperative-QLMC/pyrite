@@ -237,6 +237,14 @@ def test_invalid_execution_is_rejected_before_primary_transport(
         runner.run_case(case, transport_core=core)
 
 
+def test_runtime_execution_keys_do_not_change_the_source_case(selected):
+    """The device spectrum retry runs on ``dict(case, _spectrum_phase_cache={})`` (#1225)."""
+    work = dict(selected.case, _spectrum_phase_cache={"line": object()})
+    photon.prepare_photon_case(work, "lockstep")
+    with pytest.raises(ValueError, match="source Case changed"):
+        photon.prepare_photon_case(dict(work, seed=901), "lockstep")
+
+
 def test_data_pin_change_refuses_before_primary_transport(selected, monkeypatch):
     monkeypatch.setattr(photon, "case_table_markers", lambda case: {"bremslib:Si": "f" * 64})
     with pytest.raises(ValueError, match="table pins changed"):

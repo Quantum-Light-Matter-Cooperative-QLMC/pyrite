@@ -224,7 +224,13 @@ def prepare_photon_case(case, transport_core="auto"):
     expected_model = CUDA_MODEL if backend == "cuda" else MODEL
     if record["model"] != expected_model:
         raise ValueError("photon transport backend changed; lower the Scene again for this backend")
-    source_case = {key: value for key, value in case.items() if key != "photon_transport"}
+    # Underscore keys are per-run execution state (the spectrum retry adds
+    # ``_spectrum_phase_cache``), never part of the lowered source (#1225).
+    source_case = {
+        key: value
+        for key, value in case.items()
+        if key != "photon_transport" and not str(key).startswith("_")
+    }
     if case_digest(source_case) != record["source_case_digest"]:
         raise ValueError("photon transport source Case changed; lower the Scene again")
     if case_table_markers(source_case) != record["source_table_markers"]:
