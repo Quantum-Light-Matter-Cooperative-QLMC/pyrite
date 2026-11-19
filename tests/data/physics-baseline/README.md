@@ -473,3 +473,13 @@ shape step on every bandwidth. Only the `parameter_sha256` identity pins in
 `resolved.json` advance; every resolved case payload and `case_content_key`
 is unchanged (the fixtures use node quadrature), and output arrays and
 tolerances are retained.
+
+## Fiber-texture reflection selection (#1301)
+
+`CXR_REFLECTION_SELECTION_MODEL=measured-shell-cutoff-v7` restricts automatic
+candidates of fiber-textured crystals (HOPG, pyrolytic h-BN) to their
+fiber-axis (00l) domain and records the texture and selected-set digest.
+Only identity pins advance (`resolved.json`, `channeling.json`); every
+resolved case payload was checked unchanged before re-pinning. No fixture
+uses a fiber crystal under automatic selection, so no output arrays or
+tolerances change. The `eedl-fallback` entry stays historical.

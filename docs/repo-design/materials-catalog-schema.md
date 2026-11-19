@@ -78,6 +78,22 @@ beam_uvw = [0, 0, 1]
 B_ang2 = 0.3
 ```
 
+Crystal `texture` accepts `"single-crystal"` (the default) or `"fiber"`.
+A fiber requires `surface_hkl`: its reciprocal normal is the fiber axis,
+independent of the sample's later cut rotation or miscut. Candidate reflections
+are integer multiples of that primitive reciprocal direction, including both
+Friedel mates. Any explicit `hkl_families` must be parallel to it. An omitted
+family list permits the usual automatic yield-tolerance selection; texture
+does not fix an order count or change the tolerance.
+
+HOPG and the catalog's **pyrolytic h-BN** default declare `texture = "fiber"`
+with `surface_hkl = [0, 0, 1]`, so their automatic candidates are `(00l)`.
+Their scalar `B_ang2` is the axial B33 projection and is applied only to that
+domain. An ordered single-crystal h-BN flake needs separately sourced in-plane
+displacement data before enabling its in-plane reflections. Mosaic FWHM remains
+an independent orientation-spread parameter. See
+[reflection selection](../physics/materials/reflection-selection.md#fiber-texture).
+
 `hkl_families` is an emission set and requires `hkl_reason`; pin only when the sample is not equivalent to a single crystal or its `B_ang2` is valid only along the pinned direction. Do not pin to record the cut: `surface_hkl` does that, and its first non-extinct harmonic is the catalog primary reflection. Set `reference_hkl` (a positive multiple of `surface_hkl`) only when the conventional primary reflection is a higher harmonic; it never restricts emission.
 
 An amorphous medium supplies element number densities in atoms/Å³:

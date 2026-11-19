@@ -34,6 +34,7 @@ from ._cif import (
     crystals_crystal_to_crystal_info as crystals_crystal_to_crystal_info,
 )
 from ._cif import load_crystal_from_cif as load_crystal_from_cif
+from ._identity import reduce_indices
 from ._structure_factors import bonding_corrections
 from .atomic import (
     Z_TABLE,
@@ -175,6 +176,8 @@ def load_crystals(catalog=None):
             "mosaic_fwhm_deg": spec.mosaic_fwhm_deg,
             "bonding_dF": _bonding_table(spec),
             "bonding_source": _bonding_source(spec),
+            "texture": spec.texture,
+            "texture_axis_hkl": spec.cut if spec.texture == "fiber" else None,
         }
         for key, spec in catalog.crystals.items()
     }
@@ -944,15 +947,29 @@ def _reflection_families(crystal, E_ref_eV, B_ang2, use_henke, g_max_invang):
     Members share ``(|g|, |S(g)| exp(-W) / g^2)`` to rounding, the
     space-group-free grouping of :func:`dominant_reflections`. Returns
     ``{(|g|, metric): [(h, k, l), ...]}``.
+
+    Fiber texture retains only integer multiples of the primitive reciprocal
+    surface axis, before applying thermal factors. An invertible reciprocal
+    basis preserves collinearity: h B parallel a B iff h parallel a. Assumes
+    uniform grain azimuths and the catalog's axial coherent-line model; an
+    absent texture leaves the full single-crystal enumeration unchanged.
+    Source/limits: docs/physics/materials/reflection-selection.md#fiber-texture
+    (fiber candidate domain); basal axis gives (00l), either axis sign agrees.
+
+    Validation: reflection-yield-tolerance-selector
     """
     info = CRYSTALS[crystal]
     B = _reciprocal_basis(info["lattice"])
-    a_vecs = _direct_lattice_vectors(info["lattice"])
-
-    # exact per-axis index bounds: |h_i| <= g_max |a_i| / 2 pi
-    nmax = [int(np.floor(g_max_invang * np.linalg.norm(a) / (2.0 * np.pi))) for a in a_vecs]
-    grids = np.meshgrid(*(np.arange(-n, n + 1) for n in nmax), indexing="ij")
-    hkl = np.column_stack([G.ravel() for G in grids]).astype(float)
+    if info.get("texture") == "fiber":
+        axis = np.asarray(reduce_indices(info["texture_axis_hkl"]), dtype=float)
+        count = int(np.floor(g_max_invang / np.linalg.norm(axis @ B)))
+        hkl = np.arange(-count, count + 1)[:, None] * axis
+    else:
+        a_vecs = _direct_lattice_vectors(info["lattice"])
+        # exact per-axis index bounds: |h_i| <= g_max |a_i| / 2 pi
+        nmax = [int(np.floor(g_max_invang * np.linalg.norm(a) / (2.0 * np.pi))) for a in a_vecs]
+        grids = np.meshgrid(*(np.arange(-n, n + 1) for n in nmax), indexing="ij")
+        hkl = np.column_stack([G.ravel() for G in grids]).astype(float)
     g_vec = hkl @ B
     g_mag = np.linalg.norm(g_vec, axis=1)
     keep = (g_mag > 1e-9) & (g_mag <= g_max_invang)
@@ -1005,9 +1022,8 @@ def dominant_reflections(
     Set ``representatives_only`` to return one deterministic member per ranked
     family, useful when each family should appear once in a visualization.
 
-    NOTE: this ranks by the crystal STRUCTURE only. Texture constraints are
-    yours to impose -- e.g. HOPG must be restricted to (00l) by hand, since
-    its in-plane reflections are incoherent across fiber-textured grains.
+    Catalog fiber texture restricts candidates to reciprocal vectors parallel
+    to its surface axis before ranking: HOPG and pyrolytic h-BN use only (00l).
 
     Parameters
     ----------

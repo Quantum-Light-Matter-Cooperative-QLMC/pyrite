@@ -62,6 +62,33 @@ composition = {{ Si = 0.02205, O = 0.04410 }}
 """
 
 
+@pytest.mark.parametrize("texture", ['"powder"', '""', "true", "[]"])
+def test_catalog_rejects_unknown_crystal_texture(tmp_path, texture):
+    from pyrite.materials import MaterialConfigError, load_material_catalog
+
+    text = _minimal_catalog().replace("layers_per_cell = 2", f"texture = {texture}")
+    with pytest.raises(MaterialConfigError, match="crystals.mos2.texture"):
+        load_material_catalog(_write_catalog(tmp_path, text))
+
+
+def test_catalog_fiber_requires_reciprocal_axis_and_parallel_pins(tmp_path):
+    from pyrite.materials import MaterialConfigError, load_material_catalog
+
+    text = _minimal_catalog(material_rows='[materials.sample]\ncrystal = "mos2"').replace(
+        "layers_per_cell = 2", 'texture = "fiber"'
+    )
+    with pytest.raises(MaterialConfigError, match="requires surface_hkl"):
+        load_material_catalog(_write_catalog(tmp_path, text))
+    valid = text.replace("beam_uvw", "surface_hkl")
+    spec = load_material_catalog(_write_catalog(tmp_path, valid)).crystal("mos2")
+    assert spec.texture == "fiber" and spec.surface_hkl == (0, 0, 2)
+    invalid = valid.replace(
+        'texture = "fiber"', 'texture = "fiber"\nhkl_families = [[1,0,0]]\nhkl_reason = "test"'
+    )
+    with pytest.raises(MaterialConfigError, match="parallel to surface_hkl"):
+        load_material_catalog(_write_catalog(tmp_path, invalid))
+
+
 PER_BEAM_ENTRIES = (
     "{ energy_keV = 25.0, grid = { linspace = { start = 10.0, stop = 58.0, num = 17, "
     'endpoint = true } }, source = "derived" },\n'
@@ -2263,6 +2290,7 @@ def test_packaged_catalog_matches_independent_serialized_golden(serialized_catal
         assert surface_hkl == config["surface_hkl"]
         assert list(map(list, actual.hkl_list)) == config["hkl_list"]
         assert actual.hkl_reason == config["hkl_reason"]
+        assert actual.texture == config["texture"]
         reference = list(actual.reference_hkl) if actual.reference_hkl is not None else None
         assert reference == config["reference_hkl"]
         assert actual.layers_per_cell == config["layers_per_cell"]

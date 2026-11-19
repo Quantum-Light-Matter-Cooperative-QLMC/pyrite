@@ -675,7 +675,8 @@ def batch_means(case, transport, settings: AdaptiveSettings) -> dict[str, Any]:
     spectra on the final grids, normalized per electron, give a weighted
     batch-means standard error of the run's spectrum in each bin. Reported
     after the final reduction; never used to stop, since the line grid is
-    unknown while transport runs.
+    unknown while transport runs. After a measured reflection selection the
+    caller passes the selected case, so batches score the production set.
 
     Validation: adaptive-sample-size-stopping
     """
@@ -939,7 +940,10 @@ def attach_sampling(case, transport, output) -> None:
     sampling = dict(transport["adaptive_sampling"])
     precision = Precision.from_dict(transport["_adaptive_precision"])
     if precision.batch_means_band_eV is not None:
-        sampling["batch_means"] = batch_means(case, transport, precision)
+        from .lattice_share import selected_case
+
+        scored = selected_case(case, output.get("reflection_selection"))
+        sampling["batch_means"] = batch_means(scored, transport, precision)
     output["adaptive_sampling"] = sampling
 
 

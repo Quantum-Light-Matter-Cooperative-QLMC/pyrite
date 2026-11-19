@@ -216,22 +216,24 @@ def test_channeling_demo_and_off_profile_identities_are_unchanged():
     selection).
     #1297 re-mints the silicon pins for ``fourier-auto-v7`` (sorted warp-gather
     ES spreading).
+    #1301 re-mints every pin for ``measured-shell-cutoff-v7`` (fiber-texture
+    candidate domain; HOPG cases now select automatically).
     """
     sweep, settings, cases = _profile_cases("silicon", "channeling_demo")
     assert cases[0].line_quadrature == "bin-mean"
     assert [profiles.case_content_key(case) for case in cases] == [
-        "145f0fe4f1156529d360858b94d609afa01e90b2b4962474713462194665733b"
+        "c90218be9be87e5174bfb195c396260c3a6c00a39a2c0e5474a81766d18dc58b"
     ]
     assert profiles.named_profile_stem("silicon", catalog_profile="channeling_demo") == (
-        "silicon@channeling_demo-e68db413c2ec"
+        "silicon@channeling_demo-1e1ca671e28f"
     )
     identity = profiles.dataset_identity("silicon", settings, sweep)
     assert identity["parameter_sha256"] == (
-        "239276864bc6144a2bf14d65f54533bd2ca3690e4bc09f05a6562c267155e22b"
+        "9b9084aa6a51f3babc6a77b21d960b9b923cd935b60403bc8fe3f7d98f9b12e0"
     )
     sweep = material_sweep("hopg", catalog_profile="standard")
     settings = profiles.profile_run_settings(default_settings(), "standard", sweep=sweep)
     assert profiles.dataset_identity("hopg", settings, sweep)["parameter_sha256"] == (
-        "ac0bbcc74db416ac35cdfb5c678f2380fcad9c6d0b6fab6c9a77c8f6ca782872"
+        "fee957185ea0f6d2436df5f80334d217a5f934b0a1b5e7a2b647cfe13b9f05de"
     )
-    assert profiles.named_profile_stem("hopg") == "hopg@full-ac0bbcc74db4"
+    assert profiles.named_profile_stem("hopg") == "hopg@full-fee957185ea0"

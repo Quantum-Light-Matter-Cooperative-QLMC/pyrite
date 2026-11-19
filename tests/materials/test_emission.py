@@ -350,6 +350,7 @@ def test_mapping_overrides_and_ambiguous_default(catalog):
                 catalog.crystals["hopg"],
                 surface_hkl=None,
                 beam_uvw=(0, 0, 1),
+                texture="single-crystal",
             ),
         },
     )

@@ -22,7 +22,7 @@ from pyrite._cxr_grid_policy import (
 )
 from pyrite.energy_grid import convergence_case as cc
 from pyrite.energy_grid.convergence import spectrum_observables
-from pyrite.materials.crystal import HBARC_EV_ANG
+from pyrite.materials.crystal import HBARC_EV_ANG, dominant_reflections
 from pyrite.montecarlo.runner.cxr_grid import resolve_cxr_grid
 from pyrite.montecarlo.spectrum import coherent_windows as cw
 from pyrite.montecarlo.spectrum.cxr_seeds import sincsq_upper_tail_bound
@@ -825,7 +825,10 @@ def test_the_analytic_bunch_factor_switches_to_the_grouped_step_above_its_energy
 def tiny():
     """Ne=3 through 1 um of HOPG at 30 keV, a 100 fs bunch on a finite footprint."""
     case = cc.build_ladder_case("hopg", 30.0, 5.0, 45.0, thickness_ang=1.0e4, n_electrons=3, seed=0)
-    case = dict(case)
+    # The window probes pin the historical basal pair (#1301): fiber HOPG now
+    # selects automatically, and four basal rows exceed the windowed budget.
+    case = {key: value for key, value in case.items() if key != "reflection_selection"}
+    case["hkl_list"] = dominant_reflections("hopg", n_families=2)
     case["bunch_length_fs"] = 100.0
     ladder = cc.CaseLadder(case, transport_core="lockstep")
     return case, ladder

@@ -132,7 +132,11 @@ def iter_reflection_shells(
     Shell ``k`` is the set at cutoff ``G_k`` less the set at ``G_{k-1}``, in
     :func:`~pyrite.materials.crystal.dominant_reflections` order, so a search
     that stops at ``G`` never enumerates past it. The shells and their union
-    equal :func:`reflection_shells` at the same cap.
+    equal :func:`reflection_shells` at the same cap. Fiber-textured crystals
+    enumerate only their fiber-axis domain; zero-metric (extinct) families
+    are dropped, and an empty domain below the cap yields no shells.
+
+    Validation: reflection-yield-tolerance-selector
     """
     if not 0.0 < g_max_invang <= F0_RANGE_INVANG:
         raise ValueError(f"g_max_invang must lie in (0, {F0_RANGE_INVANG:.1f}] 1/Angstrom")
@@ -141,7 +145,11 @@ def iter_reflection_shells(
     # production enumeration; a tiny first cutoff holding only forbidden
     # families would otherwise keep them.
     floor = 1e-9 * max(
-        m for _, m in _reflection_families(crystal, 1000.0, B_ang2, False, min(g_max_invang, 8.0))
+        (
+            m
+            for _, m in _reflection_families(crystal, 1000.0, B_ang2, False, min(g_max_invang, 8.0))
+        ),
+        default=0.0,
     )
     seen: set = set()
     upper = 0.0
@@ -153,7 +161,7 @@ def iter_reflection_shells(
         members = [
             hkl
             for (_, m), hkls in sorted(families.items(), key=lambda kv: -kv[0][1])
-            if m >= floor
+            if m > 0.0 and m >= floor
             for hkl in sorted(hkls)
             if hkl not in seen
         ]
@@ -593,6 +601,24 @@ def selected_line_spectrum(
     return spectrum, record
 
 
+def _selected_set_record(radiator, outcome):
+    """Canonical selected-set identity, including the candidate texture domain.
+
+    Validation: reflection-yield-tolerance-selector
+    """
+    import hashlib
+    import json
+
+    info = CRYSTALS[radiator["crystal"]]
+    texture = dict(
+        texture=info.get("texture", "single-crystal"),
+        texture_axis_hkl=info.get("texture_axis_hkl"),
+    )
+    payload = dict(hkl_list=sorted(outcome.hkl_list), **texture)
+    digest = hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode())
+    return dict(**texture, selected_set_sha256=digest.hexdigest())
+
+
 def _line_selection(case, evaluate, grid, continuum, reference_evaluate, histories):
     """Pruned case, record, shell-summed spectrum and whether production rescoring is due."""
     from ..._backend import _to_cpu
@@ -644,6 +670,7 @@ def _line_selection(case, evaluate, grid, continuum, reference_evaluate, histori
                 reflections_per_call=per_call[layer],
                 tail_fraction=outcome.tail_fraction if np.isfinite(outcome.tail_fraction) else None,
                 converged=outcome.converged,
+                **_selected_set_record(radiator, outcome),
                 **_metric_record(outcome),
             )
             for (layer, radiator), outcome in zip(radiators, outcomes, strict=True)

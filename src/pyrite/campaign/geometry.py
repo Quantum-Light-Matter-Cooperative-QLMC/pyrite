@@ -175,7 +175,9 @@ def layer_radiator(layer: LayerSpec, n_families: int = 4):
 def crystal_params(material: str, n_families: int = 4) -> dict[str, Any]:
     """Fixed crystallography for a material: composition, the dominant
     reflections, exactly one direct beam axis [uvw] or reciprocal surface (hkl),
-    and the isotropic B-factor."""
+    and the Debye--Waller B (isotropic, or the fiber-axis B33 for fiber
+    texture). Fiber crystals rank only fiber-axis families, so HOPG/h-BN
+    ``n_families=4`` gives (002)--(008)."""
     crystal_key = material
     if material in CATALOG.materials:
         crystal_key = CATALOG.material(material).crystal_key

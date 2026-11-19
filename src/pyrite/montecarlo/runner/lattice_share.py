@@ -121,6 +121,27 @@ def continuum_case(case: Mapping[str, Any], reflection_selection: Mapping | None
     }
 
 
+
+def selected_case(case: Mapping[str, Any], reflection_selection: Mapping | None):
+    """``case`` scoring exactly the selected reflections, in lines and continuum.
+
+    Re-evaluations after a measured selection (adaptive batch means) must
+    score the set the production spectra scored, not the build-time families.
+    """
+    out = dict(continuum_case(case, reflection_selection))
+    if reflection_selection is None:
+        return out
+    if case.get("layer_radiators") is None:
+        out["hkl_list"] = scored_reflections(out, None)
+        return out
+    layers = [
+        None if radiator is None else dict(radiator, hkl_list=scored_reflections(out, layer))
+        for layer, radiator in enumerate(case["layer_radiators"])
+    ]
+    out["layer_radiators"] = layers
+    out["hkl_list"] = next(r for r in layers if r is not None)["hkl_list"]
+    return out
+
 def _uncorrected_reason(case: Mapping[str, Any], layer: int | None) -> str | None:
     """:func:`skip_reason` before the scored set is known (a selection in progress)."""
     if case.get(LATTICE_SHARE_CASE_KEY, True) is False:

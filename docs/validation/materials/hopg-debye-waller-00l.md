@@ -42,7 +42,13 @@ $$
 =\exp\left(-\frac{2\pi^2U_{33}l^2}{c^2}\right),
 $$
 
-the same equivalence used for `pdte2-debye-waller-001` and `2h-tas2-debye-waller-002`. Since `g || c` for the pinned family, `U33` is the only tensor component the catalog's reflections probe, and the scalar reduction is exact in that direction up to the site-to-site spread above.
+the same equivalence used for `pdte2-debye-waller-001` and `2h-tas2-debye-waller-002`. Since `g || c` for every fiber-axis family, `U33` is the only tensor component the catalog's reflections probe, and the scalar reduction is exact in that direction up to the site-to-site spread above.
+
+Since #1301, `texture = "fiber"` replaces the `(002)/(004)` pins. Automatic
+selection may retain higher basal orders, but every candidate remains `(00l)`;
+B33 is never applied to an in-plane reciprocal vector by this selector.
+`mosaic_fwhm_deg = 0.8` is unchanged. See
+[the candidate-domain model](../../physics/materials/reflection-selection.md#fiber-texture).
 
 ## Specimen state
 

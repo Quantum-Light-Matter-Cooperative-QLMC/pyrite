@@ -131,6 +131,27 @@ def _optional_text(value: object, path: str, errors: _Errors) -> str | None:
     return value.strip()
 
 
+def _crystal_texture(row, surface, families, path, errors):
+    """Validate texture before constructing a crystal, retaining grouped errors.
+
+    Fiber texture needs a reciprocal axis; pinned families must lie on it.
+
+    Validation: reflection-yield-tolerance-selector
+    """
+    texture = row.get("texture", "single-crystal")
+    if texture not in ("single-crystal", "fiber"):
+        errors.add(f"{path}.texture", "must be 'single-crystal' or 'fiber'")
+        return "single-crystal"
+    if texture == "fiber":
+        if surface is None:
+            errors.add(f"{path}.texture", "fiber texture requires surface_hkl")
+            return "single-crystal"
+        if any(np.any(np.cross(hkl, surface)) for hkl in families):
+            errors.add(f"{path}.hkl_families", "fiber families must be parallel to surface_hkl")
+            return "single-crystal"
+    return texture
+
+
 def _parse_crystals(raw: object, errors: _Errors, *, source: Path) -> dict[str, CrystalSpec]:
     table = _table(raw, "crystals", errors)
     if table is None:
@@ -162,6 +183,7 @@ def _parse_crystals(raw: object, errors: _Errors, *, source: Path) -> dict[str, 
         "reference_hkl",
         "layers_per_cell",
         "measured_structure_factors",
+        "texture",
     }
     required = {"cif", "validation_id", "formula", "B_ang2"}
     for key, value in table.items():
@@ -239,6 +261,7 @@ def _parse_crystals(raw: object, errors: _Errors, *, source: Path) -> dict[str, 
                 errors.add(f"{path}.hkl_reason", "is required when hkl_families is pinned")
         elif reason_raw is not None:
             errors.add(f"{path}.hkl_reason", "requires hkl_families")
+        texture = _crystal_texture(row, surface, families, path, errors)
         reference = _reference_hkl(row, surface, path, errors)
         layers_raw = row.get("layers_per_cell")
         layers = None
@@ -277,6 +300,7 @@ def _parse_crystals(raw: object, errors: _Errors, *, source: Path) -> dict[str, 
                 layers_per_cell=layers,
                 info=info,
                 measured_structure_factors=measured,
+                texture=texture,
                 reference_hkl=reference,
             )
     return out

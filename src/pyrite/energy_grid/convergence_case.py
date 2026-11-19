@@ -146,6 +146,13 @@ class CaseLadder:
         self.fingerprint = segment_fingerprint(self.segments)
         self._segments_device = runner._segments_on_device(self.segments)
         self._brem_wide = None
+        if case.get("reflection_selection") is not None and not self.coherent:
+            # Freeze the measured selection once on the production grid, so every
+            # rung scores the production set in lines and continuum alike.
+            from ..montecarlo.runner.lattice_share import selected_case
+
+            record = runner._spectrum_case(case, self.transport).get("reflection_selection")
+            self.case = selected_case(case, record)
 
     @property
     def bandwidth_eV(self) -> tuple[float, float]:

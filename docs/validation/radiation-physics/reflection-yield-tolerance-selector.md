@@ -434,11 +434,200 @@ Evidence (`qlmc:~/pyrite-1281/out-cal`, `out-stab`; RTX 5080, code
 | WS₂ 30 keV, 15° | 4096 | 0, 1 | 1024 | G16 / 6,018 | yes |
 | WS₂ 100 keV, 57° | 4096 | 0, 1 | 1024 | G16 / 6,018 | yes |
 
-Tail estimates agree within about 3 % between arms. HOPG and h-BN pin
-catalog (00l) sets and never run the selector. Measured cost on MoS₂ 30 keV
+Tail estimates agree within about 3 % between arms. At v6, HOPG and h-BN
+pinned catalog (00l) sets and never ran the selector; since v7 they select
+on a fiber-texture domain (below). Measured cost on MoS₂ 30 keV
 (709,999 segments at N = 8192): selection ≈ 12 s + 31 ms per scored history;
 production ≈ 28 ms per history. The automatic-axis generation is
 `measured-shell-cutoff-v6`.
+
+### Fiber-texture candidate domain (#1301, v7)
+
+**Claim.** For a catalog crystal with `texture = "fiber"` and primitive
+reciprocal axis $a$ (reduced `surface_hkl`), the selector's candidate set is
+$\{na : n\in\mathbb Z\setminus\{0\},\ \lvert naA\rvert\le G_{\max}\}$, filtered
+by the existing structure-factor metric floor. Shells, the geometric tail,
+the net-metric continuum shares and the reconstructed continuum-share set all
+use that one domain; the estimator and tolerance are unchanged.
+
+**Assumptions.** Uniform random grain azimuths about $a$ (HOPG; pyrolytic,
+turbostratic h-BN by user decision 2026-11-18), so only $g\parallel aA$ remains
+a coherent line in the catalog's axial model. The scalar `B_ang2` is then the
+axial projection (B33 for $a=(001)$), applied only to $g\parallel c$
+(`hopg-debye-waller-00l`, `hbn-debye-waller-00l`). Mosaic FWHM is unchanged.
+
+**Derivation.** With nonsingular reciprocal basis $A$,
+$hA=\lambda aA \iff (h-\lambda a)A=0 \iff h=\lambda a$. For primitive integer
+$a$, integer $h$ on that line are exactly $h=na$, $n\in\mathbb Z$: if
+$h=\lambda a$ with $\lambda=p/q$ reduced, $q$ divides every $a_i$, so $q=1$.
+Collinearity is therefore exact in Miller space for any (non-orthogonal)
+cell; no Cartesian angle tolerance enters. $\lvert naA\rvert=\lvert n\rvert\lvert aA\rvert$
+gives the count $\lfloor G_{\max}/\lvert aA\rvert\rfloor$.
+
+**Limits.** (i) Single-crystal texture: the enumeration is the historical
+full grid, unchanged. (ii) HOPG/h-BN (P6₃/mmc): odd $l$ is extinct by the
+structure factor, so at the default 2 Å⁻¹ shell width the first two shells are exactly the retired
+$(00\bar2),(002)$ and $(00\bar4),(004)$ pins. (iii) A cap below $\lvert aA\rvert$
+gives no candidates; the metric-floor maximum defaults to zero instead of
+raising.
+
+**Identity.** `CXR_REFLECTION_SELECTION_MODEL = measured-shell-cutoff-v7`.
+Each radiator record carries `texture`, `texture_axis_hkl` and
+`selected_set_sha256` over the sorted selected set and texture domain;
+dataset/case identities carry `crystal_texture` for fiber crystals.
+
+**Evidence (job 13676, qlmc RTX 5080, code `ec0365c5c`, intrinsic spectra,
+4096 histories, tilt 15°).** Frozen pre-change transports scored over every
+allowed basal shell to the form-factor cap; the existing net-metric stop
+replayed on the measured rows:
+
+| Case | Selector stop | Tail | Retired-pin omission of full basal yield |
+|---|---|---:|---:|
+| cleo_sub HOPG 30 keV | (0010), G = 10 Å⁻¹ | 1.02e-4 | 0.758 % |
+| cleo_sub HOPG 1 MeV | (008), G = 8 Å⁻¹ | 1.25e-4 | 0.102 % |
+| bells_45deg HOPG 30 keV | (006), G = 6 Å⁻¹ | 3.34e-4 | ≈100 % (1 − 1.6e-9), but full basal yield is 2.3e-18 against a 5.7e-7 in-band background: negligible |
+
+These are paired finite-population measurements on these scenes, not an
+omitted-yield bound.
+
+**Anchors.** `tests/montecarlo/runner/test_fiber_reflection_selection.py::test_frozen_fiber_shells_select_and_reconstruct_the_same_basal_set`
+replays the selector on the job-13676 shell rows
+(`tests/data/reflection_selection_fiber_1301.json`) and pins the stop, tail,
+texture record and reconstructed set.
+`tests/materials/test_crystal_texture.py` pins the (00l)-only domain, the
+retired pins as the first two shells, a non-orthogonal axis, and an unchanged
+single-crystal enumeration.
+
+### Fiber-texture re-verification (v7, #1301, 2026-11-18)
+
+This is a fresh-context review. The verifier derived the result below from the
+claim statement before reading the `_reflection_families` fiber branch.
+
+**1. Collinearity in Miller space.** Write $\mathbf g(h)=hA$, where $h$ is an
+integer row vector and the rows of $A$ form the reciprocal basis, with
+$\det A\neq0$. Then $hA\parallel aA$ means $hA=\lambda aA$ for some real
+$\lambda$, which is equivalent to $(h-\lambda a)A=0$. Because $A$ is
+invertible, this holds exactly when $h=\lambda a$. The argument uses neither
+orthogonality nor a metric, so an oblique or triclinic cell needs no angle
+tolerance.
+
+**2. Primitive axis, integer multiples.** Let $a$ be primitive, so
+$\gcd(a_1,a_2,a_3)=1$. By Bézout's identity there are integers $c_i$ with
+$\sum_i c_ia_i=1$. Hence $\lambda=\sum_i c_i(\lambda a_i)=\sum_i c_ih_i$ is an
+integer, and the integer points on the line are exactly
+$\{na:n\in\mathbb Z\}$. Since
+$\lvert naA\rvert=\lvert n\rvert\,\lvert aA\rvert$, the nonzero candidates
+inside the cap are $0<\lvert n\rvert\le\lfloor G_{\max}/\lvert aA\rvert\rfloor$.
+The set is symmetric in $n$, so $\pm a$ give the same domain. If the axis
+were not primitive, for example $2a$, only even multiples would remain and
+half the line would be lost. The reduction step is therefore essential.
+
+**3. P6₃/mmc $(00l)$ extinctions.** Take the catalog sites of graphite (C at
+$z=0,\tfrac12,0,\tfrac12$) and of h-BN (B and N each at $z=0,\tfrac12$). For
+$(00l)$, each species has phase sum
+$\sum_j e^{2\pi i l z_j}=1+e^{i\pi l}$, which is $0$ for odd $l$ and $2$
+for even $l$. With anomalous $f',f''$ included, a species' form factor still
+multiplies a vanishing sum. Odd $l$ is therefore extinct for every energy.
+The fiber domain $\{(0,0,n)\}$ thus keeps only $l=\pm2,\pm4,\dots$ after the
+metric floor. The orders sit at $\lvert\mathbf g_{00l}\rvert=2\pi l/c$, which
+is $0.936\,l$ Å⁻¹ for HOPG ($c=6.711$ Å) and $0.943\,l$ Å⁻¹ for h-BN
+($c=6.661$ Å). With the default $2$ Å⁻¹ shell width, the first two non-empty
+shells are therefore exactly $\{(00\bar2),(002)\}$ and
+$\{(00\bar4),(004)\}$, the retired pins. One shell holds one order until
+$l\approx30$.
+
+**4. Thermal factor.** All candidates satisfy $\mathbf g\parallel\mathbf c^*$.
+The scalar factor
+$\exp[-B(\lvert\mathbf g\rvert/4\pi)^2]=\exp(-B\,l^2/4c^2)$ then equals the
+$B_{33}$ form in `hopg-debye-waller-00l` and `hbn-debye-waller-00l`. Neither
+material ever receives $B_{33}$ on an in-plane vector. This holds because the
+domain is fixed before the Debye–Waller weight is applied.
+
+**5. Comparison with the implementation.** The comparison used the
+uncommitted diff on `issue-1301-fiber-reflections`.
+
+| Item | Derived | Code | Result |
+|---|---|---|---|
+| Axis | primitive $a$ from `surface_hkl` | `load_crystals`: `texture_axis_hkl = spec.cut`; `cut` reduces `surface_hkl`, which fiber requires; `_reflection_families` reduces again | match; `(0,0,2)` gives `(0,0,1)` |
+| Domain | $na$, $0<\lvert n\rvert\le\lfloor G_{\max}/\lvert aA\rvert\rfloor$ | `np.arange(-count, count+1)[:, None] * axis`, then the same `0<\lvert g\rvert\le G_{\max}` keep | match |
+| Order | domain before DW and metric | `hkl` is built before `g_vec`; DW and `metric` follow unchanged | match |
+| Empty cap | no candidates, no error | `max(..., default=0.0)` and the `m > 0.0` filter in `iter_reflection_shells` | match; for single crystals, `m > 0` is redundant when the floor is positive, so behavior is unchanged |
+| One domain | shells, tail, shares and reconstruction | all go through `iter_reflection_shells` and then `_reflection_families`, keyed by `CRYSTALS[crystal]`: `select_case_reflections` (shell yields and `continuum.share`), `lattice_share.scored_reflections` (rebuild) and `reflection_shells`/`dominant_reflections` | match |
+| Identity | texture and axis in identities | `_selected_set_record` hashes the sorted `hkl_list` with texture and axis; `_structure_factor_identity` adds `crystal_texture`; `CXR_REFLECTION_SELECTION_MODEL` is `v7` | match |
+| Validation | fiber needs a surface axis, and pins must be parallel | `_crystal_texture` and `CrystalSpec.__post_init__` use `np.cross(hkl, surface) == 0`, which is exact for integers and equivalent by step 1 | match |
+
+**6. Independent probes.** These live in
+`scratch/verify1301/probe.py` and `probe2.py`, which are not committed. For
+the comparison, the probe builds its own reciprocal basis from the lattice
+parameters. It scans the full integer grid, keeps vectors whose Cartesian
+cross product with $aA$ vanishes, and computes its own phase sums.
+
+- HOPG and h-BN at $G_{\max}=12$: the probe finds 24 parallel vectors. Its
+  even-$l$ subset equals the union of `iter_reflection_shells`. The first
+  three shells are $\pm2$, $\pm4$ and $\pm6$ at uppers 2, 4 and 6.
+- Hypothetical axes on the HOPG cell: for `(2,2,0)`, `(1,0,0)`, `(1,1,2)`,
+  `(2,-1,3)` and `(0,0,2)`, every vector the implementation returns lies in
+  the probe's parallel set. The only vectors it omits are $(00l)$ with odd
+  $l$, $\pm(2,\bar1,3)$ and $\pm(3,6,\bar3)$. Each of these has phase sum
+  $0$, so it is extinct.
+- Triclinic cell ($3.1, 4.3, 5.7$ Å; $81^\circ, 97^\circ, 112^\circ$) with
+  axis `(1,2,-1)`: the implementation returns $\pm1,\pm2,\pm4$ multiples. The
+  probe's set adds $\pm3$, which is extinct for this basis.
+- Frozen job-13676 rows: the probe re-implemented the net-metric stop from
+  §3 and the net-metric section, using
+  $r=\max(\lvert s_k/s_{k-1}\rvert,\lvert s_{k-1}/s_{k-2}\rvert)$,
+  denominator $\sum s_j+$ background, and two decaying shells. It reproduces
+  the recorded cutoffs, 10, 8 and 6 Å⁻¹, with bit-identical tails
+  `1.0236768e-4`, `1.2542166e-4` and `3.3350115e-4`. The retired-pin
+  omissions recomputed from the rows are 0.7581 % and 0.1016 %, matching the
+  table.
+
+**7. Findings. None changes the claimed physics.**
+
+1. *Markers.* The bullet names three functions as code owners, but they
+   carry no `Validation: reflection-yield-tolerance-selector` marker:
+   `materials/_parse.py::_crystal_texture` (line 134),
+   `montecarlo/runner/reflection_cutoff.py::iter_reflection_shells` (line
+   124, which also carries the new `m > 0` domain filter) and
+   `::_selected_set_record` (line 600). Of the named owners, only
+   `crystal.py::_reflection_families` (line 944) has one.
+   `tests/dev/test_validation_ledger.py` passes because it reads the row's
+   `**Code:**` field and not this bullet. The task owner should either add
+   the markers or move the names into the `**Code:**` field.
+2. *bells_45deg row.* In the table, the omission column for this row gives
+   only the absolute yield. The frozen record
+   (`omitted_fraction_by_pins = 0.99999999839`) shows that the retired pins
+   omitted essentially **all** of that scene's basal yield, because the
+   $(002)$ in-band yield is $0$ and the $(004)$ yield is $3.7\times10^{-27}$.
+   The yield is still negligible next to the $5.7\times10^{-7}$ background.
+   The wording should give both numbers.
+3. *Shell-width dependence.* "The first two shells are exactly the retired
+   pins" holds at the default $2$ Å⁻¹ width. That is the width used by the
+   anchors and by production, but the statement could say so.
+4. *Fixed-count routes.* For routes outside the selector, `crystal_params`
+   and `dominant_reflections(n_families=4)` now give
+   $(002),(004),(006),(008)$ for HOPG and h-BN, where the pins gave two
+   families. This is consistent with "candidate domain before selection",
+   but no page states it.
+5. *Robustness (direct construction only).* `CrystalSpec(surface_hkl=(0,0,0),
+   texture="fiber")` passes `__post_init__`. The catalog decoder rejects a
+   zero vector, but this construction would overflow in
+   `int(np.floor(g_max / 0))`.
+6. *Identity sign.* `texture_axis_hkl` records the signed axis. The spellings
+   $(0,0,1)$ and $(0,0,\bar1)$ produce the same set under different digests.
+   This can only over-invalidate a cache.
+
+**8. Tests run.** The command was
+`uv run pyrite-dev test tests/materials/test_crystal_texture.py tests/montecarlo/runner/test_fiber_reflection_selection.py tests/dev/test_validation_ledger.py tests/campaign/test_numerics_groups.py`,
+with 45 passed.
+
+**9. Verdict (v7).** `rederived`. The fiber-texture candidate domain, its
+reduction to the first two shells for P6₃/mmc, the B33 scope and the single
+shared domain match the independent derivation. The frozen-transport replay
+reproduces the anchored stops exactly. The anchors are green locally, but no
+CI run was observed for them. Once that CI run is observed, the row can move
+to `anchored`. Findings 1 and 2 should be addressed in wording or markers
+before the task owner applies the status. No human sign-off is implied.
 
 ## Historical adjudication (2026-11-13)
 
