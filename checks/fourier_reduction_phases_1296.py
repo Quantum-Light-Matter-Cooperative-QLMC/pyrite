@@ -18,6 +18,10 @@ the ``CAPTURE`` (default 3) most common line count, evenly spaced over the run,
 are saved as ``flush-<i>.npz`` (``E_res``, ``a_width``, ``weight``, ``axis``)
 for ``bench``. Record: ``capture.json``.
 
+``selections`` in the record keeps each reflection selection's mode
+(``reference_quadrature``: ``band-mass`` or ``bin-mean``; ``rescored``), band,
+cutoff, selected-set digest and shell yields (#1326).
+
 ``PROBE_PROFILE=timers`` adds synchronized inclusive timers around the
 batched CXR route (selection vs production pass, tables, per-block
 kinematics/escape/polarization, the incoherent line prologue, flushes;
@@ -140,6 +144,7 @@ def capture(material, e0_kev, tilt_deg, histories, out_dir):
         return res
 
     fc.cuda_fourier_bin_mean_reduce = timed
+    selections = _record_selections()
     mode = os.environ.get("PROBE_PROFILE", "")
     splits = _install_split_timers() if mode == "timers" else None
     timings = []
@@ -179,12 +184,48 @@ def capture(material, e0_kev, tilt_deg, histories, out_dir):
         calls=calls,
         saved=saved,
         timings=timings,
+        selections=selections,
         profile_mode=mode or None,
         split_timers=None if splits is None else splits.totals(),
         profile_tables=profile_tables,
     )
     _write(out / "capture.json", record)
     print(json.dumps({k: v for k, v in record.items() if k not in ("calls", "timings")}))
+
+
+def _record_selections():
+    """Wrap ``_line_selection`` to keep each selection's mode, cutoff and shell yields (#1326)."""
+    from pyrite.montecarlo.runner import reflection_cutoff as rc
+
+    records = []
+    real = rc._line_selection
+
+    def recorded(*args, **kwargs):
+        out = real(*args, **kwargs)
+        record, separate = out[1], out[3]
+        records.append(
+            dict(
+                reference_quadrature=record.get("reference_quadrature"),
+                reference_band_eV=record.get("reference_band_eV"),
+                selection_histories=record.get("selection_histories"),
+                rescored=separate,
+                radiators=[
+                    dict(
+                        crystal=r["crystal"],
+                        cutoff_invang=r["cutoff_invang"],
+                        reflections=r["reflections"],
+                        converged=r["converged"],
+                        selected_set_sha256=r["selected_set_sha256"],
+                        shell_yields=[x["yield_"] for x in r["shells"]],
+                    )
+                    for r in record["radiators"]
+                ],
+            )
+        )
+        return out
+
+    rc._line_selection = recorded
+    return records
 
 
 #: Synchronized inclusive timers around the batched CXR route (``timers``
