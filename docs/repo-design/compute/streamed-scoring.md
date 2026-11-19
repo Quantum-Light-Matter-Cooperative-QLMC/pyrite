@@ -118,7 +118,9 @@ grows with the electron count. Above `GridSpillPolicy.threshold_bytes`
 so far), `runner/line_grid_spill.py` moves it to a per-run scratch directory
 under the output `cache/line-grid-spill/`, and later blocks are written there
 as they arrive (#1141). Host memory is then bounded independent of N; disk is
-not.
+not. `KernelTuning.stream_spill_dir` / `stream_spill_mib` (#1283) set the
+policy's directory and threshold from `pyrite.simulate`
+(`transport_options.stream_spill_policy`); unset, the default applies.
 
 - **Blocks.** Each block's sinc samples are two raw arrays, written before the
   block commits, so a block replayed after an allocator OOM is never counted

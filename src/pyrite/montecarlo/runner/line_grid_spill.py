@@ -30,6 +30,7 @@ import itertools
 import os
 import shutil
 import socket
+import tempfile
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
@@ -73,6 +74,18 @@ class GridSpillPolicy:
         from ...console.outputs import output_dir
 
         return output_dir("cache") / SPILL_DIRNAME
+
+    def check_writable(self) -> None:
+        """Create :meth:`parent` and refuse it with ``ValueError`` if unwritable."""
+        parent = self.parent()
+        try:
+            parent.mkdir(parents=True, exist_ok=True)
+            Path(tempfile.mkdtemp(prefix=".probe-", dir=parent)).rmdir()
+        except OSError as error:
+            raise ValueError(
+                f"streamed line-grid spill directory {parent} is not writable "
+                f"(KernelTuning.stream_spill_dir): {error}"
+            ) from error
 
 
 @dataclass(frozen=True)

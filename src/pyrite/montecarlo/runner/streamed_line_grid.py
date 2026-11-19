@@ -152,7 +152,7 @@ class BlockGridEvidence:
             raise LineGridSpillError(
                 f"streamed line-grid evidence needs about {need / 1024**3:.1f} GiB more "
                 f"scratch disk in {store.root}, but only {free / 1024**3:.1f} GiB is free; "
-                "free space or point the spill directory at a larger file system"
+                "free space or set KernelTuning.stream_spill_dir to a larger file system"
             )
 
     def _start_spill(self, seen) -> None:

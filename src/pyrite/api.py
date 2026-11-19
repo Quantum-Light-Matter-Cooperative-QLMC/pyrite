@@ -48,6 +48,7 @@ from .montecarlo.runner.transport_options import (
     run_progress,
     stream_block_electrons,
     stream_memory_mib,
+    stream_spill_policy,
     transport_tuning,
 )
 from .montecarlo.spectrum import (
@@ -366,6 +367,9 @@ def simulate(
     if request.executor is None:
         block = stream_block_electrons(resolved_numerics)
         memory = stream_memory_mib(resolved_numerics)
+        spill = stream_spill_policy(resolved_numerics)
+        if spill is not None:
+            spill.check_writable()
         with transport_tuning(resolved_numerics, streaming=True), run_progress(progress):
             if block is None and memory is None:
                 output = run_case(case, transport_core=resolved_numerics.transport_core)
@@ -379,7 +383,7 @@ def simulate(
                     else MemoryBlockSizer(memory, resolved_numerics.resolved_execution.transport)
                 )
                 output = run_case_streamed(
-                    case, sizing, transport_core=resolved_numerics.transport_core
+                    case, sizing, transport_core=resolved_numerics.transport_core, spill=spill
                 )
     else:
         from .execution._simulation import execute_simulation

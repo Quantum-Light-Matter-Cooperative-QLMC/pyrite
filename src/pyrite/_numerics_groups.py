@@ -9,6 +9,7 @@ v1 compatibility window; no new case schema is introduced here.
 from __future__ import annotations
 
 import math
+import os
 from dataclasses import dataclass, field
 from typing import Literal
 
@@ -155,6 +156,14 @@ class ExecutionConfig:
     electron measured on a small first block, and scales any unset
     ``scratch_mib`` and ``electron_batch`` with the block. It excludes
     ``stream_block_electrons`` and never enters case identity.
+    ``stream_spill_dir`` (experimental, #1283; ``None``: the output
+    ``cache/line-grid-spill/``) and ``stream_spill_mib`` (experimental;
+    ``None``: 2048 MiB; ``0``: always) choose where, and above how many MiB of
+    held or projected evidence, the streamed automatic line-grid pass spills
+    to disk. They require ``stream_block_electrons`` or ``stream_memory_mib``,
+    leave the grid bitwise unchanged and never enter case identity. A path is
+    stored as ``str``; ``pyrite.simulate`` creates it and refuses an
+    unwritable one before transport.
     """
 
     transport_core: str = "auto"
@@ -165,6 +174,8 @@ class ExecutionConfig:
     cxr_energies_per_block: int | None = None
     stream_block_electrons: int | None = None
     stream_memory_mib: int | None = None
+    stream_spill_dir: str | None = None
+    stream_spill_mib: int | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.transport_core, str) or not self.transport_core:
@@ -175,6 +186,7 @@ class ExecutionConfig:
                 raise ValueError(f"{name} must be a positive integer or None")
         if self.stream_block_electrons is not None and self.stream_memory_mib is not None:
             raise ValueError("stream_block_electrons and stream_memory_mib are exclusive")
+        self._check_spill()
         if not isinstance(self.transport, TransportKernelTuning):
             raise TypeError("transport must be a TransportKernelTuning")
         for name, allowed in (
@@ -185,18 +197,36 @@ class ExecutionConfig:
             if value is not None and (type(value) is not int or value not in allowed):
                 raise ValueError(f"{name} must be one of {allowed} or None")
 
+    def _check_spill(self) -> None:
+        directory, mib = self.stream_spill_dir, self.stream_spill_mib
+        if mib is not None and (type(mib) is not int or mib < 0):
+            raise ValueError("stream_spill_mib must be a non-negative integer or None")
+        if directory is not None:
+            if not isinstance(directory, (str, os.PathLike)) or not os.fspath(directory):
+                raise ValueError("stream_spill_dir must be a nonempty path or None")
+            object.__setattr__(self, "stream_spill_dir", os.fspath(directory))
+        streaming = self.stream_block_electrons is not None or self.stream_memory_mib is not None
+        if (directory is not None or mib is not None) and not streaming:
+            raise ValueError(
+                "stream_spill_dir and stream_spill_mib require stream_block_electrons "
+                "or stream_memory_mib"
+            )
+
     def spectrum_launch_default(self) -> bool:
         """True when both CXR launch controls keep the built-in default."""
         return self.cxr_threads is None and self.cxr_energies_per_block is None
 
     def __setstate__(self, state: dict[str, object]) -> None:
         # Pickles from before #776 carry no ``transport`` entry, before #825 no
-        # CXR launch controls, before #865/#868 no streaming controls.
+        # CXR launch controls, before #865/#868 no streaming controls, before
+        # #1283 no spill controls.
         state.setdefault("transport", TransportKernelTuning())
         state.setdefault("cxr_threads", None)
         state.setdefault("cxr_energies_per_block", None)
         state.setdefault("stream_block_electrons", None)
         state.setdefault("stream_memory_mib", None)
+        state.setdefault("stream_spill_dir", None)
+        state.setdefault("stream_spill_mib", None)
         self.__dict__.update(state)
 
 

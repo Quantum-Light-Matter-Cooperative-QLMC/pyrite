@@ -339,6 +339,7 @@ def run_case_streamed(
     block_electrons: Any,
     *,
     transport_core: str = "auto",
+    spill: Any = None,
 ) -> dict[str, Any]:
     """Opt-in live streamed form of :func:`.run_case` for additive spectra (#611).
 
@@ -347,8 +348,9 @@ def run_case_streamed(
     on the per-electron/CUDA core, scores each block as soon
     as it finishes and releases it. A ``line_grid_policy`` grid is first
     resolved by a transport pass of its own
-    (:func:`.streamed_line_grid.resolve_streamed_line_grid`) unless the speed
-    cache holds it. The spectra equal :func:`.run_case`'s up to
+    (:func:`.streamed_line_grid.resolve_streamed_line_grid`, spilling under
+    ``spill``, a :class:`.line_grid_spill.GridSpillPolicy` or ``None`` for its
+    default) unless the speed cache holds it. The spectra equal :func:`.run_case`'s up to
     floating-point summation order; transport counts are exact. Cases outside
     :func:`streaming_refusal` (``live=True``) raise ``ValueError`` before any
     transport.
@@ -384,7 +386,12 @@ def run_case_streamed(
 
             # Pass 1 of 2: the grid needs the whole line population (#1001).
             E_grid, grid_record, grid_pass = resolve_streamed_line_grid(
-                case, block_electrons, transport_core=transport_core, n_hat=n_hat, groove=groove
+                case,
+                block_electrons,
+                transport_core=transport_core,
+                n_hat=n_hat,
+                groove=groove,
+                spill=spill,
             )
         inputs = dict(
             E_grid=E_grid,
