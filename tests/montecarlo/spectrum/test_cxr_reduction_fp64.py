@@ -2,14 +2,20 @@
 
 ``run_reduction_kernel`` sums FP32 sinc² cells. An FP32 per-thread sum, shared
 tree and output made retained (one call over every line) and streamed (one
-call per electron block) adaptive scoring differ at FP32 summation level; FP64
-sums leave only FP64 summation order.
+call per electron block) adaptive scoring differ at FP32 summation level
+(8e-7 of peak at 0.4M lines, 5e-4 at 40M). Compensated FP32 per-thread sums
+joined in FP64 bound the split dependence at <= 1e-9 of peak (measured
+4e-11 to 7e-10, qlmc job 13728) for ~2 % kernel time; an FP64 add per cell
+reaches 1e-15 but doubles the kernel on consumer GPUs.
 """
 
 import numpy as np
 import pytest
 
 from pyrite._backend import BACKEND, CUPY_BACKENDS
+
+#: Documented split bound of the compensated reducer (#1313), with 2x margin.
+_SPLIT_BOUND = 2.0e-9
 
 cp = pytest.importorskip("cupy")
 
@@ -52,7 +58,7 @@ def test_line_reduction_adds_over_line_blocks(energies_per_block):
     whole, blocks = cp.asnumpy(whole), cp.asnumpy(blocks)
     assert whole.dtype == np.float64
     assert np.all(whole > 0.0)
-    np.testing.assert_allclose(blocks, whole, rtol=0.0, atol=1.0e-10 * whole.max())
+    np.testing.assert_allclose(blocks, whole, rtol=0.0, atol=_SPLIT_BOUND * whole.max())
 
 
 def test_line_reduction_refuses_a_float32_accumulator():

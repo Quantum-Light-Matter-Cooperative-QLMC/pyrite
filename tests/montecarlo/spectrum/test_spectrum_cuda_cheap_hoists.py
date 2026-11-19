@@ -278,7 +278,7 @@ def test_cxr_raw_kernel_matches_numpy_sinc_reduction(energies_per_block):
     sinc_slopes = np.linspace(0.001, 0.01, 37, dtype=np.float32)
     weights = np.linspace(0.0, 1.0, 37, dtype=np.float32)
     energies = np.array([100.0, 150.0, 200.0, 250.0, 300.0], dtype=np.float32)
-    out = cp.ones(energies.size, dtype=cp.float32)
+    out = cp.ones(energies.size, dtype=cp.float64)  # FP64 accumulator (#1313)
     result = run_reduction_kernel(
         cp.asarray(resonances),
         cp.asarray(sinc_slopes),

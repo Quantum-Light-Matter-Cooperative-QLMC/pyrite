@@ -530,9 +530,10 @@ def _kernel_4e(
 #: Split-independent line sums (#1313). A plain FP32 serial sum over
 #: ``n_lines / n_threads`` cells made the result depend on how the caller split
 #: its lines between calls. Each thread keeps a compensated (Kahan) FP32 sum,
-#: rather than an FP64 add per cell, which consumer GPUs run at 1/64 rate; the
-#: sum and its compensation join in FP64, and the shared tree and output
-#: spectrum are FP64. Cells stay FP32.
+#: rather than an FP64 add per cell, which doubled this kernel on an RTX 5080;
+#: the sum and its compensation join in FP64, and the shared tree and output
+#: spectrum are FP64. Cells stay FP32. Split dependence <= 1e-9 of peak for
+#: ~2 % kernel time (qlmc job 13728).
 SPECTRUM_DTYPE = np.float64
 
 
