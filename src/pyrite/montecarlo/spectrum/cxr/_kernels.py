@@ -24,6 +24,7 @@ from ...transport import (
     beta_from_keV,
 )
 from ...transport._continuation_join import _copy_bytes
+from .._device_sizing import collect_lines
 from . import _fused
 from ._line_tables import fill_tables_in_batches
 from ._position_twins import shorten_position_twin, stage_row, with_position_twins
@@ -146,13 +147,7 @@ def _accumulate_edge_truncation(audit, E_r, a_width, weight, electron=None):
     if audit is None or E_r.size == 0:
         return
     if "collect" in audit:
-        audit["collect"].append(
-            (
-                np.asarray(_to_cpu(E_r), dtype=REAL),
-                np.asarray(_to_cpu(xp.pi / a_width), dtype=REAL),
-                np.asarray(_to_cpu(weight), dtype=REAL),
-            )
-        )
+        collect_lines(audit, (E_r, xp.pi / a_width, weight))
         return
     mass = weight * (xp.pi / a_width)
     tiny = xp.finfo(E_r.dtype).tiny

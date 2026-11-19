@@ -24,6 +24,7 @@ import numpy as np
 
 from ..._cxr_windows import FeatureSeed
 from ...materials.crystal import CRYSTALS, HBARC_EV_ANG
+from ._device_sizing import DeviceTail, device_resident
 from ._population_tail import block_tail_sums
 from .reflection_rows import MIN_RESONANCE_EV, ReflectionRows, reflection_rows
 
@@ -130,15 +131,19 @@ _POPULATION_BLOCK_SIZE = 1 << 18
 
 
 def _population_blocks(populations: Sequence[ResonancePopulation]):
-    """Yield aligned line-array views in bounded blocks."""
+    """Yield aligned host line-array views in bounded blocks.
+
+    A device-resident population (#1275) is copied block by block, so host
+    consumers never hold it whole.
+    """
     for population in populations:
         size = population.energy_eV.size
         for start in range(0, size, _POPULATION_BLOCK_SIZE):
             stop = min(start + _POPULATION_BLOCK_SIZE, size)
             yield (
-                population.energy_eV[start:stop],
-                population.weight[start:stop],
-                population.width_eV[start:stop],
+                _host(population.energy_eV[start:stop]),
+                _host(population.weight[start:stop]),
+                _host(population.width_eV[start:stop]),
             )
 
 
@@ -265,43 +270,75 @@ def resonance_population_stop_eV(
     if not 0.0 < limit < 1.0:
         raise ValueError("truncation_limit must lie in (0, 1)")
     ceiling = float(ceiling_eV)
-    total = 0.0
-    n_lines = 0
-    min_energy = np.inf
-    max_energy = -np.inf
-    for energy_block, weight_block, width_block in _population_blocks(populations):
-        mass = weight_block * width_block
-        keep = np.isfinite(mass) & (mass > 0.0)
-        if not keep.any():
-            continue
-        energies = energy_block[keep]
-        total += float(mass[keep].sum())
-        n_lines += int(keep.sum())
-        min_energy = min(min_energy, float(energies.min()))
-        max_energy = max(max_energy, float(energies.max()))
+    resident = [p.energy_eV for p in populations if p.energy_eV.size]
+    if device_resident(*resident):
+        return _lattice_stop(DeviceTail(populations), ceiling, limit, round_to_eV)
+    return _lattice_stop(_HostTail(populations), ceiling, limit, round_to_eV)
+
+
+class _HostTail:
+    """Exact host tail sums (#1270): fused block products, NumPy block sums in order."""
+
+    def __init__(self, populations):
+        total = 0.0
+        n_lines = 0
+        min_energy = np.inf
+        max_energy = -np.inf
+        for energy_block, weight_block, width_block in _population_blocks(populations):
+            mass = weight_block * width_block
+            keep = np.isfinite(mass) & (mass > 0.0)
+            if not keep.any():
+                continue
+            energies = energy_block[keep]
+            total += float(mass[keep].sum())
+            n_lines += int(keep.sum())
+            min_energy = min(min_energy, float(energies.min()))
+            max_energy = max(max_energy, float(energies.max()))
+        self.total, self.n_lines = total, n_lines
+        self.min_energy, self.max_energy = min_energy, max_energy
+        self._populations = populations
+        self._blocks = None
+        self._pool = None
+
+    def numerator(self, stop: float) -> float:
+        if self._blocks is None:
+            self._blocks = list(_population_blocks(self._populations))
+            threads = max(1, min(8, getattr(os, "process_cpu_count", os.cpu_count)() or 1))
+            if len(self._blocks) > 1 and threads > 1:
+                self._pool = ThreadPoolExecutor(threads)
+        numerator = 0.0
+        for block_sum in block_tail_sums(self._blocks, stop, self._pool):
+            numerator += block_sum
+        return numerator
+
+    def close(self) -> None:
+        if self._pool is not None:
+            self._pool.shutdown()
+
+
+def _lattice_stop(tail, ceiling: float, limit: float, round_to_eV: float):
+    """Smallest ``round_to_eV`` lattice stop whose tail share is within ``limit``.
+
+    ``tail`` supplies the kept lines' ``total`` mass, count and resonance range
+    and the summed tail bound at a trial stop (``numerator``): the host route
+    (:class:`_HostTail`) or, for resident populations, the device route
+    (:class:`._device_sizing.DeviceTail`, #1275).
+
+    Validation: line-grid-resonance-bandwidth
+    """
     summary: dict[str, Any] = {
         "truncation_limit": limit,
         "ceiling_eV": ceiling,
-        "n_lines": n_lines,
+        "n_lines": tail.n_lines,
     }
-    if n_lines == 0:
+    if tail.n_lines == 0:
         summary.update(max_resonance_eV=None, proxy_truncated_fraction=0.0, capped=False)
         return None, {**summary, "stop_eV": None}
-
-    blocks = list(_population_blocks(populations))
-    threads = max(1, min(8, getattr(os, "process_cpu_count", os.cpu_count)() or 1))
-    pool = ThreadPoolExecutor(threads) if len(blocks) > 1 and threads > 1 else None
     evaluated: dict[float, float] = {}
 
     def lost(stop):
-        # Fused per-block products, summed by NumPy as the array expression
-        # was and added in block order (_population_tail), so each value is
-        # unchanged (#1270).
         if stop not in evaluated:
-            numerator = 0.0
-            for block_sum in block_tail_sums(blocks, stop, pool):
-                numerator += block_sum
-            evaluated[stop] = numerator / total
+            evaluated[stop] = tail.numerator(stop) / tail.total
         return evaluated[stop]
 
     # Lines above a trial edge count wholly, so the search may start below the
@@ -312,8 +349,8 @@ def resonance_population_stop_eV(
     # lowest resonance every line counts wholly, so lost is one there.
     try:
         stop = ceiling
-        if min_energy < ceiling and lost(ceiling) <= limit:
-            lowest = int(np.floor(min_energy / round_to_eV)) - 1
+        if tail.min_energy < ceiling and lost(ceiling) <= limit:
+            lowest = int(np.floor(tail.min_energy / round_to_eV)) - 1
             highest = int(np.ceil(ceiling / round_to_eV))
             while highest - lowest > 1:
                 middle = (lowest + highest) // 2
@@ -324,10 +361,11 @@ def resonance_population_stop_eV(
             stop = min(ceiling, float(highest * round_to_eV))
         fraction = lost(stop)
     finally:
-        if pool is not None:
-            pool.shutdown()
+        close = getattr(tail, "close", None)
+        if close is not None:
+            close()
     summary.update(
-        max_resonance_eV=max_energy,
+        max_resonance_eV=tail.max_energy,
         proxy_truncated_fraction=fraction,
         capped=stop >= ceiling,
         stop_eV=stop,

@@ -43,6 +43,7 @@ from ..transport import (
     beta_from_keV,
     spliced_stopping_keV_per_ang,
 )
+from ._device_sizing import device_resident, device_sinc_samples, device_sinc_spacing
 from .brem import BremsstrahlungModel, _bremsstrahlung_dsigma_dk
 from .cxr import _SEG_ARRAYS, _observation_direction
 
@@ -75,9 +76,17 @@ def sinc_feature_spacing(
 
     Returns ``(step_eV, aliased_weight_fraction, n_segments)``. Invalid
     kinematics are ignored; an empty valid population fails closed.
+
+    Device-resident segments take the device route (:mod:`._device_sizing`,
+    #1275) unless their flights are grouped; host segments are the exact
+    reference.
     """
     if not 0.0 <= float(aliased_weight_limit) < 1.0:
         raise ValueError("aliased_weight_limit must be in [0, 1)")
+    if device_resident(segments["L_ang"]):
+        resident = device_sinc_samples(segments, n_hat, electron_limit=electron_limit)
+        if resident is not None:
+            return device_sinc_spacing(*resident, aliased_weight_limit=aliased_weight_limit)
     samples = list(sinc_feature_samples(segments, n_hat, electron_limit=electron_limit))
     return sinc_spacing_from_samples(samples, aliased_weight_limit=aliased_weight_limit)
 

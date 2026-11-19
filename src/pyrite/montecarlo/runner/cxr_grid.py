@@ -36,6 +36,7 @@ from ..._cxr_grid_policy import (
 )
 from ..._cxr_windows import build_window_plan, window_plan_from_payload
 from ..._grid_semantics import resolution_num, validate_backend_spacing
+from ..spectrum._device_sizing import resident_population_budget
 from ..spectrum.coherent_population import physical_bunch_electrons
 from ..spectrum.cxr_seeds import (
     SEEDING_REVISION,
@@ -395,11 +396,22 @@ def coherent_flat_omission_limit(case):
     return DEFAULT_COHERENT_FLAT_OMISSION_LIMIT if limit is None else float(limit)
 
 
-def _direction_populations(case, segments, n_hat, Ne, abs_layers, groove, start, ceiling, profile):
-    """Every production line along ``n_hat`` over ``(start, ceiling)``."""
+def _direction_populations(
+    case, segments, n_hat, Ne, abs_layers, groove, start, ceiling, profile, *, resident=False
+):
+    """Every production line along ``n_hat`` over ``(start, ceiling)``.
+
+    ``resident`` keeps the lines of device-resident segments on the device,
+    within :func:`resident_population_budget` (#1275); the streamed evidence
+    collects block populations on the host for its spill store.
+    """
     from . import _cxr_for_segments
 
     audit = {"start_eV": start, "stop_eV": ceiling, "collect": []}
+    budget = resident_population_budget(segments.get("L_ang")) if resident else None
+    if budget is not None:
+        # Resident segments keep their population on the device (#1275).
+        audit["device_bytes"] = budget
     stage_started = perf_counter() if profile is not None else 0.0
     _cxr_for_segments(
         segments,
@@ -472,6 +484,7 @@ class SegmentGridEvidence:
             start,
             ceiling,
             profile,
+            resident=True,
         )
 
 
