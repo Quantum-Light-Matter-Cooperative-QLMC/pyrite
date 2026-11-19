@@ -501,6 +501,14 @@ resolved case payload was checked unchanged before re-pinning. No fixture
 uses a fiber crystal under automatic selection, so no output arrays or
 tolerances change. The `eedl-fallback` entry stays historical.
 
+## Band-mass reflection selection (#1326)
+
+`CXR_REFLECTION_SELECTION_MODEL=measured-shell-cutoff-v8` decides each shell on
+its exact closed-form in-band line mass instead of a bin-mean reduction, and
+scores a prefix-covered population once. Only identity pins advance
+(`resolved.json`, `channeling.json`; the diffs are digest-only); every
+resolved case payload, output array and tolerance is unchanged.
+
 ## FP64 brem segment sums (#1305)
 
 The CUDA brem reducers now sum FP32 cells in FP64 (per-thread, shared tree and

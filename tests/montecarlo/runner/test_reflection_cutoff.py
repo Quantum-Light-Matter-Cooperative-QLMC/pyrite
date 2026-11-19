@@ -16,6 +16,7 @@ from pyrite.montecarlo.runner.reflection_cutoff import (
     iter_reflection_shells,
     prune_case_reflections,
     reflection_shells,
+    select_case_reflections,
     select_reflection_cutoff,
 )
 from pyrite.montecarlo.spectrum.characteristic import _energy_bin_edges_and_widths
@@ -265,3 +266,28 @@ def test_net_metric_stops_once_the_net_tail_is_small():
     assert by_net.tail_fraction == pytest.approx(tail, rel=1e-12)
     with pytest.raises(ValueError, match="negative share"):
         select_reflection_cutoff(line, shells, 1e-3, share_yield=lambda m: -1.0)
+
+
+def test_shell_mass_is_the_decision_yield_and_density_is_the_spectrum():
+    """``shell_mass`` replaces ``density @ weights``; the density still sums (#1326)."""
+    case = dict(crystal="silicon", B_ang2=0.46, hkl_list=[])
+    grid, running, sizes = np.arange(4.0), [0.0], []
+
+    def line_density(pilot, _axis):
+        n = len(pilot["hkl_list"])
+        sizes.append(n)
+        running[0] += 0.3 ** (len(sizes) - 1)  # one chunk per shell: 1, 0.3, 0.09, ...
+        return np.full(4, float(n))
+
+    _, (outcome,), total = select_case_reflections(
+        case,
+        line_density,
+        0.5,
+        grid,
+        np.full(4, 1.0e6),  # the density yield would be huge and non-geometric
+        max_reflections=10**6,
+        shell_mass=lambda: running[0],
+    )
+    assert [row[2] for row in outcome.shells] == pytest.approx([1.0, 0.3, 0.09])
+    assert outcome.converged and len(outcome.shells) == 3
+    np.testing.assert_array_equal(total, np.full(4, float(sum(sizes))))

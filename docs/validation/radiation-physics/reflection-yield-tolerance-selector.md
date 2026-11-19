@@ -1317,3 +1317,54 @@ Overall verdict: **`rederived`** for v6, conditional on these wording edits
    pin cross-$N$ invariance or unequal line/continuum prefixes.
 
 Human sign-off is not granted.
+
+## Exact band-mass decision yield and single pass (v8, #1326)
+
+This section is the implementer's derivation and regression record. It has not
+had fresh-context verification, so it does not change the row's `rederived`
+status.
+
+**Claim.** A shell's decision yield may be taken as the closed-form in-band
+mass of its line arrays,
+
+$$
+Y_{\rm band}=\sum_{\ell}w_\ell\,\frac{\pi}{a_\ell}\Bigl[R(x^{\rm hi}_\ell)-R(x^{\rm lo}_\ell)+\mathbf 1\{x^{\rm lo}_\ell<0\le x^{\rm hi}_\ell\}\Bigr],
+\qquad x^{\rm lo,hi}_\ell=\frac{a_\ell(E_{\rm lo,hi}-E^{\rm res}_\ell)}{\pi},
+$$
+
+with $R=F-s/2$ the tail complement of the $\mathrm{sinc}^2$ antiderivative
+(`sinc-bin-integration`). Bins that tile $[E_{\rm lo},E_{\rm hi}]$ telescope, so
+$h\sum_i\bar\rho_i$ over the exact bin means equals $Y_{\rm band}$ to
+rounding. The previous selector measured the same quantity through bin means
+carrying the production far-envelope replacement, whose per-line difference is
+at most $3/(2\pi^3K^2)=1.2\times10^{-5}$ of that line's mass
+(`sinc-bin-far-envelope`). $Y_{\rm band}$ has no such term, so a marginal shell
+whose yield sits within that allowance of a stop decision can flip.
+
+**Single pass.** The selector keeps every shell it scores up to the stop, so
+no scored shell is rejected. With a prefix that covers the population
+($N\le n_{\max}$) and a production axis spanning the reference band, the line
+keep window and tabulation of the production pass contain every line that
+reaches the band. The production spectrum of each shell and $Y_{\rm band}$ come
+from the same line arrays, the spectrum of the selected set is the sum of the
+scored shells, and nothing is rescored. A production axis short of the band
+cannot supply the band's lines, and a prefix smaller than the population scores
+different electrons; both keep the reference pass, which now generates the lines on the
+reference band and measures them with a `mass_only` audit, with no bin
+reduction. The decision is on the reference band alone, as in v5.
+
+**Normalization.** Audit sums are un-normalized; $Y_{\rm band}$ is divided by the
+number of electrons the spectrum is divided by, so it is in the units of
+$\rho\cdot w$ that the continuum shares and background already use.
+
+**Regression anchors.**
+`tests/montecarlo/spectrum/test_band_mass.py` pins the closed form against
+summed `band_bin_grid` bin means (exact, $10^{-11}$) and against the
+production far-envelope bins (within $3/(2\pi^3K^2)$ of the whole mass),
+plus per-line limits and guards;
+`tests/montecarlo/spectrum/test_sinc_bin_integration_cuda.py::test_band_mass_kernel_matches_the_host_closed_form`
+pins the device reduction against the host;
+`tests/montecarlo/runner/test_reflection_selection_spectrum.py::{test_axis_spanning_the_band_selects_in_one_pass,test_short_axis_measures_band_mass_without_reducing_lines}`
+pin the selected set, shell yields ($10^{-9}$) and spectrum against the
+bin-mean reference route, that no `_selected_spectrum` pass runs on the spanning
+axis, and `tests/montecarlo/runner/test_reflection_cutoff.py::test_shell_mass_is_the_decision_yield_and_density_is_the_spectrum`.
