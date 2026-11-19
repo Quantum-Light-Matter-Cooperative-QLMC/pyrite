@@ -314,10 +314,9 @@ def _transport_case(
     core = _pkg._case_transport_core(case, transport_core)
     core, zone_transport = _zone_transport(case, core)
     if core == "cuda":
-        # Cap the pool before transport allocates (#1303): uncapped, CuPy keeps
-        # freed blocks cached, so streamed adaptive transport reserved 3.5x its
-        # use and oversubscribed the card. Capped, it frees its cache and retries.
-        _pkg._ensure_pool_limit()
+        # Cap the pool before transport allocates (#1303), at a ceiling above
+        # the spectrum budget so the resident join fits (#1315).
+        _pkg._ensure_transport_pool_limit()
     channeling = zone_transport is not None
     resident = keep_segments_on_device and _resident_transport(case, core, channeling)
     straggling = bool(case.get("straggling", False))

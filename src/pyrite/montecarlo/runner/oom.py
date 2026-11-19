@@ -97,20 +97,71 @@ def _maybe_free_pool():
         _RESOURCE_POLICY.cases_since_free = 0
 
 
+#: Device bytes the transport ceiling leaves free beyond memory already used
+#: outside the pool (CUDA context, other processes), for allocations made
+#: outside the pool during transport (#1315; cf. ``stream_sizing.POOL_HEADROOM_BYTES``).
+TRANSPORT_POOL_HEADROOM_BYTES = 1024**3 // 2
+
+
+def _pool_cap_owned():
+    """Whether the pool cap in force is the one this module last set.
+
+    A scoped cap (``MemoryBlockSizer.pool_limit`` for streamed passes) replaces
+    it for its duration; the phase caps below then leave the pool alone.
+    """
+    owned = _RESOURCE_POLICY.pool_limit_bytes
+    return owned is None or BACKEND.memory_limit_bytes() == owned
+
+
 def _ensure_pool_limit():
-    """Set the CuPy pool fraction cap once per driver process.
+    """Cap the CuPy pool at the resource-policy budget for the spectrum phase.
 
     No-op on a CPU box or when cap is disabled (`_RESOURCE_POLICY.gpu_pool_fraction <= 0`).
-    Idempotent: safe to call on every case; the module flag means the actual
-    `set_limit` runs once. Makes an over-budget alloc raise a catchable
-    OutOfMemoryError before the driver's own hard-OOM. The cap is divided by
-    `_RESOURCE_POLICY.gpu_pool_share` so co-tenant scan processes on one GPU sum to _RESOURCE_POLICY.gpu_pool_fraction
-    rather than oversubscribing it."""
-    if (
-        _RESOURCE_POLICY.pool_limit_set
-        or not _RESOURCE_POLICY.gpu
-        or _RESOURCE_POLICY.gpu_pool_fraction <= 0
-    ):
+    Idempotent: safe to call on every case. Makes an over-budget alloc raise a
+    catchable OutOfMemoryError before the driver's own hard-OOM. The cap is
+    divided by `_RESOURCE_POLICY.gpu_pool_share` so co-tenant scan processes on
+    one GPU sum to _RESOURCE_POLICY.gpu_pool_fraction rather than
+    oversubscribing it. Lowering the cap after the transport ceiling keeps the
+    cached blocks; the pool returns them when an allocation crosses the cap."""
+    if not _RESOURCE_POLICY.gpu or _RESOURCE_POLICY.gpu_pool_fraction <= 0:
+        return
+    if _RESOURCE_POLICY.pool_limit_phase == "budget" or not _pool_cap_owned():
         return
     BACKEND.set_memory_limit(_RESOURCE_POLICY.gpu_pool_fraction / _RESOURCE_POLICY.gpu_pool_share)
-    _RESOURCE_POLICY.pool_limit_set = True
+    _RESOURCE_POLICY.pool_limit_bytes = BACKEND.memory_limit_bytes()
+    _RESOURCE_POLICY.pool_limit_phase = "budget"
+
+
+def _transport_pool_ceiling():
+    """Pool cap for CUDA transport: the card less memory outside the pool (#1315).
+
+    The policy budget is sized for the spectrum phase. A resident adaptive join
+    holds the kept blocks and their concatenation, about twice the rows:
+    hopg 1000 keV/20M needs 11.3 GiB there, above the RTX 5080's 11.1 GiB
+    balanced budget, and fell back to host rows (+6 s transport, line collection
+    1.1 s -> 4 s). The ceiling still bounds the pool's cached reservation below
+    the card (#1303). Never below the budget; divided by ``gpu_pool_share``.
+    An explicit ``PYRITE_MC_GPU_POOL_FRAC`` or resource policy keeps the budget.
+    """
+    share = _RESOURCE_POLICY.gpu_pool_share
+    total = BACKEND.device.total_memory_bytes
+    budget = int(_RESOURCE_POLICY.gpu_pool_fraction * total / share) if total else 0
+    outside = BACKEND.device_bytes_outside_pool()
+    if not _RESOURCE_POLICY.transport_ceiling or not total or outside is None:
+        return budget
+    return max(budget, (total - outside - TRANSPORT_POOL_HEADROOM_BYTES) // share)
+
+
+def _ensure_transport_pool_limit():
+    """Cap the CuPy pool at :func:`_transport_pool_ceiling` before CUDA transport.
+
+    Without a cap, CuPy keeps every freed block cached: streamed adaptive
+    transport reserved 3.5x its use and oversubscribed the card (#1303). Same
+    no-op and scoped-cap rules as :func:`_ensure_pool_limit`."""
+    if not _RESOURCE_POLICY.gpu or _RESOURCE_POLICY.gpu_pool_fraction <= 0:
+        return
+    if _RESOURCE_POLICY.pool_limit_phase == "transport" or not _pool_cap_owned():
+        return
+    BACKEND.set_memory_limit_bytes(_transport_pool_ceiling())
+    _RESOURCE_POLICY.pool_limit_bytes = BACKEND.memory_limit_bytes()
+    _RESOURCE_POLICY.pool_limit_phase = "transport"

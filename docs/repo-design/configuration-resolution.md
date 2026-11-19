@@ -116,7 +116,7 @@ chunking or a backend can alter floating-point reduction order.
 | `PYRITE_MC_CXR_BUDGET_MB` | Positive MiB spectrum working-set budget; unset is `min(1920, resolved device budget)`. | `runner.chunking` |
 | `PYRITE_MC_FREE_EVERY` | Positive case cadence for releasing GPU-pool blocks; unset comes from the resource policy. | `runner.chunking` |
 | `PYRITE_MC_FREE_WATERMARK_MB` | Positive MiB free-memory watermark; unset `0` disables the watermark. | `runner.chunking` |
-| `PYRITE_MC_GPU_POOL_FRAC` | Floating-point fraction cap for the CuPy pool; unset uses the resolved device-budget fraction, or `0` without a GPU. | `runner.chunking` |
+| `PYRITE_MC_GPU_POOL_FRAC` | Floating-point fraction cap for the CuPy pool; unset uses the resolved device-budget fraction, or `0` without a GPU. When neither this nor `PYRITE_MC_RESOURCE_POLICY` is set, CUDA transport caps at the card less memory outside the pool instead (#1315). | `runner.chunking` |
 | `PYRITE_MC_GPU_SHARE` | Positive number of co-tenant processes sharing one GPU; unset `1`. Remote parallel-material scripts write it. | `runner.chunking`, `remote._queue_scripts` |
 | `PYRITE_MC_GPU_OOM_RETRIES` | Positive retry count after GPU allocation failure; unset comes from the resource policy. | `runner.chunking` |
 | `PYRITE_MC_WORKER_MEM_MB` | Positive per-worker MiB budget for CPU full-case workers; unset `6144`. | `runner.chunking` |

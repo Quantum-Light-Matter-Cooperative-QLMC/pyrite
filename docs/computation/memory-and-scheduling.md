@@ -112,7 +112,7 @@ If the minimum chunk of 1000 does not fit, admission raises a resource error nam
 
 Device out-of-memory errors are handled at three levels.
 
-* The CuPy pool is capped at the configured fraction of device memory so allocations beyond that limit raise a catchable error.
+* The CuPy pool is capped at the configured fraction of device memory so allocations beyond that limit raise a catchable error. CUDA transport runs under a higher ceiling, the card less memory used outside the pool and 0.5 GiB, because the resident adaptive join briefly holds the kept blocks and their concatenation; the spectrum phase lowers the cap to the configured fraction again. An explicit `PYRITE_MC_GPU_POOL_FRAC` or resource policy keeps transport at the configured fraction (#1315).
 * The coherent-line phase retries with progressively halved chunks, up to the policy's retry count. Later cases in the same run reuse a successful smaller line chunk. The original case and its bremsstrahlung chunk remain unchanged for checkpoint and recompute compatibility. Errors in other phases propagate without changing the line chunk.
 * If resident transport segments exceed device memory, transport is replayed with the same seed and the segments downloaded to the host. Counter-addressed streams make the replay exact.
 
