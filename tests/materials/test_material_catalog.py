@@ -3,7 +3,7 @@
 import hashlib
 import json
 import pickle
-from dataclasses import FrozenInstanceError
+from dataclasses import FrozenInstanceError, replace
 from pathlib import Path
 
 import numpy as np
@@ -2613,20 +2613,26 @@ def test_bare_sweep_uses_profile_automatic_line_grid():
     from pyrite.campaign.config import material_sweep
     from pyrite.campaign.sweep import BeamSpec, Sweep, build_cases
 
+    # Fixed families keep the stored-row route; an automatic selection (fiber
+    # HOPG since #1301) always resolves its grid automatically.
     bare = Sweep(
         material="hopg",
+        n_families=2,
         beam=BeamSpec(energy_keV=30.0),
         thickness_ang=1e4,
         tilt_deg=30.0,
         tilt_azim_deg=0.0,
     )
-    profiled = material_sweep(
-        "hopg",
-        beam=bare.beam,
-        thickness_ang=1e4,
-        tilt_deg=30.0,
-        tilt_azim_deg=0.0,
-        detector=bare.detector,
+    profiled = replace(
+        material_sweep(
+            "hopg",
+            beam=bare.beam,
+            thickness_ang=1e4,
+            tilt_deg=30.0,
+            tilt_azim_deg=0.0,
+            detector=bare.detector,
+        ),
+        n_families=2,
     )
     actual, expected = build_cases(bare)[0], build_cases(profiled)[0]
     np.testing.assert_array_equal(

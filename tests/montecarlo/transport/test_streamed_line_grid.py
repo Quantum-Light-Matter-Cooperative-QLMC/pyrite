@@ -24,6 +24,8 @@ SPECTRA = ("spec", "spec_characteristic", "brem_wide", "brem")
 def _case(policy=None):
     sweep = Sweep(
         material="hopg",
+        # Fixed families: grid streaming, not measured selection, is under test (#1301).
+        n_families=2,
         thickness_ang=1e4,
         beam=BeamSpec(energy_keV=30.0),
         tilt_deg=30.0,
