@@ -119,6 +119,8 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     "checks/reference_pins_1302.py": ("reflection-yield-tolerance-selector",),
     # Streamed vs retained adaptive memory/wall/parity A/B (#1281): engineering evidence.
     "checks/streamed_adaptive_ab_1281.py": (),
+    # Selected-set line-mass concentration and predicted roulette gain (#1295).
+    "checks/line_roulette_selection_1295.py": (),
     # Device Fourier bin-mean reduction phase split (#1296): engineering evidence.
     "checks/fourier_mode_cap_1320.py": (),
     "checks/fourier_reduction_phases_1296.py": (),
