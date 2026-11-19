@@ -63,7 +63,12 @@ class _RunnerResourcePolicy:
     gpu_oom: tuple[type[BaseException], ...]
     cases_since_free: int = 0
     pool_peak_bytes: int = 0
-    pool_limit_set: bool = False
+    #: Allow the CUDA transport pool ceiling above the budget (#1315): only
+    #: under the auto resource policy without an explicit pool fraction.
+    transport_ceiling: bool = False
+    #: Pool cap this process last set and its phase ("transport"/"budget").
+    pool_limit_bytes: int | None = None
+    pool_limit_phase: str | None = None
 
 
 def _resolve_runner_resource_policy() -> _RunnerResourcePolicy:
@@ -111,6 +116,9 @@ def _resolve_runner_resource_policy() -> _RunnerResourcePolicy:
         gpu_pool_share=max(1, _env_chunk("PYRITE_MC_GPU_SHARE", 1)),
         gpu_oom_retries=_env_chunk("PYRITE_MC_GPU_OOM_RETRIES", resolved.oom_retries),
         gpu_oom=BACKEND.oom_exceptions,
+        transport_ceiling=(
+            resolved.requested == "auto" and env_value("PYRITE_MC_GPU_POOL_FRAC") is None
+        ),
     )
 
 

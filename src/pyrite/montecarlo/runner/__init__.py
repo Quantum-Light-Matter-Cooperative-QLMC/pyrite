@@ -236,6 +236,9 @@ from .oom import (
     _ensure_pool_limit as _ensure_pool_limit,
 )
 from .oom import (
+    _ensure_transport_pool_limit as _ensure_transport_pool_limit,
+)
+from .oom import (
     _maybe_free_pool as _maybe_free_pool,
 )
 from .oom import _should_free as _should_free
