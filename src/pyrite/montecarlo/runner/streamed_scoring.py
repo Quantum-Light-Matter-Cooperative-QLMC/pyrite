@@ -232,8 +232,8 @@ class BlockSpectrumScorer:
             )
             brem = self.emission.continuum.evaluate(continuum, "brem_wide").values
         parts = (spec, characteristic, brem, self._transition(segs))
-        if self.totals is None:
-            self.totals = parts
+        if self.totals is None:  # FP64 block sums, like the retained route (#1313)
+            self.totals = tuple(np.asarray(part, dtype=np.float64) for part in parts)
         else:
             self.totals = tuple(
                 total + part for total, part in zip(self.totals, parts, strict=True)

@@ -556,7 +556,9 @@ def test_characteristic_model_marker_orphans_previous_line_models():
     assert "eedl" in CHARACTERISTIC_MODEL
     assert "eadl" in CHARACTERISTIC_MODEL
     assert f"xraydb-{CHARACTERISTIC_XRAYDB_VERSION}" in CHARACTERISTIC_MODEL
-    assert CHARACTERISTIC_MODEL.endswith("eadl-cascade-eadl-yields-lorentzian-segment-escape-v7")
+    assert CHARACTERISTIC_MODEL.endswith(
+        "eadl-cascade-eadl-yields-lorentzian-segment-escape-v7/fp64-line-sum-v1"
+    )
 
 
 def test_case_content_key_separates_characteristic_models():

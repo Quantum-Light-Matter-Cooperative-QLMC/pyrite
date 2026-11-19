@@ -64,7 +64,9 @@ from ._temporal import segment_arrival_times
 # v9 (#1201): line coupling/escape tables use the edge-resolved geometric mesh
 # (spacing max(1 eV, 1e-3 E), 1 eV within 3 % of edges) instead of a uniform
 # 1 eV mesh (line-absorption-tabulation).
-CXR_ESCAPE_MODEL = "segment-mean-v9-edge-geometric-tables"
+# fp64-spectrum-sum-v1 (#1313): device line spectra accumulate in FP64 (dense
+# node kernel sums, flush and block adds); cells stay FP32.
+CXR_ESCAPE_MODEL = "segment-mean-v9-edge-geometric-tables/fp64-spectrum-sum-v1"
 
 
 #: Size of the most recent line setups' tabulation, for performance telemetry.
@@ -878,9 +880,11 @@ def _prepare_spectrum(request):
                 f"(PYRITE_MC_BACKEND=cpu) or with PYRITE_FP64=1."
             )
     E_grid = xp.asarray(E_grid_host)
-    spec = xp.zeros(E_grid.size, dtype=REAL)
-    spec_pxr = xp.zeros(E_grid.size, dtype=REAL)
-    spec_cbs = xp.zeros(E_grid.size, dtype=REAL)
+    # FP64 accumulators on every backend: line flushes and blocks add into
+    # them, so an FP32 sum would depend on the caller's segment split (#1313).
+    spec = xp.zeros(E_grid.size, dtype=xp.float64)
+    spec_pxr = xp.zeros(E_grid.size, dtype=xp.float64)
+    spec_cbs = xp.zeros(E_grid.size, dtype=xp.float64)
 
     n_rows = int(xp.asarray(segments["L_ang"]).shape[0])
 

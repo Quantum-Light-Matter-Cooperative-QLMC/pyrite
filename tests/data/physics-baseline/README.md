@@ -498,6 +498,16 @@ gain `/fp64-segment-sum-v1`. Re-pinned: the generation-dependent
 `channeling.json`. These fixtures are CPU/NumPy fp64, whose brem reduction
 was already binary64, so every recorded output keeps its expectation.
 
+## FP64 line and characteristic sums (#1313)
+
+Device CXR line spectra (dense node kernel, bin-mean flushes, block adds) and
+characteristic line yields now accumulate in FP64, so `CXR_ESCAPE_MODEL` gains
+`/fp64-spectrum-sum-v1` and the characteristic marker
+`/fp64-line-sum-v1`. Re-pinned: the generation-dependent `case_content_key`
+and `parameter_sha256` hashes in `resolved.json` and `channeling.json`. These
+fixtures are CPU/NumPy fp64, whose line sums were already binary64, so every
+recorded output keeps its expectation.
+
 ## Device line-axis sizing (#1275)
 
 `LINE_BANDWIDTH_DEFAULT_MODEL=resonance-population-default-v2` and
