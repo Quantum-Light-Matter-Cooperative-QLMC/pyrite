@@ -50,6 +50,9 @@ def isolated_dirs(monkeypatch, tmp_path: Path) -> dict[str, Path]:
     data = tmp_path / "data"
     monkeypatch.setattr("pyrite.paths.user_cache_path", lambda *a, **k: cache)
     monkeypatch.setattr("pyrite.paths.user_data_path", lambda *a, **k: data)
+    # The suite-wide PYRITE_CACHE_DIR isolation would otherwise win.
+    monkeypatch.delenv("PYRITE_CACHE_DIR", raising=False)
+    monkeypatch.delenv("PYRITE_DATA_DIR", raising=False)
     return {"cache": cache, "data": data}
 
 

@@ -194,7 +194,6 @@ Edges (importer -> imported):
   p21 -> p16
   p21 -> p17
   p21 -> p25
-  p21 -> p8
   p21 -> p9
   p22 -> p1
   p22 -> p16

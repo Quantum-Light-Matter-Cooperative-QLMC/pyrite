@@ -62,7 +62,7 @@ def release(tmp_path, isolated_dirs, packaged_dir, monkeypatch):
     # These use production keys: never let a missed directory patch select a
     # real workspace. The root is explicitly owned by this test's tmp_path.
     monkeypatch.setenv("PYRITE_HOME", str(tmp_path / "workspace"))
-    _store_all(tmp_path / "workspace" / "xsgen" / "tables")
+    _store_all(user_table_dir())
     archive, index = build_release(tmp_path / "out")
     shutil.rmtree(user_table_dir())
     index_path = tmp_path / "out" / "elsepa-tables.json"
