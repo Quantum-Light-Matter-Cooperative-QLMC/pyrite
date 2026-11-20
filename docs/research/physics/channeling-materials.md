@@ -27,7 +27,7 @@ These probes do not run transport or certify yield/linewidth accuracy.
 
 Results at #525: only Si and diamond pass the thermal gate; all other 47
 crystals raise `ChannelingDataError` before the Fourier sum. Since #535, 2H-MoS₂
-also builds static profiles from its room-temperature uniaxial rows. Fourteen crystals have
+also builds static profiles from its room-temperature uniaxial rows, and since #540 so does 2H graphite (HOPG) from an assumed-300 K row. Fourteen crystals have
 constructible electronic oscillators, including diamond. Consequently the
 inventory cannot establish whether hexagonal extinctions or compound wells are
 correct: those code paths remain behind missing thermal data. No artificial
@@ -82,7 +82,7 @@ the channeling-plane normal. Plane reachability is discussed below.
 | `hfs2` | model-gap; T: Hf, S; E; whole-shell partition | `(0,0,1)`; (0,1,0), (1,0,0), (1,1,0) | L | R: `hfs2-structure`; Bell–Liang (E); shell-model change needed; O |
 | `hfse2` | model-gap; T: Hf, Se; E; whole-shell partition | `(0,0,1)`; (0,1,0), (1,0,0), (1,1,0) | L | R: `hfse2-cif-migration`; Bell–Liang (E); shell-model change needed; O |
 | `hfte2` | model-gap; T: Hf, Te; E | `(0,0,1)`; (0,1,0), (1,0,0), (1,1,0) | L | R: `hfte2-001-structure`; E source not established; O |
-| `hopg` | model-gap; T: C; A; #524 | `(0,0,1)`; (0,1,0), (1,0,0), (1,1,0) | H | [R: COD 9011577](https://www.crystallography.net/cod/9011577.html); Trucano/Chen (T), Taft (E); O |
+| `hopg` | model-gap; 300 K (assumed) uniaxial row (static profile; mean of the two C classes, #540/#1335); A; #524 | `(0,0,1)`; (0,1,0), (1,0,0), (1,1,0) | H | [R: COD 9011577](https://www.crystallography.net/cod/9011577.html); Trucano/Chen (T), Taft (E); O |
 | `lif` | data-gap; T: F, Li; E | `(1,0,0)`; (0,0,1), (0,1,0) | L | [R: COD 1010990](https://www.crystallography.net/cod/1010990.html); E source not established; O |
 | `mos2` | model-gap; 295 ± 10 K uniaxial rows (static profile and anisotropic TDS); A | `(0,0,2)`; (0,1,0), (1,0,0), (1,1,0) | L | [R: COD 9007660](https://www.crystallography.net/cod/9007660.html); Schönfeld/Feldman (T), Moynihan (E); O |
 | `mose2` | model-gap; T: Mo, Se; A | `(0,0,2)`; (0,1,0), (1,0,0), (1,1,0) | L | R: `mose2-cif-migration`; Bell–Liang (E); O |
@@ -169,7 +169,6 @@ per-element uniaxial row would collapse the C(1)/C(2) U₃₃ difference of 0.00
 Å², which is half the quoted uncertainty; whether that justifies a per-site
 schema is the first item of
 [#1335](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/1335).
-No graphite row is admitted yet.
 The [existing basal diffraction record](../../validation/materials/hopg-debye-waller-00l.md)
 already distinguishes two carbon sites with different normal displacements.
 The channeling thermal loader currently groups by element, so a single C row
@@ -202,8 +201,18 @@ Debye temperature, 410 K, which it ties to vibrations perpendicular to the
 layers; the hk0 reflections do not follow a Debye–Waller factor and are
 attributed to scattering-factor error. No B/N split, no U₁₁, no uncertainty
 and no basal value exist. The 0–800 °C lattice-constant curves are not
-atomic displacement data. hBN therefore remains a gap; a later refinement
-with site ADPs has not yet been found.
+atomic displacement data.
+
+**hBN is a documented source gap (#540).** Beyond Pease, a literature and database
+search (2026-11-19: web search for single-crystal and neutron/Rietveld hBN
+refinements; the Crystallography Open Database entries for BN) found no
+refinement with site displacement parameters. The only hBN records with a
+thermal value are COD 2016170/2016173, a secondary hBN phase in the
+Kurakevych–Solozhenko B₁₃N₂ powder paper (Acta Cryst. C63, i80, 297 K), whose
+four atoms all carry a fixed Uiso = 0.025 Å² with no uncertainty; that is a
+refinement convention, not a measurement of B or N. Paszkowicz–Pelka (2002)
+gives only lattice parameters from 10 to 297.5 K. No row is admitted, and
+none can be without inventing ADPs.
 
 The existing Tarrio–Schnatterly electronic row (DOI
 `10.1103/PhysRevB.40.7852`) explicitly distinguishes in-plane and out-of-plane
@@ -236,6 +245,12 @@ W/Se gap remains open. The 110–400 K synchrotron Rietveld study of Mathew et
 al. (2020, Zotero `TLGREDLB`) was also checked: it reports lattice constants and
 W–W/W–Se distances with a preferred-orientation correction, no displacement
 parameters, so it cannot supply a covariance.
+
+**WSe₂ is a documented source gap (#540).** A web search for single-crystal or
+neutron/Rietveld 2H-WSe₂ refinements with Uᵢⱼ, and the Crystallography Open
+Database (entries 9009146 and 9012193, no displacement parameters), found no
+source with W or Se ADPs. Murray–Evans (1979) is a 10–320 K lattice-constant
+study. No row is admitted.
 
 MoS₂ and WSe₂ already have sourced scalar electronic rows (DOIs
 `10.1111/jmi.12900`, `10.1088/1361-648X/aa63a7`). Bell and Liang supply the

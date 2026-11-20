@@ -83,3 +83,21 @@ u_basal_ang2 = 0.0038
 u_c_ang2 = 0.0049
 source = "B. Schoenfeld, J. J. Huang, S. C. Moss, Acta Cryst. B39, 404 (1983), Table 3 (2H-MoS2, X-ray, room temperature)"
 doi = "10.1107/S0108768183002645"
+
+# 2H graphite (#540): Trucano & Chen (1975), Table 2, P6_3/mmc refinement of
+# one natural single crystal (neutron). Basal U11 = U22 = 0.0031 angstrom^2 is
+# NOT refined there: it is fixed from Ludsteck (1972) for both carbons. U33 is
+# 0.016(2) (C1, 2b) and 0.017(2) (C2, 2c) angstrom^2, "not significantly
+# different"; the row is their multiplicity-weighted mean 0.0165, a declared
+# approximation that does not resolve the two classes (#1335).
+# ASSUMPTION: the letter states no measurement temperature. 300 K is assumed
+# (room temperature) with a 10 K window; it is not a sourced value.
+[hopg.C]
+model = "uniaxial_c"
+atomic_weight = 12.011
+temperature_K = 300.0
+tolerance_K = 10.0
+u_basal_ang2 = 0.0031
+u_c_ang2 = 0.0165
+source = "P. Trucano, R. Chen, Nature 258, 136 (1975), Table 2 (P6_3/mmc, natural single crystal, neutron; U11 fixed from Ludsteck 1972; U33 mean of C1 0.016(2) and C2 0.017(2); temperature 300 K assumed, not stated in the source)"
+doi = "10.1038/258136a0"

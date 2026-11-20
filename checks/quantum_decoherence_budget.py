@@ -69,8 +69,9 @@ CELLS = (
     ("Si(110)", "silicon", (1, 1, 0), True),
     ("diamond(110)", "diamond", (1, 1, 0), True),
     ("MoS2(001)", "mos2", (0, 0, 1), False),
+    ("HOPG(001)", "hopg", (0, 0, 1), False),
 )
-UNAVAILABLE_CELLS = (("hopg", (0, 0, 1)), ("hbn", (0, 0, 1)), ("wse2", (0, 0, 1)))
+UNAVAILABLE_CELLS = (("hbn", (0, 0, 1)), ("wse2", (0, 0, 1)))
 
 
 def _deltas(period: float) -> np.ndarray:
