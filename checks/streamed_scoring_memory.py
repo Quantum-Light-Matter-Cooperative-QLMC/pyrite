@@ -60,7 +60,9 @@ could hide on the device. ``STREAM_PHASES=0`` skips
 every phase wrapper (no synchronizations) and records only the production
 wall time. ``STREAM_CPROFILE=PATH`` profiles the arm with ``cProfile`` and
 writes its stats to ``PATH`` (``python -m pstats PATH``) for host-cost
-attribution by function.
+attribution by function. ``STREAM_CXR=none`` (#862) runs the case with
+``Physics(cxr_source="none")`` (#1327): brem-only scoring, no lines,
+reflection selection or lattice share.
 """
 
 import contextlib
@@ -79,6 +81,7 @@ from pyrite.config import FixedSampling
 SPECTRA = ("spec", "spec_characteristic", "brem_wide")
 GRID = os.environ.get("STREAM_GRID", "final")
 NVTX = os.environ.get("STREAM_NVTX") == "1"
+CXR_SOURCE = os.environ.get("STREAM_CXR", "mc")
 
 
 def _case(material, ne, e0_kev, thickness_ang=1.0e4, seed=None, tilt_deg=30.0, azim_deg=0.0):
@@ -96,6 +99,7 @@ def _case(material, ne, e0_kev, thickness_ang=1.0e4, seed=None, tilt_deg=30.0, a
         bremsstrahlung_model="bremslib",
         radiative_model="bremslib-soft-hard",
         radiative_cutoff_eV=1000.0,
+        cxr_source=CXR_SOURCE,
     )
     target = pr.geometry.Slab(
         material,
@@ -465,6 +469,8 @@ def run(
         "device_pool_peak_above_base_MiB": pool.above_base / 2**20,
         "device_used_peak_above_base_MiB": (pool.used_peak - pool.used_base) / 2**20,
         "fp64": os.environ.get("PYRITE_FP64") == "1",
+        "cxr_source": CXR_SOURCE,
+        "overlap": os.environ.get("PYRITE_STREAM_OVERLAP") == "1",
         "seed": int(case["seed"]),
         "phase_s": phases.seconds,
         "phase_calls": phases.calls,
