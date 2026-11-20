@@ -94,6 +94,24 @@ HOPG and h-BN are the opposite case: short `c` axes put `(004)` near `|g| = 3.8 
 
 Remaining work for MoSe2 and MoTe2 is source retrieval, not analysis: obtain the Bronsema 1986 ADP table for MoSe2, and a modern single-crystal refinement for 2H-MoTe2. Neither is on the critical path for present accuracy.
 
+## 2026-11-19 pass: silicon and diamond (#1189)
+
+Cubic, one site: isotropic `B` is exact by symmetry within the harmonic model, so no schema change is needed. Both values are room-temperature primary refinements and match the source `B` of the measured structure-factor tables added in #1177, so the X-ray `F(hkl)` at the catalog `B` is the measured dynamic value.
+
+| material | before | after | source status |
+|---|---:|---:|---|
+| diamond | `0.21` (no provenance) | `0.1379` | Takama, Tsuchiya, Kobayashi & Sato, *Acta Cryst. A* **46**, 514–517 (1990), [doi:10.1107/S0108767390002197](https://doi.org/10.1107/S0108767390002197): synthetic-diamond Pendellösung, nine reflections at 294 K; their Dawson-model fit gives `B = 0.142(9) Å²` (Table 2). Catalog `0.1379` is the Lu–Zunger–Deutsch single-`B` fit to the same set (LZD Table I, [doi:10.1103/PhysRevB.47.9385](https://doi.org/10.1103/PhysRevB.47.9385)), 0.5σ below Takama's own value, and is the `B` at which the #1177 TTKS table is dynamic |
+| silicon | `0.46` (no provenance) | `0.4632` | Spackman, *Acta Cryst. A* **42**, 271–281 (1986), [doi:10.1107/S0108767386099312](https://doi.org/10.1107/S0108767386099312): pseudoatom refinement of Ag and Mo Kα structure factors (data at or converted to 293–298 K, harmonic term corrected for cubic anharmonicity with `β = 3.38 eV Å⁻³`). Table 1: Ag `B = 0.4638(12)`, Mo `0.4625(10)`; mean `0.4632(11) Å²` (stated in the text after Table 1), equal to `8π²<u²>` with `<u²> = 0.005867 Å²` as quoted by Flensburg & Stewart. Spackman notes `B` is sensitive to the core scattering factors; the value agrees with Aldred & Hart (1973) `0.461(3)` and with Deutsch & Hart (1985) `0.4632(41)` from the three lowest-angle reflections. Read directly from the paper (Zotero `WLIM533Y`) |
+
+Cross-checks (not adopted):
+
+- diamond: Stewart, *J. Chem. Phys.* **58**, 4430 (1973), [doi:10.1063/1.1679003](https://doi.org/10.1063/1.1679003), multipole refinement of Göttlicher–Wölfel powder data, `B = 0.140(4) Å²` (Stewart notes that published fits with Hartree–Fock atomic scattering factors gave `0.206(3)`, close to the old unprovenanced `0.21`); lattice dynamics `0.149 Å²`; Bindzus *et al.* (2014) `0.1427 Å²`; neutron powder `0.14–0.17`.
+- silicon: Flensburg & Stewart, *Phys. Rev. B* **60**, 284–291 (1999), [doi:10.1103/PhysRevB.60.284](https://doi.org/10.1103/PhysRevB.60.284): Born–von Kármán lattice dynamics at 293 K, `<u²> = 0.00594(2) Å²`, `B = 0.4691(16) Å²`. This is 1.3% (3.7σ of its quoted precision) above Spackman; the x-ray value is kept because the measured `F` table is dynamic at it. Neutron powder (Baisheng *et al.*): `0.45(2) Å²` at 284 K.
+
+The old diamond `0.21` was 48% above Takama's value and lowered the diamond `F(hkl)` by `e^{-(0.21-0.1379)s²}` relative to the measurement (0.7% at (111), 2.9% at (440)), because the bonding correction is re-smeared with the catalog `B`. Regression: `tests/materials/test_bonding_charge_structure_factors.py::test_catalog_debye_waller_reproduces_measured_dynamic_F_within_sigma`.
+
+Not touched: the channeling thermal-vibration model (`channeling_thermal.toml`, PDOS `B(T)`; diamond 0.144 Å² at 293 K, within 1σ of Takama) is a separate temperature-dependent model.
+
 ## Acceptance record
 
 Every replacement must record:
@@ -132,5 +150,5 @@ Do not extend schema yet. Evidence must first establish which catalog entries ne
 1. Reproduce four existing primary-source conversions and repair incomplete temperature/table locators.
 2. Resolve high-impact anchors: HOPG, WSe2, MoSe2, MoTe2, TiS2, PtSe2, HfS2, HfSe2, and HfTe2. The first scoped pass found no acceptable replacement for these anchors; HOPG has a natural-graphite tensor candidate, while matching WSe2/MoSe2/MoTe2 records omit ADPs and Hf/PtSe2 sources remain incomplete.
 3. Recover ADPs from primary refinements already cited for the 37 shared-value entries; record “not reported” rather than substituting another compound.
-4. Audit diamond, silicon, LiF, and sapphire legacy values.
+4. Audit diamond, silicon, LiF, and sapphire legacy values. Diamond and silicon done 2026-11-19 (#1189); LiF and sapphire open.
 5. Run pinned-reflection sensitivity calculations before changing production values or schema.

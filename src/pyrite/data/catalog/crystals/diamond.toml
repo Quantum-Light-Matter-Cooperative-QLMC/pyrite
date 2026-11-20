@@ -3,7 +3,13 @@ validation_id = "diamond-cif-migration"
 full_name = "Diamond"
 formula = "C"
 cod_id = 9008564
-B_ang2 = 0.21
+# Isotropic Debye-Waller B at room temperature (#1189). 0.1379 is the LZD single-B
+# fit to the Takama et al. (1990) Pendelloesung set (294 K), the same B the
+# measured_structure_factors table below is dynamic at; it lies within 0.5 sigma
+# of Takama's own Dawson-model refinement 0.142(9) A^2 (Acta Cryst. A 46, 514).
+# Cross-checks: Stewart (1973) powder multipole fit 0.140(4); lattice dynamics
+# 0.149 (Stewart, Acta Cryst. A 29, 602).
+B_ang2 = 0.1379
 surface_hkl = [4, 0, 0]
 
 # Measured low-order structure factors (bonding charge, issue #1177). Values are

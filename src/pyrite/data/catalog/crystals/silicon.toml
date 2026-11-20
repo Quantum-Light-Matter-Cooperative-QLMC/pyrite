@@ -3,7 +3,13 @@ validation_id = "silicon-cif-migration"
 full_name = "Silicon"
 formula = "Si"
 cod_id = 9011998
-B_ang2 = 0.46
+# Isotropic Debye-Waller B at 293-298 K (#1189). 0.4632(11) A^2 is the mean of the
+# Ag (0.4638(12)) and Mo (0.4625(10)) pseudoatom refinements in Spackman, Acta
+# Cryst. A 42, 271 (1986), Table 1 (equivalently <u^2> = 0.005867 A^2); it is the
+# B the measured_structure_factors table below uses.
+# Cross-check: lattice dynamics at 293 K, 0.4691(16) A^2 (Flensburg & Stewart,
+# Phys. Rev. B 60, 284 (1999)); neutron powder 0.45(2) A^2 at 284 K.
+B_ang2 = 0.4632
 surface_hkl = [4, 4, 0]
 
 # Measured low-order structure factors (bonding charge, issue #1177). Values are
