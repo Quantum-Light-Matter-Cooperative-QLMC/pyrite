@@ -138,6 +138,7 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     "checks/quantum_cb_elements_1134.py": ("cbs-amplitude",),
     "checks/digitize_shi_2024_fig2_1103.py": ("shi-2024-fig2-intensity-attribution",),
     "checks/shaped_electron_1102.py": ("quantum-shaped-cxr-interference",),
+    "checks/strain_ensemble_1058.py": (),  # #1058 research reference, no physics claim
     "checks/planar_exit_out_of_plane.py": (
         "cr-planar-exit-out-of-plane",
         "cr-planar-exit-angular",
