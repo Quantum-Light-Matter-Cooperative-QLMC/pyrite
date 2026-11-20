@@ -166,17 +166,19 @@ def test_refinement_keeps_library_nodes_and_inserts_geometric_sub_nodes(carbon_t
     np.testing.assert_allclose(library[2], midpoint * chi[:, None], rtol=1e-12)
 
 
-def test_reduced_energy_sub_nodes_are_the_library_interpolant(carbon_table):
-    # Sub-nodes in (0, 0.1) take the values runtime interpolation already
-    # served there, so the electron-nucleus model is unchanged by them.
+def test_reduced_energy_sub_nodes_follow_the_library_scheme_at_library_rows(carbon_table):
+    # The synthetic SDCS is linear in k/T1, which the library's spline fit
+    # reproduces, so at each library T1 the sub-nodes lie on that line and
+    # the DDCS sub-nodes are that SDCS times the (k-independent) shape.
     x = carbon_table.nominal_reduced_energy
     np.testing.assert_array_equal(x[LIBRARY_COLUMNS], [0, *np.arange(1, 10) / 10, 0.95, 0.975, 1])
-    w = x[1:6] / 0.1
-    sdcs = carbon_table.scaled_sdcs_mb
-    np.testing.assert_allclose(sdcs[:, 1:6], (1.0 - w) * sdcs[:, :1] + w * sdcs[:, 6:7], rtol=1e-13)
-    ddcs = carbon_table.scaled_ddcs_mb_sr
-    w = w[:, None]
-    np.testing.assert_allclose(ddcs[:, 1:6], (1.0 - w) * ddcs[:, :1] + w * ddcs[:, 6:7], rtol=1e-13)
+    t1 = carbon_table.incident_energy_keV[::4, None] / 1.0e3
+    sdcs = carbon_table.scaled_sdcs_mb[::4]
+    np.testing.assert_allclose(sdcs[:, 1:6], synthetic_scaled_sdcs(t1, x[1:6]), rtol=1e-12)
+    ddcs = carbon_table.scaled_ddcs_mb_sr[::4]
+    shape = ddcs[:, :1] / sdcs[:, :1, None]
+    # Library DDCS are float32, so node shapes agree to about 1e-7.
+    np.testing.assert_allclose(ddcs[:, 1:6], shape * sdcs[:, 1:6, None], rtol=1e-6)
 
 
 def test_electron_electron_multiplies_every_node_by_one_plus_eta_over_z(carbon_table):

@@ -111,8 +111,8 @@ and release assets are public, so downloads need no GitHub token.
 * - `tables-elsepa-positron-5`
   - `elsepa-positron-tables.zip` (49,517,306 B, 55 tables)
   - `src/pyrite/data/xsgen/elsepa-positron-tables.json`
-* - `tables-bremslib-3`
-  - `bremslib-tables.zip` (41,369,196 B, 42 tables)
+* - `tables-bremslib-4`
+  - `bremslib-tables.zip` (41,515,721 B, 42 tables)
   - `src/pyrite/data/xsgen/bremslib-tables.json`
 * - `tables-sbethe-4`
   - `sbethe-tables.zip` (5,127,793 B, 84 tables)

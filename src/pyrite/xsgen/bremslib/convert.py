@@ -30,9 +30,11 @@ from .read import (
     EXTENSION_RATIO_COUNT,
     RATIO_COUNT,
     DdcsPanel,
+    born_sdcs_path,
     ddcs_integral_path,
     iter_node_files,
     node_index,
+    parse_born_table,
     parse_ddcs,
     parse_ratio_table,
     sdcs_path,
@@ -120,7 +122,10 @@ def build_table(
         ``node_angular_integral_mb`` is PyRITE's own Simpson integral of each
         node and ``node_vendor_integral_mb`` is the value upstream published
         for it, so the two are comparable after the fact rather than only at
-        generation time.
+        generation time. ``born_t1_MeV``, ``born_k_over_t1`` and
+        ``born_sdcs_mb`` hold the library's Born-approximation SDCS at its
+        energies up to ``t1_max_MeV``, which staging divides by before
+        fitting in ``k/T1`` (:mod:`pyrite._bremslib_reduced_energy`).
 
         Rows above
         :data:`~pyrite.xsgen.bremslib.read.COMPLETE_T1_MAX_MEV` are
@@ -203,6 +208,8 @@ def build_table(
         finite_nucleus.append(panel.finite_nucleus)
 
     _check_complete(z, complete_rows, len(t1_grid), seen)
+    born = parse_born_table(born_sdcs_path(library, z).read_text(encoding="ascii"))
+    born_rows = born.t1_MeV <= t1_max_MeV
     order = np.lexsort((np.asarray(k_index), np.asarray(t1_index)))
     tip = (slice(complete_rows, None), slice(EXTENSION_RATIO_COUNT, None))
     sdcs_mb, rel_err, point_finite = (
@@ -230,6 +237,9 @@ def build_table(
         "ddcs_mb_sr": _concatenate(ddcs_parts, order),
         "ddcs_rel_err": _concatenate(err_parts, order).astype(np.float32),
         "ddcs_point_finite": _concatenate(ratio_parts, order).astype(np.float32),
+        "born_t1_MeV": born.t1_MeV[born_rows],
+        "born_k_over_t1": born.k_over_t1,
+        "born_sdcs_mb": born.value[born_rows],
     }
 
 

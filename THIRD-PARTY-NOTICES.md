@@ -226,11 +226,11 @@ require derived or adapted material to be marked as such.
   - PyRITE **does** redistribute cross-section tables **derived** from that
     library, for every element its built-in catalogue materials may contain.
     They are not in the PyRITE package: they are published as one
-    SHA-256-pinned archive (PyRITE release `tables-bremslib-3`) that
+    SHA-256-pinned archive (PyRITE release `tables-bremslib-4`) that
     `pyrite tables fetch bremslib` installs into
     the user's own data directory. These are **adaptations** of a CC BY 4.0
     work and are not the upstream data: they are parsed and restructured on
-    the library's own grids, per-node angular integrals are added, the
+    the library's own grids, per-node angular integrals are added (and the library's Born-approximation SDCS carried alongside), the
     double-differential cross section is reduced to single precision, the
     per-point uncertainties are removed, and the library's zero placeholders
     above 30 MeV are marked as missing. Andrius Poškus is credited as the
