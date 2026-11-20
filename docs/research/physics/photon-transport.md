@@ -57,9 +57,12 @@ Rayleigh uses $(1+\cos^2\theta)F(x,Z)^2$, with $x=\sin(\theta/2)/\lambda$,
 and unchanged photon energy. Compton angles use Klein–Nishina times $S(x,Z)$;
 since #1231 the scattered energy follows the impulse approximation of
 PENELOPE-2024 §2.3 (Doppler broadening and binding cutoff) with
-per-subshell Biggs profiles, and the event leaves one EADL vacancy. As in
-Geant4's Penelope Compton model, the photon queue relaxes that vacancy through
-the same sampled EADL cascade as photoabsorption (CPU and CUDA). Photoabsorption uses EPDL subshell probabilities and
+per-subshell Biggs profiles, and the event leaves one EADL vacancy. Following
+Geant4's Penelope Compton design, the photon queue relaxes that vacancy through
+the same sampled EADL cascade as photoabsorption (CPU and CUDA). Unlike
+Geant4, it relaxes every EADL subshell with transitions at any Z (Geant4:
+identified shells, 5 < Z < 105), and energy closes through the signed ETR
+defect rather than by dropping secondaries. Photoabsorption uses EPDL subshell probabilities and
 $T=E-B_i$, followed by the sampled EADL cascade. Its Sauter–Gavrila K-shell
 angular approximation is applied to all photoelectron shells. These choices
 do not model polarization, crystal coherence, anomalous Rayleigh amplitudes

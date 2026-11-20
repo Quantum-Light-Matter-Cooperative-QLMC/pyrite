@@ -319,9 +319,12 @@ def _photoabsorb(queue, parent: _Photon, channel, element, relaxation, rng, posi
 def _compton(queue, parent: _Photon, channel, relaxation, rng, position, element) -> None:
     """Compton photon 0, recoil 1, then the vacancy's sampled EADL cascade from 2.
 
-    As Geant4's Penelope Compton model, the sampled subshell vacancy relaxes
-    through the same EADL cascade as photoabsorption (relaxation cutoff the
-    smaller of the photon/electron cutoffs). Draw order: Compton draws, one per
+    Following Geant4's Penelope Compton design, the sampled subshell vacancy
+    relaxes through the same EADL cascade as photoabsorption (relaxation cutoff
+    the smaller of the photon/electron cutoffs), but for every EADL subshell
+    with transitions and any Z (no K/L/M or 5 < Z < 105 restriction), and
+    energy closes through the signed ETR defect rather than by dropping
+    secondaries. Draw order: Compton draws, one per
     cascade decay, then two per emitted particle. The injected EADL model must
     hold the vacancy with the Compton binding, so E = E' + T + U_i closes
     through the cascade partition.

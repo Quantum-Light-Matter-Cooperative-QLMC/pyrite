@@ -91,6 +91,7 @@
       "w_int_pyrite.json.gz": "e7fdb7059628cefeb1c7f148807ad0424c67c56c957483dbf5281304ac9f37fa"
     },
     "outcome": "Penelope 14/14 and Livermore 14/14 gated pass (unchanged). Ungated W R vs Penelope: w_ext 300-504 keV 0.200 -> 0.833 (25 vs 30 counts); w_int 100-300 keV 0.512 -> 1.012 (81 vs 80); w_int W Ka 0.125 -> 0.375 (3 vs 8 counts; Livermore 3 vs 2, ratio 1.5), a counting-statistics window",
-    "superseded_intermediate": "Doppler-only commit 3c52ed602 (no vacancy relaxation) gave the same W ratios; recorded in issue #1231 Progress, records not committed"
+    "superseded_intermediate": "Doppler-only commit 3c52ed602 (no vacancy relaxation) gave the same W ratios; recorded in issue #1231 Progress, records not committed",
+    "post_run_source_note": "After the 8fd3b1a16 runs, only a docstring of photon_histories.py::_compton changed (Geant4 Penelope wording qualified); executable code is unchanged, so its tested sha256 above differs from later checkouts."
   }
 }

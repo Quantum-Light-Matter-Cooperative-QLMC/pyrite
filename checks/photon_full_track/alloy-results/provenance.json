@@ -45,7 +45,8 @@
         "gaas_11p5kev_pyrite.json.gz": "910a548ec990c6858643095beefabff4fc689a403a0c62342d43fc70c8e1d899",
         "gaas_15kev_pyrite.json.gz": "bf989c4451fc0e2168a5d6020f9c93e19db57619ca226be56d70beabd5f2b82d",
         "gaas_30kev_pyrite.json.gz": "9af8ea8982b3b7c69e04e43d7cae3743cd6d1d9f6f3e2ad2380fb7b2e500491e"
-      }
+      },
+      "post_run_source_note": "After the 8fd3b1a16 runs, only a docstring of photon_histories.py::_compton changed (Geant4 Penelope wording qualified); executable code is unchanged, so its tested sha256 above differs from later checkouts."
     }
   },
   "allocation": {

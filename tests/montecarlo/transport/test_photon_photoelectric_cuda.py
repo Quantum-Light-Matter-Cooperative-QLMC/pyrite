@@ -9,7 +9,10 @@ from pyrite.montecarlo.eadl_relaxation import load_eadl_relaxation
 from pyrite.montecarlo.transport._photon_cuda_relaxation import host_relaxation_table
 from pyrite.montecarlo.transport.photoelectric import sample_photoelectric
 from pyrite.montecarlo.transport.photon_histories import _isotropic
-from pyrite.montecarlo.transport.photon_photoelectric_cuda import sample_photoelectric_cuda
+from pyrite.montecarlo.transport.photon_photoelectric_cuda import (
+    sample_photoelectric_cuda,
+    sample_vacancy_relaxation_cuda,
+)
 
 
 @pytest.fixture
@@ -125,6 +128,11 @@ def test_photoelectric_inputs_fail_before_device_probe(monkeypatch):
         sample_photoelectric_cuda("Si", [1e5], [[0, 0, 1]], [[0.1]], cutoff_eV=0)
     with pytest.raises(ValueError, match="capacity"):
         sample_photoelectric_cuda("Si", [1e5], [[0, 0, 1]], [[0.1]], cutoff_eV=100, capacity=0)
+    for start in (-1, 3):  # a row of two uniforms admits starts 0..2
+        with pytest.raises(ValueError, match="start"):
+            sample_vacancy_relaxation_cuda(
+                "Si", [1], [start], [[0.1, 0.2]], cutoff_eV=100, capacity=4
+            )
 
 
 @pytest.mark.parametrize("element", ["Cu", "W"])

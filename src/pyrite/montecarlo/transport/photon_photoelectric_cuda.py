@@ -72,6 +72,8 @@ def sample_vacancy_relaxation_cuda(element, designators, start, uniforms, *, cut
     n = designators.size
     if draws.ndim != 2 or draws.shape[0] != n or start.shape != (n,):
         raise ValueError("designators, starts and uniform rows must align")
+    if np.any((start < 0) | (start > draws.shape[1])):
+        raise ValueError("start must lie within each uniform row")
     host = host_relaxation_table(element)
     index = {int(d): i for i, d in enumerate(host["designators"])}
     if any(d > 0 and d not in index for d in designators.tolist()):

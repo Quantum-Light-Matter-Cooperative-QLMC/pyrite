@@ -110,6 +110,7 @@
       "results/w_3mev.json.gz": "932a377d21e93bf6e5a1cf3382eb9766da80ee04ac3ec3f7d4489a591b8cede3"
     },
     "outcome": "100 gated, the same 2 W 0.3 MeV R 1-10 keV failures (redistributed 1.196, fraction 0.342/0.307), unchanged from history",
-    "raw_reduction_sha256_note": "raw_reduction_sha256 results/ entries describe the superseded 2026-10-24 run; the rerun committed only compacted records"
+    "raw_reduction_sha256_note": "raw_reduction_sha256 results/ entries describe the superseded 2026-10-24 run; the rerun committed only compacted records",
+    "post_run_source_note": "After the 8fd3b1a16 runs, only a docstring of photon_histories.py::_compton changed (Geant4 Penelope wording qualified); executable code is unchanged, so its tested sha256 above differs from later checkouts."
   }
 }

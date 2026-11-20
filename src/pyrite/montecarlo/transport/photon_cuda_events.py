@@ -107,7 +107,7 @@ def _compton_with_relaxation(element, energy, rays, uniforms, cutoff, capacity):
     A complete Compton row continues at its ``draws_used``; the cascade's
     status (0, 1 longer prefix, 4 capacity) and total draw count replace the
     event's. Incomplete Compton rows keep their status and skip the cascade.
-    Validation: photon-compton-scattering, eadl-sampled-relaxation
+    Validation: photon-history-queue, eadl-sampled-relaxation
     """
     from ..._backend import select_cupy_backend
 
@@ -132,7 +132,10 @@ def _compton_with_relaxation(element, energy, rays, uniforms, cutoff, capacity):
 
 
 def _relaxation_products(row, arrays, table, first):
-    """Relaxation photons/electrons from ordinal ``first``, terminal binding, defect."""
+    """Relaxation photons/electrons from ordinal ``first``, terminal binding, defect.
+
+    Validation: photon-history-queue, eadl-sampled-relaxation
+    """
     from .photon_histories import ELECTRON, RELAXATION_CHANNEL
 
     nt, nh = int(arrays["n_transitions"][row]), int(arrays["n_terminal"][row])
@@ -173,7 +176,10 @@ def _photoelectric_product(row, arrays, element, channel):
 
 
 def _compton_product(row, arrays, element, channel):
-    """Photon 0, recoil 1, then vacancy relaxation from ordinal 2 (CPU twin)."""
+    """Photon 0, recoil 1, then vacancy relaxation from ordinal 2 (CPU twin).
+
+    Validation: photon-history-queue
+    """
     from .photon_histories import ELECTRON
 
     photons, charged, binding, defect = _relaxation_products(
@@ -268,7 +274,10 @@ def cuda_collision_products(active, flight, collided, compositions, rngs, *, cut
 
 
 def apply_cuda_collision(queue, parent, position, product):
-    """Use the same lineage, cutoffs and ledger owners as the CPU queue."""
+    """Use the same lineage, cutoffs and ledger owners as the CPU queue.
+
+    Validation: photon-history-queue
+    """
     for ordinal, energy, direction in product.photons:
         queue.photon(parent, ordinal, position, direction, energy)
     if product.positron_rest_eV:
