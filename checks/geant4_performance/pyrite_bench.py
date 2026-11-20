@@ -317,37 +317,49 @@ def electron_groups(r, n, max_rows):
 
 
 def block_scores(r, n, e0_keV):
-    """Per-primary observables and work counts for one block."""
+    """Per-primary observables and work counts for one block.
+
+    One ``bincount`` over (primary, event kind) gives every row count; the
+    photon and exit observables touch only their (small) row subsets, so the
+    reduction makes a few passes over a block's rows rather than one per
+    observable. Sums keep row order, so values equal per-observable
+    :func:`grouped_scores` bitwise.
+    """
     import numpy as np
 
     from pyrite.montecarlo.transport.events import SegmentEvent as EventKind
     from pyrite.perf.precision import grouped_scores
 
     ids = np.asarray(r["electron_id"], dtype=np.int64)
-    ev = np.asarray(r["event_kind"])
-    ones = np.ones(ids.size)
-    out = {}
-    for name, code in [
-        ("backscattered", EventKind.EXIT_TOP),
-        ("transmitted", EventKind.EXIT_BOTTOM),
-        ("side_exited", EventKind.EXIT_SIDE),
-        ("stopped", EventKind.CUTOFF),
-    ]:
-        m = ev == code
-        out[name] = grouped_scores(ids[m], ones[m], n)
+    ev = np.asarray(r["event_kind"]).astype(np.int64)
+    kinds = max(EventKind) + 1
+    if ids.size and (ids.min() < 0 or ids.max() >= n or ev.min() < 0 or ev.max() >= kinds):
+        raise ValueError("invalid primary ids or event kinds")
+    counts = np.bincount(ids * kinds + ev, minlength=n * kinds).reshape(n, kinds).astype(np.float64)
+    out = {
+        name: counts[:, code]
+        for name, code in [
+            ("backscattered", EventKind.EXIT_TOP),
+            ("transmitted", EventKind.EXIT_BOTTOM),
+            ("side_exited", EventKind.EXIT_SIDE),
+            ("stopped", EventKind.CUTOFF),
+        ]
+    }
     terminal = out["backscattered"] + out["transmitted"] + out["side_exited"] + out["stopped"]
     if not np.all(terminal == 1.0):
         raise RuntimeError("every primary needs exactly one terminal row")
-    m = ev == EventKind.EXIT_BOTTOM
+    m = np.flatnonzero(ev == EventKind.EXIT_BOTTOM)
     out["transmitted_energy_keV"] = grouped_scores(ids[m], np.asarray(r["E_end_keV"])[m], n)
-    k = np.asarray(r["hard_radiative_k_eV"], dtype=np.float64)
+    k_all = np.asarray(r["hard_radiative_k_eV"], dtype=np.float64)
+    photon = np.flatnonzero(k_all >= BANDS[0][1])
+    k, k_ids = k_all[photon], ids[photon]
     for name, lo, hi in BANDS:
         m = (k >= lo) & (k < hi)
-        out[name] = grouped_scores(ids[m], ones[m], n)
+        out[name] = grouped_scores(k_ids[m], np.ones(m.sum()), n)
     m = k >= 1e4
-    out["photon_keV_ge10keV"] = grouped_scores(ids[m], k[m] / 1e3, n)
+    out["photon_keV_ge10keV"] = grouped_scores(k_ids[m], k[m] / 1e3, n)
     out["path_um"] = grouped_scores(ids, np.asarray(r["L_ang"], dtype=np.float64) / 1e4, n)
-    out["rows"] = grouped_scores(ids, ones, n)
+    out["rows"] = counts.sum(axis=1)
     for name, code in [
         ("rows_elastic", EventKind.ELASTIC),
         ("rows_substep", EventKind.SUBSTEP),
@@ -356,8 +368,7 @@ def block_scores(r, n, e0_keV):
         ("rows_soft_hinge", EventKind.SOFT_HINGE),
         ("rows_delta", EventKind.DELTA),
     ]:
-        m = ev == code
-        out[name] = grouped_scores(ids[m], ones[m], n)
+        out[name] = counts[:, code]
     out |= exit_distribution_scores(r, ids, ev, n, e0_keV)
     return out
 
@@ -374,20 +385,21 @@ def exit_distribution_scores(r, ids, ev, n, e0_keV):
     from pyrite.montecarlo.transport.events import SegmentEvent as EventKind
     from pyrite.perf.precision import grouped_scores
 
-    mu = np.asarray(r["v_hat"], dtype=np.float64)[:, 2]
-    energy = np.asarray(r["E_end_keV"], dtype=np.float64) / float(e0_keV)
     out = {}
     for prefix, code, sign in [
         ("transmitted", EventKind.EXIT_BOTTOM, 1.0),
         ("backscattered", EventKind.EXIT_TOP, -1.0),
     ]:
-        exiting = ev == code
+        rows = np.flatnonzero(ev == code)
+        sub = ids[rows]
+        mu = sign * np.asarray(r["v_hat"], dtype=np.float64)[rows, 2]
+        energy = np.asarray(r["E_end_keV"], dtype=np.float64)[rows] / float(e0_keV)
         for index, (low, high) in enumerate(pairwise(COSINE_EDGES)):
-            sel = exiting & (sign * mu >= low) & (sign * mu < high)
-            out[f"{prefix}_mu_bin_{index}"] = grouped_scores(ids[sel], np.ones(sel.sum()), n)
+            sel = (mu >= low) & (mu < high)
+            out[f"{prefix}_mu_bin_{index}"] = grouped_scores(sub[sel], np.ones(sel.sum()), n)
         for index, (low, high) in enumerate(pairwise(ENERGY_FRACTION_EDGES)):
-            sel = exiting & (energy >= low) & (energy < high)
-            out[f"{prefix}_energy_bin_{index}"] = grouped_scores(ids[sel], np.ones(sel.sum()), n)
+            sel = (energy >= low) & (energy < high)
+            out[f"{prefix}_energy_bin_{index}"] = grouped_scores(sub[sel], np.ones(sel.sum()), n)
     return out
 
 
