@@ -16,7 +16,7 @@
 | PXR, acoustic satellites | $\sum_m J_m^2=1$ | **No enhancement** in the kinematic limit. Satellites at $\delta E/E\sim d/\Lambda\lesssim10^{-4}$ are unresolved. |
 | PXR, extinction relief | Real-photon reflectivity rises when tilt amplitude exceeds the Darwin width | **No-go for PXR yield at MeV.** Only a fraction $\sim\gamma\,\omega_D\approx10^{-4}$–$10^{-3}$ of the PXR cone lies within the Darwin band. Relief applies to diffracted *real* photons (DTR, diffracted bremsstrahlung). |
 | Static superlattice (Ashrafi 1991) | Two CR families separated by the kink angle | **Go as a modeling target**; it needs a depth-dependent potential (§7). |
-| Resonant hypersound, circular polarization | Helical shear wave at the beat length (≈127 GHz, Si ⟨100⟩ 3.5 MeV) | **No-go now.** It is selective in principle, but needs $\gtrsim4\times10^{-4}$ circularly polarized shear strain at ≈130 GHz to beat dephasing (§8). |
+| Resonant hypersound, circular polarization | Helical shear wave at the beat length (≈128 GHz, Si ⟨100⟩ 3.5 MeV) | **No-go now.** It is selective in principle, but needs $\gtrsim4\times10^{-4}$ circularly polarized (engineering) shear strain at ≈130 GHz to beat dephasing (§8). |
 
 The Mkrtchyan et al. (2013) shifts do not fit a strain mechanism. Their pattern fits a change in the energy scale (§6).
 
@@ -189,7 +189,7 @@ No strain amplitude is quoted. The drive is called both "electromagnetic field" 
 - *Axial analogue (#994 geometry, ⟨100⟩ along the [001] growth axis):* the [001] strings do *not* kink. The beam crosses layers whose string spacing (5.390 vs 5.590 Å) and composition differ. This is a static longitudinal modulation of the axial potential with period $2L_{\rm layer}$, the static counterpart of Grigoryan's longitudinal wave (§8). It couples $\Delta m=0$ states only. The fibre engine would need:
   - a $z$-dependent Hamiltonian and rate operators (piecewise constant);
   - continuity of the transverse wavefunction at each interface;
-  - two-time dipole correlations across layers. Layers of 10–50 nm are comparable to the 2p–1s beat length (46 nm) and dephasing length (≈ 35 nm), so the per-zone secular Lorentzian line model does not apply.
+  - two-time dipole correlations across layers. Layers of 10–50 nm are comparable to the 2p–1s beat length (45.5 nm) and dephasing length (≈ 35 nm), so the per-zone secular Lorentzian line model does not apply.
 
   The full-dynamics $G(z)$ path used for planar `cr-line-shape` is the closest existing machinery.
 
@@ -201,7 +201,7 @@ No strain amplitude is quoted. The drive is called both "electromagnetic field" 
 
 - A *longitudinal* wave along the axis modulates the string potential, Eq. (2.4): $U=-(1+\mu\cos k_sz)\,a/\rho+b+\Delta\cos k_sz$.
 - The perturbation is cylindrically symmetric. First-order mixing, Eqs. (2.5)–(2.6a), therefore joins states of the *same* $m$ with longitudinal momentum $\pm\hbar k_s$.
-- Photon emission keeps $m_f=m_i\pm1$ (Eq. (2.12)) and gains sound-assisted channels ν = ±1, Doppler-shifted by $\nu\beta\hbar k_s$ (Eq. (2.20)).
+- Photon emission keeps $m_f=m_i\pm1$ (conservation law Eq. (2.17), $j=\pm1$; matrix element Eq. (2.12)) and gains sound-assisted channels ν = ±1, Doppler-shifted by $\nu\beta\hbar k_s$ (Eq. (2.20)).
 - ν = ±2 is forbidden at first order (Eq. (3.7)), and ν = 0 is unchanged at first order.
 - Near resonance, $\hbar k_s\beta c\approx|\varepsilon_a-\varepsilon_b|$, the ν = ±1 channels grow and inverse (absorptive) transitions such as 1s→2p appear (Figs. 1–2, 10 MeV, μ = 0.01). The authors note that linear perturbation theory fails at resonance.
 
@@ -218,21 +218,21 @@ $$
 
 $(\partial_x+i\partial_y)$ raises $m$ by one. The term $e^{-iqvt}(\partial_x+i\partial_y)U$ is resonant for absorption $1s\to2p(+1)$ when $\hbar qv=\varepsilon_{2p}-\varepsilon_{1s}$. The $m\to m-1$ term is off resonance by $2\hbar qv$. The opposite helicity selects 2p(−1). The drive is therefore **chirality-selective**, unlike the longitudinal wave.
 
-*Equivalence with the bent-channel pseudo-force.* The transformation $\boldsymbol\rho'=\boldsymbol\rho-\mathbf u(z)$ replaces the displacement by the inertial force $\mathbf F=-pv\,\mathbf u''(z)$. Its matrix element $pv\,q^2u_0x_0$ equals the displaced-potential element $\gamma m\omega^2u_0x_0$ exactly when $vq=\omega$, which is the resonance condition.
+*Equivalence with the bent-channel pseudo-force.* The transformation $\boldsymbol\rho'=\boldsymbol\rho-\mathbf u(z)$ replaces the displacement by the inertial force $\mathbf F=-pv\,\mathbf u''(z)$. Its matrix element $pv\,q^2u_0x_0$ equals the displaced-potential element $\gamma m\omega^2u_0x_0$ exactly when $vq=\omega$, which is the resonance condition. The equivalence is not limited to the harmonic case: $[H_0,\mathbf p]=i\hbar\nabla U$ gives $\langle f|\nabla U|i\rangle=\gamma m\,\omega_{fi}^2\langle f|\boldsymbol\rho|i\rangle$, so on resonance it holds for any $U$.
 
-*Size.* In the harmonic limit, with $x_0=\hbar c/\sqrt{2\gamma mc^2\,\Delta\varepsilon}$ and $\gamma m\omega^2x_0=\hbar\omega/2x_0$, the resonant coupling is $V=\Delta\varepsilon\,u_0/(2x_0)$. Full transfer takes $L_\pi=(\lambda_b/2)\,x_0/u_0$, with beat length $\lambda_b=2\pi\hbar\beta c/\Delta\varepsilon$.
+*Size.* In the harmonic limit, with $x_0=\hbar c/\sqrt{2\gamma mc^2\,\Delta\varepsilon}$ and $\gamma m\omega^2x_0=\hbar\omega/2x_0$, the circular-drive element is $\langle2p(+1)|\mathbf u\cdot\boldsymbol\rho|1s\rangle=u_0x_0e^{-i\phi}/\sqrt2$ (with $a_R^\dagger=(a_x^\dagger+ia_y^\dagger)/\sqrt2$), so the resonant coupling is $|V|=\gamma m\omega^2u_0x_0/\sqrt2=\Delta\varepsilon\,u_0/(2\sqrt2\,x_0)$. Full transfer takes $L_\pi=\pi\hbar v/(2|V|)=(\lambda_b/\sqrt2)\,x_0/u_0$, with beat length $\lambda_b=2\pi\hbar\beta c/\Delta\varepsilon$. A 2D harmonic oscillator is not a two-level system, so "full transfer" assumes the axial anharmonicity of the real potential isolates 1s↔2p(+1).
 
-For Si ⟨100⟩ 3.5 MeV 2p→1s (rest-frame 212 eV, lab 3.33 keV, $\Delta\varepsilon$ = 27 eV):
+For Si ⟨100⟩ 3.5 MeV 2p→1s (rest-frame 212 eV, lab 3.31 keV, $\Delta\varepsilon$ = 27 eV):
 
-- $\lambda_b$ = 46 nm, $x_0$ = 0.13 Å;
-- drive at $f=v_T/\lambda_b$ ≈ 127 GHz (Si $v_T$ = 5.84 km/s);
-- $L_\pi$ = 0.3 µm (the case thickness) needs $u_0$ ≈ 0.010 Å, a tilt $qu_0\approx1.4\times10^{-4}$.
+- $\lambda_b$ = 45.5 nm, $x_0$ = 0.134 Å;
+- drive at $f=v_T/\lambda_b$ ≈ 128 GHz (Si $v_T=\sqrt{C_{44}/\rho}$ = 5.85 km/s);
+- $L_\pi$ = 0.3 µm (the case thickness) needs $u_0$ ≈ 0.0144 Å, a tilt $qu_0\approx2.0\times10^{-4}$. The tilt $qu_0$ is the maximum helix slope, i.e. the engineering shear strain; the tensor component is $\varepsilon_{xz}=qu_0/2$. "Strain" below means the engineering value.
 
-The 2p→1s line, however, is 0.5–0.95 keV wide in the lab (Andersen Table 2, #992), which is $\Gamma_\perp$ ≈ 4–8 eV. The coherent drive beats this dephasing only if $V>\Gamma_\perp/2$, that is $u_0\gtrsim x_0\Gamma_\perp/\Delta\varepsilon$ ≈ 0.03 Å, or tilt ≳ $4\times10^{-4}$. Below that the drive acts as a rate $\sim2V^2/(\hbar\Gamma_\perp)$ and gives only a partial ℓ imbalance.
+The 2p→1s line, however, is 0.5–0.95 keV wide in the lab (Andersen Table 2, #992), which is $\Gamma_\perp$ ≈ 4–8 eV. The coherent drive beats this dephasing only if $V>\Gamma_\perp/2$, that is $u_0\gtrsim\sqrt2\,x_0\Gamma_\perp/\Delta\varepsilon$ = 0.028–0.056 Å, or tilt 3.9–7.8 × 10⁻⁴. Below that the drive acts as a rate $4V^2/(\hbar\Gamma_\perp)$ at line centre (Lorentzian FWHM $\Gamma_\perp$) and gives only a partial ℓ imbalance.
 
-Planar Si(110) 17 MeV 1→0 ($\Delta\varepsilon$ = 7.9 eV, $\lambda_b$ = 156 nm) needs a 37 GHz *linear* shear wave, but planar states carry no ±m pair. It modulates intensity, not circular polarization.
+Planar Si(110) 17 MeV 1→0 ($\Delta\varepsilon$ = 7.9 eV, $\lambda_b$ = 157 nm) needs a 37 GHz *linear* shear wave, but planar states carry no ±m pair. It modulates intensity, not circular polarization.
 
-**Verdict.** No-go for now. The mechanism is sound and selective, but it needs a sustained, phase-locked, circularly polarized shear wave at ≈ 130 GHz with strain ≳ $4\times10^{-4}$ inside a 0.3 µm membrane. Picosecond-acoustics pulses reach such strain but are not CW and not circularly polarized. A static helical superlattice is not available either.
+**Verdict.** No-go for now. The mechanism is sound and selective, but it needs a sustained, phase-locked, circularly polarized shear wave at ≈ 130 GHz with engineering shear strain ≳ $4\times10^{-4}$ (3.9–7.8 × 10⁻⁴ for $\Gamma_\perp$ = 4–8 eV) inside a 0.3 µm membrane. Picosecond-acoustics pulses reach such strain but are not CW and not circularly polarized. A static helical superlattice is not available either. A fresh-context check (2026-11-20) confirmed §2, §5 and this section after the $\sqrt2$ correction to $V$; the correction makes the requirement stricter, and the verdict stands.
 
 ## 9. Acoustic crystalline undulators
 
