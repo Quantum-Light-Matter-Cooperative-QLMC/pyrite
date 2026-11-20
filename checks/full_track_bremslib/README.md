@@ -92,7 +92,7 @@ use ELSEPA for new transport comparisons above the Mott table range.
 
 To repeat one case in a prepared remote PyRITE checkout, set
 `PYRITE_BENCH_CASE`, `PYRITE_BENCH_NE`, `PYRITE_BENCH_CUTOFF_EV`,
-`PYRITE_BENCH_ELASTIC` (`mott`, `sr` or `elsepa`) and `PYRITE_BENCH_OUTPUT`, then run:
+`PYRITE_BENCH_ELASTIC` (`mott`, `sr` or `elsepa`), `PYRITE_BENCH_CORE` (`per-electron` or `cuda`; `PYRITE_MC_BACKEND=cuda` with `cuda`), `PYRITE_BENCH_CHECK_ALL=1` (row-event contract check on every batch, not only the first) and `PYRITE_BENCH_OUTPUT`, then run:
 
 ```bash
 pyrite-dev test checks/full_track_bremslib/test_benchmark.py -s -q

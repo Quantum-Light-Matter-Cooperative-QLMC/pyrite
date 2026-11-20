@@ -33,8 +33,39 @@ _CASES = {
 }
 
 
-def _batch(seed, count, cutoff_eV, element, number_density_ang3, energy_keV, tables, **kwargs):
-    """Transport one seeded batch and reduce it to per-primary and per-photon data."""
+def _soft_table(tables, element, energy_keV, cutoff_eV):
+    """BremsLib soft first moment [eV cm^2] on a log-energy grid, once per case.
+
+    Soft radiation joins the continuous stopping, so rows do not record it;
+    :func:`_batch` re-evaluates it at each row's mean energy from this table,
+    which interpolates it to better than 1e-5.
+    """
+    grid_eV = np.geomspace(10_000.0 * (1.0 - 1e-9), energy_keV * 1000.0, 2001)
+    soft_cm2 = [
+        build_radiative_partition(tables[element], e, min(cutoff_eV, e)).soft_stopping_cs_eV_cm2
+        for e in grid_eV
+    ]
+    return grid_eV, np.asarray(soft_cm2)
+
+
+def _batch(
+    seed,
+    count,
+    cutoff_eV,
+    element,
+    number_density_ang3,
+    energy_keV,
+    tables,
+    *,
+    soft=None,
+    check=True,
+    **kwargs,
+):
+    """Transport one seeded batch and reduce it to per-primary and per-photon data.
+
+    ``soft`` is the case's :func:`_soft_table` (built here when ``None``);
+    ``check`` runs the row-event contract check on this batch.
+    """
     result = simulate_trajectories(
         E0_keV=energy_keV,
         Ne=count,
@@ -49,7 +80,8 @@ def _batch(seed, count, cutoff_eV, element, number_density_ang3, energy_keV, tab
         bremslib_tables=tables,
         **kwargs,
     )
-    check_segment_event_contract(result)
+    if check:
+        check_segment_event_contract(result)
     photons = np.asarray(result["hard_radiative_k_eV"], dtype=float)
     payload = photons > 0.0
     before_eV = np.asarray(result["E_end_keV"], dtype=float)[payload] * 1000.0
@@ -69,14 +101,7 @@ def _batch(seed, count, cutoff_eV, element, number_density_ang3, energy_keV, tab
     )
     assert int(np.count_nonzero(terminal)) == count
     terminal_energy_keV = np.asarray(result["E_end_keV"])[terminal] - photons[terminal] * 1e-3
-    # Soft radiation joins the continuous stopping, so rows do not record it.
-    # Re-evaluate the same BremsLib soft first moment at each row's mean energy;
-    # the log-energy table interpolates it to better than 1e-5.
-    grid_eV = np.geomspace(10_000.0 * (1.0 - 1e-9), energy_keV * 1000.0, 2001)
-    soft_cm2 = [
-        build_radiative_partition(tables[element], e, min(cutoff_eV, e)).soft_stopping_cs_eV_cm2
-        for e in grid_eV
-    ]
+    grid_eV, soft_cm2 = soft or _soft_table(tables, element, energy_keV, cutoff_eV)
     row_mean_eV = 500.0 * (
         np.asarray(result["E_start_keV"], dtype=float)
         + np.asarray(result["E_end_keV"], dtype=float)
@@ -127,8 +152,12 @@ def test_full_track_bremslib_benchmark():
     number_density_ang3 = density_g_cm3 * _AVOGADRO / atomic_weight_g_mol / 1e24
     tables = load_bremsstrahlung_tables([element])
     assert element in tables
+    # The row-event contract check costs about 4x the CUDA transport of a
+    # batch (W 300 keV); the first batch is checked unless CHECK_ALL is set.
+    check_all = os.environ.get("PYRITE_BENCH_CHECK_ALL") == "1"
 
     t0 = perf_counter()
+    soft = _soft_table(tables, element, energy_keV, cutoff_eV)
     batches = []
     for index, start in enumerate(range(0, count, batch_size)):
         size = min(batch_size, count - start)
@@ -140,6 +169,8 @@ def test_full_track_bremslib_benchmark():
             number_density_ang3,
             energy_keV,
             tables,
+            soft=soft,
+            check=check_all or index == 0,
             thickness_ang=thickness_ang,
             transport_core=core,
             elastic_model=elastic_model,
