@@ -139,14 +139,37 @@ C(2) U₁₁ = 0.0033(1), U₃₃ = 0.0140(3) (without extinction: 0.0030(2)/0.0
 and 0.0033(2)/0.0138(4)). It also quotes Ludsteck's neutron values (U₁₁ =
 0.0031(6), U₃₃ = 0.0090(20)) and a phonon-spectrum value (0.0032, 0.0098).
 The sources therefore disagree on U₃₃ by a factor of 1.6–1.8: 0.0090(20)
-(polycrystalline neutron, Debye fit over 300–1150 K), 0.0140(3) (single-crystal
-X-ray), and 0.016/0.017 (single-crystal neutron, with U₁₁ fixed;
-{cite:p}`trucano1975`). The paper offers no temperature series of its own; the
-only series is Ludsteck's, which is reported there as Debye temperatures
-(Θ₁₁ = 1300, Θ₃₃ = 670 K) and which has not been read at source
-(DOI `10.1107/S0567739472000130`, unconfirmed). The catalog's `hopg` CIF has
-four P1 carbons (two 2b-type, two 2c-type); a per-element uniaxial row cannot
-carry the C(1)/C(2) U₁₁ difference, so no graphite row is admitted yet.
+(polycrystalline neutron, Debye fit), 0.0140(3) (single-crystal X-ray), and
+0.016/0.017 (single-crystal neutron).
+
+Trucano and Chen 1975 {cite:p}`trucano1975` (Zotero `NRG2VMUP`, Table 2, read
+for #540) is the source chosen for graphite. It is a neutron refinement of one
+natural single crystal (0.2 × 2 × 1.4 mm, Brookhaven HFBR, λ = 1.02041 Å, 339
+reflections, extinction neglected). In its P6₃/mmc refinement U₃₃ = 0.016(2) Å²
+for C(1) at (0, 0, 1/4) and 0.017(2) for C(2) at (1/3, 2/3, 1/4); the other
+refinements quote ±0.001. U₁₁ = U₂₂ = 0.0031 Å² is **not refined**: it is fixed
+from Ludsteck for both sites. The authors state that C(1) and C(2) are "not
+significantly different" (Debye temperatures 490 ± 40 and 470 ± 40 K). **The
+letter states no measurement temperature**, so a row cannot yet declare the
+window that `UniaxialThermalSite` requires.
+
+Ludsteck 1972 (Zotero `2PTDUCU5`, DOI `10.1107/S0567739472000130`, read for
+#540) is not a usable series. It measured elastic 002/004/110 intensities of
+polycrystalline extruded Iso-AMT graphite (anisotropy 1.05) at only four
+temperatures (25, 850, 1140, 1830 °C), treats all four atoms of the cell as
+one species, and states that these intensities give temperature differences
+Δ⟨u²⟩, not absolute values. It reports effective Debye temperatures per
+interval (300–1150 K: Θ∥c = 670 K, within 600–770 K; Θ⊥c = 1300 K, within
+1190–1510 K). Any absolute U₁₁ or U₃₃ from it, including the 0.0031 and 0.0090
+that Chen and Trucano compute through their eq. (1), assumes a Debye form.
+No graphite temperature series is therefore admissible.
+
+The catalog's `hopg` CIF has four P1 carbons (two 2b-type, two 2c-type). A
+per-element uniaxial row would collapse the C(1)/C(2) U₃₃ difference of 0.001
+Å², which is half the quoted uncertainty; whether that justifies a per-site
+schema is the first item of
+[#1335](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/1335).
+No graphite row is admitted yet.
 The [existing basal diffraction record](../../validation/materials/hopg-debye-waller-00l.md)
 already distinguishes two carbon sites with different normal displacements.
 The channeling thermal loader currently groups by element, so a single C row
