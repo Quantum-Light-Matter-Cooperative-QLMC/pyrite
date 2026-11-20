@@ -58,6 +58,46 @@ def test_measured_values_are_reproduced_at_the_source_debye_waller(crystal):
 
 
 @pytest.mark.parametrize("crystal", CRYSTALS_WITH_DATA)
+def test_catalog_debye_waller_reproduces_measured_dynamic_F_within_sigma(crystal):
+    """#1189: at the catalog ``B`` the X-ray ``F(hkl)`` is the measured dynamic value.
+
+    The static bonding correction is re-smeared with the caller's ``B``, so a
+    catalog ``B`` away from the source ``B`` (diamond was 0.21 vs 0.1379 A^2,
+    off 0.7% at (111) and 2.9% at (440)) breaks the measured values.
+
+    Validation: debye-waller-catalog-provenance
+    """
+    record = _record(crystal)
+    B = CATALOG.crystal(crystal).B_ang2
+    basis = CRYSTALS[crystal]["basis"]
+    assert B == pytest.approx(record.B_ang2, abs=1e-12)
+    for reflection in record.reflections:
+        hkl = reflection.hkl
+        S, g = structure_factor(crystal, hkl, 30_000.0, B)
+        iam, _ = structure_factor(crystal, hkl, 30_000.0, B, bonding_charge=False)
+        P = sum(np.exp(2j * np.pi * np.dot(hkl, r)) for _, r in basis)
+        f0 = cromer_mann_f0(basis[0][0], g) * debye_waller(g, B)
+        measured = _per_atom(crystal, hkl, S - iam + f0 * P)
+        assert abs(measured - reflection.F) < reflection.sigma
+
+
+def test_catalog_debye_waller_matches_primary_room_temperature_refinements():
+    """#1189: primary sources recorded in the catalog TOML comments.
+
+    Diamond: Takama et al. (1990) Dawson-model fit ``0.142(9)`` A^2 at 294 K;
+    the catalog 0.1379 (LZD fit to the same set) is within one sigma of it.
+    Si: Spackman (1986) ``<u^2> = 0.005867(14)`` A^2, ``B = 8 pi^2 <u^2>``;
+    lattice dynamics at 293 K (Flensburg & Stewart 1999) gives ``0.4691(16)``.
+
+    Validation: debye-waller-catalog-provenance
+    """
+    assert abs(CATALOG.crystal("diamond").B_ang2 - 0.142) < 0.009
+    assert CATALOG.crystal("silicon").B_ang2 == pytest.approx(8 * np.pi**2 * 0.005867, abs=5e-5)
+    # The two Si sources differ by 1.3% (3.7 sigma of the lattice-dynamical value).
+    assert CATALOG.crystal("silicon").B_ang2 == pytest.approx(0.4691, rel=0.015)
+
+
+@pytest.mark.parametrize("crystal", CRYSTALS_WITH_DATA)
 def test_every_family_member_is_corrected_with_the_iam_phase(crystal):
     hkl0 = (3, 1, 1)
     S0, _ = structure_factor(crystal, hkl0, 30_000.0, 0.3)
@@ -208,7 +248,7 @@ def test_planar_bonding_charge_raises_the_111_electron_density_between_close_pla
 def test_identity_marker_only_for_crystals_with_measured_data():
     assert structure_factor_marker(["gaas", None]) is None
     marker = structure_factor_marker(["silicon"])
-    assert marker is not None and marker.startswith("measured-low-order-v1/")
+    assert marker is not None and marker.startswith("measured-low-order-v2/")
     assert structure_factor_marker(["silicon", "gaas"]) == marker
     assert structure_factor_marker(["diamond", "silicon"]) not in (None, marker)
 
@@ -219,8 +259,8 @@ def test_identity_marker_is_platform_stable():
     Hashing the derived correction table gave different case keys on CI and
     locally (last-bit libm differences); this pin catches that regression.
     """
-    assert structure_factor_marker(["silicon"]) == "measured-low-order-v1/dd35857a0a72b4d8"
-    assert structure_factor_marker(["diamond"]) == "measured-low-order-v1/f5c2bd7cb62cd347"
+    assert structure_factor_marker(["silicon"]) == "measured-low-order-v2/dd35857a0a72b4d8"
+    assert structure_factor_marker(["diamond"]) == "measured-low-order-v2/f5c2bd7cb62cd347"
 
 
 def _raw(**overrides):

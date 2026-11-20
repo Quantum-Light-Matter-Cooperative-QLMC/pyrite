@@ -249,10 +249,11 @@ does not show that the residual offset to experiment has been removed.
 1. The Si $B_{\rm src}=0.4632$ Å$^2$ is the single $B$ LZD take from
    Spackman (their Ref. 30), not an LZD fit (Table I: $0.4585$). The ledger
    Notes call both values "LZD single-B fits"; only diamond's is.
-2. With diamond's catalog $B=0.21$ Å$^2$, the X-ray path reproduces the TTKS
-   values only to within $e^{-(0.21-0.1379)s^2}$ (0.7% at (111), 2.9% at
-   (440)). That is the open `debye-waller-catalog-provenance` issue. The
-   correction is right.
+2. With diamond's former catalog $B=0.21$ Å$^2$, the X-ray path reproduced the
+   TTKS values only to within $e^{-(0.21-0.1379)s^2}$ (0.7% at (111), 2.9% at
+   (440)). Resolved in #1189: catalog $B$ is now $0.1379$ (Si $0.4632$) and a
+   regression test pins the measured values within $\sigma$ at the catalog
+   $B$. The correction was right throughout.
 3. $\Delta F$ absorbs the Waasmaier–Kirfel residual against the measurement
    (e.g. Si (111): static per-atom $\Delta F = 0.191$ e versus LZD's
    dynamic-solid minus dynamic-atom difference $0.148$ e). This is intended

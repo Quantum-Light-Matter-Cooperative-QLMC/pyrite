@@ -517,3 +517,12 @@ pins in `resolved.json` advance (legacy, elsepa, coupled, multilayer,
 cascade); resolved case payloads, `case_content_key`, output arrays and
 tolerances are unchanged. The fixtures run on CPU/NumPy, which keeps the host
 route.
+
+## Silicon catalog `B_ang2` 0.46 → 0.4632 (#1189)
+
+Silicon's catalog Debye–Waller `B` now equals the Spackman value (0.4632 Å²) of
+its measured structure-factor table. Only the `B_ang2` field of the Si case
+payloads changed in `resolved.json`, `channeling.json` and
+`reflection_selection_1173.json`; the generation-dependent identity hashes were
+re-pinned with `pyrite-dev test-suite identity-pins --update-pins`
+(`STRUCTURE_FACTOR_MODEL` v1 → v2). Non-Si cases are unchanged.

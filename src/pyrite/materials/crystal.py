@@ -217,7 +217,11 @@ def _bonding_source(spec):
 #: Generation of the measured low-order structure-factor model (#1177). It joins
 #: dataset and case identities only when a referenced crystal carries measured
 #: structure factors, so every other material keeps its historical digest.
-STRUCTURE_FACTOR_MODEL = "measured-low-order-v1"
+#: v2 (#1189): catalog ``B_ang2`` moves to the primary room-temperature values
+#: (Si 0.46 -> 0.4632, diamond 0.21 -> 0.1379 A^2). Dataset crystallography omits
+#: ``B_ang2``, so the bump re-keys Si/diamond datasets; case keys hash it already.
+#: Validation: debye-waller-catalog-provenance
+STRUCTURE_FACTOR_MODEL = "measured-low-order-v2"
 
 
 def structure_factor_marker(crystals):
