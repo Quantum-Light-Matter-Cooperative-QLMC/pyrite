@@ -346,3 +346,36 @@ def test_grooved_lockstep_still_refuses_blocks():
     kw = _grooved_kw() | {"transport_core": "lockstep"}
     with pytest.raises(ValueError, match="counter-addressed streams"):
         simulate_trajectories(Ne=4, _electron_start=4, **kw)
+
+
+class _DeviceArray:
+    """Stand-in for a device array: array-shaped, but not a NumPy array."""
+
+    def __init__(self, values):
+        self.values = np.asarray(values)
+        self.shape, self.dtype = self.values.shape, self.values.dtype
+
+
+def test_merge_joins_host_copies_when_blocks_mix_device_and_host(monkeypatch):
+    """A block kept on the device before a transport OOM fail-over joins the host
+    blocks completed after it (#1295 job 13876: streamed selection prefix)."""
+    from pyrite.montecarlo.runner import block_transport
+
+    def to_cpu(value):
+        return np.asarray(getattr(value, "values", value))
+
+    monkeypatch.setattr(block_transport.BACKEND, "to_cpu", to_cpu)
+    device = _DeviceArray([0, 1])
+    blocks = [
+        {"Ne": 2, "elec_id": device, "electron_id": device, "L_ang": _DeviceArray([1.0, 2.0])},
+        {"Ne": 1, "elec_id": np.array([2]), "electron_id": np.array([2]), "L_ang": np.array([3.0])},
+    ]
+    blocks[1]["electron_id"] = blocks[1]["elec_id"]
+
+    merged = block_transport.merge_electron_blocks(blocks)
+
+    assert merged["Ne"] == 3
+    assert isinstance(merged["L_ang"], np.ndarray)
+    np.testing.assert_array_equal(merged["L_ang"], [1.0, 2.0, 3.0])
+    np.testing.assert_array_equal(merged["elec_id"], [0, 1, 2])
+    assert merged["elec_id"] is merged["electron_id"]
