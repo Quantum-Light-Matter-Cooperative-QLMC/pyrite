@@ -217,13 +217,32 @@ def _comparison(element, Z, energy, *, chi=1.0, moment=1.0, model="bremslib"):
     )
 
 
-def test_gate_domain_ungated_elements_are_h_and_the_li_policy_choice():
+def test_gate_domain_ungates_h_and_two_cited_li_kinds():
     from checks import brem_source_comparison as check
 
-    assert set(check.UNGATED_ELEMENTS) == {1, 3}
-    hydrogen, lithium = check.UNGATED_ELEMENTS[1], check.UNGATED_ELEMENTS[3]
+    assert set(check.UNGATED_ELEMENTS) == {1}
+    hydrogen = check.UNGATED_ELEMENTS[1]
     assert "p. 348" in hydrogen and "p. 35" in hydrogen
-    assert "policy choice" in lithium and "#1073" in lithium
+    assert set(check.UNGATED_KINDS) == {3}
+    lithium = check.UNGATED_KINDS[3]
+    assert set(lithium) == {"chi", "extension_moment"}
+    assert "Interpolate_DCS" in lithium["chi"] and "#1073" in lithium["chi"]
+    assert "p. 347" in lithium["extension_moment"] and "#1073" in lithium["extension_moment"]
+    assert "policy" not in " ".join(lithium.values())
+
+
+def test_gate_violations_gate_the_li_band_moment_only():
+    from checks import brem_source_comparison as check
+
+    kappa = np.array(_KAPPA)
+    reported = [
+        _comparison("Li", 3, 1.0, chi=1.14, moment=1.07),
+        _comparison("Li", 3, 50.0, chi=1.3, moment=1.072),
+    ]
+    assert check.gate_violations(reported, kappa) == []
+    failing = [_comparison("Li", 3, 1.0, chi=1.14, moment=1.11)]
+    kinds = [(f[0], f[1], f[2]) for f in check.gate_violations(failing, kappa)]
+    assert kinds == [("Li", 1.0, "moment")]
 
 
 def test_gate_moment_bands_follow_seltzer_berger_and_the_extension_decision():

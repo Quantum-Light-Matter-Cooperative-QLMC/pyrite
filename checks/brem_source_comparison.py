@@ -8,7 +8,8 @@ cross section above ``kappa = 0.05``, and the radiative first moment. See
 
 Gate (claim ``brem-source-comparison``, BremsLib only) on the validated domain
 ``10 keV <= T <= 30 MeV``, ``0.05 <= kappa <= 0.95``, every catalogue element
-except those in ``UNGATED_ELEMENTS``:
+except those in ``UNGATED_ELEMENTS``, and every gate kind not listed for the
+element in ``UNGATED_KINDS``:
 
 * pointwise ``chi`` ratio within ``1 +/- 0.13``;
 * first-moment ratio within ``1 +/- 0.10``.
@@ -23,8 +24,12 @@ Seltzer and Berger's (1985) ``eta`` (``pyrite._bremslib_electron``).
 grids) are reported, not gated.
 
 ``UNGATED_ELEMENTS`` maps each catalogue element that is reported but not gated
-to its reason, printed and written to the JSON report. H has two cited reasons;
-Li is an explicit policy choice for a measured, unexplained discrepancy (#1073).
+to its reason; ``UNGATED_KINDS`` maps an otherwise gated element to the gate
+kinds (``"chi"``, ``"extension_moment"``) it is reported for but not gated on,
+each with its reason. Both are printed and written to the JSON report. H is
+ungated for two cited reasons. Li (#1073) is gated on its 10 keV--30 MeV first
+moment; its pointwise ``chi`` and its extension moment are reported with the
+measured, cited cause of each.
 
 The 30--100 MeV extension rows (claim ``bremslib-high-energy-extension``,
 #439) gate only the first moment, within ``1 +/- 0.06`` (#439's decision). Their
@@ -93,8 +98,27 @@ UNGATED_ELEMENTS = {
     "Pratt et al.'s Z = 2-92 (Seltzer & Berger, ADNDT 35, 345 (1986), p. 348; Z = 2-92 range p. 346), "
     "and BremsLib uses the screened Born approximation for Z <= 2 at T2 >= 0.5 MeV "
     "(Poskus, ADNDT 166, 101734 (2025), p. 35)",
-    3: "Li: explicit policy choice, not a sourced exclusion; a measured BremsLib-versus-"
-    "Seltzer-Berger electron-nucleus discrepancy with no known cause, tracked in #1073",
+}
+
+#: Gate kinds reported but not gated for an otherwise gated element, with the
+#: reason for each (#1073).
+UNGATED_KINDS = {
+    3: {
+        "chi": "Li pointwise: PyRITE interpolates BremsLib linearly in k/T between its k/T = 0 "
+        "and 0.1 nodes, which is less accurate than the cubic-spline scheme (of SDCS/SDCS_Born "
+        "at T1 >= 1 MeV) the library's own interpolation manual prescribes (Interpolate_DCS "
+        "v1.0.7 manual, Sec. 2, p. 3), as measured with Interpolate_DCS v1.0.7 itself: at "
+        "k/T = 0.05 linear raises Li by 0.056-0.062 at 0.4-1 MeV (1.130-1.137 against "
+        "1.072-1.077), and Interpolate_DCS keeps Li <= 1.125 up to 30 MeV; #1073",
+        "extension_moment": "Li 30-100 MeV first moment: an electron-nucleus difference that "
+        "grows smoothly as Z falls (100 MeV: Al 1.035, C 1.053, B 1.058, Li 1.072, H 1.134) and "
+        "does not depend on k/T interpolation. At T >= 50 MeV it is between two analytic "
+        "high-energy theories (Seltzer & Berger, ADNDT 35, 345 (1986), p. 347; BremsLib v2.0 "
+        "manual p. 3 for k/T >= 0.1), where the reference alone carries 3-5 % (SB86 p. 346); at "
+        "30-50 MeV the reference is a spline interpolation (SB86 p. 348) with 5-10 % uncertainty "
+        "(SB86 p. 346), which Li (1.059 at 40 MeV) lies within. No source bounds the difference "
+        "within the #439 gate; #1073",
+    },
 }
 
 
@@ -118,11 +142,18 @@ def gate_violations(results, kappa):
         tolerance = moment_tolerance(r.incident_energy_MeV)
         if r.model != "bremslib" or r.atomic_number in UNGATED_ELEMENTS or tolerance is None:
             continue
+        skip = UNGATED_KINDS.get(r.atomic_number, {})
         ratio = r.chi_ratio[gated_kappa]
         extension = r.incident_energy_MeV > T_MAX_MEV * (1 + 1e-9)
-        if not extension and np.any(np.abs(ratio - 1.0) > POINTWISE_TOLERANCE):
+        if (
+            not extension
+            and "chi" not in skip
+            and np.any(np.abs(ratio - 1.0) > POINTWISE_TOLERANCE)
+        ):
             failures.append((r.element, r.incident_energy_MeV, "chi", ratio.min(), ratio.max()))
         moment = r.first_moment_ratio
+        if extension and "extension_moment" in skip:
+            continue
         if abs(moment - 1.0) > tolerance:
             failures.append((r.element, r.incident_energy_MeV, "moment", moment, moment))
     return failures
@@ -158,9 +189,15 @@ def _eedl_panel_moments(table, elements):
 
 
 def _ungated_summary(results, gated_kappa):
-    """Gated-domain ranges for each ungated element, with its reason."""
+    """Ranges for each element with an ungated gate kind, with the reasons.
+
+    ``chi_ratio`` spans the pointwise domain (10 keV--30 MeV); the first moment
+    is split into that band and the extension rows.
+    """
+    reasons = {z: {"all": reason} for z, reason in UNGATED_ELEMENTS.items()}
+    reasons.update(UNGATED_KINDS)
     rows = []
-    for z, reason in UNGATED_ELEMENTS.items():
+    for z, why in reasons.items():
         mine = [
             r
             for r in results
@@ -170,21 +207,22 @@ def _ungated_summary(results, gated_kappa):
         ]
         if not mine:
             continue
-        chi = np.concatenate(
-            [
-                r.chi_ratio[gated_kappa]
-                for r in mine
-                if r.incident_energy_MeV <= T_MAX_MEV * (1 + 1e-9)
-            ]
-        )
-        moments = [r.first_moment_ratio for r in mine]
+        in_band = [r.incident_energy_MeV <= T_MAX_MEV * (1 + 1e-9) for r in mine]
+        band = [r for r, inside in zip(mine, in_band, strict=True) if inside]
+        chi = np.concatenate([r.chi_ratio[gated_kappa] for r in band])
+        moments = [r.first_moment_ratio for r in band]
+        extension = [
+            r.first_moment_ratio for r, inside in zip(mine, in_band, strict=True) if not inside
+        ] or [np.nan]
         rows.append(
             {
                 "element": mine[0].element,
                 "Z": z,
-                "reason": reason,
+                "ungated": sorted(why),
+                "reasons": why,
                 "chi_ratio": [float(chi.min()), float(chi.max())],
                 "first_moment_ratio": [float(min(moments)), float(max(moments))],
+                "extension_first_moment_ratio": [float(min(extension)), float(max(extension))],
             }
         )
     return rows
@@ -220,9 +258,11 @@ def main(argv=None) -> int:
         print(f"{'el':>3} {'T[MeV]':>8} {'min':>7} {'max':>7} {'moment':>7} {'hard':>7}")
         for r in (r for r in results if r.model == model):
             ratio = r.chi_ratio[gated_kappa]
-            flag = (
-                "  ungated" if model == "bremslib" and r.atomic_number in UNGATED_ELEMENTS else ""
-            )
+            flag = ""
+            if model == "bremslib" and r.atomic_number in UNGATED_ELEMENTS:
+                flag = "  ungated"
+            elif model == "bremslib" and r.atomic_number in UNGATED_KINDS:
+                flag = "  partly ungated"
             print(
                 f"{r.element:>3} {r.incident_energy_MeV:8.3f} {ratio.min():7.3f} "
                 f"{ratio.max():7.3f} {r.first_moment_ratio:7.3f} "
@@ -232,11 +272,17 @@ def main(argv=None) -> int:
     ungated = _ungated_summary(results, gated_kappa)
     print("\n== bremslib reported, not gated (10 keV <= T <= 100 MeV)")
     for row in ungated:
-        print(
-            f"{row['element']:>3} chi {row['chi_ratio'][0]:.3f}..{row['chi_ratio'][1]:.3f} "
-            f"(T <= {T_MAX_MEV:g} MeV), moment {row['first_moment_ratio'][0]:.3f}.."
-            f"{row['first_moment_ratio'][1]:.3f}: {row['reason']}"
+        chi, moment, ext = (
+            row["chi_ratio"],
+            row["first_moment_ratio"],
+            row["extension_first_moment_ratio"],
         )
+        print(
+            f"{row['element']:>3} chi {chi[0]:.3f}..{chi[1]:.3f} (T <= {T_MAX_MEV:g} MeV), "
+            f"moment {moment[0]:.3f}..{moment[1]:.3f}, extension moment {ext[0]:.3f}..{ext[1]:.3f}"
+        )
+        for kind, reason in row["reasons"].items():
+            print(f"    ungated {kind}: {reason}")
 
     tip = table.kappa > KAPPA_MAX
     print(
