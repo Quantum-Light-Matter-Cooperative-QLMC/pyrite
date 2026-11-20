@@ -4,7 +4,7 @@
 
 Validation: `brem-source-comparison`. This is an implementation-context comparison, not a fresh-context re-derivation. It asks which bremsstrahlung cross-section source PyRITE should use in production: the pinned EEDL evaluation (current default) or the released BremsLib tables (#86, #84). Both are compared with an independent reference, the Seltzer–Berger tabulation, as PyRITE evaluates them in production (`montecarlo/spectrum/brem.py::_bremsstrahlung_dsigma_dk`). The angular model is not covered; no independent double-differential reference is used here.
 
-Current gate and evidence: [Gate domain and low-Z excess (#1068, 2026-11-10)](#gate-domain-and-low-z-excess-1068-2026-11-10). The sections dated 2026-09-25 measured 24 elements (Z = 5–83) with the electron–nucleus library alone; they are kept as history, and their electron–electron explanation of the low-Z deficit no longer applies to the staged tables.
+Current gate and evidence: [Gate domain and low-Z excess (#1068, 2026-11-10)](#gate-domain-and-low-z-excess-1068-2026-11-10), with Li's gate replaced by [Lithium attribution (#1073, 2026-11-20)](#lithium-attribution-1073-2026-11-20). The sections dated 2026-09-25 measured 24 elements (Z = 5–83) with the electron–nucleus library alone; they are kept as history, and their electron–electron explanation of the low-Z deficit no longer applies to the staged tables.
 
 ## Reference
 
@@ -168,7 +168,7 @@ Substituting SB86's rows moves H's total by +1.1 % at 0.5 MeV and −1.3 % at 30
 - `MOMENT_TOLERANCE_BANDS`: first moment within `1 ± 0.10` for 10 keV–30 MeV, the upper end of SB86 p. 346's quoted ranges below 50 MeV, and the existing `1 ± 0.06` for the extension rows, 30 < T ≤ 100 MeV (`bremslib-high-energy-extension`, #439). Pointwise stays `1 ± 0.13`.
 - `UNGATED_ELEMENTS`, printed and written to the JSON report with a reason each:
   - **H (Z = 1):** the reference electron–nucleus value is extrapolated outside Pratt et al.'s Z = 2–92 (SB86 p. 348, Z = 2–92 range p. 346; SB85 p. 96), and BremsLib uses the screened Born approximation for Z ≤ 2 (Poškus 2025 p. 35).
-  - **Li (Z = 3):** an explicit policy choice, not a sourced exclusion — a measured BremsLib-versus-SB86 electron–nucleus discrepancy with no known cause, tracked in #1073.
+  - **Li (Z = 3):** an explicit policy choice, not a sourced exclusion — a measured BremsLib-versus-SB86 electron–nucleus discrepancy with no known cause, tracked in #1073. Superseded by [#1073](#lithium-attribution-1073-2026-11-20): Li's band moment is now gated, and its pointwise and extension-moment exclusions cite a measured cause.
 
 ### Results (2026-11-10)
 
@@ -194,3 +194,72 @@ An independent verifier read SB86, SB85 and Poškus 2025 directly (rendering SB8
 - **Corrections applied:** SB85's Z = 1 extrapolation and Pratt et al.'s 10 % are on p. 96, not p. 97; the SB86 citation is p. 348 with the Z = 2–92 range on p. 346; the Li computational uncertainty comes from the library's `RelErr` columns, not the paper; the `η̄` shift is scoped to energy.
 - **Verdict:** `rederived`; with the gate-domain tests in `tests/montecarlo/brem/test_brem_source_comparison.py` the row is `anchored`. Li's exclusion remains a policy choice (#1073). Only a human may mark this signed off.
 
+## Lithium attribution (#1073, 2026-11-20)
+
+#1068 left Li (Z = 3) ungated as a policy choice, because no source explained its excess. This section attributes the excess, splits it into a staging part and a library-versus-reference part, and replaces the policy choice with cited reasons. It changes no physics and no default numerical output; only the gate domain changes.
+
+### Sources
+
+- **SB85 p. 96** (Pratt et al.'s method, as quoted by SB85). Pratt et al. (ADNDT 20, 175 (1977)) computed partial-wave results only for Z = 2, 8, 13, 47, 79 and 92, at `T1` typically 1, 5, 10, 50, 100, 500, 1000 and 2000 keV and at `k/T1` typically 0.95, 0.8, 0.6, 0.4 and 0.0. They filled in 2 ≤ Z ≤ 92 and 0 ≤ `k/T1` ≤ 1 by least-squares cubic-spline fits of the ratio to screened, Coulomb-corrected Born theory. Their overall uncertainty is 10 %. The footnote adds a low-energy exception from the energy-independent exchange potential. Without exchange, the `k = 0` cross section at 1 keV is 16 % lower for Li, and the difference fades by about 100 keV for low Z. So in the reference, Li is an interpolation between computed Z = 2 and Z = 8, and `k/T1 = 0.05` is an interpolation between computed 0 and 0.4. The exchange caveat raises the reference, the opposite sign to Li's excess, and does not apply above about 100 keV.
+- **SB86 p. 347.** For `T1 ≥ 50 MeV` the electron–nucleus term is analytic high-energy theory: Bethe–Heitler, plus a screening correction using Hubbell et al.'s form factors (their 1975 tables for Z ≤ 6), plus a Coulomb correction. From 2 to 50 MeV it is a spline interpolation between that theory and Pratt et al. **SB86 p. 346** gives the uncertainty: 3–5 % at `T1 ≥ 50 MeV`.
+- **BremsLib v2.0 manual (library version 2.0.8), p. 3.** For `k/T1 ≥ 0.1` and `T1 ≥ 50 MeV`, the SDCS integrates an analytic Sommerfeld–Maue triple-differential cross section with next-to-leading-order and screening corrections. Its `RelErr` column is zero there.
+- **Interpolate_DCS v1.0.7 user's manual, Sec. 2, p. 3** (shipped with BremsLib v2.0.8). Between the first two library nodes (`k/T1` = 0 and 0.1), "a simple spline fitting or interpolation typically causes relative errors greater than 10 % when k/T1 is of the order of 0.01 (and linear interpolation is even less accurate)". The manual prescribes cubic-spline fitting of `SDCS/SDCS_Born`, multiplied by the screened Born SDCS. The Born SDCS is tabulated on 20 `k/T1` nodes, including 10 below 0.1, in `SDCS/Born_appr/`, for `T1 ≥ 1 MeV`. Below 1 MeV, "simple spline fitting of the original grid values … is sufficiently accurate".
+- Pratt et al. (1977) is not in the project Zotero library: the local database has no item, creator or attachment that matches. The SB85 and SB86 quotations above are the secondary record of it. They are enough for the decision below, because both of Li's remaining exclusions lie outside what Pratt et al. cover.
+
+### Method
+
+These are local CPU probes, capped at 8 GiB. They use the pinned Seltzer–Berger table, the released Li/B/C/N/O tables and the raw BremsLib v2.0.8 files: `SDCS/SDCS_<Z>.txt`, `SDCS/Born_appr/SDCS_Born_<Z>.txt`.
+
+- **Raw.** `beta**2` times the raw library SDCS, linear in `k/T1` on its own nodes. It is multiplied by the same `1 + eta/Z` that the staged tables carry, then divided by SB's `chi`, on the SB nodes. Both sides use the same `eta`, so the ratio is the electron–nucleus ratio up to the ≤ 0.3 % SB86-versus-SB85 `eta` difference for Li (#1068).
+- **Staged.** `model_chi` on the released tables.
+- **Library scheme.** The Interpolate_DCS prescription, approximated with an interpolating (not least-squares) cubic spline. Below 1 MeV it splines the SDCS over `k/T1` = 0–0.9. At 1 MeV and above it splines `SDCS/SDCS_Born` up to `k/T1 = 0.7` and the SDCS over 0.4–0.975 above that. A second variant, linear in `SDCS/SDCS_Born`, cross-checks it.
+
+### Results
+
+**Staging is not the excess.** Raw and staged ratios agree within 0.5 % at every probed node and within 0.001 in moment, for Z = 3, 5, 6, 7 and 8 from 10 keV to 30 MeV. Reference identity, table digest and `T` interpolation were already excluded (#1068).
+
+**Li continues the low-Z trend and is not an outlier.** Electron–nucleus ratios at 0.5 MeV are on library nodes for BremsLib and on table nodes for SB:
+
+| Z | `k/T` = 0 | 0.1 | 0.2 | 0.4 | moment |
+|---|---|---|---|---|---|
+| 3 Li | 1.119 | 1.067 | 1.051 | 1.027 | 1.062 |
+| 5 B | 1.114 | 1.062 | 1.048 | 1.029 | 1.056 |
+| 6 C | 1.107 | 1.060 | 1.047 | 1.030 | 1.054 |
+| 7 N | 1.096 | 1.057 | 1.046 | 1.029 | 1.050 |
+| 8 O | 1.086 | 1.057 | 1.045 | 1.029 | 1.048 |
+
+O is one of Pratt et al.'s computed atomic numbers, and `k/T = 0` is one of their computed nodes. O still shows the same excess (1.086 at `k/T = 0`). So the shared excess is a library-versus-reference difference, not an artefact of Pratt et al.'s interpolation in Z. Li is 0.5 % above B at the nodes, and every node is within the reference's 10 %, except `k/T = 0` (1.12), which is not gated.
+
+**The pointwise failure comes from interpolation in `k/T`.** The gated maximum always falls at `k/T = 0.05`. BremsLib has no node there, and PyRITE interpolates linearly between `k/T` = 0 and 0.1, the interval the library manual warns against. The odd-node zigzag (`k/T` = 0.15, 0.25, 0.35 above both neighbours) has the same cause.
+
+| Li, `k/T = 0.05` | 0.4 MeV | 0.5 | 0.6 | 0.8 | 1.0 | 2.0 | 10 | 30 |
+|---|---|---|---|---|---|---|---|---|
+| linear (production) | 1.134 | 1.137 | 1.137 | 1.134 | 1.130 | 1.113 | 1.099 | 1.128 |
+| library scheme | 1.095 | 1.096 | 1.095 | 1.093 | 1.074 | 1.069 | 1.077 | 1.126 |
+
+On the full SB grid from 10 keV to 30 MeV, over `0.05 ≤ k/T ≤ 0.95`, Li spans 0.952–1.137 linear and 0.953–1.126 under the library scheme; the Born-ratio-linear variant gives at most 1.123. Under the library's own interpolation, Li passes the ±13 % gate everywhere. The same artefact puts B (1.121) and C (1.112) near the edge; under the library scheme C drops to 1.097 and O from 1.094 to 1.084. Li's band moment falls by about 0.01 (1.062 → 1.053 at 0.5 MeV).
+
+**Upstream data defect (B).** `SDCS_Born_5.txt` has a zero at `T1 = 3 MeV`, `k/T1 = 0.0046`. Any Born-ratio staging must guard against it: either variant gives B 1.185 at 3 MeV, `k/T = 0.15`.
+
+**The extension moment is a smooth function of Z.** At 30–100 MeV the first moment does not depend on interpolation (linear and library scheme agree within 0.001 at 20–30 MeV). It rises monotonically as Z falls:
+
+| first moment | 30 MeV | 50 MeV | 100 MeV |
+|---|---|---|---|
+| Al | 1.035 | 1.032 | 1.035 |
+| O | 1.041 | 1.040 | 1.045 |
+| C | 1.046 | 1.047 | 1.053 |
+| B | 1.049 | 1.051 | 1.058 |
+| Li | 1.058 | 1.063 | 1.072 |
+| H | 1.103 | 1.116 | 1.134 |
+
+The excess grows with `k/T` falling toward 0.1. At 100 MeV, Li is 1.038 at `k/T = 0.8` and 1.095 at `k/T = 0.1`. Above 50 MeV both sides are analytic theories, with different screening: Hubbell form factors in SB, a Kohn–Sham potential in BremsLib. That difference is a plausible cause, but no source quantifies it. The reference alone carries 3–5 %, and no source bounds the difference within the ±6 % `bremslib-high-energy-extension` gate.
+
+### Classification and gate
+
+- **Pointwise, 10 keV–30 MeV: PyRITE staging.** Linear interpolation in `k/T` below 0.1 adds 3.5–4.0 % at 0.4–1 MeV, on top of a library-versus-reference difference of 6–12 % at the library nodes. The upstream manual is the source. Correcting it changes every element's spectrum below `k/T = 0.1`. It needs a `BREMSSTRAHLUNG_BREMSLIB_MODEL` bump and identity-pin re-mint, not a tables tag, so it is out of scope here and proposed as a follow-up. Li's pointwise gate is reported, not gated, with this reason (`UNGATED_KINDS[3]["chi"]`).
+- **Band moment, 10 keV–30 MeV: gated again.** Li is 0.989–1.063, within ±0.10 (SB86 p. 346).
+- **Extension moment, 30–100 MeV: library versus reference.** Li is 1.059–1.072. The cause is cited (two analytic high-energy theories, SB86 p. 347 and the BremsLib manual p. 3) and shown to continue the low-Z trend. It is reported, not gated (`UNGATED_KINDS[3]["extension_moment"]`), because no source bounds it within ±6 %. H stays fully ungated (#1068).
+
+The exact recipe, `PYRITE_MC_BACKEND=cpu uv run python checks/brem_source_comparison.py --download`, exits 0 with `PASS`. All 42 catalogue elements are compared and Li is flagged `partly ungated`. Li reports pointwise 0.959–1.139, band moment 0.989–1.063 (gated) and extension moment 1.059–1.072.
+
+This is an implementation-context review. The gate-domain change is pinned by `test_gate_domain_ungates_h_and_two_cited_li_kinds` and `test_gate_violations_gate_the_li_band_moment_only`. No physics equation changed, and the Interpolate_DCS citation has not yet been checked in a fresh context. Only a human may mark this signed off.
