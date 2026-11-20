@@ -62,7 +62,10 @@ wall time. ``STREAM_CPROFILE=PATH`` profiles the arm with ``cProfile`` and
 writes its stats to ``PATH`` (``python -m pstats PATH``) for host-cost
 attribution by function. ``STREAM_CXR=none`` (#862) runs the case with
 ``Physics(cxr_source="none")`` (#1327): brem-only scoring, no lines,
-reflection selection or lattice share.
+reflection selection or lattice share. A ``streamed`` BLOCK of ``mem:<MiB>``
+sizes blocks with the #868 ``MemoryBlockSizer`` at that target, as
+``KernelTuning.stream_memory_mib`` does (overlap then stays off: it needs fixed
+blocks).
 """
 
 import contextlib
@@ -361,6 +364,16 @@ class _PoolPeak:
         return int(self.peak - self.base)
 
 
+def _block_sizing(block):
+    """BLOCK as an electron count, or ``mem:<MiB>`` for the #868 memory sizer."""
+    if not str(block).startswith("mem:"):
+        return int(block)
+    from pyrite._numerics_groups import TransportKernelTuning
+    from pyrite.montecarlo.runner.stream_sizing import MemoryBlockSizer
+
+    return MemoryBlockSizer(int(str(block)[4:]), TransportKernelTuning())
+
+
 def run(
     mode,
     ne,
@@ -398,6 +411,7 @@ def run(
         import cProfile
 
         profiler = cProfile.Profile()
+    sizing = None
     t0 = time.perf_counter()
     with (
         _PoolPeak() as pool,
@@ -410,7 +424,8 @@ def run(
         elif mode == "joined-device":
             out = runner.run_case(case, transport_core=core, keep_segments_on_device=True)
         elif mode == "streamed":
-            out = run_case_streamed(case, int(block), transport_core=core)
+            sizing = _block_sizing(block)
+            out = run_case_streamed(case, sizing, transport_core=core)
         elif mode == "grid-pass":
             from pyrite.montecarlo.runner import streamed_line_grid
             from pyrite.montecarlo.runner.artifacts import _case_geometry
@@ -452,7 +467,9 @@ def run(
     record = {
         "mode": mode,
         "Ne": int(ne),
-        "block": int(block) if mode.startswith(("streamed", "grid-pass")) else None,
+        "block": (str(block) if str(block).startswith("mem:") else int(block))
+        if mode.startswith(("streamed", "grid-pass"))
+        else None,
         "grid": GRID,
         "schedule": os.environ.get("PYRITE_MC_TRANSPORT_SCHEDULE", "default"),
         "material": material,
@@ -476,6 +493,7 @@ def run(
         "phase_calls": phases.calls,
         "segment_bytes": phases.segment_bytes,
         "max_block_rows": max(phases.block_rows, default=0),
+        "sizer_spans": list(sizing.spans) if hasattr(sizing, "spans") else None,
         "n_segments": int(out["n_segments"]),
         "eta": float(out["eta"]),
         "spectrum_meta": {
