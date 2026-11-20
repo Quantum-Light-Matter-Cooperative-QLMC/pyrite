@@ -1,0 +1,654 @@
+{
+ "issue": 1058,
+ "cbs": [
+  {
+   "material": "silicon",
+   "d_ang": 1.9201131089730104,
+   "kinetic_MeV": 16.92,
+   "psi_mrad": 5.0,
+   "divergence_mrad": 0.2,
+   "line_eV": 75086.56194440386,
+   "divergence_fwhm_over_E": 0.094192,
+   "acoustic_frequency_GHz": 1.0,
+   "sideband_spacing_eV": 493.7510021465714,
+   "rows": [
+    {
+     "tilt_amplitude_rad": 1e-05,
+     "shift_over_E_at_peak_tilt": 0.0019999833333055558,
+     "peak_height_ratio": 0.9993752928670525,
+     "rms_width_over_E": 0.040024992192379,
+     "sideband_g_u0": 0.30414874898300004,
+     "sideband_weight_sum": 1.0,
+     "sideband_rms_eV": 106.1888767068433,
+     "arcsine_rms_eV": 106.18887670684333
+    },
+    {
+     "tilt_amplitude_rad": 3e-05,
+     "shift_over_E_at_peak_tilt": 0.005999949999916667,
+     "peak_height_ratio": 0.9943986564931637,
+     "rms_width_over_E": 0.04022437072223753,
+     "sideband_g_u0": 0.912446246949,
+     "sideband_weight_sum": 1.0000000000000002,
+     "sideband_rms_eV": 318.56663012052985,
+     "arcsine_rms_eV": 318.56663012052996
+    },
+    {
+     "tilt_amplitude_rad": 0.0001,
+     "shift_over_E_at_peak_tilt": 0.019999833333055557,
+     "peak_height_ratio": 0.9403306823804612,
+     "rms_width_over_E": 0.042426406871192854,
+     "sideband_g_u0": 3.0414874898300006,
+     "sideband_weight_sum": 1.0,
+     "sideband_rms_eV": 1061.8887670684333,
+     "arcsine_rms_eV": 1061.8887670684333
+    },
+    {
+     "tilt_amplitude_rad": 0.0003,
+     "shift_over_E_at_peak_tilt": 0.05999949999916666,
+     "peak_height_ratio": 0.6157526998455304,
+     "rms_width_over_E": 0.058309518948453,
+     "sideband_g_u0": 9.12446246949,
+     "sideband_weight_sum": 1.0000000000000002,
+     "sideband_rms_eV": 3185.6663012052995,
+     "arcsine_rms_eV": 3185.6663012052995
+    },
+    {
+     "tilt_amplitude_rad": 0.001,
+     "shift_over_E_at_peak_tilt": 0.19999833333055556,
+     "peak_height_ratio": 0.26898985370252304,
+     "rms_width_over_E": 0.14696938456699069,
+     "sideband_g_u0": 30.414874898300003,
+     "sideband_weight_sum": 1.0000000000000004,
+     "sideband_rms_eV": 10618.887670684337,
+     "arcsine_rms_eV": 10618.887670684331
+    }
+   ]
+  },
+  {
+   "material": "diamond",
+   "d_ang": 1.2610542335680888,
+   "kinetic_MeV": 9.0,
+   "psi_mrad": 5.0,
+   "divergence_mrad": 0.3,
+   "line_eV": 33986.116507183906,
+   "divergence_fwhm_over_E": 0.14128799999999997,
+   "acoustic_frequency_GHz": 1.0,
+   "sideband_spacing_eV": 66.96642918881852,
+   "rows": [
+    {
+     "tilt_amplitude_rad": 1e-05,
+     "shift_over_E_at_peak_tilt": 0.0019999833333055558,
+     "peak_height_ratio": 0.9997222800836632,
+     "rms_width_over_E": 0.06001666435249463,
+     "sideband_g_u0": 1.0150237522920051,
+     "sideband_weight_sum": 1.0,
+     "sideband_rms_eV": 48.06382716254779,
+     "arcsine_rms_eV": 48.063827162547774
+    },
+    {
+     "tilt_amplitude_rad": 3e-05,
+     "shift_over_E_at_peak_tilt": 0.005999949999916667,
+     "peak_height_ratio": 0.9975046809966975,
+     "rms_width_over_E": 0.06014981296729026,
+     "sideband_g_u0": 3.0450712568760148,
+     "sideband_weight_sum": 1.0000000000000002,
+     "sideband_rms_eV": 144.19148148764336,
+     "arcsine_rms_eV": 144.19148148764333
+    },
+    {
+     "tilt_amplitude_rad": 0.0001,
+     "shift_over_E_at_peak_tilt": 0.019999833333055557,
+     "peak_height_ratio": 0.9727921027687929,
+     "rms_width_over_E": 0.061644140029689765,
+     "sideband_g_u0": 10.15023752292005,
+     "sideband_weight_sum": 1.0000000000000007,
+     "sideband_rms_eV": 480.63827162547796,
+     "arcsine_rms_eV": 480.6382716254778
+    },
+    {
+     "tilt_amplitude_rad": 0.0003,
+     "shift_over_E_at_peak_tilt": 0.05999949999916666,
+     "peak_height_ratio": 0.7910171621397194,
+     "rms_width_over_E": 0.07348469228349533,
+     "sideband_g_u0": 30.450712568760146,
+     "sideband_weight_sum": 1.0000000000000004,
+     "sideband_rms_eV": 1441.914814876434,
+     "arcsine_rms_eV": 1441.914814876433
+    },
+    {
+     "tilt_amplitude_rad": 0.001,
+     "shift_over_E_at_peak_tilt": 0.19999833333055556,
+     "peak_height_ratio": 0.338354425300891,
+     "rms_width_over_E": 0.15362291495737215,
+     "sideband_g_u0": 101.5023752292005,
+     "sideband_weight_sum": 0.9999999999999939,
+     "sideband_rms_eV": 4806.382716254768,
+     "arcsine_rms_eV": 4806.382716254778
+    }
+   ]
+  },
+  {
+   "material": "quartz",
+   "d_ang": 3.343,
+   "kinetic_MeV": 20.0,
+   "psi_mrad": 1.9,
+   "divergence_mrad": 0.5,
+   "line_eV": 22695.757432895734,
+   "divergence_fwhm_over_E": 0.6196842105263158,
+   "acoustic_frequency_GHz": 1.024,
+   "sideband_spacing_eV": 1076.0788068385064,
+   "rows": [
+    {
+     "tilt_amplitude_rad": 1e-05,
+     "shift_over_E_at_peak_tilt": 0.005263151561401985,
+     "peak_height_ratio": 0.9999000074995834,
+     "rms_width_over_E": 0.2631842092106579,
+     "sideband_g_u0": 0.11100620699970087,
+     "sideband_weight_sum": 0.9999999999999998,
+     "sideband_rms_eV": 84.46491389848018,
+     "arcsine_rms_eV": 84.46491389848015
+    },
+    {
+     "tilt_amplitude_rad": 3e-05,
+     "shift_over_E_at_peak_tilt": 0.015789454684205954,
+     "peak_height_ratio": 0.9991006071963695,
+     "rms_width_over_E": 0.26339463035897115,
+     "sideband_g_u0": 0.3330186209991026,
+     "sideband_weight_sum": 0.9999999999999999,
+     "sideband_rms_eV": 253.39474169544044,
+     "arcsine_rms_eV": 253.39474169544044
+    },
+    {
+     "tilt_amplitude_rad": 0.0001,
+     "shift_over_E_at_peak_tilt": 0.052631515614019846,
+     "peak_height_ratio": 0.9900745851497075,
+     "rms_width_over_E": 0.26577644574637044,
+     "sideband_g_u0": 1.1100620699970087,
+     "sideband_weight_sum": 1.0,
+     "sideband_rms_eV": 844.6491389848017,
+     "arcsine_rms_eV": 844.6491389848014
+    },
+    {
+     "tilt_amplitude_rad": 0.0003,
+     "shift_over_E_at_peak_tilt": 0.15789454684205953,
+     "peak_height_ratio": 0.9157828330545033,
+     "rms_width_over_E": 0.2858626445052688,
+     "sideband_g_u0": 3.3301862099910258,
+     "sideband_weight_sum": 0.9999999999999999,
+     "sideband_rms_eV": 2533.947416954404,
+     "arcsine_rms_eV": 2533.9474169544037
+    },
+    {
+     "tilt_amplitude_rad": 0.001,
+     "shift_over_E_at_peak_tilt": 0.5263151561401985,
+     "peak_height_ratio": 0.474404512962502,
+     "rms_width_over_E": 0.455802844097073,
+     "sideband_g_u0": 11.100620699970088,
+     "sideband_weight_sum": 0.9999999999999998,
+     "sideband_rms_eV": 8446.491389848014,
+     "arcsine_rms_eV": 8446.491389848014
+    }
+   ]
+  }
+ ],
+ "pxr": [
+  {
+   "material": "silicon",
+   "hkl": [
+    2,
+    2,
+    0
+   ],
+   "kinetic_MeV": 16.92,
+   "theta_obs_deg": 90.0,
+   "rows": [
+    {
+     "sample_tilt_deg": 15.0,
+     "theta_B_deg": 75.0,
+     "line_eV": 6232.633576298889,
+     "dlnE_dtilt_per_rad": -0.26835840966480606,
+     "minus_cot_theta_B": -0.2679491924311227
+    },
+    {
+     "sample_tilt_deg": 45.0,
+     "theta_B_deg": 45.0,
+     "line_eV": 4561.52657951973,
+     "dlnE_dtilt_per_rad": -1.0005240765510592,
+     "minus_cot_theta_B": -1.0000000000000002
+    },
+    {
+     "sample_tilt_deg": 75.0,
+     "theta_B_deg": 15.0,
+     "line_eV": 1668.7166315305499,
+     "dlnE_dtilt_per_rad": -3.734820806778531,
+     "minus_cot_theta_B": -3.7320508075688776
+    }
+   ],
+   "dlnE_dstrain": -1.0
+  },
+  {
+   "material": "diamond",
+   "hkl": [
+    2,
+    2,
+    0
+   ],
+   "kinetic_MeV": 9.0,
+   "theta_obs_deg": 90.0,
+   "rows": [
+    {
+     "sample_tilt_deg": 15.0,
+     "theta_B_deg": 75.0,
+     "line_eV": 6699.188089060355,
+     "dlnE_dtilt_per_rad": -0.26885834644833895,
+     "minus_cot_theta_B": -0.2679491924311227
+    },
+    {
+     "sample_tilt_deg": 45.0,
+     "theta_B_deg": 45.0,
+     "line_eV": 4901.17896290813,
+     "dlnE_dtilt_per_rad": -1.001552976980909,
+     "minus_cot_theta_B": -1.0000000000000002
+    },
+    {
+     "sample_tilt_deg": 75.0,
+     "theta_B_deg": 15.0,
+     "line_eV": 1790.397462551693,
+     "dlnE_dtilt_per_rad": -3.7428254077578855,
+     "minus_cot_theta_B": -3.7320508075688776
+    }
+   ],
+   "dlnE_dstrain": -1.0
+  }
+ ],
+ "extinction": [
+  {
+   "material": "silicon",
+   "hkl": [
+    1,
+    1,
+    1
+   ],
+   "rows": [
+    {
+     "photon_eV": 2500.0,
+     "theta_B_deg": 52.26348833642013,
+     "extinction_um": 0.7456831876131602,
+     "absorption_um": 2.754107896360362,
+     "abs_over_ext": 3.693402160743252,
+     "darwin_width_urad": 172.94921818119937
+    },
+    {
+     "photon_eV": 8000.0,
+     "theta_B_deg": 14.308071771007688,
+     "extinction_um": 0.7295874046639355,
+     "absorption_um": 68.70749573101419,
+     "abs_over_ext": 94.1730837070336,
+     "darwin_width_urad": 34.890237648011286
+    },
+    {
+     "photon_eV": 17500.0,
+     "theta_B_deg": 6.48691137414545,
+     "extinction_um": 0.7415422992939555,
+     "absorption_um": 727.7867587946504,
+     "abs_over_ext": 981.4500932550953,
+     "darwin_width_urad": 15.303892948937092
+    },
+    {
+     "photon_eV": 30000.0,
+     "theta_B_deg": 3.778691297609996,
+     "extinction_um": 0.7452815995512805,
+     "absorption_um": 3767.1232668330013,
+     "abs_over_ext": 5054.630718242759,
+     "darwin_width_urad": 8.844839977731715
+    }
+   ]
+  },
+  {
+   "material": "silicon",
+   "hkl": [
+    2,
+    2,
+    0
+   ],
+   "rows": [
+    {
+     "photon_eV": 8000.0,
+     "theta_B_deg": 23.80158587333031,
+     "extinction_um": 1.0382840850380655,
+     "absorption_um": 68.70749573101419,
+     "abs_over_ext": 66.17408156506148,
+     "darwin_width_urad": 25.964719637950086
+    },
+    {
+     "photon_eV": 17500.0,
+     "theta_B_deg": 10.631366330352854,
+     "extinction_um": 1.059468842736345,
+     "absorption_um": 727.7867587946504,
+     "abs_over_ext": 686.9354995989858,
+     "darwin_width_urad": 10.828787711860432
+    },
+    {
+     "photon_eV": 30000.0,
+     "theta_B_deg": 6.178069796664852,
+     "extinction_um": 1.0660928238970768,
+     "absorption_um": 3767.1232668330013,
+     "abs_over_ext": 3533.5790490197396,
+     "darwin_width_urad": 6.205829384756781
+    }
+   ]
+  },
+  {
+   "material": "diamond",
+   "hkl": [
+    2,
+    2,
+    0
+   ],
+   "rows": [
+    {
+     "photon_eV": 8000.0,
+     "theta_B_deg": 37.91464314185447,
+     "extinction_um": 2.033782477499435,
+     "absorption_um": 710.0744759853173,
+     "abs_over_ext": 349.139833704519,
+     "darwin_width_urad": 15.372876078332625
+    },
+    {
+     "photon_eV": 17500.0,
+     "theta_B_deg": 16.314420746434536,
+     "extinction_um": 2.033782477499436,
+     "absorption_um": 8948.411239833657,
+     "abs_over_ext": 4399.886093440953,
+     "darwin_width_urad": 5.7768721844491155
+    },
+    {
+     "photon_eV": 30000.0,
+     "theta_B_deg": 9.431199449686282,
+     "extinction_um": 2.0337824774994346,
+     "absorption_um": 51939.86513920314,
+     "abs_over_ext": 25538.55474409631,
+     "darwin_width_urad": 3.2784689428578364
+    }
+   ]
+  }
+ ],
+ "planar": [
+  {
+   "material": "silicon",
+   "hkl": [
+    1,
+    1,
+    0
+   ],
+   "kinetic_MeV": 16.92,
+   "thickness_um": 1.0,
+   "divergence_mrad": 0.2,
+   "well_depth_eV": 21.241120604785944,
+   "psi_c_mrad": 1.5618138453743808,
+   "lines": [
+    "2-1",
+    "1-0",
+    "3-2",
+    "3-0"
+   ],
+   "aligned": {
+    "2-1": {
+     "yield": 1.235117907202962e-05,
+     "centroid_eV": 10248.601956078832
+    },
+    "1-0": {
+     "yield": 1.0070033176735099e-05,
+     "centroid_eV": 18418.354253639016
+    },
+    "3-2": {
+     "yield": 6.226863102893493e-06,
+     "centroid_eV": 6322.448196137552
+    },
+    "3-0": {
+     "yield": 1.6057589972356987e-06,
+     "centroid_eV": 35009.7459540689
+    }
+   },
+   "tilt_scan": [
+    {
+     "tilt_mrad": 0.0,
+     "2-1": 1.235117907202962e-05,
+     "1-0": 1.0070033176735099e-05,
+     "3-2": 6.226863102893493e-06,
+     "3-0": 1.6057589972356987e-06
+    },
+    {
+     "tilt_mrad": 0.03046947660233356,
+     "2-1": 1.2280555459268629e-05,
+     "1-0": 1.0124145272340047e-05,
+     "3-2": 6.238984667762726e-06,
+     "3-0": 1.6090372250628958e-06
+    },
+    {
+     "tilt_mrad": 0.08676972820078858,
+     "2-1": 1.1797213647457411e-05,
+     "1-0": 1.0499412720178257e-05,
+     "3-2": 6.314002727321266e-06,
+     "3-0": 1.6294474770510108e-06
+    },
+    {
+     "tilt_mrad": 0.09140842980700067,
+     "2-1": 1.1738958156537995e-05,
+     "1-0": 1.054525035415938e-05,
+     "3-2": 6.322068829469774e-06,
+     "3-0": 1.6316584935611029e-06
+    },
+    {
+     "tilt_mrad": 0.12986007525021837,
+     "2-1": 1.1167389584654494e-05,
+     "1-0": 1.1002557400561338e-05,
+     "3-2": 6.389141018385622e-06,
+     "3-0": 1.650269753916056e-06
+    },
+    {
+     "tilt_mrad": 0.15318040302731598,
+     "2-1": 1.0757786981778007e-05,
+     "1-0": 1.133952293505546e-05,
+     "3-2": 6.422576034809178e-06,
+     "3-0": 1.659867913340273e-06
+    },
+    {
+     "tilt_mrad": 0.26030918460236574,
+     "2-1": 8.660920599457216e-06,
+     "1-0": 1.3233845210824251e-05,
+     "3-2": 6.330873821361141e-06,
+     "3-0": 1.6416674188884985e-06
+    },
+    {
+     "tilt_mrad": 0.30469476602333556,
+     "2-1": 7.881030481451403e-06,
+     "1-0": 1.405513019838572e-05,
+     "3-2": 6.1175742630796685e-06,
+     "3-0": 1.5888860744528929e-06
+    },
+    {
+     "tilt_mrad": 0.3895802257506551,
+     "2-1": 6.843799049604947e-06,
+     "1-0": 1.5403645308393514e-05,
+     "3-2": 5.430493839113821e-06,
+     "3-0": 1.4148354464036208e-06
+    },
+    {
+     "tilt_mrad": 0.4595412090819479,
+     "2-1": 6.518676985040956e-06,
+     "1-0": 1.610972318021302e-05,
+     "3-2": 4.716200361833352e-06,
+     "3-0": 1.2316582230420907e-06
+    },
+    {
+     "tilt_mrad": 0.8676972820078859,
+     "2-1": 7.1570935237803655e-06,
+     "1-0": 1.1542560629849404e-05,
+     "3-2": 3.0680646759832466e-06,
+     "3-0": 8.002622113335876e-07
+    },
+    {
+     "tilt_mrad": 1.2986007525021837,
+     "2-1": 3.0154920776896984e-06,
+     "1-0": 4.2232350468919426e-06,
+     "3-2": 1.7043006746866844e-06,
+     "3-0": 4.44814556441812e-07
+    },
+    {
+     "tilt_mrad": 1.5318040302731595,
+     "2-1": 1.5876376881230112e-06,
+     "1-0": 2.5522635774513318e-06,
+     "3-2": 8.7292599072788e-07,
+     "3-0": 2.2778242020349578e-07
+    }
+   ],
+   "ensembles": [
+    {
+     "amplitude_over_psi_c": 0.1,
+     "amplitude_mrad": 0.15618138453743807,
+     "yield_ratio_to_aligned": {
+      "2-1": 0.9311448203624632,
+      "1-0": 1.0666707242682938,
+      "3-2": 1.0183580411657172,
+      "3-0": 1.0195524952131105
+     }
+    },
+    {
+     "amplitude_over_psi_c": 0.3,
+     "amplitude_mrad": 0.4685441536123142,
+     "yield_ratio_to_aligned": {
+      "2-1": 0.6833832339759989,
+      "1-0": 1.3726981600550463,
+      "3-2": 0.9153741006921916,
+      "3-0": 0.921654431344653
+     }
+    },
+    {
+     "amplitude_over_psi_c": 1.0,
+     "amplitude_mrad": 1.5618138453743808,
+     "yield_ratio_to_aligned": {
+      "2-1": 0.3975582747303029,
+      "1-0": 0.8037011617640574,
+      "3-2": 0.47226289586371034,
+      "3-0": 0.47668194101707645
+     }
+    }
+   ],
+   "dlnE_dstrain": {
+    "0.001": {
+     "2-1": -1.7332760826076488,
+     "1-0": -1.3930020686799827,
+     "3-2": -1.5612242387958997,
+     "3-0": -1.524584455328326
+    }
+   },
+   "seconds": 116.37743875500746
+  },
+  {
+   "material": "diamond",
+   "hkl": [
+    1,
+    1,
+    0
+   ],
+   "kinetic_MeV": 9.0,
+   "thickness_um": 1.0,
+   "divergence_mrad": 0.3,
+   "well_depth_eV": 23.597504842253738,
+   "psi_c_mrad": 2.2308105937367393,
+   "lines": [
+    "1-0"
+   ],
+   "aligned": {
+    "1-0": {
+     "yield": 1.8872034348964995e-05,
+     "centroid_eV": 7754.4966373000625
+    }
+   },
+   "tilt_scan": [
+    {
+     "tilt_mrad": 0.0,
+     "1-0": 1.8872034348964995e-05
+    },
+    {
+     "tilt_mrad": 0.04352095570890909,
+     "1-0": 1.898921465069262e-05
+    },
+    {
+     "tilt_mrad": 0.12393719613849175,
+     "1-0": 1.980648064520888e-05
+    },
+    {
+     "tilt_mrad": 0.13056286712672727,
+     "1-0": 1.9906881141721713e-05
+    },
+    {
+     "tilt_mrad": 0.18548512194946973,
+     "1-0": 2.0915886434113844e-05
+    },
+    {
+     "tilt_mrad": 0.21879461937045847,
+     "1-0": 2.1668529988089646e-05
+    },
+    {
+     "tilt_mrad": 0.37181158841547524,
+     "1-0": 2.608727128094074e-05
+    },
+    {
+     "tilt_mrad": 0.43520955708909087,
+     "1-0": 2.8143633648127768e-05
+    },
+    {
+     "tilt_mrad": 0.5564553658484092,
+     "1-0": 3.1880557760292765e-05
+    },
+    {
+     "tilt_mrad": 0.6563838581113755,
+     "1-0": 3.431523069684898e-05
+    },
+    {
+     "tilt_mrad": 1.2393719613849177,
+     "1-0": 2.7142651829868386e-05
+    },
+    {
+     "tilt_mrad": 1.8548512194946971,
+     "1-0": 1.0246477435585495e-05
+    },
+    {
+     "tilt_mrad": 2.1879461937045845,
+     "1-0": 5.68190190922559e-06
+    }
+   ],
+   "ensembles": [
+    {
+     "amplitude_over_psi_c": 0.1,
+     "amplitude_mrad": 0.22308105937367392,
+     "yield_ratio_to_aligned": {
+      "1-0": 1.0780516585188409
+     }
+    },
+    {
+     "amplitude_over_psi_c": 0.3,
+     "amplitude_mrad": 0.6692431781210217,
+     "yield_ratio_to_aligned": {
+      "1-0": 1.4861929933637104
+     }
+    },
+    {
+     "amplitude_over_psi_c": 1.0,
+     "amplitude_mrad": 2.2308105937367393,
+     "yield_ratio_to_aligned": {
+      "1-0": 0.9433888194824223
+     }
+    }
+   ],
+   "dlnE_dstrain": {
+    "0.001": {
+     "1-0": -1.365309595082409
+    }
+   },
+   "seconds": 89.9759587830049
+  }
+ ]
+}
