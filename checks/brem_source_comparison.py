@@ -105,17 +105,19 @@ UNGATED_ELEMENTS = {
 UNGATED_KINDS = {
     3: {
         "chi": "Li pointwise: PyRITE interpolates BremsLib linearly in k/T between its k/T = 0 "
-        "and 0.1 nodes, which the library's own interpolation manual calls inaccurate there, "
-        "prescribing cubic splines (of SDCS/SDCS_Born at T1 >= 1 MeV) instead (Interpolate_DCS "
-        "v1.0.7 manual, Sec. 2, p. 3). At k/T = 0.05 this adds 3.5-4.0 % at 0.4-1 MeV (1.130-1.137 "
-        "against 1.074-1.096 with the library's scheme, which keeps every Li node <= 1.126 up to "
-        "30 MeV); #1073",
-        "extension_moment": "Li 30-100 MeV first moment: an electron-nucleus difference between "
-        "two analytic high-energy theories (Seltzer & Berger, ADNDT 35, 345 (1986), p. 347; "
-        "BremsLib v2.0 manual p. 3 for k/T >= 0.1, T1 >= 50 MeV) that grows smoothly as Z falls "
-        "(100 MeV: Al 1.035, C 1.053, B 1.058, Li 1.072, H 1.134) and does not depend on k/T "
-        "interpolation; the reference alone carries 3-5 % (SB86 p. 346) and no source bounds the "
-        "difference within the #439 gate; #1073",
+        "and 0.1 nodes, which is less accurate than the cubic-spline scheme (of SDCS/SDCS_Born "
+        "at T1 >= 1 MeV) the library's own interpolation manual prescribes (Interpolate_DCS "
+        "v1.0.7 manual, Sec. 2, p. 3), as measured with Interpolate_DCS v1.0.7 itself: at "
+        "k/T = 0.05 linear raises Li by 0.056-0.062 at 0.4-1 MeV (1.130-1.137 against "
+        "1.072-1.077), and Interpolate_DCS keeps Li <= 1.125 up to 30 MeV; #1073",
+        "extension_moment": "Li 30-100 MeV first moment: an electron-nucleus difference that "
+        "grows smoothly as Z falls (100 MeV: Al 1.035, C 1.053, B 1.058, Li 1.072, H 1.134) and "
+        "does not depend on k/T interpolation. At T >= 50 MeV it is between two analytic "
+        "high-energy theories (Seltzer & Berger, ADNDT 35, 345 (1986), p. 347; BremsLib v2.0 "
+        "manual p. 3 for k/T >= 0.1), where the reference alone carries 3-5 % (SB86 p. 346); at "
+        "30-50 MeV the reference is a spline interpolation (SB86 p. 348) with 5-10 % uncertainty "
+        "(SB86 p. 346), which Li (1.059 at 40 MeV) lies within. No source bounds the difference "
+        "within the #439 gate; #1073",
     },
 }
 
