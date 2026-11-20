@@ -22,6 +22,7 @@ cr-plane-incidence
 cr-lindblad-jump-operators
 cr-lindblad-jump-operators-anisotropic
 cr-uniaxial-thermal-projection
+cr-planar-continuum-potential-graphite
 cr-density-matrix-split-operator
 cr-planar-spatial-density-reconstruction
 cr-density-matrix-split-operator-abtem
