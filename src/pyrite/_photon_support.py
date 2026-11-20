@@ -7,11 +7,12 @@ import numpy as np
 from ._util.hashing import canonical_json_digest
 
 # v3/v2: impulse-approximation (Doppler-broadened) Compton energies with a
-# bound-shell vacancy (#1231). Enabled-only observation identities.
-MODEL = "bremslib-continuum-photon-only-cpu.v3"
-EVENT_MODEL = "physical-event-photon-cpu.v2"
-CUDA_MODEL = "bremslib-continuum-photon-only-cuda.v2"
-CUDA_EVENT_MODEL = "physical-event-photon-cuda.v2"
+# bound-shell vacancy (#1231); v4/v3: that vacancy relaxes through the sampled
+# EADL cascade (#1231). Enabled-only observation identities.
+MODEL = "bremslib-continuum-photon-only-cpu.v4"
+EVENT_MODEL = "physical-event-photon-cpu.v3"
+CUDA_MODEL = "bremslib-continuum-photon-only-cuda.v3"
+CUDA_EVENT_MODEL = "physical-event-photon-cuda.v3"
 _RELAXATION_SALT = 0x341EADE1
 # Explicit segment fields only: never select arbitrary metadata by its array length.
 _SEGMENT_KEYS = ("L_ang", "r_mid", "v_hat", "elec_id", "E_repr_keV", "E_keV", "layer")

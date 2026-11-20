@@ -166,7 +166,8 @@ def test_photon_identity_carries_the_compton_model_but_mode_off_identity_does_no
         source_ceiling_eV=1e5,
     )
     digest, payload = _photon_support._identity("0" * 64, aperture, (), [1e3, 1e5], **kwargs)
-    assert payload["model"] == "bremslib-continuum-photon-only-cpu.v3"
+    assert payload["model"] == _photon_support.MODEL
+    assert _photon_support.MODEL == "bremslib-continuum-photon-only-cpu.v4"
     assert payload["data_sha256"]["compton_profiles"] == compton_profiles.COMPTON_PROFILE_SHA256
     case = build_cases(material_sweep("hopg"), n_electrons=300, n_electrons_brem=150)[0]
     assert case.to_dict().get("photon_transport") is None
@@ -178,3 +179,61 @@ def test_photon_identity_carries_the_compton_model_but_mode_off_identity_does_no
     assert _photon_support._identity("0" * 64, aperture, (), [1e3, 1e5], **kwargs)[0] != digest
     # ...but never the photon-off case identity (pinned in identity-pins.json).
     assert case_content_key(case) == off
+
+
+def _compton_queue_event(element, energy, key, cutoff=1e3):
+    """One queue-level Compton collision; returns the queue and its parent photon."""
+    from pyrite.montecarlo.transport import photon_histories as histories
+    from pyrite.montecarlo.transport.photon_navigation import PHOTON_CHANNEL_ORDER
+
+    queue = histories._Queue(np.array([0]), cutoff, cutoff)
+    parent = histories._Photon(
+        np.zeros(3), np.array([0.0, 0.0, 1.0]), energy, 0, 1.0, np.uint64(key), 0, 0
+    )
+    rng = np.random.Generator(np.random.Philox(key=key))
+    channel = PHOTON_CHANNEL_ORDER.index("incoherent")
+    relaxation = load_eadl_relaxation(element)
+    histories._interact(queue, parent, channel, element, relaxation, rng, np.zeros(3))
+    return queue, parent
+
+
+def test_compton_vacancy_relaxes_and_closes_energy_per_event():
+    """E = E' + T + relaxation emissions + terminal binding + signed defect, per event."""
+    k_lines, totals = [], []
+    for key in range(1, 1501):
+        queue, parent = _compton_queue_event("W", 511e3, key)
+        photons = [p.energy for p in queue.pending]
+        terms = {name: sum(values[0]) for name, values in queue.terms.items()}
+        total = sum(photons) + sum(terms.values())
+        assert total == pytest.approx(parent.energy, rel=1e-12)
+        totals.append(len(photons))
+        # Ordinal 0 is the scattered photon; relaxation photons follow.
+        k_lines += [e for e in photons[1:] if 57e3 < e < 70e3]
+    # W K-shell Compton vacancies (2 of 74 electrons) fluoresce Kα/Kβ (~58–69 keV).
+    assert len(k_lines) >= 10
+    assert max(totals) > 1  # fluorescence is emitted after Compton
+
+
+def test_compton_relaxation_draws_follow_the_compton_event_on_one_stream():
+    """Queue draws: sample_compton, one per cascade decay, then two per emission."""
+    from pyrite.montecarlo.transport.relaxation import sample_relaxation_cascade
+
+    relaxation = load_eadl_relaxation("W")
+    for key in (11, 12, 13, 14, 15):
+        queue, _ = _compton_queue_event("W", 511e3, key, cutoff=100.0)
+        again, _ = _compton_queue_event("W", 511e3, key, cutoff=100.0)
+        assert [p.energy for p in again.pending] == [p.energy for p in queue.pending]
+        assert [c[4] for c in again.charged] == [c[4] for c in queue.charged]
+        draws = iter(np.random.Generator(np.random.Philox(key=key)).random, None)
+        event = sample_compton("W", 511e3, [0, 0, 1], draws)
+        cascade = sample_relaxation_cascade(relaxation, event.subshell_designator, 100.0, draws)
+        assert queue.pending[0].energy == event.photon_energy_eV
+        assert queue.charged[0][4] == event.electron_energy_eV
+        emitted = sorted([p.energy for p in queue.pending[1:]] + [c[4] for c in queue.charged[1:]])
+        assert emitted == sorted(t.energy_eV for t in cascade.transitions)
+        if cascade.transitions:  # first emission direction uses the next two draws
+            cosine = 1 - 2 * next(draws)
+            first = cascade.transitions[0]
+            pool = queue.pending[1:] if first.kind == "photon" else queue.charged[1:]
+            direction = pool[0].direction if first.kind == "photon" else pool[0][3]
+            assert direction[2] == pytest.approx(cosine, abs=1e-15)

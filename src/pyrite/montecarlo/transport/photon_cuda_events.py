@@ -21,7 +21,7 @@ from .pair_production import PAIR_THRESHOLD_EV
 from .photon_cuda import scene_first_interactions_cuda
 from .photon_navigation import PHOTON_CHANNEL_ORDER
 from .photon_pair_cuda import sample_pairs_cuda
-from .photon_photoelectric_cuda import sample_photoelectric_cuda
+from .photon_photoelectric_cuda import sample_photoelectric_cuda, sample_vacancy_relaxation_cuda
 from .photon_scattering_cuda import sample_photon_scattering_cuda
 
 _INITIAL_DRAW_WIDTH = 32
@@ -90,7 +90,9 @@ def _sample(element, channel, energy, rays, uniforms, cutoff, capacity):
         return sample_photoelectric_cuda(
             element, energy, rays, uniforms, cutoff_eV=cutoff, capacity=capacity, **options
         )
-    if name in ("coherent", "incoherent"):
+    if name == "incoherent":
+        return _compton_with_relaxation(element, energy, rays, uniforms, cutoff, capacity)
+    if name == "coherent":
         return sample_photon_scattering_cuda(
             element, energy, rays, uniforms, channel=name, **options
         )
@@ -99,29 +101,47 @@ def _sample(element, channel, energy, rays, uniforms, cutoff, capacity):
     )
 
 
-def _photoelectric_product(row, arrays, element, channel):
+def _compton_with_relaxation(element, energy, rays, uniforms, cutoff, capacity):
+    """Compton event, then its vacancy cascade on the same draw row (CPU order).
+
+    A complete Compton row continues at its ``draws_used``; the cascade's
+    status (0, 1 longer prefix, 4 capacity) and total draw count replace the
+    event's. Incomplete Compton rows keep their status and skip the cascade.
+    Validation: photon-compton-scattering, eadl-sampled-relaxation
+    """
+    from ..._backend import select_cupy_backend
+
+    cp = select_cupy_backend().xp
+    event = sample_photon_scattering_cuda(
+        element, energy, rays, uniforms, channel="incoherent", require_complete=False
+    )
+    status = cp.asnumpy(event["status"])
+    designators = np.where(status == 0, cp.asnumpy(event["subshell_designator"]), 0.0)
+    relaxed = sample_vacancy_relaxation_cuda(
+        element,
+        designators.astype(np.int64),
+        cp.asnumpy(event["draws_used"]),
+        uniforms,
+        cutoff_eV=cutoff,
+        capacity=capacity,
+    )
+    complete = cp.asarray(status == 0)
+    event.update(relaxed)
+    event["status"] = cp.where(complete, relaxed["status"], cp.asarray(status))
+    return event
+
+
+def _relaxation_products(row, arrays, table, first):
+    """Relaxation photons/electrons from ordinal ``first``, terminal binding, defect."""
     from .photon_histories import ELECTRON, RELAXATION_CHANNEL
 
-    table = host_relaxation_table(element)
     nt, nh = int(arrays["n_transitions"][row]), int(arrays["n_terminal"][row])
     ids = arrays["transition_ids"][row, :nt]
     holes = arrays["terminal_shell_indices"][row, :nh]
-    photons, charged = (
-        [],
-        [
-            (
-                0,
-                ELECTRON,
-                channel,
-                float(arrays["electron_energy_eV"][row]),
-                arrays["electron_direction"][row].copy(),
-            )
-        ],
-    )
-    defects = []
-    for ordinal, tid in enumerate(ids, start=1):
+    photons, charged, defects = [], [], []
+    for ordinal, tid in enumerate(ids, start=first):
         energy = float(table["energy"][tid])
-        direction = arrays["emission_direction"][row, ordinal - 1].copy()
+        direction = arrays["emission_direction"][row, ordinal - first].copy()
         if table["kind"][tid] == 0:
             photons.append((ordinal, energy, direction))
         else:
@@ -133,9 +153,41 @@ def _photoelectric_product(row, arrays, element, channel):
             )
             - energy
         )
-    return CudaCollision(
-        tuple(photons), tuple(charged), fsum(table["binding"][i] for i in holes), fsum(defects)
+    return photons, charged, fsum(table["binding"][i] for i in holes), fsum(defects)
+
+
+def _photoelectric_product(row, arrays, element, channel):
+    from .photon_histories import ELECTRON
+
+    photons, charged, binding, defect = _relaxation_products(
+        row, arrays, host_relaxation_table(element), 1
     )
+    electron = (
+        0,
+        ELECTRON,
+        channel,
+        float(arrays["electron_energy_eV"][row]),
+        arrays["electron_direction"][row].copy(),
+    )
+    return CudaCollision(tuple(photons), (electron, *charged), binding, defect)
+
+
+def _compton_product(row, arrays, element, channel):
+    """Photon 0, recoil 1, then vacancy relaxation from ordinal 2 (CPU twin)."""
+    from .photon_histories import ELECTRON
+
+    photons, charged, binding, defect = _relaxation_products(
+        row, arrays, host_relaxation_table(element), 2
+    )
+    photon = (0, float(arrays["photon_energy_eV"][row]), arrays["photon_direction"][row].copy())
+    electron = (
+        1,
+        ELECTRON,
+        channel,
+        float(arrays["electron_energy_eV"][row]),
+        arrays["electron_direction"][row].copy(),
+    )
+    return CudaCollision((photon, *photons), (electron, *charged), binding, defect)
 
 
 def _product(row, arrays, element, channel):
@@ -144,26 +196,11 @@ def _product(row, arrays, element, channel):
     name = PHOTON_CHANNEL_ORDER[channel]
     if name == "photoelectric":
         return _photoelectric_product(row, arrays, element, channel)
-    if name in ("coherent", "incoherent"):
-        photons = (
-            (0, float(arrays["photon_energy_eV"][row]), arrays["photon_direction"][row].copy()),
-        )
-        charged = (
-            ()
-            if name == "coherent"
-            else (
-                (
-                    1,
-                    ELECTRON,
-                    channel,
-                    float(arrays["electron_energy_eV"][row]),
-                    arrays["electron_direction"][row].copy(),
-                ),
-            )
-        )
-        # The Compton vacancy is not relaxed: its binding deposits locally (CPU twin).
-        binding = 0.0 if name == "coherent" else float(arrays["binding_energy_eV"][row])
-        return CudaCollision(photons, charged, terminal_binding_eV=binding)
+    if name == "incoherent":
+        return _compton_product(row, arrays, element, channel)
+    if name == "coherent":
+        photon = (0, float(arrays["photon_energy_eV"][row]), arrays["photon_direction"][row].copy())
+        return CudaCollision((photon,))
     charged = tuple(
         (
             ordinal,

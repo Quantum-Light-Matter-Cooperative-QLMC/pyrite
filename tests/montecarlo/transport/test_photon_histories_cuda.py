@@ -55,7 +55,8 @@ def _compare(expected, actual):
 
 
 @pytest.mark.parametrize(
-    "element,density,energy", [("C", 0.1, 5e4), ("W", 0.063, 2e4), ("W", 0.063, 6e6)]
+    "element,density,energy",
+    [("C", 0.1, 5e4), ("W", 0.063, 2e4), ("W", 0.063, 5.11e5), ("W", 0.063, 6e6)],
 )
 def test_device_history_matches_cpu_without_host_sampler_fallback(
     cp, monkeypatch, element, density, energy
@@ -74,6 +75,7 @@ def test_device_history_matches_cpu_without_host_sampler_fallback(
         "sample_rayleigh",
         "sample_compton",
         "sample_photoelectric",
+        "sample_relaxation_cascade",
         "sample_pair",
     ):
         monkeypatch.setattr(histories, name, forbidden)

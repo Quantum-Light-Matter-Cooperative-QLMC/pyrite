@@ -201,7 +201,8 @@ validation and stable angular rotations. CPU photon histories call these
 references; integrated EPDL rates own channel/atom competition.
 
 `transport/photon_histories.py` chains those references into a host photon
-history queue with optional bounded CUDA event waves: lineage-keyed Philox streams, isotropic relaxation emission,
+history queue with optional bounded CUDA event waves: lineage-keyed Philox streams, isotropic relaxation emission
+(photoabsorption and Compton vacancies share the sampled EADL cascade),
 charged electron/positron handoff rows, an absorbing sample-frame aperture
 for ordinary hits, and a per-history weighted energy ledger. Filter plates
 navigate as oriented `PhotonBox`es (`photon_navigation.scene_first_interactions`);

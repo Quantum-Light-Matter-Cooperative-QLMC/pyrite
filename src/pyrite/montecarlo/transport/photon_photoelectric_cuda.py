@@ -1,4 +1,7 @@
-"""Explicit-draw CUDA photoabsorption and canonical sampled EADL relaxation."""
+"""Explicit-draw CUDA photoabsorption and canonical sampled EADL relaxation.
+
+Also continues a Compton event's draw row with its subshell vacancy cascade.
+"""
 
 from numbers import Integral
 
@@ -8,7 +11,7 @@ from ...materials.crystal import M_E_EV
 from ...materials.photon_differential import subshell_photoionization_cross_sections_ang2
 from ._photon_cuda_relaxation import device_relaxation_table, host_relaxation_table
 from ._photon_cuda_sampling import validate_event_inputs
-from ._photon_photoelectric_cuda_kernel import photoelectric_kernel
+from ._photon_photoelectric_cuda_kernel import photoelectric_kernel, vacancy_relaxation_kernel
 from .photon_sampling import MAX_REJECTIONS
 
 
@@ -34,6 +37,93 @@ def _require_events(cp, status):
         raise ValueError("photoionization weights must have a positive finite total")
     if np.any(codes == 4):
         raise BufferError("photoelectric emission capacity exhausted; grow capacity and retry")
+
+
+def _check_capacity(capacity):
+    if (
+        isinstance(capacity, bool)
+        or not isinstance(capacity, Integral)
+        or not 1 <= capacity < 2**31 - 1
+    ):
+        raise ValueError("capacity must be a positive int32-sized integer")
+    return int(capacity)
+
+
+def sample_vacancy_relaxation_cuda(element, designators, start, uniforms, *, cutoff_eV, capacity):
+    """Sampled EADL cascade of one given vacancy per row, continuing its draw row.
+
+    ``designators`` (N,) are ENDF subshell designators (<= 0: no vacancy, row
+    skipped with status 0); ``start`` (N,) is the number of draws each row's
+    event already consumed from ``uniforms`` (N,L). Draw order continues as in
+    the CPU queue after ``sample_compton``: one draw per depth-first decay, then
+    two isotropic-direction draws per emitted particle. Cascade and outputs
+    follow :func:`sample_photoelectric_cuda` (same device ``photon_cascade``):
+    transition IDs/directions, terminal shell indices, counts, total
+    ``draws_used`` and status 0 (complete), 1 (longer prefix of the same stream)
+    or 4 (more capacity). Returns device arrays; never raises on status.
+    Validation: eadl-sampled-relaxation
+    """
+    if isinstance(cutoff_eV, bool) or not np.isfinite(cutoff_eV) or cutoff_eV <= 0:
+        raise ValueError("relaxation cutoff must be finite and positive")
+    capacity = _check_capacity(capacity)
+    draws = np.ascontiguousarray(uniforms, dtype=np.float64)
+    designators = np.asarray(designators).astype(np.int64)
+    start = np.asarray(start, dtype=np.int64)
+    n = designators.size
+    if draws.ndim != 2 or draws.shape[0] != n or start.shape != (n,):
+        raise ValueError("designators, starts and uniform rows must align")
+    host = host_relaxation_table(element)
+    index = {int(d): i for i, d in enumerate(host["designators"])}
+    if any(d > 0 and d not in index for d in designators.tolist()):
+        raise ValueError("vacancy designator is absent from the EADL relaxation data")
+    shells = np.array([index[d] if d > 0 else -1 for d in designators.tolist()], np.int32)
+    from ..._backend import select_cupy_backend
+
+    cp = select_cupy_backend().xp
+    transitions = cp.empty((n, capacity), dtype=cp.int32)
+    terminal = cp.empty((n, capacity + 1), dtype=cp.int32)
+    emitted = cp.empty((n, capacity, 3))
+    counts, used, status = (
+        cp.empty((n, 2), dtype=cp.int32),
+        cp.empty(n, dtype=cp.int64),
+        cp.empty(n, dtype=cp.int32),
+    )
+    if n:
+        table = device_relaxation_table(cp, element, cp.cuda.Device().id)
+        vacancy_relaxation_kernel(cp)(
+            ((n + 127) // 128,),
+            (128,),
+            (
+                cp.asarray(draws),
+                cp.asarray(shells),
+                cp.asarray(start),
+                table["binding"],
+                table["offsets"],
+                table["probability"],
+                table["first"],
+                table["second"],
+                np.int64(n),
+                np.int32(draws.shape[1]),
+                np.int32(capacity),
+                np.float64(cutoff_eV),
+                np.float64(np.pi),
+                transitions,
+                terminal,
+                emitted,
+                counts,
+                used,
+                status,
+            ),
+        )
+    return {
+        "transition_ids": transitions,
+        "emission_direction": emitted,
+        "terminal_shell_indices": terminal,
+        "n_transitions": counts[:, 0],
+        "n_terminal": counts[:, 1],
+        "draws_used": used,
+        "status": status,
+    }
 
 
 def sample_photoelectric_cuda(
@@ -73,18 +163,13 @@ def sample_photoelectric_cuda(
     energy, rays, draws = validate_event_inputs(energy_eV, direction, uniforms)
     if isinstance(cutoff_eV, bool) or not np.isfinite(cutoff_eV) or cutoff_eV <= 0:
         raise ValueError("relaxation cutoff must be finite and positive")
-    if (
-        isinstance(capacity, bool)
-        or not isinstance(capacity, Integral)
-        or not 1 <= capacity < 2**31 - 1
-    ):
-        raise ValueError("capacity must be a positive int32-sized integer")
+    capacity = _check_capacity(capacity)
     if type(require_complete) is not bool:
         raise TypeError("require_complete must be a bool")
     from ..._backend import select_cupy_backend
 
     cp = select_cupy_backend().xp
-    n, capacity = len(energy), int(capacity)
+    n = len(energy)
     electron, primary = cp.empty((n, 4)), cp.empty(n, dtype=cp.int32)
     transitions = cp.empty((n, capacity), dtype=cp.int32)
     terminal = cp.empty((n, capacity + 1), dtype=cp.int32)

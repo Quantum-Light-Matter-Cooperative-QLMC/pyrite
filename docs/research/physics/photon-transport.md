@@ -19,7 +19,7 @@ photon transport model:
 | `montecarlo/transport/photon_navigation.py` | Standalone CPU all-channel/element first-flight reference, vacuum entry/gaps and exact stack/prism boundaries (`photon-channel-first-interaction`) | Called per flight by `photon_histories`; `scene_first_interactions` adds disjoint oriented boxes (`photon-scene-navigation`); production pair/annihilation paths still use their historical entry point |
 | `montecarlo/eadl_relaxation.py` | EADL transition energies and probabilities; deterministic expected vacancy cascade | Pass validated records to the sampled cascade for event emission |
 | `montecarlo/transport/relaxation.py` | Standalone CPU individual vacancy cascades with explicit draws, transition ancestry, terminal holes and signed energy defects (`eadl-sampled-relaxation`) | Isotropic emission and queue handoff live in `photon_histories`; no production caller yet |
-| `montecarlo/transport/photon_scattering.py`, `compton_profiles.py` | CPU Rayleigh and Compton events; Compton energies use the impulse approximation (Doppler broadening, binding cutoff, one EADL vacancy) with Biggs per-subshell profiles (`photon-rayleigh-scattering`, `photon-compton-scattering`) | Relax the Compton vacancy through `eadl-sampled-relaxation` (its binding is deposited locally); impulse-approximation angular marginal |
+| `montecarlo/transport/photon_scattering.py`, `compton_profiles.py` | CPU Rayleigh and Compton events; Compton energies use the impulse approximation (Doppler broadening, binding cutoff, one EADL vacancy) with Biggs per-subshell profiles (`photon-rayleigh-scattering`, `photon-compton-scattering`) | Impulse-approximation angular marginal (the photon queue relaxes the Compton vacancy through `eadl-sampled-relaxation` on CPU and CUDA) |
 | `montecarlo/transport/photoelectric.py` | Standalone EPDL subshell absorption, Sauter–Gavrila photoelectrons and sampled EADL cascades (`photon-photoelectric-sampling`) | None for the host queue; production integration remains |
 | `montecarlo/transport/photon_histories.py` | Standalone CPU photon queue over all five channels with lineage-keyed streams, isotropic relaxation emission, charged handoff rows, an absorbing sample-frame aperture and per-history energy closure (`photon-history-queue`) | Source adapters and normalization; positron handoff |
 | `montecarlo/transport/photon_coupling.py` | Host photon/electron round loop: photon-born electrons through the shell cascade from an explicit launch, hard bremsstrahlung returned to the queue, coupled per-history ledger (`photon-charged-coupling`) | Positron transport/annihilation handoff; vacancies from charged impact ionization; soft radiative emission; batch-invariant charged generations ≥1 |
@@ -57,8 +57,9 @@ Rayleigh uses $(1+\cos^2\theta)F(x,Z)^2$, with $x=\sin(\theta/2)/\lambda$,
 and unchanged photon energy. Compton angles use Klein–Nishina times $S(x,Z)$;
 since #1231 the scattered energy follows the impulse approximation of
 PENELOPE-2024 §2.3 (Doppler broadening and binding cutoff) with
-per-subshell Biggs profiles, and the event leaves one EADL vacancy whose
-binding energy is deposited locally. Photoabsorption uses EPDL subshell probabilities and
+per-subshell Biggs profiles, and the event leaves one EADL vacancy. As in
+Geant4's Penelope Compton model, the photon queue relaxes that vacancy through
+the same sampled EADL cascade as photoabsorption (CPU and CUDA). Photoabsorption uses EPDL subshell probabilities and
 $T=E-B_i$, followed by the sampled EADL cascade. Its Sauter–Gavrila K-shell
 angular approximation is applied to all photoelectron shells. These choices
 do not model polarization, crystal coherence, anomalous Rayleigh amplitudes
