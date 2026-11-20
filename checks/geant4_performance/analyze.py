@@ -196,6 +196,37 @@ def rse(values):
     return se / abs(m) if m and se > 0 else math.inf
 
 
+def vov(values):
+    """MCNP/Geant4 variance of the variance, ``M4/M2**2 - 1/n`` (central sums).
+
+    The same quantity as ``G4ConvergenceTester``'s VOV and PyRITE's adaptive
+    ``variance_of_variance`` (whose gate is ``VOV + 1/n``).
+    """
+    x = np.asarray(values, dtype=float)
+    d = x - x.mean()
+    m2 = float(np.dot(d, d))
+    return float(np.sum(d**4) / m2**2 - 1.0 / x.size) if m2 > 0 else math.inf
+
+
+def vov_slope(values, points=16):
+    """Least-squares slope of ln VOV against ln n over second-half prefixes.
+
+    About -1 when the fourth moment is sampled (MCNP and Geant4 test VOV
+    falling as 1/N); shallower or positive when a heavy score arrives late.
+    ``None`` with fewer than three prefixes of positive VOV.
+    """
+    x = np.asarray(values, dtype=float)
+    pts = [
+        (n, vov(x[:n]))
+        for n in sorted({x.size * k // points for k in range(points // 2, points + 1)})
+        if n > 1
+    ]
+    pts = [(n, v) for n, v in pts if 0 < v < math.inf]
+    if len(pts) < 3:
+        return None
+    return float(np.polyfit(np.log([n for n, _ in pts]), np.log([v for _, v in pts]), 1)[0])
+
+
 def time_to_precision(samples, plan):
     runs = defaultdict(list)
     for rec in samples:
@@ -208,12 +239,16 @@ def time_to_precision(samples, plan):
             row["status"] = item["status"] if item["status"] != "planned" else "missing"
             rows.append(row)
             continue
-        achieved = []
+        achieved, vovs = [], []
         for r in recs:
             scores = dict(r["scores"])
             if GE10[0] in scores:
                 scores["photons_ge10keV"] = sum(scores[k] for k in GE10)
-            achieved.append({name: rse(scores[name]) for name in item["per_observable_histories"]})
+            names = item["per_observable_histories"]
+            achieved.append({name: rse(scores[name]) for name in names})
+            vovs.append(
+                {name: dict(vov=vov(scores[name]), slope=vov_slope(scores[name])) for name in names}
+            )
         met = [all(v <= item["target_rse"] for v in a.values()) for a in achieved]
         warm = [r["timings_s"]["warm_request"] for r in recs]
         row.update(
@@ -221,6 +256,9 @@ def time_to_precision(samples, plan):
             seeds=sorted(r["seed"] for r in recs),
             met_per_seed=met,
             worst_rse=max(max(a.values()) for a in achieved),
+            rse_per_seed=achieved,
+            vov_per_seed=vovs,
+            worst_vov=max(v["vov"] for a in vovs for v in a.values()),
             T_s=warm,
             T_s_median=statistics.median(warm),
         )
