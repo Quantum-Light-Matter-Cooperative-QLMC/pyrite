@@ -4,6 +4,11 @@
 # --plan then verifies achieved RSE and reports T(eps).
 # Usage: sbatch --dependency=after:<hold> precision.sbatch <hold-job-id> <plan.json> [seed ...]
 # Seeds default to scenes.json held_out_seeds; a subset runs one repeat at a time.
+# ENGINES=pyrite|geant4 runs one engine's arms (default both). Geant4 arms on the
+# CPU host (same Ryzen 9 9950X3D; the cpu partition caps a node at 16 CPUs, so
+# one 16-CPU job owns it and no hold is needed; jobs are not CPU-pinned):
+#   ENGINES=geant4 sbatch -p cpu -w qlmc-queen --gres=none --mem=20G \
+#       precision.sbatch none <plan.json> <seed>
 #SBATCH --job-name=g4bench821-prec
 #SBATCH --partition=gpu
 #SBATCH --nodelist=DESKTOP-QNIHO3D
@@ -15,16 +20,21 @@
 set -euo pipefail
 cd "$SLURM_SUBMIT_DIR"
 hold=$1 plan=$2; shift 2
-trap 'touch "evidence/hold-release-$hold"' EXIT
+engines=${ENGINES:-all}
+[[ $hold == none ]] || trap 'touch "evidence/hold-release-$hold"' EXIT
 source checks/geant4_performance/env.sh
-pixi install --locked -e nvidia
-[[ "$(squeue -h -j "$hold" -o %T)" == RUNNING ]] || { echo "hold job $hold not running"; exit 1; }
+# Shared home: the CPU host uses the default environment, apart from the GPU job's.
+pixi_env=nvidia
+[[ $engines != geant4 ]] || pixi_env=default
+pixi install --locked -e "$pixi_env"
+[[ $hold == none || "$(squeue -h -j "$hold" -o %T)" == RUNNING ]] || { echo "hold job $hold not running"; exit 1; }
 out="evidence/precision/$SLURM_JOB_ID"; mkdir -p "$out"
 cp "$plan" "$out/plan.json"; cp .pyrite-sync "$out/sync.json"
-lscpu > "$out/cpu.txt"; nvidia-smi > "$out/gpu.txt"
-squeue -w DESKTOP-QNIHO3D > "$out/node-jobs.txt"; free -g > "$out/memory.txt"
+echo "engines=$engines host=$(hostname)" > "$out/engines.txt"
+lscpu > "$out/cpu.txt"; nvidia-smi > "$out/gpu.txt" 2>&1 || true
+squeue -w "$(hostname)" > "$out/node-jobs.txt"; free -g > "$out/memory.txt"
 sha256sum "$G4BENCH" checks/geant4_performance/*.py checks/geant4_performance/g4bench/* > "$out/code.txt"
-pixi run --as-is -e nvidia python checks/equal_precision/prepare_stopping.py > "$out/tables.json"
+pixi run --as-is -e "$pixi_env" python checks/equal_precision/prepare_stopping.py > "$out/tables.json"
 seeds=("$@")
 (( ${#seeds[@]} )) || mapfile -t seeds < <(python3 -c "import json;print(*json.load(open('checks/geant4_performance/scenes.json'))['precision']['held_out_seeds'],sep='\n')")
 mapfile -t runs < <(python3 -c "import json;[print(r['scene'],r['config'],r['histories']) for r in json.load(open('$out/plan.json'))['runs']]")
@@ -34,10 +44,11 @@ for seed in "${seeds[@]}"; do
     for run in "${runs[@]:r}" "${runs[@]:0:r}"; do
         read -r s config n <<< "$run"
         stem="$out/$config-$s-$n-$seed"
+        [[ $engines == all || $config == "$engines"-* ]] || continue
         case $config in
             geant4-*)
                 threads=${config#geant4-}; threads=${threads%t}
-                pixi run --as-is -e nvidia python checks/geant4_performance/geant4_bench.py "$s" \
+                pixi run --as-is -e "$pixi_env" python checks/geant4_performance/geant4_bench.py "$s" \
                     --histories "$n" --warmup $(( n / 100 > 100 ? n / 100 : 100 )) --seed "$seed" \
                     --threads "$threads" --executable "$G4BENCH" --output "$stem.json" \
                     > "$stem.log" 2>&1 || echo "FAIL $config $s $n $seed" ;;
@@ -47,7 +58,7 @@ for seed in "${seeds[@]}"; do
                     mode=${config#pyrite-cuda-continuous-}; chunk=${mode##*-c}; mode=${mode%-c*}
                     extra=(--estimator continuous --cone-mode "$mode" --chunk "$chunk")
                 fi
-                PYRITE_MC_BACKEND=cuda pixi run --as-is -e nvidia python checks/geant4_performance/pyrite_bench.py \
+                PYRITE_MC_BACKEND=cuda pixi run --as-is -e "$pixi_env" python checks/geant4_performance/pyrite_bench.py \
                     "$s" --histories "$n" --warmup-histories -1 --seed "$seed" \
                     --rows-per-round 1024 --device-staging "${extra[@]}" --output "$stem.json" \
                     > "$stem.log" 2>&1 || echo "FAIL $config $s $n $seed" ;;
@@ -55,5 +66,5 @@ for seed in "${seeds[@]}"; do
         echo "DONE $config $s $n $seed"
     done
 done
-pixi run --as-is -e nvidia python checks/geant4_performance/analyze.py "$out" --plan "$out/plan.json" \
+pixi run --as-is -e "$pixi_env" python checks/geant4_performance/analyze.py "$out" --plan "$out/plan.json" \
     --output "$out/summary.json"

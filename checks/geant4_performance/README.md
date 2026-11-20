@@ -137,6 +137,21 @@ hold=$(sbatch --parsable checks/geant4_performance/hold.sbatch)
 sbatch --dependency=after:$hold checks/geant4_performance/precision.sbatch $hold precision-plan.json
 ```
 
+Since #1041 the Geant4 arms can run on the CPU host instead (`qlmc-queen`, the
+same Ryzen 9 9950X3D as the GPU host). The `cpu` partition caps a node at 16
+CPUs and jobs are not CPU-pinned, so one 16-CPU job owns that node and its
+Geant4 runs see all 32 hardware threads without a hold. The PyRITE arms keep
+the GPU host and its hold. `analyze.py --plan` then reads both evidence
+directories:
+
+```bash
+ENGINES=geant4 sbatch -p cpu -w qlmc-queen --gres=none --mem=20G -c 16 \
+    checks/geant4_performance/precision.sbatch none precision-plan.json 101
+hold=$(sbatch --parsable checks/geant4_performance/hold.sbatch)
+ENGINES=pyrite sbatch --dependency=after:$hold checks/geant4_performance/precision.sbatch \
+    $hold precision-plan.json 101 102 103
+```
+
 ## Spectral-grid sensitivity (#278)
 
 The continuous arm's cone scoring does not use a photon grid. For each
