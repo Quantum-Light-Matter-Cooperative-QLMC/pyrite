@@ -27,7 +27,7 @@ These probes do not run transport or certify yield/linewidth accuracy.
 
 Results at #525: only Si and diamond pass the thermal gate; all other 47
 crystals raise `ChannelingDataError` before the Fourier sum. Since #535, 2H-MoS₂
-also builds static profiles from its room-temperature uniaxial rows. Fourteen crystals have
+also builds static profiles from its room-temperature uniaxial rows, and since #540 so does 2H graphite (HOPG) from an assumed-300 K row. Fourteen crystals have
 constructible electronic oscillators, including diamond. Consequently the
 inventory cannot establish whether hexagonal extinctions or compound wells are
 correct: those code paths remain behind missing thermal data. No artificial
@@ -82,7 +82,7 @@ the channeling-plane normal. Plane reachability is discussed below.
 | `hfs2` | model-gap; T: Hf, S; E; whole-shell partition | `(0,0,1)`; (0,1,0), (1,0,0), (1,1,0) | L | R: `hfs2-structure`; Bell–Liang (E); shell-model change needed; O |
 | `hfse2` | model-gap; T: Hf, Se; E; whole-shell partition | `(0,0,1)`; (0,1,0), (1,0,0), (1,1,0) | L | R: `hfse2-cif-migration`; Bell–Liang (E); shell-model change needed; O |
 | `hfte2` | model-gap; T: Hf, Te; E | `(0,0,1)`; (0,1,0), (1,0,0), (1,1,0) | L | R: `hfte2-001-structure`; E source not established; O |
-| `hopg` | model-gap; T: C; A; #524 | `(0,0,1)`; (0,1,0), (1,0,0), (1,1,0) | H | [R: COD 9011577](https://www.crystallography.net/cod/9011577.html); Trucano/Chen (T), Taft (E); O |
+| `hopg` | model-gap; 300 K (assumed) uniaxial row (static profile; mean of the two C classes, #540/#1335); A; #524 | `(0,0,1)`; (0,1,0), (1,0,0), (1,1,0) | H | [R: COD 9011577](https://www.crystallography.net/cod/9011577.html); Trucano/Chen (T), Taft (E); O |
 | `lif` | data-gap; T: F, Li; E | `(1,0,0)`; (0,0,1), (0,1,0) | L | [R: COD 1010990](https://www.crystallography.net/cod/1010990.html); E source not established; O |
 | `mos2` | model-gap; 295 ± 10 K uniaxial rows (static profile and anisotropic TDS); A | `(0,0,2)`; (0,1,0), (1,0,0), (1,1,0) | L | [R: COD 9007660](https://www.crystallography.net/cod/9007660.html); Schönfeld/Feldman (T), Moynihan (E); O |
 | `mose2` | model-gap; T: Mo, Se; A | `(0,0,2)`; (0,1,0), (1,0,0), (1,1,0) | L | R: `mose2-cif-migration`; Bell–Liang (E); O |
@@ -131,7 +131,44 @@ Trucano and Chen's neutron refinement {cite:p}`trucano1975` refines only
 U₃₃ (0.016–0.017 Å² at room temperature). It fixes the basal U₁₁ = 0.0031 Å²
 from Ludsteck (1972), and its two carbon sites do not differ significantly.
 Chen and Trucano's comparison of diffraction and phonon-spectrum thermal motion
-{cite:p}`chen1978` has not been read.
+{cite:p}`chen1978` (Zotero `TZ6JDZSL`, read for #540) tabulates, at 300 K and
+per inequivalent carbon (Table 1; U in Å², Uᵢⱼ along the basal plane, U₃₃ along
+c): the X-ray charge-density refinement of Chen, Trucano and Stewart (1977),
+with extinction corrections, gives C(1) U₁₁ = 0.0030(2), U₃₃ = 0.0140(3) and
+C(2) U₁₁ = 0.0033(1), U₃₃ = 0.0140(3) (without extinction: 0.0030(2)/0.0137(4)
+and 0.0033(2)/0.0138(4)). It also quotes Ludsteck's neutron values (U₁₁ =
+0.0031(6), U₃₃ = 0.0090(20)) and a phonon-spectrum value (0.0032, 0.0098).
+The sources therefore disagree on U₃₃ by a factor of 1.6–1.8: 0.0090(20)
+(polycrystalline neutron, Debye fit), 0.0140(3) (single-crystal X-ray), and
+0.016/0.017 (single-crystal neutron).
+
+Trucano and Chen 1975 {cite:p}`trucano1975` (Zotero `NRG2VMUP`, Table 2, read
+for #540) is the source chosen for graphite. It is a neutron refinement of one
+natural single crystal (0.2 × 2 × 1.4 mm, Brookhaven HFBR, λ = 1.02041 Å, 339
+reflections, extinction neglected). In its P6₃/mmc refinement U₃₃ = 0.016(2) Å²
+for C(1) at (0, 0, 1/4) and 0.017(2) for C(2) at (1/3, 2/3, 1/4); the other
+refinements quote ±0.001. U₁₁ = U₂₂ = 0.0031 Å² is **not refined**: it is fixed
+from Ludsteck for both sites. The authors state that C(1) and C(2) are "not
+significantly different" (Debye temperatures 490 ± 40 and 470 ± 40 K). **The
+letter states no measurement temperature**, so a row cannot yet declare the
+window that `UniaxialThermalSite` requires.
+
+Ludsteck 1972 (Zotero `2PTDUCU5`, DOI `10.1107/S0567739472000130`, read for
+#540) is not a usable series. It measured elastic 002/004/110 intensities of
+polycrystalline extruded Iso-AMT graphite (anisotropy 1.05) at only four
+temperatures (25, 850, 1140, 1830 °C), treats all four atoms of the cell as
+one species, and states that these intensities give temperature differences
+Δ⟨u²⟩, not absolute values. It reports effective Debye temperatures per
+interval (300–1150 K: Θ∥c = 670 K, within 600–770 K; Θ⊥c = 1300 K, within
+1190–1510 K). Any absolute U₁₁ or U₃₃ from it, including the 0.0031 and 0.0090
+that Chen and Trucano compute through their eq. (1), assumes a Debye form.
+No graphite temperature series is therefore admissible.
+
+The catalog's `hopg` CIF has four P1 carbons (two 2b-type, two 2c-type). A
+per-element uniaxial row would collapse the C(1)/C(2) U₃₃ difference of 0.001
+Å², which is half the quoted uncertainty; whether that justifies a per-site
+schema is the first item of
+[#1335](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/1335).
 The [existing basal diffraction record](../../validation/materials/hopg-debye-waller-00l.md)
 already distinguishes two carbon sites with different normal displacements.
 The channeling thermal loader currently groups by element, so a single C row
@@ -155,11 +192,27 @@ HOPG's mosaic field would misrepresent the sample.
 
 ### hBN
 
-Pease's refinement is the starting structural/thermal source
-candidate{cite:p}`pease1952`; the available Zotero item `MFWKLT5G` has no
-attachment. A lattice thermal-expansion curve alone cannot replace atomic
-displacement data. Site B and N displacements, their temperature range and
-directional convention remain to be read and transcribed.
+Pease's study{cite:p}`pease1952` (Zotero `RV4Z2ZWJ` carries the PDF; the
+duplicate `MFWKLT5G` has none) was read for #540 and **gives no site
+displacement parameters**. It is a powder study of recrystallized BDH material
+at 35 °C (one check at 300 °C) whose structure factors "contain no allowance
+for temperature factor". From the 00l reflections alone it fits one
+Debye temperature, 410 K, which it ties to vibrations perpendicular to the
+layers; the hk0 reflections do not follow a Debye–Waller factor and are
+attributed to scattering-factor error. No B/N split, no U₁₁, no uncertainty
+and no basal value exist. The 0–800 °C lattice-constant curves are not
+atomic displacement data.
+
+**hBN is a documented source gap (#540).** Beyond Pease, a literature and database
+search (2026-11-19: web search for single-crystal and neutron/Rietveld hBN
+refinements; the Crystallography Open Database entries for BN) found no
+refinement with site displacement parameters. The only hBN records with a
+thermal value are COD 2016170/2016173, a secondary hBN phase in the
+Kurakevych–Solozhenko B₁₃N₂ powder paper (Acta Cryst. C63, i80, 297 K), whose
+four atoms all carry a fixed Uiso = 0.025 Å² with no uncertainty; that is a
+refinement convention, not a measurement of B or N. Paszkowicz–Pelka (2002)
+gives only lattice parameters from 10 to 297.5 K. No row is admitted, and
+none can be without inventing ADPs.
 
 The existing Tarrio–Schnatterly electronic row (DOI
 `10.1103/PhysRevB.40.7852`) explicitly distinguishes in-plane and out-of-plane
@@ -188,7 +241,16 @@ give their temperature dependence only as a figure, and their room-temperature
 ordering along c (Mo below S) contradicts the measurement. They are therefore
 not used, and no temperature series exists. The WSe₂ refinement (COD 9012193;
 DOI `10.1016/0022-4596(87)90057-0`) publishes no thermal parameters, so the
-W/Se gap remains open.
+W/Se gap remains open. The 110–400 K synchrotron Rietveld study of Mathew et
+al. (2020, Zotero `TLGREDLB`) was also checked: it reports lattice constants and
+W–W/W–Se distances with a preferred-orientation correction, no displacement
+parameters, so it cannot supply a covariance.
+
+**WSe₂ is a documented source gap (#540).** A web search for single-crystal or
+neutron/Rietveld 2H-WSe₂ refinements with Uᵢⱼ, and the Crystallography Open
+Database (entries 9009146 and 9012193, no displacement parameters), found no
+source with W or Se ADPs. Murray–Evans (1979) is a 10–320 K lattice-constant
+study. No row is admitted.
 
 MoS₂ and WSe₂ already have sourced scalar electronic rows (DOIs
 `10.1111/jmi.12900`, `10.1088/1361-648X/aa63a7`). Bell and Liang supply the

@@ -78,9 +78,9 @@ def test_diamond_b_factor_matches_xray_measurements():
 
 def test_ineligible_crystal_is_refused():
     with pytest.raises(ChannelingDataError, match="eligible crystals"):
-        thermal_b_factor("hopg", "C", 293.15)
+        thermal_b_factor("hbn", "B", 293.15)
     with pytest.raises(ChannelingDataError):
-        planar_profile("hopg", (0, 0, 1))
+        planar_profile("hbn", (0, 0, 1))
 
 
 # ---- uniaxial layered rows (cr-uniaxial-thermal-projection) -----------------
@@ -119,6 +119,52 @@ def test_mos2_prismatic_extinctions_and_cutoff_convergence():
         full = planar_profile("mos2", hkl, 295.0)
         cut = planar_profile("mos2", hkl, 295.0, s_max_inv_ang=4.0)
         assert np.subtract(*full.extrema()) == pytest.approx(np.subtract(*cut.extrema()), abs=0.01)
+
+
+@pytest.mark.parametrize(
+    ("hkl", "period_of", "b_ang2"),
+    # 2H graphite P6_3/mmc: odd 00l extinct (c/2); (100) has no extinction among
+    # m = 1, 2 (|F| = 1 for m not a multiple of 3); every atom lies on a (110)
+    # plane (a/2). Basal normal sees U33, prismatic normals see U11 (#540).
+    [
+        ((0, 0, 1), lambda a, c: c / 2, 8 * np.pi**2 * 0.0165),
+        ((1, 0, 0), lambda a, c: a * np.sqrt(3) / 2, 8 * np.pi**2 * 0.0031),
+        ((1, 1, 0), lambda a, c: a / 2, 8 * np.pi**2 * 0.0031),
+    ],
+)
+def test_graphite_planar_periods_and_projected_b(hkl, period_of, b_ang2):
+    lattice = CRYSTALS["hopg"]["lattice"]
+    profile = planar_profile("hopg", hkl, 300.0)
+    assert profile.period_ang == pytest.approx(period_of(lattice["a"], lattice["c"]))
+    assert profile.thermal_projected
+    assert profile.b_factors_ang2["C"] == pytest.approx(b_ang2)
+
+
+def test_graphite_extinctions_match_structure_factor():
+    # Independent |F(hkl)| of the four-carbon cell, no thermal factor: 001 and
+    # (1,0,0)-family harmonics follow the P6_3/mmc rules above.
+    basis = [(0, 0, 0), (1 / 3, 2 / 3, 0), (0, 0, 0.5), (2 / 3, 1 / 3, 0.5)]
+
+    def modulus(hkl):
+        return abs(sum(np.exp(2j * np.pi * np.dot(hkl, r)) for r in basis))
+
+    assert modulus((0, 0, 1)) == pytest.approx(0.0, abs=1e-12)
+    assert modulus((0, 0, 2)) == pytest.approx(4.0)
+    assert modulus((1, 0, 0)) == pytest.approx(1.0)
+    assert modulus((3, 0, 0)) == pytest.approx(4.0)
+    assert modulus((1, 1, 0)) == pytest.approx(4.0)
+    # Odd 00l carries no Fourier weight, so (001) and (002) are one family.
+    one = planar_profile("hopg", (0, 0, 1), 300.0)
+    two = planar_profile("hopg", (0, 0, 2), 300.0)
+    assert one.period_ang == pytest.approx(two.period_ang)
+    np.testing.assert_allclose(one.potential_eV, two.potential_eV, rtol=1e-12)
+
+
+def test_graphite_cutoff_convergence():
+    for hkl in ((0, 0, 1), (1, 0, 0), (1, 1, 0)):
+        full = planar_profile("hopg", hkl, 300.0)
+        cut = planar_profile("hopg", hkl, 300.0, s_max_inv_ang=4.0)
+        assert np.subtract(*full.extrema()) == pytest.approx(np.subtract(*cut.extrema()), abs=0.02)
 
 
 # ---- planar potential (cr-planar-continuum-potential, cr-mott-bethe-factor) --

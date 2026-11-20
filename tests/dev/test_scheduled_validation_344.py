@@ -210,11 +210,13 @@ def test_quantum_budget_material_table_matches_catalog():
     from pyrite.materials.channeling import ChannelingDataError, planar_profile
 
     budget = _script("quantum_decoherence_budget.py")
-    # MoS2 is computed for TDS only; its electronic rate stays unsupported (#541).
+    # MoS2 and HOPG are computed for TDS only; their electronic rates stay
+    # unsupported (#541, #536).
     assert [(c[1], c[3]) for c in budget.CELLS] == [
         ("silicon", True),
         ("diamond", True),
         ("mos2", False),
+        ("hopg", False),
     ]
     for _, crystal, hkl, _ in budget.CELLS:
         planar_profile(crystal, hkl, 293.15)
@@ -246,7 +248,7 @@ def test_quantum_budget_flags_material_coverage_changes(monkeypatch, capsys):
     budget = _script("quantum_decoherence_budget.py")
     _cheap_budget(monkeypatch, budget, lambda *args: object())
     assert budget.main([]) == 1
-    assert "hopg unexpectedly has channeling data" in capsys.readouterr().out
+    assert "hbn unexpectedly has channeling data" in capsys.readouterr().out
 
     def lose_mos2(crystal, *args):
         if crystal in {"mos2", "hopg", "hbn", "wse2"}:

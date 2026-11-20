@@ -161,7 +161,7 @@ def test_gates_refuse_crystals_without_thermal_data():
     scene = pr.Scene(
         pr.Beam(energy_keV=5000.0, transverse=pr.beams.Spot(), longitudinal=pr.beams.PointBunch()),
         pr.geometry.Slab(
-            "hopg", thickness_ang=20000.0, tilt_deg=3.0, footprint=pr.geometry.Footprint(5.0, 5.0)
+            "hbn", thickness_ang=20000.0, tilt_deg=3.0, footprint=pr.geometry.Footprint(5.0, 5.0)
         ),
         pr.Detector(),
         physics=pr.Physics(**UNCOUPLED),
