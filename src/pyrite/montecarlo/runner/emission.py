@@ -64,9 +64,9 @@ def _brem_wide_from_segments(
         block = replace(batch, segments=segments)
         return continuum.evaluate(block, "brem_wide", native=True).values
 
-    # Band weights are per-electron outputs, not an additive spectrum.
-    if electron_band_weights is not None:
-        return score(segs_b)
+    # Per-electron band weights are ``(Ne,)`` bincounts over global electron
+    # ids; electron-aligned blocks are disjoint, so their vectors add exactly
+    # and bound the per-segment escape/staging state like the spectrum (#1320).
     return score_in_electron_blocks(score, segs_b)
 
 

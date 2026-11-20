@@ -43,6 +43,14 @@ FOURIER_RESIDUAL_TOL = 1.0e-6
 #: Smallest accepted ``residual_tol``: below it FP64 rounding of the mode sum
 #: dominates and the bound no longer describes the error.
 FOURIER_MIN_RESIDUAL_TOL = 1.0e-12
+#: Lines with more positive modes ``floor(P / W_l)`` than this leave the
+#: Fourier route for the near/far bin mean, on device and host (#1320).
+#: Fourier work and memory grow with the largest mode count (the FFT, fine
+#: grid and output span it), so one line far narrower than ``P`` -- itself
+#: ``>~ 408 W_max`` of the widest Fourier line -- requested multi-GiB
+#: workspaces. 2^22 modes bound the largest rectangle's grid, FFT and output
+#: to about 0.6 GiB; ordinary flushes stay far below it (mos2 30 keV: 5.5e5).
+FOURIER_MAX_LINE_MODES = 1 << 22
 #: Chebyshev nodes for the smooth envelope-image correction over the band.
 _CHEB_NODES = 24
 #: Host block size in (line, mode) elements.

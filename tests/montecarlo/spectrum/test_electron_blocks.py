@@ -272,3 +272,45 @@ def test_background_blocks_add_to_the_whole_spectrum(
     np.testing.assert_allclose(
         split, whole, rtol=scaled_rtol(1e-10, eps_multiple=16), atol=1e-12 * whole.max()
     )
+
+
+def test_per_electron_brem_band_weights_split_into_electron_blocks(monkeypatch, small_transport):
+    """The adaptive monitor's per-electron brem measure is blocked too (#1320).
+
+    Each electron's band integral comes from the one block that holds all its
+    rows, in their original order, and every other block adds zero to it.
+    """
+    case, tp = small_transport
+    E_brem = tp["E_brem"]
+    weights = np.linspace(0.5, 1.5, E_brem.size)
+
+    def measure():
+        return np.asarray(
+            runner._brem_wide_from_segments(
+                tp["segs"],
+                E_brem,
+                case,
+                tp["n_hat"],
+                case.get("abs_layers"),
+                Ne=tp["Ne_brem"],
+                electron_band_weights=weights,
+            )
+        )
+
+    whole = measure()
+    assert whole.shape == (tp["Ne_brem"],) and whole.sum() > 0.0
+    sizes = []
+    original = blocks.iter_electron_blocks
+
+    def counted(segments, n_blocks):
+        for part in original(segments, n_blocks):
+            sizes.append(part["L_ang"].size)
+            yield part
+
+    monkeypatch.setattr(runner._RESOURCE_POLICY, "gpu", True)
+    monkeypatch.setattr(blocks, "device_headroom_bytes", lambda: 1)
+    monkeypatch.setattr(blocks, "electron_block_count", lambda n, headroom: 3)
+    monkeypatch.setattr(blocks, "iter_electron_blocks", counted)
+    split = measure()
+    assert len(sizes) > 1
+    np.testing.assert_array_equal(split, whole)

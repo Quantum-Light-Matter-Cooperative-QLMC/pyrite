@@ -21,6 +21,7 @@ import numpy as np
 from ._bin_broad import broad_bin_mean_reduce, broad_width_for_axis
 from ._bin_fourier import (
     _CHEB_NODES,
+    FOURIER_MAX_LINE_MODES,
     FOURIER_MIN_RESIDUAL_TOL,
     FOURIER_RESIDUAL_TOL,
     _envelope_image_correction,
@@ -376,6 +377,24 @@ DEVICE_NUFFT_EPS = 1e-9
 _DEVICE_BROAD_BLOCK = 1 << 16
 
 
+def _near_far_lines(E, a, w, axis):
+    """Near/far bin means of the over-cap lines on the reconstructed ``axis`` bins.
+
+    The kernel takes float32 line positions. A bin mean depends only on
+    ``E - edge``, so positions and edges are shifted by ``c0`` (FP64) first:
+    the float32 position error is then ``2**-24 |E - c0|``, at most
+    ``2**-24`` of the band, not ``2**-24 E`` (3e-2 eV at 1 MeV, many times the
+    width of the narrow lines that take this route).
+    """
+    from ._bin_quadrature import run_bin_mean_reduction_kernel
+
+    cp = import_module("cupy")
+    c0, h, n_bins = axis
+    edges = (cp.arange(n_bins + 1, dtype=cp.float64) - 0.5) * h
+    out = cp.zeros(n_bins, dtype=cp.float64)
+    return run_bin_mean_reduction_kernel(E - c0, a, w, edges, cp.full(n_bins, 1.0 / h), out=out)
+
+
 def cuda_fourier_bin_mean_reduce(
     E_res,
     a_width,
@@ -387,6 +406,7 @@ def cuda_fourier_bin_mean_reduce(
     eps=DEVICE_NUFFT_EPS,
     direct_precision="fp32",
     spread="gather",
+    max_line_modes=FOURIER_MAX_LINE_MODES,
 ):
     """Device counterpart of ``fourier_bin_mean_reduce(..., broad_width_eV=...)``.
 
@@ -398,7 +418,11 @@ def cuda_fourier_bin_mean_reduce(
     and the closed-form envelope-image correction (one fused FP64 pass over the
     lines). Same bounds as the host reference, plus the NUFFT tolerance ``eps``
     and, with ``direct_precision="fp32"`` (default since ``fourier-auto-v6``),
-    the single-precision phase factors of the direct rectangles.
+    the single-precision phase factors of the direct rectangles. Lines whose
+    mode count ``floor(P a_l / pi)`` exceeds ``max_line_modes`` (default
+    :data:`FOURIER_MAX_LINE_MODES`, ``fourier-auto-v8``, #1320) take the
+    near/far kernel on the same bins, with its own bounds; ``None`` keeps
+    every line on the Fourier route (the host reference's behaviour).
     ``eps=1e-12, direct_precision="fp64", spread="atomic"`` is the
     ``fourier-auto-v5`` route up to the envelope kernel's FP64 summation
     order; ``spread="atomic"`` alone is ``fourier-auto-v6`` up to the ES
@@ -451,6 +475,18 @@ def cuda_fourier_bin_mean_reduce(
     # The period depends only on the resonance extrema and the widest line.
     extrema = cp.asnumpy(cp.stack((E.min(), E.max(), a.min())))
     n_fft, P, _ = fourier_period(extrema[:2], extrema[2:], c0, h, n_bins, residual_tol=residual_tol)
+    # Removing lines only shrinks the span, so P keeps its image bounds.
+    # Same count as ``cuda_positive_modes``.
+    over = cp.floor(2.0 * a / (2.0 * np.pi / P)) > (
+        np.inf if max_line_modes is None else max_line_modes
+    )
+    if bool(over.any()):
+        sel = cp.flatnonzero(over)
+        out += _near_far_lines(E[sel], a[sel], w[sel], (c0, h, n_bins))
+        rest = cp.flatnonzero(~over)
+        E, a, w = E[rest], a[rest], w[rest]
+        if E.size == 0:
+            return out
     positive = cuda_positive_modes(
         E, a, w, c0, P, eps=eps, direct_precision=direct_precision, spread=spread
     )

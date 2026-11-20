@@ -757,8 +757,13 @@ def sincsq_bin_lineshape(
 #: of the peak from v5 on the mos2 30 keV flushes. Host flushes are unchanged.
 #: v7 (#1297): device ES spreading sums each fine point's window by sorted,
 #: batched warp gathers instead of per-source FP64 atomics (same terms, FP64
-#: summation order only).
-CXR_BIN_REDUCTION_MODEL = "fourier-auto-v7"
+#: summation order only). v8 (#1320): device and host lines with more than
+#: ``_bin_fourier.FOURIER_MAX_LINE_MODES`` positive modes take a near/far
+#: evaluator (device kernel; host numba ``_bin_mean_jit``) instead of the
+#: Fourier route; the kernel transform and gather grid are evaluated in
+#: bounded blocks. Flushes without such lines change only in FP64 summation
+#: order.
+CXR_BIN_REDUCTION_MODEL = "fourier-auto-v8"
 #: Lines per Fourier-route flush: amortises the per-call FFT and planning.
 FOURIER_FLUSH_LINES = 10_000_000
 

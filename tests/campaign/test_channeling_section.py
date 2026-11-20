@@ -218,6 +218,8 @@ def test_channeling_demo_and_off_profile_identities_are_unchanged(identity_pin):
     ES spreading).
     #1301 re-mints every pin for ``measured-shell-cutoff-v7`` (fiber-texture
     candidate domain; HOPG cases now select automatically).
+    #1320 re-mints the silicon pins for ``fourier-auto-v8`` (over-cap device
+    lines on near/far).
     """
     sweep, settings, cases = _profile_cases("silicon", "channeling_demo")
     assert cases[0].line_quadrature == "bin-mean"

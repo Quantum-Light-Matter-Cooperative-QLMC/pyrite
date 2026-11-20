@@ -120,6 +120,7 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     # Streamed vs retained adaptive memory/wall/parity A/B (#1281): engineering evidence.
     "checks/streamed_adaptive_ab_1281.py": (),
     # Device Fourier bin-mean reduction phase split (#1296): engineering evidence.
+    "checks/fourier_mode_cap_1320.py": (),
     "checks/fourier_reduction_phases_1296.py": (),
     "checks/adaptive_decision_cadence_1253.py": ("adaptive-sample-size-stopping",),
     "checks/adaptive_tail_1254.py": ("adaptive-sample-size-stopping",),
