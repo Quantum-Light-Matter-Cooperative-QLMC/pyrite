@@ -4,7 +4,7 @@
 
 Validation: `brem-source-comparison`. This is an implementation-context comparison, not a fresh-context re-derivation. It asks which bremsstrahlung cross-section source PyRITE should use in production: the pinned EEDL evaluation (current default) or the released BremsLib tables (#86, #84). Both are compared with an independent reference, the Seltzer–Berger tabulation, as PyRITE evaluates them in production (`montecarlo/spectrum/brem.py::_bremsstrahlung_dsigma_dk`). The angular model is not covered; no independent double-differential reference is used here.
 
-Current gate and evidence: [Gate domain and low-Z excess (#1068, 2026-11-10)](#gate-domain-and-low-z-excess-1068-2026-11-10), with Li's gate replaced by [Lithium attribution (#1073, 2026-11-20)](#lithium-attribution-1073-2026-11-20). The sections dated 2026-09-25 measured 24 elements (Z = 5–83) with the electron–nucleus library alone; they are kept as history, and their electron–electron explanation of the low-Z deficit no longer applies to the staged tables.
+Current gate and evidence: [Gate domain and low-Z excess (#1068, 2026-11-10)](#gate-domain-and-low-z-excess-1068-2026-11-10), with Li's gate replaced by [Lithium attribution (#1073, 2026-11-20)](#lithium-attribution-1073-2026-11-20) and Li's pointwise reason re-cited in [Lithium after the sub-node fix (#1349, 2026-11-20)](#lithium-after-the-sub-node-fix-1349-2026-11-20). The sections dated 2026-09-25 measured 24 elements (Z = 5–83) with the electron–nucleus library alone; they are kept as history, and their electron–electron explanation of the low-Z deficit no longer applies to the staged tables.
 
 ## Reference
 
@@ -258,7 +258,7 @@ The excess grows with `k/T` falling toward 0.1. At 100 MeV, Li is 1.038 at `k/T 
 
 ### Classification and gate
 
-- **Pointwise, 10 keV–30 MeV: PyRITE staging.** Linear interpolation in `k/T` below 0.1 raises Li by 0.056–0.062 at 0.4–1 MeV against Interpolate_DCS (1.130–1.137 against 1.072–1.077; the not-a-knot interpolating spline gives a smaller 0.039–0.056, depending on its end condition), on top of a library-versus-reference difference of 6–12 % at the library nodes. The upstream manual prescribes the more accurate scheme; Interpolate_DCS measures the difference. Correcting it changes every element's spectrum below `k/T = 0.1`. It needs a `BREMSSTRAHLUNG_BREMSLIB_MODEL` bump and identity-pin re-mint, not a tables tag, so it is out of scope here and proposed as a follow-up. Li's pointwise gate is reported, not gated, with this reason (`UNGATED_KINDS[3]["chi"]`).
+- **Pointwise, 10 keV–30 MeV: PyRITE staging.** Linear interpolation in `k/T` below 0.1 raises Li by 0.056–0.062 at 0.4–1 MeV against Interpolate_DCS (1.130–1.137 against 1.072–1.077; the not-a-knot interpolating spline gives a smaller 0.039–0.056, depending on its end condition), on top of a library-versus-reference difference of 6–12 % at the library nodes. The upstream manual prescribes the more accurate scheme; Interpolate_DCS measures the difference. Correcting it changes every element's spectrum below `k/T = 0.1`. It needs a `BREMSSTRAHLUNG_BREMSLIB_MODEL` bump and identity-pin re-mint, not a tables tag, so it is out of scope here and proposed as a follow-up. Li's pointwise gate is reported, not gated, with this reason (`UNGATED_KINDS[3]["chi"]`). Superseded by [#1349](#lithium-after-the-sub-node-fix-1349-2026-11-20): the staging fix landed, and the remaining exclusion cites the library's screening model.
 - **Band moment, 10 keV–30 MeV: gated again.** Li is 0.989–1.063, within ±0.10 (SB86 p. 346).
 - **Extension moment, 30–100 MeV: library versus reference.** Li is 1.059–1.072. The cause is cited and shown to continue the low-Z trend: above 50 MeV, two analytic high-energy theories (SB86 p. 347 and the BremsLib manual p. 3); at 30–50 MeV, within SB's 5–10 % interpolation uncertainty (SB86 pp. 346, 348). It is reported, not gated (`UNGATED_KINDS[3]["extension_moment"]`), because no source bounds it within ±6 %. H stays fully ungated (#1068).
 
@@ -274,3 +274,46 @@ An independent verifier read the Interpolate_DCS v1.0.7 manual (Sec. 2, p. 3), S
 - **Corrections applied:** library-scheme values below 1 MeV now quote Interpolate_DCS (1.072–1.077, so linear adds 0.056–0.062 to the ratio, not 3.5–4.0 %), with the interpolating spline's end-condition sensitivity noted; the manual is cited as prescribing a more accurate scheme, not as calling linear inaccurate at 0.4–1 MeV; "two analytic theories" is scoped to `T ≥ 50 MeV`, with 30–50 MeV covered by SB's 5–10 % interpolation uncertainty; the 2–50 MeV interpolation is SB86 p. 348 and the Li exchange figure SB85 p. 97; the interpolating-spline full-grid minimum is 0.964, not 0.953. The ≥ 1 MeV figures and the ≤ 1.126 bound stand.
 
 Only a human may mark this signed off.
+
+## Lithium after the sub-node fix (#1349, 2026-11-20)
+
+#1349 replaced the linear `k/T1` sub-nodes with the library's own Interpolate_DCS scheme (`tables-bremslib-4`, `bremslib-electron-electron`). The recipe still exits 0 with `PASS`. Li's pointwise range is 0.959–1.130 and its band moment 0.989–1.058. At 0.4–10 MeV the `k/T = 0.05` maximum fell from 1.13–1.14 to ≤ 1.085, and B (1.121 → 1.104) and C (1.112 → 1.098) fell too. One gated point is left: 30 MeV, `kappa = 0.05`, 1.1301, which is 1e-4 outside ±0.13. This section finds its cause. It changes no physics and no default numerical output.
+
+### Sources
+
+- **Y.-S. Tsai, Rev. Mod. Phys. 46, 815 (1974), Eq. (3.66) and Table B.2.** In complete screening the electron–nucleus spectrum is `chi = 4 α r_e² [(4/3 − 4y/3 + y²)(L_rad − f(Z)) + (1 − y)/9]`, `y = k/E`. For Z ≤ 4, `L_rad` comes from Hartree–Fock form factors (H 5.31, He 4.79, Li 4.74, Be 4.71). For Z ≥ 5, `L_rad = ln(184.15 Z^−1/3)` (Thomas–Fermi–Moliere). The same `L_rad` already backs the radiation-length claim in the ledger.
+- **Poškus, ADNDT 166, 101734 (2025).** The atom is a static charge distribution, and the continuum electron sees a Kohn–Sham potential (Sec. 2, and Sec. 2.1 for the screening function `Ṽ(r)`, the screened potential divided by the unscreened one). The library's screened Born DDCS is "calculated using the same screening function `Ṽ(r)` as the partial-wave DDCS" (Sec. 2.6). The Kohn–Sham references [14,15] were not read here, so the exchange–correlation functional is not known. The probe below brackets it with LDA exchange alone and with exchange plus correlation.
+- **Slater's rules** (Phys. Rev. 36, 57 (1930)) give the analytic Slater-type-orbital densities used for Li, C and Al. H uses its exact 1s density, and He the hydrogenic `ζ = 27/16`. The LDA functional is Slater exchange plus Perdew–Zunger correlation (Phys. Rev. B 23, 5048 (1981)), spin-unpolarized.
+
+### Measurement: BremsLib exceeds the complete-screening limit
+
+At `k → 0` and 30 MeV, screening is complete: the minimum momentum transfer is far below the atomic scale. Here `beta²` times the raw library SDCS (`SDCS_<Z>.txt`, `Born_appr/SDCS_Born_<Z>.txt`, `k/T1 = 0`) is compared with Tsai's `chi(y = 0)`. SB86's electron–nucleus value is SB86's total divided by the staged `1 + eta/Z`:
+
+| Z | 1 H | 2 He | 3 Li | 4 Be | 5 B | 6 C | 8 O | 13 Al | 29 Cu |
+|---|---|---|---|---|---|---|---|---|---|
+| BremsLib PW / Tsai | 1.195 | 1.114 | 1.110 | 1.093 | 1.079 | 1.071 | 1.051 | 1.031 | 1.020 |
+| BremsLib Born / Tsai | 1.195 | 1.114 | 1.110 | 1.092 | 1.078 | 1.070 | 1.051 | 1.031 | 1.026 |
+| SB86 e–n / Tsai | 0.942 | 0.990 | 1.001 | 1.001 | 1.000 | 1.000 | 0.996 | 0.992 | 0.993 |
+
+SB86 reproduces Tsai within 0.1 % for Z = 3–6, so the reference agrees with Hartree–Fock and Thomas–Fermi complete screening. BremsLib's PW and Born agree with each other within 0.1 % (Cu 0.6 %) and both exceed Tsai. The excess grows as Z falls. It is not a partial-wave or interpolation effect: it is present in the library's own Born values at a library node. At 30 MeV, BremsLib-Born divided by Bethe's intermediate-screening formula falls from 1.086 (Li) at `k → 0` to ≈ 1.0 at `k/T ≈ 0.8–0.9`, where screening stops mattering. So the excess comes from small momentum transfer, that is, from screening. At Li's failing point (30 MeV, `k/T = 0.05`) the minimum momentum transfer is ≈ 0.06 a.u., which is still inside the screening region.
+
+### Cause: exchange–correlation in the Kohn–Sham screening function
+
+In Born approximation with complete screening, `L_rad = 1 + ∫ (dq/q) [Z_eff(q)/Z]²` from 0 to `m c`, where `Z_eff(q)/Z = 1 + ∫₀^∞ Ṽ′(r) cos(qr) dr`. With an electrostatic screening function (nucleus plus electron cloud) and the densities above, this gives H 5.310, He 4.787 and Li 4.729, against Tsai's 5.31, 4.79 and 4.74. It gives C 4.598 and Al 4.284, against the Thomas–Fermi 4.618 and 4.361. A Kohn–Sham potential adds the exchange–correlation potential, `Ṽ_KS = Ṽ_es − r v_xc[ρ]/Z`. That potential is attractive and decays as `ρ^{1/3}`, so its range is longer than the charge cloud's. It undoes part of the screening. For one-electron H, the exact `v_xc` cancels the Hartree self-repulsion completely. On the same densities the predicted ratio `chi_KS/chi_es` at `y = 0` is:
+
+| Z | LDA x only | LDA x + c | BremsLib / Tsai |
+|---|---|---|---|
+| 1 H | 1.171 | 1.209 | 1.195 |
+| 2 He | 1.103 | 1.115 | 1.114 |
+| 3 Li | 1.103 | 1.115 | 1.110 |
+| 6 C | 1.068 | 1.072 | 1.071 |
+| 13 Al | 1.045 | 1.046 | 1.031 |
+
+The prediction reproduces both the size and the Z dependence of the excess. H through C fall within the LDA x / x + c bracket. Al's Slater-rule density is the crudest one, and its electrostatic `L_rad` is already 1.8 % below Thomas–Fermi. So the low-Z BremsLib excess over SB86 is the library's screening model, an exchange–correlation term in the potential seen by the projectile. That term is not a PyRITE staging or interpolation error, and it is not an SB86 defect. Whether a local exchange–correlation potential belongs in the elastic screening of a fast projectile is a modelling choice of the library. Tsai and SB86 use electrostatic form factors. No source bounds the difference within ±13 %.
+
+Limits of the probe: densities are analytic rather than self-consistent, the functional is bracketed rather than known, the calculation is non-relativistic, and only `y = 0` is covered. An earlier self-consistent LDA attempt was abandoned because of tail-precision artefacts. The probe identifies the mechanism and its size; it does not reproduce BremsLib to better than a few per cent.
+
+### Gate
+
+Li's pointwise `chi` stays reported, not gated (`UNGATED_KINDS[3]["chi"]`), now with this cause, and #1073's staging reason is retired. The band moment stays gated. The extension-moment reason stands. Its "different screening" remark (Hubbell form factors against a Kohn–Sham potential) is the same mechanism. H stays fully ungated (#1068). The re-cited reason is pinned by `test_gate_domain_ungates_h_and_two_cited_li_kinds`. The probe script and its output are recorded on [#1349](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/1349#issuecomment-7052289582).
+
