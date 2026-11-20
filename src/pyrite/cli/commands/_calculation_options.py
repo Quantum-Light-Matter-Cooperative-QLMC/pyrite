@@ -15,6 +15,7 @@ from click.shell_completion import CompletionItem
 from pyrite._numerics import CHANNELING_KEYS, PHYSICS_KEYS
 from pyrite._off_settings import DEPRECATED_OFF, NONE
 from pyrite.cli._deprecations import canonical_option, removed_option, warn_off_value
+from pyrite.cli._unit_params import unit_float
 from pyrite.cli.commands import _profile_shared
 
 _ENERGY_MODEL_VALUES = ("frozen", "midpoint")
@@ -228,7 +229,7 @@ class ChannelingSectionCommand(click.Command):
 )
 @click.option(
     "--inelastic-cutoff-ev",
-    type=click.FloatRange(min=0.0, min_open=True),
+    type=unit_float(click.FloatRange(min=0.0, min_open=True), "eV", "energy"),
     metavar="EV",
     help=(
         "Soft/hard energy-loss cutoff W_c in eV (default 50 for shell-soft-hard or auto); must exceed each "
@@ -237,7 +238,7 @@ class ChannelingSectionCommand(click.Command):
 )
 @click.option(
     "--secondary-threshold-ev",
-    type=NoneOr(click.FloatRange(min=0.0, min_open=True), "EV"),
+    type=NoneOr(unit_float(click.FloatRange(min=0.0, min_open=True), "eV", "energy"), "EV"),
     help=(
         "Transport hard-collision secondaries above this energy in eV (production cut and "
         "tracking cutoff; requires shell-soft-hard and SBETHE coverage, >= 1000 eV). "
@@ -275,7 +276,7 @@ class ChannelingSectionCommand(click.Command):
 )
 @click.option(
     "--radiative-cutoff-ev",
-    type=click.FloatRange(min=0.0, min_open=True),
+    type=unit_float(click.FloatRange(min=0.0, min_open=True), "eV", "energy"),
     metavar="EV",
     help=(
         "Hard-photon cutoff k_c in eV for bremslib-soft-hard or auto (default 1000); must not "
@@ -370,12 +371,12 @@ class ChannelingSectionCommand(click.Command):
 )
 @click.option(
     "--channeling-dz-ang",
-    type=click.FloatRange(min=0, min_open=True),
+    type=unit_float(click.FloatRange(min=0, min_open=True), "angstrom", "length"),
     help="Zone depth step in angstrom (table step_ang; default 250).",
 )
 @click.option(
     "--channeling-zone-max-ang",
-    type=click.FloatRange(min=0, min_open=True),
+    type=unit_float(click.FloatRange(min=0, min_open=True), "angstrom", "length"),
     help="Zone length cap in angstrom (table zone_max_ang; default first layer thickness).",
 )
 def _options_holder(**_values):

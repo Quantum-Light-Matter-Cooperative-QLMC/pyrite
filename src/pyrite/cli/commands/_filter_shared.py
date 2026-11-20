@@ -7,6 +7,7 @@ import click
 import tomlkit
 
 from pyrite.campaign.observation import filter_from_config, physical_detector_from_config
+from pyrite.cli._unit_params import unit_float, unit_pair
 from pyrite.instrument import FilterPlate, PlanarDetector
 
 
@@ -17,7 +18,7 @@ def filter_cli_options(function):
             (
                 ("--offset-mm",),
                 {
-                    "type": click.Tuple((float, float)),
+                    "type": unit_pair(float, "mm", "length"),
                     "metavar": "X Y",
                     "default": (0.0, 0.0),
                     "show_default": True,
@@ -27,7 +28,7 @@ def filter_cli_options(function):
             (
                 ("--roll-deg",),
                 {
-                    "type": float,
+                    "type": unit_float(float, "deg", "angle", "angle"),
                     "default": 0.0,
                     "show_default": True,
                     "help": "Local-roll angle in degrees.",
@@ -36,7 +37,7 @@ def filter_cli_options(function):
             (
                 ("--azimuth-deg",),
                 {
-                    "type": float,
+                    "type": unit_float(float, "deg", "angle", "angle"),
                     "default": 0.0,
                     "show_default": True,
                     "help": "Observation azimuth in degrees.",
@@ -45,7 +46,7 @@ def filter_cli_options(function):
             (
                 ("--polar-deg",),
                 {
-                    "type": float,
+                    "type": unit_float(float, "deg", "angle", "angle"),
                     "default": 90.0,
                     "show_default": True,
                     "help": "Observation polar angle in degrees [0, 180].",
@@ -54,7 +55,7 @@ def filter_cli_options(function):
             (
                 ("--distance-mm",),
                 {
-                    "type": click.FloatRange(min=0.0, min_open=True),
+                    "type": unit_float(click.FloatRange(min=0.0, min_open=True), "mm", "length"),
                     "required": True,
                     "metavar": "MM",
                     "help": "Source-to-plate distance in mm.",
@@ -63,7 +64,7 @@ def filter_cli_options(function):
             (
                 ("--size-mm",),
                 {
-                    "type": click.Tuple((float, float)),
+                    "type": unit_pair(float, "mm", "length"),
                     "required": True,
                     "metavar": "WIDTH HEIGHT",
                     "help": "Plate width and height in mm.",
@@ -72,7 +73,7 @@ def filter_cli_options(function):
             (
                 ("--thickness-mm",),
                 {
-                    "type": click.FloatRange(min=0.0, min_open=True),
+                    "type": unit_float(click.FloatRange(min=0.0, min_open=True), "mm", "length"),
                     "required": True,
                     "metavar": "MM",
                     "help": "Plate thickness in mm.",

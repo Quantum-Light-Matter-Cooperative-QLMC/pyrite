@@ -4,6 +4,7 @@ import math
 
 import click
 
+from pyrite.cli._unit_params import unit_float
 from pyrite.detectors.editing import POINT_DETECTOR_KIND, patch_detector
 
 
@@ -11,21 +12,28 @@ def detector_cli_options(function):
     function = click.option(
         "--solid-angle",
         "solid_angle_sr",
-        type=click.FloatRange(min=0.0, max=4.0 * math.pi, min_open=True),
+        type=unit_float(
+            click.FloatRange(min=0.0, max=4.0 * math.pi, min_open=True),
+            "sr",
+            "solid angle",
+            "solid_angle",
+        ),
         metavar="SR",
         help="Detector solid angle in sr; scalar replacement.",
     )(function)
     function = click.option(
         "--polar-acceptance",
         "polar_acceptance_deg",
-        type=click.FloatRange(min=0.0, max=180.0, min_open=True),
+        type=unit_float(
+            click.FloatRange(min=0.0, max=180.0, min_open=True), "deg", "angle", "angle"
+        ),
         metavar="DEG",
         help="Full detector polar acceptance span in degrees; scalar replacement.",
     )(function)
     function = click.option(
         "--observation-angle",
         "observation_angle_deg",
-        type=click.FloatRange(min=0.0, max=180.0),
+        type=unit_float(click.FloatRange(min=0.0, max=180.0), "deg", "angle", "angle"),
         metavar="DEG",
         help="Detector observation angle in degrees [0, 180]; scalar replacement.",
     )(function)

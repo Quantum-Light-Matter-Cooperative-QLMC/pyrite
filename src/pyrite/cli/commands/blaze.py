@@ -4,6 +4,8 @@ from pathlib import Path
 
 import click
 
+from pyrite.cli._unit_params import unit_float
+
 from ...console import output as _cli_core
 from ...console.outputs import output_default, output_label
 from ...runs import blaze as _blaze
@@ -64,7 +66,9 @@ class _BlazeCommand(click.Command):
         return super().parse_args(ctx, normalized)
 
 
-_EMISSION_ANGLE = click.FloatRange(min=0.0, max=90.0, min_open=True, max_open=True)
+_EMISSION_ANGLE = unit_float(
+    click.FloatRange(min=0.0, max=90.0, min_open=True, max_open=True), "deg", "angle", "angle"
+)
 
 
 @click.command(
@@ -85,7 +89,7 @@ _EMISSION_ANGLE = click.FloatRange(min=0.0, max=90.0, min_open=True, max_open=Tr
 @click.option(
     "--energy",
     "energies",
-    type=_cli_core.POSITIVE_FLOAT,
+    type=unit_float(_cli_core.POSITIVE_FLOAT, "keV", "energy"),
     multiple=True,
     required=True,
     metavar="E",
@@ -94,7 +98,7 @@ _EMISSION_ANGLE = click.FloatRange(min=0.0, max=90.0, min_open=True, max_open=Tr
 @click.option(
     "--spacing",
     "spacings",
-    type=_cli_core.POSITIVE_FLOAT,
+    type=unit_float(_cli_core.POSITIVE_FLOAT, "m", "length"),
     multiple=True,
     required=True,
     metavar="S",

@@ -4,6 +4,8 @@ from pathlib import Path
 
 import click
 
+from pyrite.cli._unit_params import unit_float
+
 from ...console import json as cli_json
 from ...console.output import CLIError, emit_json_result, emit_result, output_option
 
@@ -30,7 +32,7 @@ def _fractions(values: tuple[str, ...], option: str) -> dict[str, float] | None:
 @click.option("--formula", help="Simple ASCII formula (medium: fractional counts allowed).")
 @click.option(
     "--density-g-cm3",
-    type=float,
+    type=unit_float(float, "g/cm**3", "mass density"),
     help="Required bulk density for media, in g/cm³; CIF consistency check only.",
 )
 @click.option(
@@ -72,12 +74,12 @@ def _fractions(values: tuple[str, ...], option: str) -> dict[str, float] | None:
 )
 @click.option(
     "--b-ang2",
-    type=float,
+    type=unit_float(float, "angstrom**2", "area"),
     help="Required new-CIF isotropic Debye–Waller factor in angstrom²; nonnegative.",
 )
 @click.option(
     "--mosaic-fwhm-deg",
-    type=float,
+    type=unit_float(float, "deg", "angle", "angle"),
     help="Optional positive new-CIF mosaic FWHM in degrees; omitted means perfect crystal.",
 )
 @output_option

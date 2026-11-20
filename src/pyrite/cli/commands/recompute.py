@@ -14,6 +14,8 @@ from pathlib import Path
 
 import click
 
+from pyrite.cli._unit_params import unit_float
+
 from ...checkpoints import _checkpoint_store
 from ...checkpoints import recompute as _recompute
 from ...console import json as cli_json
@@ -223,21 +225,21 @@ def _reject_remote_local_options(ctx: click.Context, json_output: bool) -> None:
 )
 @click.option(
     "--start",
-    type=_cli_core.NONNEGATIVE_FLOAT,
+    type=unit_float(_cli_core.NONNEGATIVE_FLOAT, "eV", "energy"),
     default=None,
     metavar="EV",
     help="Wide-bremsstrahlung lower bound in eV; overrides profile.",
 )
 @click.option(
     "--stop",
-    type=_cli_core.POSITIVE_FLOAT,
+    type=unit_float(_cli_core.POSITIVE_FLOAT, "eV", "energy"),
     default=None,
     metavar="EV",
     help="Wide-bremsstrahlung exclusive upper bound in eV; default follows beam energy.",
 )
 @click.option(
     "--step",
-    type=_cli_core.POSITIVE_FLOAT,
+    type=unit_float(_cli_core.POSITIVE_FLOAT, "eV", "energy"),
     default=None,
     metavar="EV",
     help="Wide-bremsstrahlung grid spacing in eV; overrides profile default.",
@@ -455,14 +457,14 @@ def _cxr_cli_json(args):
 )
 @click.option(
     "--start",
-    type=_cli_core.NONNEGATIVE_FLOAT,
+    type=unit_float(_cli_core.NONNEGATIVE_FLOAT, "eV", "energy"),
     default=None,
     metavar="EV",
     help="Line-grid lower bound in eV; overrides profile.",
 )
 @click.option(
     "--stop",
-    type=_cli_core.POSITIVE_FLOAT,
+    type=unit_float(_cli_core.POSITIVE_FLOAT, "eV", "energy"),
     default=None,
     metavar="EV",
     help="Line-grid exclusive upper bound in eV; overrides profile.",
@@ -470,7 +472,7 @@ def _cxr_cli_json(args):
 @canonical_option(
     "--cxr-step",
     "line_step",
-    type=_cli_core.POSITIVE_FLOAT,
+    type=unit_float(_cli_core.POSITIVE_FLOAT, "eV", "energy"),
     default=None,
     metavar="EV",
     help="Uniform line-grid spacing in eV; overrides profile grid.",

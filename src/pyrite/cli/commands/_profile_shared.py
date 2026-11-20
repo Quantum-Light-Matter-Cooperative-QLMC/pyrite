@@ -7,6 +7,7 @@ from tomlkit.exceptions import ParseError
 
 from pyrite.campaign import _profile_document
 from pyrite.cli import _catalog_io
+from pyrite.cli._unit_params import unit_float
 from pyrite.console.output import CLIError, emit_result
 
 
@@ -82,7 +83,7 @@ def mixed_transport_options(function):
     function = click.option(
         "--mixed-maximum-step-um",
         "mixed_max_step_um",
-        type=click.FloatRange(min=0.0, min_open=True),
+        type=unit_float(click.FloatRange(min=0.0, min_open=True), "um", "length"),
         metavar="UM",
         help="Absolute step limit under mixed transport (default: a hundredth of the layer thickness).",
     )(function)

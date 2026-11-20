@@ -17,6 +17,8 @@ from dataclasses import dataclass
 
 import click
 
+from pyrite.cli._unit_params import unit_float
+
 from ...console.output import (
     CLIError,
     emit_diagnostic,
@@ -320,7 +322,7 @@ def show_command(key: str, json_output: bool) -> None:
 @click.option(
     "--energy",
     "energies_ev",
-    type=click.FloatRange(min=4.999),
+    type=unit_float(click.FloatRange(min=4.999), "eV", "energy"),
     multiple=True,
     metavar="EV",
     help="Kinetic energy in eV; repeat for a native-grid table. ELSEPA only.",
@@ -350,21 +352,21 @@ def show_command(key: str, json_output: bool) -> None:
 )
 @click.option(
     "--density",
-    type=click.FloatRange(min=0.0, min_open=True),
+    type=unit_float(click.FloatRange(min=0.0, min_open=True), "g/cm**3", "mass density"),
     metavar="G_CM3",
     help="Mass density in g/cm^3. SBETHE only.",
 )
 @click.option(
     "--mean-excitation",
-    type=click.FloatRange(min=1.0, min_open=True),
+    type=unit_float(click.FloatRange(min=1.0, min_open=True), "eV", "energy"),
     metavar="EV",
     help="Mean excitation energy in eV. SBETHE only.",
 )
 @click.option(
     "--band-gap",
-    type=click.FloatRange(min=0.0, min_open=True),
+    type=unit_float(click.FloatRange(min=0.0, min_open=True), "eV", "energy"),
     metavar="EV",
-    help="Gap energy for an insulator or semiconductor; omit for a conductor. SBETHE only.",
+    help="Gap energy in eV for an insulator or semiconductor; omit for a conductor. SBETHE only.",
 )
 @click.option(
     "--projectile",
@@ -379,7 +381,7 @@ def show_command(key: str, json_output: bool) -> None:
 @click.option(
     "--t1-max",
     "t1_max_MeV",
-    type=click.FloatRange(min=0.0, min_open=True),
+    type=unit_float(click.FloatRange(min=0.0, min_open=True), "MeV", "energy"),
     metavar="MEV",
     help=(
         "Highest incident electron energy to include, in MeV; bounds the "

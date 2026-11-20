@@ -571,7 +571,8 @@ Options:
                                   bremsstrahlung per energy.  [default: 200; x>=1]
   --ne-supp INTEGER RANGE         Supplementary electrons per polar-tilt spectrum.
                                   [default: 200; x>=1]
-  --tmd-azimuth DEGREES           Exploratory TMD azimuth.  [default: 0.0; x<=None]
+  --tmd-azimuth DEGREES           Exploratory TMD azimuth in degrees.  [default: 0.0;
+                                  x<=None]
   --refresh                       Recompute matching cache.
   --no-sync                       With -R/--remote, skip code upload.
   --dry-run                       With -R/--remote, print submission preview only.

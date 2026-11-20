@@ -5,6 +5,8 @@ from importlib import import_module
 
 import click
 
+from pyrite.cli._unit_params import unit_float
+
 from .._deprecations import canonical_option, removed_option
 from .._groups import LazyGroup
 from .._options import remote_option
@@ -238,11 +240,11 @@ def validation_export_command(
 )
 @click.option(
     "--tmd-azimuth",
-    type=click.FloatRange(),
+    type=unit_float(click.FloatRange(), "deg", "angle", "angle"),
     default=0.0,
     show_default=True,
     metavar="DEGREES",
-    help="Exploratory TMD azimuth.",
+    help="Exploratory TMD azimuth in degrees.",
 )
 @click.option("--refresh", is_flag=True, help="Recompute matching cache.")
 @click.option("--no-sync", is_flag=True, help="With -R/--remote, skip code upload.")

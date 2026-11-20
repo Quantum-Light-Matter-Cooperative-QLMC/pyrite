@@ -4,6 +4,8 @@ from pathlib import Path, PurePosixPath
 
 import click
 
+from pyrite.cli._unit_params import unit_float
+
 from ...console.output import POSITIVE_FLOAT, POSITIVE_INT, CLIError
 from ...console.outputs import output_dir
 from ...remote import trajectories
@@ -24,7 +26,7 @@ def _filters(function):
         "--energy",
         "energies",
         multiple=True,
-        type=POSITIVE_FLOAT,
+        type=unit_float(POSITIVE_FLOAT, "keV", "energy"),
         metavar="KEV",
         help="Select exact incident energy in keV; repeatable.",
     )(function)

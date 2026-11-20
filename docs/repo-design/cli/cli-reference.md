@@ -110,6 +110,9 @@ Usage: pyrite [OPTIONS] COMMAND [ARGS]...
   membership. Then run campaigns, inspect checkpoints, or open analysis notebooks.
 
   Run ``pyrite COMMAND --help`` for command options, units, defaults, and side effects.
+  Single-value physical options take a bare number in the unit their help names, or an
+  explicit unit string such as ``--distance-mm "5 cm"``; comma-separated sweep lists
+  take bare numbers.
 
   Examples:
     pyrite config setup

@@ -147,8 +147,8 @@ Options:
                                   per element. SBETHE only.
   --density G_CM3                 Mass density in g/cm^3. SBETHE only.  [x>0.0]
   --mean-excitation EV            Mean excitation energy in eV. SBETHE only.  [x>1.0]
-  --band-gap EV                   Gap energy for an insulator or semiconductor; omit for
-                                  a conductor. SBETHE only.  [x>0.0]
+  --band-gap EV                   Gap energy in eV for an insulator or semiconductor;
+                                  omit for a conductor. SBETHE only.  [x>0.0]
   --projectile [alpha|antimuon|antiproton|electron|muon|positron|proton]
                                   Projectile particle. ELSEPA: electron or positron.
                                   SBETHE: any listed species. BremsLib: electron only.
