@@ -142,12 +142,22 @@ def plan(samples, spec, max_run_s, include_optional):
         pilot=sorted({r["path"] for r in samples}),
         targets_rse=targets,
         max_run_s=max_run_s,
-        cv={"|".join(k): v for k, v in cvs.items()},
+        # A zero-mean observable has no CV; strict JSON records it as null.
+        cv={
+            "|".join(k): v | {"cv": v["cv"] if math.isfinite(v["cv"]) else None}
+            for k, v in cvs.items()
+        },
         items=items,
         missing_pilot=missing,
         runs=[dict(scene=s, config=c, histories=n) for s, c, n in runs],
         predicted_total_warm_s=sum(n * seconds_per_primary[(s, c)] for s, c, n in runs),
     )
+
+
+def median_cv(cvs, name):
+    """Median finite CV of ``name`` over scenes and arms; ``None`` when none is finite."""
+    finite = [c["cv"] for k, c in cvs.items() if k.endswith("|" + name) and c["cv"] is not None]
+    return statistics.median(finite) if finite else None
 
 
 def main():
@@ -174,17 +184,8 @@ def main():
     )
     if result["missing_pilot"]:
         print("missing pilot:", json.dumps(result["missing_pilot"]))
-    print(
-        "median CV by observable:",
-        json.dumps(
-            {
-                name: statistics.median(
-                    c["cv"] for k, c in result["cv"].items() if k.endswith("|" + name)
-                )
-                for name in sorted({k.split("|")[2] for k in result["cv"]})
-            }
-        ),
-    )
+    names = sorted({k.split("|")[2] for k in result["cv"]})
+    print("median CV by observable:", json.dumps({n: median_cv(result["cv"], n) for n in names}))
 
 
 if __name__ == "__main__":
