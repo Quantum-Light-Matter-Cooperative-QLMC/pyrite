@@ -131,7 +131,22 @@ Trucano and Chen's neutron refinement {cite:p}`trucano1975` refines only
 U₃₃ (0.016–0.017 Å² at room temperature). It fixes the basal U₁₁ = 0.0031 Å²
 from Ludsteck (1972), and its two carbon sites do not differ significantly.
 Chen and Trucano's comparison of diffraction and phonon-spectrum thermal motion
-{cite:p}`chen1978` has not been read.
+{cite:p}`chen1978` (Zotero `TZ6JDZSL`, read for #540) tabulates, at 300 K and
+per inequivalent carbon (Table 1; U in Å², Uᵢⱼ along the basal plane, U₃₃ along
+c): the X-ray charge-density refinement of Chen, Trucano and Stewart (1977),
+with extinction corrections, gives C(1) U₁₁ = 0.0030(2), U₃₃ = 0.0140(3) and
+C(2) U₁₁ = 0.0033(1), U₃₃ = 0.0140(3) (without extinction: 0.0030(2)/0.0137(4)
+and 0.0033(2)/0.0138(4)). It also quotes Ludsteck's neutron values (U₁₁ =
+0.0031(6), U₃₃ = 0.0090(20)) and a phonon-spectrum value (0.0032, 0.0098).
+The sources therefore disagree on U₃₃ by a factor of 1.6–1.8: 0.0090(20)
+(polycrystalline neutron, Debye fit over 300–1150 K), 0.0140(3) (single-crystal
+X-ray), and 0.016/0.017 (single-crystal neutron, with U₁₁ fixed;
+{cite:p}`trucano1975`). The paper offers no temperature series of its own; the
+only series is Ludsteck's, which is reported there as Debye temperatures
+(Θ₁₁ = 1300, Θ₃₃ = 670 K) and which has not been read at source
+(DOI `10.1107/S0567739472000130`, unconfirmed). The catalog's `hopg` CIF has
+four P1 carbons (two 2b-type, two 2c-type); a per-element uniaxial row cannot
+carry the C(1)/C(2) U₁₁ difference, so no graphite row is admitted yet.
 The [existing basal diffraction record](../../validation/materials/hopg-debye-waller-00l.md)
 already distinguishes two carbon sites with different normal displacements.
 The channeling thermal loader currently groups by element, so a single C row
@@ -155,11 +170,17 @@ HOPG's mosaic field would misrepresent the sample.
 
 ### hBN
 
-Pease's refinement is the starting structural/thermal source
-candidate{cite:p}`pease1952`; the available Zotero item `MFWKLT5G` has no
-attachment. A lattice thermal-expansion curve alone cannot replace atomic
-displacement data. Site B and N displacements, their temperature range and
-directional convention remain to be read and transcribed.
+Pease's study{cite:p}`pease1952` (Zotero `RV4Z2ZWJ` carries the PDF; the
+duplicate `MFWKLT5G` has none) was read for #540 and **gives no site
+displacement parameters**. It is a powder study of recrystallized BDH material
+at 35 °C (one check at 300 °C) whose structure factors "contain no allowance
+for temperature factor". From the 00l reflections alone it fits one
+Debye temperature, 410 K, which it ties to vibrations perpendicular to the
+layers; the hk0 reflections do not follow a Debye–Waller factor and are
+attributed to scattering-factor error. No B/N split, no U₁₁, no uncertainty
+and no basal value exist. The 0–800 °C lattice-constant curves are not
+atomic displacement data. hBN therefore remains a gap; a later refinement
+with site ADPs has not yet been found.
 
 The existing Tarrio–Schnatterly electronic row (DOI
 `10.1103/PhysRevB.40.7852`) explicitly distinguishes in-plane and out-of-plane
@@ -188,7 +209,10 @@ give their temperature dependence only as a figure, and their room-temperature
 ordering along c (Mo below S) contradicts the measurement. They are therefore
 not used, and no temperature series exists. The WSe₂ refinement (COD 9012193;
 DOI `10.1016/0022-4596(87)90057-0`) publishes no thermal parameters, so the
-W/Se gap remains open.
+W/Se gap remains open. The 110–400 K synchrotron Rietveld study of Mathew et
+al. (2020, Zotero `TLGREDLB`) was also checked: it reports lattice constants and
+W–W/W–Se distances with a preferred-orientation correction, no displacement
+parameters, so it cannot supply a covariance.
 
 MoS₂ and WSe₂ already have sourced scalar electronic rows (DOIs
 `10.1111/jmi.12900`, `10.1088/1361-648X/aa63a7`). Bell and Liang supply the
