@@ -86,7 +86,7 @@ def test_catalog_debye_waller_matches_primary_room_temperature_refinements():
 
     Diamond: Takama et al. (1990) Dawson-model fit ``0.142(9)`` A^2 at 294 K;
     the catalog 0.1379 (LZD fit to the same set) is within one sigma of it.
-    Si: Spackman (1986) ``<u^2> = 0.005867(14)`` A^2, ``B = 8 pi^2 <u^2>``;
+    Si: Spackman (1986) Table 1 mean ``B = 0.4632(11)`` A^2 (293-298 K);
     lattice dynamics at 293 K (Flensburg & Stewart 1999) gives ``0.4691(16)``.
 
     Validation: debye-waller-catalog-provenance
