@@ -8,6 +8,7 @@ from pyrite.campaign import profile_filters as _profile_edit
 from pyrite.campaign._profile_document import existing_profile
 from pyrite.cli import _catalog_io
 from pyrite.cli import _completion as _cli_completion
+from pyrite.cli._unit_params import unit_float, unit_pair
 from pyrite.cli.commands._filter_shared import filter_cli_options, filter_from_row, filter_row
 from pyrite.cli.commands._profile_shared import write as _write
 from pyrite.console import json as cli_json
@@ -184,27 +185,42 @@ _FILTER_FIELDS = (
 @click.option("--material", metavar="KEY", help="Catalog crystal or medium key.")
 @click.option(
     "--thickness-mm",
-    type=click.FloatRange(min=0.0, min_open=True),
+    type=unit_float(click.FloatRange(min=0.0, min_open=True), "mm", "length"),
     metavar="MM",
     help="Plate thickness in mm.",
 )
 @click.option(
     "--size-mm",
-    type=click.Tuple((float, float)),
+    type=unit_pair(float, "mm", "length"),
     metavar="WIDTH HEIGHT",
     help="Plate width and height in mm.",
 )
 @click.option(
     "--distance-mm",
-    type=click.FloatRange(min=0.0, min_open=True),
+    type=unit_float(click.FloatRange(min=0.0, min_open=True), "mm", "length"),
     metavar="MM",
     help="Source-to-plate distance in mm.",
 )
-@click.option("--polar-deg", type=float, help="Observation polar angle in degrees [0, 180].")
-@click.option("--azimuth-deg", type=float, help="Observation azimuth in degrees.")
-@click.option("--roll-deg", type=float, help="Local-roll angle in degrees.")
 @click.option(
-    "--offset-mm", type=click.Tuple((float, float)), metavar="X Y", help="Local x/y offset in mm."
+    "--polar-deg",
+    type=unit_float(float, "deg", "angle", "angle"),
+    help="Observation polar angle in degrees [0, 180].",
+)
+@click.option(
+    "--azimuth-deg",
+    type=unit_float(float, "deg", "angle", "angle"),
+    help="Observation azimuth in degrees.",
+)
+@click.option(
+    "--roll-deg",
+    type=unit_float(float, "deg", "angle", "angle"),
+    help="Local-roll angle in degrees.",
+)
+@click.option(
+    "--offset-mm",
+    type=unit_pair(float, "mm", "length"),
+    metavar="X Y",
+    help="Local x/y offset in mm.",
 )
 @click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing.")
 def filter_set_command(profile_name, identifier, dry_run, **values):

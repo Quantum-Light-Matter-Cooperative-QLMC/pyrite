@@ -4,6 +4,7 @@ import math
 
 import click
 
+from pyrite.cli._unit_params import unit_float, unit_pair
 from pyrite.console.output import (
     FINITE_FLOAT,
     MEASURED_EDGES_CSV,
@@ -23,31 +24,31 @@ def _pair_positive(ctx, param, value):
 def pixel_cli_options(function):
     @click.option(
         "--distance-mm",
-        type=POSITIVE_FLOAT,
+        type=unit_float(POSITIVE_FLOAT, "mm", "length"),
         metavar="MM",
         help="Source-to-detector distance in mm; required to create.",
     )
     @click.option(
         "--polar-deg",
-        type=click.FloatRange(0.0, 180.0),
+        type=unit_float(click.FloatRange(0.0, 180.0), "deg", "angle", "angle"),
         metavar="DEG",
         help="Detector-centre polar angle from the beam axis in degrees [0, 180].",
     )
     @click.option(
         "--azimuth-deg",
-        type=FINITE_FLOAT,
+        type=unit_float(FINITE_FLOAT, "deg", "angle", "angle"),
         metavar="DEG",
         help="Detector-centre azimuth in degrees.",
     )
     @click.option(
         "--roll-deg",
-        type=FINITE_FLOAT,
+        type=unit_float(FINITE_FLOAT, "deg", "angle", "angle"),
         metavar="DEG",
         help="Detector roll about its normal in degrees.",
     )
     @click.option(
         "--offset-mm",
-        type=click.Tuple((FINITE_FLOAT, FINITE_FLOAT)),
+        type=unit_pair(FINITE_FLOAT, "mm", "length"),
         metavar="X Y",
         help="Detector-local x/y offset of the centre in mm.",
     )
@@ -59,7 +60,7 @@ def pixel_cli_options(function):
     )
     @click.option(
         "--pitch-mm",
-        type=click.Tuple((float, float)),
+        type=unit_pair(float, "mm", "length"),
         callback=_pair_positive,
         metavar="Y X",
         help="Pixel pitch (y, x) in mm; a new table defaults to 0.055 0.055.",
@@ -82,22 +83,25 @@ def pixel_cli_options(function):
     )
     @click.option(
         "--timepix-thickness-um",
-        type=POSITIVE_FLOAT,
+        type=unit_float(POSITIVE_FLOAT, "um", "length"),
         metavar="UM",
         help="Timepix3 sensor thickness in micrometres.",
     )
     @click.option(
-        "--timepix-bias-v", type=POSITIVE_FLOAT, metavar="V", help="Timepix3 sensor bias in volts."
+        "--timepix-bias-v",
+        type=unit_float(POSITIVE_FLOAT, "V", "electric potential"),
+        metavar="V",
+        help="Timepix3 sensor bias in volts.",
     )
     @click.option(
         "--timepix-input-bin-ev",
-        type=POSITIVE_FLOAT,
+        type=unit_float(POSITIVE_FLOAT, "eV", "energy"),
         metavar="EV",
         help="Timepix3 response-model incident-energy bin width in eV.",
     )
     @click.option(
         "--timepix-output-bin-ev",
-        type=POSITIVE_FLOAT,
+        type=unit_float(POSITIVE_FLOAT, "eV", "energy"),
         metavar="EV",
         help="Timepix3 native measured-energy bin width in eV (not the reporting bins).",
     )
@@ -111,7 +115,10 @@ def pixel_cli_options(function):
         "--timepix-seed", type=NONNEGATIVE_INT, metavar="N", help="Timepix3 response-matrix seed."
     )
     @click.option(
-        "--exposure-s", type=POSITIVE_FLOAT, metavar="S", help="Exposure (integration) time in s."
+        "--exposure-s",
+        type=unit_float(POSITIVE_FLOAT, "s", "time"),
+        metavar="S",
+        help="Exposure (integration) time in s.",
     )
     @click.option(
         "--reporting-bins",
@@ -126,19 +133,19 @@ def pixel_cli_options(function):
     )
     @click.option(
         "--measured-range-ev",
-        type=click.Tuple((NONNEGATIVE_FLOAT, NONNEGATIVE_FLOAT)),
+        type=unit_pair(NONNEGATIVE_FLOAT, "eV", "energy"),
         metavar="MIN MAX",
         help="Uniform reporting range in eV; use with --measured-bin-width-ev.",
     )
     @click.option(
         "--measured-bin-width-ev",
-        type=POSITIVE_FLOAT,
+        type=unit_float(POSITIVE_FLOAT, "eV", "energy"),
         metavar="EV",
         help="Uniform reporting-bin width in eV; output binning, not detector resolution.",
     )
     @click.option(
         "--hit-threshold-ev",
-        type=NONNEGATIVE_FLOAT,
+        type=unit_float(NONNEGATIVE_FLOAT, "eV", "energy"),
         metavar="EV",
         help="Post-response measured-energy cut in eV; separate from the response's discriminator.",
     )

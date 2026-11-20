@@ -19,6 +19,7 @@ from ...remote import config, lifecycle, transport
 from .. import _completion as _cli_completion
 from .._deprecations import DeprecatingGroup, canonical_option, removed_option
 from .._groups import LazyGroup
+from .._unit_params import unit_float
 from ._remote_actions import (
     _cli_check,
     _cli_clear,
@@ -163,9 +164,24 @@ def _recompute_options(function):
     default=None,
     help="Monte Carlo electron histories used to estimate bremsstrahlung.",
 )
-@click.option("--start", type=NONNEGATIVE_FLOAT, default=None, help="Brem lower bound in eV.")
-@click.option("--stop", type=POSITIVE_FLOAT, default=None, help="Brem exclusive upper bound in eV.")
-@click.option("--step", type=POSITIVE_FLOAT, default=None, help="Wide-brem grid spacing in eV.")
+@click.option(
+    "--start",
+    type=unit_float(NONNEGATIVE_FLOAT, "eV", "energy"),
+    default=None,
+    help="Brem lower bound in eV.",
+)
+@click.option(
+    "--stop",
+    type=unit_float(POSITIVE_FLOAT, "eV", "energy"),
+    default=None,
+    help="Brem exclusive upper bound in eV.",
+)
+@click.option(
+    "--step",
+    type=unit_float(POSITIVE_FLOAT, "eV", "energy"),
+    default=None,
+    help="Wide-brem grid spacing in eV.",
+)
 @click.option("--detach", is_flag=True, help="Return after remote submission.")
 def rebrem_command(
     material,
@@ -214,12 +230,22 @@ def rebrem_command(
     default=None,
     help="New Monte Carlo electron history count for the CXR spectrum.",
 )
-@click.option("--start", type=NONNEGATIVE_FLOAT, default=None, help="Line lower bound in eV.")
-@click.option("--stop", type=POSITIVE_FLOAT, default=None, help="Line exclusive upper bound in eV.")
+@click.option(
+    "--start",
+    type=unit_float(NONNEGATIVE_FLOAT, "eV", "energy"),
+    default=None,
+    help="Line lower bound in eV.",
+)
+@click.option(
+    "--stop",
+    type=unit_float(POSITIVE_FLOAT, "eV", "energy"),
+    default=None,
+    help="Line exclusive upper bound in eV.",
+)
 @canonical_option(
     "--cxr-step",
     "line_step",
-    type=POSITIVE_FLOAT,
+    type=unit_float(POSITIVE_FLOAT, "eV", "energy"),
     default=None,
     help="Explicit uniform line-grid spacing in eV.",
 )
@@ -1081,7 +1107,7 @@ def sync_command(force, ssh_verbose):
 )
 @click.option(
     "--tmd-azimuth",
-    type=FINITE_FLOAT,
+    type=unit_float(FINITE_FLOAT, "deg", "angle", "angle"),
     default=0.0,
     show_default=True,
     help="Exploratory TMD azimuth in degrees.",
@@ -1128,6 +1154,7 @@ def check_command(ctx, ne, ne_brem, ne_supp, tmd_azimuth, refresh, no_sync, deta
 from . import remote_trajectories  # noqa: E402
 
 command.add_command(remote_trajectories.command)
+
 
 from .._options import target_commands  # noqa: E402
 

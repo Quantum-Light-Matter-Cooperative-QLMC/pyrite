@@ -17,6 +17,7 @@ from pyrite import remote
 from pyrite.cli import _completion as _cli_completion
 from pyrite.cli._deprecations import canonical_option
 from pyrite.cli._options import remote_option
+from pyrite.cli._unit_params import unit_float
 from pyrite.console import config as _cli_config
 from pyrite.console import json as cli_json
 from pyrite.console.output import (
@@ -125,7 +126,7 @@ def _derive_options(function):
 @_derive_options
 @click.option(
     "--brem-step",
-    type=POSITIVE_FLOAT,
+    type=unit_float(POSITIVE_FLOAT, "eV", "energy"),
     metavar="EV",
     help="Derivation bremsstrahlung spacing in eV; overrides deprecated batch preset.",
 )
@@ -381,10 +382,18 @@ def add_command(json_path, materials, pull, force, catalog_profile, regen_golden
 @click.command("set")
 @click.argument("material", shell_complete=_cli_completion.complete_material)
 @click.option(
-    "--energy", type=POSITIVE_FLOAT, required=True, metavar="KEV", help="Beam energy in keV."
+    "--energy",
+    type=unit_float(POSITIVE_FLOAT, "keV", "energy"),
+    required=True,
+    metavar="KEV",
+    help="Beam energy in keV.",
 )
 @click.option(
-    "--stop", type=POSITIVE_FLOAT, required=True, metavar="EV", help="Line-grid upper bound in eV."
+    "--stop",
+    type=unit_float(POSITIVE_FLOAT, "eV", "energy"),
+    required=True,
+    metavar="EV",
+    help="Line-grid upper bound in eV.",
 )
 @click.option(
     "--num",
@@ -394,7 +403,7 @@ def add_command(json_path, materials, pull, force, catalog_profile, regen_golden
 )
 @click.option(
     "--start",
-    type=POSITIVE_FLOAT,
+    type=unit_float(POSITIVE_FLOAT, "eV", "energy"),
     metavar="EV",
     help="Line-grid lower bound in eV; preserve current value if omitted.",
 )
@@ -430,7 +439,7 @@ def set_command(material, energy, stop, num, start, note, catalog_profile):
 @click.option(
     "--energy",
     "energies",
-    type=POSITIVE_FLOAT,
+    type=unit_float(POSITIVE_FLOAT, "keV", "energy"),
     metavar="KEV",
     multiple=True,
     required=True,
@@ -581,14 +590,14 @@ def gc_command(checkpoint_dir, prune_all, yes):
 @click.argument("material", shell_complete=_cli_completion.complete_material)
 @click.option(
     "--stop",
-    type=POSITIVE_FLOAT,
+    type=unit_float(POSITIVE_FLOAT, "eV", "energy"),
     required=True,
     metavar="EV",
     help="Bremsstrahlung grid upper bound in eV.",
 )
 @click.option(
     "--step",
-    type=POSITIVE_FLOAT,
+    type=unit_float(POSITIVE_FLOAT, "eV", "energy"),
     metavar="EV",
     help="Grid spacing in eV; preserve current value if omitted.",
 )
@@ -607,7 +616,7 @@ def gc_command(checkpoint_dir, prune_all, yes):
 )
 @click.option(
     "--start",
-    type=POSITIVE_FLOAT,
+    type=unit_float(POSITIVE_FLOAT, "eV", "energy"),
     metavar="EV",
     help="Lowest node in eV for --spacing geometric; default is the medium's derived floor.",
 )

@@ -12,6 +12,7 @@ from typing import Any
 import click
 import tomlkit
 
+from pyrite.cli._unit_params import unit_float
 from pyrite.console.output import FINITE_FLOAT, NONNEGATIVE_FLOAT, POSITIVE_FLOAT
 
 _ANALYTIC_FIELDS = {
@@ -95,7 +96,7 @@ def beam_cli_options(function):
         function = click.option(*names, **options)(function)
     function = click.option(
         "--envelope-rms-fs",
-        type=click.FloatRange(min=0.0, min_open=True),
+        type=unit_float(click.FloatRange(min=0.0, min_open=True), "fs", "time"),
         metavar="FS",
         help="RMS duration for gaussian or microtrain longitudinal policy.",
     )(function)
@@ -107,19 +108,19 @@ def beam_cli_options(function):
     )(function)
     function = click.option(
         "--bunch-charge-pc",
-        type=click.FloatRange(min=0.0, min_open=True),
+        type=unit_float(click.FloatRange(min=0.0, min_open=True), "pC", "charge"),
         metavar="PC",
         help="Physical charge per bunch in pC.",
     )(function)
     function = click.option(
         "--rep-rate-hz",
-        type=POSITIVE_FLOAT,
+        type=unit_float(POSITIVE_FLOAT, "Hz", "frequency"),
         metavar="HZ",
         help="Shared bunch repetition rate in Hz [default: 5000]; also used by gdf_charge.",
     )(function)
     function = click.option(
         "--transverse-fwhm-mm",
-        type=click.FloatRange(min=0.0, min_open=True),
+        type=unit_float(click.FloatRange(min=0.0, min_open=True), "mm", "length"),
         metavar="MM",
         help="Circular Gaussian transverse FWHM in mm.",
     )(function)
@@ -142,14 +143,16 @@ def beam_cli_options(function):
     function = click.option(
         "--twiss-beta",
         "beta_twiss_m",
-        type=click.FloatRange(min=0.0, min_open=True),
+        type=unit_float(click.FloatRange(min=0.0, min_open=True), "m", "length"),
         metavar="M",
         help="Courant-Snyder beta in m. Requires --emittance.",
     )(function)
     function = click.option(
         "--emittance",
         "normalized_emittance_mm_mrad",
-        type=click.FloatRange(min=0.0, min_open=True),
+        type=unit_float(
+            click.FloatRange(min=0.0, min_open=True), "mm*mrad", "length-angle", "emittance"
+        ),
         metavar="MM_MRAD",
         help="Normalized transverse emittance in mm*mrad; replaces the spot FWHM.",
     )(function)

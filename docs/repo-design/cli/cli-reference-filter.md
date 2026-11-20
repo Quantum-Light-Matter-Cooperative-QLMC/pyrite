@@ -142,13 +142,13 @@ Usage: pyrite filter set [OPTIONS] NAME
 Options:
   --description TEXT
   --material TEXT
-  --thickness-mm FLOAT
-  --size-mm <FLOAT FLOAT>...
-  --distance-mm FLOAT
-  --polar-deg FLOAT
-  --azimuth-deg FLOAT
-  --roll-deg FLOAT
-  --offset-mm <FLOAT FLOAT>...
+  --thickness-mm FLOAT          Plate thickness in mm.
+  --size-mm <FLOAT FLOAT>...    Full width/height in mm.
+  --distance-mm FLOAT           Default source-to-plate distance in mm.
+  --polar-deg FLOAT             Polar angle in degrees.
+  --azimuth-deg FLOAT           Azimuth angle in degrees.
+  --roll-deg FLOAT              Roll in degrees.
+  --offset-mm <FLOAT FLOAT>...  Local x/y offset in mm.
   --dry-run
   -h, --help                    Show this message and exit.
 ```

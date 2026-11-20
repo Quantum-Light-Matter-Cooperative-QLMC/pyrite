@@ -278,7 +278,7 @@ Canonical imports: `pyrite.experimental.observations` (experimental) and
 
 | Owner | Physical fields and accepted forms | Read-back / metadata | Evidence; disposition |
 | --- | --- | --- | --- |
-| CLI options — `cli/commands/_beam_shared.py`, `_detector_shared.py`, `_pixel_detector_shared.py`, `_filter_shared.py`, `_profile_filters.py`, `_profile_precision.py`, `profile.py`, `energy_grid.py`, `blaze.py`, `tables.py`, `material_add.py`, `beam.py` | Bare numbers only (Click `float`/`FloatRange`); the unit is fixed by the option name or help: `-mm`, `-deg`, `-ev`, `-um`, `-v`, `-s`, `-m`, `-fs`, `-pc`, `-hz`, `-ang`, `--solid-angle` sr, `--energy` keV (profile/energy-grid) or eV (`tables`), `--t1-max` MeV, `--density` g/cm³, `--emittance` mm·mrad, `--twiss-beta` m, `blaze --spacing` m (converted to Å). No Pint or unit strings on the command line | Values are written to profile TOML in the canonical suffixed key or passed numerically; `docs/repo-design/cli/cli-reference.md` documents help | `tests/cli/`; numeric CLI exception for #755 — unit-string CLI input is follow-up #810 |
+| CLI options — `cli/commands/_beam_shared.py`, `_detector_shared.py`, `_pixel_detector_shared.py`, `_filter_shared.py`, `_profile_filters.py`, `_profile_precision.py`, `profile.py`, `energy_grid.py`, `blaze.py`, `tables.py`, `material_add.py`, `beam.py` | A bare number in the canonical unit, or an explicit unit string (`--distance-mm "5 cm"`, `--timepix-thickness-um "0.1 mm"`) through `pyrite.cli._unit_params.unit_float` → `parse_unit_string` → canonical float, then the option's existing Click range. The canonical unit is fixed by the option name or help: `-mm`, `-deg`, `-ev`, `-um`, `-v`, `-s`, `-m`, `-fs`, `-pc`, `-hz`, `-ang`, `--solid-angle` sr, `--energy` keV (profile/energy-grid) or eV (`tables`), `--t1-max` MeV, `--density` g/cm³, `--emittance` mm·mrad, `--twiss-beta` m, `blaze --spacing` m (converted to Å). Angle and solid-angle options keep the `angle`/`solid_angle` guards; `--emittance` requires length·angle (`emittance` guard). Not unit-aware: comma-separated sweep lists (`profile --thickness/--energy/--polar/--azimuth`, energy-grid derive lists, `--measured-edges-ev`, `--band-ev`, `--layer`), dimensionless fractions, and wall-clock budgets (`--max-minutes`, `--perf-interval`, `--wait`) | Values are written to profile TOML in the canonical suffixed key or passed numerically; `docs/repo-design/cli/cli-reference.md` documents help | `tests/cli/`; `tests/cli/test_unit_options.py`; scalar and pair options implemented (#810); sweep-list unit strings remain a numeric-only exception (#1333) |
 | Profile/catalog TOML — `materials/_catalog_decode.py`, `materials/_beam_detector_parse.py`, `_config_presets.py` | Numbers in the key's unit, or explicit unit strings through `normalize_unit_input` → canonical magnitudes | Numeric profile records and digests | `tests/materials/test_unit_profile_inputs.py`; implemented (catalog/profile input row) |
 | Plots — `pyrite.plots` (public domain, **unregistered** in `api-surface.toml`), `plots/_frames.py`, `_pixel_frames.py`, `_common.py` | Numeric record arrays and `Settings` | Units only in axis/legend label strings (e.g. `[mm]`, `[deg]`, `[sr]`, `[Phs/eV/s/nA]`); constants `C_ANG_PER_FS`, `SI_K_EDGE_EV` are unregistered numeric exports | `tests/plots/`; presentation-only numeric exception; labels follow the owning reducer |
 | Exports — `Result.to_dataframe`, `aperture_dataframe`, `apps/configuration_exports.py`, `pyrite app analysis export` | Numeric tables with unit-suffixed column names; HTML export renders the app | Table schemas unchanged (unit-suffixed names; `aperture_dataframe` keeps its `density_units`/`count_units` columns). `Result.dataframe_units()` and `Result.spectral_flux_units(units=, mode=)` return JSON-ready `{column: {"unit", "basis"}}` with Pint-parsable units and a separate count basis (photons vs photons per incident electron); app CSV/NPZ metadata keeps `energy_unit` and adds the same `units` map for every exported array, axis and `scale` (`sr / s / nA`, basis incident electrons) | `tests/results/test_cxr_api.py`, `test_export_units.py`, `test_quantity_aperture.py`, `tests/notebooks/test_configuration_app.py`; Python and app export metadata implemented |
@@ -361,8 +361,9 @@ and unregistered numeric exports are named as such. B1–B6 are **resolved**
 owning semantic quantity properties for units and replacement. The #755
 migration is **complete**: every row is migrated or carries an explicit numeric
 contract. Quantity interfaces for material schema values, constants, deterministic
-scientific helpers and channeling-state read-back landed under #816. Deferred
-work is tracked separately: unit-string CLI input (#810).
+scientific helpers and channeling-state read-back landed under #816. CLI unit strings landed for
+single-value options (#810); unit strings in comma-separated sweep lists remain
+deferred (#1333).
 
 ## Existing output contracts (not all convertible by the same rule)
 
@@ -420,7 +421,7 @@ loading; they must not enter a checkpoint, CAS payload, worker record or hash.
    buffers remain numeric. Quantum and optical outputs remain separate.
 4. Consumers: Python and app exports carry declared `units` metadata with
    unchanged table schemas; plots keep presentation labels from their owning
-   reducer; CLI unit strings are #810. Deprecations follow release policy.
+   reducer; single-value CLI options accept unit strings (#810). Deprecations follow release policy.
 
 Any newly discovered ambiguity in units, probability measure or normalization
 is a **blocking review item**, not an invitation to guess a Pint dimension.

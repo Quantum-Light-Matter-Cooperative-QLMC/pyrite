@@ -674,12 +674,7 @@
     {
       "path": "src/pyrite/remote/pull.py",
       "name": "pull",
-      "cc": 34
-    },
-    {
-      "path": "src/pyrite/remote/pull.py",
-      "name": "resolve_profile_stem",
-      "cc": 21
+      "cc": 25
     },
     {
       "path": "src/pyrite/remote/transport.py",

@@ -147,9 +147,10 @@ Usage: pyrite beam gdf inspect [OPTIONS] PATH
 
 Options:
   --time-s NUMBER              Select time output in seconds.
-  --time-tolerance-s NUMBER    [default: 1e-15]
+  --time-tolerance-s NUMBER    Time-output match tolerance in seconds.  [default: 1e-15]
   --screen-position-m NUMBER   Select screen coordinate in meters; excludes --time-s.
-  --screen-tolerance-m NUMBER  [default: 1e-09]
+  --screen-tolerance-m NUMBER  Screen-position match tolerance in meters.  [default:
+                               1e-09]
   -o, --output [table|json]    Output format; only json is a stable automation contract.
                                [default: table]
   -h, --help                   Show this message and exit.

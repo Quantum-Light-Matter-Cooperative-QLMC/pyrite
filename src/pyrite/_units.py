@@ -63,6 +63,11 @@ def normalize_unit(
                 f"{field} received unit {received!r}; expected an angle convertible to "
                 f"{target_unit!r}"
             )
+        if kind == "emittance" and _root_unit_powers(value) != {"meter": 1, "radian": 1}:
+            raise ValueError(
+                f"{field} received unit {received!r}; expected a length-angle emittance "
+                f"convertible to {target_unit!r}"
+            )
         if kind == "temperature" and any(name.startswith("delta_") for name in value._units):
             raise ValueError(
                 f"{field} received temperature difference {received!r}; expected an "

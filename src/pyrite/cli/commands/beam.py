@@ -13,6 +13,7 @@ from pyrite._catalog_layout import object_sources
 from pyrite.cli import _catalog_io
 from pyrite.cli import _completion as _cli_completion
 from pyrite.cli._deprecations import DeprecatingGroup
+from pyrite.cli._unit_params import unit_float
 from pyrite.cli.commands._beam_shared import (
     beam_cli_options,
     collect_beam_updates,
@@ -454,16 +455,31 @@ def gdf_times(path):
 @gdf_command.command("inspect")
 @click.argument("path", type=click.Path(path_type=Path))
 @click.option(
-    "--time-s", type=NONNEGATIVE_FLOAT, default=None, help="Select time output in seconds."
+    "--time-s",
+    type=unit_float(NONNEGATIVE_FLOAT, "s", "time"),
+    default=None,
+    help="Select time output in seconds.",
 )
-@click.option("--time-tolerance-s", type=NONNEGATIVE_FLOAT, default=1e-15, show_default=True)
+@click.option(
+    "--time-tolerance-s",
+    type=unit_float(NONNEGATIVE_FLOAT, "s", "time"),
+    default=1e-15,
+    show_default=True,
+    help="Time-output match tolerance in seconds.",
+)
 @click.option(
     "--screen-position-m",
-    type=FINITE_FLOAT,
+    type=unit_float(FINITE_FLOAT, "m", "length"),
     default=None,
     help="Select screen coordinate in meters; excludes --time-s.",
 )
-@click.option("--screen-tolerance-m", type=NONNEGATIVE_FLOAT, default=1e-9, show_default=True)
+@click.option(
+    "--screen-tolerance-m",
+    type=unit_float(NONNEGATIVE_FLOAT, "m", "length"),
+    default=1e-9,
+    show_default=True,
+    help="Screen-position match tolerance in meters.",
+)
 @output_option
 def gdf_inspect(path, time_s, time_tolerance_s, screen_position_m, screen_tolerance_m, json_output):
     """List GPT outputs and inspect lab coordinates to choose a target z origin.

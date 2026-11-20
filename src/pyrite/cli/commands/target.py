@@ -10,6 +10,7 @@ from tomlkit.exceptions import ParseError
 
 from pyrite.campaign import target_presets
 from pyrite.cli import _catalog_io
+from pyrite.cli._unit_params import unit_float
 from pyrite.cli.commands._profile_shared import write
 from pyrite.console import json as cli_json
 from pyrite.console.output import (
@@ -199,7 +200,13 @@ def _field_options(function):
     options: tuple[tuple[tuple[str, ...], dict[str, Any]], ...] = (
         (("--description",), {"help": "Optional display description."}),
         (("--material",), {"metavar": "KEY", "help": "Slab: runnable material recipe key."}),
-        (("--thickness-ang",), {"type": float, "help": "Slab thickness in Angstrom."}),
+        (
+            ("--thickness-ang",),
+            {
+                "type": unit_float(float, "angstrom", "length"),
+                "help": "Slab thickness in Angstrom.",
+            },
+        ),
         (
             ("--layer", "layers"),
             {
@@ -209,11 +216,35 @@ def _field_options(function):
                 "help": "Stack layer in beam order, entrance first; repeatable.",
             },
         ),
-        (("--tilt-deg",), {"type": float, "help": "Tilt in degrees (default 30)."}),
-        (("--tilt-azim-deg",), {"type": float, "help": "Azimuth in degrees (default 0)."}),
-        (("--crystal-width-mm",), {"type": float, "help": "Width in mm (default 5)."}),
-        (("--crystal-height-mm",), {"type": float, "help": "Height in mm (default 5)."}),
-        (("--groove-spacing-ang",), {"type": float, "help": "Slab groove spacing, Angstrom."}),
+        (
+            ("--tilt-deg",),
+            {
+                "type": unit_float(float, "deg", "angle", "angle"),
+                "help": "Tilt in degrees (default 30).",
+            },
+        ),
+        (
+            ("--tilt-azim-deg",),
+            {
+                "type": unit_float(float, "deg", "angle", "angle"),
+                "help": "Azimuth in degrees (default 0).",
+            },
+        ),
+        (
+            ("--crystal-width-mm",),
+            {"type": unit_float(float, "mm", "length"), "help": "Width in mm (default 5)."},
+        ),
+        (
+            ("--crystal-height-mm",),
+            {"type": unit_float(float, "mm", "length"), "help": "Height in mm (default 5)."},
+        ),
+        (
+            ("--groove-spacing-ang",),
+            {
+                "type": unit_float(float, "angstrom", "length"),
+                "help": "Slab groove spacing, Angstrom.",
+            },
+        ),
     )
     for decls, kwargs in reversed(options):
         function = click.option(*decls, **kwargs)(function)

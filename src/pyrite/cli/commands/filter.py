@@ -9,6 +9,7 @@ import tomlkit
 from tomlkit.exceptions import ParseError
 
 from pyrite.cli import _catalog_io
+from pyrite.cli._unit_params import unit_float, unit_pair
 from pyrite.cli.commands._profile_shared import write
 from pyrite.console.output import CLIError, confirm_destructive, emit_result
 from pyrite.console.tables import emit_named_list, emit_object, flatten
@@ -122,13 +123,27 @@ def show_command(name):
 @click.option("--from", "source", help="Clone a named definition.")
 @click.option("--description", help="Optional display description.")
 @click.option("--material", help="Catalog crystal or medium key.")
-@click.option("--thickness-mm", type=float, help="Plate thickness in mm.")
-@click.option("--size-mm", type=click.Tuple((float, float)), help="Full width/height in mm.")
-@click.option("--distance-mm", type=float, help="Default source-to-plate distance in mm.")
-@click.option("--polar-deg", type=float, help="Polar angle in degrees.")
-@click.option("--azimuth-deg", type=float, help="Azimuth angle in degrees.")
-@click.option("--roll-deg", type=float, help="Roll in degrees.")
-@click.option("--offset-mm", type=click.Tuple((float, float)), help="Local x/y offset in mm.")
+@click.option(
+    "--thickness-mm", type=unit_float(float, "mm", "length"), help="Plate thickness in mm."
+)
+@click.option("--size-mm", type=unit_pair(float, "mm", "length"), help="Full width/height in mm.")
+@click.option(
+    "--distance-mm",
+    type=unit_float(float, "mm", "length"),
+    help="Default source-to-plate distance in mm.",
+)
+@click.option(
+    "--polar-deg", type=unit_float(float, "deg", "angle", "angle"), help="Polar angle in degrees."
+)
+@click.option(
+    "--azimuth-deg",
+    type=unit_float(float, "deg", "angle", "angle"),
+    help="Azimuth angle in degrees.",
+)
+@click.option(
+    "--roll-deg", type=unit_float(float, "deg", "angle", "angle"), help="Roll in degrees."
+)
+@click.option("--offset-mm", type=unit_pair(float, "mm", "length"), help="Local x/y offset in mm.")
 @click.option("--dry-run", is_flag=True)
 def create_command(name, source, description, dry_run, **values):
     """Create or clone a validated named plate without placing it in a scene."""
@@ -161,13 +176,27 @@ def create_command(name, source, description, dry_run, **values):
 @click.argument("name")
 @click.option("--description")
 @click.option("--material")
-@click.option("--thickness-mm", type=float)
-@click.option("--size-mm", type=click.Tuple((float, float)))
-@click.option("--distance-mm", type=float)
-@click.option("--polar-deg", type=float)
-@click.option("--azimuth-deg", type=float)
-@click.option("--roll-deg", type=float)
-@click.option("--offset-mm", type=click.Tuple((float, float)))
+@click.option(
+    "--thickness-mm", type=unit_float(float, "mm", "length"), help="Plate thickness in mm."
+)
+@click.option("--size-mm", type=unit_pair(float, "mm", "length"), help="Full width/height in mm.")
+@click.option(
+    "--distance-mm",
+    type=unit_float(float, "mm", "length"),
+    help="Default source-to-plate distance in mm.",
+)
+@click.option(
+    "--polar-deg", type=unit_float(float, "deg", "angle", "angle"), help="Polar angle in degrees."
+)
+@click.option(
+    "--azimuth-deg",
+    type=unit_float(float, "deg", "angle", "angle"),
+    help="Azimuth angle in degrees.",
+)
+@click.option(
+    "--roll-deg", type=unit_float(float, "deg", "angle", "angle"), help="Roll in degrees."
+)
+@click.option("--offset-mm", type=unit_pair(float, "mm", "length"), help="Local x/y offset in mm.")
 @click.option("--dry-run", is_flag=True)
 def set_command(name, description, dry_run, **values):
     """Update a user definition; future resolutions receive its new values."""
@@ -288,7 +317,11 @@ def delete_command(name, yes, dry_run):
 @click.argument("profile")
 @click.argument("name")
 @click.option("--instance-name", help="Optional scene-local display name.")
-@click.option("--distance-mm", type=float, help="Optional distance override in mm.")
+@click.option(
+    "--distance-mm",
+    type=unit_float(float, "mm", "length"),
+    help="Optional distance override in mm.",
+)
 @click.option("--dry-run", is_flag=True)
 def attach_command(profile, name, instance_name, distance_mm, dry_run):
     """Append a named plate reference to PROFILE's ordered filter sequence."""
