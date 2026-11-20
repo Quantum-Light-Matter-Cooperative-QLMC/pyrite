@@ -8,10 +8,13 @@ are maintained in [configuration resolution](../repo-design/configuration-resolu
 ## User objects or a complete catalog
 
 With no complete external catalog selected, user additions from `catalog.user`
-(or `PYRITE_USER_CATALOG`, defaulting to the platform configuration directory)
+(or `PYRITE_USER_CATALOG`, defaulting to `<config>/catalog/`)
 are read over the bundled catalog. The layer holds profiles, beams, detectors,
 crystals, media, materials, energy grids, physics/numerics presets, reusable
 filter plates, targets, gratings and tabulated `curves/`. Bundled names are read-only and cannot be reused, including case-only differences.
+On the first CLI catalog access, legacy objects in the configuration-directory
+root move into `catalog/` without changing `config.toml` or following symlinks.
+Immutable generated energy-grid artifacts use `<user data>/catalog/energy-grid-artifacts/`.
 Create editable copies, for example:
 
 ```bash
@@ -104,10 +107,12 @@ catalog. A copied demo already declares its instrument. Inspect with
 ## Output home
 
 Generated outputs use `<workspace>/pyrite-output/`: `checkpoints/`,
-`observations/`, `trajectories/`, `performance/`, `results/`, `figures/`, and
-`cache/`. A command's explicit directory option wins for that output kind.
+`observations/`, `trajectories/`, `performance/`, `results/`, and `figures/`.
+A command's explicit directory option wins for that output kind.
 Otherwise workspace selection uses `PYRITE_HOME`, then saved `workspace.root`,
-then the nearest ancestor of cwd containing `pyrite-output/`, then cwd.
+then the nearest ancestor of cwd containing `pyrite-output/` (excluding `$HOME`
+and ancestors across filesystem boundaries), then cwd. The CLI prints a notice
+when it discovers a workspace above cwd.
 Set a fixed home for installed-package use with:
 
 ```bash
@@ -115,9 +120,12 @@ pyrite config set workspace.root /scratch/lab-campaign
 pyrite checkpoint list
 ```
 
-`cache/` contains regenerable reproductions, analysis intermediates, photon-grid
-resolutions and viewer renders; it is safe to delete. Checkpoints, observations,
-trajectories and exports remain outside it. Remote pulls resolve destinations
+The platform user cache directory contains regenerable Zhai reproductions,
+checkpoint analysis, resolved line grids, line-grid spills and viewer renders.
+Use `pyrite cache status` and `pyrite cache clear` to inspect and delete them;
+the former workspace `pyrite-output/cache/` can be deleted after migration.
+Checkpoints, observations, trajectories and exports remain in the workspace.
+Remote pulls resolve destinations
 from the local workspace. See [dataset identity and storage](../repo-design/storage/dataset-identity-and-storage.md)
 for identity-qualified stems, manifests and archive behavior. Moving unchanged
 catalog definitions does not change their resolved scientific inputs.
@@ -131,19 +139,41 @@ are left alone.
 
 ## Input tables in a workspace
 
-An explicit workspace also selects generated cross-section tables and fetched
-reference inputs:
+The output workspace **does not** select generated cross-section tables or
+fetched reference inputs. These are shared by every workspace and stored under
+the platform user data directory (or `PYRITE_DATA_DIR`):
 
-| Input | Location under the workspace |
+| Input | Location under the user data root |
 | --- | --- |
 | Generated tables | `xsgen/tables/` |
 | SBETHE reference data | `xsgen/reference-data/sbethe/sdbase/` |
 | EEDL and EADL | `datasets/` |
 
-New writes use the workspace. Without an explicit workspace, the per-user data
-directory is the selected input tier. An explicit workspace does not search the
-older per-user tables directory. `pyrite tables migrate --dry-run` previews
-missing tables that can be copied from that directory; migration never deletes
-or overwrites a table. Fetched SBETHE and EEDL/EADL inputs are not copied
-automatically: fetch them into the workspace with `pyrite tables fetch`, or copy
-them explicitly. Packaged catalog/CIF data remain package-relative.
+Old workspace copies remain readable when the shared copy is absent, with a
+deprecation notice. `pyrite tables migrate --dry-run` previews missing files
+that can be copied to the shared root. Migration never deletes or overwrites
+inputs. Remote jobs explicitly export both `PYRITE_HOME` and `PYRITE_DATA_DIR`
+to retain the original on-box layout. Packaged catalog/CIF data remain
+package-relative.
+
+## Files PyRITE writes
+
+Use `pyrite config paths -o json` to inspect all effective paths and their
+sources. On Linux, the platform defaults are:
+
+| Purpose | Default | Root override |
+| --- | --- | --- |
+| Config store | `~/.config/pyrite/config.toml` | `PYRITE_CONFIG_DIR` |
+| Editable catalog | `~/.config/pyrite/catalog/` | `PYRITE_USER_CATALOG` or `catalog.user` |
+| State | `~/.local/state/pyrite/` | `PYRITE_STATE_DIR` |
+| Fetched datasets and generated tables | `~/.local/share/pyrite/` | `PYRITE_DATA_DIR` |
+| Immutable user grid artifacts | `~/.local/share/pyrite/catalog/energy-grid-artifacts/` | `PYRITE_DATA_DIR` |
+| Compiled kernels, xsgen build/scratch and other caches | `~/.cache/pyrite/` | `PYRITE_CACHE_DIR` |
+| Result outputs | `<workspace>/pyrite-output/` | `PYRITE_HOME` or `workspace.root` |
+
+`NUMBA_CACHE_DIR` and `CUPY_CACHE_DIR` take precedence over the managed JIT
+cache subdirectories. Platformdirs supplies native macOS and Windows paths;
+`PYRITE_*_DIR` overrides apply there too. SSH multiplexing sockets use the
+runtime directory when available, otherwise `<cache>/ssh` with a short-path
+fallback to meet the OS socket-path limit. Legacy workspace cache files are
+not moved automatically and do not affect dataset identity.

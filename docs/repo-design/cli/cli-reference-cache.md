@@ -11,7 +11,7 @@ Version: `0.35.0`
 ```text
 Usage: pyrite cache [OPTIONS] COMMAND [ARGS]...
 
-  Inspect, warm, and clear compiled CPU (Numba) and GPU (CuPy) kernel caches.
+  Inspect, warm, and clear compiled kernels and regenerable caches.
 
   PyRITE compiles its kernels on first use and the native Numba and CuPy caches reuse
   them in later processes. The pyrite command and the Python API (import pyrite) store
@@ -41,14 +41,14 @@ Commands:
 ```text
 Usage: pyrite cache clear [OPTIONS]
 
-  Delete PyRITE-owned compiled kernels; preview unless --yes.
+  Delete PyRITE-owned compiled kernels and regenerable caches; preview unless --yes.
 
   Removes the managed cache directories whole, and only PyRITE package entries from a
   user-set NUMBA_CACHE_DIR or the legacy in-tree __pycache__. A user-set or default CuPy
   cache is never touched. Kernels recompile on next use; results do not change.
 
 Options:
-  --backend [all|numba|cupy]  Caches to clear.  [default: all]
+  --backend [all|numba|cupy|line-grids|analysis|viewer-renders|zhai_reproduction|line-grid-spill]  Caches to clear.  [default: all]
   -y, --yes                   Delete the exact previewed paths.
   -h, --help                  Show this message and exit.
 ```
@@ -66,7 +66,7 @@ Usage: pyrite cache status [OPTIONS]
   total. Read-only.
 
 Options:
-  --backend [all|numba|cupy]  Caches to report.  [default: all]
+  --backend [all|numba|cupy|line-grids|analysis|viewer-renders|zhai_reproduction|line-grid-spill]  Caches to report.  [default: all]
   -o, --output [table|json]   Output format; only json is a stable automation contract.
                               [default: table]
   -h, --help                  Show this message and exit.

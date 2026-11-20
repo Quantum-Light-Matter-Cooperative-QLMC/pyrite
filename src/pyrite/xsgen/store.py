@@ -7,13 +7,9 @@ are the same question. Change the deck, patch the Fortran, or edit the
 material, and the key changes; a stale table is then not found rather than
 silently served.
 
-Resolution is two-tier (D3): the user table directory first, then the packaged
-one. Consumers call :func:`resolve` and never learn which tier answered, so a
-shipped table and a user-generated one are indistinguishable to
-:mod:`pyrite.montecarlo.transport.lut` and its peers. With an explicit
-workspace the pre-workspace ``<user data dir>/xsgen/tables`` is no longer
-searched (removed in 0.5.0, ADR-0014); ``pyrite tables migrate`` copies tables
-from it into the selected workspace.
+Resolution prefers shared user data, then read-only legacy workspace tables,
+then packaged tables. ``pyrite tables migrate`` copies legacy workspace tables
+into the shared data root, without overwriting existing files.
 
 Each table carries a sidecar JSON manifest recording how it was made (D5):
 source digest, compiler version, deck hash, model parameters, PyRITE version,
@@ -28,6 +24,7 @@ import json
 import os
 import shutil
 import tempfile
+import warnings
 from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -39,7 +36,7 @@ from zlib import error as ZlibError
 import numpy as np
 
 from .. import __version__
-from ..paths import data_dir, user_data_dir
+from ..paths import data_dir
 from ._errors import TableCorruptError, TableNotFoundError
 
 # Cache digests, never mutable arrays. File identity/ctime also invalidate an
@@ -364,7 +361,7 @@ class TableManifest:
 
 
 def user_table_dir() -> Path:
-    """Return the writable table directory in the selected workspace."""
+    """Return the writable shared user-data table directory."""
     from ..console.config import xsgen_data_root
 
     return xsgen_data_root() / "tables"
@@ -376,12 +373,12 @@ def packaged_table_dir() -> Path:
 
 
 def legacy_table_dir() -> Path:
-    """Return the pre-workspace table directory, the source of ``tables migrate``.
+    """Return an explicit output workspace's old tables directory, if any."""
+    from ..console.config import resolve, workspace_root
 
-    ``<user data dir>/xsgen/tables``. When no workspace is selected this *is*
-    the selected tier; with an explicit workspace it is no longer searched.
-    """
-    return user_data_dir() / "xsgen" / "tables"
+    if resolve("workspace.root").source == "built-in default":
+        return user_table_dir()
+    return workspace_root() / "xsgen" / "tables"
 
 
 def _legacy_tier_active() -> bool:
@@ -390,7 +387,20 @@ def _legacy_tier_active() -> bool:
 
 def search_dirs() -> tuple[Path, ...]:
     """Return the resolution tiers, most-preferred first."""
-    return tuple(dict.fromkeys((user_table_dir(), packaged_table_dir())))
+    selected = user_table_dir()
+    legacy = legacy_table_dir()
+    if legacy != selected and legacy.is_dir():
+        warnings.warn(
+            f"reading legacy workspace tables at {legacy}; run pyrite tables migrate",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+    tiers = (
+        (selected, legacy, packaged_table_dir())
+        if legacy.is_dir()
+        else (selected, packaged_table_dir())
+    )
+    return tuple(dict.fromkeys(tiers))
 
 
 def _tier(root: Path) -> str:
@@ -653,7 +663,7 @@ class MigrationReport:
 
 
 def migrate_legacy_tables(*, dry_run: bool = False) -> MigrationReport:
-    """Copy legacy-tier tables into the selected table directory.
+    """Copy legacy workspace tables into shared user data without overwriting.
 
     Non-destructive: legacy files are never modified or deleted, and a key the
     destination already holds is left alone (it already wins resolution).

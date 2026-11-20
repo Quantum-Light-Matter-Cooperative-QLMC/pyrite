@@ -4,8 +4,9 @@ Outputs live in one visible directory, ``<workspace>/pyrite-output/<kind>/``,
 never beside the installed package: under ``uv tool install`` the package sits
 in a hidden tool environment that an upgrade replaces. The workspace is an
 explicit ``PYRITE_HOME`` / ``workspace.root`` when set; otherwise the nearest
-directory at or above the working directory that already holds a
-``pyrite-output/`` tree, else the working directory itself.
+directory at or above the working directory (excluding HOME and ancestors on
+another filesystem) that holds a ``pyrite-output/`` tree, else the working
+directory itself. Regenerable caches live in the platform cache directory.
 
 Legacy layouts (``./checkpoints``, ``./observations``,
 ``./performance-profiles``, ``./results``) are moved into the output root the first time a
@@ -29,8 +30,7 @@ from .config import resolve, workspace_root
 
 OUTPUT_DIRNAME = "pyrite-output"
 
-# Every kind a default may name. Durable results and regenerable ``cache``
-# never share a directory, so deleting ``cache/`` is always safe.
+# Durable output kinds; regenerable caches live under paths.cache_dir().
 OUTPUT_KINDS = frozenset(
     {
         "checkpoints",
@@ -39,7 +39,6 @@ OUTPUT_KINDS = frozenset(
         "performance",
         "results",
         "figures",
-        "cache",
     }
 )
 
@@ -56,6 +55,7 @@ LEGACY_LAYOUT = (
 )
 
 _migration_enabled = False
+_discovery_notified: set[Path] = set()
 _migrated: set[Path] = set()
 
 
@@ -65,8 +65,20 @@ def _cwd() -> Path:
 
 
 def _discovered_workspace(start: Path) -> Path | None:
-    """Return the nearest ancestor of ``start`` holding an output tree."""
+    """Find a project output tree, never capturing HOME or another mount."""
+    home = Path.home().resolve()
+    try:
+        device = start.stat().st_dev
+    except OSError:
+        return None
     for candidate in (start, *start.parents):
+        if candidate == home:
+            break
+        try:
+            if candidate.stat().st_dev != device:
+                break
+        except OSError:
+            break
         if (candidate / OUTPUT_DIRNAME).is_dir():
             return candidate
     return None
@@ -77,7 +89,16 @@ def output_workspace(explicit: str | PathLike[str] | None = None) -> Path:
     if explicit is not None or resolve("workspace.root").source != "built-in default":
         return workspace_root(explicit)
     cwd = _cwd()
-    return _discovered_workspace(cwd) or cwd
+    discovered = _discovered_workspace(cwd)
+    if (
+        _migration_enabled
+        and discovered is not None
+        and discovered != cwd
+        and discovered not in _discovery_notified
+    ):
+        click.echo(f"using output workspace discovered at {discovered} (from {cwd})", err=True)
+        _discovery_notified.add(discovered)
+    return discovered or cwd
 
 
 def output_root(explicit: str | PathLike[str] | None = None) -> Path:

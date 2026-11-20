@@ -11,8 +11,8 @@ fetched datasets: `pyrite tables fetch eedl` and `pyrite tables fetch eadl`
 download them from the URLs below, or copy a local file given with
 `--archive PATH`, verify the SHA-256, and install them at
 `<data root>/datasets/eedl/EEDL.endf` and `<data root>/datasets/eadl/EADL2025.ALL`.
-The data root is the platform user data directory, or the selected workspace
-(`PYRITE_HOME`, `workspace.root`). `pyrite remote sync` ships them to the box.
+The data root is the platform user data directory, overridden by `PYRITE_DATA_DIR`;
+the output workspace (`PYRITE_HOME`) does not change it. `pyrite remote sync` ships them to the box.
 The pins live in `pyrite/datasets.py`; the loaders verify them before first use,
 and a missing file fails naming the fetch command. This README keeps the
 provenance record.

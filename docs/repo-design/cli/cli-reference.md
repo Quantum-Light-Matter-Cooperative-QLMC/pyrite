@@ -40,7 +40,7 @@ until 0.15.0; optional derivation requires explicit material/energy selection th
 Artifact mutation and verification use `pyrite-dev energy-grid`.
 
 `pyrite profile` writes your profiles to the user catalog layer
-(`catalog.user`, the platform config directory by default) and treats the
+(`catalog.user`, the platform config directory's `catalog/` child by default) and treats the
 bundled demo profiles as read-only; `pyrite-dev profile` is the same tree
 for maintainers editing the shipped demos.
 
@@ -213,6 +213,7 @@ Existing command fragments remain available below; each link opens the full fami
 - <span id="pyrite-config-list"></span>[`pyrite config list`](cli-reference-config.md#pyrite-config-list)
 - <span id="pyrite-config-set"></span>[`pyrite config set`](cli-reference-config.md#pyrite-config-set)
 - <span id="pyrite-config-unset"></span>[`pyrite config unset`](cli-reference-config.md#pyrite-config-unset)
+- <span id="pyrite-config-paths"></span>[`pyrite config paths`](cli-reference-config.md#pyrite-config-paths)
 - <span id="pyrite-config-setup"></span>[`pyrite config setup`](cli-reference-config.md#pyrite-config-setup)
 - <span id="pyrite-config-completion"></span>[`pyrite config completion`](cli-reference-config.md#pyrite-config-completion)
 - <span id="pyrite-config-completion-install"></span>[`pyrite config completion install`](cli-reference-config.md#pyrite-config-completion-install)

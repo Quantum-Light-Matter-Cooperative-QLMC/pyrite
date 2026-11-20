@@ -71,9 +71,9 @@ class GridSpillPolicy:
         """The directory holding per-run scratch directories."""
         if self.directory is not None:
             return Path(self.directory)
-        from ...console.outputs import output_dir
+        from ...paths import cache_dir
 
-        return output_dir("cache") / SPILL_DIRNAME
+        return cache_dir() / SPILL_DIRNAME
 
     def check_writable(self) -> None:
         """Create :meth:`parent` and refuse it with ``ValueError`` if unwritable."""

@@ -10,7 +10,11 @@ reason: it is a config lookup that returns a path, so it belongs above the path
 constants, not beside them.
 """
 
+import os
+import shutil
+import sys
 import tomllib
+import warnings
 from dataclasses import dataclass
 from os import PathLike
 from pathlib import Path
@@ -20,7 +24,7 @@ from tomlkit.exceptions import ParseError
 
 from .._util.env import env_value
 from .._util.io import atomic_write_text
-from ..paths import config_dir, data_dir, user_data_dir
+from ..paths import config_dir, data_dir, legacy_config_dir, user_data_dir
 
 CONFIG_PATH = config_dir() / "config.toml"
 # The three ``xsgen.*_source`` defaults are the conventional sibling checkout
@@ -29,6 +33,7 @@ CONFIG_PATH = config_dir() / "config.toml"
 # default, and distinguishes the two by ``ResolvedValue.source``. A default
 # that does not exist is not an error here -- only using it is.
 _SETTINGS = {
+    "backend.default": ("PYRITE_MC_BACKEND", "auto"),
     "profile.current": ("PYRITE_PROFILE", "standard"),
     "remote.target": ("PYRITE_REMOTE_HOST", ""),
     "remote.gpu_vendor": ("PYRITE_REMOTE_GPU_VENDOR", "nvidia"),
@@ -37,7 +42,7 @@ _SETTINGS = {
     "remote.gres": ("PYRITE_REMOTE_GRES", "gpu:1"),
     "workspace.root": ("PYRITE_HOME", "."),
     "catalog.path": ("PYRITE_CATALOG", str(data_dir() / "catalog")),
-    "catalog.user": ("PYRITE_USER_CATALOG", str(config_dir())),
+    "catalog.user": ("PYRITE_USER_CATALOG", str(config_dir() / "catalog")),
     "xsgen.bremslib_source": ("PYRITE_XSGEN_BREMSLIB_SOURCE", "../BremsLib_v2.0.8"),
     "xsgen.elsepa_source": ("PYRITE_XSGEN_ELSEPA_SOURCE", "../elsepa-2020"),
     "xsgen.sbethe_source": ("PYRITE_XSGEN_SBETHE_SOURCE", "../sbethe"),
@@ -46,15 +51,16 @@ _SETTINGS = {
 
 # One-line help per key, shown by ``pyrite config --help`` / ``config set --help``.
 _DESCRIPTIONS = {
+    "backend.default": "Default computation backend: auto, cpu, cuda, rocm, or sycl.",
     "profile.current": "Default catalog scan profile.",
     "remote.target": "SSH alias of the SLURM head node (required).",
     "remote.gpu_vendor": "Remote GPU vendor: nvidia or amd.",
     "remote.partition": "SLURM partition for new remote jobs.",
     "remote.nodelist": "SLURM node list for new remote jobs, or 'any'.",
     "remote.gres": "SLURM gres request, e.g. gpu:radeon8060s:1.",
-    "workspace.root": "Workspace directory for checkpoints and outputs.",
+    "workspace.root": "Workspace for outputs; auto-discovers a nearby tree except in HOME.",
     "catalog.path": "Material catalog directory or file.",
-    "catalog.user": "Your profiles, layered over the bundled catalog.",
+    "catalog.user": "Authored catalog objects layered over bundled (default: config/catalog).",
     "xsgen.bremslib_source": "BremsLib source tree for table generation.",
     "xsgen.elsepa_source": "ELSEPA source tree for table generation.",
     "xsgen.sbethe_source": "SBETHE source tree for table generation.",
@@ -66,12 +72,14 @@ _DEFAULT_LABELS = {
     "mott.tables_dir": "unset",
     "workspace.root": "current directory",
     "catalog.path": "bundled catalog",
-    "catalog.user": "platform config directory",
+    "catalog.user": "platform config directory / catalog",
 }
 
 
 def domain(key: str) -> str:
     """User-facing input domain; detailed validation stays at the owning setter."""
+    if key == "backend.default":
+        return "auto | cpu | cuda | rocm | sycl"
     if key == "profile.current":
         return "existing catalog profile name"
     if key == "remote.target":
@@ -113,6 +121,12 @@ def describe(key: str) -> tuple[str, str, str]:
 
 
 def _store_path_for_read() -> Path:
+    """Read a former Click/roaming config only when the native path is absent."""
+    if CONFIG_PATH.exists() or os.environ.get("PYRITE_CONFIG_DIR"):
+        return CONFIG_PATH
+    legacy = legacy_config_dir() / "config.toml"
+    if CONFIG_PATH == config_dir() / "config.toml" and legacy != CONFIG_PATH and legacy.is_file():
+        return legacy
     return CONFIG_PATH
 
 
@@ -161,6 +175,8 @@ def resolve(key: str, per_call: str | None = None) -> ResolvedValue:
     stored = _stored_value(key, _read_store())
     if stored is not None:
         return ResolvedValue(stored, "config store")
+    if key == "catalog.user":
+        default = str(config_dir() / "catalog")
     return ResolvedValue(default, "built-in default")
 
 
@@ -231,30 +247,92 @@ def catalog_path(explicit: str | PathLike[str] | None = None) -> Path:
     return Path(value).expanduser().resolve()
 
 
-def user_catalog_path() -> Path:
-    """Resolve ``PYRITE_USER_CATALOG`` > config store > platform config directory.
+_catalog_migration_enabled = False
+_catalog_migrated: set[Path] = set()
 
-    The user layer holds ``profiles/`` and ``energy-grid-artifacts/`` and is
-    read over the bundled catalog only; an explicit ``catalog.path`` is complete.
-    """
-    return Path(resolve("catalog.user").value).expanduser().resolve()
+
+def enable_legacy_catalog_migration() -> None:
+    """Allow the CLI (never library imports) to relocate the old user layer."""
+    global _catalog_migration_enabled
+    _catalog_migration_enabled = True
+
+
+def _migrate_user_catalog(destination: Path) -> None:
+    """Move only catalog-owned directories, leaving config.toml and symlinks alone."""
+    if destination in _catalog_migrated:
+        return
+    _catalog_migrated.add(destination)
+    from .._catalog_layout import ARTIFACT_DIR, ASSET_DIRS, OBJECT_TABLES
+
+    legacy = config_dir()
+    moved = []
+    for name in (*OBJECT_TABLES, *ASSET_DIRS):
+        source = legacy / name
+        if source.is_symlink() or not source.is_dir():
+            continue
+        target = destination / name
+        if target.exists() or target.is_symlink():
+            continue
+        destination.mkdir(parents=True, exist_ok=True)
+        try:
+            source.rename(target)
+        except OSError as exc:
+            print(f"warning: cannot migrate {source} to {target}: {exc}", file=sys.stderr)
+        else:
+            moved.append(name)
+    # Generated immutable objects are data, not user-editable configuration.
+    artifact_source = legacy / ARTIFACT_DIR
+    if not artifact_source.is_dir() or artifact_source.is_symlink():
+        artifact_source = destination / ARTIFACT_DIR
+    artifact_target = user_artifact_dir()
+    if (
+        artifact_source.is_dir()
+        and not artifact_source.is_symlink()
+        and not artifact_target.exists()
+    ):
+        artifact_target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(artifact_source), str(artifact_target))
+        moved.append(ARTIFACT_DIR)
+    if moved:
+        print(
+            f"moved legacy PyRITE catalog entries from {legacy}: {', '.join(moved)}",
+            file=sys.stderr,
+        )
+
+
+def user_catalog_path() -> Path:
+    """Resolve the layered user-authored catalog, defaulting to config/catalog."""
+    resolved = resolve("catalog.user")
+    path = Path(resolved.value).expanduser().resolve()
+    if resolved.source == "built-in default":
+        if _catalog_migration_enabled:
+            _migrate_user_catalog(path)
+        elif not path.exists():
+            from .._catalog_layout import OBJECT_TABLES
+
+            legacy = config_dir()
+            if any((legacy / name).is_dir() for name in OBJECT_TABLES):
+                warnings.warn(
+                    f"reading legacy user catalog at {legacy}; run a PyRITE CLI command to migrate",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
+                return legacy
+    return path
+
+
+def user_artifact_dir() -> Path:
+    """Immutable artifacts for the default user layer (never beside config.toml)."""
+    return user_data_dir() / "catalog" / "energy-grid-artifacts"
 
 
 def fetched_data_root() -> Path:
-    """Return the root for generated tables and fetched datasets.
-
-    The platform user data directory by default, so one install serves every
-    working directory; an explicit workspace (``PYRITE_HOME`` or
-    ``workspace.root``) owns its own copy, which is how the remote box finds
-    what ``pyrite remote sync`` shipped.
-    """
-    if resolve("workspace.root").source == "built-in default":
-        return user_data_dir()
-    return workspace_root()
+    """Shared user data; workspace selection never redirects pinned input tables."""
+    return user_data_dir()
 
 
 def xsgen_data_root() -> Path:
-    """Put generated tables beside checkpoints in an explicit workspace."""
+    """Return the shared xsgen table/reference-data root."""
     return fetched_data_root() / "xsgen"
 
 

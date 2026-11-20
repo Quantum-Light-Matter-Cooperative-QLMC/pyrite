@@ -37,6 +37,28 @@ def test_status_json_reports_locations_and_sizes(managed):
         "bytes": 4,
     }
 
+def test_regenerable_cache_family_status_and_clear(monkeypatch, tmp_path):
+    monkeypatch.setattr(cache_command, "cache_dir", lambda: tmp_path)
+    family = tmp_path / "line-grids"
+    family.mkdir()
+    (family / "result.json").write_bytes(b"1234")
+
+    status = invoke(cache_command.command, ["status", "--backend", "line-grids", "-o", "json"])
+    assert_clean_result(status)
+    row, = json.loads(status.stdout)["payload"]["locations"]
+    assert row["path"] == str(family)
+    assert row["bytes"] == 4
+
+    preview = invoke(cache_command.command, ["clear", "--backend", "line-grids"])
+    assert_clean_result(preview)
+    assert family.is_dir()
+    assert "preview only" in preview.stdout
+
+    cleared = invoke(cache_command.command, ["clear", "--backend", "line-grids", "--yes"])
+    assert_clean_result(cleared)
+    assert not family.exists()
+
+
 
 def test_status_table_lists_every_location(managed):
     result = invoke(cache_command.command, ["status"])

@@ -1,10 +1,14 @@
-"""Inspect and clear PyRITE's compiled-kernel (JIT) caches.
+"""Inspect and clear PyRITE's JIT and regenerable application caches.
 
-The cache logic lives in :mod:`pyrite._jit_cache`; this module only renders it.
-Building the group imports neither Numba nor CuPy.
+JIT cache logic lives in :mod:`pyrite._jit_cache`; other cache families are
+content-addressed, PyRITE-owned directories under :func:`paths.cache_dir`.
 """
 
+from pathlib import Path
+
 import click
+
+from ...paths import cache_dir
 
 from ...console.output import (
     CLIError,
@@ -16,7 +20,38 @@ from ...console.output import (
     output_option,
 )
 
-_BACKENDS = click.Choice(("all", "numba", "cupy"))
+_FAMILIES = ("line-grids", "analysis", "viewer-renders", "zhai_reproduction", "line-grid-spill")
+_BACKENDS = click.Choice(("all", "numba", "cupy", *_FAMILIES))
+
+
+def _family_path(family: str) -> Path:
+    return cache_dir() / family
+
+
+def _family_records(backend: str) -> list[dict]:
+    records = []
+    for family in _FAMILIES:
+        if backend not in ("all", family):
+            continue
+        root = _family_path(family)
+        files = (
+            [p for p in root.rglob("*") if p.is_file() and not p.is_symlink()]
+            if root.is_dir() and not root.is_symlink()
+            else []
+        )
+        records.append({
+            "backend": family, "path": str(root), "source": "managed",
+            "active": True, "files": len(files), "bytes": sum(p.stat().st_size for p in files),
+        })
+    return records
+
+
+def _family_targets(backend: str):
+    from ..._jit_cache import ClearTarget
+
+    return [ClearTarget(family, path, "tree") for family in _FAMILIES
+            if backend in ("all", family)
+            if (path := _family_path(family)).is_dir() and not path.is_symlink()]
 
 
 def _size(count: int) -> str:
@@ -40,7 +75,7 @@ def _selected(backend: str):
 
 @click.group("cache")
 def command() -> None:
-    """Inspect, warm, and clear compiled CPU (Numba) and GPU (CuPy) kernel caches.
+    """Inspect, warm, and clear compiled kernels and regenerable caches.
 
     PyRITE compiles its kernels on first use and the native Numba and CuPy
     caches reuse them in later processes. The pyrite command and the Python API
@@ -76,6 +111,7 @@ def status_command(backend: str, json_output: bool) -> None:
     from ... import _jit_cache
 
     records = [_jit_cache.location_summary(loc) for loc in _selected(backend)]
+    records.extend(_family_records(backend))
     if json_output:
         emit_json("pyrite.cache.status.v1", {"locations": records})
         return
@@ -132,6 +168,7 @@ def clear_command(backend: str, yes: bool) -> None:
             emit_diagnostic(f"skip {target.backend} {target.path}: {target.reason}")
     if not deletions:
         emit_result("no PyRITE-owned compiled kernels to clear")
+    targets.extend(_family_targets(backend))
         return
     for target in deletions:
         emit_result(f"delete {target.backend} {target.kind} {target.path}")

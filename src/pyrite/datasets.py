@@ -1,13 +1,12 @@
-"""Hash-pinned upstream datasets installed once into the workspace data root.
+"""Hash-pinned upstream datasets shared across output workspaces.
 
 ADR-0014 class (b): large upstream data that is pinned by SHA-256 in the wheel
 but not shipped in it. ``pyrite tables fetch eedl`` (or ``eadl``) downloads the
 published file from its pinned URL, or copies a local file given with
 ``--archive PATH``, verifies the digest, and installs it at
 ``<data root>/datasets/<name>/<file>``. The data root is the same one generated
-xsgen tables use: the platform user data directory by default, or an explicit
-workspace (``PYRITE_HOME`` / ``workspace.root``) when one is selected, which is
-how the remote box (``PYRITE_HOME=<remote dir>``) finds its synced copy.
+xsgen tables use: PYRITE_DATA_DIR if set, otherwise the platform user data
+directory. PYRITE_HOME affects only output locations.
 
 A missing dataset is an error naming the fetch command. Nothing here falls back
 to other data, and nothing downloads implicitly at run time: a compute node may
@@ -19,6 +18,7 @@ Validation: bote-salvat-ionization-backend
 import os
 import shutil
 import tempfile
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -201,9 +201,23 @@ def datasets_dir() -> Path:
 
 
 def dataset_path(name: str) -> Path:
-    """Return where dataset ``name`` is installed, whether or not it exists."""
+    """Find the shared copy, falling back to a read-only legacy workspace copy."""
     dataset = get(name)
-    return datasets_dir() / dataset.name / dataset.filename
+    chosen = datasets_dir() / dataset.name / dataset.filename
+    if chosen.is_file():
+        return chosen
+    from .console.config import resolve, workspace_root
+
+    if resolve("workspace.root").source != "built-in default":
+        old = workspace_root() / "datasets" / dataset.name / dataset.filename
+        if old != chosen and old.is_file():
+            warnings.warn(
+                f"reading legacy workspace dataset at {old}; copy it to {chosen}",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+            return old
+    return chosen
 
 
 def fetch_hint(name: str) -> str:
@@ -325,7 +339,7 @@ def fetch_dataset(name: str, source: str | Path | None = None) -> DatasetFetchRe
     from .xsgen.fetch import _download
 
     dataset = get(name)
-    destination = dataset_path(name)
+    destination = datasets_dir() / dataset.name / dataset.filename
     if destination.is_file():
         if file_sha256(destination) == dataset.sha256:
             return DatasetFetchResult(name, destination, dataset.sha256, False, None)

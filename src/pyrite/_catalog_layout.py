@@ -122,6 +122,25 @@ def catalog_root(path: Path | str) -> Path:
     path = Path(path)
     if is_layered(path):
         return user_layer()
+def artifact_root(path: Path | str) -> Path:
+    """Immutable grid-artifact store, separate from the default config catalog.
+
+    Independently selected catalogs still own their own artifacts, as does an
+    explicitly configured user layer (the remote staging contract).
+    """
+    if is_layered(path):
+        from .console.config import resolve, user_artifact_dir
+        from .paths import config_dir
+
+        if resolve("catalog.user").source == "built-in default":
+            selected = user_artifact_dir()
+            legacy = config_dir() / ARTIFACT_DIR
+            if not selected.exists() and legacy.is_dir() and not legacy.is_symlink():
+                return legacy
+            return selected
+    return catalog_root(path) / ARTIFACT_DIR
+
+
     return path if path.is_dir() else path.parent
 
 
@@ -473,6 +492,7 @@ __all__ = [
     "OBJECT_TABLES",
     "BundledProfileError",
     "CatalogLayoutError",
+    "artifact_root",
     "bundled_catalog",
     "bundled_profile_writes",
     "catalog_root",

@@ -7,6 +7,7 @@ from pathlib import Path
 
 from ..checkpoints import archive
 from ..console.outputs import output_dir
+from ..paths import cache_dir
 from . import config, scripts, transport
 from .reporting import report
 
@@ -474,7 +475,7 @@ def pull_zhai_cache():
             "(no zhai cache files on the box -- run `pyrite app validation reproduce --remote` first)"
         )
         return
-    dest = output_dir("cache") / "zhai_reproduction"
+    dest = cache_dir() / "zhai_reproduction"
     dest.mkdir(parents=True, exist_ok=True)
     for name in names:
         transport._run(

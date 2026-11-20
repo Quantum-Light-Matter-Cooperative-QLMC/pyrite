@@ -1,4 +1,4 @@
-"""The pre-workspace table directory: no longer searched (0.5.0), still migratable."""
+"""Read-only legacy workspace tables remain usable and migrate to shared data."""
 
 import json
 
@@ -37,11 +37,12 @@ def test_legacy_tier_is_only_distinct_with_a_workspace(tmp_path, monkeypatch):
     assert report.active is False and report.copied == ()
 
 
-def test_legacy_directory_is_no_longer_searched(workspace):
+def test_legacy_workspace_directory_is_read_through(workspace):
     key, _ = _legacy_table()
 
-    assert store.legacy_table_dir() not in store.search_dirs()
-    assert store.resolve(key) is None
+    with pytest.warns(RuntimeWarning, match="legacy workspace tables"):
+        assert store.legacy_table_dir() in store.search_dirs()
+    assert store.resolve(key) is not None
 
 
 def test_migrate_copies_missing_pairs_and_never_touches_the_source(workspace):

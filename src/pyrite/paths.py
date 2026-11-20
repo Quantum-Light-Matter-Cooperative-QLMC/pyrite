@@ -9,7 +9,7 @@ import os
 from pathlib import Path
 
 import click
-from platformdirs import user_cache_path, user_data_path, user_state_path
+from platformdirs import user_cache_path, user_config_path, user_data_path, user_state_path
 
 from ._util.io import atomic_write_text as atomic_write_text
 
@@ -24,14 +24,25 @@ def app_dir() -> Path:
     return Path(__file__).parent / "apps"
 
 
+def _root(env_name: str, default: Path) -> Path:
+    """Honor an explicit PyRITE root before the OS-specific platform default."""
+    value = os.environ.get(env_name)
+    return Path(value).expanduser().resolve() if value else default
+
+
 def config_dir() -> Path:
-    """Return the platform user config directory: the config store and user profiles."""
+    """Return the config-store directory (PYRITE_CONFIG_DIR overrides it)."""
+    return _root("PYRITE_CONFIG_DIR", user_config_path("pyrite", appauthor=False))
+
+
+def legacy_config_dir() -> Path:
+    """Old Click location (roaming on Windows), for read-only compatibility."""
     return Path(click.get_app_dir("pyrite"))
 
 
 def state_dir() -> Path:
-    """Return the platform user state directory: remembered app defaults and servers."""
-    return Path(user_state_path("pyrite", appauthor=False))
+    """Return the application-state directory (PYRITE_STATE_DIR overrides it)."""
+    return _root("PYRITE_STATE_DIR", user_state_path("pyrite", appauthor=False))
 
 
 def migrate_legacy_state(path: Path) -> Path:
@@ -52,9 +63,9 @@ def migrate_legacy_state(path: Path) -> Path:
 
 def cache_dir() -> Path:
     """Return the canonical platform-specific user cache directory."""
-    return Path(user_cache_path("pyrite", appauthor=False))
+    return _root("PYRITE_CACHE_DIR", user_cache_path("pyrite", appauthor=False))
 
 
 def user_data_dir() -> Path:
     """Return the reserved canonical platform-specific user data directory."""
-    return Path(user_data_path("pyrite", appauthor=False))
+    return _root("PYRITE_DATA_DIR", user_data_path("pyrite", appauthor=False))
