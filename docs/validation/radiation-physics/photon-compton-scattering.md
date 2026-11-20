@@ -1,5 +1,15 @@
 # Photon Compton scattering
 
+```{note}
+Since #1231 the sampled energy is Doppler broadened by the impulse
+approximation (PENELOPE-2024 §2.3) and a subshell vacancy is returned; see the
+[ledger row](../ledger-transport-background.md#photon-compton-scattering).
+The derivation and evidence below, dated 2026-10-19, cover the free-electron
+model: the angular law, proposal and azimuth remain as derived here, while the
+free-electron energy and recoil sections are historical. A fresh-context
+derivation of the impulse-approximation energy sampler is pending.
+```
+
 ## Independent source-first derivation
 
 Validation: `photon-compton-scattering`. The verifier read the ledger,

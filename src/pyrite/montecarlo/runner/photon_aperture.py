@@ -52,7 +52,7 @@ def _execution_identity(backend, stage):
     return {
         "backend": "cuda",
         "navigation": "fused-binary64.v1",
-        "conditional_samplers": "epdl-eadl-pair-explicit-draw.v1",
+        "conditional_samplers": "epdl-eadl-pair-explicit-draw.v2",
         "queue": "host-controlled-lineage-device-waves.v1",
         "rng": "numpy-philox4x64-lineage.v1",
         "ledger": "host-fsum.v1",

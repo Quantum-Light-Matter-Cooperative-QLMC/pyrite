@@ -8,6 +8,7 @@ from pyrite.materials.photon_differential import (
     coherent_form_factor,
     incoherent_scattering_function,
 )
+from pyrite.montecarlo.eadl_relaxation import load_eadl_relaxation
 from pyrite.montecarlo.transport import photon_scattering as scattering
 from pyrite.montecarlo.transport.photon_scattering import sample_compton, sample_rayleigh
 
@@ -30,7 +31,12 @@ def test_rayleigh_preserves_energy():
 def test_compton_conserves_energy():
     rng = np.random.default_rng(34111)
     event = sample_compton("Si", 1e5, [0, 0, 1], iter(rng.random, None))
-    assert event.photon_energy_eV + event.electron_energy_eV == pytest.approx(1e5)
+    binding = {
+        s.shell_designator: s.binding_energy_eV for s in load_eadl_relaxation("Si").subshells
+    }
+    assert event.binding_energy_eV == binding[event.subshell_designator]
+    total = event.photon_energy_eV + event.electron_energy_eV + event.binding_energy_eV
+    assert total == pytest.approx(1e5, rel=1e-15)
     assert np.linalg.norm(event.photon_direction) == pytest.approx(1)
     assert np.linalg.norm(event.electron_direction) == pytest.approx(1)
 
@@ -75,7 +81,7 @@ def test_rayleigh_distribution_against_independent_quadrature(element, energy):
 
 
 @pytest.mark.parametrize("element,energy", [("C", 1e3), ("Si", 511e3), ("Pb", 1e8)])
-def test_compton_distribution_and_relativistic_recoil(element, energy):
+def test_compton_angles_energy_closure_and_recoil_direction(element, energy):
     rng = np.random.default_rng(34113)
     ray = np.array([1, 2, -2]) / 3
     events = [sample_compton(element, energy, ray, iter(rng.random, None)) for _ in range(2000)]
@@ -89,12 +95,17 @@ def test_compton_distribution_and_relativistic_recoil(element, energy):
     _assert_uniform_azimuth(events, ray)
     photon_energy = np.array([e.photon_energy_eV for e in events])
     kinetic = np.array([e.electron_energy_eV for e in events])
-    np.testing.assert_allclose(photon_energy + kinetic, energy, rtol=3e-16)
-    recoil = np.sqrt(kinetic * (kinetic + 2 * M_E_EV))[:, None]
-    total_momentum = photon_energy[:, None] * np.array([e.photon_direction for e in events])
-    total_momentum += recoil * np.array([e.electron_direction for e in events])
+    binding = np.array([e.binding_energy_eV for e in events])
+    assert np.all(kinetic >= 0) and np.all(binding > 0)
+    np.testing.assert_allclose(photon_energy + kinetic + binding, energy, rtol=3e-16)
+    # Bound electron: the atom takes the momentum imbalance; the electron
+    # leaves along the momentum transfer q = E n - E' n' (PENELOPE-2024 Eq. 2.72).
+    transfer = energy * ray - photon_energy[:, None] * np.array(
+        [e.photon_direction for e in events]
+    )
+    transfer /= np.linalg.norm(transfer, axis=1)[:, None]
     np.testing.assert_allclose(
-        total_momentum, np.broadcast_to(energy * ray, (len(events), 3)), rtol=2e-13, atol=1e-12
+        np.array([e.electron_direction for e in events]), transfer, rtol=0, atol=1e-9
     )
 
 
@@ -132,15 +143,31 @@ def test_constant_scattering_function_is_free_klein_nishina(monkeypatch):
     _assert_uniform_cdf(np.interp(sampled, delta, _cdf(delta, density)))
 
 
-@pytest.mark.parametrize("sampler", [sample_rayleigh, sample_compton])
-@pytest.mark.parametrize("energy", [1.0, 1e11])
+@pytest.mark.parametrize(
+    "sampler,energy",
+    [
+        (sample_rayleigh, 1.0),
+        (sample_rayleigh, 1e11),
+        (sample_compton, 1e3),
+        (sample_compton, 1e11),
+    ],
+)
 def test_epdl_domain_endpoints(sampler, energy):
     rng = np.random.default_rng(34116)
     for _ in range(10):
         event = sampler("Pb", energy, [1, 0, 0], iter(rng.random, None))
         assert 0 <= event.one_minus_cosine <= 2
         assert np.isfinite(event.photon_direction).all()
-        assert event.photon_energy_eV + event.electron_energy_eV == pytest.approx(energy)
+        total = event.photon_energy_eV + event.electron_energy_eV + event.binding_energy_eV
+        assert total == pytest.approx(energy)
+
+
+@pytest.mark.parametrize("energy", [1.0, 20.0])
+def test_compton_without_impulse_support_has_no_final_state(energy):
+    # Pb's outermost EADL binding is 7.4 eV: nothing can be ionized at 1 eV,
+    # and at 20 eV even backscatter needs |p_z| >~ 40 a.u. (n_i underflows).
+    with pytest.raises(ValueError, match="no Compton subshell"):
+        sample_compton("Pb", energy, [1, 0, 0], iter(np.random.default_rng(34117).random, None))
 
 
 @pytest.mark.parametrize("sampler", [sample_rayleigh, sample_compton])
@@ -172,16 +199,16 @@ def test_endpoint_draws_and_exact_consumption(monkeypatch):
     assert back.one_minus_cosine == pytest.approx(2)
 
 
-def test_zero_angle_free_compton_recoil_convention(monkeypatch):
+def test_zero_angle_compton_has_no_bound_final_state(monkeypatch):
+    # theta = 0 transfers no momentum, so no bound electron can be ejected.
     monkeypatch.setattr(
         scattering,
         "incoherent_scattering_function_table",
         lambda el: (np.array([0, 1e9]), np.array([1.0, 1.0])),
     )
-    event = sample_compton("C", 1e5, [0, 1, 0], [0, 0, 0, 0])
-    assert event.one_minus_cosine == 0 and event.electron_energy_eV == 0
-    np.testing.assert_array_equal(event.electron_direction, [0, 1, 0])
-    np.testing.assert_array_equal(event.photon_direction, [0, 1, 0])
+    # Each accepted zero angle is rejected again, until the explicit tape ends.
+    with pytest.raises(ValueError, match="uniform sequence exhausted"):
+        sample_compton("C", 1e5, [0, 1, 0], [0.0] * 8)
 
 
 @pytest.mark.parametrize(

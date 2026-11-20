@@ -22,7 +22,8 @@ def cp():
 def test_same_draw_epdl_scattering_matches_cpu(cp, channel, element):
     rng = np.random.default_rng(341_901)
     n = 64
-    energy = np.geomspace(1, 1e8, n)
+    # Compton below ~100 eV can lack impulse-approximation support (status 3).
+    energy = np.geomspace(1 if channel == "coherent" else 1e3, 1e8, n)
     ray = rng.normal(size=(n, 3))
     ray /= np.linalg.norm(ray, axis=1)[:, None]
     uniforms = rng.random((n, 512))
@@ -31,7 +32,13 @@ def test_same_draw_epdl_scattering_matches_cpu(cp, channel, element):
     actual = device.sample_photon_scattering_cuda(element, energy, ray, uniforms, channel=channel)
     assert all(isinstance(value, cp.ndarray) for value in actual.values())
     np.testing.assert_array_equal(cp.asnumpy(actual["status"]), 0)
-    for key in ("photon_energy_eV", "photon_direction", "electron_energy_eV", "one_minus_cosine"):
+    for key in (
+        "photon_energy_eV",
+        "photon_direction",
+        "electron_energy_eV",
+        "one_minus_cosine",
+        "binding_energy_eV",
+    ):
         np.testing.assert_allclose(
             cp.asnumpy(actual[key]), [getattr(e, key) for e in expected], rtol=2e-12, atol=2e-14
         )
@@ -48,11 +55,23 @@ def test_same_draw_epdl_scattering_matches_cpu(cp, channel, element):
             rtol=2e-12,
             atol=2e-14,
         )
-        np.testing.assert_allclose(
-            cp.asnumpy(actual["photon_energy_eV"] + actual["electron_energy_eV"]),
-            energy,
-            rtol=3e-16,
+        np.testing.assert_array_equal(
+            cp.asnumpy(actual["subshell_designator"]), [e.subshell_designator for e in expected]
         )
+        total = actual["photon_energy_eV"] + actual["electron_energy_eV"]
+        np.testing.assert_allclose(
+            cp.asnumpy(total + actual["binding_energy_eV"]), energy, rtol=3e-16
+        )
+
+
+def test_compton_without_impulse_support_reports_status_three(cp):
+    uniforms = np.random.default_rng(1231_05).random((2, 64))
+    event = device.sample_photon_scattering_cuda(
+        "Pb", [1.0, 20.0], [[0, 0, 1], [0, 0, 1]], uniforms, channel="incoherent",
+        require_complete=False,
+    )  # fmt: skip
+    np.testing.assert_array_equal(cp.asnumpy(event["status"]), [3, 3])
+    np.testing.assert_array_equal(cp.asnumpy(event["draws_used"]), [0, 0])
 
 
 @pytest.mark.parametrize("channel", ["coherent", "incoherent"])

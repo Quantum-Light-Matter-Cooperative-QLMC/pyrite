@@ -53,3 +53,17 @@ The upstream file is 86 MB; this table is 1.5 MB. Under
 [ADR-0014](../../../../docs/adr/0014-packaged-data-layout.md) it is a class (b)
 candidate (upstream-derived, over ~1 MiB compressed), packaged for now like
 EEDL and EADL until hash-pinned fetching lands.
+
+## Compton profiles
+
+`compton_profile_j0.csv` (in the package) holds one-electron Hartree–Fock
+Compton profiles at zero projected momentum, `J_i(0)` in inverse atomic units,
+for every occupied EADL2025 subshell of Z = 1--100: Biggs, Mendelsohn & Mann,
+ADNDT 16, 201 (1975), via xraylib 4.3.0 (BSD-3-Clause; see the
+[third-party notices](../../../../THIRD-PARTY-NOTICES.md)). The `source`
+column marks the few values taken from a spin-orbit partner or a neighbouring
+element. `scripts/generate_compton_profiles.py` regenerates the file byte for
+byte (needs the `oracle` group); its SHA-256 is pinned in
+`pyrite.montecarlo.transport.compton_profiles.COMPTON_PROFILE_SHA256`. The
+photon-transport Compton sampler builds PENELOPE analytical profiles from
+these values (`photon-compton-scattering`).

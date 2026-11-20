@@ -161,7 +161,9 @@ def _product(row, arrays, element, channel):
                 ),
             )
         )
-        return CudaCollision(photons, charged)
+        # The Compton vacancy is not relaxed: its binding deposits locally (CPU twin).
+        binding = 0.0 if name == "coherent" else float(arrays["binding_energy_eV"][row])
+        return CudaCollision(photons, charged, terminal_binding_eV=binding)
     charged = tuple(
         (
             ordinal,

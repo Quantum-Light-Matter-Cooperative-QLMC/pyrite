@@ -327,6 +327,8 @@ def _interact(queue, parent: _Photon, channel, element, relaxation, rng, positio
                 parent, 1, ELECTRON, channel, position, event.electron_direction,
                 event.electron_energy_eV,
             )  # fmt: skip
+            # The Compton vacancy is not relaxed: its binding deposits locally.
+            queue.book("terminal_binding_eV", parent.row, parent.weight * event.binding_energy_eV)
     else:
         pair = sample_pair(energy, _atomic_number(element), direction, rng)
         queue.book("positron_rest_eV", parent.row, parent.weight * PAIR_THRESHOLD_EV)
