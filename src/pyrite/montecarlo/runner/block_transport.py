@@ -78,6 +78,16 @@ def _xp_of(value):
     return np if isinstance(value, np.ndarray) else BACKEND.xp
 
 
+def _concatenate(parts: list[Any]):
+    """Join ``parts`` in their shared namespace, or on the host when they mix."""
+    on_host = [isinstance(part, np.ndarray) for part in parts]
+    if all(on_host):
+        return np.concatenate(parts)
+    if any(on_host):
+        return np.concatenate([BACKEND.to_cpu(part) for part in parts])
+    return BACKEND.xp.concatenate(parts)
+
+
 # Population-wide hard-photon vectors; finalize_population_fields rebuilds them.
 _RECOMPLETED_FIELDS = ("hard_radiative_direction", "hard_radiative_target_momentum_eV_c")
 
@@ -103,6 +113,8 @@ def merge_electron_blocks(blocks: list[dict[str, Any]]) -> dict[str, Any]:
     Arrays concatenate (per-electron and per-row alike, since both are
     electron-major), counts add, and metadata is taken from the first block.
     A field that aliases another in the first block aliases it in the join.
+    A field whose parts mix device and host arrays (blocks completed after a
+    transport OOM fail-over come back on the host) joins host copies.
     """
     if not blocks:
         raise ValueError("no electron blocks to merge")
@@ -114,8 +126,7 @@ def merge_electron_blocks(blocks: list[dict[str, Any]]) -> dict[str, Any]:
             merged[key] = sum(int(b[key]) for b in blocks)
         elif _is_array(value):
             if id(value) not in joined:
-                parts = [b[key] for b in blocks]
-                joined[id(value)] = _xp_of(value).concatenate(parts)
+                joined[id(value)] = _concatenate([b[key] for b in blocks])
             merged[key] = joined[id(value)]
         else:
             merged[key] = value
