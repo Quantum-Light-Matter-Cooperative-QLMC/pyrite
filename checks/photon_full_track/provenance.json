@@ -45,14 +45,14 @@
     "reference/w_10mev.json.gz": "d9df96eba091899f00bf308429882e8c0ceca8f01b8fd7020bede981d21ee7ba",
     "reference/w_1mev.json.gz": "7188ff333f96b02934c41b189b8ef242d882476a3e5523c844b71d7547b618ea",
     "reference/w_3mev.json.gz": "05f049d43eddfef0dd3a7a267c9b35d0f94c0bbeea00a88d4b8bb5c6cfd35cfd",
-    "results/si_0p3mev.json.gz": "80bd323c69a074c897bc7f7a2bdb2d974d2470f745435153da55d3804d691b20",
-    "results/si_10mev.json.gz": "535089bf9feeb4d12b7a6877245d646b33b94b0648d73cab877427381c9bf3ce",
-    "results/si_1mev.json.gz": "6dd3aaa0e474c940ae3b4f871d06889547c164a1390b53729d114b89f910e11b",
-    "results/si_3mev.json.gz": "69c85d12ee552f5a6e5b0aeb05c4a654ff87e28d6e36f02967ad758d9444dc6a",
-    "results/w_0p3mev.json.gz": "aff05a7519bfaf75c299cda89afb2052039b929a68fe035e260606cf98352a91",
-    "results/w_10mev.json.gz": "6e510cc687aa60deccc981fe3158693805c77b7bf8c62dc03963a68370fbcf3c",
-    "results/w_1mev.json.gz": "78e8322dd3d22223210b788a60b7b4203bd57fbdcd1d51c2796ccad3116f433a",
-    "results/w_3mev.json.gz": "932a377d21e93bf6e5a1cf3382eb9766da80ee04ac3ec3f7d4489a591b8cede3"
+    "results/si_0p3mev.json.gz": "b4f4519c7f1a90e4048bda42615de532b93cf40949331ef347343078c8e6619d",
+    "results/si_10mev.json.gz": "473fa79ea66f30b2cbb55d2d553a2d7890b52167601c13058f70c8a0542b5b54",
+    "results/si_1mev.json.gz": "a9f5635c86a50d635be748b04a023173b80ee3cba7f07be882d03528c83592f0",
+    "results/si_3mev.json.gz": "0009fe0b15df1802f2904804c426308e075fe8c3201b34e009b33afacec78959",
+    "results/w_0p3mev.json.gz": "fb6dc01d22ba1d7a27fa79385f040abb384f8f766972f4b38ecbd83a5bd48cec",
+    "results/w_10mev.json.gz": "8b26e099bfd07365a610865ce16af9a43fef49daddd971ba8419399930f630b7",
+    "results/w_1mev.json.gz": "a13a787b9f53499cd39c3bff04a23fad4acedd60eea3247c757356d279ad9774",
+    "results/w_3mev.json.gz": "e9dfa485d9356083892b806b12f72a82f587d887c8c81a420d3f1054a3b49c8d"
   },
   "gate_counts": {
     "gated": 100,
@@ -71,5 +71,45 @@
       "1-10keV",
       "redistributed_fraction"
     ]
-  ]
+  ],
+  "pyrite_rerun_1231": {
+    "role": "PyRITE results/ re-pinned for #1231 (Compton Doppler broadening plus Compton-vacancy relaxation); Geant4 reference/ unchanged",
+    "run_date_utc": "2026-11-20",
+    "job": 14198,
+    "tasks": "1-160 (submit dir thick/ under the staging root)",
+    "tested_commit": "8fd3b1a16",
+    "staging_root": "~/.local/opt/pyrite-1231-8fd3b1a16",
+    "data_home": "./home under the staging root: datasets -> ~/.local/opt/pyrite-issue-341/home/datasets; xsgen/tables -> ~/pyrite/xsgen/tables",
+    "allocation": {
+      "node": "qlmc-queen",
+      "partition": "cpu",
+      "cpus_per_task": 1,
+      "memory_GiB_per_task": 4,
+      "wall_range": "1:16-7:43",
+      "max_rss_kB": "not recorded (sacct MaxRSS empty for these steps)",
+      "nonzero_task_exits": 0
+    },
+    "reduction": "compare.py reduce-pyrite then compact, per case",
+    "source_sha256_tested": {
+      "checks/photon_full_track/pyrite_bench.py": "ad8a292f9e51f3dc0c42ab763ce8cfbd4ce938d27efb04ff42acacb5ce0f0392",
+      "checks/photon_full_track/run_pyrite.sbatch": "05f0e9d9e591569bfe908f094c94eab35832bd1c0033c1d601f96baa0639a55e",
+      "checks/photon_full_track/compare.py": "e7cb036a70ba1d1ebbc3dbe56c0865b2d35493c178248b7f2bbab0adb2af6b41",
+      "src/pyrite/montecarlo/transport/photon_histories.py": "32a238ff9af1de76f5425e2a4e15d03733fca5b05057b35a4865833e8e6b8fa6",
+      "src/pyrite/montecarlo/transport/photon_scattering.py": "da2bb0228550a06b13954235de92829096810491b0276902be994315623eecd5",
+      "src/pyrite/montecarlo/transport/compton_profiles.py": "3cc4ebce58568fa2c9df1ac16e9a29f10bd7fb36b55a165cd16407a38d2c85de",
+      "src/pyrite/data/photon_cross_sections/compton_profile_j0.csv": "31671e65c882134a3fa591f0497a524846137a97c3e60e06317f08e228a35e81"
+    },
+    "superseded_committed_sha256": {
+      "results/si_0p3mev.json.gz": "80bd323c69a074c897bc7f7a2bdb2d974d2470f745435153da55d3804d691b20",
+      "results/si_10mev.json.gz": "535089bf9feeb4d12b7a6877245d646b33b94b0648d73cab877427381c9bf3ce",
+      "results/si_1mev.json.gz": "6dd3aaa0e474c940ae3b4f871d06889547c164a1390b53729d114b89f910e11b",
+      "results/si_3mev.json.gz": "69c85d12ee552f5a6e5b0aeb05c4a654ff87e28d6e36f02967ad758d9444dc6a",
+      "results/w_0p3mev.json.gz": "aff05a7519bfaf75c299cda89afb2052039b929a68fe035e260606cf98352a91",
+      "results/w_10mev.json.gz": "6e510cc687aa60deccc981fe3158693805c77b7bf8c62dc03963a68370fbcf3c",
+      "results/w_1mev.json.gz": "78e8322dd3d22223210b788a60b7b4203bd57fbdcd1d51c2796ccad3116f433a",
+      "results/w_3mev.json.gz": "932a377d21e93bf6e5a1cf3382eb9766da80ee04ac3ec3f7d4489a591b8cede3"
+    },
+    "outcome": "100 gated, the same 2 W 0.3 MeV R 1-10 keV failures (redistributed 1.196, fraction 0.342/0.307), unchanged from history",
+    "raw_reduction_sha256_note": "raw_reduction_sha256 results/ entries describe the superseded 2026-10-24 run; the rerun committed only compacted records"
+  }
 }

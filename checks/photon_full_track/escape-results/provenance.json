@@ -45,17 +45,52 @@
   "committed_record_sha256": {
     "si_ext_geant4.json.gz": "46eea516e8c89b4f3fd8634d29e406e05de90b346716b7073d1c35dee1efe8d9",
     "si_ext_geant4_emlivermore.json.gz": "f9fdf7b30ef80bf0d2b930b6d3b7ea1b90ded058cd673ef00d4901e44c1a7800",
-    "si_ext_pyrite.json.gz": "63c563a134da45ce5e2e575b3b3ec91e46246fb48d8f9179e9ff243a58e8d4a8",
+    "si_ext_pyrite.json.gz": "ddf27aa706c7504bf06b19c2193327d4f0fbcae2c02c836637baa7c232ed3593",
     "si_int_geant4.json.gz": "a996490766b038de4672410bcb3c9f96239f9d1da1cb5318b3b6089e5c019270",
     "si_int_geant4_emlivermore.json.gz": "494c0f89b3a8f005fefd20591e02e69a363b4b2ba09f19b2d695f17c1b6b6b02",
-    "si_int_pyrite.json.gz": "bf31935b625bd2bf6550df4d12b024b32499d211e40300a05657d5456386f5c0",
+    "si_int_pyrite.json.gz": "137c0b177f6fd8fbee4d6db6e4f1968651c496c72b8821a88dec8f6038555e45",
     "w_ext_geant4.json.gz": "e12a0b45a2bf75e81a9c91a72bf7aec2c82095c10417b92b47a93e267d5ec766",
     "w_ext_geant4_emlivermore.json.gz": "b0f81b7ef391b3c807e39dc6aa80a33bccf3ae260f920fd97ed92d9f6986a1c1",
-    "w_ext_pyrite.json.gz": "ab0acfe0b054adc3403594d31401a5e8eee34a0c67839b0c47b68592d306f559",
+    "w_ext_pyrite.json.gz": "41f9ac0c4e808bfafa7f993f93cb62f13ee694eaf8b49fc179819c6eb325f421",
     "w_int_geant4.json.gz": "c268fd20c595a2bf618e4abd6eb3d6d8acc04360ee038d9d33dcc64891721d23",
     "w_int_geant4_emlivermore.json.gz": "9ae5df564f7d416c6aead8b38d6736a6e44d1c7f665c17e21d0fe0e2aeb0a2b5",
-    "w_int_pyrite.json.gz": "e7fdb7059628cefeb1c7f148807ad0424c67c56c957483dbf5281304ac9f37fa"
+    "w_int_pyrite.json.gz": "46b3634550de685d05d908208fea453ab32cbef4fc00b1de085414a22ebb0433"
   },
   "raw_logs": "Geant4 GAM logs and per-shard records remain under the staging root's results/ on qlmc",
-  "post_run_merge_guard_note": "After the runs, merge() gained a duplicate-shard rejection (adjudication hardening). Reduction, tally and compare logic are unchanged; the committed records were merged from distinct shards."
+  "post_run_merge_guard_note": "After the runs, merge() gained a duplicate-shard rejection (adjudication hardening). Reduction, tally and compare logic are unchanged; the committed records were merged from distinct shards.",
+  "pyrite_rerun_1231": {
+    "role": "PyRITE arm re-pinned for #1231 (impulse-approximation Compton Doppler broadening plus Compton-vacancy EADL relaxation); Geant4 records unchanged",
+    "run_date_utc": "2026-11-20",
+    "job": 14196,
+    "tasks": "41-80 (PyRITE shards; Geant4 tasks 1-40 not used)",
+    "tested_commit": "8fd3b1a16",
+    "staging_root": "~/.local/opt/pyrite-1231-8fd3b1a16",
+    "data_home": "./home under the staging root: datasets -> ~/.local/opt/pyrite-issue-341/home/datasets; xsgen/tables -> ~/pyrite/xsgen/tables",
+    "allocation": {
+      "node": "qlmc-queen",
+      "partition": "cpu",
+      "cpus_per_task": 1,
+      "memory_GiB_per_task": 2,
+      "wall_range": "0:15-2:15",
+      "max_rss_kB": "not recorded (sacct MaxRSS empty for these steps)",
+      "nonzero_task_exits": 0
+    },
+    "source_sha256_tested": {
+      "checks/photon_full_track/annihilation_escape.py": "72f2ba31b44a036513b62611918bc3846f04315e41672df02fd37144c4e75834",
+      "checks/photon_full_track/run_annihilation_escape.sbatch": "beebb33f70420fa47adf10b89baaa7e70154f981476d5aadcd250ccf8bd107df",
+      "checks/photon_full_track/compare.py": "e7cb036a70ba1d1ebbc3dbe56c0865b2d35493c178248b7f2bbab0adb2af6b41",
+      "src/pyrite/montecarlo/transport/photon_histories.py": "32a238ff9af1de76f5425e2a4e15d03733fca5b05057b35a4865833e8e6b8fa6",
+      "src/pyrite/montecarlo/transport/photon_scattering.py": "da2bb0228550a06b13954235de92829096810491b0276902be994315623eecd5",
+      "src/pyrite/montecarlo/transport/compton_profiles.py": "3cc4ebce58568fa2c9df1ac16e9a29f10bd7fb36b55a165cd16407a38d2c85de",
+      "src/pyrite/data/photon_cross_sections/compton_profile_j0.csv": "31671e65c882134a3fa591f0497a524846137a97c3e60e06317f08e228a35e81"
+    },
+    "superseded_pyrite_record_sha256": {
+      "si_ext_pyrite.json.gz": "63c563a134da45ce5e2e575b3b3ec91e46246fb48d8f9179e9ff243a58e8d4a8",
+      "si_int_pyrite.json.gz": "bf31935b625bd2bf6550df4d12b024b32499d211e40300a05657d5456386f5c0",
+      "w_ext_pyrite.json.gz": "ab0acfe0b054adc3403594d31401a5e8eee34a0c67839b0c47b68592d306f559",
+      "w_int_pyrite.json.gz": "e7fdb7059628cefeb1c7f148807ad0424c67c56c957483dbf5281304ac9f37fa"
+    },
+    "outcome": "Penelope 14/14 and Livermore 14/14 gated pass (unchanged). Ungated W R vs Penelope: w_ext 300-504 keV 0.200 -> 0.833 (25 vs 30 counts); w_int 100-300 keV 0.512 -> 1.012 (81 vs 80); w_int W Ka 0.125 -> 0.375 (3 vs 8 counts; Livermore 3 vs 2, ratio 1.5), a counting-statistics window",
+    "superseded_intermediate": "Doppler-only commit 3c52ed602 (no vacancy relaxation) gave the same W ratios; recorded in issue #1231 Progress, records not committed"
+  }
 }

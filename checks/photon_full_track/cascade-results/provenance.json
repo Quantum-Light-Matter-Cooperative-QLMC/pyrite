@@ -182,11 +182,11 @@
   "geant4_atomic_deexcitation_source_sha256": "90625567d9421cbc3dcdb3aaba0e3af2ad1200a94db4b3a4bdda0e5cec185d53",
   "reduction_script_sha256": "f3e0ee661e7cdd2ed45d017683f0d89d29d9618853f6dcb9cc2dbe6b857fd4ad",
   "raw_reduction_sha256": "a6705ce65f8635f934ea8f810561872d2b99873a2338981f340ebf6de2c27bf8",
-  "original_pyrite_result_sha256": "aff05a7519bfaf75c299cda89afb2052039b929a68fe035e260606cf98352a91",
+  "original_pyrite_result_sha256": "fb6dc01d22ba1d7a27fa79385f040abb384f8f766972f4b38ecbd83a5bd48cec",
   "historical_geant4_reference_sha256": "77653858e80fb66421c4e629cebf11ff00f0f40d825f07a7f73a016b9b56cc82",
   "committed_sha256": {
     "reference.json.gz": "a9959e2306f6de5971abe2ceeb46bf785b32868a3f26085ee6b3c8b4713a6dd6",
-    "report.json": "1f44829d8202af288d23f7df14cb46d7c1ecac28ab4f9b32738114344df5bad0"
+    "report.json": "96d3cb88b9520cae93dee690b9c57a2bb81ca7bcc5e947f629c07405c0648bc2"
   },
   "wall_seconds": [
     89.62,
@@ -211,5 +211,11 @@
     88452,
     84444,
     83756
-  ]
+  ],
+  "repin_1231": {
+    "reason": "#1231 re-pinned results/w_0p3mev.json.gz; report.json regenerated with compare.py compare-cascade against the unchanged reference.json.gz",
+    "superseded_original_pyrite_result_sha256": "aff05a7519bfaf75c299cda89afb2052039b929a68fe035e260606cf98352a91",
+    "superseded_report_sha256": "1f44829d8202af288d23f7df14cb46d7c1ecac28ab4f9b32738114344df5bad0",
+    "outcome": "11 gated, 0 failures, 0 missing gates (unchanged)"
+  }
 }

@@ -43,18 +43,29 @@ engines' history-block standard errors. As windows are not gated at 11.5 keV.
 ## Results
 
 PyRITE / Geant4 for every window with at least 1000 reference counts in
-either arm (R unless marked T):
+either arm (R unless marked T). PyRITE values are from the #1231 rerun (job
+14197, tested commit `8fd3b1a16`, with Compton Doppler broadening and
+Compton-vacancy relaxation); the superseded job-12771 ratio follows in
+brackets where it differs:
 
 | Energy | Window | vs Penelope (gated reference) | vs Livermore (diagnostic) |
 |---|---|---|---|
-| 11.5 keV | Ga Kα | **1.928** (46σ, fail) | 0.992 (pass) |
-| 11.5 keV | Ga Kβ | **1.846** (16σ, fail) | 0.963 (pass) |
-| 15 keV | Ga Kα | **1.157** (9.8σ, fail) | 0.995 (pass) |
-| 15 keV | Ga Kβ + As Kα2 | 1.030 (pass) | 0.978 (pass) |
+| 11.5 keV | Ga Kα | **1.927** [1.928] (46σ, fail) | 0.992 (pass) |
+| 11.5 keV | Ga Kβ | **1.849** [1.846] (16σ, fail) | 0.964 [0.963] (pass) |
+| 15 keV | Ga Kα | **1.156** [1.157] (9.8σ, fail) | 0.995 (pass) |
+| 15 keV | Ga Kβ + As Kα2 | 1.029 [1.030] (pass) | 0.978 (pass) |
 | 15 keV | As Kα1 | 1.013 (pass) | 1.009 (pass) |
-| 30 keV | Ga Kα | **1.187** (6.9σ, fail) | 0.995 (pass) |
-| 30 keV | Ga Kβ + As Kα2 | 1.005 (ungated, 981 counts) | 0.924 (pass, −1.8σ) |
-| 30 keV | Ga Kα T | **1.261** (6.0σ, fail) | 1.067 (pass) |
+| 30 keV | Ga Kα | **1.186** [1.187] (6.9σ, fail) | 0.994 [0.995] (pass) |
+| 30 keV | Ga Kβ + As Kα2 | 1.004 [1.005] (ungated, 981 counts) | 0.923 [0.924] (pass, −1.8σ) |
+| 30 keV | Ga Kα T | **1.259** [1.261] (5.9σ, fail) | 1.065 [1.067] (pass) |
+
+The rerun changed no decision and no gated ratio by more than 0.003. The only
+visible change is ungated: at 11.5 keV the R "As Kα1" window (10.5–11.0 keV)
+went from 0 to 13 PyRITE counts (Penelope 20, Livermore 18; ratios 0.65/0.72).
+The beam is below the As K edge, so these are not As K photons. They are
+11.5 keV primaries Compton backscattered into the window, which free-electron
+Compton could not reach in one scatter (180° gives 11.005 keV) and Doppler
+broadening does.
 
 At 15 and 30 keV, PyRITE attributes 0.32 and 0.36 of its Ga photoabsorptions
 above the K edge to later flights, mostly As K fluorescence; at 11.5 keV the
@@ -91,7 +102,9 @@ fall about a third short on the 15 and 30 keV Ga Kα gates, far outside the
 `checks/photon_full_track/alloy-results/` holds merged history blocks for all
 nine engine/energy records, both reports and `provenance.json` (jobs 12771
 and 12843, tested commits, staging roots, source/data/executable hashes and
-resources). Regression tests recompute both reports from the committed blocks
+resources). The PyRITE records were re-pinned once, by the #1231 rerun (job
+14197); `provenance.json` keeps the superseded hashes under
+`pyrite_cpu_photon_only_1231`. Regression tests recompute both reports from the committed blocks
 and require exactly the five Penelope failures and zero Livermore failures.
 
 Before any promotion, a fresh-context adjudication must decide whether the
