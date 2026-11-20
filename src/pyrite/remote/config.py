@@ -12,6 +12,7 @@ from pathlib import Path, PurePosixPath
 
 from .._util.env import env_value
 from ..console.outputs import LEGACY_LAYOUT, OUTPUT_DIRNAME
+from ..paths import cache_dir
 
 # Compatibility override for tests and callers that historically patched this
 # module global. Normal resolution is dynamic so environment and store changes
@@ -211,14 +212,10 @@ def ssh_mux_options() -> list[str]:
     OpenSSH has no control sockets.
     """
     if os.name != "posix" or env_value("PYRITE_SSH_MUX", "1") == "0":
-    from ..paths import cache_dir
-
         return []
     runtime = os.environ.get("XDG_RUNTIME_DIR")
     sockets = (
-        Path(runtime) / "pyrite-ssh"
-        if runtime and os.path.isdir(runtime)
-        else cache_dir() / "ssh"
+        Path(runtime) / "pyrite-ssh" if runtime and os.path.isdir(runtime) else cache_dir() / "ssh"
     )
     if len(str(sockets).encode()) + len("/%C") >= 100:
         sockets = Path("/tmp") / f"pyrite-ssh-{os.getuid()}"

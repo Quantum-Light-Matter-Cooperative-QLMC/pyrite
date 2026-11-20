@@ -208,7 +208,7 @@ set -u
 {_VENDOR_PRELUDES[vendor]()}
 
 export PYRITE_DATA_DIR={config.shell_word(config.remote_dir())}
-export PYRITE_CACHE_DIR={config.shell_word(config.remote_path('cache'))}
+export PYRITE_CACHE_DIR={config.shell_word(config.remote_path("cache"))}
 export PYRITE_HOME={config.shell_word(config.remote_dir())}
 # argv below is generated; deprecated options it carries were warned locally.
 export {GENERATED_INVOCATION_ENV}=1

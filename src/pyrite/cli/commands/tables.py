@@ -830,9 +830,6 @@ def verify_command(require: str, json_output: bool) -> None:
         raise click.exceptions.Exit(1)
 
 
-@command.command("migrate")
-@click.option(
-    "--dry-run", is_flag=True, help="Report what would be copied without writing anything."
 def _migrate_legacy_reference_data(*, dry_run: bool) -> list[str]:
     """Copy legacy dataset/source files without following symlinks or overwriting.
 
@@ -880,6 +877,9 @@ def _migrate_legacy_reference_data(*, dry_run: bool) -> list[str]:
     return migrated
 
 
+@command.command("migrate")
+@click.option(
+    "--dry-run", is_flag=True, help="Report what would be copied without writing anything."
 )
 @output_option
 def migrate_command(dry_run: bool, json_output: bool) -> None:
@@ -892,11 +892,11 @@ def migrate_command(dry_run: bool, json_output: bool) -> None:
 
     try:
         report = migrate_legacy_tables(dry_run=dry_run)
+        legacy_inputs = _migrate_legacy_reference_data(dry_run=dry_run)
     except OSError as exc:
         raise CLIError(f"could not migrate tables: {exc}") from exc
     if json_output:
         emit_json(
-        legacy_inputs = _migrate_legacy_reference_data(dry_run=dry_run)
             "pyrite.tables.migrate.v1",
             {
                 "source": str(report.source),
@@ -905,29 +905,30 @@ def migrate_command(dry_run: bool, json_output: bool) -> None:
                 "dry_run": report.dry_run,
                 "copied": list(report.copied),
                 "present": list(report.present),
+                "legacy_inputs": legacy_inputs,
             },
         )
         return
-    if not report.active:
-                "legacy_inputs": legacy_inputs,
+    if not report.active and not legacy_inputs:
         emit_result(f"nothing to migrate: {report.source} is the selected table directory")
         return
     verb = "would copy" if dry_run else "copied"
-    emit_result(
-        f"{verb} {len(report.copied)} table(s) from {report.source} to {report.destination}; "
-        f"{len(report.present)} already present"
-    )
+    if report.active:
+        emit_result(
+            f"{verb} {len(report.copied)} table(s) from {report.source} to {report.destination}; "
+            f"{len(report.present)} already present"
+        )
+    if legacy_inputs:
+        emit_result(
+            f"{verb} {len(legacy_inputs)} reference-data/dataset file(s): "
+            + ", ".join(legacy_inputs)
+        )
 
 
 @command.group("sources", cls=LazyGroup)
 def sources_command() -> None:
     """Show and configure where the external code trees live."""
 
-    if legacy_inputs:
-        emit_result(
-            f"{verb} {len(legacy_inputs)} reference-data/dataset file(s): "
-            + ", ".join(legacy_inputs)
-        )
 
 @sources_command.command("list")
 @output_option

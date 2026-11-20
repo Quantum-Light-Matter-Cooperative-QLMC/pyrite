@@ -8,8 +8,6 @@ from pathlib import Path
 
 import click
 
-from ...paths import cache_dir
-
 from ...console.output import (
     CLIError,
     confirm_destructive,
@@ -19,6 +17,7 @@ from ...console.output import (
     emit_table,
     output_option,
 )
+from ...paths import cache_dir
 
 _FAMILIES = ("line-grids", "analysis", "viewer-renders", "zhai_reproduction", "line-grid-spill")
 _BACKENDS = click.Choice(("all", "numba", "cupy", *_FAMILIES))
@@ -39,19 +38,28 @@ def _family_records(backend: str) -> list[dict]:
             if root.is_dir() and not root.is_symlink()
             else []
         )
-        records.append({
-            "backend": family, "path": str(root), "source": "managed",
-            "active": True, "files": len(files), "bytes": sum(p.stat().st_size for p in files),
-        })
+        records.append(
+            {
+                "backend": family,
+                "path": str(root),
+                "source": "managed",
+                "active": True,
+                "files": len(files),
+                "bytes": sum(p.stat().st_size for p in files),
+            }
+        )
     return records
 
 
 def _family_targets(backend: str):
     from ..._jit_cache import ClearTarget
 
-    return [ClearTarget(family, path, "tree") for family in _FAMILIES
-            if backend in ("all", family)
-            if (path := _family_path(family)).is_dir() and not path.is_symlink()]
+    return [
+        ClearTarget(family, path, "tree")
+        for family in _FAMILIES
+        if backend in ("all", family)
+        if (path := _family_path(family)).is_dir() and not path.is_symlink()
+    ]
 
 
 def _size(count: int) -> str:
@@ -152,7 +160,7 @@ def status_command(backend: str, json_output: bool) -> None:
 )
 @click.option("-y", "--yes", is_flag=True, help="Delete the exact previewed paths.")
 def clear_command(backend: str, yes: bool) -> None:
-    """Delete PyRITE-owned compiled kernels; preview unless --yes.
+    """Delete PyRITE-owned compiled kernels and regenerable caches; preview unless --yes.
 
     Removes the managed cache directories whole, and only PyRITE package
     entries from a user-set NUMBA_CACHE_DIR or the legacy in-tree __pycache__.
@@ -162,13 +170,13 @@ def clear_command(backend: str, yes: bool) -> None:
     from ... import _jit_cache
 
     targets = _jit_cache.clear_plan(_selected(backend))
+    targets.extend(_family_targets(backend))
     deletions = [t for t in targets if t.kind != "skip"]
     for target in targets:
         if target.kind == "skip":
             emit_diagnostic(f"skip {target.backend} {target.path}: {target.reason}")
     if not deletions:
-        emit_result("no PyRITE-owned compiled kernels to clear")
-    targets.extend(_family_targets(backend))
+        emit_result("no PyRITE-owned caches to clear")
         return
     for target in deletions:
         emit_result(f"delete {target.backend} {target.kind} {target.path}")

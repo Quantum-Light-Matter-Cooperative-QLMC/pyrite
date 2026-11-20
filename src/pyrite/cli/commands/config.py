@@ -200,7 +200,11 @@ def paths_command(json_output: bool) -> None:
     add("fetched_data", _config.fetched_data_root(), paths["data_dir"]["source"])
     add("xsgen_tables", _config.xsgen_data_root() / "tables", paths["data_dir"]["source"])
     for name in (
-        "line-grids", "analysis", "viewer-renders", "zhai_reproduction", "line-grid-spill"
+        "line-grids",
+        "analysis",
+        "viewer-renders",
+        "zhai_reproduction",
+        "line-grid-spill",
     ):
         add(f"cache.{name}", cache_dir() / name, paths["cache_dir"]["source"])
     user = _config.resolve("catalog.user")

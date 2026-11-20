@@ -122,6 +122,9 @@ def catalog_root(path: Path | str) -> Path:
     path = Path(path)
     if is_layered(path):
         return user_layer()
+    return path if path.is_dir() else path.parent
+
+
 def artifact_root(path: Path | str) -> Path:
     """Immutable grid-artifact store, separate from the default config catalog.
 
@@ -139,9 +142,6 @@ def artifact_root(path: Path | str) -> Path:
                 return legacy
             return selected
     return catalog_root(path) / ARTIFACT_DIR
-
-
-    return path if path.is_dir() else path.parent
 
 
 def _visible(entries):
