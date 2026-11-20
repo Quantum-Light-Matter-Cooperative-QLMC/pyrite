@@ -105,7 +105,7 @@ Cubic, one site: isotropic `B` is exact by symmetry within the harmonic model, s
 
 Cross-checks (not adopted):
 
-- diamond: Stewart, *J. Chem. Phys.* **58**, 4430 (1973), multipole refinement of Göttlicher–Wölfel powder data, `B = 0.140(4) Å²` (Stewart notes that published fits with Hartree–Fock atomic scattering factors gave `0.206(3)`, close to the old unprovenanced `0.21`); lattice dynamics `0.149 Å²`; Bindzus *et al.* (2014) `0.1427 Å²`; neutron powder `0.14–0.17`.
+- diamond: Stewart, *J. Chem. Phys.* **58**, 4430 (1973), [doi:10.1063/1.1679003](https://doi.org/10.1063/1.1679003), multipole refinement of Göttlicher–Wölfel powder data, `B = 0.140(4) Å²` (Stewart notes that published fits with Hartree–Fock atomic scattering factors gave `0.206(3)`, close to the old unprovenanced `0.21`); lattice dynamics `0.149 Å²`; Bindzus *et al.* (2014) `0.1427 Å²`; neutron powder `0.14–0.17`.
 - silicon: Flensburg & Stewart, *Phys. Rev. B* **60**, 284–291 (1999), [doi:10.1103/PhysRevB.60.284](https://doi.org/10.1103/PhysRevB.60.284): Born–von Kármán lattice dynamics at 293 K, `<u²> = 0.00594(2) Å²`, `B = 0.4691(16) Å²`. This is 1.3% (3.7σ of its quoted precision) above Spackman; the x-ray value is kept because the measured `F` table is dynamic at it. Neutron powder (Baisheng *et al.*): `0.45(2) Å²` at 284 K.
 
 The old diamond `0.21` was 48% above Takama's value and lowered the diamond `F(hkl)` by `e^{-(0.21-0.1379)s²}` relative to the measurement (0.7% at (111), 2.9% at (440)), because the bonding correction is re-smeared with the catalog `B`. Regression: `tests/materials/test_bonding_charge_structure_factors.py::test_catalog_debye_waller_reproduces_measured_dynamic_F_within_sigma`.
