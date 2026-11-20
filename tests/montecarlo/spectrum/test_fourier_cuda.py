@@ -421,5 +421,7 @@ def test_over_cap_near_far_keeps_fp64_positions_at_high_energy(cp):
             cp.asarray(e), cp.asarray(a), cp.asarray(w), uniform_bin_axis(grid)
         )
     )
-    assert np.max(abs(device - exact)) < 1e-5 * np.abs(exact).max()
+    # Shifted float32 positions leave <= 2**-24 |E - c0| (~5e-5 here: lines 1 meV
+    # from edges, the worst case); un-shifted float32 E gives ~9e-3 (host emulation).
+    assert np.max(abs(device - exact)) < 1e-4 * np.abs(exact).max()
     assert abs(device.sum() - exact.sum()) < 1e-6 * np.abs(w * np.pi / a).sum()
