@@ -110,8 +110,10 @@ UNGATED_KINDS = {
         "Z = 3-6, while BremsLib (PW and its own Born) exceeds it (Li 1.110, C 1.071). BremsLib "
         "screens with a Kohn-Sham potential, used for both PW and Born (Poskus, ADNDT 166, 101734 "
         "(2025), Secs. 2, 2.1, 2.6): adding LDA exchange-correlation to the screening function "
-        "predicts 1.10-1.12 for Li (C 1.07, H 1.17-1.21, measured 1.195), so the excess is the "
-        "library's screening model, not a PyRITE error, and no source bounds it within the gate; "
+        "predicts 1.10-1.12 for Li at k -> 0 and 1.09-1.10 at k/T = 0.05 (C 1.07, H 1.17-1.21, "
+        "measured 1.195). No source bounds this screening difference within the gate. The "
+        "remaining ~2.5 % at k/T = 0.05 is PyRITE's fitted small-k/T eta shape, off-trend at "
+        "that SB86 node (1 + eta/Z 1.446 against ~1.411 implied by SB86's total), open in #1359; "
         "#1349, #1073",
         "extension_moment": "Li 30-100 MeV first moment: an electron-nucleus difference that "
         "grows smoothly as Z falls (100 MeV: Al 1.035, C 1.053, B 1.058, Li 1.072, H 1.134) and "

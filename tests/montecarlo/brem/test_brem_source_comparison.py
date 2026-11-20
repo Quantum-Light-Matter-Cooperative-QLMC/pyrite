@@ -227,7 +227,8 @@ def test_gate_domain_ungates_h_and_two_cited_li_kinds():
     lithium = check.UNGATED_KINDS[3]
     assert set(lithium) == {"chi", "extension_moment"}
     assert "Kohn-Sham" in lithium["chi"] and "Table B.2" in lithium["chi"]
-    assert "#1349" in lithium["chi"] and "Interpolate_DCS" not in lithium["chi"]
+    assert "#1349" in lithium["chi"] and "#1359" in lithium["chi"]
+    assert "Interpolate_DCS" not in lithium["chi"]
     assert "p. 347" in lithium["extension_moment"] and "#1073" in lithium["extension_moment"]
     assert "policy" not in " ".join(lithium.values())
 
