@@ -139,3 +139,76 @@ Symbolic comparison: every term matches. The factor is $1+\eta/Z$ with $Z$ to th
 - the $\bar\eta$ reproduction of the continuous model within 0.005 for all six $Z$ from 10 keV to 100 MeV.
 
 The implementation matches symbolically. The findings concern documentation precision only. The small-$k/T$ shape and the angular assignment are PyRITE modelling choices that SB85 does not supply. Human sign-off remains pending.
+
+## Sub-node scheme (#1349, fresh-context verification 2026-11-20)
+
+Scope: the electron–nucleus SDCS at the five sub-nodes $x=k/T_1\in\{0.004,0.01,0.02,0.035,0.06\}$ inserted at each library $T_1$ (`_bremslib_reduced_energy.py::refine_reduced_energy`), the Born table it reads (`xsgen/bremslib/read.py::parse_born_table`, `xsgen/bremslib/convert.py::build_table`), and the call order in `_bremslib_table.py::prepare_bremslib_table`. The $1+\eta/Z$ factor above is unchanged and was not re-derived.
+
+### Source scheme
+
+The scheme was reconstructed from the Interpolate_DCS v1.0.7 manual (Sec. 2 pp. 2–3; Sec. 4 parameters 30–33, 38–58), `Default_parameters.inp`, and the knot files `k_T1_knots1.txt` and `k_T1_knots_ref_ratio.txt`. The Fortran sources (`Interpolate_DCS.f90`, `Spline_fit/Spline_fit.f90`) were read for the exact fitting rules; nothing was copied. Let $x_j$ be the 13 library nodes, with the top node $x_{\rm top}=0.99$ for $T_1\le5$ keV, $1-50\,{\rm eV}/T_1$ up to 0.5 MeV and $0.9999$ above. Let $y_j$ be the scaled SDCS.
+
+- $T_1<T_{\rm thr}=30$ keV (strict; `knots0` is empty): $S(x)$ is linear in $x$ between $x_0$ and $x_1$.
+- $30\ {\rm keV}\le T_1\le0.999$ MeV: $S$ is the cubic spline $s$ that is $C^2$ on the knots $\{0,0.1,0.3,0.5,0.6,0.7,0.9,0.975,x_{\rm top}\}$. Its parameters are the knot values and both end slopes (`SplineFit0`: $m+2$ unknowns). It minimises
+
+$$
+\sum_{j=0}^{12} w_j\bigl(s(x_j)-y_j\bigr)^2,\qquad
+w_j=\frac{1}{y_j^2}\times\min\!\Bigl(1,\bigl(0.01/\lvert\delta_j\rvert\bigr)^2\Bigr),
+$$
+
+where $\delta_j$ is the relative uncertainty.
+
+- $T_1>0.999$ MeV: let $B_i$ be the 20-node Born SDCS at $x\in\{0,10^{-4},\dots,0.054,0.1,\dots,0.9\}$. Then $S(x)=r(x)\,b(x)$. Here $r$ is the same weighted fit of $y_j/B(x_j)$ over $x=0,\dots,0.9$ (10 points) with knots $\{0,0.2,0.4,0.5,0.7,0.8,0.9\}$. $b$ is the program's Born "fit" with $n_{\rm knots}=20-2$: knot indices $1,3,\dots,18,20$, with free end slopes. That is 20 parameters for 20 points, so it interpolates exactly with no knot at the 2nd and 19th points, which is the not-a-knot interpolating spline.
+- The program also smooths $\ln y$ against $\ln T_1$ (`T1_spline=2`: a least-squares spline with knots at every other grid $T_1$, 0.01–30 MeV, or to 100 MeV at $x=0$). It replaces $y_j$ by the smoothed value and adds the smoothing residual in quadrature to $\delta_j$. A non-positive Born value is excluded from that column's $\ln B$–$\ln T_1$ not-a-knot spline (`exclude_zero`), so it is interpolated from neighbouring $T_1$.
+
+The PyRITE intent, as declared, omits the $T_1$ smoothing and the $\delta_j$ weighting ($w_j=1/y_j^2$). It adds the anchor
+
+$$
+S_{\rm sub}(x)=S(x)+\Bigl(1-\frac{x}{0.1}\Bigr)\bigl(y_0-S(0)\bigr)+\frac{x}{0.1}\bigl(y_1-S(0.1)\bigr),
+$$
+
+so the library nodes are served unchanged. A sub-node shape is $(1-x/0.1)\,f_0+(x/0.1)\,f_1$ of the unit-integral neighbour shapes, so $\int_{4\pi}{\rm DDCS}=S_{\rm sub}$.
+
+### Cheap filters
+
+| Filter | Result |
+|---|---|
+| Units | pass: scaled SDCS in mb throughout; the Born ratio is dimensionless; the shape mix has unit integral |
+| Linear data | pass: the plain fit contains straight lines and the anchor adds zero, so a linear $y$ is exact. The Born scheme is exact only at the anchored nodes, as declared |
+| $T_1<30$ keV | pass: linear (`t1 < 0.03`, same strict test as the program). $T_1=30$ keV is a spline row in both |
+| Nodes unchanged | pass: $y_0,y_1,\dots,y_{12}$ are bit-identical at 66 $(Z,T_1)$ rows |
+| DDCS integral | pass: staged tables built end to end from the library for Z = 3 and 5 (`build_table` → `prepare_bremslib_table`, e–e off) have $\max\lvert\int{\rm DDCS}/{\rm SDCS}-1\rvert\le7\times10^{-16}$ |
+| Call order | pass: sub-nodes at library $T_1$ rows, then the $T_1$ refinement, then the $1+\eta/Z$ factor |
+
+### Numerical comparison
+
+The independent implementation is a scratch script outside the repository that does not import `pyrite._bremslib_reduced_energy`. It builds its own B-spline design matrix on the clamped knot vector, uses SciPy not-a-knot `CubicSpline`, and parses the library files itself. It was compared with the Linux executable (defaults, run in a scratch directory) and with the code.
+
+1. **Full program model vs executable.** Adding the $T_1$ smoothing, the $\delta_j$ weights and the per-column Born exclusion reproduces `Interpolate_DCS.exe` to $\le1.5\times10^{-14}$ at all 66 rows: Z = 1, 3, 5, 6, 29, 79 and $T_1$ = 0.01, 0.02, 0.03, 0.04, 0.1, 0.5, 0.8, 1, 3, 10, 30 MeV. This includes Z = 5, 3 MeV. The scheme above is therefore the program's complete $k/T_1$ algorithm for the SDCS.
+2. **Declared scheme vs code.** At the same 66 rows, the code matches the independent anchored scheme to $\le2\times10^{-15}$. At Z = 5, 3 MeV the comparison is against the plain-spline fallback, and the `PhysicsFallbackWarning` fires there and nowhere else. Staged tables built end to end for Z = 3 and 5 agree to $1.2\times10^{-15}$.
+3. **Regression pins.** In `test_bremslib_reduced_energy.py`, `INTERPOLATE_DCS` matches the executable to $3\times10^{-8}$ (its 8-digit rounding). `LI_SDCS` and `LI_BORN_1MEV` match `SDCS_3.txt` and `SDCS_Born_3.txt` to $1.3\times10^{-10}$. The code's sub-nodes are within $8.5\times10^{-5}$ (0.5 MeV) and $1.2\times10^{-4}$ (1 MeV) of the pins, inside `rtol=3e-4`. The tests pass (11 selected).
+
+Served values are the runtime linear interpolation on $\{0,\text{sub-nodes},0.1\}$. They were compared with the executable at $x$ = 0.002, 0.004, 0.007, 0.01, 0.015, 0.02, 0.03, 0.035, 0.045, 0.06, 0.07, 0.08 and 0.09, on every library $T_1$ row from 10 keV to 30 MeV:
+
+| $Z$ | served vs exe | sub-nodes vs exe | chord of own curve | linear (before) |
+|---|---|---|---|---|
+| 3 | 0.651 % (10 MeV) | 0.651 % (10 MeV) | 0.558 % (0.6 MeV, $x\approx0.079$) | 5.77 % (0.8 MeV) |
+| 5 | 0.763 % (10 MeV) | 0.763 % (10 MeV) | 0.476 % (0.6 MeV) | 4.73 % |
+| 79 | 0.144 % (1 MeV) | 0.064 % | 0.133 % | 0.62 % |
+| 1 | 1.240 % (0.5 MeV) | 0.173 % | 1.182 % (0.6 MeV) | 13.15 % |
+| all 1–100 | 1.240 % (H, 0.5 MeV) | 1.215 % (Z = 24, 30 MeV) | — | 13.15 % |
+
+### Findings
+
+The code has no divergent term. Four documentation figures are wrong or too broad:
+
+1. **Uncertainty down-weighting "< 1e-4".** This holds for the sampled Z = 1, 3, 5, 6, 29, 79, where no library $\lvert\delta_j\rvert$ exceeds 1 %. Across all Z, the library `RelErr` reaches 0.166 at 0.03–30 MeV. With the program's smoothing on, switching the weighting off moves the sub-nodes by up to 1.03 % (Z = 39, 30 MeV), and by more than $10^{-4}$ in 321 of 3100 rows. With raw values and raw $\delta_j$ the effect is up to 0.52 %. The largest effects are at Z = 34–46, 25–30 MeV. The omission itself is justified, because released tables drop `sdcs_rel_err`. The stated magnitude is not. This affects the `_bremslib_reduced_energy` module docstring, the ledger Assumptions and step 2 of the physics page.
+2. **Born vs plain spline "≤ 1.5 % for Z = 1–79".** The bound is 1.498 % for the six sampled Z. Over all Born rows (1–30 MeV) the maximum is 2.99 % (Z = 43, 30 MeV), and 29 of 1599 rows exceed 1.5 %, all at 25–30 MeV. The statement should name the sampled Z or say ≤ 3.0 %. This affects the ledger Notes and the module docstring.
+3. **Chord "up to 0.53 %".** On the sampled grid the chord of the code's own curve reaches 0.558 % (Li, 0.6 MeV, $x\approx0.079$). Say "≤ 0.56 %". Also, "the rest (≤ 0.8 %, Li 10 MeV)" misattributes the maximum: Li's sub-node gap peaks at 0.65 % (10 MeV), and the 0.76 % maximum is B at 10 MeV. That gap is the $T_1$ smoothing together with, for some Z, the $\delta_j$ weighting.
+4. **The 0.76 % / 0.8 % agreement** is correct as scoped (Li, B, Au; 0.763 %). Over all Z the served values are within 1.24 % (H, chord-dominated) and the sub-nodes within 1.22 % (Z = 24, 30 MeV). A reader may otherwise generalise the scoped figure.
+
+Note on the Born-zero fallback. The program does not fall back at Z = 5, 3 MeV: it drops the zero from that column's $\ln T_1$ spline and keeps the Born-ratio scheme. The code's plain-spline fallback is a declared deviation. It sits 0.09–0.24 % below the executable at the five sub-nodes. Interpolating the Born value in $\ln T_1$ instead would reproduce the program, which is optional.
+
+### Verdict
+
+`rederived` for the sub-node part. The independent reconstruction of the program's $k/T_1$ scheme reproduces the executable to round-off. With the declared omissions it matches the code to $2\times10^{-15}$ at every tested row and end to end. Findings 1–3 are documentation corrections, not code discrepancies. Human sign-off remains pending.

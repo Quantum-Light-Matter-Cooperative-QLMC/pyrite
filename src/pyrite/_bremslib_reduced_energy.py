@@ -24,8 +24,10 @@ and the ``k_T1_knots*.txt`` files shipped with it), at each library ``T1``:
   on 20 points, which leaves no residual.
 
 The program also down-weights grid points whose relative uncertainty
-exceeds 1 %. Released tables drop the uncertainties, and that weighting
-moves the sub-node values by under 1e-4 relative, so it is not reproduced.
+exceeds 1 %. Released tables drop the uncertainties, so it is not
+reproduced. For Z = 1, 3, 5, 6, 29 and 79 it moves the sub-node values by
+under 1e-4 relative. Across all Z (library uncertainties up to 17 %) it moves
+them by up to 1 % (Z = 39, 30 MeV).
 The fit misses the ``k/T1 = 0`` and 0.1 nodes by about 1e-4 relative. The
 library node values are served unchanged, so the sub-nodes add the linear
 interpolant of those two residuals, which keeps the curve continuous at the
@@ -34,9 +36,10 @@ nodes.
 Rows above 0.999 MeV with no usable Born row use the sub-1 MeV SDCS spline.
 These are the extension rows above 30 MeV, tables staged without Born data,
 and a Born row with a non-positive value (BremsLib v2.0.8 has a zero at
-``Z = 5``, ``T1 = 3 MeV``, ``k/T1 = 0.0046``). The last case warns. At the
-sub-nodes this fallback is within 1.5 % of the Born-ratio scheme for
-``Z = 1`` to 79 at 1-30 MeV.
+``Z = 5``, ``T1 = 3 MeV``, ``k/T1 = 0.0046``). The last case warns; the
+program instead interpolates that Born value in ``ln T1``, and the fallback is
+0.1-0.25 % below it there. At the sub-nodes this fallback is within 3.0 % of
+the Born-ratio scheme over all Z at 1-30 MeV (1.5 % below 25 MeV).
 
 Validation: bremslib-electron-electron
 """
