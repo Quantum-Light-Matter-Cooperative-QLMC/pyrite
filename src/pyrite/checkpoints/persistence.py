@@ -259,7 +259,7 @@ def cached_material_analysis(material, analyze, key, checkpoint_dir=None):
     catalog material thrashes it, forcing a full 140-225 MB gzip re-unpickle
     of every material on each re-render. This cache instead stores
     ``analyze``'s small return value both in memory and under
-    ``pyrite-output/cache/analysis/``. Thus app restarts and eviction from the
+    ``<user cache>/analysis/``. Thus app restarts and eviction from the
     small unpickle cache do not touch the large checkpoint again. Rewriting or
     replacing the checkpoint invalidates the persistent entry automatically.
 

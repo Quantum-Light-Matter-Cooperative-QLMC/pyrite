@@ -601,8 +601,6 @@ def _user_catalog_entries() -> list[tuple[str, Path]]:
         ARTIFACT_DIR,
         ASSET_DIRS,
         LAYERED_TABLES,
-        artifact_root,
-        bundled_catalog,
         user_layer,
     )
 
@@ -624,23 +622,32 @@ def _user_catalog_entries() -> list[tuple[str, Path]]:
         if file.is_file():
             arcname = PurePosixPath(config.REMOTE_USER_CATALOG, *file.relative_to(layer).parts)
             entries.append((arcname.as_posix(), file))
-    # The default layered catalog keeps immutable generated objects in the
-    # user data root, not in the config directory. Stage them under the same
-    # remote user-catalog/ path so remote jobs see unchanged catalog semantics.
-    extra_root = artifact_root(bundled_catalog())
-    if extra_root != layer / ARTIFACT_DIR and extra_root.is_dir():
-        if extra_root.is_symlink():
-            raise SystemExit(f"unsafe user artifact store symlink: {extra_root}")
-        for file in sorted(extra_root.rglob("*")):
-            if file.is_symlink() or not file.resolve().is_relative_to(extra_root.resolve()):
-                raise SystemExit(f"unsafe user artifact path: {file}")
-            if file.is_file() and not any(
-                p.startswith(".") for p in file.relative_to(extra_root).parts
-            ):
-                arcname = PurePosixPath(
-                    config.REMOTE_USER_CATALOG, ARTIFACT_DIR, *file.relative_to(extra_root).parts
-                )
-                entries.append((arcname.as_posix(), file))
+    entries.extend(_default_artifact_entries(layer))
+    return entries
+
+
+def _default_artifact_entries(layer: Path) -> list[tuple[str, Path]]:
+    """Stage default-layer grid artifacts from user data under ``user-catalog/``.
+
+    The default layered catalog keeps immutable generated objects in the user
+    data root, not the config directory; staging them at the same remote path
+    keeps the box's catalog semantics unchanged.
+    """
+    from .._catalog_layout import ARTIFACT_DIR, artifact_root, bundled_catalog
+
+    root = artifact_root(bundled_catalog())
+    if root == layer / ARTIFACT_DIR or not root.is_dir():
+        return []
+    if root.is_symlink():
+        raise SystemExit(f"unsafe user artifact store symlink: {root}")
+    entries = []
+    for file in sorted(root.rglob("*")):
+        if file.is_symlink() or not file.resolve().is_relative_to(root.resolve()):
+            raise SystemExit(f"unsafe user artifact path: {file}")
+        parts = file.relative_to(root).parts
+        if file.is_file() and not any(p.startswith(".") for p in parts):
+            arcname = PurePosixPath(config.REMOTE_USER_CATALOG, ARTIFACT_DIR, *parts)
+            entries.append((arcname.as_posix(), file))
     return entries
 
 

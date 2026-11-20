@@ -165,7 +165,11 @@ def test_cli_entry_respects_overrides_after_import_defaults(tmp_path):
                           "cupy": "cupy" in sys.modules}), file=sys.stderr)
         """
     )
-    env = {k: v for k, v in os.environ.items() if k not in {"NUMBA_CACHE_DIR", "CUPY_CACHE_DIR"}}
+    env = {
+        k: v
+        for k, v in os.environ.items()
+        if k not in {"NUMBA_CACHE_DIR", "CUPY_CACHE_DIR", "PYRITE_CACHE_DIR"}
+    }
     env["CUPY_CACHE_DIR"] = str(tmp_path / "mine")
     env["XDG_CACHE_HOME"] = str(tmp_path / "xdg")
     done = subprocess.run(
@@ -183,7 +187,11 @@ def test_cli_entry_respects_overrides_after_import_defaults(tmp_path):
     assert not report["cupy"]
     status = json.loads(done.stdout)
     assert status["schema"] == "pyrite.cache.status.v1"
-    sources = {(loc["backend"], loc["source"]) for loc in status["payload"]["locations"]}
+    sources = {
+        (loc["backend"], loc["source"])
+        for loc in status["payload"]["locations"]
+        if loc["backend"] in ("numba", "cupy")
+    }
     assert sources == {("numba", "managed"), ("numba", "in-tree"), ("cupy", "environment")}
 
 
@@ -277,7 +285,11 @@ _IMPORT_PROBE = textwrap.dedent(
 
 
 def _import_probe(mode: str, cache_root: Path, **overrides: str) -> dict:
-    env = {k: v for k, v in os.environ.items() if k not in ("NUMBA_CACHE_DIR", "CUPY_CACHE_DIR")}
+    env = {
+        k: v
+        for k, v in os.environ.items()
+        if k not in ("NUMBA_CACHE_DIR", "CUPY_CACHE_DIR", "PYRITE_CACHE_DIR")
+    }
     env["XDG_CACHE_HOME"] = str(cache_root)
     env.update(overrides)
     done = subprocess.run(

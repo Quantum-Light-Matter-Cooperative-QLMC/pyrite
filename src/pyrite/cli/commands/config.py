@@ -29,12 +29,12 @@ def _validated(key: str, value: str) -> str:
     profile check: the fall-through treated every key it did not name as
     ``profile.current``, so a new key added to the store would be validated
     against the catalog's profile names and rejected.
+    """
     if key == "backend.default":
         backend = value.strip().lower()
         if backend not in ("auto", "cpu", "cuda", "rocm", "sycl"):
             raise click.BadParameter("expected auto, cpu, cuda, rocm or sycl", param_hint="VALUE")
         return backend
-    """
     if key == "remote.target":
         try:
             return validate_remote_target(value)
@@ -161,8 +161,6 @@ def get_command(key: str) -> None:
         raise CLIError(str(exc)) from exc
 
 
-@command.command("list")
-@click.argument("prefix", required=False, default="")
 @command.command("paths")
 @output_option
 def paths_command(json_output: bool) -> None:
@@ -227,6 +225,8 @@ def paths_command(json_output: bool) -> None:
         emit_table(("PURPOSE", "PATH", "SOURCE"), rows)
 
 
+@command.command("list")
+@click.argument("prefix", required=False, default="")
 def list_command(prefix: str) -> None:
     """List effective values and sources, optionally restricted to a key PREFIX."""
     keys = _matching_keys(prefix)

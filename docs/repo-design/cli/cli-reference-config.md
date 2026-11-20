@@ -26,9 +26,9 @@ Options:
 Commands:
   explain     Show KEY's meaning, default, environment...
   get         Print the effective value for KEY.
-  paths       Show effective config, cache, data, catalog and workspace locations.
   keys        Describe supported keys without reading...
   list        List effective values and sources,...
+  paths       Show effective config, cache, data,...
   set         Persist VALUE for KEY.
   unset       Remove the stored value for KEY.
   setup       Detect GPU hardware and persist the selected backend.
@@ -59,19 +59,6 @@ Options:
   -h, --help  Show this message and exit.
 ```
 
-## `pyrite config paths`
-
-```text
-Usage: pyrite config paths [OPTIONS]
-
-  Show effective config, cache, data, catalog and workspace locations.
-
-Options:
-  -o, --output [table|json]  Output format; only json is a stable automation contract.
-                             [default: table]
-  -h, --help                 Show this message and exit.
-```
-
 ## `pyrite config keys`
 
 ```text
@@ -92,6 +79,19 @@ Usage: pyrite config list [OPTIONS] [PREFIX]
 
 Options:
   -h, --help  Show this message and exit.
+```
+
+## `pyrite config paths`
+
+```text
+Usage: pyrite config paths [OPTIONS]
+
+  Show effective config, cache, data, catalog and workspace locations.
+
+Options:
+  -o, --output [table|json]  Output format; only json is a stable automation contract.
+                             [default: table]
+  -h, --help                 Show this message and exit.
 ```
 
 ## `pyrite config set`

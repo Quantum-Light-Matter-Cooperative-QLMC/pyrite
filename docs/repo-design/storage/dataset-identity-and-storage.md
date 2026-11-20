@@ -50,7 +50,6 @@ previous preflight behavior.
   pyrite-output/trajectories/<stem>/...
   pyrite-output/results/
   pyrite-output/figures/
-  pyrite-output/cache/  # regenerable; safe to delete
 ```
 
 The exact internal files are implementation details; use `pyrite checkpoint` and the `pyrite numerics energy-grid` / `pyrite-dev energy-grid` commands rather than editing them. A command's `--checkpoint-dir` overrides the workspace checkpoint root for that invocation.

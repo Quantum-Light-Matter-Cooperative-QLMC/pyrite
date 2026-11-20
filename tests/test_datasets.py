@@ -54,11 +54,22 @@ def test_mirrors_follow_upstream_and_derived_data_has_only_pyrite_releases():
     assert datasets.EADL.download_sha256 is None
 
 
-def test_datasets_follow_the_selected_workspace(monkeypatch, tmp_path):
+def test_datasets_are_shared_across_workspaces(monkeypatch, tmp_path):
+    monkeypatch.setenv("PYRITE_DATA_DIR", str(tmp_path / "data"))
+    shared = tmp_path / "data" / "datasets/eadl/EADL2025.ALL"
+    for home in ("a", "b"):
+        monkeypatch.setenv("PYRITE_HOME", str(tmp_path / home))
+        assert datasets.dataset_path("eadl") == shared
+
+
+def test_legacy_workspace_dataset_is_read_through(monkeypatch, tmp_path):
+    monkeypatch.setenv("PYRITE_DATA_DIR", str(tmp_path / "data"))
     monkeypatch.setenv("PYRITE_HOME", str(tmp_path / "ws"))
-    assert datasets.dataset_path("eadl") == (tmp_path / "ws").resolve() / (
-        "datasets/eadl/EADL2025.ALL"
-    )
+    legacy = tmp_path / "ws" / "datasets/eadl/EADL2025.ALL"
+    legacy.parent.mkdir(parents=True)
+    legacy.write_bytes(b"x")
+    with pytest.warns(RuntimeWarning, match="legacy workspace dataset"):
+        assert datasets.dataset_path("eadl") == legacy
 
 
 def test_missing_dataset_names_the_fetch_command(pinned):

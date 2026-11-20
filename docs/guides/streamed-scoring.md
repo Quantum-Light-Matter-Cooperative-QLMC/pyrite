@@ -49,7 +49,7 @@ per line segment, plus about 12 bytes per production line under the
 
 Once that data passes 2 GiB, or is projected to over the run, it moves to
 disk, so host memory stays bounded and the grid is unchanged. It goes under
-`pyrite-output/cache/line-grid-spill/` in the workspace and is deleted when the
+`<user cache>/line-grid-spill/` (`PYRITE_CACHE_DIR` moves it) and is deleted when the
 pass ends, however it ends. Peak disk use is about twice the line-segment data
 plus the production lines: roughly 170 kB per electron for h-BN at 5 MeV, 1 mm,
 so 10^6 primaries need about 170 GB free. If the projection does not fit, the

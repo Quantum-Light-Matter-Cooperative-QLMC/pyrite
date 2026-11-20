@@ -295,7 +295,7 @@ def cached_model_spectra(
     """Load or atomically cache a Zhai reproduction keyed by inputs and code.
 
     Returns ``(model, cache_hit, path)``. Cache files are local generated
-    artifacts under ``pyrite-output/cache/zhai_reproduction`` by default.
+    artifacts under ``<user cache>/zhai_reproduction`` by default.
     """
     from pyrite.checkpoints import _checkpoint_io
 
@@ -519,7 +519,7 @@ def reproduce_all(
     exploratory-azimuth control default; the value is part of the cache key.
 
     No figures -- this only leaves correct, hash-addressed .pkl files on disk
-    under ``cache_dir`` (default pyrite-output/cache/zhai_reproduction/). This is the
+    under ``cache_dir`` (default <user cache>/zhai_reproduction/). This is the
     unit behind ``pyrite._entry.reproduce_zhai`` / ``pyrite app validation reproduce``,
     which runs here by default and on the box with ``--remote``.
 

@@ -105,11 +105,6 @@ def command() -> None:
     \b
     Examples:
       pyrite config setup
-    # Only the CLI may move legacy authored catalog objects; API path lookups
-    # remain side-effect-free.
-    from ..console.config import enable_legacy_catalog_migration
-
-    enable_legacy_catalog_migration()
       pyrite profile list
       pyrite profile show sub_100keV
       pyrite run sub_100keV -m hopg
@@ -121,6 +116,11 @@ def command() -> None:
     from ..console.outputs import enable_legacy_migration
 
     enable_legacy_migration()
+    # Only the CLI may move legacy authored catalog objects; API path lookups
+    # remain side-effect-free.
+    from ..console.config import enable_legacy_catalog_migration
+
+    enable_legacy_catalog_migration()
 
 
 def main(argv: Sequence[str] | None = None):

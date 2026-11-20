@@ -43,7 +43,7 @@ INTRINSIC_RTOL = 1.0e-3
 def _isolated(monkeypatch, tmp_path):
     for name in _ENV_NAMES:
         monkeypatch.delenv(name, raising=False)
-    monkeypatch.setattr(_cxr_grid_policy, "output_dir", lambda _kind: tmp_path)
+    monkeypatch.setattr(_cxr_grid_policy, "cache_dir", lambda: tmp_path)
 
 
 # ---- synthetic rows -----------------------------------------------------------

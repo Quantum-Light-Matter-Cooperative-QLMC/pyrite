@@ -43,8 +43,11 @@ def test_config_set_get_and_list_effective_values(monkeypatch, tmp_path):
     assert lines[0].split() == ["KEY", "VALUE", "SOURCE"]
     assert len(lines) == len(_config.keys()) + 1
     assert all(any(line.startswith(key + " ") for line in lines) for key in _config.keys())
-    assert "sub_100keV" in lines[1] and lines[1].split()[-1] == "config"
-    assert "box-a" in lines[2] and lines[2].split()[-1] == "config"
+    rows = {line.split()[0]: line for line in lines[1:]}
+    assert (
+        "sub_100keV" in rows["profile.current"] and rows["profile.current"].split()[-1] == "config"
+    )
+    assert "box-a" in rows["remote.target"] and rows["remote.target"].split()[-1] == "config"
     assert path.is_file()
 
 

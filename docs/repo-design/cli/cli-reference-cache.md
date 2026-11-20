@@ -31,7 +31,7 @@ Options:
   -h, --help  Show this message and exit.
 
 Commands:
-  clear   Delete PyRITE-owned compiled kernels; preview unless --yes.
+  clear   Delete PyRITE-owned compiled kernels and regenerable caches; preview...
   status  Report cache locations, sizes, and per-family Numba freshness.
   warm    Compile and cache common kernels ahead of the first simulation.
 ```
@@ -48,9 +48,10 @@ Usage: pyrite cache clear [OPTIONS]
   cache is never touched. Kernels recompile on next use; results do not change.
 
 Options:
-  --backend [all|numba|cupy|line-grids|analysis|viewer-renders|zhai_reproduction|line-grid-spill]  Caches to clear.  [default: all]
-  -y, --yes                   Delete the exact previewed paths.
-  -h, --help                  Show this message and exit.
+  --backend [all|numba|cupy|line-grids|analysis|viewer-renders|zhai_reproduction|line-grid-spill]
+                                  Caches to clear.  [default: all]
+  -y, --yes                       Delete the exact previewed paths.
+  -h, --help                      Show this message and exit.
 ```
 
 ## `pyrite cache status`
@@ -66,10 +67,11 @@ Usage: pyrite cache status [OPTIONS]
   total. Read-only.
 
 Options:
-  --backend [all|numba|cupy|line-grids|analysis|viewer-renders|zhai_reproduction|line-grid-spill]  Caches to report.  [default: all]
-  -o, --output [table|json]   Output format; only json is a stable automation contract.
-                              [default: table]
-  -h, --help                  Show this message and exit.
+  --backend [all|numba|cupy|line-grids|analysis|viewer-renders|zhai_reproduction|line-grid-spill]
+                                  Caches to report.  [default: all]
+  -o, --output [table|json]       Output format; only json is a stable automation
+                                  contract.  [default: table]
+  -h, --help                      Show this message and exit.
 ```
 
 ## `pyrite cache warm`

@@ -6,6 +6,7 @@ import pytest
 
 from pyrite import remote
 from pyrite.cli.commands import remote as cli  # noqa: F401
+from pyrite.paths import cache_dir
 from pyrite.remote import (  # noqa: F401
     _queue_scripts,
     config,
@@ -294,7 +295,7 @@ def test_pull_zhai_cache_fetches_every_listed_file(monkeypatch, tmp_path):
 
     assert len(runs) == 2
     assert runs[0][0] == "scp" and runs[0][1].endswith("zhai-a.pkl")
-    assert (tmp_path / "pyrite-output" / "cache" / "zhai_reproduction").is_dir()
+    assert (cache_dir() / "zhai_reproduction").is_dir()
 
 
 def test_pull_zhai_cache_reports_when_empty(monkeypatch, tmp_path, capsys):

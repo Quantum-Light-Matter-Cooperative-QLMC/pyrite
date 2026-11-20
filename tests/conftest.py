@@ -123,6 +123,18 @@ def _isolate_output_workspace(monkeypatch, tmp_path):
     # one CLI test from moving another test's fixture ``checkpoints/``.
     monkeypatch.setattr(outputs, "_migration_enabled", False)
     monkeypatch.setattr(outputs, "_migrated", set())
+    monkeypatch.setattr(outputs, "_discovery_notified", set())
+
+
+@pytest.fixture(autouse=True)
+def _isolate_user_cache(monkeypatch, tmp_path):
+    """Keep regenerable caches (line grids, analysis, renders) out of ~/.cache.
+
+    Also undo the CLI's process-wide opt-in to moving a legacy user catalog.
+    """
+    monkeypatch.setenv("PYRITE_CACHE_DIR", str(tmp_path / "pyrite-cache"))
+    monkeypatch.setattr(_config, "_catalog_migration_enabled", False)
+    monkeypatch.setattr(_config, "_catalog_migrated", set())
 
 
 @pytest.fixture(autouse=True)

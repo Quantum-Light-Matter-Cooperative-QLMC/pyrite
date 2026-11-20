@@ -165,7 +165,7 @@ def test_fetched_data_directory_fills_a_tree_that_only_ships_source(
     fetched = tmp_path / "user" / "xsgen" / "reference-data" / "sbethe" / "sdbase"
     fetched.mkdir(parents=True)
     monkeypatch.setattr("pyrite.xsgen.sources.vendor_dir", lambda: tmp_path / "packaged")
-    monkeypatch.setattr("pyrite.xsgen.sources.user_data_dir", lambda: tmp_path / "user")
+    monkeypatch.setenv("PYRITE_DATA_DIR", str(tmp_path / "user"))
     monkeypatch.delenv("PYRITE_XSGEN_SBETHE_SOURCE", raising=False)
     monkeypatch.setattr("pyrite.console.config._read_store", dict)
 

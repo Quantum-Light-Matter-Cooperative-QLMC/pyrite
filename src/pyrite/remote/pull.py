@@ -455,8 +455,7 @@ def pull(
 
 
 def pull_zhai_cache():
-    """Fetch every cache file under pyrite-output/cache/zhai_reproduction/ from the
-    box.
+    """Fetch every cache file under the box's ``cache/zhai_reproduction/``.
 
     Lists remote filenames first (like clear_remote's listing step) rather
     than `scp -r`, which double-nests the directory when the local destination

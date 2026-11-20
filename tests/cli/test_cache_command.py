@@ -85,7 +85,7 @@ def test_clear_previews_without_tty_then_deletes_with_yes(managed):
     assert not (managed / "cupy").exists()
 
     result = invoke(cache_command.command, ["clear", "--backend", "cupy", "--yes"])
-    assert_clean_result(result, stdout="no PyRITE-owned compiled kernels to clear\n")
+    assert_clean_result(result, stdout="no PyRITE-owned caches to clear\n")
 
 
 def test_clear_skips_user_cupy_cache_on_stderr(managed, monkeypatch, tmp_path):
@@ -95,7 +95,7 @@ def test_clear_skips_user_cupy_cache_on_stderr(managed, monkeypatch, tmp_path):
     result = invoke(cache_command.command, ["clear", "--backend", "cupy", "--yes"])
     assert result.exit_code == 0
     assert f"skip cupy {user}: not PyRITE-owned" in result.stderr
-    assert result.stdout == "no PyRITE-owned compiled kernels to clear\n"
+    assert result.stdout == "no PyRITE-owned caches to clear\n"
     assert user.exists()
 
 
