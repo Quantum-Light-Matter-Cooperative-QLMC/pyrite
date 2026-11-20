@@ -100,17 +100,17 @@ Two statements the bound does **not** rely on, and which are false in general:
 
 ## Results
 
-`checks/transition_radiation_omission.py` (rerun 2026-11-10), CPU, 100 trials per scene, inelastic model per scene (shell soft/hard where shell data cover every layer, else continuous), fixed coarse line grid from 3 MeV, brem grid from 1.01× the [continuum floor](spectral-observables.md) to the beam energy (30 keV cap), 30° tilt toward the detector. Bias bounds per band; **bold** fails the 1.67% tolerance. $E^\ast$ is the lowest energy above which every grid point passes.
+`checks/transition_radiation_omission.py` (rerun 2026-11-19, `2b8ef0a94`), CPU, 100 trials per scene, no lines scored (`cxr_source="none"`, so the continuum carries no lattice-share correction), inelastic model per scene (shell soft/hard with the default restricted straggling where shell data cover every layer, else deterministic continuous stopping), brem grid from 1.01× the [continuum floor](spectral-observables.md) to the beam energy (30 keV cap), 30° tilt toward the detector. Bias bounds per band; **bold** fails the 1.67% tolerance. $E^\ast$ is the lowest energy above which every grid point passes.
 
 | Scene | Detector faces | EUV (< 300 eV) | 0.3--1 keV | ≥ 1 keV | $E^\ast$ |
 | --- | --- | --- | --- | --- | --- |
-| Si, 10 keV, 10 µm | entrance | **2.8** | 8.7e-4 | 8.7e-7 | 213 eV |
-| Si, 30 keV, 2 µm | exit | **30** | 1.5e-2 | 9.1e-6 | 307 eV |
-| Si, 30 keV, 10 µm | entrance | **27** | 1.4e-2 | 3.3e-6 | 307 eV |
-| Si, 60 keV, 2 µm | exit | **1.9e2** | **8.3e-2** | 6.5e-5 | 439 eV |
-| HOPG, 30 keV, 2 µm | exit | **2.8e3** | **3.1e-2** | 3.2e-5 | 363 eV |
-| MoS₂, 30 keV, 2 µm | exit | **71** | **1.7e-2** | 2.6e-5 | 386 eV |
-| WSe₂, 30 keV, 2 µm | exit | **78** | **0.25** | 2.6e-4 | 633 eV |
+| Si, 10 keV, 10 µm | entrance | **2.5** | 7.7e-4 | 8.5e-7 | 213 eV |
+| Si, 30 keV, 2 µm | exit | **34** | 1.6e-2 | 8.9e-6 | 307 eV |
+| Si, 30 keV, 10 µm | entrance | **32** | 1.7e-2 (at tolerance) | 3.3e-6 | 366 eV |
+| Si, 60 keV, 2 µm | exit | **1.8e2** | **7.8e-2** | 6.6e-5 | 439 eV |
+| HOPG, 30 keV, 2 µm | exit | **2.8e3** | **2.7e-2** | 3.0e-5 | 363 eV |
+| MoS₂, 30 keV, 2 µm | exit | **1.1e2** | **2.7e-2** | 3.2e-5 | 386 eV |
+| WSe₂, 30 keV, 2 µm | exit | **1.2e2** | **0.50** | 1.5e-4 | 633 eV |
 | MoS₂ 0.2 µm on sapphire 50 µm, 30 keV | entrance | **58** | 1.4e-2 | 2.6e-5 | 327 eV |
 | Si, 3 MeV, 2 µm, detector 90° | exit | **6.4e4** | **1.3** | 7.2e-4 | 625 eV |
 | Si, 3 MeV, 2 µm, detector 1° | exit | **2.9e4** | **86** | **0.17** | 1.8 keV |
@@ -119,6 +119,8 @@ Two statements the bound does **not** rely on, and which are false in general:
 | Si, 100 MeV, 2 µm, detector 90° | exit | **2.9e10** | **2.0e5** | **14** | 3.6 keV |
 | Si, 100 MeV, 2 µm, detector 1° | exit | **7.7e8** | **1.5e7** | **2.6e4** | > 30 keV |
 | Si, 100 MeV, 100 µm, detector 1° | exit | **2.1e9** | **4.1e7** | **1.4e5** | > 30 keV |
+
+Every shift since the 2026-10-16 evidence is an intended model change (#1070). The Ter-Mikaelian suppression in coupled BremsLib (#439) doubled the tens-of-keV EUV bounds and raised the MeV EUV bounds by up to 40×. The electron-fraction-weighted SBETHE compound shell correction (`sbethe-corrected-v2`, #683) lowered MoS₂ and WSe₂ (WSe₂ 0.3--1 keV 1.4 → 0.25, $E^\ast$ 743 → 633 eV). The default restricted straggling for shell transport (#642) then moved the shell scenes by up to 2× (WSe₂ 0.3--1 keV 0.25 → 0.50); with `straggling=False` the study reproduces the 2026-11-10 table exactly. The 10 µm Si 30 keV 0.3--1 keV bound, $1.6674\times10^{-2}$ against $1.6667\times10^{-2}$, is within trial noise of the tolerance and counts as passing; its strict $E^\ast$ is 366 eV.
 
 The bound is conservative by construction (worst crossing direction and speed, factor 5, continuum-only denominator). The 30 keV Si scene at the actual beam exit direction gives TR/brem ≈ 0.73 at 32 eV, 0.03 at 50 eV and 0.03 at 150 eV, so the EUV failures are physical, not an artefact of the bound. Near the floor TR is a surface source, unattenuated, while the bremsstrahlung escaping at the same energy comes from the last tens of nanometres.
 
@@ -208,9 +210,9 @@ The bremsstrahlung continuum is incoherent in PyRITE and has no phased field to 
 
 | Application (research-note priority table) | Decision | Bound and validity |
 | --- | --- | --- |
-| Tens-of-keV transport, keV X-rays (≥ 1 keV) | **Omit** | $b\le2.6\times10^{-4}$ over 10--60 keV, Si/HOPG/MoS₂/WSe₂, films, bulk, film-on-substrate, both faces; $\le7\times10^{-5}$ for every scene but WSe₂. Holds for observables whose source band starts ≥ 1 keV. |
-| Tens-of-keV, soft X-ray 0.3--1 keV | **Per scene** | Passes for Si up to 30 keV and for the film-on-substrate scene; fails for HOPG, MoS₂, WSe₂ and Si at 60 keV. Use $E^\ast$ from the study, or escalate. |
-| EUV / soft X-ray down to the continuum floor (any beam energy) | **Escalate to #103** | $b$ from 2.8 to 2800 below 300 eV in every tens-of-keV scene (2026-11-10 rerun), larger at MeV. PyRITE models photons from $\max(\hbar\omega_p, 12~\text{eV})$, so this band cannot be scoped out. Below the floor (optical) is outside the model; optical TR is measured at 30 keV {cite:p}`coenen2011` and belongs to a future optical model. |
+| Tens-of-keV transport, keV X-rays (≥ 1 keV) | **Omit** | $b\le1.5\times10^{-4}$ over 10--60 keV, Si/HOPG/MoS₂/WSe₂, films, bulk, film-on-substrate, both faces; $\le7\times10^{-5}$ for every scene but WSe₂. Holds for observables whose source band starts ≥ 1 keV. |
+| Tens-of-keV, soft X-ray 0.3--1 keV | **Per scene** | Passes for Si up to 30 keV (10 µm at 30 keV at the tolerance) and for the film-on-substrate scene; fails for HOPG, MoS₂, WSe₂ and Si at 60 keV. Use $E^\ast$ from the study, or escalate. |
+| EUV / soft X-ray down to the continuum floor (any beam energy) | **Escalate to #103** | $b$ from 2.5 to 2800 below 300 eV in every tens-of-keV scene (2026-11-19 rerun), larger at MeV. PyRITE models photons from $\max(\hbar\omega_p, 12~\text{eV})$, so this band cannot be scoped out. Below the floor (optical) is outside the model; optical TR is measured at 30 keV {cite:p}`coenen2011` and belongs to a future optical model. |
 | MeV thin-film soft X-ray (outside channeling) | **Escalate to #103** below $E^\ast$; omit above | Off-axis 90° at 3 MeV: omit ≥ 625 eV ($b\le7.2\times10^{-4}$ for ≥ 1 keV). Forward detectors: fails to 1.8 keV (3 MeV) and 7.3 keV (10 MeV). The channeling row is decided separately (`cr-transition-radiation-bound`). |
 | 30--100 MeV transport, keV X-rays | **Include** (opt-in TR, #103) below $E^\ast$; omit above | With supported coupled transport (#439): forward detectors fail to 25 keV at 30 MeV and beyond the 30 keV grid at 100 MeV, for 2 µm and 100 µm Si; off-axis 90° at 100 MeV omits ≥ 3.6 keV. Above 100 MeV: #440. |
 | Purpose-built multilayer radiator | **Escalate to #103** | Essential source physics; coherent gain exceeds summed-interface estimates (above). |
