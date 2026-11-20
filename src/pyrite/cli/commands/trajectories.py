@@ -9,6 +9,7 @@ and ``score-trajectories`` stay as hidden deprecated aliases of ``export`` and
 from pathlib import Path
 
 import click
+from click.core import ParameterSource
 
 from ...console import output as _cli_core
 from ...console.output import emit_diagnostic, emit_json, emit_result, output_option
@@ -28,7 +29,7 @@ _COMMAND_HELP = {
     "ls": "List captured artifacts, partial writes, and foreign files.",
     "info": "Describe one artifact's case, provenance, and fields.",
     "export": "Export captured trajectories to VTK PolyData.",
-    "score": "Score checkpoint records from captured trajectories.",
+    "score": "Score spectra from captured or saved trajectories.",
 }
 
 
@@ -44,7 +45,8 @@ def command() -> None:
 
     Captures are HDF5 artifacts written by `pyrite run --trajectories DIR`,
     one per case under DIR/<stem>/. They are not checkpoints; `score` turns
-    them into checkpoint records.
+    them into checkpoint records. Artifacts from `pyrite.storage.save_trajectories`
+    score to `.npz` files.
 
     \b
     Examples:
@@ -492,22 +494,36 @@ def export_command(
 @click.command(
     "score",
     help=(
-        "Score checkpoint records from captured trajectories without re-transporting.\n\n"
-        "ARTIFACT is an HDF5 file written by `pyrite run --trajectories`, a "
-        "directory searched recursively for them (other files are skipped with "
-        "a warning), or a checkpoint selector as for `pyrite trajectories "
-        "export`. Each artifact's spectrum phase "
+        "Score spectra from saved trajectories without re-transporting.\n\n"
+        "ARTIFACT is an HDF5 file, a directory searched recursively for them "
+        "(other files are skipped with a warning), or a checkpoint selector as "
+        "for `pyrite trajectories export`. Each artifact's spectrum phase "
         "(line, characteristic, and bremsstrahlung spectra) is replayed from its "
-        "stored segments and saved as a record of the checkpoint stem and run "
-        "identity it was captured under, in DIR/<stem>. Records already present "
-        "are kept unless --overwrite; records of cases without an artifact are "
-        "never touched. Each new record stores its artifact's path and SHA-256. "
-        "The shared per-case cache is neither read nor written.\n\n"
+        "stored segments. The shared per-case cache is neither read nor written.\n\n"
+        "Artifacts written by `pyrite run --trajectories` are saved as records "
+        "of the checkpoint stem and run identity they were captured under, in "
+        "DIR/<stem> (--checkpoint-dir). Records already present are kept unless "
+        "--overwrite; records of cases without an artifact are never touched. "
+        "Each new record stores its artifact's path and SHA-256.\n\n"
+        "Artifacts written by `pyrite.storage.save_trajectories` record no run, "
+        "so each is scored to one NumPy result file, "
+        "`<artifact>.npz` beside it or mirrored under --out-dir. The spectra "
+        "equal `pyrite.score_spectra(load_trajectories(path, stream=True))` of "
+        "the recorded case. The file holds `<component>_photon_energy_eV` (eV) "
+        "and `<component>_density` (photons / incident electron / eV / sr) for "
+        "each of cxr_incoherent, characteristic and brem when present, and a "
+        "JSON `metadata` entry with the case, identity digest and the artifact's "
+        "path and SHA-256. An existing file is kept unless --overwrite. "
+        "Other detectors, grids or components need `score_spectra` from Python.\n\n"
         "Every artifact is checked before anything is written: schema-1 or "
-        "mismatched artifacts, incomplete or foreign files named explicitly, and "
-        "a checkpoint written by a different run, are refused. Cases needing every segment at once "
-        "(coherent emission, temporal profile) are refused; score those with "
-        "`spectrum_from_artifact` from Python."
+        "mismatched artifacts, incomplete or foreign files named explicitly, a "
+        "saved artifact whose segments fail their recorded fingerprint or were "
+        "transported with explicit E_cut_keV/max_steps, and a checkpoint "
+        "written by a different run, are refused. Inputs may mix both kinds; "
+        "--checkpoint-dir and --out-dir are each refused when no input uses "
+        "them. Cases needing every segment at once (coherent emission, temporal "
+        "profile) are refused; score those with `spectrum_from_artifact` from "
+        "Python."
     ),
 )
 @click.argument(
@@ -523,7 +539,16 @@ def export_command(
     show_default=output_label("checkpoints"),
     metavar="DIR",
     type=click.Path(file_okay=False, path_type=Path),
-    help="Root containing component checkpoint directories to write.",
+    help="Root containing component checkpoint directories to write run captures to.",
+)
+@click.option(
+    "--out-dir",
+    metavar="DIR",
+    type=click.Path(file_okay=False, path_type=Path),
+    help=(
+        "Root for the .npz result files of artifacts saved outside a run, "
+        "mirroring the input layout. [default: beside each artifact]"
+    ),
 )
 @click.option(
     "--max-segments",
@@ -538,18 +563,22 @@ def export_command(
 @click.option(
     "--overwrite",
     is_flag=True,
-    help="Re-score cases that already have a record in the target checkpoint.",
+    help="Re-score cases that already have a checkpoint record or .npz result file.",
 )
-def score_command(artifacts, checkpoint_dir, max_segments, overwrite):
+def score_command(artifacts, checkpoint_dir, out_dir, max_segments, overwrite):
     from ...checkpoints.trajectory_scoring import (
         check_targets,
-        plan_stems,
+        plan_scoring,
+        score_saved,
         score_stem,
     )
     from ...montecarlo.runner.artifacts import STREAM_MAX_SEGMENTS
     from ...montecarlo.trajectories import TrajectoryArtifactError
+    from ...scoring import ScoringRefusedError
 
-    paths = [found.path for found in _discover(artifacts)]
+    found = _discover(artifacts)
+    relative = {item.path: item.relative for item in found}
+    max_segments = max_segments or STREAM_MAX_SEGMENTS
 
     def _scored(artifact, out):
         click.echo(
@@ -558,17 +587,53 @@ def score_command(artifacts, checkpoint_dir, max_segments, overwrite):
         )
 
     try:
-        plans = plan_stems(paths)
-        check_targets(plans.values(), checkpoint_dir)
-        for plan in plans.values():
+        plan = plan_scoring(item.path for item in found)
+        context = click.get_current_context()
+        if not plan.stems and (
+            context.get_parameter_source("checkpoint_dir") is not ParameterSource.DEFAULT
+        ):
+            raise click.UsageError(
+                "--checkpoint-dir applies to artifacts captured by `pyrite run "
+                "--trajectories`; none of these records a run, so each is scored to a "
+                ".npz file (see --out-dir)"
+            )
+        if not plan.saved and out_dir is not None:
+            raise click.UsageError(
+                "--out-dir applies to artifacts saved outside a run; every input records "
+                "a run and is scored into --checkpoint-dir"
+            )
+        targets = {
+            artifact.path: (
+                out_dir / relative[artifact.path] if out_dir is not None else artifact.path
+            ).with_suffix(".npz")
+            for artifact in plan.saved
+        }
+        if len(set(targets.values())) != len(targets):
+            raise click.UsageError(
+                "several artifacts map to the same .npz path; pass their common "
+                "directory instead of individual files, or rename them"
+            )
+        check_targets(plan.stems.values(), checkpoint_dir)
+        for stem_plan in plan.stems.values():
             summary = score_stem(
-                plan,
+                stem_plan,
                 checkpoint_dir,
-                max_segments=max_segments or STREAM_MAX_SEGMENTS,
+                max_segments=max_segments,
                 overwrite=overwrite,
                 on_case=_scored,
             )
             kept = f"; {summary.kept} already scored (--overwrite to redo)" if summary.kept else ""
             click.echo(f"{summary.checkpoint_path}: scored {summary.scored}{kept}")
-    except TrajectoryArtifactError as error:
+        for artifact in plan.saved:
+            saved = score_saved(
+                artifact, targets[artifact.path], max_segments=max_segments, overwrite=overwrite
+            )
+            if saved.written:
+                click.echo(
+                    f"{saved.target}  {artifact.case['name']}  "
+                    f"E0={float(artifact.case['E0_keV']):g} keV  {saved.n_segments} segments"
+                )
+            else:
+                click.echo(f"{saved.target}: already scored (--overwrite to redo)")
+    except (TrajectoryArtifactError, ScoringRefusedError) as error:
         raise _cli_core.CLIError(str(error)) from error

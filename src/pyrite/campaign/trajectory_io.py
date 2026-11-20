@@ -10,6 +10,7 @@ case exactly. Without components the product scores only its recorded case.
 from __future__ import annotations
 
 import os
+from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -182,6 +183,50 @@ def load_trajectories(
         _source=os.fspath(artifact.path),
         _stream=stream,
     )
+
+
+class _StoredColumns(Mapping):
+    """Row fields of an open artifact in transported order, one column per read."""
+
+    def __init__(self, handle) -> None:
+        from ..montecarlo.trajectories import transport_view
+
+        self._view = transport_view(handle)
+        self._rows = set(self._view.row_fields())
+        self._order = handle["transport_order"][()] if "transport_order" in handle else None
+
+    def __getitem__(self, name: str):
+        stored = self._view[name][()]
+        if name in self._rows and self._order is not None:
+            restored = np.empty_like(stored)
+            restored[self._order] = stored
+            return restored
+        return stored
+
+    def __iter__(self):
+        return iter(self._view)
+
+    def __len__(self) -> int:
+        return len(self._view)
+
+
+def stored_segment_fingerprint(path: str | os.PathLike[str]) -> str:
+    """Segment fingerprint of a stored artifact without loading every column at once.
+
+    Equals ``Trajectories.fingerprint`` of ``load_trajectories(path)`` while
+    holding one row field in memory at a time, so a streamed replay can verify
+    the fingerprint :func:`save_trajectories` recorded.
+    """
+    import h5py
+
+    from ..montecarlo.trajectories import TrajectoryArtifactError
+    from .trajectory_product import segment_fingerprint
+
+    try:
+        with h5py.File(path, "r") as handle:
+            return segment_fingerprint(_StoredColumns(handle))
+    except (OSError, KeyError) as error:
+        raise TrajectoryArtifactError(f"unreadable trajectory artifact {path}: {error}") from error
 
 
 def _require_same_case(stored, lowered, path) -> None:

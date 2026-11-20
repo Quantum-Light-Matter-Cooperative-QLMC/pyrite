@@ -15,7 +15,7 @@ Usage: pyrite trajectories [OPTIONS] COMMAND [ARGS]...
 
   Captures are HDF5 artifacts written by `pyrite run --trajectories DIR`, one per case
   under DIR/<stem>/. They are not checkpoints; `score` turns them into checkpoint
-  records.
+  records. Artifacts from `pyrite.storage.save_trajectories` score to `.npz` files.
 
   Examples:
     pyrite trajectories ls
@@ -30,7 +30,7 @@ Commands:
   ls      List captured artifacts, partial writes, and foreign files.
   info    Describe one artifact's case, provenance, and fields.
   export  Export captured trajectories to VTK PolyData.
-  score   Score checkpoint records from captured trajectories.
+  score   Score spectra from captured or saved trajectories.
 ```
 
 ## `pyrite trajectories ls`
@@ -135,29 +135,47 @@ Options:
 ```text
 Usage: pyrite trajectories score [OPTIONS] ARTIFACT...
 
-  Score checkpoint records from captured trajectories without re-transporting.
+  Score spectra from saved trajectories without re-transporting.
 
-  ARTIFACT is an HDF5 file written by `pyrite run --trajectories`, a directory searched
-  recursively for them (other files are skipped with a warning), or a checkpoint
-  selector as for `pyrite trajectories export`. Each artifact's spectrum phase (line,
-  characteristic, and bremsstrahlung spectra) is replayed from its stored segments and
-  saved as a record of the checkpoint stem and run identity it was captured under, in
-  DIR/<stem>. Records already present are kept unless --overwrite; records of cases
-  without an artifact are never touched. Each new record stores its artifact's path and
-  SHA-256. The shared per-case cache is neither read nor written.
+  ARTIFACT is an HDF5 file, a directory searched recursively for them (other files are
+  skipped with a warning), or a checkpoint selector as for `pyrite trajectories export`.
+  Each artifact's spectrum phase (line, characteristic, and bremsstrahlung spectra) is
+  replayed from its stored segments. The shared per-case cache is neither read nor
+  written.
+
+  Artifacts written by `pyrite run --trajectories` are saved as records of the
+  checkpoint stem and run identity they were captured under, in DIR/<stem>
+  (--checkpoint-dir). Records already present are kept unless --overwrite; records of
+  cases without an artifact are never touched. Each new record stores its artifact's
+  path and SHA-256.
+
+  Artifacts written by `pyrite.storage.save_trajectories` record no run, so each is
+  scored to one NumPy result file, `<artifact>.npz` beside it or mirrored under --out-
+  dir. The spectra equal `pyrite.score_spectra(load_trajectories(path, stream=True))` of
+  the recorded case. The file holds `<component>_photon_energy_eV` (eV) and
+  `<component>_density` (photons / incident electron / eV / sr) for each of
+  cxr_incoherent, characteristic and brem when present, and a JSON `metadata` entry with
+  the case, identity digest and the artifact's path and SHA-256. An existing file is
+  kept unless --overwrite. Other detectors, grids or components need `score_spectra`
+  from Python.
 
   Every artifact is checked before anything is written: schema-1 or mismatched
-  artifacts, incomplete or foreign files named explicitly, and a checkpoint written by a
-  different run, are refused. Cases needing every segment at once (coherent emission,
-  temporal profile) are refused; score those with `spectrum_from_artifact` from Python.
+  artifacts, incomplete or foreign files named explicitly, a saved artifact whose
+  segments fail their recorded fingerprint or were transported with explicit
+  E_cut_keV/max_steps, and a checkpoint written by a different run, are refused. Inputs
+  may mix both kinds; --checkpoint-dir and --out-dir are each refused when no input uses
+  them. Cases needing every segment at once (coherent emission, temporal profile) are
+  refused; score those with `spectrum_from_artifact` from Python.
 
 Options:
-  --checkpoint-dir DIR  Root containing component checkpoint directories to write.
-                        [default: (pyrite-output/checkpoints)]
+  --checkpoint-dir DIR  Root containing component checkpoint directories to write run
+                        captures to.  [default: (pyrite-output/checkpoints)]
+  --out-dir DIR         Root for the .npz result files of artifacts saved outside a run,
+                        mirroring the input layout. [default: beside each artifact]
   --max-segments N      Segment rows read per block; bounds host memory (whole electrons
                         stay together, so one long history may exceed it). [default:
                         1048576]
-  --overwrite           Re-score cases that already have a record in the target
-                        checkpoint.
+  --overwrite           Re-score cases that already have a checkpoint record or .npz
+                        result file.
   -h, --help            Show this message and exit.
 ```
