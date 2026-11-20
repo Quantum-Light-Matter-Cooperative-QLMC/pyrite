@@ -535,3 +535,15 @@ relative), coherent `spec_coherent` (5.7e-4) and `coupled.brem_wide` (6 of 71
 bins, ≤ 3.6e-10). Seeded transport signatures (counts, `path_ang`, flight and
 energy samples), `spec_characteristic`, `brem` and every tolerance are
 unchanged (differences ≤ 1e-15 relative).
+
+## BremsLib photon-energy sub-nodes (#1349)
+
+The five `k/T1` sub-nodes in `(0, 0.1)` now take BremsLib's prescribed
+Interpolate_DCS values instead of the linear interpolant, and they are
+inserted at the library `T1` rows before the `T1` refinement.
+`BREMSSTRAHLUNG_BREMSLIB_MODEL` changed from `…/lin-x18-geo4-…` to
+`…/idcs-x18-born-v1-geo4-…`. Only the `coupled` and `cascade` identity hashes in
+`resolved.json` were re-pinned
+(`pyrite-dev test-suite identity-pins --update-pins`). The synthetic tables
+are linear in `k/T1`, which the spline reproduces at library rows. The recorded
+`outputs.json` therefore still passes at its tolerances, and it was not re-pinned.

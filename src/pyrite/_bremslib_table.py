@@ -22,24 +22,25 @@ import numpy as np
 
 from ._bremslib_electron import electron_electron_factor
 from ._bremslib_extension import extend_above_complete
+from ._bremslib_reduced_energy import SMALL_REDUCED_ENERGY_NODES, refine_reduced_energy
 
 #: Identity of the BremsLib model and of this module's interpolation scheme.
 #: Bump the suffix whenever the interpolation changes the numbers it serves.
 BREMSSTRAHLUNG_BREMSLIB_MODEL = (
-    "bremslib-v2.0-sdcs-ddcs/lin-x18-geo4-ln-t-lin-theta-v2/tm-coupled-v2/ee-sb85-v1/angle-f64-v1"
-    "/fp32-cell-mb-v1/fp64-segment-sum-v1"
+    "bremslib-v2.0-sdcs-ddcs/idcs-x18-born-v1-geo4-ln-t-lin-theta-v2/tm-coupled-v2/ee-sb85-v1"
+    "/angle-f64-v1/fp32-cell-mb-v1/fp64-segment-sum-v1"
 )
 
 #: Number of library ``k/T1`` grid values per incident energy.
 _RATIO_COUNT = 13
 
-#: ``k/T1`` sub-nodes inserted at load between the library's 0 and 0.1 nodes,
-#: where the electron-electron ratio falls steeply (see
-#: :mod:`pyrite._bremslib_electron`).
-_SMALL_REDUCED_ENERGY_NODES = (0.004, 0.01, 0.02, 0.035, 0.06)
+#: Number of staged ``k/T1`` grid values per incident energy: the library's
+#: 13 plus the sub-nodes in ``(0, 0.1)``, where the cross section and the
+#: electron-electron ratio curve most (see :mod:`pyrite._bremslib_reduced_energy`).
+STAGED_RATIO_COUNT = _RATIO_COUNT + len(SMALL_REDUCED_ENERGY_NODES)
 
-#: Number of staged ``k/T1`` grid values per incident energy.
-STAGED_RATIO_COUNT = _RATIO_COUNT + len(_SMALL_REDUCED_ENERGY_NODES)
+#: Born-approximation SDCS arrays a converted table may carry (``T1 >= 1 MeV``).
+_BORN_ARRAYS = ("born_t1_MeV", "born_k_over_t1", "born_sdcs_mb")
 
 #: Sub-intervals per library ``T1`` interval in the staged grid.
 _INCIDENT_REFINEMENT = 4
@@ -141,9 +142,11 @@ def prepare_bremslib_table(
     Rows past ``arrays["complete_rows"]`` (absent: none) are extension rows
     holding library data for ``k/T1 <= 0.95`` and the ``k = 0`` DDCS only;
     :func:`pyrite._bremslib_extension.extend_above_complete` fills the rest.
-    After ``T1`` refinement the ``k/T1`` grid gains the sub-nodes
-    :data:`_SMALL_REDUCED_ENERGY_NODES` (linear in ``k/T1``, so the
-    electron-nucleus values served are unchanged), and with
+    At each library ``T1`` the ``k/T1`` grid then gains the sub-nodes
+    :data:`pyrite._bremslib_reduced_energy.SMALL_REDUCED_ENERGY_NODES`, valued
+    by the library's own k/T1 scheme (using the ``born_*`` arrays when present)
+    by :func:`pyrite._bremslib_reduced_energy.refine_reduced_energy`, before
+    the ``T1`` refinement. With
     ``electron_electron`` every node's SDCS and DDCS is multiplied by
     :func:`pyrite._bremslib_electron.electron_electron_factor`.
 
@@ -208,10 +211,13 @@ def prepare_bremslib_table(
         )
     shape /= _positive_integral(theta_common, shape)[..., None]
 
+    reduced = np.broadcast_to(nominal, sdcs.shape).copy()
+    reduced[:, -1] = top_reduced_energy(t1_MeV)
+    born = {name: arrays[name] for name in _BORN_ARRAYS} if _BORN_ARRAYS[0] in arrays else None
+    sdcs, shape = refine_reduced_energy(t1_MeV, reduced, sdcs, shape, born)
+    nominal = np.concatenate([nominal[:1], SMALL_REDUCED_ENERGY_NODES, nominal[1:]])
     t1_fine, sdcs_fine, shape_fine = _refine_incident_grid(t1_MeV, sdcs, shape, theta_common)
-    nominal, sdcs_fine, ddcs_fine = _refine_reduced_energy(
-        nominal, sdcs_fine, shape_fine * sdcs_fine[..., None]
-    )
+    ddcs_fine = shape_fine * sdcs_fine[..., None]
     if electron_electron:
         reduced = np.broadcast_to(nominal, sdcs_fine.shape).copy()
         reduced[:, -1] = top_reduced_energy(t1_fine)
@@ -228,29 +234,6 @@ def prepare_bremslib_table(
         scaled_sdcs_mb=sdcs_fine,
         theta_rad=theta_common,
         scaled_ddcs_mb_sr=ddcs_fine,
-    )
-
-
-def _refine_reduced_energy(nominal, sdcs, ddcs):
-    """Insert :data:`_SMALL_REDUCED_ENERGY_NODES` between ``k/T1 = 0`` and 0.1.
-
-    Each sub-node takes the linear interpolant of its neighbours' SDCS and
-    DDCS, the values runtime interpolation already serves there, so the
-    electron-nucleus cross section is unchanged and every DDCS node still
-    integrates to its SDCS.
-
-    Validation: bremslib-electron-electron
-    """
-    inserted = np.asarray(_SMALL_REDUCED_ENERGY_NODES, dtype=np.float64)
-    if not (0.0 < inserted[0] and inserted[-1] < nominal[1]):
-        raise ValueError("k/T1 sub-nodes must lie between the first two library nodes")
-    w = inserted / nominal[1]
-    sdcs_sub = (1.0 - w) * sdcs[:, :1] + w * sdcs[:, 1:2]
-    ddcs_sub = (1.0 - w)[:, None] * ddcs[:, :1] + w[:, None] * ddcs[:, 1:2]
-    return (
-        np.concatenate([nominal[:1], inserted, nominal[1:]]),
-        np.concatenate([sdcs[:, :1], sdcs_sub, sdcs[:, 1:]], axis=1),
-        np.concatenate([ddcs[:, :1], ddcs_sub, ddcs[:, 1:]], axis=1),
     )
 
 

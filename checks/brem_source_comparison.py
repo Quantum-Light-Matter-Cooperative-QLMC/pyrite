@@ -104,12 +104,17 @@ UNGATED_ELEMENTS = {
 #: reason for each (#1073).
 UNGATED_KINDS = {
     3: {
-        "chi": "Li pointwise: PyRITE interpolates BremsLib linearly in k/T between its k/T = 0 "
-        "and 0.1 nodes, which is less accurate than the cubic-spline scheme (of SDCS/SDCS_Born "
-        "at T1 >= 1 MeV) the library's own interpolation manual prescribes (Interpolate_DCS "
-        "v1.0.7 manual, Sec. 2, p. 3), as measured with Interpolate_DCS v1.0.7 itself: at "
-        "k/T = 0.05 linear raises Li by 0.056-0.062 at 0.4-1 MeV (1.130-1.137 against "
-        "1.072-1.077), and Interpolate_DCS keeps Li <= 1.125 up to 30 MeV; #1073",
+        "chi": "Li pointwise: after #1349 (library-scheme sub-nodes) only Li's 30 MeV, k/T = 0.05 "
+        "point fails (1.1301). At k -> 0, 30 MeV, SB86's electron-nucleus chi equals Tsai's "
+        "Hartree-Fock complete-screening value (RMP 46, 815 (1974), Table B.2) within 0.1 % for "
+        "Z = 3-6, while BremsLib (PW and its own Born) exceeds it (Li 1.110, C 1.071). BremsLib "
+        "screens with a Kohn-Sham potential, used for both PW and Born (Poskus, ADNDT 166, 101734 "
+        "(2025), Secs. 2, 2.1, 2.6): adding LDA exchange-correlation to the screening function "
+        "predicts 1.10-1.12 for Li at k -> 0 and 1.09-1.10 at k/T = 0.05 (C 1.07, H 1.17-1.21, "
+        "measured 1.195). No source bounds this screening difference within the gate. The "
+        "remaining ~2.5 % at k/T = 0.05 is PyRITE's fitted small-k/T eta shape, off-trend at "
+        "that SB86 node (1 + eta/Z 1.446 against ~1.411 implied by SB86's total), open in #1359; "
+        "#1349, #1073",
         "extension_moment": "Li 30-100 MeV first moment: an electron-nucleus difference that "
         "grows smoothly as Z falls (100 MeV: Al 1.035, C 1.053, B 1.058, Li 1.072, H 1.134) and "
         "does not depend on k/T interpolation. At T >= 50 MeV it is between two analytic "

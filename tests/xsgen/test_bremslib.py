@@ -26,7 +26,7 @@ from pyrite.xsgen.bremslib import (
     parse_ratio_table,
     shape_function,
 )
-from pyrite.xsgen.bremslib.read import RATIO_COUNT, node_index
+from pyrite.xsgen.bremslib.read import BORN_RATIO_COUNT, RATIO_COUNT, node_index, parse_born_table
 
 #: The upstream ``k/T1`` grid. The last value is nominal: the data behind it
 #: stand slightly below 1 by a ``T1``-dependent amount.
@@ -55,6 +55,30 @@ def _ratio_file(kind: str, energies, value) -> str:
     return "\n".join(lines) + "\n"
 
 
+#: The upstream Born SDCS ``k/T1`` grid: ten geometric values below 0.1.
+BORN_RATIOS = (
+    *(0.0, 1.0e-4, 2.8e-4, 6.3e-4, 1.25e-3, 2.4e-3, 4.6e-3, 8.5e-3, 1.58e-2, 2.9e-2, 5.4e-2),
+    *(np.arange(1, 10) / 10).tolist(),
+)
+
+#: Born SDCS energies: one inside the stored range, one above 30 MeV.
+BORN_ENERGIES = (2.0e00, 5.0e01)
+
+
+def _born_file(energies, value) -> str:
+    """Render a ``SDCS_Born_<Z>.txt`` file: pairs of (CS, pnt/fin)."""
+    labels = ["T1(MeV)"]
+    for ratio in BORN_RATIOS:
+        labels += [f"CS[Ep/T1={ratio:.13f}]", f"pnt/fin[Ep/T1={ratio:.3f}]"]
+    lines = ["\t".join(labels)]
+    for energy in energies:
+        row = [f"{energy:.17E}"]
+        for column, _ in enumerate(BORN_RATIOS):
+            row += [f"{value(energy, column):.17E}", "1.00000000000000"]
+        lines.append("\t".join(row))
+    return "\n".join(lines) + "\n"
+
+
 def _ddcs_file(points: int, *, level: float, columns: int = 4) -> str:
     """Render one DDCS node file with ``points`` angular samples."""
     theta = np.linspace(0.0, 180.0, points)
@@ -77,6 +101,7 @@ def _write_library(root: Path, z: int = 79, *, level: float = 2.0) -> Path:
     """
     library = root / "BremsLib_v2.0.8"
     (library / "SDCS" / "DDCS_int").mkdir(parents=True)
+    (library / "SDCS" / "Born_appr").mkdir(parents=True)
     (library / "DDCS").mkdir(parents=True)
 
     def sdcs_value(energy: float, column: int) -> float:
@@ -89,6 +114,9 @@ def _write_library(root: Path, z: int = 79, *, level: float = 2.0) -> Path:
     )
     (library / "SDCS" / "DDCS_int" / f"DDCS_int_{z}.txt").write_text(
         _ratio_file("DDCS_int", ENERGIES, sdcs_value), encoding="ascii"
+    )
+    (library / "SDCS" / "Born_appr" / f"SDCS_Born_{z}.txt").write_text(
+        _born_file(BORN_ENERGIES, lambda energy, column: level * (20.0 - column)), encoding="ascii"
     )
     for energy in ENERGIES:
         for column, ratio in enumerate(RATIOS):
@@ -141,6 +169,24 @@ def test_ratio_table_rejects_a_descending_energy_grid():
 
     with pytest.raises(ValueError, match="ascending"):
         parse_ratio_table(rows)
+
+
+def test_born_table_reads_the_twenty_labelled_columns(library):
+    path = library / "SDCS" / "Born_appr" / "SDCS_Born_79.txt"
+    table = parse_born_table(path.read_text(encoding="ascii"))
+
+    assert table.t1_MeV.tolist() == list(BORN_ENERGIES)
+    np.testing.assert_allclose(table.k_over_t1, BORN_RATIOS)
+    assert table.value.shape == (len(BORN_ENERGIES), BORN_RATIO_COUNT)
+    assert table.value[0, :3].tolist() == [40.0, 38.0, 36.0]
+
+
+def test_born_table_rejects_a_row_of_the_wrong_width(library):
+    text = (library / "SDCS" / "Born_appr" / "SDCS_Born_79.txt").read_text(encoding="ascii")
+    lines = text.splitlines()
+    lines[1] = lines[1].rsplit("\t", 1)[0]
+    with pytest.raises(ValueError, match="41 columns"):
+        parse_born_table("\n".join(lines))
 
 
 def test_ddcs_panel_reads_both_column_counts(library):
@@ -287,6 +333,15 @@ def test_build_table_bounds_itself_with_a_maximum_energy(library):
 
     assert arrays["t1_MeV"].tolist() == [ENERGIES[0]]
     assert arrays["node_t1_index"].size == RATIO_COUNT
+    assert arrays["born_sdcs_mb"].shape == (0, BORN_RATIO_COUNT)
+
+
+def test_build_table_carries_the_born_sdcs_up_to_its_bound(library):
+    arrays = build_table(library, 79, t1_max_MeV=30.0)
+
+    assert arrays["born_t1_MeV"].tolist() == [BORN_ENERGIES[0]]
+    np.testing.assert_allclose(arrays["born_k_over_t1"], BORN_RATIOS)
+    assert arrays["born_sdcs_mb"][0, -1] == 2.0 * (20.0 - 19)
 
 
 def _add_extension_energy(library: Path, energy: float, *, leading: int, k0_node: bool) -> None:
@@ -388,6 +443,17 @@ def test_a_changed_library_is_a_changed_table(library, isolated_dirs, packaged_d
 
     sdcs = library / "SDCS" / "SDCS_79.txt"
     sdcs.write_text(sdcs.read_text().replace("1.0E-06", "2.0E-06"), encoding="ascii")
+    after = generate_element(79, source_path=library)
+
+    assert after.generated
+    assert after.table.key != before.table.key
+
+
+def test_a_changed_born_file_is_a_changed_table(library, isolated_dirs, packaged_dir):
+    before = generate_element(79, source_path=library)
+
+    born = library / "SDCS" / "Born_appr" / "SDCS_Born_79.txt"
+    born.write_text(born.read_text().replace("1.00000000000000", "0.99"), encoding="ascii")
     after = generate_element(79, source_path=library)
 
     assert after.generated

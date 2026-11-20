@@ -159,9 +159,10 @@ def test_no_share_is_removed_below_the_line_electron_cutoff(kernel):
 #: reflection with |g| <= 30 1/A (13,688), T = 30 keV, theta = 45 deg, 0.5-10 keV
 #: in 100 eV cells. ``S_P3`` is the independent P3 direct quadrature
 #: (pyrite-output/validation/issue-1250/2026-11-17-p3/share-tables.npz).
+#: ``DROP_OVER_BREM`` re-pinned for the BremsLib k/T1 sub-node scheme (#1349).
 SCENE_S_PER_ANG_SR = 3.6008354848850275e-10
 SCENE_S_P3_PER_ANG_SR = 3.590115293509795e-10
-SCENE_DROP_OVER_BREM = 0.13023378823529147
+SCENE_DROP_OVER_BREM = 0.12968644980404118
 
 
 def test_released_kernel_pins_the_si_30kev_g30_share():

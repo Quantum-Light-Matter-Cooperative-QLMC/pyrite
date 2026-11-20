@@ -16,6 +16,12 @@ Three file shapes, per the upstream manual (``BremsLib_v2.0.pdf``):
     Same layout, holding the vendor's own angular integral of the scaled
     DDCS. Its middle entry is the integral's *relative deviation* from the
     SDCS rather than a computational uncertainty.
+``SDCS/Born_appr/SDCS_Born_<Z>.txt``
+    The screened Born-approximation SDCS for ``1 MeV <= T1 <= 30 MeV``, on 20
+    ``k/T1`` values (ten geometric ones below 0.1 plus 0 to 0.9 in steps of
+    0.1): a header, then per ``T1`` a pair -- scaled SDCS in mb and the
+    point-to-finite ratio -- per ``k/T1``. BremsLib's interpolation program
+    divides by it before fitting in ``k/T1``.
 ``DDCS/DDCS_<Z>_<T1>_<k>.txt``
     One file per (Z, T1, k) node: photon emission angle in degrees, scaled
     DDCS in mb/sr, its relative uncertainty, and -- only when the reduced
@@ -46,6 +52,12 @@ SDCS_DIR = "SDCS"
 
 #: Relative name of the per-node DDCS directory, under the library root.
 DDCS_DIR = "DDCS"
+
+#: Relative name of the Born-approximation SDCS directory.
+BORN_DIR = "SDCS/Born_appr"
+
+#: Number of ``k/T1`` grid values in every Born SDCS line.
+BORN_RATIO_COUNT = 20
 
 #: Relative name of the vendor's angular-integral directory.
 DDCS_INT_DIR = "SDCS/DDCS_int"
@@ -107,6 +119,11 @@ def library_root(root: Path) -> Path:
 def sdcs_path(library: Path, z: int) -> Path:
     """Return the SDCS file for element ``z``."""
     return library / SDCS_DIR / f"SDCS_{int(z)}.txt"
+
+
+def born_sdcs_path(library: Path, z: int) -> Path:
+    """Return the Born-approximation SDCS file for element ``z``."""
+    return library / BORN_DIR / f"SDCS_Born_{int(z)}.txt"
 
 
 def ddcs_integral_path(library: Path, z: int) -> Path:
@@ -221,6 +238,67 @@ def parse_ratio_table(data: str | bytes) -> RatioTable:
         middle=values[:, 2::3],
         point_finite=values[:, 3::3],
     )
+
+
+@dataclass(frozen=True)
+class BornTable:
+    """One element's Born-approximation SDCS (``SDCS_Born_<Z>.txt``).
+
+    Parameters
+    ----------
+    t1_MeV
+        Incident energies, ascending (1 to 30 MeV in v2.0.8).
+    k_over_t1
+        The 20 ``k/T1`` grid values, ascending from 0 to 0.9.
+    value
+        Scaled Born SDCS in mb, per ``(T1, k/T1)``, stored as published: one
+        v2.0.8 entry is zero (``Z = 5``, ``T1 = 3 MeV``, ``k/T1 = 0.0046``).
+    """
+
+    t1_MeV: np.ndarray
+    k_over_t1: np.ndarray
+    value: np.ndarray
+
+
+def parse_born_table(data: str | bytes) -> BornTable:
+    """Parse one ``SDCS_Born_<Z>.txt`` file.
+
+    Raises
+    ------
+    ValueError
+        If the header does not carry 20 ascending labelled ``k/T1`` columns,
+        a row does not hold the matching 41 numbers, the energies are not
+        ascending, or a value is not finite.
+
+    Validation: bremslib-electron-electron
+    """
+    text = data.decode("ascii") if isinstance(data, bytes) else data
+    lines = [line for line in text.splitlines() if line.strip()]
+    if len(lines) < 2:
+        raise ValueError("BremsLib Born table has no data rows")
+    ratios = []
+    for label in lines[0].split()[1::2]:
+        match = _LABEL_VALUE.search(label)
+        if match is None:
+            raise ValueError(f"BremsLib Born column header is not a labelled ratio: {label!r}")
+        ratios.append(float(match.group(1)))
+    k_over_t1 = np.asarray(ratios, dtype=np.float64)
+    if k_over_t1.size != BORN_RATIO_COUNT or k_over_t1[0] != 0.0 or np.any(np.diff(k_over_t1) <= 0):
+        raise ValueError(f"BremsLib Born table needs {BORN_RATIO_COUNT} ascending k/T1 columns")
+    width = 1 + 2 * BORN_RATIO_COUNT
+    rows = [line.split() for line in lines[1:]]
+    if any(len(fields) != width for fields in rows):
+        raise ValueError(f"BremsLib Born data rows must hold {width} columns")
+    try:
+        values = np.asarray([[float(field) for field in fields] for fields in rows])
+    except ValueError as exc:
+        raise ValueError("BremsLib Born data row is not numeric") from exc
+    if not np.all(np.isfinite(values)):
+        raise ValueError("BremsLib Born table contains non-finite values")
+    t1 = values[:, 0]
+    if np.any(np.diff(t1) <= 0.0) or t1[0] <= 0.0:
+        raise ValueError("BremsLib Born T1 grid must be positive and ascending")
+    return BornTable(t1_MeV=t1, k_over_t1=k_over_t1, value=values[:, 1::2])
 
 
 @dataclass(frozen=True)
@@ -386,7 +464,7 @@ def library_version(library: Path, z: int, nodes: Sequence[NodeFile]) -> str:
     BremsLib has no buildable source, so a table's ``code_version`` is a
     digest of the library it was read from rather than of Fortran sources.
     It covers the library directory name -- which carries the deposit's patch
-    version -- the whole of the element's SDCS and ``DDCS_int`` files, and the
+    version -- the whole of the element's SDCS, ``DDCS_int`` and Born SDCS files, and the
     name and byte size of every node file read.
 
     The node files' *contents* are deliberately not hashed: that is a 20 MB
@@ -401,12 +479,12 @@ def library_version(library: Path, z: int, nodes: Sequence[NodeFile]) -> str:
     Raises
     ------
     SourceUnavailableError
-        If the element's SDCS or ``DDCS_int`` file is missing.
+        If the element's SDCS, ``DDCS_int`` or Born SDCS file is missing.
     """
     digest = hashlib.sha256()
     digest.update(library.name.encode("utf-8"))
     digest.update(b"\0")
-    for path in (sdcs_path(library, z), ddcs_integral_path(library, z)):
+    for path in (sdcs_path(library, z), ddcs_integral_path(library, z), born_sdcs_path(library, z)):
         try:
             digest.update(file_digest([path]).encode("ascii"))
         except OSError as exc:
