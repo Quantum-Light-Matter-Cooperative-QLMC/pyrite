@@ -7,6 +7,7 @@ from pathlib import Path
 
 from ..checkpoints import archive
 from ..console.outputs import output_dir
+from ..paths import cache_dir
 from . import config, scripts, transport
 from .reporting import report
 
@@ -454,8 +455,7 @@ def pull(
 
 
 def pull_zhai_cache():
-    """Fetch every cache file under pyrite-output/cache/zhai_reproduction/ from the
-    box.
+    """Fetch every cache file under the box's ``cache/zhai_reproduction/``.
 
     Lists remote filenames first (like clear_remote's listing step) rather
     than `scp -r`, which double-nests the directory when the local destination
@@ -474,7 +474,7 @@ def pull_zhai_cache():
             "(no zhai cache files on the box -- run `pyrite app validation reproduce --remote` first)"
         )
         return
-    dest = output_dir("cache") / "zhai_reproduction"
+    dest = cache_dir() / "zhai_reproduction"
     dest.mkdir(parents=True, exist_ok=True)
     for name in names:
         transport._run(

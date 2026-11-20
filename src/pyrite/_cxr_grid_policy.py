@@ -79,7 +79,7 @@ from ._grid_semantics import (
     validate_backend_spacing,
 )
 from ._util.env import env_value
-from .console.outputs import output_dir
+from .paths import cache_dir
 
 __all__ = [
     "AUTOMATIC_BANDWIDTH_POLICY",
@@ -1204,7 +1204,7 @@ def coordinate_cache_key(payload: Mapping[str, Any], resolution_inputs: Mapping[
 
 
 def _cache_path(key: str):
-    return output_dir("cache") / "line-grids" / key[:2] / f"{key}.json"
+    return cache_dir() / "line-grids" / key[:2] / f"{key}.json"
 
 
 def cached_coordinates(key: str) -> dict[str, Any] | None:

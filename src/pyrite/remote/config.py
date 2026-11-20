@@ -12,6 +12,7 @@ from pathlib import Path, PurePosixPath
 
 from .._util.env import env_value
 from ..console.outputs import LEGACY_LAYOUT, OUTPUT_DIRNAME
+from ..paths import cache_dir
 
 # Compatibility override for tests and callers that historically patched this
 # module global. Normal resolution is dynamic so environment and store changes
@@ -126,6 +127,8 @@ def remote_runtime_env() -> str:
     """Environment assignments for direct remote PyRITE invocations."""
     return " ".join(
         (
+            f"PYRITE_DATA_DIR={shell_word(remote_dir())}",
+            f"PYRITE_CACHE_DIR={shell_word(remote_path('cache'))}",
             f"PYRITE_HOME={shell_word(remote_dir())}",
             f"PYRITE_CATALOG={shell_word(remote_catalog_path())}",
             f"PYRITE_USER_CATALOG={shell_word(remote_user_catalog_path())}",
@@ -211,8 +214,11 @@ def ssh_mux_options() -> list[str]:
     if os.name != "posix" or env_value("PYRITE_SSH_MUX", "1") == "0":
         return []
     runtime = os.environ.get("XDG_RUNTIME_DIR")
-    base = Path(runtime) if runtime and os.path.isdir(runtime) else Path.home() / ".cache"
-    sockets = base / "pyrite-ssh"
+    sockets = (
+        Path(runtime) / "pyrite-ssh" if runtime and os.path.isdir(runtime) else cache_dir() / "ssh"
+    )
+    if len(str(sockets).encode()) + len("/%C") >= 100:
+        sockets = Path("/tmp") / f"pyrite-ssh-{os.getuid()}"
     try:
         sockets.mkdir(mode=0o700, parents=True, exist_ok=True)
     except OSError:
@@ -390,7 +396,9 @@ def remote_path(*parts: str) -> str:
 
 
 def remote_output_path(kind: str, *parts: str) -> str:
-    """Box output path; jobs run with PYRITE_HOME=<remote dir>, so it mirrors local."""
+    """Box output path (cache is a compatibility alias into remote user cache)."""
+    if kind == "cache":
+        return remote_path("cache", *parts)
     return remote_path(OUTPUT_DIRNAME, kind, *parts)
 
 

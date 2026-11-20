@@ -1,4 +1,4 @@
-"""``pyrite config setup``: detect hardware and persist ``PYRITE_MC_BACKEND``.
+"""``pyrite config setup``: detect hardware and persist ``backend.default``.
 
 Detection is OS-tooling only (``nvidia-smi``, ``rocm-smi``/``rocminfo``,
 ``clinfo``/``sycl-ls``/``lspci``, device nodes) and never assumes a vendor
@@ -16,6 +16,7 @@ from pathlib import Path
 
 import click
 
+from ...console import config as _config
 from ...console import output as _cli_core
 
 _ENV_KEY = "PYRITE_MC_BACKEND"
@@ -144,56 +145,24 @@ def read_existing_backend(env_path: Path) -> str | None:
     return None
 
 
-def write_backend(env_path: Path, backend: str) -> None:
-    """Write ``PYRITE_MC_BACKEND`` without disturbing unrelated entries."""
-    if not env_path.is_file():
-        env_path.write_text(f"{_ENV_KEY}={backend}\n", encoding="utf-8")
-        return
-
-    lines = env_path.read_text(encoding="utf-8").splitlines(keepends=True)
-    managed_indexes: list[int] = []
-    for index, line in enumerate(lines):
-        stripped = line.strip()
-        if stripped.startswith("#") or "=" not in stripped:
-            continue
-        key = stripped.partition("=")[0].strip()
-        if key == _ENV_KEY:
-            managed_indexes.append(index)
-
-    if managed_indexes:
-        first, *duplicates = managed_indexes
-        lines[first] = f"{_ENV_KEY}={backend}\n"
-        for index in reversed(duplicates):
-            del lines[index]
-        env_path.write_text("".join(lines), encoding="utf-8")
-        return
-
-    if lines and not lines[-1].endswith("\n"):
-        lines[-1] += "\n"
-    lines.append(f"{_ENV_KEY}={backend}\n")
-    env_path.write_text("".join(lines), encoding="utf-8")
-
-
 def _print_extra_instructions(backend: str) -> None:
     install_cmd = _VENDOR_EXTRA_INSTALL.get(backend)
     if install_cmd is None:
         return
     click.echo(
-        f"writing .env alone does not install the accelerator package; run "
-        f"`{install_cmd}` (a new Claude Code or Codex session does this "
-        "automatically via `.agents/hooks/sync_local_backend.sh`)."
+        f"Selecting a backend does not install its accelerator package; run `{install_cmd}`."
     )
 
 
 @click.command(
     "setup",
     help=(
-        "Detect installed GPU hardware and write PYRITE_MC_BACKEND to repo-root .env.\n\n"
+        "Detect installed GPU hardware and save backend.default in config.toml.\n\n"
         "Probes OS-level tooling only (nvidia-smi, rocm-smi/rocminfo, clinfo/sycl-ls/"
         "lspci) -- no vendor Python package (cupy, dpnp/dpctl) needs to be installed "
         "first. Prompts interactively to opt into an accelerator; defaults to cpu if "
         "none is detected, declined, or the session is non-interactive. A no-op once "
-        "PYRITE_MC_BACKEND is already set in .env, unless --force is given."
+        "backend.default is already stored, unless --force is given."
     ),
 )
 @click.option(
@@ -205,17 +174,25 @@ def _print_extra_instructions(backend: str) -> None:
 @click.option(
     "--force",
     is_flag=True,
-    help="Re-run detection and write the canonical PYRITE_MC_BACKEND value in .env.",
+    help="Re-run detection and replace backend.default in the user config store.",
 )
 def command(yes: bool, force: bool) -> None:
-    env_path = _env_path()
-    existing = read_existing_backend(env_path)
+    existing = _config._stored_value("backend.default", _config._read_store())
     if existing is not None and not force:
         click.echo(
-            f"{_cli_core.paint(_ENV_KEY, 'inactive')} already set to {existing!r} in "
-            f"{env_path}; nothing to do (use --force to re-detect)."
+            f"{_cli_core.paint('backend.default', 'inactive')} already set to {existing!r} in "
+            f"{_config.CONFIG_PATH}; nothing to do (use --force to re-detect)."
         )
         return
+    # Historical .env files were never loaded by the installed package. Do not
+    # modify them; users may load one manually using direnv or their shell.
+    legacy_path = _env_path()
+    if read_existing_backend(legacy_path) is not None:
+        click.echo(
+            f"note: legacy backend setting in {legacy_path} was not changed; "
+            "an exported PYRITE_MC_BACKEND will override the stored choice.",
+            err=True,
+        )
 
     candidates = detect_all()
     interactive = _interactive()
@@ -244,8 +221,10 @@ def command(yes: bool, force: bool) -> None:
                 err=True,
             )
 
-    write_backend(env_path, chosen)
-    click.echo(f"{_cli_core.paint('wrote', 'done')} {_ENV_KEY}={chosen} to {env_path}")
+    _config.set_stored("backend.default", chosen)
+    click.echo(
+        f"{_cli_core.paint('wrote', 'done')} backend.default={chosen} to {_config.CONFIG_PATH}"
+    )
     _print_extra_instructions(chosen)
 
 

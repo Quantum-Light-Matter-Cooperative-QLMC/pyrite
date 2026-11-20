@@ -37,7 +37,7 @@ from pyrite.montecarlo.spectrum.cxr import _bin_quadrature
 def _isolated(monkeypatch, tmp_path):
     for name in _cxr_grid_policy.ENVIRONMENT_NAMES:
         monkeypatch.delenv(name, raising=False)
-    monkeypatch.setattr(_cxr_grid_policy, "output_dir", lambda _kind: tmp_path)
+    monkeypatch.setattr(_cxr_grid_policy, "cache_dir", lambda: tmp_path)
 
 
 def _sweep(energy_keV=77.0, **policy):

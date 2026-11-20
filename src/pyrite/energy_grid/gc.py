@@ -20,9 +20,8 @@ from pathlib import Path
 
 from pyrite import _energy_grid_artifacts as artifacts
 from pyrite._catalog_layout import (
-    ARTIFACT_DIR,
     CatalogLayoutError,
-    catalog_root,
+    artifact_root,
     load_raw,
     read_sources,
 )
@@ -338,7 +337,7 @@ def plan_gc(
     """Inventory roots, record orphan age, and return a deletion-free GC plan."""
     catalog = Path(catalog_path)
     checkpoints = Path(checkpoint_dir)
-    store = Path(store_root) if store_root is not None else catalog_root(catalog) / ARTIFACT_DIR
+    store = Path(store_root) if store_root is not None else artifact_root(catalog)
     now = float(clock())
     if not math.isfinite(now) or now < 0:
         raise ValueError("clock must return a finite nonnegative timestamp")
@@ -425,7 +424,7 @@ def verify_artifacts(
     """Detect missing/corrupt referenced artifacts and corrupt stored objects."""
     catalog = Path(catalog_path)
     checkpoints = Path(checkpoint_dir)
-    store = Path(store_root) if store_root is not None else catalog_root(catalog) / ARTIFACT_DIR
+    store = Path(store_root) if store_root is not None else artifact_root(catalog)
     catalog_roots, _ = _catalog_roots(catalog)
     lock_roots, _, lock_sources = _lock_roots(checkpoints)
     roots = catalog_roots | lock_roots

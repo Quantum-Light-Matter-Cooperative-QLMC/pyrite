@@ -1,12 +1,21 @@
 """Manage persistent CLI context defaults."""
 
+import os
 from pathlib import Path
 
 import click
 
 from ...console import config as _config
-from ...console.output import CLIError, emit_diagnostic, emit_result, emit_table
+from ...console.output import (
+    CLIError,
+    emit_diagnostic,
+    emit_json,
+    emit_result,
+    emit_table,
+    output_option,
+)
 from ...console.tables import value_source
+from ...paths import cache_dir, config_dir, state_dir, user_data_dir
 from ...remote.config import validate_remote_target, validate_slurm_setting
 from .._groups import LazyGroup
 
@@ -21,6 +30,11 @@ def _validated(key: str, value: str) -> str:
     ``profile.current``, so a new key added to the store would be validated
     against the catalog's profile names and rejected.
     """
+    if key == "backend.default":
+        backend = value.strip().lower()
+        if backend not in ("auto", "cpu", "cuda", "rocm", "sycl"):
+            raise click.BadParameter("expected auto, cpu, cuda, rocm or sycl", param_hint="VALUE")
+        return backend
     if key == "remote.target":
         try:
             return validate_remote_target(value)
@@ -145,6 +159,70 @@ def get_command(key: str) -> None:
         click.echo(_config.resolve(key).value)
     except _config.ConfigError as exc:
         raise CLIError(str(exc)) from exc
+
+
+@command.command("paths")
+@output_option
+def paths_command(json_output: bool) -> None:
+    """Show effective config, cache, data, catalog and workspace locations."""
+    from ..._jit_cache import managed_dir
+    from ...console.outputs import OUTPUT_DIRNAME, _cwd, output_workspace
+
+    paths: dict[str, dict[str, str]] = {}
+
+    def add(name: str, path: Path, source: str) -> None:
+        paths[name] = {"path": str(path), "source": source}
+
+    for name, key, directory in (
+        ("config_dir", "PYRITE_CONFIG_DIR", config_dir()),
+        ("cache_dir", "PYRITE_CACHE_DIR", cache_dir()),
+        ("data_dir", "PYRITE_DATA_DIR", user_data_dir()),
+        ("state_dir", "PYRITE_STATE_DIR", state_dir()),
+    ):
+        add(name, directory, key if os.environ.get(key) else "platform default")
+    config_file = _config._store_path_for_read()
+    config_source = (
+        "legacy" if config_file != _config.CONFIG_PATH else paths["config_dir"]["source"]
+    )
+    add("config_file", config_file, config_source)
+    for backend, key in (("numba", "NUMBA_CACHE_DIR"), ("cupy", "CUPY_CACHE_DIR")):
+        managed = managed_dir(backend)
+        value = os.environ.get(key)
+        chosen = Path(value).expanduser() if value else managed
+        source = (
+            key if value and chosen.resolve() != managed.resolve() else paths["cache_dir"]["source"]
+        )
+        add(f"{backend}_cache", chosen, source)
+    add("xsgen_build", cache_dir() / "xsgen" / "build", paths["cache_dir"]["source"])
+    add("xsgen_scratch", cache_dir() / "xsgen" / "scratch", paths["cache_dir"]["source"])
+    add("fetched_data", _config.fetched_data_root(), paths["data_dir"]["source"])
+    add("xsgen_tables", _config.xsgen_data_root() / "tables", paths["data_dir"]["source"])
+    for name in (
+        "line-grids",
+        "analysis",
+        "viewer-renders",
+        "zhai_reproduction",
+        "line-grid-spill",
+    ):
+        add(f"cache.{name}", cache_dir() / name, paths["cache_dir"]["source"])
+    user = _config.resolve("catalog.user")
+    selected = _config.resolve("catalog.path")
+    add("user_catalog", _config.user_catalog_path(), user.source)
+    add("user_artifacts", _config.user_artifact_dir(), paths["data_dir"]["source"])
+    add("selected_catalog", _config.catalog_path(), selected.source)
+    workspace = _config.resolve("workspace.root")
+    output_workspace_path = output_workspace()
+    source = workspace.source
+    if source == "built-in default":
+        source = "discovered" if output_workspace_path != _cwd() else "cwd"
+    add("workspace", output_workspace_path, source)
+    add("output_root", output_workspace_path / OUTPUT_DIRNAME, source)
+
+    if json_output:
+        emit_json("pyrite.config.paths.v1", {"paths": paths})
+    else:
+        rows = [(name, row["path"], row["source"]) for name, row in paths.items()]
+        emit_table(("PURPOSE", "PATH", "SOURCE"), rows)
 
 
 @command.command("list")

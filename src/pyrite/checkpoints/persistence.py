@@ -10,6 +10,7 @@ from collections import defaultdict
 from pathlib import Path
 
 from ..console.outputs import output_dir
+from ..paths import cache_dir
 from ..results import records, sweep_values
 from . import _checkpoint_io, _checkpoint_store
 
@@ -244,7 +245,7 @@ def _material_analysis_cache_path(path, key):
         (_MATERIAL_ANALYSIS_CACHE_VERSION, str(Path(path).resolve()), key), protocol=5
     )
     digest = hashlib.sha256(payload).hexdigest()[:20]
-    return output_dir("cache") / "analysis" / f"{Path(path).stem}-{digest}.pkl"
+    return cache_dir() / "analysis" / f"{Path(path).stem}-{digest}.pkl"
 
 
 def cached_material_analysis(material, analyze, key, checkpoint_dir=None):
@@ -258,7 +259,7 @@ def cached_material_analysis(material, analyze, key, checkpoint_dir=None):
     catalog material thrashes it, forcing a full 140-225 MB gzip re-unpickle
     of every material on each re-render. This cache instead stores
     ``analyze``'s small return value both in memory and under
-    ``pyrite-output/cache/analysis/``. Thus app restarts and eviction from the
+    ``<user cache>/analysis/``. Thus app restarts and eviction from the
     small unpickle cache do not touch the large checkpoint again. Rewriting or
     replacing the checkpoint invalidates the persistent entry automatically.
 

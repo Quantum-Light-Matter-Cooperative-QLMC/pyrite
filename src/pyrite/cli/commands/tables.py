@@ -201,10 +201,9 @@ def command() -> None:
     """Inspect generated cross-section tables and external code trees.
 
     Tables are produced by external Fortran codes (ELSEPA, SBETHE, BremsLib)
-    and resolved in two tiers: your own tables first, then the tables shipped
-    with PyRITE. Consumers cannot tell the two apart. With an explicit
-    workspace, the pre-workspace directory is no longer searched;
-    `pyrite tables migrate` copies its tables into the workspace.
+    and resolved in three tiers: shared user data, read-only legacy workspace
+    tables, then packaged tables. `pyrite tables migrate` copies legacy
+    workspace inputs to the shared user data directory.
 
     \b
     Examples:
@@ -669,8 +668,8 @@ def fetch_command(
     elsepa for both electrons and positrons (the positron pins are what
     `--projectile positron` installs); one that fails is reported and the rest
     still run, and the command exits 1 if any failed.
-    Data lands in the user data directory, or in the selected workspace when
-    PYRITE_HOME or workspace.root is set. Each archive or file is SHA-256
+    Data lands in the shared user data directory (PYRITE_DATA_DIR overrides it),
+    independent of PYRITE_HOME. Each archive or file is SHA-256
     verified before anything is installed, whether it was downloaded or given
     with --archive. Download locations are tried in order (upstream, then
     PyRITE's mirror). A complete existing install returns successfully without
@@ -831,27 +830,69 @@ def verify_command(require: str, json_output: bool) -> None:
         raise click.exceptions.Exit(1)
 
 
+def _migrate_legacy_reference_data(*, dry_run: bool) -> list[str]:
+    """Copy legacy dataset/source files without following symlinks or overwriting.
+
+    Generated xsgen tables are migrated separately as validated pairs; this
+    helper handles the fetched upstream datasets and SBETHE reference assets.
+    """
+    import shutil
+    from pathlib import Path
+
+    from ...console.config import fetched_data_root, resolve, workspace_root
+
+    if resolve("workspace.root").source == "built-in default":
+        return []
+    workspace = workspace_root()
+    destination = fetched_data_root()
+    migrated: list[str] = []
+    for relative in (Path("xsgen/reference-data"), Path("datasets")):
+        root = workspace / relative
+        if not root.is_dir() or root.is_symlink() or root == destination / relative:
+            continue
+        for source in sorted(root.rglob("*")):
+            if source.is_symlink() or not source.is_file():
+                continue
+            if any(
+                parent.is_symlink()
+                for parent in source.parents
+                if parent == root or root in parent.parents
+            ):
+                continue
+            target = destination / relative / source.relative_to(root)
+            if target.exists() or target.is_symlink():
+                continue
+            migrated.append(str(source))
+            if dry_run:
+                continue
+            target.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                with source.open("rb") as stream, target.open("xb") as output:
+                    shutil.copyfileobj(stream, output)
+            except FileExistsError:
+                migrated.pop()
+            except BaseException:
+                target.unlink(missing_ok=True)
+                raise
+    return migrated
+
+
 @command.command("migrate")
 @click.option(
     "--dry-run", is_flag=True, help="Report what would be copied without writing anything."
 )
 @output_option
 def migrate_command(dry_run: bool, json_output: bool) -> None:
-    """Copy tables from the deprecated legacy directory into your workspace.
+    """Copy legacy workspace tables and input data into the shared data root.
 
-    With a workspace selected (PYRITE_HOME or workspace.root), tables are
-    stored in <workspace>/xsgen/tables, but the pre-workspace directory
-    <user data dir>/xsgen/tables is still searched as a deprecated tier; it
-    stops being searched in the next release. This copies every table found
-    there that the workspace lacks. Nothing is deleted or overwritten: legacy
-    files stay in place, and a key the workspace already holds is skipped.
-    Without a workspace the two directories are the same and there is nothing
-    to do. Exits 0.
+    Input identity and hashes remain unchanged. This copies only missing files,
+    never removes or overwrites old copies, and supports --dry-run. Exits 0.
     """
     from ...xsgen.store import migrate_legacy_tables
 
     try:
         report = migrate_legacy_tables(dry_run=dry_run)
+        legacy_inputs = _migrate_legacy_reference_data(dry_run=dry_run)
     except OSError as exc:
         raise CLIError(f"could not migrate tables: {exc}") from exc
     if json_output:
@@ -864,17 +905,24 @@ def migrate_command(dry_run: bool, json_output: bool) -> None:
                 "dry_run": report.dry_run,
                 "copied": list(report.copied),
                 "present": list(report.present),
+                "legacy_inputs": legacy_inputs,
             },
         )
         return
-    if not report.active:
+    if not report.active and not legacy_inputs:
         emit_result(f"nothing to migrate: {report.source} is the selected table directory")
         return
     verb = "would copy" if dry_run else "copied"
-    emit_result(
-        f"{verb} {len(report.copied)} table(s) from {report.source} to {report.destination}; "
-        f"{len(report.present)} already present"
-    )
+    if report.active:
+        emit_result(
+            f"{verb} {len(report.copied)} table(s) from {report.source} to {report.destination}; "
+            f"{len(report.present)} already present"
+        )
+    if legacy_inputs:
+        emit_result(
+            f"{verb} {len(legacy_inputs)} reference-data/dataset file(s): "
+            + ", ".join(legacy_inputs)
+        )
 
 
 @command.group("sources", cls=LazyGroup)

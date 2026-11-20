@@ -20,6 +20,7 @@ Each context value resolves independently in this order:
 
 | key | environment | built-in |
 |---|---|---|
+| `backend.default` | `PYRITE_MC_BACKEND` | `auto` |
 | `profile.current` | `PYRITE_PROFILE` | `standard` |
 | `remote.target` | `PYRITE_REMOTE_HOST` | unset; configure an SSH host alias to use remote commands |
 | `remote.gpu_vendor` | `PYRITE_REMOTE_GPU_VENDOR` | `nvidia` |
@@ -33,18 +34,22 @@ Each context value resolves independently in this order:
 `pyrite config explain KEY` shows its input domain, environment mapping, default
 and winning precedence source. Help does not dump the inventory.
 
-The persistent inventory also includes `catalog.path`, `catalog.user`,
+The persistent inventory also includes `backend.default`, `catalog.path`, `catalog.user`,
 `xsgen.bremslib_source`, `xsgen.elsepa_source`, `xsgen.sbethe_source`, and
 `mott.tables_dir`. Paths are expanded and normalized on setting; `catalog.user`
 can select a new user layer that does not yet exist.
-Backend selection is managed by `config setup`; `PYRITE_MC_BACKEND`, `PYRITE_FP64`,
+Backend selection is managed by `config setup` in `config.toml`, not `.env`.
+The `PYRITE_MC_BACKEND` environment variable overrides the saved default.
+`PYRITE_FP64`,
 transport/resource tuning, automatic grid tolerances, and remote executable/path
-settings remain process-scoped environment controls, not arbitrary config-store
-keys. The inventory below is their maintained owner.
+settings remain process-scoped environment controls. The inventory below is
+their maintained owner.
 
-`config set` writes atomically to Click's platform-specific user configuration directory.
+`config set` writes atomically to platformdirs' native user configuration directory
+(`PYRITE_CONFIG_DIR` overrides it). A former Click/Windows roaming config is
+read when the native location is empty and migrated on the next `config set`.
 
-The workspace resolver uses an explicit command path first, then the effective `workspace.root`. Generated output paths use `<workspace>/pyrite-output/<kind>/`. With no explicit workspace, output resolution searches upward from cwd for an existing `pyrite-output/` tree before falling back to cwd. See the [output-home rules](../reference/catalogs-and-workspaces.md#output-home) for migration and cache lifecycle. Packaged catalog and CIF data remain package-relative and are never redirected into the workspace.
+The workspace resolver uses an explicit command path first, then the effective `workspace.root`. Generated output paths use `<workspace>/pyrite-output/<kind>/`. With no explicit workspace, output resolution searches upward from cwd for an existing `pyrite-output/` tree, excluding HOME and other mounts, before falling back to cwd. Generated tables and fetched datasets instead use the user data root regardless of `PYRITE_HOME`. See the [output-home rules](../reference/catalogs-and-workspaces.md#output-home) and [files PyRITE writes](../reference/catalogs-and-workspaces.md#files-pyrite-writes) for migration and cache lifecycle. Packaged catalog and CIF data remain package-relative and are never redirected into the workspace.
 
 ## Environment-variable reference
 
@@ -60,8 +65,12 @@ change scheduling, memory, or profiling only.
 |---|---|---|---|
 | `PYRITE_PROFILE` | Campaign-profile name; unset resolves to `standard`. Empty is invalid. | Command option > environment > config store > default; `console.config`. | selects configuration |
 | `PYRITE_REMOTE_HOST` | SSH-config host alias; unset means remote commands require configuration. | Command option > environment > config store; `console.config`, `remote.config`. | remote destination |
-| `PYRITE_HOME` | Workspace-root path; unset resolves to the current directory. | Explicit workspace/checkpoint path > environment > config store > cwd; `console.config`. | checkpoint/artifact location |
-| `PYRITE_MC_BACKEND` | `auto`, `cpu`, `cuda`, `rocm`, or `sycl`; unset is `auto`. An explicit unavailable accelerator, or one whose device lacks native fp64, fails; `auto` falls back to CPU. | Process-wide backend selection; `_backend`. | **numerics**, resources |
+| `PYRITE_HOME` | Output-workspace path; without an explicit or stored value, search for a nearby output tree (excluding HOME), then cwd. Never relocates fetched tables or datasets. | Explicit workspace > environment > config store > discovery > cwd; `console.outputs`. | checkpoint/artifact location |
+| `PYRITE_MC_BACKEND` | `auto`, `cpu`, `cuda`, `rocm`, or `sycl`; unset reads `backend.default` from the config store (built-in `auto`). | Explicit > environment > config store > built-in; `_backend`. | **numerics**, resources |
+| `PYRITE_CONFIG_DIR` | Config store root; unset uses platformdirs. | Environment > platform default; `paths`. | configuration location |
+| `PYRITE_CACHE_DIR` | JIT, xsgen and application cache root; unset uses platformdirs. | Environment > platform default; `paths`. | cache storage |
+| `PYRITE_DATA_DIR` | Shared tables, datasets, grid artifacts; unset uses platformdirs. Remote jobs export the box checkout root. | Environment > platform default; `paths`. | input storage |
+| `PYRITE_STATE_DIR` | App state root; unset uses platformdirs. | Environment > platform default; `paths`. | app state |
 | `PYRITE_MC_SYCL_DEVICE` | A dpctl SYCL device selector; unset chooses the first usable GPU. | Used only when the SYCL backend resolves; `_backend`. | hardware choice |
 | `PYRITE_FP64` | Set to `1` for float64 accelerator calculations; any other or unset value retains the normal CPU float64/GPU float32 behavior. | Process-wide; `_backend`. | **numerics**, resources |
 | `PYRITE_MC_TRANSPORT_CORE` | `lockstep`, `per-electron`, `cuda`, or `auto`; unset leaves the requested/automatic core selection in force. | Process-wide transport pin; `montecarlo.transport.batching`. | **numerics**, resources |

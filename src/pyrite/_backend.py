@@ -356,7 +356,11 @@ def _load_sycl() -> SyclBackend:
 def select_backend(requested: str | None = None) -> ArrayBackend:
     """Resolve requested backend; ``auto`` alone may fall back to NumPy."""
 
-    requested = (requested or env_value("PYRITE_MC_BACKEND", "auto")).strip().lower()
+    if requested is None:
+        from .console.config import resolve
+
+        requested = resolve("backend.default").value
+    requested = requested.strip().lower()
     if requested not in _VALID_BACKENDS:
         raise BackendUnavailableError(
             f"PYRITE_MC_BACKEND must be one of {', '.join(_VALID_BACKENDS)}; got {requested!r}"

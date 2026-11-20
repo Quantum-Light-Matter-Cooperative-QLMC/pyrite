@@ -11,7 +11,7 @@ from typing import Any, Literal, cast
 import numpy as np
 
 from .. import DATA_DIR, _config_presets
-from .._catalog_layout import ARTIFACT_DIR, catalog_root
+from .._catalog_layout import artifact_root, catalog_root
 from .._channeling_table import channeling_table_values
 from .._cxr_grid_policy import PROFILE_CXR_GRID_SELECTORS
 from .._cxr_vocabulary import catalog_key
@@ -887,7 +887,7 @@ def _load_profile_artifacts(
             all_refs[name] = MappingProxyType(refs)
 
     selected: dict[str, tuple[str, Mapping[str, object]]] = {}
-    store_root = catalog_root(source) / ARTIFACT_DIR
+    store_root = artifact_root(source)
     for material, digest in all_refs.get(profile_name, {}).items():
         path = f"profiles.{profile_name}.energy_grid_refs.{material}"
         try:

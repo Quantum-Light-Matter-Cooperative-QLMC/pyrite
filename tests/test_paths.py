@@ -76,6 +76,8 @@ def test_legacy_state_moves_out_of_config_dir(monkeypatch, tmp_path):
 
 
 def test_platform_cache_and_data_use_pyrite(monkeypatch, tmp_path):
+    for name in ("PYRITE_CACHE_DIR", "PYRITE_DATA_DIR", "PYRITE_STATE_DIR"):
+        monkeypatch.delenv(name, raising=False)
     monkeypatch.setattr("pyrite.paths.user_cache_path", lambda *args, **kwargs: tmp_path / "cache")
     monkeypatch.setattr("pyrite.paths.user_data_path", lambda *args, **kwargs: tmp_path / "data")
     monkeypatch.setattr("pyrite.paths.user_state_path", lambda *args, **kwargs: tmp_path / "state")

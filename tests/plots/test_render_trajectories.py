@@ -56,10 +56,11 @@ def test_render_cache_key_changes_with_color_scale():
     )
 
 
-def test_render_cache_dir_honors_workspace(tmp_path, monkeypatch):
-    monkeypatch.setenv("PYRITE_HOME", str(tmp_path))
+def test_render_cache_dir_is_the_user_cache_not_the_workspace(tmp_path, monkeypatch):
+    monkeypatch.setenv("PYRITE_HOME", str(tmp_path / "ws"))
+    monkeypatch.setenv("PYRITE_CACHE_DIR", str(tmp_path / "cache"))
     out = render_cache_dir()
-    assert out == tmp_path / "pyrite-output" / "cache" / "viewer-renders"
+    assert out == tmp_path / "cache" / "viewer-renders"
     assert out.is_dir()
 
 

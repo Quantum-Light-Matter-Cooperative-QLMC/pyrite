@@ -29,7 +29,7 @@ import tomlkit
 
 from pyrite import _energy_grid_artifacts as artifacts
 from pyrite._catalog_layout import (
-    ARTIFACT_DIR,
+    artifact_root,
     bundled_catalog,
     catalog_root,
     read_raw,
@@ -434,9 +434,7 @@ def _profile_row(document, profile: str):
 
 
 def _artifact_store_root(catalog_path: Path | str | None = None) -> Path:
-    return (
-        catalog_root(active_catalog_path() if catalog_path is None else catalog_path) / ARTIFACT_DIR
-    )
+    return artifact_root(active_catalog_path() if catalog_path is None else catalog_path)
 
 
 def _existing_artifact_rows(

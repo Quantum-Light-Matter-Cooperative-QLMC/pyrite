@@ -38,6 +38,28 @@ def test_status_json_reports_locations_and_sizes(managed):
     }
 
 
+def test_regenerable_cache_family_status_and_clear(monkeypatch, tmp_path):
+    monkeypatch.setattr(cache_command, "cache_dir", lambda: tmp_path)
+    family = tmp_path / "line-grids"
+    family.mkdir()
+    (family / "result.json").write_bytes(b"1234")
+
+    status = invoke(cache_command.command, ["status", "--backend", "line-grids", "-o", "json"])
+    assert_clean_result(status)
+    (row,) = json.loads(status.stdout)["payload"]["locations"]
+    assert row["path"] == str(family)
+    assert row["bytes"] == 4
+
+    preview = invoke(cache_command.command, ["clear", "--backend", "line-grids"])
+    assert_clean_result(preview)
+    assert family.is_dir()
+    assert "preview only" in preview.stdout
+
+    cleared = invoke(cache_command.command, ["clear", "--backend", "line-grids", "--yes"])
+    assert_clean_result(cleared)
+    assert not family.exists()
+
+
 def test_status_table_lists_every_location(managed):
     result = invoke(cache_command.command, ["status"])
     assert_clean_result(result)
@@ -63,7 +85,7 @@ def test_clear_previews_without_tty_then_deletes_with_yes(managed):
     assert not (managed / "cupy").exists()
 
     result = invoke(cache_command.command, ["clear", "--backend", "cupy", "--yes"])
-    assert_clean_result(result, stdout="no PyRITE-owned compiled kernels to clear\n")
+    assert_clean_result(result, stdout="no PyRITE-owned caches to clear\n")
 
 
 def test_clear_skips_user_cupy_cache_on_stderr(managed, monkeypatch, tmp_path):
@@ -73,7 +95,7 @@ def test_clear_skips_user_cupy_cache_on_stderr(managed, monkeypatch, tmp_path):
     result = invoke(cache_command.command, ["clear", "--backend", "cupy", "--yes"])
     assert result.exit_code == 0
     assert f"skip cupy {user}: not PyRITE-owned" in result.stderr
-    assert result.stdout == "no PyRITE-owned compiled kernels to clear\n"
+    assert result.stdout == "no PyRITE-owned caches to clear\n"
     assert user.exists()
 
 

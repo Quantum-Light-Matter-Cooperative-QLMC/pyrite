@@ -73,7 +73,9 @@ kernels under the PyRITE user cache directory (`~/.cache/pyrite/numba` and
 already set to a non-empty value, which always wins. Older in-tree `__pycache__`
 entries beside the PyRITE sources and CuPy's `~/.cupy/kernel_cache` are not
 used by default; `pyrite cache status` still reports the in-tree location as
-legacy and `pyrite cache clear` removes its PyRITE entries.
+legacy and `pyrite cache clear` removes its PyRITE entries. `PYRITE_CACHE_DIR`
+moves the whole cache root; `pyrite config paths` lists every location PyRITE
+writes (see [files PyRITE writes](../reference/catalogs-and-workspaces.md#files-pyrite-writes)).
 
 To pay the compile cost once, before a job or on a new node, run
 `pyrite cache warm`. It simulates one-electron cases and discards the results;

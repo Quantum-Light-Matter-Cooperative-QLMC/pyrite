@@ -22,7 +22,7 @@ from pyrite.plots.plotly.trajectories import (
 )
 
 from ..._util.extras import require_extra
-from ...console.outputs import output_dir
+from ...paths import cache_dir
 
 _RENDER_SALT = "v3"  # bump on any change to the cache-key inputs or render format
 
@@ -141,8 +141,8 @@ def render_cache_key(
 
 
 def render_cache_dir():
-    """Workspace viewer-render cache, created if missing."""
-    out = output_dir("cache") / "viewer-renders"
+    """Platform user viewer-render cache, created if missing."""
+    out = cache_dir() / "viewer-renders"
     out.mkdir(parents=True, exist_ok=True)
     return out
 

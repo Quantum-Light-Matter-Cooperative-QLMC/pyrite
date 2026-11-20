@@ -74,7 +74,7 @@ Choose a family for its complete help, options, defaults, and examples.
 - [`pyrite filter`](cli-reference-filter.md) — Manage reusable downstream filter presets, separate from placements.
 - [`pyrite target`](cli-reference-target.md) — Manage reusable slab and stack targets, attached per profile material.
 - [`pyrite tables`](cli-reference-tables.md) — Inspect generated cross-section tables and external code trees.
-- [`pyrite cache`](cli-reference-cache.md) — Inspect, warm, and clear compiled CPU (Numba) and GPU (CuPy) kernel caches.
+- [`pyrite cache`](cli-reference-cache.md) — Inspect, warm, and clear compiled kernels and regenerable caches.
 
 ```{toctree}
 :hidden:
@@ -211,6 +211,7 @@ Existing command fragments remain available below; each link opens the full fami
 - <span id="pyrite-config-get"></span>[`pyrite config get`](cli-reference-config.md#pyrite-config-get)
 - <span id="pyrite-config-keys"></span>[`pyrite config keys`](cli-reference-config.md#pyrite-config-keys)
 - <span id="pyrite-config-list"></span>[`pyrite config list`](cli-reference-config.md#pyrite-config-list)
+- <span id="pyrite-config-paths"></span>[`pyrite config paths`](cli-reference-config.md#pyrite-config-paths)
 - <span id="pyrite-config-set"></span>[`pyrite config set`](cli-reference-config.md#pyrite-config-set)
 - <span id="pyrite-config-unset"></span>[`pyrite config unset`](cli-reference-config.md#pyrite-config-unset)
 - <span id="pyrite-config-setup"></span>[`pyrite config setup`](cli-reference-config.md#pyrite-config-setup)

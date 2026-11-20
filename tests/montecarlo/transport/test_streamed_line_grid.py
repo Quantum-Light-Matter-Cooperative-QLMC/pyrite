@@ -13,10 +13,10 @@ import pytest
 
 from pyrite._cxr_grid_policy import resolve_cxr_grid_policy
 from pyrite.campaign.sweep import BeamSpec, Sweep, build_cases
-from pyrite.console.config import output_dir
 from pyrite.montecarlo import runner
 from pyrite.montecarlo.runner.streamed_line_grid import WINDOWED_POLICY_REFUSAL, _drain
 from pyrite.montecarlo.runner.streamed_scoring import run_case_streamed, streaming_refusal
+from pyrite.paths import cache_dir
 
 SPECTRA = ("spec", "spec_characteristic", "brem_wide", "brem")
 
@@ -60,7 +60,7 @@ def _measured_policy(case):
 
 
 def _clear_grid_cache():
-    shutil.rmtree(output_dir("cache"), ignore_errors=True)
+    shutil.rmtree(cache_dir(), ignore_errors=True)
 
 
 def _joined(case):

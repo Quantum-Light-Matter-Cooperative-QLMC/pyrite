@@ -28,6 +28,7 @@ Commands:
   get         Print the effective value for KEY.
   keys        Describe supported keys without reading...
   list        List effective values and sources,...
+  paths       Show effective config, cache, data,...
   set         Persist VALUE for KEY.
   unset       Remove the stored value for KEY.
   setup       Detect GPU hardware and persist the selected backend.
@@ -80,6 +81,19 @@ Options:
   -h, --help  Show this message and exit.
 ```
 
+## `pyrite config paths`
+
+```text
+Usage: pyrite config paths [OPTIONS]
+
+  Show effective config, cache, data, catalog and workspace locations.
+
+Options:
+  -o, --output [table|json]  Output format; only json is a stable automation contract.
+                             [default: table]
+  -h, --help                 Show this message and exit.
+```
+
 ## `pyrite config set`
 
 ```text
@@ -111,17 +125,17 @@ Options:
 ```text
 Usage: pyrite config setup [OPTIONS]
 
-  Detect installed GPU hardware and write PYRITE_MC_BACKEND to repo-root .env.
+  Detect installed GPU hardware and save backend.default in config.toml.
 
   Probes OS-level tooling only (nvidia-smi, rocm-smi/rocminfo, clinfo/sycl-ls/lspci) --
   no vendor Python package (cupy, dpnp/dpctl) needs to be installed first. Prompts
   interactively to opt into an accelerator; defaults to cpu if none is detected,
-  declined, or the session is non-interactive. A no-op once PYRITE_MC_BACKEND is already
-  set in .env, unless --force is given.
+  declined, or the session is non-interactive. A no-op once backend.default is already
+  stored, unless --force is given.
 
 Options:
   -y, --yes   Accept the top detected accelerator without an interactive prompt.
-  --force     Re-run detection and write the canonical PYRITE_MC_BACKEND value in .env.
+  --force     Re-run detection and replace backend.default in the user config store.
   -h, --help  Show this message and exit.
 ```
 

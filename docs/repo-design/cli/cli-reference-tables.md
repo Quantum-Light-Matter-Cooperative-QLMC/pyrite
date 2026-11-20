@@ -14,9 +14,9 @@ Usage: pyrite tables [OPTIONS] COMMAND [ARGS]...
   Inspect generated cross-section tables and external code trees.
 
   Tables are produced by external Fortran codes (ELSEPA, SBETHE, BremsLib) and resolved
-  in two tiers: your own tables first, then the tables shipped with PyRITE. Consumers
-  cannot tell the two apart. With an explicit workspace, the pre-workspace directory is
-  no longer searched; `pyrite tables migrate` copies its tables into the workspace.
+  in three tiers: shared user data, read-only legacy workspace tables, then packaged
+  tables. `pyrite tables migrate` copies legacy workspace inputs to the shared user data
+  directory.
 
   Examples:
     pyrite tables path
@@ -38,7 +38,7 @@ Commands:
   fetch     Fetch pinned data into your user data...
   generate  Generate or reuse one external-code table.
   list      List stored tables, most-preferred tier...
-  migrate   Copy tables from the deprecated legacy...
+  migrate   Copy legacy workspace tables and input...
   path      Print the directory your generated tables...
   show      Print the provenance manifest for the...
   sources   Show and configure where the external code...
@@ -86,8 +86,8 @@ Usage: pyrite tables fetch [OPTIONS] [eedl|eadl|epdl|epdl-differential|sbethe|sb
   Without CODE every one except bote-salvat is fetched in the order above, sbethe-tables
   and elsepa for both electrons and positrons (the positron pins are what `--projectile
   positron` installs); one that fails is reported and the rest still run, and the
-  command exits 1 if any failed. Data lands in the user data directory, or in the
-  selected workspace when PYRITE_HOME or workspace.root is set. Each archive or file is
+  command exits 1 if any failed. Data lands in the shared user data directory
+  (PYRITE_DATA_DIR overrides it), independent of PYRITE_HOME. Each archive or file is
   SHA-256 verified before anything is installed, whether it was downloaded or given with
   --archive. Download locations are tried in order (upstream, then PyRITE's mirror). A
   complete existing install returns successfully without network access.
@@ -184,15 +184,10 @@ Options:
 ```text
 Usage: pyrite tables migrate [OPTIONS]
 
-  Copy tables from the deprecated legacy directory into your workspace.
+  Copy legacy workspace tables and input data into the shared data root.
 
-  With a workspace selected (PYRITE_HOME or workspace.root), tables are stored in
-  <workspace>/xsgen/tables, but the pre-workspace directory <user data dir>/xsgen/tables
-  is still searched as a deprecated tier; it stops being searched in the next release.
-  This copies every table found there that the workspace lacks. Nothing is deleted or
-  overwritten: legacy files stay in place, and a key the workspace already holds is
-  skipped. Without a workspace the two directories are the same and there is nothing to
-  do. Exits 0.
+  Input identity and hashes remain unchanged. This copies only missing files, never
+  removes or overwrites old copies, and supports --dry-run. Exits 0.
 
 Options:
   --dry-run                  Report what would be copied without writing anything.

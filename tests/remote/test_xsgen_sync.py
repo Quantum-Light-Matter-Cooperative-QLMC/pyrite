@@ -218,7 +218,8 @@ def test_remote_runtime_resolves_the_inventoried_tier_over_ambient_workspace(tmp
     ambient = tmp_path / "ambient-workspace"
     console_config.set_stored("workspace.root", str(ambient))
     monkeypatch.setenv("PYRITE_HOME", str(ambient))
-    assert user_table_dir() == ambient / "xsgen/tables"
+    monkeypatch.setenv("PYRITE_DATA_DIR", str(tmp_path / "local-data"))
+    assert user_table_dir() == tmp_path / "local-data/xsgen/tables"
     synced = tmp_path / "synced checkout"
     monkeypatch.setattr(config, "REMOTE_DIR", str(synced))
     for assignment in shlex.split(config.remote_runtime_env()):

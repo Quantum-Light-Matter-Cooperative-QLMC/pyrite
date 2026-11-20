@@ -32,12 +32,13 @@ trees, and a table generated from patched sources is a different table.
 
 import hashlib
 import json
+import warnings
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
 from ..console import config as _config
-from ..paths import data_dir, user_data_dir
+from ..paths import data_dir
 from ._errors import SourceUnavailableError
 
 #: Chunk size for hashing Fortran sources. They are small (the largest is
@@ -211,26 +212,27 @@ def fetched_data_dir(code: str, name: str) -> Path:
     if name not in spec.data_dirs:
         known = ", ".join(spec.data_dirs) or "none"
         raise KeyError(f"{code!r} has no data directory {name!r}; known: {known}")
-    from ..console.config import resolve, workspace_root
-
-    root = (
-        user_data_dir()
-        if resolve("workspace.root").source == "built-in default"
-        else workspace_root()
-    )
-    return root / "xsgen" / "reference-data" / spec.name / name
+    return _config.fetched_data_root() / "xsgen" / "reference-data" / spec.name / name
 
 
 def installed_data_dir(code: str, name: str) -> Path:
-    """Return the fetched data directory in use: selected tier, else legacy.
+    """Return the fetched directory, with read-only workspace fallback.
 
-    The pre-workspace ``<user data dir>`` location is used only when it exists
-    and the selected tier does not. The path is returned whether or not it
-    exists, so callers can quote it in an error message.
+    Prefer the shared data root. An explicit former workspace is searched
+    only when the shared copy is absent.
     """
     selected = fetched_data_dir(code, name)
-    legacy = user_data_dir() / "xsgen" / "reference-data" / code_spec(code).name / name
-    return selected if selected.is_dir() or not legacy.is_dir() else legacy
+    if selected.is_dir() or _config.resolve("workspace.root").source == "built-in default":
+        return selected
+    legacy = _config.workspace_root() / "xsgen" / "reference-data" / code_spec(code).name / name
+    if legacy != selected and legacy.is_dir():
+        warnings.warn(
+            f"reading legacy workspace data at {legacy}; migrate to {_config.fetched_data_root()}",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+        return legacy
+    return selected
 
 
 def _accepts(spec: CodeSpec, candidate: Path) -> bool:

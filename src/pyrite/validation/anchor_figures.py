@@ -43,6 +43,8 @@ from pathlib import Path
 import numpy as np
 from tabulate import tabulate
 
+from pyrite.paths import cache_dir  # noqa: E402
+
 _HERE = Path(__file__).resolve().parent
 _PACKAGE_ROOT = _HERE.parent
 from pyrite.detectors import Detector, LegacyEDS  # noqa: E402, I001
@@ -98,8 +100,8 @@ _ZHAI_FIG3B_EXPERIMENT = _EXTERNAL_BREM_V1 / "zhai_fig3b_25kev_1mm_experiment.cs
 
 
 def zhai_cache_dir() -> Path:
-    """Return the default Zhai cache, ``<workspace>/pyrite-output/cache/zhai_reproduction``."""
-    return output_dir("cache") / "zhai_reproduction"
+    """Return the default Zhai cache in the platform user cache directory."""
+    return cache_dir() / "zhai_reproduction"
 
 
 class ZhaiCacheMiss(FileNotFoundError):
@@ -293,7 +295,7 @@ def cached_model_spectra(
     """Load or atomically cache a Zhai reproduction keyed by inputs and code.
 
     Returns ``(model, cache_hit, path)``. Cache files are local generated
-    artifacts under ``pyrite-output/cache/zhai_reproduction`` by default.
+    artifacts under ``<user cache>/zhai_reproduction`` by default.
     """
     from pyrite.checkpoints import _checkpoint_io
 
@@ -517,7 +519,7 @@ def reproduce_all(
     exploratory-azimuth control default; the value is part of the cache key.
 
     No figures -- this only leaves correct, hash-addressed .pkl files on disk
-    under ``cache_dir`` (default pyrite-output/cache/zhai_reproduction/). This is the
+    under ``cache_dir`` (default <user cache>/zhai_reproduction/). This is the
     unit behind ``pyrite._entry.reproduce_zhai`` / ``pyrite app validation reproduce``,
     which runs here by default and on the box with ``--remote``.
 

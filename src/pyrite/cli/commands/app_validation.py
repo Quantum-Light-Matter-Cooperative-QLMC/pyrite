@@ -13,7 +13,7 @@ resolve or persist.
     pyrite app validation --edit      # `marimo edit` instead of `marimo run`
     pyrite app validation reproduce   # populate the Zhai reproduction cache
     pyrite app validation export      # skip marimo; render the full Zhai figure
-                                    # set from pyrite-output/cache/zhai_reproduction/
+                                    # set from <user cache>/zhai_reproduction/
                                     # (see `pyrite app validation reproduce`) to pyrite-output/figures/
 """
 

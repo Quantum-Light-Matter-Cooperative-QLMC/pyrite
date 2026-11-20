@@ -230,9 +230,9 @@ def _spill_parents(monkeypatch):
 def _clear_grid_cache():
     import shutil
 
-    from pyrite.console.outputs import output_dir
+    from pyrite.paths import cache_dir
 
-    shutil.rmtree(output_dir("cache"), ignore_errors=True)
+    shutil.rmtree(cache_dir(), ignore_errors=True)
 
 
 def test_spill_controls_choose_directory_and_threshold(monkeypatch, tmp_path):
