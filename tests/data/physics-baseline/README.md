@@ -526,3 +526,12 @@ payloads changed in `resolved.json`, `channeling.json` and
 `reflection_selection_1173.json`; the generation-dependent identity hashes were
 re-pinned with `pyrite-dev test-suite identity-pins --update-pins`
 (`STRUCTURE_FACTOR_MODEL` v1 → v2). Non-Si cases are unchanged.
+
+The same `B` also enters the Si Debye–Waller factor of the scored lines and of
+the lattice-coherent CBS share removed from the coupled continuum, so recorded
+outputs do move. Re-pinned in `outputs.json` (CPU/NumPy fp64, Python 3.14): the
+legacy, EEDL-fallback, multilayer and coherent `spec` arrays (≤ 5.6e-4
+relative), coherent `spec_coherent` (5.7e-4) and `coupled.brem_wide` (6 of 71
+bins, ≤ 3.6e-10). Seeded transport signatures (counts, `path_ang`, flight and
+energy samples), `spec_characteristic`, `brem` and every tolerance are
+unchanged (differences ≤ 1e-15 relative).
