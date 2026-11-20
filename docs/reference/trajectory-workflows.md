@@ -64,7 +64,16 @@ pyrite trajectories score pyrite-output/trajectories/
 
 This replays only the spectrum phase (line, characteristic, and bremsstrahlung spectra) of every captured case and stores each result as an ordinary record of the checkpoint stem and run identity the capturing run recorded, under `--checkpoint-dir` (default `pyrite-output/checkpoints/<stem>`). It never transports. Each new record carries `source_trajectory` with the artifact's path and SHA-256. Records that already exist are kept unless `--overwrite`, and records of cases without an artifact are never touched, so re-scoring a run's own checkpoint after a spectrum-phase change replaces exactly the captured cases. The shared per-case cache is neither read nor written.
 
-Every artifact is checked before anything is written. The command refuses artifacts from before this schema (re-run the case with `--trajectories`), incomplete or foreign files named explicitly (a directory scan skips them with a warning), artifacts written outside a run, two runs' artifacts for one stem, and a target checkpoint written by a different run. Spectrum inputs that the case alone determines are recomputed and must match what the artifact stored.
+Artifacts written outside a run by `pyrite.storage.save_trajectories` record no checkpoint stem, so they have no checkpoint to join. The same command scores each to one NumPy result file instead: `<artifact>.npz` beside it, or mirrored under `--out-dir DIR`:
+
+```bash
+pyrite trajectories score api.h5                  # writes api.npz
+pyrite trajectories score saved/ --out-dir spectra/
+```
+
+The replay is `pyrite.score_spectra(load_trajectories(path, stream=True))` of the recorded case, so the spectra equal it to streamed-scoring precision (rtol 1e-12). The file holds `<component>_photon_energy_eV` (eV) and `<component>_density` (photons / incident electron / eV / sr, response-free source density) for `cxr_incoherent`, `characteristic` and `brem` (plus `cxr_coherent`, `channeling`, `transition` and `<component>_bin_edges_eV` where the case produces them), and a JSON `metadata` entry with the units, case name and energy, identity digest, and the artifact's path, SHA-256 and schema. An existing `.npz` is kept unless `--overwrite`; writes are atomic. Other detectors, grids, or rebound components are not available from the command; load the artifact with its components and call `score_spectra` from Python. Inputs may mix both kinds; `--checkpoint-dir` and `--out-dir` are each refused when no input uses them.
+
+Every artifact is checked before anything is written. The command refuses artifacts from before this schema (re-run the case with `--trajectories`), incomplete or foreign files named explicitly (a directory scan skips them with a warning), artifacts recording only part of a run identity, two runs' artifacts for one stem, a target checkpoint written by a different run, and saved artifacts whose segments no longer match their recorded fingerprint (verified one row field at a time) or that were transported with explicit `E_cut_keV`/`max_steps`. Spectrum inputs that the case alone determines are recomputed and must match what the artifact stored.
 
 Segments stream in whole-electron blocks, bounded by `--max-segments`
 (default 1,048,576). One whole history may exceed the bound. Scored spectra
@@ -207,8 +216,9 @@ pyrite.score_spectra(recorded)  # the recorded case and detector only
 
 Without components, which is how run captures load, the result replays only
 its recorded case and detector, with the inputs the run stored; this is the
-computation `pyrite trajectories score` performs. That command scores into run
-checkpoints and therefore accepts run captures only. `stream=True` leaves the
+computation `pyrite trajectories score` performs: into run checkpoints for run
+captures, and to `.npz` result files for artifacts from `save_trajectories`
+(see above). `stream=True` leaves the
 segments on disk and scores the recorded case in bounded-memory electron
 blocks; streamed spectra equal in-memory ones to floating-point summation order
 (rtol 1e-12 in tests), and coherent or temporal cases are refused. The

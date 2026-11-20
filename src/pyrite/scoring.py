@@ -212,8 +212,14 @@ def _refuse_rebinding(*inputs: Any) -> None:
         )
 
 
-def _score_recorded(trajectories: Trajectories, progress) -> Result:
-    """Replay a loaded artifact's own case with its recorded spectrum inputs."""
+def _score_recorded(
+    trajectories: Trajectories, progress, max_segments: int | None = None
+) -> Result:
+    """Replay a loaded artifact's own case with its recorded spectrum inputs.
+
+    ``max_segments`` bounds the rows per block of a streamed replay (default:
+    the engine's bound); the CLI sets it, ``score_spectra`` does not.
+    """
     from .api import _case_result
     from .montecarlo.runner import _spectrum_with_recovery
     from .montecarlo.runner.transport_options import run_progress
@@ -221,7 +227,7 @@ def _score_recorded(trajectories: Trajectories, progress) -> Result:
     case = trajectories.case
     with run_progress(progress):
         if trajectories._stream:
-            output = _streamed_output(trajectories)
+            output = _streamed_output(trajectories, max_segments)
         else:
             output = _spectrum_with_recovery(
                 case, dict(trajectories._transport), segs_owner=trajectories._transport
@@ -252,13 +258,15 @@ def _require_recorded_case(trajectories: Trajectories, case, detector) -> None:
             )
 
 
-def _streamed_output(trajectories: Trajectories) -> dict[str, Any]:
+def _streamed_output(trajectories: Trajectories, max_segments: int | None = None) -> dict[str, Any]:
     from .montecarlo.runner.artifacts import stream_spectrum_from_artifact
     from .montecarlo.trajectories import TrajectoryArtifactError
 
     assert trajectories._source is not None
     try:
-        return stream_spectrum_from_artifact(trajectories._source)
+        if max_segments is None:
+            return stream_spectrum_from_artifact(trajectories._source)
+        return stream_spectrum_from_artifact(trajectories._source, max_segments=max_segments)
     except TrajectoryArtifactError as error:
         raise ScoringRefusedError("stream", str(error)) from error
 

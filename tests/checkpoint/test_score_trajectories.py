@@ -211,13 +211,14 @@ def test_a_checkpoint_of_another_run_is_refused_before_any_write(tmp_path):
 
 def test_every_artifact_is_checked_before_any_write(tmp_path):
     cases, capture, _live = _captured_run(tmp_path)
-    # The same transport rewritten outside a run records no stem or run identity.
+    # The same transport rewritten with half a run identity cannot be placed (#1169).
     artifact = read_trajectory_artifact(capture.path_for(cases[0]))
     write_trajectory_artifact(
         tmp_path / "traj" / "zz" / "E0_30keV.h5",
         artifact.transport,
         case={**artifact.case, "name": "z"},
         spectrum_inputs=artifact.spectrum_inputs,
+        provenance={"checkpoint_stem": "zz"},
     )
 
     result = invoke(
@@ -225,8 +226,23 @@ def test_every_artifact_is_checked_before_any_write(tmp_path):
     )
 
     assert result.exit_code == 1
-    assert "no checkpoint stem and dataset identity" in result.stderr
+    assert "only part of a run identity" in result.stderr
     assert not (tmp_path / "s").exists()
+
+
+def test_plan_stems_still_refuses_artifacts_without_a_run_identity(tmp_path):
+    cases, capture, _live = _captured_run(tmp_path)
+    artifact = read_trajectory_artifact(capture.path_for(cases[0]))
+    bare = write_trajectory_artifact(
+        tmp_path / "bare" / "E0_30keV.h5",
+        artifact.transport,
+        case={**artifact.case, "name": "z"},
+        spectrum_inputs=artifact.spectrum_inputs,
+    )
+
+    with pytest.raises(trajectory_scoring.TrajectoryArtifactError, match="records no checkpoint"):
+        trajectory_scoring.plan_stems([bare])
+    assert [a.path for a in trajectory_scoring.plan_scoring([bare]).saved] == [bare]
 
 
 def test_cases_that_cannot_stream_are_refused_at_planning(tmp_path):
