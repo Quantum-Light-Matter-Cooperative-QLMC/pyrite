@@ -20,7 +20,10 @@ for ``bench``. Record: ``capture.json``.
 
 ``selections`` in the record keeps each reflection selection's mode
 (``reference_quadrature``: ``band-mass`` or ``bin-mean``; ``rescored``), band,
-cutoff, selected-set digest and shell yields (#1326).
+cutoff, selected-set digest and shell yields (#1326). ``PROBE_SELECTION=mass``
+disables the single pass, so an automatic bandwidth selects on the mass-only
+reference pass and rescores the kept set (the arm the single pass is measured
+against).
 
 ``PROBE_PROFILE=timers`` adds synchronized inclusive timers around the
 batched CXR route (selection vs production pass, tables, per-block
@@ -147,13 +150,17 @@ def capture(material, e0_kev, tilt_deg, histories, out_dir):
 
     fc.cuda_fourier_bin_mean_reduce = timed
     selections = _record_selections()
+    if os.environ.get("PROBE_SELECTION") == "mass":
+        from pyrite.montecarlo.runner import reflection_cutoff as rc
+
+        rc._axis_covers_band = lambda *_args, **_kwargs: False
     mode = os.environ.get("PROBE_PROFILE", "")
     splits = _install_split_timers() if mode == "timers" else None
     timings = []
     t0 = time.perf_counter()
     if splits is not None:
         every = float(os.environ.get("PROBE_DUMP_S", "300"))
-        _dump_partial(out / "partial.json", splits, calls, t0, every)
+        _dump_partial(out / "partial.json", splits, calls, t0, every, selections)
     error = None
     profiler = None
     if mode == "cprofile":
@@ -210,6 +217,7 @@ def _record_selections():
         record, separate = out[1], out[3]
         records.append(
             dict(
+                mode=os.environ.get("PROBE_SELECTION") or "default",
                 reference_quadrature=record.get("reference_quadrature"),
                 reference_band_eV=record.get("reference_band_eV"),
                 selection_histories=record.get("selection_histories"),
@@ -288,7 +296,7 @@ class _Splits:
         return out
 
 
-def _dump_partial(path, splits, calls, t0, every_s):
+def _dump_partial(path, splits, calls, t0, every_s, selections=()):
     """Write ``partial.json`` every ``every_s`` seconds from a daemon thread.
 
     A run killed at its time limit then still records where its time went
@@ -308,6 +316,7 @@ def _dump_partial(path, splits, calls, t0, every_s):
                     reduce_lines=lines,
                     reduce_s=round(sum(c[1] for c in list(calls)), 3),
                     split_timers=splits.snapshot(),
+                    selections=list(selections),
                 ),
             )
 
