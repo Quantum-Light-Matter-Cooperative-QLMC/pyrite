@@ -72,9 +72,10 @@ def _assert_matches(streamed, reference):
     np.testing.assert_array_equal(streamed["E_grid"], reference["E_grid"])
     for key in SPECTRA:
         # Summation order; the windowed far tail (#1191) puts peak-scale rounding in low bins.
+        # Block-wise float64 sums differ by a few 1e-12 relative (1.4e-12 seen, #1349).
         scale = np.abs(reference[key]).max()
         np.testing.assert_allclose(
-            streamed[key], reference[key], rtol=1e-12, atol=1e-14 * scale, err_msg=key
+            streamed[key], reference[key], rtol=1e-11, atol=1e-14 * scale, err_msg=key
         )
     for key in ("eta", "hit_frac", "n_segments"):
         assert streamed[key] == reference[key], key
