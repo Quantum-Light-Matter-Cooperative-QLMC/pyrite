@@ -92,7 +92,7 @@ use ELSEPA for new transport comparisons above the Mott table range.
 
 To repeat one case in a prepared remote PyRITE checkout, set
 `PYRITE_BENCH_CASE`, `PYRITE_BENCH_NE`, `PYRITE_BENCH_CUTOFF_EV`,
-`PYRITE_BENCH_ELASTIC` (`mott` or `sr`) and `PYRITE_BENCH_OUTPUT`, then run:
+`PYRITE_BENCH_ELASTIC` (`mott`, `sr` or `elsepa`) and `PYRITE_BENCH_OUTPUT`, then run:
 
 ```bash
 pyrite-dev test checks/full_track_bremslib/test_benchmark.py -s -q
@@ -217,6 +217,10 @@ uses 2.329 g/cm³ and 28.085 g/mol (a 0.04 % areal-density difference).
 ```bash
 pyrite-dev test checks/full_track_bremslib/test_compare_emission.py -s -q
 ```
+
+`PYRITE_COMPARE_RESULTS=DIR` and `PYRITE_COMPARE_ELASTIC=elsepa` compare a
+fresh twelve-record set (for example ELSEPA, which needs no NIST tables) in
+place of the committed Mott records.
 
 ### Acceptance tolerances
 
