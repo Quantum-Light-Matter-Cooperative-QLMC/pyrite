@@ -173,6 +173,8 @@ def _doppler_ratio(momentum: float, tau_c: float, delta: float, tau_max: float) 
     b = tau_c * (1 - t * tau_c * (1 - delta))
     c = tau_c * tau_c * (1 - t)
     q = b + math.copysign(math.sqrt(max(b * b - a * c, 0.0)), b)
+    # Initial best is reached only if both roots are non-finite (q = A = 0),
+    # which the sampled path cannot produce.
     best, miss = min(tau_c, tau_max), math.inf
     for root in (c / q if q != 0 else math.nan, q / a if a != 0 else math.nan):
         if math.isfinite(root):
