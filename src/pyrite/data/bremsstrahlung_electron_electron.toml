@@ -17,9 +17,9 @@
 # `etabar`, and eta(0.05) reproduces the Seltzer-Berger (1986) digital total
 # at their kappa = 0.05 node. chi_n = chi_total / (1 + eta/Z) at kappa = 0,
 # 0.1 and 0.2, joined by the quadratic through them below 0.2. The stored p
-# is the mean over the six elements (spread <= 0.1) and s is refitted at it
-# (spread <= 4 %); both constraints then hold within 0.0014 in etabar and
-# 0.3 % in 1 + eta/Z for every element. Below 2 MeV the implied eta(0.05)
+# is the mean over the six elements (spread <= 0.25) and s is refitted at it
+# (spread <= 5 %); from 2 MeV both constraints then hold within 0.0014 in
+# etabar and 0.3 % in 1 + eta/Z for every tabulated element. Below 2 MeV the implied eta(0.05)
 # depends on how chi_n is joined more than on the shape, so p = 1 and s
 # meets etabar alone (node within 0.6 %). Below 0.5 MeV the linear rule
 # (s = 0 at and below 0.2 MeV, rising linearly in ln T to 0.5 MeV) reproduces

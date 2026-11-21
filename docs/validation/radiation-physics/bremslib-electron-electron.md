@@ -217,7 +217,7 @@ Note on the Born-zero fallback. The program does not fall back at Z = 5, 3 MeV: 
 
 The "Small-$k/T$ shape" section above describes the one-scale shape of `ee-sb85-v1`. Model `ee-sb85-v2` replaces it.
 
-**Defect.** The one-scale shape was fitted to $\bar\eta$ alone. The Seltzer–Berger (1986) digital table has one node inside $(0,0.1)$, $x=0.05$. With $\chi_n=\chi_{\rm tot}/(1+\eta/Z)$ at $x=0$, 0.1 and 0.2, where Table 4 gives $\eta$, joined by the quadratic through them, SB86's total there implies $\eta(0.05)$. At 30 MeV that gives $1+\eta/Z=1.411$ for Li and 1.203 for C. The one-scale shape gave 1.446 and 1.223. Over 0.5–100 MeV it overshot the node by up to 2.0 % for the tabulated Z = 6 (2.6 % for Li, which holds the Z = 6 $\eta$).
+**Defect.** The one-scale shape was fitted to $\bar\eta$ alone. The Seltzer–Berger (1986) digital table has one node inside $(0,0.1)$, $x=0.05$. With $\chi_n=\chi_{\rm tot}/(1+\eta/Z)$ at $x=0$, 0.1 and 0.2, where Table 4 gives $\eta$, joined by the quadratic through them, SB86's total there implies $\eta(0.05)$. At 30 MeV that gives $1+\eta/Z\approx1.409$–1.411 for Li and 1.202–1.203 for C, depending on how $\chi_n$ is joined. The one-scale shape gave 1.446 and 1.223. Over 0.5–100 MeV it overshot the node by up to 1.9 % for the tabulated Z = 6 (3.0 % for Li, which holds the Z = 6 $\eta$; both at 80 MeV).
 
 **Robustness of the implied node.** Three ways of joining $\chi_n$ give the implied $\eta(0.05)$:
 
@@ -225,9 +225,9 @@ The "Small-$k/T$ shape" section above describes the one-scale shape of `ee-sb85-
 - a quadratic in $\chi_n/\chi_{\rm Tsai}$, where $\chi_{\rm Tsai}$ is Tsai's (RMP 46, 815 (1974)) Thomas–Fermi Born electron–nucleus shape;
 - a cubic in $\chi_n/\chi_{\rm Tsai}$ that also uses $x=0.15$.
 
-Above 5 MeV they agree within 0.02 in $\eta$, which is small against the 0.1–0.15 overshoot. Below 2 MeV they diverge by more than the shape changes the node.
+At 5–10 MeV they agree within 0.06–0.09 in $\eta$ (largest for U; ≤ 0.03 for Z ≤ 13), and within 0.02 from 30 MeV, where the overshoot is 0.1–0.15. Below 2 MeV they diverge by more than the shape changes the node.
 
-**Cause.** The cause is the family, not the weighting. Refitting $\kappa_s$ to $\bar\eta$ with the smooth $\chi_n$ instead of SB86's chord moves it by at most 4 %. The node alone wants $1/\kappa_s\approx6.5\,T/{\rm MeV}$ (about 200 at 30 MeV), but $\bar\eta$ wants 58. Fitted to $\bar\eta$ alone, three one-parameter families give these values of $\eta(0.05)$ for C at 30 MeV, where the node is 1.213:
+**Cause.** The cause is the family, not the weighting. Refitting $\kappa_s$ to $\bar\eta$ with the smooth $\chi_n$ instead of SB86's chord moves it by at most 4 %. The node alone wants $1/\kappa_s\approx5$–$9\,T/{\rm MeV}$ (about 200 at 30 MeV), but $\bar\eta$ wants 58. Fitted to $\bar\eta$ alone, three one-parameter families give these values of $\eta(0.05)$ for C at 30 MeV, where the node is 1.213:
 
 | Family fitted to $\bar\eta$ | $\eta(0.05)$ |
 |---|---|
@@ -247,15 +247,15 @@ with $g(0)=1$ and $g(0.1)=0$. The function is monotone in $x$ for $s,p>0$. With 
 
 From 2 MeV, `checks/sb85_eta_small_kappa_fit.py` solves for $(s,p)$ per element so that both $\bar\eta$ and the node hold. The two parameters then behave as follows:
 
-- **Power $p$.** The fitted $p$ agrees across the six Z within 0.1. It rises with $T$: 1.2–1.3 at 2–6 MeV, 1.55 at 30 MeV and 1.86 at 200 MeV. The stored value is the Z mean.
-- **Scale $s$.** $s$ is refitted at that $p$ (spread ≤ 4 %). It runs from 29.8 at 2 MeV to 44.9 at 200 MeV.
+- **Power $p$.** The fitted $p$ agrees across the six Z within 0.25. It rises with $T$: 1.2–1.3 at 2–6 MeV, 1.55 at 30 MeV and 1.86 at 200 MeV. The stored value is the Z mean.
+- **Scale $s$.** $s$ is refitted at that $p$ (spread ≤ 5 %). It runs from 29.8 at 2 MeV to 44.9 at 200 MeV.
 
 Below 2 MeV, $p=1$ and $s$ meets $\bar\eta$ alone. Both stay held above 200 MeV.
 
 **Result.**
 
-- **$\bar\eta$.** The stored values reproduce $\bar\eta$ within 0.0014 with the smooth $\chi_n$. With the linear-chord weighting of the anchor test they reproduce it within 0.0043, the same bound as before.
-- **The node.** They reproduce it within 0.3 % in $1+\eta/Z$ from 2 MeV, and within 0.6 % at 0.5–1 MeV.
+- **$\bar\eta$.** From 2 MeV the stored values reproduce $\bar\eta$ within 0.0014 with the smooth $\chi_n$. With the linear-chord weighting of the anchor test they reproduce it within 0.0043, the same bound as before.
+- **The node.** For the six tabulated Z they reproduce it within 0.3 % in $1+\eta/Z$ from 2 MeV, and within 0.6 % at 0.5–1 MeV. Li, on the Z = 6 $\eta$, is within 0.6 % from 2 MeV and 1.4 % at 0.5 MeV.
 - **30 MeV.** Li is 1.402 and C 1.201.
 - **Catalogue sweep.** `checks/brem_source_comparison.py` exits 0. Li's 30 MeV, $\kappa=0.05$ point falls from 1.1301 to 1.105, and Z = 5–20 tops out at 1.087 (was 1.104). Li's pointwise `chi` is gated again.
 
@@ -268,3 +268,52 @@ Below 2 MeV, $p=1$ and $s$ meets $\bar\eta$ alone. Both stay held above 200 MeV.
 
 - The node constraint rests on $\chi_n$ being smooth across $x=0.05$.
 - The shape between the nodes is still a modelling choice. SB85 and SB86 tabulate no $\eta$ inside $(0,0.1)$ other than what SB86's total implies at 0.05.
+
+### Fresh-context verification (#1359, 2026-11-20)
+
+Scope: the `ee-sb85-v2` small-$k/T$ shape, its stored $(s,p)$ in `data/bremsstrahlung_electron_electron.toml`, and the numbers in the section above and in the ledger Notes. The verifier read the ledger row, the TOML header and this write-up, and did not read `checks/sb85_eta_small_kappa_fit.py` or the lead's scratch scripts. It read `electron_electron_eta` only after the independent numbers below. Independent scripts (`scratch/verify1359/`, no PyRITE imports except the final comparison) parsed the pinned `nist_brems.data` (57 $T$ by 30 $\kappa$ per $Z=1$–100, $T$ fastest) and the TOML.
+
+**Construction.** At each Table 4 row, $\chi_n=\chi_{\rm tot}/(1+\eta/Z)$ at $\kappa=0,0.1,0.2$, with $\eta$ from Table 4 at that $Z$ (Z = 6 values for Li). The implied node is $\eta(0.05)=Z\,[\chi_{\rm tot}(0.05)/\chi_n(0.05)-1]$. The smooth weight is the quadratic $\chi_n$ below 0.2 and $\chi_{\rm tot}$ (linear on the SB86 nodes) over $1+\eta_{\rm lin}/Z$ above. Two chord weights were also used: (A) $\chi_{\rm tot}$ linear over $1+\eta_{\rm model}/Z$; (B) $\chi_n$ at the SB86 nodes with the model $\eta$, linear between. Integrals use $10^5$ uniform intervals on $[0,1]$.
+
+**Shape limits.** With $e=\exp[-(0.1s)^p]$, $g(0)=(1-e)/(1-e)=1$ and $g(0.1)=0$. For $s,p>0$, $\exp[-(sx)^p]$ decreases strictly, so $g$ is monotone. For $p=1$, $s\to0$, $g\to s(0.1-x)/(0.1s)=1-x/0.1$, the linear interpolant. For $p\ne1$ the $s\to0$ limit is $1-(x/0.1)^p$, which is not linear, but $s=0$ occurs only where $p=1$ ($T\le0.2$ MeV). The code interpolates $s$ and $p$ in $\ln T$, independently. On 20001 log-spaced $T$ from 0.05 to 2000 MeV, the largest step in $\eta(0.05)$ is $2\times10^{-4}$, at the 0.2 and 0.5 MeV kinks. All filters pass.
+
+**Independent refit.** Solving both constraints per element from 2 MeV (smooth weight, quadratic node) and taking the Z mean of $p$, then the Z mean of $s$ refitted at that $p$, reproduces every stored value to its last digit (2–200 MeV). For example, the 2 MeV row gives $p=1.256$, $s=29.8$, the 30 MeV row $p=1.554$, $s=41.6$, and the 200 MeV row $p=1.861$. Below 2 MeV with $p=1$, the Z-mean $s$ is 17.2 (0.5 MeV) and 25.1 (1 MeV), as stored. The per-element $p$ spread, however, exceeds 0.1 at some rows:
+
+| $T$ (MeV) | 2 | 3 | 5 | 10 | 30 | 50 | 100 | 200 |
+|---|---|---|---|---|---|---|---|---|
+| $p$ range over six Z | 1.13–1.33 | 1.11–1.36 | 1.19–1.30 | 1.32–1.43 | 1.52–1.60 | 1.60–1.74 | 1.69–1.83 | 1.81–1.94 |
+| $s$ spread at stored $p$ | 4.9 % | 3.4 % | 3.6 % | 2.1 % | 2.1 % | 1.9 % | 1.4 % | — |
+
+**Constraint residuals with the stored $(s,p)$.**
+
+- $\bar\eta$, from 2 MeV: max $\lvert\Delta\bar\eta\rvert$ is 0.0014 (smooth, Z = 6 at 2 MeV), 0.0014 (chord A) and 0.0012 (chord B). Over all rows from 1 keV it is 0.0043 under every weight (Z = 74, 0.1 MeV, linear region).
+- Node $1+\eta(0.05)/Z$ against the quadratic-$\chi_n$ node, for the six tabulated Z: within 0.30 % from 2 MeV (Z = 6, 2 MeV, $-0.30$ %) and 0.61 % at 0.5–1 MeV (Z = 6, 0.5 MeV). For Li, which holds the Z = 6 $\eta$ with $Z=3$: $-0.58$ % from 2 MeV (15 MeV) and $+1.38$ % at 0.5 MeV.
+- At 30 MeV: model Li 1.4024, C 1.2012; node Li 1.4089, C 1.2022. The old one-scale shape (stored $1/\kappa_s=58$) gives 1.4460 and 1.2230. Its node overshoot reaches 1.94 % for C and 2.97 % for Li (both at 80 MeV).
+- The implementation equals the independent model to $1.4\times10^{-17}$ at every Table 4 row and $x\in\{0,10^{-4},0.004,\dots,0.0999,0.1,0.15,0.5,0.99,1\}$, and exactly at an interpolated row (Z = 6, 1.5 MeV). Li returns the Z = 6 $\eta$. `tests/montecarlo/brem/test_bremsstrahlung_electron_electron.py`: 6 passed, SB86 node test not skipped.
+
+**One-scale diagnosis.** Fitting $(1+sx)^{-1}$, $e^{-sx}$ and $e^{-(sx)^2}$ to $\bar\eta$ with the smooth weight reproduces the table above for C at 30 MeV exactly: 1.344, 1.300, 1.162 against the node 1.213. For Z = 6, 29, 92 at 3–100 MeV the one-scale $\eta(0.05)$ always exceeds the node (C: +0.03 at 3 MeV, +0.13 at 30 MeV). The one-scale $s$ that meets the node alone is 78–88 at 10 MeV, 187–210 at 30 MeV and 484–678 at 100 MeV, against 42–66 from $\bar\eta$. Refitting with the smooth instead of a chord weight moves the one-scale $s$ by $\le1.8$ % (chord B). With chord A it moves C's by up to 7.2 % (30 MeV); the Z-mean moves about 3 %. Either way the family, not the weight, sets the overshoot. The diagnosis is confirmed.
+
+**Joining sensitivity and the 2 MeV threshold.** The implied $\eta(0.05)$ was formed six ways: quadratic in $\chi_n$; the chord; quadratic in $\ln\chi_n$; quadratic in $\chi_n/\chi_{\rm Tsai}$, with and without Tsai's Coulomb correction; and a cubic in $\chi_n/\chi_{\rm Tsai}$ that adds $\kappa=0.15$ with $\eta(0.15)$ linear in Table 4. Here $\chi_{\rm Tsai}$ is the $Z^2$ term of Tsai (RMP 46, 815 (1974)) Eq. 3.9 with the intermediate-screening $\phi_1,\phi_2$ fits. The spread of the three joins the write-up names (quadratic, Tsai-quadratic, Tsai-cubic) is:
+
+| Z | 1 MeV | 2 MeV | 3 MeV | 5 MeV | 6 MeV | 10 MeV | 20 MeV | 30 MeV | 100 MeV |
+|---|---|---|---|---|---|---|---|---|---|
+| 6 | 0.076 | 0.060 | 0.053 | 0.035 | 0.030 | 0.022 | 0.013 | 0.009 | 0.003 |
+| 29 | 0.172 | 0.117 | 0.083 | 0.043 | 0.037 | 0.026 | 0.013 | 0.009 | 0.002 |
+| 92 | 0.296 | 0.197 | 0.134 | 0.069 | 0.058 | 0.041 | 0.022 | 0.016 | 0.005 |
+
+The shape lever, $\eta(0.05)$ for $p=1$ minus $p=2$, both fitted to $\bar\eta$, is 0.06 at 1 MeV, 0.10–0.11 at 2 MeV and 0.11–0.14 at 3 MeV. The join spread over the lever is 1.3–5.0 at 1 MeV, 0.6 (C) to 1.9 (U) at 2 MeV, 0.5–1.0 at 3 MeV and 0.3–0.4 at 5 MeV. The node therefore constrains the shape from about 2 MeV for C and from about 3 MeV for high Z. For high Z, though, $\eta/Z$ makes the node effect at most 0.1 % in $1+\eta/Z$. Below 2 MeV the fit uses $p=1$, which already meets the tabulated-Z node within 0.61 %. The 2 MeV threshold is justified. The write-up's "within 0.02 above 5 MeV" is not reproduced: this construction gives up to 0.058 above 5 MeV (U, 6 MeV; ≤ 0.030 for Z ≤ 13). The joins agree within 0.02 from about 20 MeV (U: 30 MeV). The figure depends on the Born reference; any version is small against the one-scale overshoot (0.13 for C at 30 MeV).
+
+**Findings.**
+
+1. *$p$ spread.* "the fitted $p$ consistent across Z (spread ≤ 0.1)" (ledger Notes and Assumptions, TOML header, "Power $p$" bullet above) is contradicted at 2–3 MeV (0.20–0.25) and 50–200 MeV (0.13–0.14). The Z means, which are what is stored, reproduce exactly. The $s$ spread is 4.9 % at 2 MeV against the stated ≤ 4 %. The stored residuals are unaffected: those bounds hold per element.
+2. *Join agreement.* "agree … within 0.02 above 5 MeV" is not reproduced (up to 0.058; within 0.02 from about 20 MeV). The conclusion, a 2 MeV threshold, stands.
+3. *Scope of the node bound.* "within 0.3 % from 2 MeV and 0.6 % at 0.5–1 MeV" holds for the six tabulated Z. Li (Z = 6 $\eta$ at $Z=3$) is $-0.58$ % from 2 MeV and +1.38 % at 0.5 MeV. The ledger Notes sentence follows the Li figures and should be scoped.
+4. *Scope of the $\bar\eta$ bound.* "within 0.0014 with the smooth $\chi_n$" holds from 2 MeV. Over 1 keV–100 MeV it is 0.0043 under any weight.
+5. *Old-shape Li overshoot.* "2.6 % for Li" is 2.97 % here (80 MeV). The C figure (1.94 %, "2.0 %") agrees. The Li 30 MeV node is 1.409 here against "1.411".
+6. *Node-only one-scale $s$.* "$\approx6.5\,T$/MeV" is a rough fit: $s/T$ is 7.8–8.8 at 10 MeV, 6.2–7.0 at 30 MeV and 4.8–6.8 at 100 MeV. "about 200 at 30 MeV" agrees (187–210).
+
+No factor, exponent, sign or convention diverges, and the code matches the declared shape to round-off.
+
+**Verdict.** `rederived` for the `ee-sb85-v2` small-$k/T$ shape. Findings 1–6 are documentation corrections. Human sign-off remains pending.
+
+Corrections 1–6 were applied by the lead to the ledger, the data-file header, the physics page and the #1359 section above.
