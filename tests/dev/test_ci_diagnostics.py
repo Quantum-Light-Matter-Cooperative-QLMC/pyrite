@@ -3,6 +3,7 @@
 import json
 import subprocess
 import sys
+import time
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -40,8 +41,20 @@ worker.pytest_runtest_logstart("test_probe.py::test_blocked", None)
 worker.pytest_sessionstart()
 time.sleep(60)
 """
-    with pytest.raises(subprocess.TimeoutExpired):
-        subprocess.run([sys.executable, "-c", script, str(tmp_path)], timeout=1, check=True)
+    with subprocess.Popen([sys.executable, "-c", script, str(tmp_path)]) as process:
+        try:
+            deadline = time.monotonic() + 10
+            while time.monotonic() < deadline:
+                stacks = list(tmp_path.glob("*-stacks.log"))
+                if stacks and "Timeout (" in stacks[0].read_text():
+                    break
+                assert process.poll() is None, "diagnostic worker exited before its stack dump"
+                time.sleep(0.01)
+            else:
+                pytest.fail("diagnostic worker produced no stack dump within 10 seconds")
+        finally:
+            process.kill()
+            process.wait(timeout=5)
     (events,) = list(tmp_path.glob("*.jsonl"))
     (stacks,) = list(tmp_path.glob("*-stacks.log"))
     assert json.loads(events.read_text())["nodeid"] == "test_probe.py::test_blocked"

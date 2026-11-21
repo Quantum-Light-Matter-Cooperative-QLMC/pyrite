@@ -196,6 +196,10 @@ def test_streamed_oversampled_grid_matches_the_joined_path(
     if max_points is not None:
         per_call["max_points"] = max_points
     case = _oversampled(_case(), stop_eV, **per_call)
+    if local:
+        # This seed/population includes the thin lines that force the uniform
+        # axis over budget. Fewer histories no longer exercise the local route.
+        case = {**case, "Ne": 24, "Ne_brem": 30}
     assert streaming_refusal(case, live=True) is None
     _clear_grid_cache()
     reference = _joined(case)
