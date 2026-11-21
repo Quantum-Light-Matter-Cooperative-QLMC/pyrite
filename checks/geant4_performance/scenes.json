@@ -149,7 +149,20 @@
         "cone_source_photons_ge10kev": 0.10
       },
       "set_rule": "intersection-union: a (scene, set, PyRITE arm) is equivalent only if every headline observable of the set passes and both arms met the target RSE on every seed; the conjunction needs no multiplicity adjustment. Only an equivalent set yields a headline T(eps) ratio; other targets and failed gates give qualified outcomes",
-      "discrepancy_family": "two-sided z test of ratio = 1 on ln(ratio), Holm-adjusted at alpha 0.05 across every (scene, set, PyRITE arm, observable) evaluated; flagged cells link to #1039/#1040 or a new discrepancy issue"
+      "discrepancy_family": "two-sided z test of ratio = 1 on ln(ratio), Holm-adjusted at alpha 0.05 across every (scene, set, PyRITE arm, observable) evaluated; flagged cells link to #1039/#1040 or a new discrepancy issue",
+      "amendment_v3": {
+        "frozen": "2026-11-21 (#1041), before held-out seeds 104-106 ran; from held-out seeds 101-103 (jobs 14460, 14462-14464) and the v2 plan only",
+        "reason": "v2 sized N at the expected-value count, so 8 of 10 tested sets missed the precision gate at RSE 0.0201-0.0211 on both engines; margins, observables, eps, CI level, set rule and Holm family are unchanged",
+        "held_out_seeds": [104, 105, 106],
+        "plan": "precision_plan.py re-planned from the 101-103 held-out evidence (about 50x the pilot histories) with --variance-margin 1.10, --max-run-s 1800, --drop-config geant4-16t, --only-at geant4-1t=0.05, --tail-histories 200000, --protocol-version 3",
+        "floor_rule": "a T(eps) row at min_histories measures fixed cost, not throughput: a speedup with either arm at the floor is never headline",
+        "skew_shift_over_se": 0.1,
+        "skew_rule": "a TOST cell where either arm's pooled |SHIFT/SE| exceeds skew_shift_over_se passes only if the interval recentred by each arm's SHIFT (Cornish-Fisher, #1339) also lies inside the margin",
+        "tail_slope_min": 3.0,
+        "tail_rule": "a cone speedup is headline only if the continuous arm's Hill tail slope, pooled over its runs of >= 50 000 histories in the slice, is at least tail_slope_min (MCNP's finite-variance criterion); otherwise it is qualified as heavy-tailed or insufficient",
+        "fom_stability_factor": 1.15,
+        "fom_rule": "FOM = 1/(worst RSE^2 T) per T(eps) row; an arm is FOM-stable when FOM at its largest planned N is within a factor fom_stability_factor of its smallest. The FOM ratio at each arm's largest N is a secondary speed estimate, reported as stable only when both arms are stable, and never a headline"
+      }
     }
   },
   "block_rows": 64000000,

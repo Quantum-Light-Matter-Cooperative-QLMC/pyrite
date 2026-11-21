@@ -26,6 +26,17 @@ listed as such and give no ratio. The frozen ``scenes.json``
 ``precision.equivalence`` gate (#1041) marks a ratio ``headline`` only for an
 equivalent (scene, set, PyRITE arm) at its evaluation target; every other
 ratio is a qualified outcome.
+
+Beside VOV, every ``T(eps)`` row carries the #1339 diagnostics of each headline
+observable, pooled over its seeds: SHIFT/SE (where skewness misplaces the
+symmetric interval) and the Hill tail slope (below 3 the variance may be
+infinite; reported from 50 000 scores). FOM = 1 / (RSE^2 T) is reported per
+row, with its stability between an arm's two planned history counts and a
+FOM-ratio speed estimate that never becomes a headline. A plan with
+``protocol_version >= 3`` also applies the frozen ``amendment_v3`` rules of
+``scenes.json``: a row at the history floor gives no headline, a cone
+speedup needs a pooled continuous-arm tail slope of at least 3, and a
+skew-flagged TOST cell must also pass with its SHIFT-corrected interval.
 """
 
 import argparse
@@ -36,6 +47,8 @@ from collections import defaultdict
 from pathlib import Path
 
 import numpy as np
+
+from pyrite.montecarlo.runner.adaptive import TAIL_MIN_SAMPLES, RunningMoments
 
 HERE = Path(__file__).resolve().parent
 AGREEMENT = (
@@ -231,7 +244,71 @@ def vov_slope(values, points=16):
     return float(np.polyfit(np.log([n for n, _ in pts]), np.log([v for _, v in pts]), 1)[0])
 
 
-def time_to_precision(samples, plan):
+def _values(rec, name):
+    scores = rec["scores"]
+    return sum(scores[k] for k in GE10) if name == "photons_ge10keV" else scores[name]
+
+
+def shape(arrays):
+    """#1339 SHIFT/SE and tail slope of the concatenated per-primary scores."""
+    moments = RunningMoments()
+    for values in arrays:
+        moments.add_block(np.asarray(values, dtype=float))
+    rel_se, shift = moments.relative_se(), moments.shift()
+    return dict(
+        n=moments.n,
+        shift=shift,
+        shift_over_se=shift / rel_se if shift is not None and rel_se else None,
+        tail_slope=moments.tail_slope(),
+    )
+
+
+def fom_stability(rows, tolerance):
+    """FOM at an arm's largest planned count over its smallest, per (scene, config, set).
+
+    FOM is constant when RSE falls as 1/sqrt(N) and fixed costs are negligible;
+    a ratio above ``tolerance`` marks fixed-cost-dominated small runs, below
+    ``1/tolerance`` a variance that grows faster than 1/N (a late heavy score).
+    """
+    by_arm = defaultdict(list)
+    for r in rows:
+        if r.get("fom_median"):
+            by_arm[(r["scene"], r["config"], r["set"])].append(r)
+    out = {}
+    for key, rs in by_arm.items():
+        lo = min(rs, key=lambda r: r["histories"])
+        hi = max(rs, key=lambda r: r["histories"])
+        if lo["histories"] == hi["histories"]:
+            out[key] = dict(status="single-N", histories=[lo["histories"]])
+            continue
+        q = hi["fom_median"] / lo["fom_median"]
+        out[key] = dict(
+            status="stable" if 1 / tolerance <= q <= tolerance else "unstable",
+            histories=[lo["histories"], hi["histories"]],
+            ratio=q,
+        )
+    return out
+
+
+def tail_check(samples, tail_min):
+    """Pooled cone tail slope per (scene, config) over runs of >= TAIL_MIN_SAMPLES."""
+    pooled = defaultdict(list)
+    for rec in samples:
+        if CONE in rec["scores"] and rec["histories"] >= TAIL_MIN_SAMPLES:
+            pooled[(rec["scene"]["id"], config_name(rec))].append(rec)
+    out = {}
+    for key, recs in sorted(pooled.items()):
+        d = shape([r["scores"][CONE] for r in recs])
+        slope = d["tail_slope"]
+        d.update(
+            runs=len(recs),
+            status="insufficient" if slope is None else "ok" if slope >= tail_min else "heavy",
+        )
+        out[key] = d
+    return out
+
+
+def time_to_precision(samples, plan, min_histories=None, fom_tolerance=1.15):
     runs = defaultdict(list)
     for rec in samples:
         runs[(rec["scene"]["id"], config_name(rec), rec["histories"])].append(rec)
@@ -244,18 +321,23 @@ def time_to_precision(samples, plan):
             rows.append(row)
             continue
         achieved, vovs = [], []
+        names = item["per_observable_histories"]
         for r in recs:
             scores = dict(r["scores"])
             if GE10[0] in scores:
                 scores["photons_ge10keV"] = sum(scores[k] for k in GE10)
-            names = item["per_observable_histories"]
             achieved.append({name: rse(scores[name]) for name in names})
             vovs.append(
                 {name: dict(vov=vov(scores[name]), slope=vov_slope(scores[name])) for name in names}
             )
         met = [all(v <= item["target_rse"] for v in a.values()) for a in achieved]
         warm = [r["timings_s"]["warm_request"] for r in recs]
+        foms = [1 / (max(a.values()) ** 2 * w) for a, w in zip(achieved, warm, strict=True)]
         row.update(
+            fom_per_seed=foms,
+            fom_median=statistics.median(foms),
+            floor_bound=item["histories"] == min_histories,
+            shape={name: shape([_values(r, name) for r in recs]) for name in names},
             status="met" if all(met) else "precision-unmet",
             seeds=sorted(r["seed"] for r in recs),
             met_per_seed=met,
@@ -272,6 +354,32 @@ def time_to_precision(samples, plan):
             )
             row["scoring_s_median"] = median(r["work"]["warm"].get("scoring_s") for r in recs)
         rows.append(row)
+    stability = fom_stability(rows, fom_tolerance)
+    largest = {}
+    for r in rows:
+        key = (r["scene"], r["set"], r["config"])
+        if r.get("fom_median") and r["histories"] > largest.get(key, {"histories": 0})["histories"]:
+            largest[key] = r
+    fom_ratios = []
+    for (scene, name_set, config), py in sorted(largest.items()):
+        if not config.startswith("pyrite"):
+            continue
+        for (s2, set2, g4name), g4 in sorted(largest.items()):
+            if (s2, set2) != (scene, name_set) or not g4name.startswith("geant4"):
+                continue
+            arms = [stability[(scene, c, name_set)]["status"] for c in (config, g4name)]
+            fom_ratios.append(
+                dict(
+                    scene=scene,
+                    set=name_set,
+                    pyrite=config,
+                    geant4=g4name,
+                    histories=[py["histories"], g4["histories"]],
+                    fom_ratio=py["fom_median"] / g4["fom_median"],
+                    stability=arms,
+                    status="stable" if arms == ["stable", "stable"] else "unverified",
+                )
+            )
     met = {
         (r["scene"], r["set"], r["target_rse"], r["config"]): r
         for r in rows
@@ -294,9 +402,17 @@ def time_to_precision(samples, plan):
                     geant4=g4name,
                     speedup_median=statistics.median(pairs),
                     speedup_range=[min(pairs), max(pairs)],
+                    floor_bound=py["floor_bound"] or g4["floor_bound"],
                 )
             )
-    return dict(runs=rows, speedup=ratios)
+    return dict(
+        runs=rows,
+        speedup=ratios,
+        fom_stability=[
+            dict(scene=k[0], config=k[1], set=k[2], **v) for k, v in sorted(stability.items())
+        ],
+        speedup_fom=fom_ratios,
+    )
 
 
 def _pooled(recs, name):
@@ -318,7 +434,7 @@ def holm(pvalues, alpha):
     return reject
 
 
-def equivalence(samples, plan, spec, ttp):
+def equivalence(samples, plan, spec, ttp, amendment=None):
     """Frozen #1041 TOST gate per (scene, set, PyRITE arm) at the evaluation target.
 
     Each arm pools its held-out runs at the planned count. An observable passes
@@ -327,6 +443,12 @@ def equivalence(samples, plan, spec, ttp):
     observable passes and both arms met the target RSE on every seed
     (intersection-union). Discrepancy flags are Holm-adjusted two-sided tests of
     ratio = 1 across all evaluated cells.
+
+    Every cell reports each arm's pooled SHIFT/SE. Under ``amendment`` (v3) a
+    cell whose larger ``|SHIFT/SE|`` exceeds ``skew_shift_over_se`` passes only
+    if the interval recentred by each arm's SHIFT also lies inside the margin,
+    a speedup at the history floor is never headline, and a cone speedup is
+    headline only with an ``ok`` pooled tail slope.
     """
     from statistics import NormalDist
 
@@ -374,14 +496,30 @@ def equivalence(samples, plan, spec, ttp):
                 lr, se = math.log(pm / gm), math.hypot(ps / pm, gs / gm)
                 lo, hi = math.exp(lr - zq * se), math.exp(lr + zq * se)
                 m = margins[name]
+                inside = 1 - m <= lo and hi <= 1 + m
+                py_shape = shape([_values(r, name) for r in py_recs])
+                g4_shape = shape([_values(r, name) for r in ref_recs])
+                sose = [abs(d["shift_over_se"] or 0.0) for d in (py_shape, g4_shape)]
                 cell = dict(
                     observable=name,
                     ratio=pm / gm,
                     ci=[lo, hi],
                     margin=m,
-                    status="pass" if 1 - m <= lo and hi <= 1 + m else "fail",
+                    shift_over_se=dict(
+                        pyrite=py_shape["shift_over_se"], geant4=g4_shape["shift_over_se"]
+                    ),
                     p_equal=2 * (1 - NormalDist().cdf(abs(lr) / se)) if se > 0 else 0.0,
                 )
+                if amendment and max(sose) > amendment["skew_shift_over_se"]:
+                    lr2 = (
+                        lr
+                        + math.log1p(py_shape["shift"] or 0.0)
+                        - math.log1p(g4_shape["shift"] or 0.0)
+                    )
+                    lo2, hi2 = math.exp(lr2 - zq * se), math.exp(lr2 + zq * se)
+                    cell.update(skew_flag=True, ci_shifted=[lo2, hi2])
+                    inside = inside and 1 - m <= lo2 and hi2 <= 1 + m
+                cell["status"] = "pass" if inside else "fail"
             group["cells"].append(cell)
             cells.append(cell)
         group["status"] = (
@@ -401,7 +539,12 @@ def equivalence(samples, plan, spec, ttp):
             ),
             None,
         )
-        r["headline"] = bool(r["target_rse"] == eps and g and g["status"] == "equivalent")
+        headline = r["target_rse"] == eps and g and g["status"] == "equivalent"
+        if amendment:
+            tail = ttp.get("tail", {}).get(f"{r['scene']}|{r['pyrite']}", {}).get("status")
+            r["tail"] = tail if r["set"] == "cone" else None
+            headline = headline and not r["floor_bound"] and (r["set"] != "cone" or tail == "ok")
+        r["headline"] = bool(headline)
     return dict(target_rse=eps, ci_level=spec["ci_level"], groups=groups)
 
 
@@ -415,10 +558,26 @@ def main():
     summary = summarize(samples)
     if args.plan:
         plan = json.loads(args.plan.read_text())
-        ttp = time_to_precision(samples, plan)
-        spec = json.loads((HERE / "scenes.json").read_text())["precision"].get("equivalence")
+        precision = json.loads((HERE / "scenes.json").read_text())["precision"]
+        spec = precision.get("equivalence")
+        amendment = (
+            spec.get("amendment_v3") if spec and plan.get("protocol_version", 2) >= 3 else None
+        )
+        ttp = time_to_precision(
+            samples,
+            plan,
+            min_histories=precision["min_histories"],
+            fom_tolerance=(amendment or {}).get("fom_stability_factor", 1.15),
+        )
+        ttp["tail"] = {
+            f"{s}|{c}": d
+            for (s, c), d in tail_check(
+                samples, (amendment or {}).get("tail_slope_min", 3.0)
+            ).items()
+        }
+        ttp["protocol_version"] = plan.get("protocol_version", 2)
         if spec:
-            ttp["equivalence"] = equivalence(samples, plan, spec, ttp)
+            ttp["equivalence"] = equivalence(samples, plan, spec, ttp, amendment)
         summary["time_to_precision"] = ttp
     if args.output:
         args.output.write_text(json.dumps(summary, indent=1, allow_nan=False) + "\n")
@@ -448,10 +607,23 @@ def main():
             extra = (
                 f" T {r['T_s_median']:.3f}s worst RSE {r['worst_rse']:.4f}" if "T_s" in r else ""
             )
+            if "fom_median" in r:
+                worst = {k: (d["shift_over_se"], d["tail_slope"]) for k, d in r["shape"].items()}
+                extra += f" FOM {r['fom_median']:.4g}" + (" floor" if r["floor_bound"] else "")
+                extra += " SHIFT/SE,slope " + json.dumps(worst)
             print(
                 f"  {r['scene']} {r['set']} eps={r['target_rse']:g} {r['config']} "
                 f"N={r['histories']}: {r['status']}{extra}"
             )
+        print("\n== FOM stability (largest / smallest planned N)")
+        for f in ttp["fom_stability"]:
+            print(
+                f"  {f['scene']} {f['set']} {f['config']} N={f['histories']}: {f['status']}"
+                + (f" {f['ratio']:.3f}" if "ratio" in f else "")
+            )
+        print("\n== cone tail slope (pooled runs of >= 50 000 histories)")
+        for key, d in ttp["tail"].items():
+            print(f"  {key} runs={d['runs']} n={d['n']}: slope {d['tail_slope']} {d['status']}")
         for g in ttp.get("equivalence", {}).get("groups", []):
             print(f"  equivalence {g['scene']} {g['set']} {g['pyrite']}: {g['status']}")
             for c in g.get("cells", []):
@@ -463,9 +635,18 @@ def main():
                     )
         for r in ttp["speedup"]:
             label = "headline" if r.get("headline") else "qualified"
+            notes = (" floor" if r["floor_bound"] else "") + (
+                f" tail={r['tail']}" if r.get("tail") else ""
+            )
             print(
                 f"  speedup[{label}] {r['scene']} {r['set']} eps={r['target_rse']:g} "
                 f"{r['pyrite']} vs {r['geant4']}: {r['speedup_median']:.3g} {r['speedup_range']}"
+                + notes
+            )
+        for r in ttp["speedup_fom"]:
+            print(
+                f"  fom-ratio[{r['status']}] {r['scene']} {r['set']} {r['pyrite']} vs "
+                f"{r['geant4']} N={r['histories']}: {r['fom_ratio']:.3g} {r['stability']}"
             )
 
 
