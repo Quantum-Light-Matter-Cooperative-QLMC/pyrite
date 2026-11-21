@@ -25,8 +25,11 @@ BINS = EnergyBins(cxr=np.linspace(250.0, 320.0, 15), brem=np.arange(1000.0, 3000
 
 
 def _numerics(block=None, core="per-electron", bins=BINS, **kwargs):
+    # API streaming/spill tests keep explicit families; bins=None still tests
+    # automatic grid construction independently of shell selection.
     return pr.Numerics(
         sampling=FixedSampling(cxr_histories=12, brem_histories=16),
+        cxr_reflections=cfg.CxrReflections(n_families=4),
         energy_bins=bins,
         execution=cfg.KernelTuning(transport_core=core, stream_block_electrons=block),
         **kwargs,
@@ -108,6 +111,7 @@ def test_other_entry_points_fail_before_transport(monkeypatch):
 def _memory_numerics(target):
     return pr.Numerics(
         sampling=FixedSampling(cxr_histories=12, brem_histories=16),
+        cxr_reflections=cfg.CxrReflections(n_families=4),
         energy_bins=BINS,
         execution=cfg.KernelTuning(transport_core="per-electron", stream_memory_mib=target),
     )
@@ -163,6 +167,7 @@ def test_memory_target_matches_the_default():
 def _spill_numerics(directory, mib, bins=BINS):
     return pr.Numerics(
         sampling=FixedSampling(cxr_histories=12, brem_histories=16),
+        cxr_reflections=cfg.CxrReflections(n_families=4),
         energy_bins=bins,
         execution=cfg.KernelTuning(
             transport_core="per-electron",
