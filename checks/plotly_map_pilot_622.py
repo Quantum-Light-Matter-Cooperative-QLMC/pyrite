@@ -1,7 +1,7 @@
 """Browser gate for the experimental Plotly Map cell selection (#622).
 
 Run:
-    uv run --with selenium==4.53.0 python checks/plotly_map_pilot_622.py \
+    uv run python checks/plotly_map_pilot_622.py \
         --grid 8 --out scratch/plotly_map_pilot_622_g8.json
 
 Writes a synthetic azimuth x polar-tilt HOPG checkpoint (no transport: a
@@ -567,7 +567,9 @@ def main(argv=None) -> int:
     try:
         import selenium
     except ImportError:
-        print("selenium missing: run with `uv run --with selenium==4.53.0 ...`", file=sys.stderr)
+        print(
+            "selenium missing: install the `browser` dependency group (`uv sync`)", file=sys.stderr
+        )
         return 2
     import marimo
     import plotly

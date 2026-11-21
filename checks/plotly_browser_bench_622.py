@@ -1,7 +1,7 @@
 """Browser render benchmark for Plotly spectrum traces: SVG versus WebGL (#622).
 
 Run:
-    uv run --with selenium==4.53.0 python checks/plotly_browser_bench_622.py \
+    uv run python checks/plotly_browser_bench_622.py \
         --out scratch/plotly_browser_bench_622.json
 
 Builds spectrum-shaped figures through the production Plotly spectrum trace
@@ -254,7 +254,9 @@ def main(argv=None) -> int:
     try:
         import selenium  # noqa: F401
     except ImportError:
-        print("selenium missing: run with `uv run --with selenium==4.53.0 ...`", file=sys.stderr)
+        print(
+            "selenium missing: install the `browser` dependency group (`uv sync`)", file=sys.stderr
+        )
         return 2
     record = run(args)
     text = json.dumps(record, indent=2)

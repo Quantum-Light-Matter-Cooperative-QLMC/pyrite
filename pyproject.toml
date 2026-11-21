@@ -173,6 +173,11 @@ oracle = [
     "xraylib==4.3.0",
 ]
 
+# Browser-driven plotting evidence (checks/plotly_*_622.py): drives system
+# Firefox (geckodriver) and Chrome/Chromium; never imported by ``src/``.
+browser = [
+    "selenium>=4.53.0",
+]
 
 dev = [
     { include-group = "test" },
