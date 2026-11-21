@@ -126,30 +126,35 @@ its creators, and **Publish**. This
 
 #### Separating software and dataset archives
 
-`--latest=false` does **not** exclude a release from Zenodo or change its version
-family. Before publishing another table or mirror release, the Zenodo account
-owner must arrange separate archiving; a repository edit cannot switch off
-the account's GitHub integration.
+`--latest=false` does **not** exclude a release from Zenodo or change its
+version family: the account's GitHub integration archives every GitHub
+release of this repository into the software family. Software and tables are
+therefore separated by where they are published, not by integration
+settings:
 
-The planned cutover is to disable automatic ingestion for this repository and
-deposit code releases explicitly into the software family, with a separate
-dataset family for each independently versioned table product. Validate the
-workflow in the Zenodo sandbox first, including continuation of the existing
-software family and retry behavior, then coordinate disabling ingestion with
-enabling explicit deposits to avoid duplicate or missing archives. This
-repository does not yet implement that deposition workflow.
+- **Software** stays on automatic ingestion: each `vX.Y.Z` release becomes a
+  version of the software family, with creators from `.zenodo.json`.
+- **Tables** publish only as versions of the separate Zenodo dataset family,
+  concept DOI `10.5281/zenodo.23220627`, deposited by a maintainer (see
+  {ref}`the table record <zenodo-table-record>`). No new `tables-*` or
+  `mirror-*` GitHub release is created, so no table can advance software
+  latest. The dataset record credits upstream deposits as `isDerivedFrom`
+  relations and keeps their licences and modification statements in the
+  bundled notices.
 
-Keep existing DOIs, table download URLs and digest pins intact. Ask Zenodo
-support whether already published table records can be separated from the
-software family while preserving identifiers; metadata editing alone is not
-a documented way to change that grouping. Until remediation is settled, cite
-exact software-version DOIs. Dataset deposits retain their own upstream
-attribution, licences and modification statements.
+Earlier `tables-*` and `mirror-*` releases (through `tables-bremslib-4`)
+were ingested into the software family, so concept DOI
+`10.5281/zenodo.23487182` can resolve to a table version. Those records are
+left as published: do not delete them or relabel them as software, and keep
+their download URLs, which older indexes pin. Moving them out of the family
+would need Zenodo support; a metadata edit does not change grouping. Until
+the next code release becomes the family's latest version, cite exact
+software-version DOIs.
 
-Releases for data and table archives (`tables-*`, `mirror-*`) share the
-repository's Releases page. Create them with `--latest=false` (see
-[data distribution](data-distribution-and-repository-size.md)) so the Latest
-badge always points at the newest code release.
+Existing data and table releases (`tables-*`, `mirror-*`) share the
+repository's Releases page and were created with `--latest=false`, so the
+Latest badge points at the newest code release; if one shows Latest, mark the
+newest `vX.Y.Z` release Latest (`gh release edit vX.Y.Z --latest`).
 
 `git clone` checks out `main`, not the latest release. To use a released
 version, check out its tag (`git checkout vX.Y.Z`) or pin it when installing

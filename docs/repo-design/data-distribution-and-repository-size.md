@@ -95,9 +95,15 @@ by up to 67% across single steep intervals, so it was rejected. It is classed
 
 ## Hosted table releases
 
-PyRITE's own pinned table archives are published as GitHub Release assets of
-this repository, one release per dataset (issues #284, #282). The repository
-and release assets are public, so downloads need no GitHub token.
+PyRITE's own table archives are published in the
+{ref}`Zenodo table record <zenodo-table-record>`; version
+[10.5281/zenodo.24429433](https://doi.org/10.5281/zenodo.24429433) is pinned.
+The ELSEPA, SBETHE and BremsLib indexes in `src/pyrite/data/xsgen/` pin its
+`elsepa.zip`, `sbethe.zip` and `bremslib.zip` (`bremslib.zip` is
+byte-identical to `tables-bremslib-4`, which stays as its fallback).
+Earlier archives were GitHub Release assets of this repository, one release
+per dataset (issues #284, #282); they stay public for older builds, and the
+datasets below still download from them first. No token is needed.
 
 ```{list-table}
 :header-rows: 1
@@ -105,21 +111,12 @@ and release assets are public, so downloads need no GitHub token.
 * - Release
   - Asset
   - Pinned by
-* - `tables-elsepa-5`
-  - `elsepa-tables.zip` (48,282,076 B, 55 tables)
-  - `src/pyrite/data/xsgen/elsepa-tables.json`
-* - `tables-elsepa-positron-5`
-  - `elsepa-positron-tables.zip` (49,517,306 B, 55 tables)
-  - `src/pyrite/data/xsgen/elsepa-positron-tables.json`
+* - `tables-elsepa-5`, `tables-elsepa-positron-5`, `tables-sbethe-4`, `tables-sbethe-positron-4`
+  - Separate electron/positron archives
+  - Older builds only; superseded by the Zenodo bundles
 * - `tables-bremslib-4`
   - `bremslib-tables.zip` (41,515,721 B, 42 tables)
-  - `src/pyrite/data/xsgen/bremslib-tables.json`
-* - `tables-sbethe-4`
-  - `sbethe-tables.zip` (5,127,793 B, 84 tables)
-  - `src/pyrite/data/xsgen/sbethe-tables.json`
-* - `tables-sbethe-positron-4`
-  - `sbethe-positron-tables.zip` (5,147,485 B, 84 tables)
-  - `src/pyrite/data/xsgen/sbethe-positron-tables.json`
+  - `src/pyrite/data/xsgen/bremslib-tables.json` (fallback after Zenodo)
 * - `tables-epdl-1`
   - `epdl2025_mf23.npz` (derived EPDL2025 photon table)
   - `pyrite.datasets.EPDL`
@@ -142,7 +139,7 @@ and release assets are public, so downloads need no GitHub token.
 
 Each index and dataset lists its download locations in order (`archive.urls`
 in the table indexes, `Dataset.urls` in `pyrite.datasets`): upstream first
-where one exists, then PyRITE's release, later a Zenodo record. A location
+where one exists, then PyRITE's release or Zenodo table record. A location
 that fails or serves other bytes is skipped; the pinned SHA-256 decides what
 installs, so adding a mirror cannot change it. The SBETHE archive is the
 exception to upstream-first: Mendeley Data has answered HTTP 200 with an error
@@ -160,7 +157,73 @@ forwarded on the redirect to the asset store, and never appears in output or
 manifests. CI also fetches without a token. The remote box needs no network;
 `pyrite remote sync` ships the installed tables instead.
 
-To cut or refresh a release (maintainer):
+(zenodo-table-record)=
+
+### Zenodo table record
+
+All table products are archived together in one Zenodo dataset family,
+concept DOI `10.5281/zenodo.23220627`, separate from the software family.
+Each version holds one deterministic zip and one `sha256sum` file per upstream
+code, plus `README.md` and `THIRD-PARTY-NOTICES.md`:
+
+```{list-table} Zenodo table record bundles (`pyrite.xsgen.bundles.BUNDLES`).
+:name: tbl-data-zenodo-bundles
+:header-rows: 1
+
+* - Archive
+  - Contents
+* - `elsepa.zip`
+  - ELSEPA electron and positron tables (both indexes pin this one archive)
+* - `sbethe.zip`
+  - SBETHE electron and positron stopping tables
+* - `bremslib.zip`
+  - BremsLib tables; byte-identical to the `tables-bremslib-4` asset
+* - `epics.zip`
+  - `eedl/EEDL.endf`, `eadl/EADL2025.ALL`, `epdl/…`, `epdl-differential/…`
+* - `pyrite.zip`
+  - `brem-lattice-share/brem_lattice_share_kernel.npz`
+```
+
+A bundle repackages bytes that are already pinned: table members (`tables/<key>.json`,
+`tables/<key>.npz`) are copied unchanged from the verified release archives and
+dataset members from verified installs, so table keys, manifest digests,
+dataset SHA-256 pins and model identity are unchanged. `table-bundles.json` in
+`pyrite/data/xsgen/` pins each bundle's SHA-256 and URLs. Table indexes pin
+their bundle as `archive`; when the electron and positron indexes pin the
+same bundle, one fetch installs both projectiles' tables from a single
+download. A dataset falls back to extracting itself from its
+bundle after its direct URLs fail. `--archive` accepts either a bundle zip or,
+for datasets, the bare file.
+
+New table versions publish **only** to this record, never as a GitHub
+release: the repository's Zenodo GitHub integration archives every GitHub
+release into the software family, so a table tag would advance software
+"latest" ({ref}`zenodo-archive-separation`). Existing `tables-*` and
+`mirror-*` tags stay published; older wheels pin them. The SBETHE `sdbase`
+mirror (`mirror-sbethe2-1`) and NIST SRD 64 are never bundled.
+
+To publish a table set version (maintainer):
+
+1. Build or fetch every pinned input: refresh tables with the per-code
+   builders below (`--pin` without `--url`), then `pyrite tables fetch`.
+2. Stage the upload set:
+   `uv run python scripts/release_table_bundles.py build --version <n> --archives build/xsgen-release`.
+   It reuses local archives whose digest matches the index and downloads the
+   rest, then writes `build/zenodo-tables/`.
+3. In Zenodo, open the table record, choose **New version**, upload every
+   staged file except `table-bundles.json` and `zenodo-metadata.json`, apply
+   the metadata from `zenodo-metadata.json` (creators are the PyRITE authors
+   who prepared the set; upstream deposits are `isDerivedFrom` relations and
+   their credits stay in the notices), and publish.
+4. Pin it: `uv run python scripts/release_table_bundles.py pin --record <id>`
+   downloads every bundle back, checks its SHA-256, writes
+   `table-bundles.json` and re-pins the table indexes (an existing URL is
+   kept as a fallback only when it serves the same bytes). Commit the
+   changed JSON files.
+
+### Per-code table builders
+
+To build or refresh one code's tables (maintainer):
 
 1. Build the archive and index from the stored tables, for example
    `uv run python scripts/release_elsepa_tables.py --out build/xsgen-release`
@@ -169,22 +232,13 @@ To cut or refresh a release (maintainer):
    builds the share kernel in `part`/`merge` steps on the remote box)
    (add `--generate` for missing tables). The archive is deterministic: an
    unchanged table set reproduces the pinned SHA-256.
-2. If the digest differs from the pin, use a new tag (`tables-elsepa-<n+1>`);
-   never replace an asset under an existing tag, since older indexes pin it.
-3. Publish with
-   `gh release create <tag> build/xsgen-release/elsepa-tables.zip --title ... --notes-file NOTES.md --latest=false`.
-   `--latest=false` keeps the repository's Latest badge on the newest code
-   release ([releasing](releasing.md#publishing)).
-   This flag does not exclude the release from Zenodo: first complete the
-   {ref}`Zenodo archiving cutover <zenodo-archive-separation>`
-   so a table release cannot become the software concept DOI's latest version.
-   The notes carry the upstream attribution, licence, and a modifications
-   statement (see `THIRD-PARTY-NOTICES.md`).
-4. Download the asset back (`gh release download <tag> -p <asset> -O - | sha256sum`)
-   and check it matches the index.
-5. Rebuild with `--url <release download URL> --pin` (`--url` repeats, in
-   fetch order; or edit `archive.urls`) and commit the index; CI's cache key
-   follows it. A dataset's URLs and SHA-256 live in `pyrite.datasets`.
+2. If the digest differs from the pin, pin the new index or dataset digest,
+   then publish a new {ref}`Zenodo table record <zenodo-table-record>`
+   version; never create a GitHub table release. Never replace bytes behind
+   an existing URL, since older indexes pin them.
+3. Commit the indexes and `table-bundles.json` together; CI's cache key
+   follows them. A dataset's direct URLs and SHA-256 live in
+   `pyrite.datasets`.
 
 ## Repository size
 

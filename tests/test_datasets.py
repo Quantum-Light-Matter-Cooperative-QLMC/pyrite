@@ -186,3 +186,62 @@ def test_the_eedl_loader_fails_naming_the_fetch_command(monkeypatch, tmp_path):
     monkeypatch.setattr(datasets, "datasets_dir", lambda: tmp_path)
     with pytest.raises(datasets.DatasetNotFoundError, match="pyrite tables fetch eedl"):
         load_eedl_shell_ionization("C")
+
+
+def _bundle(tmp_path, members):
+    import zipfile
+
+    path = tmp_path / "epics.zip"
+    with zipfile.ZipFile(path, "w") as zipped:
+        for name, data in members.items():
+            zipped.writestr(name, data)
+    return path
+
+
+def test_the_zenodo_bundle_is_the_last_fallback(pinned, tmp_path, monkeypatch):
+    bundle = _bundle(tmp_path, {"eedl/EEDL.endf": VETTED})
+    pin = datasets.BundlePin("epics", "epics.zip", _sha(bundle.read_bytes()), ("https://z/epics",))
+    monkeypatch.setattr(datasets, "bundle_pin", lambda name: pin if name == "epics" else None)
+    tried = []
+
+    def fake_download(url, destination, label):
+        tried.append(url)
+        if url != "https://z/epics":
+            raise DataFetchError(f"could not download {label}: unreachable")
+        destination.write_bytes(bundle.read_bytes())
+        return pin.sha256
+
+    monkeypatch.setattr("pyrite.xsgen.fetch._download", fake_download)
+
+    result = datasets.fetch_dataset("eedl")
+
+    assert tried == [*datasets.DATASETS["eedl"].urls, "https://z/epics"]
+    assert result.source == "https://z/epics"
+    assert pinned.read_bytes() == VETTED
+    assert sorted(p.name for p in pinned.parent.iterdir()) == ["EEDL.endf"]
+
+
+def test_a_local_bundle_zip_installs_its_member(pinned, tmp_path, monkeypatch):
+    bundle = _bundle(tmp_path, {"eedl/EEDL.endf": VETTED, "eadl/EADL2025.ALL": b"other"})
+    pin = datasets.BundlePin("epics", "epics.zip", _sha(bundle.read_bytes()), ())
+    monkeypatch.setattr(datasets, "bundle_pin", lambda name: pin)
+
+    assert datasets.fetch_dataset("eedl", bundle).installed
+    assert pinned.read_bytes() == VETTED
+
+
+def test_a_bundle_with_the_wrong_member_installs_nothing(pinned, tmp_path, monkeypatch):
+    bundle = _bundle(tmp_path, {"eedl/EEDL.endf": b"tampered"})
+    pin = datasets.BundlePin("epics", "epics.zip", _sha(bundle.read_bytes()), ())
+    monkeypatch.setattr(datasets, "bundle_pin", lambda name: pin)
+
+    with pytest.raises(DataFetchError, match="nothing was installed"):
+        datasets.fetch_dataset("eedl", bundle)
+    assert not pinned.exists()
+
+
+def test_every_fetched_dataset_is_pinned_in_a_shipped_bundle():
+    for dataset in datasets.DATASETS.values():
+        assert dataset.bundle is not None, dataset.name
+        pin = datasets.bundle_pin(dataset.bundle)
+        assert pin is not None and pin.file == f"{dataset.bundle}.zip"

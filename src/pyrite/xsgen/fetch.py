@@ -453,9 +453,20 @@ def _stage_release_table(bundle: zipfile.ZipFile, entry, name: str, staged: Path
 
 
 def _install_release(
-    code: str, name: str, pinned, archive: str | Path | None, *, exact: bool
+    code: str,
+    name: str,
+    pinned,
+    archive: str | Path | None,
+    *,
+    exact: bool,
+    companions: tuple = (),
 ) -> FetchResult:
     """Install every missing table of a pinned release into the user table directory.
+
+    ``companions`` are tables of another index pinning the *same* archive
+    (the electron and positron tables share one Zenodo bundle): they are
+    installed from the same download, so the other projectile's fetch finds
+    them present and downloads nothing. They never trigger a download alone.
 
     Nothing is installed unless every missing table verifies, so a failed
     fetch leaves no partial release behind.
@@ -464,6 +475,13 @@ def _install_release(
     missing = [
         entry for entry in pinned.tables if not _release_installed(entry, name, code, exact=exact)
     ]
+    if missing:
+        missing += [
+            entry
+            for entry in companions
+            if not _release_installed(entry, name, code, exact=exact)
+            and entry.key not in {known.key for known in missing}
+        ]
     if not missing:
         return FetchResult(
             code=code,
@@ -519,6 +537,16 @@ def _install_release(
     )
 
 
+def _companions(load, pinned, projectile: str, index) -> tuple:
+    """Tables of the other projectile's shipped index when it pins the same archive."""
+    if index is not None:
+        return ()
+    other = load(projectile="positron" if projectile == "electron" else "electron")
+    if other is None or other.archive_sha256 != pinned.archive_sha256:
+        return ()
+    return other.tables
+
+
 def fetch_bremslib(
     archive: str | Path | None = None, *, index: ReleaseIndex | None = None
 ) -> FetchResult:
@@ -565,8 +593,9 @@ def fetch_elsepa(
     compiler).
 
     ``projectile`` selects the electron or positron pin when ``index`` is
-    omitted; the positron archive is the ``tables-elsepa-positron-*`` release
-    pinned in ``elsepa-positron-tables.json``.
+    omitted; the positron tables are pinned in ``elsepa-positron-tables.json``.
+    When both shipped indexes pin the same archive (the Zenodo ``elsepa.zip``
+    bundle), one fetch installs both projectiles' missing tables.
 
     Raises
     ------
@@ -581,7 +610,8 @@ def fetch_elsepa(
             "this PyRITE build pins no ELSEPA table release; generate tables with "
             f"`pyrite tables generate --code elsepa --material NAME{species}`"
         )
-    return _install_release("elsepa", "ELSEPA", pinned, archive, exact=False)
+    companions = _companions(load_elsepa_release_index, pinned, projectile, index)
+    return _install_release("elsepa", "ELSEPA", pinned, archive, exact=False, companions=companions)
 
 
 def fetch_sbethe_tables(
@@ -599,8 +629,8 @@ def fetch_sbethe_tables(
     model read.
 
     ``projectile`` selects the electron or positron pin when ``index`` is
-    omitted; the positron archive is the ``tables-sbethe-positron-*`` release
-    pinned in ``sbethe-positron-tables.json``.
+    omitted; the positron tables are pinned in ``sbethe-positron-tables.json``.
+    As for ELSEPA, a shared archive installs both projectiles in one fetch.
 
     Raises
     ------
@@ -615,7 +645,10 @@ def fetch_sbethe_tables(
             "this PyRITE build pins no SBETHE table release; generate tables with "
             f"`pyrite tables generate --code sbethe --material NAME{species}`"
         )
-    return _install_release("sbethe-tables", "SBETHE", pinned, archive, exact=False)
+    companions = _companions(load_sbethe_release_index, pinned, projectile, index)
+    return _install_release(
+        "sbethe-tables", "SBETHE", pinned, archive, exact=False, companions=companions
+    )
 
 
 __all__ = [

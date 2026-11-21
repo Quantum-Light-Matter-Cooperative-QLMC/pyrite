@@ -18,6 +18,9 @@ Reusable Python implementations invoked by `pyrite-dev` live in
   `release_brem_lattice_share_table.py` (the universal lattice-coherent
   bremsstrahlung share kernel, #1250) and `release_epdl_differential.sh` are
   maintainer-only hosted-table release builders (see `docs/repo-design/data-distribution-and-repository-size.md`).
+- `release_table_bundles.py` stages the Zenodo table record (one zip and one
+  `sha256sum` file per upstream code) and, after upload, pins the published
+  record's URLs in `table-bundles.json` and the table indexes.
 - `generate_compton_profiles.py` regenerates or checks the in-package
   per-EADL-subshell Compton-profile table
   (`src/pyrite/data/photon_cross_sections/compton_profile_j0.csv`) from

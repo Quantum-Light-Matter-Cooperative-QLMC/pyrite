@@ -114,3 +114,37 @@ def test_the_shipped_index_resolves_every_catalogue_table_under_its_published_ke
     assert sorted(by_label) == list(catalog_keys())
     for key, entry in by_label.items():
         assert entry.key == resolve_catalog_table(key).key, key
+
+
+def test_a_shared_archive_installs_both_projectiles_in_one_download(release, tmp_path, monkeypatch):
+    """Electron and positron pins on one bundle download it once, not twice."""
+    import json
+
+    archive, index = release
+    record = index.record()
+    record["archive"]["urls"] = ["https://zenodo.invalid/sbethe.zip"]
+    half = len(record["tables"]) // 2
+    paths = {}
+    for projectile, rows in (
+        ("electron", record["tables"][:half]),
+        ("positron", record["tables"][half:]),
+    ):
+        paths[projectile] = tmp_path / f"{projectile}.json"
+        paths[projectile].write_text(json.dumps({**record, "tables": rows}))
+    monkeypatch.setattr(
+        "pyrite.xsgen.sbethe.release.release_index_path",
+        lambda projectile="electron": paths[projectile],
+    )
+    downloads = []
+
+    def fake_download(url, destination, label):
+        downloads.append(url)
+        destination.write_bytes(archive.read_bytes())
+        return index.archive_sha256
+
+    monkeypatch.setattr("pyrite.xsgen.fetch._download", fake_download)
+
+    assert fetch_sbethe_tables(projectile="electron").installed is True
+    assert fetch_sbethe_tables(projectile="positron").installed is False
+    assert downloads == ["https://zenodo.invalid/sbethe.zip"]
+    assert all(resolve(row["key"]) is not None for row in record["tables"])

@@ -8,10 +8,12 @@ repository-code: https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite
 authors:
   - family-names: Amador
     given-names: Alexander
+    orcid: https://orcid.org/0009-0001-7558-4966
     affiliation: >-
       Department of Electrical and Computer Engineering, UCLA, 420 Westwood Plaza, Los Angeles, CA 90095, USA
   - family-names: Farhadian
     given-names: Nicholas
+    orcid: https://orcid.org/0009-0008-7837-6899
     affiliation: >-
       Department of Electrical and Computer Engineering, UCLA, 420 Westwood Plaza, Los Angeles, CA 90095, USA
   - family-names: Rozells
@@ -20,10 +22,12 @@ authors:
       Department of Electrical and Computer Engineering, UCLA, 420 Westwood Plaza, Los Angeles, CA 90095, USA
   - family-names: Pennington
     given-names: Chad
+    orcid: https://orcid.org/0000-0002-8350-1366
     affiliation: >-
       Lumitron Technologies, Inc., 5201 California Ave., Suite 100, Irvine, CA 92617, USA
   - family-names: Carbajo
     given-names: Sergio
+    orcid: https://orcid.org/0000-0002-5292-4470
     affiliation: >-
       Department of Electrical and Computer Engineering, UCLA, 420 Westwood Plaza, Los Angeles, CA 90095, USA;
       Physics and Astronomy Department, UCLA, 475 Portola Plaza, Los Angeles, CA 90095, USA;

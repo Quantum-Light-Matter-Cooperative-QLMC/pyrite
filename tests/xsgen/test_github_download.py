@@ -39,11 +39,14 @@ def no_token(monkeypatch):
     monkeypatch.setattr(fetch_module.shutil, "which", lambda name: None)
 
 
-def test_the_shipped_elsepa_index_pins_a_github_release_url():
+def test_the_shipped_elsepa_index_pins_the_zenodo_bundle_not_a_github_release():
+    """Tables publish to the Zenodo dataset record; a GitHub release would be
+    archived into the software family (#1366)."""
     index = load_release_index()
 
     assert index is not None and index.urls
-    assert fetch_module._RELEASE_ASSET_URL.fullmatch(index.urls[0])
+    assert index.urls[0].startswith("https://zenodo.org/records/")
+    assert not any(fetch_module._RELEASE_ASSET_URL.fullmatch(url) for url in index.urls)
 
 
 def test_token_order_is_pyrite_then_github_then_gh(no_token, monkeypatch):

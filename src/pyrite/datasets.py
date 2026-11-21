@@ -8,6 +8,12 @@ published file from its pinned URL, or copies a local file given with
 xsgen tables use: PYRITE_DATA_DIR if set, otherwise the platform user data
 directory. PYRITE_HOME affects only output locations.
 
+Every dataset is also archived in a bundle of PyRITE's Zenodo table record
+(:mod:`pyrite.xsgen.bundles`): ``data/xsgen/table-bundles.json`` pins each
+bundle's SHA-256 and URLs, and a fetch falls back to extracting the dataset
+from its bundle after the direct URLs fail. ``--archive`` also accepts the
+bundle zip itself.
+
 A missing dataset is an error naming the fetch command. Nothing here falls back
 to other data, and nothing downloads implicitly at run time: a compute node may
 have no network, so installation stays an explicit step.
@@ -15,14 +21,18 @@ have no network, so installation stays an explicit step.
 Validation: bote-salvat-ionization-backend
 """
 
+import json
 import os
 import shutil
 import tempfile
 import warnings
+import zipfile
 from dataclasses import dataclass
 from pathlib import Path
+from typing import NoReturn
 
 from ._util.hashing import file_sha256
+from .paths import data_dir
 
 #: PyRITE's own GitHub Release downloads: mirrors and derived data.
 _RELEASES = "https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/releases/download"
@@ -52,6 +62,9 @@ class Dataset:
         a declared transformation of them; ``None`` when they are identical.
     strip_suffix
         The transformation: bytes removed from the end of the download.
+    bundle
+        Name of the Zenodo table bundle that also carries the pinned bytes,
+        at member :func:`bundle_member`; ``None`` if none does.
     """
 
     name: str
@@ -61,6 +74,7 @@ class Dataset:
     description: str
     download_sha256: str | None = None
     strip_suffix: bytes = b""
+    bundle: str | None = None
 
     @property
     def url(self) -> str:
@@ -84,6 +98,7 @@ EEDL = Dataset(
     # ENDF records are unchanged.
     download_sha256="ce37912435e0b8002f85878f98ccf7c5840cb168f1d46af3c9e915cd16c70ccc",
     strip_suffix=b"\r\n",
+    bundle="epics",
 )
 #: EPICS2025 EADL (NDS-IAEA-224), atomic relaxation.
 EADL = Dataset(
@@ -95,6 +110,7 @@ EADL = Dataset(
     ),
     sha256="78ccf8a4e07c1c120a2e3d94ff051aab2180d151f35e8bc3406d52df5af5e88c",
     description="EPICS2025 EADL atomic relaxation data (8 MB)",
+    bundle="epics",
 )
 #: PyRITE-derived EPDL2025 photon cross sections (``scripts/release_epdl_table.py``).
 #: Derived data, so PyRITE's release is the only location; it keeps the
@@ -105,6 +121,7 @@ EPDL = Dataset(
     urls=(f"{_RELEASES}/tables-epdl-1/epdl2025_mf23.npz",),
     sha256="fcc2f00c5bb969e99bc84cac16762f13e939f071d585c433a5c0f420913fcfc9",
     description="EPDL2025 MF=23 photon cross sections, knot-thinned by PyRITE (1.5 MB)",
+    bundle="epics",
 )
 #: PyRITE-derived EPDL2025 subshell photoionization, form factor and incoherent
 #: scattering function (``release_epdl_table.py --table differential``) for the
@@ -118,6 +135,7 @@ EPDL_DIFFERENTIAL = Dataset(
     description=(
         "EPDL2025 subshell photoionization and scattering functions, knot-thinned by PyRITE (11 MB)"
     ),
+    bundle="epics",
 )
 #: PyRITE-computed universal lattice-coherent bremsstrahlung share kernel
 #: (``release_brem_lattice_share_table.py``, #1250): crystalline BremsLib
@@ -129,6 +147,7 @@ BREM_LATTICE_SHARE = Dataset(
     urls=(f"{_RELEASES}/tables-brem-lattice-share-1/brem_lattice_share_kernel.npz",),
     sha256="c3e47b70d9260c9181e9ca496554f3630e0bd2aba4938356e986ef47082d6aa4",
     description="Lattice-coherent bremsstrahlung share kernel, computed by PyRITE (59 MB)",
+    bundle="pyrite",
 )
 #: NIST BoteSalvatICX.jl K/L/M shell-ionization parameters (public domain), the
 #: opt-in Bote--Salvat backend of #92. Optional: no default run reads it, so it
@@ -158,6 +177,44 @@ DATASETS: dict[str, Dataset] = {
 
 #: Opt-in datasets that only explicitly selected models read; fetched by name.
 OPTIONAL_DATASETS: dict[str, Dataset] = {BOTE_SALVAT.name: BOTE_SALVAT}
+
+#: Schema of ``data/xsgen/table-bundles.json``.
+BUNDLE_SCHEMA = "pyrite.xsgen.table-bundles.v1"
+
+
+@dataclass(frozen=True)
+class BundlePin:
+    """One pinned Zenodo table bundle: archive name, digest, and URLs."""
+
+    name: str
+    file: str
+    sha256: str
+    urls: tuple[str, ...]
+
+
+def bundle_index_path() -> Path:
+    """Return the shipped Zenodo bundle index."""
+    return data_dir() / "xsgen" / "table-bundles.json"
+
+
+def bundle_member(dataset: Dataset) -> str:
+    """Return the member name of ``dataset`` inside its bundle."""
+    return f"{dataset.name}/{dataset.filename}"
+
+
+def bundle_pin(name: str) -> BundlePin | None:
+    """Return the pin of bundle ``name``, or ``None`` if this build has none."""
+    path = bundle_index_path()
+    if not path.is_file():
+        return None
+    record = json.loads(path.read_text(encoding="utf-8"))
+    if record.get("schema") != BUNDLE_SCHEMA:
+        raise ValueError(f"unsupported table bundle index schema {record.get('schema')!r}")
+    entry = record["bundles"].get(name)
+    if entry is None:
+        return None
+    return BundlePin(name, str(entry["file"]), str(entry["sha256"]), tuple(entry["urls"]))
+
 
 #: Outcomes of :func:`verify_dataset`; ``ok`` is the only passing one.
 OK = "ok"
@@ -311,6 +368,72 @@ def _verify_staged(dataset: Dataset, staged: Path, origin: str) -> str | None:
     return f"{dataset.name} SHA-256 mismatch: expected {expected}, received {actual} from {origin}"
 
 
+def _extract_member(dataset: Dataset, bundle: Path, staged: Path, origin: str) -> str | None:
+    """Extract ``dataset`` from a verified bundle into ``staged``; return a failure."""
+    try:
+        with zipfile.ZipFile(bundle) as zipped, zipped.open(bundle_member(dataset)) as member:
+            with staged.open("wb") as stream:
+                shutil.copyfileobj(member, stream)
+    except (OSError, KeyError, zipfile.BadZipFile) as exc:
+        return f"could not extract {dataset.name} from {origin}: {exc}"
+    return _verify_staged(dataset, staged, origin)
+
+
+def _from_bundle(dataset: Dataset, pin: BundlePin, staged: Path) -> tuple[str | None, list[str]]:
+    """Try every URL of ``pin``; return ``(origin, failures)``."""
+    from .xsgen._errors import DataFetchError
+    from .xsgen.fetch import _download
+
+    failures = []
+    zipped = staged.with_name(pin.file)
+    for url in pin.urls:
+        try:
+            actual = _download(url, zipped, f"{pin.name} bundle ({url})")
+        except DataFetchError as exc:
+            failures.append(str(exc))
+            continue
+        if actual != pin.sha256:
+            failures.append(f"{pin.file} SHA-256 mismatch: expected {pin.sha256}, got {actual}")
+            continue
+        failure = _extract_member(dataset, zipped, staged, url)
+        zipped.unlink(missing_ok=True)
+        if failure is None:
+            return url, failures
+        failures.append(failure)
+    return None, failures
+
+
+def _raise_failures(name: str, failures: list[str]) -> NoReturn:
+    """Raise the error for a fetch whose every location failed."""
+    from .xsgen._errors import DataFetchError
+
+    if len(failures) == 1:
+        raise DataFetchError(f"{failures[0]}; nothing was installed")
+    raise DataFetchError(
+        f"every download location for {name} failed; nothing was installed:\n"
+        + "\n".join(f"- {failure}" for failure in failures)
+    )
+
+
+def _stage_local(dataset: Dataset, source: str | Path, staged: Path) -> str:
+    """Stage a local copy, either the file itself or its bundle zip."""
+    from .xsgen._errors import DataFetchError
+
+    origin = str(Path(source).resolve())
+    pin = None if dataset.bundle is None else bundle_pin(dataset.bundle)
+    try:
+        if pin is not None and file_sha256(Path(source)) == pin.sha256:
+            failure = _extract_member(dataset, Path(source), staged, origin)
+        else:
+            shutil.copyfile(source, staged)
+            failure = _verify_staged(dataset, staged, origin)
+    except OSError as exc:
+        raise DataFetchError(f"could not read {dataset.name} file {source}: {exc}") from exc
+    if failure is not None:
+        raise DataFetchError(f"{failure}; nothing was installed")
+    return origin
+
+
 def fetch_dataset(name: str, source: str | Path | None = None) -> DatasetFetchResult:
     """Install dataset ``name`` from its pinned URL or a local copy.
 
@@ -327,7 +450,8 @@ def fetch_dataset(name: str, source: str | Path | None = None) -> DatasetFetchRe
     name
         Dataset name, e.g. ``"eedl"``.
     source
-        A local copy of the pinned file, used instead of downloading.
+        A local copy of the pinned file, or of the Zenodo bundle that
+        carries it, used instead of downloading.
 
     Raises
     ------
@@ -351,14 +475,7 @@ def fetch_dataset(name: str, source: str | Path | None = None) -> DatasetFetchRe
     with tempfile.TemporaryDirectory(prefix=f".{name}-fetch-", dir=destination.parent) as temp:
         staged = Path(temp) / dataset.filename
         if source is not None:
-            origin = str(Path(source).resolve())
-            try:
-                shutil.copyfile(source, staged)
-            except OSError as exc:
-                raise DataFetchError(f"could not read {name} file {source}: {exc}") from exc
-            failure = _verify_staged(dataset, staged, origin)
-            if failure is not None:
-                raise DataFetchError(f"{failure}; nothing was installed")
+            origin = _stage_local(dataset, source, staged)
         else:
             failures = []
             for url in dataset.urls:
@@ -373,12 +490,12 @@ def fetch_dataset(name: str, source: str | Path | None = None) -> DatasetFetchRe
                     break
                 failures.append(failure)
             else:
-                if len(failures) == 1:
-                    raise DataFetchError(f"{failures[0]}; nothing was installed")
-                raise DataFetchError(
-                    f"every download location for {name} failed; nothing was installed:\n"
-                    + "\n".join(f"- {failure}" for failure in failures)
-                )
+                pin = None if dataset.bundle is None else bundle_pin(dataset.bundle)
+                bundled, more = (None, []) if pin is None else _from_bundle(dataset, pin, staged)
+                failures.extend(more)
+                if bundled is None:
+                    _raise_failures(name, failures)
+                origin = bundled
         try:
             os.replace(staged, destination)
         except OSError as exc:
@@ -388,6 +505,7 @@ def fetch_dataset(name: str, source: str | Path | None = None) -> DatasetFetchRe
 
 __all__ = [
     "BOTE_SALVAT",
+    "BUNDLE_SCHEMA",
     "DATASETS",
     "EADL",
     "EEDL",
@@ -398,10 +516,14 @@ __all__ = [
     "OK",
     "OPTIONAL_DATASETS",
     "PDATCONF_SHA256",
+    "BundlePin",
     "Dataset",
     "DatasetFetchResult",
     "DatasetMismatchError",
     "DatasetNotFoundError",
+    "bundle_index_path",
+    "bundle_member",
+    "bundle_pin",
     "dataset_path",
     "datasets_dir",
     "fetch_dataset",
