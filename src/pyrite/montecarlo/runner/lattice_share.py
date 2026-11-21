@@ -352,14 +352,18 @@ class SelectionContinuum:
     are scored by the production continuum estimator on the case's own
     continuum electrons and segments, with the same tables (and line-cutoff
     floor) the corrected continuum uses, on log-spaced nodes across
-    ``band_eV`` integrated by the trapezoid rule.
+    ``band_eV`` integrated by the trapezoid rule. With ``parts`` (streamed
+    selection, #1281), ``segments`` is the scalar header and each yield sums
+    over the staged blocks ``parts()`` returns.
 
     Validation: brem-lattice-coherent-fraction
 
     Validation: reflection-yield-tolerance-selector
     """
 
-    def __init__(self, case, segments, n_hat, abs_layers, band_eV, *, groove=None, Ne=None):
+    def __init__(
+        self, case, segments, n_hat, abs_layers, band_eV, *, groove=None, Ne=None, parts=None
+    ):
         import numpy as np
 
         from .case_tables import _case_bremslib_tables
@@ -375,6 +379,7 @@ class SelectionContinuum:
         self.weights[1:] += 0.5 * step
         self.case = case
         self._scene = (segments, n_hat, abs_layers, groove, Ne)
+        self._parts = parts
         self._tables = _case_bremslib_tables(case)
         self._background: dict = {}
 
@@ -395,19 +400,22 @@ class SelectionContinuum:
         from .emission import _layer_brem_from_segments
 
         segments, n_hat, abs_layers, groove, Ne = self._scene
-        density = _layer_brem_from_segments(
-            segments,
-            self.grid,
-            self.case,
-            n_hat,
-            abs_layers,
-            layer=layer,
-            tables=tables,
-            tabled_only=tabled_only,
-            groove=groove,
-            Ne=Ne,
-        )
-        return float(np.asarray(_to_cpu(density), dtype=float) @ self.weights)
+        total = 0.0
+        for part in [segments] if self._parts is None else self._parts():
+            density = _layer_brem_from_segments(
+                part,
+                self.grid,
+                self.case,
+                n_hat,
+                abs_layers,
+                layer=layer,
+                tables=tables,
+                tabled_only=tabled_only,
+                groove=groove,
+                Ne=Ne,
+            )
+            total += float(np.asarray(_to_cpu(density), dtype=float) @ self.weights)
+        return total
 
     def background(self, layer: int | None) -> float:
         """In-band yield of ``layer``'s uncorrected continuum."""
@@ -460,7 +468,7 @@ def lattice_share_outputs(case: Mapping[str, Any], n_layers: int) -> dict:
     return {} if record is None else {"brem_lattice_share": record}
 
 
-def selection_continuum(case: Mapping[str, Any], batch, Ne_brem):
+def selection_continuum(case: Mapping[str, Any], batch, Ne_brem, parts=None):
     """Factory ``band_eV -> SelectionContinuum`` on an emission batch's segments."""
     return lambda band: SelectionContinuum(
         case,
@@ -470,4 +478,5 @@ def selection_continuum(case: Mapping[str, Any], batch, Ne_brem):
         band,
         groove=batch.groove,
         Ne=Ne_brem,
+        parts=parts,
     )
