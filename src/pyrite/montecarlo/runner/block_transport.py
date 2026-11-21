@@ -195,6 +195,11 @@ def _stream_electron_blocks(
         if sizer is None
         else sizer.blocks(n_electrons)
     )
+    from .stream_overlap import overlap_requested, stream_overlapped
+
+    if overlap_requested(sizer, should_stop, n_electrons, block_electrons if sizer is None else 0):
+        # Uncommitted spans after a device OOM continue serially below.
+        spans = stream_overlapped(spans, simulate_block, consume, on_block, _globalize, counts)
     for start, stop in spans:
 
         def score_block(resident, start=start, stop=stop):

@@ -589,21 +589,92 @@ shell-response product (0.30 s).
 
 ## Transport/scoring overlap
 
-Overlapping CPU transport with GPU scoring is not implemented. Job 3010 timed
-CPU per-electron transport alone on the same cases (Ryzen 9950X3D, one
-thread). An ideal pipeline is bounded below by the larger of CPU transport
-and GPU scoring:
+Overlap (#862, `montecarlo/runner/stream_overlap.py`) is on by default for
+CUDA streamed runs with a fixed block size (`stream_block_electrons`), no early
+stop, and at least two full blocks of at least 2¹⁸ (262,144) electrons
+(`AUTO_MIN_BLOCK`). `PYRITE_STREAM_OVERLAP=1` forces it on for any fixed-block
+CUDA run, and `0` turns it off. The main thread transports block
+`k + 1` while one worker thread scores block `k` on a non-blocking CuPy
+stream. One block is in flight, so staging is bounded. Blocks are scored in
+order by one consumer, so outputs equal serial streaming bit for bit. A device
+OOM drains the pipeline and the serial loop resumes. Overlap engages only for
+fixed block sizes with no early stop, so the #868 memory sizer and adaptive
+stops run serially.
 
-| Case | CPU transport (s) | GPU scoring (s) | GPU-only streamed wall (s) | Ideal overlap (s) |
+**With CXR lines (the default) overlap does not pay.** All runs below use the
+#872 harness (300 keV, 10 µm slab, coupled BremsLib, seed 1) on the lab RTX
+5080. Job 13787 measured Si 20,000 electrons in blocks of 4,096: serial wall
+21.08 s, overlap 21.04 s, with spectra bitwise identical. The run was not
+GIL-bound (GIL waits 0.02–0.07 s per thread). Transport took about 1.75 s of
+the 21 s; scoring and reflection selection took the rest. Job 13824 measured
+W 8,192 electrons in blocks of 4,096 at 90% GPU busy, with transport 4.7 s of
+280 s. Overlap can hide only transport, so the ceiling is single-digit
+percent on Si and about 1% on W.
+
+The scoring lever went to bitwise-neutral GPU elementwise trims in batched
+line scoring instead (see #862):
+
+- amplitude-only `_cxr_amp_sq_total_core` unless PXR/CBS components or
+  attribution are read;
+- polarization sums seeded from their first term;
+- fused segment-block prologue kernels.
+
+Jobs 13854 and 13859 (three interleaved reps each) cut W 8,192/4,096 serial
+streamed wall from 275.8 s to 226.6 s (−17.9%) and Si 20,000/4,096 by 9%.
+Pool peak was unchanged. W line scoring has ulp-level run-to-run variance
+(≤ 1.8e-16 relative, in one or two bins), and the base commit shows it too.
+That is far inside the #611 1e-12 tolerance.
+
+**Brem-only (`cxr_source="none"`) overlap pays at large blocks.** These runs
+used a 96 GiB RTX PRO 6000 Blackwell on the same harness with
+`STREAM_CXR=none`, measuring production wall (`STREAM_PHASES=0`) with serial
+and overlap runs interleaved. Overlap spectra were bitwise equal to serial in
+every run.
+
+| Case (electrons / block) | Serial (s) | Overlap (s) | Δ | Pool, serial → overlap (GiB) |
 |---|---|---|---|---|
-| Si 64,000 | 4.6 | 2.0 | 4.8 | ≥ 4.6 |
-| W 16,000 | 18.1 | 18.6 | 28.8 | ≥ 18.6 |
+| Si 20,000 / 4,096 | 1.80–1.85 | 1.84–1.90 | +2% | 0.14 → 0.19 |
+| W 8,192 / 4,096 | 1.94–2.00 | 2.13–2.23 | +10% | 0.67 → 0.89 |
+| Si 262,144 / 8,192 | 3.38–3.50 | 3.65–3.89 | +10% | 0.25 → 0.34 |
+| W 262,144 / 8,192 | 6.80–6.92 | 6.59–6.82 | −2% | 1.3 → 1.6 |
+| Si 2,097,152 / 131,072 | 4.71–4.78 | 4.06–4.24 | −12% | 1.3 → 1.7 |
+| W 2,097,152 / 131,072 | 21.22–21.34 | 19.03–19.50 | −9.5% | 18 → 20 |
+| W 2,097,152 / 524,288 | 20.27–20.80 | 18.28–18.54 | −10.4% | 71 → 80 |
+| Si 16,777,216 / 1,048,576 | 25.02–25.40 | 17.59–17.75 | −30% | 11.0 → 11.6 |
+| W 8,388,608 / 262,144 | 77.16–77.27 | 68.59–69.03 | −11% | 36 → 41 |
 
-Si gains nothing. For scoring-heavy W cases overlap could save up to about a third
-of the wall time. It needs a producer process or a `nogil` per-electron core
-(the current core is `@njit` without `nogil`) and bounded staging buffers.
-Overlapping GPU transport with GPU scoring on separate streams has the same
-lower bound.
+At small blocks, the per-block handoff and synchronization make overlap
+slower. Gains need blocks of about 10⁵ electrons or more and many blocks.
+For brem-only runs, the #868 sizer's largest block that fits is slower than a
+modest fixed block (Si 2M as one block 4.8 s vs 4.75 s at 131,072; W 8M at a
+64 GiB target 86 s vs 77 s at 262,144). W stays far from max(transport,
+scoring) because both phases are GPU kernels on one device. Overlap costs
+about one extra block of retained rows plus scoring scratch.
+
+`checks/stream_overlap_brem_862.sbatch` repeated these on the 16 GiB RTX 5080
+(jobs 14466 and 14477, three interleaved reps unless noted; min–max).
+Spectra were bitwise equal to serial in every brem-only arm; the CXR-on arm
+differs by at most 1.8e-16, the W line-scoring jitter above.
+
+| Case (electrons / block, blocks) | Serial (s) | Overlap (s) | Δ (median) | Pool, serial → overlap (GiB) |
+|---|---|---|---|---|
+| Si 2,097,152 / 131,072 (16) | 4.44–4.53 | 4.16–4.29 | −4.0% | 1.32 → 1.67 |
+| W 2,097,152 / 65,536 (32) | 26.57–26.71 | 25.70–26.04 | −3.2% | 9.1 → 10.3 |
+| W 8,388,608 / 65,536 (128) | 102.9–108.9 | 99.07–99.58 | −3.8% | 9.1 → 10.4 |
+| Si 524,288 / 262,144 (2) | 1.878–1.883 | 1.699–1.727 | −8.7% | 2.6 → 3.1 |
+| Si 786,432 / 262,144 (3) | 2.259–2.314 | 1.988–2.015 | −11.8% | 2.6 → 3.1 |
+| Si 4,194,304 / 262,144 (16) | 7.513–7.915 | 5.862–5.947 | −23.4% | 2.6 → 3.1 |
+| Si 16,777,216 / 1,048,576 (16) | 24.00–24.45 | 16.87–17.29 | −29.7% | 10.7 → 11.6 |
+| Si 2,097,152 / 262,144 (8), CXR lines on, 1 rep | 96.79 | 93.80 | −3.1% | 7.7 → 8.2 |
+
+The default threshold follows from these: every arm at 2¹⁸ electrons or more
+gained 7–30% (brem-only) on either card, every arm at 2¹⁶–2¹⁷ on 16 GiB gained
+at most 4%, and 4,096–8,192 blocks lost 2–10%. Two blocks are enough. With
+CXR lines on, overlap hides only transport (3.4 s of 92.8 s here), so its
+gain is bounded by that share, but large blocks do not lose. The #868 memory
+sizer (`stream_memory_mib`) still runs serially: its block sizes are chosen
+one block at a time, and at a 12 GiB target it was never faster than overlap
+at 262,144-electron blocks.
 
 ## Equivalence on CUDA
 

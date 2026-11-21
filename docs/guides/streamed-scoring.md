@@ -84,6 +84,13 @@ memory on different scenes. For reference, the #611 measurements streamed a
 the largest electron count the default path fits, then raise it while memory
 allows: larger blocks amortize per-block launch and staging costs.
 
+On CUDA, fixed blocks of at least 262,144 electrons, with two or more of
+them in the run, overlap transport of the next block with scoring of the
+current one. Results are bitwise identical to streaming without overlap; wall
+time drops by up to about 30% when transport is a large share of the run, and
+peak device memory grows by about one block. Set `PYRITE_STREAM_OVERLAP=0` to
+turn it off, or `1` to force it for smaller fixed blocks.
+
 ## Set a memory target instead
 
 Use `KernelTuning.stream_memory_mib` to give a device-memory budget in MiB

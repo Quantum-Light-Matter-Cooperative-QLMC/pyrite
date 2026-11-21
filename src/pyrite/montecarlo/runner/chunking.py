@@ -228,6 +228,7 @@ _SPECTRUM_BACKEND_MODULES = (
     "cxr._fused",
     "cxr._grouped",
     "cxr._kernels",
+    "cxr._line_amplitude",
     "cxr._line_tables",
     "cxr._mosaic_sampled",
     "cxr._per_hkl",
