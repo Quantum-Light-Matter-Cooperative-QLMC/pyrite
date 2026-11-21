@@ -4,11 +4,13 @@
   "creators": [
     {
       "name": "Amador, Alexander",
-      "affiliation": "Department of Electrical and Computer Engineering, UCLA, 420 Westwood Plaza, Los Angeles, CA 90095, USA"
+      "affiliation": "Department of Electrical and Computer Engineering, UCLA, 420 Westwood Plaza, Los Angeles, CA 90095, USA",
+      "orcid": "https://orcid.org/0009-0001-7558-4966"
     },
     {
       "name": "Farhadian, Nicholas",
-      "affiliation": "Department of Electrical and Computer Engineering, UCLA, 420 Westwood Plaza, Los Angeles, CA 90095, USA"
+      "affiliation": "Department of Electrical and Computer Engineering, UCLA, 420 Westwood Plaza, Los Angeles, CA 90095, USA",
+      "orcid": "https://orcid.org/0009-0008-7837-6899"
     },
     {
       "name": "Rozells, Jackson",
@@ -16,11 +18,13 @@
     },
     {
       "name": "Pennington, Chad",
-      "affiliation": "Lumitron Technologies, Inc., 5201 California Ave., Suite 100, Irvine, CA 92617, USA"
+      "affiliation": "Lumitron Technologies, Inc., 5201 California Ave., Suite 100, Irvine, CA 92617, USA",
+      "orcid": "https://orcid.org/0000-0002-8350-1366"
     },
     {
       "name": "Carbajo, Sergio",
-      "affiliation": "Department of Electrical and Computer Engineering, UCLA, 420 Westwood Plaza, Los Angeles, CA 90095, USA; Physics and Astronomy Department, UCLA, 475 Portola Plaza, Los Angeles, CA 90095, USA; SLAC National Accelerator Laboratory, 2575 Sand Hill Road, Menlo Park, CA 94025, USA; California NanoSystems Institute, 570 Westwood Plaza, Los Angeles, CA 90095, USA"
+      "affiliation": "Department of Electrical and Computer Engineering, UCLA, 420 Westwood Plaza, Los Angeles, CA 90095, USA; Physics and Astronomy Department, UCLA, 475 Portola Plaza, Los Angeles, CA 90095, USA; SLAC National Accelerator Laboratory, 2575 Sand Hill Road, Menlo Park, CA 94025, USA; California NanoSystems Institute, 570 Westwood Plaza, Los Angeles, CA 90095, USA",
+      "orcid": "https://orcid.org/0000-0002-5292-4470"
     }
   ]
 }
