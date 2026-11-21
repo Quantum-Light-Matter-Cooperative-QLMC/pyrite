@@ -175,6 +175,9 @@ To cut or refresh a release (maintainer):
    `gh release create <tag> build/xsgen-release/elsepa-tables.zip --title ... --notes-file NOTES.md --latest=false`.
    `--latest=false` keeps the repository's Latest badge on the newest code
    release ([releasing](releasing.md#publishing)).
+   This flag does not exclude the release from Zenodo: first complete the
+   {ref}`Zenodo archiving cutover <zenodo-archive-separation>`
+   so a table release cannot become the software concept DOI's latest version.
    The notes carry the upstream attribution, licence, and a modifications
    statement (see `THIRD-PARTY-NOTICES.md`).
 4. Download the asset back (`gh release download <tag> -p <asset> -O - | sha256sum`)

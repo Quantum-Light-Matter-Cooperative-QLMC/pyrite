@@ -2,8 +2,25 @@
   "upload_type": "software",
   "license": "other-nc",
   "creators": [
-    {"name": "Amador, Alex", "affiliation": "UCLA"},
-    {"name": "Farhadian, Nicholas"},
-    {"name": "Rozells, Jackson"}
+    {
+      "name": "Amador, Alexander",
+      "affiliation": "Department of Electrical and Computer Engineering, UCLA, 420 Westwood Plaza, Los Angeles, CA 90095, USA"
+    },
+    {
+      "name": "Farhadian, Nicholas",
+      "affiliation": "Department of Electrical and Computer Engineering, UCLA, 420 Westwood Plaza, Los Angeles, CA 90095, USA"
+    },
+    {
+      "name": "Rozells, Jackson",
+      "affiliation": "Department of Electrical and Computer Engineering, UCLA, 420 Westwood Plaza, Los Angeles, CA 90095, USA"
+    },
+    {
+      "name": "Pennington, Chad",
+      "affiliation": "Lumitron Technologies, Inc., 5201 California Ave., Suite 100, Irvine, CA 92617, USA"
+    },
+    {
+      "name": "Carbajo, Sergio",
+      "affiliation": "Department of Electrical and Computer Engineering, UCLA, 420 Westwood Plaza, Los Angeles, CA 90095, USA; Physics and Astronomy Department, UCLA, 475 Portola Plaza, Los Angeles, CA 90095, USA; SLAC National Accelerator Laboratory, 2575 Sand Hill Road, Menlo Park, CA 94025, USA; California NanoSystems Institute, 570 Westwood Plaza, Los Angeles, CA 90095, USA"
+    }
   ]
 }

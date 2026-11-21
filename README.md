@@ -2,7 +2,7 @@
 
 ![PyRITE](src/pyrite/_assets/branding/pyrite-wordmark.png)
 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23487182.svg)](https://doi.org/10.5281/zenodo.23487182)  [![PyPI](https://img.shields.io/pypi/v/pyrite-mc)](https://pypi.org/project/pyrite-mc/) [![Documentation](https://readthedocs.org/projects/pyrite/badge/?version=latest)](https://pyrite.readthedocs.io/en/latest/) ![Python Version from PEP 621 TOML](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2FQuantum-Light-Matter-Cooperative-QLMC%2Fpyrite%2Fmain%2Fpyproject.toml) [![Downloads](https://img.shields.io/pypi/dm/pyrite-mc?label=downloads%2Fmonth)](https://pypistats.org/packages/pyrite-mc) [![License](https://img.shields.io/badge/License-UCLA-blue)](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/blob/main/LICENSE.txt)
+[![Cite PyRITE](https://img.shields.io/badge/Cite-PyRITE-blue)](#citing-pyrite)  [![PyPI](https://img.shields.io/pypi/v/pyrite-mc)](https://pypi.org/project/pyrite-mc/) [![Documentation](https://readthedocs.org/projects/pyrite/badge/?version=latest)](https://pyrite.readthedocs.io/en/latest/) ![Python Version from PEP 621 TOML](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2FQuantum-Light-Matter-Cooperative-QLMC%2Fpyrite%2Fmain%2Fpyproject.toml) [![Downloads](https://img.shields.io/pypi/dm/pyrite-mc?label=downloads%2Fmonth)](https://pypistats.org/packages/pyrite-mc) [![License](https://img.shields.io/badge/License-UCLA-blue)](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/blob/main/LICENSE.txt)
 
 **Simulate how electrons travel through matter—and the X-rays they produce.**
 
@@ -72,6 +72,22 @@ For selectable **uv/pip installation instructions**, GPU and other extras, and y
 > **PyRITE is research software under active development, not a fully validated radiation-transport code.** Different models and features have different levels of testing and physical validity. Check the [capability matrix](https://pyrite.readthedocs.io/en/latest/physics/capabilities.html) and [validation status](https://pyrite.readthedocs.io/en/latest/validation/status-summary.html) before relying on quantitative predictions.
 
 PyRITE's development emphasizes transparent physical assumptions, reproducible calculations, and comparison with theory and published results. The [physics documentation](https://pyrite.readthedocs.io/en/latest/physics/index.html) explains the models and their limitations.
+
+## Citing PyRITE
+
+Cite the **specific software version used** in your work. For example,
+[PyRITE 0.35.0](https://doi.org/10.5281/zenodo.24256748) has DOI
+`10.5281/zenodo.24256748`. For other versions, select the matching `vX.Y.Z`
+record from the [Zenodo version history](https://zenodo.org/records/24256748/versions)
+and export its citation.
+
+The general DOI `10.5281/zenodo.23487182` currently groups software and table
+releases, so it can resolve to a table release. Use the software version's own
+DOI for reproducible citations. Cite table datasets separately when applicable.
+The [citation metadata](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/blob/main/CITATION.cff)
+lists the software authors; see the
+[release guide](docs/repo-design/releasing.md#zenodo-authorship) for maintaining
+Zenodo records.
 
 ## Get involved
 

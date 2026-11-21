@@ -204,7 +204,14 @@ def test_zenodo_creators_are_explicit_humans() -> None:
     path = Path(__file__).resolve().parents[2] / ".zenodo.json"
     creators = json.loads(path.read_text())["creators"]
 
-    assert creators
+    assert [creator["name"] for creator in creators] == [
+        "Amador, Alexander",
+        "Farhadian, Nicholas",
+        "Rozells, Jackson",
+        "Pennington, Chad",
+        "Carbajo, Sergio",
+    ]
     for creator in creators:
+        assert creator["affiliation"]
         name = creator["name"].lower()
         assert not any(tag in name for tag in ("claude", "anthropic", "[bot]", "copilot"))

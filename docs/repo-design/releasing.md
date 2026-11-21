@@ -100,16 +100,51 @@ if publication should proceed without manual approval.
 
 ### Zenodo authorship
 
-Zenodo archives each published GitHub Release under the concept DOI in
-`README.md`. Its creators come from the committed `.zenodo.json`, never from
+The repository's Zenodo GitHub integration currently archives code, table and
+mirror releases into the same concept DOI, `10.5281/zenodo.23487182`. That DOI
+can therefore resolve to a table release. For publications, select the exact
+software version and cite its version DOI; see
+[Citing PyRITE](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite#citing-pyrite).
+
+Future archive creators come from the committed `.zenodo.json`, never from
 GitHub's contributor list: agent commits carry `Co-Authored-By: Claude …`
 trailers, which GitHub counts as contributors, and Zenodo would otherwise
 credit them as authors. Only humans are listed. Add a new human author to
-`.zenodo.json` in a normal PR; never add an AI agent or `[bot]` account.
+`.zenodo.json` and `CITATION.cff` in a normal PR, preserving author order and
+affiliations; never add an AI agent or `[bot]` account. `CITATION.cff` enables
+GitHub's citation interface. When both files exist,
+[Zenodo uses only `.zenodo.json`](https://help.zenodo.org/docs/github/describe-software/).
 `tests/dev/test_release.py` enforces this. The licence is `other-nc`, Zenodo's
 nearest vocabulary entry for the UCLA Academic Software License in
 `LICENSE.txt`, which the archived source carries. After a release, check the new
-Zenodo version's creator list; correct a stray creator by editing that record.
+Zenodo version's creator list. Repository metadata changes do not update old
+records: open each affected software record in Zenodo, choose **Edit**, correct
+its creators, and **Publish**. This
+[metadata correction preserves the DOI](https://help.zenodo.org/docs/deposit/manage-records/).
+
+(zenodo-archive-separation)=
+
+#### Separating software and dataset archives
+
+`--latest=false` does **not** exclude a release from Zenodo or change its version
+family. Before publishing another table or mirror release, the Zenodo account
+owner must arrange separate archiving; a repository edit cannot switch off
+the account's GitHub integration.
+
+The planned cutover is to disable automatic ingestion for this repository and
+deposit code releases explicitly into the software family, with a separate
+dataset family for each independently versioned table product. Validate the
+workflow in the Zenodo sandbox first, including continuation of the existing
+software family and retry behavior, then coordinate disabling ingestion with
+enabling explicit deposits to avoid duplicate or missing archives. This
+repository does not yet implement that deposition workflow.
+
+Keep existing DOIs, table download URLs and digest pins intact. Ask Zenodo
+support whether already published table records can be separated from the
+software family while preserving identifiers; metadata editing alone is not
+a documented way to change that grouping. Until remediation is settled, cite
+exact software-version DOIs. Dataset deposits retain their own upstream
+attribution, licences and modification statements.
 
 Releases for data and table archives (`tables-*`, `mirror-*`) share the
 repository's Releases page. Create them with `--latest=false` (see
