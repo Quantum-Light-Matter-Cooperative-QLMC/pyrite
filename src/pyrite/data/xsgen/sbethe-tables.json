@@ -2,10 +2,10 @@
   "schema": "pyrite.xsgen.sbethe-release.v1",
   "upstream": "SBETHE, Mendeley Data doi:10.17632/7zw25f428t.2",
   "archive": {
-    "sha256": "399ecd2264d8cf9402e8958f15c57e146b13412fdef64914e70e7dae64acaf2a",
-    "bytes": 5127793,
+    "sha256": "5cfac32332f481bea6488bce3e7ed6ee40c8d98399c19e33f1d7231263f4d9c4",
+    "bytes": 10275256,
     "urls": [
-      "https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/releases/download/tables-sbethe-4/sbethe-tables.zip"
+      "https://zenodo.org/records/24429433/files/sbethe.zip?download=1"
     ]
   },
   "tables": [

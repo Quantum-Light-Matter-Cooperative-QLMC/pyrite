@@ -2,10 +2,10 @@
   "schema": "pyrite.xsgen.elsepa-release.v1",
   "upstream": "ELSEPA 2020, Mendeley Data doi:10.17632/w4hm5vymym.1",
   "archive": {
-    "sha256": "060c06cf31fbcf083ae5ca8a47c91ae958cf7b4465e3880e905acb7736b7ccbb",
-    "bytes": 49517306,
+    "sha256": "ebed2296fd610d7ff1dd300e9e3d18ba22fae62140852b6d3ef9cd62aaace021",
+    "bytes": 97799360,
     "urls": [
-      "https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/releases/download/tables-elsepa-positron-5/elsepa-positron-tables.zip"
+      "https://zenodo.org/records/24429433/files/elsepa.zip?download=1"
     ]
   },
   "tables": [

@@ -95,9 +95,15 @@ by up to 67% across single steep intervals, so it was rejected. It is classed
 
 ## Hosted table releases
 
-PyRITE's own pinned table archives are published as GitHub Release assets of
-this repository, one release per dataset (issues #284, #282). The repository
-and release assets are public, so downloads need no GitHub token.
+PyRITE's own table archives are published in the
+{ref}`Zenodo table record <zenodo-table-record>`; version
+[10.5281/zenodo.24429433](https://doi.org/10.5281/zenodo.24429433) is pinned.
+The ELSEPA, SBETHE and BremsLib indexes in `src/pyrite/data/xsgen/` pin its
+`elsepa.zip`, `sbethe.zip` and `bremslib.zip` (`bremslib.zip` is
+byte-identical to `tables-bremslib-4`, which stays as its fallback).
+Earlier archives were GitHub Release assets of this repository, one release
+per dataset (issues #284, #282); they stay public for older builds, and the
+datasets below still download from them first. No token is needed.
 
 ```{list-table}
 :header-rows: 1
@@ -105,21 +111,12 @@ and release assets are public, so downloads need no GitHub token.
 * - Release
   - Asset
   - Pinned by
-* - `tables-elsepa-5`
-  - `elsepa-tables.zip` (48,282,076 B, 55 tables)
-  - `src/pyrite/data/xsgen/elsepa-tables.json`
-* - `tables-elsepa-positron-5`
-  - `elsepa-positron-tables.zip` (49,517,306 B, 55 tables)
-  - `src/pyrite/data/xsgen/elsepa-positron-tables.json`
+* - `tables-elsepa-5`, `tables-elsepa-positron-5`, `tables-sbethe-4`, `tables-sbethe-positron-4`
+  - Separate electron/positron archives
+  - Older builds only; superseded by the Zenodo bundles
 * - `tables-bremslib-4`
   - `bremslib-tables.zip` (41,515,721 B, 42 tables)
-  - `src/pyrite/data/xsgen/bremslib-tables.json`
-* - `tables-sbethe-4`
-  - `sbethe-tables.zip` (5,127,793 B, 84 tables)
-  - `src/pyrite/data/xsgen/sbethe-tables.json`
-* - `tables-sbethe-positron-4`
-  - `sbethe-positron-tables.zip` (5,147,485 B, 84 tables)
-  - `src/pyrite/data/xsgen/sbethe-positron-tables.json`
+  - `src/pyrite/data/xsgen/bremslib-tables.json` (fallback after Zenodo)
 * - `tables-epdl-1`
   - `epdl2025_mf23.npz` (derived EPDL2025 photon table)
   - `pyrite.datasets.EPDL`
