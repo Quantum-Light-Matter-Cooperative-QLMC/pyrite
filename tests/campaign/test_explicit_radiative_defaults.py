@@ -49,7 +49,23 @@ def _stack_sweep():
     )
 
 
-@pytest.mark.parametrize("sweep_factory", [lambda: material_sweep("silicon"), _stack_sweep])
+def _silicon_sweep():
+    # The identity contract needs representative points, not the catalog's full
+    # 3,969-case production scan and thousands of repeated dense-grid hashes.
+    sweep = material_sweep("silicon")
+    return replace(
+        sweep,
+        beam=replace(sweep.beam, energy_keV=(30.0, 60.0)),
+        target=replace(
+            sweep.target,
+            thickness_ang=(1000.0, 5000.0),
+            tilt_deg=30.0,
+            tilt_azim_deg=95.0,
+        ),
+    )
+
+
+@pytest.mark.parametrize("sweep_factory", [_silicon_sweep, _stack_sweep])
 def test_covered_scene_cases_and_identities_match_legacy_auto(sweep_factory):
     sweep = sweep_factory()
     cases = build_cases(sweep, 4, 4)
@@ -112,7 +128,7 @@ def test_grooved_default_requires_explicit_uncoupled():
 def test_eedl_scene_requires_explicit_uncoupled():
     with pytest.raises(ValueError, match="select radiative_model='uncoupled' explicitly"):
         Physics(bremsstrahlung_model="eedl")
-    sweep = material_sweep("silicon")
+    sweep = _silicon_sweep()
     with pytest.raises(ValueError, match="radiative_model='uncoupled'"):
         build_cases(sweep, 4, 4, bremsstrahlung_model="eedl")
     eedl = build_cases(sweep, 4, 4, bremsstrahlung_model="eedl", radiative_model="uncoupled")
@@ -156,7 +172,7 @@ def test_allow_fallback_degrades_default_and_records_it(monkeypatch, grooved):
 
 
 def test_explicit_uncoupled_records_no_coupled_identity():
-    sweep = material_sweep("silicon")
+    sweep = _silicon_sweep()
     settings = replace(default_settings(), radiative_model="uncoupled", radiative_cutoff_eV=None)
     numerics = dataset_identity("silicon", settings, sweep)["resolved_parameters"][
         "transport_numerics"

@@ -32,7 +32,9 @@ def _case(policy=None):
         n_electrons=8,
         n_electrons_brem=8,
     )
-    case = {**build_cases(sweep)[0], "Ne": 24, "Ne_brem": 30}
+    # Unequal populations and a partial last block exercise the streaming join;
+    # grid convergence in history count belongs to its dedicated physics tests.
+    case = {**build_cases(sweep)[0], "Ne": 8, "Ne_brem": 10}
     bandwidth = case["line_grid_policy"]["bandwidth"]
     case["line_grid_policy"] = (
         policy
@@ -108,7 +110,7 @@ def policy_case(request):
     return case
 
 
-@pytest.mark.parametrize("block", [5, 24, 1000])
+@pytest.mark.parametrize("block", [5, 8, 1000])
 def test_streamed_policy_grid_matches_the_joined_path(policy_case, block):
     _clear_grid_cache()
     reference = _joined(policy_case)
