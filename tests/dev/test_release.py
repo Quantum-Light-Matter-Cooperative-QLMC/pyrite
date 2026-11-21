@@ -215,3 +215,21 @@ def test_zenodo_creators_are_explicit_humans() -> None:
         assert creator["affiliation"]
         name = creator["name"].lower()
         assert not any(tag in name for tag in ("claude", "anthropic", "[bot]", "copilot"))
+
+
+def test_citation_cff_matches_zenodo_creators_and_orcids() -> None:
+    """GitHub's citation file lists the Zenodo creators, in order, with the same ORCIDs."""
+    yaml = pytest.importorskip("yaml")
+    root = Path(__file__).resolve().parents[2]
+    creators = json.loads((root / ".zenodo.json").read_text())["creators"]
+    authors = yaml.safe_load((root / "CITATION.cff").read_text())["authors"]
+
+    assert [f"{a['family-names']}, {a['given-names']}" for a in authors] == [
+        c["name"] for c in creators
+    ]
+    for author, creator in zip(authors, creators, strict=True):
+        # Zenodo's legacy metadata takes the bare iD; CFF requires the URL.
+        orcid = creator.get("orcid")
+        assert orcid is None or not orcid.startswith("http")
+        expected = None if orcid is None else f"https://orcid.org/{orcid}"
+        assert author.get("orcid") == expected
