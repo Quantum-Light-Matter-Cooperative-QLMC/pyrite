@@ -19,6 +19,24 @@ from tests.montecarlo.runner.test_reflection_selection_spectrum import SELECTION
 SPECTRA = ("spec", "spec_characteristic", "brem_wide", "brem")
 
 
+def assert_same_selection(record, expected, path="record"):
+    """Equal records, floats to summation order: the streamed selection sums its
+    held blocks one at a time, the retained route scores the merged prefix."""
+    assert type(record) is type(expected), path
+    if isinstance(record, dict):
+        assert record.keys() == expected.keys(), path
+        for key in record:
+            assert_same_selection(record[key], expected[key], f"{path}.{key}")
+    elif isinstance(record, list | tuple):
+        assert len(record) == len(expected), path
+        for i, (a, b) in enumerate(zip(record, expected, strict=True)):
+            assert_same_selection(a, b, f"{path}[{i}]")
+    elif isinstance(record, float):
+        np.testing.assert_allclose(record, expected, rtol=1e-12, atol=1e-300, err_msg=path)
+    else:
+        assert record == expected, path
+
+
 @pytest.fixture
 def automatic(monkeypatch):
     # Diffracted brem keeps the build-time set on both routes, so spectra compare whole.
@@ -46,7 +64,7 @@ def test_streamed_prefix_selection_matches_retained(automatic, retained, block):
 
     record, expected = streamed["reflection_selection"], retained["reflection_selection"]
     assert record["selection_histories"] == {"lines": 2, "continuum": 2}
-    assert record == expected
+    assert_same_selection(record, expected)
     # The streamed scorer used the selected set, not the build-time families.
     (radiator,) = record["radiators"]
     assert radiator["reflections"] > len(automatic["hkl_list"])
@@ -74,6 +92,29 @@ def test_held_prefix_block_replay_commits_once(automatic, retained, monkeypatch)
     monkeypatch.setattr(streamed_selection.PrefixSelectingScorer, "add", add_twice)
     streamed = run_case_streamed(automatic, 1, transport_core="per-electron")
     assert len(adds) > 1
-    assert streamed["reflection_selection"] == retained["reflection_selection"]
+    assert_same_selection(streamed["reflection_selection"], retained["reflection_selection"])
     np.testing.assert_allclose(streamed["spec"], retained["spec"], rtol=1e-12)
     assert streamed["n_segments"] == retained["n_segments"]
+
+
+def test_held_prefix_is_scored_block_by_block_on_host(automatic, retained, monkeypatch):
+    """The held prefix waits on the host and the selection never merges it (#1295).
+
+    A streamed case's prefix can be the whole population, which by construction
+    does not fit the device: merging and staging it ran out of device memory.
+    """
+    from pyrite.montecarlo.runner import block_transport, recovery
+
+    def no_merge(blocks):
+        raise AssertionError("the streamed selection must not merge its held prefix")
+
+    downloads = []
+    monkeypatch.setattr(block_transport, "merge_electron_blocks", no_merge)
+    monkeypatch.setattr("pyrite._backend.is_device_array", lambda value: hasattr(value, "shape"))
+    monkeypatch.setattr(recovery, "_host_block", lambda block: downloads.append(1) or dict(block))
+
+    streamed = run_case_streamed(automatic, 1, transport_core="per-electron")
+
+    assert downloads, "held blocks are downloaded to the host"
+    assert_same_selection(streamed["reflection_selection"], retained["reflection_selection"])
+    np.testing.assert_allclose(streamed["spec"], retained["spec"], rtol=1e-12)
