@@ -192,7 +192,9 @@ A bundle repackages bytes that are already pinned: table members (`tables/<key>.
 dataset members from verified installs, so table keys, manifest digests,
 dataset SHA-256 pins and model identity are unchanged. `table-bundles.json` in
 `pyrite/data/xsgen/` pins each bundle's SHA-256 and URLs. Table indexes pin
-their bundle as `archive`; a dataset falls back to extracting itself from its
+their bundle as `archive`; when the electron and positron indexes pin the
+same bundle, one fetch installs both projectiles' tables from a single
+download. A dataset falls back to extracting itself from its
 bundle after its direct URLs fail. `--archive` accepts either a bundle zip or,
 for datasets, the bare file.
 
