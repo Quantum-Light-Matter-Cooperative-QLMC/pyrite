@@ -27,6 +27,7 @@ from ...transport._continuation_join import _copy_bytes
 from .._device_sizing import collect_lines
 from .._ordered_bincount import ordered_bincount
 from . import _fused
+from ._band_mass import sincsq_band_mass
 from ._line_tables import fill_tables_in_batches
 from ._position_twins import shorten_position_twin, stage_row, with_position_twins
 from ._recoil import _quantum_line_factors
@@ -143,6 +144,10 @@ def _accumulate_edge_truncation(audit, E_r, a_width, weight, electron=None):
     With ``extension_stops_eV`` in the audit, the upper bound is also summed at
     each of those candidate stops into ``mass_above_extension`` (#1243).
 
+    With ``band_eV`` (``(start, stop)``) in the audit, the lines' exact in-band
+    ``sinc^2`` mass is summed into ``band_mass`` (:func:`.sincsq_band_mass`,
+    #1326); an audit holding only ``band_eV`` records nothing else.
+
     Validation: line-grid-resonance-bandwidth
     """
     if audit is None or E_r.size == 0:
@@ -150,6 +155,15 @@ def _accumulate_edge_truncation(audit, E_r, a_width, weight, electron=None):
     if "collect" in audit:
         collect_lines(audit, (E_r, xp.pi / a_width, weight))
         return
+    band = audit.get("band_eV")
+    if band is not None:
+        # Closed-form in-band mass of these lines (#1326), un-normalised and
+        # on the device like the other sums. A band-only audit has no axis.
+        audit["band_mass"] = audit.get("band_mass", 0.0) + sincsq_band_mass(
+            a_width, E_r, weight, *band
+        )
+        if "stop_eV" not in audit:
+            return
     mass = weight * (xp.pi / a_width)
     tiny = xp.finfo(E_r.dtype).tiny
     beyond = []

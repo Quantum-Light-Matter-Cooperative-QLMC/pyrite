@@ -375,3 +375,33 @@ def test_sparse_near_keeps_every_job_past_a_uint32_thread_grid():
         ]
     )
     np.testing.assert_allclose(mean[bins], host, rtol=1e-5, atol=1e-6 * np.abs(host).max())
+
+
+def test_band_mass_kernel_matches_the_host_closed_form(monkeypatch):
+    """The device ``sincsq_band_mass`` reduction equals the FP64 host evaluator (#1326)."""
+    from pyrite.montecarlo.spectrum.cxr import _band_mass
+    from pyrite.montecarlo.spectrum.cxr._band_mass import sincsq_band_mass
+
+    # Pytest runs the NumPy backend unless PYRITE_TEST_BACKEND=cuda; bind CuPy here.
+    monkeypatch.setattr(_band_mass, "xp", cp)
+    monkeypatch.setattr(_band_mass, "REAL", cp.float32)
+
+    rng = np.random.default_rng(1326)
+    count = 5000
+    e = np.r_[rng.uniform(300.0, 11500.0, count), [500.0, 10000.0]].astype(np.float32)
+    a = np.r_[10.0 ** rng.uniform(-1.0, 3.0, count), [30.0, 30.0]].astype(np.float32)
+    w = np.r_[rng.uniform(0.2, 3.0, count), [1.0, 1.0]].astype(np.float32)
+    w[:3] = (np.nan, -1.0, 0.0)  # skipped like the host guard
+    host = sincsq_band_mass(a, e, w, 500.0, 10000.0)
+    device = sincsq_band_mass(cp.asarray(a), cp.asarray(e), cp.asarray(w), 500.0, 10000.0)
+    assert float(cp.asnumpy(device)) == pytest.approx(host, rel=1e-12)
+    assert (
+        float(
+            cp.asnumpy(
+                sincsq_band_mass(
+                    cp.asarray(a[:0]), cp.asarray(e[:0]), cp.asarray(w[:0]), 500.0, 10000.0
+                )
+            )
+        )
+        == 0.0
+    )
