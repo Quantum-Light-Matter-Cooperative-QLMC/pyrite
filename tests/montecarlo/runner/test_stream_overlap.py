@@ -138,9 +138,35 @@ def test_non_oom_scoring_error_propagates(fake_cuda):
         _run(consume)
 
 
-def test_overlap_needs_opt_in_cuda_fixed_blocks_and_no_stop(fake_cuda, monkeypatch):
+def test_overlap_needs_cuda_fixed_blocks_and_no_stop(fake_cuda, monkeypatch):
     assert stream_overlap.overlap_requested(None, None)
     assert not stream_overlap.overlap_requested(object(), None)
     assert not stream_overlap.overlap_requested(None, lambda stop: False)
     monkeypatch.setenv("PYRITE_STREAM_OVERLAP", "0")
+    assert not stream_overlap.overlap_requested(None, None, 1 << 22, 1 << 20)
+    monkeypatch.setattr(stream_overlap, "BACKEND", type("CpuBackend", (), {"name": "cpu"})())
+    monkeypatch.setenv("PYRITE_STREAM_OVERLAP", "1")
     assert not stream_overlap.overlap_requested(None, None)
+
+
+def test_overlap_defaults_on_for_two_large_blocks(fake_cuda, monkeypatch):
+    """Unforced, overlap engages with >= 2 full blocks of >= 2**18 electrons (#862)."""
+    monkeypatch.delenv("PYRITE_STREAM_OVERLAP")
+    block = stream_overlap.AUTO_MIN_BLOCK
+    assert stream_overlap.overlap_requested(None, None, 2 * block, block)
+    assert stream_overlap.overlap_requested(None, None, 16 * block, 4 * block)
+    assert not stream_overlap.overlap_requested(None, None, 2 * block - 1, block)
+    assert not stream_overlap.overlap_requested(None, None, 64 * block, block // 2)
+    assert not stream_overlap.overlap_requested(object(), None, 64 * block, block)
+    assert not stream_overlap.overlap_requested(None, lambda stop: False, 64 * block, block)
+
+
+def test_small_blocks_stream_serially_by_default(fake_cuda, monkeypatch):
+    monkeypatch.delenv("PYRITE_STREAM_OVERLAP")
+    threads = []
+
+    def consume(block):
+        threads.append(threading.current_thread())
+
+    _run(consume)
+    assert threads and all(t is threading.main_thread() for t in threads)

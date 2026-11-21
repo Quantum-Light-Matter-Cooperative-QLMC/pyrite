@@ -589,8 +589,11 @@ shell-response product (0.30 s).
 
 ## Transport/scoring overlap
 
-`PYRITE_STREAM_OVERLAP=1` (#862) is an opt-in CUDA prototype in
-`montecarlo/runner/stream_overlap.py`. The main thread transports block
+Overlap (#862, `montecarlo/runner/stream_overlap.py`) is on by default for
+CUDA streamed runs with a fixed block size (`stream_block_electrons`), no early
+stop, and at least two full blocks of at least 2¹⁸ (262,144) electrons
+(`AUTO_MIN_BLOCK`). `PYRITE_STREAM_OVERLAP=1` forces it on for any fixed-block
+CUDA run, and `0` turns it off. The main thread transports block
 `k + 1` while one worker thread scores block `k` on a non-blocking CuPy
 stream. One block is in flight, so staging is bounded. Blocks are scored in
 order by one consumer, so outputs equal serial streaming bit for bit. A device
@@ -648,8 +651,30 @@ modest fixed block (Si 2M as one block 4.8 s vs 4.75 s at 131,072; W 8M at a
 scoring) because both phases are GPU kernels on one device. Overlap costs
 about one extra block of retained rows plus scoring scratch.
 
-Job 14445 (`checks/stream_overlap_brem_862.sbatch`) repeats the large-block
-brem-only cases on the 16 GiB RTX 5080, at blocks whose pool fits.
+`checks/stream_overlap_brem_862.sbatch` repeated these on the 16 GiB RTX 5080
+(jobs 14466 and 14477, three interleaved reps unless noted; min–max).
+Spectra were bitwise equal to serial in every brem-only arm; the CXR-on arm
+differs by at most 1.8e-16, the W line-scoring jitter above.
+
+| Case (electrons / block, blocks) | Serial (s) | Overlap (s) | Δ (median) | Pool, serial → overlap (GiB) |
+|---|---|---|---|---|
+| Si 2,097,152 / 131,072 (16) | 4.44–4.53 | 4.16–4.29 | −4.0% | 1.32 → 1.67 |
+| W 2,097,152 / 65,536 (32) | 26.57–26.71 | 25.70–26.04 | −3.2% | 9.1 → 10.3 |
+| W 8,388,608 / 65,536 (128) | 102.9–108.9 | 99.07–99.58 | −3.8% | 9.1 → 10.4 |
+| Si 524,288 / 262,144 (2) | 1.878–1.883 | 1.699–1.727 | −8.7% | 2.6 → 3.1 |
+| Si 786,432 / 262,144 (3) | 2.259–2.314 | 1.988–2.015 | −11.8% | 2.6 → 3.1 |
+| Si 4,194,304 / 262,144 (16) | 7.513–7.915 | 5.862–5.947 | −23.4% | 2.6 → 3.1 |
+| Si 16,777,216 / 1,048,576 (16) | 24.00–24.45 | 16.87–17.29 | −29.7% | 10.7 → 11.6 |
+| Si 2,097,152 / 262,144 (8), CXR lines on, 1 rep | 96.79 | 93.80 | −3.1% | 7.7 → 8.2 |
+
+The default threshold follows from these: every arm at 2¹⁸ electrons or more
+gained 7–30% (brem-only) on either card, every arm at 2¹⁶–2¹⁷ on 16 GiB gained
+at most 4%, and 4,096–8,192 blocks lost 2–10%. Two blocks are enough. With
+CXR lines on, overlap hides only transport (3.4 s of 92.8 s here), so its
+gain is bounded by that share, but large blocks do not lose. The #868 memory
+sizer (`stream_memory_mib`) still runs serially: its block sizes are chosen
+one block at a time, and at a 12 GiB target it was never faster than overlap
+at 262,144-electron blocks.
 
 ## Equivalence on CUDA
 

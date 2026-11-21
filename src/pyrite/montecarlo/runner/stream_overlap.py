@@ -1,7 +1,8 @@
 """Overlap live block transport with the previous block's scoring (#862).
 
-Opt-in prototype (``PYRITE_STREAM_OVERLAP=1``) for
-:func:`.block_transport._stream_electron_blocks`. The main thread transports
+Used by :func:`.block_transport._stream_electron_blocks` on CUDA when
+:func:`overlap_requested` admits the run (``PYRITE_STREAM_OVERLAP=1``/``0``
+forces it on/off). The main thread transports
 block ``k + 1`` while one worker thread scores block ``k`` on its own
 non-blocking device stream, so at most one transported block waits beside the
 one being transported (bounded staging). Blocks are scored one at a time, in
@@ -23,15 +24,30 @@ from typing import Any
 
 from ..._backend import BACKEND
 
+#: Smallest fixed block that overlaps by default (#862). Every measured
+#: brem-only arm at >= 2**18 electrons gained 7-30 % on 16 and 96 GiB cards;
+#: 2**16-2**17 gained <= 4 % on 16 GiB and 4096-8192 lost 2-10 %.
+AUTO_MIN_BLOCK = 1 << 18
 
-def overlap_requested(sizer, should_stop) -> bool:
-    """Whether to overlap: opt-in, CUDA, fixed block size and no early stop."""
-    return (
-        os.environ.get("PYRITE_STREAM_OVERLAP") == "1"
-        and getattr(BACKEND, "name", None) == "cuda"
-        and sizer is None
-        and should_stop is None
-    )
+
+def overlap_requested(sizer, should_stop, n_electrons=0, block_electrons=0) -> bool:
+    """Whether to overlap transport with scoring (#862).
+
+    Only CUDA runs with a fixed block size and no early stop can overlap.
+    ``PYRITE_STREAM_OVERLAP=1``/``0`` forces it on/off; otherwise it engages
+    with at least two full blocks of :data:`AUTO_MIN_BLOCK` electrons. Overlap
+    is bitwise equal to serial streaming, so the choice changes wall time and
+    peak memory (about one extra block) only.
+    """
+    forced = os.environ.get("PYRITE_STREAM_OVERLAP")
+    if forced == "0" or getattr(BACKEND, "name", None) != "cuda":
+        return False
+    if sizer is not None or should_stop is not None:
+        return False
+    if forced == "1":
+        return True
+    block = int(block_electrons)
+    return block >= AUTO_MIN_BLOCK and int(n_electrons) >= 2 * block
 
 
 def _score(consume, block, ready, stream) -> None:
