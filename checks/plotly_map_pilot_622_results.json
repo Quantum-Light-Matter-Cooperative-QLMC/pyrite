@@ -1,0 +1,414 @@
+{
+ "issue": 622,
+ "revision": "c23e3d1df (+ map_select hoverdistance/colorbar fix)",
+ "runs": [
+  {
+   "issue": 622,
+   "created_utc": "2026-11-21T01:14:53Z",
+   "grid": 8,
+   "records": 256,
+   "marimo": "0.25.2",
+   "plotly": "7.1.0",
+   "selenium": "4.53.0",
+   "headful": false,
+   "browsers": {
+    "firefox": {
+     "version": "160.0.1",
+     "steps": {
+      "plotly_map_rendered": {
+       "pass": true,
+       "grid": [
+        8,
+        8
+       ],
+       "targets": 64
+      },
+      "click_selects_cell": {
+       "pass": true,
+       "cell": [
+        140,
+        22.8571
+       ],
+       "latency_s": 1.12,
+       "heading": "Selected cell \u2014 polar tilt 22.8571 deg, azimuth 140 deg"
+      },
+      "click_precision": {
+       "pass": true,
+       "hits": 4,
+       "tried": 4,
+       "latency_s": [
+        0.93,
+        1.0,
+        0.95,
+        1.15
+       ]
+      },
+      "pan_drag_keeps_selection": {
+       "pass": true,
+       "heading": "Selected cell \u2014 polar tilt 22.8571 deg, azimuth 140 deg"
+      },
+      "quantity_change_keeps_selection": {
+       "pass": true,
+       "heading": "Selected cell \u2014 polar tilt 22.8571 deg, azimuth 140 deg",
+       "cell_still_visible": true
+      },
+      "gated_cell_not_selectable": {
+       "pass": true,
+       "blank": [
+        140,
+        10
+       ],
+       "blanks": 8,
+       "before": "Selected cell \u2014 polar tilt 22.8571 deg, azimuth 140 deg",
+       "after": "Selected cell \u2014 polar tilt 22.8571 deg, azimuth 140 deg",
+       "selection_cleared": false
+      },
+      "theme_change_keeps_selection": {
+       "pass": true,
+       "heading": "Selected cell \u2014 polar tilt 22.8571 deg, azimuth 140 deg"
+      },
+      "energy_change_clears": {
+       "pass": true,
+       "heading": ""
+      },
+      "energy_return_restores_selection": {
+       "pass": null,
+       "restored": true,
+       "heading": "Selected cell \u2014 polar tilt 22.8571 deg, azimuth 140 deg",
+       "note": "stored choice is scope-bound: hidden, not discarded, while energy differs"
+      },
+      "thickness_change_clears": {
+       "pass": true,
+       "heading": ""
+      },
+      "keyboard_cell_selection": {
+       "pass": false,
+       "focusable_non_modebar": 0,
+       "heading": "",
+       "note": "Plotly heatmap/scatter points expose no keyboard focus or selection"
+      },
+      "map_zoom_ms": {
+       "pass": true,
+       "zoom_ms": [
+        86,
+        51,
+        72,
+        71,
+        64
+       ]
+      },
+      "altair_click_still_selects": {
+       "pass": true,
+       "vega": {
+        "svg": false,
+        "canvas": true,
+        "rects": 0
+       },
+       "heading": "Selected cell \u2014 polar tilt 27.1429 deg, azimuth 150 deg"
+      }
+     }
+    },
+    "chrome": {
+     "version": "158.0.8127.36",
+     "steps": {
+      "plotly_map_rendered": {
+       "pass": true,
+       "grid": [
+        8,
+        8
+       ],
+       "targets": 64
+      },
+      "click_selects_cell": {
+       "pass": true,
+       "cell": [
+        140,
+        22.8571
+       ],
+       "latency_s": 1.27,
+       "heading": "Selected cell \u2014 polar tilt 22.8571 deg, azimuth 140 deg"
+      },
+      "click_precision": {
+       "pass": true,
+       "hits": 4,
+       "tried": 4,
+       "latency_s": [
+        1.21,
+        1.08,
+        0.99,
+        1.2
+       ]
+      },
+      "pan_drag_keeps_selection": {
+       "pass": true,
+       "heading": "Selected cell \u2014 polar tilt 22.8571 deg, azimuth 140 deg"
+      },
+      "quantity_change_keeps_selection": {
+       "pass": true,
+       "heading": "Selected cell \u2014 polar tilt 22.8571 deg, azimuth 140 deg",
+       "cell_still_visible": true
+      },
+      "gated_cell_not_selectable": {
+       "pass": true,
+       "blank": [
+        140,
+        10
+       ],
+       "blanks": 8,
+       "before": "Selected cell \u2014 polar tilt 22.8571 deg, azimuth 140 deg",
+       "after": "Selected cell \u2014 polar tilt 22.8571 deg, azimuth 140 deg",
+       "selection_cleared": false
+      },
+      "theme_change_keeps_selection": {
+       "pass": true,
+       "heading": "Selected cell \u2014 polar tilt 22.8571 deg, azimuth 140 deg"
+      },
+      "energy_change_clears": {
+       "pass": true,
+       "heading": ""
+      },
+      "energy_return_restores_selection": {
+       "pass": null,
+       "restored": true,
+       "heading": "Selected cell \u2014 polar tilt 22.8571 deg, azimuth 140 deg",
+       "note": "stored choice is scope-bound: hidden, not discarded, while energy differs"
+      },
+      "thickness_change_clears": {
+       "pass": true,
+       "heading": ""
+      },
+      "keyboard_cell_selection": {
+       "pass": false,
+       "focusable_non_modebar": 0,
+       "heading": "Selected cell \u2014 polar tilt 22.8571 deg, azimuth 140 deg",
+       "note": "Plotly heatmap/scatter points expose no keyboard focus or selection"
+      },
+      "map_zoom_ms": {
+       "pass": true,
+       "zoom_ms": [
+        189.9,
+        28.5,
+        50.1,
+        51.8,
+        41.3
+       ]
+      },
+      "altair_click_still_selects": {
+       "pass": true,
+       "vega": {
+        "canvas": true,
+        "rects": 0,
+        "svg": false
+       },
+       "heading": "Selected cell \u2014 polar tilt 27.1429 deg, azimuth 150 deg"
+      }
+     }
+    }
+   }
+  },
+  {
+   "issue": 622,
+   "created_utc": "2026-11-21T01:21:38Z",
+   "grid": 25,
+   "records": 2500,
+   "marimo": "0.25.2",
+   "plotly": "7.1.0",
+   "selenium": "4.53.0",
+   "headful": false,
+   "browsers": {
+    "firefox": {
+     "version": "160.0.1",
+     "steps": {
+      "plotly_map_rendered": {
+       "pass": true,
+       "grid": [
+        25,
+        25
+       ],
+       "targets": 625
+      },
+      "click_selects_cell": {
+       "pass": true,
+       "cell": [
+        135,
+        25
+       ],
+       "latency_s": 1.08,
+       "heading": "Selected cell \u2014 polar tilt 25 deg, azimuth 135 deg"
+      },
+      "click_precision": {
+       "pass": true,
+       "hits": 4,
+       "tried": 4,
+       "latency_s": [
+        0.85,
+        0.84,
+        0.87,
+        0.87
+       ]
+      },
+      "pan_drag_keeps_selection": {
+       "pass": true,
+       "heading": "Selected cell \u2014 polar tilt 25 deg, azimuth 135 deg"
+      },
+      "quantity_change_keeps_selection": {
+       "pass": true,
+       "heading": "",
+       "cell_still_visible": false
+      },
+      "gated_cell_not_selectable": {
+       "pass": true,
+       "blank": [
+        140.8333,
+        10
+       ],
+       "blanks": 28,
+       "before": "",
+       "after": "",
+       "selection_cleared": false
+      },
+      "theme_change_keeps_selection": {
+       "pass": true,
+       "heading": "Selected cell \u2014 polar tilt 25 deg, azimuth 135 deg"
+      },
+      "energy_change_clears": {
+       "pass": true,
+       "heading": ""
+      },
+      "energy_return_restores_selection": {
+       "pass": null,
+       "restored": true,
+       "heading": "Selected cell \u2014 polar tilt 25 deg, azimuth 135 deg",
+       "note": "stored choice is scope-bound: hidden, not discarded, while energy differs"
+      },
+      "thickness_change_clears": {
+       "pass": true,
+       "heading": ""
+      },
+      "keyboard_cell_selection": {
+       "pass": false,
+       "focusable_non_modebar": 0,
+       "heading": "",
+       "note": "Plotly heatmap/scatter points expose no keyboard focus or selection"
+      },
+      "map_zoom_ms": {
+       "pass": true,
+       "zoom_ms": [
+        82,
+        58,
+        90,
+        60,
+        57
+       ]
+      },
+      "altair_click_still_selects": {
+       "pass": true,
+       "vega": {
+        "svg": false,
+        "canvas": true,
+        "rects": 0
+       },
+       "heading": "Selected cell \u2014 polar tilt 26.25 deg, azimuth 149.583 deg"
+      }
+     }
+    },
+    "chrome": {
+     "version": "158.0.8127.36",
+     "steps": {
+      "plotly_map_rendered": {
+       "pass": true,
+       "grid": [
+        25,
+        25
+       ],
+       "targets": 625
+      },
+      "click_selects_cell": {
+       "pass": true,
+       "cell": [
+        135,
+        25
+       ],
+       "latency_s": 1.36,
+       "heading": "Selected cell \u2014 polar tilt 25 deg, azimuth 135 deg"
+      },
+      "click_precision": {
+       "pass": true,
+       "hits": 4,
+       "tried": 4,
+       "latency_s": [
+        1.19,
+        1.31,
+        1.27,
+        1.2
+       ]
+      },
+      "pan_drag_keeps_selection": {
+       "pass": true,
+       "heading": "Selected cell \u2014 polar tilt 25 deg, azimuth 135 deg"
+      },
+      "quantity_change_keeps_selection": {
+       "pass": true,
+       "heading": "",
+       "cell_still_visible": false
+      },
+      "gated_cell_not_selectable": {
+       "pass": true,
+       "blank": [
+        140.8333,
+        10
+       ],
+       "blanks": 28,
+       "before": "",
+       "after": "",
+       "selection_cleared": false
+      },
+      "theme_change_keeps_selection": {
+       "pass": true,
+       "heading": "Selected cell \u2014 polar tilt 25 deg, azimuth 135 deg"
+      },
+      "energy_change_clears": {
+       "pass": true,
+       "heading": ""
+      },
+      "energy_return_restores_selection": {
+       "pass": null,
+       "restored": true,
+       "heading": "Selected cell \u2014 polar tilt 25 deg, azimuth 135 deg",
+       "note": "stored choice is scope-bound: hidden, not discarded, while energy differs"
+      },
+      "thickness_change_clears": {
+       "pass": true,
+       "heading": ""
+      },
+      "keyboard_cell_selection": {
+       "pass": false,
+       "focusable_non_modebar": 0,
+       "heading": "Selected cell \u2014 polar tilt 25 deg, azimuth 135 deg",
+       "note": "Plotly heatmap/scatter points expose no keyboard focus or selection"
+      },
+      "map_zoom_ms": {
+       "pass": true,
+       "zoom_ms": [
+        359.2,
+        55.8,
+        78.8,
+        54.9,
+        30.7
+       ]
+      },
+      "altair_click_still_selects": {
+       "pass": true,
+       "vega": {
+        "canvas": true,
+        "rects": 0,
+        "svg": false
+       },
+       "heading": "Selected cell \u2014 polar tilt 26.25 deg, azimuth 149.583 deg"
+      }
+     }
+    }
+   }
+  }
+ ]
+}

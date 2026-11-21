@@ -28,6 +28,12 @@ from .._spectrum_frames import (
 )
 
 _INTENSITY_TITLE = "Intensity (Phs/s/eV/uA)"
+# Per-trace point count above which a line uses WebGL. Measured in Firefox and
+# Chrome (#622, checks/plotly_browser_bench_622.py): SVG renders faster at every
+# size up to 100k points x 12 traces; WebGL only shortens zoom/pan redraws at
+# about 100k points, and each WebGL trace spends one of the browser's few
+# WebGL contexts. Decimated app spectra (<= 5000 points) always stay SVG.
+_WEBGL_MIN_POINTS = 100_000
 _STYLES = {
     "total": ("solid", 2.2),
     "brem": ("dash", 1.3),
@@ -98,7 +104,7 @@ def _trace_series(df, *, hue, components, width, height, title, x_type, y_type, 
             # input frames and mask only trace coordinates at presentation.
             plot_y = np.where(np.isfinite(ys) & (ys > 0), ys, np.nan) if y_type == "log" else ys
             dash, thickness = _STYLES[component]
-            trace_type = go.Scattergl if xs.size > 6000 else go.Scatter
+            trace_type = go.Scattergl if xs.size > _WEBGL_MIN_POINTS else go.Scatter
             fig.add_trace(
                 trace_type(
                     x=xs,

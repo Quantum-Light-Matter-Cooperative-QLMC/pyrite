@@ -149,3 +149,24 @@ def test_material_comparison_keeps_source_values():
     assert fig.data[0].x[0] == pytest.approx(1.234)
     assert fig.data[0].y[0] == pytest.approx(56.0)
     assert fig.layout.yaxis.type == "log"
+
+
+@pytest.mark.parametrize(("points", "trace_type"), [(25_000, "scatter"), (100_001, "scattergl")])
+def test_long_spectrum_traces_switch_to_webgl_only_above_measured_threshold(points, trace_type):
+    """#622 browser benchmark: SVG renders faster than WebGL up to 100k points."""
+    energy = np.linspace(1000.0, 40000.0, points)
+    frame = pd.DataFrame(
+        {"energy_eV": energy, "intensity": np.exp(-energy / 8000.0), "component": "total"}
+    ).assign(E0_keV=30.0)
+    fig = spectra._trace_series(
+        frame,
+        hue="E0_keV",
+        components=("total",),
+        width=720,
+        height=360,
+        title="threshold",
+        x_type="linear",
+        y_type="linear",
+        x_domain=None,
+    )
+    assert [trace.type for trace in fig.data] == [trace_type]
