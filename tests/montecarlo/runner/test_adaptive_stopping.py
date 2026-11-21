@@ -656,13 +656,13 @@ def test_per_electron_brem_band_integrals_average_to_the_band_integral():
 # ---- runner ---------------------------------------------------------------------
 
 
-def _case(n_families=4, **beam):
+def _case(n_families=4, *, energy_bins=_REPLAY_BINS, **beam):
     # Adaptive replay is independent of automatic reflection-shell selection.
     # Keep a four-family workload on a bounded grid for the replay assertions.
     sweep = Sweep(
         material="hopg",
         n_families=n_families,
-        energy_bins=_REPLAY_BINS,
+        energy_bins=EnergyBins() if energy_bins is None else energy_bins,
         thickness_ang=1e4,
         beam=BeamSpec(energy_keV=30.0, **beam),
         tilt_deg=30.0,
