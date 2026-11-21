@@ -284,7 +284,7 @@ Do not refine only around the single highest scalar score. Preserve several regi
 The analysis additions should remain renderer-neutral, following the existing `plots._frames` pattern:
 
 - pure functions turn result records into tidy data frames for coverage, effects, interactions, trade-offs, and shortlists;
-- matplotlib and Altair render from those shared frames;
+- matplotlib and Plotly render from those shared frames;
 - the analysis app composes the views and owns only controls/presentation; and
 - no sampling or ranking logic should live in the validation app.
 

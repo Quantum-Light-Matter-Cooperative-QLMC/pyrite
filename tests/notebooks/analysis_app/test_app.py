@@ -3,7 +3,7 @@
 import ast
 from pathlib import Path
 
-import altair as alt
+import plotly.graph_objects as go
 
 from pyrite.apps.analysis_ui.axes import resolve_axis_spec
 from pyrite.apps.analysis_ui.controls import (
@@ -29,7 +29,7 @@ def _attribute_path(node: ast.AST) -> tuple[str, ...]:
     return tuple(reversed(parts))
 
 
-def test_blazed_face_title_preserves_altair_typography() -> None:
+def test_blazed_face_title_preserves_plotly_title_font() -> None:
     context = AnalysisContext(
         selected_material="hopg",
         selected_face="blazed",
@@ -39,16 +39,12 @@ def test_blazed_face_title_preserves_altair_typography() -> None:
         results=None,
         cases=None,
     )
-    chart = (
-        alt.Chart(alt.Data(values=[]))
-        .mark_line()
-        .properties(title=alt.TitleParams(text="Spectrum", fontSize=18))
-    )
+    fig = go.Figure(layout={"title": {"text": "Spectrum", "font": {"size": 18}}})
 
-    spec = context.title_for_face(chart).to_dict()
+    fig = context.title_for_face(fig)
 
-    assert spec["title"]["text"] == "Spectrum (blazed)"
-    assert spec["title"]["fontSize"] == 18
+    assert fig.layout.title.text == "Spectrum (blazed)"
+    assert fig.layout.title.font.size == 18
 
 
 def test_no_checkpoint_state_displays_without_analysis_tabs() -> None:
@@ -340,13 +336,11 @@ def test_chart_zoom_replaces_manual_domain_controls() -> None:
     source = APP.read_text()
     controls_source = (APP.parent / "analysis_ui" / "controls.py").read_text()
     axes_source = (APP.parent / "analysis_ui" / "axes.py").read_text()
-    spectra_source = (APP.parent.parent / "plots" / "altair" / "spectra.py").read_text()
 
     assert "mo.ui.text(" not in controls_source
     assert '"auto"' not in controls_source
     assert "manual limits" not in axes_source
     assert "include_y_domain" not in source
-    assert ".interactive(bind_y=False)" in spectra_source
 
 
 def test_axis_controls_have_four_scale_toggles_and_no_domains() -> None:

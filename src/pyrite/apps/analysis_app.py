@@ -11,7 +11,6 @@ app = marimo.App(
 )
 
 with app.setup:
-    import altair as alt
     import marimo as mo
 
     from pyrite.apps._design import (
@@ -39,11 +38,7 @@ with app.setup:
         make_vary_control,
         make_varying_control,
     )
-    from pyrite.apps.analysis_ui.interactive import (
-        is_heatmap_sweep,
-        make_map_widget,
-        make_plotly_map_widget,
-    )
+    from pyrite.apps.analysis_ui.interactive import is_heatmap_sweep, make_map_widget
     from pyrite.apps.analysis_ui.map_selection import (
         map_scope,
         restore_selection,
@@ -67,13 +62,6 @@ with app.setup:
     )
     from pyrite.runs.run import DEFAULT_CHECKPOINT_DIR
 
-    try:
-        alt.data_transformers.enable("vegafusion")
-        vegafusion_error = None
-    except Exception as exc:
-        alt.data_transformers.disable_max_rows()
-        vegafusion_error = str(exc)
-
 
 @app.cell(hide_code=True)
 def _():
@@ -95,16 +83,6 @@ def _():
             wrap=True,
         ),
     ]
-    if vegafusion_error is not None:
-        header.append(
-            mo.callout(
-                mo.md(
-                    "Vegafusion could not be enabled; Altair's row limit was disabled instead. "
-                    f"`{vegafusion_error}`"
-                ),
-                kind="warn",
-            )
-        )
     mo.vstack(header)
     return (theme_ui,)
 
@@ -226,12 +204,7 @@ def _():
     spectrum_components_ui = make_component_controls(mo)
     map_quantity_ui = make_map_quantity_control(mo)
     detector_ui = make_detector_choice(mo)
-    map_backend_ui = mo.ui.dropdown(
-        {"Altair (stable)": "altair", "Plotly (experimental)": "plotly"},
-        value="Altair (stable)",
-        label="Map renderer",
-    )
-    return detector_ui, map_backend_ui, map_quantity_ui, spectrum_components_ui, vary_ui
+    return detector_ui, map_quantity_ui, spectrum_components_ui, vary_ui
 
 
 @app.cell
@@ -300,7 +273,6 @@ def _(
     app_theme,
     context,
     energy_ui,
-    map_backend_ui,
     map_quantity_ui,
     map_selection_set,
     thickness_ui,
@@ -312,30 +284,17 @@ def _(
     map_frame = None
     map_widget = None
     if heatmap_mode:
-        if map_backend_ui.value == "plotly":
-            _scope = map_scope(context, energy=energy_ui.value, thickness=thickness_ui.value)
-            map_widget, map_frame = make_plotly_map_widget(
-                mo,
-                map_results,
-                context.settings,
-                context.cases,
-                quantity=map_quantity_ui.value,
-                energy=energy_ui.value,
-                theme=app_theme,
-                scope=_scope,
-                on_selection=map_selection_set,
-            )
-        else:
-            map_widget = make_map_widget(
-                mo,
-                alt,
-                map_results,
-                context.settings,
-                context.cases,
-                quantity=map_quantity_ui.value,
-                energy=energy_ui.value,
-                theme=app_theme,
-            )
+        map_widget, map_frame = make_map_widget(
+            mo,
+            map_results,
+            context.settings,
+            context.cases,
+            quantity=map_quantity_ui.value,
+            energy=energy_ui.value,
+            theme=app_theme,
+            scope=map_scope(context, energy=energy_ui.value, thickness=thickness_ui.value),
+            on_selection=map_selection_set,
+        )
     return heatmap_mode, map_frame, map_results, map_widget
 
 
@@ -352,7 +311,6 @@ def _(
     context,
     energy_ui,
     heatmap_mode,
-    map_backend_ui,
     map_frame,
     map_quantity_ui,
     map_results,
@@ -365,19 +323,16 @@ def _(
     mo.stop(view_nav.value != MAP)
     if map_widget is None:
         selection = None
-    elif map_backend_ui.value == "plotly":
+    else:
         _scope = map_scope(context, energy=energy_ui.value, thickness=thickness_ui.value)
         fresh = selection_for_scope(map_widget.value, map_frame, _scope)
         selection = restore_selection(map_frame, fresh or map_selection_get(), _scope)
-    else:
-        selection = map_widget.value
     render_map(
         mo,
         context=context,
         map_results=map_results,
         heatmap_mode=heatmap_mode,
         quantity_ui=map_quantity_ui,
-        map_backend_ui=map_backend_ui,
         map_widget=map_widget,
         selection=selection,
         energy=energy_ui.value,

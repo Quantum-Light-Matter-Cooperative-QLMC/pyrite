@@ -139,104 +139,6 @@ def configure_matplotlib_theme(theme: str) -> str:
     return mode
 
 
-def apply_altair_theme(chart, theme: str):
-    """Apply explicit Vega-Lite text/surface colors to an Altair chart.
-
-    marimo applies its own frontend Vega theme from the configured display
-    theme. PyRITE's runtime switch is independent of that config, so these
-    explicit chart settings keep labels, legends, and titles synchronized with
-    the selected PyRITE appearance. Existing chart typography is retained while
-    theme colors are merged into each config section. Explicit chart titles are
-    rewritten too, because a title-level color beats ``configure_title`` in
-    Vega-Lite.
-    """
-    if chart is None:
-        return None
-    mode = theme if theme in THEMES else "light"
-    palette = THEMES[mode]
-
-    try:
-        raw_config = chart.to_dict(validate=False).get("config", {})
-        config = raw_config if isinstance(raw_config, dict) else {}
-    except (TypeError, ValueError):
-        config = {}
-
-    def config_section(name: str) -> dict:
-        section = config.get(name, {})
-        return dict(section) if isinstance(section, dict) else {}
-
-    axis_config = config_section("axis") | {
-        "labelColor": palette["text"],
-        "titleColor": palette["text"],
-        "gridColor": palette["rule"],
-        "domainColor": palette["muted"],
-        "tickColor": palette["muted"],
-    }
-    legend_config = config_section("legend") | {
-        "labelColor": palette["text"],
-        "titleColor": palette["text"],
-    }
-    header_config = config_section("header") | {
-        "labelColor": palette["text"],
-        "titleColor": palette["text"],
-    }
-    title_config = config_section("title") | {
-        "color": palette["text"],
-        "subtitleColor": palette["muted"],
-    }
-    text_config = config_section("text") | {"color": palette["text"]}
-    view_config = config_section("view") | {"stroke": palette["rule"]}
-
-    chart = (
-        chart.configure(background=palette["surface"])
-        .configure_axis(**axis_config)
-        .configure_legend(**legend_config)
-        .configure_header(**header_config)
-        .configure_title(**title_config)
-        .configure_text(**text_config)
-        .configure_view(**view_config)
-    )
-
-    # ``configure_title`` does not override a color embedded directly in a
-    # chart's TitleParams. Spectrum charts use explicit titles, so normalize
-    # the top-level title while preserving its text and other properties.
-    try:
-        import altair as alt
-
-        spec = chart.to_dict(validate=False)
-        title = spec.get("title")
-        if isinstance(title, str):
-            chart = chart.properties(title=alt.TitleParams(text=title, color=palette["text"]))
-        elif isinstance(title, dict):
-            title = dict(title)
-            title["color"] = palette["text"]
-            title["subtitleColor"] = palette["muted"]
-            chart = chart.properties(title=alt.TitleParams(**title))
-    except (ImportError, TypeError, ValueError):
-        # The configure_* rules above still cover charts without a serializable
-        # top-level title (or environments where Altair is optional).
-        pass
-
-    return chart
-
-
-def static_altair_chart(mo, chart):
-    """Render a non-selectable chart through marimo's schema-safe path.
-
-    Marimo's Arrow data transformer extends Vega-Lite with
-    ``format.type = "arrow"``. Altair's raw MIME renderer validates that
-    extension against the upstream schema and rejects it; ``mo.ui.altair_chart``
-    deliberately serializes Marimo transformers without that validation.
-    """
-    if chart is None:
-        return None
-    return mo.ui.altair_chart(
-        chart,
-        chart_selection=False,
-        legend_selection=False,
-    )
-
-
 def _colorbar_title_text(colorbar) -> str:
     title = getattr(colorbar, "title", None)
     text = getattr(title, "text", None) if title is not None else None
@@ -281,7 +183,11 @@ def _theme_plotly_colorbar(colorbar, *, text: str, surface: str, rule: str, mode
 
 
 def apply_plotly_theme(fig, theme: str):
-    """Apply the shared palette to Plotly, including 2D/3D text and colorbars."""
+    """Apply the shared palette to Plotly, including 2D/3D text and colorbars.
+
+    Mutates and returns ``fig``; ``None`` (an empty chart) passes through."""
+    if fig is None:
+        return None
     mode = theme if theme in THEMES else "light"
     palette = THEMES[mode]
     text = palette["text"]

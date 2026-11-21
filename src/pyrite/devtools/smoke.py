@@ -8,7 +8,7 @@ os.environ.setdefault("MPLBACKEND", "Agg")
 
 from pyrite.campaign.config import default_settings  # noqa: E402
 from pyrite.plots import plot_best_spectra  # noqa: E402
-from pyrite.plots.altair.spectra import spectrum_chart  # noqa: E402
+from pyrite.plots.plotly.spectra import spectrum_chart  # noqa: E402
 from pyrite.results import filter_results, records, top_geometries  # noqa: E402
 from pyrite.runs.run import cases_from_results, load_checkpoint  # noqa: E402
 
@@ -40,13 +40,15 @@ def main(argv: list[str] | None = None) -> int:
     tilt = tilts[len(tilts) // 2]
     print(f"[smoke] {len(recs)} records, {len(tilts)} tilts; using tilt_deg={tilt:g}")
 
-    altair_png = output_dir / f"{material}_spectrum.png"
+    # Standalone HTML needs no browser at export time (static PNG would need
+    # kaleido's Chrome); the Matplotlib PNG below covers raster output.
+    plotly_html = output_dir / f"{material}_spectrum.html"
     chart = spectrum_chart(filtered, settings, tilt_deg=tilt, include_brem=True)
     if chart is None:
         print("[smoke] FAIL: spectrum_chart returned None")
         return 3
-    chart.save(str(altair_png))
-    print(f"[smoke] wrote {altair_png} ({altair_png.stat().st_size} bytes)")
+    chart.write_html(plotly_html, include_plotlyjs="cdn")
+    print(f"[smoke] wrote {plotly_html} ({plotly_html.stat().st_size} bytes)")
 
     matplotlib_png = output_dir / f"{material}_best_spectra.png"
     figure = plot_best_spectra(filtered, settings, top_n=6, cases=cases)

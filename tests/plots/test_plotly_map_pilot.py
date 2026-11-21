@@ -1,7 +1,7 @@
-"""Regression tests for the opt-in #622 Plotly cell-picking experiment.
+"""Regression tests for the Plotly click-selectable analysis Map (#622).
 
 No transport, detector response, checkpoint, or browser is needed: the frame
-under test is the same prepared map contract used by the Altair renderer.
+under test is the prepared map contract from the renderer-neutral frames.
 """
 
 from types import SimpleNamespace
@@ -148,3 +148,29 @@ def test_dense_grid_targets_are_bounded_and_serializable():
     assert 3 <= fig.data[1].marker.size <= 14
     assert np.asarray(fig.data[0].z).shape == (25, 25)
     assert len(fig.to_json()) < 200_000
+
+
+def test_blank_cells_cannot_snap_to_a_neighbouring_target():
+    """Browser pilot regression (#622): Plotly's default 20 px hover snap let a
+    click on a flux-gated blank cell select the adjacent cell, and a horizontal
+    colorbar title squeezed the x axis below the marker-size estimate."""
+    fig = selectable_map_figure(single_panel_frame(_frame(), 30.0), label="a long quantity label")
+    assert fig.layout.hoverdistance == 1
+    assert fig.layout.coloraxis.colorbar.title.side == "right"
+    assert fig.layout.coloraxis.colorbar.title.text == "a long quantity label"
+    width, height = fig.layout.width, fig.layout.height
+    for n in (4, 8, 25):
+        xs, ys = np.meshgrid(np.arange(n, dtype=float), np.arange(n, dtype=float))
+        frame = pd.DataFrame(
+            {
+                "x": xs.ravel(),
+                "y": ys.ravel(),
+                "value": np.ones(n * n),
+                "panel": ["30 keV"] * (n * n),
+                "panel_raw": np.full(n * n, 30.0),
+                "name": [f"case-{i}" for i in range(n * n)],
+            }
+        )
+        size = selectable_map_figure(frame, label="q").data[1].marker.size
+        # Measured plot area (#622 pilot): width - 196 by height - 145 pixels.
+        assert size < min((width - 196) / n, (height - 145) / n)

@@ -73,9 +73,9 @@ def saved_capture_panel(
     camera: dict,
 ) -> Any:
     """Render the trace app saved-source panel from already loaded rows."""
-    from ..plots.altair.trajectories import penetration_survival_chart, trajectory_chart
+    from ..plots.plotly.penetration import penetration_survival_chart, trajectory_chart
     from ..plots.plotly.trajectories import trajectory_volume_figure_from_data
-    from ._design import apply_altair_theme, apply_plotly_theme
+    from ._design import apply_plotly_theme
 
     if saved_capture is None:
         return mo.md(error or "Enter an artifact path and open a saved capture.")
@@ -92,14 +92,13 @@ def saved_capture_panel(
             mo.ui.plotly(_saved_volume),
             mo.hstack(
                 [
-                    mo.ui.altair_chart(
-                        apply_altair_theme(
+                    *(
+                        apply_plotly_theme(chart, theme)
+                        for chart in (
                             trajectory_chart(_saved_case, data=_saved_data, width=420),
-                            theme,
+                            penetration_survival_chart(_selection, width=420),
                         )
-                    ),
-                    mo.ui.altair_chart(
-                        apply_altair_theme(penetration_survival_chart(_selection, width=420), theme)
+                        if chart is not None
                     ),
                 ],
                 wrap=True,

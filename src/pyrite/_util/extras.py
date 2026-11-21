@@ -9,16 +9,14 @@ from importlib.util import find_spec
 _PLOTS_MODULES = (
     "matplotlib",
     "plotly",
-    "altair",
     "datashader",
     "kaleido",
     "imageio",
     "imageio_ffmpeg",
-    "vl_convert",
 )
 EXTRA_MODULES: dict[str, tuple[str, ...]] = {
     "plots": _PLOTS_MODULES,
-    "apps": ("marimo", "anywidget", "vegafusion", *_PLOTS_MODULES),
+    "apps": ("marimo", "anywidget", *_PLOTS_MODULES),
 }
 
 

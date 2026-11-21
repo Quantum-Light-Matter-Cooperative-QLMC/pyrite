@@ -1,9 +1,9 @@
-"""Experimental single-cell Plotly map for the marimo analysis app (#622).
+"""Single-cell selectable Plotly map for the marimo analysis app (#622).
 
-The scoring and gating policy lives in :mod:`pyrite.plots._frames`.  A nearly
+The scoring and gating policy lives in :mod:`pyrite.plots._frames`. A nearly
 transparent Scatter overlay supplies single-click targets because Plotly's
-heatmap selection can require a drag gesture.  This is a pilot, not a change to
-the default Altair map widget.
+heatmap selection can require a drag gesture. Browser gate evidence:
+``checks/plotly_map_pilot_622.py``.
 """
 
 from __future__ import annotations
@@ -157,7 +157,9 @@ def selectable_map_figure(
     # event.  A topmost Scatter trace with clickmode='event+select' does.
     # Keep the targets smaller than a heatmap cell so adjacent cells cannot
     # eclipse one another. For very dense maps, zoom before clicking.
-    px = max(3.0, min(14.0, 0.75 * min((width - 160) / len(xs), (height - 135) / len(ys))))
+    # Measured plot area with the vertical colorbar title: width - 196, height - 145.
+    cell_px = min((width - 196) / len(xs), (height - 145) / len(ys))
+    px = max(3.0, min(14.0, 0.75 * cell_px))
     fig.add_trace(
         go.Scatter(
             x=markers_x,
@@ -174,13 +176,23 @@ def selectable_map_figure(
         )
     )
     fig.update_layout(
-        title=f"{label} (experimental: click the center of a cell)",
+        title=label,
         width=width,
         height=height,
         xaxis={"title": _axis_label("tilt_azim_deg"), "type": "linear"},
         yaxis={"title": _axis_label("tilt_deg"), "type": "linear"},
-        coloraxis={"colorscale": cmap, "cmin": cmin, "cmax": cmax, "colorbar": {"title": label}},
+        coloraxis={
+            "colorscale": cmap,
+            "cmin": cmin,
+            "cmax": cmax,
+            "colorbar": {"title": {"text": label, "side": "right"}},
+        },
         clickmode="event+select",
+        # Plotly resolves a click to the nearest point within ``hoverdistance``
+        # pixels of a marker's edge (default 20), so in the #622 browser pilot
+        # a click on a blank, flux-gated cell selected its neighbour. Accept
+        # only clicks on a target marker itself.
+        hoverdistance=1,
         dragmode="pan",
         showlegend=False,
         uirevision="pyrite-map",

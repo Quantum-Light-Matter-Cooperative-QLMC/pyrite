@@ -1,6 +1,6 @@
 """Renderer-neutral detector-response spectrum frames.
 
-Plotly and legacy Altair share these exact model evaluations, unit conversions,
+The Plotly detector views use these exact model evaluations, unit conversions,
 and peak-aware sampling.  No plotting backend is imported here.
 """
 
@@ -24,7 +24,7 @@ from ._spectrum_frames import _peak_preserving_indices, _validate_band
 # incident-vs-detected long form (Timepix + Eagle photon density)
 _DET_COLUMNS = ["energy_eV", "intensity", "E0_keV", "azimuth_deg", "kind", "band"]
 # Records carry per-nA flux; these charts report per-uA, matching
-# :mod:`pyrite.plots.altair.spectra`. Display convention only.
+# :mod:`pyrite.plots._spectrum_frames`. Display convention only.
 _NA_PER_UA = 1000.0
 _INTENSITY_TITLE = "Phs/s/eV/uA"
 # Eagle recorded-charge density long form

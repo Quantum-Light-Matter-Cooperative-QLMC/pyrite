@@ -1,4 +1,4 @@
-"""Session-local scope and persistence guard for the experimental Plotly map."""
+"""Session-local scope and persistence guard for the Plotly analysis Map."""
 
 from __future__ import annotations
 

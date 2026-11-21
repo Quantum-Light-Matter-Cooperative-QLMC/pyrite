@@ -7,12 +7,12 @@ so ``from pyrite.plots import X`` resolves unchanged.
 
 Names backed by the ``mpl`` (matplotlib) backend are resolved LAZILY, via a
 module-level ``__getattr__`` (PEP 562): merely ``import pyrite.plots`` -- or
-``import pyrite.plots.altair.<mod>`` / ``import pyrite.plots.plotly.<mod>``,
+``import pyrite.plots.plotly.<mod>``,
 which always executes this package's ``__init__`` first -- does not import
 matplotlib. It loads only when a caller actually reaches an mpl-backed name
 (e.g. ``pyrite.plots.plot_by_energy``). The neutral names (``_common``,
 ``_frames``, ``_style``) stay eager imports below: none of those modules import
-matplotlib, Altair or Plotly.
+matplotlib or Plotly.
 """
 
 import importlib

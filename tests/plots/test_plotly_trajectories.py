@@ -16,7 +16,7 @@ from pyrite.plots.plotly.trajectories import (
 
 
 def test_secondary_view_uses_track_identity_and_filters_all_overlays():
-    from pyrite.plots.altair.trajectories import track_segments_frame
+    from pyrite.plots._trajectory_frames import track_segments_frame
 
     data = {
         "start_xyz": np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.5], [4.0, 0.0, 0.5]]),

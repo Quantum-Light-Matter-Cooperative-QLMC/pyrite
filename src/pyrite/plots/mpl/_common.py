@@ -3,7 +3,7 @@
 Matplotlib-only figure plumbing shared across the ``mpl`` backend's ``plot_*``
 wrappers. Split out of :mod:`pyrite.plots._common` (which stays backend-neutral:
 no matplotlib import) because this helper builds a ``matplotlib.figure.Figure``
-directly -- Altair and Plotly never call it.
+directly -- Plotly never calls it.
 """
 
 import matplotlib.pyplot as plt

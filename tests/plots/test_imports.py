@@ -11,14 +11,15 @@ import pytest
 @pytest.mark.parametrize(
     "module",
     [
-        "pyrite.plots.altair.trajectories",
         "pyrite.plots.plotly.trajectories",
+        "pyrite.plots.plotly.penetration",
+        "pyrite.plots.plotly.spectra",
     ],
 )
 def test_interactive_backend_import_does_not_pull_in_matplotlib(module: str) -> None:
-    """Rendering an interactive Altair or Plotly chart must not import matplotlib.
+    """Rendering an interactive Plotly chart must not import matplotlib.
 
-    ``pyrite.plots.altair`` / ``pyrite.plots.plotly`` reuse renderer-neutral
+    ``pyrite.plots.plotly`` reuses renderer-neutral
     helpers from :mod:`pyrite.plots._common` / :mod:`pyrite.plots._frames` --
     NOT from :mod:`pyrite.plots.mpl`, and neither neutral module (nor importing
     the ``pyrite.plots`` package itself, which every dotted submodule import

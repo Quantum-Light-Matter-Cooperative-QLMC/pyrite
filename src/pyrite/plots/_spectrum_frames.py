@@ -1,8 +1,8 @@
-"""Renderer-neutral spectral frames shared by Plotly and legacy Altair views.
+"""Renderer-neutral spectral frames behind the Plotly spectrum views.
 
-Only numerical preparation lives here; no Altair/Plotly/Matplotlib dependency.
+Only numerical preparation lives here; no Plotly/Matplotlib dependency.
 Spectra retain raw energy coordinates, component normalization and peak-aware
-sampling from the established Altair implementation (#622).
+sampling (#622).
 """
 
 import numpy as np

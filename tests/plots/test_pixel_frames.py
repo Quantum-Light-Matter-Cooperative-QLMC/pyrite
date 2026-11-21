@@ -10,7 +10,7 @@ from pyrite.plots._pixel_frames import (
     pixel_metadata_rows,
     pixel_spectrum_frame,
 )
-from pyrite.plots.altair.pixels import (
+from pyrite.plots.plotly.pixels import (
     detector_image_chart,
     histogram_chart,
     pixel_spectrum_chart,
@@ -88,12 +88,14 @@ def test_observation_images_spectra_histogram_and_metadata() -> None:
         pixel_spectrum_chart(spectrum, title="s", y_type="log"),
         histogram_chart(histogram, title="h", count_title="c", y_type="log"),
     ):
-        assert chart.to_dict()
+        assert chart.data
+        chart.to_json()
 
 
 def test_uniform_image_chart_keeps_a_valid_color_domain() -> None:
     chart = detector_image_chart(
         detector_image_frame(_image(np.zeros((3, 3)))), title="t", value_title="c", scale_type="log"
     )
-    spec = chart.to_dict()
-    assert spec["layer"][0]["encoding"]["color"]["scale"]["domain"] == [0.0, 1.0]
+    z = np.asarray(chart.data[0].z, dtype=float)
+    assert np.isfinite(z).all()
+    assert chart.data[0].colorbar.tickvals

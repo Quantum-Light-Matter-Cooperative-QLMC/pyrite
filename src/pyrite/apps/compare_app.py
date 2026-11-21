@@ -11,7 +11,6 @@ app = marimo.App(
 )
 
 with app.setup:
-    import altair as alt
     import marimo as mo
 
     from pyrite.apps._design import (
@@ -45,13 +44,6 @@ with app.setup:
     from pyrite.results import case_label, case_table_rows, slim_case_record, sweep_values
     from pyrite.runs.run import DEFAULT_CHECKPOINT_DIR
 
-    try:
-        alt.data_transformers.enable("vegafusion")
-        vegafusion_error = None
-    except Exception as exc:
-        alt.data_transformers.disable_max_rows()
-        vegafusion_error = str(exc)
-
 
 @app.cell(hide_code=True)
 def _():
@@ -74,16 +66,6 @@ def _():
             wrap=True,
         ),
     ]
-    if vegafusion_error is not None:
-        header.append(
-            mo.callout(
-                mo.md(
-                    "Vegafusion could not be enabled; Altair's row limit was disabled instead. "
-                    f"`{vegafusion_error}`"
-                ),
-                kind="warn",
-            )
-        )
     mo.vstack(header)
     return (theme_ui,)
 

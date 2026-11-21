@@ -15,6 +15,7 @@ quantity-migration-inventory
 quantity-output-contract
 materials-catalog-schema
 data-distribution-and-repository-size
+plotting-backends
 ```
 
 Earlier interface sketches and measured optimization rounds live in

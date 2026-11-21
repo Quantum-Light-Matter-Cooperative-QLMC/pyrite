@@ -190,6 +190,9 @@ CHECK_LEDGER_IDS: Final[dict[str, tuple[str, ...]]] = {
     # Checkpoint storage performance (#612), without a physics-validation claim.
     "checks/checkpoint_selective_memory.py": (),
     "checks/checkpoint_sweep_memory.py": (),
+    # Browser rendering and Map selection evidence for plotting backends (#622).
+    "checks/plotly_browser_bench_622.py": (),
+    "checks/plotly_map_pilot_622.py": (),
     # Viewer workload evidence for the trajectory backend decision (#205):
     # resource costs, not transport physics, so they emit no records.
     "checks/trajectory_paraview_probe.py": (),

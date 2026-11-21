@@ -83,7 +83,7 @@ run. Without a capture, use seeded `pyrite checkpoint recompute cxr|brem`.
 ```python
 import numpy as np
 from pyrite.montecarlo.trajectory_summary import summarize_trajectories
-from pyrite.plots.altair.trajectory_summary import summary_charts
+from pyrite.plots.plotly.trajectory_summary import summary_charts
 
 tables = summarize_trajectories(
     "capture.h5",
