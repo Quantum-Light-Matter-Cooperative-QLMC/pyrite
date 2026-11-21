@@ -1,4 +1,4 @@
-"""Browser gate for the experimental Plotly Map cell selection (#622).
+"""Browser gate for the Plotly analysis Map cell selection (#622).
 
 Run:
     uv run python checks/plotly_map_pilot_622.py \
@@ -17,11 +17,10 @@ pilot gate in the Plotly backend guide is recorded with what was observed:
 * clicking a flux-gated blank cell does not select it;
 * changing map quantity or light/dark theme keeps a valid selection;
 * changing beam energy or thickness clears the selection;
-* Altair (stable) remains click-selectable after returning to it;
 * keyboard: Tab focus plus Enter/Space on the map selects a cell or not;
 * map relayout (zoom) latency.
 
-Engineering evidence for a UI default decision; no numerical output, so no
+Engineering evidence for the Map renderer; no numerical output, so no
 validation-ledger claim. Exit 0 = ran (verdicts in the record), 2 = missing
 optional ``selenium``.
 """
@@ -330,13 +329,6 @@ def drive(page, url, grid):  # noqa: C901, PLR0915 - linear scripted scenario
         lambda: page.js("return __deep('[role=tab]').some(e => e.innerText.trim() === 'Map')"), 90
     )
     page.tab("Map")
-    page.wait(
-        lambda: page.js(
-            "return __deep('select').some(s => Array.from(s.options).some(o => o.text === 'Plotly (experimental)'))"
-        ),
-        60,
-    )
-    page.select("Altair (stable)", "Plotly (experimental)")
     cells = page.wait(page.map_cells, 60)
     if not cells:
         record("plotly_map_rendered", False)
@@ -522,35 +514,6 @@ def drive(page, url, grid):  # noqa: C901, PLR0915 - linear scripted scenario
     )
     record("map_zoom_ms", True, zoom_ms=[round(v, 1) for v in zoom_ms])
 
-    # 9. return to Altair: its own click selection still works
-    page.select("Plotly (experimental)", "Altair (stable)")
-    _settle(page, 3.0)
-    vega = page.wait(
-        lambda: page.js(
-            "const v = __deep('.vega-embed').find(__visible); if (!v) return null;"
-            "const marks = v.querySelectorAll('svg .mark-rect path, svg .mark-rect rect');"
-            "return {svg: !!v.querySelector('svg.marks'), canvas: !!v.querySelector('canvas'), rects: marks.length};"
-        ),
-        45,
-    )
-    altair_ok = False
-    if vega and vega["rects"]:
-        el = page.js(
-            "const v = __deep('.vega-embed').find(__visible);"
-            "const m = v.querySelectorAll('svg .mark-rect path, svg .mark-rect rect');"
-            "return m[Math.floor(m.length / 2)];"
-        )
-        from selenium.webdriver import ActionChains
-
-        ActionChains(page.d).move_to_element(el).pause(0.15).click().perform()
-        altair_ok = bool(_wait_heading(page, lambda h: h.startswith("Selected cell"), 30))
-    elif vega and vega["canvas"]:
-        from selenium.webdriver import ActionChains
-
-        el = page.js("return __deep('.vega-embed').find(__visible).querySelector('canvas')")
-        ActionChains(page.d).move_to_element(el).pause(0.15).click().perform()
-        altair_ok = bool(_wait_heading(page, lambda h: h.startswith("Selected cell"), 30))
-    record("altair_click_still_selects", altair_ok, vega=vega, heading=page.heading())
     return steps
 
 

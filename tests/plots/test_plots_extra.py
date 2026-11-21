@@ -10,7 +10,7 @@ import pyrite._util.extras as extras
 
 @pytest.mark.parametrize(
     ("backend", "library"),
-    [("mpl", "matplotlib"), ("altair", "altair"), ("plotly", "plotly")],
+    [("mpl", "matplotlib"), ("plotly", "plotly")],
 )
 def test_backend_import_without_library_raises_install_hint(monkeypatch, backend, library):
     real_find_spec = extras.find_spec

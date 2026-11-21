@@ -443,7 +443,7 @@ def best_azimuth(recs):
 _LABEL_FIELDS = ("thickness_ang", "tilt_deg", "tilt_azim_deg")
 
 # Record keys a basket entry needs to be plottable by
-# ``plots.altair.spectra._record_frame`` / ``metrics.cxr_metrics`` -- the same
+# ``plots._spectrum_frames._record_frame`` / ``metrics.cxr_metrics`` -- the same
 # spectral-array set ``slim_results`` trims to, minus ``E_pk``/``hit_frac``/
 # ``eta`` which neither consumer reads.
 _BASKET_RECORD_FIELDS = (
@@ -519,7 +519,7 @@ def case_table_rows(results):
 
 def slim_case_record(record, *, material, label, face="flat"):
     """Standalone, basket-sized copy of one checkpoint ``record``: just the
-    spectral arrays :func:`pyrite.plots.altair.spectra._record_frame` and
+    spectral arrays :func:`pyrite.plots._spectrum_frames._record_frame` and
     :func:`pyrite.results.metrics.cxr_metrics` need
     (:data:`_BASKET_RECORD_FIELDS`), plus a ``case`` dict tagged with the
     basket-only identity fields (``material``, ``face``, ``label``) a bare

@@ -240,7 +240,7 @@ it does not fit.
 Schema-2/3 trajectory artifacts can be reduced without running transport by
 `pyrite.montecarlo.trajectory_summary.summarize_trajectories(path,
 depth_edges_ang=..., energy_edges_keV=..., max_rows=...)`;
-`pyrite.plots.altair.trajectory_summary.summary_charts` plots its tables.
+`pyrite.plots.plotly.trajectory_summary.summary_charts` plots its tables.
 Choose depth edges covering the entire capture, including surface nudges, and
 include layer interfaces. Tables contain units in their column names. The
 [observable definitions](../physics/beam-transport/transport-outputs.md#saved-capture-observables)

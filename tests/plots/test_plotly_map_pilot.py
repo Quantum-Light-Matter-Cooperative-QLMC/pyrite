@@ -1,7 +1,7 @@
-"""Regression tests for the opt-in #622 Plotly cell-picking experiment.
+"""Regression tests for the Plotly click-selectable analysis Map (#622).
 
 No transport, detector response, checkpoint, or browser is needed: the frame
-under test is the same prepared map contract used by the Altair renderer.
+under test is the prepared map contract from the renderer-neutral frames.
 """
 
 from types import SimpleNamespace

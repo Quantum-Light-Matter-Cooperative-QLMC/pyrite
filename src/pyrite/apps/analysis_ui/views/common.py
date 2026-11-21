@@ -1,15 +1,9 @@
 from pyrite._util.formatting import fmt_thickness
-from pyrite.apps._design import apply_altair_theme, apply_plotly_theme
+from pyrite.apps._design import apply_plotly_theme
 
 
 def themed_chart(chart, theme):
-    if chart is None:
-        return None
-    return (
-        apply_plotly_theme(chart, theme)
-        if callable(getattr(chart, "update_layout", None))
-        else apply_altair_theme(chart, theme)
-    )
+    return apply_plotly_theme(chart, theme)
 
 
 def optional_selector(mo, widget, values, formatter):

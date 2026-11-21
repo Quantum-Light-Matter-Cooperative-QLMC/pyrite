@@ -779,7 +779,7 @@ def test_store_result_keeps_spec_coherent_from_transport():
 
 def test_store_result_omits_spec_coherent_for_incoherent_run():
     """An incoherent transport grows no key at all, so presence stays the honest
-    gate every reader (emission_menu, the altair overlay, reline) tests on."""
+    gate every reader (emission_menu, the Plotly overlay, reline) tests on."""
     from pyrite.results import store_result
 
     results = {}

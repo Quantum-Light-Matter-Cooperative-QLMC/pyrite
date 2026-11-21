@@ -1,20 +1,24 @@
-"""Guard tests for the Altair trajectory renderers (pyrite.plots.altair.trajectories).
+"""Guard tests for the 2D electron-penetration views (Plotly) and their frames.
 
-The pure frame builders (survival_frame / tracks_frame) take already-simulated
-``_trajectory_data`` dicts, so they're tested on synthetic data with NO Monte
-Carlo. The ``*_chart`` entry points run the electron transport; one small-Ne
-integration smoke each exercises that plumbing on a real case. Charts'
-``to_dict()`` serializes under Vega-Lite's row cap.
+The renderer-neutral frame builders (``survival_frame``, ``tracks_frame``,
+``track_segments_frame``, ``vacuum_segments_frame``) take already-simulated
+``_trajectory_data`` dicts, so they are tested on synthetic data with no Monte
+Carlo. The ``*_chart`` entry points run the electron transport; small-Ne
+integration smokes exercise that plumbing on a real case.
 """
 
-import altair as alt
 import numpy as np
+import plotly.graph_objects as go
 
-from pyrite.plots.altair.trajectories import (
-    survival_frame,
+from pyrite.plots._frames import survival_frame
+from pyrite.plots._trajectory_frames import (
     track_segments_frame,
     tracks_frame,
+    vacuum_segments_frame,
 )
+from pyrite.plots.plotly import penetration
+from pyrite.plots.plotly.penetration import penetration_survival_chart, trajectory_chart
+from pyrite.plots.plotly.trajectories import _GROOVE
 
 
 # ---- pure frame builders (synthetic, no MC) ----------------------------------
@@ -73,24 +77,29 @@ def test_track_segments_frame_no_cross_electron_bridge():
     }
     seg = track_segments_frame(data)
     assert list(seg.columns) == ["x", "y", "x2", "y2", "E"]
-    assert len(seg) == 2  # one segment per 2-vertex electron, no cross-bridge
-    # the would-be bridge (2.0 -> 3.0) must NOT appear as a segment
-    bridges = seg[(seg["x"] == 2.0) & (seg["x2"] == 3.0)]
-    assert bridges.empty
+    assert len(seg) == 2
+    assert seg[(seg["x"] == 2.0) & (seg["x2"] == 3.0)].empty
     # sorted by E ascending so high-energy strokes last (on top)
     assert list(seg["E"]) == sorted(seg["E"])
 
 
-def test_vacuum_segments_frame_stays_separate_from_radiating_tracks():
-    from pyrite.plots.altair.trajectories import vacuum_segments_frame
-
-    data = {
+def _vacuum_data():
+    return {
         "px": np.array([0.0, 1.0]),
         "py": np.array([0.0, 0.5]),
         "pE": np.array([30.0, 20.0]),
+        "pts": np.array([[0.0, 0.0], [1.0, 0.5]]),
         "beam": np.array([1.0, 0.0, 0.0]),
         "detector": np.array([0.0, 1.0, 0.0]),
+        "nslab": np.array([0.0, 1.0]),
+        "ndet": np.array([0.0, 1.0]),
         "u": 10.0,
+        "ulab": "nm",
+        "thick": 1.0,
+        "layer_bounds": [],
+        "Ne": 1,
+        "eta": 0.0,
+        "thru": 0.0,
         "vacuum_start_xyz": np.array([[1.0, 2.0, 3.0]]),
         "vacuum_end_xyz": np.array([[4.0, 5.0, 6.0]]),
         "vacuum_E": np.array([17.0]),
@@ -98,6 +107,9 @@ def test_vacuum_segments_frame_stays_separate_from_radiating_tracks():
         "vacuum_elec_id": np.array([3], dtype=np.int64),
     }
 
+
+def test_vacuum_segments_frame_stays_separate_from_radiating_tracks():
+    data = _vacuum_data()
     material = track_segments_frame(data)
     vacuum = vacuum_segments_frame(data)
 
@@ -123,51 +135,6 @@ def _real_cases(material="hopg"):
     return build_cases(sweep, s.n_electrons, s.n_electrons_brem)
 
 
-def test_penetration_survival_chart_builds_valid_spec():
-    from pyrite.plots.altair.trajectories import penetration_survival_chart
-
-    chart = penetration_survival_chart(_real_cases(), Ne=6, n_bins=20)
-    assert isinstance(chart, alt.Chart)
-    chart.to_dict()  # raises if malformed
-
-
-def test_trajectory_chart_builds_valid_spec():
-    from pyrite.plots.altair.trajectories import trajectory_chart
-
-    chart = trajectory_chart(_real_cases()[0], Ne=6)
-    assert isinstance(chart, alt.LayerChart)
-    chart.to_dict()
-
-
-def test_trajectory_chart_draws_tracks_as_rule_segments():
-    """Regression guard for the invisible-tracks bug: the energy-coloured tracks
-    must be drawn as ``rule`` segments (x2/y2), NOT a ``line`` with a quantitative
-    ``color`` -- which Vega-Lite renders as nothing. A valid-spec/data test cannot
-    catch this; the mark type is the property that distinguishes working from
-    broken."""
-    from pyrite.plots.altair.trajectories import trajectory_chart
-
-    spec = trajectory_chart(_real_cases()[0], Ne=6).to_dict()
-    track_layers = [
-        layer
-        for layer in spec["layer"]
-        if layer.get("encoding", {}).get("color", {}).get("field") == "E"
-    ]
-    assert track_layers, "no energy-coloured track layer found"
-    for layer in track_layers:
-        mark = layer["mark"]
-        mark_type = mark["type"] if isinstance(mark, dict) else mark
-        assert mark_type == "rule", f"tracks drawn as {mark_type!r}, not 'rule'"
-        assert "x2" in layer["encoding"] and "y2" in layer["encoding"]
-
-
-def test_penetration_survival_chart_none_on_empty():
-    from pyrite.plots.altair.trajectories import penetration_survival_chart
-
-    assert penetration_survival_chart([]) is None
-
-
-# ---- blazed groove profile overlay (Task 6) ----------------------------------
 def _grooved_case(spacing_ang=2.0e4, tilt_deg=45.0, energy=30.0, thickness_ang=2.0e5):
     from pyrite.campaign.config import default_settings, trajectory_sweep
     from pyrite.campaign.sweep import build_cases
@@ -191,26 +158,68 @@ def _grooved_case(spacing_ang=2.0e4, tilt_deg=45.0, energy=30.0, thickness_ang=2
     )[0]
 
 
-def _mark_color(layer):
-    mark = layer.get("mark")
-    return mark.get("color") if isinstance(mark, dict) else None
+def _named(fig, name):
+    return [trace for trace in fig.data if trace.name == name]
 
 
-def test_trajectory_chart_grooved_has_profile_layer():
-    from pyrite.plots.altair.trajectories import _GROOVE, trajectory_chart
+def test_penetration_survival_chart_one_bounded_line_per_energy():
+    fig = penetration_survival_chart(_real_cases(), Ne=6, n_bins=20)
+    assert isinstance(fig, go.Figure)
+    assert fig.data
+    energies = [trace.name for trace in fig.data]
+    assert len(energies) == len(set(energies))
+    for trace in fig.data:
+        survival = np.asarray(trace.y, dtype=float)
+        assert survival[0] == 100.0
+        assert np.all(np.diff(survival) <= 1e-9)
+    assert list(fig.layout.yaxis.range) == [0, 100]
+    assert fig.layout.yaxis.title.text == "surviving electrons (% of N0)"
 
-    spec = trajectory_chart(_grooved_case(), Ne=8).to_dict()
-    groove_layers = [layer for layer in spec["layer"] if _mark_color(layer) == _GROOVE]
-    assert len(groove_layers) == 1
-    enc = groove_layers[0]["encoding"]
-    assert enc["x"]["field"] == "x" and enc["y"]["field"] == "y"
+
+def test_penetration_survival_chart_none_on_empty():
+    assert penetration_survival_chart([]) is None
 
 
-def test_trajectory_chart_ungrooved_has_no_profile_layer():
-    from pyrite.plots.altair.trajectories import _GROOVE, trajectory_chart
+def test_trajectory_chart_draws_energy_coloured_segments_with_colourbar():
+    fig = trajectory_chart(_real_cases()[0], Ne=6)
+    assert isinstance(fig, go.Figure)
+    tracks = _named(fig, "tracks")
+    assert len(tracks) == 1
+    marker = tracks[0].marker
+    assert marker.colorscale is not None and marker.colorbar.title.text
+    assert marker.cmin == 5.0 and marker.cmax == _real_cases()[0]["E0_keV"]
+    bands = [t for t in fig.data if t.mode == "lines" and t.name is None]
+    assert bands, "no energy-band line traces"
+    # Each band draws independent segments: NaN after every segment end point.
+    for band in bands:
+        xs = np.asarray(band.x, dtype=float)
+        assert np.isnan(xs[2::3]).all() and np.isfinite(xs[0::3]).all()
+    fig.to_json()  # serializable
 
-    spec = trajectory_chart(_real_cases()[0], Ne=8).to_dict()
-    assert not [layer for layer in spec["layer"] if _mark_color(layer) == _GROOVE]
+
+def test_trajectory_chart_segments_never_bridge_electrons(monkeypatch):
+    data = _vacuum_data()
+    data["px"] = np.array([1.0, 2.0, np.nan, 3.0, 4.0])
+    data["py"] = np.array([0.0, 0.1, np.nan, 0.2, 0.3])
+    data["pE"] = np.array([30.0, 20.0, np.nan, 25.0, 15.0])
+    monkeypatch.setattr(penetration, "_trajectory_data", lambda *_args, **_kw: data)
+    fig = trajectory_chart(_real_cases()[0], Ne=2, frame=(-1.0, 5.0, -1.0, 5.0))
+    pairs = set()
+    for band in (t for t in fig.data if t.mode == "lines" and t.name is None):
+        xs = np.asarray(band.x, dtype=float)
+        pairs |= set(zip(xs[0::3], xs[1::3], strict=True))
+    assert pairs == {(1.0, 2.0), (3.0, 4.0)}
+
+
+def test_trajectory_chart_grooved_has_profile_trace():
+    fig = trajectory_chart(_grooved_case(), Ne=8)
+    groove = _named(fig, "groove profile")
+    assert len(groove) == 1
+    assert groove[0].line.color == _GROOVE
+
+
+def test_trajectory_chart_ungrooved_has_no_profile_trace():
+    assert not _named(trajectory_chart(_real_cases()[0], Ne=8), "groove profile")
 
 
 def test_vacuum_legs_stay_separate_from_radiating_track_data():
@@ -242,47 +251,13 @@ def test_flat_trajectory_data_has_typed_empty_vacuum_arrays():
     assert data["vacuum_elec_id"].dtype == np.int64
 
 
-def test_trajectory_chart_draws_vacuum_as_separate_faint_rules(monkeypatch):
-    from pyrite.plots.altair import trajectories as altair_trajectories
+def test_trajectory_chart_draws_vacuum_as_separate_faint_trace(monkeypatch):
+    data = _vacuum_data()
+    monkeypatch.setattr(penetration, "_trajectory_data", lambda *_args, **_kw: data)
 
-    data = {
-        "px": np.array([0.0, 1.0]),
-        "py": np.array([0.0, 0.5]),
-        "pE": np.array([30.0, 20.0]),
-        "pts": np.array([[0.0, 0.0], [1.0, 0.5]]),
-        "beam": np.array([1.0, 0.0, 0.0]),
-        "detector": np.array([0.0, 1.0, 0.0]),
-        "nslab": np.array([0.0, 1.0]),
-        "ndet": np.array([0.0, 1.0]),
-        "u": 10.0,
-        "ulab": "nm",
-        "thick": 1.0,
-        "layer_bounds": [],
-        "Ne": 1,
-        "eta": 0.0,
-        "thru": 0.0,
-        "vacuum_start_xyz": np.array([[1.0, 2.0, 3.0]]),
-        "vacuum_end_xyz": np.array([[4.0, 5.0, 6.0]]),
-        "vacuum_E": np.array([17.0]),
-        "vacuum_t_fs": np.array([0.75]),
-        "vacuum_elec_id": np.array([0], dtype=np.int64),
-    }
-    monkeypatch.setattr(altair_trajectories, "_trajectory_data", lambda *_args, **_kw: data)
-
-    spec = altair_trajectories.trajectory_chart(_grooved_case(), Ne=1).to_dict()
-    material_layers = [
-        layer
-        for layer in spec["layer"]
-        if layer.get("encoding", {}).get("color", {}).get("field") == "E"
-    ]
-    faint_rules = [
-        layer
-        for layer in spec["layer"]
-        if isinstance(layer.get("mark"), dict)
-        and layer["mark"].get("type") == "rule"
-        and layer["mark"].get("opacity", 1.0) <= 0.4
-    ]
-
-    assert len(material_layers) == 1
-    assert faint_rules
-    assert all(layer not in material_layers for layer in faint_rules)
+    fig = trajectory_chart(_grooved_case(), Ne=1)
+    vacuum = _named(fig, "vacuum flight")
+    assert len(vacuum) == 1
+    np.testing.assert_allclose(np.asarray(vacuum[0].x, dtype=float)[:2], [1.0, 4.0])
+    assert len(_named(fig, "tracks")) == 1
+    assert "0.35" in vacuum[0].line.color  # faint, distinct from energy-coloured tracks

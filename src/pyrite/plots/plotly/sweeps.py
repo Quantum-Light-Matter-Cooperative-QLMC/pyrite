@@ -2,8 +2,7 @@
 
 All physics and geometry reductions come from :mod:`pyrite.plots._frames`;
 heatmap cells contain only plotted summaries, not full Monte Carlo trajectories.
-The selectable map widget continues to use Altair until Plotly click-selection
-is proven equivalent in marimo.
+The click-selectable analysis Map is :mod:`pyrite.plots.plotly.map_select`.
 """
 
 from __future__ import annotations

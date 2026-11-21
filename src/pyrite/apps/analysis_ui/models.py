@@ -49,27 +49,9 @@ class AnalysisContext:
     def title_for_face(self, chart: Any) -> Any:
         if chart is None or self.selected_face != "blazed":
             return chart
-        # Plotly titles are stored under ``layout.title.text``, unlike Altair.
-        if callable(getattr(chart, "update_layout", None)):
-            title = getattr(getattr(chart.layout, "title", None), "text", None)
-            if title:
-                chart.update_layout(title=f"{title} (blazed)")
-            return chart
-        if not hasattr(chart, "title"):
-            return chart
-        title = chart.title
-        if isinstance(title, str):
-            return chart.properties(title=f"{title} (blazed)")
-        try:
-            import altair as alt
-
-            params = title.to_dict(validate=False)
-            text = params.get("text")
-            if isinstance(text, str):
-                params["text"] = f"{text} (blazed)"
-                return chart.properties(title=alt.TitleParams(**params))
-        except (AttributeError, TypeError, ValueError):
-            pass
+        title = getattr(getattr(chart.layout, "title", None), "text", None)
+        if title:
+            chart.update_layout(title_text=f"{title} (blazed)")
         return chart
 
 

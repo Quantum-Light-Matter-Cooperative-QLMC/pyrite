@@ -1,6 +1,6 @@
 """The multi-quantity sweep drivers compute the per-record metrics map ONCE.
 
-plot_heatmaps / plot_scan (matplotlib) and scan_charts (Altair) render one
+plot_heatmaps / plot_scan (matplotlib) and scan_charts (Plotly) render one
 figure per quantity, but the expensive per-record ``results.cxr_metrics``
 reduction is quantity-independent -- these guard that the drivers build the
 map once and share it across quantities, instead of once per quantity
@@ -19,8 +19,8 @@ import pytest
 
 import pyrite.plots._common as _common
 import pyrite.results.metrics as _metrics
-from pyrite.plots.altair.sweeps import scan_charts
 from pyrite.plots.mpl.sweeps import plot_heatmaps, plot_scan
+from pyrite.plots.plotly.sweeps import scan_charts
 
 N_RECORDS = 8  # 2 tilts x 2 azimuths x 2 beam energies (see _store)
 

@@ -269,7 +269,8 @@ def test_directions_share_one_time_grid(monkeypatch):
 
 
 def test_temporal_chart_renders_only_with_profiles():
-    from pyrite.plots.altair.temporal import temporal_chart, temporal_frame
+    from pyrite.plots._temporal_frames import temporal_frame
+    from pyrite.plots.plotly.temporal import temporal_chart
 
     t = np.linspace(-1.0, 1.0, 50)
     record = {

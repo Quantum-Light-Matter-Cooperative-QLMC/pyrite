@@ -1,14 +1,14 @@
 """_frames
 
 Renderer-neutral tidy-data builders. The parametric-sweep half: both
-:mod:`pyrite.plots.mpl.sweeps` (matplotlib) and :mod:`pyrite.plots.altair.sweeps`
-(Altair) render FROM these builders -- the per-cell/per-point "reduce every
+:mod:`pyrite.plots.mpl.sweeps` (matplotlib) and :mod:`pyrite.plots.plotly.sweeps`
+(Plotly) render FROM these builders -- the per-cell/per-point "reduce every
 swept case to its best record" reduction lives here exactly once. The
 electron-trajectory half: :func:`_trajectory_data` runs the transport and
 projects the cascade into the beam-detector plane, and :func:`survival_frame`
 reduces it to a penetration/survival table; :mod:`pyrite.plots.mpl.trajectories`,
-:mod:`pyrite.plots.altair.trajectories` and :mod:`pyrite.plots.plotly.trajectories`
-all render from these. No matplotlib, Altair or Plotly imports; renderers turn
+:mod:`pyrite.plots.plotly.penetration` and :mod:`pyrite.plots.plotly.trajectories`
+all render from these. No matplotlib or Plotly imports; renderers turn
 the returned ``pandas.DataFrame`` / dict / guard values into figures.
 """
 
@@ -53,7 +53,7 @@ def _effective_x(recs, x, hue):
 
 def scan_mode(recs, x, y, heatmap_min, force=None):
     """Heatmap-vs-lines auto-pick shared by ``plot_scan`` (matplotlib) and
-    ``scan_charts`` (Altair): heatmap when BOTH ``x`` and ``y`` sweep at least
+    ``scan_charts`` (Plotly): heatmap when BOTH ``x`` and ``y`` sweep at least
     ``heatmap_min`` values, else lines. ``force`` ("heatmap"|"lines")
     overrides the pick."""
     if force in ("heatmap", "lines"):
@@ -243,7 +243,7 @@ def heatmap_frame(
     Columns: ``x, y, panel, value, name, panel_raw``. ``name`` is the config
     name of the cell's best record and ``panel_raw`` its raw ``panel`` value --
     both carried so an interactive click on a cell (see
-    :func:`pyrite.plots.altair.sweeps.heatmap_select_chart`) maps back to an
+    :mod:`pyrite.plots.plotly.map_select`) maps back to an
     exact geometry / parameter set. ``metrics`` is a precomputed
     ``_common._metrics_map`` for THESE records (computed here when omitted) --
     multi-quantity drivers pass one shared map instead of re-deriving it per
@@ -287,8 +287,8 @@ def heatmap_frame(
 
 # ---- electron-trajectory data builders -----------------------------------------
 # Renderer-neutral electron-transport + projection prep, shared by
-# :mod:`pyrite.plots.mpl.trajectories` (matplotlib), :mod:`pyrite.plots.altair.trajectories`
-# (Altair) and :mod:`pyrite.plots.plotly.trajectories` (Plotly) -- the same
+# :mod:`pyrite.plots.mpl.trajectories` (matplotlib), :mod:`pyrite.plots.plotly.penetration`
+# and :mod:`pyrite.plots.plotly.trajectories` (Plotly) -- the same
 # transport, only the renderer differs.
 C_ANG_PER_FS = 2997.924580  # speed of light [Ang/fs]: age sum(L/beta)[Ang] -> fs
 
@@ -514,8 +514,8 @@ def survival_frame(data_by_energy, *, n_bins=80, depth_frac=True):
     reaching at least that depth. ``depth`` is depth/thickness when ``depth_frac``
     else absolute (display units). Shared by
     :func:`pyrite.plots.mpl.trajectories.plot_penetration_survival` (matplotlib)
-    and :func:`pyrite.plots.altair.trajectories.penetration_survival_chart`
-    (Altair). Columns: ``depth, survival, energy`` (``energy`` is the
+    and :func:`pyrite.plots.plotly.penetration.penetration_survival_chart`
+    (Plotly). Columns: ``depth, survival, energy`` (``energy`` is the
     ``"30 keV"``-style label)."""
     rows = []
     for E0 in sorted(data_by_energy):

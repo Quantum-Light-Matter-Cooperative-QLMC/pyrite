@@ -13,13 +13,12 @@ app = marimo.App(
 
 @app.cell
 def _():
-    import altair as alt
     import marimo as mo
     import numpy as np
 
+    from pyrite._util.formatting import fmt_thickness
     from pyrite.api import build_configured_cases
     from pyrite.apps._design import (
-        apply_altair_theme,
         apply_plotly_theme,
         page_title,
         resolved_theme,
@@ -28,23 +27,10 @@ def _():
     )
     from pyrite.apps._widgets import MaterialSelect
     from pyrite.apps.viewer import render_trace_animation, saved_capture_panel
-
-    # penetration_survival_chart / trajectory_chart can exceed Vega-Lite's default 5000-row cap; vegafusion
-    # (shipped with marimo[recommended]) lifts it, falling back to disabling the cap outright.
-    try:
-        alt.data_transformers.enable("vegafusion")
-    except Exception:
-        alt.data_transformers.disable_max_rows()
-
-    from pyrite._util.formatting import fmt_thickness
     from pyrite.campaign.beam_metrics import initial_state_metrics
     from pyrite.campaign.config import default_settings, trajectory_sweep
     from pyrite.materials import CATALOG
     from pyrite.montecarlo.transport.shell_oscillators import load_conduction_bands
-    from pyrite.plots.altair.trajectories import (
-        penetration_survival_chart,
-        trajectory_chart,
-    )
     from pyrite.plots.plotly.camera import (
         CAMERA_PRESETS,
         DEFAULT_ANGLES,
@@ -52,6 +38,7 @@ def _():
         resolve_scene_camera,
     )
     from pyrite.plots.plotly.crystal_lattice import crystal_lattice_figure
+    from pyrite.plots.plotly.penetration import penetration_survival_chart, trajectory_chart
     from pyrite.plots.plotly.render import (
         cached_render_path,
         render_cache_key,
@@ -71,7 +58,6 @@ def _():
         DEFAULT_ANGLES,
         MaterialSelect,
         VOLUME_CAMERA_ANGLES,
-        apply_altair_theme,
         apply_plotly_theme,
         build_configured_cases,
         cached_render_path,
@@ -494,7 +480,6 @@ def _(
     saved_capture,
     capture_error,
     MATERIAL,
-    apply_altair_theme,
     apply_plotly_theme,
     build_configured_cases,
     cached_render_path,
@@ -638,7 +623,7 @@ def _(
         else:
             _survival = penetration_survival_chart(_traj, Ne=500, tilt=_angle, width=420)
             set_penetration_survival((_survival_key, _survival))
-        _survival = apply_altair_theme(_survival, _theme)
+        _survival = apply_plotly_theme(_survival, _theme)
 
         _seed = int(penetration_regen_ui.value)
         _Ne = int(penetration_ne_ui.value)
@@ -824,7 +809,7 @@ def _(
         # now, not the 3D plot, so back to its own 480 default width.
         _cross_section_chart = trajectory_chart(_nc, data=_view_data, width=420)
         _cross_section_block = (
-            apply_altair_theme(_cross_section_chart, _theme)
+            apply_plotly_theme(_cross_section_chart, _theme)
             if _cross_section_chart is not None
             else mo.md("*No tracks pass the display filters.*")
         )

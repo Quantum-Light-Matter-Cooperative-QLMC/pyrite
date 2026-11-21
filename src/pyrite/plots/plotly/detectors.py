@@ -1,9 +1,9 @@
 """Plotly detector spectra using backend-neutral response frames (#622).
 
-Functions mirror the established Altair detector builders, including the
+The views keep the established detector conventions, including the
 beam-current conversion, one-pass broadband Timepix scoring, separate line/brem
 grids, charge-density units and Eagle quantum-efficiency secondary axis.  Frame
-sampling is peak-aware, shared with Altair, and never modifies detector scoring.
+sampling is peak-aware and never modifies detector scoring.
 """
 
 from __future__ import annotations
@@ -108,7 +108,7 @@ def _draw_curves(
         y_domain=y_domain,
     )
     fig = go.Figure()
-    # The original Altair legend is keyed by beam energy; all line/brem and
+    # The legend is keyed by beam energy; all line/brem and
     # incident/detected traces for that energy share one Plotly legendgroup.
     energies = sorted(float(x) for x in df["E0_keV"].unique())
     for i, energy in enumerate(energies):

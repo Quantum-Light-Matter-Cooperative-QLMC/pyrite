@@ -325,7 +325,7 @@ validated high-energy transport is implied. Checks:
 per-primary summary streaming; `trajectory_balance.py` reuses the canonical
 secondary energy ledger with local pair-event indices.
 `plots/trajectory_capture.py` adapts bounded whole-history selections to the
-existing shared trajectory projection; `plots/altair/trajectory_summary.py`
+existing shared trajectory projection; `plots/plotly/trajectory_summary.py`
 renders the summary tables. `apps/viewer.py::load_saved_capture` is the thin
 trace-app loading owner. `campaign/beam_metrics.py::capture_beam_metrics` reads
 a separately bounded prefix of initial sampled particles.

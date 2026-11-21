@@ -363,7 +363,7 @@ def plot_best_spectra(
         E = r["E_grid"] / 1e3
         col = energy_color(c["E0_keV"], all_E)
         # Records store per-nA flux; these panels report per-uA (see the axis
-        # label below), matching the Altair spectra the analysis app pairs them
+        # label below), matching the Plotly spectra the analysis app pairs them
         # with. Display convention only -- the records are untouched.
         scale = r["scale"] * _NA_PER_UA
         ax.plot(

@@ -1,9 +1,9 @@
-"""Experimental single-cell Plotly map for the marimo analysis app (#622).
+"""Single-cell selectable Plotly map for the marimo analysis app (#622).
 
-The scoring and gating policy lives in :mod:`pyrite.plots._frames`.  A nearly
+The scoring and gating policy lives in :mod:`pyrite.plots._frames`. A nearly
 transparent Scatter overlay supplies single-click targets because Plotly's
-heatmap selection can require a drag gesture.  This is a pilot, not a change to
-the default Altair map widget.
+heatmap selection can require a drag gesture. Browser gate evidence:
+``checks/plotly_map_pilot_622.py``.
 """
 
 from __future__ import annotations
@@ -176,7 +176,7 @@ def selectable_map_figure(
         )
     )
     fig.update_layout(
-        title=f"{label} (experimental: click the center of a cell)",
+        title=label,
         width=width,
         height=height,
         xaxis={"title": _axis_label("tilt_azim_deg"), "type": "linear"},

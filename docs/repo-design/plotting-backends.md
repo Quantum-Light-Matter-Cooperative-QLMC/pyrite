@@ -1,7 +1,7 @@
 # Plotting backends
 
 `pyrite.plots` prepares plot data independently of the renderer and supports
-three rendering backends. Display code never changes source arrays, physical
+two rendering backends, Plotly and Matplotlib. Display code never changes source arrays, physical
 normalization (`Phs/s/eV/uA`), units, peak treatment, checkpoint or result
 schemas. This page records the current backend split and the browser evidence
 behind it (#622).
@@ -10,18 +10,17 @@ behind it (#622).
 
 | Use | Backend | Entry points |
 | --- | --- | --- |
-| Interactive 2D analysis: spectra, overlays, case baskets, temporal profiles, material comparisons, metric trends, scan and pixel heatmaps, Timepix3/Eagle XO response spectra | Plotly | `pyrite.plots.plotly.spectra`, `.temporal`, `.sweeps`, `.pixels`, `.detectors` |
+| Interactive 2D analysis: spectra, overlays, case baskets, temporal profiles, material comparisons, metric trends, scan and pixel heatmaps, Timepix3/Eagle XO response spectra, 2D penetration tracks and survival, saved-trajectory summaries | Plotly | `pyrite.plots.plotly.spectra`, `.temporal`, `.sweeps`, `.pixels`, `.detectors`, `.penetration`, `.trajectory_summary` |
 | Physics, channeling diagnostics, validation and publication figures | Matplotlib | `pyrite.plots.mpl` |
 | Dense captured trajectories | Datashader raster (Matplotlib); existing Plotly 3D track views | `pyrite.plots.mpl.trajectories`, `pyrite.plots.plotly.trajectories` |
-| Click-selectable azimuth × polar-tilt Map (default) | Altair | `pyrite.plots.altair.sweeps.heatmap_select_chart` |
-| Same Map, opt-in "Plotly (experimental)" renderer | Plotly | `pyrite.plots.plotly.map_select` |
+| Click-selectable azimuth × polar-tilt Map | Plotly | `pyrite.plots.plotly.map_select` |
 
 Numerical frames come from `pyrite.plots._spectrum_frames`,
-`._temporal_frames`, `._frames`, `._pixel_frames` and `._detector_frames`; the
-Plotly and legacy Altair builders share them. Plotly builders return a
-`Figure`, or `None` for empty results; pixel views take prepared frames. The
-legacy `pyrite.plots.altair` API remains public. Static Plotly export (Kaleido)
-is optional.
+`._temporal_frames`, `._frames`, `._trajectory_frames`, `._pixel_frames` and
+`._detector_frames`. Plotly builders return a `Figure`, or `None` for empty
+results; pixel views take prepared frames. Static Plotly export (Kaleido) is
+optional. The former Altair renderer (`pyrite.plots.altair`) was removed in
+#622; its frame builders moved to the neutral modules above.
 
 Spectra are decimated **before** figure construction by the peak-aware
 paired-component sampler (`max_points`, default 5000 per chart, 2500 with both
@@ -55,10 +54,9 @@ app that shows many charts. The previous 6,000-point switch therefore cost
 render time with no interaction benefit. Headless timing on one integrated
 GPU does not cover hover latency, discrete GPUs or other operating systems.
 
-## Map cell selection pilot
+## Map cell selection
 
-The Map view's renderer selector defaults to **Altair (stable)**. **Plotly
-(experimental)** draws a single-panel heatmap from the same `heatmap_frame`
+The analysis Map draws a single-panel Plotly heatmap from the same `heatmap_frame`
 values, selection score, flux gate, energy panel and units, with a nearly
 transparent `Scatter` click target over each *finite* cell. Missing, gated and
 NaN cells have no target. The marimo `on_change` handler resolves the clicked
@@ -80,7 +78,6 @@ headless Firefox 160 and Chrome 158 (marimo 0.25.2, Plotly 7.1.0). Results for
 | Map quantity change keeps a still-visible selection | Pass | Pass |
 | Light/dark theme change keeps the selection | Pass | Pass |
 | Beam energy or thickness change hides the selection | Pass | Pass |
-| Returning to Altair restores its own click selection | Pass | Pass |
 | Keyboard focus and cell selection | Fail | Fail |
 | Map zoom redraw | 50–90 ms | 30–360 ms (first) |
 
@@ -92,12 +89,11 @@ target markers assumed. The colorbar title is now vertical and
 `hoverdistance=1` accepts only clicks on a target marker.
 
 The stored choice is scope-bound rather than discarded: after an energy change
-hides it, returning to the original energy shows it again. Neither renderer
-offers keyboard cell selection; Altair draws the Map on a canvas. An
+hides it, returning to the original energy shows it again. Keyboard cell
+selection is not available; the former Altair canvas Map lacked it too. An
 installed-wheel marimo run has not been tested.
 
-**Decision:** keep Altair as the default and the Plotly renderer opt-in. The
-pointer gate now passes in both browsers, but keyboard access fails for both
-renderers and so does not separate them. Altair stays a `plots` dependency
-while it remains the default Map and the legacy `pyrite.plots.altair` API is
-public.
+**Decision:** Plotly is the only Map renderer and Altair is removed (#622). The
+pointer gate passes in both browsers; keyboard access remains a known gap.
+`altair`, `vegafusion` and `vl-convert-python` are no longer PyRITE
+dependencies (`marimo[recommended]` still installs `altair` for marimo itself).

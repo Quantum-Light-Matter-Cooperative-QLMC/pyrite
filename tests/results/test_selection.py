@@ -1,6 +1,6 @@
 """Guard tests for pyrite.results.selection -- case label formatting,
 case-picker table rows, and basket-record slimming. Same synthetic-record
-approach as test_altair_spectra_compare.py: small records, no GPU, no
+approach as test_plotly_spectra_compare.py: small records, no GPU, no
 checkpoint. Tests case_label(), case_table_rows(), and slim_case_record().
 """
 

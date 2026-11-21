@@ -5,9 +5,7 @@ from hashlib import sha256
 from importlib.resources import files
 from pathlib import Path
 
-import altair as alt
 import marimo as mo
-import pandas as pd
 import pytest
 
 from pyrite.apps import _design
@@ -95,47 +93,6 @@ def test_theme_switch_updates_marimo_shadow_dom_controls() -> None:
     assert "background-color: var(--pyrite-surface) !important" in source
 
 
-def test_altair_light_theme_overrides_axis_and_embedded_title_colors() -> None:
-    chart = (
-        alt.Chart(alt.Data(values=[{"energy": 1.0, "photons": 2.0}]))
-        .mark_line()
-        .encode(x="energy:Q", y="photons:Q")
-        .properties(title=alt.TitleParams(text="Spectrum", color="#FFFFFF"))
-        .configure_axis(labelFontSize=14, titleFontSize=16)
-        .configure_legend(labelFontSize=14, titleFontSize=16)
-        .configure_title(fontSize=18)
-    )
-
-    spec = _design.apply_altair_theme(chart, "light").to_dict()
-    light = _design.THEMES["light"]
-    assert spec["config"]["axis"]["labelColor"] == light["text"]
-    assert spec["config"]["axis"]["titleColor"] == light["text"]
-    assert spec["config"]["axis"]["labelFontSize"] == 14
-    assert spec["config"]["axis"]["titleFontSize"] == 16
-    assert spec["config"]["legend"]["labelFontSize"] == 14
-    assert spec["config"]["legend"]["titleFontSize"] == 16
-    assert spec["config"]["title"]["fontSize"] == 18
-    assert spec["config"]["text"]["color"] == light["text"]
-    assert spec["title"]["color"] == light["text"]
-
-
-def test_static_altair_chart_bypasses_arrow_mime_validation() -> None:
-    def _arrow_transformer(_data, **_options):
-        return {"url": "memory://spectrum.arrow", "format": {"type": "arrow"}}
-
-    alt.data_transformers.register("marimo_test_arrow", _arrow_transformer)
-    chart = (
-        alt.Chart(pd.DataFrame({"energy": [1.0, 2.0], "photons": [2.0, 3.0]}))
-        .mark_line()
-        .encode(x="energy:Q", y="photons:Q")
-    )
-
-    with alt.data_transformers.enable("marimo_test_arrow"):
-        rendered = _design.static_altair_chart(mo, chart)
-
-    assert isinstance(rendered, mo.ui.altair_chart)
-
-
 def test_status_vocabulary_is_unique_and_explicit() -> None:
     assert len(_design.STATUS_KINDS) == len(set(_design.STATUS_KINDS))
     assert "Completed—interpret" in _design.STATUS_KINDS
@@ -191,3 +148,7 @@ def test_scan_grid_states_map_to_palette_tokens() -> None:
 def test_core_package_does_not_import_notebook_design() -> None:
     root = Path(__file__).parents[1] / "src" / "pyrite"
     assert all("notebooks._design" not in path.read_text() for path in root.rglob("*.py"))
+
+
+def test_plotly_theme_passes_empty_chart_through() -> None:
+    assert _design.apply_plotly_theme(None, "dark") is None

@@ -2,7 +2,7 @@
 
 Backend-neutral shared figure plumbing: per-record line/brem split,
 detector-response prep, and the trajectory/groove geometry helpers reused by the
-mpl/altair/plotly backends. No matplotlib, Altair or Plotly imports here --
+mpl/plotly backends. No matplotlib or Plotly imports here --
 :mod:`pyrite.plots.mpl._common` holds the ONE matplotlib-only helper
 (``_per_tilt_figs``) that doesn't belong in this neutral module.
 """
@@ -69,7 +69,7 @@ def _case_title(case, tail="", *, latex=True, e0_keV=None, tilt_fmt="0.1f"):
 
 def _metrics_map(recs, settings, rel_prominence, cxr_metric):
     """``id(rec) -> cxr_metrics(rec)`` for every record -- the same per-record
-    metric dict every sweep draw (matplotlib and altair) builds. Computed once
+    metric dict every sweep draw (matplotlib and Plotly) builds. Computed once
     per record and cached ACROSS calls (see ``_cached_cxr_metrics``), so
     re-rendering after a change that doesn't touch these records (e.g. a
     marimo tab re-rendering because an unrelated widget changed) reuses the
@@ -93,7 +93,7 @@ def _cxr_brem(r, settings, convolve=None):
 # ---- Timepix3 / Eagle XO detector response prep -------------------------------
 # Renderer-neutral per-record detector response builders, shared by
 # :mod:`pyrite.plots.mpl.detectors` (matplotlib) and
-# :mod:`pyrite.plots.altair.detectors` (Altair) -- the same physics/units, only
+# :mod:`pyrite.plots.plotly.detectors` (Plotly) -- the same physics/units, only
 # the renderer differs.
 SI_K_EDGE_EV = 1839.0  # silicon K absorption edge -> the QE notch the lines cross
 
@@ -153,6 +153,16 @@ _COMPARISON_DROP_REASONS = {
 }
 
 
+# Plain-language title for each cross-material selection policy.
+_COMPARISON_SELECTION_TITLES = {
+    "quality_line": "highest quality-weighted integrated line flux",
+    "line_flux": "highest integrated line flux",
+    "quality_peak": "highest quality-weighted sampled peak density",
+    "peak": "highest sampled peak density (spacing-dependent)",
+    "line_brem_ratio": "highest local line-to-bremsstrahlung ratio",
+}
+
+
 def _comparison_drop_message(dropped):
     """Format material labels grouped with their exact exclusion reasons."""
     if not dropped:
@@ -167,7 +177,7 @@ def _comparison_drop_message(dropped):
 
 # ---- trajectory/groove geometry helpers ----------------------------------------
 # Renderer-neutral case/geometry helpers for the electron-penetration figures,
-# shared by :mod:`pyrite.plots.mpl.trajectories`, :mod:`pyrite.plots.altair.trajectories`
+# shared by :mod:`pyrite.plots.mpl.trajectories`, :mod:`pyrite.plots.plotly.penetration`
 # and :mod:`pyrite.plots.plotly.trajectories`.
 def _case_of(rec_or_case):
     """Accept either a results record (carries 'case') or a raw case dict."""

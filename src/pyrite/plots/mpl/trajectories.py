@@ -441,10 +441,10 @@ def plot_penetration_survival(
     energies = sorted({c["E0_keV"] for c in cases})
 
     # Same data_by_energy -> tidy-table split as
-    # :func:`pyrite.plots.altair.trajectories.penetration_survival_chart`: build
+    # :func:`pyrite.plots.plotly.penetration.penetration_survival_chart`: build
     # one _trajectory_data per beam energy at this tilt, then reduce every energy's
     # cascade to a survival curve in ONE shared frame builder
-    # (:func:`pyrite.plots._frames.survival_frame`) so the matplotlib and Altair
+    # (:func:`pyrite.plots._frames.survival_frame`) so the matplotlib and Plotly
     # curves are computed identically.
     data_by_energy = {}
     for E0 in energies:

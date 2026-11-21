@@ -80,7 +80,6 @@ def render_map(
     map_results,
     heatmap_mode,
     quantity_ui,
-    map_backend_ui,
     map_widget,
     selection,
     energy,
@@ -102,14 +101,10 @@ def render_map(
             [
                 mo.md(
                     "Azimuth × polar tilt at the sidebar beam energy and thickness. "
-                    "Click a cell to plot its spectrum."
-                    + (
-                        " **Plotly pilot:** click near the cell center; pan and zoom are enabled."
-                        if map_backend_ui.value == "plotly"
-                        else ""
-                    )
+                    "Click near a cell's centre to plot its spectrum; drag to pan, "
+                    "scroll or use the toolbar to zoom."
                 ),
-                mo.hstack([quantity_ui, map_backend_ui], justify="start", gap=1),
+                quantity_ui,
                 map_widget
                 if map_widget is not None
                 else mo.md("*No heatmap for this quantity at this slice.*"),
