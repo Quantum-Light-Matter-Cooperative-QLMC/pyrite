@@ -27,7 +27,7 @@ from ._bremslib_reduced_energy import SMALL_REDUCED_ENERGY_NODES, refine_reduced
 #: Identity of the BremsLib model and of this module's interpolation scheme.
 #: Bump the suffix whenever the interpolation changes the numbers it serves.
 BREMSSTRAHLUNG_BREMSLIB_MODEL = (
-    "bremslib-v2.0-sdcs-ddcs/idcs-x18-born-v1-geo4-ln-t-lin-theta-v2/tm-coupled-v2/ee-sb85-v1"
+    "bremslib-v2.0-sdcs-ddcs/idcs-x18-born-v1-geo4-ln-t-lin-theta-v2/tm-coupled-v2/ee-sb85-v2"
     "/angle-f64-v1/fp32-cell-mb-v1/fp64-segment-sum-v1"
 )
 

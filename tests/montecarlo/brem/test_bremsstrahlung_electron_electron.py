@@ -90,3 +90,27 @@ def test_weighted_mean_reproduces_the_tabulated_etabar(raw):
             chi_n = np.interp(x, sb.kappa, sb.chi(z, t1[row])) / (1.0 + eta / z)
             mean = np.trapezoid(chi_n * eta, x) / np.trapezoid(chi_n, x)
             assert abs(mean - etabar[row]) <= 0.005, (z, t1[row], mean, etabar[row])
+
+
+def test_small_reduced_energy_shape_meets_the_seltzer_berger_kappa_005_total(raw):
+    """#1359: with a smooth chi_n, SB86's kappa = 0.05 total implies eta(0.05)."""
+    from pyrite.validation.brem_sources import (
+        SeltzerBergerUnavailableError,
+        load_seltzer_berger,
+    )
+
+    try:
+        sb = load_seltzer_berger()
+    except SeltzerBergerUnavailableError as exc:
+        pytest.skip(str(exc))
+    t1 = np.asarray(raw["incident_energy_MeV"])
+    nodes = [0.0, 0.05, 0.1, 0.2]
+    columns = [int(np.flatnonzero(np.isclose(sb.kappa, k))[0]) for k in nodes]
+    for z in raw["atomic_number"]:
+        for row in np.flatnonzero((t1 >= 0.5) & (t1 <= 100.0)):
+            factor = electron_electron_factor(z, t1[row : row + 1], np.asarray(nodes))[0]
+            total = sb.chi(z, t1[row])[columns]
+            chi_n = total / factor
+            smooth = np.polyval(np.polyfit([0.0, 0.1, 0.2], chi_n[[0, 2, 3]], 2), 0.05)
+            implied = total[1] / smooth
+            assert abs(factor[1] / implied - 1.0) <= 0.007, (z, t1[row], factor[1], implied)

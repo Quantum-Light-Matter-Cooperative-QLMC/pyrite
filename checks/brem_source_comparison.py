@@ -27,9 +27,9 @@ grids) are reported, not gated.
 to its reason; ``UNGATED_KINDS`` maps an otherwise gated element to the gate
 kinds (``"chi"``, ``"extension_moment"``) it is reported for but not gated on,
 each with its reason. Both are printed and written to the JSON report. H is
-ungated for two cited reasons. Li (#1073) is gated on its 10 keV--30 MeV first
-moment; its pointwise ``chi`` and its extension moment are reported with the
-measured, cited cause of each.
+ungated for two cited reasons. Li (#1073) is gated pointwise and on its
+10 keV--30 MeV first moment since #1359 corrected the small-``k/T`` ``eta``
+shape; its extension moment is reported with its measured, cited cause.
 
 The 30--100 MeV extension rows (claim ``bremslib-high-energy-extension``,
 #439) gate only the first moment, within ``1 +/- 0.06`` (#439's decision). Their
@@ -104,17 +104,6 @@ UNGATED_ELEMENTS = {
 #: reason for each (#1073).
 UNGATED_KINDS = {
     3: {
-        "chi": "Li pointwise: after #1349 (library-scheme sub-nodes) only Li's 30 MeV, k/T = 0.05 "
-        "point fails (1.1301). At k -> 0, 30 MeV, SB86's electron-nucleus chi equals Tsai's "
-        "Hartree-Fock complete-screening value (RMP 46, 815 (1974), Table B.2) within 0.1 % for "
-        "Z = 3-6, while BremsLib (PW and its own Born) exceeds it (Li 1.110, C 1.071). BremsLib "
-        "screens with a Kohn-Sham potential, used for both PW and Born (Poskus, ADNDT 166, 101734 "
-        "(2025), Secs. 2, 2.1, 2.6): adding LDA exchange-correlation to the screening function "
-        "predicts 1.10-1.12 for Li at k -> 0 and 1.09-1.10 at k/T = 0.05 (C 1.07, H 1.17-1.21, "
-        "measured 1.195). No source bounds this screening difference within the gate. The "
-        "remaining ~2.5 % at k/T = 0.05 is PyRITE's fitted small-k/T eta shape, off-trend at "
-        "that SB86 node (1 + eta/Z 1.446 against ~1.411 implied by SB86's total), open in #1359; "
-        "#1349, #1073",
         "extension_moment": "Li 30-100 MeV first moment: an electron-nucleus difference that "
         "grows smoothly as Z falls (100 MeV: Al 1.035, C 1.053, B 1.058, Li 1.072, H 1.134) and "
         "does not depend on k/T interpolation. At T >= 50 MeV it is between two analytic "

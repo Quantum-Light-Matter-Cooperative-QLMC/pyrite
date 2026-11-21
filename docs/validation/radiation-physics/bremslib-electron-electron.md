@@ -212,3 +212,59 @@ Note on the Born-zero fallback. The program does not fall back at Z = 5, 3 MeV: 
 ### Verdict
 
 `rederived` for the sub-node part. The independent reconstruction of the program's $k/T_1$ scheme reproduces the executable to round-off. With the declared omissions it matches the code to $2\times10^{-15}$ at every tested row and end to end. Findings 1–3 are documentation corrections, not code discrepancies. Human sign-off remains pending.
+
+## Small-$k/T$ shape revision (#1359, 2026-11-20)
+
+The "Small-$k/T$ shape" section above describes the one-scale shape of `ee-sb85-v1`. Model `ee-sb85-v2` replaces it.
+
+**Defect.** The one-scale shape was fitted to $\bar\eta$ alone. The Seltzer–Berger (1986) digital table has one node inside $(0,0.1)$, $x=0.05$. With $\chi_n=\chi_{\rm tot}/(1+\eta/Z)$ at $x=0$, 0.1 and 0.2, where Table 4 gives $\eta$, joined by the quadratic through them, SB86's total there implies $\eta(0.05)$. At 30 MeV that gives $1+\eta/Z=1.411$ for Li and 1.203 for C. The one-scale shape gave 1.446 and 1.223. Over 0.5–100 MeV it overshot the node by up to 2.0 % for the tabulated Z = 6 (2.6 % for Li, which holds the Z = 6 $\eta$).
+
+**Robustness of the implied node.** Three ways of joining $\chi_n$ give the implied $\eta(0.05)$:
+
+- a quadratic in $\chi_n$;
+- a quadratic in $\chi_n/\chi_{\rm Tsai}$, where $\chi_{\rm Tsai}$ is Tsai's (RMP 46, 815 (1974)) Thomas–Fermi Born electron–nucleus shape;
+- a cubic in $\chi_n/\chi_{\rm Tsai}$ that also uses $x=0.15$.
+
+Above 5 MeV they agree within 0.02 in $\eta$, which is small against the 0.1–0.15 overshoot. Below 2 MeV they diverge by more than the shape changes the node.
+
+**Cause.** The cause is the family, not the weighting. Refitting $\kappa_s$ to $\bar\eta$ with the smooth $\chi_n$ instead of SB86's chord moves it by at most 4 %. The node alone wants $1/\kappa_s\approx6.5\,T/{\rm MeV}$ (about 200 at 30 MeV), but $\bar\eta$ wants 58. Fitted to $\bar\eta$ alone, three one-parameter families give these values of $\eta(0.05)$ for C at 30 MeV, where the node is 1.213:
+
+| Family fitted to $\bar\eta$ | $\eta(0.05)$ |
+|---|---|
+| $(1+sx)^{-1}$ | 1.344 |
+| $e^{-sx}$ | 1.300 |
+| $e^{-(sx)^2}$ | 1.162 |
+
+The node lies between the exponential and the Gaussian.
+
+**Revised shape.**
+
+$$
+g(x)=\frac{e^{-(sx)^p}-e^{-(0.1s)^p}}{1-e^{-(0.1s)^p}},
+$$
+
+with $g(0)=1$ and $g(0.1)=0$. The function is monotone in $x$ for $s,p>0$. With $p=1$ and $s\to0$ it is the linear interpolant, so the $\le0.5$ MeV ramp is unchanged.
+
+From 2 MeV, `checks/sb85_eta_small_kappa_fit.py` solves for $(s,p)$ per element so that both $\bar\eta$ and the node hold. The two parameters then behave as follows:
+
+- **Power $p$.** The fitted $p$ agrees across the six Z within 0.1. It rises with $T$: 1.2–1.3 at 2–6 MeV, 1.55 at 30 MeV and 1.86 at 200 MeV. The stored value is the Z mean.
+- **Scale $s$.** $s$ is refitted at that $p$ (spread ≤ 4 %). It runs from 29.8 at 2 MeV to 44.9 at 200 MeV.
+
+Below 2 MeV, $p=1$ and $s$ meets $\bar\eta$ alone. Both stay held above 200 MeV.
+
+**Result.**
+
+- **$\bar\eta$.** The stored values reproduce $\bar\eta$ within 0.0014 with the smooth $\chi_n$. With the linear-chord weighting of the anchor test they reproduce it within 0.0043, the same bound as before.
+- **The node.** They reproduce it within 0.3 % in $1+\eta/Z$ from 2 MeV, and within 0.6 % at 0.5–1 MeV.
+- **30 MeV.** Li is 1.402 and C 1.201.
+- **Catalogue sweep.** `checks/brem_source_comparison.py` exits 0. Li's 30 MeV, $\kappa=0.05$ point falls from 1.1301 to 1.105, and Z = 5–20 tops out at 1.087 (was 1.104). Li's pointwise `chi` is gated again.
+
+**Anchors.**
+
+- `test_small_reduced_energy_shape_meets_the_seltzer_berger_kappa_005_total` pins the node within 0.7 % at 0.5–100 MeV for all six Z. It skips without the SB86 table.
+- `test_weighted_mean_reproduces_the_tabulated_etabar` still pins $\bar\eta$ within 0.005.
+
+**Limits.**
+
+- The node constraint rests on $\chi_n$ being smooth across $x=0.05$.
+- The shape between the nodes is still a modelling choice. SB85 and SB86 tabulate no $\eta$ inside $(0,0.1)$ other than what SB86's total implies at 0.05.

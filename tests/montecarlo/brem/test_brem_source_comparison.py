@@ -217,7 +217,7 @@ def _comparison(element, Z, energy, *, chi=1.0, moment=1.0, model="bremslib"):
     )
 
 
-def test_gate_domain_ungates_h_and_two_cited_li_kinds():
+def test_gate_domain_ungates_h_and_the_cited_li_extension_moment():
     from checks import brem_source_comparison as check
 
     assert set(check.UNGATED_ELEMENTS) == {1}
@@ -225,26 +225,24 @@ def test_gate_domain_ungates_h_and_two_cited_li_kinds():
     assert "p. 348" in hydrogen and "p. 35" in hydrogen
     assert set(check.UNGATED_KINDS) == {3}
     lithium = check.UNGATED_KINDS[3]
-    assert set(lithium) == {"chi", "extension_moment"}
-    assert "Kohn-Sham" in lithium["chi"] and "Table B.2" in lithium["chi"]
-    assert "#1349" in lithium["chi"] and "#1359" in lithium["chi"]
-    assert "Interpolate_DCS" not in lithium["chi"]
+    # #1359: Li pointwise chi is gated again (30 MeV, k/T = 0.05: 1.1301 -> 1.105).
+    assert set(lithium) == {"extension_moment"}
     assert "p. 347" in lithium["extension_moment"] and "#1073" in lithium["extension_moment"]
     assert "policy" not in " ".join(lithium.values())
 
 
-def test_gate_violations_gate_the_li_band_moment_only():
+def test_gate_violations_gate_li_chi_and_band_moment_but_not_its_extension():
     from checks import brem_source_comparison as check
 
     kappa = np.array(_KAPPA)
     reported = [
-        _comparison("Li", 3, 1.0, chi=1.14, moment=1.07),
+        _comparison("Li", 3, 1.0, chi=1.12, moment=1.07),
         _comparison("Li", 3, 50.0, chi=1.3, moment=1.072),
     ]
     assert check.gate_violations(reported, kappa) == []
     failing = [_comparison("Li", 3, 1.0, chi=1.14, moment=1.11)]
     kinds = [(f[0], f[1], f[2]) for f in check.gate_violations(failing, kappa)]
-    assert kinds == [("Li", 1.0, "moment")]
+    assert kinds == [("Li", 1.0, "chi"), ("Li", 1.0, "moment")]
 
 
 def test_gate_moment_bands_follow_seltzer_berger_and_the_extension_decision():
@@ -268,7 +266,7 @@ def test_gate_violations_skip_ungated_and_apply_the_bands():
     kappa = np.array(_KAPPA)
     passing = [
         _comparison("H", 1, 1.0, chi=1.27, moment=1.13),
-        _comparison("Li", 3, 1.0, chi=1.14, moment=1.07),
+        _comparison("Li", 3, 1.0, chi=1.12, moment=1.07),
         _comparison("C", 6, 1.0, chi=1.12, moment=1.09),
         _comparison("C", 6, 50.0, chi=1.3, moment=1.05),
         _comparison("C", 6, 0.005, chi=1.3, moment=1.3),
