@@ -6,11 +6,16 @@ warning sentence per failing population that names only the failed criteria,
 their measured values and effective thresholds, and says whether the RSE
 target itself was met, so a variance-sampling (VOV) refusal is not read as a
 missed RSE target. It reads the record only: no stopping rule, threshold or
-sampling identity depends on it.
+sampling identity depends on it. A tail slope below
+:data:`HEAVY_TAIL_SLOPE` is appended as context after the failed criteria;
+the slope is reported only and never a failed criterion (#1339).
 """
 
 from collections.abc import Mapping
 from typing import Any
+
+#: MCNP/Geant4 tail-slope threshold: below it the score variance may be infinite.
+HEAVY_TAIL_SLOPE = 3.0
 
 #: Display label of each stopped population.
 _LABELS = {"cxr": "CXR", "brem": "brem"}
@@ -86,6 +91,12 @@ def _population(name: str, status: Mapping[str, Any], record: Mapping[str, Any])
     parts = [_rse_text(status, target), *_failed_criteria(status, record["guards"])]
     if failure_kind(status) == "vov":
         parts.append("a looser RSE target would not lift this refusal")
+    slope = status.get("tail_slope")
+    if slope is not None and slope < HEAVY_TAIL_SLOPE:
+        parts.append(
+            f"context: tail slope {_num(slope)} < {_num(HEAVY_TAIL_SLOPE)} "
+            "(variance may be infinite; reported only)"
+        )
     return f"{head}: " + "; ".join(parts)
 
 

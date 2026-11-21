@@ -115,6 +115,9 @@ supersedes both. Fixed-count identities retain their generation.
 - Sequential stopping in simulation output analysis: P. W. Glynn and W. Whitt, "The asymptotic validity of sequential stopping rules for stochastic simulations," *Ann. Appl. Probab.* **2**, 180–198 (1992). This covers relative-precision rules and batch means.
 - Running moments: B. P. Welford, *Technometrics* **4**, 419–420 (1962); T. F. Chan, G. H. Golub and R. J. LeVeque, "Algorithms for computing the sample variance: analysis and recommendations," *Amer. Statist.* **37**, 242–247 (1983), pairwise merge.
 - Effective sample size: L. Kish, *Survey Sampling* (Wiley, 1965), $(\sum w)^2/\sum w^2$, applied here to the contributions $m_i$.
+- Tail index: B. M. Hill, "A simple general approach to inference about the tail of a distribution," *Ann. Statist.* **3**, 1163–1174 (1975).
+- Studentized Edgeworth and Cornish-Fisher expansions: P. Hall, *The Bootstrap and Edgeworth Expansion* (Springer, 1992), §2.6.
+- MCNP precision diagnostics (VOV, SHIFT, FOM, 201-score Pareto tail slope, the slope-3 criterion): J. F. Briesmeister (ed.), *MCNP—A General Monte Carlo N-Particle Transport Code, Version 4B*, LA-12625-M (1997), ch. 2 §VI.
 
 - Geant4 [B1Con documentation](https://geant4-userdoc.web.cern.ch/Doxygen/examples_doc/html/ExampleB1Con.html) and [`G4ConvergenceTester`](https://github.com/Geant4/geant4/blob/master/source/global/HEPNumerics/src/G4ConvergenceTester.cc), inspected 2026-11-17: small relative error and many histories do not establish convergence. Diagnostics include VOV, RSE/VOV trends, largest-score repetition, FOM stability, and a fitted upper-tail density slope (passing threshold 3). The implementation tests VOV against $1/N$ despite a printed label saying $1/\sqrt N$. These are diagnostic checks, not a proof of coverage or the PyRITE stopping policy.
 - F. Salvat, *PENELOPE-2024*, NEA/MBDAV/R(2024)1, §§1.3 and 1.5: pp. 24–25, Eqs. (1.89)–(1.90), gives the heuristic skewness condition $|\mu_3|/(\sigma^3\sqrt N)\ll1$ and recommends examining the estimator distribution; the text then explicitly adopts asymptotic error reporting in routine use. Pages 37–39, Eqs. (1.136)–(1.143), accumulate whole-shower scores and their squares, including all particles of each shower before squaring. PENELOPE uses the plug-in $N$ denominator; PyRITE uses Bessel correction. Chapter 7, p. 291 and pp. 317–318, describes fixed shower/time budgets, periodic output, inspection and manual stopping; no analogous automatic tail test is specified there. [NEA report](https://www.oecd-nea.org/jcms/pl_108003/penlope-2024-a-code-system-for-monte-carlo-simulation-of-electron-and-photon-transport); examined the user's Zotero PDF, item `2UVQNJ2B`, attachment `CQ6Q2F87`.
@@ -623,6 +626,111 @@ positive slopes ($+5.43$ for hBN and $+1.18$ for HOPG at 24k blocks), and
 30 keV stops give $-0.6$ to $-1.2$. The slope therefore stays a diagnostic.
 Like VOV itself, it cannot detect a population class that has not yet been
 sampled.
+
+### Tail slope, SHIFT and figure of merit (#1339)
+
+Three MCNP/`G4ConvergenceTester` diagnostics are recorded per observable in
+`adaptive_sampling["statistics"]` beside VOV. None enters `passes`, the
+stop or the identity; any later gating needs its own issue with replay
+evidence.
+
+**Tail slope.** Write the $k+1$ largest scores in decreasing order
+$x_{(1)}\ge\dots\ge x_{(k+1)}>0$, with $k=200$ (`TAIL_SCORES`). If the
+survival above the threshold $u=x_{(k+1)}$ is Pareto,
+$P(X>x\mid X>u)=(x/u)^{-\alpha}$, then $\ln(X/u)$ is exponential with rate
+$\alpha$, and conditionally on $u$ the $k$ log-ratios
+$L_i=\ln(x_{(i)}/u)$ are distributed as $k$ i.i.d. $\mathrm{Exp}(\alpha)$
+values. Their sum is $\Gamma(k,\alpha)$, so
+
+```{math}
+:label: eq-adaptive-hill-slope
+
+\hat\alpha=\frac{k-1}{\sum_{i=1}^{k}\ln\bigl(x_{(i)}/x_{(k+1)}\bigr)},\qquad
+E[\hat\alpha]=\alpha,\quad \operatorname{sd}(\hat\alpha)=\frac{\alpha}{\sqrt{k-2}},
+\qquad \text{slope}=\min\bigl(1+\hat\alpha,\,10\bigr).
+```
+
+$\hat\alpha$ is Hill's estimator with the $k-1$ numerator, unbiased for an
+exact Pareto tail; at $k=200$ its relative standard deviation is 7.1 %. A
+survival $x^{-\alpha}$ has a density $\propto x^{-(1+\alpha)}$, so the slope
+is MCNP's fitted density slope. MCNP fits a generalized Pareto distribution
+with shape $\xi$ to the ~201 largest scores and reports $1+1/\xi$; for
+$\xi>0$ (a Pareto-type tail) Hill's $\hat\alpha$ estimates the same
+$1/\xi$. Hill was chosen over the GPD fit because it is closed-form, needs
+no optimizer, and depends only on the top $k+1$ values, which merge exactly:
+the top values of a union are the top values of the per-block top values.
+Each fold partitions its segment (`np.partition`, on the host, where the
+monitor's buffered values already are) and merges at most $2(k+1)$ values,
+so memory stays bounded and no transfer is added. The slope is `None`
+without $k+1$ positive scores and is capped at 10, the value MCNP prints for
+a tail too steep to fit; equal top scores give the cap.
+
+MCNP's convention: a slope of at least 3 ($\alpha\ge2$) is needed for a
+finite variance to be plausible; below 3 the RSE and VOV are not
+trustworthy. VOV alone is not enough: on a Pareto(1.5) population (infinite
+variance) the #862 check found VOV 0.067 with a $1/N$ trend slope of
+$-1.34$, which looks healthy.
+
+Limits. For a tail that is not exactly Pareto (second-order regular
+variation), Hill has a bias that grows with $k/n$. For a light tail
+(exponential, Gaussian) $\hat\alpha$ grows with the threshold and the slope
+saturates at 10, as MCNP's does. Near $n=k+1$ the "tail" is most of the
+sample, so the slope describes the bulk; it is meaningful only for
+$n\gg k$. Like VOV it sees sampled scores only: an unsampled heavy class
+leaves it unchanged.
+
+**SHIFT.** For the Studentized mean $T=\sqrt n(\bar x-\mu)/s$ the Edgeworth
+expansion is
+$P(T\le t)=\Phi(t)+n^{-1/2}\tfrac{\gamma}{6}(2t^2+1)\phi(t)+O(n^{-1})$, with
+skewness $\gamma=\mu_3/\sigma^3$ (Hall 1992, §2.6). Its Cornish-Fisher
+quantiles are $w_p=z_p-n^{-1/2}\gamma(2z_p^2+1)/6$, and the interval
+$[\bar x-s w_{1-p}/\sqrt n,\ \bar x-s w_p/\sqrt n]$ has centre
+$\bar x+\frac{s}{\sqrt n}\frac{\gamma(2z^2+1)}{6\sqrt n}$. At $z=1$ (the
+1-sigma interval MCNP prints) the offset is $s\gamma/(2n)=\mu_3/(2\sigma^2 n)$
+to leading order, estimated from the centred sums as
+
+```{math}
+:label: eq-adaptive-shift
+
+\mathrm{SHIFT}=\frac{M_3}{2M_2\,n},\qquad
+\frac{\mathrm{SHIFT}}{\mathrm{SE}}\simeq\frac{\gamma}{2\sqrt n}.
+```
+
+`shift` is $\mathrm{SHIFT}/\lvert\bar x\rvert$ and `shift_over_se` is
+$\mathrm{SHIFT}/(r_n\lvert\bar x\rvert)$. $M_3$ comes from the existing
+pairwise merge. Limits: a constant score gives 0, a right-skewed score a
+positive value (exponential: $\mu_3=2\sigma^3$ and $\sigma=\mu$, so
+$\mathrm{SHIFT}/\mu=1/n$), a mirrored sample the opposite sign; `None` below
+two samples or at zero mean. A SHIFT comparable to the SE says the
+symmetric interval is misplaced by the skewness. It inherits the
+finite-third-moment assumption and the same blindness to unsampled tails.
+
+**Figure of merit.** $\mathrm{FOM}=1/(r_n^2T)$ in 1/s, MCNP's and Geant4's
+efficiency unit, where $T$ is the wall time since the monitor was built,
+linearly interpolated at the decision point between the chunk-end stamps
+around it. $T$ includes transport, the per-chunk measure and any restarted
+transport, but not the final spectrum reduction or the prefix re-transport
+after a stop inside a chunk. With a steady cost per electron
+$r_n^2\propto1/n$ and $T\propto n$, so the FOM is constant; a drifting FOM
+signals a changing population or cost. `elapsed_s` and `figure_of_merit`
+(`WALL_CLOCK_FIELDS`) are the only record fields that are not functions of
+the per-electron values and the policy, so replay-equality tests compare
+`without_wall_clock(record)`. Offline `run_stopping_rule` without a clock
+records `None` for both.
+
+Anchors (`tests/montecarlo/runner/test_adaptive_precision_diagnostics.py`):
+`test_top_scores_and_third_moment_merge_like_one_pass` (top $k+1$ exact and
+$M_3$ to $10^{-10}$ under four block patterns),
+`test_tail_slope_recovers_pareto_index` ($\alpha=1.5, 3, 5$ within
+$4\alpha/\sqrt k$; slope below 3 exactly for $\alpha<2$),
+`test_tail_slope_limits`, `test_shift_matches_its_closed_form_and_sign`,
+`test_figure_of_merit_is_inverse_rse_squared_time`,
+`test_recorded_diagnostics_never_change_the_stop` (records with and without
+a clock are equal after dropping the wall-clock fields; interpolated
+$T(d)=d/\text{chunk}$ exactly under a one-second-per-chunk clock), and
+`test_independent_brem_records_its_own_diagnostics`. The statistics-limited
+warning appends a slope below 3 as context only
+(`test_tail_slope_below_three_is_context_never_a_failed_criterion`).
 
 ## Independent v3 extension verification (2026-11-17, #1262)
 

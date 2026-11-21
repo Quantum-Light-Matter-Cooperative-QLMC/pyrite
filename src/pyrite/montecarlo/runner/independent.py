@@ -20,7 +20,7 @@ class IndependentStoppingMonitor:
     Validation: adaptive-sample-size-stopping
     """
 
-    def __init__(self, settings, cxr_measure, brem_measure=None):
+    def __init__(self, settings, cxr_measure, brem_measure=None, clock=None):
         self.settings = settings
         cxr = replace(
             settings,
@@ -29,8 +29,8 @@ class IndependentStoppingMonitor:
             brem_min_histories=None,
             brem_max_histories=None,
         )
-        self.cxr = StoppingMonitor(cxr, cxr_measure)
-        self.brem = StoppingMonitor(settings.brem_policy(), brem_measure or cxr_measure)
+        self.cxr = StoppingMonitor(cxr, cxr_measure, clock)
+        self.brem = StoppingMonitor(settings.brem_policy(), brem_measure or cxr_measure, clock)
         self.replayed_transport = False
         self.realized = None
         self.stop_reason = None
@@ -118,13 +118,15 @@ class IndependentStoppingMonitor:
         return record
 
 
-def case_stopping_monitor(case, settings):
+def case_stopping_monitor(case, settings, clock=None):
     """Build only the active population's emission monitor for each block.
+
+    ``clock`` times the reported figure of merit (:class:`StoppingMonitor`).
 
     Validation: adaptive-sample-size-stopping
     """
     if settings.brem_target_rse is None:
-        return StoppingMonitor(settings, case_measure(case, settings))
+        return StoppingMonitor(settings, case_measure(case, settings), clock)
     cxr = replace(
         settings,
         observables=("cxr",),
@@ -133,5 +135,8 @@ def case_stopping_monitor(case, settings):
         brem_max_histories=None,
     )
     return IndependentStoppingMonitor(
-        settings, case_measure(case, cxr), case_measure(case, settings.brem_policy())
+        settings,
+        case_measure(case, cxr),
+        case_measure(case, settings.brem_policy()),
+        clock=clock,
     )

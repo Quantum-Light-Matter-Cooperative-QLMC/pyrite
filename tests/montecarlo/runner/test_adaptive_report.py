@@ -178,3 +178,18 @@ def test_shared_limit_warning_keeps_cap_and_summary():
         "CXR at 2000/2000 electrons: RSE "
     )
     assert "(missed)" in message and "statistics-limited" in message
+
+
+@pytest.mark.parametrize("slope", [None, 2.5, 3.0, 6.0])
+def test_tail_slope_below_three_is_context_never_a_failed_criterion(slope):
+    """#1339: a heavy-tail slope is mentioned after the failures, not as one."""
+    status = {**_status(rse=0.002, relative_se=False), "tail_slope": slope}
+    summary = limit_summary(_record({"cxr": status}))
+    assert failure_kind(status) == "rse"
+    heavy = slope is not None and slope < 3.0
+    assert ("context: tail slope 2.5 < 3" in summary) is heavy
+    assert summary.endswith("(variance may be infinite; reported only)") is heavy
+    converged = {**_status(), "tail_slope": 2.5}
+    assert (
+        limit_summary(_record({"cxr": converged})) == "CXR at 1002000/1002000 electrons: converged"
+    )

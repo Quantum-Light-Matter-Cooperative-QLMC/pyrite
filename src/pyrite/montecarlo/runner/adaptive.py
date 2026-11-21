@@ -33,6 +33,7 @@ Validation: adaptive-sample-size-stopping
 """
 
 import math
+import time
 import warnings
 from collections.abc import Callable, Iterator, Mapping
 from fractions import Fraction
@@ -59,14 +60,39 @@ Measure = Callable[[int, int, Mapping[str, Any]], Mapping[str, Any]]
 AdaptiveSettings = Precision
 
 
+#: Upper order statistics in the Hill tail-index estimate (#1339).
+TAIL_SCORES = 200
+
+#: Largest reported tail slope; MCNP prints 10 for a tail too steep to fit.
+TAIL_SLOPE_CAP = 10.0
+
+#: Status fields that depend on wall time, not on the per-electron values.
+WALL_CLOCK_FIELDS = ("elapsed_s", "figure_of_merit")
+
+
+def without_wall_clock(record: Mapping[str, Any]) -> dict[str, Any]:
+    """``record`` with :data:`WALL_CLOCK_FIELDS` dropped from each observable's status.
+
+    Everything left is a function of the per-electron values and the policy,
+    so two replays of one case compare equal.
+    """
+    statistics = {
+        name: {k: v for k, v in status.items() if k not in WALL_CLOCK_FIELDS}
+        for name, status in record["statistics"].items()
+    }
+    return {**record, "statistics": statistics}
+
+
 class RunningMoments:
     """Exact running moments of one non-negative per-electron observable.
 
     Each block is reduced where its values live (device or host) to its count,
-    sum, centred moments through fourth order, sum of squares and maximum;
-    blocks merge by
+    sum, centred moments through fourth order, sum of squares, maximum and its
+    ``TAIL_SCORES + 1`` largest values; blocks merge by
     Chan et al.'s pairwise update, so the mean and variance equal a one-pass
-    Welford over the concatenated values up to rounding.
+    Welford over the concatenated values up to rounding. The retained top
+    values are exactly the top values of the concatenation (a bounded
+    partition merge of at most ``2 (TAIL_SCORES + 1)`` values).
 
     Validation: adaptive-sample-size-stopping
     """
@@ -80,6 +106,16 @@ class RunningMoments:
         self.total = 0.0
         self.total_sq = 0.0
         self.largest = 0.0
+        self.top = np.empty(0)
+
+    def _merge_top(self, values) -> None:
+        keep = TAIL_SCORES + 1
+        if values.size > keep:
+            values = np.partition(values, values.size - keep)[values.size - keep :]
+        merged = np.concatenate((self.top, values))
+        if merged.size > keep:
+            merged = np.partition(merged, merged.size - keep)[merged.size - keep :]
+        self.top = merged
 
     def add_block(self, values) -> None:
         if values.size == 0:
@@ -117,6 +153,7 @@ class RunningMoments:
         self.total += block_sum
         self.total_sq += block_sq
         self.largest = max(self.largest, block_max)
+        self._merge_top(values)
 
     def relative_se(self) -> float | None:
         """``s / (sqrt(n) |mean|)``; ``None`` below two samples or at zero mean."""
@@ -146,6 +183,54 @@ class RunningMoments:
         if self.m2 == 0.0:
             return 0.0
         return max(0.0, (math.sqrt(self.m4) / self.m2) ** 2 - 1.0 / self.n)
+
+    def tail_slope(self) -> float | None:
+        """MCNP/Geant4 tail slope ``1 + alpha`` from a Hill estimate of ``alpha``.
+
+        ``alpha = (k - 1) / sum_{i<=k} ln(x_(i) / x_(k+1))`` over the ``k =
+        TAIL_SCORES`` largest scores above the threshold ``x_(k+1)``; unbiased
+        for an exact Pareto(``alpha``) tail. A survival ``x**-alpha`` has a
+        density slope ``1 + alpha``: below 3 the variance may be infinite.
+        Capped at :data:`TAIL_SLOPE_CAP`; ``None`` without ``k + 1`` positive
+        scores. Reported only: it cannot see a tail the run has not sampled.
+
+        Validation: adaptive-sample-size-stopping
+        """
+        if self.top.size <= TAIL_SCORES:
+            return None
+        ordered = np.sort(self.top)
+        if ordered[0] <= 0.0:
+            return None
+        logs = float(np.log(ordered[1:] / ordered[0]).sum())
+        if logs <= 0.0:
+            return TAIL_SLOPE_CAP
+        return min(TAIL_SLOPE_CAP, 1.0 + (TAIL_SCORES - 1) / logs)
+
+    def shift(self) -> float | None:
+        """MCNP SHIFT ``M3 / (2 M2 n)`` relative to ``|mean|``.
+
+        The offset of the 1-sigma Cornish-Fisher interval centre of the
+        Studentized mean from the mean, ``mu3 / (2 sigma**2 n)``; positive for
+        a right-skewed score. Zero for a constant score; ``None`` below two
+        samples or at zero mean.
+
+        Validation: adaptive-sample-size-stopping
+        """
+        if self.n < 2 or self.mean == 0.0:
+            return None
+        if self.m2 == 0.0:
+            return 0.0
+        return self.m3 / (2.0 * self.m2 * self.n) / abs(self.mean)
+
+    def figure_of_merit(self, elapsed_s: float | None) -> float | None:
+        """``1 / (RSE**2 T)`` in 1/s at wall time ``elapsed_s``; ``None`` without both.
+
+        Validation: adaptive-sample-size-stopping
+        """
+        rse = self.relative_se()
+        if rse is None or rse == 0.0 or elapsed_s is None or elapsed_s <= 0.0:
+            return None
+        return 1.0 / (rse * rse * elapsed_s)
 
 
 def vov_trend_slope(points) -> float | None:
@@ -238,12 +323,25 @@ class StoppingMonitor:
     the same seed and settings give the same realized count under any chunk
     sizes.
 
+    With a ``clock`` (seconds, e.g. :func:`time.perf_counter`) each measured
+    chunk end is stamped with the wall time since construction, and a
+    decision point's elapsed time ``T`` interpolates linearly between the
+    stamps around it; ``T`` includes any restarted transport. It feeds only
+    the reported figure of merit (:data:`WALL_CLOCK_FIELDS`).
+
     Validation: adaptive-sample-size-stopping
     """
 
-    def __init__(self, settings: AdaptiveSettings, measure: Measure):
+    def __init__(
+        self,
+        settings: AdaptiveSettings,
+        measure: Measure,
+        clock: Callable[[], float] | None = None,
+    ):
         self.settings = settings
         self.measure = measure
+        self.clock = clock
+        self._origin = 0.0 if clock is None else clock()
         self.replayed_transport = False
         self._reset()
 
@@ -265,6 +363,9 @@ class StoppingMonitor:
         self._next: int | None = next(self._points)
         self._values: dict[str, list[np.ndarray]] = {name: [] for name in s.observables}
         self._measured = 0
+        #: ``(electrons measured, seconds since construction)`` at chunk ends.
+        self._stamps: list[tuple[int, float]] = [(0, 0.0)]
+        self.elapsed_s: float | None = None
         #: A count inside the last chunk past which its transport is invalid
         #: (set only by the independent brem freeze); ``None`` otherwise.
         self.cut_at: int | None = None
@@ -286,6 +387,17 @@ class StoppingMonitor:
                 raise ValueError(f"{name} must contain one value per electron in the block")
             self._values[name].append(np.asarray(_to_cpu(value), dtype=np.float64))
         self._measured = stop
+        self._stamp(stop)
+
+    def _stamp(self, count: int) -> None:
+        """Record the wall time at ``count`` measured electrons (counts stay increasing)."""
+        if self.clock is None:
+            return
+        stamp = (count, self.clock() - self._origin)
+        if self._stamps[-1][0] == count:
+            self._stamps[-1] = stamp
+        else:
+            self._stamps.append(stamp)
 
     def truncate(self, n: int) -> None:
         """Forget buffered values of electrons ``>= n``; ``n`` must not precede a fold."""
@@ -297,6 +409,8 @@ class StoppingMonitor:
             joined = np.concatenate(parts) if parts else np.empty(0)
             self._values[name] = [joined[:keep]]
         self._measured = n
+        self._stamps = [stamp for stamp in self._stamps if stamp[0] <= n]
+        self._stamp(n)
 
     def _fold(self, point: int) -> None:
         """Fold buffered values ``[n, point)`` as one segment; record the means at ``point``."""
@@ -307,6 +421,12 @@ class StoppingMonitor:
             moments.add_block(joined[:take])
             self._values[name] = [joined[take:]]
         self.history.append((point, {name: m.mean for name, m in self.moments.items()}))
+        if self.clock is not None:
+            counts, times = zip(*self._stamps, strict=True)
+            self.elapsed_s = float(np.interp(point, counts, times))
+            # Keep the last stamp at or below the point: later points interpolate from it.
+            first = int(np.searchsorted(counts, point, side="right")) - 1
+            self._stamps = self._stamps[max(first, 0) :]
         for name, m in self.moments.items():
             self.vov_history[name].append((point, m.variance_of_variance()))
 
@@ -360,6 +480,7 @@ class StoppingMonitor:
         move, limit = (None, None) if stability is None else stability
         vov = m.variance_of_variance()
         cv = None if rse is None else rse * math.sqrt(m.n)
+        shift = m.shift()
         # VOV + 1/n = M4/M2**2 <= threshold; M4/M2**2 <= 1, so 1 disables
         # (checked first: rounding may put the ratio an ulp above 1).
         # The near-constant policy exception uses EMPIRICAL CV <= target,
@@ -389,6 +510,12 @@ class StoppingMonitor:
             "variance_of_variance": vov,
             "vov_trend_slope": vov_trend_slope(self.vov_history[name]),
             "coefficient_of_variation": cv,
+            # Reported only (#1339); none enters ``passes``.
+            "tail_slope": m.tail_slope(),
+            "shift": shift,
+            "shift_over_se": None if shift is None or not rse else shift / rse,
+            "elapsed_s": self.elapsed_s,
+            "figure_of_merit": m.figure_of_merit(self.elapsed_s),
             "stability": move,
             "stability_limit": limit,
             "passes": passes,
@@ -483,21 +610,25 @@ class StoppingMonitor:
 
 
 def run_stopping_rule(
-    settings: AdaptiveSettings, measure: Measure, chunk: int | None = None
+    settings: AdaptiveSettings,
+    measure: Measure,
+    chunk: int | None = None,
+    clock: Callable[[], float] | None = None,
 ) -> dict[str, Any]:
     """Apply the stopping rule to ``measure`` without transport.
 
     The monitor the runner uses, over a supplied per-electron population in
     chunks of ``chunk`` electrons (default: one chunk per decision point);
-    ``block`` is ``None``. The record does not depend on ``chunk``. For tests
+    ``block`` is ``None``. The record does not depend on ``chunk`` (apart
+    from :data:`WALL_CLOCK_FIELDS`, ``None`` without a ``clock``). For tests
     and studies of the rule itself.
     """
     from .independent import IndependentStoppingMonitor
 
     monitor = (
-        StoppingMonitor(settings, measure)
+        StoppingMonitor(settings, measure, clock)
         if settings.brem_target_rse is None
-        else IndependentStoppingMonitor(settings, measure)
+        else IndependentStoppingMonitor(settings, measure, clock=clock)
     )
     start = 0
     while (point := monitor.next_point()) is not None:
@@ -787,7 +918,7 @@ def transport_case_adaptive(
     loop_case.update(Ne=settings.max_histories, Ne_brem=settings.max_histories)
     from .independent import case_stopping_monitor
 
-    monitor = case_stopping_monitor(loop_case, settings)
+    monitor = case_stopping_monitor(loop_case, settings, clock=time.perf_counter)
     from .host_admission import StreamedAdaptiveRoute, streamed_route_enabled
 
     monitor.stream_route = block_consumer is None and streamed_route_enabled(case)

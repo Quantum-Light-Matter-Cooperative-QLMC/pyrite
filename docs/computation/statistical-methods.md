@@ -198,6 +198,21 @@ score gives a shallower or positive slope. The slope is reported only and never
 stops a run. In the #1254 captures, the false 1 MeV stops still show about
 $-1$, because the heavy electrons had not yet been drawn.
 
+**Reported precision diagnostics.** Beside VOV, each observable's record
+holds three MCNP/Geant4 diagnostics that never stop or hold a run (#1339).
+`tail_slope` is $1+\hat\alpha$, with $\hat\alpha$ a Hill estimate of the
+tail index from the 201 largest per-electron scores, capped at 10. A slope
+below 3 means the score variance may be infinite, so the RSE and VOV may
+not be trustworthy; the statistics-limited warning mentions it as context.
+It is `null` until 201 scores are positive. `shift` is MCNP's SHIFT,
+$M_3/(2M_2n)$, the skewness offset of the 1-sigma interval centre, as a
+fraction of the mean; `shift_over_se` gives it in standard errors.
+`figure_of_merit` is $1/(r_n^2T)$ in 1/s, with $T$ = `elapsed_s` the wall
+time of the adaptive transport up to the decision point. It is roughly
+constant for a steady run and, unlike every other field, differs between
+replays. None of the three can reveal a tail the run has not sampled. See
+the [derivation](../validation/beam-transport/adaptive-sample-size-stopping.md#tail-slope-shift-and-figure-of-merit-1339).
+
 $V_{\max}$ is `max_variance_of_variance`, separate from the ESS floor
 `min_effective_histories` (#1262). The default $V_{\max}=0.01$ estimates the
 variance to about 10 % and the RSE to about 5 %. It is the only value tested
