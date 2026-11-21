@@ -123,7 +123,7 @@ def test_full_track_bremslib_benchmark():
     cutoff_eV = float(os.environ.get("PYRITE_BENCH_CUTOFF_EV", "1000"))
     core = os.environ.get("PYRITE_BENCH_CORE", "per-electron")
     elastic_model = os.environ.get("PYRITE_BENCH_ELASTIC", "mott")
-    assert elastic_model in ("mott", "sr")
+    assert elastic_model in ("mott", "sr", "elsepa")
     number_density_ang3 = density_g_cm3 * _AVOGADRO / atomic_weight_g_mol / 1e24
     tables = load_bremsstrahlung_tables([element])
     assert element in tables

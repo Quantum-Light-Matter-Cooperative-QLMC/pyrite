@@ -24,6 +24,7 @@ from ._bin_quadrature import (
     sincsq_bin_lineshape,
 )
 from ._bin_queue import flush_bin_line_queues, open_host_bin_line_queues
+from ._block_prologue import block_n_dot_g, block_recoil_pair, block_slope_keep
 from ._cpu_reduce import accumulate_sincsq
 from ._cpu_reduce import numpy_backend as _numpy_backend
 from ._escape_mu import escape_mu, escape_mu_tables
@@ -48,6 +49,7 @@ from ._kernels import (
     _segment_escape_distance,
     _sincsq_lineshape,
 )
+from ._line_amplitude import _cxr_amp_sq_total_core
 from ._node_window import accumulate_sincsq_windowed
 from ._per_hkl import (
     _flat_energy_keep,
@@ -56,13 +58,10 @@ from ._per_hkl import (
 )
 from ._polarization import _polarization_pairs
 from ._recoil import (
-    _line_recoil_terms,
     _quantum_line_factors,
     _recoil_compton_ang,
     _recoil_formation_line,
     _recoil_inverse_energy,
-    _recoil_line_allowed,
-    _recoil_slope_factor,
 )
 
 
@@ -468,7 +467,6 @@ def _batched_block(st, bt, sb):
     gy = bt.gy
     gz = bt.gz
     g2 = bt.g2
-    n_dot_g = bt.n_dot_g
     gamma_full = bt.gamma_full
     t_L_full = bt.t_L_full
     CHI_RE = bt.CHI_RE
@@ -486,18 +484,17 @@ def _batched_block(st, bt, sb):
     # Exact recoil shifts v.g and the denominator per (row, g).
     # Validation: line-recoil-in-medium-root
     gamma = gamma_full[sb]
-    r_num, r_den, inv_E = _line_recoil_terms(gamma, g2, n_dot_g)
+    r_num, r_den, inv_E, denom_vac, v_dot_g_exact = block_recoil_pair(st, bt, sb, vx, vy, vz, gamma)
     denom, delta = _in_medium_kinematics(
-        st.denom_all[sb][:, None] + r_den,
-        (vx * gx + vy * gy + vz * gz) - r_num,
+        denom_vac,
+        v_dot_g_exact,
         delta_tab_g,
         E_tab_g,
         (v_all[sb] * st.escape_gradient[sb]).sum(axis=1)[:, None],
         grad2,
     )
     grad = st.escape_gradient[sb]
-    grad_dot_g = grad[:, 0, None] * gx + grad[:, 1, None] * gy + grad[:, 2, None] * gz
-    n_dot_g_blk = n_dot_g + delta * grad_dot_g
+    n_dot_g_blk = block_n_dot_g(bt, grad, delta)
     t_L = t_L_full[sb]
     L_esc = L_esc_full[sb]
 
@@ -508,7 +505,6 @@ def _batched_block(st, bt, sb):
         vx, vy, vz, gx, gy, gz, denom, g2, n_dot_g_blk, r_num, r_den
     )
     vdg = v_dot_g
-    slope = denom * _recoil_slope_factor(omega_res, inv_E)
     # -- 3. couplings at each resonance energy (shared interp index) -----
     # chi/U real+imag all sample the SAME E_res on the SAME E_tab_g grid,
     # so bracket ONCE (_interp_index) and gather per table -- kills the
@@ -516,7 +512,7 @@ def _batched_block(st, bt, sb):
     k_mag, E_res, keep, _ix, _fr, _log_fr, _blw, _abv = _line_bracket(
         omega_res, delta, grad2, cxr_electron[sb][:, None], E_tab_g, lo_keep, hi_keep
     )
-    keep = keep & _recoil_line_allowed(denom, omega_res, inv_E, gamma)
+    slope, keep = block_slope_keep(denom, omega_res, inv_E, gamma, keep)
     chi_re, chi_im, u_re, u_im, mu = _interp_gather_cxr_tables(
         _ix,
         _fr,
@@ -786,6 +782,46 @@ def _queue_unit_lines(audit, cxr_batch, bt, blk, gm_idx, lines, electron):
             cxr_batch.append(E_r, aw, w)
 
 
+def _line_amplitudes(st, bt, blk, with_components):
+    """``(A2, A2_pxr, A2_cbs)`` summed over both polarizations; the components are
+    ``None`` unless ``with_components``.
+
+    PXR/CBS amplitudes are read only by the component spectra and the line
+    attribution audit; without either, the kernel returns |A|^2 alone. The
+    first polarization seeds each sum (``0 + a2 == a2`` bit for bit, as
+    ``|A|^2 >= 0``), saving the zero fill and one add (#862).
+    """
+    A2 = A2_pxr = A2_cbs = None
+    for E_pol, g_dot_e in ((bt.ES, bt.G_DOT_ES[None, :]), (bt.EP, bt.G_DOT_EP[None, :])):
+        ex, ey, ez = E_pol[:, 0][None, :], E_pol[:, 1][None, :], E_pol[:, 2][None, :]
+        v_dot_e, k_dot_e = _polarization_terms(st, blk, ex, ey, ez)
+        args = (
+            blk.chi_re,
+            blk.chi_im,
+            blk.u_re,
+            blk.u_im,
+            bt.g2,
+            g_dot_e,
+            blk.k_mag,
+            v_dot_e,
+            blk.vdg,
+            blk.k_dot_g,
+            blk.k_dot_v,
+            blk.gamma,
+            blk.detuning,
+            k_dot_e,
+            _recoil_compton_ang(),
+        )
+        if with_components:
+            a2, a2p, a2c = _cxr_amp_sq_core(*args)
+            A2_pxr = a2p if A2_pxr is None else A2_pxr + a2p
+            A2_cbs = a2c if A2_cbs is None else A2_cbs + a2c
+        else:
+            a2 = _cxr_amp_sq_total_core(*args)
+        A2 = a2 if A2 is None else A2 + a2
+    return A2, A2_pxr, A2_cbs
+
+
 def _batched_incoherent_block(st, bt, blk, cxr_batch):
     """Steps 5, 6 and 7: ``|A|^2`` over both polarizations, the fused
     Beer-Lambert prefactor, and the surviving lines' contribution to the
@@ -809,51 +845,13 @@ def _batched_incoherent_block(st, bt, blk, cxr_batch):
     spec = st.spec
     spec_pxr = st.spec_pxr
     spec_cbs = st.spec_cbs
-    ES = bt.ES
-    EP = bt.EP
     WM = bt.WM
-    G_DOT_ES = bt.G_DOT_ES
-    G_DOT_EP = bt.G_DOT_EP
-    gamma = blk.gamma
-    omega_res = blk.omega_res
-    detuning = blk.detuning
-    k_dot_g = blk.k_dot_g
-    k_dot_v = blk.k_dot_v
-    vdg = blk.vdg
-    k_mag = blk.k_mag
     E_res = blk.E_res
-    chi_re = blk.chi_re
-    chi_im = blk.chi_im
-    u_re = blk.u_re
-    u_im = blk.u_im
 
     # -- 5. |A|^2 summed over both polarizations ------------------------
-    A2 = xp.zeros_like(omega_res)
-    A2_pxr = xp.zeros_like(omega_res)
-    A2_cbs = xp.zeros_like(omega_res)
-    for E_pol, g_dot_e in ((ES, G_DOT_ES[None, :]), (EP, G_DOT_EP[None, :])):
-        ex, ey, ez = E_pol[:, 0][None, :], E_pol[:, 1][None, :], E_pol[:, 2][None, :]
-        v_dot_e, k_dot_e = _polarization_terms(st, blk, ex, ey, ez)
-        a2, a2p, a2c = _cxr_amp_sq_core(
-            chi_re,
-            chi_im,
-            u_re,
-            u_im,
-            bt.g2,
-            g_dot_e,
-            k_mag,
-            v_dot_e,
-            vdg,
-            k_dot_g,
-            k_dot_v,
-            gamma,
-            detuning,
-            k_dot_e,
-            _recoil_compton_ang(),
-        )
-        A2 = A2 + a2
-        A2_pxr = A2_pxr + a2p
-        A2_cbs = A2_cbs + a2c
+    audit = req.truncation_audit
+    with_components = bool(components) or (audit is not None and "attribute" in audit)
+    A2, A2_pxr, A2_cbs = _line_amplitudes(st, bt, blk, with_components)
 
     # -- 6+7. Beer-Lambert escape factor + weights (fused prefactor) -----
     T_abs, pref, a_width, weight, good = _escape_weights(st, blk, A2, WM, bt.escape_mu)
@@ -866,7 +864,6 @@ def _batched_incoherent_block(st, bt, blk, cxr_batch):
     E_r_f = E_res.reshape(-1)[gm_idx]
     aw_f = a_width.reshape(-1)[gm_idx]
     w_f = weight.reshape(-1)[gm_idx]
-    audit = req.truncation_audit
     record_cxr_attribution(
         audit,
         st,
