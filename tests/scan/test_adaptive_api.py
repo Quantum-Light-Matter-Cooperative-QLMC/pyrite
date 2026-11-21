@@ -17,6 +17,7 @@ from pyrite.campaign.sweep import Sweep as LegacySweep
 from pyrite.checkpoints import _checkpoint_io, _checkpoint_store
 from pyrite.config import FixedSampling
 from pyrite.montecarlo import Case, runner
+from pyrite.montecarlo.runner.adaptive import without_wall_clock
 from pyrite.results import Settings, store_result
 
 
@@ -359,7 +360,9 @@ def test_mixed_cpu_pool_preserves_fixed_case_and_adaptive_provenance(scene, monk
     expected_fixed = runner.run_cases([fixed], max_workers=1, progress=False, engine="cpu")[0]
     expected_adaptive = runner.run_case(adaptive, transport_core="per-electron")
     outputs = runner.run_cases([adaptive, fixed], max_workers=1, progress=False, engine="cpu")
-    assert outputs[0]["adaptive_sampling"] == expected_adaptive["adaptive_sampling"]
+    assert without_wall_clock(outputs[0]["adaptive_sampling"]) == without_wall_clock(
+        expected_adaptive["adaptive_sampling"]
+    )
     assert "adaptive_sampling" not in outputs[1]
     for field in ("spec", "spec_characteristic", "brem", "brem_wide"):
         # Parent/worker BLAS reductions may differ by a few ulps, and the

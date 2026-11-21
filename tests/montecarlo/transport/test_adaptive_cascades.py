@@ -21,6 +21,7 @@ from pyrite.montecarlo.runner.adaptive import (
     StoppingMonitor,
     case_measure,
     run_case_adaptive,
+    without_wall_clock,
 )
 from tests.montecarlo.cascades.test_coupled_radiative_runner import (  # noqa: F401
     synthetic_si_tables,
@@ -116,7 +117,7 @@ def test_converged_shell_cascade_stop_is_the_fixed_run(spread):
     assert _launched(transport) > 0
     _assert_matches(result, reference)
     again, again_stats = _adaptive(case, settings)
-    assert again_stats == stats
+    assert without_wall_clock(again_stats) == without_wall_clock(stats)
     _assert_matches(again, result)
 
 
@@ -292,5 +293,5 @@ def test_streamed_adaptive_shell_cascade_matches_retained():
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", CxrYieldStatisticsWarning)
         streamed = run_case_streamed(requested, 3, transport_core="per-electron")
-    assert streamed["adaptive_sampling"] == stats
+    assert without_wall_clock(streamed["adaptive_sampling"]) == without_wall_clock(stats)
     _assert_matches(streamed, reference)

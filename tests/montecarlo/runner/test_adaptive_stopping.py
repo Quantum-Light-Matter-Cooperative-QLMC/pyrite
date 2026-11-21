@@ -44,6 +44,7 @@ from pyrite.montecarlo.runner.adaptive import (
     run_case_adaptive,
     run_stopping_rule,
     vov_trend_slope,
+    without_wall_clock,
 )
 from pyrite.montecarlo.runner.stream_sizing import AdaptiveChunkPlan
 from pyrite.montecarlo.spectrum.brem import mc_brem_spectrum
@@ -716,7 +717,9 @@ def test_adaptive_output_does_not_depend_on_chunk_size():
     assert ref_stats["realized_electrons"] % 64  # the 64-electron chunk was cut
     for result, stats in others:
         assert stats["realized_electrons"] == ref_stats["realized_electrons"]
-        assert stats["statistics"] == ref_stats["statistics"]
+        assert (
+            without_wall_clock(stats)["statistics"] == without_wall_clock(ref_stats)["statistics"]
+        )
         _assert_identical(result, ref)
 
 
@@ -724,7 +727,7 @@ def test_same_seed_and_target_replay_the_same_count_and_output():
     case = _case()
     first, first_stats = run_case_adaptive(case, _SETTINGS, transport_core="per-electron")
     again, again_stats = run_case_adaptive(case, _SETTINGS, transport_core="per-electron")
-    assert first_stats == again_stats
+    assert without_wall_clock(first_stats) == without_wall_clock(again_stats)
     _assert_identical(again, first)
 
 
@@ -898,7 +901,9 @@ def test_late_resident_oom_reruns_only_the_failed_block(monkeypatch):
     ]
     assert events[events.index("admit") - 1] == "release"
     assert tp["segs"]["Ne"] == ref["segs"]["Ne"]
-    assert tp["adaptive_sampling"] == ref["adaptive_sampling"]
+    assert without_wall_clock(tp["adaptive_sampling"]) == without_wall_clock(
+        ref["adaptive_sampling"]
+    )
     _assert_identical(tp["segs"], ref["segs"])
     assert tp["_transport_gpu_oom_retries"] == 1
     assert tp["_recovery_path"] == "host_segments"
@@ -985,7 +990,9 @@ def test_adaptive_host_admission_feasible_transport_is_identical(monkeypatch):
     candidate = transport_case_adaptive(_case(), settings, transport_core="per-electron")
     assert any("join" in phase for _, phase in admitted)
     _assert_identical(candidate["segs"], reference["segs"])
-    assert candidate["adaptive_sampling"] == reference["adaptive_sampling"]
+    assert without_wall_clock(candidate["adaptive_sampling"]) == without_wall_clock(
+        reference["adaptive_sampling"]
+    )
 
 
 def test_measure_skips_the_grid_reduction_with_identical_line_masses(monkeypatch):

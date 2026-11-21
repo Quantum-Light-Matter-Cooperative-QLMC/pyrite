@@ -13,6 +13,7 @@ import pytest
 
 from pyrite.montecarlo import runner
 from pyrite.montecarlo.runner import block_transport
+from pyrite.montecarlo.runner.adaptive import without_wall_clock
 from pyrite.montecarlo.runner.streamed_scoring import run_case_streamed, streaming_refusal
 from tests.montecarlo.runner.test_adaptive_stopping import _case
 from tests.montecarlo.transport.test_independent_stopping import _policy
@@ -66,7 +67,7 @@ def test_streamed_adaptive_matches_retained(monkeypatch, spread):
     record, expected = streamed["adaptive_sampling"], reference["adaptive_sampling"]
     assert record["realized_electrons_brem"] < record["realized_electrons"]
     assert record["replayed_transport"] is (spread is not None)
-    assert record == expected
+    assert without_wall_clock(record) == without_wall_clock(expected)
     np.testing.assert_array_equal(streamed["E_grid"], reference["E_grid"])
     np.testing.assert_array_equal(streamed["E_grid_brem"], reference["E_grid_brem"])
     for key in SPECTRA:
@@ -128,7 +129,9 @@ def test_run_case_switches_to_streamed_when_retained_rows_exceed_headroom(monkey
     with pytest.warns(RuntimeWarning, match="streamed adaptive"):
         out = runner.run_case(case, transport_core="per-electron")
     assert out["_adaptive_route"]["route"] == "streamed"
-    assert out["adaptive_sampling"] == reference["adaptive_sampling"]
+    assert without_wall_clock(out["adaptive_sampling"]) == without_wall_clock(
+        reference["adaptive_sampling"]
+    )
     for key in SPECTRA:
         scale = np.abs(reference[key]).max()
         np.testing.assert_allclose(
