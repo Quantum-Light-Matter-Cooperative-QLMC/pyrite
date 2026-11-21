@@ -17,6 +17,10 @@ cr-dipole-matrix-element
 cr-initial-occupation
 cr-doppler-line-energy
 cr-recoil-line-energy
+cr-submev-refractive-doppler
+cr-submev-dirac-spin-correction
+cr-submev-axial-coherence-width
+cr-submev-tds-phase-object
 cr-mean-inner-potential
 cr-plane-incidence
 cr-lindblad-jump-operators

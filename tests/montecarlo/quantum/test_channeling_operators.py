@@ -354,6 +354,22 @@ def test_diamond_catalog_oscillators_give_finite_electronic_kernel():
 # ---- decoherence diagnostic --------------------------------------------------
 
 
+def test_closed_shells_place_no_electronic_nodes():
+    # Below the W K edge (69.5 keV) the K shell is closed (#585). Its empty
+    # close range must not reach losses above E, where the transfer is undefined.
+    oscillators = catalog_shell_oscillators("tungsten")
+    channels = electronic_channels(oscillators, 30e3)
+    assert not np.all(op._open_close_ranges(channels))
+    q, weight = op._electronic_nodes(channels)
+    assert np.all(np.isfinite(q)) and np.all(np.isfinite(weight))
+    loss, _ = op._close_loss_nodes(channels)
+    assert loss.max() <= max(channels.close_upper_eV[op._open_close_ranges(channels)])
+    transform = op._electronic_transform(channels, np.array([0.0, 0.5, 3.0]))
+    assert np.all(np.isfinite(transform)) and np.all(transform > 0.0)
+    # Above every binding energy all ranges are open and the rule is unchanged.
+    assert np.all(op._open_close_ranges(electronic_channels(oscillators, 100e3)))
+
+
 def test_decoherence_rate_limits(si110, tds, electronic):
     rate = decoherence_rate(si110, ENERGY_EV, [0.0, 1e-3, 2e-3, 1e5])
     assert rate.total[0] == pytest.approx(0.0, abs=1e-15)

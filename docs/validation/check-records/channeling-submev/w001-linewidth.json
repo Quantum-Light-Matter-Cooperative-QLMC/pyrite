@@ -1,0 +1,238 @@
+{
+ "meta": {
+  "issue": 585,
+  "material": "tungsten",
+  "axis_uvw": [
+   0,
+   0,
+   1
+  ]
+ },
+ "energies": [
+  {
+   "kinetic_keV": 30.0,
+   "beta": 0.32837617636028216,
+   "hbar_v_eV_ang": 647.9747931647235,
+   "k0_gap_eV": 226.38293038444695,
+   "forward_k0_line_eV": 337.06804674916725,
+   "loss_per_ang": {
+    "tds_grid": [
+     0.22210036234958566,
+     0.022504399023679015,
+     0.022504399023678758
+    ],
+    "tds_sink": [
+     0.10488094641344162,
+     0.0015199969775739812,
+     0.0015199969775739723
+    ],
+    "electronic": [
+     0.022989693574284806,
+     0.012293331101702212,
+     0.01229333110170214
+    ]
+   },
+   "population_decay_length_ang": {
+    "1s": 3.06749061075256,
+    "2px": 34.51498509822355,
+    "2py": 34.51498509822391
+   },
+   "lines": {
+    "2px->1s": {
+     "kappa_per_ang": 0.18427981645353272,
+     "half_loss_per_ang": 0.19314436472013366,
+     "gain_tds_per_ang": -0.00039149656748636543,
+     "gain_electronic_per_ang": 0.009256044834087278,
+     "gain_tds_bound": 0.08863141907208157,
+     "gain_electronic_bound": 0.016811303192654604,
+     "kappa_tds_only_per_ang": 0.1758943489496265,
+     "saturated_transverse_fwhm_eV": 158.36601512487,
+     "transverse_hwhm_eV": 119.40867595091107,
+     "transverse_fwhm_over_gap": 1.054926497754309,
+     "forward_photon_fwhm_eV": 355.5820140619848,
+     "tds_only_transverse_fwhm_eV": 227.95020875895585
+    },
+    "2py->1s": {
+     "kappa_per_ang": 0.1842798164535326,
+     "half_loss_per_ang": 0.1931443647201335,
+     "gain_tds_per_ang": -0.00039149656748636223,
+     "gain_electronic_per_ang": 0.009256044834087235,
+     "gain_tds_bound": 0.08863141907208108,
+     "gain_electronic_bound": 0.016811303192654555,
+     "kappa_tds_only_per_ang": 0.17589434894962636,
+     "saturated_transverse_fwhm_eV": 158.36601512486985,
+     "transverse_hwhm_eV": 119.40867595091099,
+     "transverse_fwhm_over_gap": 1.0549264977543082,
+     "forward_photon_fwhm_eV": 355.5820140619845,
+     "tds_only_transverse_fwhm_eV": 227.95020875895565
+    }
+   },
+   "per_atom_tds_phase_variance_1s_rad2": 0.7025969205999146,
+   "per_atom_tds_loss": {
+    "1s": 1.0348304459732236,
+    "2px": 0.07603240846476511,
+    "2py": 0.07603240846476426
+   },
+   "checks": {
+    "tds_quadrature_rel": 5.728980815620656e-14,
+    "electronic_nodes_rel": 0.00015486115800843767
+   },
+   "grid": {
+    "cells": 4,
+    "points_per_cell": 25,
+    "gauss": 20,
+    "azimuth": 16
+   }
+  },
+  {
+   "kinetic_keV": 100.0,
+   "beta": 0.5482208619523569,
+   "hbar_v_eV_ang": 1081.7876728134383,
+   "k0_gap_eV": 234.61056217470625,
+   "forward_k0_line_eV": 519.303665035469,
+   "loss_per_ang": {
+    "tds_grid": [
+     0.08478995310045741,
+     0.01089410282444564,
+     0.010894102824445693
+    ],
+    "tds_sink": [
+     0.04175330958439184,
+     0.000754530322529952,
+     0.0007545303225299541
+    ],
+    "electronic": [
+     0.008921004948811305,
+     0.005134553064186114,
+     0.005134553064186114
+    ]
+   },
+   "population_decay_length_ang": {
+    "1s": 7.964478457358132,
+    "2px": 73.75056704450186,
+    "2py": 73.75056704450155
+   },
+   "lines": {
+    "2px->1s": {
+     "kappa_per_ang": 0.07236707583644511,
+     "half_loss_per_ang": 0.07612372692241114,
+     "gain_tds_per_ang": -0.000177082553320746,
+     "gain_electronic_per_ang": 0.003933733639286767,
+     "gain_tds_bound": 0.038393437515246986,
+     "gain_electronic_bound": 0.006767966703193698,
+     "kappa_tds_only_per_ang": 0.06927303046923317,
+     "saturated_transverse_fwhm_eV": 132.25088541936086,
+     "transverse_hwhm_eV": 78.28581055742157,
+     "transverse_fwhm_over_gap": 0.6673681681826829,
+     "forward_photon_fwhm_eV": 346.5667356652746,
+     "tds_only_transverse_fwhm_eV": 149.8774208400923
+    },
+    "2py->1s": {
+     "kappa_per_ang": 0.07236707583644514,
+     "half_loss_per_ang": 0.07612372692241116,
+     "gain_tds_per_ang": -0.0001770825533207453,
+     "gain_electronic_per_ang": 0.0039337336392867685,
+     "gain_tds_bound": 0.03839343751524708,
+     "gain_electronic_bound": 0.006767966703193698,
+     "kappa_tds_only_per_ang": 0.0692730304692332,
+     "saturated_transverse_fwhm_eV": 132.2508854193609,
+     "transverse_hwhm_eV": 78.2858105574216,
+     "transverse_fwhm_over_gap": 0.6673681681826832,
+     "forward_photon_fwhm_eV": 346.56673566527473,
+     "tds_only_transverse_fwhm_eV": 149.87742084009236
+    }
+   },
+   "per_atom_tds_phase_variance_1s_rad2": 0.2682281978700516,
+   "per_atom_tds_loss": {
+    "1s": 0.40048411774500897,
+    "2px": 0.03686559418354817,
+    "2py": 0.03686559418354835
+   },
+   "checks": {
+    "tds_quadrature_rel": 5.78640984764173e-14,
+    "electronic_nodes_rel": 0.00027914854525327396
+   },
+   "grid": {
+    "cells": 4,
+    "points_per_cell": 25,
+    "gauss": 20,
+    "azimuth": 16
+   }
+  },
+  {
+   "kinetic_keV": 300.0,
+   "beta": 0.776525493114487,
+   "hbar_v_eV_ang": 1532.2943075990272,
+   "k0_gap_eV": 249.63037334733804,
+   "forward_k0_line_eV": 1117.0418354484827,
+   "loss_per_ang": {
+    "tds_grid": [
+     0.047753576557464206,
+     0.010262161571235787,
+     0.010262161571235722
+    ],
+    "tds_sink": [
+     0.026042427312769217,
+     0.0007518147355361289,
+     0.0007518147355361261
+    ],
+    "electronic": [
+     0.00478920552988203,
+     0.003147037130400357,
+     0.0031470371304003534
+    ]
+   },
+   "population_decay_length_ang": {
+    "1s": 13.854496545206665,
+    "2px": 83.13262040304048,
+    "2py": 83.13262040304093
+   },
+   "lines": {
+    "2px->1s": {
+     "kappa_per_ang": 0.04405216227038441,
+     "half_loss_per_ang": 0.046373111418643864,
+     "gain_tds_per_ang": -0.00012396250124710947,
+     "gain_electronic_per_ang": 0.0024449116495065685,
+     "gain_tds_bound": 0.028509427180516966,
+     "gain_electronic_bound": 0.0038822426028852788,
+     "kappa_tds_only_per_ang": 0.04252895258974978,
+     "saturated_transverse_fwhm_eV": 122.47709228006275,
+     "transverse_hwhm_eV": 67.50087748433867,
+     "transverse_fwhm_over_gap": 0.5408066060167872,
+     "forward_photon_fwhm_eV": 604.1036038076566,
+     "tds_only_transverse_fwhm_eV": 130.33374392284497
+    },
+    "2py->1s": {
+     "kappa_per_ang": 0.044052162270384373,
+     "half_loss_per_ang": 0.04637311141864383,
+     "gain_tds_per_ang": -0.0001239625012471088,
+     "gain_electronic_per_ang": 0.0024449116495065654,
+     "gain_tds_bound": 0.02850942718051688,
+     "gain_electronic_bound": 0.0038822426028852766,
+     "kappa_tds_only_per_ang": 0.04252895258974975,
+     "saturated_transverse_fwhm_eV": 122.47709228006264,
+     "transverse_hwhm_eV": 67.50087748433862,
+     "transverse_fwhm_over_gap": 0.5408066060167868,
+     "forward_photon_fwhm_eV": 604.1036038076561,
+     "tds_only_transverse_fwhm_eV": 130.3337439228449
+    }
+   },
+   "per_atom_tds_phase_variance_1s_rad2": 0.1510673792019045,
+   "per_atom_tds_loss": {
+    "1s": 0.2335495930485136,
+    "2px": 0.03485703221567159,
+    "2py": 0.03485703221567138
+   },
+   "checks": {
+    "tds_quadrature_rel": 5.708432849363374e-14,
+    "electronic_nodes_rel": 0.00046792968851801724
+   },
+   "grid": {
+    "cells": 4,
+    "points_per_cell": 25,
+    "gauss": 20,
+    "azimuth": 16
+   }
+  }
+ ]
+}
