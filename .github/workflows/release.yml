@@ -36,6 +36,10 @@ jobs:
           uv run --locked --no-default-groups
           python -m pyrite.devtools.release "$GITHUB_REF_NAME" --notes-file release-notes.md
 
+      # Zenodo's GitHub integration archives every published release of this
+      # repository into the *software* DOI family, so only v* code releases are
+      # published here. Table data goes to the separate Zenodo dataset record
+      # (docs/repo-design/releasing.md#zenodo-archive-separation).
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}

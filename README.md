@@ -2,7 +2,7 @@
 
 ![PyRITE](src/pyrite/_assets/branding/pyrite-wordmark.png)
 
-[![Cite PyRITE](https://img.shields.io/badge/Cite-PyRITE-blue)](#citing-pyrite)  [![PyPI](https://img.shields.io/pypi/v/pyrite-mc)](https://pypi.org/project/pyrite-mc/) [![Documentation](https://readthedocs.org/projects/pyrite/badge/?version=latest)](https://pyrite.readthedocs.io/en/latest/) ![Python Version from PEP 621 TOML](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2FQuantum-Light-Matter-Cooperative-QLMC%2Fpyrite%2Fmain%2Fpyproject.toml) [![Downloads](https://img.shields.io/pypi/dm/pyrite-mc?label=downloads%2Fmonth)](https://pypistats.org/packages/pyrite-mc) [![License](https://img.shields.io/badge/License-UCLA-blue)](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/blob/main/LICENSE.txt)
+[![Software DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23487182.svg)](https://doi.org/10.5281/zenodo.23487182) [![Tables DOI](https://img.shields.io/badge/tables%20DOI-10.5281%2Fzenodo.23220627-blue)](https://doi.org/10.5281/zenodo.23220627) [![PyPI](https://img.shields.io/pypi/v/pyrite-mc)](https://pypi.org/project/pyrite-mc/) [![Documentation](https://readthedocs.org/projects/pyrite/badge/?version=latest)](https://pyrite.readthedocs.io/en/latest/) ![Python Version from PEP 621 TOML](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2FQuantum-Light-Matter-Cooperative-QLMC%2Fpyrite%2Fmain%2Fpyproject.toml) [![Downloads](https://img.shields.io/pypi/dm/pyrite-mc?label=downloads%2Fmonth)](https://pypistats.org/packages/pyrite-mc) [![License](https://img.shields.io/badge/License-UCLA-blue)](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/blob/main/LICENSE.txt)
 
 **Simulate how electrons travel through matter—and the X-rays they produce.**
 
@@ -81,11 +81,18 @@ Cite the **specific software version used** in your work. For example,
 record from the [Zenodo version history](https://zenodo.org/records/24256748/versions)
 and export its citation.
 
-The general DOI `10.5281/zenodo.23487182` also holds earlier table releases,
-so it can resolve to a table release. Use the software version's own DOI for
-reproducible citations. Runtime tables are archived separately in the
-[PyRITE runtime tables](https://doi.org/10.5281/zenodo.23220627) dataset;
-cite its version, and the upstream sources it lists, when applicable.
+The software concept DOI [`10.5281/zenodo.23487182`](https://doi.org/10.5281/zenodo.23487182)
+resolves to the latest archived release and is suitable for referring to
+PyRITE in general; reproducible citations use the version DOI. Table releases
+up to `tables-bremslib-4` were archived in that history too, so until the next
+`vX.Y.Z` release the concept DOI may resolve to a table version.
+
+The runtime tables PyRITE downloads are archived separately in the
+[PyRITE Runtime Tables](https://doi.org/10.5281/zenodo.23220627) dataset
+(concept DOI `10.5281/zenodo.23220627`; version 2 is
+[`10.5281/zenodo.24429433`](https://doi.org/10.5281/zenodo.24429433)).
+When your results depend on them, cite that version and the upstream sources
+listed in its notices.
 The [citation metadata](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/blob/main/CITATION.cff)
 lists the software authors; see the
 [release guide](docs/repo-design/releasing.md#zenodo-authorship) for maintaining
