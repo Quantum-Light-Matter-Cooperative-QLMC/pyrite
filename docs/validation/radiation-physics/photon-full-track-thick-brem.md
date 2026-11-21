@@ -7,6 +7,9 @@ Geant4 vacancy cascades, the corrected eight-case matrix passes **100/100**
 under unchanged gates and PyRITE outputs. Fresh-context adjudication below
 rederived the estimators and decisions; the corrected-matrix regression pins
 all 100 gates. The historical two-failure regression is retained separately.
+The PyRITE results were re-pinned once, by the #1231 rerun with Compton
+Doppler broadening and Compton-vacancy relaxation; both outcomes are
+unchanged ([below](#compton-doppler-rerun-2026-11-20)).
 
 This external comparison measures the complete primary-electron source plus
 photon-only transport chain. It does not independently rederive its constituent
@@ -191,6 +194,34 @@ The fresh-context adjudication below rederives this corrected matrix; the
 claim is now **anchored** by its regression. This evidence covers the bounded
 photon-only thick-target comparison; alloy fluorescence, 511 keV escape
 and charged-feedback validation remain separate.
+
+## Compton Doppler rerun (2026-11-20)
+
+Issue #1231 added impulse-approximation Doppler broadening to PyRITE's Compton
+sampler and relaxes the Compton shell vacancy through the sampled EADL cascade.
+CPU array **14198** (160 tasks on qlmc-queen, tested commit `8fd3b1a16`,
+staging root `~/.local/opt/pyrite-1231-8fd3b1a16`) regenerated all eight
+PyRITE results with the job-2324 configuration: 20,000 primaries per case,
+same batches, seeds and defensive-mixture proposal. Geant4 records, gates and
+the reducer are unchanged.
+
+- Against the historical Auger-off reference: 98/100, with the same two W
+  300 keV reflected 1–10 keV failures (redistributed yield 1.196, fraction
+  0.342 against 0.307).
+- Against the complete-cascade references: **100/100**, gated counts per case
+  unchanged, zero missing gates. The W 300 keV reflected 1–10 keV redistributed
+  yield ratio is 0.9926 (fraction 0.34222 against 0.34889).
+- The largest gated PyRITE shift is the W 1 MeV reflected 0.3–1 MeV
+  redistributed fraction, +12.9% (1.133 → 1.279 against the complete-cascade
+  reference, which holds 1.2 × 10⁻⁵ photons per primary there). It still
+  passes, and it is the band where a Doppler-broadened backscatter tail
+  should appear. Every other gated shift is below 8%.
+
+`results/` and the dependent `cascade-results/report.json` and
+`cascade-matrix-results/*-report.json` were regenerated from the committed
+records, and their hashes re-pinned. Each `provenance.json` keeps the
+superseded hashes (`pyrite_rerun_1231`, `repin_1231`). `reduction-sha256.txt`
+and `reduce-2577.log` remain the job-2577 originals.
 
 ## Independent estimator derivation (2026-10-27)
 

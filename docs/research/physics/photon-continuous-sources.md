@@ -83,7 +83,9 @@ shares bound the energy and angle importance factors at `1/(1-a)` and
 `1/(1-b)` times those of the uniform proposal. The `(1-βμ)^{-2}` shape is a
 Sauter-like importance density only, never a model of the emission. The
 observation identity records both proposal names, and the observation model
-marker is `bremslib-continuum-photon-only-cpu.v2`.
+marker is `bremslib-continuum-photon-only-cpu.v4` (v3 for #1231's
+Doppler-broadened Compton, v4 for its relaxed Compton vacancy; the proposal
+contract is unchanged from v2).
 
 Proposal factorization does **not** assume factorization of the physical
 emissivity. The BremsLib angle-energy cross section is evaluated jointly at

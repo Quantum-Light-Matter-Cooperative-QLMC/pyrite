@@ -275,6 +275,15 @@ references and the 98/100 regression remain intact. After fresh-context
 adjudication the ledger claim is `anchored` (2026-10-29). See the canonical
 [corrected matrix evidence](../../docs/validation/radiation-physics/photon-full-track-thick-brem.md#complete-cascade-eight-case-matrix-2026-10-27).
 
+`results/` was re-pinned on 2026-11-20 by the #1231 rerun (array **14198**,
+tested commit `8fd3b1a16`, Compton Doppler broadening and Compton-vacancy
+relaxation, same 20,000-primary configuration). Both outcomes are unchanged:
+98/100 against the historical reference, with the same two W 300 keV
+failures, and 100/100 against the complete-cascade references. The
+complete-cascade reports were regenerated from the unchanged Geant4 records.
+The numbers above are from the superseded job 2324 records. See
+[the rerun evidence](../../docs/validation/radiation-physics/photon-full-track-thick-brem.md#compton-doppler-rerun-2026-11-20).
+
 ## Binary-compound secondary fluorescence (GaAs)
 
 `alloy_fluorescence.py` compares secondary fluorescence in a binary target,
@@ -302,9 +311,10 @@ subtraction. PyRITE also reports the fraction of its Ga photoabsorptions
 above the K edge that later flights cause (mostly As fluorescence). This
 shows how large the secondary contribution under test is, and is not a gate.
 
-Known unseparated differences: Geant4 Penelope Compton creates
-shell-vacancy fluorescence, whereas PyRITE's free-electron Compton does not.
-Geant4 also uses its own EADL-derived fluorescence data, against EADL2025.
+Known unseparated difference: Geant4 uses its own EADL-derived fluorescence
+data, against EADL2025. Since #1231 both engines Doppler-broaden Compton
+scattering and relax its shell vacancy (PyRITE relaxes every EADL subshell
+above the cutoff; Geant4 Penelope only identified shells for 5 < Z < 105).
 
 ```bash
 # isolated git-archive checkout on the box, after `uv sync --locked`
@@ -361,10 +371,12 @@ passes when `|P − G| ≤ max(tol · G, 3σ)`:
 | Redistributed counts, 10–100, 100–300, 300–504 keV | 5% |
 | W only: raw W Kα window, 57–60 keV | 10% |
 
-Known unseparated difference: Geant4 Penelope Compton uses the impulse
-approximation (Doppler broadening, shell vacancies). PyRITE uses the
-incoherent scattering function without Doppler broadening. This moves photons
-near the single-scatter Compton edges more than it changes the band integrals.
+Both engines use impulse-approximation Compton scattering (Doppler
+broadening, shell vacancies) since #1231. The earlier free-electron PyRITE
+records under-predicted ungated W backscatter (internal source 100–300 keV
+0.51, external 300–504 keV 0.20); the #1231 rerun (job 14196) gives 1.01 and
+0.83, within counting statistics. See the
+[validation page](../../docs/validation/radiation-physics/photon-annihilation-escape.md).
 
 ```bash
 uv run python checks/photon_full_track/annihilation_escape.py macros macros --events 100000

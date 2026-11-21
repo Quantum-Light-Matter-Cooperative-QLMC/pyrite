@@ -18,6 +18,10 @@ Reusable Python implementations invoked by `pyrite-dev` live in
   `release_brem_lattice_share_table.py` (the universal lattice-coherent
   bremsstrahlung share kernel, #1250) and `release_epdl_differential.sh` are
   maintainer-only hosted-table release builders (see `docs/repo-design/data-distribution-and-repository-size.md`).
+- `generate_compton_profiles.py` regenerates or checks the in-package
+  per-EADL-subshell Compton-profile table
+  (`src/pyrite/data/photon_cross_sections/compton_profile_j0.csv`) from
+  xraylib's Biggs et al. profiles; needs the `oracle` dependency group.
 - `__init__.py` makes the directory importable for wrapper tests.
 - `hooks/sync-skills.sh` is the pre-commit hook that regenerates
   `.claude/skills` from `.agents/skills`.

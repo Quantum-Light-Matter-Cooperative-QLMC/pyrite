@@ -6,10 +6,13 @@ import numpy as np
 
 from ._util.hashing import canonical_json_digest
 
-MODEL = "bremslib-continuum-photon-only-cpu.v2"
-EVENT_MODEL = "physical-event-photon-cpu.v1"
-CUDA_MODEL = "bremslib-continuum-photon-only-cuda.v1"
-CUDA_EVENT_MODEL = "physical-event-photon-cuda.v1"
+# v3/v2: impulse-approximation (Doppler-broadened) Compton energies with a
+# bound-shell vacancy (#1231); v4/v3: that vacancy relaxes through the sampled
+# EADL cascade (#1231). Enabled-only observation identities.
+MODEL = "bremslib-continuum-photon-only-cpu.v4"
+EVENT_MODEL = "physical-event-photon-cpu.v3"
+CUDA_MODEL = "bremslib-continuum-photon-only-cuda.v3"
+CUDA_EVENT_MODEL = "physical-event-photon-cuda.v3"
 _RELAXATION_SALT = 0x341EADE1
 # Explicit segment fields only: never select arbitrary metadata by its array length.
 _SEGMENT_KEYS = ("L_ang", "r_mid", "v_hat", "elec_id", "E_repr_keV", "E_keV", "layer")
@@ -64,6 +67,7 @@ def _identity(
     data pins, physical geometry, scoring grid, and random proposal policy.
     """
     from .datasets import EADL, EPDL, EPDL_DIFFERENTIAL
+    from .montecarlo.transport.compton_profiles import COMPTON_PROFILE_SHA256
 
     def vec(value):
         return np.asarray(value, dtype=float).tolist()
@@ -76,6 +80,7 @@ def _identity(
             "epdl_integrated": EPDL.sha256,
             "epdl_differential": EPDL_DIFFERENTIAL.sha256,
             "eadl": EADL.sha256,
+            "compton_profiles": COMPTON_PROFILE_SHA256,
         },
         "proposal": {
             "n_samples": n_samples,

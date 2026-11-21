@@ -191,15 +191,18 @@ It consumes validated `eadl_relaxation` data; the existing expected cascade
 and characteristic scorer retain their current paths. CPU photon histories call this sampler.
 
 `transport/photon_scattering.py` owns standalone CPU Rayleigh (Thomson × F²)
-and Compton (Klein–Nishina × S, without Doppler/binding corrections) events,
-including recoil and sample-frame directions. `transport/photoelectric.py`
+and Compton (Klein–Nishina × S angles; impulse-approximation Doppler-broadened
+energy, binding cutoff and one EADL vacancy) events, including recoil and
+sample-frame directions. `transport/compton_profiles.py` joins EADL subshells
+with the packaged Biggs `J_i(0)` table. `transport/photoelectric.py`
 selects EPDL subshells, samples Sauter–Gavrila photoelectrons and calls the
 sampled EADL cascade. `transport/photon_sampling.py` supplies explicit-draw
 validation and stable angular rotations. CPU photon histories call these
 references; integrated EPDL rates own channel/atom competition.
 
 `transport/photon_histories.py` chains those references into a host photon
-history queue with optional bounded CUDA event waves: lineage-keyed Philox streams, isotropic relaxation emission,
+history queue with optional bounded CUDA event waves: lineage-keyed Philox streams, isotropic relaxation emission
+(photoabsorption and Compton vacancies share the sampled EADL cascade),
 charged electron/positron handoff rows, an absorbing sample-frame aperture
 for ordinary hits, and a per-history weighted energy ledger. Filter plates
 navigate as oriented `PhotonBox`es (`photon_navigation.scene_first_interactions`);

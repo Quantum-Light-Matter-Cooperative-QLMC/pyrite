@@ -9,7 +9,10 @@ from pyrite.montecarlo.eadl_relaxation import load_eadl_relaxation
 from pyrite.montecarlo.transport._photon_cuda_relaxation import host_relaxation_table
 from pyrite.montecarlo.transport.photoelectric import sample_photoelectric
 from pyrite.montecarlo.transport.photon_histories import _isotropic
-from pyrite.montecarlo.transport.photon_photoelectric_cuda import sample_photoelectric_cuda
+from pyrite.montecarlo.transport.photon_photoelectric_cuda import (
+    sample_photoelectric_cuda,
+    sample_vacancy_relaxation_cuda,
+)
 
 
 @pytest.fixture
@@ -125,3 +128,57 @@ def test_photoelectric_inputs_fail_before_device_probe(monkeypatch):
         sample_photoelectric_cuda("Si", [1e5], [[0, 0, 1]], [[0.1]], cutoff_eV=0)
     with pytest.raises(ValueError, match="capacity"):
         sample_photoelectric_cuda("Si", [1e5], [[0, 0, 1]], [[0.1]], cutoff_eV=100, capacity=0)
+    for start in (-1, 3):  # a row of two uniforms admits starts 0..2
+        with pytest.raises(ValueError, match="start"):
+            sample_vacancy_relaxation_cuda(
+                "Si", [1], [start], [[0.1, 0.2]], cutoff_eV=100, capacity=4
+            )
+
+
+@pytest.mark.parametrize("element", ["Cu", "W"])
+def test_compton_vacancy_cascade_continues_the_event_draw_row(cp, element):
+    """Device Compton + vacancy cascade equals sample_compton, cascade, isotropic draws."""
+    from pyrite.montecarlo.transport import photon_cuda_events as events
+    from pyrite.montecarlo.transport.photon_navigation import PHOTON_CHANNEL_ORDER
+    from pyrite.montecarlo.transport.photon_scattering import sample_compton
+    from pyrite.montecarlo.transport.relaxation import sample_relaxation_cascade
+
+    n, cutoff = 96, 50.0
+    rng = np.random.default_rng(1231_07)
+    uniforms = rng.random((n, 512))
+    energy = np.full(n, 511e3)
+    rays = np.tile([0.0, 0.0, 1.0], (n, 1))
+    channel = PHOTON_CHANNEL_ORDER.index("incoherent")
+    actual = events._sample(element, channel, energy, rays, uniforms, cutoff, 64)
+    actual = {name: cp.asnumpy(value) for name, value in actual.items()}
+    assert np.all(actual["status"] == 0)
+    model = load_eadl_relaxation(element)
+    for row in range(n):
+        stream = iter(uniforms[row])
+        event = sample_compton(element, 511e3, rays[row], stream)
+        cascade = sample_relaxation_cascade(model, event.subshell_designator, cutoff, stream)
+        directions = [_isotropic(stream) for _ in cascade.transitions]
+        nt = int(actual["n_transitions"][row])
+        assert nt == len(cascade.transitions)
+        assert (
+            int(actual["draws_used"][row]) == event.draws_used + len(cascade.transitions) + 2 * nt
+        )
+        product = events._compton_product(row, actual, element, channel)
+        assert product.terminal_binding_eV == cascade.energy_budget.terminal_binding_eV
+        assert product.transition_defect_eV == cascade.energy_budget.transition_energy_defect_eV
+        emitted = [e for _, e, _ in product.photons[1:]] + [c[3] for c in product.charged[1:]]
+        assert sorted(emitted) == sorted(t.energy_eV for t in cascade.transitions)
+        np.testing.assert_allclose(
+            actual["emission_direction"][row, :nt],
+            np.asarray(directions).reshape(nt, 3),
+            rtol=2e-12,
+            atol=2e-14,
+        )
+        closure = (
+            float(actual["photon_energy_eV"][row])
+            + float(actual["electron_energy_eV"][row])
+            + fsum(emitted)
+            + product.terminal_binding_eV
+            + product.transition_defect_eV
+        )
+        assert closure == pytest.approx(511e3, rel=1e-12)

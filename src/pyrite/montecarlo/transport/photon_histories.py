@@ -30,6 +30,7 @@ from .photon_navigation import (
     validate_photon_regions,
 )
 from .photon_scattering import sample_compton, sample_rayleigh
+from .relaxation import SampledRelaxationCascade, sample_relaxation_cascade
 
 ELECTRON, POSITRON = 0, 1
 #: Charged-row ``channel`` for relaxation (Auger/Coster–Kronig) electrons.
@@ -276,6 +277,28 @@ def _isotropic(draws: Iterator[float]) -> np.ndarray:
     return np.array([sine * np.cos(azimuth), sine * np.sin(azimuth), cosine])
 
 
+def _emit_relaxation(queue, parent, cascade: SampledRelaxationCascade, draws, position, first):
+    """Isotropic relaxation particles (ordinals from ``first``) and binding remainder.
+
+    Two direction draws per emitted particle follow the whole cascade.
+    Validation: photon-history-queue, eadl-sampled-relaxation
+    """
+    for ordinal, transition in enumerate(cascade.transitions, start=first):
+        emitted = _isotropic(draws)
+        if transition.kind == "photon":
+            queue.photon(parent, ordinal, position, emitted, transition.energy_eV)
+        else:
+            queue.particle(
+                parent, ordinal, ELECTRON, RELAXATION_CHANNEL, position, emitted,
+                transition.energy_eV,
+            )  # fmt: skip
+    budget = cascade.energy_budget
+    queue.book("terminal_binding_eV", parent.row, parent.weight * budget.terminal_binding_eV)
+    queue.book(
+        "transition_defect_eV", parent.row, parent.weight * budget.transition_energy_defect_eV
+    )
+
+
 def _photoabsorb(queue, parent: _Photon, channel, element, relaxation, rng, position) -> None:
     """Photoelectron, isotropic relaxation particles and binding remainder.
 
@@ -290,27 +313,44 @@ def _photoabsorb(queue, parent: _Photon, channel, element, relaxation, rng, posi
         parent, 0, ELECTRON, channel, position, event.electron_direction,
         event.electron_energy_eV,
     )  # fmt: skip
-    for ordinal, transition in enumerate(event.relaxation.transitions, start=1):
-        emitted = _isotropic(draws)
-        if transition.kind == "photon":
-            queue.photon(parent, ordinal, position, emitted, transition.energy_eV)
-        else:
-            queue.particle(
-                parent, ordinal, ELECTRON, RELAXATION_CHANNEL, position, emitted,
-                transition.energy_eV,
-            )  # fmt: skip
-    budget = event.relaxation.energy_budget
-    queue.book("terminal_binding_eV", parent.row, parent.weight * budget.terminal_binding_eV)
-    queue.book(
-        "transition_defect_eV", parent.row, parent.weight * budget.transition_energy_defect_eV
-    )
+    _emit_relaxation(queue, parent, event.relaxation, draws, position, 1)
+
+
+def _compton(queue, parent: _Photon, channel, relaxation, rng, position, element) -> None:
+    """Compton photon 0, recoil 1, then the vacancy's sampled EADL cascade from 2.
+
+    Following Geant4's Penelope Compton design, the sampled subshell vacancy
+    relaxes through the same EADL cascade as photoabsorption (relaxation cutoff
+    the smaller of the photon/electron cutoffs), but for every EADL subshell
+    with transitions and any Z (no K/L/M or 5 < Z < 105 restriction), and
+    energy closes through the signed ETR defect rather than by dropping
+    secondaries. Draw order: Compton draws, one per
+    cascade decay, then two per emitted particle. The injected EADL model must
+    hold the vacancy with the Compton binding, so E = E' + T + U_i closes
+    through the cascade partition.
+    Validation: photon-history-queue, eadl-sampled-relaxation
+    """
+    draws = iter(rng.random, None)
+    event = sample_compton(element, parent.energy, parent.direction, draws)
+    queue.photon(parent, 0, position, event.photon_direction, event.photon_energy_eV)
+    queue.particle(
+        parent, 1, ELECTRON, channel, position, event.electron_direction,
+        event.electron_energy_eV,
+    )  # fmt: skip
+    binding = {s.shell_designator: s.binding_energy_eV for s in relaxation.subshells}
+    if binding.get(event.subshell_designator) != event.binding_energy_eV:
+        raise ValueError("Compton vacancy binding does not match the EADL relaxation data")
+    cutoff = min(queue.photon_cutoff_eV, queue.electron_cutoff_eV)
+    cascade = sample_relaxation_cascade(relaxation, event.subshell_designator, cutoff, draws)
+    _emit_relaxation(queue, parent, cascade, draws, position, 2)
 
 
 def _interact(queue, parent: _Photon, channel, element, relaxation, rng, position) -> None:
     """Dispatch one sampled collision to its conditional final-state sampler.
 
-    Daughter ordinals: scattered photon 0 then recoil 1; photoelectron 0 then
-    relaxation particles in cascade order; pair electron 0, positron 1.
+    Daughter ordinals: scattered photon 0, recoil 1, then Compton-vacancy
+    relaxation particles in cascade order; photoelectron 0 then relaxation
+    particles in cascade order; pair electron 0, positron 1.
 
     Validation: photon-history-queue
     """
@@ -318,15 +358,11 @@ def _interact(queue, parent: _Photon, channel, element, relaxation, rng, positio
     name = PHOTON_CHANNEL_ORDER[channel]
     if name == "photoelectric":
         _photoabsorb(queue, parent, channel, element, relaxation, rng, position)
-    elif name in ("coherent", "incoherent"):
-        sampler = sample_rayleigh if name == "coherent" else sample_compton
-        event = sampler(element, energy, direction, iter(rng.random, None))
+    elif name == "incoherent":
+        _compton(queue, parent, channel, relaxation, rng, position, element)
+    elif name == "coherent":
+        event = sample_rayleigh(element, energy, direction, iter(rng.random, None))
         queue.photon(parent, 0, position, event.photon_direction, event.photon_energy_eV)
-        if name == "incoherent":
-            queue.particle(
-                parent, 1, ELECTRON, channel, position, event.electron_direction,
-                event.electron_energy_eV,
-            )  # fmt: skip
     else:
         pair = sample_pair(energy, _atomic_number(element), direction, rng)
         queue.book("positron_rest_eV", parent.row, parent.weight * PAIR_THRESHOLD_EV)
@@ -512,7 +548,8 @@ def _collisions(
         if products is not None:
             cuda.apply_cuda_collision(queue, parent, points[i], products[int(i)])
         else:
-            if PHOTON_CHANNEL_ORDER[channel] == "photoelectric" and element not in cache:
+            relaxes = PHOTON_CHANNEL_ORDER[channel] in ("photoelectric", "incoherent")
+            if relaxes and element not in cache:
                 cache[element] = relaxation(element)
             _interact(queue, parent, channel, element, cache.get(element), rngs[i], points[i])
 
@@ -544,7 +581,8 @@ def track_photon_histories(
 
     Each flight samples one EPDL first collision (``photon_first_interactions``)
     from its own Philox stream keyed by lineage, then the selected conditional
-    sampler: Rayleigh, Compton (free electron, no vacancy), EPDL subshell
+    sampler: Rayleigh, Compton (impulse approximation; its subshell vacancy
+    relaxes through the sampled EADL cascade), EPDL subshell
     photoabsorption with a sampled EADL cascade, or PENELOPE pair kinematics
     for nuclear and electron-field pairs (triplet simulated as a pair).
     Relaxation photons and electrons are emitted isotropically. Daughter

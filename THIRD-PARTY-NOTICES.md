@@ -65,6 +65,46 @@ tables derived or resampled from their output.
   radiative and nonradiative transition data for the characteristic-radiation
   relaxation cascade.
 
+## xraylib Compton profiles (Biggs et al. 1975)
+
+- **Data authors**: F. Biggs, L. B. Mendelsohn, J. B. Mann, "Hartree-Fock
+  Compton profiles for the elements", *Atomic Data and Nuclear Data Tables*
+  **16**, 201–309 (1975), <https://doi.org/10.1016/0092-640X(75)90030-3>,
+  taken by xraylib from the LSCAT extension of EGS4 (Namito et al.).
+- **Distribution**: xraylib 4.3.0, <https://github.com/tschoonj/xraylib>
+  (`ComptonProfile_Partial`).
+- **License**: BSD 3-Clause. Copyright (c) 2009, Bruno Golosio, Antonio
+  Brunetti, Manuel Sanchez del Rio, Tom Schoonjans and Teemu Ikonen. All
+  rights reserved. Redistribution and use in source and binary forms, with or
+  without modification, are permitted provided that the following conditions
+  are met: (1) redistributions of source code must retain the above copyright
+  notice, this list of conditions and the following disclaimer;
+  (2) redistributions in binary form must reproduce the above copyright
+  notice, this list of conditions and the following disclaimer in the
+  documentation and/or other materials provided with the distribution;
+  (3) the names of the contributors may not be used to endorse or promote
+  products derived from this software without specific prior written
+  permission. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS "AS IS" AND
+  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+  ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS BE LIABLE FOR ANY
+  DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+  (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+  LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+  ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+  THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+- **Nature of PyRITE's use**: PyRITE **redistributes** a derived table in its
+  wheel and source distribution,
+  `src/pyrite/data/photon_cross_sections/compton_profile_j0.csv` (SHA-256
+  `31671e65c882134a3fa591f0497a524846137a97c3e60e06317f08e228a35e81`):
+  one-electron profile values at zero momentum, `J_i(0)`, keyed by EADL2025
+  subshell, written by `scripts/generate_compton_profiles.py` from xraylib.
+  **Modifications:** values are rounded to six significant figures; where
+  Biggs lists one `n,l` orbital, its value is assigned to both spin-orbit
+  subshells; Bk 6d uses the Cm value. xraylib itself is a validation-only
+  dependency and is not redistributed.
+
 ## EPICS2025 EPDL photon interaction data
 
 - **Author**: D. E. Cullen, Livermore Evaluated Photon Data Library (EPDL),

@@ -94,6 +94,9 @@ change.
 * - `photon_cross_sections/epdl2025_mf23.npz` (added by #274)
   - b
   - Moved out of the wheel (#282): hosted on the private release `tables-epdl-1` and fetched with `pyrite tables fetch epdl`, the only location since it is derived data; provenance and modifications note travel in the release notes and its README.
+* - `photon_cross_sections/compton_profile_j0.csv` (added by #1231)
+  - a
+  - In the wheel: 37 KB per-EADL-subshell Biggs `J_i(0)` table (xraylib, BSD-3-Clause), SHA-256 pinned in `compton_profiles.py`; read only by opt-in photon transport.
 * - ELSEPA sources and `database/`; `sbethe.f`
   - c
   - Moved to `vendor/xsgen/elsepa/` and `vendor/xsgen/sbethe/`.

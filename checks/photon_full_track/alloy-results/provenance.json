@@ -19,7 +19,8 @@
       "job": 12771,
       "tested_commit": "95b6d6b631f523f6ebcb053b8f89db0bef984242",
       "seed": 34121,
-      "history_ids": "shard*100000 + [0, 100000)"
+      "history_ids": "shard*100000 + [0, 100000)",
+      "superseded_by": "pyrite_cpu_photon_only_1231"
     },
     "geant4_emlivermore": {
       "role": "report-only diagnostic added after the Penelope result; same gates",
@@ -28,6 +29,24 @@
       "staging_root": "~/.local/opt/pyrite-341-alloy-6000a159",
       "outcome": "8/8 gates pass (one more window reaches 1000 reference counts)",
       "geant4_seed_base": 34120
+    },
+    "pyrite_cpu_photon_only_1231": {
+      "role": "PyRITE arm re-pinned for #1231 (Compton Doppler broadening plus Compton-vacancy relaxation); Geant4 records unchanged",
+      "run_date_utc": "2026-11-20",
+      "job": 14197,
+      "tasks": "31-60 (PyRITE shards)",
+      "tested_commit": "8fd3b1a16",
+      "staging_root": "~/.local/opt/pyrite-1231-8fd3b1a16",
+      "data_home": "./home under the staging root: datasets -> ~/.local/opt/pyrite-issue-341/home/datasets; xsgen/tables -> ~/pyrite/xsgen/tables",
+      "seed": 34121,
+      "history_ids": "shard*100000 + [0, 100000)",
+      "outcome": "Penelope: same 5 pre-existing Ga K failures, 7 gated, every gated ratio within 0.003 of the superseded arm; Livermore 8/8 gated pass. Ungated R As_Ka at 11.5 keV 0 -> 0.65 (13 vs 20 counts): below the As K edge this window holds Doppler-broadened Compton backscatter of the 11.5 keV primary, absent without broadening",
+      "superseded_pyrite_record_sha256": {
+        "gaas_11p5kev_pyrite.json.gz": "910a548ec990c6858643095beefabff4fc689a403a0c62342d43fc70c8e1d899",
+        "gaas_15kev_pyrite.json.gz": "bf989c4451fc0e2168a5d6020f9c93e19db57619ca226be56d70beabd5f2b82d",
+        "gaas_30kev_pyrite.json.gz": "9af8ea8982b3b7c69e04e43d7cae3743cd6d1d9f6f3e2ad2380fb7b2e500491e"
+      },
+      "post_run_source_note": "After the 8fd3b1a16 runs, only a docstring of photon_histories.py::_compton changed (Geant4 Penelope wording qualified); executable code is unchanged, so its tested sha256 above differs from later checkouts."
     }
   },
   "allocation": {
@@ -46,6 +65,12 @@
       "state": "all completed, no errors in task logs",
       "max_rss_kB": 94804,
       "wall_range": "0:04-0:06"
+    },
+    "job_14197": {
+      "tasks": 30,
+      "state": "all completed, exit 0:0",
+      "max_rss_kB": "not recorded (sacct MaxRSS empty for these steps)",
+      "wall_range": "0:32-0:42"
     }
   },
   "geant4_version": "11.4.2 (geant4-11-04-patch-02) / EMLOW8.8",
@@ -68,15 +93,24 @@
       "checks/photon_full_track/cases.py": "023953fe1997f7b9cbd968fedb47ac25b7219e5049644c298a52541ff3172fc5",
       "checks/photon_full_track/compare.py": "e7cb036a70ba1d1ebbc3dbe56c0865b2d35493c178248b7f2bbab0adb2af6b41",
       "src/pyrite/montecarlo/transport/photon_histories.py": "769c45a29ad3c8b266f0699becec358f4d33f3b47dea14a6e84b0eb466e4f445"
+    },
+    "8fd3b1a16": {
+      "checks/photon_full_track/alloy_fluorescence.py": "1a8f7b8a356212f680c0f0a586a02fda26ee3cbfc881ee5cd637d583aa9e2e69",
+      "checks/photon_full_track/run_alloy_fluorescence.sbatch": "fa45b6ed95138458bea77e40243d2fcacad903743d7e9d06d150e038ffb6e91e",
+      "checks/photon_full_track/compare.py": "e7cb036a70ba1d1ebbc3dbe56c0865b2d35493c178248b7f2bbab0adb2af6b41",
+      "src/pyrite/montecarlo/transport/photon_histories.py": "32a238ff9af1de76f5425e2a4e15d03733fca5b05057b35a4865833e8e6b8fa6",
+      "src/pyrite/montecarlo/transport/photon_scattering.py": "da2bb0228550a06b13954235de92829096810491b0276902be994315623eecd5",
+      "src/pyrite/montecarlo/transport/compton_profiles.py": "3cc4ebce58568fa2c9df1ac16e9a29f10bd7fb36b55a165cd16407a38d2c85de",
+      "src/pyrite/data/photon_cross_sections/compton_profile_j0.csv": "31671e65c882134a3fa591f0497a524846137a97c3e60e06317f08e228a35e81"
     }
   },
   "committed_record_sha256": {
     "gaas_11p5kev_geant4.json.gz": "bad1cd265de7cc9029e5c33268336c793211c7d8db09150f4350e944fb5598db",
-    "gaas_11p5kev_pyrite.json.gz": "910a548ec990c6858643095beefabff4fc689a403a0c62342d43fc70c8e1d899",
+    "gaas_11p5kev_pyrite.json.gz": "1bbdf91e8d5c90eb97196534acf59bb19e5fc7e459c1ab533ceb0145c143c9a0",
     "gaas_15kev_geant4.json.gz": "6e29aab725abb34940ad4c5f43d748c817ea586eb313aa3cda0afcea40ac4b18",
-    "gaas_15kev_pyrite.json.gz": "bf989c4451fc0e2168a5d6020f9c93e19db57619ca226be56d70beabd5f2b82d",
+    "gaas_15kev_pyrite.json.gz": "16394ebd91218dce31872f868cdae003bd65c04968abf95da95909b24a479a20",
     "gaas_30kev_geant4.json.gz": "89a44283edf073b7fb595097cfca797404cb1ec796f4eec0cce2f30ae8260864",
-    "gaas_30kev_pyrite.json.gz": "9af8ea8982b3b7c69e04e43d7cae3743cd6d1d9f6f3e2ad2380fb7b2e500491e",
+    "gaas_30kev_pyrite.json.gz": "173f9904979f83bbc6c90d8a4cc40f2ae645e7bfea21246eb6800df7e126eab0",
     "gaas_11p5kev_geant4_emlivermore.json.gz": "0140c061d9fd7a1000b76aa65cd345a16234d54c2621e6f727c2826752e51526",
     "gaas_15kev_geant4_emlivermore.json.gz": "e10f32538039c1837ecf45a3968a16b6ba1752a808c361e9d32ab33da8af6c2d",
     "gaas_30kev_geant4_emlivermore.json.gz": "dc2102d0a1b0ed94a22cf1230719da3071b0dc26fa24dbd704cab28d3ffa508d"

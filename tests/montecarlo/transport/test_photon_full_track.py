@@ -645,11 +645,12 @@ def test_escape_passes_every_gate_against_both_geant4_arms(escape, arm):
     assert gated == 14
 
 
-def test_escape_keeps_ungated_w_backscatter_deficit_visible(escape):
-    # Below the pre-registered 1000-count threshold, PyRITE under-predicts W
-    # backscatter: without Compton Doppler broadening its single-backscatter
-    # peak is narrow (w_int, escape-enhanced) and lacks the high-momentum
-    # K/L-shell tail that reaches 300-504 keV (w_ext).
+def test_escape_w_backscatter_shape_follows_doppler_broadening(escape):
+    # Below the pre-registered 1000-count threshold. Free-electron Compton
+    # gave 0.20 (w_ext, 300-504 keV: no K/L-shell Doppler tail) and 0.51
+    # (w_int, 100-300 keV: narrow single-backscatter peak). The #1231 rerun
+    # with impulse-approximation broadening and Compton-vacancy relaxation
+    # (job 14196, commit 8fd3b1a16) brings both within counting statistics.
     rows = {}
     for config in ("w_ext", "w_int"):
         report = escape["compare"](
@@ -657,10 +658,13 @@ def test_escape_keeps_ungated_w_backscatter_deficit_visible(escape):
             escape["_load"](ESCAPE / f"{config}_geant4.json.gz"),
         )
         rows[config] = report["R"]
-    assert not rows["w_ext"]["redist_300-504keV"]["gated"]
-    assert rows["w_ext"]["redist_300-504keV"]["ratio"] == pytest.approx(0.2)
-    assert not rows["w_int"]["redist_100-300keV"]["gated"]
-    assert rows["w_int"]["redist_100-300keV"]["ratio"] == pytest.approx(0.5125)
+    for config, window, ratio in (
+        ("w_ext", "redist_300-504keV", 25 / 30),
+        ("w_int", "redist_100-300keV", 81 / 80),
+    ):
+        row = rows[config][window]
+        assert not row["gated"] and row["pass_"]
+        assert row["ratio"] == pytest.approx(ratio)
 
 
 def test_shard_merges_reject_duplicates(escape, alloy):
