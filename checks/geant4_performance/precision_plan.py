@@ -113,12 +113,14 @@ def plan(samples, spec, max_run_s, include_optional):
                         for name, why in heads.items()
                         if why is None and math.isfinite(cvs[(scene_id, arm, name)]["cv"])
                     }
-                    if not need:
-                        continue
-                    binding = max(need, key=need.get)
-                    n = need[binding]
+                    if not need and all(why for why in heads.values()):
+                        continue  # every observable is a diagnostic: no headline set
+                    # A headline observable with zero pilot yield has no CV:
+                    # the cell stays explicit as unplannable, never silently dropped.
+                    binding = max(need, key=need.get) if need else None
+                    n = need[binding] if need else None
                     for config, spp in sorted(per_primary.items()):
-                        predicted = n * spp
+                        predicted = n * spp if n else None
                         items.append(
                             dict(
                                 scene=scene_id,
@@ -131,7 +133,13 @@ def plan(samples, spec, max_run_s, include_optional):
                                 per_observable_histories=need,
                                 diagnostics={k: w for k, w in heads.items() if w},
                                 predicted_warm_s=predicted,
-                                status="planned" if predicted <= max_run_s else "over-budget",
+                                status=(
+                                    "unplannable"
+                                    if predicted is None
+                                    else "planned"
+                                    if predicted <= max_run_s
+                                    else "over-budget"
+                                ),
                             )
                         )
     runs = sorted(
@@ -176,7 +184,7 @@ def main():
     for i in result["items"]:
         print(
             f"| {i['scene']} | {i['config']} | {i['set']} | {i['target_rse']:g} | "
-            f"{i['histories']} | {i['binding']} | {i['predicted_warm_s']:.0f} | {i['status']} |"
+            f"{i['histories']} | {i['binding']} | {i['predicted_warm_s'] or 0:.0f} | {i['status']} |"
         )
     print(
         f"\nruns: {len(result['runs'])}, predicted warm total "

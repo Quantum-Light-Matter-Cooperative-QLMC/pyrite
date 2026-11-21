@@ -304,12 +304,46 @@ timings are in
 The raw evidence archive (`penred-straggling-evidence-2026-10-22.tar.gz`,
 SHA-256 `74bf1e56…`) is not yet uploaded as a release asset.
 
+## Frozen equivalence gate (#1041)
+
+Frozen on 2026-11-20 from pilot evidence only (qlmc re-pilot job 14170, seed
+1), before held-out seeds 101–103 ran. The machine-readable copy is
+`checks/geant4_performance/scenes.json` `precision.equivalence`;
+`analyze.py --plan` applies it.
+
+- **Scope (owner decision).** No 4π photon-band set, because PyRITE's
+  discrete 4π path is not optimized, and no discrete-photon PyRITE cone arm.
+  PyRITE runs the discrete arm for the electron transport set (transmitted,
+  backscattered, stopped, transmitted energy) and the continuous estimator for
+  the ≥ 10 keV cone yield. Geant4 runs both sets.
+- **Test.** TOST on the PyRITE/Geant4 ratio of per-primary means. Each arm
+  pools its held-out runs at the planned count. An observable passes when the
+  90% delta-method CI of ln(ratio) lies inside [ln(1 − δ), ln(1 + δ)]. It is
+  evaluated at ε = 2% only.
+- **Margins δ.** 3% for the transmitted fraction and transmitted energy, 8%
+  for the backscattered and stopped fractions, 10% for the cone yield.
+- **Set rule.** Intersection–union: a (scene, set, PyRITE arm) is equivalent
+  only if every headline observable passes and both arms met the target RSE
+  on every seed. The conjunction needs no multiplicity adjustment. Only an
+  equivalent set yields a headline `T(ε)` ratio. Ratios at ε = 5% and ratios
+  on failed gates are qualified outcomes.
+- **Discrepancy flags.** Two-sided z tests of ratio = 1 on ln(ratio),
+  Holm-adjusted at α = 0.05 across every evaluated cell. Flagged cells link to
+  #1039, #1040 or a new discrepancy issue.
+- **Unplannable cells.** A headline observable with zero pilot yield has no
+  CV. Its cell is listed as `unplannable` and never silently dropped. Si
+  300 keV Geant4 cone had zero photons in 20 000 pilot histories, so that
+  cone comparison is untested on this slice.
+
+Numerical convergence is still outstanding. A passing gate therefore
+qualifies equivalence at the stated precision only, not numerical
+convergence.
+
 ## Remaining gates
 
 This stage leaves the following open: the EGSnrc adapter, a PenRed
 cone-detector tally, Geant4 transport-only and cone-detector tallies
 matching the arms above, adapter support for finite beams and explicit
 secondaries, numerical refinement (including the electron cutoff and the
-estimator's straight-ray escape against full photon transport), equivalence
-margins, equal-core resources and held-out time-to-precision runs. No physics default, model
+estimator's straight-ray escape against full photon transport), equal-core resources and held-out time-to-precision runs. No physics default, model
 marker or version changes here, and no new physics-validation claim is made.

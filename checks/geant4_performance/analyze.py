@@ -22,7 +22,10 @@ whether every headline observable of the set met the target RSE in each run,
 ``T(eps)`` (warm request seconds, median and range over seeds), the PyRITE
 transport/scoring split, and T(eps) speed ratios against each Geant4 thread
 count (median and range over all seed pairs). Over-budget or unmet targets are
-listed as such and give no ratio.
+listed as such and give no ratio. The frozen ``scenes.json``
+``precision.equivalence`` gate (#1041) marks a ratio ``headline`` only for an
+equivalent (scene, set, PyRITE arm) at its evaluation target; every other
+ratio is a qualified outcome.
 """
 
 import argparse
@@ -34,6 +37,7 @@ from pathlib import Path
 
 import numpy as np
 
+HERE = Path(__file__).resolve().parent
 AGREEMENT = (
     "transmitted",
     "backscattered",
@@ -295,6 +299,112 @@ def time_to_precision(samples, plan):
     return dict(runs=rows, speedup=ratios)
 
 
+def _pooled(recs, name):
+    values = []
+    for r in recs:
+        scores = r["scores"]
+        values.append(sum(scores[k] for k in GE10) if name == "photons_ge10keV" else scores[name])
+    return mean_se(np.concatenate(values))
+
+
+def holm(pvalues, alpha):
+    """Holm step-down rejections (same order as ``pvalues``)."""
+    order = sorted(range(len(pvalues)), key=pvalues.__getitem__)
+    reject = [False] * len(pvalues)
+    for rank, i in enumerate(order):
+        if pvalues[i] > alpha / (len(pvalues) - rank):
+            break
+        reject[i] = True
+    return reject
+
+
+def equivalence(samples, plan, spec, ttp):
+    """Frozen #1041 TOST gate per (scene, set, PyRITE arm) at the evaluation target.
+
+    Each arm pools its held-out runs at the planned count. An observable passes
+    when the ``ci_level`` delta-method CI of ln(PyRITE/Geant4) lies inside
+    [ln(1-margin), ln(1+margin)]; a set is equivalent only if every headline
+    observable passes and both arms met the target RSE on every seed
+    (intersection-union). Discrepancy flags are Holm-adjusted two-sided tests of
+    ratio = 1 across all evaluated cells.
+    """
+    from statistics import NormalDist
+
+    eps, margins = spec["evaluate_at_target_rse"], spec["margins_rel"]
+    zq = NormalDist().inv_cdf(0.5 + spec["ci_level"] / 2)
+    runs = defaultdict(list)
+    for rec in samples:
+        runs[(rec["scene"]["id"], config_name(rec), rec["histories"])].append(rec)
+    status = {
+        (r["scene"], r["config"], r["set"], r["target_rse"]): r["status"] for r in ttp["runs"]
+    }
+    items = [i for i in plan["items"] if i["target_rse"] == eps]
+    cells, groups = [], []
+    for py in items:
+        if not py["config"].startswith("pyrite"):
+            continue
+        refs = [
+            i
+            for i in items
+            if i["config"].startswith(spec["reference"])
+            and (i["scene"], i["set"]) == (py["scene"], py["set"])
+        ]
+        py_recs = runs.get((py["scene"], py["config"], py["histories"]), [])
+        ref_recs = [
+            r for i in refs for r in runs.get((i["scene"], i["config"], i["histories"]), [])
+        ]
+        met = status.get((py["scene"], py["config"], py["set"], eps)) == "met" and any(
+            status.get((i["scene"], i["config"], i["set"], eps)) == "met" for i in refs
+        )
+        group = dict(scene=py["scene"], set=py["set"], pyrite=py["config"], precision_met=met)
+        groups.append(group)
+        if not refs or any(i["status"] == "unplannable" for i in refs):
+            group["status"] = "reference-unplannable"
+            continue
+        if not py_recs or not ref_recs:
+            group["status"] = "missing"
+            continue
+        group["cells"] = []
+        for name in py["per_observable_histories"]:
+            pm, ps = _pooled(py_recs, name)
+            gm, gs = _pooled(ref_recs, name)
+            if pm <= 0 or gm <= 0:
+                cell = dict(observable=name, status="undefined")
+            else:
+                lr, se = math.log(pm / gm), math.hypot(ps / pm, gs / gm)
+                lo, hi = math.exp(lr - zq * se), math.exp(lr + zq * se)
+                m = margins[name]
+                cell = dict(
+                    observable=name,
+                    ratio=pm / gm,
+                    ci=[lo, hi],
+                    margin=m,
+                    status="pass" if 1 - m <= lo and hi <= 1 + m else "fail",
+                    p_equal=2 * (1 - NormalDist().cdf(abs(lr) / se)) if se > 0 else 0.0,
+                )
+            group["cells"].append(cell)
+            cells.append(cell)
+        group["status"] = (
+            "equivalent"
+            if met and all(c["status"] == "pass" for c in group["cells"])
+            else "not-equivalent"
+        )
+    tested = [c for c in cells if "p_equal" in c]
+    for c, flag in zip(tested, holm([c["p_equal"] for c in tested], 0.05), strict=True):
+        c["discrepancy_holm"] = flag
+    for r in ttp["speedup"]:
+        g = next(
+            (
+                g
+                for g in groups
+                if (g["scene"], g["set"], g["pyrite"]) == (r["scene"], r["set"], r["pyrite"])
+            ),
+            None,
+        )
+        r["headline"] = bool(r["target_rse"] == eps and g and g["status"] == "equivalent")
+    return dict(target_rse=eps, ci_level=spec["ci_level"], groups=groups)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("evidence", nargs="+", type=Path)
@@ -304,7 +414,12 @@ def main():
     samples = load(args.evidence)
     summary = summarize(samples)
     if args.plan:
-        summary["time_to_precision"] = time_to_precision(samples, json.loads(args.plan.read_text()))
+        plan = json.loads(args.plan.read_text())
+        ttp = time_to_precision(samples, plan)
+        spec = json.loads((HERE / "scenes.json").read_text())["precision"].get("equivalence")
+        if spec:
+            ttp["equivalence"] = equivalence(samples, plan, spec, ttp)
+        summary["time_to_precision"] = ttp
     if args.output:
         args.output.write_text(json.dumps(summary, indent=1, allow_nan=False) + "\n")
     for scene, row in summary.items():
@@ -337,9 +452,19 @@ def main():
                 f"  {r['scene']} {r['set']} eps={r['target_rse']:g} {r['config']} "
                 f"N={r['histories']}: {r['status']}{extra}"
             )
+        for g in ttp.get("equivalence", {}).get("groups", []):
+            print(f"  equivalence {g['scene']} {g['set']} {g['pyrite']}: {g['status']}")
+            for c in g.get("cells", []):
+                if "ci" in c:
+                    print(
+                        f"    {c['observable']:28s} ratio {c['ratio']:.4f} CI [{c['ci'][0]:.4f}, "
+                        f"{c['ci'][1]:.4f}] margin {c['margin']:g} {c['status']}"
+                        + (" DISCREPANT (Holm)" if c.get("discrepancy_holm") else "")
+                    )
         for r in ttp["speedup"]:
+            label = "headline" if r.get("headline") else "qualified"
             print(
-                f"  speedup {r['scene']} {r['set']} eps={r['target_rse']:g} "
+                f"  speedup[{label}] {r['scene']} {r['set']} eps={r['target_rse']:g} "
                 f"{r['pyrite']} vs {r['geant4']}: {r['speedup_median']:.3g} {r['speedup_range']}"
             )
 

@@ -126,8 +126,8 @@
       "cone": ["cone_source_photons_ge10kev"]
     },
     "arm_sets": {
-      "geant4": ["transport", "source_4pi", "cone"],
-      "pyrite-discrete": ["transport", "source_4pi", "cone"],
+      "geant4": ["transport", "cone"],
+      "pyrite-discrete": ["transport"],
       "pyrite-continuous": ["cone"]
     },
     "headline_floor": {
@@ -135,7 +135,22 @@
       "photons_per_primary": 0.001,
       "note": "terminal fractions (and transmitted energy, gated on the transmitted fraction) below fraction_mean, and 4pi photon bands below photons_per_primary in the variance pilot, are diagnostics; the cone yield is always headline (rare by design: its cost is what the comparison measures, bounded by the run budget); bands whose lower edge is at or above the beam energy are excluded"
     },
-    "min_histories": 2000
+    "min_histories": 2000,
+    "equivalence": {
+      "frozen": "2026-11-20 (#1041), from pilot evidence only, before held-out seeds 101-103 reported",
+      "scope_note": "owner decision 2026-11-20: no 4pi photon-band set (PyRITE's discrete 4pi path is not optimized) and no discrete-photon PyRITE cone arm; PyRITE arms are pyrite-discrete for the electron transport set and the continuous estimator for the cone",
+      "reference": "geant4",
+      "evaluate_at_target_rse": 0.02,
+      "ci_level": 0.90,
+      "test": "TOST on the PyRITE/Geant4 ratio of per-primary means, each arm pooled over its held-out seeds at the planned count: pass when the 90% delta-method CI of ln(ratio) lies inside [ln(1-margin), ln(1+margin)]",
+      "margins_rel": {
+        "transmitted": 0.03, "transmitted_energy_keV": 0.03,
+        "backscattered": 0.08, "stopped": 0.08,
+        "cone_source_photons_ge10kev": 0.10
+      },
+      "set_rule": "intersection-union: a (scene, set, PyRITE arm) is equivalent only if every headline observable of the set passes and both arms met the target RSE on every seed; the conjunction needs no multiplicity adjustment. Only an equivalent set yields a headline T(eps) ratio; other targets and failed gates give qualified outcomes",
+      "discrepancy_family": "two-sided z test of ratio = 1 on ln(ratio), Holm-adjusted at alpha 0.05 across every (scene, set, PyRITE arm, observable) evaluated; flagged cells link to #1039/#1040 or a new discrepancy issue"
+    }
   },
   "block_rows": 64000000,
   "max_block_histories": 20000,
