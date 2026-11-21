@@ -18,6 +18,7 @@ import numpy as np
 import pytest
 
 from pyrite.montecarlo.runner.adaptive import (
+    TAIL_MIN_SAMPLES,
     TAIL_SCORES,
     TAIL_SLOPE_CAP,
     WALL_CLOCK_FIELDS,
@@ -41,13 +42,14 @@ def _blocks(values, sizes):
 
 @pytest.mark.parametrize("sizes", [(), (1, 7, 64, 300), (150,) * 30, (5000,)])
 def test_top_scores_and_third_moment_merge_like_one_pass(sizes):
-    values = np.random.default_rng(7).lognormal(0.0, 1.2, 6001)
+    values = np.random.default_rng(7).lognormal(0.0, 1.2, 12_001)
     moments = _blocks(values, sizes)
     np.testing.assert_array_equal(np.sort(moments.top), np.sort(values)[-(TAIL_SCORES + 1) :])
     centered = values - values.mean()
     assert moments.m3 == pytest.approx(np.sum(centered**3), rel=1e-10)
     whole = RunningMoments()
     whole.add_block(values)
+    assert moments.tail_slope() is not None
     assert moments.tail_slope() == whole.tail_slope()
 
 
@@ -64,13 +66,27 @@ def test_tail_slope_recovers_pareto_index(alpha):
 
 def test_tail_slope_limits():
     moments = RunningMoments()
-    moments.add_block(np.r_[np.zeros(1000), np.ones(TAIL_SCORES)])
+    moments.add_block(np.r_[np.zeros(TAIL_MIN_SAMPLES), np.ones(TAIL_SCORES)])
     assert moments.tail_slope() is None  # threshold score x_(k+1) is zero
     moments.add_block(np.ones(1))
     assert moments.tail_slope() == TAIL_SLOPE_CAP  # flat top: no tail
     few = RunningMoments()
     few.add_block(np.arange(1.0, TAIL_SCORES + 1))
     assert few.tail_slope() is None
+
+
+@pytest.mark.parametrize("n", [TAIL_MIN_SAMPLES, 200_000])
+def test_light_tail_reads_finite_variance_once_reported(n):
+    """An exponential's Hill slope is about 2 + ln(n / k), below 3 up to
+    n ~ k e, so it is withheld until the top k are at most 2 % of n."""
+    values = np.random.default_rng(n).exponential(1.0, n)
+    moments = RunningMoments()
+    moments.add_block(values[: TAIL_MIN_SAMPLES - 1])
+    assert moments.tail_slope() is None
+    moments.add_block(values[TAIL_MIN_SAMPLES - 1 :])
+    slope = moments.tail_slope()
+    assert slope > 3.0
+    assert slope == pytest.approx(2.0 + math.log(n / TAIL_SCORES), abs=0.8)
 
 
 def test_shift_matches_its_closed_form_and_sign():
@@ -154,4 +170,5 @@ def test_independent_brem_records_its_own_diagnostics():
     assert brem["n_electrons"] == record["realized_electrons_brem"]
     assert brem["elapsed_s"] is not None
     assert brem["elapsed_s"] <= record["statistics"]["cxr"]["elapsed_s"]
-    assert brem["tail_slope"] is not None and brem["shift"] > 0.0
+    assert brem["n_electrons"] < TAIL_MIN_SAMPLES and brem["tail_slope"] is None
+    assert brem["shift"] > 0.0

@@ -662,8 +662,9 @@ the top values of a union are the top values of the per-block top values.
 Each fold partitions its segment (`np.partition`, on the host, where the
 monitor's buffered values already are) and merges at most $2(k+1)$ values,
 so memory stays bounded and no transfer is added. The slope is `None`
-without $k+1$ positive scores and is capped at 10, the value MCNP prints for
-a tail too steep to fit; equal top scores give the cap.
+below $n=50k=10\,000$ scores (`TAIL_MIN_SAMPLES`) or without $k+1$
+positive scores, and is capped at 10, the value MCNP prints for a tail too
+steep to fit; equal top scores give the cap.
 
 MCNP's convention: a slope of at least 3 ($\alpha\ge2$) is needed for a
 finite variance to be plausible; below 3 the RSE and VOV are not
@@ -672,12 +673,21 @@ variance) the #862 check found VOV 0.067 with a $1/N$ trend slope of
 $-1.34$, which looks healthy.
 
 Limits. For a tail that is not exactly Pareto (second-order regular
-variation), Hill has a bias that grows with $k/n$. For a light tail
-(exponential, Gaussian) $\hat\alpha$ grows with the threshold and the slope
-saturates at 10, as MCNP's does. Near $n=k+1$ the "tail" is most of the
-sample, so the slope describes the bulk; it is meaningful only for
-$n\gg k$. Like VOV it sees sampled scores only: an unsampled heavy class
-leaves it unchanged.
+variation), Hill has a bias that grows with $k/n$. A light tail has no
+finite $\alpha$: $\hat\alpha$ grows only slowly with the threshold. For an
+exponential the top scores are $u+E$ with $u\approx\ln(n/k)$ in units of
+the mean and $E\sim\mathrm{Exp}(1)$, so
+$E[\ln(1+E/u)]\approx1/u-1/u^2$, $\hat\alpha\approx u+1$ and
+$\text{slope}\approx2+\ln(n/k)$. That is below 3 up to $n\approx ke\approx540$ (the
+fresh-context verifier measured median slopes 1.2 at $n=201$, 2.3 at 400,
+3.35 at 1000, 6.5 at $2\times10^4$; half-normal 2.7 at 400), and reaches the
+cap only near $n\sim10^6$. A slope at a few hundred electrons would
+therefore call finite-variance populations heavy-tailed. Hence the
+$n\ge50k$ floor: the top $k$ are then at most 2 % of the sample and an
+exponential reads about 5.9 (`test_light_tail_reads_finite_variance_once_reported`).
+Subexponential tails such as a lognormal can still read near 3, which is
+MCNP's behaviour too. Like VOV the slope sees sampled scores only: an
+unsampled heavy class leaves it unchanged.
 
 **SHIFT.** For the Studentized mean $T=\sqrt n(\bar x-\mu)/s$ the Edgeworth
 expansion is
@@ -710,7 +720,9 @@ efficiency unit, where $T$ is the wall time since the monitor was built,
 linearly interpolated at the decision point between the chunk-end stamps
 around it. $T$ includes transport, the per-chunk measure and any restarted
 transport, but not the final spectrum reduction or the prefix re-transport
-after a stop inside a chunk. With a steady cost per electron
+after a stop inside a chunk. After a restart the stamps restart at
+$(0, 0)$, so inside the first new chunk $T$ is interpolated from zero and
+may read below the restart time; it is exact again at that chunk's end. With a steady cost per electron
 $r_n^2\propto1/n$ and $T\propto n$, so the FOM is constant; a drifting FOM
 signals a changing population or cost. `elapsed_s` and `figure_of_merit`
 (`WALL_CLOCK_FIELDS`) are the only record fields that are not functions of
@@ -723,7 +735,8 @@ Anchors (`tests/montecarlo/runner/test_adaptive_precision_diagnostics.py`):
 $M_3$ to $10^{-10}$ under four block patterns),
 `test_tail_slope_recovers_pareto_index` ($\alpha=1.5, 3, 5$ within
 $4\alpha/\sqrt k$; slope below 3 exactly for $\alpha<2$),
-`test_tail_slope_limits`, `test_shift_matches_its_closed_form_and_sign`,
+`test_tail_slope_limits`, `test_light_tail_reads_finite_variance_once_reported`,
+`test_shift_matches_its_closed_form_and_sign`,
 `test_figure_of_merit_is_inverse_rse_squared_time`,
 `test_recorded_diagnostics_never_change_the_stop` (records with and without
 a clock are equal after dropping the wall-clock fields; interpolated

@@ -63,6 +63,11 @@ AdaptiveSettings = Precision
 #: Upper order statistics in the Hill tail-index estimate (#1339).
 TAIL_SCORES = 200
 
+#: Fewest scores with a reported tail slope: the top ``TAIL_SCORES`` are at most
+#: 2 % of the sample. Below it a light tail can read near or below 3 (an
+#: exponential's slope is about ``2 + ln(n / TAIL_SCORES)``).
+TAIL_MIN_SAMPLES = 50 * TAIL_SCORES
+
 #: Largest reported tail slope; MCNP prints 10 for a tail too steep to fit.
 TAIL_SLOPE_CAP = 10.0
 
@@ -191,12 +196,13 @@ class RunningMoments:
         TAIL_SCORES`` largest scores above the threshold ``x_(k+1)``; unbiased
         for an exact Pareto(``alpha``) tail. A survival ``x**-alpha`` has a
         density slope ``1 + alpha``: below 3 the variance may be infinite.
-        Capped at :data:`TAIL_SLOPE_CAP`; ``None`` without ``k + 1`` positive
-        scores. Reported only: it cannot see a tail the run has not sampled.
+        Capped at :data:`TAIL_SLOPE_CAP`; ``None`` below
+        :data:`TAIL_MIN_SAMPLES` scores or without ``k + 1`` positive ones.
+        Reported only: it cannot see a tail the run has not sampled.
 
         Validation: adaptive-sample-size-stopping
         """
-        if self.top.size <= TAIL_SCORES:
+        if self.n < TAIL_MIN_SAMPLES or self.top.size <= TAIL_SCORES:
             return None
         ordered = np.sort(self.top)
         if ordered[0] <= 0.0:

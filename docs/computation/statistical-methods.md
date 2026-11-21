@@ -204,7 +204,9 @@ holds three MCNP/Geant4 diagnostics that never stop or hold a run (#1339).
 tail index from the 201 largest per-electron scores, capped at 10. A slope
 below 3 means the score variance may be infinite, so the RSE and VOV may
 not be trustworthy; the statistics-limited warning mentions it as context.
-It is `null` until 201 scores are positive. `shift` is MCNP's SHIFT,
+It is `null` below 10 000 electrons, where light-tailed scores can still read
+near or below 3 (an exponential reads below 3 up to about 540), or until 201
+scores are positive. `shift` is MCNP's SHIFT,
 $M_3/(2M_2n)$, the skewness offset of the 1-sigma interval centre, as a
 fraction of the mean; `shift_over_se` gives it in standard errors.
 `figure_of_merit` is $1/(r_n^2T)$ in 1/s, with $T$ = `elapsed_s` the wall
