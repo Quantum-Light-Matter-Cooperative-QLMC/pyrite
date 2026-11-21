@@ -7,6 +7,8 @@ at ``x_c = 100`` they stay well inside the #1143 margins (yield/centroid 1e-3,
 mass-L1 1e-2). Validation: node-support-window-tail
 """
 
+import os
+
 import numpy as np
 import pytest
 
@@ -23,6 +25,12 @@ from pyrite.montecarlo.spectrum.cxr._node_window import (
 )
 
 HBARC = 1973.269804
+# The compiled matrix runs every module test on each push. Under
+# NUMBA_DISABLE_JIT the ~1900-row reference over the full band takes ~9 min of
+# Python loops, so that tier runs the full-size flight check weekly (--slow).
+_SLOW_WITHOUT_JIT = (
+    pytest.mark.slow if os.environ.get("NUMBA_DISABLE_JIT") == "1" else (lambda f: f)
+)
 E_BAND = np.arange(500.0, 4000.0, 0.09375)
 
 
@@ -147,6 +155,7 @@ def test_far_pole_whose_window_reaches_the_band_is_evaluated_directly():
     assert abs(dy) < 1e-4 and l1 < 1e-3
 
 
+@_SLOW_WITHOUT_JIT
 def test_contiguous_flights_match_full_node_within_margins():
     rng = np.random.default_rng(1142)
     case = _contiguous_flights(rng, 120)

@@ -29,6 +29,9 @@ def _line_spectrum(energy_keV, *, energy_spread_frac=None):
         tilt_deg=30.0,
         n_electrons=_NE,
         n_electrons_brem=5,
+        # The (002) resonance derivative is the observable; pinned dominant
+        # families keep measured shell selection out of a beam-energy check.
+        n_families=4,
     )
     # Continuous stopping: loss fluctuations (hard inelastic events, the
     # default shell mode) send a few electrons to low energy, and their broad
