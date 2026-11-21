@@ -152,6 +152,17 @@ ENGINES=pyrite sbatch --dependency=after:$hold checks/geant4_performance/precisi
     $hold precision-plan.json 101 102 103
 ```
 
+#1041 v3 re-plans from held-out evidence with a variance margin, records the
+trims in the plan, and adds 200 000-history continuous cone runs for the tail
+slope. `analyze.py` then applies `scenes.json` `amendment_v3` (floor, skew,
+tail and FOM rules; see the equal-precision protocol):
+
+```bash
+uv run python checks/geant4_performance/precision_plan.py evidence/precision/{14460,14462,14463,14464} \
+    --variance-margin 1.10 --max-run-s 1800 --drop-config geant4-16t --only-at geant4-1t=0.05 \
+    --tail-histories 200000 --protocol-version 3 --output precision-plan-v3.json
+```
+
 ## Spectral-grid sensitivity (#278)
 
 The continuous arm's cone scoring does not use a photon grid. For each

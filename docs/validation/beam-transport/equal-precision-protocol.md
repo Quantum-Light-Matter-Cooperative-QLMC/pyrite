@@ -339,6 +339,50 @@ Numerical convergence is still outstanding. A passing gate therefore
 qualifies equivalence at the stated precision only, not numerical
 convergence.
 
+### Amendment v3 (held-out seeds 104–106)
+
+Frozen on 2026-11-21, before seeds 104–106 ran. The machine-readable copy is
+`scenes.json` `precision.equivalence.amendment_v3`. `analyze.py` applies it
+only to a plan with `protocol_version` 3 or higher, so the v2 results keep
+their verdicts.
+
+- **Why.** The v2 plan sized each run at the history count the pilot
+  predicted would land exactly on ε. On seeds 101–103, 8 of 10 tested sets
+  missed the precision gate, both engines at RSE 0.0201–0.0211 against
+  ε = 2%. One set was equivalent (Si 3 MeV transport, a floor-bound run);
+  one failed TOST (W 1 MeV transport, interval still containing 1).
+- **Plan.** `precision_plan.py` re-plans from the 101–103 held-out evidence
+  (jobs 14460 and 14462–14464, about 50× the pilot's histories) with a
+  variance margin of 1.10. The trims are recorded in the plan instead of
+  applied by hand: `geant4-16t` dropped, `geant4-1t` at ε = 5% only. The
+  budget is unchanged at 1800 s per run. One 200 000-history run per scene is
+  added for the continuous cone arm. The plan is
+  `checks/geant4_performance/precision-plan-v3.json`. Sizing N from earlier
+  data changes only statistical power; margins, observables, ε, the CI level,
+  the set rule and the Holm family are unchanged.
+- **Floor rule.** A run at `min_histories` (2000) measures fixed cost, not
+  throughput. A speedup with either arm at the floor is never headline.
+- **Skew rule (SHIFT).** Each TOST cell reports both arms' pooled
+  SHIFT/SE ({eq}`eq-adaptive-shift`). If either exceeds 0.1, the cell passes
+  only if the interval recentred by each arm's SHIFT also lies inside the
+  margin.
+- **Tail rule.** A cone speedup is headline only if the continuous arm's
+  Hill tail slope ({eq}`eq-adaptive-hill-slope`), pooled over its runs of at
+  least 50 000 histories, is at least 3. That is MCNP's criterion for finite
+  variance. Below 3 the speedup is qualified as heavy-tailed.
+- **FOM.** Every `T(ε)` row reports FOM = 1/(worst RSE² · T). An arm is
+  FOM-stable when its FOM at the largest planned N is within a factor 1.15 of
+  its FOM at the smallest planned N. The FOM ratio at each arm's largest N is a
+  secondary speed estimate. It is reported as stable only when both arms are
+  stable, and it is never a headline.
+
+On the v2 evidence these diagnostics already show three things:
+- Geant4 32-thread transport FOM rises 1.17–1.62× between its two run sizes,
+  so thread start-up cost dominates its small runs.
+- The pooled cone tail slopes of the continuous arm are 6.7 (Si 3 MeV) and
+  6.1 (W 3 MeV).
+- The 97× Si 1 MeV cone `T(ε)` ratio at ε = 5% has PyRITE at the floor.
+
 ## Remaining gates
 
 This stage leaves the following open: the EGSnrc adapter, a PenRed

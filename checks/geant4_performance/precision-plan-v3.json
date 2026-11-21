@@ -1,0 +1,1798 @@
+{
+ "schema": "pyrite.geant4-performance.precision-plan.v1",
+ "pilot": [
+  "evidence/precision/14460/pyrite-cuda-continuous-point-c1000000-si-1MeV-1mm-2000-101.json",
+  "evidence/precision/14460/pyrite-cuda-continuous-point-c1000000-si-1MeV-1mm-2000-102.json",
+  "evidence/precision/14460/pyrite-cuda-continuous-point-c1000000-si-1MeV-1mm-2000-103.json",
+  "evidence/precision/14460/pyrite-cuda-continuous-point-c1000000-si-1MeV-1mm-3679-101.json",
+  "evidence/precision/14460/pyrite-cuda-continuous-point-c1000000-si-1MeV-1mm-3679-102.json",
+  "evidence/precision/14460/pyrite-cuda-continuous-point-c1000000-si-1MeV-1mm-3679-103.json",
+  "evidence/precision/14460/pyrite-cuda-continuous-point-c1000000-si-300keV-100um-2000-101.json",
+  "evidence/precision/14460/pyrite-cuda-continuous-point-c1000000-si-300keV-100um-2000-102.json",
+  "evidence/precision/14460/pyrite-cuda-continuous-point-c1000000-si-300keV-100um-2000-103.json",
+  "evidence/precision/14460/pyrite-cuda-continuous-point-c1000000-si-300keV-100um-4226-101.json",
+  "evidence/precision/14460/pyrite-cuda-continuous-point-c1000000-si-300keV-100um-4226-102.json",
+  "evidence/precision/14460/pyrite-cuda-continuous-point-c1000000-si-300keV-100um-4226-103.json",
+  "evidence/precision/14460/pyrite-cuda-continuous-point-c1000000-si-3MeV-1mm-334568-101.json",
+  "evidence/precision/14460/pyrite-cuda-continuous-point-c1000000-si-3MeV-1mm-334568-102.json",
+  "evidence/precision/14460/pyrite-cuda-continuous-point-c1000000-si-3MeV-1mm-334568-103.json",
+  "evidence/precision/14460/pyrite-cuda-continuous-point-c1000000-si-3MeV-1mm-53531-101.json",
+  "evidence/precision/14460/pyrite-cuda-continuous-point-c1000000-si-3MeV-1mm-53531-102.json",
+  "evidence/precision/14460/pyrite-cuda-continuous-point-c1000000-si-3MeV-1mm-53531-103.json",
+  "evidence/precision/14460/pyrite-cuda-continuous-point-c1000000-w-1MeV-100um-2000-101.json",
+  "evidence/precision/14460/pyrite-cuda-continuous-point-c1000000-w-1MeV-100um-2000-102.json",
+  "evidence/precision/14460/pyrite-cuda-continuous-point-c1000000-w-1MeV-100um-2000-103.json",
+  "evidence/precision/14460/pyrite-cuda-continuous-point-c1000000-w-300keV-10um-2000-101.json",
+  "evidence/precision/14460/pyrite-cuda-continuous-point-c1000000-w-300keV-10um-2000-102.json",
+  "evidence/precision/14460/pyrite-cuda-continuous-point-c1000000-w-300keV-10um-2000-103.json",
+  "evidence/precision/14460/pyrite-cuda-continuous-point-c1000000-w-300keV-10um-2516-101.json",
+  "evidence/precision/14460/pyrite-cuda-continuous-point-c1000000-w-300keV-10um-2516-102.json",
+  "evidence/precision/14460/pyrite-cuda-continuous-point-c1000000-w-300keV-10um-2516-103.json",
+  "evidence/precision/14460/pyrite-cuda-continuous-point-c1000000-w-3MeV-100um-39086-101.json",
+  "evidence/precision/14460/pyrite-cuda-continuous-point-c1000000-w-3MeV-100um-39086-102.json",
+  "evidence/precision/14460/pyrite-cuda-continuous-point-c1000000-w-3MeV-100um-39086-103.json",
+  "evidence/precision/14460/pyrite-cuda-continuous-point-c1000000-w-3MeV-100um-6254-101.json",
+  "evidence/precision/14460/pyrite-cuda-continuous-point-c1000000-w-3MeV-100um-6254-102.json",
+  "evidence/precision/14460/pyrite-cuda-continuous-point-c1000000-w-3MeV-100um-6254-103.json",
+  "evidence/precision/14460/pyrite-cuda-si-1MeV-1mm-21357-101.json",
+  "evidence/precision/14460/pyrite-cuda-si-1MeV-1mm-21357-102.json",
+  "evidence/precision/14460/pyrite-cuda-si-1MeV-1mm-21357-103.json",
+  "evidence/precision/14460/pyrite-cuda-si-1MeV-1mm-3417-101.json",
+  "evidence/precision/14460/pyrite-cuda-si-1MeV-1mm-3417-102.json",
+  "evidence/precision/14460/pyrite-cuda-si-1MeV-1mm-3417-103.json",
+  "evidence/precision/14460/pyrite-cuda-si-300keV-100um-52088-101.json",
+  "evidence/precision/14460/pyrite-cuda-si-300keV-100um-52088-102.json",
+  "evidence/precision/14460/pyrite-cuda-si-300keV-100um-52088-103.json",
+  "evidence/precision/14460/pyrite-cuda-si-300keV-100um-8335-101.json",
+  "evidence/precision/14460/pyrite-cuda-si-300keV-100um-8335-102.json",
+  "evidence/precision/14460/pyrite-cuda-si-300keV-100um-8335-103.json",
+  "evidence/precision/14460/pyrite-cuda-si-3MeV-1mm-2000-101.json",
+  "evidence/precision/14460/pyrite-cuda-si-3MeV-1mm-2000-102.json",
+  "evidence/precision/14460/pyrite-cuda-si-3MeV-1mm-2000-103.json",
+  "evidence/precision/14460/pyrite-cuda-w-1MeV-100um-2000-101.json",
+  "evidence/precision/14460/pyrite-cuda-w-1MeV-100um-2000-102.json",
+  "evidence/precision/14460/pyrite-cuda-w-1MeV-100um-2000-103.json",
+  "evidence/precision/14460/pyrite-cuda-w-1MeV-100um-9550-101.json",
+  "evidence/precision/14460/pyrite-cuda-w-1MeV-100um-9550-102.json",
+  "evidence/precision/14460/pyrite-cuda-w-1MeV-100um-9550-103.json",
+  "evidence/precision/14460/pyrite-cuda-w-300keV-10um-12484-101.json",
+  "evidence/precision/14460/pyrite-cuda-w-300keV-10um-12484-102.json",
+  "evidence/precision/14460/pyrite-cuda-w-300keV-10um-12484-103.json",
+  "evidence/precision/14460/pyrite-cuda-w-300keV-10um-78020-101.json",
+  "evidence/precision/14460/pyrite-cuda-w-300keV-10um-78020-102.json",
+  "evidence/precision/14460/pyrite-cuda-w-300keV-10um-78020-103.json",
+  "evidence/precision/14460/pyrite-cuda-w-3MeV-100um-17818-101.json",
+  "evidence/precision/14460/pyrite-cuda-w-3MeV-100um-17818-102.json",
+  "evidence/precision/14460/pyrite-cuda-w-3MeV-100um-17818-103.json",
+  "evidence/precision/14460/pyrite-cuda-w-3MeV-100um-2851-101.json",
+  "evidence/precision/14460/pyrite-cuda-w-3MeV-100um-2851-102.json",
+  "evidence/precision/14460/pyrite-cuda-w-3MeV-100um-2851-103.json",
+  "evidence/precision/14462/geant4-1t-si-1MeV-1mm-3529-101.json",
+  "evidence/precision/14462/geant4-1t-si-300keV-100um-8337-101.json",
+  "evidence/precision/14462/geant4-1t-si-3MeV-1mm-2000-101.json",
+  "evidence/precision/14462/geant4-1t-w-1MeV-100um-140779-101.json",
+  "evidence/precision/14462/geant4-1t-w-1MeV-100um-2000-101.json",
+  "evidence/precision/14462/geant4-1t-w-300keV-10um-12272-101.json",
+  "evidence/precision/14462/geant4-1t-w-300keV-10um-1332956-101.json",
+  "evidence/precision/14462/geant4-1t-w-3MeV-100um-269138-101.json",
+  "evidence/precision/14462/geant4-1t-w-3MeV-100um-2694-101.json",
+  "evidence/precision/14462/geant4-32t-si-1MeV-1mm-1090528-101.json",
+  "evidence/precision/14462/geant4-32t-si-1MeV-1mm-22055-101.json",
+  "evidence/precision/14462/geant4-32t-si-1MeV-1mm-3529-101.json",
+  "evidence/precision/14462/geant4-32t-si-1MeV-1mm-6815796-101.json",
+  "evidence/precision/14462/geant4-32t-si-300keV-100um-52106-101.json",
+  "evidence/precision/14462/geant4-32t-si-300keV-100um-8337-101.json",
+  "evidence/precision/14462/geant4-32t-si-3MeV-1mm-2000-101.json",
+  "evidence/precision/14462/geant4-32t-si-3MeV-1mm-2999650-101.json",
+  "evidence/precision/14462/geant4-32t-w-1MeV-100um-140779-101.json",
+  "evidence/precision/14462/geant4-32t-w-1MeV-100um-2000-101.json",
+  "evidence/precision/14462/geant4-32t-w-1MeV-100um-879868-101.json",
+  "evidence/precision/14462/geant4-32t-w-1MeV-100um-9584-101.json",
+  "evidence/precision/14462/geant4-32t-w-300keV-10um-12272-101.json",
+  "evidence/precision/14462/geant4-32t-w-300keV-10um-1332956-101.json",
+  "evidence/precision/14462/geant4-32t-w-300keV-10um-76699-101.json",
+  "evidence/precision/14462/geant4-32t-w-300keV-10um-8330973-101.json",
+  "evidence/precision/14462/geant4-32t-w-3MeV-100um-1682108-101.json",
+  "evidence/precision/14462/geant4-32t-w-3MeV-100um-16836-101.json",
+  "evidence/precision/14462/geant4-32t-w-3MeV-100um-269138-101.json",
+  "evidence/precision/14462/geant4-32t-w-3MeV-100um-2694-101.json",
+  "evidence/precision/14463/geant4-1t-si-1MeV-1mm-3529-102.json",
+  "evidence/precision/14463/geant4-1t-si-300keV-100um-8337-102.json",
+  "evidence/precision/14463/geant4-1t-si-3MeV-1mm-2000-102.json",
+  "evidence/precision/14463/geant4-1t-w-1MeV-100um-140779-102.json",
+  "evidence/precision/14463/geant4-1t-w-1MeV-100um-2000-102.json",
+  "evidence/precision/14463/geant4-1t-w-300keV-10um-12272-102.json",
+  "evidence/precision/14463/geant4-1t-w-300keV-10um-1332956-102.json",
+  "evidence/precision/14463/geant4-1t-w-3MeV-100um-269138-102.json",
+  "evidence/precision/14463/geant4-1t-w-3MeV-100um-2694-102.json",
+  "evidence/precision/14463/geant4-32t-si-1MeV-1mm-1090528-102.json",
+  "evidence/precision/14463/geant4-32t-si-1MeV-1mm-22055-102.json",
+  "evidence/precision/14463/geant4-32t-si-1MeV-1mm-3529-102.json",
+  "evidence/precision/14463/geant4-32t-si-1MeV-1mm-6815796-102.json",
+  "evidence/precision/14463/geant4-32t-si-300keV-100um-52106-102.json",
+  "evidence/precision/14463/geant4-32t-si-300keV-100um-8337-102.json",
+  "evidence/precision/14463/geant4-32t-si-3MeV-1mm-2000-102.json",
+  "evidence/precision/14463/geant4-32t-si-3MeV-1mm-2999650-102.json",
+  "evidence/precision/14463/geant4-32t-w-1MeV-100um-140779-102.json",
+  "evidence/precision/14463/geant4-32t-w-1MeV-100um-2000-102.json",
+  "evidence/precision/14463/geant4-32t-w-1MeV-100um-879868-102.json",
+  "evidence/precision/14463/geant4-32t-w-1MeV-100um-9584-102.json",
+  "evidence/precision/14463/geant4-32t-w-300keV-10um-12272-102.json",
+  "evidence/precision/14463/geant4-32t-w-300keV-10um-1332956-102.json",
+  "evidence/precision/14463/geant4-32t-w-300keV-10um-76699-102.json",
+  "evidence/precision/14463/geant4-32t-w-300keV-10um-8330973-102.json",
+  "evidence/precision/14463/geant4-32t-w-3MeV-100um-1682108-102.json",
+  "evidence/precision/14463/geant4-32t-w-3MeV-100um-16836-102.json",
+  "evidence/precision/14463/geant4-32t-w-3MeV-100um-269138-102.json",
+  "evidence/precision/14463/geant4-32t-w-3MeV-100um-2694-102.json",
+  "evidence/precision/14464/geant4-1t-si-1MeV-1mm-3529-103.json",
+  "evidence/precision/14464/geant4-1t-si-300keV-100um-8337-103.json",
+  "evidence/precision/14464/geant4-1t-si-3MeV-1mm-2000-103.json",
+  "evidence/precision/14464/geant4-1t-w-1MeV-100um-140779-103.json",
+  "evidence/precision/14464/geant4-1t-w-1MeV-100um-2000-103.json",
+  "evidence/precision/14464/geant4-1t-w-300keV-10um-12272-103.json",
+  "evidence/precision/14464/geant4-1t-w-300keV-10um-1332956-103.json",
+  "evidence/precision/14464/geant4-1t-w-3MeV-100um-269138-103.json",
+  "evidence/precision/14464/geant4-1t-w-3MeV-100um-2694-103.json",
+  "evidence/precision/14464/geant4-32t-si-1MeV-1mm-1090528-103.json",
+  "evidence/precision/14464/geant4-32t-si-1MeV-1mm-22055-103.json",
+  "evidence/precision/14464/geant4-32t-si-1MeV-1mm-3529-103.json",
+  "evidence/precision/14464/geant4-32t-si-1MeV-1mm-6815796-103.json",
+  "evidence/precision/14464/geant4-32t-si-300keV-100um-52106-103.json",
+  "evidence/precision/14464/geant4-32t-si-300keV-100um-8337-103.json",
+  "evidence/precision/14464/geant4-32t-si-3MeV-1mm-2000-103.json",
+  "evidence/precision/14464/geant4-32t-si-3MeV-1mm-2999650-103.json",
+  "evidence/precision/14464/geant4-32t-w-1MeV-100um-140779-103.json",
+  "evidence/precision/14464/geant4-32t-w-1MeV-100um-2000-103.json",
+  "evidence/precision/14464/geant4-32t-w-1MeV-100um-879868-103.json",
+  "evidence/precision/14464/geant4-32t-w-1MeV-100um-9584-103.json",
+  "evidence/precision/14464/geant4-32t-w-300keV-10um-12272-103.json",
+  "evidence/precision/14464/geant4-32t-w-300keV-10um-1332956-103.json",
+  "evidence/precision/14464/geant4-32t-w-300keV-10um-76699-103.json",
+  "evidence/precision/14464/geant4-32t-w-300keV-10um-8330973-103.json",
+  "evidence/precision/14464/geant4-32t-w-3MeV-100um-1682108-103.json",
+  "evidence/precision/14464/geant4-32t-w-3MeV-100um-16836-103.json",
+  "evidence/precision/14464/geant4-32t-w-3MeV-100um-269138-103.json",
+  "evidence/precision/14464/geant4-32t-w-3MeV-100um-2694-103.json"
+ ],
+ "targets_rse": [
+  0.05,
+  0.02
+ ],
+ "max_run_s": 1800.0,
+ "variance_margin": 1.1,
+ "trim": {
+  "drop": [
+   "geant4-16t"
+  ],
+  "only_at": {
+   "geant4-1t": 0.05
+  }
+ },
+ "tail_runs": [
+  {
+   "scene": "si-1MeV-1mm",
+   "config": "pyrite-cuda-continuous-point-c1000000",
+   "histories": 200000
+  },
+  {
+   "scene": "si-300keV-100um",
+   "config": "pyrite-cuda-continuous-point-c1000000",
+   "histories": 200000
+  },
+  {
+   "scene": "w-1MeV-100um",
+   "config": "pyrite-cuda-continuous-point-c1000000",
+   "histories": 200000
+  },
+  {
+   "scene": "w-300keV-10um",
+   "config": "pyrite-cuda-continuous-point-c1000000",
+   "histories": 200000
+  },
+  {
+   "scene": "w-3MeV-100um",
+   "config": "pyrite-cuda-continuous-point-c1000000",
+   "histories": 200000
+  }
+ ],
+ "cv": {
+  "si-300keV-100um|geant4|transmitted": {
+   "mean": 0.8409469807114471,
+   "cv": 0.43489829336531544,
+   "n": 206340
+  },
+  "si-300keV-100um|geant4|backscattered": {
+   "mean": 0.1132645148783561,
+   "cv": 2.7980222385126985,
+   "n": 206340
+  },
+  "si-300keV-100um|geant4|stopped": {
+   "mean": 0.04578850441019676,
+   "cv": 4.565045865815405,
+   "n": 206340
+  },
+  "si-300keV-100um|geant4|transmitted_energy_keV": {
+   "mean": 197.38112507194788,
+   "cv": 0.45706336185760454,
+   "n": 206340
+  },
+  "si-300keV-100um|geant4|cone_source_photons_ge10kev": {
+   "mean": 2.4231850344092275e-05,
+   "cv": 203.1432991661868,
+   "n": 206340
+  },
+  "si-300keV-100um|pyrite-discrete|transmitted": {
+   "mean": 0.8448824674930628,
+   "cv": 0.42848289813947477,
+   "n": 181269
+  },
+  "si-300keV-100um|pyrite-discrete|backscattered": {
+   "mean": 0.11063116142307841,
+   "cv": 2.8353287161421132,
+   "n": 181269
+  },
+  "si-300keV-100um|pyrite-discrete|stopped": {
+   "mean": 0.0444863710838588,
+   "cv": 4.6345348347794575,
+   "n": 181269
+  },
+  "si-300keV-100um|pyrite-discrete|transmitted_energy_keV": {
+   "mean": 198.4692205883433,
+   "cv": 0.4501760562631878,
+   "n": 181269
+  },
+  "si-300keV-100um|pyrite-continuous|cone_source_photons_ge10kev": {
+   "mean": 4.337159436141319e-05,
+   "cv": 1.3024827305322504,
+   "n": 18678
+  },
+  "w-300keV-10um|geant4|transmitted": {
+   "mean": 0.5433247541086809,
+   "cv": 0.9167987154061026,
+   "n": 33294384
+  },
+  "w-300keV-10um|geant4|backscattered": {
+   "mean": 0.42644489232778715,
+   "cv": 1.1597279494676966,
+   "n": 33294384
+  },
+  "w-300keV-10um|geant4|stopped": {
+   "mean": 0.030230353563531917,
+   "cv": 5.663862304567469,
+   "n": 33294384
+  },
+  "w-300keV-10um|geant4|transmitted_energy_keV": {
+   "mean": 132.74495103142166,
+   "cv": 0.9387352122697872,
+   "n": 33294384
+  },
+  "w-300keV-10um|geant4|cone_source_photons_ge10kev": {
+   "mean": 0.00027256849083016525,
+   "cv": 60.59575490616035,
+   "n": 33294384
+  },
+  "w-300keV-10um|pyrite-discrete|transmitted": {
+   "mean": 0.5424216977518489,
+   "cv": 0.9184700184490308,
+   "n": 271512
+  },
+  "w-300keV-10um|pyrite-discrete|backscattered": {
+   "mean": 0.426327381478535,
+   "cv": 1.1600087018894805,
+   "n": 271512
+  },
+  "w-300keV-10um|pyrite-discrete|stopped": {
+   "mean": 0.031250920769616074,
+   "cv": 5.567689945756132,
+   "n": 271512
+  },
+  "w-300keV-10um|pyrite-discrete|transmitted_energy_keV": {
+   "mean": 132.4135954589884,
+   "cv": 0.9405706734168605,
+   "n": 271512
+  },
+  "w-300keV-10um|pyrite-continuous|cone_source_photons_ge10kev": {
+   "mean": 0.0002795086132550305,
+   "cv": 0.9995539049337194,
+   "n": 13548
+  },
+  "si-1MeV-1mm|geant4|transmitted": {
+   "mean": 0.5212180501212472,
+   "cv": 0.9584272874989063,
+   "n": 23806311
+  },
+  "si-1MeV-1mm|geant4|backscattered": {
+   "mean": 0.10341480458690135,
+   "cv": 2.9444516888334604,
+   "n": 23806311
+  },
+  "si-1MeV-1mm|geant4|stopped": {
+   "mean": 0.3753671452918514,
+   "cv": 1.2899839065768806,
+   "n": 23806311
+  },
+  "si-1MeV-1mm|geant4|transmitted_energy_keV": {
+   "mean": 256.57151456707163,
+   "cv": 1.015732863726499,
+   "n": 23806311
+  },
+  "si-1MeV-1mm|geant4|cone_source_photons_ge10kev": {
+   "mean": 0.00043039007597607206,
+   "cv": 48.196755944059824,
+   "n": 23806311
+  },
+  "si-1MeV-1mm|pyrite-discrete|transmitted": {
+   "mean": 0.5195635208955626,
+   "cv": 0.9616157854830369,
+   "n": 74322
+  },
+  "si-1MeV-1mm|pyrite-discrete|backscattered": {
+   "mean": 0.10342832539490326,
+   "cv": 2.9442567691953756,
+   "n": 74322
+  },
+  "si-1MeV-1mm|pyrite-discrete|stopped": {
+   "mean": 0.37700815370953417,
+   "cv": 1.2854900858790181,
+   "n": 74322
+  },
+  "si-1MeV-1mm|pyrite-discrete|transmitted_energy_keV": {
+   "mean": 255.38672729759037,
+   "cv": 1.0189207822802457,
+   "n": 74322
+  },
+  "si-1MeV-1mm|pyrite-continuous|cone_source_photons_ge10kev": {
+   "mean": 0.0004425866178597752,
+   "cv": 1.201275287140113,
+   "n": 17037
+  },
+  "w-1MeV-100um|geant4|transmitted": {
+   "mean": 0.22453794719477566,
+   "cv": 1.858384022367542,
+   "n": 3525030
+  },
+  "w-1MeV-100um|geant4|backscattered": {
+   "mean": 0.44354771448753627,
+   "cv": 1.1200666182438348,
+   "n": 3525030
+  },
+  "w-1MeV-100um|geant4|stopped": {
+   "mean": 0.3319143383176881,
+   "cv": 1.4187410349810823,
+   "n": 3525030
+  },
+  "w-1MeV-100um|geant4|transmitted_energy_keV": {
+   "mean": 127.54803760349539,
+   "cv": 1.9481536485185085,
+   "n": 3525030
+  },
+  "w-1MeV-100um|geant4|cone_source_photons_ge10kev": {
+   "mean": 0.002611608979214361,
+   "cv": 19.59766980430048,
+   "n": 3525030
+  },
+  "w-1MeV-100um|pyrite-discrete|transmitted": {
+   "mean": 0.21838383838383837,
+   "cv": 1.8918765096401666,
+   "n": 34650
+  },
+  "w-1MeV-100um|pyrite-discrete|backscattered": {
+   "mean": 0.4451948051948052,
+   "cv": 1.1163528420314832,
+   "n": 34650
+  },
+  "w-1MeV-100um|pyrite-discrete|stopped": {
+   "mean": 0.3364213564213564,
+   "cv": 1.4044642483198715,
+   "n": 34650
+  },
+  "w-1MeV-100um|pyrite-discrete|transmitted_energy_keV": {
+   "mean": 123.63494584509289,
+   "cv": 1.983182445859833,
+   "n": 34650
+  },
+  "w-1MeV-100um|pyrite-continuous|cone_source_photons_ge10kev": {
+   "mean": 0.00265359928209472,
+   "cv": 0.877062281677793,
+   "n": 6000
+  },
+  "si-3MeV-1mm|geant4|transmitted": {
+   "mean": 0.988774879452222,
+   "cv": 0.10654837210684145,
+   "n": 9010950
+  },
+  "si-3MeV-1mm|geant4|backscattered": {
+   "mean": 0.009747806835017395,
+   "cv": 10.079047067932851,
+   "n": 9010950
+  },
+  "si-3MeV-1mm|geant4|stopped": {
+   "mean": 0.0011141999456217159,
+   "cv": 29.941694667642142,
+   "n": 9010950
+  },
+  "si-3MeV-1mm|geant4|transmitted_energy_keV": {
+   "mean": 2554.6529245533843,
+   "cv": 0.12200240923533452,
+   "n": 9010950
+  },
+  "si-3MeV-1mm|geant4|cone_source_photons_ge10kev": {
+   "mean": 7.002591291706202e-05,
+   "cv": 120.25173961626878,
+   "n": 9010950
+  },
+  "si-3MeV-1mm|pyrite-discrete|transmitted": {
+   "mean": 0.9891666666666666,
+   "cv": 0.10466042907993582,
+   "n": 6000
+  },
+  "si-3MeV-1mm|pyrite-discrete|backscattered": {
+   "mean": 0.009,
+   "cv": 10.49425871713266,
+   "n": 6000
+  },
+  "si-3MeV-1mm|pyrite-discrete|stopped": {
+   "mean": 0.0011666666666666668,
+   "cv": 29.262357584527564,
+   "n": 6000
+  },
+  "si-3MeV-1mm|pyrite-discrete|transmitted_energy_keV": {
+   "mean": 2557.7008851659316,
+   "cv": 0.11763544221846653,
+   "n": 6000
+  },
+  "si-3MeV-1mm|pyrite-continuous|cone_source_photons_ge10kev": {
+   "mean": 7.390863334732352e-05,
+   "cv": 10.929442482391886,
+   "n": 1164297
+  },
+  "w-3MeV-100um|geant4|transmitted": {
+   "mean": 0.8636263374309435,
+   "cv": 0.39737665105719716,
+   "n": 6727824
+  },
+  "w-3MeV-100um|geant4|backscattered": {
+   "mean": 0.12955882912513764,
+   "cv": 2.592007401196663,
+   "n": 6727824
+  },
+  "w-3MeV-100um|geant4|stopped": {
+   "mean": 0.006814833443918866,
+   "cv": 12.072230571405042,
+   "n": 6727824
+  },
+  "w-3MeV-100um|geant4|transmitted_energy_keV": {
+   "mean": 2273.185992399396,
+   "cv": 0.4164372395678238,
+   "n": 6727824
+  },
+  "w-3MeV-100um|geant4|cone_source_photons_ge10kev": {
+   "mean": 0.0014438546549374656,
+   "cv": 26.63752492137545,
+   "n": 6727824
+  },
+  "w-3MeV-100um|pyrite-discrete|transmitted": {
+   "mean": 0.8662409082845485,
+   "cv": 0.39295770869908736,
+   "n": 62007
+  },
+  "w-3MeV-100um|pyrite-discrete|backscattered": {
+   "mean": 0.1268727724289193,
+   "cv": 2.6233609685354784,
+   "n": 62007
+  },
+  "w-3MeV-100um|pyrite-discrete|stopped": {
+   "mean": 0.006886319286532165,
+   "cv": 12.009070842706587,
+   "n": 62007
+  },
+  "w-3MeV-100um|pyrite-discrete|transmitted_energy_keV": {
+   "mean": 2276.4666224485836,
+   "cv": 0.4124911626764556,
+   "n": 62007
+  },
+  "w-3MeV-100um|pyrite-continuous|cone_source_photons_ge10kev": {
+   "mean": 0.001462542458121379,
+   "cv": 3.951989760862321,
+   "n": 136020
+  }
+ },
+ "items": [
+  {
+   "scene": "si-300keV-100um",
+   "arm": "geant4",
+   "config": "geant4-1t",
+   "set": "transport",
+   "target_rse": 0.05,
+   "histories": 9170,
+   "binding": "stopped",
+   "per_observable_histories": {
+    "transmitted": 2000,
+    "backscattered": 3445,
+    "stopped": 9170,
+    "transmitted_energy_keV": 2000
+   },
+   "diagnostics": {},
+   "predicted_warm_s": 3.93194685138539,
+   "status": "planned"
+  },
+  {
+   "scene": "si-300keV-100um",
+   "arm": "geant4",
+   "config": "geant4-32t",
+   "set": "transport",
+   "target_rse": 0.05,
+   "histories": 9170,
+   "binding": "stopped",
+   "per_observable_histories": {
+    "transmitted": 2000,
+    "backscattered": 3445,
+    "stopped": 9170,
+    "transmitted_energy_keV": 2000
+   },
+   "diagnostics": {},
+   "predicted_warm_s": 0.300330787049476,
+   "status": "planned"
+  },
+  {
+   "scene": "si-300keV-100um",
+   "arm": "geant4",
+   "config": "geant4-32t",
+   "set": "transport",
+   "target_rse": 0.02,
+   "histories": 57310,
+   "binding": "stopped",
+   "per_observable_histories": {
+    "transmitted": 2000,
+    "backscattered": 21530,
+    "stopped": 57310,
+    "transmitted_energy_keV": 2000
+   },
+   "diagnostics": {},
+   "predicted_warm_s": 1.8769855404368017,
+   "status": "planned"
+  },
+  {
+   "scene": "si-300keV-100um",
+   "arm": "geant4",
+   "config": "geant4-1t",
+   "set": "cone",
+   "target_rse": 0.05,
+   "histories": 18157568,
+   "binding": "cone_source_photons_ge10kev",
+   "per_observable_histories": {
+    "cone_source_photons_ge10kev": 18157568
+   },
+   "diagnostics": {},
+   "predicted_warm_s": 7785.669828398704,
+   "status": "over-budget"
+  },
+  {
+   "scene": "si-300keV-100um",
+   "arm": "geant4",
+   "config": "geant4-32t",
+   "set": "cone",
+   "target_rse": 0.05,
+   "histories": 18157568,
+   "binding": "cone_source_photons_ge10kev",
+   "per_observable_histories": {
+    "cone_source_photons_ge10kev": 18157568
+   },
+   "diagnostics": {},
+   "predicted_warm_s": 594.6866617605649,
+   "status": "planned"
+  },
+  {
+   "scene": "si-300keV-100um",
+   "arm": "geant4",
+   "config": "geant4-32t",
+   "set": "cone",
+   "target_rse": 0.02,
+   "histories": 113484800,
+   "binding": "cone_source_photons_ge10kev",
+   "per_observable_histories": {
+    "cone_source_photons_ge10kev": 113484800
+   },
+   "diagnostics": {},
+   "predicted_warm_s": 3716.791636003531,
+   "status": "over-budget"
+  },
+  {
+   "scene": "si-300keV-100um",
+   "arm": "pyrite-discrete",
+   "config": "pyrite-cuda",
+   "set": "transport",
+   "target_rse": 0.05,
+   "histories": 9451,
+   "binding": "stopped",
+   "per_observable_histories": {
+    "transmitted": 2000,
+    "backscattered": 3538,
+    "stopped": 9451,
+    "transmitted_energy_keV": 2000
+   },
+   "diagnostics": {},
+   "predicted_warm_s": 0.46455812767972404,
+   "status": "planned"
+  },
+  {
+   "scene": "si-300keV-100um",
+   "arm": "pyrite-discrete",
+   "config": "pyrite-cuda",
+   "set": "transport",
+   "target_rse": 0.02,
+   "histories": 59068,
+   "binding": "stopped",
+   "per_observable_histories": {
+    "transmitted": 2000,
+    "backscattered": 22108,
+    "stopped": 59068,
+    "transmitted_energy_keV": 2000
+   },
+   "diagnostics": {},
+   "predicted_warm_s": 2.903451432206744,
+   "status": "planned"
+  },
+  {
+   "scene": "si-300keV-100um",
+   "arm": "pyrite-continuous",
+   "config": "pyrite-cuda-continuous-point-c1000000",
+   "set": "cone",
+   "target_rse": 0.05,
+   "histories": 2000,
+   "binding": "cone_source_photons_ge10kev",
+   "per_observable_histories": {
+    "cone_source_photons_ge10kev": 2000
+   },
+   "diagnostics": {},
+   "predicted_warm_s": 0.31841694039301005,
+   "status": "planned"
+  },
+  {
+   "scene": "si-300keV-100um",
+   "arm": "pyrite-continuous",
+   "config": "pyrite-cuda-continuous-point-c1000000",
+   "set": "cone",
+   "target_rse": 0.02,
+   "histories": 4666,
+   "binding": "cone_source_photons_ge10kev",
+   "per_observable_histories": {
+    "cone_source_photons_ge10kev": 4666
+   },
+   "diagnostics": {},
+   "predicted_warm_s": 0.7428667219368925,
+   "status": "planned"
+  },
+  {
+   "scene": "w-300keV-10um",
+   "arm": "geant4",
+   "config": "geant4-1t",
+   "set": "transport",
+   "target_rse": 0.05,
+   "histories": 14115,
+   "binding": "stopped",
+   "per_observable_histories": {
+    "transmitted": 2000,
+    "backscattered": 2000,
+    "stopped": 14115,
+    "transmitted_energy_keV": 2000
+   },
+   "diagnostics": {},
+   "predicted_warm_s": 7.564626069033786,
+   "status": "planned"
+  },
+  {
+   "scene": "w-300keV-10um",
+   "arm": "geant4",
+   "config": "geant4-32t",
+   "set": "transport",
+   "target_rse": 0.05,
+   "histories": 14115,
+   "binding": "stopped",
+   "per_observable_histories": {
+    "transmitted": 2000,
+    "backscattered": 2000,
+    "stopped": 14115,
+    "transmitted_energy_keV": 2000
+   },
+   "diagnostics": {},
+   "predicted_warm_s": 0.5122857504003434,
+   "status": "planned"
+  },
+  {
+   "scene": "w-300keV-10um",
+   "arm": "geant4",
+   "config": "geant4-32t",
+   "set": "transport",
+   "target_rse": 0.02,
+   "histories": 88219,
+   "binding": "stopped",
+   "per_observable_histories": {
+    "transmitted": 2312,
+    "backscattered": 3699,
+    "stopped": 88219,
+    "transmitted_energy_keV": 2424
+   },
+   "diagnostics": {},
+   "predicted_warm_s": 3.201795013430244,
+   "status": "planned"
+  },
+  {
+   "scene": "w-300keV-10um",
+   "arm": "geant4",
+   "config": "geant4-1t",
+   "set": "cone",
+   "target_rse": 0.05,
+   "histories": 1615613,
+   "binding": "cone_source_photons_ge10kev",
+   "per_observable_histories": {
+    "cone_source_photons_ge10kev": 1615613
+   },
+   "diagnostics": {},
+   "predicted_warm_s": 865.852512736088,
+   "status": "planned"
+  },
+  {
+   "scene": "w-300keV-10um",
+   "arm": "geant4",
+   "config": "geant4-32t",
+   "set": "cone",
+   "target_rse": 0.05,
+   "histories": 1615613,
+   "binding": "cone_source_photons_ge10kev",
+   "per_observable_histories": {
+    "cone_source_photons_ge10kev": 1615613
+   },
+   "diagnostics": {},
+   "predicted_warm_s": 58.636593557318456,
+   "status": "planned"
+  },
+  {
+   "scene": "w-300keV-10um",
+   "arm": "geant4",
+   "config": "geant4-32t",
+   "set": "cone",
+   "target_rse": 0.02,
+   "histories": 10097576,
+   "binding": "cone_source_photons_ge10kev",
+   "per_observable_histories": {
+    "cone_source_photons_ge10kev": 10097576
+   },
+   "diagnostics": {},
+   "predicted_warm_s": 366.4785191912503,
+   "status": "planned"
+  },
+  {
+   "scene": "w-300keV-10um",
+   "arm": "pyrite-discrete",
+   "config": "pyrite-cuda",
+   "set": "transport",
+   "target_rse": 0.05,
+   "histories": 13640,
+   "binding": "stopped",
+   "per_observable_histories": {
+    "transmitted": 2000,
+    "backscattered": 2000,
+    "stopped": 13640,
+    "transmitted_energy_keV": 2000
+   },
+   "diagnostics": {},
+   "predicted_warm_s": 1.4940007240559225,
+   "status": "planned"
+  },
+  {
+   "scene": "w-300keV-10um",
+   "arm": "pyrite-discrete",
+   "config": "pyrite-cuda",
+   "set": "transport",
+   "target_rse": 0.02,
+   "histories": 85248,
+   "binding": "stopped",
+   "per_observable_histories": {
+    "transmitted": 2320,
+    "backscattered": 3701,
+    "stopped": 85248,
+    "transmitted_energy_keV": 2433
+   },
+   "diagnostics": {},
+   "predicted_warm_s": 9.337285463659772,
+   "status": "planned"
+  },
+  {
+   "scene": "w-300keV-10um",
+   "arm": "pyrite-continuous",
+   "config": "pyrite-cuda-continuous-point-c1000000",
+   "set": "cone",
+   "target_rse": 0.05,
+   "histories": 2000,
+   "binding": "cone_source_photons_ge10kev",
+   "per_observable_histories": {
+    "cone_source_photons_ge10kev": 2000
+   },
+   "diagnostics": {},
+   "predicted_warm_s": 0.7132016120860516,
+   "status": "planned"
+  },
+  {
+   "scene": "w-300keV-10um",
+   "arm": "pyrite-continuous",
+   "config": "pyrite-cuda-continuous-point-c1000000",
+   "set": "cone",
+   "target_rse": 0.02,
+   "histories": 2748,
+   "binding": "cone_source_photons_ge10kev",
+   "per_observable_histories": {
+    "cone_source_photons_ge10kev": 2748
+   },
+   "diagnostics": {},
+   "predicted_warm_s": 0.9799390150062348,
+   "status": "planned"
+  },
+  {
+   "scene": "si-1MeV-1mm",
+   "arm": "geant4",
+   "config": "geant4-1t",
+   "set": "transport",
+   "target_rse": 0.05,
+   "histories": 3815,
+   "binding": "backscattered",
+   "per_observable_histories": {
+    "transmitted": 2000,
+    "backscattered": 3815,
+    "stopped": 2000,
+    "transmitted_energy_keV": 2000
+   },
+   "diagnostics": {},
+   "predicted_warm_s": 11.755558729101729,
+   "status": "planned"
+  },
+  {
+   "scene": "si-1MeV-1mm",
+   "arm": "geant4",
+   "config": "geant4-32t",
+   "set": "transport",
+   "target_rse": 0.05,
+   "histories": 3815,
+   "binding": "backscattered",
+   "per_observable_histories": {
+    "transmitted": 2000,
+    "backscattered": 3815,
+    "stopped": 2000,
+    "transmitted_energy_keV": 2000
+   },
+   "diagnostics": {},
+   "predicted_warm_s": 0.7683752719946431,
+   "status": "planned"
+  },
+  {
+   "scene": "si-1MeV-1mm",
+   "arm": "geant4",
+   "config": "geant4-32t",
+   "set": "transport",
+   "target_rse": 0.02,
+   "histories": 23842,
+   "binding": "backscattered",
+   "per_observable_histories": {
+    "transmitted": 2527,
+    "backscattered": 23842,
+    "stopped": 4577,
+    "transmitted_energy_keV": 2838
+   },
+   "diagnostics": {},
+   "predicted_warm_s": 4.8019929842454205,
+   "status": "planned"
+  },
+  {
+   "scene": "si-1MeV-1mm",
+   "arm": "geant4",
+   "config": "geant4-1t",
+   "set": "cone",
+   "target_rse": 0.05,
+   "histories": 1022089,
+   "binding": "cone_source_photons_ge10kev",
+   "per_observable_histories": {
+    "cone_source_photons_ge10kev": 1022089
+   },
+   "diagnostics": {},
+   "predicted_warm_s": 3149.469794461037,
+   "status": "over-budget"
+  },
+  {
+   "scene": "si-1MeV-1mm",
+   "arm": "geant4",
+   "config": "geant4-32t",
+   "set": "cone",
+   "target_rse": 0.05,
+   "histories": 1022089,
+   "binding": "cone_source_photons_ge10kev",
+   "per_observable_histories": {
+    "cone_source_photons_ge10kev": 1022089
+   },
+   "diagnostics": {},
+   "predicted_warm_s": 205.85790652103086,
+   "status": "planned"
+  },
+  {
+   "scene": "si-1MeV-1mm",
+   "arm": "geant4",
+   "config": "geant4-32t",
+   "set": "cone",
+   "target_rse": 0.02,
+   "histories": 6388051,
+   "binding": "cone_source_photons_ge10kev",
+   "per_observable_histories": {
+    "cone_source_photons_ge10kev": 6388051
+   },
+   "diagnostics": {},
+   "predicted_warm_s": 1286.6108583592795,
+   "status": "planned"
+  },
+  {
+   "scene": "si-1MeV-1mm",
+   "arm": "pyrite-discrete",
+   "config": "pyrite-cuda",
+   "set": "transport",
+   "target_rse": 0.05,
+   "histories": 3815,
+   "binding": "backscattered",
+   "per_observable_histories": {
+    "transmitted": 2000,
+    "backscattered": 3815,
+    "stopped": 2000,
+    "transmitted_energy_keV": 2000
+   },
+   "diagnostics": {},
+   "predicted_warm_s": 1.6426631337025923,
+   "status": "planned"
+  },
+  {
+   "scene": "si-1MeV-1mm",
+   "arm": "pyrite-discrete",
+   "config": "pyrite-cuda",
+   "set": "transport",
+   "target_rse": 0.02,
+   "histories": 23839,
+   "binding": "backscattered",
+   "per_observable_histories": {
+    "transmitted": 2543,
+    "backscattered": 23839,
+    "stopped": 4545,
+    "transmitted_energy_keV": 2856
+   },
+   "diagnostics": {},
+   "predicted_warm_s": 10.264599330101206,
+   "status": "planned"
+  },
+  {
+   "scene": "si-1MeV-1mm",
+   "arm": "pyrite-continuous",
+   "config": "pyrite-cuda-continuous-point-c1000000",
+   "set": "cone",
+   "target_rse": 0.05,
+   "histories": 2000,
+   "binding": "cone_source_photons_ge10kev",
+   "per_observable_histories": {
+    "cone_source_photons_ge10kev": 2000
+   },
+   "diagnostics": {},
+   "predicted_warm_s": 2.2740355699385644,
+   "status": "planned"
+  },
+  {
+   "scene": "si-1MeV-1mm",
+   "arm": "pyrite-continuous",
+   "config": "pyrite-cuda-continuous-point-c1000000",
+   "set": "cone",
+   "target_rse": 0.02,
+   "histories": 3969,
+   "binding": "cone_source_photons_ge10kev",
+   "per_observable_histories": {
+    "cone_source_photons_ge10kev": 3969
+   },
+   "diagnostics": {},
+   "predicted_warm_s": 4.512823588543081,
+   "status": "planned"
+  },
+  {
+   "scene": "w-1MeV-100um",
+   "arm": "geant4",
+   "config": "geant4-1t",
+   "set": "transport",
+   "target_rse": 0.05,
+   "histories": 2000,
+   "binding": "transmitted",
+   "per_observable_histories": {
+    "transmitted": 2000,
+    "backscattered": 2000,
+    "stopped": 2000,
+    "transmitted_energy_keV": 2000
+   },
+   "diagnostics": {},
+   "predicted_warm_s": 8.03079778944303,
+   "status": "planned"
+  },
+  {
+   "scene": "w-1MeV-100um",
+   "arm": "geant4",
+   "config": "geant4-32t",
+   "set": "transport",
+   "target_rse": 0.05,
+   "histories": 2000,
+   "binding": "transmitted",
+   "per_observable_histories": {
+    "transmitted": 2000,
+    "backscattered": 2000,
+    "stopped": 2000,
+    "transmitted_energy_keV": 2000
+   },
+   "diagnostics": {},
+   "predicted_warm_s": 0.5235940595634799,
+   "status": "planned"
+  },
+  {
+   "scene": "w-1MeV-100um",
+   "arm": "geant4",
+   "config": "geant4-32t",
+   "set": "transport",
+   "target_rse": 0.02,
+   "histories": 10438,
+   "binding": "transmitted_energy_keV",
+   "per_observable_histories": {
+    "transmitted": 9498,
+    "backscattered": 3451,
+    "stopped": 5536,
+    "transmitted_energy_keV": 10438
+   },
+   "diagnostics": {},
+   "predicted_warm_s": 2.732637396861802,
+   "status": "planned"
+  },
+  {
+   "scene": "w-1MeV-100um",
+   "arm": "geant4",
+   "config": "geant4-1t",
+   "set": "cone",
+   "target_rse": 0.05,
+   "histories": 168991,
+   "binding": "cone_source_photons_ge10kev",
+   "per_observable_histories": {
+    "cone_source_photons_ge10kev": 168991
+   },
+   "diagnostics": {},
+   "predicted_warm_s": 678.5662746178834,
+   "status": "planned"
+  },
+  {
+   "scene": "w-1MeV-100um",
+   "arm": "geant4",
+   "config": "geant4-32t",
+   "set": "cone",
+   "target_rse": 0.05,
+   "histories": 168991,
+   "binding": "cone_source_photons_ge10kev",
+   "per_observable_histories": {
+    "cone_source_photons_ge10kev": 168991
+   },
+   "diagnostics": {},
+   "predicted_warm_s": 44.241341859846024,
+   "status": "planned"
+  },
+  {
+   "scene": "w-1MeV-100um",
+   "arm": "geant4",
+   "config": "geant4-32t",
+   "set": "cone",
+   "target_rse": 0.02,
+   "histories": 1056189,
+   "binding": "cone_source_photons_ge10kev",
+   "per_observable_histories": {
+    "cone_source_photons_ge10kev": 1056189
+   },
+   "diagnostics": {},
+   "predicted_warm_s": 276.50714308814617,
+   "status": "planned"
+  },
+  {
+   "scene": "w-1MeV-100um",
+   "arm": "pyrite-discrete",
+   "config": "pyrite-cuda",
+   "set": "transport",
+   "target_rse": 0.05,
+   "histories": 2000,
+   "binding": "transmitted",
+   "per_observable_histories": {
+    "transmitted": 2000,
+    "backscattered": 2000,
+    "stopped": 2000,
+    "transmitted_energy_keV": 2000
+   },
+   "diagnostics": {},
+   "predicted_warm_s": 1.937235299234537,
+   "status": "planned"
+  },
+  {
+   "scene": "w-1MeV-100um",
+   "arm": "pyrite-discrete",
+   "config": "pyrite-cuda",
+   "set": "transport",
+   "target_rse": 0.02,
+   "histories": 10816,
+   "binding": "transmitted_energy_keV",
+   "per_observable_histories": {
+    "transmitted": 9843,
+    "backscattered": 3428,
+    "stopped": 5425,
+    "transmitted_energy_keV": 10816
+   },
+   "diagnostics": {},
+   "predicted_warm_s": 10.476568498260376,
+   "status": "planned"
+  },
+  {
+   "scene": "w-1MeV-100um",
+   "arm": "pyrite-continuous",
+   "config": "pyrite-cuda-continuous-point-c1000000",
+   "set": "cone",
+   "target_rse": 0.05,
+   "histories": 2000,
+   "binding": "cone_source_photons_ge10kev",
+   "per_observable_histories": {
+    "cone_source_photons_ge10kev": 2000
+   },
+   "diagnostics": {},
+   "predicted_warm_s": 4.4321542389225215,
+   "status": "planned"
+  },
+  {
+   "scene": "w-1MeV-100um",
+   "arm": "pyrite-continuous",
+   "config": "pyrite-cuda-continuous-point-c1000000",
+   "set": "cone",
+   "target_rse": 0.02,
+   "histories": 2116,
+   "binding": "cone_source_photons_ge10kev",
+   "per_observable_histories": {
+    "cone_source_photons_ge10kev": 2116
+   },
+   "diagnostics": {},
+   "predicted_warm_s": 4.689219184780027,
+   "status": "planned"
+  },
+  {
+   "scene": "si-3MeV-1mm",
+   "arm": "geant4",
+   "config": "geant4-1t",
+   "set": "transport",
+   "target_rse": 0.05,
+   "histories": 2000,
+   "binding": "transmitted",
+   "per_observable_histories": {
+    "transmitted": 2000,
+    "transmitted_energy_keV": 2000
+   },
+   "diagnostics": {
+    "backscattered": "fraction 0.00975 below 0.02",
+    "stopped": "fraction 0.00111 below 0.02"
+   },
+   "predicted_warm_s": 2.878249,
+   "status": "planned"
+  },
+  {
+   "scene": "si-3MeV-1mm",
+   "arm": "geant4",
+   "config": "geant4-32t",
+   "set": "transport",
+   "target_rse": 0.05,
+   "histories": 2000,
+   "binding": "transmitted",
+   "per_observable_histories": {
+    "transmitted": 2000,
+    "transmitted_energy_keV": 2000
+   },
+   "diagnostics": {
+    "backscattered": "fraction 0.00975 below 0.02",
+    "stopped": "fraction 0.00111 below 0.02"
+   },
+   "predicted_warm_s": 0.18887451536012534,
+   "status": "planned"
+  },
+  {
+   "scene": "si-3MeV-1mm",
+   "arm": "geant4",
+   "config": "geant4-32t",
+   "set": "transport",
+   "target_rse": 0.02,
+   "histories": 2000,
+   "binding": "transmitted",
+   "per_observable_histories": {
+    "transmitted": 2000,
+    "transmitted_energy_keV": 2000
+   },
+   "diagnostics": {
+    "backscattered": "fraction 0.00975 below 0.02",
+    "stopped": "fraction 0.00111 below 0.02"
+   },
+   "predicted_warm_s": 0.18887451536012534,
+   "status": "planned"
+  },
+  {
+   "scene": "si-3MeV-1mm",
+   "arm": "geant4",
+   "config": "geant4-1t",
+   "set": "cone",
+   "target_rse": 0.05,
+   "histories": 6362612,
+   "binding": "cone_source_photons_ge10kev",
+   "per_observable_histories": {
+    "cone_source_photons_ge10kev": 6362612
+   },
+   "diagnostics": {},
+   "predicted_warm_s": 9156.590813194,
+   "status": "over-budget"
+  },
+  {
+   "scene": "si-3MeV-1mm",
+   "arm": "geant4",
+   "config": "geant4-32t",
+   "set": "cone",
+   "target_rse": 0.05,
+   "histories": 6362612,
+   "binding": "cone_source_photons_ge10kev",
+   "per_observable_histories": {
+    "cone_source_photons_ge10kev": 6362612
+   },
+   "diagnostics": {},
+   "predicted_warm_s": 600.8676289622589,
+   "status": "planned"
+  },
+  {
+   "scene": "si-3MeV-1mm",
+   "arm": "geant4",
+   "config": "geant4-32t",
+   "set": "cone",
+   "target_rse": 0.02,
+   "histories": 39766323,
+   "binding": "cone_source_photons_ge10kev",
+   "per_observable_histories": {
+    "cone_source_photons_ge10kev": 39766323
+   },
+   "diagnostics": {},
+   "predicted_warm_s": 3755.422492139603,
+   "status": "over-budget"
+  },
+  {
+   "scene": "si-3MeV-1mm",
+   "arm": "pyrite-discrete",
+   "config": "pyrite-cuda",
+   "set": "transport",
+   "target_rse": 0.05,
+   "histories": 2000,
+   "binding": "transmitted",
+   "per_observable_histories": {
+    "transmitted": 2000,
+    "transmitted_energy_keV": 2000
+   },
+   "diagnostics": {
+    "backscattered": "fraction 0.009 below 0.02",
+    "stopped": "fraction 0.00117 below 0.02"
+   },
+   "predicted_warm_s": 1.2280072199646384,
+   "status": "planned"
+  },
+  {
+   "scene": "si-3MeV-1mm",
+   "arm": "pyrite-discrete",
+   "config": "pyrite-cuda",
+   "set": "transport",
+   "target_rse": 0.02,
+   "histories": 2000,
+   "binding": "transmitted",
+   "per_observable_histories": {
+    "transmitted": 2000,
+    "transmitted_energy_keV": 2000
+   },
+   "diagnostics": {
+    "backscattered": "fraction 0.009 below 0.02",
+    "stopped": "fraction 0.00117 below 0.02"
+   },
+   "predicted_warm_s": 1.2280072199646384,
+   "status": "planned"
+  },
+  {
+   "scene": "si-3MeV-1mm",
+   "arm": "pyrite-continuous",
+   "config": "pyrite-cuda-continuous-point-c1000000",
+   "set": "cone",
+   "target_rse": 0.05,
+   "histories": 52560,
+   "binding": "cone_source_photons_ge10kev",
+   "per_observable_histories": {
+    "cone_source_photons_ge10kev": 52560
+   },
+   "diagnostics": {},
+   "predicted_warm_s": 45.94608011209345,
+   "status": "planned"
+  },
+  {
+   "scene": "si-3MeV-1mm",
+   "arm": "pyrite-continuous",
+   "config": "pyrite-cuda-continuous-point-c1000000",
+   "set": "cone",
+   "target_rse": 0.02,
+   "histories": 328495,
+   "binding": "cone_source_photons_ge10kev",
+   "per_observable_histories": {
+    "cone_source_photons_ge10kev": 328495
+   },
+   "diagnostics": {},
+   "predicted_warm_s": 287.1586298786556,
+   "status": "planned"
+  },
+  {
+   "scene": "w-3MeV-100um",
+   "arm": "geant4",
+   "config": "geant4-1t",
+   "set": "transport",
+   "target_rse": 0.05,
+   "histories": 2957,
+   "binding": "backscattered",
+   "per_observable_histories": {
+    "transmitted": 2000,
+    "backscattered": 2957,
+    "transmitted_energy_keV": 2000
+   },
+   "diagnostics": {
+    "stopped": "fraction 0.00681 below 0.02"
+   },
+   "predicted_warm_s": 6.205909509619599,
+   "status": "planned"
+  },
+  {
+   "scene": "w-3MeV-100um",
+   "arm": "geant4",
+   "config": "geant4-32t",
+   "set": "transport",
+   "target_rse": 0.05,
+   "histories": 2957,
+   "binding": "backscattered",
+   "per_observable_histories": {
+    "transmitted": 2000,
+    "backscattered": 2957,
+    "transmitted_energy_keV": 2000
+   },
+   "diagnostics": {
+    "stopped": "fraction 0.00681 below 0.02"
+   },
+   "predicted_warm_s": 0.4118966776289038,
+   "status": "planned"
+  },
+  {
+   "scene": "w-3MeV-100um",
+   "arm": "geant4",
+   "config": "geant4-32t",
+   "set": "transport",
+   "target_rse": 0.02,
+   "histories": 18476,
+   "binding": "backscattered",
+   "per_observable_histories": {
+    "transmitted": 2000,
+    "backscattered": 18476,
+    "transmitted_energy_keV": 2000
+   },
+   "diagnostics": {
+    "stopped": "fraction 0.00681 below 0.02"
+   },
+   "predicted_warm_s": 2.5736229340113717,
+   "status": "planned"
+  },
+  {
+   "scene": "w-3MeV-100um",
+   "arm": "geant4",
+   "config": "geant4-1t",
+   "set": "cone",
+   "target_rse": 0.05,
+   "histories": 312206,
+   "binding": "cone_source_photons_ge10kev",
+   "per_observable_histories": {
+    "cone_source_photons_ge10kev": 312206
+   },
+   "diagnostics": {},
+   "predicted_warm_s": 655.232392411328,
+   "status": "planned"
+  },
+  {
+   "scene": "w-3MeV-100um",
+   "arm": "geant4",
+   "config": "geant4-32t",
+   "set": "cone",
+   "target_rse": 0.05,
+   "histories": 312206,
+   "binding": "cone_source_photons_ge10kev",
+   "per_observable_histories": {
+    "cone_source_photons_ge10kev": 312206
+   },
+   "diagnostics": {},
+   "predicted_warm_s": 43.4888786390969,
+   "status": "planned"
+  },
+  {
+   "scene": "w-3MeV-100um",
+   "arm": "geant4",
+   "config": "geant4-32t",
+   "set": "cone",
+   "target_rse": 0.02,
+   "histories": 1951284,
+   "binding": "cone_source_photons_ge10kev",
+   "per_observable_histories": {
+    "cone_source_photons_ge10kev": 1951284
+   },
+   "diagnostics": {},
+   "predicted_warm_s": 271.8050039602428,
+   "status": "planned"
+  },
+  {
+   "scene": "w-3MeV-100um",
+   "arm": "pyrite-discrete",
+   "config": "pyrite-cuda",
+   "set": "transport",
+   "target_rse": 0.05,
+   "histories": 3029,
+   "binding": "backscattered",
+   "per_observable_histories": {
+    "transmitted": 2000,
+    "backscattered": 3029,
+    "transmitted_energy_keV": 2000
+   },
+   "diagnostics": {
+    "stopped": "fraction 0.00689 below 0.02"
+   },
+   "predicted_warm_s": 1.947073510899771,
+   "status": "planned"
+  },
+  {
+   "scene": "w-3MeV-100um",
+   "arm": "pyrite-discrete",
+   "config": "pyrite-cuda",
+   "set": "transport",
+   "target_rse": 0.02,
+   "histories": 18926,
+   "binding": "backscattered",
+   "per_observable_histories": {
+    "transmitted": 2000,
+    "backscattered": 18926,
+    "transmitted_energy_keV": 2000
+   },
+   "diagnostics": {
+    "stopped": "fraction 0.00689 below 0.02"
+   },
+   "predicted_warm_s": 12.165834687120853,
+   "status": "planned"
+  },
+  {
+   "scene": "w-3MeV-100um",
+   "arm": "pyrite-continuous",
+   "config": "pyrite-cuda-continuous-point-c1000000",
+   "set": "cone",
+   "target_rse": 0.05,
+   "histories": 6873,
+   "binding": "cone_source_photons_ge10kev",
+   "per_observable_histories": {
+    "cone_source_photons_ge10kev": 6873
+   },
+   "diagnostics": {},
+   "predicted_warm_s": 9.7067170137305,
+   "status": "planned"
+  },
+  {
+   "scene": "w-3MeV-100um",
+   "arm": "pyrite-continuous",
+   "config": "pyrite-cuda-continuous-point-c1000000",
+   "set": "cone",
+   "target_rse": 0.02,
+   "histories": 42951,
+   "binding": "cone_source_photons_ge10kev",
+   "per_observable_histories": {
+    "cone_source_photons_ge10kev": 42951
+   },
+   "diagnostics": {},
+   "predicted_warm_s": 60.659566776769786,
+   "status": "planned"
+  }
+ ],
+ "missing_pilot": [],
+ "runs": [
+  {
+   "scene": "si-1MeV-1mm",
+   "config": "geant4-1t",
+   "histories": 3815
+  },
+  {
+   "scene": "si-1MeV-1mm",
+   "config": "geant4-32t",
+   "histories": 3815
+  },
+  {
+   "scene": "si-1MeV-1mm",
+   "config": "geant4-32t",
+   "histories": 23842
+  },
+  {
+   "scene": "si-1MeV-1mm",
+   "config": "geant4-32t",
+   "histories": 1022089
+  },
+  {
+   "scene": "si-1MeV-1mm",
+   "config": "geant4-32t",
+   "histories": 6388051
+  },
+  {
+   "scene": "si-1MeV-1mm",
+   "config": "pyrite-cuda",
+   "histories": 3815
+  },
+  {
+   "scene": "si-1MeV-1mm",
+   "config": "pyrite-cuda",
+   "histories": 23839
+  },
+  {
+   "scene": "si-1MeV-1mm",
+   "config": "pyrite-cuda-continuous-point-c1000000",
+   "histories": 2000
+  },
+  {
+   "scene": "si-1MeV-1mm",
+   "config": "pyrite-cuda-continuous-point-c1000000",
+   "histories": 3969
+  },
+  {
+   "scene": "si-1MeV-1mm",
+   "config": "pyrite-cuda-continuous-point-c1000000",
+   "histories": 200000
+  },
+  {
+   "scene": "si-300keV-100um",
+   "config": "geant4-1t",
+   "histories": 9170
+  },
+  {
+   "scene": "si-300keV-100um",
+   "config": "geant4-32t",
+   "histories": 9170
+  },
+  {
+   "scene": "si-300keV-100um",
+   "config": "geant4-32t",
+   "histories": 57310
+  },
+  {
+   "scene": "si-300keV-100um",
+   "config": "geant4-32t",
+   "histories": 18157568
+  },
+  {
+   "scene": "si-300keV-100um",
+   "config": "pyrite-cuda",
+   "histories": 9451
+  },
+  {
+   "scene": "si-300keV-100um",
+   "config": "pyrite-cuda",
+   "histories": 59068
+  },
+  {
+   "scene": "si-300keV-100um",
+   "config": "pyrite-cuda-continuous-point-c1000000",
+   "histories": 2000
+  },
+  {
+   "scene": "si-300keV-100um",
+   "config": "pyrite-cuda-continuous-point-c1000000",
+   "histories": 4666
+  },
+  {
+   "scene": "si-300keV-100um",
+   "config": "pyrite-cuda-continuous-point-c1000000",
+   "histories": 200000
+  },
+  {
+   "scene": "si-3MeV-1mm",
+   "config": "geant4-1t",
+   "histories": 2000
+  },
+  {
+   "scene": "si-3MeV-1mm",
+   "config": "geant4-32t",
+   "histories": 2000
+  },
+  {
+   "scene": "si-3MeV-1mm",
+   "config": "geant4-32t",
+   "histories": 6362612
+  },
+  {
+   "scene": "si-3MeV-1mm",
+   "config": "pyrite-cuda",
+   "histories": 2000
+  },
+  {
+   "scene": "si-3MeV-1mm",
+   "config": "pyrite-cuda-continuous-point-c1000000",
+   "histories": 52560
+  },
+  {
+   "scene": "si-3MeV-1mm",
+   "config": "pyrite-cuda-continuous-point-c1000000",
+   "histories": 328495
+  },
+  {
+   "scene": "w-1MeV-100um",
+   "config": "geant4-1t",
+   "histories": 2000
+  },
+  {
+   "scene": "w-1MeV-100um",
+   "config": "geant4-1t",
+   "histories": 168991
+  },
+  {
+   "scene": "w-1MeV-100um",
+   "config": "geant4-32t",
+   "histories": 2000
+  },
+  {
+   "scene": "w-1MeV-100um",
+   "config": "geant4-32t",
+   "histories": 10438
+  },
+  {
+   "scene": "w-1MeV-100um",
+   "config": "geant4-32t",
+   "histories": 168991
+  },
+  {
+   "scene": "w-1MeV-100um",
+   "config": "geant4-32t",
+   "histories": 1056189
+  },
+  {
+   "scene": "w-1MeV-100um",
+   "config": "pyrite-cuda",
+   "histories": 2000
+  },
+  {
+   "scene": "w-1MeV-100um",
+   "config": "pyrite-cuda",
+   "histories": 10816
+  },
+  {
+   "scene": "w-1MeV-100um",
+   "config": "pyrite-cuda-continuous-point-c1000000",
+   "histories": 2000
+  },
+  {
+   "scene": "w-1MeV-100um",
+   "config": "pyrite-cuda-continuous-point-c1000000",
+   "histories": 2116
+  },
+  {
+   "scene": "w-1MeV-100um",
+   "config": "pyrite-cuda-continuous-point-c1000000",
+   "histories": 200000
+  },
+  {
+   "scene": "w-300keV-10um",
+   "config": "geant4-1t",
+   "histories": 14115
+  },
+  {
+   "scene": "w-300keV-10um",
+   "config": "geant4-1t",
+   "histories": 1615613
+  },
+  {
+   "scene": "w-300keV-10um",
+   "config": "geant4-32t",
+   "histories": 14115
+  },
+  {
+   "scene": "w-300keV-10um",
+   "config": "geant4-32t",
+   "histories": 88219
+  },
+  {
+   "scene": "w-300keV-10um",
+   "config": "geant4-32t",
+   "histories": 1615613
+  },
+  {
+   "scene": "w-300keV-10um",
+   "config": "geant4-32t",
+   "histories": 10097576
+  },
+  {
+   "scene": "w-300keV-10um",
+   "config": "pyrite-cuda",
+   "histories": 13640
+  },
+  {
+   "scene": "w-300keV-10um",
+   "config": "pyrite-cuda",
+   "histories": 85248
+  },
+  {
+   "scene": "w-300keV-10um",
+   "config": "pyrite-cuda-continuous-point-c1000000",
+   "histories": 2000
+  },
+  {
+   "scene": "w-300keV-10um",
+   "config": "pyrite-cuda-continuous-point-c1000000",
+   "histories": 2748
+  },
+  {
+   "scene": "w-300keV-10um",
+   "config": "pyrite-cuda-continuous-point-c1000000",
+   "histories": 200000
+  },
+  {
+   "scene": "w-3MeV-100um",
+   "config": "geant4-1t",
+   "histories": 2957
+  },
+  {
+   "scene": "w-3MeV-100um",
+   "config": "geant4-1t",
+   "histories": 312206
+  },
+  {
+   "scene": "w-3MeV-100um",
+   "config": "geant4-32t",
+   "histories": 2957
+  },
+  {
+   "scene": "w-3MeV-100um",
+   "config": "geant4-32t",
+   "histories": 18476
+  },
+  {
+   "scene": "w-3MeV-100um",
+   "config": "geant4-32t",
+   "histories": 312206
+  },
+  {
+   "scene": "w-3MeV-100um",
+   "config": "geant4-32t",
+   "histories": 1951284
+  },
+  {
+   "scene": "w-3MeV-100um",
+   "config": "pyrite-cuda",
+   "histories": 3029
+  },
+  {
+   "scene": "w-3MeV-100um",
+   "config": "pyrite-cuda",
+   "histories": 18926
+  },
+  {
+   "scene": "w-3MeV-100um",
+   "config": "pyrite-cuda-continuous-point-c1000000",
+   "histories": 6873
+  },
+  {
+   "scene": "w-3MeV-100um",
+   "config": "pyrite-cuda-continuous-point-c1000000",
+   "histories": 42951
+  },
+  {
+   "scene": "w-3MeV-100um",
+   "config": "pyrite-cuda-continuous-point-c1000000",
+   "histories": 200000
+  }
+ ],
+ "predicted_total_warm_s": 7539.326350980282,
+ "protocol_version": 3
+}
