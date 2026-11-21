@@ -141,9 +141,27 @@ def test_guides_contain_bash_blocks():
 
 
 @pytest.mark.slow
-def test_python_api_workflow_executes_as_one_accumulating_namespace():
+def test_python_api_workflow_executes_as_one_accumulating_namespace(monkeypatch):
     """Execute the fixed example retained for reproduction by the current guide."""
+    import dataclasses
+    import os
     import runpy
+
+    import pyrite
+    from pyrite.config import FixedSampling
+
+    if os.environ.get("NUMBA_DISABLE_JIT") == "1":
+        # The guide's 2**15 histories take ~40 min of Python-level kernels
+        # (#1367); compiled runs keep them. These checks hold at any count.
+        simulate = pyrite.simulate
+
+        def reduced(*args, numerics, **kwargs):
+            sampling = FixedSampling(cxr_histories=256, brem_histories=4)
+            return simulate(
+                *args, numerics=dataclasses.replace(numerics, sampling=sampling), **kwargs
+            )
+
+        monkeypatch.setattr(pyrite, "simulate", reduced)
 
     path = ROOT / "docs/examples/python_api_workflow.py"
     namespace = runpy.run_path(str(path))
