@@ -4,6 +4,11 @@
 # --plan then verifies achieved RSE and reports T(eps).
 # Usage: sbatch --dependency=after:<hold> precision.sbatch <hold-job-id> <plan.json> [seed ...]
 # Seeds default to scenes.json held_out_seeds; a subset runs one repeat at a time.
+# ENGINES=pyrite|geant4 runs one engine's arms (default both). Geant4 arms on the
+# CPU host (same Ryzen 9 9950X3D; the cpu partition caps a node at 16 CPUs, so
+# one 16-CPU job owns it and no hold is needed; jobs are not CPU-pinned):
+#   ENGINES=geant4 sbatch -p cpu -w qlmc-queen --gres=none --mem=20G \
+#       precision.sbatch none <plan.json> <seed>
 #SBATCH --job-name=g4bench821-prec
 #SBATCH --partition=gpu
 #SBATCH --nodelist=DESKTOP-QNIHO3D
@@ -15,14 +20,22 @@
 set -euo pipefail
 cd "$SLURM_SUBMIT_DIR"
 hold=$1 plan=$2; shift 2
-trap 'touch "evidence/hold-release-$hold"' EXIT
+engines=${ENGINES:-all}
+[[ $hold == none ]] || trap 'touch "evidence/hold-release-$hold"' EXIT
 source checks/geant4_performance/env.sh
-uv sync --extra nvidia --locked -q
-[[ "$(squeue -h -j "$hold" -o %T)" == RUNNING ]] || { echo "hold job $hold not running"; exit 1; }
+if [[ $engines == geant4 ]]; then
+    # Shared home: keep the CPU host's environment apart from the GPU job's .venv.
+    export UV_PROJECT_ENVIRONMENT="$PWD/.venv-cpu"
+    uv sync --locked -q
+else
+    uv sync --extra nvidia --locked -q
+fi
+[[ $hold == none || "$(squeue -h -j "$hold" -o %T)" == RUNNING ]] || { echo "hold job $hold not running"; exit 1; }
 out="evidence/precision/$SLURM_JOB_ID"; mkdir -p "$out"
 cp "$plan" "$out/plan.json"; cp .pyrite-sync "$out/sync.json"
-lscpu > "$out/cpu.txt"; nvidia-smi > "$out/gpu.txt"
-squeue -w DESKTOP-QNIHO3D > "$out/node-jobs.txt"; free -g > "$out/memory.txt"
+echo "engines=$engines host=$(hostname)" > "$out/engines.txt"
+lscpu > "$out/cpu.txt"; nvidia-smi > "$out/gpu.txt" 2>&1 || true
+squeue -w "$(hostname)" > "$out/node-jobs.txt"; free -g > "$out/memory.txt"
 sha256sum "$G4BENCH" checks/geant4_performance/*.py checks/geant4_performance/g4bench/* > "$out/code.txt"
 uv run --no-sync python checks/equal_precision/prepare_stopping.py > "$out/tables.json"
 seeds=("$@")
@@ -34,6 +47,7 @@ for seed in "${seeds[@]}"; do
     for run in "${runs[@]:r}" "${runs[@]:0:r}"; do
         read -r s config n <<< "$run"
         stem="$out/$config-$s-$n-$seed"
+        [[ $engines == all || $config == "$engines"-* ]] || continue
         case $config in
             geant4-*)
                 threads=${config#geant4-}; threads=${threads%t}

@@ -14,5 +14,6 @@ if [[ ! -f g4bench-build/CMakeCache.txt ]]; then
         -DGeant4_DIR="$G4_PREFIX/lib/cmake/Geant4" -DCMAKE_PREFIX_PATH="$G4_PREFIX" \
         -DCMAKE_CXX_COMPILER="$G4_PREFIX/bin/x86_64-conda-linux-gnu-g++" > g4bench-cmake.log
 fi
-cmake --build g4bench-build -j 8 > g4bench-build.log
+# Concurrent jobs on the shared home (GPU host and CPU host) serialize the build.
+flock g4bench-build.lock cmake --build g4bench-build -j 8 > g4bench-build.log
 mkdir -p "$XDG_CONFIG_HOME" "$PYRITE_USER_CATALOG"
