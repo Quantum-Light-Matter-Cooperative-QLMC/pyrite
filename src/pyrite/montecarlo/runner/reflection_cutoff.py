@@ -23,6 +23,7 @@ integrated yield is exact at any bin width.
 
 from collections.abc import Callable, Iterable, Iterator, Sequence
 from dataclasses import dataclass
+from functools import partial
 
 import numpy as np
 
@@ -696,15 +697,26 @@ def selected_batch_spectrum(emission, batch, Ne_brem, histories: int | None = No
     return selected_line_spectrum(**_batch_selection(emission, batch, Ne_brem, histories))
 
 
-def select_batch_reflections(emission, batch, Ne_brem, histories: int | None = None):
+def select_batch_reflections(
+    emission,
+    batch,
+    Ne_brem,
+    histories: int | None = None,
+    parts: Callable[[], Iterable[dict]] | None = None,
+):
     """The pruned case and record :func:`selected_batch_spectrum` would select.
 
     For streamed scoring (#1281): ``batch`` needs only the rows of the selection
-    prefix, and no production pass runs.
+    prefix, and no production pass runs. With ``parts``, a callable returning
+    the population's electron-ordered segment blocks, ``batch.segments`` holds
+    only the scalar header (``Ne``, ``n_layers``) and every selection call
+    stages and scores one block at a time and sums the blocks, so device memory
+    holds one block, not the prefix. The sums are the merged population's up to
+    floating-point summation order.
 
     Validation: reflection-yield-tolerance-selector
     """
-    args = _batch_selection(emission, batch, Ne_brem, histories)
+    args = _batch_selection(emission, batch, Ne_brem, histories, parts)
     pruned, record, _, _ = _line_selection(
         args["case"],
         args["evaluate"],
@@ -716,7 +728,7 @@ def select_batch_reflections(emission, batch, Ne_brem, histories: int | None = N
     return pruned, record
 
 
-def _batch_selection(emission, batch, Ne_brem, histories):
+def _batch_selection(emission, batch, Ne_brem, histories, parts=None):
     """:func:`selected_line_spectrum` arguments for an emission batch (#1281 prefix)."""
     from dataclasses import replace
 
@@ -729,29 +741,74 @@ def _batch_selection(emission, batch, Ne_brem, histories):
     if budget < 1:
         raise ValueError("selection histories must be positive")
     n_lines, n_brem = min(lines, budget), min(brem, budget)
-    sample, record = batch, None
+    sample, record, prefix = batch, None, None
     if (n_lines, n_brem) != (lines, brem):
-        sample = replace(
-            batch,
-            segments=electron_prefix(batch.segments, max(n_lines, n_brem)),
-            electron_limit=n_lines,
-        )
+        prefix = max(n_lines, n_brem)
+        segments = batch.segments if parts is not None else electron_prefix(batch.segments, prefix)
+        sample = replace(batch, segments=segments, electron_limit=n_lines)
         record = dict(lines=n_lines, continuum=n_brem)
+    population = None if parts is None else partial(_staged_parts, parts, batch.segments, None)
+    selected = None if parts is None else partial(_staged_parts, parts, batch.segments, prefix)
     return dict(
         case=batch.case,
-        evaluate=lambda pilot: (
-            emission.cxr.evaluate(replace(batch, case=pilot, table_cache={}), "spec").values
+        evaluate=lambda pilot: _summed_parts(
+            lambda part: emission.cxr.evaluate(replace(part, case=pilot, table_cache={}), "spec"),
+            batch,
+            population,
         ),
         grid=batch.energy_eV,
-        continuum=selection_continuum(batch.case, sample, n_brem if record else Ne_brem),
-        reference_evaluate=lambda pilot, axis: (
-            emission.cxr.evaluate(
-                replace(sample, case=pilot, energy_eV=axis, truncation_audit=None, table_cache={}),
+        continuum=selection_continuum(
+            batch.case, sample, n_brem if record else Ne_brem, parts=selected
+        ),
+        reference_evaluate=lambda pilot, axis: _summed_parts(
+            lambda part: emission.cxr.evaluate(
+                replace(part, case=pilot, energy_eV=axis, truncation_audit=None, table_cache={}),
                 "spec",
-            ).values
+            ),
+            sample,
+            selected,
         ),
         histories=record,
     )
+
+
+def _staged_parts(parts, header, prefix):
+    """Device copies of ``parts()`` cut to ``elec_id < prefix``, one block at a time.
+
+    Each block carries ``header``'s population ``Ne`` (as the merged population
+    would) before the prefix cut, and blocks the cut leaves empty are skipped;
+    a population with no prefix row yields one empty block, so a sum is never
+    empty.
+    """
+    from . import _segments_on_device
+    from .electron_blocks import electron_prefix
+
+    staged = 0
+    empty = None
+    for part in parts():
+        segments = {**part, "Ne": header["Ne"]}
+        if prefix is not None:
+            segments = electron_prefix(segments, prefix)
+        if int(segments["L_ang"].shape[0]) == 0:
+            empty = segments if empty is None else empty
+            continue
+        staged += 1
+        yield _segments_on_device(segments)
+    if not staged:
+        yield _segments_on_device({**header, **(empty or {})})
+
+
+def _summed_parts(score, batch, parts):
+    """``score(batch).values``, or its sum over the staged ``parts()`` blocks."""
+    from dataclasses import replace
+
+    if parts is None:
+        return score(batch).values
+    total = None
+    for segments in parts():
+        values = score(replace(batch, segments=segments)).values
+        total = values if total is None else total + values
+    return total
 
 
 def _metric_record(outcome: ReflectionCutoff) -> dict:

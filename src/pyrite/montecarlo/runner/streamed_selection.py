@@ -11,6 +11,13 @@ blocks contain every prefix electron. It then selects on those rows, builds the
 held blocks, and passes later blocks straight through. Held rows are bounded
 by the prefix plus one block; no extra transport pass runs.
 
+A streamed case is one whose rows do not fit the device, and the prefix can be
+the whole population (``Ne <= SELECTION_HISTORIES``), so held blocks wait on
+the host and the selection never merges them: each of its scoring calls
+stages one held block at a time and sums the blocks (#1295 job 14426, where
+merging and staging the 10 GiB prefix ran out of device memory). Device memory
+then holds one block, as in the production pass.
+
 Validation: reflection-yield-tolerance-selector
 """
 
@@ -72,7 +79,7 @@ class PrefixSelectingScorer:
         ids = _electron_ids(segs)
         if ids.size == 0:
             return
-        self._held[int(ids.min())] = segs
+        self._held[int(ids.min())] = _held_copy(segs)
         if int(ids.max()) >= self.prefix:
             self._select()
 
@@ -99,19 +106,18 @@ class PrefixSelectingScorer:
 
 
 def _select_on_blocks(case, inputs, blocks):
-    """Pruned case and record from the held prefix ``blocks`` (#1281)."""
-    from . import _segments_on_device
-    from .block_transport import merge_electron_blocks
+    """Pruned case and record from the held prefix ``blocks`` (#1281).
+
+    The selection scores the blocks one at a time (``parts``); its batch
+    carries only the joined scalar header.
+    """
     from .emission_adapters import EmissionBatch, select_emission
     from .reflection_cutoff import select_batch_reflections
 
-    if blocks:
-        segments = merge_electron_blocks(list(blocks)) if len(blocks) > 1 else dict(blocks[0])
-    else:
-        segments = _empty_segments()
+    blocks = list(blocks) or [_empty_segments()]
     emission = select_emission(case)
     batch = EmissionBatch(
-        _segments_on_device(segments),
+        _header(blocks),
         inputs["E_grid"],
         case,
         inputs["n_hat"],
@@ -120,7 +126,30 @@ def _select_on_blocks(case, inputs, blocks):
         electron_limit=int(inputs["Ne_lines"]),
         table_cache={},
     )
-    return select_batch_reflections(emission, batch, int(inputs["Ne_brem"]))
+    return select_batch_reflections(
+        emission, batch, int(inputs["Ne_brem"]), parts=lambda: iter(blocks)
+    )
+
+
+def _header(blocks) -> dict[str, Any]:
+    """Scalar fields of the joined ``blocks`` (counts added) over zero rows."""
+    from .block_transport import _ADDITIVE_COUNTS, _is_array
+
+    header = {k: v for k, v in blocks[0].items() if not _is_array(v)}
+    for key in _ADDITIVE_COUNTS:
+        if key in header:
+            header[key] = sum(int(b[key]) for b in blocks)
+    return {**header, **{k: v for k, v in _empty_segments().items() if k != "Ne"}}
+
+
+def _held_copy(segs: Mapping[str, Any]) -> Mapping[str, Any]:
+    """``segs`` with device arrays downloaded, so held rows leave the device free."""
+    from ..._backend import is_device_array
+    from .recovery import _host_block
+
+    if not any(is_device_array(value) for value in segs.values()):
+        return segs
+    return _host_block(segs)
 
 
 def _empty_segments() -> dict[str, Any]:

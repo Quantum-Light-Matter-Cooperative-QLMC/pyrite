@@ -53,8 +53,10 @@ The selection scores the first `SELECTION_HISTORIES` (4096) line and
 continuum electrons of the counter-addressed population (#1281), so its cost
 does not grow with the history count; the selected set is then scored on
 every history. Smaller populations select on every history. Streamed
-runs hold the leading blocks until the prefix is complete and select on them,
-so streamed and retained runs score the same set.
+runs hold the leading blocks on the host until the prefix is complete and
+select on them one block at a time, summing the blocks, so streamed and
+retained runs score the same set (yields agree to summation order) while the
+device holds one block.
 `CXR_REFLECTION_SELECTION_MODEL` is `measured-shell-cutoff-v7` since #1301,
 so older measured-selection checkpoints do not resume.
 
