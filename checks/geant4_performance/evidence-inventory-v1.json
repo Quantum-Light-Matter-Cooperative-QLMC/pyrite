@@ -1,0 +1,78 @@
+{
+  "schema": "pyrite.geant4-performance.evidence-inventory.v1",
+  "issue": 1041,
+  "status": "unpublished-local-backup",
+  "local_archive_root": "scratch/issue-1041-preserve/archives",
+  "secondary_copy": "qlmc:~/pyrite-evidence/issue-1041 (all evidence archives; source snapshot local only)",
+  "source_revision": "00ffd7a59affeaaa4d0d76bb86ffd723ed7f16ff",
+  "verified_sha256": true,
+  "repo_or_release_raw_evidence_acceptance": false,
+  "publication": "No release upload authorized. Raw archives remain unpublished; this inventory is not the raw evidence.",
+  "pilot_jobs": [
+    14170
+  ],
+  "v2_jobs": [
+    14460,
+    14462,
+    14463,
+    14464
+  ],
+  "v3_jobs": [
+    14472,
+    14473,
+    14474,
+    14475
+  ],
+  "archives": [
+    {
+      "filename": "pilot-inputs-analysis.tar.gz",
+      "bytes": 16350994,
+      "sha256": "1143e23cd76c9db953fe1e746930e947e3c421f14aa113045af29afad94c96fb"
+    },
+    {
+      "filename": "precision-14460.tar.gz",
+      "bytes": 83029161,
+      "sha256": "0748649447b0275d34541b758ca1f91e2a10be2e4ce2c1f1317ad30df9153a74"
+    },
+    {
+      "filename": "precision-14462.tar.gz",
+      "bytes": 481221172,
+      "sha256": "7e0ce115ff79e6e97c05403b911871f427473f5116f2ae73a85442a16d5957ad"
+    },
+    {
+      "filename": "precision-14463.tar.gz",
+      "bytes": 481193651,
+      "sha256": "e92b147d95b96d0c7c0a09fec7c91a3afd2fdc7792eb03340a90d96b320903be"
+    },
+    {
+      "filename": "precision-14464.tar.gz",
+      "bytes": 481189035,
+      "sha256": "d94243bac3241cda5332f72e64e5d46738b10c4237af1d852cfd45ac664d8497"
+    },
+    {
+      "filename": "precision-14472.tar.gz",
+      "bytes": 238652936,
+      "sha256": "11013979b11791818ee7091ba1f0d7bdea641c6096af6ae6ad3ff68897c7c8c2"
+    },
+    {
+      "filename": "precision-14473.tar.gz",
+      "bytes": 933897686,
+      "sha256": "0ce6a868d6cb1aa5c001ea3b85ba99c0198b4eb9169395521d31cfa92bfb3c73"
+    },
+    {
+      "filename": "precision-14474.tar.gz",
+      "bytes": 933854170,
+      "sha256": "fad5437c5ce390fc690aedf55731604d47142ee9073fa3d88f5a5ca5f4893aed"
+    },
+    {
+      "filename": "precision-14475.tar.gz",
+      "bytes": 933917756,
+      "sha256": "ce9af84e17c5e8c5b76fa577a898684a19890137ff528b4fa70844de2592490c"
+    },
+    {
+      "filename": "source-00ffd7a59.tar.gz",
+      "bytes": 28949384,
+      "sha256": "c99a062a04cb59503809b385d3a2e9d16331764ff6d912dfd70039bd6834a38a"
+    }
+  ]
+}

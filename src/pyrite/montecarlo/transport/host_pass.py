@@ -349,6 +349,9 @@ def _validated_controls(p, launch, electron_start):
         keep_segments_on_device=p.keep_segments_on_device,
         cascade=p._secondary is not None,
     )
+    from .radiative_moment_transport import validate_moment_policy
+
+    validate_moment_policy(p._radiative_moment_policy, p.radiative_moments, radiative_mode)
     radiative_cutoff_eV = p.radiative_cutoff_eV
     if radiative_mode and radiative_cutoff_eV is None:
         radiative_cutoff_eV = DEFAULT_RADIATIVE_CUTOFF_EV
@@ -521,6 +524,7 @@ def _sample_entry(p, c, stack, launch, electron_start):
             p.Ne,
             electron_start,
             moment_mode=p.radiative_moments,
+            moment_policy=p._radiative_moment_policy,
         )
         if launch is not None:
             radiative_args = (launch.radiative_keys,) + radiative_args[1:]
@@ -1164,7 +1168,7 @@ def _add_optional_fields(t, o, rows, result):
         )
         from .radiative_moment_transport import add_moment_identity
 
-        add_moment_identity(result, t.radiative_args)
+        add_moment_identity(result, t.radiative_args, p._radiative_moment_policy)
     if p.collect_diagnostics:
         result["transport_diagnostics"] = _flight_diagnostic_summary(
             rows["seg_E"],

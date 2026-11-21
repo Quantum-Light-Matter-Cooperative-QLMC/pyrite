@@ -197,7 +197,8 @@ FAKE_PEN_MAIN = textwrap.dedent(
 )
 
 
-def test_adapter_requests_one_extra_history(tmp_path):
+@pytest.mark.parametrize("cutoff", [None, 2.5])
+def test_adapter_requests_one_extra_history(tmp_path, cutoff):
     fake = tmp_path / "pen_main"
     fake.write_text(f"#!{sys.executable}\n" + FAKE_PEN_MAIN)
     fake.chmod(0o755)
@@ -207,6 +208,7 @@ def test_adapter_requests_one_extra_history(tmp_path):
             sys.executable,
             str(ROOT / "penred_adapter.py"),
             "silicon-800kev-tr0.3-75deg-oblique",
+            *([] if cutoff is None else ["--electron-cutoff-kev", str(cutoff)]),
             "--histories",
             "6",
             "--seed",
@@ -226,6 +228,13 @@ def test_adapter_requests_one_extra_history(tmp_path):
     assert record["moments"]["photons_ge10kev"]["mean"] == 1.0
     assert record["provenance"]["timings_s"]["simulation_user"] == 0.1
     assert (output.with_suffix(".npz")).exists()
+    if cutoff is not None:
+        assert record["purpose"] == "accuracy-only"
+        text = (output.with_suffix("") / "config.in").read_text()
+        assert "materials/slab/eabs/electron 2500.0" in text
+        assert "materials/slab/eabs/positron 2500.0" in text
+        assert "materials/slab/WCC 800000.0" in text
+        assert record["provenance"]["controls"]["eabs_electron_eV"] == 2500.0
 
 
 def test_prepare_rejects_unpinned_source(tmp_path):

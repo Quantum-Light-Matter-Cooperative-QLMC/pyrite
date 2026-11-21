@@ -1,0 +1,935 @@
+{
+ "schema": "pyrite.geant4-performance.accuracy-reference-plan.v1",
+ "purpose": "accuracy-only",
+ "source_plan_sha256": "466bb23bfcae31d2062c7b7010ce4906677ead1503bf5a93340cdeba5e2e5193",
+ "target_rse": 0.02,
+ "threads": 8,
+ "tasks": [
+  {
+   "index": 0,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200001
+  },
+  {
+   "index": 1,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200002
+  },
+  {
+   "index": 2,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200003
+  },
+  {
+   "index": 3,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200004
+  },
+  {
+   "index": 4,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200005
+  },
+  {
+   "index": 5,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200006
+  },
+  {
+   "index": 6,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200007
+  },
+  {
+   "index": 7,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200008
+  },
+  {
+   "index": 8,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200009
+  },
+  {
+   "index": 9,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200010
+  },
+  {
+   "index": 10,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200011
+  },
+  {
+   "index": 11,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200012
+  },
+  {
+   "index": 12,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200013
+  },
+  {
+   "index": 13,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200014
+  },
+  {
+   "index": 14,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200015
+  },
+  {
+   "index": 15,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200016
+  },
+  {
+   "index": 16,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200017
+  },
+  {
+   "index": 17,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200018
+  },
+  {
+   "index": 18,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200019
+  },
+  {
+   "index": 19,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200020
+  },
+  {
+   "index": 20,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200021
+  },
+  {
+   "index": 21,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200022
+  },
+  {
+   "index": 22,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200023
+  },
+  {
+   "index": 23,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200024
+  },
+  {
+   "index": 24,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200025
+  },
+  {
+   "index": 25,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200026
+  },
+  {
+   "index": 26,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200027
+  },
+  {
+   "index": 27,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200028
+  },
+  {
+   "index": 28,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200029
+  },
+  {
+   "index": 29,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200030
+  },
+  {
+   "index": 30,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200031
+  },
+  {
+   "index": 31,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200032
+  },
+  {
+   "index": 32,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200033
+  },
+  {
+   "index": 33,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200034
+  },
+  {
+   "index": 34,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200035
+  },
+  {
+   "index": 35,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200036
+  },
+  {
+   "index": 36,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200037
+  },
+  {
+   "index": 37,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200038
+  },
+  {
+   "index": 38,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200039
+  },
+  {
+   "index": 39,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200040
+  },
+  {
+   "index": 40,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200041
+  },
+  {
+   "index": 41,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200042
+  },
+  {
+   "index": 42,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200043
+  },
+  {
+   "index": 43,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200044
+  },
+  {
+   "index": 44,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200045
+  },
+  {
+   "index": 45,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200046
+  },
+  {
+   "index": 46,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200047
+  },
+  {
+   "index": 47,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200048
+  },
+  {
+   "index": 48,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200049
+  },
+  {
+   "index": 49,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200050
+  },
+  {
+   "index": 50,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200051
+  },
+  {
+   "index": 51,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200052
+  },
+  {
+   "index": 52,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200053
+  },
+  {
+   "index": 53,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200054
+  },
+  {
+   "index": 54,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200055
+  },
+  {
+   "index": 55,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200056
+  },
+  {
+   "index": 56,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200057
+  },
+  {
+   "index": 57,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200058
+  },
+  {
+   "index": 58,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200059
+  },
+  {
+   "index": 59,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200060
+  },
+  {
+   "index": 60,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200061
+  },
+  {
+   "index": 61,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200062
+  },
+  {
+   "index": 62,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200063
+  },
+  {
+   "index": 63,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200064
+  },
+  {
+   "index": 64,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200065
+  },
+  {
+   "index": 65,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200066
+  },
+  {
+   "index": 66,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200067
+  },
+  {
+   "index": 67,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200068
+  },
+  {
+   "index": 68,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200069
+  },
+  {
+   "index": 69,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200070
+  },
+  {
+   "index": 70,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200071
+  },
+  {
+   "index": 71,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200072
+  },
+  {
+   "index": 72,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200073
+  },
+  {
+   "index": 73,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200074
+  },
+  {
+   "index": 74,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200075
+  },
+  {
+   "index": 75,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200076
+  },
+  {
+   "index": 76,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200077
+  },
+  {
+   "index": 77,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200078
+  },
+  {
+   "index": 78,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200079
+  },
+  {
+   "index": 79,
+   "scene": "si-300keV-100um",
+   "histories": 995481,
+   "seed": 200080
+  },
+  {
+   "index": 80,
+   "scene": "si-300keV-100um",
+   "histories": 995480,
+   "seed": 200081
+  },
+  {
+   "index": 81,
+   "scene": "si-300keV-100um",
+   "histories": 995480,
+   "seed": 200082
+  },
+  {
+   "index": 82,
+   "scene": "si-300keV-100um",
+   "histories": 995480,
+   "seed": 200083
+  },
+  {
+   "index": 83,
+   "scene": "si-300keV-100um",
+   "histories": 995480,
+   "seed": 200084
+  },
+  {
+   "index": 84,
+   "scene": "si-300keV-100um",
+   "histories": 995480,
+   "seed": 200085
+  },
+  {
+   "index": 85,
+   "scene": "si-300keV-100um",
+   "histories": 995480,
+   "seed": 200086
+  },
+  {
+   "index": 86,
+   "scene": "si-300keV-100um",
+   "histories": 995480,
+   "seed": 200087
+  },
+  {
+   "index": 87,
+   "scene": "si-300keV-100um",
+   "histories": 995480,
+   "seed": 200088
+  },
+  {
+   "index": 88,
+   "scene": "si-300keV-100um",
+   "histories": 995480,
+   "seed": 200089
+  },
+  {
+   "index": 89,
+   "scene": "si-300keV-100um",
+   "histories": 995480,
+   "seed": 200090
+  },
+  {
+   "index": 90,
+   "scene": "si-300keV-100um",
+   "histories": 995480,
+   "seed": 200091
+  },
+  {
+   "index": 91,
+   "scene": "si-300keV-100um",
+   "histories": 995480,
+   "seed": 200092
+  },
+  {
+   "index": 92,
+   "scene": "si-300keV-100um",
+   "histories": 995480,
+   "seed": 200093
+  },
+  {
+   "index": 93,
+   "scene": "si-300keV-100um",
+   "histories": 995480,
+   "seed": 200094
+  },
+  {
+   "index": 94,
+   "scene": "si-300keV-100um",
+   "histories": 995480,
+   "seed": 200095
+  },
+  {
+   "index": 95,
+   "scene": "si-300keV-100um",
+   "histories": 995480,
+   "seed": 200096
+  },
+  {
+   "index": 96,
+   "scene": "si-300keV-100um",
+   "histories": 995480,
+   "seed": 200097
+  },
+  {
+   "index": 97,
+   "scene": "si-300keV-100um",
+   "histories": 995480,
+   "seed": 200098
+  },
+  {
+   "index": 98,
+   "scene": "si-300keV-100um",
+   "histories": 995480,
+   "seed": 200099
+  },
+  {
+   "index": 99,
+   "scene": "si-300keV-100um",
+   "histories": 995480,
+   "seed": 200100
+  },
+  {
+   "index": 100,
+   "scene": "si-300keV-100um",
+   "histories": 995480,
+   "seed": 200101
+  },
+  {
+   "index": 101,
+   "scene": "si-300keV-100um",
+   "histories": 995480,
+   "seed": 200102
+  },
+  {
+   "index": 102,
+   "scene": "si-300keV-100um",
+   "histories": 995480,
+   "seed": 200103
+  },
+  {
+   "index": 103,
+   "scene": "si-300keV-100um",
+   "histories": 995480,
+   "seed": 200104
+  },
+  {
+   "index": 104,
+   "scene": "si-300keV-100um",
+   "histories": 995480,
+   "seed": 200105
+  },
+  {
+   "index": 105,
+   "scene": "si-300keV-100um",
+   "histories": 995480,
+   "seed": 200106
+  },
+  {
+   "index": 106,
+   "scene": "si-300keV-100um",
+   "histories": 995480,
+   "seed": 200107
+  },
+  {
+   "index": 107,
+   "scene": "si-300keV-100um",
+   "histories": 995480,
+   "seed": 200108
+  },
+  {
+   "index": 108,
+   "scene": "si-300keV-100um",
+   "histories": 995480,
+   "seed": 200109
+  },
+  {
+   "index": 109,
+   "scene": "si-300keV-100um",
+   "histories": 995480,
+   "seed": 200110
+  },
+  {
+   "index": 110,
+   "scene": "si-300keV-100um",
+   "histories": 995480,
+   "seed": 200111
+  },
+  {
+   "index": 111,
+   "scene": "si-300keV-100um",
+   "histories": 995480,
+   "seed": 200112
+  },
+  {
+   "index": 112,
+   "scene": "si-300keV-100um",
+   "histories": 995480,
+   "seed": 200113
+  },
+  {
+   "index": 113,
+   "scene": "si-300keV-100um",
+   "histories": 995480,
+   "seed": 200114
+  },
+  {
+   "index": 114,
+   "scene": "si-3MeV-1mm",
+   "histories": 994159,
+   "seed": 200115
+  },
+  {
+   "index": 115,
+   "scene": "si-3MeV-1mm",
+   "histories": 994159,
+   "seed": 200116
+  },
+  {
+   "index": 116,
+   "scene": "si-3MeV-1mm",
+   "histories": 994159,
+   "seed": 200117
+  },
+  {
+   "index": 117,
+   "scene": "si-3MeV-1mm",
+   "histories": 994158,
+   "seed": 200118
+  },
+  {
+   "index": 118,
+   "scene": "si-3MeV-1mm",
+   "histories": 994158,
+   "seed": 200119
+  },
+  {
+   "index": 119,
+   "scene": "si-3MeV-1mm",
+   "histories": 994158,
+   "seed": 200120
+  },
+  {
+   "index": 120,
+   "scene": "si-3MeV-1mm",
+   "histories": 994158,
+   "seed": 200121
+  },
+  {
+   "index": 121,
+   "scene": "si-3MeV-1mm",
+   "histories": 994158,
+   "seed": 200122
+  },
+  {
+   "index": 122,
+   "scene": "si-3MeV-1mm",
+   "histories": 994158,
+   "seed": 200123
+  },
+  {
+   "index": 123,
+   "scene": "si-3MeV-1mm",
+   "histories": 994158,
+   "seed": 200124
+  },
+  {
+   "index": 124,
+   "scene": "si-3MeV-1mm",
+   "histories": 994158,
+   "seed": 200125
+  },
+  {
+   "index": 125,
+   "scene": "si-3MeV-1mm",
+   "histories": 994158,
+   "seed": 200126
+  },
+  {
+   "index": 126,
+   "scene": "si-3MeV-1mm",
+   "histories": 994158,
+   "seed": 200127
+  },
+  {
+   "index": 127,
+   "scene": "si-3MeV-1mm",
+   "histories": 994158,
+   "seed": 200128
+  },
+  {
+   "index": 128,
+   "scene": "si-3MeV-1mm",
+   "histories": 994158,
+   "seed": 200129
+  },
+  {
+   "index": 129,
+   "scene": "si-3MeV-1mm",
+   "histories": 994158,
+   "seed": 200130
+  },
+  {
+   "index": 130,
+   "scene": "si-3MeV-1mm",
+   "histories": 994158,
+   "seed": 200131
+  },
+  {
+   "index": 131,
+   "scene": "si-3MeV-1mm",
+   "histories": 994158,
+   "seed": 200132
+  },
+  {
+   "index": 132,
+   "scene": "si-3MeV-1mm",
+   "histories": 994158,
+   "seed": 200133
+  },
+  {
+   "index": 133,
+   "scene": "si-3MeV-1mm",
+   "histories": 994158,
+   "seed": 200134
+  },
+  {
+   "index": 134,
+   "scene": "si-3MeV-1mm",
+   "histories": 994158,
+   "seed": 200135
+  },
+  {
+   "index": 135,
+   "scene": "si-3MeV-1mm",
+   "histories": 994158,
+   "seed": 200136
+  },
+  {
+   "index": 136,
+   "scene": "si-3MeV-1mm",
+   "histories": 994158,
+   "seed": 200137
+  },
+  {
+   "index": 137,
+   "scene": "si-3MeV-1mm",
+   "histories": 994158,
+   "seed": 200138
+  },
+  {
+   "index": 138,
+   "scene": "si-3MeV-1mm",
+   "histories": 994158,
+   "seed": 200139
+  },
+  {
+   "index": 139,
+   "scene": "si-3MeV-1mm",
+   "histories": 994158,
+   "seed": 200140
+  },
+  {
+   "index": 140,
+   "scene": "si-3MeV-1mm",
+   "histories": 994158,
+   "seed": 200141
+  },
+  {
+   "index": 141,
+   "scene": "si-3MeV-1mm",
+   "histories": 994158,
+   "seed": 200142
+  },
+  {
+   "index": 142,
+   "scene": "si-3MeV-1mm",
+   "histories": 994158,
+   "seed": 200143
+  },
+  {
+   "index": 143,
+   "scene": "si-3MeV-1mm",
+   "histories": 994158,
+   "seed": 200144
+  },
+  {
+   "index": 144,
+   "scene": "si-3MeV-1mm",
+   "histories": 994158,
+   "seed": 200145
+  },
+  {
+   "index": 145,
+   "scene": "si-3MeV-1mm",
+   "histories": 994158,
+   "seed": 200146
+  },
+  {
+   "index": 146,
+   "scene": "si-3MeV-1mm",
+   "histories": 994158,
+   "seed": 200147
+  },
+  {
+   "index": 147,
+   "scene": "si-3MeV-1mm",
+   "histories": 994158,
+   "seed": 200148
+  },
+  {
+   "index": 148,
+   "scene": "si-3MeV-1mm",
+   "histories": 994158,
+   "seed": 200149
+  },
+  {
+   "index": 149,
+   "scene": "si-3MeV-1mm",
+   "histories": 994158,
+   "seed": 200150
+  },
+  {
+   "index": 150,
+   "scene": "si-3MeV-1mm",
+   "histories": 994158,
+   "seed": 200151
+  },
+  {
+   "index": 151,
+   "scene": "si-3MeV-1mm",
+   "histories": 994158,
+   "seed": 200152
+  },
+  {
+   "index": 152,
+   "scene": "si-3MeV-1mm",
+   "histories": 994158,
+   "seed": 200153
+  },
+  {
+   "index": 153,
+   "scene": "si-3MeV-1mm",
+   "histories": 994158,
+   "seed": 200154
+  }
+ ],
+ "numerical_convergence": "unverified",
+ "timing_comparison_eligible": false
+}

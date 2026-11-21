@@ -76,6 +76,7 @@ def _simulate_trajectories(
     bunch_front_tilt=None,
     _complete_hard_photons=True,
     _cone_split=None,
+    _radiative_moment_policy=None,
     mixed_elastic=None,
 ):
     """
@@ -241,6 +242,9 @@ def _simulate_trajectories(
       interpolation for frequent soft/rate totals; "exact" retains quadrature.
       Exact event totals and conditional photon sampling are unchanged.
       Validation: radiative-moment-interpolation (ensemble qualification incomplete).
+    _radiative_moment_policy: private, invocation-local MomentPolicy override for
+      coupled table convergence diagnostics. No persisted Case policy or physics
+      default changes; the result records a diagnostic model, policy and grids.
     radiative_model: "auto" (default) couples when BremsLib tables are supplied,
       otherwise keeps post-hoc brem scoring and the existing tracks.
       "bremslib-soft-hard" (exact cores only, no LUT) adds soft BremsLib loss
@@ -501,6 +505,7 @@ def _simulate_trajectories(
         elastic_tables=elastic_tables,
         radiative_model=radiative_model,
         radiative_moments=radiative_moments,
+        _radiative_moment_policy=_radiative_moment_policy,
         radiative_cutoff_eV=radiative_cutoff_eV,
         bremslib_tables=bremslib_tables,
         gdf_source=gdf_source,

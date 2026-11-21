@@ -7,7 +7,7 @@
 // scattering (scattering-power correction on, the counterpart of PyRITE's
 // atomic-electron deflection). No ePairProd, PIXE, Auger or fluorescence.
 // Every secondary is scored at creation and killed; the primary is killed on
-// its first slab exit or below 10 keV.
+// its first slab exit or below the selected cutoff (nominally 10 keV).
 //
 // Per-primary records live in per-thread memory and are written once after the
 // timed run, so no logging enters the event loop. main() times
@@ -83,9 +83,12 @@ struct Config
   long seed = 1;
   int threads = 1;
   std::string output = "g4bench";
-  // eIoni step function; <= 0 keeps the Geant4 default (0.2, 1 mm).
-  double step_dr = 0.;
-  double step_final_um = 0.;
+  // Independent eIoni step controls, nominally (0.2, 1 mm).
+  double step_dr = 0.2;
+  double step_final_um = 1000.;
+  double electron_cutoff_keV = 10.;
+  int bins_per_decade = 7;
+  double msc_range_factor = 0.;
   std::string elastic = "ss";  // ss | wvi | gs
   // Detector cone (polar centre from +z in the x-z plane, half-angle).
   double cone_center_deg = 90.;
@@ -210,7 +213,8 @@ class PhysicsList : public G4VModularPhysicsList
     p->SetFluo(false);
     p->SetAuger(false);
     p->SetPixe(false);
-    p->SetLowestElectronEnergy(10. * keV);
+    p->SetLowestElectronEnergy(gConfig.electron_cutoff_keV * keV);
+    p->SetNumberOfBinsPerDecade(gConfig.bins_per_decade);
     p->SetMscThetaLimit(gConfig.elastic == "wvi" ? 0.15 : 0.0);
     if (gConfig.elastic == "gs") {
       p->SetMscEnergyLimit(1. * GeV);
@@ -218,8 +222,9 @@ class PhysicsList : public G4VModularPhysicsList
       p->SetMscSkin(3);
       p->SetMscRangeFactor(0.08);
     }
+    if (gConfig.msc_range_factor > 0.) p->SetMscRangeFactor(gConfig.msc_range_factor);
     p->SetUseMottCorrection(true);
-    if (gConfig.step_dr > 0.) p->SetStepFunction(gConfig.step_dr, gConfig.step_final_um * um);
+    p->SetStepFunction(gConfig.step_dr, gConfig.step_final_um * um);
     RegisterPhysics(new ElectronOnlyPhysics());
   }
   void ConstructParticle() override
@@ -425,6 +430,9 @@ int main(int argc, char** argv)
     else if (k == "--cone-half-deg") gConfig.cone_half_deg = std::stod(v);
     else if (k == "--step-dr") gConfig.step_dr = std::stod(v);
     else if (k == "--step-final-um") gConfig.step_final_um = std::stod(v);
+    else if (k == "--electron-cutoff-kev") gConfig.electron_cutoff_keV = std::stod(v);
+    else if (k == "--bins-per-decade") gConfig.bins_per_decade = std::stoi(v);
+    else if (k == "--msc-range-factor") gConfig.msc_range_factor = std::stod(v);
     else if (k == "--elastic") gConfig.elastic = v;
     else {
       std::fprintf(stderr, "unknown option %s\n", k.c_str());
@@ -433,6 +441,14 @@ int main(int argc, char** argv)
   }
   if (gConfig.material != "Si" && gConfig.material != "W" && gConfig.material != "C") return 2;
   if (gConfig.elastic != "ss" && gConfig.elastic != "wvi" && gConfig.elastic != "gs") return 2;
+  if (!(gConfig.electron_cutoff_keV > 0. && gConfig.electron_cutoff_keV < gConfig.energy_keV)
+      || gConfig.bins_per_decade < 5 || gConfig.bins_per_decade >= 1000000
+      || !std::isfinite(gConfig.electron_cutoff_keV)
+      || !std::isfinite(gConfig.msc_range_factor)
+      || gConfig.msc_range_factor < 0. || gConfig.msc_range_factor >= 1.
+      || (gConfig.elastic == "ss" && gConfig.msc_range_factor != 0.)
+      || !std::isfinite(gConfig.step_dr) || !std::isfinite(gConfig.step_final_um)
+      || gConfig.step_dr <= 0. || gConfig.step_dr > 1. || gConfig.step_final_um <= 0.) return 2;
   const auto t0 = std::chrono::steady_clock::now();
   auto type = gConfig.threads > 1 ? G4RunManagerType::MTOnly : G4RunManagerType::SerialOnly;
   auto* rm = G4RunManagerFactory::CreateRunManager(type, gConfig.threads);
@@ -454,6 +470,12 @@ int main(int argc, char** argv)
   for (std::size_t i = 0; i < processes->size(); ++i) {
     std::printf("G4BENCH_PROCESS e- %s\n", (*processes)[i]->GetProcessName().c_str());
   }
+  const auto* em = G4EmParameters::Instance();
+  // Read back effective parameters after initialization; never echo requests.
+  std::printf("G4BENCH_NUMERICS electron_cutoff_keV=%.17g bins_per_decade=%d "
+              "msc_range_factor=%.17g msc_theta_limit_rad=%.17g msc_skin=%.17g\n",
+              em->LowestElectronEnergy() / keV, em->NumberOfBinsPerDecade(),
+              em->MscRangeFactor(), em->MscThetaLimit(), em->MscSkin());
   std::printf("G4BENCH_TIMING init_s=%.6f warmup_s=%.6f measured_s=%.6f threads=%d\n",
               Seconds(t0, t1), Seconds(t1, t2), Seconds(t2, t3), gConfig.threads);
   std::printf("G4BENCH_RECORD_BYTES %zu\n", sizeof(Record));

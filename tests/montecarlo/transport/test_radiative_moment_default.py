@@ -43,6 +43,14 @@ def test_default_table_and_explicit_exact_replay(core):
     table = simulate_trajectories(**kwargs, radiative_moments="table")
     exact = simulate_trajectories(**kwargs, radiative_moments="exact")
     replay = simulate_trajectories(**kwargs, radiative_moments="exact")
+    from pyrite.montecarlo.transport.radiative_moments import MomentPolicy
+
+    policy = MomentPolicy(rtol=2.5e-5, atol=(1.25e-11, 1.25e-15, 1.25e-11))
+    diagnostic = simulate_trajectories(**kwargs, _radiative_moment_policy=policy)
+    assert diagnostic["radiative"]["moment_policy"]["rtol"] == policy.rtol
+    assert diagnostic["radiative"]["moment_model"] == "diagnostic-radiative-moments-v1"
+    assert diagnostic["radiative"]["moment_energy_eV_by_layer"][0][0] == 10000.0
+    assert np.isfinite(diagnostic["E_end_keV"]).all()
     for name in ["E_end_keV", "L_ang", "hard_radiative_k_eV", "hard_radiative_direction"]:
         np.testing.assert_array_equal(default[name], table[name])
         np.testing.assert_array_equal(exact[name], replay[name])
@@ -143,3 +151,84 @@ def test_identical_passes_reuse_moment_buffer_and_inputs_change_the_key(monkeypa
     for variant in variants:
         with pytest.raises(AssertionError, match="must not rebuild"):
             radiative_core_args(*variant, moment_mode="table")
+
+
+def test_diagnostic_policy_changes_preparation_cache_and_retained_identity(monkeypatch):
+    from dataclasses import asdict
+
+    from pyrite.montecarlo.transport import radiative_moment_transport as transport
+    from pyrite.montecarlo.transport.hard_radiative import radiative_core_args
+    from pyrite.montecarlo.transport.radiative_moments import MomentPolicy
+
+    monkeypatch.setattr(transport, "_cache", type(transport._cache)())
+    args = ([[("C", 0.1)]], {"C": _table()}, 1000.0, np.array([10.0]), np.array([60.0]), 42, 1)
+    nominal = radiative_core_args(*args, moment_mode="table")
+    policy = MomentPolicy(rtol=2.5e-5, atol=(1.25e-11, 1.25e-15, 1.25e-11))
+    candidate = radiative_core_args(*args, moment_mode="table", moment_policy=policy)
+    result = {"radiative": {}}
+    transport.add_moment_identity(result, candidate, policy)
+    audit = result["radiative"]
+    assert audit["moment_model"] != RADIATIVE_MOMENT_MODEL
+    assert audit["moment_policy"] == asdict(policy)
+    grid = np.asarray(audit["moment_energy_eV_by_layer"][0])
+    assert grid[0] == 10000.0 and grid[-1] == 60000.0
+    assert np.all(np.diff(grid) > 0) and grid.size <= policy.max_nodes
+    assert len(audit["moment_table_sha256"]) == 64
+    assert candidate[-1] is not nominal[-1]
+    assert not candidate[-1].flags.writeable
+
+    def unexpected(*args, **kwargs):
+        raise AssertionError("new policy must rebuild")
+
+    monkeypatch.setattr(transport, "prepare_radiative_moments", unexpected)
+    # Equal policy values reuse; any budget/validation change must rebuild.
+    assert (
+        radiative_core_args(
+            *args, moment_mode="table", moment_policy=MomentPolicy(**asdict(policy))
+        )[-1]
+        is candidate[-1]
+    )
+    for changed in (
+        replace(policy, rtol=1e-5),
+        replace(policy, atol=(1e-12, 1e-16, 1e-12)),
+        replace(policy, max_nodes=16384),
+        replace(policy, held_out_count=4095),
+    ):
+        with pytest.raises(AssertionError, match="must rebuild"):
+            radiative_core_args(*args, moment_mode="table", moment_policy=changed)
+
+
+def test_diagnostic_policy_cap_failure_never_falls_back_to_cached_nominal(monkeypatch):
+    from pyrite.montecarlo.transport import radiative_moment_transport as transport
+    from pyrite.montecarlo.transport.hard_radiative import radiative_core_args
+    from pyrite.montecarlo.transport.radiative_moments import MomentPolicy
+
+    monkeypatch.setattr(transport, "_cache", type(transport._cache)())
+    args = ([[("C", 0.1)]], {"C": _table()}, 1000.0, np.array([10.0]), np.array([60.0]), 42, 1)
+    nominal = radiative_core_args(*args, moment_mode="table")
+    with pytest.raises(ValueError, match="exceeded max_nodes"):
+        radiative_core_args(*args, moment_mode="table", moment_policy=MomentPolicy(max_nodes=2))
+    assert radiative_core_args(*args, moment_mode="table")[-1] is nominal[-1]
+
+
+@pytest.mark.parametrize("mode,coupled", [("exact", True), ("table", False)])
+def test_diagnostic_policy_cannot_be_silently_ignored(mode, coupled):
+    from pyrite.montecarlo.transport.radiative_moment_transport import validate_moment_policy
+    from pyrite.montecarlo.transport.radiative_moments import MomentPolicy
+
+    with pytest.raises(ValueError, match="coupled table"):
+        validate_moment_policy(MomentPolicy(), mode, coupled)
+    with pytest.raises(TypeError, match="MomentPolicy"):
+        validate_moment_policy({}, "table", True)
+
+
+def test_private_transport_entry_forwards_diagnostic_policy(monkeypatch):
+    from pyrite.montecarlo.transport import api
+    from pyrite.montecarlo.transport.radiative_moments import MomentPolicy
+
+    policy = MomentPolicy(rtol=2.5e-5)
+    seen = []
+    monkeypatch.setattr(api, "run_transport_pass", lambda inputs: seen.append(inputs))
+    api._simulate_trajectories(60.0, 1, 4000.0, _radiative_moment_policy=policy)
+    assert seen[0]._radiative_moment_policy is policy
+    assert seen[0].as_kwargs()["_radiative_moment_policy"] is policy

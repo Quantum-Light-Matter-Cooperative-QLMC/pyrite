@@ -186,8 +186,10 @@ Edges (importer -> imported):
   p2 -> p7
   p2 -> p8
   p2 -> p9
+  p20 -> p1
   p20 -> p16
   p20 -> p17
+  p20 -> p31
   p20 -> p4
   p20 -> p8
   p21 -> p1

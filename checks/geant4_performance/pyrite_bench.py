@@ -108,6 +108,8 @@ def continuous_cone_scores(r, n, cone, ctx):
     primary sums and sums of squares change by ``rtol``; ``fixed`` evaluates
     once at ``ctx["order"]``; ``point`` evaluates the cone axis only, times
     the cone solid angle (production point-detector convention).
+    An explicit ``ctx["energy_order"]`` freezes energy quadrature independently
+    for fixed/point accuracy studies; omission preserves the coupled rule.
     """
     import numpy as np
 
@@ -124,7 +126,11 @@ def continuous_cone_scores(r, n, cone, ctx):
 
     def f(directions, order):
         out = np.zeros((directions.shape[0], n, len(bands)))
-        rules = [None if p is None else band_rule(p, ENERGY_NODES_PER_ORDER * order) for p in bands]
+        energy_order = ctx.get("energy_order") or order
+        rules = [
+            None if p is None else band_rule(p, ENERGY_NODES_PER_ORDER * energy_order)
+            for p in bands
+        ]
         for i, n_hat in enumerate(directions):
             for b, rule in enumerate(rules):
                 if rule is None:
@@ -412,6 +418,65 @@ class Messages(logging.Handler):
         self.messages.append(record.getMessage())
 
 
+def numerical_bounds(nominal, energy_keV, electron_cutoff_keV=None, radiative_cutoff_eV=None):
+    """Invocation-local cutoffs; scoring bands retain their frozen thresholds."""
+    bounds = dict(nominal)
+    if electron_cutoff_keV is not None:
+        bounds["electron_cutoff_keV"] = electron_cutoff_keV
+    if radiative_cutoff_eV is not None:
+        bounds["hard_photon_cutoff_eV"] = radiative_cutoff_eV
+    electron, radiative = bounds["electron_cutoff_keV"], bounds["hard_photon_cutoff_eV"]
+    if not (
+        math.isfinite(electron)
+        and 0 < electron < energy_keV
+        and math.isfinite(radiative)
+        and 0 < radiative < energy_keV * 1e3
+    ):
+        raise ValueError(
+            "electron and radiative cutoffs must be finite, positive and below beam energy"
+        )
+    return bounds
+
+
+def numerical_moment_policy(level, mode):
+    """Frozen L0..L3 diagnostic budgets; no change to the nominal timing arm."""
+    if level is None:
+        return None
+    if level not in range(4) or mode != "table":
+        raise ValueError("--moment-level 0..3 requires --radiative-moments table")
+    from pyrite.montecarlo.transport.radiative_moments import MomentPolicy
+
+    scale = 2**level
+    nominal = MomentPolicy()
+    return MomentPolicy(
+        rtol=nominal.rtol / scale,
+        atol=tuple(value / scale for value in nominal.atol),
+        max_nodes=nominal.max_nodes,
+        held_out_count=nominal.held_out_count,
+    )
+
+
+def numerical_study(args, bounds, nominal):
+    """Exclude new numerical settings from the frozen nominal timing plan."""
+    return (
+        args.accuracy_only
+        or bounds != nominal
+        or args.elsepa_level != 0
+        or bool(args.elsepa_table)
+        or args.sbethe_table is not None
+        or args.radiative_moments != "table"
+        or args.moment_level is not None
+        or args.max_de_frac != 0.05
+        or args.mixed_c1 is not None
+        or args.inelastic_cutoff_ev is not None
+        or args.transport_precision != "mixed"
+        or args.cone_order != 8
+        or getattr(args, "cone_energy_order", None) is not None
+        or getattr(args, "capture_tracks", None) is not None
+        or args.cone_rtol != 1e-3
+    )
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("scene")
@@ -436,6 +501,31 @@ def main():
         help="cold warmup request size; 0: --histories, -1: one block",
     )
     parser.add_argument("--max-de-frac", type=float, default=0.05)
+    parser.add_argument("--electron-cutoff-kev", type=float, default=None)
+    parser.add_argument("--radiative-cutoff-ev", type=float, default=None)
+    parser.add_argument("--elsepa-level", type=int, choices=range(4), default=0)
+    parser.add_argument("--elsepa-table", type=Path, action="append", default=[])
+    parser.add_argument("--sbethe-table", type=Path, default=None)
+    parser.add_argument("--radiative-moments", choices=["table", "exact"], default="table")
+    parser.add_argument("--moment-level", type=int, choices=range(4), default=None)
+    parser.add_argument("--accuracy-only", action="store_true")
+    parser.add_argument(
+        "--capture-tracks",
+        type=Path,
+        default=None,
+        help="accuracy-only whole-primary source-cone capture; new directory required",
+    )
+    parser.add_argument(
+        "--capture-max-bytes",
+        type=int,
+        default=512 * 1024**2,
+        help="total track-payload byte ceiling; exceeding it fails without truncation",
+    )
+    parser.add_argument(
+        "--tables-only",
+        action="store_true",
+        help="write checked table provenance without importing CUDA or running histories",
+    )
     parser.add_argument("--scratch-mib", type=int, default=4096)
     parser.add_argument("--seg-capacity", type=int, default=16384)
     parser.add_argument(
@@ -453,6 +543,13 @@ def main():
     )
     parser.add_argument("--cone-mode", choices=["adaptive", "fixed", "point"], default="adaptive")
     parser.add_argument("--cone-order", type=int, default=8)
+    parser.add_argument(
+        "--cone-energy-order",
+        type=int,
+        choices=(4, 8, 16, 32),
+        default=None,
+        help="accuracy-only independent energy order; 2*q nodes per edge-split panel; fixed/point only",
+    )
     parser.add_argument("--cone-rtol", type=float, default=1e-3)
     parser.add_argument("--chunk", type=int, default=20000, help="segments per estimator chunk")
     parser.add_argument(
@@ -521,15 +618,78 @@ def main():
     )
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
+    if args.capture_tracks is not None and (
+        args.estimator != "continuous"
+        or args.tables_only
+        or args.no_audit
+        or args.capture_max_bytes <= 0
+        or args.capture_tracks.exists()
+        or args.histories < 2
+        or args.score_rows <= 0
+    ):
+        parser.error(
+            "--capture-tracks requires continuous audited scoring, a new directory and positive byte ceiling"
+        )
+    if args.cone_energy_order is not None and (
+        args.estimator != "continuous" or args.cone_mode == "adaptive" or args.tables_only
+    ):
+        parser.error(
+            "--cone-energy-order requires continuous fixed/point scoring, without --tables-only"
+        )
+    moment_policy = numerical_moment_policy(args.moment_level, args.radiative_moments)
+    from dataclasses import asdict
+
+    moment_policy_record = None if moment_policy is None else asdict(moment_policy)
     spec = json.loads((HERE / "scenes.json").read_text())
     # #1013 precision-only anchors are run here but are not Geant4 benchmark scenes.
     scenes = spec["scenes"] + spec.get("precision_scenes", [])
     scene = next(s for s in scenes if s["id"] == args.scene)
     mat = spec["materials"][scene["material"]]
-    bounds = spec["bounds"]
+    bounds = numerical_bounds(
+        spec["bounds"], scene["energy_keV"], args.electron_cutoff_kev, args.radiative_cutoff_ev
+    )
     args.block_rows = args.block_rows or spec["block_rows"]
     args.block = args.block or scene_block(scene, args.block_rows, spec["max_block_histories"])
     args.max_steps = args.max_steps or scene["max_steps"]
+
+    from pyrite.xsgen.bremslib.tables import load_bremsstrahlung_tables
+    from pyrite.xsgen.elsepa.catalog import resolve_layer_tables
+    from pyrite.xsgen.sbethe.catalog import resolve_composition_table
+
+    comp = [(scene["material"], mat["number_density_ang3"])]
+    entries = resolve_layer_tables(comp)
+    stopping = resolve_composition_table(mat["catalog_key"], comp)
+    brem = load_bremsstrahlung_tables([scene["material"]])
+    from pyrite.perf._benchmark_tables import (
+        benchmark_table_audit,
+        select_elastic_tables,
+        select_stopping_table,
+    )
+
+    entries = select_elastic_tables(entries, args.elsepa_level, args.elsepa_table)
+    stopping = select_stopping_table(stopping, args.sbethe_table)
+    table_audit = benchmark_table_audit(
+        entries, stopping, brem, bounds["electron_cutoff_keV"], float(scene["energy_keV"])
+    )
+    if args.tables_only:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(
+            json.dumps(
+                dict(
+                    schema="pyrite.benchmark-table-audit.v1",
+                    purpose="accuracy-only",
+                    scene=scene,
+                    bounds=bounds,
+                    tables=table_audit,
+                    moment_policy=moment_policy_record,
+                    numerical_gate="unmeasured",
+                ),
+                indent=1,
+                allow_nan=False,
+            )
+            + "\n"
+        )
+        return
 
     import cupy as cp
 
@@ -553,14 +713,7 @@ def main():
         PerElectronTransportConfig,
     )
     from pyrite.perf.precision import primary_moments
-    from pyrite.xsgen.bremslib.tables import load_bremsstrahlung_tables
-    from pyrite.xsgen.elsepa.catalog import resolve_layer_tables
-    from pyrite.xsgen.sbethe.catalog import resolve_composition_table
 
-    comp = [(scene["material"], mat["number_density_ang3"])]
-    entries = resolve_layer_tables(comp)
-    stopping = resolve_composition_table(mat["catalog_key"], comp)
-    brem = load_bremsstrahlung_tables([scene["material"]])
     rounds = {"launched_rows": 0, "launches": 0, "assembly": []}
 
     def on_round(info):
@@ -608,7 +761,8 @@ def main():
         radiative_model="bremslib-soft-hard",
         radiative_cutoff_eV=float(bounds["hard_photon_cutoff_eV"]),
         bremslib_tables=brem,
-        radiative_moments="table",
+        radiative_moments=args.radiative_moments,
+        _radiative_moment_policy=moment_policy,
         transport_core="cuda",
         transport_precision=args.transport_precision,
         per_electron_config=config,
@@ -635,6 +789,7 @@ def main():
     ctx = dict(
         mode=args.cone_mode,
         order=args.cone_order,
+        energy_order=args.cone_energy_order,
         rtol=args.cone_rtol,
         chunk=args.chunk,
         composition=comp,
@@ -650,13 +805,14 @@ def main():
     last_grids = {}
     grid_nodes = spectrum_grids(args, mat, comp, float(scene["energy_keV"]))
 
-    def request(seed, histories):
+    def request(seed, histories, capture=None):
         # Optional study instrumentation supplied by a runpy caller (#895).
         # The ordinary benchmark creates no events or timing proxies.
         kernel_events = globals().get("STUDY_KERNEL_EVENTS")
         if kernel_events is not None:
             kernel_events.clear()
         scores = {}
+        moment_identities = {}
         retained = 0
         rounds.update(launched_rows=0, launches=0, assembly=[])
         log.messages.clear()
@@ -669,11 +825,19 @@ def main():
             r = simulate_trajectories(**kwargs, Ne=n, seed=seed, _electron_start=offset)
             cp.cuda.Device().synchronize()
             transport_s += time.perf_counter() - t1
+            if moment_policy is not None:
+                identity = r["radiative"]
+                moment_identities[identity["moment_table_sha256"]] = {
+                    key: value for key, value in identity.items() if key.startswith("moment_")
+                }
             retained += int(np.asarray(r["event_kind"]).size)
             t2 = time.perf_counter()
             pool.free_all_blocks()
             block = block_scores(r, n, kwargs["E0_keV"])
             if args.estimator == "continuous":
+                if capture is not None:
+                    for first, count, sub in electron_groups(r, n, args.score_rows):
+                        capture.append(sub, offset + first, count)
                 parts = [
                     (first, continuous_cone_scores(sub, count, cone, ctx))
                     for first, count, sub in electron_groups(r, n, args.score_rows)
@@ -711,6 +875,8 @@ def main():
             scoring_s=scoring_s,
             schedule=sorted({m for m in log.messages if "schedule" in m}),
         )
+        if moment_policy is not None:
+            work["radiative_moment_tables"] = list(moment_identities.values())
         if kernel_events is not None:
             work.update(kernel_events.summary())
         if grids:
@@ -745,13 +911,72 @@ def main():
             sys.setprofile(None)
     if calls:
         raise RuntimeError(f"PXR/CBS or line computation executed: {sorted(calls)}")
+    capture = None
+    if args.capture_tracks is not None:
+        from pyrite.perf._track_capture import TrackCapture, source_fingerprint
+
+        capture = TrackCapture(
+            args.capture_tracks,
+            args.histories,
+            dict(
+                scene=scene,
+                bounds=bounds,
+                table_audit=table_audit,
+                cone=cone,
+                context={k: v for k, v in ctx.items() if k not in ("brem", "orders")},
+                seed=args.seed,
+                transport_arguments={
+                    k: kwargs[k]
+                    for k in (
+                        "E0_keV",
+                        "composition",
+                        "thickness_ang",
+                        "crystal_width_mm",
+                        "crystal_height_mm",
+                        "beam_dir",
+                        "E_cut_keV",
+                        "energy_model",
+                        "max_dE_frac",
+                        "max_steps",
+                        "elastic_model",
+                        "atomic_electron_deflection",
+                        "straggling",
+                        "radiative_model",
+                        "radiative_cutoff_eV",
+                        "radiative_moments",
+                        "transport_core",
+                        "transport_precision",
+                        "inelastic_model",
+                        "inelastic_cutoff_eV",
+                        "inelastic_materials",
+                    )
+                    if k in kwargs
+                },
+                primary_rng_mapping="seed plus global _electron_start; scorer replay only",
+                transport_precision=args.transport_precision,
+                transport_algorithm=("ss" if args.mixed_c1 is None else "mixed"),
+                transport_controls=dict(
+                    kernel=args.kernel,
+                    max_dE_frac=args.max_de_frac,
+                    mixed_c1=args.mixed_c1,
+                    mixed_c2=args.mixed_c2,
+                    mixed_max_step_um=args.mixed_max_step_um,
+                    radiative_moments=args.radiative_moments,
+                    moment_policy=moment_policy_record,
+                ),
+                pyrite_python_source_sha256=source_fingerprint(),
+                harness_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+                pxr_cbs_audit="passed on separate audit request; no_audit=false",
+            ),
+            args.capture_max_bytes,
+        )
     profiler = None
     if args.cprofile is not None:
         import cProfile
 
         profiler = cProfile.Profile()
         profiler.enable()
-    scores, warm_s, warm_transport_s, work = request(args.seed, args.histories)
+    scores, warm_s, warm_transport_s, work = request(args.seed, args.histories, capture=capture)
     if profiler is not None:
         profiler.disable()
         args.cprofile.parent.mkdir(parents=True, exist_ok=True)
@@ -763,6 +988,7 @@ def main():
     launched, retained = work["launched_rows"], work["retained_rows"]
     if work["launches"] and (launched > retained or (not full_tail and launched != retained)):
         raise RuntimeError(f"replayed rows detected: {work}")
+    capture_record = None if capture is None else capture.finish()
     args.output.parent.mkdir(parents=True, exist_ok=True)
     npz = args.output.with_suffix(".npz")
     np.savez_compressed(npz, **scores)
@@ -779,6 +1005,7 @@ def main():
         cone_scoring=dict(
             mode=args.cone_mode if args.estimator == "continuous" else "sampled-photons",
             order=args.cone_order,
+            energy_order=args.cone_energy_order,
             rtol=args.cone_rtol,
             chunk=args.chunk,
             adaptive_orders=ctx["orders"],
@@ -789,6 +1016,8 @@ def main():
             skipped=bool(args.no_audit),
         ),
         scene=scene,
+        bounds=bounds,
+        table_audit=table_audit,
         histories=args.histories,
         warmup_histories=warmup,
         block=args.block,
@@ -796,6 +1025,9 @@ def main():
         seed=args.seed,
         controls=dict(
             max_dE_frac=args.max_de_frac,
+            electron_cutoff_keV=bounds["electron_cutoff_keV"],
+            radiative_cutoff_eV=bounds["hard_photon_cutoff_eV"],
+            elsepa_level=args.elsepa_level,
             scratch_mib=args.scratch_mib,
             seg_capacity=args.seg_capacity,
             probe_electrons=args.probe_electrons,
@@ -803,7 +1035,9 @@ def main():
             schedule=config.schedule,
             rows_per_round=args.rows_per_round,
             device_staging=args.device_staging,
-            radiative_moments="table",
+            radiative_moments=args.radiative_moments,
+            moment_level=args.moment_level,
+            moment_policy=moment_policy_record,
             pool_fraction=args.pool_fraction,
             score_rows=args.score_rows,
             kernel=args.kernel,
@@ -839,6 +1073,10 @@ def main():
         observables={k: primary_moments(v) for k, v in scores.items()},
         raw_scores_sha256=hashlib.sha256(npz.read_bytes()).hexdigest(),
     )
+    if numerical_study(args, bounds, spec["bounds"]):
+        record["purpose"] = "accuracy-only"
+    if capture_record is not None:
+        record["track_capture"] = dict(manifest_sha256=capture_record["manifest_sha256"])
     args.output.write_text(json.dumps(record, indent=1, allow_nan=False) + "\n")
     print(
         json.dumps(

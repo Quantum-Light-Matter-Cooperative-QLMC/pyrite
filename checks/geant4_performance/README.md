@@ -4,6 +4,264 @@ Performance comparison of PyRITE CUDA against Geant4 11.4.2 single scattering
 on the same problem, with physics bounds matched so that neither engine does
 work the other skips.
 
+Numerical convergence remains unverified (#1041). Statistical equivalence,
+SHIFT/tail and precision gates alone do not qualify a speed headline.
+`analyze.py --plan` retains their verdicts but emits `headline=false` with
+an explicit `numerical_convergence` record for every ratio.
+
+## Accuracy-only CPU references (#1041)
+
+`accuracy-reference-plan-v1.json` derives the two missing Si cone populations
+at epsilon = 2% from the frozen v3 plan, with disjoint seeds starting at
+200001 and at most one million primaries per shard. The 8-thread CPU shards
+may run on Hoffman2; their times cannot be compared with qlmc timings.
+`accuracy-reference.sbatch` limits each shard to 4 GiB and 30 minutes; submit
+at most four concurrently after validating the runtime on a compute node.
+The runtime and Python environment must already be staged and verified.
+
+```bash
+uv run python checks/geant4_performance/accuracy_reference.py plan \
+    checks/geant4_performance/precision-plan-v3.json --output reference-plan.json
+# LAST is len(plan["tasks"]) - 1. RUNTIME is an absolute shared-filesystem path.
+sbatch --array=0-LAST%4 checks/geant4_performance/accuracy-reference.sbatch \
+    reference-plan.json "$RUNTIME" evidence/accuracy-reference/shards
+uv run python checks/geant4_performance/accuracy_reference.py summarize \
+    reference-plan.json evidence/accuracy-reference/shards --output reference-summary.json
+```
+
+The reducer requires every planned shard, disjoint planned seeds, consistent
+binary identity, retained raw-score SHA-256 checks and exact incident-primary
+counts. Missing or mismatched shards fail rather than produce a partial
+reference. These records carry `purpose="accuracy-only"`; the timing analyzer
+rejects them as inputs to `T(epsilon)`. Achieved RSE is reported separately
+from numerical convergence, which these reference runs do not establish.
+
+`evidence-inventory-v1.json` inventories the unpublished local backup of the
+pilot and v2/v3 evidence plus the original v3 source snapshot. The archives
+were SHA-256 verified after transfer; the inventory does not satisfy the
+issue's requirement for raw evidence in the repository or release assets.
+No release publication is authorized.
+
+## Geant4 numerical controls (#1041)
+
+The adapter accepts invocation-local `--electron-cutoff-kev` (default 10),
+`--bins-per-decade` (7), `--step-dr` (0.2), and `--step-final-um` (1000).
+The two step controls vary independently. For `--elastic gs|wvi`,
+`--msc-range-factor` overrides the nominal 0.08/0.04 respectively; it is
+rejected for single scattering. Invalid or nonfinite controls fail before
+output creation. Photon production/scoring thresholds stay fixed.
+
+Rebuild `g4bench` before using this adapter. After transport, its
+`G4BENCH_NUMERICS` line reads back the effective cutoff, table density and
+MSC parameters from Geant4. The adapter checks these and the effective step
+function against the request and stores them in `bounds.numerics`.
+A missing audit (including an older executable) or a silently ignored
+setting fails the run. Existing retained records are unchanged.
+
+Refined settings are automatically marked `purpose="accuracy-only"` and
+excluded from `T(epsilon)` analysis. Use `--accuracy-only` also for nominal
+settings run as convergence references. These controls are prerequisites for
+the convergence ladder, not evidence that any ladder or cross-engine accuracy gate passes.
+The design manifest below retains source-table limitations; measured numerical
+gates and an executable submission manifest remain separate work under #1041.
+
+## Frozen numerical design (#1041)
+
+`convergence-design-v1.json` freezes **7,074** expected comparisons across
+60 scene/arm configurations: six scenes, PyRITE SS/mixed scattering on CPU
+FP64 and CUDA FP64/mixed precision, Geant4 SS/WentzelVI/GS, and PenRed.
+The six-scene W density is **19.3 g/cm3**, distinct from the 44-case matrix.
+PenRed retains its straggling-on identity and needs a separately frozen
+matched family before any cross-engine equivalence comparison.
+
+This is a numerical **design**, with `submission_ready=false`,
+`numerical_gate="unmeasured"` and `headline=false`. `available` means an
+adapter override exists, not that its numerical effect is qualified. Runtime
+identities, effective-parameter audits, staged generated tables, same-track
+replay, per-shard seed maps, resource forecasts and confirmation populations
+remain explicit blockers. No scheduler submission or transport is performed.
+
+Common positive scales come from the original v3 planning pool (seeds
+101–103): PyRITE discrete transport means and continuous cone means, shared
+by all arms. Headline membership is the union of the v3 plan's members across
+arms; rare cones remain required and existing diagnostic exclusions remain.
+The compiler verifies all four original v2 archives against the retained
+inventory, then hashes every v3 input JSON and raw-score NPZ. These hashes
+identify the unpublished backup; they do not satisfy durable raw publication.
+No accuracy-reference or confirmation means enter scale selection.
+
+At epsilon=2%, each absolute numerical budget is `S*0.02/3`. Four families
+receive one quarter each, split equally among their active primitive controls.
+Unsupported native meshes remain in the allocation and Bonferroni count;
+inapplicable detector controls on transport consume no allowance and none is
+reassigned. The three contrasts per primitive and the all-fine corner are
+explicit. The point-cone approximation has one direct comparison against
+the integrated L3 scorer, since it has no intermediate refinement levels.
+All intervals use the frozen `0.05/7074` row alpha, subject to the issue's
+count, VOV, tail, SHIFT and pairing eligibility rules. No interval evaluator
+or measured verdict is supplied by this compiler.
+
+```bash
+# Read-only reproducibility check; no archives, tables, GPU or histories needed.
+uv run python checks/geant4_performance/convergence_manifest.py --check
+# Reconstruct from the original backup into a new file; compare before adoption.
+uv run python checks/geant4_performance/convergence_manifest.py \
+    --archives /path/to/verified/archives --output scratch/reconstructed-design.json
+```
+
+An existing different output is never overwritten. `--check` compares the
+entire design with its compiler and pinned inputs, including the expected-row
+list; it does not re-read the original archives. Changes require an explicit
+version/amendment before confirmation, preserving failed and missing cells.
+The compiler's `confirmation_count` helper implements the 1.25 variance margin,
+half-allowance CI-width target, three equal repeats and 20k-per-repeat minimum.
+It rejects zero/nonfinite variance; counts still require eligible pilot
+evidence and forecasts under the frozen CPU/GPU ceilings.
+
+## PyRITE numerical and table controls (#1041)
+
+`pyrite_bench.py` accepts invocation-local `--electron-cutoff-kev`,
+`--radiative-cutoff-ev`, `--elsepa-level 0|1|2|3`, repeatable
+`--elsepa-table FILE.npz`, `--sbethe-table FILE.npz`, and
+`--radiative-moments table|exact`. Defaults retain the frozen scene settings.
+Photon scoring bands remain at their existing thresholds; the radiative
+separator changes transport's soft/hard split. Numerical changes and explicit
+table selections are accuracy-only and excluded from the nominal timing plan.
+Use `--accuracy-only` also for nominal convergence references.
+
+ELSEPA L1/L2/L3 insert one/two/three rounds of log-energy midpoints,
+preserving all original nodes and endpoints. Each level requires fresh
+generator evaluations, using the same source, target and physics options.
+`pyrite.perf._benchmark_tables.nested_energy_grid` defines the exact requested
+nodes. Generate those nodes with the existing `xsgen.elsepa.generate`
+functions in an isolated table store before running the benchmark; transport
+never launches a generator. Both free-atom and muffin-tin tables are required
+where the nominal material uses both. The existing joining rule is preserved.
+The native angular mesh stays fixed and remains unresolved.
+
+The default lookup requires the exact refined keys; a missing refinement
+fails rather than substituting nominal data. Explicit NPZ paths require
+adjacent JSON manifests and override lookup only for this invocation. Every
+explicit key must be used. The loader verifies request/manifest/payload hashes,
+source/model/target identity and grid agreement. Preserve generator inputs and
+raw outputs separately: these identity checks cannot prove that independently
+evaluated generator data were used.
+
+The current SBETHE generator has no independent grid-density control.
+`--sbethe-table` admits a pinned regeneration of the same scientific request
+on the same native grids; it rejects changed grids. Interpolating native
+SBETHE or BremsLib knots onto denser arrays is not convergence evidence.
+The BremsLib source mesh and ELSEPA angular mesh remain unresolved in the audit.
+`--moment-level 0|1|2|3` selects the derived radiative-moment tolerance ladder:
+rtol = 2e-4 divided by 1/2/4/8, with each nominal absolute tolerance
+(1e-10, 1e-14, 1e-10) divided by the same factor. The node cap (32768) and
+held-out probe count (8191) stay fixed. Explicit L0 is also accuracy-only;
+omitting the flag preserves the nominal timing path. The private transport
+override reaches the existing preparation routine and is part of its cache key.
+A cap/refinement failure raises; it never substitutes nominal moments.
+
+Diagnostic transport results record a separate model label, effective policy,
+actual per-layer energy nodes and packed-buffer SHA-256. Benchmark cold/warm
+work records retain distinct table identities across their blocks. The source
+BremsLib data and exact photon sampler remain unchanged. `--tables-only`
+records the requested policy but does not build moment tables. `exact` selects
+the existing quadrature oracle and cannot be combined with `--moment-level`.
+These controls enable a convergence study; they do not certify an error bound,
+backend parity or a numerical gate. The explicit manifest and measurements
+remain required.
+
+`--cone-energy-order 4|8|16|32` independently sets the energy quadrature
+(`2*q_E` Gauss nodes per existing edge-split panel) for continuous fixed/point
+scoring. Hold it at 32 while varying `--cone-order` for angular tests; hold
+`--cone-order 32` while varying energy order for energy tests. Point versus
+integrated comparisons must use the same energy order and the same saved
+histories. Omitting the new option preserves the coupled angular/energy rule.
+Every explicit value, including 8, is accuracy-only; the record retains it in
+`cone_scoring.energy_order`. Discrete, adaptive and table-only uses are rejected
+before table loading or CUDA access. The v1 design predates this override;
+its energy-control row remains unresolved until same-track replay evidence
+exists. This option alone does not implement saved-track capture/replay or
+qualify the point approximation.
+
+## Whole-primary scorer capture/replay (#1041)
+
+`pyrite_bench.py --estimator continuous --capture-tracks NEW_DIRECTORY`
+retains the warm request's source-cone track fields in whole-primary shards.
+The option always makes the sample accuracy-only. Cold/warmup and audit
+requests are not captured. Capture requires the existing PXR/CBS audit; it
+preserves explicit global incident-primary IDs, including primaries without
+rows, local row IDs, original numeric dtypes, representative energies,
+geometry and coupled-radiative metadata. Source Python, harness and table
+identities are retained. Channeling-weighted/callback-based tracks are refused.
+
+The total NPZ payload ceiling defaults to 512 MiB (`--capture-max-bytes`).
+Reduce `--score-rows` and the declared population for bounded capture work;
+exceeding the total ceiling fails without truncating histories. Existing
+directories are refused. A partial/failed request leaves no `capture.json`
+completion marker and cannot be replayed. Capture I/O is diagnostic overhead;
+its wall time must never enter nominal `T(epsilon)` analysis.
+
+```bash
+# Retention audit only: no scorer/table imports, GPU or histories.
+uv run python checks/geant4_performance/replay_cone.py path/to/capture \
+    --audit-only --output scratch/capture-audit.json
+# Explicit scorer computation on existing tracks; schedule remotely when heavy.
+PYRITE_MC_BACKEND=numpy uv run python checks/geant4_performance/replay_cone.py \
+    path/to/capture --output scratch/cone-replay.json
+```
+
+Replay validates the complete shard inventory, payload hashes, incident IDs,
+array shapes and byte ceilings before scoring. Actual replay also requires
+matching package/harness sources and matching BremsLib tables; the production
+scorer checks the coupled partition. Output uses a distinct accuracy-only
+schema with the capture digest, replay backend/precision, raw-score hash,
+per-primary scores and signed differences for all three angular and energy
+contrasts, both point candidates (energy orders 8/32), and the detector corner.
+All angular tests hold energy order at 32; energy tests hold angular order
+at 32. The detector corner is not the full transport all-L3 interaction check.
+Zero-score incident primaries remain in every population. All-zero differences
+remain statistically unresolved; no numerical verdict/interval gate is
+computed. Same-byte deterministic scorer pairing does not establish transport
+common-random-number pairing or CPU/GPU parity. No capture or real replay
+measurement is supplied by the implementation tests.
+
+## ELSEPA regeneration preparation (#1041)
+
+`elsepa-refinement-plan-v1.json` retains the exact nine L1/L2/L3 requests for
+the six scenes' three native tables (free-atom and muffin-tin where used).
+It pins the nominal payloads, request/source/target/physics identities, angular
+node counts and freshly requested nested energy grids, with joined coverage
+checked down to the ladder's 1.25 keV cutoff. It preserves W=19.3 g/cm3 in the
+scene family. All requests remain `requires-independent-generation`; output
+payload and raw-generator-evidence hashes are null. No generator was run.
+
+```bash
+uv run python checks/geant4_performance/prepare_convergence_tables.py \
+    --levels 1 2 3 --output scratch/new-elsepa-request-plan.json
+```
+
+The planner only reads installed native tables. It deduplicates requests,
+preserves source/target/model options, and emits the same exact keys required
+by benchmark table admission. It neither builds a generator nor writes to
+catalog/table stores, and refuses existing output files. Generation must use
+an isolated store and retain source/build/deck/raw-panel evidence separately.
+Interpolating native knots into these requested grids cannot satisfy that
+requirement. Native angular/inverse-CDF convergence remains unsupported.
+
+For a CPU-only, read-only preflight before requesting a GPU:
+
+```bash
+uv run python checks/geant4_performance/pyrite_bench.py si-300keV-100um \
+    --histories 2 --seed 301 --tables-only --electron-cutoff-kev 1.25 \
+    --output scratch/table-audit.json
+```
+
+The preflight checks actual joined elastic, stopping and staged radiative
+coverage over the requested electron range before importing CUDA or launching
+histories. Its distinct audit schema cannot enter timing analysis. Transport
+records retain effective bounds, complete table/source hashes and grid nodes.
+Neither preflight success nor a successful transport run passes a numerical gate.
+
 ## What is compared
 
 Three arms share one transport problem; they differ only in how bremsstrahlung
@@ -150,6 +408,17 @@ ENGINES=geant4 sbatch -p cpu -w qlmc-queen --gres=none --mem=20G -c 16 \
 hold=$(sbatch --parsable checks/geant4_performance/hold.sbatch)
 ENGINES=pyrite sbatch --dependency=after:$hold checks/geant4_performance/precision.sbatch \
     $hold precision-plan.json 101 102 103
+```
+
+#1041 v3 re-plans from held-out evidence with a variance margin, records the
+trims in the plan, and adds 200 000-history continuous cone runs for the tail
+slope. `analyze.py` then applies `scenes.json` `amendment_v3` (floor, skew,
+tail and FOM rules; see the equal-precision protocol):
+
+```bash
+uv run python checks/geant4_performance/precision_plan.py evidence/precision/{14460,14462,14463,14464} \
+    --variance-margin 1.10 --max-run-s 1800 --drop-config geant4-16t --only-at geant4-1t=0.05 \
+    --tail-histories 200000 --protocol-version 3 --output precision-plan-v3.json
 ```
 
 ## Spectral-grid sensitivity (#278)
