@@ -174,9 +174,10 @@ def _same_selection(new, legacy):
 
 @pytest.mark.slow
 @pytest.mark.parametrize("bandwidth", ["kinematic-ceiling", "resonance-population"])
-def test_axis_spanning_the_band_selects_in_one_pass(bandwidth, monkeypatch):
-    """A prefix covering the population and an axis spanning the band score each
-    shell once; its decision yield is the exact band mass of those lines (#1326)."""
+def test_axis_spanning_the_band_selects_on_band_mass_then_rescores(bandwidth, monkeypatch):
+    """A production axis spanning the band still decides on the mass-only
+    reference pass and rescores the kept set: #1326 dropped the production-axis
+    single pass, which reduced every rejected trailing shell and never paid."""
     from pyrite.montecarlo.runner import reflection_cutoff
 
     selected, tp = _automatic_scene(bandwidth, 30000.0, monkeypatch)
@@ -188,12 +189,12 @@ def test_axis_spanning_the_band_selects_in_one_pass(bandwidth, monkeypatch):
         lambda *args: rescored.append(1) or original(*args),
     )
     new = runner._spectrum_case(selected, tp)
-    assert rescored == []
+    assert rescored == [1]
     assert new["reflection_selection"]["reference_quadrature"] == "band-mass"
     assert new["reflection_selection"]["reference_band_eV"] == [500.0, 30000.0]
     _legacy_reference(monkeypatch)
     legacy = runner._spectrum_case(selected, tp)
-    assert rescored == [1]
+    assert rescored == [1, 1]
     assert legacy["reflection_selection"]["reference_quadrature"] == "bin-mean"
     _same_selection(new, legacy)
 

@@ -11,11 +11,8 @@ selection band. For automatic `kinematic-ceiling` and `resonance-population`
 axes, this is the shared clamped ceiling band: coarse 500 eV bins integrate
 each line profile exactly, independently of the production stop and spacing.
 A shell's yield on that band is read off its line arrays in closed form
-(`sincsq_band_mass`), with no bin reduction. When the prefix covers the
-population and the production axis spans the band, each shell is scored once on
-the production axis and its spectrum is kept; otherwise the selected reflections
-are then scored on the production axis, whose tail audit excludes the reference
-pass. Extending a refused measured stop keeps
+(`sincsq_band_mass`), with no bin reduction. The selected reflections are then
+scored on the production axis, whose tail audit excludes the reference pass. Extending a refused measured stop keeps
 the same selection band. Explicit fixed axes retain their own band and sum
 the shell spectra directly. Grouped flights (`max_dE_frac`) and truncated
 sinc profiles and explicit numeric node-support windows retain that direct

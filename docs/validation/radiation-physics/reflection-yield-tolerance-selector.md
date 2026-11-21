@@ -1318,7 +1318,7 @@ Overall verdict: **`rederived`** for v6, conditional on these wording edits
 
 Human sign-off is not granted.
 
-## Exact band-mass decision yield and single pass (v8, #1326)
+## Exact band-mass decision yield (v8, #1326)
 
 This section is the implementer's derivation and regression record, with the
 corrections from its fresh-context review (end of section).
@@ -1341,30 +1341,25 @@ at most $3/(2\pi^3K^2)=1.2\times10^{-5}$ of that line's mass
 (`sinc-bin-far-envelope`). $Y_{\rm band}$ has no such term, so a marginal shell
 whose yield sits within that allowance of a stop decision can flip.
 
-**Single pass.** The selector keeps every shell it scores up to the stop, so
-no scored shell is rejected. With a prefix that covers the population
-($N\le n_{\max}$) and a production axis spanning the reference band, the line
-keep window and tabulation of the production pass contain every line the
-reference pass keeps (its keep window is a superset of the reference one). The production spectrum of each shell and $Y_{\rm band}$ come
-from the same line arrays, the spectrum of the selected set is the sum of the
-scored shells, and nothing is rescored. A production axis short of the band
-cannot supply the band's lines, and a prefix smaller than the population scores
-different electrons; both keep the reference pass, which now generates the lines on the
-reference band and measures them with a `mass_only` audit, with no bin
-reduction. The decision is on the reference band alone, as in v5.
+**Reference pass and rescoring.** The reference pass generates each shell's
+lines on the reference band and measures them with a `mass_only` audit, with
+no bin reduction; the selected set is then rescored on the production axis.
+The decision is on the reference band alone, as in v5, so the selected set
+does not depend on the production stop.
 
-**Keep-window strip.** The two modes measure the same band but not exactly the
-same lines. `_line_keep_window` pads an axis by 20 % of its own span; the
-production nodes span the band edge to edge while the reference nodes are bin
-centres inset by $h/2$, so the production window is wider by about $0.7h$ at
-each padded edge (more when the production axis extends past the band).
-Single-mode $Y_{\rm band}$ then also holds the in-band tails of lines resonant
-in that strip, each at most $1/(2\pi a_\ell d_\ell)$ of its mass with
-$d_\ell\ge0.2(S-h)$ its distance from the band ($S$ the band width). The
-selected set is therefore independent of the production stop up to this
-shared keep-window approximation (the same class as the keep window's dropped
-tails). It is non-zero only when lines resonate beyond the padded reference
-window; none do in the anchor fixtures.
+**Single pass (measured, dropped).** An earlier v8 draft, with a prefix
+covering the population and a production axis spanning the band, scored each
+shell once on the production axis and read $Y_{\rm band}$ off those lines,
+skipping the rescoring. Its production keep window is wider than the
+reference one, so it also counted the in-band tails of lines resonant in that
+strip (at most $1/(2\pi a_\ell d_\ell)$ of each line's mass,
+$d_\ell\ge0.2(S-h)$). #1326's three-arm comparison (mos2, RTX 5080) found it
+never faster than the mass-only reference pass: equal where it did not
+engage, +2.5 % at 100 µm, and unfinished after 2.5 h at 1 mm where the mass
+arm took 8.5 h. Shells grow about as $g^2$, so the rejected trailing shells
+the stop rule scores are the largest, and the single pass reduced them on the
+production axis, while the reference pass only generates them. It was removed
+before v8 shipped; the selector has no production-axis decision mode.
 
 **Normalization.** Audit sums are un-normalized; $Y_{\rm band}$ is divided by the
 number of electrons the spectrum is divided by, so it is in the units of
@@ -1377,10 +1372,12 @@ production far-envelope bins (within $3/(2\pi^3K^2)$ of the whole mass),
 plus per-line limits and guards;
 `tests/montecarlo/spectrum/test_sinc_bin_integration_cuda.py::test_band_mass_kernel_matches_the_host_closed_form`
 pins the device reduction against the host;
-`tests/montecarlo/runner/test_reflection_selection_spectrum.py::{test_axis_spanning_the_band_selects_in_one_pass,test_short_axis_measures_band_mass_without_reducing_lines}`
+`tests/montecarlo/runner/test_reflection_selection_spectrum.py::{test_axis_spanning_the_band_selects_on_band_mass_then_rescores,test_short_axis_measures_band_mass_without_reducing_lines}`
 pin the selected set, shell yields ($10^{-9}$) and spectrum against the
-bin-mean reference route, that no `_selected_spectrum` pass runs on the spanning
-axis, and `tests/montecarlo/runner/test_reflection_cutoff.py::test_shell_mass_is_the_decision_yield_and_density_is_the_spectrum`.
+bin-mean reference route, and that the selected set is rescored on either axis;
+`tests/montecarlo/transport/test_streamed_selection.py::test_streamed_band_mass_selection_matches_retained`
+pins the band mass summed over streamed prefix blocks against the retained
+route ($10^{-12}$); `tests/montecarlo/runner/test_reflection_cutoff.py::test_shell_mass_is_the_decision_yield_and_density_is_the_spectrum`.
 
 **Fresh-context review (2026-11-19).** Verdict `rederived`. Units, limits
 (whole line, zero width, edge-centred half mass, far tails) and the $s(0)$
@@ -1393,4 +1390,114 @@ route. The review added the keep-window strip bound and the $s$ convention
 above. Device inputs are cast to `REAL` as the production line reduction
 already does, so straddling lines carry the same FP32 resonance rounding as
 the production spectrum. Untested: mass mode with a prefix smaller than the
-population (`norm = n_lines`).
+population (`norm = n_lines`), since covered by the streamed test above. The
+review covered the single mode, since removed; the mass mode it also checked
+is unchanged.
+
+## Band-mass re-verification (v8, #1326, 2026-11-21)
+
+Fresh-context review at head `64934c9fa`, after the production-axis single
+pass was removed. The derivation below was written before reading
+`_band_mass.py`.
+
+**Closed form.** With $\mathrm{sinc}\,x=\sin(\pi x)/(\pi x)$, a line
+$w\,\mathrm{sinc}^2[a(E-E^{\rm res})/\pi]=w\sin^2t/t^2$, $t=a(E-E^{\rm res})$
+($a$ in eV$^{-1}$, $t$ dimensionless). Integrating by parts,
+
+$$
+\int\frac{\sin^2t}{t^2}\,dt=-\frac{\sin^2t}{t}+\int\frac{\sin2t}{t}\,dt
+=\mathrm{Si}(2t)-\frac{\sin^2t}{t}\equiv G(t),
+$$
+
+so the in-band mass is $(w/a)[G(t_{\rm hi})-G(t_{\rm lo})]$ with
+$t_{\rm lo,hi}=a(E_{\rm lo,hi}-E^{\rm res})$. Writing $t=\pi x$,
+$G(\pi x)/\pi=\mathrm{Si}(2\pi x)/\pi-x\,\mathrm{sinc}^2x\equiv F(x)$, and the
+mass is $w(\pi/a)[F(x_{\rm hi})-F(x_{\rm lo})]$, the claim's prefactor and
+argument. $F$ is odd and $F(\pm\infty)=\pm\tfrac12$ ($\mathrm{Si}(\infty)=\pi/2$),
+so the whole line holds $w\pi/a$ in eV times the units of $w$. With
+$R=F-s/2$, $F(x_{\rm hi})-F(x_{\rm lo})=R(x_{\rm hi})-R(x_{\rm lo})+(s_{\rm hi}-s_{\rm lo})/2$,
+and $(s_{\rm hi}-s_{\rm lo})/2=\mathbf 1\{x_{\rm lo}<0\le x_{\rm hi}\}$ for
+$x_{\rm lo}<x_{\rm hi}$: the indicator form follows, for either value of $s(0)$
+as long as $R$ uses the same one.
+
+**Limits.** Band $\to(-\infty,\infty)$: $R\to0$ at both ends, indicator 1, mass
+$w\pi/a$. Narrow band $[E_0,E_0+\delta]$: $F'(x)=\mathrm{sinc}^2x$, so the mass is
+$w\,\mathrm{sinc}^2[a(E_0-E^{\rm res})/\pi]\,\delta+O(\delta^2)$, the local
+density times the width. Resonance at a band edge: $F(0)=0$, mass
+$w\pi/(2a)$ as the far edge recedes. Resonance outside the band at distance
+$D$: the mass is a difference of two same-sign tails, positive and at most
+$1/(\pi aD)$ of the line (the envelope $1/t^2$ integrated). Signs: mass is
+non-negative for $w>0$ since the integrand is.
+
+**Code.** `_bin_quadrature.py::sincsq_tail` evaluates
+$R(u)=[\mathrm{Si}(2\pi u)-\pi/2]/\pi-u\,\mathrm{sinc}^2u$ for $u=|x|$ (an
+asymptotic series in the far tail) and extends it oddly; that is $F-\tfrac12$ for
+$x\ge0$, matching the above. `_band_mass.py::_host_band_mass` and the device
+`pyrite_band_line_mass` compute $w(\pi/a)[R(x_{\rm hi})-R(x_{\rm lo})+\mathbf 1]$
+with $x=a(E-E^{\rm res})/\pi$ and drop lines whose $w\pi/a$ is not finite and
+positive. Term-for-term match.
+
+**Numeric probe** (mpmath, 30 digits, independent $G$ above; 300 random lines,
+$a\in[10^{-3},10]$ eV$^{-1}$, bands $10^{-2}$ to $10^4$ eV): the largest
+difference from `sincsq_band_mass` is $2.4\times10^{-16}$ of a line's mass. Direct
+quadrature of $w\,\mathrm{sinc}^2$ over a straddling band agrees to 16 digits.
+Edge-centred line: $0.4999999995$ of the whole; band 100 to 200 eV above the
+resonance: equal to the mpmath value to 16 digits.
+
+**Prefix-block parts.** The band mass is a sum over lines of a function of each
+line alone, so the mass of a concatenated prefix equals the sum over any
+partition of its lines; the probe's seven-way split agrees bit for bit here.
+`reflection_cutoff.py::_band_evaluator` sums both the spectra and the masses
+over `parts()`, each mass divided by the same `norm`, so normalization is
+unchanged. `_batch_selection` passes `parts=selected`, the prefix-cut blocks.
+
+**Selection path.** `_selection_mode` returns `mass` whenever a reference axis
+exists and `band_mass` is given, otherwise `reference` or `production`; no
+production-axis decision mode remains. `_pilot_scorer` in `mass` mode adds each
+pilot's mass to the decision accumulator and does not reduce the lines;
+`_accumulate_edge_truncation` adds `band_mass` from the generated lines, and
+`mass_only` skips the grid reduction. The record reports
+`reference_quadrature = "band-mass"`.
+
+**Anchors.** `test_band_mass.py` compares the closed form with summed bin means
+from `_host_bin_mean`. That route shares $F$ with the closed form, so a
+common error in $F$ would cancel. The per-line limit test (whole line within
+$2/(\pi a D)$, edge-centred half to $10^{-4}$) does catch a wrong $F$ or
+prefactor. The streamed test uses a prefix of 2 histories and one-history
+blocks, and requires the retained-route record. Dropping or double-counting a
+block's mass would change the shell yields and fail it.
+
+**Markers.** `sincsq_band_mass` carries `Validation: sinc-bin-integration`
+and `_accumulate_edge_truncation` carries
+`Validation: line-grid-resonance-bandwidth`, the rows that own them. The v8
+bullet cites them as dependencies. `_selection_mode`, `_pilot_scorer` and
+`_band_evaluator` carry `Validation: reflection-yield-tolerance-selector`.
+`tests/dev/test_validation_ledger.py` is green.
+
+**Verdict.** `rederived`: the closed form, limits, units and parts linearity
+match. The anchors are green locally, but CI on PR #1328 at `64934c9fa` was still
+pending at review time. `anchored` applies once that CI is green.
+PR #1328 CI (slow tier included) passed at `321e02f4a`; `64934c9fa` adds
+only `checks/` probe changes, so the anchored code and tests are those CI ran.
+The row is `anchored`.
+
+**Set agreement (job 14513, `64934c9fa`, RTX 5080).** `fourier_reduction_phases_1296.py selection`
+transports each case once and selects through the band-mass reference pass and
+through the bin-mean route it replaced. On the #1143 scenes with the gate's
+frozen physics on their own automatic line grids (64 histories, seed 642501)
+and on the #1320 thick case (mos2 5 MeV/15°, 1 mm, N=16), every radiator
+keeps the same cutoff and selected-set digest. The largest shell-yield
+difference is 1.2e-9 relative, and the full line spectra differ by at most
+4.5e-16 of the peak:
+
+| Case | Radiator cutoff (1/Å), reflections, set | Max shell rel | Spectrum |
+|---|---|---|---|
+| hopg | 6, 6, `8d050741` | 3.7e-10 | 8.6e-17 |
+| silicon | 20, 4016, `f3547f43` | 1.2e-9 | 0 |
+| mos2-on-si | 16, 5970, `6e2e61dc`; 20, 4016, `f3547f43` | 6.8e-10 | 4.5e-16 |
+| hopg-mosaic | 6, 6, `8d050741` | 1.8e-10 | 3.0e-16 |
+| mos2-15deg | 22, 15930, `d0eb2d8e` | 3.3e-10 | 3.2e-16 |
+| thick mos2 (select only) | 24, 20698, `00cb4b86` | 2.8e-10 | — |
+
+On the thick case the band-mass selection took 21.5 s against 243 s for the
+bin-mean route at N=16.

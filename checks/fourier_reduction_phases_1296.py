@@ -20,10 +20,13 @@ for ``bench``. Record: ``capture.json``.
 
 ``selections`` in the record keeps each reflection selection's mode
 (``reference_quadrature``: ``band-mass`` or ``bin-mean``; ``rescored``), band,
-cutoff, selected-set digest and shell yields (#1326). ``PROBE_SELECTION=mass``
-disables the single pass, so an automatic bandwidth selects on the mass-only
-reference pass and rescores the kept set (the arm the single pass is measured
-against).
+cutoff, selected-set digest and shell yields (#1326).
+
+``selection OUT_JSON "MAT:E0:TILT;..." HISTORIES [SELECT_ONLY]`` transports
+each ``PROFILE`` case or ``scene:NAME`` #1143 scene once and runs automatic reflection selection through the
+band-mass reference pass and through the bin-mean reference route it replaced
+(#1326 acceptance), comparing selected-set digests, cutoffs, shell yields and,
+unless ``SELECT_ONLY=1``, the line spectrum.
 
 ``PROBE_PROFILE=timers`` adds synchronized inclusive timers around the
 batched CXR route (selection vs production pass, tables, per-block
@@ -150,10 +153,6 @@ def capture(material, e0_kev, tilt_deg, histories, out_dir):
 
     fc.cuda_fourier_bin_mean_reduce = timed
     selections = _record_selections()
-    if os.environ.get("PROBE_SELECTION") == "mass":
-        from pyrite.montecarlo.runner import reflection_cutoff as rc
-
-        rc._axis_covers_band = lambda *_args, **_kwargs: False
     mode = os.environ.get("PROBE_PROFILE", "")
     splits = _install_split_timers() if mode == "timers" else None
     timings = []
@@ -217,7 +216,6 @@ def _record_selections():
         record, separate = out[1], out[3]
         records.append(
             dict(
-                mode=os.environ.get("PROBE_SELECTION") or "default",
                 reference_quadrature=record.get("reference_quadrature"),
                 reference_band_eV=record.get("reference_band_eV"),
                 selection_histories=record.get("selection_histories"),
@@ -1454,6 +1452,151 @@ def margins(out_json, scenes="all", histories=64, seed=642501, spacings="0.375,3
         _write(out_json, record)
 
 
+def _native_scene_case(gate, name, histories, seed):
+    """#1143 scene on its own automatic line grid, with the gate's frozen physics.
+
+    ``_scene_case`` swaps in an explicit uniform axis, which has no automatic
+    bandwidth and so never reaches the band-mass reference pass.
+    """
+    from pyrite.energy_grid.convergence_case import build_ladder_case
+
+    frozen = _scene_case(gate, name, histories, seed)
+    material, energy, tilt, thickness, _ = SCENES[name]
+    if material == "mos2-on-si":
+        case = gate["layered_case"](histories, seed)
+    else:
+        case = build_ladder_case(
+            material, energy, tilt, 180, thickness_ang=thickness, n_electrons=histories, seed=seed
+        )
+    grid_keys = ("E_grid", "E_grid_line", "line_quadrature", "line_grid_policy")
+    case.update({k: v for k, v in frozen.items() if k not in grid_keys})
+    return dict(case, line_quadrature="bin-mean")
+
+
+def selection(out_json, cases, histories, select_only="0"):
+    """Band-mass (v8) vs bin-mean (main) automatic selection on one transport per case (#1326).
+
+    ``cases`` is ``"MAT:E0_KEV:TILT;..."`` from ``PROFILE`` or ``"scene:NAME"``
+    for a ``SCENES`` entry (the #1143 gate physics on its automatic line grid).
+    Each case is
+    transported once, then scored with the default band-mass reference pass and
+    with ``_band_evaluator`` disabled (the bin-mean reference route of ``main``
+    before #1326). ``select_only=1`` stops each arm after its selection (thick
+    cases, whose production pass takes hours) and compares records only.
+    """
+    from pyrite.montecarlo import runner
+    from pyrite.montecarlo.runner import reflection_cutoff as rc
+    from pyrite.runs import scan
+
+    helper = runpy.run_path(str(Path(__file__).with_name("adaptive_block_size_1252.py")))
+    n, stop = int(histories), select_only == "1"
+    resolved = scan._resolved_run
+
+    def fixed(args, mat):
+        settings, sweep, identity, stem = resolved(args, mat)
+        precision = dataclasses.replace(
+            settings.precision, min_histories=n, max_histories=n, pilot_histories=None
+        )
+        return dataclasses.replace(settings, precision=precision), sweep, identity, stem
+
+    scan._resolved_run = fixed
+
+    class Selected(Exception):
+        pass
+
+    real_line, real_band = rc._line_selection, rc._band_evaluator
+    rows = []
+    record = dict(
+        issue=1326,
+        code_sha=os.environ.get("PROBE_SHA"),
+        gpu=_gpu(),
+        profile=PROFILE,
+        histories=n,
+        select_only=stop,
+        rows=rows,
+    )
+    gate = runpy.run_path(str(Path(__file__).with_name("defaults_spectral_gate_642.py")))
+    for spec in cases.split(";"):
+        kind, *parts = spec.split(":")
+        t0 = time.perf_counter()
+        if kind == "scene":  # #1143 frozen scene, gate seed
+            case = _native_scene_case(gate, parts[0], n, 642501)
+            tp = runner._transport_case(case)
+            if SCENES[parts[0]][4] is not None:
+                case = gate["mosaic_mc_case"](case, SCENES[parts[0]][4])
+        else:
+            case, _, _ = helper["profile_case"](kind, float(parts[0]), float(parts[1]), "auto")
+            tp = runner._transport_case(case)
+        row = dict(case=spec, transport_s=time.perf_counter() - t0, arms={})
+        for arm in ("band-mass", "bin-mean"):
+            seen = {}
+
+            def line_selection(*args, seen=seen, **kwargs):
+                t = time.perf_counter()
+                out = real_line(*args, **kwargs)
+                _sync()
+                seen.update(record=out[1], selection_s=time.perf_counter() - t)
+                if stop:
+                    raise Selected
+                return out
+
+            rc._line_selection = line_selection
+            rc._band_evaluator = real_band if arm == "band-mass" else (lambda *_a, **_k: None)
+            t0, spectrum, error = time.perf_counter(), None, None
+            try:
+                spectrum = runner._spectrum_case(case, tp)
+            except Selected:
+                pass
+            except Exception as exc:  # record failure as evidence
+                error = f"{type(exc).__name__}: {exc}"
+            finally:
+                rc._line_selection, rc._band_evaluator = real_line, real_band
+            rec = seen.get("record") or {}
+            row["arms"][arm] = dict(
+                error=error,
+                wall_s=time.perf_counter() - t0,
+                selection_s=seen.get("selection_s"),
+                reference_quadrature=rec.get("reference_quadrature"),
+                radiators=[
+                    dict(
+                        crystal=r["crystal"],
+                        cutoff_invang=r["cutoff_invang"],
+                        reflections=r["reflections"],
+                        converged=r["converged"],
+                        tail_fraction=r["tail_fraction"],
+                        selected_set_sha256=r["selected_set_sha256"],
+                        shell_yields=[x["yield_"] for x in r["shells"]],
+                    )
+                    for r in rec.get("radiators", [])
+                ],
+                spec=None if spectrum is None else np.asarray(spectrum["spec"], float).tolist(),
+            )
+        a, b = row["arms"]["band-mass"], row["arms"]["bin-mean"]
+        row["same_sets"] = [x["selected_set_sha256"] for x in a["radiators"]] == [
+            x["selected_set_sha256"] for x in b["radiators"]
+        ]
+        row["max_shell_rel"] = max(
+            (
+                abs(x - y) / max(abs(y), 1e-300)
+                for ra, rb in zip(a["radiators"], b["radiators"], strict=False)
+                for x, y in zip(ra["shell_yields"], rb["shell_yields"], strict=False)
+            ),
+            default=None,
+        )
+        if a["spec"] is not None and b["spec"] is not None:
+            sa, sb = np.asarray(a["spec"]), np.asarray(b["spec"])
+            row["spec_max_rel_of_peak"] = float(
+                np.max(np.abs(sa - sb)) / max(np.max(np.abs(sb)), 1e-300)
+            )
+        rows.append(row)
+        _write(Path(out_json), record)
+        print(
+            json.dumps({k: v for k, v in row.items() if k != "arms"}),
+            {k: (v["selection_s"], v["error"]) for k, v in row["arms"].items()},
+            flush=True,
+        )
+
+
 def spread_bench(out_dir, repeats=5):
     """#1297: production ``cuda_fourier_bin_mean_reduce`` per spreader on the saved flushes.
 
@@ -1516,6 +1659,8 @@ if __name__ == "__main__":
         spread_bench(rest[0], int(rest[1]) if len(rest) > 1 else 5)
     elif cmd == "margins":
         margins(*rest)
+    elif cmd == "selection":
+        selection(*rest)
     elif cmd in ARM_SETS:
         bench(rest[0], int(rest[1]) if len(rest) > 1 else 3, arm_set=cmd)
     else:

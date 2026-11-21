@@ -544,20 +544,6 @@ def _selection_reference_grid(case: dict) -> np.ndarray | None:
     return band_bin_grid(float(band["start_eV"]), float(band["stop_eV"]))
 
 
-def _axis_covers_band(grid, quadrature: str, band_eV: tuple[float, float]) -> bool:
-    """Whether the production axis spans ``band_eV`` (#1326).
-
-    Then the production line window (axis padded by 20 %) and tabulation hold
-    every line the reference pass keeps, so the band mass read off the
-    production lines is the reference band's, up to the in-band tails of lines
-    resonant in the wider production window's strip (a keep-window bound).
-
-    Validation: reflection-yield-tolerance-selector
-    """
-    lo, hi = axis_band_eV(grid, quadrature)
-    return lo <= band_eV[0] * (1.0 + 1e-12) and hi >= band_eV[1] * (1.0 - 1e-12)
-
-
 def _selected_spectrum(case, evaluate, grid):
     """Score a selected set in admitted chunks, auditing only this production pass."""
     from ..._backend import _to_cpu
@@ -587,7 +573,6 @@ def selected_line_spectrum(
     *,
     reference_evaluate: Callable[[dict, np.ndarray], object] | None = None,
     histories: dict | None = None,
-    band_evaluate: Callable[[dict, tuple[float, float]], tuple[object, float]] | None = None,
     band_mass: Callable[[dict, np.ndarray, tuple[float, float]], tuple[object, float]]
     | None = None,
 ) -> tuple[np.ndarray, dict]:
@@ -610,17 +595,11 @@ def selected_line_spectrum(
     band or else the production axis, and ``evaluate`` rescores the selected
     set on the full population.
 
-    ``band_evaluate(pilot, band_eV)`` (#1326) is ``evaluate`` that also returns
-    the pilot's exact in-band line mass per electron (``sincsq_band_mass`` of
-    the lines it scored). With it, an automatic bandwidth whose production
-    axis spans the reference band and a prefix that covers the population
-    score each shell once on the production axis and decide on that mass: the
-    sum of the scored shells is the returned spectrum and nothing is rescored.
-    Otherwise ``band_mass(pilot, axis, band_eV)`` (the reference-prefix
-    counterpart of ``reference_evaluate``) generates the pilot's lines on the
-    reference ``axis`` and returns ``(unused values, exact band mass per
-    electron)`` without reducing them onto bins, and the production
-    rescoring above applies.
+    ``band_mass(pilot, axis, band_eV)`` (#1326, the band-mass counterpart of
+    ``reference_evaluate``) generates the pilot's lines on the reference
+    ``axis`` and returns ``(unused values, exact band mass per electron)``
+    without reducing them onto bins; shells are decided on that mass and
+    ``evaluate`` rescores the selected set as above.
 
     Returns the host spectrum and the selection record: model, tolerance,
     and per radiator its cutoff, reflection count, tail estimate, convergence
@@ -632,7 +611,7 @@ def selected_line_spectrum(
     Validation: reflection-yield-tolerance-selector
     """
     pruned, record, spectrum, separate = _line_selection(
-        case, evaluate, grid, continuum, reference_evaluate, histories, band_evaluate, band_mass
+        case, evaluate, grid, continuum, reference_evaluate, histories, band_mass
     )
     if separate:
         spectrum = _selected_spectrum(pruned, evaluate, grid)
@@ -689,22 +668,19 @@ def _selection_record(case, outcomes, per_call, quadrature, histories):
     return record
 
 
-def _pilot_scorer(mode, mass, band, evaluate, reference_evaluate, band_evaluate, band_mass):
+def _pilot_scorer(mode, mass, band, evaluate, reference_evaluate, band_mass):
     """``line_density(pilot, axis)`` of :func:`select_case_reflections` for a selection mode.
 
-    ``single``: ``band_evaluate`` on the production axis. ``mass``:
-    ``band_mass`` on the reference axis, lines never reduced. ``reference``:
-    the bin-mean reduction on the reference axis. ``production``: ``evaluate``.
-    The two band-mass modes add each pilot's mass to ``mass[0]``.
+    ``mass``: ``band_mass`` on the reference axis, lines never reduced, each
+    pilot's mass added to ``mass[0]``. ``reference``: the bin-mean reduction on
+    the reference axis. ``production``: ``evaluate``.
 
     Validation: reflection-yield-tolerance-selector
     """
     from ..._backend import _to_cpu
 
     def line_density(pilot, axis):
-        if mode == "single":
-            values, pilot_mass = band_evaluate(pilot, band)
-        elif mode == "mass":
+        if mode == "mass":
             values, pilot_mass = band_mass(pilot, axis, band)
         else:
             values = reference_evaluate(pilot, axis) if mode == "reference" else evaluate(pilot)
@@ -715,11 +691,13 @@ def _pilot_scorer(mode, mass, band, evaluate, reference_evaluate, band_evaluate,
     return line_density
 
 
-def _selection_mode(case, grid, histories, reference_evaluate, band_evaluate, band_mass):
+def _selection_mode(case, histories, reference_evaluate, band_mass):
     """``(mode, reference axis, band)`` of one selection (see :func:`_pilot_scorer`).
 
-    A reference axis exists for automatic bandwidths. ``single`` needs a
-    prefix covering the population and a production axis spanning the band.
+    A reference axis exists for automatic bandwidths; it is scored on band mass
+    when ``band_mass`` is given. #1326 measured a production-axis single pass
+    against this and dropped it: scoring the rejected trailing shells on the
+    production axis never paid for the skipped rescoring.
 
     Validation: reflection-yield-tolerance-selector
     """
@@ -728,13 +706,6 @@ def _selection_mode(case, grid, histories, reference_evaluate, band_evaluate, ba
         prefix = histories is not None and reference_evaluate is not None
         return ("reference" if prefix else "production"), None, None
     band = axis_band_eV(reference, "bin-mean")
-    quadrature = case.get("line_quadrature", "node")
-    if (
-        band_evaluate is not None
-        and histories is None
-        and _axis_covers_band(grid, quadrature, band)
-    ):
-        return "single", reference, band
     return ("reference" if band_mass is None else "mass"), reference, band
 
 
@@ -745,33 +716,25 @@ def _line_selection(
     continuum,
     reference_evaluate,
     histories,
-    band_evaluate=None,
     band_mass=None,
 ):
     """Pruned case, record, shell-summed spectrum and whether production rescoring is due.
 
-    With ``band_evaluate`` (#1326), an automatic bandwidth whose production axis
-    spans the reference band, and a prefix that covers the population
-    (``histories is None``), every shell is scored once on the production axis
-    and its decision yield is the exact band mass of those same lines, so no
-    rescoring is due. Otherwise ``band_mass(pilot, axis, band)`` generates the
-    pilot's lines on the reference axis and returns only their exact band mass
-    (no bin reduction), and ``evaluate`` rescores the selected set.
+    With ``band_mass`` (#1326) and an automatic bandwidth, ``band_mass(pilot,
+    axis, band)`` generates the pilot's lines on the reference axis and returns
+    only their exact band mass (no bin reduction), and ``evaluate`` rescores the
+    selected set.
     """
     selection = case["reflection_selection"]
     quadrature = case.get("line_quadrature", "node")
-    mode, reference, band = _selection_mode(
-        case, grid, histories, reference_evaluate, band_evaluate, band_mass
-    )
+    mode, reference, band = _selection_mode(case, histories, reference_evaluate, band_mass)
     separate = mode in ("reference", "mass")
     on_reference = reference is not None and separate
     selection_grid = reference if on_reference else grid
     selection_quadrature = "bin-mean" if on_reference else quadrature
     per_call = selection_call_sizes(case, selection_grid)
     mass = [0.0]
-    line_density = _pilot_scorer(
-        mode, mass, band, evaluate, reference_evaluate, band_evaluate, band_mass
-    )
+    line_density = _pilot_scorer(mode, mass, band, evaluate, reference_evaluate, band_mass)
 
     pruned, outcomes, spectrum = select_case_reflections(
         case,
@@ -785,15 +748,13 @@ def _line_selection(
         max_reflections=lambda layer, _radiator: per_call[layer],
         continuum=None
         if continuum is None
-        else continuum(
-            band if mode == "single" else axis_band_eV(selection_grid, selection_quadrature)
-        ),
-        shell_mass=(lambda: mass[0]) if mode in ("single", "mass") else None,
+        else continuum(axis_band_eV(selection_grid, selection_quadrature)),
+        shell_mass=(lambda: mass[0]) if mode == "mass" else None,
     )
     record = _selection_record(case, outcomes, per_call, quadrature, histories)
     if reference is not None:
         record["reference_band_eV"] = list(band)
-        record["reference_quadrature"] = "band-mass" if mode in ("single", "mass") else "bin-mean"
+        record["reference_quadrature"] = "band-mass" if mode == "mass" else "bin-mean"
     return pruned, record, spectrum, separate
 
 
@@ -882,8 +843,7 @@ def _batch_selection(emission, batch, Ne_brem, histories, parts=None):
             selected,
         ),
         histories=record,
-        band_evaluate=_band_evaluator(emission, batch, lines, parts=population),
-        band_mass=_band_evaluator(emission, sample, n_lines, reference=True, parts=selected),
+        band_mass=_band_evaluator(emission, sample, n_lines, parts=selected),
     )
 
 
@@ -926,21 +886,13 @@ def _summed_parts(score, batch, parts):
     return total
 
 
-def _band_evaluator(emission, source, norm, *, reference=False, parts=None):
-    """Band-mass scorers of :func:`selected_line_spectrum` for an emission batch (#1326).
+def _band_evaluator(emission, source, norm, *, parts=None):
+    """``band_mass(pilot, axis, band) -> (spectrum, mass)`` of :func:`selected_line_spectrum` (#1326).
 
-    The pilot's lines add their exact in-band mass to a truncation audit as
-    they are generated; the mass is read per electron (``norm`` is the
-    population the spectrum is normalized by).
-
-    ``reference=False``: ``(pilot, band) -> (spectrum, mass)`` on the
-    production batch, reducing the lines as usual. The batch's own audit (a
-    throwaway one when it has none) keeps its production sums, and the band
-    keys are removed again.
-
-    ``reference=True``: ``(pilot, axis, band) -> (spectrum, mass)`` on the
-    selection sample and ``axis``, in a ``mass_only`` audit, so the lines are
-    generated and measured but never reduced onto bins.
+    The pilot's lines are generated on the selection sample and ``axis`` in a
+    ``mass_only`` truncation audit, which adds their exact in-band mass as they
+    are generated and never reduces them onto bins; the mass is read per
+    electron (``norm`` is the population the spectrum is normalized by).
 
     With ``parts`` (streamed prefix selection, #1281), each staged block is
     scored in turn and the spectra and masses are summed; the mass is a sum
@@ -963,27 +915,12 @@ def _band_evaluator(emission, source, norm, *, reference=False, parts=None):
         return values, mass
 
     def score_one(source, pilot, axis, band):
-        if reference:
-            audit = {"band_eV": tuple(map(float, band)), "mass_only": True}
-            batch = replace(
-                source, case=pilot, energy_eV=axis, truncation_audit=audit, table_cache={}
-            )
-        else:
-            audit = {} if source.truncation_audit is None else source.truncation_audit
-            audit["band_eV"] = tuple(map(float, band))
-            audit.pop("band_mass", None)
-            batch = replace(source, case=pilot, table_cache={}, truncation_audit=audit)
-        try:
-            values = emission.cxr.evaluate(batch, "spec").values
-            return values, float(_to_cpu(audit.get("band_mass", 0.0))) / norm
-        finally:
-            if not reference:
-                audit.pop("band_eV", None)
-                audit.pop("band_mass", None)
+        audit = {"band_eV": tuple(map(float, band)), "mass_only": True}
+        batch = replace(source, case=pilot, energy_eV=axis, truncation_audit=audit, table_cache={})
+        values = emission.cxr.evaluate(batch, "spec").values
+        return values, float(_to_cpu(audit.get("band_mass", 0.0))) / norm
 
-    if reference:
-        return score
-    return lambda pilot, band: score(pilot, None, band)
+    return score
 
 
 def _metric_record(outcome: ReflectionCutoff) -> dict:
