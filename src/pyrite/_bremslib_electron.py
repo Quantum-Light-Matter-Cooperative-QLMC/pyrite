@@ -17,10 +17,12 @@ linear in ``k/T`` for ``k/T >= 0.1``. Below 0.1, where Table 4 has no node but
 ``eta`` falls steeply from its soft-photon value,
 
     eta(x) = eta(0.1) + (eta(0) - eta(0.1)) g(x),
-    g(x) = (1/(1 + x/kappa_s) - 1/(1 + 0.1/kappa_s)) / (1 - 1/(1 + 0.1/kappa_s)),
+    g(x) = (exp(-(s x)**p) - exp(-(0.1 s)**p)) / (1 - exp(-(0.1 s)**p)),
 
-with ``1/kappa_s(T)`` fitted so that the ``chi_n``-weighted mean of ``eta``
-reproduces Table 4's ``etabar`` (Eq. 27); see the data file.
+with ``s(T)`` and ``p(T)`` fitted so that the ``chi_n``-weighted mean of
+``eta`` reproduces Table 4's ``etabar`` (Eq. 27) and ``eta(0.05)`` reproduces
+the Seltzer-Berger (1986) total at their ``k/T = 0.05`` node; see the data
+file.
 
 Assumptions: the electron-electron photon has the electron-nucleus angular
 distribution at the same ``(T, k/T)`` (both are forward-peaked within
@@ -58,6 +60,7 @@ def _table():
         np.asarray(raw["incident_energy_MeV"], dtype=float),
         np.asarray(raw["reduced_energy"], dtype=float),
         np.asarray(raw["inverse_small_kappa_scale"], dtype=float),
+        np.asarray(raw["small_kappa_power"], dtype=float),
         eta,
     )
 
@@ -77,7 +80,7 @@ def electron_electron_eta(atomic_number: int, t1_MeV, reduced_energy) -> np.ndar
 
     Validation: bremslib-electron-electron
     """
-    z_grid, t_grid, x_grid, inverse_scale, eta = _table()
+    z_grid, t_grid, x_grid, inverse_scale, power, eta = _table()
     t1 = np.asarray(t1_MeV, dtype=float)
     x = np.broadcast_to(
         np.asarray(reduced_energy, dtype=float), (t1.size, np.shape(reduced_energy)[-1])
@@ -88,14 +91,16 @@ def electron_electron_eta(atomic_number: int, t1_MeV, reduced_energy) -> np.ndar
     w = t_weight[:, None]
     at_t = (1.0 - w) * rows[t_lower] + w * rows[t_lower + 1]  # (n_T, n_x_table)
     inverse = (1.0 - t_weight) * inverse_scale[t_lower] + t_weight * inverse_scale[t_lower + 1]
+    exponent = (1.0 - t_weight) * power[t_lower] + t_weight * power[t_lower + 1]
     out = np.stack([np.interp(x[i], x_grid, at_t[i]) for i in range(t1.size)])
     small = x < _SMALL_X
     scale = np.broadcast_to(inverse[:, None], x.shape)
     curved = small & (scale > 0.0)
     if np.any(curved):
         s, xs = scale[curved], x[curved]
-        edge = 1.0 / (1.0 + _SMALL_X * s)
-        g = (1.0 / (1.0 + xs * s) - edge) / (1.0 - edge)
+        p = np.broadcast_to(exponent[:, None], x.shape)[curved]
+        edge = np.exp(-((_SMALL_X * s) ** p))
+        g = (np.exp(-((xs * s) ** p)) - edge) / (1.0 - edge)
         row = np.nonzero(curved)[0]
         out[curved] = at_t[row, 1] + (at_t[row, 0] - at_t[row, 1]) * g
     return out

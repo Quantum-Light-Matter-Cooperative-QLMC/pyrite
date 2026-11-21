@@ -377,12 +377,12 @@ An earlier self-consistent LDA attempt was abandoned because of tail-precision a
 
 ### Gate
 
-- **Li pointwise `chi`:** stays reported, not gated (`UNGATED_KINDS[3]["chi"]`). The reason now cites both contributors, and #1073's staging reason is retired. Kohn–Sham screening alone (≈ +10 % at the failing point) stays inside ±0.13, but no source bounds it. The ≈ 2.5 % from PyRITE's $\eta$ shape is open in #1359.
+- **Li pointwise `chi`:** stays reported, not gated (`UNGATED_KINDS[3]["chi"]`). The reason now cites both contributors, and #1073's staging reason is retired. Kohn–Sham screening alone (≈ +10 % at the failing point) stays inside ±0.13, but no source bounds it. The ≈ 2.5 % from PyRITE's $\eta$ shape is open in #1359. (Superseded by #1359 below: Li pointwise is gated again.)
 - **Band moment:** stays gated.
 - **Extension moment:** the reason stands. Its "different screening" remark (Hubbell form factors against a Kohn–Sham potential) is the same mechanism.
 - **H:** stays fully ungated (#1068).
 
-The re-cited reason is pinned by `test_gate_domain_ungates_h_and_two_cited_li_kinds`. The probe script and its output are recorded on [#1349](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/1349#issuecomment-7052289582).
+The re-cited reason was pinned by `test_gate_domain_ungates_h_and_two_cited_li_kinds` (renamed in #1359). The probe script and its output are recorded on [#1349](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/issues/1349#issuecomment-7052289582).
 
 ### Fresh-context verification (2026-11-20)
 
@@ -403,3 +403,22 @@ An independent verifier did the following:
 - the unread Kohn–Sham references and the unverified Tsai equation number.
 
 The verifier located the off-trend node. Splitting it into SB86's smooth total and PyRITE's $1+\eta/Z$ was done afterwards, in implementation context. The row stays `anchored`. Only a human may mark this signed off.
+
+## Lithium after the small-$k/T$ $\eta$ fix (#1359, 2026-11-20)
+
+#1359 refitted PyRITE's small-$k/T$ $\eta$ shape (`ee-sb85-v2`). The shape now meets both Table 4's $\bar\eta$ and the SB86 `kappa = 0.05` total that the section above used to attribute the dip. See [`bremslib-electron-electron`](bremslib-electron-electron.md), section "Small-$k/T$ shape revision (#1359)".
+
+At 30 MeV, `kappa = 0.05`, the staged $1+\eta/Z$ is now 1.402 for Li and 1.201 for C. The values implied by SB86 are about 1.409–1.411 and 1.202–1.203, and the old shape gave 1.446 and 1.223.
+
+The recipe exits 0 with `PASS`. Over 10 keV–30 MeV, `0.05 <= kappa <= 0.95`, the measurements are:
+
+- **Li pointwise.** 0.959–1.105, down from 1.130. The 30 MeV, `kappa = 0.05` point is 1.105, which matches the Kohn–Sham screening estimate (≈ 1.099) times PW/Born (≈ 1.005) once the $\eta$ contribution is removed.
+- **Li moment.** 0.989–1.056.
+- **Z = 5–20.** Pointwise 0.957–1.087 (was 1.104), moment 0.981–1.051.
+- **Z ≥ 22.** Unchanged within 0.001.
+- **Extension moments.** 1.022–1.056.
+
+Gate changes:
+
+- **Li pointwise `chi`.** It is gated again, and `UNGATED_KINDS[3]` keeps only the extension moment. Kohn–Sham screening still accounts for ≈ 10 % at `kappa = 0.05` and 30 MeV, inside ±0.13.
+- **Pins.** The gate domain is pinned by `test_gate_domain_ungates_h_and_the_cited_li_extension_moment` and `test_gate_violations_gate_li_chi_and_band_moment_but_not_its_extension`.
