@@ -553,8 +553,13 @@ are linear in `k/T1`, which the spline reproduces at library rows. The recorded
 The `η` shape below `k/T = 0.1` changed from the one-scale `(1 + x/κ_s)⁻¹`
 form to a stretched exponential whose scale and power meet both SB85 `η̄` and
 the SB86 `k/T = 0.05` total. `BREMSSTRAHLUNG_BREMSLIB_MODEL` changed from
-`…/ee-sb85-v1` to `…/ee-sb85-v2`. Only the `coupled` and `cascade` identity
+`…/ee-sb85-v1` to `…/ee-sb85-v2`. The `coupled` and `cascade` identity
 hashes in `resolved.json` were re-pinned
 (`pyrite-dev test-suite identity-pins --update-pins`). The shape is linear at
-and below 0.2 MeV, as before. The recorded `outputs.json` still passes at its
-tolerances, so it was not re-pinned.
+and below 0.2 MeV, as before, so the 40 keV `coupled` output still passes at
+its tolerances. The 3 MeV `cascade` fixture lies where `s(T)` and `p(T)` now
+meet the SB86 node, and CI run 44872144036 showed it moving. Its
+`outputs.json` entry was re-pinned on CPU/NumPy fp64 (Python 3.14): total
+path +4.1e-5 relative, the leading flight samples ≤ 4e-9, converted photon
+energies ≤ 7e-4. Rows, event kinds, electron IDs and launch kinds are
+unchanged, and so is every tolerance.
