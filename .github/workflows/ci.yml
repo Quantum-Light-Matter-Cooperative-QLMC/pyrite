@@ -224,10 +224,11 @@ jobs:
   # Keep the existing JIT-compiled suite above. Here --numba intentionally
   # disables JIT to exercise Python-level Numba bodies; it does NOT test
   # compiled kernels. Online tests run separately on push/main and weekly.
-  # Main pushes skip the slow tier (51% of JIT-disabled cost; PRs run it
-  # compiled); the weekly run and a dispatch with slow=true keep it. Runners act as ~2 cores (4 workers
-  # cost 1.6-2.5x per test), so 2 workers per shard; shards balance measured
-  # non-slow JIT-disabled cost (#344, lab job 10909, CI run 42924996024).
+  # Main pushes skip the slow tier (PRs run it compiled); the weekly run and
+  # a dispatch with slow=true keep it. Runners
+  # act as ~2 cores (4 workers cost 1.6-2.5x per test), so 2 workers per shard.
+  # Transport and runner each own a budget. Core runs independently of data
+  # suites so a slow core cannot starve them (#1367, main run 44928520114).
   numba-online:
     if: github.event_name != 'pull_request'
     strategy:
@@ -236,12 +237,18 @@ jobs:
         include:
           - shard: collisions
             suites: transport-collisions
-          - shard: transport-spectrum
+          - shard: transport
+            suites: transport
+          - shard: runner
+            suites: transport-runner
+          - shard: spectrum
             suites: >-
-              transport transport-runner transport-cascades spectrum
+              transport-cascades spectrum
               spectrum-coherent spectrum-brem channeling quantum
-          - shard: core-data
-            suites: core packaging apps cli energy-grid materials xsgen
+          - shard: core
+            suites: core
+          - shard: data
+            suites: packaging apps cli energy-grid materials xsgen
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
