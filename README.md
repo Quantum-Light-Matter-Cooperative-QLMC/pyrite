@@ -81,9 +81,11 @@ Cite the **specific software version used** in your work. For example,
 record from the [Zenodo version history](https://zenodo.org/records/24256748/versions)
 and export its citation.
 
-The general DOI `10.5281/zenodo.23487182` currently groups software and table
-releases, so it can resolve to a table release. Use the software version's own
-DOI for reproducible citations. Cite table datasets separately when applicable.
+The general DOI `10.5281/zenodo.23487182` also holds earlier table releases,
+so it can resolve to a table release. Use the software version's own DOI for
+reproducible citations. Runtime tables are archived separately in the
+[PyRITE runtime tables](https://doi.org/10.5281/zenodo.23220627) dataset;
+cite its version, and the upstream sources it lists, when applicable.
 The [citation metadata](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite/blob/main/CITATION.cff)
 lists the software authors; see the
 [release guide](docs/repo-design/releasing.md#zenodo-authorship) for maintaining

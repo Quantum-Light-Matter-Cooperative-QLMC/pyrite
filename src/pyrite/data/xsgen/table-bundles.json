@@ -1,0 +1,42 @@
+{
+  "schema": "pyrite.xsgen.table-bundles.v1",
+  "concept_doi": "10.5281/zenodo.23220627",
+  "record": null,
+  "bundles": {
+    "elsepa": {
+      "file": "elsepa.zip",
+      "sha256": "ebed2296fd610d7ff1dd300e9e3d18ba22fae62140852b6d3ef9cd62aaace021",
+      "bytes": 97799360,
+      "urls": [],
+      "members": 220
+    },
+    "sbethe": {
+      "file": "sbethe.zip",
+      "sha256": "5cfac32332f481bea6488bce3e7ed6ee40c8d98399c19e33f1d7231263f4d9c4",
+      "bytes": 10275256,
+      "urls": [],
+      "members": 336
+    },
+    "bremslib": {
+      "file": "bremslib.zip",
+      "sha256": "4f1a2273d86ba378c099a4d8df73589406c5e9b0c463b57b3e2f828a07c41ccd",
+      "bytes": 41515721,
+      "urls": [],
+      "members": 84
+    },
+    "epics": {
+      "file": "epics.zip",
+      "sha256": "6e84d3525c2e1524736bbf0f0303362dc58c0f8636bcc088b7de6479dc5fa006",
+      "bytes": 46676372,
+      "urls": [],
+      "members": 4
+    },
+    "pyrite": {
+      "file": "pyrite.zip",
+      "sha256": "e3c4b830c7291118eb4c12a934cdf964b5c69c4f7dd0623dcd0253fea9206ae5",
+      "bytes": 58667309,
+      "urls": [],
+      "members": 1
+    }
+  }
+}
