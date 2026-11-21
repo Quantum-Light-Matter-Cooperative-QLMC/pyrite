@@ -406,7 +406,7 @@ The verifier located the off-trend node. Splitting it into SB86's smooth total a
 
 ## Lithium after the small-$k/T$ $\eta$ fix (#1359, 2026-11-20)
 
-#1359 refitted PyRITE's small-$k/T$ $\eta$ shape (`ee-sb85-v2`). The shape now meets both Table 4's $\bar\eta$ and the SB86 `kappa = 0.05` total that the section above used to attribute the dip. See [`bremslib-electron-electron`](bremslib-electron-electron.md#small-kt-shape-revision-1359-2026-11-20).
+#1359 refitted PyRITE's small-$k/T$ $\eta$ shape (`ee-sb85-v2`). The shape now meets both Table 4's $\bar\eta$ and the SB86 `kappa = 0.05` total that the section above used to attribute the dip. See [`bremslib-electron-electron`](bremslib-electron-electron.md), section "Small-$k/T$ shape revision (#1359)".
 
 At 30 MeV, `kappa = 0.05`, the staged $1+\eta/Z$ is now 1.402 for Li and 1.201 for C. The values implied by SB86 are about 1.409–1.411 and 1.202–1.203, and the old shape gave 1.446 and 1.223.
 
