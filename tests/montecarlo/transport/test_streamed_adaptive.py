@@ -67,7 +67,7 @@ def test_streamed_adaptive_matches_retained(monkeypatch, spread):
     record, expected = streamed["adaptive_sampling"], reference["adaptive_sampling"]
     assert record["realized_electrons_brem"] < record["realized_electrons"]
     assert record["replayed_transport"] is (spread is not None)
-    assert record == expected
+    assert without_wall_clock(record) == without_wall_clock(expected)
     np.testing.assert_array_equal(streamed["E_grid"], reference["E_grid"])
     np.testing.assert_array_equal(streamed["E_grid_brem"], reference["E_grid_brem"])
     for key in SPECTRA:

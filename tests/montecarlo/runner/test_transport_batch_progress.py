@@ -342,8 +342,8 @@ def test_adaptive_stop_reports_realized_count_before_spectrum(monkeypatch, case)
     monkeypatch.setattr(
         independent,
         "case_stopping_monitor",
-        lambda _case, policy: StoppingMonitor(
-            policy, lambda start, stop, _block: {"cxr": np.ones(stop - start)}
+        lambda _case, policy, **kwargs: StoppingMonitor(
+            policy, lambda start, stop, _block: {"cxr": np.ones(stop - start)}, **kwargs
         ),
     )
     monkeypatch.setattr(scheduling, "perf_counter", lambda: 0.0)
