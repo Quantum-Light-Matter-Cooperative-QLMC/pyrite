@@ -353,6 +353,7 @@ def select_case_reflections(
     width_invang: float = DEFAULT_SHELL_WIDTH_INVANG,
     max_reflections: int | Callable[[int | None, dict], int] = 512,
     continuum=None,
+    shell_mass: Callable[[], float] | None = None,
 ) -> tuple[dict, list[ReflectionCutoff], np.ndarray]:
     """Cut each radiator at its measured cutoff and keep the scored spectrum.
 
@@ -379,6 +380,12 @@ def select_case_reflections(
     lattice-share continuum yield, against that layer's net lines plus its
     uncorrected continuum. Radiators it does not correct keep the line metric.
 
+    ``shell_mass`` (#1326) replaces ``density @ weights`` as the shell yield:
+    a running total the caller's ``line_density`` advances, read before and
+    after each shell. The decision yield then comes from the same line arrays
+    as ``line_density``'s spectrum (a closed-form band mass), so the returned
+    spectrum is the only scoring pass.
+
     Validation: reflection-yield-tolerance-selector
     """
     weights = np.asarray(weights, dtype=float)
@@ -400,12 +407,13 @@ def select_case_reflections(
         def shell_yield(hkls: list, layer: int | None = layer, chunk: int = chunk) -> float:
             nonlocal total
             shell = 0.0
+            before = 0.0 if shell_mass is None else float(shell_mass())
             for i in range(0, len(hkls), chunk):
                 pilot = _pilot_case(case, layer, hkls[i : i + chunk], quadrature)
                 density = np.asarray(line_density(pilot, grid), dtype=float)
                 total = density if total is None else total + density
                 shell += float(density @ weights)
-            return shell
+            return shell if shell_mass is None else float(shell_mass()) - before
 
         shells = iter_reflection_shells(
             radiator["crystal"], float(radiator["B_ang2"]), g_max_invang, width_invang
@@ -565,6 +573,8 @@ def selected_line_spectrum(
     *,
     reference_evaluate: Callable[[dict, np.ndarray], object] | None = None,
     histories: dict | None = None,
+    band_mass: Callable[[dict, np.ndarray, tuple[float, float]], tuple[object, float]]
+    | None = None,
 ) -> tuple[np.ndarray, dict]:
     """Incoherent line spectrum of ``case`` under its ``reflection_selection``.
 
@@ -585,6 +595,12 @@ def selected_line_spectrum(
     band or else the production axis, and ``evaluate`` rescores the selected
     set on the full population.
 
+    ``band_mass(pilot, axis, band_eV)`` (#1326, the band-mass counterpart of
+    ``reference_evaluate``) generates the pilot's lines on the reference
+    ``axis`` and returns ``(unused values, exact band mass per electron)``
+    without reducing them onto bins; shells are decided on that mass and
+    ``evaluate`` rescores the selected set as above.
+
     Returns the host spectrum and the selection record: model, tolerance,
     and per radiator its cutoff, reflection count, tail estimate, convergence
     and shell table. ``continuum(band_eV)`` builds the net metric's
@@ -595,7 +611,7 @@ def selected_line_spectrum(
     Validation: reflection-yield-tolerance-selector
     """
     pruned, record, spectrum, separate = _line_selection(
-        case, evaluate, grid, continuum, reference_evaluate, histories
+        case, evaluate, grid, continuum, reference_evaluate, histories, band_mass
     )
     if separate:
         spectrum = _selected_spectrum(pruned, evaluate, grid)
@@ -620,38 +636,8 @@ def _selected_set_record(radiator, outcome):
     return dict(**texture, selected_set_sha256=digest.hexdigest())
 
 
-def _line_selection(case, evaluate, grid, continuum, reference_evaluate, histories):
-    """Pruned case, record, shell-summed spectrum and whether production rescoring is due."""
-    from ..._backend import _to_cpu
-
-    selection = case["reflection_selection"]
-    quadrature = case.get("line_quadrature", "node")
-    reference = None if reference_evaluate is None else _selection_reference_grid(case)
-    separate = reference is not None or (histories is not None and reference_evaluate is not None)
-    selection_grid = grid if reference is None else reference
-    selection_quadrature = quadrature if reference is None else "bin-mean"
-    per_call = selection_call_sizes(case, selection_grid)
-    pruned, outcomes, spectrum = select_case_reflections(
-        case,
-        lambda pilot, axis: np.asarray(
-            _to_cpu(
-                reference_evaluate(pilot, axis)
-                if separate and reference_evaluate is not None
-                else evaluate(pilot)
-            ),
-            dtype=float,
-        ),
-        float(selection["tolerance"]),
-        selection_grid,
-        axis_yield_weights(selection_grid, selection_quadrature),
-        quadrature=selection_quadrature,
-        g_max_invang=float(selection["g_max_invang"]),
-        width_invang=float(selection["shell_width_invang"]),
-        max_reflections=lambda layer, _radiator: per_call[layer],
-        continuum=None
-        if continuum is None
-        else continuum(axis_band_eV(selection_grid, selection_quadrature)),
-    )
+def _selection_record(case, outcomes, per_call, quadrature, histories):
+    """Selection record of ``case``'s radiators from their per-radiator ``outcomes``."""
     layered = case.get("layer_radiators") is not None
     radiators = [
         (layer, radiator)
@@ -660,7 +646,7 @@ def _line_selection(case, evaluate, grid, continuum, reference_evaluate, histori
     ]
     record = dict(
         model=REFLECTION_SELECTION_MODEL,
-        tolerance=float(selection["tolerance"]),
+        tolerance=float(case["reflection_selection"]["tolerance"]),
         quadrature=quadrature,
         radiators=[
             dict(
@@ -679,9 +665,96 @@ def _line_selection(case, evaluate, grid, continuum, reference_evaluate, histori
     )
     if histories is not None:
         record["selection_histories"] = dict(histories)
+    return record
+
+
+def _pilot_scorer(mode, mass, band, evaluate, reference_evaluate, band_mass):
+    """``line_density(pilot, axis)`` of :func:`select_case_reflections` for a selection mode.
+
+    ``mass``: ``band_mass`` on the reference axis, lines never reduced, each
+    pilot's mass added to ``mass[0]``. ``reference``: the bin-mean reduction on
+    the reference axis. ``production``: ``evaluate``.
+
+    Validation: reflection-yield-tolerance-selector
+    """
+    from ..._backend import _to_cpu
+
+    def line_density(pilot, axis):
+        if mode == "mass":
+            values, pilot_mass = band_mass(pilot, axis, band)
+        else:
+            values = reference_evaluate(pilot, axis) if mode == "reference" else evaluate(pilot)
+            pilot_mass = 0.0
+        mass[0] += pilot_mass
+        return np.asarray(_to_cpu(values), dtype=float)
+
+    return line_density
+
+
+def _selection_mode(case, histories, reference_evaluate, band_mass):
+    """``(mode, reference axis, band)`` of one selection (see :func:`_pilot_scorer`).
+
+    A reference axis exists for automatic bandwidths; it is scored on band mass
+    when ``band_mass`` is given. #1326 measured a production-axis single pass
+    against this and dropped it: scoring the rejected trailing shells on the
+    production axis never paid for the skipped rescoring.
+
+    Validation: reflection-yield-tolerance-selector
+    """
+    reference = None if reference_evaluate is None else _selection_reference_grid(case)
+    if reference is None:
+        prefix = histories is not None and reference_evaluate is not None
+        return ("reference" if prefix else "production"), None, None
+    band = axis_band_eV(reference, "bin-mean")
+    return ("reference" if band_mass is None else "mass"), reference, band
+
+
+def _line_selection(
+    case,
+    evaluate,
+    grid,
+    continuum,
+    reference_evaluate,
+    histories,
+    band_mass=None,
+):
+    """Pruned case, record, shell-summed spectrum and whether production rescoring is due.
+
+    With ``band_mass`` (#1326) and an automatic bandwidth, ``band_mass(pilot,
+    axis, band)`` generates the pilot's lines on the reference axis and returns
+    only their exact band mass (no bin reduction), and ``evaluate`` rescores the
+    selected set.
+    """
+    selection = case["reflection_selection"]
+    quadrature = case.get("line_quadrature", "node")
+    mode, reference, band = _selection_mode(case, histories, reference_evaluate, band_mass)
+    separate = mode in ("reference", "mass")
+    on_reference = reference is not None and separate
+    selection_grid = reference if on_reference else grid
+    selection_quadrature = "bin-mean" if on_reference else quadrature
+    per_call = selection_call_sizes(case, selection_grid)
+    mass = [0.0]
+    line_density = _pilot_scorer(mode, mass, band, evaluate, reference_evaluate, band_mass)
+
+    pruned, outcomes, spectrum = select_case_reflections(
+        case,
+        line_density,
+        float(selection["tolerance"]),
+        selection_grid,
+        axis_yield_weights(selection_grid, selection_quadrature),
+        quadrature=selection_quadrature,
+        g_max_invang=float(selection["g_max_invang"]),
+        width_invang=float(selection["shell_width_invang"]),
+        max_reflections=lambda layer, _radiator: per_call[layer],
+        continuum=None
+        if continuum is None
+        else continuum(axis_band_eV(selection_grid, selection_quadrature)),
+        shell_mass=(lambda: mass[0]) if mode == "mass" else None,
+    )
+    record = _selection_record(case, outcomes, per_call, quadrature, histories)
     if reference is not None:
-        record["reference_band_eV"] = list(axis_band_eV(reference, "bin-mean"))
-        record["reference_quadrature"] = "bin-mean"
+        record["reference_band_eV"] = list(band)
+        record["reference_quadrature"] = "band-mass" if mode == "mass" else "bin-mean"
     return pruned, record, spectrum, separate
 
 
@@ -724,6 +797,7 @@ def select_batch_reflections(
         args["continuum"],
         args["reference_evaluate"],
         args["histories"],
+        band_mass=args["band_mass"],
     )
     return pruned, record
 
@@ -769,6 +843,7 @@ def _batch_selection(emission, batch, Ne_brem, histories, parts=None):
             selected,
         ),
         histories=record,
+        band_mass=_band_evaluator(emission, sample, n_lines, parts=selected),
     )
 
 
@@ -809,6 +884,43 @@ def _summed_parts(score, batch, parts):
         values = score(replace(batch, segments=segments)).values
         total = values if total is None else total + values
     return total
+
+
+def _band_evaluator(emission, source, norm, *, parts=None):
+    """``band_mass(pilot, axis, band) -> (spectrum, mass)`` of :func:`selected_line_spectrum` (#1326).
+
+    The pilot's lines are generated on the selection sample and ``axis`` in a
+    ``mass_only`` truncation audit, which adds their exact in-band mass as they
+    are generated and never reduces them onto bins; the mass is read per
+    electron (``norm`` is the population the spectrum is normalized by).
+
+    With ``parts`` (streamed prefix selection, #1281), each staged block is
+    scored in turn and the spectra and masses are summed; the mass is a sum
+    over lines, so the per-block sum is exact.
+
+    Validation: reflection-yield-tolerance-selector
+    """
+    from dataclasses import replace
+
+    from ..._backend import _to_cpu
+
+    def score(pilot, axis, band):
+        if parts is None:
+            return score_one(source, pilot, axis, band)
+        values, mass = None, 0.0
+        for segments in parts():
+            v, m = score_one(replace(source, segments=segments), pilot, axis, band)
+            values = v if values is None else values + v
+            mass += m
+        return values, mass
+
+    def score_one(source, pilot, axis, band):
+        audit = {"band_eV": tuple(map(float, band)), "mass_only": True}
+        batch = replace(source, case=pilot, energy_eV=axis, truncation_audit=audit, table_cache={})
+        values = emission.cxr.evaluate(batch, "spec").values
+        return values, float(_to_cpu(audit.get("band_mass", 0.0))) / norm
+
+    return score
 
 
 def _metric_record(outcome: ReflectionCutoff) -> dict:

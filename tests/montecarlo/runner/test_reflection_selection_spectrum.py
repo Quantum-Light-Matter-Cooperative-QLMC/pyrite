@@ -137,6 +137,88 @@ def test_automatic_bandwidths_select_the_same_reflections(bandwidth, monkeypatch
     assert records[0]["reference_band_eV"] == [500.0, 30000.0]
 
 
+def _automatic_scene(bandwidth, stop_eV, monkeypatch):
+    """The silicon scene with an automatic bandwidth on ``[500, stop_eV]``, DBR off."""
+    from pyrite._cxr_grid_policy import resolve_cxr_grid_policy
+    from pyrite.montecarlo.runner import diffracted_brem
+
+    monkeypatch.setattr(
+        diffracted_brem, "case_diffracted_brem", lambda _case, _segs, grid, *_: np.zeros(grid.shape)
+    )
+    case, tp = _transported()
+    policy = resolve_cxr_grid_policy(
+        start_eV=500.0, stop_eV=30000.0, bandwidth_policy=bandwidth
+    ).payload()
+    if bandwidth == "resonance-population":
+        policy["bandwidth"]["truncation_limit"] = 0.99
+    selected = dict(case, reflection_selection=SELECTION, line_grid_policy=policy)
+    return selected, {**tp, "E_grid": np.arange(500.0, stop_eV + 1.0, 25.0)}
+
+
+def _legacy_reference(monkeypatch):
+    """Select through the bin-mean reference reduction, as before #1326."""
+    from pyrite.montecarlo.runner import reflection_cutoff
+
+    monkeypatch.setattr(reflection_cutoff, "_band_evaluator", lambda *_a, **_k: None)
+
+
+def _same_selection(new, legacy):
+    (a,), (b,) = (r["reflection_selection"]["radiators"] for r in (new, legacy))
+    assert a["selected_set_sha256"] == b["selected_set_sha256"]
+    assert a["cutoff_invang"] == b["cutoff_invang"] and a["converged"] == b["converged"]
+    for x, y in zip(a["shells"], b["shells"], strict=True):
+        assert x["yield_"] == pytest.approx(y["yield_"], rel=1e-9)
+        assert x["share"] == pytest.approx(y["share"], rel=1e-9)
+    np.testing.assert_allclose(new["spec"], legacy["spec"], rtol=SELECTED_RTOL, atol=0)
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("bandwidth", ["kinematic-ceiling", "resonance-population"])
+def test_axis_spanning_the_band_selects_on_band_mass_then_rescores(bandwidth, monkeypatch):
+    """A production axis spanning the band still decides on the mass-only
+    reference pass and rescores the kept set: #1326 dropped the production-axis
+    single pass, which reduced every rejected trailing shell and never paid."""
+    from pyrite.montecarlo.runner import reflection_cutoff
+
+    selected, tp = _automatic_scene(bandwidth, 30000.0, monkeypatch)
+    rescored = []
+    original = reflection_cutoff._selected_spectrum
+    monkeypatch.setattr(
+        reflection_cutoff,
+        "_selected_spectrum",
+        lambda *args: rescored.append(1) or original(*args),
+    )
+    new = runner._spectrum_case(selected, tp)
+    assert rescored == [1]
+    assert new["reflection_selection"]["reference_quadrature"] == "band-mass"
+    assert new["reflection_selection"]["reference_band_eV"] == [500.0, 30000.0]
+    _legacy_reference(monkeypatch)
+    legacy = runner._spectrum_case(selected, tp)
+    assert rescored == [1, 1]
+    assert legacy["reflection_selection"]["reference_quadrature"] == "bin-mean"
+    _same_selection(new, legacy)
+
+
+@pytest.mark.slow
+def test_short_axis_measures_band_mass_without_reducing_lines(monkeypatch):
+    """An axis short of the band keeps the reference pass, now mass-only (#1326)."""
+    from pyrite.montecarlo.runner import reflection_cutoff
+
+    selected, tp = _automatic_scene("kinematic-ceiling", 8000.0, monkeypatch)
+    rescored = []
+    original = reflection_cutoff._selected_spectrum
+    monkeypatch.setattr(
+        reflection_cutoff,
+        "_selected_spectrum",
+        lambda *args: rescored.append(1) or original(*args),
+    )
+    new = runner._spectrum_case(selected, tp)
+    assert rescored == [1]  # the production axis cannot supply the band's lines
+    assert new["reflection_selection"]["reference_quadrature"] == "band-mass"
+    _legacy_reference(monkeypatch)
+    _same_selection(new, runner._spectrum_case(selected, tp))
+
+
 @pytest.mark.parametrize(
     "unsupported", [{"max_dE_frac": 1e-3}, {"sinc_cutoff": 10.0}, {"node_support_cutoff": 10.0}]
 )

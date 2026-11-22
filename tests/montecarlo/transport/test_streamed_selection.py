@@ -119,3 +119,23 @@ def test_held_prefix_is_scored_block_by_block_on_host(automatic, retained, monke
     assert downloads, "held blocks are downloaded to the host"
     assert_same_selection(streamed["reflection_selection"], retained["reflection_selection"])
     np.testing.assert_allclose(streamed["spec"], retained["spec"], rtol=1e-12)
+
+
+@pytest.mark.slow
+def test_streamed_band_mass_selection_matches_retained(monkeypatch):
+    """With an automatic bandwidth the shells are decided on the exact band mass
+    (#1326), summed over the held blocks one at a time; the record equals the
+    retained route's to summation order."""
+    from tests.montecarlo.runner.test_reflection_selection_spectrum import _automatic_scene
+
+    monkeypatch.setattr(reflection_cutoff, "SELECTION_HISTORIES", 2)
+    case, _ = _automatic_scene("kinematic-ceiling", 30000.0, monkeypatch)
+    case = {**case, "reflection_selection": {**SELECTION, "automatic": True}}
+    transport = runner._transport_case(case, transport_core="per-electron")
+    retained = runner._spectrum_case(case, transport)
+    streamed = run_case_streamed(case, 1, transport_core="per-electron")
+
+    record = streamed["reflection_selection"]
+    assert record["reference_quadrature"] == "band-mass"
+    assert record["selection_histories"] == {"lines": 2, "continuum": 2}
+    assert_same_selection(record, retained["reflection_selection"])

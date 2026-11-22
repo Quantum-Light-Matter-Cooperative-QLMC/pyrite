@@ -218,6 +218,7 @@ _SPECTRUM_BACKEND_MODULES = (
     "coherent_population",
     "cxr",
     "cxr._attribution",
+    "cxr._band_mass",
     "cxr._batched",
     "cxr._batched_finalize",
     "cxr._bin_quadrature",
