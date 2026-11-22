@@ -126,7 +126,7 @@ ships your local tables.
    pyrite remote target add campus --host MY_SSH_ALIAS --remote-dir '~/pyrite' \
      --partition campus --account MY_ACCOUNT \
      --constraint 'A100|H200' --max-time 1-00:00:00 \
-     --host-exec 'srun --time=00:30:00 --cpus-per-task=2 --mem=8G'
+     --host-exec 'srun --account=MY_ACCOUNT --time=00:30:00 --cpus-per-task=2 --mem=8G'
    pyrite remote sync --target campus
    ```
 

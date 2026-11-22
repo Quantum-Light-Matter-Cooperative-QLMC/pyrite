@@ -463,13 +463,16 @@ def host_uv_command(extra_env: str = "") -> str:
     """Return ``<runtime env> <uv>`` for PyRITE Python run on the host outside a job.
 
     With ``host_exec`` (e.g. ``srun --time=00:30:00``) the command runs inside
-    that allocation instead of on the login node; ``env`` carries the runtime
-    variables into the launched task regardless of the scheduler's export policy.
+    that allocation instead of on the login node; ``/usr/bin/env`` carries the
+    runtime variables into the launched task regardless of the scheduler's
+    export policy. It is absolute because launchers resolve a bare ``env``
+    through the user's PATH, where uv's installer leaves a non-executable
+    ``~/.local/bin/env`` shell snippet that shadows the real one.
     """
     assignments = f"{remote_runtime_env()} {extra_env}".rstrip()
     command = f"{assignments} {shell_remote_uv()}"
     prefix = host_exec()
-    return f"{prefix} env {command}" if prefix else command
+    return f"{prefix} /usr/bin/env {command}" if prefix else command
 
 
 def slurm_time_seconds(value: str) -> int | None:
