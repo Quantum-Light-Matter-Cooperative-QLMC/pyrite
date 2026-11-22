@@ -19,11 +19,16 @@ The equivalence rests on three properties:
 
 The lockstep core shares one generator across electrons and is not supported.
 This is internal API: the stopping rule, estimators, and the public ``"auto"``
-electron count build on it.
+electron count build on it, and so do history shards (#1387): an
+:class:`ElectronShard` transports one range ``[start, stop)`` in another
+process and hands its unfinalized join to the block consumer; a
+:class:`ShardJoin` joins those shard results in electron order and finalizes
+once, as one call over ``[0, N)`` would. Both travel as ``block_electrons``.
 """
 
 from collections.abc import Callable, Mapping
 from contextlib import nullcontext
+from dataclasses import dataclass
 from functools import partial
 from typing import Any
 
@@ -68,6 +73,33 @@ def electron_blocks(n_electrons: int, block_electrons: int) -> list[tuple[int, i
     if b < 1:
         raise ValueError("block_electrons must be a positive integer")
     return [(start, min(start + b, n)) for start in range(0, n, b)]
+
+
+@dataclass(frozen=True, slots=True)
+class ElectronShard:
+    """Transport only electrons ``[start, stop)``, ``block_electrons`` at a time (#1387).
+
+    Passed as ``block_electrons`` with a block consumer: the consumer receives
+    the range's unfinalized join once -- global electron indices, the range's
+    additive counts, no population-wide fields (bunch timing, completed
+    hard-photon vectors) -- and only the counts return. :class:`ShardJoin`
+    redoes the population-wide fields once.
+    """
+
+    start: int
+    stop: int
+    block_electrons: int
+
+
+@dataclass(frozen=True, slots=True)
+class ShardJoin:
+    """Join :class:`ElectronShard` results in electron order instead of transporting (#1387).
+
+    ``shards`` must cover ``[0, N)`` contiguously in order; the join is then
+    the result one call over ``[0, N)`` returns, bit for bit.
+    """
+
+    shards: tuple[dict[str, Any], ...]
 
 
 def _is_array(value) -> bool:
@@ -178,6 +210,55 @@ def finalize_population_fields(
 
         complete_hard_radiative_events(result, bremslib_tables, seed)
     return result
+
+
+def transport_shard_range(
+    simulate_block: Callable[[int, int], dict[str, Any]],
+    start: int,
+    stop: int,
+    block_electrons: int,
+) -> dict[str, Any]:
+    """Unfinalized join of electrons ``[start, stop)`` run in blocks (#1387).
+
+    Exactly the blocks :func:`transport_electron_blocks` keeps for that range:
+    globalized, with the population-wide hard-photon vectors cleared, merged
+    without :func:`finalize_population_fields`. Merging such shard joins in
+    electron order equals merging all their blocks, since arrays concatenate
+    and counts add.
+    """
+    if not 0 <= start < stop:
+        raise ValueError("an electron shard must cover a nonempty [start, stop) range")
+    blocks = []
+    for lo, hi in electron_blocks(stop - start, block_electrons):
+        block = _globalize(simulate_block(start + lo, start + hi), start + lo)
+        if "hard_radiative_k_eV" in block:
+            block.update(dict.fromkeys(_RECOMPLETED_FIELDS))
+        blocks.append(block)
+        del block
+    return merge_electron_blocks(blocks)
+
+
+def _shard_transport(shard, simulate_block, case, beam_kw, n_electrons, monitor, consume):
+    """Run one :class:`ElectronShard`, or join and finalize a :class:`ShardJoin` (#1387)."""
+    if monitor is not None:
+        raise ValueError("history shards are fixed-count transport only")
+    if isinstance(shard, ElectronShard):
+        if shard.stop > n_electrons or consume is None:
+            raise ValueError(f"electron shard {shard} needs a consumer and a range within N")
+        rows = transport_shard_range(simulate_block, shard.start, shard.stop, shard.block_electrons)
+        consume(rows)
+        return {key: int(rows[key]) for key in _ADDITIVE_COUNTS}
+    if consume is not None:
+        raise ValueError("a shard join returns the joined rows; it takes no consumer")
+    merged = merge_electron_blocks(list(shard.shards))
+    if int(merged["Ne"]) != n_electrons:
+        raise ValueError(f"shards hold {merged['Ne']} electrons; the case has {n_electrons}")
+    return finalize_population_fields(
+        merged,
+        seed=case["seed"],
+        bunch={k: beam_kw[k] for k in BUNCH_KWARGS},
+        bremslib_tables=_case_radiative_kwargs(case).get("bremslib_tables"),
+    )
 
 
 def _stream_electron_blocks(
@@ -472,6 +553,11 @@ def transport_case_blocks(
     root primary) and keeps none, and the realized ``[0, n)`` then runs as the
     fixed-``n`` transport, a single call (:func:`_fixed_cascade`).
 
+    ``block_electrons`` may be a history shard (#1387): an
+    :class:`ElectronShard` transports only its range and streams the
+    unfinalized join to ``consume``; a :class:`ShardJoin` transports nothing
+    and joins and finalizes published shards. Neither takes a monitor.
+
     Validation: adaptive-sample-size-stopping
     """
     n_electrons = int(E_cut_by_electrons.size)
@@ -523,6 +609,10 @@ def transport_case_blocks(
         bunch={k: beam_kw[k] for k in BUNCH_KWARGS},
         bremslib_tables=_case_radiative_kwargs(case).get("bremslib_tables"),
     )
+    if isinstance(block_electrons, ElectronShard | ShardJoin):
+        return _shard_transport(
+            block_electrons, simulate_block, case, beam_kw, n_electrons, monitor, consume
+        )
     if budget is not None and monitor is None:
         consume = budget.wrap(consume)
     if monitor is None:
