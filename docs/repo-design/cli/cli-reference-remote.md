@@ -471,6 +471,8 @@ Options:
   --transfer-host TEXT  SSH alias of a data-transfer node that shares remote_dir (e.g. a
                         site DTN); sync uploads and pull/trajectory/performance
                         downloads go there. Empty uses --host.
+  --extras TEXT         Comma-separated uv extras every job's uv sync keeps beside the
+                        GPU vendor's, e.g. dask; empty syncs only the vendor extra.
   --description TEXT    Free-text note shown by list.
   -h, --help            Show this message and exit.
 ```
@@ -511,6 +513,8 @@ Options:
   --transfer-host TEXT  SSH alias of a data-transfer node that shares remote_dir (e.g. a
                         site DTN); sync uploads and pull/trajectory/performance
                         downloads go there. Empty uses --host.
+  --extras TEXT         Comma-separated uv extras every job's uv sync keeps beside the
+                        GPU vendor's, e.g. dask; empty syncs only the vendor extra.
   --description TEXT    Free-text note shown by list.
   -h, --help            Show this message and exit.
 ```

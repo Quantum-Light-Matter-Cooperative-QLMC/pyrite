@@ -746,6 +746,29 @@ def remote_host() -> str:
     return selected.host if selected is not None else _legacy_remote_host()
 
 
+_EXTRA_RE = re.compile(r"[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?")
+_VENDOR_EXTRAS = frozenset({"nvidia", "amd", "intel"})
+
+
+def parse_extras(value: str) -> tuple[str, ...]:
+    """Validate a comma-separated uv extra list; each name is safe unquoted in a shell line.
+
+    Vendor extras are refused: ``gpu_vendor`` selects exactly one of them.
+    """
+    names = tuple(dict.fromkeys(part.strip() for part in value.split(",") if part.strip()))
+    for name in names:
+        if _EXTRA_RE.fullmatch(name) is None:
+            raise ValueError(f"invalid target extras: {name!r} is not a uv extra name")
+        if name in _VENDOR_EXTRAS:
+            raise ValueError(f"invalid target extras: {name!r} is selected by gpu_vendor")
+    return names
+
+
+def remote_extras() -> tuple[str, ...]:
+    """uv extras each job keeps beside the vendor extra (the target's ``extras``)."""
+    return parse_extras(_target_field("extras", ""))
+
+
 def transfer_host() -> str:
     """SSH alias that carries bulk data: the target's ``transfer_host``, else the login host.
 
@@ -823,6 +846,9 @@ class RemoteTarget:
     qos: str = ""
     # Additional ``#SBATCH`` long options; options PyRITE owns are rejected.
     sbatch_extra: str = ""
+    # Comma-separated uv extras each job's ``uv sync`` keeps beside the GPU
+    # vendor's, e.g. ``dask``; empty syncs the vendor extra alone.
+    extras: str = ""
 
     def __post_init__(self):
         from .targets import validate_name
@@ -846,6 +872,7 @@ class RemoteTarget:
             "mail_user",
             "qos",
             "sbatch_extra",
+            "extras",
         ):
             value = getattr(self, field)
             if not isinstance(value, str) or any(ord(c) < 32 or ord(c) == 127 for c in value):
@@ -853,6 +880,7 @@ class RemoteTarget:
         validate_remote_target(self.host)
         if self.transfer_host:
             validate_remote_target(self.transfer_host)
+        object.__setattr__(self, "extras", ",".join(parse_extras(self.extras)))
         if self.name is not None:
             validate_name(self.name)
         if not (PurePosixPath(self.remote_dir).is_absolute() or self.remote_dir.startswith("~/")):

@@ -99,6 +99,22 @@ def test_nvidia_uv_sync_does_not_request_hip():
     assert "--extra nvidia" in block
 
 
+def test_target_extras_survive_the_exact_job_sync():
+    target = config.RemoteTarget(
+        host="cluster", remote_dir="/srv/pyrite", uv="uv", extras="dask, optimization,dask"
+    )
+    assert target.extras == "dask,optimization"
+    with config.use_target(target):
+        block = scripts._uv_sync_block(once=True)
+    assert "--no-default-groups --extra nvidia --extra dask --extra optimization >>" in block
+
+
+@pytest.mark.parametrize(("extras", "error"), [("dask;rm", "uv extra"), ("amd", "gpu_vendor")])
+def test_target_extras_refuse_unsafe_or_vendor_names(extras, error):
+    with pytest.raises(ValueError, match=error):
+        config.RemoteTarget(host="cluster", extras=extras)
+
+
 @pytest.mark.parametrize(
     ("attribute", "value", "key"),
     [

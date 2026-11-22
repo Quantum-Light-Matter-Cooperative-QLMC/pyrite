@@ -67,6 +67,7 @@ _HELP = {
     "host_exec": "Prefix for helper Python on the host (pull, gc, trajectories), e.g. 'srun --time=00:30:00 --mem=8G'; empty runs it on the login node.",
     "nice": "SLURM --nice for chunked and background jobs (default 10000); 0 omits it, e.g. on age-priority queues.",
     "transfer_host": "SSH alias of a data-transfer node that shares remote_dir (e.g. a site DTN); sync uploads and pull/trajectory/performance downloads go there. Empty uses --host.",
+    "extras": "Comma-separated uv extras every job's uv sync keeps beside the GPU vendor's, e.g. dask; empty syncs only the vendor extra.",
     "description": "Free-text note shown by list.",
 }
 
