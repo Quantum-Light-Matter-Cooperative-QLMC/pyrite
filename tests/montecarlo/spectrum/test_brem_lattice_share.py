@@ -224,3 +224,113 @@ def test_released_kernel_pins_the_si_30kev_g30_share():
     drop = (full - reduced).sum()
     assert drop / full.sum() == pytest.approx(SCENE_DROP_OVER_BREM, rel=1e-6)
     assert 0.98 < drop * 100.0 / S < 1.0
+
+
+@pytest.mark.slow  # ~6 s: two full-table G30 share builds
+def test_isotropic_share_is_the_sdcs_the_bremslib_route_removes():
+    """#1261 acceptance: the theta-integrated EEDL correction on the pinned Si G30 scene.
+
+    The BremsLib table's theta nodes contain the kernel's, so its removed SDCS
+    (``Z^2/k`` x scaled SDCS, in mb) equals the isotropic share per atom to
+    rounding; T between nodes adds only the ln T interpolation error.
+    """
+    from pyrite.datasets import require_verified
+    from pyrite.materials.crystal import dominant_reflections
+    from pyrite.montecarlo.spectrum.brem_lattice_share import (
+        IsotropicLatticeShare,
+        isotropic_share_sigma,
+    )
+    from pyrite.xsgen.bremslib.tables import load_bremsstrahlung_tables
+
+    released = LatticeShareKernel.load(require_verified("brem-lattice-share"))
+    hkls = dominant_reflections("silicon", n_families=10**9, B_ang2=0.46, g_max_invang=30.0)
+    g, w = reflection_shell_weights("silicon", hkls, 0.46, [("Si", N_SI)])
+    table = load_bremsstrahlung_tables(["Si"])["Si"]
+    corrected, info = lattice_share_table(table, released, "Si", N_SI, g, w["Si"])
+    assert info.clamped_nodes == 0
+    T = np.asarray(table.incident_energy_keV)
+    for T_target in (30.0, 100.0, 300.0):
+        i = int(np.argmin(np.abs(T - T_target)))
+        kap = np.array(table.nominal_reduced_energy, dtype=float)
+        kap[-1] = float(table.top_reduced_energy[i])
+        k = kap * T[i] * 1e3
+        removed = np.asarray(table.scaled_sdcs_mb[i]) - np.asarray(corrected.scaled_sdcs_mb[i])
+        removed_cm2 = removed * 14.0**2 / np.where(k > 0, k, 1.0) * 1e-27
+        iso = isotropic_share_sigma(released, g, w["Si"], N_SI, T[i], k)
+        band = (k > 500.0) & (k < 10000.0)
+        assert iso[band].min() > 0
+        np.testing.assert_allclose(removed_cm2[band], iso[band], rtol=1e-9)
+
+    # Between T nodes: within the kernel's ln T interpolation tolerance.
+    # A 200 keV floor keeps the table to the nodes this check reads.
+    share = IsotropicLatticeShare(released, g, w["Si"], N_SI, T_floor_keV=200.0)
+    k = np.arange(550.0, 10000.0, 100.0)
+    for T_off in (250.0, 610.0):
+        direct = isotropic_share_sigma(released, g, w["Si"], N_SI, T_off, k)
+        tabled = share.sigma(np.array([T_off]), k)[0]
+        assert abs(tabled.sum() / direct.sum() - 1.0) < 1e-3
+        assert np.abs(tabled - direct).max() < 3e-3 * direct.max()
+
+
+def test_isotropic_share_limits_and_floor(kernel):
+    from pyrite.montecarlo.spectrum.brem_lattice_share import IsotropicLatticeShare
+
+    k = np.linspace(500.0, 9000.0, 30)
+    g, w = reflection_shell_weights("silicon", [(1, 1, 1)], 1e4, [("Si", N_SI)])
+    assert np.abs(IsotropicLatticeShare(kernel, g, w["Si"], N_SI).sigma([30.0], k)).max() < 1e-40
+    empty = IsotropicLatticeShare(kernel, np.array([]), np.array([]), N_SI)
+    assert not empty.sigma([30.0], k).any()  # G -> 0
+    g, w = _si_low_order()
+    share = IsotropicLatticeShare(kernel, g, w["Si"], N_SI, T_floor_keV=30.0)
+    out = share.sigma(np.array([25.0, 30.0, 40.0, 50.0]), k)
+    assert not out[0].any() and not out[3].any()  # below the floor, above the kernel
+    assert out[1].sum() > 0 and out[2].sum() > 0
+
+
+def test_eedl_spectrum_loses_exactly_the_isotropic_share(kernel):
+    from pyrite.montecarlo import mc_brem_spectrum
+    from pyrite.montecarlo.spectrum.brem import _bremsstrahlung_dsigma_dk
+    from pyrite.montecarlo.spectrum.brem_lattice_share import IsotropicLatticeShare
+
+    g, w = _si_low_order()
+    share = IsotropicLatticeShare(kernel, g, w["Si"], N_SI)
+    k = np.arange(550.0, 10000.0, 100.0)
+    v = np.array([np.sin(np.pi / 4), 0.0, np.cos(np.pi / 4)])
+    segment = dict(
+        r_mid=np.array([[0.0, 0.0, 0.5]]),
+        v_hat=v[None],
+        L_ang=np.array([1.0]),
+        E_keV=np.array([30.0]),
+        t_ang=np.zeros(1),
+        t0_ang=np.zeros(1),
+        elec_id=np.zeros(1, dtype=int),
+        layer=np.zeros(1, dtype=int),
+        Ne=1,
+        thickness_ang=1.0,
+        crystal_width_ang=None,
+        crystal_height_ang=None,
+        n_backscattered=0,
+        n_missed=0,
+    )
+
+    def brem(**extra):
+        return np.asarray(
+            mc_brem_spectrum(
+                segment,
+                k,
+                element="Si",
+                n_atoms_per_ang3=N_SI,
+                n_hat=np.array([0.0, 0.0, 1.0]),
+                cross_section_model="eedl",
+                **extra,
+            )
+        )
+
+    full = brem()
+    reduced = brem(isotropic_lattice_share={"Si": share})
+    sigma = np.asarray(
+        _bremsstrahlung_dsigma_dk("Si", np.array([30.0]), k, cross_section_model="eedl")
+    )[0]
+    expected = full * (1.0 - share.sigma(np.array([30.0]), k)[0] / sigma)
+    np.testing.assert_allclose(reduced, expected, rtol=1e-9)
+    assert 0.0 < 1.0 - reduced.sum() / full.sum() < 0.2

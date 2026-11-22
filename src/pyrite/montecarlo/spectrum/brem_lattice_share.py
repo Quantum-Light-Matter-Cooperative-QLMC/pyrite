@@ -47,14 +47,20 @@ from .cxr._recoil import (
 )
 
 __all__ = [
+    "BREM_LATTICE_SHARE_ISOTROPIC_MODEL",
     "KERNEL_SCHEMA",
+    "IsotropicLatticeShare",
     "LatticeShare",
     "LatticeShareKernel",
     "kernel_x",
     "lattice_share_density",
+    "lattice_share_model",
+    "isotropic_share_sigma",
+    "isotropic_shares_of",
     "lattice_share_table",
     "reflection_shell_weights",
     "shell_kernel_x",
+    "without_isotropic_share",
 ]
 
 #: Schema of the released kernel table; bump on any change to its contents.
@@ -64,6 +70,10 @@ KERNEL_SCHEMA = "pyrite.brem-lattice-share-kernel.v1"
 #: removed (#1250); bump with the kernel release tag or the subtraction rule.
 #: v2: no subtraction below the line route's electron cutoff ``E_cut_lines_keV``.
 BREM_LATTICE_SHARE_MODEL = "born-dw-cbs-share-v2/tables-brem-lattice-share-1/scored-set"
+
+#: Identity marker of crystalline isotropic (EEDL / Bethe--Heitler) continua
+#: scored with the theta-integrated share removed (#1261).
+BREM_LATTICE_SHARE_ISOTROPIC_MODEL = f"{BREM_LATTICE_SHARE_MODEL}/isotropic-theta-integrated-v1"
 
 _ALPHA = 1.0 / 137.035999084
 _H_ANG = HBARC_EV_ANG / M_E_EV  # hbar c / m c^2 [Angstrom]
@@ -390,3 +400,150 @@ def lattice_share_table(
         scaled_sdcs_mb=sdcs.astype(np.asarray(table.scaled_sdcs_mb).dtype),
     )
     return corrected, LatticeShare(element, removed, clamped, outside)
+
+
+def lattice_share_model(bremsstrahlung_model: str | None) -> str:
+    """Identity marker of the correction for a continuum source (``"bremslib"`` or EEDL).
+
+    Validation: brem-lattice-coherent-fraction
+    """
+    if bremsstrahlung_model == "bremslib":
+        return BREM_LATTICE_SHARE_MODEL
+    return BREM_LATTICE_SHARE_ISOTROPIC_MODEL
+
+
+#: 1 Angstrom^2 in cm^2.
+_CM2_PER_ANG2 = 1.0e-16
+
+#: ``ln T`` sub-intervals per kernel ``T`` interval of the isotropic share table.
+_ISOTROPIC_T_SUBNODES = 4
+
+#: Log photon-energy nodes per decade of the isotropic share table; finer grids
+#: are interpolated linearly in ``ln k`` (the share is smooth in ``k``).
+_ISOTROPIC_K_PER_DECADE = 96
+
+
+def isotropic_share_sigma(kernel, g, weights, n_atoms_per_ang3, T_keV, k_eV):
+    """Theta-integrated share per atom, ``d sigma / dk`` [cm^2/eV] at ``T`` and each ``k``.
+
+    ``2 pi int S_j(theta, k) sin theta d theta / n_j``: the solid-angle integral
+    (linear in ``theta`` between the kernel nodes) of the direction-resolved
+    share :func:`lattice_share_density`, per atom of element ``j``. It is
+    exactly the SDCS the BremsLib route removes when its DDCS loses
+    ``k S_j / (n_j Z^2)`` on the kernel's ``theta`` nodes, so an isotropic
+    continuum loses the same photons per unit path.
+
+    Validation: brem-lattice-share-isotropic
+    """
+    from ..._bremslib_table import solid_angle_integral
+
+    S = lattice_share_density(kernel, g, weights, T_keV, k_eV)  # (theta, K)
+    sigma = solid_angle_integral(np.deg2rad(kernel.theta_deg), S.T)
+    return sigma * _CM2_PER_ANG2 / float(n_atoms_per_ang3)
+
+
+class IsotropicLatticeShare:
+    """Theta-integrated share of one element, subtracted from an isotropic continuum (#1261).
+
+    EEDL and Bethe--Heitler continua emit ``d sigma/dk / (4 pi)`` toward every
+    direction, so the direction-resolved BremsLib subtraction has no node to act
+    on. Their ``d sigma / dk`` instead loses :func:`isotropic_share_sigma`, the
+    absolute Born--Debye--Waller CBS-only share integrated over photon
+    direction, and the remainder is emitted isotropically. Orientation-averaged
+    lines plus continuum then hold the isotropic model's angle-integrated yield
+    (the absolute-subtraction rule of ``brem-lattice-coherent-fraction``).
+
+    The share is tabulated on ``ln T`` nodes (the kernel's own, each split into
+    :data:`_ISOTROPIC_T_SUBNODES`) from ``max(kernel T_min, T_floor_keV)`` to the
+    kernel top, and interpolated linearly in ``ln T`` per segment. Incident
+    energies outside that range lose nothing: below ``T_floor_keV`` the line
+    route scores no CBS.
+
+    Validation: brem-lattice-share-isotropic
+    """
+
+    def __init__(self, kernel, g, weights, n_atoms_per_ang3, *, T_floor_keV: float = 0.0):
+        self.kernel = kernel
+        self.g = np.asarray(g, dtype=float)
+        self.weights = np.asarray(weights, dtype=float)
+        self.n_atoms_per_ang3 = float(n_atoms_per_ang3)
+        lo = max(float(kernel.T_keV[0]), float(T_floor_keV))
+        hi = float(kernel.T_keV[-1])
+        inner = [float(t) for t in kernel.T_keV if lo < t < hi]
+        coarse = np.log(np.array([lo, *inner, hi])) if lo < hi else np.zeros(0)
+        if coarse.size >= 2:
+            fine = [
+                np.linspace(a, b, _ISOTROPIC_T_SUBNODES + 1)[:-1]
+                for a, b in zip(coarse[:-1], coarse[1:], strict=True)
+            ]
+            self.log_T = np.concatenate([*fine, coarse[-1:]])
+        else:
+            self.log_T = np.zeros(0)
+        self._tables: dict[bytes, np.ndarray] = {}
+
+    @property
+    def T_keV(self) -> np.ndarray:
+        return np.exp(self.log_T)
+
+    def sigma_nodes(self, k_eV) -> np.ndarray:
+        """Share per atom on the ``T`` nodes, ``(T, K)`` [cm^2/eV]."""
+        k = np.ascontiguousarray(np.asarray(k_eV, dtype=float))
+        key = k.tobytes()
+        cached = self._tables.get(key)
+        if cached is not None:
+            return cached
+        positive = k[k > 0]
+        if self.log_T.size == 0 or positive.size == 0 or self.weights.size == 0:
+            table = np.zeros((self.log_T.size, k.size))
+        else:
+            lo, hi = float(positive.min()), float(positive.max())
+            count = max(2, int(np.ceil(_ISOTROPIC_K_PER_DECADE * np.log10(hi / lo))) + 1)
+            direct = k.size <= count
+            nodes = k if direct else np.geomspace(lo, hi, count)
+            table = np.empty((self.log_T.size, k.size))
+            for i, T in enumerate(self.T_keV):
+                row = isotropic_share_sigma(
+                    self.kernel, self.g, self.weights, self.n_atoms_per_ang3, T, nodes
+                )
+                if direct:
+                    table[i] = row
+                else:
+                    table[i] = np.where(
+                        k > 0, np.interp(np.log(np.where(k > 0, k, lo)), np.log(nodes), row), 0.0
+                    )
+        table.setflags(write=False)
+        self._tables[key] = table
+        return table
+
+    def sigma(self, T_keV, k_eV, xp=np):
+        """Share per atom for each segment energy and photon energy, ``(M, K)`` [cm^2/eV]."""
+        from ..._backend import _to_cpu
+
+        T = xp.asarray(T_keV)
+        k = np.asarray(_to_cpu(k_eV), dtype=float)
+        if self.log_T.size < 2:
+            return xp.zeros((T.size, k.size), dtype=T.dtype)
+        table = xp.asarray(self.sigma_nodes(k), dtype=T.dtype)
+        nodes = xp.asarray(self.log_T, dtype=xp.float64)
+        lt = xp.log(xp.maximum(T.astype(xp.float64), 1e-300))
+        i = xp.clip(xp.searchsorted(nodes, lt) - 1, 0, self.log_T.size - 2)
+        w = ((lt - nodes[i]) / (nodes[i + 1] - nodes[i])).astype(T.dtype)
+        inside = ((lt >= nodes[0]) & (lt <= nodes[-1])).astype(T.dtype)
+        return ((1 - w)[:, None] * table[i] + w[:, None] * table[i + 1]) * inside[:, None]
+
+
+def isotropic_shares_of(shares, bremslib_staged) -> dict:
+    """Lattice shares of the elements scored isotropically (no staged BremsLib table)."""
+    return {el: s for el, s in (shares or {}).items() if el not in bremslib_staged}
+
+
+def without_isotropic_share(dsig, share, T_keV, E_grid):
+    """Isotropic ``dsig`` [cm^2/eV] less the theta-integrated share, clamped at zero.
+
+    Validation: brem-lattice-share-isotropic
+    """
+    if share is None:
+        return dsig
+    from ..._backend import REAL, xp
+
+    return xp.maximum(dsig - share.sigma(T_keV, E_grid, xp=xp), REAL(0.0))

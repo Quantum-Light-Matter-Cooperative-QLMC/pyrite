@@ -184,16 +184,24 @@ Validated on frozen transports of the two #642 scenes (#1250):
 - **Si 300 keV, temperature check:** the match holds within 0.2--0.7 % while CBS changes 2.6× with {math}`B` between 0.23 and 0.92 Å{sup}`2`.
 - **MoS{sub}`2`/Si 30 keV:** before the line-cutoff floor, the share was 4.5 % above the Monte Carlo CBS (0.4 % of the continuum), concentrated at 0.5--2 keV. The beam stops in this scene, and the share removed from electrons below `E_cut_lines_keV` (2.8 % of the share, 95 % of it at 0.5--2 keV, measured on a 16-history transport) accounts for most of that excess. The remainder is partly explained by the share's floor at {math}`T=1`--2 keV.
 
+**Isotropic continua (#1261).** EEDL and Bethe--Heitler emit {math}`d\sigma_j/dk/(4\pi)` toward every direction, so there is no table node per angle to correct. Their {math}`d\sigma_j/dk` instead loses the same share integrated over photon direction, and the remainder stays isotropic:
+
+```{math}
+\frac{d\sigma_j}{dk}\to\max\!\Big(0,\ \frac{d\sigma_j}{dk}-\Delta\sigma_j\Big),\qquad
+\Delta\sigma_j(T,k)=\frac{2\pi}{n_j}\int_0^\pi S_j(T,\theta,k)\sin\theta\,d\theta .
+```
+
+{math}`\Delta\sigma_j` is exactly the SDCS the BremsLib route removes, so a crystalline EEDL run removes the same photons per unit path as a BremsLib run. The subtraction is absolute, as on the BremsLib route. A fraction weighted by the BremsLib DDCS would scale the removed share by {math}`\sigma_{\rm EEDL}/\sigma_{\rm BremsLib}` and would need BremsLib tables in an EEDL run. {math}`\Delta\sigma_j` is tabulated per run on the kernel's {math}`\ln T` nodes, each split in four, from {math}`\max(1\ {\rm keV}, E_{\rm cut,lines})` upward, and interpolated in {math}`\ln T`. The interpolation error is below 1e-3 of the band-integrated share. The angular distribution is not corrected, so the double count is removed on average over photon direction rather than toward each direction. The reflection selector's net metric stays BremsLib-only: an EEDL selection stops on gross line yield. Validation: `brem-lattice-share-isotropic`.
+
 Not corrected, and stated as such:
 
-- the isotropic EEDL continuum, which warns with `LatticeShareUncorrectedWarning`;
-- elements without a BremsLib table;
+- elements without a BremsLib table in a BremsLib run (their isotropic EEDL fallback), which warns with `LatticeShareUncorrectedWarning`;
 - channeling cases;
 - incident energies above 1.06 MeV.
 
 Grazing photon exit is also uncovered: refraction suppresses the production lines there, while the share uses vacuum kinematics. Validation: `brem-lattice-coherent-fraction`.
 
-**Migration.** Default crystalline BremsLib spectra lose the double-counted share: 3--4 % of the total 0.5--10 keV yield on the #642 scenes at {math}`G=8` Å{sup}`-1` and about 8 % at {math}`G=30` Å{sup}`-1`, and the total spectrum's dominant peak falls by 9--12 % at {math}`G=30`. Line spectra are unchanged at a fixed reflection set. Crystalline BremsLib checkpoints written before the correction do not resume: their identity lacks the `brem_lattice_share_model` marker. Pass the private case key `_brem_lattice_share=False` only to reproduce the old double-counting sum in validation harnesses.
+**Migration.** Default crystalline BremsLib spectra lose the double-counted share: 3--4 % of the total 0.5--10 keV yield on the #642 scenes at {math}`G=8` Å{sup}`-1` and about 8 % at {math}`G=30` Å{sup}`-1`, and the total spectrum's dominant peak falls by 9--12 % at {math}`G=30`. Line spectra are unchanged at a fixed reflection set. Crystalline BremsLib checkpoints written before the correction do not resume: their identity lacks the `brem_lattice_share_model` marker. Pass the private case key `_brem_lattice_share=False` only to reproduce the old double-counting sum in validation harnesses. Since #1261, crystalline EEDL continua are corrected as well (they previously warned) and record the `brem_lattice_share_model` marker `…/isotropic-theta-integrated-v1`. Crystalline EEDL checkpoints written before #1261 therefore do not resume, and their continuum falls by the same share.
 
 ## Per-segment yield
 

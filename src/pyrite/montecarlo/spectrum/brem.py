@@ -825,6 +825,12 @@ def _layer_depth(path, mu_by_layer):
     return depth
 
 
+def _jit_reduction_enabled() -> bool:
+    """Whether the fused GPU FP32 reductions are available on this backend."""
+    fp32 = np.dtype(REAL) == np.dtype(np.float32)
+    return _USE_JIT_BREM_REDUCTION and BACKEND.name in CUPY_BACKENDS and fp32
+
+
 def mc_brem_spectrum(
     segments,
     E_grid_eV,
@@ -843,6 +849,7 @@ def mc_brem_spectrum(
     electron_band_weights=None,
     dielectric_plasma_eV: float = 0.0,
     photon_block: int | None = None,
+    isotropic_lattice_share: Mapping[str, Any] | None = None,
 ):
     """Return the incoherent bremsstrahlung density from transport segments.
 
@@ -914,6 +921,9 @@ def mc_brem_spectrum(
         depends on the block width, the BremsLib route caps the segment chunk
         by ``(segment, photon)`` cells per pass, and per-electron band
         integrals add per-block partial sums.
+    isotropic_lattice_share
+        Internal (#1261). ``{element: IsotropicLatticeShare}``, subtracted from
+        that element's isotropic ``d sigma/dk`` on the chunked path.
 
     Returns
     -------
@@ -934,6 +944,7 @@ def mc_brem_spectrum(
     Validation: substep-radiation-invariance
     Validation: adaptive-sample-size-stopping
     Validation: cr-zone-incoherent-flux-weight
+    Validation: brem-lattice-share-isotropic
     """
     if photon_block is not None:
         arguments = dict(locals())  # every parameter, so blocks rescore exactly this call
@@ -1030,11 +1041,10 @@ def mc_brem_spectrum(
     # pass only O(Nsegment) interpolation/geometry state and small staged EEDL
     # panels. The EEDL reducer is CUDA-only; other accelerators retain the
     # conservative chunked path below.
-    _use_jit = (
-        _USE_JIT_BREM_REDUCTION
-        and BACKEND.name in CUPY_BACKENDS
-        and np.dtype(REAL) == np.dtype(np.float32)
-    )
+    from .brem_lattice_share import isotropic_shares_of, without_isotropic_share
+
+    isotropic_shares = isotropic_shares_of(isotropic_lattice_share, bremslib_staged)
+    _use_jit = _jit_reduction_enabled() and not isotropic_shares
     _use_bremslib_jit = _use_jit and cross_section_model == "bremslib"
     per_electron = electron_band_weights is not None
     band_q = row_electron = row_band = None
@@ -1210,41 +1220,10 @@ def mc_brem_spectrum(
                     seg_E[sl],
                     E_grid,
                 )
+            dsig = without_isotropic_share(dsig, isotropic_shares.get(el_i), seg_E[sl], E_grid)
             if bremslib_state is not None:
                 dsig = xp.where(bremslib_state.available[:, None], directional, dsig / REAL(unit))
             _accumulate(n_i * 1e24 * unit * path_cm, dsig * T_abs, sl)
     if per_electron:
         return _electron_band()
     return _to_cpu(spec / (4.0 * xp.pi) / Ne)
-
-
-def load_external_brem(path, E_grid_eV):
-    """
-    Interpolate an EXTERNAL bremsstrahlung background onto the spectral grid
-    -- e.g. a NIST DTSA-II simulation, which is what Zhai et al. use both
-    for their simulated backgrounds (refs 96-100) and, with a PIXE-style
-    numerical fit, for their experimental subtraction (SI S3).
-
-    File format: two columns (energy [eV], intensity), whitespace- or
-    comma-separated; '#' comment lines and non-numeric headers are skipped.
-    The intensity must already be in DETECTED units matching your plots
-    (e.g. Phs/eV/s/nA: from a DTSA-II counts export, divide counts/channel
-    by channel width [eV] x live time [s] x beam current [nA]). It is
-    treated as an as-detected spectrum: window efficiency and detector
-    resolution are NOT re-applied. Energies outside the file's range
-    interpolate to zero.
-    """
-    rows = []
-    with open(path) as f:
-        for line in f:
-            parts = line.strip().replace(",", " ").split()
-            if len(parts) < 2 or parts[0].startswith(("#", "//")):
-                continue
-            try:
-                rows.append((float(parts[0]), float(parts[1])))
-            except ValueError:
-                continue  # header / text line
-    if not rows:
-        raise ValueError(f"no numeric (E, intensity) rows found in {path}")
-    arr = np.array(sorted(rows))
-    return np.interp(np.asarray(E_grid_eV, dtype=float), arr[:, 0], arr[:, 1], left=0.0, right=0.0)

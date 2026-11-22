@@ -471,6 +471,18 @@ was regenerated, at the PR head on CPU/NumPy fp64; its transport signature is
 asserted unchanged before re-pinning. Six of 71 bins move (at most a few
 parts in 1e7); every other output and tolerance is unchanged.
 
+## Isotropic lattice-share continuum (#1261)
+
+The `legacy`, `eedl-fallback`, `multilayer` and `coherent` fixtures are
+crystalline EEDL cases (four families), so their isotropic continuum now loses
+the theta-integrated lattice-coherent share of the scored reflections above
+`E_cut_lines_keV` (`BREM_LATTICE_SHARE_ISOTROPIC_MODEL=born-dw-cbs-share-v2/.../isotropic-theta-integrated-v1`).
+Only `spectra.brem_wide` (1 of 3 bins) and `spectra.brem` were regenerated, at
+the PR head on CPU/NumPy fp64, with each transport signature asserted
+unchanged first; the largest move is 1.2e-5 relative. Their `case_content_key`
+and `parameter_sha256` pins advance for the new `brem_lattice_share_model`
+marker. Every other output and tolerance is unchanged.
+
 ## Quadrature-only line resolution (#1265)
 
 `LINE_RESOLUTION_DEFAULT_MODEL=sinc-oversampled-x8-v2` takes the bin-mean

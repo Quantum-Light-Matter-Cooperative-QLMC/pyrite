@@ -21,9 +21,9 @@ from .brem import (
     _bremsstrahlung_dsigma_dk,
     _eedl_brem_dsigma_dk,
     load_bremsstrahlung_cross_sections,
-    load_external_brem,
     mc_brem_spectrum,
 )
+from .external_brem import load_external_brem
 from .characteristic import (
     CHARACTERISTIC_EEDL_FILENAME,
     CHARACTERISTIC_EEDL_SHA256,

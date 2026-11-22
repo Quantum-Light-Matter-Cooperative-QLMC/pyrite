@@ -21,7 +21,9 @@ def test_crystalline_bremslib_cases_are_corrected_and_others_say_why():
     assert ls.skip_reason(_case(), None) is None
     assert ls.lattice_share_applies(_case())
     assert ls.skip_reason(_case(**{ls.LATTICE_SHARE_CASE_KEY: False}), None) == "disabled"
-    assert ls.skip_reason(dict(SI, bremsstrahlung_model="eedl"), None).startswith("no BremsLib")
+    # The isotropic EEDL continuum is corrected too (#1261).
+    assert ls.skip_reason(dict(SI, bremsstrahlung_model="eedl"), None) is None
+    assert ls.lattice_share_applies(dict(SI, bremsstrahlung_model="eedl"))
     assert ls.skip_reason(_case(channeling={"model": "planar"}), None) == "channeling zone"
     assert ls.skip_reason(_case(crystal=None), None) == "amorphous layer"
     assert ls.skip_reason(_case(hkl_list=[]), None) == "no scored reflections"
@@ -57,13 +59,37 @@ def test_measured_selection_subtracts_exactly_the_selected_shells():
         ls.scored_reflections(case, None)
 
 
-def test_eedl_crystal_warns_and_bremslib_or_amorphous_do_not():
-    with pytest.warns(ls.LatticeShareUncorrectedWarning):
-        ls.warn_if_eedl_double_counts(dict(SI, bremsstrahlung_model="eedl"))
+def test_eedl_crystal_gets_theta_integrated_shares_without_warning():
+    from pyrite.montecarlo.spectrum.brem_lattice_share import (
+        BREM_LATTICE_SHARE_ISOTROPIC_MODEL,
+        BREM_LATTICE_SHARE_MODEL,
+        IsotropicLatticeShare,
+    )
+
+    case = dict(SI, bremsstrahlung_model="eedl", E_cut_lines_keV=5.0)
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        ls.warn_if_eedl_double_counts(_case())
-        ls.warn_if_eedl_double_counts(dict(SI, crystal=None, bremsstrahlung_model="eedl"))
+        shares, record = ls.layer_isotropic_share(case, None, [("Si", 0.05)])
+    assert isinstance(shares["Si"], IsotropicLatticeShare)
+    assert shares["Si"].T_keV[0] == pytest.approx(5.0)
+    assert record["corrected"] and record["continuum"] == "isotropic"
+    assert record["reflections"] == len(SI["hkl_list"])
+    out = ls.lattice_share_record(dict(case, composition=[("Si", 0.05)]), 1)
+    assert out["model"] == BREM_LATTICE_SHARE_ISOTROPIC_MODEL != BREM_LATTICE_SHARE_MODEL
+    assert ls.layer_isotropic_share(dict(case, crystal=None), None, [("Si", 0.05)]) == (
+        None,
+        dict(layer=None, corrected=False, reason="amorphous layer"),
+    )
+
+
+def test_untabled_element_of_a_bremslib_run_warns(monkeypatch):
+    from pyrite.xsgen.bremslib.tables import load_bremsstrahlung_tables
+
+    tables = load_bremsstrahlung_tables(["Si"])
+    case = _case(hkl_list=[(1, 1, 1), (-1, -1, -1)], E_cut_lines_keV=7.5)
+    with pytest.warns(ls.LatticeShareUncorrectedWarning, match="O"):
+        _, record = ls.layer_emission_tables(case, None, [("Si", 0.05), ("O", 0.01)], tables)
+    assert record["elements"][1] == dict(element="O", corrected=False, reason="no BremsLib table")
 
 
 def test_uncorrected_layers_pass_their_tables_through():

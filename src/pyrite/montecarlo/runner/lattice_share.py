@@ -12,10 +12,15 @@ their parent's key and digest, which name the BremsLib source the coupled
 partition check compares; the correction has its own identity marker and
 per-case record.
 
+Isotropic (EEDL / Bethe--Heitler) continua have no emission angle to correct
+per node; their ``d sigma/dk`` loses the theta-integrated share of the same
+scored reflections instead (#1261).
+
 Not corrected (recorded as such): layers without scored reflections, cases
 with a channeling zone (their zone rows are not the Born line sum the share
-describes), elements without a BremsLib table (their isotropic EEDL fallback),
-and incident energies outside the kernel's range.
+describes), elements without a BremsLib table in a BremsLib run (their
+isotropic EEDL fallback; warned), and incident energies outside the kernel's
+range.
 
 Validation: brem-lattice-coherent-fraction
 """
@@ -158,8 +163,6 @@ def _uncorrected_reason(case: Mapping[str, Any], layer: int | None) -> str | Non
         return "disabled"
     if lines_off(case):
         return "lines off (cxr_source='none')"
-    if case.get("bremsstrahlung_model") != "bremslib":
-        return "no BremsLib tables (EEDL continuum)"
     if case.get("channeling") not in (None, "off"):
         return "channeling zone"
     if _radiator(case, layer) is None:
@@ -179,13 +182,12 @@ def lattice_share_applies(case: Mapping[str, Any]) -> bool:
     """Whether any of ``case``'s layers radiates a corrected continuum.
 
     Decided from the case alone (no kernel load), for identity markers: a
-    crystalline BremsLib radiator that scores reflections or selects them.
+    crystalline radiator that scores reflections or selects them, with either
+    continuum (BremsLib tables, or the isotropic EEDL route since #1261).
 
     Validation: brem-lattice-coherent-fraction
     """
     if case.get(LATTICE_SHARE_CASE_KEY, True) is False or lines_off(case):
-        return False
-    if case.get("bremsstrahlung_model") != "bremslib":
         return False
     if case.get("channeling") not in (None, "off"):
         return False
@@ -198,27 +200,16 @@ def lattice_share_applies(case: Mapping[str, Any]) -> bool:
     )
 
 
-def warn_if_eedl_double_counts(case: Mapping[str, Any]) -> None:
-    """Warn when a crystalline case scores its continuum from EEDL.
+def _warn_untabled(elements) -> None:
+    import warnings
 
-    The EEDL continuum is isotropic and is not corrected (#1250 follow-up), so
-    its lattice-coherent share is counted again by the CBS lines: about 3--8 %
-    of the total yield on the #642 scenes.
-
-    Validation: brem-lattice-coherent-fraction
-    """
-    if case.get(LATTICE_SHARE_CASE_KEY, True) is False or lines_off(case):
-        return
-    eedl = dict(case, bremsstrahlung_model="bremslib")
-    if case.get("bremsstrahlung_model") != "bremslib" and lattice_share_applies(eedl):
-        import warnings
-
-        warnings.warn(
-            "the EEDL continuum is not corrected for its lattice-coherent share, which "
-            "the CBS lines also score; select bremsstrahlung_model='bremslib' to remove it",
-            LatticeShareUncorrectedWarning,
-            stacklevel=3,
-        )
+    warnings.warn(
+        f"the isotropic EEDL fallback of {', '.join(elements)} is not corrected for its "
+        "lattice-coherent share, which the CBS lines also score; install their BremsLib "
+        "tables or select bremsstrahlung_model='eedl' for the whole run",
+        LatticeShareUncorrectedWarning,
+        stacklevel=4,
+    )
 
 
 def _line_cutoff_keV(case: Mapping[str, Any]) -> float:
@@ -236,6 +227,9 @@ def _corrected_tables(radiator, hkls, composition, tables, floor_keV):
     )
     out = dict(tables)
     elements = []
+    untabled = [element for element, _ in composition if element not in tables]
+    if untabled:
+        _warn_untabled(untabled)
     for element, n in composition:
         if element not in tables:
             elements.append(dict(element=element, corrected=False, reason="no BremsLib table"))
@@ -252,6 +246,67 @@ def _corrected_tables(radiator, hkls, composition, tables, floor_keV):
             )
         )
     return out, elements, int(g.size)
+
+
+def _isotropic_shares(radiator, hkls, composition, floor_keV):
+    """Per element, the theta-integrated share of ``hkls`` for an isotropic continuum."""
+    from ..spectrum.brem_lattice_share import IsotropicLatticeShare, reflection_shell_weights
+
+    kernel = _kernel()
+    g, weights = reflection_shell_weights(
+        radiator["crystal"], hkls, float(radiator["B_ang2"]), composition
+    )
+    shares = {
+        element: IsotropicLatticeShare(kernel, g, weights[element], n, T_floor_keV=floor_keV)
+        for element, n in composition
+    }
+    return shares, int(g.size)
+
+
+def layer_isotropic_share(case, layer, composition):
+    """Theta-integrated shares of ``layer``'s scored reflections, for the EEDL route (#1261).
+
+    Returns ``(shares, record)``: ``shares`` maps each element of
+    ``composition`` to its :class:`IsotropicLatticeShare` (``None`` when the
+    layer is not corrected), for ``mc_brem_spectrum(isotropic_lattice_share=)``.
+    Electrons below ``E_cut_lines_keV`` keep the full continuum.
+
+    Validation: brem-lattice-share-isotropic
+    """
+    reason = skip_reason(case, layer)
+    if reason is not None:
+        return None, dict(layer=layer, corrected=False, reason=reason)
+    radiator = _radiator(case, layer)
+    hkls = scored_reflections(case, layer)
+    composition = [(str(el), float(n)) for el, n in composition]
+    floor = _line_cutoff_keV(case)
+    key = (
+        "isotropic",
+        radiator["crystal"],
+        float(radiator["B_ang2"]),
+        tuple(sorted(tuple(int(i) for i in h) for h in hkls)),
+        tuple(composition),
+        floor,
+    )
+    cached = _CACHE.get(key)
+    if cached is None:
+        shares, n_shells = _isotropic_shares(radiator, hkls, composition, floor)
+        if len(_CACHE) >= _CACHE_LIMIT:
+            _CACHE.clear()
+        cached = _CACHE[key] = (
+            shares,
+            dict(
+                layer=layer,
+                corrected=True,
+                continuum="isotropic",
+                crystal=radiator["crystal"],
+                reflections=len(hkls),
+                shells=n_shells,
+                line_cutoff_keV=floor,
+                elements=[dict(element=el, corrected=True) for el, _ in composition],
+            ),
+        )
+    return cached
 
 
 def layer_emission_tables(case, layer, composition, tables):
@@ -316,7 +371,12 @@ def share_only_tables(case, layer, composition, tables, hkls):
 
     import numpy as np
 
-    if tables is None or _uncorrected_reason(case, layer) is not None or not hkls:
+    if (
+        tables is None
+        or case.get("bremsstrahlung_model") != "bremslib"
+        or _uncorrected_reason(case, layer) is not None
+        or not hkls
+    ):
         return None
     composition = [(str(el), float(n)) for el, n in composition]
     corrected, _, _ = _corrected_tables(
@@ -434,31 +494,33 @@ class SelectionContinuum:
 def lattice_share_record(case: Mapping[str, Any], n_layers: int) -> dict | None:
     """Run provenance of the continuum correction: per layer, corrected or why not.
 
-    ``None`` when no layer could be corrected (EEDL continuum, amorphous or
-    channeling cases), so uncorrected runs gain no key. Each layer entry is
-    :func:`layer_emission_tables`'s record (cached; no second table build):
-    the removed fraction per element, or the skip reason.
+    ``None`` when no layer could be corrected (amorphous or channeling cases),
+    so uncorrected runs gain no key. Each layer entry is
+    :func:`layer_emission_tables`'s record (BremsLib: the removed fraction per
+    element) or :func:`layer_isotropic_share`'s (EEDL), cached so nothing is
+    rebuilt, or the skip reason.
 
     Validation: brem-lattice-coherent-fraction
     """
-    from ..spectrum.brem_lattice_share import BREM_LATTICE_SHARE_MODEL
+    from ..spectrum.brem_lattice_share import lattice_share_model
     from .case_tables import _case_bremslib_tables
 
     if not lattice_share_applies(case):
         return None
     tables = _case_bremslib_tables(case)
-    if tables is None:
-        return None
     if int(n_layers) == 1:
         views = [(None, case["composition"])]
     else:
         views = [(layer, case["abs_layers"][layer][2]) for layer in range(int(n_layers))]
+
+    def record(layer, composition):
+        if tables is None:
+            return layer_isotropic_share(case, layer, composition)[1]
+        return layer_emission_tables(case, layer, composition, tables)[1]
+
     return dict(
-        model=BREM_LATTICE_SHARE_MODEL,
-        layers=[
-            layer_emission_tables(case, layer, composition, tables)[1]
-            for layer, composition in views
-        ],
+        model=lattice_share_model(case.get("bremsstrahlung_model")),
+        layers=[record(layer, composition) for layer, composition in views],
     )
 
 

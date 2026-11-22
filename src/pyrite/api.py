@@ -189,10 +189,10 @@ def source_git_state() -> tuple[str | None, bool | None]:
 
 def _lattice_share_provenance(case) -> dict[str, str]:
     from .montecarlo.runner.lattice_share import lattice_share_applies
-    from .montecarlo.spectrum.brem_lattice_share import BREM_LATTICE_SHARE_MODEL
+    from .montecarlo.spectrum.brem_lattice_share import lattice_share_model
 
     return (
-        {"brem_lattice_share_model": BREM_LATTICE_SHARE_MODEL}
+        {"brem_lattice_share_model": lattice_share_model(case.get("bremsstrahlung_model"))}
         if lattice_share_applies(case)
         else {}
     )

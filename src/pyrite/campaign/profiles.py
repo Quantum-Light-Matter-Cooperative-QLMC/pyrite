@@ -51,7 +51,7 @@ from ..montecarlo.case import Case
 from ..montecarlo.channeling.handoff import CHANNELING_MODEL
 from ..montecarlo.spectrum import BREMSSTRAHLUNG_MODEL, CHARACTERISTIC_MODEL, CXR_ESCAPE_MODEL
 from ..montecarlo.spectrum.brem_bremslib import BREMSSTRAHLUNG_BREMSLIB_MODEL
-from ..montecarlo.spectrum.brem_lattice_share import BREM_LATTICE_SHARE_MODEL
+from ..montecarlo.spectrum.brem_lattice_share import lattice_share_model
 from ..montecarlo.spectrum.characteristic import IonizationModel, characteristic_model_marker
 from ..montecarlo.spectrum.coherent_population import (
     COHERENT_POPULATION_MODEL,
@@ -642,10 +642,10 @@ def _identity_v1(
     resolved["bremsstrahlung_model"] = _bremsstrahlung_identity_marker(resolved_brem_model)
     resolved.update(_adaptive_sampling_markers(precision_payload))
     resolved.update(_brem_band_reduction_markers(precision_payload, resolved_brem_model))
-    # Crystalline BremsLib continua lose their lattice-coherent share (#1250);
-    # channeling runs score zone rows instead and stay uncorrected.
-    if resolved_brem_model == "bremslib" and "channeling" not in resolved:
-        resolved["brem_lattice_share_model"] = BREM_LATTICE_SHARE_MODEL
+    # Crystalline continua lose their lattice-coherent share (BremsLib #1250,
+    # isotropic EEDL #1261); channeling runs score zone rows and stay uncorrected.
+    if "channeling" not in resolved:
+        resolved["brem_lattice_share_model"] = lattice_share_model(resolved_brem_model)
     radiative = radiative_numerics_payload(options, resolved_brem_model, grooved=grooved)
     if radiative:
         transport_numerics.update(radiative)
@@ -803,7 +803,7 @@ def case_content_key(
     from ..montecarlo.runner.lattice_share import lattice_share_applies
 
     if lattice_share_applies(case):
-        payload["brem_lattice_share_model"] = BREM_LATTICE_SHARE_MODEL
+        payload["brem_lattice_share_model"] = lattice_share_model(case.get("bremsstrahlung_model"))
     if case.get("coherent_emission", False):
         payload["coherent_population_model"] = COHERENT_POPULATION_MODEL
         payload["physical_bunch_electrons"] = physical_bunch_electrons(case)

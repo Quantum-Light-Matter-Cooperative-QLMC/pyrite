@@ -375,7 +375,7 @@
     {
       "path": "src/pyrite/montecarlo/spectrum/brem.py",
       "name": "mc_brem_spectrum",
-      "cc": 45
+      "cc": 44
     },
     {
       "path": "src/pyrite/montecarlo/spectrum/brem_events.py",

@@ -86,6 +86,8 @@ def _uncoupled_brem_from_segments(
     """Existing per-layer reduction with one selected/prepared continuum model.
 
     Validation: brem-lattice-coherent-fraction
+
+    Validation: brem-lattice-share-isotropic
     """
     from .. import runner
 
@@ -98,14 +100,15 @@ def _uncoupled_brem_from_segments(
     def photon_block(composition):
         return runner._brem_photon_block(E_brem.size, composition, model, n_layers=n_lay)
 
-    from .lattice_share import layer_emission_tables, warn_if_eedl_double_counts
-
-    if "bremslib_tables" not in model_kwargs:
-        warn_if_eedl_double_counts(case)
+    from .lattice_share import layer_emission_tables, layer_isotropic_share
 
     def layer_kwargs(layer, composition):
         if "bremslib_tables" not in model_kwargs:
-            return model_kwargs
+            # Isotropic EEDL route: subtract the theta-integrated share (#1261).
+            shares, _ = layer_isotropic_share(case, layer, composition)
+            if shares is None:
+                return model_kwargs
+            return {**model_kwargs, "isotropic_lattice_share": shares}
 
         tables, _ = layer_emission_tables(case, layer, composition, model_kwargs["bremslib_tables"])
         return {**model_kwargs, "bremslib_tables": tables}
