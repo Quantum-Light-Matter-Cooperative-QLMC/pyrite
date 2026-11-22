@@ -21,13 +21,13 @@ from pyrite.montecarlo.runner import run_case
 _NE = 200
 
 
-def _line_spectrum(energy_keV, *, energy_spread_frac=None):
+def _line_spectrum(energy_keV, *, energy_spread_frac=None, n_electrons=_NE):
     sweep = Sweep(
         material="hopg",
         thickness_ang=1e4,
         beam=BeamSpec(energy_keV=energy_keV, energy_spread_frac=energy_spread_frac),
         tilt_deg=30.0,
-        n_electrons=_NE,
+        n_electrons=n_electrons,
         n_electrons_brem=5,
         # The (002) resonance derivative is the observable; pinned dominant
         # families keep measured shell selection out of a beam-energy check.
@@ -74,7 +74,9 @@ def test_spread_line_stays_inside_the_catalog_window():
     grid is cut with 15% headroom, so the 90% coverage energy has to resolve
     without `coverage_energy` hitting its final bin.
     """
-    grid, spec = _line_spectrum(30.0, energy_spread_frac=0.01)
+    # The coverage edge is unchanged from 200 electrons at 50, which keeps this
+    # default-tier check off the JIT-disabled budget (#1367).
+    grid, spec = _line_spectrum(30.0, energy_spread_frac=0.01, n_electrons=50)
     # Raises CoverageGridTooNarrow if coverage is only reached in the last bin.
     covered_eV = coverage_energy(grid, spec, 0.9)
     assert covered_eV < grid[-1]

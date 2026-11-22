@@ -405,6 +405,10 @@ def test_node_window_kernel_spells_contraction_off_for_each_vendor(monkeypatch, 
     assert seen["options"] == options
 
 
+@pytest.mark.skipif(
+    os.environ.get("NUMBA_DISABLE_JIT") == "1",
+    reason="prange is serial without JIT, so there is no thread pool to vary",
+)
 def test_cpu_window_reductions_do_not_depend_on_the_thread_count():
     """Fixed partial-sum chunks: a pool worker's one-thread pin is bit-identical (#1291)."""
     import numba
