@@ -154,7 +154,7 @@ def pull_files(records, remote_root, local_root, *, artifacts=True, overwrite=Fa
                     "-e",
                     shlex.join(config.ssh_argv()),
                     "--",
-                    f"{config.remote_host()}:{source}",
+                    f"{config.transfer_host()}:{source}",
                     str(staging.resolve()),
                 ],
                 label=f"pulling {record['path']} ({record['bytes']} bytes)",

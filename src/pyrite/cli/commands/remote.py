@@ -30,6 +30,7 @@ from ._remote_actions import (
     _cli_prune_jobs,
     _cli_pull,
     _cli_pull_json,
+    _cli_pull_staging,
     _cli_reap,
     _cli_rebrem,
     _cli_recxr,
@@ -1027,12 +1028,14 @@ def gc_command(all_profiles, catalog_profile, min_age_minutes, yes, ssh_verbose)
         yes=yes,
         ssh_verbose=ssh_verbose,
     )
-    return _invoke_action(
+    status = _invoke_action(
         _cli_reap,
         min_age_minutes=min_age_minutes,
         yes=yes,
         ssh_verbose=ssh_verbose,
     )
+    _invoke_action(_cli_pull_staging, yes=yes, ssh_verbose=ssh_verbose)
+    return status
 
 
 @command.command(

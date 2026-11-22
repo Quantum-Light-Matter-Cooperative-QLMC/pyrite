@@ -594,19 +594,23 @@ def sbatch_remote_path(*parts: str) -> str:
 
 
 def rsync_remote_path(path: str) -> str:
-    """Render validated host plus one raw absolute remote path for ``rsync -s``."""
+    """Render validated data host plus one raw absolute remote path for ``rsync -s``.
+
+    The host is :func:`transfer_host`: bulk data goes to the target's transfer
+    node when one is set, else to the login host.
+    """
     _reject_controls("remote rsync path", path)
     if not PurePosixPath(path).is_absolute():
         raise SystemExit(f"invalid remote rsync path={path!r}: expected absolute POSIX path")
-    return f"{remote_host()}:{path}"
+    return f"{transfer_host()}:{path}"
 
 
 def scp_remote_path(path: str) -> str:
-    """Render validated host plus one quoted remote path for SCP argv."""
+    """Render validated data host plus one quoted remote path for SCP argv."""
     _reject_controls("remote SCP path", path)
     if not PurePosixPath(path).is_absolute():
         raise SystemExit(f"invalid remote SCP path={path!r}: expected absolute POSIX path")
-    return f"{remote_host()}:{shell_arg(path)}"
+    return f"{transfer_host()}:{shell_arg(path)}"
 
 
 # Invocation-local selection keeps concurrent callers and nested commands isolated.
@@ -631,6 +635,40 @@ def _target_field(name, fallback):
 def remote_host() -> str:
     selected = _selected_target()
     return selected.host if selected is not None else _legacy_remote_host()
+
+
+def transfer_host() -> str:
+    """SSH alias that carries bulk data: the target's ``transfer_host``, else the login host.
+
+    A transfer node (a site DTN) only moves files and reads digests; SLURM,
+    locks and PyRITE Python stay on :func:`remote_host`. Both hosts must see
+    ``remote_dir`` at one absolute path; a ``~/`` checkout is checked by
+    comparing the two login homes (one cached ssh round trip each).
+    """
+    login = remote_host()
+    selected = _selected_target()
+    data = getattr(selected, "transfer_host", "") if selected is not None else ""
+    if not data or data == login:
+        return login
+    raw = _target_field("remote_dir", REMOTE_DIR)
+    if (raw == "~" or raw.startswith("~/")) and _remote_home(data) != _remote_home(login):
+        raise SystemExit(
+            f"transfer host {data!r} and login host {login!r} have different homes "
+            f"({_remote_home(data)} vs {_remote_home(login)}), so {raw!r} is not one "
+            "shared directory; set the target's remote_dir to an absolute path both mount"
+        )
+    return data
+
+
+def uses_transfer_host() -> bool:
+    """Whether bulk data goes to a host other than the login host.
+
+    Decided from the selected target alone when it names no transfer host, so
+    callers that only branch on it contact no host and need none configured.
+    """
+    if not getattr(_selected_target(), "transfer_host", ""):
+        return False
+    return transfer_host() != remote_host()
 
 
 @contextmanager
@@ -668,6 +706,8 @@ class RemoteTarget:
     max_time: str = ""
     host_exec: str = ""
     nice: str = "10000"
+    # SSH alias of a data-transfer node sharing remote_dir; empty uses ``host``.
+    transfer_host: str = ""
 
     def __post_init__(self):
         from .targets import validate_name
@@ -686,11 +726,14 @@ class RemoteTarget:
             "max_time",
             "host_exec",
             "nice",
+            "transfer_host",
         ):
             value = getattr(self, field)
             if not isinstance(value, str) or any(ord(c) < 32 or ord(c) == 127 for c in value):
                 raise ValueError(f"invalid target {field}: expected printable string")
         validate_remote_target(self.host)
+        if self.transfer_host:
+            validate_remote_target(self.transfer_host)
         if self.name is not None:
             validate_name(self.name)
         if not (PurePosixPath(self.remote_dir).is_absolute() or self.remote_dir.startswith("~/")):
