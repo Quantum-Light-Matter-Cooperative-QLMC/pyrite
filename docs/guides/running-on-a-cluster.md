@@ -146,7 +146,32 @@ ships your local tables.
    yields a shared box to other jobs between slices. Where priority is mostly
    queue age (`ssh MY_SSH_ALIAS 'sprio -w'`), that penalty delays every slice;
    set `pyrite remote target edit campus --nice 0`.
-5. Run something small and confirm the allocation:
+5. If the site routes file transfers through data-transfer nodes (DTNs), give
+   the DTN its own SSH alias and add it as the target's transfer host:
+
+   ```text
+   Host MY_DTN_ALIAS
+       HostName dtn.example.edu
+       User MY_USER
+       ServerAliveInterval 30
+   ```
+
+   ```bash
+   ssh MY_DTN_ALIAS true   # accept and check its host key once, yourself
+   pyrite remote target edit campus --transfer-host MY_DTN_ALIAS
+   ```
+
+   The transfer host must mount the remote directory at the same absolute
+   path; a `~/` directory is checked by comparing the two homes. Then sync
+   uploads, the table inventories and unpacking, and the downloads of `pull`,
+   `remote trajectories` and `remote performance` go to the DTN. Scheduler
+   commands, the sync lock and PyRITE itself stay on the login node or in
+   `--host-exec`. A pull with a transfer host slims into
+   `.pull-staging/` in the remote directory, then downloads with resumable
+   `rsync`: rerun an interrupted pull to resume it, and `remote gc --yes`
+   removes leftover staged files. For one-off multi-gigabyte moves, the site's
+   Globus endpoint is faster than SSH.
+6. Run something small and confirm the allocation:
 
    ```bash
    pyrite run quickstart -m hopg --remote --target campus --dry-run

@@ -26,6 +26,7 @@ _FIELDS = (
     "max_time",
     "host_exec",
     "nice",
+    "transfer_host",
     "description",
 )
 

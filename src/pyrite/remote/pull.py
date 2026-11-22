@@ -1,9 +1,11 @@
 """Remote checkpoint and validation-cache retrieval."""
 
+import hashlib
 import json
 import sys
 import time
-from pathlib import Path
+import uuid
+from pathlib import Path, PurePosixPath
 
 from ..checkpoints import archive
 from ..console.outputs import output_dir
@@ -401,9 +403,7 @@ def pull(
             # here sits near the link speed the wire is the wall; if it sits far
             # below it, the box's compress pass is.
             started = time.monotonic()
-            transport._ssh_download(
-                remote_transfer, incoming_local, label=f"Pulling checkpoint '{stem}'..."
-            )
+            _download_checkpoint(remote_transfer, ckpt, flags, incoming_local, stem)
             elapsed = max(time.monotonic() - started, 1e-9)
             transferred = incoming_local.stat().st_size / 1e6
             report(
@@ -452,6 +452,105 @@ def pull(
             f"remote pull failed for {len(failed)} of {len(stems)} requested "
             f"checkpoint(s): {', '.join(failed)}"
         )
+
+
+#: Checkout-relative directory for slimmed pickles awaiting a transfer-node download.
+PULL_STAGING = ".pull-staging"
+# Content fingerprint of a checkpoint directory (names, sizes, mtimes).
+_FINGERPRINT = "find {ckpt} -type f -printf '%P %s %T@\\n' | LC_ALL=C sort | sha256sum | cut -c1-64"
+
+
+def _download_checkpoint(remote_transfer, ckpt, flags, incoming, stem) -> None:
+    """Stream the slimmed checkpoint over ssh, or stage it via the transfer node."""
+    if config.uses_transfer_host():
+        _staged_transfer(ckpt, flags, incoming, stem)
+    else:
+        transport._ssh_download(remote_transfer, incoming, label=f"Pulling checkpoint '{stem}'...")
+
+
+def _staged_transfer(ckpt: str, flags: str, incoming: Path, stem: str) -> None:
+    """Pull one checkpoint through the target's transfer node (#1377).
+
+    The login host slims into ``<remote_dir>/.pull-staging/`` (through
+    ``host_exec`` when set); the transfer node renames it into place, records
+    the checkpoint's fingerprint and digest, and serves an ``rsync --partial``
+    download. A re-run after an interrupted download reuses an intact staged
+    file whose fingerprint still matches, and rsync resumes the local partial.
+    The staged file is removed once the local copy verifies; a failed slim
+    removes its partial output, and ``remote gc`` sweeps anything left.
+    """
+    data_host = config.transfer_host()
+    key = hashlib.sha256(f"{ckpt}\0{flags}".encode()).hexdigest()[:16]
+    staged = config.remote_path(PULL_STAGING, f"{PurePosixPath(ckpt).name}.{key}.pkl")
+    staged_q, fp_q = config.shell_word(staged), config.shell_word(f"{staged}.fp")
+    fingerprint = _FINGERPRINT.format(ckpt=config.shell_word(ckpt))
+    describe = f"stat -c %s {staged_q} && sha256sum {staged_q} | cut -c1-64"
+    state = transport._ssh_capture(
+        f'fp=$({fingerprint}) || exit $?; if [ -f {staged_q} ] && [ "$(cat {fp_q} 2>/dev/null)" = "$fp" ]; '
+        f'then echo REUSE; {describe}; else echo "SLIM $fp"; fi',
+        host=data_host,
+    ).split()
+    if state[:1] == ["SLIM"]:
+        partial = config.shell_word(f"{staged}.partial.{uuid.uuid4().hex}")
+        report(f"Slimming checkpoint '{stem}' on the host...", file=sys.stderr)
+        transport._run(
+            config.ssh_argv(
+                "-n",
+                config.remote_host(),
+                f"cd {config.shell_remote_dir()} && mkdir -p {PULL_STAGING} "
+                f"&& rm -f {staged_q} {fp_q} && "
+                f"{{ {config.host_uv_command()} run --no-sync pyrite checkpoint slim "
+                f"{config.shell_arg(ckpt)}{flags} -o {partial} || {{ rc=$?; rm -f {partial}; exit $rc; }}; }}",
+            )
+        )
+        # Record the fingerprint only if the checkpoint did not change while slimming.
+        state = transport._ssh_capture(
+            f"mv -f {partial} {staged_q} || exit $?; "
+            f'[ "$({fingerprint})" = {config.shell_word(state[1])} ] '
+            f"&& printf %s {config.shell_word(state[1])} > {fp_q}; {describe}",
+            host=data_host,
+        ).split()
+    else:
+        state = state[1:]
+        report(f"Reusing staged checkpoint '{stem}' on {data_host}", file=sys.stderr)
+    if len(state) != 2 or not state[0].isdigit():
+        raise SystemExit(f"invalid staged-pull description for {staged!r}")
+    size, digest = int(state[0]), state[1]
+    transport._run(
+        config.rsync_argv("--partial", config.rsync_remote_path(staged), str(incoming)),
+        label=f"Pulling checkpoint '{stem}' from {data_host}...",
+    )
+    if incoming.stat().st_size != size or transport._local_sha256(incoming) != digest:
+        incoming.unlink(missing_ok=True)
+        transport._ssh_capture(f"rm -f {staged_q} {fp_q}", host=data_host)
+        raise SystemExit(f"staged checkpoint {stem!r} failed its size/digest check; re-run")
+    transport._ssh_capture(f"rm -f {staged_q} {fp_q}", host=data_host)
+
+
+def pull_staging_command(*, yes: bool, min_age_minutes: float = 60.0) -> str:
+    """List (or with ``yes`` delete) leftover staged pulls on the transfer node.
+
+    Partial slims younger than ``min_age_minutes`` may belong to a running
+    pull and are kept; every finished staged pickle and fingerprint goes.
+    """
+    root = config.shell_word(config.remote_path(PULL_STAGING))
+    action = "-print -delete" if yes else "-print"
+    return (
+        f"[ -d {root} ] || exit 0; find {root} -maxdepth 1 -type f "
+        f"\\( ! -name '*.partial.*' -o -mmin +{int(min_age_minutes)} \\) {action}"
+    )
+
+
+def reclaim_pull_staging(*, yes: bool = False) -> list[str]:
+    """Preview or remove leftover staged pulls; a no-op without a transfer host."""
+    if not config.uses_transfer_host():
+        return []
+    output = transport._ssh_capture(pull_staging_command(yes=yes), host=config.transfer_host())
+    paths = output.split()
+    verb = "removed" if yes else "would remove"
+    for path in paths:
+        report(f"{verb} staged pull: {path}")
+    return paths
 
 
 def pull_zhai_cache():

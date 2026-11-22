@@ -532,6 +532,11 @@ def _cli_reap(*, min_age_minutes, yes):
     lifecycle.reap_reservations(min_age_minutes=min_age_minutes, yes=yes)
 
 
+def _cli_pull_staging(*, yes):
+    """Sweep leftover transfer-node pull staging; a no-op without ``transfer_host``."""
+    lifecycle.reclaim_pull_staging(yes=yes)
+
+
 def _cli_clear(*, materials, all_checkpoints, catalog_profile, yes):
     if catalog_profile is not None:
         if all_checkpoints or materials:

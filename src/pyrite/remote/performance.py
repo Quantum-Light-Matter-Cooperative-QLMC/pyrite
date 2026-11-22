@@ -66,7 +66,10 @@ def pull_performance_profile(profile: str) -> list[Path]:
         )
         try:
             transport._ssh_download(
-                f"cat {config.shell_arg(remote)}", temporary, label=f"Pulling {jobid}/{filename}..."
+                f"cat {config.shell_arg(remote)}",
+                temporary,
+                label=f"Pulling {jobid}/{filename}...",
+                host=config.transfer_host(),
             )
             temporary.replace(destination)
         finally:

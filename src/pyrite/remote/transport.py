@@ -63,7 +63,7 @@ def _run(cmd, *, label=None, **kw):
     subprocess.run(cmd, check=True, **kw)
 
 
-def _ssh_capture(remote_cmd):
+def _ssh_capture(remote_cmd, *, host=None):
     """Run a remote command over ssh and return its stdout (text). Prints the
     box's stderr and aborts on a nonzero exit.
 
@@ -71,9 +71,10 @@ def _ssh_capture(remote_cmd):
     block-glyph progress bars, e.g. `████▌`), but `text=True` alone would decode
     with the Windows locale (cp1252), which chokes on those bytes -- so `status`,
     `jobs`, and `logs` would crash mid-read. `errors="replace"` keeps any stray
-    non-UTF-8 byte from aborting the whole command."""
+    non-UTF-8 byte from aborting the whole command. ``host`` defaults to the
+    login host; data-side commands pass :func:`config.transfer_host`."""
     r = subprocess.run(
-        config.ssh_argv("-n", config.remote_host(), remote_cmd),
+        config.ssh_argv("-n", host or config.remote_host(), remote_cmd),
         capture_output=True,
         encoding="utf-8",
         errors="replace",
@@ -85,13 +86,15 @@ def _ssh_capture(remote_cmd):
     return r.stdout
 
 
-def _ssh_download(remote_cmd: str, destination: Path, *, label=None) -> None:
+def _ssh_download(remote_cmd: str, destination: Path, *, label=None, host=None) -> None:
     """Stream one remote command's stdout directly into a local file."""
     destination = Path(destination)
     try:
         with destination.open("wb") as output:
             _run(
-                config.ssh_argv("-n", config.remote_host(), remote_cmd), stdout=output, label=label
+                config.ssh_argv("-n", host or config.remote_host(), remote_cmd),
+                stdout=output,
+                label=label,
             )
     except BaseException:
         destination.unlink(missing_ok=True)
@@ -339,10 +342,15 @@ def _remote_inventories(
     if not commands:
         return frozenset(), {}, {}, {}, False
     # Rides this round trip: jobs need uv, and on a busy queue a job would only
-    # discover its absence after waiting for an allocation.
+    # discover its absence after waiting for an allocation. With a transfer
+    # node the digests run there and the probe stays with the login host.
     uv = config.shell_remote_uv()
-    commands.insert(0, f"command -v {uv} >/dev/null 2>&1 || echo {_UV_MISSING_MARK}")
-    output = _ssh_capture("; ".join(commands))
+    probe = f"command -v {uv} >/dev/null 2>&1 || echo {_UV_MISSING_MARK}"
+    data_host = config.transfer_host()
+    if data_host == config.remote_host():
+        output = _ssh_capture("; ".join([probe, *commands]))
+    else:
+        output = _ssh_capture(probe) + _ssh_capture("; ".join(commands), host=data_host)
     if _UV_MISSING_MARK in output:
         raise SystemExit(
             f"refusing to sync: uv not found on {config.remote_host()} at {config.remote_uv()}.\n"
@@ -1103,8 +1111,8 @@ def _sync_code_locked(entries, digest, *, force):
     )
     shipped_any = False
     with tempfile.TemporaryDirectory() as td:
-        # Unique per sync: nothing else on the box shares, extracts or removes it.
-        remote_tar = f"/tmp/pyrite_code.{digest[:12]}.{uuid.uuid4().hex}.tgz"
+        data_host = config.transfer_host()
+        remote_tar = _remote_tar_path(digest)
         tarpath = os.path.join(td, "pyrite_code.tgz")
         with tarfile.open(tarpath, "w:gz") as t:
             for arc, f in tar_entries:
@@ -1178,7 +1186,7 @@ def _sync_code_locked(entries, digest, *, force):
         _run(
             config.ssh_argv(
                 "-n",
-                config.remote_host(),
+                data_host,
                 _rsync_finish_command(stage if shipped_any else None, tar_word, stamp_write),
             )
         )
@@ -1186,7 +1194,7 @@ def _sync_code_locked(entries, digest, *, force):
     _run(
         config.ssh_argv(
             "-n",
-            config.remote_host(),
+            data_host,
             f"mkdir -p {config.shell_remote_dir()} && cd {config.shell_remote_dir()} || exit $?; "
             # Unpack into a staging dir first: a truncated or corrupt upload fails
             # here, before anything in the live tree is touched.
@@ -1198,6 +1206,18 @@ def _sync_code_locked(entries, digest, *, force):
             f"rc=$?; rm -rf {stage} {tar_word}; exit $rc",
         )
     )
+
+
+def _remote_tar_path(digest: str) -> str:
+    """Unique upload path: nothing else on the box shares, extracts or removes it.
+
+    A transfer node stages it in the checkout instead of ``/tmp`` (sites with
+    DTNs, such as Hoffman2, forbid ``/tmp`` on shared nodes).
+    """
+    name = f"pyrite_code.{digest[:12]}.{uuid.uuid4().hex}.tgz"
+    if config.uses_transfer_host():
+        return config.remote_path(f".pyrite-stage-{name}")
+    return f"/tmp/{name}"
 
 
 def _rsync_finish_command(stage: str | None, tar_word: str, stamp_write: str) -> str:
