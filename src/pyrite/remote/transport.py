@@ -224,6 +224,7 @@ _XSGEN_TABLE_DIR = "xsgen/tables"
 _XSGEN_NAME_RE = re.compile(r"[0-9a-f]{64}\.(?:npz|json)")
 _XSGEN_SECTION_MARK = "---pyrite-xsgen-inventory---"
 _RSYNC_PROBE_MARK = "---pyrite-rsync-probe---"
+_UV_MISSING_MARK = "---pyrite-uv-missing---"
 
 
 def _local_xsgen_tables() -> dict[str, Path]:
@@ -337,7 +338,17 @@ def _remote_inventories(
         commands.append("command -v rsync >/dev/null 2>&1 && echo rsync")
     if not commands:
         return frozenset(), {}, {}, {}, False
+    # Rides this round trip: jobs need uv, and on a busy queue a job would only
+    # discover its absence after waiting for an allocation.
+    uv = config.shell_remote_uv()
+    commands.insert(0, f"command -v {uv} >/dev/null 2>&1 || echo {_UV_MISSING_MARK}")
     output = _ssh_capture("; ".join(commands))
+    if _UV_MISSING_MARK in output:
+        raise SystemExit(
+            f"refusing to sync: uv not found on {config.remote_host()} at {config.remote_uv()}.\n"
+            "  fix: ssh to the host and run: curl -LsSf https://astral.sh/uv/install.sh | sh\n"
+            "  or point the target at an existing uv: pyrite remote target edit NAME --uv PATH"
+        )
     output, _, probe_part = output.partition(_RSYNC_PROBE_MARK + "\n")
     remote_rsync = rsync and probe_part.strip() == "rsync"
     if sdbase and _SDBASE_SECTION_MARK not in output:

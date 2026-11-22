@@ -13,7 +13,21 @@ from . import config
 from .config import RemoteTarget
 
 _NAME = re.compile(r"[A-Za-z][A-Za-z0-9_.-]{0,63}\Z")
-_FIELDS = ("host", "remote_dir", "uv", "gpu_vendor", "partition", "nodelist", "gres", "description")
+_FIELDS = (
+    "host",
+    "remote_dir",
+    "uv",
+    "gpu_vendor",
+    "partition",
+    "nodelist",
+    "gres",
+    "account",
+    "constraint",
+    "max_time",
+    "host_exec",
+    "nice",
+    "description",
+)
 
 
 def validate_name(name: str) -> str:
@@ -98,6 +112,11 @@ def _fallback_values(exclude=()):
                 ("partition", "SLURM_PARTITION"),
                 ("nodelist", "SLURM_NODELIST"),
                 ("gres", "SLURM_GRES"),
+                ("account", "SLURM_ACCOUNT"),
+                ("constraint", "SLURM_CONSTRAINT"),
+                ("max_time", "SLURM_MAX_TIME"),
+                ("host_exec", "HOST_EXEC"),
+                ("nice", "SLURM_NICE"),
             )
             if field not in exclude
         },
@@ -108,7 +127,14 @@ def save_target(name: str, values: dict, *, edit: bool = False) -> RemoteTarget:
     validate_name(name)
     targets = named_targets()
     if edit != (name in targets):
-        raise ValueError(f"target {name!r} {'does not exist' if edit else 'already exists'}")
+        hint = (
+            f"add it with: pyrite remote target add {name} --host HOST"
+            if edit
+            else f"change it with: pyrite remote target edit {name} --FIELD VALUE"
+        )
+        raise ValueError(
+            f"target {name!r} {'does not exist' if edit else 'already exists'}; {hint}"
+        )
     target = (
         replace(targets[name], **values)
         if edit

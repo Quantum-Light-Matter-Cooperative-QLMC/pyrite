@@ -393,7 +393,7 @@ def pull(
             # propagates the remote command's status.
             remote_transfer = (
                 f"cd {config.shell_remote_dir()} && "
-                f"{config.remote_runtime_env()} {config.shell_remote_uv()} run --no-sync pyrite checkpoint slim "
+                f"{config.host_uv_command()} run --no-sync pyrite checkpoint slim "
                 f"{config.shell_arg(ckpt)}{flags} -o -"
             )
             # Timed so a slow pull is attributable: this covers box slim CPU +

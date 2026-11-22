@@ -71,6 +71,19 @@ def test_missing_section_marker_fails_closed(monkeypatch):
         transport._remote_inventories(artifacts=False, tables=True)
 
 
+def test_missing_remote_uv_fails_before_transfer(monkeypatch):
+    commands = []
+
+    def capture(command):
+        commands.append(command)
+        return transport._UV_MISSING_MARK + "\n"
+
+    monkeypatch.setattr(transport, "_ssh_capture", capture)
+    with pytest.raises(SystemExit, match="uv not found on remote-host at uv"):
+        transport._remote_inventories(artifacts=False, tables=True)
+    assert len(commands) == 1 and commands[0].startswith('command -v "uv" ')
+
+
 def test_ships_only_missing_or_differing_pairs_payload_first(tmp_path):
     local = _tables(tmp_path)
     digests = _digests(local)

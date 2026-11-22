@@ -162,6 +162,9 @@ def _pin_remote_paths(monkeypatch):
     monkeypatch.setattr(config, "SLURM_PARTITION", "gpu")
     monkeypatch.setattr(config, "SLURM_NODELIST", "any")
     monkeypatch.setattr(config, "SLURM_GRES", "gpu:1")
+    monkeypatch.setattr(config, "SLURM_NICE", "10000")
+    for optional in ("SLURM_ACCOUNT", "SLURM_CONSTRAINT", "SLURM_MAX_TIME", "HOST_EXEC"):
+        monkeypatch.setattr(config, optional, "")
     package = sys.modules.get("pyrite.remote")
     if package is not None:
         monkeypatch.setattr(package, "HOST", "remote-host")

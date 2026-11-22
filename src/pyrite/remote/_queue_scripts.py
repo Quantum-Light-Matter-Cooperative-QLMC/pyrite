@@ -618,7 +618,7 @@ if [ "$stalled" -ge 3 ]; then
 fi
 k=$(grep -c "^slurm_job_id: " "$JOBDIR/meta" 2>/dev/null)
 echo "queued slice $((k + 1)) $(date -Is)" > "$JOBDIR/state"
-{_sbatch_retry_block("sbatch --parsable --nice=10000", '"$JOBDIR/run.sh"')}
+{_sbatch_retry_block(config.sbatch_submit_command(nice=True), '"$JOBDIR/run.sh"')}
 if [ -z "$SID" ]; then
   echo "FAILED (slice resubmission) $(date -Is)" > "$JOBDIR/state"
   exit 1

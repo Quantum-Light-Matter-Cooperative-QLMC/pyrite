@@ -49,9 +49,28 @@ def show_command(name, json_output):
     emit_object(name, flatten({key: item for key, item in value.items() if key != "name"}))
 
 
+_HELP = {
+    "host": "SSH alias of the SLURM login node.",
+    "remote_dir": "Checkout directory on the host (absolute or ~/path).",
+    "uv": "uv executable on the host.",
+    "gpu_vendor": "nvidia or amd.",
+    "partition": "SLURM partition.",
+    "nodelist": "SLURM node list, or 'any'.",
+    "gres": "SLURM gres request, e.g. gpu:1.",
+    "account": "SLURM account to charge; empty uses the site default.",
+    "constraint": "SLURM node features, e.g. 'A100|H200'; empty for none.",
+    "max_time": "Site wall-time cap, e.g. 1-00:00:00; replaces UNLIMITED and bounds --chunk-minutes.",
+    "host_exec": "Prefix for helper Python on the host (pull, gc, trajectories), e.g. 'srun --time=00:30:00 --mem=8G'; empty runs it on the login node.",
+    "nice": "SLURM --nice for chunked and background jobs (default 10000); 0 omits it, e.g. on age-priority queues.",
+    "description": "Free-text note shown by list.",
+}
+
+
 def _fields(function):
     for field in reversed(targets._FIELDS):
-        function = click.option(f"--{field.replace('_', '-')}", default=None)(function)
+        function = click.option(f"--{field.replace('_', '-')}", default=None, help=_HELP[field])(
+            function
+        )
     return function
 
 

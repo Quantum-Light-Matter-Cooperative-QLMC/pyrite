@@ -19,9 +19,24 @@ def _isolated_store(monkeypatch, tmp_path):
         "PYRITE_REMOTE_PARTITION",
         "PYRITE_REMOTE_NODELIST",
         "PYRITE_REMOTE_GRES",
+        "PYRITE_REMOTE_ACCOUNT",
+        "PYRITE_REMOTE_CONSTRAINT",
+        "PYRITE_REMOTE_MAX_TIME",
+        "PYRITE_REMOTE_HOST_EXEC",
+        "PYRITE_REMOTE_NICE",
     ):
         monkeypatch.delenv(name, raising=False)
-    for attribute in ("REMOTE_GPU_VENDOR", "SLURM_PARTITION", "SLURM_NODELIST", "SLURM_GRES"):
+    for attribute in (
+        "REMOTE_GPU_VENDOR",
+        "SLURM_PARTITION",
+        "SLURM_NODELIST",
+        "SLURM_GRES",
+        "SLURM_ACCOUNT",
+        "SLURM_CONSTRAINT",
+        "SLURM_MAX_TIME",
+        "HOST_EXEC",
+        "SLURM_NICE",
+    ):
         monkeypatch.setattr(remote_config, attribute, None)
     return path
 
