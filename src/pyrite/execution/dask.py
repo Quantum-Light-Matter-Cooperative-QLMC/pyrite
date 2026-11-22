@@ -13,11 +13,12 @@ import uuid
 from collections import deque
 from collections.abc import Callable, Generator, Mapping, Sequence
 from contextlib import closing
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from threading import Event, Lock
 from typing import Any, Literal
 
+from . import _dask_slurm
 from .artifacts import (
     CaseArtifactStore,
     DirectionalArtifactRef,
@@ -36,13 +37,18 @@ from .slurm import _atomic_json, _save_input
 class DaskConfig:
     """A connected scheduler, local workers, or SLURM-provisioned Dask workers.
 
-    `scheduler_address` applies only to `cluster='existing'`. The jobqueue
-    adapter is deliberately conservative: it requests one worker per SLURM
-    allocation and does not auto-configure GPU device isolation.
+    `cluster='existing'` connects through exactly one of `scheduler_address`
+    or `scheduler_file`. With `cluster='slurm'`, `workers`/`max_workers`
+    count SLURM jobs; each CPU job packs one single-threaded Dask worker
+    process per allocated core, and a GPU job runs one worker labelled
+    `GPU=1`. Site settings come from dask-jobqueue configuration, selected
+    by `config_name`, plus the `jobqueue` table of cluster keywords; PyRITE
+    fields (resources, `partition`, `walltime`) override both. GPU jobs need
+    the site's GPU directive there; PyRITE never writes GRES syntax.
 
     `max_in_flight` bounds outstanding Futures independently of worker count.
-    When omitted, use twice the configured worker count (the maximum for
-    adaptive clusters). Set it explicitly for borrowed/external clusters.
+    When omitted, use twice the configured worker-process count (the maximum
+    for adaptive clusters). Set it explicitly for borrowed/external clusters.
     """
 
     cluster: Literal["existing", "local", "slurm"] = "local"
@@ -52,19 +58,22 @@ class DaskConfig:
     adaptive: bool = False
     max_workers: int | None = None
     partition: str | None = None
-    walltime: str = "01:00:00"
+    walltime: str | None = None
     poll_seconds: float = 0.1
     max_in_flight: int | None = None
+    scheduler_file: str | None = None
+    config_name: str | None = None
+    jobqueue: dict[str, Any] = field(default_factory=dict, hash=False)
 
     def __post_init__(self) -> None:
         from .slurm import _WALLTIME, _token
 
         if self.cluster not in ("existing", "local", "slurm"):
             raise ValueError("cluster must be existing, local, or slurm")
-        if self.cluster == "existing" and not self.scheduler_address:
-            raise ValueError("existing Dask cluster requires scheduler_address")
-        if self.cluster != "existing" and self.scheduler_address is not None:
-            raise ValueError("scheduler_address applies only to existing clusters")
+        self._validate_connection()
+        if self.cluster != "slurm" and (self.config_name is not None or self.jobqueue):
+            raise ValueError("config_name and jobqueue apply only to cluster='slurm'")
+        object.__setattr__(self, "jobqueue", _dask_slurm.normalize_jobqueue(self.jobqueue))
         if self.cluster == "local" and (self.adaptive or self.partition is not None):
             raise ValueError("local Dask cluster does not support adaptive SLURM scaling")
         if self.cluster != "slurm" and self.adaptive:
@@ -78,14 +87,27 @@ class DaskConfig:
             ),
             "max_in_flight": (1 if self.max_in_flight is None else self.max_in_flight, 1),
         }
-        for field, (value, minimum) in limits.items():
+        for name, (value, minimum) in limits.items():
             if type(value) is not int or value < minimum:
-                raise ValueError(f"{field} must be an integer >= {minimum}")
+                raise ValueError(f"{name} must be an integer >= {minimum}")
         _token("partition", self.partition)
-        if not _WALLTIME.fullmatch(self.walltime):
+        _token("config_name", self.config_name)
+        if self.walltime is not None and not _WALLTIME.fullmatch(self.walltime):
             raise ValueError("invalid Dask SLURM walltime")
         if not isinstance(self.poll_seconds, (int, float)) or self.poll_seconds <= 0:
             raise ValueError("poll_seconds must be positive")
+
+    def _validate_connection(self) -> None:
+        """An existing cluster is reached through exactly one scheduler locator."""
+        given = [v for v in (self.scheduler_address, self.scheduler_file) if v is not None]
+        if self.cluster != "existing":
+            if given:
+                raise ValueError("scheduler_address/scheduler_file apply only to existing clusters")
+            return
+        if len(given) != 1 or not all(isinstance(v, str) and v for v in given):
+            raise ValueError(
+                "existing Dask cluster requires exactly one of scheduler_address or scheduler_file"
+            )
 
 
 def _worker_run_unit(run_dir: str, unit_index: int) -> list[dict[str, Any]]:
@@ -236,35 +258,46 @@ class DaskExecutor:
             ) from exc
         cfg = self.config
         if cfg.cluster == "existing":
+            if cfg.scheduler_file is not None:
+                return Client(scheduler_file=str(Path(cfg.scheduler_file).expanduser())), None
             return Client(cfg.scheduler_address), None
         if cfg.cluster == "local":
             cluster = LocalCluster(n_workers=cfg.workers, threads_per_worker=1, processes=True)
             return Client(cluster), cluster
+        from dask_jobqueue import SLURMCluster
+
+        cluster = SLURMCluster(**self._slurm_cluster_kwargs())
+        # Fixed-size clusters adapt between equal bounds so jobs retired by
+        # walltime/--lifetime are resubmitted instead of leaving work stranded.
+        cluster.adapt(minimum_jobs=cfg.workers, maximum_jobs=self._max_jobs())
+        return Client(cluster), cluster
+
+    def _slurm_cluster_kwargs(self) -> dict[str, Any]:
         try:
-            from dask_jobqueue import SLURMCluster
+            import dask_jobqueue  # noqa: F401
         except ImportError as exc:
             raise RuntimeError("SLURM worker provisioning needs pyrite-mc[dask]") from exc
-        if self.resources.gpu_count:
-            raise ValueError(
-                "Dask SLURM GPU provisioning requires site-specific device isolation; "
-                "connect to a preconfigured GPU scheduler instead"
-            )
-        kwargs: dict[str, Any] = {
-            "cores": self.resources.cpu_cores,
-            "processes": 1,
-            "memory": f"{max(1, self.resources.memory_bytes // 1024**2)}MiB"
-            if self.resources.memory_bytes
-            else "4GiB",
-            "walltime": cfg.walltime,
+        return _dask_slurm.cluster_kwargs(self.config, self.resources)
+
+    def _max_jobs(self) -> int:
+        cfg = self.config
+        return (cfg.max_workers or cfg.workers) if cfg.adaptive else cfg.workers
+
+    def _processes_per_job(self) -> int:
+        if self.config.cluster != "slurm":
+            return 1
+        return _dask_slurm.processes_per_job(self.resources)
+
+    def topology(self) -> dict[str, Any]:
+        """Requested worker layout: allocations and Dask worker processes in each."""
+        per_job = self._processes_per_job()
+        return {
+            "cluster": self.config.cluster,
+            "max_allocations": self._max_jobs(),
+            "worker_processes_per_allocation": per_job,
+            "threads_per_worker_process": 1 if per_job > 1 else None,
+            "max_worker_processes": self._max_jobs() * per_job,
         }
-        if cfg.partition:
-            kwargs["queue"] = cfg.partition
-        cluster = SLURMCluster(**kwargs)
-        if cfg.adaptive:
-            cluster.adapt(minimum=cfg.workers, maximum=cfg.max_workers or cfg.workers)
-        else:
-            cluster.scale(cfg.workers)
-        return Client(cluster), cluster
 
     def _completed_units(
         self, run_dir: Path, pending: Sequence[int], resources: dict[str, int]
@@ -277,8 +310,7 @@ class DaskExecutor:
         from distributed import as_completed
 
         cfg = self.config
-        workers = (cfg.max_workers or cfg.workers) if cfg.adaptive else cfg.workers
-        limit = cfg.max_in_flight or 2 * workers
+        limit = cfg.max_in_flight or 2 * self._max_jobs() * self._processes_per_job()
         remaining = deque(pending)
         active: dict[Any, int] = {}
         completed = as_completed()
@@ -332,6 +364,10 @@ class DaskExecutor:
             raise ValueError("Dask GPU requires explicit cuda or rocm accelerator")
         if self.resources.gpu_count and self.config.cluster == "local":
             raise ValueError("local Dask cluster has no GPU isolation; use existing scheduler")
+        if self.config.cluster == "slurm" and self._client is None:
+            # Unknown keywords, a missing config_name section, or a GPU job
+            # without a site GPU directive fail here, before staging.
+            self._slurm_cluster_kwargs()
 
     def _validate_options(self, options: Mapping[str, Any]) -> None:
         supported = {
@@ -360,10 +396,12 @@ class DaskExecutor:
     def runtime_plan(self, cases: Sequence[Any], max_workers: int | None = None) -> dict[str, Any]:
         """Describe the configured cluster; coordinator devices play no part in it."""
         cfg = self.config
+        topology = self.topology()
         return {
             "engine": "dask",
             "requested_workers": max_workers,
-            "effective_workers": (cfg.max_workers or cfg.workers) if cfg.adaptive else cfg.workers,
+            "effective_workers": topology["max_worker_processes"],
+            "worker_processes_per_allocation": topology["worker_processes_per_allocation"],
             "cases_per_task": cfg.cases_per_task,
             "work_units": (len(cases) + cfg.cases_per_task - 1) // cfg.cases_per_task,
             "cpu_cores_per_task": self.resources.cpu_cores,
@@ -419,7 +457,8 @@ class DaskExecutor:
             },
         )
         _atomic_json(
-            run_dir / "execution.json", run_provenance("dask", resources=self.resources, config=cfg)
+            run_dir / "execution.json",
+            run_provenance("dask", resources=self.resources, config=cfg, topology=self.topology()),
         )
         self._cancelled.clear()
         self._running.set()
@@ -534,6 +573,7 @@ class DaskExecutor:
                     "dask",
                     resources=self.resources,
                     config=cfg,
+                    topology=self.topology(),
                     state="cancelled" if self._cancelled.is_set() else state,
                 ),
             )

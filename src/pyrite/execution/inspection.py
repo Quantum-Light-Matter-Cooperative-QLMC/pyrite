@@ -23,17 +23,29 @@ def inspect_execution(profile: ExecutionProfile, case_count: int) -> dict[str, A
     from .dask import DaskConfig
     from .slurm import SlurmArrayConfig
 
+    per_allocation = 1
+    allocations = None
+
     if profile.backend == "slurm":
         cfg = profile.slurm or SlurmArrayConfig()
         batch = cfg.cases_per_task
         units = math.ceil(case_count / batch)
         concurrency = min(units, cfg.max_concurrent)
     elif profile.backend == "dask":
+        from ._dask_slurm import processes_per_job
+
         cfg = profile.dask or DaskConfig()
         batch = cfg.cases_per_task
         units = math.ceil(case_count / batch)
         maximum = (cfg.max_workers or cfg.workers) if cfg.adaptive else cfg.workers
-        concurrency = min(units, maximum)
+        if cfg.cluster == "slurm":
+            # Each SLURM job holds `resources` and packs one single-unit
+            # worker process per core (one per GPU job); jobs stay requested.
+            per_allocation = processes_per_job(profile.resources)
+            concurrency = min(units, maximum * per_allocation)
+            allocations = maximum
+        else:
+            concurrency = min(units, maximum)
     else:
         # LocalExecutor delegates to run_cases' adaptive worker sizing; no
         # bound is requested from an external scheduler.
@@ -41,6 +53,8 @@ def inspect_execution(profile: ExecutionProfile, case_count: int) -> dict[str, A
         batch = 1
         units = case_count
         concurrency = None
+    if allocations is None:
+        allocations = concurrency
     resource = asdict(profile.resources)
     return {
         "format": "pyrite.execution.plan.v1",
@@ -51,14 +65,15 @@ def inspect_execution(profile: ExecutionProfile, case_count: int) -> dict[str, A
         "cases_per_unit": batch,
         "max_simultaneous_units_requested": concurrency,
         "resources_per_unit": resource,
-        "max_cpus_requested": concurrency * profile.resources.cpu_cores
-        if concurrency is not None
+        "worker_processes_per_allocation": per_allocation,
+        "max_cpus_requested": allocations * profile.resources.cpu_cores
+        if allocations is not None
         else None,
-        "max_gpus_requested": concurrency * profile.resources.gpu_count
-        if concurrency is not None
+        "max_gpus_requested": allocations * profile.resources.gpu_count
+        if allocations is not None
         else None,
-        "max_memory_bytes_requested": concurrency * profile.resources.memory_bytes
-        if concurrency is not None
+        "max_memory_bytes_requested": allocations * profile.resources.memory_bytes
+        if allocations is not None
         else None,
         "retry_max_attempts": profile.retry_policy.max_attempts,
         "scheduler": asdict(cfg) if cfg is not None else None,
@@ -73,8 +88,10 @@ def run_provenance(
     config: Any,
     submitted_job_ids: list[str] | None = None,
     state: str = "staged",
+    topology: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Operational sidecar only. Never write into the checkpoint/CAS tree."""
+    extra = {"worker_topology": dict(topology)} if topology is not None else {}
     return {
         "format": "pyrite.execution.provenance.v1",
         "backend": backend,
@@ -85,4 +102,5 @@ def run_provenance(
         "python": sys.version.split()[0],
         "host": platform.node(),
         "note": "Requested resources; actual scheduler allocations not verified here",
+        **extra,
     }

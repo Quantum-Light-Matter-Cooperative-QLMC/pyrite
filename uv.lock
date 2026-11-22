@@ -4485,6 +4485,7 @@ browser = [
     { name = "selenium" },
 ]
 dev = [
+    { name = "dask-jobqueue" },
     { name = "grimp" },
     { name = "import-linter" },
     { name = "nbqa" },
@@ -4531,6 +4532,7 @@ oracle = [
     { name = "xraylib" },
 ]
 test = [
+    { name = "dask-jobqueue" },
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "pytest-timeout" },
@@ -4586,6 +4588,7 @@ provides-extras = ["units", "dask", "optimization", "external-db", "nvidia", "am
 [package.metadata.requires-dev]
 browser = [{ name = "selenium", specifier = ">=4.53.0" }]
 dev = [
+    { name = "dask-jobqueue", specifier = ">=0.9" },
     { name = "grimp", specifier = ">=3.12" },
     { name = "import-linter", specifier = ">=2.9" },
     { name = "nbqa", specifier = ">=1.9.1" },
@@ -4632,6 +4635,7 @@ oracle = [
     { name = "xraylib", specifier = "==4.3.0" },
 ]
 test = [
+    { name = "dask-jobqueue", specifier = ">=0.9" },
     { name = "pytest", specifier = ">=9.1.0" },
     { name = "pytest-cov", specifier = ">=7.1.0" },
     { name = "pytest-timeout", specifier = ">=2.4.0" },
