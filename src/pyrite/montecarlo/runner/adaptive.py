@@ -704,10 +704,13 @@ def case_measure(case, settings: AdaptiveSettings) -> Measure:
     brem_q = band_weights(E_brem, start_eV, stop_eV) if "brem" in settings.observables else None
 
     def measure(start, stop, block):
-        values = measure_rows(stop - start, block)
         record = block.get("cone_split")
         if record is None:
-            return values
+            return measure_rows(stop - start, block)
+        # Primaries alone, then copies per history: the spectrum-side stratum
+        # fold must not also reach the monitor's line-mass audit.
+        primaries = {key: value for key, value in block.items() if key != "cone_split"}
+        values = measure_rows(stop - start, primaries)
         return split_history_values(values, record, measure_rows, stop - start)
 
     def measure_rows(n, block):

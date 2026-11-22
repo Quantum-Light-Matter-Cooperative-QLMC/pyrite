@@ -183,11 +183,21 @@ class EmissionSelection:
                 )
 
 
+#: Caller audit settings a copy stratum's own audit shares (#379).
+_COPY_AUDIT_SETTINGS = ("start_eV", "stop_eV", "band_eV", "ceiling_eV", "extension_stops_eV")
+#: Un-normalized audit sums a copy stratum adds at its weight.
+_COPY_AUDIT_SUMS = ("line_mass", "mass_above", "mass_below", "band_mass", "mass_above_extension")
+
+
 def _copy_strata(adapter, batch: EmissionBatch, slot: str, native: bool) -> Any:
     """Detector-cone copies' spectrum, per power-of-two weight stratum (#379).
 
-    The truncation audit stays a primary-only measure. Per-electron (monitor)
-    batches never reach here: they fold copies per history instead.
+    A caller's truncation audit gets each stratum's line-mass sums at weight
+    ``W``, and its per-electron masses fold onto the parents
+    (``m_i + sum_c W m_c``), so the line-yield statistics read weighted
+    per-history samples. A line-collecting audit (grid resolution) is not
+    extended: the grid sees primaries only. Per-electron (monitor) batches
+    never reach here: they fold copies per history instead.
 
     Validation: detector-cone-variance-reduction
     """
@@ -196,18 +206,66 @@ def _copy_strata(adapter, batch: EmissionBatch, slot: str, native: bool) -> Any:
     from .. import runner
     from .cone_split_strata import fold_copies
 
+    record = batch.segments["cone_split"]
+    n_norm = int(batch.segments["Ne"] if batch.electron_limit is None else batch.electron_limit)
+    caller = batch.truncation_audit
+    if caller is not None and "collect" in caller:
+        caller = None
+
     def score(segments, n_copies):
+        audit = None
+        if caller is not None:
+            audit = {k: caller[k] for k in _COPY_AUDIT_SETTINGS if k in caller}
+            if "n_electrons" in caller:
+                audit["n_electrons"] = n_copies
         part = replace(
             batch,
             segments=runner._segments_on_device(segments),
             electron_limit=n_copies,
-            truncation_audit=None,
+            truncation_audit=audit,
             line_screen=None,
         )
-        return adapter.evaluate(part, slot, native=native).values
+        values = adapter.evaluate(part, slot, native=native).values
+        if caller is not None and audit is not None:
+            _fold_copy_audit(caller, audit, record, segments)
+        return values
 
-    n_norm = batch.segments["Ne"] if batch.electron_limit is None else batch.electron_limit
-    return fold_copies(batch.segments, int(n_norm), score)
+    return fold_copies(batch.segments, n_norm, score)
+
+
+def _fold_copy_audit(caller: dict, audit: dict, record, segments) -> None:
+    """Add one stratum's audit to the caller's at its weight, masses onto parents."""
+    import numpy as np
+
+    from ..._backend import _to_cpu
+    from .electron_blocks import _electron_ids
+
+    ids = np.unique(np.asarray(_electron_ids(segments), dtype=np.int64))
+    if ids.size == 0:
+        return
+    weight = float(np.asarray(record["weight"])[ids[0]])
+    for key in _COPY_AUDIT_SUMS:
+        if key in audit:
+            caller[key] = caller.get(key, 0.0) + weight * audit[key]
+    mass = audit.get("electron_mass")
+    if mass is None or "n_electrons" not in caller:
+        return
+    mass = np.asarray(_to_cpu(mass), dtype=np.float64)
+    parent = int(record["electron_start"]) + np.asarray(record["parent"], dtype=np.int64)[ids]
+    added = np.bincount(parent, weights=weight * mass[ids], minlength=int(caller["n_electrons"]))
+    existing = caller.get("electron_mass")
+    if existing is None or np.ndim(existing) == 0:
+        caller["electron_mass"] = (0.0 if existing is None else existing) + added
+    else:
+        xp = np if isinstance(existing, np.ndarray) else _backend_xp()
+        caller["electron_mass"] = existing + xp.asarray(added)
+
+
+def _backend_xp():
+    """The configured array backend module."""
+    from ..._backend import BACKEND
+
+    return BACKEND.xp
 
 
 def _cxr(batch: EmissionBatch) -> EmissionOutput:

@@ -9,7 +9,7 @@ payload, so it enters case identity; absent, transport stays analog bit for bit.
 Experimental: the adaptive monitor scores weighted per-history samples, and
 the spectrum phase scores each power-of-two copy-weight stratum with the
 production scorers (:mod:`pyrite.montecarlo.runner.cone_split_strata`); the
-line-grid truncation audit and grid resolution see primaries only.
+line-yield audit folds copy masses per history; grid resolution sees primaries.
 
 Validation: detector-cone-variance-reduction
 """

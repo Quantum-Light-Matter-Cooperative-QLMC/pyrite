@@ -316,3 +316,21 @@ def test_public_option_copies_carry_power_of_two_weights():
     weight = record["weight"]
     assert weight.size > 0
     np.testing.assert_array_equal(np.log2(weight), np.round(np.log2(weight)))
+
+
+def test_copy_audit_folds_line_mass_onto_parents():
+    """Line-yield statistics read m_i + sum_c W m_c per primary; sums add at W."""
+    from pyrite.montecarlo.runner.emission_adapters import _fold_copy_audit
+
+    record = {
+        "weight": np.array([0.25, 0.25, 0.5]),
+        "parent": np.array([1, 0, 1]),
+        "electron_start": 2,
+    }
+    caller = {"n_electrons": 5, "line_mass": 10.0, "electron_mass": np.ones(5)}
+    stratum = {"elec_id": np.array([0, 0, 1])}  # rows of copies 0 and 1 (W = 0.25)
+    audit = {"line_mass": 4.0, "mass_above": 1.0, "electron_mass": np.array([3.0, 1.0, 0.0])}
+    _fold_copy_audit(caller, audit, record, stratum)
+    assert caller["line_mass"] == 11.0 and caller["mass_above"] == 0.25
+    # Copy 0 -> global parent 3, copy 1 -> global parent 2.
+    np.testing.assert_array_equal(caller["electron_mass"], [1.0, 1.0, 1.25, 1.75, 1.0])
