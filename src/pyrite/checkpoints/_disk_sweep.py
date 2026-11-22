@@ -58,7 +58,9 @@ class DiskSweepCheckpoint(_SweepCheckpoint):
         records[energy] = self.results[name][energy]
         _checkpoint_store.save_part(self.path.name, self.path.parent, name, records)
         if self.incremental_manifest is None:
-            self.incremental_manifest = _IncrementalManifest(self.dataset_identity)
+            self.incremental_manifest = _IncrementalManifest(
+                self.dataset_identity, self.transport_realization
+            )
             self.incremental_manifest.add(self.material_subset())
         else:
             self.incremental_manifest.add({name: {energy: records[energy]}})
@@ -80,4 +82,9 @@ class DiskSweepCheckpoint(_SweepCheckpoint):
     def save(self):
         subset = self.material_subset()  # metadata only
         _checkpoint_store.save_streaming(self.path.name, self.path.parent, subset)
-        _manifest_save(self.checkpoint_path, subset, self.dataset_identity)
+        _manifest_save(
+            self.checkpoint_path,
+            subset,
+            self.dataset_identity,
+            transport_realization=self.transport_realization,
+        )

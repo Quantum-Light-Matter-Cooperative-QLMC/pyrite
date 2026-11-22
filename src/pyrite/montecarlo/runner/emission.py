@@ -8,6 +8,7 @@ from typing import Any
 
 import numpy as np
 
+from ..realization import with_realization
 from .electron_blocks import score_in_electron_blocks
 
 
@@ -378,6 +379,7 @@ def _characteristic_from_segments(
     return score_in_electron_blocks(score, segs)
 
 
+@with_realization
 def _brem_for_case(case, E_brem):
     """Regenerate a case's bremsstrahlung background on ``E_brem`` from scratch:
     build the tilted geometry, transport ``Ne_brem`` electrons through the stack

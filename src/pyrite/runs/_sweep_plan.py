@@ -17,7 +17,24 @@ from ..checkpoints.persistence import (
     _valid_cas_payload,
     _write_case_manifest,
 )
+from ..montecarlo.realization import (
+    case_realization,
+    common_realization,
+    require_matching_realization,
+)
 from ..results import store_result
+
+
+def _validate_result_realizations(cases, results):
+    if not cases:
+        return
+    expected = common_realization(cases)
+    material = cases[0]["crystal"]
+    for by_energy in results.values():
+        for record in by_energy.values():
+            stored = record.get("case", {})
+            if stored.get("crystal", material) == material:
+                require_matching_realization(expected, case_realization(stored))
 
 
 def validate_sweep_request(cases, results, group_key):
@@ -30,6 +47,7 @@ def validate_sweep_request(cases, results, group_key):
     """
     if not cases:
         return
+    _validate_result_realizations(cases, results)
     material = cases[0]["crystal"]
     identities = set()
     group_by_name = {}
@@ -96,6 +114,7 @@ class SweepResume:
         self.on_activity = checkpoint.on_activity
         self.cas_root = os.path.dirname(self.checkpoint_path) or "."
         self.content_key_fn = content_key_fn
+        self.transport_realization = common_realization(cases)
         self.cache_read = cache_read and content_key_fn is not None
         self.cache_write = cache_write and content_key_fn is not None
 
@@ -152,6 +171,7 @@ class SweepResume:
         """
         if not self.cases:
             return
+        _validate_result_realizations(self.cases, loaded)
         for name, values in loaded.items():
             restored = _record_crystals(values)
             live = _record_crystals(self.results.get(name, {}))
@@ -165,6 +185,7 @@ class SweepResume:
 
     def validate_identity(self, manifest_path):
         existing_identity = None
+        manifest = {}
         if os.path.isfile(manifest_path):
             try:
                 with open(manifest_path) as handle:
@@ -173,6 +194,13 @@ class SweepResume:
                     existing_identity = manifest.get("dataset_identity")
             except (OSError, ValueError, TypeError):
                 pass
+        try:
+            require_matching_realization(
+                common_realization(self.cases),
+                manifest.get("transport_realization") if isinstance(manifest, dict) else None,
+            )
+        except ValueError as error:
+            raise _CheckpointIdentityError(str(error)) from error
         if isinstance(existing_identity, dict):
             from ..campaign.profiles import normalize_dataset_identity
 

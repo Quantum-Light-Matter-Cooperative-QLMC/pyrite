@@ -24,6 +24,14 @@ consumed-table digests remain the cache authority. A dataset records its table
 union; API source keys and per-case CAS keys record only that case's subset.
 Historical omitted selectors retain their historical meaning.
 
+Experimental CPU history sharding binds a versioned `transport_realization`
+record to the canonical case before any key or cache lookup. Marked cases use
+CPU per-electron transport and CPU scoring; ordinary unmarked case and dataset
+digests remain unchanged. The same marker enters dataset resolved parameters
+only when selected, and checkpoint manifests validate it even without a
+dataset identity. Marked and unmarked records cannot resume into each other.
+See [history shards](../compute/history-shards.md#numerical-identity-and-stored-work).
+
 Remote run submissions embed the submitter's resolved dataset digests and table
 unions. Each allocation resolves them through the same scan owner against the
 staged catalog and host tables before running or reading checkpoints. A mismatch

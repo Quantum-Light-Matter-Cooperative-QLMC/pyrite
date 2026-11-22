@@ -30,7 +30,7 @@ from .inspection import run_provenance
 from .shards import HistoryShardStore, ShardPolicy, shard_content_key
 from .slurm import _atomic_json, _save_input
 
-_PLAN_FORMAT = "pyrite.dask.shards.v1"
+_PLAN_FORMAT = "pyrite.dask.shards.v2"
 
 
 class ShardedDaskExecutor(DaskExecutor):
@@ -46,6 +46,12 @@ class ShardedDaskExecutor(DaskExecutor):
         if not isinstance(sharding, ShardPolicy):
             raise TypeError("sharding must be a ShardPolicy")
         self.sharding = sharding
+
+    @property
+    def transport_realization(self):
+        from ..montecarlo.realization import TransportRealization
+
+        return TransportRealization()
 
     def runtime_plan(self, cases: Sequence[Any], max_workers: int | None = None) -> dict[str, Any]:
         plan = super().runtime_plan(cases, max_workers)
@@ -67,6 +73,9 @@ def _staged(run_dir: str, case_index: int) -> tuple[dict[str, Any], dict[str, An
     (record,) = _checkpoint_io.load(str(root / "inputs" / f"{case_index}.h5"))["cases"]
     if record["index"] != entry["index"] or record["content_key"] != entry["content_key"]:
         raise ValueError("staged case does not match its shard plan")
+    from ..montecarlo.realization import case_realization, require_matching_realization
+
+    require_matching_realization(plan["transport_realization"], case_realization(record["case"]))
     return plan, {**entry, "case": record["case"]}
 
 
@@ -164,6 +173,11 @@ def _stage(executor, cases: Sequence[Any], keys: list[str]) -> tuple[Path, list[
     policy = executor.sharding
     entries = []
     for index, case in enumerate(cases):
+        from ..campaign.realization import prepare_executor_case
+
+        case = prepare_executor_case(executor, case)
+        if keys[index] != executor.case_key(case):
+            raise ValueError("staged case key does not include its transport_realization")
         core = refuse_unshardable(case, policy.transport_core)
         ranges = shard_ranges(case, policy.shard_electrons)
         executor.store.path_for(case["crystal"], keys[index])
@@ -185,6 +199,7 @@ def _stage(executor, cases: Sequence[Any], keys: list[str]) -> tuple[Path, list[
             "format": _PLAN_FORMAT,
             "artifact_root": str(executor.store.root),
             "transport_core": policy.transport_core,
+            "transport_realization": dict(executor.transport_realization),
             "block_electrons": policy.block_electrons,
             "keep_shards": policy.keep_shards,
             "cases": entries,
@@ -205,10 +220,16 @@ def execute_sharded(executor, cases: Sequence[Any], *, callback=None, **options:
     executor._validate_configuration()
     if executor.resources.gpu_count:
         raise ValueError("history shards run on CPU workers only")
+    from ..campaign.realization import prepare_executor_cases
+
+    cases = prepare_executor_cases(executor, cases)
     keys = [executor.case_key(case) for case in cases]
     run_dir, entries = _stage(executor, cases, keys)
     executor.last_run_dir = run_dir
-    provenance = {"history_shards": asdict(executor.sharding)}
+    provenance = {
+        "history_shards": asdict(executor.sharding),
+        "transport_realization": dict(executor.transport_realization),
+    }
 
     def record(state: str) -> None:
         document = run_provenance(

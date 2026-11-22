@@ -55,6 +55,29 @@ def test_backend_binding_inventory_and_module_scope():
     assert found == set(_SPECTRUM_BACKEND_MODULES)
 
 
+def test_marked_case_scopes_cpu_scoring_and_restores_backend(monkeypatch):
+    from pyrite.montecarlo import runner, spectrum
+    from pyrite.montecarlo.realization import TransportRealization
+    from pyrite.montecarlo.runner import case_driver
+    from pyrite.montecarlo.runner.chunking import _RESOURCE_POLICY
+
+    device = object()
+    monkeypatch.setattr(spectrum, "xp", device)
+    monkeypatch.setattr(_RESOURCE_POLICY, "gpu", True)
+    monkeypatch.setattr(runner, "_transport_case", lambda *args, **kwargs: {})
+
+    def score(case, transport, record_timing):
+        assert spectrum.xp is np
+        assert not _RESOURCE_POLICY.gpu
+        return {"spec": np.array([1.0])}
+
+    monkeypatch.setattr(case_driver, "_spectrum_with_recovery", score)
+    result = runner.run_case({"transport_realization": TransportRealization()})
+    np.testing.assert_array_equal(result["spec"], [1.0])
+    assert spectrum.xp is device
+    assert _RESOURCE_POLICY.gpu
+
+
 @pytest.mark.hardware
 @pytest.mark.slow
 def test_cuda_oom_recovers_without_device_allocations(monkeypatch, tmp_path, pytestconfig):

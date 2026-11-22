@@ -100,6 +100,19 @@ def _default_group_key(case):
     )
 
 
+def _prepare_sweep_realization(executor, cases, dataset_identity):
+    """Bind numerical identity and pins before any resume or cache effect."""
+    from ..campaign.profiles import _with_transport_realization
+    from ..campaign.realization import prepare_executor_cases
+    from ..montecarlo.realization import common_realization, required_core
+
+    cases = prepare_executor_cases(executor, cases)
+    realization = common_realization(cases)
+    if realization is not None:
+        required_core(realization=realization)
+    return cases, _with_transport_realization(dataset_identity, realization), realization
+
+
 def _validate_executor(executor, run_options, artifact_store):
     """Apply whichever optional capability checks ``executor`` defines."""
     validate_options = getattr(executor, "validate_run_options", None)
@@ -162,7 +175,10 @@ def _case_callback(
     ``on_progress`` report the in-memory record; ``on_chunk`` follows persistence.
     """
 
+    from ..montecarlo.realization import case_realization, require_matching_realization
+
     def callback(_index, case, out):
+        require_matching_realization(preparation.transport_realization, case_realization(case))
         out = resolve_worker_output(
             case,
             out,
@@ -453,6 +469,9 @@ def run_sweep(
         incomplete return, including partial configs. An exception skips that
         final save; configs published before it remain resumable.
     """
+    cases, dataset_identity, realization = _prepare_sweep_realization(
+        executor, cases, dataset_identity
+    )
     admit_axial_channeling_cases(cases)
     if artifact_store is not None and content_key_fn is None:
         raise ValueError("artifact_store requires content_key_fn for physics identity validation")
@@ -488,6 +507,7 @@ def run_sweep(
         on_timing,
         on_activity,
         retain_results=retain_results,
+        transport_realization=realization,
     )
     os.makedirs(os.path.dirname(checkpoint_path) or ".", exist_ok=True)
     preparation = SweepResume(cases, results, checkpoint, content_key_fn, cache_read, cache_write)

@@ -11,6 +11,7 @@ from pyrite.execution import CaseArtifactStore, DaskConfig, RetryPolicy
 from pyrite.execution.dask_shards import ShardedDaskExecutor
 from pyrite.execution.shards import HistoryShardStore, ShardPolicy, shard_content_key
 from pyrite.montecarlo import runner
+from pyrite.montecarlo.realization import TransportRealization, bind_realization
 from pyrite.montecarlo.runner.history_shards import shard_ranges, transport_history_shard
 from pyrite.montecarlo.runner.scheduling import _UNTIMED_OUTPUT_KEYS
 
@@ -26,7 +27,7 @@ def _case():
         n_electrons=11,
         n_electrons_brem=6,
     )
-    return build_cases(sweep)[0]
+    return bind_realization(build_cases(sweep)[0], TransportRealization())
 
 
 def _assert_identical(got, ref, path=""):
@@ -198,3 +199,59 @@ def test_concurrent_task_reuses_winner_after_shard_cleanup(tmp_path, monkeypatch
     ref = executor.store.reference("hopg", KEY)
     assert result == asdict(ref)
     np.testing.assert_array_equal(executor.store.load(ref)["spec"], winner["spec"])
+
+
+@pytest.mark.slow
+def test_sharded_final_cannot_reuse_ordinary_artifact(tmp_path, client):
+    from pyrite.campaign.profiles import case_content_key
+    from pyrite.execution import DaskExecutor
+
+    marked = dict(_case())
+    # Fix coordinates so this identity regression is independent of ordinary
+    # unmarked cores' historical population-grid speed-cache behavior.
+    marked.pop("line_grid_policy", None)
+    ordinary = dict(marked)
+    ordinary.pop("transport_realization")
+    store = CaseArtifactStore(tmp_path)
+    ordinary_key = case_content_key(ordinary)
+    lockstep = runner.run_case(ordinary, transport_core="lockstep")
+    prior = store.publish("hopg", ordinary_key, lockstep)
+    executor = ShardedDaskExecutor(
+        store, case_content_key, client=client, sharding=ShardPolicy(shard_electrons=4)
+    )
+    [ref] = executor.execute([ordinary])
+    assert ref.content_key == case_content_key(marked)
+    assert ref.content_key != prior.content_key
+    assert "spec" in store.load(ref)
+    np.testing.assert_array_equal(store.load(prior)["spec"], lockstep["spec"])
+    # Reverse direction: a store containing only a marked result cannot
+    # satisfy ordinary Dask's unmarked request.
+    reverse = CaseArtifactStore(tmp_path / "reverse")
+    reverse.publish("hopg", ref.content_key, store.load(ref))
+    ordinary_executor = DaskExecutor(reverse, case_content_key, client=client)
+    [ordinary_ref] = ordinary_executor.execute([ordinary])
+    assert ordinary_ref.content_key == ordinary_key
+    assert ordinary_ref.content_key != ref.content_key
+    np.testing.assert_array_equal(reverse.load(ordinary_ref)["spec"], lockstep["spec"])
+
+
+def test_staged_plan_rejects_legacy_format_or_unmarked_input(tmp_path):
+    import json
+
+    from pyrite.execution.dask_shards import _stage, _staged
+
+    executor = _executor(tmp_path, None, shard_electrons=4)
+    run_dir, _ = _stage(executor, [_case()], [KEY])
+    path = run_dir / "plan.json"
+    plan = json.loads(path.read_text())
+    assert plan["format"] == "pyrite.dask.shards.v2"
+    assert plan["transport_realization"] == dict(executor.transport_realization)
+    plan["format"] = "pyrite.dask.shards.v1"
+    path.write_text(json.dumps(plan))
+    with pytest.raises(ValueError, match="invalid Dask staged"):
+        _staged(str(run_dir), 0)
+    plan["format"] = "pyrite.dask.shards.v2"
+    plan["transport_realization"] = None
+    path.write_text(json.dumps(plan))
+    with pytest.raises(ValueError, match="mismatch"):
+        _staged(str(run_dir), 0)

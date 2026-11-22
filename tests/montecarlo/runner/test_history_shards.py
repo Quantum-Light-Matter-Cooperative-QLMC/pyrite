@@ -13,6 +13,7 @@ import pytest
 
 from pyrite.campaign.sweep import BeamSpec, Sweep, build_cases
 from pyrite.montecarlo import runner
+from pyrite.montecarlo.realization import TransportRealization, bind_realization
 from pyrite.montecarlo.runner.block_transport import ShardJoin
 from pyrite.montecarlo.runner.history_shards import (
     refuse_unshardable,
@@ -55,7 +56,7 @@ def _assert_identical(got, ref, path=""):
 
 @pytest.fixture(scope="module")
 def case_and_reference():
-    case = _case()
+    case = bind_realization(_case(), TransportRealization())
     ref = runner.run_case(case, transport_core="per-electron")
     for key in _UNTIMED_OUTPUT_KEYS:
         ref.pop(key, None)
@@ -120,3 +121,29 @@ def test_unsupported_cores_and_cases_fail_early(monkeypatch):
         refuse_unshardable({**case, "secondary_threshold_eV": 1e3})
     with pytest.raises(ValueError, match="within N"):
         transport_history_shard(case, 10, 14)
+
+
+def test_marker_isolates_grid_cache_without_changing_per_electron_numbers(case_and_reference):
+    case, reference, _ = case_and_reference
+    ordinary = dict(case)
+    ordinary.pop("transport_realization")
+    plain = runner.run_case(ordinary, transport_core="per-electron")
+    assert (
+        plain["line_grid_diagnostic"]["cache_key"] != reference["line_grid_diagnostic"]["cache_key"]
+    )
+    for key in ("spec", "brem", "E_grid", "E_grid_brem", "brem_wide"):
+        np.testing.assert_array_equal(plain[key], reference[key], err_msg=key)
+
+
+def test_marked_case_honors_auto_env_and_pool_default(case_and_reference, monkeypatch):
+    from pyrite.montecarlo.runner.scheduling import _pool_worker
+
+    case, reference, _ = case_and_reference
+    monkeypatch.setenv("PYRITE_MC_TRANSPORT_CORE", "auto")
+    np.testing.assert_array_equal(runner.run_case(case)["spec"], reference["spec"])
+    # A pool's injected lockstep default is not an inherited user pin.
+    monkeypatch.setattr(runner, "_WORKER_INHERITED_CORE", "")
+    monkeypatch.setenv("PYRITE_MC_TRANSPORT_CORE", "lockstep")
+    worker = _pool_worker(case, transport=False)
+    np.testing.assert_array_equal(worker(case)["spec"], reference["spec"])
+    assert runner.env_value("PYRITE_MC_TRANSPORT_CORE") == "lockstep"

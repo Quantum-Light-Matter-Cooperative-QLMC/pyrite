@@ -54,6 +54,39 @@ repeats the comparison through real Dask process workers and checks resume.
 Cache hit/miss telemetry can differ between processes; it is excluded from
 the comparison, while numerical diagnostics and spectra remain exact.
 
+## Numerical identity and stored work
+
+Before keys or resume are evaluated, the executor binds an immutable
+`transport_realization` record to each case:
+
+```json
+{"schema": "pyrite.transport-realization.v1", "core": "per-electron"}
+```
+
+This admitted realization uses CPU per-electron transport and CPU spectrum
+scoring, including when a GPU is available in the coordinating process.
+Conflicting explicit transport-core requests or environment pins fail early.
+An ordinary serial run of the same marked case reproduces the same numerical
+realization. Shard size, block size, worker count and scheduler placement do
+not participate in its final identity.
+
+The marker is part of the canonical case, so existing independent validators
+use `case_content_key` directly. Simulation results retain the prepared case
+and its canonical digest. A case without the marker retains its historical
+mapping, key and default execution behavior; it cannot reuse a marked artifact
+or resume into a marked checkpoint. Dataset identity adds the marker only for
+this opt-in mode. Checkpoint manifests also record it when no dataset identity
+was supplied, and reject mismatched live records, metadata-only completion,
+and checkpoint-to-CAS seeding before adoption. The marker survives component,
+low-retention and recompute paths.
+
+Shard plans use `pyrite.dask.shards.v2` and validate their realization against
+their staged cases. Old experimental plans and unmarked prototype outputs are
+not adopted automatically. Existing files are preserved. An unmarked prototype
+final cannot be distinguished from an ordinary final by its key alone; keep
+known mixed prototype stores separate from ordinary production stores rather
+than assuming their provenance can be recovered.
+
 ## What crosses the network
 
 Raw rows, not per-shard spectra. Spectra of disjoint electron blocks add, but

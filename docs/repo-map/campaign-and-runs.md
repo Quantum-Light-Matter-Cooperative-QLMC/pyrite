@@ -105,6 +105,16 @@ Filesystem-free simulation seam. `simulate` combines scalar beam, target, and de
 - Public: root-lazy `simulate`, whose experimental `progress=` routes `SimulationProgress` (`_simulation_progress.py`) from per-batch transport and per-stage spectrum sinks (`runner._TRANSPORT_PROGRESS`/`_SPECTRUM_PROGRESS`, installed by `runner.transport_options.run_progress`) for in-process runs.
 - Deps: `campaign.model`, `campaign.sweep`, `campaign.profiles`, `detectors`, `montecarlo`, `results`.
 
+### `campaign/realization.py`, `montecarlo/realization.py`
+
+Experimental numerical identity for history sharding (#1387). Campaign binding
+prepares marked cases before simulation keys, sweep resume and direct executor
+dispatch. Monte Carlo owns the immutable per-electron CPU realization, core-pin
+validation and scoped CPU scoring. Unmarked cases retain their historical
+serialization, keys and defaults. Canonical case hashing, independent artifact
+validation and checkpoint/CAS recovery use the same prepared case; manifests
+reject marked/unmarked mixing even without a supplied dataset identity.
+
 ### `scoring.py`, `campaign/trajectory_product.py`, `campaign/trajectory_io.py`
 
 Stable two-step workflow (#1162). `campaign.trajectories.simulate_trajectories`

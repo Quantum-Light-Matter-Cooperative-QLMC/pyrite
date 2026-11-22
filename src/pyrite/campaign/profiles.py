@@ -728,6 +728,33 @@ def normalize_dataset_identity(identity: Mapping[str, Any]) -> dict[str, Any]:
     return normalized
 
 
+def _with_transport_realization(identity, realization):
+    """Derive a divergence-only dataset identity from its canonical payload."""
+    from ..montecarlo.realization import normalize_realization, require_matching_realization
+
+    if identity is None:
+        return None
+    resolved = identity.get("resolved_parameters")
+    recorded = resolved.get("transport_realization") if isinstance(resolved, Mapping) else None
+    if realization is None:
+        require_matching_realization(None, recorded)
+        return identity
+    marker = normalize_realization(realization)
+    if not isinstance(resolved, Mapping) or identity.get("schema") != DATASET_IDENTITY_SCHEMA:
+        raise ValueError(
+            "transport_realization requires a canonical dataset resolved_parameters payload"
+        )
+    if recorded is not None:
+        require_matching_realization(marker, recorded)
+    payload = {**resolved, "transport_realization": dict(marker)}
+    encoded = json.dumps(_jsonable(payload), sort_keys=True, separators=(",", ":")).encode()
+    return {
+        **identity,
+        "resolved_parameters": payload,
+        "parameter_sha256": hashlib.sha256(encoded).hexdigest(),
+    }
+
+
 def case_content_key(
     case: Case | Mapping[str, Any],
     *,
