@@ -241,3 +241,42 @@ def test_statistics_limited_names_split_when_few_histories_dominate(guard, hinte
     statistics = {"statistics": {"cxr": {"passes": {**passes, guard: False}}}}
     assert bool(_split_hint(_base(), statistics)) is hinted
     assert _split_hint(_split(), statistics) == ""
+
+
+def test_weight_ladder_is_unbiased_and_lands_on_powers_of_two():
+    from pyrite.montecarlo.transport.cone_split import split_stream_keys, weight_ladder
+
+    rng = np.random.default_rng(7)
+    n = 200_000
+    weights = np.exp(rng.uniform(np.log(1e-4), np.log(0.9), n))
+    keys = split_stream_keys(np.arange(n, dtype=np.uint64))
+    flights = rng.integers(0, 10_000, n)
+    kept, ladder = weight_ladder(weights, keys, flights)
+    assert np.all(ladder >= weights) and np.all(ladder < 2.0 * weights)
+    np.testing.assert_array_equal(np.log2(ladder), np.round(np.log2(ladder)))
+    assert kept.mean() > 0.5
+    # E[W 1{kept}] = w, per history and in aggregate.
+    score = np.where(kept, ladder, 0.0)
+    se = score.std(ddof=1) / np.sqrt(n)
+    assert abs(score.mean() - weights.mean()) < 5.0 * se
+    # Exact powers of two are kept surely at their own weight.
+    exact = np.array([0.25, 2.0**-10, 1.0])
+    kept, ladder = weight_ladder(exact, keys[:3], flights[:3])
+    assert kept.all()
+    np.testing.assert_array_equal(ladder, exact)
+    # The draw is keyed: the same (key, flight) gives the same decision.
+    again = weight_ladder(weights[:100], keys[:100], flights[:100])
+    np.testing.assert_array_equal(
+        again[0], weight_ladder(weights[:100], keys[:100], flights[:100])[0]
+    )
+
+
+def test_public_option_copies_carry_power_of_two_weights():
+    n = 24
+    case = {**_split(), "Ne": n, "Ne_brem": n}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", ConeSplitLowGainWarning)
+        record = runner._transport_case(case)["segs"]["cone_split"]
+    weight = record["weight"]
+    assert weight.size > 0
+    np.testing.assert_array_equal(np.log2(weight), np.round(np.log2(weight)))

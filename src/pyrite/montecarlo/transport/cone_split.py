@@ -51,6 +51,7 @@ __all__ = [
     "copy_stream_keys",
     "history_sums",
     "split_stream_keys",
+    "weight_ladder",
     "weighted_history_statistics",
 ]
 
@@ -78,6 +79,12 @@ class ConeSplit:
     finite ``angle_scale`` (``u_ref``) applies a second roulette after the copy
     direction is drawn, against the target ``target_weight * max(1, (u/u_ref)^2)``
     with ``u = gamma * angle(copy, n_hat)``.
+
+    ``weight_ladder`` (#379) adds a final roulette when copy records are
+    collected: a copy of weight ``w`` is kept with probability ``w / W`` at
+    ``W = 2**ceil(log2 w)`` and carries ``W``, so every copy weight is a power
+    of two and spectrum tallies can score each weight stratum with unchanged
+    scorers. Its uniform is counter 4 of the copy's event key.
     """
 
     n_hat: tuple[float, float, float]
@@ -86,6 +93,7 @@ class ConeSplit:
     max_copies_per_electron: int = 64
     min_energy_keV: float = 0.0
     angle_scale: float = math.inf
+    weight_ladder: bool = False
 
     def __post_init__(self) -> None:
         n = np.asarray(self.n_hat, dtype=float)
@@ -103,6 +111,8 @@ class ConeSplit:
             raise ValueError("min_energy_keV must be finite and non-negative")
         if not self.angle_scale > 0.0:
             raise ValueError("angle_scale must be positive (inf disables it)")
+        if type(self.weight_ladder) is not bool:
+            raise ValueError("weight_ladder must be a bool")
 
     def policy(self):
         """Core policy vector ``[target_weight, min_energy_keV, angle_scale or 0]``."""
@@ -126,6 +136,37 @@ def split_stream_keys(stream_keys):
 def _event_key(split_key, flight):
     """Key of one elastic event: the electron's split key and its flight index."""
     return _splitmix64(split_key + _SM64_GOLDEN * (np.uint64(flight) + _SM64_ONE))
+
+
+@njit(cache=True)
+def _ladder_uniforms(split_keys, flights):
+    """Counter 4 of each copy's event key: the weight-ladder roulette draw."""
+    out = np.empty(split_keys.size)
+    for i in range(split_keys.size):
+        out[i] = _stream_uniform_scalar(_event_key(split_keys[i], flights[i]), np.uint64(4))
+    return out
+
+
+def weight_ladder(weights, split_keys, flights):
+    """Power-of-two weight ladder: ``(kept, W)`` for copies of weight ``w``.
+
+    A copy is kept with probability ``w / W``, ``W = 2**ceil(log2 w)``, and then
+    carries ``W``; ``E[W 1{kept}] = w``, so every linear tally keeps its
+    expectation, and the survival probability is above 1/2. The draw is counter
+    4 of the copy's event key, so it depends only on (seed, electron, flight).
+
+    Validation: detector-cone-variance-reduction
+    """
+    w = np.asarray(weights, dtype=np.float64)
+    if np.any(~(w > 0.0)) or not np.all(np.isfinite(w)):
+        raise ValueError("copy weights must be positive and finite")
+    ladder = np.exp2(np.ceil(np.log2(w)))
+    # log2 rounding: a power of two must map to itself, never to twice itself.
+    ladder = np.where(ladder / 2.0 >= w, ladder / 2.0, ladder)
+    u = _ladder_uniforms(
+        np.asarray(split_keys, dtype=np.uint64), np.asarray(flights, dtype=np.int64)
+    )
+    return u < w / ladder, ladder
 
 
 def copy_stream_keys(split_keys, flights):
@@ -384,6 +425,10 @@ class _ConeSplitPass:
             )
         parent = np.repeat(np.arange(n_electrons, dtype=np.int64), count)
         rows = parent * cap + (np.arange(parent.size) - np.repeat(np.cumsum(count) - count, count))
+        copy_weight = weight[rows]
+        if self.cone.weight_ladder and rows.size:
+            kept, ladder = weight_ladder(copy_weight, keys[parent], flight[rows])
+            parent, rows, copy_weight = parent[kept], rows[kept], ladder[kept]
         return {
             "parent": parent,
             "flight": flight[rows].copy(),
@@ -391,7 +436,7 @@ class _ConeSplitPass:
             "v_hat": direction[rows].copy(),
             "E_keV": energy[rows].copy(),
             "t_ang": clock[rows].copy(),
-            "weight": weight[rows].copy(),
+            "weight": copy_weight.copy(),
             "stream_keys": copy_stream_keys(keys[parent], flight[rows]),
             "killed": killed.copy(),
             "n_hat": self.cone.n_hat,

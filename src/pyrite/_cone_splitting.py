@@ -20,8 +20,9 @@ from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 from typing import Any
 
-#: Versioned estimator: event partition, roulettes and copy streams.
-CONE_SPLIT_MODEL = "elastic-cone-split-roulette-v1"
+#: Versioned estimator: event partition, roulettes, power-of-two weight ladder
+#: and copy streams.
+CONE_SPLIT_MODEL = "elastic-cone-split-ladder-v1"
 
 #: Below this beam energy #203 measured near-unit gain (1-2 MeV h-BN).
 LOW_GAIN_ENERGY_KEV = 3000.0
@@ -58,7 +59,9 @@ class ConeSplitting:
     ``angle_scale`` (``u_ref``) applies the angle-scaled roulette; ``None``
     disables it. ``target_weight`` is the roulette target copy weight and
     ``max_copies_per_electron`` the copy buffer, which raises when full.
-    Defaults are the #203 measured values (5 MeV h-BN 1 mm).
+    A final roulette snaps each copy weight to a power of two (the weight
+    ladder), so spectrum tallies can score weight strata with unchanged
+    scorers. Defaults are the #203 measured values (5 MeV h-BN 1 mm).
 
     Validation: detector-cone-variance-reduction
     """
@@ -114,6 +117,7 @@ class ConeSplitting:
             "max_copies_per_electron": int(self.max_copies_per_electron),
             "min_energy_keV": float(self.min_energy_fraction) * float(E0_keV),
             "angle_scale": math.inf if self.angle_scale is None else float(self.angle_scale),
+            "weight_ladder": True,
         }
 
     def validate_case(self, case: Mapping[str, Any]) -> None:
