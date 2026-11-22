@@ -170,6 +170,7 @@ def test_gpu_job_with_site_gres_runs_one_labelled_worker(tmp_path):
     assert "--nworkers" not in script and "--nthreads 8" in script
     assert "--resources GPU=1" in script
     assert executor.topology()["worker_processes_per_allocation"] == 1
+    assert executor.topology()["threads_per_worker_process"] == 8
 
 
 def test_gpu_job_without_site_directive_fails_before_staging(tmp_path):

@@ -291,11 +291,12 @@ class DaskExecutor:
     def topology(self) -> dict[str, Any]:
         """Requested worker layout: allocations and Dask worker processes in each."""
         per_job = self._processes_per_job()
+        threads = {"slurm": self.resources.cpu_cores // per_job, "local": 1}
         return {
             "cluster": self.config.cluster,
             "max_allocations": self._max_jobs(),
             "worker_processes_per_allocation": per_job,
-            "threads_per_worker_process": 1 if per_job > 1 else None,
+            "threads_per_worker_process": threads.get(self.config.cluster),
             "max_worker_processes": self._max_jobs() * per_job,
         }
 
