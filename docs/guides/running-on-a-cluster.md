@@ -85,6 +85,66 @@ jobs; **do not combine `--remote` with `--execution`**. Remote trajectory captur
 need a separate [trajectory transfer](../reference/trajectory-workflows.md),
 rather than a checkpoint pull.
 
+(new-remote-host)=
+### Set up a new remote host
+
+The helper needs SSH access to a SLURM login node, `uv` on that host, and a
+home or project directory that compute nodes also see. It needs no other
+PyRITE installation there: each job runs `uv sync` from the synced lockfile.
+
+1. On the host, install `uv` and a supported Python. Login nodes are for
+   installs, not runs:
+
+   ```bash
+   curl -LsSf https://astral.sh/uv/install.sh | sh   # ~/.local/bin/uv
+   ~/.local/bin/uv python install 3.13
+   ```
+
+   A different `uv` location goes in `--uv PATH`. `pyrite remote sync`
+   refuses when it cannot find `uv`.
+2. Choose the remote directory against the site's quotas. Checkpoints and the
+   job environment live under it, so prefer a backed-up home or project space
+   over purged scratch.
+3. Read the site's SLURM policy, then preview a one-GPU request without
+   submitting it:
+
+   ```bash
+   ssh MY_SSH_ALIAS 'sinfo -o "%P %l %G %f"; sacctmgr -nP show assoc user=$USER format=account,qos'
+   ssh MY_SSH_ALIAS sbatch --test-only -p PARTITION -c 8 --gres=gpu:1 -t 30 \
+     --constraint='FEATURE_A|FEATURE_B' --wrap=true
+   ```
+
+   Untyped `gpu:1` gres on a mixed partition can land on any GPU model;
+   select models with node features (`--constraint`), not `--nodelist`, which
+   requires every listed node. A partition `MaxTime` means jobs need a
+   `--max-time` cap.
+4. Add the target with the site policy. For example, a shared campus
+   partition capped at 24 hours:
+
+   ```bash
+   pyrite remote target add campus --host MY_SSH_ALIAS --remote-dir '~/pyrite' \
+     --partition campus --account MY_ACCOUNT \
+     --constraint 'A100|H200' --max-time 1-00:00:00
+   pyrite remote sync --target campus
+   ```
+
+   `--max-time` replaces an unlimited request with the cap and refuses longer
+   finite requests before submission. A chunked slice requests three times
+   `--chunk-minutes`, so a 24-hour cap allows `--chunk-minutes 480` at most.
+   Each slice queues again, so on a busy shared partition use long chunks.
+5. Run something small and confirm the allocation:
+
+   ```bash
+   pyrite run quickstart -m hopg --remote --target campus --dry-run
+   pyrite run quickstart -m hopg --remote --target campus --chunk-minutes 400 --detach
+   pyrite remote job logs --follow
+   ```
+
+   The job log header names the node. Compute nodes must reach the package
+   index for the first `uv sync`; on a site without outbound access, run the
+   same `uv sync --package pyrite-mc --no-default-groups --extra nvidia` once
+   in the remote directory from the login node to fill uv's cache.
+
 (amd-rocm-nodes)=
 ### AMD (ROCm) nodes
 

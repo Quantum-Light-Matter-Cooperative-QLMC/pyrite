@@ -13,7 +13,19 @@ from . import config
 from .config import RemoteTarget
 
 _NAME = re.compile(r"[A-Za-z][A-Za-z0-9_.-]{0,63}\Z")
-_FIELDS = ("host", "remote_dir", "uv", "gpu_vendor", "partition", "nodelist", "gres", "description")
+_FIELDS = (
+    "host",
+    "remote_dir",
+    "uv",
+    "gpu_vendor",
+    "partition",
+    "nodelist",
+    "gres",
+    "account",
+    "constraint",
+    "max_time",
+    "description",
+)
 
 
 def validate_name(name: str) -> str:
@@ -98,6 +110,9 @@ def _fallback_values(exclude=()):
                 ("partition", "SLURM_PARTITION"),
                 ("nodelist", "SLURM_NODELIST"),
                 ("gres", "SLURM_GRES"),
+                ("account", "SLURM_ACCOUNT"),
+                ("constraint", "SLURM_CONSTRAINT"),
+                ("max_time", "SLURM_MAX_TIME"),
             )
             if field not in exclude
         },

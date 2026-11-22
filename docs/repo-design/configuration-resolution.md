@@ -27,6 +27,9 @@ Each context value resolves independently in this order:
 | `remote.partition` | `PYRITE_REMOTE_PARTITION` | `gpu` |
 | `remote.nodelist` | `PYRITE_REMOTE_NODELIST` | `any` (no `--nodelist`) |
 | `remote.gres` | `PYRITE_REMOTE_GRES` | `gpu:1` |
+| `remote.account` | `PYRITE_REMOTE_ACCOUNT` | unset (no `--account`; site default) |
+| `remote.constraint` | `PYRITE_REMOTE_CONSTRAINT` | unset (no `--constraint`) |
+| `remote.max_time` | `PYRITE_REMOTE_MAX_TIME` | unset (no wall-time cap) |
 | `workspace.root` | `PYRITE_HOME` | current directory |
 
 `pyrite config keys [PREFIX]` lists supported persistent keys without resolving live values;
@@ -105,6 +108,9 @@ output.
 | `PYRITE_REMOTE_PARTITION` | SLURM partition name for new jobs; unset is `gpu`. | Environment > config store (`remote.partition`); `console.config`, `remote.config`. | remote resources |
 | `PYRITE_REMOTE_NODELIST` | SLURM node list for `#SBATCH --nodelist`, or `any`; unset is `any`. | Environment > config store (`remote.nodelist`); `console.config`, `remote.config`. | remote resources |
 | `PYRITE_REMOTE_GRES` | SLURM gres string for `#SBATCH --gres`, such as `gpu:radeon8060s:1`; unset is `gpu:1`. | Environment > config store (`remote.gres`); `console.config`, `remote.config`. | remote resources |
+| `PYRITE_REMOTE_ACCOUNT` | SLURM account for `#SBATCH --account`; unset omits the directive. | Environment > config store (`remote.account`); `console.config`, `remote.config`. | remote resources |
+| `PYRITE_REMOTE_CONSTRAINT` | SLURM node-feature expression for `#SBATCH --constraint`, such as `A100\|H200`; unset omits the directive. | Environment > config store (`remote.constraint`); `console.config`, `remote.config`. | remote resources |
+| `PYRITE_REMOTE_MAX_TIME` | Site wall-time cap in SLURM time syntax, such as `1-00:00:00`. Replaces an `UNLIMITED` request; a larger finite request (chunked: 3 × `--chunk-minutes`) fails before submission. Unset is no cap. | Environment > config store (`remote.max_time`); `console.config`, `remote.config`. | remote resources |
 | `PYRITE_XSGEN_BREMSLIB_SOURCE` | Directory containing the BremsLib source tree; unset is `../BremsLib_v2.0.8`. | `console.config`, `xsgen.sources` | external data/tooling |
 | `PYRITE_XSGEN_ELSEPA_SOURCE` | Directory containing the ELSEPA source tree; unset is `../elsepa-2020`. | `console.config`, `xsgen.sources` | external data/tooling |
 | `PYRITE_XSGEN_SBETHE_SOURCE` | Directory containing the SBETHE source tree; unset is `../sbethe`. | `console.config`, `xsgen.sources` | external data/tooling |

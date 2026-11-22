@@ -25,11 +25,15 @@ REMOTE_DIR = env_value("PYRITE_REMOTE_DIR", "~/pyrite")
 REMOTE_UV = env_value("PYRITE_REMOTE_UV", "~/.local/bin/uv")
 # SLURM target profile overrides, same compatibility role as ``HOST``: ``None``
 # resolves ``remote.gpu_vendor`` / ``remote.partition`` / ``remote.nodelist`` /
-# ``remote.gres`` through the shared config precedence (see ``console.config``).
+# ``remote.gres`` / ``remote.account`` / ``remote.constraint`` /
+# ``remote.max_time`` through the shared config precedence (see ``console.config``).
 REMOTE_GPU_VENDOR: str | None = None
 SLURM_PARTITION: str | None = None
 SLURM_NODELIST: str | None = None
 SLURM_GRES: str | None = None
+SLURM_ACCOUNT: str | None = None
+SLURM_CONSTRAINT: str | None = None
+SLURM_MAX_TIME: str | None = None
 SLURM_GPUS = 1
 SLURM_CPUS_PER_MATERIAL = 8
 SLURM_TIME = "UNLIMITED"
@@ -338,6 +342,23 @@ _SLURM_SETTINGS = {
         re.compile(r"[A-Za-z0-9][A-Za-z0-9._:,-]*"),
         "a SLURM gres string such as gpu:1 or gpu:radeon8060s:1",
     ),
+    # The three below are optional: an empty value omits the #SBATCH directive.
+    "remote.account": (
+        "PYRITE_REMOTE_ACCOUNT",
+        re.compile(r"(?:[A-Za-z0-9][A-Za-z0-9._-]*)?"),
+        "a SLURM account name such as pi_lab, or empty for the site default",
+    ),
+    "remote.constraint": (
+        "PYRITE_REMOTE_CONSTRAINT",
+        # SLURM feature expression: names joined by & | , with [] () and *count.
+        re.compile(r"(?:[A-Za-z0-9_.:\[\]()|&,*-]+)?"),
+        "a SLURM feature expression such as 'A100|H200', or empty for none",
+    ),
+    "remote.max_time": (
+        "PYRITE_REMOTE_MAX_TIME",
+        re.compile(r"(?:\d+(?:-\d+)?(?::\d+){0,2})?"),
+        "a SLURM time limit such as 1-00:00:00 or 1440, or empty for no cap",
+    ),
 }
 # ``remote.nodelist`` value meaning "let SLURM pick any node in the partition".
 NODELIST_ANY = "any"
@@ -386,6 +407,39 @@ def slurm_nodelist() -> str | None:
 def slurm_gres() -> str:
     """Return validated SLURM generic-resource request (``remote.gres``)."""
     return _slurm_setting("remote.gres", SLURM_GRES)
+
+
+def slurm_account() -> str | None:
+    """Return validated SLURM account (``remote.account``), or None for the site default."""
+    return _slurm_setting("remote.account", SLURM_ACCOUNT) or None
+
+
+def slurm_constraint() -> str | None:
+    """Return validated SLURM node-feature expression (``remote.constraint``), or None."""
+    return _slurm_setting("remote.constraint", SLURM_CONSTRAINT) or None
+
+
+def slurm_max_time() -> str | None:
+    """Return the target's SLURM wall-time cap (``remote.max_time``), or None for no cap."""
+    return _slurm_setting("remote.max_time", SLURM_MAX_TIME) or None
+
+
+def slurm_time_seconds(value: str) -> int | None:
+    """Return SLURM ``--time`` syntax in seconds; None for ``UNLIMITED``/``infinite``.
+
+    Accepts ``M``, ``M:S``, ``H:M:S``, ``D-H``, ``D-H:M`` and ``D-H:M:S``.
+    """
+    if value.upper() in ("UNLIMITED", "INFINITE"):
+        return None
+    days, _, clock = value.rpartition("-")
+    parts = [int(part) for part in clock.split(":")]
+    if days:
+        hours, minutes, seconds = (parts + [0, 0])[:3]
+    elif len(parts) == 3:
+        hours, minutes, seconds = parts
+    else:
+        hours, (minutes, seconds) = 0, (parts + [0])[:2]
+    return ((int(days or 0) * 24 + hours) * 60 + minutes) * 60 + seconds
 
 
 def remote_path(*parts: str) -> str:
@@ -557,6 +611,10 @@ class RemoteTarget:
     gres: str = "gpu:1"
     description: str = ""
     name: str | None = None
+    # Optional site policy; empty omits the directive (appended for positional compatibility).
+    account: str = ""
+    constraint: str = ""
+    max_time: str = ""
 
     def __post_init__(self):
         from .targets import validate_name
@@ -570,6 +628,9 @@ class RemoteTarget:
             "nodelist",
             "gres",
             "description",
+            "account",
+            "constraint",
+            "max_time",
         ):
             value = getattr(self, field)
             if not isinstance(value, str) or any(ord(c) < 32 or ord(c) == 127 for c in value):
@@ -582,7 +643,15 @@ class RemoteTarget:
         uv = self.uv[1:] if self.uv.startswith("~/") else self.uv
         if not (_EXECUTABLE_RE.fullmatch(uv) or _ABS_EXECUTABLE_RE.fullmatch(uv)):
             raise ValueError("uv must be an executable name, absolute POSIX path or ~/path")
-        for field in ("gpu_vendor", "partition", "nodelist", "gres"):
+        for field in (
+            "gpu_vendor",
+            "partition",
+            "nodelist",
+            "gres",
+            "account",
+            "constraint",
+            "max_time",
+        ):
             object.__setattr__(
                 self, field, validate_slurm_setting(f"remote.{field}", getattr(self, field))
             )

@@ -443,14 +443,18 @@ Usage: pyrite remote target add [OPTIONS] NAME
   Add a target; --host is required. Other fields use built-in defaults.
 
 Options:
-  --host TEXT
-  --remote-dir TEXT
-  --uv TEXT
-  --gpu-vendor TEXT
-  --partition TEXT
-  --nodelist TEXT
-  --gres TEXT
-  --description TEXT
+  --host TEXT         SSH alias of the SLURM login node.
+  --remote-dir TEXT   Checkout directory on the host (absolute or ~/path).
+  --uv TEXT           uv executable on the host.
+  --gpu-vendor TEXT   nvidia or amd.
+  --partition TEXT    SLURM partition.
+  --nodelist TEXT     SLURM node list, or 'any'.
+  --gres TEXT         SLURM gres request, e.g. gpu:1.
+  --account TEXT      SLURM account to charge; empty uses the site default.
+  --constraint TEXT   SLURM node features, e.g. 'A100|H200'; empty for none.
+  --max-time TEXT     Site wall-time cap, e.g. 1-00:00:00; replaces UNLIMITED and bounds
+                      --chunk-minutes.
+  --description TEXT  Free-text note shown by list.
   -h, --help          Show this message and exit.
 ```
 
@@ -462,14 +466,18 @@ Usage: pyrite remote target edit [OPTIONS] NAME
   Update only the supplied fields of an existing target.
 
 Options:
-  --host TEXT
-  --remote-dir TEXT
-  --uv TEXT
-  --gpu-vendor TEXT
-  --partition TEXT
-  --nodelist TEXT
-  --gres TEXT
-  --description TEXT
+  --host TEXT         SSH alias of the SLURM login node.
+  --remote-dir TEXT   Checkout directory on the host (absolute or ~/path).
+  --uv TEXT           uv executable on the host.
+  --gpu-vendor TEXT   nvidia or amd.
+  --partition TEXT    SLURM partition.
+  --nodelist TEXT     SLURM node list, or 'any'.
+  --gres TEXT         SLURM gres request, e.g. gpu:1.
+  --account TEXT      SLURM account to charge; empty uses the site default.
+  --constraint TEXT   SLURM node features, e.g. 'A100|H200'; empty for none.
+  --max-time TEXT     Site wall-time cap, e.g. 1-00:00:00; replaces UNLIMITED and bounds
+                      --chunk-minutes.
+  --description TEXT  Free-text note shown by list.
   -h, --help          Show this message and exit.
 ```
 

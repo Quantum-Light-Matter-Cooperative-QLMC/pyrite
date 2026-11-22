@@ -152,6 +152,28 @@ _VENDOR_LOG_PROBES = {
 }
 
 
+def _capped_time_limit(time_limit: str) -> str:
+    """Apply the target's ``max_time`` cap to a requested ``--time`` value.
+
+    An unlimited request becomes the cap; a finite request above the cap fails
+    locally, since sites with ``EnforcePartLimits`` reject it at submission.
+    Chunked requests are ``3 x --chunk-minutes``, hence the suggested bound.
+    """
+    cap = config.slurm_max_time()
+    if cap is None:
+        return time_limit
+    cap_seconds = config.slurm_time_seconds(cap)
+    requested = config.slurm_time_seconds(time_limit)
+    if requested is None:
+        return cap
+    if cap_seconds is not None and requested > cap_seconds:
+        raise SystemExit(
+            f"refusing to submit: SLURM time limit {time_limit} min exceeds the target's "
+            f"max_time {cap}; for chunked runs use --chunk-minutes {cap_seconds // 180} or less"
+        )
+    return time_limit
+
+
 def _slurm_batch_script(
     jobid: str,
     payload: str,
@@ -178,6 +200,11 @@ def _slurm_batch_script(
     partition = config.slurm_partition()
     nodelist = config.slurm_nodelist()
     nodelist_line = f"#SBATCH --nodelist={nodelist}\n" if nodelist else ""
+    account, constraint = config.slurm_account(), config.slurm_constraint()
+    policy_lines = (f"#SBATCH --account={account}\n" if account else "") + (
+        f"#SBATCH --constraint={constraint}\n" if constraint else ""
+    )
+    time_limit = _capped_time_limit(time_limit)
     signal_grace = max(10, min(120, int(time_limit) * 30)) if chunked else 0
     signal_line = f"#SBATCH --signal=B:USR1@{signal_grace}\n" if chunked else ""
     reservation_stems = reservation_stems or []
@@ -195,7 +222,7 @@ def _slurm_batch_script(
     return f"""#!/usr/bin/env bash
 #SBATCH --job-name={job_name}
 #SBATCH --partition={partition}
-{nodelist_line}#SBATCH --nodes=1
+{policy_lines}{nodelist_line}#SBATCH --nodes=1
 #SBATCH --ntasks-per-node={config.SLURM_GPUS}
 #SBATCH --cpus-per-task={cpus_per_task}
 {f"#SBATCH --mem-per-cpu={mem_per_cpu}" if mem_per_cpu else ""}

@@ -153,3 +153,106 @@ def test_omitted_named_fields_follow_environment_then_flat_keys(configured, monk
     assert targets.resolve_target("minimal").partition == "environment"
     monkeypatch.setenv("PYRITE_REMOTE_PARTITION", "")
     assert targets.resolve_target("amd").partition == "gpu-amd"
+
+
+def _hoffman(**extra):
+    values = {
+        "host": "h2",
+        "remote_dir": "/srv/h2",
+        "uv": "uv",
+        "partition": "campus",
+        "account": "pi_lab",
+        "constraint": "A100|H200|RTXPRO6000Bw",
+        "max_time": "1-00:00:00",
+    }
+    targets.save_target("h2", values | extra)
+
+
+def test_site_policy_fields_round_trip_through_cli(configured):
+    assert_clean_result(
+        invoke(
+            remote_targets.command,
+            [
+                "add",
+                "h2",
+                "--host",
+                "h2",
+                "--partition",
+                "campus",
+                "--account",
+                "pi_lab",
+                "--constraint",
+                "A100|H200",
+                "--max-time",
+                "1-00:00:00",
+            ],
+        )
+    )
+    target = targets.resolve_target("h2")
+    assert (target.account, target.constraint, target.max_time) == (
+        "pi_lab",
+        "A100|H200",
+        "1-00:00:00",
+    )
+    assert_clean_result(invoke(remote_targets.command, ["edit", "h2", "--constraint", "H200"]))
+    assert targets.resolve_target("h2").constraint == "H200"
+
+
+@pytest.mark.parametrize(
+    "values",
+    [
+        {"host": "box", "account": "pi lab"},
+        {"host": "box", "constraint": "A100\n#SBATCH --x"},
+        {"host": "box", "constraint": "A100 H200"},
+        {"host": "box", "max_time": "24h"},
+    ],
+)
+def test_invalid_site_policy_fields(values):
+    with pytest.raises(ValueError):
+        targets.RemoteTarget(**values)
+
+
+def test_batch_script_site_policy(configured):
+    _hoffman()
+    with config.use_target("h2"):
+        unlimited = scripts._slurm_batch_script("job", "true", job_name="t", reservation_stems=[])
+        chunked = scripts._slurm_batch_script(
+            "job", "true", job_name="t", reservation_stems=[], time_limit="1200", chunked=True
+        )
+    assert "#SBATCH --account=pi_lab\n" in unlimited
+    assert "#SBATCH --constraint=A100|H200|RTXPRO6000Bw\n" in unlimited
+    assert "#SBATCH --time=1-00:00:00\n" in unlimited
+    assert "UNLIMITED" not in unlimited
+    assert "#SBATCH --time=1200\n" in chunked
+
+
+def test_batch_script_rejects_time_over_cap(configured):
+    _hoffman()
+    with config.use_target("h2"), pytest.raises(SystemExit, match="--chunk-minutes 480 or less"):
+        scripts._slurm_batch_script(
+            "job", "true", job_name="t", reservation_stems=[], time_limit="1800", chunked=True
+        )
+
+
+def test_batch_script_without_site_policy_is_unchanged(configured):
+    with config.use_target("nvidia"):
+        script = scripts._slurm_batch_script("job", "true", job_name="t", reservation_stems=[])
+    assert "--account" not in script and "--constraint" not in script
+    assert "#SBATCH --partition=gpu\n#SBATCH --nodes=1\n" in script
+    assert "#SBATCH --time=UNLIMITED\n" in script
+
+
+@pytest.mark.parametrize(
+    ("value", "seconds"),
+    [
+        ("30", 1800),
+        ("30:15", 1815),
+        ("2:00:00", 7200),
+        ("1-00:00:00", 86400),
+        ("1-12", 129600),
+        ("1-0:30", 88200),
+        ("UNLIMITED", None),
+    ],
+)
+def test_slurm_time_seconds(value, seconds):
+    assert config.slurm_time_seconds(value) == seconds
