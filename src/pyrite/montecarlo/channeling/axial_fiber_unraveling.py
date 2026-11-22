@@ -134,6 +134,76 @@ class FiberChannels:
     tail_q_max_inv_ang: float | None = None
 
 
+@dataclass(frozen=True)
+class FiberZones:
+    r"""Depth-piecewise fibre model: zone ``k`` owns ``[interfaces[k-1], interfaces[k])``.
+
+    Each zone is a :class:`FiberChannels` (its own $H(\kappa)$, cut and rate
+    operators); the first starts at the entrance and the last runs to the
+    slab exit. ``interfaces_ang`` (len(channels) - 1) are strictly
+    increasing positive depths [Å]. Every zone must share the order window,
+    outgoing box and reciprocal cell: the transverse lattice is common
+    (commensurate growth along the axis), so the Bloch carrier is conserved
+    across an interface and the order basis is shared. Consecutive zones that
+    are the same object merge, so a constant sequence *is* the one-zone model
+    and runs the unzoned code path bitwise.
+
+    Validation: cr-axial-z-dependent-hamiltonian
+    """
+
+    channels: tuple[FiberChannels, ...]
+    interfaces_ang: tuple[float, ...]
+
+    def __post_init__(self) -> None:
+        channels, cuts = tuple(self.channels), tuple(float(z) for z in self.interfaces_ang)
+        if not channels or not all(isinstance(c, FiberChannels) for c in channels):
+            raise ValueError("channels must be a non-empty sequence of FiberChannels")
+        if len(cuts) != len(channels) - 1:
+            raise ValueError("interfaces_ang needs one depth fewer than channels")
+        if not all(np.isfinite(cuts)) or any(z <= 0 for z in cuts) or np.any(np.diff(cuts) <= 0):
+            raise ValueError("interfaces_ang must be finite, positive and strictly increasing")
+        first = channels[0]
+        reference = (_extents(first), tuple(float(g) for g in first.reciprocal_inv_ang))
+        for zone in channels[1:]:
+            if (_extents(zone), tuple(float(g) for g in zone.reciprocal_inv_ang)) != reference:
+                raise ValueError("zones must share order_max, outgoing_order_max and the cell")
+        object.__setattr__(self, "channels", channels)
+        object.__setattr__(self, "interfaces_ang", cuts)
+
+    def merged(self) -> FiberChannels | FiberZones:
+        """Drop interfaces between identical (``is``) zones; one zone returns its channels."""
+        channels, cuts = [self.channels[0]], []
+        for zone, z in zip(self.channels[1:], self.interfaces_ang, strict=True):
+            if zone is not channels[-1]:
+                channels.append(zone)
+                cuts.append(z)
+        return channels[0] if len(channels) == 1 else FiberZones(tuple(channels), tuple(cuts))
+
+
+def periodic_fiber_zones(
+    phases: Sequence[FiberChannels], slice_ang: float, depth_ang: float
+) -> FiberChannels | FiberZones:
+    r"""Cycle ``phases`` in slices of ``slice_ang`` [Å] up to ``depth_ang`` [Å].
+
+    Period ``len(phases) * slice_ang``. A superlattice is two phases with
+    ``slice_ang = L_layer``; a smooth modulation $U(\rho, z)$ is sampled at
+    slice midpoints (piecewise-constant approximation, error ``O(slice^2)`` in
+    the phase per period). Reusing the same objects shares each phase's fibre
+    cache. Returns the merged sequence (:meth:`FiberZones.merged`).
+
+    Validation: cr-axial-z-dependent-hamiltonian
+    """
+    phases = tuple(phases)
+    if not phases:
+        raise ValueError("phases must not be empty")
+    if not (np.isfinite(slice_ang) and slice_ang > 0 and np.isfinite(depth_ang) and depth_ang > 0):
+        raise ValueError("slice_ang and depth_ang must be finite and positive")
+    count = int(np.ceil(depth_ang / slice_ang * (1.0 - 1e-12)))
+    cuts = tuple(float(k * slice_ang) for k in range(1, count))
+    zones = tuple(phases[k % len(phases)] for k in range(count))
+    return FiberZones(zones, cuts).merged()
+
+
 def fiber_stream(seed: int, incident_id: int) -> np.random.Generator:
     """Version-2 jump-draw stream (group-then-channel draws) for one incident identity (order independent).
 
@@ -290,6 +360,11 @@ class _Engine:
         self.cache: OrderedDict[tuple[float, float], _Fiber] = OrderedDict()
         self.cache_size = cache_size
 
+    @property
+    def zones(self) -> tuple[tuple[_Engine, float], ...]:
+        """One zone to infinite depth (the unzoned model)."""
+        return ((self, np.inf),)
+
     def fiber(self, kappa: tuple[float, float]) -> _Fiber:
         key = (round(float(kappa[0]), 12), round(float(kappa[1]), 12))
         if key not in self.cache:
@@ -382,6 +457,54 @@ class _Engine:
             :, source[0][rows][:, None], source[1][cols][None, :]
         ]
         return out.reshape(len(full), -1).T
+
+
+class _ZonedEngine:
+    """Per-zone :class:`_Engine` list sharing window, box and cell geometry.
+
+    Distinct channel objects get one engine (and fibre cache) each; the
+    shared geometry attributes are those of the first zone.
+
+    Validation: cr-axial-z-dependent-hamiltonian
+    """
+
+    def __init__(self, zones: FiberZones, hbar_v: float):
+        engines: dict[int, _Engine] = {}
+        for channels in zones.channels:
+            engines.setdefault(id(channels), _Engine(channels, hbar_v))
+        ends = (*zones.interfaces_ang, np.inf)
+        self.zones = tuple(
+            (engines[id(c)], float(end)) for c, end in zip(zones.channels, ends, strict=True)
+        )
+        first = self.zones[0][0]
+        self.hbar_v, self.m, self.box, self.g = first.hbar_v, first.m, first.box, first.g
+        self.k, self.shape, self.box_shape = first.k, first.shape, first.box_shape
+        self.window_in_box = first.window_in_box
+
+
+def _make_engine(channels: FiberChannels | FiberZones, hbar_v: float):
+    """Engine of a fibre model; a constant zone sequence is the plain engine.
+
+    Validation: cr-axial-z-dependent-hamiltonian
+    """
+    if isinstance(channels, FiberZones):
+        channels = channels.merged()
+    if isinstance(channels, FiberZones):
+        return _ZonedEngine(channels, hbar_v)
+    return _Engine(channels, hbar_v)
+
+
+def _interface(fiber: _Fiber, state: np.ndarray, new: _Fiber):
+    """Sudden re-projection of the unnormalized retained ``state`` onto ``new``.
+
+    Returns the new retained coordinates and the window-order complement
+    ``(1 - V' V'^dagger) V state`` (above the new zone's cut).
+
+    Validation: cr-axial-z-dependent-hamiltonian
+    """
+    chi = fiber.vectors @ state
+    c = new.vectors.conj().T @ chi
+    return c, chi - new.vectors @ c
 
 
 def _measure(engine, phi_orders, window, seed, incident):
@@ -552,14 +675,19 @@ def _trajectory(
     ``carry``, if given, follows the history without drawing: after each
     no-jump segment ``carry.segment(fiber, c, kappa, start, stop, final)`` and
     at each retained jump ``carry.jump(fiber, norm, operator, new_fiber, c_new)``
-    with the pre-jump state norm and the drawn batched box map.
+    with the pre-jump state norm and the drawn batched box map, and at each
+    zone interface ``carry.interface(fiber, new_fiber)``. Zones come from
+    ``engine.zones``; one waiting threshold spans every interface it crosses.
 
     Validation: cr-axial-fiber-unraveling
     Validation: cr-axial-tds-tail
     Validation: cr-axial-fiber-regression
+    Validation: cr-axial-z-dependent-hamiltonian
     """
     rng = fiber_stream(seed, incident)
-    fiber = engine.fiber(kappa)
+    zones, zone = engine.zones, 0
+    active = zones[0][0]
+    fiber = active.fiber(kappa)
     c = fiber.vectors.conj().T @ entry
     weight = float(np.vdot(c, c).real)
     if weight <= 0:
@@ -577,21 +705,37 @@ def _trajectory(
         )
 
     while True:
-        start = depth
-        depth, state = _waiting(fiber, c, rng.random(), depth, max_depth, step, tolerance)
-        if observe is not None:
-            stop = max_depth if depth is None else depth
-            _observe_segment(
-                observe, incident, fiber, c, kappa, start, stop, checkpoints, depth is None
-            )
-        if carry is not None:
-            final = depth is None
-            carry.segment(fiber, c, kappa, start, max_depth if final else depth, final)
-        if depth is None:
-            return event("retained", max_depth)
+        threshold = rng.random()
+        while True:  # one waiting time across zone interfaces
+            start, end = depth, min(zones[zone][1], max_depth)
+            hit, state = _waiting(fiber, c, threshold, start, end, step, tolerance)
+            final = hit is None and end == max_depth
+            stop = end if hit is None else hit
+            if observe is not None:
+                _observe_segment(
+                    observe, incident, fiber, c, kappa, start, stop, checkpoints, final
+                )
+            if carry is not None:
+                carry.segment(fiber, c, kappa, start, stop, final)
+            if hit is not None:
+                depth = hit
+                break
+            if final:
+                return event("retained", max_depth)
+            zone, depth = zone + 1, end
+            active = zones[zone][0]
+            new = active.fiber(kappa)
+            c, lost = _interface(fiber, state, new)
+            if carry is not None:
+                carry.interface(fiber, new)
+            fiber = new
+            if float(np.vdot(c, c).real) <= threshold:
+                out = np.zeros(int(np.prod(engine.box_shape)), dtype=complex)
+                out[engine.window_in_box] = lost
+                return outgoing(out, depth)
         chi = fiber.vectors @ (state / np.linalg.norm(state))
         operators, before = ([] if carry is not None else None), fiber
-        kind, kappa, fiber, choice, c_new, f = _jump(engine, fiber, chi, kappa, rng, operators)
+        kind, kappa, fiber, choice, c_new, f = _jump(active, fiber, chi, kappa, rng, operators)
         counts[kind] += 1
         if choice is None:
             return event("unresolved", depth)
@@ -615,7 +759,7 @@ def _trajectory(
 
 
 def unravel_fiber_outgoing(
-    channels: FiberChannels,
+    channels: FiberChannels | FiberZones,
     entry_orders: np.ndarray,
     *,
     carrier_inv_ang: tuple[float, float] = (0.0, 0.0),
@@ -664,8 +808,19 @@ def unravel_fiber_outgoing(
     mean of ``weight * 1(alive) * c c^dagger`` is the retained density at that
     depth. Observation draws no random numbers.
 
+    ``channels`` may be a :class:`FiberZones` depth sequence (#1343): the
+    no-jump evolution, rates and jumps are those of the zone holding the
+    current depth; at an interface the unnormalized retained state is
+    re-projected onto the next zone's retained subspace at the same carrier
+    (sudden approximation, continuity of the transverse wavefunction on the
+    shared order window). The removed norm is a terminal outgoing branch: it
+    ends the history, at the interface depth, when the norm falls below the
+    segment's waiting threshold, and is then Weyl-measured like a jump's
+    outgoing part. A constant sequence runs the unzoned path bitwise.
+
     Validation: cr-axial-fiber-unraveling
     Validation: cr-axial-fiber-return-deficit
+    Validation: cr-axial-z-dependent-hamiltonian
     """
     for name, value in (
         ("hbar_v_eV_ang", hbar_v_eV_ang),
@@ -675,7 +830,7 @@ def unravel_fiber_outgoing(
     ):
         if not np.isfinite(value) or value <= 0:
             raise ValueError(f"{name} must be finite and positive")
-    engine = _Engine(channels, hbar_v_eV_ang)
+    engine = _make_engine(channels, hbar_v_eV_ang)
     entry = np.asarray(entry_orders, dtype=complex)
     if entry.shape != (engine.k,) or not np.all(np.isfinite(entry)):
         raise ValueError("entry_orders must be finite on the order window")

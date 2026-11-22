@@ -34,7 +34,13 @@ import numpy as np
 
 from pyrite.materials.crystal import ALPHA_FS, HBARC_EV_ANG, M_E_EV
 
-from .axial_fiber_unraveling import FiberChannels, FiberEvent, _Engine, _trajectory
+from .axial_fiber_unraveling import (
+    FiberChannels,
+    FiberEvent,
+    FiberZones,
+    _make_engine,
+    _trajectory,
+)
 from .bloch import longitudinal_kinematics
 from .quantum_regression import RegressionCorrelation
 
@@ -148,6 +154,18 @@ class _Companions:
                 self.flux_sum[i] += self.flux.factors(fiber.vectors @ (u / norm))
         if not final and self.y is not None:
             self.y = self.y * np.exp(rate * (stop - here))[:, None]
+
+    def interface(self, fiber, new_fiber):
+        """Apply the primary's interface re-projection ``V'^dagger V`` (no divisor).
+
+        The primary is not renormalized at an interface, so neither is the
+        companion; ``y`` is already advanced to the interface depth.
+        Validation: cr-axial-z-dependent-hamiltonian
+        """
+        if self.y is None:
+            return
+        chi = fiber.vectors @ (fiber.eigen[1] @ self.y)
+        self.y = new_fiber.eigen[2] @ (new_fiber.vectors.conj().T @ chi)
 
     def jump(self, fiber, norm, operator, new_fiber, c_new):
         if self.y is None:
@@ -288,7 +306,7 @@ def _primaries(
 
     Validation: cr-axial-fiber-regression, cr-axial-fiber-angular
     """
-    engine = _Engine(channels, hbar_v_eV_ang)
+    engine = _make_engine(channels, hbar_v_eV_ang)
     entry = np.asarray(entry_orders, dtype=complex)
     if entry.shape != (engine.k,) or not np.all(np.isfinite(entry)):
         raise ValueError("entry_orders must be finite on the order window")
@@ -319,7 +337,7 @@ def _primaries(
 
 
 def fiber_on_axis_source(
-    channels: FiberChannels,
+    channels: FiberChannels | FiberZones,
     entry_orders: np.ndarray,
     *,
     kinetic_energy_eV: float,
@@ -362,8 +380,16 @@ def fiber_on_axis_source(
     ``batches >= 2`` adds ``batch_correlations``. Neither changes draws,
     events or spectra.
 
+    ``channels`` may be a :class:`.FiberZones` depth sequence (#1343): the
+    companions receive the primary's interface re-projections, so $G$ spans
+    zones (no per-zone secular line model). Currents are the lowering
+    elements of the zone holding each record, so first-order sideband
+    amplitudes keep initial-state dressing and drop final-state dressing
+    through raising elements (``cr-axial-z-dependent-hamiltonian``).
+
     Validation: cr-axial-fiber-regression, cr-zone-incoherent-flux-weight
     Validation: cr-axial-directional-observation
+    Validation: cr-axial-z-dependent-hamiltonian
     """
     z, energies = _admit(
         depths_ang, photon_energy_eV, kinetic_energy_eV, hbar_v_eV_ang, max_working_bytes
@@ -448,7 +474,7 @@ def fiber_on_axis_source(
 
 
 def fiber_thickness_spectra(
-    channels: FiberChannels,
+    channels: FiberChannels | FiberZones,
     entry_orders: np.ndarray,
     *,
     kinetic_energy_eV: float,
