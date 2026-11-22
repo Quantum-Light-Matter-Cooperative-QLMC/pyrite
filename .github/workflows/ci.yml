@@ -250,7 +250,10 @@ jobs:
           - shard: data
             suites: packaging apps cli energy-grid materials xsgen
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # Main pushes fit 60 min (#1367, run 44952391262: slowest shard 43 min).
+    # The slow tier's transport shard holds ~95 test-minutes on two workers
+    # (run 44963024170), so weekly and slow=true runs get 90.
+    timeout-minutes: ${{ (github.event_name == 'schedule' || inputs.slow) && 90 || 60 }}
     env:
       NUMBA_DISABLE_JIT: '1'
       PYRITE_MC_BACKEND: cpu
