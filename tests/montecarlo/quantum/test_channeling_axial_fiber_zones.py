@@ -493,3 +493,10 @@ def test_drive_above_a_gap_opens_the_inverse_transition():
     e, driven = _modulated(0, 0.05, drive)
     assert _line(e, driven, inverse) > 0.8 * driven.sum() * (e[1] - e[0])
     assert _line(e, driven, inverse) > 1e-6
+
+
+def test_empty_retained_zone_is_refused():
+    a = _channels(1.0, 0.0, 0.0)
+    empty = FiberChannels(**{**{f: getattr(a, f) for f in FIELDS}, "cut": lambda e: -np.inf})
+    with pytest.raises(ValueError, match="retained subspace is empty"):
+        _source(FiberZones((a, empty), (1100.0,)), 2)

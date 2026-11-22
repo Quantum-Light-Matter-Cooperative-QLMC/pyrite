@@ -146,7 +146,10 @@ class FiberZones:
     (commensurate growth along the axis), so the Bloch carrier is conserved
     across an interface and the order basis is shared. Consecutive zones that
     are the same object merge, so a constant sequence *is* the one-zone model
-    and runs the unzoned code path bitwise.
+    and runs the unzoned code path bitwise. An interface at or beyond the slab
+    exit is ignored: the exit record stays in the zone before it. A record at
+    an interface depth sees the post-interface state and the new zone. A zone
+    with no retained state below its cut is refused when its fibre is built.
 
     Validation: cr-axial-z-dependent-hamiltonian
     """
@@ -186,9 +189,10 @@ def periodic_fiber_zones(
     r"""Cycle ``phases`` in slices of ``slice_ang`` [Å] up to ``depth_ang`` [Å].
 
     Period ``len(phases) * slice_ang``. A superlattice is two phases with
-    ``slice_ang = L_layer``; a smooth modulation $U(\rho, z)$ is sampled at
-    slice midpoints (piecewise-constant approximation, error ``O(slice^2)`` in
-    the phase per period). Reusing the same objects shares each phase's fibre
+    ``slice_ang = L_layer``. For a smooth modulation $U(\rho, z)$ the caller
+    builds each phase at its slice midpoint (piecewise-constant
+    approximation; sideband intensity low by about ``(pi/N)^2/3`` for ``N``
+    phases). Reusing the same objects shares each phase's fibre
     cache. Returns the merged sequence (:meth:`FiberZones.merged`).
 
     Validation: cr-axial-z-dependent-hamiltonian
@@ -370,6 +374,8 @@ class _Engine:
         if key not in self.cache:
             energies, vectors = self.ch.spectrum(key)
             keep = energies < self.ch.cut(energies)
+            if not keep.any():
+                raise ValueError("retained subspace is empty: no state below the cut")
             v = np.asarray(vectors, dtype=complex)[:, keep]
             h_eff = np.diag(energies[keep]) - 0.5j * self.hbar_v * (v.conj().T @ self.loss @ v)
             lam, right = np.linalg.eig(h_eff)
