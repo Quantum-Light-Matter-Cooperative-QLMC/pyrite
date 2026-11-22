@@ -312,7 +312,7 @@ def _trajectories_dir(ctx, param, value):
     default=None,
     metavar="MINUTES",
     help=(
-        "With -R/--remote, self-resubmitting SLURM slice length; defaults to 10, "
+        "With -R/--remote, self-resubmitting SLURM slice length; defaults to 60, "
         "or 0 (one unchunked allocation) for profiling captures."
     ),
 )

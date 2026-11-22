@@ -319,7 +319,7 @@ def test_recompute_bare_remote_waits_by_default(monkeypatch):
     assert_clean_result(result)
     assert seen["material"] == ["hopg"]
     assert seen["detach"] is False
-    assert seen["chunk_minutes"] == 10.0
+    assert seen["chunk_minutes"] == 60.0
 
 
 def test_recompute_locality_controls_are_rejected_when_incompatible():
@@ -360,7 +360,7 @@ def test_run_remote_chunk_minutes_forwards_value_and_default(monkeypatch):
     assert_clean_result(explicit)
     assert_clean_result(default)
     assert seen[0]["chunk_minutes"] == 30.0
-    assert seen[1]["chunk_minutes"] == 10.0
+    assert seen[1]["chunk_minutes"] == 60.0
 
 
 def test_run_chunk_minutes_requires_remote(monkeypatch):

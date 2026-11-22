@@ -103,7 +103,7 @@ def test_run_click_defaults_and_zero_meanings(monkeypatch):
                 "quick": False,
                 "workers": 0,
                 "parallel_materials": None,
-                "chunk_minutes": 10.0,
+                "chunk_minutes": 60.0,
                 "no_sync": False,
                 "dry_run": False,
                 "high_energy_min_kev": None,

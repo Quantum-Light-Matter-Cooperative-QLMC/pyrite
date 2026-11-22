@@ -11,7 +11,7 @@ Current command reference generated from live Click definitions. See
 [deprecations](cli-deprecations.md) for retired-spelling replacements and
 removal versions. Regenerate this page with `pyrite-dev cli-reference --write`.
 
-Remote lab defaults: `--chunk-minutes 10` runs one material at a time in
+Remote lab defaults: `--chunk-minutes 60` runs one material at a time in
 self-resubmitting slices. `--chunk-minutes 0` selects one monolithic
 `UNLIMITED` allocation; that mode defaults to one material process and
 accepts at most four. Context-backed values use one precedence chain:

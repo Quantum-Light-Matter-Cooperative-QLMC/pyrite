@@ -124,7 +124,7 @@ def _recompute_options(function):
     function = click.option(
         "--chunk-minutes",
         type=NONNEGATIVE_FLOAT,
-        default=10.0,
+        default=60.0,
         show_default=True,
         help="Self-resubmitting SLURM slice length; 0 runs one monolithic job.",
     )(function)
@@ -380,7 +380,7 @@ def _resolve_start_chunk_minutes(flags):
         or flags.cpu
         or flags.cpu_only
     )
-    return 0.0 if monolithic else 10.0
+    return 0.0 if monolithic else 60.0
 
 
 def _reject_start_allocation_conflicts(flags, chunk_minutes):
@@ -475,7 +475,7 @@ _start_allocation_options = _option_group(
         type=NONNEGATIVE_FLOAT,
         default=None,
         help=(
-            "Self-resubmitting SLURM slice length; defaults to 10, or 0 for "
+            "Self-resubmitting SLURM slice length; defaults to 60, or 0 for "
             "--perf-reps >1, --nsys, and CPU profiling."
         ),
     ),

@@ -65,7 +65,7 @@ def test_plain_run_profiles_nothing_and_chunks_by_default():
     resolved = plan()
 
     assert resolved.performance_profile is None
-    assert resolved.chunk_minutes == 10.0
+    assert resolved.chunk_minutes == 60.0
 
 
 @pytest.mark.parametrize(
@@ -96,7 +96,7 @@ def test_profiling_modes_default_to_one_monolithic_job(overrides):
 
 
 def test_perf_alone_keeps_the_ordinary_chunk_default():
-    assert plan(perf=True).chunk_minutes == 10.0
+    assert plan(perf=True).chunk_minutes == 60.0
 
 
 def test_explicit_chunk_minutes_is_never_overridden():

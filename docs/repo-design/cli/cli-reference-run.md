@@ -83,7 +83,7 @@ Options:
   --wait                          Wait for remote completion and pull results.
   --detach                        Return after remote submission.
   --chunk-minutes MINUTES         With -R/--remote, self-resubmitting SLURM slice
-                                  length; defaults to 10, or 0 (one unchunked
+                                  length; defaults to 60, or 0 (one unchunked
                                   allocation) for profiling captures.
   -o, --output [table|json|wide]  Output format; only json is a stable automation
                                   contract.  [default: table]

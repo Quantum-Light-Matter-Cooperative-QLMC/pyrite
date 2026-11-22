@@ -187,7 +187,7 @@ def submit(
     materials: Sequence[str] | None = None,
     quick: bool = False,
     workers: int | None = None,
-    chunk_minutes: float = 10.0,
+    chunk_minutes: float = 60.0,
     parallel_materials: int | None = None,
     no_sync: bool = False,
     dry_run: bool = False,

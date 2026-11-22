@@ -207,7 +207,7 @@ def start_queue(
     no_sync=False,
     dry_run=False,
     parallel_materials=None,
-    chunk_minutes=10.0,
+    chunk_minutes=60.0,
     high_energy_min_kev=None,
     catalog_profile="standard",
     performance_profile=None,

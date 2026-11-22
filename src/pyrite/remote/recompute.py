@@ -15,7 +15,7 @@ def start_rebrem_queue(
     redo_all=False,
     no_sync=False,
     dry_run=False,
-    chunk_minutes=10.0,
+    chunk_minutes=60.0,
     brem_start_eV=None,
     brem_stop_eV=None,
 ):
@@ -134,7 +134,7 @@ def start_recxr_queue(
     redo_all=False,
     no_sync=False,
     dry_run=False,
-    chunk_minutes=10.0,
+    chunk_minutes=60.0,
     cxr_start_eV=None,
     line_stop_eV=None,
 ):

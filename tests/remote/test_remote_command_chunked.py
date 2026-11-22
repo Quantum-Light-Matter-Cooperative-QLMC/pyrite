@@ -50,7 +50,7 @@ def test_chunked_dry_run_emits_chain_script(monkeypatch, capsys):
     # instead of stamping FAILED over an operator-requested stop
     assert "cancelled (stop requested)" in out
     assert "failed: $m" in out  # hard-failure marker, never retried
-    assert "#SBATCH --time=30" in out  # 3 x 10 min backstop
+    assert "#SBATCH --time=180" in out  # 3 x 60 min backstop
     assert '"queued slice"*' in out  # trap handoff case
     # handoff must not release reservations: the trap's release happens only in
     # terminal branches -- assert the handoff case body is empty (';;' right after)

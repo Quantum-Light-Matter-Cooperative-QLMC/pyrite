@@ -179,7 +179,7 @@ def test_real_chunked_submission_carries_the_nice_flag(monkeypatch):
 
     remote.start_queue(["hopg"], no_sync=True)  # chunked is the default
 
-    assert "chunk_minutes: 10.0" in uploads[0][0][0][-1]
+    assert "chunk_minutes: 60.0" in uploads[0][0][0][-1]
     sbatch_commands = [command for command in submissions if "sbatch" in command]
     assert sbatch_commands, "the live path must reach sbatch"
     assert all("sbatch --parsable --nice=10000" in command for command in sbatch_commands)
