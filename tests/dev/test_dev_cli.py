@@ -343,6 +343,13 @@ def test_numba_online_shards_run_every_primary_suite_once(dev_module) -> None:
 
     assert sorted(suites) == sorted(dev_module.PRIMARY_TEST_SUITE_NAMES)
     assert job["env"]["NUMBA_DISABLE_JIT"] == "1"
+    upload = next(step for step in job["steps"] if "upload-artifact" in step.get("uses", ""))
+    assert upload["if"] == "always()"
+    assert "numba-diagnostics/" in upload["with"]["path"]
+    assert any(
+        'PYRITE_TEST_DIAGNOSTICS="numba-diagnostics/$suite"' in step.get("run", "")
+        for step in job["steps"]
+    )
 
 
 @pytest.mark.parametrize(

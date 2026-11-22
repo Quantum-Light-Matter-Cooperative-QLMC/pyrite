@@ -40,7 +40,20 @@ def precision():
 
 @pytest.fixture
 def numerics(precision):
-    return pr.Numerics(sampling=adaptive_sampling(precision), transport_core="per-electron")
+    return _bounded_numerics(adaptive_sampling(precision))
+
+
+def _bounded_numerics(sampling):
+    # These tests own adaptive scheduling/provenance, not production reflection
+    # selection or grid convergence. Keep real scoring on a bounded fixed set.
+    return pr.Numerics(
+        sampling=sampling,
+        transport_core="per-electron",
+        cxr_reflections=pr.config.CxrReflections(n_families=2),
+        energy_bins=pr.detectors.EnergyBins(
+            cxr=np.arange(500.0, 8000.0, 100.0), brem=np.arange(500.0, 30000.0, 500.0)
+        ),
+    )
 
 
 def test_precision_roundtrips_json_and_process_pickle(precision):
@@ -188,7 +201,7 @@ def test_early_stop_preserves_requested_case_and_matches_realized_fixed_n(scene,
         max_variance_of_variance=1.0,
         stability_checks=0,
     )
-    case = api.build_case(scene, pr.Numerics(sampling=adaptive_sampling(precision)))
+    case = api.build_case(scene, _bounded_numerics(adaptive_sampling(precision)))
     key = case_content_key(case)
     if split:
         output = runner._spectrum_case(
@@ -228,7 +241,9 @@ def test_public_batch_means_survive_checkpoint_storage(scene, numerics, tmp_path
 
 def test_simulate_carries_requested_identity_and_realized_provenance(scene, numerics):
     with pytest.warns(CxrYieldStatisticsWarning):
-        result = pr.simulate(scene.beam, scene.target, scene.detector, numerics=numerics)
+        result = pr.simulate(
+            scene.beam, scene.target, scene.detector, physics=scene.physics, numerics=numerics
+        )
     sampling = result.provenance["adaptive_sampling"]
     assert sampling["mode"] == "adaptive" and sampling["realized_electrons"] == 60
     assert result.provenance["identity_digest"] == case_content_key(
@@ -353,9 +368,9 @@ def test_mixed_cpu_pool_preserves_fixed_case_and_adaptive_provenance(scene, monk
         max_variance_of_variance=1.0,
         stability_checks=0,
     )
-    adaptive = api.build_case(scene, pr.Numerics(sampling=adaptive_sampling(precision)))
+    adaptive = api.build_case(scene, _bounded_numerics(adaptive_sampling(precision)))
     fixed = api.build_case(
-        scene, pr.Numerics(sampling=FixedSampling(cxr_histories=8, brem_histories=4))
+        scene, _bounded_numerics(FixedSampling(cxr_histories=8, brem_histories=4))
     )
     expected_fixed = runner.run_cases([fixed], max_workers=1, progress=False, engine="cpu")[0]
     expected_adaptive = runner.run_case(adaptive, transport_core="per-electron")

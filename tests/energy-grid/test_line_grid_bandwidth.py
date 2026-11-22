@@ -5,6 +5,7 @@ refusals, case construction where the ceiling alone overflows the budget, and
 the production-weight truncation audit.
 """
 
+import os
 import warnings
 from dataclasses import replace
 
@@ -453,6 +454,11 @@ def test_dominant_fwhm_matches_a_gaussian():
 
 
 @pytest.mark.slow
+@pytest.mark.skipif(
+    os.environ.get("NUMBA_DISABLE_JIT") == "1",
+    reason="the full MoS2 selection takes ~36 min of Python kernels (#1367); "
+    "compiled --slow CI runs it",
+)
 def test_selected_reflections_feed_the_measured_bandwidth_audit(monkeypatch):
     """Selected lines outside the measured population are still audited (#1243).
 

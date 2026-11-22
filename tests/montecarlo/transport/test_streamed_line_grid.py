@@ -7,6 +7,7 @@ records must match.
 """
 
 import shutil
+from functools import cache
 
 import numpy as np
 import pytest
@@ -183,20 +184,31 @@ OVERSAMPLED_CASES = [
 ]
 
 
+@pytest.fixture(scope="module")
+def oversampled_reference():
+    # Block size changes only the streamed arm. Reuse the identical retained
+    # arm without reducing the histories needed by local-axis and spill tests.
+    @cache
+    def reference(bandwidth, stop_eV, max_points, quadrature):
+        per_call = {"quadrature": quadrature, "bandwidth": bandwidth}
+        if max_points is not None:
+            per_call["max_points"] = max_points
+        case = _oversampled(_case(), stop_eV, **per_call)
+        _clear_grid_cache()
+        return case, _joined(case)
+
+    return reference
+
+
 @pytest.mark.parametrize("block", [5, 1000])
 @pytest.mark.parametrize("quadrature", ["node", "bin-mean"])
 @pytest.mark.parametrize(("bandwidth", "stop_eV", "max_points", "local"), OVERSAMPLED_CASES)
 def test_streamed_oversampled_grid_matches_the_joined_path(
-    block, quadrature, bandwidth, stop_eV, max_points, local
+    block, quadrature, bandwidth, stop_eV, max_points, local, oversampled_reference
 ):
     """The over-budget node-local axis (#1257) refines around streamed lines (#1280)."""
-    per_call = {"quadrature": quadrature, "bandwidth": bandwidth}
-    if max_points is not None:
-        per_call["max_points"] = max_points
-    case = _oversampled(_case(), stop_eV, **per_call)
+    case, reference = oversampled_reference(bandwidth, stop_eV, max_points, quadrature)
     assert streaming_refusal(case, live=True) is None
-    _clear_grid_cache()
-    reference = _joined(case)
     assert ("local_axis" in reference["line_grid_resolved"]) is local
     _clear_grid_cache()
     streamed = run_case_streamed(case, block, transport_core="per-electron")

@@ -8,6 +8,7 @@ arithmetic.
 """
 
 import math
+import os
 import time
 
 import numpy as np
@@ -166,6 +167,7 @@ def test_spacing_quantile_unchanged_with_tied_widths():
     assert result == (step, aliased, width.size)
 
 
+@pytest.mark.slow
 def test_ten_million_line_sizing_smoke():
     rng = np.random.default_rng(13)
     n = 10_000_000
@@ -179,10 +181,16 @@ def test_ten_million_line_sizing_smoke():
     started = time.perf_counter()
     stop, _ = resonance_population_stop_eV([population], ceiling_eV=2.5e5, truncation_limit=1e-2)
     samples = [population.width_eV.astype(float), population.weight.astype(float)]
-    sinc_spacing_from_samples(samples, aliased_weight_limit=0.01)
+    step, aliased, count = sinc_spacing_from_samples(samples, aliased_weight_limit=0.01)
+    elapsed = time.perf_counter() - started
     # ~2 s on a desktop CPU; pre-#1270 the stop search alone took ~13 s.
     assert stop < 2.5e5
-    assert time.perf_counter() - started < 20.0
+    assert count == n and np.isfinite(step) and step > 0.0
+    assert 0.0 <= aliased <= 0.01
+    # This budget measures the compiled kernel. The weekly Python-body run
+    # still exercises all ten million lines and the same numerical assertions.
+    if os.environ.get("NUMBA_DISABLE_JIT") != "1":
+        assert elapsed < 20.0
 
 
 @pytest.mark.parametrize("layout", ["ordered", "shuffled", "negative"])

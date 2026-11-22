@@ -244,7 +244,7 @@ def test_symmetric_laue_without_absorption_redistributes_no_flux():
 def germanium():
     import pyrite as pr
     from pyrite.api import build_case
-    from pyrite.config import FixedSampling
+    from pyrite.config import CxrReflections, FixedSampling
     from pyrite.detectors import EnergyBins, PointDetector
     from pyrite.montecarlo import runner
 
@@ -258,9 +258,12 @@ def germanium():
     )
     numerics = pr.Numerics(
         sampling=FixedSampling(cxr_histories=20, brem_histories=1),
+        # Kossel integration needs its (400) cone, not native-line shell selection.
+        cxr_reflections=CxrReflections(n_families=4),
         energy_bins=EnergyBins(cxr=np.linspace(9.0e3, 11.5e3, 501)),
     )
     case = build_case(scene, numerics)
+    assert any(sorted(map(abs, hkl)) == [0, 0, 4] for hkl in case.hkl_list)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", UserWarning)
         transport = runner._transport_case(case, transport_core="per-electron")

@@ -75,8 +75,10 @@ def pytest_collection_modifyitems(config, items):
 
 
 def pytest_configure(config):
+    from tests.helpers.ci_diagnostics import configure_test_diagnostics
     from tests.helpers.table_store_guard import TableStoreWriteGuard
 
+    configure_test_diagnostics(config)
     # Audit hooks also see direct np.savez/copy/unlink calls that bypass store().
     # Install before collection, including on each xdist worker.
     roots = [tempfile.gettempdir()]

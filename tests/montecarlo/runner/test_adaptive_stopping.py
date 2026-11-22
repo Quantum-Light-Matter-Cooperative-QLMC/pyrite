@@ -33,6 +33,7 @@ import pytest
 from pyrite._backend import REAL
 from pyrite._cxr_grid_policy import CxrYieldStatisticsWarning
 from pyrite.campaign.sweep import BeamSpec, Sweep, build_cases
+from pyrite.detectors import EnergyBins
 from pyrite.montecarlo import runner
 from pyrite.montecarlo.runner.adaptive import (
     AdaptiveSettings,
@@ -60,6 +61,10 @@ _RULE_ONLY = dict(
     min_effective_histories=0.0,
     max_variance_of_variance=1.0,
     stability_checks=0,
+)
+
+_REPLAY_BINS = EnergyBins(
+    cxr=np.arange(500.0, 8000.0, 100.0), brem=np.arange(500.0, 30000.0, 500.0)
 )
 
 
@@ -263,6 +268,8 @@ def light_line_masses():
     """
     sweep = Sweep(
         material="hopg",
+        n_families=4,
+        energy_bins=_REPLAY_BINS,
         thickness_ang=1e4,
         beam=BeamSpec(energy_keV=30.0),
         tilt_deg=30.0,
@@ -649,10 +656,13 @@ def test_per_electron_brem_band_integrals_average_to_the_band_integral():
 # ---- runner ---------------------------------------------------------------------
 
 
-def _case(n_families=None, **beam):
+def _case(n_families=4, *, energy_bins=_REPLAY_BINS, **beam):
+    # Adaptive replay is independent of automatic reflection-shell selection.
+    # Keep a four-family workload on a bounded grid for the replay assertions.
     sweep = Sweep(
         material="hopg",
         n_families=n_families,
+        energy_bins=EnergyBins() if energy_bins is None else energy_bins,
         thickness_ang=1e4,
         beam=BeamSpec(energy_keV=30.0, **beam),
         tilt_deg=30.0,

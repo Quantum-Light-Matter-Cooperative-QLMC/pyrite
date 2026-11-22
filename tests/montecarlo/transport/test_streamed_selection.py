@@ -37,16 +37,17 @@ def assert_same_selection(record, expected, path="record"):
         assert record == expected, path
 
 
-@pytest.fixture
-def automatic(monkeypatch):
+@pytest.fixture(scope="module")
+def automatic():
     # Diffracted brem keeps the build-time set on both routes, so spectra compare whole.
-    monkeypatch.setattr(reflection_cutoff, "SELECTION_HISTORIES", 2)
-    case, _ = _transported()
-    case = {k: v for k, v in case.items() if k != "line_grid_policy"}
-    return {**case, "reflection_selection": {**SELECTION, "automatic": True}}
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(reflection_cutoff, "SELECTION_HISTORIES", 2)
+        case, _ = _transported()
+        case = {k: v for k, v in case.items() if k != "line_grid_policy"}
+        yield {**case, "reflection_selection": {**SELECTION, "automatic": True}}
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def retained(automatic):
     transport = runner._transport_case(automatic, transport_core="per-electron")
     return runner._spectrum_case(automatic, transport)

@@ -6,6 +6,7 @@ request that would have changed the transport before spectrum work.
 """
 
 import warnings
+from dataclasses import replace
 
 import numpy as np
 import pytest
@@ -13,14 +14,29 @@ import pytest
 import pyrite
 from pyrite import Physics, simulate
 from pyrite.beams import Beam, PointBunch, Spot
-from pyrite.config import FixedSampling, KernelTuning, Numerics, TransportKernelTuning
+from pyrite.config import (
+    CxrReflections,
+    FixedSampling,
+    KernelTuning,
+    Numerics,
+    TransportKernelTuning,
+)
 from pyrite.detectors import Detector, EnergyBins, PlanarDetector, PlanarPose
 from pyrite.geometry import BlazedGrooves, Footprint, Layer, Slab, Stack
 from pyrite.montecarlo import runner
 from pyrite.scoring import ScoringRefusedError
 from pyrite.transport import Trajectories, simulate_trajectories
 
-NUMERICS = Numerics(sampling=FixedSampling(cxr_histories=8, brem_histories=4), seed=3)
+# Replay tests need real lines, not automatic reflection-shell convergence.
+# The auto-line-grid case below separately keeps the automatic grid contract.
+NUMERICS = Numerics(
+    sampling=FixedSampling(cxr_histories=8, brem_histories=4),
+    seed=3,
+    cxr_reflections=CxrReflections(n_families=2),
+    energy_bins=EnergyBins(
+        cxr=np.linspace(500.0, 8000.0, 32), brem=np.linspace(500.0, 20000.0, 16)
+    ),
+)
 BEAM = Beam(30.0, transverse=Spot(), longitudinal=PointBunch())
 FLAT = Slab("hopg", 1000.0, tilt_deg=30.0, footprint=Footprint(5.0, 5.0))
 GROOVED = Slab(
@@ -70,11 +86,12 @@ def flat():
     ],
 )
 def test_two_step_reproduces_simulate(target, physics):
+    numerics = replace(NUMERICS, energy_bins=None) if target is AUTO_GRID else NUMERICS
     trajectories = simulate_trajectories(
-        BEAM, target, physics=physics, numerics=NUMERICS, detector=Detector()
+        BEAM, target, physics=physics, numerics=numerics, detector=Detector()
     )
     assert isinstance(trajectories, Trajectories) and trajectories.scorable
-    expected = simulate(BEAM, target, Detector(), physics=physics, numerics=NUMERICS)
+    expected = simulate(BEAM, target, Detector(), physics=physics, numerics=numerics)
     _assert_identical(pyrite.score_spectra(trajectories), expected)
     if target is AUTO_GRID:
         assert trajectories.case.get("line_grid_policy") is not None
@@ -94,9 +111,8 @@ def test_detector_free_transport_scores_any_detector(monkeypatch):
 def test_one_transport_scores_independent_detectors_and_grids(flat, monkeypatch):
     fingerprint = flat.fingerprint
     side = Detector(observation_angle_deg=60.0)
-    grid = Numerics(
-        sampling=NUMERICS.sampling,
-        seed=NUMERICS.seed,
+    grid = replace(
+        NUMERICS,
         energy_bins=EnergyBins(cxr=np.linspace(1000.0, 4000.0, 64)),
     )
     expected_side = simulate(BEAM, FLAT, side, numerics=NUMERICS)
@@ -123,9 +139,9 @@ def _no_spectra(monkeypatch):
 @pytest.mark.parametrize(
     ("numerics", "physics", "field"),
     [
-        pytest.param(Numerics(sampling=NUMERICS.sampling, seed=4), None, "seed", id="seed"),
+        pytest.param(replace(NUMERICS, seed=4), None, "seed", id="seed"),
         pytest.param(
-            Numerics(sampling=FixedSampling(cxr_histories=9, brem_histories=4), seed=3),
+            replace(NUMERICS, sampling=FixedSampling(cxr_histories=9, brem_histories=4)),
             None,
             "Ne",
             id="population",
@@ -286,7 +302,7 @@ def test_load_refusals_name_the_field(flat, tmp_path):
     from pyrite.storage import load_trajectories, save_trajectories
 
     path = save_trajectories(flat, tmp_path / "flat.h5")
-    wrong = Numerics(sampling=NUMERICS.sampling, seed=4)
+    wrong = replace(NUMERICS, seed=4)
     with pytest.raises(ScoringRefusedError, match="seed") as error:
         load_trajectories(path, BEAM, FLAT, numerics=wrong, detector=Detector())
     assert error.value.field == "seed"
