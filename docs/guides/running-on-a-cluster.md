@@ -12,7 +12,8 @@ small workload before scaling up.
 The coordinator and workers need compatible PyRITE/Python versions and the same
 material data and reference tables. For execution profiles they also need a
 **shared POSIX filesystem at the same absolute path**. Keep the coordinator
-running until completion; use an allocation if your site requires it.
+running until completion; on an HPC site run it as a compute-node job, never
+on a login node.
 
 In a source checkout, install the Dask extra only if using Dask:
 
@@ -36,8 +37,6 @@ tasks do not all compile concurrently.
 
 (run-and-inspect-a-profile)=
 (native-slurm-array-cpu)=
-(dask-with-slurm-provisioned-cpu-workers)=
-(dask-with-an-existing-scheduler-cpu-or-gpu)=
 ## Preview, then run
 
 Use a small campaign such as `quickstart` first. CPU examples:
@@ -54,8 +53,7 @@ not submit jobs or predict runtime. `slurm-cpu` requires SLURM tools and request
 one CPU per array task by default. Replace it with a site-specific execution
 profile for partitions, memory and concurrency; complete
 [SLURM and Dask templates](../reference/cluster-execution.md#native-slurm-array-cpu)
-include GPU allocation rules. Dask SLURM provisioning supports CPU workers;
-GPU Dask requires an existing scheduler with actual device isolation.
+include GPU allocation rules.
 
 (checkpoints-retries-and-outputs)=
 Only the coordinator updates the normal checkpoints; completed immutable case
@@ -63,6 +61,49 @@ artifacts can be reused after failure. Inspect the resulting dataset with
 `pyrite checkpoint list`, then [plot saved results](working-with-results.md).
 [Retry and output contracts](../reference/cluster-execution.md#checkpoints-retries-and-outputs)
 explain operational metadata and queue limits.
+
+(dask-with-slurm-provisioned-cpu-workers)=
+(dask-with-an-existing-scheduler-cpu-or-gpu)=
+## Run Dask workers on a SLURM site
+
+Dask on SLURM fills whole worker jobs: each job runs one single-threaded
+worker process per allocated core. Site details (account, QoS, modules,
+Python, network interface) go in dask-jobqueue's own config file; the
+execution profile keeps resources, partition and walltime. The
+[Dask reference](../reference/cluster-execution.md#dask-on-an-hpc-cluster)
+lists every field and a worked Hoffman2 example.
+
+1. Answer the [site checklist](../reference/cluster-execution.md#site-checklist):
+   account and QoS limits, whether compute nodes may run `sbatch`, the
+   network interface, node-local disk and the partition's walltime.
+2. Build the environment inside a short compute-node job, not on the login node:
+
+   ```bash
+   srun --time=00:30:00 --cpus-per-task=2 --mem=8G uv sync --extra dask
+   ```
+
+   Add the GPU vendor extra (for example `--extra nvidia`) for GPU workers.
+
+3. Put the site settings in `~/.config/dask/jobqueue.yaml`, starting from
+   the [starter file](../reference/cluster-execution.md#site-settings).
+4. Write an execution profile with `cluster = "slurm"`, `resources.cpu_cores`
+   per worker job and `workers` jobs, then preview it inside a short
+   allocation; the preview submits nothing:
+
+   ```bash
+   pyrite run quickstart -m hopg --execution site-dask      --execution-config execution.toml --execution-plan
+   ```
+
+5. Submit the [coordinator job](../reference/cluster-execution.md#coordinator-job)
+   with `sbatch`. It starts the scheduler, submits the worker jobs and writes
+   the checkpoints. If it stops before finishing, submit it again; finished
+   cases are reused.
+
+If compute nodes may not call `sbatch`, start the scheduler and workers
+yourself and use a profile with `cluster = "existing"` and `scheduler_file`.
+For one-GPU workers, add the site's GPU directive (for example
+`--gres=gpu:1`) to `job_extra_directives`; PyRITE refuses a GPU profile
+without one.
 
 (ssh-remote-helper-and-manual-slurm)=
 ## Submit from a workstation over SSH
@@ -129,6 +170,10 @@ ships your local tables.
      --host-exec 'srun --account=MY_ACCOUNT --time=00:30:00 --cpus-per-task=2 --mem=8G'
    pyrite remote sync --target campus
    ```
+
+   Each job runs an exact `uv sync` of the vendor extra, which removes
+   other extras from the shared environment. To keep the Dask backend there,
+   add `--extras dask` (comma-separated for several).
 
    Simulations always run as `sbatch` jobs. Sync, job status, logs and stop
    are file and scheduler operations on the login node. `pull`, `remote gc`
