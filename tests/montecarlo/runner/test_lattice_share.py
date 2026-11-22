@@ -154,3 +154,11 @@ def test_layer_tables_keep_every_node_below_the_line_cutoff():
     np.testing.assert_array_equal(new[T < cutoff], base[T < cutoff])
     above = (T >= cutoff) & (T <= 1000.0)
     assert np.all((base[above] - new[above]).reshape(above.sum(), -1).sum(axis=1) > 0)
+
+
+def test_eedl_record_without_a_composition_says_why():
+    # Fixtures that score no continuum carry composition=None (#1261 CI).
+    case = dict(SI, bremsstrahlung_model="eedl", composition=None)
+    assert ls.lattice_share_record(case, 1)["layers"] == [
+        dict(layer=None, corrected=False, reason="no composition")
+    ]

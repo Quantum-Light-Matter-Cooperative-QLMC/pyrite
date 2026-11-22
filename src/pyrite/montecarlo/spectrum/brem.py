@@ -1220,7 +1220,7 @@ def mc_brem_spectrum(
                     seg_E[sl],
                     E_grid,
                 )
-            dsig = without_isotropic_share(dsig, isotropic_shares.get(el_i), seg_E[sl], E_grid)
+            dsig = without_isotropic_share(dsig, isotropic_shares.get(el_i), seg_E[sl], E_grid, xp)
             if bremslib_state is not None:
                 dsig = xp.where(bremslib_state.available[:, None], directional, dsig / REAL(unit))
             _accumulate(n_i * 1e24 * unit * path_cm, dsig * T_abs, sl)

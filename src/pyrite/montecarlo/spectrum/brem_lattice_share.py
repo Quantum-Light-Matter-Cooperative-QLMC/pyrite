@@ -537,13 +537,13 @@ def isotropic_shares_of(shares, bremslib_staged) -> dict:
     return {el: s for el, s in (shares or {}).items() if el not in bremslib_staged}
 
 
-def without_isotropic_share(dsig, share, T_keV, E_grid):
+def without_isotropic_share(dsig, share, T_keV, E_grid, xp):
     """Isotropic ``dsig`` [cm^2/eV] less the theta-integrated share, clamped at zero.
+
+    ``xp`` is the caller's array module (backends bind at module scope).
 
     Validation: brem-lattice-share-isotropic
     """
     if share is None:
         return dsig
-    from ..._backend import REAL, xp
-
-    return xp.maximum(dsig - share.sigma(T_keV, E_grid, xp=xp), REAL(0.0))
+    return xp.maximum(dsig - share.sigma(T_keV, E_grid, xp=xp), 0)
