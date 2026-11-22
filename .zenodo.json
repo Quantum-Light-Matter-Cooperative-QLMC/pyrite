@@ -1,6 +1,40 @@
 {
   "upload_type": "software",
   "license": "other-nc",
+  "title": "PyRITE: Python-based Radiative Interaction and Transport Engine",
+  "description": "PyRITE (Python-based Radiative Interaction and Transport Engine) is a Python-native Monte Carlo toolkit for simulating electron transport and X-ray emission in crystalline and amorphous solids. It combines electron scattering and energy-loss modelling with calculations of parametric X-ray radiation, coherent bremsstrahlung, bremsstrahlung, and characteristic X-ray emission. Researchers can investigate how beam properties, material composition, crystal orientation, target geometry, and detector configuration affect predicted radiation spectra. PyRITE provides a Python API, command-line workflows, interactive analysis applications, and optional GPU acceleration for studies of electron–matter interactions and crystal-based X-ray sources.",
+  "language": "eng",
+  "keywords": [
+    "Monte Carlo simulation",
+    "electron transport",
+    "electron–matter interactions",
+    "X-ray emission",
+    "parametric X-ray radiation",
+    "coherent bremsstrahlung",
+    "bremsstrahlung",
+    "characteristic X-rays",
+    "crystal-based X-ray sources",
+    "Python",
+    "GPU acceleration"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "https://pyrite.readthedocs.io/en/latest/",
+      "relation": "isDocumentedBy",
+      "scheme": "url"
+    },
+    {
+      "identifier": "https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite",
+      "relation": "isSupplementTo",
+      "scheme": "url"
+    },
+    {
+      "identifier": "10.5281/zenodo.23220627",
+      "relation": "requires",
+      "resource_type": "dataset",
+      "scheme": "doi"
+    }
+  ],
   "creators": [
     {
       "name": "Amador, Alexander",
@@ -23,10 +57,19 @@
     },
     {
       "name": "Carbajo, Sergio",
-      "affiliation": [
-        "Department of Electrical and Computer Engineering, UCLA, 420 Westwood Plaza, Los Angeles, CA 90095, USA",
-        "Physics and Astronomy Department, UCLA, 475 Portola Plaza, Los Angeles, CA 90095, USA",
-        "SLAC National Accelerator Laboratory, 2575 Sand Hill Road, Menlo Park, CA 94025, USA; California NanoSystems Institute, 570 Westwood Plaza, Los Angeles, CA 90095, USA"
+      "affiliations": [
+        {
+          "name": "Department of Electrical and Computer Engineering, UCLA, 420 Westwood Plaza, Los Angeles, CA 90095, USA"
+        },
+        {
+          "name": "Physics and Astronomy Department, UCLA, 475 Portola Plaza, Los Angeles, CA 90095, USA"
+        },
+        {
+          "name": "SLAC National Accelerator Laboratory, 2575 Sand Hill Road, Menlo Park, CA 94025, USA"
+        },
+        {
+          "name": "California NanoSystems Institute, 570 Westwood Plaza, Los Angeles, CA 90095, USA"
+        }
       ],
       "orcid": "0000-0002-5292-4470"
     }

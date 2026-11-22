@@ -114,13 +114,52 @@ credit them as authors. Only humans are listed. Add a new human author to
 affiliations; never add an AI agent or `[bot]` account. `CITATION.cff` enables
 GitHub's citation interface. When both files exist,
 [Zenodo uses only `.zenodo.json`](https://help.zenodo.org/docs/github/describe-software/).
-`tests/dev/test_release.py` enforces this. The licence is `other-nc`, Zenodo's
-nearest vocabulary entry for the UCLA Academic Software License in
-`LICENSE.txt`, which the archived source carries. After a release, check the new
-Zenodo version's creator list. Repository metadata changes do not update old
-records: open each affected software record in Zenodo, choose **Edit**, correct
-its creators, and **Publish**. This
-[metadata correction preserves the DOI](https://help.zenodo.org/docs/deposit/manage-records/).
+The licence is `other-nc`, Zenodo's nearest vocabulary entry for the UCLA
+Academic Software License in `LICENSE.txt`, which the archived source carries.
+
+The committed `description` supplies a general software abstract instead of
+the GitHub release changelog. Maintain it alongside README capabilities;
+release-specific changes stay in GitHub release notes. The title, English
+language, keywords and related identifiers support discovery. Documentation is
+linked with `isDocumentedBy`; the runtime tables concept DOI
+`10.5281/zenodo.23220627` is linked with `requires` as a dataset. Keep these
+links stable, and let ingestion derive each release's version, date and DOI
+rather than freezing them in `.zenodo.json`.
+
+For multiple affiliations, use `affiliations: [{"name": "…"}, …]` on a creator,
+with one full institution/department/address per entry. Sergio has four entries,
+matching the four semicolon-separated texts in `CITATION.cff`. Do not also set
+the singular `affiliation`: current ingestion converts that value to one entry
+and overwrites the plural list. A singular string remains valid for one
+affiliation; an array under the singular key is invalid, and semicolons inside
+a string do not create separate affiliations. This plural form is supported by
+the current [GitHub metadata loader](https://github.com/zenodo/zenodo-rdm/blob/c0ad6c384218530072e39c0e0901c9fd37ce6659/site/zenodo_rdm/github/release.py#L22-L41)
+and [creator deserializer](https://github.com/zenodo/zenodo-rdm/blob/c0ad6c384218530072e39c0e0901c9fd37ce6659/site/zenodo_rdm/legacy/deserializers/metadata.py#L80-L109),
+although the older documented legacy schema shows only a singular string.
+The upstream creator deserializer was checked locally against all five creators;
+confirm the published result after ingestion as well.
+
+After each software release:
+
+1. Open the exact version's Zenodo record. Check the abstract, keywords,
+   documentation link, runtime-tables **Requires** link, version and creator
+   order/ORCIDs. Confirm Sergio occurs once with four separate affiliations.
+2. If a correction is needed, choose **Edit**. Update the description from
+   `.zenodo.json` and edit Sergio's creator entry. The
+   [creator form](https://help.zenodo.org/docs/deposit/describe-records/creators/)
+   accepts multiple affiliations: add each of the four full texts separately,
+   using text entries where institution suggestions lose department/address
+   details. Remove any combined affiliation, save the creator, then **Publish**.
+   This [metadata correction preserves the DOI](https://help.zenodo.org/docs/deposit/manage-records/).
+3. Check the record's citation/metadata exports and a fresh Zotero import for
+   the general abstract. Inspect structured affiliations on the record even
+   if the chosen citation format omits them.
+
+Repository metadata changes affect future archives; they do not update already
+published records. Apply the same correction procedure to affected versions,
+including the reported v0.36.1 abstract. Existing Zotero items may retain the
+old abstract: refresh their metadata or compare a fresh import before replacing
+any locally edited fields.
 
 (zenodo-archive-separation)=
 
