@@ -390,6 +390,8 @@ AdaptiveSampling = { target = "pyrite._sampling:AdaptiveSampling", status = "adv
 CxrReflections = { target = "pyrite._numerics:CxrReflections", status = "advanced-stable" }
 FixedSampling = { target = "pyrite._sampling:FixedSampling", status = "advanced-stable" }
 LineRoulette = { target = "pyrite._line_roulette:LineRoulette", status = "experimental" }
+# #379: transport estimator; the spectrum phase refuses split cases until copy weights land.
+ConeSplitting = { target = "pyrite._cone_splitting:ConeSplitting", status = "experimental" }
 PixelScorer = { target = "pyrite.instrument:PixelScorer", status = "advanced-stable" }
 RadiationNumerics = { target = "pyrite._numerics_groups:RadiationNumerics", status = "advanced-stable" }
 TransportNumerics = { target = "pyrite._numerics_groups:TransportNumerics", status = "advanced-stable" }

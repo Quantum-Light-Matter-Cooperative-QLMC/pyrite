@@ -5,6 +5,7 @@ from contextvars import ContextVar
 from dataclasses import replace
 from typing import Any
 
+from ..._cone_splitting import ConeSplitting, warn_low_gain
 from ..case import admit_axial_channeling, refuse_channeling, refuse_transition_radiation
 
 # Public KernelTuning.transport override (#776): a ``PerElectronTransportConfig``
@@ -202,6 +203,25 @@ def _beam_kwargs(case):
     )
 
 
+def split_transport_kwargs(case) -> dict[str, Any]:
+    """``{"_cone_split": request}`` toward the case's detector direction, else none (#379).
+
+    Option off adds no keyword, so analog transport keeps its call shape.
+
+    Validation: detector-cone-variance-reduction
+    """
+    record = case.get("cone_split")
+    if record is None:
+        return {}
+    from ..transport.cone_split import ConeSplit
+    from .artifacts import _case_geometry
+
+    warn_low_gain(case)
+    nx, ny, nz = (float(v) for v in _case_geometry(case)[3])
+    policy = ConeSplitting.from_dict(record)
+    return {"_cone_split": ConeSplit((nx, ny, nz), **policy.transport_parameters(case["E0_keV"]))}
+
+
 def _check_opt_in_transport(
     case,
     trajectory_capture,
@@ -211,7 +231,11 @@ def _check_opt_in_transport(
     block_monitor=None,
     block_consumer=None,
 ):
-    """Refuse transport options an opt-in component lacks, before any work (ADR-0017 tier 3)."""
+    """Refuse transport options an opt-in component lacks, before any work (ADR-0017 tier 3).
+
+    Returns the opt-in transport keywords: ``{"_cone_split": request}`` for a
+    detector-cone split case (#379), else none, so analog calls keep their shape.
+    """
     if case.get("photon_transport") is not None:
         from .photon_aperture import prepare_photon_case
 
@@ -220,6 +244,8 @@ def _check_opt_in_transport(
         prepare_photon_case(case, transport_core)
 
     admit_axial_channeling(case)
+    if case.get("cone_split") is not None and trajectory_capture is not None:
+        raise ValueError("trajectory capture does not record detector-cone split copies (#379)")
     if trajectory_capture is not None:
         refuse_channeling(case, "trajectory capture")
     if block_electrons is not None:
@@ -229,6 +255,7 @@ def _check_opt_in_transport(
     adaptive = case.get("adaptive_precision") is not None
     if block_consumer is not None and block_electrons is None and not adaptive:
         raise ValueError("a block consumer needs electron blocks")
+    return split_transport_kwargs(case)
 
 
 @contextmanager

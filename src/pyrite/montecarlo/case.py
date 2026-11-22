@@ -154,6 +154,7 @@ _CASE_KEY_ORDER = (
     "reflection_selection",
     "cxr_source",
     "transport_realization",
+    "cone_split",
 )
 
 
@@ -306,6 +307,10 @@ class Case(Mapping[str, Any]):
         line grid. Absent scores lines. Refuses every line-only setting
         (coherent emission, temporal profile, roulette, channeling, transition
         radiation, reflection selection, line-grid policy).
+    cone_split
+        Opt-in detector-cone splitting (#379) as a
+        :class:`pyrite._cone_splitting.ConeSplitting` record; absent is analog
+        transport. Validation: detector-cone-variance-reduction
     """
 
     # Producer-required fields. Their declaration order need not match the
@@ -421,11 +426,18 @@ class Case(Mapping[str, Any]):
     cxr_source: Literal["none"] | _Absent = _ABSENT
     # Append for frozen-slot pickle compatibility; absent preserves legacy keys.
     transport_realization: TransportRealization | Mapping[str, str] | _Absent = _ABSENT
+    # Opt-in detector-cone splitting (#379), appended for pickle offsets.
+    cone_split: dict[str, object] | _Absent = _ABSENT
 
     def __getstate__(self) -> list[Any]:
-        """Keep the historical frozen-slot pickle when the marker is absent."""
+        """Keep the historical frozen-slot pickle: drop trailing absent appended fields."""
         state = [getattr(self, field.name) for field in fields(self)]
-        return state[:-1] if self.transport_realization is _ABSENT else state
+        # Only cone_split and transport_realization postdate the legacy layout.
+        for _ in range(2):
+            if state[-1] is not _ABSENT:
+                break
+            state.pop()
+        return state
 
     def __setstate__(self, state: list[Any]) -> None:
         """Restore frozen-slot pickles, filling newly appended optional fields."""
@@ -557,6 +569,7 @@ class Case(Mapping[str, Any]):
         self._validate_transition_radiation()
         self._validate_photon_transport()
         self._validate_line_roulette()
+        self._validate_cone_split()
         self._validate_node_support_cutoff()
         self._validate_reflection_selection()
         self._validate_cxr_source()
@@ -799,6 +812,13 @@ class Case(Mapping[str, Any]):
         from .runner.reflection_cutoff import validate_reflection_selection
 
         validate_reflection_selection(self.reflection_selection, self)
+
+    def _validate_cone_split(self) -> None:
+        if isinstance(self.cone_split, _Absent):
+            return
+        from .._cone_splitting import ConeSplitting
+
+        ConeSplitting.from_dict(self.cone_split).validate_case(self)
 
     def _validate_line_roulette(self) -> None:
         if isinstance(self.line_roulette, _Absent):

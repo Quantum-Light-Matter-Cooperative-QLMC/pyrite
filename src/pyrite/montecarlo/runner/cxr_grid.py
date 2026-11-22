@@ -11,6 +11,7 @@ from time import perf_counter
 import numpy as np
 
 from ..._backend import BACKEND, REAL, _to_cpu
+from ..._cone_splitting import refuse_split_spectrum
 from ..._cxr_grid_policy import (
     BANDWIDTH_PROXY_SAFETY,
     COHERENT_JUMP_CLUSTER_SEPARATION,
@@ -1117,7 +1118,11 @@ def cxr_truncation_audit(case, E_grid, n_electrons=None):
     :func:`check_cxr_truncation` can report the line yield's standard error. A
     defaulted bandwidth below its ceiling also bounds the upper share at each
     :func:`extension_stop_ladder` stop, which a refusal extends to (#1243).
+
+    Every spectrum phase builds this audit first, so a detector-cone split case
+    is refused here until its line tallies carry copy weights (#379).
     """
+    refuse_split_spectrum(case)
     payload = case.get("line_grid_policy")
     if payload is None or payload["bandwidth"]["policy"] != RESONANCE_BANDWIDTH_POLICY:
         return None

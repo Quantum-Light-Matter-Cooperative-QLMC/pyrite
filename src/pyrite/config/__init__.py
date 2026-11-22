@@ -10,6 +10,7 @@ from importlib import import_module
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from pyrite._cone_splitting import ConeSplitting as ConeSplitting
     from pyrite._config_presets import (
         load_numerics as load_numerics,
     )
@@ -58,6 +59,7 @@ if TYPE_CHECKING:
 
 _EXPORTS = {
     "AdaptiveSampling": ("pyrite._sampling", "AdaptiveSampling"),
+    "ConeSplitting": ("pyrite._cone_splitting", "ConeSplitting"),
     "CxrReflections": ("pyrite._numerics", "CxrReflections"),
     "ExecutionConfig": ("pyrite._numerics_groups", "ExecutionConfig"),
     "KernelTuning": ("pyrite._numerics_groups", "KernelTuning"),
@@ -78,6 +80,7 @@ _EXPORTS = {
 __all__ = [
     "AdaptiveSampling",
     "AngularSampling",
+    "ConeSplitting",
     "CxrReflections",
     "ExecutionConfig",
     "KernelTuning",

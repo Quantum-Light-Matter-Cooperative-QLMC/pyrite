@@ -422,15 +422,19 @@ def transport_cone_split(simulate, kw):
 
     Returns the primaries' result; ``result["cone_split"]`` holds the copy
     records and ``["copies"]``, the copies' own transport result (or ``None``).
-    Copies are not split again.
+    Copies are not split again. ``parent`` indexes the call's own primaries,
+    so an electron block (``_electron_start``) keeps block-local parents.
+
+    Copies draw only from their counter-addressed keys, and their coupled hard
+    photons are keyed by lineage, so a block run equals the single call.
 
     Validation: detector-cone-variance-reduction
     """
     from .secondaries import LaunchState, SecondaryPass, _radiative_keys
 
     cone = kw["_cone_split"]
-    if kw.get("_secondary") is not None or int(kw.get("_electron_start", 0)):
-        raise ValueError("detector-cone splitting supports neither cascades nor electron blocks")
+    if kw.get("_secondary") is not None:
+        raise ValueError("detector-cone splitting does not support particle cascades")
     if kw.get("gdf_source") is not None or kw.get("groove") is not None:
         raise ValueError("detector-cone splitting supports neither GDF beams nor grooves")
     base = {k: v for k, v in kw.items() if k not in ("_cone_split", "_secondary")}
@@ -460,7 +464,10 @@ def transport_cone_split(simulate, kw):
         Ne=int(parent.size),
         E_cut_by_electrons=np.asarray(primaries["initial_E_cut_keV"], dtype=float)[parent],
         transport_core="per-electron",
+        _electron_start=0,
         _energy_range_keV=table_range,
     )
-    record["copies"] = simulate(**step, _secondary=SecondaryPass(launch, table_range, photon_seed))
+    record["copies"] = simulate(
+        **step, _secondary=SecondaryPass(launch, table_range, photon_seed, lineage=True)
+    )
     return primaries
