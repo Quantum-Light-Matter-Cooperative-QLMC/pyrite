@@ -279,3 +279,12 @@ def test_host_exec_wraps_host_side_python(configured):
 def test_host_exec_rejects_shell_text(value):
     with pytest.raises(ValueError):
         targets.RemoteTarget(host="box", host_exec=value)
+
+
+def test_add_existing_and_edit_missing_name_the_other_command(configured):
+    result = invoke(remote_targets.command, ["add", "amd", "--host", "box"])
+    assert result.exit_code == 2
+    assert "pyrite remote target edit amd" in result.stderr
+    result = invoke(remote_targets.command, ["edit", "absent", "--partition", "gpu"])
+    assert result.exit_code == 2
+    assert "pyrite remote target add absent" in result.stderr

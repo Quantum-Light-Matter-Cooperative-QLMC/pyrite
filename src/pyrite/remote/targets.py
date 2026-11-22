@@ -125,7 +125,14 @@ def save_target(name: str, values: dict, *, edit: bool = False) -> RemoteTarget:
     validate_name(name)
     targets = named_targets()
     if edit != (name in targets):
-        raise ValueError(f"target {name!r} {'does not exist' if edit else 'already exists'}")
+        hint = (
+            f"add it with: pyrite remote target add {name} --host HOST"
+            if edit
+            else f"change it with: pyrite remote target edit {name} --FIELD VALUE"
+        )
+        raise ValueError(
+            f"target {name!r} {'does not exist' if edit else 'already exists'}; {hint}"
+        )
     target = (
         replace(targets[name], **values)
         if edit
