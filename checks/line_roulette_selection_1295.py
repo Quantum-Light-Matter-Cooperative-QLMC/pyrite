@@ -30,6 +30,13 @@ timed (for cases whose production pass takes hours, e.g. the 1 mm MeV scene).
 ``predict`` then assumes a free screen and production time proportional to rows
 scored, so its arm gains and the free-screen optimal bound are upper bounds.
 
+Each record carries ``verdict``: ``pays`` when the free-screen optimal bound
+reaches ``GAIN_THRESHOLD`` (1.5x), else ``negative``. ``diagnostics`` reports
+the #1339 per-history moment checks (``RunningMoments``: RSE, VOV, SHIFT, tail
+slope, FOM) for the analog masses and, per arm, for the realized rouletted
+scores ``m_i I_i / p_i``: whether the analog CV is trustworthy at this N, and
+whether a rouletted run would still pass the adaptive VOV gate.
+
 Yield-level prediction only: per-bin variance can concentrate differently.
 Remote GPU only. Engineering evidence for ``line-scoring-roulette``; no
 accuracy verdict.
@@ -56,6 +63,10 @@ REDUCTION = os.environ.get("PROBE_REDUCTION", "")
 #: Stop after the mass-only screen (no timed analog or kept-row pass).
 MASS_ONLY = os.environ.get("PROBE_MASS_ONLY", "0") != "0"
 PILOT = 128
+#: Free-screen optimal bound at or above which roulette is worth pursuing.
+GAIN_THRESHOLD = 1.5
+#: Default adaptive VOV gate, ``VOV + 1/n <= max_variance_of_variance``.
+VOV_GATE = 0.01
 DEFAULT_ARMS = [f"{k}:{f}" for k in (0.02, 0.05, 0.1, 0.25) for f in (0.05, 0.1, 0.25, 0.5)]
 
 
@@ -155,6 +166,37 @@ def optimal_bound(mass, rows, var_a, scales=np.geomspace(1e-4, 1e4, 801)):
     return best
 
 
+def diagnostics(scores, elapsed_s=None):
+    """#1339 moment diagnostics of one per-history score vector."""
+    from pyrite.montecarlo.runner.adaptive import RunningMoments
+
+    m = RunningMoments()
+    m.add_block(np.asarray(scores, dtype=float))
+    rse, vov, shift = m.relative_se(), m.variance_of_variance(), m.shift()
+    return dict(
+        relative_se=rse,
+        variance_of_variance=vov,
+        vov_gate_passes=None if vov is None else vov + 1.0 / m.n <= VOV_GATE,
+        shift=shift,
+        shift_over_se=None if shift is None or not rse else shift / rse,
+        tail_slope=m.tail_slope(),
+        max_share=m.max_share(),
+        effective_sample_size=m.effective_sample_size(),
+        figure_of_merit=m.figure_of_merit(elapsed_s),
+    )
+
+
+def _rouletted_scores(mass, seed, keep, floor, pilot=PILOT):
+    """Realized ``m_i I_i / p_i`` of one arm (``LineScreen._select`` draws)."""
+    from pyrite.montecarlo.runner.line_roulette import roulette_uniforms
+
+    ids = np.arange(mass.size)
+    threshold = float(np.quantile(mass[:pilot], 1.0 - keep))
+    low = (ids >= pilot) & (mass > 0.0) & (mass < threshold)
+    kept = ~low | (roulette_uniforms(seed, ids) < floor)
+    return np.where(kept, mass / np.where(low, floor, 1.0), 0.0)
+
+
 def predict(mass, rows, seed, timing, arms):
     n = mass.size
     var_a = float(n * mass.var(ddof=1))
@@ -178,6 +220,8 @@ def predict(mass, rows, seed, timing, arms):
         screen_over_production=None if assumed else t_screen / t_prod,
         timing_assumed=assumed,
         optimal_keep_probability_bound_free_screen=optimal_bound(mass, rows, var_a),
+        gain_threshold=GAIN_THRESHOLD,
+        diagnostics=diagnostics(mass, None if assumed else t_prod),
         arms=[],
     )
     for keep, floor in arms:
@@ -188,9 +232,18 @@ def predict(mass, rows, seed, timing, arms):
             variance_ratio=var_r / var_a,
             production_time_ratio=t_r / t_prod,
             fom_gain_production=(var_a * t_prod) / (var_r * t_r),
+            diagnostics=diagnostics(
+                _rouletted_scores(mass, seed, keep, floor), None if assumed else t_r
+            ),
+        )
+        rse_a, rse_r = out["diagnostics"]["relative_se"], row["diagnostics"]["relative_se"]
+        row["fom_gain_realized"] = (
+            None if not rse_a or not rse_r else (rse_a**2 * t_prod) / (rse_r**2 * t_r)
         )
         out["arms"].append(row)
     out["best"] = max(out["arms"], key=lambda r: r["fom_gain_production"])
+    bound = out["optimal_keep_probability_bound_free_screen"]
+    out["verdict"] = "pays" if bound >= GAIN_THRESHOLD else "negative"
     return out
 
 
@@ -315,6 +368,11 @@ def _parse(arms):
     return [tuple(float(v) for v in text.split(":")) for text in arms]
 
 
+def _brief(diag):
+    keys = ("variance_of_variance", "vov_gate_passes", "shift_over_se", "tail_slope")
+    return None if not diag else {k: diag[k] for k in keys}
+
+
 def _summary(record):
     pred = record.get("prediction") or {}
     best = pred.get("best") or {}
@@ -326,6 +384,10 @@ def _summary(record):
         subset_s=record.get("subset_s"),
         subset_row_share=record.get("subset_row_share"),
         mass_share_top=pred.get("mass_share_top"),
+        mass_cv=pred.get("mass_cv"),
+        bound=pred.get("optimal_keep_probability_bound_free_screen"),
+        verdict=pred.get("verdict"),
+        analog=_brief(pred.get("diagnostics")),
         best=None
         if not best
         else {k: best[k] for k in ("keep_fraction", "floor", "fom_gain_production")},
@@ -348,10 +410,12 @@ def table(out_dir):
             continue
         print(json.dumps(_summary(record), default=str))
         for row in (record.get("prediction") or {}).get("arms", []):
+            diag = row.get("diagnostics") or {}
             print(
                 f"  keep={row['keep_fraction']:<5g} floor={row['floor']:<5g} "
                 f"rows={row['expected_row_share']:.3f} var={row['variance_ratio']:.3f} "
-                f"T={row['production_time_ratio']:.3f} FOM={row['fom_gain_production']:.2f}"
+                f"T={row['production_time_ratio']:.3f} FOM={row['fom_gain_production']:.2f} "
+                f"VOV={diag.get('variance_of_variance')} gate={diag.get('vov_gate_passes')}"
             )
 
 
