@@ -61,6 +61,7 @@ _HELP = {
     "constraint": "SLURM node features, e.g. 'A100|H200'; empty for none.",
     "max_time": "Site wall-time cap, e.g. 1-00:00:00; replaces UNLIMITED and bounds --chunk-minutes.",
     "host_exec": "Prefix for helper Python on the host (pull, gc, trajectories), e.g. 'srun --time=00:30:00 --mem=8G'; empty runs it on the login node.",
+    "nice": "SLURM --nice for chunked and background jobs (default 10000); 0 omits it, e.g. on age-priority queues.",
     "description": "Free-text note shown by list.",
 }
 

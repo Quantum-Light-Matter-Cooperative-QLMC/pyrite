@@ -23,6 +23,7 @@ def _isolated_store(monkeypatch, tmp_path):
         "PYRITE_REMOTE_CONSTRAINT",
         "PYRITE_REMOTE_MAX_TIME",
         "PYRITE_REMOTE_HOST_EXEC",
+        "PYRITE_REMOTE_NICE",
     ):
         monkeypatch.delenv(name, raising=False)
     for attribute in (
@@ -34,6 +35,7 @@ def _isolated_store(monkeypatch, tmp_path):
         "SLURM_CONSTRAINT",
         "SLURM_MAX_TIME",
         "HOST_EXEC",
+        "SLURM_NICE",
     ):
         monkeypatch.setattr(remote_config, attribute, None)
     return path

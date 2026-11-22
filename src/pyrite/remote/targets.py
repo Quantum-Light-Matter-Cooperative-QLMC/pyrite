@@ -25,6 +25,7 @@ _FIELDS = (
     "constraint",
     "max_time",
     "host_exec",
+    "nice",
     "description",
 )
 
@@ -115,6 +116,7 @@ def _fallback_values(exclude=()):
                 ("constraint", "SLURM_CONSTRAINT"),
                 ("max_time", "SLURM_MAX_TIME"),
                 ("host_exec", "HOST_EXEC"),
+                ("nice", "SLURM_NICE"),
             )
             if field not in exclude
         },

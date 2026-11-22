@@ -14,6 +14,7 @@ import unicodedata
 from datetime import date
 
 from pyrite import remote
+from pyrite.remote import config as remote_config
 
 today = date.today()
 
@@ -122,7 +123,7 @@ fi
 [ -f "$JOBDIR/STOP" ] && {{ echo "cancelled (stop requested) $(date -Is)" > "$JOBDIR/state"; exit 0; }}
 k=$(grep -c "^slurm_job_id: " "$JOBDIR/meta" 2>/dev/null)
 echo "queued slice $((k + 1)) $(date -Is)" > "$JOBDIR/state"
-SID=$(sbatch --parsable --nice=10000 "$JOBDIR/run.sh") || {{ echo "FAILED (slice resubmission) $(date -Is)" > "$JOBDIR/state"; exit 1; }}
+SID=$({remote_config.sbatch_submit_command(nice=True)} "$JOBDIR/run.sh") || {{ echo "FAILED (slice resubmission) $(date -Is)" > "$JOBDIR/state"; exit 1; }}
 SID=${{SID%%;*}}
 case "$SID" in ''|*[!0-9]*) echo "FAILED (slice resubmission) $(date -Is)" > "$JOBDIR/state"; exit 1 ;; esac
 printf 'slurm_job_id: %s\n' "$SID" >> "$JOBDIR/meta"

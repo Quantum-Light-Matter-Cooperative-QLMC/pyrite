@@ -163,6 +163,8 @@ def _slice_payload(jobdir: str, command: str, remote, sync_block: str) -> str:
     (``remote.scripts._uv_sync_block``); the body runs ``uv run --no-sync``, so
     without it a box whose venv predates the lockfile fails on import.
     """
+    from ..remote import config as remote_config
+
     return f"""JOBDIR={remote.shell_word(jobdir)}
 cd {remote.shell_remote_dir()} || exit 1
 [ -f "$JOBDIR/STOP" ] && {{ echo "cancelled (stop requested) $(date -Is)" > "$JOBDIR/state"; exit 0; }}
@@ -181,7 +183,7 @@ fi
 [ -f "$JOBDIR/STOP" ] && {{ echo "cancelled (stop requested) $(date -Is)" > "$JOBDIR/state"; exit 0; }}
 k=$(grep -c "^slurm_job_id: " "$JOBDIR/meta" 2>/dev/null)
 echo "queued slice $((k + 1)) $(date -Is)" > "$JOBDIR/state"
-SID=$(sbatch --parsable --nice=10000 "$JOBDIR/run.sh") || {{ echo "FAILED (slice resubmission) $(date -Is)" > "$JOBDIR/state"; exit 1; }}
+SID=$({remote_config.sbatch_submit_command(nice=True)} "$JOBDIR/run.sh") || {{ echo "FAILED (slice resubmission) $(date -Is)" > "$JOBDIR/state"; exit 1; }}
 SID=${{SID%%;*}}
 case "$SID" in ''|*[!0-9]*) echo "FAILED (slice resubmission) $(date -Is)" > "$JOBDIR/state"; exit 1 ;; esac
 printf 'slurm_job_id: %s\\n' "$SID" >> "$JOBDIR/meta"

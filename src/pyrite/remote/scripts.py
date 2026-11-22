@@ -305,7 +305,7 @@ def _submit_slurm_command(
     jobdir_word = config.shell_single_word(jobdir)
     run_script_word = config.shell_single_word(f"{jobdir}/run.sh")
     release = _release_checkpoint_stems_command(jobid, reservation_stems)
-    sbatch = "sbatch --parsable --nice=10000" if nice else "sbatch --parsable"
+    sbatch = config.sbatch_submit_command(nice=nice)
     return f"""D={jobdir_word}; \
 echo "queued $(date -Is)" > "$D/state"; \
 SID=""; attempt=0; \

@@ -35,6 +35,7 @@ SLURM_ACCOUNT: str | None = None
 SLURM_CONSTRAINT: str | None = None
 SLURM_MAX_TIME: str | None = None
 HOST_EXEC: str | None = None
+SLURM_NICE: str | None = None
 SLURM_GPUS = 1
 SLURM_CPUS_PER_MATERIAL = 8
 SLURM_TIME = "UNLIMITED"
@@ -362,6 +363,11 @@ _SLURM_SETTINGS = {
     ),
     # Not a batch directive: a plain-word command prefix (no shell operators or
     # quotes), so it is safe unquoted in the ssh command line.
+    "remote.nice": (
+        "PYRITE_REMOTE_NICE",
+        re.compile(r"\d{1,9}"),
+        "a non-negative SLURM nice value such as 10000, or 0 for none",
+    ),
     "remote.host_exec": (
         "PYRITE_REMOTE_HOST_EXEC",
         re.compile(r"(?:[A-Za-z0-9_./:=,@%+-]+(?: [A-Za-z0-9_./:=,@%+-]+)*)?"),
@@ -430,6 +436,22 @@ def slurm_constraint() -> str | None:
 def slurm_max_time() -> str | None:
     """Return the target's SLURM wall-time cap (``remote.max_time``), or None for no cap."""
     return _slurm_setting("remote.max_time", SLURM_MAX_TIME) or None
+
+
+def slurm_nice() -> int:
+    """Return the ``--nice`` for chunked/background submissions (``remote.nice``)."""
+    return int(_slurm_setting("remote.nice", SLURM_NICE))
+
+
+def sbatch_submit_command(*, nice: bool = False) -> str:
+    """Return ``sbatch --parsable``, plus the target's ``--nice`` when ``nice`` and nonzero.
+
+    The default 10000 lets a shared single-GPU box run others' jobs between
+    slices. On an age-weighted queue it instead costs queue position: on a
+    site where age weight W saturates at max age A, it is 10000/W of A.
+    """
+    value = slurm_nice() if nice else 0
+    return f"sbatch --parsable --nice={value}" if value else "sbatch --parsable"
 
 
 def host_exec() -> str | None:
@@ -642,6 +664,7 @@ class RemoteTarget:
     constraint: str = ""
     max_time: str = ""
     host_exec: str = ""
+    nice: str = "10000"
 
     def __post_init__(self):
         from .targets import validate_name
@@ -659,6 +682,7 @@ class RemoteTarget:
             "constraint",
             "max_time",
             "host_exec",
+            "nice",
         ):
             value = getattr(self, field)
             if not isinstance(value, str) or any(ord(c) < 32 or ord(c) == 127 for c in value):
@@ -680,6 +704,7 @@ class RemoteTarget:
             "constraint",
             "max_time",
             "host_exec",
+            "nice",
         ):
             object.__setattr__(
                 self, field, validate_slurm_setting(f"remote.{field}", getattr(self, field))

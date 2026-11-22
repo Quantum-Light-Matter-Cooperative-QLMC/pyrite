@@ -288,3 +288,24 @@ def test_add_existing_and_edit_missing_name_the_other_command(configured):
     result = invoke(remote_targets.command, ["edit", "absent", "--partition", "gpu"])
     assert result.exit_code == 2
     assert "pyrite remote target add absent" in result.stderr
+
+
+def test_nice_defaults_to_10000_and_zero_omits_it(configured):
+    with config.use_target("nvidia"):
+        assert config.sbatch_submit_command(nice=True) == "sbatch --parsable --nice=10000"
+        assert config.sbatch_submit_command() == "sbatch --parsable"
+    _hoffman(nice="0")
+    with config.use_target("h2"):
+        assert config.sbatch_submit_command(nice=True) == "sbatch --parsable"
+        resubmit = scripts._queue_scripts._chunked_queue_tail()
+        submit = scripts._submit_slurm_command("job", [], nice=True)
+    assert "--nice" not in resubmit and "--nice" not in submit
+    targets.save_target("polite", {"host": "box", "nice": "500"})
+    with config.use_target("polite"):
+        assert config.sbatch_submit_command(nice=True) == "sbatch --parsable --nice=500"
+
+
+@pytest.mark.parametrize("value", ["-5", "10k", ""])
+def test_invalid_nice(value):
+    with pytest.raises(ValueError):
+        targets.RemoteTarget(host="box", nice=value)

@@ -142,6 +142,10 @@ ships your local tables.
    finite requests before submission. A chunked slice requests three times
    `--chunk-minutes`, so a 24-hour cap allows `--chunk-minutes 480` at most.
    Each slice queues again, so on a busy shared partition use long chunks.
+   Chunked slices are also submitted with `--nice=10000` by default, which
+   yields a shared box to other jobs between slices. Where priority is mostly
+   queue age (`ssh MY_SSH_ALIAS 'sprio -w'`), that penalty delays every slice;
+   set `pyrite remote target edit campus --nice 0`.
 5. Run something small and confirm the allocation:
 
    ```bash
