@@ -42,6 +42,34 @@ def build(energy_keV, thickness_ang, tilt, azimuth, ne, seed, material=MATERIAL)
     return build_case(material, float(energy_keV), config, seed=int(seed), resolution="local")
 
 
+def split_case(
+    case,
+    cone_factor,
+    target_weight,
+    *,
+    min_energy_fraction=0.0,
+    angle_scale=None,
+    max_copies_per_electron=1024,
+):
+    """``case`` with the public #379 ``cone_split`` option (no gate/angle roulette by default)."""
+    from pyrite._cone_splitting import ConeSplitting
+
+    policy = ConeSplitting(
+        cone_factor=float(cone_factor),
+        min_energy_fraction=float(min_energy_fraction),
+        angle_scale=None if angle_scale is None or np.isinf(angle_scale) else float(angle_scale),
+        target_weight=float(target_weight),
+        max_copies_per_electron=int(max_copies_per_electron),
+    )
+    policy.validate_case(case)
+    return {**case, "cone_split": policy.to_dict()}
+
+
+def primaries(segs):
+    """Primary rows only: production scorers fold a ``cone_split`` record's copies."""
+    return {key: value for key, value in segs.items() if key != "cone_split"}
+
+
 def _settings(ne):
     from pyrite._precision import Precision
 
@@ -182,58 +210,30 @@ def brute(args):
 def compare(args):
     """Pilot weighted line-mass and continuum statistics; characteristic remains pending.
 
-    Uses full analytic line mass, not a restricted energy-grid integral. Grid
-    resolution is bypassed in both arms because it does not enter these tallies.
-    This is experimental evidence, not an independently verified estimator.
+    Uses full analytic line mass, not a restricted energy-grid integral. The
+    split arm enables the public ``cone_split`` case option (#379) with no
+    energy gate or angle roulette; the monitor folds each primary's weighted
+    copies per history. This is experimental evidence, not an independently
+    verified estimator.
     """
-    from unittest.mock import patch
-
     from pyrite._backend import BACKEND
     from pyrite.montecarlo import runner
-    from pyrite.montecarlo.runner import case_driver
     from pyrite.montecarlo.runner.adaptive import case_measure
-    from pyrite.montecarlo.transport.cone_split import ConeSplit, history_sums
 
-    case = build(
+    analog = build(
         args.energy, args.thickness, args.tilt, args.azimuth, args.ne, args.seed, args.material
     )
-    n_hat = runner._case_geometry(case)[3]
-    cone = ConeSplit(
-        tuple(n_hat), args.cone_factor / (1.0 + args.energy / 511.0), args.target_weight
-    )
-    original = case_driver.simulate_trajectories
+    arms = {"analog": analog, "split": split_case(analog, args.cone_factor, args.target_weight)}
     report = {"args": vars(args), "device": BACKEND.device.name, "arms": {}}
-    for label in ("analog", "split"):
-
-        def transport(*a, label=label, **kw):
-            return original(*a, **kw, **({"_cone_split": cone} if label == "split" else {}))
-
+    for label, case in arms.items():
         started = time.perf_counter()
-        with (
-            patch.object(case_driver, "simulate_trajectories", transport),
-            patch.object(
-                case_driver, "resolve_cxr_grid", lambda c, s, n, ne, grid, *a: (grid, None)
-            ),
-        ):
-            tp = runner._transport_case(case, transport_core="per-electron")
+        tp = runner._transport_case(case, transport_core="per-electron")
         transport_s = time.perf_counter() - started
         started = time.perf_counter()
         measure = case_measure(case, _settings(args.ne))
         values = {k: _host(v) for k, v in measure(0, args.ne, tp["segs"]).items()}
         record = tp["segs"].get("cone_split")
         copies = 0 if record is None else record["parent"].size
-        if copies:
-            # The measurement derives its population from stop-start. Reuse
-            # the primary policy; a single copy is not an adaptive sample.
-            copy_values = measure(0, copies, record["copies"])
-            for key in values:
-                values[key] = history_sums(
-                    values[key],
-                    _host(copy_values[key]),
-                    record["parent"],
-                    record["weight"],
-                    args.ne,
-                )
         measure_s = time.perf_counter() - started
         row = {
             "transport_s": transport_s,

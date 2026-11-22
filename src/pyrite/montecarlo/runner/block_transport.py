@@ -154,7 +154,11 @@ def merge_electron_blocks(blocks: list[dict[str, Any]]) -> dict[str, Any]:
     merged: dict[str, Any] = {}
     joined: dict[int, Any] = {}
     for key, value in first.items():
-        if key in _ADDITIVE_COUNTS:
+        if key == "cone_split" and value is not None:
+            from .cone_split_strata import merge_split_records
+
+            merged[key] = merge_split_records([b[key] for b in blocks])
+        elif key in _ADDITIVE_COUNTS:
             merged[key] = sum(int(b[key]) for b in blocks)
         elif _is_array(value):
             if id(value) not in joined:

@@ -108,7 +108,10 @@ class EmissionAdapter:
             )
         if output.values.shape != expected:
             raise ValueError("producer output must match its native grid or electron population")
-        if batch.electron_band_weights is None:
+        # A continuum adapter's batch score re-enters its native producer
+        # through ``_brem_wide_from_segments``, which folds copies once,
+        # outside its electron blocks (#379); other families fold here.
+        if self.from_segments is None and batch.electron_band_weights is None:
             record = batch.segments.get("cone_split")
             if record is not None and record.get("copies") is not None:
                 values = output.values + _copy_strata(self, batch, slot, native)

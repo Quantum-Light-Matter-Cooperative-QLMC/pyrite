@@ -916,7 +916,14 @@ class Numerics:
             "transport": {
                 "classification": "scientific",
                 "source": "typed" if self.transport is not None else "legacy",
-                "effective": asdict(self.resolved_transport),
+                "effective": {
+                    **asdict(self.resolved_transport),
+                    **(
+                        {"cone_split": self.cone_split.to_dict()}
+                        if self.cone_split is not None
+                        else {}
+                    ),
+                },
             },
             "radiation": {
                 "classification": "scientific",

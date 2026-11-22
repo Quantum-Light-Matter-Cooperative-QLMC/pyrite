@@ -801,6 +801,9 @@ def _electron_rows(segments, start: int, stop: int):
     for field in _SEG_ARRAYS:
         if field in view:
             view[field] = _take(view[field], rows)
+    if view.get("cone_split") is not None:
+        # Fold only this range's primaries' copies (#379).
+        view["cone_split"] = {**view["cone_split"], "parent_range": (start, stop)}
     return view
 
 

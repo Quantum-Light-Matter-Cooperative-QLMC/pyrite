@@ -147,6 +147,9 @@ class BlockSpectrumScorer:
         from .diffracted_brem import DiffractedDepthAccumulator
 
         self.diffracted = DiffractedDepthAccumulator(case, self.E_grid, self.n_hat)
+        from .cone_split_strata import SplitTally
+
+        self.split = SplitTally(case) if case.get("cone_split") is not None else None
         self.totals: tuple | None = None
         self.n_segments = 0
         self.n_layers = 1
@@ -263,6 +266,8 @@ class BlockSpectrumScorer:
                 total + part for total, part in zip(self.totals, parts, strict=True)
             )
         self.n_segments += rows
+        if self.split is not None:  # after the block's totals: a retry never double-counts
+            self.split.add(segs)
 
     def _past_brem_freeze(self, segs) -> bool:
         """Whether every electron of a provisional block lies past the brem freeze.
@@ -411,6 +416,8 @@ class BlockSpectrumScorer:
                 )
         if self.line_screen is not None:
             out["line_roulette"] = self.line_screen.record()
+        if self.split is not None:
+            out["cone_split"] = self.split.record()
         from .lattice_share import lattice_share_outputs
 
         out.update(lattice_share_outputs(self.brem_case, self.n_layers))

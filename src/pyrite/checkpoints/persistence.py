@@ -115,6 +115,7 @@ _CAS_OPTIONAL_PAYLOAD_KEYS = frozenset(
         "line_data_coverage",
         "physics_fallbacks",
         "line_roulette",
+        "cone_split",
         "reflection_selection",
         "brem_lattice_share",
     }

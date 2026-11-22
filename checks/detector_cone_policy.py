@@ -126,27 +126,25 @@ def min_local_u(segs, n_hat, count):
 
 
 def arm(case, args, factor):
-    from detector_cone_variance_reduction import _host, _settings, _stats
+    from detector_cone_variance_reduction import _host, _settings, _stats, primaries, split_case
 
     from pyrite._backend import BACKEND
     from pyrite.montecarlo import runner
-    from pyrite.montecarlo.runner import case_driver
     from pyrite.montecarlo.runner.adaptive import case_measure
-    from pyrite.montecarlo.transport.cone_split import ConeSplit, _ConeSplitPass, history_sums
+    from pyrite.montecarlo.transport.cone_split import _ConeSplitPass, history_sums
 
     n_hat = runner._case_geometry(case)[3]
-    half_angle = factor / (1.0 + 5000 / 511.0)
-    cone = None
+    E0 = float(case["E0_keV"])
+    half_angle = factor / (1.0 + E0 / 511.0)
     if factor:
-        cone = ConeSplit(
-            tuple(n_hat),
-            half_angle,
+        case = split_case(
+            case,
+            factor,
             args.target_weight,
-            args.max_copies_per_electron,
-            min_energy_keV=args.min_energy_keV,
+            min_energy_fraction=args.min_energy_keV / E0,
             angle_scale=args.angle_scale,
+            max_copies_per_electron=args.max_copies_per_electron,
         )
-    original = case_driver.simulate_trajectories
     collect = _ConeSplitPass.collect
 
     def capped_collect(self, *a, **kw):
@@ -155,23 +153,19 @@ def arm(case, args, factor):
             raise RuntimeError("copy budget exceeded before launching copy generation")
         return record
 
-    def transport(*a, **kw):
-        return original(*a, **kw, **({"_cone_split": cone} if factor else {}))
-
     started = time.perf_counter()
-    with (
-        patch.object(case_driver, "simulate_trajectories", transport),
-        patch.object(_ConeSplitPass, "collect", capped_collect),
-        patch.object(case_driver, "resolve_cxr_grid", lambda c, s, n, ne, grid, *a: (grid, None)),
-    ):
+    with patch.object(_ConeSplitPass, "collect", capped_collect):
         tp = runner._transport_case(case, transport_core="per-electron")
     transport_s = time.perf_counter() - started
     try:
         record = tp["segs"].get("cone_split")
+        # Primaries and copies are scored apart and folded per history here;
+        # production scorers would otherwise fold the copies a second time.
+        segs = primaries(tp["segs"])
         parent = np.zeros(0, dtype=int) if record is None else record["parent"]
         weight = np.zeros(0) if record is None else record["weight"]
         count = parent.size
-        rows = tp["segs"]["L_ang"].size
+        rows = segs["L_ang"].size
         if count:
             rows += record["copies"]["L_ang"].size
             assert np.all(weight > 0)
@@ -181,14 +175,14 @@ def arm(case, args, factor):
             raise RuntimeError("segment budget exceeded before scoring")
         measure = case_measure(case, _settings(args.ne))
         started = time.perf_counter()
-        primary = {k: _host(v) for k, v in measure(0, args.ne, tp["segs"]).items()}
+        primary = {k: _host(v) for k, v in measure(0, args.ne, segs).items()}
         copy = {k: np.zeros(0) for k in primary}
         if count:
             copy = {k: _host(v) for k, v in measure(0, count, record["copies"]).items()}
         values = {k: history_sums(v, copy[k], parent, weight, args.ne) for k, v in primary.items()}
         monitor_s = time.perf_counter() - started
         started = time.perf_counter()
-        bins = line_bins(case, tp, args.ne, args.edges_eV)
+        bins = line_bins(case, {**tp, "segs": segs}, args.ne, args.edges_eV)
         observed_coverage = {"primary": covered(bins.mass, primary["cxr"])}
         copy_bins = np.zeros((0, bins.bins.shape[1]))
         if count:
@@ -211,8 +205,8 @@ def arm(case, args, factor):
             "bin_attribution_s": bin_s,
             "rows": int(rows),
             "copies": int(count),
-            "trajectory_dtype": str(tp["segs"]["r_mid"].dtype),
-            "primary_min_u": min_local_u(tp["segs"], n_hat, args.ne),
+            "trajectory_dtype": str(segs["r_mid"].dtype),
+            "primary_min_u": min_local_u(segs, n_hat, args.ne),
             "primary_values": primary,
             "copy_values": copy,
             "history_values": values,

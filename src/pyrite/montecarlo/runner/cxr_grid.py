@@ -406,6 +406,7 @@ def _direction_populations(
     collects block populations on the host for its spill store.
     """
     from . import _cxr_for_segments
+    from .cone_split_strata import collect_copy_lines
 
     audit = {"start_eV": start, "stop_eV": ceiling, "collect": []}
     budget = resident_population_budget(segments.get("L_ang")) if resident else None
@@ -424,6 +425,7 @@ def _direction_populations(
         Ne=Ne,
         truncation_audit=audit,
     )
+    collect_copy_lines(audit, case, segments, n_hat, Ne, abs_layers, groove)  # #379
     chunks = audit["collect"]
     if profile is not None:
         _profile_stage(

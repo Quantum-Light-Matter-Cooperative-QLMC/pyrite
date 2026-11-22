@@ -8,7 +8,7 @@ Every observable is a **per-incident-electron expectation**. The estimator is th
 
 That includes exit fractions (transmitted, backscattered, side-exited, stopped), path-length and energy moments, and spectra per unit energy and solid angle. Details of the normalization conventions live in [transport outputs](../physics/beam-transport/transport-outputs.md#tallies-and-normalization) and [spectral observables](../physics/radiation-physics/spectral-observables.md#units-and-normalization).
 
-By default electrons carry no statistical weights and no variance reduction, splitting, or Russian roulette is applied: each electron contributes once to the sample mean. [Line-scoring roulette](#line-scoring-roulette) is the one opt-in exception, and it reweights only the incoherent line tally. For ordinary sample means, variance falls as $1/N$.
+By default electrons carry no statistical weights and no variance reduction, splitting, or Russian roulette is applied: each electron contributes once to the sample mean. Two opt-in exceptions exist: [line-scoring roulette](#line-scoring-roulette) reweights only the incoherent line tally, and [detector-cone splitting](#detector-cone-splitting) adds weighted transport copies. For ordinary sample means, variance falls as $1/N$.
 
 **No absolute flux.** A spectrum is per incident electron until a caller supplies a multiplier. No photons-per-second normalization is applied anywhere.
 
@@ -227,9 +227,9 @@ Brem retains its existing stopping guards. See the [derivation and limitations](
 
 **Variance reduction and this guard.** Transport-side
 [detector-cone splitting](../research/beam-transport/detector-cone-line-variance.md)
-targets rare trajectories; its production integration is tracked in #379.
-Its statistical sample must be the primary's score plus all weighted copy
-scores, combined before computing moments. Copies do not increase the
+targets rare trajectories ([opt-in](#detector-cone-splitting)). Its
+statistical sample is the primary's score plus all weighted copy scores,
+combined before computing moments, and copies do not increase the
 independent history count. A measured gain in the h-BN 5 MeV scene does not
 establish a gain for the 1 MeV thin-target populations examined in #1254.
 [Line-scoring roulette](#line-scoring-roulette) instead saves spectrum-scoring
@@ -287,6 +287,16 @@ The `line_roulette` case record (`LineRoulette(floor, keep_fraction, pilot_histo
 * **Measured result.** On h-BN 5 MeV, 1 mm (CUDA, `keep_fraction=0.05`, `floor=0.02`, `pilot_histories=4096`), roulette scored 7.6% of 2^20 primaries in the wall time analog needed for about 10^5. Over bins at or above 10^-3 of the analog peak, the median per-bin standard error fell to 0.25 times analog's, but the 95th percentile rose to 1.78 times, so the option failed its declared acceptance (both quantiles lower). The bins that lost are faint (10^-3 to 10^-2 of peak) and lit by rare histories. Use it where the strong lines matter, not the faint tail of the spectrum.
 * **What is refused.** Coherent emission, temporal profiles, channeling, two-beam line scoring and flight-grouped substeps (`max_dE_frac`).
 * **Unchanged scorers.** Characteristic lines and the continuum are not rouletted. Batch-means standard errors stay analog and repeat the line scoring, so they spend the time roulette saves.
+
+## Detector-cone splitting
+
+The `cone_split` case record (`ConeSplitting(cone_factor, min_energy_fraction, angle_scale, target_weight, max_copies_per_electron)` from `pyrite.config`) splits primaries at ELSEPA elastic events toward the single detector direction. A copy is launched into the cone of half-angle `cone_factor / γ0` above `min_energy_fraction · E0`, the analog primary is killed if it scattered into that cone itself, and copy weights are bounded by angle-scaled Russian roulette toward `target_weight`. A final roulette snaps every copy weight to a power of two, so each spectrum tally scores each weight stratum with the unchanged scorers. It is off by default, enters case identity when on, and runs on the per-electron CPU transport core only. The result's `provenance.cone_split` records the policy, the cone and the realized copies per weight.
+
+* **What a sample is.** Each primary plus its weighted copies is one history, `X_i = x_i + Σ w_c x_c`. The adaptive monitor, its ESS and max-share guards, the #1339 tail slope, SHIFT and FOM, and the post-scoring line-yield statistics all read these per-history sums. Copies never count toward `N`.
+* **When it helps.** Rare detector-bound elastic scatters dominating a tally: the brem toward a 10° detector from 5 MeV h-BN 1 mm reached a figure-of-merit gain of about 100 against the brute-force analog variance ([measurements](../research/beam-transport/detector-cone-line-variance.md)). Below 3 MeV the cone is wide and gains are expected to be small, so a warning is issued.
+* **Judging it.** In this regime a small analog run under-samples the rare class: its RSE, and so its FOM, is too optimistic, and the comparison needs a long analog reference. The `statistics_limited` warning names this option when a few histories dominate.
+* **What is refused.** Coherent emission, temporal profiles, channeling, GDF beams, grooves, cascades (secondary electrons, pairs, positrons, photon transport), transition radiation, line roulette, mixed transport, non-ELSEPA elastic models, observation directions beyond the detector's, planar detectors and trajectory capture.
+* **Validation.** See the [derivation and fresh-context checks](../validation/beam-transport/detector-cone-variance-reduction.md).
 
 ## Convergence protocol
 

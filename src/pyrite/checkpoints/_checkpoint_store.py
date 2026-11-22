@@ -45,6 +45,7 @@ _SHARED_KEYS = frozenset(
         "adaptive_sampling",
         "physics_fallbacks",
         "line_roulette",
+        "cone_split",
         "reflection_selection",
     }
 )

@@ -334,3 +334,216 @@ def test_copy_audit_folds_line_mass_onto_parents():
     assert caller["line_mass"] == 11.0 and caller["mass_above"] == 0.25
     # Copy 0 -> global parent 3, copy 1 -> global parent 2.
     np.testing.assert_array_equal(caller["electron_mass"], [1.0, 1.0, 1.25, 1.75, 1.0])
+
+
+def test_grid_populations_carry_copy_lines_at_their_weight():
+    from pyrite.montecarlo.runner.cone_split_strata import copy_strata
+    from pyrite.montecarlo.runner.cxr_grid import _direction_populations
+
+    n = 24
+    case = {**_split(), "Ne": n, "Ne_brem": n}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", ConeSplitLowGainWarning)
+        segs = runner._transport_case(case)["segs"]
+    E_grid, _, _, n_hat, groove = runner._case_geometry(case)
+    band = (float(E_grid[0]), float(E_grid[-1]))
+    args = (case, n_hat, n, None, groove, *band, None)
+
+    def mass(populations):
+        return sum(float(np.sum(p.weight * p.width_eV)) for p in populations)
+
+    plain = {k: v for k, v in segs.items() if k != "cone_split"}
+    full = mass(_direction_populations(args[0], segs, *args[1:]))
+    primaries = mass(_direction_populations(args[0], plain, *args[1:]))
+    expected = 0.0
+    for scale, rows, n_copies in copy_strata(segs, n):
+        alone = mass(_direction_populations(args[0], rows, *args[1:]))
+        expected += scale * n / n_copies * alone
+    assert expected > 0.0
+    np.testing.assert_allclose(full, primaries + expected, rtol=1e-10)
+
+
+@pytest.mark.parametrize("blocks", [None, 3])
+def test_continuum_folds_copies_exactly_once(monkeypatch, blocks):
+    """Copies add once: not again at the native re-entry, nor per electron block."""
+    from pyrite.montecarlo.runner import emission
+    from pyrite.montecarlo.runner.electron_blocks import iter_electron_blocks
+
+    if blocks is not None:  # the GPU headroom/OOM branch of score_in_electron_blocks
+
+        def blocked(score, segments):
+            return sum(score(block) for block in iter_electron_blocks(segments, blocks))
+
+        monkeypatch.setattr(emission, "score_in_electron_blocks", blocked)
+    from pyrite.montecarlo.runner.emission_adapters import EmissionBatch, select_continuum
+
+    n = 24
+    case = {**_split(), "Ne": n, "Ne_brem": n}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", ConeSplitLowGainWarning)
+        transport = runner._transport_case(case)
+    segs, record = transport["segs"], transport["segs"]["cone_split"]
+    continuum = select_continuum(case)
+    E_brem = np.asarray(transport["E_brem"], dtype=float)
+
+    def brem(segments, limit):
+        batch = EmissionBatch(
+            runner._segments_on_device(segments), E_brem, case, transport["n_hat"],
+            case.get("abs_layers"), transport["groove"], electron_limit=limit,
+        )  # fmt: skip
+        return np.asarray(continuum.evaluate(batch, "brem_wide").values, dtype=float)
+
+    added = brem(segs, n) - brem({k: v for k, v in segs.items() if k != "cone_split"}, n)
+    # Independent: every copy scored on its own population, weighted, over N.
+    copies = record["copies"]
+    expected = np.zeros_like(added)
+    ids = np.asarray(copies["elec_id"])
+    for c, w in enumerate(record["weight"]):
+        alone = {**copies, "elec_id": np.where(ids == c, 0, 1)}
+        expected += w * brem(alone, 1) / n
+    np.testing.assert_allclose(added, expected, rtol=1e-10, atol=1e-30)
+
+
+def test_retained_block_join_keeps_every_split_record():
+    """Chunks of 8 join to the one-chunk record and spectrum (#361 with splitting)."""
+    case = _split()
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", ConeSplitLowGainWarning)
+        one, blocks = (
+            transport_case_adaptive(case, _settings(48, chunk), transport_core="auto")
+            for chunk in (48, 8)
+        )
+        spectra = [runner._spectrum_case(case, out) for out in (one, blocks)]
+    a, b = one["segs"]["cone_split"], blocks["segs"]["cone_split"]
+    for key in ("parent", "weight", "flight", "killed"):
+        np.testing.assert_array_equal(a[key], b[key])
+    assert a["copies"]["Ne"] == b["copies"]["Ne"] == a["weight"].size > 0
+    for key in ("brem_wide", "spec"):
+        np.testing.assert_allclose(spectra[1][key], spectra[0][key], rtol=1e-12)
+
+
+def test_split_provenance_reaches_spectrum_output_and_numerics():
+    from pyrite.config import Numerics
+
+    n = 24
+    case = {**_split(), "Ne": n, "Ne_brem": n}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", ConeSplitLowGainWarning)
+        transport = runner._transport_case(case)
+        out = runner._spectrum_case(case, transport)
+    record = out["cone_split"]
+    weights = transport["segs"]["cone_split"]["weight"]
+    assert record["model"] == CONE_SPLIT_MODEL and record["primaries"] == n
+    assert (
+        record["copies"] == weights.size == sum(s["copies"] for s in record["copy_weight_strata"])
+    )
+    assert record["half_angle_rad"] == pytest.approx(POLICY.half_angle_rad(case["E0_keV"]))
+    assert record["primaries_killed"] == int(transport["segs"]["cone_split"]["killed"].sum())
+    described = Numerics(cone_split=POLICY).describe_numerics()["transport"]["effective"]
+    assert described["cone_split"] == POLICY.to_dict()
+    assert "cone_split" not in Numerics().describe_numerics()["transport"]["effective"]
+
+
+def test_streamed_split_spectrum_matches_the_retained_path():
+    """Blocks of 8 stream the same weighted spectra and provenance as one join."""
+    from pyrite.montecarlo.runner.streamed_scoring import run_case_streamed
+
+    n = 24
+    case = {**_split(), "Ne": n, "Ne_brem": n}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", ConeSplitLowGainWarning)
+        retained = runner._spectrum_case(case, runner._transport_case(case))
+        streamed = run_case_streamed(case, 8, transport_core="per-electron")
+    # Each block's strata carry their own W n_c / N factor: summation order only.
+    for key in ("spec", "brem_wide", "spec_characteristic"):
+        atol = 1e-10 * float(np.max(np.abs(retained[key])))
+        np.testing.assert_allclose(streamed[key], retained[key], rtol=1e-12, atol=atol, err_msg=key)
+    assert streamed["cone_split"] == retained["cone_split"]
+
+
+def test_independent_stopping_with_split_matches_fixed_pair_and_batch_means():
+    """#366 brem-prefix stopping on a split case: realized pair equals the fixed run.
+
+    Copies of primaries past the brem freeze drop from brem with their parents;
+    every batch-means batch folds only its own primaries' copies.
+    """
+    settings = Precision(
+        target_rse=1.0,
+        min_histories=48,
+        max_histories=64,
+        observables=("cxr", "brem"),
+        brem_target_rse=1.0,
+        brem_min_histories=24,
+        batch_means_band_eV=(1000.0, 10000.0),
+        max_history_share=1.0,
+        min_effective_histories=0.0,
+        max_variance_of_variance=1.0,
+        stability_checks=0,
+    )
+    case = {**_split(), "E_cut_lines_keV": 29.0, "E_cut_brem_keV": 1.0}
+    requested = {
+        **case,
+        "Ne": settings.max_histories,
+        "Ne_brem": settings.max_histories,
+        "adaptive_precision": settings.to_dict(),
+    }
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", ConeSplitLowGainWarning)
+        transport = runner._transport_case(requested)
+        output = runner._spectrum_case(requested, transport)
+        record = output["adaptive_sampling"]
+        n, nb = record["realized_electrons"], record["realized_electrons_brem"]
+        assert nb < n
+        fixed = {**case, "Ne": n, "Ne_brem": nb}
+        reference_transport = runner._transport_case(fixed)
+        reference = runner._spectrum_case(fixed, reference_transport)
+    split = transport["segs"]["cone_split"]
+    parents = split["electron_start"] + split["parent"]
+    # Copies on both sides of the brem prefix exercise the drop.
+    assert np.any(parents < nb) and np.any(parents >= nb)
+    np.testing.assert_array_equal(
+        split["parent"], reference_transport["segs"]["cone_split"]["parent"]
+    )
+    np.testing.assert_array_equal(
+        split["weight"], reference_transport["segs"]["cone_split"]["weight"]
+    )
+    for key in ("spec", "spec_characteristic", "brem", "brem_wide", "E_grid"):
+        np.testing.assert_array_equal(output[key], reference[key], err_msg=key)
+    batches = record["batch_means"]
+    for key, axis in (("spec", "E_grid"), ("brem_wide", "E_grid_brem")):
+        energies = np.asarray(output[axis])
+        mask = (energies >= 1000) & (energies <= 10000)
+        expected = output[key][mask]
+        # Strata rescaling per batch reassociates the copy sums.
+        tolerance = 64 * np.finfo(expected.dtype).eps
+        np.testing.assert_allclose(
+            batches[key]["mean"], expected, rtol=tolerance, atol=tolerance * np.abs(expected).max()
+        )
+
+
+@pytest.mark.parametrize("route", ["checkpoint", "shard"])
+def test_split_record_survives_checkpoint_and_resume_shards(tmp_path, route):
+    """A resumed sweep reloads split spectra and copy provenance unchanged."""
+    from pyrite.checkpoints import _checkpoint_store as store
+    from pyrite.results.store import store_result
+
+    n = 24
+    case = {**_split(), "Ne": n, "Ne_brem": n}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", ConeSplitLowGainWarning)
+        out = runner._spectrum_case(case, runner._transport_case(case))
+    results = {}
+    store_result(results, case, out)
+    name, E0 = case["name"], case["E0_keV"]
+    if route == "checkpoint":
+        store.save("split", tmp_path, results)
+        loaded = store.load("split", tmp_path)
+    else:
+        store.save_part("split", tmp_path, name, results[name])
+        loaded = store.load_parts("split", tmp_path)
+    record, saved = loaded[name][E0], results[name][E0]
+    assert record["cone_split"] == saved["cone_split"]
+    assert record["cone_split"]["copies"] > 0
+    assert record["case"]["cone_split"] == POLICY.to_dict()
+    for key in ("spec", "brem_wide"):
+        np.testing.assert_array_equal(record[key], saved[key], err_msg=key)

@@ -161,8 +161,10 @@ def weight_ladder(weights, split_keys, flights):
     if np.any(~(w > 0.0)) or not np.all(np.isfinite(w)):
         raise ValueError("copy weights must be positive and finite")
     ladder = np.exp2(np.ceil(np.log2(w)))
-    # log2 rounding: a power of two must map to itself, never to twice itself.
+    # log2 rounding: a power of two maps to itself (never twice itself), and a
+    # weight an ulp above 2**k maps to 2**(k+1) (never below itself).
     ladder = np.where(ladder / 2.0 >= w, ladder / 2.0, ladder)
+    ladder = np.where(ladder < w, 2.0 * ladder, ladder)
     u = _ladder_uniforms(
         np.asarray(split_keys, dtype=np.uint64), np.asarray(flights, dtype=np.int64)
     )

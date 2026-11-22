@@ -36,8 +36,21 @@ def _brem_wide_from_segments(
     :func:`_coupled_brem_from_segments`.
 
     ``electron_band_weights`` (internal, #361) returns each brem electron's
-    in-band integral instead, summed over layers; see ``mc_brem_spectrum``."""
+    in-band integral instead, summed over layers; see ``mc_brem_spectrum``.
+
+    Detector-cone copies (#379) fold here once, per weight stratum, outside
+    the electron blocks: every block scores primaries only."""
     from .. import runner
+
+    if electron_band_weights is None and segs_b.get("cone_split") is not None:
+        from .cone_split_strata import fold_copies
+
+        def brem(segments, n):
+            return _brem_wide_from_segments(segments, E_brem, case, n_hat, abs_layers, groove, n)
+
+        primaries = {k: v for k, v in segs_b.items() if k != "cone_split"}
+        n_norm = int(segs_b["Ne"] if Ne is None else Ne)
+        return brem(primaries, Ne) + fold_copies(segs_b, n_norm, brem)
 
     brem_chunk = runner._admit_chunk(
         case.get("brem_chunk")
@@ -481,4 +494,8 @@ def optional_line_components(case, tp) -> dict[str, Any]:
         from .transition_emission import case_transition_spectrum
 
         out["spec_transition"] = case_transition_spectrum(case, tp)
+    if case.get("cone_split") is not None:  # #379 provenance of the copies scored
+        from .cone_split_strata import split_outputs
+
+        out.update(split_outputs(case, tp["segs"]))
     return out

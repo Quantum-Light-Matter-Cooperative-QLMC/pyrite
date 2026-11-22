@@ -658,3 +658,141 @@ Suggested ledger change: this section alone does not change the status; the
 task owner decides. Optionally add to the row's limiting cases: "only
 `angle_scale = inf` disables the angle roulette; a finite `u_ref` always
 applies the `w_t` weight window".
+
+## Fresh-context verification of the weight ladder and spectrum strata (2026-11-22)
+
+**Scope.** This section covers the #379 additions to the ledger row at these
+commits:
+
+- `5ef6188ed`: weight ladder
+- `a0dd785f6`: spectrum strata
+- `a6010462e`: line-yield audit fold and monitor strip
+- `cac2ce049`: grid-collection lines
+- `84422e715`: fixes for the first review
+
+The verifier derived the identities below from the ledger statement before
+reading the implementation. The probe scripts live in the task worktree's
+`scratch/verify_*.py` and are not committed.
+
+### Derivation: power-of-two ladder
+
+A collected copy carries $w>0$. Define $W=2^{\lceil\log_2 w\rceil}$. Then
+$W\ge w>W/2$, so $p=w/W\in(1/2,1]$. The copy is kept iff $V<p$, where $V$ is
+uniform on $[0,1)$ and independent of the copy's state $\mathcal S$ and of its
+future $H$. Then
+
+$$
+E\!\left[W\,\mathbf 1\{V<p\}\,H\mid\mathcal S\right]=W\,p\,E[H\mid\mathcal S]=w\,E[H\mid\mathcal S].
+$$
+
+The ladder does not need $w\le1$. The angle roulette can leave
+$w=w_t\max(1,u^2/u_{\rm ref}^2)>1$, and the identity holds for any $w>0$.
+
+**Independence of $V$.** $V$ is counter 4 of the event key.
+
+- Counters 0–3 of the same key are the only other draws on it, all in
+  `cone_split_event`: the copy roulette, $\xi$, $\psi$ and the angle roulette.
+- The copy's transport keys are `_mix(event ^ _COPY_STREAM_SALT)`.
+- There is at most one split per flight.
+- `split_key` is a function of the seed and the global electron index, so $V$
+  depends only on (seed, electron, flight).
+
+### Derivation: stratum fold
+
+Take a producer that sums the rows whose electron id is below $n$ and divides
+by $n$:
+
+$$
+P(\mathcal R,n)=\frac1n\sum_{r\in\mathcal R,\ {\rm id}(r)<n}x_r .
+$$
+
+Let $\mathcal R_W$ be the rows of the weight-$W$ copies whose global parent lies
+below $N$. The copies are numbered $0,\dots,n_c-1$, so all their rows pass the
+$n=n_c$ filter, and
+
+$$
+\sum_W \frac{W\,n_c}{N}\,P(\mathcal R_W,n_c)=\frac1N\sum_{c}w_c x_c .
+$$
+
+Audit sums and collected line coefficients have no $1/n$ factor. They
+therefore add at weight $W$, and per-copy masses fold onto the global parent
+$s+p_c$, where $s$ is the block's `electron_start` and $p_c$ the copy's
+block-local parent.
+
+### Verified against the implementation
+
+- **Weight ladder.** It satisfies $W\ge w>W/2$ on $2\times10^5$ values around
+  every power of two from $2^{-60}$ to $2^{39}$, including the ulp
+  neighbours. This holds now that the two-sided guard is in place
+  (`84422e715`). For $w=0.3$ over $4\times10^5$ draws,
+  $E[W\,\mathbf 1]=0.29994\pm0.00039$.
+- **CXR and characteristic folds.** Each copy was scored alone, with its id
+  remapped and `electron_limit = 1`. The folds agree with this independent
+  per-copy sum to $2\times10^{-14}$ and $3\times10^{-16}$.
+- **Retained continuum.** The copy contribution is 1.0000 times the
+  independent sum (after `84422e715`).
+- **Audit sums.** They add at $W$, and `electron_mass` folds onto $s+p_c$
+  exactly.
+- **Grid collection.** Collected line coefficients do not depend on `Ne`, and
+  the copy lines add at exactly $W$ (relative difference $3\times10^{-15}$).
+- **Block joins.** A retained run in chunks of 8 equals a single chunk of 48
+  field by field: every `cone_split` record field, the nested copy results and
+  the primary segments. The retained spectra are bit-identical. Streamed
+  blocks of 8 match the retained run to $4\times10^{-14}$.
+- **Refusals.** `_REFUSED_KEYS` refuses coherent emission, temporal profiles,
+  transition radiation, line roulette, cascades and channeling. The monitor
+  strips `cone_split` and folds copies only through `split_history_values`.
+- **DBR and Kossel.** Both are linear in the depth weights by inspection. No
+  probe exercised them, because the test case has no Bragg reflections.
+
+### Remaining discrepancy
+
+Under a GPU headroom split of the continuum, copies are folded once per
+block.
+
+- `_brem_wide_from_segments` scores through `score_in_electron_blocks`.
+- On a GPU that function can split the rows with `iter_electron_blocks`
+  (`n_blocks > 1`). Every block keeps the whole `cone_split` record.
+- Each block's native `evaluate` is now the only fold site, so it folds all
+  copies once per block.
+- A CPU emulation with `n_blocks = 3` measured 3.000 times the copy
+  contribution.
+
+The affected routes are the retained and streamed continuum on a GPU whose
+brem population exceeds device headroom, or that retries after an OOM. CPU
+runs are not affected. CXR and characteristic are not affected either: their
+blocking happens inside the producer, below the adapter.
+
+### Verdict
+
+- **Weight ladder:** `rederived`.
+- **Spectrum strata:** `rederived` for CPU routes, retained and streamed alike,
+  including the audit and grid scaling. On GPU the continuum is a
+  `discrepancy` whenever `score_in_electron_blocks` splits, until the per-block
+  view drops `cone_split` or the fold moves outside the block loop.
+
+### Re-check after `e34e4f22a`
+
+The GPU blocked-continuum discrepancy is resolved.
+
+- **Where the continuum folds.** `_brem_wide_from_segments` scores the
+  primaries with `cone_split` stripped and adds `fold_copies` once, outside
+  `score_in_electron_blocks`. Continuum adapters have a native producer, so
+  they no longer fold in `EmissionAdapter.evaluate`.
+- **Every continuum route passes through that function.** Each continuum
+  adapter's `score` is `_continuum`, which calls `_brem_wide_from_segments`.
+  The only native `evaluate` call is at emission.py:78, inside that function.
+  This covers the retained, streamed, `stage_continuum_rows` restage,
+  directional and coupled routes.
+- **Monitor.** Calls that carry `electron_band_weights` fold in neither
+  place.
+- **Recursion.** It is one level deep. The copy views carry no `cone_split`,
+  and the extra `_stream_escape_recovery` key is a stateless evaluator.
+- **Probes.** The unblocked and three-block runs each call `copy_strata`
+  once, with ratio 1.0. Streamed and retained runs agree to $4\times10^{-14}$.
+  The chunk-8 join is bit-identical to the single chunk. CXR and
+  characteristic still fold once.
+- **Not probed.** No probe covers the coupled radiative route or DBR/Kossel.
+  Both conclusions rest on inspection.
+
+**Verdict:** `rederived` for the strata claim. The ladder stays `rederived`.

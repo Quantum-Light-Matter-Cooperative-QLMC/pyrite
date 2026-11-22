@@ -251,6 +251,25 @@ it. Coherent emission, temporal profiles, channeling, `max_dE_frac > 0`, two-bea
 transition radiation and pixel detectors are refused. See
 [Line-scoring roulette](../computation/statistical-methods.md#line-scoring-roulette).
 
+## Split rare detector-bound scatters (experimental)
+
+When a few electrons that elastically scatter toward the detector dominate a
+tally (for example 5 MeV brem through 1 mm of a light crystal), split them:
+
+```python
+from pyrite.config import ConeSplitting
+
+split = pr.Numerics(cone_split=ConeSplitting())  # #203 defaults
+# Transport needs the ELSEPA elastic model; inspect result.provenance.cone_split.
+```
+
+Every tally stays unbiased; each primary plus its weighted copies is one
+history. The option enters case identity, runs on the per-electron CPU core,
+warns below 3 MeV, and refuses cascades, coherent and temporal scoring,
+channeling and planar detectors. Measure the gain against a long analog
+reference, not a short one. See
+[Detector-cone splitting](../computation/statistical-methods.md#detector-cone-splitting).
+
 ## Line-axis resolution
 
 The automatic CXR line axis defaults to `"sinc-oversampled"`: the measured
