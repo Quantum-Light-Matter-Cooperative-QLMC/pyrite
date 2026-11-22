@@ -29,6 +29,7 @@ bremslib-radiative-partition
 radiative-moment-interpolation
 cbs-amplitude
 brem-lattice-coherent-fraction
+brem-lattice-share-isotropic
 characteristic-radiation
 continuum-node-refinement
 eedl-shell-ionization-comparison
