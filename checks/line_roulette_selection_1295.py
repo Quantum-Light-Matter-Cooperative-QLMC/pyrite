@@ -25,6 +25,11 @@ seed's draws): the analog and rouletted variance of the summed line mass
 figure-of-merit gain ``(Var_A T_A) / (Var_R T_R)``; transport and the
 fixed prefix selection are excluded, so the whole-case gain is smaller.
 
+``PROBE_MASS_ONLY=1`` stops after the screen: no analog or kept-row pass is
+timed (for cases whose production pass takes hours, e.g. the 1 mm MeV scene).
+``predict`` then assumes a free screen and production time proportional to rows
+scored, so its arm gains and the free-screen optimal bound are upper bounds.
+
 Yield-level prediction only: per-bin variance can concentrate differently.
 Remote GPU only. Engineering evidence for ``line-scoring-roulette``; no
 accuracy verdict.
@@ -48,6 +53,8 @@ ARM = tuple(float(v) for v in os.environ.get("ARM", "0.1:0.1").split(":"))
 #: Forced device bin-mean reduction (``bin_reduction_override``), e.g. ``auto``
 #: for near/far when the Fourier route cannot fit a case; empty keeps the default.
 REDUCTION = os.environ.get("PROBE_REDUCTION", "")
+#: Stop after the mass-only screen (no timed analog or kept-row pass).
+MASS_ONLY = os.environ.get("PROBE_MASS_ONLY", "0") != "0"
 PILOT = 128
 DEFAULT_ARMS = [f"{k}:{f}" for k in (0.02, 0.05, 0.1, 0.25) for f in (0.05, 0.1, 0.25, 0.5)]
 
@@ -126,12 +133,37 @@ def arm_prediction(mass, rows, seed, keep, floor, pilot=PILOT):
     )
 
 
+class _MassOnlyDone(Exception):
+    """Raised after the screen in ``PROBE_MASS_ONLY`` mode to skip production."""
+
+
+def optimal_bound(mass, rows, var_a, scales=np.geomspace(1e-4, 1e4, 801)):
+    """Best FOM gain of per-history keep probabilities ``p ∝ m/sqrt(rows)``.
+
+    Free exact screen, production time proportional to rows scored; the
+    Horvitz-Thompson added variance is ``sum m^2 (1/p - 1)``.
+    """
+    scored = mass > 0.0
+    m, r = mass[scored], rows[scored].astype(float)
+    shape = m / np.sqrt(np.maximum(r, 1.0))
+    shape = shape / shape.max()
+    best = 1.0
+    for c in scales:
+        p = np.minimum(1.0, c * shape)
+        var_r = var_a + float((m**2 * (1.0 / p - 1.0)).sum())
+        best = max(best, var_a * r.sum() / (var_r * float((r * p).sum())))
+    return best
+
+
 def predict(mass, rows, seed, timing, arms):
     n = mass.size
     var_a = float(n * mass.var(ddof=1))
     order = np.sort(mass)[::-1]
     cumulative = np.cumsum(order) / order.sum()
     t_prod, t_screen = timing["production_s"], timing["screen_s"]
+    assumed = t_prod is None
+    if assumed:  # mass-only run: free screen, time proportional to rows
+        t_prod, t_screen = 1.0, 0.0
     out = dict(
         primaries=n,
         rows=int(rows.sum()),
@@ -142,7 +174,10 @@ def predict(mass, rows, seed, timing, arms):
             f: float(cumulative[max(int(f * n) - 1, 0)]) for f in (0.001, 0.01, 0.1, 0.5)
         },
         rows_vs_mass_corr=float(np.corrcoef(rows, mass)[0, 1]),
-        screen_over_production=t_screen / t_prod,
+        mass_cv=float(mass.std(ddof=1) / mass.mean()),
+        screen_over_production=None if assumed else t_screen / t_prod,
+        timing_assumed=assumed,
+        optimal_keep_probability_bound_free_screen=optimal_bound(mass, rows, var_a),
         arms=[],
     )
     for keep, floor in arms:
@@ -174,11 +209,15 @@ def instrument(state):
 
         emission, batch = state["emission"], state["batch"]
         n = int(batch.segments["Ne"] if batch.electron_limit is None else batch.electron_limit)
-        spec, state["production_s"] = _timed(lambda: production(case, evaluate, grid))
+        if not MASS_ONLY:
+            spec, state["production_s"] = _timed(lambda: production(case, evaluate, grid))
         mass, state["screen_s"] = _timed(lambda: _screen_masses(emission, batch, case, n))
         ids = _electron_ids(batch.segments)
         rows = np.bincount(ids[ids < n], minlength=n)
         seed = int(batch.case["seed"])
+        if MASS_ONLY:
+            state.update(mass=mass, rows=rows, seed=seed, selected_reflections=_count(case))
+            raise _MassOnlyDone
         arm = arm_prediction(mass, rows, seed, *ARM)
         threshold = arm["threshold"]
         low = (np.arange(n) >= PILOT) & (mass > 0.0) & (mass < threshold)
@@ -202,6 +241,11 @@ def instrument(state):
         return spec
 
     rc._batch_selection, rc._selected_spectrum = captured, measured
+
+
+def _count(case):
+    layers = case.get("layer_radiators") or [case]
+    return sum(len(r["hkl_list"]) for r in layers if r is not None)
 
 
 def _reduction_scope():
@@ -232,6 +276,7 @@ def run(material, e0_kev, tilt_deg, histories, seed, out_stem):
         seed_offset=int(seed),
         arm=list(ARM),
         reduction_override=REDUCTION or None,
+        mass_only=MASS_ONLY,
         error=None,
     )
     case = replace(spec, **changes) if changes else spec
@@ -241,19 +286,21 @@ def run(material, e0_kev, tilt_deg, histories, seed, out_stem):
         with _reduction_scope():
             out = run_cases([case], max_workers=0, progress=False, on_timing=timings.append)[0]
     except Exception as exc:  # record failure as evidence
-        record["error"] = f"{type(exc).__name__}: {exc}"
-        record["traceback"] = traceback.format_exc()
-        print(record["traceback"], file=sys.stderr)
+        if not (MASS_ONLY and "mass" in state):  # _MassOnlyDone, possibly wrapped
+            record["error"] = f"{type(exc).__name__}: {exc}"
+            record["traceback"] = traceback.format_exc()
+            print(record["traceback"], file=sys.stderr)
     record["wall_s"] = time.perf_counter() - t0
     record["timings"] = timings
     record["reflection_selection"] = (out or {}).get("reflection_selection")
     record["n_segments"] = None if out is None else out.get("n_segments")
-    for key in ("production_s", "screen_s", "subset_s", "subset_row_share", "spec_sum"):
+    keys = ("production_s", "screen_s", "subset_s", "subset_row_share", "spec_sum")
+    for key in (*keys, "selected_reflections"):
         record[key] = state.get(key)
     record["subset_spec_sum"] = state.get("subset_spec_sum")
     if "mass" in state:
         np.savez(stem.with_suffix(".npz"), mass=state["mass"], rows=state["rows"])
-        timing = dict(production_s=state["production_s"], screen_s=state["screen_s"])
+        timing = dict(production_s=state.get("production_s"), screen_s=state["screen_s"])
         record["seed"] = state["seed"]
         record["prediction"] = predict(
             state["mass"], state["rows"], state["seed"], timing, _parse(DEFAULT_ARMS)
