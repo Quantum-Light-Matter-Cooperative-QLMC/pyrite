@@ -34,6 +34,7 @@ SLURM_GRES: str | None = None
 SLURM_ACCOUNT: str | None = None
 SLURM_CONSTRAINT: str | None = None
 SLURM_MAX_TIME: str | None = None
+HOST_EXEC: str | None = None
 SLURM_GPUS = 1
 SLURM_CPUS_PER_MATERIAL = 8
 SLURM_TIME = "UNLIMITED"
@@ -359,6 +360,13 @@ _SLURM_SETTINGS = {
         re.compile(r"(?:\d+(?:-\d+)?(?::\d+){0,2})?"),
         "a SLURM time limit such as 1-00:00:00 or 1440, or empty for no cap",
     ),
+    # Not a batch directive: a plain-word command prefix (no shell operators or
+    # quotes), so it is safe unquoted in the ssh command line.
+    "remote.host_exec": (
+        "PYRITE_REMOTE_HOST_EXEC",
+        re.compile(r"(?:[A-Za-z0-9_./:=,@%+-]+(?: [A-Za-z0-9_./:=,@%+-]+)*)?"),
+        "a command prefix such as 'srun --time=00:30:00 --mem=8G', or empty",
+    ),
 }
 # ``remote.nodelist`` value meaning "let SLURM pick any node in the partition".
 NODELIST_ANY = "any"
@@ -422,6 +430,24 @@ def slurm_constraint() -> str | None:
 def slurm_max_time() -> str | None:
     """Return the target's SLURM wall-time cap (``remote.max_time``), or None for no cap."""
     return _slurm_setting("remote.max_time", SLURM_MAX_TIME) or None
+
+
+def host_exec() -> str | None:
+    """Return the prefix for host-side PyRITE Python (``remote.host_exec``), or None."""
+    return _slurm_setting("remote.host_exec", HOST_EXEC) or None
+
+
+def host_uv_command(extra_env: str = "") -> str:
+    """Return ``<runtime env> <uv>`` for PyRITE Python run on the host outside a job.
+
+    With ``host_exec`` (e.g. ``srun --time=00:30:00``) the command runs inside
+    that allocation instead of on the login node; ``env`` carries the runtime
+    variables into the launched task regardless of the scheduler's export policy.
+    """
+    assignments = f"{remote_runtime_env()} {extra_env}".rstrip()
+    command = f"{assignments} {shell_remote_uv()}"
+    prefix = host_exec()
+    return f"{prefix} env {command}" if prefix else command
 
 
 def slurm_time_seconds(value: str) -> int | None:
@@ -615,6 +641,7 @@ class RemoteTarget:
     account: str = ""
     constraint: str = ""
     max_time: str = ""
+    host_exec: str = ""
 
     def __post_init__(self):
         from .targets import validate_name
@@ -631,6 +658,7 @@ class RemoteTarget:
             "account",
             "constraint",
             "max_time",
+            "host_exec",
         ):
             value = getattr(self, field)
             if not isinstance(value, str) or any(ord(c) < 32 or ord(c) == 127 for c in value):
@@ -651,6 +679,7 @@ class RemoteTarget:
             "account",
             "constraint",
             "max_time",
+            "host_exec",
         ):
             object.__setattr__(
                 self, field, validate_slurm_setting(f"remote.{field}", getattr(self, field))

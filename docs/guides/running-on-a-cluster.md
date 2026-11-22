@@ -89,15 +89,15 @@ rather than a checkpoint pull.
 ### Set up a new remote host
 
 The helper needs SSH access to a SLURM login node, `uv` on that host, and a
-home or project directory that compute nodes also see. It needs no other
-PyRITE installation there: each job runs `uv sync` from the synced lockfile.
+home or project directory that compute nodes also see. Do not install PyRITE
+or fetch tables there yourself: each batch job runs `uv sync` (and downloads
+a supported Python if needed) on its compute node, and `pyrite remote sync`
+ships your local tables.
 
-1. On the host, install `uv` and a supported Python. Login nodes are for
-   installs, not runs:
+1. On the host, install `uv`, a single binary:
 
    ```bash
    curl -LsSf https://astral.sh/uv/install.sh | sh   # ~/.local/bin/uv
-   ~/.local/bin/uv python install 3.13
    ```
 
    A different `uv` location goes in `--uv PATH`. `pyrite remote sync`
@@ -119,14 +119,24 @@ PyRITE installation there: each job runs `uv sync` from the synced lockfile.
    requires every listed node. A partition `MaxTime` means jobs need a
    `--max-time` cap.
 4. Add the target with the site policy. For example, a shared campus
-   partition capped at 24 hours:
+   partition capped at 24 hours, on a site that reserves login nodes for
+   editing and submission:
 
    ```bash
    pyrite remote target add campus --host MY_SSH_ALIAS --remote-dir '~/pyrite' \
      --partition campus --account MY_ACCOUNT \
-     --constraint 'A100|H200' --max-time 1-00:00:00
+     --constraint 'A100|H200' --max-time 1-00:00:00 \
+     --host-exec 'srun --time=00:30:00 --cpus-per-task=2 --mem=8G'
    pyrite remote sync --target campus
    ```
+
+   Simulations always run as `sbatch` jobs. Sync, job status, logs and stop
+   are file and scheduler operations on the login node. `pull`, `remote gc`
+   and `remote trajectories` also run PyRITE on the host (`pull` slims each
+   checkpoint there and streams it back); `--host-exec` runs those inside a
+   short allocation instead, at the cost of the allocation wait per command.
+   Use a blocking `srun` without `--pty`: it returns the command's output
+   over the same SSH session, which `sbatch` cannot.
 
    `--max-time` replaces an unlimited request with the cap and refuses longer
    finite requests before submission. A chunked slice requests three times
@@ -141,9 +151,11 @@ PyRITE installation there: each job runs `uv sync` from the synced lockfile.
    ```
 
    The job log header names the node. Compute nodes must reach the package
-   index for the first `uv sync`; on a site without outbound access, run the
-   same `uv sync --package pyrite-mc --no-default-groups --extra nvidia` once
-   in the remote directory from the login node to fill uv's cache.
+   index for the first `uv sync`; on a site without outbound access, fill
+   uv's cache once from an interactive allocation
+   (`srun --time=01:00:00 --cpus-per-task=4 --mem=8G --pty $SHELL -l`) by
+   running `uv sync --package pyrite-mc --no-default-groups --extra nvidia`
+   in the remote directory.
 
 (amd-rocm-nodes)=
 ### AMD (ROCm) nodes

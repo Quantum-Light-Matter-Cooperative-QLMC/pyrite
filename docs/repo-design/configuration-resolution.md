@@ -30,6 +30,7 @@ Each context value resolves independently in this order:
 | `remote.account` | `PYRITE_REMOTE_ACCOUNT` | unset (no `--account`; site default) |
 | `remote.constraint` | `PYRITE_REMOTE_CONSTRAINT` | unset (no `--constraint`) |
 | `remote.max_time` | `PYRITE_REMOTE_MAX_TIME` | unset (no wall-time cap) |
+| `remote.host_exec` | `PYRITE_REMOTE_HOST_EXEC` | unset (host-side PyRITE runs on the login node) |
 | `workspace.root` | `PYRITE_HOME` | current directory |
 
 `pyrite config keys [PREFIX]` lists supported persistent keys without resolving live values;
@@ -111,6 +112,7 @@ output.
 | `PYRITE_REMOTE_ACCOUNT` | SLURM account for `#SBATCH --account`; unset omits the directive. | Environment > config store (`remote.account`); `console.config`, `remote.config`. | remote resources |
 | `PYRITE_REMOTE_CONSTRAINT` | SLURM node-feature expression for `#SBATCH --constraint`, such as `A100\|H200`; unset omits the directive. | Environment > config store (`remote.constraint`); `console.config`, `remote.config`. | remote resources |
 | `PYRITE_REMOTE_MAX_TIME` | Site wall-time cap in SLURM time syntax, such as `1-00:00:00`. Replaces an `UNLIMITED` request; a larger finite request (chunked: 3 × `--chunk-minutes`) fails before submission. Unset is no cap. | Environment > config store (`remote.max_time`); `console.config`, `remote.config`. | remote resources |
+| `PYRITE_REMOTE_HOST_EXEC` | Plain-word command prefix (no shell operators or quotes), such as `srun --time=00:30:00 --mem=8G`, for PyRITE Python the helper runs on the host outside batch jobs (`pull` slimming, `remote gc`, `remote trajectories`); runtime variables pass through `env`. Unset runs them on the login node. | Environment > config store (`remote.host_exec`); `console.config`, `remote.config`. | remote execution |
 | `PYRITE_XSGEN_BREMSLIB_SOURCE` | Directory containing the BremsLib source tree; unset is `../BremsLib_v2.0.8`. | `console.config`, `xsgen.sources` | external data/tooling |
 | `PYRITE_XSGEN_ELSEPA_SOURCE` | Directory containing the ELSEPA source tree; unset is `../elsepa-2020`. | `console.config`, `xsgen.sources` | external data/tooling |
 | `PYRITE_XSGEN_SBETHE_SOURCE` | Directory containing the SBETHE source tree; unset is `../sbethe`. | `console.config`, `xsgen.sources` | external data/tooling |

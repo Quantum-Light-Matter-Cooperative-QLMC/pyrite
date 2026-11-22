@@ -454,6 +454,9 @@ Options:
   --constraint TEXT   SLURM node features, e.g. 'A100|H200'; empty for none.
   --max-time TEXT     Site wall-time cap, e.g. 1-00:00:00; replaces UNLIMITED and bounds
                       --chunk-minutes.
+  --host-exec TEXT    Prefix for helper Python on the host (pull, gc, trajectories),
+                      e.g. 'srun --time=00:30:00 --mem=8G'; empty runs it on the login
+                      node.
   --description TEXT  Free-text note shown by list.
   -h, --help          Show this message and exit.
 ```
@@ -477,6 +480,9 @@ Options:
   --constraint TEXT   SLURM node features, e.g. 'A100|H200'; empty for none.
   --max-time TEXT     Site wall-time cap, e.g. 1-00:00:00; replaces UNLIMITED and bounds
                       --chunk-minutes.
+  --host-exec TEXT    Prefix for helper Python on the host (pull, gc, trajectories),
+                      e.g. 'srun --time=00:30:00 --mem=8G'; empty runs it on the login
+                      node.
   --description TEXT  Free-text note shown by list.
   -h, --help          Show this message and exit.
 ```

@@ -256,3 +256,26 @@ def test_batch_script_without_site_policy_is_unchanged(configured):
 )
 def test_slurm_time_seconds(value, seconds):
     assert config.slurm_time_seconds(value) == seconds
+
+
+def test_host_exec_wraps_host_side_python(configured):
+    _hoffman(host_exec="srun --time=00:30:00 --cpus-per-task=2 --mem=8G")
+    with config.use_target("nvidia"):
+        plain = config.host_uv_command()
+    assert plain.startswith("PYRITE_DATA_DIR=") and plain.endswith(' "uv"')
+    with config.use_target("h2"):
+        wrapped = config.host_uv_command("PYRITE_REMOTE_DIR=/srv/h2")
+        gc = scripts._prune_checkpoint_stems_command("gcjob", ["hopg"], catalog_profile="standard")
+    assert wrapped.startswith(
+        "srun --time=00:30:00 --cpus-per-task=2 --mem=8G env PYRITE_DATA_DIR="
+    )
+    assert wrapped.endswith(' PYRITE_REMOTE_DIR=/srv/h2 "uv"')
+    assert "srun --time=00:30:00 --cpus-per-task=2 --mem=8G env " in gc
+
+
+@pytest.mark.parametrize(
+    "value", ["srun; rm -rf ~", "srun $(id)", "srun 'quoted'", "srun --x  --y", "srun\n"]
+)
+def test_host_exec_rejects_shell_text(value):
+    with pytest.raises(ValueError):
+        targets.RemoteTarget(host="box", host_exec=value)

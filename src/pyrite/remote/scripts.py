@@ -464,7 +464,7 @@ def _prune_checkpoint_stems_command(
         f"{reserve}; "
         f"release_prune() {{ {release}; }}; trap release_prune EXIT; "
         f"cd {config.shell_remote_dir()} || exit $?; "
-        f"{config.remote_runtime_env()} {config.shell_remote_uv()} run --no-sync pyrite {command}"
+        f"{config.host_uv_command()} run --no-sync pyrite {command}"
     )
     if not obsolete_stems:
         return base

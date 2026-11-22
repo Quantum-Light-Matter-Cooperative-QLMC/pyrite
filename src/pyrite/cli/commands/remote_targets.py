@@ -60,6 +60,7 @@ _HELP = {
     "account": "SLURM account to charge; empty uses the site default.",
     "constraint": "SLURM node features, e.g. 'A100|H200'; empty for none.",
     "max_time": "Site wall-time cap, e.g. 1-00:00:00; replaces UNLIMITED and bounds --chunk-minutes.",
+    "host_exec": "Prefix for helper Python on the host (pull, gc, trajectories), e.g. 'srun --time=00:30:00 --mem=8G'; empty runs it on the login node.",
     "description": "Free-text note shown by list.",
 }
 
