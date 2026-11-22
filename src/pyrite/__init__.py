@@ -18,7 +18,7 @@ from ._jit_cache import apply_managed_cache_env
 from ._util.env import env_value
 from .paths import data_dir
 
-__version__ = "0.36.0"
+__version__ = "0.36.1"
 
 # Default the Numba/CuPy kernel caches to PyRITE's managed user-cache
 # directories (a non-empty NUMBA_CACHE_DIR / CUPY_CACHE_DIR always wins). This
