@@ -274,6 +274,8 @@ def layer_isotropic_share(case, layer, composition):
     Validation: brem-lattice-share-isotropic
     """
     reason = skip_reason(case, layer)
+    if reason is None and composition is None:
+        reason = "no composition"  # nothing to score the continuum with
     if reason is not None:
         return None, dict(layer=layer, corrected=False, reason=reason)
     radiator = _radiator(case, layer)
