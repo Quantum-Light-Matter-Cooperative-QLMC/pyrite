@@ -468,7 +468,8 @@ def transport_cone_split(simulate, kw):
     Returns the primaries' result; ``result["cone_split"]`` holds the copy
     records and ``["copies"]``, the copies' own transport result (or ``None``).
     Copies are not split again. ``parent`` indexes the call's own primaries,
-    so an electron block (``_electron_start``) keeps block-local parents.
+    so an electron block (``_electron_start``, kept as ``electron_start``)
+    keeps block-local parents.
 
     Copies draw only from their counter-addressed keys, and their coupled hard
     photons are keyed by lineage, so a block run equals the single call.
@@ -487,6 +488,7 @@ def transport_cone_split(simulate, kw):
     record = primaries["cone_split"]
     parent = record["parent"]
     record["copies"] = None
+    record["electron_start"] = int(kw.get("_electron_start") or 0)
     if parent.size == 0:
         return primaries
     keys = record["stream_keys"]

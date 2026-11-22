@@ -502,7 +502,7 @@ def case_spectrum_inputs(case, segs, Ne, Ne_brem, *, resolve_grid=True) -> dict[
     """
     E_grid, E_brem, _beam, n_hat, groove = _case_geometry(case)
     diagnostic_grid_result = None
-    if resolve_grid and case.get("cone_split") is None:  # copies wait on #379 weights
+    if resolve_grid:
         E_grid, diagnostic_grid_result = resolve_cxr_grid(
             case, segs, n_hat, Ne, E_grid, case.get("abs_layers"), groove
         )

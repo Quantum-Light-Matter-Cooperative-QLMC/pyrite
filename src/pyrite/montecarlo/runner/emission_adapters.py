@@ -108,6 +108,11 @@ class EmissionAdapter:
             )
         if output.values.shape != expected:
             raise ValueError("producer output must match its native grid or electron population")
+        if batch.electron_band_weights is None:
+            record = batch.segments.get("cone_split")
+            if record is not None and record.get("copies") is not None:
+                values = output.values + _copy_strata(self, batch, slot, native)
+                return EmissionOutput(slot, values)
         return output
 
 
@@ -176,6 +181,33 @@ class EmissionSelection:
                 raise ValueError(
                     f"selected emission does not support adaptive observable {observable}"
                 )
+
+
+def _copy_strata(adapter, batch: EmissionBatch, slot: str, native: bool) -> Any:
+    """Detector-cone copies' spectrum, per power-of-two weight stratum (#379).
+
+    The truncation audit stays a primary-only measure. Per-electron (monitor)
+    batches never reach here: they fold copies per history instead.
+
+    Validation: detector-cone-variance-reduction
+    """
+    from dataclasses import replace
+
+    from .. import runner
+    from .cone_split_strata import fold_copies
+
+    def score(segments, n_copies):
+        part = replace(
+            batch,
+            segments=runner._segments_on_device(segments),
+            electron_limit=n_copies,
+            truncation_audit=None,
+            line_screen=None,
+        )
+        return adapter.evaluate(part, slot, native=native).values
+
+    n_norm = batch.segments["Ne"] if batch.electron_limit is None else batch.electron_limit
+    return fold_copies(batch.segments, int(n_norm), score)
 
 
 def _cxr(batch: EmissionBatch) -> EmissionOutput:

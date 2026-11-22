@@ -149,20 +149,56 @@ def test_option_off_adds_no_transport_keyword_and_low_energy_warns():
     assert kwargs["_cone_split"].half_angle_rad == pytest.approx(1.0 / (1.0 + 30.0 / 510.99895))
 
 
-def test_spectrum_and_capture_refuse_split_cases():
+def test_capture_refuses_split_cases():
     case = {**_split(), "Ne": 4, "Ne_brem": 4}
+    with pytest.raises(ValueError, match="trajectory capture"):
+        runner._transport_case(case, trajectory_capture=object())
+
+
+def test_copy_strata_fold_weights_copies_over_primaries():
+    """A linear row tally folds to sum_c w_c x_c / N; copies of excluded parents drop."""
+    from pyrite.montecarlo.runner.cone_split_strata import copy_strata, fold_copies
+
+    ids = np.array([0, 0, 1, 2, 2, 2, 3])
+    length = np.arange(1.0, 8.0)
+    weight = np.array([0.25, 0.5, 0.25, 0.125])
+    parent = np.array([0, 1, 3, 1])  # block-local parents
+    segments = {
+        "Ne": 2,
+        "cone_split": {
+            "copies": {"elec_id": ids, "L_ang": length, "Ne": 4},
+            "weight": weight,
+            "parent": parent,
+            "electron_start": 2,
+        },
+    }
+
+    def score(rows, n):
+        return np.array([rows["L_ang"].sum() / n])
+
+    per_copy = np.bincount(ids, weights=length)
+    # Global parents 2, 3, 5, 3: only those below N = 4 are scored.
+    keep = 2 + parent < 4
+    expected = (weight[keep] * per_copy[keep]).sum() / 4
+    np.testing.assert_allclose(fold_copies(segments, 4, score), [expected], rtol=1e-15)
+    # scale = W n_c / N with n_c = N = 4; parent 5 (weight 0.25) is dropped.
+    assert sorted(scale for scale, _, _ in copy_strata(segments, 4)) == [0.125, 0.25, 0.5]
+    assert fold_copies({"Ne": 2}, 2, score) == 0.0
+
+
+def test_split_spectrum_adds_weighted_copies():
+    n = 24
+    case = {**_split(), "Ne": n, "Ne_brem": n}
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", ConeSplitLowGainWarning)
         transport = runner._transport_case(case)
-    with pytest.raises(NotImplementedError, match="copy weights"):
-        runner._spectrum_case(case, transport)
-    # Streamed scoring builds the same audit first.
-    from pyrite.montecarlo.runner.cxr_grid import cxr_truncation_audit
-
-    with pytest.raises(NotImplementedError, match="copy weights"):
-        cxr_truncation_audit(case, np.array([1.0, 2.0]))
-    with pytest.raises(ValueError, match="trajectory capture"):
-        runner._transport_case(case, trajectory_capture=object())
+        split = runner._spectrum_case(case, transport)
+        segs = {k: v for k, v in transport["segs"].items() if k != "cone_split"}
+        primaries = runner._spectrum_case(case, {**transport, "segs": segs})
+    assert transport["segs"]["cone_split"]["weight"].size > 0
+    for key in ("brem_wide", "spec"):
+        assert np.all(np.isfinite(split[key]))
+        assert split[key].sum() > primaries[key].sum()
 
 
 def test_monitor_scores_primary_plus_weighted_copies_per_history():

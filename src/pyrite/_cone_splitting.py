@@ -6,8 +6,10 @@ direction (:mod:`pyrite.montecarlo.transport.cone_split`). Each primary plus
 its weighted copies is one statistical sample. The record is part of the case
 payload, so it enters case identity; absent, transport stays analog bit for bit.
 
-Experimental: the adaptive monitor scores weighted per-history samples, but
-the spectrum phase does not yet carry copy weights and refuses split cases.
+Experimental: the adaptive monitor scores weighted per-history samples, and
+the spectrum phase scores each power-of-two copy-weight stratum with the
+production scorers (:mod:`pyrite.montecarlo.runner.cone_split_strata`); the
+line-grid truncation audit and grid resolution see primaries only.
 
 Validation: detector-cone-variance-reduction
 """
@@ -159,16 +161,6 @@ def split_transport_core(requested: str = "auto") -> str:
     )
 
 
-def refuse_split_spectrum(case: Mapping[str, Any]) -> None:
-    """Refuse a spectrum phase on a split case until its tallies carry copy weights."""
-    if case.get("cone_split") is not None:
-        # Without the weighted copies the spectrum is biased low yet labelled split.
-        raise NotImplementedError(
-            "detector-cone splitting scores only the adaptive monitor so far; spectrum "
-            "tallies do not yet carry copy weights (#379). Run it measure-only."
-        )
-
-
 def _is_real(value) -> bool:
     return not isinstance(value, bool) and isinstance(value, int | float) and math.isfinite(value)
 
@@ -182,7 +174,6 @@ __all__ = [
     "CONE_SPLIT_MODEL",
     "ConeSplitLowGainWarning",
     "ConeSplitting",
-    "refuse_split_spectrum",
     "split_transport_core",
     "warn_low_gain",
 ]
