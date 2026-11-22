@@ -41,6 +41,10 @@ def _assert_identical(got, ref, path=""):
     assert set(got) == set(ref), path
     for key, value in ref.items():
         where = f"{path}.{key}"
+        if where in {".line_grid_diagnostic.cache", ".line_grid_resolved.cache"}:
+            # Cache warmth is operational telemetry, not a scientific result.
+            assert got[key] in {"hit", "miss"}
+            continue
         if isinstance(value, dict):
             _assert_identical(got[key], value, where)
         elif isinstance(value, np.ndarray):
