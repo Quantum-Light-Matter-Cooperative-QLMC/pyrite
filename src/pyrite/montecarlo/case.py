@@ -422,6 +422,11 @@ class Case(Mapping[str, Any]):
     # Append for frozen-slot pickle compatibility; absent preserves legacy keys.
     transport_realization: TransportRealization | Mapping[str, str] | _Absent = _ABSENT
 
+    def __getstate__(self) -> list[Any]:
+        """Keep the historical frozen-slot pickle when the marker is absent."""
+        state = [getattr(self, field.name) for field in fields(self)]
+        return state[:-1] if self.transport_realization is _ABSENT else state
+
     def __setstate__(self, state: list[Any]) -> None:
         """Restore frozen-slot pickles, filling newly appended optional fields."""
         declared = fields(self)

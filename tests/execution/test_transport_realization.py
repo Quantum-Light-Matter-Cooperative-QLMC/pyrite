@@ -3,7 +3,7 @@
 import hashlib
 import json
 import pickle
-from dataclasses import FrozenInstanceError
+from dataclasses import FrozenInstanceError, fields
 
 import pytest
 
@@ -70,9 +70,20 @@ def test_bad_realization_fails_before_case_use(marker):
         Case(**_legacy_case(), transport_realization=marker)
 
 
-def test_case_old_slot_pickle_and_marked_io_round_trips(tmp_path):
+def test_case_old_slot_pickle_and_marked_io_round_trips(tmp_path, monkeypatch):
     plain = Case(**_legacy_case())
-    old_state = plain.__getstate__()[:-1]
+    old_state = plain.__getstate__()
+    # This is the pre-marker frozen dataclass's complete slot-state contract.
+    before = pickle.dumps(plain, protocol=5)
+    with monkeypatch.context() as patch:
+        patch.setattr(
+            Case,
+            "__getstate__",
+            lambda self: [
+                getattr(self, f.name) for f in fields(self) if f.name != "transport_realization"
+            ],
+        )
+        assert pickle.dumps(plain, protocol=5) == before
     old = object.__new__(Case)
     old.__setstate__(old_state)
     assert old.to_dict().keys() == plain.to_dict().keys()
