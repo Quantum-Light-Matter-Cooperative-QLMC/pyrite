@@ -561,12 +561,15 @@ uv run --group docs sphinx-build -b html -W --keep-going docs docs/_build/html
 
 The `optimization` extra supplies Optuna for notebook 11. Regeneration uses the
 project environment, so inline notebook dependencies must already be installed.
+Tutorials importing Optuna are skipped with a message when it is missing;
+their existing captures are retained.
 
 Regeneration executes each notebook **once** using `marimo export ipynb
 --include-outputs --sort=top-down --no-sandbox`, using disposable source copies
-and CPU transport with a conservative initial allocation. Only after all
-exports succeed are generated `.ipynb` pages promoted and the corresponding
-`.md` iframe wrappers removed. The migration carries over each page's title,
+and CPU transport with a conservative initial allocation. Each generated `.ipynb`
+page is validated, formatted and atomically published as soon as it finishes,
+then its corresponding `.md` iframe wrapper is removed. If a later export fails,
+earlier successful captures remain published. The migration carries over each page's title,
 `Continue learning` links and canonical-source download. The author-controlled
 Molab badge is inserted immediately after the native notebook title, never into
 Marimo source. Repeated regeneration uses stored page metadata. Commit the

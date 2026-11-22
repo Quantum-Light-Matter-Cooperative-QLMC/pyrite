@@ -180,6 +180,78 @@ def test_failed_export_leaves_old_pages_intact(tmp_path, monkeypatch):
     assert not page.with_suffix(".ipynb").exists()
 
 
+@pytest.mark.parametrize("optuna_available", [False, True])
+def test_regenerate_publishes_incrementally_and_skips_missing_optuna(
+    tmp_path, monkeypatch, capsys, optuna_available
+):
+    import subprocess
+
+    module = _notebook_extension()
+    sources = tmp_path / "notebooks"
+    pages = sources / "fundamentals"
+    pages.mkdir(parents=True)
+    for name in ("first", "optimized", "broken"):
+        (sources / f"{name}.py").write_text("import optuna\n" if name == "optimized" else "")
+        (pages / f"{name}.md").write_text(
+            f"# {name}\n\n## Continue learning\n\nNext\n\n## Canonical source\n"
+        )
+    monkeypatch.setattr(module, "DOCS", tmp_path)
+    monkeypatch.setattr(module, "NOTEBOOKS", sources)
+    monkeypatch.setattr(module, "validate_source", lambda source: None)
+    monkeypatch.setattr(module, "project_version", lambda: "0.36.2")
+    monkeypatch.setattr(
+        module.importlib.util, "find_spec", lambda name: object() if optuna_available else None
+    )
+    exported_names = []
+
+    def mock_run(command, **kwargs):
+        if "check" in command:
+            checked = [Path(value).stem for value in command if value.endswith(".py")]
+            assert ("optimized" in checked) == optuna_available
+        if "export" not in command:
+            return
+        exported = Path(command[command.index("-o") + 1])
+        name = exported.stem
+        if name != "first":
+            assert (pages / "first.ipynb").exists()
+            assert not (pages / "first.md").exists()
+        if name == "broken":
+            raise subprocess.CalledProcessError(1, command)
+        exported_names.append(name)
+        figure = nbformat.v4.new_output("display_data", data={"image/png": "iVBORw0KGgo="})
+        nbformat.write(
+            nbformat.v4.new_notebook(
+                cells=[
+                    nbformat.v4.new_markdown_cell(f"# {name}"),
+                    nbformat.v4.new_code_cell("figure", outputs=[figure]),
+                ]
+            ),
+            exported,
+        )
+
+    monkeypatch.setattr(module.subprocess, "run", mock_run)
+    with pytest.raises(subprocess.CalledProcessError):
+        module.regenerate(["first", "optimized", "broken"])
+    assert exported_names == (["first", "optimized"] if optuna_available else ["first"])
+    assert (pages / "optimized.md").exists() == (not optuna_available)
+    assert (pages / "optimized.ipynb").exists() == optuna_available
+    assert (pages / "broken.md").exists()
+    assert not (pages / "broken.ipynb").exists()
+    output = capsys.readouterr().out
+    assert ("Skipping tutorial: optimized" in output) == (not optuna_available)
+
+
+def test_regenerate_only_missing_optuna_runs_no_subprocesses(tmp_path, monkeypatch, capsys):
+    module = _notebook_extension()
+    (tmp_path / "optimized.py").write_text("from optuna.samplers import TPESampler\n")
+    monkeypatch.setattr(module, "NOTEBOOKS", tmp_path)
+    monkeypatch.setattr(module, "validate_source", lambda source: None)
+    monkeypatch.setattr(module.importlib.util, "find_spec", lambda name: None)
+    monkeypatch.setattr(module.subprocess, "run", lambda *a, **kw: pytest.fail("ran subprocess"))
+    module.regenerate(["optimized"])
+    assert "Skipping tutorial: optimized" in capsys.readouterr().out
+
+
 def test_docs_links_target_exported_notebooks_not_deleted_md_wrappers():
     """Avoid Sphinx warnings for .md links after MyST-NB takes over the pages."""
     import re

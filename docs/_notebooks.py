@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import ast
 import hashlib
+import importlib.util
 import io
 import json
 import os
@@ -437,15 +438,37 @@ def check_notebooks(app=None):
             raise ValueError(f"{source.stem}: missing Molab badge beneath tutorial title")
 
 
+def uses_optuna(source):
+    """Whether a tutorial imports the optional optimization backend."""
+    for node in ast.walk(ast.parse(source.read_text())):
+        if isinstance(node, ast.Import):
+            if any(alias.name.split(".")[0] == "optuna" for alias in node.names):
+                return True
+        elif isinstance(node, ast.ImportFrom) and (node.module or "").split(".")[0] == "optuna":
+            return True
+    return False
+
+
 def regenerate(names):
-    """Explicitly execute tutorials, then atomically promote checked ipynb pages."""
+    """Execute tutorials, atomically publishing each checked capture as it finishes."""
     import nbformat
 
-    sources = [NOTEBOOKS / f"{name}.py" for name in names]
-    for source in sources:
+    sources = []
+    for name in names:
+        source = NOTEBOOKS / f"{name}.py"
         if not source.is_file():
             raise ValueError(f"unknown tutorial: {source.stem}")
         validate_source(source)
+        if uses_optuna(source) and importlib.util.find_spec("optuna") is None:
+            print(
+                f"Skipping tutorial: {source.stem} (optuna is not installed; "
+                "install the optimization extra to regenerate)",
+                flush=True,
+            )
+            continue
+        sources.append(source)
+    if not sources:
+        return
     base = dict(os.environ, MPLBACKEND="Agg")
     base.setdefault("PYRITE_MC_TRANSPORT_INITIAL_MAX_STEPS", "128")
     base.setdefault("MPLCONFIGDIR", "/tmp/pyrite-mpl-cache")
@@ -458,11 +481,9 @@ def regenerate(names):
         check=True,
         env=dict(base, PYRITE_MC_BACKEND="cpu"),
     )
-    # Stage *all* exports before touching tracked documentation pages. Failures
-    # cannot leave a partially migrated published curriculum.
+    # Validate and format each export before replacing its published page.
     with tempfile.TemporaryDirectory(prefix="pyrite-notebooks-") as temporary:
         directory = Path(temporary)
-        completed = []
         for source in sources:
             page = page_location(source)
             footer = page_footer(page)
@@ -492,16 +513,14 @@ def regenerate(names):
             nbformat.validate(notebook)
             nbformat.write(notebook, exported)
             format_capture(exported)
-            completed.append((page, exported))
-        for old_page, exported in completed:
-            destination = old_page.with_suffix(".ipynb")
+            destination = page.with_suffix(".ipynb")
             # The exported document is the canonical Sphinx page, with the same docname.
             local_stage = destination.with_suffix(".ipynb.tmp")
             shutil.copyfile(exported, local_stage)
             os.replace(local_stage, destination)
-            if old_page != destination:
-                old_page.unlink()
-            print(destination)
+            if page != destination:
+                page.unlink()
+            print(destination, flush=True)
 
 
 def runtime_structure(content):
