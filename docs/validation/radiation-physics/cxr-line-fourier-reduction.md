@@ -349,7 +349,7 @@ Validation: `cxr-line-fourier-reduction`. Since `CXR_BIN_REDUCTION_MODEL = "four
 
 $$\bar\rho(c)=\frac1P\Big[G_0+2\operatorname{Re}\sum_{m\ge1}\operatorname{sinc}\!\Big(\frac{t_mh}{2\pi}\Big)A_m\,e^{it_m(c-c_0)}\Big]-\mathcal E(c),\qquad A_m=\sum_l w_l\frac{\pi}{a_l}\Big(1-\frac{t_m}{2a_l}\Big)_+e^{-i(E_l-c_0)t_m},$$
 
-with $t_m=2\pi m/P$ and $\mathcal E$ the envelope-image correction. It holds at every centre $c$ and for every $P$ that meets the clearance condition of `fourier_period`; $P=Nh$ and folding modulo $N$ only let one inverse FFT evaluate it on the grid $c_0+kh$. The line coefficients $A_m$ depend on the lines, $P$ and the phase origin $c_0$, not on $h$. A shift of origin is the factor $e^{it_m(c_0-c_0')}$, which the evaluation points absorb. So one set $A_m$ at a common $P$ and origin $c_0=c_{01}$ gives every run: the run takes its multiplier $\operatorname{sinc}(t_mh_j/2\pi)$ and is evaluated at its own centres $x_{jk}=(c_{0j}-c_0+kh_j)\,2\pi/P$. Runs with the same $h_j$ share one evaluation.
+with $t_m=2\pi m/P$ and $\mathcal E$ the envelope-image correction. It holds at every centre $c$ and for every $P$ that meets the clearance condition of `fourier_period`; $P=Nh$ and folding modulo $N$ only let one inverse FFT evaluate it on the grid $c_0+kh$. The line coefficients $A_m$ depend on the lines, $P$ and the phase origin $c_0$, not on $h$. Moving the origin to $c_0'$ gives $A_m(c_0')=A_m(c_0)\,e^{it_m(c_0'-c_0)}$, and the evaluation factor changes by the inverse, so the evaluation points absorb the shift. So one set $A_m$ at a common $P$ and origin $c_0=c_{01}$ gives every run: the run takes its multiplier $\operatorname{sinc}(t_mh_j/2\pi)$ and is evaluated at its own centres $x_{jk}=(c_{0j}-c_0+kh_j)\,2\pi/P$. Runs with the same $h_j$ share one evaluation.
 
 **Common parameters keep each run's bounds.**
 
@@ -580,3 +580,65 @@ Scratch scripts, `numba` host function, FP64.
 - Finding 1: `_fourier_cuda._near_far_lines` now passes the kernel $E_l-c_0$ and edges $-c_0$, so the float32 position error is $2^{-24}|E_l-c_0|\le2^{-24}U$. Regression `test_fourier_cuda.py::test_over_cap_near_far_keeps_fp64_positions_at_high_energy` (lines 1 meV from bin edges at $E\approx10^5$ eV; device-only).
 - Findings 2 and 3: the ledger note states the near/far allowance for over-cap lines and the corrected $\approx4\times10^{-14}$ agreement.
 - Findings 4 and 5: informational, no change.
+
+## Independent verification: shared-mode runs (#1392)
+
+Fresh-context verifier, 2026-11-23, worktree HEAD `252375548`. Scope: [Shared-mode runs on piecewise-uniform axes (#1392)](#shared-mode-runs-on-piecewise-uniform-axes-1392) and the #1392 ledger note. The verifier read the ledger row, the base derivation and that section, and derived the steps below before reading `_fourier_runs.py`, `_fourier_host.py`, `_fourier_spread.py`, `_fourier_cuda.py` and `_bin_quadrature.py::_run_segmented_reduction`. Scratch scripts are in the git-ignored `scratch/1392-validation/`.
+
+### Independent derivation
+
+**Synthesis at any centre and period.** With $\hat\rho(t)=\sum_lw_l(\pi/a_l)(1-|t|/2a_l)_+e^{-iE_lt}$ and the box multiplier $\operatorname{sinc}(th/2\pi)$, Poisson summation gives, for every real $c$ and every $P>0$,
+
+$$
+\sum_{n\in\mathbb Z}\bar\rho(c+nP)=\frac1P\sum_{m\in\mathbb Z}\hat\rho(t_m)\operatorname{sinc}\Bigl(\frac{t_mh}{2\pi}\Bigr)e^{ict_m},\qquad t_m=\frac{2\pi m}{P}.
+$$
+
+Nothing in it requires $c$ on a grid or $P=Nh$; those only make the sum an inverse FFT after folding. Writing $e^{-iE_lt}e^{ict}=e^{-i(E_l-c_0)t}e^{i(c-c_0)t}$ for any origin $c_0$ and using $\hat\rho(-t)=\overline{\hat\rho(t)}$ gives the stated form with $A_m(c_0)=\sum_lw_l(\pi/a_l)(1-t_m/2a_l)_+e^{-i(E_l-c_0)t_m}$. Changing origin, $A_m(c_0')=A_m(c_0)\,e^{it_m(c_0'-c_0)}$, while the evaluation factor changes by the inverse, $e^{it_m(c-c_0)}=e^{it_m(c-c_0')}e^{it_m(c_0'-c_0)}$, so the product $A_m(c_0)e^{it_m(c-c_0)}$ is origin-independent. The images $n\ne0$ are subtracted as before: the closed-form envelope $\mathcal E(c)$ depends only on $c-E_l$ and $P$, and the image bounds only on $D=P-U-h/2$, the line width and $h$. So the bounds hold at any $P$ with $D\ge h$, and the run's own $U_j$, $h_j$ and band $B_j=n_jh_j$ enter.
+
+**Evaluation points.** For run $j$, $c=c_{0j}+kh_j$ and $t_m(c-c_0)=m\,x_{jk}$ with $x_{jk}=(c_{0j}-c_0+kh_j)\,2\pi/P$. The run's synthesis is $\frac1P[G_0+2\operatorname{Re}\sum_{m\ge1}\operatorname{sinc}(t_mh_j/2\pi)A_me^{imx_{jk}}]-\mathcal E_j(c)$, the type-2 sum $\sum_mB_me^{imx}$ with $B_m=\operatorname{sinc}(t_mh_j/2\pi)A_m$, $B_0=0$. $B_m$ depends on $j$ only through $h_j$, and type-2 points are independent, so evaluating all runs of one $h$ in one call is a pure regrouping.
+
+**Common parameters.** The pointwise bound $W^2(1+h^2/D^2)/(6D^2)$ and the yield bound $W^2/(4\pi D^2)+\pi^2Wh^2B/(270D^4)$ are decreasing in $D$ for fixed $W,h,B$, so $P=\max_jP_j$ gives $D_j\ge D_j(P_j)$, which meets run $j$'s clearance. `broad_bin_mean_error_bound` decreases in its minimum width argument (both $(\pi L/2W)^{64}$ and $(\pi h/W)^8$), so with broad $\Leftrightarrow W_l\ge W_0$ ($a_l\le\pi/W_0$), $W_0=\max_jW_{0j}$ leaves every run's broad set inside its own $W\ge W_{0j}$ region and lowers its bound. A larger $W_0$ moves lines broad $\to$ Fourier, which is exact for any width but raises $W_{\max}=\pi/\min a$ of the Fourier set; $P_j$ must therefore be computed after the shared broad split, from the minimum $a$ of the remaining set. The over-cap test $\lfloor Pa_l/\pi\rfloor>$ cap is monotone in $P$, so the common-$P$ over-cap set contains every run's own over-cap set; those extra lines take near/far with the `sinc-bin-far-envelope` allowance. Removing them only shrinks $U_j$, so $D_j$ only grows.
+
+**Type-2 as the adjoint.** The type-1 spreader computes $f_q=\psi^{-1}(q)\sum_l\sum_r\varphi(r\Delta-x_l)s_le^{-iqr\Delta}$, $\Delta=2\pi/n_{\rm fine}$, with the source modulation $e^{-is x_l}$ placing centred mode $q$ at $j=q+s$, $s=j_0+\lfloor M/2\rfloor$. As a matrix it is $T_1=D\,F\,S\,\mathrm{diag}(e^{-isx})$ with $D$ real diagonal, $F$ the forward DFT and $S$ the real spreading matrix. Its adjoint is $T_2=\mathrm{diag}(e^{isx})\,S^{\top}F^{H}D$: deconvolve by the same real factors, place at centred indices, apply $F^H=n_{\rm fine}\cdot$`ifft`, interpolate with the same real kernel, multiply by $e^{isx}$. Because $\varphi$ is real and even, $\sum_r\varphi(r\Delta-x)e^{iq(r\Delta-x)}$ approximates the same real transform as the type-1's conjugate sum, so $T_2B\approx\sum_jB_je^{ijx}$ with the same ES error, $\epsilon\sum|B_j|$ in FINUFFT's sense.
+
+**Single run.** With one axis, $\max$ over runs is that run's $P$ and $W_0$, the origin is $c_{01}$, and the coefficients, multiplier, over-cap set and envelope are those of the uniform route. Only type-2 interpolation replaces folding plus inverse FFT.
+
+### Comparison with the implementation
+
+| item | derivation | code | result |
+| --- | --- | --- | --- |
+| broad set | $a_l\le\pi/\max_jW_{0j}$ | `broad = a <= np.pi / shared_broad_width(...)`, `max(broad_width_for_axis(h, (n-1)h, ...))` | matches; per-run `broad_reduce` on its own $(c_{0j},h_j,n_j)$ with `tolerance=residual_tol` |
+| period | $\max_jP_j$ after broad split, $W_{\max}$ from $\min a$ | `extrema = (E.min(), E.max(), a.min())` of the post-split set, `shared_run_period` | matches |
+| over-cap | $\lfloor2a_l/\Delta t\rfloor>$ cap at common $P$, after $P$ | `xp.floor(2.0 * a / dt) > limit` | matches; same count as the uniform route |
+| origin, points | $c_0=c_{01}$, $x_{jk}=(c_{0j}-c_0+kh_j)\Delta t$ | `origin = axes[0][0]`; `((axes[j][0] - origin) + h * arange(n)) * dt` | matches |
+| multiplier | $\operatorname{sinc}(t_mh_j/2\pi)$, $B_0=0$, $G_0$ separate | `positive * xp.sinc(t * (h / (2π)))`, `coeffs[0] = 0`, `g0 = sum(w π/a)` | matches (NumPy/CuPy `sinc` is normalized) |
+| synthesis | $(G_0+2\operatorname{Re}T_2B)/P-\mathcal E_j$ | `(g0 + 2 evaluate(coeffs, x).real) / P`, minus `_envelope_image_correction(E, a, w, c0, h, n, P)` per run | matches; the 24-node fit spans the run, poles at distance $\ge D_j$ |
+| type-2 host | $e^{isx}S^{\top}(n_{\rm fine}\,\mathrm{ifft})D$ | `host_es_mode_evaluate`: `grid[centred] = coeffs * factors`, `n_fine * sf.ifft`, `_es_interp`, `* exp(1j * shift * x)` | matches; same `es_width`, $\beta=2.30w$, `_fine_size`, `_deconvolution` ($2/(wI)$, real, even) as `host_es_mode_transform` |
+| type-2 device | same | `es_mode_evaluate` + `_interp_kernel` (`fmod` with negative wrap, index wrap) | matches symbolically; not run |
+| grouping | regrouping by identical $h$ | `_width_groups` keyed by `float(h)`, slices in member order | matches |
+| device wiring | runs share one call | `_run_segmented_reduction` collects `axis is not None` runs into one `cuda_fourier_runs_reduce` | matches |
+
+### Numeric checks (host, CPU)
+
+- **Shared-mode vs exact and per-run** (`scratch/1392-validation/check.py`): 12 random piecewise-uniform axes, 2–5 runs of 64–400 bins with $h\in\{0.05,\dots,3\}$ eV and gaps; 300 lines with $W$ log-uniform in $[0.01,40]$ eV, 15 broad lines $W\in[1,8]$ keV, 10 resonances 2–20 keV above the band, signed and zero weights; cap $2^{12}$ on half the cases. Against `_host_bin_mean(exact_widths=None)`: largest $|\Delta|/\sum|w|=3.6\times10^{-7}$ (inside $2\tau$ and the broad bound, $\tau=10^{-6}$). Against `host_fourier_bin_mean_reduce` per run: $\le9.3\times10^{-10}$ of $\sum|w|$; this difference comes from the common $P$ and $W_0$, each side within its own bounds.
+- **Independent quadrature:** 3 random bins per run, `scipy.integrate.quad` of the raw $\operatorname{sinc}^2$ sum (no PyRITE primitive): $\le1.7\times10^{-8}$ of $\sum|w|$.
+- **Single-run limit** (`single.py`): 10 uniform axes, 64–3000 bins, $W\in[0.005,50]$ eV plus broad lines: shared vs uniform route $\le1.7\times10^{-12}$ of $\sum|w|$, the ES level.
+- **Type-2:** against direct $\sum_jB_je^{ijx}$ for $M\in\{37,1000,4097,20000\}$, $j_0\in\{0,5,-300\}$, $x\in[-20,20]$: $\le4.4\times10^{-13}\sum|B|$ at $\epsilon=10^{-12}$. Adjointness $\langle T_1s,B\rangle=\langle s,T_2B\rangle$: relative $\le2.1\times10^{-15}$.
+- **Bound monotonicity:** `image_residual_bounds` at the common $P$ is below that at each $P_j$ for every run (randomized axes).
+- `tests/montecarlo/spectrum/test_fourier_host.py`: 30 passed.
+
+### Findings
+
+1. **Low (wording):** "A shift of origin is the factor $e^{it_m(c_0-c_0')}$" leaves the direction implicit. Precisely, $A_m(c_0')=A_m(c_0)e^{it_m(c_0'-c_0)}$; the stated factor is the one that converts origin $c_0'$ coefficients to origin $c_0$. The code never converts coefficients (it shifts the points), so nothing depends on it.
+2. **Info (FP64 phase):** the type-2 multiplies by $e^{isx}$ with $s\approx M/2$, and $x$ carries relative rounding $\varepsilon_{64}$, so phases carry $\lesssim M|x|\varepsilon_{64}$ rad. For $M\le2^{22}$ and $|x|\le2\pi U/P$ ($\approx0.12$ on the #1320 flush) this is $\sim5\times10^{-11}$ of $\sum|B|$, above $\epsilon=10^{-12}$ but far below `residual_tol`. The type-1 phases $(E_l-c_0)\Delta t$ already carry the same order; it is "FP64 rounding on top", not a new bound.
+3. **Info (cost/allowance):** the common $P$ can move a line near the cap onto near/far for every run, as the section says; accuracy remains inside the stated near/far allowance.
+
+Not verified: device code (`es_mode_evaluate`, `_interp_kernel`, `cuda_fourier_runs_reduce`, `_run_segmented_reduction`) was not run; the #1320 timings and the $1.3\times10^{-9}$ figure and $P_j$ range were not reproduced.
+
+### Verdict
+
+`rederived` for the #1392 extension: the synthesis at arbitrary centres and admissible $P$, the origin shift, the evaluation points, the per-run envelope at the common $P$, the monotonicity of the image, broad and over-cap selections under $P=\max_jP_j$ and $W_0=\max_jW_{0j}$, the type-2 adjointness and its $\epsilon$ error, width grouping, and the single-run limit. Status stays `anchored`; not `signed-off`.
+
+### Resolution (task owner, 2026-11-23)
+
+Finding 1 fixed: the section now states $A_m(c_0')=A_m(c_0)\,e^{it_m(c_0'-c_0)}$ and that the evaluation points absorb the shift. Findings 2 and 3 need no change. Device numerics: King job 15590.
