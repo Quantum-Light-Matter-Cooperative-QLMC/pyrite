@@ -341,6 +341,36 @@ Over the three-chunk sum the relative yield changes by $8.4\times10^{-8}$ and ev
 
 On ROCm (qlmc 12572, Radeon 8060S iGPU, ES transform), the same replay's chunks 0 and 78 match the CUDA near/far reference within $4.1\times10^{-6}$ and $8.0\times10^{-6}$ of peak, with yield ratios $1+7.7\times10^{-8}$ and $1+2.3\times10^{-8}$. They run 3.3× and 5.7× faster than the ROCm near/far route. That route, which the default replaces on ROCm, returns only 1.5–3% of the CUDA yield on this layered scene. This is a pre-existing ROCm defect, tracked separately. A full Fourier pass takes 258 s there.
 
+## Shared-mode runs on piecewise-uniform axes (#1392)
+
+Validation: `cxr-line-fourier-reduction`. Since `CXR_BIN_REDUCTION_MODEL = "fourier-auto-v10"` the uniform runs of a non-uniform axis (`"segmented"`, #1390) share one line transform per flush (`_fourier_runs.fourier_runs_reduce`; host `_fourier_host.host_fourier_runs_reduce`, device `_fourier_cuda.cuda_fourier_runs_reduce`). Before, each run $j$ with axis $(c_{0j},h_j,n_j)$ took the uniform route on its own and reran the exact-cutoff type-1 transform of every line: 19 times per flush on the #1320 thick-target case (4.25M lines, 85,246 bins), 60–65% of wall time on host and device.
+
+**Why one transform serves every run.** The [Derivation](#derivation) evaluates the bin mean of the period-$P$ periodized line sum,
+
+$$\bar\rho(c)=\frac1P\Big[G_0+2\operatorname{Re}\sum_{m\ge1}\operatorname{sinc}\!\Big(\frac{t_mh}{2\pi}\Big)A_m\,e^{it_m(c-c_0)}\Big]-\mathcal E(c),\qquad A_m=\sum_l w_l\frac{\pi}{a_l}\Big(1-\frac{t_m}{2a_l}\Big)_+e^{-i(E_l-c_0)t_m},$$
+
+with $t_m=2\pi m/P$ and $\mathcal E$ the envelope-image correction. It holds at every centre $c$ and for every $P$ that meets the clearance condition of `fourier_period`; $P=Nh$ and folding modulo $N$ only let one inverse FFT evaluate it on the grid $c_0+kh$. The line coefficients $A_m$ depend on the lines, $P$ and the phase origin $c_0$, not on $h$. A shift of origin is the factor $e^{it_m(c_0-c_0')}$, which the evaluation points absorb. So one set $A_m$ at a common $P$ and origin $c_0=c_{01}$ gives every run: the run takes its multiplier $\operatorname{sinc}(t_mh_j/2\pi)$ and is evaluated at its own centres $x_{jk}=(c_{0j}-c_0+kh_j)\,2\pi/P$. Runs with the same $h_j$ share one evaluation.
+
+**Common parameters keep each run's bounds.**
+
+- Broad threshold $W_0=\max_jW_{0j}$, with $W_{0j}$ from `broad_width_for_axis` for run $j$. `broad_bin_mean_error_bound` falls as the threshold grows, so every run keeps its broad-route bound. Lines with $W_{0j}\le W_l<W_0$ move from run $j$'s broad route to the Fourier route, which holds for any line.
+- Period $P=\max_jP_j$, with $P_j$ from `fourier_period` for the shared Fourier line set and run $j$'s band. The image bounds (`image_residual_bounds`) depend on $D_j=P-U_j-h_j/2$ and fall as $D_j$ grows. $P\ge P_j$ meets run $j$'s clearance, so every run keeps the pointwise and yield image bounds of its own route. On the #1320 flush the $P_j$ differ by under 1% ($1.2926$–$1.3045\times10^7$ eV). They are set by $W_{\max}/\sqrt{6\tau}$, not by the 0.25 MeV band.
+- Over-cap lines ($\lfloor Pa_l/\pi\rfloor>$ `FOURIER_MAX_LINE_MODES`) are selected at the common $P$, so a line near the cap may now take near/far for every run, with the `sinc-bin-far-envelope` allowance stated for #1320.
+- The envelope correction $\mathcal E$ stays per run: its 24-node Chebyshev fit spans the run's centres and uses the common $P$, for which its closed form holds unchanged.
+
+**Type-2 evaluation.** $\sum_mB_me^{imx}$ at arbitrary points uses the ES type-2 transform (`host_es_mode_evaluate`, `_fourier_spread.es_mode_evaluate`). It is the adjoint of the type-1 spreader: the same width $w$, $\beta=2.30w$, upsampling 2 and real deconvolution factors, an inverse FFT onto the fine grid, then ES interpolation at each point. This replaces folding and the inverse FFT. Its error is the ES kernel tolerance $\epsilon$ relative to $\sum_m|B_m|$, as for the type-1 (FINUFFT's rule; not a rigorous final-error bound). It adds to the image, broad and spreading errors and is far below `residual_tol` ($\epsilon=10^{-12}$ on host, $10^{-9}$ on device). Each point sums its window in a fixed order, so results do not depend on thread count or launch order.
+
+**Limiting case.** A single run gives the uniform route's $A_m$, multiplier and correction; the two differ only by type-2 interpolation against folding, within $\epsilon$. Uniform axes keep the `"fourier"` route and are unchanged.
+
+**Checks.** `test_fourier_host.py`:
+
+- Type-2 against direct sums within $10\epsilon\|B\|_1$, and adjointness $\langle T_1s,B\rangle=\langle s,T_2B\rangle$ against the host spreader.
+- Shared-mode against the per-run route within $10^{-9}$ of $\sum_l|w_l|\pi/a_l$, on four runs of three widths with broad, over-cap, signed and zero-weight lines.
+- Against exact bin means within $10^{-6}$ of peak; $2\times10^{-5}$ with a small cap, the near/far allowance of both routes.
+- Bitwise equal at 1 and many numba threads.
+
+`test_fourier_cuda.py` checks device against host. On the #1320 flush (host, 16 threads) shared-mode runs take 20.9 s for every bin against 93.6 s for the per-run Fourier runs alone, and match the per-run route within $1.3\times10^{-9}$ of peak.
+
 ## Independent verification
 
 Fresh-context verifier, 2026-11-14, worktree HEAD `7b216478d`. The verifier derived the transform, the Poisson identity, the envelope image sum, and both remainder bounds from the ledger row and the `sinc-bin-integration` profile and bin convention. That derivation came before the implementation body or the derivation above was read. The verifier changed only this section. Scratch scripts are outside the repository.

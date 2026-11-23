@@ -26,7 +26,10 @@ from ._bin_fourier import FOURIER_MIN_RESIDUAL_TOL, _envelope_image_correction, 
 
 
 def shared_run_period(extrema, axes, residual_tol):
-    """Largest :func:`fourier_period` over ``axes``: every run's image bound holds."""
+    """Largest :func:`fourier_period` over ``axes``: every run's image bound holds.
+
+    Validation: cxr-line-fourier-reduction
+    """
     return max(
         fourier_period(extrema[:2], extrema[2:], c0, h, n, residual_tol=residual_tol)[1]
         for c0, h, n in axes
@@ -34,7 +37,10 @@ def shared_run_period(extrema, axes, residual_tol):
 
 
 def shared_broad_width(axes, residual_tol, floor_eV):
-    """Largest :func:`broad_width_for_axis` over ``axes``: every run's broad bound holds."""
+    """Largest :func:`broad_width_for_axis` over ``axes``: every run's broad bound holds.
+
+    Validation: cxr-line-fourier-reduction, cxr-line-broad-interpolation
+    """
     return max(broad_width_for_axis(h, (n - 1) * h, residual_tol, floor_eV) for _, h, n in axes)
 
 

@@ -768,7 +768,10 @@ def sincsq_bin_lineshape(
 #: call (device-preamble ``Si``, FP64 per-bin sums), instead of the dense
 #: ``scipy.special.sici`` matrix product. The device route mirrors it
 #: (``"segmented"``: CUDA Fourier per run, one near/far launch for the rest).
-CXR_BIN_REDUCTION_MODEL = "fourier-auto-v9"
+#: v10 (#1392): the uniform runs of a ``"segmented"`` axis share one line
+#: transform at the largest run period and broad threshold, each run
+#: evaluated at its centres by an ES type-2 transform (``_fourier_runs``).
+CXR_BIN_REDUCTION_MODEL = "fourier-auto-v10"
 #: Lines per Fourier-route flush: amortises the per-call FFT and planning.
 FOURIER_FLUSH_LINES = 10_000_000
 

@@ -222,6 +222,8 @@ def test_channeling_demo_and_off_profile_identities_are_unchanged(identity_pin):
     lines on near/far).
     #1390 re-mints the silicon pins for ``fourier-auto-v9`` (host non-uniform
     bin-mean axes on the numba near/far queue).
+    #1392 re-mints the silicon pins for ``fourier-auto-v10`` (shared-mode
+    Fourier runs on segmented axes).
     """
     sweep, settings, cases = _profile_cases("silicon", "channeling_demo")
     assert cases[0].line_quadrature == "bin-mean"
