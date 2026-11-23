@@ -184,6 +184,45 @@ def _transform_workers(n_jobs):
     return max(1, min(int(n_jobs), get_num_threads()))
 
 
+_NODE_SUM_BLOCK = 1 << 16
+
+
+@njit(parallel=True, cache=True)
+def _node_sum_blocks(E, q, nodes, scale, partial):  # pragma: no cover - numba
+    """``partial[b, i] = sum_{l in block b} q_l g(scale (c_i - E_l))``, ``g = csc^2 - 1/x^2``."""
+    for b in prange(partial.shape[0]):
+        lo = b * _NODE_SUM_BLOCK
+        hi = min(lo + _NODE_SUM_BLOCK, E.shape[0])
+        for i in range(nodes.shape[0]):
+            acc = 0.0
+            for k in range(lo, hi):
+                x = scale * (nodes[i] - E[k])
+                y = x * x
+                if abs(x) < 0.2:
+                    tail = 2 / 10395 + y * (1382 / 58046625 + y * (4 / 1403325))
+                    g = 1 / 3 + y * (1 / 15 + y * (2 / 189 + y * (1 / 675 + y * tail)))
+                else:
+                    sx = np.sin(x)
+                    g = 1.0 / (sx * sx) - 1.0 / y
+                acc += q[k] * g
+            partial[b, i] = acc
+
+
+def _host_node_sums(E_res, q, nodes, P):
+    """Numba ``_envelope_node_sums``: line blocks in parallel, summed in block order (#1390).
+
+    Same ``1/sin^2 x - 1/x^2`` series/closed-form split as
+    ``_inv_sin_sq_minus_inv_sq``; FP64 summation order differs only.
+
+    Validation: cxr-line-fourier-reduction
+    """
+    E = np.ascontiguousarray(E_res, dtype=np.float64)
+    nodes = np.ascontiguousarray(nodes, dtype=np.float64)
+    partial = np.zeros(((E.size + _NODE_SUM_BLOCK - 1) // _NODE_SUM_BLOCK, nodes.size))
+    _node_sum_blocks(E, np.ascontiguousarray(q, dtype=np.float64), nodes, np.pi / P, partial)
+    return partial.sum(axis=0) if partial.shape[0] else np.zeros(nodes.size)
+
+
 def host_fourier_bin_mean_reduce(
     E_res,
     a_width,
@@ -261,7 +300,7 @@ def host_fourier_bin_mean_reduce(
         )
     g0 = float(np.sum(w * np.pi / a))
     out += (g0 + 2.0 * (n_fft * sf.ifft(folded)).real[:n_bins]) / P
-    out -= _envelope_image_correction(E, a, w, c0, h, n_bins, P)
+    out -= _envelope_image_correction(E, a, w, c0, h, n_bins, P, node_sums=_host_node_sums)
     return out
 
 

@@ -206,3 +206,24 @@ def test_uniform_runs_cover_every_bin_and_merge_short_runs():
     fourier = [r for r in runs if r[2] is not None]
     assert [r[2][1] for r in fourier] == pytest.approx([3.0, 2.0])
     assert sum(r[2] is None for r in runs) == 1
+
+
+def test_host_node_sums_match_the_numpy_image_sums():
+    """#1390: numba envelope-image node sums = ``_envelope_node_sums`` at FP64 rounding.
+
+    Lines straddle the series/closed-form switch at ``|x| = 0.2`` and span
+    several numba line blocks.
+
+    Validation: cxr-line-fourier-reduction
+    """
+    from pyrite.montecarlo.spectrum.cxr._bin_fourier import _envelope_node_sums
+    from pyrite.montecarlo.spectrum.cxr._fourier_host import _NODE_SUM_BLOCK, _host_node_sums
+
+    rng = np.random.default_rng(1390)
+    P = 4000.0
+    E = rng.uniform(-1500.0, 1500.0, 2 * _NODE_SUM_BLOCK + 17)
+    q = rng.uniform(-1.0, 1.0, E.size)
+    nodes = np.r_[np.linspace(-200.0, 200.0, 23), E[5] + 1e-3]
+    want = _envelope_node_sums(E, q, nodes, P)
+    got = _host_node_sums(E, q, nodes, P)
+    assert np.abs(got - want).max() <= 1e-12 * np.abs(want).max()
