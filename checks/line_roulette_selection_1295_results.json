@@ -1,0 +1,1281 @@
+{
+ "issue": 1295,
+ "code_sha": "6b8a64e47e94c766d49f1daa0ec37fc23480a038",
+ "job": [
+  13663,
+  13669
+ ],
+ "device": "RTX 5080 (qlmc gpu partition), CuPy",
+ "profile": "cleo_sub_1281 (30 keV) and production cleo_sub (300 keV-30 MeV); both resonance-population / resonance-local / bin-mean",
+ "policy": "exact-line-mass-two-stratum-v1, pilot 128, case seed draws",
+ "metric": "production-pass FOM gain (Var_A T_A)/(Var_R T_R) of the summed exact line mass; transport and prefix selection excluded",
+ "cases": [
+  {
+   "case": "mos2 500 nm 30 keV tilt 15",
+   "histories": 8192,
+   "segments": 709999,
+   "selected_reflections": 11924,
+   "cutoff_invang": 20.0,
+   "production_s": 139.02,
+   "screen_s": 16.56,
+   "screen_over_production": 0.1191,
+   "kept_rows_pass": {
+    "arm": "keep 0.1 floor 0.1",
+    "row_share": 0.3627,
+    "measured_s": 51.29,
+    "linear_prediction_s": 50.43
+   },
+   "mass_cv": 0.6541,
+   "rows_mass_correlation": 0.8682,
+   "zero_mass_primaries": 0,
+   "mass_share_top": {
+    "0.001": 0.0063,
+    "0.01": 0.0465,
+    "0.1": 0.2594,
+    "0.5": 0.6784
+   },
+   "relative_se_analog": 0.00723,
+   "arms": [
+    {
+     "keep_fraction": 0.02,
+     "floor": 0.05,
+     "row_share": 0.1438,
+     "variance_ratio": 48.719,
+     "production_time_ratio": 0.2629,
+     "fom_gain": 0.078
+    },
+    {
+     "keep_fraction": 0.02,
+     "floor": 0.1,
+     "row_share": 0.1889,
+     "variance_ratio": 23.604,
+     "production_time_ratio": 0.308,
+     "fom_gain": 0.138
+    },
+    {
+     "keep_fraction": 0.02,
+     "floor": 0.25,
+     "row_share": 0.3241,
+     "variance_ratio": 8.535,
+     "production_time_ratio": 0.4432,
+     "fom_gain": 0.264
+    },
+    {
+     "keep_fraction": 0.02,
+     "floor": 0.5,
+     "row_share": 0.5494,
+     "variance_ratio": 3.512,
+     "production_time_ratio": 0.6685,
+     "fom_gain": 0.426
+    },
+    {
+     "keep_fraction": 0.05,
+     "floor": 0.05,
+     "row_share": 0.2385,
+     "variance_ratio": 37.718,
+     "production_time_ratio": 0.3577,
+     "fom_gain": 0.074
+    },
+    {
+     "keep_fraction": 0.05,
+     "floor": 0.1,
+     "row_share": 0.2786,
+     "variance_ratio": 18.393,
+     "production_time_ratio": 0.3977,
+     "fom_gain": 0.137
+    },
+    {
+     "keep_fraction": 0.05,
+     "floor": 0.25,
+     "row_share": 0.3988,
+     "variance_ratio": 6.798,
+     "production_time_ratio": 0.518,
+     "fom_gain": 0.284
+    },
+    {
+     "keep_fraction": 0.05,
+     "floor": 0.5,
+     "row_share": 0.5992,
+     "variance_ratio": 2.933,
+     "production_time_ratio": 0.7184,
+     "fom_gain": 0.475
+    },
+    {
+     "keep_fraction": 0.1,
+     "floor": 0.05,
+     "row_share": 0.3258,
+     "variance_ratio": 30.132,
+     "production_time_ratio": 0.4449,
+     "fom_gain": 0.075
+    },
+    {
+     "keep_fraction": 0.1,
+     "floor": 0.1,
+     "row_share": 0.3612,
+     "variance_ratio": 14.799,
+     "production_time_ratio": 0.4804,
+     "fom_gain": 0.141
+    },
+    {
+     "keep_fraction": 0.1,
+     "floor": 0.25,
+     "row_share": 0.4677,
+     "variance_ratio": 5.6,
+     "production_time_ratio": 0.5868,
+     "fom_gain": 0.304
+    },
+    {
+     "keep_fraction": 0.1,
+     "floor": 0.5,
+     "row_share": 0.6451,
+     "variance_ratio": 2.533,
+     "production_time_ratio": 0.7643,
+     "fom_gain": 0.517
+    },
+    {
+     "keep_fraction": 0.25,
+     "floor": 0.05,
+     "row_share": 0.5047,
+     "variance_ratio": 18.798,
+     "production_time_ratio": 0.6238,
+     "fom_gain": 0.085
+    },
+    {
+     "keep_fraction": 0.25,
+     "floor": 0.1,
+     "row_share": 0.5308,
+     "variance_ratio": 9.43,
+     "production_time_ratio": 0.6499,
+     "fom_gain": 0.163
+    },
+    {
+     "keep_fraction": 0.25,
+     "floor": 0.25,
+     "row_share": 0.609,
+     "variance_ratio": 3.81,
+     "production_time_ratio": 0.7281,
+     "fom_gain": 0.36
+    },
+    {
+     "keep_fraction": 0.25,
+     "floor": 0.5,
+     "row_share": 0.7393,
+     "variance_ratio": 1.937,
+     "production_time_ratio": 0.8584,
+     "fom_gain": 0.601
+    }
+   ],
+   "best_arm_fom_gain": 0.601,
+   "optimal_keep_probability_bound_free_screen": 1.003,
+   "profile": "cleo_sub_1281",
+   "job": 13663
+  },
+  {
+   "case": "ws2 500 nm 30 keV tilt 15",
+   "histories": 8192,
+   "segments": 1182512,
+   "selected_reflections": 6018,
+   "cutoff_invang": 16.0,
+   "production_s": 120.3,
+   "screen_s": 13.87,
+   "screen_over_production": 0.1153,
+   "kept_rows_pass": {
+    "arm": "keep 0.1 floor 0.1",
+    "row_share": 0.4237,
+    "measured_s": 50.6,
+    "linear_prediction_s": 50.97
+   },
+   "mass_cv": 0.7221,
+   "rows_mass_correlation": 0.8339,
+   "zero_mass_primaries": 0,
+   "mass_share_top": {
+    "0.001": 0.0061,
+    "0.01": 0.0465,
+    "0.1": 0.2688,
+    "0.5": 0.7254
+   },
+   "relative_se_analog": 0.00798,
+   "arms": [
+    {
+     "keep_fraction": 0.02,
+     "floor": 0.05,
+     "row_share": 0.1412,
+     "variance_ratio": 43.562,
+     "production_time_ratio": 0.2565,
+     "fom_gain": 0.09
+    },
+    {
+     "keep_fraction": 0.02,
+     "floor": 0.1,
+     "row_share": 0.1864,
+     "variance_ratio": 21.161,
+     "production_time_ratio": 0.3017,
+     "fom_gain": 0.157
+    },
+    {
+     "keep_fraction": 0.02,
+     "floor": 0.25,
+     "row_share": 0.322,
+     "variance_ratio": 7.72,
+     "production_time_ratio": 0.4373,
+     "fom_gain": 0.296
+    },
+    {
+     "keep_fraction": 0.02,
+     "floor": 0.5,
+     "row_share": 0.548,
+     "variance_ratio": 3.24,
+     "production_time_ratio": 0.6633,
+     "fom_gain": 0.465
+    },
+    {
+     "keep_fraction": 0.05,
+     "floor": 0.05,
+     "row_share": 0.2012,
+     "variance_ratio": 37.117,
+     "production_time_ratio": 0.3164,
+     "fom_gain": 0.085
+    },
+    {
+     "keep_fraction": 0.05,
+     "floor": 0.1,
+     "row_share": 0.2432,
+     "variance_ratio": 18.108,
+     "production_time_ratio": 0.3585,
+     "fom_gain": 0.154
+    },
+    {
+     "keep_fraction": 0.05,
+     "floor": 0.25,
+     "row_share": 0.3693,
+     "variance_ratio": 6.703,
+     "production_time_ratio": 0.4846,
+     "fom_gain": 0.308
+    },
+    {
+     "keep_fraction": 0.05,
+     "floor": 0.5,
+     "row_share": 0.5796,
+     "variance_ratio": 2.901,
+     "production_time_ratio": 0.6948,
+     "fom_gain": 0.496
+    },
+    {
+     "keep_fraction": 0.1,
+     "floor": 0.05,
+     "row_share": 0.3949,
+     "variance_ratio": 22.35,
+     "production_time_ratio": 0.5102,
+     "fom_gain": 0.088
+    },
+    {
+     "keep_fraction": 0.1,
+     "floor": 0.1,
+     "row_share": 0.4268,
+     "variance_ratio": 11.113,
+     "production_time_ratio": 0.542,
+     "fom_gain": 0.166
+    },
+    {
+     "keep_fraction": 0.1,
+     "floor": 0.25,
+     "row_share": 0.5223,
+     "variance_ratio": 4.371,
+     "production_time_ratio": 0.6376,
+     "fom_gain": 0.359
+    },
+    {
+     "keep_fraction": 0.1,
+     "floor": 0.5,
+     "row_share": 0.6815,
+     "variance_ratio": 2.124,
+     "production_time_ratio": 0.7968,
+     "fom_gain": 0.591
+    },
+    {
+     "keep_fraction": 0.25,
+     "floor": 0.05,
+     "row_share": 0.5637,
+     "variance_ratio": 13.653,
+     "production_time_ratio": 0.679,
+     "fom_gain": 0.108
+    },
+    {
+     "keep_fraction": 0.25,
+     "floor": 0.1,
+     "row_share": 0.5867,
+     "variance_ratio": 6.994,
+     "production_time_ratio": 0.702,
+     "fom_gain": 0.204
+    },
+    {
+     "keep_fraction": 0.25,
+     "floor": 0.25,
+     "row_share": 0.6556,
+     "variance_ratio": 2.998,
+     "production_time_ratio": 0.7709,
+     "fom_gain": 0.433
+    },
+    {
+     "keep_fraction": 0.25,
+     "floor": 0.5,
+     "row_share": 0.7704,
+     "variance_ratio": 1.666,
+     "production_time_ratio": 0.8857,
+     "fom_gain": 0.678
+    }
+   ],
+   "best_arm_fom_gain": 0.678,
+   "optimal_keep_probability_bound_free_screen": 1.018,
+   "profile": "cleo_sub_1281",
+   "job": 13663
+  },
+  {
+   "case": "ws2 500 nm 300 keV tilt 15",
+   "profile": "cleo_sub",
+   "job": 13669,
+   "histories": 8192,
+   "segments": 147063,
+   "selected_reflections": 8692,
+   "cutoff_invang": 18.0,
+   "production_s": 28.17,
+   "screen_s": 2.67,
+   "screen_over_production": 0.0948,
+   "kept_rows_pass": {
+    "arm": "keep 0.1 floor 0.1",
+    "row_share": 0.2549,
+    "measured_s": 7.45,
+    "linear_prediction_s": 7.18
+   },
+   "mass_cv": 0.4941,
+   "rows_mass_correlation": 0.552,
+   "zero_mass_primaries": 0,
+   "mass_share_top": {
+    "0.001": 0.0117,
+    "0.01": 0.041,
+    "0.1": 0.1625,
+    "0.5": 0.5689
+   },
+   "relative_se_analog": 0.00546,
+   "arms": [
+    {
+     "keep_fraction": 0.02,
+     "floor": 0.05,
+     "row_share": 0.1119,
+     "variance_ratio": 69.599,
+     "production_time_ratio": 0.2067,
+     "fom_gain": 0.07
+    },
+    {
+     "keep_fraction": 0.02,
+     "floor": 0.1,
+     "row_share": 0.1586,
+     "variance_ratio": 33.494,
+     "production_time_ratio": 0.2534,
+     "fom_gain": 0.118
+    },
+    {
+     "keep_fraction": 0.02,
+     "floor": 0.25,
+     "row_share": 0.2989,
+     "variance_ratio": 11.831,
+     "production_time_ratio": 0.3936,
+     "fom_gain": 0.215
+    },
+    {
+     "keep_fraction": 0.02,
+     "floor": 0.5,
+     "row_share": 0.5326,
+     "variance_ratio": 4.61,
+     "production_time_ratio": 0.6273,
+     "fom_gain": 0.346
+    },
+    {
+     "keep_fraction": 0.05,
+     "floor": 0.05,
+     "row_share": 0.1562,
+     "variance_ratio": 64.016,
+     "production_time_ratio": 0.2509,
+     "fom_gain": 0.062
+    },
+    {
+     "keep_fraction": 0.05,
+     "floor": 0.1,
+     "row_share": 0.2006,
+     "variance_ratio": 30.85,
+     "production_time_ratio": 0.2954,
+     "fom_gain": 0.11
+    },
+    {
+     "keep_fraction": 0.05,
+     "floor": 0.25,
+     "row_share": 0.3338,
+     "variance_ratio": 10.95,
+     "production_time_ratio": 0.4286,
+     "fom_gain": 0.213
+    },
+    {
+     "keep_fraction": 0.05,
+     "floor": 0.5,
+     "row_share": 0.5559,
+     "variance_ratio": 4.317,
+     "production_time_ratio": 0.6506,
+     "fom_gain": 0.356
+    },
+    {
+     "keep_fraction": 0.1,
+     "floor": 0.05,
+     "row_share": 0.2185,
+     "variance_ratio": 57.753,
+     "production_time_ratio": 0.3132,
+     "fom_gain": 0.055
+    },
+    {
+     "keep_fraction": 0.1,
+     "floor": 0.1,
+     "row_share": 0.2596,
+     "variance_ratio": 27.883,
+     "production_time_ratio": 0.3543,
+     "fom_gain": 0.101
+    },
+    {
+     "keep_fraction": 0.1,
+     "floor": 0.25,
+     "row_share": 0.383,
+     "variance_ratio": 9.961,
+     "production_time_ratio": 0.4777,
+     "fom_gain": 0.21
+    },
+    {
+     "keep_fraction": 0.1,
+     "floor": 0.5,
+     "row_share": 0.5887,
+     "variance_ratio": 3.987,
+     "production_time_ratio": 0.6834,
+     "fom_gain": 0.367
+    },
+    {
+     "keep_fraction": 0.25,
+     "floor": 0.05,
+     "row_share": 0.3209,
+     "variance_ratio": 48.405,
+     "production_time_ratio": 0.4157,
+     "fom_gain": 0.05
+    },
+    {
+     "keep_fraction": 0.25,
+     "floor": 0.1,
+     "row_share": 0.3567,
+     "variance_ratio": 23.455,
+     "production_time_ratio": 0.4514,
+     "fom_gain": 0.094
+    },
+    {
+     "keep_fraction": 0.25,
+     "floor": 0.25,
+     "row_share": 0.4639,
+     "variance_ratio": 8.485,
+     "production_time_ratio": 0.5587,
+     "fom_gain": 0.211
+    },
+    {
+     "keep_fraction": 0.25,
+     "floor": 0.5,
+     "row_share": 0.6426,
+     "variance_ratio": 3.495,
+     "production_time_ratio": 0.7374,
+     "fom_gain": 0.388
+    }
+   ],
+   "best_arm_fom_gain": 0.388,
+   "optimal_keep_probability_bound_free_screen": 1.0
+  },
+  {
+   "case": "mos2 500 nm 300 keV tilt 15",
+   "profile": "cleo_sub",
+   "job": 13669,
+   "histories": 8192,
+   "segments": 96798,
+   "selected_reflections": 11924,
+   "cutoff_invang": 20.0,
+   "production_s": 23.77,
+   "screen_s": 2.45,
+   "screen_over_production": 0.1029,
+   "kept_rows_pass": {
+    "arm": "keep 0.1 floor 0.1",
+    "row_share": 0.2338,
+    "measured_s": 5.8,
+    "linear_prediction_s": 5.56
+   },
+   "mass_cv": 0.2064,
+   "rows_mass_correlation": 0.1828,
+   "zero_mass_primaries": 0,
+   "mass_share_top": {
+    "0.001": 0.0051,
+    "0.01": 0.0239,
+    "0.1": 0.1291,
+    "0.5": 0.5376
+   },
+   "relative_se_analog": 0.00228,
+   "arms": [
+    {
+     "keep_fraction": 0.02,
+     "floor": 0.05,
+     "row_share": 0.0939,
+     "variance_ratio": 415.825,
+     "production_time_ratio": 0.1968,
+     "fom_gain": 0.012
+    },
+    {
+     "keep_fraction": 0.02,
+     "floor": 0.1,
+     "row_share": 0.1416,
+     "variance_ratio": 197.496,
+     "production_time_ratio": 0.2445,
+     "fom_gain": 0.021
+    },
+    {
+     "keep_fraction": 0.02,
+     "floor": 0.25,
+     "row_share": 0.2847,
+     "variance_ratio": 66.499,
+     "production_time_ratio": 0.3876,
+     "fom_gain": 0.039
+    },
+    {
+     "keep_fraction": 0.02,
+     "floor": 0.5,
+     "row_share": 0.5231,
+     "variance_ratio": 22.833,
+     "production_time_ratio": 0.626,
+     "fom_gain": 0.07
+    },
+    {
+     "keep_fraction": 0.05,
+     "floor": 0.05,
+     "row_share": 0.1467,
+     "variance_ratio": 385.668,
+     "production_time_ratio": 0.2496,
+     "fom_gain": 0.01
+    },
+    {
+     "keep_fraction": 0.05,
+     "floor": 0.1,
+     "row_share": 0.1916,
+     "variance_ratio": 183.211,
+     "production_time_ratio": 0.2945,
+     "fom_gain": 0.019
+    },
+    {
+     "keep_fraction": 0.05,
+     "floor": 0.25,
+     "row_share": 0.3263,
+     "variance_ratio": 61.737,
+     "production_time_ratio": 0.4292,
+     "fom_gain": 0.038
+    },
+    {
+     "keep_fraction": 0.05,
+     "floor": 0.5,
+     "row_share": 0.5509,
+     "variance_ratio": 21.246,
+     "production_time_ratio": 0.6538,
+     "fom_gain": 0.072
+    },
+    {
+     "keep_fraction": 0.1,
+     "floor": 0.05,
+     "row_share": 0.1965,
+     "variance_ratio": 359.996,
+     "production_time_ratio": 0.2994,
+     "fom_gain": 0.009
+    },
+    {
+     "keep_fraction": 0.1,
+     "floor": 0.1,
+     "row_share": 0.2388,
+     "variance_ratio": 171.051,
+     "production_time_ratio": 0.3417,
+     "fom_gain": 0.017
+    },
+    {
+     "keep_fraction": 0.1,
+     "floor": 0.25,
+     "row_share": 0.3656,
+     "variance_ratio": 57.684,
+     "production_time_ratio": 0.4685,
+     "fom_gain": 0.037
+    },
+    {
+     "keep_fraction": 0.1,
+     "floor": 0.5,
+     "row_share": 0.5771,
+     "variance_ratio": 19.895,
+     "production_time_ratio": 0.68,
+     "fom_gain": 0.074
+    },
+    {
+     "keep_fraction": 0.25,
+     "floor": 0.05,
+     "row_share": 0.3335,
+     "variance_ratio": 291.602,
+     "production_time_ratio": 0.4364,
+     "fom_gain": 0.008
+    },
+    {
+     "keep_fraction": 0.25,
+     "floor": 0.1,
+     "row_share": 0.3686,
+     "variance_ratio": 138.654,
+     "production_time_ratio": 0.4715,
+     "fom_gain": 0.015
+    },
+    {
+     "keep_fraction": 0.25,
+     "floor": 0.25,
+     "row_share": 0.4738,
+     "variance_ratio": 46.885,
+     "production_time_ratio": 0.5767,
+     "fom_gain": 0.037
+    },
+    {
+     "keep_fraction": 0.25,
+     "floor": 0.5,
+     "row_share": 0.6492,
+     "variance_ratio": 16.295,
+     "production_time_ratio": 0.7521,
+     "fom_gain": 0.082
+    }
+   ],
+   "best_arm_fom_gain": 0.082,
+   "optimal_keep_probability_bound_free_screen": 1.0
+  },
+  {
+   "case": "mos2 500 nm 1000 keV tilt 15",
+   "profile": "cleo_sub",
+   "job": 13669,
+   "histories": 8192,
+   "segments": 68958,
+   "selected_reflections": 11924,
+   "cutoff_invang": 20.0,
+   "production_s": 16.47,
+   "screen_s": 1.8,
+   "screen_over_production": 0.1092,
+   "kept_rows_pass": {
+    "arm": "keep 0.1 floor 0.1",
+    "row_share": 0.1991,
+    "measured_s": 3.6,
+    "linear_prediction_s": 3.28
+   },
+   "mass_cv": 0.1013,
+   "rows_mass_correlation": 0.179,
+   "zero_mass_primaries": 0,
+   "mass_share_top": {
+    "0.001": 0.0027,
+    "0.01": 0.0153,
+    "0.1": 0.1191,
+    "0.5": 0.5304
+   },
+   "relative_se_analog": 0.00112,
+   "arms": [
+    {
+     "keep_fraction": 0.02,
+     "floor": 0.05,
+     "row_share": 0.094,
+     "variance_ratio": 1747.237,
+     "production_time_ratio": 0.2032,
+     "fom_gain": 0.003
+    },
+    {
+     "keep_fraction": 0.02,
+     "floor": 0.1,
+     "row_share": 0.1416,
+     "variance_ratio": 828.165,
+     "production_time_ratio": 0.2509,
+     "fom_gain": 0.005
+    },
+    {
+     "keep_fraction": 0.02,
+     "floor": 0.25,
+     "row_share": 0.2847,
+     "variance_ratio": 276.722,
+     "production_time_ratio": 0.3939,
+     "fom_gain": 0.009
+    },
+    {
+     "keep_fraction": 0.02,
+     "floor": 0.5,
+     "row_share": 0.5231,
+     "variance_ratio": 92.907,
+     "production_time_ratio": 0.6324,
+     "fom_gain": 0.017
+    },
+    {
+     "keep_fraction": 0.05,
+     "floor": 0.05,
+     "row_share": 0.1199,
+     "variance_ratio": 1685.154,
+     "production_time_ratio": 0.2291,
+     "fom_gain": 0.003
+    },
+    {
+     "keep_fraction": 0.05,
+     "floor": 0.1,
+     "row_share": 0.1662,
+     "variance_ratio": 798.757,
+     "production_time_ratio": 0.2754,
+     "fom_gain": 0.005
+    },
+    {
+     "keep_fraction": 0.05,
+     "floor": 0.25,
+     "row_share": 0.3052,
+     "variance_ratio": 266.919,
+     "production_time_ratio": 0.4144,
+     "fom_gain": 0.009
+    },
+    {
+     "keep_fraction": 0.05,
+     "floor": 0.5,
+     "row_share": 0.5368,
+     "variance_ratio": 89.64,
+     "production_time_ratio": 0.646,
+     "fom_gain": 0.017
+    },
+    {
+     "keep_fraction": 0.1,
+     "floor": 0.05,
+     "row_share": 0.1556,
+     "variance_ratio": 1606.224,
+     "production_time_ratio": 0.2648,
+     "fom_gain": 0.002
+    },
+    {
+     "keep_fraction": 0.1,
+     "floor": 0.1,
+     "row_share": 0.2001,
+     "variance_ratio": 761.369,
+     "production_time_ratio": 0.3093,
+     "fom_gain": 0.004
+    },
+    {
+     "keep_fraction": 0.1,
+     "floor": 0.25,
+     "row_share": 0.3334,
+     "variance_ratio": 254.456,
+     "production_time_ratio": 0.4426,
+     "fom_gain": 0.009
+    },
+    {
+     "keep_fraction": 0.1,
+     "floor": 0.5,
+     "row_share": 0.5556,
+     "variance_ratio": 85.485,
+     "production_time_ratio": 0.6648,
+     "fom_gain": 0.018
+    },
+    {
+     "keep_fraction": 0.25,
+     "floor": 0.05,
+     "row_share": 0.3589,
+     "variance_ratio": 1199.104,
+     "production_time_ratio": 0.4681,
+     "fom_gain": 0.002
+    },
+    {
+     "keep_fraction": 0.25,
+     "floor": 0.1,
+     "row_share": 0.3927,
+     "variance_ratio": 568.523,
+     "production_time_ratio": 0.5019,
+     "fom_gain": 0.004
+    },
+    {
+     "keep_fraction": 0.25,
+     "floor": 0.25,
+     "row_share": 0.4939,
+     "variance_ratio": 190.174,
+     "production_time_ratio": 0.6031,
+     "fom_gain": 0.009
+    },
+    {
+     "keep_fraction": 0.25,
+     "floor": 0.5,
+     "row_share": 0.6626,
+     "variance_ratio": 64.058,
+     "production_time_ratio": 0.7718,
+     "fom_gain": 0.02
+    }
+   ],
+   "best_arm_fom_gain": 0.02,
+   "optimal_keep_probability_bound_free_screen": 1.0
+  },
+  {
+   "case": "ws2 500 nm 1000 keV tilt 15",
+   "profile": "cleo_sub",
+   "job": 13669,
+   "histories": 8192,
+   "segments": 104417,
+   "selected_reflections": 8692,
+   "cutoff_invang": 18.0,
+   "production_s": 18.67,
+   "screen_s": 1.93,
+   "screen_over_production": 0.1034,
+   "kept_rows_pass": {
+    "arm": "keep 0.1 floor 0.1",
+    "row_share": 0.2312,
+    "measured_s": 4.66,
+    "linear_prediction_s": 4.32
+   },
+   "mass_cv": 0.2423,
+   "rows_mass_correlation": 0.1356,
+   "zero_mass_primaries": 0,
+   "mass_share_top": {
+    "0.001": 0.0061,
+    "0.01": 0.0201,
+    "0.1": 0.1223,
+    "0.5": 0.5292
+   },
+   "relative_se_analog": 0.00268,
+   "arms": [
+    {
+     "keep_fraction": 0.02,
+     "floor": 0.05,
+     "row_share": 0.0895,
+     "variance_ratio": 305.663,
+     "production_time_ratio": 0.1929,
+     "fom_gain": 0.017
+    },
+    {
+     "keep_fraction": 0.02,
+     "floor": 0.1,
+     "row_share": 0.1374,
+     "variance_ratio": 145.314,
+     "production_time_ratio": 0.2408,
+     "fom_gain": 0.029
+    },
+    {
+     "keep_fraction": 0.02,
+     "floor": 0.25,
+     "row_share": 0.2812,
+     "variance_ratio": 49.105,
+     "production_time_ratio": 0.3846,
+     "fom_gain": 0.053
+    },
+    {
+     "keep_fraction": 0.02,
+     "floor": 0.5,
+     "row_share": 0.5208,
+     "variance_ratio": 17.035,
+     "production_time_ratio": 0.6242,
+     "fom_gain": 0.094
+    },
+    {
+     "keep_fraction": 0.05,
+     "floor": 0.05,
+     "row_share": 0.1322,
+     "variance_ratio": 288.424,
+     "production_time_ratio": 0.2356,
+     "fom_gain": 0.015
+    },
+    {
+     "keep_fraction": 0.05,
+     "floor": 0.1,
+     "row_share": 0.1778,
+     "variance_ratio": 137.148,
+     "production_time_ratio": 0.2812,
+     "fom_gain": 0.026
+    },
+    {
+     "keep_fraction": 0.05,
+     "floor": 0.25,
+     "row_share": 0.3149,
+     "variance_ratio": 46.383,
+     "production_time_ratio": 0.4183,
+     "fom_gain": 0.052
+    },
+    {
+     "keep_fraction": 0.05,
+     "floor": 0.5,
+     "row_share": 0.5432,
+     "variance_ratio": 16.128,
+     "production_time_ratio": 0.6466,
+     "fom_gain": 0.096
+    },
+    {
+     "keep_fraction": 0.1,
+     "floor": 0.05,
+     "row_share": 0.1911,
+     "variance_ratio": 266.645,
+     "production_time_ratio": 0.2945,
+     "fom_gain": 0.013
+    },
+    {
+     "keep_fraction": 0.1,
+     "floor": 0.1,
+     "row_share": 0.2337,
+     "variance_ratio": 126.832,
+     "production_time_ratio": 0.3371,
+     "fom_gain": 0.023
+    },
+    {
+     "keep_fraction": 0.1,
+     "floor": 0.25,
+     "row_share": 0.3614,
+     "variance_ratio": 42.944,
+     "production_time_ratio": 0.4648,
+     "fom_gain": 0.05
+    },
+    {
+     "keep_fraction": 0.1,
+     "floor": 0.5,
+     "row_share": 0.5743,
+     "variance_ratio": 14.981,
+     "production_time_ratio": 0.6777,
+     "fom_gain": 0.099
+    },
+    {
+     "keep_fraction": 0.25,
+     "floor": 0.05,
+     "row_share": 0.3487,
+     "variance_ratio": 210.931,
+     "production_time_ratio": 0.4521,
+     "fom_gain": 0.01
+    },
+    {
+     "keep_fraction": 0.25,
+     "floor": 0.1,
+     "row_share": 0.383,
+     "variance_ratio": 100.441,
+     "production_time_ratio": 0.4864,
+     "fom_gain": 0.02
+    },
+    {
+     "keep_fraction": 0.25,
+     "floor": 0.25,
+     "row_share": 0.4858,
+     "variance_ratio": 34.147,
+     "production_time_ratio": 0.5892,
+     "fom_gain": 0.05
+    },
+    {
+     "keep_fraction": 0.25,
+     "floor": 0.5,
+     "row_share": 0.6572,
+     "variance_ratio": 12.049,
+     "production_time_ratio": 0.7606,
+     "fom_gain": 0.109
+    }
+   ],
+   "best_arm_fom_gain": 0.109,
+   "optimal_keep_probability_bound_free_screen": 1.0
+  },
+  {
+   "case": "mos2 500 nm 30000 keV tilt 15",
+   "profile": "cleo_sub",
+   "job": 13669,
+   "histories": 8192,
+   "segments": 63015,
+   "selected_reflections": 15930,
+   "cutoff_invang": 22.0,
+   "production_s": 19.01,
+   "screen_s": 2.23,
+   "screen_over_production": 0.1172,
+   "kept_rows_pass": {
+    "arm": "keep 0.1 floor 0.1",
+    "row_share": 0.2199,
+    "measured_s": 4.47,
+    "linear_prediction_s": 4.18
+   },
+   "mass_cv": 0.045,
+   "rows_mass_correlation": 0.0947,
+   "zero_mass_primaries": 0,
+   "mass_share_top": {
+    "0.001": 0.0015,
+    "0.01": 0.0131,
+    "0.1": 0.1091,
+    "0.5": 0.5106
+   },
+   "relative_se_analog": 0.0005,
+   "arms": [
+    {
+     "keep_fraction": 0.02,
+     "floor": 0.05,
+     "row_share": 0.0827,
+     "variance_ratio": 9012.943,
+     "production_time_ratio": 0.1999,
+     "fom_gain": 0.001
+    },
+    {
+     "keep_fraction": 0.02,
+     "floor": 0.1,
+     "row_share": 0.131,
+     "variance_ratio": 4269.815,
+     "production_time_ratio": 0.2482,
+     "fom_gain": 0.001
+    },
+    {
+     "keep_fraction": 0.02,
+     "floor": 0.25,
+     "row_share": 0.2758,
+     "variance_ratio": 1423.938,
+     "production_time_ratio": 0.393,
+     "fom_gain": 0.002
+    },
+    {
+     "keep_fraction": 0.02,
+     "floor": 0.5,
+     "row_share": 0.5172,
+     "variance_ratio": 475.313,
+     "production_time_ratio": 0.6344,
+     "fom_gain": 0.003
+    },
+    {
+     "keep_fraction": 0.05,
+     "floor": 0.05,
+     "row_share": 0.1183,
+     "variance_ratio": 8648.606,
+     "production_time_ratio": 0.2354,
+     "fom_gain": 0.0
+    },
+    {
+     "keep_fraction": 0.05,
+     "floor": 0.1,
+     "row_share": 0.1647,
+     "variance_ratio": 4097.234,
+     "production_time_ratio": 0.2818,
+     "fom_gain": 0.001
+    },
+    {
+     "keep_fraction": 0.05,
+     "floor": 0.25,
+     "row_share": 0.3039,
+     "variance_ratio": 1366.411,
+     "production_time_ratio": 0.4211,
+     "fom_gain": 0.002
+    },
+    {
+     "keep_fraction": 0.05,
+     "floor": 0.5,
+     "row_share": 0.5359,
+     "variance_ratio": 456.137,
+     "production_time_ratio": 0.6531,
+     "fom_gain": 0.003
+    },
+    {
+     "keep_fraction": 0.1,
+     "floor": 0.05,
+     "row_share": 0.1748,
+     "variance_ratio": 8119.086,
+     "production_time_ratio": 0.2919,
+     "fom_gain": 0.0
+    },
+    {
+     "keep_fraction": 0.1,
+     "floor": 0.1,
+     "row_share": 0.2182,
+     "variance_ratio": 3846.409,
+     "production_time_ratio": 0.3353,
+     "fom_gain": 0.001
+    },
+    {
+     "keep_fraction": 0.1,
+     "floor": 0.25,
+     "row_share": 0.3485,
+     "variance_ratio": 1282.803,
+     "production_time_ratio": 0.4656,
+     "fom_gain": 0.002
+    },
+    {
+     "keep_fraction": 0.1,
+     "floor": 0.5,
+     "row_share": 0.5657,
+     "variance_ratio": 428.268,
+     "production_time_ratio": 0.6828,
+     "fom_gain": 0.003
+    },
+    {
+     "keep_fraction": 0.25,
+     "floor": 0.05,
+     "row_share": 0.2998,
+     "variance_ratio": 6936.78,
+     "production_time_ratio": 0.417,
+     "fom_gain": 0.0
+    },
+    {
+     "keep_fraction": 0.25,
+     "floor": 0.1,
+     "row_share": 0.3366,
+     "variance_ratio": 3286.369,
+     "production_time_ratio": 0.4538,
+     "fom_gain": 0.001
+    },
+    {
+     "keep_fraction": 0.25,
+     "floor": 0.25,
+     "row_share": 0.4472,
+     "variance_ratio": 1096.123,
+     "production_time_ratio": 0.5644,
+     "fom_gain": 0.002
+    },
+    {
+     "keep_fraction": 0.25,
+     "floor": 0.5,
+     "row_share": 0.6315,
+     "variance_ratio": 366.041,
+     "production_time_ratio": 0.7486,
+     "fom_gain": 0.004
+    }
+   ],
+   "best_arm_fom_gain": 0.004,
+   "optimal_keep_probability_bound_free_screen": 1.0
+  }
+ ],
+ "verdict": "negative at every energy: no arm gains (best 0.60/0.68 at 30 keV, <=0.39 at 300 keV-30 MeV); optimal per-history keep probabilities p_i \u221d m_i/sqrt(rows_i) with free exact masses gain <=1.02x. Per-history line mass is not concentrated (CV ~0.7 at 30 keV, lower at higher energy; top 10% of histories hold 11-27% of the mass) and rows track mass (corr ~0.85).",
+ "thick_target_mass_only": {
+  "job": 14521,
+  "code_sha": "4674e995f1c41af7cc7d2d239e116b48128f5e7b",
+  "note": "probe merge of #1328 head 3d80b0d79 + branch; PROBE_MASS_ONLY=1, so gains assume a free screen and time proportional to rows scored (upper bounds)",
+  "device": "RTX 5080 (qlmc gpu partition), CuPy",
+  "profile": "thick_hiE_1295_45deg (remote private config: production cleo_sub settings, 1 mm target, straggling, 45 deg aperture)",
+  "gain_threshold": 1.5,
+  "cases": [
+   {
+    "case": "mos2 1 mm 1 MeV tilt 15, 45 deg aperture",
+    "histories": 1024,
+    "selected_reflections": 2518,
+    "screen_s": 492.4,
+    "rows": 20991042,
+    "mass_cv": 1.6408,
+    "rows_mass_correlation": 0.1606,
+    "zero_mass_primaries": 0,
+    "mass_share_top": {
+     "0.001": 0.0126,
+     "0.01": 0.0882,
+     "0.1": 0.5056,
+     "0.5": 0.9771
+    },
+    "analog": {
+     "relative_se": 0.0513,
+     "variance_of_variance": 0.00952,
+     "vov_gate_passes": false,
+     "shift_over_se": 0.0394,
+     "effective_sample_size": 277.5
+    },
+    "best_arm_free_screen": {
+     "keep_fraction": 0.25,
+     "floor": 0.1,
+     "fom_gain": 1.775,
+     "expected_row_share": 0.4435
+    },
+    "optimal_bound_free_screen": 2.975,
+    "verdict": "pays"
+   },
+   {
+    "case": "mose2 1 mm 30 MeV tilt 15, 45 deg aperture",
+    "histories": 1024,
+    "selected_reflections": 18200,
+    "screen_s": 6525.4,
+    "rows": 18692174,
+    "mass_cv": 0.5711,
+    "rows_mass_correlation": 0.186,
+    "zero_mass_primaries": 0,
+    "mass_share_top": {
+     "0.001": 0.0055,
+     "0.01": 0.0457,
+     "0.1": 0.2202,
+     "0.5": 0.669
+    },
+    "analog": {
+     "relative_se": 0.0178,
+     "variance_of_variance": 0.01994,
+     "vov_gate_passes": false,
+     "shift_over_se": 0.0525,
+     "effective_sample_size": 772.3
+    },
+    "best_arm_free_screen": {
+     "keep_fraction": 0.25,
+     "floor": 0.5,
+     "fom_gain": 0.622,
+     "expected_row_share": 0.6634
+    },
+    "optimal_bound_free_screen": 1.014,
+    "verdict": "negative"
+   },
+   {
+    "case": "mos2 1 mm 5 MeV tilt 15, 45 deg aperture",
+    "job": 14530,
+    "histories": 1024,
+    "selected_reflections": 20698,
+    "screen_s": 7173.4,
+    "rows": 17926044,
+    "mass_cv": 4.0381,
+    "rows_mass_correlation": 0.1838,
+    "zero_mass_primaries": 0,
+    "mass_share_top": {
+     "0.001": 0.0494,
+     "0.01": 0.32,
+     "0.1": 0.9099,
+     "0.5": 0.9934
+    },
+    "analog": {
+     "relative_se": 0.1262,
+     "variance_of_variance": 0.05231,
+     "vov_gate_passes": false,
+     "shift_over_se": 0.1022,
+     "effective_sample_size": 59.2
+    },
+    "best_arm_free_screen": {
+     "keep_fraction": 0.05,
+     "floor": 0.05,
+     "fom_gain": 3.569,
+     "expected_row_share": 0.2502
+    },
+    "optimal_bound_free_screen": 12.997,
+    "verdict": "pays"
+   },
+   {
+    "case": "mos2 1 mm 30 MeV tilt 15, 45 deg aperture",
+    "job": 14530,
+    "histories": 1024,
+    "selected_reflections": 26276,
+    "screen_s": 7399.5,
+    "rows": 13860132,
+    "mass_cv": 0.7875,
+    "rows_mass_correlation": 0.269,
+    "zero_mass_primaries": 0,
+    "mass_share_top": {
+     "0.001": 0.0173,
+     "0.01": 0.0575,
+     "0.1": 0.2046,
+     "0.5": 0.64
+    },
+    "analog": {
+     "relative_se": 0.0246,
+     "variance_of_variance": 0.26968,
+     "vov_gate_passes": false,
+     "shift_over_se": 0.2287,
+     "effective_sample_size": 632.3
+    },
+    "best_arm_free_screen": {
+     "keep_fraction": 0.25,
+     "floor": 0.5,
+     "fom_gain": 0.846,
+     "expected_row_share": 0.6632
+    },
+    "optimal_bound_free_screen": 1.031,
+    "verdict": "negative"
+   }
+  ],
+  "verdict": "mixed, not actionable: the free-screen bound pays for mos2 1 MeV (2.98x) and 5 MeV (13.0x; best arm 3.57x) and fails for mos2 and mose2 30 MeV (1.03x, 1.01x). Every case fails the analog VOV gate at N=1024. The screen alone costs 0.5-2 h per case, and production scoring on this scene is dominated by per-flush bin-mean reduction on its resonance-local axis (#1390, #1392): 8.5 h at N=16 (#1326 job 14428) and more than 9 h at N=1024 (14529), so time does not yet fall with rows scored. Gated on #1390/#1392.",
+  "jobs": [
+   14521,
+   14530
+  ],
+  "timed_kept_row": {
+   "job": 14529,
+   "case": "mos2 1 mm 1 MeV tilt 15, 45 deg aperture, ARM keep 0.25 floor 0.1, N=1024",
+   "result": "no timing: hit the 9 h per-case limit (rc 124) in the scoring pass after transport; the analog production pass alone exceeds the limit at N=1024"
+  }
+ }
+}
