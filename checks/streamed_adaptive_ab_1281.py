@@ -173,7 +173,7 @@ def run(route, material, e0_kev, tilt_deg, max_histories, out_prefix):
         host_peak_MiB=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024,
         route_taken=((out or {}).get("_adaptive_route") or {"route": "retained"}),
         realized_electrons=sampling.get("realized_electrons"),
-        realized_brem=sampling.get("realized_brem_electrons"),
+        realized_brem=sampling.get("realized_electrons_brem"),
         stop_reason=sampling.get("stop_reason"),
         relative_se={
             k: v.get("relative_se") for k, v in (sampling.get("statistics") or {}).items()
