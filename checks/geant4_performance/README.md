@@ -183,6 +183,65 @@ its energy-control row remains unresolved until same-track replay evidence
 exists. This option alone does not implement saved-track capture/replay or
 qualify the point approximation.
 
+## Confirmation resource forecasts (#1041)
+
+`prepare_convergence_resources.py` converts pilot summaries into conservative
+confirmation forecasts. This is a planning reference, not a submission or
+numerical gate. It never runs histories, allocates seeds, submits jobs, or
+changes the frozen design. Every expected row and the original multiplicity
+remain present, including unsupported, unresolved and missing rows.
+
+```bash
+uv run python checks/geant4_performance/prepare_convergence_resources.py \
+    --pilots path/to/pilot-summary.json --output scratch/confirmation-resources.json
+```
+
+The pilot-summary JSON uses schema
+`pyrite.geant4-performance.convergence-pilot-summary.v1` and fields:
+
+| Field | Meaning |
+| --- | --- |
+| `design_sha256` | Exact SHA-256 of the frozen design JSON |
+| `phase`, `seeds` | `"pilot"`, nonempty unique subset of `[301,302,303]` |
+| `evidence_files_sha256` | Relative file paths beside the summary mapped to SHA-256; each is verified |
+| `rows` | Summaries keyed by an expected comparison's `id`; omitted rows remain missing |
+
+Each row supplies `id`, `sampling`, `variance`, `evidence_files` and `arms`.
+`variance` is per incident primary: `Var(D)` for `sampling="paired"`, or the
+**sum** `Var(Y_left)+Var(Y_right)` for `sampling="independent"`. Paired scoring
+uses one costed replay population; independent transport uses two costed arms,
+each with the full calculated confirmation count. Pairing requires the issue's
+saved-history/substream audit; the summary label alone does not establish it.
+`evidence_files` is a nonempty subset of the top-level hashed paths. Hashes
+verify retention integrity; the planner does not parse raw scores to certify
+summary statistics, seed provenance, diagnostics or scientific identity.
+
+Each arm supplies positive `histories`, `elapsed_seconds`, `cpus`,
+`peak_memory_bytes`, and `memory_margin_factor` (at least one), plus nonnegative
+`overhead_seconds`, `gpus` (zero or one) and `peak_vram_bytes`. GPU arms require
+positive peak VRAM; CPU arms require zero VRAM. Explicit `hardware_identity`
+and `runtime_identity` strings identify the pilot environment. Memory requests
+round the observed peaks times the declared margin up to bytes.
+
+Counts use the frozen row alpha and allowance: `ceil(1.25*4*z²*variance/b²)`,
+rounded up to three equal repeats with at least 20,000 histories each.
+Zero variance remains unresolved. Each repeat is split into balanced shards
+under the 30-minute ceiling using pilot `elapsed_seconds/histories`; measured
+overhead is **additionally** charged to every shard. This deliberately avoids
+subtracting unverified setup costs from the pilot rate. CPU core-hours include
+CPU allocation during GPU work. The planner charges every contrast separately;
+shared-run scheduling and cost deduplication need a separate audited plan.
+
+The aggregate is compared with the frozen 256 CPU core-hour and 8 GPU-hour
+confirmation ceilings. An incomplete forecast cannot report `within-ceilings`;
+known cost above a ceiling reports `over-budget` even if other rows are missing.
+Pilot spend is separate. Input/source hashes and per-row evidence references
+are retained; an existing output is never replaced. No measured forecast is
+committed by this implementation. Actual audited pilots, collision-checked
+seed/substream maps, runtime/table identities and memory qualification remain
+required; `submission_ready=false`, `numerical_gate="unmeasured"` and
+`headline=false` are unconditional.
+
 ## Whole-primary scorer capture/replay (#1041)
 
 `pyrite_bench.py --estimator continuous --capture-tracks NEW_DIRECTORY`
@@ -462,3 +521,31 @@ pixi run python checks/geant4_performance/analyze.py evidence/run/JOB --output s
 `run.sbatch` takes the gpu partition's 8; partition caps leave the remaining 8
 unallocatable, so the host runs nothing else during measurement. Geant4 runs at
 1, 16 and 32 threads (16 cores, SMT 2).
+
+### Retained free-atom ELSEPA generation (#1041)
+
+`generate_convergence_table.py PLAN KEY --output NEW_DIRECTORY` evaluates one
+exact free-atom request from `elsepa-refinement-plan-v1.json`. Run remotely in a
+bounded CPU allocation with the matching installed native tables and Fortran
+toolchain. The runner validates the nested grid, native manifest/payload pins,
+source digest and every deck model field before building a fresh binary. It
+never selects a cached refined payload or modifies a catalog.
+
+The new directory retains generator sources and atomic data, compiler command
+and streams, executable, one fresh-process deck and raw output per energy, and
+the NPZ/JSON table pair under `tables/`. `generation.json` records their hashes,
+requested and actually printed panel energies, and completion only after all
+panels parse and preserve the native angular mesh. Native Fortran energy
+rounding and the existing parser tolerance remain explicit; no equation, deck
+format or interpolation policy changes. A failure leaves incomplete evidence
+without that completion record. Existing directories are never reused. The
+default retained-file ceiling is 256 MiB, each generator process times out after
+120 s, and the scheduler must bound aggregate runtime/memory. Compilation and
+intermediate parser allocations are not hard-limited by the retained-file cap.
+
+Muffin-tin requests are explicitly refused by this runner. Fresh free-atom
+evaluations do not resolve the native angular/inverse-CDF limitation or qualify
+numerical convergence. Admit the resulting explicit table pairs through
+`pyrite_bench.py --elsepa-level N --elsepa-table FILE.npz` before transport.
+Copy and checksum-verify the complete evidence directory into durable storage;
+a generated remote directory alone does not meet raw-publication acceptance.
