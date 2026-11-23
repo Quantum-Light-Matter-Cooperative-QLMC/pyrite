@@ -524,7 +524,7 @@ def _parse_profile_precision(row, path, errors) -> None:
     if table is None:
         return
     try:
-        Precision.from_dict(table)
+        Precision.from_dict(table, source=f"catalog {path}.adaptive_sampling")
     except (TypeError, ValueError) as exc:
         errors.add(f"{path}.adaptive_sampling", str(exc))
     for key in ("n_electrons", "n_electrons_brem"):

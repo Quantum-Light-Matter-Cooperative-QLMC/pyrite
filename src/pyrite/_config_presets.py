@@ -149,7 +149,7 @@ def validate_values(kind: PresetKind, values: Mapping[str, Any]) -> None:
             )
         from ._precision import Precision
 
-        Precision.from_dict(values["precision"])
+        Precision.from_dict(values["precision"], source=f"{kind.table} preset")
     validate_profile_numerics(
         {key: values[key] for key in kind.scalar_keys if key in values and key != "emission"}
     )
@@ -231,7 +231,7 @@ def numerics_from_values(values: Mapping[str, Any]) -> Numerics:
     }
     sampling: SamplingPolicy
     if "precision" in values:
-        sampling = AdaptiveSampling.from_dict(values["precision"])
+        sampling = AdaptiveSampling.from_dict(values["precision"], source="numerics preset")
     else:
         default = FixedSampling()
         sampling = FixedSampling(

@@ -179,6 +179,7 @@ def test_realized_pair_matches_fixed_transport_and_spectra(spread, core):
         max_histories=120,
         brem_target_rse=1.0,
         brem_min_histories=40,
+        brem_max_histories=120,  # the former implicit default: the shared maximum
         batch_means_band_eV=(1000.0, 10000.0),
     )
     requested = {
@@ -348,6 +349,20 @@ def test_explicit_required_keys_keep_the_mirrored_minimum_default(recwarn):
     policy = Precision(**kw, brem_target_rse=0.01, brem_max_histories=60_000)
     assert policy.brem_min_histories == 100
     assert not [w for w in recwarn if issubclass(w.category, DeprecationWarning)]
+
+
+def test_inheritance_warning_names_the_source_and_the_missing_keys():
+    """From a catalog the warning's own frame is not the user's: it must say where to look."""
+    payload = {"target_rse": 0.1, "min_electrons": 40, "max_electrons": 200}
+    payload["observables"] = ["line", "brem"]
+    with pytest.warns(DeprecationWarning) as caught:
+        Precision.from_dict(payload, source="profile 'cleo_sub'")
+    message = str(caught[0].message)
+    assert "profile 'cleo_sub'" in message
+    assert "missing brem_target_rse and brem_max_histories" in message
+    with pytest.warns(DeprecationWarning) as caught:
+        Precision.from_dict(payload)
+    assert "profile" not in str(caught[0].message)
 
 
 def test_complete_brem_request_does_not_warn(recwarn):

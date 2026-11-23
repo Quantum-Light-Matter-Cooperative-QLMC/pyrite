@@ -16,7 +16,8 @@ class IndependentStoppingMonitor:
     Electrons past a brem freeze run to the line cutoff, so a freeze at
     ``d`` inside a chunk sets ``cut_at = d``: the driver keeps ``[0, d)`` and
     transports the rest again. Equal fixed bounds recover the joint rule;
-    equal targets alone need not. Brem never gates the shared (CXR) stop (#1398).
+    equal targets alone need not. Brem never enters the CXR stopping test (#1398); as a prefix it only
+    delays the CXR stop to the first passing decision point at or after ``Ne_brem``.
 
     Validation: adaptive-sample-size-stopping
     """

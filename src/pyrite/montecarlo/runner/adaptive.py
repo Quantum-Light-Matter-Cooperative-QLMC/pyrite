@@ -6,8 +6,9 @@ transport electron chunks through :mod:`.block_transport`, sized for the device
 by :class:`.stream_sizing.AdaptiveChunkPlan`, and buffer grid-independent
 per-electron scalars:
 
-* ``"line"`` -- the per-electron line mass ``sum w pi / a_w`` over the lines a
-  fixed monitor band keeps, the quantity of the #201 line-yield audit;
+* ``"cxr"`` -- the per-electron line mass ``sum w pi / a_w`` over the lines a
+  fixed monitor band keeps, the quantity of the #201 line-yield audit (stored
+  policies spell this observable ``"line"`` for identity stability);
 * ``"brem"`` -- the per-electron bremsstrahlung integral over the same band.
 
 Neither depends on the line grid, which is resolved only once transport has

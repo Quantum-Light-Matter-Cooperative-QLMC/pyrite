@@ -49,11 +49,11 @@ to obtain frozen configurations. See [named presets ADR](../adr/0021-named-physi
 ## Adaptive electron counts
 
 Eligible profiles without fixed counts or an `adaptive_sampling` table use adaptive
-sampling: target relative standard error 0.05 on the line yield and, independently,
+sampling: target relative standard error 0.05 on the CXR yield and, independently,
 on the bremsstrahlung yield, 200–20,000 histories each, checked at decision points
-10 % apart, with heavy-tail guards. A case stops when the line yield meets its target
+10 % apart, with heavy-tail guards. A case stops when the CXR yield meets its target
 and the guards pass, or at the maximum with a statistics-limited flag. Brem stops on
-its own rule (below) and never gates the line stop. Both components use one
+its own rule (below). Brem never enters the CXR stopping test; because brem is a prefix (`Ne_brem <= Ne`), the CXR stop is the first CXR-passing decision point at or after `Ne_brem`. Both components use one
 transported population.
 `pyrite profile numerics adaptive-sampling show PROFILE` reports the policy, fixed counts,
 blockers and line-grid source.
@@ -124,11 +124,12 @@ of three checks (about a quarter of the sample) refuses those in the measured
 `cleo_sub` cases, but for heavy-tailed scenes a larger `--min-histories` remains
 the reliable remedy.
 
-The shared stop is the line (CXR) rule only; bremsstrahlung never gates it
-(#1398). Brem stopping is requested by listing `brem` next to `cxr` in
+The shared stop is the CXR rule only (#1398): brem never enters the
+CXR stopping test; because brem is a prefix (`Ne_brem <= Ne`), the CXR stop is the
+first CXR-passing decision point at or after `Ne_brem`. Brem stopping is requested by listing `brem` next to `cxr` in
 `--observable`, or by setting any of `--brem-target-rse`,
 `--brem-min-histories` and `--brem-max-histories`, and then always runs as
-independent brem-prefix stopping. The brem keys mirror the line keys:
+independent brem-prefix stopping. The brem keys mirror the CXR keys:
 
 | Brem key | Mirrors | Rule |
 | --- | --- | --- |
@@ -137,13 +138,13 @@ independent brem-prefix stopping. The brem keys mirror the line keys:
 | `--brem-min-histories` | `--min-histories` | default 100, at most `--brem-max-histories` (see the inheritance rule below) |
 
 Brem uses a prefix of the shared transport and freezes when its target and
-guards pass or its maximum is reached; line work continues until the line stop
+guards pass or its maximum is reached; CXR work continues until the CXR stop
 and the brem prefix have both finished, so the brem count never exceeds the
-line count. Guards, `--decision-growth` and the pilot are shared (the brem
+CXR count. Guards, `--decision-growth` and the pilot are shared (the brem
 pilot is clipped to the brem bounds). Without a brem request
 (`--observable cxr`), brem is scored on every history and not monitored.
 `--observable brem` alone, for a `cxr_source="none"` run, applies the shared
-rule to brem. The CLI fills omitted brem target and maximum with the line
+rule to brem. The CLI fills omitted brem target and maximum with the CXR
 values when it writes a policy, the minimum included; with the brem target and
 maximum both given, an omitted brem minimum keeps the default above; `--observable cxr` withdraws the request and its
 brem keys. Resetting the required brem keys while brem stopping is requested is
@@ -161,7 +162,7 @@ explicit independent policy, so its identity differs from the former shared
 form (`adaptive_sampling_model=decision-points-v5`); CXR-only policies keep
 theirs. See [compatibility](python-api/compatibility.md).
 
-The requested policy enters dataset/case identity. Realized counts and errors
+The requested policy enters dataset/case identity. Stored policies (catalog tables, checkpoints, case payloads) spell the `cxr` observable as `"line"` for identity stability; `"line"` stays accepted as an alias of `cxr` and the stored spelling never changes. Realized counts and errors
 live separately in `adaptive_sampling`, so stopping does not change resume
 identity. Count grids cannot combine with adaptive sampling. The Python
 policy is `Numerics(sampling=AdaptiveSampling(...))`; configured campaigns also

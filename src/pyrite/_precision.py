@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import math
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import asdict, dataclass, replace
 from functools import wraps
 from pathlib import Path
@@ -34,6 +36,21 @@ LEGACY_STORED_KEYS = {"stability_blocks": "stability_checks"}
 
 #: Keyword arguments renamed by #1253: accepted with a deprecation warning.
 DEPRECATED_ARGUMENTS = {"stability_blocks": "stability_checks"}
+
+#: Where the policy being built came from (a catalog profile, a stored case, ...),
+#: named by deprecation warnings that fire inside the constructor (#1398).
+_SOURCE: ContextVar[str | None] = ContextVar("pyrite_precision_source", default=None)
+
+
+@contextmanager
+def policy_source(source: str | None) -> Iterator[None]:
+    """Name *source* in any deprecation warning raised while a policy is built."""
+    token = _SOURCE.set(source)
+    try:
+        yield
+    finally:
+        _SOURCE.reset(token)
+
 
 #: Brem stopping keys (#1398): the first two are required, mirroring ``target_rse`` and
 #: ``max_histories``; the minimum defaults like ``min_histories``.
@@ -154,9 +171,10 @@ class Precision:
         ``brem_max_histories`` are required, ``brem_min_histories`` defaults
         like ``min_histories`` (100, at most ``brem_max_histories``). Brem
         stopping is requested by listing ``"brem"`` next to ``"cxr"`` or by
-        setting any of these keys, and never gates the CXR stop: line
-        transport continues until brem finishes, so ``Ne_brem <= Ne`` and
-        ``brem_max_histories <= max_histories``. Without a request, brem is
+        setting any of these keys. Brem never enters the CXR stopping test; because
+        brem is a prefix (``Ne_brem <= Ne``), the CXR stop is the first
+        CXR-passing decision point at or after ``Ne_brem``: CXR transport
+        continues until brem finishes. ``brem_max_histories <= max_histories``. Without a request, brem is
         scored on all ``Ne`` electrons and not monitored. Guards, decision
         growth and the pilot are shared; the brem pilot is clipped to its own
         bounds. Deprecated: a request without ``brem_target_rse`` or
@@ -307,11 +325,16 @@ class Precision:
             values["brem_min_histories"] = minimum
             sources["brem_min_histories"] = "min_histories"
         detail = ", ".join(f"{key}={value} (from {sources[key]})" for key, value in values.items())
+        origin = _SOURCE.get()
+        where = f"{origin}: " if origin else ""
+        # The warning's own location is not the caller's when the policy is read from a
+        # catalog, so it names the source and the keys to add.
+        detail = f"{where}missing {' and '.join(missing)}; inheriting {detail}"
         # Attribute the warning to the caller, past the constructor layers
         # (``AdaptiveSampling``, the dataclass ``__init__``, ``from_dict``).
         warn_api(
             BREM_INHERITANCE,
-            detail=f"inheriting {detail}",
+            detail=detail,
             skip_file_prefixes=(str(Path(__file__).parent), "<string>"),
         )
 
@@ -356,8 +379,15 @@ class Precision:
         return values
 
     @classmethod
-    def from_dict(cls, payload: Mapping[str, Any]) -> Self:
-        """Validate a serialized (stored-vocabulary) policy and restore its fields."""
+    def from_dict(cls, payload: Mapping[str, Any], *, source: str | None = None) -> Self:
+        """Validate a serialized (stored-vocabulary) policy and restore its fields.
+
+        ``source`` names where the payload came from (for example
+        ``"profile 'cleo_sub'"``) in deprecation warnings.
+        """
+        if source is not None:
+            with policy_source(source):
+                return cls.from_dict(payload)
         if not isinstance(payload, Mapping):
             raise TypeError("adaptive_precision must be a mapping")
         values = dict(payload)
@@ -397,10 +427,11 @@ class Precision:
 # the CXR variance gate to ``1/min_effective_histories`` (#1254); v3 gave it its
 # own ``max_variance_of_variance`` threshold (#1262); v4 checks at geometric
 # decision points with a drift-tolerant stability window, independent of
-# transport chunks (#1253). v5 (#1398) applies to policies that request brem
-# stopping only: the shared stop is CXR-only and brem always stops
-# independently, so the realized counts of ``("cxr", "brem")`` configs change.
-# CXR-only and brem-only policies keep their v4 identities.
+# transport chunks (#1253). v5 (#1398) marks every policy that requests brem
+# stopping (it resolves to explicit independent stopping with mirrored keys):
+# the realized counts of legacy ``("cxr", "brem")`` configs change, while fully
+# explicit pre-#1398 independent policies keep their counts and only miss the
+# cache. CXR-only and brem-only policies keep their v4 identities.
 ADAPTIVE_SAMPLING_MODEL = "decision-points-v4"
 ADAPTIVE_BREM_STOPPING_MODEL = "decision-points-v5"
 

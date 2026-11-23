@@ -43,6 +43,15 @@ def test_default_policy_matches_the_recorded_decision():
     )
 
 
+def test_legacy_profile_policy_warning_names_the_profile(monkeypatch):
+    legacy = {"target_rse": 0.1, "min_electrons": 40, "max_electrons": 80}
+    legacy["observables"] = ["line", "brem"]
+    _with_standard(monkeypatch, "profile_precisions", legacy)
+    with pytest.warns(DeprecationWarning, match=r"profile 'standard': missing brem_target_rse"):
+        policy = materials.CATALOG.profile_precision("standard")
+    assert policy.brem_target_rse == 0.1 and policy.brem_min_histories == 40
+
+
 def test_a_plain_profile_runs_the_default_policy():
     settings = profile_run_settings(default_settings(), "standard", sweep=_sweep())
     assert settings.precision == DEFAULT_PRECISION

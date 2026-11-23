@@ -456,7 +456,9 @@ class Case(Mapping[str, Any]):
         if not isinstance(self.adaptive_precision, _Absent):
             from .._precision import Precision
 
-            precision = Precision.from_dict(self.adaptive_precision)
+            precision = Precision.from_dict(
+                self.adaptive_precision, source="stored case adaptive_precision"
+            )
             precision.validate_case(self)
             if self.Ne != precision.max_histories or self.Ne_brem != precision.max_histories:
                 raise ValueError("adaptive case Ne and Ne_brem must equal precision.max_histories")
