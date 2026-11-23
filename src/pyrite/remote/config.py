@@ -26,7 +26,8 @@ REMOTE_UV = env_value("PYRITE_REMOTE_UV", "~/.local/bin/uv")
 # SLURM target profile overrides, same compatibility role as ``HOST``: ``None``
 # resolves ``remote.gpu_vendor`` / ``remote.partition`` / ``remote.nodelist`` /
 # ``remote.gres`` / ``remote.account`` / ``remote.constraint`` /
-# ``remote.max_time`` through the shared config precedence (see ``console.config``).
+# ``remote.max_time`` / ``remote.qos`` / ``remote.mail_type`` / ``remote.mail_user`` /
+# ``remote.sbatch_extra`` through the shared config precedence (see ``console.config``).
 REMOTE_GPU_VENDOR: str | None = None
 SLURM_PARTITION: str | None = None
 SLURM_NODELIST: str | None = None
@@ -34,6 +35,10 @@ SLURM_GRES: str | None = None
 SLURM_ACCOUNT: str | None = None
 SLURM_CONSTRAINT: str | None = None
 SLURM_MAX_TIME: str | None = None
+SLURM_QOS: str | None = None
+SLURM_MAIL_TYPE: str | None = None
+SLURM_MAIL_USER: str | None = None
+SLURM_SBATCH_EXTRA: str | None = None
 HOST_EXEC: str | None = None
 SLURM_NICE: str | None = None
 SLURM_GPUS = 1
@@ -322,6 +327,53 @@ def remote_uv() -> str:
     return value
 
 
+# ``sbatch --mail-type`` events; NONE suppresses the others.
+_MAIL_TYPES = (
+    "NONE",
+    "BEGIN",
+    "END",
+    "FAIL",
+    "REQUEUE",
+    "ALL",
+    "INVALID_DEPEND",
+    "STAGE_OUT",
+    "TIME_LIMIT",
+    "TIME_LIMIT_90",
+    "TIME_LIMIT_80",
+    "TIME_LIMIT_50",
+)
+_MAIL_TYPE = f"(?:{'|'.join(sorted(_MAIL_TYPES, key=len, reverse=True))})"
+# One ``remote.sbatch_extra`` item: a long option, optionally ``=value``, whose
+# characters are safe unquoted in an ``#SBATCH`` line.
+_SBATCH_ITEM = r"--[a-z][a-z0-9-]*(?:=[A-Za-z0-9_./:,@%+|&\[\]()*-]+)?"
+# Options ``remote.sbatch_extra`` may not set: PyRITE writes them itself (job
+# bookkeeping, chunk timing, resources) or a dedicated setting owns them.
+_SBATCH_OWNED = {
+    "job-name": None,
+    "output": None,
+    "error": None,
+    "time": "remote.max_time or --chunk-minutes",
+    "signal": None,
+    "array": None,
+    "nodes": None,
+    "ntasks": None,
+    "ntasks-per-node": None,
+    "cpus-per-task": None,
+    "mem-per-cpu": None,
+    "parsable": None,
+    "wait": None,
+    "test-only": None,
+    "partition": "remote.partition",
+    "nodelist": "remote.nodelist",
+    "gres": "remote.gres",
+    "account": "remote.account",
+    "constraint": "remote.constraint",
+    "qos": "remote.qos",
+    "mail-type": "remote.mail_type",
+    "mail-user": "remote.mail_user",
+    "nice": "remote.nice",
+}
+
 _SLURM_SETTINGS = {
     # key: (environment name, value pattern, what a valid value looks like)
     "remote.gpu_vendor": (
@@ -344,7 +396,7 @@ _SLURM_SETTINGS = {
         re.compile(r"[A-Za-z0-9][A-Za-z0-9._:,-]*"),
         "a SLURM gres string such as gpu:1 or gpu:radeon8060s:1",
     ),
-    # The three below are optional: an empty value omits the #SBATCH directive.
+    # The optional settings below omit their #SBATCH directive when empty.
     "remote.account": (
         "PYRITE_REMOTE_ACCOUNT",
         re.compile(r"(?:[A-Za-z0-9][A-Za-z0-9._-]*)?"),
@@ -360,6 +412,28 @@ _SLURM_SETTINGS = {
         "PYRITE_REMOTE_MAX_TIME",
         re.compile(r"(?:\d+(?:-\d+)?(?::\d+){0,2})?"),
         "a SLURM time limit such as 1-00:00:00 or 1440, or empty for no cap",
+    ),
+    "remote.qos": (
+        "PYRITE_REMOTE_QOS",
+        re.compile(r"(?:[A-Za-z0-9][A-Za-z0-9._-]*)?"),
+        "a SLURM QOS name such as normal or highp, or empty for the site default",
+    ),
+    "remote.mail_type": (
+        "PYRITE_REMOTE_MAIL_TYPE",
+        re.compile(rf"(?:{_MAIL_TYPE}(?:,{_MAIL_TYPE})*)?"),
+        "comma-separated SLURM mail events such as END,FAIL "
+        f"({', '.join(_MAIL_TYPES)}), or empty for no email",
+    ),
+    "remote.mail_user": (
+        "PYRITE_REMOTE_MAIL_USER",
+        re.compile(r"(?:[A-Za-z0-9._%+-]+(?:@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*)?)?"),
+        "an email address or cluster username, or empty for the submitting user",
+    ),
+    "remote.sbatch_extra": (
+        "PYRITE_REMOTE_SBATCH_EXTRA",
+        re.compile(rf"(?:{_SBATCH_ITEM}(?: {_SBATCH_ITEM})*)?"),
+        "space-separated sbatch long options such as '--reservation=lab --exclude=node3', "
+        "or empty for none",
     ),
     # Not a batch directive: a plain-word command prefix (no shell operators or
     # quotes), so it is safe unquoted in the ssh command line.
@@ -383,9 +457,24 @@ def validate_slurm_setting(key: str, value: str) -> str:
     _env_name, pattern, expected = _SLURM_SETTINGS[key]
     if key == "remote.gpu_vendor":
         value = value.strip().lower()
+    elif key == "remote.mail_type":
+        value = value.replace(" ", "").upper()
+    elif key == "remote.sbatch_extra":
+        value = " ".join(value.split())
     if pattern.fullmatch(value) is None:
         raise ValueError(f"expected {expected}")
+    if key == "remote.sbatch_extra":
+        _reject_owned_sbatch_options(value)
     return value
+
+
+def _reject_owned_sbatch_options(value: str) -> None:
+    for item in value.split():
+        name = item[2:].partition("=")[0]
+        if name in _SBATCH_OWNED:
+            owner = _SBATCH_OWNED[name]
+            hint = f"; set {owner} instead" if owner else "; PyRITE sets it for job bookkeeping"
+            raise ValueError(f"--{name} is not allowed in sbatch_extra{hint}")
 
 
 def _slurm_setting(key: str, override: str | None) -> str:
@@ -436,6 +525,26 @@ def slurm_constraint() -> str | None:
 def slurm_max_time() -> str | None:
     """Return the target's SLURM wall-time cap (``remote.max_time``), or None for no cap."""
     return _slurm_setting("remote.max_time", SLURM_MAX_TIME) or None
+
+
+def slurm_qos() -> str | None:
+    """Return validated SLURM quality of service (``remote.qos``), or None for the default."""
+    return _slurm_setting("remote.qos", SLURM_QOS) or None
+
+
+def slurm_sbatch_extra() -> tuple[str, ...]:
+    """Return extra validated ``#SBATCH`` options (``remote.sbatch_extra``)."""
+    return tuple(_slurm_setting("remote.sbatch_extra", SLURM_SBATCH_EXTRA).split())
+
+
+def slurm_mail_type() -> str | None:
+    """Return SLURM email events (``remote.mail_type``), or None for no notifications."""
+    return _slurm_setting("remote.mail_type", SLURM_MAIL_TYPE) or None
+
+
+def slurm_mail_user() -> str | None:
+    """Return the SLURM email recipient (``remote.mail_user``), or None for the submitter."""
+    return _slurm_setting("remote.mail_user", SLURM_MAIL_USER) or None
 
 
 def slurm_nice() -> int:
@@ -708,6 +817,12 @@ class RemoteTarget:
     nice: str = "10000"
     # SSH alias of a data-transfer node sharing remote_dir; empty uses ``host``.
     transfer_host: str = ""
+    # SLURM email notifications; empty mail_type sends none, empty mail_user is the submitter.
+    mail_type: str = ""
+    mail_user: str = ""
+    qos: str = ""
+    # Additional ``#SBATCH`` long options; options PyRITE owns are rejected.
+    sbatch_extra: str = ""
 
     def __post_init__(self):
         from .targets import validate_name
@@ -727,6 +842,10 @@ class RemoteTarget:
             "host_exec",
             "nice",
             "transfer_host",
+            "mail_type",
+            "mail_user",
+            "qos",
+            "sbatch_extra",
         ):
             value = getattr(self, field)
             if not isinstance(value, str) or any(ord(c) < 32 or ord(c) == 127 for c in value):
@@ -751,6 +870,10 @@ class RemoteTarget:
             "max_time",
             "host_exec",
             "nice",
+            "mail_type",
+            "mail_user",
+            "qos",
+            "sbatch_extra",
         ):
             object.__setattr__(
                 self, field, validate_slurm_setting(f"remote.{field}", getattr(self, field))

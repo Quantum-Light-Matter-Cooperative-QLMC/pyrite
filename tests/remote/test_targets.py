@@ -205,6 +205,17 @@ def test_site_policy_fields_round_trip_through_cli(configured):
         {"host": "box", "constraint": "A100\n#SBATCH --x"},
         {"host": "box", "constraint": "A100 H200"},
         {"host": "box", "max_time": "24h"},
+        {"host": "box", "mail_type": "END,NEVER"},
+        {"host": "box", "mail_type": "END\n#SBATCH --x"},
+        {"host": "box", "mail_user": "me@lab edu"},
+        {"host": "box", "mail_user": "me@lab.edu\n#SBATCH --x"},
+        {"host": "box", "qos": "high p"},
+        {"host": "box", "sbatch_extra": "--exclude=node3\n#SBATCH --x"},
+        {"host": "box", "sbatch_extra": "-x node3"},
+        {"host": "box", "sbatch_extra": "--comment='a;b'"},
+        {"host": "box", "sbatch_extra": "--time=10"},
+        {"host": "box", "sbatch_extra": "--output=/tmp/x"},
+        {"host": "box", "sbatch_extra": "--qos=highp"},
     ],
 )
 def test_invalid_site_policy_fields(values):
@@ -234,10 +245,49 @@ def test_batch_script_rejects_time_over_cap(configured):
         )
 
 
+def test_mail_settings_round_trip_through_cli(configured):
+    assert_clean_result(
+        invoke(
+            remote_targets.command,
+            ["add", "h2", "--host", "h2", "--mail-type", "end, fail", "--mail-user", "me@lab.edu"],
+        )
+    )
+    target = targets.resolve_target("h2")
+    assert (target.mail_type, target.mail_user) == ("END,FAIL", "me@lab.edu")
+    with config.use_target("h2"):
+        script = scripts._slurm_batch_script("job", "true", job_name="t", reservation_stems=[])
+    assert "#SBATCH --mail-type=END,FAIL\n#SBATCH --mail-user=me@lab.edu\n" in script
+
+
+def test_qos_and_sbatch_extra_render_directives(configured):
+    _hoffman(qos="highp", sbatch_extra="  --reservation=lab_resv   --exclude=node[3-4] --requeue ")
+    target = targets.resolve_target("h2")
+    assert target.sbatch_extra == "--reservation=lab_resv --exclude=node[3-4] --requeue"
+    with config.use_target("h2"):
+        script = scripts._slurm_batch_script("job", "true", job_name="t", reservation_stems=[])
+    assert "#SBATCH --account=pi_lab\n#SBATCH --qos=highp\n" in script
+    assert (
+        "#SBATCH --reservation=lab_resv\n#SBATCH --exclude=node[3-4]\n#SBATCH --requeue\n" in script
+    )
+
+
+def test_sbatch_extra_names_owning_setting():
+    with pytest.raises(ValueError, match="set remote.qos instead"):
+        targets.RemoteTarget(host="box", sbatch_extra="--qos=highp")
+
+
+def test_mail_user_without_mail_type_sends_no_mail(configured):
+    _hoffman(mail_user="me@lab.edu")
+    with config.use_target("h2"):
+        script = scripts._slurm_batch_script("job", "true", job_name="t", reservation_stems=[])
+    assert "--mail" not in script
+
+
 def test_batch_script_without_site_policy_is_unchanged(configured):
     with config.use_target("nvidia"):
         script = scripts._slurm_batch_script("job", "true", job_name="t", reservation_stems=[])
     assert "--account" not in script and "--constraint" not in script
+    assert "--mail" not in script
     assert "#SBATCH --partition=gpu\n#SBATCH --nodes=1\n" in script
     assert "#SBATCH --time=UNLIMITED\n" in script
 
@@ -309,3 +359,70 @@ def test_nice_defaults_to_10000_and_zero_omits_it(configured):
 def test_invalid_nice(value):
     with pytest.raises(ValueError):
         targets.RemoteTarget(host="box", nice=value)
+
+
+def _remember(jobid, target):
+    with config.use_target(target):
+        targets.remember_job(jobid)
+
+
+def test_profile_stop_uses_target_that_ran_the_profile(configured, monkeypatch):
+    """Regression: `job stop --profile` queried the default target, not the job's."""
+    from pyrite.remote import jobs as lifecycle_jobs
+    from pyrite.remote import state
+
+    targets.default_target("nvidia")
+    _remember("sub_100keV-2", "amd")
+    _remember("other", "nvidia")
+    seen = []
+
+    def live_jobs():
+        seen.append(config.remote_dir())
+        return [("sub_100keV-2", False, ["hopg"])]
+
+    monkeypatch.setattr(state, "_live_jobs", live_jobs)
+    monkeypatch.setattr(state, "_job_profiles", lambda jobids: dict.fromkeys(jobids, "sub_100keV"))
+    monkeypatch.setattr(lifecycle_jobs, "_stop_jobids", lambda jobids: seen.append(jobids))
+
+    assert_clean_result(invoke(job.command, ["stop", "--profile", "sub_100keV", "--yes"]))
+    assert seen == ["/srv/amd", ["sub_100keV-2"]]
+
+
+def test_profile_target_explicit_target_wins(configured):
+    _remember("sub_100keV", "amd")
+    with config.use_target("nvidia"), targets.selected_for_profile("sub_100keV"):
+        assert config.remote_dir() == "/srv/nvidia"
+
+
+def test_profile_target_ignores_other_profiles_and_rejects_ambiguity(configured):
+    _remember("sub_100keV_wide", "amd")
+    assert targets.profile_job_target("sub_100keV") is None
+    _remember("sub_100keV", "amd")
+    assert targets.profile_job_target("sub_100keV").remote_dir == "/srv/amd"
+    _remember("sub_100keV-1", "nvidia")
+    with pytest.raises(ValueError, match=r"several targets \(amd, nvidia\)"):
+        targets.profile_job_target("sub_100keV")
+
+
+def test_profile_pull_uses_target_that_ran_the_profile(configured, monkeypatch):
+    targets.default_target("nvidia")
+    _remember("quickstart-2", "amd")
+    seen = []
+    monkeypatch.setattr(
+        remote_cli,
+        "_cli_pull",
+        lambda **values: seen.append((config.remote_dir(), values["material"])),
+    )
+
+    assert_clean_result(invoke(remote_cli.command, ["pull", "quickstart", "-m", "hopg"]))
+    assert_clean_result(invoke(remote_cli.command, ["pull", "hopg@quickstart"]))
+    assert_clean_result(
+        invoke(remote_cli.command, ["pull", "hopg@quickstart", "--target", "nvidia"])
+    )
+    assert_clean_result(invoke(remote_cli.command, ["pull", "hopg"]))
+    assert seen == [
+        ("/srv/amd", ["hopg@quickstart"]),
+        ("/srv/amd", ["hopg@quickstart"]),
+        ("/srv/nvidia", ["hopg@quickstart"]),
+        ("/srv/nvidia", ["hopg"]),
+    ]

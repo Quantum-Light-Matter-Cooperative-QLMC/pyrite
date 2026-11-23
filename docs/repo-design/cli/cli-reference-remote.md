@@ -451,9 +451,18 @@ Options:
   --nodelist TEXT       SLURM node list, or 'any'.
   --gres TEXT           SLURM gres request, e.g. gpu:1.
   --account TEXT        SLURM account to charge; empty uses the site default.
+  --qos TEXT            SLURM quality of service, e.g. highp; empty uses the site
+                        default.
   --constraint TEXT     SLURM node features, e.g. 'A100|H200'; empty for none.
   --max-time TEXT       Site wall-time cap, e.g. 1-00:00:00; replaces UNLIMITED and
                         bounds --chunk-minutes.
+  --mail-type TEXT      SLURM email events, e.g. END,FAIL or ALL; empty sends no email.
+                        Chunked runs mail once per slice.
+  --mail-user TEXT      Email address or cluster username for SLURM mail; empty uses the
+                        submitting user.
+  --sbatch-extra TEXT   Extra space-separated sbatch long options, e.g. '--
+                        reservation=lab --exclude=node3'; options PyRITE sets (time,
+                        output, partition, ...) are rejected.
   --host-exec TEXT      Prefix for helper Python on the host (pull, gc, trajectories),
                         e.g. 'srun --time=00:30:00 --mem=8G'; empty runs it on the login
                         node.
@@ -482,9 +491,18 @@ Options:
   --nodelist TEXT       SLURM node list, or 'any'.
   --gres TEXT           SLURM gres request, e.g. gpu:1.
   --account TEXT        SLURM account to charge; empty uses the site default.
+  --qos TEXT            SLURM quality of service, e.g. highp; empty uses the site
+                        default.
   --constraint TEXT     SLURM node features, e.g. 'A100|H200'; empty for none.
   --max-time TEXT       Site wall-time cap, e.g. 1-00:00:00; replaces UNLIMITED and
                         bounds --chunk-minutes.
+  --mail-type TEXT      SLURM email events, e.g. END,FAIL or ALL; empty sends no email.
+                        Chunked runs mail once per slice.
+  --mail-user TEXT      Email address or cluster username for SLURM mail; empty uses the
+                        submitting user.
+  --sbatch-extra TEXT   Extra space-separated sbatch long options, e.g. '--
+                        reservation=lab --exclude=node3'; options PyRITE sets (time,
+                        output, partition, ...) are rejected.
   --host-exec TEXT      Prefix for helper Python on the host (pull, gc, trajectories),
                         e.g. 'srun --time=00:30:00 --mem=8G'; empty runs it on the login
                         node.

@@ -927,22 +927,49 @@ def pull_command(
         raise click.UsageError("--brem-only and --cxr-only are mutually exclusive")
     if hash_prefix is not None and sum("@" in m for m in materials) != 1:
         raise click.UsageError("--hash requires exactly one MATERIAL@PROFILE selector to pull")
+    with _pull_profile_target(materials):
+        return _pull_invoke(
+            json_output,
+            materials,
+            all_,
+            hash_prefix=hash_prefix,
+            skip_unmatched=skip_unmatched,
+            full=full_,
+            drop_wide_brem=drop_wide_brem,
+            downcast=downcast,
+            level9=level9,
+            no_sync=no_sync,
+            brem_only=brem_only,
+            cxr_only=cxr_only,
+            force=force,
+            ssh_verbose=ssh_verbose,
+        )
+
+
+def _pull_profile_target(materials):
+    """Select the target that ran a profile's jobs when the pull names one profile.
+
+    Without a job ID the default target would answer; profile-named job records
+    say where that profile actually ran (see ``targets.selected_for_profile``).
+    """
+    from contextlib import nullcontext
+
+    from ...remote import targets
+
+    profiles = {m.partition("@")[2] for m in materials if "@" in m}
+    profiles.discard("standard")
+    if len(profiles) != 1:
+        return nullcontext()
+    return targets.selected_for_profile(profiles.pop())
+
+
+def _pull_invoke(json_output, materials, all_, **options):
     return _invoke_action(
         _cli_pull_json if json_output else _cli_pull,
         remote_command="pull",
         material=materials,
         all_=all_,
-        hash_prefix=hash_prefix,
-        skip_unmatched=skip_unmatched,
-        full=full_,
-        drop_wide_brem=drop_wide_brem,
-        downcast=downcast,
-        level9=level9,
-        no_sync=no_sync,
-        brem_only=brem_only,
-        cxr_only=cxr_only,
-        force=force,
-        ssh_verbose=ssh_verbose,
+        **options,
     )
 
 
