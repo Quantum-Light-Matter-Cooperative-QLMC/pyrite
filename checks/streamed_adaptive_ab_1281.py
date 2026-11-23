@@ -17,9 +17,9 @@ through ``run_cases`` (production serial path). ROUTE:
 - ``streamed``: the production streamed route forced at the first admission
   check, in blocks of ``PROBE_STREAM_BLOCK_MIB`` (default 2048, the
   production ``STREAMED_BLOCK_BYTES``) of observed rows.
-- ``measure``: ``streamed`` on the #1280 measure-only route
+- ``measure``: ``auto`` on the #1280 measure-only streamed route
   (``streamed_adaptive.MONITORED_PASS = False``): the same-revision arm of the
-  #1397 single-pass / folded-evidence comparison.
+  #1397 single-pass / folded-evidence comparison against ``auto``.
 
 ``PROBE_FRESH_GRID=1`` removes the line-grid speed cache (``cache_dir() /
 "line-grids"``; point ``PYRITE_CACHE_DIR`` at a scratch directory) before the
@@ -121,12 +121,12 @@ def run(route, material, e0_kev, tilt_deg, max_histories, out_prefix):
         raise SystemExit(f"ROUTE must be one of {ROUTES}")
     if route == "retained":
         os.environ["PYRITE_STREAMED_ADAPTIVE"] = "off"
-    elif route in ("streamed", "measure"):
+    elif route == "streamed":
         _force_stream(int(float(os.environ.get("PROBE_STREAM_BLOCK_MIB", "2048")) * 1024**2))
-        if route == "measure":
-            from pyrite.montecarlo.runner import streamed_adaptive
+    elif route == "measure":
+        from pyrite.montecarlo.runner import streamed_adaptive
 
-            streamed_adaptive.MONITORED_PASS = False
+        streamed_adaptive.MONITORED_PASS = False
     if os.environ.get("PROBE_FRESH_GRID") == "1":
         import shutil
 
