@@ -183,6 +183,22 @@ def test_budget_bounds_population_and_matches(radiative_reference):
     assert sum(r["rows"] for r in records) == radiative_reference["electron_id"].size
 
 
+@pytest.mark.parametrize("staging", [False, True])
+def test_automatic_quantum_matches_full_history(radiative_reference, staging):
+    """#1396: the quantum changes after round one and in the drain; rows do not."""
+    records = []
+    cont = TransportContinuationConfig(device_staging=staging, on_round=records.append)
+    # Eight 256-row lanes: the probe round leaves pending histories to refill.
+    budget = 8 * (256 * (2 * 125 + 24) + 13)
+    config = replace(REFERENCE, scratch_budget_bytes=budget, continuation=cont)
+    _assert_identical(radiative_reference, _radiative(config))
+    records = [r for r in records if r["phase"] == "round"]
+    assert records[0]["rows_per_round"] == 256 and records[0]["launched"] == 8
+    assert len({r["rows_per_round"] for r in records}) > 1
+    assert max(r["launched"] for r in records) > 8
+    assert all(r["scratch_bytes"] <= budget for r in records)
+
+
 @pytest.mark.parametrize("energy_model", ["midpoint", "frozen"])
 def test_layered_prism_exits_match_full_history(energy_model):
     reference = _layered(REFERENCE, energy_model=energy_model)

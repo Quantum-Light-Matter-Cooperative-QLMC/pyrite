@@ -40,3 +40,16 @@ def test_timing_collect_forwards_stage_counters_and_strips_them():
     assert update["line_axis_nodes"] == 1234
     assert update["segments"] == 777
     assert not any(key.startswith("_") for key in out)
+
+
+def test_timing_collect_reports_continuation_sizing_once():
+    from pyrite.montecarlo.transport import continuation
+
+    continuation.pop_continuation_stats()
+    continuation._record_pass(16, 113_000, 9)
+    continuation._record_pass(32, 90_000, 4)
+    update = _TimingAgg().collect({"_t_transport": 1.0})
+    assert update["continuation_rows_per_round"] == 32
+    assert update["continuation_lanes"] == 113_000
+    assert (update["continuation_rounds"], update["continuation_passes"]) == (13, 2)
+    assert "continuation_lanes" not in _TimingAgg().collect({"_t_transport": 1.0})

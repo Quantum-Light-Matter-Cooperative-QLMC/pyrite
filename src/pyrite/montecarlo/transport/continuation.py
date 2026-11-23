@@ -6,7 +6,9 @@ longest track and a launch's lanes idle while its longest histories finish.
 This driver instead keeps a fixed population of *active* histories, launches
 them for at most ``rows_per_round`` rows each, and between launches retires
 finished histories and refills their lanes from the pending primaries. Live
-scratch is ``active x rows_per_round`` rows whatever the track length.
+scratch is ``active x rows_per_round`` rows whatever the track length. An
+unset ``rows_per_round`` is sized from the first round's rows per history
+(#1396), so short-track scenes run few wide rounds instead of many narrow ones.
 
 Results do not depend on the schedule. The kernel yields only between steps,
 where its loop-carried state is the per-history record held here, and every
@@ -60,6 +62,16 @@ _GATHER_INDEX_BYTES = 3 * 8
 _LANE_BYTES = 4 + 8 + 1
 # Fraction of free device memory the derived staging budget leaves unused.
 STAGING_HEADROOM = 0.1
+#: Automatic row quantum range (#1396). The first round of an automatic pass
+#: launches at the upper end, so long-track scenes (W 1 MeV, ~1,100 rows per
+#: electron) keep 256 rows; short-track scenes drop toward the lower end.
+AUTO_ROWS_PER_ROUND = (16, 256)
+#: Quantile of first-round rows per history the automatic quantum covers.
+AUTO_ROWS_QUANTILE = 0.95
+#: Process-wide sizing record of automatic and explicit continuation passes,
+#: read and cleared by the runner's timing collector (see
+#: :func:`pop_continuation_stats`).
+_STATS: dict[str, int] = {}
 
 logger = logging.getLogger(__name__)
 
@@ -77,9 +89,14 @@ class TransportContinuationConfig:
     """Bounded-continuation schedule; no field changes results.
 
     ``rows_per_round`` is the row quantum each active history may emit per
-    launch. ``active_histories`` caps the concurrent population; ``None``
+    launch. ``None`` (the default, #1396) sizes it automatically: the first
+    round launches at ``AUTO_ROWS_PER_ROUND[1]`` rows, and later rounds use the
+    ``AUTO_ROWS_QUANTILE`` quantile of that round's rows per history, rounded
+    up to a power of two and clamped to ``AUTO_ROWS_PER_ROUND``, with the
+    population resized to the smaller quantum. ``active_histories`` caps the
+    concurrent population; ``None``
     takes as many as ``PerElectronTransportConfig.scratch_budget_bytes`` and
-    ``max_batch`` allow. The budget covers the round's row scratch, its
+    ``max_batch`` allow (an unset ``max_batch`` leaves only the budget). The budget covers the round's row scratch, its
     compaction copy and gather indices, and the lane arrays, sized from the
     enabled row schema. Ne-sized per-history state and retained output are
     outside it: bounded scratch does not bound total trajectory storage.
@@ -105,15 +122,15 @@ class TransportContinuationConfig:
     scratch bytes, then one ``phase="assembly"`` dict timing the reassembly.
     """
 
-    rows_per_round: int = 256
+    rows_per_round: int | None = None
     active_histories: int | None = None
     device_staging: bool = True
     staging_budget_bytes: int | None = None
     on_round: Callable[[dict[str, Any]], None] | None = None
 
     def __post_init__(self):
-        if int(self.rows_per_round) < 1:
-            raise ValueError("rows_per_round must be a positive integer")
+        if self.rows_per_round is not None and int(self.rows_per_round) < 1:
+            raise ValueError("rows_per_round must be a positive integer or None")
         if self.active_histories is not None and int(self.active_histories) < 1:
             raise ValueError("active_histories must be a positive integer or None")
         if self.staging_budget_bytes is not None and int(self.staging_budget_bytes) < 0:
@@ -125,9 +142,35 @@ def continuation_row_bytes(scratch_row):
     return sum(int(a.nbytes) for a in scratch_row)
 
 
-def active_population(Ne, row_bytes, config, cont):
-    """Concurrent histories that fit the scratch budget, or a clear error."""
-    quantum = int(cont.rows_per_round)
+def initial_quantum(cont):
+    """The row quantum of a pass's first round: the explicit one, else the automatic ceiling."""
+    rows = cont.rows_per_round
+    return AUTO_ROWS_PER_ROUND[1] if rows is None else int(rows)
+
+
+def automatic_quantum(counts):
+    """Row quantum for the rounds after a first round that emitted ``counts`` rows per lane.
+
+    The ``AUTO_ROWS_QUANTILE`` quantile of the per-lane rows, rounded up to a
+    power of two and clamped to ``AUTO_ROWS_PER_ROUND``. Lanes suspended at
+    the first round's quantum count as that quantum, so a scene whose
+    histories outlast it keeps the ceiling. Performance only (#1396).
+    """
+    low, high = AUTO_ROWS_PER_ROUND
+    counts = np.asarray(counts)
+    if not counts.size:
+        return high
+    rows = int(np.quantile(counts, AUTO_ROWS_QUANTILE, method="higher"))
+    return min(max(low, 1 << max(rows - 1, 0).bit_length()), high)
+
+
+def active_population(Ne, row_bytes, config, cont, quantum=None):
+    """Concurrent histories that fit the scratch budget, or a clear error.
+
+    ``quantum`` defaults to :func:`initial_quantum`. An unset
+    ``config.max_batch`` caps the population only by the budget and ``Ne``.
+    """
+    quantum = initial_quantum(cont) if quantum is None else int(quantum)
     per_lane = quantum * (2 * row_bytes + _GATHER_INDEX_BYTES) + _LANE_BYTES
     fit = int(config.scratch_budget_bytes) // per_lane
     if fit < 1:
@@ -136,10 +179,32 @@ def active_population(Ne, row_bytes, config, cont):
             f"{row_bytes} bytes plus staging), above scratch_budget_bytes="
             f"{int(config.scratch_budget_bytes)}; lower rows_per_round"
         )
-    limit = int(config.max_batch)
+    limit = int(Ne)
+    if config.max_batch is not None:
+        limit = min(limit, int(config.max_batch))
     if cont.active_histories is not None:
         limit = min(limit, int(cont.active_histories))
-    return max(1, min(fit, limit, int(Ne))), per_lane
+    return max(1, min(fit, limit)), per_lane
+
+
+def pop_continuation_stats():
+    """Continuation sizing since the last call, as timing metrics; clears the record.
+
+    ``continuation_rows_per_round`` and ``continuation_lanes`` are the largest
+    quantum and population any pass ran its later rounds with,
+    ``continuation_rounds`` the launches and ``continuation_passes`` the
+    driver calls. Empty when no continuation pass ran.
+    """
+    stats = {f"continuation_{key}": value for key, value in _STATS.items()}
+    _STATS.clear()
+    return stats
+
+
+def _record_pass(quantum, lanes, rounds):
+    _STATS["rows_per_round"] = max(_STATS.get("rows_per_round", 0), int(quantum))
+    _STATS["lanes"] = max(_STATS.get("lanes", 0), int(lanes))
+    _STATS["rounds"] = _STATS.get("rounds", 0) + int(rounds)
+    _STATS["passes"] = _STATS.get("passes", 0) + 1
 
 
 def check_schedule(schedule):
@@ -432,6 +497,12 @@ def _assemble(
     return None
 
 
+def _round_buffers(xp, alloc_scratch, n_active, quantum):
+    """One round's row scratch and per-lane row counts and exit codes."""
+    scratch = alloc_scratch(n_active * quantum)
+    return scratch, xp.zeros(n_active, dtype=xp.int64), xp.zeros(n_active, dtype=xp.int8)
+
+
 def _drive_continuation_rounds(
     core,
     core_args,
@@ -459,15 +530,13 @@ def _drive_continuation_rounds(
     joined, stragg_dE)``.
     """
     cont = config.continuation
-    quantum = int(cont.rows_per_round)
+    quantum = initial_quantum(cont)
+    # An automatic quantum is chosen once, after the first round (#1396).
+    automatic = sizing = cont.rows_per_round is None
     row_bytes = continuation_row_bytes(alloc_scratch(1))
-    n_active, per_lane = active_population(Ne, row_bytes, config, cont)
-    scratch = alloc_scratch(n_active * quantum)
-    # Frozen rows keep seven columns; the kernel still takes the empty end fields.
-    columns = scratch[: len(out_bufs)]
+    n_active, per_lane = active_population(Ne, row_bytes, config, cont, quantum)
+    scratch, seg_count, exit_code = _round_buffers(xp, alloc_scratch, n_active, quantum)
     retained = _Retained(xp, cont, keep_on_device, to_host)
-    seg_count = xp.zeros(n_active, dtype=xp.int64)
-    exit_code = xp.zeros(n_active, dtype=xp.int8)
     state = tuple(xp.zeros((Ne, _STATE_WORDS), dtype=t) for t in (xp.int32, xp.uint64, xp.float64))
     pending = _pending_order(Ne, history_order)
     rows_total = np.zeros(Ne, dtype=np.int64)
@@ -480,9 +549,13 @@ def _drive_continuation_rounds(
 
     while active.size:
         m = int(active.size)
+        cap = quantum
+        if automatic and not sizing and next_pending == Ne:
+            # Draining: spread the fixed scratch over the remaining lanes.
+            cap = min(AUTO_ROWS_PER_ROUND[1], max(quantum, n_active * quantum // m))
         _nsys_push("pyrite.transport.continuation.launch")
         core(
-            (0, m, quantum, d_keys),
+            (0, m, cap, d_keys),
             *core_args,
             scratch,
             (seg_count[:m], exit_code[:m]),
@@ -493,8 +566,9 @@ def _drive_continuation_rounds(
         _nsys_pop()
         # The first device read in the stage range is also the launch's sync.
         _nsys_push("pyrite.transport.continuation.stage")
-        index = _gather_index(xp, seg_count[:m], quantum)
-        gathered = tuple(a[index] if a.shape[0] else a for a in columns)
+        index = _gather_index(xp, seg_count[:m], cap)
+        # Frozen rows keep seven columns; the kernel still takes the empty end fields.
+        gathered = tuple(a[index] if a.shape[0] else a for a in scratch[: len(out_bufs)])
         nseg += int(index.size)
         del index
         retained.append(gathered, lanes=m)
@@ -509,29 +583,43 @@ def _drive_continuation_rounds(
         for code in tallies:
             tallies[code] += int((codes == code).sum())
         finished = codes != EXIT_SUSPENDED
-        refill = pending[next_pending : next_pending + int(finished.sum())]
+        record = {
+            "round": len(chunks) - 1,
+            "launched": m,
+            "rows_per_round": cap,
+            "scratch_bytes": int(sum(a.nbytes for a in scratch)),
+            "budgeted_lane_bytes": per_lane,
+        }
+        if sizing:
+            sizing = False
+            resized = automatic_quantum(counts)
+            if resized != quantum:
+                quantum = resized
+                n_active, per_lane = active_population(Ne, row_bytes, config, cont, quantum)
+                del scratch, seg_count, exit_code
+                scratch, seg_count, exit_code = _round_buffers(xp, alloc_scratch, n_active, quantum)
+        # Fill every free lane; equal to the finished count unless just resized.
+        room = n_active - int(m - finished.sum())
+        refill = pending[next_pending : next_pending + room]
         next_pending += refill.size
         if cont.on_round is not None:
             cont.on_round(
                 {
                     "phase": "round",
-                    "round": len(chunks) - 1,
-                    "launched": m,
+                    **record,
                     "rows": int(counts.sum()),
                     "max_rows": int(counts.max()),
                     "finished": int(finished.sum()),
                     "refilled": int(refill.size),
                     "pending": int(Ne - next_pending),
-                    "rows_per_round": quantum,
                     "row_bytes": row_bytes,
-                    "scratch_bytes": int(sum(a.nbytes for a in scratch)),
-                    "budgeted_lane_bytes": per_lane,
                 }
             )
         active = np.concatenate((active[~finished], refill))
         if finished.any() and on_batch is not None:
             on_batch(int(next_pending - active.size), Ne)
 
+    _record_pass(quantum, n_active, len(chunks))
     assembly = time.perf_counter()
     _nsys_push("pyrite.transport.continuation.assemble")
     on_device = retained.on_device
@@ -542,7 +630,7 @@ def _drive_continuation_rounds(
         chunks,
         rows_total,
         retained.chunks,
-        columns,
+        scratch[: len(out_bufs)],
         out_bufs,
         nseg,
         on_device,

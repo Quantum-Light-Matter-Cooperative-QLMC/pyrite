@@ -333,6 +333,8 @@ def _session_row(
         "checkpoint_share": checkpoint / wall if checkpoint is not None and wall > 0 else None,
         "gpu_feed_wait_fraction": terminal.get("gpu_feed_wait_fraction"),
         "gpu_oom_retries": terminal.get("gpu_oom_retry_count_total"),
+        "continuation_rows_per_round": terminal.get("continuation_rows_per_round"),
+        "continuation_lanes": terminal.get("continuation_lanes"),
         "mean_transport_per_case": transport / timed if transport is not None and timed else None,
         "mean_spectrum_per_case": spectrum / timed if spectrum is not None and timed else None,
         "transport_supply_time": (

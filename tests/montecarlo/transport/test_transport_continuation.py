@@ -25,10 +25,12 @@ from pyrite.montecarlo.transport.batching import (
     _alloc_scratch,
 )
 from pyrite.montecarlo.transport.continuation import (
+    AUTO_ROWS_PER_ROUND,
     EXIT_SUSPENDED,
     TransportContinuationConfig,
     _drive_continuation_rounds,
     active_population,
+    automatic_quantum,
     continuation_row_bytes,
     effective_schedule,
     resolve_schedule,
@@ -413,6 +415,121 @@ def test_population_honours_max_batch_and_explicit_cap():
     assert active_population(100, 125, config, cont)[0] == 7
     assert active_population(100, 125, config, replace(cont, active_histories=3))[0] == 3
     assert active_population(2, 125, config, cont)[0] == 2
+
+
+@pytest.mark.parametrize(
+    ("counts", "quantum"),
+    [
+        ([], 256),
+        ([1, 2, 2, 3] * 25, 16),  # short tracks clamp to the floor
+        ([17] * 100, 32),  # rounded up to a power of two
+        ([2] * 94 + [40] * 6, 64),  # the 95th percentile, not the mean
+        ([2] * 96 + [200] * 4, 16),  # a 4% tail does not raise it
+        ([256] * 100, 256),  # suspended lanes keep the ceiling (W 1 MeV)
+    ],
+)
+def test_automatic_quantum_quantile_power_of_two_and_clamp(counts, quantum):
+    assert AUTO_ROWS_PER_ROUND == (16, 256)
+    assert automatic_quantum(np.asarray(counts, dtype=np.int64)) == quantum
+
+
+# Thin-target stand-in (#1396): mostly one- to three-row histories, a few long.
+SHORT = np.array([1, 2, 3, 2, 1, 0, 2, 3, 1, 2] * 30 + [40, 70, 300], dtype=np.int64)
+
+
+def _lanes(budget, quantum):
+    return budget // (quantum * (2 * continuation_row_bytes(_alloc(1)) + 24) + 13)
+
+
+def _short_rows(cont, budget, keep_on_device=False):
+    records = []
+    counts, rows, launches, _ = _drive(
+        replace(cont, on_round=records.append),
+        budget=budget,
+        lengths=SHORT,
+        keep_on_device=keep_on_device,
+    )
+    return counts, rows, launches, [r for r in records if r["phase"] == "round"]
+
+
+@pytest.mark.parametrize("keep_on_device", [False, True])
+def test_automatic_quantum_resizes_after_the_first_round(keep_on_device):
+    row_bytes = continuation_row_bytes(_alloc(1))
+    budget = 8 * (256 * (2 * row_bytes + 24) + 13)  # eight 256-row lanes
+    auto, auto_rows, launches, records = _short_rows(
+        TransportContinuationConfig(), budget, keep_on_device
+    )
+    fixed, fixed_rows, _, fixed_records = _short_rows(
+        TransportContinuationConfig(rows_per_round=256), budget, keep_on_device
+    )
+    # Results do not depend on the quantum: identical rows and tallies.
+    assert auto[:6] == fixed[:6]
+    for column in WRITTEN:
+        np.testing.assert_array_equal(auto_rows[column], fixed_rows[column])
+    first, *later = records
+    assert (first["rows_per_round"], first["launched"]) == (256, 8)
+    assert first["scratch_bytes"] <= budget
+    # 16-row lanes: about sixteen times as many fit the same budget.
+    steady = [r for r in later if r["pending"] or r["refilled"]]
+    assert steady and all(r["rows_per_round"] == 16 for r in steady)
+    assert max(r["launched"] for r in later) == _lanes(budget, 16) == 127
+    assert all(r["scratch_bytes"] <= budget for r in records)
+    assert len(records) < len(fixed_records)
+    assert {r["rows_per_round"] for r in fixed_records} == {256}
+    launched = np.concatenate(launches)
+    assert set(launched.tolist()) == set(range(SHORT.size))
+
+
+def test_draining_rounds_spread_scratch_over_remaining_lanes():
+    row_bytes = continuation_row_bytes(_alloc(1))
+    budget = 8 * (256 * (2 * row_bytes + 24) + 13)
+    _, _, launches, records = _short_rows(TransportContinuationConfig(), budget)
+    drain = [r for r in records[1:] if not r["pending"] and not r["refilled"]]
+    # The 300-row history finishes in fewer rounds than 300 / 16.
+    assert drain and len(records) - 1 < int(np.ceil(300 / 16))
+    for r in drain:
+        assert r["launched"] * r["rows_per_round"] <= 16 * _lanes(budget, 16)
+        assert 16 <= r["rows_per_round"] <= 256
+
+
+def test_explicit_quantum_and_population_caps_win():
+    row_bytes = continuation_row_bytes(_alloc(1))
+    budget = 8 * (256 * (2 * row_bytes + 24) + 13)
+    _, _, _, records = _short_rows(TransportContinuationConfig(rows_per_round=32), budget)
+    assert {r["rows_per_round"] for r in records} == {32}
+    _, _, _, records = _short_rows(TransportContinuationConfig(active_histories=20), budget)
+    assert max(r["launched"] for r in records) == 20
+    config = PerElectronTransportConfig(max_batch=20)
+    cont = TransportContinuationConfig()
+    assert active_population(1000, row_bytes, config, cont, 16)[0] == 20
+
+
+def test_unset_max_batch_leaves_continuation_to_the_budget():
+    config = PerElectronTransportConfig(scratch_budget_bytes=1 << 30)
+    cont = TransportContinuationConfig()
+    lanes, per_lane = active_population(10**6, 125, config, cont, 16)
+    assert lanes == (1 << 30) // per_lane > 65536
+    # Full-history keeps its 65,536-electron cap.
+    from pyrite.montecarlo.transport.batching import FULL_HISTORY_MAX_BATCH, _batch_size
+
+    assert _batch_size(1, config) == FULL_HISTORY_MAX_BATCH == 65536
+
+
+def test_continuation_stats_are_recorded_and_cleared():
+    from pyrite.montecarlo.transport.continuation import pop_continuation_stats
+
+    pop_continuation_stats()
+    row_bytes = continuation_row_bytes(_alloc(1))
+    budget = 8 * (256 * (2 * row_bytes + 24) + 13)
+    _, _, _, records = _short_rows(TransportContinuationConfig(), budget)
+    stats = pop_continuation_stats()
+    assert stats == {
+        "continuation_rows_per_round": 16,
+        "continuation_lanes": _lanes(budget, 16),
+        "continuation_rounds": len(records),
+        "continuation_passes": 1,
+    }
+    assert pop_continuation_stats() == {}
 
 
 @pytest.mark.parametrize(
