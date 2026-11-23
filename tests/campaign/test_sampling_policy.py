@@ -202,3 +202,50 @@ def test_preset_values_build_the_single_policy():
     assert numerics_from_values({}).sampling == FixedSampling()
     adaptive = numerics_from_values({"precision": _policy().to_dict()})
     assert adaptive.sampling == _policy()
+
+
+def _legacy_payload():
+    """A stored ``["cxr", "brem"]`` policy from before brem stopping mirrored CXR (#1398)."""
+    return {
+        "target_rse": 0.1,
+        "min_electrons": 40,
+        "max_electrons": 80,
+        "observables": ["line", "brem"],
+    }
+
+
+def test_legacy_both_observables_resolve_to_explicit_independent_brem_stopping():
+    from pyrite._precision import identity_policy, sampling_model
+
+    legacy = _legacy_payload()
+    with pytest.warns(DeprecationWarning, match="brem stopping without"):
+        resolved = identity_policy(legacy)
+    assert resolved["brem_target_rse"] == 0.1
+    assert resolved["brem_max_electrons"] == 80
+    assert resolved["brem_min_electrons"] == 80  # default 100 capped at brem_max_histories
+    # The explicit spelling of the same request has the same identity: no stale reuse,
+    # and no second identity for one rule.
+    explicit = Precision.from_dict(
+        {**legacy, "brem_target_rse": 0.1, "brem_max_electrons": 80}
+    ).to_dict()
+    assert dict(resolved) == {**explicit, "observables": ["line", "brem"]}
+    assert identity_policy(explicit) == explicit
+    assert sampling_model(legacy) == sampling_model(explicit) == "decision-points-v5"
+
+
+def test_legacy_policy_changes_case_identity_while_cxr_only_keeps_it():
+    from pyrite._precision import _adaptive_sampling_markers
+
+    fixed = {"Ne": 80, "Ne_brem": 80, "seed": 1}
+    cxr_only = Precision(0.1, 40, 80).to_dict()
+    # Pre-change bytes: no brem keys, the v4 marker.
+    assert not any(key.startswith("brem_") for key in cxr_only)
+    assert _adaptive_sampling_markers(cxr_only) == {"adaptive_sampling_model": "decision-points-v4"}
+    cxr_key = case_content_key({**fixed, "adaptive_precision": cxr_only})
+    with pytest.warns(DeprecationWarning):
+        legacy_key = case_content_key({**fixed, "adaptive_precision": _legacy_payload()})
+    assert legacy_key != cxr_key
+    explicit = Precision(
+        0.1, 40, 80, observables=("cxr", "brem"), brem_target_rse=0.1, brem_max_histories=80
+    )
+    assert case_content_key({**fixed, "adaptive_precision": explicit.to_dict()}) == legacy_key

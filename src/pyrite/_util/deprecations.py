@@ -139,6 +139,9 @@ def _api_entry(spelling: str, replacement: str, *, since: str) -> ApiDeprecation
 # announcement version (and recalculate the window if bundled in a later minor).
 ROOT_API_REPLACEMENTS = {}
 
+#: Spelling of the deprecated implicit brem stopping keys (#1398).
+BREM_INHERITANCE = "AdaptiveSampling brem stopping without brem_target_rse/brem_max_histories"
+
 API_DEPRECATIONS: dict[str, ApiDeprecation] = {
     # #1162: the typed transport product and stable two-step scoring replace the
     # untyped dict and the experimental #776 phase split.
@@ -171,17 +174,46 @@ API_DEPRECATIONS: dict[str, ApiDeprecation] = {
         "AdaptiveSampling(stability_checks=...)",
         since="0.36.0",
     ),
+    # #1398: brem stopping mirrors the CXR setup. A request without its required
+    # keys inherits the CXR values until the removal, then is refused.
+    BREM_INHERITANCE: _api_entry(
+        BREM_INHERITANCE,
+        "explicit brem_target_rse and brem_max_histories",
+        since="0.37.0",
+    ),
 }
 
 
-def warn_api(spelling: str, *, stacklevel: int = 3) -> None:
-    """Warn that registered *spelling* is deprecated, naming its replacement."""
+def api_removal_reached(spelling: str, version: str) -> bool:
+    """Whether *version* (the shipping ``__version__``) reaches *spelling*'s removal target."""
+
+    def minor(text: str) -> tuple[int, int]:
+        major, number, *_ = text.split(".")
+        return int(major), int(number)
+
+    return minor(version) >= minor(API_DEPRECATIONS[spelling].remove_in)
+
+
+def warn_api(
+    spelling: str,
+    *,
+    stacklevel: int = 3,
+    detail: str = "",
+    skip_file_prefixes: tuple[str, ...] = (),
+) -> None:
+    """Warn that registered *spelling* is deprecated, naming its replacement.
+
+    ``detail`` adds one clause about this occurrence (for example the values it
+    inherited). ``skip_file_prefixes`` attributes the warning to the first frame
+    outside those files, for constructors reached through several layers.
+    """
     entry = API_DEPRECATIONS[spelling]
     # An omitted argument becomes an error at the target; a renamed name is removed.
     outcome = "an error" if " without " in entry.spelling else "removed"
     warnings.warn(
         f"{entry.spelling} is deprecated and will be {outcome} in {entry.remove_in}; "
-        f"use {entry.replacement} instead",
+        f"use {entry.replacement} instead" + (f" ({detail})" if detail else ""),
         DeprecationWarning,
         stacklevel=stacklevel,
+        skip_file_prefixes=skip_file_prefixes,
     )

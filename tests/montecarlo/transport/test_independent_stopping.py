@@ -10,7 +10,7 @@ import pytest
 
 from pyrite._precision import Precision
 from pyrite.montecarlo import runner
-from pyrite.montecarlo.runner.adaptive import run_stopping_rule
+from pyrite.montecarlo.runner.adaptive import run_stopping_rule, without_wall_clock
 from pyrite.montecarlo.runner.independent import IndependentStoppingMonitor
 from tests.montecarlo.runner.test_adaptive_stopping import _RULE_ONLY, _case
 
@@ -23,6 +23,8 @@ def _policy(**kw):
             max_histories=200,
             observables=("cxr", "brem"),
             brem_target_rse=0.2,
+            brem_min_histories=40,
+            brem_max_histories=200,
             **_RULE_ONLY,
         )
         | kw
@@ -144,8 +146,8 @@ def test_light_case_brem_converges_first_with_equal_minima():
         {"brem_max_histories": 220},
         {"brem_min_histories": True},
         {"brem_min_histories": 80, "brem_max_histories": 60},
-        {"observables": ("cxr",)},
-        {"brem_target_rse": None, "brem_min_histories": 40},
+        {"brem_max_histories": 1},
+        {"observables": ("brem",)},  # brem keys need the cxr observable (#1398)
     ],
 )
 def test_invalid_independent_policies(kw):
@@ -221,22 +223,126 @@ def test_realized_pair_matches_fixed_transport_and_spectra(spread, core):
         )
 
 
-def test_shared_policy_serialization_and_rule_are_unchanged():
-    independent = _policy()
-    shared = replace(independent, brem_target_rse=None)
+def _explicit(**kw):
+    return dict(target_rse=0.1, min_histories=40, max_histories=200, **kw)
+
+
+def test_cxr_only_policy_keeps_its_serialization_and_ignores_brem():
+    """Brem never gates the shared stop (#1398): CXR alone decides, brem is not monitored."""
+    shared = Precision(**_explicit(), **_RULE_ONLY)
     payload = shared.to_dict()
     assert not any(key.startswith("brem_") for key in payload)
+    assert payload["observables"] == ("line",)
     assert Precision.from_dict(payload) == shared
+    values = np.random.default_rng(366).lognormal(0, 0.5, 200)
+    calls = []
+
+    def measure(a, b, _):
+        calls.append(a)
+        return {"cxr": values[a:b], "brem": np.random.default_rng(a).pareto(1.1, b - a)}
+
+    record = run_stopping_rule(shared, measure)
+    assert record["observables"] == ["cxr"]
+    assert set(record["statistics"]) == {"cxr"}
+    # The CXR stop is the one CXR alone gives, whatever brem would have done.
+    alone = run_stopping_rule(shared, lambda a, b, _: {"cxr": values[a:b]})
+    assert record["realized_electrons"] == alone["realized_electrons"]
+    assert record["stop_reason"] == alone["stop_reason"]
+    assert record["sampling_model"] == "decision-points-v4"
+
+
+@pytest.mark.parametrize("chunk", [7, 50])
+def test_independent_record_does_not_depend_on_the_transport_chunk(chunk):
+    """A brem freeze inside a chunk truncates and replays; the record is unchanged."""
+    settings = _policy(brem_min_histories=60)
+    values = np.random.default_rng(3).lognormal(0, 0.3, 200)
+
+    def measure(a, b, _):
+        return {"cxr": values[a:b], "brem": values[a:b]}
+
+    whole = run_stopping_rule(settings, measure)
+    chunked = run_stopping_rule(settings, measure, chunk=chunk)
+    assert whole["realized_electrons_brem"] is not None
+    assert without_wall_clock(chunked) == without_wall_clock(whole)
+
+
+def test_independent_brem_stop_with_explicit_keys_round_trips():
+    independent = _policy()
     assert Precision.from_dict(independent.to_dict()) == independent
+    payload = independent.to_dict()
+    assert payload["observables"] == ("line", "brem")
+    assert (payload["brem_target_rse"], payload["brem_min_electrons"]) == (0.2, 40)
+    assert payload["brem_max_electrons"] == 200
+    # Equal bounds and targets recover the joint rule.
     values = np.random.default_rng(366).lognormal(0, 0.5, 200)
 
     def measure(a, b, _):
         return {"cxr": values[a:b], "brem": values[a:b]}
 
-    expected = run_stopping_rule(shared, measure)
-    equal = run_stopping_rule(replace(independent, brem_target_rse=shared.target_rse), measure)
-    assert (
-        equal["realized_electrons"]
-        == equal["realized_electrons_brem"]
-        == expected["realized_electrons"]
+    equal = run_stopping_rule(replace(independent, brem_target_rse=independent.target_rse), measure)
+    assert equal["realized_electrons"] == equal["realized_electrons_brem"]
+    assert equal["sampling_model"] == "decision-points-v5"
+
+
+@pytest.mark.parametrize(
+    "kw, missing",
+    [
+        ({"observables": ("cxr", "brem")}, "brem_target_rse and brem_max_histories"),
+        ({"brem_target_rse": 0.2}, "brem_max_histories"),
+        ({"brem_max_histories": 100}, "brem_target_rse"),
+        ({"brem_min_histories": 60}, "brem_target_rse and brem_max_histories"),
+    ],
+)
+def test_incomplete_brem_request_warns_and_inherits_the_cxr_values(kw, missing):
+    """#1398 deprecation: requested brem stopping inherits CXR's required keys."""
+    with pytest.warns(DeprecationWarning, match="brem stopping without") as caught:
+        legacy = Precision(**_explicit(), **_RULE_ONLY, **kw)
+    assert "will be an error in 0.39.0" in str(caught[0].message)
+    for name in missing.split(" and "):
+        assert name in str(caught[0].message)
+    assert legacy.observables == ("cxr", "brem")
+    explicit = Precision(
+        **_explicit(),
+        **_RULE_ONLY,
+        observables=("cxr", "brem"),
+        brem_target_rse=kw.get("brem_target_rse", 0.1),
+        # Omitted, the minimum defaults like min_histories: 100, at most brem_max_histories.
+        brem_min_histories=kw.get("brem_min_histories", 100),
+        brem_max_histories=kw.get("brem_max_histories", 200),
     )
+    # The same policy, hence the same identity, as the explicit spelling.
+    assert legacy == explicit
+    assert legacy.to_dict() == explicit.to_dict()
+
+
+def test_complete_brem_request_does_not_warn(recwarn):
+    _policy()
+    assert not [w for w in recwarn if issubclass(w.category, DeprecationWarning)]
+
+
+def test_incomplete_brem_request_is_refused_at_the_scheduled_removal(monkeypatch):
+    import pyrite
+    from pyrite._util.deprecations import API_DEPRECATIONS, BREM_INHERITANCE
+
+    entry = API_DEPRECATIONS[BREM_INHERITANCE]
+    assert entry.remove_in == "0.39.0"
+    monkeypatch.setattr(pyrite, "__version__", entry.remove_in)
+    with pytest.raises(ValueError, match="requires brem_target_rse and brem_max_histories"):
+        Precision(**_explicit(), observables=("cxr", "brem"))
+    with pytest.raises(ValueError, match="requires brem_max_histories"):
+        Precision(**_explicit(), brem_target_rse=0.2)
+    # Complete requests and CXR-only policies are unaffected by the removal.
+    _policy()
+    Precision(**_explicit())
+
+
+def test_brem_only_observable_keeps_the_shared_rule_on_brem():
+    brem_only = Precision(**_explicit(), observables=("brem",))
+    assert brem_only.brem_target_rse is None
+    assert "brem_target_rse" not in brem_only.to_dict()
+    assert brem_only.to_dict()["observables"] == ("brem",)
+
+
+def test_brem_cannot_exceed_the_cxr_maximum():
+    with pytest.raises(ValueError, match="must not exceed max_histories"):
+        _policy(brem_max_histories=201)

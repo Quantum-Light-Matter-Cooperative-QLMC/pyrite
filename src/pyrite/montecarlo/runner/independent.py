@@ -2,6 +2,7 @@
 
 from dataclasses import replace
 
+from ..._precision import sampling_model
 from .adaptive import StoppingMonitor, case_measure
 
 
@@ -14,8 +15,8 @@ class IndependentStoppingMonitor:
     its own decision points; the two grids are visited in electron order.
     Electrons past a brem freeze run to the line cutoff, so a freeze at
     ``d`` inside a chunk sets ``cut_at = d``: the driver keeps ``[0, d)`` and
-    transports the rest again. Equal fixed bounds recover the shared rule;
-    equal targets alone need not.
+    transports the rest again. Equal fixed bounds recover the joint rule;
+    equal targets alone need not. Brem never gates the shared (CXR) stop (#1398).
 
     Validation: adaptive-sample-size-stopping
     """
@@ -99,6 +100,7 @@ class IndependentStoppingMonitor:
         record.update(
             precision=self.settings.to_dict(),
             observables=list(self.settings.observables),
+            sampling_model=sampling_model(self.settings),
             realized_electrons=self.realized,
             realized_electrons_brem=self.brem_count,
             stop_reason=self.stop_reason,

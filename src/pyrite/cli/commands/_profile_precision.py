@@ -81,25 +81,28 @@ def _policy_options(function):
             "--brem-target-rse",
             type=click.FloatRange(min=0.0, min_open=True),
             metavar="FRACTION",
-            help="Stop brem independently at this RSE; requires both cxr and brem observables.",
+            help=(
+                "Brem target RSE, mirroring --target-rse. Any --brem-* option requests brem "
+                "stopping; omitted brem target and maximum take the line values."
+            ),
         ),
         click.option(
             "--brem-min-histories",
             type=click.IntRange(min=2),
             metavar="N",
-            help="Brem minimum; defaults to --min-histories. Requires --brem-target-rse.",
+            help="Brem minimum, mirroring --min-histories (at most --brem-max-histories).",
         ),
         click.option(
             "--brem-max-histories",
             type=click.IntRange(min=2),
             metavar="N",
-            help="Brem maximum, at most --max-histories; defaults to it. Requires --brem-target-rse.",
+            help="Brem maximum, mirroring --max-histories; at most --max-histories.",
         ),
         click.option(
             "--target-rse",
             type=click.FloatRange(min=0.0, min_open=True),
             metavar="FRACTION",
-            help="Target relative standard error of each watched yield (0.05 = 5%).",
+            help="Target relative standard error of the line (CXR) yield (0.05 = 5%).",
         ),
         click.option(
             "--min-histories",
@@ -131,8 +134,9 @@ def _policy_options(function):
             type=click.Choice((*OBSERVABLES, "line")),
             multiple=True,
             help=(
-                "Yield that must converge; repeat for both. Replaces the watched set "
-                "(a new policy watches line and brem)."
+                "Yield to monitor; repeat for both. Replaces the set. Line is the shared "
+                "stop; adding brem requests independent brem stopping with the --brem-* "
+                "options (a new policy requests it); line alone scores brem on every history."
             ),
         ),
         click.option(
@@ -259,12 +263,16 @@ def command():
     """Inspect and edit PROFILE's history-count mode: adaptive policy or fixed counts.
 
     Profiles without fixed history counts or a policy run adaptive by default
-    (target RSE 0.05, 200-20000 histories, line and bremsstrahlung). Each incoherent case stops when the relative standard error
-    of its line (and optionally bremsstrahlung) yield meets the target and its
-    heavy-tail guards pass, or at the maximum count flagged statistics-limited.
-    By default one count serves both populations. --brem-target-rse enables
-    independent brem-prefix stopping; line transport continues until brem finishes.
-    Coherent emission,
+    (target RSE 0.05, 200-20000 histories, for line and for brem). Each
+    incoherent case stops when the relative standard error of its line yield
+    meets the target and its heavy-tail guards pass, or at the maximum count
+    flagged statistics-limited. Bremsstrahlung never gates that stop: when
+    brem stopping is requested (--observable brem or any --brem-* option) it
+    stops independently on its own --brem-target-rse, --brem-min-histories and
+    --brem-max-histories (mirroring the line options; omitted keys take the
+    line values), and line transport continues until brem finishes, so the brem
+    count is at most the line count. Without a request brem is scored on every
+    history and not monitored. Coherent emission,
     physical detectors, GDF beams, grooves and fixed history counts keep fixed
     counts. A history is one transported primary electron with all its
     secondaries, pairs and positrons.
@@ -403,7 +411,8 @@ def precision_set_command(name, yes, dry_run, **values):
 
     Fields left unspecified keep the existing policy's values; a new policy takes
     them from the default (target RSE 0.05, 200-20000 histories,
-    line and brem). A profile with fixed counts is refused; switch it with
+    line and independent brem); brem keys not given mirror the line values.
+    A profile with fixed counts is refused; switch it with
     'pyrite profile numerics adaptive-sampling enable'.
     """
     updates = policy_updates(values)

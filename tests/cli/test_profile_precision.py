@@ -61,16 +61,14 @@ def test_independent_brem_targets_roundtrip_and_reset(tmp_path, monkeypatch):
     assert invalid.exit_code != 0
     assert "must not exceed max_histories" in invalid.output
     assert catalog.read_text() == original
+    brem_keys = ["brem-target-rse", "brem-min-histories", "brem-max-histories"]
+    # Brem is still observed: its required keys cannot be reset away alone (#1398).
+    refused = invoke(numerics_command, ["adaptive-sampling", "reset", "sub_100keV", *brem_keys])
+    assert refused.exit_code == 1
+    assert "brem_target_rse, brem_max_histories is required" in refused.stderr
+    assert catalog.read_text() == original
     reset = invoke(
-        numerics_command,
-        [
-            "adaptive-sampling",
-            "reset",
-            "sub_100keV",
-            "brem-target-rse",
-            "brem-min-histories",
-            "brem-max-histories",
-        ],
+        numerics_command, ["adaptive-sampling", "reset", "sub_100keV", *brem_keys, "observable"]
     )
     assert_clean_result(reset)
     assert not any(key.startswith("brem_") for key in _precision(catalog))
@@ -159,6 +157,10 @@ def test_precision_set_show_and_reset_round_trip(tmp_path, monkeypatch):
         "max_histories": 2000,
         "observables": ["cxr", "brem"],
         "band_eV": [100.0, 900.0],
+        # Brem stopping mirrors the line setup; unset brem keys take its values (#1398).
+        "brem_target_rse": 0.1,
+        "brem_min_histories": 200,
+        "brem_max_histories": 2000,
     }
 
     updated = invoke(

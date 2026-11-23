@@ -4,7 +4,7 @@ Ledger row: [`adaptive-sample-size-stopping`](../ledger-transport-background.md#
 
 ## Claim
 
-For a case transported on the counter-addressed per-electron or CUDA cores, the run stops at the first decision point $n = d_J$ ({eq}`eq-adaptive-decision-points`, v4, #1253) that meets the following conditions for every watched observable $o$, plus the CXR variance-sampling gate below. Here $d_{J-j}$, $j = 1..k$, are the $k$ preceding points; the decisions and the realized count do not depend on how electrons are grouped for transport:
+For a case transported on the counter-addressed per-electron or CUDA cores, the run stops at the first decision point $n = d_J$ ({eq}`eq-adaptive-decision-points`, v4, #1253) that meets the following conditions for the shared stop's watched observable $o$ (the line mass; brem only in a brem-only `cxr_source="none"` run, where it is the sole observable), plus the CXR variance-sampling gate below. Bremsstrahlung never gates this shared stop (#1398): a brem request applies the same conditions to the brem population separately, with its own mirrored keys (*Brem stopping mirrors the CXR setup* below). Here $d_{J-j}$, $j = 1..k$, are the $k$ preceding points; the decisions and the realized count do not depend on how electrons are grouped for transport:
 
 ```{math}
 :label: eq-adaptive-stop-rule
@@ -58,7 +58,7 @@ so a plain tolerance $f\varepsilon$ over a fixed share refuses at random once $r
 
 **Batch means.** The realized $n$ electrons are split into $K=\min(20,n)$ contiguous batches of $n_b\in\{\lfloor n/K\rfloor,\lceil n/K\rceil\}$ electrons, independent of the chunks. With batch spectra $\bar S_b$, $S=\sum_b(n_b/n)\bar S_b$ holds exactly by linearity, and $\operatorname{Var}\bar S_b=\sigma^2/n_b$ gives the unbiased estimate $\hat\sigma^2=\sum_b n_b(\bar S_b-S)^2/(K-1)$ and $\widehat{\operatorname{Var}}S=\hat\sigma^2/n$. For equal batches this is $s(\{\bar S_b\})^2/K$. Brem batches partition $[0,N_{\rm brem})$ separately.
 
-The stopping generation `adaptive_sampling_model="decision-points-v4"` re-keys adaptive dataset identities, case content keys and provenance. The deprecated `block_histories` (a chunk-floor hint) is excluded from both identities.
+The stopping generation `adaptive_sampling_model="decision-points-v4"` re-keys adaptive dataset identities, case content keys and provenance; `decision-points-v5` (#1398) does so for policies that request brem stopping only, and CXR-only and brem-only policies keep their v4 identities. The deprecated `block_histories` (a chunk-floor hint) is excluded from both identities.
 
 ### CXR variance sampling (v2, #1254)
 
@@ -159,7 +159,7 @@ The target $r_n\le\varepsilon$ therefore implies $\mathrm{ESS}_n\ge 1/(\varepsil
 - The per-electron values have finite variance. A heavy tail with infinite variance (Pareto index $\le 2$) breaks the CLT and every guard. The guards only act on sampled values.
 - The incoherent reduction is a sum over electrons. The coherent line sum couples electrons ([coherent versus incoherent statistics](../../computation/statistical-methods.md#coherent-versus-incoherent-statistics)), so adaptive runs refuse `coherent_emission`. They also refuse the lockstep core, whose shared generator is not prefix-stable, and GDF beams.
 - A sample is one primary history including every descendant track. Particle cascades (shell secondaries, pair electrons, transported positrons) satisfy prefix stability because their RNG is lineage-addressed (`CASCADE_RNG_MODEL`, #923): a primary's whole cascade is the same in any block, and the run-wide track cap decides identically at every block size (#1240).
-- Without `brem_target_rse`, all watched observables share one realized count, with `Ne == Ne_brem`. Per-electron cutoffs depend on the line/brem split, so a shared count keeps every block's transport equal to the fixed-$N$ run's.
+- Without a brem request, brem is scored on all $N_e$ electrons and not monitored (`Ne == Ne_brem`); a brem-only run monitors only brem. Per-electron cutoffs depend on the line/brem split, so a shared count keeps every block's transport equal to the fixed-$N$ run's. A brem request always stops independently, so $N_b\le N_L$.
 - The monitor band is fixed before transport: the case's policy bandwidth, else its line-grid ends. Under the `resonance-population` policy the final axis may end below the bandwidth ceiling, so the monitor counts tails the final axis truncates. That share is audited separately (`line-grid-resonance-bandwidth`).
 
 ## Limiting cases
@@ -304,6 +304,18 @@ The anchor file `tests/montecarlo/runner/test_adaptive_stopping.py` passed: 45 t
 
 The estimator, the merge, the ESS identity, the guards, the pilot, batch means and band weights rederive and match the code. The anchor tests are green. The Gaussian and hopg acceptance numbers reproduce exactly, and the issue #361 acceptance holds: 20/20 light-case seeds lie within $1.96\varepsilon$, and the paired stopping bias of 0.06 % is below the 3.0 % smallest reported error. This supports `anchored`. Findings 1–3 are errors in quoted evidence and limit statements, not in the implementation. Correct the ledger `Checks` and `Notes` text before applying the status, so the row does not certify a wrong number or an overstated default guard. Human sign-off remains pending (#277).
 
+### Brem stopping mirrors the CXR setup (#1398)
+
+**Claim.** The shared stop watches the line scalar only. Brem stopping is requested by listing `brem` next to `cxr` or by setting any `brem_*` key; it then always runs as the independent brem-prefix rule above with $N_b\le N_L$. The brem keys mirror the CXR keys: $\varepsilon_b$ (`brem_target_rse`) mirrors $\varepsilon$ and $n_{b,\max}$ (`brem_max_histories`) mirrors $n_{\max}$, both required, with $n_{b,\max}\le n_{\max}$ (brem is a prefix); $n_{b,\min}$ (`brem_min_histories`) mirrors $n_{\min}$ with the same default, $\min(100, n_{b,\max})$. Brem then applies the scalar rule of this record on its own decision points $d^{b}_{j+1}=\min(n_{b,\max},\max(d^b_j+1,\lceil d^b_j(1+\delta)\rceil))$ from $d^b_0=n_{b,\min}$.
+
+**Shared on purpose.** The guards ($c$, $E_{\min}$, $V_{\max}$, $k$, $f$) and $\delta$ are properties of the estimator's sampling distribution and of the decision grid, not of a population's target, so one value serves both. The pilot is a scheduling device (it projects $N=N_p\max(r/\varepsilon)^2$ from the first RSE and skips checks until then), not a stopping target: it is clipped to each population's bounds, as before. A separate `brem_pilot_histories` was not added because a clipped pilot already reaches the brem cap or minimum; a user who needs a different brem schedule sets the brem bounds.
+
+**Limiting cases.** Equal explicit mirrored keys recover the common-count rule when both scalars pass at the same point. `brem_max_histories = max_histories` with an unreachable brem target runs brem to the cap while CXR stops by its own rule at or after $N_b$ (not before brem finishes). A CXR-only policy is bit-identical to the pre-#1398 shared rule (same payload, same `decision-points-v4`). A brem-only (`cxr_source="none"`) policy keeps the shared rule on brem.
+
+**Migration.** A request with `brem_target_rse` or `brem_max_histories` absent (formerly: `observables=("cxr","brem")`, the joint stop on a common count) warns and inherits $\varepsilon$ and $n_{\max}$ until 0.39.0, then is refused. The resolved policy is the explicit independent one, so its identity (normalized before hashing, marker `decision-points-v5`) differs from the former joint form: a cache miss, never stale reuse. Realized counts of those configurations change because brem no longer holds the line count to a common stop and the omitted brem minimum defaults to $\min(100, n_{b,\max})$ rather than $n_{\min}$. The default profile policy (`DEFAULT_PRECISION`) now spells out its brem keys, so default-profile identities move once.
+
+**Anchors.** `tests/montecarlo/transport/test_independent_stopping.py::{test_cxr_only_policy_keeps_its_serialization_and_ignores_brem, test_independent_brem_stop_with_explicit_keys_round_trips, test_incomplete_brem_request_warns_and_inherits_the_cxr_values, test_incomplete_brem_request_is_refused_at_the_scheduled_removal, test_brem_only_observable_keeps_the_shared_rule_on_brem, test_brem_cannot_exceed_the_cxr_maximum, test_independent_record_does_not_depend_on_the_transport_chunk}`; `tests/campaign/test_sampling_policy.py::{test_legacy_both_observables_resolve_to_explicit_independent_brem_stopping, test_legacy_policy_changes_case_identity_while_cxr_only_keeps_it}`; `tests/cli/test_profile_precision.py`; `tests/montecarlo/transport/test_streamed_adaptive.py` (CXR-only and independent brem, retained equals streamed). These are consistency anchors of the implemented keys, defaults, identity and refusal schedule; the statistics themselves are unchanged. Fresh-context verification of this extension is pending.
+
 Human sign-off pending (#277).
 
 ## Independent prefix extension verification (2026-10-18, issue #366)
@@ -346,7 +358,7 @@ block end at or after $N_b$ satisfying $P_L(n)$, or the overall maximum.
 A prior line pass cannot be latched: its RSE and stability can fail after a late
 large contribution. Thus $N_b\le N_L$; equal targets alone do not require equal
 counts. Equal fixed bounds give $N_b=N_L=N$, the ordinary fixed-count limit.
-Absent `brem_target_rse`, the existing shared policy remains the governing rule.
+Without a brem request (since #1398, listing `brem` or any `brem_*` key), the CXR rule alone governs and brem is scored on all $N_L$ electrons; the former joint rule on a common count is no longer selectable.
 An all-zero component has undefined relative precision and reaches its cap.
 
 For equal batches of $B$ incident electrons, component $o$ has
@@ -409,8 +421,8 @@ cutoffs, bunch centering and zero/nonzero energy spread. Batch means reconstruct
 the component spectra on their respective populations.
 
 **Verdict:** extension `rederived`. Retain the shared-policy verification above.
-The prior equal-count assumption now applies only when `brem_target_rse` is
-absent; it is superseded for the opt-in extension by $N_b\le N_L$ and the cutoff
+The prior equal-count assumption now applies only when brem stopping is not
+requested; it is superseded for a brem request by $N_b\le N_L$ and the cutoff
 and replay conditions derived here. Existing skew-tail, optional-stopping and
 unsampled-tail limitations remain. No new calibrated coverage claim is made.
 Human sign-off remains pending (#277).

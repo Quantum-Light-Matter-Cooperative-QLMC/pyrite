@@ -16,17 +16,27 @@ from pyrite._precision import (
     STORED_KEYS,
     Precision,
     default_precision_fallback,
+    requests_brem_stopping,
 )
 from pyrite.detectors.editing import _toml_value
 
 from ._profile_document import existing_profile, profile_overrides, values_item
 from .profile_numerics import profile_numerics_values
 
+BREM_REQUIRED_STORED = ("brem_target_rse", "brem_max_electrons")
+
 SAMPLING_FLAGS = {"n_electrons": "cxr-histories", "n_electrons_brem": "brem-histories"}
 
 
 #: Fields a first partial edit copies from the default policy.
 _INITIAL_FIELDS = (*REQUIRED_FIELDS, "min_electrons", "observables")
+
+#: Brem stopping keys and the CXR keys they mirror (stored vocabulary, #1398).
+_MIRRORED = {
+    "brem_target_rse": "target_rse",
+    "brem_max_electrons": "max_electrons",
+    "brem_min_electrons": "min_electrons",  # last: capped at the brem maximum
+}
 
 
 def profile_precision_values(profile):
@@ -135,11 +145,31 @@ def _check_adaptive(name, profile):
 
 
 def merge_policy(current, updates):
-    """Merge ``updates`` over ``current``, or over the default budget for a first policy."""
+    """Merge ``updates`` over ``current``, or over the default budget for a first policy.
+
+    Brem stopping mirrors the CXR setup (#1398): a request whose brem keys are
+    not supplied writes them as the merged CXR values (the minimum capped at the
+    brem maximum), so a stored policy never relies on the deprecated
+    inheritance. Setting ``observables`` without brem and no brem key withdraws
+    the request and drops its keys.
+    """
     if current is None:
         current = {key: DEFAULT_PRECISION.to_dict()[key] for key in _INITIAL_FIELDS}
         current["observables"] = list(current["observables"])
     merged = {**current, **updates}
+    observables = {
+        "cxr" if name == "line" else name for name in merged.get("observables", ("cxr",))
+    }
+    if "observables" in updates and observables != {"cxr", "brem"}:
+        if not any(key in updates for key in _MIRRORED):
+            for key in _MIRRORED:
+                merged.pop(key, None)
+    if requests_brem_stopping(merged) and "cxr" in observables:
+        for brem_key, key in _MIRRORED.items():
+            if merged.get(brem_key) is None and merged.get(key) is not None:
+                merged[brem_key] = merged[key]
+                if brem_key == "brem_min_electrons":
+                    merged[brem_key] = min(merged[key], merged["brem_max_electrons"])
     Precision.from_dict(merged)
     return merged
 
@@ -228,6 +258,12 @@ def reset_precision(document, name, fields=()):
         )
     removed = tuple(field for field in fields if field in current)
     remaining = {key: value for key, value in current.items() if key not in fields}
+    missing = [key for key in BREM_REQUIRED_STORED if key not in remaining]
+    if missing and requests_brem_stopping(remaining):
+        raise ValueError(
+            f"{', '.join(catalog_key(key) for key in missing)} is required while brem stopping "
+            "is requested; reset the brem fields and observable together, or set them"
+        )
     Precision.from_dict(remaining)
     target["precision"] = precision_table(remaining)
     return removed

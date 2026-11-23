@@ -36,6 +36,10 @@ def test_default_policy_matches_the_recorded_decision():
         min_histories=200,
         max_histories=20_000,
         observables=("cxr", "brem"),
+        # Brem stops independently, mirroring the CXR setup (#1398).
+        brem_target_rse=0.05,
+        brem_min_histories=200,
+        brem_max_histories=20_000,
     )
 
 

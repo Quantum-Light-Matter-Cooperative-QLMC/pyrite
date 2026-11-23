@@ -11,17 +11,17 @@ Validation: adaptive-sample-size-stopping
 import numpy as np
 import pytest
 
+from pyrite._precision import Precision
 from pyrite.montecarlo import runner
 from pyrite.montecarlo.runner import block_transport
 from pyrite.montecarlo.runner.adaptive import without_wall_clock
 from pyrite.montecarlo.runner.streamed_scoring import run_case_streamed, streaming_refusal
-from tests.montecarlo.runner.test_adaptive_stopping import _case
-from tests.montecarlo.transport.test_independent_stopping import _policy
+from tests.montecarlo.runner.test_adaptive_stopping import _RULE_ONLY, _case
 
 SPECTRA = ("spec", "spec_characteristic", "brem_wide", "brem")
 
 
-def _requested(spread=None, **policy):
+def _requested(spread=None, *, brem=True, **policy):
     case = {
         # Fixed families: streaming, not measured selection, is under test (#1301).
         **_case(n_families=2, energy_bins=None, energy_spread_frac=spread),
@@ -31,12 +31,17 @@ def _requested(spread=None, **policy):
         "E_cut_lines_keV": 29.0,
         "E_cut_brem_keV": 1.0,
     }
-    settings = _policy(
+    # ``brem=False``: CXR-only shared stop; brem is scored on every history (#1398).
+    brem_keys = (
+        dict(brem_target_rse=1.0, brem_min_histories=40, brem_max_histories=120) if brem else {}
+    )
+    settings = Precision(
+        **_RULE_ONLY,
         target_rse=1.0,
         min_histories=80,
         max_histories=120,
-        brem_target_rse=1.0,
-        brem_min_histories=40,
+        observables=("cxr", "brem") if brem else ("cxr",),
+        **brem_keys,
         **policy,
     )
     return {
@@ -53,9 +58,10 @@ def _retained(case):
 
 
 @pytest.mark.slow
+@pytest.mark.parametrize("brem", [True, False], ids=["independent-brem", "cxr-only"])
 @pytest.mark.parametrize("spread", [None, 0.001])
-def test_streamed_adaptive_matches_retained(monkeypatch, spread):
-    case = _requested(spread)
+def test_streamed_adaptive_matches_retained(monkeypatch, spread, brem):
+    case = _requested(spread, brem=brem)
     reference = _retained(case)
 
     def no_join(*args, **kwargs):
@@ -65,7 +71,10 @@ def test_streamed_adaptive_matches_retained(monkeypatch, spread):
     streamed = run_case_streamed(case, 13, transport_core="per-electron")
 
     record, expected = streamed["adaptive_sampling"], reference["adaptive_sampling"]
-    assert record["realized_electrons_brem"] < record["realized_electrons"]
+    if brem:
+        assert record["realized_electrons_brem"] < record["realized_electrons"]
+    else:
+        assert set(record["statistics"]) == {"cxr"}
     assert record["replayed_transport"] is (spread is not None)
     assert without_wall_clock(record) == without_wall_clock(expected)
     np.testing.assert_array_equal(streamed["E_grid"], reference["E_grid"])
@@ -98,8 +107,9 @@ def test_population_wide_adaptive_outputs_are_refused(monkeypatch, extra, policy
         run_case_streamed(case, 10)
 
 
-def test_plain_adaptive_case_is_live_streamable():
-    case = _requested()
+@pytest.mark.parametrize("brem", [True, False], ids=["independent-brem", "cxr-only"])
+def test_plain_adaptive_case_is_live_streamable(brem):
+    case = _requested(brem=brem)
     # The default sinc-oversampled line grid streams since #1280.
     assert case["line_grid_policy"]["resolution"]["policy"] == "sinc-oversampled"
     assert streaming_refusal(case, live=True) is None
