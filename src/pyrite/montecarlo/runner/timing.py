@@ -8,6 +8,7 @@ import sys
 
 import numpy as np
 
+from ..transport.continuation import pop_continuation_stats
 from .chunking import _RESOURCE_POLICY
 from .recovery import RECOVERY_KEYS
 
@@ -81,6 +82,9 @@ class _TimingAgg:
             if key in out
         }
         fallback_reason = out.pop("_backend_fallback_reason", None)
+        # Continuation quantum/lanes of the passes since the last case (#1396);
+        # a GPU run transports in this process, one case at a time.
+        chunk_metrics.update(pop_continuation_stats())
         return {
             "timed_case_count": max(len(self.transport), len(self.spectrum)),
             "transport_seconds": t,

@@ -446,6 +446,10 @@ run_material() {{
         scan_rc=127
       else
         export PYRITE_MC_NSYS=1
+        # nsys keeps its session files under $TMPDIR/nvidia; a shared node's
+        # /tmp/nvidia may belong to another user (#1396), so use a job-local dir.
+        nsys_tmp="$JOBDIR/tmp/nsys-$m"
+        mkdir -p "$nsys_tmp"
         # --wait=all lets nsys wait for the spawn worker tree to exit cleanly
         # (else --wait=primary SIGTERMs survivors -> leaked semaphores).
         nsys_cmd=(
@@ -466,7 +470,7 @@ run_material() {{
             --python-backtrace=cuda --cudabacktrace=sync,kernel,memory
           )
         fi
-        "${{nsys_cmd[@]}}" \\
+        TMPDIR="$nsys_tmp" "${{nsys_cmd[@]}}" \\
           "${{scan_command[@]}}" >> "$JOBDIR/log" 2>&1 || scan_rc=$?
       fi
     elif [ "$py_spy_enabled" -eq 1 ]; then
@@ -500,10 +504,13 @@ run_material() {{
       return 1
     fi
     if [ "$nsys_enabled" -eq 1 ] && [ -f "$trace_base.nsys-rep" ]; then
-      nsys stats \\
+      TMPDIR="$nsys_tmp" nsys stats \\
         --report cuda_api_sum,cuda_gpu_kern_sum,cuda_kern_exec_sum,nvtx_sum \\
         "$trace_base.nsys-rep" > "$trace_base.nsys-stats.txt" 2>&1 || \\
         echo "WARNING: nsys stats failed; .nsys-rep remains available" >> "$JOBDIR/log"
+    fi
+    if [ "$nsys_enabled" -eq 1 ]; then
+      rm -rf "$nsys_tmp"
     fi
   done
     if [ "$cpu_enabled" -eq 1 ]; then

@@ -15,6 +15,7 @@ from pyrite.montecarlo.transport import _simulate_trajectories as simulate_traje
 from pyrite.montecarlo.transport.batching import (
     _ELECTRON_STATUS_BYTES,
     _SEG_SCRATCH_BYTES,
+    FULL_HISTORY_MAX_BATCH,
     _alloc_batch_scratch,
     _batch_size,
     _scratch_row_bytes,
@@ -60,7 +61,7 @@ def test_batch_scratch_fits_budget_and_is_tight(name, cap, budget):
         assert m == 1  # one history must still run; see the warning test
         return
     assert _allocated_bytes(schema, m, cap) <= budget
-    assert m == config.max_batch or _allocated_bytes(schema, m + 1, cap) > budget
+    assert m == FULL_HISTORY_MAX_BATCH or _allocated_bytes(schema, m + 1, cap) > budget
 
 
 def test_coupled_midpoint_no_longer_overshoots_the_786_budget():

@@ -54,7 +54,13 @@ share a transport launch (below the `electron_batch` cap) and
 `kernel_threads` the transport launch's threads per block; `cxr_threads` and
 `cxr_energies_per_block` select the CXR reduction launch and kernel variant
 on the node-quadrature line route. Their best values depend on the scene and
-GPU, so tune them per workload and device rather than copying them across. `objective="total"` instead times
+GPU, so tune them per workload and device rather than copying them across.
+`None` for `continuation_rows` is not a fixed 256 rows: each continuation
+pass measures its first round and sizes the row quantum (16-256 rows) and
+lane count from the scene's rows per history, and `None` for
+`electron_batch` then leaves the lane count to `scratch_mib` alone
+([automatic sizing](../repo-design/compute/gpu-transport-rawkernel.md#bounded-continuation-automatic-production-schedule)).
+Keep `None` among the candidates; a fixed value replaces that sizing. `objective="total"` instead times
 whole `simulate` calls over all dimensions jointly.
 
 The baseline is the scene's own `KernelTuning` on the CUDA core. By default
@@ -117,7 +123,8 @@ variables:
 
 - `PYRITE_MC_ELECTRON_BATCH_MAX` caps CUDA transport electrons per launch
   (`PerElectronTransportConfig.max_batch`); the segment-scratch budget can
-  impose a smaller effective limit.
+  impose a smaller effective limit. Unset, full-history launches cap at
+  65,536 electrons and continuation lanes follow the scratch budget.
 - `PYRITE_MC_CXR_CHUNK` sets the requested **segment** chunk for CXR spectral
   processing (this is *not* the electron count). The VRAM admission policy can
   clamp it to a smaller effective value.

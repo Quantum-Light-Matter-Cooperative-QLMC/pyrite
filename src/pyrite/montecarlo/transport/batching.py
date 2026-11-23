@@ -220,6 +220,9 @@ def _flight_diagnostic_summary(
     }
 
 
+#: Electrons per full-history launch when ``max_batch`` is unset.
+FULL_HISTORY_MAX_BATCH = 65536
+
 #: CUDA transport launch sizes accepted by ``TransportKernelConfig``.
 KERNEL_THREADS = (32, 64, 128, 256, 512, 1024)
 
@@ -253,6 +256,12 @@ class PerElectronTransportConfig:
     what a GPU run wants: there a batch costs about one electron lifetime whatever
     its width, so a discarded batch and a probe cost the same launch.
 
+    ``max_batch`` caps the electrons per launch. ``None`` (the default
+    unless ``PYRITE_MC_ELECTRON_BATCH_MAX`` is set) caps full-history batches
+    at ``FULL_HISTORY_MAX_BATCH`` and leaves continuation lanes bounded only by
+    ``scratch_budget_bytes`` (#1396): a short-track scene's small automatic
+    row quantum then fits more than 65,536 lanes in the same budget.
+
     ``continuation`` opts the exact CUDA core into bounded continuation rounds
     (:class:`.continuation.TransportContinuationConfig`, #789) under the same
     ``scratch_budget_bytes`` and ``max_batch``; ``seg_capacity`` and
@@ -277,7 +286,7 @@ class PerElectronTransportConfig:
     seg_capacity: int = 512
     scratch_budget_bytes: int = 512 * 1024 * 1024
     capacity_headroom: float = 1.25
-    max_batch: int = 65536
+    max_batch: int | None = None
     probe_electrons: int = 1024
     continuation: TransportContinuationConfig | None = None
     schedule: str | None = None
@@ -287,19 +296,23 @@ class PerElectronTransportConfig:
         check_schedule(self.schedule)
         if self.kernel_threads not in KERNEL_THREADS:
             raise ValueError(f"kernel_threads must be one of {KERNEL_THREADS}")
+        if self.max_batch is not None and int(self.max_batch) < 1:
+            raise ValueError("max_batch must be a positive integer or None")
 
 
-def _default_batch_limit_from_env() -> int:
+def _default_batch_limit_from_env() -> int | None:
     """Optional per-process max electrons per transport launch for CUDA tuning.
 
     Fresh subprocesses are required when sweeping this value because the API
     and JIT driver capture DEFAULT_PER_ELECTRON_TRANSPORT_CONFIG at import time.
     This does not change separately constructed PerElectronTransportConfig's
-    defaults; the legacy default remains 65536 when the variable is absent.
+    defaults. Absent, it is None: full-history batches keep the
+    ``FULL_HISTORY_MAX_BATCH`` cap and continuation lanes follow the scratch
+    budget (#1396).
     """
     raw = env_value("PYRITE_MC_ELECTRON_BATCH_MAX", "").strip()
     if not raw:
-        return 65536
+        return None
     try:
         size = int(raw)
     except ValueError as exc:
@@ -418,7 +431,8 @@ def _batch_size(cap, config, row_bytes=_SEG_SCRATCH_BYTES):
     """
     per_electron = cap * int(row_bytes) + _ELECTRON_STATUS_BYTES
     n = int(config.scratch_budget_bytes // per_electron)
-    return max(1, min(n, int(config.max_batch)))
+    limit = FULL_HISTORY_MAX_BATCH if config.max_batch is None else int(config.max_batch)
+    return max(1, min(n, limit))
 
 
 def _warn_over_budget(cap, config, row_bytes, warned):

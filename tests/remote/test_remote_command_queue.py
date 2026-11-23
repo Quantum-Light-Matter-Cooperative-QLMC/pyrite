@@ -166,6 +166,22 @@ def test_queue_script_wraps_single_profile_session_with_nsys():
         assert subprocess.run([bash, "-n"], input=script, text=True).returncode == 0
 
 
+def test_queue_script_points_nsys_tmpdir_at_a_job_local_directory():
+    # #1396 job 15412: the RTX 5080 node's /tmp/nvidia belongs to another user,
+    # so nsys must not fall back to /tmp for its session files.
+    script = remote._queue_script(
+        "j", ["hopg"], quick=False, workers=1, performance_profile="p", nsys=True
+    )
+    assert 'nsys_tmp="$JOBDIR/tmp/nsys-$m"' in script
+    assert 'mkdir -p "$nsys_tmp"' in script
+    assert 'TMPDIR="$nsys_tmp" "${nsys_cmd[@]}"' in script
+    assert 'TMPDIR="$nsys_tmp" nsys stats' in script
+    assert script.index('mkdir -p "$nsys_tmp"') < script.index('TMPDIR="$nsys_tmp" "${nsys_cmd')
+    assert 'rm -rf "$nsys_tmp"' in script
+    plain = remote._queue_script("j", ["hopg"], quick=False, workers=1, performance_profile="p")
+    assert "nsys_enabled=0" in plain
+
+
 def test_queue_script_cpu_flag_adds_cprofile_after_primary():
     script = remote._queue_script(
         "j",

@@ -77,12 +77,15 @@ class TransportKernelTuning:
     (#799) and takes precedence over ``PYRITE_MC_TRANSPORT_SCHEDULE``;
     ``None`` defers to that variable, then ``"auto"`` (the #799 default).
     ``continuation_rows`` is the continuation row quantum: the trajectory rows
-    each active history may emit per launch (``None``: 256). It counts emitted
-    rows, not wall-clock time, and no launch ends early when its first history
-    finishes; it requires ``"continuation"`` or ``"auto"``.
+    each active history may emit per launch. ``None`` sizes it per pass
+    (#1396): the first round runs 256 rows, later rounds a power of two in
+    16-256 covering the 95th percentile of that round's rows per history. It
+    counts emitted rows, not wall-clock time, and no launch ends early when its
+    first history finishes; it requires ``"continuation"`` or ``"auto"``.
     ``electron_batch`` caps the electrons (or concurrent continuation
     histories) per transport launch and takes precedence over
-    ``PYRITE_MC_ELECTRON_BATCH_MAX`` (``None``: that variable, then 65536).
+    ``PYRITE_MC_ELECTRON_BATCH_MAX`` (``None``: that variable, then 65536 for
+    full-history batches and only the scratch budget for continuation lanes).
     ``scratch_mib`` is the device scratch budget, in MiB, that full-history
     batches and continuation lanes are sized from (``None``: 512); it, not
     ``electron_batch``, usually sets how many histories share one launch.
