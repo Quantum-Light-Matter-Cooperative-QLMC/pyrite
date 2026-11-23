@@ -150,6 +150,14 @@ class BlockSpectrumScorer:
         self.totals: tuple | None = None
         self.n_segments = 0
         self.n_layers = 1
+        # Single-pass adaptive scoring (#1397): ``Ne_lines``/``Ne_brem`` are a
+        # provisional power-of-two count, and ``brem_stop()`` the brem freeze.
+        self.provisional = bool(inputs.get("provisional", False))
+        self._brem_stop = inputs.get("brem_stop")
+        if self.provisional and (self.audit is not None or self.line_screen is not None):
+            # Both size per-electron state by the line population; only an
+            # explicit grid (no audit) and analog lines score provisionally.
+            raise ValueError("provisional scoring needs an explicit grid and analog lines")
 
     @measure_block_fallbacks
     def add(self, segs: Mapping[str, Any]) -> None:
@@ -166,6 +174,7 @@ class BlockSpectrumScorer:
             return
         self.n_layers = int(segs.get("n_layers", 1))
         case = self.case
+        lines_only = self._past_brem_freeze(segs)
         block = _segments_on_device(segs)
         batch = EmissionBatch(
             block,
@@ -181,6 +190,19 @@ class BlockSpectrumScorer:
         )
         brem_batch = replace(batch, electron_limit=self.Ne_brem)
         spec = self._lines(batch)
+        if lines_only:
+            # A whole block past the brem freeze adds nothing to the brem
+            # population: its estimators would score zero rows (#1397).
+            self._commit(
+                (
+                    spec,
+                    np.zeros(self.E_grid.shape),
+                    np.zeros(self.E_brem.shape),
+                    np.zeros(self.E_grid.shape),
+                ),
+                rows,
+            )
+            return
         # Diffracted brem (#1166) and Kossel lines (#1176) are track-length sums
         # over a fixed electron count: blocks add their depth weights, and the
         # two-beam mode is solved once in :meth:`result`.
@@ -231,15 +253,68 @@ class BlockSpectrumScorer:
                 electron_limit=self.Ne_brem,
             )
             brem = self.emission.continuum.evaluate(continuum, "brem_wide").values
-        parts = (spec, characteristic, brem, self._transition(segs))
+        self._commit((spec, characteristic, brem, self._transition(segs)), rows)
+
+    def _commit(self, parts, rows) -> None:
         if self.totals is None:  # FP64 block sums, like the retained route (#1313)
             self.totals = tuple(np.asarray(part, dtype=np.float64) for part in parts)
         else:
             self.totals = tuple(
                 total + part for total, part in zip(self.totals, parts, strict=True)
             )
-
         self.n_segments += rows
+
+    def _past_brem_freeze(self, segs) -> bool:
+        """Whether every electron of a provisional block lies past the brem freeze.
+
+        Monitored chunks never straddle the freeze: one containing it is
+        replayed on its prefix (:func:`.block_transport.transport_monitored_blocks`).
+        """
+        frozen = None if self._brem_stop is None else self._brem_stop()
+        if frozen is None:
+            return False
+        from ..._backend import _to_cpu
+
+        ids = segs["elec_id"]
+        first, last = int(_to_cpu(ids.min())), int(_to_cpu(ids.max()))
+        if last < frozen:
+            return False
+        if first < frozen:
+            raise RuntimeError(f"streamed block [{first}, {last}] straddles the brem freeze")
+        return True
+
+    def snapshot(self):
+        """State :meth:`restore` rolls a failed :meth:`add` back to (#1397 commit-once)."""
+        from .electron_blocks import snapshot_audit
+
+        diffracted = self.diffracted
+        return (
+            self.totals,
+            self.n_segments,
+            self.n_layers,
+            snapshot_audit(self.audit),
+            (
+                diffracted.dbr,
+                {key: list(line) for key, line in diffracted.lines.items()},
+                diffracted.edges,
+            ),
+            self.fallbacks.snapshot(),
+        )
+
+    def restore(self, state) -> None:
+        """Undo every :meth:`add` since ``state`` (:meth:`snapshot`)."""
+        from .electron_blocks import restore_audit
+
+        totals, segments, layers, audit, diffracted, fallbacks = state
+        self.totals, self.n_segments, self.n_layers = totals, segments, layers
+        restore_audit(self.audit, audit)
+        self.diffracted.dbr, self.diffracted.lines, self.diffracted.edges = diffracted
+        self.fallbacks.restore(fallbacks)
+
+    def _renormalize(self, realized):
+        """``x -> x * L / realized`` for the provisional count ``L`` (exact ``x * L``)."""
+        provisional = float(self.Ne_lines)
+        return lambda values: np.asarray(values, dtype=np.float64) * provisional / realized
 
     def _lines(self, batch):
         """The block's incoherent lines; a selected set scores in admitted chunks.
@@ -275,10 +350,17 @@ class BlockSpectrumScorer:
         n_missed: int,
         line_coverage,
         diagnostic_grid=None,
+        population=None,
     ) -> dict[str, Any]:
         """The spectrum-phase output from the accumulated totals and counts.
 
-        Validation: diffracted-bremsstrahlung, diffracted-characteristic-radiation
+        ``population`` (``(Ne_lines, Ne_brem)``, provisional scoring only,
+        #1397) renormalizes the provisional power-of-two count to the realized
+        one: blocks were scored as ``sum / L``, exactly, so ``x * L / Ne``
+        differs from scoring by ``Ne`` only in the final rounding.
+
+        Validation: diffracted-bremsstrahlung, diffracted-characteristic-radiation,
+        adaptive-sample-size-stopping
         """
         from .cxr_grid import check_cxr_truncation
 
@@ -289,6 +371,11 @@ class BlockSpectrumScorer:
         else:
             spec, spec_characteristic, brem_wide, spec_transition = self.totals
         dbr, kossel = self.diffracted.spectra()
+        if population is not None:
+            lines, brem = (self._renormalize(int(n)) for n in population)
+            spec, dbr, kossel = lines(spec), brem(dbr), brem(kossel)
+            spec_characteristic, brem_wide = brem(spec_characteristic), brem(brem_wide)
+            spec_transition = None if spec_transition is None else brem(spec_transition)
         spec, spec_characteristic = spec + dbr, spec_characteristic + kossel
         truncation = None if self.audit is None else check_cxr_truncation(case, self.audit)
         out = dict(
@@ -355,10 +442,32 @@ def run_case_streamed(
     :func:`streaming_refusal` (``live=True``) raise ``ValueError`` before any
     transport.
 
-    An adaptive case (#1280) first runs a measure-only monitored transport
-    that keeps no chunk, then the fixed case at the realized ``(Ne, Ne_brem)``
-    as above. Counter-addressed streams make that the population the retained
-    adaptive route scores; ``adaptive_sampling`` is the monitor's record.
+    An adaptive case (#1280, #1397) runs the monitored adaptive transport
+    first (:func:`.streamed_adaptive.run_adaptive_streamed`). With an explicit
+    grid the monitored pass scores its kept chunks and no other transport
+    runs. With a ``line_grid_policy`` grid it collects the grid evidence
+    instead; the grid is then resolved at the stop (or read from the speed
+    cache) and the fixed case at the realized ``(Ne, Ne_brem)`` streams on
+    it, two transports in all. Counter-addressed streams make that the
+    population the retained adaptive route scores; ``adaptive_sampling`` is
+    the monitor's record.
+
+    Validation: adaptive-sample-size-stopping
+    """
+    reason = streaming_refusal(case, live=True)
+    if reason is not None:
+        raise ValueError(f"cannot stream this case's spectra: {reason}")
+    if case.get("adaptive_precision") is not None:
+        from .streamed_adaptive import run_adaptive_streamed
+
+        return run_adaptive_streamed(
+            case, block_electrons, transport_core=transport_core, spill=spill
+        )
+    return score_fixed_streamed(case, block_electrons, transport_core=transport_core, spill=spill)
+
+
+def score_fixed_streamed(case, block_electrons, *, transport_core, spill=None, grid=None):
+    """Stream a fixed-count ``case``; ``grid`` (``(E_grid, record, grid_pass)``) skips the grid pass.
 
     Validation: adaptive-sample-size-stopping
     """
@@ -368,12 +477,6 @@ def run_case_streamed(
     from .oom import _ensure_pool_limit
     from .streamed_selection import block_scorer
 
-    reason = streaming_refusal(case, live=True)
-    if reason is not None:
-        raise ValueError(f"cannot stream this case's spectra: {reason}")
-    sampling = None
-    if case.get("adaptive_precision") is not None:
-        case, sampling, transport_core = _measure_adaptive_case(case, transport_core)
     E_grid, E_brem, _, n_hat, groove = _case_geometry(case)
     grid_record = grid_pass = None
     # Same allocator cap as the joined spectrum phase.
@@ -381,7 +484,9 @@ def run_case_streamed(
 
     sized = not isinstance(block_electrons, int)
     with block_electrons.pool_limit() if sized else nullcontext():
-        if case.get("line_grid_policy") is not None:
+        if grid is not None:
+            E_grid, grid_record, grid_pass = grid
+        elif case.get("line_grid_policy") is not None:
             from .streamed_line_grid import resolve_streamed_line_grid
 
             # Pass 1 of 2: the grid needs the whole line population (#1001).
@@ -423,29 +528,4 @@ def run_case_streamed(
     from .recovery import RECOVERY_KEYS
 
     out.update({key: tp[key] for key in RECOVERY_KEYS if key in tp})
-    if sampling is not None:
-        out["adaptive_sampling"] = sampling
     return out
-
-
-def _measure_adaptive_case(case, transport_core):
-    """The realized fixed case, sampling record and core of an adaptive ``case`` (#1280).
-
-    Runs the monitored adaptive transport measure-only: the monitor reads each
-    chunk and no chunk is kept, so memory follows the chunk size.
-
-    Validation: adaptive-sample-size-stopping
-    """
-    from . import _transport_case
-    from .block_transport import _discard
-
-    tp = _transport_case(
-        case,
-        transport_core=transport_core,
-        keep_segments_on_device=True,
-        block_consumer=_discard,
-    )
-    sampling = dict(tp["adaptive_sampling"])
-    fixed = {key: value for key, value in case.items() if key != "adaptive_precision"}
-    fixed.update(Ne=int(tp["Ne_lines"]), Ne_brem=int(tp["Ne_brem"]))
-    return fixed, sampling, sampling["transport_core"]

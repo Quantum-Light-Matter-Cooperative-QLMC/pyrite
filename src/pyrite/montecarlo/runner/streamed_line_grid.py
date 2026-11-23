@@ -68,7 +68,9 @@ class BlockGridEvidence:
     :class:`.line_grid_spill.LineGridSpillError` at that block.
     """
 
-    def __init__(self, case, payload, n_hat, Ne, abs_layers=None, groove=None, spill=None):
+    def __init__(
+        self, case, payload, n_hat, Ne, abs_layers=None, groove=None, spill=None, project=True
+    ):
         from .line_grid_spill import GridSpillPolicy
 
         self.case, self.n_hat, self.Ne = case, np.asarray(n_hat, dtype=float), int(Ne)
@@ -80,7 +82,9 @@ class BlockGridEvidence:
         oversampled = payload["resolution"]["policy"] == OVERSAMPLED_RESOLUTION_POLICY
         self.keeps_lines = self.measured or (oversampled and case.get("transport_mode") != "mixed")
         self.policy = GridSpillPolicy(threshold_bytes=None) if spill is None else spill
-        self._electrons = max(int(Ne), int(case.get("Ne_brem") or 0), 1)
+        # An adaptive monitored pass (#1397) does not know its population, so
+        # it projects nothing: it spills at the threshold actually held.
+        self._electrons = max(int(Ne), int(case.get("Ne_brem") or 0), 1) if project else None
         self._width: list[np.ndarray] | None = []
         self._weight: list[np.ndarray] | None = []
         self._populations: list = []
@@ -134,6 +138,8 @@ class BlockGridEvidence:
         self._seen = seen
 
     def _projected(self, seen) -> tuple[float, float]:
+        if self._electrons is None:
+            return seen[1], seen[2]
         scale = self._electrons / max(seen[0], 1)
         return seen[1] * scale, seen[2] * scale
 

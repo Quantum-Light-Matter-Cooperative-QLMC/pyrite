@@ -99,7 +99,8 @@ grid-pass evidence spills to disk (below).
    as for a final grid.
 
 A speed-cache hit (`cxr_grid.cached_policy_cxr_grid`) needs no trajectories,
-so it skips the grid pass. The output's private `_streamed_line_grid_pass`
+so it skips the grid pass. An adaptive case collects this evidence in its
+monitored pass instead of a pass of its own ([Adaptive cases](#adaptive-cases)). The output's private `_streamed_line_grid_pass`
 records whether the pass ran and how many evidence bytes it held.
 
 Equality: the sinc samples of consecutive whole-electron blocks concatenate to
@@ -170,18 +171,62 @@ without appearing to be stalled transport.
 ### Adaptive cases
 
 Adaptive cases stream since #1280, with memory bounded by the chunk size
-instead of `max_histories`. `run_case_streamed` first runs the monitored
-adaptive transport measure-only (`block_consumer=_discard`, the #1240
-cascade pattern). The stopping monitor reads each chunk, the driver's
-stop-inside-a-chunk and brem-freeze replays (`[start, cut)`) and the
-energy-range replay run as on the retained route, and no chunk is kept. The
-realized `(Ne, Ne_brem)` then runs as the fixed case through the streamed
-route above, including the #1001 grid pass. Counter-addressed streams make
-that the population the retained route scores, so the result equals retained
-adaptive within streamed-vs-joined summation order and `adaptive_sampling` is
-the same record (`tests/montecarlo/transport/test_streamed_adaptive.py`,
-`test_adaptive_cascades.py`). The cost is one extra transport. On the #1280
-mos2 30 keV probe, transport was 16.5 s of a 256 s monitored pass.
+instead of `max_histories`. `run_case_streamed` runs the monitored adaptive
+transport with a block consumer (#1397,
+`runner/streamed_adaptive.py::run_adaptive_streamed`). The stopping monitor
+reads each chunk, and the driver's stop-inside-a-chunk and brem-freeze
+replays (`[start, cut)`) and the energy-range replay run as on the retained
+route. The consumer sees only the chunks the driver keeps, which are the
+realized population. Counter-addressed streams make that the population the
+retained route scores, so the result equals retained adaptive within
+streamed-vs-joined summation order, and `adaptive_sampling` is the same record
+(`tests/montecarlo/transport/test_streamed_adaptive.py`,
+`test_adaptive_cascades.py`). `adaptive_route` picks one of three routes:
+
+| Route | Case | Monitored pass | Transports |
+|---|---|---|---|
+| `single` | explicit grid (no `line_grid_policy`) | scores the kept chunks | 1 |
+| `folded` | `line_grid_policy` | collects the grid evidence | 2, cached or not |
+| `measure` | cascades (#1240), line roulette | measure-only (#1280) | 2, or 3 with a grid pass |
+
+- **Single pass.** The realized counts are unknown until the stop, so blocks
+  are scored at a provisional power-of-two count `L >= max_histories`. Every
+  estimator's `electron_limit` passes every kept row, and its `sum / L` is
+  exact. At the stop, `BlockSpectrumScorer.result(population=(Ne, Ne_brem))`
+  multiplies the line totals by `L / Ne` and the brem-population totals
+  (continuum, characteristic, DBR, Kossel) by `L / Ne_brem`, which differs
+  from scoring by `Ne` only in the final rounding. A chunk past the brem
+  freeze scores lines only; no kept chunk straddles the freeze. An automatic
+  selection reads `min(Ne_brem, SELECTION_HISTORIES)`: when the prefix is
+  complete before the stop, the brem population is frozen or larger than the
+  prefix, so the provisional count stands in for it exactly. A prefix still
+  held at the stop (`Ne <= SELECTION_HISTORIES`) is selected and scored at
+  the realized counts. Only explicit grids qualify: a policy grid needs the
+  whole population, and its truncation audit and the line roulette size
+  per-electron state by the line population.
+- **Folded evidence.** The monitored pass feeds `BlockGridEvidence`. With an
+  integer block size the kept chunks are re-blocked to the fixed route's
+  blocks `[kB, (k+1)B)` (a block spanning chunks waits on the host for its
+  remainder), so the evidence and the `resonance-population` tail sums are
+  the separate grid pass's, and the grid and its record are bit for bit
+  equal. Under a `MemoryBlockSizer` the evidence follows the chunks; the sinc
+  samples still concatenate exactly, and the tail sums can differ from a
+  separate pass in the last ulp. The speed-cache key reads the realized
+  `Ne`/`Ne_brem`, so a cache hit is known only at the stop: a hit discards
+  the evidence, and a miss resolves the grid from it. Then the fixed case at
+  the realized pair streams on that grid. The evidence projects no spill over
+  the unknown population; it spills once it holds the threshold.
+- **Commit-once.** Each pass calls the consumer's `begin_pass(monitor)`
+  (`transport_case_blocks`), which starts a fresh scorer or evidence store,
+  so an energy-range replay never counts twice. A scoring allocator OOM rolls
+  the scorer back (`snapshot`/`restore`) and rescores a host copy of the
+  chunk once (`commit_once`); grid evidence commits only after a whole block.
+
+The output's private `_adaptive_route` names the route (`scoring`) and its
+full-population `transports`, counting each energy-range replay pass;
+`_streamed_line_grid_pass` gains `monitored_evidence` and `cache` on the
+folded route. `streamed_adaptive.MONITORED_PASS = False` restores the #1280
+measure-only route for a same-revision comparison.
 
 Scans (`run_case`, `run_cases`, `pyrite run`) select this route
 automatically. A retained adaptive transport projects its kept bytes at
@@ -248,6 +293,15 @@ a nondivisor, `N` and above `N`, with `Ne` above and below `Ne_brem`.
 pair and positron cascades reproduce every joined history's rows, launches,
 pair events and annihilation photons bit for bit on CPU, including with energy
 spread and per-electron cutoffs. Transport counts and segment totals agree exactly.
+`tests/montecarlo/transport/test_streamed_adaptive.py` compares the adaptive
+routes with the retained route and the #1280 measure-only route: a stop inside
+a chunk, a brem freeze and the energy-range replay on the single pass; an
+automatic selection whose prefix completes at the stop, before the brem
+freeze and after it; and a `resonance-population` grid at block sizes 7, 13
+and 1000, cache miss then hit, whose grid, record and spectra equal the
+separate grid pass's bit for bit. It counts the monitored and fixed passes,
+and a scoring OOM injected after the scorer mutated its state commits the
+chunk once.
 
 ## Memory and wall time
 
