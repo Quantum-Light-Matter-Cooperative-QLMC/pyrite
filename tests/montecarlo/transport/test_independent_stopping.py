@@ -306,13 +306,48 @@ def test_incomplete_brem_request_warns_and_inherits_the_cxr_values(kw, missing):
         **_RULE_ONLY,
         observables=("cxr", "brem"),
         brem_target_rse=kw.get("brem_target_rse", 0.1),
-        # Omitted, the minimum defaults like min_histories: 100, at most brem_max_histories.
-        brem_min_histories=kw.get("brem_min_histories", 100),
+        # Inheritance carries the minimum too: an old config behaves as written.
+        brem_min_histories=kw.get("brem_min_histories", 40),
         brem_max_histories=kw.get("brem_max_histories", 200),
     )
+    assert legacy.brem_min_histories == kw.get("brem_min_histories", legacy.min_histories)
+    if "brem_min_histories" not in kw:
+        assert "brem_min_histories=40 (from min_histories)" in str(caught[0].message)
     # The same policy, hence the same identity, as the explicit spelling.
     assert legacy == explicit
     assert legacy.to_dict() == explicit.to_dict()
+
+
+def test_inheritance_carries_the_cxr_minimum_capped_at_the_brem_maximum():
+    """cleo_sub-like legacy config: min_histories=3000, observables cxr+brem."""
+    kw = dict(target_rse=0.001, min_histories=3000, max_histories=60_000, **_RULE_ONLY)
+    with pytest.warns(DeprecationWarning, match="brem_min_histories=3000 .from min_histories"):
+        legacy = Precision(**kw, observables=("cxr", "brem"))
+    assert (legacy.brem_target_rse, legacy.brem_min_histories, legacy.brem_max_histories) == (
+        0.001,
+        3000,
+        60_000,
+    )
+    explicit = Precision(
+        **kw,
+        observables=("cxr", "brem"),
+        brem_target_rse=0.001,
+        brem_min_histories=3000,
+        brem_max_histories=60_000,
+    )
+    assert legacy.to_dict() == explicit.to_dict()
+    # A smaller explicit brem maximum caps the inherited minimum.
+    with pytest.warns(DeprecationWarning):
+        capped = Precision(**kw, brem_max_histories=2000)
+    assert capped.brem_min_histories == 2000
+
+
+def test_explicit_required_keys_keep_the_mirrored_minimum_default(recwarn):
+    """With target and maximum given, an omitted minimum defaults like min_histories."""
+    kw = dict(target_rse=0.001, min_histories=3000, max_histories=60_000, **_RULE_ONLY)
+    policy = Precision(**kw, brem_target_rse=0.01, brem_max_histories=60_000)
+    assert policy.brem_min_histories == 100
+    assert not [w for w in recwarn if issubclass(w.category, DeprecationWarning)]
 
 
 def test_complete_brem_request_does_not_warn(recwarn):

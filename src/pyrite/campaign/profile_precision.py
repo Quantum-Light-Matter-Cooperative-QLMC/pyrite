@@ -150,7 +150,8 @@ def merge_policy(current, updates):
     Brem stopping mirrors the CXR setup (#1398): a request whose brem keys are
     not supplied writes them as the merged CXR values (the minimum capped at the
     brem maximum), so a stored policy never relies on the deprecated
-    inheritance. Setting ``observables`` without brem and no brem key withdraws
+    inheritance; with the target and maximum given, an omitted minimum keeps the
+    mirrored default. Setting ``observables`` without brem and no brem key withdraws
     the request and drops its keys.
     """
     if current is None:
@@ -165,11 +166,19 @@ def merge_policy(current, updates):
             for key in _MIRRORED:
                 merged.pop(key, None)
     if requests_brem_stopping(merged) and "cxr" in observables:
+        # Same rule as the Python policy: omitted required keys take the line values,
+        # and then the minimum does too; with both required keys given, an omitted
+        # minimum is left to the mirrored default (100, at most the brem maximum).
+        inherits = any(merged.get(key) is None for key in BREM_REQUIRED_STORED)
+        fill_minimum = inherits and merged.get("brem_min_electrons") is None
         for brem_key, key in _MIRRORED.items():
             if merged.get(brem_key) is None and merged.get(key) is not None:
-                merged[brem_key] = merged[key]
-                if brem_key == "brem_min_electrons":
-                    merged[brem_key] = min(merged[key], merged["brem_max_electrons"])
+                if brem_key != "brem_min_electrons" or inherits:
+                    merged[brem_key] = merged[key]
+        if fill_minimum:
+            merged["brem_min_electrons"] = min(
+                merged["brem_min_electrons"], merged["brem_max_electrons"]
+            )
     Precision.from_dict(merged)
     return merged
 

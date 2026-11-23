@@ -161,7 +161,9 @@ class Precision:
         growth and the pilot are shared; the brem pilot is clipped to its own
         bounds. Deprecated: a request without ``brem_target_rse`` or
         ``brem_max_histories`` warns and inherits ``target_rse`` or
-        ``max_histories`` until the scheduled removal, then is refused.
+        ``max_histories`` (and ``min_histories`` for an omitted brem minimum,
+        so an old config behaves as written) until the scheduled removal, then
+        is refused.
     decision_growth
         Relative spacing ``delta`` of the decision points: the stop overshoots
         the last refused point by at most ``delta`` relative, with
@@ -276,7 +278,11 @@ class Precision:
         self.brem_policy()  # the mirrored rule is itself a valid policy
 
     def _inherit_cxr_stopping(self, missing: list[str]) -> None:
-        """Deprecated (#1398): a brem request without its required keys inherits CXR's."""
+        """Deprecated (#1398): a brem request without its required keys inherits CXR's.
+
+        Target and maximum inherit as given; an omitted brem minimum inherits
+        ``min_histories`` too (capped at the brem maximum).
+        """
         from . import __version__
         from ._util.deprecations import BREM_INHERITANCE, api_removal_reached, warn_api
 
@@ -290,9 +296,17 @@ class Precision:
         values = {key: getattr(self, name) for key, name in inherited.items() if key in missing}
         for key, value in values.items():
             object.__setattr__(self, key, value)
-        detail = ", ".join(
-            f"{key}={value} (from {inherited[key]})" for key, value in values.items()
-        )
+        sources = {key: inherited[key] for key in values}
+        if self.brem_min_histories is None:
+            # An old config behaves as written: its minimum applies to brem too (capped at
+            # an explicit brem maximum). Explicit required keys keep the mirrored default.
+            maximum = self.brem_max_histories
+            assert maximum is not None  # filled above or explicit
+            minimum = min(self.min_histories, maximum)
+            object.__setattr__(self, "brem_min_histories", minimum)
+            values["brem_min_histories"] = minimum
+            sources["brem_min_histories"] = "min_histories"
+        detail = ", ".join(f"{key}={value} (from {sources[key]})" for key, value in values.items())
         # Attribute the warning to the caller, past the constructor layers
         # (``AdaptiveSampling``, the dataclass ``__init__``, ``from_dict``).
         warn_api(

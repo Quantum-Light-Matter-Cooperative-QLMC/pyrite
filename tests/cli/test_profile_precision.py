@@ -74,6 +74,39 @@ def test_independent_brem_targets_roundtrip_and_reset(tmp_path, monkeypatch):
     assert not any(key.startswith("brem_") for key in _precision(catalog))
 
 
+def test_brem_minimum_follows_the_python_inheritance_rule(tmp_path, monkeypatch):
+    """Missing required brem keys take the line values, minimum included; with both
+    required keys given an omitted minimum is left to the mirrored default (#1398)."""
+    catalog = _catalog(tmp_path, monkeypatch)
+    inherited = invoke(
+        numerics_command,
+        ["adaptive-sampling", "set", "sub_100keV", *_POLICY, "--brem-target-rse", "0.2"],
+    )
+    assert_clean_result(inherited)
+    table = _precision(catalog)
+    assert (table["brem_target_rse"], table["brem_max_histories"]) == (0.2, 2000)
+    assert table["brem_min_histories"] == 200  # min_histories, not the default 100
+    invoke(numerics_command, ["adaptive-sampling", "reset", "sub_100keV"])
+    explicit = invoke(
+        numerics_command,
+        [
+            "adaptive-sampling",
+            "set",
+            "sub_100keV",
+            *_POLICY,
+            "--brem-target-rse",
+            "0.2",
+            "--brem-max-histories",
+            "1000",
+        ],
+    )
+    assert_clean_result(explicit)
+    table = _precision(catalog)
+    assert "brem_min_histories" not in table
+    shown = invoke(numerics_command, ["adaptive-sampling", "show", "sub_100keV", "-o", "json"])
+    assert json.loads(shown.stdout)["payload"]["effective"]["brem_min_histories"] == 100
+
+
 def test_precision_show_reports_the_default_policy_without_a_table(tmp_path, monkeypatch):
     _catalog(tmp_path, monkeypatch)
 

@@ -222,11 +222,11 @@ def test_legacy_both_observables_resolve_to_explicit_independent_brem_stopping()
         resolved = identity_policy(legacy)
     assert resolved["brem_target_rse"] == 0.1
     assert resolved["brem_max_electrons"] == 80
-    assert resolved["brem_min_electrons"] == 80  # default 100 capped at brem_max_histories
+    assert resolved["brem_min_electrons"] == 40  # the minimum is inherited too (#1398)
     # The explicit spelling of the same request has the same identity: no stale reuse,
     # and no second identity for one rule.
     explicit = Precision.from_dict(
-        {**legacy, "brem_target_rse": 0.1, "brem_max_electrons": 80}
+        {**legacy, "brem_target_rse": 0.1, "brem_min_electrons": 40, "brem_max_electrons": 80}
     ).to_dict()
     assert dict(resolved) == {**explicit, "observables": ["line", "brem"]}
     assert identity_policy(explicit) == explicit
@@ -246,6 +246,12 @@ def test_legacy_policy_changes_case_identity_while_cxr_only_keeps_it():
         legacy_key = case_content_key({**fixed, "adaptive_precision": _legacy_payload()})
     assert legacy_key != cxr_key
     explicit = Precision(
-        0.1, 40, 80, observables=("cxr", "brem"), brem_target_rse=0.1, brem_max_histories=80
+        0.1,
+        40,
+        80,
+        observables=("cxr", "brem"),
+        brem_target_rse=0.1,
+        brem_min_histories=40,
+        brem_max_histories=80,
     )
     assert case_content_key({**fixed, "adaptive_precision": explicit.to_dict()}) == legacy_key

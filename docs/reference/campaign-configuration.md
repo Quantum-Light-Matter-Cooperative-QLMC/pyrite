@@ -134,7 +134,7 @@ independent brem-prefix stopping. The brem keys mirror the line keys:
 | --- | --- | --- |
 | `--brem-target-rse` | `--target-rse` | required |
 | `--brem-max-histories` | `--max-histories` | required; at most `--max-histories` |
-| `--brem-min-histories` | `--min-histories` | default 100, at most `--brem-max-histories` |
+| `--brem-min-histories` | `--min-histories` | default 100, at most `--brem-max-histories` (see the inheritance rule below) |
 
 Brem uses a prefix of the shared transport and freezes when its target and
 guards pass or its maximum is reached; line work continues until the line stop
@@ -144,14 +144,19 @@ pilot is clipped to the brem bounds). Without a brem request
 (`--observable cxr`), brem is scored on every history and not monitored.
 `--observable brem` alone, for a `cxr_source="none"` run, applies the shared
 rule to brem. The CLI fills omitted brem target and maximum with the line
-values when it writes a policy; `--observable cxr` withdraws the request and its
+values when it writes a policy, the minimum included; with the brem target and
+maximum both given, an omitted brem minimum keeps the default above; `--observable cxr` withdraws the request and its
 brem keys. Resetting the required brem keys while brem stopping is requested is
 refused.
 
 A policy that requests brem stopping without `brem_target_rse` or
 `brem_max_histories` (the former `observables = ["cxr", "brem"]` shared form)
-is deprecated: it warns, inherits `target_rse` and `max_histories`, and is
-refused from 0.39.0 with a message naming the missing keys. It resolves to the
+is deprecated: it warns, inherits `target_rse` and `max_histories`, and an
+omitted `brem_min_histories` inherits `min_histories` too (capped at the brem
+maximum), so an old config behaves as written. It is refused from 0.39.0 with a
+message naming the missing keys. The rule is one sentence: when any required brem
+key is missing, every omitted brem key takes its CXR value; when both required keys
+are given, an omitted `brem_min_histories` takes the mirrored default. It resolves to the
 explicit independent policy, so its identity differs from the former shared
 form (`adaptive_sampling_model=decision-points-v5`); CXR-only policies keep
 theirs. See [compatibility](python-api/compatibility.md).
