@@ -77,7 +77,10 @@ def _override_max(n):
 
     def capped(args, material):
         settings, sweep, identity, stem = resolved(args, material)
-        precision = dataclasses.replace(settings.precision, max_histories=int(n))
+        overrides = {"max_histories": int(n)}
+        if settings.precision.brem_max_histories is not None:
+            overrides["brem_max_histories"] = min(int(n), settings.precision.brem_max_histories)
+        precision = dataclasses.replace(settings.precision, **overrides)
         return dataclasses.replace(settings, precision=precision), sweep, identity, stem
 
     scan._resolved_run = capped
