@@ -764,9 +764,10 @@ def sincsq_bin_lineshape(
 #: bounded blocks. Flushes without such lines change only in FP64 summation
 #: order. v9 (#1390): NumPy-backend bin-mean lines on non-uniform axes are
 #: queued; each uniform run of at least 64 bins takes the host Fourier route
-#: on its sub-axis (no far envelope there), the other bins the numba near/far
-#: evaluator (device-preamble ``Si``, FP64 per-bin sums), instead of the dense
-#: ``scipy.special.sici`` matrix product. Device routes unchanged.
+#: on its sub-axis (no far envelope there), the other bins one numba near/far
+#: call (device-preamble ``Si``, FP64 per-bin sums), instead of the dense
+#: ``scipy.special.sici`` matrix product. The device route mirrors it
+#: (``"segmented"``: CUDA Fourier per run, one near/far launch for the rest).
 CXR_BIN_REDUCTION_MODEL = "fourier-auto-v9"
 #: Lines per Fourier-route flush: amortises the per-call FFT and planning.
 FOURIER_FLUSH_LINES = 10_000_000
