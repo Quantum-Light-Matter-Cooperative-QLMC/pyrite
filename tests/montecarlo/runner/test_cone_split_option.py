@@ -201,6 +201,45 @@ def test_split_spectrum_adds_weighted_copies():
         assert split[key].sum() > primaries[key].sum()
 
 
+def _spectrum_yields(case):
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", ConeSplitLowGainWarning)
+        out = runner.run_case(case)
+    yields = {
+        "line": np.trapezoid(out["spec"], out["E_grid"]),
+        "brem": np.trapezoid(out["brem_wide"], out.get("E_grid_brem", out["E_grid"])),
+    }
+    if out.get("spec_characteristic") is not None:
+        yields["characteristic"] = np.trapezoid(out["spec_characteristic"], out["E_grid"])
+    return yields, out.get("cone_split")
+
+
+@pytest.mark.slow
+def test_split_spectra_agree_with_analog_through_the_production_run():
+    """Anchor: seeded public-option spectra match analog within seed-level error.
+
+    Each seed is one full ``run_case`` of the same case with and without the
+    ``cone_split`` key; copies are active on every split seed. Seeds are fixed,
+    so the |z| bound is a deterministic regression pin, not a flaky test.
+    """
+    seeds, n = range(6), 32
+    analog, split, copies = [], [], 0
+    for seed in seeds:
+        base = {**_base(), "Ne": n, "Ne_brem": n, "seed": seed}
+        analog.append(_spectrum_yields(base)[0])
+        values, record = _spectrum_yields({**base, "cone_split": POLICY.to_dict()})
+        split.append(values)
+        assert record is not None and record["copies"] > 0
+        copies += record["copies"]
+    assert copies > len(seeds)
+    for name in analog[0]:
+        a = np.array([row[name] for row in analog])
+        b = np.array([row[name] for row in split])
+        se = math.hypot(a.std(ddof=1), b.std(ddof=1)) / math.sqrt(len(seeds))
+        assert a.mean() > 0.0 and se > 0.0
+        assert abs(b.mean() - a.mean()) / se < 3.0, name
+
+
 def test_monitor_scores_primary_plus_weighted_copies_per_history():
     n = 24
     case = {**_split(), "Ne": n, "Ne_brem": n}
