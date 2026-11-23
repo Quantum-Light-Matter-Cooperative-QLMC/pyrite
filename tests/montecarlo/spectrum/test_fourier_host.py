@@ -193,3 +193,16 @@ def test_host_over_cap_lines_take_near_far(monkeypatch, cap):
     exact = _exact(E, a, w, c0, h, n)
     assert np.abs(got - exact).max() <= 1e-5 * np.abs(exact).max()
     assert abs(got.sum() - exact.sum()) <= 1e-6 * np.abs(w * np.pi / a).sum()
+
+
+def test_uniform_runs_cover_every_bin_and_merge_short_runs():
+    """#1390: long equal-width runs get a Fourier axis; short runs merge into one near/far run."""
+    from pyrite.montecarlo.spectrum.cxr._fourier_host import uniform_runs
+
+    edges = np.r_[np.arange(100.0, 400.0, 3.0), 400.0, 402.5, 405.0, np.arange(407.0, 607.0, 2.0)]
+    runs = uniform_runs(edges)
+    assert runs[0][0] == 0 and runs[-1][1] == edges.size - 1
+    assert all(prev[1] == nxt[0] for prev, nxt in zip(runs, runs[1:], strict=False))
+    fourier = [r for r in runs if r[2] is not None]
+    assert [r[2][1] for r in fourier] == pytest.approx([3.0, 2.0])
+    assert sum(r[2] is None for r in runs) == 1

@@ -407,13 +407,16 @@ def test_midpoint_series_matches_the_bin_integral_inside_its_window():
         assert abs(series[k] - exact) <= 2.5e-9 * envelope
 
 
-# ---- host near/far queue on non-uniform axes (#1390) ---------------------------
-def test_host_near_far_queue_matches_the_dense_bin_mean_on_a_nonuniform_axis():
-    """Queued numba near/far = dense ``_host_bin_mean`` at FP64 rounding, per target.
+# ---- host segmented queue on non-uniform axes (#1390) --------------------------
+def test_host_segmented_queue_matches_exact_and_near_far_bin_means_per_run():
+    """Queued per-target sums: Fourier runs = exact bin means, the rest = dense near/far.
 
-    Validation: sinc-bin-integration, sinc-bin-far-envelope
+    The #101 windowed axis has uniform runs (Fourier sub-axes) and short
+    joins (numba near/far, FP64 rounding of ``_host_bin_mean``).
+
+    Validation: cxr-line-fourier-reduction, sinc-bin-far-envelope
     """
-    from pyrite.montecarlo.spectrum.cxr._bin_queue import HostNearFarLineQueues
+    from pyrite.montecarlo.spectrum.cxr._bin_queue import HostSegmentedLineQueues
 
     grid = _windowed_axis()
     edges, widths = _energy_bin_edges_and_widths(grid)
@@ -424,27 +427,36 @@ def test_host_near_far_queue_matches_the_dense_bin_mean_on_a_nonuniform_axis():
     w = rng.uniform(-1.0, 1.0, n)
     w[::7] = 0.0
     first, second = np.zeros(grid.size), np.zeros(grid.size)
-    queues = HostNearFarLineQueues(edges, 1.0 / widths, flush_lines=250)
+    queues = HostSegmentedLineQueues(edges, 1.0 / widths, flush_lines=250)
+    fourier = np.zeros(grid.size, dtype=bool)
+    for start, stop, axis in queues._runs:
+        fourier[start:stop] = axis is not None
+    assert fourier.any() and not fourier.all()
     mask = np.ones(n, dtype=bool)
     queues.add([(w[:200], first)], E[:200], a[:200], mask[:200])
     queues.add([(w[200:], first), (2 * w[200:], second)], E[200:], a[200:], mask[200:])
     queues.flush()
-    dense = bq._host_bin_mean(a, E, edges, 1.0 / widths, bq.BIN_MEAN_EXACT_WIDTHS)
-    expected = w @ dense
-    assert np.abs(first - expected).max() <= 1e-12 * np.abs(expected).max()
-    tail = (2 * w[200:]) @ dense[200:]
-    assert np.abs(second - tail).max() <= 1e-12 * np.abs(tail).max()
+    near_far = bq._host_bin_mean(a, E, edges, 1.0 / widths, bq.BIN_MEAN_EXACT_WIDTHS)
+    exact = bq._host_bin_mean(a, E, edges, 1.0 / widths)
+    for got, weights, lines in ((first, w, slice(None)), (second, 2 * w[200:], slice(200, None))):
+        peak = np.abs(weights @ exact[lines]).max()
+        diff = np.abs(got - weights @ exact[lines])[fourier]
+        assert diff.max() <= 5e-6 * peak
+        diff = np.abs(got - weights @ near_far[lines])[~fourier]
+        assert diff.max() <= 1e-12 * peak
 
 
-@host_backend_only("the host near/far queue is the NumPy backend's route")
+@host_backend_only("the host segmented queue is the NumPy backend's route")
 @pytest.mark.parametrize("route", ["batched", "per_hkl"])
 def test_nonuniform_bin_mean_spectrum_takes_the_queue_and_matches_dense(route):
     """Default host routing on a non-uniform axis equals the dense override (#1390).
 
+    A geometric axis has no uniform run, so every bin takes near/far.
+
     Validation: sinc-bin-integration
     """
     from pyrite.montecarlo.spectrum.cxr._bin_queue import (
-        HostNearFarLineQueues,
+        HostSegmentedLineQueues,
         open_bin_line_queues,
     )
 
@@ -455,7 +467,7 @@ def test_nonuniform_bin_mean_spectrum_takes_the_queue_and_matches_dense(route):
     accumulate = _accumulate_batched if route == "batched" else _accumulate_per_hkl
     probe = _prepare_spectrum(request)
     open_bin_line_queues(probe)
-    assert isinstance(probe.bin_line_queues, HostNearFarLineQueues)
+    assert isinstance(probe.bin_line_queues, HostSegmentedLineQueues)
     queued = _prepare_spectrum(request)
     accumulate(queued)
     with bq.bin_reduction_override("auto"):

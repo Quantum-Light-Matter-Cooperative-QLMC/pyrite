@@ -90,26 +90,31 @@ class HostBinLineQueues:
         return host_fourier_bin_mean_reduce(E_r, a_width, w, self._axis)
 
 
-class HostNearFarLineQueues(HostBinLineQueues):
-    """Host line queues reduced by the numba near/far evaluator on any bin axis (#1390).
+class HostSegmentedLineQueues(HostBinLineQueues):
+    """Host line queues for non-uniform bin axes (#1390).
 
-    The NumPy-backend counterpart of the device near/far flush for axes the
-    Fourier route cannot take: no ``(line, bin)`` matrix, FP64 per-bin sums
-    independent of thread count, the far-field envelope beyond
-    ``BIN_MEAN_EXACT_WIDTHS``.
+    Each uniform run of at least ``HOST_SEGMENT_MIN_BINS`` bins takes the host
+    Fourier route on its sub-axis; the remaining bins take the numba near/far
+    evaluator (no ``(line, bin)`` matrix, the far-field envelope beyond
+    ``BIN_MEAN_EXACT_WIDTHS``). Sums are independent of thread count.
 
-    Validation: sinc-bin-integration, sinc-bin-far-envelope
+    Validation: cxr-line-fourier-reduction, sinc-bin-far-envelope
     """
 
     def __init__(self, edges, inv_width, flush_lines: int) -> None:
+        from ._fourier_host import uniform_runs
+
         super().__init__(None, flush_lines)
         self._edges = np.asarray(edges, dtype=np.float64)
         self._inv_width = np.asarray(inv_width, dtype=np.float64)
+        self._runs = uniform_runs(self._edges)
 
     def _reduce(self, E_r, a_width, w):
-        from ._bin_mean_jit import host_near_far_edges_reduce
+        from ._fourier_host import host_segmented_bin_mean_reduce
 
-        return host_near_far_edges_reduce(E_r, a_width, w, self._edges, self._inv_width)
+        return host_segmented_bin_mean_reduce(
+            E_r, a_width, w, self._edges, self._inv_width, self._runs
+        )
 
 
 def open_bin_line_queues(st) -> None:
@@ -117,7 +122,7 @@ def open_bin_line_queues(st) -> None:
 
     The device route queues into ``_CxrBatch`` flushes; the NumPy backend
     queues into :class:`HostBinLineQueues` on uniform axes and into
-    :class:`HostNearFarLineQueues` otherwise (#1390), unless a
+    :class:`HostSegmentedLineQueues` otherwise (#1390), unless a
     :func:`bin_reduction_override` selects the dense evaluator. Other host
     backends keep the dense evaluator.
     """
@@ -129,7 +134,7 @@ def open_bin_line_queues(st) -> None:
         if host is not None:
             st.bin_line_queues = HostBinLineQueues(*host)
         elif host_near_far_applies():
-            st.bin_line_queues = HostNearFarLineQueues(
+            st.bin_line_queues = HostSegmentedLineQueues(
                 edges, st.bin_inv_width, HOST_NEAR_FAR_FLUSH_LINES
             )
         return

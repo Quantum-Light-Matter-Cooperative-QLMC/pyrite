@@ -1,9 +1,9 @@
 """Numba host near/far bin-mean line sum (#1320, #1390).
 
 The host Fourier route (``_fourier_host``) sends lines whose positive mode
-count exceeds ``FOURIER_MAX_LINE_MODES`` here, and host bin-mean lines on
-axes the Fourier route cannot take (non-uniform bins) are reduced here
-through ``_bin_queue.HostNearFarLineQueues``. It evaluates the same bin
+count exceeds ``FOURIER_MAX_LINE_MODES`` here, and on non-uniform axes
+``_bin_queue.HostSegmentedLineQueues`` sends the bins outside its uniform
+Fourier runs here. It evaluates the same bin
 mean as ``_bin_quadrature._host_bin_mean(..., exact_widths)``: the exact
 ``sinc^2`` bin mean within ``exact_widths`` first-zero widths of a resonance
 and, beyond, the float32 far-field envelope ``1 / (2 pi^2 x_lo x_hi)`` in the
