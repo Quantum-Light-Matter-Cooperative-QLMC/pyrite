@@ -405,3 +405,63 @@ def test_midpoint_series_matches_the_bin_integral_inside_its_window():
         tol = 1e-12 * envelope * dx[k]
         exact = quad(lambda x: np.sinc(x) ** 2, lo, hi, epsabs=tol, epsrel=1e-11)[0] / dx[k]
         assert abs(series[k] - exact) <= 2.5e-9 * envelope
+
+
+# ---- host near/far queue on non-uniform axes (#1390) ---------------------------
+def test_host_near_far_queue_matches_the_dense_bin_mean_on_a_nonuniform_axis():
+    """Queued numba near/far = dense ``_host_bin_mean`` at FP64 rounding, per target.
+
+    Validation: sinc-bin-integration, sinc-bin-far-envelope
+    """
+    from pyrite.montecarlo.spectrum.cxr._bin_queue import HostNearFarLineQueues
+
+    grid = _windowed_axis()
+    edges, widths = _energy_bin_edges_and_widths(grid)
+    rng = np.random.default_rng(1390)
+    n = 600
+    E = np.r_[rng.uniform(7980.0, 9020.0, n - 4), 8500.0, 8003.0, 2e4, 100.0]
+    a = np.pi / np.exp(rng.uniform(np.log(1e-3), np.log(50.0), n))
+    w = rng.uniform(-1.0, 1.0, n)
+    w[::7] = 0.0
+    first, second = np.zeros(grid.size), np.zeros(grid.size)
+    queues = HostNearFarLineQueues(edges, 1.0 / widths, flush_lines=250)
+    mask = np.ones(n, dtype=bool)
+    queues.add([(w[:200], first)], E[:200], a[:200], mask[:200])
+    queues.add([(w[200:], first), (2 * w[200:], second)], E[200:], a[200:], mask[200:])
+    queues.flush()
+    dense = bq._host_bin_mean(a, E, edges, 1.0 / widths, bq.BIN_MEAN_EXACT_WIDTHS)
+    expected = w @ dense
+    assert np.abs(first - expected).max() <= 1e-12 * np.abs(expected).max()
+    tail = (2 * w[200:]) @ dense[200:]
+    assert np.abs(second - tail).max() <= 1e-12 * np.abs(tail).max()
+
+
+@host_backend_only("the host near/far queue is the NumPy backend's route")
+@pytest.mark.parametrize("route", ["batched", "per_hkl"])
+def test_nonuniform_bin_mean_spectrum_takes_the_queue_and_matches_dense(route):
+    """Default host routing on a non-uniform axis equals the dense override (#1390).
+
+    Validation: sinc-bin-integration
+    """
+    from pyrite.montecarlo.spectrum.cxr._bin_queue import (
+        HostNearFarLineQueues,
+        open_bin_line_queues,
+    )
+
+    grid = np.geomspace(701.0, 1499.0, 401)
+    request = SpectrumRequest(
+        segments=_long_flights(), E_grid_eV=grid, line_quadrature="bin-mean", **_KW
+    )
+    accumulate = _accumulate_batched if route == "batched" else _accumulate_per_hkl
+    probe = _prepare_spectrum(request)
+    open_bin_line_queues(probe)
+    assert isinstance(probe.bin_line_queues, HostNearFarLineQueues)
+    queued = _prepare_spectrum(request)
+    accumulate(queued)
+    with bq.bin_reduction_override("auto"):
+        dense = _prepare_spectrum(request)
+        accumulate(dense)
+    ref = to_host(_finalize_spectrum(dense))
+    got = to_host(_finalize_spectrum(queued))
+    assert np.abs(ref).max() > 0.0
+    np.testing.assert_allclose(got, ref, rtol=0.0, atol=1e-12 * np.abs(ref).max())

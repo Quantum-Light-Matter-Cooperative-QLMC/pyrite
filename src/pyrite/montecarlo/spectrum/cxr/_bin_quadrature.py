@@ -762,8 +762,11 @@ def sincsq_bin_lineshape(
 #: evaluator (device kernel; host numba ``_bin_mean_jit``) instead of the
 #: Fourier route; the kernel transform and gather grid are evaluated in
 #: bounded blocks. Flushes without such lines change only in FP64 summation
-#: order.
-CXR_BIN_REDUCTION_MODEL = "fourier-auto-v8"
+#: order. v9 (#1390): NumPy-backend bin-mean lines on non-uniform axes are
+#: queued and reduced by the numba near/far evaluator (device-preamble ``Si``,
+#: FP64 per-bin sums) instead of the dense ``scipy.special.sici`` matrix
+#: product; FP64 rounding and summation order only. Device routes unchanged.
+CXR_BIN_REDUCTION_MODEL = "fourier-auto-v9"
 #: Lines per Fourier-route flush: amortises the per-call FFT and planning.
 FOURIER_FLUSH_LINES = 10_000_000
 
@@ -861,6 +864,17 @@ def resolve_host_bin_reduction(edges):
             raise ValueError("Fourier reduction needs a uniform c_k +- h/2 bin axis")
         return None
     return axis, HOST_FOURIER_FLUSH_LINES if flush is None else flush
+
+
+def host_near_far_applies() -> bool:
+    """Whether host bin-mean lines on a non-uniform axis take the numba near/far queue.
+
+    True unless a :func:`bin_reduction_override` is active: a non-Fourier
+    override keeps the dense host evaluator for comparisons (#1390).
+
+    Validation: sinc-bin-far-envelope
+    """
+    return _REDUCTION_OVERRIDE.get() is None
 
 
 def _bin_reduction_markers(resolved):
