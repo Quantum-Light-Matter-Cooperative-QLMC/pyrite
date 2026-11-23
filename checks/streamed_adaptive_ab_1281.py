@@ -19,11 +19,13 @@ through ``run_cases`` (production serial path). ROUTE:
   production ``STREAMED_BLOCK_BYTES``) of observed rows.
 - ``measure``: ``auto`` on the #1280 measure-only streamed route
   (``streamed_adaptive.MONITORED_PASS = False``): the same-revision arm of the
-  #1397 single-pass / folded-evidence comparison against ``auto``.
+  #1397 single-pass comparison against ``auto``.
 
 ``PROBE_FRESH_GRID=1`` removes the line-grid speed cache (``cache_dir() /
 "line-grids"``; point ``PYRITE_CACHE_DIR`` at a scratch directory) before the
-arm, so its policy grid misses the cache.
+arm, so its policy grid misses the cache. ``PROBE_EXPLICIT_GRID=1`` drops the
+profile's ``line_grid_policy``, so the case scores on its explicit grid (the
+#1397 single-pass route under ``auto``).
 
 One arm per process, so ``ru_maxrss`` is that arm's host peak; device peaks
 use the #1252 sampler (``adaptive_block_size_1252.py``); phase splits are
@@ -138,6 +140,8 @@ def run(route, material, e0_kev, tilt_deg, max_histories, out_prefix):
         shutil.rmtree(cache_dir() / "line-grids", ignore_errors=True)
     _override_max(max_histories)
     case, _, _ = HELPER["profile_case"](material, float(e0_kev), float(tilt_deg), "auto")
+    if os.environ.get("PROBE_EXPLICIT_GRID") == "1":
+        case = {key: value for key, value in case.items() if key != "line_grid_policy"}
     record = {
         "issue": 1281,
         "stub": True,
@@ -150,6 +154,7 @@ def run(route, material, e0_kev, tilt_deg, max_histories, out_prefix):
         "max_histories": int(max_histories),
         "backend": os.environ.get("PYRITE_MC_BACKEND"),
         "stream_block_MiB": os.environ.get("PROBE_STREAM_BLOCK_MIB"),
+        "explicit_grid": os.environ.get("PROBE_EXPLICIT_GRID") == "1",
     }
     Path(f"{out_prefix}.json").write_text(json.dumps(record, default=_json_default))
     memory = HELPER["Memory"]()
