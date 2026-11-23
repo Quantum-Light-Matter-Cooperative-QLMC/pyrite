@@ -101,6 +101,59 @@ def host_es_mode_transform(phase, strengths, j0, j1, *, eps=1e-12):
 
 
 @njit(parallel=True, cache=True)
+def _es_interp(x, grid, width, beta, out):  # pragma: no cover - numba
+    """``out[k] = sum_l phi(l step - x_k) grid[l]``; one fixed-order sum per point."""
+    n_fine = grid.shape[0]
+    two_pi = 2.0 * np.pi
+    step = two_pi / n_fine
+    half = 0.5 * width
+    for k in prange(x.shape[0]):
+        u = (x[k] % two_pi) / step
+        l0 = int(np.ceil(u - half))
+        acc = 0.0j
+        for p in range(width):
+            index = l0 + p
+            z = (index - u) / half
+            arg = 1.0 - z * z
+            if arg <= 0.0:
+                continue
+            acc += np.exp(beta * (np.sqrt(arg) - 1.0)) * grid[index % n_fine]
+        out[k] = acc
+
+
+def host_es_mode_evaluate(coeffs, j0, x, *, eps=1e-12, factors=None):
+    """Type-2 transform ``sum_j coeffs[j - j0] exp(i j x_k)`` for ``j0 <= j < j0 + len(coeffs)``.
+
+    The adjoint of :func:`host_es_mode_transform` with the same kernel width,
+    shape parameter, upsampling and (real) deconvolution factors: deconvolve,
+    one inverse FFT onto the fine grid, ES interpolation at each point (#1392).
+    Points are independent, so the result does not depend on thread count.
+    ``factors`` reuses precomputed deconvolution factors for ``len(coeffs)``
+    modes (callers evaluating several coefficient sets of one length).
+
+    Validation: cxr-line-fourier-reduction
+    """
+    coeffs = np.asarray(coeffs, dtype=np.complex128)
+    x = np.ascontiguousarray(x, dtype=np.float64)
+    modes = coeffs.size
+    width = es_width(eps)
+    n_fine = _fine_size(modes, width)
+    shift = j0 + modes // 2
+    if factors is None:
+        factors = (
+            _cached_deconvolution(modes, n_fine, width)
+            if modes <= 1 << 20
+            else _deconvolution(np, modes, n_fine, width)
+        )
+    grid = np.zeros(n_fine, dtype=np.complex128)
+    grid[np.arange(-(modes // 2), modes - modes // 2) % n_fine] = coeffs * factors
+    grid = n_fine * sf.ifft(grid)
+    out = np.empty(x.size, dtype=np.complex128)
+    _es_interp(x, grid, width, _BETA_PER_WIDTH * width, out)
+    return out * np.exp(1j * shift * x)
+
+
+@njit(parallel=True, cache=True)
 def _direct_rectangles(phase, constant, linear, rectangles, dt, out):  # pragma: no cover - numba
     """Accumulate exact triangle moments without one Python callback per rectangle.
 
@@ -304,6 +357,68 @@ def host_fourier_bin_mean_reduce(
     return out
 
 
+def host_fourier_runs_reduce(
+    E_res,
+    a_width,
+    weight,
+    axes,
+    *,
+    residual_tol=FOURIER_RESIDUAL_TOL,
+    broad_width_eV=1000.0,
+    eps=1e-12,
+    max_line_modes=FOURIER_MAX_LINE_MODES,
+):
+    """Per-run bin means on uniform ``axes``, one line transform for all (#1392).
+
+    The shared-mode form of :func:`host_fourier_bin_mean_reduce` called once
+    per axis: same exact-cutoff coefficients, broad route, over-cap near/far
+    and envelope-image correction, at the largest run period and broad
+    threshold, with an ES type-2 evaluation (:func:`host_es_mode_evaluate`)
+    at each run's centres (``_fourier_runs``).
+
+    Validation: cxr-line-fourier-reduction, cxr-line-broad-interpolation
+    """
+    from ._fourier_runs import fourier_runs_reduce
+
+    E = np.asarray(E_res, dtype=np.float64).ravel()
+    a = np.asarray(a_width, dtype=np.float64).ravel()
+    w = np.asarray(weight, dtype=np.float64).ravel()
+    if not (E.shape == a.shape == w.shape):
+        raise ValueError("E_res, a_width and weight must have one shape")
+    keep = w != 0.0
+    E, a, w = E[keep], a[keep], w[keep]
+    finite = np.isfinite(E).all() and np.isfinite(w).all() and np.isfinite(a).all()
+    if not (finite and (a > 0.0).all()):
+        raise ValueError("lines need finite E_res and weight and positive finite a_width")
+    factors = {}
+
+    def evaluate(coeffs, x):
+        # One deconvolution per flush: every width group has the same modes.
+        if coeffs.size not in factors:
+            width = es_width(eps)
+            factors[coeffs.size] = _deconvolution(
+                np, coeffs.size, _fine_size(coeffs.size, width), width
+            )
+        return host_es_mode_evaluate(coeffs, 0, x, eps=eps, factors=factors[coeffs.size])
+
+    return fourier_runs_reduce(
+        E,
+        a,
+        w,
+        list(axes),
+        xp=np,
+        to_host=np.asarray,
+        positive_modes=lambda E, a, w, c0, P: _positive_modes(E, a, w, c0, P, eps),
+        evaluate=evaluate,
+        broad_reduce=lambda *args: broad_bin_mean_reduce(*args, tolerance=residual_tol),
+        near_far=host_near_far_bin_mean_reduce,
+        node_sums=_host_node_sums,
+        residual_tol=residual_tol,
+        broad_width_eV=broad_width_eV,
+        max_line_modes=max_line_modes,
+    )
+
+
 #: Shortest uniform run of a non-uniform axis that takes its own Fourier
 #: transform (#1390). Each run costs about one transform of every line, the
 #: near/far evaluator about ``lines`` exact pairs per bin; on the #1320 flush
@@ -380,9 +495,11 @@ def host_segmented_bin_mean_reduce(E_res, a_width, weight, edges, inv_width, run
     inv_width = np.asarray(inv_width, dtype=np.float64)
     out = np.zeros(edges.size - 1, dtype=np.float64)
     runs = uniform_runs(edges) if runs is None else runs
-    for start, stop, axis in runs:
-        if axis is not None:
-            out[start:stop] = host_fourier_bin_mean_reduce(E_res, a_width, weight, axis)
+    fourier = [(start, stop, axis) for start, stop, axis in runs if axis is not None]
+    if fourier:
+        parts = host_fourier_runs_reduce(E_res, a_width, weight, [r[2] for r in fourier])
+        for (start, stop, _), part in zip(fourier, parts, strict=True):
+            out[start:stop] = part
     leftover = leftover_bins(edges, runs)
     if leftover is not None:
         sub_edges, sub_bins, bins = leftover

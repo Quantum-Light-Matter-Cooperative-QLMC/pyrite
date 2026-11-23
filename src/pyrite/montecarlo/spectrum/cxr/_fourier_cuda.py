@@ -28,7 +28,7 @@ from ._bin_fourier import (
     fourier_period,
 )
 from ._fourier_cutoffs import cutoff_rectangle_array
-from ._fourier_spread import SPREADERS, es_gather_moments, es_mode_transform
+from ._fourier_spread import SPREADERS, es_gather_moments, es_mode_evaluate, es_mode_transform
 
 
 def cufinufft_mode_transform(phase, strengths, j0, j1, *, eps=1e-12, plans=None):
@@ -509,3 +509,62 @@ def cuda_fourier_bin_mean_reduce(
         )
     )
     return out
+
+
+def cuda_fourier_runs_reduce(
+    E_res,
+    a_width,
+    weight,
+    axes,
+    *,
+    residual_tol=FOURIER_RESIDUAL_TOL,
+    broad_width_eV=1000.0,
+    eps=DEVICE_NUFFT_EPS,
+    direct_precision="fp32",
+    spread="gather",
+    max_line_modes=FOURIER_MAX_LINE_MODES,
+):
+    """Per-run device bin means on uniform ``axes``, one line transform for all (#1392).
+
+    The shared-mode form of :func:`cuda_fourier_bin_mean_reduce` called once
+    per axis (``_fourier_runs``): same coefficients, broad route, over-cap
+    near/far and envelope kernel, at the largest run period and broad
+    threshold, with an ES type-2 evaluation (``es_mode_evaluate``) at each
+    run's centres. Returns ``(n_j,)`` FP64 device arrays.
+
+    Validation: cxr-line-fourier-reduction, cxr-line-broad-interpolation
+    """
+    from ._fourier_runs import fourier_runs_reduce
+
+    cp = import_module("cupy")
+    E = cp.asarray(E_res, dtype=cp.float64).ravel()
+    a = cp.asarray(a_width, dtype=cp.float64).ravel()
+    w = cp.asarray(weight, dtype=cp.float64).ravel()
+    if not (E.shape == a.shape == w.shape):
+        raise ValueError("E_res, a_width and weight must have one shape")
+    keep = cp.flatnonzero(w != 0.0)
+    E, a, w = E[keep], a[keep], w[keep]
+    finite = cp.isfinite(E).all() & cp.isfinite(w).all() & cp.isfinite(a).all()
+    if E.size and not bool(finite & (a > 0.0).all()):
+        raise ValueError("lines need finite E_res and weight and positive finite a_width")
+    plans = {}
+    return fourier_runs_reduce(
+        E,
+        a,
+        w,
+        list(axes),
+        xp=cp,
+        to_host=cp.asnumpy,
+        positive_modes=lambda E, a, w, c0, P: cuda_positive_modes(
+            E, a, w, c0, P, eps=eps, direct_precision=direct_precision, spread=spread
+        ),
+        evaluate=lambda coeffs, x: es_mode_evaluate(coeffs, 0, x, eps=eps, plans=plans),
+        broad_reduce=lambda *args: broad_bin_mean_reduce(
+            *args, tolerance=residual_tol, xp=cp, block=_DEVICE_BROAD_BLOCK
+        ),
+        near_far=_near_far_lines,
+        node_sums=_device_envelope_node_sums,
+        residual_tol=residual_tol,
+        broad_width_eV=broad_width_eV,
+        max_line_modes=max_line_modes,
+    )

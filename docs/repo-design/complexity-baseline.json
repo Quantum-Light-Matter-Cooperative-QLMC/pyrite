@@ -139,7 +139,7 @@
     {
       "path": "src/pyrite/cli/commands/remote.py",
       "name": "pull_command",
-      "cc": 27
+      "cc": 26
     },
     {
       "path": "src/pyrite/cli/commands/tables.py",

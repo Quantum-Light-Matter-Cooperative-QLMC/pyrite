@@ -476,3 +476,51 @@ def test_over_cap_near_far_keeps_fp64_positions_at_high_energy(cp):
     # from edges, the worst case); un-shifted float32 E gives ~9e-3 (host emulation).
     assert np.max(abs(device - exact)) < 1e-4 * np.abs(exact).max()
     assert abs(device.sum() - exact.sum()) < 1e-6 * np.abs(w * np.pi / a).sum()
+
+
+# ---- shared-mode runs (#1392) ---------------------------------------------------
+@pytest.mark.parametrize(("modes", "j0", "eps"), [(1, 0, 1e-12), (37, 0, 1e-9), (4097, 5, 1e-12)])
+def test_device_type2_matches_direct_sums_and_the_host_type2(cp, modes, j0, eps):
+    """Validation: cxr-line-fourier-reduction"""
+    from pyrite.montecarlo.spectrum.cxr._fourier_host import host_es_mode_evaluate
+    from pyrite.montecarlo.spectrum.cxr._fourier_spread import es_mode_evaluate
+
+    rng = np.random.default_rng(1392)
+    coeffs = rng.normal(size=modes) + 1j * rng.normal(size=modes)
+    x = rng.uniform(-30.0, 30.0, 400)
+    want = np.exp(1j * np.outer(x, np.arange(j0, j0 + modes))) @ coeffs
+    plans = {}
+    got = cp.asnumpy(es_mode_evaluate(cp.asarray(coeffs), j0, cp.asarray(x), eps=eps, plans=plans))
+    assert modes in plans
+    l1 = np.abs(coeffs).sum()
+    assert np.abs(got - want).max() <= 10 * eps * l1
+    host = host_es_mode_evaluate(coeffs, j0, x, eps=eps)
+    assert np.abs(got - host).max() <= 1e-12 * l1
+
+
+def test_device_shared_mode_runs_match_the_host_and_exact_bin_means(cp):
+    """Device shared-mode runs = host shared-mode runs within the device NUFFT
+    and fp32-direct tolerances; exact bin means within the route bound.
+
+    Validation: cxr-line-fourier-reduction, cxr-line-broad-interpolation
+    """
+    from pyrite.montecarlo.spectrum.cxr._bin_quadrature import _host_bin_mean
+    from pyrite.montecarlo.spectrum.cxr._fourier_cuda import cuda_fourier_runs_reduce
+    from pyrite.montecarlo.spectrum.cxr._fourier_host import host_fourier_runs_reduce
+
+    rng = np.random.default_rng(1392)
+    E = np.r_[rng.uniform(600.0, 1100.0, 300), 820.0, 950.0]
+    a = np.pi / np.r_[rng.uniform(0.5, 40.0, 300), 900.0, 1500.0]
+    w = np.r_[rng.uniform(-1.0, 1.0, 300), 1.0, 0.7]
+    w[::9] = 0.0
+    axes = [(600.0, 0.25, 801), (801.0, 0.4, 300), (922.0, 0.25, 400), (1100.0, 0.31, 64)]
+    got = cuda_fourier_runs_reduce(*(cp.asarray(v) for v in (E, a, w)), axes)
+    host = host_fourier_runs_reduce(E, a, w, axes)
+    mass = np.abs(w * np.pi / a).sum()
+    for part, ref, (c0, h, n) in zip(got, host, axes, strict=True):
+        centres = c0 + h * np.arange(n)
+        edges = np.r_[centres - 0.5 * h, centres[-1] + 0.5 * h]
+        exact = w @ _host_bin_mean(a, E, edges, np.full(n, 1.0 / h))
+        part = cp.asnumpy(part)
+        assert np.abs(part - ref).max() <= 1e-8 * mass
+        assert np.abs(part - exact).max() <= 1e-6 * np.abs(exact).max()
