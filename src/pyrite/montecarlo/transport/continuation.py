@@ -94,10 +94,10 @@ class TransportContinuationConfig:
     ``AUTO_ROWS_QUANTILE`` quantile of that round's rows per history, rounded
     up to a power of two and clamped to ``AUTO_ROWS_PER_ROUND``, with the
     population resized to the smaller quantum. ``active_histories`` caps the
-    concurrent population; ``None``
-    takes as many as ``PerElectronTransportConfig.scratch_budget_bytes`` and
-    ``max_batch`` allow (an unset ``max_batch`` leaves only the budget). The budget covers the round's row scratch, its
-    compaction copy and gather indices, and the lane arrays, sized from the
+    concurrent population; ``None`` takes as many as
+    ``PerElectronTransportConfig.scratch_budget_bytes`` and ``max_batch``
+    allow (an unset ``max_batch`` leaves only the budget). The budget covers
+    the round's row scratch, its compaction copy and gather indices, and the lane arrays, sized from the
     enabled row schema. Ne-sized per-history state and retained output are
     outside it: bounded scratch does not bound total trajectory storage.
 
