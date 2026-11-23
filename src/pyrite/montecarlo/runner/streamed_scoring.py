@@ -445,12 +445,11 @@ def run_case_streamed(
     An adaptive case (#1280, #1397) runs the monitored adaptive transport
     first (:func:`.streamed_adaptive.run_adaptive_streamed`). With an explicit
     grid the monitored pass scores its kept chunks and no other transport
-    runs. With a ``line_grid_policy`` grid it collects the grid evidence
-    instead; the grid is then resolved at the stop (or read from the speed
-    cache) and the fixed case at the realized ``(Ne, Ne_brem)`` streams on
-    it, two transports in all. Counter-addressed streams make that the
-    population the retained adaptive route scores; ``adaptive_sampling`` is
-    the monitor's record.
+    runs. Otherwise (a ``line_grid_policy`` grid, a cascade or line roulette)
+    the pass only measures, and the fixed case at the realized ``(Ne,
+    Ne_brem)`` streams as above, with its own grid pass. Counter-addressed
+    streams make that the population the retained adaptive route scores;
+    ``adaptive_sampling`` is the monitor's record.
 
     Validation: adaptive-sample-size-stopping
     """
@@ -466,8 +465,8 @@ def run_case_streamed(
     return score_fixed_streamed(case, block_electrons, transport_core=transport_core, spill=spill)
 
 
-def score_fixed_streamed(case, block_electrons, *, transport_core, spill=None, grid=None):
-    """Stream a fixed-count ``case``; ``grid`` (``(E_grid, record, grid_pass)``) skips the grid pass.
+def score_fixed_streamed(case, block_electrons, *, transport_core, spill=None):
+    """Stream a fixed-count ``case`` (the fixed route of :func:`run_case_streamed`).
 
     Validation: adaptive-sample-size-stopping
     """
@@ -484,9 +483,7 @@ def score_fixed_streamed(case, block_electrons, *, transport_core, spill=None, g
 
     sized = not isinstance(block_electrons, int)
     with block_electrons.pool_limit() if sized else nullcontext():
-        if grid is not None:
-            E_grid, grid_record, grid_pass = grid
-        elif case.get("line_grid_policy") is not None:
+        if case.get("line_grid_policy") is not None:
             from .streamed_line_grid import resolve_streamed_line_grid
 
             # Pass 1 of 2: the grid needs the whole line population (#1001).

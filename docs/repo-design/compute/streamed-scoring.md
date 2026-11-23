@@ -99,8 +99,8 @@ grid-pass evidence spills to disk (below).
    as for a final grid.
 
 A speed-cache hit (`cxr_grid.cached_policy_cxr_grid`) needs no trajectories,
-so it skips the grid pass. An adaptive case collects this evidence in its
-monitored pass instead of a pass of its own ([Adaptive cases](#adaptive-cases)). The output's private `_streamed_line_grid_pass`
+so it skips the grid pass. An adaptive policy-grid case runs this grid pass
+after its monitored pass ([Adaptive cases](#adaptive-cases)). The output's private `_streamed_line_grid_pass`
 records whether the pass ran and how many evidence bytes it held.
 
 Equality: the sinc samples of consecutive whole-electron blocks concatenate to
@@ -181,13 +181,12 @@ realized population. Counter-addressed streams make that the population the
 retained route scores, so the result equals retained adaptive within
 streamed-vs-joined summation order, and `adaptive_sampling` is the same record
 (`tests/montecarlo/transport/test_streamed_adaptive.py`,
-`test_adaptive_cascades.py`). `adaptive_route` picks one of three routes:
+`test_adaptive_cascades.py`). `adaptive_route` picks one of two routes:
 
 | Route | Case | Monitored pass | Transports |
 |---|---|---|---|
 | `single` | explicit grid (no `line_grid_policy`) | scores the kept chunks | 1 |
-| `folded` | `line_grid_policy` | collects the grid evidence | 2, cached or not |
-| `measure` | cascades (#1240), line roulette | measure-only (#1280) | 2, or 3 with a grid pass |
+| `measure` | `line_grid_policy`, cascades (#1240), line roulette | measure-only (#1280) | 2, or 3 with a grid pass |
 
 - **Single pass.** The realized counts are unknown until the stop, so blocks
   are scored at a provisional power-of-two count `L >= max_histories`. Every
@@ -204,29 +203,27 @@ streamed-vs-joined summation order, and `adaptive_sampling` is the same record
   the realized counts. Only explicit grids qualify: a policy grid needs the
   whole population, and its truncation audit and the line roulette size
   per-electron state by the line population.
-- **Folded evidence.** The monitored pass feeds `BlockGridEvidence`. With an
-  integer block size the kept chunks are re-blocked to the fixed route's
-  blocks `[kB, (k+1)B)` (a block spanning chunks waits on the host for its
-  remainder), so the evidence and the `resonance-population` tail sums are
-  the separate grid pass's, and the grid and its record are bit for bit
-  equal. Under a `MemoryBlockSizer` the evidence follows the chunks; the sinc
-  samples still concatenate exactly, and the tail sums can differ from a
-  separate pass in the last ulp. The speed-cache key reads the realized
-  `Ne`/`Ne_brem`, so a cache hit is known only at the stop: a hit discards
-  the evidence, and a miss resolves the grid from it. Then the fixed case at
-  the realized pair streams on that grid. The evidence projects no spill over
-  the unknown population; it spills once it holds the threshold.
+- **Policy grids stay on the measure route.** The grid needs the whole
+  population, and its speed-cache key reads the realized `Ne`/`Ne_brem`, so
+  a cache hit is known only at the stop. Collecting the evidence inside the
+  monitored pass (#1397) was tried and measured on the 16 GiB RTX 5080
+  (`cleo_sub_perf1` HOPG 500 nm, 300 keV, 15°, 55.1M realized electrons; jobs
+  15587, 15589, 15595, 15598). After #1396 a full transport costs less than
+  the folded evidence: the folded route was 8-10 % slower on a fresh run
+  (2 transports vs 3) and 57 % slower on a cached rerun (2 vs 2). Overlapping
+  it with the monitored transport was 5 s slower again, because the adaptive
+  chunks are small and the GPU is already busy with CXR. A cache hit
+  therefore still runs two transports and a fresh case three.
 - **Commit-once.** Each pass calls the consumer's `begin_pass(monitor)`
-  (`transport_case_blocks`), which starts a fresh scorer or evidence store,
+  (`transport_case_blocks`), which starts a fresh scorer,
   so an energy-range replay never counts twice. A scoring allocator OOM rolls
   the scorer back (`snapshot`/`restore`) and rescores a host copy of the
-  chunk once (`commit_once`); grid evidence commits only after a whole block.
+  chunk once (`commit_once`).
 
 The output's private `_adaptive_route` names the route (`scoring`) and its
-full-population `transports`, counting each energy-range replay pass;
-`_streamed_line_grid_pass` gains `monitored_evidence` and `cache` on the
-folded route. `streamed_adaptive.MONITORED_PASS = False` restores the #1280
-measure-only route for a same-revision comparison.
+full-population `transports`, counting each energy-range replay pass.
+`streamed_adaptive.MONITORED_PASS = False` restores the #1280 measure-only
+route for explicit grids too, for a same-revision comparison.
 
 Scans (`run_case`, `run_cases`, `pyrite run`) select this route
 automatically. A retained adaptive transport projects its kept bytes at

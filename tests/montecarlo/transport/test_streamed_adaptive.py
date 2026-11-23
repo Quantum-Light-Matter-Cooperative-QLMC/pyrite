@@ -1,12 +1,11 @@
 """Live streamed scoring of adaptive cases (#1280).
 
 The monitored adaptive pass scores its kept chunks when the grid is explicit
-(one transport), or collects the policy grid's evidence for the fixed case at
-the realized ``(Ne, Ne_brem)`` (two transports, #1397). For one seed the
-result must equal the retained adaptive route and the #1280 measure-only
-route: the same realized counts and sampling record, spectra within
-streamed-vs-joined summation order, and a policy grid and its record equal
-the separate grid pass's bit for bit.
+(one transport, #1397); a policy grid keeps the #1280 measure-only route
+(monitored pass, grid pass, fixed pass). For one seed the result must equal
+the retained adaptive route and the #1280 measure-only route: the same
+realized counts and sampling record, and spectra within streamed-vs-joined
+summation order.
 
 Validation: adaptive-sample-size-stopping
 """
@@ -330,41 +329,19 @@ def _clear_grid_cache():
     clear()
 
 
-def _assert_identical_grid(streamed, two_pass):
-    """Grid and record equal the separate grid pass's bit for bit; so does scoring."""
-    np.testing.assert_array_equal(streamed["E_grid"], two_pass["E_grid"])
-    for key in ("line_grid_resolved", "line_grid_diagnostic"):
-        np.testing.assert_equal(streamed[key], two_pass[key], err_msg=key)
-    for key in (*SPECTRA, "n_segments", "eta", "hit_frac"):
-        np.testing.assert_array_equal(streamed[key], two_pass[key], err_msg=key)
-
-
 @pytest.mark.slow
-@pytest.mark.parametrize("block", [7, 13, 1000])
-def test_policy_grid_evidence_folds_into_the_monitored_pass(monkeypatch, block):
-    """Cache miss then hit: two transports each; the grid pass's grid and record."""
+def test_policy_grid_keeps_the_measure_route(monkeypatch):
+    """A policy grid needs the whole population: monitored, grid and fixed passes (#1397)."""
     case = _measured(_requested())
-    assert streamed_adaptive.adaptive_route(case) == "folded"
+    assert streamed_adaptive.adaptive_route(case) == "measure"
     _clear_grid_cache()
     reference = _retained(case)
     _clear_grid_cache()
-    two_pass = _measure_route(monkeypatch, case, block)
-    assert two_pass["_adaptive_route"]["transports"] == 3
-    assert two_pass["_streamed_line_grid_pass"]["transported"]
-
-    _clear_grid_cache()
     counts = _passes(monkeypatch)
-    missed = run_case_streamed(case, block, transport_core="per-electron")
-    assert counts == {"monitored": 1, "fixed": 1}
-    assert missed["_adaptive_route"]["transports"] == 2
-    grid_pass = missed["_streamed_line_grid_pass"]
-    assert grid_pass["monitored_evidence"] and grid_pass["cache"] == "miss"
-    assert not grid_pass["transported"] and grid_pass["evidence_bytes"] > 0
-    assert missed["line_grid_resolved"]["cache"] == "miss"
-    _assert_identical_grid(missed, two_pass)
-    assert without_wall_clock(missed["adaptive_sampling"]) == without_wall_clock(
-        two_pass["adaptive_sampling"]
-    )
+    missed = run_case_streamed(case, 13, transport_core="per-electron")
+    assert counts == {"monitored": 1, "fixed": 2}
+    assert missed["_adaptive_route"] == {"route": "streamed", "scoring": "measure", "transports": 3}
+    assert missed["_streamed_line_grid_pass"]["transported"]
     assert without_wall_clock(missed["adaptive_sampling"]) == without_wall_clock(
         reference["adaptive_sampling"]
     )
@@ -372,10 +349,9 @@ def test_policy_grid_evidence_folds_into_the_monitored_pass(monkeypatch, block):
     _assert_spectra(missed, reference, rtol=1e-11)
 
     counts.update(monitored=0, fixed=0)
-    hit = run_case_streamed(case, block, transport_core="per-electron")
+    hit = run_case_streamed(case, 13, transport_core="per-electron")
     assert counts == {"monitored": 1, "fixed": 1}
     assert hit["_adaptive_route"]["transports"] == 2
-    assert hit["_streamed_line_grid_pass"]["cache"] == "hit"
     assert hit["line_grid_resolved"]["cache"] == "hit"
     np.testing.assert_array_equal(hit["E_grid"], missed["E_grid"])
     _assert_spectra(hit, missed)

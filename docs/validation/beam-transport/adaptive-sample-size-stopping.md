@@ -1588,18 +1588,20 @@ completes before the stop, `Ne > H`; the brem population is then frozen
 whole population and is selected at the realized counts.
 
 **Policy grids.** The grid needs the whole population and its speed-cache
-key reads the realized counts, so the monitored pass collects the evidence,
-re-blocked to the fixed route's integer blocks; the grid is resolved (or read
-from the cache) at the stop and the fixed case streams on it.
+key reads the realized counts, so a `line_grid_policy` case keeps the #1280
+route: a measure-only monitored pass, then the fixed case at the realized
+pair with its own grid pass. Folding the evidence into the monitored pass was
+measured slower on the target GPU and was dropped (engineering evidence in
+`docs/repo-design/compute/streamed-scoring.md`).
 
 **Anchors.** `tests/montecarlo/transport/test_streamed_adaptive.py`:
 `test_explicit_grid_scores_in_the_monitored_pass` (stop inside a chunk, brem
 freeze, with and without the energy-range replay; one monitored pass per
 pass and no fixed pass), `test_explicit_grid_selection_in_the_monitored_pass`
 (selection at the stop, before and after the freeze),
-`test_policy_grid_evidence_folds_into_the_monitored_pass` (resonance-population
-grid at blocks 7, 13 and 1000, cache miss and hit: two passes; grid, records
-and spectra equal the #1280 route bit for bit) and
+`test_policy_grid_keeps_the_measure_route` (resonance-population grid, cache
+miss and hit: three and two passes; records and spectra equal the retained
+route) and
 `test_a_scoring_oom_rolls_back_and_commits_the_chunk_once`. Spectra match the
 retained route at CPU fp64 `rtol = 1e-12` and the `adaptive_sampling`
 records are equal without wall-clock fields. Status of the extension:
