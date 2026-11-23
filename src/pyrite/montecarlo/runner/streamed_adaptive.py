@@ -270,16 +270,27 @@ def _electron_slice(block, start, first, stop):
 
 
 def _join(pieces):
-    """One block from consecutive electron slices (host rows when they mix)."""
+    """One block from consecutive electron slices, on the device when any piece is.
+
+    The host-stashed remainder is uploaded, not the live chunk downloaded: a
+    host join sent the whole fixed block back through the scorer's per-field
+    host staging, the folded route's largest evidence cost (#1397, job 15589).
+    Concatenation copies values, so the rows are identical either way.
+    """
+    from ..._backend import BACKEND, is_device_array
     from ..spectrum.cxr._kernels import _SEG_ARRAYS
-    from .block_transport import _concatenate
 
     if len(pieces) == 1:
         return pieces[0]
     block = dict(pieces[0])
     for key in _SEG_ARRAYS:
         if key in block:
-            block[key] = _concatenate([piece[key] for piece in pieces])
+            parts = [piece[key] for piece in pieces]
+            if any(is_device_array(part) for part in parts):
+                xp = BACKEND.xp
+                block[key] = xp.concatenate([xp.asarray(part) for part in parts])
+            else:
+                block[key] = np.concatenate(parts)
     block["Ne"] = sum(int(piece["Ne"]) for piece in pieces)
     return block
 
