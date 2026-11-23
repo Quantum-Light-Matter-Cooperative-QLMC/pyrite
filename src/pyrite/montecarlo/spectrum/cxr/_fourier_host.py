@@ -17,11 +17,12 @@ mainly with lines, as on the device.
 Validation: cxr-line-fourier-reduction
 """
 
+from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
 
 import numpy as np
 import scipy.fft as sf
-from numba import njit
+from numba import njit, prange
 
 from ._bin_broad import broad_bin_mean_reduce, broad_width_for_axis
 from ._bin_fourier import (
@@ -52,7 +53,7 @@ def _cached_deconvolution(modes, n_fine, width):
     return factors
 
 
-@njit(cache=True)
+@njit(cache=True, nogil=True)
 def _es_spread(x, sources, n_fine, width, beta, grid):  # pragma: no cover - numba
     two_pi = 2.0 * np.pi
     step = two_pi / n_fine
@@ -99,21 +100,40 @@ def host_es_mode_transform(phase, strengths, j0, j1, *, eps=1e-12):
     return spectrum[:, centred] * factors
 
 
-@njit(cache=True)
+@njit(parallel=True, cache=True)
 def _direct_rectangles(phase, constant, linear, rectangles, dt, out):  # pragma: no cover - numba
-    """Accumulate exact triangle moments without one Python callback per rectangle."""
-    for r in range(rectangles.shape[0]):
-        j0, j1, lo, hi = rectangles[r]
+    """Accumulate exact triangle moments without one Python callback per rectangle.
+
+    Each (rectangle, mode) fills one scratch slot in parallel, summing its
+    lines serially; the slices are then added to ``out`` in
+    rectangle order, the serial sum's order, so the result does not depend on
+    thread count.
+    """
+    n = rectangles.shape[0]
+    offsets = np.zeros(n + 1, dtype=np.int64)
+    for r in range(n):
+        offsets[r + 1] = offsets[r] + rectangles[r, 1] - rectangles[r, 0]
+    scratch = np.empty(offsets[n], dtype=np.complex128)
+    # One parallel item per (rectangle, mode): the few high-mode rectangles
+    # hold most of the work, so a split over rectangles would serialize them.
+    for m in prange(offsets[n]):
+        r = np.searchsorted(offsets, m, side="right") - 1
+        j0, lo, hi = rectangles[r, 0], rectangles[r, 2], rectangles[r, 3]
+        j = j0 + m - offsets[r]
+        re0 = im0 = re1 = im1 = 0.0
+        for k in range(lo, hi):
+            angle = -j * phase[k]
+            c, s = np.cos(angle), np.sin(angle)
+            re0 += constant[k] * c
+            im0 += constant[k] * s
+            re1 += linear[k] * c
+            im1 += linear[k] * s
+        scratch[m] = complex(re0 - dt * j * re1, im0 - dt * j * im1)
+    for r in range(n):
+        j0, j1 = rectangles[r, 0], rectangles[r, 1]
+        base = offsets[r] - j0
         for j in range(j0, j1):
-            re0 = im0 = re1 = im1 = 0.0
-            for k in range(lo, hi):
-                angle = -j * phase[k]
-                c, s = np.cos(angle), np.sin(angle)
-                re0 += constant[k] * c
-                im0 += constant[k] * s
-                re1 += linear[k] * c
-                im1 += linear[k] * s
-            out[j] += complex(re0 - dt * j * re1, im0 - dt * j * im1)
+            out[j] += scratch[base + j]
 
 
 def _positive_modes(E, a, w, c0, period, eps):
@@ -141,11 +161,66 @@ def _positive_modes(E, a, w, c0, period, eps):
         & (sources * modes >= _NUFFT_MIN_WORK)
     )
     _direct_rectangles(phase, constant, linear, rectangles[~large], dt, positive)
-    for j0, j1, lo, hi in rectangles[large]:
+
+    def transform(rect):
+        j0, j1, lo, hi = rect
         strengths = np.stack((constant[lo:hi], linear[lo:hi]))
-        moments = host_es_mode_transform(phase[lo:hi], strengths, j0, j1, eps=eps)
-        positive[j0:j1] += moments[0] - dt * np.arange(j0, j1) * moments[1]
+        return host_es_mode_transform(phase[lo:hi], strengths, j0, j1, eps=eps)
+
+    # The spreader releases the GIL and scipy.fft threads, so rectangles
+    # transform concurrently (#1390); they are added in rectangle order, so the
+    # sum does not depend on the worker count.
+    jobs = rectangles[large]
+    with ThreadPoolExecutor(max_workers=_transform_workers(len(jobs))) as pool:
+        for (j0, j1, _, _), moments in zip(jobs, pool.map(transform, jobs), strict=True):
+            positive[j0:j1] += moments[0] - dt * np.arange(j0, j1) * moments[1]
     return positive
+
+
+def _transform_workers(n_jobs):
+    """Worker threads for the host ES rectangles: numba's thread budget, at least one."""
+    from numba import get_num_threads
+
+    return max(1, min(int(n_jobs), get_num_threads()))
+
+
+_NODE_SUM_BLOCK = 1 << 16
+
+
+@njit(parallel=True, cache=True)
+def _node_sum_blocks(E, q, nodes, scale, partial):  # pragma: no cover - numba
+    """``partial[b, i] = sum_{l in block b} q_l g(scale (c_i - E_l))``, ``g = csc^2 - 1/x^2``."""
+    for b in prange(partial.shape[0]):
+        lo = b * _NODE_SUM_BLOCK
+        hi = min(lo + _NODE_SUM_BLOCK, E.shape[0])
+        for i in range(nodes.shape[0]):
+            acc = 0.0
+            for k in range(lo, hi):
+                x = scale * (nodes[i] - E[k])
+                y = x * x
+                if abs(x) < 0.2:
+                    tail = 2 / 10395 + y * (1382 / 58046625 + y * (4 / 1403325))
+                    g = 1 / 3 + y * (1 / 15 + y * (2 / 189 + y * (1 / 675 + y * tail)))
+                else:
+                    sx = np.sin(x)
+                    g = 1.0 / (sx * sx) - 1.0 / y
+                acc += q[k] * g
+            partial[b, i] = acc
+
+
+def _host_node_sums(E_res, q, nodes, P):
+    """Numba ``_envelope_node_sums``: line blocks in parallel, summed in block order (#1390).
+
+    Same ``1/sin^2 x - 1/x^2`` series/closed-form split as
+    ``_inv_sin_sq_minus_inv_sq``; FP64 summation order differs only.
+
+    Validation: cxr-line-fourier-reduction
+    """
+    E = np.ascontiguousarray(E_res, dtype=np.float64)
+    nodes = np.ascontiguousarray(nodes, dtype=np.float64)
+    partial = np.zeros(((E.size + _NODE_SUM_BLOCK - 1) // _NODE_SUM_BLOCK, nodes.size))
+    _node_sum_blocks(E, np.ascontiguousarray(q, dtype=np.float64), nodes, np.pi / P, partial)
+    return partial.sum(axis=0) if partial.shape[0] else np.zeros(nodes.size)
 
 
 def host_fourier_bin_mean_reduce(
@@ -225,5 +300,92 @@ def host_fourier_bin_mean_reduce(
         )
     g0 = float(np.sum(w * np.pi / a))
     out += (g0 + 2.0 * (n_fft * sf.ifft(folded)).real[:n_bins]) / P
-    out -= _envelope_image_correction(E, a, w, c0, h, n_bins, P)
+    out -= _envelope_image_correction(E, a, w, c0, h, n_bins, P, node_sums=_host_node_sums)
+    return out
+
+
+#: Shortest uniform run of a non-uniform axis that takes its own Fourier
+#: transform (#1390). Each run costs about one transform of every line, the
+#: near/far evaluator about ``lines`` exact pairs per bin; on the #1320 flush
+#: (4.2M lines) a 64-bin run costs about as much either way.
+HOST_SEGMENT_MIN_BINS = 64
+
+
+def uniform_runs(edges, *, min_bins=HOST_SEGMENT_MIN_BINS):
+    """Split ``edges`` into ``(start, stop, axis)`` bin runs; ``axis`` is ``None`` off-Fourier.
+
+    Maximal runs of equal bin widths (to ``1e-9`` relative) with at least
+    ``min_bins`` bins carry their :func:`fourier_bin_axis`; every other bin is
+    in a run with ``axis=None``. Runs are contiguous and cover every bin.
+    """
+    from ._bin_quadrature import fourier_bin_axis
+
+    widths = np.diff(np.asarray(edges, dtype=np.float64))
+    breaks = np.flatnonzero(np.abs(np.diff(widths)) > 1e-9 * np.abs(widths[1:])) + 1
+    runs = []
+    for start, stop in zip(np.r_[0, breaks], np.r_[breaks, widths.size], strict=True):
+        start, stop = int(start), int(stop)
+        axis = fourier_bin_axis(edges[start : stop + 1]) if stop - start >= min_bins else None
+        if axis is None and runs and runs[-1][2] is None:
+            runs[-1] = (runs[-1][0], stop, None)
+        else:
+            runs.append((start, stop, axis))
+    return runs
+
+
+def leftover_bins(edges, runs):
+    """Every off-Fourier bin of ``runs`` on one ascending axis, or ``None`` (#1390).
+
+    Returns ``(sub_edges, sub_bins, bins)``: the edges of each ``axis=None`` run
+    concatenated, so the gap between two runs becomes one extra bin, with
+    ``sub_bins`` the positions of the real bins on that axis and ``bins`` their
+    indices on ``edges``. One near/far call then covers bins scattered between
+    Fourier runs; a call per single bin leaves the device kernel one block and
+    the host evaluator one thread.
+    """
+    pieces, sub_bins, bins, offset = [], [], [], 0
+    for start, stop, axis in runs:
+        if axis is None:
+            pieces.append(edges[start : stop + 1])
+            sub_bins.append(np.arange(offset, offset + stop - start))
+            bins.append(np.arange(start, stop))
+            offset += stop - start + 1
+    if not pieces:
+        return None
+    return np.concatenate(pieces), np.concatenate(sub_bins), np.concatenate(bins)
+
+
+def leftover_inv_width(sub_edges, sub_bins, bins, inv_width):
+    """``1 / width`` on the :func:`leftover_bins` axis; real bins keep ``inv_width``."""
+    sub_inv = 1.0 / np.diff(sub_edges)
+    sub_inv[sub_bins] = np.asarray(inv_width, dtype=np.float64)[bins]
+    return sub_inv
+
+
+def host_segmented_bin_mean_reduce(E_res, a_width, weight, edges, inv_width, runs=None):
+    """``sum_l w_l mean_k(line l)`` on any ascending ``edges``, host FP64 (#1390).
+
+    A bin mean depends only on its own edges, so each uniform run of
+    :func:`uniform_runs` takes :func:`host_fourier_bin_mean_reduce` on its
+    sub-axis, and the remaining bins one numba near/far call
+    (:func:`leftover_bins`). A
+    piecewise-uniform axis (as built from resonance-local grids) then costs a
+    few transforms instead of ``lines * bins`` pairs.
+
+    Validation: cxr-line-fourier-reduction, sinc-bin-far-envelope
+    """
+    from ._bin_mean_jit import host_near_far_edges_reduce
+
+    edges = np.asarray(edges, dtype=np.float64)
+    inv_width = np.asarray(inv_width, dtype=np.float64)
+    out = np.zeros(edges.size - 1, dtype=np.float64)
+    runs = uniform_runs(edges) if runs is None else runs
+    for start, stop, axis in runs:
+        if axis is not None:
+            out[start:stop] = host_fourier_bin_mean_reduce(E_res, a_width, weight, axis)
+    leftover = leftover_bins(edges, runs)
+    if leftover is not None:
+        sub_edges, sub_bins, bins = leftover
+        sub_inv = leftover_inv_width(sub_edges, sub_bins, bins, inv_width)
+        out[bins] = host_near_far_edges_reduce(E_res, a_width, weight, sub_edges, sub_inv)[sub_bins]
     return out

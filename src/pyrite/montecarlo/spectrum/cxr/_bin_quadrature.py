@@ -762,8 +762,13 @@ def sincsq_bin_lineshape(
 #: evaluator (device kernel; host numba ``_bin_mean_jit``) instead of the
 #: Fourier route; the kernel transform and gather grid are evaluated in
 #: bounded blocks. Flushes without such lines change only in FP64 summation
-#: order.
-CXR_BIN_REDUCTION_MODEL = "fourier-auto-v8"
+#: order. v9 (#1390): NumPy-backend bin-mean lines on non-uniform axes are
+#: queued; each uniform run of at least 64 bins takes the host Fourier route
+#: on its sub-axis (no far envelope there), the other bins one numba near/far
+#: call (device-preamble ``Si``, FP64 per-bin sums), instead of the dense
+#: ``scipy.special.sici`` matrix product. The device route mirrors it
+#: (``"segmented"``: CUDA Fourier per run, one near/far launch for the rest).
+CXR_BIN_REDUCTION_MODEL = "fourier-auto-v9"
 #: Lines per Fourier-route flush: amortises the per-call FFT and planning.
 FOURIER_FLUSH_LINES = 10_000_000
 
@@ -772,7 +777,7 @@ FOURIER_FLUSH_LINES = 10_000_000
 _REDUCTION_OVERRIDE: ContextVar[tuple[str, int | None] | None] = ContextVar(
     "pyrite_bin_reduction_override", default=None
 )
-_REDUCTION_METHODS = ("auto", "pairs", "tree", "sparse", "fourier")
+_REDUCTION_METHODS = ("auto", "pairs", "tree", "sparse", "fourier", "segmented")
 
 
 @contextmanager
@@ -821,9 +826,12 @@ def fourier_backend_available() -> bool:
 def resolve_bin_reduction(edges):
     """``(method, axis, flush_lines)`` for device bin-mean flushes on ``edges``.
 
-    Default: ``"fourier"`` with its uniform axis when available, else
-    ``"auto"`` (near/far). An active :func:`bin_reduction_override` wins.
-    ``flush_lines`` is ``None`` for the caller's default batch target.
+    Default: ``"fourier"`` with its uniform axis when available; on a
+    non-uniform axis holding a uniform run of at least ``HOST_SEGMENT_MIN_BINS``
+    bins, ``"segmented"`` with the :func:`uniform_runs` list as ``axis``
+    (#1390); else ``"auto"`` (near/far). An active
+    :func:`bin_reduction_override` wins. ``flush_lines`` is ``None`` for the
+    caller's default batch target.
 
     Validation: cxr-line-fourier-reduction
     """
@@ -835,7 +843,13 @@ def resolve_bin_reduction(edges):
         if axis is None and method == "fourier":
             raise ValueError("Fourier reduction needs a uniform c_k +- h/2 bin axis")
         method = "auto" if axis is None else "fourier"
-    if method == "fourier" and flush is None:
+        if axis is None:
+            from ._fourier_host import uniform_runs
+
+            runs = uniform_runs(np.asarray(_to_cpu(edges), dtype=np.float64))
+            if any(run[2] is not None for run in runs):
+                method, axis = "segmented", tuple(runs)
+    if method in ("fourier", "segmented") and flush is None:
         flush = FOURIER_FLUSH_LINES
     return method, axis, flush
 
@@ -861,6 +875,54 @@ def resolve_host_bin_reduction(edges):
             raise ValueError("Fourier reduction needs a uniform c_k +- h/2 bin axis")
         return None
     return axis, HOST_FOURIER_FLUSH_LINES if flush is None else flush
+
+
+def host_near_far_applies() -> bool:
+    """Whether host bin-mean lines on a non-uniform axis take the numba near/far queue.
+
+    True unless a :func:`bin_reduction_override` is active: a non-Fourier
+    override keeps the dense host evaluator for comparisons (#1390).
+
+    Validation: sinc-bin-far-envelope
+    """
+    return _REDUCTION_OVERRIDE.get() is None
+
+
+def _run_segmented_reduction(E_r, aw, w, edges, inv_width, *, out, exact_widths, runs):
+    """Device ``"segmented"`` flush: Fourier per uniform run, near/far elsewhere (#1390).
+
+    Validation: cxr-line-fourier-reduction, sinc-bin-far-envelope
+    """
+    import cupy
+
+    from ._fourier_cuda import cuda_fourier_bin_mean_reduce
+    from ._fourier_host import leftover_bins, leftover_inv_width, uniform_runs
+
+    host_edges = np.asarray(_to_cpu(edges), dtype=np.float64)
+    if runs is None:
+        runs = uniform_runs(host_edges)
+    for start, stop, axis in runs:
+        if axis is not None:
+            part = out[start:stop]
+            part += cuda_fourier_bin_mean_reduce(E_r, aw, w, axis).astype(out.dtype)
+    leftover = leftover_bins(host_edges, runs)
+    if leftover is not None:
+        # One launch over every leftover bin: a launch per single bin ran one
+        # block over all lines (~0.6 s each on the #1320 flush, nsys 15404).
+        sub_edges, sub_bins, bins = leftover
+        sub_inv = leftover_inv_width(sub_edges, sub_bins, bins, _to_cpu(inv_width))
+        sub_out = cupy.zeros(sub_edges.size - 1, dtype=cupy.float64)
+        run_bin_mean_reduction_kernel(
+            E_r,
+            aw,
+            w,
+            cupy.asarray(sub_edges),
+            cupy.asarray(sub_inv),
+            out=sub_out,
+            exact_widths=exact_widths,
+        )
+        out[cupy.asarray(bins)] += sub_out[cupy.asarray(sub_bins)].astype(out.dtype)
+    return out
 
 
 def _bin_reduction_markers(resolved):
@@ -892,7 +954,11 @@ def run_bin_mean_reduction_kernel(
     ``method="fourier"`` instead evaluates every bin without the envelope
     through the device Fourier route on a uniform axis (``fourier_axis`` from
     :func:`fourier_bin_axis`, computed when omitted); ``exact_widths`` does not
-    apply to it. Callers pick the method with :func:`resolve_bin_reduction`.
+    apply to it. ``method="segmented"`` takes ``fourier_axis`` as the
+    :func:`uniform_runs` list of a non-uniform axis: each uniform run takes the
+    device Fourier route on its sub-axis and the other bins ``"auto"`` near/far
+    with ``exact_widths`` (#1390); a bin mean depends only on its own edges.
+    Callers pick the method with :func:`resolve_bin_reduction`.
 
     Validation: sinc-bin-integration
     Validation: sinc-bin-far-envelope
@@ -907,6 +973,10 @@ def run_bin_mean_reduction_kernel(
         return out
     if method not in _REDUCTION_METHODS:
         raise ValueError(f"method must be one of {_REDUCTION_METHODS}")
+    if method == "segmented":
+        return _run_segmented_reduction(
+            E_r, aw, w, edges, inv_width, out=out, exact_widths=exact_widths, runs=fourier_axis
+        )
     if method == "fourier":
         from ._fourier_cuda import cuda_fourier_bin_mean_reduce
 

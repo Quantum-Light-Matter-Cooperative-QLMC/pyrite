@@ -219,7 +219,7 @@ def _reduction_tolerance(reduction, grid, rtol):
     """
     edges = _energy_bin_edges_and_widths(grid)[0]
     with bq.bin_reduction_override(reduction) if reduction else contextlib.nullcontext():
-        fourier = bq.resolve_bin_reduction(edges)[0] == "fourier"
+        fourier = bq.resolve_bin_reduction(edges)[0] in ("fourier", "segmented")
         if numpy_backend():  # the host Fourier route (#1230)
             fourier = bq.resolve_host_bin_reduction(edges) is not None
     return (
@@ -405,3 +405,75 @@ def test_midpoint_series_matches_the_bin_integral_inside_its_window():
         tol = 1e-12 * envelope * dx[k]
         exact = quad(lambda x: np.sinc(x) ** 2, lo, hi, epsabs=tol, epsrel=1e-11)[0] / dx[k]
         assert abs(series[k] - exact) <= 2.5e-9 * envelope
+
+
+# ---- host segmented queue on non-uniform axes (#1390) --------------------------
+def test_host_segmented_queue_matches_exact_and_near_far_bin_means_per_run():
+    """Queued per-target sums: Fourier runs = exact bin means, the rest = dense near/far.
+
+    The #101 windowed axis has uniform runs (Fourier sub-axes) and short
+    joins (numba near/far, FP64 rounding of ``_host_bin_mean``).
+
+    Validation: cxr-line-fourier-reduction, sinc-bin-far-envelope
+    """
+    from pyrite.montecarlo.spectrum.cxr._bin_queue import HostSegmentedLineQueues
+
+    grid = _windowed_axis()
+    edges, widths = _energy_bin_edges_and_widths(grid)
+    rng = np.random.default_rng(1390)
+    n = 600
+    E = np.r_[rng.uniform(7980.0, 9020.0, n - 4), 8500.0, 8003.0, 2e4, 100.0]
+    a = np.pi / np.exp(rng.uniform(np.log(1e-3), np.log(50.0), n))
+    w = rng.uniform(-1.0, 1.0, n)
+    w[::7] = 0.0
+    first, second = np.zeros(grid.size), np.zeros(grid.size)
+    queues = HostSegmentedLineQueues(edges, 1.0 / widths, flush_lines=250)
+    fourier = np.zeros(grid.size, dtype=bool)
+    for start, stop, axis in queues._runs:
+        fourier[start:stop] = axis is not None
+    assert fourier.any() and not fourier.all()
+    mask = np.ones(n, dtype=bool)
+    queues.add([(w[:200], first)], E[:200], a[:200], mask[:200])
+    queues.add([(w[200:], first), (2 * w[200:], second)], E[200:], a[200:], mask[200:])
+    queues.flush()
+    near_far = bq._host_bin_mean(a, E, edges, 1.0 / widths, bq.BIN_MEAN_EXACT_WIDTHS)
+    exact = bq._host_bin_mean(a, E, edges, 1.0 / widths)
+    for got, weights, lines in ((first, w, slice(None)), (second, 2 * w[200:], slice(200, None))):
+        peak = np.abs(weights @ exact[lines]).max()
+        diff = np.abs(got - weights @ exact[lines])[fourier]
+        assert diff.max() <= 5e-6 * peak
+        diff = np.abs(got - weights @ near_far[lines])[~fourier]
+        assert diff.max() <= 1e-12 * peak
+
+
+@host_backend_only("the host segmented queue is the NumPy backend's route")
+@pytest.mark.parametrize("route", ["batched", "per_hkl"])
+def test_nonuniform_bin_mean_spectrum_takes_the_queue_and_matches_dense(route):
+    """Default host routing on a non-uniform axis equals the dense override (#1390).
+
+    A geometric axis has no uniform run, so every bin takes near/far.
+
+    Validation: sinc-bin-integration
+    """
+    from pyrite.montecarlo.spectrum.cxr._bin_queue import (
+        HostSegmentedLineQueues,
+        open_bin_line_queues,
+    )
+
+    grid = np.geomspace(701.0, 1499.0, 401)
+    request = SpectrumRequest(
+        segments=_long_flights(), E_grid_eV=grid, line_quadrature="bin-mean", **_KW
+    )
+    accumulate = _accumulate_batched if route == "batched" else _accumulate_per_hkl
+    probe = _prepare_spectrum(request)
+    open_bin_line_queues(probe)
+    assert isinstance(probe.bin_line_queues, HostSegmentedLineQueues)
+    queued = _prepare_spectrum(request)
+    accumulate(queued)
+    with bq.bin_reduction_override("auto"):
+        dense = _prepare_spectrum(request)
+        accumulate(dense)
+    ref = to_host(_finalize_spectrum(dense))
+    got = to_host(_finalize_spectrum(queued))
+    assert np.abs(ref).max() > 0.0
+    np.testing.assert_allclose(got, ref, rtol=0.0, atol=1e-12 * np.abs(ref).max())

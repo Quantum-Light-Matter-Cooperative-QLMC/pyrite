@@ -1,7 +1,9 @@
-"""Numba host near/far bin-mean line sum on uniform bins (#1320).
+"""Numba host near/far bin-mean line sum (#1320, #1390).
 
 The host Fourier route (``_fourier_host``) sends lines whose positive mode
-count exceeds ``FOURIER_MAX_LINE_MODES`` here. It evaluates the same bin
+count exceeds ``FOURIER_MAX_LINE_MODES`` here, and on non-uniform axes
+``_bin_queue.HostSegmentedLineQueues`` sends the bins outside its uniform
+Fourier runs here. It evaluates the same bin
 mean as ``_bin_quadrature._host_bin_mean(..., exact_widths)``: the exact
 ``sinc^2`` bin mean within ``exact_widths`` first-zero widths of a resonance
 and, beyond, the float32 far-field envelope ``1 / (2 pi^2 x_lo x_hi)`` in the
@@ -143,15 +145,35 @@ def host_near_far_bin_mean_reduce(E_res, a_width, weight, axis, *, exact_widths=
 
     Validation: sinc-bin-integration, sinc-bin-far-envelope
     """
+    c0, h, n_bins = axis
+    edges = c0 + (np.arange(int(n_bins) + 1, dtype=np.float64) - 0.5) * h
+    return host_near_far_edges_reduce(E_res, a_width, weight, edges, exact_widths=exact_widths)
+
+
+def host_near_far_edges_reduce(E_res, a_width, weight, edges, inv_width=None, *, exact_widths=None):
+    """``sum_l w_l mean_k(line l)`` on arbitrary ascending ``edges``, host FP64 (#1390).
+
+    The host mirror of the device near/far reduction for any bin axis,
+    including the non-uniform axes the Fourier route cannot take.
+    ``inv_width`` defaults to ``1 / diff(edges)``; ``exact_widths`` as in
+    :func:`host_near_far_bin_mean_reduce`. Zero-weight lines are skipped.
+
+    Validation: sinc-bin-integration, sinc-bin-far-envelope
+    """
     from ._bin_quadrature import BIN_MEAN_EXACT_WIDTHS
 
-    c0, h, n_bins = axis
     widths = BIN_MEAN_EXACT_WIDTHS if exact_widths is None else exact_widths
     E = np.ascontiguousarray(E_res, dtype=np.float64).ravel()
     a = np.ascontiguousarray(a_width, dtype=np.float64).ravel()
     w = np.ascontiguousarray(weight, dtype=np.float64).ravel()
-    edges = c0 + (np.arange(int(n_bins) + 1, dtype=np.float64) - 0.5) * h
-    out = np.zeros(int(n_bins), dtype=np.float64)
+    keep = w != 0.0
+    if not keep.all():
+        E, a, w = E[keep], a[keep], w[keep]
+    edges = np.ascontiguousarray(edges, dtype=np.float64).ravel()
+    if inv_width is None:
+        inv_width = 1.0 / np.diff(edges)
+    inv_width = np.ascontiguousarray(inv_width, dtype=np.float64).ravel()
+    out = np.zeros(edges.size - 1, dtype=np.float64)
     if E.size == 0 or out.size == 0:
         return out
     f32 = np.float32
@@ -160,7 +182,6 @@ def host_near_far_bin_mean_reduce(E_res, a_width, weight, axis, *, exact_widths=
     e_head = E.astype(f32)
     e_carry = (E - e_head.astype(np.float64)).astype(f32)
     scale32 = a.astype(f32) * _INV_PI_F32
-    inv_width = 1.0 / np.diff(edges)
     _near_far_bins(
         E, a, w, e_head, e_carry, scale32, edges, head, carry, inv_width, f32(widths), out
     )

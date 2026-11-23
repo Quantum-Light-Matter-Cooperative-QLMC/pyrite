@@ -193,3 +193,68 @@ def test_host_over_cap_lines_take_near_far(monkeypatch, cap):
     exact = _exact(E, a, w, c0, h, n)
     assert np.abs(got - exact).max() <= 1e-5 * np.abs(exact).max()
     assert abs(got.sum() - exact.sum()) <= 1e-6 * np.abs(w * np.pi / a).sum()
+
+
+def test_uniform_runs_cover_every_bin_and_merge_short_runs():
+    """#1390: long equal-width runs get a Fourier axis; short runs merge into one near/far run."""
+    from pyrite.montecarlo.spectrum.cxr._fourier_host import uniform_runs
+
+    edges = np.r_[np.arange(100.0, 400.0, 3.0), 400.0, 402.5, 405.0, np.arange(407.0, 607.0, 2.0)]
+    runs = uniform_runs(edges)
+    assert runs[0][0] == 0 and runs[-1][1] == edges.size - 1
+    assert all(prev[1] == nxt[0] for prev, nxt in zip(runs, runs[1:], strict=False))
+    fourier = [r for r in runs if r[2] is not None]
+    assert [r[2][1] for r in fourier] == pytest.approx([3.0, 2.0])
+    assert sum(r[2] is None for r in runs) == 1
+
+
+def test_host_node_sums_match_the_numpy_image_sums():
+    """#1390: numba envelope-image node sums = ``_envelope_node_sums`` at FP64 rounding.
+
+    Lines straddle the series/closed-form switch at ``|x| = 0.2`` and span
+    several numba line blocks.
+
+    Validation: cxr-line-fourier-reduction
+    """
+    from pyrite.montecarlo.spectrum.cxr._bin_fourier import _envelope_node_sums
+    from pyrite.montecarlo.spectrum.cxr._fourier_host import _NODE_SUM_BLOCK, _host_node_sums
+
+    rng = np.random.default_rng(1390)
+    P = 4000.0
+    E = rng.uniform(-1500.0, 1500.0, 2 * _NODE_SUM_BLOCK + 17)
+    q = rng.uniform(-1.0, 1.0, E.size)
+    nodes = np.r_[np.linspace(-200.0, 200.0, 23), E[5] + 1e-3]
+    want = _envelope_node_sums(E, q, nodes, P)
+    got = _host_node_sums(E, q, nodes, P)
+    assert np.abs(got - want).max() <= 1e-12 * np.abs(want).max()
+
+
+def test_leftover_bins_share_one_axis_with_gap_bins():
+    """#1390: scattered off-Fourier bins map onto one ascending near/far axis."""
+    from pyrite.montecarlo.spectrum.cxr._fourier_host import (
+        leftover_bins,
+        leftover_inv_width,
+        uniform_runs,
+    )
+
+    edges = np.r_[
+        np.arange(400.0, 700.0, 0.25),
+        700.0,
+        700.6,
+        701.5,
+        702.0,
+        np.arange(702.5, 900.0, 0.5),
+        901.2,
+        np.arange(901.7, 1102.0, 0.5),
+    ]
+    runs = uniform_runs(edges)
+    sub_edges, sub_bins, bins = leftover_bins(edges, runs)
+    np.testing.assert_array_equal(sub_edges, [700.0, 700.6, 701.5, 899.5, 901.2])
+    np.testing.assert_array_equal(bins, [1200, 1201, 1598])
+    np.testing.assert_array_equal(sub_edges[sub_bins], edges[bins])
+    np.testing.assert_array_equal(sub_edges[sub_bins + 1], edges[bins + 1])
+    inv = 1.0 / np.diff(edges)
+    np.testing.assert_array_equal(
+        leftover_inv_width(sub_edges, sub_bins, bins, inv)[sub_bins], inv[bins]
+    )
+    assert leftover_bins(edges, [(0, edges.size - 1, (1.0, 1.0, 1))]) is None

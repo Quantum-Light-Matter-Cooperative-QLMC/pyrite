@@ -220,6 +220,8 @@ def test_channeling_demo_and_off_profile_identities_are_unchanged(identity_pin):
     candidate domain; HOPG cases now select automatically).
     #1320 re-mints the silicon pins for ``fourier-auto-v8`` (over-cap device
     lines on near/far).
+    #1390 re-mints the silicon pins for ``fourier-auto-v9`` (host non-uniform
+    bin-mean axes on the numba near/far queue).
     """
     sweep, settings, cases = _profile_cases("silicon", "channeling_demo")
     assert cases[0].line_quadrature == "bin-mean"

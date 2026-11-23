@@ -276,9 +276,11 @@ def test_default_resolution_routes_uniform_axes_through_fourier(cp, monkeypatch)
         fourier_axis=axis,
     )
     assert np.max(abs(cp.asnumpy(out) - exact)) < 1e-7 * np.abs(w).sum()
-    # Clamped or non-uniform axes keep the near/far kernel by default.
+    # A clamped axis keeps a long uniform run: segmented (#1390). Short
+    # non-uniform axes keep the near/far kernel.
     clamped = np.r_[0.0, edges[1:]]
-    assert resolve_bin_reduction(cp.asarray(clamped))[0] == "auto"
+    assert resolve_bin_reduction(cp.asarray(clamped))[0] == "segmented"
+    assert resolve_bin_reduction(cp.asarray(np.geomspace(500.0, 900.0, 200)))[0] == "auto"
     with bin_reduction_override("sparse"):
         assert resolve_bin_reduction(cp.asarray(edges))[0] == "sparse"
     with pytest.raises(ValueError, match="uniform"):
@@ -291,6 +293,55 @@ def test_default_resolution_routes_uniform_axes_through_fourier(cp, monkeypatch)
             out=out,
             method="fourier",
         )
+
+
+def test_segmented_device_route_matches_exact_and_near_far_per_run(cp, monkeypatch):
+    """#1390: on a piecewise-uniform axis each uniform run takes the device Fourier
+    route (exact bin means, no envelope) and the leftover bins the near/far kernel.
+
+    Validation: cxr-line-fourier-reduction, sinc-bin-far-envelope
+    """
+    from pyrite.montecarlo.spectrum.cxr import _bin_quadrature
+    from pyrite.montecarlo.spectrum.cxr._bin_quadrature import (
+        _host_bin_mean,
+        resolve_bin_reduction,
+        run_bin_mean_reduction_kernel,
+    )
+
+    monkeypatch.setattr(_bin_quadrature, "_cupy_backend", lambda: True)
+    monkeypatch.setattr(_bin_quadrature, "_to_cpu", cp.asnumpy)
+    rng = np.random.default_rng(1390)
+    e, a, w = _line_set(rng, 300)
+    e, a, w = (np.asarray(x, dtype=np.float32).astype(float) for x in (e, a, w))
+    edges = np.r_[
+        np.arange(400.0, 700.0, 0.25),
+        700.0,
+        700.6,
+        701.5,
+        702.0,
+        np.arange(702.5, 900.0, 0.5),
+        901.2,
+        np.arange(901.7, 1102.0, 0.5),
+    ]
+    method, runs, flush = resolve_bin_reduction(cp.asarray(edges))
+    assert method == "segmented" and flush is not None
+    # Two leftover runs between Fourier runs share one near/far launch.
+    assert [r[2] is None for r in runs] == [False, True, False, True, False]
+    out = cp.zeros(edges.size - 1, dtype=cp.float64)
+    run_bin_mean_reduction_kernel(
+        *(cp.asarray(x) for x in (e, a, w, edges, 1 / np.diff(edges))),
+        out=out,
+        method=method,
+        fourier_axis=runs,
+    )
+    got = cp.asnumpy(out)
+    inv = 1 / np.diff(edges)
+    exact = w @ _host_bin_mean(a, e, edges, inv, exact_widths=None)
+    near_far = w @ _host_bin_mean(a, e, edges, inv)
+    scale = np.abs(w).sum()
+    for start, stop, axis in runs:
+        want = (exact if axis is not None else near_far)[start:stop]
+        assert np.max(abs(got[start:stop] - want)) < 1e-7 * scale
 
 
 def test_es_width_follows_tolerance():
