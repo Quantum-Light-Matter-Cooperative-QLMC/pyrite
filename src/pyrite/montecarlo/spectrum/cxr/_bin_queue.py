@@ -138,7 +138,7 @@ def open_bin_line_queues(st) -> None:
                 edges, st.bin_inv_width, HOST_NEAR_FAR_FLUSH_LINES
             )
         return
-    if resolve_bin_reduction(edges)[0] == "fourier":
+    if resolve_bin_reduction(edges)[0] in ("fourier", "segmented"):
         st.bin_line_queues = BinLineQueues(st.E_grid, edges, st.bin_inv_width)
 
 

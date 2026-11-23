@@ -219,7 +219,7 @@ def _reduction_tolerance(reduction, grid, rtol):
     """
     edges = _energy_bin_edges_and_widths(grid)[0]
     with bq.bin_reduction_override(reduction) if reduction else contextlib.nullcontext():
-        fourier = bq.resolve_bin_reduction(edges)[0] == "fourier"
+        fourier = bq.resolve_bin_reduction(edges)[0] in ("fourier", "segmented")
         if numpy_backend():  # the host Fourier route (#1230)
             fourier = bq.resolve_host_bin_reduction(edges) is not None
     return (
