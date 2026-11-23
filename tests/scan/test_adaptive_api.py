@@ -35,7 +35,15 @@ def scene():
 
 @pytest.fixture
 def precision():
-    return pr.config.AdaptiveSampling(0.1, 40, 60, observables=("cxr", "brem"))
+    return pr.config.AdaptiveSampling(
+        0.1,
+        40,
+        60,
+        observables=("cxr", "brem"),
+        brem_target_rse=0.1,
+        brem_min_histories=40,
+        brem_max_histories=60,
+    )
 
 
 @pytest.fixture
@@ -161,7 +169,7 @@ def test_adaptive_dataset_identity_hashes_policy_not_unused_fixed_counts(scene, 
 @pytest.fixture
 def adaptive_output(scene, numerics):
     case = api.build_case(scene, numerics)
-    with pytest.warns(CxrYieldStatisticsWarning, match="max_histories=60"):
+    with pytest.warns(CxrYieldStatisticsWarning, match="stopped at Ne=60, Ne_brem=60"):
         output = runner.run_case(case, transport_core="per-electron")
     return case, output
 
@@ -196,6 +204,9 @@ def test_early_stop_preserves_requested_case_and_matches_realized_fixed_n(scene,
         200,
         20,
         observables=("cxr", "brem"),
+        brem_target_rse=1.0,
+        brem_min_histories=40,
+        brem_max_histories=200,
         max_history_share=1.0,
         min_effective_histories=0.0,
         max_variance_of_variance=1.0,

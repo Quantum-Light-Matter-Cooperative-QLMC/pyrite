@@ -961,7 +961,7 @@ class Numerics:
                 "maximum_brem_histories": (
                     policy.max_histories
                     if policy.brem_target_rse is None
-                    else policy.brem_policy().max_histories
+                    else policy.brem_max_histories
                 ),
             },
         }

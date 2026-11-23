@@ -88,14 +88,15 @@ Options:
                                   select fixed. Switching replaces the previous sampling
                                   settings. With no counts, switching to fixed uses 450
                                   CXR and 100 brem histories.
-  --brem-target-rse FRACTION      Stop brem independently at this RSE; requires both cxr
-                                  and brem observables.  [x>0.0]
-  --brem-min-histories N          Brem minimum; defaults to --min-histories. Requires
-                                  --brem-target-rse.  [x>=2]
-  --brem-max-histories N          Brem maximum, at most --max-histories; defaults to it.
-                                  Requires --brem-target-rse.  [x>=2]
-  --target-rse FRACTION           Target relative standard error of each watched yield
-                                  (0.05 = 5%).  [x>0.0]
+  --brem-target-rse FRACTION      Brem target RSE, mirroring --target-rse. Any --brem-*
+                                  option requests brem stopping; omitted brem target and
+                                  maximum take the CXR values.  [x>0.0]
+  --brem-min-histories N          Brem minimum, mirroring --min-histories (at most
+                                  --brem-max-histories).  [x>=2]
+  --brem-max-histories N          Brem maximum, mirroring --max-histories; at most
+                                  --max-histories.  [x>=2]
+  --target-rse FRACTION           Target relative standard error of the CXR yield (0.05
+                                  = 5%).  [x>0.0]
   --min-histories N               Smallest count at which the run may stop (default
                                   100).  [x>=2]
   --max-histories N               Count at which the run stops regardless, flagged
@@ -104,8 +105,12 @@ Options:
                                   the stop or output.  [x>=1]
   --decision-growth FRACTION      Relative spacing of the stopping-rule checks (default
                                   0.1).  [x>0.0]
-  --observable [cxr|brem|line]    Yield that must converge; repeat for both. Replaces
-                                  the watched set (a new policy watches line and brem).
+  --observable [cxr|brem|line]    Yield to monitor; repeat for both. Replaces the set.
+                                  cxr is the shared stop; cxr with brem requests
+                                  independent brem stopping (a new policy requests it);
+                                  cxr alone scores brem on every history; brem alone
+                                  applies the shared rule to brem (no cxr). line is an
+                                  alias of cxr.
   --max-history-share FRACTION    Guard: largest share of a yield one history may hold
                                   (default 0.05).  [0.0<x<=1.0]
   --min-effective-histories N     Guard: effective sample size floor (sum m)^2 / sum m^2
@@ -212,14 +217,15 @@ Options:
                                   select fixed. Switching replaces the previous sampling
                                   settings. With no counts, switching to fixed uses 450
                                   CXR and 100 brem histories.
-  --brem-target-rse FRACTION      Stop brem independently at this RSE; requires both cxr
-                                  and brem observables.  [x>0.0]
-  --brem-min-histories N          Brem minimum; defaults to --min-histories. Requires
-                                  --brem-target-rse.  [x>=2]
-  --brem-max-histories N          Brem maximum, at most --max-histories; defaults to it.
-                                  Requires --brem-target-rse.  [x>=2]
-  --target-rse FRACTION           Target relative standard error of each watched yield
-                                  (0.05 = 5%).  [x>0.0]
+  --brem-target-rse FRACTION      Brem target RSE, mirroring --target-rse. Any --brem-*
+                                  option requests brem stopping; omitted brem target and
+                                  maximum take the CXR values.  [x>0.0]
+  --brem-min-histories N          Brem minimum, mirroring --min-histories (at most
+                                  --brem-max-histories).  [x>=2]
+  --brem-max-histories N          Brem maximum, mirroring --max-histories; at most
+                                  --max-histories.  [x>=2]
+  --target-rse FRACTION           Target relative standard error of the CXR yield (0.05
+                                  = 5%).  [x>0.0]
   --min-histories N               Smallest count at which the run may stop (default
                                   100).  [x>=2]
   --max-histories N               Count at which the run stops regardless, flagged
@@ -228,8 +234,12 @@ Options:
                                   the stop or output.  [x>=1]
   --decision-growth FRACTION      Relative spacing of the stopping-rule checks (default
                                   0.1).  [x>0.0]
-  --observable [cxr|brem|line]    Yield that must converge; repeat for both. Replaces
-                                  the watched set (a new policy watches line and brem).
+  --observable [cxr|brem|line]    Yield to monitor; repeat for both. Replaces the set.
+                                  cxr is the shared stop; cxr with brem requests
+                                  independent brem stopping (a new policy requests it);
+                                  cxr alone scores brem on every history; brem alone
+                                  applies the shared rule to brem (no cxr). line is an
+                                  alias of cxr.
   --max-history-share FRACTION    Guard: largest share of a yield one history may hold
                                   (default 0.05).  [0.0<x<=1.0]
   --min-effective-histories N     Guard: effective sample size floor (sum m)^2 / sum m^2

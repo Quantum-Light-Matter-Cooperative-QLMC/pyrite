@@ -814,13 +814,21 @@ Usage: pyrite profile numerics adaptive-sampling [OPTIONS] COMMAND [ARGS]...
   Inspect and edit PROFILE's history-count mode: adaptive policy or fixed counts.
 
   Profiles without fixed history counts or a policy run adaptive by default (target RSE
-  0.05, 200-20000 histories, line and bremsstrahlung). Each incoherent case stops when
-  the relative standard error of its line (and optionally bremsstrahlung) yield meets
-  the target and its heavy-tail guards pass, or at the maximum count flagged statistics-
-  limited. By default one count serves both populations. --brem-target-rse enables
-  independent brem-prefix stopping; line transport continues until brem finishes.
-  Coherent emission, physical detectors, GDF beams, grooves and fixed history counts
-  keep fixed counts. A history is one transported primary electron with all its
+  0.05, 200-20000 histories, for CXR and for brem). Each incoherent case stops when the
+  relative standard error of its CXR yield meets the target and its heavy-tail guards
+  pass, or at the maximum count flagged statistics-limited. Brem never enters that
+  stopping test. Brem stopping is requested by listing brem next to cxr (--observable
+  cxr --observable brem) or by any --brem-* option; it then stops independently on
+  --brem-target-rse, --brem-min-histories and --brem-max-histories, mirroring the CXR
+  options. Because brem is a prefix of the CXR histories, transport continues until brem
+  finishes: the brem count is at most the CXR count, and the CXR stop is its first
+  passing check at or after the brem count. When the brem target or maximum is omitted,
+  brem takes the CXR values (including the minimum); when both are given, an omitted
+  --brem-min-histories defaults to 100 (at most the brem maximum). Without a request
+  brem is scored on every history and not monitored. --observable brem alone (a
+  cxr_source=none run) applies the shared rule to brem and is not a brem-stopping
+  request. Coherent emission, physical detectors, GDF beams, grooves and fixed history
+  counts keep fixed counts. A history is one transported primary electron with all its
   secondaries, pairs and positrons.
 
     enable   switch to adaptive: drop fixed counts, optionally customize
@@ -852,7 +860,7 @@ Usage: pyrite profile numerics adaptive-sampling disable [OPTIONS] NAME
   --cxr-histories/--brem-histories replace that count. A count the profile already sets
   is otherwise kept, including a sweep grid. A count it lacks is prompted for on a
   terminal; without a terminal, or with --yes or --dry-run, it takes the built-in
-  default (300 line, 150 brem).
+  default (300 CXR, 150 brem).
 
 Options:
   --cxr-histories N   Fixed Monte Carlo electron histories for the CXR spectrum.  [x>=1]
@@ -877,14 +885,15 @@ Usage: pyrite profile numerics adaptive-sampling enable [OPTIONS] NAME
   changed.
 
 Options:
-  --brem-target-rse FRACTION      Stop brem independently at this RSE; requires both cxr
-                                  and brem observables.  [x>0.0]
-  --brem-min-histories N          Brem minimum; defaults to --min-histories. Requires
-                                  --brem-target-rse.  [x>=2]
-  --brem-max-histories N          Brem maximum, at most --max-histories; defaults to it.
-                                  Requires --brem-target-rse.  [x>=2]
-  --target-rse FRACTION           Target relative standard error of each watched yield
-                                  (0.05 = 5%).  [x>0.0]
+  --brem-target-rse FRACTION      Brem target RSE, mirroring --target-rse. Any --brem-*
+                                  option requests brem stopping; omitted brem target and
+                                  maximum take the CXR values.  [x>0.0]
+  --brem-min-histories N          Brem minimum, mirroring --min-histories (at most
+                                  --brem-max-histories).  [x>=2]
+  --brem-max-histories N          Brem maximum, mirroring --max-histories; at most
+                                  --max-histories.  [x>=2]
+  --target-rse FRACTION           Target relative standard error of the CXR yield (0.05
+                                  = 5%).  [x>0.0]
   --min-histories N               Smallest count at which the run may stop (default
                                   100).  [x>=2]
   --max-histories N               Count at which the run stops regardless, flagged
@@ -893,8 +902,12 @@ Options:
                                   the stop or output.  [x>=1]
   --decision-growth FRACTION      Relative spacing of the stopping-rule checks (default
                                   0.1).  [x>0.0]
-  --observable [cxr|brem|line]    Yield that must converge; repeat for both. Replaces
-                                  the watched set (a new policy watches line and brem).
+  --observable [cxr|brem|line]    Yield to monitor; repeat for both. Replaces the set.
+                                  cxr is the shared stop; cxr with brem requests
+                                  independent brem stopping (a new policy requests it);
+                                  cxr alone scores brem on every history; brem alone
+                                  applies the shared rule to brem (no cxr). line is an
+                                  alias of cxr.
   --max-history-share FRACTION    Guard: largest share of a yield one history may hold
                                   (default 0.05).  [0.0<x<=1.0]
   --min-effective-histories N     Guard: effective sample size floor (sum m)^2 / sum m^2
@@ -953,19 +966,20 @@ Usage: pyrite profile numerics adaptive-sampling set [OPTIONS] NAME
   Create or update PROFILE's adaptive policy.
 
   Fields left unspecified keep the existing policy's values; a new policy takes them
-  from the default (target RSE 0.05, 200-20000 histories, line and brem). A profile with
-  fixed counts is refused; switch it with 'pyrite profile numerics adaptive-sampling
-  enable'.
+  from the default (target RSE 0.05, 200-20000 histories, cxr and independent brem);
+  brem keys not given mirror the CXR values. A profile with fixed counts is refused;
+  switch it with 'pyrite profile numerics adaptive-sampling enable'.
 
 Options:
-  --brem-target-rse FRACTION      Stop brem independently at this RSE; requires both cxr
-                                  and brem observables.  [x>0.0]
-  --brem-min-histories N          Brem minimum; defaults to --min-histories. Requires
-                                  --brem-target-rse.  [x>=2]
-  --brem-max-histories N          Brem maximum, at most --max-histories; defaults to it.
-                                  Requires --brem-target-rse.  [x>=2]
-  --target-rse FRACTION           Target relative standard error of each watched yield
-                                  (0.05 = 5%).  [x>0.0]
+  --brem-target-rse FRACTION      Brem target RSE, mirroring --target-rse. Any --brem-*
+                                  option requests brem stopping; omitted brem target and
+                                  maximum take the CXR values.  [x>0.0]
+  --brem-min-histories N          Brem minimum, mirroring --min-histories (at most
+                                  --brem-max-histories).  [x>=2]
+  --brem-max-histories N          Brem maximum, mirroring --max-histories; at most
+                                  --max-histories.  [x>=2]
+  --target-rse FRACTION           Target relative standard error of the CXR yield (0.05
+                                  = 5%).  [x>0.0]
   --min-histories N               Smallest count at which the run may stop (default
                                   100).  [x>=2]
   --max-histories N               Count at which the run stops regardless, flagged
@@ -974,8 +988,12 @@ Options:
                                   the stop or output.  [x>=1]
   --decision-growth FRACTION      Relative spacing of the stopping-rule checks (default
                                   0.1).  [x>0.0]
-  --observable [cxr|brem|line]    Yield that must converge; repeat for both. Replaces
-                                  the watched set (a new policy watches line and brem).
+  --observable [cxr|brem|line]    Yield to monitor; repeat for both. Replaces the set.
+                                  cxr is the shared stop; cxr with brem requests
+                                  independent brem stopping (a new policy requests it);
+                                  cxr alone scores brem on every history; brem alone
+                                  applies the shared rule to brem (no cxr). line is an
+                                  alias of cxr.
   --max-history-share FRACTION    Guard: largest share of a yield one history may hold
                                   (default 0.05).  [0.0<x<=1.0]
   --min-effective-histories N     Guard: effective sample size floor (sum m)^2 / sum m^2

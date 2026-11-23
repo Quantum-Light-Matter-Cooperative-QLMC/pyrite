@@ -125,29 +125,31 @@ def _ticking_clock():
     return lambda: float(next(calls))
 
 
+@pytest.mark.parametrize("name", ["cxr", "brem"])
 @pytest.mark.parametrize("chunk", [37, 250])
-def test_recorded_diagnostics_never_change_the_stop(chunk):
+def test_recorded_diagnostics_never_change_the_stop(chunk, name):
     population = np.random.default_rng(11).lognormal(0.0, 1.0, 8000)
-    settings = AdaptiveSettings(0.03, 400, 8000, observables=("cxr", "brem"))
+    # One monitored observable per run: a shared ticking clock cannot serve the
+    # CXR and brem monitors of an independent run at once.
+    settings = AdaptiveSettings(0.03, 400, 8000, observables=(name,))
 
     def measure(start, stop, _):
-        return dict.fromkeys(("cxr", "brem"), population[start:stop])
+        return {name: population[start:stop]}
 
     plain = run_stopping_rule(settings, measure)
     timed = run_stopping_rule(settings, measure, chunk=chunk, clock=_ticking_clock())
     assert without_wall_clock(timed) == without_wall_clock(plain)
     realized = timed["realized_electrons"]
     assert realized is not None and realized < 8000
-    for name in ("cxr", "brem"):
-        status = timed["statistics"][name]
-        assert set(_DIAGNOSTICS) <= set(status)
-        assert not set(_DIAGNOSTICS) & set(status["passes"])
-        assert all(plain["statistics"][name][key] is None for key in WALL_CLOCK_FIELDS)
-        # Chunk ends at one second each: T(d) = d / chunk exactly.
-        assert status["elapsed_s"] == pytest.approx(realized / chunk, rel=1e-12)
-        rse = status["relative_se"]
-        assert status["figure_of_merit"] == pytest.approx(chunk / (rse * rse * realized))
-        assert status["shift_over_se"] == pytest.approx(status["shift"] / rse)
+    status = timed["statistics"][name]
+    assert set(_DIAGNOSTICS) <= set(status)
+    assert not set(_DIAGNOSTICS) & set(status["passes"])
+    assert all(plain["statistics"][name][key] is None for key in WALL_CLOCK_FIELDS)
+    # Chunk ends at one second each: T(d) = d / chunk exactly.
+    assert status["elapsed_s"] == pytest.approx(realized / chunk, rel=1e-12)
+    rse = status["relative_se"]
+    assert status["figure_of_merit"] == pytest.approx(chunk / (rse * rse * realized))
+    assert status["shift_over_se"] == pytest.approx(status["shift"] / rse)
 
 
 def test_independent_brem_records_its_own_diagnostics():

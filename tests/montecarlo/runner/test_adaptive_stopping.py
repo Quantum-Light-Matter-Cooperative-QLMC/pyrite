@@ -161,7 +161,15 @@ def test_vov_trend_slope_is_recorded_and_never_gates(late_heavy):
     population = np.random.default_rng(11).exponential(1.0, 4000)
     if late_heavy:
         population[3500] += 500.0
-    settings = AdaptiveSettings(1e-6, 2000, 4000, observables=("cxr", "brem"))
+    settings = AdaptiveSettings(
+        1e-6,
+        2000,
+        4000,
+        observables=("cxr", "brem"),
+        brem_target_rse=1e-6,
+        brem_min_histories=2000,
+        brem_max_histories=4000,
+    )
     record = run_stopping_rule(
         settings, lambda start, stop, _: dict.fromkeys(("cxr", "brem"), population[start:stop])
     )
@@ -457,7 +465,13 @@ def test_variance_tail_keeps_cxr_running_after_independent_brem_freezes():
     population[500] = 1.5
     population[5000] = 20.0
     settings = AdaptiveSettings(
-        0.001, 3000, 6000, 1000, observables=("cxr", "brem"), brem_target_rse=0.001
+        0.001,
+        3000,
+        6000,
+        1000,
+        brem_target_rse=0.001,
+        brem_min_histories=3000,
+        brem_max_histories=6000,
     )
     record = run_stopping_rule(
         settings, lambda start, stop, _: dict.fromkeys(("cxr", "brem"), population[start:stop])
@@ -694,6 +708,9 @@ _SETTINGS = AdaptiveSettings(
     max_histories=200,
     block_histories=20,
     observables=("cxr", "brem"),
+    brem_target_rse=0.1,
+    brem_min_histories=40,
+    brem_max_histories=200,
 )
 
 

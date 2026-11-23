@@ -40,6 +40,21 @@ _RULE_ONLY = dict(
 #: One monitor band over the line grid and the continuum grid, so both observables score.
 BAND = dict(observables=("cxr", "brem"), band_eV=(1500.0, 150000.0))
 
+
+def _mirrored(target, minimum, maximum, block, **kw):
+    """CXR and brem stopping with the same explicit setup (#1398: brem mirrors CXR)."""
+    return Precision(
+        target,
+        minimum,
+        maximum,
+        block,
+        brem_target_rse=target,
+        brem_min_histories=minimum,
+        brem_max_histories=maximum,
+        **kw,
+    )
+
+
 pytestmark = pytest.mark.usefixtures("synthetic_si_tables")
 
 
@@ -76,7 +91,7 @@ def _launched(transport):
 def test_adaptive_shell_cascade_is_the_fixed_run_at_its_count(block, maximum):
     """An unreachable target stops at the maximum; every block size gives the fixed run."""
     case = _cascade_case(coupled=False, Ne=4, Ne_brem=4, threshold=1000.0, seed=5)
-    settings = Precision(1e-9, max(block, 2), maximum, block, **BAND, **_RULE_ONLY)
+    settings = _mirrored(1e-9, max(block, 2), maximum, block, **BAND, **_RULE_ONLY)
     result, stats = _adaptive(case, settings)
     assert stats["realized_electrons"] == maximum and stats["stop_reason"] == "max_electrons"
     for name in ("cxr", "brem"):
@@ -108,7 +123,7 @@ def _assert_monitor_saw_the_fixed_run(case, settings, transport, stats, n):
 def test_converged_shell_cascade_stop_is_the_fixed_run(spread):
     """A converged stop before the maximum, with and without the energy-range replay."""
     case = _cascade_case(coupled=False, Ne=4, Ne_brem=4, threshold=1000.0, seed=17, spread=spread)
-    settings = Precision(0.5, 6, 30, 3, **BAND, **_RULE_ONLY)
+    settings = _mirrored(0.5, 6, 30, 3, **BAND, **_RULE_ONLY)
     result, stats = _adaptive(case, settings)
     n = stats["realized_electrons"]
     assert stats["stop_reason"] == "converged" and 6 <= n < 30, stats["stop_reason"]
@@ -151,7 +166,7 @@ def test_monitor_samples_are_root_summed_primaries():
     transport, _ = _fixed(case, 6)
     segs = transport["segs"]
     assert _launched(transport) > 0
-    settings = Precision(0.1, 6, 6, 6, **BAND)
+    settings = _mirrored(0.1, 6, 6, 6, **BAND)
     measure = case_measure(case, settings)
     generation = np.asarray(segs["generation"])
     rows = generation.shape
@@ -195,7 +210,7 @@ def test_adaptive_pair_cascade_is_the_fixed_run_at_its_count(
 
         require_positron_tables()
     case = _pair_case(monkeypatch, positrons=positrons, Ne=4, Ne_brem=4)
-    settings = Precision(
+    settings = _mirrored(
         1e-9,
         max(block, 2),
         maximum,
@@ -228,12 +243,12 @@ def test_track_cap_fails_iff_the_fixed_run_does(monkeypatch):
     with pytest.raises(RuntimeError, match="max_secondary_tracks"):
         _fixed(case, 6)
     for block in (2, 3, 6):
-        settings = Precision(1e-9, block, 6, block, **BAND, **_RULE_ONLY)
+        settings = _mirrored(1e-9, block, 6, block, **BAND, **_RULE_ONLY)
         with pytest.raises(RuntimeError, match="max_secondary_tracks"):
             _adaptive(case, settings)
     monkeypatch.setattr(secondaries, "DEFAULT_SECONDARY_TRACKS_PER_PRIMARY", loose)
     for block in (2, 3, 6):
-        settings = Precision(1e-9, block, 6, block, **BAND, **_RULE_ONLY)
+        settings = _mirrored(1e-9, block, 6, block, **BAND, **_RULE_ONLY)
         assert _adaptive(case, settings)[1]["realized_electrons"] == 6
 
 
@@ -267,7 +282,7 @@ def test_gpu_adaptive_cascade_is_the_fixed_run_at_its_count(monkeypatch, kind, b
             require_positron_tables()
         case = _pair_case(monkeypatch, positrons=kind == "positron", Ne=4, Ne_brem=4)
         band = dict(observables=("cxr", "brem"), band_eV=(1500.0, 2.5e6))
-    settings = Precision(1e-9, max(block, 2), maximum, block, **band, **_RULE_ONLY)
+    settings = _mirrored(1e-9, max(block, 2), maximum, block, **band, **_RULE_ONLY)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", UserWarning)
         result, stats = run_case_adaptive(case, settings, transport_core="cuda")
@@ -287,7 +302,7 @@ def test_streamed_adaptive_shell_cascade_matches_retained():
     from pyrite.montecarlo.runner.streamed_scoring import run_case_streamed
 
     case = _cascade_case(coupled=False, Ne=4, Ne_brem=4, threshold=1000.0, seed=5)
-    settings = Precision(1e-9, 4, 8, 4, **BAND, **_RULE_ONLY)
+    settings = _mirrored(1e-9, 4, 8, 4, **BAND, **_RULE_ONLY)
     reference, stats = _adaptive(case, settings)
     requested = {**case, "Ne": 8, "Ne_brem": 8, "adaptive_precision": settings.to_dict()}
     with warnings.catch_warnings():

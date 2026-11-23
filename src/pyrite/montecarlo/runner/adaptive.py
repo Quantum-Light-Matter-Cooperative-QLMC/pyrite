@@ -6,8 +6,9 @@ transport electron chunks through :mod:`.block_transport`, sized for the device
 by :class:`.stream_sizing.AdaptiveChunkPlan`, and buffer grid-independent
 per-electron scalars:
 
-* ``"line"`` -- the per-electron line mass ``sum w pi / a_w`` over the lines a
-  fixed monitor band keeps, the quantity of the #201 line-yield audit;
+* ``"cxr"`` -- the per-electron line mass ``sum w pi / a_w`` over the lines a
+  fixed monitor band keeps, the quantity of the #201 line-yield audit (stored
+  policies spell this observable ``"line"`` for identity stability);
 * ``"brem"`` -- the per-electron bremsstrahlung integral over the same band.
 
 Neither depends on the line grid, which is resolved only once transport has
@@ -16,11 +17,13 @@ The rule is checked at geometric decision points ``d_{j+1} = ceil(d_j (1 +
 decision_growth))`` from ``min_electrons`` to ``max_electrons``; the values of
 each segment between points are folded into the moments at once, so decisions
 do not depend on the chunks. The stop is the first point ``n`` at which, for
-every chosen observable, the relative standard error of the mean is at most
+every monitored observable, the relative standard error of the mean is at most
 ``target_rse`` and the heavy-tail guards hold (largest single-electron share,
 effective sample size, CXR variance sampling, stability of the running mean
 over the last decision points); at ``max_electrons`` the case completes
-flagged ``statistics_limited``. A stop inside a chunk keeps the prefix by
+flagged ``statistics_limited``. The shared stop monitors CXR only; a brem
+request stops the brem prefix independently (:mod:`.independent`, #1398).
+A stop inside a chunk keeps the prefix by
 transporting it again, so the realized case is the fixed-N case at the
 realized count, bit for bit: the stop changes how many electrons run, never
 how they run.
@@ -44,8 +47,8 @@ import numpy as np
 
 from ..._backend import _to_cpu
 from ..._cxr_grid_policy import CxrYieldStatisticsWarning
-from ..._precision import ADAPTIVE_SAMPLING_MODEL, Precision
 from ..._precision import OBSERVABLES as OBSERVABLES
+from ..._precision import Precision, sampling_model
 from ..spectrum.cxr._kernels import _SEG_ARRAYS
 from .adaptive_report import limit_summary
 from .artifacts import _case_geometry
@@ -595,7 +598,7 @@ class StoppingMonitor:
             "max_electrons": s.max_histories,
             "decision_growth": s.decision_growth,
             "observables": list(s.observables),
-            "sampling_model": ADAPTIVE_SAMPLING_MODEL,
+            "sampling_model": sampling_model(s),
             "guards": {
                 "max_electron_share": s.max_history_share,
                 "min_effective_electrons": s.min_effective_histories,
@@ -643,9 +646,9 @@ def run_stopping_rule(
         start = stop
         if monitor.should_stop(stop):
             break
-        if monitor.cut_at is not None:
-            monitor.truncate(monitor.cut_at)
-            start = monitor.cut_at
+        if (cut := monitor.cut_at) is not None:
+            monitor.truncate(cut)  # clears ``cut_at``
+            start = cut
     return monitor.record()
 
 

@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import math
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import asdict, dataclass, replace
 from functools import wraps
+from pathlib import Path
 from typing import Any, Self
 
 OBSERVABLES = ("cxr", "brem")
@@ -33,6 +36,26 @@ LEGACY_STORED_KEYS = {"stability_blocks": "stability_checks"}
 
 #: Keyword arguments renamed by #1253: accepted with a deprecation warning.
 DEPRECATED_ARGUMENTS = {"stability_blocks": "stability_checks"}
+
+#: Where the policy being built came from (a catalog profile, a stored case, ...),
+#: named by deprecation warnings that fire inside the constructor (#1398).
+_SOURCE: ContextVar[str | None] = ContextVar("pyrite_precision_source", default=None)
+
+
+@contextmanager
+def policy_source(source: str | None) -> Iterator[None]:
+    """Name *source* in any deprecation warning raised while a policy is built."""
+    token = _SOURCE.set(source)
+    try:
+        yield
+    finally:
+        _SOURCE.reset(token)
+
+
+#: Brem stopping keys (#1398): the first two are required, mirroring ``target_rse`` and
+#: ``max_histories``; the minimum defaults like ``min_histories``.
+BREM_REQUIRED = ("brem_target_rse", "brem_max_histories")
+BREM_KEYS = ("brem_target_rse", "brem_min_histories", "brem_max_histories")
 
 #: Default ``min_histories`` when omitted (capped at ``max_histories``).
 DEFAULT_MIN_HISTORIES = 100
@@ -107,8 +130,11 @@ class Precision:
         changes decisions, realized counts, output or identity; ``None``
         sizes chunks from device fill and memory.
     observables
-        Non-empty subset of ``('cxr', 'brem')`` that must all converge; a single
-        name such as ``"cxr"`` is accepted.
+        Non-empty subset of ``('cxr', 'brem')``; a single name such as ``"cxr"``
+        is accepted. The shared stop (``target_rse``, ``min_histories``,
+        ``max_histories``) is the CXR rule. Listing ``"brem"`` next to ``"cxr"``
+        requests independent brem stopping (see ``brem_target_rse``); ``("brem",)``
+        alone (``cxr_source="none"``) applies the shared rule to brem.
     max_history_share
         Guard: the largest single-electron value may hold at most this share
         of the observable's sum.
@@ -139,14 +165,23 @@ class Precision:
         Optional band for per-bin batch-means errors of the final ``spec`` and
         ``brem_wide``; reported only, never used to stop. Costs one extra
         line and brem reduction over the realized segments.
-    brem_target_rse
-        Enable independent brem-prefix stopping at this target. Requires both
-        observables. ``target_rse`` then governs CXR; line transport continues
-        until brem finishes, so ``Ne_brem <= Ne``. Omit for the shared rule.
-    brem_min_histories, brem_max_histories
-        Optional brem bounds, defaulting to the shared bounds. The brem
-        maximum cannot exceed ``max_histories``. Guards and decision growth
-        are shared; the brem pilot is clipped to its own bounds.
+    brem_target_rse, brem_min_histories, brem_max_histories
+        Independent brem-prefix stopping (#1398), mirroring ``target_rse``,
+        ``min_histories`` and ``max_histories``: ``brem_target_rse`` and
+        ``brem_max_histories`` are required, ``brem_min_histories`` defaults
+        like ``min_histories`` (100, at most ``brem_max_histories``). Brem
+        stopping is requested by listing ``"brem"`` next to ``"cxr"`` or by
+        setting any of these keys. Brem never enters the CXR stopping test; because
+        brem is a prefix (``Ne_brem <= Ne``), the CXR stop is the first
+        CXR-passing decision point at or after ``Ne_brem``: CXR transport
+        continues until brem finishes. ``brem_max_histories <= max_histories``. Without a request, brem is
+        scored on all ``Ne`` electrons and not monitored. Guards, decision
+        growth and the pilot are shared; the brem pilot is clipped to its own
+        bounds. Deprecated: a request without ``brem_target_rse`` or
+        ``brem_max_histories`` warns and inherits ``target_rse`` or
+        ``max_histories`` (and ``min_histories`` for an omitted brem minimum,
+        so an old config behaves as written) until the scheduled removal, then
+        is refused.
     decision_growth
         Relative spacing ``delta`` of the decision points: the stop overshoots
         the last refused point by at most ``delta`` relative, with
@@ -220,7 +255,7 @@ class Precision:
                 or not 0.0 < band[0] < band[1]
             ):
                 raise ValueError(f"{name} must contain two positive finite increasing energies")
-        self._validate_brem_policy()
+        self._resolve_brem_stopping()
 
     def _validate_unit_fractions(self) -> None:
         for name in ("max_history_share", "max_variance_of_variance"):
@@ -228,25 +263,90 @@ class Precision:
             if isinstance(value, bool) or not 0.0 < value <= 1.0:
                 raise ValueError(f"{name} must lie in (0, 1]")
 
-    def _validate_brem_policy(self) -> None:
-        if self.brem_target_rse is None:
-            if self.brem_min_histories is not None or self.brem_max_histories is not None:
-                raise ValueError("brem count bounds require brem_target_rse")
-            return
-        if set(self.observables) != set(OBSERVABLES):
-            raise ValueError("brem_target_rse requires both cxr and brem observables")
-        policy = self.brem_policy()
-        if policy.max_histories > self.max_histories:
+    def _resolve_brem_stopping(self) -> None:
+        """Normalize a brem stopping request to explicit keys (identity and runner agree)."""
+        names = set(self.observables)
+        keyed = [key for key in BREM_KEYS if getattr(self, key) is not None]
+        if not keyed and names != set(OBSERVABLES):
+            return  # CXR-only (brem scored, not monitored) or brem-only shared rule
+        if "cxr" not in names:
+            raise ValueError(
+                f"{', '.join(keyed)} need the cxr observable; brem-only adaptive sampling "
+                "stops on target_rse and max_histories"
+            )
+        object.__setattr__(self, "observables", OBSERVABLES)
+        missing = [key for key in BREM_REQUIRED if getattr(self, key) is None]
+        if missing:
+            self._inherit_cxr_stopping(missing)
+        _require_positive_finite("brem_target_rse", self.brem_target_rse)
+        for name in ("brem_min_histories", "brem_max_histories"):
+            value = getattr(self, name)
+            if value is not None and (type(value) is not int or value < 1):
+                raise ValueError(f"{name} must be a positive integer")
+        maximum = self.brem_max_histories
+        assert maximum is not None  # filled above or inherited
+        minimum = self.brem_min_histories
+        if minimum is None:
+            minimum = _default_minimum(maximum)
+            object.__setattr__(self, "brem_min_histories", minimum)
+        if not 2 <= minimum <= maximum:
+            raise ValueError("need 2 <= brem_min_histories <= brem_max_histories")
+        if maximum > self.max_histories:
             raise ValueError("brem_max_histories must not exceed max_histories (brem is a prefix)")
+        self.brem_policy()  # the mirrored rule is itself a valid policy
+
+    def _inherit_cxr_stopping(self, missing: list[str]) -> None:
+        """Deprecated (#1398): a brem request without its required keys inherits CXR's.
+
+        Target and maximum inherit as given; an omitted brem minimum inherits
+        ``min_histories`` too (capped at the brem maximum).
+        """
+        from . import __version__
+        from ._util.deprecations import BREM_INHERITANCE, api_removal_reached, warn_api
+
+        inherited = {"brem_target_rse": "target_rse", "brem_max_histories": "max_histories"}
+        if api_removal_reached(BREM_INHERITANCE, __version__):
+            raise ValueError(
+                f"brem stopping requires {' and '.join(missing)}: it mirrors target_rse and "
+                "max_histories and never inherits them; set them, or drop 'brem' from "
+                "observables to score brem on all histories without monitoring it"
+            )
+        values = {key: getattr(self, name) for key, name in inherited.items() if key in missing}
+        for key, value in values.items():
+            object.__setattr__(self, key, value)
+        sources = {key: inherited[key] for key in values}
+        if self.brem_min_histories is None:
+            # An old config behaves as written: its minimum applies to brem too (capped at
+            # an explicit brem maximum). Explicit required keys keep the mirrored default.
+            maximum = self.brem_max_histories
+            assert maximum is not None  # filled above or explicit
+            minimum = min(self.min_histories, maximum)
+            object.__setattr__(self, "brem_min_histories", minimum)
+            values["brem_min_histories"] = minimum
+            sources["brem_min_histories"] = "min_histories"
+        detail = ", ".join(f"{key}={value} (from {sources[key]})" for key, value in values.items())
+        origin = _SOURCE.get()
+        where = f"{origin}: " if origin else ""
+        # The warning's own location is not the caller's when the policy is read from a
+        # catalog, so it names the source and the keys to add.
+        detail = f"{where}missing {' and '.join(missing)}; inheriting {detail}"
+        # Attribute the warning to the caller, past the constructor layers
+        # (``AdaptiveSampling``, the dataclass ``__init__``, ``from_dict``).
+        warn_api(
+            BREM_INHERITANCE,
+            detail=detail,
+            skip_file_prefixes=(str(Path(__file__).parent), "<string>"),
+        )
 
     def brem_policy(self) -> Precision:
         """Scalar brem rule for independent stopping; shares decision growth and guards."""
-        minimum = self.min_histories if self.brem_min_histories is None else self.brem_min_histories
-        maximum = self.max_histories if self.brem_max_histories is None else self.brem_max_histories
+        minimum, maximum = self.brem_min_histories, self.brem_max_histories
+        if self.brem_target_rse is None or minimum is None or maximum is None:
+            raise ValueError("brem stopping is not requested")
         pilot = self.pilot_histories
         return replace(
             self,
-            target_rse=self.target_rse if self.brem_target_rse is None else self.brem_target_rse,
+            target_rse=self.brem_target_rse,
             min_histories=minimum,
             max_histories=maximum,
             observables=("brem",),
@@ -279,8 +379,15 @@ class Precision:
         return values
 
     @classmethod
-    def from_dict(cls, payload: Mapping[str, Any]) -> Self:
-        """Validate a serialized (stored-vocabulary) policy and restore its fields."""
+    def from_dict(cls, payload: Mapping[str, Any], *, source: str | None = None) -> Self:
+        """Validate a serialized (stored-vocabulary) policy and restore its fields.
+
+        ``source`` names where the payload came from (for example
+        ``"profile 'cleo_sub'"``) in deprecation warnings.
+        """
+        if source is not None:
+            with policy_source(source):
+                return cls.from_dict(payload)
         if not isinstance(payload, Mapping):
             raise TypeError("adaptive_precision must be a mapping")
         values = dict(payload)
@@ -320,24 +427,56 @@ class Precision:
 # the CXR variance gate to ``1/min_effective_histories`` (#1254); v3 gave it its
 # own ``max_variance_of_variance`` threshold (#1262); v4 checks at geometric
 # decision points with a drift-tolerant stability window, independent of
-# transport chunks (#1253).
+# transport chunks (#1253). v5 (#1398) marks every policy that requests brem
+# stopping (it resolves to explicit independent stopping with mirrored keys):
+# the realized counts of legacy ``("cxr", "brem")`` configs change, while fully
+# explicit pre-#1398 independent policies keep their counts and only miss the
+# cache. CXR-only and brem-only policies keep their v4 identities.
 ADAPTIVE_SAMPLING_MODEL = "decision-points-v4"
+ADAPTIVE_BREM_STOPPING_MODEL = "decision-points-v5"
+
+
+def requests_brem_stopping(policy: Mapping[str, Any]) -> bool:
+    """Whether a stored policy (stored vocabulary, possibly legacy) requests brem stopping."""
+    observables = set(policy.get("observables", ("line",)))
+    keyed = any(
+        STORED_KEYS.get(key, key) in policy and policy[STORED_KEYS.get(key, key)] is not None
+        for key in BREM_KEYS
+    )
+    return keyed or {"brem"} < observables
+
+
+def sampling_model(policy: Mapping[str, Any] | Precision) -> str:
+    """The sampling-model generation a policy runs under (identity and record marker)."""
+    payload = policy.to_dict() if isinstance(policy, Precision) else policy
+    return (
+        ADAPTIVE_BREM_STOPPING_MODEL if requests_brem_stopping(payload) else ADAPTIVE_SAMPLING_MODEL
+    )
 
 
 def identity_policy(payload: Mapping[str, Any] | None) -> Mapping[str, Any] | None:
-    """A stored policy without its transport-only chunk hint (``block_electrons``).
+    """A stored policy as identity sees it: normalized, without the chunk hint.
 
-    The hint never changes decisions or output (#1253), so it stays out of
-    dataset identities and case content keys.
+    A brem stopping request resolves to its explicit keys first (#1398), so a
+    legacy ``["cxr", "brem"]`` payload and its explicit form share one identity.
+    The transport-only ``block_electrons`` hint never changes decisions or
+    output (#1253), so it stays out of dataset identities and case content keys.
     """
-    if not isinstance(payload, Mapping) or "block_electrons" not in payload:
+    if not isinstance(payload, Mapping):
+        return payload
+    if requests_brem_stopping(payload):
+        resolved = Precision.from_dict(payload).to_dict()
+        # Keep the payload's own sequence type (stored JSON lists stay lists).
+        resolved["observables"] = type(payload.get("observables", ()))(resolved["observables"])
+        payload = resolved
+    if "block_electrons" not in payload:
         return payload
     return {key: value for key, value in payload.items() if key != "block_electrons"}
 
 
 def _adaptive_sampling_markers(policy) -> dict[str, str]:
     """Re-key adaptive results when the stopping rule changes; fixed N is stable."""
-    return {"adaptive_sampling_model": ADAPTIVE_SAMPLING_MODEL} if policy is not None else {}
+    return {"adaptive_sampling_model": sampling_model(policy)} if policy is not None else {}
 
 
 _BREM_BAND_REDUCTION_MODEL = "cuda-fused-fp32-row-fp64-primary-band-v2"
@@ -353,7 +492,7 @@ def _brem_band_reduction_markers(policy, model) -> dict[str, str]:
     if (
         model == "bremslib"
         and isinstance(policy, Mapping)
-        and "brem" in policy.get("observables", ())
+        and ("brem" in policy.get("observables", ()) or requests_brem_stopping(policy))
     ):
         return {"brem_band_reduction_model": _BREM_BAND_REDUCTION_MODEL}
     return {}
@@ -366,6 +505,9 @@ DEFAULT_PRECISION = Precision(
     min_histories=200,
     max_histories=20_000,
     observables=("cxr", "brem"),
+    brem_target_rse=0.05,
+    brem_min_histories=200,
+    brem_max_histories=20_000,
 )
 
 

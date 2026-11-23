@@ -16,6 +16,11 @@
 # cxr_trials, brem_trials, precision and positional arguments were removed (hard break).
 # Budget fields are *_histories; pyrite.config.Precision was removed (use
 # AdaptiveSampling). Stored adaptive_precision payloads keep *_electrons keys.
+# #1398: AdaptiveSampling's shared stop is CXR-only; a brem request ("brem" next to
+# "cxr" in observables, or any brem_* key) is always independent brem-prefix stopping
+# with mirrored keys (brem_target_rse and brem_max_histories required, brem_min_histories
+# defaulting like min_histories). Omitting a required key warns and inherits the CXR value
+# until 0.39.0 (API_DEPRECATIONS), then is an error. No new exports or fields.
 # #1105: Physics.channeling_admission (also Settings, profile key and CLI
 # --channeling-admission) and QuantumSetup.admission, "admitted" (default) or
 # "accept-inaccurate"; appended last positionally. Channeling cases outside the

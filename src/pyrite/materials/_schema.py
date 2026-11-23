@@ -697,7 +697,11 @@ class MaterialCatalog:
     def profile_precision(self, name: str) -> Precision | None:
         """Adaptive history-count policy for ``name``, or ``None`` for fixed counts."""
         payload = self.profile_precisions.get(name)
-        return None if payload is None else AdaptiveSampling.from_dict(payload)
+        return (
+            None
+            if payload is None
+            else AdaptiveSampling.from_dict(payload, source=f"profile {name!r}")
+        )
 
     def profile_numerics(self, name: str) -> Mapping[str, object] | None:
         """Explicit result-affecting transport numerics for ``name``."""
