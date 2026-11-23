@@ -1201,12 +1201,81 @@
     },
     "optimal_bound_free_screen": 1.014,
     "verdict": "negative"
+   },
+   {
+    "case": "mos2 1 mm 5 MeV tilt 15, 45 deg aperture",
+    "job": 14530,
+    "histories": 1024,
+    "selected_reflections": 20698,
+    "screen_s": 7173.4,
+    "rows": 17926044,
+    "mass_cv": 4.0381,
+    "rows_mass_correlation": 0.1838,
+    "zero_mass_primaries": 0,
+    "mass_share_top": {
+     "0.001": 0.0494,
+     "0.01": 0.32,
+     "0.1": 0.9099,
+     "0.5": 0.9934
+    },
+    "analog": {
+     "relative_se": 0.1262,
+     "variance_of_variance": 0.05231,
+     "vov_gate_passes": false,
+     "shift_over_se": 0.1022,
+     "effective_sample_size": 59.2
+    },
+    "best_arm_free_screen": {
+     "keep_fraction": 0.05,
+     "floor": 0.05,
+     "fom_gain": 3.569,
+     "expected_row_share": 0.2502
+    },
+    "optimal_bound_free_screen": 12.997,
+    "verdict": "pays"
+   },
+   {
+    "case": "mos2 1 mm 30 MeV tilt 15, 45 deg aperture",
+    "job": 14530,
+    "histories": 1024,
+    "selected_reflections": 26276,
+    "screen_s": 7399.5,
+    "rows": 13860132,
+    "mass_cv": 0.7875,
+    "rows_mass_correlation": 0.269,
+    "zero_mass_primaries": 0,
+    "mass_share_top": {
+     "0.001": 0.0173,
+     "0.01": 0.0575,
+     "0.1": 0.2046,
+     "0.5": 0.64
+    },
+    "analog": {
+     "relative_se": 0.0246,
+     "variance_of_variance": 0.26968,
+     "vov_gate_passes": false,
+     "shift_over_se": 0.2287,
+     "effective_sample_size": 632.3
+    },
+    "best_arm_free_screen": {
+     "keep_fraction": 0.25,
+     "floor": 0.5,
+     "fom_gain": 0.846,
+     "expected_row_share": 0.6632
+    },
+    "optimal_bound_free_screen": 1.031,
+    "verdict": "negative"
    }
   ],
-  "timed_out": [
-   "mos2 1 mm 5 MeV (2 h per-case limit; monitor CXR RSE 0.126 at N=1024)",
-   "mos2 1 mm 30 MeV (2 h per-case limit; monitor CXR RSE 0.023 at N=1024)"
+  "verdict": "mixed, not actionable: the free-screen bound pays for mos2 1 MeV (2.98x) and 5 MeV (13.0x; best arm 3.57x) and fails for mos2 and mose2 30 MeV (1.03x, 1.01x). Every case fails the analog VOV gate at N=1024. The screen alone costs 0.5-2 h per case, and production scoring on this scene is dominated by per-flush bin-mean reduction on its resonance-local axis (#1390, #1392): 8.5 h at N=16 (#1326 job 14428) and more than 9 h at N=1024 (14529), so time does not yet fall with rows scored. Gated on #1390/#1392.",
+  "jobs": [
+   14521,
+   14530
   ],
-  "verdict": "mixed: mos2 1 MeV pays on the free-screen bound (2.98x; best arm keep 0.25 floor 0.1, 1.78x), mose2 30 MeV does not (1.01x). Both fail the analog VOV gate at N=1024. Pending: timed kept-row run on mos2 1 MeV (14529) and the two timed-out cases (14530)."
+  "timed_kept_row": {
+   "job": 14529,
+   "case": "mos2 1 mm 1 MeV tilt 15, 45 deg aperture, ARM keep 0.25 floor 0.1, N=1024",
+   "result": "no timing: hit the 9 h per-case limit (rc 124) in the scoring pass after transport; the analog production pass alone exceeds the limit at N=1024"
+  }
  }
 }
