@@ -227,3 +227,34 @@ def test_host_node_sums_match_the_numpy_image_sums():
     want = _envelope_node_sums(E, q, nodes, P)
     got = _host_node_sums(E, q, nodes, P)
     assert np.abs(got - want).max() <= 1e-12 * np.abs(want).max()
+
+
+def test_leftover_bins_share_one_axis_with_gap_bins():
+    """#1390: scattered off-Fourier bins map onto one ascending near/far axis."""
+    from pyrite.montecarlo.spectrum.cxr._fourier_host import (
+        leftover_bins,
+        leftover_inv_width,
+        uniform_runs,
+    )
+
+    edges = np.r_[
+        np.arange(400.0, 700.0, 0.25),
+        700.0,
+        700.6,
+        701.5,
+        702.0,
+        np.arange(702.5, 900.0, 0.5),
+        901.2,
+        np.arange(901.7, 1102.0, 0.5),
+    ]
+    runs = uniform_runs(edges)
+    sub_edges, sub_bins, bins = leftover_bins(edges, runs)
+    np.testing.assert_array_equal(sub_edges, [700.0, 700.6, 701.5, 899.5, 901.2])
+    np.testing.assert_array_equal(bins, [1200, 1201, 1598])
+    np.testing.assert_array_equal(sub_edges[sub_bins], edges[bins])
+    np.testing.assert_array_equal(sub_edges[sub_bins + 1], edges[bins + 1])
+    inv = 1.0 / np.diff(edges)
+    np.testing.assert_array_equal(
+        leftover_inv_width(sub_edges, sub_bins, bins, inv)[sub_bins], inv[bins]
+    )
+    assert leftover_bins(edges, [(0, edges.size - 1, (1.0, 1.0, 1))]) is None

@@ -314,11 +314,19 @@ def test_segmented_device_route_matches_exact_and_near_far_per_run(cp, monkeypat
     e, a, w = _line_set(rng, 300)
     e, a, w = (np.asarray(x, dtype=np.float32).astype(float) for x in (e, a, w))
     edges = np.r_[
-        np.arange(400.0, 700.0, 0.25), 700.0, 700.6, 701.5, 702.0, np.arange(702.5, 1102.0, 0.5)
+        np.arange(400.0, 700.0, 0.25),
+        700.0,
+        700.6,
+        701.5,
+        702.0,
+        np.arange(702.5, 900.0, 0.5),
+        901.2,
+        np.arange(901.7, 1102.0, 0.5),
     ]
     method, runs, flush = resolve_bin_reduction(cp.asarray(edges))
     assert method == "segmented" and flush is not None
-    assert [r[2] is None for r in runs] == [False, True, False]
+    # Two leftover runs between Fourier runs share one near/far launch.
+    assert [r[2] is None for r in runs] == [False, True, False, True, False]
     out = cp.zeros(edges.size - 1, dtype=cp.float64)
     run_bin_mean_reduction_kernel(
         *(cp.asarray(x) for x in (e, a, w, edges, 1 / np.diff(edges))),

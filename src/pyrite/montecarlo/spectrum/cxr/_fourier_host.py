@@ -333,12 +333,42 @@ def uniform_runs(edges, *, min_bins=HOST_SEGMENT_MIN_BINS):
     return runs
 
 
+def leftover_bins(edges, runs):
+    """Every off-Fourier bin of ``runs`` on one ascending axis, or ``None`` (#1390).
+
+    Returns ``(sub_edges, sub_bins, bins)``: the edges of each ``axis=None`` run
+    concatenated, so the gap between two runs becomes one extra bin, with
+    ``sub_bins`` the positions of the real bins on that axis and ``bins`` their
+    indices on ``edges``. One near/far call then covers bins scattered between
+    Fourier runs; a call per single bin leaves the device kernel one block and
+    the host evaluator one thread.
+    """
+    pieces, sub_bins, bins, offset = [], [], [], 0
+    for start, stop, axis in runs:
+        if axis is None:
+            pieces.append(edges[start : stop + 1])
+            sub_bins.append(np.arange(offset, offset + stop - start))
+            bins.append(np.arange(start, stop))
+            offset += stop - start + 1
+    if not pieces:
+        return None
+    return np.concatenate(pieces), np.concatenate(sub_bins), np.concatenate(bins)
+
+
+def leftover_inv_width(sub_edges, sub_bins, bins, inv_width):
+    """``1 / width`` on the :func:`leftover_bins` axis; real bins keep ``inv_width``."""
+    sub_inv = 1.0 / np.diff(sub_edges)
+    sub_inv[sub_bins] = np.asarray(inv_width, dtype=np.float64)[bins]
+    return sub_inv
+
+
 def host_segmented_bin_mean_reduce(E_res, a_width, weight, edges, inv_width, runs=None):
     """``sum_l w_l mean_k(line l)`` on any ascending ``edges``, host FP64 (#1390).
 
     A bin mean depends only on its own edges, so each uniform run of
     :func:`uniform_runs` takes :func:`host_fourier_bin_mean_reduce` on its
-    sub-axis, and the remaining bins the numba near/far evaluator. A
+    sub-axis, and the remaining bins one numba near/far call
+    (:func:`leftover_bins`). A
     piecewise-uniform axis (as built from resonance-local grids) then costs a
     few transforms instead of ``lines * bins`` pairs.
 
@@ -349,11 +379,13 @@ def host_segmented_bin_mean_reduce(E_res, a_width, weight, edges, inv_width, run
     edges = np.asarray(edges, dtype=np.float64)
     inv_width = np.asarray(inv_width, dtype=np.float64)
     out = np.zeros(edges.size - 1, dtype=np.float64)
-    for start, stop, axis in uniform_runs(edges) if runs is None else runs:
-        if axis is None:
-            out[start:stop] = host_near_far_edges_reduce(
-                E_res, a_width, weight, edges[start : stop + 1], inv_width[start:stop]
-            )
-        else:
+    runs = uniform_runs(edges) if runs is None else runs
+    for start, stop, axis in runs:
+        if axis is not None:
             out[start:stop] = host_fourier_bin_mean_reduce(E_res, a_width, weight, axis)
+    leftover = leftover_bins(edges, runs)
+    if leftover is not None:
+        sub_edges, sub_bins, bins = leftover
+        sub_inv = leftover_inv_width(sub_edges, sub_bins, bins, inv_width)
+        out[bins] = host_near_far_edges_reduce(E_res, a_width, weight, sub_edges, sub_inv)[sub_bins]
     return out

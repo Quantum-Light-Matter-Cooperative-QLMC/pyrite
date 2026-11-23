@@ -892,25 +892,35 @@ def _run_segmented_reduction(E_r, aw, w, edges, inv_width, *, out, exact_widths,
 
     Validation: cxr-line-fourier-reduction, sinc-bin-far-envelope
     """
-    from ._fourier_cuda import cuda_fourier_bin_mean_reduce
-    from ._fourier_host import uniform_runs
+    import cupy
 
+    from ._fourier_cuda import cuda_fourier_bin_mean_reduce
+    from ._fourier_host import leftover_bins, leftover_inv_width, uniform_runs
+
+    host_edges = np.asarray(_to_cpu(edges), dtype=np.float64)
     if runs is None:
-        runs = uniform_runs(np.asarray(_to_cpu(edges), dtype=np.float64))
+        runs = uniform_runs(host_edges)
     for start, stop, axis in runs:
-        part = out[start:stop]
-        if axis is None:
-            run_bin_mean_reduction_kernel(
-                E_r,
-                aw,
-                w,
-                edges[start : stop + 1],
-                inv_width[start:stop],
-                out=part,
-                exact_widths=exact_widths,
-            )
-        else:
+        if axis is not None:
+            part = out[start:stop]
             part += cuda_fourier_bin_mean_reduce(E_r, aw, w, axis).astype(out.dtype)
+    leftover = leftover_bins(host_edges, runs)
+    if leftover is not None:
+        # One launch over every leftover bin: a launch per single bin ran one
+        # block over all lines (~0.6 s each on the #1320 flush, nsys 15404).
+        sub_edges, sub_bins, bins = leftover
+        sub_inv = leftover_inv_width(sub_edges, sub_bins, bins, _to_cpu(inv_width))
+        sub_out = cupy.zeros(sub_edges.size - 1, dtype=cupy.float64)
+        run_bin_mean_reduction_kernel(
+            E_r,
+            aw,
+            w,
+            cupy.asarray(sub_edges),
+            cupy.asarray(sub_inv),
+            out=sub_out,
+            exact_widths=exact_widths,
+        )
+        out[cupy.asarray(bins)] += sub_out[cupy.asarray(sub_bins)].astype(out.dtype)
     return out
 
 
