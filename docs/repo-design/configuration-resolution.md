@@ -30,6 +30,10 @@ Each context value resolves independently in this order:
 | `remote.account` | `PYRITE_REMOTE_ACCOUNT` | unset (no `--account`; site default) |
 | `remote.constraint` | `PYRITE_REMOTE_CONSTRAINT` | unset (no `--constraint`) |
 | `remote.max_time` | `PYRITE_REMOTE_MAX_TIME` | unset (no wall-time cap) |
+| `remote.qos` | `PYRITE_REMOTE_QOS` | unset (no `--qos`; site default) |
+| `remote.sbatch_extra` | `PYRITE_REMOTE_SBATCH_EXTRA` | unset (no extra directives) |
+| `remote.mail_type` | `PYRITE_REMOTE_MAIL_TYPE` | unset (no `--mail-type`; no email) |
+| `remote.mail_user` | `PYRITE_REMOTE_MAIL_USER` | unset (no `--mail-user`; submitting user) |
 | `remote.host_exec` | `PYRITE_REMOTE_HOST_EXEC` | unset (host-side PyRITE runs on the login node) |
 | `remote.nice` | `PYRITE_REMOTE_NICE` | `10000` |
 | `workspace.root` | `PYRITE_HOME` | current directory |
@@ -113,6 +117,10 @@ output.
 | `PYRITE_REMOTE_ACCOUNT` | SLURM account for `#SBATCH --account`; unset omits the directive. | Environment > config store (`remote.account`); `console.config`, `remote.config`. | remote resources |
 | `PYRITE_REMOTE_CONSTRAINT` | SLURM node-feature expression for `#SBATCH --constraint`, such as `A100\|H200`; unset omits the directive. | Environment > config store (`remote.constraint`); `console.config`, `remote.config`. | remote resources |
 | `PYRITE_REMOTE_MAX_TIME` | Site wall-time cap in SLURM time syntax, such as `1-00:00:00`. Replaces an `UNLIMITED` request; a larger finite request (chunked: 3 × `--chunk-minutes`) fails before submission. Unset is no cap. | Environment > config store (`remote.max_time`); `console.config`, `remote.config`. | remote resources |
+| `PYRITE_REMOTE_QOS` | SLURM quality of service for `#SBATCH --qos`; unset omits the directive. | Environment > config store (`remote.qos`); `console.config`, `remote.config`. | remote resources |
+| `PYRITE_REMOTE_SBATCH_EXTRA` | Space-separated sbatch long options, each `--name` or `--name=value` without quotes or shell operators, such as `--reservation=lab --exclude=node3`; each becomes one `#SBATCH` line. Options PyRITE writes (`--time`, `--output`, `--error`, `--job-name`, `--signal`, task/CPU/memory counts) or that have their own setting (`--partition`, `--qos`, `--mail-type`, ...) are rejected. Unset adds nothing. | Environment > config store (`remote.sbatch_extra`); `console.config`, `remote.config`. | remote resources |
+| `PYRITE_REMOTE_MAIL_TYPE` | Comma-separated SLURM email events for `#SBATCH --mail-type`, such as `END,FAIL` or `ALL` (case-insensitive; `NONE`, `BEGIN`, `END`, `FAIL`, `REQUEUE`, `ALL`, `INVALID_DEPEND`, `STAGE_OUT`, `TIME_LIMIT`, `TIME_LIMIT_90`/`_80`/`_50`). Each chunked slice is its own job and mails separately. Unset omits the directive and sends no email. | Environment > config store (`remote.mail_type`); `console.config`, `remote.config`. | remote resources |
+| `PYRITE_REMOTE_MAIL_USER` | Email address or cluster username for `#SBATCH --mail-user`; emitted only with `remote.mail_type`. Unset lets SLURM mail the submitting user. | Environment > config store (`remote.mail_user`); `console.config`, `remote.config`. | remote resources |
 | `PYRITE_REMOTE_HOST_EXEC` | Plain-word command prefix (no shell operators or quotes), such as `srun --time=00:30:00 --mem=8G`, for PyRITE Python the helper runs on the host outside batch jobs (`pull` slimming, `remote gc`, `remote trajectories`); runtime variables pass through `env`. Unset runs them on the login node. | Environment > config store (`remote.host_exec`); `console.config`, `remote.config`. | remote execution |
 | `PYRITE_REMOTE_NICE` | Non-negative SLURM `--nice` for chunked submissions and their self-resubmitted slices (and energy-grid jobs); `0` omits it. Unset is `10000`, which lets a shared single-GPU box run other jobs between slices; on an age-priority queue it instead costs queue position. | Environment > config store (`remote.nice`); `console.config`, `remote.config`. | remote resources |
 | `PYRITE_XSGEN_BREMSLIB_SOURCE` | Directory containing the BremsLib source tree; unset is `../BremsLib_v2.0.8`. | `console.config`, `xsgen.sources` | external data/tooling |

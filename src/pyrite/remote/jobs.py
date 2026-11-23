@@ -150,7 +150,10 @@ def stop_jobs(materials=None, all_jobs=False, *, yes=True, profile=None):
         profiles = state._job_profiles([jobid for jobid, _quick, _mats in live])
         jobids = sorted(jobid for jobid, _quick, _mats in live if profiles.get(jobid) == profile)
         if not jobids:
-            raise SystemExit(f"no live job found for profile: {profile}")
+            raise SystemExit(
+                f"no live job found for profile: {profile} on {config.remote_host()}; "
+                "use --target NAME for another target"
+            )
     elif all_jobs:
         if materials:
             raise SystemExit("stop --all does not take material names")

@@ -174,6 +174,65 @@ def _capped_time_limit(time_limit: str) -> str:
     return time_limit
 
 
+# SLURM reruns a requeued batch script (node failure, preemption, admin
+# requeue) from the top under the same job ID, with SLURM_RESTART_COUNT > 0.
+# The first run's TERM handling already wrote FAILED and released this job's
+# checkpoint reservations, and a chunked slice may already have handed off to
+# its successor. ``chain_superseded`` is true once ``meta`` records a later
+# scheduler ID than this one: that job then owns state and reservations.
+_RESTART_HELPERS = """\
+chain_superseded() {
+  latest=$(sed -n "s/^slurm_job_id: //p" "$JOBDIR/meta" 2>/dev/null | tail -1)
+  [ -n "$latest" ] && [ -n "${SLURM_JOB_ID:-}" ] && [ "$latest" != "$SLURM_JOB_ID" ]
+}
+reclaim_reservation() {
+  if mkdir "$RESERVATIONS/$1" 2>/dev/null; then
+    printf '%s\\n' "$JOBID" > "$RESERVATIONS/$1/jobid"
+    return 0
+  fi
+  owner=$(cat "$RESERVATIONS/$1/jobid" 2>/dev/null || true)
+  [ "$owner" = "$JOBID" ] && return 0
+  echo "FAILED (requeued, but checkpoint $1 is now reserved by ${owner:-another job}) $(date -Is)" > "$JOBDIR/state"
+  return 1
+}"""
+# Runs after the traps: a refused restart exits through ``finish``, which
+# releases only reservations this job owns.
+_RESTART_GUARD = """\
+slurm_restarts=${SLURM_RESTART_COUNT:-0}
+if [ "$slurm_restarts" -gt 0 ]; then
+  if chain_superseded; then
+    echo "SLURM job $SLURM_JOB_ID restart $slurm_restarts superseded by a later slice; exiting $(date -Is)" >> "$JOBDIR/log"
+    exit 0
+  fi
+  printf '\\n===== SLURM job %s requeued (restart %s) %s =====\\n' "${SLURM_JOB_ID:-unknown}" "$slurm_restarts" "$(date -Is)" >> "$JOBDIR/log"
+  echo "restarted: $(date -Is) (restart $slurm_restarts)" >> "$JOBDIR/meta"
+  if [ -f "$JOBDIR/STOP" ]; then
+    echo "cancelled (stop requested) $(date -Is)" > "$JOBDIR/state"
+    exit 0
+  fi
+  reclaim_reservations || exit 1
+fi"""
+
+
+def _site_policy_lines(account: str | None, constraint: str | None) -> str:
+    """Render optional site-policy ``#SBATCH`` lines; unset settings emit nothing."""
+    qos, mail_type, mail_user = (
+        config.slurm_qos(),
+        config.slurm_mail_type(),
+        config.slurm_mail_user(),
+    )
+    options = [
+        f"--account={account}" if account else "",
+        f"--qos={qos}" if qos else "",
+        f"--constraint={constraint}" if constraint else "",
+        f"--mail-type={mail_type}" if mail_type else "",
+        # Without --mail-type SLURM sends no mail, so a lone recipient is noise.
+        f"--mail-user={mail_user}" if mail_type and mail_user else "",
+        *config.slurm_sbatch_extra(),
+    ]
+    return "".join(f"#SBATCH {option}\n" for option in options if option)
+
+
 def _slurm_batch_script(
     jobid: str,
     payload: str,
@@ -201,9 +260,7 @@ def _slurm_batch_script(
     nodelist = config.slurm_nodelist()
     nodelist_line = f"#SBATCH --nodelist={nodelist}\n" if nodelist else ""
     account, constraint = config.slurm_account(), config.slurm_constraint()
-    policy_lines = (f"#SBATCH --account={account}\n" if account else "") + (
-        f"#SBATCH --constraint={constraint}\n" if constraint else ""
-    )
+    policy_lines = _site_policy_lines(account, constraint)
     time_limit = _capped_time_limit(time_limit)
     signal_grace = max(10, min(120, int(time_limit) * 30)) if chunked else 0
     signal_line = f"#SBATCH --signal=B:USR1@{signal_grace}\n" if chunked else ""
@@ -218,6 +275,9 @@ def _slurm_batch_script(
             for stem in reservation_stems
         )
         or ":"
+    )
+    reclaim_lines = "\n  ".join(
+        f"reclaim_reservation {stem} || return 1" for stem in reservation_stems
     )
     return f"""#!/usr/bin/env bash
 #SBATCH --job-name={job_name}
@@ -247,15 +307,26 @@ RESERVATIONS={config.shell_word(reservations)}
 release_reservations() {{
   {release_lines}
 }}
+{_RESTART_HELPERS}
+reclaim_reservations() {{
+  mkdir -p "$RESERVATIONS" || return 1
+  {reclaim_lines or ":"}
+}}
 termination_signal=""
 termination_status=0
 record_termination() {{
   termination_signal=$1
   termination_status=$2
-  echo "FAILED (signal $termination_signal) $(date -Is)" > "$JOBDIR/state"
+  # A later slice owns state and reservations once this job is superseded.
+  chain_superseded || echo "FAILED (signal $termination_signal) $(date -Is)" > "$JOBDIR/state"
 }}
 finish() {{
   status=$?
+  if chain_superseded; then
+    trap - EXIT
+    [ -n "$termination_signal" ] && exit "$termination_status"
+    exit "$status"
+  fi
   if [ -n "$termination_signal" ]; then
     echo "FAILED (signal $termination_signal) $(date -Is)" > "$JOBDIR/state"
     release_reservations
@@ -273,6 +344,7 @@ trap 'record_termination TERM 143' TERM
 trap 'record_termination INT 130' INT
 trap 'record_termination HUP 129' HUP
 trap finish EXIT
+{_RESTART_GUARD}
 echo "running $(date -Is)" > "$JOBDIR/state"
 {{
   echo "===== SLURM job ${{SLURM_JOB_ID:-unknown}} ====="

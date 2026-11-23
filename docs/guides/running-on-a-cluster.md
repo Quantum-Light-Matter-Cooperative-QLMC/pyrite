@@ -146,6 +146,28 @@ ships your local tables.
    yields a shared box to other jobs between slices. Where priority is mostly
    queue age (`ssh MY_SSH_ALIAS 'sprio -w'`), that penalty delays every slice;
    set `pyrite remote target edit campus --nice 0`.
+
+   For email when jobs finish or fail, set SLURM mail events and, if the
+   site does not deliver to your cluster username, a recipient:
+
+   ```bash
+   pyrite remote target edit campus --mail-type END,FAIL --mail-user you@example.org
+   ```
+
+   Every chunked slice is a separate SLURM job, so `END` mails once per
+   slice; use `FAIL` alone for long chunked runs. An empty `--mail-type ''`
+   turns notifications off.
+
+   A site QOS goes in `--qos`. Any other sbatch option the site needs, such as
+   a reservation or excluded nodes, goes in `--sbatch-extra` as long options:
+
+   ```bash
+   pyrite remote target edit campus --qos highp \
+     --sbatch-extra '--reservation=lab_resv --exclude=node3'
+   ```
+
+   Options PyRITE writes itself (time, output, job name, signal, CPU and memory
+   counts) or that have their own flag are rejected.
 5. If the site routes file transfers through data-transfer nodes (DTNs), give
    the DTN its own SSH alias and add it as the target's transfer host:
 

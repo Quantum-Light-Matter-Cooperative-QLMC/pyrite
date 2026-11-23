@@ -22,8 +22,12 @@ _FIELDS = (
     "nodelist",
     "gres",
     "account",
+    "qos",
     "constraint",
     "max_time",
+    "mail_type",
+    "mail_user",
+    "sbatch_extra",
     "host_exec",
     "nice",
     "transfer_host",
@@ -116,6 +120,10 @@ def _fallback_values(exclude=()):
                 ("account", "SLURM_ACCOUNT"),
                 ("constraint", "SLURM_CONSTRAINT"),
                 ("max_time", "SLURM_MAX_TIME"),
+                ("mail_type", "SLURM_MAIL_TYPE"),
+                ("mail_user", "SLURM_MAIL_USER"),
+                ("qos", "SLURM_QOS"),
+                ("sbatch_extra", "SLURM_SBATCH_EXTRA"),
                 ("host_exec", "HOST_EXEC"),
                 ("nice", "SLURM_NICE"),
             )
@@ -188,6 +196,48 @@ def job_target(jobid: str) -> RemoteTarget | None:
     if len(records) > 1:
         raise ValueError(f"job {jobid!r} exists on multiple targets; specify --target")
     return RemoteTarget(**next(iter(records.values()))) if records else None
+
+
+def profile_job_target(profile: str) -> RemoteTarget | None:
+    """Return the one target that ran jobs named for ``profile``, from local records.
+
+    Profile submissions name their job ``PROFILE`` or ``PROFILE-N``. ``None``
+    means no such job was recorded locally; records on several targets raise.
+    """
+    table = store._read_store().get("remote_jobs", {})
+    if not isinstance(table, dict):
+        raise store.ConfigError("remote_jobs must be a table")
+    pattern = re.compile(rf"{re.escape(profile)}(?:-\d+)?\Z")
+    found: dict[tuple[str, str], RemoteTarget] = {}
+    for jobid, records in table.items():
+        if pattern.match(jobid) and isinstance(records, dict):
+            for record in records.values():
+                target = RemoteTarget(**record)
+                found[(target.host, target.remote_dir)] = target
+    if len(found) > 1:
+        names = ", ".join(sorted(t.name or t.host for t in found.values()))
+        raise ValueError(
+            f"profile {profile!r} has jobs on several targets ({names}); specify --target"
+        )
+    return next(iter(found.values()), None)
+
+
+@contextmanager
+def selected_for_profile(profile: str):
+    """Bind the target that ran ``profile``'s jobs unless one is already chosen.
+
+    An explicit ``--target`` or ``PYRITE_REMOTE_TARGET`` wins; otherwise local
+    job records beat the default target, as they do for a job ID.
+    """
+    if config._TARGET.get() is not None or os.environ.get("PYRITE_REMOTE_TARGET") is not None:
+        yield
+        return
+    target = profile_job_target(profile)
+    if target is None:
+        yield
+    else:
+        with config.use_target(target):
+            yield
 
 
 @contextmanager
