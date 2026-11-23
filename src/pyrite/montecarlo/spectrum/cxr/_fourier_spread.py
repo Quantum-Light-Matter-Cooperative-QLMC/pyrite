@@ -428,3 +428,83 @@ def es_mode_transform(phase, strengths, j0, j1, *, eps=1e-12, plans=None, spread
     spectrum = cp.fft.fft(grid, axis=1)
     centred = cp.arange(-(modes // 2), modes - modes // 2) % n_fine
     return spectrum[:, centred] * deconv
+
+
+@lru_cache(maxsize=1)
+def _interp_kernel():
+    """One thread per point: ``out[k] = sum_l phi(l step - x_k) grid[l]`` (fixed order)."""
+    cp = import_module("cupy")
+    return cp.RawKernel(
+        r"""
+#include <cupy/complex.cuh>
+extern "C" __global__ void es_interp(
+    const double* x, const complex<double>* grid, const long long n,
+    const long long n_fine, const int width, const double beta, complex<double>* out) {
+    const long long k = (long long)blockIdx.x * blockDim.x + threadIdx.x;
+    if (k >= n) return;
+    const double two_pi = 6.283185307179586;
+    const double h = two_pi / double(n_fine);
+    double xk = fmod(x[k], two_pi);
+    if (xk < 0.0) xk += two_pi;
+    const double u = xk / h;
+    const double half = 0.5 * double(width);
+    const long long l0 = (long long)ceil(u - half);
+    complex<double> acc(0.0, 0.0);
+    for (int p = 0; p < width; ++p) {
+        const long long l = l0 + p;
+        const double z = (double(l) - u) / half;
+        const double arg = 1.0 - z * z;
+        if (arg <= 0.0) continue;
+        long long idx = l % n_fine;
+        if (idx < 0) idx += n_fine;
+        acc += exp(beta * (sqrt(arg) - 1.0)) * grid[idx];
+    }
+    out[k] = acc;
+}
+""",
+        "es_interp",
+    )
+
+
+def es_mode_evaluate(coeffs, j0, x, *, eps=1e-12, plans=None):
+    """Device type-2 transform ``sum_j coeffs[j - j0] exp(i j x_k)`` (#1392).
+
+    The adjoint of the type-1 spreaders with the same kernel width, shape
+    parameter, upsampling and (real) deconvolution factors; mirrors
+    ``_fourier_host.host_es_mode_evaluate``. One thread per point sums its
+    window in a fixed order, so the result does not depend on launch order.
+    ``plans`` caches the deconvolution factors by mode count.
+
+    Validation: cxr-line-fourier-reduction
+    """
+    cp = import_module("cupy")
+    coeffs = cp.asarray(coeffs, dtype=cp.complex128)
+    x = cp.ascontiguousarray(x, dtype=cp.float64)
+    modes = coeffs.size
+    width = es_width(eps)
+    n_fine = _fine_size(modes, width)
+    shift = j0 + modes // 2
+    deconv = None if plans is None else plans.get(modes)
+    if deconv is None:
+        deconv = _deconvolution(cp, modes, n_fine, width)
+        if plans is not None:
+            plans[modes] = deconv
+    grid = cp.zeros(n_fine, dtype=cp.complex128)
+    grid[cp.arange(-(modes // 2), modes - modes // 2) % n_fine] = coeffs * deconv
+    grid = n_fine * cp.fft.ifft(grid)
+    out = cp.empty(x.size, dtype=cp.complex128)
+    if x.size:
+        _interp_kernel()(
+            ((x.size + 255) // 256,),
+            (256,),
+            (
+                x,
+                grid,
+                np.int64(x.size),
+                np.int64(n_fine),
+                np.int32(width),
+                np.float64(_BETA_PER_WIDTH * width),
+                out,
+            ),
+        )
+    return out * cp.exp(1j * shift * x)

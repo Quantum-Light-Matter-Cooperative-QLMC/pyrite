@@ -889,22 +889,26 @@ def host_near_far_applies() -> bool:
 
 
 def _run_segmented_reduction(E_r, aw, w, edges, inv_width, *, out, exact_widths, runs):
-    """Device ``"segmented"`` flush: Fourier per uniform run, near/far elsewhere (#1390).
+    """Device ``"segmented"`` flush: shared-mode Fourier on the uniform runs, near/far elsewhere.
+
+    #1390 split the axis; #1392 shares one line transform across its runs.
 
     Validation: cxr-line-fourier-reduction, sinc-bin-far-envelope
     """
     import cupy
 
-    from ._fourier_cuda import cuda_fourier_bin_mean_reduce
+    from ._fourier_cuda import cuda_fourier_runs_reduce
     from ._fourier_host import leftover_bins, leftover_inv_width, uniform_runs
 
     host_edges = np.asarray(_to_cpu(edges), dtype=np.float64)
     if runs is None:
         runs = uniform_runs(host_edges)
-    for start, stop, axis in runs:
-        if axis is not None:
-            part = out[start:stop]
-            part += cuda_fourier_bin_mean_reduce(E_r, aw, w, axis).astype(out.dtype)
+    fourier = [(start, stop, axis) for start, stop, axis in runs if axis is not None]
+    if fourier:
+        # One line transform serves every run (#1392).
+        parts = cuda_fourier_runs_reduce(E_r, aw, w, [r[2] for r in fourier])
+        for (start, stop, _), part in zip(fourier, parts, strict=True):
+            out[start:stop] += part.astype(out.dtype)
     leftover = leftover_bins(host_edges, runs)
     if leftover is not None:
         # One launch over every leftover bin: a launch per single bin ran one

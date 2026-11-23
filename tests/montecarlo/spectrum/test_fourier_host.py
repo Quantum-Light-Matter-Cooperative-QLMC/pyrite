@@ -258,3 +258,91 @@ def test_leftover_bins_share_one_axis_with_gap_bins():
         leftover_inv_width(sub_edges, sub_bins, bins, inv)[sub_bins], inv[bins]
     )
     assert leftover_bins(edges, [(0, edges.size - 1, (1.0, 1.0, 1))]) is None
+
+
+# ---- shared-mode runs (#1392) ---------------------------------------------------
+@pytest.mark.parametrize(("modes", "j0", "eps"), [(1, 0, 1e-12), (37, 0, 1e-9), (4097, 5, 1e-12)])
+def test_host_type2_matches_direct_sums_and_is_the_spreader_adjoint(modes, j0, eps):
+    """ES type-2 = direct trigonometric sums within ``eps`` of the l1 norm, and
+    ``<T1 s, c> = <s, T2 c>`` against the host type-1 spreader.
+
+    Validation: cxr-line-fourier-reduction
+    """
+    from pyrite.montecarlo.spectrum.cxr._fourier_host import host_es_mode_evaluate
+
+    rng = np.random.default_rng(1392)
+    coeffs = rng.normal(size=modes) + 1j * rng.normal(size=modes)
+    x = rng.uniform(-30.0, 30.0, 400)
+    want = np.exp(1j * np.outer(x, np.arange(j0, j0 + modes))) @ coeffs
+    got = host_es_mode_evaluate(coeffs, j0, x, eps=eps)
+    assert np.abs(got - want).max() <= 10 * eps * np.abs(coeffs).sum()
+    strengths = rng.normal(size=(2, x.size))
+    forward = host_es_mode_transform(x, strengths, j0, j0 + modes, eps=eps)[0]
+    lhs = np.vdot(coeffs, forward)  # sum conj(c_j) sum_k s_k e^{-i j x_k}
+    rhs = np.vdot(got, strengths[0])
+    assert abs(lhs - rhs) <= 10 * eps * np.abs(coeffs).sum() * np.abs(strengths[0]).sum()
+
+
+def _mixed_runs():
+    """Uniform runs of three widths, one width repeated (one shared type-2 group)."""
+    return [(600.0, 0.25, 801), (801.0, 0.4, 300), (922.0, 0.25, 400), (1100.0, 0.31, 64)]
+
+
+@pytest.mark.parametrize("cap", [None, 1 << 12])
+def test_shared_mode_runs_match_the_per_run_route_and_exact_bin_means(cap):
+    """One line transform for all runs = per-run Fourier route within the bound.
+
+    Mixed widths (0.002 eV over-cap to 900 eV), a broad line, signed and zero
+    weights, lines off every run. With the small cap, over-cap lines take
+    near/far and its far-envelope allowance on both routes (~1e-5 of peak).
+
+    Validation: cxr-line-fourier-reduction, cxr-line-broad-interpolation
+    """
+    from pyrite.montecarlo.spectrum.cxr._fourier_host import host_fourier_runs_reduce
+
+    E, a, w = _mixed_width_lines()
+    E, a, w = np.r_[E, 950.0, 3000.0], np.r_[a, np.pi / 1500.0, np.pi / 2.0], np.r_[w, 0.7, 0.0]
+    axes = _mixed_runs()
+    kwargs = {} if cap is None else {"max_line_modes": cap}
+    parts = host_fourier_runs_reduce(E, a, w, axes, **kwargs)
+    mass = np.abs(w * np.pi / a).sum()
+    tol = 1e-6 if cap is None else 2e-5
+    for part, axis in zip(parts, axes, strict=True):
+        single = host_fourier_bin_mean_reduce(E, a, w, axis, **kwargs)
+        exact = _exact(E, a, w, *axis)
+        assert part.shape == (axis[2],)
+        assert np.abs(part - exact).max() <= tol * np.abs(exact).max()
+        assert np.abs(part - single).max() <= 1e-9 * mass
+
+
+def test_shared_mode_runs_do_not_depend_on_thread_count():
+    """Validation: cxr-line-fourier-reduction"""
+    import numba
+
+    from pyrite.montecarlo.spectrum.cxr._fourier_host import host_fourier_runs_reduce
+
+    E, a, w = _mixed_width_lines()
+    before = numba.get_num_threads()
+    try:
+        numba.set_num_threads(1)
+        serial = host_fourier_runs_reduce(E, a, w, _mixed_runs())
+        numba.set_num_threads(before)
+        threaded = host_fourier_runs_reduce(E, a, w, _mixed_runs())
+    finally:
+        numba.set_num_threads(before)
+    for one, many in zip(serial, threaded, strict=True):
+        np.testing.assert_array_equal(one, many)
+
+
+def test_shared_mode_runs_handle_empty_and_all_broad_lines():
+    from pyrite.montecarlo.spectrum.cxr._fourier_host import host_fourier_runs_reduce
+
+    axes = _mixed_runs()
+    empty = host_fourier_runs_reduce(np.ones(2), np.ones(2), np.zeros(2), axes)
+    assert [p.tolist() for p in empty] == [[0.0] * n for _, _, n in axes]
+    E, a, w = np.array([700.0, 1000.0]), np.full(2, np.pi / 5000.0), np.array([1.0, -0.5])
+    for part, axis in zip(host_fourier_runs_reduce(E, a, w, axes), axes, strict=True):
+        exact = _exact(E, a, w, *axis)
+        assert np.abs(part - exact).max() <= 1e-6 * np.abs(exact).max()
+    with pytest.raises(ValueError, match="positive finite"):
+        host_fourier_runs_reduce(E, -a, w, axes)
