@@ -2,6 +2,7 @@
 
 import os
 from dataclasses import replace
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -125,6 +126,20 @@ def test_unshardable_case_fails_before_submission(tmp_path, client):
     with pytest.raises(ValueError, match="adaptive"):
         executor.execute([{**case, "adaptive_precision": {}}])
     assert executor.last_run_dir is None
+
+
+def test_device_scored_policy_marks_cases_and_routes_joins_to_gpu_workers(tmp_path):
+    from pyrite.execution.dask_shards import _task_resources
+
+    with pytest.raises(ValueError, match="scoring"):
+        ShardPolicy(shard_electrons=4, scoring="tpu")
+    executor = SimpleNamespace(sharding=ShardPolicy(shard_electrons=4, scoring="gpu"))
+    assert _task_resources(executor, None) == {"GPU": 1}
+    assert _task_resources(executor, 0) is None
+    executor.sharding = ShardPolicy(shard_electrons=4)
+    assert _task_resources(executor, None) is None
+    device = _executor(tmp_path, None, shard_electrons=4, scoring="gpu")
+    assert device.transport_realization == TransportRealization(scoring="gpu")
 
 
 def test_shard_policy_refuses_other_cores():

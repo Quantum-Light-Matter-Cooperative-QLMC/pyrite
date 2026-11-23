@@ -51,7 +51,7 @@ class ShardedDaskExecutor(DaskExecutor):
     def transport_realization(self):
         from ..montecarlo.realization import TransportRealization
 
-        return TransportRealization()
+        return TransportRealization(scoring=self.sharding.scoring)
 
     def runtime_plan(self, cases: Sequence[Any], max_workers: int | None = None) -> dict[str, Any]:
         plan = super().runtime_plan(cases, max_workers)
@@ -218,8 +218,8 @@ def execute_sharded(executor, cases: Sequence[Any], *, callback=None, **options:
     if executor._running.is_set():
         raise RuntimeError("Dask executor already running")
     executor._validate_configuration()
-    if executor.resources.gpu_count:
-        raise ValueError("history shards run on CPU workers only")
+    if executor.resources.gpu_count and executor.sharding.scoring == "cpu":
+        raise ValueError("CPU-scored history shards run on CPU workers only")
     from ..campaign.realization import prepare_executor_cases
 
     cases = prepare_executor_cases(executor, cases)
@@ -327,6 +327,11 @@ def _missing_shards(store, material, keys):
     return missing
 
 
+def _task_resources(executor, shard):
+    """A device-scored join needs a worker advertising ``GPU``; shards run anywhere."""
+    return {"GPU": 1} if shard is None and executor.sharding.scoring == "gpu" else None
+
+
 def _completed_tasks(executor, run_dir, pending):
     """Refill a bounded task window; joins become ready only after their shards."""
     from distributed import as_completed
@@ -346,7 +351,11 @@ def _completed_tasks(executor, run_dir, pending):
                     if executor._cancelled.is_set():
                         break
                     future = executor._client.submit(
-                        fn, *args, pure=False, retries=executor.retry_policy.max_attempts - 1
+                        fn,
+                        *args,
+                        pure=False,
+                        retries=executor.retry_policy.max_attempts - 1,
+                        resources=_task_resources(executor, shard),
                     )
                     active[future] = (index, shard)
                     executor._futures.append(future)

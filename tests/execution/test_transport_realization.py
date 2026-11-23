@@ -54,6 +54,40 @@ def test_marker_is_validated_immutable_and_identity_significant():
     assert prepare_executor_case(LocalExecutor(), original) is original
 
 
+def test_device_scoring_is_recorded_and_cpu_scoring_stays_implicit():
+    """#1387: ``scoring='gpu'`` is identity-bearing; CPU keeps the v1 two-key record."""
+    original = _legacy_case()
+    gpu = TransportRealization(scoring="gpu")
+    assert dict(MARKER) == {"schema": MARKER.schema, "core": "per-electron"}
+    assert dict(gpu) == {**MARKER, "scoring": "gpu"}
+    assert Case(**original, transport_realization={**MARKER, "scoring": "cpu"}) == Case(
+        **original, transport_realization=MARKER
+    )
+    keys = {
+        case_content_key({**original, "transport_realization": dict(marker)})
+        for marker in (MARKER, gpu)
+    }
+    assert len(keys) == 2
+    assert Case(**original, transport_realization=dict(gpu)).transport_realization == gpu
+    # CPU markers keep the original two-field pickle state; old states still load.
+    assert MARKER.__getstate__() == [MARKER.schema, "per-electron"]
+    restored = TransportRealization.__new__(TransportRealization)
+    restored.__setstate__([MARKER.schema, "per-electron"])
+    assert restored == MARKER
+    assert pickle.loads(pickle.dumps(gpu)) == gpu
+
+
+def test_device_scoring_refuses_a_cpu_process(monkeypatch):
+    from pyrite.montecarlo.realization import require_scoring_backend
+    from pyrite.montecarlo.runner.chunking import _RESOURCE_POLICY
+
+    monkeypatch.setattr(_RESOURCE_POLICY, "gpu", False)
+    require_scoring_backend({"transport_realization": MARKER})
+    require_scoring_backend({})
+    with pytest.raises(ValueError, match="scoring='gpu' needs a GPU process"):
+        require_scoring_backend({"transport_realization": TransportRealization(scoring="gpu")})
+
+
 @pytest.mark.parametrize(
     "marker",
     [
@@ -63,6 +97,7 @@ def test_marker_is_validated_immutable_and_identity_significant():
         {**MARKER, "extra": 1},
         {**MARKER, "core": "lockstep"},
         {**MARKER, "schema": "unknown"},
+        {**MARKER, "scoring": "tpu"},
     ],
 )
 def test_bad_realization_fails_before_case_use(marker):

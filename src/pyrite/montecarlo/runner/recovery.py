@@ -333,9 +333,11 @@ def _spectrum_with_recovery(
 ):
     """Apply the same retry/admitted CPU policy in every execution topology."""
     from .. import runner
+    from ..realization import require_scoring_backend
     from .adaptive import STREAMED_ROUTE_KEY
     from .oom import _drop_traceback_locals
 
+    require_scoring_backend(case)
     if (route := tp.get(STREAMED_ROUTE_KEY)) is not None:
         return _streamed_adaptive(case, route, tp["transport_core"])
     if not runner._RESOURCE_POLICY.gpu:

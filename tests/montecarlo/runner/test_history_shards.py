@@ -147,3 +147,53 @@ def test_marked_case_honors_auto_env_and_pool_default(case_and_reference, monkey
     worker = _pool_worker(case, transport=False)
     np.testing.assert_array_equal(worker(case)["spec"], reference["spec"])
     assert runner.env_value("PYRITE_MC_TRANSPORT_CORE") == "lockstep"
+
+
+def test_device_scored_join_refuses_a_cpu_process(monkeypatch):
+    from pyrite.montecarlo.runner.chunking import _RESOURCE_POLICY
+
+    monkeypatch.setattr(_RESOURCE_POLICY, "gpu", False)
+    case = bind_realization(_case(), TransportRealization(scoring="gpu"))
+    shards = [transport_history_shard(case, *span) for span in shard_ranges(case, 7)]
+    with pytest.raises(ValueError, match="scoring='gpu' needs a GPU process"):
+        run_case_from_shards(case, shards)
+
+
+@pytest.mark.hardware
+@pytest.mark.slow
+@pytest.mark.parametrize("shard_electrons", [5, 4])
+def test_device_scored_join_equals_the_device_scored_single_run(shard_electrons):
+    """#1387: CPU transport shards + a GPU-scored join = the marked GPU-scored run.
+
+    Shards cross a pickle boundary, as from CPU workers. Exact on the same
+    device; CPU-scored marked results are pinned by the tests above.
+    """
+    from pyrite._backend import BACKEND
+
+    if BACKEND.name != "cuda":
+        pytest.skip("requires CUDA backend")
+    case = bind_realization(_case(), TransportRealization(scoring="gpu"))
+    ref = runner.run_case(case, transport_core="per-electron")
+    for key in _UNTIMED_OUTPUT_KEYS:
+        ref.pop(key, None)
+    shards = [
+        pickle.loads(pickle.dumps(transport_history_shard(case, *span)))
+        for span in shard_ranges(case, shard_electrons)
+    ]
+    got = run_case_from_shards(case, shards)
+    _assert_identical(_host(got), _host(ref))
+    cpu = runner.run_case(
+        bind_realization(_case(), TransportRealization()), transport_core="per-electron"
+    )
+    assert (
+        np.abs(np.asarray(_host(ref)["spec"]) - cpu["spec"]).max()
+        <= 1e-6 * np.abs(cpu["spec"]).max()
+    )
+
+
+def _host(value):
+    from pyrite._backend import BACKEND
+
+    if isinstance(value, dict):
+        return {key: _host(item) for key, item in value.items()}
+    return BACKEND.to_cpu(value) if BACKEND.is_array(value) else value

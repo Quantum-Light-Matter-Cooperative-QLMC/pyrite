@@ -41,13 +41,17 @@ class ShardPolicy:
     (default: the whole shard); it never changes results. ``transport_core``
     must resolve to ``"per-electron"``: the lockstep core cannot shard and GPU
     shards are not supported. ``keep_shards`` keeps shard files after their
-    case artifact is published (default: delete them).
+    case artifact is published (default: delete them). ``scoring`` is the
+    join's spectrum backend: ``"cpu"`` (default) or ``"gpu"``, which scores on
+    a Dask worker advertising the ``GPU`` resource and gives the cases a
+    distinct, device-scored realization identity.
     """
 
     shard_electrons: int
     block_electrons: int | None = None
     transport_core: str = "per-electron"
     keep_shards: bool = False
+    scoring: str = "cpu"
 
     def __post_init__(self) -> None:
         for field in ("shard_electrons", "block_electrons"):
@@ -58,6 +62,8 @@ class ShardPolicy:
                 raise ValueError(f"{field} must be a positive integer")
         if self.transport_core != "per-electron":
             raise ValueError("history shards run on transport_core='per-electron' only")
+        if self.scoring not in ("cpu", "gpu"):
+            raise ValueError("ShardPolicy.scoring must be 'cpu' or 'gpu'")
 
 
 def shard_content_key(case_key: str, start: int, stop: int, transport_core: str) -> str:

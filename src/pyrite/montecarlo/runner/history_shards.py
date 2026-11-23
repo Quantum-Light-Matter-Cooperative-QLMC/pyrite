@@ -16,12 +16,13 @@ seeding scheme exists here.
 
 Supported: fixed-count cases on the per-electron CPU core. Refused before any
 work: the lockstep core (one generator across electrons), the CUDA core (GPU
-shards are out of scope), adaptive electron counts, secondary cascades,
+transport shards are out of scope; a ``scoring="gpu"`` realization scores the
+join on the device instead), adaptive electron counts, secondary cascades,
 channeling, transition radiation, photon transport and GDF beams.
 """
 
 from collections.abc import Sequence
-from contextlib import nullcontext
+from contextlib import contextmanager, nullcontext
 from typing import Any
 
 from .block_transport import ElectronShard, ShardJoin, electron_blocks
@@ -105,17 +106,19 @@ def run_case_from_shards(
 
     ``shards`` must cover the transport population ``[0, max(Ne, Ne_brem))``
     contiguously, as :func:`transport_history_shard` returned them. The spectrum
-    phase runs as the serial CPU scheduler runs it; untimed private metrics are
-    dropped exactly as there.
+    phase runs as the serial scheduler runs it, on the backend a marked case's
+    realization names (``scoring``: CPU by default, or the process's GPU);
+    untimed private metrics are dropped exactly as there.
     """
     from .. import runner
-    from .chunking import _RESOURCE_POLICY, _cpu_spectrum_backend
-    from .recovery import _spectrum_with_recovery, recovery_engine
+    from ..realization import case_realization, realization_context
+    from .recovery import _spectrum_with_recovery
     from .scheduling import _UNTIMED_OUTPUT_KEYS
 
     core = refuse_unshardable(case, transport_core)
-    force_cpu = _RESOURCE_POLICY.gpu
-    with recovery_engine("cpu"), _cpu_spectrum_backend() if force_cpu else nullcontext():
+    # A marked case's realization names the spectrum backend ("cpu" or "gpu").
+    marked = case_realization(case) is not None
+    with realization_context(case) if marked else _unmarked_cpu_scope():
         transport = runner._transport_case(
             case,
             record_timing,
@@ -127,3 +130,13 @@ def run_case_from_shards(
         for key in _UNTIMED_OUTPUT_KEYS:
             out.pop(key, None)
     return out
+
+
+@contextmanager
+def _unmarked_cpu_scope():
+    """An unmarked join scores on CPU, as the serial CPU scheduler does."""
+    from .chunking import _RESOURCE_POLICY, _cpu_spectrum_backend
+    from .recovery import recovery_engine
+
+    with recovery_engine("cpu"), _cpu_spectrum_backend() if _RESOURCE_POLICY.gpu else nullcontext():
+        yield

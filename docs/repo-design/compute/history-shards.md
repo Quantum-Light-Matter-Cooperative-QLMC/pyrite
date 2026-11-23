@@ -1,6 +1,7 @@
 # History shards
 
-Experimental, CPU only (#1387). Every execution backend parallelizes across
+Experimental (#1387). Transport shards run on CPU; the join scores on CPU, or
+on one GPU with `ShardPolicy(scoring="gpu")`. Every execution backend parallelizes across
 cases, so one expensive case gets no speedup from more hardware. History
 shards split one fixed-count case's electron histories into ranges that run on
 separate workers, then join them into the result a single run over
@@ -65,6 +66,28 @@ Before keys or resume are evaluated, the executor binds an immutable
 
 This admitted realization uses CPU per-electron transport and CPU spectrum
 scoring, including when a GPU is available in the coordinating process.
+
+`ShardPolicy(scoring="gpu")` binds the device-scored variant instead:
+
+```json
+{"schema": "pyrite.transport-realization.v1", "core": "per-electron", "scoring": "gpu"}
+```
+
+- **Transport** is unchanged: CPU per-electron shards. They run on any worker,
+  including a CPU-only one.
+- **The join** is submitted with the Dask resource `GPU=1`, so it needs a
+  worker started with `--resources GPU=1` (for example a #1386 GPU worker), and
+  scores the spectrum phase on that process's CuPy backend.
+- **No silent CPU fallback.** A GPU out-of-memory error raises instead of
+  rescoring on CPU. A CPU-only process refuses the spectrum phase of a
+  device-scored case before it starts.
+- **Exactness.** A device-scored result equals the unsharded marked run with
+  device scoring, bit for bit on the same device. It is a different
+  realization from the CPU-scored one, and its distinct key keeps the two from
+  sharing artifacts.
+
+The CPU record stays implicit (two keys, the original pickle state), so every
+CPU-marked key and stored artifact is unchanged.
 Conflicting explicit transport-core requests or environment pins fail early.
 An ordinary serial run of the same marked case reproduces the same numerical
 realization. Shard size, block size, worker count and scheduler placement do
@@ -115,12 +138,15 @@ a read or publication, the worker reuses the completed case artifact.
 
 - Refused before staging (`refuse_unshardable`): the lockstep core (one
   generator across electrons; CPU `"auto"` resolves to it, so pin
-  `transport_core="per-electron"`), the CUDA core (GPU shards are out of
-  scope), adaptive electron counts, secondary cascades, channeling, transition
+  `transport_core="per-electron"`), the CUDA transport core (GPU transport shards are out of scope;
+  `scoring="gpu"` moves only the join to a GPU), adaptive electron counts, secondary cascades, channeling, transition
   radiation, photon transport, GDF beams, and observation directions.
 - The equality is with the per-electron run, not the CPU default (lockstep),
   which is a different realization of the same distribution.
 - The spectrum phase is serial at the join, so the speedup is bounded by the
-  transport share of the case wall time.
+  transport share of the case wall time. Sharding pays for transport-dominated
+  cases. For line-dominated ones (the #1320 thick-target case: transport about
+  3 s, spectrum phase hours on CPU and minutes on one GPU), `scoring="gpu"`
+  shortens the join, and parallel line scoring is #1395.
 - The join holds every row, as the unsharded run does.
 
