@@ -23,13 +23,10 @@ def _completed_materials(jobid, materials):
     return [material for material in materials if material in completed]
 
 
-def _materials_needing_pull(jobid, materials):
-    """Return successful materials whose remote scan added checkpoint cases.
+def _progress_records(jobid, materials):
+    """Return each material's box-side ``progress/<material>.json`` record.
 
-    A repeated remote run can finish successfully using only the box-side case
-    cache.  Its checkpoint is then identical to the one already pulled
-    locally, so avoid retransferring it.  Missing or invalid progress records
-    remain eligible to pull: transfer is safer than assuming equivalence.
+    Missing or unparsable records are omitted.
     """
     transport._check_shell_tokens([jobid, *materials])
     jobdir = config.shell_remote_path(config.JOBS_SUBDIR, jobid)
@@ -47,12 +44,41 @@ def _materials_needing_pull(jobid, materials):
             records[material] = json.loads(payload)
         except json.JSONDecodeError:
             continue
+    return records
+
+
+def _materials_needing_pull(jobid, materials):
+    """Return successful materials whose remote scan added checkpoint cases.
+
+    A repeated remote run can finish successfully using only the box-side case
+    cache.  Its checkpoint is then identical to the one already pulled
+    locally, so avoid retransferring it.  Missing or invalid progress records
+    remain eligible to pull: transfer is safer than assuming equivalence.
+    """
+    records = _progress_records(jobid, materials)
     return [
         material
         for material in materials
         if not isinstance(records.get(material, {}).get("completed_new_cases"), int)
         or records[material]["completed_new_cases"] > 0
     ]
+
+
+def _partial_materials(jobid, materials):
+    """Return ``{material: (new_cases, total_cases)}`` for failed scans that saved cases.
+
+    A scan that fails mid-material has already persisted every finished case
+    in its checkpoint, so those cases stay worth pulling. Only a valid
+    progress record with a positive ``completed_new_cases`` qualifies.
+    """
+    if not materials:
+        return {}
+    partial = {}
+    for material, record in _progress_records(jobid, materials).items():
+        new_cases = record.get("completed_new_cases") if isinstance(record, dict) else None
+        if isinstance(new_cases, int) and new_cases > 0:
+            partial[material] = (new_cases, record.get("total_cases"))
+    return partial
 
 
 def _job_state(jobid):

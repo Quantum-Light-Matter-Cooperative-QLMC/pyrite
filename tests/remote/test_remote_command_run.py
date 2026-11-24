@@ -291,6 +291,39 @@ def test_run_pulls_cached_remote_checkpoint_missing_locally(monkeypatch):
     assert pulls == [[named_profile_stem("hopg")]]
 
 
+def test_run_pulls_partial_checkpoint_of_failed_material(monkeypatch, capsys):
+    pulls = []
+    monkeypatch.setattr(lifecycle, "start_queue", lambda _mats, **_kwargs: "j")
+    monkeypatch.setattr(viewer, "attach", lambda _jobid: True)
+    monkeypatch.setattr(state, "_completed_materials", lambda _jobid, _mats: [])
+    monkeypatch.setattr(
+        state, "_partial_materials", lambda _jobid, mats: {m: (6, 15) for m in mats}
+    )
+    monkeypatch.setattr(
+        state, "_materials_needing_pull", lambda *_args: pytest.fail("no completed materials")
+    )
+    monkeypatch.setattr(lifecycle, "pull", lambda stems, **_kwargs: pulls.append(list(stems)))
+
+    from pyrite.campaign.profiles import named_profile_stem
+
+    _remote_main(["run", "standard", "-m", "hopg", "--no-sync"])
+
+    assert pulls == [[named_profile_stem("hopg")]]
+    assert "scan failed for hopg after 6/15 new case(s)" in capsys.readouterr().err
+
+
+def test_run_skips_pull_when_failed_material_saved_no_cases(monkeypatch, capsys):
+    monkeypatch.setattr(lifecycle, "start_queue", lambda _mats, **_kwargs: "j")
+    monkeypatch.setattr(viewer, "attach", lambda _jobid: True)
+    monkeypatch.setattr(state, "_completed_materials", lambda _jobid, _mats: [])
+    monkeypatch.setattr(state, "_partial_materials", lambda _jobid, _mats: {})
+    monkeypatch.setattr(lifecycle, "pull", lambda *_args, **_kwargs: pytest.fail("pulled"))
+
+    _remote_main(["run", "standard", "-m", "hopg", "--no-sync"])
+
+    assert "saved no new checkpoint cases" in capsys.readouterr().err
+
+
 @pytest.mark.parametrize("cache_flag", ["--no-cache", "--recompute"])
 @pytest.mark.parametrize("chunk_minutes", [None, "0"])
 def test_run_cache_mode_reaches_each_box_side_scan_once(cache_flag, chunk_minutes, capsys):

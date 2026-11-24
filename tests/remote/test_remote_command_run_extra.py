@@ -32,6 +32,23 @@ def test_materials_needing_pull_skips_only_valid_zero_new_case_records(monkeypat
     assert state._materials_needing_pull("job", ["hopg", "wse2", "mos2"]) == ["wse2", "mos2"]
 
 
+def test_partial_materials_reports_failed_scans_that_saved_new_cases(monkeypatch):
+    monkeypatch.setattr(config, "JOBS_SUBDIR", "jobs")
+    monkeypatch.setattr(
+        transport,
+        "_ssh_capture",
+        lambda _command: (
+            'hopg\t{"completed_new_cases": 6, "total_cases": 15}\n'
+            'wse2\t{"completed_new_cases": 0, "total_cases": 4}\n'
+            "mos2\tnot-json\n"
+            "hbn\t\n"
+        ),
+    )
+
+    assert state._partial_materials("job", ["hopg", "wse2", "mos2", "hbn"]) == {"hopg": (6, 15)}
+    assert state._partial_materials("job", []) == {}
+
+
 @pytest.mark.parametrize("retired", ["scan", "submit", "start"])
 def test_retired_remote_run_commands_are_removed(retired, capsys):
     assert _remote_main([retired, "--help"]) == 2

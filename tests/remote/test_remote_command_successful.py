@@ -42,6 +42,7 @@ def test_successful_profile_run_resolves_remote_stem_before_real_pull(monkeypatc
     monkeypatch.setattr(lifecycle, "start_queue", lambda _materials, **_kwargs: "job")
     monkeypatch.setattr(viewer, "attach", lambda _jobid: True)
     monkeypatch.setattr(state, "_completed_materials", lambda _jobid, _materials: ["hopg"])
+    monkeypatch.setattr(state, "_partial_materials", lambda _jobid, _mats: {})
     monkeypatch.setattr(state, "_materials_needing_pull", lambda _jobid, mats: list(mats))
 
     def resolve(material, profile, **_kwargs):
@@ -94,6 +95,7 @@ def test_successful_multi_detector_run_pulls_every_stem_of_completed_material(
     monkeypatch.setattr(lifecycle, "start_queue", lambda _materials, **_kwargs: "job")
     monkeypatch.setattr(viewer, "attach", lambda _jobid: True)
     monkeypatch.setattr(state, "_completed_materials", lambda _jobid, _materials: ["hopg"])
+    monkeypatch.setattr(state, "_partial_materials", lambda _jobid, _mats: {})
     monkeypatch.setattr(state, "_materials_needing_pull", lambda _jobid, mats: list(mats))
     monkeypatch.setattr(lifecycle, "pull", lambda stems, **_kwargs: pulled.append(list(stems)))
 
