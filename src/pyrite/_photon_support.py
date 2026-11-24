@@ -194,7 +194,7 @@ def _feedback_table_markers(stage):
     if isinstance(materials, str):
         materials = [materials]
     records = [resolve_catalog_table(key, projectile="positron") for key in materials]
-    if transport.get("elastic_model") == "elsepa":
+    if transport.get("elastic_model", "elsepa") == "elsepa":
         records.extend(
             table
             for layer in transport["layers"]

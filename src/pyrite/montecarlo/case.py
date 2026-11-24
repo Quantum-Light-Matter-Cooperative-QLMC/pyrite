@@ -168,7 +168,7 @@ class Case(Mapping[str, Any]):
     energies use keV, photon grids use eV, angles use their suffix (rad/deg),
     compositions use atoms/angstrom^3, and detector acceptance uses steradian.
     Optional divergence-only fields retain an internal absence sentinel so
-    :meth:`to_dict` exactly reproduces the historical mapping payload.
+    :meth:`to_dict` preserves canonical mapping order and names the elastic model.
     ``transport_realization`` optionally identifies the per-electron CPU core;
     its immutable, versioned record participates in numerical identity.
 
@@ -242,9 +242,9 @@ class Case(Mapping[str, Any]):
         Opt-in secondary transport threshold in eV (shell mode only); absent
         transports no secondaries.
     elastic_model
-        ``"elsepa"`` tabulated elastic scattering, which the default
-        :class:`~pyrite.Numerics` lowers to explicitly; absent is the
-        historical ``"mott"`` model, so pre-ELSEPA case keys stay valid.
+        ``"elsepa"`` tabulated elastic scattering (default, including omitted
+        mapping keys), or explicit deprecated ``"mott"``. Stored legacy cases
+        with an omitted key are decoded as Mott before reuse.
     transport_mode, mixed_c1, mixed_c2, mixed_max_step_um
         Opt-in ``"mixed"`` elastic transport with a random hinge and its
         parameters (#894); absent is detailed single scattering.
@@ -392,7 +392,7 @@ class Case(Mapping[str, Any]):
     inelastic_cutoff_eV: float | _Absent = _ABSENT
     secondary_threshold_eV: float | _Absent = _ABSENT
     cascade_rng_model: str | _Absent = _ABSENT
-    elastic_model: Literal["elsepa"] | _Absent = _ABSENT
+    elastic_model: Literal["mott", "elsepa"] = "elsepa"
     transport_mode: Literal["mixed"] | _Absent = _ABSENT
     mixed_c1: float | _Absent = _ABSENT
     mixed_c2: float | _Absent = _ABSENT
@@ -463,6 +463,8 @@ class Case(Mapping[str, Any]):
             value = state[index] if index < len(state) else field.default
             if value is MISSING:
                 raise ValueError(f"Case pickle is missing required field {field.name}")
+            if field.name == "elastic_model" and (value is _ABSENT or index >= len(state)):
+                value = "mott"  # Frozen-slot pickles predate the ELSEPA case default.
             object.__setattr__(self, field.name, value)
 
     def _validate_execution(self) -> None:
@@ -541,8 +543,8 @@ class Case(Mapping[str, Any]):
                 raise ValueError("secondary_threshold_eV requires inelastic_model")
             _positive("secondary_threshold_eV", self.secondary_threshold_eV)
         self._validate_cascade_rng_model()
-        if self.elastic_model is not _ABSENT and self.elastic_model != "elsepa":
-            raise ValueError("elastic_model must be absent or 'elsepa'")
+        if self.elastic_model not in {"mott", "elsepa"}:
+            raise ValueError("elastic_model must be 'mott' or 'elsepa'")
         self._validate_transport_mode()
         if self.bremsstrahlung_model is not _ABSENT and self.bremsstrahlung_model != "bremslib":
             raise ValueError("bremsstrahlung_model must be absent or 'bremslib'")
@@ -568,7 +570,7 @@ class Case(Mapping[str, Any]):
         if self.atomic_electron_deflection is not _ABSENT:
             if self.atomic_electron_deflection != "kawrakow":
                 raise ValueError("atomic_electron_deflection must be absent or 'kawrakow'")
-            if self.inelastic_model is not _ABSENT and self.elastic_model is _ABSENT:
+            if self.inelastic_model is not _ABSENT and self.elastic_model != "elsepa":
                 raise ValueError(
                     "atomic_electron_deflection with inelastic_model needs elastic_model='elsepa'"
                 )
@@ -771,7 +773,7 @@ class Case(Mapping[str, Any]):
             self.mixed_c2,
             None if self.mixed_max_step_um is _ABSENT else self.mixed_max_step_um,
         )
-        if self.elastic_model is _ABSENT or self.energy_model is _ABSENT:
+        if self.elastic_model != "elsepa" or self.energy_model is _ABSENT:
             raise ValueError(
                 "transport_mode='mixed' requires elastic_model='elsepa' and energy_model='midpoint'"
             )
@@ -939,7 +941,7 @@ class Case(Mapping[str, Any]):
             )
 
     def to_dict(self) -> dict[str, Any]:
-        """Return the exact legacy mapping shape and insertion order.
+        """Return the resolved mapping in canonical insertion order.
 
         Returns
         -------

@@ -22,9 +22,12 @@ from pyrite.montecarlo.case import Case
 
 @pytest.fixture
 def baseline_cases():
-    return json.loads(
+    cases = json.loads(
         (Path(__file__).parents[1] / "data/physics-baseline/resolved.json").read_text()
     )
+    for record in cases.values():
+        record["case"].setdefault("elastic_model", "mott")
+    return cases
 
 
 def test_metadata_import_has_no_scientific_or_device_dependencies():
@@ -94,7 +97,7 @@ def test_resolved_view_retains_case_and_selected_models(baseline_cases, kind):
     view = resolved_physics_view(payload, table_markers={"selected-table": "a" * 64})
     assert pickle.dumps(payload) == before
     assert view.parameters == payload
-    assert "transport.elastic/" + payload.get("elastic_model", "mott") in view.descriptor_ids
+    assert "transport.elastic/" + payload.get("elastic_model", "elsepa") in view.descriptor_ids
     assert (
         "emission.continuum/" + payload.get("bremsstrahlung_model", "eedl") in view.descriptor_ids
     )
@@ -110,7 +113,7 @@ def test_resolved_view_retains_case_and_selected_models(baseline_cases, kind):
         resolved_physics_view(Case(**payload), table_markers={"selected-table": "a" * 64}) == view
     )
     if kind in ("legacy", "eedl-fallback"):
-        assert "elastic_model" not in view.parameters
+        assert view.parameters["elastic_model"] == "mott"
         assert "bremsstrahlung_model" not in view.parameters
         assert "radiative_model" not in view.parameters
 
@@ -246,3 +249,10 @@ def test_historical_mapping_omissions_survive_descriptive_provenance(baseline_ca
     assert "transport.elastic/mott" in view.descriptor_ids
     assert "emission.continuum/eedl" in view.descriptor_ids
     assert "crystal_width_mm" not in view.parameters
+
+
+@pytest.mark.parametrize("model", [None, "mott", "elsepa"])
+def test_elastic_provenance_resolves_live_omission_as_elsepa(model):
+    case = {} if model is None else {"elastic_model": model}
+    view = resolved_physics_view(case, table_markers={})
+    assert "transport.elastic/" + (model or "elsepa") in view.descriptor_ids

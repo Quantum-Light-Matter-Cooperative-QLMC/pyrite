@@ -6,18 +6,41 @@ Version 1 is read forever and never written again. See [Compatibility and writes
 
 ## Container header
 
-The HDF5 root has three required attributes and one contract marker:
+The HDF5 root has three required attributes and two contract markers:
 
 | Attribute | Type | Current value | Meaning |
 | --- | --- | --- | --- |
 | `schema` | UTF-8 string | `pyrite.result` | Format discriminator |
 | `schema_version` | integer | `2` | Container/tree encoding version |
 | `identity_version` | integer | `1` | Dataset-identity normalization version |
+| `case_elastic_default` | UTF-8 string | `elsepa` | Omitted case elastic key; absent marker means legacy Mott |
 | `emission_components` | UTF-8 string | `separate` | Emission arrays exclude one another; absent on older artifacts |
 
 A container without `emission_components`, and every pickle, predates the separate-component contract: its `spec` and `spec_coherent` include any co-located `spec_characteristic`. The reader subtracts that component once, so loaded records always follow the current contract. The marker is on the container rather than on records so slim, dataset-merge, and basket key projections cannot drop it.
 
 The root group `value` contains the encoded payload; the root group `blobs`, when present, is the array pool. Readers must reject an unknown `schema` or `schema_version`; identity compatibility remains governed by the checkpoint manifest and dataset-identity rules.
+
+### Case elastic-model compatibility
+
+Live case mappings without `elastic_model` select ELSEPA, matching direct
+transport and `Physics`. New typed cases and campaign lowering serialize both
+`"elsepa"` and deprecated `"mott"` explicitly. Pre-change stored cases with an
+omitted key ran Mott: when `case_elastic_default` is absent, all checkpoint
+read paths (full, selected, metadata, CAS and framed/pickled generations) name
+that choice as `elastic_model="mott"` before replay or provenance. Rewriting
+such a record preserves its explicit Mott selection. Unknown default markers
+are refused. Frozen-slot legacy `Case` pickles restore an absent elastic slot
+as Mott; new pickles carry the explicit selection.
+
+Trajectory artifacts apply the same rule using `/case` attribute
+`elastic_default="elsepa"`; an absent attribute means legacy Mott, including
+JSON-only schema 1. Original stored digests remain provenance of the original
+bytes. Geometry-only JSON views do not select a transport model.
+
+Dataset identities are unchanged. Case content hashing keeps explicit ELSEPA
+and projects explicit Mott back to its historical omitted-key representation,
+preserving both existing CAS identities. A new live omitted key hashes as
+explicit ELSEPA, so it cannot reuse a legacy Mott blob.
 
 ## Why version 2 exists
 

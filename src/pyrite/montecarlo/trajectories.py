@@ -646,6 +646,7 @@ def write_trajectory_artifact(
             case_group = handle.create_group("case")
             case_group.attrs["json"] = _dumps(case)
             case_group.attrs["case_type"] = _case_type(case)
+            case_group.attrs["elastic_default"] = "elsepa"
             _write_node(case_group, "payload", dict(case), {}, None)
             handle.create_group("provenance").attrs["json"] = _dumps(provenance or {})
             handle.attrs["parameter_sha256"] = str((provenance or {}).get("parameter_sha256", ""))
@@ -896,6 +897,7 @@ def _header_attrs(handle) -> dict[str, Any]:
     for key, value in handle.attrs.items():
         attrs[key] = value.item() if isinstance(value, np.generic) else value
     attrs["fields"] = json.loads(attrs.get("fields", "[]"))
+    attrs["case_elastic_default"] = handle["case"].attrs.get("elastic_default", "mott")
     return attrs
 
 
@@ -1071,9 +1073,14 @@ def _electron_boundary(ids, start: int, stop: int) -> int:
 
 
 def _read_case(group) -> Mapping[str, Any]:
-    if "payload" not in group:  # schema 1: JSON only
-        return json.loads(group.attrs["json"])
-    payload = _read_node(group["payload"])
+    payload = (
+        _read_node(group["payload"]) if "payload" in group else json.loads(group.attrs["json"])
+    )
+    default = group.attrs.get("elastic_default", "mott")
+    if default not in {"mott", "elsepa"}:
+        raise TrajectoryArtifactError(f"unsupported stored elastic_default: {default!r}")
+    if default == "mott":
+        payload.setdefault("elastic_model", "mott")
     if group.attrs.get("case_type") == "Case":
         from .case import Case
 

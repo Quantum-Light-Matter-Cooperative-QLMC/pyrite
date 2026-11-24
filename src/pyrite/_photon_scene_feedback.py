@@ -103,7 +103,7 @@ def _scene_materials(case, layers, boxes, box_materials):
     from .montecarlo.runner.case_tables import case_shell_materials
     from .montecarlo.transport.shell_transport import validate_shell_cutoff
 
-    if case.get("elastic_model") != "elsepa":
+    if case.get("elastic_model", "elsepa") != "elsepa":
         raise ValueError("charged scene feedback requires ELSEPA elastic tables")
     if (
         box_materials is None

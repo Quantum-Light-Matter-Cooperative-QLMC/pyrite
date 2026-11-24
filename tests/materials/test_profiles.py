@@ -1166,7 +1166,7 @@ def test_default_elsepa_model_forks_identity_and_case_payload_from_mott():
     default_case = build_cases(sweep, 4, 4)[0]
     mott_case = build_cases(sweep, 4, 4, elastic_model="mott")[0]
     assert default_case["elastic_model"] == "elsepa"
-    assert "elastic_model" not in mott_case
+    assert mott_case["elastic_model"] == "mott"
     assert profiles.case_content_key(default_case) != profiles.case_content_key(mott_case)
     with pytest.raises(ValueError, match="elastic_model"):
         build_cases(sweep, 4, 4, elastic_model="nope")

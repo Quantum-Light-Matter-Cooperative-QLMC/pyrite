@@ -144,7 +144,10 @@ def resolve_atomic_electron_deflection(cases: list[Case], model: object) -> list
         return cases
     out, mott_shell = [], set()
     for case in cases:
-        if case.get("elastic_model") is None and case.get("inelastic_model") is not None:
+        if (
+            case.get("elastic_model", "elsepa") == "mott"
+            and case.get("inelastic_model") is not None
+        ):
             mott_shell.add(str(case["crystal"]))
             out.append(case)
         else:

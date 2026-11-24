@@ -70,10 +70,11 @@ adding an unused descriptor cannot invalidate a case.
    Keep existing warnings and fallback rules. Explicit unsupported requests
    fail; do not turn them into a new implicit fallback.
 3. `Case` validates and serializes the resolved choice with its historical
-   omission rules. An absent elastic key means Mott even though the direct
-   transport API defaults to ELSEPA. An absent continuum key means EEDL;
-   absent radiative keys mean uncoupled. Legacy decoding must not fill these
-   keys with current public defaults.
+   omission rules. An absent live elastic key means ELSEPA; stored legacy
+   omissions decode to explicit Mott before reaching this boundary (see
+   [case compatibility](../repo-design/storage/result-schema.md#case-elastic-model-compatibility)).
+   An absent continuum key means EEDL; absent radiative keys mean uncoupled.
+   Legacy decoding must preserve those historical physical choices.
 4. Derive the immutable resolved view from that case and the actual consumed
    table inventory. Report physical applicability separately from execution
    support and from ledger-validated domain. Preflight a requested backend,

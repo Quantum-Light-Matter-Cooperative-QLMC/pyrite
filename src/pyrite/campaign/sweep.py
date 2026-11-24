@@ -993,10 +993,8 @@ def _model_case_keys(
         keys["secondary_threshold_eV"] = float(secondary_threshold_eV)
         # Lineage-addressed cascade RNG (#923); joins only cascade cases.
         keys["cascade_rng_model"] = CASCADE_RNG_MODEL
-    # ELSEPA elastic model (the default): an explicit "mott" case keeps its
-    # historical payload.
-    if elastic_model == "elsepa":
-        keys["elastic_model"] = "elsepa"
+    # Always name the model; only identity hashing retains legacy Mott omission.
+    keys["elastic_model"] = elastic_model
     # Opt-in BremsLib continuum, with any coupled radiative keys.
     if bremsstrahlung_model == "bremslib":
         keys.update({"bremsstrahlung_model": "bremslib", **radiative})

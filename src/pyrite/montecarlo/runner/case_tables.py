@@ -10,8 +10,8 @@ from ..._physics_contract import BUILTIN_DESCRIPTORS
 
 
 def _elastic_descriptor(case):
-    """Look up the resolved family ID; legacy omission remains Mott."""
-    return BUILTIN_DESCRIPTORS.get("transport.elastic", case.get("elastic_model", "mott"))
+    """Look up the resolved family ID; omission follows the ELSEPA default."""
+    return BUILTIN_DESCRIPTORS.get("transport.elastic", case.get("elastic_model", "elsepa"))
 
 
 def _prepare_mott_elastic(entries):
@@ -139,8 +139,8 @@ def _case_elastic_entries(case):
 def _case_elastic_kwargs(case):
     """``simulate_trajectories`` kwargs of a case's elastic model.
 
-    A case without the ``elastic_model`` key is Mott; it is passed explicitly
-    because ``simulate_trajectories`` defaults to ELSEPA (#293). Atomic-electron
+    An omitted ``elastic_model`` selects ELSEPA, matching transport. Legacy
+    stored cases are decoded with explicit Mott before reaching here. Atomic-electron
     deflection (#317) rides here because it scales the elastic rate; absent
     keeps elastic-only deflection.
     """
