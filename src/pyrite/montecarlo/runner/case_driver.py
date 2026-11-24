@@ -1,17 +1,15 @@
 """Per-case orchestration: transport phase, spectrum phase, and reline mirrors.
 
-``run_case`` and ``run_case_directions`` drive one case through
-``_transport_case`` (CPU/CUDA trajectories) and ``_spectrum_case`` (lines,
-characteristic, bremsstrahlung). ``runner/__init__.py`` re-exports every name
-here and keeps ``__module__`` on the package so pickled references stay
-``pyrite.montecarlo.runner.<name>``.
+``run_case`` and ``run_case_directions`` drive one case through ``_transport_case`` (CPU/CUDA
+trajectories) and ``_spectrum_case`` (lines, characteristic, bremsstrahlung).
+``runner/__init__.py`` re-exports every name here and keeps ``__module__`` on the package so
+pickled references stay ``pyrite.montecarlo.runner.<name>``.
 
 Patch seam: a test that replaces a name this module imports or defines
 (``simulate_trajectories``, ``_spectrum_case_impl``, ...) patches
-``pyrite.montecarlo.runner.case_driver``. The names ``_TIMING``,
-``_is_gpu_oom``, ``_nsys_range``, ``_case_transport_core`` and
-``_transport_case`` are also read through the package by sibling runner
-modules and external callers, so this module reads them late as
+``pyrite.montecarlo.runner.case_driver``. The names ``_TIMING``, ``_is_gpu_oom``,
+``_nsys_range``, ``_case_transport_core`` and ``_transport_case`` are also read through the
+package by sibling runner modules and external callers, so this module reads them late as
 ``_pkg.<name>`` and their patch target stays ``pyrite.montecarlo.runner``.
 
 Validation: blazed-groove-geometry
@@ -74,6 +72,7 @@ from .fallbacks import spectrum_fallbacks
 from .oom import _maybe_free_pool, _SpectrumPhaseOOM
 from .planar_zone_lines import planar_zone_line_parts
 from .recovery import _spectrum_with_recovery, transport_with_recovery
+from .shard_scoring import route_shard_sum
 from .stage_chunks import _stage_counters
 from .step_budget import retry_step_budget
 from .transport_options import (
@@ -95,6 +94,7 @@ def _spectrum_stage_done(stage):
 
 @with_case_math_mode
 @with_realization
+@route_shard_sum
 def run_case(
     case: Case | Mapping[str, Any],
     record_timing: bool = False,

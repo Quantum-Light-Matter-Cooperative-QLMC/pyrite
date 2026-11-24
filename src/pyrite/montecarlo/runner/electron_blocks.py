@@ -224,6 +224,38 @@ def score_in_electron_blocks(score, segments):
 
 #: Audit entries that blocks append to rather than sum into.
 _APPENDED = ("collect", "attribution")
+#: Audit entries that blocks sum into (``cxr._kernels._accumulate_edge_truncation``).
+_SUMMED = (
+    "line_mass",
+    "mass_above",
+    "mass_below",
+    "band_mass",
+    "electron_mass",
+    "mass_above_extension",
+)
+
+
+def audit_sums(audit):
+    """The accumulated part of ``audit`` on the host: what :func:`merge_audit` adds (#1395)."""
+    if audit is None:
+        return None
+    sums = {k: np.asarray(_to_cpu(v)) for k, v in audit.items() if k in _SUMMED}
+    return sums | {k: list(v) for k, v in audit.items() if k in _APPENDED}
+
+
+def merge_audit(audit, sums) -> None:
+    """Add another scorer's :func:`audit_sums` to ``audit``: sums add, lists extend.
+
+    Configuration entries (axis edges, ceiling, ladder, electron count) are the
+    frozen plan's and stay as they are.
+    """
+    if audit is None or sums is None:
+        return
+    for key, value in sums.items():
+        if key in _APPENDED:
+            audit.setdefault(key, []).extend(value)
+        else:
+            audit[key] = audit.get(key, 0.0) + value
 
 
 def snapshot_audit(audit):

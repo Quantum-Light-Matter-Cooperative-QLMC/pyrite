@@ -13,43 +13,75 @@ _SCHEMA = "pyrite.transport-realization.v1"
 #: identity derived from it are unchanged; ``"gpu"`` scores on the process's
 #: CuPy backend and is recorded, giving a distinct case identity.
 _SCORING = ("cpu", "gpu")
+#: Spectrum reductions (#1395). ``"joined"`` scores the joined population once
+#: and stays implicit; ``"shard-sum"`` scores each ``shard_electrons`` history
+#: shard against one frozen plan and adds the spectra in shard order. It is
+#: recorded with its shard size, which fixes the FP64 summation order.
+_REDUCTIONS = ("joined", "shard-sum")
 _CORE = ContextVar[str | None]("transport_realization_core", default=None)
 
 
 @dataclass(frozen=True, slots=True)
-class TransportRealization(Mapping[str, str]):
+class TransportRealization(Mapping[str, str | int]):
     """Immutable identity of the admitted counter-addressed CPU transport realization.
 
     ``scoring`` names the spectrum-phase backend: ``"cpu"`` (default, implicit
     in the mapping) or ``"gpu"`` (recorded; device-scored results are exact
     only against device-scored runs on the same device).
+
+    ``reduction`` names how spectra are reduced (#1395): ``"joined"``
+    (default, implicit) or ``"shard-sum"``, which scores every
+    ``shard_electrons`` electron range separately and sums the spectra in
+    shard order. A shard-sum result is deterministic for its record and lies
+    within the FP64 reordering bound of the joined one, so it has its own
+    identity; the record then always names ``scoring`` too.
     """
 
     schema: str = _SCHEMA
     core: str = "per-electron"
     scoring: str = "cpu"
+    reduction: str = "joined"
+    shard_electrons: int | None = None
 
     def __post_init__(self) -> None:
         if self.schema != _SCHEMA or self.core != "per-electron":
             raise ValueError("transport_realization requires v1 core='per-electron'")
         if self.scoring not in _SCORING:
             raise ValueError(f"transport_realization scoring must be one of {_SCORING}")
+        if self.reduction not in _REDUCTIONS:
+            raise ValueError(f"transport_realization reduction must be one of {_REDUCTIONS}")
+        size = self.shard_electrons
+        if self.reduction == "joined":
+            if size is not None:
+                raise ValueError("shard_electrons belongs to reduction='shard-sum' only")
+        elif isinstance(size, bool) or not isinstance(size, int) or size < 1:
+            raise ValueError("reduction='shard-sum' needs a positive integer shard_electrons")
 
-    def __getstate__(self) -> list[str]:
+    def __getstate__(self) -> list[str | int]:
         # CPU markers keep the original two-field pickle state (a list, as the
         # generated slots ``__getstate__`` wrote it), so their bytes are unchanged.
         return [getattr(self, key) for key in self._keys()]
 
-    def __setstate__(self, state: Sequence[str]) -> None:
-        schema, core, *scoring = state
-        values = {"schema": schema, "core": core, "scoring": scoring[0] if scoring else "cpu"}
+    def __setstate__(self, state: Sequence[str | int]) -> None:
+        schema, core, *rest = state
+        defaults = ["cpu", "joined", None]
+        scoring, reduction, size = [*rest, *defaults[len(rest) :]]
+        values = {
+            "schema": schema,
+            "core": core,
+            "scoring": scoring,
+            "reduction": reduction,
+            "shard_electrons": size,
+        }
         for name, value in values.items():
             object.__setattr__(self, name, value)
 
     def _keys(self) -> tuple[str, ...]:
+        if self.reduction != "joined":
+            return ("schema", "core", "scoring", "reduction", "shard_electrons")
         return ("schema", "core") if self.scoring == "cpu" else ("schema", "core", "scoring")
 
-    def __getitem__(self, key: str) -> str:
+    def __getitem__(self, key: str) -> str | int:
         if key not in self._keys():
             raise KeyError(key)
         return getattr(self, key)
@@ -61,14 +93,37 @@ class TransportRealization(Mapping[str, str]):
         return len(self._keys())
 
 
+_FIELDS = {"schema", "core", "scoring", "reduction", "shard_electrons"}
+
+
 def normalize_realization(value: Any) -> TransportRealization:
-    if not isinstance(value, Mapping) or not (
-        {"schema", "core"} <= set(value) <= {"schema", "core", "scoring"}
-    ):
-        raise ValueError("transport_realization requires schema, core and optional scoring")
+    if not isinstance(value, Mapping) or not ({"schema", "core"} <= set(value) <= _FIELDS):
+        raise ValueError(
+            "transport_realization requires schema, core and optional scoring/reduction"
+        )
+    size = value.get("shard_electrons")
     return TransportRealization(
-        schema=value["schema"], core=value["core"], scoring=value.get("scoring", "cpu")
+        schema=str(value["schema"]),
+        core=str(value["core"]),
+        scoring=str(value.get("scoring", "cpu")),
+        reduction=str(value.get("reduction", "joined")),
+        shard_electrons=None if size is None else _integer(size),
     )
+
+
+def _integer(value: Any) -> int:
+    """``value`` as an exact Python int (HDF5 round trips return NumPy integers)."""
+    import numbers
+
+    if isinstance(value, bool) or not isinstance(value, numbers.Integral):
+        raise ValueError("transport_realization shard_electrons must be an integer")
+    return int(value)
+
+
+def case_reduction(case: Mapping[str, Any]) -> TransportRealization | None:
+    """A marked case's realization when it reduces spectra by shard sums, else ``None``."""
+    realization = case_realization(case)
+    return realization if realization is not None and realization.reduction != "joined" else None
 
 
 def case_scoring(case: Mapping[str, Any]) -> str | None:

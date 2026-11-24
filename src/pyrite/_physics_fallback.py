@@ -74,6 +74,20 @@ class FallbackAudit:
     def restore(self, snapshot):
         self.rows = snapshot
 
+    def absorb(self, snapshot):
+        """Record another audit's :meth:`snapshot` rows after this one's (history shards)."""
+        for event in snapshot.values():
+            self.record(
+                event["model_requested"],
+                event["model_used"],
+                event["elements"][0],
+                event["segments_total"],
+                event["segments_affected"],
+                event["energy_span_keV"],
+                event["scope"],
+                event["reason"],
+            )
+
 
 @contextmanager
 def collect_physics_fallbacks(*, allow=False, preflight=(), audit=None):

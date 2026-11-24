@@ -423,9 +423,13 @@ def _drain(blocks: list[np.ndarray]) -> np.ndarray:
 
 
 def resolve_streamed_line_grid(
-    case, block_electrons, *, transport_core, n_hat, groove, spill=None
+    case, block_electrons, *, transport_core, n_hat, groove, spill=None, feed=None
 ) -> tuple[np.ndarray, dict[str, Any], dict[str, Any]]:
     """The case's policy line grid, from the speed cache or a transport pass.
+
+    ``feed(consumer)``, when given, replaces the transport pass: it passes the
+    population's whole-electron blocks to ``consumer`` in electron order (stored
+    history shards, #1395).
 
     Returns ``(E_grid, record, grid_pass)``; ``record`` equals the joined
     :func:`.cxr_grid.resolve_cxr_grid` record and ``grid_pass`` describes the
@@ -454,13 +458,16 @@ def resolve_streamed_line_grid(
     evidence = BlockGridEvidence(case, payload, n_hat, case["Ne"], abs_layers, groove, spill=spill)
     _announce_transport_pass("grid")
     try:
-        _transport_case(
-            case,
-            transport_core=transport_core,
-            block_electrons=block_electrons,
-            block_consumer=evidence.add,
-            keep_segments_on_device=True,
-        )
+        if feed is None:
+            _transport_case(
+                case,
+                transport_core=transport_core,
+                block_electrons=block_electrons,
+                block_consumer=evidence.add,
+                keep_segments_on_device=True,
+            )
+        else:
+            feed(evidence.add)
         grid, record = _resolve_policy_grid(
             payload,
             case,

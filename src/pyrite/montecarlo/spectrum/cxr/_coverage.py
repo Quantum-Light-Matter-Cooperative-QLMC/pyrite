@@ -64,11 +64,13 @@ def _warn(records):
 
 
 @contextmanager
-def collect_line_data_coverage():
+def collect_line_data_coverage(*, warn: bool = True):
     """Collect successful spectrum calls transactionally, including OOM retries.
 
     Nested collectors publish to their parent only on successful exit. A failed
     electron-block attempt therefore cannot inflate a later successful audit.
+    ``warn=False`` keeps an outermost collector silent: a history shard's
+    records warn once, where the shards are merged (#1395).
     """
     parent = _COLLECTOR.get()
     records = []
@@ -79,7 +81,8 @@ def collect_line_data_coverage():
         raise
     else:
         if parent is None:
-            _warn(records)
+            if warn:
+                _warn(records)
         else:
             parent.extend(records)
     finally:

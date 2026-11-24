@@ -252,6 +252,18 @@ class DiffractedDepthAccumulator:
             else:
                 self.lines[key] = [energy, fwhm, weight, element]
 
+    def absorb(self, dbr, lines, edges) -> None:
+        """Add another accumulator's ``(dbr, lines, edges)`` state, as :meth:`add` adds a block."""
+        if dbr is None:
+            return
+        self.dbr = dbr if self.dbr is None else [a + b for a, b in zip(self.dbr, dbr, strict=True)]
+        self.edges = edges
+        for key, (energy, fwhm, weight, element) in lines.items():
+            if key in self.lines:
+                self.lines[key][2] = self.lines[key][2] + weight
+            else:
+                self.lines[key] = [energy, fwhm, weight, element]
+
     def spectra(self) -> tuple[np.ndarray, np.ndarray]:
         """``(DBR, Kossel)`` on the line grid from the summed depth weights."""
         from ..spectrum.diffracted_brem import dbr_from_depth_weights

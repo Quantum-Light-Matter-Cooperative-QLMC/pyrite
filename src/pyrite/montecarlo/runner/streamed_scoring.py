@@ -326,6 +326,43 @@ class BlockSpectrumScorer:
         if self.split is not None:
             self.split.restore(split)
 
+    def partial(self) -> dict[str, Any]:
+        """This scorer's additive state on the host, for another scorer's :meth:`absorb`.
+
+        A history shard (#1395) scores its electron range with its own scorer
+        and ships this; the merge absorbs the shards in electron order.
+        """
+        from .electron_blocks import audit_sums
+
+        diffracted = self.diffracted
+        return dict(
+            totals=self.totals,
+            n_segments=self.n_segments,
+            n_layers=self.n_layers,
+            audit=audit_sums(self.audit),
+            diffracted=(
+                diffracted.dbr,
+                {key: list(line) for key, line in diffracted.lines.items()},
+                diffracted.edges,
+            ),
+            fallbacks=self.fallbacks.snapshot(),
+        )
+
+    def absorb(self, partial: Mapping[str, Any]) -> None:
+        """Add a :meth:`partial` of a later, disjoint electron range.
+
+        Totals add exactly as :meth:`add` commits a block, so absorbing
+        one-block partials in order equals streaming those blocks bit for bit.
+        """
+        from .electron_blocks import merge_audit
+
+        if partial["totals"] is not None:
+            self._commit(partial["totals"], int(partial["n_segments"]))
+            self.n_layers = int(partial["n_layers"])
+        merge_audit(self.audit, partial["audit"])
+        self.diffracted.absorb(*partial["diffracted"])
+        self.fallbacks.absorb(partial["fallbacks"])
+
     def _renormalize(self, realized):
         """``x -> x * L / realized`` for the provisional count ``L`` (exact ``x * L``)."""
         provisional = float(self.Ne_lines)
