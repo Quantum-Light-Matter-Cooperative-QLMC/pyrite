@@ -142,6 +142,29 @@ def test_collector_moves_an_over_budget_population_to_the_host(monkeypatch):
             np.testing.assert_array_equal(got, want.astype(_device_sizing.REAL))
 
 
+def test_collector_moves_a_population_to_the_host_when_a_host_chunk_joins(monkeypatch):
+    # Detector-cone copy lines can arrive on the host after resident chunks (#379).
+    class Resident(np.ndarray):
+        pass
+
+    def resident(array, dtype=None):
+        return np.asarray(array, dtype=dtype).view(Resident)
+
+    monkeypatch.setattr(_device_sizing, "is_device_array", lambda a: isinstance(a, Resident))
+    monkeypatch.setattr(_device_sizing, "xp", type("XP", (), {"asarray": staticmethod(resident)}))
+    chunk = tuple(np.arange(4, dtype=float) + k for k in range(3))
+    audit = {"collect": [], "device_bytes": 10**6}
+    _device_sizing.collect_lines(audit, tuple(resident(a) for a in chunk))
+    assert isinstance(audit["collect"][0][0], Resident)
+    _device_sizing.collect_lines(audit, chunk)
+    assert audit["device_bytes"] is None and len(audit["collect"]) == 2
+    for collected in audit["collect"]:
+        for got, want in zip(collected, chunk, strict=True):
+            assert type(got) is np.ndarray
+            np.testing.assert_array_equal(got, want.astype(_device_sizing.REAL))
+    assert _device_sizing.join_resident_chunks(audit["collect"]) is audit["collect"]
+
+
 def _cupy():
     cupy = pytest.importorskip("cupy")
     try:

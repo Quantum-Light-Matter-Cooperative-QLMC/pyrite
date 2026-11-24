@@ -88,6 +88,9 @@ def collect_copy_lines(audit, case, segments, n_hat, Ne, abs_layers, groove):
     n_norm = int(segments["Ne"] if Ne is None else Ne)
     for scale, rows, n_copies in copy_strata(segments, n_norm):
         part = {"start_eV": audit["start_eV"], "stop_eV": audit["stop_eV"], "collect": []}
+        if audit.get("device_bytes") is not None:
+            # Resident copies stay on the device while the parent budget allows.
+            part["device_bytes"] = audit["device_bytes"]
         grid = np.array([audit["start_eV"], audit["stop_eV"]])
         _cxr_for_segments(
             rows, grid, case, n_hat, abs_layers, groove, coherent=False, Ne=n_copies,

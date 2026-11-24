@@ -385,21 +385,23 @@ def collect_lines(audit, lines):
 
     In ``REAL`` dtype, on the host; or, while ``audit["device_bytes"]`` (a
     remaining byte budget) covers it, as device arrays, so the measured sizing
-    reads them where they are. A chunk over the budget moves every collected
-    chunk to the host and ends device collection, so a population is wholly on
-    one side. The values are the same either way.
+    reads them where they are. A chunk over the budget, or one already on the
+    host (detector-cone copies, #379), moves every collected chunk to the host
+    and ends device collection, so a population is wholly on one side. The
+    values are the same either way.
 
     Validation: line-grid-resonance-bandwidth
     """
     collected = audit["collect"]
     budget = audit.get("device_bytes")
-    if budget is not None and is_device_array(lines[0]):
-        chunk = tuple(xp.asarray(array, dtype=REAL) for array in lines)
-        size = sum(int(array.nbytes) for array in chunk)
-        if size <= budget:
-            audit["device_bytes"] = budget - size
-            collected.append(chunk)
-            return
+    if budget is not None:
+        if is_device_array(lines[0]):
+            chunk = tuple(xp.asarray(array, dtype=REAL) for array in lines)
+            size = sum(int(array.nbytes) for array in chunk)
+            if size <= budget:
+                audit["device_bytes"] = budget - size
+                collected.append(chunk)
+                return
         audit["device_bytes"] = None
         collected[:] = [tuple(np.asarray(_to_cpu(a)) for a in old) for old in collected]
     collected.append(tuple(np.asarray(_to_cpu(array), dtype=REAL) for array in lines))
