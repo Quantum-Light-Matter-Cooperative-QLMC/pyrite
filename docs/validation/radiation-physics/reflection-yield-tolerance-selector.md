@@ -1501,3 +1501,323 @@ difference is 1.2e-9 relative, and the full line spectra differ by at most
 
 On the thick case the band-mass selection took 21.5 s against 243 s for the
 bin-mean route at N=16.
+
+## Row-budget selection prefix (v9, #1368)
+
+Implementation-context change; this section is the implementer's derivation
+and regression record.
+
+**Change.** v6 scored the selection on $n=\min(N,\texttt{SELECTION\_HISTORIES})$
+electrons. v9 scores it on $n=\min(N_{\max},\,H,\,k_R)$, where
+$N_{\max}=\max(N_e,N_e^{\rm brem})$, $H=\texttt{SELECTION\_HISTORIES}$ (4096),
+and
+
+$$
+k_R=\min\Bigl\{k\ge1:\ \sum_{i<k}r_i\ \ge\ R\Bigr\},
+$$
+
+with $r_i$ the segment rows of electron $i$ (every flight and secondary of
+that history) and $R=\texttt{SELECTION\_ROWS}$. The line and continuum
+prefixes are $\min(N_e,n)$ and $\min(N_e^{\rm brem},n)$, as in v6. Rows,
+not lines, are the budget unit: they are known before any shell is scored,
+and lines per row vary by shell.
+
+**Same estimator.** $k_R$ is a whole-electron cut, so the prefix still keeps
+whole histories. Every quantity the stop reads ($L_k$, $S_k$, $C_r$) is the
+v6 per-primary sum over that prefix with the matching normalization. The
+stop is invariant to their common normalization. Conditional on $n$, v9 is
+therefore exactly v6 at that prefix. The production spectrum still sums the
+selected set over all $N$ histories.
+
+**N-invariance.** $k_R$ depends only on $r_0,\dots,r_{k_R-1}$. On
+counter-addressed cores (per-electron, CUDA) these are the same histories for
+every $N\ge k_R$, so $n$, and with it the selected set, is identical for
+every $N\ge n$ at fixed seed, as in v6, for fixed $\min(N_e^{\rm brem},n)$
+and a monoenergetic beam (an energy spread agrees only to round-off).
+Electrons past $N_e^{\rm brem}$ run at the line cutoff and leave different
+rows, so $k_R$ is invariant only if $N_e^{\rm brem}$ is fixed or $\ge k_R$.
+The lockstep caveat of v6 (prefix histories depend on $N$) applies unchanged.
+
+**Limits.**
+
+- $R\to\infty$, or any population whose first $\min(N_{\max},H)$ electrons
+  leave fewer than $R$ rows: $n=\min(N_{\max},H)$, exactly v6/v8. Thin films
+  (the `cleo_sub` 500 nm cases) are in this regime.
+- Population inside both budgets ($N_{\max}\le H$, $\sum_{i<N_{\max}}r_i<R$):
+  no prefix is taken and the record has no `selection_histories`, as before.
+- Thick targets with $\bar r\gg R/H$ rows per electron: $n\approx R/\bar r$,
+  so selection cost is $O(R)$ rows whatever the thickness.
+
+**Noise.** A row-bound prefix has fewer histories than $H$, so the cutoff
+inherits the sampling noise of $n$ histories. The tail estimate was already a
+finite-sample extrapolation (v6). The stop reads shell-yield ratios, and each
+thick-target history already averages over its many rows. #1326 measured the
+same set on the 1 mm mos2 5 MeV case at $N=16$ (job 14428) and $N=4096$ (job
+14479). Set stability against the 4096-electron prefix is measured
+[below](#row-budget-stability-evidence-and-choice-of-r-1368).
+
+**Streamed route.** `PrefixSelectingScorer` holds whole-electron blocks in
+electron order and selects once a row of electron $\ge\min(N_{\max},H)$
+arrives or the held rows reach $R$. Held blocks cover every electron up to
+the largest held id, so the electron whose rows cross $R$ is complete, and
+`row_budget_prefix` recovers the retained route's $k_R$ from them. This
+assumes whole-electron blocks arriving in electron order without gaps, and a
+replay replacing the held block keyed by the same first electron; the
+history-cap trigger shares the assumption. An overlapping or gapped held set
+would overcount rows or read a missing electron as zero rows (unreachable
+today; a hazard for any future re-splitting recovery).
+
+**Record.** `selection_histories` keeps `lines`/`continuum` and adds `rows`
+(realized prefix rows $\sum_{i<n}r_i$) and `row_budget` ($R$).
+
+**Regression anchors.**
+`tests/montecarlo/runner/test_reflection_selection_spectrum.py::test_selection_scores_an_electron_prefix_then_every_history`
+(history cap binds: record rows below $R$, selection equals the v6 prefix
+selection);
+`::test_row_budget_binds_before_the_history_cap` (rows of the first $k\in\{2,4\}$
+of six histories as the budget, three continuum histories: the record carries
+$n=k$ lines and $\min(k,3)$ continuum electrons, so $k=4$ exercises unequal
+prefixes, and the selection and spectrum equal the $H=k$ selection exactly);
+`::test_row_budget_prefix_counts_whole_electrons` ($k_R$ on unordered blocks,
+zero-row electrons, rows past the cap ignored);
+`tests/montecarlo/transport/test_streamed_selection.py::test_streamed_row_budget_prefix_matches_retained`
+(streamed blocks of 1 and 3 electrons select on the same $k_R$ prefix before
+the population is held; record equal to the retained route at fixed counts
+to summation order, spectra within $10^{-12}$);
+`tests/montecarlo/transport/test_streamed_adaptive.py::test_row_budget_selection_in_the_monitored_pass`
+(#1397 provisional scoring, budget equal to the realized rows and to half of
+them: record and spectra equal the retained route at the realized counts).
+
+### Row-budget stability evidence and choice of R (#1368)
+
+Probe `checks/reflection_selection_subsample_1281.py` (arms `hN`: fixed
+$N$-electron prefix; `rN`: row budget $N$, cap 4096) on qlmc RTX 5080, $N=4096$
+histories, tilt 15°, code `0061fe98b` (jobs 14524–14528) and `0b64ee2fe`
+(15384, 15385). Each arm selects on the held streamed prefix of one
+transport, so arms differ only in the prefix. A set is "same" when its
+`selected_set_sha256` equals the `h4096` arm's (today's v8 rule).
+
+Rows left by the first 4096 electrons:
+
+| scenes | rows at 4096 electrons | rows per electron (max) |
+|---|---|---|
+| `cleo_sub_1281` 500 nm, 15 cases (14527) | 7.8e3 – 5.8e5 | ≤ 1,140 |
+| 10 µm mos2/mose2 1, 5, 30 MeV (14526) | 5.5e5 – 8.6e5 | |
+| 100 µm mos2/mose2 1, 5, 30 MeV (14525) | 5.5e6 – 1.42e7 | |
+| 1 mm mos2/mose2 1, 5, 30 MeV (14524, 14528, 15384) | 5.5e7 – 8.45e7 | 1.07e5 |
+
+Set agreement with `h4096` (seed 0 unless noted):
+
+| case | r1e6 | r4e6 | r1.6e7 | r6.4e7 |
+|---|---|---|---|---|
+| 500 nm, all 15 | cap binds | — | — | — |
+| 10 µm, all 6 | cap binds | cap binds | cap binds | cap binds |
+| 100 µm mos2 1 / 30 MeV, mose2 30 MeV | same | same | cap binds | cap binds |
+| 100 µm mos2 5 MeV | G24 vs G22 | same | cap binds | cap binds |
+| 100 µm mose2 1 MeV | G14 vs G16 | G14 vs G16 | cap binds | cap binds |
+| 100 µm mose2 5 MeV | G22 vs G20 | same | cap binds | cap binds |
+| 1 mm mos2 5 MeV, seeds 0–2 | same | same | same (882–914 e⁻) | same |
+| 1 mm mos2 / mose2 30 MeV | same | same | same (1182 / 879 e⁻) | same |
+
+Every flip is one 2 Å⁻¹ marginal shell with both tails inside the $10^{-3}$
+tolerance. 1 mm mos2 5 MeV selects set `00cb4b86` (G24, 20,698 reflections)
+on every arm and seed; tails at $R=1.6\times10^7$ are 7.18–7.53e-4 against
+7.32–7.37e-4 at 4096. Selection time is ≈ 26 µs per row + ~15 s.
+
+**Choice.** $R=2^{24}=1.68\times10^7$. It exceeds every 10 µm and 100 µm
+case's rows at 4096 electrons, so the cap binds there and no flip measured
+above occurs at this $R$; the 500 nm margin is ≈ 29×
+($2^{24}/5.8\times10^5=28.9$). Measured at $R=1.6\times10^7$ and
+$6.4\times10^7$, which bracket $2^{24}$, every 1 mm case whose 4096 prefix
+completes selects the 4096-prefix set (879–1182 electrons at
+$1.6\times10^7$); at $2^{24}$ itself, job 15385 (mos2 5 MeV, seed 0).
+
+**1 mm, 1 MeV (15384).** The `h4096` arm ran out of device memory
+(15.1 GB) on mos2 and mose2 at 1 MeV (8.4e7 rows), so today's rule selects
+nothing there. The $R=2^{24}$ arm selects (mos2 G12, 2518 reflections, tail
+5.0e-4, 83 s; mose2 G16, 7022 reflections, tail 1.4e-4, 173 s) on ~815
+electrons. No 4096-prefix set exists to compare with. mose2 5 MeV fails
+host-memory admission in retained transport output before any selection
+(14.8 GiB required), independent of the prefix.
+
+**Acceptance timing (15385).** Default route (streamed), `0b64ee2fe`,
+1 mm mos2 5 MeV / 15°, $N=4096$, seed 0, uninstrumented: selection
+438.8 s (599 s wall to selection) against 1860–1988 s for the 4096
+prefix (14524); set `00cb4b86…`, cutoff 24 Å⁻¹, 20,698 reflections, tail
+7.2e-4, converged, model `measured-shell-cutoff-v9`.
+
+## Row-budget re-verification (v9, #1368, 2026-11-24)
+
+Fresh-context review of the reconstructed branch `issue-1368-selection-row-budget`
+(head `a7589b4cb`, on `main` `2f74b0e65`, including #1397 provisional
+scoring). The derivation below was written from the ledger row and the
+section [above](#row-budget-selection-prefix-v9-1368) before the
+implementation bodies were read. It is not human sign-off.
+
+### 1. Definition and whole-history cut
+
+Let $r_i\ge0$ be the segment rows carrying electron id $i$ (the primary and
+every secondary that carries its id), $c=\min(H,N_{\max})$ the history cap, and
+
+$$
+k_R=\min\Bigl\{k\in\{1,\dots,c\}:\ \sum_{i<k}r_i\ge R\Bigr\},
+\qquad k_R=c\ \text{if the set is empty}.
+$$
+
+Then $n=k_R$, and the line and continuum prefixes are $n_L=\min(N_e,n)$ and
+$n_B=\min(N_e^{\rm brem},n)$. Properties that follow:
+
+- $k_R$ is an electron count, so the cut is `elec_id < k_R`; every kept
+  electron keeps all of its rows. Electrons with $r_i=0$ before the crossing
+  are counted; those after it are not.
+- If the budget is met exactly, $\sum_{i<k_R}r_i=R$, the crossing electron
+  is kept. In general $R\le\sum_{i<k_R}r_i<R+\max_i r_i$, so the prefix row
+  count is $O(R)$ with overshoot below one history ($\le1.07\times10^5$ rows
+  on the measured 1 mm cases against $R=1.68\times10^7$).
+- Rows of electrons $i\ge c$ never enter $k_R$.
+
+### 2. Conditional equivalence to v6
+
+The stop reads $L_k$, $S_k$ and $C_r$, each a per-primary sum over the
+prefix. Given $n$, the v9 inputs are the v6 inputs with
+$\texttt{SELECTION\_HISTORIES}=n$. The v6 normalization argument therefore
+applies unchanged: $L_k$ is divided by $n_L$, and $S_k$ and $C_r$ by $n_B$.
+v9 conditional on $n$ is v6 at that prefix. The production spectrum sums the
+selected set over all $N$ histories. **Matches.**
+
+### 3. $N$-invariance
+
+$k_R$ depends on $r_0,\dots,r_{k_R-1}$ and on $c$ only through $c\ge k_R$.
+On counter-addressed cores, $r_i$ is a function of (seed, $i$) and of the
+transport settings of history $i$. The v6 conditions (2)–(3) of
+[§2 of the v6 review](#electron-prefix-re-verification-v6-1281-2026-11-18)
+therefore extend to the rows: electrons with $i\ge N_e^{\rm brem}$ run with
+the line cutoff and leave fewer rows, so $k_R$ is $N$-invariant only if
+$N_e^{\rm brem}$ is fixed or $\ge k_R$. Under the same conditions as v6
+(counter-addressed core, fixed $\min(N_e^{\rm brem},n)$, monoenergetic beam;
+round-off only with an energy spread), $n$ and the selected set are identical
+for every $N\ge n$. The section's "as in v6" carries these conditions
+implicitly; stating them is the wording edit below. Lockstep: unchanged v6
+caveat.
+
+### 4. Limits
+
+| Limit | Derived | Section |
+|---|---|---|
+| $R\to\infty$ or $\sum_{i<c}r_i<R$ | $k_R=c$: v6/v8 exactly | matches |
+| $N_{\max}\le H$, $\sum_{i<N_{\max}}r_i<R$ | $n_L=N_e$, $n_B=N_e^{\rm brem}$: no record | matches |
+| $\bar r\gg R/H$ | $n\approx R/\bar r$, prefix rows $<R+\max r_i$ | matches |
+| $R\le r_0$ | $n=1$ (one history) | not stated, consistent |
+
+### 5. Streamed route
+
+Let blocks arrive in electron order, each containing every row of the
+electrons it spans, so the held blocks cover $0,\dots,m$ contiguously. The
+scorer selects when a row with id $\ge c$ arrives, or when
+$\sum_{\rm held}r\ge R$, or at the end of the population.
+
+- Row trigger: $\sum_{i\le m}r_i\ge R$, so $k_R\le m+1$, and
+  $r_0,\dots,r_{k_R-1}$ are all held and complete. `row_budget_prefix` on the
+  held blocks equals $k_R$ on the population.
+- Id trigger: every $i<c$ is held, so $k_R$ is determined.
+- End of population: the whole population is held.
+
+**Matches**, under the contiguity assumption. That assumption is the latent
+hazard noted by the earlier review. If a replay ever left an overlapping or
+gapped held set, `row_budget_prefix` would count duplicated rows or read a
+missing electron as zero rows. The id trigger shares the same assumption.
+Today's replay replaces the block keyed by the same first electron, and
+`commit_once` restores a snapshot, so no such set arises. A probe with an
+overlapping stale block confirms that the prefix `rows` are then overcounted
+(60 against 50).
+
+**Composition with #1397 provisional scoring.** Under the monitored pass
+the scorer is built at the provisional count $L\ge$ `max_histories` for both
+populations, and `_selection_inputs` substitutes the frozen
+$N_e^{\rm brem}$. Kept chunks never straddle the freeze, and the monitor
+reads a chunk before the sink. At a row trigger, $k_R\le m+1\le N_e$. The
+brem count is frozen or exceeds every held id, so
+$n_L=\min(L,k_R)=k_R=\min(N_e,k_R)$ and $n_B$ equals the realized route's.
+The cap $\min(H,L)$ differs from the realized $\min(H,N_{\max})$, but both
+are $\ge k_R$. The selected set therefore equals the fixed case's at the
+realized counts. A whole population still held at `result(population=...)`
+is selected at the realized counts. A failed `add` restores the held
+dictionary and committed scorer, and the retry recounts held rows.
+
+**Defect (record only).** When the row budget is first met by the last
+realized electron ($k_R=N_e$ at the adaptive stop), the streamed selection
+runs at the trigger with provisional counts. Its $(n_L,n_B)=(N_e,N_e^{\rm
+brem})$ differs from $(L,\cdot)$, so it writes `selection_histories`. The
+retained route at the realized counts has $(n_L,n_B)=(N_e,N_e^{\rm brem})$
+and writes none. The selected radiators are identical; only the record keys
+differ. The fixed (non-provisional) streamed route does not show this,
+because there the inputs are the realized counts.
+
+*Resolved (implementer, after this review):* `PrefixSelectingScorer.result`
+drops `selection_histories` when its line and continuum prefixes equal the
+realized population (`streamed_selection.py::_realized_record`), as the
+retained route writes it. Anchor
+`test_streamed_adaptive.py::test_row_budget_selection_in_the_monitored_pass`
+(budget = realized rows, and half of them) fails without the fix and passes
+with it.
+
+### 6. Probes (scratchpad, CPU)
+
+- `row_budget_prefix` against a brute-force $k_R$ over 20,000 random
+  populations (1–59 electrons, zero-row fraction up to 60 %, random cap and
+  $R$, shuffled whole-electron blocks): 0 mismatches. Edge cases: exact hit
+  `[3,2,4]`, $R=5\to(2,5)$; leading zeros `[0,0,5]`$\to(3,5)$; trailing zeros
+  `[5,0,0]`$\to(1,5)$; cap below the population; rows past the cap ignored;
+  empty block list and zero-row block $\to(c,0)$; cap 0 $\to(0,0)$;
+  `electron_id` key.
+- The real `PrefixSelectingScorer` trigger (selection and scoring stubbed)
+  over 5,000 random contiguous block splits, random $H$ and $R$: the held-set
+  $k_R$ equals the retained $k_R$ in every case.
+- Provisional route, 5,000 random cases (provisional power-of-two $L$,
+  freeze at a chunk boundary, `result(population=...)`): $(n_L,n_B)$ equals
+  the realized retained route in every case. Record presence differs in
+  289 cases, all with $k_R=N_e$ at a row trigger.
+- Production code, CPU per-electron, `test_streamed_adaptive` explicit-grid
+  automatic case (realized 80 / 40 electrons, 1240 rows), with
+  `SELECTION_ROWS` = 1240: streamed `selection_histories` =
+  `{lines: 80, continuum: 40, rows: 1240, row_budget: 1240}`, retained none.
+  Radiators are equal, and `assert_same_selection` would fail on the keys.
+
+### 7. Anchors and evidence
+
+`pyrite-dev test --slow` on `test_reflection_selection_spectrum.py`,
+`test_streamed_selection.py` and `test_streamed_adaptive.py`: 51 passed
+(326.8 s). No anchor exercises the row budget under provisional scoring.
+
+The evidence tables are consistent with $R=2^{24}=1.678\times10^7$. Every
+500 nm, 10 µm and 100 µm case leaves at most $1.42\times10^7<R$ rows at 4096
+electrons, so the cap binds and every listed flip (all at $R\le4\times10^6$)
+is excluded. Every flip is a single 2 Å⁻¹ shell. Electron counts check
+against rows per electron: $1.6\times10^7/882$–$914\approx1.8\times10^4$,
+consistent with 1 mm rows $5.5$–$8.45\times10^7$ at 4096; the 1 MeV
+$\approx815$ e⁻ at $2^{24}$ implies $8.4\times10^7$ rows, as tabulated.
+Wording issues:
+
+- $2^{24}/5.8\times10^5=28.9$, so "≥ 29×" overstates the margin.
+- Apart from job 15385 (mos2 5 MeV, seed 0), the 1 mm set agreement was
+  measured at $R=1.6\times10^7$ and $6.4\times10^7$, which bracket $2^{24}$,
+  not at $2^{24}$ itself.
+- 1 mm mose2 5 MeV never selected (host-memory admission), yet the ledger
+  lists it among the agreeing cases.
+
+### 8. Verdict (v9)
+
+| Filter | Result |
+|---|---|
+| Units / normalization | Pass: rows are a count; per-primary normalization unchanged from v6 |
+| Limits | Pass (table in §4) |
+| Signs / conventions | Pass: `elec_id < k`, `searchsorted(..., "left") + 1` is the first $k$ with cumulative $\ge R$ |
+| Streamed $k_R$ | Pass on contiguous in-order blocks; latent overlap/gap hazard as above |
+| #1397 composition | Selected set passes; `selection_histories` presence fails when $k_R=N_e$ at a provisional row trigger |
+
+Re-derivation **matches** for the selection itself. Verdict **`rederived`**
+for the v9 selected set and prefix, conditional on the wording edits listed
+in the report. The record-presence mismatch under provisional scoring is
+either fixed in code (drop `selection_histories` at `result(population=...)`
+when it equals the realized counts) or documented as a known record
+difference. Human sign-off is not granted.

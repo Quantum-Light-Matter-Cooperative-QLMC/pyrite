@@ -12,6 +12,7 @@
 #       OUT_DIR "MATERIAL:E0_KEV:TILT ..." HISTORIES "SEED ..." BUDGETS [ARM_TIMEOUT_S]
 # BUDGETS is comma-separated; the first arm also runs the production pass; 0 = full.
 set -uo pipefail
+export PATH="$HOME/.local/bin:$PATH"
 cd "$SLURM_SUBMIT_DIR"
 . checks/rocm/env.sh
 export XDG_CONFIG_HOME="$PWD/.xdg-config" PYRITE_USER_CATALOG="$PWD/.xdg-config/pyrite"

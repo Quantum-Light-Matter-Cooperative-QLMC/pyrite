@@ -116,6 +116,32 @@ def electron_prefix(segments, n_electrons):
     return block
 
 
+def row_budget_prefix(blocks, cap, rows):
+    """``(k, rows(elec_id < k))``: the smallest ``k <= cap`` whose rows reach ``rows``.
+
+    The row-budget selection prefix (#1368). ``blocks`` are electron-aligned
+    segment tables in any order; only their ``elec_id < cap`` rows are counted,
+    on the device that holds them. A population whose first ``cap`` electrons
+    leave fewer than ``rows`` rows gives ``k = cap``.
+
+    Validation: reflection-yield-tolerance-selector
+    """
+    from ..._backend import array_namespace
+
+    cap = int(cap)
+    counts = np.zeros(max(cap, 0), dtype=np.int64)
+    for block in blocks:
+        key = "electron_id" if "electron_id" in block else "elec_id"
+        ids = block[key]
+        xp = array_namespace(ids)
+        kept = ids[ids < cap]
+        if kept.size:
+            counts += np.asarray(_to_cpu(xp.bincount(kept, minlength=cap)), dtype=np.int64)
+    cumulative = np.cumsum(counts)
+    k = min(cap, int(np.searchsorted(cumulative, int(rows), side="left")) + 1)
+    return k, int(cumulative[k - 1]) if k > 0 else 0
+
+
 def score_in_electron_blocks(score, segments):
     """Sum an additive per-row ``score(segments)`` over electron-aligned blocks.
 

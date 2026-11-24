@@ -1,12 +1,15 @@
 """Automatic reflection selection on a streamed electron prefix (#1281).
 
 Retained runs select reflections on the counter-addressed prefix
-``elec_id < SELECTION_HISTORIES`` and then score the selected set on every
-history (:func:`.reflection_cutoff.selected_batch_spectrum`). Streamed runs
-(live blocks and artifact replay) see the population one whole-electron block
-at a time, in electron order. :class:`PrefixSelectingScorer` holds the leading
-blocks until a row of an electron at or past the prefix arrives, so the held
-blocks contain every prefix electron. It then selects on those rows, builds the
+``elec_id < k`` and then score the selected set on every history
+(:func:`.reflection_cutoff.selected_batch_spectrum`); ``k`` is the smallest
+electron count whose rows reach ``SELECTION_ROWS``, at most
+``SELECTION_HISTORIES`` (#1368). Streamed runs (live blocks and artifact
+replay) see the population one whole-electron block at a time, in electron
+order. :class:`PrefixSelectingScorer` holds the leading blocks until a row of
+an electron at or past the history cap arrives or the held rows reach the row
+budget. Either way the held blocks contain every prefix electron, and the
+selection finds the same ``k`` from them. It then selects on those rows, builds the
 :class:`.streamed_scoring.BlockSpectrumScorer` for the selected set, scores the
 held blocks, and passes later blocks straight through. Held rows are bounded
 by the prefix plus one block; no extra transport pass runs.
@@ -54,12 +57,14 @@ class PrefixSelectingScorer:
     """
 
     def __init__(self, case: Mapping[str, Any], inputs: Mapping[str, Any]):
-        from .reflection_cutoff import SELECTION_HISTORIES
+        from .reflection_cutoff import SELECTION_HISTORIES, SELECTION_ROWS
 
         self.case, self.inputs = case, inputs
         lines, brem = int(inputs["Ne_lines"]), int(inputs["Ne_brem"])
-        #: Electrons the selection reads: the larger of its two prefixes.
+        #: Electrons the selection reads at most: the larger of its two prefixes.
         self.prefix = min(max(lines, brem), SELECTION_HISTORIES)
+        #: Held rows that end the prefix before the history cap (#1368).
+        self.rows = SELECTION_ROWS
         self._held: dict[int, Mapping[str, Any]] = {}
         self.scorer: Any = None
         self.record: dict | None = None
@@ -80,7 +85,8 @@ class PrefixSelectingScorer:
         if ids.size == 0:
             return
         self._held[int(ids.min())] = _held_copy(segs)
-        if int(ids.max()) >= self.prefix:
+        held = sum(int(b["L_ang"].shape[0]) for b in self._held.values())
+        if int(ids.max()) >= self.prefix or held >= self.rows:
             self._select()
 
     def _select(self, case=None, inputs=None):
@@ -90,7 +96,7 @@ class PrefixSelectingScorer:
         case = self.case if case is None else case
         inputs = self.inputs if inputs is None else inputs
         blocks = [self._held[key] for key in sorted(self._held)]
-        pruned, record = _select_on_blocks(case, _selection_inputs(inputs), blocks)
+        pruned, record = _select_on_blocks(case, _selection_inputs(inputs), blocks, self.rows)
         scorer = BlockSpectrumScorer(case, inputs, selection=(pruned, record))
         for block in blocks:
             scorer.add(block)
@@ -120,7 +126,7 @@ class PrefixSelectingScorer:
         else:
             scorer = self.scorer if self.scorer is not None else self._select()
             out = scorer.result(population=population, **counts)
-        out["reflection_selection"] = self.record
+        out["reflection_selection"] = _realized_record(self.record, population)
         return out
 
     def snapshot(self):
@@ -133,6 +139,22 @@ class PrefixSelectingScorer:
         self._held, self.scorer, self.record = held, scorer, record
         if scorer is not None:
             scorer.restore(inner)
+
+
+def _realized_record(record, population):
+    """``record`` as the retained route writes it at the realized counts (#1368).
+
+    A row budget first met by the last kept electron under provisional
+    scoring (#1397) selects on the whole realized population; the retained
+    route at those counts takes no prefix and writes no
+    ``selection_histories``, so neither does this one.
+    """
+    prefix = (record or {}).get("selection_histories")
+    if population is None or prefix is None:
+        return record
+    if (prefix["lines"], prefix["continuum"]) != tuple(int(n) for n in population):
+        return record
+    return {key: value for key, value in record.items() if key != "selection_histories"}
 
 
 def _selection_inputs(inputs):
@@ -148,8 +170,8 @@ def _selection_inputs(inputs):
     return inputs if frozen is None else {**inputs, "Ne_brem": int(frozen)}
 
 
-def _select_on_blocks(case, inputs, blocks):
-    """Pruned case and record from the held prefix ``blocks`` (#1281).
+def _select_on_blocks(case, inputs, blocks, rows=None):
+    """Pruned case and record from the held prefix ``blocks`` (#1281, #1368).
 
     The selection scores the blocks one at a time (``parts``); its batch
     carries only the joined scalar header.
@@ -170,7 +192,7 @@ def _select_on_blocks(case, inputs, blocks):
         table_cache={},
     )
     return select_batch_reflections(
-        emission, batch, int(inputs["Ne_brem"]), parts=lambda: iter(blocks)
+        emission, batch, int(inputs["Ne_brem"]), parts=lambda: iter(blocks), rows=rows
     )
 
 

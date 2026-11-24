@@ -509,6 +509,15 @@ scores a prefix-covered population once. Only identity pins advance
 (`resolved.json`, `channeling.json`; the diffs are digest-only); every
 resolved case payload, output array and tolerance is unchanged.
 
+## Row-budget selection prefix (#1368)
+
+`CXR_REFLECTION_SELECTION_MODEL=measured-shell-cutoff-v9` ends the selection
+electron prefix at the smallest count whose segment rows reach
+`SELECTION_ROWS`, capped at `SELECTION_HISTORIES`. Only identity pins advance
+(`resolved.json`, `channeling.json`; digest-only); no fixture reaches the row
+budget, so every resolved case payload, output array and tolerance is
+unchanged.
+
 ## FP64 brem segment sums (#1305)
 
 The CUDA brem reducers now sum FP32 cells in FP64 (per-thread, shared tree and

@@ -1,8 +1,9 @@
 """Automatic reflection selection on a streamed electron prefix (#1281).
 
-Streamed runs hold the leading blocks until the prefix ``elec_id <
-SELECTION_HISTORIES`` is complete, select on it, then score every block with
-the selected set. The selection record must equal the retained route's, and
+Streamed runs hold the leading blocks until the prefix ``elec_id < k`` is
+complete (``k`` capped at ``SELECTION_HISTORIES``, or ended earlier by the
+``SELECTION_ROWS`` row budget, #1368), select on it, then score every block
+with the selected set. The selection record must equal the retained route's, and
 the spectra must match it up to block summation order, for any block size.
 
 Validation: reflection-yield-tolerance-selector
@@ -11,6 +12,7 @@ Validation: reflection-yield-tolerance-selector
 import numpy as np
 import pytest
 
+from pyrite._backend import _to_cpu
 from pyrite.montecarlo import runner
 from pyrite.montecarlo.runner import reflection_cutoff
 from pyrite.montecarlo.runner.streamed_scoring import run_case_streamed, streaming_refusal
@@ -64,7 +66,8 @@ def test_streamed_prefix_selection_matches_retained(automatic, retained, block):
     streamed = run_case_streamed(automatic, block, transport_core="per-electron")
 
     record, expected = streamed["reflection_selection"], retained["reflection_selection"]
-    assert record["selection_histories"] == {"lines": 2, "continuum": 2}
+    assert record["selection_histories"]["lines"] == 2
+    assert record["selection_histories"]["continuum"] == 2
     assert_same_selection(record, expected)
     # The streamed scorer used the selected set, not the build-time families.
     (radiator,) = record["radiators"]
@@ -75,6 +78,47 @@ def test_streamed_prefix_selection_matches_retained(automatic, retained, block):
             streamed[key], retained[key], rtol=1e-12, atol=1e-14 * scale, err_msg=key
         )
     assert streamed["n_segments"] == retained["n_segments"]
+
+
+@pytest.mark.parametrize("block", [1, 3])
+def test_streamed_row_budget_prefix_matches_retained(automatic, block, monkeypatch):
+    """With the row budget binding before the history cap, the streamed scorer
+    stops holding blocks once the held rows reach it and selects on the same
+    prefix as the retained route (#1368)."""
+    from pyrite.montecarlo.runner import streamed_selection
+
+    monkeypatch.setattr(reflection_cutoff, "SELECTION_HISTORIES", 4096)
+    transport = runner._transport_case(automatic, transport_core="per-electron")
+    counts = np.bincount(np.asarray(_to_cpu(transport["segs"]["elec_id"])))
+    budget = int(counts[:2].sum())  # k = 2 of 6 line histories
+    assert counts[1] > 0 and budget < counts.sum()
+    monkeypatch.setattr(reflection_cutoff, "SELECTION_ROWS", budget)
+    retained = runner._spectrum_case(automatic, transport)
+
+    held = []
+    original = streamed_selection.PrefixSelectingScorer._select
+
+    def select(self):
+        held.append(sum(int(b["L_ang"].shape[0]) for b in self._held.values()))
+        return original(self)
+
+    monkeypatch.setattr(streamed_selection.PrefixSelectingScorer, "_select", select)
+    streamed = run_case_streamed(automatic, block, transport_core="per-electron")
+
+    record = streamed["reflection_selection"]
+    assert record["selection_histories"] == {
+        "lines": 2,
+        "continuum": 2,
+        "rows": budget,
+        "row_budget": budget,
+    }
+    assert_same_selection(record, retained["reflection_selection"])
+    assert held and held[0] < counts.sum(), "selection ran before the population was held"
+    for key in SPECTRA:
+        scale = np.abs(retained[key]).max()
+        np.testing.assert_allclose(
+            streamed[key], retained[key], rtol=1e-12, atol=1e-14 * scale, err_msg=key
+        )
 
 
 def test_held_prefix_block_replay_commits_once(automatic, retained, monkeypatch):
@@ -137,5 +181,5 @@ def test_streamed_band_mass_selection_matches_retained(monkeypatch):
 
     record = streamed["reflection_selection"]
     assert record["reference_quadrature"] == "band-mass"
-    assert record["selection_histories"] == {"lines": 2, "continuum": 2}
+    assert record["selection_histories"]["lines"] == 2
     assert_same_selection(record, retained["reflection_selection"])

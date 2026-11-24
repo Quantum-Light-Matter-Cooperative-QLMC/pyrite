@@ -354,6 +354,30 @@ def test_explicit_grid_selection_in_the_monitored_pass(monkeypatch, histories):
     _assert_spectra(streamed, two_pass)
 
 
+@pytest.mark.slow
+@pytest.mark.parametrize("fraction", [1, 2])
+def test_row_budget_selection_in_the_monitored_pass(monkeypatch, fraction):
+    """#1368 under provisional scoring (#1397). ``1``: the budget is the realized
+    rows, first met by the last kept electron, so neither route records a
+    prefix. ``2``: half of them, so the prefix ends mid-pass."""
+    from pyrite.montecarlo.runner import reflection_cutoff
+
+    from .test_streamed_selection import assert_same_selection
+
+    case = _automatic(_explicit(_requested()))
+    rows = int(_retained(case)["n_segments"]) // fraction
+    monkeypatch.setattr(reflection_cutoff, "SELECTION_ROWS", rows)
+    reference = _retained(case)
+    streamed = run_case_streamed(case, 13, transport_core="per-electron")
+
+    prefix = reference["reflection_selection"].get("selection_histories")
+    assert (prefix is None) == (fraction == 1)
+    if prefix is not None:
+        assert prefix["row_budget"] == rows <= prefix["rows"]
+    assert_same_selection(streamed["reflection_selection"], reference["reflection_selection"])
+    _assert_spectra(streamed, reference)
+
+
 def _measured(case):
     from tests.montecarlo.transport.test_streamed_line_grid import _measured_policy
 
