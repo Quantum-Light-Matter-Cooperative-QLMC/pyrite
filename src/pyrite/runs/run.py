@@ -69,6 +69,7 @@ from ..checkpoints.recompute import (  # noqa: F401 -- compatibility exports
 from ..montecarlo import run_cases, runner
 from ..montecarlo.case import admit_axial_channeling_cases
 from ..results import store_result
+from ._case_failures import CaseFailureBudget
 from ._sweep_execution import (
     SweepBudget,
     SweepCompletion,
@@ -221,6 +222,34 @@ def _dispatch_publishing_interrupts(dispatch, todo, callback, checkpoint, run_op
         raise
 
 
+def _case_failure_budget(max_case_failures, executor, run_options):
+    """The sweep's :class:`CaseFailureBudget`, installed as ``on_case_error``; None at 0."""
+    if not max_case_failures:
+        return None
+    if executor is not None:
+        raise ValueError("max_case_failures requires local execution (executor=None)")
+    failure_budget = CaseFailureBudget(max_case_failures)
+    run_options["on_case_error"] = failure_budget
+    return failure_budget
+
+
+def _publish_partly_failed(failure_budget, checkpoint):
+    """Skipped cases leave their configs partly run; publish what finished."""
+    if failure_budget is not None and failure_budget.failures:
+        checkpoint.interrupted()
+
+
+def _report_case_failures(failure_budget, budget):
+    """Raise the skipped cases, unless a time budget paused the sweep.
+
+    A pause returns False instead, so the next slice retries them.
+    """
+    if failure_budget is None or not failure_budget.failures:
+        return
+    if budget.should_stop is None or not budget.expired():
+        failure_budget.raise_if_failed()
+
+
 def run_sweep(
     cases,
     results,
@@ -253,6 +282,7 @@ def run_sweep(
     retain_results=True,
     executor=None,
     artifact_store=None,
+    max_case_failures=0,
 ):
     """Run ``cases`` into ``results`` (mutated in place).
 
@@ -293,6 +323,16 @@ def run_sweep(
         the coordinator verifies its physics key and digest, then performs the
         established checkpoint writes. With resume and cache_read enabled,
         completed but uncommitted worker artifacts are recovered on restart.
+    max_case_failures
+        number of failing cases to skip before the sweep aborts (default 0:
+        the first failure propagates, as before). A skipped case is reported on
+        stderr and stores nothing; the remaining cases still run. Once they
+        finish, finished cases are published as on an interrupt and
+        :class:`~pyrite.runs._case_failures.CaseFailuresError` lists the skipped
+        cases; resume retries them. When ``max_seconds``/``deadline`` paused
+        the sweep, it returns False instead so the next call retries them. The
+        failure past the budget propagates itself. Local execution only: an ``executor`` with a nonzero budget
+        raises ``ValueError``.
     checkpoint_dir
         directory for the per-material checkpoints (default
         ``pyrite-output/checkpoints`` in the workspace). A sweep is
@@ -489,6 +529,7 @@ def run_sweep(
         on_activity,
     )
     _validate_executor(executor, run_options, artifact_store)
+    failure_budget = _case_failure_budget(max_case_failures, executor, run_options)
     if dataset_identity is not None:
         from ..campaign.profiles import normalize_dataset_identity
 
@@ -577,6 +618,8 @@ def run_sweep(
             dispatch = run_cases if executor is None else executor.execute
             _dispatch_publishing_interrupts(dispatch, todo, callback, checkpoint, run_options)
         print(f"{len(todo)} cases in {time.perf_counter() - t0:.0f} s")
+        _publish_partly_failed(failure_budget, checkpoint)
         # Publication follows what is stored; transport-only execution stores nothing.
         checkpoint.finish(work.stored_complete())
+        _report_case_failures(failure_budget, budget)
         return work.requested_complete()

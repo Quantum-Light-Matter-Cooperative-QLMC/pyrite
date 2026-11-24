@@ -6,10 +6,12 @@ lives here, in `cli/`, which is allowed to reach down into `remote`
 (issue #64, finding 2).
 """
 
+from contextlib import ExitStack
 from functools import wraps
 
 import click
 
+from ..console.output import CLIError
 from ..remote.config import validate_remote_target
 
 
@@ -54,11 +56,17 @@ def target_option(function):
                 raise click.UsageError(
                     "use --remote --target NAME, not --remote=HOST with --target"
                 )
-        try:
-            with selected(target, jobid=kwargs.get("jobid")):
+        with ExitStack() as scope:
+            try:
+                scope.enter_context(selected(target, jobid=kwargs.get("jobid")))
+            except (ValueError, TypeError) as exc:
+                raise click.BadParameter(str(exc), param_hint="--target") from exc
+            try:
                 return function(*args, **kwargs)
-        except (ValueError, TypeError) as exc:
-            raise click.BadParameter(str(exc), param_hint="--target") from exc
+            except (ValueError, TypeError) as exc:
+                # The command's own failure (e.g. a run's physics refusal), not
+                # a bad --target: report it as a runtime error, exit 1.
+                raise CLIError(str(exc)) from exc
 
     return click.option(
         "--target", default=None, metavar="NAME", help="Use named remote compute target NAME."

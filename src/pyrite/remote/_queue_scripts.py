@@ -293,6 +293,11 @@ def _trajectory_flags(trajectories, overwrite_trajectories, trajectory_storage):
     return flags
 
 
+def _case_failure_flag(max_case_failures):
+    """``--max-case-failures N`` when given; empty keeps the scan default."""
+    return "" if max_case_failures is None else f" --max-case-failures {int(max_case_failures)}"
+
+
 def _fallback_runtime(allow):
     """Return CLI and environment policy for scan fallback handling."""
     if allow:
@@ -324,6 +329,7 @@ def _queue_script(
     trajectory_storage=None,
     expected_physics=None,
     allow_physics_fallback=False,
+    max_case_failures=None,
 ):
     """CXR payload for one bounded-concurrency queue in a SLURM allocation."""
     parallel_materials = _validate_parallel_materials(parallel_materials)
@@ -342,6 +348,7 @@ def _queue_script(
     flags = _trajectory_flags(trajectories, overwrite_trajectories, trajectory_storage)
     fallback_flag, fallback_env = _fallback_runtime(allow_physics_fallback)
     flags += fallback_flag
+    flags += _case_failure_flag(max_case_failures)
     if quick:
         flags += " --quick"
     if workers is not None:
@@ -659,6 +666,7 @@ def _chunked_queue_script(
     trajectory_storage=None,
     expected_physics=None,
     allow_physics_fallback=False,
+    max_case_failures=None,
 ):
     """One SLURM slice of a self-resubmitting chain (spec: chunked remote jobs).
 
@@ -672,6 +680,7 @@ def _chunked_queue_script(
     flags = _trajectory_flags(trajectories, overwrite_trajectories, trajectory_storage)
     fallback_flag, fallback_env = _fallback_runtime(allow_physics_fallback)
     flags += fallback_flag
+    flags += _case_failure_flag(max_case_failures)
     if quick:
         flags += " --quick"
     if workers is not None:

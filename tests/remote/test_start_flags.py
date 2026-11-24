@@ -30,6 +30,7 @@ DEFAULT_FLAGS = {
     "no_cache": False,
     "recompute": False,
     "allow_physics_fallback": False,
+    "max_case_failures": None,
     "no_sync": False,
     "dry_run": False,
     "headless": False,

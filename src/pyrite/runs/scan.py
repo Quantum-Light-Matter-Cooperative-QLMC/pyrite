@@ -50,6 +50,7 @@ from ..console import dashboard as _dashboard
 from ..console import json as cli_json
 from ..console import output as _cli_core
 from ..console.outputs import output_dir
+from ._case_failures import CaseFailuresError
 from ._material_progress import MaterialProgress, start_performance_logger
 
 # Lazy runtime bindings keep help fast while preserving monkeypatchable module
@@ -470,6 +471,7 @@ def run(args):
 
     try:
         incomplete = False
+        case_failures = []
         from ..materials import CATALOG, load_material_catalog
 
         profile = _effective_catalog_profile(args)
@@ -481,6 +483,10 @@ def run(args):
                 remaining = None if deadline is None else max(0.0, deadline - time.monotonic())
                 try:
                     complete = _run_material(args, material, max_seconds=remaining)
+                except CaseFailuresError as error:
+                    # Finished cases are saved; carry on with the next material.
+                    case_failures.append(f"{material} [{detector_id}]: {error}")
+                    continue
                 except Exception as error:
                     from ..checkpoints.persistence import _CheckpointIdentityError
                     from ..montecarlo.case import AxialAdmissionError
@@ -501,6 +507,8 @@ def run(args):
                     raise SystemExit(str(error)) from None
                 if not complete:
                     incomplete = True
+        if case_failures:
+            raise SystemExit("\n".join(case_failures))
         if incomplete:
             raise SystemExit(75)  # EX_TEMPFAIL: budget hit, work remains
     finally:
@@ -968,6 +976,7 @@ def _run_material(args, material, max_seconds=None):
             **capture_kw,
             **execution_kwargs,
             observation=observation,
+            max_case_failures=_max_case_failures(args, execution_kwargs),
         )
         # run_sweep returns a bool (complete?). Only a bare None -- test doubles
         # that predate the budget feature and don't bother returning anything --
@@ -998,6 +1007,11 @@ def _run_material(args, material, max_seconds=None):
             f"{args.checkpoint_dir}/{stem}/ ({n} records)"
         )
     return complete
+
+
+def _max_case_failures(args, execution_kwargs):
+    """The run's case-failure budget; distributed executors keep their own policy."""
+    return 0 if execution_kwargs else getattr(args, "max_case_failures", 0)
 
 
 def _print_sweep_header(args, material, cases, settings, identity):

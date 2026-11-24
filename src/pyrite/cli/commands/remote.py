@@ -317,6 +317,7 @@ class _StartFlags:
     overwrite_trajectories: bool = False
     trajectory_storage: str | None = None
     allow_physics_fallback: bool = False
+    max_case_failures: int | None = None
 
 
 @dataclass(frozen=True)
@@ -641,6 +642,16 @@ _start_transfer_options = _option_group(
 @click.option(
     "--allow-physics-fallback", is_flag=True, help="Allow and record physics-table fallbacks."
 )
+@click.option(
+    "--max-case-failures",
+    type=click.IntRange(min=0),
+    default=None,
+    metavar="N",
+    help=(
+        "Failed cases each material's scan skips before it aborts "
+        "(default: the scan's own, 5); 0 aborts on the first failure."
+    ),
+)
 @_start_transfer_options
 @click.option(
     "--trajectories",
@@ -706,6 +717,7 @@ def start_command(**params):
         overwrite_trajectories=flags.overwrite_trajectories,
         trajectory_storage=flags.trajectory_storage,
         allow_physics_fallback=flags.allow_physics_fallback,
+        max_case_failures=flags.max_case_failures,
     )
 
 

@@ -49,6 +49,12 @@ Options:
                                   [default: (pyrite-output/checkpoints)]
   --max-minutes MINUTES           Soft wall-clock budget in minutes; exit 75 if
                                   resumable work remains.
+  --max-case-failures N           Skip up to N failing cases per material and keep
+                                  running the rest; the next failure aborts. Skipped
+                                  cases are listed at the end (exit 1) and retried on
+                                  resume. 0 aborts on the first failure. Local and
+                                  remote runs only; --execution backends ignore it.
+                                  [default: 5; x>=0]
   --allow-physics-fallback        Allow missing BremsLib tables to select EEDL for a
                                   local sweep; record the substitution.
   --no-cache                      Neither read nor write the shared per-case checkpoint

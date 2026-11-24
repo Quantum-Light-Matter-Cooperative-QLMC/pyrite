@@ -408,3 +408,16 @@ def test_remote_forwards_physics_fallback(monkeypatch):
     )
     assert_clean_result(result)
     assert seen["allow_physics_fallback"] is True
+
+
+@pytest.mark.parametrize(("flags", "expected"), [([], None), (["--max-case-failures", "2"], 2)])
+def test_remote_modifier_forwards_only_an_explicit_case_failure_budget(
+    monkeypatch, flags, expected
+):
+    seen = {}
+    monkeypatch.setattr(remote_cli, "_cli_start", lambda **kwargs: seen.update(kwargs))
+
+    result = invoke(scan.command, ["standard", "-m", "hopg", "--remote", "--detach", *flags])
+
+    assert_clean_result(result)
+    assert seen["max_case_failures"] == expected
