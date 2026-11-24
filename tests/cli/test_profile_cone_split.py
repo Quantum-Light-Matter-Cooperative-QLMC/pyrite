@@ -207,3 +207,10 @@ def test_profile_key_reaches_cases_and_identity_only_when_present(catalog):
     numerics = split_identity["resolved_parameters"]["transport_numerics"]
     assert numerics["cone_split"] == record
     assert not canonical_settings(split_settings)
+
+
+def test_profile_without_the_key_keeps_an_incoming_policy(catalog):
+    load_material_catalog.cache_clear()
+    loaded = load_material_catalog(catalog, profile="split")
+    incoming = replace(default_settings(), cone_split=ConeSplitting(cone_factor=6.0))
+    assert profile_run_settings(incoming, "split", loaded).cone_split == incoming.cone_split
