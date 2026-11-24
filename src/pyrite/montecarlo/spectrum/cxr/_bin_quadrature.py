@@ -976,6 +976,43 @@ def _run_segmented_reduction(E_r, aw, w, edges, inv_width, *, out, exact_widths,
     return out
 
 
+def _run_pairs_reduction(E_r, aw, w, edges, inv_width, out, exact_widths, bins):
+    """All-pairs near/far launch: grid ``(bins, line chunks)``, see :func:`_line_chunks`.
+
+    Validation: sinc-bin-near-far
+    """
+    import cupy
+
+    n_bins = int(inv_width.shape[0]) if bins is None else int(len(bins))
+    n_cxr_rows = int(E_r.size)
+    threads = int(_REDUCE_THREADS)
+    chunks, chunk_lines = _line_chunks(n_bins, n_cxr_rows)
+    per_chunk = cupy.empty((n_bins, chunks), dtype=cupy.float64)
+    _bin_reduce_kernel()(
+        (n_bins, chunks),
+        (threads,),
+        (
+            cupy.ascontiguousarray(E_r, dtype=cupy.float32),
+            cupy.ascontiguousarray(aw, dtype=cupy.float32),
+            cupy.ascontiguousarray(w, dtype=cupy.float32),
+            cupy.ascontiguousarray(edges, dtype=cupy.float64),
+            cupy.ascontiguousarray(inv_width, dtype=cupy.float64),
+            per_chunk,
+            np.int64(n_cxr_rows),
+            np.float32(np.inf if exact_widths is None else float(exact_widths)),
+            np.int64(chunk_lines),
+            cupy.arange(n_bins, dtype=cupy.int64)
+            if bins is None
+            else cupy.asarray(bins, dtype=cupy.int64),
+        ),
+        # partial sums, a two-tile line queue, warp offsets, the queue count
+        shared_mem=threads * 8 + 2 * threads * 8 + 33 * 4,
+    )
+    per_bin = per_chunk[:, 0] if chunks == 1 else per_chunk.sum(axis=1)
+    out += per_bin.astype(out.dtype)
+    return out
+
+
 def _bin_reduction_markers(resolved):
     """Numerical generation for bin-mean cases, including policy-only identities."""
     policy = resolved.get("line_grid_policy") or {}
@@ -999,7 +1036,8 @@ def run_bin_mean_reduction_kernel(
     """Fused CUDA bin-mean line reduction: ``out[k] += sum_l w_l * mean_k(line l)``.
 
     The bin-mean counterpart of ``cxr_jit_kernel.run_reduction_kernel``: no
-    ``(line, bin)`` matrix, one launch per flush with one block per bin, FP64
+    ``(line, bin)`` matrix, one launch per flush with one block per bin (and
+    per line chunk when bins are few, :func:`_line_chunks`), FP64
     accumulation of near pairs, compensated float32 far pairs, and one cast to
     the spectrum dtype. Bins beyond
     ``exact_widths`` first-zero widths take the far-field envelope.
@@ -1064,29 +1102,4 @@ def run_bin_mean_reduction_kernel(
         )
         out += full[cupy.asarray(bins)].astype(out.dtype)
         return out
-    threads = int(_REDUCE_THREADS)
-    chunks, chunk_lines = _line_chunks(n_bins, n_cxr_rows)
-    per_chunk = cupy.empty((n_bins, chunks), dtype=cupy.float64)
-    _bin_reduce_kernel()(
-        (n_bins, chunks),
-        (threads,),
-        (
-            cupy.ascontiguousarray(E_r, dtype=cupy.float32),
-            cupy.ascontiguousarray(aw, dtype=cupy.float32),
-            cupy.ascontiguousarray(w, dtype=cupy.float32),
-            cupy.ascontiguousarray(edges, dtype=cupy.float64),
-            cupy.ascontiguousarray(inv_width, dtype=cupy.float64),
-            per_chunk,
-            np.int64(n_cxr_rows),
-            np.float32(np.inf if exact_widths is None else float(exact_widths)),
-            np.int64(chunk_lines),
-            cupy.arange(n_bins, dtype=cupy.int64)
-            if bins is None
-            else cupy.asarray(bins, dtype=cupy.int64),
-        ),
-        # partial sums, a two-tile line queue, warp offsets, the queue count
-        shared_mem=threads * 8 + 2 * threads * 8 + 33 * 4,
-    )
-    per_bin = per_chunk[:, 0] if chunks == 1 else per_chunk.sum(axis=1)
-    out += per_bin.astype(out.dtype)
-    return out
+    return _run_pairs_reduction(E_r, aw, w, edges, inv_width, out, exact_widths, bins)
