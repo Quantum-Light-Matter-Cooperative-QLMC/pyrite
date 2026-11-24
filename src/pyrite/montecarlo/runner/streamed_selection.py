@@ -96,9 +96,7 @@ class PrefixSelectingScorer:
         case = self.case if case is None else case
         inputs = self.inputs if inputs is None else inputs
         blocks = [self._held[key] for key in sorted(self._held)]
-        pruned, record = _select_on_blocks(
-            case, _selection_inputs(inputs), blocks, self.rows
-        )
+        pruned, record = _select_on_blocks(case, _selection_inputs(inputs), blocks, self.rows)
         scorer = BlockSpectrumScorer(case, inputs, selection=(pruned, record))
         for block in blocks:
             scorer.add(block)
