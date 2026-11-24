@@ -137,8 +137,14 @@ def capture(material, e0_kev, tilt_deg, histories, out_dir):
 
     def fixed(args, mat):
         settings, sweep, identity, stem = resolved(args, mat)
+        # #1398: brem stops on its own prefix, which must not exceed max_histories.
+        brem = (
+            {"brem_min_histories": n, "brem_max_histories": n}
+            if getattr(settings.precision, "brem_max_histories", None) is not None
+            else {}
+        )
         precision = dataclasses.replace(
-            settings.precision, min_histories=n, max_histories=n, pilot_histories=None
+            settings.precision, min_histories=n, max_histories=n, pilot_histories=None, **brem
         )
         return dataclasses.replace(settings, precision=precision), sweep, identity, stem
 
