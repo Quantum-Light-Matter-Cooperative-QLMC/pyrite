@@ -7,11 +7,17 @@ correction (``_bin_fourier``). Large rectangles go through a two-row type-1
 NUFFT: the exponential-of-semicircle (ES) kernel of ``_fourier_spread``
 (Barnett, Magland and af Klinteberg, SIAM J. Sci. Comput. 41 (2019) C479),
 spread by a serial numba loop and transformed with ``scipy.fft``. Smaller
-rectangles take a direct numba sum. Both are serial, so a host result does
-not depend on thread count.
+rectangles take a direct numba sum. Rectangles and (rectangle, mode) items run
+in parallel, but their contributions are added in rectangle order, so a host
+result does not depend on thread count.
 
-Without it, CPU bin-mean scoring builds a dense ``(line, bin)`` matrix, and
-its cost grows with lines × bins. With it, the cost on a uniform axis grows
+Non-uniform axes (#1390, #1392) take :func:`host_segmented_bin_mean_reduce`:
+the uniform runs of :func:`uniform_runs` share one line transform
+(:func:`host_fourier_runs_reduce`), and the remaining bins are gathered onto
+one axis (:func:`leftover_bins`) for one numba near/far call.
+
+Without these routes, CPU bin-mean scoring builds a dense ``(line, bin)``
+matrix, and its cost grows with lines × bins. With them, the cost grows
 mainly with lines, as on the device.
 
 Validation: cxr-line-fourier-reduction
