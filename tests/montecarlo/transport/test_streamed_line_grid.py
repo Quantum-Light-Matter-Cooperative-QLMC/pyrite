@@ -139,6 +139,7 @@ def test_a_cached_grid_skips_the_grid_pass(monkeypatch):
         "evidence_bytes": 0,
         "spilled": False,
         "spill_peak_bytes": 0,
+        "fallback_transports": 0,
     }
     assert streamed["line_grid_resolved"]["cache"] == "hit"
     _assert_matches(streamed, reference)

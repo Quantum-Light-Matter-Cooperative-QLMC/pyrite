@@ -344,3 +344,25 @@ def resolve_streamed_line_grid(
             "spill_peak_bytes": evidence.spill_peak_bytes,
         },
     )
+
+
+def streamed_fallback_grid(case, refusal, grid_record, block_electrons, **grid_options):
+    """``(E_grid, record, grid_pass)`` of the axis a refused streamed default extends to.
+
+    The streamed counterpart of :func:`.bandwidth_fallback.measured_bandwidth_fallback`
+    (#1243): the stop comes from :func:`.bandwidth_fallback.fallback_axis_payload`
+    (raising ``refusal`` for an explicit bandwidth) and the kinematic-shaped
+    axis is resolved like any streamed policy grid, by its own evidence pass.
+    The record carries the same ``bandwidth_fallback`` provenance; the case
+    keeps its measured payload, so the rescore is audited again.
+
+    Validation: line-grid-resonance-bandwidth
+    """
+    from .bandwidth_fallback import fallback_axis_payload, fallback_record
+
+    earlier = (grid_record or {}).get("bandwidth_fallback")
+    fallback, stop, ceiling, refusals = fallback_axis_payload(case, refusal, earlier)
+    E_grid, record, grid_pass = resolve_streamed_line_grid(
+        {**case, "line_grid_policy": fallback}, block_electrons, **grid_options
+    )
+    return E_grid, fallback_record(record, case, stop, ceiling, refusals), grid_pass
