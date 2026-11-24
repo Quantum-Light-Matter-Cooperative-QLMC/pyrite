@@ -12,7 +12,7 @@ import os
 import uuid
 from collections import deque
 from collections.abc import Callable, Generator, Mapping, Sequence
-from contextlib import closing
+from contextlib import closing, contextmanager
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from threading import Event, Lock
@@ -31,6 +31,28 @@ from .inspection import run_provenance
 from .model import ResourceRequest, RetryPolicy
 from .planning import iter_work_units
 from .slurm import _atomic_json, _save_input
+
+
+@contextmanager
+def single_native_thread() -> Generator[None]:
+    """Run a Dask task body on one native thread: BLAS/OpenMP pools and Numba's team.
+
+    ``threadpool_limits(limits=1)`` caps the pools threadpoolctl sees, but not
+    Numba's parallel team: a ``prange`` kernel inside it still spans the
+    worker's full CPU mask (#1432, qlmc job 15941). Workers already own one
+    allocated CPU each, so both are capped here and Numba's count is restored
+    on exit (#1395).
+    """
+    import numba
+    from threadpoolctl import threadpool_limits
+
+    previous = numba.get_num_threads()
+    numba.set_num_threads(1)
+    try:
+        with threadpool_limits(limits=1):
+            yield
+    finally:
+        numba.set_num_threads(previous)
 
 
 @dataclass(frozen=True, slots=True)
@@ -192,9 +214,7 @@ def _worker_run_unit(run_dir: str, unit_index: int) -> list[dict[str, Any]]:
         # Prevent nested BLAS fan-out when a Dask worker already owns its
         # allocated CPU/GPU resources. PyRITE's usual local multiprocessing
         # stays untouched; distributed tasks use serial local dispatch.
-        from threadpoolctl import threadpool_limits
-
-        with threadpool_limits(limits=1):
+        with single_native_thread():
             run_cases(
                 [r["case"] for r in pending],
                 callback=publish,

@@ -142,3 +142,20 @@ def test_retry_only_submits_missing_work_units(submitted_campaign, monkeypatch):
 def test_invalid_in_flight_limit_refuses(limit):
     with pytest.raises(ValueError, match="max_in_flight"):
         DaskConfig(max_in_flight=limit)
+
+
+def test_single_native_thread_caps_and_restores_numba_team():
+    """#1395/#1432: threadpoolctl leaves Numba's team alone, so the task seam caps it too."""
+    import numba
+
+    from pyrite.execution.dask import single_native_thread
+
+    before = numba.get_num_threads()
+    widest = numba.config.NUMBA_NUM_THREADS
+    numba.set_num_threads(widest)
+    try:
+        with single_native_thread():
+            assert numba.get_num_threads() == 1
+        assert numba.get_num_threads() == widest
+    finally:
+        numba.set_num_threads(before)

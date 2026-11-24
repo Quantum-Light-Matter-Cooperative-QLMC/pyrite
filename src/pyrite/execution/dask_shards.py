@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import Any
 
 from .artifacts import ArtifactIntegrityError, CaseArtifactStore
-from .dask import DaskExecutor
+from .dask import DaskExecutor, single_native_thread
 from .inspection import run_provenance
 from .shards import (
     HistoryShardStore,
@@ -115,12 +115,11 @@ def _publish_shard(plan, entry, shard_index):
     if prior is not None:
         store.verify(prior)
         return asdict(prior)
-    from threadpoolctl import threadpool_limits
 
     from ..montecarlo.runner.history_shards import transport_history_shard
 
     start, stop = entry["ranges"][shard_index]
-    with threadpool_limits(limits=1):
+    with single_native_thread():
         segments = transport_history_shard(
             entry["case"],
             start,
@@ -182,7 +181,6 @@ def _plan_stage(plan, entry):
     prior = store.reference(material, entry["plan_key"])
     if prior is not None:
         return asdict(prior)
-    from threadpoolctl import threadpool_limits
 
     from ..montecarlo.runner.shard_scoring import resolve_shard_plan, scoring_scope
 
@@ -197,7 +195,7 @@ def _plan_stage(plan, entry):
         if plan["transport_realization"].get("scoring", "cpu") == "gpu"
         else (lambda held: _scattered_selection(case, held))
     )
-    with threadpool_limits(limits=1), scoring_scope(case):
+    with single_native_thread(), scoring_scope(case):
         frozen = resolve_shard_plan(case, shards, distribute=distribute)
     return asdict(store.publish(material, entry["plan_key"], {"plan": frozen}))
 
@@ -232,12 +230,11 @@ def _scattered_selection(case, held):
 
 def _selection_part(case, fn, part, header, prefix):
     """Dask subtask: one held shard's share of one selection pilot."""
-    from threadpoolctl import threadpool_limits
 
     from ..montecarlo.runner.part_map import staged_part_result
     from ..montecarlo.runner.shard_scoring import scoring_scope
 
-    with threadpool_limits(limits=1), scoring_scope(case):
+    with single_native_thread(), scoring_scope(case):
         return staged_part_result(fn, part, header, prefix)
 
 
@@ -251,12 +248,11 @@ def _score_stage(plan, entry, shard_index):
     prior = store.reference(material, key)
     if prior is not None:
         return asdict(prior)
-    from threadpoolctl import threadpool_limits
 
     from ..montecarlo.runner.shard_scoring import score_history_shard, scoring_scope
 
     rows = _load_one(store, material, entry["shard_keys"][shard_index])
-    with threadpool_limits(limits=1), scoring_scope(case):
+    with single_native_thread(), scoring_scope(case):
         partial = score_history_shard(case, rows, frozen)
     return asdict(store.publish(material, key, partial))
 
@@ -277,11 +273,9 @@ def _merge_stage(run_dir: str, case_index: int) -> dict[str, Any]:
             if prior is None:
                 raise
         if prior is None:
-            from threadpoolctl import threadpool_limits
-
             from ..montecarlo.runner.shard_scoring import merge_shard_spectra, scoring_scope
 
-            with threadpool_limits(limits=1), scoring_scope(case):
+            with single_native_thread(), scoring_scope(case):
                 out = merge_shard_spectra(case, frozen, partials)
             prior = CaseArtifactStore(plan["artifact_root"]).publish(
                 material, entry["content_key"], out
@@ -319,8 +313,6 @@ def _worker_join_case(run_dir: str, case_index: int, *_shards: Any) -> dict[str,
     material = entry["case"]["crystal"]
     prior = cases.reference(material, entry["content_key"])
     if prior is None:
-        from threadpoolctl import threadpool_limits
-
         from ..montecarlo.runner.history_shards import run_case_from_shards
 
         try:
@@ -331,7 +323,7 @@ def _worker_join_case(run_dir: str, case_index: int, *_shards: Any) -> dict[str,
             if prior is None:
                 raise
         if prior is None:
-            with threadpool_limits(limits=1):
+            with single_native_thread():
                 out = run_case_from_shards(
                     entry["case"], rows, transport_core=plan["transport_core"]
                 )
