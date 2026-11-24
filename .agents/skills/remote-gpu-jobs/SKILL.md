@@ -11,8 +11,9 @@ Never run heavy sweep locally; WSL multiprocessing can OOM/crash.
 
 Run before every submission; most failed remote runs were stale state.
 
-1. Checkpoint first: with push authority, `ship checkpoint` so a session limit
-   cannot strand the code behind a running job.
+1. Checkpoint first: with push authority, commit, push and open a draft PR
+   (or ask the user to run Claude Code's `/ship`) so a session limit cannot
+   strand the code behind a running job.
 2. Code identity: commit the code under test and record `git rev-parse HEAD`
    in the job name or log. Sync ships the working tree, so run from a clean
    tree. `pyrite remote sync` skips `tests/`; for remote pytest, also

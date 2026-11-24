@@ -187,7 +187,9 @@ Do not add separate tutorial provenance manifests or HTML/session exports.
   `.agents/hooks/guard_bash.sh` blocks these and non-lease force pushes.
 - Ship in checkpoints: with push authority, commit, push and open a draft PR
   before any remote/GPU job or long check, so a session limit strands only
-  evidence. `ship` owns the verify → rebase → push → PR → issue sequence.
+  evidence. Before pushing, verify, rebase onto `main`, and check remote/PR
+  state; record progress in the issue. In Claude Code, `/ship` does this
+  publishing (see Task dispatch).
 - Remote runs start with the `remote-gpu-jobs` pre-flight (synced SHA, node
   state, `uv` on PATH, explicit catalog env). Record job IDs in the issue's
   `## Progress` section instead of blocking on them.
@@ -209,10 +211,12 @@ Do not add separate tutorial provenance manifests or HTML/session exports.
   normal checklist slices, or `lead-task` for complex/integrating ownership.
   It also owns landed teardown: close the issue, promote durable content, hand
   worktree/ref removal to `repo-cleanup`.
-- Use `ship` (`/ship [checkpoint|final]`) to publish a task branch: verify,
-  rebase onto `main`, check remote/PR state, push, open or update the PR, and
-  record progress in the issue. Direct invocation grants push/PR/issue-writer
-  for the current issue branch only.
+- Claude Code's built-in `/ship` publishes a branch: it commits and pushes,
+  opens a PR if the branch has none, reviews it and fixes real problems, then
+  watches CI, conflicts and review comments until the PR is merged or closed.
+  It never merges. Only the user can start it; an agent asked to ship tells
+  the user to type `/ship`. The user starting it grants push/PR for the
+  current branch only. Other agents publish by hand (see "Ship in checkpoints").
 - Example model tiers: Haiku/Luna → lite; Sonnet/Terra → normal;
   Opus/Sol/Fable/K3 → lead. Risk and scope override model label.
 - Use `repo-cleanup` for git hygiene. It fans cheap subagents out per item to
