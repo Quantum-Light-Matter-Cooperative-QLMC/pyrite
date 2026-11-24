@@ -232,18 +232,12 @@ def _corrected_tables(radiator, hkls, composition, tables, floor_keV):
         _warn_untabled(untabled)
     # Elements share each node's kernel interpolation and resonance gathers.
     tabled = [(tables[el], el, n, weights[el]) for el, n in composition if el in tables]
-    results = dict(
-        zip(
-            (el for _, el, _, _ in tabled),
-            _lattice_share_tables(tabled, kernel, g, T_floor_keV=floor_keV),
-            strict=True,
-        )
-    )
+    results = iter(_lattice_share_tables(tabled, kernel, g, T_floor_keV=floor_keV))
     for element, _ in composition:
         if element not in tables:
             elements.append(dict(element=element, corrected=False, reason="no BremsLib table"))
             continue
-        out[element], info = results[element]
+        out[element], info = next(results)  # in composition order, one per entry
         elements.append(
             dict(
                 element=element,

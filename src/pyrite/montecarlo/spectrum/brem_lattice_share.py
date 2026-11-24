@@ -306,7 +306,7 @@ def _kernel_at_T(
     return total * shape
 
 
-def _share_profiles(kernel, g, T_keV, k):
+def _share_profiles(kernel, g, T_keV, k, used=None):
     """Per-reflection share density at unit weight, ``(rows, D)``, or ``None``.
 
     ``rows`` indexes the ``g`` inside the kernel's ``|g|`` range and ``D`` is
@@ -314,9 +314,13 @@ def _share_profiles(kernel, g, T_keV, k):
     only through :func:`_share_from_profiles`, so elements sharing a node
     reuse one profile. Every ``g`` row is computed on its own: a row equals
     the one a smaller set of ``g`` would give. ``None`` outside the kernel's
-    ``T`` range or with no ``g`` in range.
+    ``T`` range or with no ``g`` in range. ``used`` (a mask over ``g``) skips
+    rows no weight set uses.
+
+    Validation: brem-lattice-coherent-fraction
     """
-    rows = np.flatnonzero((g >= kernel.g_invang[0]) & (g <= kernel.g_invang[-1]))
+    in_range = (g >= kernel.g_invang[0]) & (g <= kernel.g_invang[-1])
+    rows = np.flatnonzero(in_range if used is None else in_range & used)
     if rows.size == 0:
         return None
     g = g[rows]
@@ -376,7 +380,8 @@ def lattice_share_density(kernel, g, weights, T_keV, k_eV):
     k = np.atleast_1d(np.asarray(k_eV, dtype=float))
     g = np.asarray(g, dtype=float)
     weights = np.asarray(weights, dtype=float)
-    profiles = _share_profiles(kernel, g, T_keV, k) if (weights > 0).any() else None
+    used = weights > 0
+    profiles = _share_profiles(kernel, g, T_keV, k, used) if used.any() else None
     return _share_from_profiles(profiles, weights, (kernel.theta_deg.size, k.size))
 
 
@@ -449,7 +454,10 @@ def _lattice_share_tables(entries, kernel, g, *, T_floor_keV: float = 0.0):
 
 
 def _corrected_group(entries, kernel, g, T_floor_keV):
-    """Corrected tables of entries sharing one node grid (see :func:`_lattice_share_tables`)."""
+    """Corrected tables of entries sharing one node grid (see :func:`_lattice_share_tables`).
+
+    Validation: brem-lattice-coherent-fraction
+    """
     first = entries[0][0]
     T = np.asarray(first.incident_energy_keV, dtype=float)
     kap = np.asarray(first.nominal_reduced_energy, dtype=float)
@@ -459,14 +467,14 @@ def _corrected_group(entries, kernel, g, T_floor_keV):
     weights = [np.asarray(w, dtype=float) for *_, w in entries]
     norms = [float(n) * float(table.atomic_number) ** 2 for table, _, n, _ in entries]
     shape = (kernel.theta_deg.size, kap.size)
-    wanted = any((w > 0).any() for w in weights)
+    used = np.logical_or.reduce([w > 0 for w in weights])
     for i, Ti in enumerate(T):
         if not lo <= Ti <= hi:
             continue
         kr = kap.copy()
         kr[-1] = float(first.top_reduced_energy[i])
         k = kr * Ti * 1e3
-        profiles = _share_profiles(kernel, g, Ti, k) if wanted else None
+        profiles = _share_profiles(kernel, g, Ti, k, used) if used.any() else None
         for d, w, norm in zip(ddcs, weights, norms, strict=True):
             S = _share_from_profiles(profiles, w, shape)  # (Th_kernel, K)
             delta = _MB_PER_ANG2 * k[None, :] * S / norm
