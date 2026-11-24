@@ -871,10 +871,17 @@ def _staged_parts(parts, header, prefix):
     Each block carries ``header``'s population ``Ne`` (as the merged population
     would) before the prefix cut, and blocks the cut leaves empty are skipped;
     a population with no prefix row yields one empty block, so a sum is never
-    empty.
+    empty. Oversized held blocks are subdivided on the host using the scorer's
+    device-headroom budget before staging (#1416). Consumers must release each
+    yielded device block before requesting the next one.
     """
     from . import _segments_on_device
-    from .electron_blocks import electron_prefix
+    from .electron_blocks import (
+        device_headroom_bytes,
+        electron_block_count,
+        electron_prefix,
+        iter_electron_blocks,
+    )
 
     staged = 0
     empty = None
@@ -886,7 +893,11 @@ def _staged_parts(parts, header, prefix):
             empty = segments if empty is None else empty
             continue
         staged += 1
-        yield _segments_on_device(segments)
+        # A transport block (or the whole short population) need not fit a
+        # selection scorer's row setup. Partition on the host before uploading.
+        count = electron_block_count(int(segments["L_ang"].shape[0]), device_headroom_bytes())
+        for block in iter_electron_blocks(segments, count):
+            yield _segments_on_device(block)
     if not staged:
         yield _segments_on_device({**header, **(empty or {})})
 
@@ -901,6 +912,7 @@ def _summed_parts(score, batch, parts):
     for segments in parts():
         values = score(replace(batch, segments=segments)).values
         total = values if total is None else total + values
+        del segments  # release device rows before the generator uploads its next block
     return total
 
 
@@ -930,6 +942,7 @@ def _band_evaluator(emission, source, norm, *, parts=None):
             v, m = score_one(replace(source, segments=segments), pilot, axis, band)
             values = v if values is None else values + v
             mass += m
+            del segments
         return values, mass
 
     def score_one(source, pilot, axis, band):

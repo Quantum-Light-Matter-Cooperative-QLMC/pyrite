@@ -21,6 +21,77 @@ from tests.montecarlo.runner.test_reflection_selection_spectrum import SELECTION
 SPECTRA = ("spec", "spec_characteristic", "brem_wide", "brem")
 
 
+@pytest.mark.parametrize("route", ["spectrum", "mass", "continuum"])
+def test_selection_releases_each_staged_block_before_uploading_next(monkeypatch, route):
+    """Many held blocks use one device row buffer, independent of prefix size (#1416)."""
+    import weakref
+    from types import SimpleNamespace
+
+    from pyrite.montecarlo.runner.emission_adapters import EmissionBatch
+    from pyrite.montecarlo.runner.lattice_share import SelectionContinuum
+
+    refs = []
+
+    def upload(segments):
+        assert not any(ref() is not None for ref in refs), "previous device block is still live"
+        out = {**segments, "L_ang": segments["L_ang"].copy()}
+        refs.append(weakref.ref(out["L_ang"]))
+        return out
+
+    monkeypatch.setattr(runner, "_segments_on_device", upload)
+    blocks = [dict(L_ang=np.ones(4), elec_id=np.full(4, i), Ne=64) for i in range(64)]
+
+    def parts():
+        return reflection_cutoff._staged_parts(lambda: iter(blocks), {"Ne": 64}, None)
+
+    batch = EmissionBatch({}, np.array([1000.0, 2000.0]), {}, None, None, None)
+
+    def score(batch, _key=None):
+        if batch.truncation_audit is not None:
+            batch.truncation_audit["band_mass"] = float(batch.segments["L_ang"].sum())
+        return SimpleNamespace(values=np.full(2, batch.segments["L_ang"].sum()))
+
+    if route == "spectrum":
+        values = reflection_cutoff._summed_parts(score, batch, parts)
+    elif route == "mass":
+        emission = SimpleNamespace(cxr=SimpleNamespace(evaluate=score))
+        evaluate = reflection_cutoff._band_evaluator(emission, batch, 64, parts=parts)
+        values, mass = evaluate({}, batch.energy_eV, (1000.0, 2000.0))
+        assert mass == 4.0
+    else:
+        monkeypatch.setattr(
+            "pyrite.montecarlo.runner.case_tables._case_bremslib_tables", lambda _: None
+        )
+        monkeypatch.setattr(
+            "pyrite.montecarlo.runner.emission._layer_brem_from_segments",
+            lambda segments, grid, *a, **kw: np.full(grid.size, segments["L_ang"].sum()),
+        )
+        continuum = SelectionContinuum({}, {}, None, None, (1000.0, 2000.0), parts=parts)
+        assert continuum._yield(None, None, False) == pytest.approx(256000.0)
+        values = np.full(2, 256.0)
+    np.testing.assert_array_equal(values, [256.0, 256.0])
+    assert len(refs) == 64 and all(ref() is None for ref in refs)
+
+
+def test_selection_splits_held_blocks_before_device_upload(monkeypatch):
+    """A host transport block may exceed the selection's available device memory (#1416)."""
+    from pyrite.montecarlo.runner import electron_blocks
+
+    monkeypatch.setattr(electron_blocks, "device_headroom_bytes", lambda: 16 * 1024)
+    uploaded = []
+
+    def upload(segments):
+        uploaded.append(segments["L_ang"].size)
+        assert uploaded[-1] <= 16, "selection staged an over-budget transport block"
+        return segments
+
+    monkeypatch.setattr(runner, "_segments_on_device", upload)
+    block = dict(L_ang=np.ones(64), elec_id=np.arange(64), Ne=64)
+    parts = reflection_cutoff._staged_parts(lambda: iter([block]), {"Ne": 64}, 48)
+    assert sum(part["L_ang"].size for part in parts) == 48
+    assert len(uploaded) == 3
+
+
 def assert_same_selection(record, expected, path="record"):
     """Equal records, floats to summation order: the streamed selection sums its
     held blocks one at a time, the retained route scores the merged prefix."""
@@ -78,6 +149,21 @@ def test_streamed_prefix_selection_matches_retained(automatic, retained, block):
             streamed[key], retained[key], rtol=1e-12, atol=1e-14 * scale, err_msg=key
         )
     assert streamed["n_segments"] == retained["n_segments"]
+
+
+@pytest.mark.slow
+def test_selection_subdivided_for_device_headroom_matches_retained(
+    automatic, retained, monkeypatch
+):
+    """Force whole-electron subblocks inside a held transport block (#1416)."""
+    from pyrite.montecarlo.runner import electron_blocks
+
+    monkeypatch.setattr(electron_blocks, "device_headroom_bytes", lambda: 1024)
+    streamed = run_case_streamed(automatic, 3, transport_core="per-electron")
+    assert_same_selection(streamed["reflection_selection"], retained["reflection_selection"])
+    for key in SPECTRA:
+        scale = np.abs(retained[key]).max()
+        np.testing.assert_allclose(streamed[key], retained[key], rtol=1e-12, atol=1e-14 * scale)
 
 
 @pytest.mark.parametrize("block", [1, 3])
